@@ -1421,19 +1421,16 @@ SmallVector<int64_t, 4> TensorUpdateOp::getTiedResultOperandIndices() {
 // Returns the offsets, sizes and strides to use when combining two operations
 // that implement the `OffsetSizeAndStrideOpInterface`.
 LogicalResult foldOffsetsSizesAndStrides(
-    OpBuilder &builder, Location loc, OffsetSizeAndStrideOpInterface producer,
-    OffsetSizeAndStrideOpInterface consumer,
+    OpBuilder &builder, Location loc, ArrayRef<OpFoldResult> producerOffsets,
+    ArrayRef<OpFoldResult> producerSizes,
+    ArrayRef<OpFoldResult> producerStrides,
     const llvm::SmallBitVector &droppedProducerDims,
+    ArrayRef<OpFoldResult> consumerOffsets,
+    ArrayRef<OpFoldResult> consumerSizes,
+    ArrayRef<OpFoldResult> consumerStrides,
     SmallVector<OpFoldResult> &combinedOffsets,
     SmallVector<OpFoldResult> &combinedSizes,
     SmallVector<OpFoldResult> &combinedStrides) {
-  SmallVector<OpFoldResult> consumerOffsets = consumer.getMixedOffsets();
-  SmallVector<OpFoldResult> consumerSizes = consumer.getMixedSizes();
-  SmallVector<OpFoldResult> consumerStrides = consumer.getMixedStrides();
-  SmallVector<OpFoldResult> producerOffsets = producer.getMixedOffsets();
-  SmallVector<OpFoldResult> producerSizes = producer.getMixedSizes();
-  SmallVector<OpFoldResult> producerStrides = producer.getMixedStrides();
-
   combinedOffsets.resize(producerOffsets.size());
   combinedSizes.resize(producerOffsets.size());
   combinedStrides.resize(producerOffsets.size());
@@ -1465,6 +1462,24 @@ LogicalResult foldOffsetsSizesAndStrides(
     consumerPos++;
   }
   return success();
+}
+LogicalResult foldOffsetsSizesAndStrides(
+    OpBuilder &builder, Location loc, OffsetSizeAndStrideOpInterface producer,
+    OffsetSizeAndStrideOpInterface consumer,
+    const llvm::SmallBitVector &droppedProducerDims,
+    SmallVector<OpFoldResult> &combinedOffsets,
+    SmallVector<OpFoldResult> &combinedSizes,
+    SmallVector<OpFoldResult> &combinedStrides) {
+  SmallVector<OpFoldResult> consumerOffsets = consumer.getMixedOffsets();
+  SmallVector<OpFoldResult> consumerSizes = consumer.getMixedSizes();
+  SmallVector<OpFoldResult> consumerStrides = consumer.getMixedStrides();
+  SmallVector<OpFoldResult> producerOffsets = producer.getMixedOffsets();
+  SmallVector<OpFoldResult> producerSizes = producer.getMixedSizes();
+  SmallVector<OpFoldResult> producerStrides = producer.getMixedStrides();
+  return foldOffsetsSizesAndStrides(
+      builder, loc, producerOffsets, producerSizes, producerStrides,
+      droppedProducerDims, consumerOffsets, consumerSizes, consumerStrides,
+      combinedOffsets, combinedSizes, combinedStrides);
 }
 
 /// Pattern to fold `flow.dispatch.tensor.load` -> `tensor.extract_slice`.

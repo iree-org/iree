@@ -79,12 +79,12 @@ hal.executable private @matmul_tensors {
 //  CHECK-DAG:   %[[LB_Y:.+]] = affine.apply #[[MAP1]]()[%[[WG_ID_Y]]]
 //  CHECK-DAG:   %[[STEP_Y:.+]] = affine.apply #[[MAP1]]()[%[[WG_COUNT_Y]]]
 //      CHECK:   scf.for %[[IV0:.+]] = %[[LB_Y]] to %[[M]] step %[[STEP_Y]]
+//  CHECK-DAG:     %[[TILESIZE_M:.+]] = affine.min #[[MAP2]](%[[IV0]])[%[[M]]]
 //  CHECK-DAG:     %[[LB_X:.+]] = affine.apply #[[MAP1]]()[%[[WG_ID_X]]]
 //  CHECK-DAG:     %[[STEP_X:.+]] = affine.apply #[[MAP1]]()[%[[WG_COUNT_X]]]
 //      CHECK:     scf.for %[[IV1:.+]] = %[[LB_X]] to %[[N]] step %[[STEP_X]]
-//  CHECK-DAG:       %[[TILESIZE_M:.+]] = affine.min #[[MAP2]](%[[IV0]])[%[[M]]]
-//  CHECK-DAG:       %[[LHS:.+]] = flow.dispatch.tensor.load %[[LHS_BINDING]], offsets = [%[[IV0]], 0], sizes = [%[[TILESIZE_M]], %[[K]]]
 //  CHECK-DAG:       %[[TILESIZE_N:.+]] = affine.min #[[MAP2]](%[[IV1]])[%[[N]]]
+//  CHECK-DAG:       %[[LHS:.+]] = flow.dispatch.tensor.load %[[LHS_BINDING]], offsets = [%[[IV0]], 0], sizes = [%[[TILESIZE_M]], %[[K]]]
 //  CHECK-DAG:       %[[RHS:.+]] = flow.dispatch.tensor.load %[[RHS_BINDING]], offsets = [0, %[[IV1]]], sizes = [%[[K]], %[[TILESIZE_N]]]
 //  CHECK-DAG:       %[[INIT:.+]] = flow.dispatch.tensor.load %[[INIT_BINDING]], offsets = [%[[IV0]], %[[IV1]]], sizes = [%[[TILESIZE_M]], %[[TILESIZE_N]]]
 //      CHECK:       %[[GEMM:.+]] = linalg.matmul
@@ -463,10 +463,10 @@ hal.executable public @copy_op {
 //  CHECK-DAG:   %[[LB_Y:.+]] = affine.apply #[[MAP1]]()[%[[WG_ID_Y]]]
 //  CHECK-DAG:   %[[STEP_Y:.+]] = affine.apply #[[MAP1]]()[%[[WG_COUNT_Y]]]
 //      CHECK:   scf.for %[[IV0:.+]] = %[[LB_Y]] to %[[SLICE_SIZE_Y]] step %[[STEP_Y]]
+//  CHECK-DAG      %[[TILESIZE_Y:.+]] = affine.min #[[MAP2]](%[[IV0]])[%[[SLICE_SIZE_Y]]]
 //  CHECK-DAG:     %[[LB_X:.+]] = affine.apply #[[MAP1]]()[%[[WG_ID_X]]]
 //  CHECK-DAG:     %[[STEP_X:.+]] = affine.apply #[[MAP1]]()[%[[WG_COUNT_X]]]
 //      CHECK:     scf.for %[[IV1:.+]] = %[[LB_X]] to %[[SLICE_SIZE_X]] step %[[STEP_X]]
-//  CHECK-DAG:       %[[TILESIZE_Y:.+]] = affine.min #[[MAP2]](%[[IV0]])[%[[SLICE_SIZE_Y]]]
 //  CHECK-DAG:       %[[TILESIZE_X:.+]] = affine.min #[[MAP2]](%[[IV1]])[%[[SLICE_SIZE_X]]]
 //  CHECK-DAG:       %[[SOURCE_SUBVIEW:.+]] = memref.subview %[[SOURCE]][%[[IV0]], %[[IV1]]]
 //  CHECK-DAG:       %[[DEST_SUBVIEW:.+]] = memref.subview %[[DEST]][%[[IV0]], %[[IV1]]]
@@ -584,9 +584,11 @@ hal.executable private @static_3d_fft_stage3 {
 //      CHECK:     scf.for %[[IV1:.+]] =
 //      CHECK:       scf.for %[[IV2:.+]] =
 //  CHECK-DAG:         %[[SUBVIEW1:.+]] = memref.subview %{{.+}}[%[[IV0]], %[[IV1]], %[[IV2]]]
+//  CHECK-DAG:         %[[CAST1:.+]] = memref.cast %[[SUBVIEW1]]
 //  CHECK-DAG:         %[[SUBVIEW2:.+]] = memref.subview %{{.+}}[%[[IV0]], %[[IV1]], %[[IV2]]]
+//  CHECK-DAG:         %[[CAST2:.+]] = memref.cast %[[SUBVIEW2]]
 //      CHECK:         iree_linalg_ext.fft
-// CHECK-SAME:             outs(%[[SUBVIEW1]], %[[SUBVIEW2]] :
+// CHECK-SAME:             outs(%[[CAST1]], %[[CAST2]] :
 
 // -----
 

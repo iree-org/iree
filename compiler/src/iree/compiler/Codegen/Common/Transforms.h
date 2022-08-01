@@ -5,15 +5,15 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 
 namespace mlir {
 namespace iree_compiler {
 
-/// Expose the implementation of the set num workgroups pass as a free function
-/// because passes are surprisingly hard to apply reliably when they need to
-/// anchor on special (i.e. non-Module) ops.
-LogicalResult setNumWorkgroupsImpl(IREE::HAL::ExecutableVariantOp variantOp,
-                                   ArrayRef<int64_t> workloadPerWorkgroup);
+/// Populate patterns related to tile and distribute to workgroups.
+void populateTileAndDistributeToWorkgroupsPatterns(
+    RewritePatternSet &patterns, linalg::LinalgTilingOptions options,
+    linalg::LinalgTransformationFilter filter);
 
 }  // namespace iree_compiler
 }  // namespace mlir

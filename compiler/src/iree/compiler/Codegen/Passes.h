@@ -117,11 +117,6 @@ createTestPartitionableLoopsInterfacePass();
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createTileAndDistributeToWorkgroupsPass();
 
-/// Pass to rewrite Linalg destructive updates, see DestructiveUpdateUtils.h for
-/// more details.
-std::unique_ptr<OperationPass<func::FuncOp>>
-createRewriteLinalgDestructiveUpdatesPass();
-
 /// Pass to propagate type to avoid generating load/stores of illegal types.
 std::unique_ptr<OperationPass<func::FuncOp>> createTypePropagationPass();
 

@@ -33,6 +33,7 @@ iree_cc_library(
     MLIRAffineUtils
     MLIRArithmeticDialect
     MLIRArithmeticTransforms
+    MLIRArithmeticUtils
     MLIRAsyncDialect
     MLIRBufferizationDialect
     MLIRBufferizationTransforms
@@ -71,7 +72,6 @@ iree_cc_library(
     Common
   HDRS
     "BufferizationAnalysis.h"
-    "DestructiveUpdateUtils.h"
     "Transforms.h"
   SRCS
     "BufferizationAnalysis.cpp"
@@ -79,7 +79,6 @@ iree_cc_library(
     "CleanupBufferAllocViewPass.cpp"
     "ConvertToDestinationPassingStylePass.cpp"
     "DecomposeLinalgGeneric.cpp"
-    "DestructiveUpdateUtils.cpp"
     "FlattenMemRefSubspanPass.cpp"
     "FoldAffineMinInDistributedLoops.cpp"
     "FoldTensorExtractOpPass.cpp"
@@ -92,9 +91,9 @@ iree_cc_library(
     "PadDynamicAlloc.cpp"
     "PolynomialApproximationPass.cpp"
     "RemoveTrivialLoops.cpp"
-    "RewriteLinalgDestructiveUpdatesPass.cpp"
     "TestPartitionableLoopsInterface.cpp"
     "TileAndDistributeToWorkgroupsPass.cpp"
+    "TileDispatchUsingInterface.cpp"
     "TypePropagationPass.cpp"
     "VectorizeConv.cpp"
     "WorkGroupSwizzle.cpp"
@@ -109,6 +108,7 @@ iree_cc_library(
     MLIRAnalysis
     MLIRArithmeticDialect
     MLIRArithmeticTransforms
+    MLIRArithmeticUtils
     MLIRBufferizationDialect
     MLIRBufferizationTransforms
     MLIRFuncDialect
@@ -127,9 +127,11 @@ iree_cc_library(
     MLIRSCFDialect
     MLIRSCFToControlFlow
     MLIRSCFTransforms
+    MLIRSCFUtils
     MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTensorDialect
+    MLIRTensorTransforms
     MLIRTilingInterface
     MLIRTransforms
     MLIRVectorDialect

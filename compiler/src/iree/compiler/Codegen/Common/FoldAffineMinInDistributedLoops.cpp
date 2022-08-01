@@ -79,8 +79,6 @@ struct FoldAffineMinOverDistributedLoopInductionVariable final
 
   LogicalResult matchAndRewrite(AffineMinOp minOp,
                                 PatternRewriter &rewriter) const override {
-    Location loc = minOp.getLoc();
-
     auto loopMatcher = [&](Value iv, OpFoldResult &lb, OpFoldResult &ub,
                            OpFoldResult &step) {
       scf::ForOp forOp = scf::getForInductionVarOwner(iv);
@@ -97,8 +95,8 @@ struct FoldAffineMinOverDistributedLoopInductionVariable final
       // ..and we tile according to some static tile sizes for processors.
       if (!loopInfo->tileSize) return failure();
 
-      lb = getAsValue(loopInfo->untiledLowerBound, rewriter, loc);
-      ub = getAsValue(loopInfo->untiledUpperBound, rewriter, loc);
+      lb = loopInfo->untiledLowerBound;
+      ub = loopInfo->untiledUpperBound;
       // The "step" expected by the upstream utility is really the tiling size.
       step =
           OpBuilder(iv.getContext()).getIndexAttr(loopInfo->tileSize.value());
