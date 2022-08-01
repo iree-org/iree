@@ -158,6 +158,9 @@ jobs:
         with:
           submodules: true
       - name: "Building with Bazel"
+        env:
+          # Don't swap the condition! 0 is falsey and then it would always be 1
+          IREE_BAZEL_WRITE_REMOTE_CACHE: ${{ github.event_name != 'pull_request' && 1 || 0 }}
         # This doesn't really need everything in the frontends image, but we
         # want the cache to be shared with the integrations build (no point
         # building LLVM twice) and the cache key is the docker container it's
@@ -194,6 +197,8 @@ jobs:
         id: build
         env:
           IREE_TF_BINARIES_OUTPUT_DIR: iree-tf-binaries
+          # Don't swap the condition! 0 is falsey and then it would always be 1
+          IREE_BAZEL_WRITE_REMOTE_CACHE: ${{ github.event_name != 'pull_request' && 1 || 0 }}
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "IREE_TF_BINARIES_OUTPUT_DIR=$(realpath "${IREE_TF_BINARIES_OUTPUT_DIR}")" \

@@ -20,7 +20,16 @@
 #   See https://docs.bazel.build/versions/master/command-line-reference.html#flag--test_tag_filters)
 #   Default: If IREE_VULKAN_DISABLE=1, "-nokokoro,-driver=vulkan". Else "-nokokoro".
 
-set -exuo pipefail
+set -xeuo pipefail
+
+
+IREE_BAZEL_READ_REMOTE_CACHE="${IREE_BAZEL_READ_REMOTE_CACHE:-1}"
+IREE_BAZEL_WRITE_REMOTE_CACHE="${IREE_BAZEL_WRITE_REMOTE_CACHE:-0}"
+BAZEL_BIN="${BAZEL_BIN:-$(which bazel)}"
+
+if (( ${IREE_BAZEL_WRITE_REMOTE_CACHE} == 1 && ${IREE_BAZEL_READ_REMOTE_CACHE} != 1 )); then
+  echo "Can't have 'IREE_BAZEL_WRITE_REMOTE_CACHE' (${IREE_BAZEL_WRITE_REMOTE_CACHE}) set without 'IREE_BAZEL_READ_REMOTE_CACHE' (${IREE_BAZEL_READ_REMOTE_CACHE})"
+fi
 
 # Use user-environment variables if set, otherwise use CI-friendly defaults.
 if ! [[ -v IREE_VULKAN_DISABLE ]]; then
@@ -64,8 +73,7 @@ if ! [[ -v TEST_TAG_FILTERS ]]; then
   TEST_TAG_FILTERS="$(IFS="," ; echo "${default_test_tag_filters[*]?}")"
 fi
 
-# Build and test everything in supported directories not excluded by the tag
-# filters.
+# Build and test everything in the main workspace (not integrations).
 # Note that somewhat contrary to its name `bazel test` will also build
 # any non-test targets specified.
 # We use `bazel query //...` piped to `bazel test` rather than the simpler
@@ -77,21 +85,37 @@ fi
 # xargs is set to high arg limits to avoid multiple Bazel invocations and will
 # hard fail if the limits are exceeded.
 # See https://github.com/bazelbuild/bazel/issues/12479
-bazel \
-  --noworkspace_rc \
-  --bazelrc=build_tools/bazel/iree.bazelrc \
-  query //... | \
-      xargs --max-args 1000000 --max-chars 1000000 --exit \
-        bazel \
-          --noworkspace_rc \
-          --bazelrc=build_tools/bazel/iree.bazelrc \
-            test \
-              --color=yes \
-              ${test_env_args[@]} \
-              --config=generic_clang \
-              --build_tag_filters="${BUILD_TAG_FILTERS?}" \
-              --test_tag_filters="${TEST_TAG_FILTERS?}" \
-              --keep_going \
-              --test_output=errors \
-              --config=rs \
-              --config=remote_cache_bazel_ci
+
+declare -a BAZEL_STARTUP_CMD=(
+  "${BAZEL_BIN}"
+  --noworkspace_rc
+  --bazelrc=build_tools/bazel/iree.bazelrc
+)
+
+declare -a BAZEL_TEST_CMD=(
+  "${BAZEL_STARTUP_CMD[@]}"
+  test
+)
+
+if (( IREE_BAZEL_READ_REMOTE_CACHE == 1 )); then
+  BAZEL_TEST_CMD+=(--config=remote_cache_bazel_ci)
+fi
+
+if (( IREE_BAZEL_WRITE_REMOTE_CACHE != 1 )); then
+  BAZEL_TEST_CMD+=(--noremote_upload_local_results)
+fi
+
+BAZEL_TEST_CMD+=(
+  --color=yes
+  "${test_env_args[@]}"
+  --build_tag_filters="${BUILD_TAG_FILTERS?}"
+  --test_tag_filters="${TEST_TAG_FILTERS?}"
+  --keep_going
+  --test_output=errors
+  --config=rs
+  --config=generic_clang
+)
+
+"${BAZEL_STARTUP_CMD[@]}" query //... | \
+  xargs --max-args 1000000 --max-chars 1000000 --exit \
+    "${BAZEL_TEST_CMD[@]}"
