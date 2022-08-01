@@ -72,4 +72,4 @@ generate_llvm_cpu_vmfb tosa-rvv \
   -o "${BUILD_RISCV_DIR}/person_detect_rvv.vmfb"
 
 ${PYTHON_BIN} "${ROOT_DIR}/third_party/llvm-project/llvm/utils/lit/lit.py" \
-  -v --path "${LLVM_BIN_DIR}" ${ROOT_DIR}/tests/riscv64"
+  -v --path "${LLVM_BIN_DIR}" "${ROOT_DIR}/tests/riscv64"
