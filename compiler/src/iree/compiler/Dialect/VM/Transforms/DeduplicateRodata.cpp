@@ -50,7 +50,7 @@ class DeduplicateRodataPass
                                 "cannot perform deduplication";
         return signalPassFailure();
       }
-      RodataKey key = std::make_tuple(rodataOp.getMimeType().getValueOr(""),
+      RodataKey key = std::make_tuple(rodataOp.getMimeType().value_or(""),
                                       rodataOp.getValue());
       auto &bucketOps = bucketedOps[key];
       bucketOps.push_back(rodataOp);
@@ -66,7 +66,7 @@ class DeduplicateRodataPass
       uint64_t alignment = 0;
       for (auto rodataOp : bucketOps) {
         locs.push_back(rodataOp.getLoc());
-        alignment = std::max(alignment, rodataOp.getAlignment().getValueOr(0));
+        alignment = std::max(alignment, rodataOp.getAlignment().value_or(0));
       }
       auto fusedLoc = FusedLoc::get(moduleOp.getContext(), locs);
 

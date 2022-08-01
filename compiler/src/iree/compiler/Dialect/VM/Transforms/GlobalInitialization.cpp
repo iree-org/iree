@@ -247,7 +247,7 @@ class GlobalInitializationPass
   LogicalResult appendPrimitiveInitialization(VMGlobalOp globalOp,
                                               OpBuilder &builder) {
     auto initialValue =
-        globalOp.getInitialValueUntyped().getValueOr<Attribute>({});
+        globalOp.getInitialValueUntyped().value_or<Attribute>({});
     Value value = {};
     if (initialValue) {
       LogicalResult constResult = success();

@@ -70,7 +70,7 @@ class SerializeTargetExecutablesPass
     // serialization.
     TargetBackend::SerializationOptions serializationOptions;
     serializationOptions.dumpBaseName =
-        (moduleOp.getName().getValueOr("module") + "_" + executableOp.getName())
+        (moduleOp.getName().value_or("module") + "_" + executableOp.getName())
             .str();
     serializationOptions.dumpIntermediatesPath = dumpIntermediatesPath;
     serializationOptions.dumpBinariesPath = dumpBinariesPath;

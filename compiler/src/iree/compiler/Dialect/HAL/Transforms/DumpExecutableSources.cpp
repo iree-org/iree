@@ -51,7 +51,7 @@ class DumpExecutableSourcesPass
 
   void runOnOperation() override {
     auto moduleOp = getOperation();
-    auto moduleName = moduleOp.getName().getValueOr("module");
+    auto moduleName = moduleOp.getName().value_or("module");
 
     // Help people out and mkdir if needed.
     if (!path.empty() && path != "-") {

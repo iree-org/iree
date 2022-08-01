@@ -320,7 +320,7 @@ class LLVMCPUTargetBackend final : public TargetBackend {
       // memory. We fetch that value here and plumb it through so the runtime
       // knows how much memory to reserve and pass in.
       int64_t localMemorySize = exportOp.getWorkgroupLocalMemory()
-                                    .getValueOr(APInt(64, 0))
+                                    .value_or(APInt(64, 0))
                                     .getSExtValue();
 
       libraryBuilder.addExport(exportOp.getName(), "",
