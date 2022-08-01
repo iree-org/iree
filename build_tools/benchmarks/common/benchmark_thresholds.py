@@ -41,25 +41,27 @@ class BenchmarkThreshold:
 # match is used.
 BENCHMARK_THRESHOLDS = [
     # Fluctuating benchmarks on CPUs.
-    BenchmarkThreshold(re.compile(r"^DeepLabV3.*big-core.*CPU.* @ Pixel"), 20,
-                       ThresholdUnit.PERCENTAGE),
-    BenchmarkThreshold(
-        re.compile(r"^MobileBertSquad.*big-core.*local-sync @ Pixel-4"), 50,
-        ThresholdUnit.PERCENTAGE),
-    BenchmarkThreshold(re.compile(r"^MobileNetV2.*CPU @ Pixel"), 15,
-                       ThresholdUnit.PERCENTAGE),
-    BenchmarkThreshold(re.compile(r"^MobileNetV3Small.*local-sync @ Pixel-6"),
+    BenchmarkThreshold(re.compile(r"^DeepLabV3.*big-core.*LLVM-CPU.* @ Pixel"),
                        20, ThresholdUnit.PERCENTAGE),
     BenchmarkThreshold(
-        re.compile(r"^MobileNetV3Small.*big-core.*CPU @ Pixel-6"), 20,
+        re.compile(r"^MobileBertSquad.*big-core.*LLVM-CPU-Sync @ Pixel-4"), 50,
+        ThresholdUnit.PERCENTAGE),
+    BenchmarkThreshold(re.compile(r"^MobileNetV2.*LLVM-CPU @ Pixel"), 15,
+                       ThresholdUnit.PERCENTAGE),
+    BenchmarkThreshold(
+        re.compile(r"^MobileNetV3Small.*LLVM-CPU-Sync @ Pixel-6"), 20,
         ThresholdUnit.PERCENTAGE),
     BenchmarkThreshold(
-        re.compile(r"^MobileNetV3Small.*little-core.*CPU @ Pixel"), 20,
+        re.compile(r"^MobileNetV3Small.*big-core.*LLVM-CPU @ Pixel-6"), 20,
         ThresholdUnit.PERCENTAGE),
-    BenchmarkThreshold(re.compile(r"^MobileSSD.*little-core.*CPU.* @ Pixel-6"),
+    BenchmarkThreshold(
+        re.compile(r"^MobileNetV3Small.*little-core.*LLVM-CPU @ Pixel"), 20,
+        ThresholdUnit.PERCENTAGE),
+    BenchmarkThreshold(
+        re.compile(r"^MobileSSD.*little-core.*LLVM-CPU.* @ Pixel-6"), 20,
+        ThresholdUnit.PERCENTAGE),
+    BenchmarkThreshold(re.compile(r"^PoseNet.*big-core.*LLVM-CPU.* @ Pixel-6"),
                        20, ThresholdUnit.PERCENTAGE),
-    BenchmarkThreshold(re.compile(r"^PoseNet.*big-core.*CPU.* @ Pixel-6"), 20,
-                       ThresholdUnit.PERCENTAGE),
 
     # Fluctuating benchmarks on GPUs.
     BenchmarkThreshold(
