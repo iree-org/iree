@@ -327,9 +327,21 @@ class LLVMCPUTargetBackend final : public TargetBackend {
                                     .value_or(APInt(64, 0))
                                     .getSExtValue();
 
-      libraryBuilder.addExport(exportOp.getName(), "",
-                               LibraryBuilder::DispatchAttrs{localMemorySize},
-                               llvmFunc);
+      std::string sourceFile = "";
+      if (options_.debugSymbols && !options.dumpedSourcesPath.empty()) {
+        // TODO(scotttodd): get this path and loc from an attribute?
+        //     Right now this has to line up with DumpExecutableSourcesPass
+        SmallString<256> pathStorage;
+        llvm::sys::path::append(pathStorage, options.dumpedSourcesPath,
+                                "module_" + exportOp.getName().str() + ".mlir");
+        llvm::sys::fs::make_absolute(pathStorage);
+        (void)llvm::sys::path::remove_dots(pathStorage,
+                                           /*remove_dot_dot=*/true);
+        sourceFile = pathStorage.c_str();
+      }
+      libraryBuilder.addExport(
+          exportOp.getName(), sourceFile, /*sourceLoc=*/0, /*tag=*/"",
+          LibraryBuilder::DispatchAttrs{localMemorySize}, llvmFunc);
     }
 
     auto queryFunctionName = std::string(kQueryFunctionName);

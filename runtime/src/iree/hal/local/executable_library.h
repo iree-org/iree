@@ -408,6 +408,13 @@ typedef struct iree_hal_executable_export_table_v0_t {
   // verbose logging. The string values, when present, may be attached to
   // tracing/debugging events related to the entry point.
   const char* const* tags;
+
+  // Optional table of source files which src_locs index into, 1:1 with ptrs.
+  const char* const* src_files;
+
+  // Optional table of source location line numbers, 1:1 with ptrs.
+  // Used to map back to locations in src_file.
+  const uint32_t* src_locs;
 } iree_hal_executable_export_table_v0_t;
 
 // A table declaring the executable-level constants that can be used to

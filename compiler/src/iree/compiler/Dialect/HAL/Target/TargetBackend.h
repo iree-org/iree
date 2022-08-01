@@ -216,6 +216,8 @@ class TargetBackend {
     std::string dumpIntermediatesPath;
     // Optional path to write serialized binary results into.
     std::string dumpBinariesPath;
+    // Optional path that executable sources were already written to.
+    std::string dumpedSourcesPath;
   };
 
   // Serializes the given |variantOp| executable produced by this backend to one

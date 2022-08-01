@@ -27,7 +27,8 @@ namespace HAL {
 //
 // Usage:
 //  LibraryBuilder builder(&module);
-//  builder.addExport("hello", "", DispatchAttrs{}, &helloFunc);
+//  builder.addExport(
+//     "hello", "source.mlir", 123, "test tag", DispatchAttrs{}, &helloFunc);
 //  ...
 //  auto *queryFunc = builder.build("_query_library_foo");
 //  // call queryFunc, export it, etc
@@ -110,11 +111,13 @@ class LibraryBuilder {
   }
 
   // Defines a new entry point on the library implemented by |func|.
-  // |name| will be used as the library export and an optional |tag| will be
-  // attached.
-  void addExport(StringRef name, StringRef tag, DispatchAttrs attrs,
-                 llvm::Function *func) {
-    exports.push_back({name.str(), tag.str(), attrs, func});
+  // |name| will be used as the library export
+  // |sourceFile| and |sourceLoc| are optional source information
+  // |tag| is an optional attachment
+  void addExport(StringRef name, StringRef sourceFile, uint32_t sourceLoc,
+                 StringRef tag, DispatchAttrs attrs, llvm::Function *func) {
+    exports.push_back(
+        {name.str(), sourceFile.str(), sourceLoc, tag.str(), attrs, func});
   }
 
   // Builds a `iree_hal_executable_library_query_fn_t` with the given
@@ -148,6 +151,8 @@ class LibraryBuilder {
 
   struct Dispatch {
     std::string name;
+    std::string sourceFile;
+    uint32_t sourceLoc;
     std::string tag;
     DispatchAttrs attrs;
     llvm::Function *func;
