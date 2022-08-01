@@ -46,4 +46,4 @@ echo "Cross-compiling with cmake"
 ./build_tools/cmake/build_host_and_riscv.sh
 
 echo "Run sanity tests"
-./build_tools/testing/test_riscv64.sh
+./tests/riscv64/smoke.sh

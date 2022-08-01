@@ -404,7 +404,7 @@ jobs:
             --env "LLVM_BIN_DIR=${BUILD_DIR}/third_party/llvm-project/llvm/bin" \
             gcr.io/iree-oss/riscv@sha256:e566f054ff1b1d8be61459ce4789dd944b70e85c8939a4d3b7331ab519d8db4c \
             bash -c \
-              "./build_tools/cmake/build_riscv.sh && ./build_tools/testing/test_riscv64.sh"
+              "./build_tools/cmake/build_riscv.sh && ./tests/riscv64/smoke.sh"
 
 
   summary:
