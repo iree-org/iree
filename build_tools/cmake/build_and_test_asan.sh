@@ -27,7 +27,7 @@ ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
 cd "${ROOT_DIR}"
 
 CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
-BUILD_DIR="${1:-${IREE_TSAN_BUILD_DIR:-build-asan}}"
+BUILD_DIR="${1:-${IREE_ASAN_BUILD_DIR:-build-asan}}"
 IREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS:-ON}"
 IREE_ENABLE_CCACHE="${IREE_ENABLE_CCACHE:-OFF}"
 
