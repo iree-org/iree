@@ -15,8 +15,7 @@ namespace VM {
 
 void DebugDatabaseBuilder::addFunctionSourceMap(IREE::VM::FuncOp funcOp,
                                                 FunctionSourceMap sourceMap) {
-  uint64_t ordinal =
-      funcOp.getOrdinal().getValueOr(APInt(64, 0)).getZExtValue();
+  uint64_t ordinal = funcOp.getOrdinal().value_or(APInt(64, 0)).getZExtValue();
   if (functionSourceMaps.size() <= ordinal) {
     functionSourceMaps.resize(ordinal + 1);
   }

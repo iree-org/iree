@@ -3361,7 +3361,7 @@ class FailOpConversion : public OpConversionPattern<IREE::VM::FailOp> {
       releaseRefs(rewriter, loc, funcOp, *typeConverter);
 
       std::string message = std::string("\"") +
-                            op.getMessage().getValueOr("").str() +
+                            op.getMessage().value_or("").str() +
                             std::string("\"");
 
       auto messageOp = rewriter.create<emitc::CallOp>(

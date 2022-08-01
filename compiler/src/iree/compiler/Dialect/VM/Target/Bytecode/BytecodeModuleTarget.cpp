@@ -613,12 +613,12 @@ LogicalResult translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
     RodataRef rodataRef;
     rodataRef.rodataOp = rodataOp;
     rodataRef.alignment =
-        rodataOp.getAlignment().getValueOr(kDefaultRodataAlignment);
+        rodataOp.getAlignment().value_or(kDefaultRodataAlignment);
     rodataRef.totalSize = static_cast<uint64_t>(actualSize);
     if (storeExternal) {
       std::string fileName =
           (rodataOp.getName() +
-           mimeTypeToFileExtension(rodataOp.getMimeType().getValueOr("")))
+           mimeTypeToFileExtension(rodataOp.getMimeType().value_or("")))
               .str();
       rodataRef.archiveFile = archiveWriter->declareFile(
           fileName, rodataRef.alignment, rodataRef.totalSize,

@@ -410,7 +410,7 @@ class DumpExecutableBenchmarksPass
 
   void runOnOperation() override {
     auto moduleOp = getOperation();
-    auto moduleName = moduleOp.getName().getValueOr("module");
+    auto moduleName = moduleOp.getName().value_or("module");
 
     // Analyze the module to find dispatch parameters.
     // This is a full walk of all stream.cmd.dispatch ops and will handle
