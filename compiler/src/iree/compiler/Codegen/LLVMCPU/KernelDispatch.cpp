@@ -1231,10 +1231,10 @@ static LogicalResult setRootConfig(
   builder.setInsertionPoint(tiledOpInterfaceOp);
   SmallVector<Range> iterationDomain =
       tiledOpInterfaceOp.getIterationDomain(builder);
-  auto getStaticValue = [](Value v) -> int64_t {
-    IntegerAttr attr;
-    if (!matchPattern(v, m_Constant(&attr))) return ShapedType::kDynamicSize;
-    return attr.getInt();
+  auto getStaticValue = [](OpFoldResult ofr) -> int64_t {
+    Optional<int64_t> intVal = getConstantIntValue(ofr);
+    if (!intVal) return ShapedType::kDynamicSize;
+    return intVal.getValue();
   };
   auto lbs = llvm::to_vector(llvm::map_range(
       iterationDomain, [&](Range r) { return getStaticValue(r.offset); }));

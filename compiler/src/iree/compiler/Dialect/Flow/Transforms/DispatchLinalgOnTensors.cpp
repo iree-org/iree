@@ -23,6 +23,7 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arithmetic/Utils/Utils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -231,13 +232,14 @@ template <>
 SmallVector<Range> getLoopRanges<tensor::InsertSliceOp>(
     tensor::InsertSliceOp insertSliceOp, Location loc,
     PatternRewriter &rewriter) {
-  Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-  Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+  OpFoldResult zero = rewriter.getIndexAttr(0);
+  OpFoldResult one = rewriter.getIndexAttr(1);
   Value source = insertSliceOp.getSource();
   SmallVector<Range> loopRanges(insertSliceOp.getSourceType().getRank(),
                                 Range{zero, one, one});
   for (auto dim : llvm::seq<unsigned>(0, loopRanges.size())) {
-    loopRanges[dim].size = rewriter.create<tensor::DimOp>(loc, source, dim);
+    loopRanges[dim].size =
+        rewriter.create<tensor::DimOp>(loc, source, dim).getResult();
   }
   return loopRanges;
 }
@@ -266,8 +268,11 @@ static SmallVector<Value> getWorkloadForRootOp(PatternRewriter &rewriter,
   bindSymbols(rewriter.getContext(), s0, s1, s2);
   AffineMap workload = AffineMap::get(0, 3, (s1 - s0).ceilDiv(s2));
   return llvm::to_vector(llvm::map_range(loopRanges, [&](Range r) -> Value {
-    return rewriter.create<AffineApplyOp>(
-        rootOp.getLoc(), workload, ValueRange{r.offset, r.size, r.stride});
+    Value offset = getValueOrCreateConstantIndexOp(rewriter, loc, r.offset);
+    Value size = getValueOrCreateConstantIndexOp(rewriter, loc, r.size);
+    Value stride = getValueOrCreateConstantIndexOp(rewriter, loc, r.stride);
+    return rewriter.create<AffineApplyOp>(rootOp.getLoc(), workload,
+                                          ValueRange{offset, size, stride});
   }));
 }
 

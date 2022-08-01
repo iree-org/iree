@@ -13,6 +13,7 @@
 #include "iree-dialects/Dialect/LinalgExt/Passes/Transforms.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arithmetic/Utils/Utils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Math/IR/Math.h"
@@ -120,17 +121,17 @@ tileInterfaceOpImpl(OpBuilder &builder, TiledOpInterface tilableOp,
   if (isUntiledLoop(tileSizes[loopDepth])) {
     auto zeroAttr = builder.getI64IntegerAttr(0);
     offsets.push_back(zeroAttr);
-    assert(matchPattern(loopBounds[loopDepth].offset, m_Zero()) &&
-           "expected loop bounds to have lower bound of zero");
-    tileSizes[loopDepth] = getAsOpFoldResult(loopBounds[loopDepth].size);
+    tileSizes[loopDepth] = loopBounds[loopDepth].size;
     return tileInterfaceOpImpl(builder, tilableOp, outputs, tileSizes,
                                iteratorTypes, loopBounds, loopDepth + 1,
                                offsets, distributionInfo);
   }
 
   // Generate an scf.for for the current loop depth.
-  Value lb = loopBounds[loopDepth].offset;
-  Value ub = loopBounds[loopDepth].size;
+  Value lb = getValueOrCreateConstantIndexOp(builder, loc,
+                                             loopBounds[loopDepth].offset);
+  Value ub =
+      getValueOrCreateConstantIndexOp(builder, loc, loopBounds[loopDepth].size);
   // TODO(#7073): Put the check back. This is required by tiling linalg_ext.fft
   // op. We can put the check back after updating linalg_ext.fft semantics.
   // if (!matchPattern(loopBounds[loopDepth].stride, m_One())) {
