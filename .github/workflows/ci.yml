@@ -400,7 +400,7 @@ jobs:
             --env "RISCV_CONFIG=${RISCV_CONFIG}" \
             --env "BUILD_RISCV_DIR=${BUILD_RISCV_DIR}" \
             --env "IREE_HOST_BINARY_ROOT=${HOST_BINARY_ROOT}" \
-            --env "IREE_IMPORT_TFLITE_BIN=${IREE_TF_BINARIES_DIR}/iree-import-tflite" \
+            --env "IREE_IMPORT_TFLITE_BIN=${TF_BINARIES_DIR}/iree-import-tflite" \
             --env "LLVM_BIN_DIR=${BUILD_DIR}/third_party/llvm-project/llvm/bin" \
             gcr.io/iree-oss/riscv@sha256:e566f054ff1b1d8be61459ce4789dd944b70e85c8939a4d3b7331ab519d8db4c \
             bash -c \

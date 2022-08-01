@@ -32,19 +32,15 @@ export LLVM_BINDIR="${BUILD_HOST_DIR}/third_party/llvm-project/llvm/bin"
 echo "Build iree-import-tflite with Bazel"
 pushd "${ROOT_DIR}/integrations/tensorflow"
 BAZEL_CMD=(bazel --noworkspace_rc --bazelrc=build_tools/bazel/iree-tf.bazelrc)
-BAZEL_BINDIR="$(${BAZEL_CMD[@]} info bazel-bin)"
-# xargs is set to high arg limits to avoid multiple Bazel invocations and will
-# hard fail if the limits are exceeded.
-# See https://github.com/bazelbuild/bazel/issues/12479
-xargs --max-args 1000000 --max-chars 1000000 --exit \
-  "${BAZEL_CMD[@]}" build \
-    --config=remote_cache_bazel_ci \
-    --config=generic_clang \
-    --build_tag_filters="-nokokoro" \
-    //iree_tf_compiler:iree-import-tflite
+# Yes this is really the best way to get the path to a single binary
+export IREE_IMPORT_TFLITE_BIN="$(
+"${BAZEL_CMD[@]}" run --run_under=echo \
+  --config=remote_cache_bazel_ci \
+  --config=generic_clang \
+  //iree_tf_compiler:iree-import-tflite
+)"
 popd
 
-export PATH="${BAZEL_BINDIR}/iree_tf_compiler:${PATH}"
 
 echo "Cross-compiling with cmake"
 ./build_tools/cmake/build_host_and_riscv.sh
