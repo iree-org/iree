@@ -130,6 +130,25 @@ ENV PYTHON_BIN /usr/bin/python3
 
 ##############
 
+######## IREE ROCM DEPS ########
+WORKDIR /install-rocm
+ARG ROCM_VERSION=5.2.1
+ARG AMDGPU_VERSION=22.20.1
+
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates curl libnuma-dev gnupg \
+  && curl -sL https://repo.radeon.com/rocm/rocm.gpg.key | apt-key add - \
+  && printf "deb [arch=amd64] https://repo.radeon.com/rocm/apt/$ROCM_VERSION/ ubuntu main" | tee /etc/apt/sources.list.d/rocm.list \
+  && printf "deb [arch=amd64] https://repo.radeon.com/amdgpu/$AMDGPU_VERSION/ubuntu bionic main" | tee /etc/apt/sources.list.d/amdgpu.list \
+  && apt-get update \
+  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+  libelf1 \
+  kmod \
+  file \
+  rocm-dev \
+  build-essential
+WORKDIR /
+##############
+
 ######## IREE CUDA DEPS ########
 COPY fetch_cuda_deps.sh /usr/local/bin
 RUN /usr/local/bin/fetch_cuda_deps.sh /usr/local/iree_cuda_deps
@@ -177,5 +196,9 @@ RUN echo "deb http://ppa.launchpad.net/ubuntu-toolchain-r/test/ubuntu bionic mai
   && apt-get install -y gcc-9 g++-9
 
 ##############
+
+### Clean up
+RUN apt-get clean \
+  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /

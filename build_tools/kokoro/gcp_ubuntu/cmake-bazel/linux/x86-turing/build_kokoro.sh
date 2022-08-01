@@ -25,7 +25,7 @@ nvidia-smi || true
 
 "${KOKORO_ARTIFACTS_DIR?}/github/iree/build_tools/kokoro/gcp_ubuntu/docker_run.sh" \
   --gpus all \
-  gcr.io/iree-oss/frontends-nvidia@sha256:311ae679618bd248692522ea243ff73c8205725c95b6d915dea3a74dca9929ed \
+  gcr.io/iree-oss/frontends-nvidia@sha256:e934ed09e9e60c28ebe11a02f37a993dd975db40118d410c4279d0fa2d4e6b9a \
   build_tools/kokoro/gcp_ubuntu/cmake-bazel/linux/x86-turing/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the

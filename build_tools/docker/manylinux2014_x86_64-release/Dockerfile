@@ -50,3 +50,13 @@ ENV BAZEL_LINKLIBS "-lstdc++ -lm"
 # fetch/build/install exactly what is needed.
 COPY install_tbb_manylinux2014.sh /usr/local/bin
 RUN bash /usr/local/bin/install_tbb_manylinux2014.sh
+
+######## AMD ROCM #######
+ARG ROCM_VERSION=5.2.1
+ARG AMDGPU_VERSION=22.20.1
+
+# Install the ROCm rpms
+RUN yum clean all \
+  && echo -e "[ROCm]\nname=ROCm\nbaseurl=https://repo.radeon.com/rocm/yum/$ROCM_VERSION/main\nenabled=1\ngpgcheck=0" >> /etc/yum.repos.d/rocm.repo \
+  && echo -e "[amdgpu]\nname=amdgpu\nbaseurl=https://repo.radeon.com/amdgpu/$AMDGPU_VERSION/rhel/7.9/main/x86_64\nenabled=1\ngpgcheck=0" >> /etc/yum.repos.d/amdgpu.repo \
+  && yum install -y rocm-dev
