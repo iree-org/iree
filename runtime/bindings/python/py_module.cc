@@ -186,7 +186,7 @@ class PyModuleInterface {
                               e.what());
     }
 
-    return iree_ok_status();
+    return iree_vm_stack_function_leave(stack);
   }
 
   std::string ToString() {
@@ -398,6 +398,11 @@ class PyModuleInterface {
         case IREE_VM_CCONV_TYPE_REF: {
           iree_vm_ref_t *result_ref =
               reinterpret_cast<iree_vm_ref_t *>(packed_results);
+          if (value.is_none()) {
+            return iree_make_status(
+                IREE_STATUS_FAILED_PRECONDITION,
+                "expected ref returned from Python function but got None");
+          }
           VmRef *py_ref = py::cast<VmRef *>(value);
           iree_vm_ref_retain(&py_ref->ref(), result_ref);
           packed_results += sizeof(iree_vm_ref_t);
