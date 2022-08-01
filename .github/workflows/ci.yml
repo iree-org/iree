@@ -391,7 +391,7 @@ jobs:
         # just to get FileCheck from LLVM's bin directory. This is silly and we
         # should make FileCheck available another way.
       - name: "Downloading build dir archive"
-        run: gcloud alpha storage cp "${GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting archive"
         run: tar -xf "${BUILD_DIR_ARCHIVE}"
       - name: "Cross-compiling and testing riscv64"
@@ -404,7 +404,7 @@ jobs:
             --env "LLVM_BIN_DIR=${BUILD_DIR}/third_party/llvm-project/llvm/bin" \
             gcr.io/iree-oss/riscv@sha256:e566f054ff1b1d8be61459ce4789dd944b70e85c8939a4d3b7331ab519d8db4c \
             bash -c \
-              "./build_tools/cmake/build_riscv.sh && ./build_tools/kokoro/gcp_ubuntu/cmake/linux/riscv64/test.sh"
+              "./build_tools/cmake/build_riscv.sh && ./build_tools/testing/test_riscv64.sh"
 
 
   summary:
