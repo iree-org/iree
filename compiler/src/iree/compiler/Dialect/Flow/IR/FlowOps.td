@@ -25,6 +25,7 @@ class FLOW_PureOp<string mnemonic, list<Trait> traits = []> :
 //===----------------------------------------------------------------------===//
 
 def FLOW_DispatchRegionOp : FLOW_PureOp<"dispatch.region", [
+    Util_ShapeAwareOp,
     SingleBlockImplicitTerminator<"IREE::Flow::ReturnOp">]> {
   let summary = [{a group of ops}];
   let description = [{
@@ -39,10 +40,16 @@ def FLOW_DispatchRegionOp : FLOW_PureOp<"dispatch.region", [
     deciding which ops should form a dispatch region.
   }];
 
+  let arguments = (ins FLOW_ShapeDynamicDims:$result_dims);
   let results = (outs Variadic<AnyType>:$result);
   let regions = (region AnyRegion:$body);
-  let assemblyFormat = "attr-dict `:` type($result) $body";
+  let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
+
+  let extraClassDeclaration = [{
+    ValueRange getOperandDynamicDims(unsigned idx) { return ValueRange{}; }
+    ValueRange getResultDynamicDims(unsigned idx);
+  }];
 }
 
 def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [

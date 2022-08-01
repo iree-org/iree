@@ -276,9 +276,92 @@ static void printDispatchWorkgroupsCountRegion(OpAsmPrinter &p, Operation *op,
 //===----------------------------------------------------------------------===//
 
 LogicalResult DispatchRegionOp::verify() {
+  // No block arguments.
   if (!getBody().getArguments().empty())
     return emitOpError() << "expected no block arguments";
+
+  // Verify terminator.
+  auto term = dyn_cast<Flow::ReturnOp>(getBody().front().getTerminator());
+  if (!term) return emitOpError() << "expected 'flow.return' terminator";
+  for (const auto &it : llvm::zip(getResultTypes(), term->getOperandTypes()))
+    if (std::get<0>(it) != std::get<1>(it))
+      return term->emitOpError()
+             << "operand types do not match with parent results";
+
   return success();
+}
+
+ParseResult DispatchRegionOp::parse(OpAsmParser &parser,
+                                    OperationState &result) {
+  SmallVector<Type> resultTypes;
+  SmallVector<OpAsmParser::UnresolvedOperand> allOperands;
+  std::unique_ptr<Region> bodyRegion = std::make_unique<Region>();
+  if (parser.parseOptionalAttrDict(result.attributes)) return failure();
+  if (succeeded(parser.parseOptionalArrow())) {
+    ParseResult typeListResult =
+        parser.parseCommaSeparatedList(OpAsmParser::Delimiter::Paren, [&]() {
+          if (parser.parseType(resultTypes.emplace_back())) return failure();
+          auto shapedType = resultTypes.back().dyn_cast<ShapedType>();
+          if (!shapedType) return success();
+          if (shapedType.hasStaticShape()) return success();
+          SmallVector<OpAsmParser::UnresolvedOperand> dynamicDims;
+          if (parser.parseOperandList(dynamicDims,
+                                      shapedType.getNumDynamicDims(),
+                                      OpAsmParser::Delimiter::Braces))
+            return failure();
+          allOperands.append(dynamicDims.begin(), dynamicDims.end());
+          return success();
+        });
+    if (typeListResult) return failure();
+  }
+  if (parser.parseRegion(*bodyRegion)) return failure();
+  ensureTerminator(*bodyRegion, parser.getBuilder(), result.location);
+  result.addRegion(std::move(bodyRegion));
+  result.addTypes(resultTypes);
+  if (parser.resolveOperands(allOperands, parser.getBuilder().getIndexType(),
+                             result.operands))
+    return failure();
+  return success();
+}
+
+void DispatchRegionOp::print(OpAsmPrinter &p) {
+  p.printOptionalAttrDict((*this)->getAttrs());
+  p << " -> (";
+  unsigned resultDimCounter = 0;
+  for (const auto &it : llvm::enumerate(getResult().getTypes())) {
+    Type type = it.value();
+    p << type;
+    if (auto shapedType = type.dyn_cast<ShapedType>()) {
+      if (!shapedType.hasStaticShape()) {
+        p << "{";
+        p << getResultDims().slice(resultDimCounter,
+                                   shapedType.getNumDynamicDims());
+        p << "}";
+        resultDimCounter += shapedType.getNumDynamicDims();
+      }
+    }
+    if (it.index() < getNumResults() - 1) p << ", ";
+  }
+  p << ") ";
+
+  bool printTerminator = true;
+  if (auto *term =
+          getBody().empty() ? nullptr : getBody().begin()->getTerminator()) {
+    printTerminator = !term->getAttrDictionary().empty() ||
+                      term->getNumOperands() != 0 || term->getNumResults() != 0;
+  }
+  p.printRegion(getBody(), /*printEntryBlockArgs=*/true,
+                /*printBlockTerminators=*/printTerminator);
+}
+
+ValueRange DispatchRegionOp::getResultDynamicDims(unsigned idx) {
+  unsigned counter = 0;
+  for (unsigned i = 0; i < idx; ++i)
+    if (auto shapedType = getResultTypes()[i].dyn_cast<ShapedType>())
+      counter += shapedType.getNumDynamicDims();
+  auto shapedType = getResultTypes()[idx].dyn_cast<ShapedType>();
+  return getResultDims().slice(counter,
+                               shapedType ? shapedType.getNumDynamicDims() : 0);
 }
 
 //===----------------------------------------------------------------------===//
