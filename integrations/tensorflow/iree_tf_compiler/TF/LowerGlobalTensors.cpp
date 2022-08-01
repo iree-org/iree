@@ -179,7 +179,7 @@ void LowerGlobalTensors::runOnOperation() {
           *latticeElement->getValue().ops.begin();
       ml_program::GlobalOp globalOp = symbolRefMap[globalTensor];
 
-      for (Operation *user : val.getUsers()) {
+      for (Operation *user : llvm::make_early_inc_range(val.getUsers())) {
         if (auto read = llvm::dyn_cast<::mlir::TF::ReadVariableOp>(user)) {
           OpBuilder builder(read);
           Value load = builder.create<mlir::ml_program::GlobalLoadOp>(
