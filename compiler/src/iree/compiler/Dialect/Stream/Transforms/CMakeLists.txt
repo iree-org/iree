@@ -54,6 +54,7 @@ iree_cc_library(
     MLIRMemRefDialect
     MLIRPass
     MLIRSCFDialect
+    MLIRSCFToControlFlow
     MLIRSupport
     MLIRTensorDialect
     MLIRTransformUtils

@@ -10,6 +10,7 @@
 
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
+#include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Pass/PassOptions.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
@@ -206,6 +207,11 @@ void buildStreamOptimizationPassPipeline(
   // Forming streams involves a fair amount of subgraph stitching, which can
   // cause duplication. Run CSE to collapse.
   addCleanupPatterns(passManager);
+
+  // If any scf ops crept in we get rid of them here. We should be able to
+  // support them all the way through the stream dialect but some passes are not
+  // currently set up to handle them (such as elide timepoints).
+  FunctionLikeNest(passManager).addPass(mlir::createConvertSCFToCFPass);
 
   //----------------------------------------------------------------------------
   // Whole-program scheduling optimization

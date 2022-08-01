@@ -398,13 +398,12 @@ TraversalResult Explorer::walkReturnOps(Operation *parentOp,
   if (auto regionOp = dyn_cast<RegionBranchOpInterface>(parentOp)) {
     auto enumerateTerminatorOps = [&](Region &region) {
       for (auto &block : region) {
-        for (auto terminatorOp :
-             block.getOps<RegionBranchTerminatorOpInterface>()) {
+        if (auto *terminatorOp = block.getTerminator()) {
           // TODO(benvanik): ensure this terminator can return to parent? this
           // region op interface confuses me.
           LLVM_DEBUG({
             llvm::dbgs() << "  == emitting region branch terminator op ";
-            terminatorOp.print(llvm::dbgs(), asmState);
+            terminatorOp->print(llvm::dbgs(), asmState);
             llvm::dbgs() << "\n";
           });
           return fn(terminatorOp);
@@ -588,10 +587,6 @@ TraversalResult Explorer::walkDefiningOps(Value value, ResultWalkFn fn) {
     auto *targetBlock = arg.getParentBlock();
     return walkIncomingBranchOperands(
         targetBlock, [&](Block *sourceBlock, OperandRange operands) {
-          if (sourceBlock == targetBlock) {
-            // Recursion; ignore (?).
-            return WalkResult::advance();
-          }
           auto branchOperand = operands[arg.getArgNumber()];
           LLVM_DEBUG({
             llvm::dbgs() << "   + queuing ";
