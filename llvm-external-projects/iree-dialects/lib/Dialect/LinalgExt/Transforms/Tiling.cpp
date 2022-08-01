@@ -7,6 +7,7 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Utils.h"
+#include "mlir/Dialect/Arithmetic/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -36,19 +37,22 @@ SmallVector<Value> tileToSCF(PatternRewriter &rewriter, TilingInterface op,
 
   // Fill the tile sizes with zeros for the untiled dimensions.
   Location loc = op->getLoc();
-  SmallVector<Value> tileSizesVec(tileSizes.begin(), tileSizes.end());
+  SmallVector<OpFoldResult> tileSizesVec = getAsOpFoldResult(tileSizes);
   if (ranges.size() != tileSizes.size()) {
-    Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-    tileSizesVec.resize(ranges.size(), zero);
+    tileSizesVec.resize(ranges.size(), rewriter.getIndexAttr(0));
   }
 
-  SmallVector<Value> lbs, dims, allDims, steps;
+  SmallVector<Value> lbs, dims, steps;
+  SmallVector<OpFoldResult> allDims;
   for (auto it : llvm::enumerate(ranges)) {
     allDims.push_back(it.value().size);
-    if (!isZero(tileSizesVec[it.index()])) {
-      lbs.push_back(it.value().offset);
-      dims.push_back(it.value().size);
-      steps.push_back(tileSizesVec[it.index()]);
+    if (!isConstantIntValue(tileSizesVec[it.index()], 0)) {
+      lbs.push_back(
+          getValueOrCreateConstantIndexOp(rewriter, loc, it.value().offset));
+      dims.push_back(
+          getValueOrCreateConstantIndexOp(rewriter, loc, it.value().size));
+      steps.push_back(getValueOrCreateConstantIndexOp(
+          rewriter, loc, tileSizesVec[it.index()]));
     }
   }
 
@@ -60,9 +64,9 @@ SmallVector<Value> tileToSCF(PatternRewriter &rewriter, TilingInterface op,
       [&](OpBuilder &b, Location loc, ValueRange localIvs,
           ValueRange iterArgs) -> scf::ValueVector {
         // Compute offsets and sizes of ExtractSliceOp.
-        SmallVector<Value> offsets =
-            linalg::computeTileOffsets(b, loc, localIvs, tileSizesVec);
-        SmallVector<Value> sizes =
+        SmallVector<OpFoldResult> offsets = linalg::computeTileOffsets(
+            b, loc, getAsOpFoldResult(localIvs), tileSizesVec);
+        SmallVector<OpFoldResult> sizes =
             linalg::computeTileSizes(b, loc, tileSizesVec, allDims);
         // Create ExtractSliceOp: Extract a tile from the PadOp.
         // Note: The PadOp is located outside of the loop nest. It is

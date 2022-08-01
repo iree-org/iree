@@ -9,6 +9,7 @@
 #include "iree-dialects/Dialect/LinalgExt/Passes/PassDetail.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arithmetic/Utils/Utils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Math/IR/Math.h"
@@ -39,9 +40,13 @@ static LogicalResult lowerToLoopsImpl(OpBuilder &builder,
   }
   LogicalResult status = success();
   builder.create<scf::ForOp>(
-      loc, loopRanges[loopDepth].offset, loopRanges[loopDepth].size,
-      loopRanges[loopDepth].stride, ValueRange{},
-      [&](OpBuilder &b, Location loc, Value iv, ValueRange args) {
+      loc,
+      getValueOrCreateConstantIndexOp(builder, loc,
+                                      loopRanges[loopDepth].offset),
+      getValueOrCreateConstantIndexOp(builder, loc, loopRanges[loopDepth].size),
+      getValueOrCreateConstantIndexOp(builder, loc,
+                                      loopRanges[loopDepth].stride),
+      ValueRange{}, [&](OpBuilder &b, Location loc, Value iv, ValueRange args) {
         ivs.push_back(iv);
         status = lowerToLoopsImpl(b, tilableOp, loopRanges, loopDepth + 1, ivs);
         b.create<scf::YieldOp>(loc);
