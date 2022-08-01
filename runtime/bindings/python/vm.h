@@ -10,7 +10,7 @@
 #include <optional>
 
 #include "./binding.h"
-#include "./hal.h"
+#include "./status_utils.h"
 #include "iree/base/api.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
@@ -24,6 +24,12 @@ class FunctionAbi;
 //------------------------------------------------------------------------------
 // Retain/release bindings
 //------------------------------------------------------------------------------
+
+template <>
+struct ApiPtrAdapter<iree_vm_buffer_t> {
+  static void Retain(iree_vm_buffer_t* b) { iree_vm_buffer_retain(b); }
+  static void Release(iree_vm_buffer_t* b) { iree_vm_buffer_release(b); }
+};
 
 template <>
 struct ApiPtrAdapter<iree_vm_instance_t> {
@@ -68,6 +74,12 @@ struct ApiPtrAdapter<iree_vm_ref_t> {
 };
 
 //------------------------------------------------------------------------------
+// VmBuffer
+//------------------------------------------------------------------------------
+
+class VmBuffer : public ApiRefCounted<VmBuffer, iree_vm_buffer_t> {};
+
+//------------------------------------------------------------------------------
 // VmVariantList
 // TODO: Rename to VmList
 //------------------------------------------------------------------------------
@@ -94,9 +106,10 @@ class VmVariantList : public ApiRefCounted<VmVariantList, iree_vm_list_t> {
   void PushFloat(double fvalue);
   void PushInt(int64_t ivalue);
   void PushList(VmVariantList& other);
-  void PushBufferView(HalBufferView& buffer_view);
+  void PushRef(py::handle ref_or_object);
   py::object GetAsList(int index);
-  py::object GetAsBufferView(int index);
+  py::object GetAsRef(int index);
+  py::object GetAsObject(int index, py::object clazz);
   py::object GetVariant(int index);
   py::object GetAsSerializedTraceValue(int index);
 };
@@ -174,7 +187,8 @@ class VmRef {
   //   [readonly property] __iree_vm_ref__ :
   //        Gets a VmRef from the object.
   //   __iree_vm_cast__(ref) :
-  //        Dereferences the VmRef to the concrete type.
+  //        Dereferences the VmRef to the concrete type. Returns None on cast
+  //        failure.
   //
   // In addition, a user attribute of "ref" will be added that is an alias of
   // __iree_vm_ref__.
@@ -191,10 +205,10 @@ class VmRef {
   static const char* const kCastAttr;
 
   template <typename PyClass, typename TypeIdFunctor, typename RetainRefFunctor,
-            typename CheckDerefFunctor>
+            typename DerefFunctor, typename IsaFunctor>
   static void BindRefProtocol(PyClass& cls, TypeIdFunctor type_id,
-                              RetainRefFunctor retain_ref,
-                              CheckDerefFunctor check_deref) {
+                              RetainRefFunctor retain_ref, DerefFunctor deref,
+                              IsaFunctor isa) {
     using WrapperType = typename PyClass::type;
     using RawPtrType = typename WrapperType::RawPtrType;
     auto ref_lambda = [=](WrapperType& self) {
@@ -203,10 +217,12 @@ class VmRef {
     cls.def_static(VmRef::kTypeIdAttr, [=]() { return type_id(); });
     cls.def_property_readonly(VmRef::kRefAttr, ref_lambda);
     cls.def_property_readonly("ref", ref_lambda);
-    cls.def_static(VmRef::kCastAttr, [=](VmRef& ref) {
-      RawPtrType casted;
-      CheckApiStatus(check_deref(ref.ref(), &casted), "Incompatible type");
-      return WrapperType::StealFromRawPtr(casted);
+    cls.def_static(VmRef::kCastAttr, [=](VmRef& ref) -> py::object {
+      if (!isa(ref.ref())) {
+        return py::none();
+      }
+      return py::cast(WrapperType::BorrowFromRawPtr(deref(ref.ref())),
+                      py::return_value_policy::move);
     });
     cls.def("__eq__", [](WrapperType& self, WrapperType& other) {
       return self.raw_ptr() == other.raw_ptr();
@@ -233,7 +249,7 @@ class VmRef {
 
   iree_vm_ref_t& ref() { return ref_; }
 
-  py::object Deref(py::object ref_object_class);
+  py::object Deref(py::object ref_object_class, bool optional);
   bool IsInstance(py::object ref_object_class);
 
   std::string ToString();

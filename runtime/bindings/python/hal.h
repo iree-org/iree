@@ -11,6 +11,7 @@
 
 #include "./binding.h"
 #include "./status_utils.h"
+#include "./vm.h"
 #include "iree/hal/api.h"
 
 namespace iree {

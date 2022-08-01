@@ -64,52 +64,6 @@ class VmTest(unittest.TestCase):
         iree.compiler.core.DEFAULT_TESTING_DRIVER)
     self.hal_module = iree.runtime.create_hal_module(self.device)
 
-  def test_variant_list(self):
-    l = iree.runtime.VmVariantList(5)
-    logging.info("variant_list: %s", l)
-    self.assertEqual(l.size, 0)
-
-  def test_variant_list_i64(self):
-    l = iree.runtime.VmVariantList(5)
-    # Push a value that exceeds 32-bit range.
-    l.push_int(10 * 1000 * 1000 * 1000)
-    self.assertEqual(str(l), "<VmVariantList(1): [10000000000]>")
-
-  def test_variant_list_buffers(self):
-    ET = iree.runtime.HalElementType
-    for dt, et in ((np.int8, ET.SINT_8), (np.int16, ET.SINT_16),
-                   (np.int32, ET.SINT_32), (np.int64, ET.SINT_64),
-                   (np.uint8, ET.UINT_8), (np.uint16, ET.UINT_16),
-                   (np.uint32, ET.UINT_32), (np.uint64, ET.UINT_64),
-                   (np.float32, ET.FLOAT_32), (np.float64, ET.FLOAT_64)):
-      # TODO: Unimplemented: (np.float16, ET.FLOAT_16)
-      lst = iree.runtime.VmVariantList(5)
-      ary1 = np.asarray([1, 2, 3, 4], dtype=dt)
-      bv1 = self.device.allocator.allocate_buffer_copy(
-          memory_type=iree.runtime.MemoryType.DEVICE_LOCAL,
-          allowed_usage=(iree.runtime.BufferUsage.DEFAULT |
-                         iree.runtime.BufferUsage.MAPPING),
-          buffer=ary1,
-          element_type=et)
-      lst.push_buffer_view(bv1)
-      ary2 = iree.runtime.DeviceArray(self.device,
-                                      lst.get_as_buffer_view(0),
-                                      override_dtype=dt,
-                                      implicit_host_transfer=True)
-      np.testing.assert_array_equal(ary1, ary2)
-      with self.assertRaises(IndexError):
-        lst.get_as_buffer_view(1)
-
-  def test_variant_list_list(self):
-    lst1 = iree.runtime.VmVariantList(5)
-    lst2 = iree.runtime.VmVariantList(5)
-    lst1.push_list(lst2)
-    self.assertEqual("<VmVariantList(1): [List[]]>", str(lst1))
-    lstout = lst1.get_as_list(0)
-    self.assertEqual("<VmVariantList(0): []>", str(lstout))
-    with self.assertRaises(IndexError):
-      lst1.get_as_list(1)
-
   def test_context_id(self):
     instance = iree.runtime.VmInstance()
     context1 = iree.runtime.VmContext(instance)

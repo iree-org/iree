@@ -515,7 +515,7 @@ class FunctionTest(unittest.TestCase):
           allowed_usage=IMPLICIT_BUFFER_ARG_USAGE,
           buffer=result_array,
           element_type=rt.HalElementType.SINT_32)
-      ret_list.push_buffer_view(buffer_view)
+      ret_list.push_ref(buffer_view)
 
     vm_context = MockVmContext(invoke)
     vm_function = MockVmFunction(reflection={
@@ -537,7 +537,7 @@ class FunctionTest(unittest.TestCase):
           allowed_usage=IMPLICIT_BUFFER_ARG_USAGE,
           buffer=result_array,
           element_type=rt.HalElementType.SINT_32)
-      ret_list.push_buffer_view(buffer_view)
+      ret_list.push_ref(buffer_view)
 
     vm_context = MockVmContext(invoke)
     vm_function = MockVmFunction(reflection={})
@@ -555,7 +555,7 @@ class FunctionTest(unittest.TestCase):
           allowed_usage=IMPLICIT_BUFFER_ARG_USAGE,
           buffer=result_array,
           element_type=rt.HalElementType.UINT_8)
-      ret_list.push_buffer_view(buffer_view)
+      ret_list.push_ref(buffer_view)
 
     vm_context = MockVmContext(invoke)
     vm_function = MockVmFunction(reflection={
