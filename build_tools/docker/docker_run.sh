@@ -86,6 +86,10 @@ function docker_run() {
       --volume="${HOME?}/.config/gcloud:${HOME?}/.config/gcloud:ro"
     )
 
+    DOCKER_RUN_ARGS+=(
+      --tmpfs /dev/shm
+    )
+
     docker run "${DOCKER_RUN_ARGS[@]}" "$@"
 }
 
