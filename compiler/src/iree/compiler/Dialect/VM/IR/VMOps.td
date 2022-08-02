@@ -1034,7 +1034,8 @@ def VM_RodataInlineOp : VM_PureOp<"rodata.inline", [
   let arguments = (ins
     OptionalAttr<StrAttr>:$name,
     Util_AnySerializableAttr:$value,
-    OptionalAttr<I64Attr>:$alignment
+    OptionalAttr<I64Attr>:$alignment,
+    OptionalAttr<StrAttr>:$mime_type
   );
 
   let results = (outs

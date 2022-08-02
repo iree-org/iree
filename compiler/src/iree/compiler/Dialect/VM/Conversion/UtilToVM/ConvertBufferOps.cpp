@@ -40,7 +40,7 @@ struct BufferConstantOpConversion
         op,
         IREE::VM::RefType::get(
             IREE::VM::BufferType::get(rewriter.getContext())),
-        /*name=*/nullptr, op.getValue(), alignmentAttr);
+        op.getNameAttr(), op.getValue(), alignmentAttr, op.getMimeTypeAttr());
     return success();
   }
 };

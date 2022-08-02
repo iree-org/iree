@@ -736,17 +736,17 @@ def Util_BufferConstantOp : Util_PureOp<"buffer.constant", [
   }];
 
   let arguments = (ins
-    AnyAttr:$value,
-    OptionalAttr<IndexAttr>:$alignment
+    OptionalAttr<StrAttr>:$name,
+    Util_AnySerializableAttr:$value,
+    OptionalAttr<IndexAttr>:$alignment,
+    OptionalAttr<StrAttr>:$mime_type
   );
   let results = (outs
     Util_BufferType:$result
   );
 
   let assemblyFormat = [{
-    attr-dict `:`
-    type($result)
-    `=` $value
+    ($name^)? attr-dict `:` type($result) `=` $value
   }];
 
   let hasVerifier = 1;

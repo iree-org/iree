@@ -62,6 +62,9 @@ class HoistInlinedRodataPass
       if (auto alignmentAttr = inlineOp.getAlignmentAttr()) {
         rodataOp.setAlignmentAttr(alignmentAttr);
       }
+      if (auto mimeTypeAttr = inlineOp.getMimeTypeAttr()) {
+        rodataOp.setMimeTypeAttr(mimeTypeAttr);
+      }
       moduleSymbolTable.insert(rodataOp);
       rodataOp.setPrivate();
       replaceInlineOpWithRodataRef(inlineOp, rodataOp);
