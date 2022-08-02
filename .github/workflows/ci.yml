@@ -505,6 +505,7 @@ jobs:
       - build_runtime
       - test_runtime
       - build_all
+      - build_test_all_bazel
       - test_all
       - test_gpu
       - host_tools_assertions
