@@ -115,7 +115,7 @@ endfunction()
 # Common library
 #-------------------------------------------------------------------------------
 
-file(GLOB COMMON_SRCS ${TRACY_SOURCE_DIR}/common/*.cpp)
+file(GLOB COMMON_SRCS ${TRACY_SOURCE_DIR}/public/common/*.cpp)
 add_library(IREETracyCommon
   ${COMMON_SRCS}
 )
