@@ -86,8 +86,11 @@ function docker_run() {
       --volume="${HOME?}/.config/gcloud:${HOME?}/.config/gcloud:ro"
     )
 
+    # Give the container a ramdisk and set the Bazel sandbox base to point to
+    # it. This helps a lot with Bazel getting IO bound.
     DOCKER_RUN_ARGS+=(
       --tmpfs /dev/shm
+      --env SANDBOX_BASE=/dev/shm
     )
 
     docker run "${DOCKER_RUN_ARGS[@]}" "$@"

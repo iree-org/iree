@@ -95,8 +95,11 @@ declare -a BAZEL_STARTUP_CMD=(
 declare -a BAZEL_TEST_CMD=(
   "${BAZEL_STARTUP_CMD[@]}"
   test
-  --sandbox_base=/dev/shm
 )
+
+if [[ ! -z "${SANDBOX_BASE}" ]]; then
+  BAZEL_TEST_CMD+=(--sandbox_base="${SANDBOX_BASE}")
+fi
 
 if (( IREE_BAZEL_READ_REMOTE_CACHE == 1 )); then
   BAZEL_TEST_CMD+=(--config=remote_cache_bazel_ci)
