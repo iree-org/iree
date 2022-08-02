@@ -184,8 +184,8 @@ if(IREE_ENABLE_RUNTIME_TRACING)
       tracing
     HDRS
       "tracing.h"
-      "${IREE_ROOT_DIR}/third_party/tracy/public/tracy/Tracy.hpp"
-      "${IREE_ROOT_DIR}/third_party/tracy/public/tracy/TracyC.h"
+      "${IREE_ROOT_DIR}/third_party/tracy/Tracy.hpp"
+      "${IREE_ROOT_DIR}/third_party/tracy/TracyC.h"
     SRCS
       "tracing.cc"
     DEPS
