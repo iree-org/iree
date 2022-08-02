@@ -101,6 +101,7 @@ jobs:
       - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
       - cpu
       - os-family=Linux
+      - bmuniz-test
     env:
       BUILD_DIR: full-build-dir
     outputs:
