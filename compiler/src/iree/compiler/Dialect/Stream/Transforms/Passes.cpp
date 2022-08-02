@@ -10,6 +10,7 @@
 
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
+#include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Pass/PassOptions.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
@@ -26,13 +27,13 @@ using FunctionLikeNest = MultiOpNest<func::FuncOp, IREE::Util::InitializerOp>;
 //===----------------------------------------------------------------------===//
 
 static void addCleanupPatterns(OpPassManager &passManager) {
-  // Standard MLIR cleanup.
-  passManager.addPass(mlir::createCanonicalizerPass());
-  passManager.addPass(mlir::createCSEPass());
-
-  // Simplify util.global accesses; this can help with data flow tracking as
-  // redundant store-loads are removed.
   FunctionLikeNest(passManager)
+      // Standard MLIR cleanup.
+      .addPass(mlir::createCanonicalizerPass)
+      .addPass(mlir::createCSEPass)
+
+      // Simplify util.global accesses; this can help with data flow tracking as
+      // redundant store-loads are removed.
       .addPass(IREE::Util::createSimplifyGlobalAccessesPass);
 
   // Cleanup and canonicalization of util.global (and other util ops).
@@ -150,8 +151,6 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   passManager.addPass(IREE::Stream::createPropagateTimepointsPass());
   addCleanupPatterns(passManager);
 
-  // TODO(benvanik): remove covered timepoints in awaits (dominance).
-
   // Everything must now be in stream.async.* form.
   passManager.addPass(IREE::Stream::createVerifyLoweringToAsyncPass());
 }
@@ -208,6 +207,38 @@ void buildStreamOptimizationPassPipeline(
   // Forming streams involves a fair amount of subgraph stitching, which can
   // cause duplication. Run CSE to collapse.
   addCleanupPatterns(passManager);
+
+  // If any scf ops crept in we get rid of them here. We should be able to
+  // support them all the way through the stream dialect but some passes are not
+  // currently set up to handle them (such as elide timepoints).
+  FunctionLikeNest(passManager).addPass(mlir::createConvertSCFToCFPass);
+
+  //----------------------------------------------------------------------------
+  // Whole-program scheduling optimization
+  //----------------------------------------------------------------------------
+
+  {
+    // We run these under a fixed-point iteration such that we can perform
+    // inter-procedural, intra-procedural, and canonicalization as separably
+    // verifiable/reusable passes alongside the custom stream ones. IPO will
+    // fold duplicate arguments/results and inline constants to allow the local
+    // optimizations to work more effectively.
+    OpPassManager ipoPipeline(mlir::ModuleOp::getOperationName());
+
+    // IPO and other cleanups.
+    addCleanupPatterns(ipoPipeline);
+
+    // TODO(#9747): elide timepoints that are know-reached due to host
+    // synchronization via stream.timepoint.await.
+
+    // Elide timepoints in dependency chains where one is known to have been
+    // reached by the time another is (A -> B -> A|C).
+    ipoPipeline.addPass(IREE::Stream::createElideTimepointsPass());
+
+    // Run fixed-point iteration on the IPO pipeline.
+    passManager.addPass(
+        IREE::Util::createFixedPointIteratorPass(std::move(ipoPipeline)));
+  }
 
   //----------------------------------------------------------------------------
   // Binding optimization

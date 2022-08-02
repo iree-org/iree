@@ -53,6 +53,9 @@ void registerHALTransformPassPipeline();
 // Converts input flow/std/etc dialects to the IREE HAL dialect.
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createConvertToHALPass();
 
+// Materializes timelines for device queues.
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createMaterializeTimelinesPass();
+
 //===----------------------------------------------------------------------===//
 // Device management
 //===----------------------------------------------------------------------===//
@@ -66,6 +69,11 @@ createVerifyTargetEnvironmentPass();
 // Assigns the HAL devices the module will target to the given list of targets.
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createAssignTargetDevicesPass(
     ArrayRef<std::string> targets);
+
+// Applies fixups to the program for when using legacy HAL devices that only
+// support synchronous execution. Once all devices support async this will be
+// removed.
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createFixupLegacySyncPass();
 
 // Outlines hal.device.switch conditions into functions and inlines conditions.
 std::unique_ptr<OperationPass<void>> createInlineDeviceSwitchesPass();
@@ -162,10 +170,12 @@ inline void registerHALPasses() {
   createDumpExecutableSourcesPass("");
   createElideRedundantCommandsPass();
   createInlineDeviceSwitchesPass();
+  createFixupLegacySyncPass();
   createLinkExecutablesPass();
   createLinkTargetExecutablesPass("");
   createMaterializeInterfacesPass();
   createMaterializeResourceCachesPass(targetOptions);
+  createMaterializeTimelinesPass();
   createMemoizeDeviceQueriesPass();
   createResolveExportOrdinalsPass();
   createSerializeExecutablesPass();

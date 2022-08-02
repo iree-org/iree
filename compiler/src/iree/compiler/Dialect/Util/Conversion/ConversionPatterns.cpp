@@ -75,6 +75,25 @@ void populateUtilConversionPatterns(MLIRContext *context,
 
 namespace {
 
+struct ConvertInitializerOp
+    : public OpConversionPattern<IREE::Util::InitializerOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      IREE::Util::InitializerOp initializerOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    auto &typeConverter = *getTypeConverter();
+    rewriter.startRootUpdate(initializerOp);
+    if (failed(rewriter.convertRegionTypes(&initializerOp.getBody(),
+                                           typeConverter))) {
+      rewriter.cancelRootUpdate(initializerOp);
+      return rewriter.notifyMatchFailure(initializerOp,
+                                         "failed to convert region types");
+    }
+    rewriter.finalizeRootUpdate(initializerOp);
+    return success();
+  }
+};
+
 struct ConvertFuncOp : public OpConversionPattern<mlir::func::FuncOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
@@ -226,6 +245,10 @@ void populateGenericStructuralConversionPatterns(
   // We need to rewrite certain types on operands/results so use the default
   // dynamic legality checker to force any ops using such types to run through
   // our patterns.
+  conversionTarget.addDynamicallyLegalOp<IREE::Util::InitializerOp>(
+      [&](IREE::Util::InitializerOp op) {
+        return typeConverter.isLegal(&op.getBody());
+      });
   conversionTarget.addDynamicallyLegalOp<mlir::func::FuncOp>(
       [&](mlir::func::FuncOp op) {
         return typeConverter.isSignatureLegal(op.getFunctionType()) &&
@@ -238,9 +261,10 @@ void populateGenericStructuralConversionPatterns(
   addGenericLegalOp<arith::SelectOp>(conversionTarget, typeConverter);
   addGenericLegalOp<scf::IfOp>(conversionTarget, typeConverter);
   addGenericLegalOp<scf::YieldOp>(conversionTarget, typeConverter);
-  patterns.insert<ConvertFuncOp, ConvertCallOp, ConvertReturnOp,
-                  ConvertBranchOp, ConvertCondBranchOp, ConvertSelectOp,
-                  ConvertIfOp, ConvertYieldOp>(typeConverter, context);
+  patterns.insert<ConvertInitializerOp, ConvertFuncOp, ConvertCallOp,
+                  ConvertReturnOp, ConvertBranchOp, ConvertCondBranchOp,
+                  ConvertSelectOp, ConvertIfOp, ConvertYieldOp>(typeConverter,
+                                                                context);
 }
 
 }  // namespace iree_compiler

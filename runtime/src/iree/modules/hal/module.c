@@ -37,13 +37,27 @@ typedef struct iree_hal_module_t {
 
 typedef struct iree_hal_module_state_t {
   iree_allocator_t host_allocator;
-  iree_hal_module_flags_t flags;
-  iree_hal_device_t* shared_device;
-  iree_status_t loop_status;
-  iree_hal_executable_cache_t* executable_cache;
 
-  iree_hal_semaphore_t* submit_semaphore;
-  uint64_t submit_value;
+  // Flags controlling HAL module behavior passed in from the hosting
+  // application. All instantiations of a module share the same flags.
+  iree_hal_module_flags_t flags;
+
+  // HACK: today we only support a single device per context - in the future
+  // this should be a set of available devices that the module is able to pick
+  // from - the module will then hang on to them and use them as native globals
+  // instead of storing anything in module state here.
+  iree_hal_device_t* shared_device;
+
+  // TODO(benvanik): add iree_loop_t to module constructor.
+  // Status of the nested loop we run for executable creation today. We should
+  // instead be taking a loop upon creation and scheduling work against that.
+  iree_status_t loop_status;
+
+  // Shared executable cache for all executables created in the context.
+  // We could have multiple to allow for modules to create distinct sets of
+  // executables like ones for training vs inference in the same model, or just
+  // always use this.
+  iree_hal_executable_cache_t* executable_cache;
 } iree_hal_module_state_t;
 
 static void IREE_API_PTR iree_hal_module_destroy(void* base_module) {
@@ -73,11 +87,6 @@ iree_hal_module_alloc_state(void* self, iree_allocator_t host_allocator,
               state->shared_device, iree_string_view_empty(),
               iree_loop_inline(&state->loop_status), &state->executable_cache));
 
-  state->submit_value = 0ull;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_semaphore_create(state->shared_device, state->submit_value,
-                                    &state->submit_semaphore));
-
   *out_module_state = (iree_vm_module_state_t*)state;
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
@@ -88,7 +97,6 @@ iree_hal_module_free_state(void* self, iree_vm_module_state_t* module_state) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_module_state_t* state = (iree_hal_module_state_t*)module_state;
-  iree_hal_semaphore_release(state->submit_semaphore);
   iree_hal_executable_cache_release(state->executable_cache);
   iree_status_ignore(state->loop_status);
   iree_hal_device_release(state->shared_device);
@@ -120,40 +128,6 @@ IREE_VM_ABI_EXPORT(iree_hal_module_ex_shared_device,  //
                    v, r) {
   rets->r0 = iree_hal_device_retain_ref(state->shared_device);
   return iree_ok_status();
-}
-
-IREE_VM_ABI_EXPORT(iree_hal_module_ex_submit_and_wait,  //
-                   iree_hal_module_state_t,             //
-                   rr, v) {
-  iree_hal_device_t* device = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
-  iree_hal_command_buffer_t* command_buffer = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_command_buffer_check_deref(args->r1, &command_buffer));
-
-  // Batch with our single command buffer.
-  iree_hal_submission_batch_t batch;
-  memset(&batch, 0, sizeof(batch));
-
-  iree_hal_command_buffer_t* command_buffer_ptrs[] = {command_buffer};
-  batch.command_buffer_count = IREE_ARRAYSIZE(command_buffer_ptrs);
-  batch.command_buffers = command_buffer_ptrs;
-
-  uint64_t next_semaphore_value = ++state->submit_value;
-  iree_hal_semaphore_t* signal_semaphore_ptrs[] = {state->submit_semaphore};
-  uint64_t signal_semaphore_values[] = {next_semaphore_value};
-  batch.signal_semaphores.count = IREE_ARRAYSIZE(signal_semaphore_ptrs);
-  batch.signal_semaphores.semaphores = signal_semaphore_ptrs;
-  batch.signal_semaphores.payload_values = signal_semaphore_values;
-
-  iree_status_t status = iree_hal_device_queue_submit(
-      device, IREE_HAL_COMMAND_CATEGORY_ANY, 0, 1, &batch);
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_semaphore_wait(
-        state->submit_semaphore, next_semaphore_value, iree_infinite_timeout());
-  }
-
-  return status;
 }
 
 //===----------------------------------------------------------------------===//
@@ -868,6 +842,112 @@ IREE_VM_ABI_EXPORT(iree_hal_module_device_query_i64,  //
   return iree_ok_status();
 }
 
+IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_alloca,  //
+                   iree_hal_module_state_t,              //
+                   rIrriiiI, r) {
+  iree_hal_device_t* device = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
+  iree_hal_queue_affinity_t queue_affinity =
+      (iree_hal_queue_affinity_t)args->i1;
+  iree_hal_fence_t* wait_fence = iree_hal_fence_deref(args->r2);
+  iree_hal_fence_t* signal_fence = iree_hal_fence_deref(args->r3);
+  uint32_t pool = args->i4;
+  iree_hal_memory_type_t memory_types = (iree_hal_memory_type_t)args->i5;
+  iree_hal_buffer_usage_t buffer_usage = (iree_hal_buffer_usage_t)args->i6;
+  iree_device_size_t allocation_size = iree_hal_cast_device_size(args->i7);
+
+  // TODO(benvanik): HAL APIs for queue-ordered allocations.
+  // For now we just perform a blocking wait to synchronize with the queue,
+  // allocate the buffer as normal, and then pass it back committed.
+  (void)queue_affinity;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_fence_wait(wait_fence, iree_infinite_timeout()));
+
+  // TODO(benvanik): enforce queue-ordered allocation restrictions on memory
+  // type and usage.
+  (void)pool;
+
+  const iree_hal_buffer_params_t params = {
+      .type = memory_types,
+      .usage = buffer_usage,
+  };
+  iree_hal_buffer_t* buffer = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(
+      iree_hal_device_allocator(device), params, allocation_size,
+      iree_const_byte_span_empty(), &buffer));
+
+  IREE_RETURN_IF_ERROR(iree_hal_fence_signal(signal_fence));
+
+  rets->r0 = iree_hal_buffer_move_ref(buffer);
+  return iree_ok_status();
+}
+
+IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_dealloca,  //
+                   iree_hal_module_state_t,                //
+                   rIrrr, v) {
+  iree_hal_device_t* device = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
+  iree_hal_queue_affinity_t queue_affinity =
+      (iree_hal_queue_affinity_t)args->i1;
+  iree_hal_fence_t* wait_fence = iree_hal_fence_deref(args->r2);
+  iree_hal_fence_t* signal_fence = iree_hal_fence_deref(args->r3);
+  iree_hal_buffer_t* buffer = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_check_deref(args->r4, &buffer));
+
+  // TODO(benvanik): HAL APIs for queue-ordered allocations.
+  // For now we just perform a blocking wait to synchronize with the queue and
+  // then ignore the buffer for GC to cleanup.
+  (void)queue_affinity;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_fence_wait(wait_fence, iree_infinite_timeout()));
+  IREE_RETURN_IF_ERROR(iree_hal_fence_signal(signal_fence));
+
+  return iree_ok_status();
+}
+
+IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_execute,  //
+                   iree_hal_module_state_t,               //
+                   rIrrCrD, v) {
+  iree_hal_device_t* device = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
+  iree_hal_queue_affinity_t queue_affinity =
+      (iree_hal_queue_affinity_t)args->i1;
+  iree_hal_fence_t* wait_fence = iree_hal_fence_deref(args->r2);
+  iree_hal_fence_t* signal_fence = iree_hal_fence_deref(args->r3);
+  iree_host_size_t command_buffer_count = 0;
+  iree_hal_command_buffer_t** command_buffers = NULL;
+  IREE_VM_ABI_VLA_STACK_DEREF(args, a4_count, a4, iree_hal_command_buffer, 32,
+                              &command_buffer_count, &command_buffers);
+
+  iree_hal_submission_batch_t batch = {
+      .wait_semaphores = iree_hal_fence_semaphore_list(wait_fence),
+      .signal_semaphores = iree_hal_fence_semaphore_list(signal_fence),
+      .command_buffer_count = command_buffer_count,
+      .command_buffers = command_buffers,
+  };
+  IREE_RETURN_IF_ERROR(iree_hal_device_queue_submit(
+      device, IREE_HAL_COMMAND_CATEGORY_ANY, queue_affinity, 1, &batch));
+
+  return iree_ok_status();
+}
+
+IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_flush,  //
+                   iree_hal_module_state_t,             //
+                   rI, v) {
+  iree_hal_device_t* device = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
+  iree_hal_queue_affinity_t queue_affinity =
+      (iree_hal_queue_affinity_t)args->i1;
+
+  // TODO(benvanik): queue flush API.
+  // This will be most useful for backends that perform internal batching and
+  // require the explicit flush. For now we don't have this exposed.
+  (void)device;
+  (void)queue_affinity;
+
+  return iree_ok_status();
+}
+
 //===--------------------------------------------------------------------===//
 // iree_hal_executable_t
 //===--------------------------------------------------------------------===//
@@ -1001,8 +1081,8 @@ IREE_VM_ABI_EXPORT(iree_hal_module_fence_join,  //
                    CrD, r) {
   iree_host_size_t fence_count = 0;
   iree_hal_fence_t** fences = NULL;
-  IREE_VM_ABI_VLA_STACK_DEREF(args, a0_count, a0, iree_hal_fence, 32,
-                              &fence_count, &fences);
+  IREE_VM_ABI_VLA_STACK_DEREF_OR_NULL(args, a0_count, a0, iree_hal_fence, 32,
+                                      &fence_count, &fences);
 
   iree_hal_fence_t* fence = NULL;
   IREE_RETURN_IF_ERROR(
@@ -1161,8 +1241,8 @@ IREE_VM_ABI_EXPORT(iree_hal_module_fence_await,  //
     uint32_t timeout_millis = (uint32_t)args->i0;
     iree_host_size_t fence_count = 0;
     iree_hal_fence_t** fences = NULL;
-    IREE_VM_ABI_VLA_STACK_DEREF(args, a1_count, a1, iree_hal_fence, 32,
-                                &fence_count, &fences);
+    IREE_VM_ABI_VLA_STACK_DEREF_OR_NULL(args, a1_count, a1, iree_hal_fence, 32,
+                                        &fence_count, &fences);
 
     IREE_TRACE_ZONE_BEGIN(z0);
     zone_id = z0;
@@ -1189,11 +1269,11 @@ IREE_VM_ABI_EXPORT(iree_hal_module_fence_await,  //
           if (!iree_status_is_ok(wait_status)) break;
         }
       } else {
+        current_frame->pc = IREE_HAL_MODULE_FENCE_AWAIT_PC_RESUME;
         IREE_RETURN_AND_END_ZONE_IF_ERROR(
             zone_id,
             iree_hal_module_fence_await_begin(stack, fence_count, fences,
                                               timeout, zone_id, &wait_status));
-        current_frame->pc = IREE_HAL_MODULE_FENCE_AWAIT_PC_RESUME;
         if (iree_status_is_deferred(wait_status)) {
           zone_id = 0;  // ownership transferred to wait frame
         }
@@ -1455,7 +1535,8 @@ IREE_API_EXPORT iree_status_t iree_hal_module_create(
 
   iree_hal_module_t* module = IREE_HAL_MODULE_CAST(base_module);
   module->host_allocator = host_allocator;
-  module->flags = flags;
+  // TODO(benvanik): fix vm yield with result storage.
+  module->flags = flags | IREE_HAL_MODULE_FLAG_SYNCHRONOUS;
   module->shared_device = device;
   iree_hal_device_retain(module->shared_device);
 

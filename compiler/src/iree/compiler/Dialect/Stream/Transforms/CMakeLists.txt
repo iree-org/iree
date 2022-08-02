@@ -21,6 +21,7 @@ iree_cc_library(
     "ConvertToStream.cpp"
     "DumpStatistics.cpp"
     "ElideAsyncCopies.cpp"
+    "ElideTimepoints.cpp"
     "EncodeTensors.cpp"
     "FoldUniformOperands.cpp"
     "FuseDispatchBindings.cpp"
@@ -53,6 +54,7 @@ iree_cc_library(
     MLIRMemRefDialect
     MLIRPass
     MLIRSCFDialect
+    MLIRSCFToControlFlow
     MLIRSupport
     MLIRTensorDialect
     MLIRTransformUtils

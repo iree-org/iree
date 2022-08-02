@@ -487,6 +487,11 @@ static iree_status_t iree_vm_bytecode_issue_import_call(
   iree_status_t call_status =
       call.function.module->begin_call(call.function.module->self, stack, call);
   if (iree_status_is_deferred(call_status)) {
+    if (!iree_byte_span_is_empty(call.results)) {
+      iree_status_ignore(call_status);
+      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                              "yield in imports with results not supported");
+    }
     return call_status;  // deferred for future resume
   } else if (IREE_UNLIKELY(!iree_status_is_ok(call_status))) {
     // TODO(benvanik): set execution result to failure/capture stack.

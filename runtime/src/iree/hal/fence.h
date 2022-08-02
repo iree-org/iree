@@ -16,6 +16,10 @@
 extern "C" {
 #endif  // __cplusplus
 
+//===----------------------------------------------------------------------===//
+// iree_hal_fence_t
+//===----------------------------------------------------------------------===//
+
 // A list of semaphores and their corresponding payloads.
 // When signaling each semaphore will be set to the new payload value provided.
 // When waiting each semaphore must reach or exceed the payload value.
@@ -123,6 +127,10 @@ IREE_API_EXPORT iree_status_t iree_hal_fence_wait(iree_hal_fence_t* fence,
 // all defined timepoints.
 IREE_API_EXPORT iree_wait_source_t
 iree_hal_fence_await(iree_hal_fence_t* fence);
+
+//===----------------------------------------------------------------------===//
+// iree_hal_fence_t implementation details
+//===----------------------------------------------------------------------===//
 
 IREE_API_EXPORT void iree_hal_fence_destroy(iree_hal_fence_t* fence);
 

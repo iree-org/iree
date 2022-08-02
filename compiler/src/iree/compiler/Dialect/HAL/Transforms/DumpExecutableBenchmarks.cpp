@@ -312,9 +312,27 @@ static void appendDispatchBenchmark(IREE::HAL::ExecutableOp executableOp,
         forBuilder.create<scf::YieldOp>(loc);
       });
 
-  // Submit command buffer.
   funcBuilder.create<IREE::HAL::CommandBufferFinalizeOp>(loc, commandBuffer);
-  funcBuilder.create<IREE::HAL::ExSubmitAndWaitOp>(loc, device, commandBuffer);
+
+  // We begin executing immediately and then wait on a fence.
+  // TODO(benvanik): add fences to ABI so the benchmark tool can pipeline.
+  Value waitFence = funcBuilder.create<IREE::Util::NullOp>(
+      loc, funcBuilder.getType<IREE::HAL::FenceType>());
+  Value signalFence = funcBuilder.create<IREE::HAL::TimelineAdvanceOp>(
+      loc, funcBuilder.getType<IREE::HAL::FenceType>());
+
+  // Queue execution.
+  auto queueAffinity = funcBuilder.create<arith::ConstantIntOp>(loc, -1, 64);
+  funcBuilder.create<IREE::HAL::DeviceQueueExecuteOp>(
+      loc, device, queueAffinity, waitFence, signalFence,
+      ValueRange{commandBuffer});
+
+  // Block until it completes.
+  Value timeoutMillis = funcBuilder.create<arith::ConstantIntOp>(loc, -1, 32);
+  auto fenceOp = funcBuilder.create<IREE::HAL::FenceAwaitOp>(
+      loc, funcBuilder.getI32Type(), timeoutMillis, signalFence);
+  funcBuilder.create<IREE::Util::StatusCheckOkOp>(
+      loc, fenceOp.getStatus(), "failed to wait on timepoint");
 
   funcBuilder.create<mlir::func::ReturnOp>(loc);
 }

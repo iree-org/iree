@@ -308,6 +308,51 @@ vm.import @device.query.i64(
 ) -> (i32, i64)
 attributes {nosideeffects}
 
+// Returns a queue-ordered transient buffer that will be available for use when
+// the signal fence is reached. The allocation will not be made until the
+// wait fence has been reached.
+vm.import @device.queue.alloca(
+  %device : !vm.ref<!hal.device>,
+  %queue_affinity : i64,
+  %wait_fence : !vm.ref<!hal.fence>,
+  %signal_fence : !vm.ref<!hal.fence>,
+  %pool : i32,
+  %memory_types : i32,
+  %buffer_usage : i32,
+  %allocation_size : i64
+) -> !vm.ref<!hal.buffer>
+
+// Deallocates a queue-ordered transient buffer.
+// The deallocation will not be made until the wait fence has been reached and
+// once the storage is available for reuse the signal fence will be signaled.
+vm.import @device.queue.dealloca(
+  %device : !vm.ref<!hal.device>,
+  %queue_affinity : i64,
+  %wait_fence : !vm.ref<!hal.fence>,
+  %signal_fence : !vm.ref<!hal.fence>,
+  %buffer : !vm.ref<!hal.buffer>
+)
+
+// Executes one or more command buffers on a device queue.
+// The command buffers are executed in order as if they were recorded as one.
+// No commands will execute until the wait fence has been reached and the signal
+// fence will be signaled when all commands have completed.
+vm.import @device.queue.execute(
+  %device : !vm.ref<!hal.device>,
+  %queue_affinity : i64,
+  %wait_fence : !vm.ref<!hal.fence>,
+  %signal_fence : !vm.ref<!hal.fence>,
+  %command_buffers : !vm.ref<!hal.command_buffer>...
+)
+
+// Flushes any locally-pending submissions in the queue.
+// When submitting many queue operations this can be used to eagerly flush
+// earlier submissions while later ones are still being constructed.
+vm.import @device.queue.flush(
+  %device : !vm.ref<!hal.device>,
+  %queue_affinity : i64
+)
+
 //===----------------------------------------------------------------------===//
 // iree_hal_executable_t
 //===----------------------------------------------------------------------===//

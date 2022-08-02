@@ -207,6 +207,11 @@ Attribute DeviceTargetAttr::getMatchExpression() {
   return DeviceMatchIDAttr::get(*this);
 }
 
+bool DeviceTargetAttr::hasConfigurationAttr(StringRef name) {
+  auto configAttr = getConfiguration();
+  return configAttr && configAttr.get(name);
+}
+
 SmallVector<ExecutableTargetAttr, 4> DeviceTargetAttr::getExecutableTargets() {
   SmallVector<ExecutableTargetAttr, 4> resultAttrs;
   auto configAttr = getConfiguration();

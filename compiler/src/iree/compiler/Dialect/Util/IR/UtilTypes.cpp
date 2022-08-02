@@ -127,7 +127,10 @@ llvm::Optional<unsigned> detail::getTiedResultOperandIndex(
   auto valueAttrs = storageAttr.getValue();
   if (valueAttrs.empty()) return llvm::None;
   auto tiedOp = cast<TiedOpInterface>(op);
-  resultIndex -= tiedOp.getTiedResultsIndexAndLength().first;
+  auto indexAndLength = tiedOp.getTiedResultsIndexAndLength();
+  if (resultIndex < indexAndLength.first) return None;
+  resultIndex -= indexAndLength.first;
+  if (resultIndex >= indexAndLength.second) return None;
   int64_t value = valueAttrs[resultIndex].cast<IntegerAttr>().getInt();
   if (value == TiedOpInterface::kUntiedIndex) return llvm::None;
   unsigned tiedOperandsOffset = tiedOp.getTiedOperandsIndexAndLength().first;

@@ -120,6 +120,15 @@ void populateHALDeviceToVMPatterns(MLIRContext *context,
   patterns.insert<DeviceQueryIntCastOpConversion>(context, typeConverter);
   patterns.insert<DeviceQueryI64OpConversion>(
       context, importSymbols, typeConverter, "hal.device.query.i64");
+
+  patterns.insert<VMImportOpConversion<IREE::HAL::DeviceQueueAllocaOp>>(
+      context, importSymbols, typeConverter, "hal.device.queue.alloca");
+  patterns.insert<VMImportOpConversion<IREE::HAL::DeviceQueueDeallocaOp>>(
+      context, importSymbols, typeConverter, "hal.device.queue.dealloca");
+  patterns.insert<VMImportOpConversion<IREE::HAL::DeviceQueueExecuteOp>>(
+      context, importSymbols, typeConverter, "hal.device.queue.execute");
+  patterns.insert<VMImportOpConversion<IREE::HAL::DeviceQueueFlushOp>>(
+      context, importSymbols, typeConverter, "hal.device.queue.flush");
 }
 
 }  // namespace iree_compiler

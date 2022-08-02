@@ -268,6 +268,93 @@ struct TieRegionResults : public OpRewritePattern<Op> {
   }
 };
 
+// Adds await dependencies on |newTimepoints| to the op with an optional
+// |existingTimepoint| by possibly producing a new timepoint to await.
+// This may just pass through the provided timepoint or create a join based on
+// the existing await behavior of the op and the new values.
+static Value joinAwaitTimepoints(Location loc, Value existingTimepoint,
+                                 ArrayRef<Value> newTimepoints,
+                                 OpBuilder &builder) {
+  if (newTimepoints.empty()) {
+    // No new timepoints - preserve existing.
+    return existingTimepoint;
+  } else if (newTimepoints.size() == 1 && !existingTimepoint) {
+    // Adding a single new timepoint.
+    return newTimepoints.front();
+  }
+
+  // Materialize a join of the new timepoints + the existing (if present).
+  SmallVector<Value> joinTimepoints;
+  if (existingTimepoint) {
+    joinTimepoints.push_back(existingTimepoint);
+  }
+  llvm::append_range(joinTimepoints, newTimepoints);
+  return builder.create<IREE::Stream::TimepointJoinOp>(
+      loc, builder.getType<IREE::Stream::TimepointType>(), joinTimepoints);
+}
+
+// Elides waits that are known to be immediately resolved.
+//
+// Example:
+//  %0 = stream.timepoint.immediate
+//  %1 = stream.resource.alloca await(%0) ...
+// ->
+//  %1 = stream.resource.alloca ...
+template <typename Op>
+struct ElideImmediateTimepointWait : public OpRewritePattern<Op> {
+  using OpRewritePattern<Op>::OpRewritePattern;
+  LogicalResult matchAndRewrite(Op op,
+                                PatternRewriter &rewriter) const override {
+    bool isImmediate =
+        op.getAwaitTimepoint() && isa_and_nonnull<TimepointImmediateOp>(
+                                      op.getAwaitTimepoint().getDefiningOp());
+    if (!isImmediate) return failure();
+    rewriter.updateRootInPlace(
+        op, [&]() { op.getAwaitTimepointMutable().clear(); });
+    return success();
+  }
+};
+
+// Chains operand resources produced by an await to dependent execution regions.
+// This elides host waits and allows for device-side wait resolution.
+//
+// Example:
+//  %0 = stream.cmd.execute with(%resource)
+//  %1 = stream.timepoint.await %0 => %resource
+//  %2 = stream.cmd.execute with(%resource)
+// ->
+//  %0 = stream.cmd.execute with(%resource)
+//  %2 = stream.cmd.execute await(%0) => with(%resource)
+template <typename Op>
+struct ChainDependentAwaits : public OpRewritePattern<Op> {
+  using OpRewritePattern<Op>::OpRewritePattern;
+  LogicalResult matchAndRewrite(Op op,
+                                PatternRewriter &rewriter) const override {
+    SmallVector<Value> newTimepoints;
+    SmallVector<std::pair<unsigned, Value>> replacements;
+    for (auto operand : llvm::enumerate(op.getResourceOperands())) {
+      if (auto awaitOp =
+              operand.value().template getDefiningOp<TimepointAwaitOp>()) {
+        newTimepoints.push_back(awaitOp.getAwaitTimepoint());
+        replacements.push_back(std::make_pair(
+            operand.index(), awaitOp.getTiedResultOperand(operand.value())));
+      }
+    }
+    if (replacements.empty()) return failure();
+    rewriter.updateRootInPlace(op, [&]() {
+      auto newTimepoint = joinAwaitTimepoints(
+          op.getLoc(), op.getAwaitTimepoint(), newTimepoints, rewriter);
+      op.getAwaitTimepointMutable().assign(newTimepoint);
+      for (auto replacement : replacements) {
+        op.getResourceOperandsMutable()
+            .slice(replacement.first, 1)
+            .assign(replacement.second);
+      }
+    });
+    return success();
+  }
+};
+
 }  // namespace
 
 //===----------------------------------------------------------------------===//
@@ -287,6 +374,7 @@ void ResourceAllocaOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                    MLIRContext *context) {
   // TODO(benvanik): sink to first user.
   // TODO(benvanik): elide if only user is dealloc.
+  results.insert<ElideImmediateTimepointWait<ResourceAllocaOp>>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -296,6 +384,7 @@ void ResourceAllocaOp::getCanonicalizationPatterns(RewritePatternSet &results,
 void ResourceDeallocaOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                      MLIRContext *context) {
   // TODO(benvanik): move up to producer of timepoint.
+  results.insert<ElideImmediateTimepointWait<ResourceDeallocaOp>>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1548,94 +1637,7 @@ void AsyncDispatchOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // stream.async.execute
 //===----------------------------------------------------------------------===//
 
-// Adds await dependencies on |newTimepoints| to the op with an optional
-// |existingTimepoint| by possibly producing a new timepoint to await.
-// This may just pass through the provided timepoint or create a join based on
-// the existing await behavior of the op and the new values.
-static Value joinAwaitTimepoints(Location loc, Value existingTimepoint,
-                                 ArrayRef<Value> newTimepoints,
-                                 OpBuilder &builder) {
-  if (newTimepoints.empty()) {
-    // No new timepoints - preserve existing.
-    return existingTimepoint;
-  } else if (newTimepoints.size() == 1 && !existingTimepoint) {
-    // Adding a single new timepoint.
-    return newTimepoints.front();
-  }
-
-  // Materialize a join of the new timepoints + the existing (if present).
-  SmallVector<Value> joinTimepoints;
-  if (existingTimepoint) {
-    joinTimepoints.push_back(existingTimepoint);
-  }
-  llvm::append_range(joinTimepoints, newTimepoints);
-  return builder.create<IREE::Stream::TimepointJoinOp>(
-      loc, builder.getType<IREE::Stream::TimepointType>(), joinTimepoints);
-}
-
 namespace {
-
-// Elides waits that are known to be immediately resolved.
-//
-// Example:
-//  %0 = stream.timepoint.immediate
-//  %1 = stream.async.execute await(%0) => with(...)
-// ->
-//  %1 = stream.async.execute with(...)
-struct ElideImmediateAsyncExecuteWaits
-    : public OpRewritePattern<AsyncExecuteOp> {
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(AsyncExecuteOp op,
-                                PatternRewriter &rewriter) const override {
-    bool isImmediate =
-        op.getAwaitTimepoint() && isa_and_nonnull<TimepointImmediateOp>(
-                                      op.getAwaitTimepoint().getDefiningOp());
-    if (!isImmediate) return failure();
-    rewriter.updateRootInPlace(
-        op, [&]() { op.getAwaitTimepointMutable().clear(); });
-    return success();
-  }
-};
-
-// If any operands are sourced from subviews clone those subviews into the
-// region and rewrite the operands to point at the original resource. This
-// allows us to progressively fold the subviews into the ops consuming them.
-//
-// Example:
-//  %0 = stream.resource.subview %src[%offset] ...
-//  %1 = stream.async.execute with(%0 as %arg0)
-// ->
-//  %1 = stream.async.execute with(%src as %arg0) {
-//    %2 = stream.resource.subview %arg0[%offset] ...
-//  }
-struct ChainAsyncExecuteWaits : public OpRewritePattern<AsyncExecuteOp> {
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(AsyncExecuteOp op,
-                                PatternRewriter &rewriter) const override {
-    SmallVector<Value> newTimepoints;
-    SmallVector<std::pair<unsigned, Value>> replacements;
-    for (auto operand : llvm::enumerate(op.getResourceOperands())) {
-      if (auto awaitOp = operand.value().getDefiningOp<TimepointAwaitOp>()) {
-        newTimepoints.push_back(awaitOp.getAwaitTimepoint());
-        replacements.push_back(std::make_pair(
-            operand.index(), awaitOp.getTiedResultOperand(operand.value())));
-      }
-    }
-    if (replacements.empty()) return failure();
-    rewriter.updateRootInPlace(op, [&]() {
-      auto newTimepoint = joinAwaitTimepoints(
-          op.getLoc(), op.getAwaitTimepoint(), newTimepoints, rewriter);
-      op.getAwaitTimepointMutable().assign(newTimepoint);
-
-      for (auto replacement : replacements) {
-        op.getResourceOperandsMutable()
-            .slice(replacement.first, 1)
-            .assign(replacement.second);
-      }
-    });
-    return success();
-  }
-};
 
 // If any operands are sourced from subviews clone those subviews into the
 // region and rewrite the operands to point at the original resource. This
@@ -1725,8 +1727,8 @@ struct ElideNoOpAsyncExecuteOp : public OpRewritePattern<AsyncExecuteOp> {
 
 void AsyncExecuteOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                  MLIRContext *context) {
-  results.insert<ElideImmediateAsyncExecuteWaits>(context);
-  results.insert<ChainAsyncExecuteWaits>(context);
+  results.insert<ElideImmediateTimepointWait<AsyncExecuteOp>>(context);
+  results.insert<ChainDependentAwaits<AsyncExecuteOp>>(context);
   results.insert<CloneCapturedAsyncExecuteSubviewOps>(context);
   results.insert<ElideNoOpAsyncExecuteOp>(context);
   results.insert<IREE::Util::ClosureOptimizationPattern<AsyncExecuteOp>>(
@@ -2033,65 +2035,6 @@ void CmdDispatchOp::getCanonicalizationPatterns(RewritePatternSet &results,
 
 namespace {
 
-// Elides waits that are known to be immediately resolved.
-//
-// Example:
-//  %0 = stream.timepoint.immediate
-//  %1 = stream.cmd.execute await(%0) => with(...)
-// ->
-//  %1 = stream.cmd.execute with(...)
-struct ElideImmediateCmdExecuteWaits : public OpRewritePattern<CmdExecuteOp> {
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(CmdExecuteOp op,
-                                PatternRewriter &rewriter) const override {
-    bool isImmediate =
-        op.getAwaitTimepoint() && isa_and_nonnull<TimepointImmediateOp>(
-                                      op.getAwaitTimepoint().getDefiningOp());
-    if (!isImmediate) return failure();
-    rewriter.updateRootInPlace(
-        op, [&]() { op.getAwaitTimepointMutable().clear(); });
-    return success();
-  }
-};
-
-// Chains operand resources produced by an await to dependent execution regions.
-// This elides host waits and allows for device-side wait resolution.
-//
-// Example:
-//  %0 = stream.cmd.execute with(%resource)
-//  %1 = stream.timepoint.await %0 => %resource
-//  %2 = stream.cmd.execute with(%resource)
-// ->
-//  %0 = stream.cmd.execute with(%resource)
-//  %2 = stream.cmd.execute await(%0) => with(%resource)
-struct ChainCmdExecuteWaits : public OpRewritePattern<CmdExecuteOp> {
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(CmdExecuteOp op,
-                                PatternRewriter &rewriter) const override {
-    SmallVector<Value> newTimepoints;
-    SmallVector<std::pair<unsigned, Value>> replacements;
-    for (auto operand : llvm::enumerate(op.getResourceOperands())) {
-      if (auto awaitOp = operand.value().getDefiningOp<TimepointAwaitOp>()) {
-        newTimepoints.push_back(awaitOp.getAwaitTimepoint());
-        replacements.push_back(std::make_pair(
-            operand.index(), awaitOp.getTiedResultOperand(operand.value())));
-      }
-    }
-    if (replacements.empty()) return failure();
-    rewriter.updateRootInPlace(op, [&]() {
-      auto newTimepoint = joinAwaitTimepoints(
-          op.getLoc(), op.getAwaitTimepoint(), newTimepoints, rewriter);
-      op.getAwaitTimepointMutable().assign(newTimepoint);
-      for (auto replacement : replacements) {
-        op.getResourceOperandsMutable()
-            .slice(replacement.first, 1)
-            .assign(replacement.second);
-      }
-    });
-    return success();
-  }
-};
-
 // If any operands are sourced from subviews clone those subviews into the
 // region and rewrite the operands to point at the original resource. This
 // allows us to progressively fold the subviews into the ops consuming them.
@@ -2174,8 +2117,8 @@ struct ElideNoOpCmdExecuteOp : public OpRewritePattern<CmdExecuteOp> {
 
 void CmdExecuteOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                MLIRContext *context) {
-  results.insert<ElideImmediateCmdExecuteWaits>(context);
-  results.insert<ChainCmdExecuteWaits>(context);
+  results.insert<ElideImmediateTimepointWait<CmdExecuteOp>>(context);
+  results.insert<ChainDependentAwaits<CmdExecuteOp>>(context);
   results.insert<CloneCapturedCmdExecuteSubviewOps>(context);
   results.insert<ElideNoOpCmdExecuteOp>(context);
   results.insert<IREE::Util::ClosureOptimizationPattern<CmdExecuteOp>>(context);
@@ -2366,7 +2309,7 @@ LogicalResult TimepointAwaitOp::fold(ArrayRef<Attribute> foldOperands,
 
 namespace {
 
-struct ElideImmediateAwaits : public OpRewritePattern<TimepointAwaitOp> {
+struct ElideImmediateHostAwaits : public OpRewritePattern<TimepointAwaitOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(TimepointAwaitOp op,
                                 PatternRewriter &rewriter) const override {
@@ -2601,7 +2544,7 @@ struct FoldDuplicateAwaitResources : public OpRewritePattern<TimepointAwaitOp> {
 void TimepointAwaitOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                    MLIRContext *context) {
   // TODO(benvanik): elide waits if timepoint must be satisfied in use-def.
-  results.insert<ElideImmediateAwaits>(context);
+  results.insert<ElideImmediateHostAwaits>(context);
   results.insert<SinkAwaitToFirstConsumer>(context);
   results.insert<SinkSubviewsAcrossAwaits>(context);
   results.insert<GroupAwaitsByTimepoint>(context);

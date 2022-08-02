@@ -22,10 +22,12 @@ iree_cc_library(
     "DumpExecutableBenchmarks.cpp"
     "DumpExecutableSources.cpp"
     "ElideRedundantCommands.cpp"
+    "FixupLegacySync.cpp"
     "InlineDeviceSwitches.cpp"
     "LinkExecutables.cpp"
     "MaterializeInterfaces.cpp"
     "MaterializeResourceCaches.cpp"
+    "MaterializeTimelines.cpp"
     "MemoizeDeviceQueries.cpp"
     "Passes.cpp"
     "ResolveExportOrdinals.cpp"
@@ -42,6 +44,7 @@ iree_cc_library(
     MLIRIR
     MLIRPass
     MLIRSCFDialect
+    MLIRSCFToControlFlow
     MLIRSupport
     MLIRTransforms
     iree::compiler::Dialect::Flow::IR

@@ -1,12 +1,8 @@
 // RUN: iree-opt --split-input-file --iree-hal-conversion %s | FileCheck %s
 
-// TODO(#1285): implement timepoint lowering into HAL semaphores.
-// For now all timepoints turn into ints and are mostly ignored.
-
-// CHECK-LABEL: @rwTimepoint
-// CHECK-SAME: = 0 : i64
+// CHECK-LABEL: util.global private mutable @rwTimepoint : !hal.fence
 util.global private mutable @rwTimepoint = #stream.timepoint<immediate>
-// CHECK: func.func @globalTimepoint(%arg0: i64) -> i64
+// CHECK: func.func @globalTimepoint(%arg0: !hal.fence) -> !hal.fence
 func.func @globalTimepoint(%arg0: !stream.timepoint) -> !stream.timepoint {
   // CHECK: util.global.store %arg0, @rwTimepoint
   util.global.store %arg0, @rwTimepoint : !stream.timepoint
@@ -20,42 +16,47 @@ func.func @globalTimepoint(%arg0: !stream.timepoint) -> !stream.timepoint {
 
 // CHECK-LABEL: @timepointImmediate
 func.func @timepointImmediate() -> !stream.timepoint {
-  // CHECK: %[[TIMEPOINT:.+]] = arith.constant 0
+  // CHECK: %[[FENCE:.+]] = util.null : !hal.fence
   %0 = stream.timepoint.immediate => !stream.timepoint
-  // CHECK: return %[[TIMEPOINT]]
+  // CHECK: return %[[FENCE]]
   return %0 : !stream.timepoint
 }
 
 // -----
 
-// CHECK-LABEL: @timepointImport
-func.func @timepointImport(%arg0: !hal.semaphore, %arg1: i64) -> !stream.timepoint {
-  // CHECK: %[[WAIT_OK:.+]] = hal.semaphore.await<%arg0 : !hal.semaphore> until(%arg1) : i32
-  // CHECK: util.status.check_ok %[[WAIT_OK]]
-  // CHECK: %[[TIMEPOINT:.+]] = arith.constant 0
+// CHECK-LABEL: @timepointImportFence
+func.func @timepointImportFence(%arg0: !hal.fence) -> !stream.timepoint {
+  %0 = stream.timepoint.import %arg0 : (!hal.fence) => !stream.timepoint
+  // CHECK: return %arg0
+  return %0 : !stream.timepoint
+}
+
+// -----
+
+// CHECK-LABEL: @timepointImportSemaphore
+func.func @timepointImportSemaphore(%arg0: !hal.semaphore, %arg1: i64) -> !stream.timepoint {
+  // CHECK: %[[FENCE:.+]] = hal.fence.create at<%arg0 : !hal.semaphore>(%arg1) -> !hal.fence
   %0 = stream.timepoint.import %arg0, %arg1 : (!hal.semaphore, i64) => !stream.timepoint
-  // CHECK: return %[[TIMEPOINT]]
+  // CHECK: return %[[FENCE]]
   return %0 : !stream.timepoint
 }
 
 // -----
 
-// CHECK-LABEL: @timepointExport
-func.func @timepointExport(%arg0: !stream.timepoint) -> (!hal.semaphore, i64) {
-  // CHECK: %[[TIMEPOINT:.+]] = arith.constant 0
-  // CHECK: %[[SEMAPHORE:.+]] = hal.semaphore.create device(%device : !hal.device) initial(%[[TIMEPOINT]]) : !hal.semaphore
-  %0:2 = stream.timepoint.export %arg0 => (!hal.semaphore, i64)
-  // CHECK: return %[[SEMAPHORE]], %[[TIMEPOINT]]
-  return %0#0, %0#1 : !hal.semaphore, i64
+// CHECK-LABEL: @timepointExportFence
+func.func @timepointExportFence(%arg0: !stream.timepoint) -> !hal.fence {
+  %0 = stream.timepoint.export %arg0 => (!hal.fence)
+  // CHECK: return %arg0
+  return %0 : !hal.fence
 }
 
 // -----
 
 // CHECK-LABEL: @timepointJoin
 func.func @timepointJoin(%arg0: !stream.timepoint, %arg1: !stream.timepoint) -> !stream.timepoint {
-  // CHECK: %[[TIMEPOINT:.+]] = arith.constant 0
+  // CHECK: %[[FENCE:.+]] = hal.fence.join at([%arg0, %arg1]) -> !hal.fence
   %0 = stream.timepoint.join max(%arg0, %arg1) => !stream.timepoint
-  // CHECK: return %[[TIMEPOINT]]
+  // CHECK: return %[[FENCE]]
   return %0 : !stream.timepoint
 }
 
@@ -65,6 +66,8 @@ func.func @timepointJoin(%arg0: !stream.timepoint, %arg1: !stream.timepoint) -> 
 func.func @timepointAwait(%arg0: !stream.timepoint, %arg1: !stream.resource<staging>, %arg2: !stream.resource<*>) -> (!stream.resource<staging>, !stream.resource<*>) {
   %c100 = arith.constant 100 : index
   %c200 = arith.constant 200 : index
+  // CHECK: %[[WAIT_OK:.+]] = hal.fence.await until([%arg0]) timeout_millis(%c-1_i32) : i32
+  // CHECK-NEXT: util.status.check_ok %[[WAIT_OK]]
   %0:2 = stream.timepoint.await %arg0 => %arg1, %arg2 : !stream.resource<staging>{%c100}, !stream.resource<*>{%c200}
   // CHECK: return %arg1, %arg2
   return %0#0, %0#1 : !stream.resource<staging>, !stream.resource<*>

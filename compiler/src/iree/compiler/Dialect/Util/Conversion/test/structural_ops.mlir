@@ -3,6 +3,20 @@
 // These patterns are not doing anything dialect-specific and instead just
 // allowing for the ops to update their types during dialect conversions.
 
+// CHECK: util.initializer
+util.initializer {
+  // CHECK: %[[VALUE:.+]] = func.call @extern
+  %value = func.call @extern() : () -> memref<?xi8>
+  // CHECK: cf.br ^bb1(%[[VALUE]] : !util.buffer)
+  cf.br ^bb1(%value : memref<?xi8>)
+// CHECK: ^bb1(%[[ARG:.+]]: !util.buffer)
+^bb1(%block_arg: memref<?xi8>):
+  util.initializer.return
+}
+func.func private @extern() -> memref<?xi8>
+
+// -----
+
 // CHECK-LABEL: @funcOp
 // CHECK-SAME: (%[[ARG0:.+]]: !util.buffer) -> !util.buffer
 func.func @funcOp(%arg0: memref<?xi8>) -> memref<?xi8> {

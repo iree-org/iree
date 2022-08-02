@@ -44,7 +44,7 @@ class ConstantAttributePVS
   }
   static const char ID;
 
-  const std::string getAsStr() const override;
+  const std::string getAsStr(AsmState &asmState) const override;
 
  private:
   void initializeValue(Value value, DFX::Solver &solver) override;

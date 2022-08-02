@@ -451,6 +451,9 @@ struct PotentialValuesState : AbstractState {
   // Unions assumed set with an undef value.
   void unionAssumedWithUndef() { unionWithUndef(); }
 
+  // Intersects assumed set with assumed set of the passed state |rhs|.
+  void intersectAssumed(const PotentialValuesState &rhs) { intersectWith(rhs); }
+
   // "Clamps" this state with |rhs|.
   PotentialValuesState operator^=(const PotentialValuesState &rhs) {
     validState ^= rhs.validState;
