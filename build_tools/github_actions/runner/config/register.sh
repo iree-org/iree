@@ -86,11 +86,7 @@ RUNNER_NAME="${GOOGLE_CLOUD_PROJECT}.${INSTANCE_ID}"
 
 GOOGLE_CLOUD_RUN_ID_TOKEN=$(get_metadata "instance/service-accounts/default/identity?audience=${TOKEN_PROXY_URL}")
 
-REGISTRATION_TOKEN="$(curl -sSfL "${TOKEN_PROXY_URL}/register" \
-  --header "Authorization: Bearer ${GOOGLE_CLOUD_RUN_ID_TOKEN}" \
-  --data-binary "{\"scope\": \"${RUNNER_SCOPE}\"}" \
-  | jq -r ".token"
-)"
+REGISTRATION_TOKEN="$(curl -sSfL "${TOKEN_PROXY_URL}/register" --header "Authorization: Bearer ${GOOGLE_CLOUD_RUN_ID_TOKEN}" --data-binary "{\"scope\": \"${RUNNER_SCOPE}\"}" | jq -r ".token")"
 
 if [ -z "${REGISTRATION_TOKEN}" ]; then
   echo "failed to get registration runner token" >&2
