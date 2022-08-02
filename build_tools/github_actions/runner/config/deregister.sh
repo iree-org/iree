@@ -25,4 +25,4 @@ fi
 
 echo "removing github actions runner "
 
-${HOME}/actions-runner/config.sh --unattended remove --token "${REMOVE_TOKEN}"
+${HOME}/actions-runner/config.sh remove --token "${REMOVE_TOKEN}"
