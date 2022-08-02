@@ -12,7 +12,7 @@
 // We do this here instead of relying on an external build target so that we can
 // ensure our configuration specified in tracing.h is picked up.
 #if IREE_TRACING_FEATURES != 0
-#include "third_party/tracy/public/TracyClient.cpp"
+#include "third_party/tracy/TracyClient.cpp"
 #endif  // IREE_TRACING_FEATURES
 
 #ifdef __cplusplus
@@ -125,8 +125,7 @@ void iree_tracing_zone_end(iree_zone_id_t zone_id) {
 void iree_tracing_set_plot_type_impl(const char* name_literal,
                                      uint8_t plot_type) {
   tracy::Profiler::ConfigurePlot(name_literal,
-                                 static_cast<tracy::PlotFormatType>(plot_type),
-                                 false, true, 0);
+                                 static_cast<tracy::PlotFormatType>(plot_type));
 }
 
 void iree_tracing_plot_value_i64_impl(const char* name_literal, int64_t value) {
@@ -193,7 +192,7 @@ void iree_tracing_mutex_after_try_lock(uint32_t lock_id, bool was_acquired) {
 void iree_tracing_mutex_after_unlock(uint32_t lock_id) {
   auto item = tracy::Profiler::QueueSerial();
   tracy::MemWrite(&item->hdr.type, tracy::QueueType::LockRelease);
-  tracy::MemWrite(&item->lockReleaseShared.thread, tracy::GetThreadHandle());
+  tracy::MemWrite(&item->lockRelease.thread, tracy::GetThreadHandle());
   tracy::MemWrite(&item->lockRelease.id, lock_id);
   tracy::MemWrite(&item->lockRelease.time, tracy::Profiler::GetTime());
   tracy::Profiler::QueueSerialFinish();
