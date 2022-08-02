@@ -6,46 +6,52 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Build and test the project with CMake using Kokoro, with ASan enabled and
-# using SwiftShader's software Vulkan driver.
-# ASan docs: https://clang.llvm.org/docs/AddressSanitizer.html
-#
 # Note: this script diverges from the non-ASan build in a few ways:
 #   * The CMake build sets `IREE_ENABLE_ASAN=ON`
 #   * Omit optional components that don't work with ASan (e.g. Python bindings)
 #   * Some tests that fail under ASan are individually excluded
+#
+# The desired build directory can be passed as
+# the first argument. Otherwise, it uses the environment variable
+# IREE_ASAN_BUILD_DIR, defaulting to "build-asan". Designed for CI, but
+# can be run manually. This reuses the build directory if it already exists.
+#
+# Build and test the project with CMake with ASan enabled and using
+# SwiftShader's software Vulkan driver.
+# ASan docs: https://clang.llvm.org/docs/AddressSanitizer.html
 
-set -e
-set -x
 
-# Print the UTC time when set -x is on
-export PS4='[$(date -u "+%T %Z")] '
+set -xeuo pipefail
 
-# Check these exist and print the versions for later debugging
-export CMAKE_BIN="$(which cmake)"
-"${CMAKE_BIN?}" --version
-"${CC?}" --version
-"${CXX?}" --version
-python3 --version
+ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
+cd "${ROOT_DIR}"
 
-echo "Initializing submodules"
-git submodule update --init --jobs 8 --depth 1
+CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
+BUILD_DIR="${1:-${IREE_ASAN_BUILD_DIR:-build-asan}}"
+IREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS:-ON}"
+IREE_ENABLE_CCACHE="${IREE_ENABLE_CCACHE:-OFF}"
 
-./build_tools/kokoro/gcp_ubuntu/check_vulkan.sh
+"$CMAKE_BIN" --version
+ninja --version
 
-# Print SwiftShader git commit
-cat /swiftshader/git-commit
-
-CMAKE_BUILD_DIR="${CMAKE_BUILD_DIR:-$HOME/build}"
+if [[ -d "${BUILD_DIR}" ]]; then
+  echo "Build directory '${BUILD_DIR}' already exists. Will use cached results there."
+else
+  echo "Build directory '${BUILD_DIR}' does not already exist. Creating a new one."
+  mkdir "${BUILD_DIR}"
+fi
 
 CMAKE_ARGS=(
   "-G" "Ninja"
   "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
   "-DIREE_ENABLE_ASAN=ON"
-  "-B" "${CMAKE_BUILD_DIR?}"
+  "-B" "${BUILD_DIR?}"
 
   # Also check if microbenchmarks are buildable.
   "-DIREE_BUILD_MICROBENCHMARKS=ON"
+
+  "-DIREE_ENABLE_ASSERTIONS=${IREE_ENABLE_ASSERTIONS}"
+  "-DIREE_ENABLE_CCACHE=${IREE_ENABLE_CCACHE}"
 
   # Enable CUDA compiler and runtime builds unconditionally. Our CI images all
   # have enough deps to at least build CUDA support and compile CUDA binaries
@@ -59,31 +65,29 @@ echo "Configuring CMake"
 
 echo "Building all"
 echo "------------"
-"${CMAKE_BIN?}" --build "${CMAKE_BUILD_DIR?}" -- -k 0
+"${CMAKE_BIN?}" --build "${BUILD_DIR?}" -- -k 0
 
 echo "Building test deps"
 echo "------------------"
-"${CMAKE_BIN?}" --build "${CMAKE_BUILD_DIR?}" --target iree-test-deps -- -k 0
+"${CMAKE_BIN?}" --build "${BUILD_DIR?}" --target iree-test-deps -- -k 0
 
 echo "Building microbenchmark suites"
 echo "------------------"
-"${CMAKE_BIN?}" --build "${CMAKE_BUILD_DIR?}" --target iree-microbenchmark-suites -- -k 0
+"${CMAKE_BIN?}" --build "${BUILD_DIR?}" --target iree-microbenchmark-suites -- -k 0
 
 # Respect the user setting, but default to as many jobs as we have cores.
 export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
 
-# Respect the user setting, but default to turning off the vulkan tests.
-# TODO(#5716): Fix and enable Vulkan tests.
-export IREE_VULKAN_DISABLE=${IREE_VULKAN_DISABLE:-1}
-# CUDA is off by default.
+# Respect the user setting, but default to turning on Vulkan.
+export IREE_VULKAN_DISABLE=${IREE_VULKAN_DISABLE:-0}
+# Respect the user setting, but default to turning off CUDA.
 export IREE_CUDA_DISABLE=${IREE_CUDA_DISABLE:-1}
 # The VK_KHR_shader_float16_int8 extension is optional prior to Vulkan 1.2.
-# We test on SwiftShader, which does not support this extension.
+# We test on SwiftShader as a baseline, which does not support this extension.
 export IREE_VULKAN_F16_DISABLE=${IREE_VULKAN_F16_DISABLE:-1}
 
 # Tests to exclude by label. In addition to any custom labels (which are carried
-# over from Bazel tags), every test should be labeled with the directory it is
-# in.
+# over from Bazel tags), every test should be labeled with its directory.
 declare -a label_exclude_args=(
   # Exclude specific labels.
   # Put the whole label with anchors for exact matches.
@@ -108,13 +112,12 @@ if [[ "${IREE_VULKAN_DISABLE?}" == 1 ]]; then
 fi
 if [[ "${IREE_CUDA_DISABLE?}" == 1 ]]; then
   label_exclude_args+=("^driver=cuda$")
-  label_exclude_args+=("^uses_cuda_runtime$")
 fi
+
 if [[ "${IREE_VULKAN_F16_DISABLE?}" == 1 ]]; then
   label_exclude_args+=("^vulkan_uses_vk_khr_shader_float16_int8$")
 fi
 
-# Join on "|"
 label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]?}"))"
 
 # These tests currently have asan failures
@@ -134,7 +137,7 @@ excluded_tests=( "${excluded_tests[@]/%/$}" )
 # Join on `|` and wrap in parens
 excluded_tests_regex="($(IFS="|" ; echo "${excluded_tests[*]?}"))"
 
-cd ${CMAKE_BUILD_DIR?}
+cd ${BUILD_DIR?}
 
 echo "******************** Running main project ctests ************************"
 ctest \
