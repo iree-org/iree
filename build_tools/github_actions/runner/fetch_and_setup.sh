@@ -22,13 +22,13 @@ if [[ "$(whoami)" != "runner" ]]; then
   exit
 fi
 
-cd /dev/shm
+cd ${HOME}
 rm -rf config
 
 rm -rf /tmp/iree
 git clone https://github.com/iree-org/iree.git /tmp/iree
 
-cp -r /tmp/iree/build_tools/github_actions/runner/config/ /dev/shm/config
+cp -r /tmp/iree/build_tools/github_actions/runner/config/ ${HOME}/config
 
 rm -rf /tmp/iree
 

@@ -16,7 +16,7 @@ SELF_PATH="${SELF_DIR}/${SELF_NAME}"
 
 >&2 echo "Starting runner"
 
-/dev/shm/actions-runner/bin/Runner.Listener run --startuptype service
+${HOME}/actions-runner/bin/Runner.Listener run --startuptype service
 
 CODE=$?
 
