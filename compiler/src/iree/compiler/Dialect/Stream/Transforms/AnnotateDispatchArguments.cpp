@@ -86,7 +86,7 @@ class GlobalPVS : public DFX::StateWrapper<
   }
   static const char ID;
 
-  const std::string getAsStr() const override {
+  const std::string getAsStr(AsmState &asmState) const override {
     return getPVSAsStr(getState());
   }
 
@@ -119,7 +119,7 @@ class ValuePVS : public DFX::StateWrapper<DFX::PotentialConstantIntValuesState,
   }
   static const char ID;
 
-  const std::string getAsStr() const override {
+  const std::string getAsStr(AsmState &asmState) const override {
     return getPVSAsStr(getState());
   }
 
@@ -258,7 +258,7 @@ class ValueAlignment
   }
   static const char ID;
 
-  const std::string getAsStr() const override {
+  const std::string getAsStr(AsmState &asmState) const override {
     return std::string("alignment: ") +
            std::to_string(getAssumedAlignment().valueOrOne().value());
   }

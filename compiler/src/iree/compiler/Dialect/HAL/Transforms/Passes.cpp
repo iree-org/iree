@@ -13,6 +13,7 @@
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
+#include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
 
@@ -147,6 +148,14 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
 
   // Convert supported input dialects (std, stream, etc) into the HAL dialect.
   passManager.addPass(createConvertToHALPass());
+
+  // Materialize timelines for device queues.
+  passManager.addPass(createMaterializeTimelinesPass());
+
+  // If any devices require the legacy synchronous execution behavior then
+  // make all async operations blocking.
+  passManager.addPass(createFixupLegacySyncPass());
+
   addCleanupPatterns(passManager);
 
   //----------------------------------------------------------------------------
@@ -198,7 +207,11 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
 
   // Fixup workgroup count calculations that may have used the affine dialect.
   // Kind of random here but can happen if the benchmarking code does things.
-  passManager.addPass(createLowerAffinePass());
+  passManager.addPass(mlir::createLowerAffinePass());
+
+  // TODO(benvanik): remove the need for this; some cleanup passes such as
+  // SimplifyGlobalAccesses are currently broken with scf present.
+  FunctionLikeNest(passManager).addPass(mlir::createConvertSCFToCFPass);
 
   // Combine the initializers we emitted during resource cache materialization.
   passManager.addPass(IREE::Util::createCombineInitializersPass());
@@ -218,7 +231,7 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
 
     // NOTE: symbol DCE will destroy executable target contents, so only run it
     // if we serialized things.
-    passManager.addPass(createSymbolDCEPass());
+    passManager.addPass(mlir::createSymbolDCEPass());
   }
 }
 

@@ -138,6 +138,21 @@ typedef iree_status_t(IREE_API_PTR* iree_vm_native_function_target2_t)(
         ref_type##_check_deref((args)->vla_field[i].r0, &(*(out_ptrs))[i]));  \
   }
 
+#define IREE_VM_ABI_VLA_STACK_DEREF_OR_NULL(                                  \
+    args, vla_count, vla_field, ref_type, max_count, out_count, out_ptrs)     \
+  *(out_count) = (args)->vla_count;                                           \
+  if (IREE_UNLIKELY((args)->vla_count > (max_count))) {                       \
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,                         \
+                            "count %u of " #ref_type " > %u",                 \
+                            (args)->vla_count, (uint32_t)(max_count));        \
+  }                                                                           \
+  *(out_ptrs) =                                                               \
+      (ref_type##_t**)iree_alloca((args)->vla_count * sizeof(ref_type##_t*)); \
+  for (iree_host_size_t i = 0; i < (args)->vla_count; ++i) {                  \
+    IREE_RETURN_IF_ERROR(ref_type##_check_deref_or_null(                      \
+        (args)->vla_field[i].r0, &(*(out_ptrs))[i]));                         \
+  }
+
 #define IREE_VM_ABI_VLA_HEAP_DEREF(args, vla_count, vla_field, ref_type,         \
                                    host_allocator, out_count, out_ptrs)          \
   *(out_count) = (args)->vla_count;                                              \
@@ -340,6 +355,34 @@ IREE_VM_ABI_FIXED_STRUCT(rrrIii, {
   int32_t i5;
 });
 
+IREE_VM_ABI_FIXED_STRUCT(rIrriiiI, {
+  iree_vm_ref_t r0;
+  int64_t i1;
+  iree_vm_ref_t r2;
+  iree_vm_ref_t r3;
+  int32_t i4;
+  int32_t i5;
+  int32_t i6;
+  int64_t i7;
+});
+
+IREE_VM_ABI_FIXED_STRUCT(rIrrr, {
+  iree_vm_ref_t r0;
+  int64_t i1;
+  iree_vm_ref_t r2;
+  iree_vm_ref_t r3;
+  iree_vm_ref_t r4;
+});
+
+IREE_VM_ABI_VLA_STRUCT(rIrrCrD, a4_count, a4, {
+  iree_vm_ref_t r0;
+  int64_t i1;
+  iree_vm_ref_t r2;
+  iree_vm_ref_t r3;
+  iree_vm_size_t a4_count;
+  iree_vm_abi_r_t a4[0];
+});
+
 IREE_VM_ABI_VLA_STRUCT(rCiD, a1_count, a1, {
   iree_vm_ref_t r0;
   iree_vm_size_t a1_count;
@@ -521,6 +564,9 @@ IREE_VM_ABI_DECLARE_SHIM(rrirCID, v);
 IREE_VM_ABI_DECLARE_SHIM(rrirI, v);
 IREE_VM_ABI_DECLARE_SHIM(rrIrII, v);
 IREE_VM_ABI_DECLARE_SHIM(rrrIii, v);
+IREE_VM_ABI_DECLARE_SHIM(rIrriiiI, r);
+IREE_VM_ABI_DECLARE_SHIM(rIrrr, v);
+IREE_VM_ABI_DECLARE_SHIM(rIrrCrD, v);
 IREE_VM_ABI_DECLARE_SHIM(CrID, r);
 IREE_VM_ABI_DECLARE_SHIM(CrD, r);
 IREE_VM_ABI_DECLARE_SHIM(iCrD, i);

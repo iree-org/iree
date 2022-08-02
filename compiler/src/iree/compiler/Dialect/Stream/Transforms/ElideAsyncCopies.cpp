@@ -67,7 +67,7 @@ class LastUsers
     return getAssumedSet().contains(op);
   }
 
-  const std::string getAsStr() const override {
+  const std::string getAsStr(AsmState &asmState) const override {
     return std::string("last users: ") + std::to_string(getAssumedSet().size());
   }
 
@@ -162,7 +162,7 @@ class ArgumentSemantics
     return (this->getAssumed() & NOT_BY_REFERENCE) == NOT_BY_REFERENCE;
   }
 
-  const std::string getAsStr() const override {
+  const std::string getAsStr(AsmState &asmState) const override {
     std::string str;
     auto append = [&](const char *part) {
       if (!str.empty()) str += '|';
@@ -217,8 +217,9 @@ class ArgumentSemantics
     if (auto arg = operand.get().dyn_cast<BlockArgument>()) {
       auto &argumentSemantics = solver.getElementFor<ArgumentSemantics>(
           *this, Position::forValue(operand.get()), DFX::Resolution::REQUIRED);
-      LLVM_DEBUG(llvm::dbgs() << "  pred is arg; combining state: "
-                              << argumentSemantics.getAsStr() << "\n");
+      LLVM_DEBUG(llvm::dbgs()
+                 << "  pred is arg; combining state: "
+                 << argumentSemantics.getAsStr(solver.getAsmState()) << "\n");
       getState() ^= argumentSemantics.getState();
     }
 

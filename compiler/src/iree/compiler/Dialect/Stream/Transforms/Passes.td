@@ -113,6 +113,14 @@ def PropagateTimepoints :
   }];
 }
 
+def ElideTimepoints :
+    Pass<"iree-stream-elide-timepoints", "mlir::ModuleOp"> {
+  let summary = "Elides timepoints that are known to be covered by dependent timepoints.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createElideTimepointsPass()
+  }];
+}
+
 //===----------------------------------------------------------------------===//
 // Allocation and command issuing
 //===----------------------------------------------------------------------===//

@@ -66,7 +66,7 @@ class AbstractElement : public Position, public DepGraphNode {
 
   // Returns the human-friendly summarized assumed state as string for
   // debugging.
-  virtual const std::string getAsStr() const = 0;
+  virtual const std::string getAsStr(AsmState &asmState) const = 0;
 
   void print(llvm::raw_ostream &os, AsmState &asmState) const override;
   virtual void printWithDeps(llvm::raw_ostream &os, AsmState &asmState) const;

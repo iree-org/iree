@@ -115,7 +115,14 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
     // CHECK: hal.command_buffer.finalize<%[[CMD]] : !hal.command_buffer>
     } => !stream.timepoint
 
-    // CHECK: hal.ex.submit_and_wait %[[DEVICE]], %[[CMD]]
+    // CHECK: %[[WAIT_FENCE:.+]] = util.null : !hal.fence
+    // CHECK: %[[SIGNAL_FENCE:.+]] = hal.timeline.advance
+    // CHECK: hal.device.queue.execute<%[[DEVICE]]
+    // CHECK-SAME: wait(%[[WAIT_FENCE]])
+    // CHECK-SAME: signal(%[[SIGNAL_FENCE]])
+    // CHECK-SAME: commands([%[[CMD]]])
+
+    // CHECK: hal.fence.await until([%[[SIGNAL_FENCE]]])
     %result_ready = stream.timepoint.await %timepoint => %result_resource : !stream.resource<external>{%c16}
 
     // CHECK: %[[RESULT_VIEW:.+]] = hal.buffer_view.create

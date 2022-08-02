@@ -17,7 +17,6 @@ func.func @cmdMemoryControl(%arg0: !stream.resource<transient>, %arg1: index) ->
     stream.cmd.discard %arg2[%c0 for %c128] : !stream.resource<transient>{%arg1}
   } => !stream.timepoint
   // CHECK-NEXT: hal.command_buffer.finalize<%[[CMD]]
-  // CHECK-NEXT: hal.ex.submit_and_wait
   return %0 : !stream.timepoint
 }
 
@@ -37,7 +36,6 @@ func.func @cmdFill(%arg0: !stream.resource<transient>, %arg1: index) -> !stream.
     // CHECK-NEXT: hal.command_buffer.execution_barrier<%[[CMD]]
   } => !stream.timepoint
   // CHECK-NEXT: hal.command_buffer.finalize<%[[CMD]]
-  // CHECK-NEXT: hal.ex.submit_and_wait
   return %0 : !stream.timepoint
 }
 
@@ -57,7 +55,6 @@ func.func @cmdCopy(%arg0: !stream.resource<transient>, %arg1: index, %arg2: !str
     // CHECK-NEXT: hal.command_buffer.execution_barrier<%[[CMD]]
   } => !stream.timepoint
   // CHECK-NEXT: hal.command_buffer.finalize<%[[CMD]]
-  // CHECK-NEXT: hal.ex.submit_and_wait
   return %0 : !stream.timepoint
 }
 
@@ -93,7 +90,13 @@ func.func @cmdExecute(%arg0: !stream.resource<transient>, %arg1: index, %arg2: !
     }
   } => !stream.timepoint
   // CHECK-NEXT: hal.command_buffer.finalize<%[[CMD]]
-  // CHECK-NEXT: hal.ex.submit_and_wait
+  // CHECK: %[[SIGNAL_FENCE:.+]] = hal.timeline.advance
+  // CHECK: hal.device.queue.execute
+  // CHECK-SAME: affinity(%c-1
+  // CHECK-SAME: wait(%arg4)
+  // CHECK-SAME: signal(%[[SIGNAL_FENCE]])
+  // CHECK-SAME: commands([%[[CMD]]])
+  // CHECK: return %[[SIGNAL_FENCE]]
   return %0 : !stream.timepoint
 }
 
@@ -179,6 +182,5 @@ func.func @cmdDispatch(%arg0: !stream.resource<transient>, %arg1: index, %arg2: 
     // CHECK: hal.command_buffer.execution_barrier<%[[CMD]]
   } => !stream.timepoint
   // CHECK-NEXT: hal.command_buffer.finalize<%[[CMD]]
-  // CHECK-NEXT: hal.ex.submit_and_wait
   return %0 : !stream.timepoint
 }

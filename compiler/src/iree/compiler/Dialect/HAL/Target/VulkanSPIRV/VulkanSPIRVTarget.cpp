@@ -126,6 +126,10 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
 
+    // Indicates that the runtime HAL driver operates only in the legacy
+    // synchronous mode.
+    configItems.emplace_back(b.getStringAttr("legacy_sync"), b.getUnitAttr());
+
     configItems.emplace_back(b.getStringAttr("executable_targets"),
                              getExecutableTargets(context));
 

@@ -90,7 +90,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
 
   // Submit and wait for dispatches to complete:
   // CHECK: hal.command_buffer.finalize<%[[CMD]] : !hal.command_buffer>
-  // CHECK: hal.ex.submit_and_wait %{{.+}}, %[[CMD]]
+  // CHECK: hal.fence.await
 
   // ===========================================================================
   // @dispatch1 benchmark logic (note two deduplicated dispatches):

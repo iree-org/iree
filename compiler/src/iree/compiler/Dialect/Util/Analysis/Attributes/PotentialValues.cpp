@@ -57,7 +57,7 @@ ChangeStatus ConstantAttributePVS::updateValue(Value value,
   return DFX::clampStateAndIndicateChange(getState(), newState);
 }
 
-const std::string ConstantAttributePVS::getAsStr() const {
+const std::string ConstantAttributePVS::getAsStr(AsmState &asmState) const {
   std::string str;
   llvm::raw_string_ostream sstream(str);
   sstream << "pvs: ";

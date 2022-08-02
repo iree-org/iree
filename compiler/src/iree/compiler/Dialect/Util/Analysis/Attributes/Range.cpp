@@ -45,7 +45,7 @@ void FloatRangeStats::addDomainValue(double value) {
   }
 }
 
-std::string FloatRangeStats::getAsStr() const {
+std::string FloatRangeStats::getAsStr(AsmState &asmState) const {
   if (!valid) return std::string("<<INVALID>>");
   std::string s("[");
   s += std::to_string(minValue);
@@ -157,8 +157,8 @@ ChangeStatus FloatRangeValueElement::updateValue(Value value,
           stats.addDomainValue(elementValue.convertToDouble());
         }
         newState.setAssumed(stats);
-        LLVM_DEBUG(dbgs() << "*** COMPUTED KNOWN RANGE: " << stats.getAsStr()
-                          << "\n");
+        LLVM_DEBUG(dbgs() << "*** COMPUTED KNOWN RANGE: "
+                          << stats.getAsStr(solver.getAsmState()) << "\n");
         newState.indicateOptimisticFixpoint();
       } else {
         // Unknown.
@@ -206,9 +206,12 @@ ChangeStatus FloatRangeValueElement::updateValue(Value value,
               DFX::Resolution::REQUIRED);
 
           newState.applyMinf(lhs.getAssumed(), rhs.getAssumed());
-          LLVM_DEBUG(dbgs() << "VISITING minf: lhs = " << lhs.getAsStr()
-                            << ", rhs = " << rhs.getAsStr() << " -> "
-                            << newState.getAssumed().getAsStr() << "\n");
+          LLVM_DEBUG(dbgs()
+                     << "VISITING minf: lhs = "
+                     << lhs.getAsStr(solver.getAsmState()) << ", rhs = "
+                     << rhs.getAsStr(solver.getAsmState()) << " -> "
+                     << newState.getAssumed().getAsStr(solver.getAsmState())
+                     << "\n");
           return WalkResult::advance();
         } else if (auto maxfOp = dyn_cast<arith::MaxFOp>(definingOp)) {
           auto lhs = solver.getElementFor<FloatRangeValueElement>(
@@ -219,9 +222,12 @@ ChangeStatus FloatRangeValueElement::updateValue(Value value,
               DFX::Resolution::REQUIRED);
 
           newState.applyMaxf(lhs.getAssumed(), rhs.getAssumed());
-          LLVM_DEBUG(dbgs() << "VISITING maxf: lhs = " << lhs.getAsStr()
-                            << ", rhs = " << rhs.getAsStr() << " -> "
-                            << newState.getAssumed().getAsStr() << "\n");
+          LLVM_DEBUG(dbgs()
+                     << "VISITING maxf: lhs = "
+                     << lhs.getAsStr(solver.getAsmState()) << ", rhs = "
+                     << rhs.getAsStr(solver.getAsmState()) << " -> "
+                     << newState.getAssumed().getAsStr(solver.getAsmState())
+                     << "\n");
           return WalkResult::advance();
         } else if (auto floorOp = dyn_cast<math::FloorOp>(definingOp)) {
           auto operand = solver.getElementFor<FloatRangeValueElement>(
@@ -229,8 +235,10 @@ ChangeStatus FloatRangeValueElement::updateValue(Value value,
               DFX::Resolution::REQUIRED);
           newState.applyFloor(operand.getAssumed());
           LLVM_DEBUG(dbgs()
-                     << "VISITING floor: " << operand.getAsStr() << " -> "
-                     << newState.getAssumed().getAsStr() << "\n");
+                     << "VISITING floor: "
+                     << operand.getAsStr(solver.getAsmState()) << " -> "
+                     << newState.getAssumed().getAsStr(solver.getAsmState())
+                     << "\n");
           return WalkResult::advance();
         }
 
@@ -247,10 +255,10 @@ ChangeStatus FloatRangeValueElement::updateValue(Value value,
   return DFX::clampStateAndIndicateChange(getState(), newState);
 }
 
-const std::string FloatRangeValueElement::getAsStr() const {
+const std::string FloatRangeValueElement::getAsStr(AsmState &asmState) const {
   auto range = getAssumed();
   std::string s("fp-range: ");
-  s += range.getAsStr();
+  s += range.getAsStr(asmState);
   return s;
 }
 

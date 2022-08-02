@@ -206,14 +206,16 @@ static void expandSubranges(Operation *op, ExpandedGlobalMap &globalMap,
 // Recursively expands resources into (resource, size, offset, length) tuples
 // within the given |region|. All branches, ops, and nested regions will be
 // processed.
-static void expandRegion(Region &region, ExpandedGlobalMap &globalMap,
-                         IndexSet &indexSet, SubrangeMap subrangeMap) {
+static void expandRegion(Region &region, bool canModifyEntryBlock,
+                         ExpandedGlobalMap &globalMap, IndexSet &indexSet,
+                         SubrangeMap subrangeMap) {
   if (region.empty()) return;
 
   // Update all block arguments.
   auto indexType = IndexType::get(region.getContext());
   for (auto &block : region.getBlocks()) {
     if (!llvm::any_of(block.getArgumentTypes(), isResourceType)) continue;
+    if (block.isEntryBlock() && !canModifyEntryBlock) continue;
 
     // Insert and build a list of expanded (resource, size, offset) tuples.
     SmallVector<Subrange> expansions;
@@ -263,10 +265,11 @@ static void expandRegion(Region &region, ExpandedGlobalMap &globalMap,
 }
 
 // Recursively expands all regions on the op.
-static void expandRegions(Operation *op, ExpandedGlobalMap &globalMap,
-                          IndexSet &indexSet, SubrangeMap subrangeMap) {
+static void expandRegions(Operation *op, bool canModifyEntryBlock,
+                          ExpandedGlobalMap &globalMap, IndexSet &indexSet,
+                          SubrangeMap subrangeMap) {
   for (auto &region : op->getRegions()) {
-    expandRegion(region, globalMap, indexSet, subrangeMap);
+    expandRegion(region, canModifyEntryBlock, globalMap, indexSet, subrangeMap);
   }
 }
 
@@ -381,7 +384,8 @@ static void expandGlobalStoreOp(IREE::Util::GlobalStoreOp op,
 static void expandInitializerOp(IREE::Util::InitializerOp op,
                                 ExpandedGlobalMap &globalMap,
                                 IndexSet &indexSet, SubrangeMap &subrangeMap) {
-  expandRegion(op.getRegion(), globalMap, indexSet, subrangeMap);
+  expandRegion(op.getRegion(), /*canModifyEntryBlock=*/false, globalMap,
+               indexSet, subrangeMap);
 }
 
 // Returns true if |op| is either public and visible to external modules or
@@ -410,7 +414,8 @@ static bool isPublicOrExternal(CallableOpInterface callableOp) {
 static void expandFuncOp(mlir::func::FuncOp op, ExpandedGlobalMap &globalMap,
                          IndexSet &indexSet, SubrangeMap &subrangeMap) {
   // Ignore public/external function signatures but still convert regions.
-  if (!isPublicOrExternal(op)) {
+  bool canModifyEntryBlock = !isPublicOrExternal(op);
+  if (canModifyEntryBlock) {
     auto oldType = op.getFunctionType();
     auto inputTypes = expandTypes(oldType.getInputs());
     auto resultTypes = expandTypes(oldType.getResults());
@@ -419,7 +424,8 @@ static void expandFuncOp(mlir::func::FuncOp op, ExpandedGlobalMap &globalMap,
       op.setType(newType);
     }
   }
-  expandRegion(op.getRegion(), globalMap, indexSet, subrangeMap);
+  expandRegion(op.getRegion(), canModifyEntryBlock, globalMap, indexSet,
+               subrangeMap);
 }
 
 // Splits resource operands and results into (resource, resourceSize,
@@ -565,11 +571,14 @@ static void expandSubranges(Operation *op, ExpandedGlobalMap &globalMap,
   // We could add an interface to ops we want to do this to, though, to at least
   // allow dialects to plug in. For now we just need SCF so this is hardcoded.
   if (auto ifOp = dyn_cast<mlir::scf::IfOp>(op)) {
-    return expandRegions(ifOp, globalMap, indexSet, subrangeMap);
+    return expandRegions(ifOp, /*canModifyEntryBlock=*/false, globalMap,
+                         indexSet, subrangeMap);
   } else if (auto forOp = dyn_cast<mlir::scf::ForOp>(op)) {
-    return expandRegions(forOp, globalMap, indexSet, subrangeMap);
+    return expandRegions(forOp, /*canModifyEntryBlock=*/false, globalMap,
+                         indexSet, subrangeMap);
   } else if (auto whileOp = dyn_cast<mlir::scf::WhileOp>(op)) {
-    return expandRegions(whileOp, globalMap, indexSet, subrangeMap);
+    return expandRegions(whileOp, /*canModifyEntryBlock=*/false, globalMap,
+                         indexSet, subrangeMap);
   }
   // TODO(benvanik): also handle scf.yield: today we don't propagate across
   // return values.

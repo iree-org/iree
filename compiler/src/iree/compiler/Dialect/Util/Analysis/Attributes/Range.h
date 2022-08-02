@@ -94,7 +94,7 @@ struct FloatRangeStats {
     }
   }
 
-  std::string getAsStr() const;
+  std::string getAsStr(AsmState &asmState) const;
 };
 
 // State that tracks floating point ranges and flags.
@@ -165,7 +165,7 @@ class FloatRangeValueElement
   static bool classof(const DFX::AbstractElement *element) {
     return (element->getID() == &ID);
   }
-  const std::string getAsStr() const override;
+  const std::string getAsStr(AsmState &asmState) const override;
 
  private:
   void initializeValue(Value value, DFX::Solver &solver) override;
