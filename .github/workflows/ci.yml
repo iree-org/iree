@@ -303,8 +303,7 @@ jobs:
 
   test_tf_integrations_gpu:
     needs: [build_tf_integrations, build_all]
-    # DO NOT SUBMIT: uncomment this
-    # if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request'
     runs-on:
       # Hacks, and order matters. See the comment at the top of the file.
       - self-hosted
