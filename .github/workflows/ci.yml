@@ -99,7 +99,6 @@ jobs:
       # Hacks, and order matters. See the comment at the top of the file.
       - self-hosted
       - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
-      - cpu
       - os-family=Linux
       - bmuniz-test
     env:
