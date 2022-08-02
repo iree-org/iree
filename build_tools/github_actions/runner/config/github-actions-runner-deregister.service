@@ -6,9 +6,9 @@ Before=halt.target shutdown.target reboot.target
 [Service]
 User=runner
 Group=runner
-WorkingDirectory=${HOME}/config
+WorkingDirectory=/home/runner/config
 Type=oneshot
-ExecStart=${HOME}/config/deregister.sh
+ExecStart=/home/runner/config/deregister.sh
 RemainAfterExit=yes
 
 [Install]
