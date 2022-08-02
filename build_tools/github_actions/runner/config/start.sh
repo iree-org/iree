@@ -16,9 +16,7 @@ SELF_PATH="${SELF_DIR}/${SELF_NAME}"
 
 >&2 echo "Starting runner"
 
-${HOME}/actions-runner/bin/Runner.Listener run --startuptype service
-
-CODE=$?
+${HOME}/actions-runner/bin/Runner.Listener run --startuptype service || CODE=$?
 
 # A return code 3 means the runner stopped because it is updating. Wait a few
 # seconds to let it update and then respawn.
