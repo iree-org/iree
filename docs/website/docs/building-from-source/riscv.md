@@ -150,7 +150,7 @@ tools/iree-compile \
   --iree-llvm-target-cpu=generic-rv64 \
   --iree-llvm-target-abi=lp64d \
   --iree-llvm-target-cpu-features="+m,+a,+f,+d,+v" \
-  --riscv-v-vector-bits-min=256 --riscv-v-fixed-length-vector-lmul-max=8 \
+  --riscv-v-vector-bits-min=512 --riscv-v-fixed-length-vector-lmul-max=8 \
   iree_input.mlir -o mobilenet_cpu.vmfb
 ```
 
@@ -158,7 +158,7 @@ Then run on the RISC-V QEMU:
 
 ```shell hl_lines="2 5"
 ${QEMU_BIN} \
-  -cpu rv64,x-v=true,x-k=true,vlen=256,elen=64,vext_spec=v1.0 \
+  -cpu rv64,x-v=true,x-k=true,vlen=512,elen=64,vext_spec=v1.0 \
   -L ${RISCV_TOOLCHAIN_ROOT}/sysroot/ \
   ../iree-build-riscv/tools/iree-run-module \
   --device=local-task \

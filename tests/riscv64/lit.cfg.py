@@ -16,7 +16,7 @@ config.environment["BUILD_RISCV_DIR"] = BUILD_RISCV_DIR
 test_cmd = [
     os.environ["QEMU_RV64_BIN"],
     "-cpu",
-    "rv64,x-v=true,x-k=true,vlen=256,elen=64,vext_spec=v1.0",
+    "rv64,x-v=true,x-k=true,vlen=512,elen=64,vext_spec=v1.0",
     "-L",
     os.path.join(os.environ["RISCV_TOOLCHAIN_ROOT"], "sysroot"),
 ]
