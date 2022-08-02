@@ -81,6 +81,12 @@ def parse_arguments():
       "-n",
       action="store_true",
       help="Print output without building or pushing any images.")
+  parser.add_argument(
+      "--only_references",
+      "--only-references",
+      action="store_true",
+      help=
+      "Just update references to images using the digests in prod_digests.txt")
 
   args = parser.parse_args()
   for image in args.images:
@@ -183,24 +189,24 @@ def parse_prod_digests() -> Dict[str, str]:
 
 if __name__ == "__main__":
   args = parse_arguments()
-
-  # Ensure the user has the correct authorization to push to GCR.
-  utils.check_gcloud_auth(dry_run=args.dry_run)
-
+  image_urls_to_prod_digests = parse_prod_digests()
   images_to_process = get_ordered_images_to_process(args.images)
   print(f"Also processing dependent images. Will process: {images_to_process}")
 
-  dependencies = get_dependencies(images_to_process)
-  print(f"Pulling image dependencies: {dependencies}")
-  image_urls_to_prod_digests = parse_prod_digests()
-  for dependency in dependencies:
-    dependency_url = posixpath.join(IREE_GCR_URL, dependency)
-    # If `dependency` is a new image then it may not have a prod digest yet.
-    if dependency_url in image_urls_to_prod_digests:
-      digest = image_urls_to_prod_digests[dependency_url]
-      dependency_with_digest = f"{dependency_url}@{digest}"
-      utils.run_command(["docker", "pull", dependency_with_digest],
-                        dry_run=args.dry_run)
+  if not args.only_references:
+    # Ensure the user has the correct authorization to push to GCR.
+    utils.check_gcloud_auth(dry_run=args.dry_run)
+
+    dependencies = get_dependencies(images_to_process)
+    print(f"Pulling image dependencies: {dependencies}")
+    for dependency in dependencies:
+      dependency_url = posixpath.join(IREE_GCR_URL, dependency)
+      # If `dependency` is a new image then it may not have a prod digest yet.
+      if dependency_url in image_urls_to_prod_digests:
+        digest = image_urls_to_prod_digests[dependency_url]
+        dependency_with_digest = f"{dependency_url}@{digest}"
+        utils.run_command(["docker", "pull", dependency_with_digest],
+                          dry_run=args.dry_run)
 
   for image in images_to_process:
     print("\n" * 5 + f"Processing image {image}")
@@ -208,23 +214,27 @@ if __name__ == "__main__":
     tagged_image_url = f"{image_url}"
     image_path = os.path.join(DOCKER_DIR, image)
 
-    utils.run_command(
-        ["docker", "build", "--tag", tagged_image_url, image_path],
-        dry_run=args.dry_run)
+    if args.only_references:
+      digest = image_urls_to_prod_digests[image_url]
+    else:
+      utils.run_command(
+          ["docker", "build", "--tag", tagged_image_url, image_path],
+          dry_run=args.dry_run)
 
-    utils.run_command(["docker", "push", tagged_image_url],
-                      dry_run=args.dry_run)
+      utils.run_command(["docker", "push", tagged_image_url],
+                        dry_run=args.dry_run)
 
-    digest = get_repo_digest(tagged_image_url, args.dry_run)
+      digest = get_repo_digest(tagged_image_url, args.dry_run)
 
-    # Check that the image is in "prod_digests.txt" and append it to the list
-    # in the file if it isn"t.
-    if image_url not in image_urls_to_prod_digests:
-      image_with_digest = f"{image_url}@{digest}"
-      print(
-          f"Adding new image {image_with_digest} to {utils.PROD_DIGESTS_PATH}")
-      if not args.dry_run:
-        with open(utils.PROD_DIGESTS_PATH, "a") as f:
-          f.write(f"{image_with_digest}\n")
+      # Check that the image is in "prod_digests.txt" and append it to the list
+      # in the file if it isn"t.
+      if image_url not in image_urls_to_prod_digests:
+        image_with_digest = f"{image_url}@{digest}"
+        print(
+            f"Adding new image {image_with_digest} to {utils.PROD_DIGESTS_PATH}"
+        )
+        if not args.dry_run:
+          with open(utils.PROD_DIGESTS_PATH, "a") as f:
+            f.write(f"{image_with_digest}\n")
 
     update_references(image_url, digest, dry_run=args.dry_run)
