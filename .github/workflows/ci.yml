@@ -27,7 +27,11 @@ name: CI
 #
 # - We have to do a weird hack to get a pseudo-ternary operator. See
 # https://github.com/actions/runner/issues/409, hence patterns like:
-# runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+# `github.event_name == 'pull_request' && 'presubmit' || 'postsubmit'`
+# to mean `'presubmit' if github.event_name == 'pull_request' else 'postsubmit'`
+# Note that this only works if the true branch value is truthy. If it is falsey
+# then we would always get the false branch condition (`p && false` is always
+# false).
 
 on:
   workflow_dispatch:
@@ -96,7 +100,7 @@ jobs:
 
   build_all:
     runs-on:
-      # Hacks, and order matters. See the comment at the top of the file.
+      # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
       - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
       - cpu
@@ -145,6 +149,32 @@ jobs:
           gcloud alpha storage cp "${BUILD_DIR_ARCHIVE}" "${GCS_ARTIFACT}"
           echo "::set-output name=gcs-artifact::${GCS_ARTIFACT}"
 
+  build_test_all_bazel:
+    runs-on:
+      # Pseudo-ternary hack and order matters. See comment at top of file.
+      - self-hosted
+      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - cpu
+      - os-family=Linux
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
+        with:
+          submodules: true
+      - name: "Building with Bazel"
+        env:
+          # Psuedo-ternary hack. Don't swap the condition! See comment at top of file.
+          IREE_BAZEL_WRITE_REMOTE_CACHE: ${{ github.event_name != 'pull_request' && 1 || 0 }}
+        # This doesn't really need everything in the frontends image, but we
+        # want the cache to be shared with the integrations build (no point
+        # building LLVM twice) and the cache key is the docker container it's
+        # run in (to ensure correct cache hits).
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            gcr.io/iree-oss/frontends-swiftshader@sha256:41e516b8c1b432e3c02896c4bf4b7f06df6a67371aa167b88767b8d4d2018ea6 \
+            ./build_tools/bazel/build_core.sh
+
+
   host_tools_assertions:
     uses: ./.github/workflows/host_tools.yml
     with:
@@ -153,7 +183,7 @@ jobs:
 
   build_tf_integrations:
     runs-on:
-      # Hacks, and order matters. See the comment at the top of the file.
+      # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
       - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
       - cpu
@@ -171,6 +201,8 @@ jobs:
         id: build
         env:
           IREE_TF_BINARIES_OUTPUT_DIR: iree-tf-binaries
+          # Psuedo-ternary hack. Don't swap the condition! See comment at top of file.
+          IREE_BAZEL_WRITE_REMOTE_CACHE: ${{ github.event_name != 'pull_request' && 1 || 0 }}
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "IREE_TF_BINARIES_OUTPUT_DIR=$(realpath "${IREE_TF_BINARIES_OUTPUT_DIR}")" \
@@ -197,7 +229,7 @@ jobs:
   test_all:
     needs: build_all
     runs-on:
-      # Hacks, and order matters. See the comment at the top of the file.
+      # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
       - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
       - cpu
@@ -227,7 +259,7 @@ jobs:
     if: github.event_name != 'pull_request'
     needs: build_all
     runs-on:
-      # Hacks, and order matters. See the comment at the top of the file.
+      # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
       - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
       - gpu
@@ -266,7 +298,7 @@ jobs:
   test_tf_integrations:
     needs: [build_tf_integrations, build_all]
     runs-on:
-      # Hacks, and order matters. See the comment at the top of the file.
+      # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
       - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
       - cpu
@@ -305,7 +337,7 @@ jobs:
     needs: [build_tf_integrations, build_all]
     if: github.event_name != 'pull_request'
     runs-on:
-      # Hacks, and order matters. See the comment at the top of the file.
+      # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
       - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
       - gpu
@@ -347,7 +379,7 @@ jobs:
 
   asan:
     runs-on:
-      # Hacks, and order matters. See the comment at the top of the file.
+      # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
       - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
       - cpu
@@ -365,7 +397,7 @@ jobs:
 
   tsan:
     runs-on:
-      # Hacks, and order matters. See the comment at the top of the file.
+      # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
       - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
       - cpu
@@ -384,7 +416,7 @@ jobs:
   riscv32:
     needs: host_tools_assertions
     runs-on:
-      # Hacks, and order matters. See the comment at the top of the file.
+      # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
       - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
       - cpu
@@ -419,7 +451,7 @@ jobs:
   riscv64:
     needs: [build_all, host_tools_assertions, build_tf_integrations]
     runs-on:
-      # Hacks, and order matters. See the comment at the top of the file.
+      # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
       - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
       - cpu
@@ -477,6 +509,7 @@ jobs:
       - build_runtime
       - test_runtime
       - build_all
+      - build_test_all_bazel
       - test_all
       - test_gpu
       - host_tools_assertions
