@@ -18,7 +18,7 @@ tagging them with `latest` and updating all references to their sha digests:
   python3 build_tools/docker/manage_images.py --image cmake
 
 Print out output for rebuilding the cmake image and all images that
-transitively depend on it, but don"t take side-effecting actions:
+transitively depend on it, but don't take side-effecting actions:
   python3 build_tools/docker/manage_images.py --image cmake --dry-run
 
 Rebuild and push all images and update references to them in the repository:
@@ -102,7 +102,7 @@ def parse_arguments():
 
 def _dag_dfs(input_nodes: Sequence[str],
              node_to_child_nodes: Dict[str, Sequence[str]]) -> List[str]:
-  # Python doesn"t have a builtin OrderedSet, but we don"t have many images, so
+  # Python doesn't have a builtin OrderedSet, but we don't have many images, so
   # we just use a list.
   ordered_nodes = []
 
@@ -227,7 +227,7 @@ if __name__ == "__main__":
       digest = get_repo_digest(tagged_image_url, args.dry_run)
 
       # Check that the image is in "prod_digests.txt" and append it to the list
-      # in the file if it isn"t.
+      # in the file if it isn't.
       if image_url not in image_urls_to_prod_digests:
         image_with_digest = f"{image_url}@{digest}"
         print(
