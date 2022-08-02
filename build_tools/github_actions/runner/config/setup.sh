@@ -13,16 +13,16 @@
 set -euo pipefail
 
 # Register the self-hoster runner
-chmod +x ./register.sh
-./register.sh
+chmod +x ${HOME}/config/register.sh
+${HOME}/config/register.sh
 
 # Setup the deregister service
-sudo cp ./github-actions-runner-deregister.services /etc/systemd/system/
-chmod +x ./deregister.sh
+sudo cp ${HOME}/config/github-actions-runner-deregister.services /etc/systemd/system/
+chmod +x ${HOME}/config/deregister.sh
 
 # Setup the start actions runner service.
-sudo cp ./github-actions-runner-start.services /etc/systemd/system/
-chmod +x ./start.sh
+sudo cp ${HOME}/config/github-actions-runner-start.services /etc/systemd/system/
+chmod +x ${HOME}/config/start.sh
 
 # Reload system service files to reflect changes.
 sudo systemctl daemon-reload
