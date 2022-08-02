@@ -37,3 +37,21 @@ module attributes {tf_saved_model.semantics} {
     return
   }
 }
+
+// -----
+
+// Check for previous error where no early increment happened.
+
+// CHECK-LABEL: module attributes {tf_saved_model.semantics}
+module attributes {tf_saved_model.semantics} {
+
+  "tf_saved_model.global_tensor"() { is_mutable, sym_name = "v", type = tensor<?xf32>, value = dense<1.> : tensor<1xf32> } : () -> ()
+  func.func @f(%arg0: tensor<?xf32> {tf_saved_model.index_path = [0]}, %arg1: tensor<!tf_type.resource<tensor<?xf32>>> {tf_saved_model.bound_input = @v})
+  attributes {tf_saved_model.exported_names = ["f"]} {
+    "tf.AssignVariableOp"(%arg1, %arg0) : (tensor<!tf_type.resource<tensor<?xf32>>>, tensor<?xf32>) -> ()
+    %0 = "tf.ReadVariableOp"(%arg1) : (tensor<!tf_type.resource<tensor<?xf32>>>) -> tensor<?xf32>
+    %1 = "tf.ReadVariableOp"(%arg1) : (tensor<!tf_type.resource<tensor<?xf32>>>) -> tensor<?xf32>
+    return
+  }
+}
+
