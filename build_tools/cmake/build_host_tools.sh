@@ -45,6 +45,9 @@ declare -a CMAKE_ARGS=(
   "-DIREE_BUILD_TESTS=OFF"
   "-DIREE_BUILD_SAMPLES=OFF"
 
+  # Enable building Tracy capture and profiler tools.
+  "-DIREE_BUILD_TRACY=ON"
+
   # Enable CUDA compiler and runtime builds unconditionally. Our CI images all
   # have enough deps to at least build CUDA support and compile CUDA binaries
   # (but not necessarily test on real hardware).
