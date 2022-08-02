@@ -8,7 +8,7 @@
 
 # Checks that Vulkan is working correctly and logs some useful information
 
-set -x
+set -xeuo pipefail
 
 # Print Vulkan related information: SDK version and GPU ICD version
 vulkaninfo 2> /tmp/vulkaninfo.stderr 1> /tmp/vulkaninfo.stdout
