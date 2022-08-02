@@ -15,14 +15,14 @@ source "${SCRIPT_DIR}/functions.sh"
 
 TOKEN_PROXY_URL="$(get_attribute github-token-proxy-url)"
 RUNNER_SCOPE="$(get_attribute github-runner-scope)"
-GOOGLE_CLOUD_RUN_ID_TOKEN=$(curl -sSfL "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=${TOKEN_PROXY_URL}" --header "Metadata-Flavor: Google")
-REMOVE_TOKEN="$(curl -sSfL "${TOKEN_PROXY_URL}/remove" --header "Authorization: Bearer ${GOOGLE_CLOUD_RUN_ID_TOKEN}" --data-binary "{\"scope\": \"${RUNNER_SCOPE}\"}"   | jq -r ".token")"
+GOOGLE_CLOUD_RUN_ID_TOKEN="$(get_metadata "instance/service-accounts/default/identity?audience=${TOKEN_PROXY_URL}")"
+DEREGISTER_TOKEN="$(get_token remove ${RUNNER_SCOPE})"
 
-if [ -z "${REMOVE_TOKEN}" ]; then
+if [ -z "${DEREGISTER_TOKEN}" ]; then
   echo "failed to get remove runner token" >&2
   exit 1
 fi
 
-echo "removing github actions runner "
+echo "removing github actions runner"
 
-${HOME}/actions-runner/config.sh remove --token "${REMOVE_TOKEN}"
+"${HOME}/actions-runner/config.sh remove --token ${DEREGISTER_TOKEN}"

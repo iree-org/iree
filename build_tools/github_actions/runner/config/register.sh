@@ -82,11 +82,10 @@ RUNNER_LABELS="${RUNNER_LABELS}${RUNNER_CUSTOM_LABELS:+,${RUNNER_CUSTOM_LABELS}}
 
 INSTANCE_ID="$(get_metadata instance/id)"
 GOOGLE_CLOUD_PROJECT="$(get_metadata project/project-id)"
-RUNNER_NAME="${GOOGLE_CLOUD_PROJECT}.${INSTANCE_ID}"
 
-GOOGLE_CLOUD_RUN_ID_TOKEN=$(get_metadata "instance/service-accounts/default/identity?audience=${TOKEN_PROXY_URL}")
+GOOGLE_CLOUD_RUN_ID_TOKEN="$(get_metadata "instance/service-accounts/default/identity?audience=${TOKEN_PROXY_URL}")"
 
-REGISTRATION_TOKEN="$(curl -sSfL "${TOKEN_PROXY_URL}/register" --header "Authorization: Bearer ${GOOGLE_CLOUD_RUN_ID_TOKEN}" --data-binary "{\"scope\": \"${RUNNER_SCOPE}\"}" | jq -r ".token")"
+REGISTER_TOKEN="$(get_token register ${RUNNER_SCOPE})"
 
 if [ -z "${REGISTRATION_TOKEN}" ]; then
   echo "failed to get registration runner token" >&2
@@ -97,7 +96,7 @@ declare -a args=(
 --unattended \
 --ephemeral \
 --url "https://github.com/${RUNNER_SCOPE}" \
---name "${RUNNER_NAME}" \
+--name "${HOSTNAME}" \
 --replace \
 --runnergroup "${RUNNER_GROUP}" \
 --labels "${RUNNER_LABELS}"
@@ -110,4 +109,4 @@ declare -a args=(
 # functionality.
 (set -x; : Running configuration with additional args: "${args[@]}")
 
-${HOME}/actions-runner/config.sh --token "${REGISTRATION_TOKEN}" "${args[@]}"
+"${HOME} /actions-runner/config.sh --token ${REGISTER_TOKEN} ${args[@]}"

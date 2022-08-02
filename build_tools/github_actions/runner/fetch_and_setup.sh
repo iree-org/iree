@@ -22,14 +22,18 @@ if [[ "$(whoami)" != "runner" ]]; then
   exit
 fi
 
-cd ${HOME}
+CLONE_TARGET="$(get_attribute clone_target)"
+
+cd "${HOME}"
 rm -rf config
 
 rm -rf /tmp/iree
-git clone https://github.com/iree-org/iree.git /tmp/iree
+git clone "${CLONE_TARGET}" /tmp/iree
 
-cp -r /tmp/iree/build_tools/github_actions/runner/config/ ${HOME}/config
+cp -r /tmp/iree/build_tools/github_actions/runner/config/ "${HOME}/config"
 
 rm -rf /tmp/iree
 
-./config/setup.sh
+cd "${HOME}/config"
+
+./setup.sh
