@@ -96,7 +96,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:Transforms",
         "@mlir-hlo//:chlo_legalize_to_hlo",
-        "@mlir-hlo//:hlo",
+        "@mlir-hlo//:mlir_hlo",
         "@mlir-hlo//:hlo_legalize_shape_ops_to_standard",
         "@mlir-hlo//:hlo_legalize_to_arithmetic",
         "@mlir-hlo//:hlo_legalize_to_lhlo",

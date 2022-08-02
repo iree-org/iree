@@ -28,7 +28,7 @@ cc_library(
         "@llvm-project//mlir:ConversionPasses",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:TosaDialect",
-        "@mlir-hlo//:hlo",
+        "@mlir-hlo//:mlir_hlo",
         "@mlir-hlo//:lhlo",
         "@torch-mlir-dialects//:TorchMLIRTMTensorDialect",
     ],
