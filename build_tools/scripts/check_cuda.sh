@@ -8,7 +8,7 @@
 
 # Checks that CUDA is working correctly and logs some useful information
 
-set -x
+set -xeuo pipefail
 
 dpkg -l | grep nvidia
 nvidia-smi
