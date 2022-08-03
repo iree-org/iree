@@ -17,10 +17,10 @@ get_metadata() {
   ret=0
   curl "${url}" \
     --silent --fail --show-error \
-    --header "Metadata-Flavor: Google" || ret=$?
-  if [[ $ret != 0 ]]; then
+    --header "Metadata-Flavor: Google" || "${ret}"=$?
+  if [[ "${ret}" != 0 ]]; then
     echo "Failed fetching ${url}" >&2
-    return ${ret}
+    return "${ret}"
   fi
 }
 
@@ -44,7 +44,7 @@ is_contained() {
   local match="$1"
   shift
   for e in "$@"; do
-    if [[ "$e" == "$match" ]]; then
+    if [[ "${e}" == "${match}" ]]; then
       return 0
     fi
   done
