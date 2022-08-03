@@ -57,7 +57,7 @@ function get_token() {
   local scope=$2
   local token_proxy_url="$(get_attribute github-token-proxy-url)"
   local cloud_run_id_token="$(get_metadata "instance/service-accounts/default/identity?audience=${token_proxy_url}")"
-  curl -sSfL "${token_proxy_url}/${method}" --header "Authorization: Bearer "${cloud_run_id_token}" \--data-binary {\"scope\": \"${scope}\"} | jq -r ".token")"
+  return "$(curl -sSfL "${token_proxy_url}/${method}" --header "Authorization: Bearer ${cloud_run_id_token}" --data-binary "{\"scope\": \"${runner_scope}\"}" | jq -r ".token")"
 }
 
 ################################################################################
