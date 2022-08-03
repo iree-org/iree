@@ -35,9 +35,9 @@ cc_library(
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo:all_passes",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo:chlo_legalize_to_hlo",
-        "@org_tensorflow//tensorflow/compiler/mlir/hlo:mhlo_to_mhlo_lowering_patterns",
+        "@org_tensorflow//tensorflow/compiler/xla/mlir_hlo",
+        "@org_tensorflow//tensorflow/compiler/xla/mlir_hlo:all_passes",
+        "@org_tensorflow//tensorflow/compiler/xla/mlir_hlo:chlo_legalize_to_hlo",
+        "@org_tensorflow//tensorflow/compiler/xla/mlir_hlo:mhlo_to_mhlo_lowering_patterns",
     ],
 )
