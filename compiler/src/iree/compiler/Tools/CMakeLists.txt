@@ -134,7 +134,6 @@ iree_cc_library(
     MLIRLinalgTransforms
     MLIRMLProgramDialect
     MLIRQuantDialect
-    MLIRQuantTransforms
     MLIRSCFDialect
     MLIRSCFToGPU
     MLIRSCFTransforms
