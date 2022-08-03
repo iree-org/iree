@@ -123,16 +123,15 @@ createResolveExportOrdinalsPass();
 
 // Converts hal.executable.variants to one or more hal.executable.binary ops.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
-createSerializeExecutablesPass(std::string dumpIntermediatesPath = "",
-                               std::string dumpBinariesPath = "",
-                               std::string dumpedSourcesPath = "");
+createSerializeExecutablesPass(int debugLevel = 2,
+                               std::string dumpIntermediatesPath = "",
+                               std::string dumpBinariesPath = "");
 
 // Serializes executables for the specified |target| backend.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
-createSerializeTargetExecutablesPass(StringRef target,
+createSerializeTargetExecutablesPass(StringRef target, int debugLevel = 2,
                                      std::string dumpIntermediatesPath = "",
-                                     std::string dumpBinariesPath = "",
-                                     std::string dumpedSourcesPath = "");
+                                     std::string dumpBinariesPath = "");
 
 //===----------------------------------------------------------------------===//
 // Resource initialization, caching, and optimization

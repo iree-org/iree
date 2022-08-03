@@ -226,9 +226,8 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   if (transformOptions.serializeExecutables) {
     passManager.addNestedPass<IREE::HAL::ExecutableOp>(
         createSerializeExecutablesPass(
-            targetOptions.executableIntermediatesPath,
-            targetOptions.executableBinariesPath,
-            targetOptions.sourceListingPath));
+            targetOptions.debugLevel, targetOptions.executableIntermediatesPath,
+            targetOptions.executableBinariesPath));
 
     // NOTE: symbol DCE will destroy executable target contents, so only run it
     // if we serialized things.

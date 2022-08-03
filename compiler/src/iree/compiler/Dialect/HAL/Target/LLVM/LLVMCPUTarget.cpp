@@ -328,19 +328,16 @@ class LLVMCPUTargetBackend final : public TargetBackend {
                                     .getSExtValue();
 
       std::string sourceFile = "";
-      if (options_.debugSymbols && !options.dumpedSourcesPath.empty()) {
-        // TODO(scotttodd): get this path and loc from an attribute?
-        //     Right now this has to line up with DumpExecutableSourcesPass
-        SmallString<256> pathStorage;
-        llvm::sys::path::append(pathStorage, options.dumpedSourcesPath,
-                                "module_" + exportOp.getName().str() + ".mlir");
-        llvm::sys::fs::make_absolute(pathStorage);
-        (void)llvm::sys::path::remove_dots(pathStorage,
-                                           /*remove_dot_dot=*/true);
-        sourceFile = pathStorage.c_str();
+      int sourceLine = 0;
+      if (options.debugLevel >= 1) {
+        // TODO(scotttodd): Copy findFirstFileLoc() from VulkanSPIRVTarget?
+        if (auto loc = exportOp.getLoc().dyn_cast<FileLineColLoc>()) {
+          sourceFile = loc.getFilename().str();
+          sourceLine = loc.getLine();
+        }
       }
       libraryBuilder.addExport(
-          exportOp.getName(), sourceFile, /*sourceLoc=*/0, /*tag=*/"",
+          exportOp.getName(), sourceFile, sourceLine, /*tag=*/"",
           LibraryBuilder::DispatchAttrs{localMemorySize}, llvmFunc);
     }
 
