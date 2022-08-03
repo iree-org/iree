@@ -861,9 +861,15 @@ def Util_BufferSubspanOp : Util_PureOp<"buffer.subspan", [
     "getTiedResultOperandIndices",
   ]>,
 ]> {
-  let summary = [{returns the buffer storage size in bytes}];
+  let summary = [{returns a reference to a subrange of a buffer}];
   let description = [{
-    Returns the length of the buffer in bytes from its base offset.
+    Returns a logical view into an underlying source buffer. This induces
+    aliasing and multiple SSA values may allow access to the same underlying
+    buffer storage.
+
+    Subspans are a compiler-only concept and are propagated by an analysis pass
+    to result in absolute offsets on accesses any place the subrange would have
+    been used.
   }];
 
   let arguments = (ins
