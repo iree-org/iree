@@ -87,12 +87,12 @@ typedef struct iree_hal_executable_environment_v0_t
 // or some semantic versioning we track in whatever spec we end up having.
 typedef uint32_t iree_hal_executable_library_version_t;
 
-#define IREE_HAL_EXECUTABLE_LIBRARY_VERSION_0_2 0x00000002u
+#define IREE_HAL_EXECUTABLE_LIBRARY_VERSION_0_3 0x00000003u
 
 // The latest version of the library API; can be used to populate the
 // iree_hal_executable_library_header_t::version when building libraries.
 #define IREE_HAL_EXECUTABLE_LIBRARY_VERSION_LATEST \
-  IREE_HAL_EXECUTABLE_LIBRARY_VERSION_0_2
+  IREE_HAL_EXECUTABLE_LIBRARY_VERSION_0_3
 
 // A header present at the top of all versions of the library API used by the
 // runtime to ensure version compatibility.
