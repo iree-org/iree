@@ -22,8 +22,7 @@ if [[ "$(whoami)" != "runner" ]]; then
   exit
 fi
 
-CLONE_TARGET="$(curl -sSfL http://metadata.google.internal/computeMetadata/v1/instance/attributes/github-clone-target \
-    --header Metadata-Flavor: Google)"
+CLONE_TARGET="$(curl -sSfL "http://metadata.google.internal/computeMetadata/v1/instance/attributes/github-clone-target" -H "Metadata-Flavor: Google")"
 
 cd "${HOME}"
 rm -rf config
