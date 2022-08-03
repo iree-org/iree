@@ -13,6 +13,23 @@ package(
 )
 
 cc_library(
+    name = "context_util",
+    srcs = ["context_util.c"],
+    hdrs = ["context_util.h"],
+    deps = [
+        ":device_util",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/base/internal:file_io",
+        "//runtime/src/iree/base/internal:flags",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/modules/hal",
+        "//runtime/src/iree/vm",
+        "//runtime/src/iree/vm:bytecode_module",
+    ],
+)
+
+cc_library(
     name = "cpu_features",
     srcs = ["cpu_features.c"],
     hdrs = ["cpu_features.h"],

@@ -43,8 +43,9 @@ class VmUtilTest : public ::testing::Test {
 TEST_F(VmUtilTest, ParsePrintBuffer) {
   std::string buf_string = "&2x2xi32=[42 43][44 45]";
   vm::ref<iree_vm_list_t> variant_list;
-  IREE_ASSERT_OK(ParseToVariantList(
-      allocator_, std::vector<std::string>{buf_string}, &variant_list));
+  IREE_ASSERT_OK(
+      ParseToVariantList(allocator_, std::vector<std::string>{buf_string},
+                         iree_vm_instance_allocator(instance_), &variant_list));
   std::stringstream os;
   IREE_ASSERT_OK(PrintVariantList(variant_list.get(), &os));
   // TODO(benvanik): add a !hal.buffer printer.
@@ -55,8 +56,9 @@ TEST_F(VmUtilTest, ParsePrintBuffer) {
 TEST_F(VmUtilTest, ParsePrintBufferView) {
   std::string buf_string = "2x2xi32=[42 43][44 45]";
   vm::ref<iree_vm_list_t> variant_list;
-  IREE_ASSERT_OK(ParseToVariantList(
-      allocator_, std::vector<std::string>{buf_string}, &variant_list));
+  IREE_ASSERT_OK(
+      ParseToVariantList(allocator_, std::vector<std::string>{buf_string},
+                         iree_vm_instance_allocator(instance_), &variant_list));
   std::stringstream os;
   IREE_ASSERT_OK(PrintVariantList(variant_list.get(), &os));
   EXPECT_EQ(os.str(),
@@ -66,8 +68,9 @@ TEST_F(VmUtilTest, ParsePrintBufferView) {
 TEST_F(VmUtilTest, ParsePrintScalar) {
   std::string input_string = "42";
   vm::ref<iree_vm_list_t> variant_list;
-  IREE_ASSERT_OK(ParseToVariantList(
-      allocator_, std::vector<std::string>{input_string}, &variant_list));
+  IREE_ASSERT_OK(
+      ParseToVariantList(allocator_, std::vector<std::string>{input_string},
+                         iree_vm_instance_allocator(instance_), &variant_list));
   std::stringstream os;
   IREE_ASSERT_OK(PrintVariantList(variant_list.get(), &os));
   EXPECT_EQ(os.str(), std::string("result[0]: i32=") + input_string + "\n");
@@ -76,8 +79,9 @@ TEST_F(VmUtilTest, ParsePrintScalar) {
 TEST_F(VmUtilTest, ParsePrintRank0BufferView) {
   std::string buf_string = "i32=42";
   vm::ref<iree_vm_list_t> variant_list;
-  IREE_ASSERT_OK(ParseToVariantList(
-      allocator_, std::vector<std::string>{buf_string}, &variant_list));
+  IREE_ASSERT_OK(
+      ParseToVariantList(allocator_, std::vector<std::string>{buf_string},
+                         iree_vm_instance_allocator(instance_), &variant_list));
   std::stringstream os;
   IREE_ASSERT_OK(PrintVariantList(variant_list.get(), &os));
   EXPECT_EQ(os.str(),
@@ -90,7 +94,7 @@ TEST_F(VmUtilTest, ParsePrintMultipleBufferViews) {
   vm::ref<iree_vm_list_t> variant_list;
   IREE_ASSERT_OK(ParseToVariantList(
       allocator_, std::vector<std::string>{buf_string1, buf_string2},
-      &variant_list));
+      iree_vm_instance_allocator(instance_), &variant_list));
   std::stringstream os;
   IREE_ASSERT_OK(PrintVariantList(variant_list.get(), &os));
   EXPECT_EQ(os.str(), std::string("result[0]: hal.buffer_view\n") +

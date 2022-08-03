@@ -409,6 +409,7 @@ IREE_API_EXPORT iree_status_t iree_vm_context_register_modules(
                               "modules[%zu] is null", i);
     }
   }
+  if (!module_count) return iree_ok_status();
 
   IREE_TRACE_ZONE_BEGIN(z0);
 

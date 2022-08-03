@@ -137,7 +137,8 @@ Status RunModule(const IreeModuleInvocation& invocation) {
   }
   vm::ref<iree_vm_list_t> inputs;
   IREE_RETURN_IF_ERROR(ParseToVariantList(iree_hal_device_allocator(device),
-                                          input_views, &inputs));
+                                          input_views, iree_allocator_system(),
+                                          &inputs));
 
   vm::ref<iree_vm_list_t> outputs;
   IREE_RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr, 16,

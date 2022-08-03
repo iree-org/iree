@@ -58,11 +58,11 @@ class CheckModuleTest : public ::testing::Test {
                            iree_vm_function_t function)
       : instance_(instance), modules_(modules), function_(function) {}
   void SetUp() override {
-    IREE_CHECK_OK(iree_vm_context_create_with_modules(
-        instance_,
-        FLAG_trace_execution ? IREE_VM_CONTEXT_FLAG_TRACE_EXECUTION
-                             : IREE_VM_CONTEXT_FLAG_NONE,
-        modules_.size(), modules_.data(), iree_allocator_system(), &context_));
+    IREE_CHECK_OK(iree_tooling_create_context_from_flags(
+        instance_, modules_.count, modules_.values,
+        /*default_device_uri=*/iree_string_view_empty(),
+        iree_vm_instance_allocator(instance_), &context_,
+        /*out_device=*/NULL, /*out_device_allocator=*/NULL));
   }
   void TearDown() override { iree_vm_context_release(context_); }
 
@@ -109,15 +109,14 @@ iree_status_t Run(std::string module_file_path, int* out_exit_code) {
       iree_file_contents_deallocator(flatbuffer_contents),
       iree_allocator_system(), &input_module));
 
-  iree_hal_device_t* device = nullptr;
-  IREE_RETURN_IF_ERROR(iree_hal_create_device_from_flags(
-      iree_hal_default_device_uri(), iree_allocator_system(), &device));
-  iree_vm_module_t* hal_module = nullptr;
-  IREE_RETURN_IF_ERROR(iree_hal_module_create(
-      device, IREE_HAL_MODULE_FLAG_NONE, iree_allocator_system(), &hal_module));
-  iree_vm_module_t* check_module = nullptr;
-  IREE_RETURN_IF_ERROR(
-      iree_check_module_create(iree_allocator_system(), &check_module));
+  // Resolve all system modules required by the user and check modules.
+  iree_vm_module_t* user_modules[2] = {check_module, main_module};
+  iree_tooling_module_list_t modules;
+  iree_tooling_module_list_initialize(&modules);
+  IREE_RETURN_IF_ERROR(iree_tooling_resolve_modules(
+      instance, IREE_ARRAYSIZE(user_modules), user_modules,
+      /*default_device_uri=*/iree_string_view_empty(), host_allocator, &modules,
+      /*out_device=*/NULL, /*out_device_allocator=*/NULL));
 
   std::array<iree_vm_module_t*, 3> modules = {hal_module, check_module,
                                               input_module};

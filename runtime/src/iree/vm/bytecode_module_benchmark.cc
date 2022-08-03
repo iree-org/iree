@@ -75,7 +75,6 @@ static iree_status_t RunFunction(benchmark::State& state,
                                  int result_count, int64_t batch_size = 1) {
   iree_vm_instance_t* instance = NULL;
   IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance));
-  IREE_CHECK_OK(iree_vm_register_builtin_types());
 
   iree_vm_module_t* import_module = NULL;
   IREE_CHECK_OK(

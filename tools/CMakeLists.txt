@@ -48,15 +48,13 @@ iree_cc_binary(
     benchmark
     iree::base
     iree::base::cc
-    iree::base::internal::file_io
     iree::base::internal::flags
     iree::base::tracing
     iree::hal
-    iree::modules::hal
+    iree::tooling::context_util
     iree::tooling::device_util
     iree::tooling::vm_util
     iree::vm
-    iree::vm::bytecode_module
     iree::vm::cc
 )
 
@@ -126,14 +124,12 @@ iree_cc_binary(
   DEPS
     iree::base
     iree::base::cc
-    iree::base::internal::file_io
     iree::base::internal::flags
     iree::base::tracing
-    iree::modules::hal
-    iree::tooling::device_util
+    iree::hal
+    iree::tooling::context_util
     iree::tooling::vm_util
     iree::vm
-    iree::vm::bytecode_module
     iree::vm::cc
 )
 
@@ -259,7 +255,7 @@ if(IREE_BUILD_COMPILER)
       iree::compiler::Tools::init_passes_and_dialects
       iree::compiler::Tools::init_targets
       iree::hal
-      iree::modules::hal
+      iree::tooling::context_util
       iree::tooling::device_util
       iree::tooling::vm_util
       iree::vm

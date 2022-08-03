@@ -33,6 +33,7 @@ namespace iree {
 // The returned variant list must be freed by the caller.
 Status ParseToVariantList(iree_hal_allocator_t* device_allocator,
                           iree::span<const std::string> input_strings,
+                          iree_allocator_t host_allocator,
                           iree_vm_list_t** out_list);
 
 // Prints a variant list of VM scalars and buffers to |os|.
