@@ -22,7 +22,7 @@ if [[ "$(whoami)" != "runner" ]]; then
   exit
 fi
 
-CLONE_TARGET="$(get_attribute clone-target)"
+CLONE_TARGET="$(get_attribute github-clone-target)"
 
 cd "${HOME}"
 rm -rf config
