@@ -318,7 +318,7 @@ function(iree_cc_unified_library)
   set(_LIBS "$<REMOVE_DUPLICATES:$<GENEX_EVAL:$<TARGET_PROPERTY:${_RULE_ROOT},INTERFACE_IREE_TRANSITIVE_OBJECT_LIBS>>>")
 
   # For debugging, write out evaluated objects to a file.
-  file(GENERATE OUTPUT "${_RULE_NAME}.contents.txt" CONTENT
+  file(GENERATE OUTPUT "${_RULE_NAME}.$<CONFIG>.contents.txt" CONTENT
     "OBJECTS:\n${_OBJECTS}\n\nLIBS:\n${_LIBS}\n")
   if(_RULE_SHARED)
     add_library(${_NAME} SHARED ${_OBJECTS})
