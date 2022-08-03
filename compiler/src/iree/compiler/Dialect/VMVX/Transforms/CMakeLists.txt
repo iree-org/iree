@@ -41,6 +41,7 @@ iree_cc_library(
   SRCS
     "Conversion.cpp"
     "Passes.cpp"
+    "ResolveBufferDescriptors.cpp"
   DEPS
     ::PassHeaders
     IREELinalgExtPasses

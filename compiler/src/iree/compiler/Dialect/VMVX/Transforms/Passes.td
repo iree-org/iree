@@ -14,4 +14,9 @@ def Conversion : Pass<"iree-vmvx-conversion", "mlir::ModuleOp"> {
   let constructor = "mlir::iree_compiler::IREE::VMVX::createConversionPass()";
 }
 
+def ResolveBufferDescriptors : Pass<"iree-vmvx-resolve-buffer-descriptors", ""> {
+  let summary = "Resolves any existing vmvx.get_buffer_descriptor ops";
+  let constructor = "mlir::iree_compiler::IREE::VMVX::createResolveBufferDescriptorsPass()";
+}
+
 #endif  // IREE_MODULES_VMVX_PASSES

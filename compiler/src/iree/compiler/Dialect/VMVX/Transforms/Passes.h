@@ -42,6 +42,9 @@ void buildVMVXTransformPassPipeline(OpPassManager &passManager);
 // Converts from various dialects (HAL, standard, etc) to the VMVX dialect.
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createConversionPass();
 
+// Resolves any outstanding get_buffer_descriptor ops.
+std::unique_ptr<OperationPass<>> createResolveBufferDescriptorsPass();
+
 //===----------------------------------------------------------------------===//
 // Register all Passes
 //===----------------------------------------------------------------------===//

@@ -45,6 +45,7 @@ iree_compiler_cc_library(
     srcs = [
         "Conversion.cpp",
         "Passes.cpp",
+        "ResolveBufferDescriptors.cpp",
     ],
     hdrs = ["Passes.h"],
     deps = [
