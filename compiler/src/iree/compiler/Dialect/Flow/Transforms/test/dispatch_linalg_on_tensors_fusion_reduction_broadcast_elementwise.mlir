@@ -158,12 +158,9 @@ func.func @reduction_broadcast_elementwise_dynamic(%a: tensor<12x16x?xf32>, %b: 
   return %42 : tensor<12x16x?xf32>
 }
 
-// When a same indexing map is used for reduction and broadcast with dynamic
-// shape,  their dimension size is guarateed to be the same at runtime, so the
-// case should be supported.
+// Dynamic shape case is not supported yet by the Vulkan codegen. See #9802.
 
 // CHECK-LABEL: func.func @reduction_broadcast_elementwise_dynamic
 //      CHECK: flow.dispatch.workgroups
-//      CHECK:   %[[RED:.+]] = linalg.generic
-//      CHECK:   linalg.generic
-//      CHECK-SAME: %[[RED]]
+//      CHECK: flow.dispatch.workgroups
+
