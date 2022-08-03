@@ -77,6 +77,21 @@ struct HighLevelOptimizationOptions {
 
 // Options controlling scheduling across host/device.
 struct SchedulingOptions {
+  // Defines the execution model used for scheduling work.
+  enum class ExecutionModel {
+    // Host-local code only that does not need execution scheduling.
+    // Disables flow/stream/hal pipelines.
+    HostOnly = 0,
+    // Full HAL using asynchronous host/device execution internally but
+    // exporting functions as if synchronous.
+    AsyncInternal = 1,
+    // Full HAL using asynchronous host/device execution both internally and
+    // externally.
+    AsyncExternal = 2,
+  };
+  // Program execution model specifying scheduling behavior.
+  ExecutionModel executionModel = ExecutionModel::AsyncInternal;
+
   // TODO(benvanik): find a way to share this with
   // Stream/Transforms/PassDetail.h w/o circular deps.
   // Defines the output format of a dump pass.
