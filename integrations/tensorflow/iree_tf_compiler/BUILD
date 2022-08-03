@@ -98,6 +98,7 @@ cc_binary(
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:QuantOps",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TosaDialect",
         "@org_tensorflow//tensorflow/compiler/mlir/lite:flatbuffer_import",
