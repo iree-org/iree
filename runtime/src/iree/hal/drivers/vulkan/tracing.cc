@@ -10,9 +10,9 @@
 
 #include "iree/base/api.h"
 #include "iree/base/target_platform.h"
-#include "third_party/tracy/Tracy.hpp"
-#include "third_party/tracy/client/TracyProfiler.hpp"
-#include "third_party/tracy/common/TracyAlloc.hpp"
+#include "third_party/tracy/public/client/TracyProfiler.hpp"
+#include "third_party/tracy/public/common/TracyAlloc.hpp"
+#include "third_party/tracy/public/tracy/Tracy.hpp"
 
 // Total number of queries the per-queue query pool will contain. This
 // translates to the maximum number of outstanding queries before collection is

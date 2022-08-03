@@ -115,7 +115,7 @@ endfunction()
 # Common library
 #-------------------------------------------------------------------------------
 
-file(GLOB COMMON_SRCS ${TRACY_SOURCE_DIR}/common/*.cpp)
+file(GLOB COMMON_SRCS ${TRACY_SOURCE_DIR}/public/common/*.cpp)
 add_library(IREETracyCommon
   ${COMMON_SRCS}
 )
@@ -139,11 +139,14 @@ target_link_libraries(IREETracyServer
 # IMGUI library
 #-------------------------------------------------------------------------------
 
-file(GLOB IMGUI_SOURCES ${TRACY_SOURCE_DIR}/imgui/*.cpp)
+file(GLOB IMGUI_SOURCES
+  ${TRACY_SOURCE_DIR}/imgui/*.cpp
+  ${TRACY_SOURCE_DIR}/profiler/src/imgui/*.cpp
+)
 add_library(IREETracyIMGUI
   ${IMGUI_SOURCES}
 )
-setup_cxx_options(IREETracyServer)
+setup_cxx_options(IREETracyIMGUI)
 
 #-------------------------------------------------------------------------------
 # Standalone capture server
