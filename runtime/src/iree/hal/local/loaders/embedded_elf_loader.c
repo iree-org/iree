@@ -265,20 +265,20 @@ static iree_status_t iree_hal_elf_executable_issue_call(
   }
   const char* source_file = NULL;
   size_t source_file_length = 0;
-  uint32_t source_loc;
-  if (library->exports.src_files != NULL && library->exports.src_locs != NULL) {
+  uint32_t source_line;
+  if (library->exports.src_locs != NULL) {
     // We have source location data, so use it.
-    source_file = library->exports.src_files[ordinal];
-    source_file_length = strlen(source_file);
-    source_loc = library->exports.src_locs[ordinal];
+    source_file = library->exports.src_locs[ordinal].path;
+    source_file_length = library->exports.src_locs[ordinal].path_length;
+    source_line = library->exports.src_locs[ordinal].line;
   } else {
     // No source location data, so make do with what we have.
     source_file = executable->identifier.data;
     source_file_length = executable->identifier.size;
-    source_loc = ordinal;
+    source_line = ordinal;
   }
   IREE_TRACE_ZONE_BEGIN_EXTERNAL(z0, source_file, source_file_length,
-                                 source_loc, entry_point_name.data,
+                                 source_line, entry_point_name.data,
                                  entry_point_name.size, NULL, 0);
   if (library->exports.tags != NULL) {
     const char* tag = library->exports.tags[ordinal];

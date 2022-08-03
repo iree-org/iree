@@ -124,14 +124,36 @@ static llvm::StructType *makeDispatchAttrsType(llvm::LLVMContext &context) {
   return type;
 }
 
+// %struct.iree_hal_executable_src_loc_v0_t = type {
+//   i32,
+//   i32,
+//   i8*
+// }
+static llvm::StructType *makeSrcLocType(llvm::LLVMContext &context) {
+  if (auto *existingType = llvm::StructType::getTypeByName(
+          context, "iree_hal_executable_src_loc_v0_t")) {
+    return existingType;
+  }
+  auto *i32Type = llvm::IntegerType::getInt32Ty(context);
+  auto *i8PtrType = llvm::IntegerType::getInt8PtrTy(context);
+  auto *type = llvm::StructType::create(context,
+                                        {
+                                            i32Type,
+                                            i32Type,
+                                            i8PtrType,
+                                        },
+                                        "iree_hal_executable_src_loc_v0_t",
+                                        /*isPacked=*/false);
+  return type;
+}
+
 // %struct.iree_hal_executable_export_table_v0_t = type {
 //   i32,
 //   i32*,
 //   %struct.iree_hal_executable_dispatch_attrs_v0_t*,
 //   i8**,
 //   i8**,
-//   i8**,
-//   i32*
+//   %struct.iree_hal_executable_src_loc_v0_t*,
 // }
 static llvm::StructType *makeExportTableType(llvm::LLVMContext &context) {
   if (auto *existingType = llvm::StructType::getTypeByName(
@@ -142,7 +164,7 @@ static llvm::StructType *makeExportTableType(llvm::LLVMContext &context) {
   auto *dispatchFunctionType = makeDispatchFunctionType(context);
   auto *dispatchAttrsType = makeDispatchAttrsType(context);
   auto *i8PtrType = llvm::IntegerType::getInt8PtrTy(context);
-  auto *i32PtrType = llvm::IntegerType::getInt32PtrTy(context);
+  auto *srcLocType = makeSrcLocType(context);
   auto *type = llvm::StructType::create(
       context,
       {
@@ -151,8 +173,7 @@ static llvm::StructType *makeExportTableType(llvm::LLVMContext &context) {
           dispatchAttrsType->getPointerTo(),
           i8PtrType->getPointerTo(),
           i8PtrType->getPointerTo(),
-          i8PtrType->getPointerTo(),
-          i32PtrType,
+          srcLocType->getPointerTo(),
       },
       "iree_hal_executable_export_table_v0_t",
       /*isPacked=*/false);
@@ -339,6 +360,7 @@ llvm::Constant *LibraryBuilder::buildLibraryV0ExportTable(
   auto *exportTableType = makeExportTableType(context);
   auto *dispatchFunctionType = makeDispatchFunctionType(context);
   auto *dispatchAttrsType = makeDispatchAttrsType(context);
+  auto *srcLocType = makeSrcLocType(context);
   auto *i8Type = llvm::IntegerType::getInt8Ty(context);
   auto *i16Type = llvm::IntegerType::getInt16Ty(context);
   auto *i32Type = llvm::IntegerType::getInt32Ty(context);
@@ -434,46 +456,33 @@ llvm::Constant *LibraryBuilder::buildLibraryV0ExportTable(
         exportTagsType, global, ArrayRef<llvm::Constant *>{zero, zero});
   }
 
-  // iree_hal_executable_export_table_v0_t::src_files
-  llvm::Constant *exportSrcFiles =
-      llvm::Constant::getNullValue(i8Type->getPointerTo()->getPointerTo());
-  if (mode == Mode::INCLUDE_REFLECTION_ATTRS) {
-    SmallVector<llvm::Constant *, 4> exportSrcFileValues;
-    for (auto dispatch : exports) {
-      exportSrcFileValues.push_back(
-          getStringConstant(dispatch.sourceFile, module));
-    }
-    auto *exportSrcFilesType = llvm::ArrayType::get(i8Type->getPointerTo(),
-                                                    exportSrcFileValues.size());
-    auto *global = new llvm::GlobalVariable(
-        *module, exportSrcFilesType, /*isConstant=*/true,
-        llvm::GlobalVariable::PrivateLinkage,
-        llvm::ConstantArray::get(exportSrcFilesType, exportSrcFileValues),
-        /*Name=*/libraryName + "_SrcFiles");
-    // TODO(benvanik): force alignment (16? natural pointer width *2?)
-    exportSrcFiles = llvm::ConstantExpr::getInBoundsGetElementPtr(
-        exportSrcFilesType, global, ArrayRef<llvm::Constant *>{zero, zero});
-  }
-
   // iree_hal_executable_export_table_v0_t::src_locs
   llvm::Constant *exportSrcLocs =
-      llvm::Constant::getNullValue(i32Type->getPointerTo());
+      llvm::Constant::getNullValue(srcLocType->getPointerTo());
   if (mode == Mode::INCLUDE_REFLECTION_ATTRS) {
-    SmallVector<llvm::Constant *, 4> sourceLocValues;
+    SmallVector<llvm::Constant *, 4> exportSrcLocValues;
     for (auto dispatch : exports) {
-      sourceLocValues.push_back(
-          llvm::ConstantInt::get(i32Type, dispatch.sourceLoc));
+      exportSrcLocValues.push_back(llvm::ConstantStruct::get(
+          srcLocType,
+          {
+              // line=
+              llvm::ConstantInt::get(i32Type, dispatch.sourceLoc),
+              // path_length=
+              llvm::ConstantInt::get(i32Type, dispatch.sourceFile.length()),
+              // path=
+              getStringConstant(dispatch.sourceFile, module),
+          }));
     }
-    auto *sourceLocsType =
-        llvm::ArrayType::get(i32Type, sourceLocValues.size());
+    auto *exportSrcLocsType =
+        llvm::ArrayType::get(srcLocType, exportSrcLocValues.size());
     auto *global = new llvm::GlobalVariable(
-        *module, sourceLocsType, /*isConstant=*/true,
+        *module, exportSrcLocsType, /*isConstant=*/true,
         llvm::GlobalVariable::PrivateLinkage,
-        llvm::ConstantArray::get(sourceLocsType, sourceLocValues),
+        llvm::ConstantArray::get(exportSrcLocsType, exportSrcLocValues),
         /*Name=*/libraryName + "_src_locs");
-    // TODO(benvanik): force alignment (16? natural pointer width *2?)
+    // TODO(benvanik): force alignment (16? natural pointer width?)
     exportSrcLocs = llvm::ConstantExpr::getInBoundsGetElementPtr(
-        sourceLocsType, global, ArrayRef<llvm::Constant *>{zero, zero});
+        exportSrcLocsType, global, ArrayRef<llvm::Constant *>{zero, zero});
   }
 
   return llvm::ConstantStruct::get(
@@ -488,8 +497,6 @@ llvm::Constant *LibraryBuilder::buildLibraryV0ExportTable(
                            exportNames,
                            // tags=
                            exportTags,
-                           // src_files=
-                           exportSrcFiles,
                            // src_locs=
                            exportSrcLocs,
                        });
