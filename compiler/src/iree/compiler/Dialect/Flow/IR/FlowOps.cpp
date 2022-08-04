@@ -280,6 +280,10 @@ LogicalResult DispatchRegionOp::verify() {
   if (!getBody().getArguments().empty())
     return emitOpError() << "expected no block arguments";
 
+  // Only one block.
+  if (!getBody().hasOneBlock())
+    return emitOpError() << "expected exactly 1 block";
+
   // Verify terminator.
   auto term = dyn_cast<Flow::ReturnOp>(getBody().front().getTerminator());
   if (!term) return emitOpError() << "expected 'flow.return' terminator";
@@ -367,6 +371,79 @@ ValueRange DispatchRegionOp::getResultDynamicDims(unsigned idx) {
   auto shapedType = getResultTypes()[idx].dyn_cast<ShapedType>();
   return getResultDims().slice(counter,
                                shapedType ? shapedType.getNumDynamicDims() : 0);
+}
+
+/// Canonicalizes a DispatchRegionOp: Drop all unused results. Returns `true`
+/// if the IR was modified.
+bool dropUnusedDispatchRegionResults(RewriterBase &rewriter,
+                                     Flow::DispatchRegionOp regionOp) {
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPoint(regionOp);
+
+  // Determine unused results and result types + dynamic dimensions of the new
+  // op.
+  llvm::DenseSet<unsigned> unusedResults;
+  SmallVector<Type> resultTypes;
+  SmallVector<Value> dynamicDims;
+  unsigned dimOffset = 0;
+  for (const auto &it : llvm::enumerate(regionOp.getResults())) {
+    Type type = it.value().getType();
+    auto shapedType = type.dyn_cast<ShapedType>();
+    if (it.value().use_empty()) {
+      unusedResults.insert(it.index());
+    } else {
+      resultTypes.push_back(type);
+      ValueRange dims = regionOp.getResultDims().slice(
+          dimOffset, shapedType.getNumDynamicDims());
+      dynamicDims.append(dims.begin(), dims.end());
+    }
+    dimOffset += shapedType.getNumDynamicDims();
+  }
+  assert(dimOffset == regionOp.getResultDims().size() &&
+         "expected that all dynamic dims were processed");
+
+  // Nothing to do if all results are used.
+  if (unusedResults.empty()) return false;
+
+  // Create new region and move over the body.
+  auto newRegionOp = rewriter.create<Flow::DispatchRegionOp>(
+      regionOp.getLoc(), resultTypes, dynamicDims);
+  newRegionOp.getBody().takeBody(regionOp.getBody());
+
+  // Update terminator.
+  auto returnOp =
+      cast<Flow::ReturnOp>(newRegionOp.getBody().front().getTerminator());
+  SmallVector<Value> yieldedValues;
+  for (const auto &it : llvm::enumerate(returnOp.getOperands()))
+    if (!unusedResults.contains(it.index()))
+      yieldedValues.push_back(it.value());
+  rewriter.updateRootInPlace(
+      returnOp, [&]() { returnOp.operandsMutable().assign(yieldedValues); });
+
+  // Replace all uses of the old op.
+  SmallVector<Value> replacements(regionOp->getNumResults(), nullptr);
+  unsigned resultCounter = 0;
+  for (const auto &it : llvm::enumerate(regionOp.getResults()))
+    if (!unusedResults.contains(it.index()))
+      replacements[it.index()] = newRegionOp->getResult(resultCounter++);
+  rewriter.replaceOp(regionOp, replacements);
+
+  return true;
+}
+
+struct DispatchRegionDropUnusedResults
+    : public OpRewritePattern<DispatchRegionOp> {
+  using OpRewritePattern<DispatchRegionOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(DispatchRegionOp regionOp,
+                                PatternRewriter &rewriter) const final {
+    return success(dropUnusedDispatchRegionResults(rewriter, regionOp));
+  }
+};
+
+void DispatchRegionOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                   MLIRContext *context) {
+  results.add<DispatchRegionDropUnusedResults>(context);
 }
 
 //===----------------------------------------------------------------------===//

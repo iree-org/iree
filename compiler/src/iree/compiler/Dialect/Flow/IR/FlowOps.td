@@ -43,6 +43,7 @@ def FLOW_DispatchRegionOp : FLOW_PureOp<"dispatch.region", [
   let arguments = (ins FLOW_ShapeDynamicDims:$result_dims);
   let results = (outs Variadic<AnyType>:$result);
   let regions = (region AnyRegion:$body);
+  let hasCanonicalizer = 1;
   let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
 

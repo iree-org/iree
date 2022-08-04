@@ -30,6 +30,7 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace Flow {
+class DispatchRegionOp;
 
 // Returns the `combinedOffsets`, `combinedSizes` and `combinedStrides` to use
 // when folding a "producer" **into** a "consumer" op that implement
@@ -57,6 +58,11 @@ void populateTensorSliceOpWithDispatchTensorOpFoldingPatterns(
 
 // Verifies the flow.dispatch.workgroup.size/id/count operations.
 LogicalResult verifyDispatchWorkgroupInfoOp(Operation *op, uint64_t dimension);
+
+// Drop unused results of the given dispatch region. Return `true` if the IR
+// was modified.
+bool dropUnusedDispatchRegionResults(RewriterBase &rewriter,
+                                     Flow::DispatchRegionOp regionOp);
 
 }  // namespace Flow
 }  // namespace IREE

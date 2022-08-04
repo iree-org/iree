@@ -177,3 +177,27 @@ func.func @keep_used_read_write_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi
   }
   return %0#0 : tensor<i32>
 }
+
+// -----
+
+// CHECK-LABEL: func.func @drop_unused_dispatch_region_result
+func.func @drop_unused_dispatch_region_result(
+    %arg0: tensor<?x?xf32>, %arg1: tensor<5x10xf32>, %arg2: tensor<7x11xf32>)
+  -> tensor<?x?xf32>
+{
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %d0 = tensor.dim %arg0, %c0 : tensor<?x?xf32>
+  %d1 = tensor.dim %arg0, %c1 : tensor<?x?xf32>
+  // CHECK: %[[r:.*]] = flow.dispatch.region -> (tensor<?x?xf32>{%{{.*}}, %{{.*}}}) {
+  // CHECK:   %[[slice:.*]] = tensor.insert_slice
+  // CHECK:   flow.return %[[slice]] : tensor<?x?xf32>
+  // CHECK: }
+  %r:2 = flow.dispatch.region -> (tensor<?x?xf32>{%d0, %d1}, tensor<?x?xf32>{%d0, %d1}) {
+    %0 = tensor.insert_slice %arg1 into %arg0[6, 7][5, 10][1, 1] : tensor<5x10xf32> into tensor<?x?xf32>
+    %1 = tensor.insert_slice %arg2 into %0[9, 10][7, 11][1, 1] : tensor<7x11xf32> into tensor<?x?xf32>
+    flow.return %0, %1 : tensor<?x?xf32>, tensor<?x?xf32>
+  }
+  // CHECK: return %[[r]]
+  return %r#0 : tensor<?x?xf32>
+}
