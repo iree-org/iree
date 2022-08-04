@@ -47,15 +47,6 @@ verifySupportedTilingOptions(PatternRewriter &rewriter, Operation *op,
     return rewriter.notifyMatchFailure(op,
                                        "only tiling with scf.for is supported");
   }
-  if (options.distribution) {
-    if (llvm::any_of(options.distribution->distributionMethod,
-                     [](linalg::DistributionMethod method) {
-                       return method != linalg::DistributionMethod::Cyclic;
-                     })) {
-      return rewriter.notifyMatchFailure(op,
-                                         "only cyclic distibution is allowed");
-    }
-  }
   return success();
 }
 
@@ -371,14 +362,11 @@ void TilingInterfaceTilingPass::runOnOperation() {
               buildFlowWorkgroupInfoOp<IREE::Input::DispatchWorkgroupIDOp>(
                   builder, dim),
               buildFlowWorkgroupInfoOp<IREE::Input::DispatchWorkgroupCountOp>(
-                  builder, dim)};
+                  builder, dim),
+              linalg::DistributionMethod::Cyclic};
         }
         return procInfo;
-      },
-      {linalg::DistributionMethod::Cyclic, linalg::DistributionMethod::Cyclic,
-       linalg::DistributionMethod::Cyclic},
-      DenseMap<StringRef,
-               std::function<linalg::ProcInfo(OpBuilder &, Location)>>()};
+      }};
 
   patterns.add<TilingInterfaceTilingPattern>(
       context,

@@ -110,10 +110,6 @@ static void populateTilingToSubgroupPatterns(ArrayRef<int64_t> subgroupCounts,
 
   linalg::LinalgLoopDistributionOptions distributionOptions;
   distributionOptions.procInfo = getSubgroupProcInfoFn;
-  distributionOptions.distributionMethod = {
-      linalg::DistributionMethod::CyclicNumProcsEqNumIters,
-      linalg::DistributionMethod::CyclicNumProcsEqNumIters,
-      linalg::DistributionMethod::CyclicNumProcsEqNumIters};
 
   auto setTileSizesFn = [](OpBuilder &builder, Operation *op) {
     SmallVector<int64_t> tileSizes = getTileSizes(op, 1);

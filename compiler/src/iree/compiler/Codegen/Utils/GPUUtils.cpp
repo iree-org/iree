@@ -28,7 +28,8 @@ llvm::SmallVector<mlir::linalg::ProcInfo, 2> getGPUThreadIdsAndCounts(
     procInfo[numDims - 1 - i] = {
         builder.create<mlir::gpu::ThreadIdOp>(loc, indexType, dimAttr[i]),
         builder.create<mlir::arith::ConstantOp>(
-            loc, builder.getIndexAttr(workgroupSize[i]))};
+            loc, builder.getIndexAttr(workgroupSize[i])),
+        linalg::DistributionMethod::Cyclic};
   }
   return procInfo;
 }
@@ -51,8 +52,10 @@ llvm::SmallVector<mlir::linalg::ProcInfo, 2> getSubgroupIdsAndCounts(
           {subgroupId});
     }
     procInfo[numDims - 1 - i] = {
-        subgroupId, builder.create<mlir::arith::ConstantOp>(
-                        loc, builder.getIndexAttr(numSubgroups[i]))};
+        subgroupId,
+        builder.create<mlir::arith::ConstantOp>(
+            loc, builder.getIndexAttr(numSubgroups[i])),
+        linalg::DistributionMethod::Cyclic};
   }
   return procInfo;
 }

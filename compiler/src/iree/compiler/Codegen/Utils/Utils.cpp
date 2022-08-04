@@ -640,14 +640,11 @@ linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions() {
               buildHALWorkgroupInfoOp<IREE::HAL::InterfaceWorkgroupIDOp>(
                   builder, dim),
               buildHALWorkgroupInfoOp<IREE::HAL::InterfaceWorkgroupCountOp>(
-                  builder, dim)};
+                  builder, dim),
+              linalg::DistributionMethod::Cyclic};
         }
         return procInfo;
-      },
-      {linalg::DistributionMethod::Cyclic, linalg::DistributionMethod::Cyclic,
-       linalg::DistributionMethod::Cyclic},
-      DenseMap<StringRef,
-               std::function<linalg::ProcInfo(OpBuilder &, Location)>>()};
+      }};
 }
 
 void replaceMemrefUsesAndPropagateType(Operation *oldOp, Value val,

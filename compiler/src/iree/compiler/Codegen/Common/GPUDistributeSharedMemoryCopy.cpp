@@ -70,9 +70,6 @@ static void populateTilingCopyToWorkgroupMemPatterns(
   };
   linalg::LinalgLoopDistributionOptions copyInvocationDistributionOptions;
   copyInvocationDistributionOptions.procInfo = getCopyThreadProcInfoFn;
-  copyInvocationDistributionOptions.distributionMethod = {
-      {linalg::DistributionMethod::Cyclic, linalg::DistributionMethod::Cyclic,
-       linalg::DistributionMethod::Cyclic}};
 
   auto tilingOptions =
       linalg::LinalgTilingOptions()
