@@ -268,6 +268,12 @@ PartitioningConfigAttr PartitioningConfigAttr::lookup(Operation *op) {
   return PartitioningConfigAttr::get(favorAttr);
 }
 
+Attribute PartitioningConfigAttr::replaceImmediateSubElements(
+    ArrayRef<Attribute> replAttrs, ArrayRef<Type> replTypes) const {
+  return PartitioningConfigAttr::get(
+      replAttrs[0].cast<IREE::Stream::FavorAttr>());
+}
+
 //===----------------------------------------------------------------------===//
 // !stream.resource<lifetime>
 //===----------------------------------------------------------------------===//

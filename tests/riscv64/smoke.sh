@@ -59,7 +59,7 @@ function generate_llvm_cpu_vmfb {
 
 generate_llvm_cpu_vmfb mhlo \
   "${ROOT_DIR}/tools/test/iree-run-module.mlir" \
-  -o "${BUILD_RISCV_DIR}/iree-run-module-llvm_aot.vmfb"
+  -o "${BUILD_RISCV_DIR}/iree-run-module-llvm_cpu.vmfb"
 
 wget -P "${BUILD_RISCV_DIR}/" "https://storage.googleapis.com/iree-model-artifacts/person_detect.tflite"
 

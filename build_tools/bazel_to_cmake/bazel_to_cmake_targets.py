@@ -62,7 +62,7 @@ EXPLICIT_TARGET_MAPPING = {
         "tensorflow::external_mhlo_includes",
         "ChloPasses",
     ],
-    "@mlir-hlo//:hlo": [
+    "@mlir-hlo//:mlir_hlo": [
         "tensorflow::external_mhlo_includes",
         "ChloDialect",
         "MhloDialect",
