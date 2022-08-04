@@ -14,6 +14,7 @@ iree_check_single_backend_test_suite(
   NAME
     check_dylib-llvm-aot_dylib
   SRCS
+    "layernorm.mlir"
     "reduction_broadcast_elementwise.mlir"
     "softmax.mlir"
   TARGET_BACKEND
@@ -28,6 +29,7 @@ iree_check_single_backend_test_suite(
   NAME
     check_vmvx_vmvx
   SRCS
+    "layernorm.mlir"
     "reduction_broadcast_elementwise.mlir"
     "softmax.mlir"
   TARGET_BACKEND
@@ -42,6 +44,7 @@ iree_check_single_backend_test_suite(
   NAME
     check_vmvx_vmvx_microkernels
   SRCS
+    "layernorm.mlir"
     "reduction_broadcast_elementwise.mlir"
     "softmax.mlir"
   TARGET_BACKEND
@@ -57,6 +60,7 @@ iree_check_single_backend_test_suite(
   NAME
     check_vulkan-spirv_vulkan
   SRCS
+    "layernorm.mlir"
     "reduction_broadcast_elementwise.mlir"
     "softmax.mlir"
   TARGET_BACKEND

@@ -18,6 +18,7 @@ package(
 
 LLVM_SRCS = enforce_glob(
     [
+        "layernorm.mlir",
         "reduction_broadcast_elementwise.mlir",
         "softmax.mlir",
     ],
@@ -34,6 +35,7 @@ iree_check_single_backend_test_suite(
 
 VMVX_SRCS = enforce_glob(
     [
+        "layernorm.mlir",
         "reduction_broadcast_elementwise.mlir",
         "softmax.mlir",
     ],
@@ -52,6 +54,7 @@ iree_check_single_backend_test_suite(
 
 VMVX_MICROKERNELS_SRCS = enforce_glob(
     [
+        "layernorm.mlir",
         "reduction_broadcast_elementwise.mlir",
         "softmax.mlir",
     ],
@@ -72,6 +75,7 @@ iree_check_single_backend_test_suite(
 
 VULKAN_SRCS = enforce_glob(
     [
+        "layernorm.mlir",
         "reduction_broadcast_elementwise.mlir",
         "softmax.mlir",
     ],
