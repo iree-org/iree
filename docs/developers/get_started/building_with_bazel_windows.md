@@ -115,5 +115,5 @@ Translate a
 and execute a function in the compiled module:
 
 ```powershell
-> .\bazel-bin\tools\iree-run-mlir.exe .\iree\samples\models\simple_abs.mlir --function-input="f32=-2" --iree-hal-target-backends=vmvx --print-mlir
+> .\bazel-bin\tools\iree-run-mlir.exe --function-input="f32=-2" --iree-hal-target-backends=vmvx --print-mlir .\iree\samples\models\simple_abs.mlir
 ```
