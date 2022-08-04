@@ -624,6 +624,12 @@ void SetupVmBindings(pybind11::module m) {
   py::class_<VmModule>(m, "VmModule")
       .def_static("from_flatbuffer", &VmModule::FromFlatbufferBlob)
       .def_property_readonly("name", &VmModule::name)
+      .def_property_readonly("version",
+                             [](VmModule& self) {
+                               iree_vm_module_signature_t sig =
+                                   iree_vm_module_signature(self.raw_ptr());
+                               return sig.version;
+                             })
       .def("lookup_function", &VmModule::LookupFunction, py::arg("name"),
            py::arg("linkage") = IREE_VM_FUNCTION_LINKAGE_EXPORT)
       .def_property_readonly(

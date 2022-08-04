@@ -401,7 +401,7 @@ extern "C" iree_status_t iree_check_module_create(
   IREE_ASSERT_ARGUMENT(out_module);
   *out_module = NULL;
   auto module = std::make_unique<CheckModule>(
-      "check", allocator,
+      "check", /*version=*/0, allocator,
       iree::span<const vm::NativeFunction<CheckModuleState>>(
           kCheckModuleFunctions));
   *out_module = module.release()->interface();

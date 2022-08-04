@@ -86,7 +86,7 @@ static iree_string_view_t IREE_API_PTR iree_vm_native_module_name(void* self) {
   if (module->user_interface.name) {
     return module->user_interface.name(module->self);
   }
-  return module->descriptor->module_name;
+  return module->descriptor->name;
 }
 
 static iree_vm_module_signature_t IREE_API_PTR
@@ -95,11 +95,13 @@ iree_vm_native_module_signature(void* self) {
   if (module->user_interface.signature) {
     return module->user_interface.signature(module->self);
   }
-  iree_vm_module_signature_t signature;
-  memset(&signature, 0, sizeof(signature));
-  signature.import_function_count = module->descriptor->import_count;
-  signature.export_function_count = module->descriptor->export_count;
-  signature.internal_function_count = 0;  // unused
+  iree_vm_module_signature_t signature = {
+      .version = module->descriptor->version,
+      .attr_count = module->descriptor->attr_count,
+      .import_function_count = module->descriptor->import_count,
+      .export_function_count = module->descriptor->export_count,
+      .internal_function_count = 0,  // unused
+  };
   return signature;
 }
 
@@ -109,10 +111,26 @@ static iree_status_t IREE_API_PTR iree_vm_native_module_get_module_attr(
   if (module->user_interface.get_module_attr) {
     return module->user_interface.get_module_attr(module->self, index,
                                                   out_attr);
-  } else if (index >= module->descriptor->module_attr_count) {
+  } else if (index >= module->descriptor->attr_count) {
     return iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
   }
-  *out_attr = module->descriptor->module_attrs[index];
+  *out_attr = module->descriptor->attrs[index];
+  return iree_ok_status();
+}
+
+static iree_status_t iree_vm_native_module_enumerate_dependencies(
+    void* self, iree_vm_module_dependency_callback_t callback,
+    void* user_data) {
+  iree_vm_native_module_t* module = (iree_vm_native_module_t*)self;
+  if (module->user_interface.enumerate_dependencies) {
+    return module->user_interface.enumerate_dependencies(module->self, callback,
+                                                         user_data);
+  }
+  for (iree_host_size_t i = 0; i < module->descriptor->dependency_count; ++i) {
+    const iree_vm_module_dependency_t* dependency =
+        &module->descriptor->dependencies[i];
+    IREE_RETURN_IF_ERROR(callback(user_data, dependency));
+  }
   return iree_ok_status();
 }
 
@@ -242,8 +260,8 @@ static iree_status_t IREE_API_PTR iree_vm_native_module_lookup_function(
   }
   return iree_make_status(
       IREE_STATUS_NOT_FOUND, "no function %.*s.%.*s exported by module",
-      (int)module->descriptor->module_name.size,
-      module->descriptor->module_name.data, (int)name.size, name.data);
+      (int)module->descriptor->name.size, module->descriptor->name.data,
+      (int)name.size, name.data);
 }
 
 static iree_status_t IREE_API_PTR
@@ -469,6 +487,8 @@ IREE_API_EXPORT iree_status_t iree_vm_native_module_initialize(
   module->base_interface.signature = iree_vm_native_module_signature;
   module->base_interface.get_module_attr =
       iree_vm_native_module_get_module_attr;
+  module->base_interface.enumerate_dependencies =
+      iree_vm_native_module_enumerate_dependencies;
   module->base_interface.lookup_function =
       iree_vm_native_module_lookup_function;
   module->base_interface.get_function = iree_vm_native_module_get_function;

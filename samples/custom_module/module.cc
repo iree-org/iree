@@ -189,7 +189,7 @@ extern "C" iree_status_t iree_custom_module_create(
   IREE_ASSERT_ARGUMENT(out_module);
   *out_module = NULL;
   auto module = std::make_unique<CustomModule>(
-      "custom", allocator,
+      "custom", /*version=*/0, allocator,
       iree::span<const vm::NativeFunction<CustomModuleState>>(
           kCustomModuleFunctions));
   *out_module = module.release()->interface();

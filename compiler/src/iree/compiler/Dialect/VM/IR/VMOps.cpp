@@ -75,6 +75,23 @@ LogicalResult ModuleOp::verify() {
   return success();
 }
 
+SmallVector<ModuleOp::Dependency> ModuleOp::getDependencies() {
+  std::map<StringRef, Dependency> dependencies;
+  for (auto importOp : getOps<IREE::VM::ImportOp>()) {
+    auto [moduleName, importName] = importOp.getName().split(".");
+    auto &dependency = dependencies[moduleName];
+    dependency.name = moduleName;
+    if (!importOp.getIsOptional()) {
+      dependency.minimumVersion = std::max(
+          dependency.minimumVersion, importOp.getMinimumVersion().value_or(0u));
+      // Any required import in the module makes the entire module required.
+      dependency.isOptional = false;
+    }
+  }
+  return llvm::to_vector(
+      llvm::map_range(dependencies, [](auto it) { return it.second; }));
+}
+
 ParseResult FuncOp::parse(OpAsmParser &parser, OperationState &result) {
   auto buildFuncType =
       [](Builder &builder, ArrayRef<Type> argTypes, ArrayRef<Type> results,

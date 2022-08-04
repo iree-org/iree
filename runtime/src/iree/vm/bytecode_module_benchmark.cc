@@ -46,15 +46,18 @@ static_assert(IREE_ARRAYSIZE(native_import_module_funcs_) ==
               "function pointer table must be 1:1 with exports");
 static const iree_vm_native_module_descriptor_t
     native_import_module_descriptor_ = {
-        iree_make_cstring_view("native_import_module"),
-        0,
-        NULL,
-        0,
-        NULL,
-        IREE_ARRAYSIZE(native_import_module_exports_),
-        native_import_module_exports_,
-        IREE_ARRAYSIZE(native_import_module_funcs_),
-        native_import_module_funcs_,
+        /*.name=*/iree_make_cstring_view("native_import_module"),
+        /*.version=*/0u,
+        /*.attr_count=*/0,
+        /*.attrs=*/NULL,
+        /*.dependency_count=*/0,
+        /*.dependencies=*/NULL,
+        /*.import_count=*/0,
+        /*.imports=*/NULL,
+        /*.export_count=*/IREE_ARRAYSIZE(native_import_module_exports_),
+        /*.exports=*/native_import_module_exports_,
+        /*.import_count=*/IREE_ARRAYSIZE(native_import_module_funcs_),
+        /*.imports=*/native_import_module_funcs_,
 };
 
 static iree_status_t native_import_module_create(

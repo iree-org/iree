@@ -150,41 +150,22 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
     return ("{\"" + s + "\", " + std::to_string(s.size()) + "}").str();
   };
 
-  // exports
-  SmallVector<func::FuncOp, 4> exportedFunctions;
-  for (auto func : moduleOp.getOps<func::FuncOp>()) {
-    if (func.getOperation()->hasAttr("vm.export_name")) {
-      exportedFunctions.push_back(func);
-    }
-  }
-  auto extractExportName = [](func::FuncOp funcOp) {
-    return funcOp.getOperation()->getAttr("vm.export_name").cast<StringAttr>();
-  };
-
-  std::string exportName = moduleName + "_exports_";
-  output << "static const iree_vm_native_export_descriptor_t " << exportName
+  // dependencies
+  std::string dependenciesName = moduleName + "_dependencies_";
+  output << "static const iree_vm_module_dependency_t " << dependenciesName
          << "[] = {\n";
-  if (exportedFunctions.empty()) {
+  auto dependencies = moduleOp.getDependencies();
+  if (dependencies.empty()) {
     // Empty list placeholder.
     output << "    {{0}},\n";
   } else {
-    // sort export ops
-    llvm::sort(exportedFunctions, [&extractExportName](auto &lhs, auto &rhs) {
-      return extractExportName(lhs).compare(extractExportName(rhs)) < 0;
-    });
-    for (auto funcOp : exportedFunctions) {
-      StringAttr exportName = extractExportName(funcOp);
-      StringAttr callingConvention = funcOp.getOperation()
-                                         ->getAttr("vm.calling_convention")
-                                         .cast<StringAttr>();
-      if (!callingConvention) {
-        return funcOp.emitError("Couldn't find calling convention attribute");
-      }
-
-      // TODO(simon-camp): support function-level reflection attributes
-      output << "{" << printStringView(exportName) << ", "
-             << printStringView(callingConvention.getValue())
-             << ", 0, NULL},\n";
+    for (auto &dependency : dependencies) {
+      output << "{" << printStringView(dependency.name) << ", "
+             << dependency.minimumVersion << ", "
+             << (dependency.isOptional
+                     ? "IREE_VM_MODULE_DEPENDENCY_FLAG_OPTIONAL"
+                     : "IREE_VM_MODULE_DEPENDENCY_FLAG_REQUIRED")
+             << "},\n";
     }
   }
   output << "};\n";
@@ -210,6 +191,45 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
              << (importOp.getIsOptional() ? "IREE_VM_NATIVE_IMPORT_OPTIONAL"
                                           : "IREE_VM_NATIVE_IMPORT_REQUIRED")
              << ", " << printStringView(importOp.getName()) << "},\n";
+    }
+  }
+  output << "};\n";
+  output << "\n";
+
+  // exports
+  SmallVector<func::FuncOp, 4> exportedFunctions;
+  for (auto func : moduleOp.getOps<func::FuncOp>()) {
+    if (func.getOperation()->hasAttr("vm.export_name")) {
+      exportedFunctions.push_back(func);
+    }
+  }
+  auto extractExportName = [](func::FuncOp funcOp) {
+    return funcOp.getOperation()->getAttr("vm.export_name").cast<StringAttr>();
+  };
+  std::string exportName = moduleName + "_exports_";
+  output << "static const iree_vm_native_export_descriptor_t " << exportName
+         << "[] = {\n";
+  if (exportedFunctions.empty()) {
+    // Empty list placeholder.
+    output << "    {{0}},\n";
+  } else {
+    // sort export ops
+    llvm::sort(exportedFunctions, [&extractExportName](auto &lhs, auto &rhs) {
+      return extractExportName(lhs).compare(extractExportName(rhs)) < 0;
+    });
+    for (auto funcOp : exportedFunctions) {
+      StringAttr exportName = extractExportName(funcOp);
+      StringAttr callingConvention = funcOp.getOperation()
+                                         ->getAttr("vm.calling_convention")
+                                         .cast<StringAttr>();
+      if (!callingConvention) {
+        return funcOp.emitError("Couldn't find calling convention attribute");
+      }
+
+      // TODO(simon-camp): support function-level reflection attributes
+      output << "{" << printStringView(exportName) << ", "
+             << printStringView(callingConvention.getValue())
+             << ", 0, NULL},\n";
     }
   }
   output << "};\n";
@@ -241,13 +261,28 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   std::string descriptorName = moduleName + "_descriptor_";
   output << "static const iree_vm_native_module_descriptor_t " << descriptorName
          << " = {\n"
-         << printStringView(moduleName) << ",\n"
+         // name:
+         << printStringView(moduleName)
+         << ",\n"
+         // version:
+         << moduleOp.getVersion().value_or(0u)
+         << ",\n"
+         // attrs:
          << "0,\n"
          << "NULL,\n"
+         // dependencies:
+         << dependencies.size() << ",\n"
+         << dependenciesName
+         << ",\n"
+         // imports:
          << importOps.size() << ",\n"
-         << importName << ",\n"
+         << importName
+         << ",\n"
+         // exports:
          << exportedFunctions.size() << ",\n"
-         << exportName << ",\n"
+         << exportName
+         << ",\n"
+         // functions:
          << exportedFunctions.size() << ",\n"
          << functionName << ",\n"
          << "};\n";

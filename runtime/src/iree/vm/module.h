@@ -97,6 +97,10 @@ typedef struct iree_vm_function_signature_t {
 
 // Describes the imports, exports, and capabilities of a module.
 typedef struct iree_vm_module_signature_t {
+  // Module version.
+  uint32_t version;
+  // Total number of module-level attributes.
+  iree_host_size_t attr_count;
   // Total number of imported functions.
   iree_host_size_t import_function_count;
   // Total number of exported functions.
@@ -106,13 +110,42 @@ typedef struct iree_vm_module_signature_t {
   iree_host_size_t internal_function_count;
 } iree_vm_module_signature_t;
 
+// Defines the behavior of dependency resolution.
+enum iree_vm_module_dependency_flag_bits_t {
+  IREE_VM_MODULE_DEPENDENCY_FLAG_NONE = 0u,
+  // Module is required and must have the minimum version specified.
+  // Individual imports may still be optional.
+  IREE_VM_MODULE_DEPENDENCY_FLAG_REQUIRED = 1u << 0,
+  // Module is optional and if not present the module will still load. All
+  // methods imported from the module must also be marked optional.
+  IREE_VM_MODULE_DEPENDENCY_FLAG_OPTIONAL = 1u << 1,
+};
+typedef uint32_t iree_vm_module_dependency_flags_t;
+
+// Describes a module's dependency on another module.
+typedef struct iree_vm_module_dependency_t {
+  // Name of the module (`hal`, etc).
+  iree_string_view_t name;
+  // Minimum required version in order to satisfy the dependency.
+  uint32_t minimum_version;
+  // Flags controlling the dependency resolution behavior.
+  iree_vm_module_dependency_flags_t flags;
+} iree_vm_module_dependency_t;
+
+// Callback issued as part of module dependency enumeration.
+// The dependency and references such as the module name are only valid for the
+// duration of the callback and callers must copy them out in order to extend
+// their lifetime.
+typedef iree_status_t(IREE_API_PTR* iree_vm_module_dependency_callback_t)(
+    void* user_data_ptr, const iree_vm_module_dependency_t* dependency);
+
 // Internal storage for the module state.
 // Thread-compatible; it's expected that only one thread at a time is executing
 // VM functions and accessing this state.
 typedef struct iree_vm_module_state_t iree_vm_module_state_t;
 
 //===----------------------------------------------------------------------===//
-// Function calls and coroutines
+// Function ABI management
 //===----------------------------------------------------------------------===//
 
 // A variable-length list of registers.
@@ -328,6 +361,11 @@ typedef struct iree_vm_module_t {
   // Returns the reflected signature of the module.
   iree_vm_module_signature_t(IREE_API_PTR* signature)(void* self);
 
+  // Enumerates all module dependencies.
+  iree_status_t(IREE_API_PTR* enumerate_dependencies)(
+      void* self, iree_vm_module_dependency_callback_t callback,
+      void* user_data);
+
   // Gets a reflection attribute for the module by attribute index.
   // The returned key and value strings are guaranteed valid for the life
   // of the module. Note that not all modules have reflection attributes.
@@ -451,6 +489,13 @@ IREE_API_EXPORT iree_status_t
 iree_vm_module_get_attr(const iree_vm_module_t* module, iree_host_size_t index,
                         iree_string_pair_t* out_attr);
 
+// Enumerates all modules that |module| depends on, calling the provided
+// |callback| once per module.
+// Failures from the callback will be propagated to the caller.
+IREE_API_EXPORT iree_status_t iree_vm_module_enumerate_dependencies(
+    iree_vm_module_t* module, iree_vm_module_dependency_callback_t callback,
+    void* user_data);
+
 // Looks up a function with the given name and linkage in the |module|.
 // This may perform a linear scan and results should be cached.
 IREE_API_EXPORT iree_status_t iree_vm_module_lookup_function_by_name(
@@ -467,6 +512,10 @@ IREE_API_EXPORT iree_status_t iree_vm_module_lookup_function_by_ordinal(
 IREE_API_EXPORT iree_status_t iree_vm_module_resolve_source_location(
     const iree_vm_module_t* module, iree_vm_stack_frame_t* frame,
     iree_vm_source_location_t* out_source_location);
+
+//===----------------------------------------------------------------------===//
+// iree_vm_function_t
+//===----------------------------------------------------------------------===//
 
 // Returns the name of the given function or empty string if not available.
 IREE_API_EXPORT iree_string_view_t

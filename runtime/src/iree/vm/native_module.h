@@ -84,11 +84,18 @@ typedef struct iree_vm_native_module_descriptor_t {
   IREE_API_UNSTABLE
 
   // Name of the module prefixed on all exported functions.
-  iree_string_view_t module_name;
+  iree_string_view_t name;
+
+  // Version of the module used during dependency resolution.
+  uint32_t version;
 
   // An optional list of module-level reflection attributes.
-  iree_host_size_t module_attr_count;
-  const iree_string_pair_t* module_attrs;
+  iree_host_size_t attr_count;
+  const iree_string_pair_t* attrs;
+
+  // Modules that the native module depends upon.
+  iree_host_size_t dependency_count;
+  const iree_vm_module_dependency_t* dependencies;
 
   // All imported function descriptors.
   // interface.resolve_import will be called for each import.

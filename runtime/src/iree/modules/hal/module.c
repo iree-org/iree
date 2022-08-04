@@ -17,6 +17,9 @@
 #include "iree/modules/hal/utils/buffer_diagnostics.h"
 #include "iree/vm/api.h"
 
+#define IREE_HAL_MODULE_VERSION_0_0 0x00000000u
+#define IREE_HAL_MODULE_VERSION_LATEST IREE_HAL_MODULE_VERSION_0_0
+
 // Limit the number of bindings we pass down through the HAL. This can be tuned
 // in the future but right now guards the stack from blowing up during calls.
 #define IREE_HAL_MODULE_MAX_DESCRIPTOR_BINDING_COUNT ((iree_host_size_t)32)
@@ -1492,9 +1495,12 @@ static_assert(IREE_ARRAYSIZE(iree_hal_module_funcs_) ==
               "function pointer table must be 1:1 with exports");
 
 static const iree_vm_native_module_descriptor_t iree_hal_module_descriptor_ = {
-    .module_name = iree_string_view_literal("hal"),
-    .module_attr_count = 0,
-    .module_attrs = NULL,
+    .name = iree_string_view_literal("hal"),
+    .version = IREE_HAL_MODULE_VERSION_LATEST,
+    .attr_count = 0,
+    .attrs = NULL,
+    .dependency_count = 0,
+    .dependencies = NULL,
     .import_count = 0,  // workaround for 0-length C struct
     .imports = iree_hal_module_imports_,
     .export_count = IREE_ARRAYSIZE(iree_hal_module_exports_),

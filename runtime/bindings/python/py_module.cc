@@ -34,6 +34,8 @@ class PyModuleInterface {
     interface_.destroy = &PyModuleInterface::ModuleDestroy;
     interface_.name = &PyModuleInterface::ModuleName;
     interface_.signature = &PyModuleInterface::ModuleSignature;
+    interface_.enumerate_dependencies =
+        &PyModuleInterface::ModuleEnumerateDependencies;
     interface_.get_function = &PyModuleInterface::ModuleGetFunction;
     interface_.lookup_function = &PyModuleInterface::ModuleLookupFunction;
     interface_.alloc_state = &PyModuleInterface::ModuleAllocState;
@@ -42,41 +44,50 @@ class PyModuleInterface {
     interface_.notify = &PyModuleInterface::ModuleNotify;
     interface_.begin_call = &PyModuleInterface::ModuleBeginCall;
   }
-  PyModuleInterface(const PyModuleInterface &) = delete;
+  PyModuleInterface(const PyModuleInterface&) = delete;
   ~PyModuleInterface() = default;
 
-  static PyModuleInterface *AsSelf(void *vself) {
-    return static_cast<PyModuleInterface *>(vself);
+  static PyModuleInterface* AsSelf(void* vself) {
+    return static_cast<PyModuleInterface*>(vself);
   }
 
-  static void ModuleDestroy(void *vself) {
+  static void ModuleDestroy(void* vself) {
     auto self = AsSelf(vself);
     py::gil_scoped_acquire acquire;
     self->retained_self_ref_ = {};
   }
 
-  static iree_string_view_t ModuleName(void *vself) {
+  static iree_string_view_t ModuleName(void* vself) {
     auto self = AsSelf(vself);
     return {self->module_name_.data(), self->module_name_.size()};
   }
 
-  static iree_vm_module_signature_t ModuleSignature(void *vself) {
+  static iree_vm_module_signature_t ModuleSignature(void* vself) {
     auto self = AsSelf(vself);
     iree_vm_module_signature_t signature = {0};
-    signature.import_function_count = 0;
+    signature.version = self->descriptor_.version;
+    signature.attr_count = 0;
+    signature.import_function_count = self->imports_.size();
     signature.export_function_count = self->exports_.size();
     signature.internal_function_count = 0;
     return signature;
   }
 
+  static iree_status_t ModuleEnumerateDependencies(
+      void* vself, iree_vm_module_dependency_callback_t callback,
+      void* user_data) {
+    // TODO(laurenzo): python support for declaring dependencies on the module.
+    return iree_ok_status();
+  }
+
   static iree_status_t ModuleGetFunction(
-      void *vself, iree_vm_function_linkage_t linkage, iree_host_size_t ordinal,
-      iree_vm_function_t *out_function, iree_string_view_t *out_name,
-      iree_vm_function_signature_t *out_signature) {
+      void* vself, iree_vm_function_linkage_t linkage, iree_host_size_t ordinal,
+      iree_vm_function_t* out_function, iree_string_view_t* out_name,
+      iree_vm_function_signature_t* out_signature) {
     auto self = AsSelf(vself);
     if (IREE_LIKELY(linkage == IREE_VM_FUNCTION_LINKAGE_EXPORT)) {
       if (IREE_LIKELY(ordinal < self->export_functions_.size())) {
-        std::unique_ptr<PyFunction> &f = self->export_functions_[ordinal];
+        std::unique_ptr<PyFunction>& f = self->export_functions_[ordinal];
         if (IREE_LIKELY(out_function)) {
           out_function->linkage = linkage;
           out_function->module = &self->interface_;
@@ -95,10 +106,10 @@ class PyModuleInterface {
     return iree_make_status(IREE_STATUS_NOT_FOUND);
   }
 
-  static iree_status_t ModuleLookupFunction(void *vself,
+  static iree_status_t ModuleLookupFunction(void* vself,
                                             iree_vm_function_linkage_t linkage,
                                             iree_string_view_t name,
-                                            iree_vm_function_t *out_function) {
+                                            iree_vm_function_t* out_function) {
     auto self = AsSelf(vself);
     std::string_view name_cpp(name.data, name.size);
     if (linkage == IREE_VM_FUNCTION_LINKAGE_EXPORT) {
@@ -115,8 +126,8 @@ class PyModuleInterface {
   }
 
   static iree_status_t ModuleAllocState(
-      void *vself, iree_allocator_t allocator,
-      iree_vm_module_state_t **out_module_state) {
+      void* vself, iree_allocator_t allocator,
+      iree_vm_module_state_t** out_module_state) {
     auto self = AsSelf(vself);
     *out_module_state = nullptr;
     py::gil_scoped_acquire acquire;
@@ -125,40 +136,40 @@ class PyModuleInterface {
       // Steal the reference and use the raw PyObject* as the state.
       // This will be released in ModuleFreeState.
       *out_module_state =
-          reinterpret_cast<iree_vm_module_state_t *>(py_state.release().ptr());
+          reinterpret_cast<iree_vm_module_state_t*>(py_state.release().ptr());
       return iree_ok_status();
-    } catch (std::exception &e) {
+    } catch (std::exception& e) {
       return iree_make_status(IREE_STATUS_UNKNOWN,
                               "Exception in call to PyModule constructor: %s",
                               e.what());
     }
   }
 
-  static void ModuleFreeState(void *vself,
-                              iree_vm_module_state_t *module_state) {
+  static void ModuleFreeState(void* vself,
+                              iree_vm_module_state_t* module_state) {
     py::gil_scoped_acquire acquire;
     // Release the reference stolen in ModuleAllocState.
     auto retained_handle =
-        py::handle(reinterpret_cast<PyObject *>(module_state));
+        py::handle(reinterpret_cast<PyObject*>(module_state));
     retained_handle.dec_ref();
   }
 
   static iree_status_t ModuleResolveImport(
-      void *vself, iree_vm_module_state_t *module_state,
-      iree_host_size_t ordinal, const iree_vm_function_t *function,
-      const iree_vm_function_signature_t *signature) {
+      void* vself, iree_vm_module_state_t* module_state,
+      iree_host_size_t ordinal, const iree_vm_function_t* function,
+      const iree_vm_function_signature_t* signature) {
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                             "Python API does not support imports");
   }
 
-  static iree_status_t ModuleNotify(void *vself,
-                                    iree_vm_module_state_t *module_state,
+  static iree_status_t ModuleNotify(void* vself,
+                                    iree_vm_module_state_t* module_state,
                                     iree_vm_signal_t signal) {
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                             "ModuleNotify not implemented");
   }
 
-  static iree_status_t ModuleBeginCall(void *vself, iree_vm_stack_t *stack,
+  static iree_status_t ModuleBeginCall(void* vself, iree_vm_stack_t* stack,
                                        iree_vm_function_call_t call) {
     auto self = AsSelf(vself);
     if (IREE_UNLIKELY(call.function.ordinal >=
@@ -169,18 +180,18 @@ class PyModuleInterface {
                               self->export_functions_.size());
     }
 
-    auto &f = self->export_functions_[call.function.ordinal];
+    auto& f = self->export_functions_[call.function.ordinal];
     iree_host_size_t frame_size = 0;
-    iree_vm_stack_frame_t *callee_frame = nullptr;
+    iree_vm_stack_frame_t* callee_frame = nullptr;
     IREE_RETURN_IF_ERROR(iree_vm_stack_function_enter(
         stack, &call.function, IREE_VM_STACK_FRAME_NATIVE, frame_size,
         /*frame_cleanup_fn=*/nullptr, &callee_frame));
     auto state_object =
-        py::handle(reinterpret_cast<PyObject *>(callee_frame->module_state));
+        py::handle(reinterpret_cast<PyObject*>(callee_frame->module_state));
 
     try {
       IREE_RETURN_IF_ERROR(self->Invoke(*f, state_object, stack, call));
-    } catch (std::exception &e) {
+    } catch (std::exception& e) {
       return iree_make_status(IREE_STATUS_UNKNOWN,
                               "Exception raised from Python module: %s",
                               e.what());
@@ -228,13 +239,13 @@ class PyModuleInterface {
     auto py_function = std::make_unique<PyFunction>(
         std::move(name), std::move(cconv), std::move(callable));
     exports_.push_back({});
-    iree_vm_native_export_descriptor_t &d = exports_.back();
+    iree_vm_native_export_descriptor_t& d = exports_.back();
     d.local_name = {py_function->name.data(), py_function->name.size()};
     d.calling_convention = {py_function->cconv.data(),
                             py_function->cconv.size()};
     d.attr_count = 0;
     d.attrs = nullptr;
-    std::string &alloced_name = py_function->name;
+    std::string& alloced_name = py_function->name;
     CheckApiStatus(py_function->ParseCconv(), "Unparseable calling convention");
 
     // Transfer the PyFunction to its vector now that we are done touching it.
@@ -251,9 +262,10 @@ class PyModuleInterface {
     AssertMutable();
     initialized_ = true;
     memset(&descriptor_, 0, sizeof(descriptor_));
-    descriptor_.module_name = {module_name_.data(), module_name_.size()};
-    descriptor_.module_attr_count = attrs_.size();
-    descriptor_.module_attrs = attrs_.empty() ? nullptr : attrs_.data();
+    descriptor_.name = {module_name_.data(), module_name_.size()};
+    descriptor_.version = version_;
+    descriptor_.attr_count = attrs_.size();
+    descriptor_.attrs = attrs_.empty() ? nullptr : attrs_.data();
     descriptor_.import_count = imports_.size();
     descriptor_.imports = imports_.empty() ? nullptr : imports_.data();
     descriptor_.export_count = exports_.size();
@@ -302,10 +314,10 @@ class PyModuleInterface {
     }
   };
 
-  iree_status_t Invoke(PyFunction &f, py::handle state_object,
-                       iree_vm_stack_t *stack, iree_vm_function_call_t call) {
+  iree_status_t Invoke(PyFunction& f, py::handle state_object,
+                       iree_vm_stack_t* stack, iree_vm_function_call_t call) {
     py::gil_scoped_acquire acquire;
-    uint8_t *packed_arguments = call.arguments.data;
+    uint8_t* packed_arguments = call.arguments.data;
     iree_host_size_t packed_arguments_required_size;
     // TODO: Is this validation needed or do we assume it from up-stack?
     IREE_RETURN_IF_ERROR(iree_vm_function_call_compute_cconv_fragment_size(
@@ -327,27 +339,27 @@ class PyModuleInterface {
           break;
         case IREE_VM_CCONV_TYPE_I32:
           arguments.append(
-              py::cast(*reinterpret_cast<int32_t *>(packed_arguments)));
+              py::cast(*reinterpret_cast<int32_t*>(packed_arguments)));
           packed_arguments += sizeof(int32_t);
           break;
         case IREE_VM_CCONV_TYPE_F32:
           arguments.append(
-              py::cast(*reinterpret_cast<float *>(packed_arguments)));
+              py::cast(*reinterpret_cast<float*>(packed_arguments)));
           packed_arguments += sizeof(float);
           break;
         case IREE_VM_CCONV_TYPE_I64:
           arguments.append(
-              py::cast(*reinterpret_cast<int64_t *>(packed_arguments)));
+              py::cast(*reinterpret_cast<int64_t*>(packed_arguments)));
           packed_arguments += sizeof(int64_t);
           break;
         case IREE_VM_CCONV_TYPE_F64:
           arguments.append(
-              py::cast(*reinterpret_cast<double *>(packed_arguments)));
+              py::cast(*reinterpret_cast<double*>(packed_arguments)));
           packed_arguments += sizeof(double);
           break;
         case IREE_VM_CCONV_TYPE_REF: {
           iree_vm_ref_t ref =
-              *reinterpret_cast<iree_vm_ref_t *>(packed_arguments);
+              *reinterpret_cast<iree_vm_ref_t*>(packed_arguments);
           // Since the Python level VmRef can escape, it needs its own ref
           // count.
           VmRef py_ref;
@@ -370,40 +382,40 @@ class PyModuleInterface {
     if (f.cconv_results.size == 0) {
       return iree_ok_status();
     }
-    uint8_t *packed_results = call.results.data;
+    uint8_t* packed_results = call.results.data;
     bool unary_result = f.cconv_results.size == 1;
-    auto pack_result = [&](py::object &value,
+    auto pack_result = [&](py::object& value,
                            char cconv_type) -> iree_status_t {
       switch (cconv_type) {
         case IREE_VM_CCONV_TYPE_VOID:
           break;
         case IREE_VM_CCONV_TYPE_I32:
-          *reinterpret_cast<int32_t *>(packed_results) =
+          *reinterpret_cast<int32_t*>(packed_results) =
               py::cast<int32_t>(value);
           packed_results += sizeof(int32_t);
           break;
         case IREE_VM_CCONV_TYPE_F32:
-          *reinterpret_cast<float *>(packed_results) = py::cast<float>(value);
+          *reinterpret_cast<float*>(packed_results) = py::cast<float>(value);
           packed_results += sizeof(float);
           break;
         case IREE_VM_CCONV_TYPE_I64:
-          *reinterpret_cast<int64_t *>(packed_results) =
+          *reinterpret_cast<int64_t*>(packed_results) =
               py::cast<int64_t>(value);
           packed_results += sizeof(int64_t);
           break;
         case IREE_VM_CCONV_TYPE_F64:
-          *reinterpret_cast<double *>(packed_results) = py::cast<double>(value);
+          *reinterpret_cast<double*>(packed_results) = py::cast<double>(value);
           packed_results += sizeof(double);
           break;
         case IREE_VM_CCONV_TYPE_REF: {
-          iree_vm_ref_t *result_ref =
-              reinterpret_cast<iree_vm_ref_t *>(packed_results);
+          iree_vm_ref_t* result_ref =
+              reinterpret_cast<iree_vm_ref_t*>(packed_results);
           if (value.is_none()) {
             return iree_make_status(
                 IREE_STATUS_FAILED_PRECONDITION,
                 "expected ref returned from Python function but got None");
           }
-          VmRef *py_ref = py::cast<VmRef *>(value);
+          VmRef* py_ref = py::cast<VmRef*>(value);
           iree_vm_ref_retain(&py_ref->ref(), result_ref);
           packed_results += sizeof(iree_vm_ref_t);
           break;
@@ -433,6 +445,7 @@ class PyModuleInterface {
   // Descriptor state is built up when mutable and then will be populated
   // on the descriptor when frozen.
   std::string module_name_;
+  uint32_t version_;
   py::object ctor_;
   std::vector<iree_string_pair_t> attrs_;
   std::vector<iree_vm_native_import_descriptor_t> imports_;
@@ -452,7 +465,7 @@ class PyModuleInterface {
   py::object retained_self_ref_;
 };
 
-void SetupPyModuleBindings(py::module &m) {
+void SetupPyModuleBindings(py::module& m) {
   py::class_<PyModuleInterface>(m, "PyModuleInterface")
       .def(py::init<std::string, py::object>(), py::arg("module_name"),
            py::arg("ctor"))
