@@ -32,6 +32,12 @@ BACKEND_TESTS = [
     "strided_slice.mlir",
 ]
 
+TOSA_BACKEND_TESTS = [
+    "layernorm.mlir",
+    "reduction_broadcast_elementwise.mlir",
+    "softmax.mlir",
+]
+
 iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
@@ -88,7 +94,7 @@ iree_check_single_backend_test_suite(
         # it includes the --iree-linalg-quantized-matmul-to-matmul pass,
         # so this tests provides e2e coverage for that pass.
         "linalg_quantized_matmul_vs_linalg_matmul.mlir",
-    ],
+    ] + TOSA_BACKEND_TESTS,
     compiler_flags = ["--iree-input-type=tosa"],
     driver = "local-task",
     target_backend = "llvm-cpu",
@@ -103,9 +109,25 @@ iree_check_single_backend_test_suite(
 )
 
 iree_check_single_backend_test_suite(
+    name = "check_regression_tosa_vmvx",
+    srcs = TOSA_BACKEND_TESTS,
+    compiler_flags = ["--iree-input-type=tosa"],
+    driver = "local-task",
+    target_backend = "vmvx",
+)
+
+iree_check_single_backend_test_suite(
     name = "check_regression_vulkan-spirv",
     srcs = BACKEND_TESTS,
     compiler_flags = ["--iree-input-type=mhlo"],
+    driver = "vulkan",
+    target_backend = "vulkan-spirv",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_regression_tosa_vulkan-spirv",
+    srcs = TOSA_BACKEND_TESTS,
+    compiler_flags = ["--iree-input-type=tosa"],
     driver = "vulkan",
     target_backend = "vulkan-spirv",
 )
@@ -116,6 +138,22 @@ iree_check_single_backend_test_suite(
         "large_reduction.mlir",
     ] + BACKEND_TESTS,
     compiler_flags = ["--iree-input-type=mhlo"],
+    driver = "cuda",
+    tags = [
+        # CUDA cuInit fails with sanitizer on.
+        "noasan",
+        "nomsan",
+        "notsan",
+        "noubsan",
+        "requires-gpu-nvidia",
+    ],
+    target_backend = "cuda",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_regression_tosa_cuda",
+    srcs = TOSA_BACKEND_TESTS,
+    compiler_flags = ["--iree-input-type=tosa"],
     driver = "cuda",
     tags = [
         # CUDA cuInit fails with sanitizer on.
