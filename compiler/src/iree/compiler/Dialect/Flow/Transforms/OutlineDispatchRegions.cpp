@@ -10,8 +10,11 @@
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -26,6 +29,75 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 namespace {
+
+// Estimates the evaluation cost of a linalg op using a heuristic cost model.
+static int estimateLinalgOpCost(linalg::LinalgOp op) {
+  if (op.hasDynamicShape()) {
+    // Note: bounded dynamic shapes would be interesting, if the compiler used
+    // them. For now just treat dynamic shapes as arbitrarily large.
+    return INT_MAX;
+  }
+
+  int cost = 1;
+  for (auto loopRange : op.getStaticLoopRanges()) {
+    cost *= loopRange;
+  }
+  LLVM_DEBUG(llvm::dbgs() << "// " << op->getName() << " cost: " << cost
+                          << "\n");
+  return cost;
+}
+
+static std::string loopRangeToString(int64_t loopRange) {
+  return ShapedType::isDynamic(loopRange) ? "?" : llvm::itostr(loopRange);
+}
+
+// Returns a string like "512x?x128" representing a linalg op's loop ranges.
+static std::string getLinalgOpLoopRanges(linalg::LinalgOp op) {
+  auto loopRanges = op.getStaticLoopRanges();
+  std::string outputString;
+  llvm::raw_string_ostream sstream(outputString);
+  llvm::interleave(
+      loopRanges,
+      [&](int64_t loopRange) { sstream << loopRangeToString(loopRange); },
+      [&] { sstream << "x"; });
+  return outputString;
+}
+
+static std::string summarizeLinalgOp(linalg::LinalgOp op) {
+  auto opName = op->getName().getStringRef();
+  if (!opName.consume_front("linalg.")) return "";
+  std::string opSuffix = getLinalgOpLoopRanges(op);
+  // TODO(scotttodd): include element type(s) in this string
+  return opName.str() + (opSuffix.empty() ? "" : "_" + opSuffix);
+}
+
+// Summarizes the contents of a dispatch into a short string.
+// This uses heuristics to aid developer debugging.
+static std::string summarizeDispatchWorkgroupsOp(
+    DispatchWorkgroupsOp regionOp) {
+  Operation *bestOp = NULL;
+  int bestEstimatedCost = -1;
+  std::string bestSummary = "";
+
+  regionOp.getBodyRegion().walk([&](Operation *op) {
+    TypeSwitch<Operation *>(op)
+        .Case<linalg::LinalgOp>([&](auto op) {
+          int estimatedCost = estimateLinalgOpCost(op);
+          if (estimatedCost < bestEstimatedCost) return;
+          bestEstimatedCost = estimatedCost;
+          bestOp = op;
+          bestSummary = summarizeLinalgOp(op);
+          LLVM_DEBUG(llvm::dbgs() << "// new best op; summary: '" << bestSummary
+                                  << "', cost: " << bestEstimatedCost << "\n");
+        })
+        // TODO(scotttodd): IREE::LinalgExt::LinalgExtOp
+        .Default([&](Operation *op) {
+          // No heuristic implemented, skip.
+        });
+  });
+
+  return bestSummary;
+}
 
 // Creates a flow.executable out of a set of functions, pulling in all other
 // functions reachable by the provided functions.
@@ -116,9 +188,10 @@ static mlir::func::FuncOp createWorkgroupFunc(Location loc,
 // Outlines a dispatch region into a flow.executable and replaces the region op
 // with a dispatch to that outlined executable.
 static LogicalResult outlineDispatchWorkgroupsOp(
-    std::string namePrefix, DispatchWorkgroupsOp regionOp) {
+    std::string executableOpName, std::string exportOpName,
+    DispatchWorkgroupsOp regionOp) {
   // Convert the region to a free-floating function.
-  auto workgroupFuncOp = createWorkgroupFunc(regionOp.getLoc(), namePrefix,
+  auto workgroupFuncOp = createWorkgroupFunc(regionOp.getLoc(), exportOpName,
                                              regionOp.getWorkgroupBody());
   if (!workgroupFuncOp) {
     return failure();
@@ -127,7 +200,7 @@ static LogicalResult outlineDispatchWorkgroupsOp(
   // Create the executable with the region cloned into it.
   auto parentFuncOp = regionOp->getParentOfType<FunctionOpInterface>();
   auto executableOp =
-      createExecutable(regionOp.getLoc(), namePrefix, {workgroupFuncOp},
+      createExecutable(regionOp.getLoc(), executableOpName, {workgroupFuncOp},
                        parentFuncOp->getParentOfType<mlir::ModuleOp>());
   executableOp.getOperation()->moveBefore(parentFuncOp);
   executableOp.setPrivate();
@@ -165,14 +238,15 @@ class OutlineDispatchRegionsPass
       Operation *operation = op;
 
       // Generate a nice name if possible.
-      std::string opName;
+      std::string namePrefix;
       if (auto funcOp = llvm::dyn_cast<mlir::func::FuncOp>(operation)) {
-        opName = funcOp.getName().str();
+        namePrefix = funcOp.getName().str();
       } else if (llvm::isa<IREE::Util::InitializerOp>(operation)) {
-        opName =
+        namePrefix =
             std::string("_initializer_") + std::to_string(initializerCount++);
       } else {
-        opName = std::string("_function_like_") + std::to_string(it.index());
+        namePrefix =
+            std::string("_function_like_") + std::to_string(it.index());
       }
 
       auto &bodyRegion = op.getBody();
@@ -180,8 +254,20 @@ class OutlineDispatchRegionsPass
       auto dispatchWorkgroupsOps =
           llvm::to_vector<8>(bodyRegion.getOps<DispatchWorkgroupsOp>());
       for (int i = 0; i < dispatchWorkgroupsOps.size(); ++i) {
-        std::string namePrefix = (opName + "_dispatch_" + llvm::Twine(i)).str();
-        if (failed(outlineDispatchWorkgroupsOp(namePrefix,
+        std::string executableOpName =
+            (namePrefix + "_dispatch_" + llvm::Twine(i)).str();
+        // Add a summary of the op as a suffix, if one can be generated.
+        // Note: the executable names omit this suffix so their names are more
+        // predictable.
+        LLVM_DEBUG(llvm::dbgs()
+                   << "//--- summarizing '" << executableOpName << "' ---//\n");
+        std::string opSummary =
+            summarizeDispatchWorkgroupsOp(dispatchWorkgroupsOps[i]);
+        LLVM_DEBUG(llvm::dbgs()
+                   << "//--- opSummary: '" << opSummary << "' ---//\n\n");
+        std::string opSuffix = opSummary.empty() ? "" : "_" + opSummary;
+        std::string exportOpName = executableOpName + opSuffix;
+        if (failed(outlineDispatchWorkgroupsOp(executableOpName, exportOpName,
                                                dispatchWorkgroupsOps[i]))) {
           return signalPassFailure();
         }
