@@ -42,22 +42,6 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_vmvx_vmvx_microkernels
-  SRCS
-    "layernorm.mlir"
-    "reduction_broadcast_elementwise.mlir"
-    "softmax.mlir"
-  TARGET_BACKEND
-    "vmvx"
-  DRIVER
-    "local-sync"
-  COMPILER_FLAGS
-    "--iree-input-type=tosa"
-    "--iree-vmvx-enable-microkernels"
-)
-
-iree_check_single_backend_test_suite(
-  NAME
     check_vulkan-spirv_vulkan
   SRCS
     "layernorm.mlir"

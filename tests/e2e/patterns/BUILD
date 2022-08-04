@@ -16,7 +16,7 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-LLVM_SRCS = enforce_glob(
+SRCS = enforce_glob(
     [
         "layernorm.mlir",
         "reduction_broadcast_elementwise.mlir",
@@ -27,24 +27,15 @@ LLVM_SRCS = enforce_glob(
 
 iree_check_single_backend_test_suite(
     name = "check_dylib-llvm-aot_dylib",
-    srcs = LLVM_SRCS,
+    srcs = SRCS,
     compiler_flags = ["--iree-input-type=tosa"],
     driver = "local-task",
     target_backend = "llvm-cpu",
 )
 
-VMVX_SRCS = enforce_glob(
-    [
-        "layernorm.mlir",
-        "reduction_broadcast_elementwise.mlir",
-        "softmax.mlir",
-    ],
-    include = ["*.mlir"],
-)
-
 iree_check_single_backend_test_suite(
     name = "check_vmvx_vmvx",
-    srcs = VMVX_SRCS,
+    srcs = SRCS,
     compiler_flags = [
         "--iree-input-type=tosa",
     ],
@@ -52,39 +43,9 @@ iree_check_single_backend_test_suite(
     target_backend = "vmvx",
 )
 
-VMVX_MICROKERNELS_SRCS = enforce_glob(
-    [
-        "layernorm.mlir",
-        "reduction_broadcast_elementwise.mlir",
-        "softmax.mlir",
-    ],
-    include = ["*.mlir"],
-)
-
-iree_check_single_backend_test_suite(
-    name = "check_vmvx_vmvx_microkernels",
-    srcs = VMVX_MICROKERNELS_SRCS,
-    compiler_flags = [
-        "--iree-input-type=tosa",
-        "--iree-vmvx-enable-microkernels",
-    ],
-    # Sync has more strict runtime error checking for mis-compiled programs.
-    driver = "local-sync",
-    target_backend = "vmvx",
-)
-
-VULKAN_SRCS = enforce_glob(
-    [
-        "layernorm.mlir",
-        "reduction_broadcast_elementwise.mlir",
-        "softmax.mlir",
-    ],
-    include = ["*.mlir"],
-)
-
 iree_check_single_backend_test_suite(
     name = "check_vulkan-spirv_vulkan",
-    srcs = VULKAN_SRCS,
+    srcs = SRCS,
     compiler_flags = ["--iree-input-type=tosa"],
     driver = "vulkan",
     target_backend = "vulkan-spirv",
