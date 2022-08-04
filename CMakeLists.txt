@@ -219,15 +219,17 @@ cmake_dependent_option(IREE_INPUT_MHLO "Builds support for compiling MHLO progra
 cmake_dependent_option(IREE_INPUT_TORCH "Builds support for compiling Torch MLIR programs" ON ${IREE_BUILD_COMPILER} OFF)
 cmake_dependent_option(IREE_INPUT_TOSA "Builds support for compiling TOSA programs" ON ${IREE_BUILD_COMPILER} OFF)
 
-message(STATUS "IREE compiler input dialects:")
-if(IREE_INPUT_MHLO)
-  message(STATUS "  - MHLO")
-endif()
-if(IREE_INPUT_TORCH)
-  message(STATUS "  - Torch MLIR")
-endif()
-if(IREE_INPUT_TOSA)
-  message(STATUS "  - TOSA")
+if(IREE_BUILD_COMPILER)
+  message(STATUS "IREE compiler input dialects:")
+  if(IREE_INPUT_MHLO)
+    message(STATUS "  - MHLO")
+  endif()
+  if(IREE_INPUT_TORCH)
+    message(STATUS "  - Torch MLIR")
+  endif()
+  if(IREE_INPUT_TOSA)
+    message(STATUS "  - TOSA")
+  endif()
 endif()
 
 #-------------------------------------------------------------------------------
@@ -236,13 +238,15 @@ endif()
 
 cmake_dependent_option(IREE_OUTPUT_FORMAT_C "Enables the 'vm-c' output format, using MLIR EmitC" ON ${IREE_BUILD_COMPILER} OFF)
 
-message(STATUS "IREE compiler output formats:")
-if(IREE_OUTPUT_FORMAT_C)
-  message(STATUS "  - C source module")
+if(IREE_BUILD_COMPILER)
+  message(STATUS "IREE compiler output formats:")
+  if(IREE_OUTPUT_FORMAT_C)
+    message(STATUS "  - C source module")
+  endif()
+  # The 'vm-bytecode' and 'vm-asm' formats are always enabled.
+  message(STATUS "  - VM Bytecode")
+  message(STATUS "  - VM MLIR Assembly")
 endif()
-# The 'vm-bytecode' and 'vm-asm' formats are always enabled.
-message(STATUS "  - VM Bytecode")
-message(STATUS "  - VM MLIR Assembly")
 
 #-------------------------------------------------------------------------------
 # IREE compilation toolchain configuration
