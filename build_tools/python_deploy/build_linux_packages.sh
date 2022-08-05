@@ -123,17 +123,21 @@ function build_wheel() {
 
 function build_iree_runtime() {
   IREE_HAL_DRIVER_CUDA=ON \
+  IREE_EXTERNAL_HAL_DRIVERS=rocm \
   build_wheel runtime/
 }
 
 function build_iree_runtime_instrumented() {
-  IREE_HAL_DRIVER_CUDA=ON IREE_BUILD_TRACY=ON IREE_ENABLE_RUNTIME_TRACING=ON \
+  IREE_HAL_DRIVER_CUDA=ON \
+  IREE_EXTERNAL_HAL_DRIVERS=rocm \
+  IREE_BUILD_TRACY=ON IREE_ENABLE_RUNTIME_TRACING=ON \
   IREE_RUNTIME_CUSTOM_PACKAGE_SUFFIX="-instrumented" \
   build_wheel runtime/
 }
 
 function build_iree_compiler() {
   IREE_TARGET_BACKEND_CUDA=ON \
+  IREE_TARGET_BACKEND_ROCM=ON \
   build_wheel compiler/
 }
 

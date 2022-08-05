@@ -234,6 +234,7 @@ def prepare_installation():
         "-DPython3_EXECUTABLE={}".format(sys.executable),
         "-DCMAKE_BUILD_TYPE={}".format(cfg),
         get_env_cmake_option("IREE_TARGET_BACKEND_CUDA"),
+        get_env_cmake_option("IREE_TARGET_BACKEND_ROCM"),
         get_env_cmake_option("IREE_ENABLE_CPUINFO", "ON"),
     ]
 
