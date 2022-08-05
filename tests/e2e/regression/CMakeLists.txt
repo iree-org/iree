@@ -44,8 +44,11 @@ iree_check_single_backend_test_suite(
     "dynamic_torch_index_select_scalar.mlir"
     "dynamic_torch_index_select_vector.mlir"
     "i1_inlined_constant.mlir"
+    "layernorm.mlir"
     "linalg_ops.mlir"
     "lowering_config.mlir"
+    "reduction_broadcast_elementwise.mlir"
+    "softmax.mlir"
     "strided_slice.mlir"
   TARGET_BACKEND
     "llvm-cpu"
@@ -59,10 +62,7 @@ iree_check_single_backend_test_suite(
   NAME
     check_regression_tosa_llvm-cpu
   SRCS
-    "layernorm.mlir"
     "linalg_quantized_matmul_vs_linalg_matmul.mlir"
-    "reduction_broadcast_elementwise.mlir"
-    "softmax.mlir"
   TARGET_BACKEND
     "llvm-cpu"
   DRIVER
@@ -84,7 +84,10 @@ iree_check_single_backend_test_suite(
     "dynamic_torch_index_select_scalar.mlir"
     "dynamic_torch_index_select_vector.mlir"
     "i1_inlined_constant.mlir"
+    "layernorm.mlir"
     "linalg_ops.mlir"
+    "reduction_broadcast_elementwise.mlir"
+    "softmax.mlir"
     "strided_slice.mlir"
   TARGET_BACKEND
     "vmvx"
@@ -92,21 +95,6 @@ iree_check_single_backend_test_suite(
     "local-task"
   COMPILER_FLAGS
     "--iree-input-type=mhlo"
-)
-
-iree_check_single_backend_test_suite(
-  NAME
-    check_regression_tosa_vmvx
-  SRCS
-    "layernorm.mlir"
-    "reduction_broadcast_elementwise.mlir"
-    "softmax.mlir"
-  TARGET_BACKEND
-    "vmvx"
-  DRIVER
-    "local-task"
-  COMPILER_FLAGS
-    "--iree-input-type=tosa"
 )
 
 iree_check_single_backend_test_suite(
@@ -122,7 +110,10 @@ iree_check_single_backend_test_suite(
     "dynamic_torch_index_select_scalar.mlir"
     "dynamic_torch_index_select_vector.mlir"
     "i1_inlined_constant.mlir"
+    "layernorm.mlir"
     "linalg_ops.mlir"
+    "reduction_broadcast_elementwise.mlir"
+    "softmax.mlir"
     "strided_slice.mlir"
   TARGET_BACKEND
     "vulkan-spirv"
@@ -130,21 +121,6 @@ iree_check_single_backend_test_suite(
     "vulkan"
   COMPILER_FLAGS
     "--iree-input-type=mhlo"
-)
-
-iree_check_single_backend_test_suite(
-  NAME
-    check_regression_tosa_vulkan-spirv
-  SRCS
-    "layernorm.mlir"
-    "reduction_broadcast_elementwise.mlir"
-    "softmax.mlir"
-  TARGET_BACKEND
-    "vulkan-spirv"
-  DRIVER
-    "vulkan"
-  COMPILER_FLAGS
-    "--iree-input-type=tosa"
 )
 
 iree_check_single_backend_test_suite(
@@ -161,7 +137,10 @@ iree_check_single_backend_test_suite(
     "dynamic_torch_index_select_vector.mlir"
     "i1_inlined_constant.mlir"
     "large_reduction.mlir"
+    "layernorm.mlir"
     "linalg_ops.mlir"
+    "reduction_broadcast_elementwise.mlir"
+    "softmax.mlir"
     "strided_slice.mlir"
   TARGET_BACKEND
     "cuda"
@@ -169,27 +148,6 @@ iree_check_single_backend_test_suite(
     "cuda"
   COMPILER_FLAGS
     "--iree-input-type=mhlo"
-  LABELS
-    "noasan"
-    "nomsan"
-    "notsan"
-    "noubsan"
-    "requires-gpu-nvidia"
-)
-
-iree_check_single_backend_test_suite(
-  NAME
-    check_regression_tosa_cuda
-  SRCS
-    "layernorm.mlir"
-    "reduction_broadcast_elementwise.mlir"
-    "softmax.mlir"
-  TARGET_BACKEND
-    "cuda"
-  DRIVER
-    "cuda"
-  COMPILER_FLAGS
-    "--iree-input-type=tosa"
   LABELS
     "noasan"
     "nomsan"
