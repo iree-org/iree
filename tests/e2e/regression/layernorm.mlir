@@ -21,7 +21,7 @@
 //   return
 // }
 
-func.func private @layernorm() {
+func.func @layernorm() {
   %cst = arith.constant 1.000000e+00 : f32
   %cst_0 = arith.constant 0.000000e+00 : f32
   %cst_1 = arith.constant dense<0.000000e+00> : tensor<128x384xf32>
@@ -72,7 +72,7 @@ func.func private @layernorm() {
   return
 }
 
-func.func private @layernorm_dynamic() {
+func.func @layernorm_dynamic() {
   %cst = arith.constant 1.000000e+00 : f32
   %cst_0 = arith.constant 0.000000e+00 : f32
   %cst_1 = arith.constant dense<0.000000e+00> : tensor<128x384xf32>
