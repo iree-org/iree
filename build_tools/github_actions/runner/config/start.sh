@@ -18,9 +18,10 @@ SELF_PATH="${SELF_DIR}/${SELF_NAME}"
 
 ${HOME}/actions-runner/bin/Runner.Listener run --startuptype service || CODE=$?
 
+
 # A return code 3 means the runner stopped because it is updating. Wait a few
 # seconds to let it update and then respawn.
-if [[ $code == 3 ]]; then
+if [[ $CODE == 3 ]]; then
   >&2 echo "Runner received update"
   sleep 10
   exec ${SELF_PATH}

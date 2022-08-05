@@ -22,7 +22,7 @@ if [[ "$(whoami)" != "runner" ]]; then
   exit
 fi
 
- "${HOME}"
+cd "${HOME}"
 rm -rf config
 
 rm -rf /tmp/iree
