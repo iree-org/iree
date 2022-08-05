@@ -34,6 +34,7 @@ iree_cc_library(
     "ConvertConv2D1x1ToMatmul.cpp"
     "ConvertConv2DToImg2Col.cpp"
     "ConvertLinalgMatmulToMmt4D.cpp"
+    "ConvertRegionToWorkgroups.cpp"
     "DeduplicateExecutables.cpp"
     "DetachElementwiseFromNamedOps.cpp"
     "DispatchLinalgOnTensors.cpp"
