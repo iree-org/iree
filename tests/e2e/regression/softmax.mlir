@@ -12,7 +12,7 @@
 //   return
 // }
 
-func.func private @softmax() {
+func.func @softmax() {
   %cst = arith.constant 1.000000e+00 : f32
   %cst_0 = arith.constant 0.000000e+00 : f32
   %cst_1 = arith.constant -3.40282347E+38 : f32
@@ -58,7 +58,7 @@ func.func private @softmax() {
   return
 }
 
-func.func private @softmax_dynamic() {
+func.func @softmax_dynamic() {
   %cst = arith.constant 1.000000e+00 : f32
   %cst_0 = arith.constant 0.000000e+00 : f32
   %cst_1 = arith.constant -3.40282347E+38 : f32
