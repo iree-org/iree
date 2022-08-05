@@ -199,8 +199,8 @@ hal.executable private @reduce_then_broadcast  {
   }
 }
 
-// Check that there is no scf.if generated. If we are able to distribute all the vectors.
-// If some operations are not distributed we would end up with a scf.if(warp0) block.
+// Check that there is no scf.if generated.
+// If some operations were not distributed we would end up with a scf.if(warp0) block.
 // CHECK-LABEL: func.func @reduce_then_broadcast() {
 //   CHECK-NOT:  scf.if
 //       CHECK:  return
