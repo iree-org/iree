@@ -87,7 +87,7 @@ GOOGLE_CLOUD_RUN_ID_TOKEN="$(get_metadata "instance/service-accounts/default/ide
 
 REGISTER_TOKEN="$(get_token register ${RUNNER_SCOPE})"
 
-if [ -z "${REGISTRATION_TOKEN}" ]; then
+if [ -z "${REGISTER_TOKEN}" ]; then
   echo "failed to get registration runner token" >&2
   exit 1
 fi
