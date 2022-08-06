@@ -78,8 +78,8 @@ class ConversionPass : public ConversionBase<ConversionPass> {
     // MemRef to Util (to VM) is an A->B->C lowering. We must instruct it
     // specifically on what the correct C buffer type is.
     populateMemRefToUtilPatterns(context, conversionTarget, typeConverter,
-                                 patterns, IREE::Util::BufferType::get(&getContext()));
-
+                                 patterns,
+                                 IREE::Util::BufferType::get(&getContext()));
 
     // Use the default 64-bit lowering for TOSA's ApplyScale operator:
     //   This lowering widens integer types to 64-bit an performs the non-fused
