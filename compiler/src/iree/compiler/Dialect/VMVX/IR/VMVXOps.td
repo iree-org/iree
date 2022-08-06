@@ -16,6 +16,40 @@ class VMVX_PureOp<string mnemonic, list<Trait> traits = []> :
     VMVX_Op<mnemonic, !listconcat(traits, [NoSideEffect])>;
 
 //===----------------------------------------------------------------------===//
+// Utility ops
+//===----------------------------------------------------------------------===//
+
+def VMVX_GetBufferDescriptorOp : VMVX_PureOp<"get_buffer_descriptor", [
+    SameVariadicResultSize
+  ]> {
+  let summary = "Late binds a base buffer/offset/strides";
+  let description = [{
+    Queries a base buffer, offset and strides. This op is late bound to its
+    source (alloca, binding, etc), allowing additional layers of
+    transformations to be added as lowering progresses (or for buffers to be
+    combined).
+
+    This op has canonicalization rules which will bubble it up through the
+    view stack. A final reconciliation pass is used explicitly to bind it to
+    concrete sources.
+  }];
+
+  let arguments = (ins
+    AnyMemRef:$source
+  );
+  let results = (outs
+    Util_BufferType:$base_buffer,
+    Index:$offset,
+    Variadic<Index>:$sizes,
+    Variadic<Index>:$strides
+  );
+
+  let assemblyFormat = [{
+    $source `:` type($source) `->` type(results) attr-dict
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // VMVX Ops: ABI
 //===----------------------------------------------------------------------===//
 
