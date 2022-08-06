@@ -36,10 +36,8 @@ std::ostream& operator<<(std::ostream& os, const TestParams& params) {
 std::vector<TestParams> GetModuleTestParams() {
   std::vector<TestParams> test_params;
 
-  // TODO(#8698): need to register these on an instance.
-  // The instance constructor does this for us and if we created it first we
-  // wouldn't need to call this.
-  IREE_CHECK_OK(iree_vm_register_builtin_types(NULL));
+  iree_vm_instance_t* instance = NULL;
+  IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance));
 
   const struct iree_file_toc_t* module_file_toc =
       all_bytecode_modules_c_create();
@@ -47,6 +45,7 @@ std::vector<TestParams> GetModuleTestParams() {
     const auto& module_file = module_file_toc[i];
     iree_vm_module_t* module = nullptr;
     IREE_CHECK_OK(iree_vm_bytecode_module_create(
+        instance,
         iree_const_byte_span_t{
             reinterpret_cast<const uint8_t*>(module_file.data),
             module_file.size},
@@ -64,6 +63,8 @@ std::vector<TestParams> GetModuleTestParams() {
     iree_vm_module_release(module);
   }
 
+  iree_vm_instance_release(instance);
+
   return test_params;
 }
 
@@ -77,6 +78,7 @@ class VMBytecodeDispatchTest
     IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance_));
 
     IREE_CHECK_OK(iree_vm_bytecode_module_create(
+        instance_,
         iree_const_byte_span_t{
             reinterpret_cast<const uint8_t*>(test_params.module_file.data),
             test_params.module_file.size},

@@ -471,7 +471,8 @@ iree_status_t iree_hal_vmvx_module_loader_create(
 
   // A single VMVX module is shared across all loaded executables.
   iree_vm_module_t* vmvx_module = NULL;
-  IREE_RETURN_IF_ERROR(iree_vmvx_module_create(host_allocator, &vmvx_module));
+  IREE_RETURN_IF_ERROR(
+      iree_vmvx_module_create(instance, host_allocator, &vmvx_module));
 
   iree_host_size_t common_module_count = 1 + user_module_count;
   iree_hal_vmvx_module_loader_t* executable_loader = NULL;
@@ -584,8 +585,9 @@ static iree_status_t iree_hal_vmvx_module_loader_try_load(
   // we have it) to the module to manage.
   iree_vm_module_t* bytecode_module = NULL;
   iree_status_t status = iree_vm_bytecode_module_create(
-      executable_params->executable_data, bytecode_module_allocator,
-      executable_loader->host_allocator, &bytecode_module);
+      executable_loader->instance, executable_params->executable_data,
+      bytecode_module_allocator, executable_loader->host_allocator,
+      &bytecode_module);
 
   // Create the context tying together the shared VMVX module and the
   // user-provided module that references it. We always link the compiled module

@@ -58,7 +58,7 @@ iree_status_t iree_tooling_load_module_from_flags(
   // The module takes ownership of the file contents (when successful).
   iree_vm_module_t* module = NULL;
   iree_status_t status = iree_vm_bytecode_module_create(
-      file_contents->const_buffer,
+      instance, file_contents->const_buffer,
       iree_file_contents_deallocator(file_contents), host_allocator, &module);
 
   if (iree_status_is_ok(status)) {
@@ -115,7 +115,7 @@ static iree_status_t iree_tooling_load_hal_async_module(
   iree_hal_module_flags_t flags = IREE_HAL_MODULE_FLAG_NONE;
   iree_vm_module_t* module = NULL;
   iree_status_t status =
-      iree_hal_module_create(device, flags, host_allocator, &module);
+      iree_hal_module_create(instance, device, flags, host_allocator, &module);
 
   if (iree_status_is_ok(status)) {
     *out_module = module;

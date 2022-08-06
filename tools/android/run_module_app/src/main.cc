@@ -98,6 +98,7 @@ Status RunModule(const IreeModuleInvocation& invocation) {
 
   iree_vm_module_t* input_module = nullptr;
   IREE_RETURN_IF_ERROR(iree_vm_bytecode_module_create(
+      instance,
       iree_make_const_byte_span((void*)invocation.module.data(),
                                 invocation.module.size()),
       iree_allocator_null(), iree_allocator_system(), &input_module));
@@ -108,8 +109,9 @@ Status RunModule(const IreeModuleInvocation& invocation) {
       iree_make_string_view(invocation.device.data(), invocation.device.size()),
       iree_allocator_system(), &device));
   iree_vm_module_t* hal_module = nullptr;
-  IREE_RETURN_IF_ERROR(iree_hal_module_create(
-      device, IREE_HAL_MODULE_FLAG_NONE, iree_allocator_system(), &hal_module));
+  IREE_RETURN_IF_ERROR(
+      iree_hal_module_create(instance, device, IREE_HAL_MODULE_FLAG_NONE,
+                             iree_allocator_system(), &hal_module));
 
   iree_vm_context_t* context = nullptr;
   // Order matters. The input module will likely be dependent on the hal module.

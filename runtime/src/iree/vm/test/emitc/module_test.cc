@@ -41,7 +41,8 @@ using namespace std;
 
 namespace {
 
-typedef iree_status_t (*create_function_t)(iree_allocator_t,
+typedef iree_status_t (*create_function_t)(iree_vm_instance_t*,
+                                           iree_allocator_t,
                                            iree_vm_module_t**);
 
 struct TestParams {
@@ -121,8 +122,8 @@ class VMCModuleTest : public ::testing::Test,
     IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance_));
 
     iree_vm_module_t* module_ = nullptr;
-    IREE_CHECK_OK(
-        test_params.create_function(iree_allocator_system(), &module_));
+    IREE_CHECK_OK(test_params.create_function(
+        instance_, iree_allocator_system(), &module_));
 
     std::vector<iree_vm_module_t*> modules = {module_};
     IREE_CHECK_OK(iree_vm_context_create_with_modules(

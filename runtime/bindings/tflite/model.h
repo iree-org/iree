@@ -29,6 +29,10 @@ struct TfLiteModel {
   iree_allocator_t allocator;
   void* owned_model_data;
 
+  // HACK: no public API that allows us to share this without spooky action
+  // at a distance. Today it's ok for these to be unique as we don't check that
+  // they are consistent and all instances have the same types registered.
+  iree_vm_instance_t* instance;
   iree_vm_module_t* module;
   _TfLiteModelExports exports;
   int32_t input_count;

@@ -1510,8 +1510,10 @@ static const iree_vm_native_module_descriptor_t iree_hal_module_descriptor_ = {
 };
 
 IREE_API_EXPORT iree_status_t iree_hal_module_create(
-    iree_hal_device_t* device, iree_hal_module_flags_t flags,
-    iree_allocator_t host_allocator, iree_vm_module_t** out_module) {
+    iree_vm_instance_t* instance, iree_hal_device_t* device,
+    iree_hal_module_flags_t flags, iree_allocator_t host_allocator,
+    iree_vm_module_t** out_module) {
+  IREE_ASSERT_ARGUMENT(instance);
   IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(out_module);
   *out_module = NULL;
@@ -1532,8 +1534,9 @@ IREE_API_EXPORT iree_status_t iree_hal_module_create(
   IREE_RETURN_IF_ERROR(
       iree_allocator_malloc(host_allocator, total_size, (void**)&base_module));
   memset(base_module, 0, total_size);
-  iree_status_t status = iree_vm_native_module_initialize(
-      &interface, &iree_hal_module_descriptor_, host_allocator, base_module);
+  iree_status_t status =
+      iree_vm_native_module_initialize(&interface, &iree_hal_module_descriptor_,
+                                       instance, host_allocator, base_module);
   if (!iree_status_is_ok(status)) {
     iree_allocator_free(host_allocator, base_module);
     return status;

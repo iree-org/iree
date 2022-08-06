@@ -10,7 +10,19 @@
 
 #include "iree/base/internal/atomics.h"
 #include "iree/base/tracing.h"
-#include "iree/vm/builtin_types.h"
+
+// Defined in their respective files:
+iree_status_t iree_vm_buffer_register_types(iree_vm_instance_t* instance);
+iree_status_t iree_vm_list_register_types(iree_vm_instance_t* instance);
+
+// Registers the builtin VM types. This must be called on startup. Safe to call
+// multiple times.
+static iree_status_t iree_vm_register_builtin_types(
+    iree_vm_instance_t* instance) {
+  IREE_RETURN_IF_ERROR(iree_vm_buffer_register_types(instance));
+  IREE_RETURN_IF_ERROR(iree_vm_list_register_types(instance));
+  return iree_ok_status();
+}
 
 struct iree_vm_instance_t {
   iree_atomic_ref_count_t ref_count;

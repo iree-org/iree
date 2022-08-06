@@ -53,6 +53,9 @@ struct iree_runtime_instance_t {
   // can find the same devices. This may mean a new HAL type like
   // iree_hal_device_pool_t to prevent too much coupling and make weak
   // references easier.
+
+  // VM instance shared across all sessions.
+  iree_vm_instance_t* vm_instance;
 };
 
 IREE_API_EXPORT iree_status_t iree_runtime_instance_create(
@@ -70,16 +73,6 @@ IREE_API_EXPORT iree_status_t iree_runtime_instance_create(
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_api_version_check(options->api_version, &actual_version));
 
-  // Register builtin types.
-  // TODO(#8698): change to per-instance type registries to avoid these
-  // global (UNSAFE!) calls. For now hosting applications should really only
-  // be using a single instance anyway.
-  // The instance constructor does the builtin types for us and if we created it
-  // first we wouldn't need to call it.
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, iree_vm_register_builtin_types(NULL));
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0,
-                                    iree_hal_module_register_all_types(NULL));
-
   // Allocate the instance state.
   iree_runtime_instance_t* instance = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -91,15 +84,26 @@ IREE_API_EXPORT iree_status_t iree_runtime_instance_create(
   instance->driver_registry = options->driver_registry;
   // TODO(benvanik): driver registry ref counting.
 
-  *out_instance = instance;
+  iree_status_t status =
+      iree_vm_instance_create(host_allocator, &instance->vm_instance);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_module_register_all_types(instance->vm_instance);
+  }
+
+  if (iree_status_is_ok(status)) {
+    *out_instance = instance;
+  } else {
+    iree_runtime_instance_release(instance);
+  }
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return status;
 }
 
 static void iree_runtime_instance_destroy(iree_runtime_instance_t* instance) {
   IREE_ASSERT_ARGUMENT(instance);
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  iree_vm_instance_release(instance->vm_instance);
   iree_allocator_free(instance->host_allocator, instance);
 
   IREE_TRACE_ZONE_END(z0);
@@ -123,6 +127,12 @@ IREE_API_EXPORT iree_allocator_t
 iree_runtime_instance_host_allocator(const iree_runtime_instance_t* instance) {
   IREE_ASSERT_ARGUMENT(instance);
   return instance->host_allocator;
+}
+
+IREE_API_EXPORT iree_vm_instance_t* iree_runtime_instance_vm_instance(
+    const iree_runtime_instance_t* instance) {
+  IREE_ASSERT_ARGUMENT(instance);
+  return instance->vm_instance;
 }
 
 IREE_API_EXPORT iree_hal_driver_registry_t*

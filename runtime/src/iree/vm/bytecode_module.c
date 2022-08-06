@@ -1119,8 +1119,9 @@ static iree_status_t iree_vm_bytecode_module_resume_call(
 }
 
 IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_create(
-    iree_const_byte_span_t archive_contents, iree_allocator_t archive_allocator,
-    iree_allocator_t allocator, iree_vm_module_t** out_module) {
+    iree_vm_instance_t* instance, iree_const_byte_span_t archive_contents,
+    iree_allocator_t archive_allocator, iree_allocator_t allocator,
+    iree_vm_module_t** out_module) {
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_ASSERT_ARGUMENT(out_module);
   *out_module = NULL;

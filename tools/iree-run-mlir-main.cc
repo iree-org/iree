@@ -359,6 +359,7 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
   // with devices.
   iree_vm_module_t* main_module = nullptr;
   IREE_RETURN_IF_ERROR(iree_vm_bytecode_module_create(
+      instance,
       iree_make_const_byte_span((void*)flatbuffer_data.data(),
                                 flatbuffer_data.size()),
       iree_allocator_null(), iree_allocator_system(), &main_module));

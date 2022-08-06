@@ -42,7 +42,6 @@ iree_cc_library(
     impl
   HDRS
     "buffer.h"
-    "builtin_types.h"
     "context.h"
     "instance.h"
     "invocation.h"
@@ -56,7 +55,6 @@ iree_cc_library(
     "value.h"
   SRCS
     "buffer.c"
-    "builtin_types.c"
     "context.c"
     "instance.c"
     "invocation.c"

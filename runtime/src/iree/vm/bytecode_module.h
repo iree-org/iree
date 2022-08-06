@@ -21,8 +21,9 @@ extern "C" {
 // |archive_contents| when the module is destroyed and otherwise the ownership
 // of the memory remains with the caller.
 IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_create(
-    iree_const_byte_span_t archive_contents, iree_allocator_t archive_allocator,
-    iree_allocator_t allocator, iree_vm_module_t** out_module);
+    iree_vm_instance_t* instance, iree_const_byte_span_t archive_contents,
+    iree_allocator_t archive_allocator, iree_allocator_t allocator,
+    iree_vm_module_t** out_module);
 
 // Parses the module archive header in |archive_contents|.
 // The subrange containing the FlatBuffer data is returned as well as the

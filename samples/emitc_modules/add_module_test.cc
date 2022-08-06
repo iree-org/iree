@@ -21,7 +21,8 @@ class VMAddModuleTest : public ::testing::Test {
     IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance_));
 
     iree_vm_module_t* add_module = nullptr;
-    IREE_CHECK_OK(add_module_create(iree_allocator_system(), &add_module));
+    IREE_CHECK_OK(
+        add_module_create(instance_, iree_allocator_system(), &add_module));
 
     std::vector<iree_vm_module_t*> modules = {add_module};
     IREE_CHECK_OK(iree_vm_context_create_with_modules(

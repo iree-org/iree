@@ -168,12 +168,12 @@ still some trickiness involved).
 
 ```c
 // Ensure custom types are registered before loading modules that use them.
-// This only needs to be done once.
-IREE_CHECK_OK(iree_custom_module_register_types());
+// This only needs to be done once per instance.
+IREE_CHECK_OK(iree_custom_module_register_types(instance));
 
 // Create the custom module that can be reused across contexts.
 iree_vm_module_t* custom_module = NULL;
-IREE_CHECK_OK(iree_custom_module_create(allocator, &custom_module));
+IREE_CHECK_OK(iree_custom_module_create(instance, allocator, &custom_module));
 
 // Create the context for this invocation reusing the loaded modules.
 // Contexts hold isolated state and can be reused for multiple calls.

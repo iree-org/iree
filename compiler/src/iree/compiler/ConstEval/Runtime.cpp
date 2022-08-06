@@ -272,13 +272,14 @@ void CompiledBinary::initialize(void* data, size_t length) {
   iree_hal_driver_release(driver);
 
   // Create hal module.
-  IREE_CHECK_OK(iree_hal_module_create(device, IREE_HAL_MODULE_FLAG_NONE,
+  IREE_CHECK_OK(iree_hal_module_create(runtime.instance, device,
+                                       IREE_HAL_MODULE_FLAG_NONE,
                                        iree_allocator_system(), &hal_module));
 
   // Bytecode module.
   IREE_CHECK_OK(iree_vm_bytecode_module_create(
-      iree_make_const_byte_span(data, length), iree_allocator_null(),
-      iree_allocator_system(), &main_module));
+      runtime.instance, iree_make_const_byte_span(data, length),
+      iree_allocator_null(), iree_allocator_system(), &main_module));
 
   // Context.
   std::array<iree_vm_module_t*, 2> modules = {hal_module, main_module};

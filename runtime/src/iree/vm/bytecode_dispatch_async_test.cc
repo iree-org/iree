@@ -26,11 +26,6 @@ using iree::testing::status::StatusIs;
 
 class VMBytecodeDispatchAsyncTest : public ::testing::Test {
  protected:
-  static void SetUpTestSuite() {
-    // TODO(#8698): need to register these on an instance.
-    IREE_CHECK_OK(iree_vm_register_builtin_types(NULL));
-  }
-
   void SetUp() override {
     IREE_TRACE_SCOPE();
     const iree_file_toc_t* file = async_bytecode_modules_c_create();
@@ -38,6 +33,7 @@ class VMBytecodeDispatchAsyncTest : public ::testing::Test {
     IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance_));
 
     IREE_CHECK_OK(iree_vm_bytecode_module_create(
+        instance_,
         iree_const_byte_span_t{reinterpret_cast<const uint8_t*>(file->data),
                                file->size},
         iree_allocator_null(), iree_allocator_system(), &bytecode_module_));

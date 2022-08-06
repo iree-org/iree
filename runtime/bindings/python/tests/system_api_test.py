@@ -17,7 +17,7 @@ import iree.runtime
 import numpy as np
 
 
-def create_simple_mul_module():
+def create_simple_mul_module(instance):
   binary = iree.compiler.compile_str(
       """
       module @arithmetic {
@@ -29,7 +29,7 @@ def create_simple_mul_module():
       """,
       target_backends=iree.compiler.core.DEFAULT_TESTING_BACKENDS,
   )
-  m = iree.runtime.VmModule.from_flatbuffer(binary)
+  m = iree.runtime.VmModule.from_flatbuffer(instance, binary)
   return m
 
 
@@ -62,7 +62,7 @@ class SystemApiTest(unittest.TestCase):
   def test_custom_dynamic(self):
     ctx = iree.runtime.SystemContext()
     self.assertTrue(ctx.is_dynamic)
-    ctx.add_vm_module(create_simple_mul_module())
+    ctx.add_vm_module(create_simple_mul_module(ctx.instance))
     self.assertEqual(ctx.modules.arithmetic.name, "arithmetic")
     f = ctx.modules.arithmetic["simple_mul"]
     f_repr = repr(f)
@@ -72,14 +72,14 @@ class SystemApiTest(unittest.TestCase):
   def test_duplicate_module(self):
     ctx = iree.runtime.SystemContext()
     self.assertTrue(ctx.is_dynamic)
-    ctx.add_vm_module(create_simple_mul_module())
+    ctx.add_vm_module(create_simple_mul_module(ctx.instance))
     with self.assertRaisesRegex(ValueError, "arithmetic"):
-      ctx.add_vm_module(create_simple_mul_module())
+      ctx.add_vm_module(create_simple_mul_module(ctx.instance))
 
   def test_static_invoke(self):
     ctx = iree.runtime.SystemContext()
     self.assertTrue(ctx.is_dynamic)
-    ctx.add_vm_module(create_simple_mul_module())
+    ctx.add_vm_module(create_simple_mul_module(ctx.instance))
     self.assertEqual(ctx.modules.arithmetic.name, "arithmetic")
     f = ctx.modules.arithmetic["simple_mul"]
     arg0 = np.array([1., 2., 3., 4.], dtype=np.float32)
@@ -92,7 +92,7 @@ class SystemApiTest(unittest.TestCase):
     # and input to functions.
     ctx = iree.runtime.SystemContext()
     self.assertTrue(ctx.is_dynamic)
-    ctx.add_vm_module(create_simple_mul_module())
+    ctx.add_vm_module(create_simple_mul_module(ctx.instance))
     self.assertEqual(ctx.modules.arithmetic.name, "arithmetic")
     f = ctx.modules.arithmetic["simple_mul"]
     arg0 = np.array([1., 2., 3., 4.], dtype=np.float32)
@@ -121,7 +121,7 @@ class SystemApiTest(unittest.TestCase):
   def verify_tracing(self, config, temp_dir):
     logging.info("Tracing test to: %s", temp_dir)
     ctx = iree.runtime.SystemContext(config=config)
-    ctx.add_vm_module(create_simple_mul_module())
+    ctx.add_vm_module(create_simple_mul_module(ctx.instance))
     f = ctx.modules.arithmetic["simple_mul"]
     arg0 = np.array([1., 2., 3., 4.], dtype=np.float32)
     arg1 = np.array([4., 5., 6., 7.], dtype=np.float32)
@@ -131,7 +131,9 @@ class SystemApiTest(unittest.TestCase):
     # TODO: Once replay is possible, verify that.
 
   def test_load_vm_module(self):
-    arithmetic = iree.runtime.load_vm_module(create_simple_mul_module())
+    ctx = iree.runtime.SystemContext()
+    arithmetic = iree.runtime.load_vm_module(
+        create_simple_mul_module(ctx.instance))
     arg0 = np.array([1., 2., 3., 4.], dtype=np.float32)
     arg1 = np.array([4., 5., 6., 7.], dtype=np.float32)
     results = arithmetic.simple_mul(arg0, arg1)
@@ -142,7 +144,8 @@ class SystemApiTest(unittest.TestCase):
     # Doing default device configuration multiple times should be valid
     # (if this were instantiating drivers multiple times, it can trigger
     # a crash, depending on whether the driver supports multi-instantiation).
-    m = create_simple_mul_module()
+    ctx = iree.runtime.SystemContext()
+    m = create_simple_mul_module(ctx.instance)
     m1 = iree.runtime.load_vm_module(m)
     m2 = iree.runtime.load_vm_module(m)
 

@@ -387,12 +387,12 @@ py::object MapElementTypeToDType(iree_hal_element_type_t element_type) {
 // HAL module
 //------------------------------------------------------------------------------
 
-VmModule CreateHalModule(HalDevice* device) {
-  iree_vm_module_t* module;
-  CheckApiStatus(
-      iree_hal_module_create(device->raw_ptr(), IREE_HAL_MODULE_FLAG_NONE,
-                             iree_allocator_system(), &module),
-      "Error creating hal module");
+VmModule CreateHalModule(VmInstance* instance, HalDevice* device) {
+  iree_vm_module_t* module = NULL;
+  CheckApiStatus(iree_hal_module_create(instance->raw_ptr(), device->raw_ptr(),
+                                        IREE_HAL_MODULE_FLAG_NONE,
+                                        iree_allocator_system(), &module),
+                 "Error creating hal module");
   return VmModule::StealFromRawPtr(module);
 }
 
@@ -402,9 +402,6 @@ VmModule CreateHalModule(HalDevice* device) {
 
 void SetupHalBindings(pybind11::module m) {
   py::dict driver_cache;
-
-  // TODO(#8698): need to register these on an instance.
-  IREE_CHECK_OK(iree_hal_module_register_all_types(NULL));
 
   // Built-in module creation.
   m.def("create_hal_module", &CreateHalModule);

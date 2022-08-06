@@ -83,7 +83,8 @@ iree_status_t Run(std::string module_file_path, iree_allocator_t host_allocator,
                        "creating instance");
 
   iree_vm_module_t* check_module = nullptr;
-  IREE_RETURN_IF_ERROR(iree_check_module_create(host_allocator, &check_module));
+  IREE_RETURN_IF_ERROR(
+      iree_check_module_create(instance, host_allocator, &check_module));
 
   // TODO(benvanik): use --module_file= flag in order to reuse
   // iree_tooling_load_module_from_flags.
@@ -98,7 +99,7 @@ iree_status_t Run(std::string module_file_path, iree_allocator_t host_allocator,
   }
   iree_vm_module_t* main_module = nullptr;
   IREE_RETURN_IF_ERROR(iree_vm_bytecode_module_create(
-      flatbuffer_contents->const_buffer,
+      instance, flatbuffer_contents->const_buffer,
       iree_file_contents_deallocator(flatbuffer_contents), host_allocator,
       &main_module));
 

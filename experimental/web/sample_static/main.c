@@ -39,11 +39,13 @@ typedef struct iree_sample_state_t {
   iree_runtime_call_t call;
 } iree_sample_state_t;
 
-iree_status_t create_bytecode_module(iree_vm_module_t** out_module) {
+iree_status_t create_bytecode_module(iree_vm_instance_t* instance,
+                                     iree_vm_module_t** out_module) {
   const struct iree_file_toc_t* module_file_toc = iree_static_mnist_create();
   iree_const_byte_span_t module_data =
       iree_make_const_byte_span(module_file_toc->data, module_file_toc->size);
-  return iree_vm_bytecode_module_create(module_data, iree_allocator_null(),
+  return iree_vm_bytecode_module_create(instance, module_data,
+                                        iree_allocator_null(),
                                         iree_allocator_system(), out_module);
 }
 
@@ -76,7 +78,7 @@ iree_sample_state_t* setup_sample() {
   }
 
   if (iree_status_is_ok(status)) {
-    status = create_bytecode_module(&state->module);
+    status = create_bytecode_module(state->instance, &state->module);
   }
   if (iree_status_is_ok(status)) {
     status = iree_runtime_session_append_module(state->session, state->module);

@@ -14,6 +14,7 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/span.h"
 #include "iree/base/status_cc.h"
+#include "iree/vm/instance.h"
 #include "iree/vm/module.h"
 #include "iree/vm/native_module_packing.h"  // IWYU pragma: export
 #include "iree/vm/stack.h"
@@ -67,12 +68,15 @@ namespace vm {
 template <typename State>
 class NativeModule {
  public:
-  NativeModule(const char* name, uint32_t version, iree_allocator_t allocator,
+  NativeModule(const char* name, uint32_t version, iree_vm_instance_t* instance,
+               iree_allocator_t allocator,
                iree::span<const NativeFunction<State>> dispatch_table)
       : name_(name),
         version_(version),
+        instance_(instance),
         allocator_(allocator),
         dispatch_table_(dispatch_table) {
+    iree_vm_instance_retain(instance);
     IREE_CHECK_OK(iree_vm_module_initialize(&interface_, this));
     interface_.destroy = NativeModule::ModuleDestroy;
     interface_.name = NativeModule::ModuleName;
@@ -91,7 +95,7 @@ class NativeModule {
     // TODO(benvanik): resume_call
   }
 
-  virtual ~NativeModule() = default;
+  virtual ~NativeModule() { iree_vm_instance_release(instance_); }
 
   // C API module interface bound to this NativeModule instance.
   iree_vm_module_t* interface() { return &interface_; }
@@ -278,6 +282,7 @@ class NativeModule {
 
   const char* name_;
   uint32_t version_;
+  iree_vm_instance_t* instance_;
   const iree_allocator_t allocator_;
   iree_vm_module_t interface_;
 

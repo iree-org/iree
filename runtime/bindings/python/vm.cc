@@ -58,9 +58,17 @@ py::dict GetFunctionReflectionDict(iree_vm_function_t& f) {
 
 VmInstance VmInstance::Create() {
   IREE_TRACE_SCOPE0("VmInstance::Create");
-  iree_vm_instance_t* instance;
+
+  iree_vm_instance_t* instance = NULL;
   auto status = iree_vm_instance_create(iree_allocator_system(), &instance);
   CheckApiStatus(status, "Error creating instance");
+
+  // The python bindings assume the HAL is always available for use.
+  // We register the types here so modules can be loaded using the HAL types
+  // in any order.
+  CheckApiStatus(iree_hal_module_register_all_types(instance),
+                 "registering HAL types");
+
   return VmInstance::StealFromRawPtr(instance);
 }
 
@@ -122,11 +130,12 @@ void VmContext::Invoke(iree_vm_function_t f, VmVariantList& inputs,
 // VmModule
 //------------------------------------------------------------------------------
 
-VmModule VmModule::FromFlatbufferBlob(py::object flatbuffer_blob_object) {
+VmModule VmModule::FromFlatbufferBlob(VmInstance* instance,
+                                      py::object flatbuffer_blob_object) {
   IREE_TRACE_SCOPE0("VmModule::FromFlatbufferBlob");
   auto flatbuffer_blob = py::cast<py::buffer>(flatbuffer_blob_object);
   auto buffer_info = flatbuffer_blob.request();
-  iree_vm_module_t* module;
+  iree_vm_module_t* module = nullptr;
 
   // Bridge to the C-based deallocator API.
   auto* raw_ptr = flatbuffer_blob.ptr();
@@ -141,6 +150,7 @@ VmModule VmModule::FromFlatbufferBlob(py::object flatbuffer_blob_object) {
   iree_allocator_t deallocator{/*self=*/NULL, /*ctl=*/ctl_fn};
 
   auto status = iree_vm_bytecode_module_create(
+      instance->raw_ptr(),
       {static_cast<const uint8_t*>(buffer_info.ptr),
        static_cast<iree_host_size_t>(buffer_info.size)},
       deallocator, iree_allocator_system(), &module);
@@ -511,11 +521,6 @@ std::string VmVariantList::DebugString() const {
 }
 
 void SetupVmBindings(pybind11::module m) {
-  // TODO(#8698): need to register these on an instance.
-  // The instance constructor does this for us and if we created it first we
-  // wouldn't need to call this.
-  IREE_CHECK_OK(iree_vm_register_builtin_types(NULL));
-
   py::enum_<enum iree_vm_function_linkage_e>(m, "Linkage")
       .value("INTERNAL", IREE_VM_FUNCTION_LINKAGE_INTERNAL)
       .value("IMPORT", IREE_VM_FUNCTION_LINKAGE_IMPORT)

@@ -17,7 +17,8 @@ simple_mul_dispatch_0_library_query(
     iree_hal_executable_library_version_t max_version,
     const iree_hal_executable_environment_v0_t* environment);
 // A function to create the bytecode or C module.
-extern iree_status_t create_module(iree_vm_module_t** module);
+extern iree_status_t create_module(iree_vm_instance_t* instance,
+                                   iree_vm_module_t** out_module);
 
 extern void print_success();
 
@@ -95,7 +96,8 @@ iree_status_t Run() {
   iree_vm_module_t* module = NULL;
 
   if (iree_status_is_ok(status)) {
-    status = create_module(&module);
+    status =
+        create_module(iree_runtime_instance_vm_instance(instance), &module);
   }
 
   if (iree_status_is_ok(status)) {

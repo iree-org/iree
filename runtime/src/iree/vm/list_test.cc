@@ -12,7 +12,7 @@
 #include "iree/base/api.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
-#include "iree/vm/builtin_types.h"
+#include "iree/vm/instance.h"
 #include "iree/vm/ref_cc.h"
 
 class A : public iree::vm::RefObject<A> {
@@ -70,15 +70,13 @@ static iree_vm_ref_t MakeRef(V value) {
   return ref;
 }
 
-class VMListTest : public ::testing::Test {
- protected:
+static iree_vm_instance_t* instance = NULL;
+struct VMListTest : public ::testing::Test {
   static void SetUpTestSuite() {
-    // TODO(#8698): need to register these on an instance.
-    // The instance constructor does this for us and if we created it first we
-    // wouldn't need to call this.
-    IREE_CHECK_OK(iree_vm_register_builtin_types(NULL));
-    RegisterRefTypes(NULL);
+    IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance));
+    RegisterRefTypes(instance);
   }
+  static void TearDownTestSuite() { iree_vm_instance_release(instance); }
 };
 
 // Tests simple primitive value list usage, mainly just for demonstration.
