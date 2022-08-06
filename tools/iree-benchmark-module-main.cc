@@ -91,6 +91,7 @@ IREE_FLAG(string, entry_function, "",
 IREE_FLAG(bool, print_statistics, false,
           "Prints runtime statistics to stderr on exit.");
 
+// TODO(benvanik): move --function_input= flag into a util.
 static iree_status_t parse_function_input(iree_string_view_t flag_name,
                                           void* storage,
                                           iree_string_view_t value) {

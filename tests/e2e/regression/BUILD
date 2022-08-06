@@ -51,12 +51,6 @@ iree_lit_test_suite(
         # TODO(#5897): enable these for codegen linalg on tensors/etc.
         exclude = [
             "associative_reordering.mlir",
-            "dynamic_compare_and_select.mlir",
-            "dynamic_dot_general.mlir",
-            "dynamic_linalg_matmul_on_tensors.mlir",
-            "dynamic_linalg_matmul_on_tensors_fuse_0.mlir",
-            "dynamic_linalg_matmul_on_tensors_fuse_1.mlir",
-            "dynamic_linalg_matmul_on_tensors_fuse_2.mlir",
             "large_reduction.mlir",
             "layernorm.mlir",
             "linalg_quantized_matmul_vs_linalg_matmul.mlir",

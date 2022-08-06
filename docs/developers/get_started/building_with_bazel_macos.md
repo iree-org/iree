@@ -112,7 +112,9 @@ Translate a
 and execute a function in the compiled module:
 
 ```shell
+# iree-run-mlir <compiler flags> [input.mlir] <runtime flags>
 $ ./bazel-bin/tools/iree-run-mlir \
-  --function-input="f32=-2" --iree-hal-target-backends=vmvx --print-mlir \
-  ./samples/models/simple_abs.mlir
+  --iree-hal-target-backends=vmvx --print-mlir \
+  ./samples/models/simple_abs.mlir \
+  --function_input=f32=-2
 ```

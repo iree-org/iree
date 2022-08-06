@@ -1,9 +1,18 @@
-// RUN: iree-run-mlir --iree-input-type=mhlo --iree-hal-target-backends=vmvx --function-input="f32=0" --function-input="5x1xf32=[1][-2][-3][4][-5]" --function-input="f32=1" --function-input="5x5xf32=[3.46499 -7.64389 -5.72249 5.98053 17.6892][2.9707 -6.20734 -4.25962 4.76055 13.8784][2.47641 -4.77079 -2.79675 3.54056 10.0675][1.98212 -3.33424 -1.33388 2.32058 6.25666][1.48783 -1.8977 0.12899 1.1006 2.4458]" --function-input="5xf32=0 0 0 0 0" %s | FileCheck %s
-// RUN: iree-run-mlir --iree-input-type=mhlo --iree-hal-target-backends=llvm-cpu --function-input="f32=0" --function-input="5x1xf32=[1][-2][-3][4][-5]" --function-input="f32=1" --function-input="5x5xf32=[3.46499 -7.64389 -5.72249 5.98053 17.6892][2.9707 -6.20734 -4.25962 4.76055 13.8784][2.47641 -4.77079 -2.79675 3.54056 10.0675][1.98212 -3.33424 -1.33388 2.32058 6.25666][1.48783 -1.8977 0.12899 1.1006 2.4458]" --function-input="5xf32=0 0 0 0 0" %s | FileCheck %s
-// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir --iree-input-type=mhlo --iree-hal-target-backends=vulkan-spirv --function-input="f32=0" --function-input="5x1xf32=[1][-2][-3][4][-5]" --function-input="f32=1" --function-input="5x5xf32=[3.46499 -7.64389 -5.72249 5.98053 17.6892][2.9707 -6.20734 -4.25962 4.76055 13.8784][2.47641 -4.77079 -2.79675 3.54056 10.0675][1.98212 -3.33424 -1.33388 2.32058 6.25666][1.48783 -1.8977 0.12899 1.1006 2.4458]" --function-input="5xf32=0 0 0 0 0" %s | FileCheck %s)
+// RUN: iree-run-mlir --iree-input-type=mhlo --iree-hal-target-backends=vmvx %s | FileCheck %s
+// RUN: iree-run-mlir --iree-input-type=mhlo --iree-hal-target-backends=llvm-cpu %s | FileCheck %s
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir --iree-input-type=mhlo --iree-hal-target-backends=vulkan-spirv %s | FileCheck %s)
 
-// CHECK-LABEL: EXEC @main_entry_dispatch_3
-func.func @main_entry_dispatch_3(
+// CHECK-LABEL: EXEC @entry
+func.func @entry() -> tensor<5x5xf32> {
+  %arg0 = util.unfoldable_constant dense<0.0> : tensor<f32>
+  %arg1 = util.unfoldable_constant dense<[[1.0],[-2.0],[-3.0],[4.0],[-5.0]]> : tensor<5x1xf32>
+  %arg2 = util.unfoldable_constant dense<1.0> : tensor<f32>
+  %arg3 = util.unfoldable_constant dense<[[3.46499,-7.64389,-5.72249,5.98053,17.6892],[2.9707,-6.20734,-4.25962,4.76055,13.8784],[2.47641,-4.77079,-2.79675,3.54056,10.0675],[1.98212,-3.33424,-1.33388,2.32058,6.25666],[1.48783,-1.8977,0.12899,1.1006,2.4458]]> : tensor<5x5xf32>
+  %arg4 = util.unfoldable_constant dense<0.0> : tensor<5xf32>
+  %ret0 = call @_entry(%arg0, %arg1, %arg2, %arg3, %arg4) : (tensor<f32>, tensor<5x1xf32>, tensor<f32>, tensor<5x5xf32>, tensor<5xf32>) -> tensor<5x5xf32>
+  return %ret0 : tensor<5x5xf32>
+}
+func.func private @_entry(
     %0: tensor<f32>,
     %1: tensor<5x1xf32>,
     %2: tensor<f32>,

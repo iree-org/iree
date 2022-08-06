@@ -126,12 +126,6 @@ static llvm::cl::opt<std::string> output_file_flag{
     llvm::cl::init(""),
 };
 
-static llvm::cl::list<std::string> function_inputs_flag{
-    "function-input",
-    llvm::cl::desc("Input shapes and optional values"),
-    llvm::cl::ZeroOrMore,
-};
-
 static llvm::cl::opt<bool> run_flag{
     "run",
     llvm::cl::desc("Runs the module (vs. just compiling and verifying)"),
@@ -143,6 +137,42 @@ static llvm::cl::list<std::string> run_args_flag{
     llvm::cl::desc("Argument passed to the execution flag parser"),
     llvm::cl::ConsumeAfter,
 };
+
+// TODO(benvanik): move --function_input= flag into a util.
+static iree_status_t parse_function_input(iree_string_view_t flag_name,
+                                          void* storage,
+                                          iree_string_view_t value) {
+  auto* list = (std::vector<std::string>*)storage;
+  list->push_back(std::string(value.data, value.size));
+  return iree_ok_status();
+}
+static void print_function_input(iree_string_view_t flag_name, void* storage,
+                                 FILE* file) {
+  auto* list = (std::vector<std::string>*)storage;
+  if (list->empty()) {
+    fprintf(file, "# --%.*s=\n", (int)flag_name.size, flag_name.data);
+  } else {
+    for (size_t i = 0; i < list->size(); ++i) {
+      fprintf(file, "--%.*s=\"%s\"\n", (int)flag_name.size, flag_name.data,
+              list->at(i).c_str());
+    }
+  }
+}
+static std::vector<std::string> FLAG_function_inputs;
+IREE_FLAG_CALLBACK(
+    parse_function_input, print_function_input, &FLAG_function_inputs,
+    function_input,
+    "An input value or buffer of the format:\n"
+    "  [shape]xtype=[value]\n"
+    "  2x2xi32=1 2 3 4\n"
+    "Optionally, brackets may be used to separate the element values:\n"
+    "  2x2xi32=[[1 2][3 4]]\n"
+    "Raw binary files can be read to provide buffer contents:\n"
+    "  2x2xi32=@some/file.bin\n"
+    "numpy npy files (from numpy.save) can be read to provide 1+ values:\n"
+    "  @some.npy\n"
+    "Each occurrence of the flag indicates an input in the order they were\n"
+    "specified on the command line.");
 
 namespace iree {
 namespace {
@@ -295,12 +325,11 @@ Status EvaluateFunction(iree_vm_context_t* context,
 
   // Parse input values from the flags.
   vm::ref<iree_vm_list_t> inputs;
-  auto function_inputs_list = iree::span<std::string>(
-      function_inputs_flag.empty() ? nullptr : &function_inputs_flag.front(),
-      function_inputs_flag.size());
-  IREE_RETURN_IF_ERROR(ParseToVariantList(device_allocator,
-                                          function_inputs_list,
-                                          iree_allocator_system(), &inputs));
+  IREE_RETURN_IF_ERROR(ParseToVariantList(
+      device_allocator,
+      iree::span<const std::string>{FLAG_function_inputs.data(),
+                                    FLAG_function_inputs.size()},
+      iree_allocator_system(), &inputs));
 
   // Prepare outputs list to accept the results from the invocation.
   vm::ref<iree_vm_list_t> outputs;
