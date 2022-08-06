@@ -108,8 +108,6 @@ void buildVMVXTransformPassPipeline(OpPassManager &passManager) {
   // ---------------------------------------------------------------------------
 
   passManager.addNestedPass<mlir::ModuleOp>(createConversionPass());
-  passManager.nest<mlir::ModuleOp>().addNestedPass<func::FuncOp>(
-      memref::createFoldSubViewOpsPass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
 

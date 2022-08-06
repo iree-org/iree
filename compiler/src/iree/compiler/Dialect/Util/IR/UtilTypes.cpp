@@ -18,6 +18,7 @@
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/Dominance.h"
+#include "mlir/IR/FunctionInterfaces.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/TypeSupport.h"
@@ -308,8 +309,9 @@ static bool isValueUsableForOp(Value value, Block *block,
     if (value.getDefiningOp()->isBeforeInBlock(&*insertionPoint)) {
       return true;
     }
-  } else if (definingBlock->isEntryBlock()) {
-    // Entry block always dominates - fast path for constants.
+  } else if (definingBlock->isEntryBlock() &&
+             llvm::isa<FunctionOpInterface>(definingBlock->getParentOp())) {
+    // Function entry block always dominates - fast path for constants.
     return true;
   } else {
     // See if block the value is defined in dominates the forOp block.
@@ -351,8 +353,9 @@ Value SizeAwareTypeInterface::findSizeValue(Value resourceValue, Block *block,
               use.getOwner())) {
         auto sizeValue = sizeAwareOp.getOperandSize(use.getOperandNumber());
         if (sizeValue) {
-          if (isValueUsableForOp(sizeValue, block, insertionPoint))
+          if (isValueUsableForOp(sizeValue, block, insertionPoint)) {
             return sizeValue;
+          }
         }
       }
       if (auto tiedOp =
