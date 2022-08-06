@@ -69,14 +69,11 @@ class ConversionPass : public ConversionBase<ConversionPass> {
                          mlir::arith::ArithmeticDialect>();
     conversionTarget.addLegalDialect<mlir::AffineDialect>();
     conversionTarget.addLegalDialect<memref::MemRefDialect>();
-    conversionTarget.addLegalOp<mlir::UnrealizedConversionCastOp>();
+    conversionTarget.addIllegalOp<mlir::UnrealizedConversionCastOp>();
 
     RewritePatternSet patterns(&getContext());
     populateHALToVMVXPatterns(context, patterns, typeConverter);
     populateStandardToVMVXPatterns(context, patterns, typeConverter);
-
-    // MemRef to Util (to VM) is an A->B->C lowering. We must instruct it
-    // specifically on what the correct C buffer type is.
     populateMemRefToUtilPatterns(context, conversionTarget, typeConverter,
                                  patterns,
                                  IREE::Util::BufferType::get(&getContext()));
