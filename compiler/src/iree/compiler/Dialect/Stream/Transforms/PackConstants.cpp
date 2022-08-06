@@ -500,9 +500,9 @@ class PackConstantsPass : public PackConstantsBase<PackConstantsPass> {
       SmallVector<Value> storageBuffers;
       for (auto &storageResource : storageResources) {
         auto rodataOp = builder.create<IREE::Util::BufferConstantOp>(
-            storageResource.loc, builder.getType<IREE::Util::BufferType>(),
-            storageResource.data,
-            builder.getIndexAttr(resourceConfig.getMinBufferOffsetAlignment()));
+            storageResource.loc, /*name=*/nullptr, storageResource.data,
+            builder.getIndexAttr(resourceConfig.getMinBufferOffsetAlignment()),
+            /*mimeType=*/nullptr);
         storageBuffers.push_back(rodataOp);
       }
 

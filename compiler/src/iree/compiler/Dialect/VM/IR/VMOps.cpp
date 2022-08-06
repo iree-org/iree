@@ -857,8 +857,9 @@ void RodataInlineOp::build(OpBuilder &builder, OperationState &result,
   auto safeIdentifier = makeSafeIdentifier(value.getValue());
   build(builder, result,
         IREE::VM::RefType::get(IREE::VM::BufferType::get(builder.getContext())),
-        builder.getStringAttr(safeIdentifier), value,
-        /*alignment=*/builder.getI64IntegerAttr(1));
+        /*name=*/builder.getStringAttr(safeIdentifier), /*data=*/value,
+        /*alignment=*/builder.getI64IntegerAttr(1),
+        /*mimeType=*/nullptr);
 }
 
 //===----------------------------------------------------------------------===//

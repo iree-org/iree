@@ -1062,7 +1062,7 @@ LogicalResult ListSetOp::verify() {
 
 void BufferConstantOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(getResult(), "buffer_cst");
+  setNameFn(getResult(), getName().value_or("buffer_cst"));
 }
 
 LogicalResult BufferConstantOp::verify() {
