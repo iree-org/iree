@@ -55,3 +55,9 @@ IREE_API_EXPORT void iree_vm_instance_release(iree_vm_instance_t* instance) {
     iree_vm_instance_destroy(instance);
   }
 }
+
+IREE_API_EXPORT iree_allocator_t
+iree_vm_instance_allocator(iree_vm_instance_t* instance) {
+  IREE_ASSERT_ARGUMENT(instance);
+  return instance->allocator;
+}
