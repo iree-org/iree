@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
+#include "iree/compiler/Dialect/Util/Conversion/MemRefToUtil/ConvertMemRefToUtil.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"
 #include "iree/compiler/Dialect/VMVX/Conversion/HALToVMVX/ConvertHALToVMVX.h"
@@ -73,6 +74,12 @@ class ConversionPass : public ConversionBase<ConversionPass> {
     RewritePatternSet patterns(&getContext());
     populateHALToVMVXPatterns(context, patterns, typeConverter);
     populateStandardToVMVXPatterns(context, patterns, typeConverter);
+
+    // MemRef to Util (to VM) is an A->B->C lowering. We must instruct it
+    // specifically on what the correct C buffer type is.
+    populateMemRefToUtilPatterns(context, conversionTarget, typeConverter,
+                                 patterns, IREE::Util::BufferType::get(&getContext()));
+
 
     // Use the default 64-bit lowering for TOSA's ApplyScale operator:
     //   This lowering widens integer types to 64-bit an performs the non-fused

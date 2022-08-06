@@ -8,7 +8,6 @@
 #include <tuple>
 
 #include "iree/compiler/Dialect/Util/Conversion/ConversionPatterns.h"
-#include "iree/compiler/Dialect/Util/Conversion/MemRefToUtil/ConvertMemRefToUtil.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionDialectInterface.h"
@@ -78,7 +77,7 @@ class ConversionPass
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Util::UtilDialect, IREE::VM::VMDialect,
                     func::FuncDialect, mlir::arith::ArithmeticDialect,
-                    math::MathDialect, AffineDialect, memref::MemRefDialect>();
+                    math::MathDialect, AffineDialect>();
   }
 
   void runOnOperation() override {
@@ -125,14 +124,6 @@ class ConversionPass
     populateStandardToVMPatterns(context, typeConverter, patterns);
     populateMathToVMPatterns(context, typeConverter, patterns);
     populateAffineToStdConversionPatterns(patterns);
-
-    // MemRef to Util (to VM) is an A->B->C lowering. We must instruct it
-    // specifically on what the correct C buffer type is.
-    auto utilBufferType =
-        typeConverter.convertType(IREE::Util::BufferType::get(&getContext()));
-    assert(utilBufferType);
-    populateMemRefToUtilPatterns(context, conversionTarget, typeConverter,
-                                 patterns, utilBufferType);
 
     conversionTarget
         .addIllegalDialect<func::FuncDialect, mlir::arith::ArithmeticDialect>();
