@@ -20,26 +20,12 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/modules/check/module.h"
-#include "iree/modules/hal/module.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
-#include "iree/tooling/device_util.h"
+#include "iree/tooling/context_util.h"
 #include "iree/tooling/vm_util.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
-
-// On Windows stdin defaults to text mode and will get weird line ending
-// expansion that will corrupt the input binary.
-#if defined(IREE_PLATFORM_WINDOWS)
-#include <fcntl.h>
-#include <io.h>
-
-#define IREE_FORCE_BINARY_STDIN() _setmode(_fileno(stdin), O_BINARY)
-#else
-#define IREE_FORCE_BINARY_STDIN()
-#endif  // IREE_PLATFORM_WINDOWS
-
-IREE_FLAG(bool, trace_execution, false, "Traces VM execution to stderr.");
 
 IREE_FLAG(
     bool, expect_failure, false,
@@ -54,9 +40,13 @@ namespace {
 class CheckModuleTest : public ::testing::Test {
  public:
   explicit CheckModuleTest(iree_vm_instance_t* instance,
-                           std::array<iree_vm_module_t*, 3> modules,
+                           const iree_tooling_module_list_t* modules,
                            iree_vm_function_t function)
-      : instance_(instance), modules_(modules), function_(function) {}
+      : instance_(instance), function_(function) {
+    iree_tooling_module_list_clone(modules, &modules_);
+  }
+  ~CheckModuleTest() { iree_tooling_module_list_reset(&modules_); }
+
   void SetUp() override {
     IREE_CHECK_OK(iree_tooling_create_context_from_flags(
         instance_, modules_.count, modules_.values,
@@ -64,50 +54,53 @@ class CheckModuleTest : public ::testing::Test {
         iree_vm_instance_allocator(instance_), &context_,
         /*out_device=*/NULL, /*out_device_allocator=*/NULL));
   }
+
   void TearDown() override { iree_vm_context_release(context_); }
 
   void TestBody() override {
-    IREE_EXPECT_OK(iree_vm_invoke(
-        context_, function_, IREE_VM_INVOCATION_FLAG_NONE,
-        /*policy=*/nullptr,
-        /*inputs=*/nullptr, /*outputs=*/nullptr, iree_allocator_system()));
+    IREE_EXPECT_OK(iree_vm_invoke(context_, function_,
+                                  IREE_VM_INVOCATION_FLAG_NONE,
+                                  /*policy=*/nullptr,
+                                  /*inputs=*/nullptr, /*outputs=*/nullptr,
+                                  iree_vm_instance_allocator(instance_)));
   }
 
  private:
   iree_vm_instance_t* instance_ = nullptr;
-  std::array<iree_vm_module_t*, 3> modules_;
+  iree_tooling_module_list_t modules_;
   iree_vm_function_t function_;
 
   iree_vm_context_t* context_ = nullptr;
 };
 
-iree_status_t Run(std::string module_file_path, int* out_exit_code) {
+iree_status_t Run(std::string module_file_path, iree_allocator_t host_allocator,
+                  int* out_exit_code) {
   IREE_TRACE_SCOPE0("iree-check-module");
   *out_exit_code = 1;
 
-  IREE_RETURN_IF_ERROR(iree_hal_module_register_all_types(),
-                       "registering HAL types");
   iree_vm_instance_t* instance = nullptr;
-  IREE_RETURN_IF_ERROR(
-      iree_vm_instance_create(iree_allocator_system(), &instance),
-      "creating instance");
+  IREE_RETURN_IF_ERROR(iree_tooling_create_instance(host_allocator, &instance),
+                       "creating instance");
 
+  iree_vm_module_t* check_module = nullptr;
+  IREE_RETURN_IF_ERROR(iree_check_module_create(host_allocator, &check_module));
+
+  // TODO(benvanik): use --module_file= flag in order to reuse
+  // iree_tooling_load_module_from_flags.
   iree_file_contents_t* flatbuffer_contents = NULL;
   if (module_file_path == "-") {
     std::cout << "Reading module contents from stdin...\n";
-    IREE_RETURN_IF_ERROR(iree_stdin_read_contents(iree_allocator_system(),
-                                                  &flatbuffer_contents));
+    IREE_RETURN_IF_ERROR(
+        iree_stdin_read_contents(host_allocator, &flatbuffer_contents));
   } else {
-    IREE_RETURN_IF_ERROR(iree_file_read_contents(module_file_path.c_str(),
-                                                 iree_allocator_system(),
-                                                 &flatbuffer_contents));
+    IREE_RETURN_IF_ERROR(iree_file_read_contents(
+        module_file_path.c_str(), host_allocator, &flatbuffer_contents));
   }
-
-  iree_vm_module_t* input_module = nullptr;
+  iree_vm_module_t* main_module = nullptr;
   IREE_RETURN_IF_ERROR(iree_vm_bytecode_module_create(
       flatbuffer_contents->const_buffer,
-      iree_file_contents_deallocator(flatbuffer_contents),
-      iree_allocator_system(), &input_module));
+      iree_file_contents_deallocator(flatbuffer_contents), host_allocator,
+      &main_module));
 
   // Resolve all system modules required by the user and check modules.
   iree_vm_module_t* user_modules[2] = {check_module, main_module};
@@ -118,15 +111,13 @@ iree_status_t Run(std::string module_file_path, int* out_exit_code) {
       /*default_device_uri=*/iree_string_view_empty(), host_allocator, &modules,
       /*out_device=*/NULL, /*out_device_allocator=*/NULL));
 
-  std::array<iree_vm_module_t*, 3> modules = {hal_module, check_module,
-                                              input_module};
-  auto module_signature = iree_vm_module_signature(input_module);
+  auto module_signature = iree_vm_module_signature(main_module);
   for (iree_host_size_t ordinal = 0;
        ordinal < module_signature.export_function_count; ++ordinal) {
     iree_vm_function_t function;
     IREE_RETURN_IF_ERROR(
         iree_vm_module_lookup_function_by_ordinal(
-            input_module, IREE_VM_FUNCTION_LINKAGE_EXPORT, ordinal, &function),
+            main_module, IREE_VM_FUNCTION_LINKAGE_EXPORT, ordinal, &function),
         "looking up function export %zu", ordinal);
     iree_string_view_t function_name = iree_vm_function_name(&function);
 
@@ -153,20 +144,19 @@ iree_status_t Run(std::string module_file_path, int* out_exit_code) {
                               signature.calling_convention.data);
     }
 
-    iree_string_view_t module_name = iree_vm_module_name(input_module);
-    ::testing::RegisterTest(
-        module_name.data, function_name.data, nullptr,
-        std::to_string(ordinal).c_str(), __FILE__, __LINE__,
-        [&instance, modules, function]() -> CheckModuleTest* {
-          return new CheckModuleTest(instance, modules, function);
-        });
+    iree_string_view_t module_name = iree_vm_module_name(main_module);
+    ::testing::RegisterTest(module_name.data, function_name.data, nullptr,
+                            std::to_string(ordinal).c_str(), __FILE__, __LINE__,
+                            [=]() -> CheckModuleTest* {
+                              return new CheckModuleTest(instance, &modules,
+                                                         function);
+                            });
   }
   *out_exit_code = RUN_ALL_TESTS();
 
-  iree_vm_module_release(hal_module);
+  iree_tooling_module_list_reset(&modules);
   iree_vm_module_release(check_module);
-  iree_vm_module_release(input_module);
-  iree_hal_device_release(device);
+  iree_vm_module_release(main_module);
   iree_vm_instance_release(instance);
 
   return iree_ok_status();
@@ -180,7 +170,6 @@ extern "C" int main(int argc, char** argv) {
                                IREE_FLAGS_PARSE_MODE_CONTINUE_AFTER_HELP,
                            &argc, &argv);
   ::testing::InitGoogleTest(&argc, argv);
-  IREE_FORCE_BINARY_STDIN();
 
   if (argc < 2) {
     std::cerr
@@ -190,7 +179,8 @@ extern "C" int main(int argc, char** argv) {
   auto module_file_path = std::string(argv[1]);
 
   int exit_code = 1;
-  iree_status_t status = Run(std::move(module_file_path), &exit_code);
+  iree_status_t status =
+      Run(std::move(module_file_path), iree_allocator_system(), &exit_code);
   int ret = iree_status_is_ok(status) ? exit_code : 1;
   if (FLAG_expect_failure) {
     if (ret == 0) {

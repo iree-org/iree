@@ -93,9 +93,8 @@ iree_cc_binary(
     iree::base::tracing
     iree::hal
     iree::modules::check
-    iree::modules::hal
     iree::testing::gtest
-    iree::tooling::device_util
+    iree::tooling::context_util
     iree::tooling::vm_util
     iree::vm
     iree::vm::bytecode_module
