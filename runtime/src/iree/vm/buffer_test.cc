@@ -17,7 +17,10 @@ namespace {
 class VMBufferTest : public ::testing::Test {
  protected:
   static void SetUpTestSuite() {
-    IREE_CHECK_OK(iree_vm_register_builtin_types());
+    // TODO(#8698): need to register these on an instance.
+    // The instance constructor does this for us and if we created it first we
+    // wouldn't need to call this.
+    IREE_CHECK_OK(iree_vm_register_builtin_types(NULL));
   }
 };
 

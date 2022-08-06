@@ -27,7 +27,8 @@ using iree::testing::status::StatusIs;
 class VMBytecodeDispatchAsyncTest : public ::testing::Test {
  protected:
   static void SetUpTestSuite() {
-    IREE_CHECK_OK(iree_vm_register_builtin_types());
+    // TODO(#8698): need to register these on an instance.
+    IREE_CHECK_OK(iree_vm_register_builtin_types(NULL));
   }
 
   void SetUp() override {

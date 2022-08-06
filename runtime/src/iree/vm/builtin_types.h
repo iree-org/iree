@@ -13,9 +13,12 @@
 extern "C" {
 #endif  // __cplusplus
 
+typedef struct iree_vm_instance_t iree_vm_instance_t;
+
 // Registers the builtin VM types. This must be called on startup. Safe to call
 // multiple times.
-IREE_API_EXPORT iree_status_t iree_vm_register_builtin_types(void);
+IREE_API_EXPORT iree_status_t
+iree_vm_register_builtin_types(iree_vm_instance_t* instance);
 
 #ifdef __cplusplus
 }  // extern "C"

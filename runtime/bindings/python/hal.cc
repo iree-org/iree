@@ -403,7 +403,8 @@ VmModule CreateHalModule(HalDevice* device) {
 void SetupHalBindings(pybind11::module m) {
   py::dict driver_cache;
 
-  IREE_CHECK_OK(iree_hal_module_register_all_types());
+  // TODO(#8698): need to register these on an instance.
+  IREE_CHECK_OK(iree_hal_module_register_all_types(NULL));
 
   // Built-in module creation.
   m.def("create_hal_module", &CreateHalModule);

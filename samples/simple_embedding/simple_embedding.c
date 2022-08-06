@@ -31,12 +31,10 @@ extern iree_status_t create_sample_device(iree_allocator_t host_allocator,
 extern const iree_const_byte_span_t load_bytecode_module_data();
 
 iree_status_t Run() {
-  // TODO(benvanik): move to instance-based registration.
-  IREE_RETURN_IF_ERROR(iree_hal_module_register_all_types());
-
   iree_vm_instance_t* instance = NULL;
   IREE_RETURN_IF_ERROR(
       iree_vm_instance_create(iree_allocator_system(), &instance));
+  IREE_RETURN_IF_ERROR(iree_hal_module_register_all_types(instance));
 
   iree_hal_device_t* device = NULL;
   IREE_RETURN_IF_ERROR(create_sample_device(iree_allocator_system(), &device),

@@ -21,7 +21,9 @@ namespace {
 class VmUtilTest : public ::testing::Test {
  protected:
   virtual void SetUp() {
-    IREE_ASSERT_OK(iree_hal_module_register_all_types());
+    IREE_ASSERT_OK(
+        iree_vm_instance_create(iree_allocator_system(), &instance_));
+    IREE_ASSERT_OK(iree_hal_module_register_all_types(instance_));
     iree_status_t status = iree_hal_create_device(
         iree_hal_available_driver_registry(), IREE_SV("local-sync"),
         iree_allocator_system(), &device_);
@@ -34,8 +36,12 @@ class VmUtilTest : public ::testing::Test {
     allocator_ = iree_hal_device_allocator(device_);
   }
 
-  virtual void TearDown() { iree_hal_device_release(device_); }
+  virtual void TearDown() {
+    iree_hal_device_release(device_);
+    iree_vm_instance_release(instance_);
+  }
 
+  iree_vm_instance_t* instance_ = nullptr;
   iree_hal_device_t* device_ = nullptr;
   iree_hal_allocator_t* allocator_ = nullptr;
 };

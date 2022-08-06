@@ -25,7 +25,7 @@ iree_status_t iree_trace_replay_initialize(
     iree_allocator_t host_allocator, iree_trace_replay_t* out_replay) {
   memset(out_replay, 0, sizeof(*out_replay));
 
-  IREE_RETURN_IF_ERROR(iree_hal_module_register_all_types());
+  IREE_RETURN_IF_ERROR(iree_hal_module_register_all_types(instance));
 
   out_replay->host_allocator = host_allocator;
   out_replay->root_path = root_path;

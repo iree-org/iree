@@ -16,8 +16,12 @@
 static iree_status_t _TfLiteModelPrepareRuntime() {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, iree_vm_register_builtin_types());
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, iree_hal_module_register_all_types());
+  // TODO(#8698): need to register these on an instance.
+  // The instance constructor does the builtin types for us and if we created it
+  // first we wouldn't need to call it.
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, iree_vm_register_builtin_types(NULL));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0,
+                                    iree_hal_module_register_all_types(NULL));
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();

@@ -10,6 +10,7 @@
 #include <string.h>
 
 #include "iree/base/tracing.h"
+#include "iree/vm/instance.h"
 
 static iree_vm_ref_type_descriptor_t iree_vm_buffer_descriptor = {0};
 
@@ -290,7 +291,7 @@ IREE_API_EXPORT iree_status_t iree_vm_buffer_write_elements(
   return iree_ok_status();
 }
 
-iree_status_t iree_vm_buffer_register_types(void) {
+iree_status_t iree_vm_buffer_register_types(iree_vm_instance_t* instance) {
   if (iree_vm_buffer_descriptor.type != IREE_VM_REF_TYPE_NULL) {
     // Already registered.
     return iree_ok_status();

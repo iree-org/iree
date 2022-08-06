@@ -511,7 +511,10 @@ std::string VmVariantList::DebugString() const {
 }
 
 void SetupVmBindings(pybind11::module m) {
-  IREE_CHECK_OK(iree_vm_register_builtin_types());
+  // TODO(#8698): need to register these on an instance.
+  // The instance constructor does this for us and if we created it first we
+  // wouldn't need to call this.
+  IREE_CHECK_OK(iree_vm_register_builtin_types(NULL));
 
   py::enum_<enum iree_vm_function_linkage_e>(m, "Linkage")
       .value("INTERNAL", IREE_VM_FUNCTION_LINKAGE_INTERNAL)

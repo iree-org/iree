@@ -94,7 +94,8 @@ static iree_status_t iree_tooling_load_hal_async_module(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Register required types before creating the module.
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, iree_hal_module_register_all_types());
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_module_register_all_types(instance));
 
   // Create the device to use.
   // In the future this will change to a set of available devices instead.
@@ -321,8 +322,9 @@ iree_status_t iree_tooling_create_instance(iree_allocator_t host_allocator,
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_vm_instance_create(host_allocator, &instance));
 
-  // TODO(benvanik): make instance-specific.
-  iree_status_t status = iree_hal_module_register_all_types();
+  // HACK: to load modules we need the types registered even though we don't
+  // know if the types are used.
+  iree_status_t status = iree_hal_module_register_all_types(instance);
 
   if (iree_status_is_ok(status)) {
     *out_instance = instance;

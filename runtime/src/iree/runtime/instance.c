@@ -71,11 +71,14 @@ IREE_API_EXPORT iree_status_t iree_runtime_instance_create(
       z0, iree_api_version_check(options->api_version, &actual_version));
 
   // Register builtin types.
-  // TODO(benvanik): change to per-instance type registries to avoid these
+  // TODO(#8698): change to per-instance type registries to avoid these
   // global (UNSAFE!) calls. For now hosting applications should really only
   // be using a single instance anyway.
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, iree_vm_register_builtin_types());
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, iree_hal_module_register_all_types());
+  // The instance constructor does the builtin types for us and if we created it
+  // first we wouldn't need to call it.
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, iree_vm_register_builtin_types(NULL));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0,
+                                    iree_hal_module_register_all_types(NULL));
 
   // Allocate the instance state.
   iree_runtime_instance_t* instance = NULL;

@@ -23,8 +23,6 @@ IREE_API_EXPORT iree_status_t iree_vm_instance_create(
   IREE_ASSERT_ARGUMENT(out_instance);
   *out_instance = NULL;
 
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, iree_vm_register_builtin_types());
-
   iree_vm_instance_t* instance = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0,
@@ -32,9 +30,15 @@ IREE_API_EXPORT iree_status_t iree_vm_instance_create(
   instance->allocator = allocator;
   iree_atomic_ref_count_init(&instance->ref_count);
 
-  *out_instance = instance;
+  iree_status_t status = iree_vm_register_builtin_types(instance);
+
+  if (iree_status_is_ok(status)) {
+    *out_instance = instance;
+  } else {
+    iree_vm_instance_release(instance);
+  }
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return status;
 }
 
 static void iree_vm_instance_destroy(iree_vm_instance_t* instance) {

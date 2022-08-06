@@ -55,7 +55,7 @@ static void RegisterRefType(iree_vm_ref_type_descriptor_t* descriptor,
   }
 }
 
-static void RegisterRefTypes() {
+static void RegisterRefTypes(iree_vm_instance_t* instance) {
   RegisterRefType<A>(&test_a_descriptor, "AType");
   RegisterRefType<B>(&test_b_descriptor, "BType");
 }
@@ -73,8 +73,11 @@ static iree_vm_ref_t MakeRef(V value) {
 class VMListTest : public ::testing::Test {
  protected:
   static void SetUpTestSuite() {
-    IREE_CHECK_OK(iree_vm_register_builtin_types());
-    RegisterRefTypes();
+    // TODO(#8698): need to register these on an instance.
+    // The instance constructor does this for us and if we created it first we
+    // wouldn't need to call this.
+    IREE_CHECK_OK(iree_vm_register_builtin_types(NULL));
+    RegisterRefTypes(NULL);
   }
 };
 

@@ -29,8 +29,9 @@ namespace {
 class CheckTest : public ::testing::Test {
  protected:
   static void SetUpTestSuite() {
-    // TODO(benvanik): move to instance-based registration.
-    IREE_ASSERT_OK(iree_hal_module_register_all_types());
+    IREE_ASSERT_OK(
+        iree_vm_instance_create(iree_allocator_system(), &instance_));
+    IREE_ASSERT_OK(iree_hal_module_register_all_types(instance_));
 
     iree_hal_driver_t* hal_driver = nullptr;
     iree_status_t status = iree_hal_driver_registry_try_create(
@@ -49,9 +50,6 @@ class CheckTest : public ::testing::Test {
                                           iree_allocator_system(),
                                           &hal_module_));
     iree_hal_driver_release(hal_driver);
-
-    IREE_ASSERT_OK(
-        iree_vm_instance_create(iree_allocator_system(), &instance_));
 
     IREE_ASSERT_OK(
         iree_check_module_create(iree_allocator_system(), &check_module_))
