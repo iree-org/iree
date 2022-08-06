@@ -83,6 +83,7 @@ iree_cc_library(
     iree::compiler::Dialect::VMVX::Conversion::StandardToVMVX
     iree::compiler::Dialect::VMVX::IR
     iree::compiler::Dialect::VMVX::IR::VMVXDialect
+    iree::compiler::Utils
   PUBLIC
 )
 

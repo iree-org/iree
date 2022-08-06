@@ -24,6 +24,7 @@ iree_cc_library(
     MLIRPass
     MLIRTransforms
     iree::compiler::Codegen::PassHeaders
+    iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::VMVX::IR
     iree::compiler::Dialect::VMVX::IR::VMVXDialect
   PUBLIC

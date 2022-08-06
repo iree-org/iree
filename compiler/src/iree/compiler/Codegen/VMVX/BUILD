@@ -19,6 +19,7 @@ iree_compiler_cc_library(
     ],
     deps = [
         "//compiler/src/iree/compiler/Codegen:PassHeaders",
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
         "//compiler/src/iree/compiler/Dialect/VMVX/IR",
         "//compiler/src/iree/compiler/Dialect/VMVX/IR:VMVXDialect",
         "@llvm-project//mlir:ArithmeticDialect",
