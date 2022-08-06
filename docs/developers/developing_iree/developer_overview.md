@@ -181,9 +181,9 @@ For example, to execute the contents of
 
 ```shell
 $ ../iree-build/tools/iree-run-mlir \
-  $PWD/samples/models/simple_abs.mlir \
   --function-input="f32=-2" \
-  --iree-hal-target-backends=vmvx
+  --iree-hal-target-backends=vmvx \
+  $PWD/samples/models/simple_abs.mlir
 ```
 
 ### iree-dump-module

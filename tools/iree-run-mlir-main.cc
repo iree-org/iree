@@ -141,7 +141,7 @@ static llvm::cl::opt<bool> run_flag{
 static llvm::cl::list<std::string> run_args_flag{
     "run-arg",
     llvm::cl::desc("Argument passed to the execution flag parser"),
-    llvm::cl::ZeroOrMore,
+    llvm::cl::ConsumeAfter,
 };
 
 static llvm::cl::opt<bool> trace_execution_flag{
@@ -212,7 +212,7 @@ Status PrepareModule(std::string target_backend,
   }
 
   // Translate from MLIR to IREE bytecode.
-  std::cout << "Compiling for target backend '" << target_backend << "'...";
+  std::cout << "Compiling for target backend '" << target_backend << "'...\n";
   mlir::PassManager pass_manager(mlir_module->getContext());
   pass_manager.enableVerifier(verify_passes_flag);
   mlir::applyPassManagerCLOptions(pass_manager);
@@ -505,7 +505,7 @@ Status RunFile(const std::string& mlir_filename,
     auto sub_failure = EvaluateFile(std::move(sub_buffer), registry);
     if (!sub_failure.ok()) {
       std::cerr << "Failure for split at line #" << split_line << ": "
-                << sub_failure;
+                << sub_failure << "\n";
       if (any_failure.ok()) {
         any_failure = std::move(sub_failure);
       }
@@ -517,23 +517,8 @@ Status RunFile(const std::string& mlir_filename,
 
 }  // namespace
 
-extern "C" int main(int argc, char** argv) {
+extern "C" int main(int argc_llvm, char** argv_llvm) {
   IREE_TRACE_SCOPE0("iree-run-mlir");
-
-  int argc_llvm = argc;
-  char** argv_llvm = argv;
-  int argc_iree = 1;
-  std::vector<char*> argv_iree = {argv[0]};
-  for (int i = 0; i < argc; ++i) {
-    if (std::strcmp(argv[i], "--") == 0) {
-      argc_llvm = i;
-      argc_iree = argc - i;
-      for (int j = i + 1; j < argc; ++j) {
-        argv_iree.push_back(argv[i + 1]);
-      }
-      break;
-    }
-  }
 
   mlir::DialectRegistry registry;
   mlir::iree_compiler::registerAllDialects(registry);
@@ -559,21 +544,27 @@ extern "C" int main(int argc, char** argv) {
   // Register pass manager command-line options like -mlir-print-ir-*.
   mlir::registerPassManagerCLOptions();
 
+  // On Windows InitLLVM re-queries the command line from Windows directly and
+  // totally messes up the array.
   llvm::InitLLVM init_llvm(argc_llvm, argv_llvm);
   llvm::cl::ParseCommandLineOptions(argc_llvm, argv_llvm);
 
+  // Consume all options after the positional filename and pass them to the IREE
+  // flag parser.
+  std::vector<char*> argv_iree = {argv_llvm[0]};
   for (auto& run_arg : run_args_flag) {
+    if (run_arg == "--") continue;
     argv_iree.push_back(const_cast<char*>(run_arg.c_str()));
   }
-  argc_iree += run_args_flag.size();
+  int argc_iree = static_cast<int>(argv_iree.size());
   char** argv_iree_ptr = argv_iree.data();
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_DEFAULT, &argc_iree,
                            &argv_iree_ptr);
 
   auto status = RunFile(input_file_flag, registry);
   if (!status.ok()) {
-    std::cerr << "ERROR running file (" << input_file_flag << "): " << status
-              << "\n";
+    std::cerr << "ERROR running file (" << input_file_flag << "):\n"
+              << status << "\n";
     return 1;
   }
   return 0;
