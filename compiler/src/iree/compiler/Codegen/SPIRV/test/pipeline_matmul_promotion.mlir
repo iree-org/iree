@@ -57,18 +57,18 @@ hal.executable @matmul_128x256x64 {
 //   CHECK-COUNT-5: spv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
 
 //           CHECK: spv.mlir.loop
-//           CHECK:   spv.ControlBarrier Workgroup, Workgroup, "AcquireRelease|WorkgroupMemory"
+//           CHECK:   spv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
 //   CHECK-COUNT-5:   spv.Store "Workgroup" %{{.+}}, %{{.+}} : vector<4xf32>
-//           CHECK:   spv.ControlBarrier Workgroup, Workgroup, "AcquireRelease|WorkgroupMemory"
+//           CHECK:   spv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
 
 //  CHECK-COUNT-64:   spv.Load "Workgroup" %{{.+}} : vector<4xf32>
 // CHECK-COUNT-128:   spv.GL.Fma %{{.+}}, %{{.+}}, %{{.+}} : vector<4xf32>
 //   CHECK-COUNT-5:   spv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
 //           CHECK:   spv.mlir.merge
 
-//           CHECK: spv.ControlBarrier Workgroup, Workgroup, "AcquireRelease|WorkgroupMemory"
+//           CHECK: spv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
 //   CHECK-COUNT-5: spv.Store "Workgroup" %{{.+}}, %{{.+}} : vector<4xf32>
-//           CHECK: spv.ControlBarrier Workgroup, Workgroup, "AcquireRelease|WorkgroupMemory"
+//           CHECK: spv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
 
 //  CHECK-COUNT-64: spv.Load "Workgroup" %{{.+}} : vector<4xf32>
 // CHECK-COUNT-128: spv.GL.Fma %{{.+}}, %{{.+}}, %{{.+}} : vector<4xf32>

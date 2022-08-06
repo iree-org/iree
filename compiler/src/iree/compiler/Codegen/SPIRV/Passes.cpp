@@ -18,6 +18,8 @@
 #include "iree/compiler/Codegen/Passes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
+#include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRV.h"
+#include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRVPass.h"
 #include "mlir/Dialect/Arithmetic/Transforms/Passes.h"
 #include "mlir/Dialect/Func/Transforms/Passes.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
@@ -43,9 +45,10 @@ static FailureOr<Value> gpuAllocateWorkgroupMemoryFn(OpBuilder &builder,
                                                      MemRefType memRefType,
                                                      ValueRange dynamicSizes,
                                                      unsigned alignment) {
-  auto storageClass = gpu::GPUDialect::getWorkgroupAddressSpace();
+  Optional<unsigned> space =
+      spirv::mapVulkanStorageClassToMemorySpace(spirv::StorageClass::Workgroup);
   MemRefType allocType = MemRefType::get(
-      memRefType.getShape(), memRefType.getElementType(), {}, storageClass);
+      memRefType.getShape(), memRefType.getElementType(), {}, *space);
   return builder
       .create<memref::AllocOp>(loc, allocType, dynamicSizes,
                                builder.getI64IntegerAttr(alignment))
@@ -57,9 +60,10 @@ static FailureOr<Value> gpuAllocateFunctionMemoryFn(OpBuilder &builder,
                                                     MemRefType memRefType,
                                                     ValueRange dynamicSizes,
                                                     unsigned alignment) {
-  auto storageClass = gpu::GPUDialect::getWorkgroupAddressSpace();
+  Optional<unsigned> space =
+      spirv::mapVulkanStorageClassToMemorySpace(spirv::StorageClass::Function);
   MemRefType allocType = MemRefType::get(
-      memRefType.getShape(), memRefType.getElementType(), {}, storageClass);
+      memRefType.getShape(), memRefType.getElementType(), {}, *space);
   return builder
       .create<memref::AllocaOp>(loc, allocType, dynamicSizes,
                                 builder.getI64IntegerAttr(alignment))
@@ -181,6 +185,7 @@ static void addSPIRVLoweringPasses(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
+  pm.addPass(createMapMemRefStorageClassPass());
   pm.addPass(createConvertToSPIRVPass());
 
   OpPassManager &spirvPM = pm.nest<spirv::ModuleOp>();
