@@ -367,11 +367,11 @@ struct AdaptLinalgInputOperandToOutputOperand
     auto newOp = rewriter.create<linalg::GenericOp>(
         loc, op.getResultTypes(), newOperands, operand->get(), maps, iterTypes,
         /*bodyBuild=*/nullptr, PruneAttributeList(op));
-    rewriter.inlineRegionBefore(op.region(), newOp.region(),
-                                newOp.region().begin());
+    rewriter.inlineRegionBefore(op.getRegion(), newOp.getRegion(),
+                                newOp.getRegion().begin());
 
     // Repair the payload entry block.
-    Block &payload = newOp.region().front();
+    Block &payload = newOp.getRegion().front();
     payload.getArgument(operand->getOperandNumber())
         .replaceAllUsesWith(payload.getArgument(op.getNumInputs()));
     payload.eraseArgument(operand->getOperandNumber());

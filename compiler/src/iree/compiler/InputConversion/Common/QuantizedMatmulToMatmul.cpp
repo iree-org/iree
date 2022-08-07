@@ -98,13 +98,13 @@ struct QuantizedMatmulToMatmul
   LogicalResult matchAndRewrite(linalg::QuantizedMatmulOp quantizedMatmulOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = quantizedMatmulOp.getLoc();
-    ValueRange inputs = quantizedMatmulOp.inputs();
+    ValueRange inputs = quantizedMatmulOp.getInputs();
     assert(inputs.size() == 4);
     Value lhs = inputs[0];
     Value rhs = inputs[1];
     Value lhsZp = inputs[2];
     Value rhsZp = inputs[3];
-    ValueRange outputs = quantizedMatmulOp.outputs();
+    ValueRange outputs = quantizedMatmulOp.getOutputs();
     // Compute the matmul part.
     Value acc = outputs[0];
     Value matmul = rewriter

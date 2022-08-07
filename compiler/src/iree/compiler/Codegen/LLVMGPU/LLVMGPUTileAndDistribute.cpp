@@ -240,7 +240,7 @@ static void propagateFillIntoPromotionAlloc(func::FuncOp funcOp) {
         if (fillOp.output() != copyOp.getSource()) break;
         // Move the fillOp and change the destination to the copy destination.
         fillOp->moveBefore(copyOp);
-        fillOp.outputsMutable().assign(copyOp.getTarget());
+        fillOp.getOutputsMutable().assign(copyOp.getTarget());
         toDelete.push_back(copyOp.getOperation());
         break;
       }

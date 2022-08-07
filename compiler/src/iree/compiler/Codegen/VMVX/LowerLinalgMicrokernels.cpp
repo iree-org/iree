@@ -474,9 +474,9 @@ struct LinalgFillConversion : public OpRewritePattern<linalg::FillOp> {
     StridedBufferAnalysis outAnal;
     int64_t getRank() { return outAnal.getRank(); }
 
-    OpInfo(linalg::FillOp op) : op(op), outAnal(op.outputs().front()) {
-      scalar = op.inputs().front();
-      out = op.outputs().front();
+    OpInfo(linalg::FillOp op) : op(op), outAnal(op.getOutputs().front()) {
+      scalar = op.getInputs().front();
+      out = op.getOutputs().front();
     }
   };
 

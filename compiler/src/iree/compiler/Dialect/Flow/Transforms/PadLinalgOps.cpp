@@ -29,9 +29,9 @@ class PadMatmulOp : public OpRewritePattern<linalg::MatmulOp> {
   LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
     auto loc = matmulOp.getLoc();
-    auto lhs = matmulOp.inputs()[0];
-    auto rhs = matmulOp.inputs()[1];
-    auto result = matmulOp.outputs()[0];
+    auto lhs = matmulOp.getInputs()[0];
+    auto rhs = matmulOp.getInputs()[1];
+    auto result = matmulOp.getOutputs()[0];
 
     auto lhsType = lhs.getType().dyn_cast<RankedTensorType>();
     auto rhsType = rhs.getType().dyn_cast<RankedTensorType>();

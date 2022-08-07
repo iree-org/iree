@@ -111,7 +111,8 @@ struct LinalgInitTensorCast
     Type resultType = castOp.getCasted().getType();
 
     rewriter.replaceOpWithNewOp<linalg::InitTensorOp>(
-        castOp, resultType, initTensorOp.sizes(), initTensorOp.static_sizes());
+        castOp, resultType, initTensorOp.getSizes(),
+        initTensorOp.getStaticSizes());
     return success();
   }
 };
@@ -157,9 +158,9 @@ struct LinalgFpMatmulToLowP : public OpRewritePattern<linalg::MatmulOp> {
                                 PatternRewriter &rewriter) const override {
     Location loc = matmulOp.getLoc();
     Type origResultType = matmulOp.getResult(0).getType();
-    auto lhsParams = NarrowParams::forValue(matmulOp.inputs()[0]);
-    auto rhsParams = NarrowParams::forValue(matmulOp.inputs()[1]);
-    auto accumParams = NarrowParams::forValue(matmulOp.outputs()[0]);
+    auto lhsParams = NarrowParams::forValue(matmulOp.getInputs()[0]);
+    auto rhsParams = NarrowParams::forValue(matmulOp.getInputs()[1]);
+    auto accumParams = NarrowParams::forValue(matmulOp.getOutputs()[0]);
     if (!lhsParams || !rhsParams || !accumParams) {
       return rewriter.notifyMatchFailure(matmulOp, "no narrowing annotations");
     }
