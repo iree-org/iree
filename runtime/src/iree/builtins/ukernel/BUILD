@@ -13,21 +13,24 @@ package(
 )
 
 iree_runtime_cc_library(
-    name = "mmt4d",
+    name = "ukernel",
     srcs = [
+        "elementwise_generic.c",
         "mmt4d_arm_64.c",
         "mmt4d_generic.c",
     ],
     hdrs = [
+        "common.h",
+        "elementwise.h",
         "mmt4d.h",
         "mmt4d_generic.h",
     ],
     copts = [
         # Placeholder for a real flag.
-        "-DIREE_MMT4D_PLATFORM_EXAMPLE_FLAG=1",
+        "-DIREE_UKERNEL_PLATFORM_EXAMPLE_FLAG=1",
     ],
     defines = [
-        "IREE_HAVE_MMT4D_BUILTINS=1",
+        "IREE_HAVE_UKERNEL_BUILTINS=1",
     ],
     deps = [
         "//runtime/src/iree/base:core_headers",

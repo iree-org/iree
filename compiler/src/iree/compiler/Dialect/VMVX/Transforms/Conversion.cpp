@@ -60,7 +60,6 @@ class ConversionPass : public ConversionBase<ConversionPass> {
 
     // Ensure all input dialects go away.
     ConversionTarget conversionTarget(*context);
-    conversionTarget.addIllegalDialect<IREE::HAL::HALDialect>();
     conversionTarget.addIllegalDialect<tensor::TensorDialect>();
     conversionTarget.addLegalDialect<IREE::Util::UtilDialect>();
     conversionTarget.addLegalDialect<IREE::VMVX::VMVXDialect>();
@@ -72,7 +71,8 @@ class ConversionPass : public ConversionBase<ConversionPass> {
     conversionTarget.addIllegalOp<mlir::UnrealizedConversionCastOp>();
 
     RewritePatternSet patterns(&getContext());
-    populateHALToVMVXPatterns(context, patterns, typeConverter);
+    populateHALToVMVXPatterns(context, conversionTarget, patterns,
+                              typeConverter);
     populateStandardToVMVXPatterns(context, patterns, typeConverter);
     populateMemRefToUtilPatterns(context, conversionTarget, typeConverter,
                                  patterns,

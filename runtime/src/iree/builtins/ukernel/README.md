@@ -1,11 +1,11 @@
-IREE MMT4D Microkernel Library: `libmmt4d`
-==========================================
+IREE Microkernels Library: `libukernel`
+=======================================
 
 This library provides builtin microkernels to both the IREE VMVX module for
 runtime linkage and the IREE compiler for ahead-of-time compilation. Each
 deployment approach has tradeoffs and the intent with this library is to share
-the same compiler passes/infrastructure for emitting the MMT4D ops and the same
-microkernel implementations.
+the same compiler passes/infrastructure for emitting the microkernel ops and
+the same microkernel implementations.
 
 ## Runtime Linkage
 
@@ -18,9 +18,9 @@ library is linked into the runtime VMVX module and called via the VM FFI:
                      +------------+      +---------+      +================+
                                                                   |
                                                                   v
-+-----------+      +------------+      +------------+      +--------------+
-| mmt4d_*.c | ---> | C compiler | ---> | libmmt4d.a |      | .vmfb module |
-+-----------+      +------------+      +------------+      +--------------+
++-----------+      +------------+      +--------------+    +--------------+
+| mmt4d_*.c | ---> | C compiler | ---> | libukernel.a |    | .vmfb module |
++-----------+      +------------+      +--------------+    +--------------+
                                              |                    |
                                              v                    v
                                  +-------------------+      +============+
@@ -41,9 +41,9 @@ For deployments using ahead-of-time compilation the library is compiled to
 bitcode files that are loaded and linked while producing the generated code:
 ```
 +-----------+      +-------+      +-------------------------------+
-| mmt4d_*.c | ---> | clang | ---> |+-------------------------------+
-+-----------+      +-------+      +| libmmt4d_[arch]_[variant].bc |
-                                   +-------------------------------+
+| mmt4d_*.c | ---> | clang | ---> |+--------------------------------+
++-----------+      +-------+      +| libukernel_[arch]_[variant].bc |
+                                   +--------------------------------+
                                                   |||
                                                   vvv
       +------------+      +---------+      +================+
@@ -112,29 +112,30 @@ For example, this flag can be specified by either passing a define when
 compiling the library for standalone/VMVX use or using the
 `overridePlatformGlobal` helper when emitting LLVM IR in the IREE compiler:
 ```c
-#if defined(IREE_MMT4D_PLATFORM_EXAMPLE_FLAG)
-static const int iree_mmt4d_platform_example_flag =
-    IREE_MMT4D_PLATFORM_EXAMPLE_FLAG;
+#if defined(IREE_UKERNEL_PLATFORM_EXAMPLE_FLAG)
+static const int iree_microkernels_platform_example_flag =
+    IREE_UKERNEL_PLATFORM_EXAMPLE_FLAG;
 #else
-extern int iree_mmt4d_platform_example_flag;
-#endif  // IREE_MMT4D_PLATFORM_EXAMPLE_FLAG
+extern int iree_microkernels_platform_example_flag;
+#endif  // IREE_UKERNEL_PLATFORM_EXAMPLE_FLAG
 ```
 
 Any code may then use this flag to condition/control behavior:
 ```c
-if (iree_mmt4d_platform_example_flag >= 1) {
+if (iree_microkernels_platform_example_flag >= 1) {
   // Do something special.
 }
 ```
 
-When linking libmmt4d statically the flags can be provided by the hosting
-application via compiler defines: `-DIREE_MMT4D_PLATFORM_EXAMPLE_FLAG=123`.
+When linking libmicrokernels statically the flags can be provided by the hosting
+application via compiler defines:
+`-DIREE_UKERNEL_PLATFORM_EXAMPLE_FLAG=123`.
 
 When producing bitcode the flags are left symbolic and the IREE compiler
 provides their values:
 ```c++
 overridePlatformGlobal(*bitcodeModule,
-                       "iree_mmt4d_platform_example_flag", 123u);
+                       "iree_microkernels_platform_example_flag", 123u);
 ```
 
 What flags are useful and how to handle cases where flags are arch-dependent are

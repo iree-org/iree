@@ -7,10 +7,6 @@
 set(_VMVX_OPTIONAL_COPTS)
 set(_VMVX_OPTIONAL_DEPS)
 
-if(IREE_BUILD_EXPERIMENTAL_VMVX_MMT4D)
-  list(APPEND _VMVX_OPTIONAL_DEPS iree::builtins::mmt4d)
-endif()
-
 iree_cc_library(
   NAME
     vmvx
@@ -25,6 +21,7 @@ iree_cc_library(
   DEPS
     iree::base
     iree::base::tracing
+    iree::builtins::ukernel
     iree::vm
     ${_VMVX_OPTIONAL_DEPS}
   PUBLIC

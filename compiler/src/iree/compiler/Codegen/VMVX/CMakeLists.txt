@@ -23,6 +23,7 @@ iree_cc_library(
     MLIRMemRefDialect
     MLIRPass
     MLIRTransforms
+    iree::builtins::ukernel
     iree::compiler::Codegen::PassHeaders
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::VMVX::IR

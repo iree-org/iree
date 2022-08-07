@@ -12,8 +12,8 @@
 // due to this _test.cc file naming.
 
 #include "iree/base/api.h"
-#include "iree/builtins/mmt4d/mmt4d.h"
-#include "iree/builtins/mmt4d/mmt4d_generic.h"
+#include "iree/builtins/ukernel/mmt4d.h"
+#include "iree/builtins/ukernel/mmt4d_generic.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 

@@ -6,7 +6,8 @@
 
 #include "mmt4d_generic.h"
 
-#if defined(IREE_MMT4D_ARCH_GENERIC_32) || defined(IREE_MMT4D_ARCH_GENERIC_64)
+#if defined(IREE_UKERNEL_ARCH_GENERIC_32) || \
+    defined(IREE_UKERNEL_ARCH_GENERIC_64)
 
 //===----------------------------------------------------------------------===//
 // Target-specific queries
@@ -19,14 +20,14 @@
 // This ensures that if multiple architectures reuse the generic methods the
 // flags don't conflict.
 
-#if defined(IREE_MMT4D_PLATFORM_EXAMPLE_FLAG)
+#if defined(IREE_UKERNEL_PLATFORM_EXAMPLE_FLAG)
 // Set by command-line logic:
-static const int iree_mmt4d_platform_example_flag =
-    IREE_MMT4D_PLATFORM_EXAMPLE_FLAG;
+static const int iree_microkernels_platform_example_flag =
+    IREE_UKERNEL_PLATFORM_EXAMPLE_FLAG;
 #else
 // Set by IREE AOT compiler:
-extern int iree_mmt4d_platform_example_flag;
-#endif  // IREE_MMT4D_PLATFORM_EXAMPLE_FLAG
+extern int iree_microkernels_platform_example_flag;
+#endif  // IREE_UKERNEL_PLATFORM_EXAMPLE_FLAG
 
 //===----------------------------------------------------------------------===//
 // Public API
@@ -35,11 +36,11 @@ extern int iree_mmt4d_platform_example_flag;
 // Specific architectures may still share various parts of the reference
 // implementation but will export their own API as primary.
 
-IREE_MMT4D_EXPORT int iree_mmt4d_example_matmul_f32(
-    const float* lhs, iree_mmt4d_size_t lhs_stride, const float* rhs,
-    iree_mmt4d_size_t rhs_stride, float* IREE_RESTRICT out,
-    iree_mmt4d_size_t out_stride, int32_t m, int32_t n, int32_t k, float alpha,
-    float beta) {
+IREE_UKERNEL_EXPORT int iree_mmt4d_example_matmul_f32(
+    const float* lhs, iree_ukernel_size_t lhs_stride, const float* rhs,
+    iree_ukernel_size_t rhs_stride, float* IREE_RESTRICT out,
+    iree_ukernel_size_t out_stride, int32_t m, int32_t n, int32_t k,
+    float alpha, float beta) {
   // We could check the flag here or branch off to different implementations
   // based on mnk or alpha/beta values.
   return iree_mmt4d_example_matmul_f32_generic(

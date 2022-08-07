@@ -22,6 +22,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/Util/IR",
         "//compiler/src/iree/compiler/Dialect/VMVX/IR",
         "//compiler/src/iree/compiler/Dialect/VMVX/IR:VMVXDialect",
+        "//runtime/src/iree/builtins/ukernel",
         "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:IR",

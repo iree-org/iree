@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/VMVX/Conversion/HALToVMVX/ConvertHALToVMVX.h"
 
+#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
@@ -191,6 +192,37 @@ struct ConvertHALInterfaceConstantLoadOp
   }
 };
 
+struct ConvertGetRawInterfaceBindingBufferOp
+    : public OpConversionPattern<IREE::VMVX::GetRawInterfaceBindingBufferOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      IREE::VMVX::GetRawInterfaceBindingBufferOp op, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    // Find the vmvx.interface argument to the function.
+    auto bindingsArg = op->getParentOfType<mlir::func::FuncOp>().getArgument(
+        kEntryArgBindings);
+    assert(bindingsArg && bindingsArg.getType().isa<IREE::Util::ListType>() &&
+           "entry point not conforming to requirements");
+
+    // TODO(benvanik): compact the indices - the bindings we have on the ABI
+    // interface are dense.
+    if (op.getSet().getZExtValue() != 0) {
+      return op.emitOpError() << "sparse binding sets not yet implemented";
+    }
+
+    IndexSet indexSet(op.getLoc(), rewriter);
+    auto bindingType =
+        bindingsArg.getType().cast<IREE::Util::ListType>().getElementType();
+    rewriter
+        .replaceOpWithNewOp<IREE::Util::ListGetOp>(
+            op, bindingType, bindingsArg,
+            rewriter.createOrFold<arith::ConstantIndexOp>(
+                op.getLoc(), op.getBinding().getZExtValue()))
+        .getResult();
+    return success();
+  }
+};
+
 /// Rewrites hal.interface.binding.subspan to ops loading from the ABI structs.
 struct ConvertHALInterfaceBindingSubspanOp
     : public OpConversionPattern<IREE::HAL::InterfaceBindingSubspanOp> {
@@ -257,8 +289,14 @@ struct ConvertHALInterfaceBindingSubspanOp
 }  // namespace
 
 void populateHALToVMVXPatterns(MLIRContext *context,
+                               ConversionTarget &conversionTarget,
                                RewritePatternSet &patterns,
                                TypeConverter &typeConverter) {
+  conversionTarget.addIllegalDialect<IREE::HAL::HALDialect>();
+  conversionTarget.addIllegalOp<IREE::VMVX::GetRawInterfaceBindingBufferOp>();
+
+  patterns.insert<ConvertGetRawInterfaceBindingBufferOp>(typeConverter,
+                                                         context);
   patterns.insert<ConvertHALInterfaceWorkgroupIDOp>(typeConverter, context);
   patterns.insert<ConvertHALInterfaceWorkgroupSizeOp>(typeConverter, context);
   patterns.insert<ConvertHALInterfaceWorkgroupCountOp>(typeConverter, context);

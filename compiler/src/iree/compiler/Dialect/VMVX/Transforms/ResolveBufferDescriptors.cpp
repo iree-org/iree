@@ -159,8 +159,77 @@ struct FromHalInterfaceBindingSubspan
     // Base buffer.
     op.getBaseBuffer().replaceAllUsesWith(
         rewriter
+            .create<IREE::VMVX::GetRawInterfaceBindingBufferOp>(
+                loc, op.getBaseBuffer().getType(), binding.getSetAttr(),
+                binding.getBindingAttr())
+            .getResult());
+
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
+// Allocations (and anything else the returns a non-offset identity memref)
+// are matched by this pattern.
+struct FromAllocation : public OpRewritePattern<GetBufferDescriptorOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(GetBufferDescriptorOp op,
+                                PatternRewriter &rewriter) const override {
+    auto alloca = op.getSource().getDefiningOp<memref::AllocaOp>();
+    if (!alloca) return failure();
+    auto memRefType = alloca.getResult().getType().cast<MemRefType>();
+    if (!memRefType.getLayout().isIdentity()) {
+      return rewriter.notifyMatchFailure(op, "not identity allocation");
+    }
+
+    auto loc = op.getLoc();
+    IndexSet indexSet(loc, rewriter);
+
+    // Replace the op with values:
+    //   base_buffer: The subspan result
+    //   offset: byte offset from subspan divided by element type size
+    //   sizes: static and dynamic sizes from the subspan
+    //   strides: identity strides
+    int rank = memRefType.getRank();
+
+    // Compute sizes.
+    SmallVector<Value> sizes;
+    auto dynamicDimIt = alloca.getDynamicSizes().begin();
+    for (int i = 0; i < rank; ++i) {
+      if (memRefType.isDynamicDim(i)) {
+        sizes.push_back(*dynamicDimIt);
+        dynamicDimIt++;
+      } else {
+        sizes.push_back(rewriter.create<arith::ConstantIndexOp>(
+            loc, memRefType.getDimSize(i)));
+      }
+
+      // Replace as we go.
+      op.getSizes()[i].replaceAllUsesWith(sizes.back());
+    }
+
+    // Strides (just creates identity strides).
+    if (rank > 0) {
+      SmallVector<Value> strides;
+      strides.resize(rank);
+      strides[rank - 1] = indexSet.get(1);
+      for (int i = rank - 2; i >= 0; --i) {
+        strides[i] = rewriter.createOrFold<arith::MulIOp>(loc, strides[i + 1],
+                                                          sizes[i + 1]);
+      }
+      for (int i = 0; i < rank; ++i) {
+        op.getStrides()[i].replaceAllUsesWith(strides[i]);
+      }
+    }
+
+    // Offset.
+    op.getOffset().replaceAllUsesWith(indexSet.get(0));
+
+    // Base buffer.
+    op.getBaseBuffer().replaceAllUsesWith(
+        rewriter
             .create<UnrealizedConversionCastOp>(
-                loc, op.getBaseBuffer().getType(), binding.getResult())
+                loc, op.getBaseBuffer().getType(), alloca.getResult())
             .getResult(0));
 
     rewriter.eraseOp(op);
@@ -179,8 +248,8 @@ class ResolveBufferDescriptorsPass
 
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
-    patterns.insert<FromHalInterfaceBindingSubspan, FromMemRefSubView>(
-        &getContext());
+    patterns.insert<FromAllocation, FromHalInterfaceBindingSubspan,
+                    FromMemRefSubView>(&getContext());
 
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
