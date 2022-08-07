@@ -60,7 +60,8 @@ static LogicalResult setOpConfig(const spirv::TargetEnv &targetEnv,
     return success();
   }
 
-  Value lhs = op.inputs()[0], rhs = op.inputs()[1], init = op.outputs()[0];
+  Value lhs = op.getInputs()[0], rhs = op.getInputs()[1],
+        init = op.getOutputs()[0];
 
   ArrayRef<int64_t> lhsShape = lhs.getType().cast<ShapedType>().getShape();
   ArrayRef<int64_t> rhsShape = rhs.getType().cast<ShapedType>().getShape();

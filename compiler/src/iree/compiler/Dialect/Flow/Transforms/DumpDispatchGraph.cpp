@@ -324,9 +324,9 @@ class DumpDispatchGraphPass
   void printLinalgInsOuts(raw_ostream &os, T op, AsmState &state) {
     printResultsAndName(os, op.getOperation(), state);
     os << " " << op.iterator_types() << "(";
-    printOperands(os, op.inputs(), state);
+    printOperands(os, op.getInputs(), state);
     os << ") -> (";
-    printOperands(os, op.outputs(), state);
+    printOperands(os, op.getOutputs(), state);
     os << ")\r";
   }
 

@@ -55,11 +55,11 @@ class Convert1x1ConvolutionMatmulOp
     // TODO(ataei): Support conversion to linalg.batch_matmul.
     if (inputShape[0] != 1) return failure();
 
-    if (!llvm::all_of(convOp.strides(), [](APInt element) {
+    if (!llvm::all_of(convOp.getStrides(), [](APInt element) {
           return element.getSExtValue() == 1;
         }))
       return failure();
-    if (!llvm::all_of(convOp.dilations(), [](APInt element) {
+    if (!llvm::all_of(convOp.getDilations(), [](APInt element) {
           return element.getSExtValue() == 1;
         }))
       return failure();

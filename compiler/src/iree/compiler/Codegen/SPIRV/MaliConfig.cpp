@@ -33,7 +33,8 @@ LogicalResult setMaliCodeGenConfig(const spirv::TargetEnv &targetEnv,
       .Case<linalg::BatchMatmulOp, linalg::MatmulOp>([subgroupSize](auto op) {
         std::array<int64_t, 2> workgroupXY = {subgroupSize / 2, 2};
         std::array<int64_t, 3> threadMNK;
-        auto inputType = op.inputs()[0].getType().template cast<ShapedType>();
+        auto inputType =
+            op.getInputs()[0].getType().template cast<ShapedType>();
         if (inputType.getElementType().isF16()) {
           threadMNK = {2, 8, 8};
         } else {

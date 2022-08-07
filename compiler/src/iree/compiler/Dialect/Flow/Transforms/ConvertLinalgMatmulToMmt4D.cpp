@@ -393,14 +393,14 @@ struct FoldFillGenericOpPattern : public OpRewritePattern<linalg::GenericOp> {
     auto results =
         llvm::to_vector<4>(genericOp.getBody()->getOps<linalg::YieldOp>());
     if (results.size() != 1) return failure();
-    if (results[0].values().size() != 1) return failure();
-    auto blockArgument = results[0].values()[0].dyn_cast<BlockArgument>();
+    if (results[0].getValues().size() != 1) return failure();
+    auto blockArgument = results[0].getValues()[0].dyn_cast<BlockArgument>();
     if (!blockArgument || blockArgument.getArgNumber() != 0) return failure();
 
-    auto input = genericOp.inputs()[0];
+    auto input = genericOp.getInputs()[0];
 
     auto outputType =
-        genericOp.outputs()[0].getType().dyn_cast<RankedTensorType>();
+        genericOp.getOutputs()[0].getType().dyn_cast<RankedTensorType>();
 
     // TODO: To enable dynamic shapes we need to apply the same permutation on
     // init tensor sizes.

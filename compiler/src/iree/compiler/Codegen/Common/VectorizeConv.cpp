@@ -58,7 +58,7 @@ struct VectorizeLinalgConv : OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
     LLVM_DEBUG(llvm::dbgs() << "inspecting " << convOp << "\n");
 
     // This pattern does not handle convolutions with dilation.
-    if (auto dilations = convOp.dilations()) {
+    if (auto dilations = convOp.getDilations()) {
       auto values = dilations.getValues<APInt>();
       if (llvm::any_of(values, [](const APInt &value) {
             return value.getSExtValue() != 1;
@@ -69,7 +69,7 @@ struct VectorizeLinalgConv : OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
 
     Value input = convOp.image();
     Value filter = convOp.filter();
-    Value output = convOp.outputs()[0];
+    Value output = convOp.getOutputs()[0];
 
     auto inputType = input.getType().cast<ShapedType>();
     auto filterType = filter.getType().cast<ShapedType>();
@@ -98,8 +98,8 @@ struct VectorizeLinalgConv : OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
 
     int64_t numOutputHeights = outputShape[1];
     int64_t numOutputWidths = outputShape[2];
-    int64_t heightStride = convOp.strides().getValues<int64_t>()[0];
-    int64_t widthStride = convOp.strides().getValues<int64_t>()[1];
+    int64_t heightStride = convOp.getStrides().getValues<int64_t>()[0];
+    int64_t widthStride = convOp.getStrides().getValues<int64_t>()[1];
 
     // This invocation handles a batch of
     // (numOutputHeights * numOutputWidths * numOutputChannels).
@@ -247,7 +247,7 @@ struct VectorizeLinalgDepthwiseConv
 
     Value input = convOp.image();
     Value filter = convOp.filter();
-    Value output = convOp.outputs()[0];
+    Value output = convOp.getOutputs()[0];
 
     auto inputType = input.getType().cast<ShapedType>();
     auto filterType = filter.getType().cast<ShapedType>();
@@ -275,8 +275,8 @@ struct VectorizeLinalgDepthwiseConv
 
     int64_t numOutputHeights = outputShape[1];
     int64_t numOutputWidths = outputShape[2];
-    int64_t heightStride = convOp.strides().getValues<int64_t>()[0];
-    int64_t widthStride = convOp.strides().getValues<int64_t>()[1];
+    int64_t heightStride = convOp.getStrides().getValues<int64_t>()[0];
+    int64_t widthStride = convOp.getStrides().getValues<int64_t>()[1];
 
     // This invocation handles a batch of (numOutputHeights * numOutputWidths *
     // numChannels).
