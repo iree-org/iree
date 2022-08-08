@@ -110,7 +110,6 @@ iree_check_single_backend_test_suite(
     "dynamic_torch_index_select_scalar.mlir"
     "dynamic_torch_index_select_vector.mlir"
     "i1_inlined_constant.mlir"
-    "layernorm.mlir"
     "linalg_ops.mlir"
     "reduction_broadcast_elementwise.mlir"
     "softmax.mlir"

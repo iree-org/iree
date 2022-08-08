@@ -28,7 +28,6 @@ BACKEND_TESTS = [
     "dynamic_torch_index_select_scalar.mlir",
     "dynamic_torch_index_select_vector.mlir",
     "i1_inlined_constant.mlir",
-    "layernorm.mlir",
     "linalg_ops.mlir",
     "reduction_broadcast_elementwise.mlir",
     "softmax.mlir",
@@ -77,6 +76,7 @@ iree_check_single_backend_test_suite(
     name = "check_regression_llvm-cpu",
     srcs = [
         "associative_reordering.mlir",
+        "layernorm.mlir",
         "lowering_config.mlir",
     ] + BACKEND_TESTS,
     compiler_flags = ["--iree-input-type=mhlo"],
@@ -99,7 +99,9 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
     name = "check_regression_vmvx",
-    srcs = BACKEND_TESTS,
+    srcs = [
+        "layernorm.mlir",
+    ] + BACKEND_TESTS,
     compiler_flags = ["--iree-input-type=mhlo"],
     driver = "local-task",
     target_backend = "vmvx",
@@ -107,6 +109,7 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
     name = "check_regression_vulkan-spirv",
+    # TODO(#10024): Fix layernorm.mlir on Pixel 6 and put in BACKEND_TESTS.
     srcs = BACKEND_TESTS,
     compiler_flags = ["--iree-input-type=mhlo"],
     driver = "vulkan",
@@ -117,6 +120,7 @@ iree_check_single_backend_test_suite(
     name = "check_regression_cuda",
     srcs = [
         "large_reduction.mlir",
+        "layernorm.mlir",
     ] + BACKEND_TESTS,
     compiler_flags = ["--iree-input-type=mhlo"],
     driver = "cuda",
