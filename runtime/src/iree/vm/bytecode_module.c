@@ -210,8 +210,8 @@ static bool iree_vm_bytecode_module_resolve_type(
         iree_vm_ref_lookup_registered_type(type_name);
     if (type_descriptor) {
       out_type->ref_type = type_descriptor->type;
+      return true;
     }
-    return true;
   }
   return false;
 }

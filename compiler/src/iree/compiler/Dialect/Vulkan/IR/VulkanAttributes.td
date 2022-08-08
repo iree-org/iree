@@ -9,7 +9,7 @@
 
 include "iree/compiler/Dialect/Vulkan/IR/VulkanBase.td"
 
-class VK_Attr<string attrName, string attrMnemonic, list<Trait> traits = []>
+class VK_Attr<string attrName, string attrMnemonic>
     : AttrDef<VK_Dialect, attrName> {
   let mnemonic = attrMnemonic;
   let assemblyFormat = "`<` struct(params) `>`";

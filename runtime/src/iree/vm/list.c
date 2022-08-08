@@ -542,7 +542,8 @@ static iree_status_t iree_vm_list_get_ref_assign_or_retain(
     }
     case IREE_VM_LIST_STORAGE_MODE_VARIANT: {
       iree_vm_variant_t* variant = (iree_vm_variant_t*)element_ptr;
-      if (!iree_vm_type_def_is_ref(&variant->type)) {
+      if (!iree_vm_variant_is_empty(*variant) &&
+          !iree_vm_type_def_is_ref(&variant->type)) {
         return iree_make_status(IREE_STATUS_FAILED_PRECONDITION);
       }
       is_retain ? iree_vm_ref_retain(&variant->ref, out_value)
