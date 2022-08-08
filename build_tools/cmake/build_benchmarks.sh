@@ -36,7 +36,7 @@ echo "Reconfiguring to enable benchmarks"
   -DIREE_IMPORT_TF_PATH="${IREE_TF_BINARIES_DIR}/iree-import-tf"
 
 echo "Building benchmark artifacts"
-"${CMAKE_BIN}" --build . --target \
-  iree-benchmark-suites \
-  iree-microbenchmark-suites \
+"${CMAKE_BIN}" \
+  --build "${BUILD_DIR}"
+  --target iree-benchmark-suites iree-microbenchmark-suites \
   -- -k 0
