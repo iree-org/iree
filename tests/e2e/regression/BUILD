@@ -58,6 +58,7 @@ iree_lit_test_suite(
             "dynamic_linalg_matmul_on_tensors_fuse_1.mlir",
             "dynamic_linalg_matmul_on_tensors_fuse_2.mlir",
             "large_reduction.mlir",
+            "layernorm.mlir",
             "linalg_quantized_matmul_vs_linalg_matmul.mlir",
             "lowering_config.mlir",
         ] + BACKEND_TESTS,
