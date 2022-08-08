@@ -30,10 +30,11 @@ class SerializeTargetExecutablesPass
  public:
   SerializeTargetExecutablesPass() = default;
   SerializeTargetExecutablesPass(const SerializeTargetExecutablesPass &pass) {}
-  SerializeTargetExecutablesPass(StringRef target,
+  SerializeTargetExecutablesPass(StringRef target, int debugLevel,
                                  std::string dumpIntermediatesPath,
                                  std::string dumpBinariesPath) {
     this->target = target.str();
+    this->debugLevel = debugLevel;
     this->dumpIntermediatesPath = dumpIntermediatesPath;
     this->dumpBinariesPath = dumpBinariesPath;
   }
@@ -72,6 +73,7 @@ class SerializeTargetExecutablesPass
     serializationOptions.dumpBaseName =
         (moduleOp.getName().value_or("module") + "_" + executableOp.getName())
             .str();
+    serializationOptions.debugLevel = debugLevel;
     serializationOptions.dumpIntermediatesPath = dumpIntermediatesPath;
     serializationOptions.dumpBinariesPath = dumpBinariesPath;
     if (!dumpIntermediatesPath.empty()) {
@@ -106,6 +108,9 @@ class SerializeTargetExecutablesPass
           "Target backend name whose executables will be serialized by "
           "this pass.")};
 
+  Option<int> debugLevel{*this, "debug-level",
+                         llvm::cl::desc("Debug level for serialization (0-3)"),
+                         llvm::cl::init(2)};
   Option<std::string> dumpIntermediatesPath{
       *this, "dump-intermediates-path",
       llvm::cl::desc("Path to write translated executable intermediates (.bc, "
@@ -117,11 +122,11 @@ class SerializeTargetExecutablesPass
 };
 
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
-createSerializeTargetExecutablesPass(StringRef target,
+createSerializeTargetExecutablesPass(StringRef target, int debugLevel,
                                      std::string dumpIntermediatesPath,
                                      std::string dumpBinariesPath) {
   return std::make_unique<SerializeTargetExecutablesPass>(
-      target, dumpIntermediatesPath, dumpBinariesPath);
+      target, debugLevel, dumpIntermediatesPath, dumpBinariesPath);
 }
 
 static PassRegistration<SerializeTargetExecutablesPass> linkTargetPass([] {
@@ -133,9 +138,10 @@ class SerializeExecutablesPass
                          OperationPass<IREE::HAL::ExecutableOp>> {
  public:
   SerializeExecutablesPass() = default;
-  SerializeExecutablesPass(std::string dumpIntermediatesPath,
+  SerializeExecutablesPass(int debugLevel, std::string dumpIntermediatesPath,
                            std::string dumpBinariesPath)
-      : dumpIntermediatesPath(dumpIntermediatesPath),
+      : debugLevel(debugLevel),
+        dumpIntermediatesPath(dumpIntermediatesPath),
         dumpBinariesPath(dumpBinariesPath) {}
 
   StringRef getArgument() const override {
@@ -151,7 +157,7 @@ class SerializeExecutablesPass
     OpPassManager passManager(executableOp.getOperationName());
     for (const auto &targetName : gatherExecutableTargetNames(executableOp)) {
       passManager.addPass(createSerializeTargetExecutablesPass(
-          targetName, dumpIntermediatesPath, dumpBinariesPath));
+          targetName, debugLevel, dumpIntermediatesPath, dumpBinariesPath));
     }
     if (failed(runPipeline(passManager, executableOp))) {
       executableOp.emitError() << "failed to serialize executables";
@@ -160,15 +166,17 @@ class SerializeExecutablesPass
   }
 
  private:
+  int debugLevel;
   std::string dumpIntermediatesPath;
   std::string dumpBinariesPath;
 };
 
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
-createSerializeExecutablesPass(std::string dumpIntermediatesPath,
+createSerializeExecutablesPass(int debugLevel,
+                               std::string dumpIntermediatesPath,
                                std::string dumpBinariesPath) {
-  return std::make_unique<SerializeExecutablesPass>(dumpIntermediatesPath,
-                                                    dumpBinariesPath);
+  return std::make_unique<SerializeExecutablesPass>(
+      debugLevel, dumpIntermediatesPath, dumpBinariesPath);
 }
 
 static PassRegistration<SerializeExecutablesPass> linkPass([] {

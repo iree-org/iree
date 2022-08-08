@@ -87,12 +87,12 @@ typedef struct iree_hal_executable_environment_v0_t
 // or some semantic versioning we track in whatever spec we end up having.
 typedef uint32_t iree_hal_executable_library_version_t;
 
-#define IREE_HAL_EXECUTABLE_LIBRARY_VERSION_0_2 0x00000002u
+#define IREE_HAL_EXECUTABLE_LIBRARY_VERSION_0_3 0x00000003u
 
 // The latest version of the library API; can be used to populate the
 // iree_hal_executable_library_header_t::version when building libraries.
 #define IREE_HAL_EXECUTABLE_LIBRARY_VERSION_LATEST \
-  IREE_HAL_EXECUTABLE_LIBRARY_VERSION_0_2
+  IREE_HAL_EXECUTABLE_LIBRARY_VERSION_0_3
 
 // A header present at the top of all versions of the library API used by the
 // runtime to ensure version compatibility.
@@ -383,6 +383,19 @@ typedef struct iree_hal_executable_dispatch_attrs_v0_t {
 } iree_hal_executable_dispatch_attrs_v0_t;
 static_assert(sizeof(iree_hal_executable_dispatch_attrs_v0_t) == 4, "uint32_t");
 
+// Source location information for a dispatch function indicating what code was
+// used to generate it. This only represents a single source snapshot, of which
+// there may be multiple valid possibilities (source program in Python, imported
+// high level framework .mlir, LLVM bitcode, etc.).
+typedef struct iree_hal_executable_src_loc_v0_t {
+  // The line within the file at |path|.
+  uint32_t line;
+  // The length of |path|.
+  uint32_t path_length;
+  // The path (absolute or relative) to the source file.
+  const char* path;
+} iree_hal_executable_src_loc_v0_t;
+
 // A table of exported functions arranged as a struct-of-arrays for more
 // efficient packing and faster lookup. Each subarray - when not omitted and
 // NULL - is indexed by export ordinal and has up to |count| entries.
@@ -408,6 +421,9 @@ typedef struct iree_hal_executable_export_table_v0_t {
   // verbose logging. The string values, when present, may be attached to
   // tracing/debugging events related to the entry point.
   const char* const* tags;
+
+  // Optional table of source locations 1:1 with ptrs.
+  const iree_hal_executable_src_loc_v0_t* src_locs;
 } iree_hal_executable_export_table_v0_t;
 
 // A table declaring the executable-level constants that can be used to

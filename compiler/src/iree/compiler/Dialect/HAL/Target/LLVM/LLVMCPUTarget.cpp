@@ -327,9 +327,18 @@ class LLVMCPUTargetBackend final : public TargetBackend {
                                     .value_or(APInt(64, 0))
                                     .getSExtValue();
 
-      libraryBuilder.addExport(exportOp.getName(), "",
-                               LibraryBuilder::DispatchAttrs{localMemorySize},
-                               llvmFunc);
+      std::string sourceFile = "";
+      int sourceLine = 0;
+      if (options.debugLevel >= 1) {
+        // TODO(scotttodd): Copy findFirstFileLoc() from VulkanSPIRVTarget?
+        if (auto loc = exportOp.getLoc().dyn_cast<FileLineColLoc>()) {
+          sourceFile = loc.getFilename().str();
+          sourceLine = loc.getLine();
+        }
+      }
+      libraryBuilder.addExport(
+          exportOp.getName(), sourceFile, sourceLine, /*tag=*/"",
+          LibraryBuilder::DispatchAttrs{localMemorySize}, llvmFunc);
     }
 
     auto queryFunctionName = std::string(kQueryFunctionName);

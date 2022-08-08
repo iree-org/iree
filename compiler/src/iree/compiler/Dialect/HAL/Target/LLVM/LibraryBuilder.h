@@ -27,7 +27,8 @@ namespace HAL {
 //
 // Usage:
 //  LibraryBuilder builder(&module);
-//  builder.addExport("hello", "", DispatchAttrs{}, &helloFunc);
+//  builder.addExport(
+//     "hello", "source.mlir", 123, "test tag", DispatchAttrs{}, &helloFunc);
 //  ...
 //  auto *queryFunc = builder.build("_query_library_foo");
 //  // call queryFunc, export it, etc
@@ -47,11 +48,11 @@ class LibraryBuilder {
     // NOTE: until we hit v1 the versioning scheme here is not set in stone.
     // We may want to make this major release number, date codes (0x20220307),
     // or some semantic versioning we track in whatever spec we end up having.
-    V_0_2 = 0x0000'0002u,  // v0.2 - ~2022-04-19
+    V_0_3 = 0x0000'0003u,  // v0.3 - ~2022-08-08
 
     // Pinned to the latest version.
     // Requires that the runtime be compiled with the same version.
-    LATEST = V_0_2,
+    LATEST = V_0_3,
   };
 
   // iree_hal_executable_library_features_t
@@ -110,11 +111,13 @@ class LibraryBuilder {
   }
 
   // Defines a new entry point on the library implemented by |func|.
-  // |name| will be used as the library export and an optional |tag| will be
-  // attached.
-  void addExport(StringRef name, StringRef tag, DispatchAttrs attrs,
-                 llvm::Function *func) {
-    exports.push_back({name.str(), tag.str(), attrs, func});
+  // |name| will be used as the library export
+  // |sourceFile| and |sourceLoc| are optional source information
+  // |tag| is an optional attachment
+  void addExport(StringRef name, StringRef sourceFile, uint32_t sourceLoc,
+                 StringRef tag, DispatchAttrs attrs, llvm::Function *func) {
+    exports.push_back(
+        {name.str(), sourceFile.str(), sourceLoc, tag.str(), attrs, func});
   }
 
   // Builds a `iree_hal_executable_library_query_fn_t` with the given
@@ -148,6 +151,8 @@ class LibraryBuilder {
 
   struct Dispatch {
     std::string name;
+    std::string sourceFile;
+    uint32_t sourceLoc;
     std::string tag;
     DispatchAttrs attrs;
     llvm::Function *func;

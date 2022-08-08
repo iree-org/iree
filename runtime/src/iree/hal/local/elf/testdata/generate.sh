@@ -14,14 +14,14 @@
 #
 # To use, ensure iree-compile and your compiled ld.lld are on your PATH and
 # run the script:
-#   $ ./iree/hal/local/elf/testdata/generate.sh
+#   $ ./runtime/src/iree/hal/local/elf/testdata/generate.sh
 
 # Uncomment to see the iree-compile commands issued:
 # set -x
 set -e
 
 ROOT_DIR=$(git rev-parse --show-toplevel)
-TESTDATA="${ROOT_DIR}/iree/hal/local/elf/testdata"
+TESTDATA="${ROOT_DIR}/runtime/src/iree/hal/local/elf/testdata"
 
 # $1: file name ("foo_arm_32.so")
 # $2: list of iree-compile arguments for targeting

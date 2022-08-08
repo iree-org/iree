@@ -23,10 +23,10 @@ namespace IREE {
 namespace HAL {
 
 static void dumpExecutableToStream(IREE::HAL::ExecutableOp executableOp,
-                                   StringRef fileName, llvm::raw_ostream &os) {
+                                   StringRef filePath, llvm::raw_ostream &os) {
   OpPrintingFlags flags;
   flags.useLocalScope();
-  mlir::generateLocationsFromIR(os, fileName, executableOp, flags);
+  mlir::generateLocationsFromIR(os, filePath, executableOp, flags);
   os << "\n";  // newline at end of file
 }
 
@@ -73,7 +73,7 @@ class DumpExecutableSourcesPass
               << "while dumping to " << path << ": " << error;
           return signalPassFailure();
         }
-        dumpExecutableToStream(executableOp, fileName, file->os());
+        dumpExecutableToStream(executableOp, filePath, file->os());
         file->keep();
       }
     }

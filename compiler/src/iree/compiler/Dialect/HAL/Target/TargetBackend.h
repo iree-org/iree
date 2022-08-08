@@ -31,10 +31,19 @@ struct TargetOptions {
   // TODO(benvanik): multiple targets of the same type, etc.
   std::vector<std::string> targets;
 
+  // Coarse debug level for executable translation across all targets.
+  // Each target backend can use this to control its own flags, with values
+  // generally corresponding to the gcc-style levels 0-3:
+  //   0: no debug information
+  //   1: minimal debug information
+  //   2: default debug information
+  //   3: maximal debug information
+  int debugLevel;
+
   // A path to write individual executable source listings into.
   std::string sourceListingPath;
 
-  // A path to write standalone executable benchkmarks into.
+  // A path to write standalone executable benchmarks into.
   std::string executableBenchmarksPath;
 
   // A path to write executable intermediates into.
@@ -43,12 +52,6 @@ struct TargetOptions {
   // A path to write translated and serialized executable binaries into.
   std::string executableBinariesPath;
 
-  // TODO(benvanik): flags for debug/optimization/etc.
-  // The intent is that we can have a global debug/-ON flag that then each
-  // target backend can have tickle it's own flags in the right way. Right now
-  // the best we can do is a coarse flag as to whether source maps should be
-  // embedded, however we could be much better here on the TargetBackend
-  // interface.
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<TargetOptions>;
 };
@@ -208,6 +211,8 @@ class TargetBackend {
   }
 
   struct SerializationOptions {
+    // Debug level for serialization (0-3).
+    int debugLevel;
     // File name prefix used when creating scratch files.
     // This contains the module and executable name in canonical form.
     // Example: some_module_executable_43
