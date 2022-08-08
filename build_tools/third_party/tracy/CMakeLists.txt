@@ -136,19 +136,6 @@ target_link_libraries(IREETracyServer
 )
 
 #-------------------------------------------------------------------------------
-# IMGUI library
-#-------------------------------------------------------------------------------
-
-file(GLOB IMGUI_SOURCES
-  ${TRACY_SOURCE_DIR}/imgui/*.cpp
-  ${TRACY_SOURCE_DIR}/profiler/src/imgui/*.cpp
-)
-add_library(IREETracyIMGUI
-  ${IMGUI_SOURCES}
-)
-setup_cxx_options(IREETracyIMGUI)
-
-#-------------------------------------------------------------------------------
 # Standalone capture server
 #-------------------------------------------------------------------------------
 
@@ -171,6 +158,19 @@ target_link_libraries(IREETracyCaptureServer
 #-------------------------------------------------------------------------------
 
 if(TRACY_GTK_DEPS_FOUND)
+  #-----------------------------------------------------------------------------
+  # IMGUI library
+  #-----------------------------------------------------------------------------
+
+  file(GLOB IMGUI_SOURCES
+    ${TRACY_SOURCE_DIR}/imgui/*.cpp
+    ${TRACY_SOURCE_DIR}/profiler/src/imgui/*.cpp
+  )
+  add_library(IREETracyIMGUI
+    ${IMGUI_SOURCES}
+  )
+  setup_cxx_options(IREETracyIMGUI)
+
   #-----------------------------------------------------------------------------
   # NFD library
   #-----------------------------------------------------------------------------
