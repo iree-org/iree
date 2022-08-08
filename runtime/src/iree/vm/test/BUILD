@@ -9,7 +9,7 @@ load("//build_tools/bazel:iree_bytecode_module.bzl", "iree_bytecode_module")
 load("//build_tools/embed_data:build_defs.bzl", "c_embed_data")
 
 package(
-    default_visibility = ["//visibility:public"],
+    default_visibility = ["//runtime/src/iree/vm:__subpackages__"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
 )
