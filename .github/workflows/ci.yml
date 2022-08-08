@@ -413,6 +413,39 @@ jobs:
             gcr.io/iree-oss/base@sha256:5d43683c6b50aebe1fca6c85f2012f3b0fa153bf4dd268e8767b619b1891423a \
             ./build_tools/cmake/build_and_test_tsan.sh
 
+  android_arm64:
+    needs: [host_tools_assertions]
+    runs-on:
+      # Hacks, and order matters. See the comment at the top of the file.
+      - self-hosted
+      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - cpu
+      - os-family=Linux
+    env:
+      BUILD_DIR: "build-android-arm64"
+      ANDROID_ABI: "arm64-v8a"
+      HOST_BINARY_ROOT: ${{ needs.host_tools_assertions.outputs.host-binary-root }}
+      HOST_BINARY_ARCHIVE: ${{ needs.host_tools_assertions.outputs.host-binary-root }}.tar
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
+        with:
+          submodules: true
+      - name: "Downloading host tools"
+        uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741 # v3.0.0
+        with:
+          name: "${{ env.HOST_BINARY_ARCHIVE }}"
+      - name: "Extracting host tools archive"
+        run: |
+          tar -xvf ${HOST_BINARY_ARCHIVE}
+      - name: "Building for Android"
+        run: |
+          build_tools/github_actions/docker_run.sh \
+            --env "ANDROID_ABI=${ANDROID_ABI}" \
+            --env "IREE_HOST_BINARY_ROOT=${HOST_BINARY_ROOT}" \
+            gcr.io/iree-oss/android@sha256:9bc723fc707a18bd0c1be9c12e01ea5bb7c7d77f607427879e10ffcffd7d2bb5 \
+            build_tools/build_android.sh
+
   riscv32:
     needs: host_tools_assertions
     runs-on:
@@ -502,39 +535,6 @@ jobs:
             bash -euo pipefail -c \
               "./build_tools/cmake/build_riscv.sh && ./tests/riscv64/smoke.sh"
 
-  android_arm64:
-    needs: [host_tools_assertions]
-    runs-on:
-      # Hacks, and order matters. See the comment at the top of the file.
-      - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
-      - cpu
-      - os-family=Linux
-    env:
-      BUILD_DIR: "build-android-arm64"
-      ANDROID_ABI: "arm64-v8a"
-      HOST_BINARY_ROOT: ${{ needs.host_tools_assertions.outputs.host-binary-root }}
-      HOST_BINARY_ARCHIVE: ${{ needs.host_tools_assertions.outputs.host-binary-root }}.tar
-    steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
-        with:
-          submodules: true
-      - name: "Downloading host tools"
-        uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741 # v3.0.0
-        with:
-          name: "${{ env.HOST_BINARY_ARCHIVE }}"
-      - name: "Extracting host tools archive"
-        run: |
-          tar -xvf ${HOST_BINARY_ARCHIVE}
-      - name: "Building for Android"
-        run: |
-          build_tools/github_actions/docker_run.sh \
-            --env "ANDROID_ABI=${ANDROID_ABI}" \
-            --env "IREE_HOST_BINARY_ROOT=${HOST_BINARY_ROOT}" \
-            gcr.io/iree-oss/android@sha256:9bc723fc707a18bd0c1be9c12e01ea5bb7c7d77f607427879e10ffcffd7d2bb5 \
-            build_tools/build_android.sh
-
   summary:
     runs-on: ubuntu-20.04
     needs:
@@ -549,9 +549,9 @@ jobs:
       - test_tf_integrations_gpu
       - asan
       - tsan
+      - android_arm64
       - riscv32
       - riscv64
-      - android_arm64
     if: always()
     steps:
       - name: Getting combined job status
