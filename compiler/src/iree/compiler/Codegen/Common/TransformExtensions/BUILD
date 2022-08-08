@@ -41,14 +41,6 @@ iree_gentbl_cc_library(
             ["--gen-op-defs"],
             "CommonExtensionsOps.cpp.inc",
         ),
-        (
-            ["--gen-enum-decls"],
-            "CommonExtensionsAttrs.h.inc",
-        ),
-        (
-            ["--gen-enum-defs"],
-            "CommonExtensionsAttrs.cpp.inc",
-        ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "CommonExtensionsOps.td",
@@ -59,12 +51,10 @@ iree_compiler_cc_library(
     name = "CommonExtensions",
     srcs = [
         "CommonExtensions.cpp",
-        "CommonExtensionsAttrs.cpp.inc",
         "CommonExtensionsOps.cpp.inc",
     ],
     hdrs = [
         "CommonExtensions.h",
-        "CommonExtensionsAttrs.h.inc",
         "CommonExtensionsOps.h.inc",
     ],
     deps = [
