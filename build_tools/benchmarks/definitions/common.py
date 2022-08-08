@@ -33,7 +33,6 @@ class ModelSourceType(Enum):
 
 
 class InputDataFormat(Enum):
-  # Generated data with all zeros.
   ZEROS = "zeros"
   NUMPY_NPY = "numpy_npy"
 
@@ -68,3 +67,11 @@ class ModelInputData(object):
   tags: List[str]
   data_format: InputDataFormat
   source_uri: str
+
+
+ZEROS_MODEL_INPUT_DATA = ModelInputData(id="zeros",
+                                        model_id="any",
+                                        name="zeros_dummy_input",
+                                        tags=[],
+                                        data_format=InputDataFormat.ZEROS,
+                                        source_uri="")

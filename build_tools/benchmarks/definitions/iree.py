@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import List
 
-from definitions.common import DeviceArchitecture, DevicePlatform, Model
+from definitions.common import DeviceArchitecture, DevicePlatform, DeviceSpec, Model, ModelInputData
 
 
 class IreeTargetBackend(Enum):
@@ -34,30 +34,30 @@ class IreeCompileTarget(object):
 @dataclass(frozen=True)
 class IreeCompileConfig(object):
   id: str
-  compile_targets: List[IreeCompileTarget]
   tags: List[str]
-  compile_flags: List[str]
+  compile_targets: List[IreeCompileTarget]
+  extra_flags: List[str]
 
 
 @dataclass(frozen=True)
-class IreeRuntimeConfig(object):
+class IreeRunConfig(object):
   id: str
+  tags: List[str]
   loader: IreeRuntimeLoader
   driver: IreeRuntimeDriver
-  tags: List[str]
-  runtime_flags: List[str]
+  benchmark_tool: str
+  extra_flags: List[str]
 
 
 @dataclass(frozen=True)
 class IreeBenchmarkCompileSpec(object):
-  compile_config_id: str
+  compile_config: IreeCompileConfig
   model: Model
 
 
 @dataclass(frozen=True)
 class IreeBenchmarkRunSpec(object):
-  benchmark_tool: str
   compile_spec: IreeBenchmarkCompileSpec
-  runtime_config_id: str
-  target_device_spec_id: str
-  input_data_id: str
+  run_config: IreeRunConfig
+  target_device_spec: DeviceSpec
+  input_data: ModelInputData
