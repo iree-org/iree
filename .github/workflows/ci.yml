@@ -45,6 +45,7 @@ env:
 
 jobs:
   build_runtime:
+    if: false
     runs-on: ubuntu-20.04
     env:
       BUILD_DIR: build-runtime
@@ -76,6 +77,7 @@ jobs:
 
   test_runtime:
     needs: build_runtime
+    if: false
     runs-on: ubuntu-20.04
     env:
       BUILD_DIR: ${{ needs.build_runtime.outputs.build-dir }}
@@ -150,6 +152,7 @@ jobs:
           echo "::set-output name=gcs-artifact::${GCS_ARTIFACT}"
 
   build_test_all_bazel:
+    if: false
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
@@ -176,6 +179,7 @@ jobs:
 
 
   host_tools_assertions:
+    if: false
     uses: ./.github/workflows/host_tools.yml
     with:
       host-binary-root: host-tools-assertions
@@ -228,6 +232,7 @@ jobs:
 
   test_all:
     needs: build_all
+    if: false
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
@@ -297,6 +302,7 @@ jobs:
 
   test_tf_integrations:
     needs: [build_tf_integrations, build_all]
+    if: false
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
@@ -378,6 +384,7 @@ jobs:
               build_tools/cmake/run_tf_tests.sh ${BUILD_DIR}"
 
   asan:
+    if: false
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
@@ -396,6 +403,7 @@ jobs:
             ./build_tools/cmake/build_and_test_asan.sh
 
   tsan:
+    if: false
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
@@ -415,6 +423,7 @@ jobs:
 
   riscv32:
     needs: host_tools_assertions
+    if: false
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
@@ -450,6 +459,7 @@ jobs:
 
   riscv64:
     needs: [build_all, host_tools_assertions, build_tf_integrations]
+    if: false
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
@@ -504,6 +514,7 @@ jobs:
 
   android_arm64:
     needs: [host_tools_assertions]
+    if: false
     runs-on:
       # Hacks, and order matters. See the comment at the top of the file.
       - self-hosted
