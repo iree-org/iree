@@ -98,7 +98,7 @@ std::vector<TestParams> GetModuleTestParams() {
     create_function_t function = modules[i].create_function;
 
     std::string module_name =
-        std::string(descriptor.module_name.data, descriptor.module_name.size);
+        std::string(descriptor.name.data, descriptor.name.size);
 
     for (iree_host_size_t i = 0; i < descriptor.export_count; i++) {
       iree_vm_native_export_descriptor_t export_descriptor =

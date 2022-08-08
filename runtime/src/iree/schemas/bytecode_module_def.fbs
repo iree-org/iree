@@ -38,6 +38,28 @@ table FunctionSignatureDef {
   attrs:[AttrDef];
 }
 
+// Defines the behavior of dependency resolution.
+enum ModuleDependencyFlagBits:uint32 (bit_flags) {
+  // Module is required and must have the minimum version specified.
+  // Individual imports may still be optional.
+  REQUIRED = 0,  // 1u << 0
+  // Module is optional and if not present the module will still load. All
+  // methods imported from the module must also be marked optional.
+  OPTIONAL = 1,  // 1u << 1
+}
+
+// Describes a module's dependency on another module.
+table ModuleDependencyDef {
+  // Name of the module (`hal`, etc).
+  name:string;
+
+  // Minimum required version in order to satisfy the dependency.
+  minimum_version:uint32;
+
+  // Flags controlling the dependency resolution behavior.
+  flags:ModuleDependencyFlagBits = REQUIRED;
+}
+
 enum ImportFlagBits:uint32 (bit_flags) {
   REQUIRED = 0,  // 1u << 0
   OPTIONAL = 1,  // 1u << 1
@@ -51,7 +73,7 @@ table ImportFunctionDef {
   // Signature of the function expected used for verifying that imports match.
   signature:FunctionSignatureDef;
 
-  // Version flags controlling the behavior of import resolution.
+  // Flags controlling the behavior of import resolution.
   flags:ImportFlagBits = REQUIRED;
 }
 
@@ -212,11 +234,19 @@ table BytecodeModuleDef {
   // Module namespace used for fully-qualified function lookups.
   name:string (required);
 
+  // Version of the module as reported to the runtime.
+  // Dependees can specify minimum versions that they require in order to
+  // resolve.
+  version:uint32;
+
   // Module-level attributes, if any.
   attrs:[AttrDef];
 
   // Type table mapping type IDs used within the module to type signatures.
   types:[TypeDef];
+
+  // Dependent modules.
+  dependencies:[ModuleDependencyDef];
 
   // Imported function definitions used to resolve imports.
   imported_functions:[ImportFunctionDef];

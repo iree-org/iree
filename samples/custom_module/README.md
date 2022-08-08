@@ -139,7 +139,7 @@ static const vm::NativeFunction<TableModuleState> kTableModuleFunctions[] = {
 extern "C" iree_status_t iree_table_module_create(
     iree_allocator_t allocator, iree_vm_module_t** out_module) {
   auto module = std::make_unique<TableModule>(
-      "table", allocator,
+      "table", /*version=*/0, allocator,
       iree::span<const vm::NativeFunction<CustomModuleState>>
       (kTableModuleFunctions));
   *out_module = module.release()->interface();

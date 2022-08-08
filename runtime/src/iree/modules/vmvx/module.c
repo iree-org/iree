@@ -34,6 +34,9 @@
 #include "iree/builtins/mmt4d/mmt4d.h"
 #endif  // IREE_HAVE_MMT4D_BUILTINS
 
+#define IREE_VMVX_MODULE_VERSION_0_0 0x00000000u
+#define IREE_VMVX_MODULE_VERSION_LATEST IREE_VMVX_MODULE_VERSION_0_0
+
 //===----------------------------------------------------------------------===//
 // Module type definitions
 //===----------------------------------------------------------------------===//
@@ -564,10 +567,12 @@ static_assert(IREE_ARRAYSIZE(iree_vmvx_module_funcs_) ==
               "function pointer table must be 1:1 with exports");
 
 static const iree_vm_native_module_descriptor_t iree_vmvx_module_descriptor_ = {
-    .module_name = iree_string_view_literal("vmv"
-                                            "x"),
-    .module_attr_count = 0,
-    .module_attrs = NULL,
+    .name = iree_string_view_literal("vmvx"),
+    .version = IREE_VMVX_MODULE_VERSION_LATEST,
+    .attr_count = 0,
+    .attrs = NULL,
+    .dependency_count = 0,
+    .dependencies = NULL,
     .import_count = 0,  // workaround for 0-length C struct
     .imports = iree_vmvx_module_imports_,
     .export_count = IREE_ARRAYSIZE(iree_vmvx_module_exports_),

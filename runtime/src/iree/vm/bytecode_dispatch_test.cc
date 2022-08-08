@@ -48,7 +48,7 @@ std::vector<TestParams> GetModuleTestParams() {
             reinterpret_cast<const uint8_t*>(module_file.data),
             module_file.size},
         iree_allocator_null(), iree_allocator_system(), &module));
-    iree_vm_module_signature_t signature = module->signature(module->self);
+    iree_vm_module_signature_t signature = iree_vm_module_signature(module);
     test_params.reserve(test_params.size() + signature.export_function_count);
     for (int i = 0; i < signature.export_function_count; ++i) {
       iree_vm_function_t function;

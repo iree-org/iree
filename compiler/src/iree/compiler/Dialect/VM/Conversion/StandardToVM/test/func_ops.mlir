@@ -31,7 +31,10 @@ module {
 module @t003_extern_func {
 module {
   // CHECK: vm.import @some.import(i32) -> !vm.buffer
-  func.func private @some.import(%arg0: index) -> !util.buffer
+  // CHECK-SAME: attributes {minimum_version = 4 : i32}
+  func.func private @some.import(%arg0: index) -> !util.buffer attributes {
+    vm.version = 4 : i32
+  }
   // CHECK: vm.func private @my_fn(%[[ARG0:.+]]: i32) -> !vm.buffer
   func.func @my_fn(%arg0: index) -> !util.buffer {
     // CHECK: %[[RET:.+]] = vm.call @some.import(%[[ARG0]]) : (i32) -> !vm.buffer

@@ -44,6 +44,9 @@ class ModuleOpConversion : public OpConversionPattern<ModuleOp> {
     auto newModuleOp =
         rewriter.create<IREE::VM::ModuleOp>(srcOp.getLoc(), name);
     assert(!newModuleOp.getBodyRegion().empty());
+    if (auto version = srcOp->getAttrOfType<IntegerAttr>("vm.version")) {
+      newModuleOp.setVersionAttr(version);
+    }
     Block *firstCreatedBlock = &newModuleOp.getBodyRegion().front();
     rewriter.inlineRegionBefore(srcOp.getBodyRegion(), firstCreatedBlock);
     auto blockRange = llvm::make_range(Region::iterator(firstCreatedBlock),
@@ -213,6 +216,11 @@ class ExternalFuncOpConversion : public OpConversionPattern<func::FuncOp> {
     // If there is a fallback then the import is optional.
     if (srcOp->hasAttr("vm.fallback")) {
       importOp.setIsOptionalAttr(rewriter.getUnitAttr());
+    }
+
+    // By default imports are unversioned but we allow the user to specify one.
+    if (auto minimumVersion = srcOp->getAttrOfType<IntegerAttr>("vm.version")) {
+      importOp.setMinimumVersionAttr(minimumVersion);
     }
 
     // Retain function attributes in the allowlist.

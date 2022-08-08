@@ -8,6 +8,7 @@
 #define IREE_VM_NATIVE_MODULE_CC_H_
 
 #include <cstring>
+#include <functional>
 #include <memory>
 
 #include "iree/base/api.h"
@@ -66,20 +67,28 @@ namespace vm {
 template <typename State>
 class NativeModule {
  public:
-  NativeModule(const char* name, iree_allocator_t allocator,
+  NativeModule(const char* name, uint32_t version, iree_allocator_t allocator,
                iree::span<const NativeFunction<State>> dispatch_table)
-      : name_(name), allocator_(allocator), dispatch_table_(dispatch_table) {
+      : name_(name),
+        version_(version),
+        allocator_(allocator),
+        dispatch_table_(dispatch_table) {
     IREE_CHECK_OK(iree_vm_module_initialize(&interface_, this));
     interface_.destroy = NativeModule::ModuleDestroy;
     interface_.name = NativeModule::ModuleName;
     interface_.signature = NativeModule::ModuleSignature;
-    interface_.get_function = NativeModule::ModuleGetFunction;
+    // TODO(benvanik): get_module_attr
+    interface_.enumerate_dependencies =
+        NativeModule::ModuleEnumerateDependencies;
     interface_.lookup_function = NativeModule::ModuleLookupFunction;
+    interface_.get_function = NativeModule::ModuleGetFunction;
+    // TODO(benvanik): get_function_attr
     interface_.alloc_state = NativeModule::ModuleAllocState;
     interface_.free_state = NativeModule::ModuleFreeState;
     interface_.resolve_import = NativeModule::ModuleResolveImport;
     interface_.notify = NativeModule::ModuleNotify;
     interface_.begin_call = NativeModule::ModuleBeginCall;
+    // TODO(benvanik): resume_call
   }
 
   virtual ~NativeModule() = default;
@@ -88,6 +97,12 @@ class NativeModule {
   iree_vm_module_t* interface() { return &interface_; }
 
  protected:
+  // Enumerates module dependencies by issuing |callback| for each dependency.
+  virtual Status EnumerateDependencies(
+      std::function<Status(const iree_vm_module_dependency_t*)> callback) {
+    return OkStatus();
+  }
+
   // Creates a new per-context module State holder.
   virtual StatusOr<std::unique_ptr<State>> CreateState(
       iree_allocator_t allocator) = 0;
@@ -115,10 +130,24 @@ class NativeModule {
   static iree_vm_module_signature_t ModuleSignature(void* self) {
     auto* module = FromModulePointer(self);
     iree_vm_module_signature_t signature = {0};
+    signature.version = module->version_;
+    signature.attr_count = 0;
     signature.import_function_count = 0;
     signature.export_function_count = module->dispatch_table_.size();
     signature.internal_function_count = 0;
     return signature;
+  }
+
+  static iree_status_t ModuleEnumerateDependencies(
+      void* self, iree_vm_module_dependency_callback_t callback,
+      void* user_data) {
+    auto* module = FromModulePointer(self);
+    auto callback_fn =
+        [callback, user_data](const iree_vm_module_dependency_t* dependency) {
+          return Status(callback(user_data, dependency));
+        };
+    IREE_RETURN_IF_ERROR(module->EnumerateDependencies(std::move(callback_fn)));
+    return OkStatus();
   }
 
   static iree_status_t ModuleGetFunction(
@@ -248,6 +277,7 @@ class NativeModule {
   }
 
   const char* name_;
+  uint32_t version_;
   const iree_allocator_t allocator_;
   iree_vm_module_t interface_;
 

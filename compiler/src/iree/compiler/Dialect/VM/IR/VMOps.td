@@ -37,8 +37,8 @@ def VM_ModuleOp : VM_Op<"module", [
   let arguments = (ins
     OptionalAttr<StrAttr>:$sym_visibility,
     SymbolNameAttr:$sym_name,
-    // TODO(benvanik): add compatibility and versioning attributes.
-    OptionalAttr<VM_OrdinalCountsAttr>:$ordinal_counts
+    OptionalAttr<VM_OrdinalCountsAttr>:$ordinal_counts,
+    OptionalAttr<I32Attr>:$version
   );
 
   let regions = (region SizedRegion<1>:$body);
@@ -60,6 +60,15 @@ def VM_ModuleOp : VM_Op<"module", [
   let extraClassDeclaration = [{
     Region &getBodyRegion() { return getOperation()->getRegion(0); }
     Block& getBlock() { return this->getOperation()->getRegion(0).front(); }
+
+    struct Dependency {
+      StringRef name;
+      uint32_t minimumVersion = 0;
+      bool isOptional = true;
+    };
+    // Returns an alphabetically-ordered list of dependencies based on vm.import
+    // ops and metadata.
+    SmallVector<Dependency> getDependencies();
   }];
 
   let hasVerifier = 1;
@@ -174,11 +183,19 @@ def VM_ImportOp : VM_Op<"import", [
   let description = [{
     Specifies a function that should be imported from either the runtime or
     an external VM module.
+
+    Required imports can be declared with a minimum version of the module that
+    contains the import. The maximum declared minimum version of all required
+    imports from the module will become the required minimum version at runtime.
+
+    Optional imports not present at runtime will be invalid to call and whether
+    they were resolved can be queried with `vm.import.resolved`.
   }];
 
   let arguments = (ins
     OptionalAttr<VM_Ordinal>:$ordinal,
-    OptionalAttr<UnitAttr>:$is_optional
+    OptionalAttr<UnitAttr>:$is_optional,
+    OptionalAttr<I32Attr>:$minimum_version
   );
 
   // Required because FunctionOpInterface and CallableOpInterface disagree with

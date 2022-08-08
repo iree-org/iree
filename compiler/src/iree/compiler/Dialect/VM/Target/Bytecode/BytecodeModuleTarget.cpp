@@ -437,12 +437,19 @@ static LogicalResult buildFlatBufferModule(
   // NOTE: rwdata is currently unused.
   SmallVector<iree_vm_RwdataSegmentDef_ref_t, 8> rwdataSegmentRefs;
 
-  auto typeRefs =
-      llvm::to_vector<8>(llvm::map_range(typeTable, [&](auto typeDef) {
-        auto fullNameRef = fbb.createString(typeDef.full_name);
-        iree_vm_TypeDef_start(fbb);
-        iree_vm_TypeDef_full_name_add(fbb, fullNameRef);
-        return iree_vm_TypeDef_end(fbb);
+  auto exportFuncRefs =
+      llvm::to_vector<8>(llvm::map_range(exportFuncOps, [&](auto exportOp) {
+        auto localNameRef = fbb.createString(exportOp.getExportName());
+        auto funcOp =
+            symbolTable.lookup<IREE::VM::FuncOp>(exportOp.getFunctionRef());
+        auto signatureRef = makeExportFunctionSignatureDef(exportOp, funcOp,
+                                                           typeOrdinalMap, fbb);
+        iree_vm_ExportFunctionDef_start(fbb);
+        iree_vm_ExportFunctionDef_local_name_add(fbb, localNameRef);
+        iree_vm_ExportFunctionDef_signature_add(fbb, signatureRef);
+        iree_vm_ExportFunctionDef_internal_ordinal_add(
+            fbb, funcOp.getOrdinal()->getLimitedValue());
+        return iree_vm_ExportFunctionDef_end(fbb);
       }));
 
   auto importFuncRefs =
@@ -460,19 +467,32 @@ static LogicalResult buildFlatBufferModule(
         return iree_vm_ImportFunctionDef_end(fbb);
       }));
 
-  auto exportFuncRefs =
-      llvm::to_vector<8>(llvm::map_range(exportFuncOps, [&](auto exportOp) {
-        auto localNameRef = fbb.createString(exportOp.getExportName());
-        auto funcOp =
-            symbolTable.lookup<IREE::VM::FuncOp>(exportOp.getFunctionRef());
-        auto signatureRef = makeExportFunctionSignatureDef(exportOp, funcOp,
-                                                           typeOrdinalMap, fbb);
-        iree_vm_ExportFunctionDef_start(fbb);
-        iree_vm_ExportFunctionDef_local_name_add(fbb, localNameRef);
-        iree_vm_ExportFunctionDef_signature_add(fbb, signatureRef);
-        iree_vm_ExportFunctionDef_internal_ordinal_add(
-            fbb, funcOp.getOrdinal()->getLimitedValue());
-        return iree_vm_ExportFunctionDef_end(fbb);
+  auto dependencies = moduleOp.getDependencies();
+  auto dependencyRefs = llvm::to_vector<8>(
+      llvm::map_range(llvm::reverse(dependencies), [&](const auto &dependency) {
+        auto nameRef = fbb.createString(dependency.name);
+        iree_vm_ModuleDependencyFlagBits_enum_t flags = 0;
+        if (dependency.isOptional) {
+          // All imported methods are optional and the module is not required.
+          flags |= iree_vm_ModuleDependencyFlagBits_OPTIONAL;
+        } else {
+          // At least one method is required and thus the module is required.
+          flags |= iree_vm_ModuleDependencyFlagBits_REQUIRED;
+        }
+        iree_vm_ModuleDependencyDef_start(fbb);
+        iree_vm_ModuleDependencyDef_name_add(fbb, nameRef);
+        iree_vm_ModuleDependencyDef_minimum_version_add(
+            fbb, dependency.minimumVersion);
+        iree_vm_ModuleDependencyDef_flags_add(fbb, flags);
+        return iree_vm_ModuleDependencyDef_end(fbb);
+      }));
+
+  auto typeRefs =
+      llvm::to_vector<8>(llvm::map_range(typeTable, [&](auto typeDef) {
+        auto fullNameRef = fbb.createString(typeDef.full_name);
+        iree_vm_TypeDef_start(fbb);
+        iree_vm_TypeDef_full_name_add(fbb, fullNameRef);
+        return iree_vm_TypeDef_end(fbb);
       }));
 
   // NOTE: we keep the vectors clustered here so that we can hopefully keep the
@@ -485,6 +505,7 @@ static LogicalResult buildFlatBufferModule(
   auto rwdataSegmentsRef = fbb.createOffsetVecDestructive(rwdataSegmentRefs);
   auto exportFuncsOffset = fbb.createOffsetVecDestructive(exportFuncRefs);
   auto importFuncsRef = fbb.createOffsetVecDestructive(importFuncRefs);
+  auto dependenciesRef = fbb.createOffsetVecDestructive(dependencyRefs);
   auto typesRef = fbb.createOffsetVecDestructive(typeRefs);
 
   int32_t globalRefs = ordinalCounts.getGlobalRefs();
@@ -507,7 +528,11 @@ static LogicalResult buildFlatBufferModule(
       moduleOp.getSymName().empty() ? "module" : moduleOp.getSymName());
 
   iree_vm_BytecodeModuleDef_name_add(fbb, moduleNameRef);
+  iree_vm_BytecodeModuleDef_version_add(fbb,
+                                        moduleOp.getVersion().value_or(0u));
+  // TODO(benvanik): iree_vm_BytecodeModuleDef_attrs_add
   iree_vm_BytecodeModuleDef_types_add(fbb, typesRef);
+  iree_vm_BytecodeModuleDef_dependencies_add(fbb, dependenciesRef);
   iree_vm_BytecodeModuleDef_imported_functions_add(fbb, importFuncsRef);
   iree_vm_BytecodeModuleDef_exported_functions_add(fbb, exportFuncsOffset);
   iree_vm_BytecodeModuleDef_module_state_add(fbb, moduleStateDef);

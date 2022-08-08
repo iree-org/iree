@@ -299,6 +299,20 @@ static iree_status_t iree_vm_bytecode_module_flatbuffer_verify(
     }
   }
 
+  iree_vm_ModuleDependencyDef_vec_t dependencies =
+      iree_vm_BytecodeModuleDef_dependencies(module_def);
+  for (size_t i = 0; i < iree_vm_ModuleDependencyDef_vec_len(dependencies);
+       ++i) {
+    iree_vm_ModuleDependencyDef_table_t dependency_def =
+        iree_vm_ModuleDependencyDef_vec_at(dependencies, i);
+    flatbuffers_string_t module_name =
+        iree_vm_ModuleDependencyDef_name(dependency_def);
+    if (flatbuffers_string_len(module_name) == 0) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "dependencies[%zu] has no module name", i);
+    }
+  }
+
   iree_vm_ImportFunctionDef_vec_t imported_functions =
       iree_vm_BytecodeModuleDef_imported_functions(module_def);
   iree_vm_ExportFunctionDef_vec_t exported_functions =
@@ -458,13 +472,16 @@ static iree_string_view_t iree_vm_bytecode_module_name(void* self) {
 static iree_vm_module_signature_t iree_vm_bytecode_module_signature(
     void* self) {
   iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;
-  iree_vm_module_signature_t signature;
-  memset(&signature, 0, sizeof(signature));
-  signature.import_function_count = iree_vm_ImportFunctionDef_vec_len(
-      iree_vm_BytecodeModuleDef_imported_functions(module->def));
-  signature.export_function_count = iree_vm_ExportFunctionDef_vec_len(
-      iree_vm_BytecodeModuleDef_exported_functions(module->def));
-  signature.internal_function_count = module->function_descriptor_count;
+  iree_vm_module_signature_t signature = {
+      .version = iree_vm_BytecodeModuleDef_version(module->def),
+      .attr_count =
+          iree_vm_AttrDef_vec_len(iree_vm_BytecodeModuleDef_attrs(module->def)),
+      .import_function_count = iree_vm_ImportFunctionDef_vec_len(
+          iree_vm_BytecodeModuleDef_imported_functions(module->def)),
+      .export_function_count = iree_vm_ExportFunctionDef_vec_len(
+          iree_vm_BytecodeModuleDef_exported_functions(module->def)),
+      .internal_function_count = module->function_descriptor_count,
+  };
   return signature;
 }
 
@@ -488,6 +505,31 @@ static iree_status_t iree_vm_bytecode_module_get_module_attr(
   *out_attr = iree_make_string_pair(
       iree_make_string_view(attr_key, flatbuffers_string_len(attr_key)),
       iree_make_string_view(attr_value, flatbuffers_string_len(attr_value)));
+  return iree_ok_status();
+}
+
+static iree_status_t iree_vm_bytecode_module_enumerate_dependencies(
+    void* self, iree_vm_module_dependency_callback_t callback,
+    void* user_data) {
+  iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;
+  iree_vm_ModuleDependencyDef_vec_t dependencies =
+      iree_vm_BytecodeModuleDef_dependencies(module->def);
+  for (size_t i = 0; i < iree_vm_ModuleDependencyDef_vec_len(dependencies);
+       ++i) {
+    const iree_vm_ModuleDependencyDef_table_t dependency_def =
+        iree_vm_ModuleDependencyDef_vec_at(dependencies, i);
+    flatbuffers_string_t module_name =
+        iree_vm_ModuleDependencyDef_name(dependency_def);
+    const iree_vm_module_dependency_t dependency = {
+        .name = iree_make_string_view(module_name,
+                                      flatbuffers_string_len(module_name)),
+        .minimum_version =
+            iree_vm_ModuleDependencyDef_minimum_version(dependency_def),
+        // NOTE: bits match today but may not in the future.
+        .flags = iree_vm_ModuleDependencyDef_flags(dependency_def),
+    };
+    IREE_RETURN_IF_ERROR(callback(user_data, &dependency));
+  }
   return iree_ok_status();
 }
 
@@ -1150,6 +1192,8 @@ IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_create(
   module->interface.name = iree_vm_bytecode_module_name;
   module->interface.signature = iree_vm_bytecode_module_signature;
   module->interface.get_module_attr = iree_vm_bytecode_module_get_module_attr;
+  module->interface.enumerate_dependencies =
+      iree_vm_bytecode_module_enumerate_dependencies;
   module->interface.lookup_function = iree_vm_bytecode_module_lookup_function;
   module->interface.get_function = iree_vm_bytecode_module_get_function;
   module->interface.get_function_attr =

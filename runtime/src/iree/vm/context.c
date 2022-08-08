@@ -114,10 +114,55 @@ static iree_status_t iree_vm_context_query_module_state(
   return iree_make_status(IREE_STATUS_NOT_FOUND);
 }
 
+// Checks that |dependency| is satisfied by the context.
+static iree_status_t iree_vm_context_check_module_dependency(
+    void* user_data_ptr, const iree_vm_module_dependency_t* dependency) {
+  // Scan the context to find the dependency by module name.
+  iree_vm_context_t* context = (iree_vm_context_t*)user_data_ptr;
+  for (iree_host_size_t i = 0; i < context->list.count; ++i) {
+    iree_vm_module_t* module = context->list.modules[i];
+    if (iree_string_view_equal(iree_vm_module_name(module), dependency->name)) {
+      iree_vm_module_signature_t signature = iree_vm_module_signature(module);
+      if (iree_all_bits_set(dependency->flags,
+                            IREE_VM_MODULE_DEPENDENCY_FLAG_REQUIRED)) {
+        if (signature.version < dependency->minimum_version) {
+          // Required modules must meet the version requirement.
+          return iree_make_status(
+              IREE_STATUS_NOT_FOUND,
+              "required module '%.*s' version mismatch; have %u but require %u",
+              (int)dependency->name.size, dependency->name.data,
+              signature.version, dependency->minimum_version);
+        }
+        // Found and version matches.
+        return iree_ok_status();
+      } else {
+        // Found the module and it's optional so allow all versions.
+        return iree_ok_status();
+      }
+    }
+  }
+  // Optional dependencies are not failures when not found.
+  if (iree_all_bits_set(dependency->flags,
+                        IREE_VM_MODULE_DEPENDENCY_FLAG_OPTIONAL)) {
+    return iree_ok_status();
+  }
+  return iree_make_status(
+      IREE_STATUS_NOT_FOUND,
+      "required module '%.*s' not registered on the context",
+      (int)dependency->name.size, dependency->name.data);
+}
+
 static iree_status_t iree_vm_context_resolve_module_imports(
     iree_vm_context_t* context, iree_vm_module_t* module,
     iree_vm_module_state_t* module_state) {
   IREE_TRACE_ZONE_BEGIN(z0);
+
+  // Check module presence/versions before individual imports.
+  // This gives better error messages ("requires hal module version 4") than
+  // failing on individual methods.
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_vm_module_enumerate_dependencies(
+              module, iree_vm_context_check_module_dependency, context));
 
   // NOTE: this has some bad characteristics, but the number of modules and the
   // number of imported functions should be relatively small (even if the number
@@ -441,6 +486,10 @@ IREE_API_EXPORT iree_status_t iree_vm_context_register_modules(
         iree_vm_context_resolve_module_imports(context, module, module_state);
     if (!iree_status_is_ok(status)) {
       // Cleanup handled below.
+      iree_string_view_t module_name = iree_vm_module_name(module);
+      (void)module_name;
+      status = iree_status_annotate_f(status, "resolving module '%.*s' imports",
+                                      (int)module_name.size, module_name.data);
       break;
     }
 
