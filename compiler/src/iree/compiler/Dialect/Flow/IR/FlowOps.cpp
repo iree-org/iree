@@ -288,6 +288,11 @@ LogicalResult DispatchRegionOp::verify() {
       return term->emitOpError()
              << "operand types do not match with parent results";
 
+  // Make sure that all returned values are ranked tensors.
+  for (Type t : getResultTypes())
+    if (!t.isa<RankedTensorType>())
+      return emitOpError() << "only ranked tensor results are allowed";
+
   return success();
 }
 

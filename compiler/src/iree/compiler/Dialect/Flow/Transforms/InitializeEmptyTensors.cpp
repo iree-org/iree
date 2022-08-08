@@ -56,7 +56,7 @@ struct RewriteInitTensorToSplat
     Value value =
         rewriter.create<arith::ConstantOp>(loc, elementType, zero.getValue());
     rewriter.replaceOpWithNewOp<TensorSplatOp>(initTensorOp, resultType, value,
-                                               initTensorOp.sizes());
+                                               initTensorOp.getSizes());
     return success();
   }
 };

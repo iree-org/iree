@@ -45,6 +45,7 @@ iree_compiler_cc_library(
     srcs = [
         "Conversion.cpp",
         "Passes.cpp",
+        "ResolveBufferDescriptors.cpp",
     ],
     hdrs = ["Passes.h"],
     deps = [
@@ -62,6 +63,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/VMVX/Conversion/StandardToVMVX",
         "//compiler/src/iree/compiler/Dialect/VMVX/IR",
         "//compiler/src/iree/compiler/Dialect/VMVX/IR:VMVXDialect",
+        "//compiler/src/iree/compiler/Utils",
         "//llvm-external-projects/iree-dialects:IREELinalgExtPasses",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AffineDialect",

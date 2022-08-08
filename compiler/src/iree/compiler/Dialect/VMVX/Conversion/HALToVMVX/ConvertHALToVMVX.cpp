@@ -12,6 +12,7 @@
 #include "iree/compiler/Dialect/VMVX/IR/VMVXDialect.h"
 #include "iree/compiler/Dialect/VMVX/IR/VMVXOps.h"
 #include "iree/compiler/Dialect/VMVX/IR/VMVXTypes.h"
+#include "iree/compiler/Utils/IndexSet.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -71,16 +72,13 @@ LogicalResult updateHALToVMVXEntryFuncOp(func::FuncOp funcOp,
     return funcOp.emitError() << "exported functions must have no I/O";
   }
 
-  auto i8Type = IntegerType::get(funcOp.getContext(), 8);
-  auto i32Type = IntegerType::get(funcOp.getContext(), 32);
-  auto memRefI8Type = MemRefType::get({-1}, i8Type);
-  auto memRefI32Type = MemRefType::get({-1}, i32Type);
-  auto bindingsType = IREE::Util::ListType::get(memRefI8Type);
+  auto bufferType = IREE::Util::BufferType::get(funcOp.getContext());
+  auto bindingsType = IREE::Util::ListType::get(bufferType);  // of i8
   auto indexType = IndexType::get(funcOp.getContext());
   auto newType = FunctionType::get(funcOp.getContext(),
                                    {
-                                       /*local_memory=*/memRefI8Type,
-                                       /*constants=*/memRefI32Type,
+                                       /*local_memory=*/bufferType,  // of i8
+                                       /*constants=*/bufferType,     // of i32
                                        /*bindings=*/bindingsType,
                                        /*workgroup_id_x=*/indexType,
                                        /*workgroup_id_y=*/indexType,
@@ -177,17 +175,18 @@ struct ConvertHALInterfaceConstantLoadOp
     auto constantsArg = op->getParentOfType<mlir::func::FuncOp>().getArgument(
         kEntryArgConstants);
     assert(constantsArg && "entry point not conforming to requirements");
-    auto constantType =
-        constantsArg.getType().cast<MemRefType>().getElementType();
-
+    auto constantsSize =
+        rewriter.create<IREE::Util::BufferSizeOp>(op.getLoc(), constantsArg);
     auto resultType = getTypeConverter()->convertType(op.getResult().getType());
 
     auto constantIndex = rewriter.createOrFold<arith::ConstantIndexOp>(
         op.getLoc(), op.getIndex().getZExtValue());
-    auto loadedValue = rewriter.createOrFold<memref::LoadOp>(
-        op.getLoc(), constantType, constantsArg, ValueRange{constantIndex});
-    rewriter.replaceOpWithNewOp<mlir::UnrealizedConversionCastOp>(
-        op, resultType, loadedValue);
+    auto elementSize =
+        rewriter.createOrFold<IREE::Util::SizeOfOp>(op.getLoc(), resultType);
+    auto byteOffset = rewriter.createOrFold<arith::MulIOp>(
+        op.getLoc(), elementSize, constantIndex);
+    rewriter.replaceOpWithNewOp<IREE::Util::BufferLoadOp>(
+        op, resultType, constantsArg, constantsSize, byteOffset);
     return success();
   }
 };
@@ -211,39 +210,46 @@ struct ConvertHALInterfaceBindingSubspanOp
       return op.emitOpError() << "sparse binding sets not yet implemented";
     }
 
+    IndexSet indexSet(op.getLoc(), rewriter);
     auto bindingType =
         bindingsArg.getType().cast<IREE::Util::ListType>().getElementType();
-    auto memrefValue = rewriter
-                           .create<IREE::Util::ListGetOp>(
-                               op.getLoc(), bindingType, bindingsArg,
-                               rewriter.createOrFold<arith::ConstantIndexOp>(
-                                   op.getLoc(), op.getBinding().getZExtValue()))
-                           .getResult();
+    auto sourceBuffer =
+        rewriter
+            .create<IREE::Util::ListGetOp>(
+                op.getLoc(), bindingType, bindingsArg,
+                rewriter.createOrFold<arith::ConstantIndexOp>(
+                    op.getLoc(), op.getBinding().getZExtValue()))
+            .getResult();
+
     if (op.getByteOffset() && !matchPattern(op.getByteOffset(), m_Zero())) {
-      auto memrefType = op.getResult().getType().cast<MemRefType>();
-      Value elementCount;
-      if (memrefType.isDynamicDim(0)) {
-        elementCount = op.getDynamicDims().front();
-      } else {
-        elementCount = rewriter.createOrFold<arith::ConstantIndexOp>(
-            op.getLoc(), memrefType.getDimSize(0));
+      // Offsetted binding: replace with a BufferSpan.
+      Value sourceSize = rewriter.createOrFold<IREE::Util::BufferSizeOp>(
+          op.getLoc(), sourceBuffer);
+
+      // Compute the dest size by multiplying the element size by all extents
+      // (static and dynamic).
+      auto memRefType = op.getResult().getType().cast<MemRefType>();
+      Value destSize = rewriter.createOrFold<IREE::Util::SizeOfOp>(
+          op.getLoc(), memRefType.getElementType());
+      auto dynamicExtentIt = adaptor.getDynamicDims().begin();
+      for (int i = 0; i < memRefType.getRank(); ++i) {
+        Value extent;
+        if (memRefType.isDynamicDim(i)) {
+          extent = *dynamicExtentIt;
+          dynamicExtentIt++;
+        } else {
+          extent = indexSet.get(memRefType.getDimSize(i));
+        }
+        destSize =
+            rewriter.createOrFold<arith::MulIOp>(op.getLoc(), destSize, extent);
       }
-      auto byteLength = rewriter.createOrFold<arith::MulIOp>(
-          op.getLoc(),
-          rewriter.createOrFold<arith::ConstantIndexOp>(
-              op.getLoc(), memrefType.getElementTypeBitWidth()),
-          elementCount);
-      memrefValue = rewriter.createOrFold<memref::SubViewOp>(
-          op.getLoc(), memrefValue, ArrayRef<OpFoldResult>{op.getByteOffset()},
-          ArrayRef<OpFoldResult>{byteLength},
-          ArrayRef<OpFoldResult>{rewriter.getIndexAttr(1)});
+
+      rewriter.replaceOpWithNewOp<IREE::Util::BufferSubspanOp>(
+          op, sourceBuffer, sourceSize, adaptor.getByteOffset(), destSize);
+    } else {
+      // Zero offset. Just return the source buffer.
+      rewriter.replaceOp(op, sourceBuffer);
     }
-    rewriter.replaceOpWithNewOp<UnrealizedConversionCastOp>(
-        op,
-        getTypeConverter()
-            ->convertType(op.getResult().getType())
-            .cast<MemRefType>(),
-        memrefValue);
     return success();
   }
 };

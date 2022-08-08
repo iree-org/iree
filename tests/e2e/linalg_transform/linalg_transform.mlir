@@ -1,9 +1,9 @@
-// RUN: iree-run-mlir %s --iree-hal-target-backends=llvm-cpu \
+// RUN: iree-run-mlir --iree-hal-target-backends=llvm-cpu \
 /// Specify the dispatch region formation with the transform dialect.
 // RUN:   --iree-flow-dispatch-use-transform-dialect=%p/transform_dialect_dispatch_spec.mlir \
 /// Specify the codegen strategy with the transform dialect.
 // RUN:   --iree-codegen-llvmcpu-use-transform-dialect=%p/transform_dialect_codegen_spec.mlir \
-// RUN: | FileCheck %s
+// RUN: %s | FileCheck %s
 
 func.func @matmul_static() -> tensor<5x5xf32> {
   %res = flow.tensor.constant dense<[

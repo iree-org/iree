@@ -70,7 +70,7 @@ struct DetachElementwisePattern
     Value zero = rewriter.create<arith::ConstantOp>(
         loc, rewriter.getZeroAttr(elementType));
     Value fill =
-        rewriter.create<linalg::FillOp>(loc, zero, initOp.result()).result();
+        rewriter.create<linalg::FillOp>(loc, zero, initOp.getResult()).result();
 
     // Update the contraction op to use the new zero tensor as output operand.
     rewriter.updateRootInPlace(linalgOp,

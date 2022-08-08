@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/VMVX/IR/VMVXDialect.h"
 #include "iree/compiler/Dialect/VMVX/IR/VMVXOps.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
@@ -66,9 +67,21 @@ void leftPadToRank(Location loc, SmallVectorImpl<Value> &indices,
   }
 }
 
+bool isMemRefUnitInnerStride(MemRefType type) {
+  SmallVector<int64_t> strides;
+  int64_t offset;
+  if (type.getLayout().isIdentity()) {
+    return true;
+  }
+
+  if (failed(mlir::getStridesAndOffset(type, strides, offset))) {
+    return false;
+  }
+  return strides.back() == 1;
+}
+
 struct StridedBufferDescriptor {
-  // The base buffer, corresponding to a row-major, contiguous memory layout.
-  Value baseBuffer;
+  MemRefType memRefType;
 
   // Size/offset/strides of the buffer.
   Value offset;
@@ -76,55 +89,23 @@ struct StridedBufferDescriptor {
   SmallVector<Value> strides;
 
   StridedBufferDescriptor() = default;
-  StridedBufferDescriptor(Value baseBuffer, unsigned rank)
-      : baseBuffer(baseBuffer) {
-    sizes.resize(rank);
-    strides.resize(rank);
-  }
 
   unsigned getRank() { return strides.size(); }
-  Type getElementType() {
-    return baseBuffer.getType().cast<MemRefType>().getElementType();
-  }
+  Type getElementType() { return memRefType.getElementType(); }
   TypeAttr getElementTypeAttr() { return TypeAttr::get(getElementType()); }
 
   /// Returns whether the innermost stride is statically 1. Many kernels
   /// require this, so we provide the convenience here.
-  bool isUnitInnerStride() {
-    if (getRank() == 0) return true;
-    APInt stride;
-    if (!matchPattern(strides.back(), m_ConstantInt(&stride))) return false;
-    return stride.getZExtValue() == 1;
-  }
+  bool isUnitInnerStride() { return isMemRefUnitInnerStride(memRefType); }
 
   /// Casts the memref to a memref<?x...> that is safe for linear access
   /// with element-based addressing.
-  Value castToLinear(Location loc, OpBuilder &builder) {
-    BaseMemRefType sourceType = baseBuffer.getType().cast<MemRefType>();
-    if (sourceType.getRank() == 1) return baseBuffer;
+  Value castToLinear(Location loc, OpBuilder &builder) { return baseBuffer; }
 
-    // Insert the cast just after the original def to keep inner loops tidy.
-    OpBuilder::InsertionGuard restoreIp(builder);
-    Operation *def = baseBuffer.getDefiningOp();
-    if (def) builder.setInsertionPointAfter(def);
-
-    if (sourceType.getRank() > 1) {
-      // Collapse to 1D.
-      ReassociationIndices reassociation;
-      reassociation.resize(sourceType.getRank());
-      for (int i = 0; i < sourceType.getRank(); ++i) {
-        reassociation[i] = i;
-      }
-      return builder.create<memref::CollapseShapeOp>(loc, baseBuffer,
-                                                     reassociation);
-    } else {
-      // Expand 0D to 1D.
-      // ReassociationIndices reassociation;
-      return builder.create<memref::ExpandShapeOp>(
-          loc, MemRefType::get({1}, sourceType.getElementType()), baseBuffer,
-          ArrayRef<ReassociationIndices>{});
-    }
-  }
+ private:
+  // The base !util.buffer
+  Value baseBuffer;
+  friend class StridedBufferAnalysis;
 };
 
 /// Holds the results of an analysis which indicates whether a given memref
@@ -137,202 +118,53 @@ struct StridedBufferDescriptor {
 /// applied).
 class StridedBufferAnalysis {
  public:
-  StridedBufferAnalysis(Value buffer) {
-    for (;;) {
-      auto type = buffer.getType().dyn_cast<MemRefType>();
-      if (!type) break;
-      if (type.getLayout().isIdentity()) {
-        // Successful conclusion.
-        valid = true;
-        identityRoot = buffer;
-        break;
-      }
-
-      // Unroll the subview stack.
-      Operation *definingOp = buffer.getDefiningOp();
-      if (!definingOp) break;
-      if (auto subview = llvm::dyn_cast<memref::SubViewOp>(definingOp)) {
-        auto subviewType = subview.getResult().getType().cast<MemRefType>();
-        // TODO: For the moment, don't deal with the rank reducing subview case.
-        if (subviewType.getRank() != type.getRank()) break;
-        viewStack.push_back(subview);
-        buffer = subview.getSource();
-        continue;
-      }
-
-      break;
-    }
-  }
+  StridedBufferAnalysis(Value buffer) : buffer(buffer) {}
 
   // Whether analysis was successful.
-  bool isValid() { return valid; }
+  bool isValid() { return true; }
 
   // Gets the type of the buffer being analyzed.
-  MemRefType getType() {
-    assert(isValid() && "invalid StridedBufferAnalysis");
-    if (viewStack.empty()) {
-      return identityRoot.getType().cast<MemRefType>();
-    } else {
-      return viewStack.front().getResult().getType().cast<MemRefType>();
-    }
-  }
+  MemRefType getType() { return buffer.getType().cast<MemRefType>(); }
 
   // Gets the rank of the buffer being analyzed.
   unsigned getRank() { return getType().getRank(); }
 
   /// Returns whether the innermost stride is statically 1. Many kernels
   /// require this, so we provide the convenience here.
-  bool isUnitInnerStride() {
-    assert(isValid() && "invalid StridedBufferAnalysis");
-    if (viewStack.empty()) {
-      // Empty view stack implies identity layout, which implies inner stride
-      // of 1.
-      return true;
-    }
-
-    // Traverse the view stack and ensure that each inner stride multiplier
-    // is statically 1.
-    for (auto currentView : llvm::reverse(viewStack)) {
-      auto strides = currentView.getMixedStrides();
-      if (strides.empty()) {
-        // 0d: sure.
-        return true;
-      }
-      Optional<int64_t> lastStride = mlir::getConstantIntValue(strides.back());
-      if (!lastStride || *lastStride != 1) return false;
-    }
-
-    return true;
-  }
+  bool isUnitInnerStride() { return isMemRefUnitInnerStride(getType()); }
 
   StridedBufferDescriptor &getDesc(OpBuilder &builder) {
     assert(isValid() && "invalid StridedBufferAnalysis");
     if (desc) return *desc;
 
-    Location loc = identityRoot.getLoc();
-    auto constant = [&](int64_t idxValue) -> Value {
-      return builder.create<arith::ConstantIndexOp>(loc, idxValue);
-    };
-    auto fillSize = [&](StridedBufferDescriptor &desc, Value v) {
-      auto t = v.getType().cast<MemRefType>();
-      for (int i = 0; i < t.getRank(); ++i) {
-        if (t.isDynamicDim(i)) {
-          desc.sizes[i] = builder.create<memref::DimOp>(loc, v, i);
-        } else {
-          desc.sizes[i] = constant(t.getDimSize(i));
-        }
-      }
-    };
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPointAfterValue(buffer);
 
-    // Compose from the identity root to the outermost subview.
-    SmallVector<StridedBufferDescriptor> descStack;
-    {
-      auto rootType = identityRoot.getType().cast<MemRefType>();
-      auto rootRank = rootType.getRank();
-      StridedBufferDescriptor &rootDesc =
-          descStack.emplace_back(identityRoot, rootRank);
-      if (rootRank == 0) {
-        // Rank == 0.
-        rootDesc.offset = constant(0);
-      } else {
-        // Rank > 0.
-        OpBuilder::InsertionGuard restoreIp(builder);
-        builder.setInsertionPointAfterValue(identityRoot);
-        // Initialize sizes.
-        fillSize(rootDesc, identityRoot);
-        // Strides.
-        rootDesc.strides[rootRank - 1] = constant(1);
-        for (int i = rootRank - 2; i >= 0; --i) {
-          rootDesc.strides[i] = builder.create<arith::MulIOp>(
-              loc, rootDesc.strides[i + 1], rootDesc.sizes[i + 1]);
-        }
-        // Offset.
-        rootDesc.offset = constant(0);
-      }
+    Location loc = buffer.getLoc();
+    desc = StridedBufferDescriptor();
+    desc->memRefType = buffer.getType().cast<MemRefType>();
+
+    int rank = getType().getRank();
+    SmallVector<Type> sizeStrideTypes;
+    IndexType indexType = builder.getIndexType();
+    for (int i = 0; i < rank; ++i) {
+      sizeStrideTypes.push_back(indexType);
     }
 
-    // Iterate over composed views and compose:
-    //   1. For each source stride, multiply by the subview stride (these are
-    //      really "stride multipliers", not strides).
-    //   2. Discard the source size, using the destination.
-    //   3. Add the offset, computing using the new strides.
-    for (auto currentView : llvm::reverse(viewStack)) {
-      // Insert before the subview op we are working on since we know everything
-      // dominates here.
-      OpBuilder::InsertionGuard restoreIp(builder);
-      builder.setInsertionPoint(currentView);
+    auto op = builder.create<IREE::VMVX::GetBufferDescriptorOp>(
+        loc, builder.getType<IREE::Util::BufferType>(), builder.getIndexType(),
+        sizeStrideTypes, sizeStrideTypes, buffer);
 
-      loc = currentView.getLoc();
-      auto composedType = currentView.getResult().getType().cast<MemRefType>();
-      Value composedBuffer = currentView.getResult();
-      auto composedRank = composedType.getRank();
-      auto &sourceDesc = descStack.back();
-      StridedBufferDescriptor composedDesc(sourceDesc.baseBuffer, composedRank);
-      fillSize(composedDesc, composedBuffer);
+    desc->baseBuffer = op.getBaseBuffer();
+    desc->offset = op.getOffset();
+    desc->sizes = op.getSizes();
+    desc->strides = op.getStrides();
 
-      // Stride multipliers.
-      for (int idx = 0; idx < composedRank; ++idx) {
-        if (currentView.isDynamicStride(idx)) {
-          // Dynamic stride multiplier.
-          composedDesc.strides[idx] = builder.create<arith::MulIOp>(
-              loc, sourceDesc.strides[idx], currentView.getDynamicStride(idx));
-        } else {
-          // Handle static strides, dealing with the 0/1 common cases without
-          // generating math ops.
-          int64_t staticStrideMultiplier = currentView.getStaticStride(idx);
-          if (staticStrideMultiplier == 1) {
-            composedDesc.strides[idx] = sourceDesc.strides[idx];
-          } else if (staticStrideMultiplier == 0) {
-            composedDesc.strides[idx] = constant(0);
-          } else {
-            Value strideMultiplier = constant(staticStrideMultiplier);
-            composedDesc.strides[idx] = builder.create<arith::MulIOp>(
-                loc, sourceDesc.strides[idx], strideMultiplier);
-          }
-        }
-      }
-
-      // Compute offset.
-      composedDesc.offset = sourceDesc.offset;
-      for (int idx = 0; idx < composedRank; ++idx) {
-        Value logicalOffset;
-        if (currentView.isDynamicOffset(idx)) {
-          logicalOffset = currentView.getDynamicOffset(idx);
-        } else {
-          int64_t staticOffset = currentView.getStaticOffset(idx);
-          if (staticOffset == 0) {
-            // Can just omit since all terms are added and this will multiply
-            // to 0.
-            continue;
-          }
-          logicalOffset = constant(staticOffset);
-        }
-        Value physicalOffset = builder.create<arith::MulIOp>(
-            loc, logicalOffset, composedDesc.strides[idx]);
-        composedDesc.offset = builder.create<arith::AddIOp>(
-            loc, composedDesc.offset, physicalOffset);
-      }
-
-      // Push onto stack.
-      descStack.push_back(std::move(composedDesc));
-    }
-
-    // Memoize/return outermost.
-    desc = std::move(descStack.back());
     return *desc;
   }
 
  private:
-  // The stack is ordered from inner-most to outermost.
-  SmallVector<memref::SubViewOp> viewStack;
-
-  // The root identity-layout buffer.
-  Value identityRoot;
-
-  // Whether the analysis concluded successfully.
-  bool valid = false;
-
-  // The computed descriptor, if it has been built.
+  Value buffer;
   Optional<StridedBufferDescriptor> desc;
 };
 
@@ -642,9 +474,9 @@ struct LinalgFillConversion : public OpRewritePattern<linalg::FillOp> {
     StridedBufferAnalysis outAnal;
     int64_t getRank() { return outAnal.getRank(); }
 
-    OpInfo(linalg::FillOp op) : op(op), outAnal(op.outputs().front()) {
-      scalar = op.inputs().front();
-      out = op.outputs().front();
+    OpInfo(linalg::FillOp op) : op(op), outAnal(op.getOutputs().front()) {
+      scalar = op.getInputs().front();
+      out = op.getOutputs().front();
     }
   };
 
@@ -810,7 +642,8 @@ struct LinalgMatmulConversion
 class VMVXLowerLinalgMicrokernelsPass
     : public VMVXLowerLinalgMicrokernelsBase<VMVXLowerLinalgMicrokernelsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::VMVX::VMVXDialect, memref::MemRefDialect>();
+    registry.insert<IREE::Util::UtilDialect, IREE::VMVX::VMVXDialect,
+                    memref::MemRefDialect>();
   }
 
   void runOnOperation() override {

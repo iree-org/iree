@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -144,7 +145,8 @@ class InsertElementToBroadcast final
 struct LLVMGPUReduceToGPUPass
     : public LLVMGPUReduceToGPUBase<LLVMGPUReduceToGPUPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<scf::SCFDialect, memref::MemRefDialect>();
+    registry.insert<scf::SCFDialect, memref::MemRefDialect, gpu::GPUDialect,
+                    AffineDialect>();
   }
   void runOnOperation() override {
     func::FuncOp funcOp = getOperation();
@@ -156,7 +158,11 @@ struct LLVMGPUReduceToGPUPass
       RewritePatternSet patterns(ctx);
       vector::populateVectorMultiReductionLoweringPatterns(
           patterns, vector::VectorMultiReductionLowering::InnerReduction);
+      // Add clean up patterns after lowering of multidimreduce lowering.
       patterns.add<InsertElementToBroadcast>(ctx);
+      vector::ShapeCastOp::getCanonicalizationPatterns(patterns, ctx);
+      vector::BroadcastOp::getCanonicalizationPatterns(patterns, ctx);
+      vector::ExtractOp::getCanonicalizationPatterns(patterns, ctx);
       (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     }
 

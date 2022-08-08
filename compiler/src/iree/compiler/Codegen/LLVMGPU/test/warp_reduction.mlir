@@ -78,7 +78,6 @@ hal.executable private @simple_reduce  {
 
 // -----
 
-
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -160,3 +159,48 @@ hal.executable private @simple_reduce_multi_warp  {
 //       CHECK:     vector.transfer_write %[[DIV]], {{.*}} : vector<1xf32>, memref<128xf32>
 //       CHECK:   }
 //       CHECK:   return
+
+// -----
+
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+hal.executable private @reduce_then_broadcast  {
+  hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
+    hal.executable.export @reduce_then_broadcast layout(#executable_layout) attributes {
+      workgroup_size = [64 : index, 1 : index, 1 : index]
+    }
+    builtin.module {
+    func.func @reduce_then_broadcast() {
+      %c0 = arith.constant 0 : index
+      %cst = arith.constant dense<0.000000e+00> : vector<1x1xf32>
+      %cst_0 = arith.constant 0.000000e+00 : f32
+      %c64 = arith.constant 64 : index
+      %c384 = arith.constant 384 : index
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : memref<12x512x512xf32>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : memref<12x512x512xf32>
+      %workgroup_id_x = hal.interface.workgroup.id[0] : index
+      %workgroup_id_y = hal.interface.workgroup.id[1] : index
+      %6 = vector.transfer_read %0[%workgroup_id_y, %workgroup_id_x, %c0], %cst_0 {in_bounds = [true]} : memref<12x512x512xf32>, vector<512xf32>
+      %7 = vector.broadcast %6 : vector<512xf32> to vector<1x1x512xf32>
+      %8 = vector.multi_reduction <maxf>, %7, %cst [2] : vector<1x1x512xf32> to vector<1x1xf32>
+      %9 = vector.broadcast %8 : vector<1x1xf32> to vector<1x1x512xf32>
+      %10 = vector.extract %9[0, 0] : vector<1x1x512xf32>
+      %11 = arith.subf %6, %10 : vector<512xf32>
+      %12 = math.exp %11 : vector<512xf32>
+      vector.transfer_write %12, %1[%workgroup_id_y, %workgroup_id_x, %c0] {in_bounds = [true]} : vector<512xf32>, memref<12x512x512xf32>
+      return
+    }
+    }
+  }
+}
+
+// Check that there is no scf.if generated.
+// If some operations were not distributed we would end up with a scf.if(warp0) block.
+// CHECK-LABEL: func.func @reduce_then_broadcast() {
+//   CHECK-NOT:  scf.if
+//       CHECK:  return

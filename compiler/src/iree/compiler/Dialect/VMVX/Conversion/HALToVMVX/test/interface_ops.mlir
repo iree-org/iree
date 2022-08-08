@@ -1,12 +1,15 @@
 // RUN: iree-opt --split-input-file --iree-vmvx-conversion --canonicalize %s | FileCheck %s
 
-// CHECK: memref.global "private" constant @__constant_5xi32 : memref<5xi32> = dense<[1, 2, 3, 4, 5]>
+// CHECK: util.global private @__constant_5xi32 : !util.buffer
+// CHECK: util.initializer {
+// CHECK:   %[[CST:.*]] = util.buffer.constant : !util.buffer = dense<[1, 2, 3, 4, 5]> : tensor<5xi32>
+// CHECK:   util.global.store %[[CST]], @__constant_5xi32
 memref.global "private" constant @__constant_5xi32 : memref<5xi32> = dense<[1, 2, 3, 4, 5]>
 
 // CHECK-LABEL: func.func @entry(
-//  CHECK-SAME:   %[[SCRATCHPAD:.+]]: memref<?xi8>,
-//  CHECK-SAME:   %[[CONSTANTS:.+]]: memref<?xi32>,
-//  CHECK-SAME:   %[[BINDINGS:.+]]: !util.list<memref<?xi8>>,
+//  CHECK-SAME:   %[[SCRATCHPAD:[a-z0-9]+]]: !util.buffer,
+//  CHECK-SAME:   %[[CONSTANTS:[a-z0-9]+]]: !util.buffer,
+//  CHECK-SAME:   %[[BINDINGS:[a-z0-9]+]]: !util.list<!util.buffer>,
 //  CHECK-SAME:   %[[WORKGROUP_X:[a-z0-9]+]]: index,
 //  CHECK-SAME:   %[[WORKGROUP_Y:[a-z0-9]+]]: index,
 //  CHECK-SAME:   %[[WORKGROUP_Z:[a-z0-9]+]]: index,
@@ -22,11 +25,9 @@ func.func @entry() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %0 = memref.get_global @__constant_5xi32 : memref<5xi32>
-  //      CHECK: %[[BINDING0_RAW:.+]] = util.list.get %[[BINDINGS]][%c0] : !util.list<memref<?xi8>>
-  // CHECK-NEXT: %[[BINDING0:.+]] = builtin.unrealized_conversion_cast %[[BINDING0_RAW]] : memref<?xi8> to memref<5xf32>
+  //      CHECK: %[[BINDING0:.+]] = util.list.get %[[BINDINGS]][%c0] : !util.list<!util.buffer>
   %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<5xf32>
-  //      CHECK: %[[BINDING1_RAW:.+]] = util.list.get %[[BINDINGS]][%c1] : !util.list<memref<?xi8>>
-  // CHECK-NEXT: %[[BINDING1:.+]] = builtin.unrealized_conversion_cast %[[BINDING1_RAW]] : memref<?xi8> to memref<5xi32>
+  //      CHECK: %[[BINDING1:.+]] = util.list.get %[[BINDINGS]][%c1] : !util.list<!util.buffer>
   %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<5xi32>
   %workgroup_size_x = hal.interface.workgroup.size[0] : index
   %workgroup_id_x = hal.interface.workgroup.id[0] : index

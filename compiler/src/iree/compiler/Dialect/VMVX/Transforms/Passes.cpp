@@ -66,6 +66,11 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
   nestedModulePM.addPass(arith::createConstantBufferizePass());
   nestedModulePM.addPass(createFoldTensorExtractOpPass());
 
+  // Resolve get_buffer_descriptor ops. All structural buffer manipulations
+  // must conclude before this point.
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createResolveBufferDescriptorsPass());
+
   // Flatten and cleanup memrefs.
   nestedModulePM.addNestedPass<func::FuncOp>(
       memref::createFoldSubViewOpsPass());
@@ -103,8 +108,6 @@ void buildVMVXTransformPassPipeline(OpPassManager &passManager) {
   // ---------------------------------------------------------------------------
 
   passManager.addNestedPass<mlir::ModuleOp>(createConversionPass());
-  passManager.nest<mlir::ModuleOp>().addNestedPass<func::FuncOp>(
-      memref::createFoldSubViewOpsPass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
 

@@ -77,7 +77,7 @@ class Conv2DImg2ColMatmulConversion
     if (inputShapeType.getShape()[0] > 1) return failure();
 
     // TODO(ataei) : Support padding & dilation.
-    if (!llvm::all_of(convOp.dilations(), [](APInt element) {
+    if (!llvm::all_of(convOp.getDilations(), [](APInt element) {
           return element.getSExtValue() == 1;
         }))
       return failure();
@@ -99,7 +99,7 @@ class Conv2DImg2ColMatmulConversion
 
     auto s = [&](unsigned i) {
       return rewriter.getAffineConstantExpr(
-          convOp.strides().getValues<int64_t>()[i]);
+          convOp.getStrides().getValues<int64_t>()[i]);
     };
 
     SmallVector<AffineExpr, 4> inputExprs = {n, d(1) * s(0) + k(1),
@@ -190,7 +190,7 @@ class DepthwiseConv2DNHWCHWCImg2ColMatmulConversion
       return failure();
 
     // TODO(ataei) : Support padding & dilation.
-    if (!llvm::all_of(convOp.dilations(), [](APInt element) {
+    if (!llvm::all_of(convOp.getDilations(), [](APInt element) {
           return element.getSExtValue() == 1;
         }))
       return failure();
@@ -263,7 +263,7 @@ class DepthwiseConv2DNHWCHWCImg2ColMatmulConversion
 
     auto s = [&](unsigned i) {
       return rewriter.getAffineConstantExpr(
-          convOp.strides().getValues<int64_t>()[i]);
+          convOp.getStrides().getValues<int64_t>()[i]);
     };
 
     SmallVector<AffineExpr> inputExprs = {n, ci, d(1) * s(0) + k(1),

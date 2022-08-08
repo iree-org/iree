@@ -38,6 +38,12 @@ def ConvertConv2DToImg2Col :
   let constructor = "mlir::iree_compiler::IREE::Flow::createConvertConv2DToImg2ColPass()";
 }
 
+def ConvertRegionToWorkgroups :
+    Pass<"iree-flow-convert-region-to-workgroups", ""> {
+  let summary = "Convert DispatchRegion ops to Workgroups ops.";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createConvertRegionToWorkgroupsPass()";
+}
+
 def ConvertToFlow :
     Pass<"iree-flow-convert-to-flow", ""> {
   let summary = "Convert operations to flow. Currently just a test pass.";

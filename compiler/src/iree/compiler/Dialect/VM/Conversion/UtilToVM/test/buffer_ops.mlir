@@ -3,8 +3,8 @@
 
 // CHECK-LABEL: @buffer_constant
 func.func @buffer_constant() -> !util.buffer {
-  // CHECK-64: %[[BUFFER:.+]] = vm.rodata.inline {alignment = 64 : i64} : !vm.buffer = dense<[1, 2, 3]> : tensor<3xi32>
-  %0 = util.buffer.constant {alignment = 64 : index} : !util.buffer = dense<[1, 2, 3]> : tensor<3xi32>
+  // CHECK-64: %[[BUFFER:.+]] = vm.rodata.inline "name"  {alignment = 64 : i64, mime_type = "text/plain"} : !vm.buffer = dense<[1, 2, 3]> : tensor<3xi32>
+  %0 = util.buffer.constant "name" {alignment = 64 : index, mime_type = "text/plain"} : !util.buffer = dense<[1, 2, 3]> : tensor<3xi32>
   // CHECK-64: return %[[BUFFER]]
   return %0 : !util.buffer
 }

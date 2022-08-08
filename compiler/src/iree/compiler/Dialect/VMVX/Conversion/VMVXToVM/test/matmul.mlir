@@ -4,11 +4,11 @@
 // CHECK-LABEL: @matmul_f32f32f32
 func.func @matmul_f32f32f32(
     // LHS
-    %arg0 : memref<196608xf32>, %arg1 : index, %arg2 : index,
+    %arg0 : !util.buffer, %arg1 : index, %arg2 : index,
     // RHS
-    %arg3 : memref<24576xf32>, %arg4 : index, %arg5 : index,
+    %arg3 : !util.buffer, %arg4 : index, %arg5 : index,
     // OUT
-    %arg6 : memref<65536xf32>, %arg7 : index, %arg8 : index,
+    %arg6 : !util.buffer, %arg7 : index, %arg8 : index,
     // SIZE
     %arg9 : index, %arg10 : index, %arg11 : index,
     // SCALE
@@ -20,9 +20,9 @@ func.func @matmul_f32f32f32(
   // CHECK-SAME: %arg3, %arg4, %arg5,
   // CHECK-SAME: %arg6, %arg7, %arg8,
   // CHECK-SAME: %arg9, %arg10, %arg11, %arg12, %arg13, %[[ZERO]]) : (!vm.buffer, i64, i64, !vm.buffer, i64, i64, !vm.buffer, i64, i64, i64, i64, i64, f32, f32, i32) -> ()
-  vmvx.matmul lhs(%arg0 offset %arg1 row_stride %arg2 : memref<196608xf32>)
-              rhs(%arg3 offset %arg4 row_stride %arg5 : memref<24576xf32>)
-              out(%arg6 offset %arg7 row_stride %arg8 : memref<65536xf32>)
+  vmvx.matmul lhs(%arg0 offset %arg1 row_stride %arg2 : !util.buffer)
+              rhs(%arg3 offset %arg4 row_stride %arg5 : !util.buffer)
+              out(%arg6 offset %arg7 row_stride %arg8 : !util.buffer)
               mnk(%arg9, %arg10, %arg11)
               scale(%arg12 : f32, %arg13 : f32)
               flags(0) : (f32, f32, f32)
