@@ -59,25 +59,25 @@ hal.executable private @resource_bindings_in_same_func {
         // Same type
         // CHECK: spv.mlir.addressof @[[ARG0]]
         // CHECK: spv.mlir.addressof @[[ARG0]]
-        %0 = hal.interface.binding.subspan set(1) binding(2) type(storage_buffer) : memref<4x4xf32>
-        %1 = hal.interface.binding.subspan set(1) binding(2) type(storage_buffer) : memref<4x4xf32>
+        %0 = hal.interface.binding.subspan set(1) binding(2) type(storage_buffer) : memref<4x4xf32, #spv.storage_class<StorageBuffer>>
+        %1 = hal.interface.binding.subspan set(1) binding(2) type(storage_buffer) : memref<4x4xf32, #spv.storage_class<StorageBuffer>>
 
         // Different type
         // CHECK: spv.mlir.addressof @[[ARG1_0]]
         // CHECK: spv.mlir.addressof @[[ARG1_1]]
-        %2 = hal.interface.binding.subspan set(1) binding(3) type(storage_buffer) : memref<4x4xf32>
-        %3 = hal.interface.binding.subspan set(1) binding(3) type(storage_buffer) : memref<4xvector<4xf32>>
+        %2 = hal.interface.binding.subspan set(1) binding(3) type(storage_buffer) : memref<4x4xf32, #spv.storage_class<StorageBuffer>>
+        %3 = hal.interface.binding.subspan set(1) binding(3) type(storage_buffer) : memref<4xvector<4xf32>, #spv.storage_class<StorageBuffer>>
 
         // CHECK: spv.mlir.addressof @[[RET0]]
-        %4 = hal.interface.binding.subspan set(3) binding(4) type(storage_buffer) : memref<4x4xf32>
+        %4 = hal.interface.binding.subspan set(3) binding(4) type(storage_buffer) : memref<4x4xf32, #spv.storage_class<StorageBuffer>>
 
-        %5 = memref.load %0[%c0, %c0] : memref<4x4xf32>
-        %6 = memref.load %1[%c0, %c0] : memref<4x4xf32>
+        %5 = memref.load %0[%c0, %c0] : memref<4x4xf32, #spv.storage_class<StorageBuffer>>
+        %6 = memref.load %1[%c0, %c0] : memref<4x4xf32, #spv.storage_class<StorageBuffer>>
 
-        %7 = memref.load %2[%c0, %c0] : memref<4x4xf32>
-        %8 = memref.load %3[%c0] : memref<4xvector<4xf32>>
+        %7 = memref.load %2[%c0, %c0] : memref<4x4xf32, #spv.storage_class<StorageBuffer>>
+        %8 = memref.load %3[%c0] : memref<4xvector<4xf32>, #spv.storage_class<StorageBuffer>>
 
-        %9 = memref.load %4[%c0, %c0] : memref<4x4xf32>
+        %9 = memref.load %4[%c0, %c0] : memref<4x4xf32, #spv.storage_class<StorageBuffer>>
 
         return
       }
@@ -116,11 +116,11 @@ hal.executable private @resource_bindings_in_multi_entry_func {
         // CHECK: spv.mlir.addressof @[[FUNC1_ARG]]
         // CHECK: spv.mlir.addressof @[[FUNC1_RET]]
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan set(1) binding(2) type(storage_buffer) : memref<4x4xf32>
-        %1 = hal.interface.binding.subspan set(3) binding(4) type(storage_buffer) : memref<4xvector<4xf32>>
+        %0 = hal.interface.binding.subspan set(1) binding(2) type(storage_buffer) : memref<4x4xf32, #spv.storage_class<StorageBuffer>>
+        %1 = hal.interface.binding.subspan set(3) binding(4) type(storage_buffer) : memref<4xvector<4xf32>, #spv.storage_class<StorageBuffer>>
 
-        %2 = memref.load %0[%c0, %c0] : memref<4x4xf32>
-        %3 = memref.load %1[%c0] : memref<4xvector<4xf32>>
+        %2 = memref.load %0[%c0, %c0] : memref<4x4xf32, #spv.storage_class<StorageBuffer>>
+        %3 = memref.load %1[%c0] : memref<4xvector<4xf32>, #spv.storage_class<StorageBuffer>>
 
         return
       }
@@ -130,11 +130,11 @@ hal.executable private @resource_bindings_in_multi_entry_func {
         // CHECK: spv.mlir.addressof @[[FUNC2_ARG]]
         // CHECK: spv.mlir.addressof @[[FUNC2_RET]]
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan set(1) binding(2) type(storage_buffer) : memref<4x4xf32> // Same type as previous function
-        %1 = hal.interface.binding.subspan set(3) binding(4) type(storage_buffer) : memref<4x4xf32> // Different type as previous function
+        %0 = hal.interface.binding.subspan set(1) binding(2) type(storage_buffer) : memref<4x4xf32, #spv.storage_class<StorageBuffer>> // Same type as previous function
+        %1 = hal.interface.binding.subspan set(3) binding(4) type(storage_buffer) : memref<4x4xf32, #spv.storage_class<StorageBuffer>> // Different type as previous function
 
-        %2 = memref.load %0[%c0, %c0] : memref<4x4xf32>
-        %3 = memref.load %1[%c0, %c0] : memref<4x4xf32>
+        %2 = memref.load %0[%c0, %c0] : memref<4x4xf32, #spv.storage_class<StorageBuffer>>
+        %3 = memref.load %1[%c0, %c0] : memref<4x4xf32, #spv.storage_class<StorageBuffer>>
 
         return
       }
@@ -160,13 +160,13 @@ hal.executable private @interface_binding {
     builtin.module {
       func.func @interface_binding() {
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<8x5xf32>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<5xf32>
-        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<8x5xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<8x5xf32, #spv.storage_class<StorageBuffer>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<5xf32, #spv.storage_class<StorageBuffer>>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<8x5xf32, #spv.storage_class<StorageBuffer>>
 
-        %3 = memref.load %0[%c0, %c0] : memref<8x5xf32>
-        %4 = memref.load %1[%c0] : memref<5xf32>
-        %5 = memref.load %2[%c0, %c0] : memref<8x5xf32>
+        %3 = memref.load %0[%c0, %c0] : memref<8x5xf32, #spv.storage_class<StorageBuffer>>
+        %4 = memref.load %1[%c0] : memref<5xf32, #spv.storage_class<StorageBuffer>>
+        %5 = memref.load %2[%c0, %c0] : memref<8x5xf32, #spv.storage_class<StorageBuffer>>
 
         return
       }
