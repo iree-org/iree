@@ -16,6 +16,8 @@
 #include "mlir/Transforms/Passes.h"
 #include "mlir/Transforms/SideEffectUtils.h"
 
+#define DEBUG_TYPE "iree-llvmgpu-reduction-distribution"
+
 namespace mlir {
 namespace iree_compiler {
 
@@ -160,6 +162,13 @@ struct LLVMGPUReduceToGPUPass
       (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     }
 
+    DEBUG_WITH_TYPE(DEBUG_TYPE, {
+      llvm::dbgs()
+          << "\n--- After Step 1: Preprocessing of reduction ops ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
+
     auto workgroupSize = llvm::to_vector<4>(llvm::map_range(
         getEntryPoint(funcOp)->getWorkgroupSize().getValue(),
         [&](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
@@ -183,8 +192,20 @@ struct LLVMGPUReduceToGPUPass
     builder.setInsertionPointToEnd(&warpOp.getWarpRegion().getBlocks().back());
     builder.create<vector::YieldOp>(loc);
 
+    DEBUG_WITH_TYPE(DEBUG_TYPE, {
+      llvm::dbgs() << "\n--- After Step 2: Adding the distribution op ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
+
     // 3. Hoist the scalar code outside of the warp region.
     moveScalarAndBindingUniformCode(warpOp);
+
+    DEBUG_WITH_TYPE(DEBUG_TYPE, {
+      llvm::dbgs() << "\n--- After Step 3: Hoist uniform code ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
 
     // 4. Distribute transfer write operations.
     {
@@ -204,7 +225,13 @@ struct LLVMGPUReduceToGPUPass
       (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     }
 
-    // 4. Propagate vector distribution.
+    DEBUG_WITH_TYPE(DEBUG_TYPE, {
+      llvm::dbgs() << "\n--- After Step 4: Distribute transfer write ops ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
+
+    // 5. Propagate vector distribution.
     {
       RewritePatternSet patterns(ctx);
       vector::populatePropagateWarpVectorDistributionPatterns(patterns);
@@ -212,7 +239,13 @@ struct LLVMGPUReduceToGPUPass
       (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     }
 
-    // 5. Lower the remaining WarpExecuteOnLane0 ops.
+    DEBUG_WITH_TYPE(DEBUG_TYPE, {
+      llvm::dbgs() << "\n--- After Step 5: Propagate distribution ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
+
+    // 6. Lower the remaining WarpExecuteOnLane0 ops.
     {
       RewritePatternSet patterns(ctx);
       vector::WarpExecuteOnLane0LoweringOptions options;
@@ -224,6 +257,12 @@ struct LLVMGPUReduceToGPUPass
       vector::populateWarpExecuteOnLane0OpToScfForPattern(patterns, options);
       (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     }
+
+    DEBUG_WITH_TYPE(DEBUG_TYPE, {
+      llvm::dbgs() << "\n--- After Step 6: Lower remaining ops ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
   }
 };
 
