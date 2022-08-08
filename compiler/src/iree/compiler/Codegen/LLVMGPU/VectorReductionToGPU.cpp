@@ -165,7 +165,7 @@ struct LLVMGPUReduceToGPUPass
     DEBUG_WITH_TYPE(DEBUG_TYPE, {
       llvm::dbgs()
           << "\n--- After Step 1: Preprocessing of reduction ops ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      funcOp.dump();
       llvm::dbgs() << "\n\n";
     });
 
@@ -194,7 +194,7 @@ struct LLVMGPUReduceToGPUPass
 
     DEBUG_WITH_TYPE(DEBUG_TYPE, {
       llvm::dbgs() << "\n--- After Step 2: Adding the distribution op ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      funcOp.dump();
       llvm::dbgs() << "\n\n";
     });
 
@@ -203,7 +203,7 @@ struct LLVMGPUReduceToGPUPass
 
     DEBUG_WITH_TYPE(DEBUG_TYPE, {
       llvm::dbgs() << "\n--- After Step 3: Hoist uniform code ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      funcOp.dump();
       llvm::dbgs() << "\n\n";
     });
 
@@ -227,7 +227,7 @@ struct LLVMGPUReduceToGPUPass
 
     DEBUG_WITH_TYPE(DEBUG_TYPE, {
       llvm::dbgs() << "\n--- After Step 4: Distribute transfer write ops ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      funcOp.dump();
       llvm::dbgs() << "\n\n";
     });
 
@@ -241,7 +241,7 @@ struct LLVMGPUReduceToGPUPass
 
     DEBUG_WITH_TYPE(DEBUG_TYPE, {
       llvm::dbgs() << "\n--- After Step 5: Propagate distribution ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      funcOp.dump();
       llvm::dbgs() << "\n\n";
     });
 
@@ -260,7 +260,7 @@ struct LLVMGPUReduceToGPUPass
 
     DEBUG_WITH_TYPE(DEBUG_TYPE, {
       llvm::dbgs() << "\n--- After Step 6: Lower remaining ops ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      funcOp.dump();
       llvm::dbgs() << "\n\n";
     });
   }
