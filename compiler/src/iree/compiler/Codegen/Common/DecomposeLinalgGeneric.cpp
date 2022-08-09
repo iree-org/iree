@@ -23,8 +23,10 @@ class DecomposeLinalgGenericPass
     registry.insert<AffineDialect, linalg::LinalgDialect>();
   }
   void runOnOperation() override {
-    RewritePatternSet patterns(&getContext());
+    MLIRContext *context = &getContext();
+    RewritePatternSet patterns(context);
     linalg::populateDecomposeLinalgOpsPattern(patterns);
+    linalg::GenericOp::getCanonicalizationPatterns(patterns, context);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       return signalPassFailure();
