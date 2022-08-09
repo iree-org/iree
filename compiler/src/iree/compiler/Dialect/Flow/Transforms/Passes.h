@@ -82,6 +82,9 @@ std::unique_ptr<Pass> createConvertConv2DToImg2ColPass();
 // Creates a pass to convert dispatch.region ops to dispatch.workgroups ops.
 std::unique_ptr<Pass> createConvertRegionToWorkgroupsPass();
 
+// Creates a pass to convert tensor dialect ops to Flow dialect ops.
+std::unique_ptr<Pass> createConvertTensorToFlowPass();
+
 // Pass to convert a linalg.pad_tensor operation into a linalg.fill +
 // subtensor_insert. This allows lowering the operation into a single kernel.
 std::unique_ptr<Pass> createPadTensorToTensorInsertSlicePass();

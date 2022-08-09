@@ -38,6 +38,7 @@ iree_compiler_cc_library(
         "ConvertConv2DToImg2Col.cpp",
         "ConvertLinalgMatmulToMmt4D.cpp",
         "ConvertRegionToWorkgroups.cpp",
+        "ConvertTensorToFlow.cpp",
         "DeduplicateExecutables.cpp",
         "DetachElementwiseFromNamedOps.cpp",
         "DispatchLinalgOnTensors.cpp",

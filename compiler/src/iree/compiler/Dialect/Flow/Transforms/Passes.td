@@ -44,6 +44,12 @@ def ConvertRegionToWorkgroups :
   let constructor = "mlir::iree_compiler::IREE::Flow::createConvertRegionToWorkgroupsPass()";
 }
 
+def ConvertTensorToFlow :
+    Pass<"iree-flow-convert-tensor-to-flow", ""> {
+  let summary = "Convert tensor dialect ops to Flow dialect ops.";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createConvertTensorToFlowPass()";
+}
+
 def ConvertToFlow :
     Pass<"iree-flow-convert-to-flow", ""> {
   let summary = "Convert operations to flow. Currently just a test pass.";
