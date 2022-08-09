@@ -68,7 +68,6 @@ iree_runtime_cc_library(
     hdrs = [
         "api.h",
     ],
-    visibility = ["//visibility:public"],
     deps = [
         "//runtime/src/iree/base",
         "//runtime/src/iree/base:core_headers",
