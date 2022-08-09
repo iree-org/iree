@@ -28,7 +28,7 @@ cd "${HOME}"
 rm -rf config
 
 rm -rf /tmp/iree
-git clone "${GITHUB_CLONE_TARGET}" /tmp/iree
+git clone -b ${GITHUB_CLONE_TARGET} --single-branch -- https://github.com/iree-org/iree.git /tmp/iree
 
 cp -r /tmp/iree/build_tools/github_actions/runner/config/ "${HOME}/config"
 
