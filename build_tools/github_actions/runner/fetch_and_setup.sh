@@ -22,11 +22,13 @@ if [[ "$(whoami)" != "runner" ]]; then
   exit
 fi
 
+GITHUB_CLONE_TARGET=$(curl --silent --fail --show-error "http://metadata.google.internal/computeMetadata/v1/instance/attributes/github-clone-target" -H "Metadata-Flavor: Google")
+ 
 cd "${HOME}"
 rm -rf config
 
 rm -rf /tmp/iree
-git clone https://github.com/iree-org/iree.git /tmp/iree
+git clone "${GITHUB_CLONE_TARGET}" /tmp/iree
 
 cp -r /tmp/iree/build_tools/github_actions/runner/config/ "${HOME}/config"
 
