@@ -5,7 +5,7 @@ After=network.target
 [Service]
 User=runner
 Group=runner
-ExecStart=/home/runner/actions-runner/bin/runsvc.sh
+ExecStart=/home/runner/actions-runner/bin/Runner.Listener run --startuptype service
 Restart=no
 WorkingDirectory=/home/runner/actions-runner
 KillMode=process
