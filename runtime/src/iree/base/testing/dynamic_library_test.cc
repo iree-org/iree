@@ -67,7 +67,7 @@ class DynamicLibraryTest : public ::testing::Test {
         iree_make_const_byte_span(file_toc->data, file_toc->size)));
 
     std::cout << "Embedded test library written to temp path: "
-              << library_temp_path_;
+              << library_temp_path_ << "\n";
   }
 
   static std::string library_temp_path_;
