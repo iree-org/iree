@@ -12,6 +12,7 @@
 #include <string.h>
 
 #include "iree/base/tracing.h"
+#include "iree/vm/instance.h"
 
 static uint8_t iree_vm_value_type_size(iree_vm_value_type_t type) {
   // Size of each iree_vm_value_type_t in bytes. We bitpack these so that we
@@ -694,7 +695,7 @@ IREE_API_EXPORT iree_status_t iree_vm_list_push_variant(
   return iree_vm_list_set_variant(list, i, value);
 }
 
-iree_status_t iree_vm_list_register_types(void) {
+iree_status_t iree_vm_list_register_types(iree_vm_instance_t* instance) {
   if (iree_vm_list_descriptor.type != IREE_VM_REF_TYPE_NULL) {
     // Already registered.
     return iree_ok_status();

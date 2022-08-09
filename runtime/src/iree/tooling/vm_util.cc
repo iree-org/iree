@@ -157,12 +157,13 @@ static iree_status_t CreateBufferViewFromFile(
 
 Status ParseToVariantList(iree_hal_allocator_t* device_allocator,
                           iree::span<const std::string> input_strings,
+                          iree_allocator_t host_allocator,
                           iree_vm_list_t** out_list) {
   *out_list = NULL;
   vm::ref<iree_vm_list_t> variant_list;
   IREE_RETURN_IF_ERROR(iree_vm_list_create(
-      /*element_type=*/nullptr, input_strings.size(),
-      iree_hal_allocator_host_allocator(device_allocator), &variant_list));
+      /*element_type=*/nullptr, input_strings.size(), host_allocator,
+      &variant_list));
   for (size_t i = 0; i < input_strings.size(); ++i) {
     iree_string_view_t input_view = iree_string_view_trim(iree_make_string_view(
         input_strings[i].data(), input_strings[i].size()));

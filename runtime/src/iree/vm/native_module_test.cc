@@ -32,9 +32,11 @@ class VMNativeModuleTest : public ::testing::Test {
     // Create both modules shared instances. These are generally immutable and
     // can be shared by multiple contexts.
     iree_vm_module_t* module_a = nullptr;
-    IREE_CHECK_OK(module_a_create(iree_allocator_system(), &module_a));
+    IREE_CHECK_OK(
+        module_a_create(instance_, iree_allocator_system(), &module_a));
     iree_vm_module_t* module_b = nullptr;
-    IREE_CHECK_OK(module_b_create(iree_allocator_system(), &module_b));
+    IREE_CHECK_OK(
+        module_b_create(instance_, iree_allocator_system(), &module_b));
 
     // Create the context with both modules and perform runtime linkage.
     // Imports from module_a -> module_b will be resolved and per-context state

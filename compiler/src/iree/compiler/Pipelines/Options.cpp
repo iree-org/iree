@@ -10,22 +10,22 @@ namespace mlir {
 namespace iree_compiler {
 
 void BindingOptions::bindOptions(OptionsBinder &binder) {
-  static llvm::cl::OptionCategory bindingOptionsCategory(
+  static llvm::cl::OptionCategory category(
       "IREE translation binding support options.");
 
   binder.opt<bool>(
       "iree-native-bindings-support", native,
       llvm::cl::desc(
           "Include runtime support for native IREE ABI-compatible bindings."),
-      llvm::cl::cat(bindingOptionsCategory));
+      llvm::cl::cat(category));
   binder.opt<bool>("iree-tflite-bindings-support", tflite,
                    llvm::cl::desc("Include runtime support for the IREE TFLite "
                                   "compatibility bindings."),
-                   llvm::cl::cat(bindingOptionsCategory));
+                   llvm::cl::cat(category));
 }
 
 void InputDialectOptions::bindOptions(OptionsBinder &binder) {
-  static llvm::cl::OptionCategory inputDialectOptions(
+  static llvm::cl::OptionCategory category(
       "IREE options for controlling the input transformations to apply.");
 
   binder.opt<InputDialectOptions::Type>(
@@ -51,7 +51,7 @@ void InputDialectOptions::bindOptions(OptionsBinder &binder) {
 #endif  // IREE_HAVE_TOSA_INPUT
           ),
       // clang-format on
-      llvm::cl::cat(inputDialectOptions));
+      llvm::cl::cat(category));
 }
 
 void HighLevelOptimizationOptions::bindOptions(OptionsBinder &binder) {
@@ -83,6 +83,22 @@ void HighLevelOptimizationOptions::bindOptions(OptionsBinder &binder) {
 void SchedulingOptions::bindOptions(OptionsBinder &binder) {
   static llvm::cl::OptionCategory category(
       "IREE options for controlling host/device scheduling.");
+
+  binder.opt<ExecutionModel>(
+      "iree-execution-model", executionModel,
+      llvm::cl::desc("Specifies the execution model used for scheduling tensor "
+                     "compute operations."),
+      llvm::cl::values(
+          clEnumValN(
+              ExecutionModel::HostOnly, "host-only",
+              "Host-local code only that does not need execution scheduling."),
+          clEnumValN(ExecutionModel::AsyncInternal, "async-internal",
+                     "Full HAL using asynchronous host/device execution "
+                     "internally but exporting functions as if synchronous."),
+          clEnumValN(ExecutionModel::AsyncExternal, "async-external",
+                     "Full HAL using asynchronous host/device execution both "
+                     "internally and externally.")),
+      llvm::cl::cat(category));
 
   binder.opt<DumpOutputFormat>(
       "iree-scheduling-dump-statistics-format", dumpStatisticsFormat,

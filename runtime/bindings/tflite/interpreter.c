@@ -61,9 +61,9 @@ static iree_status_t _TfLiteInterpreterPrepareHAL(
       "failed creating the default device for driver '%.*s'",
       (int)driver_name.size, driver_name.data);
 
-  IREE_RETURN_IF_ERROR(
-      iree_hal_module_create(interpreter->device, IREE_HAL_MODULE_FLAG_NONE,
-                             interpreter->allocator, &interpreter->hal_module));
+  IREE_RETURN_IF_ERROR(iree_hal_module_create(
+      interpreter->instance, interpreter->device, IREE_HAL_MODULE_FLAG_NONE,
+      interpreter->allocator, &interpreter->hal_module));
 
   return iree_ok_status();
 }
@@ -357,13 +357,13 @@ static iree_status_t _TfLiteInterpreterCreate(
            sizeof(interpreter->options));
   }
 
+  interpreter->instance = model->instance;
+  iree_vm_instance_retain(interpreter->instance);
   interpreter->user_module = model->module;
   iree_vm_module_retain(interpreter->user_module);
 
   // External contexts could possibly used to emulate sharing this, but really
   // if a user is running with multiple models the tflite API is insufficient.
-  IREE_RETURN_IF_ERROR(
-      iree_vm_instance_create(interpreter->allocator, &interpreter->instance));
   IREE_RETURN_IF_ERROR(_TfLiteInterpreterPrepareHAL(interpreter));
 
   // Context will contain both the user-provided bytecode and the HAL module.

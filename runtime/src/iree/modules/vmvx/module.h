@@ -18,7 +18,8 @@ extern "C" {
 
 // Creates the VMVX module with a default configuration.
 IREE_API_EXPORT iree_status_t iree_vmvx_module_create(
-    iree_allocator_t host_allocator, iree_vm_module_t** out_module);
+    iree_vm_instance_t* instance, iree_allocator_t host_allocator,
+    iree_vm_module_t** out_module);
 
 #ifdef __cplusplus
 }  // extern "C"

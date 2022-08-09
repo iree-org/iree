@@ -9,6 +9,7 @@
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
+#include "iree/vm/api.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -103,6 +104,10 @@ IREE_API_EXPORT void iree_runtime_instance_release(
 // being performed correctly attributes the allocations to the instance.
 IREE_API_EXPORT iree_allocator_t
 iree_runtime_instance_host_allocator(const iree_runtime_instance_t* instance);
+
+// Returns the VM instance shared by all sessions using the runtime instance.
+IREE_API_EXPORT iree_vm_instance_t* iree_runtime_instance_vm_instance(
+    const iree_runtime_instance_t* instance);
 
 // Returns the optional driver registry used to enumerate drivers and devices.
 // If not provided then iree_runtime_session_create_with_device must be used

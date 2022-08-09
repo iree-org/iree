@@ -1007,10 +1007,16 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 
     auto funcType = mlir::FunctionType::get(
         ctx,
-        {emitc::OpaqueType::get(ctx, "iree_allocator_t"),
-         emitc::PointerType::get(emitc::PointerType::get(
-             emitc::OpaqueType::get(ctx, "iree_vm_module_t")))},
-        {emitc::OpaqueType::get(ctx, "iree_status_t")});
+        {
+            emitc::PointerType::get(
+                emitc::OpaqueType::get(ctx, "iree_vm_instance_t")),
+            emitc::OpaqueType::get(ctx, "iree_allocator_t"),
+            emitc::PointerType::get(emitc::PointerType::get(
+                emitc::OpaqueType::get(ctx, "iree_vm_module_t"))),
+        },
+        {
+            emitc::OpaqueType::get(ctx, "iree_status_t"),
+        });
 
     auto funcOp = builder.create<mlir::func::FuncOp>(
         loc, moduleName + "_create", funcType);
@@ -1054,7 +1060,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 
     returnIfError(builder, loc, StringAttr::get(ctx, "iree_allocator_malloc"),
                   {}, {},
-                  {funcOp.getArgument(0), moduleSize, voidPtr.getResult()},
+                  {funcOp.getArgument(1), moduleSize, voidPtr.getResult()},
                   /*typeConverter=*/typeConverter);
 
     builder.create<emitc::CallOp>(
@@ -1072,7 +1078,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
     emitc_builders::structPtrMemberAssign(builder, loc,
                                           /*memberName=*/"allocator",
                                           /*operand=*/module.getResult(),
-                                          /*value=*/funcOp.getArgument(0));
+                                          /*value=*/funcOp.getArgument(1));
 
     auto vmModule = builder.create<emitc::VariableOp>(
         /*location=*/loc,
@@ -1122,7 +1128,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
           /*args=*/ArrayAttr{},
           /*templateArgs=*/ArrayAttr{},
           /*operands=*/
-          ArrayRef<Value>{funcOp.getArgument(0), module.getResult()});
+          ArrayRef<Value>{funcOp.getArgument(1), module.getResult()});
 
       builder.create<mlir::func::ReturnOp>(loc,
                                            vmInitializeStatus.getResult(0));
@@ -1144,7 +1150,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
                                          /*value=*/moduleName + "_" + funcName);
     }
 
-    std::string descriptoPtr = "&" + moduleName + "_descriptor_";
+    std::string descriptorPtr = "&" + moduleName + "_descriptor_";
 
     auto status = builder.create<emitc::CallOp>(
         /*location=*/loc,
@@ -1152,12 +1158,13 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         /*callee=*/StringAttr::get(ctx, "iree_vm_native_module_create"),
         /*args=*/
         ArrayAttr::get(ctx, {builder.getIndexAttr(0),
-                             emitc::OpaqueAttr::get(ctx, descriptoPtr),
-                             builder.getIndexAttr(1), builder.getIndexAttr(2)}),
+                             emitc::OpaqueAttr::get(ctx, descriptorPtr),
+                             builder.getIndexAttr(1), builder.getIndexAttr(2),
+                             builder.getIndexAttr(3)}),
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/
         ArrayRef<Value>{vmModulePtr, funcOp.getArgument(0),
-                        funcOp.getArgument(1)});
+                        funcOp.getArgument(1), funcOp.getArgument(2)});
 
     builder.create<mlir::func::ReturnOp>(loc, status.getResult(0));
   }

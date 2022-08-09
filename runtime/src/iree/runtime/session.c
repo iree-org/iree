@@ -87,14 +87,15 @@ IREE_API_EXPORT iree_status_t iree_runtime_session_create_with_device(
 
   // Create the context empty so that we can add our modules to it.
   iree_status_t status = iree_vm_context_create(
-      /*instance=*/NULL, options->context_flags, host_allocator,
-      &session->context);
+      iree_runtime_instance_vm_instance(instance), options->context_flags,
+      host_allocator, &session->context);
 
   // Add the HAL module; it is always required when using the runtime API.
   // Lower-level usage of the VM can avoid the HAL if it's not required.
   iree_vm_module_t* hal_module = NULL;
   if (iree_status_is_ok(status)) {
-    status = iree_hal_module_create(device, IREE_HAL_MODULE_FLAG_NONE,
+    status = iree_hal_module_create(iree_runtime_instance_vm_instance(instance),
+                                    device, IREE_HAL_MODULE_FLAG_NONE,
                                     host_allocator, &hal_module);
   }
   if (iree_status_is_ok(status)) {
@@ -208,8 +209,9 @@ iree_runtime_session_append_bytecode_module_from_memory(
 
   iree_vm_module_t* module = NULL;
   iree_status_t status = iree_vm_bytecode_module_create(
-      flatbuffer_data, flatbuffer_allocator,
-      iree_runtime_session_host_allocator(session), &module);
+      iree_runtime_instance_vm_instance(session->instance), flatbuffer_data,
+      flatbuffer_allocator, iree_runtime_session_host_allocator(session),
+      &module);
   if (iree_status_is_ok(status)) {
     status = iree_runtime_session_append_module(session, module);
   }

@@ -61,11 +61,13 @@ static const iree_vm_native_module_descriptor_t
 };
 
 static iree_status_t native_import_module_create(
-    iree_allocator_t allocator, iree_vm_module_t** out_module) {
+    iree_vm_instance_t* instance, iree_allocator_t allocator,
+    iree_vm_module_t** out_module) {
   iree_vm_module_t interface;
   IREE_RETURN_IF_ERROR(iree_vm_module_initialize(&interface, NULL));
-  return iree_vm_native_module_create(
-      &interface, &native_import_module_descriptor_, allocator, out_module);
+  return iree_vm_native_module_create(&interface,
+                                      &native_import_module_descriptor_,
+                                      instance, allocator, out_module);
 }
 
 // Benchmarks the given exported function, optionally passing in arguments.
@@ -75,16 +77,16 @@ static iree_status_t RunFunction(benchmark::State& state,
                                  int result_count, int64_t batch_size = 1) {
   iree_vm_instance_t* instance = NULL;
   IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance));
-  IREE_CHECK_OK(iree_vm_register_builtin_types());
 
   iree_vm_module_t* import_module = NULL;
-  IREE_CHECK_OK(
-      native_import_module_create(iree_allocator_system(), &import_module));
+  IREE_CHECK_OK(native_import_module_create(instance, iree_allocator_system(),
+                                            &import_module));
 
   const auto* module_file_toc =
       iree_vm_bytecode_module_benchmark_module_create();
   iree_vm_module_t* bytecode_module = nullptr;
   IREE_CHECK_OK(iree_vm_bytecode_module_create(
+      instance,
       iree_const_byte_span_t{
           reinterpret_cast<const uint8_t*>(module_file_toc->data),
           module_file_toc->size},
@@ -131,13 +133,15 @@ static iree_status_t RunFunction(benchmark::State& state,
 }
 
 static void BM_ModuleCreate(benchmark::State& state) {
-  IREE_CHECK_OK(iree_vm_register_builtin_types());
+  iree_vm_instance_t* instance = NULL;
+  IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance));
 
   while (state.KeepRunning()) {
     const auto* module_file_toc =
         iree_vm_bytecode_module_benchmark_module_create();
     iree_vm_module_t* module = nullptr;
     IREE_CHECK_OK(iree_vm_bytecode_module_create(
+        instance,
         iree_const_byte_span_t{
             reinterpret_cast<const uint8_t*>(module_file_toc->data),
             module_file_toc->size},
@@ -148,16 +152,20 @@ static void BM_ModuleCreate(benchmark::State& state) {
 
     iree_vm_module_release(module);
   }
+
+  iree_vm_instance_release(instance);
 }
 BENCHMARK(BM_ModuleCreate);
 
 static void BM_ModuleCreateState(benchmark::State& state) {
-  IREE_CHECK_OK(iree_vm_register_builtin_types());
+  iree_vm_instance_t* instance = NULL;
+  IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance));
 
   const auto* module_file_toc =
       iree_vm_bytecode_module_benchmark_module_create();
   iree_vm_module_t* module = nullptr;
   IREE_CHECK_OK(iree_vm_bytecode_module_create(
+      instance,
       iree_const_byte_span_t{
           reinterpret_cast<const uint8_t*>(module_file_toc->data),
           module_file_toc->size},
@@ -175,17 +183,20 @@ static void BM_ModuleCreateState(benchmark::State& state) {
   }
 
   iree_vm_module_release(module);
+  iree_vm_instance_release(instance);
 }
 BENCHMARK(BM_ModuleCreateState);
 
 static void BM_FullModuleInit(benchmark::State& state) {
-  IREE_CHECK_OK(iree_vm_register_builtin_types());
+  iree_vm_instance_t* instance = NULL;
+  IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance));
 
   while (state.KeepRunning()) {
     const auto* module_file_toc =
         iree_vm_bytecode_module_benchmark_module_create();
     iree_vm_module_t* module = nullptr;
     IREE_CHECK_OK(iree_vm_bytecode_module_create(
+        instance,
         iree_const_byte_span_t{
             reinterpret_cast<const uint8_t*>(module_file_toc->data),
             module_file_toc->size},
@@ -199,6 +210,8 @@ static void BM_FullModuleInit(benchmark::State& state) {
     module->free_state(module->self, module_state);
     iree_vm_module_release(module);
   }
+
+  iree_vm_instance_release(instance);
 }
 BENCHMARK(BM_FullModuleInit);
 

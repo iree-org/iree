@@ -84,9 +84,6 @@ Check the API version and register components:
 iree_api_version_t actual_version;
 IREE_CHECK_OK(iree_api_version_check(IREE_API_VERSION_LATEST, &actual_version));
 
-// Modules with custom types must be statically registered before use.
-IREE_CHECK_OK(iree_hal_module_register_all_types());
-
 // Device drivers are managed through registries.
 // Applications may use multiple registries to more finely control driver
 // lifetimes and visibility.
@@ -108,6 +105,9 @@ Create a VM instance along with a HAL driver and device:
 iree_vm_instance_t* instance = NULL;
 IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance));
 
+// Modules with custom types must be statically registered before use.
+IREE_CHECK_OK(iree_hal_module_register_all_types(instance));
+
 // We use the CPU "local-task" driver in this example, but could use a different
 // driver like the GPU "vulkan" driver. The driver(s) used should match with
 // the target(s) specified during compilation.
@@ -128,7 +128,7 @@ IREE_CHECK_OK(iree_hal_driver_create_default_device(
 // We'll load this module into a VM context later.
 iree_vm_module_t* hal_module = NULL;
 IREE_CHECK_OK(
-    iree_hal_module_create(device, IREE_HAL_MODULE_FLAG_NONE,
+    iree_hal_module_create(instance, device, IREE_HAL_MODULE_FLAG_NONE,
                            iree_allocator_system(), &hal_module));
 // The reference to the driver can be released now.
 iree_hal_driver_release(driver);
@@ -145,6 +145,7 @@ Load a vmfb bytecode module containing program data:
 
 iree_vm_module_t* bytecode_module = NULL;
 IREE_CHECK_OK(iree_vm_bytecode_module_create(
+    instance,
     iree_const_byte_span_t{module_data, module_size},
     /*flatbuffer_allocator=*/iree_allocator_null(),
     /*allocator=*/iree_allocator_system(), &bytecode_module));

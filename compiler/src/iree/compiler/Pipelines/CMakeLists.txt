@@ -57,5 +57,3 @@ iree_cc_library(
     iree::compiler::InputConversion::Common
   PUBLIC
 )
-
-### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

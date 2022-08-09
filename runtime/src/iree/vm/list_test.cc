@@ -12,7 +12,7 @@
 #include "iree/base/api.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
-#include "iree/vm/builtin_types.h"
+#include "iree/vm/instance.h"
 #include "iree/vm/ref_cc.h"
 
 class A : public iree::vm::RefObject<A> {
@@ -55,7 +55,7 @@ static void RegisterRefType(iree_vm_ref_type_descriptor_t* descriptor,
   }
 }
 
-static void RegisterRefTypes() {
+static void RegisterRefTypes(iree_vm_instance_t* instance) {
   RegisterRefType<A>(&test_a_descriptor, "AType");
   RegisterRefType<B>(&test_b_descriptor, "BType");
 }
@@ -70,12 +70,13 @@ static iree_vm_ref_t MakeRef(V value) {
   return ref;
 }
 
-class VMListTest : public ::testing::Test {
- protected:
+static iree_vm_instance_t* instance = NULL;
+struct VMListTest : public ::testing::Test {
   static void SetUpTestSuite() {
-    IREE_CHECK_OK(iree_vm_register_builtin_types());
-    RegisterRefTypes();
+    IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance));
+    RegisterRefTypes(instance);
   }
+  static void TearDownTestSuite() { iree_vm_instance_release(instance); }
 };
 
 // Tests simple primitive value list usage, mainly just for demonstration.

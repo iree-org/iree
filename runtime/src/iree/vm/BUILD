@@ -55,7 +55,6 @@ iree_runtime_cc_library(
     name = "impl",
     srcs = [
         "buffer.c",
-        "builtin_types.c",
         "context.c",
         "instance.c",
         "invocation.c",
@@ -68,7 +67,6 @@ iree_runtime_cc_library(
     ],
     hdrs = [
         "buffer.h",
-        "builtin_types.h",
         "context.h",
         "instance.h",
         "invocation.h",

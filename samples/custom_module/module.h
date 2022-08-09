@@ -31,16 +31,15 @@ iree_status_t iree_custom_string_create(iree_string_view_t value,
                                         iree_custom_string_t** out_string);
 
 // Registers types provided by the custom module.
-// TODO(benvanik): move to instance-based type registration (this would take
-// a iree_vm_instance_t).
-iree_status_t iree_custom_module_register_types(void);
+iree_status_t iree_custom_module_register_types(iree_vm_instance_t* instance);
 
 // Creates a native custom module that can be reused in multiple contexts.
 // The module itself may hold state that can be shared by all instantiated
 // copies but it will require the module to provide synchronization; usually
 // it's safer to just treat the module as immutable and keep state within the
 // instantiated module states instead.
-iree_status_t iree_custom_module_create(iree_allocator_t allocator,
+iree_status_t iree_custom_module_create(iree_vm_instance_t* instance,
+                                        iree_allocator_t allocator,
                                         iree_vm_module_t** out_module);
 
 #ifdef __cplusplus

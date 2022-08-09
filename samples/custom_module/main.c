@@ -48,12 +48,11 @@ int main(int argc, char** argv) {
 
   // Ensure custom types are registered before loading modules that use them.
   // This only needs to be done once.
-  // TODO(benvanik): move to instance-based registration.
-  IREE_CHECK_OK(iree_custom_module_register_types());
+  IREE_CHECK_OK(iree_custom_module_register_types(instance));
 
   // Create the custom module that can be reused across contexts.
   iree_vm_module_t* custom_module = NULL;
-  IREE_CHECK_OK(iree_custom_module_create(allocator, &custom_module));
+  IREE_CHECK_OK(iree_custom_module_create(instance, allocator, &custom_module));
 
   // Load the module from stdin or a file on disk.
   // Applications can ship and load modules however they want (such as mapping
@@ -75,7 +74,7 @@ int main(int argc, char** argv) {
   // Note that we let the module retain the file contents for as long as needed.
   iree_vm_module_t* bytecode_module = NULL;
   IREE_CHECK_OK(iree_vm_bytecode_module_create(
-      module_contents->const_buffer,
+      instance, module_contents->const_buffer,
       iree_file_contents_deallocator(module_contents), allocator,
       &bytecode_module));
 

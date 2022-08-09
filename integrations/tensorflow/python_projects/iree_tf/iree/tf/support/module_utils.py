@@ -369,8 +369,9 @@ class IreeCompiledModule(CompiledModule):
         backend_info=backend_info,
         exported_names=exported_names,
         artifacts_dir=artifacts_dir)
-    vm_module = iree.runtime.VmModule.from_flatbuffer(module_blob)
     config = iree.runtime.Config(driver_name=backend_info.driver)
+    vm_module = iree.runtime.VmModule.from_flatbuffer(config.vm_instance,
+                                                      module_blob)
 
     compiled_paths = None
     if compiled_path is not None:
@@ -412,8 +413,9 @@ class IreeCompiledModule(CompiledModule):
     module_blob, compiled_path = _incrementally_compile_tf_signature_def_saved_model(
         saved_model_dir, saved_model_tags, backend_info, exported_name,
         artifacts_dir)
-    vm_module = iree.runtime.VmModule.from_flatbuffer(module_blob)
     config = iree.runtime.Config(driver_name=backend_info.driver)
+    vm_module = iree.runtime.VmModule.from_flatbuffer(config.vm_instance,
+                                                      module_blob)
 
     compiled_paths = None
     if compiled_path is not None:

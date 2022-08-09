@@ -402,7 +402,11 @@ static iree_status_t IREE_API_PTR iree_vm_native_module_resume_call(
 IREE_API_EXPORT iree_status_t iree_vm_native_module_create(
     const iree_vm_module_t* interface,
     const iree_vm_native_module_descriptor_t* module_descriptor,
-    iree_allocator_t allocator, iree_vm_module_t** out_module) {
+    iree_vm_instance_t* instance, iree_allocator_t allocator,
+    iree_vm_module_t** out_module) {
+  IREE_ASSERT_ARGUMENT(interface);
+  IREE_ASSERT_ARGUMENT(module_descriptor);
+  IREE_ASSERT_ARGUMENT(instance);
   IREE_ASSERT_ARGUMENT(out_module);
   *out_module = NULL;
 
@@ -434,8 +438,9 @@ IREE_API_EXPORT iree_status_t iree_vm_native_module_create(
   IREE_RETURN_IF_ERROR(
       iree_allocator_malloc(allocator, sizeof(*module), (void**)&module));
 
-  iree_status_t status = iree_vm_native_module_initialize(
-      interface, module_descriptor, allocator, (iree_vm_module_t*)module);
+  iree_status_t status =
+      iree_vm_native_module_initialize(interface, module_descriptor, instance,
+                                       allocator, (iree_vm_module_t*)module);
   if (!iree_status_is_ok(status)) {
     iree_allocator_free(allocator, module);
     return status;
@@ -448,9 +453,11 @@ IREE_API_EXPORT iree_status_t iree_vm_native_module_create(
 IREE_API_EXPORT iree_status_t iree_vm_native_module_initialize(
     const iree_vm_module_t* interface,
     const iree_vm_native_module_descriptor_t* module_descriptor,
-    iree_allocator_t allocator, iree_vm_module_t* base_module) {
+    iree_vm_instance_t* instance, iree_allocator_t allocator,
+    iree_vm_module_t* base_module) {
   IREE_ASSERT_ARGUMENT(interface);
   IREE_ASSERT_ARGUMENT(module_descriptor);
+  IREE_ASSERT_ARGUMENT(instance);
   IREE_ASSERT_ARGUMENT(base_module);
   iree_vm_native_module_t* module = (iree_vm_native_module_t*)base_module;
 

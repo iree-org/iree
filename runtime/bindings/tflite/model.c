@@ -13,16 +13,6 @@
 #include "iree/modules/hal/module.h"
 #include "iree/vm/bytecode_module.h"
 
-static iree_status_t _TfLiteModelPrepareRuntime() {
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, iree_vm_register_builtin_types());
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, iree_hal_module_register_all_types());
-
-  IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
-}
-
 static iree_status_t _TfLiteModelCalculateFunctionIOCounts(
     const iree_vm_function_signature_t* signature, int32_t* out_input_count,
     int32_t* out_output_count) {
@@ -43,15 +33,19 @@ static iree_status_t _TfLiteModelInitializeModule(const void* flatbuffer_data,
                                                   TfLiteModel* model) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, _TfLiteModelPrepareRuntime());
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_vm_instance_create(allocator, &model->instance));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_module_register_all_types(model->instance));
 
   iree_const_byte_span_t flatbuffer_span =
       iree_make_const_byte_span(flatbuffer_data, flatbuffer_size);
   iree_allocator_t flatbuffer_allocator = iree_allocator_null();
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0,
-      iree_vm_bytecode_module_create(flatbuffer_span, flatbuffer_allocator,
-                                     allocator, &model->module),
+      iree_vm_bytecode_module_create(model->instance, flatbuffer_span,
+                                     flatbuffer_allocator, allocator,
+                                     &model->module),
       "error creating bytecode module");
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -126,7 +120,7 @@ TFL_CAPI_EXPORT extern TfLiteModel* TfLiteModelCreate(const void* model_data,
   if (!iree_status_is_ok(status)) {
     iree_status_fprint(stderr, status);
     iree_status_free(status);
-    iree_allocator_free(allocator, model);
+    TfLiteModelDelete(model);
     IREE_TRACE_ZONE_END(z0);
     return NULL;
   }
@@ -166,6 +160,7 @@ TFL_CAPI_EXPORT extern TfLiteModel* TfLiteModelCreateFromFile(
   int ret = fread(model->owned_model_data, 1, file_size, file);
   fclose(file);
   if (ret != file_size) {
+    TfLiteModelDelete(model);
     IREE_TRACE_MESSAGE(ERROR, "failed model+data read");
     IREE_TRACE_ZONE_END(z0);
     return NULL;
@@ -174,6 +169,7 @@ TFL_CAPI_EXPORT extern TfLiteModel* TfLiteModelCreateFromFile(
   status = _TfLiteModelInitializeModule(model->owned_model_data, file_size,
                                         allocator, model);
   if (!iree_status_is_ok(iree_status_consume_code(status))) {
+    TfLiteModelDelete(model);
     IREE_TRACE_ZONE_END(z0);
     return NULL;
   }
@@ -192,6 +188,7 @@ void _TfLiteModelRelease(TfLiteModel* model) {
   if (model && iree_atomic_ref_count_dec(&model->ref_count) == 1) {
     IREE_TRACE_ZONE_BEGIN(z0);
     iree_vm_module_release(model->module);
+    iree_vm_instance_release(model->instance);
     iree_allocator_free(model->allocator, model);
     IREE_TRACE_ZONE_END(z0);
   }

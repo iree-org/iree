@@ -30,8 +30,9 @@ typedef uint32_t iree_hal_module_flags_t;
 // Each context using this module will share the device and have compatible
 // allocations.
 IREE_API_EXPORT iree_status_t iree_hal_module_create(
-    iree_hal_device_t* device, iree_hal_module_flags_t flags,
-    iree_allocator_t host_allocator, iree_vm_module_t** out_module);
+    iree_vm_instance_t* instance, iree_hal_device_t* device,
+    iree_hal_module_flags_t flags, iree_allocator_t host_allocator,
+    iree_vm_module_t** out_module);
 
 // Returns the device currently in use by the HAL module.
 // Returns NULL if no device has been initialized yet.

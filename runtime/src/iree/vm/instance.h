@@ -39,6 +39,10 @@ IREE_API_EXPORT void iree_vm_instance_retain(iree_vm_instance_t* instance);
 // Releases the given |instance| from the caller.
 IREE_API_EXPORT void iree_vm_instance_release(iree_vm_instance_t* instance);
 
+// Returns the host allocator the instance was created with.
+IREE_API_EXPORT iree_allocator_t
+iree_vm_instance_allocator(iree_vm_instance_t* instance);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

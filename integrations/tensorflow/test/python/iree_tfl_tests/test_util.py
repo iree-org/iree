@@ -105,7 +105,7 @@ class TFLiteModelTest(testing.absltest.TestCase):
     with open(self.binary, 'rb') as f:
       config = iree_rt.Config(configs[absl.flags.FLAGS.target_backend])
       self.iree_context = iree_rt.SystemContext(config=config)
-      vm_module = iree_rt.VmModule.from_flatbuffer(f.read())
+      vm_module = iree_rt.VmModule.from_flatbuffer(config.vm_instance, f.read())
       self.iree_context.add_vm_module(vm_module)
 
   def invoke_tflite(self, args):

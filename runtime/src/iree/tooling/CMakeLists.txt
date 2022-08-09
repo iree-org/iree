@@ -12,6 +12,26 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
+    context_util
+  HDRS
+    "context_util.h"
+  SRCS
+    "context_util.c"
+  DEPS
+    ::device_util
+    iree::base
+    iree::base::internal::file_io
+    iree::base::internal::flags
+    iree::base::tracing
+    iree::hal
+    iree::modules::hal
+    iree::vm
+    iree::vm::bytecode_module
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     cpu_features
   HDRS
     "cpu_features.h"

@@ -13,6 +13,11 @@ import iree.runtime as rt
 
 class VmTypesTest(unittest.TestCase):
 
+  @classmethod
+  def setUp(self):
+    # Ensures types are registered.
+    self.instance = rt.VmInstance()
+
   def testRefProtocol(self):
     lst1 = rt.VmVariantList(0)
     ref = lst1.__iree_vm_ref__

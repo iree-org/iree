@@ -96,17 +96,17 @@ def create_tokenizer_module():
 
 
 def compile():
-  vmfb_contents = compiler.tools.compile_file(os.path.join(
-      os.path.dirname(__file__), "main.mlir"),
-                                              target_backends=["vmvx"])
-  return rt.VmModule.from_flatbuffer(vmfb_contents)
+  return compiler.tools.compile_file(os.path.join(os.path.dirname(__file__),
+                                                  "main.mlir"),
+                                     target_backends=["vmvx"])
 
 
 def main():
   print("Compiling...")
-  main_module = compile()
+  vmfb_contents = compile()
   print("Decoding secret message...")
   config = rt.Config("local-sync")
+  main_module = rt.VmModule.from_flatbuffer(config.vm_instance, vmfb_contents)
   modules = config.default_vm_modules + (
       create_tokenizer_module(),
       main_module,

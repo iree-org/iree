@@ -31,7 +31,8 @@ static iree_vm_ref_type_descriptor_t iree_hal_semaphore_descriptor = {0};
   descriptor.destroy = (iree_vm_ref_destroy_t)destroy_fn;                 \
   IREE_RETURN_IF_ERROR(iree_vm_ref_register_type(&descriptor));
 
-static iree_status_t iree_hal_module_register_common_types(void) {
+static iree_status_t iree_hal_module_register_common_types(
+    iree_vm_instance_t* instance) {
   static bool has_registered = false;
   if (has_registered) return iree_ok_status();
 
@@ -46,7 +47,8 @@ static iree_status_t iree_hal_module_register_common_types(void) {
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_module_register_executable_types(void) {
+static iree_status_t iree_hal_module_register_executable_types(
+    iree_vm_instance_t* instance) {
   static bool has_registered = false;
   if (has_registered) return iree_ok_status();
 
@@ -58,22 +60,25 @@ static iree_status_t iree_hal_module_register_executable_types(void) {
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_module_register_inline_types(void) {
-  return iree_hal_module_register_common_types();
+IREE_API_EXPORT iree_status_t
+iree_hal_module_register_inline_types(iree_vm_instance_t* instance) {
+  return iree_hal_module_register_common_types(instance);
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_module_register_loader_types(void) {
-  IREE_RETURN_IF_ERROR(iree_hal_module_register_common_types());
-  IREE_RETURN_IF_ERROR(iree_hal_module_register_executable_types());
+IREE_API_EXPORT iree_status_t
+iree_hal_module_register_loader_types(iree_vm_instance_t* instance) {
+  IREE_RETURN_IF_ERROR(iree_hal_module_register_common_types(instance));
+  IREE_RETURN_IF_ERROR(iree_hal_module_register_executable_types(instance));
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_module_register_all_types(void) {
+IREE_API_EXPORT iree_status_t
+iree_hal_module_register_all_types(iree_vm_instance_t* instance) {
   static bool has_registered = false;
   if (has_registered) return iree_ok_status();
 
-  IREE_RETURN_IF_ERROR(iree_hal_module_register_common_types());
-  IREE_RETURN_IF_ERROR(iree_hal_module_register_executable_types());
+  IREE_RETURN_IF_ERROR(iree_hal_module_register_common_types(instance));
+  IREE_RETURN_IF_ERROR(iree_hal_module_register_executable_types(instance));
 
   IREE_VM_REGISTER_HAL_C_TYPE(iree_hal_allocator_t, "hal.allocator",
                               iree_hal_allocator_destroy,

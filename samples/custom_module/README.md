@@ -42,8 +42,9 @@ are implemented using this mechanism.
 3. Compile the [example module](./test/example.mlir) to a .vmfb file:
 
     ```
-    # TODO(benvanik): remove requirement of hal backend for non-HAL modules.
-    iree-compile samples/custom_module/test/example.mlir -o=/tmp/example.vmfb -iree-hal-target-backends=vmvx
+    # This simple sample doesn't use tensors and can be compiled in host-only
+    # mode to avoid the need for the HAL.
+    iree-compile --iree-execution-model=host-only samples/custom_module/test/example.mlir -o=/tmp/example.vmfb
     ```
 
 3. Build the `iree_samples_custom_module_run` CMake target :
@@ -167,12 +168,12 @@ still some trickiness involved).
 
 ```c
 // Ensure custom types are registered before loading modules that use them.
-// This only needs to be done once.
-IREE_CHECK_OK(iree_custom_module_register_types());
+// This only needs to be done once per instance.
+IREE_CHECK_OK(iree_custom_module_register_types(instance));
 
 // Create the custom module that can be reused across contexts.
 iree_vm_module_t* custom_module = NULL;
-IREE_CHECK_OK(iree_custom_module_create(allocator, &custom_module));
+IREE_CHECK_OK(iree_custom_module_create(instance, allocator, &custom_module));
 
 // Create the context for this invocation reusing the loaded modules.
 // Contexts hold isolated state and can be reused for multiple calls.

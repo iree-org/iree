@@ -49,7 +49,7 @@
 #include "iree/compiler/Tools/init_dialects.h"
 #include "iree/compiler/Tools/init_targets.h"
 #include "iree/hal/api.h"
-#include "iree/modules/hal/module.h"
+#include "iree/tooling/context_util.h"
 #include "iree/tooling/device_util.h"
 #include "iree/tooling/vm_util.h"
 #include "iree/vm/api.h"
@@ -126,15 +126,9 @@ static llvm::cl::opt<std::string> output_file_flag{
     llvm::cl::init(""),
 };
 
-static llvm::cl::list<std::string> function_inputs_flag{
-    "function-input",
-    llvm::cl::desc("Input shapes and optional values"),
-    llvm::cl::ZeroOrMore,
-};
-
 static llvm::cl::opt<bool> run_flag{
     "run",
-    llvm::cl::desc("Runs the module (vs. just compiling and verifing)"),
+    llvm::cl::desc("Runs the module (vs. just compiling and verifying)"),
     llvm::cl::init(true),
 };
 
@@ -144,20 +138,52 @@ static llvm::cl::list<std::string> run_args_flag{
     llvm::cl::ConsumeAfter,
 };
 
-static llvm::cl::opt<bool> trace_execution_flag{
-    "trace-execution",
-    llvm::cl::desc("Traces VM execution to stderr"),
-    llvm::cl::init(false),
-};
+// TODO(benvanik): move --function_input= flag into a util.
+static iree_status_t parse_function_input(iree_string_view_t flag_name,
+                                          void* storage,
+                                          iree_string_view_t value) {
+  auto* list = (std::vector<std::string>*)storage;
+  list->push_back(std::string(value.data, value.size));
+  return iree_ok_status();
+}
+static void print_function_input(iree_string_view_t flag_name, void* storage,
+                                 FILE* file) {
+  auto* list = (std::vector<std::string>*)storage;
+  if (list->empty()) {
+    fprintf(file, "# --%.*s=\n", (int)flag_name.size, flag_name.data);
+  } else {
+    for (size_t i = 0; i < list->size(); ++i) {
+      fprintf(file, "--%.*s=\"%s\"\n", (int)flag_name.size, flag_name.data,
+              list->at(i).c_str());
+    }
+  }
+}
+static std::vector<std::string> FLAG_function_inputs;
+IREE_FLAG_CALLBACK(
+    parse_function_input, print_function_input, &FLAG_function_inputs,
+    function_input,
+    "An input value or buffer of the format:\n"
+    "  [shape]xtype=[value]\n"
+    "  2x2xi32=1 2 3 4\n"
+    "Optionally, brackets may be used to separate the element values:\n"
+    "  2x2xi32=[[1 2][3 4]]\n"
+    "Raw binary files can be read to provide buffer contents:\n"
+    "  2x2xi32=@some/file.bin\n"
+    "numpy npy files (from numpy.save) can be read to provide 1+ values:\n"
+    "  @some.npy\n"
+    "Each occurrence of the flag indicates an input in the order they were\n"
+    "specified on the command line.");
 
 namespace iree {
 namespace {
 
-// Returns a driver name capable of handling input from the given backend.
-std::string BackendToDriverName(std::string backend) {
-  // TODO(#9336): remove this or allow override for external drivers.
+// Tries to guess a default device name from the backend, where possible.
+// Users are still able to override this by passing in --device= flags.
+std::string InferDefaultDeviceFromBackend(const std::string& backend) {
   if (backend == "vmvx" || backend == "llvm-cpu") {
     return "local-task";
+  } else if (backend == "vmvx-inline") {
+    return "";
   }
   size_t dash = backend.find('-');
   if (dash == std::string::npos) {
@@ -289,7 +315,7 @@ Status PrepareModule(std::string target_backend,
 
 // Evaluates a single function in its own fiber, printing the results to stdout.
 Status EvaluateFunction(iree_vm_context_t* context,
-                        iree_hal_allocator_t* allocator,
+                        iree_hal_allocator_t* device_allocator,
                         iree_vm_function_t function,
                         iree_string_view_t function_name) {
   IREE_TRACE_SCOPE();
@@ -299,11 +325,11 @@ Status EvaluateFunction(iree_vm_context_t* context,
 
   // Parse input values from the flags.
   vm::ref<iree_vm_list_t> inputs;
-  auto function_inputs_list = iree::span<std::string>(
-      function_inputs_flag.empty() ? nullptr : &function_inputs_flag.front(),
-      function_inputs_flag.size());
-  IREE_RETURN_IF_ERROR(
-      ParseToVariantList(allocator, function_inputs_list, &inputs));
+  IREE_RETURN_IF_ERROR(ParseToVariantList(
+      device_allocator,
+      iree::span<const std::string>{FLAG_function_inputs.data(),
+                                    FLAG_function_inputs.size()},
+      iree_allocator_system(), &inputs));
 
   // Prepare outputs list to accept the results from the invocation.
   vm::ref<iree_vm_list_t> outputs;
@@ -324,59 +350,33 @@ Status EvaluateFunction(iree_vm_context_t* context,
 
 // Evaluates all exported functions within given module.
 Status EvaluateFunctions(iree_vm_instance_t* instance,
-                         const std::string& driver_name,
+                         const std::string& default_device_uri,
                          const std::string& flatbuffer_data) {
   IREE_TRACE_SCOPE0("EvaluateFunctions");
-
-  iree_string_view_t device_uri =
-      iree_make_string_view(driver_name.data(), driver_name.size());
-
-  // We'll prioritize using the device the user specifies on the command line;
-  // if not set we'll try to infer it based on the compilation mode.
-  // TODO(#5724): remove this and instead provide a device set.
-  iree_host_size_t device_uri_count = 0;
-  iree_string_view_t* device_uris = NULL;
-  iree_hal_get_devices_flag_list(&device_uri_count, &device_uris);
-  if (device_uri_count == 1) {
-    device_uri = device_uris[0];
-  }
-
-  std::cout << "Evaluating all functions in module for driver '" << driver_name
-            << "' using device '"
-            << std::string(device_uri.data, device_uri.size) << "'...";
 
   // Load the bytecode module from the flatbuffer data.
   // We do this first so that if we fail validation we know prior to dealing
   // with devices.
-  iree_vm_module_t* bytecode_module = nullptr;
+  iree_vm_module_t* main_module = nullptr;
   IREE_RETURN_IF_ERROR(iree_vm_bytecode_module_create(
+      instance,
       iree_make_const_byte_span((void*)flatbuffer_data.data(),
                                 flatbuffer_data.size()),
-      iree_allocator_null(), iree_allocator_system(), &bytecode_module));
+      iree_allocator_null(), iree_allocator_system(), &main_module));
 
   if (!run_flag) {
     // Just wanted verification; return without running.
-    iree_vm_module_release(bytecode_module);
+    iree_vm_module_release(main_module);
     return OkStatus();
   }
-
-  iree_hal_device_t* device = nullptr;
-  IREE_RETURN_IF_ERROR(iree_hal_create_device(
-      iree_hal_available_driver_registry(),
-      iree_make_string_view(driver_name.data(), driver_name.size()),
-      iree_allocator_system(), &device));
-
-  iree_vm_module_t* hal_module = nullptr;
-  IREE_RETURN_IF_ERROR(iree_hal_module_create(
-      device, IREE_HAL_MODULE_FLAG_NONE, iree_allocator_system(), &hal_module));
 
   // Evaluate all exported functions.
   auto run_function = [&](int ordinal) -> Status {
     iree_vm_function_t function;
-    IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_ordinal(
-                             bytecode_module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-                             ordinal, &function),
-                         "Looking up function export %d", ordinal);
+    IREE_RETURN_IF_ERROR(
+        iree_vm_module_lookup_function_by_ordinal(
+            main_module, IREE_VM_FUNCTION_LINKAGE_EXPORT, ordinal, &function),
+        "looking up function export %d", ordinal);
     iree_string_view_t function_name = iree_vm_function_name(&function);
     if (iree_string_view_starts_with(function_name,
                                      iree_make_cstring_view("__")) ||
@@ -390,27 +390,27 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
     // with other running evaluations, such as when in a multithreaded test
     // runner).
     iree_vm_context_t* context = nullptr;
-    std::vector<iree_vm_module_t*> modules = {hal_module, bytecode_module};
-    IREE_RETURN_IF_ERROR(
-        iree_vm_context_create_with_modules(
-            instance,
-            trace_execution_flag ? IREE_VM_CONTEXT_FLAG_TRACE_EXECUTION
-                                 : IREE_VM_CONTEXT_FLAG_NONE,
-            modules.size(), modules.data(), iree_allocator_system(), &context),
-        "Creating context");
+    iree_hal_device_t* device = NULL;
+    iree_hal_allocator_t* device_allocator = nullptr;
+    IREE_RETURN_IF_ERROR(iree_tooling_create_context_from_flags(
+        instance, /*user_module_count=*/1, /*user_modules=*/&main_module,
+        iree_make_string_view(default_device_uri.data(),
+                              default_device_uri.size()),
+        iree_allocator_system(), &context, &device, &device_allocator));
 
     // Invoke the function and print results.
     IREE_RETURN_IF_ERROR(
-        EvaluateFunction(context, iree_hal_device_allocator(device), function,
-                         function_name),
-        "Evaluating export function %d", ordinal);
+        EvaluateFunction(context, device_allocator, function, function_name),
+        "evaluating export function %d", ordinal);
 
     iree_vm_context_release(context);
+    iree_hal_allocator_release(device_allocator);
+    iree_hal_device_release(device);
     return OkStatus();
   };
 
   Status evaluate_status = OkStatus();
-  auto module_signature = iree_vm_module_signature(bytecode_module);
+  auto module_signature = iree_vm_module_signature(main_module);
   for (iree_host_size_t i = 0; i < module_signature.export_function_count;
        ++i) {
     evaluate_status = run_function(i);
@@ -419,9 +419,7 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
     }
   }
 
-  iree_vm_module_release(hal_module);
-  iree_vm_module_release(bytecode_module);
-  iree_hal_device_release(device);
+  iree_vm_module_release(main_module);
 
   return evaluate_status;
 }
@@ -431,13 +429,9 @@ Status EvaluateFile(std::unique_ptr<llvm::MemoryBuffer> file_buffer,
                     mlir::DialectRegistry& registry) {
   IREE_TRACE_SCOPE0("EvaluateFile");
 
-  // TODO(benvanik): move to instance-based registration.
-  IREE_RETURN_IF_ERROR(iree_hal_module_register_all_types(),
-                       "Registering HAL types");
-
   iree_vm_instance_t* instance = nullptr;
   IREE_RETURN_IF_ERROR(
-      iree_vm_instance_create(iree_allocator_system(), &instance),
+      iree_tooling_create_instance(iree_allocator_system(), &instance),
       "Creating instance");
 
   std::vector<std::string> target_backends;
@@ -453,9 +447,10 @@ Status EvaluateFile(std::unique_ptr<llvm::MemoryBuffer> file_buffer,
                       registry, &flatbuffer_data),
         "Translating module");
     IREE_TRACE_FRAME_MARK();
+    std::string default_device_uri =
+        InferDefaultDeviceFromBackend(target_backend);
     IREE_RETURN_IF_ERROR(
-        EvaluateFunctions(instance, BackendToDriverName(target_backend),
-                          flatbuffer_data),
+        EvaluateFunctions(instance, default_device_uri, flatbuffer_data),
         "Evaluating functions");
   }
 

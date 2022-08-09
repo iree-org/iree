@@ -123,13 +123,14 @@ static const iree_vm_native_module_descriptor_t module_a_descriptor_ = {
     /*functions=*/module_a_funcs_,
 };
 
-static iree_status_t module_a_create(iree_allocator_t allocator,
+static iree_status_t module_a_create(iree_vm_instance_t* instance,
+                                     iree_allocator_t allocator,
                                      iree_vm_module_t** out_module) {
   // NOTE: this module has neither shared or per-context module state.
   iree_vm_module_t interface;
   IREE_RETURN_IF_ERROR(iree_vm_module_initialize(&interface, NULL));
   return iree_vm_native_module_create(&interface, &module_a_descriptor_,
-                                      allocator, out_module);
+                                      instance, allocator, out_module);
 }
 
 //===----------------------------------------------------------------------===//
@@ -274,7 +275,8 @@ static const iree_vm_native_module_descriptor_t module_b_descriptor_ = {
     /*functions=*/module_b_funcs_,
 };
 
-static iree_status_t module_b_create(iree_allocator_t allocator,
+static iree_status_t module_b_create(iree_vm_instance_t* instance,
+                                     iree_allocator_t allocator,
                                      iree_vm_module_t** out_module) {
   // Allocate shared module state.
   module_b_t* module = NULL;
@@ -307,5 +309,5 @@ static iree_status_t module_b_create(iree_allocator_t allocator,
   interface.free_state = module_b_free_state;
   interface.resolve_import = module_b_resolve_import;
   return iree_vm_native_module_create(&interface, &module_b_descriptor_,
-                                      allocator, out_module);
+                                      instance, allocator, out_module);
 }

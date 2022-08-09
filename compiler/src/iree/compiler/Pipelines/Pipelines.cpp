@@ -68,6 +68,8 @@ void buildIREEVMTransformPassPipeline(
 
   // Now that inputs are legalized, generate wrapper for entry functions.
   if (bindingOptions.native) {
+    // TODO(benvanik): pass down execution model to the ABI pipeline so that
+    // it can change default function signature behavior
     IREE::ABI::buildTransformPassPipeline(passManager);
   }
   if (bindingOptions.tflite) {
@@ -105,11 +107,27 @@ void buildIREEVMTransformPassPipeline(
       (IREE::Stream::DumpOutputFormat)schedulingOptions.dumpStatisticsFormat;
   streamOptions.dumpStatisticsFile = schedulingOptions.dumpStatisticsFile;
 
-  // TODO(benvanik): only run these pipelines if there are tensors in the
-  // program that we need to convert.
-  IREE::Flow::buildFlowTransformPassPipeline(passManager, flowOptions);
-  IREE::Stream::buildStreamTransformPassPipeline(passManager, streamOptions);
-  IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions);
+  switch (schedulingOptions.executionModel) {
+    case SchedulingOptions::ExecutionModel::HostOnly:
+      // No flow/stream processing (implies no tensors).
+      break;
+    default:
+      IREE::Flow::buildFlowTransformPassPipeline(passManager, flowOptions);
+      IREE::Stream::buildStreamTransformPassPipeline(passManager,
+                                                     streamOptions);
+      break;
+  }
+
+  switch (schedulingOptions.executionModel) {
+    case SchedulingOptions::ExecutionModel::HostOnly:
+      // No HAL required.
+      break;
+    default:
+    case SchedulingOptions::ExecutionModel::AsyncInternal:
+    case SchedulingOptions::ExecutionModel::AsyncExternal:
+      IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions);
+      break;
+  }
 
   IREE::VM::buildVMTransformPassPipeline(passManager, targetOptions);
   passManager.addPass(IREE::Util::createDropCompilerHintsPass());

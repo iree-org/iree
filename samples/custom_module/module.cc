@@ -68,7 +68,8 @@ extern "C" void iree_custom_string_destroy(void* ptr) {
   iree_allocator_free(string->allocator, ptr);
 }
 
-extern "C" iree_status_t iree_custom_module_register_types(void) {
+extern "C" iree_status_t iree_custom_module_register_types(
+    iree_vm_instance_t* instance) {
   if (iree_custom_string_descriptor.type) {
     return iree_ok_status();  // Already registered.
   }
@@ -185,11 +186,12 @@ class CustomModule final : public vm::NativeModule<CustomModuleState> {
 // Note that while we are using C++ bindings internally we still expose the
 // module as a C instance. This hides the details of our implementation.
 extern "C" iree_status_t iree_custom_module_create(
-    iree_allocator_t allocator, iree_vm_module_t** out_module) {
+    iree_vm_instance_t* instance, iree_allocator_t allocator,
+    iree_vm_module_t** out_module) {
   IREE_ASSERT_ARGUMENT(out_module);
   *out_module = NULL;
   auto module = std::make_unique<CustomModule>(
-      "custom", /*version=*/0, allocator,
+      "custom", /*version=*/0, instance, allocator,
       iree::span<const vm::NativeFunction<CustomModuleState>>(
           kCustomModuleFunctions));
   *out_module = module.release()->interface();

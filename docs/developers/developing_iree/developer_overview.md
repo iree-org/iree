@@ -180,10 +180,11 @@ For example, to execute the contents of
 [samples/models/simple_abs.mlir](https://github.com/iree-org/iree/blob/main/samples/models/simple_abs.mlir):
 
 ```shell
+# iree-run-mlir <compiler flags> [input.mlir] <runtime flags>
 $ ../iree-build/tools/iree-run-mlir \
-  --function-input="f32=-2" \
   --iree-hal-target-backends=vmvx \
-  $PWD/samples/models/simple_abs.mlir
+  $PWD/samples/models/simple_abs.mlir \
+  --function_input=f32=-2
 ```
 
 ### iree-dump-module

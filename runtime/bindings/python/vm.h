@@ -129,7 +129,8 @@ class VmInstance : public ApiRefCounted<VmInstance, iree_vm_instance_t> {
 
 class VmModule : public ApiRefCounted<VmModule, iree_vm_module_t> {
  public:
-  static VmModule FromFlatbufferBlob(py::object flatbuffer_blob_object);
+  static VmModule FromFlatbufferBlob(VmInstance* instance,
+                                     py::object flatbuffer_blob_object);
 
   std::optional<iree_vm_function_t> LookupFunction(
       const std::string& name, iree_vm_function_linkage_t linkage);

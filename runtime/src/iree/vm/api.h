@@ -9,7 +9,6 @@
 
 #include "iree/base/api.h"
 #include "iree/vm/buffer.h"         // IWYU pragma: export
-#include "iree/vm/builtin_types.h"  // IWYU pragma: export
 #include "iree/vm/context.h"        // IWYU pragma: export
 #include "iree/vm/instance.h"       // IWYU pragma: export
 #include "iree/vm/invocation.h"     // IWYU pragma: export

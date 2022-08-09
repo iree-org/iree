@@ -14,7 +14,7 @@ import iree.compiler
 import iree.runtime
 
 
-def create_add_scalar_module():
+def create_add_scalar_module(instance):
   binary = iree.compiler.compile_str(
       """
       func.func @add_scalar(%arg0: i32, %arg1: i32) -> i32 {
@@ -24,11 +24,11 @@ def create_add_scalar_module():
       """,
       target_backends=iree.compiler.core.DEFAULT_TESTING_BACKENDS,
   )
-  m = iree.runtime.VmModule.from_flatbuffer(binary)
+  m = iree.runtime.VmModule.from_flatbuffer(instance, binary)
   return m
 
 
-def create_simple_static_mul_module():
+def create_simple_static_mul_module(instance):
   binary = iree.compiler.compile_str(
       """
       func.func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32> {
@@ -38,11 +38,11 @@ def create_simple_static_mul_module():
       """,
       target_backends=iree.compiler.core.DEFAULT_TESTING_BACKENDS,
   )
-  m = iree.runtime.VmModule.from_flatbuffer(binary)
+  m = iree.runtime.VmModule.from_flatbuffer(instance, binary)
   return m
 
 
-def create_simple_dynamic_abs_module():
+def create_simple_dynamic_abs_module(instance):
   binary = iree.compiler.compile_str(
       """
       func.func @dynamic_abs(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32> {
@@ -52,7 +52,7 @@ def create_simple_dynamic_abs_module():
       """,
       target_backends=iree.compiler.DEFAULT_TESTING_BACKENDS,
   )
-  m = iree.runtime.VmModule.from_flatbuffer(binary)
+  m = iree.runtime.VmModule.from_flatbuffer(instance, binary)
   return m
 
 
@@ -60,49 +60,46 @@ class VmTest(unittest.TestCase):
 
   @classmethod
   def setUp(self):
+    self.instance = iree.runtime.VmInstance()
     self.device = iree.runtime.get_device(
         iree.compiler.core.DEFAULT_TESTING_DRIVER)
-    self.hal_module = iree.runtime.create_hal_module(self.device)
+    self.hal_module = iree.runtime.create_hal_module(self.instance, self.device)
 
   def test_context_id(self):
-    instance = iree.runtime.VmInstance()
-    context1 = iree.runtime.VmContext(instance)
-    context2 = iree.runtime.VmContext(instance)
+    context1 = iree.runtime.VmContext(self.instance)
+    context2 = iree.runtime.VmContext(self.instance)
     self.assertNotEqual(context2.context_id, context1.context_id)
 
   def test_module_basics(self):
-    m = create_simple_static_mul_module()
+    m = create_simple_static_mul_module(self.instance)
     f = m.lookup_function("simple_mul")
     self.assertGreaterEqual(f.ordinal, 0)
     notfound = m.lookup_function("notfound")
     self.assertIs(notfound, None)
 
   def test_dynamic_module_context(self):
-    instance = iree.runtime.VmInstance()
-    context = iree.runtime.VmContext(instance)
-    m = create_simple_static_mul_module()
+    context = iree.runtime.VmContext(self.instance)
+    m = create_simple_static_mul_module(self.instance)
     context.register_modules([self.hal_module, m])
 
   def test_static_module_context(self):
-    m = create_simple_static_mul_module()
+    m = create_simple_static_mul_module(self.instance)
     logging.info("module: %s", m)
-    instance = iree.runtime.VmInstance()
-    logging.info("instance: %s", instance)
-    context = iree.runtime.VmContext(instance, modules=[self.hal_module, m])
+    context = iree.runtime.VmContext(self.instance,
+                                     modules=[self.hal_module, m])
     logging.info("context: %s", context)
 
   def test_dynamic_shape_compile(self):
-    m = create_simple_dynamic_abs_module()
+    m = create_simple_dynamic_abs_module(self.instance)
     logging.info("module: %s", m)
-    instance = iree.runtime.VmInstance()
-    logging.info("instance: %s", instance)
-    context = iree.runtime.VmContext(instance, modules=[self.hal_module, m])
+    context = iree.runtime.VmContext(self.instance,
+                                     modules=[self.hal_module, m])
     logging.info("context: %s", context)
 
   def test_add_scalar_new_abi(self):
-    m = create_add_scalar_module()
-    instance = iree.runtime.VmInstance()
-    context = iree.runtime.VmContext(instance, modules=[self.hal_module, m])
+    m = create_add_scalar_module(self.instance)
+    context = iree.runtime.VmContext(self.instance,
+                                     modules=[self.hal_module, m])
     f = m.lookup_function("add_scalar")
     finv = iree.runtime.FunctionInvoker(context, self.device, f, tracer=None)
     result = finv(5, 6)
@@ -110,9 +107,9 @@ class VmTest(unittest.TestCase):
     self.assertEqual(result, 11)
 
   def test_synchronous_dynamic_shape_invoke_function_new_abi(self):
-    m = create_simple_dynamic_abs_module()
-    instance = iree.runtime.VmInstance()
-    context = iree.runtime.VmContext(instance, modules=[self.hal_module, m])
+    m = create_simple_dynamic_abs_module(self.instance)
+    context = iree.runtime.VmContext(self.instance,
+                                     modules=[self.hal_module, m])
     f = m.lookup_function("dynamic_abs")
     finv = iree.runtime.FunctionInvoker(context, self.device, f, tracer=None)
     arg0 = np.array([[-1., 2.], [3., -4.]], dtype=np.float32)
@@ -121,9 +118,9 @@ class VmTest(unittest.TestCase):
     np.testing.assert_allclose(result, [[1., 2.], [3., 4.]])
 
   def test_synchronous_invoke_function_new_abi(self):
-    m = create_simple_static_mul_module()
-    instance = iree.runtime.VmInstance()
-    context = iree.runtime.VmContext(instance, modules=[self.hal_module, m])
+    m = create_simple_static_mul_module(self.instance)
+    context = iree.runtime.VmContext(self.instance,
+                                     modules=[self.hal_module, m])
     f = m.lookup_function("simple_mul")
     finv = iree.runtime.FunctionInvoker(context, self.device, f, tracer=None)
     arg0 = np.array([1., 2., 3., 4.], dtype=np.float32)

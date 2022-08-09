@@ -17,7 +17,8 @@ extern "C" {
 #endif  // __cplusplus
 
 // Creates a native custom module.
-iree_status_t iree_check_module_create(iree_allocator_t allocator,
+iree_status_t iree_check_module_create(iree_vm_instance_t* instance,
+                                       iree_allocator_t allocator,
                                        iree_vm_module_t** out_module);
 
 #ifdef __cplusplus

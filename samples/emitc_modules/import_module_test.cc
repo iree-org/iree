@@ -21,10 +21,12 @@ class VMImportModuleTest : public ::testing::Test {
     IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance_));
 
     iree_vm_module_t* module_a = nullptr;
-    IREE_CHECK_OK(module_a_create(iree_allocator_system(), &module_a));
+    IREE_CHECK_OK(
+        module_a_create(instance_, iree_allocator_system(), &module_a));
 
     iree_vm_module_t* module_b = nullptr;
-    IREE_CHECK_OK(module_b_create(iree_allocator_system(), &module_b));
+    IREE_CHECK_OK(
+        module_b_create(instance_, iree_allocator_system(), &module_b));
 
     // Note: order matters as module_a imports from module_b
     std::vector<iree_vm_module_t*> modules = {module_b, module_a};

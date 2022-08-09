@@ -38,15 +38,18 @@ extern "C" {
 
 // Registers the custom types used by the inline HAL module.
 // WARNING: not thread-safe; call at startup before using.
-IREE_API_EXPORT iree_status_t iree_hal_module_register_inline_types(void);
+IREE_API_EXPORT iree_status_t
+iree_hal_module_register_inline_types(iree_vm_instance_t* instance);
 
 // Registers the custom types used by the dynamic HAL executable loader module.
 // WARNING: not thread-safe; call at startup before using.
-IREE_API_EXPORT iree_status_t iree_hal_module_register_loader_types(void);
+IREE_API_EXPORT iree_status_t
+iree_hal_module_register_loader_types(iree_vm_instance_t* instance);
 
 // Registers the custom types used by the full HAL module.
 // WARNING: not thread-safe; call at startup before using.
-IREE_API_EXPORT iree_status_t iree_hal_module_register_all_types(void);
+IREE_API_EXPORT iree_status_t
+iree_hal_module_register_all_types(iree_vm_instance_t* instance);
 
 // TODO(benvanik): generate these list helpers:
 

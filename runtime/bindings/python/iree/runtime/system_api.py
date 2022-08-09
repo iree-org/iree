@@ -72,7 +72,7 @@ class Config:
           driver_name.split(",") if driver_name is not None else None)
 
     self.vm_instance = _binding.VmInstance()
-    hal_module = _binding.create_hal_module(self.device)
+    hal_module = _binding.create_hal_module(self.vm_instance, self.device)
     self.default_vm_modules = (hal_module,)
     self.tracer = tracer or tracing.get_default_tracer()
     if self.tracer and self.tracer.enabled:
@@ -283,8 +283,10 @@ def load_vm_flatbuffer(vm_flatbuffer: bytes,
                      "the driver from.")
   if backend is not None:
     driver = TARGET_BACKEND_TO_DRIVER[backend]
-  vm_module = _binding.VmModule.from_flatbuffer(vm_flatbuffer)
-  bound_module = load_vm_module(vm_module, Config(driver))
+  config = Config(driver)
+  vm_module = _binding.VmModule.from_flatbuffer(config.vm_instance,
+                                                vm_flatbuffer)
+  bound_module = load_vm_module(vm_module, config)
   return bound_module
 
 

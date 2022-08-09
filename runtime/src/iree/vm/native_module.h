@@ -12,6 +12,7 @@
 #include <stdint.h>
 
 #include "iree/base/api.h"
+#include "iree/vm/instance.h"
 #include "iree/vm/module.h"
 #include "iree/vm/stack.h"
 
@@ -136,12 +137,14 @@ IREE_API_EXPORT iree_host_size_t iree_vm_native_module_size(void);
 IREE_API_EXPORT iree_status_t iree_vm_native_module_create(
     const iree_vm_module_t* interface,
     const iree_vm_native_module_descriptor_t* module_descriptor,
-    iree_allocator_t allocator, iree_vm_module_t** out_module);
+    iree_vm_instance_t* instance, iree_allocator_t allocator,
+    iree_vm_module_t** out_module);
 
 IREE_API_EXPORT iree_status_t iree_vm_native_module_initialize(
     const iree_vm_module_t* interface,
     const iree_vm_native_module_descriptor_t* module_descriptor,
-    iree_allocator_t allocator, iree_vm_module_t* module);
+    iree_vm_instance_t* instance, iree_allocator_t allocator,
+    iree_vm_module_t* module);
 
 #ifdef __cplusplus
 }  // extern "C"

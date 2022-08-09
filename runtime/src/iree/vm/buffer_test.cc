@@ -10,15 +10,16 @@
 
 #include "iree/base/api.h"
 #include "iree/testing/gtest.h"
-#include "iree/vm/builtin_types.h"
+#include "iree/vm/instance.h"
 
 namespace {
 
-class VMBufferTest : public ::testing::Test {
- protected:
+static iree_vm_instance_t* instance = NULL;
+struct VMBufferTest : public ::testing::Test {
   static void SetUpTestSuite() {
-    IREE_CHECK_OK(iree_vm_register_builtin_types());
+    IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance));
   }
+  static void TearDownTestSuite() { iree_vm_instance_release(instance); }
 };
 
 // Tests that the data allocator is correctly called when using stack

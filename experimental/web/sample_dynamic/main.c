@@ -131,7 +131,7 @@ iree_program_state_t* load_program(iree_sample_state_t* sample_state,
     // Take ownership of the FlatBuffer data so JavaScript doesn't need to
     // explicitly call `Module._free()`.
     status = iree_vm_bytecode_module_create(
-        iree_make_const_byte_span(vmfb_data, length),
+        sample_state->instance, iree_make_const_byte_span(vmfb_data, length),
         /*flatbuffer_allocator=*/iree_allocator_system(),
         iree_allocator_system(), &program_state->module);
   } else {
