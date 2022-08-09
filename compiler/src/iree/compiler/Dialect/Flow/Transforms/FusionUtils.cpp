@@ -12,6 +12,7 @@
 //===---------------------------------------------------------------------===//
 #include "iree/compiler/Dialect/Flow/Transforms/FusionUtils.h"
 
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -116,8 +117,12 @@ static bool isReductionBroadcastElementwise(OpOperand *operand) {
   auto consumer = dyn_cast<linalg::LinalgOp>(operand->getOwner());
   if (!producer || !consumer) return false;
 
+  llvm::dbgs() << "ccccccccccccc\n";
+
   // Check if the producer is a simple reduction.
   if (!isReductionOnInnermostDims(producer)) return false;
+
+  llvm::dbgs() << "cccccccccccccd\n";
 
   // Check if the reduction is broadcasted back for the elementwise op.
   // TODO: We may need to relax the condition to support some broadcast with
@@ -127,8 +132,12 @@ static bool isReductionBroadcastElementwise(OpOperand *operand) {
   auto inputIndexingMap = consumer.getTiedIndexingMap(operand);
   if (outputIndexingMap != inputIndexingMap) return false;
 
+  llvm::dbgs() << "ccccccccccccce\n";
+
   // Check if the consumer is an elementwise with identity output indexing map.
   if (!isSimpleElementwise(consumer)) return false;
+
+  llvm::dbgs() << "cccccccccccccf\n";
 
   // When we have static shapes, we do extra checks for the type. For dynamic
   // shape cases, we do not check the shape and do aggressive fusion with high
@@ -139,6 +148,8 @@ static bool isReductionBroadcastElementwise(OpOperand *operand) {
   // #9802: Vulkan codegen with dynamic shape is not supported yet.
   if (!hasOnlyStaticShape) return false;
 
+  llvm::dbgs() << "cccccccccccccg\n";
+
   // Check the input and output shapes are compatible. They are compatible when
   //   1. the shapes are identical, or
   //   2. the broadcasted input shape is the same as the output shape.
@@ -147,11 +158,16 @@ static bool isReductionBroadcastElementwise(OpOperand *operand) {
   if (numInputs == 1) {
     auto input = producer.getInputOperand(0);
     auto indexingMap = producer.getTiedIndexingMap(input);
+    llvm::dbgs() << "ccccccccccccch\n";
     if (!indexingMap.isIdentity()) return false;
+
+    llvm::dbgs() << "ccccccccccccci\n";
 
     if (hasOnlyStaticShape &&
         producer.getInputOperand(0)->get().getType() != ewOutputType)
       return false;
+
+    llvm::dbgs() << "cccccccccccccj\n";
   } else {
     assert(numInputs == 2 && "Expected two inputs to reduction");
 
@@ -195,6 +211,7 @@ static bool isReductionBroadcastElementwise(OpOperand *operand) {
 bool areLinalgOpsFusableUsingTileAndFuse(OpOperand &use) {
   auto producer = use.get().getDefiningOp<linalg::LinalgOp>();
   auto consumer = dyn_cast<linalg::LinalgOp>(use.getOwner());
+  llvm::dbgs() << "aaaaaaaa\n";
   if (!producer || !consumer) return false;
 
   // 1. Producer has a single result.
@@ -210,6 +227,7 @@ bool areLinalgOpsFusableUsingTileAndFuse(OpOperand &use) {
   // Otherwise, check if the result of producer is accessed using identity
   // indexing.
   AffineMap consumerIndexingMap = consumer.getTiedIndexingMap(&use);
+  llvm::dbgs() << "bbbbbbbbb\n";
   if (clFuseReductionBroadcastElementwise &&
       isReductionBroadcastElementwise(&use)) {
     return true;
