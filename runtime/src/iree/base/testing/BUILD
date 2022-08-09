@@ -8,7 +8,6 @@ load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_test")
 load("//build_tools/embed_data:build_defs.bzl", "c_embed_data")
 
 package(
-    default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
 )
