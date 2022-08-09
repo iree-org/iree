@@ -11,8 +11,8 @@ from urllib.parse import urlparse
 import os
 
 from benchmarks.definitions.common import ArchitectureInfo, ModelSourceType
-from benchmarks import iree_benchmarks
 from benchmarks.definitions.iree import IreeCompileConfig, IreeCompileTarget
+from benchmarks import iree_benchmarks
 
 TEMPLATE_DIR = Path(__file__).parent
 DOWNLOAD_ARTIFACT_CMAKE_TEMPLATE = Template(
