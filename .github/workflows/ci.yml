@@ -45,10 +45,25 @@ env:
 
 # Jobs are organized into groups and topologically sorted by dependencies
 jobs:
+  choose_jobs:
+    runs-on: ubuntu-20.04
+    outputs:
+      jobs: ${{ steps.compute.outputs.jobs }}
+    steps:
+      - name: "Computing which jobs to run"
+        id: compute
+        run: |
+          # DO NOT SUBMIT: replace with some Python script
+          JOBS="$(echo '["build_runtime", "test_runtime"]' | jq -c)"
+          echo "::set-output name=jobs::${JOBS}"
+
+
   ################################### Basic ####################################
   # Jobs that build all of IREE "normally"
   ##############################################################################
   build_all:
+    needs: choose_jobs
+    if: contains(fromJson(needs.choose_jobs.outputs.jobs), 'build_all')
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
@@ -100,6 +115,8 @@ jobs:
           echo "::set-output name=gcs-artifact::${GCS_ARTIFACT}"
 
   build_test_all_bazel:
+    needs: choose_jobs
+    if: contains(fromJson(needs.choose_jobs.outputs.jobs), 'build_test_all_bazel')
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
@@ -125,7 +142,8 @@ jobs:
             ./build_tools/bazel/build_core.sh
 
   test_all:
-    needs: build_all
+    needs: [build_all, choose_jobs]
+    if: contains(fromJson(needs.choose_jobs.outputs.jobs), 'test_all')
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
@@ -154,8 +172,8 @@ jobs:
             "${BUILD_DIR}"
 
   test_gpu:
-    if: github.event_name != 'pull_request'
-    needs: build_all
+    needs: [build_all, choose_jobs]
+    if: contains(fromJson(needs.choose_jobs.outputs.jobs), 'test_gpu')
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
@@ -197,6 +215,8 @@ jobs:
   # Jobs that build some subset of IREE
   ##############################################################################
   build_runtime:
+    needs: choose_jobs
+    if: contains(fromJson(needs.choose_jobs.outputs.jobs), 'build_runtime')
     runs-on: ubuntu-20.04
     env:
       BUILD_DIR: build-runtime
@@ -227,7 +247,8 @@ jobs:
           path: "${{ env.BUILD_DIR }}.tar"
 
   test_runtime:
-    needs: build_runtime
+    needs: [build_runtime, choose_jobs]
+    if: contains(fromJson(needs.choose_jobs.outputs.jobs), 'test_runtime')
     runs-on: ubuntu-20.04
     env:
       BUILD_DIR: ${{ needs.build_runtime.outputs.build-dir }}
@@ -260,6 +281,8 @@ jobs:
   # Jobs that build the IREE-Tensorflow integrations
   ##############################################################################
   build_tf_integrations:
+    needs: choose_jobs
+    if: contains(fromJson(needs.choose_jobs.outputs.jobs), 'build_tf_integrations')
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
@@ -305,7 +328,8 @@ jobs:
           echo "::set-output name=gcs-artifact::${GCS_ARTIFACT}"
 
   test_tf_integrations:
-    needs: [build_tf_integrations, build_all]
+    needs: [build_tf_integrations, build_all, choose_jobs, choose_jobs]
+    if: contains(fromJson(needs.choose_jobs.outputs.jobs), 'test_tf_integrations')
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
@@ -343,8 +367,8 @@ jobs:
             "${BUILD_DIR}"
 
   test_tf_integrations_gpu:
-    needs: [build_tf_integrations, build_all]
-    if: github.event_name != 'pull_request'
+    needs: [build_tf_integrations, build_all, choose_jobs]
+    if: contains(fromJson(needs.choose_jobs.outputs.jobs), 'test_tf_integrations_gpu')
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
@@ -390,6 +414,8 @@ jobs:
   # Jobs that build IREE in some non-default configuration
   ##############################################################################
   asan:
+    needs: choose_jobs
+    if: contains(fromJson(needs.choose_jobs.outputs.jobs), 'asan')
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
@@ -408,6 +434,8 @@ jobs:
             ./build_tools/cmake/build_and_test_asan.sh
 
   tsan:
+    needs: choose_jobs
+    if: contains(fromJson(needs.choose_jobs.outputs.jobs), 'tsan')
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
@@ -426,7 +454,8 @@ jobs:
             ./build_tools/cmake/build_and_test_tsan.sh
 
   build_benchmarks:
-    needs: [build_all, build_tf_integrations]
+    needs: [build_all, build_tf_integrations, choose_jobs]
+    if: contains(fromJson(needs.choose_jobs.outputs.jobs), 'build_benchmarks')
     runs-on:
       # Hacks, and order matters. See the comment at the top of the file.
       - self-hosted
@@ -468,7 +497,8 @@ jobs:
   # Jobs that cross-compile IREE for other platforms
   ##############################################################################
   android_arm64:
-    needs: [host_tools_assertions]
+    needs: [host_tools_assertions, choose_jobs]
+    if: contains(fromJson(needs.choose_jobs.outputs.jobs), 'android_arm64')
     runs-on:
       # Hacks, and order matters. See the comment at the top of the file.
       - self-hosted
@@ -501,7 +531,8 @@ jobs:
             build_tools/build_android.sh
 
   riscv32:
-    needs: host_tools_assertions
+    needs: [host_tools_assertions, choose_jobs]
+    if: contains(fromJson(needs.choose_jobs.outputs.jobs), 'riscv32')
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
@@ -536,7 +567,8 @@ jobs:
             "./build_tools/cmake/build_riscv.sh && tests/riscv32/smoke.sh"
 
   riscv64:
-    needs: [build_all, host_tools_assertions, build_tf_integrations]
+    needs: [build_all, host_tools_assertions, build_tf_integrations, choose_jobs]
+    if: contains(fromJson(needs.choose_jobs.outputs.jobs), 'riscv64')
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
