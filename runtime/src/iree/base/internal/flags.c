@@ -305,7 +305,7 @@ IREE_FLAG_CALLBACK(iree_flags_parse_help, iree_flags_print_help, NULL, help,
 static void iree_flags_remove_arg(int arg, int* argc_ptr, char*** argv_ptr) {
   int argc = *argc_ptr;
   char** argv = *argv_ptr;
-  memmove(&argv[arg], &argv[arg + 1], (argc - arg) * sizeof(char*));
+  memmove(&argv[arg], &argv[arg + 1], (argc - arg - 1) * sizeof(char*));
   *argc_ptr = argc - 1;
 }
 
