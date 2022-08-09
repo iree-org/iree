@@ -277,7 +277,7 @@ IREE_API_EXPORT iree_status_t iree_vm_invoke(
   // Perform the initial invocation step, which if synchronous may fully
   // complete the invocation before returning. If it yields we'll need to resume
   // it, possibly after taking care of pending waits.
-  iree_vm_invoke_state_t state;
+  iree_vm_invoke_state_t state = {0};
   iree_status_t status = iree_vm_begin_invoke(&state, context, function, flags,
                                               policy, inputs, host_allocator);
   while (iree_status_is_deferred(status)) {

@@ -142,6 +142,12 @@ iree_vm_ref_type_name(iree_vm_ref_type_t type);
 IREE_API_EXPORT const iree_vm_ref_type_descriptor_t*
 iree_vm_ref_lookup_registered_type(iree_string_view_t full_name);
 
+// Returns a NULL ref wrapper.
+static inline iree_vm_ref_t iree_vm_ref_null(void) {
+  iree_vm_ref_t ref = {0};
+  return ref;
+}
+
 // Wraps a raw pointer in a iree_vm_ref_t reference and assigns it to |out_ref|.
 // |out_ref| will be released if it already contains a reference. The target
 // object will not be retained and must come in with a count >= 1.

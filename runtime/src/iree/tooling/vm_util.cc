@@ -170,6 +170,11 @@ Status ParseToVariantList(iree_hal_allocator_t* device_allocator,
       IREE_RETURN_IF_ERROR(LoadNdarraysFromFile(input_view, device_allocator,
                                                 variant_list.get()));
       continue;
+    } else if (iree_string_view_equal(input_view, IREE_SV("(null)"))) {
+      iree_vm_ref_t null_ref = iree_vm_ref_null();
+      IREE_RETURN_IF_ERROR(
+          iree_vm_list_push_ref_retain(variant_list.get(), &null_ref));
+      continue;
     }
     bool has_equal =
         iree_string_view_find_char(input_view, '=', 0) != IREE_STRING_VIEW_NPOS;
@@ -247,7 +252,9 @@ Status PrintVariantList(iree_vm_list_t* variant_list, size_t max_element_count,
                          "variant %zu not present", i);
 
     *os << "result[" << i << "]: ";
-    if (iree_vm_variant_is_value(variant)) {
+    if (iree_vm_variant_is_empty(variant)) {
+      *os << "(null)\n";
+    } else if (iree_vm_variant_is_value(variant)) {
       switch (variant.type.value_type) {
         case IREE_VM_VALUE_TYPE_I8:
           *os << "i8=" << variant.i8 << "\n";

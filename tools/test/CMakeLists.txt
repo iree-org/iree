@@ -19,6 +19,7 @@ iree_lit_test_suite(
     "iree-run-module.mlir"
     "multiple_args.mlir"
     "multiple_exported_functions.mlir"
+    "null_values.mlir"
     "repeated_return.mlir"
     "scalars.mlir"
   TOOLS
