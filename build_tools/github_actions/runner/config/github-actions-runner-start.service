@@ -5,9 +5,9 @@ After=network.target
 [Service]
 User=runner
 Group=runner
-ExecStart=/home/runner/actions-runner/bin/Runner.Listener run --startuptype service
+ExecStart=/home/runner/config/start.sh
 Restart=no
-WorkingDirectory=/home/runner/actions-runner
+WorkingDirectory=/home/runner/config
 KillMode=process
 KillSignal=SIGTERM
 TimeoutStopSec=5min
