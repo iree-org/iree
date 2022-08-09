@@ -37,6 +37,6 @@ echo "Reconfiguring to enable benchmarks"
 
 echo "Building benchmark artifacts"
 "${CMAKE_BIN}" \
-  --build "${BUILD_DIR}"
+  --build "${BUILD_DIR}" \
   --target iree-benchmark-suites iree-microbenchmark-suites \
   -- -k 0
