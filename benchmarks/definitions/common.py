@@ -26,6 +26,8 @@ class DevicePlatform(Enum):
 
 
 class ModelSourceType(Enum):
+  # Exported MLIR file.
+  EXPORTED_MLIR = "exported_mlir"
   # Exported TFLite model file.
   EXPORTED_TFLITE = "exported_tflite"
   # Exported SavedModel from Tensorflow.

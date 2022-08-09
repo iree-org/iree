@@ -5,10 +5,10 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 from typing import List, Tuple
-from device_library import GCP_C2_STANDARD_16_DEVICE_SPEC
-from model_library import MOBILENET_V2_MODEL
-from definitions.common import DeviceArchitecture, DevicePlatform, ZEROS_MODEL_INPUT_DATA
-from definitions.iree import IreeBenchmarkCompileSpec, IreeBenchmarkRunSpec, IreeCompileTarget, IreeCompileConfig, IreeRunConfig, IreeRuntimeDriver, IreeRuntimeLoader, IreeTargetBackend
+from benchmarks.device_library import GCP_C2_STANDARD_16_DEVICE_SPEC
+from benchmarks.model_library import MOBILENET_V2_MODEL
+from benchmarks.definitions.common import DeviceArchitecture, DevicePlatform, ZEROS_MODEL_INPUT_DATA
+from benchmarks.definitions.iree import IreeBenchmarkCompileSpec, IreeBenchmarkRunSpec, IreeCompileTarget, IreeCompileConfig, IreeRunConfig, IreeRuntimeDriver, IreeRuntimeLoader, IreeTargetBackend
 
 
 class Linux_x86_64_Benchmarks(object):

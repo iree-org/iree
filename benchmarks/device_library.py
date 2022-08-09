@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-from definitions.common import DeviceArchitecture, DevicePlatform, DeviceSpec
+from benchmarks.definitions.common import DeviceArchitecture, DevicePlatform, DeviceSpec
 
 GCP_C2_STANDARD_16_DEVICE_SPEC = DeviceSpec(
     id="d1234",
