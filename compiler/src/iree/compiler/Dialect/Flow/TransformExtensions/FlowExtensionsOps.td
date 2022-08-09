@@ -159,9 +159,6 @@ def CloneSucceedingOpIntoDispatchRegionOp : Op<
     are yielded from the dispatch region and used instead of results of the
     original target op.
 
-    TODO: Support multiple payload ops for the `target` handle. In that case,
-    the targets must be sorted topologically before cloning them.
-
     #### Return modes
 
     This transform consumes both the `target` handle and the `dispatch_region`
