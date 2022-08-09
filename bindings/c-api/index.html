@@ -1235,9 +1235,6 @@ through the Hardware Abstraction Layer (HAL) interface.</p>
 <span class="n">iree_api_version_t</span><span class="w"> </span><span class="n">actual_version</span><span class="p">;</span><span class="w"></span>
 <span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_api_version_check</span><span class="p">(</span><span class="n">IREE_API_VERSION_LATEST</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">actual_version</span><span class="p">));</span><span class="w"></span>
 
-<span class="c1">// Modules with custom types must be statically registered before use.</span>
-<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_hal_module_register_all_types</span><span class="p">());</span><span class="w"></span>
-
 <span class="c1">// Device drivers are managed through registries.</span>
 <span class="c1">// Applications may use multiple registries to more finely control driver</span>
 <span class="c1">// lifetimes and visibility.</span>
@@ -1255,6 +1252,9 @@ Applications should propagate errors and handle or report them as desired.</p>
 <span class="c1">// is handled and extraneous device interaction is avoided.</span>
 <span class="n">iree_vm_instance_t</span><span class="o">*</span><span class="w"> </span><span class="n">instance</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span><span class="w"></span>
 <span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_vm_instance_create</span><span class="p">(</span><span class="n">iree_allocator_system</span><span class="p">(),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">instance</span><span class="p">));</span><span class="w"></span>
+
+<span class="c1">// Modules with custom types must be statically registered before use.</span>
+<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_hal_module_register_all_types</span><span class="p">(</span><span class="n">instance</span><span class="p">));</span><span class="w"></span>
 
 <span class="c1">// We use the CPU &quot;local-task&quot; driver in this example, but could use a different</span>
 <span class="c1">// driver like the GPU &quot;vulkan&quot; driver. The driver(s) used should match with</span>
@@ -1276,7 +1276,7 @@ Applications should propagate errors and handle or report them as desired.</p>
 <span class="c1">// We&#39;ll load this module into a VM context later.</span>
 <span class="n">iree_vm_module_t</span><span class="o">*</span><span class="w"> </span><span class="n">hal_module</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span><span class="w"></span>
 <span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="w"></span>
-<span class="w">    </span><span class="n">iree_hal_module_create</span><span class="p">(</span><span class="n">device</span><span class="p">,</span><span class="w"> </span><span class="n">IREE_HAL_MODULE_FLAG_NONE</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="n">iree_hal_module_create</span><span class="p">(</span><span class="n">instance</span><span class="p">,</span><span class="w"> </span><span class="n">device</span><span class="p">,</span><span class="w"> </span><span class="n">IREE_HAL_MODULE_FLAG_NONE</span><span class="p">,</span><span class="w"></span>
 <span class="w">                           </span><span class="n">iree_allocator_system</span><span class="p">(),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">hal_module</span><span class="p">));</span><span class="w"></span>
 <span class="c1">// The reference to the driver can be released now.</span>
 <span class="n">iree_hal_driver_release</span><span class="p">(</span><span class="n">driver</span><span class="p">);</span><span class="w"></span>
@@ -1291,6 +1291,7 @@ but custom allocators may also be used.</p>
 
 <span class="n">iree_vm_module_t</span><span class="o">*</span><span class="w"> </span><span class="n">bytecode_module</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span><span class="w"></span>
 <span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_vm_bytecode_module_create</span><span class="p">(</span><span class="w"></span>
+<span class="w">    </span><span class="n">instance</span><span class="p">,</span><span class="w"></span>
 <span class="w">    </span><span class="n">iree_const_byte_span_t</span><span class="p">{</span><span class="n">module_data</span><span class="p">,</span><span class="w"> </span><span class="n">module_size</span><span class="p">},</span><span class="w"></span>
 <span class="w">    </span><span class="cm">/*flatbuffer_allocator=*/</span><span class="n">iree_allocator_null</span><span class="p">(),</span><span class="w"></span>
 <span class="w">    </span><span class="cm">/*allocator=*/</span><span class="n">iree_allocator_system</span><span class="p">(),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">bytecode_module</span><span class="p">));</span><span class="w"></span>
