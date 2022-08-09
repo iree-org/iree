@@ -43,61 +43,11 @@ on:
 env:
   BUCKET: gs://iree-github-actions-${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}-artifacts
 
+# Jobs are organized into groups and topologically sorted by dependencies
 jobs:
-  build_runtime:
-    runs-on: ubuntu-20.04
-    env:
-      BUILD_DIR: build-runtime
-    outputs:
-      # Pass through the build directory as output so it's available to
-      # dependent jobs.
-      build-dir: ${{ env.BUILD_DIR }}
-    steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
-        with:
-          submodules: true
-      - name: "Building runtime"
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/base@sha256:5d43683c6b50aebe1fca6c85f2012f3b0fa153bf4dd268e8767b619b1891423a \
-            ./build_tools/cmake/build_runtime.sh \
-            "${BUILD_DIR}"
-      # Using a tar archive is necessary to preserve file permissions. See
-      # https://github.com/actions/upload-artifact#maintaining-file-permissions-and-case-sensitive-files
-      # The upload action already does its own gzip compression, so no need to
-      # do our own.
-      - name: "Create build dir archive"
-        run: tar -cf ${BUILD_DIR}.tar ${BUILD_DIR}
-      - uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # v3.1.0
-        with:
-          name: "${{ env.BUILD_DIR }}.tar"
-          path: "${{ env.BUILD_DIR }}.tar"
-
-  test_runtime:
-    needs: build_runtime
-    runs-on: ubuntu-20.04
-    env:
-      BUILD_DIR: ${{ needs.build_runtime.outputs.build-dir }}
-    steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
-        with:
-          submodules: true
-      - name: "Downloading runtime build directory"
-        uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741 # v3.0.0
-        with:
-          name: "${{ env.BUILD_DIR }}.tar"
-      - name: "Extracting archive"
-        run: tar -xf ${BUILD_DIR}.tar
-      - name: "Testing runtime"
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            --env IREE_VULKAN_DISABLE=1 \
-            gcr.io/iree-oss/base@sha256:5d43683c6b50aebe1fca6c85f2012f3b0fa153bf4dd268e8767b619b1891423a \
-            ./build_tools/cmake/ctest_all.sh \
-            "${BUILD_DIR}"
-
+  ################################### Basic ####################################
+  # Jobs that build all of IREE "normally"
+  ##############################################################################
   build_all:
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
@@ -174,58 +124,6 @@ jobs:
             gcr.io/iree-oss/frontends-swiftshader@sha256:41e516b8c1b432e3c02896c4bf4b7f06df6a67371aa167b88767b8d4d2018ea6 \
             ./build_tools/bazel/build_core.sh
 
-
-  host_tools_assertions:
-    uses: ./.github/workflows/host_tools.yml
-    with:
-      host-binary-root: host-tools-assertions
-      enable-assertions: "ON"
-
-  build_tf_integrations:
-    runs-on:
-      # Pseudo-ternary hack and order matters. See comment at top of file.
-      - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
-      - cpu
-      - os-family=Linux
-    outputs:
-      binaries-dir: ${{ steps.build.outputs.binaries-dir }}
-      binaries-archive: ${{ steps.archive.outputs.binaries-archive }}
-      gcs-artifact: ${{ steps.upload.outputs.gcs-artifact }}
-    steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
-        with:
-          submodules: true
-      - name: "Building TF binaries"
-        id: build
-        env:
-          IREE_TF_BINARIES_OUTPUT_DIR: iree-tf-binaries
-          # Psuedo-ternary hack. Don't swap the condition! See comment at top of file.
-          IREE_BAZEL_WRITE_REMOTE_CACHE: ${{ github.event_name != 'pull_request' && 1 || 0 }}
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            --env "IREE_TF_BINARIES_OUTPUT_DIR=$(realpath "${IREE_TF_BINARIES_OUTPUT_DIR}")" \
-            gcr.io/iree-oss/frontends-swiftshader@sha256:3090418a8d8a64c356d35eff285af32570a72f41127aa123209c1562f57abb01 \
-            build_tools/cmake/build_tf_binaries.sh
-          echo "::set-output name=binaries-dir::${IREE_TF_BINARIES_OUTPUT_DIR}"
-      - name: "Creating archive of binaries"
-        id: archive
-        env:
-          BINARIES_ARCHIVE: tf-binaries.tar
-          BINARIES_DIR: ${{ steps.build.outputs.binaries-dir }}
-        run: |
-          tar -cf "${BINARIES_ARCHIVE}" "${BINARIES_DIR}"
-          echo "::set-output name=binaries-archive::${BINARIES_ARCHIVE}"
-      - name: "Uploading binaries archive"
-        id: upload
-        env:
-          GCS_ARTIFACT: ${{ env.BUCKET }}/${{ github.sha }}/${{ steps.archive.outputs.binaries-archive }}
-          BINARIES_ARCHIVE: ${{ steps.archive.outputs.binaries-archive }}
-        run: |
-          gcloud alpha storage cp "${BINARIES_ARCHIVE}" "${GCS_ARTIFACT}"
-          echo "::set-output name=gcs-artifact::${GCS_ARTIFACT}"
-
   test_all:
     needs: build_all
     runs-on:
@@ -294,6 +192,117 @@ jobs:
               "./build_tools/scripts/check_cuda.sh
               ./build_tools/scripts/check_vulkan.sh
               ./build_tools/cmake/ctest_all.sh ${BUILD_DIR}"
+
+  ################################## Subsets ###################################
+  # Jobs that build some subset of IREE
+  ##############################################################################
+  build_runtime:
+    runs-on: ubuntu-20.04
+    env:
+      BUILD_DIR: build-runtime
+    outputs:
+      # Pass through the build directory as output so it's available to
+      # dependent jobs.
+      build-dir: ${{ env.BUILD_DIR }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
+        with:
+          submodules: true
+      - name: "Building runtime"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            gcr.io/iree-oss/base@sha256:5d43683c6b50aebe1fca6c85f2012f3b0fa153bf4dd268e8767b619b1891423a \
+            ./build_tools/cmake/build_runtime.sh \
+            "${BUILD_DIR}"
+      # Using a tar archive is necessary to preserve file permissions. See
+      # https://github.com/actions/upload-artifact#maintaining-file-permissions-and-case-sensitive-files
+      # The upload action already does its own gzip compression, so no need to
+      # do our own.
+      - name: "Create build dir archive"
+        run: tar -cf ${BUILD_DIR}.tar ${BUILD_DIR}
+      - uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # v3.1.0
+        with:
+          name: "${{ env.BUILD_DIR }}.tar"
+          path: "${{ env.BUILD_DIR }}.tar"
+
+  test_runtime:
+    needs: build_runtime
+    runs-on: ubuntu-20.04
+    env:
+      BUILD_DIR: ${{ needs.build_runtime.outputs.build-dir }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
+        with:
+          submodules: true
+      - name: "Downloading runtime build directory"
+        uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741 # v3.0.0
+        with:
+          name: "${{ env.BUILD_DIR }}.tar"
+      - name: "Extracting archive"
+        run: tar -xf ${BUILD_DIR}.tar
+      - name: "Testing runtime"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env IREE_VULKAN_DISABLE=1 \
+            gcr.io/iree-oss/base@sha256:5d43683c6b50aebe1fca6c85f2012f3b0fa153bf4dd268e8767b619b1891423a \
+            ./build_tools/cmake/ctest_all.sh \
+            "${BUILD_DIR}"
+
+  host_tools_assertions:
+    uses: ./.github/workflows/host_tools.yml
+    with:
+      host-binary-root: host-tools-assertions
+      enable-assertions: "ON"
+
+  ################################# Tensorflow #################################
+  # Jobs that build the IREE-Tensorflow integrations
+  ##############################################################################
+  build_tf_integrations:
+    runs-on:
+      # Pseudo-ternary hack and order matters. See comment at top of file.
+      - self-hosted
+      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - cpu
+      - os-family=Linux
+    outputs:
+      binaries-dir: ${{ steps.build.outputs.binaries-dir }}
+      binaries-archive: ${{ steps.archive.outputs.binaries-archive }}
+      gcs-artifact: ${{ steps.upload.outputs.gcs-artifact }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
+        with:
+          submodules: true
+      - name: "Building TF binaries"
+        id: build
+        env:
+          IREE_TF_BINARIES_OUTPUT_DIR: iree-tf-binaries
+          # Psuedo-ternary hack. Don't swap the condition! See comment at top of file.
+          IREE_BAZEL_WRITE_REMOTE_CACHE: ${{ github.event_name != 'pull_request' && 1 || 0 }}
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "IREE_TF_BINARIES_OUTPUT_DIR=$(realpath "${IREE_TF_BINARIES_OUTPUT_DIR}")" \
+            gcr.io/iree-oss/frontends-swiftshader@sha256:3090418a8d8a64c356d35eff285af32570a72f41127aa123209c1562f57abb01 \
+            build_tools/cmake/build_tf_binaries.sh
+          echo "::set-output name=binaries-dir::${IREE_TF_BINARIES_OUTPUT_DIR}"
+      - name: "Creating archive of binaries"
+        id: archive
+        env:
+          BINARIES_ARCHIVE: tf-binaries.tar
+          BINARIES_DIR: ${{ steps.build.outputs.binaries-dir }}
+        run: |
+          tar -cf "${BINARIES_ARCHIVE}" "${BINARIES_DIR}"
+          echo "::set-output name=binaries-archive::${BINARIES_ARCHIVE}"
+      - name: "Uploading binaries archive"
+        id: upload
+        env:
+          GCS_ARTIFACT: ${{ env.BUCKET }}/${{ github.sha }}/${{ steps.archive.outputs.binaries-archive }}
+          BINARIES_ARCHIVE: ${{ steps.archive.outputs.binaries-archive }}
+        run: |
+          gcloud alpha storage cp "${BINARIES_ARCHIVE}" "${GCS_ARTIFACT}"
+          echo "::set-output name=gcs-artifact::${GCS_ARTIFACT}"
 
   test_tf_integrations:
     needs: [build_tf_integrations, build_all]
@@ -377,6 +386,9 @@ jobs:
               ./build_tools/scripts/check_vulkan.sh
               build_tools/cmake/run_tf_tests.sh ${BUILD_DIR}"
 
+  ############################### Configurations ###############################
+  # Jobs that build IREE in some non-default configuration
+  ##############################################################################
   asan:
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
@@ -412,6 +424,42 @@ jobs:
           ./build_tools/github_actions/docker_run.sh \
             gcr.io/iree-oss/base@sha256:5d43683c6b50aebe1fca6c85f2012f3b0fa153bf4dd268e8767b619b1891423a \
             ./build_tools/cmake/build_and_test_tsan.sh
+
+  ############################## Crosscompilation ##############################
+  # Jobs that cross-compile IREE for other platforms
+  ##############################################################################
+  android_arm64:
+    needs: [host_tools_assertions]
+    runs-on:
+      # Hacks, and order matters. See the comment at the top of the file.
+      - self-hosted
+      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - cpu
+      - os-family=Linux
+    env:
+      BUILD_DIR: "build-android-arm64"
+      ANDROID_ABI: "arm64-v8a"
+      HOST_BINARY_ROOT: ${{ needs.host_tools_assertions.outputs.host-binary-root }}
+      HOST_BINARY_ARCHIVE: ${{ needs.host_tools_assertions.outputs.host-binary-root }}.tar
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
+        with:
+          submodules: true
+      - name: "Downloading host tools"
+        uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741 # v3.0.0
+        with:
+          name: "${{ env.HOST_BINARY_ARCHIVE }}"
+      - name: "Extracting host tools archive"
+        run: |
+          tar -xvf ${HOST_BINARY_ARCHIVE}
+      - name: "Building for Android"
+        run: |
+          build_tools/github_actions/docker_run.sh \
+            --env "ANDROID_ABI=${ANDROID_ABI}" \
+            --env "IREE_HOST_BINARY_ROOT=${HOST_BINARY_ROOT}" \
+            gcr.io/iree-oss/android@sha256:9bc723fc707a18bd0c1be9c12e01ea5bb7c7d77f607427879e10ffcffd7d2bb5 \
+            build_tools/build_android.sh
 
   riscv32:
     needs: host_tools_assertions
@@ -502,21 +550,34 @@ jobs:
             bash -euo pipefail -c \
               "./build_tools/cmake/build_riscv.sh && ./tests/riscv64/smoke.sh"
 
+  ##############################################################################
 
+  # Depends on all the other jobs to provide a single anchor that indicates the
+  # final status. Status reporting will become more sophisticated in the future.
   summary:
     runs-on: ubuntu-20.04
     needs:
-      - build_runtime
-      - test_runtime
+      # Basic
       - build_all
       - build_test_all_bazel
       - test_all
       - test_gpu
+
+      # Subsets
+      - build_runtime
+      - test_runtime
       - host_tools_assertions
+
+      # Tensorflow
       - test_tf_integrations
       - test_tf_integrations_gpu
+
+      # Configurations
       - asan
       - tsan
+
+      # Crosscompilation
+      - android_arm64
       - riscv32
       - riscv64
     if: always()
