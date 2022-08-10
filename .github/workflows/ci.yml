@@ -51,7 +51,7 @@ jobs:
       - name: "Print labels"
         run: |
           cat <<EOF | jq -c
-            ${{ toJson(github.event.labels.*.name) }}
+            ${{ toJson(github.event) }}
           EOF
 
   ################################### Basic ####################################
