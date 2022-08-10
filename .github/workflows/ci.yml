@@ -36,9 +36,49 @@ name: CI
 on:
   workflow_dispatch:
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - 'experimental/**'
+      - 'build_tools/kokoro/**'
+      - 'build_tools/buildkite/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '**.cff'
+      - '**.clang-format'
+      - '**.git-ignore'
+      - '**.md'
+      - '**.natvis'
+      - '**.pylintrc'
+      - '**.rst'
+      - '**.toml'
+      - '**.yamllint.yml'
+      - '**.yapf'
+      - '**CODEOWNERS'
+      - '**AUTHORS'
+      - '**LICENSE'
   push:
     branches:
       - main
+    # Keep this in sync with the above. Once more, the lack of variables means
+    # this whole thing has to be repeated.
+    paths-ignore:
+      - 'docs/**'
+      - 'experimental/**'
+      - 'build_tools/kokoro/**'
+      - 'build_tools/buildkite/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '**.cff'
+      - '**.clang-format'
+      - '**.git-ignore'
+      - '**.md'
+      - '**.natvis'
+      - '**.pylintrc'
+      - '**.rst'
+      - '**.toml'
+      - '**.yamllint.yml'
+      - '**.yapf'
+      - '**CODEOWNERS'
+      - '**AUTHORS'
+      - '**LICENSE'
 
 env:
   BUCKET: gs://iree-github-actions-${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}-artifacts
