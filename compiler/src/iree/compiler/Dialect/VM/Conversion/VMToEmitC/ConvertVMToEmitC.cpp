@@ -196,15 +196,10 @@ LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
   }
 
   // Add constant ops for local refs
-  const int numRefArgs = llvm::count_if(inputTypes, [](Type inputType) {
-    return inputType.isa<IREE::VM::RefType>();
-  });
-  const int numLocalRefs =
-      vmAnalysis.getValue().get().getNumRefRegisters() - numRefArgs;
+  const int numRefArgs = vmAnalysis.getValue().get().getNumRefArguments();
+  const int numLocalRefs = vmAnalysis.getValue().get().getNumLocalRefs();
 
   builder.setInsertionPointToStart(&entryBlock);
-
-  vmAnalysis.getValue().get().numRefArguments = numRefArgs;
 
   for (int i = 0; i < numLocalRefs; i++) {
     auto refOp = builder.create<emitc::VariableOp>(
@@ -428,7 +423,7 @@ void releaseRefs(OpBuilder &builder, Location location,
   for (auto arg : funcOp.getArguments()) {
     if (arg.getType() ==
         emitc::PointerType::get(emitc::OpaqueType::get(ctx, "iree_vm_ref_t"))) {
-      if (vmAnalysis.getValue().get().numRefArguments <=
+      if (vmAnalysis.getValue().get().getNumRefArguments() <=
           refArgumentsReleased++) {
         break;
       }
@@ -1286,11 +1281,11 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
   using OpConversionPattern<IREE::VM::ExportOp>::OpConversionPattern;
 
  private:
-  typedef struct GeneratedStruct {
+  struct GeneratedStruct {
     Optional<Value> value = None;
     Optional<std::string> name = None;
     SmallVector<Value> callArguments;
-  } GeneratedStruct;
+  };
 
   LogicalResult matchAndRewrite(
       IREE::VM::ExportOp exportOp, OpAdaptor adaptor,
@@ -1309,11 +1304,6 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
       funcOp.emitError() << "func op not found in cache.";
       return failure();
     }
-
-    FunctionType funcType = vmAnalysis.getValue().get().originalFunctionType;
-    const int numRefArgs = llvm::count_if(
-        funcType.getInputs(),
-        [](Type inputType) { return inputType.isa<IREE::VM::RefType>(); });
 
     std::string newFuncName = (funcOp.getName() + "_export_shim").str();
 
@@ -1341,11 +1331,10 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
     auto newFuncOp =
         rewriter.create<mlir::func::FuncOp>(loc, newFuncName, newFuncType);
 
-    VMAnalysis newVmAnalysis;
-    newVmAnalysis.numRefArguments = numRefArgs;
+    FunctionType functionType = vmAnalysis.getValue().get().getFunctionType();
 
     typeConverter->analysisCache.insert(
-        std::make_pair(newFuncOp.getOperation(), std::move(newVmAnalysis)));
+        std::make_pair(newFuncOp.getOperation(), VMAnalysis(functionType)));
 
     attachAttribute(newFuncOp, "emitc.static", UnitAttr::get(ctx));
     attachAttribute(newFuncOp, "vm.calling_convention",
@@ -1521,7 +1510,7 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
                                        /*fields=*/fields);
     };
 
-    FunctionType funcType = vmAnalysis.getValue().get().originalFunctionType;
+    FunctionType funcType = vmAnalysis.getValue().get().getFunctionType();
 
     GeneratedStruct argumentStruct;
     GeneratedStruct resultStruct;
@@ -1634,7 +1623,7 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
       return failure();
     }
 
-    FunctionType funcType = vmAnalysis.getValue().get().originalFunctionType;
+    FunctionType funcType = vmAnalysis.getValue().get().getFunctionType();
 
     for (const auto &input : llvm::enumerate(funcType.getInputs())) {
       assert(argumentStruct.value.hasValue());
@@ -1692,7 +1681,7 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
       return failure();
     }
 
-    FunctionType funcType = vmAnalysis.getValue().get().originalFunctionType;
+    FunctionType funcType = vmAnalysis.getValue().get().getFunctionType();
 
     for (const auto &result : llvm::enumerate(funcType.getResults())) {
       assert(resultStruct.value.hasValue());
@@ -1862,7 +1851,7 @@ class ImportOpConverter {
         loc, newFuncName.getValue(), newFuncType.getValue());
 
     typeConverter.analysisCache.insert(
-        std::make_pair(newFuncOp.getOperation(), VMAnalysis{}));
+        std::make_pair(newFuncOp.getOperation(), VMAnalysis(functionType)));
 
     attachAttribute(newFuncOp, "emitc.static", UnitAttr::get(ctx));
 
@@ -1936,11 +1925,6 @@ class ImportOpConverter {
         emitc::OpaqueType::get(ctx, "iree_vm_function_t"));
 
     SmallVector<Type> types{stackType, funcType};
-
-    // auto isTuple = [](Type t) { return t.isa<TupleType>(); };
-    // if (llvm::any_of(functionType.getInputs(), isTuple)) {
-    //   types.push_back(rewriter.getI32Type());
-    // }
 
     for (Type type :
          flattenInputTypes(functionType.getInputs(), numSpans, builder)) {
