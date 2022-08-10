@@ -7,7 +7,6 @@ User=runner
 Group=runner
 ExecStart=/home/runner/config/start.sh
 Restart=no
-WorkingDirectory=/home/runner/config
 KillMode=process
 KillSignal=SIGTERM
 TimeoutStopSec=5min
