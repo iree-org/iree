@@ -17,8 +17,8 @@ chmod +x /home/runner/config/register.sh
 runuser --user runner ~runner/config/register.sh
 
 echo "Setup the deregister service."
-sudo cp /home/runner/config/github-actions-runner-deregister.service /etc/systemd/system/
-chmod +x /home/runner/config/deregister.sh
+cp ~runner/config/github-actions-runner-deregister.service /etc/systemd/system/
+chmod +x ~runner/config/deregister.sh
 
 echo "Setup the start actions runner service."
 sudo cp /home/runner/config/github-actions-runner-start.service /etc/systemd/system/
