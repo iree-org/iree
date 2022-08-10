@@ -738,6 +738,46 @@ class ReorderBroadcastInDimOpAndElementwiseOp
   }
 };
 
+// Identifies cases where a dense operation has inputs that come from widening
+// operations. For instance, a dot product widening from FP16 to FP32 is better
+// to have the casting operation fused into the dot operation. This decreases
+// the loading required during a dense computation.
+template <class Op>
+struct FuseWidenOperands : public OpRewritePattern<Op> {
+  using OpRewritePattern<Op>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(Op op,
+                                PatternRewriter &rewriter) const override {
+    llvm::SmallVector<Value> operands;
+    for (Value operand : op->getOperands()) {
+      auto convertOp =
+          dyn_cast_or_null<mhlo::ConvertOp>(operand.getDefiningOp());
+      if (convertOp) {
+        auto inputType = getElementTypeOrSelf(convertOp.operand().getType());
+        auto castedType = getElementTypeOrSelf(convertOp.getResult().getType());
+        bool isSameCast =
+            (inputType.isa<IntegerType>() && castedType.isa<IntegerType>()) ||
+            (inputType.isa<FloatType>() && castedType.isa<FloatType>());
+        if (isSameCast && inputType.getIntOrFloatBitWidth() <
+                              castedType.getIntOrFloatBitWidth()) {
+          operands.push_back(convertOp.getOperand());
+          continue;
+        }
+      }
+      operands.push_back(operand);
+    }
+
+    if (llvm::all_of(llvm::zip(operands, op->getOperands()), [](auto pair) {
+          return std::get<0>(pair) == std::get<1>(pair);
+        }))
+      return failure();
+
+    rewriter.replaceOpWithNewOp<Op>(op, op->getResultTypes(), operands,
+                                    op->getAttrs());
+    return success();
+  }
+};
+
 struct MHLOToMHLOPreprocessingPass
     : public MHLOToMHLOPreprocessingBase<MHLOToMHLOPreprocessingPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -774,6 +814,11 @@ struct MHLOToMHLOPreprocessingPass
     // dot_general canoncalization patterns.
     mhlo::populateGeneralDotOpLoweringPatterns(&patterns, context);
     patterns.insert<TransposeReshapeGenericDotGeneral>(context);
+
+    // Fusion operations.
+    patterns.insert<FuseWidenOperands<mhlo::DotOp>,
+                    FuseWidenOperands<mhlo::DotGeneralOp>,
+                    FuseWidenOperands<mhlo::ConvolutionOp>>(context);
 
     // Unary elementwise op.
     patterns.insert<
