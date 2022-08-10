@@ -42,7 +42,6 @@ endfunction()
 # Configure CMake and tablegen.
 list(APPEND CMAKE_MODULE_PATH ${MLIR_MAIN_SRC_DIR}/cmake/modules)
 list(APPEND CMAKE_MODULE_PATH ${LLVM_MAIN_SRC_DIR}/cmake)
-set(MLIR_TABLEGEN_EXE mlir-tblgen)
 
 include(TableGen)
 include(AddLLVM)
