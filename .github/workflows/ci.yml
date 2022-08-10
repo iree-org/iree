@@ -80,11 +80,23 @@ on:
       - '**AUTHORS'
       - '**LICENSE'
 
+concurrency:
+  # A PR number if a pull request and otherwise the commit hash. This cancels
+  # queued and in-progress runs for the same PR (presubmit) or commit
+  # (postsubmit).
+  group: ${{ github.event.number || github.sha }}
+  cancel-in-progress: true
+
 env:
   BUCKET: gs://iree-github-actions-${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}-artifacts
 
 # Jobs are organized into groups and topologically sorted by dependencies
 jobs:
+  gcmn_test:
+    runs-on: ubuntu-20.04
+    steps:
+      - run: echo ${{ github.event.number || github.sha }}
+
   ################################### Basic ####################################
   # Jobs that build all of IREE "normally"
   ##############################################################################
