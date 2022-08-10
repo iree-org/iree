@@ -51,6 +51,8 @@ on:
       - '**.rst'
       - '**.toml'
       - '**.yamllint.yml'
+      # DO NOT SUBMIT
+      - '**.yml'
       - '**.yapf'
       - '**CODEOWNERS'
       - '**AUTHORS'
@@ -75,6 +77,8 @@ on:
       - '**.rst'
       - '**.toml'
       - '**.yamllint.yml'
+      # DO NOT SUBMIT
+      - '**.yml'
       - '**.yapf'
       - '**CODEOWNERS'
       - '**AUTHORS'
