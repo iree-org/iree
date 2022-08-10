@@ -149,9 +149,11 @@ static iree_status_t iree_hal_vmvx_executable_create(
   *out_executable = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  // NOTE: executable layouts are optional but if provided must be consistent.
   iree_host_size_t entry_count =
       iree_vm_module_signature(bytecode_module).export_function_count;
-  if (entry_count != executable_params->executable_layout_count) {
+  if (executable_params->executable_layout_count > 0 &&
+      entry_count != executable_params->executable_layout_count) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                             "executable provides %zu entry points but caller "
                             "provided %zu; must match",

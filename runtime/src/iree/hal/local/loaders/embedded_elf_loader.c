@@ -185,11 +185,14 @@ static iree_status_t iree_hal_elf_executable_create(
         iree_hal_elf_executable_resolve_imports(executable, import_provider);
   }
 
+  // TODO(benvanik): move alloc and verification to an executable_library_util.
   const bool disable_verification =
       iree_all_bits_set(executable_params->caching_mode,
                         IREE_HAL_EXECUTABLE_CACHING_MODE_DISABLE_VERIFICATION);
-  if (iree_status_is_ok(status) && !disable_verification) {
-    // Check to make sure that the entry point count matches the layout count.
+  if (iree_status_is_ok(status) &&
+      (!disable_verification &&
+       executable_params->executable_layout_count > 0)) {
+    // NOTE: executable layouts are optional but if provided must be consistent.
     if (executable->library.v0->exports.count !=
         executable_params->executable_layout_count) {
       status =
