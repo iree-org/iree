@@ -21,8 +21,8 @@ cp ~runner/config/github-actions-runner-deregister.service /etc/systemd/system/
 chmod +x ~runner/config/deregister.sh
 
 echo "Setup the start actions runner service."
-sudo cp /home/runner/config/github-actions-runner-start.service /etc/systemd/system/
-chmod +x /home/runner/config/start.sh
+cp ~runner/config/github-actions-runner-start.service /etc/systemd/system/
+chmod +x ~runner/config/start.sh
 
 echo "Reload system service files to reflect changes."
 systemctl daemon-reload
