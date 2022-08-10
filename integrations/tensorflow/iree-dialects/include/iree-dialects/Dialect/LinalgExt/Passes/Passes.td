@@ -15,10 +15,10 @@ def LinalgExtToLoops :
   let constructor = "mlir::iree_compiler::IREE::LinalgExt::createLinalgExtToLoopsPass()";
 }
 
-def TiledOpInterfaceTiling :
+def TilingInterfaceTiling :
     Pass<"iree-linalg-ext-tile", "func::FuncOp"> {
   let summary = "Test pass for tiling using TiledOpInterface";
-  let constructor = "mlir::iree_compiler::IREE::LinalgExt::createTiledOpInterfaceTilingPass()";
+  let constructor = "mlir::iree_compiler::IREE::LinalgExt::createTilingInterfaceTilingPass()";
 }
 
 def PadContractionToBlockSize :
@@ -54,8 +54,8 @@ def TopkSplitReduction:
   }];
   let constructor = "mlir::iree_compiler::IREE::LinalgExt::createTopkSplitReductionPass()";
   let options = [
-    Option<"splitRatio", "split-ratio", "int", /*default=*/"1",
-           "Split reduction ratio">,
+    ListOption<"splitRatios", "split-ratios", "int",
+           "List of split reduction ratios">,
   ];
 }
 

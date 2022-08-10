@@ -7,6 +7,7 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Utils.h"
+#include "mlir/Dialect/Arithmetic/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -64,8 +65,10 @@ tileToForeachOp(PatternRewriter &rewriter, TilingInterface op,
           AffineExpr i, j, M, N, O;
           bindDims(rewriter.getContext(), i, j);
           bindSymbols(rewriter.getContext(), M, N, O);
-          Value size = loopRanges[loopIdx].size;
-          Value offset = loopRanges[loopIdx].offset;
+          Value size = getValueOrCreateConstantIndexOp(
+              rewriter, loc, loopRanges[loopIdx].size);
+          Value offset = getValueOrCreateConstantIndexOp(
+              rewriter, loc, loopRanges[loopIdx].offset);
           Value threadId = threadIds[threadIdIdx];
           // Symbolic fixed max size per thread.
           // TODO: floor + 0/1 depending on case for better load-balancing.

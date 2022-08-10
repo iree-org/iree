@@ -26,7 +26,6 @@ from ... import (
 from .... import (
     ir,
     passmanager,
-    transforms as unused_transforms,
 )
 
 

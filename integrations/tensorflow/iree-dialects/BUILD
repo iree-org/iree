@@ -230,26 +230,6 @@ gentbl_cc_library(
 )
 
 gentbl_cc_library(
-    name = "IREELinalgExtTiledOpInterfacesIncGen",
-    strip_include_prefix = "include",
-    tbl_outs = [
-        (
-            ["--gen-op-interface-decls"],
-            "include/iree-dialects/Dialect/LinalgExt/IR/TiledOpInterface.h.inc",
-        ),
-        (
-            ["--gen-op-interface-defs"],
-            "include/iree-dialects/Dialect/LinalgExt/IR/TiledOpInterface.cpp.inc",
-        ),
-    ],
-    tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "include/iree-dialects/Dialect/LinalgExt/IR/TiledOpInterface.td",
-    deps = [
-        ":TdFiles",
-    ],
-)
-
-gentbl_cc_library(
     name = "IREELinalgExtPassIncGen",
     strip_include_prefix = "include",
     tbl_outs = [
@@ -287,7 +267,6 @@ cc_library(
         ":IREELinalgExtIncGen",
         ":IREELinalgExtInterfacesIncGen",
         ":IREELinalgExtPassIncGen",
-        ":IREELinalgExtTiledOpInterfacesIncGen",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:ArithmeticDialect",
@@ -325,6 +304,7 @@ cc_library(
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:ArithmeticDialect",
+        "@llvm-project//mlir:ArithmeticUtils",
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
@@ -339,6 +319,7 @@ cc_library(
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TensorUtils",
+        "@llvm-project//mlir:TilingInterface",
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
     ],
