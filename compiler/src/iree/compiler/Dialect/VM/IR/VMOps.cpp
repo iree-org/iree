@@ -400,7 +400,7 @@ LogicalResult verifyGlobalOp(Operation *op) {
       op->getAttrOfType<StringAttr>(SymbolTable::getSymbolAttrName());
   auto globalType = op->getAttrOfType<TypeAttr>("type");
   auto initializerAttr = op->getAttrOfType<FlatSymbolRefAttr>("initializer");
-  auto initialValueAttr = op->getAttr("initial_value");
+  auto initialValueAttr = op->getAttrOfType<TypedAttr>("initial_value");
   if (initializerAttr && initialValueAttr) {
     return op->emitOpError()
            << "globals can have either an initializer or an initial value";
@@ -556,7 +556,7 @@ LogicalResult verifyGlobalStoreOp(Operation *op) {
 //===----------------------------------------------------------------------===//
 
 template <int SZ>
-static bool isConstIntegerBuildableWith(Attribute value, Type type) {
+static bool isConstIntegerBuildableWith(TypedAttr value, Type type) {
   // FlatSymbolRefAttr can only be used with a function type.
   if (value.isa<FlatSymbolRefAttr>()) {
     return false;
@@ -576,7 +576,7 @@ static bool isConstIntegerBuildableWith(Attribute value, Type type) {
 }
 
 template <int SZ>
-static bool isConstFloatBuildableWith(Attribute value, Type type) {
+static bool isConstFloatBuildableWith(TypedAttr value, Type type) {
   // FlatSymbolRefAttr can only be used with a function type.
   if (value.isa<FlatSymbolRefAttr>()) {
     return false;
@@ -596,7 +596,7 @@ static bool isConstFloatBuildableWith(Attribute value, Type type) {
 }
 
 template <int SZ>
-static Attribute convertConstIntegerValue(Attribute value) {
+static Attribute convertConstIntegerValue(TypedAttr value) {
   assert(isConstIntegerBuildableWith<SZ>(value, value.getType()));
   Builder builder(value.getContext());
   auto integerType = builder.getIntegerType(SZ);
@@ -639,7 +639,7 @@ static FloatType getFloatType(int bitwidth, MLIRContext *context) {
 }
 
 template <int SZ>
-static Attribute convertConstFloatValue(Attribute value) {
+static Attribute convertConstFloatValue(TypedAttr value) {
   assert(isConstFloatBuildableWith<SZ>(value, value.getType()));
   Builder builder(value.getContext());
   auto floatType = getFloatType(SZ, value.getContext());
@@ -662,18 +662,18 @@ static Attribute convertConstFloatValue(Attribute value) {
 }
 
 // static
-bool ConstI32Op::isBuildableWith(Attribute value, Type type) {
+bool ConstI32Op::isBuildableWith(TypedAttr value, Type type) {
   return isConstIntegerBuildableWith<32>(value, type);
 }
 
 // static
-Attribute ConstI32Op::convertConstValue(Attribute value) {
+TypedAttr ConstI32Op::convertConstValue(TypedAttr value) {
   return convertConstIntegerValue<32>(value);
 }
 
 void ConstI32Op::build(OpBuilder &builder, OperationState &result,
-                       Attribute value) {
-  Attribute newValue = convertConstValue(value);
+                       TypedAttr value) {
+  TypedAttr newValue = convertConstValue(value);
   result.addAttribute("value", newValue);
   result.addTypes(newValue.getType());
 }
@@ -689,18 +689,18 @@ void ConstI32Op::build(OpBuilder &builder, OperationState &result,
 }
 
 // static
-bool ConstI64Op::isBuildableWith(Attribute value, Type type) {
+bool ConstI64Op::isBuildableWith(TypedAttr value, Type type) {
   return isConstIntegerBuildableWith<64>(value, type);
 }
 
 // static
-Attribute ConstI64Op::convertConstValue(Attribute value) {
+TypedAttr ConstI64Op::convertConstValue(TypedAttr value) {
   return convertConstIntegerValue<64>(value);
 }
 
 void ConstI64Op::build(OpBuilder &builder, OperationState &result,
-                       Attribute value) {
-  Attribute newValue = convertConstValue(value);
+                       TypedAttr value) {
+  TypedAttr newValue = convertConstValue(value);
   result.addAttribute("value", newValue);
   result.addTypes(newValue.getType());
 }
@@ -716,18 +716,18 @@ void ConstI64Op::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
 }
 
 // static
-bool ConstF32Op::isBuildableWith(Attribute value, Type type) {
+bool ConstF32Op::isBuildableWith(TypedAttr value, Type type) {
   return isConstFloatBuildableWith<32>(value, type);
 }
 
 // static
-Attribute ConstF32Op::convertConstValue(Attribute value) {
+TypedAttr ConstF32Op::convertConstValue(TypedAttr value) {
   return convertConstFloatValue<32>(value);
 }
 
 void ConstF32Op::build(OpBuilder &builder, OperationState &result,
-                       Attribute value) {
-  Attribute newValue = convertConstValue(value);
+                       TypedAttr value) {
+  TypedAttr newValue = convertConstValue(value);
   result.addAttribute("value", newValue);
   result.addTypes(newValue.getType());
 }
@@ -738,18 +738,18 @@ void ConstF32Op::build(OpBuilder &builder, OperationState &result,
 }
 
 // static
-bool ConstF64Op::isBuildableWith(Attribute value, Type type) {
+bool ConstF64Op::isBuildableWith(TypedAttr value, Type type) {
   return isConstFloatBuildableWith<64>(value, type);
 }
 
 // static
-Attribute ConstF64Op::convertConstValue(Attribute value) {
+TypedAttr ConstF64Op::convertConstValue(TypedAttr value) {
   return convertConstFloatValue<64>(value);
 }
 
 void ConstF64Op::build(OpBuilder &builder, OperationState &result,
-                       Attribute value) {
-  Attribute newValue = convertConstValue(value);
+                       TypedAttr value) {
+  TypedAttr newValue = convertConstValue(value);
   result.addAttribute("value", newValue);
   result.addTypes(newValue.getType());
 }

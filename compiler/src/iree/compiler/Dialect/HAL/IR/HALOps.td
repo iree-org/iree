@@ -11,6 +11,7 @@ include "iree/compiler/Dialect/HAL/IR/HALBase.td"
 include "iree/compiler/Dialect/HAL/IR/HALInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilAttrs.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
+include "mlir/IR/BuiltinAttributeInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
@@ -1382,7 +1383,7 @@ def HAL_DeviceQueryOp :
     HAL_Device:$device,
     StrAttr:$category,
     StrAttr:$key,
-    OptionalAttr<AnyAttr>:$default_value
+    OptionalAttr<TypedAttrInterface>:$default_value
   );
   let results = (outs
     I1:$ok,

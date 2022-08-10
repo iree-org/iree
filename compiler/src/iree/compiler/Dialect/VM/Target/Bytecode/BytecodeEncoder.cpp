@@ -100,7 +100,7 @@ class V0BytecodeEncoder : public BytecodeEncoder {
     return writeUint32(typeOrdinal);
   }
 
-  LogicalResult encodePrimitiveAttr(Attribute attr) override {
+  LogicalResult encodePrimitiveAttr(TypedAttr attr) override {
     unsigned int bitWidth = attr.getType().getIntOrFloatBitWidth();
     if (auto integerAttr = attr.dyn_cast<IntegerAttr>()) {
       uint64_t limitedValue =

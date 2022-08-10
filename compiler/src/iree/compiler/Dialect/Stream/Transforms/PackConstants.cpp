@@ -50,12 +50,6 @@ struct ConstantSlice {
   uint64_t getRawLength() const {
     if (auto denseAttr = value.dyn_cast<DenseElementsAttr>()) {
       return denseAttr.getRawData().size();
-    } else if (auto opaqueAttr = value.dyn_cast<OpaqueElementsAttr>()) {
-      // Later on in the pipeline opaque attrs will cause the compiler to fail
-      // (as at some point we need to get the data) but this allows us to run
-      // the stream transforms on IR that has had its large constants elided.
-      return opaqueAttr.getNumElements() *
-             opaqueAttr.getElementType().getIntOrFloatBitWidth();
     } else {
       assert(false && "invalid constant attr type");
       return 0;

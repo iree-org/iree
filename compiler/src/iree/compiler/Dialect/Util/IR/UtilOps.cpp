@@ -84,7 +84,10 @@ ParseResult parseTypeOrAttr(OpAsmParser &parser, TypeAttr &typeAttr,
       return parser.emitError(parser.getCurrentLocation())
              << "expected attribute";
     }
-    typeAttr = TypeAttr::get(attr.getType());
+
+    if (auto typedAttr = attr.dyn_cast<TypedAttr>()) {
+      typeAttr = TypeAttr::get(typedAttr.getType());
+    }
     return success();
   }
 
@@ -107,7 +110,8 @@ ParseResult parseTypeOrAttr(OpAsmParser &parser, TypeAttr &typeAttr,
 void printTypeOrAttr(OpAsmPrinter &p, Operation *op, TypeAttr type,
                      Attribute attr) {
   bool needsSpace = false;
-  if (!attr || attr.getType() != type.getValue()) {
+  auto typedAttr = attr.dyn_cast_or_null<TypedAttr>();
+  if (!typedAttr || typedAttr.getType() != type.getValue()) {
     p << ": ";
     p.printAttribute(type);
     needsSpace = true;  // subsequent attr value needs a space separator
@@ -678,8 +682,8 @@ ParseResult UnfoldableConstantOp::parse(OpAsmParser &parser,
 
   // If the attribute is a symbol reference, then we expect a trailing type.
   Type type;
-  if (!valueAttr.isa<SymbolRefAttr>())
-    type = valueAttr.getType();
+  if (auto typedAttr = valueAttr.dyn_cast<TypedAttr>())
+    type = typedAttr.getType();
   else if (parser.parseColonType(type))
     return failure();
 
@@ -786,8 +790,15 @@ static bool isGlobalTypeCompatible(Type globalType, Type accessType) {
 }
 
 void GlobalOp::build(OpBuilder &builder, OperationState &result, StringRef name,
+                     bool isMutable, Type type, TypedAttr initialValue,
+                     ArrayRef<NamedAttribute> attrs) {
+  build(builder, result, name, isMutable, type,
+        Optional<TypedAttr>(initialValue), attrs);
+}
+
+void GlobalOp::build(OpBuilder &builder, OperationState &result, StringRef name,
                      bool isMutable, Type type,
-                     Optional<Attribute> initialValue,
+                     Optional<TypedAttr> initialValue,
                      ArrayRef<NamedAttribute> attrs) {
   result.addAttribute(SymbolTable::getSymbolAttrName(),
                       builder.getStringAttr(name));

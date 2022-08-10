@@ -17,6 +17,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -62,7 +63,7 @@ struct PrimitiveTypeConverter : public TypeConverter {
 };
 
 // Returns |oldAttr| converted to its new type via |typeConverter|, if needed.
-static Attribute convertAttribute(Location loc, Attribute oldAttr,
+static Attribute convertAttribute(Location loc, TypedAttr oldAttr,
                                   TypeConverter &typeConverter) {
   // Type attributes get their nested type converted.
   if (auto oldTypeAttr = oldAttr.dyn_cast<TypeAttr>()) {
