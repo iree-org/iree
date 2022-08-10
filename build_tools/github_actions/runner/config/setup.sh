@@ -28,7 +28,7 @@ echo "Reload system service files to reflect changes."
 systemctl daemon-reload
 
 echo "Enable deregister so it can hook onto system shutdown."
-sudo systemctl enable github-actions-runner-deregister
+systemctl enable github-actions-runner-deregister
 
 echo "Start the runner so it can be assigned workflows."
 systemctl start github-actions-runner-start
