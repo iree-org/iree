@@ -17,7 +17,7 @@ get_metadata() {
   ret=0
   curl "${url}" \
     --silent --fail --show-error \
-    --header "Metadata-Flavor: Google" || "${ret}"=$?
+    --header "Metadata-Flavor: Google" || ret=$?
   if [[ "${ret}" != 0 ]]; then
     echo "Failed fetching ${url}" >&2
     return "${ret}"
