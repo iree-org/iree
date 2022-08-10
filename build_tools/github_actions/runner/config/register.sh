@@ -93,13 +93,18 @@ if [ -z "${REGISTER_TOKEN}" ]; then
 fi
 
 declare -a args=(
---unattended \
---ephemeral \
---url "https://github.com/${RUNNER_SCOPE}" \
---name "${HOSTNAME}" \
---replace \
---runnergroup "${RUNNER_GROUP}" \
---labels "${RUNNER_LABELS}"
+  --unattended \
+  # Shut down after completing a single job
+  --ephemeral \
+  # We don't immediately update each time we start. We handle our own
+  # updates instead.
+  --disableupdate \
+  --url "https://github.com/${RUNNER_SCOPE}" \
+  --name "${HOSTNAME}" \
+  # If we end up with name conflicts, just replace the old entry. 
+  --replace \
+  --runnergroup "${RUNNER_GROUP}" \
+  --labels "${RUNNER_LABELS}"
 )
 # I would love to discover another way to print an array while preserving quote
 # escaping. We're not just using `set -x` on the command itself because we don't
