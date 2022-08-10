@@ -747,7 +747,7 @@ struct FuseWidenOperands : public OpRewritePattern<Op> {
   using OpRewritePattern<Op>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(Op op,
-                                PatternRewriter& rewriter) const override {
+                                PatternRewriter &rewriter) const override {
     llvm::SmallVector<Value> operands;
     for (Value operand : op->getOperands()) {
       auto convertOp =
