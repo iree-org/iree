@@ -92,11 +92,6 @@ env:
 
 # Jobs are organized into groups and topologically sorted by dependencies
 jobs:
-  gcmn_test:
-    runs-on: ubuntu-20.04
-    steps:
-      - run: echo ${{ github.event.number || github.sha }}
-
   ################################### Basic ####################################
   # Jobs that build all of IREE "normally"
   ##############################################################################
