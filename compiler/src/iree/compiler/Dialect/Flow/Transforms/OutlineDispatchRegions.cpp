@@ -53,7 +53,7 @@ static std::string loopRangeToString(int64_t loopRange) {
   return ShapedType::isDynamic(loopRange) ? "D" : llvm::itostr(loopRange);
 }
 
-// Returns a string like "512x?x128" representing a linalg op's loop ranges.
+// Returns a string like "512xDx128" representing a linalg op's loop ranges.
 static std::string getLinalgOpLoopRanges(linalg::LinalgOp op) {
   auto loopRanges = op.getStaticLoopRanges();
   std::string outputString;
