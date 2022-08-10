@@ -25,4 +25,4 @@ fi
 
 echo "removing github actions runner"
 
-/home/runner/actions-runner/config.sh remove --token "${DEREGISTER_TOKEN}"
+~runner/actions-runner/config.sh remove --token "${DEREGISTER_TOKEN}"
