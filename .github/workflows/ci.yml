@@ -45,15 +45,6 @@ env:
 
 # Jobs are organized into groups and topologically sorted by dependencies
 jobs:
-  gcmn_test:
-    runs-on: ubuntu-20.04
-    steps:
-      - name: "Print labels"
-        run: |
-          cat <<EOF | jq -c
-            ${{ toJson(github.event.labels.*.name) }}
-          EOF
-
   ################################### Basic ####################################
   # Jobs that build all of IREE "normally"
   ##############################################################################
