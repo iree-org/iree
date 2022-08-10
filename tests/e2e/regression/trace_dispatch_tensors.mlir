@@ -7,13 +7,13 @@ func.func @two_dispatch() -> (tensor<5x5xf32>, tensor<3x5xf32>) {
   %3 = "mhlo.dot"(%1, %2) : (tensor<3x5xf32>, tensor<5x5xf32>) -> tensor<3x5xf32>
   return %2, %3 : tensor<5x5xf32>, tensor<3x5xf32>
 }
-// CHECK: === two_dispatch_dispatch_0::two_dispatch_dispatch_0 inputs ===
+// CHECK: === two_dispatch_dispatch_0::two_dispatch_dispatch_0{{.*}} inputs ===
 // CHECK: 5x3xf32=
 // CHECK: 3x5xf32=
-// CHECK: === two_dispatch_dispatch_0::two_dispatch_dispatch_0 outputs ===
+// CHECK: === two_dispatch_dispatch_0::two_dispatch_dispatch_0{{.*}} outputs ===
 // CHECK: 5x5xf32=
-// CHECK: === two_dispatch_dispatch_1::two_dispatch_dispatch_1 inputs ===
+// CHECK: === two_dispatch_dispatch_1::two_dispatch_dispatch_1{{.*}} inputs ===
 // CHECK: 3x5xf32=
 // CHECK: 5x5xf32=
-// CHECK: === two_dispatch_dispatch_1::two_dispatch_dispatch_1 outputs ===
+// CHECK: === two_dispatch_dispatch_1::two_dispatch_dispatch_1{{.*}} outputs ===
 // CHECK: 3x5xf32=
