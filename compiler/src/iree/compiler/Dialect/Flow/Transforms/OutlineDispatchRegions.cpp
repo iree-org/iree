@@ -48,7 +48,9 @@ static int estimateLinalgOpCost(linalg::LinalgOp op) {
 }
 
 static std::string loopRangeToString(int64_t loopRange) {
-  return ShapedType::isDynamic(loopRange) ? "?" : llvm::itostr(loopRange);
+  // Note: normally we'd use '?', but that isn't a valid character for function
+  // names on a variety of targets, so we stick to [a-Z0-9_] characters.
+  return ShapedType::isDynamic(loopRange) ? "D" : llvm::itostr(loopRange);
 }
 
 // Returns a string like "512x?x128" representing a linalg op's loop ranges.
