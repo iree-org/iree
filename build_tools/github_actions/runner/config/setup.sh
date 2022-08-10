@@ -14,7 +14,7 @@ set -euo pipefail
 
 echo "Register the self-hoster runner."
 chmod +x /home/runner/config/register.sh
-/home/runner/config/register.sh
+runuser --user runner ~runner/config/register.sh
 
 echo "Setup the deregister service."
 sudo cp /home/runner/config/github-actions-runner-deregister.service /etc/systemd/system/
