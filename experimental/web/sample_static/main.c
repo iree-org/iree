@@ -78,7 +78,8 @@ iree_sample_state_t* setup_sample() {
   }
 
   if (iree_status_is_ok(status)) {
-    status = create_bytecode_module(state->instance, &state->module);
+    status = create_bytecode_module(
+        iree_runtime_instance_vm_instance(state->instance), &state->module);
   }
   if (iree_status_is_ok(status)) {
     status = iree_runtime_session_append_module(state->session, state->module);
