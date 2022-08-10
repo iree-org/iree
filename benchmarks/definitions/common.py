@@ -30,7 +30,8 @@ class DeviceArchitecture(Enum):
                                         "cascadelake")
 
   # ARM CPUs
-  ARMV8_A_GENERIC = ArchitectureInfo(ArchitectureType.CPU, "armv8-a", "generic")
+  ARMV8_2_A_GENERIC = ArchitectureInfo(ArchitectureType.CPU, "armv8.2-a",
+                                       "generic")
 
   # RISC-V CPUs
   RV64_GENERIC = ArchitectureInfo(ArchitectureType.CPU, "rv64", "generic")
@@ -41,6 +42,7 @@ class DeviceArchitecture(Enum):
   ADRENO_GENERIC = ArchitectureInfo(ArchitectureType.GPU, "adreno", "generic")
 
   # CUDA GPUs
+  CUDA_SM70 = ArchitectureInfo(ArchitectureType.GPU, "cuda", "sm_70")
   CUDA_SM80 = ArchitectureInfo(ArchitectureType.GPU, "cuda", "sm_80")
 
 

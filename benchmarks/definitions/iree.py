@@ -14,17 +14,26 @@ from benchmarks.definitions.common import DeviceArchitecture, DevicePlatform, De
 class IreeTargetBackend(Enum):
   """IREE target backend."""
   LLVM_CPU = "llvm-cpu"
+  CUDA = "cuda"
+  ROCM = "rocm"
+  VMVX = "vmvx"
+  METAL_SPIRV = "metal-spirv"
+  VULKAN_SPIRV = "vulkan-spirv"
 
 
 class IreeRuntimeLoader(Enum):
   """IREE runtime loader."""
   EMBEDDED_ELF = "embedded-elf"
+  VMVX_MODULE = "vmvx-module"
+  SYSTEM_LIBRARY = "system-library"
 
 
 class IreeRuntimeDriver(Enum):
   """IREE runtime driver."""
   LOCAL_SYNC = "local-sync"
   LOCAL_TASK = "local-task"
+  CUDA = "cuda"
+  VULKAN = "vulkan"
 
 
 @dataclass(frozen=True)
