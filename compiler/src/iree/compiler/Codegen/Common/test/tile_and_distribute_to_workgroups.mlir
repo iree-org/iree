@@ -238,13 +238,12 @@ hal.executable private @add4D {
 //  CHECK-DAG:    %[[D2:.+]] = affine.apply #[[MAP]]()[%[[WORKLOAD_3]]]
 //      CHECK:    hal.return %[[D2]], %[[D1]], %[[D0]] : index, index, index
 //      CHECK: func.func @add4D()
-//      CHECK:   %[[C0:.+]] = arith.constant 0 : index
 //      CHECK:   scf.for %[[IV0:.+]] =
 //      CHECK:     scf.for %[[IV1:.+]] =
 //      CHECK:       scf.for %[[IV2:.+]] =
 //  CHECK-NOT:         scf.for
 //      CHECK:         %[[GENERIC:.+]] = linalg.generic
-//      CHECK:         flow.dispatch.tensor.store %[[GENERIC]], %{{.+}}, offsets = [%[[C0]], %[[IV0]], %[[IV1]], %[[IV2]]]
+//      CHECK:         flow.dispatch.tensor.store %[[GENERIC]], %{{.+}}, offsets = [0, %[[IV0]], %[[IV1]], %[[IV2]]]
 
 // -----
 
@@ -746,7 +745,6 @@ hal.executable private @conv {
 //  CHECK-DAG:   %[[D2:.+]] = affine.apply #[[MAP]]()[%[[WORKLOAD_3]]]
 //      CHECK:   hal.return %[[D2]], %[[D1]], %[[D0]] : index, index, index
 //      CHECK: func.func @conv()
-//      CHECK:   %[[C0:.+]] = arith.constant 0
 //      CHECK:   scf.for %[[IV0:.+]] =
 //      CHECK:     scf.for %[[IV1:.+]] =
 //      CHECK:       scf.for %[[IV2:.+]] =
@@ -754,7 +752,7 @@ hal.executable private @conv {
 //  CHECK-DAG:         %[[FILTER:.+]] = flow.dispatch.tensor.load %{{.+}}, offsets = [0, 0, 0, %[[IV2]]]
 //  CHECK-DAG:         %[[INIT:.+]] = flow.dispatch.tensor.load %{{.+}}, offsets = [0, %[[IV0]], %[[IV1]], %[[IV2]]]
 //      CHECK:         %[[RESULT:.+]] = linalg.conv_2d_nhwc_hwcf
-//      CHECK:         flow.dispatch.tensor.store %[[RESULT]], %{{.+}}, offsets = [%[[C0]], %[[IV0]], %[[IV1]], %[[IV2]]]
+//      CHECK:         flow.dispatch.tensor.store %[[RESULT]], %{{.+}}, offsets = [0, %[[IV0]], %[[IV1]], %[[IV2]]]
 
 // -----
 
@@ -821,7 +819,6 @@ hal.executable private @conv_static {
 //  CHECK-DAG:   %[[D2:.+]] = affine.apply #[[MAP2]]()[%[[WORKLOAD_3]]]
 //      CHECK:   hal.return %[[D2]], %[[D1]], %[[D0]] : index, index, index
 //      CHECK: func.func @conv_static()
-//      CHECK:   %[[C0:.+]] = arith.constant 0 : index
 //      CHECK:   scf.for %[[IV0:.+]] =
 //      CHECK:     scf.for %[[IV1:.+]] =
 //      CHECK:       scf.for %[[IV2:.+]] =
@@ -830,7 +827,7 @@ hal.executable private @conv_static {
 // CHECK-SAME:             outs(%[[INIT]] :
 //      CHECK:         %[[RESULT:.+]] = linalg.depthwise_conv_2d_nhwc_hwc
 // CHECK-SAME:             outs(%[[FILL]] :
-//      CHECK:         flow.dispatch.tensor.store %[[RESULT]], %{{.+}}, offsets = [%[[C0]], %[[IV0]], %[[IV1]], %[[IV2]]], sizes = [1, 20, 40, 48]
+//      CHECK:         flow.dispatch.tensor.store %[[RESULT]], %{{.+}}, offsets = [0, %[[IV0]], %[[IV1]], %[[IV2]]], sizes = [1, 20, 40, 48]
 
 // -----
 
@@ -1156,7 +1153,6 @@ hal.executable private @gemm_unit_N {
 //  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_0]]]
 //      CHECK:   hal.return %[[D0]], %[[C1]], %[[C1]] : index, index, index
 //      CHECK: func.func @gemm_unit_N()
-//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //  CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load[0]
 //  CHECK-DAG:   %[[WG_ID_X:.+]] = hal.interface.workgroup.id[0]
 //  CHECK-DAG:   %[[WG_COUNT_X:.+]] = hal.interface.workgroup.count[0]
@@ -1166,7 +1162,7 @@ hal.executable private @gemm_unit_N {
 //  CHECK-NOT:     scf.for
 //      CHECK:     %[[GEMM:.+]] = linalg.matmul
 //      CHECK:     flow.dispatch.tensor.store %[[GEMM]],
-// CHECK-SAME:         offsets = [%[[IV0]], %[[C0]]]
+// CHECK-SAME:         offsets = [%[[IV0]], 0]
 
 // -----
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 0, 0], [0, 0, 0], [0, 0, 16]]>
@@ -1298,13 +1294,12 @@ hal.executable private @generic_unit_dims {
 //  CHECK-DAG:   %[[D2:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_7]]]
 //      CHECK:   hal.return %[[D2]], %[[D1]], %[[D0]] : index, index, index
 //      CHECK: func.func @generic_unit_dims()
-//      CHECK:   %[[C0:.+]] = arith.constant 0 : index
 //      CHECK:   scf.for %[[IV0:.+]] =
 //      CHECK:     scf.for %[[IV1:.+]] =
 //      CHECK:       scf.for %[[IV2:.+]] =
 //      CHECK:         %[[GENERIC:.+]] = linalg.generic
 //      CHECK:         flow.dispatch.tensor.store %[[GENERIC]],
-// CHECK-SAME:             offsets = [%[[C0]], %[[C0]], %[[C0]], %[[C0]], %[[IV0]], %[[IV1]], %[[C0]], %[[IV2]]]
+// CHECK-SAME:             offsets = [0, 0, 0, 0, %[[IV0]], %[[IV1]], 0, %[[IV2]]]
 
 // -----
 #config = #iree_codegen.lowering_config<tile_sizes = [[0], [0], [4]]>
