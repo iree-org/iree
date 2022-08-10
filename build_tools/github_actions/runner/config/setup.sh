@@ -31,4 +31,4 @@ echo "Enable deregister so it can hook onto system shutdown."
 sudo systemctl enable github-actions-runner-deregister
 
 echo "Start the runner so it can be assigned workflows."
-sudo systemctl start github-actions-runner-start
+systemctl start github-actions-runner-start
