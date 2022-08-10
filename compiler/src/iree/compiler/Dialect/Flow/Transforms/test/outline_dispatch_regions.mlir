@@ -170,3 +170,76 @@ func.func @dispatchWithCountRegion(%arg0: tensor<4xi32>) -> tensor<4xi32> {
   }
   return %0 : tensor<4xi32>
 }
+
+// -----
+
+// Dispatches containing some ops get a heuristics-driven summary in their name.
+
+//      CHECK: flow.executable private @main_dispatch_0 {
+// CHECK-NEXT:   flow.executable.export public @main_dispatch_0_fill_4x8
+//      CHECK: func.func @main_dispatch_0_fill_4x8(
+func.func @main() -> tensor<4x8xf32> {
+  %x = arith.constant 100 : index
+  %y = arith.constant 50 : index
+  %0 = flow.dispatch.workgroups[%x, %y]() : () -> (tensor<4x8xf32>) = (
+    %ret: !flow.dispatch.tensor<writeonly:4x8xf32>
+  ) {
+    %cst = arith.constant 100.0 : f32
+    %init = linalg.init_tensor [4, 8] : tensor<4x8xf32>
+    %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<4x8xf32>) -> tensor<4x8xf32>
+    flow.dispatch.tensor.store %fill, %ret, offsets = [0, 0], sizes = [4, 8], strides = [1, 1] : tensor<4x8xf32> -> !flow.dispatch.tensor<writeonly:4x8xf32>
+    flow.return
+  }
+  return %0 : tensor<4x8xf32>
+}
+
+// -----
+
+// A cost model picks the "most expensive" op to include in the summary.
+
+//      CHECK: flow.executable private @main_dispatch_0 {
+// CHECK-NEXT:   flow.executable.export public @main_dispatch_0_fill_40
+//      CHECK: func.func @main_dispatch_0_fill_40(
+func.func @main() -> tensor<10xf32> {
+  %x = arith.constant 100 : index
+  %0 = flow.dispatch.workgroups[%x]() : () -> (tensor<10xf32>) = (
+    %ret: !flow.dispatch.tensor<writeonly:10xf32>
+  ) {
+    %cst = arith.constant 100.0 : f32
+    %init_small = linalg.init_tensor [10] : tensor<10xf32>
+    %fill_small = linalg.fill ins(%cst : f32) outs(%init_small : tensor<10xf32>) -> tensor<10xf32>
+    // Note the ordering here - test that we don't just pick the first or the
+    // last op. If an op in the middle has a higher cost then it should be used.
+    %init_large = linalg.init_tensor [40] : tensor<40xf32>
+    %fill_large = linalg.fill ins(%cst : f32) outs(%init_large : tensor<40xf32>) -> tensor<40xf32>
+    %init_medium = linalg.init_tensor [20] : tensor<20xf32>
+    %fill_medium = linalg.fill ins(%cst : f32) outs(%init_medium : tensor<20xf32>) -> tensor<20xf32>
+    flow.dispatch.tensor.store %fill_small, %ret, offsets = [0], sizes = [10], strides = [1] : tensor<10xf32> -> !flow.dispatch.tensor<writeonly:10xf32>
+    flow.return
+  }
+  return %0 : tensor<10xf32>
+}
+
+// -----
+
+// Dynamic dimensions are considered the most expensive.
+
+//      CHECK: flow.executable private @main_dispatch_0 {
+// CHECK-NEXT:   flow.executable.export public @main_dispatch_0_fill_DxDxD
+//      CHECK: func.func @main_dispatch_0_fill_DxDxD(
+func.func @main(%arg0 : index) -> tensor<10xf32> {
+  %x = arith.constant 100 : index
+  %0 = flow.dispatch.workgroups[%x]() : () -> (tensor<10xf32>) = (
+    %arg0: index,
+    %ret: !flow.dispatch.tensor<writeonly:10xf32>
+  ) {
+    %cst = arith.constant 100.0 : f32
+    %init_small = linalg.init_tensor [10] : tensor<10xf32>
+    %fill_small = linalg.fill ins(%cst : f32) outs(%init_small : tensor<10xf32>) -> tensor<10xf32>
+    %init_dynamic = linalg.init_tensor [%arg0, %arg0, %arg0] : tensor<?x?x?xf32>
+    %fill_dynamic = linalg.fill ins(%cst : f32) outs(%init_dynamic : tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
+    flow.dispatch.tensor.store %fill_small, %ret, offsets = [0], sizes = [10], strides = [1] : tensor<10xf32> -> !flow.dispatch.tensor<writeonly:10xf32>
+    flow.return
+  }
+  return %0 : tensor<10xf32>
+}
