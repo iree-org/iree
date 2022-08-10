@@ -268,74 +268,80 @@ struct ConvertDispatchInputLoadOfTensorToSubTensor
   }
 };
 
+/// For `op` that implements the `OffsetsStridesAndSizesInterface`, canonicalize
+/// the `offsets`, `sizes` and `strides` by replacing aby value operand that is
+/// defined by a constant with the integer value directly. The type of the slice
+/// (result type for `flow.dispatch.tensor.load` and `value` type for
+/// `flow.dispatch.tensor.store`) is also passed in. The type of the slice to
+/// use in the canonicalized op is returned.
+template <typename OpTy>
+static FailureOr<RankedTensorType> canonicalizeSubViewParts(
+    OpTy op, RankedTensorType sliceType,
+    SmallVector<OpFoldResult> &mixedOffsets,
+    SmallVector<OpFoldResult> &mixedSizes,
+    SmallVector<OpFoldResult> &mixedStrides) {
+  // If there are no constant operands then we return early before the more
+  // expensive work below.
+  if (llvm::none_of(op.offsets(),
+                    [](Value operand) {
+                      return matchPattern(operand, matchConstantIndex());
+                    }) &&
+      llvm::none_of(op.sizes(),
+                    [](Value operand) {
+                      return matchPattern(operand, matchConstantIndex());
+                    }) &&
+      llvm::none_of(op.strides(), [](Value operand) {
+        return matchPattern(operand, matchConstantIndex());
+      })) {
+    return failure();
+  }
+
+  // At least one of offsets/sizes/strides is a new constant.
+  // Form the new list of operands and constant attributes from the existing.
+  mixedOffsets.assign(op.getMixedOffsets());
+  mixedSizes.assign(op.getMixedSizes());
+  mixedStrides.assign(op.getMixedStrides());
+  canonicalizeSubViewPart(mixedOffsets, ShapedType::isDynamicStrideOrOffset);
+  canonicalizeSubViewPart(mixedSizes, ShapedType::isDynamic);
+  canonicalizeSubViewPart(mixedStrides, ShapedType::isDynamicStrideOrOffset);
+
+  // Drop out the same dimensions form before.
+  llvm::SmallVector<int64_t> newShape;
+  llvm::SmallBitVector droppedDims = op.getDroppedDims();
+  for (auto size : llvm::enumerate(mixedSizes)) {
+    if (droppedDims.test(size.index())) continue;
+    Optional<int64_t> staticSize = getConstantIntValue(size.value());
+    newShape.push_back(staticSize ? staticSize.getValue()
+                                  : ShapedType::kDynamicSize);
+  }
+
+  auto newSliceType =
+      RankedTensorType::get(newShape, sliceType.getElementType());
+  return newSliceType;
+}
+
 /// Pattern to rewrite a subview op with constant arguments.
 struct DispatchTensorLoadOpWithOffsetSizesAndStridesConstantArgumentFolder final
     : public OpRewritePattern<DispatchTensorLoadOp> {
   using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(DispatchTensorLoadOp op,
+  LogicalResult matchAndRewrite(DispatchTensorLoadOp loadOp,
                                 PatternRewriter &rewriter) const override {
-    // If there are no constant operands then we return early before the more
-    // expensive work below.
-    if (llvm::none_of(op.offsets(),
-                      [](Value operand) {
-                        return matchPattern(operand, matchConstantIndex());
-                      }) &&
-        llvm::none_of(op.sizes(),
-                      [](Value operand) {
-                        return matchPattern(operand, matchConstantIndex());
-                      }) &&
-        llvm::none_of(op.strides(), [](Value operand) {
-          return matchPattern(operand, matchConstantIndex());
-        })) {
-      return failure();
-    }
-
-    // At least one of offsets/sizes/strides is a new constant.
-    // Form the new list of operands and constant attributes from the existing.
-    SmallVector<OpFoldResult> mixedOffsets(op.getMixedOffsets());
-    SmallVector<OpFoldResult> mixedSizes(op.getMixedSizes());
-    SmallVector<OpFoldResult> mixedStrides(op.getMixedStrides());
-
-    // Determine which length-1 dimensions were collapsed.
-    auto sourceTy = op.getSource().getType().cast<DispatchTensorType>();
-    auto oldResultTy = op.getResult().getType().cast<RankedTensorType>();
-    auto oldInferredResultTy =
-        DispatchTensorLoadOp::inferResultType(sourceTy, mixedSizes);
-    llvm::SmallVector<bool> dropDim(oldInferredResultTy.getRank(), true);
-    for (int i = 0, j = 0, s = oldInferredResultTy.getRank(),
-             t = oldResultTy.getRank();
-         i < s && j < t; i++) {
-      auto inferredDim = oldInferredResultTy.getDimSize(i);
-      auto resultDim = oldResultTy.getDimSize(j);
-      if (inferredDim != 1 || inferredDim == resultDim) {
-        dropDim[i] = false;
-        j++;
-      }
-    }
-
-    canonicalizeSubViewPart(mixedOffsets, ShapedType::isDynamicStrideOrOffset);
-    canonicalizeSubViewPart(mixedSizes, ShapedType::isDynamic);
-    canonicalizeSubViewPart(mixedStrides, ShapedType::isDynamicStrideOrOffset);
-
-    // Create the new op in canonical form.
-    auto resultTy = DispatchTensorLoadOp::inferResultType(sourceTy, mixedSizes);
-
-    // Drop out the same dimensions form before.
-    llvm::SmallVector<int64_t> newShape;
-    for (auto it : zip(resultTy.getShape(), dropDim)) {
-      if (!std::get<1>(it)) {
-        newShape.push_back(std::get<0>(it));
-      }
-    }
-
-    resultTy = RankedTensorType::get(newShape, resultTy.getElementType());
+    SmallVector<OpFoldResult> mixedOffsets, mixedSizes, mixedStrides;
+    RankedTensorType resultType = loadOp.getType();
+    auto newResultType = canonicalizeSubViewParts(
+        loadOp, resultType, mixedOffsets, mixedSizes, mixedStrides);
+    if (failed(newResultType)) return failure();
 
     // We need to resolve the new inferred type with the specified type.
-    auto newOp = rewriter.create<DispatchTensorLoadOp>(
-        op.getLoc(), resultTy, op.getSource(), op.getSourceDims(), mixedOffsets,
-        mixedSizes, mixedStrides);
-    rewriter.replaceOpWithNewOp<tensor::CastOp>(op, op.getResult().getType(),
-                                                newOp.getResult());
+    Location loc = loadOp.getLoc();
+    Value replacement = rewriter.create<DispatchTensorLoadOp>(
+        loc, newResultType.getValue(), loadOp.getSource(),
+        loadOp.getSourceDims(), mixedOffsets, mixedSizes, mixedStrides);
+    if (newResultType.getValue() != resultType) {
+      replacement =
+          rewriter.create<tensor::CastOp>(loc, resultType, replacement);
+    }
+    rewriter.replaceOp(loadOp, replacement);
     return success();
   }
 };
@@ -385,8 +391,9 @@ struct FoldCastOpIntoDispatchStoreOp
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(DispatchTensorStoreOp storeOp,
                                 PatternRewriter &rewriter) const override {
-    if (!storeOp.getValue().getDefiningOp<tensor::CastOp>()) return failure();
     auto parentOp = storeOp.getValue().getDefiningOp<tensor::CastOp>();
+    if (!parentOp || !tensor::canFoldIntoConsumerOp(parentOp)) return failure();
+
     rewriter.replaceOpWithNewOp<DispatchTensorStoreOp>(
         storeOp, parentOp.getSource(), storeOp.getTarget(),
         storeOp.getTargetDims(), storeOp.offsets(), storeOp.sizes(),
@@ -396,12 +403,38 @@ struct FoldCastOpIntoDispatchStoreOp
   }
 };
 
+struct DispatchTensorStoreOpWithOffsetSizesAndStridesConstantArgumentFolder
+    final : public OpRewritePattern<DispatchTensorStoreOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(DispatchTensorStoreOp storeOp,
+                                PatternRewriter &rewriter) const override {
+    SmallVector<OpFoldResult> mixedOffsets, mixedSizes, mixedStrides;
+    RankedTensorType valueType = storeOp.getValueType();
+    auto newValueType = canonicalizeSubViewParts(
+        storeOp, valueType, mixedOffsets, mixedSizes, mixedStrides);
+    if (failed(newValueType)) return failure();
+
+    Value value = storeOp.getValue();
+    Location loc = storeOp.getLoc();
+    if (newValueType.getValue() != valueType) {
+      value =
+          rewriter.create<tensor::CastOp>(loc, newValueType.getValue(), value);
+    }
+    rewriter.replaceOpWithNewOp<DispatchTensorStoreOp>(
+        storeOp, value, storeOp.getTarget(), storeOp.getTargetDims(),
+        mixedOffsets, mixedSizes, mixedStrides);
+    return success();
+  }
+};
+
 }  // namespace
 
 void DispatchTensorStoreOp::getCanonicalizationPatterns(
     RewritePatternSet &results, MLIRContext *context) {
-  results.insert<ReuseDispatchTensorStoreShapeDims>(context);
-  results.insert<FoldCastOpIntoDispatchStoreOp>(context);
+  results.insert<
+      DispatchTensorStoreOpWithOffsetSizesAndStridesConstantArgumentFolder,
+      FoldCastOpIntoDispatchStoreOp, ReuseDispatchTensorStoreShapeDims>(
+      context);
 }
 
 //===----------------------------------------------------------------------===//

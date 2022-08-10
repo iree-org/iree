@@ -536,6 +536,9 @@ def FLOW_DispatchTensorStoreOp : FLOW_Op<"dispatch.tensor.store", [
       return {resultRank, resultRank, resultRank};
     }
 
+    /// Return the type of the value type as a RankedTensorType.
+    RankedTensorType getValueType() { return getValue().getType().cast<RankedTensorType>(); }
+
     /// Return the number of leading operands before the `offsets`, `sizes` and
     /// and `strides` operands.
     static unsigned getOffsetSizeAndStrideStartOperandIndex() { return 3; }

@@ -107,6 +107,9 @@ static llvm::SmallBitVector getDroppedDimsImpl(
     RankedTensorType slicedObjectType, ArrayRef<OpFoldResult> mixedSizes) {
   ArrayRef<int64_t> resultShape = slicedObjectType.getShape();
   llvm::SmallBitVector droppedDims(mixedSizes.size());
+  if (slicedObjectType.getRank() == mixedSizes.size()) {
+    return droppedDims;
+  }
   unsigned shapePos = 0;
   for (const auto &size : llvm::enumerate(mixedSizes)) {
     Optional<int64_t> sizeVal = getConstantIntValue(size.value());
