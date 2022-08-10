@@ -13,7 +13,7 @@
 set -euo pipefail
 
 echo "Register the self-hoster runner."
-chmod +x /home/runner/config/register.sh
+chmod +x ~runner/config/register.sh
 runuser --user runner ~runner/config/register.sh
 
 echo "Setup the deregister service."

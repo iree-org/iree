@@ -13,27 +13,26 @@
 
 set -euo pipefail
 
-SCRIPT="$( readlink -f -- "$0"; )"
-SCRIPT_BASENAME="$(basename ${SCRIPT})"
 
-if [[ "$(whoami)" != "runner" ]]; then
-  echo "Current user is not 'runner'. Rerunning script as 'runner'."
-  sudo su runner --shell /bin/bash --command "${SCRIPT}"
-  exit
+# Change config-ref metadata to a different git reference to fetch from somewhere else.
+# For PRs, that would be refs/pull/<pr_number>/merge
+gihub_config_ref=$(curl --silent --fail "http://metadata.google.internal/computeMetadata/v1/instance/attributes/github-config-ref" -H "Metadata-Flavor: Google")
+
+if [[ -z "${gihub_config_ref}" ]]; then
+  echo "Using default 'main' config as no github-config-ref was specified."
+  github_config_ref="main"
 fi
 
-GITHUB_CLONE_TARGET=$(curl --silent --fail --show-error "http://metadata.google.internal/computeMetadata/v1/instance/attributes/github-clone-target" -H "Metadata-Flavor: Google")
- 
-cd "${HOME}"
-rm -rf config
+cd /home/runner
+rm -rf config/
+mkdir config/
+curl --silent --fail --show-error --location \
+  "https://github.com/iree-org/iree/archive/${gihub_config_ref}.tar.gz" \
+  | tar -zx -f - \
+  --strip-components=4  --wildcards \
+  */build_tools/github_actions/runner/config/
 
-rm -rf /tmp/iree
-git clone -b ${GITHUB_CLONE_TARGET} --single-branch -- https://github.com/iree-org/iree.git /tmp/iree
+chown -R runner:runner /home/runner/config/
+cd config
 
-cp -r /tmp/iree/build_tools/github_actions/runner/config/ "${HOME}/config"
-
-rm -rf /tmp/iree
-
-cd "${HOME}/config"
-
-./setup.sh
+./start.sh
