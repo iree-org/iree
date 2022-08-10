@@ -25,7 +25,7 @@ sudo cp /home/runner/config/github-actions-runner-start.service /etc/systemd/sys
 chmod +x /home/runner/config/start.sh
 
 echo "Reload system service files to reflect changes."
-sudo systemctl daemon-reload
+systemctl daemon-reload
 
 echo "Enable deregister so it can hook onto system shutdown."
 sudo systemctl enable github-actions-runner-deregister
