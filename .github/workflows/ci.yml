@@ -154,7 +154,6 @@ jobs:
             "${BUILD_DIR}"
 
   test_gpu:
-    if: github.event_name != 'pull_request'
     needs: build_all
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
@@ -344,7 +343,6 @@ jobs:
 
   test_tf_integrations_gpu:
     needs: [build_tf_integrations, build_all]
-    if: github.event_name != 'pull_request'
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
