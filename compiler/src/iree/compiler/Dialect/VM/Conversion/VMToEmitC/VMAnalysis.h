@@ -24,15 +24,27 @@ struct VMAnalysis {
     valueLiveness = ValueLiveness(op);
     originalFunctionType = funcOp.getFunctionType();
   }
+  VMAnalysis(FunctionType functionType) { originalFunctionType = functionType; }
 
   VMAnalysis(VMAnalysis &&) = default;
   VMAnalysis &operator=(VMAnalysis &&) = default;
   VMAnalysis(const VMAnalysis &) = delete;
   VMAnalysis &operator=(const VMAnalysis &) = delete;
 
+  FunctionType getFunctionType() { return originalFunctionType; }
+
   int getNumRefRegisters() {
     return registerAllocation.getMaxRefRegisterOrdinal() + 1;
   }
+
+  int getNumRefArguments() {
+    assert(originalFunctionType);
+    return llvm::count_if(originalFunctionType.getInputs(), [](Type inputType) {
+      return inputType.isa<IREE::VM::RefType>();
+    });
+  }
+
+  int getNumLocalRefs() { return getNumRefRegisters() - getNumRefArguments(); }
 
   uint16_t getRefRegisterOrdinal(Value ref) {
     assert(ref.getType().isa<IREE::VM::RefType>());
@@ -56,13 +68,12 @@ struct VMAnalysis {
   }
 
   DenseMap<int64_t, Operation *> &localRefs() { return refs; }
-  size_t numRefArguments;
-  FunctionType originalFunctionType;
 
  private:
   RegisterAllocation registerAllocation;
   ValueLiveness valueLiveness;
   DenseMap<int64_t, Operation *> refs;
+  FunctionType originalFunctionType;
 };
 
 using VMAnalysisCache = DenseMap<Operation *, VMAnalysis>;
