@@ -34,6 +34,9 @@ iree_benchmark_suite(
     "${MOBILEBERT_FP32_MODULE}"
     "${MOBILENET_V2_MODULE}"
     "${MOBILENET_V3SMALL_MODULE}"
+    "${MOBILEBERT_INT8_MODULE}"
+    "${PERSON_DETECT_INT8_MODULE}"
+    "${EFFICIENTNET_INT8_MODULE}"
 
   BENCHMARK_MODES
     "full-inference,default-flags"
@@ -63,6 +66,9 @@ iree_benchmark_suite(
     "${MOBILEBERT_FP32_MODULE}"
     "${MOBILENET_V2_MODULE}"
     "${MOBILENET_V3SMALL_MODULE}"
+    "${MOBILEBERT_INT8_MODULE}"
+    "${PERSON_DETECT_INT8_MODULE}"
+    "${EFFICIENTNET_INT8_MODULE}"
 
   BENCHMARK_MODES
     "1-thread,full-inference,default-flags"
@@ -94,6 +100,9 @@ iree_benchmark_suite(
     "${MOBILEBERT_FP32_MODULE}"
     "${MOBILENET_V2_MODULE}"
     "${MOBILENET_V3SMALL_MODULE}"
+    "${MOBILEBERT_INT8_MODULE}"
+    "${PERSON_DETECT_INT8_MODULE}"
+    "${EFFICIENTNET_INT8_MODULE}"
 
   BENCHMARK_MODES
     "4-thread,full-inference,default-flags"
@@ -125,6 +134,9 @@ iree_benchmark_suite(
     "${MOBILEBERT_FP32_MODULE}"
     "${MOBILENET_V2_MODULE}"
     "${MOBILENET_V3SMALL_MODULE}"
+    "${MOBILEBERT_INT8_MODULE}"
+    "${PERSON_DETECT_INT8_MODULE}"
+    "${EFFICIENTNET_INT8_MODULE}"
 
   BENCHMARK_MODES
     "8-thread,full-inference,default-flags"

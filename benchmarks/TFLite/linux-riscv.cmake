@@ -45,6 +45,9 @@ iree_benchmark_suite(
     "${DEEPLABV3_FP32_MODULE}"
     "${MOBILEBERT_FP32_MODULE}"
     "${MOBILENET_V1_MODULE}"
+    "${MOBILEBERT_INT8_MODULE}"
+    "${PERSON_DETECT_INT8_MODULE}"
+    "${EFFICIENTNET_INT8_MODULE}"
 
   BENCHMARK_MODES
     "full-inference,default-flags"
@@ -70,7 +73,9 @@ iree_benchmark_suite(
     "linux-riscv"
 
   MODULES
+    "${MOBILEBERT_INT8_MODULE}"
     "${PERSON_DETECT_INT8_MODULE}"
+    "${EFFICIENTNET_INT8_MODULE}"
 
   BENCHMARK_MODES
     "full-inference,default-flags"
