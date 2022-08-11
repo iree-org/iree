@@ -59,9 +59,17 @@ hal.executable private @dispatch_2 {
     }
   }
 }
-func.func @basic_linking() -> () {
+func.func @basic_linking() -> () attributes {
+  testing.func.a = @dispatch_0,
+  testing.func.b = @dispatch_0::@vmvx,
+  testing.func.c = @dispatch_0::@vmvx::@dispatch_0
+} {
   %device = hal.ex.shared_device : !hal.device
-  %cmd = hal.command_buffer.create device(%device : !hal.device) mode("OneShot") categories("Transfer|Dispatch") : !hal.command_buffer
+  %cmd = hal.command_buffer.create device(%device : !hal.device) mode("OneShot") categories("Transfer|Dispatch") : !hal.command_buffer attributes {
+    testing.op.a = @dispatch_0,
+    testing.op.b = @dispatch_0::@vmvx,
+    testing.op.c = @dispatch_0::@vmvx::@dispatch_0
+  }
   %c1 = arith.constant 1 : index
   hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@dispatch_0::@vmvx::@dispatch_0) workgroups([%c1, %c1, %c1])
   hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@dispatch_1::@vmvx::@dispatch_1) workgroups([%c1, %c1, %c1])
@@ -107,19 +115,21 @@ util.initializer {
 // CHECK-NEXT:    }
 // CHECK-NEXT:  }
 //
-// CHECK:       func.func @basic_linking() {
+// CHECK:       func.func @basic_linking()
+// CHECK:           testing.func.a = @vmvx_linked
+// CHECK-SAME:      testing.func.b = @vmvx_linked::@vmvx_bytecode_fb
+// CHECK-SAME:      testing.func.c = @vmvx_linked::@vmvx_bytecode_fb::@dispatch_0
+// CHECK:           testing.op.a = @vmvx_linked
+// CHECK-SAME:      testing.op.b = @vmvx_linked::@vmvx_bytecode_fb
+// CHECK-SAME:      testing.op.c = @vmvx_linked::@vmvx_bytecode_fb::@dispatch_0
 // CHECK:         hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@vmvx_linked::@vmvx_bytecode_fb::@dispatch_0) workgroups([%c1, %c1, %c1])
 // CHECK-NEXT:    hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@vmvx_linked::@vmvx_bytecode_fb::@dispatch_1) workgroups([%c1, %c1, %c1])
 // CHECK-NEXT:    hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@vmvx_linked::@vmvx_bytecode_fb::@dispatch_2) workgroups([%c1, %c1, %c1])
-// CHECK-NEXT:    return
-// CHECK-NEXT:  }
 //
-// CHECK:       util.initializer {
+// CHECK:       util.initializer
 // CHECK:         hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@vmvx_linked::@vmvx_bytecode_fb::@dispatch_0) workgroups([%c1, %c1, %c1])
 // CHECK-NEXT:    hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@vmvx_linked::@vmvx_bytecode_fb::@dispatch_1) workgroups([%c1, %c1, %c1])
 // CHECK-NEXT:    hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@vmvx_linked::@vmvx_bytecode_fb::@dispatch_2) workgroups([%c1, %c1, %c1])
-// CHECK-NEXT:    util.initializer.return
-// CHECK-NEXT:  }
 
 // -----
 
