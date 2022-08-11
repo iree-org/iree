@@ -20,8 +20,8 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         [
             "reduction.mlir",
-            "transform_dialect_codegen_spec.mlir",
-            "transform_dialect_dispatch_spec.mlir",
+            "reduction_codegen_spec.mlir",
+            "reduction_dispatch_spec.mlir",
         ],
         include =
             ["*.mlir"],
