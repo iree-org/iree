@@ -785,9 +785,17 @@ struct DotToMul : public OpRewritePattern<mhlo::DotOp> {
                                 PatternRewriter &rewriter) const override {
     auto lhs = op.lhs();
     auto rhs = op.rhs();
-    auto lhsTy = lhs.getType().cast<RankedTensorType>();
-    auto rhsTy = rhs.getType().cast<RankedTensorType>();
+    auto lhsTy = lhs.getType().dyn_cast<RankedTensorType>();
+    auto rhsTy = rhs.getType().dyn_cast<RankedTensorType>();
     auto resultTy = op.getType().cast<RankedTensorType>();
+
+    if (!lhsTy || !rhsTy) {
+      return rewriter.notifyMatchFailure(op, "lhs and rhs must be ranked");
+    }
+
+    if (lhsTy.getRank() != 2 || rhsTy.getRank() != 2) {
+      return rewriter.notifyMatchFailure(op, "lhs and rhs must be rank-2");
+    }
 
     if (lhsTy.getDimSize(1) != 1) return failure();
 
@@ -802,18 +810,6 @@ struct DotToMul : public OpRewritePattern<mhlo::DotOp> {
     Value outSize = rewriter.create<mhlo::ConcatenateOp>(
         op.getLoc(), RankedTensorType::get({2}, rewriter.getI32Type()),
         ValueRange{batchSize, featureSize}, rewriter.getI64IntegerAttr(0));
-
-    /*
-        lhs = rewriter.create<mhlo::DynamicReshapeOp>(
-            op.getLoc(),
-            RankedTensorType::get(lhsTy.getDimSize(0), lhsTy.getElementType()),
-       lhs, batchSize);
-
-        rhs = rewriter.create<mhlo::DynamicReshapeOp>(
-            op.getLoc(),
-            RankedTensorType::get(rhsTy.getDimSize(1), lhsTy.getElementType()),
-       rhs, featureSize);
-            */
 
     lhs = rewriter.create<mhlo::DynamicBroadcastInDimOp>(
         op.getLoc(), resultTy.clone(lhsTy.getElementType()), lhs, outSize,
