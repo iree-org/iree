@@ -19,6 +19,7 @@ package(
 )
 
 BACKEND_TESTS = [
+    "disable_demote_f64_to_f32",
     "dynamic_abs.mlir",
     "dynamic_add.mlir",
     "dynamic_dot.mlir",
@@ -51,11 +52,11 @@ iree_lit_test_suite(
         # TODO(#5897): enable these for codegen linalg on tensors/etc.
         exclude = [
             "associative_reordering.mlir",
+            "disable_demote_f64_to_f32",
             "large_reduction.mlir",
             "layernorm.mlir",
             "linalg_quantized_matmul_vs_linalg_matmul.mlir",
             "lowering_config.mlir",
-            "disable_demote_f64_to_f32",
         ] + BACKEND_TESTS,
     ),
     cfg = "//tests:lit.cfg.py",
