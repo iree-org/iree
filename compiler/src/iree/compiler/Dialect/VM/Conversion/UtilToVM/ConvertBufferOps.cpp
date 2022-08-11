@@ -9,6 +9,7 @@
 #include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/VM/Conversion/UtilToVM/ConvertUtilToVM.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -24,6 +25,12 @@ static Value castToI64(Value value, OpBuilder &builder) {
   if (value.getType().isInteger(64)) return value;
   return builder.createOrFold<IREE::VM::ExtI32I64UOp>(
       value.getLoc(), builder.getI64Type(), value);
+}
+
+static Value castToIndex(Value value, OpBuilder &builder) {
+  if (value.getType().isIndex()) return value;
+  return builder.createOrFold<arith::IndexCastOp>(
+      value.getLoc(), builder.getIndexType(), value);
 }
 
 struct BufferConstantOpConversion
@@ -110,7 +117,7 @@ struct BufferSizeOpConversion
       ConversionPatternRewriter &rewriter) const override {
     Value size = rewriter.create<IREE::VM::BufferLengthOp>(
         sizeOp.getLoc(), rewriter.getI64Type(), adaptor.getOperand());
-    rewriter.replaceOp(sizeOp, size);
+    rewriter.replaceOp(sizeOp, castToIndex(size, rewriter));
     return success();
   }
 };

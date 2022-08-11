@@ -63,9 +63,12 @@ func.func @buffer_slice(%arg0: !util.buffer, %arg1: index, %arg2: index, %arg3: 
 
 // CHECK-LABEL: @buffer_size
 func.func @buffer_size(%arg0: !util.buffer) -> index {
-  // CHECK-32: %[[SIZE:.+]] = vm.buffer.length %arg0 : !vm.buffer -> i64
+  // CHECK-32: %[[SIZE_I64:.+]] = vm.buffer.length %arg0 : !vm.buffer -> i64
+  // CHECK-32: %[[SIZE_I32:.+]] = vm.trunc.i64.i32 %[[SIZE_I64]]
+  // CHECK-64: %[[SIZE_I64:.+]] = vm.buffer.length %arg0 : !vm.buffer -> i64
   %0 = util.buffer.size %arg0 : !util.buffer
-  // CHECK-32: return %[[SIZE]]
+  // CHECK-32: return %[[SIZE_I32]]
+  // CHECK-64: return %[[SIZE_I64]]
   return %0 : index
 }
 
