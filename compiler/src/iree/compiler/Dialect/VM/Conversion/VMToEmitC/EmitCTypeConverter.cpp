@@ -57,8 +57,7 @@ EmitCTypeConverter::EmitCTypeConverter() {
     auto op = builder.create<emitc::VariableOp>(
         /*location=*/loc,
         /*resultType=*/refType,
-        // TODO: Type()
-        /*value=*/emitc::OpaqueAttr::get(ctx, Type(), ""));
+        /*value=*/emitc::OpaqueAttr::get(ctx, ""));
 
     sourceMaterializations.insert(op.getOperation());
 
