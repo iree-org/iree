@@ -799,6 +799,9 @@ struct DotToMul : public OpRewritePattern<mhlo::DotOp> {
 
     if (lhsTy.getDimSize(1) != 1) return failure();
 
+    // Dynamically compoute the shape of the result of the DotOp by querying
+    // the 0-th dimesnions of hte left, the 1st dimension of the right, and
+    // concatenating them.
     Value batchSize = rewriter.create<mhlo::GetDimensionSizeOp>(
         op.getLoc(), RankedTensorType::get({1}, rewriter.getI32Type()), lhs,
         rewriter.getI64IntegerAttr(0));
