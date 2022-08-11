@@ -53,7 +53,14 @@ jobs:
       should-run: ${{ env.SHOULD_RUN }}
     steps:
       - name: "Computing whether CI should run"
-        run: echo "SHOULD_RUN=${SHOULD_RUN}"
+        run: |
+          echo "EVENT_IS_PR=${{ github.event_name == 'pull_request' }}"
+          echo "SKIP_LABEL=${{ contains(github.event.pull_request.labels.*.name, 'skip-ci') }}"
+          echo LABELS:
+          cat <<EOF | jq -c
+            ${{ toJson(github.event.pull_request.labels.*.name) }}
+          EOF
+          echo "SHOULD_RUN=${SHOULD_RUN}"
 
   ################################### Basic ####################################
   # Jobs that build all of IREE "normally"
