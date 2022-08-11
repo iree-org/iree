@@ -840,7 +840,6 @@ struct DotToMul : public OpRewritePattern<mhlo::DotOp> {
   }
 };
 
-
 // Similar to DotIsMul, this finds the case where a canonical dot general
 // can be represented using a mul operation. This includes possibly making
 // an implicit cast explicit prior the mul.
