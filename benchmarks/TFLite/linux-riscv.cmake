@@ -47,6 +47,7 @@ iree_benchmark_suite(
     "${MOBILENET_V1_MODULE}"
     "${MOBILEBERT_INT8_MODULE}"
     "${PERSON_DETECT_INT8_MODULE}"
+    "${EFFICIENTNET_INT8_MODULE}"
 
   BENCHMARK_MODES
     "full-inference,default-flags"
@@ -74,6 +75,7 @@ iree_benchmark_suite(
   MODULES
     "${MOBILEBERT_INT8_MODULE}"
     "${PERSON_DETECT_INT8_MODULE}"
+    "${EFFICIENTNET_INT8_MODULE}"
 
   BENCHMARK_MODES
     "full-inference,default-flags"
