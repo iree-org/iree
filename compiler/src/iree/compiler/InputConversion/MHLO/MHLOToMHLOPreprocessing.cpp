@@ -853,6 +853,7 @@ struct DotGeneralIsMul : public OpRewritePattern<mhlo::DotGeneralOp> {
     auto lhsTy = lhs.getType().dyn_cast<RankedTensorType>();
     auto rhsTy = rhs.getType().dyn_cast<RankedTensorType>();
     auto resultTy = op.getType().dyn_cast<RankedTensorType>();
+    ImplicitLocOpBuilder builder(op.getLoc(), rewriter);
 
     if (!lhsTy || !rhsTy || !resultTy) return failure();
 
@@ -864,49 +865,45 @@ struct DotGeneralIsMul : public OpRewritePattern<mhlo::DotGeneralOp> {
 
     // Check there are canonical number of dimensions.
     if (batchDimsL.size() != 1 || batchDimsR.size() != 1 ||
-        contractDimsL.size() != 1 || contractDimsR.size() != 1)
-      return failure();
+        contractDimsL.size() != 1 || contractDimsR.size() != 1) {
+      return rewriter.notifyMatchFailure(
+          op, "Incorrect number of Dot Dimension Numbers");
+    }
 
     // Check the dimensions are the valid members.
     if (batchDimsL.front() != 0 || batchDimsR.front() != 0 ||
-        contractDimsL.front() != 2 || contractDimsR.front() != 1)
-      return failure();
+        contractDimsL.front() != 2 || contractDimsR.front() != 1) {
+      return rewriter.notifyMatchFailure(op,
+                                         "Dot Dimension Numbers not canonical");
+    }
 
     // Check that the contraction dimension is degenerate.
-    if (lhsTy.getDimSize(2) != 1) return failure();
-    if (rhsTy.getDimSize(1) != 1) return failure();
+    if (lhsTy.getDimSize(2) != 1 || rhsTy.getDimSize(1) != 1) {
+      return rewriter.notifyMatchFailure(op, "contraction dim not length-1");
+    }
 
     // Determine the output size of the result.
-    auto batchSize = rewriter.create<mhlo::GetDimensionSizeOp>(
-        op.getLoc(), RankedTensorType::get({1}, rewriter.getI32Type()), lhs, 0);
-    auto leftSize = rewriter.create<mhlo::GetDimensionSizeOp>(
-        op.getLoc(), RankedTensorType::get({1}, rewriter.getI32Type()), lhs, 1);
-    auto rightSize = rewriter.create<mhlo::GetDimensionSizeOp>(
-        op.getLoc(), RankedTensorType::get({1}, rewriter.getI32Type()), rhs, 2);
-    auto dynSize = rewriter.create<mhlo::ConcatenateOp>(
-        op.getLoc(), RankedTensorType::get({3}, rewriter.getI32Type()),
+    auto r1i32Ty = RankedTensorType::get({1}, builder.getI32Type());
+    auto batchSize = builder.create<mhlo::GetDimensionSizeOp>(r1i32Ty, lhs, 0);
+    auto leftSize = builder.create<mhlo::GetDimensionSizeOp>(r1i32Ty, lhs, 1);
+    auto rightSize = builder.create<mhlo::GetDimensionSizeOp>(r1i32Ty, rhs, 2);
+    auto dynSize = builder.create<mhlo::ConcatenateOp>(
+        RankedTensorType::get({3}, builder.getI32Type()),
         ValueRange{batchSize, leftSize, rightSize}, 0);
 
+    auto i64Iota = builder.getI64TensorAttr({0, 1, 2});
     auto lhsBroadcastTy =
         RankedTensorType::get(resultTy.getShape(), lhsTy.getElementType());
-    lhs = rewriter.create<mhlo::DynamicBroadcastInDimOp>(
-        op.getLoc(), lhsBroadcastTy, lhs, dynSize,
-        rewriter.getI64TensorAttr({0, 1, 2}));
+    lhs = builder.createOrFold<mhlo::DynamicBroadcastInDimOp>(lhsBroadcastTy, lhs,
+                                                        dynSize, i64Iota);
 
     auto rhsBroadcastTy =
         RankedTensorType::get(resultTy.getShape(), rhsTy.getElementType());
-    rhs = rewriter.create<mhlo::DynamicBroadcastInDimOp>(
-        op.getLoc(), rhsBroadcastTy, rhs, dynSize,
-        rewriter.getI64TensorAttr({0, 1, 2}));
+    rhs = builder.createOrFold<mhlo::DynamicBroadcastInDimOp>(rhsBroadcastTy, rhs,
+                                                        dynSize, i64Iota);
 
-    if (lhsBroadcastTy != resultTy) {
-      lhs = rewriter.create<mhlo::ConvertOp>(op.getLoc(), resultTy, lhs);
-    }
-
-    if (rhsBroadcastTy != resultTy) {
-      rhs = rewriter.create<mhlo::ConvertOp>(op.getLoc(), resultTy, rhs);
-    }
-
+    lhs = builder.createOrFold<mhlo::ConvertOp>(resultTy, lhs);
+    rhs = builder.createOrFold<mhlo::ConvertOp>(resultTy, rhs);
     rewriter.replaceOpWithNewOp<mhlo::MulOp>(op, resultTy, lhs, rhs);
     return success();
   }
