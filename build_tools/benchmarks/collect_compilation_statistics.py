@@ -20,8 +20,7 @@ from dataclasses import asdict
 from pathlib import PurePath, Path
 from typing import BinaryIO, Dict, Optional, TextIO
 # Add build_tools utility dir to the search path.
-sys.path.insert(
-    0,
+sys.path.append(
     next(
         str(parent / "python")
         for parent in Path(__file__).parents
