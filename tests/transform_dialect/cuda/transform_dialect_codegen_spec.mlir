@@ -1,23 +1,7 @@
-// RUN: iree-opt %s
+// RUN: iree-opt %s 
 
 transform.with_pdl_patterns {
 ^bb0(%arg0: !pdl.operation):
-  pdl.pattern @pdl_generic_target : benefit(1) {
-    %args = operands
-    %results = types
-    %0 = operation "linalg.generic"(%args : !pdl.range<value>) -> (%results : !pdl.range<type>)
-    // TODO: we don't want this, but it is the required terminator for pdl.pattern
-    rewrite %0 with "transform.dialect"
-  }
-
-  pdl.pattern @pdl_if_op_target : benefit(1) {
-    %args = operands
-    %results = types
-    %0 = operation "scf.if"(%args : !pdl.range<value>) -> (%results : !pdl.range<type>)
-    // TODO: we don't want this, but it is the required terminator for pdl.pattern
-    rewrite %0 with "transform.dialect"
-  }
-
   transform.structured.canonicalized_sequence %arg0 {
   ^bb1(%arg1: !pdl.operation):
     %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
@@ -30,14 +14,11 @@ transform.with_pdl_patterns {
     
     %1 = transform.structured.match ops{["linalg.generic"]} in %arg1
     %foreach_thread_1, %tiled_fill = 
-      tile_to_foreach_thread_op %fill_op 
-        {num_threads = [8, 2], thread_dim_mapping = [2, 1, 0]}
+      transform.structured.tile_to_foreach_thread_op %fill_op num_threads [8, 2] (mapped to dims [2, 1, 0])
     %foreach_thread_2, %tiled_more_parallel_op = 
-       tile_to_foreach_thread_op %more_parallel_op 
-         {num_threads = [8, 2], thread_dim_mapping = [2, 1, 0]}
+       transform.structured.tile_to_foreach_thread_op %more_parallel_op num_threads [8, 2] (mapped to dims [2, 1, 0])
     %foreach_thread_3, %tiled_combiner_op = 
-      tile_to_foreach_thread_op %combiner_op 
-        {num_threads = [8], thread_dim_mapping = [2, 1, 0]}
+      transform.structured.tile_to_foreach_thread_op %combiner_op num_threads [8] (mapped to dims [2, 1, 0])
 
     %isolated_handle_1 = transform.get_closest_isolated_parent %foreach_thread_2
     %isolated_handle_2 = transform.structured.vectorize %isolated_handle_1
