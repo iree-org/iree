@@ -9,8 +9,8 @@
 import re
 from typing import Optional, Sequence
 
-from .benchmark_definition import (execute_cmd_and_get_output, DeviceInfo,
-                                   PlatformType)
+from build_tools.utils import execute_cmd_and_get_output
+from .benchmark_definition import (DeviceInfo, PlatformType)
 
 
 def _get_lscpu_field(lscpu_output: str, field_name: str) -> str:

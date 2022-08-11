@@ -31,18 +31,23 @@ Example usages:
 
 import atexit
 import os
-import re
 import subprocess
 import tarfile
 import shutil
 import sys
+from pathlib import Path
+# Add build_tools utility dir to the search path.
+sys.path.insert(
+    0,
+    next(
+        str(parent / "python")
+        for parent in Path(__file__).parents
+        if parent.name == "build_tools"))
 
 from typing import Optional, Sequence
 from common.benchmark_config import BenchmarkConfig
 from common.benchmark_driver import BenchmarkDriver
-from common.benchmark_definition import (DriverInfo, execute_cmd,
-                                         execute_cmd_and_get_output,
-                                         get_git_commit_hash,
+from common.benchmark_definition import (DriverInfo,
                                          get_iree_benchmark_module_arguments,
                                          wait_for_iree_benchmark_module_start)
 from common.benchmark_suite import (MODEL_FLAGFILE_NAME, BenchmarkCase,
@@ -51,6 +56,7 @@ from common.android_device_utils import (get_android_device_model,
                                          get_android_device_info,
                                          get_android_gpu_name)
 from common.common_arguments import build_common_argument_parser
+from build_tools.utils import execute_cmd, execute_cmd_and_get_output, get_git_commit_hash
 
 # Root directory to perform benchmarks in on the Android device.
 ANDROID_TMPDIR = "/data/local/tmp/iree-benchmarks"

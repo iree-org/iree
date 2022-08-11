@@ -15,10 +15,17 @@ import json
 import os
 import re
 import zipfile
-
+import sys
 from dataclasses import asdict
+from pathlib import PurePath, Path
 from typing import BinaryIO, Dict, Optional, TextIO
-from pathlib import PurePath
+# Add build_tools utility dir to the search path.
+sys.path.insert(
+    0,
+    next(
+        str(parent / "python")
+        for parent in Path(__file__).parents
+        if parent.name == "build_tools"))
 
 from common.benchmark_definition import CompilationInfo, CompilationResults, CompilationStatistics, ModuleComponentSizes, get_git_commit_hash
 from common.benchmark_suite import BENCHMARK_SUITE_REL_PATH, BenchmarkSuite

@@ -9,19 +9,27 @@
 import subprocess
 import atexit
 import os
-import re
 import shutil
-import sys
 import tarfile
+import sys
+from pathlib import Path
+# Add build_tools utility dir to the search path.
+sys.path.insert(
+    0,
+    next(
+        str(parent / "python")
+        for parent in Path(__file__).parents
+        if parent.name == "build_tools"))
 
 from typing import List, Optional
 
 from common.benchmark_driver import BenchmarkDriver
 from common.benchmark_suite import MODEL_FLAGFILE_NAME, BenchmarkCase, BenchmarkSuite
 from common.benchmark_config import BenchmarkConfig
-from common.benchmark_definition import execute_cmd, execute_cmd_and_get_output, get_git_commit_hash, get_iree_benchmark_module_arguments, wait_for_iree_benchmark_module_start
+from common.benchmark_definition import get_iree_benchmark_module_arguments, wait_for_iree_benchmark_module_start
 from common.common_arguments import build_common_argument_parser
 from common.linux_device_utils import get_linux_device_info
+from build_tools.utils import execute_cmd, execute_cmd_and_get_output, get_git_commit_hash
 
 
 class LinuxBenchmarkDriver(BenchmarkDriver):
