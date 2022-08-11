@@ -13,10 +13,14 @@
 
 set -euo pipefail
 
+echo "Running setup script"
+
 # Change this to a different git reference to fetch from somewhere else.
 # For PRs, that would be refs/pull/<pr_number>/merge
 CONFIG_REF=main
  
+echo "Fetching from ${CONFIG_REF}"
+
 cd ~runner
 rm -rf config
 curl --silent --fail --show-error --location \
