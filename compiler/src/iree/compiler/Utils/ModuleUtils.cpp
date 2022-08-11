@@ -92,9 +92,13 @@ LogicalResult mergeModuleInto(Operation *sourceModuleOp,
           }
         }
       }
-      sourceOp->moveBefore(targetBuilder.getInsertionBlock(),
-                           targetBuilder.getInsertionPoint());
+      sourceOp->moveAfter(targetBuilder.getInsertionBlock(),
+                          targetBuilder.getInsertionPoint());
       targetSymbolTable.insert(sourceOp);
+      targetBuilder.setInsertionPoint(sourceOp);
+    } else {
+      sourceOp->moveAfter(targetBuilder.getInsertionBlock(),
+                          targetBuilder.getInsertionPoint());
       targetBuilder.setInsertionPoint(sourceOp);
     }
   }
