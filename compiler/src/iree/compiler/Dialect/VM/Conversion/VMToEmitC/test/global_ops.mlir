@@ -35,7 +35,7 @@ vm.module @my_module {
   vm.func @global_load_ref() -> !vm.buffer {
     // CHECK: %[[A:.+]] = emitc.call "EMITC_STRUCT_PTR_MEMBER"(%arg2) {args = [0 : index, #emitc.opaque<"refs">]} : (!emitc.ptr<!emitc.opaque<"my_module_state_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>
     // CHECK: %[[B:.+]] = emitc.call "EMITC_ARRAY_ELEMENT_ADDRESS"(%[[A]]) {args = [0 : index, 0 : ui32]} : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>
-    // CHECK: %[[C:.+]] = "emitc.variable"() {value = #emitc.opaque<""> : !emitc.opaque<"iree_vm_type_def_t">} : () -> !emitc.opaque<"iree_vm_type_def_t">
+    // CHECK: %[[C:.+]] = "emitc.variable"() {value = #emitc.opaque<"">} : () -> !emitc.opaque<"iree_vm_type_def_t">
     // CHECK: emitc.call "EMITC_STRUCT_MEMBER_ASSIGN"{{.*}}
     // CHECK: %[[D:.+]] = emitc.apply "&"(%[[C]]) : (!emitc.opaque<"iree_vm_type_def_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_type_def_t">>
     // CHECK: %[[E:.+]] = emitc.call "EMITC_STRUCT_PTR_MEMBER"(%[[D]]) {args = [0 : index, #emitc.opaque<"ref_type">]} : (!emitc.ptr<!emitc.opaque<"iree_vm_type_def_t">>) -> !emitc.opaque<"iree_vm_ref_type_t">
@@ -54,7 +54,7 @@ vm.module @my_module {
   vm.func @global_store_ref(%arg0 : !vm.buffer) {
     // CHECK: %[[A:.+]] = emitc.call "EMITC_STRUCT_PTR_MEMBER"(%arg2) {args = [0 : index, #emitc.opaque<"refs">]} : (!emitc.ptr<!emitc.opaque<"my_module_state_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>
     // CHECK: %[[B:.+]] = emitc.call "EMITC_ARRAY_ELEMENT_ADDRESS"(%[[A]]) {args = [0 : index, 0 : ui32]} : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>
-    // CHECK: %[[C:.+]] = "emitc.variable"() {value = #emitc.opaque<""> : !emitc.opaque<"iree_vm_type_def_t">} : () -> !emitc.opaque<"iree_vm_type_def_t">
+    // CHECK: %[[C:.+]] = "emitc.variable"() {value = #emitc.opaque<"">} : () -> !emitc.opaque<"iree_vm_type_def_t">
     // CHECK: emitc.call "EMITC_STRUCT_MEMBER_ASSIGN"{{.*}}
     // CHECK: %[[D:.+]] = emitc.apply "&"(%[[C]]) : (!emitc.opaque<"iree_vm_type_def_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_type_def_t">>
     // CHECK: %[[E:.+]] = emitc.call "EMITC_STRUCT_PTR_MEMBER"(%[[D]]) {args = [0 : index, #emitc.opaque<"ref_type">]} : (!emitc.ptr<!emitc.opaque<"iree_vm_type_def_t">>) -> !emitc.opaque<"iree_vm_ref_type_t">
