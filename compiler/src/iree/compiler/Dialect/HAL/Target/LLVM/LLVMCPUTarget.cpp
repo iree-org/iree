@@ -249,6 +249,22 @@ class LLVMCPUTargetBackend final : public TargetBackend {
 
     // At this moment we are leaving MLIR LLVM dialect land translating module
     // into target independent LLVMIR.
+    if (!options_.debugSymbols) {
+      Operation *operation = variantOp.getInnerModule().getOperation();
+      auto unknownLoc = UnknownLoc::get(operation->getContext());
+      operation->walk([&](Operation *op) {
+        op->setLoc(unknownLoc);
+        // Strip block arguments debug info.
+        for (Region &region : op->getRegions()) {
+          for (Block &block : region.getBlocks()) {
+            for (BlockArgument &arg : block.getArguments()) {
+              arg.setLoc(unknownLoc);
+            }
+          }
+        }
+      });
+    }
+
     auto llvmModule = mlir::translateModuleToLLVMIR(variantOp.getInnerModule(),
                                                     context, libraryName);
     if (!llvmModule) {
