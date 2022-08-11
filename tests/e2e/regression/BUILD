@@ -129,3 +129,13 @@ iree_check_single_backend_test_suite(
     ],
     target_backend = "cuda",
 )
+
+iree_check_single_backend_test_suite(
+    name = "disable_demote_f64_to_f32",
+    srcs = [
+        "disable_demote_f64_to_f32.mlir",
+    ],
+    compiler_flags = ["-iree-flow-demote-f64-to-f32=false"],
+    driver = "local-task",
+    target_backend = "llvm-cpu",
+)
