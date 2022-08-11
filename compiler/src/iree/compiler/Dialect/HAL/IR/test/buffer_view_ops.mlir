@@ -28,12 +28,10 @@ func.func @buffer_view_buffer(%arg0: !hal.buffer_view) -> !hal.buffer {
 // -----
 
 // CHECK-LABEL: @buffer_view_shape_queries
-func.func @buffer_view_shape_queries(%arg0: !hal.buffer_view) -> (index, index, index, index) {
+func.func @buffer_view_shape_queries(%arg0: !hal.buffer_view) -> (index, index) {
   // CHECK: %{{.+}} = hal.buffer_view.rank<%arg0 : !hal.buffer_view> : index
   %0 = hal.buffer_view.rank<%arg0 : !hal.buffer_view> : index
   // CHECK: %{{.+}} = hal.buffer_view.dim<%arg0 : !hal.buffer_view>[0] : index
   %1 = hal.buffer_view.dim<%arg0 : !hal.buffer_view>[0] : index
-  // CHECK: %{{.+}}:2 = hal.buffer_view.dims<%arg0 : !hal.buffer_view> : index, index
-  %2, %3 = hal.buffer_view.dims<%arg0 : !hal.buffer_view> : index, index
-  return %0, %1, %2, %3 : index, index, index, index
+  return %0, %1 : index, index
 }
