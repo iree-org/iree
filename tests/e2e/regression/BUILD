@@ -55,6 +55,7 @@ iree_lit_test_suite(
             "layernorm.mlir",
             "linalg_quantized_matmul_vs_linalg_matmul.mlir",
             "lowering_config.mlir",
+            "disable_demote_f64_to_f32",
         ] + BACKEND_TESTS,
     ),
     cfg = "//tests:lit.cfg.py",
@@ -128,4 +129,14 @@ iree_check_single_backend_test_suite(
         "requires-gpu-nvidia",
     ],
     target_backend = "cuda",
+)
+
+iree_check_single_backend_test_suite(
+    name = "disable_demote_f64_to_f32",
+    srcs = [
+        "disable_demote_f64_to_f32.mlir",
+    ],
+    compiler_flags = ["-iree-flow-demote-f64-to-f32=false"],
+    driver = "local-task",
+    target_backend = "llvm-cpu",
 )
