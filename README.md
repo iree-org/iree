@@ -9,7 +9,7 @@ constraints and special considerations of mobile and edge deployments.
 See [our website](https://iree-org.github.io/iree/) for project details, user
 guides, and instructions on building from source.
 
-![status_badge](https://github.com/iree-org/iree/actions/workflows/ci.yml/badge.svg?branch=main)
+[![CI Status](https://github.com/iree-org/iree/actions/workflows/ci.yml/badge.svg?query=branch%3Amain+event%3Apush)](https://github.com/iree-org/iree/actions/workflows/ci.yml?query=branch%3Amain+event%3Apush)
 
 #### Project Status
 
