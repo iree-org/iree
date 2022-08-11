@@ -69,7 +69,7 @@ class SinkGlobalBufferLoadsPass
           symbolTable.lookupNearestSymbolFrom<IREE::VM::GlobalRefOp>(
               storeOp->getParentOp(), storeOp.getGlobalAttr());
       if (globalOp) {
-        if (!globalOp.isMutable()) {
+        if (!globalOp.isGlobalMutable()) {
           globalInitInfos[globalOp] = GlobalInitInfo{storeOp, initializerOp};
         }
       }
@@ -95,7 +95,7 @@ class SinkGlobalBufferLoadsPass
 
       // Still here? If the global is immutable, we can replace with null.
       // (i.e. there is no initializing store)
-      if (!globalOp.isMutable()) {
+      if (!globalOp.isGlobalMutable()) {
         OpBuilder builder(loadOp);
         Value zero = builder.create<IREE::VM::ConstRefZeroOp>(
             loadOp.getLoc(), loadOp.getResult().getType());

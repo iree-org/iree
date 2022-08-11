@@ -2,7 +2,7 @@
 
 util.global mutable @var : !hal.buffer
 func.func @fn(%arg0: !hal.buffer_view) {
-  // expected-error @+1 {{global var is '!hal.buffer' but store is '!hal.buffer_view'}}
+  // expected-error @+1 {{global "var" is '!hal.buffer' but store is '!hal.buffer_view'}}
   util.global.store %arg0, @var : !hal.buffer_view
   return
 }

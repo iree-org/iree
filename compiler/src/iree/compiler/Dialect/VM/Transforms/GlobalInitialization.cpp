@@ -83,32 +83,6 @@ static void exportFuncIfNeeded(IREE::VM::ModuleOp moduleOp,
   moduleBuilder.create<IREE::VM::ExportOp>(funcOp.getLoc(), funcOp);
 }
 
-// Returns true if |op| is nested within an initializer function.
-static bool isParentInitializer(Operation *op) {
-  auto initializerOp = op->getParentOfType<IREE::VM::InitializerOp>();
-  if (initializerOp) return true;
-  auto funcOp = op->getParentOfType<IREE::VM::FuncOp>();
-  return funcOp.getName() == "__init" || funcOp.getName() == "__deinit";
-}
-
-static bool isGlobalLoadOp(Operation *op) {
-  // TODO(benvanik): trait/interface to make this more generic?
-  return isa<IREE::VM::GlobalLoadI32Op>(op) ||
-         isa<IREE::VM::GlobalLoadI64Op>(op) ||
-         isa<IREE::VM::GlobalLoadF32Op>(op) ||
-         isa<IREE::VM::GlobalLoadF64Op>(op) ||
-         isa<IREE::VM::GlobalLoadRefOp>(op);
-}
-
-static bool isGlobalStoreOp(Operation *op) {
-  // TODO(benvanik): trait/interface to make this more generic?
-  return isa<IREE::VM::GlobalStoreI32Op>(op) ||
-         isa<IREE::VM::GlobalStoreI64Op>(op) ||
-         isa<IREE::VM::GlobalStoreF32Op>(op) ||
-         isa<IREE::VM::GlobalStoreF64Op>(op) ||
-         isa<IREE::VM::GlobalStoreRefOp>(op);
-}
-
 // TODO(benvanik): make this a generic pass.
 // Updates the mutability of globals based on whether they are stored outside of
 // initializers. A more sophisticated analysis is required as initializers can
@@ -117,11 +91,11 @@ static void fixupGlobalMutability(Operation *moduleOp,
                                   SymbolTable &symbolTable) {
   SmallVector<Operation *> deadOps;
   for (auto &op : moduleOp->getRegion(0).front()) {
-    auto globalOp = dyn_cast<IREE::VM::VMGlobalOp>(op);
+    auto globalOp = dyn_cast<IREE::Util::GlobalOpInterface>(op);
     if (!globalOp) continue;
     if (!cast<SymbolOpInterface>(op).isPrivate()) {
       // May be used outside the module; treat as used and mutable.
-      globalOp.makeMutable();
+      globalOp.setGlobalMutable(true);
       continue;
     }
     auto uses = symbolTable.getSymbolUses(globalOp, moduleOp);
@@ -133,18 +107,18 @@ static void fixupGlobalMutability(Operation *moduleOp,
     bool maybeStored = false;
     for (auto use : uses.getValue()) {
       auto *user = use.getUser();
-      if (isa<IREE::VM::GlobalAddressOp>(user)) {
+      if (isa<IREE::Util::GlobalAddressOpInterface>(user)) {
         // Can't analyze indirect variables; assume mutated.
         maybeStored = true;
         break;
-      } else if (isGlobalStoreOp(user)) {
+      } else if (isa<IREE::Util::GlobalStoreOpInterface>(user)) {
         maybeStored = true;
       }
     }
     // NOTE: we could erase globals never loaded if we know that computing
     // their value has no side effects.
     if (maybeStored) {
-      globalOp.makeMutable();
+      globalOp.setGlobalMutable(true);
     }
   }
   for (auto *deadOp : deadOps) {
@@ -207,14 +181,19 @@ class GlobalInitializationPass
     SmallVector<Operation *> deadOps;
     for (auto &op : moduleOp.getBlock().getOperations()) {
       if (auto globalOp = dyn_cast<IREE::VM::GlobalRefOp>(op)) {
-        if (failed(appendRefInitialization(globalOp, initBuilder))) {
-          globalOp.emitOpError() << "unable to be initialized";
-          return signalPassFailure();
-        }
-      } else if (auto globalOp = dyn_cast<IREE::VM::VMGlobalOp>(op)) {
-        if (failed(appendPrimitiveInitialization(globalOp, initBuilder))) {
-          globalOp.emitOpError() << "unable to be initialized";
-          return signalPassFailure();
+      } else if (auto globalOp = dyn_cast<IREE::Util::GlobalOpInterface>(op)) {
+        if (globalOp.getGlobalType().isa<IREE::VM::RefType>()) {
+          if (failed(appendRefInitialization(globalOp, initBuilder))) {
+            globalOp.emitOpError()
+                << "ref-type global unable to be initialized";
+            return signalPassFailure();
+          }
+        } else {
+          if (failed(appendPrimitiveInitialization(globalOp, initBuilder))) {
+            globalOp.emitOpError()
+                << "primitive global unable to be initialized";
+            return signalPassFailure();
+          }
         }
       } else if (auto initializerOp = dyn_cast<IREE::VM::InitializerOp>(op)) {
         if (failed(appendInitializer(initializerOp, inlinerInterface,
@@ -244,10 +223,9 @@ class GlobalInitializationPass
   }
 
  private:
-  LogicalResult appendPrimitiveInitialization(VMGlobalOp globalOp,
-                                              OpBuilder &builder) {
-    auto initialValue =
-        globalOp.getInitialValueUntyped().value_or<Attribute>({});
+  LogicalResult appendPrimitiveInitialization(
+      IREE::Util::GlobalOpInterface globalOp, OpBuilder &builder) {
+    auto initialValue = globalOp.getGlobalInitialValue();
     Value value = {};
     if (initialValue) {
       LogicalResult constResult = success();
@@ -257,15 +235,15 @@ class GlobalInitializationPass
         return globalOp.emitOpError()
                << "unable to create initializer constant for global";
       }
-      globalOp.clearInitialValue();
+      globalOp.setGlobalInitialValue({});
     }
     if (!value) {
       // Globals are zero-initialized by default so we can just strip the
       // initial value/initializer and avoid the work entirely.
       return success();
     }
-    globalOp.makeMutable();
-    return storePrimitiveGlobal(globalOp.getLoc(), globalOp.getSymbolName(),
+    globalOp.setGlobalMutable(true);
+    return storePrimitiveGlobal(globalOp.getLoc(), globalOp.getGlobalName(),
                                 value, builder);
   }
 
@@ -335,7 +313,7 @@ class GlobalInitializationPass
     return failure();
   }
 
-  LogicalResult appendRefInitialization(GlobalRefOp globalOp,
+  LogicalResult appendRefInitialization(IREE::Util::GlobalOpInterface globalOp,
                                         OpBuilder &builder) {
     // NOTE: nothing yet, though if we had attribute initialization we'd do it
     // here (for example, #vm.magic.initial.ref<foo>).

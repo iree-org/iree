@@ -14,6 +14,7 @@ include "mlir/IR/BuiltinAttributeInterfaces.td"
 include "mlir/IR/FunctionInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
+include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilTypes.td"
 include "iree/compiler/Dialect/VM/IR/VMBase.td"
 
@@ -259,6 +260,7 @@ def VM_InitializerOp : VM_Op<"initializer", [
     HasParent<"IREE::VM::ModuleOp">,
     FunctionOpInterface,
     CallableOpInterface,
+    Util_InitializerOpInterface,
   ]> {
   let summary = [{global initialization function}];
   let description = [{
@@ -305,14 +307,12 @@ def VM_InitializerOp : VM_Op<"initializer", [
 // Globals
 //===----------------------------------------------------------------------===//
 
-// TODO(b/142336293): DCE globals when unused and not exports. Note that side
-// effects may need to be observed.
-class VM_GlobalOp<string mnemonic, Attr attr_type, list<Trait> traits = []> :
+class VM_PrimitiveGlobalOp<string mnemonic, Attr attr_type, list<Trait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [
       IsolatedFromAbove,
       HasParent<"IREE::VM::ModuleOp">,
       Symbol,
-      VM_GlobalOpInterface,
+      Util_GlobalOpInterface,
     ])> {
   let arguments = (ins
     OptionalAttr<StrAttr>:$sym_visibility,
@@ -340,7 +340,7 @@ class VM_GlobalOp<string mnemonic, Attr attr_type, list<Trait> traits = []> :
     ),
     [{
       $_state.addAttribute(SymbolTable::getSymbolAttrName(),
-                          $_builder.getStringAttr(name));
+                           $_builder.getStringAttr(name));
       if (isMutable) {
         $_state.addAttribute("is_mutable", $_builder.getUnitAttr());
       }
@@ -360,79 +360,114 @@ class VM_GlobalOp<string mnemonic, Attr attr_type, list<Trait> traits = []> :
       build($_builder, $_state, name, isMutable, type, llvm::None, attrs);
     }]>,
   ];
-
-  let extraClassDeclaration = [{
-    StringRef getSymbolName() { return getSymName(); }
-    Type getStorageType() { return getType(); }
-    bool isMutable() { return getIsMutable(); }
-    void makeMutable() { (*this)->setAttr("is_mutable", UnitAttr::get(getContext())); }
-    Optional<TypedAttr> getInitialValueUntyped() {
-      return Optional<TypedAttr>(getInitialValueAttr());
-    }
-    void setInitialValue(TypedAttr value) { (*this)->setAttr("initial_value", (value)); }
-    void clearInitialValue() { (*this)->removeAttr("initial_value"); }
-    LogicalResult verify() { return verifyGlobalOp(getOperation()); }
-  }];
 }
 
-def VM_GlobalI32Op : VM_GlobalOp<"global.i32",
-                                 VM_ConstantIntegerValueAttr<I32>> {
+def VM_GlobalI32Op : VM_PrimitiveGlobalOp<"global.i32",
+                                          VM_ConstantIntegerValueAttr<I32>> {
   let summary = [{32-bit integer global declaration}];
   let description = [{
     Defines a global value that is treated as a scalar literal at runtime.
-    Initialized to zero unless a custom initializer function is specified.
+    Initialized to zero unless an initial value is specified.
   }];
 
   let hasCanonicalizer = 1;
 }
 
-def VM_GlobalI64Op : VM_GlobalOp<"global.i64",
-                                 VM_ConstantIntegerValueAttr<I64>> {
+def VM_GlobalI64Op : VM_PrimitiveGlobalOp<"global.i64",
+                                          VM_ConstantIntegerValueAttr<I64>> {
   let summary = [{64-bit integer global declaration}];
   let description = [{
     Defines a global value that is treated as a scalar literal at runtime.
-    Initialized to zero unless a custom initializer function is specified.
+    Initialized to zero unless an initial value is specified.
   }];
 
   let hasCanonicalizer = 1;
 }
 
-def VM_GlobalF32Op : VM_GlobalOp<"global.f32",
-                                 VM_ConstantFloatValueAttr<F32>,
-                                 [VM_ExtF32]> {
+def VM_GlobalF32Op : VM_PrimitiveGlobalOp<"global.f32",
+                                          VM_ConstantFloatValueAttr<F32>,
+                                          [VM_ExtF32]> {
   let summary = [{32-bit floating-point global declaration}];
   let description = [{
     Defines a global value that is treated as a scalar literal at runtime.
-    Initialized to zero unless a custom initializer function is specified.
+    Initialized to zero unless an initial value is specified.
   }];
 
   let hasCanonicalizer = 1;
 }
 
-def VM_GlobalF64Op : VM_GlobalOp<"global.f64",
-                                 VM_ConstantFloatValueAttr<F64>,
-                                 [VM_ExtF64]> {
+def VM_GlobalF64Op : VM_PrimitiveGlobalOp<"global.f64",
+                                          VM_ConstantFloatValueAttr<F64>,
+                                          [VM_ExtF64]> {
   let summary = [{64-bit floating-point global declaration}];
   let description = [{
     Defines a global value that is treated as a scalar literal at runtime.
-    Initialized to zero unless a custom initializer function is specified.
+    Initialized to zero unless an initial value is specified.
   }];
 
   let hasCanonicalizer = 1;
 }
 
-def VM_GlobalRefOp : VM_GlobalOp<"global.ref", UnitAttr> {
+def VM_GlobalRefOp :
+    VM_Op<"global.ref", [
+      IsolatedFromAbove,
+      HasParent<"IREE::VM::ModuleOp">,
+      Symbol,
+      DeclareOpInterfaceMethods<Util_GlobalOpInterface>,
+    ]> {
   let summary = [{ref<T> global declaration}];
   let description = [{
     Defines a global value that is a ref of a specific type. The global will
     retain the ref object for the lifetime of the context or until the value is
     replaced with a store or reset.
+    Initialized to null unless an initial value is specified.
+  }];
+
+  let arguments = (ins
+    OptionalAttr<StrAttr>:$sym_visibility,
+    SymbolNameAttr:$sym_name,
+    TypeAttr:$type,
+    UnitAttr:$is_mutable,
+    OptionalAttr<VM_Ordinal>:$ordinal
+  );
+
+  let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
+    (`mutable` $is_mutable^)?
+    $sym_name
+    attr-dict
+    `:` $type
+  }];
+
+  let builders = [
+    OpBuilder<(ins
+      "StringRef":$name, "bool":$isMutable, "Type":$type,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
+    ),
+    [{
+      $_state.addAttribute(SymbolTable::getSymbolAttrName(),
+                           $_builder.getStringAttr(name));
+      if (isMutable) {
+        $_state.addAttribute("is_mutable", $_builder.getUnitAttr());
+      }
+      $_state.addAttribute("type", TypeAttr::get(type));
+      $_state.attributes.append(attrs.begin(), attrs.end());
+    }]>,
+  ];
+
+  let extraClassDeclaration = [{
+    // No initial values supported for ref globals (they start null).
+    Attribute getGlobalInitialValue() { return {}; }
+    void setGlobalInitialValue(Attribute) {}
   }];
 
   let hasCanonicalizer = 1;
 }
 
-def VM_GlobalAddressOp : VM_PureOp<"global.address"> {
+def VM_GlobalAddressOp : VM_PureOp<"global.address", [
+      SymbolUserOpInterface,
+      Util_GlobalAddressOpInterface,
+    ]> {
   let summary = [{returns an address reference to a global}];
   let description = [{
     Returns an indirect address reference to the given global. During export the
@@ -451,11 +486,17 @@ def VM_GlobalAddressOp : VM_PureOp<"global.address"> {
     $global attr-dict `:` type($result)
   }];
 
-  let hasVerifier = 1;
+  let extraClassDeclaration = [{
+    LogicalResult verifySymbolUses(SymbolTableCollection &symbolTable) {
+      return IREE::Util::detail::verifyGlobalAddressOp(*this, symbolTable);
+    }
+  }];
 }
 
 class VM_GlobalLoadOp<Type type, string mnemonic, list<Trait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [
+      SymbolUserOpInterface,
+      Util_GlobalLoadOpInterface,
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       // HACK: works around the lack of symbol side effects in C++.
       DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
@@ -472,8 +513,8 @@ class VM_GlobalLoadOp<Type type, string mnemonic, list<Trait> traits = []> :
   }];
 
   let extraClassDeclaration = [{
-    LogicalResult verify() {
-      return verifyGlobalLoadOp(getOperation());
+    LogicalResult verifySymbolUses(SymbolTableCollection &symbolTable) {
+      return IREE::Util::detail::verifyGlobalLoadOp(*this, symbolTable);
     }
   }];
 }
@@ -494,6 +535,8 @@ class VM_GlobalLoadPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
 
 class VM_GlobalStoreOp<Type type, string mnemonic, list<Trait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [
+      SymbolUserOpInterface,
+      Util_GlobalStoreOpInterface,
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
     ])> {
   let arguments = (ins
@@ -506,8 +549,8 @@ class VM_GlobalStoreOp<Type type, string mnemonic, list<Trait> traits = []> :
   }];
 
   let extraClassDeclaration = [{
-    LogicalResult verify() {
-      return verifyGlobalStoreOp(getOperation());
+    LogicalResult verifySymbolUses(SymbolTableCollection &symbolTable) {
+      return IREE::Util::detail::verifyGlobalStoreOp(*this, symbolTable);
     }
   }];
 }
@@ -530,6 +573,7 @@ class VM_GlobalLoadIndirectOp<Type type, string mnemonic,
                               list<Trait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+      Util_GlobalLoadIndirectOpInterface,
     ])> {
   let arguments = (ins
     AnyTypeOf<[VM_Ptr, Util_PtrOf<type>]>:$global
@@ -562,6 +606,7 @@ class VM_GlobalStoreIndirectOp<Type type, string mnemonic,
                                list<Trait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+      Util_GlobalStoreIndirectOpInterface,
     ])> {
   let arguments = (ins
     type:$value,

@@ -506,7 +506,9 @@ class DumpDispatchGraphPass
     Node node;
 
     // Do not handle some noisy Operations.
-    if (isa<arith::ConstantOp>(op) || isa<Util::GlobalLoadOp>(op)) return node;
+    if (isa<arith::ConstantOp>(op) || isa<Util::GlobalLoadOpInterface>(op)) {
+      return node;
+    }
 
     if (op->getNumRegions() == 1) {
       // do not generate a cluster when there is one region.

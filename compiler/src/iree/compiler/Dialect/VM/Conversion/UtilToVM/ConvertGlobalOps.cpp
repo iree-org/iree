@@ -64,7 +64,7 @@ class GlobalOpConversion : public OpConversionPattern<IREE::Util::GlobalOp> {
         IREE::VM::RefType::isCompatible(convertedType)) {
       newOp = rewriter.replaceOpWithNewOp<IREE::VM::GlobalRefOp>(
           op, op.getSymName(), op.getIsMutable(), convertedType,
-          op.getInitialValue(), llvm::to_vector<4>(op->getDialectAttrs()));
+          llvm::to_vector<4>(op->getDialectAttrs()));
     } else if (convertedType.isInteger(32)) {
       llvm::Optional<TypedAttr> convertedValue = llvm::None;
       if (op.getInitialValue().hasValue()) {

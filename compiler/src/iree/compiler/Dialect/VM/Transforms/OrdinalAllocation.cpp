@@ -21,6 +21,15 @@ namespace iree_compiler {
 namespace IREE {
 namespace VM {
 
+// Returns the size in bytes of the global when stored in memory.
+// Valid only for globals using primitive storage.
+static size_t getGlobalStorageSize(IREE::Util::GlobalOpInterface globalOp) {
+  auto storageType = globalOp.getGlobalType();
+  assert(storageType.isIntOrFloat());
+  assert(storageType.getIntOrFloatBitWidth() % 8 == 0);
+  return IREE::Util::getRoundedElementByteWidth(storageType);
+}
+
 // Assigns per-category ordinals to module-level symbols in the module.
 // Each ordinal is unique per-category and ordinals are contiguous starting from
 // zero.
@@ -51,8 +60,8 @@ class OrdinalAllocationPass
     int nextExportOrdinal = 0;
     int nextGlobalRefOrdinal = 0;
     int nextRodataOrdinal = 0;
-    SmallVector<SmallVector<VMGlobalOp, 4>, 8> primitiveGlobalOps(
-        sizeof(int64_t) + 1);
+    SmallVector<SmallVector<IREE::Util::GlobalOpInterface, 4>, 8>
+        primitiveGlobalOps(sizeof(int64_t) + 1);
     for (auto &op : getOperation().getBlock().getOperations()) {
       Optional<int> ordinal = llvm::None;
       if (auto funcOp = dyn_cast<FuncOp>(op)) {
@@ -63,13 +72,16 @@ class OrdinalAllocationPass
         ordinal = nextImportOrdinal++;
       } else if (isa<RodataOp>(op)) {
         ordinal = nextRodataOrdinal++;
-      } else if (isa<GlobalRefOp>(op)) {
-        ordinal = nextGlobalRefOrdinal++;
-      } else if (auto globalOp = dyn_cast<VMGlobalOp>(op)) {
-        // Bucket the primitive global ops (like vm.global.i32) so we can
-        // run over all of them below.
-        primitiveGlobalOps[globalOp.getStorageSize()].push_back(globalOp);
-        continue;
+      } else if (auto globalOp = dyn_cast<IREE::Util::GlobalOpInterface>(op)) {
+        if (globalOp.getGlobalType().isa<IREE::VM::RefType>()) {
+          ordinal = nextGlobalRefOrdinal++;
+        } else {
+          // Bucket the primitive global ops (like vm.global.i32) by byte size
+          // so we can run over all of them below and pack. Note that i32 and
+          // f32/etc will end up in the same buckets.
+          size_t storageSize = getGlobalStorageSize(globalOp);
+          primitiveGlobalOps[storageSize].push_back(globalOp);
+        }
       }
       if (ordinal.hasValue()) {
         op.setAttr("ordinal", builder.getI32IntegerAttr(ordinal.getValue()));
@@ -103,7 +115,7 @@ class OrdinalAllocationPass
     // Convert all global address pseudo-ops to constants referencing the
     // ordinals we just assigned.
     SmallVector<Operation *, 32> deadOps;
-    getOperation().walk([&](IREE::VM::GlobalAddressOp op) {
+    getOperation().walk([&](IREE::Util::GlobalAddressOpInterface op) {
       auto *globalOp =
           symbolTable.lookupNearestSymbolFrom(op, op.getGlobalAttr());
       assert(globalOp);
@@ -112,7 +124,7 @@ class OrdinalAllocationPass
       OpBuilder builder(op);
       auto ordinalOp =
           builder.create<IREE::VM::ConstI32Op>(op.getLoc(), ordinal);
-      op.getResult().replaceAllUsesWith(ordinalOp);
+      op.getReturnedGlobalRef().replaceAllUsesWith(ordinalOp);
 
       deadOps.push_back(op);
     });

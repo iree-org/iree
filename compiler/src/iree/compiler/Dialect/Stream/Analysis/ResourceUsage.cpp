@@ -250,11 +250,11 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
               DFX::Resolution::REQUIRED);
           getState() ^= sourceUsage.getState();
         })
-        .Case([&](IREE::Util::GlobalLoadOp op) {
+        .Case([&](IREE::Util::GlobalLoadOpInterface op) {
           removeAssumedBits(NOT_GLOBAL_READ);
           auto *globalInfo =
-              solver.getExplorer().queryGlobalInfoFrom(op.getGlobal(), op);
-          auto globalType = globalInfo->op.getType()
+              solver.getExplorer().queryGlobalInfoFrom(op.getGlobalName(), op);
+          auto globalType = globalInfo->op.getGlobalType()
                                 .template cast<IREE::Stream::ResourceType>();
           switch (globalType.getLifetime()) {
             case IREE::Stream::Lifetime::Constant:
@@ -265,14 +265,14 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
               break;
           }
           auto resultUsage = solver.getElementFor<ValueResourceUsage>(
-              *this, Position::forValue(op.getResult()),
+              *this, Position::forValue(op.getLoadedGlobalValue()),
               DFX::Resolution::REQUIRED);
           getState() ^= resultUsage.getState();
         })
-        .Case([&](IREE::Util::GlobalLoadIndirectOp op) {
+        .Case([&](IREE::Util::GlobalLoadIndirectOpInterface op) {
           removeAssumedBits(NOT_INDIRECT | NOT_GLOBAL_READ);
           auto resultUsage = solver.getElementFor<ValueResourceUsage>(
-              *this, Position::forValue(op.getResult()),
+              *this, Position::forValue(op.getLoadedGlobalValue()),
               DFX::Resolution::REQUIRED);
           getState() ^= resultUsage.getState();
         })
@@ -444,11 +444,11 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
               DFX::Resolution::REQUIRED);
           getState() ^= resultUsage.getState();
         })
-        .Case([&](IREE::Util::GlobalStoreOp op) {
+        .Case([&](IREE::Util::GlobalStoreOpInterface op) {
           removeAssumedBits(NOT_GLOBAL_WRITE);
           auto *globalInfo =
-              solver.getExplorer().queryGlobalInfoFrom(op.getGlobal(), op);
-          auto globalType = globalInfo->op.getType()
+              solver.getExplorer().queryGlobalInfoFrom(op.getGlobalName(), op);
+          auto globalType = globalInfo->op.getGlobalType()
                                 .template cast<IREE::Stream::ResourceType>();
           switch (globalType.getLifetime()) {
             case IREE::Stream::Lifetime::Constant:
@@ -459,7 +459,7 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
               break;
           }
         })
-        .Case([&](IREE::Util::GlobalStoreIndirectOp op) {
+        .Case([&](IREE::Util::GlobalStoreIndirectOpInterface op) {
           removeAssumedBits(NOT_INDIRECT | NOT_GLOBAL_WRITE);
         })
         .Case([&](IREE::Stream::TensorExportOp op) {

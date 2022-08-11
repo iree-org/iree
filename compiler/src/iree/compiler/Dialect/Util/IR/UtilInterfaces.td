@@ -90,19 +90,205 @@ def Util_ClosureOpInterface : OpInterface<"ClosureOpInterface"> {
       /*retTy=*/"IREE::Util::ValueAccess",
       /*methodName=*/"getResultAccess",
       /*args=*/(ins "unsigned":$resultIndex)
-    >
+    >,
   ];
 }
 
 //===----------------------------------------------------------------------===//
-// IREE::Util::GlobalAccessorOpInterface
+// IREE::Util::InitializerOpInterface
 //===----------------------------------------------------------------------===//
 
-def Util_GlobalAccessorOpInterface : OpInterface<"GlobalAccessorOpInterface"> {
+def Util_InitializerOpInterface : OpInterface<"InitializerOpInterface"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Util";
 
   let description = [{
-    Interface for ops that reference globals (load/store).
+    Interface for ops that behave as module-wide initializers.
+    Initializers run in the order they are defined in the module as if they were
+    concatenated. All initializers run to completion when modules are
+    instantiated though arbitrary globals and functions may be called as part
+    of initialization.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the body region of the initializer (may have multiple blocks).
+      }],
+      /*retTy=*/"Region &",
+      /*methodName=*/"getInitializerRegion",
+      /*args=*/(ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return this->getOperation()->getRegion(0);
+      }]
+    >,
+  ];
+}
+
+//===----------------------------------------------------------------------===//
+// IREE::Util::Global*OpInterface[]
+//===----------------------------------------------------------------------===//
+
+def Util_GlobalOpInterface : OpInterface<"GlobalOpInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+
+  let description = [{
+    Interface for ops that define global values.
+    Globals themselves have value-type semantics but the values stored may not,
+    such as if the global is a mutable !util.buffer.
+
+    Globals that are only ever initialized by their attached initial value or
+    by stores in an initializer are considered immutable. Loads of immutable
+    globals outside of initializers are able to be hoisted and CSEd.
+
+    By default this interface assumes that the global has the following attrs:
+    ```
+      let arguments = (ins
+        // From Symbol:
+        OptionalAttr<StrAttr>:$sym_visibility,
+        SymbolNameAttr:$sym_name,
+        // Assumed by accessors:
+        TypeAttr:$type,
+        UnitAttr:$is_mutable,
+        OptionalAttr<AnyAttr>:$initial_value
+      );
+    ```
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the global symbol name.
+      }],
+      /*retTy=*/"StringAttr",
+      /*methodName=*/"getGlobalName",
+      /*args=*/(ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return $_op.getSymNameAttr();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns true if the global is private to the module.
+        This is equivalent to SymbolOpInterface::isPrivate but with less nasty
+        casting required.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"isGlobalPrivate",
+      /*args=*/(ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return cast<mlir::SymbolOpInterface>($_op.getOperation()).isPrivate();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the type of the global.
+      }],
+      /*retTy=*/"Type",
+      /*methodName=*/"getGlobalType",
+      /*args=*/(ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return $_op.getType();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the type of the global.
+      }],
+      /*retTy=*/"void",
+      /*methodName=*/"setGlobalType",
+      /*args=*/(ins "Type":$value),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        $_op.setTypeAttr(TypeAttr::get(value));
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns true if the global is mutable outside of initializers. Even if
+        immutable initializers can store to the global and may do so multiple
+        times.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"isGlobalMutable",
+      /*args=*/(ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return $_op.getIsMutable();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Sets whether the global can be mutated outside of initializers.
+      }],
+      /*retTy=*/"void",
+      /*methodName=*/"setGlobalMutable",
+      /*args=*/(ins "bool":$value),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        if (value) {
+          $_op.setIsMutableAttr(UnitAttr::get($_op.getContext()));
+        } else {
+          $_op.removeIs_mutableAttr();
+        }
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns an optional initial value for the global.
+        This may differ from the global type if type conversion is supported via
+        the GlobalTypeInterface.
+      }],
+      /*retTy=*/"Attribute",
+      /*methodName=*/"getGlobalInitialValue",
+      /*args=*/(ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return $_op.getInitialValueAttr();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Sets (or clears) the initial value of the global.
+      }],
+      /*retTy=*/"void",
+      /*methodName=*/"setGlobalInitialValue",
+      /*args=*/(ins "Attribute":$value),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        if (value) {
+          // Not fantastic but the typed attr may not accept Attribute.
+          $_op->setAttr("initial_value", (value));
+        } else {
+          $_op.removeInitial_valueAttr();
+        }
+      }]
+    >,
+  ];
+
+  let verify = [{
+    return IREE::Util::detail::verifyGlobalOp(cast<GlobalOpInterface>($_op));
+  }];
+}
+
+class Util_GlobalAccessorOpInterface<string name> : OpInterface<name> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+
+  let extraClassDeclaration = [{
+    // Returns the global name accessed by the op.
+    StringRef getGlobalName() {
+      return getGlobalAttr().getValue();
+    }
+  }];
+}
+
+def Util_GlobalAddressOpInterface : Util_GlobalAccessorOpInterface<"GlobalAddressOpInterface"> {
+  let description = [{
+    Interface for ops that take the address of a global symbol.
+    The returned address can be accessed indirectly.
   }];
 
   let methods = [
@@ -111,8 +297,164 @@ def Util_GlobalAccessorOpInterface : OpInterface<"GlobalAccessorOpInterface"> {
         Returns the global symbol accessed by the op.
       }],
       /*retTy=*/"FlatSymbolRefAttr",
-      /*methodName=*/"getGlobalRefAttr",
+      /*methodName=*/"getGlobalAttr",
       /*args=*/(ins)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the global symbol accessed by the op.
+      }],
+      /*retTy=*/"void",
+      /*methodName=*/"setGlobalAttr",
+      /*args=*/(ins "FlatSymbolRefAttr":$value)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the result of the address operation.
+      }],
+      /*retTy=*/"OpResult",
+      /*methodName=*/"getReturnedGlobalRef",
+      /*args=*/(ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return $_op->getResult(0);
+      }]
+    >,
+  ];
+}
+
+def Util_GlobalLoadOpInterface : Util_GlobalAccessorOpInterface<"GlobalLoadOpInterface"> {
+  let description = [{
+    Interface for ops that directly load globals via a symbol ref.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the global symbol accessed by the op.
+      }],
+      /*retTy=*/"FlatSymbolRefAttr",
+      /*methodName=*/"getGlobalAttr",
+      /*args=*/(ins)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the global symbol accessed by the op.
+      }],
+      /*retTy=*/"void",
+      /*methodName=*/"setGlobalAttr",
+      /*args=*/(ins "FlatSymbolRefAttr":$value)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the result of the load operation.
+      }],
+      /*retTy=*/"OpResult",
+      /*methodName=*/"getLoadedGlobalValue",
+      /*args=*/(ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return $_op->getResult(0);
+      }]
+    >,
+  ];
+}
+
+def Util_GlobalStoreOpInterface : Util_GlobalAccessorOpInterface<"GlobalStoreOpInterface"> {
+  let description = [{
+    Interface for ops that directly stores globals via a symbol ref.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the global symbol accessed by the op.
+      }],
+      /*retTy=*/"FlatSymbolRefAttr",
+      /*methodName=*/"getGlobalAttr",
+      /*args=*/(ins)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the global symbol accessed by the op.
+      }],
+      /*retTy=*/"void",
+      /*methodName=*/"setGlobalAttr",
+      /*args=*/(ins "FlatSymbolRefAttr":$value)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the value stored by the operation.
+      }],
+      /*retTy=*/"Value",
+      /*methodName=*/"getStoredGlobalValue",
+      /*args=*/(ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return $_op.getValue();
+      }]
+    >,
+  ];
+}
+
+class Util_GlobalIndirectAccessorOpInterface<string name> : OpInterface<name> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+}
+
+def Util_GlobalLoadIndirectOpInterface : Util_GlobalIndirectAccessorOpInterface<"GlobalLoadIndirectOpInterface"> {
+  let description = [{
+    Interface for ops that indirectly load globals via a pointer.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the global symbol accessed by the op.
+      }],
+      /*retTy=*/"Value",
+      /*methodName=*/"getGlobal",
+      /*args=*/(ins)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the result of the load operation.
+      }],
+      /*retTy=*/"OpResult",
+      /*methodName=*/"getLoadedGlobalValue",
+      /*args=*/(ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return $_op->getResult(0);
+      }]
+    >,
+  ];
+}
+
+def Util_GlobalStoreIndirectOpInterface : Util_GlobalIndirectAccessorOpInterface<"GlobalStoreIndirectOpInterface"> {
+  let description = [{
+    Interface for ops that indirect stores globals via a pointer.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the global symbol accessed by the op.
+      }],
+      /*retTy=*/"Value",
+      /*methodName=*/"getGlobal",
+      /*args=*/(ins)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the value stored by the operation.
+      }],
+      /*retTy=*/"Value",
+      /*methodName=*/"getStoredGlobalValue",
+      /*args=*/(ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return $_op.getValue();
+      }]
     >,
   ];
 }

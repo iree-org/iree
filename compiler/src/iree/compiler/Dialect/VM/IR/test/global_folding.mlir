@@ -28,30 +28,6 @@ vm.module @global_i32_folds {
 
 // -----
 
-// CHECK-LABEL: @global_load_i32_folds
-vm.module @global_load_i32_folds {
-  vm.global.i32 @g0 = 123 : i32
-  // CHECK-LABEL: @inline_const_value
-  vm.func @inline_const_value() -> i32 {
-    // CHECK-NEXT: %c123 = vm.const.i32 123
-    // CHECK-NEXT: vm.return %c123 : i32
-    %g0 = vm.global.load.i32 @g0 : i32
-    vm.return %g0 : i32
-  }
-
-  vm.global.i32 mutable @g1 = 123 : i32
-  // CHECK-LABEL: @ignore_nonconst_value
-  vm.func @ignore_nonconst_value() -> i32 {
-    // NOTE: ensure we don't inline non-constant values.
-    // CHECK-NEXT: %g1 = vm.global.load.i32 @g1 : i32
-    // CHECK-NEXT: vm.return %g1 : i32
-    %g1 = vm.global.load.i32 @g1 : i32
-    vm.return %g1 : i32
-  }
-}
-
-// -----
-
 // CHECK-LABEL: @global_indirect_folds
 vm.module @global_indirect_folds {
   vm.global.i32 mutable @g0 : i32

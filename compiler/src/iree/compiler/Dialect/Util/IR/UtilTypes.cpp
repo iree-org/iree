@@ -22,6 +22,7 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/TypeSupport.h"
+#include "mlir/IR/TypeUtilities.h"
 #include "mlir/Interfaces/CastInterfaces.h"
 #include "mlir/Parser/Parser.h"
 
@@ -114,6 +115,105 @@ LogicalResult PtrType::verify(function_ref<InFlightDiagnostic()> emitError,
     return emitError() << "invalid target type for a pointer: " << targetType;
   }
   return success();
+}
+
+//===----------------------------------------------------------------------===//
+// Global and structural interface utilities
+//===----------------------------------------------------------------------===//
+
+// Returns true if the given |accessType| is compatible with the |globalType|.
+// For example, this will return true if the global type is a tensor<?xf32>
+// and the access is tensor<4xf32>.
+static bool isGlobalTypeCompatible(Type globalType, Type accessType) {
+  // If one is a shaped type, then they both must be and have compatible
+  // shapes.
+  if (globalType.isa<ShapedType>() && accessType.isa<ShapedType>()) {
+    return succeeded(mlir::verifyCompatibleShape(globalType, accessType));
+  }
+
+  if (auto knownType = globalType.dyn_cast<IREE::Util::GlobalTypeInterface>()) {
+    return knownType.isAccessStorageCompatible(accessType);
+  }
+
+  // Otherwise, the types must be the same.
+  return globalType == accessType;
+}
+
+LogicalResult detail::verifyGlobalOp(IREE::Util::GlobalOpInterface globalOp) {
+  auto initialValue = globalOp.getGlobalInitialValue();
+  if (auto typedInitialValue = initialValue.dyn_cast_or_null<TypedAttr>()) {
+    // Ensure the value is something we can convert to a const.
+    if (!isGlobalTypeCompatible(globalOp.getGlobalType(),
+                                typedInitialValue.getType())) {
+      return globalOp->emitOpError()
+             << "initial value type mismatch; global "
+             << globalOp.getGlobalName() << " is " << globalOp.getGlobalType()
+             << " but initial value provided is "
+             << typedInitialValue.getType();
+    }
+  }
+  return success();
+}
+
+LogicalResult detail::verifyGlobalAddressOp(
+    GlobalAddressOpInterface addressOp, SymbolTableCollection &symbolTable) {
+  auto globalOp =
+      lookupGlobalOp(addressOp, addressOp.getGlobalAttr(), symbolTable);
+  if (!globalOp) {
+    return addressOp->emitOpError()
+           << "undefined global: " << addressOp.getGlobalAttr();
+  }
+  // TODO(benvanik): allow type conversion here? probably better on the indirect
+  // access ops instead as it's then easier to fold the conversion.
+  return success();
+}
+
+LogicalResult detail::verifyGlobalLoadOp(GlobalLoadOpInterface loadOp,
+                                         SymbolTableCollection &symbolTable) {
+  auto globalOp = lookupGlobalOp(loadOp, loadOp.getGlobalAttr(), symbolTable);
+  if (!globalOp) {
+    return loadOp->emitOpError()
+           << "undefined global: " << loadOp.getGlobalAttr();
+  }
+  auto loadType = loadOp->getResult(0).getType();
+  if (!isGlobalTypeCompatible(globalOp.getGlobalType(), loadType)) {
+    return loadOp->emitOpError()
+           << "global type mismatch; global " << globalOp.getGlobalName()
+           << " is " << globalOp.getGlobalType() << " but load is " << loadType;
+  }
+  return success();
+}
+
+LogicalResult detail::verifyGlobalStoreOp(GlobalStoreOpInterface storeOp,
+                                          SymbolTableCollection &symbolTable) {
+  auto globalOp = lookupGlobalOp(storeOp, storeOp.getGlobalAttr(), symbolTable);
+  if (!globalOp) {
+    return storeOp->emitOpError()
+           << "undefined global: " << storeOp.getGlobalAttr();
+  }
+  auto storeType = storeOp.getStoredGlobalValue().getType();
+  if (globalOp.getGlobalType() != storeType) {
+    return storeOp->emitOpError()
+           << "global type mismatch; global " << globalOp.getGlobalName()
+           << " is " << globalOp.getGlobalType() << " but store is "
+           << storeType;
+  }
+  if (!globalOp.isGlobalMutable()) {
+    // Allow stores to immutable globals in initializers.
+    if (!storeOp->getParentOfType<IREE::Util::InitializerOpInterface>()) {
+      return storeOp->emitOpError()
+             << "global " << globalOp.getGlobalName()
+             << " is not mutable and cannot be stored to";
+    }
+  }
+  return success();
+}
+
+IREE::Util::GlobalOpInterface lookupGlobalOp(
+    Operation *accessorOp, SymbolRefAttr globalRefAttr,
+    SymbolTableCollection &symbolTable) {
+  return symbolTable.lookupNearestSymbolFrom<IREE::Util::GlobalOpInterface>(
+      accessorOp->getParentOp(), globalRefAttr);
 }
 
 //===----------------------------------------------------------------------===//

@@ -150,7 +150,7 @@ struct GenericTypeConversionPattern : public ConversionPattern {
     // want to convert and structural information in the same type.
     llvm::SmallVector<NamedAttribute> newAttrs;
     if (op->hasTrait<OpTrait::ConstantLike>() ||
-        isa<IREE::Util::GlobalOp>(op)) {
+        isa<IREE::Util::GlobalOpInterface>(op)) {
       for (auto attr : op->getAttrs()) {
         auto newAttr = convertAttribute(op->getLoc(), attr.getValue(),
                                         *getTypeConverter());

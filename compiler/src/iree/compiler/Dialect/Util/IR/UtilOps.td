@@ -377,6 +377,7 @@ def Util_InitializerOp : Util_Op<"initializer", [
     IsolatedFromAbove,
     FunctionOpInterface,
     CallableOpInterface,
+    Util_InitializerOpInterface,
   ]> {
   let summary = [{global initialization function}];
   let description = [{
@@ -441,6 +442,7 @@ def Util_InitializerReturnOp : Util_Op<"initializer.return", [
 
 def Util_GlobalOp : Util_Op<"global", [
   Symbol,
+  Util_GlobalOpInterface,
 ]> {
   let summary = [{stateful global variable declaration}];
   let description = [{
@@ -489,19 +491,13 @@ def Util_GlobalOp : Util_Op<"global", [
     )>,
   ];
 
-  let extraClassDeclaration = [{
-    void clearInitialValue() { (*this)->removeAttr("initial_value"); }
-  }];
-
-  let hasVerifier = 1;
-
   let hasCanonicalizer = 1;
 }
 
 def Util_GlobalAddressOp : Util_PureOp<"global.address", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  DeclareOpInterfaceMethods<SymbolUserOpInterface>,
-  DeclareOpInterfaceMethods<Util_GlobalAccessorOpInterface>,
+  SymbolUserOpInterface,
+  Util_GlobalAddressOpInterface,
 ]> {
   let summary = [{returns an address reference to a global}];
   let description = [{
@@ -521,7 +517,9 @@ def Util_GlobalAddressOp : Util_PureOp<"global.address", [
   }];
 
   let extraClassDeclaration = [{
-    IREE::Util::GlobalOp getGlobalOp(SymbolTableCollection &symbolTable);
+    LogicalResult verifySymbolUses(SymbolTableCollection &symbolTable) {
+      return IREE::Util::detail::verifyGlobalAddressOp(*this, symbolTable);
+    }
   }];
 }
 
@@ -529,8 +527,8 @@ def Util_GlobalLoadOp : Util_Op<"global.load", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   // HACK: works around the lack of symbol side effects in C++.
   DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-  DeclareOpInterfaceMethods<SymbolUserOpInterface>,
-  DeclareOpInterfaceMethods<Util_GlobalAccessorOpInterface>,
+  SymbolUserOpInterface,
+  Util_GlobalLoadOpInterface,
 ]> {
   let summary = [{loads a value from a global variable}];
   let description = [{
@@ -550,17 +548,21 @@ def Util_GlobalLoadOp : Util_Op<"global.load", [
 
   let builders = [
     OpBuilder<(ins
-      "IREE::Util::GlobalOp":$globalOp,
+      "IREE::Util::GlobalOpInterface":$globalOp,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes
     )>,
   ];
 
   let extraClassDeclaration = [{
-    IREE::Util::GlobalOp getGlobalOp(SymbolTableCollection &symbolTable);
+    LogicalResult verifySymbolUses(SymbolTableCollection &symbolTable) {
+      return IREE::Util::detail::verifyGlobalLoadOp(*this, symbolTable);
+    }
   }];
 }
 
-def Util_GlobalLoadIndirectOp : Util_Op<"global.load.indirect"> {
+def Util_GlobalLoadIndirectOp : Util_Op<"global.load.indirect", [
+  Util_GlobalLoadIndirectOpInterface,
+]> {
   let summary = [{loads a value from a global variable}];
   let description = [{
     Returns a copy of the global variable value.
@@ -583,8 +585,8 @@ def Util_GlobalLoadIndirectOp : Util_Op<"global.load.indirect"> {
 }
 
 def Util_GlobalStoreOp : Util_Op<"global.store", [
-  DeclareOpInterfaceMethods<SymbolUserOpInterface>,
-  DeclareOpInterfaceMethods<Util_GlobalAccessorOpInterface>,
+  SymbolUserOpInterface,
+  Util_GlobalStoreOpInterface,
 ]> {
   let summary = [{stores a value into a global variable}];
   let description = [{
@@ -603,19 +605,23 @@ def Util_GlobalStoreOp : Util_Op<"global.store", [
   let builders = [
     OpBuilder<(ins
       "Value":$value,
-      "IREE::Util::GlobalOp":$globalOp,
+      "IREE::Util::GlobalOpInterface":$globalOp,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes
     )>,
   ];
 
   let extraClassDeclaration = [{
-    IREE::Util::GlobalOp getGlobalOp(SymbolTableCollection &symbolTable);
+    LogicalResult verifySymbolUses(SymbolTableCollection &symbolTable) {
+      return IREE::Util::detail::verifyGlobalStoreOp(*this, symbolTable);
+    }
   }];
 
   let hasCanonicalizer = 1;
 }
 
-def Util_GlobalStoreIndirectOp : Util_Op<"global.store.indirect"> {
+def Util_GlobalStoreIndirectOp : Util_Op<"global.store.indirect", [
+  Util_GlobalStoreIndirectOpInterface,
+]> {
   let summary = [{stores a value into a global variable}];
   let description = [{
     Stores a copy of the value into a global variable.

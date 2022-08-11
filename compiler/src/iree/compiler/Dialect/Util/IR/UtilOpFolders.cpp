@@ -460,19 +460,18 @@ struct InlineConstantGlobalInitializer
   LogicalResult matchAndRewrite(InitializerOp op,
                                 PatternRewriter &rewriter) const override {
     SmallVector<Operation *> deadOps;
-    op.walk([&](GlobalStoreOp storeOp) {
+    op.walk([&](GlobalStoreOpInterface storeOp) {
       Attribute valueAttr;
-      if (!matchPattern(storeOp.getValue(), m_Constant(&valueAttr))) return;
+      if (!matchPattern(storeOp.getStoredGlobalValue(),
+                        m_Constant(&valueAttr))) {
+        return;
+      }
       auto globalOp =
-          SymbolTable::lookupNearestSymbolFrom<IREE::Util::GlobalOp>(
+          SymbolTable::lookupNearestSymbolFrom<IREE::Util::GlobalOpInterface>(
               storeOp->getParentOp(), storeOp.getGlobalAttr());
-      rewriter.updateRootInPlace(globalOp, [&]() {
-        if (valueAttr && !valueAttr.isa<UnitAttr>()) {
-          globalOp.setInitialValueAttr(valueAttr);
-        } else {
-          globalOp.clearInitialValue();
-        }
-      });
+      rewriter.updateRootInPlace(
+          globalOp, [&]() { globalOp.setGlobalInitialValue(valueAttr); });
+
       deadOps.push_back(storeOp);
     });
     if (deadOps.empty()) return failure();
@@ -502,10 +501,10 @@ class PropagateGlobalLoadAddress
  public:
   LogicalResult matchAndRewrite(GlobalLoadIndirectOp op,
                                 PatternRewriter &rewriter) const override {
-    if (auto addressOp =
-            dyn_cast_or_null<GlobalAddressOp>(op.getGlobal().getDefiningOp())) {
+    if (auto addressOp = dyn_cast_or_null<GlobalAddressOpInterface>(
+            op.getGlobal().getDefiningOp())) {
       rewriter.replaceOpWithNewOp<GlobalLoadOp>(op, op.getResult().getType(),
-                                                addressOp.getGlobal());
+                                                addressOp.getGlobalAttr());
       return success();
     }
     return failure();
@@ -530,9 +529,9 @@ struct EraseUnusedGlobalStoreOp : public OpRewritePattern<GlobalStoreOp> {
 
   LogicalResult matchAndRewrite(GlobalStoreOp op,
                                 PatternRewriter &rewriter) const override {
-    if (auto loadOp =
-            dyn_cast_or_null<GlobalLoadOp>(op.getValue().getDefiningOp())) {
-      if (loadOp.getGlobal() == op.getGlobal()) {
+    if (auto loadOp = dyn_cast_or_null<GlobalLoadOpInterface>(
+            op.getValue().getDefiningOp())) {
+      if (loadOp.getGlobalName() == op.getGlobal()) {
         rewriter.eraseOp(op);
         return success();
       }
@@ -558,10 +557,10 @@ class PropagateGlobalStoreAddress
  public:
   LogicalResult matchAndRewrite(GlobalStoreIndirectOp op,
                                 PatternRewriter &rewriter) const override {
-    if (auto addressOp =
-            dyn_cast_or_null<GlobalAddressOp>(op.getGlobal().getDefiningOp())) {
+    if (auto addressOp = dyn_cast_or_null<GlobalAddressOpInterface>(
+            op.getGlobal().getDefiningOp())) {
       rewriter.replaceOpWithNewOp<GlobalStoreOp>(op, op.getValue(),
-                                                 addressOp.getGlobal());
+                                                 addressOp.getGlobalAttr());
       return success();
     }
     return failure();
