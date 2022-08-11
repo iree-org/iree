@@ -36,49 +36,9 @@ name: CI
 on:
   workflow_dispatch:
   pull_request:
-    paths-ignore:
-      - 'docs/**'
-      - 'experimental/**'
-      - 'build_tools/kokoro/**'
-      - 'build_tools/buildkite/**'
-      - '.github/ISSUE_TEMPLATE/**'
-      - '**.cff'
-      - '**.clang-format'
-      - '**.git-ignore'
-      - '**.md'
-      - '**.natvis'
-      - '**.pylintrc'
-      - '**.rst'
-      - '**.toml'
-      - '**.yamllint.yml'
-      - '**.yapf'
-      - '**CODEOWNERS'
-      - '**AUTHORS'
-      - '**LICENSE'
   push:
     branches:
       - main
-    # Keep this in sync with the above. Once more, the lack of variables means
-    # this whole thing has to be repeated.
-    paths-ignore:
-      - 'docs/**'
-      - 'experimental/**'
-      - 'build_tools/kokoro/**'
-      - 'build_tools/buildkite/**'
-      - '.github/ISSUE_TEMPLATE/**'
-      - '**.cff'
-      - '**.clang-format'
-      - '**.git-ignore'
-      - '**.md'
-      - '**.natvis'
-      - '**.pylintrc'
-      - '**.rst'
-      - '**.toml'
-      - '**.yamllint.yml'
-      - '**.yapf'
-      - '**CODEOWNERS'
-      - '**AUTHORS'
-      - '**LICENSE'
 
 concurrency:
   # A PR number if a pull request and otherwise the commit hash. This cancels
@@ -96,7 +56,6 @@ jobs:
   # Jobs that build all of IREE "normally"
   ##############################################################################
   build_all:
-    if: github.event_name != 'pull_request' || ! contains(github.event.pull_request.labels.*.name, 'skip-ci')
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
@@ -148,7 +107,6 @@ jobs:
           echo "::set-output name=gcs-artifact::${GCS_ARTIFACT}"
 
   build_test_all_bazel:
-    if: github.event_name != 'pull_request' || ! contains(github.event.pull_request.labels.*.name, 'skip-ci')
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
@@ -174,7 +132,6 @@ jobs:
             ./build_tools/bazel/build_core.sh
 
   test_all:
-    if: github.event_name != 'pull_request' || ! contains(github.event.pull_request.labels.*.name, 'skip-ci')
     needs: build_all
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
@@ -204,7 +161,6 @@ jobs:
             "${BUILD_DIR}"
 
   test_gpu:
-    if: github.event_name != 'pull_request' || ! contains(github.event.pull_request.labels.*.name, 'skip-ci')
     needs: build_all
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
@@ -247,7 +203,6 @@ jobs:
   # Jobs that build some subset of IREE
   ##############################################################################
   build_runtime:
-    if: github.event_name != 'pull_request' || ! contains(github.event.pull_request.labels.*.name, 'skip-ci')
     runs-on: ubuntu-20.04
     env:
       BUILD_DIR: build-runtime
@@ -278,7 +233,6 @@ jobs:
           path: "${{ env.BUILD_DIR }}.tar"
 
   test_runtime:
-    if: github.event_name != 'pull_request' || ! contains(github.event.pull_request.labels.*.name, 'skip-ci')
     needs: build_runtime
     runs-on: ubuntu-20.04
     env:
@@ -303,7 +257,6 @@ jobs:
             "${BUILD_DIR}"
 
   host_tools_assertions:
-    if: github.event_name != 'pull_request' || ! contains(github.event.pull_request.labels.*.name, 'skip-ci')
     uses: ./.github/workflows/host_tools.yml
     with:
       host-binary-root: host-tools-assertions
@@ -313,7 +266,6 @@ jobs:
   # Jobs that build the IREE-Tensorflow integrations
   ##############################################################################
   build_tf_integrations:
-    if: github.event_name != 'pull_request' || ! contains(github.event.pull_request.labels.*.name, 'skip-ci')
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
@@ -359,7 +311,6 @@ jobs:
           echo "::set-output name=gcs-artifact::${GCS_ARTIFACT}"
 
   test_tf_integrations:
-    if: github.event_name != 'pull_request' || ! contains(github.event.pull_request.labels.*.name, 'skip-ci')
     needs: [build_tf_integrations, build_all]
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
@@ -398,7 +349,6 @@ jobs:
             "${BUILD_DIR}"
 
   test_tf_integrations_gpu:
-    if: github.event_name != 'pull_request' || ! contains(github.event.pull_request.labels.*.name, 'skip-ci')
     needs: [build_tf_integrations, build_all]
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
@@ -445,7 +395,6 @@ jobs:
   # Jobs that build IREE in some non-default configuration
   ##############################################################################
   asan:
-    if: github.event_name != 'pull_request' || ! contains(github.event.pull_request.labels.*.name, 'skip-ci')
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
@@ -464,7 +413,6 @@ jobs:
             ./build_tools/cmake/build_and_test_asan.sh
 
   tsan:
-    if: github.event_name != 'pull_request' || ! contains(github.event.pull_request.labels.*.name, 'skip-ci')
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
@@ -483,7 +431,6 @@ jobs:
             ./build_tools/cmake/build_and_test_tsan.sh
 
   build_benchmarks:
-    if: github.event_name != 'pull_request' || ! contains(github.event.pull_request.labels.*.name, 'skip-ci')
     needs: [build_all, build_tf_integrations]
     runs-on:
       # Hacks, and order matters. See the comment at the top of the file.
@@ -526,7 +473,6 @@ jobs:
   # Jobs that cross-compile IREE for other platforms
   ##############################################################################
   android_arm64:
-    if: github.event_name != 'pull_request' || ! contains(github.event.pull_request.labels.*.name, 'skip-ci')
     needs: [host_tools_assertions]
     runs-on:
       # Hacks, and order matters. See the comment at the top of the file.
@@ -560,7 +506,6 @@ jobs:
             build_tools/build_android.sh
 
   riscv32:
-    if: github.event_name != 'pull_request' || ! contains(github.event.pull_request.labels.*.name, 'skip-ci')
     needs: host_tools_assertions
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
@@ -596,7 +541,6 @@ jobs:
             "./build_tools/cmake/build_riscv.sh && tests/riscv32/smoke.sh"
 
   riscv64:
-    if: github.event_name != 'pull_request' || ! contains(github.event.pull_request.labels.*.name, 'skip-ci')
     needs: [build_all, host_tools_assertions, build_tf_integrations]
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
@@ -655,9 +599,6 @@ jobs:
   # Depends on all the other jobs to provide a single anchor that indicates the
   # final status. Status reporting will become more sophisticated in the future.
   summary:
-    # Even if you have an explicit if condition, you still need to override
-    # GitHub's default behavior of not running if any dependencies failed.
-    if: always() && github.event_name != 'pull_request' || ! contains(github.event.pull_request.labels.*.name, 'skip-ci')
     runs-on: ubuntu-20.04
     needs:
       # Basic
@@ -684,6 +625,7 @@ jobs:
       - android_arm64
       - riscv32
       - riscv64
+    if: always()
     steps:
       - name: Getting combined job status
         run: |
