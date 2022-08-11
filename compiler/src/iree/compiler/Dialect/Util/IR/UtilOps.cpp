@@ -682,8 +682,8 @@ ParseResult UnfoldableConstantOp::parse(OpAsmParser &parser,
 
   // If the attribute is a symbol reference, then we expect a trailing type.
   Type type;
-  if (auto typedAttr = valueAttr.dyn_cast<TypedAttr>())
-    type = typedAttr.getType();
+  if (!valueAttr.isa<SymbolRefAttr>())
+    type = valueAttr.cast<TypedAttr>().getType();
   else if (parser.parseColonType(type))
     return failure();
 

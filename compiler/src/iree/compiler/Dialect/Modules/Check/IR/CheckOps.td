@@ -97,7 +97,7 @@ def CHECK_ExpectEqOp : Op<CHECK_Dialect, "expect_eq", [SameTypeOperands]> {
 }
 
 def CHECK_ExpectEqConstOp :
-    Op<CHECK_Dialect, "expect_eq_const", [SameTypeOperands]> {
+    Op<CHECK_Dialect, "expect_eq_const", [AllTypesMatch<["lhs", "value"]>]> {
   let summary = [{Checks that the tensor operand is equal to some constant}];
   let description =  [{
     Verifies that the tensor operand is exactly equal to a constant attribute.
