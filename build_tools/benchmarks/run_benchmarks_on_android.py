@@ -36,7 +36,7 @@ import tarfile
 import shutil
 import sys
 from pathlib import Path
-# Add build_tools utility dir to the search path.
+# Add build_tools python dir to the search path.
 sys.path.append(
     next(
         str(parent / "python")
@@ -55,7 +55,7 @@ from common.android_device_utils import (get_android_device_model,
                                          get_android_device_info,
                                          get_android_gpu_name)
 from common.common_arguments import build_common_argument_parser
-from build_tools.utils import execute_cmd, execute_cmd_and_get_output, get_git_commit_hash
+from common_utils import execute_cmd, execute_cmd_and_get_output, get_git_commit_hash
 
 # Root directory to perform benchmarks in on the Android device.
 ANDROID_TMPDIR = "/data/local/tmp/iree-benchmarks"

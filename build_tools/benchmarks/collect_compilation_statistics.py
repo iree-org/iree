@@ -19,7 +19,7 @@ import sys
 from dataclasses import asdict
 from pathlib import PurePath, Path
 from typing import BinaryIO, Dict, Optional, TextIO
-# Add build_tools utility dir to the search path.
+# Add build_tools python dir to the search path.
 sys.path.append(
     next(
         str(parent / "python")
@@ -28,7 +28,7 @@ sys.path.append(
 
 from common.benchmark_definition import CompilationInfo, CompilationResults, CompilationStatistics, ModuleComponentSizes
 from common.benchmark_suite import BENCHMARK_SUITE_REL_PATH, BenchmarkSuite
-from build_tools.utils import get_git_commit_hash
+from common_utils import get_git_commit_hash
 
 BENCHMARK_FLAGFILE = "flagfile"
 MODULE_DIR = "vmfb"

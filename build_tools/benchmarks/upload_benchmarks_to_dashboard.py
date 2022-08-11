@@ -23,7 +23,7 @@ import requests
 import sys
 from pathlib import Path
 from typing import Any, Dict, Optional
-# Add build_tools utility dir to the search path.
+# Add build_tools python dir to the search path.
 sys.path.append(
     next(
         str(parent / "python")
@@ -35,7 +35,7 @@ from common.benchmark_presentation import (COMPILATION_METRICS_TO_TABLE_MAPPERS,
                                            collect_all_compilation_metrics)
 from common.benchmark_definition import BenchmarkResults
 from common.benchmark_thresholds import BENCHMARK_THRESHOLDS
-from build_tools.utils import execute_cmd_and_get_output
+from common_utils import execute_cmd_and_get_output
 
 IREE_GITHUB_COMMIT_URL_PREFIX = 'https://github.com/iree-org/iree/commit'
 IREE_PROJECT_ID = 'IREE'

@@ -9,7 +9,7 @@
 import re
 from typing import Optional, Sequence
 
-from build_tools.utils import execute_cmd_and_get_output
+from common_utils import execute_cmd_and_get_output
 from .benchmark_definition import (DeviceInfo, PlatformType)
 
 

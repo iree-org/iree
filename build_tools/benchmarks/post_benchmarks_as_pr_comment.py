@@ -40,7 +40,7 @@ import markdown_strings as md
 import sys
 from pathlib import Path
 from typing import Any, Dict, Optional, Sequence, Tuple
-# Add build_tools utility dir to the search path.
+# Add build_tools python dir to the search path.
 sys.path.append(
     next(
         str(parent / "python")
@@ -49,7 +49,7 @@ sys.path.append(
 
 from common.common_arguments import expand_and_check_file_paths
 from common.benchmark_presentation import *
-from build_tools.utils import execute_cmd_and_get_output
+from common_utils import execute_cmd_and_get_output
 
 ABBR_PR_COMMENT_TITLE = "Abbreviated Benchmark Summary"
 GITHUB_GIST_API_PREFIX = "https://api.github.com/gists"

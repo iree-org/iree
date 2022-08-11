@@ -13,7 +13,7 @@ import shutil
 import tarfile
 import sys
 from pathlib import Path
-# Add build_tools utility dir to the search path.
+# Add build_tools python dir to the search path.
 sys.path.append(
     next(
         str(parent / "python")
@@ -28,7 +28,7 @@ from common.benchmark_config import BenchmarkConfig
 from common.benchmark_definition import get_iree_benchmark_module_arguments, wait_for_iree_benchmark_module_start
 from common.common_arguments import build_common_argument_parser
 from common.linux_device_utils import get_linux_device_info
-from build_tools.utils import execute_cmd, execute_cmd_and_get_output, get_git_commit_hash
+from common_utils import execute_cmd, execute_cmd_and_get_output, get_git_commit_hash
 
 
 class LinuxBenchmarkDriver(BenchmarkDriver):
