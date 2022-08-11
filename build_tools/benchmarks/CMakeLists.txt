@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 set(BENCHMARKS_TOOL_PYTHON_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+set(BUILD_TOOLS_PYTHON_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../python")
 
 # benchmark_tool_py_test()
 #
@@ -35,7 +36,8 @@ function(benchmark_tool_py_test)
     LABELS
       ${_RULE_LABELS}
     PACKAGE_DIRS
-      ${BENCHMARKS_TOOL_PYTHON_DIR}
+      "${BENCHMARKS_TOOL_PYTHON_DIR}"
+      "${BUILD_TOOLS_PYTHON_DIR}"
   )
 endfunction()
 

@@ -27,8 +27,9 @@ sys.path.insert(
         for parent in Path(__file__).parents
         if parent.name == "build_tools"))
 
-from common.benchmark_definition import CompilationInfo, CompilationResults, CompilationStatistics, ModuleComponentSizes, get_git_commit_hash
+from common.benchmark_definition import CompilationInfo, CompilationResults, CompilationStatistics, ModuleComponentSizes
 from common.benchmark_suite import BENCHMARK_SUITE_REL_PATH, BenchmarkSuite
+from build_tools.utils import get_git_commit_hash
 
 BENCHMARK_FLAGFILE = "flagfile"
 MODULE_DIR = "vmfb"
