@@ -68,9 +68,8 @@ void structDefinition(OpBuilder builder, Location location,
   builder.create<emitc::CallOp>(
       /*location=*/location, /*type=*/TypeRange{},
       /*callee=*/StringAttr::get(ctx, "EMITC_TYPEDEF_STRUCT"), /*args=*/
-      // TODO: Type()
-      ArrayAttr::get(ctx, {emitc::OpaqueAttr::get(ctx, Type(), structName),
-                           emitc::OpaqueAttr::get(ctx, Type(), structBody)}),
+      ArrayAttr::get(ctx, {emitc::OpaqueAttr::get(ctx, mlir::NoneType(), structName),
+                           emitc::OpaqueAttr::get(ctx, mlir::NoneType(), structBody)}),
       /*templateArgs=*/ArrayAttr{}, /*operands=*/ArrayRef<Value>{});
 }
 
@@ -83,9 +82,8 @@ Value structMember(OpBuilder builder, Location location, Type type,
           /*type=*/type,
           /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_MEMBER"),
           /*args=*/
-          // TODO: Type()
           ArrayAttr::get(ctx, {builder.getIndexAttr(0),
-                               emitc::OpaqueAttr::get(ctx, Type(), memberName)}),
+                               emitc::OpaqueAttr::get(ctx, mlir::NoneType(), memberName)}),
           /*templateArgs=*/ArrayAttr{},
           /*operands=*/ArrayRef<Value>{operand})
       .getResult(0);
@@ -99,9 +97,8 @@ void structMemberAssign(OpBuilder builder, Location location,
       /*type=*/TypeRange{},
       /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_MEMBER_ASSIGN"),
       /*args=*/
-      // TODO: Type()
       ArrayAttr::get(ctx, {builder.getIndexAttr(0),
-                           emitc::OpaqueAttr::get(ctx, Type(), memberName),
+                           emitc::OpaqueAttr::get(ctx, mlir::NoneType(), memberName),
                            builder.getIndexAttr(1)}),
       /*templateArgs=*/ArrayAttr{},
       /*operands=*/ArrayRef<Value>{operand, data});
@@ -115,10 +112,9 @@ void structMemberAssign(OpBuilder builder, Location location,
       /*type=*/TypeRange{},
       /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_MEMBER_ASSIGN"),
       /*args=*/
-      // TODO: Type()
       ArrayAttr::get(ctx, {builder.getIndexAttr(0),
-                           emitc::OpaqueAttr::get(ctx, Type(), memberName),
-                           emitc::OpaqueAttr::get(ctx, Type(), data)}),
+                           emitc::OpaqueAttr::get(ctx, mlir::NoneType(), memberName),
+                           emitc::OpaqueAttr::get(ctx, mlir::NoneType(), data)}),
       /*templateArgs=*/ArrayAttr{},
       /*operands=*/ArrayRef<Value>{operand});
 }
@@ -132,9 +128,8 @@ Value structPtrMember(OpBuilder builder, Location location, Type type,
           /*type=*/type,
           /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_PTR_MEMBER"),
           /*args=*/
-          // TODO: Type()
           ArrayAttr::get(ctx, {builder.getIndexAttr(0),
-                               emitc::OpaqueAttr::get(ctx, Type(), memberName)}),
+                               emitc::OpaqueAttr::get(ctx, mlir::NoneType(), memberName)}),
           /*templateArgs=*/ArrayAttr{},
           /*operands=*/ArrayRef<Value>{operand})
       .getResult(0);
@@ -148,9 +143,8 @@ void structPtrMemberAssign(OpBuilder builder, Location location,
       /*type=*/TypeRange{},
       /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_PTR_MEMBER_ASSIGN"),
       /*args=*/
-      // TODO: Type()
       ArrayAttr::get(ctx, {builder.getIndexAttr(0),
-                           emitc::OpaqueAttr::get(ctx, Type(), memberName),
+                           emitc::OpaqueAttr::get(ctx, mlir::NoneType(), memberName),
                            builder.getIndexAttr(1)}),
       /*templateArgs=*/ArrayAttr{},
       /*operands=*/ArrayRef<Value>{operand, data});
