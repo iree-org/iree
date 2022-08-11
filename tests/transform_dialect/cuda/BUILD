@@ -27,10 +27,6 @@ iree_lit_test_suite(
             ["*.mlir"],
     ),
     cfg = "//tests:lit.cfg.py",
-    data = [
-        "transform_dialect_codegen_spec.mlir",
-        "transform_dialect_dispatch_spec.mlir",
-    ],
     tags = [
         # CUDA cuInit fails with sanitizer on.
         "noasan",

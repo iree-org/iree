@@ -22,9 +22,6 @@ iree_lit_test_suite(
     iree-compile
     iree-opt
     iree-run-module
-  DATA
-    transform_dialect_codegen_spec.mlir
-    transform_dialect_dispatch_spec.mlir
   LABELS
     "noasan"
     "nomsan"
