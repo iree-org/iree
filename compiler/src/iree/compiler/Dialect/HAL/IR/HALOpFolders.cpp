@@ -78,32 +78,6 @@ void BufferViewBufferOp::getCanonicalizationPatterns(RewritePatternSet &results,
   results.insert<SkipBufferViewBufferOp>(context);
 }
 
-namespace {
-
-/// Expands a hal.buffer_view.dims op into individual ops for each dimension.
-struct ExpandBufferViewDimsOp : public OpRewritePattern<BufferViewDimsOp> {
-  using OpRewritePattern<BufferViewDimsOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(BufferViewDimsOp op,
-                                PatternRewriter &rewriter) const override {
-    SmallVector<Value, 4> newDimValues;
-    for (unsigned i = 0; i < op.getNumResults(); ++i) {
-      newDimValues.push_back(rewriter.createOrFold<BufferViewDimOp>(
-          op.getLoc(), rewriter.getIndexType(), op.getBufferView(),
-          rewriter.getIndexAttr(i)));
-    }
-    rewriter.replaceOp(op, {newDimValues});
-    return success();
-  }
-};
-
-}  // namespace
-
-void BufferViewDimsOp::getCanonicalizationPatterns(RewritePatternSet &results,
-                                                   MLIRContext *context) {
-  results.insert<ExpandBufferViewDimsOp>(context);
-}
-
 //===----------------------------------------------------------------------===//
 // hal.command_buffer.*
 //===----------------------------------------------------------------------===//

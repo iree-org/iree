@@ -18,6 +18,14 @@ extern "C" {
 typedef struct iree_hal_local_executable_t {
   iree_hal_resource_t resource;
   iree_allocator_t host_allocator;
+
+  // Optional executable layouts.
+  // Not all users require the layouts (such as when directly calling executable
+  // functions) and in those cases they can be omitted. Users routing through
+  // the HAL command buffer APIs will usually require them.
+  //
+  // TODO(benvanik): make this a flag we set and can query instead - poking into
+  // this from dispatch code is a layering violation.
   iree_host_size_t executable_layout_count;
   iree_hal_executable_layout_t** executable_layouts;
 

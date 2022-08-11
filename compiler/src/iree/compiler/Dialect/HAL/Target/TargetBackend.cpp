@@ -169,18 +169,53 @@ static LogicalResult mergeModuleInto(
   return success();
 }
 
+struct SymbolReplacements {
+  DenseMap<Attribute, Attribute> executableRefs;
+  DenseMap<Attribute, Attribute> variantRefs;
+  DenseMap<Attribute, Attribute> exportRefs;
+};
+
 // Replaces each usage of an entry point with its original symbol name with a
 // new symbol name.
+//
+// Due to replaceSubElements recursing into symbol refs we need to perform
+// replacement in descending symbol ref length; otherwise replacing the
+// executable name in `@old_executable::@old_export` would result in
+// `@new_executable::@old_export` and an export update would then not match the
+// new/old mismatched ref. This means we have to do three walks over the entire
+// module in order to do the replacements; not great.
 static void replaceEntryPointUses(
-    mlir::ModuleOp moduleOp,
-    const DenseMap<Attribute, Attribute> &replacements) {
+    mlir::ModuleOp moduleOp, const SymbolReplacements &symbolReplacements) {
+  auto replaceSymbolRefs = [](Operation *rootOp,
+                              const DenseMap<Attribute, Attribute> &map) {
+    auto allUses = SymbolTable::getSymbolUses(rootOp);
+    if (!allUses) return;
+    for (auto use : *allUses) {
+      auto oldAttr = use.getSymbolRef();
+      auto newAttr = map.lookup(oldAttr);
+      if (!newAttr) continue;
+      auto newDict = use.getUser()->getAttrDictionary().replaceSubElements(
+          [&](Attribute attr) -> std::pair<Attribute, WalkResult> {
+            if (attr == oldAttr) {
+              // Found old->new replacement.
+              return {newAttr, WalkResult::skip()};
+            } else if (attr.isa<SymbolRefAttr>()) {
+              // Don't recurse into symbol refs - we only want to match roots.
+              return {attr, WalkResult::skip()};
+            }
+            // Non-symbol ref attr.
+            return {attr, WalkResult::advance()};
+          });
+      use.getUser()->setAttrs(newDict.cast<DictionaryAttr>());
+    }
+  };
+  replaceSymbolRefs(moduleOp, symbolReplacements.exportRefs);
+  replaceSymbolRefs(moduleOp, symbolReplacements.variantRefs);
+  replaceSymbolRefs(moduleOp, symbolReplacements.executableRefs);
   for (auto funcLikeOp : moduleOp.getOps<FunctionOpInterface>()) {
-    funcLikeOp.walk([&](IREE::HAL::CommandBufferDispatchSymbolOp dispatchOp) {
-      auto it = replacements.find(dispatchOp.getEntryPoint());
-      if (it != replacements.end()) {
-        dispatchOp.setEntryPointAttr(it->second.cast<SymbolRefAttr>());
-      }
-    });
+    replaceSymbolRefs(funcLikeOp, symbolReplacements.exportRefs);
+    replaceSymbolRefs(funcLikeOp, symbolReplacements.variantRefs);
+    replaceSymbolRefs(funcLikeOp, symbolReplacements.executableRefs);
   }
 }
 
@@ -193,7 +228,7 @@ LogicalResult TargetBackend::linkExecutablesInto(
     OpBuilder &builder) {
   int nextEntryPointOrdinal = 0;
   DenseMap<StringRef, Operation *> targetSymbolMap;
-  DenseMap<Attribute, Attribute> exportRefReplacements;
+  SymbolReplacements symbolReplacements;
 
   auto linkedTargetBuilder =
       OpBuilder::atBlockBegin(&linkedTargetOp.getBlock());
@@ -201,11 +236,24 @@ LogicalResult TargetBackend::linkExecutablesInto(
 
   // Iterate over all source executable ops, linking as many as we can.
   for (auto sourceExecutableOp : sourceExecutableOps) {
+    // Remap root executable refs.
+    symbolReplacements.executableRefs[SymbolRefAttr::get(sourceExecutableOp)] =
+        SymbolRefAttr::get(linkedExecutableOp);
+
     auto variantOps = llvm::to_vector<4>(
         sourceExecutableOp.getOps<IREE::HAL::ExecutableVariantOp>());
     for (auto variantOp : variantOps) {
       // Only process targets matching our pattern.
       if (variantOp.getTarget().getBackend().getValue() != name()) continue;
+
+      // Remap variant refs.
+      auto oldVariantRefAttr =
+          SymbolRefAttr::get(builder.getContext(), sourceExecutableOp.getName(),
+                             {SymbolRefAttr::get(variantOp)});
+      auto newVariantRefAttr =
+          SymbolRefAttr::get(builder.getContext(), linkedExecutableOp.getName(),
+                             {SymbolRefAttr::get(linkedTargetOp)});
+      symbolReplacements.variantRefs[oldVariantRefAttr] = newVariantRefAttr;
 
       // Clone export ops and queue remapping ordinals and updating
       // symbol refs.
@@ -219,14 +267,14 @@ LogicalResult TargetBackend::linkExecutablesInto(
 
         // Add to replacement table for fixing up dispatch calls referencing
         // this export.
-        auto oldSymbolRefAttr = SymbolRefAttr::get(
+        auto oldExportRefAttr = SymbolRefAttr::get(
             builder.getContext(), sourceExecutableOp.getName(),
             {SymbolRefAttr::get(variantOp), SymbolRefAttr::get(exportOp)});
-        auto newSymbolRefAttr = SymbolRefAttr::get(
+        auto newExportRefAttr = SymbolRefAttr::get(
             builder.getContext(), linkedExecutableOp.getName(),
             {SymbolRefAttr::get(linkedTargetOp),
              SymbolRefAttr::get(newExportOp)});
-        exportRefReplacements[oldSymbolRefAttr] = newSymbolRefAttr;
+        symbolReplacements.exportRefs[oldExportRefAttr] = newExportRefAttr;
       }
 
       // Merge the existing module into the new linked module op.
@@ -245,7 +293,7 @@ LogicalResult TargetBackend::linkExecutablesInto(
   }
 
   // Update references to @executable::@target::@entry symbols.
-  replaceEntryPointUses(moduleOp, exportRefReplacements);
+  replaceEntryPointUses(moduleOp, symbolReplacements);
 
   // Remove if we didn't add anything.
   if (linkedTargetOp.getOps<IREE::HAL::ExecutableExportOp>().empty()) {

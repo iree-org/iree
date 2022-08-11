@@ -15,16 +15,3 @@ func.func @skip_buffer_view_buffer(%buffer : !hal.buffer) -> !hal.buffer {
   // CHECK: return %[[BUFFER]]
   return %view_buffer : !hal.buffer
 }
-
-// -----
-
-// CHECK-LABEL: func.func @expand_buffer_view_dims
-// CHECK-SAME: %[[VIEW:.+]]: !hal.buffer_view
-func.func @expand_buffer_view_dims(%view : !hal.buffer_view) -> (index, index, index) {
-  // CHECK-DAG: %[[D0:.+]] = hal.buffer_view.dim<%[[VIEW]] : !hal.buffer_view>[0] : index
-  // CHECK-DAG: %[[D1:.+]] = hal.buffer_view.dim<%[[VIEW]] : !hal.buffer_view>[1] : index
-  // CHECK-DAG: %[[D2:.+]] = hal.buffer_view.dim<%[[VIEW]] : !hal.buffer_view>[2] : index
-  %0, %1, %2 = hal.buffer_view.dims<%view : !hal.buffer_view> : index, index, index
-  // CHECK-NEXT: return %[[D0]], %[[D1]], %[[D2]]
-  return %0, %1, %2 : index, index, index
-}

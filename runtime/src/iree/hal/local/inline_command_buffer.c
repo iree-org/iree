@@ -404,6 +404,12 @@ static iree_status_t iree_hal_inline_command_buffer_dispatch(
 
   iree_hal_local_executable_t* local_executable =
       iree_hal_local_executable_cast(executable);
+  if (IREE_UNLIKELY(!local_executable->executable_layouts)) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "layouts not provided during executable creation; cannot dispatch");
+  }
+
   iree_hal_local_executable_layout_t* local_layout =
       (iree_hal_local_executable_layout_t*)
           local_executable->executable_layouts[entry_point];

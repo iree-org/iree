@@ -628,28 +628,6 @@ def HAL_BufferViewDimOp : HAL_PureOp<"buffer_view.dim"> {
   }];
 }
 
-def HAL_BufferViewDimsOp : HAL_PureOp<"buffer_view.dims"> {
-  let summary = [{buffer view multi-value dimension query}];
-  let description = [{
-    Returns each dimension value of the buffer view.
-  }];
-
-  let arguments = (ins
-    HAL_BufferView:$buffer_view
-  );
-  let results = (outs
-    Variadic<Index>:$result
-  );
-
-  let assemblyFormat = [{
-    `<` $buffer_view `:` type($buffer_view) `>`
-    `:` type($result)
-    attr-dict-with-keyword
-  }];
-
-  let hasCanonicalizer = 1;
-}
-
 def HAL_BufferViewTraceOp : HAL_Op<"buffer_view.trace", []> {
   let summary = [{trace value(s) operation}];
   let description = [{
