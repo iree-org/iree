@@ -14,7 +14,6 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "disable_demote_f64_to_f32.mlir"
     "fill_i64.mlir"
     "globals.mlir"
     "globals_ml_program.mlir"
