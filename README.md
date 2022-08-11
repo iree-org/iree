@@ -9,6 +9,8 @@ constraints and special considerations of mobile and edge deployments.
 See [our website](https://iree-org.github.io/iree/) for project details, user
 guides, and instructions on building from source.
 
+[![CI Status](https://github.com/iree-org/iree/actions/workflows/ci.yml/badge.svg?query=branch%3Amain+event%3Apush)](https://github.com/iree-org/iree/actions/workflows/ci.yml?query=branch%3Amain+event%3Apush)
+
 #### Project Status
 
 IREE is still in its early phase. We have settled down on the overarching
@@ -32,24 +34,6 @@ of feedback on any [communication channels](#communication-channels)!
     IREE is enabled by and heavily relies on [MLIR](https://mlir.llvm.org). IREE
     sometimes is referred to in certain MLIR discussions. Useful if you are also
     interested in MLIR evolution.
-
-## Build Status
-
-
-CI System | Build System  | Platform   | Architecture         | Configuration / Component    | Status
-:-------: | :-----------: | :--------: | :------------------: | :--------------------------: | :----:
-Kokoro    | Bazel         | Linux      | x86-64               |                              | [![kokoro status bazel/linux/x86-swiftshader/core](https://storage.googleapis.com/iree-oss-build-badges/bazel/linux/x86-swiftshader/core/main_status.svg)](https://storage.googleapis.com/iree-oss-build-badges/bazel/linux/x86-swiftshader/core/main_result.html)
-Kokoro    | CMake & Bazel | Linux      | x86-64 (swiftshader) | Integrations                 | [![kokoro status cmake-bazel/linux/x86-swiftshader](https://storage.googleapis.com/iree-oss-build-badges/cmake-bazel/linux/x86-swiftshader/main_status.svg)](https://storage.googleapis.com/iree-oss-build-badges/cmake-bazel/linux/x86-swiftshader/main_result.html)
-Kokoro    | CMake & Bazel | Linux      | x86-64 (turing)      | Integrations                 | [![kokoro status cmake-bazel/linux/x86-turing](https://storage.googleapis.com/iree-oss-build-badges/cmake-bazel/linux/x86-turing/main_status.svg)](https://storage.googleapis.com/iree-oss-build-badges/cmake-bazel/linux/x86-turing/main_result.html)
-Kokoro    | CMake         | Linux      | x86-64 (swiftshader) |                              | [![kokoro status cmake/linux/x86-swiftshader](https://storage.googleapis.com/iree-oss-build-badges/cmake/linux/x86-swiftshader/main_status.svg)](https://storage.googleapis.com/iree-oss-build-badges/cmake/linux/x86-swiftshader/main_result.html)
-Kokoro    | CMake         | Linux      | x86-64 (swiftshader) | asan                         | [![kokoro status cmake/linux/x86-swiftshader-asan](https://storage.googleapis.com/iree-oss-build-badges/cmake/linux/x86-swiftshader-asan/main_status.svg)](https://storage.googleapis.com/iree-oss-build-badges/cmake/linux/x86-swiftshader-asan/main_result.html)
-Kokoro    | CMake         | Linux      | x86-64 (turing)      |                              | [![kokoro status cmake/linux/x86-turing](https://storage.googleapis.com/iree-oss-build-badges/cmake/linux/x86-turing/main_status.svg)](https://storage.googleapis.com/iree-oss-build-badges/cmake/linux/x86-turing/main_result.html)
-Kokoro    | CMake         | Android    | arm64-v8a            | Runtime (build only)         | [![kokoro status cmake/android/arm64-v8a](https://storage.googleapis.com/iree-oss-build-badges/cmake/android/arm64-v8a/main_status.svg)](https://storage.googleapis.com/iree-oss-build-badges/cmake/android/arm64-v8a/main_result.html)
-Kokoro    | CMake         | Bare Metal | risc-v-32            | Runtime                      | [![kokoro status cmake/baremetal/riscv32](https://storage.googleapis.com/iree-oss-build-badges/cmake/baremetal/riscv32/main_status.svg)](https://storage.googleapis.com/iree-oss-build-badges/cmake/baremetal/riscv32/main_result.html)
-Kokoro    | CMake         | Linux      | risc-v-64            | Runtime                      | [![kokoro status cmake/linux/riscv64](https://storage.googleapis.com/iree-oss-build-badges/cmake/linux/riscv64/main_status.svg)](https://storage.googleapis.com/iree-oss-build-badges/cmake/linux/riscv64/main_result.html)
-Buildkite | CMake         | Android    | arm64-v8a            | Runtime                      | [![buildkite status iree-android-arm64-v8a](https://badge.buildkite.com/a73df0ba9f4aa132650dd6676bc1e6c20d3d99ed6b24db2179.svg?branch=main)](https://buildkite.com/iree/iree-android-arm64-v8a)
-BuildKite | CMake         | Android    | arm64-v8a            | Runtime Benchmarks           | [![buildkite status iree-benchmark](https://badge.buildkite.com/62e504b93171f4a19e5c46f8b9a99eb5dba050666640fbc21b.svg?branch=main)](https://buildkite.com/iree/iree-benchmark)
-BuildKite | CMake         | Linux      | x86-64               | Tracing + Standalone Runtime | [![buildkite status iree-build-configurations](https://badge.buildkite.com/3bc03ad54a6b785b3fdd0dd3d67fd93ed22ef2b538cb34adc3.svg?branch=main)](https://buildkite.com/iree/iree-build-configurations)
 
 ## Architecture Overview
 
