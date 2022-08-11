@@ -894,13 +894,13 @@ struct DotGeneralIsMul : public OpRewritePattern<mhlo::DotGeneralOp> {
     auto i64Iota = builder.getI64TensorAttr({0, 1, 2});
     auto lhsBroadcastTy =
         RankedTensorType::get(resultTy.getShape(), lhsTy.getElementType());
-    lhs = builder.createOrFold<mhlo::DynamicBroadcastInDimOp>(lhsBroadcastTy, lhs,
-                                                        dynSize, i64Iota);
+    lhs = builder.createOrFold<mhlo::DynamicBroadcastInDimOp>(
+        lhsBroadcastTy, lhs, dynSize, i64Iota);
 
     auto rhsBroadcastTy =
         RankedTensorType::get(resultTy.getShape(), rhsTy.getElementType());
-    rhs = builder.createOrFold<mhlo::DynamicBroadcastInDimOp>(rhsBroadcastTy, rhs,
-                                                        dynSize, i64Iota);
+    rhs = builder.createOrFold<mhlo::DynamicBroadcastInDimOp>(
+        rhsBroadcastTy, rhs, dynSize, i64Iota);
 
     lhs = builder.createOrFold<mhlo::ConvertOp>(resultTy, lhs);
     rhs = builder.createOrFold<mhlo::ConvertOp>(resultTy, rhs);
