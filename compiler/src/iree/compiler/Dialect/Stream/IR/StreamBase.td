@@ -12,6 +12,7 @@ include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilTypes.td"
 include "mlir/IR/AttrTypeBase.td"
+include "mlir/IR/BuiltinAttributeInterfaces.td"
 include "mlir/IR/EnumAttr.td"
 include "mlir/IR/SubElementInterfaces.td"
 
@@ -320,7 +321,8 @@ def Stream_Timepoint : TypeDef<Stream_Dialect, "Timepoint", [
   let parameters = (ins);
 }
 
-def Stream_TimepointAttr : AttrDef<Stream_Dialect, "Timepoint", []> {
+def Stream_TimepointAttr : AttrDef<Stream_Dialect, "Timepoint",
+                             [TypedAttrInterface]> {
   let mnemonic = "timepoint";
   let summary = [{an immediately-resolved timepoint}];
   let description = [{}];
