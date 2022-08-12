@@ -31,14 +31,14 @@ namespace Flow {
 namespace {
 
 // Estimates the evaluation cost of a linalg op using a heuristic cost model.
-static int estimateLinalgOpCost(linalg::LinalgOp op) {
+static int64_t estimateLinalgOpCost(linalg::LinalgOp op) {
   if (op.hasDynamicShape()) {
     // Note: bounded dynamic shapes would be interesting, if the compiler used
     // them. For now just treat dynamic shapes as arbitrarily large.
     return INT_MAX;
   }
 
-  int cost = 1;
+  int64_t cost = 1;
   for (auto loopRange : op.getStaticLoopRanges()) {
     cost *= loopRange;
   }
@@ -77,10 +77,21 @@ static std::string summarizeLinalgOp(linalg::LinalgOp op) {
 // This uses heuristics to aid developer debugging.
 static std::string summarizeDispatchWorkgroupsOp(
     DispatchWorkgroupsOp regionOp) {
-  Operation *bestOp = NULL;
-  int bestEstimatedCost = -1;
-  std::string bestSummary = "";
+  // The goal here is to build a relatively concise description that gives
+  // enough information to developers to see roughly what sort of computation a
+  // dispatch region performs. Multiple approaches are valid here, depending on
+  // what a developer wants to highlight.
+  //
+  // Currently, this uses a cost model to estimate which individual operation
+  // is the most computationally expensive, then a summary is generated which
+  // includes some of that operation's parameters.
+  //
+  // Other metrics to determine which single op is the "best" or which list of
+  // ops is most interesting (e.g. to highlight large data movements) could be
+  // used instead.
 
+  Operation *bestOp = NULL;
+  int64_t bestEstimatedCost = -1;
   regionOp.getBodyRegion().walk([&](Operation *op) {
     TypeSwitch<Operation *>(op)
         .Case<linalg::LinalgOp>([&](auto op) {
@@ -88,16 +99,27 @@ static std::string summarizeDispatchWorkgroupsOp(
           if (estimatedCost < bestEstimatedCost) return;
           bestEstimatedCost = estimatedCost;
           bestOp = op;
-          bestSummary = summarizeLinalgOp(op);
-          LLVM_DEBUG(llvm::dbgs() << "// new best op; summary: '" << bestSummary
+          LLVM_DEBUG(llvm::dbgs() << "// new best op: '" << bestOp->getName()
                                   << "', cost: " << bestEstimatedCost << "\n");
         })
         // TODO(scotttodd): IREE::LinalgExt::LinalgExtOp
         .Default([&](Operation *op) {
-          // No heuristic implemented, skip.
+          // No cost estimation implemented, skip.
         });
   });
+  if (!bestOp) return "";
 
+  std::string bestSummary = "";
+  TypeSwitch<Operation *>(bestOp)
+      .Case<linalg::LinalgOp>(
+          [&](auto op) { bestSummary = summarizeLinalgOp(op); })
+      // TODO(scotttodd): IREE::LinalgExt::LinalgExtOp
+      .Default([&](Operation *op) {
+        // No summarization implemented, default to the op's name.
+        bestSummary = op->getName().getStringRef().str();
+      });
+
+  LLVM_DEBUG(llvm::dbgs() << "// best op summary: '" << bestSummary << "'\n");
   return bestSummary;
 }
 
