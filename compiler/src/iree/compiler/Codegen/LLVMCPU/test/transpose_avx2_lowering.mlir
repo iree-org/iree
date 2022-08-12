@@ -7,7 +7,7 @@
   ]>
 ]>
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<
-  "llvm",
+  "llvm-cpu",
   "embedded-elf-x86_64", {
     cpu_features = "+avx2",
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
@@ -65,7 +65,7 @@ hal.executable private @transpose_10_8x8_pattern {
   ]>
 ]>
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<
-  "llvm",
+  "llvm-cpu",
   "embedded-elf-x86_64", {
     cpu_features = "+avx2",
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
@@ -123,7 +123,7 @@ hal.executable private @transpose_021_8x8_pattern {
   ]>
 ]>
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<
-  "llvm",
+  "llvm-cpu",
   "embedded-elf-x86_64", {
     cpu_features = "+avx2",
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
@@ -181,7 +181,7 @@ hal.executable private @transpose_201_8x8_pattern {
   ]>
 ]>
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<
-  "llvm",
+  "llvm-cpu",
   "embedded-elf-x86_64", {
     cpu_features = "+avx2",
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
@@ -239,7 +239,7 @@ hal.executable private @transpose_210_8x8_pattern {
   ]>
 ]>
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<
-  "llvm",
+  "llvm-cpu",
   "embedded-elf-x86_64", {
     cpu_features = "+avx2",
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
@@ -297,7 +297,7 @@ hal.executable private @transpose_120_8x8_pattern {
   ]>
 ]>
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<
-  "llvm",
+  "llvm-cpu",
   "embedded-elf-x86_64", {
     cpu_features = "+avx2",
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
@@ -347,7 +347,7 @@ hal.executable private @transpose_102 {
   ]>
 ]>
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<
-  "llvm",
+  "llvm-cpu",
   "embedded-elf-x86_64", {
     // No '+avx2' cpu feature.
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",

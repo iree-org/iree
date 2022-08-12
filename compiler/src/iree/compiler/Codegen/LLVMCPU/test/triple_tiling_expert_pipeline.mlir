@@ -9,7 +9,7 @@
 ]>
 hal.executable private @matmul_128_384_1536  {
   hal.executable.variant @system_elf_x86_64, target = <
-    "llvm",
+    "llvm-cpu",
     "embedded-elf-x86_64", {
       data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
       native_vector_size = 4 : index,
