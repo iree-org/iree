@@ -184,7 +184,9 @@ jobs:
 
   test_gpu:
     needs: [should_run, build_all]
-    if: needs.should_run.outputs.should-run == 'true'
+    # TODO(gcmn): There is something wrong with the GPU MIG. The machines keep
+    # immediately shutting down.
+    if: false && needs.should_run.outputs.should-run == 'true'
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
@@ -381,7 +383,9 @@ jobs:
 
   test_tf_integrations_gpu:
     needs: [should_run, build_tf_integrations, build_all]
-    if: needs.should_run.outputs.should-run == 'true'
+    # TODO(gcmn): There is something wrong with the GPU MIG. The machines keep
+    # immediately shutting down.
+    if: false && needs.should_run.outputs.should-run == 'true'
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
