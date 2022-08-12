@@ -144,9 +144,7 @@ class LLVMCPUTargetBackend final : public TargetBackend {
     initConfiguration();
   }
 
-  std::string name() const override { return "llvm"; }
-
-  std::string deviceID() const override { return "cpu"; }
+  std::string name() const override { return "llvm-cpu"; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
     mlir::registerLLVMDialectTranslation(registry);
@@ -742,7 +740,7 @@ class LLVMCPUTargetBackend final : public TargetBackend {
               StringAttr::get(context, options_.targetCPUFeatures));
 
     return IREE::HAL::ExecutableTargetAttr::get(
-        context, StringAttr::get(context, "llvm"),
+        context, StringAttr::get(context, "llvm-cpu"),
         StringAttr::get(context, format), DictionaryAttr::get(context, config));
   }
 
