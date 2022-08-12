@@ -59,11 +59,9 @@ createHoistInlinedRodataPass();
 std::unique_ptr<OperationPass<IREE::VM::ModuleOp>>
 createDeduplicateRodataPass();
 
-// Sinks global buffer references into loads. This should result in the
-// elimination of initializers that are trivially initializing a global buffer
-// from rodata.
+// Resolves global loads of rodata ops to direct rodata references.
 std::unique_ptr<OperationPass<IREE::VM::ModuleOp>>
-createSinkGlobalBufferLoadsPass();
+createResolveRodataLoadsPass();
 
 //===----------------------------------------------------------------------===//
 // Module analysis and ordinal assignment
@@ -111,8 +109,8 @@ inline void registerVMPasses() {
   createDropEmptyModuleInitializersPass();
   createGlobalInitializationPass();
   createOrdinalAllocationPass();
+  createResolveRodataLoadsPass();
   createSinkDefiningOpsPass();
-  createSinkGlobalBufferLoadsPass();
 }
 
 inline void registerVMTestPasses() {

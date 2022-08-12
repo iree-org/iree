@@ -23,8 +23,8 @@ iree_cc_library(
     "HoistInlinedRodata.cpp"
     "OrdinalAllocation.cpp"
     "Passes.cpp"
+    "ResolveRodataLoads.cpp"
     "SinkDefiningOps.cpp"
-    "SinkGlobalBufferLoads.cpp"
   DEPS
     LLVMSupport
     MLIRAffineDialect
@@ -43,6 +43,7 @@ iree_cc_library(
     MLIRSupport
     MLIRTransformUtils
     MLIRTransforms
+    iree::compiler::Dialect::Util::Analysis
     iree::compiler::Dialect::Util::Conversion
     iree::compiler::Dialect::Util::Conversion::MemRefToUtil
     iree::compiler::Dialect::Util::IR
