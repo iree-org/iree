@@ -44,7 +44,7 @@ See details about `IREE_ENABLE_RUNTIME_TRACING` [here](/docs/developers/developi
 ./run_benchmarks_on_linux.py \
   --normal_benchmark_tool_dir=$IREE_NORMAL_TOOL_DIR \
   --model_name_regex="MobileBertSquad" \
-  --driver_filter_regex="dylib" \
+  --driver_filter_regex="local-task" \
   --mode_regex="4-threads" \
   --output=results.json $IREE_BUILD_DIR
 ```

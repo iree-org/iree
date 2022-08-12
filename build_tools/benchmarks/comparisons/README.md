@@ -18,7 +18,7 @@ It assumes a directory structure like below:
   └── models/
         ├── tflite/*.tflite
         └── iree/
-              └── <driver>/*.vmfb e.g. dylib, vulkan, cuda.
+              └── <target>/*.vmfb e.g. llvm-cpu, vulkan, cuda.
 ```
 
 # Prerequisites

@@ -47,7 +47,7 @@ class DriverInfo:
   """An object describing a IREE HAL driver.
 
   It includes the following characteristics:
-  - pretty_name: the pretty name, e.g., 'IREE-DyLib'
+  - pretty_name: the pretty name, e.g., 'IREE-LLVM-CPU'
   - device_type: the targeted device type, e.g., 'CPU'
   - driver_name: runtime driver flag, e.g., 'local-task'
   - loader_name: executable loader name, if used
@@ -63,10 +63,10 @@ class DriverInfo:
 # mapping to more friendly ones and detach to keep driver names used in
 # benchmark presentation stable.
 IREE_DRIVERS_INFOS = {
-    "iree-dylib":
-        DriverInfo("IREE-Dylib", "CPU", "local-task", "embedded-elf"),
-    "iree-dylib-sync":
-        DriverInfo("IREE-Dylib-Sync", "CPU", "local-sync", "embedded-elf"),
+    "iree-llvm-cpu":
+        DriverInfo("IREE-LLVM-CPU", "CPU", "local-task", "embedded-elf"),
+    "iree-llvm-cpu-sync":
+        DriverInfo("IREE-LLVM-CPU-Sync", "CPU", "local-sync", "embedded-elf"),
     "iree-vmvx":
         DriverInfo("IREE-VMVX", "CPU", "local-task", "vmvx-module"),
     "iree-vmvx-sync":

@@ -20,7 +20,7 @@ set(ANDROID_CPU_COMPILATION_FLAGS
   "--iree-input-type=tosa"
   "--iree-llvm-target-triple=aarch64-none-linux-android29")
 
-# CPU, Dylib-Sync, big/little-core, full-inference
+# CPU, LLVM, local-sync, big/little-core, full-inference
 iree_benchmark_suite(
   GROUP_NAME
     "android-arm64-v8a"
@@ -38,7 +38,7 @@ iree_benchmark_suite(
     "big-core,full-inference,default-flags"
     "little-core,full-inference,default-flags"
   TARGET_BACKEND
-    "dylib-llvm-aot"
+    "llvm-cpu"
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
   COMPILATION_FLAGS
@@ -46,12 +46,12 @@ iree_benchmark_suite(
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
-    "iree-dylib-sync"
+    "iree-llvm-cpu-sync"
   DRIVER
     "local-sync"
 )
 
-# CPU, Dylib, 1 through 4 threads, big/little-core, full-inference.
+# CPU, LLVM, local-task, 1 through 4 threads, big/little-core, full-inference.
 iree_benchmark_suite(
   GROUP_NAME
     "android-arm64-v8a"
@@ -69,7 +69,7 @@ iree_benchmark_suite(
     "1-thread,big-core,full-inference,default-flags"
     "1-thread,little-core,full-inference,default-flags"
   TARGET_BACKEND
-    "dylib-llvm-aot"
+    "llvm-cpu"
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
   COMPILATION_FLAGS
@@ -77,7 +77,7 @@ iree_benchmark_suite(
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
-    "iree-dylib"
+    "iree-llvm-cpu"
   DRIVER
     "local-task"
   RUNTIME_FLAGS
@@ -102,7 +102,7 @@ iree_benchmark_suite(
 #     "2-thread,big-core,full-inference,default-flags"
 #     "2-thread,little-core,full-inference,default-flags"
 #   TARGET_BACKEND
-#     "dylib-llvm-aot"
+#     "llvm-cpu"
 #   TARGET_ARCHITECTURE
 #     "CPU-ARM64-v8A"
 #   COMPILATION_FLAGS
@@ -110,7 +110,7 @@ iree_benchmark_suite(
 #   BENCHMARK_TOOL
 #     iree-benchmark-module
 #   CONFIG
-#    "iree-dylib"
+#    "iree-llvm-cpu"
 #   DRIVER
 #     "local-task"
 #   RUNTIME_FLAGS
@@ -133,7 +133,7 @@ iree_benchmark_suite(
 #     "3-thread,big-core,full-inference,default-flags"
 #     "3-thread,little-core,full-inference,default-flags"
 #   TARGET_BACKEND
-#     "dylib-llvm-aot"
+#     "llvm-cpu"
 #   TARGET_ARCHITECTURE
 #     "CPU-ARM64-v8A"
 #   COMPILATION_FLAGS
@@ -141,7 +141,7 @@ iree_benchmark_suite(
 #   BENCHMARK_TOOL
 #     iree-benchmark-module
 #   CONFIG
-#    "iree-dylib"
+#    "iree-llvm-cpu"
 #   DRIVER
 #     "local-task"
 #   RUNTIME_FLAGS
@@ -165,7 +165,7 @@ iree_benchmark_suite(
     "4-thread,big-core,full-inference,default-flags"
     "4-thread,little-core,full-inference,default-flags"
   TARGET_BACKEND
-    "dylib-llvm-aot"
+    "llvm-cpu"
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
   COMPILATION_FLAGS
@@ -173,7 +173,7 @@ iree_benchmark_suite(
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
-    "iree-dylib"
+    "iree-llvm-cpu"
   DRIVER
     "local-task"
   RUNTIME_FLAGS
@@ -196,7 +196,7 @@ iree_benchmark_suite(
 #                                                                              #
 ################################################################################
 
-# CPU, Dylib-Sync, big/little-core, full-inference
+# CPU, LLVM, local-sync, big/little-core, full-inference
 # NOTE: this is not enabling any SIMD extension beyond baseline Aarch64.
 # At the moment we use that for fp32 models. We would change that when new
 # devices support relevant fp32 SIMD extensions beyond that (e.g. +f32mm).
@@ -216,7 +216,7 @@ iree_benchmark_suite(
     "big-core,full-inference,experimental-flags"
     "little-core,full-inference,experimental-flags"
   TARGET_BACKEND
-    "dylib-llvm-aot"
+    "llvm-cpu"
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
   COMPILATION_FLAGS
@@ -225,12 +225,12 @@ iree_benchmark_suite(
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
-    "iree-dylib-sync"
+    "iree-llvm-cpu-sync"
   DRIVER
     "local-sync"
 )
 
-# CPU, Dylib-Sync, big/little-core, full-inference, +dotprod
+# CPU, LLVM, local-sync, big/little-core, full-inference, +dotprod
 # NOTE: +dotprod is only relevant to int8, not fp32.
 # TODO: add a +i8mm variant, supported by new devices already. No rush: our i8mm
 # kernel is currently naive, not ready for benchmarking.
@@ -245,7 +245,7 @@ iree_benchmark_suite(
     "big-core,full-inference,experimental-flags"
     "little-core,full-inference,experimental-flags"
   TARGET_BACKEND
-    "dylib-llvm-aot"
+    "llvm-cpu"
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
   COMPILATION_FLAGS
@@ -255,7 +255,7 @@ iree_benchmark_suite(
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
-    "iree-dylib-sync"
+    "iree-llvm-cpu-sync"
   DRIVER
     "local-sync"
 )
@@ -263,7 +263,7 @@ iree_benchmark_suite(
 # TODO(#7792): Consider re-enabling little-core experimental-flags if we start
 # optimizing for little cores or we can just run them occasionally
 
-# CPU, Dylib, 1 through 4 threads, big/little-core, full-inference.
+# CPU, LLVM, local-task, 1 through 4 threads, big/little-core, full-inference.
 # NOTE: this is not enabling any SIMD extension beyond baseline Aarch64.
 # At the moment we use that for fp32 models. We would change that when new
 # devices support relevant fp32 SIMD extensions beyond that (e.g. f32mm).
@@ -283,7 +283,7 @@ iree_benchmark_suite(
     "1-thread,big-core,full-inference,experimental-flags"
     # "1-thread,little-core,full-inference,experimental-flags"
   TARGET_BACKEND
-    "dylib-llvm-aot"
+    "llvm-cpu"
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
   COMPILATION_FLAGS
@@ -292,14 +292,14 @@ iree_benchmark_suite(
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
-    "iree-dylib"
+    "iree-llvm-cpu"
   DRIVER
     "local-task"
   RUNTIME_FLAGS
     "--task_topology_group_count=1"
 )
 
-# CPU, Dylib, 1 through 4 threads, big/little-core, full-inference, +dotprod
+# CPU, LLVM, local-task, 1 through 4 threads, big/little-core, full-inference, +dotprod
 # NOTE: +dotprod is only relevant to int8, not fp32.
 # TODO: add a +i8mm variant, supported by new devices already. No rush: our i8mm
 # kernel is currently naive, not ready for benchmarking.
@@ -314,7 +314,7 @@ iree_benchmark_suite(
     "1-thread,big-core,full-inference,experimental-flags"
     # "1-thread,little-core,full-inference,experimental-flags"
   TARGET_BACKEND
-    "dylib-llvm-aot"
+    "llvm-cpu"
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
   COMPILATION_FLAGS
@@ -324,7 +324,7 @@ iree_benchmark_suite(
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
-    "iree-dylib"
+    "iree-llvm-cpu"
   DRIVER
     "local-task"
   RUNTIME_FLAGS
@@ -349,7 +349,7 @@ iree_benchmark_suite(
 #     "2-thread,big-core,full-inference,experimental-flags"
 #     "2-thread,little-core,full-inference,experimental-flags"
 #   TARGET_BACKEND
-#     "dylib-llvm-aot"
+#     "llvm-cpu"
 #   TARGET_ARCHITECTURE
 #     "CPU-ARM64-v8A"
 #   COMPILATION_FLAGS
@@ -358,7 +358,7 @@ iree_benchmark_suite(
 #   BENCHMARK_TOOL
 #     iree-benchmark-module
 #   CONFIG
-#    "iree-dylib"
+#    "iree-llvm-cpu"
 #   DRIVER
 #     "local-task"
 #   RUNTIME_FLAGS
@@ -381,7 +381,7 @@ iree_benchmark_suite(
 #     "3-thread,big-core,full-inference,experimental-flags"
 #     "3-thread,little-core,full-inference,experimental-flags"
 #   TARGET_BACKEND
-#     "dylib-llvm-aot"
+#     "llvm-cpu"
 #   TARGET_ARCHITECTURE
 #     "CPU-ARM64-v8A"
 #   COMPILATION_FLAGS
@@ -390,14 +390,14 @@ iree_benchmark_suite(
 #   BENCHMARK_TOOL
 #     iree-benchmark-module
 #   CONFIG
-#    "iree-dylib"
+#    "iree-llvm-cpu"
 #   DRIVER
 #     "local-task"
 #   RUNTIME_FLAGS
 #     "--task_topology_group_count=3"
 # )
 
-# CPU, Dylib, 1 through 4 threads, big/little-core, full-inference.
+# CPU, LLVM, local-task, 1 through 4 threads, big/little-core, full-inference.
 # NOTE: this is not enabling any SIMD extension beyond baseline Aarch64.
 # At the moment we use that for fp32 models. We would change that when new
 # devices support relevant fp32 SIMD extensions beyond that (e.g. f32mm).
@@ -417,7 +417,7 @@ iree_benchmark_suite(
     "4-thread,big-core,full-inference,experimental-flags"
     # "4-thread,little-core,full-inference,experimental-flags"
   TARGET_BACKEND
-    "dylib-llvm-aot"
+    "llvm-cpu"
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
   COMPILATION_FLAGS
@@ -427,14 +427,14 @@ iree_benchmark_suite(
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
-    "iree-dylib"
+    "iree-llvm-cpu"
   DRIVER
     "local-task"
   RUNTIME_FLAGS
     "--task_topology_group_count=4"
 )
 
-# CPU, Dylib-Sync, big/little-core, full-inference, +dotprod
+# CPU, LLVM, local-sync, big/little-core, full-inference, +dotprod
 # NOTE: +dotprod is only relevant to int8, not fp32.
 # TODO: add a +i8mm variant, supported by new devices already. No rush: our i8mm
 # kernel is currently naive, not ready for benchmarking.
@@ -449,7 +449,7 @@ iree_benchmark_suite(
     "4-thread,big-core,full-inference,experimental-flags"
     # "4-thread,little-core,full-inference,experimental-flags"
   TARGET_BACKEND
-    "dylib-llvm-aot"
+    "llvm-cpu"
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
   COMPILATION_FLAGS
@@ -460,7 +460,7 @@ iree_benchmark_suite(
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
-    "iree-dylib"
+    "iree-llvm-cpu"
   DRIVER
     "local-task"
   RUNTIME_FLAGS
