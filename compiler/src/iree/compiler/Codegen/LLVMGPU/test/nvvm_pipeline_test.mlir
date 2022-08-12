@@ -505,22 +505,22 @@ hal.executable @mma_fused {
 //          MMASYNC:   llvm.br
 //          MMASYNC:   nvvm.cp.async.wait.group 3
 //  MMASYNC-COUNT-4:   nvvm.ldmatrix{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32)
-//  MMASYNC-COUNT-8:   nvvm.mma.sync
+//  MMASYNC-COUNT-8:   nvgpu.mma.sync
 //  MMASYNC-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
 //          MMASYNC:   nvvm.cp.async.commit.group
 //          MMASYNC:   llvm.br
 //          MMASYNC:   nvvm.cp.async.wait.group 3
 //  MMASYNC-COUNT-4:   nvvm.ldmatrix{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32)
-//  MMASYNC-COUNT-8:   nvvm.mma.sync
+//  MMASYNC-COUNT-8:   nvgpu.mma.sync
 //          MMASYNC:   nvvm.cp.async.wait.group 2
 //  MMASYNC-COUNT-4:   nvvm.ldmatrix{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32)
-//  MMASYNC-COUNT-8:   nvvm.mma.sync
+//  MMASYNC-COUNT-8:   nvgpu.mma.sync
 //          MMASYNC:   nvvm.cp.async.wait.group 1
 //  MMASYNC-COUNT-4:   nvvm.ldmatrix{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32)
-//  MMASYNC-COUNT-8:   nvvm.mma.sync
+//  MMASYNC-COUNT-8:   nvgpu.mma.sync
 //          MMASYNC:   nvvm.cp.async.wait.group 0
 //  MMASYNC-COUNT-4:   nvvm.ldmatrix{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32)
-//  MMASYNC-COUNT-8:   nvvm.mma.sync
+//  MMASYNC-COUNT-8:   nvgpu.mma.sync
 //  MMASYNC-COUNT-4:   llvm.store {{.*}} : !llvm.ptr<vector<2xf32>, 3>
 //  MMASYNC-COUNT-2:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
 //  MMASYNC-COUNT-2:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
@@ -634,22 +634,22 @@ hal.executable @mma_fused_fp16 {
 //          MMASYNC:   llvm.br
 //          MMASYNC:   nvvm.cp.async.wait.group 3
 //  MMASYNC-COUNT-4:   nvvm.ldmatrix {{.*}} : (!llvm.ptr<f16, 3>) -> !llvm.struct<(i32, i32)>
-//  MMASYNC-COUNT-8:   nvvm.mma.sync
+//  MMASYNC-COUNT-8:   nvgpu.mma.sync
 //  MMASYNC-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
 //          MMASYNC:   nvvm.cp.async.commit.group
 //          MMASYNC:   llvm.br
 //          MMASYNC:   nvvm.cp.async.wait.group 3
 //  MMASYNC-COUNT-4:   nvvm.ldmatrix {{.*}} : (!llvm.ptr<f16, 3>) -> !llvm.struct<(i32, i32)>
-//  MMASYNC-COUNT-8:   nvvm.mma.sync
+//  MMASYNC-COUNT-8:   nvgpu.mma.sync
 //          MMASYNC:   nvvm.cp.async.wait.group 2
 //  MMASYNC-COUNT-4:   nvvm.ldmatrix {{.*}} : (!llvm.ptr<f16, 3>) -> !llvm.struct<(i32, i32)>
-//  MMASYNC-COUNT-8:   nvvm.mma.sync
+//  MMASYNC-COUNT-8:   nvgpu.mma.sync
 //          MMASYNC:   nvvm.cp.async.wait.group 1
 //  MMASYNC-COUNT-4:   nvvm.ldmatrix {{.*}} : (!llvm.ptr<f16, 3>) -> !llvm.struct<(i32, i32)>
-//  MMASYNC-COUNT-8:   nvvm.mma.sync
+//  MMASYNC-COUNT-8:   nvgpu.mma.sync
 //          MMASYNC:   nvvm.cp.async.wait.group 0
 //  MMASYNC-COUNT-4:   nvvm.ldmatrix {{.*}} : (!llvm.ptr<f16, 3>) -> !llvm.struct<(i32, i32)>
-//  MMASYNC-COUNT-8:   nvvm.mma.sync
+//  MMASYNC-COUNT-8:   nvgpu.mma.sync
 //  MMASYNC-COUNT-4:   llvm.store {{.*}} : !llvm.ptr<vector<2xf16>, 3>
 //          MMASYNC:   llvm.load {{.*}} : !llvm.ptr<vector<8xf16>, 3>
 //          MMASYNC:   llvm.store {{.*}} : !llvm.ptr<vector<8xf16>>
