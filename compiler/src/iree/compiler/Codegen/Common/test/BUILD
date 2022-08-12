@@ -38,6 +38,7 @@ iree_lit_test_suite(
             "swizzle_workgroup.mlir",
             "test_partitionable_loops_interface.mlir",
             "tile_and_distribute_to_workgroups.mlir",
+            "tile_and_distribute_to_workgroups_with_specialization.mlir",
             "transform_dialect_apply_pattern_op.mlir",
             "transpose_canonicalization.mlir",
             "type_propagation.mlir",

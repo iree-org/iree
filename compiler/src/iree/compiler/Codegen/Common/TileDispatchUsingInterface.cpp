@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Utils/GraphUtils.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
@@ -19,6 +20,7 @@
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
+#include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/TilingInterface.h"
@@ -27,6 +29,11 @@
 
 namespace mlir {
 namespace iree_compiler {
+
+static llvm::cl::opt<bool> clSpecializeWorkgroupDistribution(
+    "iree-codegen-specialize-workgroup-distribution",
+    llvm::cl::desc("Specialize workgroup distribution with tile size"),
+    llvm::cl::init(true));
 
 /// Method to check if a value is zero
 static bool isZero(Value val) {
@@ -126,7 +133,9 @@ static SmallVector<scf::ForOp> generateTileLoopNest(
     ArrayRef<Value> tileSizeVals,
     ArrayRef<linalg::DistributionMethod> distributionMethod,
     ArrayRef<linalg::ProcInfo> procInfo, SmallVector<OpFoldResult> &offsets,
-    SmallVector<OpFoldResult> &sizes) {
+    SmallVector<OpFoldResult> &sizes,
+    SmallVector<OpFoldResult> &boundedSizesForLoops,
+    SmallVector<Value> &tileSizesForLoops) {
   assert(!loopRanges.empty() && "expected at least one loop range");
   assert(loopRanges.size() == tileSizeVals.size() &&
          "expected as many tile sizes as loop ranges");
@@ -191,7 +200,10 @@ static SmallVector<scf::ForOp> generateTileLoopNest(
           builder.create<scf::YieldOp>(loc);
         });
     offsets[index] = loop.getInductionVar();
+    // keep the record of the loops and their bounded size and tile size
     loops.push_back(loop);
+    boundedSizesForLoops.push_back(sizes[index]);
+    tileSizesForLoops.push_back(tileSizeVals[index]);
     builder.setInsertionPoint(loop.getBody()->getTerminator());
   }
   return loops;
@@ -266,14 +278,237 @@ static LogicalResult replaceAllStoresWithTiledVersion(
 
 namespace {
 
-/// Result of the tiled operation.
+/// Result of the tiled operation. The resulted tiled loops may have a different
+/// number of loops of the input loop range. `loops`, `tileSizesForLoops`, and
+/// `boundedSizesForLoops` have the same size.
 struct TilingResult {
   Operation *tiledOp;
-  SmallVector<scf::ForOp> loops;
+  // BitVector for the tiled loops in the loop range
   llvm::SmallBitVector tiledLoops;
+  // offsets for the input loop range
   SmallVector<OpFoldResult> tileOffsets;
+  // tile sizes for the input loop range
   SmallVector<OpFoldResult> tileSizes;
+  // tile sizes requested for the input loop range
+  SmallVector<Value> requestedTileSizes;
+
+  // The result information
+  //
+  // tiled loops.
+  SmallVector<scf::ForOp> loops;
+  // tile sizes for the resulted loops
+  SmallVector<Value> tileSizesForLoops;
+  // bounded tile size for the resulted loops
+  SmallVector<OpFoldResult> boundedSizesForLoops;
+
+  void dump() {
+    llvm::dbgs() << "<TilingResult>\n"
+                 << "tiledOp =\n";
+    if (tiledOp) {
+      tiledOp->dump();
+      llvm::dbgs() << "\n";
+    } else {
+      llvm::dbgs() << "nullptr\n";
+    }
+
+    llvm::dbgs() << "\ntileOffsets:\n";
+    for (auto tileOffset : tileOffsets) {
+      tileOffset.dump();
+    }
+
+    llvm::dbgs() << "\ntileSizes:\n";
+    for (auto tileSize : tileSizes) {
+      tileSize.dump();
+    }
+
+    llvm::dbgs() << "\nrequestedTileSizes:\n";
+    for (auto size : requestedTileSizes) {
+      size.dump();
+    }
+
+    llvm::dbgs() << "# of loops = " << loops.size() << "\n";
+    if (!loops.empty()) {
+      loops[0].dump();
+    }
+
+    llvm::dbgs() << "\ntileSizesForLoops:\n";
+    for (auto size : tileSizesForLoops) {
+      size.dump();
+    }
+
+    llvm::dbgs() << "\nboundedSizesForLoops:\n";
+    for (auto size : boundedSizesForLoops) {
+      size.dump();
+    }
+    llvm::dbgs() << "</TilingResult>\n";
+  }
 };
+
+/// Get the integer tile sizes from the requestedTileSizes
+static FailureOr<SmallVector<int64_t>> getTileSizesAsInt64(
+    ArrayRef<Value> requestedTileSizes) {
+  SmallVector<int64_t> tileSizes;
+
+  for (auto val : requestedTileSizes) {
+    if (auto constIndexOp = val.getDefiningOp<arith::ConstantIndexOp>()) {
+      auto v = constIndexOp.value();
+      // When tiling is not defined, let's use 1 here.
+      tileSizes.push_back(v == 0 ? 1 : v);
+    } else {
+      return failure();
+    }
+  }
+  return tileSizes;
+}
+
+static SmallVector<AffineMinOp> collectTileSizeMinOps(
+    ArrayRef<OpFoldResult> tileSizes) {
+  SmallVector<AffineMinOp> res;
+
+  for (auto ofr : tileSizes) {
+    if (auto value = ofr.dyn_cast<Value>()) {
+      if (auto minOp = value.getDefiningOp<AffineMinOp>()) {
+        res.push_back(minOp);
+      } else {
+        res.push_back(AffineMinOp());
+      }
+    } else {
+      res.push_back(AffineMinOp());
+    }
+  }
+  return res;
+}
+
+static SmallVector<scf::ForOp> collectNestedLoops(scf::ForOp outerLoop) {
+  SmallVector<scf::ForOp> loops;
+
+  outerLoop.getOperation()->walk<WalkOrder::PreOrder>(
+      [&](scf::ForOp op) { loops.push_back(op); });
+
+  return loops;
+}
+
+// Specialize the tiled distribution loops with the main tile sizes.
+//
+// Inputs:
+//   - TilingResult including main distribution loops and other info
+//
+// Transformed output
+//   cond = (group_id_y != last) && (group_id_x != last)
+//   scf.if cond
+//     distribution loops with static shapes with the tile size
+//   else
+//     distribution loops with dynamic shapes with the tile size
+//
+// Steps:
+//   1. bail out if the loop bounds are already a multiple of the tile size.
+//   2. create a condition for scf.if
+//   3. clone the nested loops in the else block.
+//   4. update the bounded size ops of the original loop nest with the constant
+//      tile size.
+//   5. clone the updated loop nest in the then block.
+static LogicalResult specializeDistributionLoops(TilingResult &tilingResult,
+                                                 PatternRewriter &rewriter) {
+  auto &distLoops = tilingResult.loops;
+  auto tileSizes = getTileSizesAsInt64(tilingResult.tileSizesForLoops);
+  if (failed(tileSizes)) return failure();
+
+  assert(tileSizes->size() == distLoops.size());
+
+  // Check the eligilbility. Unsupported cases are:
+  //   1. Dynamic cases
+  //   2. UB < Tile size
+  //   3. UB == a multiple of the tile size
+  bool isAlreadyMultiple = true;
+  for (auto it : zip(distLoops, *tileSizes)) {
+    auto loop = std::get<0>(it);
+    auto ubOp = loop.getUpperBound().getDefiningOp<arith::ConstantIndexOp>();
+    if (!ubOp) {
+      // TODO: handle dynamic cases by adding more code to check the
+      // conditions.
+      return success();
+    }
+    auto ub = ubOp.value();
+    auto tileSize = std::get<1>(it);
+    if (ub % tileSize != 0) {
+      isAlreadyMultiple = false;
+    }
+    if (ub < tileSize) {
+      return success();
+    }
+  }
+
+  if (isAlreadyMultiple) return success();
+
+  auto minSizeOps = collectTileSizeMinOps(tilingResult.boundedSizesForLoops);
+
+  LLVM_DEBUG({ tilingResult.dump(); });
+
+  PatternRewriter::InsertionGuard guard(rewriter);
+  auto distLoop0 = distLoops[0];  // the outermost loop
+  auto loc = distLoop0.getLoc();
+  rewriter.setInsertionPoint(distLoop0);
+
+  // create a condition for scf.if
+  Value cond;
+  SmallVector<Value> constantOps;  // ConstantIndexOps for tile sizes
+  for (unsigned i = 0, e = distLoops.size(); i != e; ++i) {
+    auto tileSize = (*tileSizes)[i];
+    if (tileSize == 0 || tileSize == 1) {
+      constantOps.push_back(Value());
+      continue;
+    }
+
+    // clone the minSize op in the loop and place it before scf.if
+    auto minOp = minSizeOps[i];
+    auto distLoop = distLoops[i];
+    // clone the lower bound and put before the nested loops.
+    BlockAndValueMapping mapperForLB;
+    Operation *lb =
+        rewriter.clone(*distLoop.getLowerBound().getDefiningOp(), mapperForLB);
+
+    // Clone the affine min op for the dynamic size in the current loop and
+    // place it before the nested loops. The induction variable is replaced by
+    // the cloned lower-bound above.
+    BlockAndValueMapping mapperForIV;
+    auto iv = distLoop.getInductionVar();
+    mapperForIV.map(iv, lb->getResult(0));
+    Value size =
+        rewriter.clone(*minOp.getOperation(), mapperForIV)->getResult(0);
+
+    // Generate a compare op that checks the dynamic size is equal to the
+    // constant main tile size.
+    Value constant = rewriter.create<arith::ConstantIndexOp>(loc, tileSize);
+    constantOps.push_back(constant);
+    Value cmp = rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq,
+                                               size, constant);
+    cond = cond ? rewriter.create<arith::AndIOp>(loc, cond, cmp) : cmp;
+  }
+
+  // generate scf.if %cond then { scf.for ... } else { scf.for ... }
+  auto ifOp = rewriter.create<scf::IfOp>(loc, cond, /*withElseRegion=*/true);
+  ifOp.getElseBodyBuilder().clone(*distLoop0.getOperation());
+
+  // Specialize the size operations (affine min) in each for loop.
+  for (int i = 0, e = distLoops.size(); i != e; ++i) {
+    auto minOp = minSizeOps[i];
+    if (!minOp) {
+      assert((*tileSizes)[i] == 0 || (*tileSizes)[i] == 1);
+      continue;
+    }
+    LLVM_DEBUG({
+      llvm::dbgs() << "Replacing ";
+      minOp.dump();
+      llvm::dbgs() << "with ";
+      constantOps[i].dump();
+    });
+    rewriter.replaceOp(minOp, constantOps[i]);
+  }
+  ifOp.getThenBodyBuilder().clone(*distLoop0.getOperation());
+
+  rewriter.eraseOp(distLoop0);
+  return success();
+}
 
 /// Pattern to tile an op that implements the `TilingInterface` using
 /// `scf.for`+`flow.dispatch.tensor.load/store` for iterating over the tiles.
@@ -304,7 +539,15 @@ struct TileDispatchUsingSCFForOp
 
   LogicalResult matchAndRewrite(TilingInterface op,
                                 PatternRewriter &rewriter) const override {
-    return returningMatchAndRewrite(op, rewriter);
+    auto result = returningMatchAndRewrite(op, rewriter);
+    if (failed(result)) return failure();
+
+    if (clSpecializeWorkgroupDistribution) {
+      if (failed(specializeDistributionLoops(*result, rewriter)))
+        return failure();
+    }
+
+    return success();
   }
 
  private:
@@ -429,9 +672,10 @@ FailureOr<TilingResult> TileDispatchUsingSCFForOp::returningMatchAndRewrite(
     // 3. Materialize an empty loop nest that iterates over the tiles. These
     // loops for now do not return any values even if the original operation has
     // results.
-    tilingResult.loops =
-        generateTileLoopNest(rewriter, loc, iterationDomain, tileSizeVector,
-                             distributionMethods, procInfo, offsets, sizes);
+    tilingResult.loops = generateTileLoopNest(
+        rewriter, loc, iterationDomain, tileSizeVector, distributionMethods,
+        procInfo, offsets, sizes, tilingResult.boundedSizesForLoops,
+        tilingResult.tileSizesForLoops);
 
     if (!interchangeVector.empty()) {
       auto inversePermutation = invertPermutationVector(interchangeVector);
@@ -468,6 +712,7 @@ FailureOr<TilingResult> TileDispatchUsingSCFForOp::returningMatchAndRewrite(
     });
     std::swap(tilingResult.tileOffsets, offsets);
     std::swap(tilingResult.tileSizes, sizes);
+    std::swap(tilingResult.requestedTileSizes, tileSizeVector);
   }
 
   // Update the filter.
@@ -496,8 +741,8 @@ namespace {
 
 /// Result of tile and fuse operations.
 struct TileAndFuseResult {
-  SmallVector<Operation *> tiledAndFusedOps;
-  SmallVector<scf::ForOp> loops;
+  SmallVector<Operation *> tiledProducers;
+  FailureOr<TilingResult> tilingResult;
 };
 
 struct TileAndFuseDispatchUsingSCFForOp
@@ -523,7 +768,13 @@ struct TileAndFuseDispatchUsingSCFForOp
 
   LogicalResult matchAndRewrite(TilingInterface op,
                                 PatternRewriter &rewriter) const override {
-    return returningMatchAndRewrite(op, rewriter);
+    auto result = returningMatchAndRewrite(op, rewriter);
+    if (clSpecializeWorkgroupDistribution && succeeded(result) &&
+        !result->tilingResult->loops.empty()) {
+      return specializeDistributionLoops(*(result->tilingResult), rewriter);
+    }
+
+    return result;
   }
 
  private:
@@ -531,7 +782,7 @@ struct TileAndFuseDispatchUsingSCFForOp
 };
 }  // namespace
 
-/// Find all producers to fuse and return then in sorted order;
+/// Find all producers to fuse and return them in sorted order;
 static std::vector<Operation *> getAllFusableProducers(TilingInterface op) {
   llvm::SetVector<Operation *> producers;
   std::deque<Operation *> worklist;
@@ -578,17 +829,20 @@ TileAndFuseDispatchUsingSCFForOp::returningMatchAndRewrite(
   TileAndFuseResult tileAndFuseResult;
   std::vector<Operation *> fusableProducers = getAllFusableProducers(op);
   // Apply the tiling pattern.
-  FailureOr<TilingResult> tilingResult =
+  tileAndFuseResult.tilingResult =
       tilingPattern.returningMatchAndRewrite(op, rewriter);
-  if (failed(tilingResult)) {
+  if (failed(tileAndFuseResult.tilingResult)) {
     return failure();
   }
+
+  auto &tilingResult = *tileAndFuseResult.tilingResult;
+
   // If there is no tiling then there is nothing to do for fusion.
-  if (!tilingResult->tiledLoops.any()) {
+  if (!tilingResult.tiledLoops.any()) {
     return tileAndFuseResult;
   }
-  tileAndFuseResult.tiledAndFusedOps.push_back(tilingResult->tiledOp);
-  tileAndFuseResult.loops.append(tilingResult->loops);
+
+  SmallVector<Operation *> tiledOps{tilingResult.tiledOp};
 
   // Get all ops to tile and fuse.
   auto fusableProducersRef = llvm::makeArrayRef(fusableProducers);
@@ -599,8 +853,7 @@ TileAndFuseDispatchUsingSCFForOp::returningMatchAndRewrite(
     // Find a slice that is used to access the producer. Get all the slice ops.
     // It is assumed that the slice ops are returned in-order, so that you
     // could use the first slice as the insertion point.
-    auto sliceOps = getAllFusableProducerUses(
-        fusableProducer, tileAndFuseResult.tiledAndFusedOps);
+    auto sliceOps = getAllFusableProducerUses(fusableProducer, tiledOps);
     if (sliceOps.empty()) continue;
     tensor::ExtractSliceOp sliceOp = sliceOps.front();
     OpBuilder::InsertionGuard g(rewriter);
@@ -635,10 +888,10 @@ TileAndFuseDispatchUsingSCFForOp::returningMatchAndRewrite(
     SmallVector<Range> producerIterationDomain =
         fusableProducer.getIterationDomain(rewriter);
     for (auto range : llvm::enumerate(producerIterationDomain)) {
-      if (range.index() < tilingResult->tiledLoops.size() &&
-          tilingResult->tiledLoops.test(range.index())) {
-        producerOffset.push_back(tilingResult->tileOffsets[range.index()]);
-        producerSizes.push_back(tilingResult->tileSizes[range.index()]);
+      if (range.index() < tilingResult.tiledLoops.size() &&
+          tilingResult.tiledLoops.test(range.index())) {
+        producerOffset.push_back(tilingResult.tileOffsets[range.index()]);
+        producerSizes.push_back(tilingResult.tileSizes[range.index()]);
       } else {
         producerOffset.push_back(range.value().offset);
         producerSizes.push_back(range.value().size);
@@ -661,7 +914,8 @@ TileAndFuseDispatchUsingSCFForOp::returningMatchAndRewrite(
           sliceOp.getSource().cast<OpResult>().getResultNumber();
       rewriter.replaceOp(sliceOp, tiledProducer->getResult(resultNumber));
     }
-    tileAndFuseResult.tiledAndFusedOps.push_back(tiledProducer);
+    tiledOps.push_back(tiledProducer);
+    tileAndFuseResult.tiledProducers.push_back(tiledProducer);
   }
 
   return tileAndFuseResult;
