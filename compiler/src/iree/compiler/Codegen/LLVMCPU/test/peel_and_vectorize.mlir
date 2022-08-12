@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline='hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target))' -split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline='hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target))' --iree-codegen-specialize-workgroup-distribution=false -split-input-file %s | FileCheck %s
 
 // Test peeling + vectorization using CPUDoubleTilingPeelingExpert.
 
