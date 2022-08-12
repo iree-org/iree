@@ -55,33 +55,19 @@ jobs:
   should_run:
     runs-on: ubuntu-20.04
     env:
-      # The commit being checked out is the merge commit for the PR. Its first
-      # parent will be the tip of main.
-      BASE_REF: HEAD^
-      LABELS: join(${{ github.event.pull_request.labels.*.name }})
+      SHOULD_RUN: ${{ github.event_name != 'pull_request' || ! contains(github.event.pull_request.labels.*.name, 'skip-ci') }}
     outputs:
-      should-run: ${{ steps.should-run.outputs.should-run }}
+      should-run: ${{ env.SHOULD_RUN }}
     steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
-        with:
-          # We need the parent commit to do a diff
-          fetch-depth: 2
       - name: "Computing whether CI should run"
-        id: should-run
         run: |
-          git log --oneline --graph
-          ret=0
-          ./build_tools/github_actions/should_ci_run.py || ret=$?
-          if (( ret==0 )); then
-            echo "::set-output name=should-run::true"
-            exit 0
-          elif (( ret==2 )); then
-            echo "::set-output name=should-run::false"
-            exit 0
-          fi
-          exit "${ret}"
-
+          echo "EVENT_IS_PR=${{ github.event_name == 'pull_request' }}"
+          echo "SKIP_LABEL=${{ contains(github.event.pull_request.labels.*.name, 'skip-ci') }}"
+          echo LABELS:
+          cat <<EOF | jq -c
+            ${{ toJson(github.event.pull_request.labels.*.name) }}
+          EOF
+          echo "SHOULD_RUN=${SHOULD_RUN}"
 
   ################################### Basic ####################################
   # Jobs that build all of IREE "normally"
