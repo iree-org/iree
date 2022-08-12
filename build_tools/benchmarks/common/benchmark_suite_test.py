@@ -29,7 +29,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
                           model_tags=[],
                           bench_mode=["1-thread", "full-inference"],
                           target_arch="CPU-ARMv8",
-                          driver_info=IREE_DRIVERS_INFOS["iree-dylib"],
+                          driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu"],
                           benchmark_case_dir="case1",
                           benchmark_tool_name="tool")
     case2 = BenchmarkCase(model_name="deepnetv2",
@@ -43,7 +43,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
                           model_tags=["f32"],
                           bench_mode=["full-inference"],
                           target_arch="CPU-x86_64",
-                          driver_info=IREE_DRIVERS_INFOS["iree-dylib-sync"],
+                          driver_info=IREE_DRIVERS_INFOS["iree-llvm-cpu-sync"],
                           benchmark_case_dir="case3",
                           benchmark_tool_name="tool")
     suite = BenchmarkSuite({
@@ -104,7 +104,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
                                         model_tags=["f32"],
                                         bench_mode=["4-thread", "full"],
                                         target_arch="CPU-ARMv8",
-                                        config="iree-dylib",
+                                        config="iree-llvm-cpu",
                                         tool="run-cpu-bench")
       case2 = BenchmarkSuiteTest.__create_bench(pytorch_dir,
                                                 model_name="DeepNetv2",

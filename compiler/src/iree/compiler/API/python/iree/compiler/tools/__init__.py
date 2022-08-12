@@ -29,7 +29,7 @@ Example
   # There are many keyword options available.
   # See iree.compiler.CompilerOptions
   binary = iree.compiler.tools.compile_str(
-      SIMPLE_MUL_ASM, input_type="tosa", target_backends=["cpu"])
+      SIMPLE_MUL_ASM, input_type="tosa", target_backends=["llvm-cpu"])
 '''
 
 from .core import *

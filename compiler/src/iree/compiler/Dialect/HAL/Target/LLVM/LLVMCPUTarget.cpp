@@ -144,9 +144,7 @@ class LLVMCPUTargetBackend final : public TargetBackend {
     initConfiguration();
   }
 
-  std::string name() const override { return "llvm"; }
-
-  std::string deviceID() const override { return "cpu"; }
+  std::string name() const override { return "llvm-cpu"; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
     mlir::registerLLVMDialectTranslation(registry);
@@ -742,7 +740,7 @@ class LLVMCPUTargetBackend final : public TargetBackend {
               StringAttr::get(context, options_.targetCPUFeatures));
 
     return IREE::HAL::ExecutableTargetAttr::get(
-        context, StringAttr::get(context, "llvm"),
+        context, StringAttr::get(context, "llvm-cpu"),
         StringAttr::get(context, format), DictionaryAttr::get(context, config));
   }
 
@@ -843,21 +841,9 @@ void registerLLVMCPUTargetBackends(
     return std::make_shared<LLVMCPUTargetBackend>(queryOptions());
   };
 
-  // Preferred name.
+  // #hal.device.target<"llvm-cpu", ...
   // #hal.executable.target<"llvm-cpu", ...
-  static TargetBackendRegistration registration0("llvm-cpu", backendFactory);
-
-  // Abbreviated names.
-  // #hal.device.target<"cpu", ...
-  static TargetBackendRegistration registration1("cpu", backendFactory);
-  // #hal.executable.target<"llvm", ...
-  static TargetBackendRegistration registration2("llvm", backendFactory);
-
-  // Legacy names.
-  // TODO(benvanik): remove legacy dylib name.
-  static TargetBackendRegistration registration3("dylib", backendFactory);
-  static TargetBackendRegistration registration4("dylib-llvm-aot",
-                                                 backendFactory);
+  static TargetBackendRegistration registration("llvm-cpu", backendFactory);
 }
 
 }  // namespace HAL

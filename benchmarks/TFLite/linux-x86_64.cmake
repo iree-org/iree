@@ -22,7 +22,7 @@ set(LINUX_X86_64_CASCADELAKE_CPU_COMPILATION_FLAGS
   "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
 )
 
-# CPU, Dylib-Sync, x86_64, full-inference
+# CPU, LLVM, local-sync, x86_64, full-inference
 iree_benchmark_suite(
   GROUP_NAME
     "linux-x86_64"
@@ -41,7 +41,7 @@ iree_benchmark_suite(
   BENCHMARK_MODES
     "full-inference,default-flags"
   TARGET_BACKEND
-    "dylib-llvm-aot"
+    "llvm-cpu"
   TARGET_ARCHITECTURE
     "CPU-x86_64-CascadeLake"
   COMPILATION_FLAGS
@@ -49,12 +49,12 @@ iree_benchmark_suite(
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
-    "iree-dylib-sync"
+    "iree-llvm-cpu-sync"
   DRIVER
     "local-sync"
 )
 
-# CPU, Dylib, 1 thread, x86_64, full-inference
+# CPU, LLVM, local-task, 1 thread, x86_64, full-inference
 iree_benchmark_suite(
   GROUP_NAME
     "linux-x86_64"
@@ -73,7 +73,7 @@ iree_benchmark_suite(
   BENCHMARK_MODES
     "1-thread,full-inference,default-flags"
   TARGET_BACKEND
-    "dylib-llvm-aot"
+    "llvm-cpu"
   TARGET_ARCHITECTURE
     "CPU-x86_64-CascadeLake"
   COMPILATION_FLAGS
@@ -81,14 +81,14 @@ iree_benchmark_suite(
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
-    "iree-dylib"
+    "iree-llvm-cpu"
   DRIVER
     "local-task"
   RUNTIME_FLAGS
     "--task_topology_group_count=1"
 )
 
-# CPU, Dylib, 4 threads, x86_64, full-inference
+# CPU, LLVM, local-task, 4 threads, x86_64, full-inference
 iree_benchmark_suite(
   GROUP_NAME
     "linux-x86_64"
@@ -107,7 +107,7 @@ iree_benchmark_suite(
   BENCHMARK_MODES
     "4-thread,full-inference,default-flags"
   TARGET_BACKEND
-    "dylib-llvm-aot"
+    "llvm-cpu"
   TARGET_ARCHITECTURE
     "CPU-x86_64-CascadeLake"
   COMPILATION_FLAGS
@@ -115,14 +115,14 @@ iree_benchmark_suite(
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
-    "iree-dylib"
+    "iree-llvm-cpu"
   DRIVER
     "local-task"
   RUNTIME_FLAGS
     "--task_topology_group_count=4"
 )
 
-# CPU, Dylib, 8 threads, x86_64, full-inference
+# CPU, LLVM, local-task, 8 threads, x86_64, full-inference
 iree_benchmark_suite(
   GROUP_NAME
     "linux-x86_64"
@@ -141,7 +141,7 @@ iree_benchmark_suite(
   BENCHMARK_MODES
     "8-thread,full-inference,default-flags"
   TARGET_BACKEND
-    "dylib-llvm-aot"
+    "llvm-cpu"
   TARGET_ARCHITECTURE
     "CPU-x86_64-CascadeLake"
   COMPILATION_FLAGS
@@ -149,7 +149,7 @@ iree_benchmark_suite(
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
-    "iree-dylib"
+    "iree-llvm-cpu"
   DRIVER
     "local-task"
   RUNTIME_FLAGS

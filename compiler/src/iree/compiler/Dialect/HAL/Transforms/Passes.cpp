@@ -241,6 +241,16 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   buildHALTransformPassPipeline(passManager, targetOptions, transformOptions);
 }
 
+void registerHALConfigurationPassPipeline() {
+  PassPipelineRegistration<>("iree-hal-configuration-pipeline",
+                             "Runs the IREE HAL dialect configuration pipeline",
+                             [](OpPassManager &passManager) {
+                               buildHALConfigurationPassPipeline(
+                                   passManager,
+                                   TargetOptions::FromFlags::get());
+                             });
+}
+
 void registerHALTransformPassPipeline() {
   PassPipelineRegistration<TransformOptions>(
       "iree-hal-transformation-pipeline",

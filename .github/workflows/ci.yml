@@ -55,19 +55,33 @@ jobs:
   should_run:
     runs-on: ubuntu-20.04
     env:
-      SHOULD_RUN: ${{ github.event_name != 'pull_request' || ! contains(github.event.pull_request.labels.*.name, 'skip-ci') }}
+      # The commit being checked out is the merge commit for the PR. Its first
+      # parent will be the tip of main.
+      BASE_REF: HEAD^
+      LABELS: join(${{ github.event.pull_request.labels.*.name }})
     outputs:
-      should-run: ${{ env.SHOULD_RUN }}
+      should-run: ${{ steps.should-run.outputs.should-run }}
     steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
+        with:
+          # We need the parent commit to do a diff
+          fetch-depth: 2
       - name: "Computing whether CI should run"
+        id: should-run
         run: |
-          echo "EVENT_IS_PR=${{ github.event_name == 'pull_request' }}"
-          echo "SKIP_LABEL=${{ contains(github.event.pull_request.labels.*.name, 'skip-ci') }}"
-          echo LABELS:
-          cat <<EOF | jq -c
-            ${{ toJson(github.event.pull_request.labels.*.name) }}
-          EOF
-          echo "SHOULD_RUN=${SHOULD_RUN}"
+          git log --oneline --graph
+          ret=0
+          ./build_tools/github_actions/should_ci_run.py || ret=$?
+          if (( ret==0 )); then
+            echo "::set-output name=should-run::true"
+            exit 0
+          elif (( ret==2 )); then
+            echo "::set-output name=should-run::false"
+            exit 0
+          fi
+          exit "${ret}"
+
 
   ################################### Basic ####################################
   # Jobs that build all of IREE "normally"
@@ -184,7 +198,9 @@ jobs:
 
   test_gpu:
     needs: [should_run, build_all]
-    if: needs.should_run.outputs.should-run == 'true'
+    # TODO(gcmn): There is something wrong with the GPU MIG. The machines keep
+    # immediately shutting down.
+    if: false && needs.should_run.outputs.should-run == 'true'
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
@@ -381,7 +397,9 @@ jobs:
 
   test_tf_integrations_gpu:
     needs: [should_run, build_tf_integrations, build_all]
-    if: needs.should_run.outputs.should-run == 'true'
+    # TODO(gcmn): There is something wrong with the GPU MIG. The machines keep
+    # immediately shutting down.
+    if: false && needs.should_run.outputs.should-run == 'true'
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted

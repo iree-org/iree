@@ -3,8 +3,8 @@
 // Tests dumping executable benchmarks to stdout - it's more common to use files
 // but this is much easier to test with lit.
 
-#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm", "embedded-elf-x86_64">
-#device_target_cpu = #hal.device.target<"cpu", {
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64">
+#device_target_cpu = #hal.device.target<"llvm-cpu", {
   executable_targets = [#executable_target_embedded_elf_x86_64_]
 }>
 #executable_layout_0 = #hal.executable.layout<push_constants = 2, sets = [
