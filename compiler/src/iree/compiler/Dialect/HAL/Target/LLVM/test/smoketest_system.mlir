@@ -5,9 +5,9 @@
 
 module attributes {
   hal.device.targets = [
-    #hal.device.target<"dylib", {
+    #hal.device.target<"llvm-cpu", {
       executable_targets = [
-        #hal.executable.target<"llvm", "embedded-elf-x86_64">
+        #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64">
       ]
     }>
   ]

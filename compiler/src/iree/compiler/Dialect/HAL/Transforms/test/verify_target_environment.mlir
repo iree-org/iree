@@ -42,7 +42,7 @@ module @module attributes {hal.device.targets = [#device_target_vmvx]} {
 
 // Modules without anything that needs an environment are OK.
 
-#executable_target = #hal.executable.target<"llvm", "embedded-elf-arm_64", {}>
+#executable_target = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {}>
 
 // CHECK: module @module
 module @module {

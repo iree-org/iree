@@ -3,10 +3,10 @@
 // Tests an executable with a workgroup count region specified.
 
 module attributes {hal.device.targets = [
-  #hal.device.target<"cpu", {
+  #hal.device.target<"llvm-cpu", {
     executable_targets = [
-      #hal.executable.target<"llvm", "embedded-elf-arm_64">,
-      #hal.executable.target<"llvm", "embedded-elf-x86_64">
+      #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64">,
+      #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64">
     ]
   }>
 ]} {
@@ -57,10 +57,10 @@ func.func @main(%arg0: !stream.resource<external>, %arg1: index) -> !stream.reso
 // themselves.
 
 module attributes {hal.device.targets = [
-  #hal.device.target<"cpu", {
+  #hal.device.target<"llvm-cpu", {
     executable_targets = [
-      #hal.executable.target<"llvm", "embedded-elf-arm_64">,
-      #hal.executable.target<"llvm", "embedded-elf-x86_64">
+      #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64">,
+      #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64">
     ]
   }>
 ]} {

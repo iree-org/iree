@@ -9,7 +9,7 @@
     #hal.descriptor_set.binding<3, storage_buffer>
   ]>
 ]>
-#executable_target_embedded_elf_arm_64_ = #hal.executable.target<"llvm", "embedded-elf-arm_64", {
+#executable_target_embedded_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 16 : index,
   target_triple = "aarch64-unknown-unknown-eabi-elf"
@@ -106,7 +106,7 @@ hal.executable private @matmul_tensors {
     #hal.descriptor_set.binding<2, storage_buffer>
   ]>
 ]>
-#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm", "embedded-elf-x86_64", {
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 16 : index,
   target_triple = "x86_64-unknown-linux-gnu"
@@ -180,7 +180,7 @@ hal.executable private @add {
     #hal.descriptor_set.binding<3, storage_buffer>
   ]>
 ]>
-#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm", "embedded-elf-x86_64", {
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 16 : index,
   target_triple = "x86_64-unknown-linux-gnu"}>
@@ -255,7 +255,7 @@ hal.executable private @add4D {
     #hal.descriptor_set.binding<2, storage_buffer>
   ]>
 ]>
-#executable_target_embedded_elf_arm_64_ = #hal.executable.target<"llvm", "embedded-elf-arm_64", {
+#executable_target_embedded_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 16 : index,
   target_triple = "aarch64-unknown-unknown-eabi-elf"}>
@@ -325,7 +325,7 @@ hal.executable private @batch_matmul_tensors {
     #hal.descriptor_set.binding<2, storage_buffer>
   ]>
 ]>
-#executable_target_system_elf_x86_64_ = #hal.executable.target<"llvm", "system-elf-x86_64">
+#executable_target_system_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "system-elf-x86_64">
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 hal.executable private @preset_config_matmul_tensors {
   hal.executable.variant public @system_elf_x86_64, target = #executable_target_system_elf_x86_64_ {
@@ -392,7 +392,7 @@ hal.executable private @preset_config_matmul_tensors {
     #hal.descriptor_set.binding<1, storage_buffer>
   ]>
 ]>
-#executable_target_system_elf_x86_64_ = #hal.executable.target<"llvm", "system-elf-x86_64">
+#executable_target_system_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "system-elf-x86_64">
 #translation = #iree_codegen.translation_info<CPUBufferOpsTileAndVectorize>
 hal.executable public @copy_op {
   hal.executable.variant public @system_elf_x86_64, target = #executable_target_system_elf_x86_64_ {
@@ -486,7 +486,7 @@ hal.executable public @copy_op {
     #hal.descriptor_set.binding<1, storage_buffer>
   ]>
 ]>
-#executable_target_system_elf_x86_64_ = #hal.executable.target<"llvm", "system-elf-x86_64">
+#executable_target_system_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "system-elf-x86_64">
 #translation = #iree_codegen.translation_info<CPUDefault>
 hal.executable private @static_1d_fft_stage2 {
   hal.executable.variant public @system_elf_x86_64, target = #executable_target_system_elf_x86_64_ {
@@ -544,7 +544,7 @@ hal.executable private @static_1d_fft_stage2 {
     #hal.descriptor_set.binding<1, storage_buffer>
   ]>
 ]>
-#executable_target_system_elf_x86_64_ = #hal.executable.target<"llvm", "system-elf-x86_64">
+#executable_target_system_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "system-elf-x86_64">
 #translation = #iree_codegen.translation_info<CPUDefault>
 hal.executable private @static_3d_fft_stage3 {
   hal.executable.variant public @system_elf_x86_64, target = #executable_target_system_elf_x86_64_ {
@@ -601,7 +601,7 @@ hal.executable private @static_3d_fft_stage3 {
     #hal.descriptor_set.binding<2, storage_buffer>
   ]>
 ]>
-#executable_target_system_elf_x86_64_ = #hal.executable.target<"llvm", "system-elf-x86_64">
+#executable_target_system_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "system-elf-x86_64">
 #map0 = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map2 = affine_map<(d0, d1, d2) -> (d2, d1)>
@@ -683,7 +683,7 @@ hal.executable private @outs_fusion {
     #hal.descriptor_set.binding<2, storage_buffer>
   ]>
 ]>
-#executable_target_system_elf_x86_64_ = #hal.executable.target<"llvm", "system-elf-x86_64", {
+#executable_target_system_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "system-elf-x86_64", {
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 16 : index,
   target_triple = "x86_64-unknown-linux-gnu"}>
@@ -764,7 +764,7 @@ hal.executable private @conv {
     #hal.descriptor_set.binding<2, storage_buffer>
   ]>
 ]>
-#executable_target_system_elf_x86_64_ = #hal.executable.target<"llvm", "system-elf-x86_64", {
+#executable_target_system_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "system-elf-x86_64", {
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 16 : index,
   target_triple = "x86_64-unknown-linux-gnu"}>
@@ -838,7 +838,7 @@ hal.executable private @conv_static {
     #hal.descriptor_set.binding<1, storage_buffer>
   ]>
 ]>
-#executable_target_system_elf_x86_64_ = #hal.executable.target<"llvm", "system-elf-x86_64", {
+#executable_target_system_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "system-elf-x86_64", {
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 64 : index,
   target_triple = "x86_64-pc-linux-gnu"}>
@@ -903,7 +903,7 @@ hal.executable private @generic_static {
     #hal.descriptor_set.binding<2, storage_buffer>
   ]>
 ]>
-#executable_target_system_elf_arm_64_ = #hal.executable.target<"llvm", "system-elf-arm_64", {
+#executable_target_system_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "system-elf-arm_64", {
   data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128",
   native_vector_size = 16 : index,
   target_triple = "aarch64-none-linux-android30"}>
@@ -964,7 +964,7 @@ hal.executable private @matmul_static {
     #hal.descriptor_set.binding<2, storage_buffer>
   ]>
 ]>
-#executable_target_system_elf_arm_64_ = #hal.executable.target<"llvm", "system-elf-arm_64", {
+#executable_target_system_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "system-elf-arm_64", {
   data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128",
   native_vector_size = 16 : index,
   target_triple = "aarch64-none-linux-android30"}>
@@ -1027,7 +1027,7 @@ hal.executable private @restrict_num_workgroups {
     #hal.descriptor_set.binding<2, storage_buffer>
   ]>
 ]>
-#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm", "embedded-elf-x86_64", {
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 16 : index,
   target_triple = "x86_64-unknown-unknown-eabi-elf"}>
@@ -1102,7 +1102,7 @@ hal.executable private @reduction {
     #hal.descriptor_set.binding<2, storage_buffer>
   ]>
 ]>
-#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm", "embedded-elf-x86_64", {
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 16 : index,
   target_triple = "x86_64-unknown-unknown-eabi-elf"}>
@@ -1173,7 +1173,7 @@ hal.executable private @gemm_unit_N {
     #hal.descriptor_set.binding<2, storage_buffer>
   ]>
 ]>
-#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm", "embedded-elf-x86_64", {
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 16 : index,
   target_triple = "x86_64-unknown-unknown-eabi-elf"}>
@@ -1235,7 +1235,7 @@ hal.executable private @gemm_unit_M_unit_N {
     #hal.descriptor_set.binding<2, storage_buffer>
   ]>
 ]>
-#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm", "embedded-elf-x86_64", {
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 16 : index,
   target_triple = "x86_64-unknown-linux-gnu"}>
@@ -1310,7 +1310,7 @@ hal.executable private @generic_unit_dims {
     #hal.descriptor_set.binding<2, storage_buffer>
   ]>
 ]>
-#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm", "embedded-elf-x86_64", {
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 16 : index,
   target_triple = "x86_64-unknown-linux-gnu"}>
@@ -1370,7 +1370,7 @@ hal.executable private @reduce_to_scalar {
     #hal.descriptor_set.binding<2, storage_buffer>
   ]>
 ]>
-#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm", "embedded-elf-x86_64", {
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 16 : index,
   target_triple = "x86_64-unknown-linux-gnu"}>
@@ -1427,7 +1427,7 @@ hal.executable private @scalar {
     #hal.descriptor_set.binding<1, storage_buffer>
   ]>
 ]>
-#executable_target_embedded_elf_arm_64_ = #hal.executable.target<"llvm", "embedded-elf-arm_64", {
+#executable_target_embedded_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 16 : index,
   target_triple = "aarch64-unknown-unknown-eabi-elf"
@@ -1496,7 +1496,7 @@ hal.executable private @rank_reduced_slice {
     #hal.descriptor_set.binding<3, storage_buffer>
   ]>
 ]>
-#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm", "embedded-elf-x86_64", {
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 16 : index,
   target_triple = "x86_64-unknown-linux-gnu"}>
@@ -1558,7 +1558,7 @@ hal.executable private @matmul_interchange {
 // -----
 
 hal.executable private @no_compute {
-  hal.executable.variant public @embedded_elf_x86_64, target = <"llvm", "embedded-elf-x86_64", {}> {
+  hal.executable.variant public @embedded_elf_x86_64, target = <"llvm-cpu", "embedded-elf-x86_64", {}> {
     hal.executable.export public @no_compute ordinal(0) layout(#hal.executable.layout<push_constants = 5, sets = [<0, bindings = [<0, storage_buffer>, <1, storage_buffer>]>]>) attributes {translation_info = #iree_codegen.translation_info<CPUDefault>} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3

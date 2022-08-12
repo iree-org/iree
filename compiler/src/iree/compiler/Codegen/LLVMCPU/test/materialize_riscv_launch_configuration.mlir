@@ -9,7 +9,7 @@
 ]>
 hal.executable private @matmul_riscv  {
   hal.executable.variant public @embedded_elf_x86_64, target = #hal.executable.target<
-    "llvm",
+    "llvm-cpu",
     "embedded-elf-riscv_32", {
       cpu_features = "+m,+f",
       data_layout = "e-m:e-p:32:32-i64:64-n32-S128",

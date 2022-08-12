@@ -10,7 +10,7 @@
 #map3 = affine_map<(d0) -> (d0)>
 #map4 = affine_map<(d0, d1) -> (d0)>
 #map5 = affine_map<(d0, d1) -> (d0, d1)>
-#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm", "embedded-elf-x86_64", {
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {
   cpu_features = "",
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 16 : index,
@@ -80,7 +80,7 @@ hal.executable private @check_no_cse {
   ]>
 ]>
 hal.executable private @preset_config_matmul  {
-  hal.executable.variant @system_elf_x86_64, target = <"llvm", "system-elf-x86_64"> {
+  hal.executable.variant @system_elf_x86_64, target = <"llvm-cpu", "system-elf-x86_64"> {
     hal.executable.export @preset_config_matmul layout(#executable_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
@@ -119,7 +119,7 @@ hal.executable private @preset_config_matmul  {
 
 // -----
 
-#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm", "embedded-elf-x86_64", {
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {
   cpu_features = "",
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 16 : index,
@@ -172,7 +172,7 @@ hal.executable private @batch_matmul_dynamic {
 
 // -----
 
-#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm", "embedded-elf-x86_64", {
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {
   cpu_features = "",
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
   native_vector_size = 16 : index,
@@ -217,7 +217,7 @@ hal.executable private @check_buffer_ops_vectorization {
 
 hal.executable private @vectorize_fill_conv2d_generic {
   hal.executable.variant public @embedded_elf_x86_64, target = #hal.executable.target<
-    "llvm", "embedded-elf-x86_64", {
+    "llvm-cpu", "embedded-elf-x86_64", {
       cpu_features = "",
       data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
       native_vector_size = 16 : index,
