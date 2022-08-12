@@ -76,9 +76,11 @@ class DeviceSpec(object):
   vendor_name: str
   architecture: DeviceArchitecture
   platform: DevicePlatform
-  # Device-specific configurations. E.g., big-cores. Benchmark machines use
-  # these configs to set up the devices.
-  configs: List[str]
+  # Device-specific parameters. E.g., 2-big-cores, 4-little-cores.
+  # This is for modeling the spec of a heterogeneous processor. Depending on
+  # which cores you run, the device has a different spec. Benchmark machines use
+  # these parameters to set up the devices. E.g. set CPU mask.
+  device_parameters: List[str]
 
 
 @dataclass(frozen=True)
