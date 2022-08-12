@@ -48,7 +48,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  BUCKET: gs://iree-github-actions-${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}-artifacts
+  GCS_DIR: gs://iree-github-actions-${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}-artifacts/${{ github.run_id }}/${{ github.run_attempt }}
 
 # Jobs are organized into groups and topologically sorted by dependencies
 jobs:
@@ -133,7 +133,7 @@ jobs:
       - name: "Uploading build dir archive"
         id: upload
         env:
-          GCS_ARTIFACT: ${{ env.BUCKET }}/${{ github.sha }}/${{ steps.archive.outputs.build-dir-archive }}
+          GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.build-dir-archive }}
           BUILD_DIR_ARCHIVE: ${{ steps.archive.outputs.build-dir-archive }}
         run: |
           gcloud alpha storage cp "${BUILD_DIR_ARCHIVE}" "${GCS_ARTIFACT}"
@@ -348,7 +348,7 @@ jobs:
       - name: "Uploading binaries archive"
         id: upload
         env:
-          GCS_ARTIFACT: ${{ env.BUCKET }}/${{ github.sha }}/${{ steps.archive.outputs.binaries-archive }}
+          GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.binaries-archive }}
           BINARIES_ARCHIVE: ${{ steps.archive.outputs.binaries-archive }}
         run: |
           gcloud alpha storage cp "${BINARIES_ARCHIVE}" "${GCS_ARTIFACT}"
