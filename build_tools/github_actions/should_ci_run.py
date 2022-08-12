@@ -54,7 +54,7 @@ def get_modified_paths(base_ref):
                         stdout=subprocess.PIPE,
                         check=True,
                         text=True,
-                        timeout=20).stdout.splitlines()
+                        timeout=60).stdout.splitlines()
 
 
 def modifies_included_path(base_ref):
@@ -75,7 +75,13 @@ def should_run_ci():
     print(f"Not running CI because PR has label '{SKIP_CI_LABEL}'.")
     return False
 
-  if not modifies_included_path(base_ref):
+  try:
+    modifies = modifies_included_path(base_ref)
+  except TimeoutError as e:
+    print("Computing modified files timed out. Running the CI")
+    return True
+
+  if not modifies:
     print("Skipping CI because all modified files are marked as excluded.")
     return False
 
