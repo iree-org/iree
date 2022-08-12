@@ -843,21 +843,9 @@ void registerLLVMCPUTargetBackends(
     return std::make_shared<LLVMCPUTargetBackend>(queryOptions());
   };
 
-  // Preferred name.
+  // #hal.device.target<"llvm-cpu", ...
   // #hal.executable.target<"llvm-cpu", ...
-  static TargetBackendRegistration registration0("llvm-cpu", backendFactory);
-
-  // Abbreviated names.
-  // #hal.device.target<"cpu", ...
-  static TargetBackendRegistration registration1("cpu", backendFactory);
-  // #hal.executable.target<"llvm", ...
-  static TargetBackendRegistration registration2("llvm", backendFactory);
-
-  // Legacy names.
-  // TODO(benvanik): remove legacy dylib name.
-  static TargetBackendRegistration registration3("dylib", backendFactory);
-  static TargetBackendRegistration registration4("dylib-llvm-aot",
-                                                 backendFactory);
+  static TargetBackendRegistration registration("llvm-cpu", backendFactory);
 }
 
 }  // namespace HAL
