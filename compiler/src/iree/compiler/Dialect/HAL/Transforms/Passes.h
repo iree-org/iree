@@ -45,6 +45,7 @@ void buildHALConfigurationPassPipeline(OpPassManager &passManager,
                                        const TargetOptions &targetOptions);
 
 void registerHALTransformPassPipeline();
+void registerHALConfigurationPassPipeline();
 
 //===----------------------------------------------------------------------===//
 // Conversion
@@ -164,6 +165,7 @@ std::unique_ptr<OperationPass<func::FuncOp>> createBenchmarkBatchDispatchesPass(
 
 inline void registerHALPasses() {
   registerHALTransformPassPipeline();
+  registerHALConfigurationPassPipeline();
   auto targetOptions = TargetOptions::FromFlags::get();
   createAssignTargetDevicesPass({});
   createBenchmarkBatchDispatchesPass(/*repeatCount=*/1);
