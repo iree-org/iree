@@ -479,7 +479,7 @@ func.func @three_init_tensor_uses() {
   %c1638400 = arith.constant 1638400 : index
   %c0 = arith.constant 0 : index
   %cst = arith.constant 3.40282347E+38 : f32
-  %cst_0 = arith.constant opaque<"elided_large_const", "0xDEADBEEF"> : tensor<64xf32>
+  %cst_0 = arith.constant dense_resource<__elided__> : tensor<64xf32>
   %cst_1 = arith.constant 0.000000e+00 : f32
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:6400x64xf32>
   %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c1638400) alignment(32) : !flow.dispatch.tensor<readonly:64x64xf32>
