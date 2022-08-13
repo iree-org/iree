@@ -334,7 +334,7 @@ def Util_UnfoldableConstantOp : Util_Op<"unfoldable_constant"> {
     std.constant wrapped in an util.do_not_optimize.
   }];
 
-  let arguments = (ins TypedAttrInterface:$value);
+  let arguments = (ins AnyAttr:$value);
   let results = (outs AnyType);
 
   let builders = [
