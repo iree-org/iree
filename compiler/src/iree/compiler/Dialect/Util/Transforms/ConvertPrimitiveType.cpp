@@ -63,19 +63,23 @@ struct PrimitiveTypeConverter : public TypeConverter {
 };
 
 // Returns |oldAttr| converted to its new type via |typeConverter|, if needed.
-static Attribute convertAttribute(Location loc, TypedAttr oldAttr,
+static Attribute convertAttribute(Location loc, Attribute oldAttr,
                                   TypeConverter &typeConverter) {
   // Type attributes get their nested type converted.
   if (auto oldTypeAttr = oldAttr.dyn_cast<TypeAttr>()) {
     return TypeAttr::get(typeConverter.convertType(oldTypeAttr.getValue()));
   }
 
-  // Convert the attribute type - if it's the same then it's already legal.
-  auto oldType = oldAttr.getType();
-  auto newType = typeConverter.convertType(oldType);
-  if (oldType == newType) return oldAttr;
+  // Return the same attribute if it doesn't have a type.
+  auto typedOldAttr = oldAttr.dyn_cast<TypedAttr>();
+  if (!typedOldAttr) return oldAttr;
 
-  if (auto intAttr = oldAttr.dyn_cast<IntegerAttr>()) {
+  // Convert the attribute type - if it's the same then it's already legal.
+  auto oldType = typedOldAttr.getType();
+  auto newType = typeConverter.convertType(oldType);
+  if (oldType == newType) return typedOldAttr;
+
+  if (auto intAttr = typedOldAttr.dyn_cast<IntegerAttr>()) {
     APInt value = intAttr.getValue();
     if (newType.isSignedInteger()) {
       value = value.truncSSat(newType.getIntOrFloatBitWidth());
@@ -85,21 +89,21 @@ static Attribute convertAttribute(Location loc, TypedAttr oldAttr,
       value = value.trunc(newType.getIntOrFloatBitWidth());
     }
     return IntegerAttr::get(newType, value);
-  } else if (auto floatAttr = oldAttr.dyn_cast<FloatAttr>()) {
+  } else if (auto floatAttr = typedOldAttr.dyn_cast<FloatAttr>()) {
     auto newFloatType = newType.cast<FloatType>();
     APFloat value = floatAttr.getValue();
     bool losesInfo = false;
     value.convert(newFloatType.getFloatSemantics(), APFloat::rmTowardZero,
                   &losesInfo);
     return FloatAttr::get(newType, value);
-  } else if (auto splatAttr = oldAttr.dyn_cast<SplatElementsAttr>()) {
+  } else if (auto splatAttr = typedOldAttr.dyn_cast<SplatElementsAttr>()) {
     // NOTE: splats are also dense but this way we avoid needing to convert the
     // same splat value N times.
     return SplatElementsAttr::get(
         newType.cast<ShapedType>(),
         convertAttribute(loc, splatAttr.getSplatValue<Attribute>(),
                          typeConverter));
-  } else if (auto denseAttr = oldAttr.dyn_cast<DenseIntElementsAttr>()) {
+  } else if (auto denseAttr = typedOldAttr.dyn_cast<DenseIntElementsAttr>()) {
     auto newElementType = newType.cast<ShapedType>().getElementType();
     auto newElementBitWidth = newElementType.getIntOrFloatBitWidth();
     if (newElementType.isSignedInteger()) {
@@ -115,7 +119,7 @@ static Attribute convertAttribute(Location loc, TypedAttr oldAttr,
         return src.trunc(newElementBitWidth);
       });
     }
-  } else if (auto denseAttr = oldAttr.dyn_cast<DenseFPElementsAttr>()) {
+  } else if (auto denseAttr = typedOldAttr.dyn_cast<DenseFPElementsAttr>()) {
     auto newElementType =
         newType.cast<ShapedType>().getElementType().cast<FloatType>();
     const auto &newFloatSemantics = newElementType.getFloatSemantics();
