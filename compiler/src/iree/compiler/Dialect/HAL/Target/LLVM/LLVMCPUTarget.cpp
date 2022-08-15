@@ -196,7 +196,7 @@ class LLVMCPUTargetBackend final : public TargetBackend {
 
     // Create our new "linked" hal.executable.
     std::string linkedExecutableName =
-        llvm::formatv("{0}_linked_{1}", moduleName, name());
+        llvm::formatv("{0}_linked_{1}", moduleName, "llvm_cpu");
     auto linkedExecutableOp = builder.create<IREE::HAL::ExecutableOp>(
         moduleOp.getLoc(), linkedExecutableName);
     linkedExecutableOp.setVisibility(
