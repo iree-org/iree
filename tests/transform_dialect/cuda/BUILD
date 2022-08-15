@@ -6,11 +6,21 @@
 
 # Tests for end-to-end IREE support of entire models or their close derivatives.
 
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content")
 load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 
 package(
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
+)
+
+iree_cmake_extra_content(
+    content = """
+if(NOT IREE_HAL_DRIVER_CUDA OR NOT IREE_TARGET_BACKEND_CUDA)
+  return()
+endif()
+""",
+    inline = True,
 )
 
 iree_lit_test_suite(
