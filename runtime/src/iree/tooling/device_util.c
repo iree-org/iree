@@ -104,10 +104,19 @@ static iree_status_t iree_hal_flags_list_driver_device(
 
 static iree_status_t iree_hal_flags_list_driver_devices(
     iree_hal_driver_registry_t* driver_registry, iree_string_view_t driver_name,
-    iree_allocator_t host_allocator, FILE* file) {
+    iree_allocator_t host_allocator, bool fail_on_driver_error, FILE* file) {
   iree_hal_driver_t* driver = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_driver_registry_try_create(
-      driver_registry, driver_name, host_allocator, &driver));
+  iree_status_t driver_status = iree_hal_driver_registry_try_create(
+      driver_registry, driver_name, host_allocator, &driver);
+  if (!iree_status_is_ok(driver_status) && fail_on_driver_error) {
+    // Driver could not be created (not found, unavailable, etc) and user asked
+    // for it explicitly and should be notified.
+    return driver_status;
+  } else if (!iree_status_is_ok(driver_status)) {
+    // Driver could not be created so there are no devices to list.
+    iree_status_ignore(driver_status);
+    return iree_ok_status();
+  }
 
   iree_host_size_t device_info_count = 0;
   iree_hal_device_info_t* device_infos = NULL;
@@ -122,7 +131,7 @@ static iree_status_t iree_hal_flags_list_driver_devices(
 
   iree_allocator_free(host_allocator, device_infos);
   iree_hal_driver_release(driver);
-  return iree_ok_status();
+  return status;
 }
 
 static iree_status_t iree_hal_flags_list_devices(iree_string_view_t flag_name,
@@ -141,13 +150,15 @@ static iree_status_t iree_hal_flags_list_devices(iree_string_view_t flag_name,
     for (iree_host_size_t i = 0; i < driver_info_count; ++i) {
       const iree_hal_driver_info_t* driver_info = &driver_infos[i];
       IREE_RETURN_IF_ERROR(iree_hal_flags_list_driver_devices(
-          driver_registry, driver_info->driver_name, host_allocator, stdout));
+          driver_registry, driver_info->driver_name, host_allocator,
+          /*fail_on_driver_error=*/false, stdout));
     }
     iree_allocator_free(host_allocator, driver_infos);
   } else {
     // List all devices from a particular driver.
     IREE_RETURN_IF_ERROR(iree_hal_flags_list_driver_devices(
-        driver_registry, value, host_allocator, stdout));
+        driver_registry, value, host_allocator, /*fail_on_driver_error=*/true,
+        stdout));
   }
 
   exit(0);
@@ -192,7 +203,7 @@ static iree_status_t iree_hal_flags_dump_driver_device(
 
 static iree_status_t iree_hal_flags_dump_driver_devices(
     iree_hal_driver_registry_t* driver_registry, iree_string_view_t driver_name,
-    iree_allocator_t host_allocator, FILE* file) {
+    iree_allocator_t host_allocator, bool fail_on_driver_error, FILE* file) {
   iree_hal_flags_print_action_header();
   fprintf(stdout, "# Enumerated devices for driver '%.*s'\n",
           (int)driver_name.size, driver_name.data);
@@ -200,8 +211,17 @@ static iree_status_t iree_hal_flags_dump_driver_devices(
   fprintf(stdout, "\n");
 
   iree_hal_driver_t* driver = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_driver_registry_try_create(
-      driver_registry, driver_name, host_allocator, &driver));
+  iree_status_t driver_status = iree_hal_driver_registry_try_create(
+      driver_registry, driver_name, host_allocator, &driver);
+  if (!iree_status_is_ok(driver_status) && fail_on_driver_error) {
+    // Driver could not be created (not found, unavailable, etc) and user asked
+    // for it explicitly and should be notified.
+    return driver_status;
+  } else if (!iree_status_is_ok(driver_status)) {
+    // Driver could not be created so there are no devices to list.
+    iree_status_ignore(driver_status);
+    return iree_ok_status();
+  }
 
   iree_host_size_t device_info_count = 0;
   iree_hal_device_info_t* device_infos = NULL;
@@ -216,7 +236,7 @@ static iree_status_t iree_hal_flags_dump_driver_devices(
 
   iree_allocator_free(host_allocator, device_infos);
   iree_hal_driver_release(driver);
-  return iree_ok_status();
+  return status;
 }
 
 static iree_status_t iree_hal_flags_dump_devices(iree_string_view_t flag_name,
@@ -236,13 +256,15 @@ static iree_status_t iree_hal_flags_dump_devices(iree_string_view_t flag_name,
       if (i) fprintf(stdout, "\n");
       const iree_hal_driver_info_t* driver_info = &driver_infos[i];
       IREE_RETURN_IF_ERROR(iree_hal_flags_dump_driver_devices(
-          driver_registry, driver_info->driver_name, host_allocator, stdout));
+          driver_registry, driver_info->driver_name, host_allocator,
+          /*fail_on_driver_error=*/false, stdout));
     }
     iree_allocator_free(host_allocator, driver_infos);
   } else {
     // List all devices from a particular driver.
     IREE_RETURN_IF_ERROR(iree_hal_flags_dump_driver_devices(
-        driver_registry, value, host_allocator, stdout));
+        driver_registry, value, host_allocator, /*fail_on_driver_error=*/true,
+        stdout));
   }
 
   exit(0);
