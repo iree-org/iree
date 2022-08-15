@@ -201,7 +201,7 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
   ///
   /// TODO(hanchung): Add a pattern for legalizing mhlo.scatter to canonical
   /// form to MHLOToMHLOPreprocessingPass.
-    static bool hasCanonicalDimensionNumbers(mhlo::ScatterOp op) {
+  static bool hasCanonicalDimensionNumbers(mhlo::ScatterOp op) {
     auto dimNumbers = op.scatter_dimension_numbers();
     auto indicesType = op.scatter_indices().getType().cast<ShapedType>();
     auto indicesRank = indicesType.getRank();
@@ -344,6 +344,7 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
     signatureConverter.addInputs(1, argType);
     signatureConverter.addInputs(0, argType);
     rewriter.applySignatureConversion(&region, signatureConverter);
+
     rewriter.replaceOp(op, scatterOp->getResults());
     return success();
   }
