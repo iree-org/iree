@@ -16,10 +16,12 @@ iree_cc_library(
   SRCS
     "LowerLinalgMicrokernels.cpp"
   DEPS
+    LLVMSupport
     MLIRArithmeticDialect
     MLIRBufferizationDialect
     MLIRIR
     MLIRLinalgDialect
+    MLIRMathDialect
     MLIRMemRefDialect
     MLIRPass
     MLIRTransforms

@@ -27,8 +27,7 @@ func.func @resolve_binding_subspan_zero_offset() -> (!util.buffer, index, index,
   // CHECK-DAG: %[[C384:.*]] = arith.constant 384 : index
   // CHECK-DAG: %[[C1:.*]] = arith.constant 1 : index
   // CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
-  //     CHECK: %[[BINDING:.*]] = hal.interface.binding.subspan
-  //     CHECK: %[[CAST:.*]] = builtin.unrealized_conversion_cast %[[BINDING]] : memref<512x384xf32> to !util.buffer
+  //     CHECK: %[[CAST:.*]] = vmvx.get_raw_interface_binding_buffer set(0) binding(0)
   //     CHECK: return %[[CAST]], %[[C0]], %[[C512]], %[[C384]], %[[C384]], %[[C1]]
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : memref<512x384xf32>
@@ -45,8 +44,7 @@ func.func @resolve_binding_subspan_offset_index(%arg0 : index) -> (!util.buffer,
   // CHECK-DAG: %[[C1:.*]] = arith.constant 1 : index
   // CHECK-DAG: %[[INDEX_SIZE:.*]] = util.sizeof index
   // CHECK-DAG: %[[OFFSET:.*]] = arith.divui %arg0, %[[INDEX_SIZE]] : index
-  // CHECK-DAG: %[[BINDING:.*]] = hal.interface.binding.subspan
-  // CHECK-DAG: %[[CAST:.*]] = builtin.unrealized_conversion_cast %[[BINDING]] : memref<512x384xindex> to !util.buffer
+  //     CHECK: %[[CAST:.*]] = vmvx.get_raw_interface_binding_buffer set(0) binding(0)
   //     CHECK: return %[[CAST]], %[[OFFSET]], %[[C512]], %[[C384]], %[[C384]], %[[C1]]
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%arg0) alignment(64) : memref<512x384xindex>
   %base_buffer, %offset, %sizes:2, %strides:2 = vmvx.get_buffer_descriptor %0 : memref<512x384xindex> -> !util.buffer, index, index, index, index, index
@@ -58,7 +56,7 @@ func.func @resolve_binding_subspan_offset_index(%arg0 : index) -> (!util.buffer,
 // CHECK-LABEL: @resolve_binding_subspan_dyn_dims
 func.func @resolve_binding_subspan_dyn_dims(%arg0 : index, %arg1 : index) -> (!util.buffer, index, index, index, index, index) {
   // CHECK-DAG: %[[C1:.*]] = arith.constant 1 : index
-  // CHECK-DAG: %[[CAST:.*]] = builtin.unrealized_conversion_cast
+  //     CHECK: %[[CAST:.*]] = vmvx.get_raw_interface_binding_buffer set(0) binding(0)
   //     CHECK: return %[[CAST]], %{{.*}}, %arg0, %arg1, %arg1, %[[C1]]
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : memref<?x?xindex>{%arg0, %arg1}
