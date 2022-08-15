@@ -887,9 +887,9 @@ class MMTKernelGenerator {
     // Extract result vectors from the asm op.
     SmallVector<Value> resVec;
     for (int i = 0; i < kernel.accRegs; ++i) {
-      resVec.push_back(rewriter.create<LLVM::ExtractValueOp>(
-          loc, getAccRegVectorType(), asmOp.getRes(),
-          rewriter.getI64ArrayAttr({i})));
+      SmallVector<int64_t, 1> position = {i};
+      resVec.push_back(
+          rewriter.create<LLVM::ExtractValueOp>(loc, asmOp.getRes(), position));
     }
     return resVec;
   }
