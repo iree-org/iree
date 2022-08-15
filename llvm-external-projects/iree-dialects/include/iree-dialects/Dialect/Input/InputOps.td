@@ -8,9 +8,10 @@
 #define IREE_DIALECTS_DIALECT_INPUT_OPS_TD
 
 include "iree-dialects/Dialect/Input/InputDialect.td"
+include "mlir/IR/BuiltinAttributeInterfaces.td"
+include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
-include "mlir/IR/SymbolInterfaces.td"
 
 def IREEInput_NullOp : IREEInput_PureOp<"null"> {
   let summary = "a null value";
@@ -79,7 +80,7 @@ def IREEInput_GlobalOp : IREEInput_Op<"global", [
     TypeAttr:$type,
     UnitAttr:$is_mutable,
     OptionalAttr<FlatSymbolRefAttr>:$initializer,
-    OptionalAttr<AnyAttr>:$initial_value
+    OptionalAttr<TypedAttrInterface>:$initial_value
   );
 
   let assemblyFormat = [{
@@ -96,7 +97,7 @@ def IREEInput_GlobalOp : IREEInput_Op<"global", [
       "StringRef":$name,
       "bool":$isMutable,
       "Type":$type,
-      "Optional<Attribute>":$initialValue,
+      "Optional<TypedAttr>":$initialValue,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
     )>,
     OpBuilder<(ins

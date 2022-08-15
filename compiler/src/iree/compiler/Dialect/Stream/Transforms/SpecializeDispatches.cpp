@@ -41,7 +41,7 @@ struct ConstantSet {
   // Locations of all constants that went into the table.
   SetVector<Location> locs;
   // Operand index -> all values from dispatch sites.
-  SmallVector<std::pair<unsigned, SmallVector<Attribute>>> values;
+  SmallVector<std::pair<unsigned, SmallVector<TypedAttr>>> values;
 };
 
 struct ConstantTable {
@@ -92,7 +92,7 @@ static ConstantTable buildConstantTable(
       set.type = operandType;
       typeOrder.push_back(operandType);
     }
-    SmallVector<Attribute> values;
+    SmallVector<TypedAttr> values;
     for (auto dispatchOp : dispatchOps) {
       auto operand = dispatchOp.getUniformOperands()[idx];
       Attribute constantValue;

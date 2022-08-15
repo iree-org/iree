@@ -868,7 +868,7 @@ struct TensorConstantToSplat : public OpRewritePattern<TensorConstantOp> {
           "only constant splat attrs can be converted to splat ops");
     }
 
-    auto splatElementAttr = splatAttr.getSplatValue<Attribute>();
+    auto splatElementAttr = splatAttr.getSplatValue<TypedAttr>();
     auto splatValue = rewriter.create<arith::ConstantOp>(
         constantOp.getLoc(), splatElementAttr.getType(), splatElementAttr);
     auto resultType = IREE::Stream::ResourceType::get(constantOp.getContext());
@@ -1202,7 +1202,7 @@ struct ConvertSplatConstantsIntoSplats
     if (!value.isSplat()) return failure();
 
     auto splatElementAttr =
-        value.dyn_cast<SplatElementsAttr>().getSplatValue<Attribute>();
+        value.dyn_cast<SplatElementsAttr>().getSplatValue<TypedAttr>();
     auto splatValue = rewriter.create<arith::ConstantOp>(
         constantOp.getLoc(), splatElementAttr.getType(), splatElementAttr);
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncSplatOp>(

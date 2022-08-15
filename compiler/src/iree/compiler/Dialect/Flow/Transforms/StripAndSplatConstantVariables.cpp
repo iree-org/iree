@@ -55,7 +55,7 @@ class StripAndSplatConstantVariablesPass
 
       auto tensorType = op.getType().cast<TensorType>();
       auto elementType = tensorType.getElementType();
-      DenseElementsAttr newValue;
+      TypedAttr newValue;
       if (elementType.isa<FloatType>()) {
         newValue = DenseElementsAttr::get(
             tensorType, FloatAttr::get(elementType, 1.0 / replaceIndex));

@@ -12,6 +12,7 @@
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
+#include "mlir/Dialect/NVGPU/Transforms/Transforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir {
@@ -241,10 +242,26 @@ struct LLVMGPUVectorToGPUPass
     populatePrepareVectorToMMAPatterns(patterns, llvmgpuUseMMASync);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
 
-    if (llvmgpuUseMMASync)
+    if (llvmgpuUseMMASync) {
       (void)convertVectorToNVVMCompatibleMMASync(funcOp);
-    else
+
+      // TODO: Remove once populateMmaSyncF32ToTF32Patterns is fixed to not add
+      // attribute tf32 attributes to none f32 ops.
+      bool hasFP32mma = false;
+      funcOp.walk([&hasFP32mma](nvgpu::MmaSyncOp op) {
+        if (op.getType().cast<VectorType>().getElementType().isF32())
+          hasFP32mma = true;
+      });
+      if (hasFP32mma) {
+        // Use TF32 for float32 case for now.
+        RewritePatternSet patterns(funcOp.getContext());
+        nvgpu::populateMmaSyncF32ToTF32Patterns(
+            patterns, nvgpu::MmaSyncF32Lowering::TF32);
+        (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+      }
+    } else {
       convertVectorToMMAOps(funcOp);
+    }
     createAsyncGroups(funcOp);
   }
 };

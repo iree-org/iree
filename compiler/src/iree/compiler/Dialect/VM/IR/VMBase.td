@@ -219,8 +219,8 @@ def VM_GlobalOpInterface : OpInterface<"VMGlobalOp"> {
     }]>,
     InterfaceMethod<[{}], "StringRef", "getSymbolName", (ins)>,
     InterfaceMethod<[{}], "bool", "isMutable", (ins)>,
-    InterfaceMethod<[{}], "Optional<Attribute>", "getInitialValueUntyped", (ins)>,
-    InterfaceMethod<[{}], "void", "setInitialValue", (ins "Attribute":$value)>,
+    InterfaceMethod<[{}], "Optional<TypedAttr>", "getInitialValueUntyped", (ins)>,
+    InterfaceMethod<[{}], "void", "setInitialValue", (ins "TypedAttr":$value)>,
     InterfaceMethod<[{}], "IntegerAttr", "getOrdinalAttr", (ins)>,
     InterfaceMethod<[{}], "int", "getOrdinal", (ins), [{
       return $_self.getOrdinalAttr().getInt();

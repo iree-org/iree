@@ -10,6 +10,7 @@
 #include "iree/compiler/InputConversion/Common/PassDetail.h"
 #include "iree/compiler/InputConversion/Common/Passes.h"
 #include "mlir/Dialect/MLProgram/IR/MLProgram.h"
+#include "mlir/IR/BuiltinAttributeInterfaces.h"
 #include "mlir/IR/BuiltinDialect.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
@@ -71,9 +72,13 @@ class MLProgramGlobalOpPattern
       ConversionPatternRewriter &rewriter) const override {
     Type newType = typeConverter->convertType(srcOp.getType());
     if (!newType) return failure();
+    auto srcOpAttr = srcOp.getValue();
+    auto srcOpTypedAttr =
+        srcOpAttr.hasValue()
+            ? Optional<TypedAttr>(srcOpAttr.getValue().cast<TypedAttr>())
+            : llvm::None;
     auto globalOp = rewriter.replaceOpWithNewOp<IREE::Util::GlobalOp>(
-        srcOp, srcOp.getName(), srcOp.getIsMutable(), newType,
-        srcOp.getValue());
+        srcOp, srcOp.getName(), srcOp.getIsMutable(), newType, srcOpTypedAttr);
     globalOp.setVisibility(srcOp.getVisibility());
     return success();
   }

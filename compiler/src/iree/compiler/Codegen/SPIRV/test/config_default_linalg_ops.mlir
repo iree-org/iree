@@ -321,7 +321,7 @@ hal.executable @dwconv_elementwise {
     hal.executable.export public @dwconv_elementwise layout(#executable_layout)
     builtin.module  {
       func.func @dwconv_elementwise() {
-        %cst = arith.constant opaque<"_", "0xDEADBEEF"> : tensor<3x3x1x4xf32>
+        %cst = arith.constant dense_resource<__elided__> : tensor<3x3x1x4xf32>
         %cst_8 = arith.constant 1.001000e+00 : f32
         %cst_9 = arith.constant 0.000000e+00 : f32
         %c18 = arith.constant 18 : index
