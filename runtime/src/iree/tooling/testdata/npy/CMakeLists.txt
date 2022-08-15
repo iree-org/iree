@@ -25,6 +25,7 @@ iree_c_embed_data(
     "npy_files.h"
   IDENTIFIER
     "iree_numpy_npy_files"
+  TESTONLY
   FLATTEN
   PUBLIC
 )

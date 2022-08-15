@@ -14,7 +14,7 @@ package(
 
 iree_runtime_cc_library(
     name = "task_test",
-    testonly = 1,
+    testonly = True,
     hdrs = ["task_test.h"],
     deps = [
         "//runtime/src/iree/task",
@@ -24,7 +24,7 @@ iree_runtime_cc_library(
 
 iree_runtime_cc_library(
     name = "test_util",
-    testonly = 1,
+    testonly = True,
     hdrs = ["test_util.h"],
     deps = [
         "//runtime/src/iree/task",

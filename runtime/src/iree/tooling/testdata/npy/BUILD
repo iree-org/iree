@@ -14,6 +14,7 @@ package(
 
 c_embed_data(
     name = "npy",
+    testonly = True,
     srcs = [
         "array_shapes.npy",
         "array_types.npy",
