@@ -130,7 +130,8 @@ static llvm::SmallBitVector getDroppedDimsImpl(
 /// Helper function to create `AffineExpr` from `OpFoldResult`. If the
 /// `OpFoldResult` is a `Value`, creates a `AffineSymbolExpr` and appends it to
 /// `symbols`.
-static AffineExpr getAffineExpr(OpFoldResult ofr, SmallVector<OpFoldResult> &symbols) {
+static AffineExpr getAffineExpr(OpFoldResult ofr,
+                                SmallVector<OpFoldResult> &symbols) {
   if (auto attr = ofr.dyn_cast<Attribute>()) {
     return getAffineConstantExpr(attr.cast<IntegerAttr>().getInt(),
                                  attr.getContext());
