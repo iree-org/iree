@@ -9,6 +9,7 @@
 
 include "mlir/Dialect/PDL/IR/PDLTypes.td"
 include "mlir/Dialect/Transform/IR/TransformDialect.td"
+include "mlir/Dialect/Transform/IR/TransformEffects.td"
 include "mlir/Dialect/Transform/IR/TransformInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpBase.td"
@@ -45,6 +46,79 @@ def ForeachThreadToFlowDispatchWorkgroupsOp : Op<Transform_Dialect, "iree.foreac
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::scf::ForeachThreadOp target,
         ::llvm::SmallVectorImpl<::mlir::Operation *> &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
+def WrapInDispatchRegionOp : Op<
+    Transform_Dialect, "iree.wrap_in_dispatch_region",
+    [FunctionalStyleTransformOpTrait, MemoryEffectsOpInterface,
+     TransformOpInterface, TransformEachOpTrait]> {
+  let description = [{
+    Wrap the `target` op in a new `dispatch.region` op. All uses of target op
+    are replaces with the results of the newly generated `dispach.region` op.
+
+    #### Return modes
+
+    This transform consumes the `target` handle and produces the `transformed`
+    handle (i.e., the `dispatch.region` op).
+  }];
+
+  let arguments = (ins PDL_Operation:$target);
+  let results = (outs PDL_Operation:$transformed);
+
+  let assemblyFormat = "$target attr-dict";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::Operation *target,
+        ::llvm::SmallVectorImpl<::mlir::Operation *> &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
+def ClonePrecedingOpIntoDispatchRegionOp : Op<
+    Transform_Dialect, "iree.clone_preceding_op_into_dispatch_region",
+    [TransformOpInterface]> {
+  let description = [{
+    Clone the `target` op into the given dispatch region op. The dispatch region
+    handle must be mapped to exactly one payload op.
+
+    All uses of the target inside of the dispatch region are replaced with the
+    results of the cloned op.
+
+    If `update_uses_outside_of_region` is set, all uses outside of the dispatch
+    region are also replaced: The results of the cloned target op are yielded
+    from the dispatch region and used in all uses outside of the dispatch
+    region. The transform fails if there are uses that appear before the
+    dispatch region.
+
+
+
+    TODO: Support multiple payload ops for the `target` handle. In that case,
+    the targets must be sorted topologically before cloning them.
+
+    #### Return modes
+
+    This transform consumes both the `target` handle and the `dispatch_region`
+    handle. It produces a new handle to the extended dispatch region.
+  }];
+
+  let arguments = (ins Arg<PDL_Operation, "",
+                           [TransformMappingRead,
+                            TransformMappingFree]>:$target,
+                       Arg<PDL_Operation, "",
+                           [TransformMappingRead,
+                            TransformMappingFree]>:$dispatch_region,
+                       DefaultValuedAttr<BoolAttr, "false">:$update_uses_outside_of_region);
+  let results = (outs Res<PDL_Operation, "",
+                           [TransformMappingAlloc,
+                            TransformMappingWrite]>:$transformed);
+  let assemblyFormat = "$target `into` $dispatch_region attr-dict";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure apply(
+        ::mlir::transform::TransformResults &transformResults,
         ::mlir::transform::TransformState &state);
   }];
 }

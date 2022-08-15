@@ -3,8 +3,8 @@
 // Tests dumping executable sources to stdout - it's more common to use files
 // but this is much easier to test with lit.
 
-#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm", "embedded-elf-x86_64">
-#device_target_cpu = #hal.device.target<"cpu", {
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64">
+#device_target_cpu = #hal.device.target<"llvm-cpu", {
   executable_targets = [#executable_target_embedded_elf_x86_64_]
 }>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
@@ -20,7 +20,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
   // CHECK: hal.executable private @ex0
   hal.executable private @ex0 {
     // We expect local outputs with attributes inlined:
-    // CHECK-NEXT: hal.executable.variant {{.+}}, target = <"llvm"
+    // CHECK-NEXT: hal.executable.variant {{.+}}, target = <"llvm-cpu"
     hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
       hal.executable.export public @dispatch0 ordinal(0) layout(#executable_layout) attributes {
         translation_info = #iree_codegen.translation_info<CPUDefault workload_per_wg = [4]>

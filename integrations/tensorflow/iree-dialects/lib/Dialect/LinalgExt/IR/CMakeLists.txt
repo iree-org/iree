@@ -2,7 +2,6 @@ add_mlir_library(IREELinalgExtDialect
   LinalgExtDialect.cpp
   LinalgExtInterfaces.cpp
   LinalgExtOps.cpp
-  TiledOpInterface.cpp
 
   ADDITIONAL_HEADER_DIRS
   ${IREE_DIALECTS_SOURCE_DIR}/include
@@ -25,6 +24,7 @@ add_mlir_library(IREELinalgExtDialect
   MLIRSCFDialect
   MLIRFuncDialect
   MLIRTensorDialect
+  MLIRTilingInterface
   MLIRViewLikeInterface
 )
 

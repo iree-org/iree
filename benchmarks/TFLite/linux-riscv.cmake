@@ -36,7 +36,7 @@ set(LINUX_RV32_GENERIC_CPU_COMPILATION_FLAGS
   "--riscv-v-fixed-length-vector-lmul-max=8"
 )
 
-# CPU, Dylib-Sync, RV64-Generic, full-inference
+# CPU, LLVM, local-sync, RV64-Generic, full-inference
 iree_benchmark_suite(
   GROUP_NAME
     "linux-riscv"
@@ -45,11 +45,14 @@ iree_benchmark_suite(
     "${DEEPLABV3_FP32_MODULE}"
     "${MOBILEBERT_FP32_MODULE}"
     "${MOBILENET_V1_MODULE}"
+    "${MOBILEBERT_INT8_MODULE}"
+    "${PERSON_DETECT_INT8_MODULE}"
+    "${EFFICIENTNET_INT8_MODULE}"
 
   BENCHMARK_MODES
     "full-inference,default-flags"
   TARGET_BACKEND
-    "dylib-llvm-aot"
+    "llvm-cpu"
   TARGET_ARCHITECTURE
     "CPU-RV64-Generic"
   COMPILATION_FLAGS
@@ -57,12 +60,12 @@ iree_benchmark_suite(
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
-    "iree-dylib-sync"
+    "iree-llvm-cpu-sync"
   DRIVER
     "local-sync"
 )
 
-# CPU, Dylib-Sync, RV32-Generic, full-inference
+# CPU, LLVM, local-sync, RV32-Generic, full-inference
 # Note this target is for codegen only. Inference is only possible with
 # the cross-compiled runtime and an emulator.
 iree_benchmark_suite(
@@ -70,12 +73,14 @@ iree_benchmark_suite(
     "linux-riscv"
 
   MODULES
+    "${MOBILEBERT_INT8_MODULE}"
     "${PERSON_DETECT_INT8_MODULE}"
+    "${EFFICIENTNET_INT8_MODULE}"
 
   BENCHMARK_MODES
     "full-inference,default-flags"
   TARGET_BACKEND
-    "dylib-llvm-aot"
+    "llvm-cpu"
   TARGET_ARCHITECTURE
     "CPU-RV32-Generic"
   COMPILATION_FLAGS
@@ -83,7 +88,7 @@ iree_benchmark_suite(
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
-    "iree-dylib-sync"
+    "iree-llvm-cpu-sync"
   DRIVER
-    "dylib-sync"
+    "local-sync"
 )

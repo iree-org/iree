@@ -48,7 +48,7 @@ class VMFuncEncoder {
 
   // Encodes an integer or floating-point primitive attribute as a fixed byte
   // length based on bitwidth.
-  virtual LogicalResult encodePrimitiveAttr(Attribute value) = 0;
+  virtual LogicalResult encodePrimitiveAttr(TypedAttr value) = 0;
 
   // Encodes a variable-length integer or floating-point array attribute.
   virtual LogicalResult encodePrimitiveArrayAttr(DenseElementsAttr value) = 0;

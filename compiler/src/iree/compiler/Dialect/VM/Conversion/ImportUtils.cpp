@@ -196,7 +196,7 @@ Optional<SmallVector<Value, 4>> rewriteAttrToOperands(
     return allValues;
   }
 
-  emitError(loc) << "unsupported attribute encoding: " << attrValue.getType();
+  emitError(loc) << "unsupported attribute encoding: " << attrValue;
   return llvm::None;
 }
 

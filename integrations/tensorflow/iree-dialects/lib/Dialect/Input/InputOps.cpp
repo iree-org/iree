@@ -9,6 +9,7 @@
 #include "iree-dialects/Dialect/Input/InputDialect.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributeInterfaces.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/TypeUtilities.h"
@@ -53,7 +54,7 @@ static void printSymbolVisibility(OpAsmPrinter &p, Operation *op,
 // some.op : i32 = 42 : index
 
 static ParseResult parseTypeOrAttr(OpAsmParser &parser, TypeAttr &typeAttr,
-                                   Attribute &attr) {
+                                   TypedAttr &attr) {
   if (succeeded(parser.parseOptionalEqual())) {
     if (failed(parser.parseAttribute(attr))) {
       return parser.emitError(parser.getCurrentLocation())
@@ -80,7 +81,7 @@ static ParseResult parseTypeOrAttr(OpAsmParser &parser, TypeAttr &typeAttr,
 }
 
 static void printTypeOrAttr(OpAsmPrinter &p, Operation *op, TypeAttr type,
-                            Attribute attr) {
+                            TypedAttr attr) {
   if (!attr || attr.getType() != type.getValue()) {
     p << " : ";
     p.printAttribute(type);
@@ -97,7 +98,7 @@ static void printTypeOrAttr(OpAsmPrinter &p, Operation *op, TypeAttr type,
 
 void GlobalOp::build(OpBuilder &builder, OperationState &result, StringRef name,
                      bool isMutable, Type type,
-                     Optional<Attribute> initialValue,
+                     Optional<TypedAttr> initialValue,
                      ArrayRef<NamedAttribute> attrs) {
   result.addAttribute(SymbolTable::getSymbolAttrName(),
                       builder.getStringAttr(name));

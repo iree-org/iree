@@ -116,7 +116,7 @@ func.func @otherDescriptorSetLayoutLookup(%device : !hal.device) -> !hal.descrip
   ]>
 ]>
 
-module attributes {hal.device.targets = [#hal.device.target<"cpu">]} {
+module attributes {hal.device.targets = [#hal.device.target<"llvm-cpu">]} {
 
 // TODO(scotttodd): Test without depending on a specific HAL target? Or move to HAL/Target/*/test/?
 //   - If there is no matching hal.executable.variant then the executable will not be cached

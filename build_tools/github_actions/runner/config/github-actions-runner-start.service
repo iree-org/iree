@@ -1,0 +1,16 @@
+[Unit]
+Description=GitHub Actions Runner
+After=network.target
+
+[Service]
+User=runner
+Group=runner
+ExecStart=/home/runner/config/start.sh
+Restart=no
+KillMode=process
+KillSignal=SIGTERM
+TimeoutStopSec=5min
+ExecStopPost=sudo /usr/sbin/shutdown -P now
+
+[Install]
+WantedBy=multi-user.target

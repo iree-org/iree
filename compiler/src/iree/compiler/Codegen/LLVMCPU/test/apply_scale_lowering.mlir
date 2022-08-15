@@ -6,7 +6,7 @@
     #hal.descriptor_set.binding<1, storage_buffer>
   ]>
 ]>
-#executable_target_embedded_elf_riscv_64_ = #hal.executable.target<"llvm", "embedded-elf-riscv_64", {
+#executable_target_embedded_elf_riscv_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {
   cpu_features = "+m,+a,+f,+d,+c",
   data_layout = "e-m:e-p:64:64-i64:64-i128:128-n64-S128",
   native_vector_size = 256 : index,
@@ -54,7 +54,7 @@ hal.executable private @apply_scale_no_vector_feature {
     #hal.descriptor_set.binding<1, storage_buffer>
   ]>
 ]>
-#executable_target_embedded_elf_riscv_64_ = #hal.executable.target<"llvm", "embedded-elf-riscv_64", {
+#executable_target_embedded_elf_riscv_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {
   cpu_features = "+m,+a,+f,+d,+c,+v",
   data_layout = "e-m:e-p:64:64-i64:64-i128:128-n64-S128",
   native_vector_size = 256 : index,
@@ -100,7 +100,7 @@ hal.executable private @apply_scale_v {
     #hal.descriptor_set.binding<1, storage_buffer>
   ]>
 ]>
-#executable_target_embedded_elf_riscv_64_ = #hal.executable.target<"llvm", "embedded-elf-riscv_64", {
+#executable_target_embedded_elf_riscv_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {
   cpu_features = "+m,+a,+f,+d,+c,+zve64x",
   data_layout = "e-m:e-p:64:64-i64:64-i128:128-n64-S128",
   native_vector_size = 256 : index,
@@ -146,7 +146,7 @@ hal.executable private @apply_scale_zve64x {
     #hal.descriptor_set.binding<1, storage_buffer>
   ]>
 ]>
-#executable_target_embedded_elf_riscv_64_ = #hal.executable.target<"llvm", "embedded-elf-riscv_64", {
+#executable_target_embedded_elf_riscv_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {
   cpu_features = "+m,+a,+f,+d,+c,+zve32x",
   data_layout = "e-m:e-p:64:64-i64:64-i128:128-n64-S128",
   native_vector_size = 256 : index,
@@ -185,4 +185,3 @@ hal.executable private @apply_scale_zve32x {
 //       CHECK:   %[[MUL:.*]] = llvm.mul %{{.*}}, %{{.*}} : vector<2xi64>
 //  CHECK-NEXT:   %[[SHR:.*]] = llvm.lshr %{{.*}}, %{{.*}} : vector<2xi64>
 //  CHECK-NEXT:   llvm.trunc %[[SHR]] : vector<2xi64> to vector<2xi32>
-

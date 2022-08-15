@@ -18,9 +18,9 @@ func.func @binding_ptrs() {
   // CHECK: %[[STATE:.+]] = llvm.load %arg1 : !llvm.ptr<struct<[[DISPATCH_STATE_TYPE]]>>
   // CHECK: %[[BINDING_PTRS:.+]] = llvm.extractvalue %[[STATE]][10]
   // CHECK: %[[C1:.+]] = llvm.mlir.constant(1 : i64) : i64
-  // CHECK: %[[ARRAY_PTR:.+]] = llvm.getelementptr %[[BINDING_PTRS]][%[[C1]]] : (!llvm.ptr<ptr<i8>>, i64) -> !llvm.ptr<ptr<i8>>
+  // CHECK: %[[ARRAY_PTR:.+]] = llvm.getelementptr %[[BINDING_PTRS]][1] : (!llvm.ptr<ptr<i8>>) -> !llvm.ptr<ptr<i8>>
   // CHECK: %[[BASE_PTR_I8:.+]] = llvm.load %[[ARRAY_PTR]] : !llvm.ptr<ptr<i8>>
-  // CHECK: %[[BUFFER_I8:.+]] = llvm.getelementptr %[[BASE_PTR_I8]][%[[C72]]] : (!llvm.ptr<i8>, i64) -> !llvm.ptr<i8>
+  // CHECK: %[[BUFFER_I8:.+]] = llvm.getelementptr %[[BASE_PTR_I8]][72] : (!llvm.ptr<i8>) -> !llvm.ptr<i8>
   // CHECK: %[[BUFFER_F32:.+]] = llvm.bitcast %[[BUFFER_I8]] : !llvm.ptr<i8> to !llvm.ptr<f32>
   // CHECK: %[[DESC_A:.+]] = llvm.mlir.undef : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<2 x i64>, array<2 x i64>)>
   // CHECK: %[[DESC_B:.+]] = llvm.insertvalue %[[BUFFER_F32]], %[[DESC_A]][0]

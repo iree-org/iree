@@ -84,7 +84,6 @@ iree_cc_library(
     IREELinalgExtTransforms
     IREELinalgTransformDialect
     IREELinalgTransformDialectPasses
-    IREEPyDMDialect
     MLIRIR
     iree::compiler::Bindings::Native::Transforms
     iree::compiler::Bindings::TFLite::Transforms

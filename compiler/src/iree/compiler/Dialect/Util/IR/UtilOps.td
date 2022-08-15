@@ -10,6 +10,7 @@
 include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilTypes.td"
+include "mlir/IR/BuiltinAttributeInterfaces.td"
 include "mlir/IR/FunctionInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
@@ -337,7 +338,7 @@ def Util_UnfoldableConstantOp : Util_Op<"unfoldable_constant"> {
   let results = (outs AnyType);
 
   let builders = [
-    OpBuilder<(ins "Attribute":$value),
+    OpBuilder<(ins "TypedAttr":$value),
     [{ build($_builder, $_state, value.getType(), value); }]>];
 
   let hasCanonicalizer = 1;
@@ -453,7 +454,7 @@ def Util_GlobalOp : Util_Op<"global", [
     SymbolNameAttr:$sym_name,
     TypeAttr:$type,
     UnitAttr:$is_mutable,
-    OptionalAttr<AnyAttr>:$initial_value
+    OptionalAttr<TypedAttrInterface>:$initial_value
   );
 
   let assemblyFormat = [{
@@ -470,7 +471,14 @@ def Util_GlobalOp : Util_Op<"global", [
       "StringRef":$name,
       "bool":$isMutable,
       "Type":$type,
-      "Optional<Attribute>":$initialValue,
+      "TypedAttr":$initialValue,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
+    )>,
+    OpBuilder<(ins
+      "StringRef":$name,
+      "bool":$isMutable,
+      "Type":$type,
+      "Optional<TypedAttr>":$initialValue,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
     )>,
     OpBuilder<(ins

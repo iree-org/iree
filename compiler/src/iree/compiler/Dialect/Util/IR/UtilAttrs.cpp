@@ -346,13 +346,6 @@ CompositeAttr CompositeAttr::get(MLIRContext *context,
     if (auto serializableAttr =
             valueAttr.dyn_cast<SerializableAttrInterface>()) {
       calculatedLength += serializableAttr.getStorageSize();
-    } else if (auto opaqueAttr = valueAttr.dyn_cast<OpaqueElementsAttr>()) {
-      // Allow opaque attrs to be placed into composites ease debugging of IR
-      // that has had large attrs elided; these will fail to actually serialize
-      // but being able to run most passes with these unserializable attrs is
-      // useful.
-      calculatedLength += opaqueAttr.getNumElements() *
-                          opaqueAttr.getElementType().getIntOrFloatBitWidth();
     } else {
       return {};
     }
@@ -369,12 +362,8 @@ LogicalResult CompositeAttr::verify(
     if (auto serializableAttr =
             valueAttr.dyn_cast<SerializableAttrInterface>()) {
       calculatedLength += serializableAttr.getStorageSize();
-    } else if (auto opaqueAttr = valueAttr.dyn_cast<OpaqueElementsAttr>()) {
-      calculatedLength += opaqueAttr.getNumElements() *
-                          opaqueAttr.getElementType().getIntOrFloatBitWidth();
     } else {
-      return emitError() << "value is not serializable: "
-                         << valueAttr.getType();
+      return emitError() << "value is not serializable: " << valueAttr;
     }
   }
   if (calculatedLength != totalLength) {
@@ -464,7 +453,7 @@ LogicalResult CompositeAttr::serializeToStream(llvm::support::endianness endian,
     auto serializableAttr = valueAttr.dyn_cast<SerializableAttrInterface>();
     if (!serializableAttr) {
       llvm::errs() << "unable to serialize a non-serializable attribute: "
-                   << valueAttr.getType() << "\n";
+                   << valueAttr << "\n";
       return failure();
     }
     if (failed(serializableAttr.serializeToStream(endian, os))) {

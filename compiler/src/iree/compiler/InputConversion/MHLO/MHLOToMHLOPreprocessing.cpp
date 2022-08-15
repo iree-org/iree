@@ -738,6 +738,177 @@ class ReorderBroadcastInDimOpAndElementwiseOp
   }
 };
 
+// Identifies cases where a dense operation has inputs that come from widening
+// operations. For instance, a dot product widening from FP16 to FP32 is better
+// to have the casting operation fused into the dot operation. This decreases
+// the loading required during a dense computation.
+template <class Op>
+struct FuseWidenOperands : public OpRewritePattern<Op> {
+  using OpRewritePattern<Op>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(Op op,
+                                PatternRewriter &rewriter) const override {
+    llvm::SmallVector<Value> operands;
+    for (Value operand : op->getOperands()) {
+      auto convertOp =
+          dyn_cast_or_null<mhlo::ConvertOp>(operand.getDefiningOp());
+      if (convertOp) {
+        auto inputType = getElementTypeOrSelf(convertOp.operand().getType());
+        auto castedType = getElementTypeOrSelf(convertOp.getResult().getType());
+        bool isSameCast =
+            (inputType.isa<IntegerType>() && castedType.isa<IntegerType>()) ||
+            (inputType.isa<FloatType>() && castedType.isa<FloatType>());
+        if (isSameCast && inputType.getIntOrFloatBitWidth() <
+                              castedType.getIntOrFloatBitWidth()) {
+          operands.push_back(convertOp.getOperand());
+          continue;
+        }
+      }
+      operands.push_back(operand);
+    }
+
+    if (llvm::all_of(llvm::zip(operands, op->getOperands()), [](auto pair) {
+          return std::get<0>(pair) == std::get<1>(pair);
+        }))
+      return failure();
+
+    rewriter.replaceOpWithNewOp<Op>(op, op->getResultTypes(), operands,
+                                    op->getAttrs());
+    return success();
+  }
+};
+
+struct DotToMul : public OpRewritePattern<mhlo::DotOp> {
+  using OpRewritePattern<mhlo::DotOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mhlo::DotOp op,
+                                PatternRewriter &rewriter) const override {
+    auto lhs = op.lhs();
+    auto rhs = op.rhs();
+    auto lhsTy = lhs.getType().dyn_cast<RankedTensorType>();
+    auto rhsTy = rhs.getType().dyn_cast<RankedTensorType>();
+    auto resultTy = op.getType().cast<RankedTensorType>();
+
+    if (!lhsTy || !rhsTy) {
+      return rewriter.notifyMatchFailure(op, "lhs and rhs must be ranked");
+    }
+
+    if (lhsTy.getRank() != 2 || rhsTy.getRank() != 2) {
+      return rewriter.notifyMatchFailure(op, "lhs and rhs must be rank-2");
+    }
+
+    if (lhsTy.getDimSize(1) != 1) return failure();
+
+    // Dynamically compute the shape of the result of the DotOp by querying
+    // the 0-th dimensions, of the left, and the 1st dimension of the right.
+    // Concatenating them togething to make the final shape.
+    Value batchSize = rewriter.create<mhlo::GetDimensionSizeOp>(
+        op.getLoc(), RankedTensorType::get({1}, rewriter.getI32Type()), lhs,
+        rewriter.getI64IntegerAttr(0));
+
+    Value featureSize = rewriter.create<mhlo::GetDimensionSizeOp>(
+        op.getLoc(), RankedTensorType::get({1}, rewriter.getI32Type()), rhs,
+        rewriter.getI64IntegerAttr(1));
+
+    Value outSize = rewriter.create<mhlo::ConcatenateOp>(
+        op.getLoc(), RankedTensorType::get({2}, rewriter.getI32Type()),
+        ValueRange{batchSize, featureSize}, rewriter.getI64IntegerAttr(0));
+
+    lhs = rewriter.create<mhlo::DynamicBroadcastInDimOp>(
+        op.getLoc(), resultTy.clone(lhsTy.getElementType()), lhs, outSize,
+        rewriter.getI64TensorAttr({0, 1}));
+
+    rhs = rewriter.create<mhlo::DynamicBroadcastInDimOp>(
+        op.getLoc(), resultTy.clone(rhsTy.getElementType()), rhs, outSize,
+        rewriter.getI64TensorAttr({0, 1}));
+
+    auto computeETy = lhsTy.getElementType();
+    if (computeETy.getIntOrFloatBitWidth() < rhsTy.getElementTypeBitWidth())
+      computeETy = rhsTy.getElementType();
+    if (computeETy.getIntOrFloatBitWidth() < resultTy.getElementTypeBitWidth())
+      computeETy = resultTy.getElementType();
+
+    auto computeTy = resultTy.clone(computeETy);
+
+    rhs = rewriter.create<mhlo::ConvertOp>(op.getLoc(), computeTy, rhs);
+    lhs = rewriter.create<mhlo::ConvertOp>(op.getLoc(), computeTy, lhs);
+
+    auto result = rewriter.create<mhlo::MulOp>(
+        op.getLoc(), resultTy.clone(computeETy), lhs, rhs);
+    rewriter.replaceOpWithNewOp<mhlo::ConvertOp>(op, resultTy, result);
+    return success();
+  }
+};
+
+// Similar to DotIsMul, this finds the case where a canonical dot general
+// can be represented using a mul operation. This includes possibly making
+// an implicit cast explicit prior the mul.
+struct DotGeneralIsMul : public OpRewritePattern<mhlo::DotGeneralOp> {
+  using OpRewritePattern<mhlo::DotGeneralOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mhlo::DotGeneralOp op,
+                                PatternRewriter &rewriter) const override {
+    auto lhs = op.lhs();
+    auto rhs = op.rhs();
+    auto lhsTy = lhs.getType().dyn_cast<RankedTensorType>();
+    auto rhsTy = rhs.getType().dyn_cast<RankedTensorType>();
+    auto resultTy = op.getType().dyn_cast<RankedTensorType>();
+    ImplicitLocOpBuilder builder(op.getLoc(), rewriter);
+
+    if (!lhsTy || !rhsTy || !resultTy) return failure();
+
+    auto dNums = op.dot_dimension_numbers();
+    auto batchDimsL = dNums.getLhsBatchingDimensions();
+    auto batchDimsR = dNums.getRhsBatchingDimensions();
+    auto contractDimsL = dNums.getLhsContractingDimensions();
+    auto contractDimsR = dNums.getRhsContractingDimensions();
+
+    // Check there are canonical number of dimensions.
+    if (batchDimsL.size() != 1 || batchDimsR.size() != 1 ||
+        contractDimsL.size() != 1 || contractDimsR.size() != 1) {
+      return rewriter.notifyMatchFailure(
+          op, "Incorrect number of Dot Dimension Numbers");
+    }
+
+    // Check the dimensions are the valid members.
+    if (batchDimsL.front() != 0 || batchDimsR.front() != 0 ||
+        contractDimsL.front() != 2 || contractDimsR.front() != 1) {
+      return rewriter.notifyMatchFailure(op,
+                                         "Dot Dimension Numbers not canonical");
+    }
+
+    // Check that the contraction dimension is degenerate.
+    if (lhsTy.getDimSize(2) != 1 || rhsTy.getDimSize(1) != 1) {
+      return rewriter.notifyMatchFailure(op, "contraction dim not length-1");
+    }
+
+    // Determine the output size of the result.
+    auto r1i32Ty = RankedTensorType::get({1}, builder.getI32Type());
+    auto batchSize = builder.create<mhlo::GetDimensionSizeOp>(r1i32Ty, lhs, 0);
+    auto leftSize = builder.create<mhlo::GetDimensionSizeOp>(r1i32Ty, lhs, 1);
+    auto rightSize = builder.create<mhlo::GetDimensionSizeOp>(r1i32Ty, rhs, 2);
+    auto dynSize = builder.create<mhlo::ConcatenateOp>(
+        RankedTensorType::get({3}, builder.getI32Type()),
+        ValueRange{batchSize, leftSize, rightSize}, 0);
+
+    auto i64Iota = builder.getI64TensorAttr({0, 1, 2});
+    auto lhsBroadcastTy =
+        RankedTensorType::get(resultTy.getShape(), lhsTy.getElementType());
+    lhs = builder.createOrFold<mhlo::DynamicBroadcastInDimOp>(
+        lhsBroadcastTy, lhs, dynSize, i64Iota);
+
+    auto rhsBroadcastTy =
+        RankedTensorType::get(resultTy.getShape(), rhsTy.getElementType());
+    rhs = builder.createOrFold<mhlo::DynamicBroadcastInDimOp>(
+        rhsBroadcastTy, rhs, dynSize, i64Iota);
+
+    lhs = builder.createOrFold<mhlo::ConvertOp>(resultTy, lhs);
+    rhs = builder.createOrFold<mhlo::ConvertOp>(resultTy, rhs);
+    rewriter.replaceOpWithNewOp<mhlo::MulOp>(op, resultTy, lhs, rhs);
+    return success();
+  }
+};
+
 struct MHLOToMHLOPreprocessingPass
     : public MHLOToMHLOPreprocessingBase<MHLOToMHLOPreprocessingPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -774,6 +945,17 @@ struct MHLOToMHLOPreprocessingPass
     // dot_general canoncalization patterns.
     mhlo::populateGeneralDotOpLoweringPatterns(&patterns, context);
     patterns.insert<TransposeReshapeGenericDotGeneral>(context);
+    patterns.insert<DotGeneralIsMul>(context);
+
+    // Fusion operations.
+    patterns.insert<FuseWidenOperands<mhlo::DotOp>,
+                    FuseWidenOperands<mhlo::DotGeneralOp>,
+                    FuseWidenOperands<mhlo::ConvolutionOp>>(context,
+                                                            /*benefit=*/100);
+
+    // Additional canonicalizers that simplify to computationally
+    // less-complex operations.
+    patterns.insert<DotToMul>(context);
 
     // Unary elementwise op.
     patterns.insert<

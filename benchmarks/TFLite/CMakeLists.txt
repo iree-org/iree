@@ -161,6 +161,20 @@ set(PERSON_DETECT_INT8_MODULE
     "1x96x96x1xi8"
 )
 
+set(EFFICIENTNET_INT8_MODULE
+  NAME
+    "EfficientNet"
+  TAGS
+    "int8"
+  SOURCE
+    # Mirror of https://tfhub.dev/tensorflow/lite-model/efficientnet/lite0/int8/2
+    "https://storage.googleapis.com/iree-model-artifacts/efficientnet_lite0_int8_2.tflite"
+  ENTRY_FUNCTION
+    "main"
+  FUNCTION_INPUTS
+    "1x224x224x3xui8"
+)
+
 ################################################################################
 # Add benchmarks for all platforms.                                            #
 ################################################################################

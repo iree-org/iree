@@ -11,6 +11,7 @@ include "iree/compiler/Dialect/HAL/IR/HALBase.td"
 include "iree/compiler/Dialect/HAL/IR/HALInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilAttrs.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
+include "mlir/IR/BuiltinAttributeInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
@@ -626,28 +627,6 @@ def HAL_BufferViewDimOp : HAL_PureOp<"buffer_view.dim"> {
     `:` type($result)
     attr-dict-with-keyword
   }];
-}
-
-def HAL_BufferViewDimsOp : HAL_PureOp<"buffer_view.dims"> {
-  let summary = [{buffer view multi-value dimension query}];
-  let description = [{
-    Returns each dimension value of the buffer view.
-  }];
-
-  let arguments = (ins
-    HAL_BufferView:$buffer_view
-  );
-  let results = (outs
-    Variadic<Index>:$result
-  );
-
-  let assemblyFormat = [{
-    `<` $buffer_view `:` type($buffer_view) `>`
-    `:` type($result)
-    attr-dict-with-keyword
-  }];
-
-  let hasCanonicalizer = 1;
 }
 
 def HAL_BufferViewTraceOp : HAL_Op<"buffer_view.trace", []> {
@@ -1382,7 +1361,7 @@ def HAL_DeviceQueryOp :
     HAL_Device:$device,
     StrAttr:$category,
     StrAttr:$key,
-    OptionalAttr<AnyAttr>:$default_value
+    OptionalAttr<TypedAttrInterface>:$default_value
   );
   let results = (outs
     I1:$ok,

@@ -2,8 +2,8 @@
 
 // Tests an end-to-end simple single-dispatch `dispatch(arg0, arg1) -> result`.
 
-#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm", "embedded-elf-x86_64">
-#device_target_cpu = #hal.device.target<"cpu", {
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64">
+#device_target_cpu = #hal.device.target<"llvm-cpu", {
   executable_targets = [#executable_target_embedded_elf_x86_64_]
 }>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [

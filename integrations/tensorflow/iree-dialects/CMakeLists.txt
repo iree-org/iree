@@ -59,7 +59,6 @@ endif()
 
 add_subdirectory(include)
 add_subdirectory(lib)
-add_subdirectory(resources)
 add_subdirectory(test)
 add_subdirectory(tools)
 

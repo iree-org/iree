@@ -14,7 +14,7 @@
   ]>
 ]>
 hal.executable private @preset_config_matmul  {
-  hal.executable.variant @system_elf_x86_64, target = <"llvm", "system-elf-x86_64"> {
+  hal.executable.variant @system_elf_x86_64, target = <"llvm-cpu", "system-elf-x86_64"> {
     hal.executable.export @no_peel_static_matmul layout(#executable_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
@@ -70,7 +70,7 @@ hal.executable private @preset_config_matmul  {
   ]>
 ]>
 hal.executable private @preset_config_matmul  {
-  hal.executable.variant @system_elf_x86_64, target = <"llvm", "system-elf-x86_64"> {
+  hal.executable.variant @system_elf_x86_64, target = <"llvm-cpu", "system-elf-x86_64"> {
     hal.executable.export @peel_static_matmul layout(#executable_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
@@ -138,7 +138,7 @@ hal.executable private @preset_config_matmul  {
   ]>
 ]>
 hal.executable private @preset_config_matmul  {
-  hal.executable.variant @system_elf_x86_64, target = <"llvm", "system-elf-x86_64"> {
+  hal.executable.variant @system_elf_x86_64, target = <"llvm-cpu", "system-elf-x86_64"> {
     hal.executable.export @peel_dynamic_matmul layout(#executable_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
@@ -205,4 +205,3 @@ hal.executable private @preset_config_matmul  {
 // CHECK:                   linalg.matmul
 
 // CHECK-NOT: scf.for
-

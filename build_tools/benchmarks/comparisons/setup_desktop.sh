@@ -50,7 +50,7 @@ IREE_COMPILE_PATH="${SOURCE_DIR}/iree-build/tools/iree-compile"
 TFLITE_MODEL_DIR="${ROOT_DIR}/models/tflite"
 IREE_MODEL_DIR="${ROOT_DIR}/models/iree"
 mkdir -p "${IREE_MODEL_DIR}/cuda"
-mkdir -p "${IREE_MODEL_DIR}/dylib"
+mkdir -p "${IREE_MODEL_DIR}/llvm-cpu"
 
 MODEL_NAME="mobilebert_float_384_gpu"
 bazel-bin/iree_tf_compiler/iree-import-tflite "${TFLITE_MODEL_DIR}/${MODEL_NAME}.tflite" -o "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir"
@@ -66,16 +66,16 @@ echo "Compiling ${MODEL_NAME}.vmfb for cuda..."
   "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
   --o "${IREE_MODEL_DIR}/cuda/${MODEL_NAME}.vmfb"
 # Build for x86.
-echo "Compiling ${MODEL_NAME}.vmfb for dylib..."
+echo "Compiling ${MODEL_NAME}.vmfb for llvm-cpu..."
 "${IREE_COMPILE_PATH}" \
   --iree-input-type=tosa \
   --iree-llvm-target-cpu-features=host \
-  --iree-hal-target-backends=dylib-llvm-aot \
+  --iree-hal-target-backends=llvm-cpu \
   --iree-llvm-debug-symbols=false \
   --iree-vm-bytecode-module-strip-source-map=true \
   --iree-vm-emit-polyglot-zip=false \
   "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
-  --o "${IREE_MODEL_DIR}/dylib/${MODEL_NAME}.vmfb"
+  --o "${IREE_MODEL_DIR}/llvm-cpu/${MODEL_NAME}.vmfb"
 
 cp "${SOURCE_DIR}/iree-build/tools/iree-benchmark-module" "${ROOT_DIR}/"
 

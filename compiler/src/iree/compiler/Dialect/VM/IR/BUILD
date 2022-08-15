@@ -31,6 +31,7 @@ td_library(
     ),
     deps = [
         "//compiler/src/iree/compiler/Dialect/Util/IR:td_files",
+        "@llvm-project//mlir:BuiltinDialectTdFiles",
         "@llvm-project//mlir:CallInterfacesTdFiles",
         "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
         "@llvm-project//mlir:FunctionInterfacesTdFiles",

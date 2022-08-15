@@ -148,7 +148,7 @@ func.func @matmul_fill() {
 func.func @elementwise() {
   %c4 = arith.constant 4 : index
   %c0 = arith.constant 0 : index
-  %cst = arith.constant opaque<"elided_large_const", "0xDEADBEEF"> : tensor<1x10xf32>
+  %cst = arith.constant dense_resource<__elided__> : tensor<1x10xf32>
   %c512 = arith.constant 512 : index
   %c64 = arith.constant 64 : index
   %c10 = arith.constant 10 : index
@@ -186,7 +186,7 @@ func.func @elementwise() {
   return
 }
 //      CHECK: func.func @elementwise()
-//  CHECK-DAG:   %[[CST_TENSOR:.+]] = arith.constant opaque<"elided_large_const", "0xDEADBEEF"> : tensor<1x10xf32>
+//  CHECK-DAG:   %[[CST_TENSOR:.+]] = arith.constant dense_resource<__elided__> : tensor<1x10xf32>
 //  CHECK-DAG:   %[[CST_BUF:.+]] = bufferization.to_memref %[[CST_TENSOR]]
 //  CHECK-DAG:   %[[IN_BUF:.+]] = hal.interface.binding.subspan set(0)  binding(0) {{.+}} : memref<1x10xf32>
 //  CHECK-DAG:   %[[OUT_BUF:.+]] = hal.interface.binding.subspan set(0)  binding(1) {{.+}} : memref<1x10xf32>

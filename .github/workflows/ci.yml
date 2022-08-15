@@ -40,15 +40,55 @@ on:
     branches:
       - main
 
+concurrency:
+  # A PR number if a pull request and otherwise the commit hash. This cancels
+  # queued and in-progress runs for the same PR (presubmit) or commit
+  # (postsubmit).
+  group: ${{ github.event.number || github.sha }}
+  cancel-in-progress: true
+
 env:
-  BUCKET: gs://iree-github-actions-${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}-artifacts
+  GCS_DIR: gs://iree-github-actions-${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}-artifacts/${{ github.run_id }}/${{ github.run_attempt }}
 
 # Jobs are organized into groups and topologically sorted by dependencies
 jobs:
+  should_run:
+    runs-on: ubuntu-20.04
+    env:
+      # The commit being checked out is the merge commit for the PR. Its first
+      # parent will be the tip of main.
+      BASE_REF: HEAD^
+      LABELS: join(${{ github.event.pull_request.labels.*.name }})
+    outputs:
+      should-run: ${{ steps.should-run.outputs.should-run }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
+        with:
+          # We need the parent commit to do a diff
+          fetch-depth: 2
+      - name: "Computing whether CI should run"
+        id: should-run
+        run: |
+          git log --oneline --graph
+          ret=0
+          ./build_tools/github_actions/should_ci_run.py || ret=$?
+          if (( ret==0 )); then
+            echo "::set-output name=should-run::true"
+            exit 0
+          elif (( ret==2 )); then
+            echo "::set-output name=should-run::false"
+            exit 0
+          fi
+          exit "${ret}"
+
+
   ################################### Basic ####################################
   # Jobs that build all of IREE "normally"
   ##############################################################################
   build_all:
+    needs: should_run
+    if: needs.should_run.outputs.should-run == 'true'
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
@@ -93,13 +133,15 @@ jobs:
       - name: "Uploading build dir archive"
         id: upload
         env:
-          GCS_ARTIFACT: ${{ env.BUCKET }}/${{ github.sha }}/${{ steps.archive.outputs.build-dir-archive }}
+          GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.build-dir-archive }}
           BUILD_DIR_ARCHIVE: ${{ steps.archive.outputs.build-dir-archive }}
         run: |
           gcloud alpha storage cp "${BUILD_DIR_ARCHIVE}" "${GCS_ARTIFACT}"
           echo "::set-output name=gcs-artifact::${GCS_ARTIFACT}"
 
   build_test_all_bazel:
+    needs: should_run
+    if: needs.should_run.outputs.should-run == 'true'
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
@@ -125,7 +167,8 @@ jobs:
             ./build_tools/bazel/build_core.sh
 
   test_all:
-    needs: build_all
+    needs: [should_run, build_all]
+    if: needs.should_run.outputs.should-run == 'true'
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
@@ -154,8 +197,10 @@ jobs:
             "${BUILD_DIR}"
 
   test_gpu:
-    if: github.event_name != 'pull_request'
-    needs: build_all
+    needs: [should_run, build_all]
+    # TODO(gcmn): There is something wrong with the GPU MIG. The machines keep
+    # immediately shutting down.
+    if: false && needs.should_run.outputs.should-run == 'true'
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
@@ -197,6 +242,8 @@ jobs:
   # Jobs that build some subset of IREE
   ##############################################################################
   build_runtime:
+    needs: should_run
+    if: needs.should_run.outputs.should-run == 'true'
     runs-on: ubuntu-20.04
     env:
       BUILD_DIR: build-runtime
@@ -227,7 +274,8 @@ jobs:
           path: "${{ env.BUILD_DIR }}.tar"
 
   test_runtime:
-    needs: build_runtime
+    needs: [should_run, build_runtime]
+    if: needs.should_run.outputs.should-run == 'true'
     runs-on: ubuntu-20.04
     env:
       BUILD_DIR: ${{ needs.build_runtime.outputs.build-dir }}
@@ -251,6 +299,8 @@ jobs:
             "${BUILD_DIR}"
 
   host_tools_assertions:
+    needs: should_run
+    if: needs.should_run.outputs.should-run == 'true'
     uses: ./.github/workflows/host_tools.yml
     with:
       host-binary-root: host-tools-assertions
@@ -260,6 +310,8 @@ jobs:
   # Jobs that build the IREE-Tensorflow integrations
   ##############################################################################
   build_tf_integrations:
+    needs: should_run
+    if: needs.should_run.outputs.should-run == 'true'
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
@@ -298,14 +350,15 @@ jobs:
       - name: "Uploading binaries archive"
         id: upload
         env:
-          GCS_ARTIFACT: ${{ env.BUCKET }}/${{ github.sha }}/${{ steps.archive.outputs.binaries-archive }}
+          GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.binaries-archive }}
           BINARIES_ARCHIVE: ${{ steps.archive.outputs.binaries-archive }}
         run: |
           gcloud alpha storage cp "${BINARIES_ARCHIVE}" "${GCS_ARTIFACT}"
           echo "::set-output name=gcs-artifact::${GCS_ARTIFACT}"
 
   test_tf_integrations:
-    needs: [build_tf_integrations, build_all]
+    needs: [should_run, build_tf_integrations, build_all]
+    if: needs.should_run.outputs.should-run == 'true'
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
@@ -343,8 +396,10 @@ jobs:
             "${BUILD_DIR}"
 
   test_tf_integrations_gpu:
-    needs: [build_tf_integrations, build_all]
-    if: github.event_name != 'pull_request'
+    needs: [should_run, build_tf_integrations, build_all]
+    # TODO(gcmn): There is something wrong with the GPU MIG. The machines keep
+    # immediately shutting down.
+    if: false && needs.should_run.outputs.should-run == 'true'
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
@@ -390,6 +445,8 @@ jobs:
   # Jobs that build IREE in some non-default configuration
   ##############################################################################
   asan:
+    needs: should_run
+    if: needs.should_run.outputs.should-run == 'true'
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
@@ -408,6 +465,8 @@ jobs:
             ./build_tools/cmake/build_and_test_asan.sh
 
   tsan:
+    needs: should_run
+    if: needs.should_run.outputs.should-run == 'true'
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
@@ -426,7 +485,8 @@ jobs:
             ./build_tools/cmake/build_and_test_tsan.sh
 
   build_benchmarks:
-    needs: [build_all, build_tf_integrations]
+    needs: [should_run, build_all, build_tf_integrations]
+    if: needs.should_run.outputs.should-run == 'true'
     runs-on:
       # Hacks, and order matters. See the comment at the top of the file.
       - self-hosted
@@ -468,7 +528,8 @@ jobs:
   # Jobs that cross-compile IREE for other platforms
   ##############################################################################
   android_arm64:
-    needs: [host_tools_assertions]
+    needs: [should_run, host_tools_assertions]
+    if: needs.should_run.outputs.should-run == 'true'
     runs-on:
       # Hacks, and order matters. See the comment at the top of the file.
       - self-hosted
@@ -501,7 +562,8 @@ jobs:
             build_tools/build_android.sh
 
   riscv32:
-    needs: host_tools_assertions
+    needs: [should_run, host_tools_assertions]
+    if: needs.should_run.outputs.should-run == 'true'
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
@@ -536,7 +598,8 @@ jobs:
             "./build_tools/cmake/build_riscv.sh && tests/riscv32/smoke.sh"
 
   riscv64:
-    needs: [build_all, host_tools_assertions, build_tf_integrations]
+    needs: [should_run, build_all, host_tools_assertions, build_tf_integrations]
+    if: needs.should_run.outputs.should-run == 'true'
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
@@ -594,6 +657,9 @@ jobs:
   # Depends on all the other jobs to provide a single anchor that indicates the
   # final status. Status reporting will become more sophisticated in the future.
   summary:
+    # Even if you have an explicit if condition, you still need to override
+    # GitHub's default behavior of not running if any dependencies failed.
+    if: always()
     runs-on: ubuntu-20.04
     needs:
       # Basic
@@ -620,7 +686,6 @@ jobs:
       - android_arm64
       - riscv32
       - riscv64
-    if: always()
     steps:
       - name: Getting combined job status
         run: |

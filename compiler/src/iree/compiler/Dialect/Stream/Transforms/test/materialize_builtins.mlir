@@ -2,8 +2,6 @@
 
 // Tests expansion of the stream.builtin.splat.i64 op.
 
-// CHECK: stream.executable private @__builtin_splat_i64
-
 // CHECK-LABEL: @builtinSplatI64
 func.func @builtinSplatI64(%arg0: index, %arg1: i64) -> !stream.resource<*> {
   // CHECK: %[[COUNT:.+]] = arith.divui %arg0, %c8
@@ -13,11 +11,11 @@ func.func @builtinSplatI64(%arg0: index, %arg1: i64) -> !stream.resource<*> {
   return %0 : !stream.resource<*>
 }
 
+// CHECK: stream.executable private @__builtin_splat_i64
+
 // -----
 
 // Tests expansion of the stream.builtin.fill.i64 op.
-
-// CHECK: stream.executable private @__builtin_fill_i64
 
 // CHECK-LABEL: @builtinFillI64
 // CHECK-SAME: (%[[RES:.+]]: !stream.resource<*>, %[[SIZE:.+]]: index, %[[VALUE:.+]]: i64, %[[BYTE_OFFSET:.+]]: index, %[[BYTE_LENGTH:.+]]: index)
@@ -29,12 +27,11 @@ func.func @builtinFillI64(%res: !stream.resource<*>, %size: index, %value: i64, 
   return %0 : !stream.resource<*>
 }
 
+// CHECK: stream.executable private @__builtin_fill_i64
+
 // -----
 
 // Tests that builtins used in multiple functions share the same executable.
-
-// CHECK: stream.executable private @__builtin_splat_i64
-// CHECK-NOT: stream.executable private @__builtin_splat_i64
 
 // CHECK: util.initializer
 util.initializer {
@@ -45,6 +42,8 @@ util.initializer {
   util.initializer.return
 }
 
+// CHECK: stream.executable private @__builtin_splat_i64
+
 // CHECK: func.func @otherUser
 func.func @otherUser() -> !stream.resource<*> {
   %c128 = arith.constant 128 : index
@@ -54,3 +53,5 @@ func.func @otherUser() -> !stream.resource<*> {
   // CHECK: return %[[RET]]
   return %0 : !stream.resource<*>
 }
+
+// CHECK-NOT: stream.executable private @__builtin_splat_i64

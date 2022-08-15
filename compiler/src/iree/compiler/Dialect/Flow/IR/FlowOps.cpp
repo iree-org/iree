@@ -18,6 +18,7 @@
 #include "mlir/Dialect/Arithmetic/Utils/Utils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
@@ -129,7 +130,8 @@ static llvm::SmallBitVector getDroppedDimsImpl(
 /// Helper function to create `AffineExpr` from `OpFoldResult`. If the
 /// `OpFoldResult` is a `Value`, creates a `AffineSymbolExpr` and appends it to
 /// `symbols`.
-static AffineExpr getAffineExpr(OpFoldResult ofr, SmallVector<Value> &symbols) {
+static AffineExpr getAffineExpr(OpFoldResult ofr,
+                                SmallVector<OpFoldResult> &symbols) {
   if (auto attr = ofr.dyn_cast<Attribute>()) {
     return getAffineConstantExpr(attr.cast<IntegerAttr>().getInt(),
                                  attr.getContext());
@@ -143,26 +145,26 @@ static AffineExpr getAffineExpr(OpFoldResult ofr, SmallVector<Value> &symbols) {
 /// operation.
 static OpFoldResult getOpFoldResult(OpBuilder &builder, Location loc,
                                     AffineExpr expr,
-                                    SmallVector<Value> &symbols) {
+                                    SmallVector<OpFoldResult> &symbols) {
   AffineMap m = AffineMap::get(0, symbols.size(), expr);
-  return applyMapToValues(builder, loc, m, symbols)[0];
+  return makeComposedFoldedAffineApply(builder, loc, m, symbols);
 }
 
 /// Methods to build the Affine Expr for arithmetic operations.
 static AffineExpr add(AffineExpr expr, OpFoldResult ofr,
-                      SmallVector<Value> &symbols) {
+                      SmallVector<OpFoldResult> &symbols) {
   return expr + getAffineExpr(ofr, symbols);
 }
 static AffineExpr add(OpFoldResult lhs, OpFoldResult rhs,
-                      SmallVector<Value> &symbols) {
+                      SmallVector<OpFoldResult> &symbols) {
   return getAffineExpr(lhs, symbols) + getAffineExpr(rhs, symbols);
 }
 static AffineExpr mul(AffineExpr expr, OpFoldResult ofr,
-                      SmallVector<Value> &symbols) {
+                      SmallVector<OpFoldResult> &symbols) {
   return expr * getAffineExpr(ofr, symbols);
 }
 static AffineExpr mul(OpFoldResult lhs, OpFoldResult rhs,
-                      SmallVector<Value> &symbols) {
+                      SmallVector<OpFoldResult> &symbols) {
   return getAffineExpr(lhs, symbols) * getAffineExpr(rhs, symbols);
 }
 
@@ -1444,7 +1446,7 @@ LogicalResult foldOffsetsSizesAndStrides(
       combinedStrides[i] = producerStrides[i];
       continue;
     }
-    SmallVector<Value> offsetSymbols, strideSymbols;
+    SmallVector<OpFoldResult> offsetSymbols, strideSymbols;
     // The combined offset is computed as
     //    producer_offset + consumer_offset * producer_strides.
     combinedOffsets[i] =

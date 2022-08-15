@@ -10,6 +10,7 @@
 include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
+include "mlir/IR/BuiltinAttributeInterfaces.td"
 include "mlir/IR/FunctionInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
@@ -334,7 +335,7 @@ class VM_GlobalOp<string mnemonic, Attr attr_type, list<Trait> traits = []> :
   let builders = [
     OpBuilder<(ins
       "StringRef":$name, "bool":$isMutable, "Type":$type,
-      "Optional<Attribute>":$initialValue,
+      "Optional<TypedAttr>":$initialValue,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
     ),
     [{
@@ -365,8 +366,10 @@ class VM_GlobalOp<string mnemonic, Attr attr_type, list<Trait> traits = []> :
     Type getStorageType() { return getType(); }
     bool isMutable() { return getIsMutable(); }
     void makeMutable() { (*this)->setAttr("is_mutable", UnitAttr::get(getContext())); }
-    Optional<Attribute> getInitialValueUntyped() { return getInitialValueAttr(); }
-    void setInitialValue(Attribute value) { (*this)->setAttr("initial_value", (value)); }
+    Optional<TypedAttr> getInitialValueUntyped() {
+      return Optional<TypedAttr>(getInitialValueAttr());
+    }
+    void setInitialValue(TypedAttr value) { (*this)->setAttr("initial_value", (value)); }
     void clearInitialValue() { (*this)->removeAttr("initial_value"); }
     LogicalResult verify() { return verifyGlobalOp(getOperation()); }
   }];
@@ -776,17 +779,17 @@ class VM_ConstOp<string mnemonic, string ctype, list<Trait> traits = []> :
     ])> {
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilder<(ins "Attribute":$value)>,
+    OpBuilder<(ins "TypedAttr":$value)>,
     OpBuilder<(ins ctype:$value)>,
   ];
 
   let extraClassDeclaration = [{
     /// Returns true if a constant operation can be built with the given value
     /// and result type.
-    static bool isBuildableWith(Attribute value, Type type);
+    static bool isBuildableWith(TypedAttr value, Type type);
 
     /// Returns an attribute in the appropriate type for the const op.
-    static Attribute convertConstValue(Attribute value);
+    static TypedAttr convertConstValue(TypedAttr value);
   }];
 }
 

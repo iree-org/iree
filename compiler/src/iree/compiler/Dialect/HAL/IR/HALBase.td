@@ -541,10 +541,10 @@ def HAL_DeviceTargetAttr :
 
     Example:
     ```mlir
-    #hal.device.target<"cpu", {
+    #hal.device.target<"llvm-cpu", {
       executable_targets = [
-        #hal.executable.target<"llvm", "embedded-elf-arm_32">,
-        #hal.executable.target<"llvm", "embedded-elf-arm_64">,
+        #hal.executable.target<"llvm-cpu", "embedded-elf-arm_32">,
+        #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64">,
       ]
     }>
     ```
@@ -601,7 +601,7 @@ def HAL_ExecutableTargetAttr :
     Example:
     ```mlir
       // Produce a system-native ELF for x86-64 systems using the LLVM backend:
-      #hal.executable.target<"llvm", "system-elf-x86_64", {
+      #hal.executable.target<"llvm-cpu", "system-elf-x86_64", {
         triple = "x86_64-unknown-linux-elf",
         cpu = "host",
         cpu_features = "host",

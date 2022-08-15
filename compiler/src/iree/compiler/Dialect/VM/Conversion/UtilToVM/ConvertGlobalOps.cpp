@@ -66,7 +66,7 @@ class GlobalOpConversion : public OpConversionPattern<IREE::Util::GlobalOp> {
           op, op.getSymName(), op.getIsMutable(), convertedType,
           op.getInitialValue(), llvm::to_vector<4>(op->getDialectAttrs()));
     } else if (convertedType.isInteger(32)) {
-      llvm::Optional<Attribute> convertedValue = llvm::None;
+      llvm::Optional<TypedAttr> convertedValue = llvm::None;
       if (op.getInitialValue().hasValue()) {
         convertedValue = rewriter.getI32IntegerAttr(static_cast<int32_t>(
             op.getInitialValue().getValue().cast<IntegerAttr>().getInt()));
@@ -75,7 +75,7 @@ class GlobalOpConversion : public OpConversionPattern<IREE::Util::GlobalOp> {
           op, op.getSymName(), op.getIsMutable(), convertedType, convertedValue,
           llvm::to_vector<4>(op->getDialectAttrs()));
     } else if (convertedType.isInteger(64)) {
-      llvm::Optional<Attribute> convertedValue = llvm::None;
+      llvm::Optional<TypedAttr> convertedValue = llvm::None;
       if (op.getInitialValue().hasValue()) {
         convertedValue = rewriter.getI64IntegerAttr(
             op.getInitialValue().getValue().cast<IntegerAttr>().getInt());
@@ -84,7 +84,7 @@ class GlobalOpConversion : public OpConversionPattern<IREE::Util::GlobalOp> {
           op, op.getSymName(), op.getIsMutable(), convertedType, convertedValue,
           llvm::to_vector<4>(op->getDialectAttrs()));
     } else if (convertedType.isF32()) {
-      llvm::Optional<Attribute> convertedValue = llvm::None;
+      llvm::Optional<TypedAttr> convertedValue = llvm::None;
       if (op.getInitialValue().hasValue()) {
         convertedValue = rewriter.getF32FloatAttr(
             static_cast<float>(op.getInitialValue()
@@ -96,7 +96,7 @@ class GlobalOpConversion : public OpConversionPattern<IREE::Util::GlobalOp> {
           op, op.getSymName(), op.getIsMutable(), convertedType, convertedValue,
           llvm::to_vector<4>(op->getDialectAttrs()));
     } else if (convertedType.isF64()) {
-      llvm::Optional<Attribute> convertedValue = llvm::None;
+      llvm::Optional<TypedAttr> convertedValue = llvm::None;
       if (op.getInitialValue().hasValue()) {
         convertedValue = rewriter.getF64FloatAttr(op.getInitialValue()
                                                       .getValue()

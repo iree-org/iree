@@ -286,7 +286,7 @@ class Trace:
             f"--module_file={compiled_path}",
             f"--device={self.backend_driver}",
             f"--entry_function={entry_function}",
-        ] + [f"--function_input={input}" for input in serialized_inputs]
+        ] + [f"--function_input=\"{input}\"" for input in serialized_inputs]
         with open(os.path.join(trace_dir, "flagfile"), "w") as f:
           f.writelines(line + "\n" for line in flagfile)
       else:
