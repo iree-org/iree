@@ -18,9 +18,9 @@ from definitions import iree_benchmarks
 
 TEMPLATE_DIR = Path(__file__).parent.parent / "cmake"
 DOWNLOAD_ARTIFACT_CMAKE_TEMPLATE = Template(
-    open(TEMPLATE_DIR / "download_artifact_template.cmake", "r").read())
+    open(TEMPLATE_DIR / "iree_download_artifact_template.cmake", "r").read())
 TFLITE_IMPORT_CMAKE_TEMPLATE = Template(
-    open(TEMPLATE_DIR / "tflite_import_template.cmake", "r").read())
+    open(TEMPLATE_DIR / "iree_tflite_import_template.cmake", "r").read())
 IREE_BYTECODE_MODULE_CMAKE_TEMPLATE = Template(
     open(TEMPLATE_DIR / "iree_bytecode_module_template.cmake", "r").read())
 
@@ -62,8 +62,7 @@ def main():
       # Local path: root_dir/<model_id>_<artifact basename>
       artifact_local_path = f"${{_ROOT_ARTIFACTS_DIR}}/{model.id}_{os.path.basename(model_url.path)}"
       download_model_rule = DOWNLOAD_ARTIFACT_CMAKE_TEMPLATE.substitute(
-          _ARTIFACT_LOCAL_PATH_=artifact_local_path,
-          _ARTIFACT_SOURCE_URL_=model.source_url)
+          _OUTPUT_PATH_=artifact_local_path, _SOURCE_URL_=model.source_url)
       print(download_model_rule)
     else:
       raise ValueError("Unsupported model url: {model.source_uri}.")
@@ -77,9 +76,9 @@ def main():
       # Imported MLIR local path: root_dir/<model_id>_<model_name>.mlir
       mlir_local_path = f"${{_ROOT_ARTIFACTS_DIR}}/{model.id}_{model.name}.mlir"
       import_rule = TFLITE_IMPORT_CMAKE_TEMPLATE.substitute(
-          _IMPORT_TARGET_=model_cmake_target,
-          _ARTIFACT_LOCAL_PATH_=artifact_local_path,
-          _OUTPUT_PATH_=mlir_local_path)
+          _TARGET_NAME_=model_cmake_target,
+          _SOURCE_MODEL_PATH_=artifact_local_path,
+          _MLIR_OUTPUT_PATH_=mlir_local_path)
       print(import_rule)
     else:
       raise ValueError(f"Unsupported model source: {model.source_type}.")
@@ -92,10 +91,10 @@ def main():
     config_id = compile_spec.compile_config.id
     model_cmake_target, mlir_local_path = generated_model_targets[model_id]
     module_rule = IREE_BYTECODE_MODULE_CMAKE_TEMPLATE.substitute(
-        _MODULE_TARGET_NAME_=f"model-{model_id}-compile-{config_id}",
-        _OUTPUT_PATH_=
+        _TARGET_NAME_=f"model-{model_id}-compile-{config_id}",
+        _MODULE_OUTPUT_PATH_=
         f"${{_VMFB_ARTIFACTS_DIR}}/model_{model_id}_compile_{config_id}.vmfb",
-        _MLIR_LOCAL_PATH_=mlir_local_path,
+        _SOURCE_MODEL_PATH_=mlir_local_path,
         _COMPILE_FLAGS_=";".join(f"\"{flag}\"" for flag in compile_flags),
         _SOURCE_MODEL_TARGET_=model_cmake_target)
     print(module_rule)
