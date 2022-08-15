@@ -26,6 +26,11 @@ namespace iree_compiler {
 namespace IREE {
 namespace Util {
 
+class GlobalOpInterface;
+class GlobalAccessorOpInterface;
+class GlobalAddressOpInterface;
+class GlobalLoadOpInterface;
+class GlobalStoreOpInterface;
 class ShapeAwareOpInterface;
 class TiedOpInterface;
 
@@ -71,6 +76,26 @@ struct ValueAccess {
   static ValueAccess WriteOnly() { return ValueAccess(false, true, false); }
   static ValueAccess DiscardWrite() { return ValueAccess(false, true, true); }
 };
+
+//===----------------------------------------------------------------------===//
+// Global and structural interface utilities
+//===----------------------------------------------------------------------===//
+
+namespace detail {
+
+LogicalResult verifyGlobalOp(GlobalOpInterface globalOp);
+LogicalResult verifyGlobalAddressOp(GlobalAddressOpInterface addressOp,
+                                    SymbolTableCollection &symbolTable);
+LogicalResult verifyGlobalLoadOp(GlobalLoadOpInterface loadOp,
+                                 SymbolTableCollection &symbolTable);
+LogicalResult verifyGlobalStoreOp(GlobalStoreOpInterface storeOp,
+                                  SymbolTableCollection &symbolTable);
+
+}  // namespace detail
+
+IREE::Util::GlobalOpInterface lookupGlobalOp(
+    Operation *accessorOp, SymbolRefAttr globalRefAttr,
+    SymbolTableCollection &symbolTable);
 
 //===----------------------------------------------------------------------===//
 // Tied operand interface utilities

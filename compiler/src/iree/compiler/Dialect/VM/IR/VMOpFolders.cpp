@@ -92,13 +92,10 @@ struct InlineConstGlobalInitializer : public OpRewritePattern<InitializerOp> {
       auto globalRefAttr = op->getAttrOfType<SymbolRefAttr>("global");
       assert(globalRefAttr);
       auto globalOp =
-          SymbolTable::lookupNearestSymbolFrom<IREE::VM::VMGlobalOp>(
+          SymbolTable::lookupNearestSymbolFrom<IREE::Util::GlobalOpInterface>(
               op, globalRefAttr);
-      if (valueAttr && !valueAttr.isa<UnitAttr>()) {
-        globalOp.setInitialValue(valueAttr);
-      } else {
-        globalOp.clearInitialValue();
-      }
+      rewriter.updateRootInPlace(
+          globalOp, [&]() { globalOp.setGlobalInitialValue(valueAttr); });
       deadOps.push_back(op);
     });
     if (deadOps.empty()) return failure();
@@ -144,9 +141,11 @@ struct DropDefaultConstGlobalOpInitializer : public OpRewritePattern<T> {
                    op.getInitialValueAttr().template dyn_cast<FloatAttr>()) {
       if (value.getValue().isNonZero()) return failure();
     }
-    rewriter.replaceOpWithNewOp<T>(op, op.getSymName(), op.getIsMutable(),
-                                   op.getType(),
-                                   llvm::to_vector<4>(op->getDialectAttrs()));
+    auto visibility = op.getVisibility();
+    auto newOp = rewriter.replaceOpWithNewOp<T>(
+        op, op.getSymName(), op.getIsMutable(), op.getType(),
+        llvm::to_vector<4>(op->getDialectAttrs()));
+    newOp.setVisibility(visibility);
     return success();
   }
 };
@@ -176,60 +175,17 @@ void GlobalF64Op::getCanonicalizationPatterns(RewritePatternSet &results,
 void GlobalRefOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {}
 
-namespace {
-
-/// Inlines immutable global constants into their loads.
-template <typename LOAD_OP, typename GLOBAL_OP, typename CONST_OP,
-          typename CONST_ZERO_OP>
-struct InlineConstGlobalLoadIntegerOp : public OpRewritePattern<LOAD_OP> {
-  using OpRewritePattern<LOAD_OP>::OpRewritePattern;
-  LogicalResult matchAndRewrite(LOAD_OP op,
-                                PatternRewriter &rewriter) const override {
-    auto globalAttr = op->template getAttrOfType<FlatSymbolRefAttr>("global");
-    auto globalOp =
-        op->template getParentOfType<VM::ModuleOp>()
-            .template lookupSymbol<GLOBAL_OP>(globalAttr.getValue());
-    if (!globalOp) return failure();
-    if (globalOp.getIsMutable()) return failure();
-    if (globalOp.getInitialValue()) {
-      rewriter.replaceOpWithNewOp<CONST_OP>(
-          op, globalOp.getInitialValue().getValue());
-    } else {
-      rewriter.replaceOpWithNewOp<CONST_ZERO_OP>(op);
-    }
-    return success();
-  }
-};
-
-}  // namespace
-
 void GlobalLoadI32Op::getCanonicalizationPatterns(RewritePatternSet &results,
-                                                  MLIRContext *context) {
-  results.insert<InlineConstGlobalLoadIntegerOp<GlobalLoadI32Op, GlobalI32Op,
-                                                ConstI32Op, ConstI32ZeroOp>>(
-      context);
-}
+                                                  MLIRContext *context) {}
 
 void GlobalLoadI64Op::getCanonicalizationPatterns(RewritePatternSet &results,
-                                                  MLIRContext *context) {
-  results.insert<InlineConstGlobalLoadIntegerOp<GlobalLoadI64Op, GlobalI64Op,
-                                                ConstI64Op, ConstI64ZeroOp>>(
-      context);
-}
+                                                  MLIRContext *context) {}
 
 void GlobalLoadF32Op::getCanonicalizationPatterns(RewritePatternSet &results,
-                                                  MLIRContext *context) {
-  results.insert<InlineConstGlobalLoadIntegerOp<GlobalLoadF32Op, GlobalF32Op,
-                                                ConstF32Op, ConstF32ZeroOp>>(
-      context);
-}
+                                                  MLIRContext *context) {}
 
 void GlobalLoadF64Op::getCanonicalizationPatterns(RewritePatternSet &results,
-                                                  MLIRContext *context) {
-  results.insert<InlineConstGlobalLoadIntegerOp<GlobalLoadF64Op, GlobalF64Op,
-                                                ConstF64Op, ConstF64ZeroOp>>(
-      context);
-}
+                                                  MLIRContext *context) {}
 
 namespace {
 
@@ -239,10 +195,10 @@ struct PropagateGlobalLoadAddress : public OpRewritePattern<INDIRECT> {
 
   LogicalResult matchAndRewrite(INDIRECT op,
                                 PatternRewriter &rewriter) const override {
-    if (auto addressOp =
-            dyn_cast_or_null<GlobalAddressOp>(op.getGlobal().getDefiningOp())) {
+    if (auto addressOp = dyn_cast_or_null<IREE::Util::GlobalAddressOpInterface>(
+            op.getGlobal().getDefiningOp())) {
       rewriter.replaceOpWithNewOp<DIRECT>(op, op.getValue().getType(),
-                                          addressOp.getGlobal());
+                                          addressOp.getGlobalAttr());
       return success();
     }
     return failure();
@@ -294,10 +250,10 @@ struct PropagateGlobalStoreAddress : public OpRewritePattern<INDIRECT> {
 
   LogicalResult matchAndRewrite(INDIRECT op,
                                 PatternRewriter &rewriter) const override {
-    if (auto addressOp =
-            dyn_cast_or_null<GlobalAddressOp>(op.getGlobal().getDefiningOp())) {
+    if (auto addressOp = dyn_cast_or_null<IREE::Util::GlobalAddressOpInterface>(
+            op.getGlobal().getDefiningOp())) {
       rewriter.replaceOpWithNewOp<DIRECT>(op, op.getValue(),
-                                          addressOp.getGlobal());
+                                          addressOp.getGlobalAttr());
       return success();
     }
     return failure();

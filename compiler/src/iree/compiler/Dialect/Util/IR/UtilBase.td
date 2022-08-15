@@ -66,7 +66,7 @@ def Util_TiedOpStorageAttr :
 }
 
 def Util_GlobalRefAttr : Confined<FlatSymbolRefAttr, [
-  ReferToOp<"IREE::Util::GlobalOp">,
+  ReferToOp<"IREE::Util::GlobalOpInterface">,
 ]>;
 
 def Util_AnySerializableAttr : Attr<Or<[

@@ -7,11 +7,9 @@ vm.module @global_ops {
   vm.global.i32 private @c42 = 42 : i32
   vm.global.i32 private mutable @c107_mut = 107 : i32
   vm.global.ref mutable @g0 : !vm.buffer
-  // TODO(simon-camp): Add test for initializer
 
   vm.rodata private @buffer dense<[1, 2, 3]> : tensor<3xi8>
 
-  // TODO(simon-camp) This test gets constant folded
   vm.export @test_global_load_i32
   vm.func @test_global_load_i32() {
     %actual = vm.global.load.i32 @c42 : i32

@@ -43,7 +43,6 @@ vm.module @unique_mime_types {
 
 // -----
 
-// {alignment = 16 : i64, mime_type = "application/x-elf"}
 // CHECK-LABEL: vm.module public @widen_alignment
 vm.module @widen_alignment {
   // CHECK: vm.rodata private @const1a {alignment = 16 : i64} dense<1>

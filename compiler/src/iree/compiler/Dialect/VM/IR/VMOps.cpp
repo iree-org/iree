@@ -395,54 +395,6 @@ Block *InitializerOp::addBlock() {
 // Globals
 //===----------------------------------------------------------------------===//
 
-LogicalResult verifyGlobalOp(Operation *op) {
-  auto globalName =
-      op->getAttrOfType<StringAttr>(SymbolTable::getSymbolAttrName());
-  auto globalType = op->getAttrOfType<TypeAttr>("type");
-  auto initializerAttr = op->getAttrOfType<FlatSymbolRefAttr>("initializer");
-  auto initialValueAttr = op->getAttrOfType<TypedAttr>("initial_value");
-  if (initializerAttr && initialValueAttr) {
-    return op->emitOpError()
-           << "globals can have either an initializer or an initial value";
-  } else if (initializerAttr) {
-    // Ensure initializer returns the same value as the global.
-    auto initializer = op->getParentOfType<ModuleOp>().lookupSymbol<FuncOp>(
-        initializerAttr.getValue());
-    if (!initializer) {
-      return op->emitOpError()
-             << "initializer function " << initializerAttr << " not found";
-    }
-    if (initializer.getFunctionType().getNumInputs() != 0 ||
-        initializer.getFunctionType().getNumResults() != 1 ||
-        initializer.getFunctionType().getResult(0) != globalType.getValue()) {
-      return op->emitOpError()
-             << "initializer type mismatch; global " << globalName << " is "
-             << globalType << " but initializer function "
-             << initializer.getName() << " is "
-             << initializer.getFunctionType();
-    }
-  } else if (initialValueAttr) {
-    // Ensure the value is something we can convert to a const.
-    if (initialValueAttr.getType() != globalType.getValue()) {
-      return op->emitOpError()
-             << "initial value type mismatch; global " << globalName << " is "
-             << globalType << " but initial value provided is "
-             << initialValueAttr.getType();
-    }
-  }
-  return success();
-}
-
-LogicalResult GlobalAddressOp::verify() {
-  Operation *op = getOperation();
-  auto *globalOp =
-      op->getParentOfType<VM::ModuleOp>().lookupSymbol(getGlobal());
-  if (!globalOp) {
-    return op->emitOpError() << "Undefined global: " << getGlobal();
-  }
-  return success();
-}
-
 template <typename T>
 static void addMemoryEffectsForGlobal(
     Operation *op, mlir::FlatSymbolRefAttr global,
@@ -500,55 +452,6 @@ void GlobalLoadRefOp::getEffects(
 
 void GlobalLoadRefOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
   setResultName(setNameFn, getResult(), getGlobal());
-}
-
-LogicalResult verifyGlobalLoadOp(Operation *op) {
-  auto globalAttr = op->getAttrOfType<FlatSymbolRefAttr>("global");
-  auto *globalOp =
-      op->getParentOfType<VM::ModuleOp>().lookupSymbol(globalAttr.getValue());
-  if (!globalOp) {
-    return op->emitOpError() << "undefined global: " << globalAttr;
-  }
-  auto globalType = globalOp->getAttrOfType<TypeAttr>("type");
-  auto loadType = op->getResult(0).getType();
-  if (globalType.getValue() != loadType) {
-    return op->emitOpError()
-           << "global type mismatch; global " << globalAttr << " is "
-           << globalType << " but load is " << loadType;
-  }
-  return success();
-}
-
-// Returns true if |op| is nested within an initializer function.
-static bool isParentInitializer(Operation *op) {
-  auto initializerOp = op->getParentOfType<IREE::VM::InitializerOp>();
-  if (initializerOp) return true;
-  auto funcOp = op->getParentOfType<IREE::VM::FuncOp>();
-  return funcOp.getName() == "__init" || funcOp.getName() == "__deinit";
-}
-
-LogicalResult verifyGlobalStoreOp(Operation *op) {
-  auto globalAttr = op->getAttrOfType<FlatSymbolRefAttr>("global");
-  auto *globalOp =
-      op->getParentOfType<VM::ModuleOp>().lookupSymbol(globalAttr.getValue());
-  if (!globalOp) {
-    return op->emitOpError() << "undefined global: " << globalAttr;
-  }
-  auto globalType = globalOp->getAttrOfType<TypeAttr>("type");
-  auto storeType = op->getOperand(0).getType();
-  if (globalType.getValue() != storeType) {
-    return op->emitOpError()
-           << "global type mismatch; global " << globalAttr << " is "
-           << globalType << " but store is " << storeType;
-  }
-  if (!globalOp->getAttrOfType<UnitAttr>("is_mutable")) {
-    // Allow stores to immutable globals in initializers.
-    if (!isParentInitializer(op)) {
-      return op->emitOpError() << "global " << globalAttr
-                               << " is not mutable and cannot be stored to";
-    }
-  }
-  return success();
 }
 
 //===----------------------------------------------------------------------===//

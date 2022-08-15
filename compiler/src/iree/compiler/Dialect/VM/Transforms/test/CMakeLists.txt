@@ -19,8 +19,8 @@ iree_lit_test_suite(
     "global_initialization.mlir"
     "hoist_inlined_rodata.mlir"
     "ordinal_allocation.mlir"
+    "resolve_rodata_loads.mlir"
     "sink_defining_ops.mlir"
-    "sink_global_buffer_loads.mlir"
   TOOLS
     FileCheck
     iree-opt

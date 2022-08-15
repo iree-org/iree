@@ -208,8 +208,14 @@ static LogicalResult canonicalizeModule(BytecodeTargetOptions targetOptions,
   passManager.addInstrumentation(std::make_unique<PassTracing>());
   auto &modulePasses = passManager.nest<IREE::VM::ModuleOp>();
 
+  // TODO(benvanik): these ideally happen beforehand but when performing
+  // serialization the input IR often has some of these low-level VM ops. In
+  // real workflows these have already run earlier and are no-ops.
+  modulePasses.addPass(IREE::VM::createGlobalInitializationPass());
+  modulePasses.addPass(IREE::VM::createDropEmptyModuleInitializersPass());
+
   if (targetOptions.optimize) {
-    // TODO(benvanik): does this run until it quiesces?
+    // TODO(benvanik): run this as part of a fixed-point iteration.
     modulePasses.addPass(mlir::createInlinerPass());
     modulePasses.addPass(mlir::createCSEPass());
     modulePasses.addPass(mlir::createCanonicalizerPass());

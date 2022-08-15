@@ -32,13 +32,13 @@ namespace {
 
 struct Global {
   size_t ordinal = 0;
-  IREE::Util::GlobalOp op;
+  IREE::Util::GlobalOpInterface op;
   bool isIndirect = false;
-  SmallVector<IREE::Util::GlobalLoadOp> loadOps;
-  SmallVector<IREE::Util::GlobalStoreOp> storeOps;
+  SmallVector<IREE::Util::GlobalLoadOpInterface> loadOps;
+  SmallVector<IREE::Util::GlobalStoreOpInterface> storeOps;
 
   bool isCandidate() {
-    return !isIndirect && op.isPrivate() && !op->hasAttr("noinline");
+    return !isIndirect && op.isGlobalPrivate() && !op->hasAttr("noinline");
   }
 };
 
@@ -56,18 +56,22 @@ struct GlobalTable {
   void rebuild() {
     globalOrder.clear();
     globalMap.clear();
-    for (auto globalOp : moduleOp.getOps<IREE::Util::GlobalOp>()) {
-      globalMap[globalOp.getName()] = Global{globalOrder.size(), globalOp};
-      globalOrder.push_back(globalOp.getName());
+    for (auto globalOp : moduleOp.getOps<IREE::Util::GlobalOpInterface>()) {
+      auto globalName = globalOp.getGlobalName();
+      globalMap[globalName] = Global{globalOrder.size(), globalOp};
+      globalOrder.push_back(globalName);
     }
     for (auto callableOp : moduleOp.getOps<CallableOpInterface>()) {
       callableOp.walk([&](Operation *op) {
-        if (auto addressOp = dyn_cast<IREE::Util::GlobalAddressOp>(op)) {
-          globalMap[addressOp.getGlobal()].isIndirect = true;
-        } else if (auto loadOp = dyn_cast<IREE::Util::GlobalLoadOp>(op)) {
-          globalMap[loadOp.getGlobal()].loadOps.push_back(loadOp);
-        } else if (auto storeOp = dyn_cast<IREE::Util::GlobalStoreOp>(op)) {
-          globalMap[storeOp.getGlobal()].storeOps.push_back(storeOp);
+        if (auto addressOp =
+                dyn_cast<IREE::Util::GlobalAddressOpInterface>(op)) {
+          globalMap[addressOp.getGlobalName()].isIndirect = true;
+        } else if (auto loadOp =
+                       dyn_cast<IREE::Util::GlobalLoadOpInterface>(op)) {
+          globalMap[loadOp.getGlobalName()].loadOps.push_back(loadOp);
+        } else if (auto storeOp =
+                       dyn_cast<IREE::Util::GlobalStoreOpInterface>(op)) {
+          globalMap[storeOp.getGlobalName()].storeOps.push_back(storeOp);
         }
       });
     }
@@ -122,8 +126,6 @@ class FuseGlobalsPass
     // Note that we are only looking for stores within the same block - we
     // expect other canonicalizations to have moved stores into the same block
     // that are guaranteed to be on the same execution path.
-    //
-    //
     DenseMap<StringRef, llvm::BitVector> correlationMap;
     llvm::BitVector tempBits(globalTable.size());
     for (auto callableOp : moduleOp.getOps<CallableOpInterface>()) {
@@ -132,14 +134,16 @@ class FuseGlobalsPass
       auto *region = callableOp.getCallableRegion();
       if (!region) continue;
       for (auto &block : *region) {
-        DenseMap<Value, SmallVector<IREE::Util::GlobalStoreOp>> valueStores;
-        for (auto storeOp : block.getOps<IREE::Util::GlobalStoreOp>()) {
-          auto &global = globalTable.globalMap[storeOp.getGlobal()];
+        DenseMap<Value, SmallVector<IREE::Util::GlobalStoreOpInterface>>
+            valueStores;
+        for (auto storeOp :
+             block.getOps<IREE::Util::GlobalStoreOpInterface>()) {
+          auto &global = globalTable.globalMap[storeOp.getGlobalName()];
           LLVM_DEBUG(llvm::dbgs()
                      << " - store #" << global.ordinal << ": " << storeOp
                      << "; candidate=" << global.isCandidate() << "\n");
           if (!global.isCandidate()) continue;
-          valueStores[storeOp.getValue()].push_back(storeOp);
+          valueStores[storeOp.getStoredGlobalValue()].push_back(storeOp);
         }
         for (auto valueStore : valueStores) {
           LLVM_DEBUG({
@@ -149,19 +153,19 @@ class FuseGlobalsPass
             llvm::dbgs() << ":\n";
             for (auto storeOp : valueStore.second) {
               LLVM_DEBUG(llvm::dbgs()
-                         << " => @" << storeOp.getGlobal() << "\n");
+                         << " => @" << storeOp.getGlobalName() << "\n");
             }
           });
           tempBits.reset();
           for (auto storeOp : valueStore.second) {
-            auto &global = globalTable.globalMap[storeOp.getGlobal()];
+            auto &global = globalTable.globalMap[storeOp.getGlobalName()];
             tempBits.set(global.ordinal);
           }
           for (auto storeOp : valueStore.second) {
-            auto entry = correlationMap.find(storeOp.getGlobal());
+            auto entry = correlationMap.find(storeOp.getGlobalName());
             if (entry == correlationMap.end()) {
               correlationMap.insert(
-                  std::make_pair(storeOp.getGlobal(), tempBits));
+                  std::make_pair(storeOp.getGlobalName(), tempBits));
             } else {
               entry->second &= tempBits;
             }
@@ -199,8 +203,9 @@ class FuseGlobalsPass
         auto globalName = it.first;
         auto &correlationBits = it.second;
         auto &global = globalTable.globalMap[globalName];
-        llvm::dbgs() << "= #" << global.ordinal << " " << global.op.getName()
-                     << " = " << correlationBits << ":\n";
+        llvm::dbgs() << "= #" << global.ordinal << " "
+                     << global.op.getGlobalName() << " = " << correlationBits
+                     << ":\n";
         for (auto ordinal : correlationBits.set_bits()) {
           llvm::dbgs() << "  => " << globalTable.globalOrder[ordinal] << "\n";
         }
@@ -215,7 +220,8 @@ class FuseGlobalsPass
       auto &correlationBits = it.second;
       auto &global = globalTable.globalMap[globalName];
       for (auto ordinal : correlationBits.set_bits()) {
-        ec.unionSets(global.op.getName(), globalTable.globalOrder[ordinal]);
+        ec.unionSets(global.op.getGlobalName(),
+                     globalTable.globalOrder[ordinal]);
       }
     }
 
@@ -230,7 +236,7 @@ class FuseGlobalsPass
       DenseMap<Attribute, SmallVector<Global *>> initialValueMap;
       for (auto mi = ec.member_begin(it); mi != ec.member_end(); ++mi) {
         Global &global = globalTable.globalMap[*mi];
-        initialValueMap[global.op.getInitialValueAttr()].push_back(&global);
+        initialValueMap[global.op.getGlobalInitialValue()].push_back(&global);
       }
       for (auto it : initialValueMap) {
         fusableSets.push_back(std::move(it.second));
@@ -240,7 +246,7 @@ class FuseGlobalsPass
     // For each foldable set combine into a single global and update all uses.
     SymbolTable symbolTable(moduleOp);
     for (auto &fusableSet : fusableSets) {
-      IREE::Util::GlobalOp baseGlobalOp = fusableSet.front()->op;
+      IREE::Util::GlobalOpInterface baseGlobalOp = fusableSet.front()->op;
 
       // Build fused location from all of the globals.
       SmallVector<Location> locs;
@@ -257,7 +263,7 @@ class FuseGlobalsPass
 
       // Replace all globals to point at the new one.
       auto baseGlobalNameAttr = FlatSymbolRefAttr::get(
-          baseGlobalOp.getContext(), baseGlobalOp.getSymName());
+          baseGlobalOp.getContext(), baseGlobalOp.getGlobalName());
       for (auto *global : fusableSet) {
         if (global->op == baseGlobalOp) continue;
 
