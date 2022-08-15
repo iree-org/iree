@@ -74,7 +74,7 @@ func.func @matmul_row_major(%arg0 : memref<64x64xf32>, %arg1 : memref<64x384xf32
 //   CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
 //   CHECK-DAG: %[[BB0:.*]], %[[OFFSET0:.*]], %[[SIZES0:.*]]:2, %[[STRIDES0:.*]]:2 = vmvx.get_buffer_descriptor %arg0
 //   CHECK-DAG: %[[BB1:.*]], %[[OFFSET1:.*]], %[[SIZE1:.*]], %[[STRIDE1:.*]] = vmvx.get_buffer_descriptor %arg1
-//       CHECK: vmvx.add lhs(%[[BB1]] offset %[[OFFSET1]] strides[%[[C0]], %[[STRIDE1]]] : !util.buffer)
+//       CHECK: vmvx.binary op("addf" : f32) lhs(%[[BB1]] offset %[[OFFSET1]] strides[%[[C0]], %[[STRIDE1]]] : !util.buffer)
 //  CHECK-SAME:   rhs(%[[BB0]] offset %[[OFFSET0]] strides[%[[STRIDES0]]#0, %[[STRIDES0]]#1] : !util.buffer)
 //  CHECK-SAME:   out(%[[BB0]] offset %[[OFFSET0]] strides[%[[STRIDES0]]#0, %[[STRIDES0]]#1] : !util.buffer)
 //  CHECK-SAME:   sizes(%[[SIZES0]]#0, %[[SIZES0]]#1)
@@ -93,14 +93,266 @@ func.func @addf2d_rank_broadcast(%arg0 : memref<64x64xf32>, %arg1 : memref<64xf3
 //   CHECK-DAG: %[[C1:.*]] = arith.constant 1 : index
 //   CHECK-DAG: %[[BB0:.*]], %[[OFFSET0:.*]], %[[SIZE0:.*]], %[[STRIDE0:.*]] = vmvx.get_buffer_descriptor %arg0
 //   CHECK-DAG: %[[BB1:.*]], %[[OFFSET1:.*]] = vmvx.get_buffer_descriptor %arg1
-//       CHECK: vmvx.add lhs(%[[BB1]] offset %[[OFFSET1]] strides[%[[C0]], %[[C0]]] : !util.buffer)
+//       CHECK: vmvx.binary op("addf" : f32) lhs(%[[BB1]] offset %[[OFFSET1]] strides[%[[C0]], %[[C0]]] : !util.buffer)
 //  CHECK-SAME:   rhs(%[[BB0]] offset %[[OFFSET0]] strides[%[[C0]], %[[STRIDE0]]] : !util.buffer)
-//  CHECK-SAME:   out(%[[BB0]] offset %[[OFFSET0]] strides[%[[C0]], %[[STRIDE0]]] : !util.buffer) sizes(%[[C1]], %[[SIZE0]]) : f32
+//  CHECK-SAME:   out(%[[BB0]] offset %[[OFFSET0]] strides[%[[C0]], %[[STRIDE0]]] : !util.buffer) sizes(%[[C1]], %[[SIZE0]])
 func.func @addf0d(%arg0 : memref<2xf32>, %arg1 : memref<f32>) {
   linalg.generic {indexing_maps = [affine_map<(d0) -> ()>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]}
     ins(%arg1 : memref<f32>) outs(%arg0 : memref<2xf32>) {
   ^bb0(%arg2: f32, %arg3: f32):
     %12 = arith.addf %arg2, %arg3 : f32
+    linalg.yield %12 : f32
+  }
+  func.return
+}
+
+// Now test all binary primitives just to make sure they convert. Split by
+// type because it is easier to copy/paste.
+// CHECK-LABEL: @addi
+// CHECK: vmvx.binary op("addi" : i32)
+func.func @addi(%arg0 : memref<64x64xi32>, %arg1 : memref<64xi32>) {
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+    ins(%arg1 : memref<64xi32>) outs(%arg0 : memref<64x64xi32>) {
+  ^bb0(%arg2: i32, %arg3: i32):
+    %12 = arith.addi %arg2, %arg3 : i32
+    linalg.yield %12 : i32
+  }
+  func.return
+}
+
+// Now test all binary primitives just to make sure they convert.
+// CHECK-LABEL: @andi
+// CHECK: vmvx.binary op("andi" : i32)
+func.func @andi(%arg0 : memref<64x64xi32>, %arg1 : memref<64xi32>) {
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+    ins(%arg1 : memref<64xi32>) outs(%arg0 : memref<64x64xi32>) {
+  ^bb0(%arg2: i32, %arg3: i32):
+    %12 = arith.andi %arg2, %arg3 : i32
+    linalg.yield %12 : i32
+  }
+  func.return
+}
+
+// Now test all binary primitives just to make sure they convert.
+// CHECK-LABEL: @divsi
+// CHECK: vmvx.binary op("divsi" : i32)
+func.func @divsi(%arg0 : memref<64x64xi32>, %arg1 : memref<64xi32>) {
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+    ins(%arg1 : memref<64xi32>) outs(%arg0 : memref<64x64xi32>) {
+  ^bb0(%arg2: i32, %arg3: i32):
+    %12 = arith.divsi %arg2, %arg3 : i32
+    linalg.yield %12 : i32
+  }
+  func.return
+}
+
+// Now test all binary primitives just to make sure they convert.
+// CHECK-LABEL: @divui
+// CHECK: vmvx.binary op("divui" : i32)
+func.func @divui(%arg0 : memref<64x64xi32>, %arg1 : memref<64xi32>) {
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+    ins(%arg1 : memref<64xi32>) outs(%arg0 : memref<64x64xi32>) {
+  ^bb0(%arg2: i32, %arg3: i32):
+    %12 = arith.divui %arg2, %arg3 : i32
+    linalg.yield %12 : i32
+  }
+  func.return
+}
+
+// Now test all binary primitives just to make sure they convert.
+// CHECK-LABEL: @muli
+// CHECK: vmvx.binary op("muli" : i32)
+func.func @muli(%arg0 : memref<64x64xi32>, %arg1 : memref<64xi32>) {
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+    ins(%arg1 : memref<64xi32>) outs(%arg0 : memref<64x64xi32>) {
+  ^bb0(%arg2: i32, %arg3: i32):
+    %12 = arith.muli %arg2, %arg3 : i32
+    linalg.yield %12 : i32
+  }
+  func.return
+}
+
+// Now test all binary primitives just to make sure they convert.
+// CHECK-LABEL: @ori
+// CHECK: vmvx.binary op("ori" : i32)
+func.func @ori(%arg0 : memref<64x64xi32>, %arg1 : memref<64xi32>) {
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+    ins(%arg1 : memref<64xi32>) outs(%arg0 : memref<64x64xi32>) {
+  ^bb0(%arg2: i32, %arg3: i32):
+    %12 = arith.ori %arg2, %arg3 : i32
+    linalg.yield %12 : i32
+  }
+  func.return
+}
+
+// Now test all binary primitives just to make sure they convert.
+// CHECK-LABEL: @shli
+// CHECK: vmvx.binary op("shli" : i32)
+func.func @shli(%arg0 : memref<64x64xi32>, %arg1 : memref<64xi32>) {
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+    ins(%arg1 : memref<64xi32>) outs(%arg0 : memref<64x64xi32>) {
+  ^bb0(%arg2: i32, %arg3: i32):
+    %12 = arith.shli %arg2, %arg3 : i32
+    linalg.yield %12 : i32
+  }
+  func.return
+}
+
+// Now test all binary primitives just to make sure they convert.
+// CHECK-LABEL: @shrsi
+// CHECK: vmvx.binary op("shrsi" : i32)
+func.func @shrsi(%arg0 : memref<64x64xi32>, %arg1 : memref<64xi32>) {
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+    ins(%arg1 : memref<64xi32>) outs(%arg0 : memref<64x64xi32>) {
+  ^bb0(%arg2: i32, %arg3: i32):
+    %12 = arith.shrsi %arg2, %arg3 : i32
+    linalg.yield %12 : i32
+  }
+  func.return
+}
+
+// Now test all binary primitives just to make sure they convert.
+// CHECK-LABEL: @xori
+// CHECK: vmvx.binary op("xori" : i32)
+func.func @xori(%arg0 : memref<64x64xi32>, %arg1 : memref<64xi32>) {
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+    ins(%arg1 : memref<64xi32>) outs(%arg0 : memref<64x64xi32>) {
+  ^bb0(%arg2: i32, %arg3: i32):
+    %12 = arith.xori %arg2, %arg3 : i32
+    linalg.yield %12 : i32
+  }
+  func.return
+}
+
+// Now test all binary primitives just to make sure they convert.
+// CHECK-LABEL: @subi
+// CHECK: vmvx.binary op("subi" : i32)
+func.func @subi(%arg0 : memref<64x64xi32>, %arg1 : memref<64xi32>) {
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+    ins(%arg1 : memref<64xi32>) outs(%arg0 : memref<64x64xi32>) {
+  ^bb0(%arg2: i32, %arg3: i32):
+    %12 = arith.subi %arg2, %arg3 : i32
+    linalg.yield %12 : i32
+  }
+  func.return
+}
+
+// CHECK-LABEL: @divf
+// CHECK: vmvx.binary op("divf" : f32)
+func.func @divf(%arg0 : memref<64x64xf32>, %arg1 : memref<64xf32>) {
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+    ins(%arg1 : memref<64xf32>) outs(%arg0 : memref<64x64xf32>) {
+  ^bb0(%arg2: f32, %arg3: f32):
+    %12 = arith.divf %arg2, %arg3 : f32
+    linalg.yield %12 : f32
+  }
+  func.return
+}
+
+// CHECK-LABEL: @mulf
+// CHECK: vmvx.binary op("mulf" : f32)
+func.func @mulf(%arg0 : memref<64x64xf32>, %arg1 : memref<64xf32>) {
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+    ins(%arg1 : memref<64xf32>) outs(%arg0 : memref<64x64xf32>) {
+  ^bb0(%arg2: f32, %arg3: f32):
+    %12 = arith.mulf %arg2, %arg3 : f32
+    linalg.yield %12 : f32
+  }
+  func.return
+}
+
+// CHECK-LABEL: @subf
+// CHECK: vmvx.binary op("subf" : f32)
+func.func @subf(%arg0 : memref<64x64xf32>, %arg1 : memref<64xf32>) {
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+    ins(%arg1 : memref<64xf32>) outs(%arg0 : memref<64x64xf32>) {
+  ^bb0(%arg2: f32, %arg3: f32):
+    %12 = arith.subf %arg2, %arg3 : f32
+    linalg.yield %12 : f32
+  }
+  func.return
+}
+
+// Unary ops.
+// CHECK-LABEL: @absf
+// CHECK: vmvx.unary op("absf" : f32)
+func.func @absf(%arg0 : memref<64x64xf32>, %arg1 : memref<64xf32>) {
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+    ins(%arg1 : memref<64xf32>) outs(%arg0 : memref<64x64xf32>) {
+  ^bb0(%arg2: f32, %arg3: f32):
+    %12 = math.abs %arg2 : f32
+    linalg.yield %12 : f32
+  }
+  func.return
+}
+
+// CHECK-LABEL: @ceilf
+// CHECK: vmvx.unary op("ceilf" : f32)
+func.func @ceilf(%arg0 : memref<64x64xf32>, %arg1 : memref<64xf32>) {
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+    ins(%arg1 : memref<64xf32>) outs(%arg0 : memref<64x64xf32>) {
+  ^bb0(%arg2: f32, %arg3: f32):
+    %12 = math.ceil %arg2 : f32
+    linalg.yield %12 : f32
+  }
+  func.return
+}
+
+// CHECK-LABEL: @exp
+// CHECK: vmvx.unary op("expf" : f32)
+func.func @expf(%arg0 : memref<64x64xf32>, %arg1 : memref<64xf32>) {
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+    ins(%arg1 : memref<64xf32>) outs(%arg0 : memref<64x64xf32>) {
+  ^bb0(%arg2: f32, %arg3: f32):
+    %12 = math.exp %arg2 : f32
+    linalg.yield %12 : f32
+  }
+  func.return
+}
+
+// CHECK-LABEL: @floorf
+// CHECK: vmvx.unary op("floorf" : f32)
+func.func @floorf(%arg0 : memref<64x64xf32>, %arg1 : memref<64xf32>) {
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+    ins(%arg1 : memref<64xf32>) outs(%arg0 : memref<64x64xf32>) {
+  ^bb0(%arg2: f32, %arg3: f32):
+    %12 = math.floor %arg2 : f32
+    linalg.yield %12 : f32
+  }
+  func.return
+}
+
+// CHECK-LABEL: @log
+// CHECK: vmvx.unary op("logf" : f32)
+func.func @logf(%arg0 : memref<64x64xf32>, %arg1 : memref<64xf32>) {
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+    ins(%arg1 : memref<64xf32>) outs(%arg0 : memref<64x64xf32>) {
+  ^bb0(%arg2: f32, %arg3: f32):
+    %12 = math.log %arg2 : f32
+    linalg.yield %12 : f32
+  }
+  func.return
+}
+
+// CHECK-LABEL: @negf
+// CHECK: vmvx.unary op("negf" : f32)
+func.func @negf(%arg0 : memref<64x64xf32>, %arg1 : memref<64xf32>) {
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+    ins(%arg1 : memref<64xf32>) outs(%arg0 : memref<64x64xf32>) {
+  ^bb0(%arg2: f32, %arg3: f32):
+    %12 = arith.negf %arg2 : f32
+    linalg.yield %12 : f32
+  }
+  func.return
+}
+
+// CHECK-LABEL: @rsqrt
+// CHECK: vmvx.unary op("rsqrtf" : f32)
+func.func @rsqrt(%arg0 : memref<64x64xf32>, %arg1 : memref<64xf32>) {
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+    ins(%arg1 : memref<64xf32>) outs(%arg0 : memref<64x64xf32>) {
+  ^bb0(%arg2: f32, %arg3: f32):
+    %12 = math.rsqrt %arg2 : f32
     linalg.yield %12 : f32
   }
   func.return
