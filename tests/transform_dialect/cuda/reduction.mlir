@@ -1,8 +1,11 @@
-// RUN: iree-compile %s -iree-hal-target-backends=cuda \
+// RUN: iree-opt %s -iree-hal-target-backends=cuda \
+// RUN:     -iree-abi-transformation-pipeline \
+// RUN:     -iree-flow-transformation-pipeline  \
 // RUN:     -iree-flow-dispatch-use-transform-dialect=%p/reduction_dispatch_spec.mlir \
-// RUN:     -iree-hal-dump-executable-sources-to=- -o /dev/null | \
+// RUN:     -iree-stream-transformation-pipeline \
+// RUN:     -iree-hal-configuration-pipeline | \
 // RUN: iree-opt -pass-pipeline='hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target-pass))' \
-// RUN:     -iree-codegen-llvmgpu-use-transform-dialect=%p/reduction_codegen_spec.mlir |\
+// RUN:     -iree-codegen-llvmgpu-use-transform-dialect=%p/reduction_codegen_spec.mlir | \
 // RUN: FileCheck %s
 
 // RUN: iree-compile %s -iree-hal-target-backends=cuda \
@@ -15,8 +18,7 @@ func.func @reduce() -> (tensor<8xf32>) {
   %cst = arith.constant -0.000000e+00 : f32
 
   // Note: arith.constant is good for our purposes here but it may be useful to use
-  // util.unfoldable_constant. However that would not bufferize with just iree-opt
-  // for now and only bufferizes via iree-run-mlir.
+  // util.unfoldable_constant.
   %arg = arith.constant dense<1.0> : tensor<8x64xf32>
   %0 = linalg.init_tensor [8] : tensor<8xf32>
   %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<8xf32>) ->   tensor<8xf32>
