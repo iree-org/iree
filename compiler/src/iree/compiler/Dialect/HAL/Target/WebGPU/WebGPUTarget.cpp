@@ -113,9 +113,9 @@ class WebGPUTargetBackend : public TargetBackend {
     SymbolUserMap symbolUsers(symbolTable, variantOp);
     for (auto exportOp : exportOps) {
       auto entryPointFunc = dyn_cast<spirv::FuncOp>(
-          SymbolTable::lookupSymbolIn(spvModuleOp, exportOp.sym_name()));
+          SymbolTable::lookupSymbolIn(spvModuleOp, exportOp.getSymName()));
 
-      std::string symbolName = llvm::formatv("d{0}", exportOp.ordinal());
+      std::string symbolName = llvm::formatv("d{0}", exportOp.getOrdinal());
       mlir::StringAttr nameAttr =
           mlir::StringAttr::get(variantOp->getContext(), symbolName);
 
@@ -126,7 +126,7 @@ class WebGPUTargetBackend : public TargetBackend {
       // We only have one shader module right now, so all point to index 0.
       // TODO(#7824): Support multiple shader modules per executable.
       uint64_t ordinal =
-          exportOp.ordinal().getValueOr(APInt(64, 0)).getZExtValue();
+          exportOp.getOrdinal().getValueOr(APInt(64, 0)).getZExtValue();
       entryPointOrdinals[ordinal] = 0;
     }
 
@@ -199,10 +199,10 @@ class WebGPUTargetBackend : public TargetBackend {
 
     // Add the binary data to the target executable.
     auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-        variantOp.getLoc(), variantOp.sym_name(),
-        variantOp.target().getFormat(),
+        variantOp.getLoc(), variantOp.getSymName(),
+        variantOp.getTarget().getFormat(),
         builder.getBufferAttr(executableBuilder.getContext()));
-    binaryOp.mime_typeAttr(
+    binaryOp.setMimeTypeAttr(
         executableBuilder.getStringAttr("application/x-flatbuffers"));
 
     return success();
