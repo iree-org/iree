@@ -201,17 +201,22 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
   ///
   /// TODO(hanchung): Add a pattern for legalizing mhlo.scatter to canonical
   /// form to MHLOToMHLOPreprocessingPass.
-  static bool hasCanonicalDimensionNumbers(mhlo::ScatterOp op) {
+    static bool hasCanonicalDimensionNumbers(mhlo::ScatterOp op) {
     auto dimNumbers = op.scatter_dimension_numbers();
     auto indicesType = op.scatter_indices().getType().cast<ShapedType>();
     auto indicesRank = indicesType.getRank();
-
-    if (indicesRank < 2) return false;
-    if (dimNumbers.getIndexVectorDim() != indicesRank - 1) return false;
-
+    auto indexVectorDim = dimNumbers.getIndexVectorDim();
     auto indexDepth = indicesType.getShape().back();
     auto scatterDimsToOperandDims = dimNumbers.getScatterDimsToOperandDims();
-    if (scatterDimsToOperandDims.size() != indexDepth) return false;
+
+    // The indices have an implicit trailing dim
+    if (indexVectorDim == indicesRank) {
+      if (indicesRank < 1) return false;
+    } else {
+      if (indicesRank < 2) return false;
+      if (indexVectorDim != indicesRank - 1) return false;
+      if (scatterDimsToOperandDims.size() != indexDepth) return false;
+    }
     for (auto en : llvm::enumerate(scatterDimsToOperandDims)) {
       if (en.index() != en.value()) return false;
     }
@@ -226,6 +231,37 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
     }
 
     return true;
+  }
+
+  static Value insertImplicitTrailingDimIfNeeded(
+      mhlo::ScatterOp op, ConversionPatternRewriter &rewriter,
+      OpAdaptor adaptor) {
+    auto scatterIndices = adaptor.scatter_indices();
+    auto scatterDims = adaptor.scatter_dimension_numbers();
+    auto indicesType = scatterIndices.getType().cast<ShapedType>();
+    auto indicesShape = indicesType.getShape();
+    auto indicesRank = indicesType.getRank();
+    auto indexVectorDim = scatterDims.getIndexVectorDim();
+
+    if (indexVectorDim == indicesRank) {
+      SmallVector<ReassociationExprs, 4> reassociationMap;
+      reassociationMap.resize(indicesRank);
+      SmallVector<int64_t> newShape;
+      for (int i = 0; i < indicesRank; i++) {
+        reassociationMap[i].push_back(rewriter.getAffineDimExpr(i));
+        newShape.push_back(indicesShape[i]);
+      }
+      reassociationMap[indicesRank - 1].push_back(
+          rewriter.getAffineDimExpr(indicesRank));
+      newShape.push_back(1);
+      Type newType =
+          RankedTensorType::get(newShape, indicesType.getElementType());
+      return rewriter
+          .create<tensor::ExpandShapeOp>(op.getLoc(), newType, scatterIndices,
+                                         reassociationMap)
+          .getResult();
+    }
+    return scatterIndices;
   }
 
   static SmallVector<int64_t> getTiedResultOperandIndices(ValueRange operands) {
@@ -285,12 +321,14 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
     ImplicitLocOpBuilder b(op.getLoc(), rewriter);
 
     Value original = adaptor.operands().front();
-    Value indices = adaptor.scatter_indices();
+    Value indices = insertImplicitTrailingDimIfNeeded(
+        op, rewriter, adaptor);
     Value updates = adaptor.updates().front();
 
     if (failed(collapseBatchDimsIfNeeded(indices, updates, b))) {
       return failure();
     }
+
     auto scatterOp = rewriter.create<IREE::LinalgExt::ScatterOp>(
         op.getLoc(), op->getResultTypes(), ValueRange{updates, indices},
         ValueRange{original}, op.unique_indices());
@@ -306,7 +344,6 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
     signatureConverter.addInputs(1, argType);
     signatureConverter.addInputs(0, argType);
     rewriter.applySignatureConversion(&region, signatureConverter);
-
     rewriter.replaceOp(op, scatterOp->getResults());
     return success();
   }
