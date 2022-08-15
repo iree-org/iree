@@ -71,6 +71,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:ArithmeticUtils",
         "@llvm-project//mlir:ControlFlowInterfaces",
+        "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:InferTypeOpInterface",
