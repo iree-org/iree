@@ -276,12 +276,22 @@ static void appendDispatchBenchmark(IREE::HAL::ExecutableOp executableOp,
   }
   if (currentSet != -1) flushSet();
 
+  // @executable::@variant::@export
+  auto exportRefAttr =
+      SymbolRefAttr::get(executableOp.getNameAttr(),
+                         {
+                             SymbolRefAttr::get(variantOp.getNameAttr()),
+                             SymbolRefAttr::get(exportOp.getNameAttr()),
+                         });
+
   // Compute the workgroup parameters.
   auto workload = llvm::to_vector(
       llvm::map_range(dispatchParams.workload,
                       [&](unsigned dim) { return indexSet.get(dim); }));
-  auto workgroupCount =
-      exportOp.calculateWorkgroupCount(loc, device, workload, funcBuilder);
+  auto workgroupCountOp =
+      funcBuilder.create<IREE::HAL::ExecutableCalculateWorkgroupsOp>(
+          loc, funcBuilder.getIndexType(), funcBuilder.getIndexType(),
+          funcBuilder.getIndexType(), device, exportRefAttr, workload);
 
   // Loop around dispatches based on batch size.
   // Note that we insert a barrier between each dispatch - we could make this
@@ -290,15 +300,9 @@ static void appendDispatchBenchmark(IREE::HAL::ExecutableOp executableOp,
       loc, indexSet.get(0), batchSizeArg, indexSet.get(1), ValueRange{},
       [&](OpBuilder &forBuilder, Location loc, Value iv, ValueRange iters) {
         // Dispatch.
-        auto symbolRefAttr =
-            SymbolRefAttr::get(executableOp.getNameAttr(),
-                               {
-                                   SymbolRefAttr::get(variantOp.getNameAttr()),
-                                   SymbolRefAttr::get(exportOp.getNameAttr()),
-                               });
         forBuilder.create<IREE::HAL::CommandBufferDispatchSymbolOp>(
-            loc, commandBuffer, symbolRefAttr, workgroupCount[0],
-            workgroupCount[1], workgroupCount[2]);
+            loc, commandBuffer, exportRefAttr, workgroupCountOp.getWorkgroupX(),
+            workgroupCountOp.getWorkgroupY(), workgroupCountOp.getWorkgroupZ());
 
         // Barrier following the dispatch to block the next dispatch.
         auto sourceStage = IREE::HAL::ExecutionStageBitfield::CommandRetire |
