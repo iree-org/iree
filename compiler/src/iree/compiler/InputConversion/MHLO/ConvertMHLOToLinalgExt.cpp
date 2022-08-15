@@ -321,8 +321,7 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
     ImplicitLocOpBuilder b(op.getLoc(), rewriter);
 
     Value original = adaptor.operands().front();
-    Value indices = insertImplicitTrailingDimIfNeeded(
-        op, rewriter, adaptor);
+    Value indices = insertImplicitTrailingDimIfNeeded(op, rewriter, adaptor);
     Value updates = adaptor.updates().front();
 
     if (failed(collapseBatchDimsIfNeeded(indices, updates, b))) {
