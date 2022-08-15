@@ -9,8 +9,6 @@ add_mlir_public_c_api_library(IREEDialectsCAPI
   IREELinalgExtTransformOps
   IREELinalgTransformDialect
   IREELinalgTransformDialectPasses
-  IREEPyDMDialect
-  IREEPyDMPasses
 )
 
 iree_dialects_target_includes(IREEDialectsCAPI)

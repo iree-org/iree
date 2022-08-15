@@ -17,7 +17,6 @@
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
-#include "iree-dialects/Dialect/PyDM/IR/PyDMDialect.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Interfaces/Interfaces.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
@@ -46,8 +45,7 @@ inline void registerIreeDialects(DialectRegistry &registry) {
                   IREE::VM::VMDialect,
                   IREE::VMVX::VMVXDialect,
                   IREE::Vulkan::VulkanDialect,
-                  IREE::Input::IREEInputDialect,
-                  IREE::PYDM::IREEPyDMDialect>();
+                  IREE::Input::IREEInputDialect>();
   // clang-format on
 
   // External models.
