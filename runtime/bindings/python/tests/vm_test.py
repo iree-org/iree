@@ -46,7 +46,7 @@ def create_simple_dynamic_abs_module(instance):
   binary = iree.compiler.compile_str(
       """
       func.func @dynamic_abs(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32> {
-        %0 = math.abs %arg0 : tensor<?x?xf32>
+        %0 = math.absf %arg0 : tensor<?x?xf32>
         return %0 : tensor<?x?xf32>
       }
       """,

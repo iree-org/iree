@@ -20,6 +20,7 @@
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Dialect/Arithmetic/Transforms/Passes.h"
 #include "mlir/Dialect/Func/Transforms/Passes.h"
+#include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
@@ -42,8 +43,7 @@ static FailureOr<Value> gpuAllocateWorkgroupMemoryFn(OpBuilder &builder,
                                                      MemRefType memRefType,
                                                      ValueRange dynamicSizes,
                                                      unsigned alignment) {
-  auto storageClass = SPIRVTypeConverter::getMemorySpaceForStorageClass(
-      spirv::StorageClass::Workgroup);
+  auto storageClass = gpu::GPUDialect::getWorkgroupAddressSpace();
   MemRefType allocType = MemRefType::get(
       memRefType.getShape(), memRefType.getElementType(), {}, storageClass);
   return builder
@@ -57,8 +57,7 @@ static FailureOr<Value> gpuAllocateFunctionMemoryFn(OpBuilder &builder,
                                                     MemRefType memRefType,
                                                     ValueRange dynamicSizes,
                                                     unsigned alignment) {
-  auto storageClass = SPIRVTypeConverter::getMemorySpaceForStorageClass(
-      spirv::StorageClass::Function);
+  auto storageClass = gpu::GPUDialect::getWorkgroupAddressSpace();
   MemRefType allocType = MemRefType::get(
       memRefType.getShape(), memRefType.getElementType(), {}, storageClass);
   return builder
