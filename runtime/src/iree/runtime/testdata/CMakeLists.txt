@@ -23,6 +23,7 @@ iree_bytecode_module(
     "iree_runtime_testdata_simple_mul_module"
   FLAGS
     "--iree-hal-target-backends=vmvx"
+  TESTONLY
   PUBLIC
 )
 

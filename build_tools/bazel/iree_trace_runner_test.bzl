@@ -61,6 +61,7 @@ def iree_trace_runner_test(
             "--iree-hal-target-backends=%s" % target_backend,
         ] + compiler_flags,
         visibility = ["//visibility:private"],
+        testonly = True,
         **kwargs
     )
 
@@ -145,6 +146,7 @@ def iree_single_backend_generated_trace_runner_test(
         tools = [generator],
         message = "Generating code and trace for test %s..." % (name),
         output_to_bindir = 1,
+        testonly = True,
         **kwargs
     )
     iree_trace_runner_test(

@@ -24,6 +24,7 @@ endif()
 
 iree_bytecode_module(
     name = "simple_mul_module",
+    testonly = True,
     src = "simple_mul.mlir",
     c_identifier = "iree_runtime_testdata_simple_mul_module",
     flags = [
