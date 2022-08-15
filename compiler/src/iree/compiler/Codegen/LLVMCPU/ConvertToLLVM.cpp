@@ -555,7 +555,7 @@ class HALDispatchABI {
                                          /*import_func_ptr=*/importPtrValue,
                                          /*import_params=*/params,
                                      });
-    return callOp.getResult(0);
+    return callOp.getResult();
   }
 
  private:
