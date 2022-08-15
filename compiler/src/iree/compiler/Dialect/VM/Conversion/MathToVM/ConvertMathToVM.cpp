@@ -86,7 +86,7 @@ void populateMathToVMPatterns(MLIRContext *context,
                               TypeConverter &typeConverter,
                               RewritePatternSet &patterns) {
   patterns.insert<
-      UnaryArithmeticOpConversion<math::AbsOp, IREE::VM::AbsF32Op,
+      UnaryArithmeticOpConversion<math::AbsFOp, IREE::VM::AbsF32Op,
                                   IREE::VM::AbsF64Op>,
       UnaryArithmeticOpConversion<math::CeilOp, IREE::VM::CeilF32Op,
                                   IREE::VM::CeilF64Op>,
