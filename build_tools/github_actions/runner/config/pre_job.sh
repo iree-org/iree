@@ -6,7 +6,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-set -euo pipefail
+set -xeuo pipefail
 
 SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")";
 

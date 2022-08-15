@@ -12,7 +12,7 @@
 # and at the exit codes so it can retry if the runner is busy updating.
 # We disable updating, so can avoid those layers of cruft.
 
-set -euo pipefail
+set -xeuo pipefail
 
 echo "Starting runner"
 

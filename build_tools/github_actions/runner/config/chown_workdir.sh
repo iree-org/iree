@@ -6,7 +6,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-set -euo pipefail
+set -xeuo pipefail
 
 # Docker has a tendency to make things owned by root unless you do a dance with
 # which user you run it as. This can make the workspace unusable.

@@ -10,7 +10,7 @@
 # configuration settings and uses a proxy service to obtain runner registration
 # tokens (https://github.com/google-github-actions/github-runner-token-proxy).
 
-set -euo pipefail
+set -xeuo pipefail
 
 SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")";
 source "${SCRIPT_DIR}/functions.sh"
@@ -83,14 +83,15 @@ RUNNER_LABELS="${RUNNER_LABELS}${RUNNER_CUSTOM_LABELS:+,${RUNNER_CUSTOM_LABELS}}
 INSTANCE_ID="$(get_metadata instance/id)"
 GOOGLE_CLOUD_PROJECT="$(get_metadata project/project-id)"
 
-GOOGLE_CLOUD_RUN_ID_TOKEN="$(get_metadata "instance/service-accounts/default/identity?audience=${TOKEN_PROXY_URL}")"
-
+set +x
+echo "Calling get_token"
 REGISTER_TOKEN="$(get_token register ${RUNNER_SCOPE})"
 
 if [ -z "${REGISTER_TOKEN}" ]; then
   echo "failed to get registration runner token" >&2
   exit 1
 fi
+set -x
 
 declare -a args=(
   --unattended \
@@ -101,7 +102,7 @@ declare -a args=(
   --disableupdate \
   --url "https://github.com/${RUNNER_SCOPE}" \
   --name "${HOSTNAME}" \
-  # If we end up with name conflicts, just replace the old entry. 
+  # If we end up with name conflicts, just replace the old entry.
   --replace \
   --runnergroup "${RUNNER_GROUP}" \
   --labels "${RUNNER_LABELS}"
@@ -113,5 +114,6 @@ declare -a args=(
 # "running" a command exclusively to print it using the shell's builtin
 # functionality.
 (set -x; : Running configuration with additional args: "${args[@]}")
+set +x
 
 ~runner/actions-runner/config.sh --token "${REGISTER_TOKEN}" "${args[@]}"

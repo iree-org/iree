@@ -7,10 +7,10 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # Sets up GitHub actions runner services to start and teardown runner.
-# Registers the runner followed by enabling deregister service then 
+# Registers the runner followed by enabling deregister service then
 # starts the registered runner to accept self-hosted GitHub workflows.
 
-set -euo pipefail
+set -xeuo pipefail
 
 echo "Register the self-hoster runner."
 chmod +x ~runner/config/register.sh
