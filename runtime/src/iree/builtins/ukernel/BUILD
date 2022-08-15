@@ -15,8 +15,8 @@ package(
 iree_runtime_cc_library(
     name = "ukernel",
     srcs = [
-        "elementwise_impl.inc.c",
         "elementwise_generic.c",
+        "elementwise_impl.inc.c",
         "mmt4d_arm_64.c",
         "mmt4d_generic.c",
     ],
