@@ -6,27 +6,23 @@
 
 # Tests for end-to-end IREE support of entire models or their close derivatives.
 
-load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 
 package(
-    default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
 )
 
 iree_lit_test_suite(
     name = "lit",
-    srcs = enforce_glob(
-        [
-            "reduction.mlir",
-            "reduction_codegen_spec.mlir",
-            "reduction_dispatch_spec.mlir",
-        ],
-        include =
-            ["*.mlir"],
-    ),
+    srcs = ["reduction.mlir"],
     cfg = "//tests:lit.cfg.py",
+    # transform dialect spec files are MLIR files that specify a transformation,
+    # they need to be included as data.
+    data = [
+        "reduction_codegen_spec.mlir",
+        "reduction_dispatch_spec.mlir",
+    ],
     tags = [
         # CUDA cuInit fails with sanitizer on.
         "noasan",
