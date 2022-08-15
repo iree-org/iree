@@ -10,7 +10,7 @@ func.func @select_cmp_eq_select(%arg0: i64, %arg1: i64) -> i64 {
 
 transform.with_pdl_patterns {
 ^bb0(%arg0: !pdl.operation):
-  transform.sequence %arg0 {
+  transform.sequence %arg0 failures(propagate) {
   ^bb1(%arg1: !pdl.operation):
     %0 = transform.structured.match ops{["func.func"]} in %arg1
     transform.iree.apply_patterns %0 { canonicalization }
