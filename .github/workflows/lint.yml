@@ -8,123 +8,32 @@
 
 name: Lint
 
-on: [pull_request]
+on:
+  pull_request:
+    types:
+      - assigned
+      - unassigned
+      - labeled
+      - unlabeled
+      - opened
+      - edited
+      - closed
+      - reopened
+      - synchronize
+      - converted_to_draft
+      - ready_for_review
+      - locked
+      - unlocked
+      - review_requested
+      - review_request_removed
+      - auto_merge_enabled
+      - auto_merge_disabled
+
 
 jobs:
-  bazel_to_cmake:
+  print_event:
     runs-on: ubuntu-20.04
     steps:
-      - name: Checking out repository
-        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
-      - name: Running bazel_to_cmake for IREE core
-        run: ./build_tools/bazel_to_cmake/bazel_to_cmake.py --verbosity=2
-      - name: Running bazel_to_cmake for IREE TF Integration Tests
-        run: ./build_tools/bazel_to_cmake/bazel_to_cmake.py --root_dir=integrations/tensorflow/e2e --verbosity=2
-      - name: Checking Diff
+      - name: Print action
         run: |
-          # Make sure to pick up new files that have been added.
-          git add -A
-          git diff HEAD --exit-code
-
-  buildifier:
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Checking out repository
-        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
-      - name: Fetching Base Branch
-        # We have to explicitly fetch the base branch as well
-        run: git fetch --no-tags --prune --depth=1 origin "${GITHUB_BASE_REF?}:${GITHUB_BASE_REF?}"
-      - name: Downloading Buildifier
-        run: |
-          mkdir -p "${HOME?}/bin"
-          wget https://github.com/bazelbuild/buildtools/releases/download/4.0.1/buildifier -O "${HOME?}/bin/buildifier"
-          chmod +x "${HOME?}/bin/buildifier"
-          echo "${HOME?}/bin" >> $GITHUB_PATH
-      - name: Running buildifier on changed files
-        run: |
-          # Fail if the script fails (unfixable lint warnings) or it creates a
-          # diff (fixable lint warnings or formatting).
-          EXIT_CODE=0
-          ./build_tools/scripts/run_buildifier.sh "${GITHUB_BASE_REF?}" || EXIT_CODE=1
-          git diff --exit-code
-          exit "${EXIT_CODE?}"
-
-  yapf:
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Checking out repository
-        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
-      - name: Setting up python
-        uses: actions/setup-python@7f80679172b057fc5e90d70d197929d454754a5a # v2
-      - name: Fetching Base Branch
-        # We have to explicitly fetch the base branch as well
-        run: git fetch --no-tags --prune --depth=1 origin "${GITHUB_BASE_REF?}:${GITHUB_BASE_REF?}"
-      - name: Install yapf
-        run: |
-          python3 -m pip install yapf==0.30.0
-      - name: Run format_diff.py with yapf
-        run: |
-          git diff -U0 "${GITHUB_BASE_REF?}" | python3 third_party/format_diff/format_diff.py yapf -i
-          git diff --exit-code
-      - name: Instructions for fixing the above linting errors
-        if: ${{ failure() }}
-        run: |
-          printf "You can fix the lint errors above by running\n"
-          printf "  git diff -U0 "${GITHUB_BASE_REF?}" | python3 third_party/format_diff/format_diff.py yapf -i\n"
-
-  pytype:
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Checking out repository
-        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
-      - name: Setting up python
-        uses: actions/setup-python@7f80679172b057fc5e90d70d197929d454754a5a # v2
-        with:
-          # Pytype does not support python3.9, which this action defaults to.
-          python-version: "3.8"
-      - name: Fetching Base Branch
-        # We have to explicitly fetch the base branch as well
-        run: git fetch --no-tags --prune --depth=1 origin "${GITHUB_BASE_REF?}:${GITHUB_BASE_REF?}"
-      - name: Install pytype
-        run: python3 -m pip install pytype
-      - name: Run pytype on changed files
-        run: ./build_tools/pytype/check_diff.sh "${GITHUB_BASE_REF?}"
-
-  clang-format:
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Installing dependencies
-        run: |
-          wget https://raw.githubusercontent.com/llvm-mirror/clang/master/tools/clang-format/git-clang-format -O /tmp/git-clang-format
-          chmod +x /tmp/git-clang-format
-      - name: Checking out repository
-        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
-      - name: Fetching Base Branch
-        # We have to explicitly fetch the base branch as well
-        run: git fetch --no-tags --prune --depth=1 origin "${GITHUB_BASE_REF?}:${GITHUB_BASE_REF?}"
-      - name: Running clang-format on changed source files
-        run: |
-          /tmp/git-clang-format "${GITHUB_BASE_REF?}" --binary=clang-format-12 --style=file
-          git diff --exit-code
-
-  tabs:
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Checking out repository
-        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
-      - name: Fetching Base Branch
-        # We have to explicitly fetch the base branch as well
-        run: git fetch --no-tags --prune --depth=1 origin "${GITHUB_BASE_REF?}:${GITHUB_BASE_REF?}"
-      - name: Checking tabs
-        run: ./build_tools/scripts/check_tabs.sh "${GITHUB_BASE_REF?}"
-
-  yamllint:
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Checking out repository
-        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
-      - name: Fetching Base Branch
-        # We have to explicitly fetch the base branch as well
-        run: git fetch --no-tags --prune --depth=1 origin "${GITHUB_BASE_REF?}:${GITHUB_BASE_REF?}"
-      - name: yamllint
-        run: ./build_tools/scripts/run_yamllint.sh "${GITHUB_BASE_REF?}"
+          echo "${{ github.event.action }}"
