@@ -293,6 +293,19 @@ class GenericTypeConvert : public ConversionPattern {
   }
 };
 
+llvm::Optional<Value> scalarToTensor(OpBuilder &builder, Type /*type*/,
+                                     ValueRange inputs, Location loc) {
+  assert(inputs.size() == 1);
+  if (inputs.front().getType().isa<ShapedType>()) {
+    return llvm::None;
+  }
+  return builder
+      .create<tensor::FromElementsOp>(
+          loc, RankedTensorType::get({}, inputs.front().getType()),
+          inputs.front())
+      .getResult();
+}
+
 struct ConvertMHLOToLinalgOnTensorsPass
     : public ConvertMHLOToLinalgOnTensorsBase<
           ConvertMHLOToLinalgOnTensorsPass> {
@@ -307,6 +320,7 @@ struct ConvertMHLOToLinalgOnTensorsPass
     MLIRContext *context = &getContext();
 
     auto typeConverter = mhlo::createHloToLinalgSignedIntegerConverter();
+    typeConverter->addArgumentMaterialization(scalarToTensor);
     // NOTE: not using corresponding setupMHLOToFlowPatterns because the entire
     // MHLO dialects are marked illegal by this pass.
     // TODO: Collapse/rework all of these patterns once the consolidation
