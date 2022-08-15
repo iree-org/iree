@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import List
 
-from .common import DeviceArchitecture, DevicePlatform, DeviceSpec, Model, ModelInputData
+from .common_definitions import DeviceArchitecture, DevicePlatform, DeviceSpec, Model, ModelInputData
 
 
 class IreeTargetBackend(Enum):
