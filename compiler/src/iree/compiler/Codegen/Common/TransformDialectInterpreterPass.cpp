@@ -46,7 +46,7 @@
 #include "mlir/Support/FileUtilities.h"
 
 #define DEBUG_TYPE "iree-transform-dialect-interpreter"
-#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE << "]: ")
+#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 
 using namespace mlir;
 
@@ -120,6 +120,7 @@ class TransformDialectInterpreterPass
     if (failed(transform::parseTransformModuleFromFile(
             context, transformFileName, module)))
       return failure();
+
     sharedTransformModule =
         std::make_shared<OwningOpRef<ModuleOp>>(std::move(module));
     return success();
