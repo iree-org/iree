@@ -3,8 +3,9 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+"""Defines x86_64 linux devices."""
 
-from .common_definitions import DeviceArchitecture, DevicePlatform, DeviceSpec
+from ..definitions.common import DeviceArchitecture, DevicePlatform, DeviceSpec
 
 GCP_C2_STANDARD_16_DEVICE_SPEC = DeviceSpec(
     id="d1234",

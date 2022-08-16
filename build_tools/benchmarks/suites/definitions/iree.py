@@ -3,12 +3,13 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+"""Classes for defining IREE benchmarks."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import List
 
-from .common_definitions import DeviceArchitecture, DevicePlatform, DeviceSpec, Model, ModelInputData
+from .common import DeviceArchitecture, DevicePlatform, DeviceSpec, Model, ModelInputData
 
 
 class IreeTargetBackend(Enum):
@@ -50,7 +51,7 @@ class IreeCompileConfig(object):
   id: str
   tags: List[str]
   compile_targets: List[IreeCompileTarget]
-  extra_flags: List[str]
+  extra_flags: List[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -61,7 +62,7 @@ class IreeRunConfig(object):
   loader: IreeRuntimeLoader
   driver: IreeRuntimeDriver
   benchmark_tool: str
-  extra_flags: List[str]
+  extra_flags: List[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
