@@ -115,6 +115,56 @@ IREE_API_EXPORT iree_wait_source_t
 iree_hal_semaphore_await(iree_hal_semaphore_t* semaphore, uint64_t value);
 
 //===----------------------------------------------------------------------===//
+// iree_hal_semaphore_list_t
+//===----------------------------------------------------------------------===//
+
+// A list of semaphores and their corresponding payloads.
+// When signaling each semaphore will be set to the new payload value provided.
+// When waiting each semaphore must reach or exceed the payload value.
+// This points at external storage and does not retain the semaphores itself.
+typedef struct iree_hal_semaphore_list_t {
+  iree_host_size_t count;
+  iree_hal_semaphore_t** semaphores;
+  uint64_t* payload_values;
+} iree_hal_semaphore_list_t;
+
+// Returns an empty semaphore list.
+static inline iree_hal_semaphore_list_t iree_hal_semaphore_list_empty(void) {
+  iree_hal_semaphore_list_t list = {0};
+  return list;
+}
+
+// Signals each semaphore in |semaphore_list| to the defined timepoint.
+IREE_API_EXPORT iree_status_t
+iree_hal_semaphore_list_signal(iree_hal_semaphore_list_t semaphore_list);
+
+// Signals each semaphore in |semaphore_list| to indicate failure with
+// |signal_status|.
+IREE_API_EXPORT void iree_hal_semaphore_list_fail(
+    iree_hal_semaphore_list_t semaphore_list, iree_status_t signal_status);
+
+// Blocks the caller until all semaphore timepoints are reached or the |timeout|
+// elapses.
+//
+// Returns success if the wait is successful and all semaphores reached their
+// timepoints successfully.
+//
+// Returns IREE_STATUS_DEADLINE_EXCEEDED if the |timeout| elapses without all
+// timepoints being reached. If an asynchronous failure occurred on any timeline
+// this will return the failure status that was set immediately.
+//
+// Returns IREE_STATUS_ABORTED if one or more semaphores has failed. Callers can
+// use iree_hal_semaphore_query to get the status from each.
+//
+// NOTE: this is not the most optimal way to wait on semaphores; if at all
+// possible use a single wait on a single semaphore to avoid additional
+// overheads in multiplexing fences across device implementations. This list
+// wait should be used to perform a join that will propagate failures from any
+// semaphore used in timepoints.
+IREE_API_EXPORT iree_status_t iree_hal_semaphore_list_wait(
+    iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout);
+
+//===----------------------------------------------------------------------===//
 // iree_hal_semaphore_t implementation details
 //===----------------------------------------------------------------------===//
 

@@ -20,22 +20,6 @@ extern "C" {
 // iree_hal_fence_t
 //===----------------------------------------------------------------------===//
 
-// A list of semaphores and their corresponding payloads.
-// When signaling each semaphore will be set to the new payload value provided.
-// When waiting each semaphore must reach or exceed the payload value.
-// This points at external storage and does not retain the semaphores itself.
-typedef struct iree_hal_semaphore_list_t {
-  iree_host_size_t count;
-  iree_hal_semaphore_t** semaphores;
-  uint64_t* payload_values;
-} iree_hal_semaphore_list_t;
-
-// Returns an empty semaphore list.
-static inline iree_hal_semaphore_list_t iree_hal_semaphore_list_empty(void) {
-  iree_hal_semaphore_list_t list = {0};
-  return list;
-}
-
 // A set of semaphores and their corresponding payloads.
 // When signaling each semaphore will be set to the new payload value provided.
 // When waiting each semaphore must reach or exceed the payload value.

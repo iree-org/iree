@@ -173,9 +173,8 @@ TEST_P(semaphore_submission_test, SubmitWithMultipleSemaphores) {
   IREE_ASSERT_OK(iree_hal_semaphore_signal(wait_semaphore_1, 1ull));
   IREE_ASSERT_OK(iree_hal_semaphore_signal(wait_semaphore_2, 1ull));
 
-  IREE_ASSERT_OK(iree_hal_device_wait_semaphores(
-      device_, IREE_HAL_WAIT_MODE_ALL, &signal_semaphores,
-      iree_infinite_timeout()));
+  IREE_ASSERT_OK(
+      iree_hal_semaphore_list_wait(signal_semaphores, iree_infinite_timeout()));
 
   iree_hal_command_buffer_release(command_buffer);
   iree_hal_semaphore_release(wait_semaphore_1);
