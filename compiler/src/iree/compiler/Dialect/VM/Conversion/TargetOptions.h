@@ -18,7 +18,7 @@ namespace VM {
 // Controls VM translation targets.
 struct TargetOptions {
   // Target size of `index` when converted to an integer in bits.
-  int indexBits = 32;
+  int indexBits = 64;
 
   // Whether the f32 extension is enabled in the target VM.
   bool f32Extension = true;

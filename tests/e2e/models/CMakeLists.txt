@@ -114,6 +114,7 @@ iree_static_linker_test(
     "1x28x28x1xf32"
   COMPILER_FLAGS
     "--iree-input-type=mhlo"
+    "--iree-vm-target-index-bits=32"
   EMITC
 )
 
@@ -141,5 +142,7 @@ iree_static_linker_test(
     "simple_mul"
   FUNCTION_INPUTS
     "4xf32,4xf32"
+  COMPILER_FLAGS
+    "--iree-vm-target-index-bits=32"
   EMITC
 )
