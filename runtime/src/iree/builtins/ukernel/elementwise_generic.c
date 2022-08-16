@@ -7,7 +7,7 @@
 #include "elementwise.h"
 
 // Include the generic implementation helpers.
-#include "elementwise_impl.inc.c"
+#include "elementwise_impl.c.inc"
 
 DISPATCH_UKERNEL_BINARY_2D(addf, IREE_UKERNEL_X32B_ADDF, uint32_t, x32b);
 DISPATCH_UKERNEL_BINARY_2D(addi, IREE_UKERNEL_X32B_ADDI, uint32_t, x32b);

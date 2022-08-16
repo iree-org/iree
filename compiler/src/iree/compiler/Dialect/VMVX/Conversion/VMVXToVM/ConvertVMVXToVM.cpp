@@ -128,7 +128,7 @@ class BinaryOpConversion : public VMVXImportOpConversion<IREE::VMVX::BinaryOp> {
     name.append(".");
     name.append(std::to_string(rank));
     name.append("d.");
-    name.append(getSizedTypeStr(op.getElementType()));
+    name.append(getTypedTypeStr(op.getElementType()));
     return name;
   }
 };
@@ -185,7 +185,7 @@ class UnaryOpConversion : public VMVXImportOpConversion<IREE::VMVX::UnaryOp> {
     name.append(".");
     name.append(std::to_string(rank));
     name.append("d.");
-    name.append(getSizedTypeStr(op.getElementType()));
+    name.append(getTypedTypeStr(op.getElementType()));
     return name;
   }
 };

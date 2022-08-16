@@ -30,7 +30,7 @@ vm.module @vmvx {
 // Each is specialized by opcode, rank and type width.
 //===----------------------------------------------------------------------===//
 
-vm.import @addf.2d.x32(
+vm.import @addf.2d.f32(
   %lhs_buffer : !vm.buffer,
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
@@ -46,7 +46,7 @@ vm.import @addf.2d.x32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @addi.2d.x32(
+vm.import @addi.2d.i32(
   %lhs_buffer : !vm.buffer,
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
@@ -62,7 +62,7 @@ vm.import @addi.2d.x32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @andi.2d.x32(
+vm.import @andi.2d.i32(
   %lhs_buffer : !vm.buffer,
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
@@ -78,7 +78,7 @@ vm.import @andi.2d.x32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @divf.2d.x32(
+vm.import @divf.2d.f32(
   %lhs_buffer : !vm.buffer,
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
@@ -94,7 +94,7 @@ vm.import @divf.2d.x32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @divsi.2d.x32(
+vm.import @divsi.2d.i32(
   %lhs_buffer : !vm.buffer,
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
@@ -110,7 +110,7 @@ vm.import @divsi.2d.x32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @divui.2d.x32(
+vm.import @divui.2d.i32(
   %lhs_buffer : !vm.buffer,
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
@@ -126,7 +126,7 @@ vm.import @divui.2d.x32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @mulf.2d.x32(
+vm.import @mulf.2d.f32(
   %lhs_buffer : !vm.buffer,
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
@@ -142,7 +142,7 @@ vm.import @mulf.2d.x32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @muli.2d.x32(
+vm.import @muli.2d.i32(
   %lhs_buffer : !vm.buffer,
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
@@ -158,7 +158,7 @@ vm.import @muli.2d.x32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @ori.2d.x32(
+vm.import @ori.2d.i32(
   %lhs_buffer : !vm.buffer,
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
@@ -174,7 +174,7 @@ vm.import @ori.2d.x32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @shli.2d.x32(
+vm.import @shli.2d.i32(
   %lhs_buffer : !vm.buffer,
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
@@ -190,7 +190,7 @@ vm.import @shli.2d.x32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @shrsi.2d.x32(
+vm.import @shrsi.2d.i32(
   %lhs_buffer : !vm.buffer,
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
@@ -206,7 +206,7 @@ vm.import @shrsi.2d.x32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @shrui.2d.x32(
+vm.import @shrui.2d.i32(
   %lhs_buffer : !vm.buffer,
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
@@ -222,7 +222,7 @@ vm.import @shrui.2d.x32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @subf.2d.x32(
+vm.import @subf.2d.f32(
   %lhs_buffer : !vm.buffer,
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
@@ -238,7 +238,7 @@ vm.import @subf.2d.x32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @subi.2d.x32(
+vm.import @subi.2d.i32(
   %lhs_buffer : !vm.buffer,
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
@@ -254,7 +254,7 @@ vm.import @subi.2d.x32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @xori.2d.x32(
+vm.import @xori.2d.i32(
   %lhs_buffer : !vm.buffer,
   %lhs_offset : i64,
   %lhs_strides : tuple<i64, i64>,
@@ -275,7 +275,7 @@ vm.import @xori.2d.x32(
 // Each is specialized by opcode, rank and type width.
 //===----------------------------------------------------------------------===//
 
-vm.import @absf.2d.x32(
+vm.import @absf.2d.f32(
   %in_buffer : !vm.buffer,
   %in_offset : i64,
   %in_strides : tuple<i64, i64>,
@@ -285,7 +285,7 @@ vm.import @absf.2d.x32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @ceilf.2d.x32(
+vm.import @ceilf.2d.f32(
   %in_buffer : !vm.buffer,
   %in_offset : i64,
   %in_strides : tuple<i64, i64>,
@@ -295,7 +295,7 @@ vm.import @ceilf.2d.x32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @ctlz.2d.x32(
+vm.import @ctlz.2d.i32(
   %in_buffer : !vm.buffer,
   %in_offset : i64,
   %in_strides : tuple<i64, i64>,
@@ -305,7 +305,7 @@ vm.import @ctlz.2d.x32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @expf.2d.x32(
+vm.import @expf.2d.f32(
   %in_buffer : !vm.buffer,
   %in_offset : i64,
   %in_strides : tuple<i64, i64>,
@@ -315,7 +315,7 @@ vm.import @expf.2d.x32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @floorf.2d.x32(
+vm.import @floorf.2d.f32(
   %in_buffer : !vm.buffer,
   %in_offset : i64,
   %in_strides : tuple<i64, i64>,
@@ -325,7 +325,7 @@ vm.import @floorf.2d.x32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @logf.2d.x32(
+vm.import @logf.2d.f32(
   %in_buffer : !vm.buffer,
   %in_offset : i64,
   %in_strides : tuple<i64, i64>,
@@ -335,7 +335,7 @@ vm.import @logf.2d.x32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @negf.2d.x32(
+vm.import @negf.2d.f32(
   %in_buffer : !vm.buffer,
   %in_offset : i64,
   %in_strides : tuple<i64, i64>,
@@ -345,7 +345,7 @@ vm.import @negf.2d.x32(
   %sizes : tuple<i64, i64>
 )
 
-vm.import @rsqrtf.2d.x32(
+vm.import @rsqrtf.2d.f32(
   %in_buffer : !vm.buffer,
   %in_offset : i64,
   %in_strides : tuple<i64, i64>,
