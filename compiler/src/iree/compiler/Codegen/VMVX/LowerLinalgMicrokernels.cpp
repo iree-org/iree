@@ -700,7 +700,7 @@ struct LinalgUnaryGenericConversion
     // Emit from the iree_ukernel_x32b_opcode_t table.
     Optional<UnaryEmitter> emitter =
         TypeSwitch<Operation *, Optional<UnaryEmitter>>(unaryOp)
-            .Case([&](math::AbsOp op) -> Optional<UnaryEmitter> {
+            .Case([&](math::AbsFOp op) -> Optional<UnaryEmitter> {
               if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
                 return configureGenericUnary(op, "abs");
               }
