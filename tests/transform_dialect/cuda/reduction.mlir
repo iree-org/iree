@@ -1,16 +1,16 @@
-// RUN: iree-opt %s -iree-hal-target-backends=cuda \
-// RUN:     -iree-abi-transformation-pipeline \
-// RUN:     -iree-flow-transformation-pipeline  \
-// RUN:     -iree-flow-dispatch-use-transform-dialect=%p/reduction_dispatch_spec.mlir \
-// RUN:     -iree-stream-transformation-pipeline \
-// RUN:     -iree-hal-configuration-pipeline | \
-// RUN: iree-opt -pass-pipeline='hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target-pass))' \
-// RUN:     -iree-codegen-llvmgpu-use-transform-dialect=%p/reduction_codegen_spec.mlir | \
+// RUN: iree-opt %s --iree-hal-target-backends=cuda \
+// RUN:     --iree-abi-transformation-pipeline \
+// RUN:     --iree-flow-transformation-pipeline  \
+// RUN:     --iree-flow-dispatch-use-transform-dialect=%p/reduction_dispatch_spec.mlir \
+// RUN:     --iree-stream-transformation-pipeline \
+// RUN:     --iree-hal-configuration-pipeline | \
+// RUN: iree-opt --pass-pipeline='hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target-pass))' \
+// RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/reduction_codegen_spec.mlir | \
 // RUN: FileCheck %s
 
-// RUN: iree-compile %s -iree-hal-target-backends=cuda \
-// RUN:     -iree-flow-dispatch-use-transform-dialect=%p/reduction_dispatch_spec.mlir \
-// RUN:     -iree-codegen-llvmgpu-use-transform-dialect=%p/reduction_codegen_spec.mlir |\
+// RUN: iree-compile %s --iree-hal-target-backends=cuda \
+// RUN:     --iree-flow-dispatch-use-transform-dialect=%p/reduction_dispatch_spec.mlir \
+// RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/reduction_codegen_spec.mlir | \
 // RUN: iree-run-module --entry_function=reduce --device=cuda |\
 // RUN: FileCheck %s --check-prefix=EXEC
 
