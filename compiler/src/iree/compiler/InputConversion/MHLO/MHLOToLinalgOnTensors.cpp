@@ -348,6 +348,7 @@ struct ScatterUpdateConversion : public OpConversionPattern<mhlo::ScatterOp> {
     result = rewriter.create<arith::SelectOp>(loc, args[2].getType(), pred,
                                               args[2], result);
 
+    op.emitWarning("op is lowered to an inefficient way, which is unexpected");
     rewriter.replaceOpWithNewOp<linalg::YieldOp>(terminator, result);
     rewriter.replaceOp(op, linalgOp.getResults());
     return success();
@@ -535,9 +536,9 @@ void populateMHLOToLinalgOnTensorsConversionPatterns(
   mhlo::populateHloToLinalgConversionPattern(context, typeConverter, &patterns);
   // TODO(#5809): Drop ConcatenateOp lowering in favor of the upstream version
   //              then remove the PatternBenefit here
-  patterns.insert<ConcatenateOpConversion, FftOpConversion,
-                  ScatterUpdateConversion>(typeConverter, context,
-                                           PatternBenefit(1000));
+  patterns.insert<ScatterUpdateConversion>(typeConverter, context);
+  patterns.insert<ConcatenateOpConversion, FftOpConversion>(
+      typeConverter, context, PatternBenefit(1000));
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>> createMHLOToLinalgOnTensorsPass() {
