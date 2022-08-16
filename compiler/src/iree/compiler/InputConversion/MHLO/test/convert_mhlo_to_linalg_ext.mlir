@@ -243,7 +243,7 @@ func.func @scatter_update_scalar_1D(%arg0: tensor<8xi32>, %arg1: tensor<4x1xi32>
 // CHECK-SAME:      ins(%[[ARG2]], %[[ARG1]] : tensor<4xi32>, tensor<4x1xi32>)
 // CHECK-SAME:      outs(%[[ARG0]] : tensor<8xi32>)
 // CHECK:           ^bb0(%[[V1:.+]]: i32, %[[V2:.+]]: i32):
-// CEECK:             linalg.yield %[[V1]]
+// CHECK:             iree_linalg_ext.yield %[[V1]]
 // CHECK:         return %[[SCATTER]]
 
 // -----
@@ -272,7 +272,7 @@ func.func @scatter_update_scalar_2D(%arg0: tensor<4x3xi32>, %arg1: tensor<3x2xi3
 // CHECK-SAME:      ins(%[[ARG2]], %[[ARG1]] : tensor<3xi32>, tensor<3x2xi32>)
 // CHECK-SAME:      outs(%[[ARG0]] : tensor<4x3xi32>)
 // CHECK:           ^bb0(%[[V1:.+]]: i32, %[[V2:.+]]: i32):
-// CEECK:             linalg.yield %[[V1]]
+// CHECK:             iree_linalg_ext.yield %[[V1]]
 // CHECK:         return %[[SCATTER]]
 
 // -----
@@ -303,7 +303,7 @@ func.func @scatter_update_slice_2D(%arg0: tensor<6x3xi32>, %arg1: tensor<2x1xi32
 // CHECK-SAME:      ins(%[[ARG2]], %[[ARG1]] : tensor<2x3xi32>, tensor<2x1xi32>)
 // CHECK-SAME:      outs(%[[ARG0]] : tensor<6x3xi32>)
 // CHECK:           ^bb0(%[[V1:.+]]: i32, %[[V2:.+]]: i32):
-// CEECK:             linalg.yield %[[V1]]
+// CHECK:             iree_linalg_ext.yield %[[V1]]
 // CHECK:         return %[[SCATTER]]
 
 // -----
@@ -338,7 +338,7 @@ func.func @scatter_add_slice_2D(%arg0: tensor<6x3xi32>, %arg1: tensor<2x1xi32>,
 //
 //                   The order is reverse.
 // CHECK:              %[[V3:.+]] = arith.addi %[[V2]], %[[V1]]
-// CEECK:              linalg.yield %[[V3]]
+// CHECK:              iree_linalg_ext.yield %[[V3]]
 // CHECK:         return %[[SCATTER]]
 
 // -----
@@ -372,7 +372,7 @@ func.func @scatter_update_batch_scalar_1D(%arg0: tensor<8xi32>,
 // CHECK-SAME:       ins(%[[COLLAPSED_UPDATES]], %[[COLLAPSED_INDICES]] : tensor<12xi32>, tensor<12x1xi32>)
 // CHECK-SAME:       outs(%[[ARG0]] : tensor<8xi32>)
 // CHECK:            ^bb0(%[[V1:.+]]: i32, %[[V2:.+]]: i32):
-// CEECK:              linalg.yield %[[V1]]
+// CHECK:              iree_linalg_ext.yield %[[V1]]
 // CHECK:         return %[[SCATTER]]
 
 // -----
@@ -406,10 +406,44 @@ func.func @scatter_update_batch_slice_3D_dynamic(%arg0: tensor<1x24x512xi32>,
 // CHECK-SAME:        ins(%[[COLLAPSED_UPDATES]], %[[COLLAPSED_INDICES]] : tensor<?x512xi32>, tensor<?x2xi32>)
 // CHECK-SAME:        outs(%[[ARG0]] : tensor<1x24x512xi32>)
 // CHECK:             ^bb0(%[[V1:.+]]: i32, %[[V2:.+]]: i32):
-// CEECK:               linalg.yield %[[V1]]
+// CHECK:               iree_linalg_ext.yield %[[V1]]
 // CHECK:         return %[[SCATTER]]
 
 // -----
+
+func.func @scatter_with_implicit_trailing_dim(%arg0: tensor<30522x384xf32>,
+  %arg1: tensor<512xi32>, %arg2: tensor<512x384xf32>) -> tensor<30522x384xf32> {
+  %0 = "mhlo.scatter"(%arg0, %arg1, %arg2) ({
+  ^bb0(%arg3: tensor<f32>, %arg4: tensor<f32>):
+    %1 = mhlo.add %arg3, %arg4 : tensor<f32>
+    "mhlo.return"(%1) : (tensor<f32>) -> ()
+  }) {indices_are_sorted = false,
+      scatter_dimension_numbers = #mhlo.scatter<
+      update_window_dims = [1],
+      inserted_window_dims = [0],
+      scatter_dims_to_operand_dims = [0],
+      index_vector_dim = 1>, 
+      unique_indices = false
+      } : (tensor<30522x384xf32>, tensor<512xi32>, tensor<512x384xf32>) -> tensor<30522x384xf32>
+  return %0 : tensor<30522x384xf32>
+}
+// CHECK-LABEL: func.func @scatter_with_implicit_trailing_dim
+// CHECK:         %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK:         %[[ARG1:[a-zA-Z0-9]+]]
+// CHECK:         %[[ARG2:[a-zA-Z0-9]+]]
+// CHECK:         %[[EXPANDED_INDICES:.+]] = tensor.expand_shape
+// CHECK-SAME:        %[[ARG1]] {{\[}}[0, 1]] : tensor<512xi32> into tensor<512x1xi32>
+// CHECK:         %[[SCATTER:.+]] = iree_linalg_ext.scatter
+// CHECK-SAME:        unique_indices(false)
+// CHECK-SAME:        ins(%[[ARG2]], %[[EXPANDED_INDICES]] : tensor<512x384xf32>, tensor<512x1xi32>)
+// CHECK-SAME:        outs(%[[ARG0]] : tensor<30522x384xf32>)
+// CHECK:           ^bb0(%[[V1:.+]]: f32, %[[V2:.+]]: f32):
+// CHECK:              %[[V3:.+]] = arith.addf %[[V2]], %[[V1]]
+// CHECK:              iree_linalg_ext.yield %[[V3]]
+// CHECK:         return %[[SCATTER]]
+
+// -----
+
 
 func.func @rfft_1d(%input: tensor<8xf32>) -> (tensor<5xf32>, tensor<5xf32>) {
   %0 = "mhlo.fft"(%input) {
