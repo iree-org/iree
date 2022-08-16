@@ -209,7 +209,8 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
     auto indexDepth = indicesType.getShape().back();
     auto scatterDimsToOperandDims = dimNumbers.getScatterDimsToOperandDims();
 
-    // The indices have an implicit trailing dim
+    // When the indices have an implicit trailing dim, the last dim is the index
+    // depth.
     if (indexVectorDim == indicesRank) {
       if (indicesRank < 1) return false;
     } else {
