@@ -266,7 +266,8 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
 void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
                                       int64_t numLevels, bool enablePeeling,
                                       bool lowerToAVX2 = false);
-void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager);
+void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager,
+					  bool skipSecondLevelTiling = false);
 
 // Populates the passes needed to do tiling, decomposing, and vectorizing the
 // convolution ops using the Codegen drivers from sandbox.

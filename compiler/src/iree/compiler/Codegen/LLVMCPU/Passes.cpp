@@ -255,7 +255,7 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager) {
   }
 }
 
-void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager) {
+void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager, bool skipSecondLevelTiling) {
   addTileAndDistributePasses(passManager);
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
@@ -322,7 +322,7 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager) {
   // Fold dim(pad) away before vectorization.
   nestedModulePM.addPass(memref::createResolveShapedTypeResultDimsPass());
 
-  {
+  if (!skipSecondLevelTiling) {
     LinalgSingleTilingExpertPassOptions options;
     options.vectorize = true;
     options.vectorizePadding = true;

@@ -26,24 +26,26 @@ def CPU_CPUAArchDoubleTilingExpert
 def CPU_BufferOpsTileAndVectorize
     : I32EnumAttrCase<"CPUBufferOpsTileAndVectorize", 6>;
 def CPU_TripleTilingExpert : I32EnumAttrCase<"CPUTripleTilingExpert", 7>;
+def CPU_SingleTiling2DPeelExpert : I32EnumAttrCase<"CPUSingleTiling2DPeelExpert", 8>;
+def CPU_SingleTiling3DPadExpert : I32EnumAttrCase<"CPUSingleTiling3DPadExpert", 9>;
 
 def Linalg_TransformInterpCodegen
-    : I32EnumAttrCase<"TransformDialectInterpreterCodegen", 8>;
+    : I32EnumAttrCase<"TransformDialectInterpreterCodegen", 10>;
 
-def LLVMGPU_SimpleDistribute : I32EnumAttrCase<"LLVMGPUDistribute", 9>;
-def LLVMGPU_Vectorize : I32EnumAttrCase<"LLVMGPUVectorize", 10>;
-def LLVMGPU_MatmulSimt : I32EnumAttrCase<"LLVMGPUMatmulSimt", 11>;
-def LLVMGPU_MatmulTensorCore : I32EnumAttrCase<"LLVMGPUMatmulTensorCore", 12>;
-def LLVMGPU_WarpReduction : I32EnumAttrCase<"LLVMGPUWarpReduction", 13>;
+def LLVMGPU_SimpleDistribute : I32EnumAttrCase<"LLVMGPUDistribute", 11>;
+def LLVMGPU_Vectorize : I32EnumAttrCase<"LLVMGPUVectorize", 12>;
+def LLVMGPU_MatmulSimt : I32EnumAttrCase<"LLVMGPUMatmulSimt", 13>;
+def LLVMGPU_MatmulTensorCore : I32EnumAttrCase<"LLVMGPUMatmulTensorCore", 14>;
+def LLVMGPU_WarpReduction : I32EnumAttrCase<"LLVMGPUWarpReduction", 15>;
 
-def SPIRV_Distribute : I32EnumAttrCase<"SPIRVDistribute", 14>;
-def SPIRV_Vectorize : I32EnumAttrCase<"SPIRVVectorize", 15>;
+def SPIRV_Distribute : I32EnumAttrCase<"SPIRVDistribute", 16>;
+def SPIRV_Vectorize : I32EnumAttrCase<"SPIRVVectorize", 17>;
 def SPIRV_VectorizeToCooperativeOps
-    : I32EnumAttrCase<"SPIRVVectorizeToCooperativeOps", 16>;
+    : I32EnumAttrCase<"SPIRVVectorizeToCooperativeOps", 18>;
 def SPIRV_VectorizeWithWorkgroupMemory
-    : I32EnumAttrCase<"SPIRVVectorizeWithWorkgroupMemory", 17>;
+    : I32EnumAttrCase<"SPIRVVectorizeWithWorkgroupMemory", 19>;
 
-def VMVX_Default : I32EnumAttrCase<"VMVXDefault", 18>;
+def VMVX_Default : I32EnumAttrCase<"VMVXDefault", 20>;
 
 def None : I32EnumAttrCase<"None", 0xff>;
 
@@ -56,6 +58,7 @@ def DispatchLoweringPassPipelineEnum
                     CPU_DoubleTilingPadExpert, CPU_DoubleTilingPeelingExpert,
                     CPU_ConvTileAndDecomposeExpert, CPU_CPUAArchDoubleTilingExpert,
                     CPU_BufferOpsTileAndVectorize, CPU_TripleTilingExpert,
+                    CPU_SingleTiling2DPeelExpert, CPU_SingleTiling3DPadExpert,
                     Linalg_TransformInterpCodegen, LLVMGPU_SimpleDistribute,
                     LLVMGPU_Vectorize, LLVMGPU_MatmulSimt,
                     LLVMGPU_MatmulTensorCore, LLVMGPU_WarpReduction,
