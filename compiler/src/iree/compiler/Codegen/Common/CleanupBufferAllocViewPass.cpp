@@ -26,9 +26,12 @@
 namespace mlir {
 namespace iree_compiler {
 
+void populateReshapeToInterfaceTensorPatterns(RewritePatternSet &patterns);
+
 namespace {
 
-/// Folds linalg.tensor_reshape into the source hal.interface.binding.subspan.
+/// Folds tensor.expand/collapse_shape into the source
+/// hal.interface.binding.subspan.
 ///
 /// For example, this matches the following pattern:
 ///
@@ -119,9 +122,8 @@ struct CleanupBufferAllocViewPass
     : public CleanupBufferAllocViewBase<CleanupBufferAllocViewPass> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
-    patterns.insert<FoldReshapeIntoInterfaceTensorLoad<tensor::CollapseShapeOp>,
-                    FoldReshapeIntoInterfaceTensorLoad<tensor::ExpandShapeOp>,
-                    RemoveDeadMemAllocs>(&getContext());
+    populateReshapeToInterfaceTensorPatterns(patterns);
+    patterns.insert<RemoveDeadMemAllocs>(&getContext());
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       return signalPassFailure();
@@ -130,6 +132,12 @@ struct CleanupBufferAllocViewPass
 };
 
 }  // namespace
+
+void populateReshapeToInterfaceTensorPatterns(RewritePatternSet &patterns) {
+  patterns.insert<FoldReshapeIntoInterfaceTensorLoad<tensor::CollapseShapeOp>,
+                  FoldReshapeIntoInterfaceTensorLoad<tensor::ExpandShapeOp>>(
+      patterns.getContext());
+}
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createCleanupBufferAllocViewPass() {

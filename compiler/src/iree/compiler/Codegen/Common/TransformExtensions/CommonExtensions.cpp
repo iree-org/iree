@@ -8,6 +8,7 @@
 
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "iree-dialects/Transforms/ListenerGreedyPatternRewriteDriver.h"
+#include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "llvm/ADT/StringSet.h"
@@ -34,6 +35,7 @@ void mlir::iree_compiler::registerTransformDialectCommonExtension(
 //===---------------------------------------------------------------------===//
 
 static void addRankReducingPatterns(RewritePatternSet &patterns) {
+  populateReshapeToInterfaceTensorPatterns(patterns);
   vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
   linalg::populateFoldUnitExtentDimsPatterns(patterns);
 }

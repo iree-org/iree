@@ -38,6 +38,7 @@ iree_cc_library(
     MLIRBufferizationTransforms
     MLIRPass
     MLIRTransformDialect
+    iree::compiler::Codegen::Common::CommonPasses
     iree::compiler::Codegen::Interfaces::BufferizationInterfaces
     iree::compiler::Codegen::PassHeaders
   PUBLIC
