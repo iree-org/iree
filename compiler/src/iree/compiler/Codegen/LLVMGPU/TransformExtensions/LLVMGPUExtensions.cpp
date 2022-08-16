@@ -11,14 +11,11 @@
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
-#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/PDL/IR/PDLOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/VectorDistribution.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
-#include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/Region.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -40,8 +37,8 @@ void mlir::iree_compiler::registerTransformDialectLLVMGPUExtension(
 // TODO: Maybe we need both a transform.iree.cpu.bufferize and a
 // transform.iree.gpu.bufferize rather than a single common bufferize op?
 
-/// Apply the permutation `perm` to `vals.
-/// Return failure if perm is not a permutation.
+/// Apply the permutation `perm` to `vals; i.e. vals[i] is stored into
+/// res[perm[i]] Return failure if perm is not a permutation.
 // TODO: upstream as extraClassDeclaration once stabilized.
 template <typename T>
 static FailureOr<SmallVector<T>> permute(const SmallVector<T> &vals,
@@ -49,11 +46,11 @@ static FailureOr<SmallVector<T>> permute(const SmallVector<T> &vals,
   if (vals.size() != perm.size()) return failure();
   SmallVector<T> result(vals.size());
   SmallVector<bool> seen(vals.size());
-  for (const auto &it : llvm::zip(perm, vals)) {
+  for (auto [idx, val] : llvm::zip(perm, vals)) {
     // Already seen, invalid thread_dim_mapping.
-    if (seen[std::get<0>(it)]) return failure();
-    result[std::get<0>(it)] = std::get<1>(it);
-    seen[std::get<0>(it)] = true;
+    if (seen[idx]) return failure();
+    result[idx] = val;
+    seen[idx] = true;
   }
   // Some not seen, invalid thread_dim_mapping.
   if (!llvm::all_of(seen, [](bool b) { return b; })) return failure();
@@ -64,7 +61,7 @@ static FailureOr<SmallVector<T>> permute(const SmallVector<T> &vals,
 /// `foreachThreadOp` to `values`.
 // TODO: upstream as extraClassDeclaration once stabilized.
 template <typename T>
-static FailureOr<SmallVector<T>> getPermuted(
+static FailureOr<SmallVector<T>> getValuesPermutedByThreadMapping(
     scf::ForeachThreadOp foreachThreadOp, const SmallVector<T> &values) {
   // Apply mapping permutation if specified.
   auto mapping = foreachThreadOp.getThreadDimMapping();
@@ -84,7 +81,7 @@ static FailureOr<SmallVector<OpFoldResult>> getNumThreads(
     OpBuilder &b, scf::ForeachThreadOp foreachThreadOp) {
   SmallVector<OpFoldResult> threadCount = foreachThreadOp.getNumThreads();
   threadCount.resize(3, b.getIndexAttr(1));
-  return getPermuted(foreachThreadOp, threadCount);
+  return getValuesPermutedByThreadMapping(foreachThreadOp, threadCount);
 }
 
 /// Helper to get the thread indices of a `foreachThreadOp` after applying the
@@ -94,7 +91,7 @@ static FailureOr<SmallVector<Value>> getThreadIndices(
     OpBuilder &b, scf::ForeachThreadOp foreachThreadOp) {
   SmallVector<Value> threadCount = foreachThreadOp.getThreadIndices();
   threadCount.resize(3, Value());
-  return getPermuted(foreachThreadOp, threadCount);
+  return getValuesPermutedByThreadMapping(foreachThreadOp, threadCount);
 }
 
 //===---------------------------------------------------------------------===//
@@ -120,9 +117,9 @@ mlir::iree_compiler::rewriteForeachThreadToGpu(
       }))
     return foreachThreadOp->emitError("unsupported dynamic workgroup size");
 
-  SmallVector<int64_t> workgroupSizes;
-  for (OpFoldResult ofr : *maybeWorkgroupSizes)
-    workgroupSizes.push_back(getConstantIntValue(ofr).value());
+  SmallVector<int64_t> workgroupSizes = llvm::to_vector(llvm::map_range(
+      *maybeWorkgroupSizes,
+      [](OpFoldResult ofr) { return getConstantIntValue(ofr).value(); }));
 
   // Step 1. Create the gpu.thread ops
   Location loc = foreachThreadOp.getLoc();
@@ -138,11 +135,12 @@ mlir::iree_compiler::rewriteForeachThreadToGpu(
 
   // Step 2. Maybe create conditionals to predicate the region.
   Value predicate;
-  for (auto it : llvm::zip(threadOps, workgroupSizes, globalWorkgroupSizes)) {
-    auto threadId = std::get<0>(it);
-    auto workgroupSize = std::get<1>(it);
-    auto globalWorkgroupSize = std::get<2>(it);
-    assert(workgroupSize <= globalWorkgroupSize && "workgroup size overflow");
+  for (auto [threadId, workgroupSize, globalWorkgroupSize] :
+       llvm::zip(threadOps, workgroupSizes, globalWorkgroupSizes)) {
+    if (workgroupSize > globalWorkgroupSize) {
+      return foreachThreadOp.emitOpError("workgroup size overflow: ")
+             << workgroupSize << " > " << globalWorkgroupSize;
+    }
     if (workgroupSize == globalWorkgroupSize) continue;
     Value tmpPredicate = rewriter.create<arith::CmpIOp>(
         loc, arith::CmpIPredicate::ult, threadId,
@@ -220,6 +218,7 @@ transform_dialect::ForeachThreadToGpuAndTranslationInfo::applyToOne(
 
   SmallVector<int64_t> workgroupSize =
       extractFromI64ArrayAttr(getWorkgroupSize());
+  // TODO: no magic constant but IREE uses this extensively.
   workgroupSize.resize(/*size=*/3, /*value=*/1);
   SimplePatternRewriter rewriter(target);
   auto walkResult = target->walk([&](scf::ForeachThreadOp foreachThreadOp) {
@@ -242,13 +241,39 @@ transform_dialect::ForeachThreadToGpuAndTranslationInfo::applyToOne(
 }
 
 //===---------------------------------------------------------------------===//
-// VectorWarpExecuteOnLane0Op.
+// VectorToWarpExecuteOnLane0Op.
 //===---------------------------------------------------------------------===//
 
+/// Helper method to replace all uses of the laneId operand by the constant
+/// 0 inside the region. This is a necessary prerequisite to perform any kind of
+/// hoisting of IR that is inside the region.
+/// Return success if any replacement occurred, failure otherwise.
+// TODO: this is currently brittle, what we really need here is a scope-aware
+// SCCP.
+static LogicalResult replaceAllUsesOfLaneWithin(
+    RewriterBase &b, vector::WarpExecuteOnLane0Op executeOp) {
+  OpBuilder::InsertionGuard g(b);
+  b.setInsertionPoint(executeOp);
+  Value zero = b.create<arith::ConstantIndexOp>(executeOp.getLoc(), 0);
+  b.setInsertionPointToStart(&executeOp.getWarpRegion().front());
+  Value laneId = executeOp.getLaneid();
+  bool applied = false;
+  for (Operation *user : llvm::make_early_inc_range(laneId.getUsers())) {
+    if (!executeOp->isProperAncestor(user)) continue;
+    b.startRootUpdate(user);
+    user->replaceUsesOfWith(laneId, zero);
+    b.finalizeRootUpdate(user);
+    applied = true;
+  }
+  return success(applied);
+}
+
+/// Return the gpu::ThreadIdOp for which the predicate if equivalent to
+/// `if (threadIdx.x == 0)`.
 // TODO: Figure out the proper canonicalization and drop the complexity here.
 // TODO: More sophisticated detection for matching
 //   (threadIdx.x == 0 && other stuff not involving threadIdx.x)
-static LogicalResult isThreadIdxxZeroPredicate(scf::IfOp ifOp) {
+static FailureOr<gpu::ThreadIdOp> isThreadIdxxZeroPredicate(scf::IfOp ifOp) {
   if (!ifOp || ifOp.getNumResults() > 0 ||
       ifOp.getThenRegion().getBlocks().size() != 1 ||
       !ifOp.getElseRegion().empty())
@@ -261,32 +286,34 @@ static LogicalResult isThreadIdxxZeroPredicate(scf::IfOp ifOp) {
   auto ULT = arith::CmpIPredicate::ult;
   auto ULE = arith::CmpIPredicate::ule;
   if (auto threadIdOp = pred.getLhs().getDefiningOp<gpu::ThreadIdOp>()) {
+    if (threadIdOp.dimension() != gpu::Dimension::x) return failure();
     if (pred.getPredicate() == EQ && isConstantIntValue(pred.getRhs(), 0))
-      return success();
+      return threadIdOp;
     if (pred.getPredicate() == SLE && isConstantIntValue(pred.getRhs(), 0))
-      return success();
+      return threadIdOp;
     if (pred.getPredicate() == ULE && isConstantIntValue(pred.getRhs(), 0))
-      return success();
+      return threadIdOp;
     if (pred.getPredicate() == SLT && isConstantIntValue(pred.getRhs(), 1))
-      return success();
+      return threadIdOp;
     if (pred.getPredicate() == ULT && isConstantIntValue(pred.getRhs(), 1))
-      return success();
+      return threadIdOp;
   }
   auto SGT = arith::CmpIPredicate::sgt;
   auto SGE = arith::CmpIPredicate::sge;
   auto UGT = arith::CmpIPredicate::ugt;
   auto UGE = arith::CmpIPredicate::uge;
   if (auto threadIdOp = pred.getRhs().getDefiningOp<gpu::ThreadIdOp>()) {
+    if (threadIdOp.dimension() != gpu::Dimension::x) return failure();
     if (pred.getPredicate() == EQ && isConstantIntValue(pred.getLhs(), 0))
-      return success();
+      return threadIdOp;
     if (pred.getPredicate() == SGE && isConstantIntValue(pred.getLhs(), 0))
-      return success();
+      return threadIdOp;
     if (pred.getPredicate() == UGE && isConstantIntValue(pred.getLhs(), 0))
-      return success();
+      return threadIdOp;
     if (pred.getPredicate() == SGT && isConstantIntValue(pred.getLhs(), 1))
-      return success();
+      return threadIdOp;
     if (pred.getPredicate() == UGT && isConstantIntValue(pred.getLhs(), 1))
-      return success();
+      return threadIdOp;
   }
   return failure();
 }
@@ -295,16 +322,19 @@ struct VectorDistributionResult {
   vector::WarpExecuteOnLane0Op warpOp;
 };
 
-static FailureOr<VectorDistributionResult> vectorDistribution(
+static FailureOr<VectorDistributionResult> rewriteScfIfAsWarpExecuteOnLane0(
     PatternRewriter &rewriter, Location loc, scf::IfOp ifOp,
     int64_t workgroupSizeX, int64_t warpSize) {
   // Bail if cond is not `if (threadIdx.x == 0)`.
-  if (failed(isThreadIdxxZeroPredicate(ifOp))) return failure();
+  FailureOr<gpu::ThreadIdOp> maybeThreadIdxxOp =
+      isThreadIdxxZeroPredicate(ifOp);
+  if (failed(maybeThreadIdxxOp)) return failure();
 
   // All the code below will be executed on a single warp given a fixed
   // (threadIdxy, threadIdxz).
-  Value threadIdxx = rewriter.create<gpu::ThreadIdOp>(
-      loc, rewriter.getIndexType(), gpu::Dimension::x);
+  // Note, we reuse `maybeThreadIdxxOp` here because we later want to replace
+  // this op instance by 0 without relying on CSE or canonicalizations.
+  Value threadIdxx = *maybeThreadIdxxOp;
 
   assert(workgroupSizeX % warpSize == 0);
   if (workgroupSizeX != warpSize) {
@@ -334,6 +364,13 @@ static FailureOr<VectorDistributionResult> vectorDistribution(
   // Erase old op.
   rewriter.eraseOp(ifOp);
 
+  // This simple rewrite propagates zero in lieu of laneId within the
+  // warp_execute_on_lane_0 op.
+  // Atm, this **must** occur before any hoisting of code.
+  // TODO: Replace this by a more robust scoped SCCP that will make it more
+  // robust re. hoisting.
+  (void)replaceAllUsesOfLaneWithin(rewriter, warpOp);
+
   // Hoist the scalar code outside of the warp region.
   // Note: moving code does not require a listener.
   vector::moveScalarUniformCode(warpOp);
@@ -355,15 +392,15 @@ static HAL::ExecutableExportOp getExecutableExportOpForFunc(
 }
 
 DiagnosedSilenceableFailure
-transform_dialect::VectorWarpExecuteOnLane0Op::applyToOne(
+transform_dialect::VectorToWarpExecuteOnLane0Op::applyToOne(
     scf::IfOp target, SmallVectorImpl<Operation *> &results,
     transform::TransformState &state) {
   if (!isa<HAL::ExecutableOp, HAL::ExecutableVariantOp>(state.getTopLevel())) {
     state.getTopLevel()->emitOpError(
         "requires HAL::ExecutableOp or HAL::ExecutableVariantOp toplevel so "
-        "that "
-        "IR is properly isolated. This is required so we can safely inspect "
-        "the HAL::ExecutableExportOp under multi-threaded pass assumptions.");
+        "that IR is properly isolated. This is required so we can safely "
+        "inspect the HAL::ExecutableExportOp under multi-threaded pass "
+        "assumptions.");
     return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
   }
 
@@ -402,8 +439,8 @@ transform_dialect::VectorWarpExecuteOnLane0Op::applyToOne(
 
   SimplePatternRewriter rewriter(target);
   FailureOr<VectorDistributionResult> vectorDistributionResult =
-      vectorDistribution(rewriter, target->getLoc(), target, workgroupSizeX,
-                         warpSize);
+      rewriteScfIfAsWarpExecuteOnLane0(rewriter, target->getLoc(), target,
+                                       workgroupSizeX, warpSize);
   if (failed(vectorDistributionResult)) {
     // Return a silenceable failure and set the expected 1 result to nullptr.
     results.assign(1, nullptr);
@@ -477,6 +514,7 @@ static LogicalResult applyMultiReductionLoweringPatterns(Operation *target) {
 
   MLIRContext *ctx = target->getContext();
   RewritePatternSet patterns(ctx);
+
   vector::populateVectorMultiReductionLoweringPatterns(
       patterns, vector::VectorMultiReductionLowering::InnerReduction);
   patterns.add<InsertElementToBroadcast>(ctx);

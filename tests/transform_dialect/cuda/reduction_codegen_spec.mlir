@@ -33,7 +33,7 @@ transform.with_pdl_patterns {
     
     // Vector distribution needs to happen on buffers.
     %if_op = transform.structured.match ops{["scf.if"]} in %arg1
-    %warp = transform.iree.vector.warp_execute_on_lane_0 %if_op { warp_size = 32 }
+    %warp = transform.iree.vector.to_warp_execute_on_lane_0 %if_op { warp_size = 32 }
     transform.iree.vector.warp_distribute %isolated_handle_4
     
     // transform.print { name = "after codegen"}

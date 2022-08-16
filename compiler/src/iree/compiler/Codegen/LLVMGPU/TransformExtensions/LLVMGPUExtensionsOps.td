@@ -99,7 +99,7 @@ def ForeachThreadToGpuAndTranslationInfo :
   }];
 }
 
-def VectorWarpExecuteOnLane0Op : Op<Transform_Dialect, "iree.vector.warp_execute_on_lane_0",
+def VectorToWarpExecuteOnLane0Op : Op<Transform_Dialect, "iree.vector.to_warp_execute_on_lane_0",
     [FunctionalStyleTransformOpTrait, 
      MemoryEffectsOpInterface,
      TransformEachOpTrait, 

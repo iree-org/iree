@@ -707,6 +707,12 @@ transform_dialect::ClonePrecedingOpIntoDispatchRegionOp::apply(
   ArrayRef<Operation *> dispatchRegion =
       state.getPayloadOps(getDispatchRegion());
 
+  if (targetOps.empty() && dispatchRegion.empty()) {
+    transformResults.set(getResult().cast<OpResult>(),
+                         SmallVector<mlir::Operation *>{});
+    return DiagnosedSilenceableFailure::success();
+  }
+
   if (dispatchRegion.size() != 1)
     return DiagnosedSilenceableFailure(this->emitOpError(
         "requires exactly one target/dispatch region handle"));
