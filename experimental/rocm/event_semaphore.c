@@ -15,6 +15,7 @@
 typedef struct iree_hal_rocm_semaphore_t {
   iree_hal_semaphore_t base;
   iree_hal_rocm_context_wrapper_t* context;
+  iree_atomic_int64_t value;
 } iree_hal_rocm_semaphore_t;
 
 static const iree_hal_semaphore_vtable_t iree_hal_rocm_semaphore_vtable;
@@ -61,9 +62,12 @@ static void iree_hal_rocm_semaphore_destroy(
 
 static iree_status_t iree_hal_rocm_semaphore_query(
     iree_hal_semaphore_t* base_semaphore, uint64_t* out_value) {
+  iree_hal_rocm_semaphore_t* semaphore =
+      iree_hal_rocm_semaphore_cast(base_semaphore);
   // TODO: Support semaphores completely.
-  *out_value = 0;
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "Not impemented on rocm");
+  *out_value =
+      iree_atomic_load_int64(&semaphore->value, iree_memory_order_acquire);
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_rocm_semaphore_signal(
