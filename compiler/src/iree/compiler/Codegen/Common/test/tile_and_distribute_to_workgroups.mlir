@@ -83,13 +83,10 @@ hal.executable private @matmul_tensors {
 //  CHECK-DAG:     %[[STEP_X:.+]] = affine.apply #[[MAP1]]()[%[[WG_COUNT_X]]]
 //      CHECK:     scf.for %[[IV1:.+]] = %[[LB_X]] to %[[N]] step %[[STEP_X]]
 //  CHECK-DAG:       %[[TILESIZE_M:.+]] = affine.min #[[MAP2]](%[[IV0]])[%[[M]]]
-//  CHECK-DAG:       %[[LHS:.+]] = flow.dispatch.tensor.load %[[LHS_BINDING]]
-// CHECK-SAME:           offsets = [%[[IV0]], 0], sizes = [%[[TILESIZE_M]], %[[K]]]
+//  CHECK-DAG:       %[[LHS:.+]] = flow.dispatch.tensor.load %[[LHS_BINDING]], offsets = [%[[IV0]], 0], sizes = [%[[TILESIZE_M]], %[[K]]]
 //  CHECK-DAG:       %[[TILESIZE_N:.+]] = affine.min #[[MAP2]](%[[IV1]])[%[[N]]]
-//  CHECK-DAG:       %[[RHS:.+]] = flow.dispatch.tensor.load %[[RHS_BINDING]]
-// CHECK-SAME:           offsets = [0, %[[IV1]]], sizes = [%[[K]], %[[TILESIZE_N]]]
-//  CHECK-DAG:       %[[INIT:.+]] = flow.dispatch.tensor.load %[[INIT_BINDING]]
-// CHECK-SAME:           offsets = [%[[IV0]], %[[IV1]]], sizes = [%[[TILESIZE_M]], %[[TILESIZE_N]]]
+//  CHECK-DAG:       %[[RHS:.+]] = flow.dispatch.tensor.load %[[RHS_BINDING]], offsets = [0, %[[IV1]]], sizes = [%[[K]], %[[TILESIZE_N]]]
+//  CHECK-DAG:       %[[INIT:.+]] = flow.dispatch.tensor.load %[[INIT_BINDING]], offsets = [%[[IV0]], %[[IV1]]], sizes = [%[[TILESIZE_M]], %[[TILESIZE_N]]]
 //      CHECK:       %[[GEMM:.+]] = linalg.matmul
 // CHECK-SAME:           ins(%[[LHS]], %[[RHS]] :
 // CHECK-SAME:           outs(%[[INIT]] :

@@ -206,6 +206,7 @@ cc_binary(
     name = "iree-tblgen",
     srcs = [
         "//compiler/src/iree/compiler/Dialect/VM/Tools:GenSrcs",
+        "@llvm-project//mlir:tools/mlir-tblgen/mlir-tblgen.cpp",
     ],
     tags = ["hostonly"],
     deps = [

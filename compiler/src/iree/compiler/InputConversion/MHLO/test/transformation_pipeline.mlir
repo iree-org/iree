@@ -93,8 +93,8 @@ func.func @reduction(%arg0 : tensor<4x8xf32>) -> tensor<4xf32> {
 // CHECK-NEXT:     %0 = linalg.init_tensor [4] : tensor<4xf32>
 // CHECK-NEXT:     %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<4xf32>) -> tensor<4xf32>
 // CHECK-NEXT:     %2 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "reduction"]} ins(%arg0 : tensor<4x8xf32>) outs(%1 : tensor<4xf32>) {
-// CHECK-NEXT:     ^bb0(%arg1: f32, %arg2: f32):
-// CHECK-NEXT:       %3 = arith.addf %arg1, %arg2 : f32
+// CHECK-NEXT:     ^bb0(%[[ARG1:.*]]: f32, %[[ARG2:.*]]: f32):
+// CHECK-NEXT:       %3 = arith.addf %[[ARG2]], %[[ARG1]] : f32
 // CHECK-NEXT:       linalg.yield %3 : f32
 // CHECK-NEXT:     } -> tensor<4xf32>
 // CHECK-NEXT:     return %2 : tensor<4xf32>

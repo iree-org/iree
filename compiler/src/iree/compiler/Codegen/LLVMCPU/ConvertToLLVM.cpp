@@ -495,10 +495,9 @@ class HALDispatchABI {
   Value loadProcessorData(Location loc, int64_t index, OpBuilder &builder) {
     // Load the value; it should always be in bounds.
     Value dataArrayValue = loadFieldValue(loc, ProcessorField::data, builder);
-    Type elementType =
-        dataArrayValue.getType().cast<LLVM::LLVMArrayType>().getElementType();
-    Value dataValue = builder.create<LLVM::ExtractValueOp>(
-        loc, elementType, dataArrayValue, builder.getI64ArrayAttr(index));
+    SmallVector<int64_t, 1> position = {index};
+    Value dataValue =
+        builder.create<LLVM::ExtractValueOp>(loc, dataArrayValue, position);
     return dataValue;
   }
 
@@ -555,7 +554,7 @@ class HALDispatchABI {
                                          /*import_func_ptr=*/importPtrValue,
                                          /*import_params=*/params,
                                      });
-    return callOp.getResult(0);
+    return callOp.getResult();
   }
 
  private:
@@ -577,35 +576,35 @@ class HALDispatchABI {
     auto environmentPtrValue = funcOp.getArgument(0);
     Value environmentValue =
         builder.create<LLVM::LoadOp>(loc, environmentPtrValue);
-    Type fieldType = environmentType.getBody()[(int)field];
-    return builder.createOrFold<LLVM::ExtractValueOp>(
-        loc, fieldType, environmentValue, builder.getI64ArrayAttr((int)field));
+    SmallVector<int64_t, 1> position = {int64_t(field)};
+    return builder.createOrFold<LLVM::ExtractValueOp>(loc, environmentValue,
+                                                      position);
   }
 
   Value loadFieldValue(Location loc, ProcessorField field, OpBuilder &builder) {
     Value processorValue =
         loadFieldValue(loc, EnvironmentField::processor, builder);
-    Type fieldType = processorType.getBody()[(int)field];
-    return builder.createOrFold<LLVM::ExtractValueOp>(
-        loc, fieldType, processorValue, builder.getI64ArrayAttr((int)field));
+    SmallVector<int64_t, 1> position = {int64_t(field)};
+    return builder.createOrFold<LLVM::ExtractValueOp>(loc, processorValue,
+                                                      position);
   }
 
   Value loadFieldValue(Location loc, DispatchStateField field,
                        OpBuilder &builder) {
     Value statePtrValue = funcOp.getArgument(1);
     Value stateValue = builder.createOrFold<LLVM::LoadOp>(loc, statePtrValue);
-    Type fieldType = dispatchStateType.getBody()[(int)field];
-    return builder.createOrFold<LLVM::ExtractValueOp>(
-        loc, fieldType, stateValue, builder.getI64ArrayAttr((int)field));
+    SmallVector<int64_t, 1> position = {int64_t(field)};
+    return builder.createOrFold<LLVM::ExtractValueOp>(loc, stateValue,
+                                                      position);
   }
 
   Value loadFieldValue(Location loc, WorkgroupStateField field,
                        OpBuilder &builder) {
     Value statePtrValue = funcOp.getArgument(2);
     Value stateValue = builder.createOrFold<LLVM::LoadOp>(loc, statePtrValue);
-    Type fieldType = dispatchStateType.getBody()[(int)field];
-    return builder.createOrFold<LLVM::ExtractValueOp>(
-        loc, fieldType, stateValue, builder.getI64ArrayAttr((int)field));
+    SmallVector<int64_t, 1> position = {int64_t(field)};
+    return builder.createOrFold<LLVM::ExtractValueOp>(loc, stateValue,
+                                                      position);
   }
 
   LLVM::LLVMFuncOp funcOp;

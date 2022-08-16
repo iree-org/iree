@@ -15,7 +15,7 @@ module {
       ins(%arg0 : tensor<?x?xf32>)
       outs(%2 : tensor<?x?xf32>) {
     ^bb0(%arg1: f32, %arg2: f32):
-      %4 = math.abs %arg1 : f32
+      %4 = math.absf %arg1 : f32
       linalg.yield %4 : f32
     } -> tensor<?x?xf32>
     return %3 : tensor<?x?xf32>

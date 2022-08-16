@@ -240,7 +240,7 @@ func.func @rng_normal(%arg0: tensor<f32>, %arg1: tensor<f32>) -> tensor<3x5xf32>
 //                Concate and reshape the output.
 // CHECK:         %[[CON:.+]] = "mhlo.concatenate"(%[[Z0]], %[[Z1]]) {dimension = 0 : i64} : (tensor<8xf32>, tensor<8xf32>) -> tensor<16xf32>
 // CHECK:         %[[SLICE:.+]] = tensor.extract_slice %[[CON]][0] [15] [1] : tensor<16xf32> to tensor<15xf32>
-// CHECK:         %[[RES:.+]] = "mhlo.reshape"(%[[SLICE]]) : (tensor<15xf32>) -> tensor<3x5xf32>
+// CHECK:         %[[RES:.+]] = mhlo.reshape %[[SLICE]] : (tensor<15xf32>) -> tensor<3x5xf32>
 // CHECK:         return %[[RES]]
 
 // -----
@@ -254,10 +254,10 @@ func.func @scatter_rank0(%arg0: tensor<5x5xi32>, %arg1: tensor<2xi32>, %arg2: te
 }
 
 // CHECK-LABEL: func.func @scatter_rank0
-// CHECK-DAG: %[[RE_I:.+]] = "mhlo.reshape"(%arg1) : (tensor<2xi32>) -> tensor<1x2xi32>
-// CHECK-DAG: %[[RE_U:.+]] = "mhlo.reshape"(%arg2) : (tensor<i32>) -> tensor<1xi32>
-// CHECK:     %[[SCATTER:.+]] = "mhlo.scatter"(%arg0, %[[RE_I]], %[[RE_U]])
-// CHECK:       mhlo.return %arg4
+// CHECK-DAG: %[[RE_I:.+]] = mhlo.reshape %{{.*}} : (tensor<2xi32>) -> tensor<1x2xi32>
+// CHECK-DAG: %[[RE_U:.+]] = mhlo.reshape %{{.*}} : (tensor<i32>) -> tensor<1xi32>
+// CHECK:     %[[SCATTER:.+]] = "mhlo.scatter"(%{{.*}}, %[[RE_I]], %[[RE_U]])
+// CHECK:       mhlo.return %{{.*}}
 
 // -----
 

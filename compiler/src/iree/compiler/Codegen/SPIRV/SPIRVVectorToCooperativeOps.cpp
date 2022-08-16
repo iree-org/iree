@@ -9,9 +9,11 @@
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Analysis/SliceAnalysis.h"
+#include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRV.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVTypes.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
@@ -237,9 +239,11 @@ struct SPIRVVectorToCooperativeOpsPass final
           // In IREE all MemRefs are originated from subspan ops, which should
           // have identity layout.
           if (!type.getLayout().isIdentity()) return llvm::None;
-          auto flattenedType =
-              MemRefType::get(ShapedType::kDynamicSize, type.getElementType(),
-                              AffineMap(), type.getMemorySpace());
+          auto storage = spirv::mapMemorySpaceToVulkanStorageClass(
+              type.getMemorySpaceAsInt());
+          auto flattenedType = MemRefType::get(
+              ShapedType::kDynamicSize, type.getElementType(), AffineMap(),
+              spirv::StorageClassAttr::get(type.getContext(), *storage));
           return typeConverter.convertType(flattenedType);
         });
 
