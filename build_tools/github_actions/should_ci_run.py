@@ -16,7 +16,7 @@ import os
 import subprocess
 import sys
 
-SKIPC_CI_TAG = "skip-ci"
+SKIP_CI_TAG = "skip-ci"
 
 # Note that these are fnmatch patterns, which are not the same as gitignore
 # patterns because they don't treat '/' specially. The standard library doesn't
@@ -72,8 +72,8 @@ def should_run_ci():
     return True
 
   for line in description.splitlines():
-    if line.strip().lower() == SKIPC_CI_TAG:
-      print(f"Not running CI because PR description has '{SKIPC_CI_TAG}' line.")
+    if line.strip().lower() == SKIP_CI_TAG:
+      print(f"Not running CI because PR description has '{SKIP_CI_TAG}' line.")
       return False
 
   try:
