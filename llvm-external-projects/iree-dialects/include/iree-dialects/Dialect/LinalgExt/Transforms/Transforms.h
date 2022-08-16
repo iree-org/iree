@@ -24,33 +24,6 @@ namespace iree_compiler {
 namespace IREE {
 namespace LinalgExt {
 
-struct TilingResult {
-  Operation *tileOp;
-  Operation *tiledOp;
-};
-
-/// Pattern to tile a TilingInterface op using a scf::ForeachThreadOp.
-struct ForeachThreadTilingPattern
-    : public OpInterfaceRewritePattern<TilingInterface> {
-  ForeachThreadTilingPattern(MLIRContext *context, ArrayRef<int64_t> tileSizes,
-                             ArrayRef<int64_t> threadDimMapping)
-      : OpInterfaceRewritePattern<TilingInterface>(context),
-        tileSizes(tileSizes.begin(), tileSizes.end()),
-        threadDimMapping(threadDimMapping.begin(), threadDimMapping.end()) {}
-
-  FailureOr<TilingResult>
-  returningMatchAndRewrite(TilingInterface op, PatternRewriter &rewriter) const;
-
-  LogicalResult matchAndRewrite(TilingInterface op,
-                                PatternRewriter &rewriter) const override {
-    return returningMatchAndRewrite(op, rewriter);
-  }
-
-private:
-  SmallVector<int64_t> tileSizes;
-  SmallVector<int64_t> threadDimMapping;
-};
-
 /// Pattern to swap a `TilingInterface` op -> `tensor::ExtractSliceOp`.
 struct SwapTilingInterfaceOp : public OpRewritePattern<tensor::ExtractSliceOp> {
   using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
@@ -93,27 +66,6 @@ struct ForeachThreadOpToScfForRewriter
                                 PatternRewriter &rewriter) const override {
     return returningMatchAndRewrite(foreachThreadOp, rewriter);
   }
-};
-
-/// Pattern to fuse a tileable op into a containing op.
-struct LinalgExtFusionInContainingOpPattern
-    : public OpInterfaceRewritePattern<TilingInterface> {
-  LinalgExtFusionInContainingOpPattern(MLIRContext *context,
-                                       Operation *containingOp)
-      : OpInterfaceRewritePattern<TilingInterface>(context),
-        containingOp(containingOp) {}
-
-  FailureOr<SmallVector<TilingInterface>>
-  returningMatchAndRewrite(TilingInterface producerOp,
-                           PatternRewriter &rewriter) const;
-
-  LogicalResult matchAndRewrite(TilingInterface producerOp,
-                                PatternRewriter &rewriter) const override {
-    return returningMatchAndRewrite(producerOp, rewriter);
-  }
-
-private:
-  Operation *containingOp;
 };
 
 struct FusionResult {

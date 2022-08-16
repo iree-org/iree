@@ -93,16 +93,20 @@ void buildVMTransformPassPipeline(OpPassManager &passManager,
   // VM conversion dialect interface.
   passManager.addPass(createConversionPass(targetOptions));
 
+  // Hoist globals and get the final set that need to be initialized.
   passManager.addNestedPass<IREE::VM::ModuleOp>(createHoistInlinedRodataPass());
   passManager.addNestedPass<IREE::VM::ModuleOp>(createDeduplicateRodataPass());
-  passManager.addNestedPass<IREE::VM::ModuleOp>(
-      createSinkGlobalBufferLoadsPass());
-  passManager.addNestedPass<IREE::VM::ModuleOp>(
-      createGlobalInitializationPass());
+  addCleanupPatterns(passManager);
+  passManager.addNestedPass<IREE::VM::ModuleOp>(createResolveRodataLoadsPass());
 
   // Catch any inlining opportunities we created during lowering.
   passManager.addPass(mlir::createInlinerPass());
   passManager.addPass(mlir::createSymbolDCEPass());
+
+  // Create global initialization functions (__init/__deinit).
+  addCleanupPatterns(passManager);
+  passManager.addNestedPass<IREE::VM::ModuleOp>(
+      createGlobalInitializationPass());
 
   // Ideally we'd run this as part of a fixed-point iteration: CSE may need the
   // canonicalizer to remove ops in order to get the equivalences it needs to

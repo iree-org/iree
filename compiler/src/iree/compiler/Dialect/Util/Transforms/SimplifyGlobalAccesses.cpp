@@ -26,9 +26,9 @@ namespace Util {
 // Builds symbol ref set for all immutable globals in |moduleOp|.
 static DenseSet<StringRef> gatherImmutableGlobals(mlir::ModuleOp moduleOp) {
   DenseSet<StringRef> set;
-  for (auto globalOp : moduleOp.getOps<IREE::Util::GlobalOp>()) {
-    if (!globalOp.getIsMutable()) {
-      set.insert(globalOp.getSymName());
+  for (auto globalOp : moduleOp.getOps<IREE::Util::GlobalOpInterface>()) {
+    if (!globalOp.isGlobalMutable()) {
+      set.insert(globalOp.getGlobalName());
     }
   }
   return set;
@@ -47,16 +47,18 @@ static void hoistImmutableLoads(Region &region,
   Operation *lastEntryOp = nullptr;
   SmallVector<std::pair<Operation *, Operation *>> opReplacements;
   for (auto &block : region) {
-    auto ops = llvm::to_vector<8>(block.getOps<IREE::Util::GlobalLoadOp>());
+    auto ops =
+        llvm::to_vector<8>(block.getOps<IREE::Util::GlobalLoadOpInterface>());
     for (auto &op : ops) {
-      if (!immutableGlobals.contains(op.getGlobal())) continue;
+      if (!immutableGlobals.contains(op.getGlobalName())) continue;
       auto globalRef = op.getGlobalAttr().cast<Attribute>();
       auto it = loadOps.find(globalRef);
       if (it == loadOps.end()) {
         // Move to entry block; even if it's already there (so loads are
         // hoisted at the same time).
-        LLVM_DEBUG(llvm::dbgs() << "moving immutable global " << op.getGlobal()
-                                << " load to the entry block\n");
+        LLVM_DEBUG(llvm::dbgs()
+                   << "moving immutable global " << op.getGlobalName()
+                   << " load to the entry block\n");
         if (lastEntryOp) {
           op->moveAfter(lastEntryOp);
         } else {
@@ -65,8 +67,8 @@ static void hoistImmutableLoads(Region &region,
         loadOps[globalRef] = op;
         lastEntryOp = op;
       } else {
-        LLVM_DEBUG(llvm::dbgs()
-                   << "CSE'ing immutable global " << op.getGlobal() << "\n");
+        LLVM_DEBUG(llvm::dbgs() << "CSE'ing immutable global "
+                                << op.getGlobalName() << "\n");
         opReplacements.push_back({op, it->getSecond()});
       }
     }
@@ -108,8 +110,8 @@ static bool optimizeBuckets(
     for (int i = ops.size() - 1; i >= 1; --i) {
       auto previous = ops[i - 1];
       auto current = ops[i];
-      if (isa<IREE::Util::GlobalStoreOp>(previous) &&
-          isa<IREE::Util::GlobalLoadOp>(current)) {
+      if (isa<IREE::Util::GlobalStoreOpInterface>(previous) &&
+          isa<IREE::Util::GlobalLoadOpInterface>(current)) {
         // RAW - forward the stored global to the following use.
         auto storedValue = previous->getOperand(0);
         LLVM_DEBUG({
@@ -122,8 +124,8 @@ static bool optimizeBuckets(
         ops.erase(ops.begin() + i);
         current->erase();
         didRemoveAny = true;
-      } else if (isa<IREE::Util::GlobalLoadOp>(previous) &&
-                 isa<IREE::Util::GlobalLoadOp>(current)) {
+      } else if (isa<IREE::Util::GlobalLoadOpInterface>(previous) &&
+                 isa<IREE::Util::GlobalLoadOpInterface>(current)) {
         // RAR - forward the loaded global to the following use.
         LLVM_DEBUG({
           llvm::dbgs() << "RAR: replacing subsequent load with op:\n";
@@ -135,8 +137,8 @@ static bool optimizeBuckets(
         ops.erase(ops.begin() + i);
         current->erase();
         didRemoveAny = true;
-      } else if (isa<IREE::Util::GlobalStoreOp>(previous) &&
-                 isa<IREE::Util::GlobalStoreOp>(current)) {
+      } else if (isa<IREE::Util::GlobalStoreOpInterface>(previous) &&
+                 isa<IREE::Util::GlobalStoreOpInterface>(current)) {
         // WAW - remove the first store.
         LLVM_DEBUG({
           llvm::dbgs() << "WAW: erasing source op:\n";
@@ -151,16 +153,19 @@ static bool optimizeBuckets(
     }
     if (ops.empty()) continue;
 
-    if (auto loadOp = dyn_cast<IREE::Util::GlobalLoadOp>(ops.front())) {
+    if (auto loadOp =
+            dyn_cast<IREE::Util::GlobalLoadOpInterface>(ops.front())) {
       // If the head op is a load we can move that to the top of the block.
-      LLVM_DEBUG(llvm::dbgs() << "moving mutable global " << loadOp.getGlobal()
-                              << " load upward\n");
+      LLVM_DEBUG(llvm::dbgs() << "moving mutable global "
+                              << loadOp.getGlobalName() << " load upward\n");
       moveOpUpInBlock(block, ops.front());
     }
-    if (auto storeOp = dyn_cast<IREE::Util::GlobalStoreOp>(ops.back())) {
+    if (auto storeOp =
+            dyn_cast<IREE::Util::GlobalStoreOpInterface>(ops.back())) {
       // If the tail op is a store we can move that to the bottom of the block.
-      LLVM_DEBUG(llvm::dbgs() << "moving mutable global " << storeOp.getGlobal()
-                              << " store downward\n");
+      LLVM_DEBUG(llvm::dbgs()
+                 << "moving mutable global " << storeOp.getGlobalName()
+                 << " store downward\n");
       moveOpDownInBlock(block, ops.back());
     }
   }
@@ -200,12 +205,13 @@ static bool rearrangeBlockGlobalAccesses(
   sequencedBuckets.push_back({});  // Start in a sequence.
   block.walk([&](Operation *op) {
     auto &buckets = sequencedBuckets.back();
-    if (auto loadOp = dyn_cast<IREE::Util::GlobalLoadOp>(op)) {
-      if (!immutableGlobals.contains(loadOp.getGlobal())) {
-        buckets[loadOp.getGlobal()].push_back(op);
+    if (auto loadOp = dyn_cast<IREE::Util::GlobalLoadOpInterface>(op)) {
+      if (!immutableGlobals.contains(loadOp.getGlobalName())) {
+        buckets[loadOp.getGlobalName()].push_back(op);
       }
-    } else if (auto storeOp = dyn_cast<IREE::Util::GlobalStoreOp>(op)) {
-      buckets[storeOp.getGlobal()].push_back(op);
+    } else if (auto storeOp =
+                   dyn_cast<IREE::Util::GlobalStoreOpInterface>(op)) {
+      buckets[storeOp.getGlobalName()].push_back(op);
     } else if (doesOpBlockMotion(op)) {
       // Split point - all accesses after this point must not assume anything
       // about accesses before it.
@@ -267,8 +273,8 @@ class SimplifyGlobalAccessesPass
     // Note that constant loads are still ok above.
     for (auto &block : region) {
       for (auto &op : block) {
-        if (isa<IREE::Util::GlobalLoadIndirectOp>(op) ||
-            isa<IREE::Util::GlobalStoreIndirectOp>(op)) {
+        if (isa<IREE::Util::GlobalLoadIndirectOpInterface>(op) ||
+            isa<IREE::Util::GlobalStoreIndirectOpInterface>(op)) {
           LLVM_DEBUG(llvm::dbgs()
                      << "bailing on global access simplification: indirect "
                         "accesses present in function\n");

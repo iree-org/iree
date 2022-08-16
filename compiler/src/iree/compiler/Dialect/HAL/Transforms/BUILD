@@ -41,6 +41,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/Flow/IR",
         "//compiler/src/iree/compiler/Dialect/HAL/Analysis",
         "//compiler/src/iree/compiler/Dialect/HAL/Conversion",
+        "//compiler/src/iree/compiler/Dialect/HAL/Conversion/HALToHAL",
         "//compiler/src/iree/compiler/Dialect/HAL/Conversion/StandardToHAL",
         "//compiler/src/iree/compiler/Dialect/HAL/Conversion/StreamToHAL",
         "//compiler/src/iree/compiler/Dialect/HAL/Conversion/UtilToHAL",

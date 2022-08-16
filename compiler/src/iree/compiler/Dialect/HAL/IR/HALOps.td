@@ -1837,6 +1837,34 @@ def HAL_ExecutableLookupOp : HAL_PureOp<"executable.lookup", [
   ];
 }
 
+def HAL_ExecutableCalculateWorkgroupsOp : HAL_PureOp<"executable.calculate_workgroups"> {
+  let summary = [{calculates workgroup count from workload for an exported function}];
+  let description = [{
+    Calculates the workgroup count (grid XYZ) based on the given workload using
+    the workgroup count calculation region of the target
+    `hal.executable.export` op.
+  }];
+
+  let arguments = (ins
+    HAL_Device:$device,
+    SymbolRefAttr:$entry_point,
+    Variadic<Index>:$workload
+  );
+  let results = (outs
+    HAL_Dim:$workgroup_x,
+    HAL_Dim:$workgroup_y,
+    HAL_Dim:$workgroup_z
+  );
+
+  let assemblyFormat = [{
+    `device` `(` $device `:` type($device) `)`
+    `target` `(` $entry_point `)`
+    (`workload` `(` `[` $workload^ `]` `)`)?
+    `:` type($workgroup_x) `,` type($workgroup_y) `,` type($workgroup_z)
+    attr-dict-with-keyword
+  }];
+}
+
 //===----------------------------------------------------------------------===//
 // hal.interface
 //===----------------------------------------------------------------------===//

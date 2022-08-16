@@ -91,7 +91,7 @@ iree_runtime_cc_test(
 
 iree_runtime_cc_library(
     name = "loop_test_hdrs",
-    testonly = 1,
+    testonly = True,
     hdrs = [
         "loop_test.h",
     ],

@@ -22,13 +22,14 @@ iree_compiler_cc_library(
         "HoistInlinedRodata.cpp",
         "OrdinalAllocation.cpp",
         "Passes.cpp",
+        "ResolveRodataLoads.cpp",
         "SinkDefiningOps.cpp",
-        "SinkGlobalBufferLoads.cpp",
     ],
     hdrs = [
         "Passes.h",
     ],
     deps = [
+        "//compiler/src/iree/compiler/Dialect/Util/Analysis",
         "//compiler/src/iree/compiler/Dialect/Util/Conversion",
         "//compiler/src/iree/compiler/Dialect/Util/Conversion/MemRefToUtil",
         "//compiler/src/iree/compiler/Dialect/Util/IR",

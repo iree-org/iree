@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "executable_benchmarks.mlir"
     "hal_executable.mlir"
     "smoketest.mlir"
     "streams.mlir"

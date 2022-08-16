@@ -63,9 +63,6 @@ static void populateTilingToInvocationPatterns(RewritePatternSet &patterns) {
   };
   linalg::LinalgLoopDistributionOptions distributionOptions;
   distributionOptions.procInfo = getThreadProcInfoFn;
-  distributionOptions.distributionMethod = {
-      {linalg::DistributionMethod::Cyclic, linalg::DistributionMethod::Cyclic,
-       linalg::DistributionMethod::Cyclic}};
 
   auto tilingOptions = linalg::LinalgTilingOptions()
                            .setLoopType(linalg::LinalgTilingLoopType::Loops)

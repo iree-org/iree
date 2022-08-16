@@ -126,7 +126,7 @@ class Explorer {
   // Cached information about a global variable.
   struct GlobalInfo {
     // Global variable definition.
-    mutable IREE::Util::GlobalOp op;
+    mutable IREE::Util::GlobalOpInterface op;
     // True if the global is ever used indirectly anywhere in the program.
     // The explorer cannot (currently) see through these and the global should
     // be considered volatile.
@@ -140,8 +140,12 @@ class Explorer {
       return llvm::map_range(
           llvm::make_filter_range(
               uses,
-              [](Operation *op) { return isa<IREE::Util::GlobalLoadOp>(op); }),
-          [](Operation *op) { return cast<IREE::Util::GlobalLoadOp>(op); });
+              [](Operation *op) {
+                return isa<IREE::Util::GlobalLoadOpInterface>(op);
+              }),
+          [](Operation *op) {
+            return cast<IREE::Util::GlobalLoadOpInterface>(op);
+          });
     }
 
     // Returns a range of all direct stores to the global.
@@ -150,13 +154,17 @@ class Explorer {
       return llvm::map_range(
           llvm::make_filter_range(
               uses,
-              [](Operation *op) { return isa<IREE::Util::GlobalStoreOp>(op); }),
-          [](Operation *op) { return cast<IREE::Util::GlobalStoreOp>(op); });
+              [](Operation *op) {
+                return isa<IREE::Util::GlobalStoreOpInterface>(op);
+              }),
+          [](Operation *op) {
+            return cast<IREE::Util::GlobalStoreOpInterface>(op);
+          });
     }
   };
 
   // Gets analyzed global information for the given global operation.
-  const GlobalInfo *getGlobalInfo(IREE::Util::GlobalOp globalOp);
+  const GlobalInfo *getGlobalInfo(IREE::Util::GlobalOpInterface globalOp);
 
   // Queries memoized information about a global variable, returning nullptr if
   // not found.

@@ -10,7 +10,6 @@ load("//build_tools/bazel:iree_trace_runner_test.bzl", "iree_generated_trace_run
 load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
 
 package(
-    default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
 )

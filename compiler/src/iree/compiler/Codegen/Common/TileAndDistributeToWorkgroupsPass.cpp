@@ -25,6 +25,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
@@ -347,13 +348,12 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
 
     // Configure the linalg options.
     // Tile size selection function.
-    ArrayRef<int64_t> tileSizesRef(tileSizes);
     auto tileSizeFn = [&](OpBuilder &builder,
                           Operation *op) -> SmallVector<Value, 4> {
       // Check if tile sizes are deduced from the configuration. If so use
       // those.
       return llvm::to_vector<4>(
-          llvm::map_range(tileSizesRef, [&](int64_t ts) -> Value {
+          llvm::map_range(tileSizes, [&](int64_t ts) -> Value {
             return builder.create<arith::ConstantIndexOp>(op->getLoc(), ts);
           }));
     };

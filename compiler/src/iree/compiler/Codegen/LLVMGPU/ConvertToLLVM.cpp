@@ -26,12 +26,13 @@ namespace mlir {
 namespace iree_compiler {
 
 void ConvertToDynamicSharedMemory(ModuleOp moduleOp) {
+  SymbolTableCollection symbolTableCollection;
   // Collect all the adressOfOps to static shared memory globals.
   SmallVector<LLVM::AddressOfOp> addressOfOps;
   moduleOp.walk([&](LLVM::AddressOfOp addressOfOp) {
     // Check that the global associated with this addressOfOp has shared memory
     // space.
-    if (addressOfOp.getGlobal().getAddrSpace() == 3)
+    if (addressOfOp.getGlobal(symbolTableCollection).getAddrSpace() == 3)
       addressOfOps.push_back(addressOfOp);
   });
   if (addressOfOps.size() == 0) return;
@@ -50,7 +51,7 @@ void ConvertToDynamicSharedMemory(ModuleOp moduleOp) {
   for (auto addressOfOpsIt : llvm::enumerate(addressOfOps)) {
     uint32_t offset = 0;
     auto addressOfOp = addressOfOpsIt.value();
-    auto globalOp = addressOfOp.getGlobal();
+    auto globalOp = addressOfOp.getGlobal(symbolTableCollection);
     if (globalMemoryOffsetMap.count(globalOp)) {
       offset = globalMemoryOffsetMap[globalOp];
     } else {
@@ -424,7 +425,7 @@ void populateLLVMConversionPatterns(MLIRContext *context,
 }
 
 void populateScalarizeMathOps(RewritePatternSet &patterns) {
-  patterns.add<ScalarizeMathOp<math::SqrtOp>, ScalarizeMathOp<math::AbsOp>,
+  patterns.add<ScalarizeMathOp<math::SqrtOp>, ScalarizeMathOp<math::AbsFOp>,
                ScalarizeMathOp<math::AtanOp>, ScalarizeMathOp<math::Atan2Op>,
                ScalarizeMathOp<math::CeilOp>, ScalarizeMathOp<math::CosOp>,
                ScalarizeMathOp<math::ExpOp>, ScalarizeMathOp<math::ExpM1Op>,

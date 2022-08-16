@@ -93,9 +93,17 @@ struct ProgramExtractor {
 
   void scanDependentSymbols(Operation *parentOp) {
     // Find any global accessors and note their dependent symbols.
-    parentOp->walk([&](IREE::Util::GlobalAccessorOpInterface accessorOp) {
-      FlatSymbolRefAttr refAttr = accessorOp.getGlobalRefAttr();
-      symbolImportWorklist.push_back(refAttr.getAttr());
+    parentOp->walk([&](Operation *op) {
+      TypeSwitch<Operation *>(op)
+          .Case([&](IREE::Util::GlobalAddressOpInterface addressOp) {
+            symbolImportWorklist.push_back(addressOp.getGlobalAttr().getAttr());
+          })
+          .Case([&](IREE::Util::GlobalLoadOpInterface loadOp) {
+            symbolImportWorklist.push_back(loadOp.getGlobalAttr().getAttr());
+          })
+          .Case([&](IREE::Util::GlobalStoreOpInterface storeOp) {
+            symbolImportWorklist.push_back(storeOp.getGlobalAttr().getAttr());
+          });
     });
 
     // TODO: Scan for functions, etc.

@@ -60,11 +60,11 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
           // FOREACH-TO-GPU: scf.if %[[COND2]] {
           // FOREACH-TO-GPU:   affine.min #{{.*}}()[%[[TIDX]]]
           // FOREACH-TO-GPU:   affine.min #{{.*}}()[%[[TIDY]]]
-          // FOREACH-TO-GPU:   affine.apply #{{.*}}()[%[[TIDX]]]
-          // FOREACH-TO-GPU:   %[[svA:.*]] = memref.subview {{.*}} : memref<250x500xf32> to memref<?x500xf32
-          // FOREACH-TO-GPU:   affine.apply #{{.*}}()[%[[TIDY]]]
-          // FOREACH-TO-GPU:   %[[svB:.*]] = memref.subview {{.*}} : memref<500x1020xf32> to memref<500x?xf32
-          // FOREACH-TO-GPU:   %[[svC:.*]] = memref.subview {{.*}} : memref<250x1020xf32> to memref<?x?xf32
+          // FOREACH-TO-GPU-DAG:   affine.apply #{{.*}}()[%[[TIDX]]]
+          // FOREACH-TO-GPU-DAG:   %[[svA:.*]] = memref.subview {{.*}} : memref<250x500xf32> to memref<?x500xf32
+          // FOREACH-TO-GPU-DAG:   affine.apply #{{.*}}()[%[[TIDY]]]
+          // FOREACH-TO-GPU-DAG:   %[[svB:.*]] = memref.subview {{.*}} : memref<500x1020xf32> to memref<500x?xf32
+          // FOREACH-TO-GPU-DAG:   %[[svC:.*]] = memref.subview {{.*}} : memref<250x1020xf32> to memref<?x?xf32
           // FOREACH-TO-GPU:   linalg.matmul ins(%[[svA]], %[[svB]] : memref<?x500xf32{{.*}}>, memref<500x?xf32{{.*}}>) outs(%[[svC]] : memref<?x?xf32{{.*}}>)
           // FOREACH-TO-GPU: }
           // FOREACH-TO-GPU: gpu.barrier

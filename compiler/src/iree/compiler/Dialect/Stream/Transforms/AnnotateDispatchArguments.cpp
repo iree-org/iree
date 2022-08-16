@@ -143,10 +143,10 @@ class ValuePVS : public DFX::StateWrapper<DFX::PotentialConstantIntValuesState,
             return WalkResult::advance();
           }
 
-          if (auto loadOp =
-                  dyn_cast<IREE::Util::GlobalLoadOp>(result.getDefiningOp())) {
+          if (auto loadOp = dyn_cast<IREE::Util::GlobalLoadOpInterface>(
+                  result.getDefiningOp())) {
             auto *globalInfo = solver.getExplorer().queryGlobalInfoFrom(
-                loadOp.getGlobal(), loadOp);
+                loadOp.getGlobalName(), loadOp);
             auto global = solver.getElementFor<GlobalPVS>(
                 *this, Position::forOperation(globalInfo->op),
                 DFX::Resolution::REQUIRED);
@@ -215,10 +215,10 @@ ChangeStatus GlobalPVS::updateOperation(IREE::Util::GlobalOp globalOp,
   StateType newState;
   auto *globalInfo = solver.getExplorer().getGlobalInfo(globalOp);
   for (auto use : globalInfo->uses) {
-    auto storeOp = dyn_cast<IREE::Util::GlobalStoreOp>(use);
+    auto storeOp = dyn_cast<IREE::Util::GlobalStoreOpInterface>(use);
     if (!storeOp) continue;
     auto value = solver.getElementFor<ValuePVS>(
-        *this, Position::forValue(storeOp.getValue()),
+        *this, Position::forValue(storeOp.getStoredGlobalValue()),
         DFX::Resolution::REQUIRED);
     if (value.isValidState()) {
       newState.unionAssumed(value);

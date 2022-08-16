@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/HAL/Conversion/ConversionDialectInterface.h"
 #include "iree/compiler/Dialect/HAL/Conversion/ConversionTarget.h"
+#include "iree/compiler/Dialect/HAL/Conversion/HALToHAL/ConvertHALToHAL.h"
 #include "iree/compiler/Dialect/HAL/Conversion/StandardToHAL/ConvertStandardToHAL.h"
 #include "iree/compiler/Dialect/HAL/Conversion/StreamToHAL/ConvertStreamToHAL.h"
 #include "iree/compiler/Dialect/HAL/Conversion/TypeConverter.h"
@@ -75,6 +76,8 @@ class ConvertToHALPass
 
     RewritePatternSet patterns(&getContext());
 
+    populateHALToHALPatterns(context, conversionTarget, typeConverter,
+                             patterns);
     populateUtilToHALPatterns(context, conversionTarget, typeConverter,
                               patterns);
     populateStandardToHALPatterns(context, conversionTarget, typeConverter,

@@ -194,9 +194,9 @@ class IsImmediate
   void updateFromDefiningOp(StateType &newState, Value value, OpResult result,
                             DFX::Solver &solver) {
     TypeSwitch<Operation *, void>(result.getOwner())
-        .Case([&](IREE::Util::GlobalLoadOp op) {
+        .Case([&](IREE::Util::GlobalLoadOpInterface op) {
           auto *globalInfo =
-              solver.getExplorer().queryGlobalInfoFrom(op.getGlobal(), op);
+              solver.getExplorer().queryGlobalInfoFrom(op.getGlobalName(), op);
           if (!globalInfo || globalInfo->isIndirect) {
             LLVM_DEBUG(
                 {
@@ -291,11 +291,12 @@ ChangeStatus IsGlobalImmediate::updateOperation(IREE::Util::GlobalOp globalOp,
   // Walk all stores and clamp to their status.
   for (auto storeOp : globalInfo->getStores()) {
     auto isImmediate = solver.getElementFor<IsImmediate>(
-        *this, Position::forValue(storeOp.getValue()),
+        *this, Position::forValue(storeOp.getStoredGlobalValue()),
         DFX::Resolution::REQUIRED);
     LLVM_DEBUG({
       llvm::dbgs() << "[ElideTimepoints] global store: ";
-      storeOp.getValue().printAsOperand(llvm::dbgs(), solver.getAsmState());
+      storeOp.getStoredGlobalValue().printAsOperand(llvm::dbgs(),
+                                                    solver.getAsmState());
       llvm::dbgs() << "; ";
       isImmediate.print(llvm::dbgs(), solver.getAsmState());
       llvm::dbgs() << "\n";
@@ -543,7 +544,7 @@ class TimepointCoverageAnalysis {
           Position::forOperation(globalInfo->op));
       for (auto loadOp : globalInfo->getLoads()) {
         solver.getOrCreateElementFor<IsImmediate>(
-            Position::forValue(loadOp.getResult()));
+            Position::forValue(loadOp.getLoadedGlobalValue()));
       }
     });
     std::function<void(Region &)> seedRegion;

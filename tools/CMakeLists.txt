@@ -184,6 +184,7 @@ if(IREE_BUILD_COMPILER)
       LLVMTableGen
       MLIRSupport
       MLIRTableGen
+      MLIRTblgenLib
       iree::compiler::Utils
     HOSTONLY
   )

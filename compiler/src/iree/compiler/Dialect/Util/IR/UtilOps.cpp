@@ -771,6 +771,7 @@ Block *InitializerOp::addBlock() {
 // util.global
 //===----------------------------------------------------------------------===//
 
+// TODO(benvanik): move entirely to the interface.
 // Returns true if the given |accessType| is compatible with the |globalType|.
 // For example, this will return true if the global type is a tensor<?xf32>
 // and the access is tensor<4xf32>.
@@ -818,59 +819,18 @@ void GlobalOp::build(OpBuilder &builder, OperationState &result, StringRef name,
   build(builder, result, name, isMutable, type, llvm::None, attrs);
 }
 
-LogicalResult GlobalOp::verify() {
-  Operation *op = getOperation();
-  if (getInitialValue().hasValue()) {
-    // Ensure the value is something we can convert to a const.
-    if (!isGlobalTypeCompatible(getType(), getInitialValueAttr().getType())) {
-      return op->emitOpError()
-             << "initial value type mismatch; global " << getSymName() << " is "
-             << getType() << " but initial value provided is "
-             << getInitialValueAttr().getType();
-    }
-  }
-  return success();
-}
-
-IREE::Util::GlobalOp GlobalAddressOp::getGlobalOp(
-    SymbolTableCollection &symbolTable) {
-  return symbolTable.lookupNearestSymbolFrom<IREE::Util::GlobalOp>(
-      getOperation()->getParentOp(), getGlobalAttr());
-}
-
-FlatSymbolRefAttr GlobalAddressOp::getGlobalRefAttr() {
-  return getGlobalAttr();
-}
-
 void GlobalAddressOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(getResult(), Twine("ptr_" + getGlobal()).str());
 }
 
-LogicalResult GlobalAddressOp::verifySymbolUses(
-    SymbolTableCollection &symbolTable) {
-  Operation *op = getOperation();
-  auto globalOp = getGlobalOp(symbolTable);
-  if (!globalOp) {
-    return op->emitOpError() << "undefined global: " << getGlobal();
-  }
-  return success();
-}
-
 void GlobalLoadOp::build(OpBuilder &builder, OperationState &state,
-                         GlobalOp globalOp, ArrayRef<NamedAttribute> attrs) {
-  state.addTypes({globalOp.getType()});
+                         IREE::Util::GlobalOpInterface globalOp,
+                         ArrayRef<NamedAttribute> attrs) {
+  state.addTypes({globalOp.getGlobalType()});
   state.addAttribute("global", SymbolRefAttr::get(globalOp));
   state.attributes.append(attrs.begin(), attrs.end());
 }
-
-IREE::Util::GlobalOp GlobalLoadOp::getGlobalOp(
-    SymbolTableCollection &symbolTable) {
-  return symbolTable.lookupNearestSymbolFrom<IREE::Util::GlobalOp>(
-      getOperation()->getParentOp(), getGlobalAttr());
-}
-
-FlatSymbolRefAttr GlobalLoadOp::getGlobalRefAttr() { return getGlobalAttr(); }
 
 void GlobalLoadOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
@@ -889,22 +849,6 @@ void GlobalLoadOp::getEffects(
   }
 }
 
-LogicalResult GlobalLoadOp::verifySymbolUses(
-    SymbolTableCollection &symbolTable) {
-  Operation *op = getOperation();
-  auto globalOp = getGlobalOp(symbolTable);
-  if (!globalOp) {
-    return op->emitOpError() << "undefined global: " << getGlobal();
-  }
-  auto loadType = op->getResult(0).getType();
-  if (!isGlobalTypeCompatible(globalOp.getType(), loadType)) {
-    return op->emitOpError()
-           << "global type mismatch; global " << getGlobal() << " is "
-           << globalOp.getType() << " but load is " << loadType;
-  }
-  return success();
-}
-
 LogicalResult GlobalLoadIndirectOp::verify() {
   Operation *op = getOperation();
   auto globalType =
@@ -918,42 +862,11 @@ LogicalResult GlobalLoadIndirectOp::verify() {
 }
 
 void GlobalStoreOp::build(OpBuilder &builder, OperationState &state,
-                          Value value, GlobalOp globalOp,
+                          Value value, IREE::Util::GlobalOpInterface globalOp,
                           ArrayRef<NamedAttribute> attrs) {
   state.addOperands({value});
   state.addAttribute("global", SymbolRefAttr::get(globalOp));
   state.attributes.append(attrs.begin(), attrs.end());
-}
-
-IREE::Util::GlobalOp GlobalStoreOp::getGlobalOp(
-    SymbolTableCollection &symbolTable) {
-  return symbolTable.lookupNearestSymbolFrom<IREE::Util::GlobalOp>(
-      getOperation()->getParentOp(), getGlobalAttr());
-}
-
-FlatSymbolRefAttr GlobalStoreOp::getGlobalRefAttr() { return getGlobalAttr(); }
-
-LogicalResult GlobalStoreOp::verifySymbolUses(
-    SymbolTableCollection &symbolTable) {
-  Operation *op = getOperation();
-  auto globalOp = getGlobalOp(symbolTable);
-  if (!globalOp) {
-    return op->emitOpError() << "undefined global: " << getGlobal();
-  }
-  auto storeType = op->getOperand(0).getType();
-  if (globalOp.getType() != storeType) {
-    return op->emitOpError()
-           << "global type mismatch; global " << getGlobal() << " is "
-           << globalOp.getType() << " but store is " << storeType;
-  }
-  if (!globalOp.getIsMutable()) {
-    // Allow stores to immutable globals in initializers.
-    if (!op->getParentOfType<IREE::Util::InitializerOp>()) {
-      return op->emitOpError() << "global " << getGlobal()
-                               << " is not mutable and cannot be stored to";
-    }
-  }
-  return success();
 }
 
 LogicalResult GlobalStoreIndirectOp::verify() {

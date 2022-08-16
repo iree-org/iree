@@ -93,3 +93,39 @@ func.func @executable_layout_create(%device: !hal.device,
                                    layouts([%layout0, %layout1]) : !hal.executable_layout
   return
 }
+
+// -----
+
+// CHECK-LABEL: @unresolved_workload_ex
+hal.executable @unresolved_workload_ex {
+  // CHECK: hal.executable.variant public @backend
+  hal.executable.variant @backend, target = #hal.executable.target<"backend", "format"> {
+    // CHECK: hal.executable.export public @entry0
+    hal.executable.export public @entry0 ordinal(0) layout(#hal.executable.layout<push_constants = 0, sets = [
+      #hal.descriptor_set.layout<0, bindings = [
+        #hal.descriptor_set.binding<0, storage_buffer>,
+        #hal.descriptor_set.binding<1, storage_buffer>
+      ]>
+    ]>) {
+    ^bb0(%device: !hal.device, %arg0: index):
+      hal.return %arg0, %arg0, %arg0 : index, index, index
+    }
+  }
+}
+// CHECK-LABEL: @unresolved_workload
+// CHECK-SAME: (%[[DEVICE:.+]]: !hal.device,
+// CHECK-SAME:  %[[WORKLOAD_0:.+]]: index, %[[WORKLOAD_1:.+]]: index)
+func.func @unresolved_workload(%device: !hal.device,
+                               %workload_0: index, %workload_1: index) -> (index, index, index) {
+  // CHECK: %[[WORKGROUP_X:.+]], %[[WORKGROUP_Y:.+]], %[[WORKGROUP_Z:.+]] =
+  // CHECK-SAME:   hal.executable.calculate_workgroups
+  // CHECK-SAME:       device(%[[DEVICE]] : !hal.device)
+  // CHECK-SAME:       target(@unresolved_workload_ex::@backend::@entry0)
+  // CHECK-SAME:       workload([%[[WORKLOAD_0]], %[[WORKLOAD_1]]]) : index, index, index
+  %workgroups:3 = hal.executable.calculate_workgroups
+      device(%device : !hal.device)
+      target(@unresolved_workload_ex::@backend::@entry0)
+      workload([%workload_0, %workload_1]) : index, index, index
+  // CHECK: return %[[WORKGROUP_X]], %[[WORKGROUP_Y]], %[[WORKGROUP_Z]]
+  return %workgroups#0, %workgroups#1, %workgroups#2 : index, index, index
+}

@@ -397,6 +397,65 @@ Optional<emitc::ApplyOp> createVmTypeDefPtr(ConversionPatternRewriter &rewriter,
   return cast<emitc::ApplyOp>(elementTypePtr.getDefiningOp());
 }
 
+/// Move multiple refs from one set of variables to another set. As these two
+/// sets may alias we move the source variables into temporaries first.
+/// The generated code works as follows:
+/// `isMove` == true:
+///    move(src_i, tmp_i); for all i
+///    move(tmp_i, dest_i); for all i
+/// `isMove` == false:
+///    retain(src_i, tmp_i); for all i
+///    assign(tmp_i, dest_i); for all i
+LogicalResult retainOrMoveRefs(OpBuilder &builder, Location location,
+                               BlockAndValueMapping mapping, bool isMove) {
+  auto ctx = builder.getContext();
+
+  BlockAndValueMapping tmpMapping;
+  for (auto &[srcRef, destRef] : mapping.getValueMap()) {
+    assert(srcRef.getType() == emitc::PointerType::get(emitc::OpaqueType::get(
+                                   ctx, "iree_vm_ref_t")));
+
+    auto tmpRef = builder.create<emitc::VariableOp>(
+        /*location=*/location,
+        /*resultType=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t"),
+        /*value=*/emitc::OpaqueAttr::get(ctx, ""));
+
+    Value tmpPtr =
+        emitc_builders::addressOf(builder, location, tmpRef.getResult());
+
+    if (failed(clearStruct(builder, tmpPtr))) {
+      return failure();
+    }
+
+    StringRef callee = isMove ? "iree_vm_ref_move" : "iree_vm_ref_retain";
+    builder.create<emitc::CallOp>(
+        /*location=*/location,
+        /*type=*/TypeRange{},
+        /*callee=*/StringAttr::get(ctx, callee),
+        /*args=*/ArrayAttr{},
+        /*templateArgs=*/ArrayAttr{},
+        /*operands=*/ArrayRef<Value>{srcRef, tmpPtr});
+
+    tmpMapping.map(srcRef, tmpPtr);
+  }
+
+  for (const auto &[srcRef, destRef] : mapping.getValueMap()) {
+    Value tmpRef = tmpMapping.lookup(srcRef);
+
+    StringRef callee = isMove ? "iree_vm_ref_move" : "iree_vm_ref_assign";
+
+    builder.create<emitc::CallOp>(
+        /*location=*/location,
+        /*type=*/TypeRange{},
+        /*callee=*/StringAttr::get(ctx, callee),
+        /*args=*/ArrayAttr{},
+        /*templateArgs=*/ArrayAttr{},
+        /*operands=*/ArrayRef<Value>{tmpRef, destRef});
+  }
+
+  return success();
+}
+
 /// Releases refs which are local to the function as well as ref arguments.
 void releaseRefs(OpBuilder &builder, Location location,
                  mlir::func::FuncOp funcOp,
@@ -2876,7 +2935,6 @@ class BranchOpConversion : public OpConversionPattern<IREE::VM::BranchOp> {
   LogicalResult matchAndRewrite(
       IREE::VM::BranchOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto ctx = op.getContext();
     auto loc = op.getLoc();
 
     assert(op.getOperands().size() == adaptor.getOperands().size());
@@ -2917,6 +2975,7 @@ class BranchOpConversion : public OpConversionPattern<IREE::VM::BranchOp> {
       OpBuilder::InsertionGuard guard(rewriter);
       destDispatch = rewriter.createBlock(dest);
 
+      BlockAndValueMapping refMapping;
       for (auto pair : llvm::zip(op.getOperands(), dest->getArguments())) {
         Value operand = std::get<0>(pair);
         BlockArgument blockArg = std::get<1>(pair);
@@ -2938,15 +2997,11 @@ class BranchOpConversion : public OpConversionPattern<IREE::VM::BranchOp> {
           return op.emitError() << "local ref not found";
         }
 
-        rewriter.create<emitc::CallOp>(
-            /*location=*/loc,
-            /*type=*/TypeRange{},
-            /*callee=*/
-            StringAttr::get(ctx, "iree_vm_ref_retain"),
-            /*args=*/ArrayAttr{},
-            /*templateArgs=*/ArrayAttr{},
-            /*operands=*/
-            ArrayRef<Value>{operandRef.getValue(), blockArgRef.getValue()});
+        refMapping.map(operandRef.getValue(), blockArgRef.getValue());
+      }
+      if (failed(
+              retainOrMoveRefs(rewriter, loc, refMapping, /*isMove=*/false))) {
+        return op.emitError() << "moving of multiple refs failed";
       }
       rewriter.create<mlir::cf::BranchOp>(loc, op.getDest(), nonRefOperands);
     }
@@ -2989,7 +3044,6 @@ class CondBranchOpConversion
   LogicalResult matchAndRewrite(
       IREE::VM::CondBranchOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto ctx = op.getContext();
     auto loc = op.getLoc();
 
     assert(op.getOperands().size() == adaptor.getOperands().size());
@@ -3040,38 +3094,6 @@ class CondBranchOpConversion
       OpBuilder::InsertionGuard guard(rewriter);
       trueDestDispatch = rewriter.createBlock(trueDest);
 
-      for (auto pair :
-           llvm::zip(op.getTrueOperands(), trueDest->getArguments())) {
-        Value operand = std::get<0>(pair);
-        BlockArgument blockArg = std::get<1>(pair);
-
-        if (isNotRefOperand(operand)) {
-          continue;
-        }
-
-        assert(operand.getType().isa<IREE::VM::RefType>());
-        assert(blockArg.getType().isa<IREE::VM::RefType>());
-
-        Optional<Value> operandRef = typeConverter->materializeRef(operand);
-        Optional<Value> blockArgRef = typeConverter->materializeRef(blockArg);
-
-        if (!operandRef.hasValue()) {
-          return op.emitError() << "local ref not found";
-        }
-        if (!blockArgRef.hasValue()) {
-          return op.emitError() << "local ref not found";
-        }
-
-        rewriter.create<emitc::CallOp>(
-            /*location=*/loc,
-            /*type=*/TypeRange{},
-            /*callee=*/
-            StringAttr::get(ctx, "iree_vm_ref_retain"),
-            /*args=*/ArrayAttr{},
-            /*templateArgs=*/ArrayAttr{},
-            /*operands=*/
-            ArrayRef<Value>{operandRef.getValue(), blockArgRef.getValue()});
-      }
       // Let the BranchOpConversion handle ref block arguments.
       rewriter.create<IREE::VM::BranchOp>(loc, op.getTrueDest(),
                                           op.getTrueOperands());
@@ -3082,38 +3104,6 @@ class CondBranchOpConversion
       OpBuilder::InsertionGuard guard(rewriter);
       falseDestDispatch = rewriter.createBlock(falseDest);
 
-      for (auto pair :
-           llvm::zip(op.getFalseOperands(), falseDest->getArguments())) {
-        Value operand = std::get<0>(pair);
-        BlockArgument blockArg = std::get<1>(pair);
-
-        if (isNotRefOperand(operand)) {
-          continue;
-        }
-
-        assert(operand.getType().isa<IREE::VM::RefType>());
-        assert(blockArg.getType().isa<IREE::VM::RefType>());
-
-        Optional<Value> operandRef = typeConverter->materializeRef(operand);
-        Optional<Value> blockArgRef = typeConverter->materializeRef(blockArg);
-
-        if (!operandRef.hasValue()) {
-          return op.emitError() << "local ref not found";
-        }
-        if (!blockArgRef.hasValue()) {
-          return op.emitError() << "local ref not found";
-        }
-
-        rewriter.create<emitc::CallOp>(
-            /*location=*/loc,
-            /*type=*/TypeRange{},
-            /*callee=*/
-            StringAttr::get(ctx, "iree_vm_ref_retain"),
-            /*args=*/ArrayAttr{},
-            /*templateArgs=*/ArrayAttr{},
-            /*operands=*/
-            ArrayRef<Value>{operandRef.getValue(), blockArgRef.getValue()});
-      }
       // Let the BranchOpConversion handle ref block arguments.
       rewriter.create<IREE::VM::BranchOp>(loc, op.getFalseDest(),
                                           op.getFalseOperands());
@@ -3144,43 +3134,7 @@ class ReturnOpConversion : public OpConversionPattern<IREE::VM::ReturnOp> {
     unsigned int firstOutputArgumentIndex =
         funcOp.getNumArguments() - op.getOperands().size();
 
-    // NOTE: We need to move the ref operands of the return op into our result
-    // function arguments. As these two sets may alias we create some
-    // temporaries; We take the simple path here and save all refs.
-    BlockAndValueMapping mapping;
-    for (const auto &operand : op.getOperands()) {
-      if (operand.getType().isa<IREE::VM::RefType>()) {
-        Optional<Value> operandRef = typeConverter->materializeRef(operand);
-
-        if (!operandRef.hasValue()) {
-          return op->emitError() << "local ref not found";
-        }
-
-        auto refOp = rewriter.create<emitc::VariableOp>(
-            /*location=*/loc,
-            /*resultType=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t"),
-            /*value=*/emitc::OpaqueAttr::get(ctx, ""));
-
-        Value refPtr =
-            emitc_builders::addressOf(rewriter, loc, refOp.getResult());
-
-        if (failed(clearStruct(rewriter, refPtr))) {
-          return failure();
-        }
-
-        rewriter.create<emitc::CallOp>(
-            /*location=*/loc,
-            /*type=*/TypeRange{},
-            /*callee=*/StringAttr::get(ctx, "iree_vm_ref_move"),
-            /*args=*/ArrayAttr{},
-            /*templateArgs=*/ArrayAttr{},
-            /*operands=*/
-            ArrayRef<Value>{operandRef.getValue(), refPtr});
-
-        mapping.map(operandRef.getValue(), refPtr);
-      }
-    }
-
+    BlockAndValueMapping refMapping;
     for (auto &pair : llvm::enumerate(op.getOperands())) {
       Value operand = pair.value();
       size_t index = pair.index();
@@ -3198,17 +3152,7 @@ class ReturnOpConversion : public OpConversionPattern<IREE::VM::ReturnOp> {
         if (!operandRef.hasValue()) {
           return op->emitError() << "local ref not found";
         }
-
-        Value tmpRef = mapping.lookup(operandRef.getValue());
-
-        rewriter.create<emitc::CallOp>(
-            /*location=*/loc,
-            /*type=*/TypeRange{},
-            /*callee=*/StringAttr::get(ctx, "iree_vm_ref_move"),
-            /*args=*/ArrayAttr{},
-            /*templateArgs=*/ArrayAttr{},
-            /*operands=*/
-            ArrayRef<Value>{tmpRef, resultArgument});
+        refMapping.map(operandRef.getValue(), resultArgument);
       } else {
         rewriter.create<emitc::CallOp>(
             /*location=*/loc,
@@ -3220,6 +3164,9 @@ class ReturnOpConversion : public OpConversionPattern<IREE::VM::ReturnOp> {
       }
     }
 
+    if (failed(retainOrMoveRefs(rewriter, loc, refMapping, /*isMove=*/true))) {
+      return op.emitError() << "moving of multiple refs failed";
+    }
     releaseRefs(rewriter, loc, funcOp, *typeConverter);
 
     auto status = emitc_builders::ireeOkStatus(rewriter, loc);

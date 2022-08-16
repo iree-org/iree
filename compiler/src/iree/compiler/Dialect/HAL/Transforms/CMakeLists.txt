@@ -50,6 +50,7 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Analysis
     iree::compiler::Dialect::HAL::Conversion
+    iree::compiler::Dialect::HAL::Conversion::HALToHAL
     iree::compiler::Dialect::HAL::Conversion::StandardToHAL
     iree::compiler::Dialect::HAL::Conversion::StreamToHAL
     iree::compiler::Dialect::HAL::Conversion::UtilToHAL

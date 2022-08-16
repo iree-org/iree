@@ -1114,7 +1114,7 @@ void populateStandardToVMPatterns(MLIRContext *context,
 
   // Floating-point arithmetic ops.
   patterns
-      .insert<UnaryArithmeticOpConversion<math::AbsOp, IREE::VM::AbsF32Op,
+      .insert<UnaryArithmeticOpConversion<math::AbsFOp, IREE::VM::AbsF32Op,
                                           IREE::VM::AbsF64Op>,
               BinaryArithmeticOpConversion<arith::AddFOp, IREE::VM::AddF32Op,
                                            IREE::VM::AddF64Op>,

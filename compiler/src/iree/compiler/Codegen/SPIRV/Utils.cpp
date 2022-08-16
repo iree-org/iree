@@ -45,7 +45,8 @@ static linalg::ProcInfo getGPUProcessorIdAndCountImpl(OpBuilder &builder,
       gpu::Dimension::x, gpu::Dimension::y, gpu::Dimension::z};
   Type indexType = builder.getIndexType();
   return {builder.create<GPUIdOp>(loc, indexType, dimAttr[dim]),
-          builder.create<GPUCountOp>(loc, indexType, dimAttr[dim])};
+          builder.create<GPUCountOp>(loc, indexType, dimAttr[dim]),
+          linalg::DistributionMethod::Cyclic};
 }
 
 template <typename GPUIdOp, typename GPUCountOp>

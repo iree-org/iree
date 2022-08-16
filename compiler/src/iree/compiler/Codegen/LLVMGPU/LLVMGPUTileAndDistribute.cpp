@@ -83,9 +83,9 @@ static SmallVector<Value, 4> calculateDistributedTileSize(
   if (partitionedLoops.empty()) {
     return tileSizesVal;
   }
-  unsigned maxDepth = partitionedLoops.back() + 1;
   auto zero = builder.create<arith::ConstantIndexOp>(operation->getLoc(), 0);
-  tileSizesVal.resize(maxDepth, zero);
+  tileSizesVal.resize(interfaceOp.getNumLoops(), zero);
+
   // partitionedLoops contains the dimensions we want to distribute.
   // We are distributing them in order onto the different workgroup
   // dimensions.
@@ -122,9 +122,6 @@ static void populateTilingToWarpPatterns(
   };
   linalg::LinalgLoopDistributionOptions warpDistributionOptions;
   warpDistributionOptions.procInfo = getWarpProcInfoFn;
-  warpDistributionOptions.distributionMethod = {
-      {linalg::DistributionMethod::Cyclic, linalg::DistributionMethod::Cyclic,
-       linalg::DistributionMethod::Cyclic}};
 
   auto tilingOptions = linalg::LinalgTilingOptions()
                            .setLoopType(linalg::LinalgTilingLoopType::Loops)
@@ -157,9 +154,6 @@ static void populateTilingToInvocationPatterns(
   };
   linalg::LinalgLoopDistributionOptions invocationDistributionOptions;
   invocationDistributionOptions.procInfo = getThreadProcInfoFn;
-  invocationDistributionOptions.distributionMethod = {
-      {linalg::DistributionMethod::Cyclic, linalg::DistributionMethod::Cyclic,
-       linalg::DistributionMethod::Cyclic}};
 
   auto tilingOptions =
       linalg::LinalgTilingOptions()

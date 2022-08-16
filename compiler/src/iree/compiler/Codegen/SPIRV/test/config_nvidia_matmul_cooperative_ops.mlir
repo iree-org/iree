@@ -25,13 +25,13 @@ hal.executable public @matmul_256x1024x128_div_sub {
         cooperative_matrix_properties_nv = [
           #spv.coop_matrix_props<
             a_type = i8, b_type = i8, c_type = i32, k_size = 32,
-            m_size = 8, n_size = 8, result_type = i32, scope = 3 : i32>,
+            m_size = 8, n_size = 8, result_type = i32, scope  = <Subgroup>>,
           #spv.coop_matrix_props<
             a_type = f16, b_type = f16, c_type = f16, k_size = 16,
-            m_size = 16, n_size = 16, result_type = f16, scope = 3 : i32>,
+            m_size = 16, n_size = 16, result_type = f16, scope  = <Subgroup>>,
           #spv.coop_matrix_props<
             a_type = f16, b_type = f16, c_type = f32, k_size = 16,
-            m_size = 16, n_size = 16, result_type = f32, scope = 3 : i32>
+            m_size = 16, n_size = 16, result_type = f32, scope  = <Subgroup>>
         ],
         max_compute_shared_memory_size = 49152,
         max_compute_workgroup_invocations = 1024,
@@ -115,13 +115,13 @@ hal.executable public @matmul_256x1024x8 {
         cooperative_matrix_properties_nv = [
           #spv.coop_matrix_props<
             a_type = i8, b_type = i8, c_type = i32, k_size = 32,
-            m_size = 8, n_size = 8, result_type = i32, scope = 3 : i32>,
+            m_size = 8, n_size = 8, result_type = i32, scope  = <Subgroup>>,
           #spv.coop_matrix_props<
             a_type = f16, b_type = f16, c_type = f16, k_size = 16,
-            m_size = 16, n_size = 16, result_type = f16, scope = 3 : i32>,
+            m_size = 16, n_size = 16, result_type = f16, scope  = <Subgroup>>,
           #spv.coop_matrix_props<
             a_type = f16, b_type = f16, c_type = f32, k_size = 16,
-            m_size = 16, n_size = 16, result_type = f32, scope = 3 : i32>
+            m_size = 16, n_size = 16, result_type = f32, scope  = <Subgroup>>
         ],
         max_compute_shared_memory_size = 49152,
         max_compute_workgroup_invocations = 1024,
