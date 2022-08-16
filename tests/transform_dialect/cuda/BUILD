@@ -40,6 +40,7 @@ iree_lit_test_suite(
         "notsan",
         "noubsan",
         "requires-gpu-nvidia",
+        "driver=cuda",
     ],
     tools = [
         "//tools:iree-compile",

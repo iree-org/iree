@@ -33,6 +33,7 @@ iree_lit_test_suite(
     "notsan"
     "noubsan"
     "requires-gpu-nvidia"
+    "driver=cuda"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
