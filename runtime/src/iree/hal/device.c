@@ -201,12 +201,3 @@ IREE_API_EXPORT iree_status_t iree_hal_device_wait_semaphores(
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
-
-IREE_API_EXPORT iree_status_t
-iree_hal_device_wait_idle(iree_hal_device_t* device, iree_timeout_t timeout) {
-  IREE_ASSERT_ARGUMENT(device);
-  IREE_TRACE_ZONE_BEGIN(z0);
-  iree_status_t status = _VTABLE_DISPATCH(device, wait_idle)(device, timeout);
-  IREE_TRACE_ZONE_END(z0);
-  return status;
-}

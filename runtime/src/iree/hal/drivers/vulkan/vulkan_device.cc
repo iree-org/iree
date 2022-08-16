@@ -1099,15 +1099,6 @@ static iree_status_t iree_hal_vulkan_device_wait_semaphores(
       device->logical_device, semaphore_list, timeout, wait_flags);
 }
 
-static iree_status_t iree_hal_vulkan_device_wait_idle(
-    iree_hal_device_t* base_device, iree_timeout_t timeout) {
-  iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
-  for (iree_host_size_t i = 0; i < device->queue_count; ++i) {
-    IREE_RETURN_IF_ERROR(device->queues[i]->WaitIdle(timeout));
-  }
-  return iree_ok_status();
-}
-
 namespace {
 const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable = {
     /*.destroy=*/iree_hal_vulkan_device_destroy,
@@ -1131,6 +1122,5 @@ const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable = {
     /*.transfer_range=*/iree_hal_device_submit_transfer_range_and_wait,
     /*.queue_submit=*/iree_hal_vulkan_device_queue_submit,
     /*.wait_semaphores=*/iree_hal_vulkan_device_wait_semaphores,
-    /*.wait_idle=*/iree_hal_vulkan_device_wait_idle,
 };
 }  // namespace

@@ -285,14 +285,6 @@ static iree_status_t iree_hal_sync_device_wait_semaphores(
                                             semaphore_list, timeout);
 }
 
-static iree_status_t iree_hal_sync_device_wait_idle(
-    iree_hal_device_t* base_device, iree_timeout_t timeout) {
-  // No-op (in intended usages). If we allowed multiple threads to call into
-  // the same device then we may want to change this to an atomic flag as to
-  // whether any thread is actively performing work.
-  return iree_ok_status();
-}
-
 static const iree_hal_device_vtable_t iree_hal_sync_device_vtable = {
     .destroy = iree_hal_sync_device_destroy,
     .id = iree_hal_sync_device_id,
@@ -313,5 +305,4 @@ static const iree_hal_device_vtable_t iree_hal_sync_device_vtable = {
     .transfer_range = iree_hal_device_transfer_mappable_range,
     .queue_submit = iree_hal_sync_device_queue_submit,
     .wait_semaphores = iree_hal_sync_device_wait_semaphores,
-    .wait_idle = iree_hal_sync_device_wait_idle,
 };

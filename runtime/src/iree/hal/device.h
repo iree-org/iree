@@ -336,19 +336,6 @@ IREE_API_EXPORT iree_status_t iree_hal_device_wait_semaphores(
     iree_hal_device_t* device, iree_hal_wait_mode_t wait_mode,
     const iree_hal_semaphore_list_t* semaphore_list, iree_timeout_t timeout);
 
-// Blocks the caller until all outstanding requests on all queues have been
-// completed or the |timeout| elapses. This is equivalent to having waited
-// on all semaphores outstanding at the time of the call, meaning that if new
-// work is submitted by another thread it may not be waited on prior to this
-// call returning.
-//
-// Returns success if the device reaches an idle point during the call.
-//
-// Returns DEADLINE_EXCEEDED if the |timeout| elapses without the device having
-// become idle.
-IREE_API_EXPORT iree_status_t
-iree_hal_device_wait_idle(iree_hal_device_t* device, iree_timeout_t timeout);
-
 //===----------------------------------------------------------------------===//
 // iree_hal_device_t implementation details
 //===----------------------------------------------------------------------===//
@@ -423,9 +410,6 @@ typedef struct iree_hal_device_vtable_t {
   iree_status_t(IREE_API_PTR* wait_semaphores)(
       iree_hal_device_t* device, iree_hal_wait_mode_t wait_mode,
       const iree_hal_semaphore_list_t* semaphore_list, iree_timeout_t timeout);
-
-  iree_status_t(IREE_API_PTR* wait_idle)(iree_hal_device_t* device,
-                                         iree_timeout_t timeout);
 } iree_hal_device_vtable_t;
 IREE_HAL_ASSERT_VTABLE_LAYOUT(iree_hal_device_vtable_t);
 

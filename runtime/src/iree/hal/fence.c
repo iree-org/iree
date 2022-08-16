@@ -253,6 +253,8 @@ IREE_API_EXPORT iree_status_t iree_hal_fence_wait(iree_hal_fence_t* fence,
   // no device-side batching. We should probably expose this as a device method
   // instead or have a way to batch by semaphore implementation for heterogenous
   // fences.
+  //
+  // TODO(benvanik): use iree_hal_device_wait_semaphores for each unique device.
   iree_hal_semaphore_list_t semaphore_list =
       iree_hal_fence_semaphore_list(fence);
   iree_status_t status = iree_ok_status();

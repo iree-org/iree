@@ -370,18 +370,6 @@ static iree_status_t iree_hal_cuda_device_wait_semaphores(
                           "semaphore not implemented");
 }
 
-static iree_status_t iree_hal_cuda_device_wait_idle(
-    iree_hal_device_t* base_device, iree_timeout_t timeout) {
-  iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
-  // Wait until the stream is done.
-  // TODO(thomasraoux): CUDA doesn't support a deadline for wait, figure out how
-  // to handle it better.
-  CUDA_RETURN_IF_ERROR(device->context_wrapper.syms,
-                       cuStreamSynchronize(device->stream),
-                       "cuStreamSynchronize");
-  return iree_ok_status();
-}
-
 static const iree_hal_device_vtable_t iree_hal_cuda_device_vtable = {
     .destroy = iree_hal_cuda_device_destroy,
     .id = iree_hal_cuda_device_id,
@@ -402,5 +390,4 @@ static const iree_hal_device_vtable_t iree_hal_cuda_device_vtable = {
     .transfer_range = iree_hal_device_submit_transfer_range_and_wait,
     .queue_submit = iree_hal_cuda_device_queue_submit,
     .wait_semaphores = iree_hal_cuda_device_wait_semaphores,
-    .wait_idle = iree_hal_cuda_device_wait_idle,
 };

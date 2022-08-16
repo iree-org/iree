@@ -341,19 +341,6 @@ static iree_status_t iree_hal_task_device_wait_semaphores(
       &device->large_block_pool);
 }
 
-static iree_status_t iree_hal_task_device_wait_idle(
-    iree_hal_device_t* base_device, iree_timeout_t timeout) {
-  iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
-  IREE_TRACE_ZONE_BEGIN(z0);
-  iree_status_t status = iree_ok_status();
-  for (iree_host_size_t i = 0; i < device->queue_count; ++i) {
-    status = iree_hal_task_queue_wait_idle(&device->queues[i], timeout);
-    if (!iree_status_is_ok(status)) break;
-  }
-  IREE_TRACE_ZONE_END(z0);
-  return status;
-}
-
 static const iree_hal_device_vtable_t iree_hal_task_device_vtable = {
     .destroy = iree_hal_task_device_destroy,
     .id = iree_hal_task_device_id,
@@ -374,5 +361,4 @@ static const iree_hal_device_vtable_t iree_hal_task_device_vtable = {
     .transfer_range = iree_hal_device_transfer_mappable_range,
     .queue_submit = iree_hal_task_device_queue_submit,
     .wait_semaphores = iree_hal_task_device_wait_semaphores,
-    .wait_idle = iree_hal_task_device_wait_idle,
 };
