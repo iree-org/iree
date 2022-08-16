@@ -18,6 +18,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "executable_benchmarks.mlir",
             "iree-benchmark-module.mlir",
             "iree-run-mlir.mlir",
             "iree-run-module.mlir",
