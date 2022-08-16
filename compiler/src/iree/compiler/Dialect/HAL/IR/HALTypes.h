@@ -155,8 +155,8 @@ struct FieldParser<mlir::iree_compiler::IREE::HAL::DescriptorType> {
     if (parser.parseKeywordOrString(&value)) return failure();
     auto result = mlir::iree_compiler::IREE::HAL::symbolizeEnum<
         mlir::iree_compiler::IREE::HAL::DescriptorType>(value);
-    if (!result.hasValue()) return failure();
-    return result.getValue();
+    if (!result.has_value()) return failure();
+    return result.value();
   }
 };
 static inline AsmPrinter &operator<<(
