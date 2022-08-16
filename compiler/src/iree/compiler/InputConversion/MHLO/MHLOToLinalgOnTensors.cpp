@@ -221,7 +221,7 @@ struct ScatterUpdateConversion : public OpConversionPattern<mhlo::ScatterOp> {
 
   LogicalResult matchAndRewrite(
       mhlo::ScatterOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter& rewriter) const final {
+      ConversionPatternRewriter &rewriter) const final {
     // Variadic Scatter support not yet implemented
     if (op.operands().size() != 1 || op.updates().size() != 1) return failure();
 
@@ -294,7 +294,7 @@ struct ScatterUpdateConversion : public OpConversionPattern<mhlo::ScatterOp> {
                    adaptor.updates()[0]},
         /*outputs=*/adaptor.operands()[0], indexingMaps,
         mhlo::getNParallelLoopsAttrs(nloops),
-        [](OpBuilder& b, Location loc, ValueRange args) {},
+        [](OpBuilder &b, Location loc, ValueRange args) {},
         mhlo::pruneAttributeList(op));
 
     // Transform the scatter update computation region
@@ -305,7 +305,7 @@ struct ScatterUpdateConversion : public OpConversionPattern<mhlo::ScatterOp> {
     //   result = idx == cmpIdx ? update : old_value
     //   linalg.yield result
     bool updateIsTrivial = (op.getRegion().front().getOperations().size() == 1);
-    Block* block = &linalgOp->getRegion(0).front();
+    Block *block = &linalgOp->getRegion(0).front();
     auto args = block->getArguments();
 
     BlockAndValueMapping mapping;
@@ -334,7 +334,7 @@ struct ScatterUpdateConversion : public OpConversionPattern<mhlo::ScatterOp> {
     rewriter.mergeBlocks(&linalgOp->getRegion(0).back(), block, llvm::None);
 
     // Generate: result = idx == cmpIdx ? update : old_value.
-    Operation* terminator = block->getTerminator();
+    Operation *terminator = block->getTerminator();
     rewriter.setInsertionPoint(terminator);
     Value cmpIdx =
         rewriter.create<linalg::IndexOp>(loc, scatterDimsToOperandDims[0]);
