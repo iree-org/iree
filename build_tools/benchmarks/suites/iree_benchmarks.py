@@ -10,8 +10,13 @@ from typing import List, Tuple
 from .device_specs.linux_x86_64 import GCP_C2_STANDARD_16_DEVICE_SPEC
 from .models.model_group import MOBILE_MODEL_GROUP
 from .definitions.common import DeviceArchitecture, DevicePlatform, RANDOM_MODEL_INPUT_DATA
-from .definitions.iree import IreeBenchmarkCompileSpec, IreeBenchmarkRunSpec, IreeCompileTarget, IreeCompileConfig, IreeRunConfig, IreeRuntimeDriver, IreeRuntimeLoader, IreeTargetBackend
-from .id_defs import IREE_COMPILE_CONFIG_LINUX_CASCADELAKE_ID, IREE_RUN_CONFIG_LOCAL_SYNC_ID, IREE_RUN_CONFIG_LOCAL_TASK_BASE_ID
+from .definitions.iree import (IreeBenchmarkCompileSpec, IreeBenchmarkRunSpec,
+                               IreeCompileTarget, IreeCompileConfig,
+                               IreeRunConfig, IreeRuntimeDriver,
+                               IreeRuntimeLoader, IreeTargetBackend)
+from .id_defs import (IREE_COMPILE_CONFIG_LINUX_CASCADELAKE_ID,
+                      IREE_RUN_CONFIG_LOCAL_SYNC_ID,
+                      IREE_RUN_CONFIG_LOCAL_TASK_BASE_ID)
 
 MODULE_BENCHMARK_TOOL = "iree-benchmark-module"
 
@@ -26,14 +31,15 @@ class Linux_x86_64_Benchmarks(object):
 
   CASCADELAKE_COMPILE_CONFIG = IreeCompileConfig(
       id=IREE_COMPILE_CONFIG_LINUX_CASCADELAKE_ID,
-      tags=["defaults"],
+      tags=["default-flags"],
       compile_targets=[CASCADELAKE_CPU_TARGET])
 
-  LOCAL_SYNC_RUN_CONFIG = IreeRunConfig(id=IREE_RUN_CONFIG_LOCAL_SYNC_ID,
-                                        tags=[f"sync,defaults"],
-                                        loader=IreeRuntimeLoader.EMBEDDED_ELF,
-                                        driver=IreeRuntimeDriver.LOCAL_SYNC,
-                                        benchmark_tool=MODULE_BENCHMARK_TOOL)
+  LOCAL_SYNC_RUN_CONFIG = IreeRunConfig(
+      id=IREE_RUN_CONFIG_LOCAL_SYNC_ID,
+      tags=["full-inference", "default-flags"],
+      loader=IreeRuntimeLoader.EMBEDDED_ELF,
+      driver=IreeRuntimeDriver.LOCAL_SYNC,
+      benchmark_tool=MODULE_BENCHMARK_TOOL)
 
   @classmethod
   def generate(
@@ -44,7 +50,7 @@ class Linux_x86_64_Benchmarks(object):
       default_run_configs.append(
           IreeRunConfig(
               id=f"{IREE_RUN_CONFIG_LOCAL_TASK_BASE_ID}_{thread_num}",
-              tags=[f"{thread_num}-cores,defaults"],
+              tags=[f"{thread_num}-thread", "full-inference", "default-flags"],
               loader=IreeRuntimeLoader.EMBEDDED_ELF,
               driver=IreeRuntimeDriver.LOCAL_TASK,
               benchmark_tool=MODULE_BENCHMARK_TOOL,

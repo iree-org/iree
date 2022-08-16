@@ -10,7 +10,7 @@ from ..definitions.common import DeviceArchitecture, DevicePlatform, DeviceSpec
 
 GCP_C2_STANDARD_16_DEVICE_SPEC = DeviceSpec(
     id=DEVICE_SPEC_GCP_C2_STANDARD_16_ID,
-    vendor_name="intel",
+    vendor_name="GCP-c2-standard-16",
     architecture=DeviceArchitecture.X86_64_CASCADELAKE,
     platform=DevicePlatform.LINUX_GNU,
     device_parameters=["all-cores"])
