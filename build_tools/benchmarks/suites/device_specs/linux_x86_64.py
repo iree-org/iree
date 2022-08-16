@@ -5,10 +5,11 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Defines x86_64 linux devices."""
 
+from ..id_defs import DEVICE_SPEC_GCP_C2_STANDARD_16_ID
 from ..definitions.common import DeviceArchitecture, DevicePlatform, DeviceSpec
 
 GCP_C2_STANDARD_16_DEVICE_SPEC = DeviceSpec(
-    id="d1234",
+    id=DEVICE_SPEC_GCP_C2_STANDARD_16_ID,
     vendor_name="intel",
     architecture=DeviceArchitecture.X86_64_CASCADELAKE,
     platform=DevicePlatform.LINUX_GNU,
