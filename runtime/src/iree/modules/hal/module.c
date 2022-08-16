@@ -934,14 +934,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_flush,  //
   IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
   iree_hal_queue_affinity_t queue_affinity =
       (iree_hal_queue_affinity_t)args->i1;
-
-  // TODO(benvanik): queue flush API.
-  // This will be most useful for backends that perform internal batching and
-  // require the explicit flush. For now we don't have this exposed.
-  (void)device;
-  (void)queue_affinity;
-
-  return iree_ok_status();
+  return iree_hal_device_queue_flush(device, queue_affinity);
 }
 
 //===--------------------------------------------------------------------===//

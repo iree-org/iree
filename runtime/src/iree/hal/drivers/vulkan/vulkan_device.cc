@@ -1076,6 +1076,26 @@ iree_hal_vulkan_device_query_semaphore_compatibility(
   return IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_ONLY;
 }
 
+static iree_status_t iree_hal_vulkan_device_queue_alloca(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_allocator_pool_id_t pool_id, iree_hal_buffer_params_t params,
+    iree_device_size_t allocation_size,
+    iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
+  // TODO(benvanik): queue-ordered allocations.
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED);
+}
+
+static iree_status_t iree_hal_vulkan_device_queue_dealloca(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_buffer_t* buffer) {
+  // TODO(benvanik): queue-ordered allocations.
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED);
+}
+
 static iree_status_t iree_hal_vulkan_device_queue_execute(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
@@ -1093,6 +1113,12 @@ static iree_status_t iree_hal_vulkan_device_queue_execute(
       /*.signal_semaphores=*/signal_semaphore_list,
   };
   return queue->Submit(1, &batch);
+}
+
+static iree_status_t iree_hal_vulkan_device_queue_flush(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity) {
+  // Currently unused; we flush as submissions are made.
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_vulkan_device_wait_semaphores(
@@ -1128,7 +1154,10 @@ const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable = {
     /*.query_semaphore_compatibility=*/
     iree_hal_vulkan_device_query_semaphore_compatibility,
     /*.transfer_range=*/iree_hal_device_submit_transfer_range_and_wait,
+    /*.queue_alloca=*/iree_hal_vulkan_device_queue_alloca,
+    /*.queue_dealloca=*/iree_hal_vulkan_device_queue_dealloca,
     /*.queue_execute=*/iree_hal_vulkan_device_queue_execute,
+    /*.queue_flush=*/iree_hal_vulkan_device_queue_flush,
     /*.wait_semaphores=*/iree_hal_vulkan_device_wait_semaphores,
 };
 }  // namespace

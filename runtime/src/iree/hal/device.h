@@ -295,6 +295,33 @@ IREE_API_EXPORT iree_status_t iree_hal_device_transfer_d2d(
     iree_device_size_t target_offset, iree_device_size_t data_length,
     iree_hal_transfer_buffer_flags_t flags, iree_timeout_t timeout);
 
+// Reserves and returns a queue-ordered transient buffer.
+// The allocation will not be committed until the entire |wait_semaphore_list|
+// has been reached. Once the storage is available for use the
+// |signal_semaphore_list| will be signaled.
+//
+// Usage:
+//   iree_hal_device_queue_alloca(wait(0), signal(1), &buffer);
+//   iree_hal_device_queue_execute(wait(1), signal(2), commands...);
+//   iree_hal_device_queue_dealloca(wait(2), signal(3), buffer);
+IREE_API_EXPORT iree_status_t iree_hal_device_queue_alloca(
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_allocator_pool_id_t pool_id, iree_hal_buffer_params_t params,
+    iree_device_size_t allocation_size,
+    iree_hal_buffer_t** IREE_RESTRICT out_buffer);
+
+// Deallocates a queue-ordered transient buffer.
+// The deallocation will not be made until the entire |wait_semaphore_list| has
+// been reached. Once the storage is available for reuse the
+// |signal_semaphore_list| will be signaled.
+IREE_API_EXPORT iree_status_t iree_hal_device_queue_dealloca(
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_buffer_t* buffer);
+
 // Executes zero or more command buffers on a device queue.
 // The command buffers are executed in order as if they were recorded as one.
 // No commands will execute until the wait fence has been reached and the signal
@@ -319,6 +346,12 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_execute(
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_host_size_t command_buffer_count,
     iree_hal_command_buffer_t* const* command_buffers);
+
+// Flushes any locally-pending submissions in the queue.
+// When submitting many queue operations this can be used to eagerly flush
+// earlier submissions while later ones are still being constructed.
+IREE_API_EXPORT iree_status_t iree_hal_device_queue_flush(
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity);
 
 // Blocks the caller until the semaphores reach or exceed the specified payload
 // values or the |timeout| elapses. All semaphores in |semaphore_list| must be
@@ -408,12 +441,29 @@ typedef struct iree_hal_device_vtable_t {
       iree_device_size_t target_offset, iree_device_size_t data_length,
       iree_hal_transfer_buffer_flags_t flags, iree_timeout_t timeout);
 
+  iree_status_t(IREE_API_PTR* queue_alloca)(
+      iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+      const iree_hal_semaphore_list_t wait_semaphore_list,
+      const iree_hal_semaphore_list_t signal_semaphore_list,
+      iree_hal_allocator_pool_id_t pool_id, iree_hal_buffer_params_t params,
+      iree_device_size_t allocation_size,
+      iree_hal_buffer_t** IREE_RESTRICT out_buffer);
+
+  iree_status_t(IREE_API_PTR* queue_dealloca)(
+      iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+      const iree_hal_semaphore_list_t wait_semaphore_list,
+      const iree_hal_semaphore_list_t signal_semaphore_list,
+      iree_hal_buffer_t* buffer);
+
   iree_status_t(IREE_API_PTR* queue_execute)(
       iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
       const iree_hal_semaphore_list_t wait_semaphore_list,
       const iree_hal_semaphore_list_t signal_semaphore_list,
       iree_host_size_t command_buffer_count,
       iree_hal_command_buffer_t* const* command_buffers);
+
+  iree_status_t(IREE_API_PTR* queue_flush)(
+      iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity);
 
   iree_status_t(IREE_API_PTR* wait_semaphores)(
       iree_hal_device_t* device, iree_hal_wait_mode_t wait_mode,
