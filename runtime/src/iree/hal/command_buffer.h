@@ -260,7 +260,7 @@ typedef struct iree_hal_command_buffer_t iree_hal_command_buffer_t;
 // existing one from the |device| pool.
 //
 // |queue_affinity| specifies the device queues the command buffer may be
-// submitted to. The queue affinity provided to iree_hal_device_queue_submit
+// submitted to. The queue affinity provided to iree_hal_device_queue_execute
 // must match or be a subset of the |queue_affinity|.
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_create(
     iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,

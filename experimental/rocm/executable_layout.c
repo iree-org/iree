@@ -47,7 +47,7 @@ static void iree_hal_rocm_executable_layout_destroy(
 
 iree_status_t iree_hal_rocm_executable_layout_create(
     iree_hal_rocm_context_wrapper_t* context, iree_host_size_t set_layout_count,
-    iree_hal_descriptor_set_layout_t** set_layouts,
+    iree_hal_descriptor_set_layout_t* const* set_layouts,
     iree_host_size_t push_constant_count,
     iree_hal_executable_layout_t** out_executable_layout) {
   IREE_ASSERT_ARGUMENT(context);

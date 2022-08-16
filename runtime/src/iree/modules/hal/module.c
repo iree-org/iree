@@ -921,17 +921,10 @@ IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_execute,  //
   iree_hal_command_buffer_t** command_buffers = NULL;
   IREE_VM_ABI_VLA_STACK_DEREF(args, a4_count, a4, iree_hal_command_buffer, 32,
                               &command_buffer_count, &command_buffers);
-
-  iree_hal_submission_batch_t batch = {
-      .wait_semaphores = iree_hal_fence_semaphore_list(wait_fence),
-      .signal_semaphores = iree_hal_fence_semaphore_list(signal_fence),
-      .command_buffer_count = command_buffer_count,
-      .command_buffers = command_buffers,
-  };
-  IREE_RETURN_IF_ERROR(iree_hal_device_queue_submit(
-      device, IREE_HAL_COMMAND_CATEGORY_ANY, queue_affinity, 1, &batch));
-
-  return iree_ok_status();
+  return iree_hal_device_queue_execute(
+      device, queue_affinity, iree_hal_fence_semaphore_list(wait_fence),
+      iree_hal_fence_semaphore_list(signal_fence), command_buffer_count,
+      command_buffers);
 }
 
 IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_flush,  //

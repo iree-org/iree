@@ -90,37 +90,34 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
   // Submits |command_buffer| to the device and waits for it to complete before
   // returning.
   iree_status_t SubmitCommandBufferAndWait(
-      iree_hal_command_category_t command_categories,
       iree_hal_command_buffer_t* command_buffer) {
+    return SubmitCommandBuffersAndWait(1, &command_buffer);
+  }
+
+  // Submits |command_buffers| to the device and waits for them to complete
+  // before returning.
+  iree_status_t SubmitCommandBuffersAndWait(
+      iree_host_size_t command_buffer_count,
+      iree_hal_command_buffer_t** command_buffers) {
+    // No wait semaphores.
+    iree_hal_semaphore_list_t wait_semaphores = iree_hal_semaphore_list_empty();
+
+    // One signal semaphore from 0 -> 1.
     iree_hal_semaphore_t* signal_semaphore = NULL;
     IREE_RETURN_IF_ERROR(
         iree_hal_semaphore_create(device_, 0ull, &signal_semaphore));
+    uint64_t target_payload_value = 1ull;
+    iree_hal_semaphore_list_t signal_semaphores = {
+        /*count=*/1,
+        /*semaphores=*/&signal_semaphore,
+        /*payload_values=*/&target_payload_value,
+    };
 
-    iree_hal_submission_batch_t submission_batch;
-
-    // No wait semaphores.
-    submission_batch.wait_semaphores.count = 0;
-    submission_batch.wait_semaphores.semaphores = NULL;
-    submission_batch.wait_semaphores.payload_values = NULL;
-
-    iree_hal_command_buffer_t* command_buffer_ptrs[] = {command_buffer};
-    submission_batch.command_buffer_count = IREE_ARRAYSIZE(command_buffer_ptrs);
-    submission_batch.command_buffers = command_buffer_ptrs;
-
-    // One signal semaphore from 0 -> 1.
-    iree_hal_semaphore_t* signal_semaphore_ptrs[] = {signal_semaphore};
-    uint64_t payload_values[] = {1ull};
-    submission_batch.signal_semaphores.count =
-        IREE_ARRAYSIZE(signal_semaphore_ptrs);
-    submission_batch.signal_semaphores.semaphores = signal_semaphore_ptrs;
-    submission_batch.signal_semaphores.payload_values = payload_values;
-
-    iree_status_t status =
-        iree_hal_device_queue_submit(device_, command_categories,
-                                     /*queue_affinity=*/0,
-                                     /*batch_count=*/1, &submission_batch);
+    iree_status_t status = iree_hal_device_queue_execute(
+        device_, IREE_HAL_QUEUE_AFFINITY_ANY, wait_semaphores,
+        signal_semaphores, command_buffer_count, command_buffers);
     if (iree_status_is_ok(status)) {
-      status = iree_hal_semaphore_wait(signal_semaphore, 1ull,
+      status = iree_hal_semaphore_wait(signal_semaphore, target_payload_value,
                                        iree_infinite_timeout());
     }
 

@@ -231,7 +231,7 @@ static iree_status_t iree_hal_rocm_device_create_executable_cache(
 static iree_status_t iree_hal_rocm_device_create_executable_layout(
     iree_hal_device_t* base_device, iree_host_size_t push_constants,
     iree_host_size_t set_layout_count,
-    iree_hal_descriptor_set_layout_t** set_layouts,
+    iree_hal_descriptor_set_layout_t* const* set_layouts,
     iree_hal_executable_layout_t** out_executable_layout) {
   iree_hal_rocm_device_t* device = iree_hal_rocm_device_cast(base_device);
   return iree_hal_rocm_executable_layout_create(
@@ -254,11 +254,12 @@ iree_hal_rocm_device_query_semaphore_compatibility(
   return IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_ONLY;
 }
 
-static iree_status_t iree_hal_rocm_device_queue_submit(
-    iree_hal_device_t* base_device,
-    iree_hal_command_category_t command_categories,
-    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
-    const iree_hal_submission_batch_t* batches) {
+static iree_status_t iree_hal_rocm_device_queue_execute(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_host_size_t command_buffer_count,
+    iree_hal_command_buffer_t* const* command_buffers) {
   iree_hal_rocm_device_t* device = iree_hal_rocm_device_cast(base_device);
   // TODO(raikonenfnu): Once semaphore is implemented wait for semaphores
   // TODO(thomasraoux): implement semaphores - for now this conservatively
@@ -272,7 +273,7 @@ static iree_status_t iree_hal_rocm_device_queue_submit(
 
 static iree_status_t iree_hal_rocm_device_wait_semaphores(
     iree_hal_device_t* base_device, iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t* semaphore_list, iree_timeout_t timeout) {
+    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout) {
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                           "semaphore not implemented");
 }
@@ -295,6 +296,6 @@ static const iree_hal_device_vtable_t iree_hal_rocm_device_vtable = {
     .query_semaphore_compatibility =
         iree_hal_rocm_device_query_semaphore_compatibility,
     .transfer_range = iree_hal_device_submit_transfer_range_and_wait,
-    .queue_submit = iree_hal_rocm_device_queue_submit,
+    .queue_execute = iree_hal_rocm_device_queue_execute,
     .wait_semaphores = iree_hal_rocm_device_wait_semaphores,
 };

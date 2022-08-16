@@ -288,7 +288,7 @@ static iree_status_t iree_hal_task_device_create_executable_cache(
 static iree_status_t iree_hal_task_device_create_executable_layout(
     iree_hal_device_t* base_device, iree_host_size_t push_constants,
     iree_host_size_t set_layout_count,
-    iree_hal_descriptor_set_layout_t** set_layouts,
+    iree_hal_descriptor_set_layout_t* const* set_layouts,
     iree_hal_executable_layout_t** out_executable_layout) {
   return iree_hal_local_executable_layout_create(
       push_constants, set_layout_count, set_layouts,
@@ -319,21 +319,28 @@ iree_hal_task_device_query_semaphore_compatibility(
   return IREE_HAL_SEMAPHORE_COMPATIBILITY_ALL;
 }
 
-static iree_status_t iree_hal_task_device_queue_submit(
-    iree_hal_device_t* base_device,
-    iree_hal_command_category_t command_categories,
-    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
-    const iree_hal_submission_batch_t* batches) {
+static iree_status_t iree_hal_task_device_queue_execute(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_host_size_t command_buffer_count,
+    iree_hal_command_buffer_t* const* command_buffers) {
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
+  // NOTE: today we are not discriminating queues based on command type.
   iree_host_size_t queue_index = iree_hal_task_device_select_queue(
-      device, command_categories, queue_affinity);
-  return iree_hal_task_queue_submit(&device->queues[queue_index], batch_count,
-                                    batches);
+      device, IREE_HAL_COMMAND_CATEGORY_ANY, queue_affinity);
+  iree_hal_submission_batch_t batch = {
+      .wait_semaphores = wait_semaphore_list,
+      .signal_semaphores = signal_semaphore_list,
+      .command_buffer_count = command_buffer_count,
+      .command_buffers = command_buffers,
+  };
+  return iree_hal_task_queue_submit(&device->queues[queue_index], 1, &batch);
 }
 
 static iree_status_t iree_hal_task_device_wait_semaphores(
     iree_hal_device_t* base_device, iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t* semaphore_list, iree_timeout_t timeout) {
+    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout) {
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
   return iree_hal_task_semaphore_multi_wait(
       wait_mode, semaphore_list, timeout,
@@ -359,6 +366,6 @@ static const iree_hal_device_vtable_t iree_hal_task_device_vtable = {
     .query_semaphore_compatibility =
         iree_hal_task_device_query_semaphore_compatibility,
     .transfer_range = iree_hal_device_transfer_mappable_range,
-    .queue_submit = iree_hal_task_device_queue_submit,
+    .queue_execute = iree_hal_task_device_queue_execute,
     .wait_semaphores = iree_hal_task_device_wait_semaphores,
 };

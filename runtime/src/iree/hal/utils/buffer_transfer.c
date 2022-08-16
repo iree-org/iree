@@ -68,25 +68,19 @@ static iree_status_t iree_hal_device_transfer_and_wait(
       iree_hal_semaphore_create(device, 0ull, &fence_semaphore);
   uint64_t signal_value = 1ull;
   if (iree_status_is_ok(status)) {
-    iree_hal_submission_batch_t batch = {
-        .wait_semaphores =
-            {
-                .count = wait_semaphore != NULL ? 1 : 0,
-                .semaphores = &wait_semaphore,
-                .payload_values = &wait_value,
-            },
-        .command_buffer_count = 1,
-        .command_buffers = &command_buffer,
-        .signal_semaphores =
-            {
-                .count = 1,
-                .semaphores = &fence_semaphore,
-                .payload_values = &signal_value,
-            },
+    iree_hal_semaphore_list_t wait_semaphores = {
+        .count = wait_semaphore != NULL ? 1 : 0,
+        .semaphores = &wait_semaphore,
+        .payload_values = &wait_value,
     };
-    status =
-        iree_hal_device_queue_submit(device, IREE_HAL_COMMAND_CATEGORY_TRANSFER,
-                                     IREE_HAL_QUEUE_AFFINITY_ANY, 1, &batch);
+    iree_hal_semaphore_list_t signal_semaphores = {
+        .count = 1,
+        .semaphores = &fence_semaphore,
+        .payload_values = &signal_value,
+    };
+    status = iree_hal_device_queue_execute(device, IREE_HAL_QUEUE_AFFINITY_ANY,
+                                           wait_semaphores, signal_semaphores,
+                                           1, &command_buffer);
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_semaphore_wait(fence_semaphore, signal_value, timeout);

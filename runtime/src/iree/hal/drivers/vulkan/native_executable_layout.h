@@ -24,7 +24,7 @@ extern "C" {
 iree_status_t iree_hal_vulkan_native_executable_layout_create(
     iree::hal::vulkan::VkDeviceHandle* logical_device,
     iree_host_size_t push_constant_count, iree_host_size_t set_layout_count,
-    iree_hal_descriptor_set_layout_t** set_layouts,
+    iree_hal_descriptor_set_layout_t* const* set_layouts,
     iree_hal_executable_layout_t** out_executable_layout);
 
 // Returns the native VkPipelineLayout handle for the executable layout.

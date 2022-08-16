@@ -224,7 +224,7 @@ static iree_status_t iree_hal_sync_device_create_executable_cache(
 static iree_status_t iree_hal_sync_device_create_executable_layout(
     iree_hal_device_t* base_device, iree_host_size_t push_constants,
     iree_host_size_t set_layout_count,
-    iree_hal_descriptor_set_layout_t** set_layouts,
+    iree_hal_descriptor_set_layout_t* const* set_layouts,
     iree_hal_executable_layout_t** out_executable_layout) {
   return iree_hal_local_executable_layout_create(
       push_constants, set_layout_count, set_layouts,
@@ -246,11 +246,12 @@ iree_hal_sync_device_query_semaphore_compatibility(
   return IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_ONLY;
 }
 
-static iree_status_t iree_hal_sync_device_queue_submit(
-    iree_hal_device_t* base_device,
-    iree_hal_command_category_t command_categories,
-    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
-    const iree_hal_submission_batch_t* batches) {
+static iree_status_t iree_hal_sync_device_queue_execute(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_host_size_t command_buffer_count,
+    iree_hal_command_buffer_t* const* command_buffers) {
   iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
 
   // TODO(#4680): there is some better error handling here needed; we should
@@ -258,28 +259,24 @@ static iree_status_t iree_hal_sync_device_queue_submit(
   // shouldn't be any failures or if there are there's not much we'd be able to
   // do - we already executed everything inline!
 
-  for (iree_host_size_t i = 0; i < batch_count; ++i) {
-    const iree_hal_submission_batch_t* batch = &batches[i];
+  // Wait for semaphores to be signaled before performing any work.
+  IREE_RETURN_IF_ERROR(iree_hal_sync_semaphore_multi_wait(
+      &device->semaphore_state, IREE_HAL_WAIT_MODE_ALL, wait_semaphore_list,
+      iree_infinite_timeout()));
 
-    // Wait for semaphores to be signaled before performing any work.
-    IREE_RETURN_IF_ERROR(iree_hal_sync_semaphore_multi_wait(
-        &device->semaphore_state, IREE_HAL_WAIT_MODE_ALL,
-        &batch->wait_semaphores, iree_infinite_timeout()));
+  // TODO(#4680): if we were doing deferred submissions we would issue them
+  // here. With only inline command buffers we have nothing to do here.
 
-    // TODO(#4680): if we were doing deferred submissions we would issue them
-    // here. With only inline command buffers we have nothing to do here.
-
-    // Signal all semaphores now that batch work has completed.
-    IREE_RETURN_IF_ERROR(iree_hal_sync_semaphore_multi_signal(
-        &device->semaphore_state, &batch->signal_semaphores));
-  }
+  // Signal all semaphores now that batch work has completed.
+  IREE_RETURN_IF_ERROR(iree_hal_sync_semaphore_multi_signal(
+      &device->semaphore_state, signal_semaphore_list));
 
   return iree_ok_status();
 }
 
 static iree_status_t iree_hal_sync_device_wait_semaphores(
     iree_hal_device_t* base_device, iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t* semaphore_list, iree_timeout_t timeout) {
+    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout) {
   iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
   return iree_hal_sync_semaphore_multi_wait(&device->semaphore_state, wait_mode,
                                             semaphore_list, timeout);
@@ -303,6 +300,6 @@ static const iree_hal_device_vtable_t iree_hal_sync_device_vtable = {
     .query_semaphore_compatibility =
         iree_hal_sync_device_query_semaphore_compatibility,
     .transfer_range = iree_hal_device_transfer_mappable_range,
-    .queue_submit = iree_hal_sync_device_queue_submit,
+    .queue_execute = iree_hal_sync_device_queue_execute,
     .wait_semaphores = iree_hal_sync_device_wait_semaphores,
 };

@@ -132,8 +132,7 @@ TEST_P(command_buffer_dispatch_test, DispatchAbs) {
 
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
 
-  IREE_ASSERT_OK(SubmitCommandBufferAndWait(IREE_HAL_COMMAND_CATEGORY_DISPATCH,
-                                            command_buffer));
+  IREE_ASSERT_OK(SubmitCommandBufferAndWait(command_buffer));
 
   float output_value = 0.0f;
   IREE_ASSERT_OK(iree_hal_device_transfer_d2h(
