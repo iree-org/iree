@@ -185,15 +185,30 @@ class V0BytecodeEncoder : public BytecodeEncoder {
     // Compute required remappings - we only need to emit them when the source
     // and dest registers differ. Hopefully the allocator did a good job and
     // this list is small :)
+    //
+    // 64-bit registers, which are split in 2, need to be remapped as each part.
+    // This is something that could be improved in the bytecode format with
+    // dedicated remapping commands or something.
     auto srcDstRegs = registerAllocation_->remapSuccessorRegisters(
         currentOp_, successorIndex);
-    if (failed(ensureAlignment(2)) || failed(writeUint16(srcDstRegs.size()))) {
+    uint16_t registerParts = 0;
+    for (auto srcDstReg : srcDstRegs) {
+      registerParts +=
+          srcDstReg.first.isValue() && srcDstReg.first.byteWidth() == 8 ? 2 : 1;
+    }
+    if (failed(ensureAlignment(2)) || failed(writeUint16(registerParts))) {
       return failure();
     }
     for (auto srcDstReg : srcDstRegs) {
       if (failed(writeUint16(srcDstReg.first.encode())) ||
           failed(writeUint16(srcDstReg.second.encode()))) {
         return failure();
+      }
+      if (srcDstReg.first.isValue() && srcDstReg.first.byteWidth() == 8) {
+        if (failed(writeUint16(srcDstReg.first.encodeHi())) ||
+            failed(writeUint16(srcDstReg.second.encodeHi()))) {
+          return failure();
+        }
       }
     }
 
