@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "executable_benchmarks.mlir"
     "iree-benchmark-module.mlir"
     "iree-run-mlir.mlir"
     "iree-run-module.mlir"
