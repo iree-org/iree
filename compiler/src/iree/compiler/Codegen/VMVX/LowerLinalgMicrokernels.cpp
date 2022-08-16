@@ -553,85 +553,85 @@ struct LinalgBinaryGenericConversion
         TypeSwitch<Operation *, Optional<BinaryEmitter>>(binaryOp)
             .Case([&](arith::AddFOp op) -> Optional<BinaryEmitter> {
               if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
-                return configureGenericBinary(op, "addf");
+                return configureGenericBinary(op, "add");
               }
               return None;
             })
             .Case([&](arith::AddIOp op) -> Optional<BinaryEmitter> {
               if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
-                return configureGenericBinary(op, "addi");
+                return configureGenericBinary(op, "add");
               }
               return None;
             })
             .Case([&](arith::AndIOp op) -> Optional<BinaryEmitter> {
               if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
-                return configureGenericBinary(op, "andi");
+                return configureGenericBinary(op, "and");
               }
               return None;
             })
             .Case([&](arith::DivFOp op) -> Optional<BinaryEmitter> {
               if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
-                return configureGenericBinary(op, "divf");
+                return configureGenericBinary(op, "div");
               }
               return None;
             })
             .Case([&](arith::DivSIOp op) -> Optional<BinaryEmitter> {
               if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
-                return configureGenericBinary(op, "divsi");
+                return configureGenericBinary(op, "divs");
               }
               return None;
             })
             .Case([&](arith::DivUIOp op) -> Optional<BinaryEmitter> {
               if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
-                return configureGenericBinary(op, "divui");
+                return configureGenericBinary(op, "divu");
               }
               return None;
             })
             .Case([&](arith::MulFOp op) -> Optional<BinaryEmitter> {
               if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
-                return configureGenericBinary(op, "mulf");
+                return configureGenericBinary(op, "mul");
               }
               return None;
             })
             .Case([&](arith::MulIOp op) -> Optional<BinaryEmitter> {
               if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
-                return configureGenericBinary(op, "muli");
+                return configureGenericBinary(op, "mul");
               }
               return None;
             })
             .Case([&](arith::OrIOp op) -> Optional<BinaryEmitter> {
               if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
-                return configureGenericBinary(op, "ori");
+                return configureGenericBinary(op, "or");
               }
               return None;
             })
             .Case([&](arith::ShLIOp op) -> Optional<BinaryEmitter> {
               if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
-                return configureGenericBinary(op, "shli");
+                return configureGenericBinary(op, "shl");
               }
               return None;
             })
             .Case([&](arith::ShRSIOp op) -> Optional<BinaryEmitter> {
               if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
-                return configureGenericBinary(op, "shrsi");
+                return configureGenericBinary(op, "shrs");
               }
               return None;
             })
             .Case([&](arith::XOrIOp op) -> Optional<BinaryEmitter> {
               if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
-                return configureGenericBinary(op, "xori");
+                return configureGenericBinary(op, "xor");
               }
               return None;
             })
             .Case([&](arith::SubFOp op) -> Optional<BinaryEmitter> {
               if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
-                return configureGenericBinary(op, "subf");
+                return configureGenericBinary(op, "sub");
               }
               return None;
             })
             .Case([&](arith::SubIOp op) -> Optional<BinaryEmitter> {
               if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
-                return configureGenericBinary(op, "subi");
+                return configureGenericBinary(op, "sub");
               }
               return None;
             })
@@ -702,13 +702,13 @@ struct LinalgUnaryGenericConversion
         TypeSwitch<Operation *, Optional<UnaryEmitter>>(unaryOp)
             .Case([&](math::AbsOp op) -> Optional<UnaryEmitter> {
               if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
-                return configureGenericUnary(op, "absf");
+                return configureGenericUnary(op, "abs");
               }
               return None;
             })
             .Case([&](math::CeilOp op) -> Optional<UnaryEmitter> {
               if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
-                return configureGenericUnary(op, "ceilf");
+                return configureGenericUnary(op, "ceil");
               }
               return None;
             })
@@ -720,31 +720,31 @@ struct LinalgUnaryGenericConversion
             })
             .Case([&](math::ExpOp op) -> Optional<UnaryEmitter> {
               if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
-                return configureGenericUnary(op, "expf");
+                return configureGenericUnary(op, "exp");
               }
               return None;
             })
             .Case([&](math::FloorOp op) -> Optional<UnaryEmitter> {
               if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
-                return configureGenericUnary(op, "floorf");
+                return configureGenericUnary(op, "floor");
               }
               return None;
             })
             .Case([&](math::LogOp op) -> Optional<UnaryEmitter> {
               if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
-                return configureGenericUnary(op, "logf");
+                return configureGenericUnary(op, "log");
               }
               return None;
             })
             .Case([&](arith::NegFOp op) -> Optional<UnaryEmitter> {
               if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
-                return configureGenericUnary(op, "negf");
+                return configureGenericUnary(op, "neg");
               }
               return None;
             })
             .Case([&](math::RsqrtOp op) -> Optional<UnaryEmitter> {
               if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
-                return configureGenericUnary(op, "rsqrtf");
+                return configureGenericUnary(op, "rsqrt");
               }
               return None;
             })
