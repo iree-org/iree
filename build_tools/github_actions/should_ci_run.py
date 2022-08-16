@@ -16,7 +16,7 @@ import os
 import subprocess
 import sys
 
-SKIP_CI_LABEL = "skip-ci"
+SKIPC_CI_TAG = "skip-ci"
 
 # Note that these are fnmatch patterns, which are not the same as gitignore
 # patterns because they don't treat '/' specially. The standard library doesn't
@@ -64,16 +64,17 @@ def modifies_included_path(base_ref):
 def should_run_ci():
   event_name = os.environ["GITHUB_EVENT_NAME"]
   base_ref = os.environ["BASE_REF"]
-  labels = os.environ["LABELS"].split(",")
+  description = os.environ["PR_DESCRIPTION"]
 
   if event_name != "pull_request":
     print("Running CI independent of diff because run was not triggered by a"
           "pull request event.")
     return True
 
-  if SKIP_CI_LABEL in labels:
-    print(f"Not running CI because PR has label '{SKIP_CI_LABEL}'.")
-    return False
+  for line in description.splitlines():
+    if line.strip().lower() == SKIPC_CI_TAG:
+      print(f"Not running CI because PR description has '{SKIPC_CI_TAG}' line.")
+      return False
 
   try:
     modifies = modifies_included_path(base_ref)
