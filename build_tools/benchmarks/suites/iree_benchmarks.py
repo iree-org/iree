@@ -16,7 +16,7 @@ from .definitions.iree import (IreeBenchmarkCompileSpec, IreeBenchmarkRunSpec,
                                IreeRuntimeLoader, IreeTargetBackend)
 from .id_defs import (IREE_COMPILE_CONFIG_LINUX_CASCADELAKE_ID,
                       IREE_RUN_CONFIG_LOCAL_SYNC_ID,
-                      IREE_RUN_CONFIG_LOCAL_TASK_BASE_ID)
+                      IREE_RUN_CONFIG_LOCAL_TASK_ID_BASE)
 
 MODULE_BENCHMARK_TOOL = "iree-benchmark-module"
 
@@ -49,7 +49,7 @@ class Linux_x86_64_Benchmarks(object):
     for thread_num in [1, 4, 8]:
       default_run_configs.append(
           IreeRunConfig(
-              id=f"{IREE_RUN_CONFIG_LOCAL_TASK_BASE_ID}_{thread_num}",
+              id=f"{IREE_RUN_CONFIG_LOCAL_TASK_ID_BASE}_{thread_num}",
               tags=[f"{thread_num}-thread", "full-inference", "default-flags"],
               loader=IreeRuntimeLoader.EMBEDDED_ELF,
               driver=IreeRuntimeDriver.LOCAL_TASK,
