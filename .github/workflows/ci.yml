@@ -58,7 +58,7 @@ jobs:
       # The commit being checked out is the merge commit for the PR. Its first
       # parent will be the tip of main.
       BASE_REF: HEAD^
-      LABELS: join(${{ github.event.pull_request.labels.*.name }})
+      PR_DESCRIPTION: ${{ github.event.pull_request.body }}
     outputs:
       should-run: ${{ steps.should-run.outputs.should-run }}
     steps:
