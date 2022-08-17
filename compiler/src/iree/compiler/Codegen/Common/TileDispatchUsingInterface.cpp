@@ -250,6 +250,20 @@ FailureOr<TilingResult> TileDispatchUsingSCFForOp::returningMatchAndRewrite(
     return failure();
   }
 
+  // For now we are looking at cases where the untiled op has the
+  // `flow.dispatch.tensor.store` in the same block as the operation.
+  // We can generalize this as needed, but bailing early to not silently
+  // miscompile.
+  if (llvm::any_of(op->getUsers(), [&](Operation *user) {
+        return isa<IREE::Flow::DispatchTensorStoreOp>(user) &&
+               user->getBlock() != op->getBlock();
+      })) {
+    return rewriter.notifyMatchFailure(
+        op,
+        "unhandled use of untiled op in flow.dispatch.tensor.store in a "
+        "different block");
+  }
+
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPointAfter(op);
 
@@ -394,7 +408,8 @@ FailureOr<TilingResult> TileDispatchUsingSCFForOp::returningMatchAndRewrite(
   SmallVector<IREE::Flow::DispatchTensorStoreOp> storeOps;
   for (OpOperand &use : op->getUses()) {
     auto storeOp = dyn_cast<IREE::Flow::DispatchTensorStoreOp>(use.getOwner());
-    if (storeOp && storeOp.getValue() == use.get()) {
+    if (storeOp && storeOp.getValue() == use.get() &&
+        storeOp->getBlock() == op->getBlock()) {
       storeOps.push_back(storeOp);
     }
   }
@@ -455,7 +470,58 @@ struct SwapExtractSliceWithTiledProducer
     if (failed(tiledProducer)) {
       return failure();
     }
+    auto sliceOffsets = sliceOp.getMixedOffsets();
+    auto sliceSizes = sliceOp.getMixedSizes();
+    auto sliceStrides = sliceOp.getMixedStrides();
     rewriter.replaceOp(sliceOp, tiledProducer.getValue());
+
+    // Check if any flow.dispatch.tensor.store operations need to be updated.
+    // Note that this is only valid to do when it is a guarantee that the
+    // producer is not computed redundantly within the tiled loops. That
+    // is not a verifiable property, enforcable through checks, but something
+    // that IREEs choice of configuration ensure happens.
+    SmallVector<IREE::Flow::DispatchTensorStoreOp> storeOps;
+    for (OpOperand &use : producer.getUses()) {
+      auto storeOp =
+          dyn_cast<IREE::Flow::DispatchTensorStoreOp>(use.getOwner());
+      if (storeOp && storeOp.getValue() == use.get() &&
+          storeOp->getBlock() == use.getOwner()->getBlock()) {
+        storeOps.push_back(storeOp);
+      }
+    }
+    if (storeOps.empty()) {
+      // Nothing to do. Return.
+      return success();
+    }
+
+    // Rewrite to tiled store of the producer.
+    rewriter.setInsertionPointAfter(tiledProducer->getDefiningOp());
+    for (auto storeOp : storeOps) {
+      SmallVector<OpFoldResult> combinedOffsets, combinedSizes, combinedStrides;
+      if (failed(IREE::Flow::foldOffsetsSizesAndStrides(
+              rewriter, storeOp.getLoc(), storeOp.getMixedOffsets(),
+              storeOp.getMixedSizes(), storeOp.getMixedStrides(),
+              storeOp.getDroppedDims(), sliceOffsets, sliceSizes, sliceStrides,
+              combinedOffsets, combinedSizes, combinedStrides))) {
+        return rewriter.notifyMatchFailure(
+            storeOp, "failed to create tiled flow.dispatch.tensor.store op");
+      }
+
+      rewriter.create<IREE::Flow::DispatchTensorStoreOp>(
+          storeOp.getLoc(), tiledProducer.getValue(), storeOp.getTarget(),
+          storeOp.getTargetDims(), combinedOffsets, combinedSizes,
+          combinedStrides);
+    }
+
+    // If the producer has no more slices, erase the store op.
+    if (llvm::none_of(producer.getUsers(), [](Operation *user) {
+          return isa<tensor::ExtractSliceOp>(user);
+        })) {
+      for (auto storeOp : storeOps) {
+        rewriter.eraseOp(storeOp);
+      }
+    }
+
     return success();
   }
 };

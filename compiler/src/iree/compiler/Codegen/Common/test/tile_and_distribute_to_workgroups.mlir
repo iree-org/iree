@@ -1589,3 +1589,228 @@ hal.executable private @no_compute {
 // CHECK-NEXT: ^bb0
 // CHECK-NEXT:   %[[C1:.+]] = arith.constant 1 : index
 // CHECK-NEXT:   hal.return %[[C1]], %[[C1]], %[[C1]]
+
+// -----
+
+#config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0], [16, 4, 0], [0, 0, 64]]>
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>,
+    #hal.descriptor_set.binding<3, storage_buffer>,
+    #hal.descriptor_set.binding<4, storage_buffer>
+  ]>
+]>
+#executable_target_embedded_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {
+  data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+  native_vector_size = 16 : index,
+  target_triple = "aarch64-unknown-unknown-eabi-elf"
+}>
+#translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
+hal.executable private @matmul_fusion {
+  hal.executable.variant public @llvm, target = #executable_target_embedded_elf_arm_64_ {
+    hal.executable.export public @matmul_fusion layout(#executable_layout) attributes {translation_info = #translation} {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @matmul_fusion() {
+        %m = hal.interface.constant.load[0] : index
+        %n = hal.interface.constant.load[1] : index
+        %k = hal.interface.constant.load[2] : index
+        %lhs_interface = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
+            : !flow.dispatch.tensor<readonly:?x?xf32>{%m, %k}
+        %rhs_interface = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
+            : !flow.dispatch.tensor<readonly:?x?xf32>{%k, %n}
+        %bias_interface = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
+            : !flow.dispatch.tensor<readonly:?xf32>{%n}
+        %biasAdd_result_interface = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer)
+            : !flow.dispatch.tensor<writeonly:?x?xf32>{%m, %n}
+        %gemm_result_interface = hal.interface.binding.subspan set(0) binding(4) type(storage_buffer)
+            : !flow.dispatch.tensor<writeonly:?x?xf32>{%m, %n}
+        %lhs = flow.dispatch.tensor.load %lhs_interface, offsets = [0, 0], sizes = [%m, %k], strides = [1, 1]
+            : !flow.dispatch.tensor<readonly:?x?xf32>{%m, %k} -> tensor<?x?xf32>
+        %rhs = flow.dispatch.tensor.load %rhs_interface, offsets = [0, 0], sizes = [%k, %n], strides = [1, 1]
+            : !flow.dispatch.tensor<readonly:?x?xf32>{%k, %n} -> tensor<?x?xf32>
+        %bias = flow.dispatch.tensor.load %bias_interface, offsets = [0], sizes = [%n], strides = [1]
+            : !flow.dispatch.tensor<readonly:?xf32>{%n} -> tensor<?xf32>
+        %cst = arith.constant 0.0 : f32
+        %init = linalg.init_tensor [%m, %n] : tensor<?x?xf32>
+        %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<?x?xf32>) -> tensor<?x?xf32>
+        %gemm = linalg.matmul {lowering_config = #config}
+            ins(%lhs, %rhs : tensor<?x?xf32>, tensor<?x?xf32>) outs(%fill  : tensor<?x?xf32>) -> tensor<?x?xf32>
+        %biasAdd = linalg.generic {
+            indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>],
+            iterator_types = ["parallel", "parallel"]}
+            ins(%gemm, %bias : tensor<?x?xf32>, tensor<?xf32>) outs(%init : tensor<?x?xf32>) {
+            ^bb0(%b0 : f32, %b1 : f32, %b2 : f32):
+              %addf = arith.addf %b0, %b1 : f32
+              linalg.yield %addf : f32
+            } -> tensor<?x?xf32>
+        flow.dispatch.tensor.store %biasAdd, %biasAdd_result_interface, offsets = [0, 0], sizes = [%m, %n], strides = [1, 1]
+            : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:?x?xf32>{%m, %n}
+        flow.dispatch.tensor.store %gemm, %gemm_result_interface, offsets = [0, 0], sizes = [%m, %n], strides = [1, 1]
+            : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:?x?xf32>{%m, %n}
+        return
+      }
+    }
+  }
+}
+// CHECK-LABEL: func.func @matmul_fusion()
+//       CHECK: scf.for %[[IV0:.+]] =
+//       CHECK:   scf.for %[[IV1:.+]] =
+//       CHECK:     %[[GEMM:.+]] = linalg.matmul
+//       CHECK:     flow.dispatch.tensor.store %[[GEMM]]
+//  CHECK-SAME:         offsets = [%[[IV0]], %[[IV1]]]
+//       CHECK:     %[[BIASADD:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[GEMM]],
+//       CHECK:     flow.dispatch.tensor.store %[[BIASADD]]
+//  CHECK-SAME:         offsets = [%[[IV0]], %[[IV1]]]
+
+// -----
+
+#config = #iree_codegen.lowering_config<tile_sizes = [[4, 4, 4]]>
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+#executable_target_embedded_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {}>
+#map0 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d2, d1, d0)>
+#translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
+hal.executable private @generic_multi_store {
+  hal.executable.variant public @llvm, target = #executable_target_embedded_elf_arm_64_ {
+    hal.executable.export public @generic_multi_store layout(#executable_layout) attributes {translation_info = #translation} {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @generic_multi_store() {
+        %input_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
+            : !flow.dispatch.tensor<readonly:32x32x32xf32>
+        %result0_binding = hal.interface.binding.subspan set(1) binding(0) type(storage_buffer)
+            : !flow.dispatch.tensor<writeonly:32x32x32xf32>
+        %result1_binding = hal.interface.binding.subspan set(2) binding(0) type(storage_buffer)
+            : !flow.dispatch.tensor<writeonly:32x32x32xf32>
+        %input = flow.dispatch.tensor.load %input_binding, offsets = [0, 0, 0], sizes = [32, 32, 32], strides = [1, 1, 1]
+            : !flow.dispatch.tensor<readonly:32x32x32xf32> -> tensor<32x32x32xf32>
+        %init = linalg.init_tensor [32, 32, 32] : tensor<32x32x32xf32>
+        %generic:2 = linalg.generic {
+            indexing_maps = [#map0, #map1, #map2],
+            iterator_types = ["parallel", "parallel", "parallel"]}
+            {lowering_config = #config}
+            ins(%input : tensor<32x32x32xf32>)
+            outs(%init, %init : tensor<32x32x32xf32>, tensor<32x32x32xf32>) {
+            ^bb0(%b0 : f32, %b1 : f32, %b2 : f32):
+              linalg.yield %b0, %b0 : f32, f32
+            } -> (tensor<32x32x32xf32>, tensor<32x32x32xf32>)
+        flow.dispatch.tensor.store %generic#0, %result0_binding, offsets = [0, 0, 0], sizes = [32, 32, 32], strides = [1, 1, 1]
+            : tensor<32x32x32xf32> -> !flow.dispatch.tensor<writeonly:32x32x32xf32>
+        flow.dispatch.tensor.store %generic#1, %result1_binding, offsets = [0, 0, 0], sizes = [32, 32, 32], strides = [1, 1, 1]
+            : tensor<32x32x32xf32> -> !flow.dispatch.tensor<writeonly:32x32x32xf32>
+        return
+      }
+    }
+  }
+}
+// CHECK-LABEL: func.func @generic_multi_store()
+//       CHECK: scf.for %[[IV0:[a-zA-Z0-9]+]] =
+//       CHECK:   scf.for %[[IV1:[a-zA-Z0-9]+]] =
+//       CHECK:     scf.for %[[IV2:[a-zA-Z0-9]+]] =
+//       CHECK:       %[[GENERIC:.+]]:2 = linalg.generic
+//       CHECK:       flow.dispatch.tensor.store %[[GENERIC]]#0
+//  CHECK-SAME:           offsets = [%[[IV0]], %[[IV2]], %[[IV1]]], sizes = [4, 4, 4], strides = [1, 1, 1]
+//       CHECK:       flow.dispatch.tensor.store %[[GENERIC]]#1
+//  CHECK-SAME:           offsets = [%[[IV2]], %[[IV1]], %[[IV0]]], sizes = [4, 4, 4], strides = [1, 1, 1]
+//   CHECK-NOT:  flow.dispatch.tensor.store
+
+// -----
+
+#config = #iree_codegen.lowering_config<tile_sizes = [[4, 4, 4]]>
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+#executable_target_embedded_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {}>
+#map0 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d2, d1, d0)>
+#map3 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+#map4 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+#translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
+hal.executable private @generic_multi_store_fusion {
+  hal.executable.variant public @llvm, target = #executable_target_embedded_elf_arm_64_ {
+    hal.executable.export public @generic_multi_store_fusion layout(#executable_layout) attributes {translation_info = #translation} {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
+      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @generic_multi_store_fusion() {
+        %input_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
+            : !flow.dispatch.tensor<readonly:32x32x32x4xf32>
+        %result0_binding = hal.interface.binding.subspan set(1) binding(0) type(storage_buffer)
+            : !flow.dispatch.tensor<writeonly:32x32x32xf32>
+        %result1_binding = hal.interface.binding.subspan set(2) binding(0) type(storage_buffer)
+            : !flow.dispatch.tensor<writeonly:32x32x32xf32>
+        %result2_binding = hal.interface.binding.subspan set(3) binding(0) type(storage_buffer)
+            : !flow.dispatch.tensor<writeonly:32x32x32xf32>
+        %input = flow.dispatch.tensor.load %input_binding, offsets = [0, 0, 0, 0], sizes = [32, 32, 32, 4], strides = [1, 1, 1, 1]
+            : !flow.dispatch.tensor<readonly:32x32x32x4xf32> -> tensor<32x32x32x4xf32>
+        %init = linalg.init_tensor [32, 32, 32] : tensor<32x32x32xf32>
+        %cst = arith.constant 0.0 : f32
+        %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<32x32x32xf32>) -> tensor<32x32x32xf32>
+        %reduce = linalg.generic {
+            indexing_maps = [#map3, #map4], iterator_types = ["parallel", "parallel", "parallel", "reduction"]}
+            ins(%input : tensor<32x32x32x4xf32>) outs(%fill : tensor<32x32x32xf32>) {
+            ^bb0(%b0 : f32, %b1 : f32) :
+              %addf = arith.addf %b0, %b1 : f32
+              linalg.yield %addf : f32
+            } -> tensor<32x32x32xf32>
+        %generic:2 = linalg.generic {
+            indexing_maps = [#map0, #map1, #map2],
+            iterator_types = ["parallel", "parallel", "parallel"]}
+            {lowering_config = #config}
+            ins(%reduce : tensor<32x32x32xf32>)
+            outs(%init, %init : tensor<32x32x32xf32>, tensor<32x32x32xf32>) {
+            ^bb0(%b0 : f32, %b1 : f32, %b2 : f32):
+              linalg.yield %b0, %b0 : f32, f32
+            } -> (tensor<32x32x32xf32>, tensor<32x32x32xf32>)
+        flow.dispatch.tensor.store %generic#0, %result0_binding, offsets = [0, 0, 0], sizes = [32, 32, 32], strides = [1, 1, 1]
+            : tensor<32x32x32xf32> -> !flow.dispatch.tensor<writeonly:32x32x32xf32>
+        flow.dispatch.tensor.store %generic#1, %result1_binding, offsets = [0, 0, 0], sizes = [32, 32, 32], strides = [1, 1, 1]
+            : tensor<32x32x32xf32> -> !flow.dispatch.tensor<writeonly:32x32x32xf32>
+        flow.dispatch.tensor.store %reduce, %result2_binding, offsets = [0, 0, 0], sizes = [32, 32, 32], strides = [1, 1, 1]
+                  : tensor<32x32x32xf32> -> !flow.dispatch.tensor<writeonly:32x32x32xf32>
+        return
+      }
+    }
+  }
+}
+// CHECK-LABEL: func.func @generic_multi_store_fusion()
+//       CHECK: scf.for %[[IV0:[a-zA-Z0-9]+]] =
+//       CHECK:   scf.for %[[IV1:[a-zA-Z0-9]+]] =
+//       CHECK:     scf.for %[[IV2:[a-zA-Z0-9]+]] =
+//       CHECK:       %[[INIT:.+]] = linalg.init_tensor [4, 4, 4]
+//       CHECK:       %[[FILL:.+]] = linalg.fill
+//  CHECK-SAME:           outs(%[[INIT]] :
+//       CHECK:       %[[REDUCE:.+]] = linalg.generic
+//  CHECK-SAME:           outs(%[[FILL]] :
+//       CHECK:       flow.dispatch.tensor.store %[[REDUCE]]
+//  CHECK-SAME:           offsets = [%[[IV0]], %[[IV1]], %[[IV2]]], sizes = [4, 4, 4], strides = [1, 1, 1]
+//       CHECK:       %[[GENERIC:.+]]:2 = linalg.generic
+//       CHECK:       flow.dispatch.tensor.store %[[GENERIC]]#0
+//  CHECK-SAME:           offsets = [%[[IV0]], %[[IV2]], %[[IV1]]], sizes = [4, 4, 4], strides = [1, 1, 1]
+//       CHECK:       flow.dispatch.tensor.store %[[GENERIC]]#1
+//  CHECK-SAME:           offsets = [%[[IV2]], %[[IV1]], %[[IV0]]], sizes = [4, 4, 4], strides = [1, 1, 1]
+//   CHECK-NOT:  flow.dispatch.tensor.store

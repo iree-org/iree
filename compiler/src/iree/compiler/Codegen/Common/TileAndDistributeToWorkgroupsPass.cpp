@@ -184,7 +184,8 @@ static LogicalResult lowerDispatchDefaultWorkgroupCountOp(
   SmallVector<Value> numWorkgroups;
   for (auto partitionedLoop : llvm::reverse(partitionableLoops)) {
     // If the loop isnt tiled, skip it.
-    if (tileSizes[partitionedLoop] == 0) continue;
+    if (partitionedLoop >= tileSizes.size() || tileSizes[partitionedLoop] == 0)
+      continue;
     numWorkgroups.push_back(numTiles[partitionedLoop]);
     workloadPerWorkgroup.push_back(tileSizes[partitionedLoop]);
   }

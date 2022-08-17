@@ -59,12 +59,6 @@ static llvm::cl::opt<int> clInlineConstantByteLength(
                    "dispatch region"),
     llvm::cl::init(256));
 
-static llvm::cl::opt<bool> clEnableMultiResultDispatches(
-    "iree-flow-enable-multi-result-dispatches",
-    llvm::cl::desc(
-        "Enable dispatch region formation to enable multi-result dispatches"),
-    llvm::cl::init(false));
-
 static const char kRootOpAttr[] = "__root_op__";
 static const char kFusionGroupsAttr[] = "__fused_op__";
 
@@ -867,13 +861,6 @@ static bool isFusableWithConsumer(OpOperand &use) {
 /// For all uses of an operation, finds the use that dominates all other uses.
 static Optional<OpOperand *> getFusableUse(Operation *op,
                                            DominanceInfo const &dominanceInfo) {
-  if (!clEnableMultiResultDispatches) {
-    if (op->hasOneUse()) {
-      OpOperand &use = *(op->use_begin());
-      return &use;
-    }
-    return llvm::None;
-  }
   for (auto &use : op->getUses()) {
     Operation *user = use.getOwner();
     if (llvm::all_of(op->getUsers(), [&](Operation *c) {
