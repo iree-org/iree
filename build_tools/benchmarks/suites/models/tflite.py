@@ -8,12 +8,12 @@
 from ..id_defs import MODEL_MOBILENET_V2_ID
 from ..definitions.common import Model, ModelSourceType
 
-# Mirror https://github.com/tensorflow/tflite-support/blob/master/tensorflow_lite_support/metadata/python/tests/testdata/image_classifier/mobilenet_v2_1.0_224.tflite
 MOBILENET_V2_MODEL = Model(
     id=MODEL_MOBILENET_V2_ID,
     name="mobilenet_v2",
     tags=["f32", "imagenet"],
     source_type=ModelSourceType.EXPORTED_TFLITE,
+    # Mirror of https://github.com/tensorflow/tflite-support/blob/master/tensorflow_lite_support/metadata/python/tests/testdata/image_classifier/mobilenet_v2_1.0_224.tflite
     source_url=
     "https://storage.googleapis.com/iree-model-artifacts/mobilenet_v2_1.0_224.tflite",
     entry_function="main",
