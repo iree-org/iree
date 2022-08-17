@@ -10,12 +10,20 @@
 
 #if IREE_FILE_IO_ENABLE
 
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <ostream>
 #include <string>
 #include <type_traits>
 #include <utility>
+
+// Includes needed for GetTrueRandomUint64 depending on the platform.
+#ifdef __linux__
+#include <sys/auxv.h>
+#else
+#include <random>
+#endif
 
 #include "iree/base/status_cc.h"
 #include "iree/testing/gtest.h"
@@ -26,6 +34,18 @@ namespace file_io {
 namespace {
 
 using ::iree::testing::status::StatusIs;
+
+std::uint64_t GetTrueRandomUint64() {
+  std::uint64_t result;
+#ifdef __linux__
+  const void* random_src = reinterpret_cast<const void*>(getauxval(AT_RANDOM));
+  std::memcpy(&result, random_src, sizeof result);
+#else
+  std::random_device d;
+  result = (static_cast<std::uint64_t>(d()) << 32) | d();
+#endif
+  return result;
+}
 
 std::string GetUniquePath(const char* unique_name) {
   char* test_tmpdir = getenv("TEST_TMPDIR");
@@ -39,7 +59,18 @@ std::string GetUniquePath(const char* unique_name) {
     std::cerr << "TEST_TMPDIR/TMPDIR/TEMP not defined\n";
     exit(1);
   }
-  return test_tmpdir + std::string("/iree_test_") + unique_name;
+  // This test might be running on multiple parallel processes, for example with
+  //   ctest --repeat-until-fail 10 -j 10
+  // It's hard to make this test completely race-free in that two processes
+  // could generate the same "unique path" concurrently, and a serious attempt
+  // will likely compromise on portability and/or complexity. Since this is only
+  // test code and we only care to avoid intermittent test failures, let's try
+  // just a random 64bit value.
+  char unique_path[256];
+  std::uint64_t random = GetTrueRandomUint64();
+  snprintf(unique_path, sizeof unique_path, "%s/iree_test_%" PRIx64 "_%s",
+           test_tmpdir, random, unique_name);
+  return unique_path;
 }
 
 std::string GetUniqueContents(const char* unique_name) {
