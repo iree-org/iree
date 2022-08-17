@@ -80,7 +80,6 @@ struct ResourceLatticeValue {
   mutable DenseSet<tf_saved_model::GlobalTensorOp> ops;
 };
 
-namespace {
 class ResourceAnalysis : public ::mlir::dataflow::SparseDataFlowAnalysis<
                              dataflow::Lattice<ResourceLatticeValue>> {
  public:
@@ -240,8 +239,6 @@ void LowerGlobalTensors::runOnOperation() {
     globalTensor.erase();
   }
 }
-
-}  // namespace
 
 std::unique_ptr<OperationPass<ModuleOp>> createLowerGlobalTensorsPass() {
   return std::make_unique<LowerGlobalTensors>();
