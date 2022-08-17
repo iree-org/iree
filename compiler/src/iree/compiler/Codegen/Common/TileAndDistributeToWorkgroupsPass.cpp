@@ -15,7 +15,7 @@
 //===---------------------------------------------------------------------===//
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Transforms.h"
-#include "iree/compiler/Codegen/Common/DestructiveUpdateUtils.h"
+#include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/PassDetail.h"
@@ -30,6 +30,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -219,57 +220,6 @@ static LogicalResult updateTranslationInfoAttr(
 // Patterns and methods for tile and distribute of Linalg ops to workgroups.
 //===---------------------------------------------------------------------===//
 
-// Pull in producers into the tiled operation.
-static void pullInProducers(linalg::LinalgOp tiledOp,
-                            ValueRange untiledOperands,
-                            PatternRewriter &rewriter) {
-  for (auto en : llvm::enumerate(untiledOperands)) {
-    auto producer = en.value().getDefiningOp<linalg::LinalgOp>();
-    if (!producer) continue;
-
-    OpResult opResult = en.value().cast<OpResult>();
-    auto maybeFusionInfo = linalg::fuseProducerOfTensor(
-        rewriter, producer->getResult(opResult.getResultNumber()),
-        tiledOp->getOpOperand(en.index()));
-    if (failed(maybeFusionInfo)) continue;
-
-    // If the fusion was successfull recurse over the current producers operands
-    // and fuse them in as well.
-    SmallVector<Value> origProducerOperands =
-        producer.getInputAndOutputOperands();
-    pullInProducers(maybeFusionInfo->fusedProducer, origProducerOperands,
-                    rewriter);
-  }
-}
-
-namespace {
-// Rewrite pattern to ensure only ops with tensor semantics are tiled.
-struct TileAndDistributeLinalgOpsPattern : public linalg::LinalgTilingPattern {
-  using Base = linalg::LinalgTilingPattern;
-  TileAndDistributeLinalgOpsPattern(MLIRContext *context,
-                                    linalg::LinalgTilingOptions options,
-                                    linalg::LinalgTransformationFilter marker,
-                                    PatternBenefit benefit = 1)
-      : Base(context, options, marker, benefit) {}
-
-  LogicalResult matchAndRewrite(linalg::LinalgOp linalgOp,
-                                PatternRewriter &rewriter) const override {
-    SmallVector<Value> untiledOperands = linalgOp.getInputAndOutputOperands();
-    FailureOr<linalg::TiledLinalgOp> tiledLinalgOpOr =
-        Base::returningMatchAndRewrite(linalgOp, rewriter);
-    if (failed(tiledLinalgOpOr)) {
-      return failure();
-    }
-    if (tiledLinalgOpOr->loops.empty()) {
-      // If there are no loops, there is nothing to do.
-      return success();
-    }
-    pullInProducers(tiledLinalgOpOr->op, untiledOperands, rewriter);
-    return success();
-  }
-};
-}  // namespace
-
 namespace {
 struct TileAndDistributeToWorkgroupsPass
     : public TileAndDistributeToWorkgroupsBase<
@@ -298,6 +248,7 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
     SmallVector<Operation *> computeOps;
     SmallVector<LoopTilingAndDistributionInfo> tiledLoops;
     if (failed(getComputeOps(funcOp, computeOps, tiledLoops))) {
+      funcOp.emitOpError("failed to get compute ops in dispatch");
       return signalPassFailure();
     }
     if (!tiledLoops.empty()) {
@@ -332,9 +283,12 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
     if (failed(lowerDispatchDefaultWorkgroupCountOp(
             defaultWorkgroupCountOp, computeOps, tileSizes, interchange,
             workloadPerWorkgroup))) {
+      defaultWorkgroupCountOp.emitOpError(
+          "failed to lower default number of workgroups");
       return signalPassFailure();
     }
     if (failed(updateTranslationInfoAttr(exportOp, workloadPerWorkgroup))) {
+      exportOp.emitOpError("failed to update translation info");
       return signalPassFailure();
     }
 
@@ -371,11 +325,11 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
 
     {
       RewritePatternSet patterns(context);
-      patterns.insert<TileAndDistributeLinalgOpsPattern,
-                      IREE::LinalgExt::TilingInterfaceTilingPattern>(
-          context, linalgTilingOptions,
+      populateTileAndDistributeToWorkgroupsPatterns(
+          patterns, linalgTilingOptions,
           linalg::LinalgTransformationFilter(marker));
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+        funcOp.emitOpError("Tile+Distribute failed");
         return signalPassFailure();
       }
     }
@@ -386,36 +340,21 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
       llvm::dbgs() << "\n\n";
     });
 
-    // Apply linalg tiling optimization patterns.
-    RewritePatternSet canonicalizationPatterns(context);
-    linalg::populateLinalgTilingCanonicalizationPatterns(
-        canonicalizationPatterns);
-    if (failed(applyPatternsAndFoldGreedily(
-            funcOp, std::move(canonicalizationPatterns)))) {
-      return signalPassFailure();
+    {
+      // Apply linalg tiling optimization patterns.
+      RewritePatternSet canonicalizationPatterns(context);
+      linalg::populateLinalgTilingCanonicalizationPatterns(
+          canonicalizationPatterns);
+      populateFoldAffineMinInDistributedLoopsPatterns(canonicalizationPatterns);
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(canonicalizationPatterns)))) {
+        funcOp.emitOpError("tiling canonicalizations failed");
+        return signalPassFailure();
+      }
     }
 
     LLVM_DEBUG({
       llvm::dbgs() << "--- After Canonicalize ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
-
-    // Rewrite destructive updates and ensure no remaining store remains to the
-    // full output.
-
-    // TODO(#...): Use of the destructive update rewrite is a hack! There needs
-    // to be a way to generate loops as we need, and use the tiled op generation
-    // implementation. This should be possible after moving everything to use
-    // the `TilingInterface`.
-    if (failed(rewriteLinalgDestructiveUpdates(funcOp))) {
-      funcOp->emitError("Failed to rewrite destructive updates in:\n")
-          << *funcOp.getOperation();
-      return signalPassFailure();
-    }
-
-    LLVM_DEBUG({
-      llvm::dbgs() << "--- After Rewriting destructive updates ---\n";
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });
@@ -426,6 +365,7 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
     memref::populateResolveRankedShapeTypeResultDimsPatterns(resolveDimOps);
     if (failed(
             applyPatternsAndFoldGreedily(funcOp, std::move(resolveDimOps)))) {
+      funcOp.emitOpError("resolving ranked shaped results dims failed");
       return signalPassFailure();
     }
   }

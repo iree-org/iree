@@ -39,6 +39,17 @@ class DispatchRegionOp;
 //   - offsets = producer_offsets * consumer_strides + consumer_offsets,
 //   - strides = producer_strides * consumer_strides.
 LogicalResult foldOffsetsSizesAndStrides(
+    OpBuilder &builder, Location loc, ArrayRef<OpFoldResult> producerOffsets,
+    ArrayRef<OpFoldResult> producerSizes,
+    ArrayRef<OpFoldResult> producerStrides,
+    const llvm::SmallBitVector &droppedProducerDims,
+    ArrayRef<OpFoldResult> consumerOffsets,
+    ArrayRef<OpFoldResult> consumerSizes,
+    ArrayRef<OpFoldResult> consumerStrides,
+    SmallVector<OpFoldResult> &combinedOffsets,
+    SmallVector<OpFoldResult> &combinedSizes,
+    SmallVector<OpFoldResult> &combinedStrides);
+LogicalResult foldOffsetsSizesAndStrides(
     OpBuilder &builder, Location loc, OffsetSizeAndStrideOpInterface producer,
     OffsetSizeAndStrideOpInterface consumer,
     const llvm::SmallBitVector &droppedProducerDims,

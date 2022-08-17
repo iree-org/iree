@@ -1437,7 +1437,8 @@ LogicalResult TopkOp::getResultTilePosition(
     SmallVector<OpFoldResult> &resultSizes) {
   resultOffsets.assign(offsets.begin(), offsets.end());
   resultSizes.assign(sizes.begin(), sizes.end());
-  Value kSize = getDimValue(builder, getLoc(), outputValues(), dimension());
+  Value kSize = getDimValue(builder, getLoc(),
+                            getOutputOperand(resultNumber)->get(), dimension());
   resultSizes[dimension()] = getAsOpFoldResult(kSize);
   return success();
 }
