@@ -273,7 +273,7 @@ LogicalResult optimizeClosureLikeOp(ClosureOpInterface closureOp,
   for (auto replacement : llvm::enumerate(blockArgReplacements)) {
     if (!replacement.value()) {
       // No change.
-    } else if (!replacement.value().getValue()) {
+    } else if (!replacement.value().value()) {
       // Dropped.
     } else {
       // Replaced.

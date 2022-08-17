@@ -186,12 +186,12 @@ static void inlineUniformConstants(
         uniformOperandMap.reset(idx);
         continue;
       }
-      if (!operandValues[idx].hasValue()) {
+      if (!operandValues[idx].has_value()) {
         // First constant seen for this operand.
         operandValues[idx] = intValue;
       } else {
         // Ensure uniform constant value with previous occurrances.
-        if (operandValues[idx].getValue() != intValue) {
+        if (operandValues[idx].value() != intValue) {
           uniformOperandMap.reset(idx);
           continue;
         }
@@ -208,8 +208,8 @@ static void inlineUniformConstants(
     llvm::dbgs() << "inlineUniformConstants for " << funcOp.getSymName()
                  << "\n";
     for (unsigned i = 0; i < operandValues.size(); ++i) {
-      if (!operandValues[i].hasValue()) continue;
-      llvm::dbgs() << "  operand " << i << " = " << operandValues[i].getValue()
+      if (!operandValues[i].has_value()) continue;
+      llvm::dbgs() << "  operand " << i << " = " << operandValues[i].value()
                    << "\n";
     }
   });
@@ -227,7 +227,7 @@ static void inlineUniformConstants(
     auto constantOp = builder.create<arith::ConstantOp>(
         builder.getFusedLoc(operandLocs[operandIdx]),
         builder.getIntegerAttr(arg.getType(),
-                               operandValues[operandIdx].getValue()));
+                               operandValues[operandIdx].value()));
     arg.replaceAllUsesWith(constantOp);
   }
 

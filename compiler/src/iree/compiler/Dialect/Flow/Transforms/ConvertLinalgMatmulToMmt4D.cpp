@@ -276,7 +276,7 @@ class LinalgMatmulOpToLinalgMmt4DOpPattern
       // generic fallback (for tests) is not enabled.
       return failure();
     }
-    const Mmt4DTileParams &tileParams = maybeTileParams.getValue();
+    const Mmt4DTileParams &tileParams = maybeTileParams.value();
 
     Value paddedLhs = pad(loc, rewriter, lhs, tileParams.lhs());
     Value paddedRhs = pad(loc, rewriter, rhs, tileParams.rhs());

@@ -264,7 +264,7 @@ static LogicalResult rewriteDestructiveUpdateInPlace(
   if (!resultNumber) {
     return linalgLikeOp.emitOpError("operand is not a out operand");
   }
-  Value result = linalgLikeOp->getResult(resultNumber.getValue());
+  Value result = linalgLikeOp->getResult(resultNumber.value());
   if (result.use_empty()) return success();
   if (!result.hasOneUse()) {
     return linalgLikeOp.emitError("not a single use result");
@@ -328,8 +328,8 @@ LogicalResult rewriteDestructiveUpdateInPlace<tensor::InsertSliceOp>(
       SmallVector<OpFoldResult> offsets, sizes, strides;
       Location loc = insertSliceOp->getLoc();
       if (failed(foldOffsetsSizesAndStrides(
-              b, loc, storeOp.getValue(), insertSliceOp,
-              storeOp->getDroppedDims(), offsets, sizes, strides))) {
+              b, loc, storeOp.value(), insertSliceOp, storeOp->getDroppedDims(),
+              offsets, sizes, strides))) {
         return failure();
       }
 
@@ -422,7 +422,7 @@ LogicalResult rewriteLinalgDestructiveUpdates(func::FuncOp funcOp) {
     if (failed(rewriteDestructiveUpdateInPlace(b, it.second))) {
       return failure();
     }
-    processedStores.push_back(it.second.dest.getValue());
+    processedStores.push_back(it.second.dest.value());
   };
   for (auto op : processedStores) op.erase();
 

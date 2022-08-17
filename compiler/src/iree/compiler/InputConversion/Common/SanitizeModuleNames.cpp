@@ -27,8 +27,8 @@ struct SanitizeModuleNamesPass
 
     auto moduleOp = getOperation();
     auto optionalName = moduleOp.getName();
-    if (!optionalName.hasValue()) return;
-    auto name = optionalName.getValue();
+    if (!optionalName.has_value()) return;
+    auto name = optionalName.value();
     if (!name.contains('.')) return;
 
     std::string sanitizedName(name);

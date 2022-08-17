@@ -106,7 +106,7 @@ static LogicalResult lowerDispatchDefaultWorkgroupCountOp(
 
   IREE::Codegen::LoweringConfigAttr rootOpConfig = getLoweringConfig(*rootOp);
   if (!rootOpConfig) {
-    return rootOp.getValue()->emitOpError(
+    return rootOp.value()->emitOpError(
         "unable to find configuration of root op to define workgroup count "
         "region");
   }

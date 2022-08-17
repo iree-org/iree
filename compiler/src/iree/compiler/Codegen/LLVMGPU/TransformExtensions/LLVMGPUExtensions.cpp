@@ -114,13 +114,13 @@ FailureOr<SmallVector<OpFoldResult>> rewriteForeachThreadToGpu(
   auto maybeWorkgroupSizes = getNumThreads(rewriter, foreachThreadOp);
   if (failed(maybeWorkgroupSizes) ||
       llvm::any_of(*maybeWorkgroupSizes, [](OpFoldResult ofr) {
-        return !getConstantIntValue(ofr).hasValue();
+        return !getConstantIntValue(ofr).has_value();
       }))
     return foreachThreadOp->emitError("unsupported dynamic workgroup size");
 
   SmallVector<int64_t> workgroupSizes;
   for (OpFoldResult ofr : *maybeWorkgroupSizes)
-    workgroupSizes.push_back(getConstantIntValue(ofr).getValue());
+    workgroupSizes.push_back(getConstantIntValue(ofr).value());
 
   // Step 1. Create the gpu.thread ops
   Location loc = foreachThreadOp.getLoc();

@@ -133,7 +133,7 @@ struct DropDefaultConstGlobalOpInitializer : public OpRewritePattern<T> {
   using OpRewritePattern<T>::OpRewritePattern;
   LogicalResult matchAndRewrite(T op,
                                 PatternRewriter &rewriter) const override {
-    if (!op.getInitialValue().hasValue()) return failure();
+    if (!op.getInitialValue().has_value()) return failure();
     if (auto value =
             op.getInitialValueAttr().template dyn_cast<IntegerAttr>()) {
       if (value.getValue() != 0) return failure();
@@ -2861,9 +2861,8 @@ struct RewriteCondFailToBranchFail : public OpRewritePattern<CondFailOp> {
         rewriter.createBlock(block, {op.getStatus().getType()}, {op.getLoc()});
     block->moveBefore(failBlock);
     rewriter.setInsertionPointToStart(failBlock);
-    rewriter.create<FailOp>(
-        op.getLoc(), failBlock->getArgument(0),
-        op.getMessage().hasValue() ? op.getMessage().getValue() : "");
+    rewriter.create<FailOp>(op.getLoc(), failBlock->getArgument(0),
+                            op.getMessage().value_or(""));
 
     // Replace the original cond_fail with our cond_branch, splitting the block
     // and continuing if the condition is not taken.

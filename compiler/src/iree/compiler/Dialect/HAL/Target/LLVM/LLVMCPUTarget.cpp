@@ -58,12 +58,11 @@ static llvm::Optional<FileLineColLoc> findFirstFileLoc(Location baseLoc) {
 }
 
 static std::string guessModuleName(mlir::ModuleOp moduleOp) {
-  std::string moduleName =
-      moduleOp.getName().hasValue() ? moduleOp.getName().getValue().str() : "";
+  std::string moduleName = moduleOp.getName().value_or("").str();
   if (!moduleName.empty()) return moduleName;
   auto loc = findFirstFileLoc(moduleOp.getLoc());
-  if (loc.hasValue()) {
-    return llvm::sys::path::stem(loc.getValue().getFilename()).str();
+  if (loc.has_value()) {
+    return llvm::sys::path::stem(loc.value().getFilename()).str();
   } else {
     return "llvm_module";
   }
@@ -74,10 +73,10 @@ static std::string guessModuleName(mlir::ModuleOp moduleOp) {
 static LogicalResult appendDebugDatabase(std::vector<int8_t> &baseFile,
                                          Artifact &debugFileArtifact) {
   auto debugFileOr = debugFileArtifact.read();
-  if (!debugFileOr.hasValue()) {
+  if (!debugFileOr.has_value()) {
     return failure();
   }
-  auto debugFile = std::move(debugFileOr).getValue();
+  auto debugFile = std::move(debugFileOr).value();
 
   // NOTE: we align the sizes so that the files all start at nice offsets.
   auto baseFileSize = IREE::Util::align(baseFile.size(), 16);
@@ -544,12 +543,12 @@ class LLVMCPUTargetBackend final : public TargetBackend {
     // Link the generated object files into a dylib.
     auto linkArtifactsOr =
         linkerTool->linkDynamicLibrary(libraryName, objectFiles);
-    if (!linkArtifactsOr.hasValue()) {
+    if (!linkArtifactsOr.has_value()) {
       return mlir::emitError(variantOp.getLoc())
              << "failed to link executable and generate target dylib (check "
                 "above for more specific error messages)";
     }
-    auto &linkArtifacts = linkArtifactsOr.getValue();
+    auto &linkArtifacts = linkArtifactsOr.value();
     if (options_.keepLinkerArtifacts) {
       mlir::emitRemark(variantOp.getLoc())
           << "linker artifacts for " << variantOp.getName() << " preserved:\n"
@@ -563,7 +562,7 @@ class LLVMCPUTargetBackend final : public TargetBackend {
     if (options_.linkEmbedded) {
       // Load the linked ELF file and pack into an attr.
       auto elfFile = linkArtifacts.libraryFile.read();
-      if (!elfFile.hasValue()) {
+      if (!elfFile.has_value()) {
         return variantOp.emitError()
                << "failed to read back dylib temp file at "
                << linkArtifacts.libraryFile.path;
@@ -575,7 +574,7 @@ class LLVMCPUTargetBackend final : public TargetBackend {
       auto bufferAttr = DenseIntElementsAttr::get(
           VectorType::get({static_cast<int64_t>(elfFile->size())},
                           IntegerType::get(executableBuilder.getContext(), 8)),
-          std::move(elfFile.getValue()));
+          std::move(elfFile.value()));
 
       // Add the binary to the parent hal.executable.
       auto binaryOp = executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
@@ -614,12 +613,12 @@ class LLVMCPUTargetBackend final : public TargetBackend {
       // ignored by system loaders and tools but still accessible to the runtime
       // loader. Not all platforms have separate debug databases and need this.
       auto libraryFileOr = linkArtifacts.libraryFile.read();
-      if (!libraryFileOr.hasValue()) {
+      if (!libraryFileOr.has_value()) {
         return variantOp.emitError()
                << "failed to read back dylib temp file at "
                << linkArtifacts.libraryFile.path;
       }
-      auto libraryFile = std::move(libraryFileOr).getValue();
+      auto libraryFile = std::move(libraryFileOr).value();
       if (options_.debugSymbols && linkArtifacts.debugFile.outputFile) {
         if (failed(appendDebugDatabase(libraryFile, linkArtifacts.debugFile))) {
           return variantOp.emitError()

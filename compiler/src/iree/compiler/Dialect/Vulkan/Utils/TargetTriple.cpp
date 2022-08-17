@@ -366,19 +366,18 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
 TargetTriple TargetTriple::get(const char *triple) {
   llvm::SmallVector<llvm::StringRef, 3> fragments;
   llvm::SplitString(triple, fragments, "-");
-
   TargetTripleArch arch = TargetTripleArch::Unknown;
-  if (auto symbol = symbolizeTargetTripleArch(fragments[0]))
-    arch = symbol.getValue();
-
+  if (auto symbol = symbolizeTargetTripleArch(fragments[0])) {
+    arch = symbol.value();
+  }
   TargetTripleProduct product = TargetTripleProduct::Unknown;
-  if (auto symbol = symbolizeTargetTripleProduct(fragments[1]))
-    product = symbol.getValue();
-
+  if (auto symbol = symbolizeTargetTripleProduct(fragments[1])) {
+    product = symbol.value();
+  }
   TargetTripleOS os = TargetTripleOS::Unknown;
-  if (auto symbol = symbolizeTargetTripleOS(fragments[2]))
-    os = symbol.getValue();
-
+  if (auto symbol = symbolizeTargetTripleOS(fragments[2])) {
+    os = symbol.value();
+  }
   return TargetTriple(arch, product, os);
 }
 

@@ -83,8 +83,8 @@ class OrdinalAllocationPass
           primitiveGlobalOps[storageSize].push_back(globalOp);
         }
       }
-      if (ordinal.hasValue()) {
-        op.setAttr("ordinal", builder.getI32IntegerAttr(ordinal.getValue()));
+      if (ordinal.has_value()) {
+        op.setAttr("ordinal", builder.getI32IntegerAttr(ordinal.value()));
       }
     }
 

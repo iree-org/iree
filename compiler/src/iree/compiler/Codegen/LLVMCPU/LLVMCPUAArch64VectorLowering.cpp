@@ -113,8 +113,8 @@ void LLVMCPUAArch64VectorLoweringPass::runOnOperation() {
     // There are issues when unrolling 1Dx1D->0D vector.contract op. Only unroll
     // the op when there are more than one loop.
     constexpr int64_t kVectorSize = 4;
-    SmallVector<int64_t> vectorTiles(numLoops.getValue(), kVectorSize);
-    if (numLoops.getValue() > 1) {
+    SmallVector<int64_t> vectorTiles(numLoops.value(), kVectorSize);
+    if (numLoops.value() > 1) {
       vector::populateVectorUnrollPatterns(
           vectorUnrollPatterns,
           vector::UnrollVectorOptions().setNativeShape(vectorTiles));

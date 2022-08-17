@@ -1290,7 +1290,7 @@ void CondFailOp::print(OpAsmPrinter &p) {
   }
   p << getStatus();
   if (auto messageAttr = getMessage()) {
-    p << ", \"" << messageAttr.getValue() << "\"";
+    p << ", \"" << messageAttr.value() << "\"";
   }
   p.printOptionalAttrDict(getOperation()->getAttrs(),
                           /*elidedAttrs=*/{"message"});

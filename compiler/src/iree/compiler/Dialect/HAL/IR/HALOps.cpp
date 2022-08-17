@@ -538,7 +538,7 @@ void DeviceAllocatorOp::getAsmResultNames(
 
 LogicalResult DeviceQueryOp::verify() {
   DeviceQueryOp op = *this;
-  if (op.getDefaultValue().hasValue()) {
+  if (op.getDefaultValue().has_value()) {
     if (op.getDefaultValue()->getType() != op.getValue().getType()) {
       return op.emitOpError()
              << "type mismatch between result and default value";
@@ -988,7 +988,7 @@ static llvm::Optional<APInt> lookupValueOrAlignment(Value value) {
   if (auto loadOp = dyn_cast_or_null<IREE::HAL::InterfaceConstantLoadOp>(op)) {
     // Push constants have an optional value alignment.
     auto alignment = loadOp.getAlignment();
-    if (alignment.hasValue()) return alignment;
+    if (alignment.has_value()) return alignment;
   } else if (auto alignmentAttr =
                  op->getAttrOfType<IntegerAttr>("stream.alignment")) {
     // The op has an alignment tagged on it we can use directly.
@@ -1014,7 +1014,7 @@ llvm::Align InterfaceBindingSubspanOp::calculateAlignment() {
   auto bindingAlignmentInt = getAlignment();
   if (!bindingAlignmentInt) return naturalAlignment;
   auto bindingAlignment =
-      llvm::Align(bindingAlignmentInt.getValue().getZExtValue());
+      llvm::Align(bindingAlignmentInt.value().getZExtValue());
 
   // If there's no offset specified then we can use the binding alignment
   // directly.
@@ -1024,7 +1024,7 @@ llvm::Align InterfaceBindingSubspanOp::calculateAlignment() {
   // find a common alignment between it and the base and otherwise we need to
   // try to infer the alignment from the IR - otherwise we fall back.
   auto offsetOrAlignment = lookupValueOrAlignment(getByteOffset());
-  if (!offsetOrAlignment.hasValue()) return naturalAlignment;
+  if (!offsetOrAlignment.has_value()) return naturalAlignment;
 
   // Compute the common alignment between that of the binding base and that of
   // the byte offset.

@@ -67,41 +67,36 @@ class GlobalOpConversion : public OpConversionPattern<IREE::Util::GlobalOp> {
           llvm::to_vector<4>(op->getDialectAttrs()));
     } else if (convertedType.isInteger(32)) {
       llvm::Optional<TypedAttr> convertedValue = llvm::None;
-      if (op.getInitialValue().hasValue()) {
+      if (op.getInitialValue().has_value()) {
         convertedValue = rewriter.getI32IntegerAttr(static_cast<int32_t>(
-            op.getInitialValue().getValue().cast<IntegerAttr>().getInt()));
+            op.getInitialValue().value().cast<IntegerAttr>().getInt()));
       }
       newOp = rewriter.replaceOpWithNewOp<IREE::VM::GlobalI32Op>(
           op, op.getSymName(), op.getIsMutable(), convertedType, convertedValue,
           llvm::to_vector<4>(op->getDialectAttrs()));
     } else if (convertedType.isInteger(64)) {
       llvm::Optional<TypedAttr> convertedValue = llvm::None;
-      if (op.getInitialValue().hasValue()) {
+      if (op.getInitialValue().has_value()) {
         convertedValue = rewriter.getI64IntegerAttr(
-            op.getInitialValue().getValue().cast<IntegerAttr>().getInt());
+            op.getInitialValue().value().cast<IntegerAttr>().getInt());
       }
       newOp = rewriter.replaceOpWithNewOp<IREE::VM::GlobalI64Op>(
           op, op.getSymName(), op.getIsMutable(), convertedType, convertedValue,
           llvm::to_vector<4>(op->getDialectAttrs()));
     } else if (convertedType.isF32()) {
       llvm::Optional<TypedAttr> convertedValue = llvm::None;
-      if (op.getInitialValue().hasValue()) {
-        convertedValue = rewriter.getF32FloatAttr(
-            static_cast<float>(op.getInitialValue()
-                                   .getValue()
-                                   .cast<FloatAttr>()
-                                   .getValueAsDouble()));
+      if (op.getInitialValue().has_value()) {
+        convertedValue = rewriter.getF32FloatAttr(static_cast<float>(
+            op.getInitialValue().value().cast<FloatAttr>().getValueAsDouble()));
       }
       newOp = rewriter.replaceOpWithNewOp<IREE::VM::GlobalF32Op>(
           op, op.getSymName(), op.getIsMutable(), convertedType, convertedValue,
           llvm::to_vector<4>(op->getDialectAttrs()));
     } else if (convertedType.isF64()) {
       llvm::Optional<TypedAttr> convertedValue = llvm::None;
-      if (op.getInitialValue().hasValue()) {
-        convertedValue = rewriter.getF64FloatAttr(op.getInitialValue()
-                                                      .getValue()
-                                                      .cast<FloatAttr>()
-                                                      .getValueAsDouble());
+      if (op.getInitialValue().has_value()) {
+        convertedValue = rewriter.getF64FloatAttr(
+            op.getInitialValue().value().cast<FloatAttr>().getValueAsDouble());
       }
       newOp = rewriter.replaceOpWithNewOp<IREE::VM::GlobalF64Op>(
           op, op.getSymName(), op.getIsMutable(), convertedType, convertedValue,

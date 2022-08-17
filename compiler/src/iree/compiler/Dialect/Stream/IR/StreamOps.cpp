@@ -1499,7 +1499,7 @@ std::pair<unsigned, unsigned> AsyncExecuteOp::getTiedResultsIndexAndLength() {
 
 OperandRange AsyncExecuteOp::getSuccessorEntryOperands(
     Optional<unsigned> index) {
-  assert(index && index.getValue() == 0 && "invalid region index");
+  assert(index && index.value() == 0 && "invalid region index");
   return getResourceOperands();
 }
 
@@ -1509,7 +1509,7 @@ void AsyncExecuteOp::getSuccessorRegions(
   // Unconditional control flow into the region and back to the parent, so
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
-  if (index.hasValue()) {
+  if (index.has_value()) {
     regions.push_back(RegionSuccessor(getResults()));
   } else {
     regions.push_back(RegionSuccessor(&getBody(), getBody().getArguments()));
@@ -1612,7 +1612,7 @@ LogicalResult AsyncConcurrentOp::verify() {
 
 OperandRange AsyncConcurrentOp::getSuccessorEntryOperands(
     Optional<unsigned> index) {
-  assert(index && index.getValue() == 0 && "invalid region index");
+  assert(index && index.value() == 0 && "invalid region index");
   return getResourceOperands();
 }
 
@@ -1622,7 +1622,7 @@ void AsyncConcurrentOp::getSuccessorRegions(
   // Unconditional control flow into the region and back to the parent, so
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
-  if (index.hasValue()) {
+  if (index.has_value()) {
     regions.push_back(RegionSuccessor(getResults()));
   } else {
     regions.push_back(RegionSuccessor(&getBody(), getBody().getArguments()));
@@ -1966,7 +1966,7 @@ LogicalResult CmdExecuteOp::verify() {
 }
 
 OperandRange CmdExecuteOp::getSuccessorEntryOperands(Optional<unsigned> index) {
-  assert(index && index.getValue() == 0 && "invalid region index");
+  assert(index && index.value() == 0 && "invalid region index");
   return getResourceOperands();
 }
 
@@ -1976,7 +1976,7 @@ void CmdExecuteOp::getSuccessorRegions(
   // Unconditional control flow into the region and back to the parent, so
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
-  if (index.hasValue()) {
+  if (index.has_value()) {
     regions.push_back(RegionSuccessor({}));
   } else {
     regions.push_back(RegionSuccessor(&getBody(), getBody().getArguments()));
@@ -2041,7 +2041,7 @@ void CmdSerialOp::getSuccessorRegions(
   // Unconditional control flow into the region and back to the parent, so
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
-  if (index.hasValue()) {
+  if (index.has_value()) {
     regions.push_back(RegionSuccessor({}));
   } else {
     regions.push_back(RegionSuccessor(&getBody(), {}));
@@ -2066,7 +2066,7 @@ void CmdConcurrentOp::getSuccessorRegions(
   // Unconditional control flow into the region and back to the parent, so
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
-  if (index.hasValue()) {
+  if (index.has_value()) {
     regions.push_back(RegionSuccessor({}));
   } else {
     regions.push_back(RegionSuccessor(&getBody(), {}));

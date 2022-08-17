@@ -74,8 +74,8 @@ class MLProgramGlobalOpPattern
     if (!newType) return failure();
     auto srcOpAttr = srcOp.getValue();
     auto srcOpTypedAttr =
-        srcOpAttr.hasValue()
-            ? Optional<TypedAttr>(srcOpAttr.getValue().cast<TypedAttr>())
+        srcOpAttr.has_value()
+            ? Optional<TypedAttr>(srcOpAttr.value().cast<TypedAttr>())
             : llvm::None;
     auto globalOp = rewriter.replaceOpWithNewOp<IREE::Util::GlobalOp>(
         srcOp, srcOp.getName(), srcOp.getIsMutable(), newType, srcOpTypedAttr);

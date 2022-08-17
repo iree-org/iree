@@ -343,8 +343,8 @@ void printShapedTiedResult(OpAsmPrinter &p, Operation *op, Type resultType,
                            ValueRange resultDims) {
   auto tiedOp = cast<IREE::Util::TiedOpInterface>(op);
   auto tiedOperandIndex = tiedOp.getTiedResultOperandIndex(0);
-  if (tiedOperandIndex.hasValue()) {
-    auto tiedOperand = op->getOperand(tiedOperandIndex.getValue());
+  if (tiedOperandIndex.has_value()) {
+    auto tiedOperand = op->getOperand(tiedOperandIndex.value());
     p.printOperand(tiedOperand);
     p << " as ";
   }
@@ -498,8 +498,8 @@ void printShapedResultList(OpAsmPrinter &p, Operation *op, ValueRange operands,
     auto resultType = resultTypes[i];
     auto tiedOperandIndex = tiedOp.getTiedResultOperandIndex(i);
     bool printType = true;
-    if (tiedOperandIndex.hasValue()) {
-      auto tiedOperand = op->getOperand(tiedOperandIndex.getValue());
+    if (tiedOperandIndex.has_value()) {
+      auto tiedOperand = op->getOperand(tiedOperandIndex.value());
       p.printOperand(tiedOperand);
       if (tiedOperand.getType() != resultType) {
         p << " as ";
@@ -806,8 +806,8 @@ void GlobalOp::build(OpBuilder &builder, OperationState &result, StringRef name,
   if (isMutable) {
     result.addAttribute("is_mutable", builder.getUnitAttr());
   }
-  if (initialValue.hasValue()) {
-    result.addAttribute("initial_value", initialValue.getValue());
+  if (initialValue.has_value()) {
+    result.addAttribute("initial_value", initialValue.value());
   }
   result.addAttribute("type", TypeAttr::get(type));
   result.attributes.append(attrs.begin(), attrs.end());

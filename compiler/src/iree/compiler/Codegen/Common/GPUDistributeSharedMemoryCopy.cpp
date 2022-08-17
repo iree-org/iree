@@ -190,7 +190,7 @@ static void distributeTransferRead(func::FuncOp funcOp, Value flatThreadId,
         vector::distributPointwiseVectorOp(
             b, readOp, ids, multiplier,
             AffineMap::get(shape.size(), 0, exprs, funcOp.getContext()));
-    if (ops.hasValue()) {
+    if (ops.has_value()) {
       SmallPtrSet<Operation *, 1> extractOp({ops->extract, ops->insert});
       readOp.getResult().replaceAllUsesExcept(ops->insert.getResult(),
                                               extractOp);
@@ -210,7 +210,7 @@ class GPUDistributeSharedMemoryCopyPass
     func::FuncOp funcOp = getOperation();
     FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
     if (failed(exportOp)) return;
-    auto workgroupSize = getWorkgroupSize(exportOp.getValue());
+    auto workgroupSize = getWorkgroupSize(exportOp.value());
     workgroupSize.resize(3, 1);
     MLIRContext *context = &getContext();
     SmallVector<linalg::GenericOp> copiesToWorkgroupMem;

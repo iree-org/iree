@@ -493,7 +493,7 @@ Optional<int64_t> getNumBytes(Type type) {
   if (auto vectorType = type.dyn_cast<VectorType>()) {
     auto elementBytes = getNumBytes(vectorType.getElementType());
     if (!elementBytes) return llvm::None;
-    return elementBytes.getValue() * vectorType.getNumElements();
+    return elementBytes.value() * vectorType.getNumElements();
   }
   return llvm::None;
 }
@@ -546,7 +546,7 @@ struct FoldSubspanOffsetIntoLoadStore final : public OpRewritePattern<OpType> {
     auto divMap = AffineMap::get(0, 2, {sym0.floorDiv(sym1)}, context);
 
     Value byteValue = rewriter.create<arith::ConstantIndexOp>(
-        op.getMemref().getLoc(), numBytes.getValue());
+        op.getMemref().getLoc(), numBytes.value());
     // We assume that upper layers guarantee the byte offset is perfectly
     // divisible by the element byte count so the content is well aligned.
     Value offset = rewriter.create<AffineApplyOp>(

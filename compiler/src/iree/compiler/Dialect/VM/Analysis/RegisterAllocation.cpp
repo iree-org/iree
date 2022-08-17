@@ -126,10 +126,10 @@ struct RegisterUsage {
     if (type.isIntOrFloat()) {
       size_t byteWidth = IREE::Util::getRoundedElementByteWidth(type);
       auto ordinalStartOr = findFirstUnsetIntOrdinalSpan(byteWidth);
-      if (!ordinalStartOr.hasValue()) {
+      if (!ordinalStartOr.has_value()) {
         return llvm::None;
       }
-      int ordinalStart = ordinalStartOr.getValue();
+      int ordinalStart = ordinalStartOr.value();
       unsigned int ordinalEnd = ordinalStart + (byteWidth / 4) - 1;
       intRegisters.set(ordinalStart, ordinalEnd + 1);
       maxI32RegisterOrdinal =
@@ -240,11 +240,11 @@ LogicalResult RegisterAllocation::recalculate(IREE::VM::FuncOp funcOp) {
     // Allocate arguments first from left-to-right.
     for (auto blockArg : block->getArguments()) {
       auto reg = registerUsage.allocateRegister(blockArg.getType());
-      if (!reg.hasValue()) {
+      if (!reg.has_value()) {
         return funcOp.emitError() << "register allocation failed for block arg "
                                   << blockArg.getArgNumber();
       }
-      map_[blockArg] = reg.getValue();
+      map_[blockArg] = reg.value();
     }
 
     // Cleanup any block arguments that were unused. We do this after the
@@ -266,13 +266,13 @@ LogicalResult RegisterAllocation::recalculate(IREE::VM::FuncOp funcOp) {
       }
       for (auto result : op.getResults()) {
         auto reg = registerUsage.allocateRegister(result.getType());
-        if (!reg.hasValue()) {
+        if (!reg.has_value()) {
           return op.emitError() << "register allocation failed for result "
                                 << result.cast<OpResult>().getResultNumber();
         }
-        map_[result] = reg.getValue();
+        map_[result] = reg.value();
         if (result.use_empty()) {
-          registerUsage.releaseRegister(reg.getValue());
+          registerUsage.releaseRegister(reg.value());
         }
       }
     }

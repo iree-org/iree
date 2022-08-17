@@ -207,7 +207,7 @@ class GlobalOpPattern : public OpConversionPattern<IREE::Input::GlobalOp> {
         srcOp, srcOp.getName(), srcOp.is_mutable(), newType,
         srcOp.initial_value());
     globalOp.setVisibility(srcOp.getVisibility());
-    if (srcOp.initializer().hasValue()) {
+    if (srcOp.initializer().has_value()) {
       auto initializerOp =
           rewriter.create<IREE::Util::InitializerOp>(srcOp.getLoc());
       auto ip = rewriter.saveInsertionPoint();

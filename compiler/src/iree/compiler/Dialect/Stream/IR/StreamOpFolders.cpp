@@ -252,7 +252,7 @@ struct TieRegionResults : public OpRewritePattern<Op> {
     bool didModify = false;
     for (auto yieldOp : op.template getOps<IREE::Stream::YieldOp>()) {
       for (auto result : llvm::enumerate(yieldOp.getResourceOperands())) {
-        if (op.getTiedResultOperandIndex(result.index()).hasValue()) {
+        if (op.getTiedResultOperandIndex(result.index()).has_value()) {
           continue;  // Already tied.
         }
         auto baseValue =
@@ -1703,7 +1703,7 @@ struct ElideNoOpAsyncExecuteOp : public OpRewritePattern<AsyncExecuteOp> {
                                 PatternRewriter &rewriter) const override {
     auto &entryBlock = op.getBody().front();
     auto yieldOp = getYieldIfOnlyOp(entryBlock);
-    if (!yieldOp.hasValue()) {
+    if (!yieldOp.has_value()) {
       // Has non-yield ops.
       return failure();
     }
@@ -2099,7 +2099,7 @@ struct ElideNoOpCmdExecuteOp : public OpRewritePattern<CmdExecuteOp> {
                                 PatternRewriter &rewriter) const override {
     auto &entryBlock = op.getBody().front();
     auto yieldOp = getYieldIfOnlyOp(entryBlock);
-    if (!yieldOp.hasValue()) {
+    if (!yieldOp.has_value()) {
       // Has non-yield ops.
       return failure();
     }
@@ -2140,7 +2140,7 @@ struct ElideEmptyCmdRegionOp : public OpRewritePattern<OpT> {
                                 PatternRewriter &rewriter) const override {
     auto &entryBlock = op.getBody().front();
     auto yieldOp = getYieldIfOnlyOp(entryBlock);
-    if (!yieldOp.hasValue()) {
+    if (!yieldOp.has_value()) {
       // Has non-yield ops.
       return failure();
     }
@@ -2472,7 +2472,7 @@ struct GroupAwaitsByTimepoint : public OpRewritePattern<TimepointAwaitOp> {
     }
     auto newOp = rewriter.create<TimepointAwaitOp>(
         op.getLoc(), newOperands, newOperandSizes, op.getAwaitTimepoint());
-    if (op.getAffinity().hasValue()) {
+    if (op.getAffinity().has_value()) {
       newOp.setAffinityAttr(op.getAffinityAttr());
     }
 
@@ -2524,7 +2524,7 @@ struct FoldDuplicateAwaitResources : public OpRewritePattern<TimepointAwaitOp> {
     // Create replacement op with deduped operands/results.
     auto newOp = rewriter.create<IREE::Stream::TimepointAwaitOp>(
         op.getLoc(), newOperands, newOperandSizes, op.getAwaitTimepoint());
-    if (op.getAffinity().hasValue()) {
+    if (op.getAffinity().has_value()) {
       newOp.setAffinityAttr(op.getAffinityAttr());
     }
 

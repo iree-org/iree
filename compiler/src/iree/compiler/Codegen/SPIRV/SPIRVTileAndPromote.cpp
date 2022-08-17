@@ -179,7 +179,7 @@ void SPIRVTileAndPromotePass::runOnOperation() {
   });
 
   auto workgroupSize = llvm::to_vector<4>(llvm::map_range(
-      exportOp->getWorkgroupSize().getValue(),
+      exportOp->getWorkgroupSize().value(),
       [&](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
   int64_t flatWorkgroupSize =
       workgroupSize[0] * workgroupSize[1] * workgroupSize[2];

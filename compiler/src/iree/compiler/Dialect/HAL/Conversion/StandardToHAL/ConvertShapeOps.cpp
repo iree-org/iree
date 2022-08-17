@@ -26,10 +26,10 @@ struct BufferViewDimPattern : public OpConversionPattern<tensor::DimOp> {
       return failure();
     }
     Optional<int64_t> index = dimOp.getConstantIndex();
-    assert(index.hasValue() && "expect constant index in `std.dim` operation");
+    assert(index.has_value() && "expect constant index in `std.dim` operation");
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferViewDimOp>(
         dimOp, dimOp.getResult().getType(), adaptor.getSource(),
-        rewriter.getIndexAttr(index.getValue()));
+        rewriter.getIndexAttr(index.value()));
     return success();
   }
 };

@@ -99,13 +99,13 @@ static void fixupGlobalMutability(Operation *moduleOp,
       continue;
     }
     auto uses = symbolTable.getSymbolUses(globalOp, moduleOp);
-    if (!uses.hasValue()) {
+    if (!uses.has_value()) {
       // No uses - erase the global entirely.
       deadOps.push_back(globalOp);
       continue;
     }
     bool maybeStored = false;
-    for (auto use : uses.getValue()) {
+    for (auto use : uses.value()) {
       auto *user = use.getUser();
       if (isa<IREE::Util::GlobalAddressOpInterface>(user)) {
         // Can't analyze indirect variables; assume mutated.

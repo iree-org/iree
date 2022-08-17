@@ -293,7 +293,7 @@ class ValueAlignment
                                               DFX::Resolution::OPTIONAL);
     if (pvs.isValidState() && !pvs.isUndefContained()) {
       auto alignment = computeAlignment(pvs.getAssumedSet());
-      if (alignment.hasValue()) {
+      if (alignment.has_value()) {
         newState.takeAssumedMinimum(alignment.valueOrOne().value());
         newState.indicateOptimisticFixpoint();
       }
@@ -502,7 +502,7 @@ static void annotateExport(IREE::Stream::ExecutableOp executableOp,
 
     if (argType.isIndex()) {
       auto alignment = analysis.getOperandAlignment(exportOp, operandIdx);
-      if (alignment.hasValue()) {
+      if (alignment.has_value()) {
         uint64_t alignmentOrOne = alignment.valueOrOne().value();
         funcOp.setArgAttr(argIdx, "stream.alignment",
                           IntegerAttr::get(indexType, alignmentOrOne));
@@ -515,7 +515,7 @@ static void annotateExport(IREE::Stream::ExecutableOp executableOp,
        ++resourceIdx) {
     unsigned argIdx = resourceToArgMap[resourceIdx];
     auto alignment = analysis.getResourceOffsetAlignment(exportOp, resourceIdx);
-    if (alignment.hasValue()) {
+    if (alignment.has_value()) {
       uint64_t alignmentOrOne = alignment.valueOrOne().value();
       funcOp.setArgAttr(argIdx, "stream.alignment",
                         IntegerAttr::get(indexType, alignmentOrOne));

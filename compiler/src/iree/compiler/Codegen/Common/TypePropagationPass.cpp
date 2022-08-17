@@ -74,7 +74,7 @@ static Optional<Type> getLegalizedType(Type t) {
     Optional<Type> legalizedElementType = getLegalizedElementType(elementType);
     if (!legalizedElementType) return llvm::None;
     return RankedTensorType::get(shapedType.getShape(),
-                                 legalizedElementType.getValue());
+                                 legalizedElementType.value());
   }
   return llvm::None;
 }
@@ -87,7 +87,7 @@ struct TypePropagationTypeConverter : public TypeConverter {
     addConversion([](Type t) {
       auto convertedType = getLegalizedType(t);
       if (!convertedType) return t;
-      return convertedType.getValue();
+      return convertedType.value();
     });
   }
 };
@@ -132,7 +132,7 @@ struct ConstantOpTypeConversion
       legalizedValues.emplace_back(bitWidth, value.getZExtValue());
     }
     auto newAttrType = RankedTensorType::get(attrType.getShape(),
-                                             legalizedElementType.getValue());
+                                             legalizedElementType.value());
     auto newAttr = DenseElementsAttr::get(newAttrType, legalizedValues);
     rewriter.replaceOpWithNewOp<arith::ConstantOp>(constantOp, newAttr,
                                                    newAttrType);
@@ -204,7 +204,7 @@ struct GenericOpTypePropagation
         return genericOp.emitOpError("failed to get legalized type for arg ")
                << arg.index();
       }
-      signatureConverter.addInputs(arg.index(), legalizedArgType.getValue());
+      signatureConverter.addInputs(arg.index(), legalizedArgType.value());
     }
     rewriter.applySignatureConversion(&modifiedOpRegion, signatureConverter);
 
@@ -252,7 +252,7 @@ struct GenericOpTypePropagation
           }
           yieldOperands[yieldOperand->getOperandNumber()] =
               convertElementType(rewriter, yieldOp->getLoc(),
-                                 legalizedType.getValue(), yieldOperand->get());
+                                 legalizedType.value(), yieldOperand->get());
         }
       }
       if (modifyYield) {
@@ -285,7 +285,7 @@ struct LinalgFillTypePropagation
       return fillOp.emitOpError("failed to get legalized type for value");
     }
     Value legalizedValue = convertElementType(
-        rewriter, fillOp->getLoc(), legalizedElementType.getValue(), value);
+        rewriter, fillOp->getLoc(), legalizedElementType.value(), value);
     rewriter.replaceOpWithNewOp<linalg::FillOp>(
         fillOp, ValueRange{legalizedValue}, ValueRange{adaptor.getOutputs()});
     return success();
