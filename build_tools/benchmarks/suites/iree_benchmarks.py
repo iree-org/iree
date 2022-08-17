@@ -26,7 +26,7 @@ class Linux_x86_64_Benchmarks(object):
       target_backend=iree_definitions.TargetBackend.LLVM_CPU)
 
   CASCADELAKE_COMPILE_CONFIG = iree_definitions.CompileConfig(
-      id=unique_ids.IREE_COMPILE_CONFIG_LINUX_CASCADELAKE_ID,
+      id=unique_ids.IREE_COMPILE_CONFIG_LINUX_CASCADELAKE,
       tags=["default-flags"],
       compile_targets=[CASCADELAKE_CPU_TARGET])
 
@@ -64,7 +64,7 @@ class Linux_x86_64_Benchmarks(object):
     run_configs = [
         # Local-sync run config.
         iree_definitions.RunConfig(
-            id=unique_ids.IREE_RUN_CONFIG_LOCAL_SYNC_ID,
+            id=unique_ids.IREE_RUN_CONFIG_LOCAL_SYNC,
             tags=["full-inference", "default-flags"],
             loader=iree_definitions.RuntimeLoader.EMBEDDED_ELF,
             driver=iree_definitions.RuntimeDriver.LOCAL_SYNC,
@@ -73,7 +73,7 @@ class Linux_x86_64_Benchmarks(object):
     for thread_num in [1, 4, 8]:
       run_configs.append(
           iree_definitions.RunConfig(
-              id=f"{unique_ids.IREE_RUN_CONFIG_LOCAL_TASK_ID_BASE}_{thread_num}",
+              id=f"{unique_ids.IREE_RUN_CONFIG_LOCAL_TASK_BASE}_{thread_num}",
               tags=[f"{thread_num}-thread", "full-inference", "default-flags"],
               loader=iree_definitions.RuntimeLoader.EMBEDDED_ELF,
               driver=iree_definitions.RuntimeDriver.LOCAL_TASK,

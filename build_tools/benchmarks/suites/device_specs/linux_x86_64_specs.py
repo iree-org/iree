@@ -9,7 +9,7 @@ from .. import unique_ids
 from ..definitions import common_definitions
 
 GCP_C2_STANDARD_16 = common_definitions.DeviceSpec(
-    id=unique_ids.DEVICE_SPEC_GCP_C2_STANDARD_16_ID,
+    id=unique_ids.DEVICE_SPEC_GCP_C2_STANDARD_16,
     vendor_name="GCP-c2-standard-16",
     architecture=common_definitions.DeviceArchitecture.X86_64_CASCADELAKE,
     platform=common_definitions.DevicePlatform.LINUX_GNU,

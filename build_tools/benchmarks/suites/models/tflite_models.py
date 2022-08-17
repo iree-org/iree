@@ -9,7 +9,7 @@ from .. import unique_ids
 from ..definitions import common_definitions
 
 MOBILENET_V2 = common_definitions.Model(
-    id=unique_ids.MODEL_MOBILENET_V2_ID,
+    id=unique_ids.MODEL_MOBILENET_V2,
     name="mobilenet_v2",
     tags=["f32", "imagenet"],
     source_type=common_definitions.ModelSourceType.EXPORTED_TFLITE,
