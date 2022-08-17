@@ -36,6 +36,7 @@ iree_runtime_cc_library(
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/local",
         "//runtime/src/iree/hal/utils:buffer_transfer",
+        "//runtime/src/iree/hal/utils:deferred_command_buffer",
         "//runtime/src/iree/hal/utils:semaphore_base",
     ],
 )

@@ -18,7 +18,10 @@ extern "C" {
 // Parameters configuring an iree_hal_sync_device_t.
 // Must be initialized with iree_hal_sync_device_params_initialize prior to use.
 typedef struct iree_hal_sync_device_params_t {
-  int reserved;
+  // Total size of each block in the device shared block pool.
+  // Larger sizes will lower overhead and ensure the heap isn't hit for
+  // transient allocations while also increasing memory consumption.
+  iree_host_size_t arena_block_size;
 } iree_hal_sync_device_params_t;
 
 // Initializes |out_params| to default values.

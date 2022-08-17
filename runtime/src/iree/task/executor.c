@@ -293,7 +293,8 @@ void iree_task_executor_schedule_ready_tasks(
     // If the scope has been marked as failing then we abort the task.
     // This needs to happen as a poll here because one or more of the tasks we
     // are joining may have failed.
-    if (IREE_UNLIKELY(iree_task_scope_has_failed(task->scope))) {
+    if (IREE_UNLIKELY(!task->scope ||
+                      iree_task_scope_has_failed(task->scope))) {
       iree_task_list_t discard_worklist;
       iree_task_list_initialize(&discard_worklist);
       iree_task_discard(task, &discard_worklist);

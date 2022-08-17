@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "iree/base/internal/arena.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/local_sync/sync_event.h"
 #include "iree/hal/drivers/local_sync/sync_semaphore.h"
@@ -19,6 +20,7 @@
 #include "iree/hal/local/local_executable_cache.h"
 #include "iree/hal/local/local_executable_layout.h"
 #include "iree/hal/utils/buffer_transfer.h"
+#include "iree/hal/utils/deferred_command_buffer.h"
 
 typedef struct iree_hal_sync_device_t {
   iree_hal_resource_t resource;
@@ -27,6 +29,13 @@ typedef struct iree_hal_sync_device_t {
   iree_allocator_t host_allocator;
   iree_hal_allocator_t* device_allocator;
 
+  // Block pool used for command buffers with a larger block size (as command
+  // buffers can contain inlined data uploads).
+  iree_arena_block_pool_t large_block_pool;
+
+  // Shared semaphore state used to emulate OS-level primitives. This backend
+  // is intended to run on bare-metal systems where we need to perform all
+  // synchronization ourselves.
   iree_hal_sync_semaphore_state_t semaphore_state;
 
   iree_host_size_t loader_count;
@@ -44,10 +53,15 @@ static iree_hal_sync_device_t* iree_hal_sync_device_cast(
 void iree_hal_sync_device_params_initialize(
     iree_hal_sync_device_params_t* out_params) {
   memset(out_params, 0, sizeof(*out_params));
+  out_params->arena_block_size = 32 * 1024;
 }
 
 static iree_status_t iree_hal_sync_device_check_params(
     const iree_hal_sync_device_params_t* params) {
+  if (params->arena_block_size < 4096) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "arena block size too small (< 4096 bytes)");
+  }
   return iree_ok_status();
 }
 
@@ -81,6 +95,8 @@ iree_status_t iree_hal_sync_device_create(
     device->host_allocator = host_allocator;
     device->device_allocator = device_allocator;
     iree_hal_allocator_retain(device_allocator);
+    iree_arena_block_pool_initialize(params->arena_block_size, host_allocator,
+                                     &device->large_block_pool);
 
     device->loader_count = loader_count;
     for (iree_host_size_t i = 0; i < device->loader_count; ++i) {
@@ -111,6 +127,7 @@ static void iree_hal_sync_device_destroy(iree_hal_device_t* base_device) {
     iree_hal_executable_loader_release(device->loaders[i]);
   }
   iree_hal_allocator_release(device->device_allocator);
+  iree_arena_block_pool_deinitialize(&device->large_block_pool);
   iree_allocator_free(host_allocator, device);
 
   IREE_TRACE_ZONE_END(z0);
@@ -178,11 +195,17 @@ static iree_status_t iree_hal_sync_device_create_command_buffer(
     iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity,
     iree_hal_command_buffer_t** out_command_buffer) {
-  // TODO(#4680): implement a non-inline command buffer that stores its commands
-  // and can be submitted later on/multiple-times.
-  return iree_hal_inline_command_buffer_create(
-      base_device, mode, command_categories, queue_affinity,
-      iree_hal_device_host_allocator(base_device), out_command_buffer);
+  if (iree_all_bits_set(mode,
+                        IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION)) {
+    return iree_hal_inline_command_buffer_create(
+        base_device, mode, command_categories, queue_affinity,
+        iree_hal_device_host_allocator(base_device), out_command_buffer);
+  } else {
+    iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
+    return iree_hal_deferred_command_buffer_create(
+        base_device, mode, command_categories, &device->large_block_pool,
+        device->host_allocator, out_command_buffer);
+  }
 }
 
 static iree_status_t iree_hal_sync_device_create_descriptor_set(
@@ -275,6 +298,47 @@ static iree_status_t iree_hal_sync_device_queue_dealloca(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_sync_device_apply_deferred_command_buffers(
+    iree_hal_sync_device_t* device, iree_host_size_t command_buffer_count,
+    iree_hal_command_buffer_t* const* command_buffers) {
+  // See if there are any deferred command buffers; this saves us work in cases
+  // of pure inline execution.
+  bool any_deferred = false;
+  for (iree_host_size_t i = 0; i < command_buffer_count && !any_deferred; ++i) {
+    any_deferred = iree_hal_deferred_command_buffer_isa(command_buffers[i]);
+  }
+  if (!any_deferred) return iree_ok_status();
+
+  // Stack allocate storage for an inline command buffer we'll use to replay
+  // the deferred command buffers. We want to reset it between each apply so
+  // that we don't get state carrying across.
+  iree_byte_span_t storage =
+      iree_make_byte_span(iree_alloca(iree_hal_inline_command_buffer_size()),
+                          iree_hal_inline_command_buffer_size());
+
+  // NOTE: we ignore any inline command buffers that may be passed in as they've
+  // already executed during recording. The caller is probably in for a bad time
+  // if they mixed the two modes together!
+  for (iree_host_size_t i = 0; i < command_buffer_count; ++i) {
+    iree_hal_command_buffer_t* command_buffer = command_buffers[i];
+    if (iree_hal_deferred_command_buffer_isa(command_buffer)) {
+      iree_hal_command_buffer_t* inline_command_buffer = NULL;
+      IREE_RETURN_IF_ERROR(iree_hal_inline_command_buffer_initialize(
+          (iree_hal_device_t*)device,
+          iree_hal_command_buffer_mode(command_buffer) |
+              IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION,
+          IREE_HAL_COMMAND_CATEGORY_ANY, IREE_HAL_QUEUE_AFFINITY_ANY,
+          device->host_allocator, storage, &inline_command_buffer));
+      iree_status_t status = iree_hal_deferred_command_buffer_apply(
+          command_buffer, inline_command_buffer);
+      iree_hal_inline_command_buffer_deinitialize(inline_command_buffer);
+      IREE_RETURN_IF_ERROR(status);
+    }
+  }
+
+  return iree_ok_status();
+}
+
 static iree_status_t iree_hal_sync_device_queue_execute(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
@@ -286,15 +350,17 @@ static iree_status_t iree_hal_sync_device_queue_execute(
   // TODO(#4680): there is some better error handling here needed; we should
   // propagate failures to all signal semaphores. Today we aren't as there
   // shouldn't be any failures or if there are there's not much we'd be able to
-  // do - we already executed everything inline!
+  // do - chances are we already executed everything inline!
 
   // Wait for semaphores to be signaled before performing any work.
   IREE_RETURN_IF_ERROR(iree_hal_sync_semaphore_multi_wait(
       &device->semaphore_state, IREE_HAL_WAIT_MODE_ALL, wait_semaphore_list,
       iree_infinite_timeout()));
 
-  // TODO(#4680): if we were doing deferred submissions we would issue them
-  // here. With only inline command buffers we have nothing to do here.
+  // Run all deferred command buffers - any we could have run inline we already
+  // did during recording.
+  IREE_RETURN_IF_ERROR(iree_hal_sync_device_apply_deferred_command_buffers(
+      device, command_buffer_count, command_buffers));
 
   // Signal all semaphores now that batch work has completed.
   IREE_RETURN_IF_ERROR(iree_hal_sync_semaphore_multi_signal(
