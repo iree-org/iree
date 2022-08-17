@@ -5,14 +5,15 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Classes for IREE benchmark definitions."""
 
-from dataclasses import dataclass, field
+import dataclasses
+from dataclasses import dataclass
 from enum import Enum
 from typing import List
 
-from .common import DeviceArchitecture, DevicePlatform, DeviceSpec, Model, ModelInputData
+from . import common_definitions
 
 
-class IreeTargetBackend(Enum):
+class TargetBackend(Enum):
   """IREE target backend."""
   LLVM_CPU = "llvm-cpu"
   CUDA = "cuda"
@@ -22,14 +23,14 @@ class IreeTargetBackend(Enum):
   VULKAN_SPIRV = "vulkan-spirv"
 
 
-class IreeRuntimeLoader(Enum):
+class RuntimeLoader(Enum):
   """IREE runtime loader."""
   EMBEDDED_ELF = "embedded-elf"
   VMVX_MODULE = "vmvx-module"
   SYSTEM_LIBRARY = "system-library"
 
 
-class IreeRuntimeDriver(Enum):
+class RuntimeDriver(Enum):
   """IREE runtime driver."""
   LOCAL_SYNC = "local-sync"
   LOCAL_TASK = "local-task"
@@ -38,44 +39,44 @@ class IreeRuntimeDriver(Enum):
 
 
 @dataclass(frozen=True)
-class IreeCompileTarget(object):
+class CompileTarget(object):
   """Describes a target device to build for."""
-  target_architecture: DeviceArchitecture
-  target_platform: DevicePlatform
-  target_backend: IreeTargetBackend
+  target_architecture: common_definitions.DeviceArchitecture
+  target_platform: common_definitions.DevicePlatform
+  target_backend: TargetBackend
 
 
 @dataclass(frozen=True)
-class IreeCompileConfig(object):
+class CompileConfig(object):
   """Describes the options to build a module."""
   id: str
   tags: List[str]
-  compile_targets: List[IreeCompileTarget]
-  extra_flags: List[str] = field(default_factory=list)
+  compile_targets: List[CompileTarget]
+  extra_flags: List[str] = dataclasses.field(default_factory=list)
 
 
 @dataclass(frozen=True)
-class IreeRunConfig(object):
+class RunConfig(object):
   """Describes the options to run a module."""
   id: str
   tags: List[str]
-  loader: IreeRuntimeLoader
-  driver: IreeRuntimeDriver
+  loader: RuntimeLoader
+  driver: RuntimeDriver
   benchmark_tool: str
-  extra_flags: List[str] = field(default_factory=list)
+  extra_flags: List[str] = dataclasses.field(default_factory=list)
 
 
 @dataclass(frozen=True)
-class IreeBenchmarkCompileSpec(object):
+class BenchmarkCompileSpec(object):
   """Describes a compile target to generate the module."""
-  compile_config: IreeCompileConfig
-  model: Model
+  compile_config: CompileConfig
+  model: common_definitions.Model
 
 
 @dataclass(frozen=True)
-class IreeBenchmarkRunSpec(object):
+class BenchmarkRunSpec(object):
   """Describes a run target to be benchmarked."""
-  compile_spec: IreeBenchmarkCompileSpec
-  run_config: IreeRunConfig
-  target_device_spec: DeviceSpec
-  input_data: ModelInputData
+  compile_spec: BenchmarkCompileSpec
+  run_config: RunConfig
+  target_device_spec: common_definitions.DeviceSpec
+  input_data: common_definitions.ModelInputData

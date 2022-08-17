@@ -5,14 +5,14 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Defines TFLite models."""
 
-from ..id_defs import MODEL_MOBILENET_V2_ID
-from ..definitions.common import Model, ModelSourceType
+from .. import unique_ids
+from ..definitions import common_definitions
 
-MOBILENET_V2_MODEL = Model(
-    id=MODEL_MOBILENET_V2_ID,
+MOBILENET_V2 = common_definitions.Model(
+    id=unique_ids.MODEL_MOBILENET_V2_ID,
     name="mobilenet_v2",
     tags=["f32", "imagenet"],
-    source_type=ModelSourceType.EXPORTED_TFLITE,
+    source_type=common_definitions.ModelSourceType.EXPORTED_TFLITE,
     # Mirror of https://github.com/tensorflow/tflite-support/blob/master/tensorflow_lite_support/metadata/python/tests/testdata/image_classifier/mobilenet_v2_1.0_224.tflite
     source_url=
     "https://storage.googleapis.com/iree-model-artifacts/mobilenet_v2_1.0_224.tflite",

@@ -5,6 +5,6 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Defines the groups of models."""
 
-from . import tflite
+from . import tflite_models
 
-MOBILE_MODEL_GROUP = [tflite.MOBILENET_V2_MODEL]
+MOBILE = [tflite_models.MOBILENET_V2]

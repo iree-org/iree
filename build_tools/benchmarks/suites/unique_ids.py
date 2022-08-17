@@ -3,7 +3,10 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-"""List of unique IDs in the benchmark suites."""
+"""List of unique random IDs in the benchmark suites.
+
+Each ID should be generated from uuid.uuid4().
+"""
 
 # Models
 MODEL_MOBILENET_V2_ID = "7d45f8e5-bb5e-48d0-928d-8f125104578f"
