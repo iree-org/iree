@@ -15,24 +15,15 @@
 #include "iree/base/tracing.h"
 #include "iree/vm/api.h"
 
-// Today we optionally enable MMT4D based on build-time configuration.
-// Compiler code can be emitted using optional imports if we want to support
-// both generic matmul and mmt4d in the same module with optional runtime
-// support but the hope is that we settle on one or the other and
-// unconditionally use that. Until we're there this is kept optional so that we
-// can reduce binary size when MMT4D is known unused mostly as an example of
-// how this could be done for other libraries.
-//
-// Note that adding optional things to VMVX has other overheads (this file grows
-// infinitely large). For entire sets of microkernels with a larger surface area
-// we can move those into other entirely optional modules that can be passed in
-// by the user when creating the VMVX loader via the user_modules arg of
-// iree_hal_vmvx_module_loader_create. We expect here that MMT4D will be used
-// anywhere VMVX is and since it is defined in-tree that's a safer bet than
-// random external libraries.
-#if defined(IREE_HAVE_MMT4D_BUILTINS)
-#include "iree/builtins/mmt4d/mmt4d.h"
-#endif  // IREE_HAVE_MMT4D_BUILTINS
+// Include the ukernel support library so that we can use its implementations
+// as fixed-function components of the runtime.
+#include "iree/builtins/ukernel/elementwise.h"
+#include "iree/builtins/ukernel/mmt4d.h"
+
+// Temporary switch between a blas-style matmul kernel and an mmt4d style.
+// We omit the latter for the time being since it is experimental and keeps
+// the binary size down.
+#define IREE_VMVX_USE_BLAS_MATMUL 1
 
 #define IREE_VMVX_MODULE_VERSION_0_0 0x00000000u
 #define IREE_VMVX_MODULE_VERSION_LATEST IREE_VMVX_MODULE_VERSION_0_0
@@ -207,26 +198,57 @@ IREE_VMVX_ABI_FIXED_STRUCT(binary2d, rIIIrIIIrIIIII, {
 IREE_VMVX_ABI_DEFINE_SHIM(binary2d, v);
 
 //===----------------------------------------------------------------------===//
-// Exported add function definitions
+// Ukernel shims. These shims are a bit different in that they directly marshal
+// to a low level ukernel target function.
 //===----------------------------------------------------------------------===//
 
-IREE_VMVX_ABI_EXPORT(iree_vmvx_add2d_f32, binary2d, v) {
+IREE_VMVX_ABI_FIXED_STRUCT(ukernel_x32b_2d, rIIIrIIIrIIIII, {
+  iree_vm_ref_t lhs_ref;
+  int64_t lhs_offset;
+  int64_t lhs_stride0;
+  int64_t lhs_stride1;
+  iree_vm_ref_t rhs_ref;
+  int64_t rhs_offset;
+  int64_t rhs_stride0;
+  int64_t rhs_stride1;
+  iree_vm_ref_t out_ref;
+  int64_t out_offset;
+  int64_t out_stride0;
+  int64_t out_stride1;
+  int64_t size0;
+  int64_t size1;
+});
+
+static iree_status_t iree_vm_shim_ukernel_x32b_2d_v(
+    iree_vm_stack_t* IREE_RESTRICT stack, iree_vm_native_function_flags_t flags,
+    iree_byte_span_t args_storage, iree_byte_span_t rets_storage,
+    iree_vm_native_function_target2_t target_fn, void* IREE_RESTRICT module,
+    void* IREE_RESTRICT module_state) {
+  // TODO: Figure out how to identify this with the actual target fn.
   IREE_TRACE_ZONE_BEGIN(z0);
-  MAP_BUFFER_2D_RO(lhs, float,
+  const iree_vm_abi_ukernel_x32b_2d_t* args =
+      iree_vm_abi_ukernel_x32b_2d_checked_deref(args_storage);
+  if (IREE_UNLIKELY(!((flags & IREE_VM_NATIVE_FUNCTION_CALL_RESUME) || args))) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "argument/result signature mismatch");
+  }
+
+  MAP_BUFFER_2D_RO(lhs, uint32_t,
                    /*buffer_ref=*/args->lhs_ref,
                    /*offset=*/args->lhs_offset,
                    /*stride0=*/args->lhs_stride0,
                    /*stride1=*/args->lhs_stride1,
                    /*size0=*/args->size0,
                    /*size1=*/args->size1);
-  MAP_BUFFER_2D_RO(rhs, float,
+  MAP_BUFFER_2D_RO(rhs, uint32_t,
                    /*buffer_ref=*/args->rhs_ref,
                    /*offset=*/args->rhs_offset,
                    /*stride0=*/args->rhs_stride0,
                    /*stride1=*/args->rhs_stride1,
                    /*size0=*/args->size0,
                    /*size1=*/args->size1);
-  MAP_BUFFER_2D_RW(out, float,
+  MAP_BUFFER_2D_RW(out, uint32_t,
                    /*buffer_ref=*/args->out_ref,
                    /*offset=*/args->out_offset,
                    /*stride0=*/args->out_stride0,
@@ -234,16 +256,85 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_add2d_f32, binary2d, v) {
                    /*size0=*/args->size0,
                    /*size1=*/args->size1);
 
-  for (iree_host_size_t i = 0; i < out_size0; ++i) {
-    for (iree_host_size_t j = 0; j < out_size1; ++j) {
-      out[i * out_stride0 + j * out_stride1] =
-          lhs[i * lhs_stride0 + j * lhs_stride1] +
-          rhs[i * rhs_stride0 + j * rhs_stride1];
-    }
-  }
+  iree_ukernel_x32b_2d_func_t ukernel_func =
+      (iree_ukernel_x32b_2d_func_t)target_fn;
+
+  int ret = ukernel_func(
+      // LHS
+      lhs, lhs_offset, lhs_stride0, lhs_stride1,
+      // RHS
+      rhs, rhs_offset, rhs_stride0, rhs_stride1,
+      // OUT
+      out, out_offset, out_stride0, out_stride1,
+      // SIZE
+      out_size0, out_size1);
 
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return ret == 0
+             ? iree_ok_status()
+             : iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "illegal x32b ukernel return code (%d)", ret);
+}
+
+IREE_VMVX_ABI_FIXED_STRUCT(ukernel_x32u_2d, rIIIrIIIII, {
+  iree_vm_ref_t in_ref;
+  int64_t in_offset;
+  int64_t in_stride0;
+  int64_t in_stride1;
+  iree_vm_ref_t out_ref;
+  int64_t out_offset;
+  int64_t out_stride0;
+  int64_t out_stride1;
+  int64_t size0;
+  int64_t size1;
+});
+
+static iree_status_t iree_vm_shim_ukernel_x32u_2d_v(
+    iree_vm_stack_t* IREE_RESTRICT stack, iree_vm_native_function_flags_t flags,
+    iree_byte_span_t args_storage, iree_byte_span_t rets_storage,
+    iree_vm_native_function_target2_t target_fn, void* IREE_RESTRICT module,
+    void* IREE_RESTRICT module_state) {
+  // TODO: Figure out how to identify this with the actual target fn.
+  IREE_TRACE_ZONE_BEGIN(z0);
+  const iree_vm_abi_ukernel_x32u_2d_t* args =
+      iree_vm_abi_ukernel_x32u_2d_checked_deref(args_storage);
+  if (IREE_UNLIKELY(!((flags & IREE_VM_NATIVE_FUNCTION_CALL_RESUME) || args))) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "argument/result signature mismatch");
+  }
+
+  MAP_BUFFER_2D_RO(in, uint32_t,
+                   /*buffer_ref=*/args->in_ref,
+                   /*offset=*/args->in_offset,
+                   /*stride0=*/args->in_stride0,
+                   /*stride1=*/args->in_stride1,
+                   /*size0=*/args->size0,
+                   /*size1=*/args->size1);
+  MAP_BUFFER_2D_RW(out, uint32_t,
+                   /*buffer_ref=*/args->out_ref,
+                   /*offset=*/args->out_offset,
+                   /*stride0=*/args->out_stride0,
+                   /*stride1=*/args->out_stride1,
+                   /*size0=*/args->size0,
+                   /*size1=*/args->size1);
+
+  iree_ukernel_x32u_2d_func_t ukernel_func =
+      (iree_ukernel_x32u_2d_func_t)target_fn;
+
+  int ret = ukernel_func(
+      // IN
+      in, in_offset, in_stride0, in_stride1,
+      // OUT
+      out, out_offset, out_stride0, out_stride1,
+      // SIZE
+      out_size0, out_size1);
+
+  IREE_TRACE_ZONE_END(z0);
+  return ret == 0
+             ? iree_ok_status()
+             : iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "illegal x32u ukernel return code (%d)", ret);
 }
 
 //===----------------------------------------------------------------------===//
@@ -399,6 +490,8 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_fill2d_x32, fill2d_x32, v) {
 // Exported matmul function definitions
 //===----------------------------------------------------------------------===//
 
+#if IREE_VMVX_USE_BLAS_MATMUL
+
 IREE_VMVX_ABI_FIXED_STRUCT(matmul_f32, rIIrIIrIIIIIffi, {
   iree_vm_ref_t lhs_ref;
   int64_t lhs_offset;
@@ -468,11 +561,13 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_matmul_f32f32f32, matmul_f32, v) {
   return iree_ok_status();
 }
 
+#endif  // IREE_VMVX_USE_BLAS_MATMUL
+
 //===----------------------------------------------------------------------===//
 // MMT4D
 //===----------------------------------------------------------------------===//
 
-#if defined(IREE_HAVE_MMT4D_BUILTINS)
+#if !IREE_VMVX_USE_BLAS_MATMUL
 
 // NOTE: for demo purposes this reuses the matmul signature.
 IREE_VMVX_ABI_FIXED_STRUCT(mmt4d_f32, rIIrIIrIIIIIffi, {
@@ -529,7 +624,7 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_mmt4d_f32f32f32, mmt4d_f32, v) {
                                      "unsupported mmt4d parameters");
 }
 
-#endif  // IREE_HAVE_MMT4D_BUILTINS
+#endif  // !IREE_VMVX_USE_BLAS_MATMUL
 
 //===----------------------------------------------------------------------===//
 // VM module interface implementation

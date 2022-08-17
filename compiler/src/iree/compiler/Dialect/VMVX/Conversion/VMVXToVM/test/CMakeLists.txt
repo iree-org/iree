@@ -14,10 +14,11 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "add.mlir"
+    "binary.mlir"
     "copy.mlir"
     "fill.mlir"
     "matmul.mlir"
+    "unary.mlir"
   TOOLS
     FileCheck
     iree-opt

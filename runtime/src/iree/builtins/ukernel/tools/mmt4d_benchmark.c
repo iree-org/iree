@@ -8,7 +8,7 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
-#include "iree/builtins/mmt4d/mmt4d.h"
+#include "iree/builtins/ukernel/mmt4d.h"
 #include "iree/testing/benchmark.h"
 
 // Example flag; not really useful:

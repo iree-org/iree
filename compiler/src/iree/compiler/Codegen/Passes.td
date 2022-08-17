@@ -190,7 +190,7 @@ def PadDynamicAlloc :
 def TransformDialectInterpreter :
     Pass<"iree-transform-dialect-interpreter"> {
   let summary = "Pass to apply transform dialect operations one by one.";
-  let constructor = 
+  let constructor =
     "mlir::iree_compiler::createTransformDialectInterpreterPass()";
   let options = [
     Option<"transformFileName", "transform-file-name", "std::string",
@@ -448,6 +448,11 @@ def VMVXLowerLinalgMicrokernels :
   let summary =
       "Lowers linalg ops to the VMVX microkernel library";
   let constructor = "mlir::iree_compiler::createVMVXLowerLinalgMicrokernelsPass()";
+  let options = [
+    Option<"warnOnUnconverted", "warn-on-unconverted", "bool",
+           /*default=*/"false",
+           "Warns on any unconverted linalg ops which remain live">
+  ];
 }
 
 //------------------------------------------------------------------------------

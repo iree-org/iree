@@ -49,19 +49,48 @@ def VMVX_GetBufferDescriptorOp : VMVX_PureOp<"get_buffer_descriptor", [
   }];
 }
 
+def VMVX_GetRawInterfaceBindingBufferOp : VMVX_PureOp<
+    "get_raw_interface_binding_buffer"> {
+  let summary = "Gets the raw buffer associated with a binding";
+  let description = [{
+    Normally, a slice of a binding buffer is returned via
+    hal.interface.binding.subspan. However, the normal VMVX lowering flow for
+    this presumes that the result is a memref, and upon final conversion, it
+    will offset the memref automatically to make it consistent.
+
+    This op is used in situations where earlier in a lowering, we have fully
+    resolved the binding to a buffer and would just like the raw backing
+    buffer as passed to the interface.
+  }];
+  let arguments = (ins
+    IndexAttr:$set,
+    IndexAttr:$binding
+  );
+  let results = (outs
+    Util_BufferType:$buffer
+  );
+  let assemblyFormat = [{
+    `set` `(` $set `)` `binding` `(` $binding `)` attr-dict
+  }];
+}
+
 //===----------------------------------------------------------------------===//
 // VMVX Ops: ABI
 //===----------------------------------------------------------------------===//
 
-def VMVX_AddOp : VMVX_Op<"add", [SameVariadicOperandSize]> {
-  let summary = "Performs a strided elementwise add of two same-rank buffers";
+def VMVX_BinaryOp : VMVX_Op<"binary", [SameVariadicOperandSize]> {
+  let summary = "Performs a strided elementwise operation on two same-rank buffers";
   let description = [{
-    Performs addition in-place as if:
-      OUT = LHS + RHS
+    Performs the operation in-place as if:
+    ```
+      OUT = OP(LHS, RHS)
+    ```
 
-    All operands have the same rank.
+    Where `OP` is a concrete operation name as defined in ukernel/elementwise.h
   }];
   let arguments = (ins
+    // Corresponds to lower-cased opcode suffix of a ukernel binary op.
+    StrAttr:$opcode,
     // LHS.
     VMVX_Buffer:$lhs_buffer,
     VMVX_Index:$lhs_offset,
@@ -83,11 +112,11 @@ def VMVX_AddOp : VMVX_Op<"add", [SameVariadicOperandSize]> {
   );
 
   let assemblyFormat = [{
+    `op` `` `(` $opcode `:` $element_type `)`
     `lhs` `` `(` $lhs_buffer `offset` $lhs_offset `strides` `[` $lhs_strides `]` `:` type($lhs_buffer) `)`
     `rhs` `` `(` $rhs_buffer `offset` $rhs_offset `strides` `[` $rhs_strides `]` `:` type($rhs_buffer) `)`
     `out` `` `(` $out_buffer `offset` $out_offset `strides` `[` $out_strides `]` `:` type($out_buffer) `)`
     `sizes` `` `(` $sizes `)`
-    `:` $element_type
     attr-dict
   }];
 }
@@ -188,6 +217,44 @@ def VMVX_MatmulOp : VMVX_Op<"matmul"> {
     `scale` `` `(` $alpha `:` type($alpha) `,` $beta `:` type($beta) `)`
     `flags` `` `(` $flags `)`
     `:` `(` $lhs_type `,` $rhs_type `,` $out_type `)`
+    attr-dict
+  }];
+}
+
+def VMVX_UnaryOp : VMVX_Op<"unary", [SameVariadicOperandSize]> {
+  let summary = "Performs a strided elementwise unary operation";
+  let description = [{
+    Performs the operation in-place as if:
+    ```
+      OUT = OP(IN)
+    ```
+
+    Where `OP` is a concrete operation name as defined in ukernel/elementwise.h
+  }];
+  let arguments = (ins
+    // Corresponds to lower-cased opcode suffix of a ukernel unary op.
+    StrAttr:$opcode,
+    // IN.
+    VMVX_Buffer:$in_buffer,
+    VMVX_Index:$in_offset,
+    Variadic<VMVX_Index>:$in_strides,
+    // OUT.
+    VMVX_Buffer:$out_buffer,
+    VMVX_Index:$out_offset,
+    Variadic<VMVX_Index>:$out_strides,
+
+    // Dimensions.
+    Variadic<VMVX_Index>:$sizes,
+
+    // Attributes.
+    VMVX_ElementTypeAttr:$element_type
+  );
+
+  let assemblyFormat = [{
+    `op` `` `(` $opcode `:` $element_type `)`
+    `in` `` `(` $in_buffer `offset` $in_offset `strides` `[` $in_strides `]` `:` type($in_buffer) `)`
+    `out` `` `(` $out_buffer `offset` $out_offset `strides` `[` $out_strides `]` `:` type($out_buffer) `)`
+    `sizes` `` `(` $sizes `)`
     attr-dict
   }];
 }

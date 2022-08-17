@@ -16,10 +16,11 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
-            "add.mlir",
+            "binary.mlir",
             "copy.mlir",
             "fill.mlir",
             "matmul.mlir",
+            "unary.mlir",
         ],
         include = ["*.mlir"],
     ),

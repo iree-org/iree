@@ -22,6 +22,7 @@ LogicalResult updateHALToVMVXEntryFuncOp(func::FuncOp funcOp,
 // Populates conversion patterns from the IREE HAL dialect interface to the
 // VMVX dialect interface.
 void populateHALToVMVXPatterns(MLIRContext *context,
+                               ConversionTarget &conversionTarget,
                                RewritePatternSet &patterns,
                                TypeConverter &typeConverter);
 

@@ -19,7 +19,7 @@ cc_binary_benchmark(
     deps = [
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal:flags",
-        "//runtime/src/iree/builtins/mmt4d",
+        "//runtime/src/iree/builtins/ukernel",
         "//runtime/src/iree/testing:benchmark",
     ],
 )
@@ -30,7 +30,7 @@ iree_runtime_cc_test(
     deps = [
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal:flags",
-        "//runtime/src/iree/builtins/mmt4d",
+        "//runtime/src/iree/builtins/ukernel",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
     ],

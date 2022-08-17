@@ -9,9 +9,11 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/VMVX/IR/VMVXDialect.h"
 #include "iree/compiler/Dialect/VMVX/IR/VMVXOps.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Matchers.h"
@@ -171,7 +173,17 @@ class StridedBufferAnalysis {
 /// Emits a vmvx binary op.
 struct BinaryEmitter {
   enum class OpType {
-    AddOp,
+    // Emits a vmvx.binary op with a given opcode.
+    GenericBinary,
+  };
+  struct OpSelection {
+    OpType opType;
+    // If the OpType takes an opcode, this is it.
+    StringRef opcode;
+
+    static OpSelection genericBinary(StringRef opcode) {
+      return OpSelection{OpType::GenericBinary, opcode};
+    }
   };
   struct Descriptor {
     Value buffer;
@@ -184,9 +196,13 @@ struct BinaryEmitter {
   };
   std::pair<Descriptor, Descriptor> operands;
   Descriptor result;
+  OpSelection selection;
 
-  BinaryEmitter(Descriptor operand0, Descriptor operand1, Descriptor result)
-      : operands(std::make_pair(operand0, operand1)), result(result) {}
+  BinaryEmitter(Descriptor operand0, Descriptor operand1, Descriptor result,
+                OpSelection selection)
+      : operands(std::make_pair(operand0, operand1)),
+        result(result),
+        selection(selection) {}
 
   bool isProjectedPermutation() {
     return operands.first.indexingMap.isProjectedPermutation() &&
@@ -216,17 +232,16 @@ struct BinaryEmitter {
     return success();
   }
 
-  struct EmitParams {
-    SmallVector<Value> in0Strides;
-    SmallVector<Value> in1Strides;
-    SmallVector<Value> outStrides;
-    SmallVector<Value> sizes;
-    Value in0Buffer;
-    Value in1Buffer;
-    Value outBuffer;
-  };
-
-  void emit(Location loc, OpType opType, PatternRewriter &rewriter) {
+  void emit(Location loc, PatternRewriter &rewriter) {
+    struct EmitParams {
+      SmallVector<Value> in0Strides;
+      SmallVector<Value> in1Strides;
+      SmallVector<Value> outStrides;
+      SmallVector<Value> sizes;
+      Value in0Buffer;
+      Value in1Buffer;
+      Value outBuffer;
+    };
     EmitParams params;
     params.in0Strides =
         permuteStrides(loc, operands.first.indexingMap,
@@ -249,30 +264,126 @@ struct BinaryEmitter {
     leftPadToRank(loc, params.outStrides, 2, 0, rewriter);
     leftPadToRank(loc, params.sizes, 2, 1, rewriter);
 
-    switch (opType) {
-      case OpType::AddOp:
-        emitSpecialization<IREE::VMVX::AddOp>(loc, params, rewriter);
+    switch (selection.opType) {
+      case OpType::GenericBinary: {
+        rewriter.create<IREE::VMVX::BinaryOp>(
+            loc, rewriter.getStringAttr(selection.opcode),
+            // LHS
+            params.in0Buffer, operands.first.bufferDesc->offset,
+            params.in0Strides,
+            // RHS
+            params.in1Buffer, operands.second.bufferDesc->offset,
+            params.in1Strides,
+            // OUT
+            params.outBuffer, result.bufferDesc->offset, params.outStrides,
+            // Sizes
+            params.sizes,
+            // Attributes
+            operands.first.bufferDesc->getElementTypeAttr());
+
         break;
+      }
       default:
         assert(false && "unhandled OpType");
     }
   }
+};
 
-  template <typename OpTy>
-  void emitSpecialization(Location loc, EmitParams &params,
-                          PatternRewriter &rewriter) {
-    rewriter.create<OpTy>(
-        loc,
-        // LHS
-        params.in0Buffer, operands.first.bufferDesc->offset, params.in0Strides,
-        // RHS
-        params.in1Buffer, operands.second.bufferDesc->offset, params.in1Strides,
-        // OUT
-        params.outBuffer, result.bufferDesc->offset, params.outStrides,
-        // Sizes
-        params.sizes,
-        // Attributes
-        operands.first.bufferDesc->getElementTypeAttr());
+/// Emits a vmvx unary op.
+struct UnaryEmitter {
+  enum class OpType {
+    // Emits a vmvx.unary op with a given opcode.
+    GenericUnary,
+  };
+  struct OpSelection {
+    OpType opType;
+    // If the OpType takes an opcode, this is it.
+    StringRef opcode;
+
+    static OpSelection genericUnary(StringRef opcode) {
+      return OpSelection{OpType::GenericUnary, opcode};
+    }
+  };
+  struct Descriptor {
+    Value buffer;
+    AffineMap indexingMap;
+    StridedBufferAnalysis bufferAnal;
+    StridedBufferDescriptor *bufferDesc = nullptr;
+    Descriptor(Value buffer, AffineMap indexingMap)
+        : buffer(buffer), indexingMap(indexingMap), bufferAnal(buffer) {}
+    unsigned getRank() { return indexingMap.getNumDims(); }
+  };
+  Descriptor operand;
+  Descriptor result;
+  OpSelection selection;
+
+  UnaryEmitter(Descriptor operand, Descriptor result, OpSelection selection)
+      : operand(operand), result(result), selection(selection) {}
+
+  bool isProjectedPermutation() {
+    return operand.indexingMap.isProjectedPermutation() &&
+           result.indexingMap.isProjectedPermutation();
+  }
+
+  unsigned maxRank() { return std::max(operand.getRank(), result.getRank()); }
+
+  LogicalResult initialize(Location loc, PatternRewriter &rewriter) {
+    if (!isProjectedPermutation())
+      return rewriter.notifyMatchFailure(loc, "not projected permutation");
+    if (maxRank() > 2) return rewriter.notifyMatchFailure(loc, "rank > 2");
+    if (!operand.bufferAnal.isValid() || !result.bufferAnal.isValid()) {
+      return rewriter.notifyMatchFailure(loc,
+                                         "could not compute buffer descriptor");
+    }
+
+    // All pre-conditions pass. Mutate IR.
+    operand.bufferDesc = &operand.bufferAnal.getDesc(rewriter);
+    result.bufferDesc = &result.bufferAnal.getDesc(rewriter);
+    return success();
+  }
+
+  void emit(Location loc, PatternRewriter &rewriter) {
+    struct EmitParams {
+      SmallVector<Value> inStrides;
+      SmallVector<Value> outStrides;
+      SmallVector<Value> sizes;
+      Value inBuffer;
+      Value outBuffer;
+    };
+    EmitParams params;
+    params.inStrides = permuteStrides(loc, operand.indexingMap,
+                                      operand.bufferDesc->strides, rewriter);
+    params.outStrides = permuteStrides(loc, result.indexingMap,
+                                       result.bufferDesc->strides, rewriter);
+    params.sizes = result.bufferDesc->sizes;
+    assert(params.outStrides.size() == result.bufferDesc->strides.size() &&
+           "output projection mismatched strides");
+    params.inBuffer = operand.bufferDesc->castToLinear(loc, rewriter);
+    params.outBuffer = result.bufferDesc->castToLinear(loc, rewriter);
+
+    // Binary ops support minimum of 2d indexing. Pad.
+    leftPadToRank(loc, params.inStrides, 2, 0, rewriter);
+    leftPadToRank(loc, params.outStrides, 2, 0, rewriter);
+    leftPadToRank(loc, params.sizes, 2, 1, rewriter);
+
+    switch (selection.opType) {
+      case OpType::GenericUnary: {
+        rewriter.create<IREE::VMVX::UnaryOp>(
+            loc, rewriter.getStringAttr(selection.opcode),
+            // IN
+            params.inBuffer, operand.bufferDesc->offset, params.inStrides,
+            // OUT
+            params.outBuffer, result.bufferDesc->offset, params.outStrides,
+            // Sizes
+            params.sizes,
+            // Attributes
+            operand.bufferDesc->getElementTypeAttr());
+
+        break;
+      }
+      default:
+        assert(false && "unhandled OpType");
+    }
   }
 };
 
@@ -400,28 +511,254 @@ struct LinalgBinaryGenericConversion
     OpOperand *operand0 = &op->getOpOperand(operandScalar0.getArgNumber());
     OpOperand *operand1 = &op->getOpOperand(operandScalar1.getArgNumber());
     OpOperand *result = op.getOutputOperand(0);
-    BinaryEmitter emitter(BinaryEmitter::Descriptor(
-                              operand0->get(), op.getTiedIndexingMap(operand0)),
-                          BinaryEmitter::Descriptor(
-                              operand1->get(), op.getTiedIndexingMap(operand1)),
-                          BinaryEmitter::Descriptor(
-                              result->get(), op.getTiedIndexingMap(result)));
+
+    // Returns an emitter for a generic binary compatible operation where
+    // |binaryOp| has a 1:1 correspondance with |opcode|.
+    auto configureGenericBinary =
+        [&](Operation *binaryOp, StringRef opcode) -> Optional<BinaryEmitter> {
+      SmallVector<BinaryEmitter::Descriptor, 2> operands;
+      // Make sure that the binary op has operands that map to the
+      // ins and detect the order.
+      auto selection = BinaryEmitter::OpSelection::genericBinary(opcode);
+      if (binaryOp->getOperand(0) == operandScalar0 &&
+          binaryOp->getOperand(1) == operandScalar1) {
+        // 1:1 matching.
+        return BinaryEmitter(
+            BinaryEmitter::Descriptor(operand0->get(),
+                                      op.getTiedIndexingMap(operand0)),
+            BinaryEmitter::Descriptor(operand1->get(),
+                                      op.getTiedIndexingMap(operand1)),
+            BinaryEmitter::Descriptor(result->get(),
+                                      op.getTiedIndexingMap(result)),
+            selection);
+      } else if (binaryOp->getOperand(1) == operandScalar0 &&
+                 binaryOp->getOperand(0) == operandScalar1) {
+        // Inverted operands.
+        return BinaryEmitter(
+            BinaryEmitter::Descriptor(operand1->get(),
+                                      op.getTiedIndexingMap(operand1)),
+            BinaryEmitter::Descriptor(operand0->get(),
+                                      op.getTiedIndexingMap(operand0)),
+            BinaryEmitter::Descriptor(result->get(),
+                                      op.getTiedIndexingMap(result)),
+            selection);
+      } else {
+        return None;
+      }
+    };
+
+    // Select the op to lower to and configure the emitter.
+    // Emit from the iree_ukernel_x32b_opcode_t table.
+    Optional<BinaryEmitter> emitter =
+        TypeSwitch<Operation *, Optional<BinaryEmitter>>(binaryOp)
+            .Case([&](arith::AddFOp op) -> Optional<BinaryEmitter> {
+              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+                return configureGenericBinary(op, "add");
+              }
+              return None;
+            })
+            .Case([&](arith::AddIOp op) -> Optional<BinaryEmitter> {
+              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+                return configureGenericBinary(op, "add");
+              }
+              return None;
+            })
+            .Case([&](arith::AndIOp op) -> Optional<BinaryEmitter> {
+              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+                return configureGenericBinary(op, "and");
+              }
+              return None;
+            })
+            .Case([&](arith::DivFOp op) -> Optional<BinaryEmitter> {
+              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+                return configureGenericBinary(op, "div");
+              }
+              return None;
+            })
+            .Case([&](arith::DivSIOp op) -> Optional<BinaryEmitter> {
+              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+                return configureGenericBinary(op, "divs");
+              }
+              return None;
+            })
+            .Case([&](arith::DivUIOp op) -> Optional<BinaryEmitter> {
+              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+                return configureGenericBinary(op, "divu");
+              }
+              return None;
+            })
+            .Case([&](arith::MulFOp op) -> Optional<BinaryEmitter> {
+              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+                return configureGenericBinary(op, "mul");
+              }
+              return None;
+            })
+            .Case([&](arith::MulIOp op) -> Optional<BinaryEmitter> {
+              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+                return configureGenericBinary(op, "mul");
+              }
+              return None;
+            })
+            .Case([&](arith::OrIOp op) -> Optional<BinaryEmitter> {
+              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+                return configureGenericBinary(op, "or");
+              }
+              return None;
+            })
+            .Case([&](arith::ShLIOp op) -> Optional<BinaryEmitter> {
+              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+                return configureGenericBinary(op, "shl");
+              }
+              return None;
+            })
+            .Case([&](arith::ShRSIOp op) -> Optional<BinaryEmitter> {
+              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+                return configureGenericBinary(op, "shrs");
+              }
+              return None;
+            })
+            .Case([&](arith::XOrIOp op) -> Optional<BinaryEmitter> {
+              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+                return configureGenericBinary(op, "xor");
+              }
+              return None;
+            })
+            .Case([&](arith::SubFOp op) -> Optional<BinaryEmitter> {
+              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+                return configureGenericBinary(op, "sub");
+              }
+              return None;
+            })
+            .Case([&](arith::SubIOp op) -> Optional<BinaryEmitter> {
+              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+                return configureGenericBinary(op, "sub");
+              }
+              return None;
+            })
+            .Default([](Operation *) { return None; });
 
     // Determine op type to lower to.
-    Optional<BinaryEmitter::OpType> opType = matchOpType(binaryOp);
-    if (!opType) {
+    if (!emitter) {
       return rewriter.notifyMatchFailure(op, "unrecognized binary op");
     }
-    if (failed(emitter.initialize(op.getLoc(), rewriter))) return failure();
+    if (failed(emitter->initialize(op.getLoc(), rewriter))) return failure();
 
-    emitter.emit(op.getLoc(), *opType, rewriter);
+    emitter->emit(op.getLoc(), rewriter);
     rewriter.eraseOp(op);
     return success();
   }
+};
 
-  Optional<BinaryEmitter::OpType> matchOpType(Operation *op) const {
-    if (llvm::isa<arith::AddFOp>(op)) return BinaryEmitter::OpType::AddOp;
-    return None;
+/// Matches a generic which contains an expressible unary operation, emitting
+/// as a vmvx op.
+struct LinalgUnaryGenericConversion
+    : public OpRewritePattern<linalg::GenericOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(linalg::GenericOp op,
+                                PatternRewriter &rewriter) const override {
+    auto &children = op.getBlock()->getOperations();
+    // Only match two children (op + yield).
+    if (children.size() != 2) return failure();
+    // Only match parallel loops.
+    if (op.getNumParallelLoops() != op.getNumLoops()) return failure();
+
+    // Match:
+    //   %0 = someop %arg2
+    //   yield %0
+    Operation *unaryOp = &children.front();
+    Operation *yieldOp = op.getBlock()->getTerminator();
+    if (unaryOp->getNumOperands() != 1 || yieldOp->getNumOperands() != 1 ||
+        yieldOp->getOperand(0) != unaryOp->getResult(0)) {
+      return failure();
+    }
+    BlockArgument operandScalar0 =
+        unaryOp->getOperands()[0].dyn_cast<BlockArgument>();
+    if (!operandScalar0) return failure();
+
+    // Construct the emitter and start lowering.
+    // Note that the operands may map to an out if the aliasing is safe,
+    // so we use getOpOperand() vs restricting to just the generic ins.
+    OpOperand *operand0 = &op->getOpOperand(operandScalar0.getArgNumber());
+    OpOperand *result = op.getOutputOperand(0);
+
+    // Returns an emitter for a generic binary compatible operation where
+    // |binaryOp| has a 1:1 correspondance with |opcode|.
+    auto configureGenericUnary =
+        [&](Operation *unaryOp, StringRef opcode) -> Optional<UnaryEmitter> {
+      SmallVector<UnaryEmitter::Descriptor, 2> operands;
+      // Make sure that the binary op has operands that map to the
+      // ins and detect the order.
+      auto selection = UnaryEmitter::OpSelection::genericUnary(opcode);
+      return UnaryEmitter(UnaryEmitter::Descriptor(
+                              operand0->get(), op.getTiedIndexingMap(operand0)),
+                          UnaryEmitter::Descriptor(
+                              result->get(), op.getTiedIndexingMap(result)),
+                          selection);
+    };
+
+    // Select the op to lower to and configure the emitter.
+    // Emit from the iree_ukernel_x32b_opcode_t table.
+    Optional<UnaryEmitter> emitter =
+        TypeSwitch<Operation *, Optional<UnaryEmitter>>(unaryOp)
+            .Case([&](math::AbsFOp op) -> Optional<UnaryEmitter> {
+              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+                return configureGenericUnary(op, "abs");
+              }
+              return None;
+            })
+            .Case([&](math::CeilOp op) -> Optional<UnaryEmitter> {
+              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+                return configureGenericUnary(op, "ceil");
+              }
+              return None;
+            })
+            .Case([&](math::CountLeadingZerosOp op) -> Optional<UnaryEmitter> {
+              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+                return configureGenericUnary(op, "ctlz");
+              }
+              return None;
+            })
+            .Case([&](math::ExpOp op) -> Optional<UnaryEmitter> {
+              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+                return configureGenericUnary(op, "exp");
+              }
+              return None;
+            })
+            .Case([&](math::FloorOp op) -> Optional<UnaryEmitter> {
+              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+                return configureGenericUnary(op, "floor");
+              }
+              return None;
+            })
+            .Case([&](math::LogOp op) -> Optional<UnaryEmitter> {
+              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+                return configureGenericUnary(op, "log");
+              }
+              return None;
+            })
+            .Case([&](arith::NegFOp op) -> Optional<UnaryEmitter> {
+              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+                return configureGenericUnary(op, "neg");
+              }
+              return None;
+            })
+            .Case([&](math::RsqrtOp op) -> Optional<UnaryEmitter> {
+              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+                return configureGenericUnary(op, "rsqrt");
+              }
+              return None;
+            })
+            .Default([](Operation *) { return None; });
+
+    // Determine op type to lower to.
+    if (!emitter) {
+      return rewriter.notifyMatchFailure(op, "unrecognized unary op");
+    }
+    if (failed(emitter->initialize(op.getLoc(), rewriter))) return failure();
+
+    emitter->emit(op.getLoc(), rewriter);
+    rewriter.eraseOp(op);
+    return success();
   }
 };
 
@@ -649,12 +986,23 @@ class VMVXLowerLinalgMicrokernelsPass
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     patterns.insert<LinalgBinaryGenericConversion, LinalgFillConversion,
-                    LinalgMatmulConversion, LinalgTrivialGenericConversion>(
-        &getContext());
+                    LinalgMatmulConversion, LinalgTrivialGenericConversion,
+                    LinalgUnaryGenericConversion>(&getContext());
 
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       return signalPassFailure();
+    }
+
+    if (warnOnUnconverted) {
+      getOperation()->walk([](Operation *op) {
+        if (llvm::isa<linalg::LinalgOp>(op)) {
+          auto diag = op->emitWarning(
+              "Linalg op not converted to microkernel and will be implemented "
+              "with fallback scalar loops");
+          diag.attachNote(op->getLoc()) << "unmatched op: " << *op;
+        }
+      });
     }
   }
 };

@@ -4,13 +4,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_BUILTINS_MMT4D_MMT4D_H_
-#define IREE_BUILTINS_MMT4D_MMT4D_H_
+#ifndef IREE_BUILTINS_UKERNEL_COMMON_H_
+#define IREE_BUILTINS_UKERNEL_COMMON_H_
 
 //===----------------------------------------------------------------------===//
-// MMT4D microkernel library
+// Generic microkernel library
 //===----------------------------------------------------------------------===//
-// This library is focused on supporting usage of MMT4D for GEMMs from both
+// This library is focused on supporting usage of tiled microkernels from both
 // runtime libraries (VMVX via the IREE VM) and compiled libraries (LLVM CPU
 // codegen). It is designed to compile standalone as well as to bitcode that
 // can be linked into generated libraries and has support for specialization
@@ -52,16 +52,16 @@ extern "C" {
 // -DIREE_MMT4D_ARCH_GENERIC_32=1 or -DIREE_MMT4D_ARCH_GENERIC_64=1 to the
 // compiler in addition to -DIREE_PLATFORM_GENERIC=1.
 
-#if defined(IREE_MMT4D_ARCH_GENERIC_32)
-#define IREE_MMT4D_SIZE_TYPE int32_t
-#elif defined(IREE_MMT4D_ARCH_GENERIC_64)
-#define IREE_MMT4D_SIZE_TYPE int64_t
+#if defined(IREE_UKERNEL_ARCH_GENERIC_32)
+#define IREE_UKERNEL_SIZE_TYPE int32_t
+#elif defined(IREE_UKERNEL_ARCH_GENERIC_64)
+#define IREE_UKERNEL_SIZE_TYPE int64_t
 #elif defined(IREE_ARCH_ARM_64)
-#define IREE_MMT4D_ARCH_ARM_64 1
-#define IREE_MMT4D_SIZE_TYPE int64_t
+#define IREE_UKERNEL_ARCH_ARM_64 1
+#define IREE_UKERNEL_SIZE_TYPE int64_t
 #else
-#define IREE_MMT4D_ARCH_GENERIC_64 1
-#define IREE_MMT4D_SIZE_TYPE int64_t
+#define IREE_UKERNEL_ARCH_GENERIC_64 1
+#define IREE_UKERNEL_SIZE_TYPE int64_t
 #endif  // IREE_ARCH_*
 
 //===----------------------------------------------------------------------===//
@@ -73,7 +73,7 @@ extern "C" {
 // that embeds this one to transitively export functions but may want to have
 // the functions exported based on how we link them. For now this is used as
 // documentation.
-#define IREE_MMT4D_EXPORT
+#define IREE_UKERNEL_EXPORT
 
 //===----------------------------------------------------------------------===//
 // stdint.h
@@ -119,30 +119,10 @@ typedef unsigned long long uint64_t;
 // For any argument that is known to fit in a specific size prefer that to
 // ensure this code operates well on systems with small/weird widths (x32/ilp32,
 // etc).
-typedef IREE_MMT4D_SIZE_TYPE iree_mmt4d_size_t;
-
-//===----------------------------------------------------------------------===//
-// Public API
-//===----------------------------------------------------------------------===//
-
-// Example matmul tile. This should be removed after we have any real methods
-// that can be used to demonstrate how this all fits together. The shape of the
-// method is close to what we need (proper buffer types, using the
-// iree_mmt4d_size_t type for strides, and taking the minimal required metadata)
-// but what we pass is dependent on the what the compiler produces.
-//
-// Returns 0 if the parameters were valid and the operation was performed.
-// Non-zero results will fail the entire submission or lose the device and
-// should be used as if an abort() ("no correct execution is possible after
-// this point").
-IREE_MMT4D_EXPORT int iree_mmt4d_example_matmul_f32(
-    const float* lhs, iree_mmt4d_size_t lhs_stride, const float* rhs,
-    iree_mmt4d_size_t rhs_stride, float* IREE_RESTRICT out,
-    iree_mmt4d_size_t out_stride, int32_t m, int32_t n, int32_t k, float alpha,
-    float beta);
+typedef IREE_UKERNEL_SIZE_TYPE iree_ukernel_size_t;
 
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_BUILTINS_MMT4D_MMT4D_H_
+#endif  // IREE_BUILTINS_UKERNEL_COMMON_H_

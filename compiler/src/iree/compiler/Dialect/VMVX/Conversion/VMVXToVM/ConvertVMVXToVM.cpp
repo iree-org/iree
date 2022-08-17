@@ -117,15 +117,15 @@ class VMVXImportOpConversion : public OpConversionPattern<T> {
   TypeConverter &typeConverter;
 };
 
-// Converts the vmvx.add op to an appropriate typed import.
-// TODO: This should be an interface pattern on binary ops.
-class AddOpConversion : public VMVXImportOpConversion<IREE::VMVX::AddOp> {
+class BinaryOpConversion : public VMVXImportOpConversion<IREE::VMVX::BinaryOp> {
  public:
   using VMVXImportOpConversion::VMVXImportOpConversion;
 
-  std::string getImportFqName(IREE::VMVX::AddOp op) const override {
+  std::string getImportFqName(IREE::VMVX::BinaryOp op) const override {
     int rank = op.getLhsStrides().size();
-    std::string name("vmvx.add.");
+    std::string name("vmvx.");
+    name.append(op.getOpcode().begin(), op.getOpcode().end());
+    name.append(".");
     name.append(std::to_string(rank));
     name.append("d.");
     name.append(getTypedTypeStr(op.getElementType()));
@@ -174,6 +174,22 @@ class MatmulOpConversion : public VMVXImportOpConversion<IREE::VMVX::MatmulOp> {
   }
 };
 
+class UnaryOpConversion : public VMVXImportOpConversion<IREE::VMVX::UnaryOp> {
+ public:
+  using VMVXImportOpConversion::VMVXImportOpConversion;
+
+  std::string getImportFqName(IREE::VMVX::UnaryOp op) const override {
+    int rank = op.getInStrides().size();
+    std::string name("vmvx.");
+    name.append(op.getOpcode().begin(), op.getOpcode().end());
+    name.append(".");
+    name.append(std::to_string(rank));
+    name.append("d.");
+    name.append(getTypedTypeStr(op.getElementType()));
+    return name;
+  }
+};
+
 }  // namespace
 
 void populateVMVXToVMPatterns(MLIRContext *context,
@@ -181,8 +197,9 @@ void populateVMVXToVMPatterns(MLIRContext *context,
                               TypeConverter &typeConverter,
                               SymbolTable &importSymbols,
                               RewritePatternSet &patterns) {
-  patterns.insert<AddOpConversion, CopyOpConversion, Fill2DOpConversion,
-                  MatmulOpConversion>(context, importSymbols, typeConverter);
+  patterns.insert<BinaryOpConversion, CopyOpConversion, Fill2DOpConversion,
+                  MatmulOpConversion, UnaryOpConversion>(context, importSymbols,
+                                                         typeConverter);
 }
 
 }  // namespace iree_compiler

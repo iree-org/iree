@@ -26,7 +26,7 @@ iree_runtime_cc_library(
     deps = [
         "//runtime/src/iree/base",
         "//runtime/src/iree/base:tracing",
-        "//runtime/src/iree/builtins/mmt4d",
+        "//runtime/src/iree/builtins/ukernel",
         "//runtime/src/iree/vm",
     ],
 )
