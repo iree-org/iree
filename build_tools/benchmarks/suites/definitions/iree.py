@@ -3,7 +3,7 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-"""Classes that define IREE benchmarks."""
+"""Classes for IREE benchmark definitions."""
 
 from dataclasses import dataclass, field
 from enum import Enum

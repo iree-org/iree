@@ -34,31 +34,18 @@ class Linux_x86_64_Benchmarks(object):
       tags=["default-flags"],
       compile_targets=[CASCADELAKE_CPU_TARGET])
 
-  LOCAL_SYNC_RUN_CONFIG = IreeRunConfig(
-      id=IREE_RUN_CONFIG_LOCAL_SYNC_ID,
-      tags=["full-inference", "default-flags"],
-      loader=IreeRuntimeLoader.EMBEDDED_ELF,
-      driver=IreeRuntimeDriver.LOCAL_SYNC,
-      benchmark_tool=MODULE_BENCHMARK_TOOL)
-
   @classmethod
   def generate(
       cls) -> Tuple[List[IreeBenchmarkCompileSpec], List[IreeBenchmarkRunSpec]]:
-    # Generate default run configs.
-    default_run_configs = [cls.LOCAL_SYNC_RUN_CONFIG]
-    for thread_num in [1, 4, 8]:
-      default_run_configs.append(
-          IreeRunConfig(
-              id=f"{IREE_RUN_CONFIG_LOCAL_TASK_ID_BASE}_{thread_num}",
-              tags=[f"{thread_num}-thread", "full-inference", "default-flags"],
-              loader=IreeRuntimeLoader.EMBEDDED_ELF,
-              driver=IreeRuntimeDriver.LOCAL_TASK,
-              benchmark_tool=MODULE_BENCHMARK_TOOL,
-              extra_flags=[f"--task_topology_group_count={thread_num}"]))
+    """Generates IREE compile and run specs."""
+
+    default_run_configs = cls._generate_default_run_configs()
+
     # Generate compile specs for mobile models.
     mobile_model_compile_specs = list(
         IreeBenchmarkCompileSpec(compile_config=cls.CASCADELAKE_COMPILE_CONFIG,
                                  model=model) for model in MOBILE_MODEL_GROUP)
+
     # Generate run specs for mobile models.
     mobile_model_run_specs = []
     for compile_spec, run_config in product(mobile_model_compile_specs,
@@ -71,3 +58,24 @@ class Linux_x86_64_Benchmarks(object):
               input_data=RANDOM_MODEL_INPUT_DATA))
 
     return (mobile_model_compile_specs, mobile_model_run_specs)
+
+  @staticmethod
+  def _generate_default_run_configs() -> List[IreeRunConfig]:
+    run_configs = [
+        # Local-sync run config.
+        IreeRunConfig(id=IREE_RUN_CONFIG_LOCAL_SYNC_ID,
+                      tags=["full-inference", "default-flags"],
+                      loader=IreeRuntimeLoader.EMBEDDED_ELF,
+                      driver=IreeRuntimeDriver.LOCAL_SYNC,
+                      benchmark_tool=MODULE_BENCHMARK_TOOL)
+    ]
+    for thread_num in [1, 4, 8]:
+      run_configs.append(
+          IreeRunConfig(
+              id=f"{IREE_RUN_CONFIG_LOCAL_TASK_ID_BASE}_{thread_num}",
+              tags=[f"{thread_num}-thread", "full-inference", "default-flags"],
+              loader=IreeRuntimeLoader.EMBEDDED_ELF,
+              driver=IreeRuntimeDriver.LOCAL_TASK,
+              benchmark_tool=MODULE_BENCHMARK_TOOL,
+              extra_flags=[f"--task_topology_group_count={thread_num}"]))
+    return run_configs
