@@ -14,16 +14,10 @@
 #include <cstdlib>
 #include <cstring>
 #include <ostream>
+#include <random>
 #include <string>
 #include <type_traits>
 #include <utility>
-
-// Includes needed for GetTrueRandomUint64 depending on the platform.
-#ifdef __linux__
-#include <sys/auxv.h>
-#else
-#include <random>
-#endif
 
 #include "iree/base/status_cc.h"
 #include "iree/testing/gtest.h"
@@ -36,15 +30,8 @@ namespace {
 using ::iree::testing::status::StatusIs;
 
 std::uint64_t GetTrueRandomUint64() {
-  std::uint64_t result;
-#ifdef __linux__
-  const void* random_src = reinterpret_cast<const void*>(getauxval(AT_RANDOM));
-  std::memcpy(&result, random_src, sizeof result);
-#else
   std::random_device d;
-  result = (static_cast<std::uint64_t>(d()) << 32) | d();
-#endif
-  return result;
+  return (static_cast<std::uint64_t>(d()) << 32) | d();
 }
 
 std::string GetUniquePath(const char* unique_name) {
