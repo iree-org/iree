@@ -41,7 +41,7 @@ jobs:
       # which is poorly documented, but useful for us here. See
       # https://github.com/github/docs/issues/16515
       - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
-      - cpu
+      - ramdisk
       - os-family=Linux
     env:
       HOST_BINARY_ROOT: ${{ inputs.host-binary-root }}
