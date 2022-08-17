@@ -15,7 +15,6 @@ source "${SCRIPT_DIR}/functions.sh"
 
 TOKEN_PROXY_URL="$(get_attribute github-token-proxy-url)"
 RUNNER_SCOPE="$(get_attribute github-runner-scope)"
-GOOGLE_CLOUD_RUN_ID_TOKEN="$(get_metadata "instance/service-accounts/default/identity?audience=${TOKEN_PROXY_URL}")"
 DEREGISTER_TOKEN="$(get_token remove ${RUNNER_SCOPE})"
 
 if [ -z "${DEREGISTER_TOKEN}" ]; then
@@ -25,4 +24,4 @@ fi
 
 echo "removing github actions runner"
 
-~runner/actions-runner/config.sh remove --token "${DEREGISTER_TOKEN}"
+/home/runner/actions-runner/config.sh remove --token "${DEREGISTER_TOKEN}"

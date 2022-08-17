@@ -95,13 +95,14 @@ fi
 declare -a args=(
   --unattended \
   # Shut down after completing a single job
-  --ephemeral \
+  # DO NOT SUBMIT: make ephemeral again
+  # --ephemeral \
   # We don't immediately update each time we start. We handle our own
   # updates instead.
   --disableupdate \
   --url "https://github.com/${RUNNER_SCOPE}" \
   --name "${HOSTNAME}" \
-  # If we end up with name conflicts, just replace the old entry. 
+  # If we end up with name conflicts, just replace the old entry.
   --replace \
   --runnergroup "${RUNNER_GROUP}" \
   --labels "${RUNNER_LABELS}"
@@ -114,4 +115,4 @@ declare -a args=(
 # functionality.
 (set -x; : Running configuration with additional args: "${args[@]}")
 
-~runner/actions-runner/config.sh --token "${REGISTER_TOKEN}" "${args[@]}"
+/home/runner/actions-runner/config.sh --token "${REGISTER_TOKEN}" "${args[@]}"
