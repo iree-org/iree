@@ -52,11 +52,11 @@ llvm::Optional<FileLineColLoc> findFirstFileLoc(Location baseLoc) {
 
 std::string guessModuleName(ModuleOp moduleOp) {
   std::string moduleName =
-      moduleOp.getName().hasValue() ? moduleOp.getName().getValue().str() : "";
+      moduleOp.getName().has_value() ? moduleOp.getName().value().str() : "";
   if (!moduleName.empty()) return moduleName;
   auto loc = findFirstFileLoc(moduleOp.getLoc());
-  if (loc.hasValue()) {
-    return llvm::sys::path::stem(loc.getValue().getFilename()).str();
+  if (loc.has_value()) {
+    return llvm::sys::path::stem(loc.value().getFilename()).str();
   } else {
     return "spirv_module";
   }

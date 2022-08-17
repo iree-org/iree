@@ -59,11 +59,11 @@ static void captureDims(IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
     // Find the dimensions in the parent.
     auto maybeDynamicDims = IREE::Util::findDynamicDims(
         externalValue, dispatchOp->getBlock(), Block::iterator(dispatchOp));
-    if (!maybeDynamicDims.hasValue()) return;
+    if (!maybeDynamicDims.has_value()) return;
     // Convert to a vector -- we cannot use the ValueRange directly because
     // it might point into the operand list of this op, which we might mutate
     // in-place.
-    auto dynamicDims = llvm::to_vector(maybeDynamicDims.getValue());
+    auto dynamicDims = llvm::to_vector(maybeDynamicDims.value());
 
     // Find the insertion position. All extra arguments need to be added before
     // "writeonly" tensors corresponding to the result.

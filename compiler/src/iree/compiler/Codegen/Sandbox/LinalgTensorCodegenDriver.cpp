@@ -61,7 +61,7 @@ static bool getTilingOptionsFromConfig(func::FuncOp funcOp, int64_t tilingLevel,
       return false;
     }
     tilingOptions.setTileSizes(
-        mlir::iree_compiler ::getTileSizes(rootOp.getValue(), tilingLevel));
+        mlir::iree_compiler ::getTileSizes(rootOp.value(), tilingLevel));
     return true;
   }
   return false;
@@ -101,9 +101,9 @@ static LogicalResult getPaddingDims(func::FuncOp funcOp,
   if (failed(rootOp)) return failure();
 
   // No need to set padding dims.
-  if (!rootOp.getValue()) return success();
+  if (!rootOp.value()) return success();
 
-  linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(rootOp.getValue());
+  linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(rootOp.value());
   for (auto en : llvm::enumerate(linalgOp.getIteratorTypes())) {
     if (en.value().cast<StringAttr>().getValue() == targetIterType) {
       paddingDims.push_back(en.index());
@@ -122,10 +122,10 @@ static FailureOr<LinalgTilingAndFusionOptions> getTileAndFuseOptionsFromConfig(
   }
 
   FailureOr<Operation *> rootOp = getRootOp(funcOp);
-  if (failed(rootOp) || !rootOp.getValue()) return failure();
+  if (failed(rootOp) || !rootOp.value()) return failure();
 
   iree_compiler::IREE::Codegen::LoweringConfigAttr loweringConfig =
-      iree_compiler::getLoweringConfig(rootOp.getValue());
+      iree_compiler::getLoweringConfig(rootOp.value());
 
   LinalgTilingAndFusionOptions options;
   options.tileSizes.assign(loweringConfig.getTileSizeVals(tilingLevel));
@@ -265,7 +265,7 @@ void LinalgFusePass::runOnOperation() {
   if (failed(defaultTilingOptions)) {
     return signalPassFailure();
   }
-  LinalgTilingAndFusionOptions tilingOptions = defaultTilingOptions.getValue();
+  LinalgTilingAndFusionOptions tilingOptions = defaultTilingOptions.value();
   bool doTiling = !tilingOptions.tileSizes.empty();
   if (!tileSizes.empty()) {
     doTiling = true;
@@ -283,7 +283,7 @@ void LinalgFusePass::runOnOperation() {
   if (setAnchorOpToRootOp) {
     FailureOr<Operation *> rootOp = getRootOp(funcOp);
     if (failed(rootOp)) return signalPassFailure();
-    StringRef str = rootOp.getValue()->getName().getStringRef();
+    StringRef str = rootOp.value()->getName().getStringRef();
     anchorOpName = std::string(str.begin(), str.end());
   }
 
@@ -546,15 +546,14 @@ void UnrollOneVectorOpPass::runOnOperation() {
                           dyn_cast<VectorUnrollOpInterface>(op);
                       if (!unrollInterface ||
                           op->getName().getStringRef() != anchorOpName ||
-                          !sourceShape.hasValue() ||
-                          !unrollInterface.getShapeForUnroll().hasValue())
+                          !sourceShape.hasValue()) {
                         return failure();
-
+                      }
+                      auto shapeForUnroll = unrollInterface.getShapeForUnroll();
+                      if (!shapeForUnroll) return failure();
                       ArrayRef<int64_t> sourceShapeToMatch{sourceShape};
-                      auto shapeForUnroll =
-                          unrollInterface.getShapeForUnroll().getValue();
                       ArrayRef<int64_t> actualSourceShape{
-                          shapeForUnroll.begin(), shapeForUnroll.end()};
+                          shapeForUnroll->begin(), shapeForUnroll->end()};
                       return success(sourceShapeToMatch == actualSourceShape);
                     }));
   vector::populateVectorToVectorCanonicalizationPatterns(patterns);

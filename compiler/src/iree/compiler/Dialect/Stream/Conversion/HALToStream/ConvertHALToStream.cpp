@@ -83,21 +83,21 @@ struct ConvertTensorImportOp
                                                OpBuilder &builder) {
     auto elementType =
         IREE::HAL::getElementTypeValue(tensorType.getElementType());
-    if (!elementType.hasValue()) {
+    if (!elementType.has_value()) {
       return mlir::emitError(loc)
              << "invalid tensor element type: " << tensorType.getElementType();
     }
     auto expectedElementType =
-        builder.create<arith::ConstantIntOp>(loc, elementType.getValue(), 32);
+        builder.create<arith::ConstantIntOp>(loc, elementType.value(), 32);
 
     auto encodingType =
         IREE::HAL::getEncodingTypeValue(tensorType.getEncoding());
-    if (!encodingType.hasValue()) {
+    if (!encodingType.has_value()) {
       return mlir::emitError(loc)
              << "invalid tensor encoding: " << tensorType.getEncoding();
     }
     auto expectedEncodingType =
-        builder.create<arith::ConstantIntOp>(loc, encodingType.getValue(), 32);
+        builder.create<arith::ConstantIntOp>(loc, encodingType.value(), 32);
 
     SmallVector<Value> shapeDims;
     if (tensorType.getRank() > 0) {

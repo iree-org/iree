@@ -290,8 +290,8 @@ struct ConvertDispatchOp : public OpConversionPattern<IREE::Flow::DispatchOp> {
         continue;
       }
       auto tiedOperand = op.getTiedResultOperandIndex(result.index());
-      if (tiedOperand.hasValue()) {
-        auto operandIndex = tiedOperand.getValue() - tiedOperandBase;
+      if (tiedOperand.has_value()) {
+        auto operandIndex = tiedOperand.value() - tiedOperandBase;
         resultSizes.push_back(operandSizes[operandIndex]);
         resultTypes.push_back(dispatchOperands[operandIndex].getType());
       } else {

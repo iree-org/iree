@@ -28,16 +28,9 @@ EmitCTypeConverter::EmitCTypeConverter() {
                                   ValueRange inputs, Location loc) -> Value {
     assert(inputs.size() == 1);
     assert(inputs[0].getType().isa<IREE::VM::RefType>());
-
     Value ref = inputs[0];
-
     Optional<Value> result = materializeRef(ref);
-
-    if (!result.hasValue()) {
-      return {};
-    }
-
-    return result.getValue();
+    return result.has_value() ? result.value() : Value{};
   });
 
   // We need a source materialization for refs because after running
@@ -152,7 +145,7 @@ Optional<Value> EmitCTypeConverter::materializeRef(Value ref) {
     return None;
   }
 
-  int32_t ordinal = vmAnalysis.getValue().get().getRefRegisterOrdinal(ref);
+  int32_t ordinal = vmAnalysis.value().get().getRefRegisterOrdinal(ref);
 
   auto ctx = funcOp.getContext();
 
@@ -169,7 +162,7 @@ Optional<Value> EmitCTypeConverter::materializeRef(Value ref) {
     }
   }
 
-  emitc::ApplyOp applyOp = vmAnalysis.getValue().get().lookupLocalRef(ordinal);
+  emitc::ApplyOp applyOp = vmAnalysis.value().get().lookupLocalRef(ordinal);
   return applyOp.getResult();
 }
 

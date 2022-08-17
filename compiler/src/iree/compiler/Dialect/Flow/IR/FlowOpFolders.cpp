@@ -213,8 +213,8 @@ static bool updateTensorOpDims(Operation *op, Value tensorValue,
                                MutableOperandRange mutableDimValues) {
   auto dynamicDimsOr = IREE::Util::findDynamicDims(tensorValue, op->getBlock(),
                                                    Block::iterator(op));
-  if (!dynamicDimsOr.hasValue()) return false;
-  auto dynamicDims = dynamicDimsOr.getValue();
+  if (!dynamicDimsOr.has_value()) return false;
+  auto dynamicDims = dynamicDimsOr.value();
   bool anyChanged = false;
   OperandRange oldValueRange = mutableDimValues;
   auto oldValues = llvm::to_vector<4>(oldValueRange);
@@ -311,7 +311,7 @@ static FailureOr<RankedTensorType> canonicalizeSubViewParts(
   for (auto size : llvm::enumerate(mixedSizes)) {
     if (droppedDims.test(size.index())) continue;
     Optional<int64_t> staticSize = getConstantIntValue(size.value());
-    newShape.push_back(staticSize ? staticSize.getValue()
+    newShape.push_back(staticSize ? staticSize.value()
                                   : ShapedType::kDynamicSize);
   }
 
@@ -335,9 +335,9 @@ struct DispatchTensorLoadOpWithOffsetSizesAndStridesConstantArgumentFolder final
     // We need to resolve the new inferred type with the specified type.
     Location loc = loadOp.getLoc();
     Value replacement = rewriter.create<DispatchTensorLoadOp>(
-        loc, newResultType.getValue(), loadOp.getSource(),
-        loadOp.getSourceDims(), mixedOffsets, mixedSizes, mixedStrides);
-    if (newResultType.getValue() != resultType) {
+        loc, newResultType.value(), loadOp.getSource(), loadOp.getSourceDims(),
+        mixedOffsets, mixedSizes, mixedStrides);
+    if (newResultType.value() != resultType) {
       replacement =
           rewriter.create<tensor::CastOp>(loc, resultType, replacement);
     }
@@ -416,9 +416,8 @@ struct DispatchTensorStoreOpWithOffsetSizesAndStridesConstantArgumentFolder
 
     Value value = storeOp.getValue();
     Location loc = storeOp.getLoc();
-    if (newValueType.getValue() != valueType) {
-      value =
-          rewriter.create<tensor::CastOp>(loc, newValueType.getValue(), value);
+    if (newValueType.value() != valueType) {
+      value = rewriter.create<tensor::CastOp>(loc, newValueType.value(), value);
     }
     rewriter.replaceOpWithNewOp<DispatchTensorStoreOp>(
         storeOp, value, storeOp.getTarget(), storeOp.getTargetDims(),
@@ -628,11 +627,11 @@ struct ResolveShapedDim : public OpRewritePattern<tensor::DimOp> {
   using OpRewritePattern<tensor::DimOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::DimOp op,
                                 PatternRewriter &rewriter) const override {
-    if (!op.getConstantIndex().hasValue()) {
+    if (!op.getConstantIndex().has_value()) {
       return rewriter.notifyMatchFailure(
           op, "non-constant index dim ops are unsupported");
     }
-    auto idx = op.getConstantIndex().getValue();
+    auto idx = op.getConstantIndex().value();
 
     auto shapedType = op.getSource().getType().cast<ShapedType>();
     if (!shapedType.isDynamicDim(idx)) {
@@ -643,14 +642,14 @@ struct ResolveShapedDim : public OpRewritePattern<tensor::DimOp> {
 
     auto dynamicDims = IREE::Util::findDynamicDims(
         op.getSource(), op->getBlock(), Block::iterator(op.getOperation()));
-    if (!dynamicDims.hasValue()) {
+    if (!dynamicDims.has_value()) {
       return rewriter.notifyMatchFailure(op, "no dynamic dims found/usable");
     }
     unsigned dimOffset = 0;
     for (unsigned i = 0; i < idx; ++i) {
       if (shapedType.isDynamicDim(i)) ++dimOffset;
     }
-    rewriter.replaceOp(op, dynamicDims.getValue()[dimOffset]);
+    rewriter.replaceOp(op, dynamicDims.value()[dimOffset]);
 
     return success();
   }

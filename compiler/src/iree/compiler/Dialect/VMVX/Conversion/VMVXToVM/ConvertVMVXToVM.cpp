@@ -68,8 +68,8 @@ class VMVXImportOpConversion : public OpConversionPattern<T> {
       return failure();
     }
     auto results = emitCall(op, adaptor, importOp, rewriter);
-    if (!results.hasValue()) return failure();
-    rewriter.replaceOp(op, results.getValue());
+    if (!results.has_value()) return failure();
+    rewriter.replaceOp(op, results.value());
     return success();
   }
 

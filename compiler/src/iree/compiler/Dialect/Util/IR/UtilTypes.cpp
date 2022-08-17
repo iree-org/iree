@@ -257,9 +257,7 @@ void detail::setTiedResultOperandIndex(Operation *op, unsigned resultIndex,
     }
   }
 
-  indices[resultIndex] = operandIndex.hasValue()
-                             ? operandIndex.getValue()
-                             : TiedOpInterface::kUntiedIndex;
+  indices[resultIndex] = operandIndex.value_or(TiedOpInterface::kUntiedIndex);
   op->setAttr(TiedOpInterface::getStorageAttrName(),
               Builder(op).getIndexArrayAttr(indices));
 }
@@ -525,7 +523,7 @@ Optional<ValueRange> findDynamicDims(Value shapedValue, Block *block,
   // Look up the use-def chain: always safe, as any value we reach dominates
   // {|block|, |insertionPoint|} implicitly.
   auto upwardRange = findDynamicDims(shapedValue);
-  if (upwardRange.hasValue()) return upwardRange.getValue();
+  if (upwardRange.has_value()) return upwardRange.value();
 
   // Look down the use-def chain: not safe at some point because we'll move past
   // where {|block|, |insertionPoint|} is dominated. This is often fine for a
@@ -586,8 +584,8 @@ SmallVector<Value> buildDynamicDimsForValue(Location loc, Value value,
   // always available.
   auto foundDynamicDims = IREE::Util::findDynamicDims(
       value, builder.getBlock(), builder.getInsertionPoint());
-  if (foundDynamicDims.hasValue()) {
-    return llvm::to_vector<4>(foundDynamicDims.getValue());
+  if (foundDynamicDims.has_value()) {
+    return llvm::to_vector<4>(foundDynamicDims.value());
   }
 
   // Slower path that materializes the entire shape for a result. Some

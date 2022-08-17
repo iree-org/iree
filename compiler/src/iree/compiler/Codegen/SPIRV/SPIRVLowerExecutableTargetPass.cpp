@@ -83,7 +83,7 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
       IREE::Codegen::DispatchLoweringPassPipeline currPipeline =
           translationInfo.getDispatchLoweringPassPipeline();
       if (passPipeline) {
-        if (currPipeline != passPipeline.getValue()) {
+        if (currPipeline != passPipeline.value()) {
           moduleOp.emitError(
               "unhandled compilation of entry point function with different "
               "pass pipelines within a module");
@@ -95,7 +95,7 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
     }
   }
 
-  if (!testLoweringConfiguration && passPipeline.hasValue()) {
+  if (!testLoweringConfiguration && passPipeline.has_value()) {
     switch (*passPipeline) {
       case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistribute:
         addSPIRVTileAndDistributePassPipeline(executableLoweringPipeline);

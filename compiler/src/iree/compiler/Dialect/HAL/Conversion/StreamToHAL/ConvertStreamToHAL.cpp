@@ -551,10 +551,10 @@ struct TensorExportBufferViewOpPattern
     // HAL pipeline.
     auto encodingType =
         IREE::HAL::getEncodingTypeValue(tensorType.getEncoding());
-    assert(encodingType.hasValue() && "invalid tensor encoding");
+    assert(encodingType.has_value() && "invalid tensor encoding");
     auto elementType =
         IREE::HAL::getElementTypeValue(tensorType.getElementType());
-    assert(elementType.hasValue() && "invalid tensor element type");
+    assert(elementType.has_value() && "invalid tensor element type");
 
     // Flatten static + dynamic shape dimensions.
     SmallVector<Value> dims;
@@ -569,8 +569,8 @@ struct TensorExportBufferViewOpPattern
     }
 
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferViewCreateOp>(
-        exportOp, adaptor.getSource(), elementType.getValue(),
-        encodingType.getValue(), dims);
+        exportOp, adaptor.getSource(), elementType.value(),
+        encodingType.value(), dims);
     return success();
   }
 };
@@ -1014,7 +1014,7 @@ struct GlobalTimepointConversionPattern
       IREE::Util::GlobalOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto initialValue = op.getInitialValue();
-    if (!initialValue.hasValue()) return failure();
+    if (!initialValue.has_value()) return failure();
     if (!initialValue->isa<IREE::Stream::TimepointAttr>()) return failure();
     rewriter.updateRootInPlace(op, [&]() { op.removeInitial_valueAttr(); });
     return success();

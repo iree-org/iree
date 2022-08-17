@@ -160,7 +160,7 @@ static Optional<int64_t> getNativeVectorSizeInBytes(func::FuncOp entryPointFn) {
 static int64_t getVectorSize(func::FuncOp entryPointFn, unsigned byteWidth) {
   if (Optional<int64_t> nativeVectorSize =
           getNativeVectorSizeInBytes(entryPointFn)) {
-    return nativeVectorSize.getValue() / byteWidth;
+    return nativeVectorSize.value() / byteWidth;
   }
   return clNativeVectorSizeInBytes / byteWidth;
 }
@@ -1237,7 +1237,7 @@ static LogicalResult setRootConfig(
   auto getStaticValue = [](OpFoldResult ofr) -> int64_t {
     Optional<int64_t> intVal = getConstantIntValue(ofr);
     if (!intVal) return ShapedType::kDynamicSize;
-    return intVal.getValue();
+    return intVal.value();
   };
   auto lbs = llvm::to_vector(llvm::map_range(
       iterationDomain, [&](Range r) { return getStaticValue(r.offset); }));
@@ -1350,7 +1350,7 @@ static LogicalResult setRootConfig(
   if (failed(rootOp)) {
     return failure();
   }
-  Operation *rootOperation = rootOp.getValue();
+  Operation *rootOperation = rootOp.value();
 
   if (rootOperation) {
     auto variantOp = getExecutableVariantOp(entryPointFn);

@@ -748,9 +748,8 @@ static LogicalResult legalizeDispatchWorkgroupOperands(
         unsigned dynamicDimIdx = 0;
         for (auto dim : llvm::enumerate(tensorType.getShape())) {
           if (dim.value() != ShapedType::kDynamicSize) continue;
-          if (availableDims.hasValue()) {
-            dynamicDimOperands.push_back(
-                availableDims.getValue()[dynamicDimIdx]);
+          if (availableDims.has_value()) {
+            dynamicDimOperands.push_back(availableDims.value()[dynamicDimIdx]);
           } else {
             dynamicDimOperands.push_back(b.createOrFold<tensor::DimOp>(
                 dispatchOp.getLoc(), value, dim.index()));
@@ -834,14 +833,14 @@ struct CreateDispatchRegionOp : Base<OpType> {
     // Create a simple dispatch op with no operands, and not isolated from
     // above.
     auto clonedOps = buildOperandLessFlowDispatchWorkgroupOp(
-        rewriter, rootOp.getLoc(), workload.getValue(), dispatchOps);
+        rewriter, rootOp.getLoc(), workload.value(), dispatchOps);
     if (failed(clonedOps)) {
       return failure();
     }
 
     transformationFilter.replaceLinalgTransformationFilter(rewriter, rootOp);
     transformationFilter.replaceLinalgTransformationFilter(
-        rewriter, clonedOps.getValue()[0]);
+        rewriter, clonedOps.value()[0]);
     return success();
   }
 
@@ -911,13 +910,13 @@ static void fuseRootsWithConsumers(MLIRContext *context,
     if (!fusableUse) continue;
 
     // Analyse the use to see if it is fusable.
-    Operation *consumerOp = fusableUse.getValue()->getOwner();
+    Operation *consumerOp = fusableUse.value()->getOwner();
     if (hasRootOpAttribute(consumerOp) ||
         hasFusionGroupsAttribute(consumerOp)) {
       continue;
     }
 
-    if (isFusableWithConsumer(*(fusableUse.getValue()))) {
+    if (isFusableWithConsumer(*(fusableUse.value()))) {
       updateRootTo(consumerOp);
       workList.push_back(consumerOp);
     }
@@ -965,7 +964,7 @@ static unsigned decideFusableLinalgOps(FunctionOpInterface funcOp,
         // Fuse with the consumer if all uses of producer are dominated by it.
         Optional<OpOperand *> fusableUse =
             getFusableUse(producer, dominanceInfo);
-        if (!fusableUse || fusableUse.getValue() != operand) continue;
+        if (!fusableUse || fusableUse.value() != operand) continue;
 
         if (producer.getNumLoops() != producer.getNumParallelLoops()) {
           continue;

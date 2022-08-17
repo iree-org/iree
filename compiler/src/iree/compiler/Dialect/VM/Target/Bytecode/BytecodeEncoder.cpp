@@ -379,11 +379,11 @@ Optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
     return llvm::None;
   }
   auto bytecodeData = encoder.finish();
-  if (!bytecodeData.hasValue()) {
+  if (!bytecodeData.has_value()) {
     funcOp.emitError() << "failed to fixup and finish encoding";
     return llvm::None;
   }
-  result.bytecodeData = bytecodeData.getValue();
+  result.bytecodeData = bytecodeData.value();
   result.i32RegisterCount = registerAllocation.getMaxI32RegisterOrdinal() + 1;
   result.refRegisterCount = registerAllocation.getMaxRefRegisterOrdinal() + 1;
   return result;

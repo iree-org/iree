@@ -65,7 +65,7 @@ struct LinalgSplitReduction
     if (failed(result)) return failure();
     // If any attributes needs to be propagated set it.
     for (std::pair<StringAttr, Attribute> &attrib : attributes) {
-      result.getValue()->setAttr(attrib.first, attrib.second);
+      result.value()->setAttr(attrib.first, attrib.second);
     }
     return result;
   }

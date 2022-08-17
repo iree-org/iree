@@ -54,7 +54,7 @@ struct RewriteInitTensorToSplat
           initTensorOp, "unable to get zero value for element type");
     }
     Value value =
-        rewriter.create<arith::ConstantOp>(loc, elementType, zero.getValue());
+        rewriter.create<arith::ConstantOp>(loc, elementType, zero.value());
     rewriter.replaceOpWithNewOp<TensorSplatOp>(initTensorOp, resultType, value,
                                                initTensorOp.getSizes());
     return success();

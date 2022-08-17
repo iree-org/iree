@@ -238,7 +238,7 @@ class CUDATargetBackend final : public TargetBackend {
         workgroupLocalMemory = workgroupLocalMemoryAttr->getSExtValue();
       }
       if (Optional<ArrayAttr> workgroupSizeAttr = exportOp.getWorkgroupSize()) {
-        for (auto it : llvm::enumerate(workgroupSizeAttr.getValue())) {
+        for (auto it : llvm::enumerate(workgroupSizeAttr.value())) {
           workgroupSize[it.index()] = it.value().cast<IntegerAttr>().getInt();
         }
       } else {

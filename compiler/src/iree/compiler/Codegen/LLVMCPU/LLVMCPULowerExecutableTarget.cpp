@@ -150,7 +150,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
       if (IREE::Codegen::TranslationInfoAttr currTranslationInfo =
               getTranslationInfo(exportOp)) {
         if (translationInfo) {
-          if (currTranslationInfo != translationInfo.getValue()) {
+          if (currTranslationInfo != translationInfo.value()) {
             moduleOp.emitOpError(
                 "unhandled compilation of entry point functions with different "
                 "translation info");
@@ -162,14 +162,14 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
     }
 
     // Verify the configuration.
-    if (translationInfo.hasValue()) {
+    if (translationInfo.has_value()) {
       LogicalResult verificationStatus = success();
-      switch (translationInfo.getValue().getDispatchLoweringPassPipeline()) {
+      switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
         case IREE::Codegen::DispatchLoweringPassPipeline::CPUDoubleTilingExpert:
         case IREE::Codegen::DispatchLoweringPassPipeline::
             CPUDoubleTilingPadExpert:
           verificationStatus = verifyLoweringConfiguration(
-              moduleOp, translationInfo.getValue(),
+              moduleOp, translationInfo.value(),
               verifyDoubleTilingExpertPassPipelineConfig);
           break;
         default:;
@@ -180,7 +180,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
 
       bool lowerToAVX2 = hasAVX2Feature(variantOp);
       if (!testLoweringConfiguration) {
-        switch (translationInfo.getValue().getDispatchLoweringPassPipeline()) {
+        switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
           case IREE::Codegen::DispatchLoweringPassPipeline::CPUDefault:
           case IREE::Codegen::DispatchLoweringPassPipeline::None:
             addCPUDefaultPassPipeline(executableLoweringPipeline);

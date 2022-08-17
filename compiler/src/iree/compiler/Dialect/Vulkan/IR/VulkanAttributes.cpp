@@ -223,8 +223,8 @@ Attribute parseTargetAttr(DialectAsmParser &parser) {
 
     auto processExtension = [&](llvm::SMLoc loc, StringRef extension) {
       if (auto symbol = symbolizeExtension(extension)) {
-        extensions.push_back(builder.getI32IntegerAttr(
-            static_cast<uint32_t>(symbol.getValue())));
+        extensions.push_back(
+            builder.getI32IntegerAttr(static_cast<uint32_t>(symbol.value())));
         return success();
       }
       return errorloc = loc, errorKeyword = extension, failure();

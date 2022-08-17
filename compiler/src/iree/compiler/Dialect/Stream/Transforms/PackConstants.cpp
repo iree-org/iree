@@ -320,7 +320,7 @@ static UploadResult buildStagingUpload(
   auto executeOp = builder.create<IREE::Stream::CmdExecuteOp>(
       constantsOp.getLoc(), /*awaitTimepoint=*/Value{}, capturedResources,
       capturedResourceSizes);
-  if (constantsOp.getAffinity().hasValue()) {
+  if (constantsOp.getAffinity().has_value()) {
     executeOp.setAffinityAttr(constantsOp.getAffinityAttr());
   }
   uploadResult.timepoint = executeOp.getResultTimepoint();

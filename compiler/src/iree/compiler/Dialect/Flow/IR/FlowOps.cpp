@@ -117,7 +117,7 @@ static llvm::SmallBitVector getDroppedDimsImpl(
     // If the size is not 1, or if the current matched dimension of the result
     // is the same static shape as the size value (which is 1), then the
     // dimension is preserved.
-    if (!sizeVal || sizeVal.getValue() != 1 ||
+    if (!sizeVal || sizeVal.value() != 1 ||
         (shapePos < resultShape.size() && resultShape[shapePos] == 1)) {
       shapePos++;
       continue;
@@ -889,7 +889,7 @@ LogicalResult DispatchWorkgroupsOp::verify() {
 
 BlockArgument DispatchWorkgroupsOp::getOutputBlockArgument(unsigned idx) {
   Optional<ArrayAttr> tiedOperands = getTiedOperands();
-  if (!tiedOperands.hasValue() || tiedOperands->empty()) {
+  if (!tiedOperands.has_value() || tiedOperands->empty()) {
     unsigned numInputs = getArguments().size();
     return getWorkgroupBody().getArguments().drop_front(numInputs)[idx];
   }
@@ -1521,7 +1521,7 @@ struct FoldInsertSliceWithTensorStoreOp
     Optional<BlockArgument> targetBinding =
         getBindingArgument(dispatchTensorStoreOp.getTarget());
     if (!destBinding || !targetBinding ||
-        destBinding.getValue() != targetBinding.getValue()) {
+        destBinding.value() != targetBinding.value()) {
       return failure();
     }
 

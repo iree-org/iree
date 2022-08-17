@@ -96,8 +96,8 @@ void Explorer::initializeGlobalInfos() {
   // today we don't yet have the actions specified so we can't.
 
   auto allUses = symbolTable.getSymbolUses(&symbolTableOp->getRegion(0));
-  if (!allUses.hasValue()) return;
-  for (auto use : allUses.getValue()) {
+  if (!allUses.has_value()) return;
+  for (auto use : allUses.value()) {
     auto *symbolOp =
         symbolTable.lookupNearestSymbolFrom(use.getUser(), use.getSymbolRef());
     if (!isa_and_nonnull<IREE::Util::GlobalOpInterface>(symbolOp)) continue;
@@ -550,7 +550,7 @@ TraversalResult Explorer::walkOutgoingBranchOperandArguments(
        ++successorIdx) {
     auto successorOperandIdx =
         mapSuccessorOperand(branchOp, successorIdx, operandIdx);
-    if (!successorOperandIdx.hasValue()) continue;
+    if (!successorOperandIdx.has_value()) continue;
     auto *targetBlock = branchOp->getSuccessor(successorIdx);
     auto blockArg = targetBlock->getArgument(*successorOperandIdx);
     if (fn(targetBlock, blockArg).wasInterrupted()) {

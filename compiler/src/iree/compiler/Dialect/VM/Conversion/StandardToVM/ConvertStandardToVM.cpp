@@ -119,7 +119,7 @@ class FuncOpConversion : public OpConversionPattern<func::FuncOp> {
         srcOp.getNumArguments());
     auto newFuncType = convertFuncSignature(srcOp, *getTypeConverter(),
                                             signatureConversion, rewriter);
-    if (!newFuncType.hasValue()) return failure();
+    if (failed(newFuncType)) return failure();
 
     // Create new function with converted argument and result types.
     // Note that attributes are dropped. Consider preserving some if needed.
@@ -204,7 +204,7 @@ class ExternalFuncOpConversion : public OpConversionPattern<func::FuncOp> {
           srcOp.getNumArguments());
       auto convertedSignature = convertFuncSignature(
           srcOp, *getTypeConverter(), signatureConversion, rewriter);
-      if (!convertedSignature.hasValue()) return failure();
+      if (failed(convertedSignature)) return failure();
       newSignature = *convertedSignature;
     }
 
@@ -254,7 +254,7 @@ class CallOpConversion : public OpConversionPattern<func::CallOp> {
     auto callResults = convertCallOp(
         callOp->getParentOfType<IREE::VM::ModuleOp>(), callOp.getLoc(),
         callOp.getCallee(), adaptor.getOperands(), resultTypes, rewriter);
-    if (!callResults.hasValue()) {
+    if (failed(callResults)) {
       return rewriter.notifyMatchFailure(
           callOp, "unable to convert call (results mismatch)");
     }
@@ -365,7 +365,7 @@ class CallOpConversion : public OpConversionPattern<func::CallOp> {
     rewriter.setInsertionPointToStart(fallbackBlock);
     auto fallbackResults = convertCallOp(rootOp, loc, fallbackName, operands,
                                          resultTypes, rewriter);
-    if (!fallbackResults.hasValue()) return failure();
+    if (failed(fallbackResults)) return failure();
     rewriter.create<IREE::VM::BranchOp>(loc, exitBlock, *fallbackResults);
 
     return exitResults;

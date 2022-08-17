@@ -90,7 +90,7 @@ static Optional<llvm::Triple> getTargetTriple(
     IREE::HAL::ExecutableVariantOp variantOp) {
   auto triple = getConfigStringAttr(variantOp, "target_triple");
   if (!triple) return llvm::None;
-  return llvm::Triple(triple.getValue().str());
+  return llvm::Triple(triple.value().str());
 }
 
 /// Returns the CPU target features associated with the `hal.executable.variant`
@@ -104,12 +104,12 @@ static Optional<StringRef> getCpuFeatures(
 
 bool isX86(IREE::HAL::ExecutableVariantOp variantOp) {
   Optional<llvm::Triple> triple = getTargetTriple(variantOp);
-  return triple && triple.getValue().isX86();
+  return triple && triple.value().isX86();
 }
 
 bool isAArch64(IREE::HAL::ExecutableVariantOp variantOp) {
   Optional<llvm::Triple> triple = getTargetTriple(variantOp);
-  return triple && triple.getValue().isAArch64();
+  return triple && triple.value().isAArch64();
 }
 
 // TODO(dcaballe): If we have to check for a significantly large number of
@@ -158,7 +158,7 @@ bool hasZve64xFeature(IREE::HAL::ExecutableVariantOp variantOp) {
 
 bool isRISCV(IREE::HAL::ExecutableVariantOp variantOp) {
   Optional<llvm::Triple> triple = getTargetTriple(variantOp);
-  return triple && triple.getValue().isRISCV();
+  return triple && triple.value().isRISCV();
 }
 
 bool isReadOnly(Value v) {
@@ -258,11 +258,11 @@ static Optional<unsigned> checkDimensions(
     auto currDimension = getDimension<T...>(v.getDefiningOp());
     if (!currDimension) return llvm::None;
     if (refDimension) {
-      if (refDimension.getValue() != currDimension.getValue()) {
+      if (refDimension.value() != currDimension.value()) {
         return llvm::None;
       }
     } else {
-      refDimension = currDimension.getValue();
+      refDimension = currDimension.value();
     }
   }
   return refDimension;
@@ -342,7 +342,7 @@ class LowerBoundExprVisitor
     if (!dimension) {
       return failure();
     }
-    loopInfo.processorDistributionDim = dimension.getValue();
+    loopInfo.processorDistributionDim = dimension.value();
     if (!loopInfo.untiledLowerBound) {
       loopInfo.untiledLowerBound =
           IntegerAttr::get(IndexType::get(applyOp.getContext()), 0);
@@ -521,7 +521,7 @@ Optional<LoopTilingAndDistributionInfo> isTiledAndDistributedLoop(
     Builder b(forOp.getContext());
     loopInfo.untiledLowerBound = b.getIndexAttr(0);
     loopInfo.untiledStep = b.getIndexAttr(1);
-    loopInfo.processorDistributionDim = idDim.getValue();
+    loopInfo.processorDistributionDim = idDim.value();
     // For such special case, the tile size is 1.
     loopInfo.tileSize = 1;
     return loopInfo;
@@ -556,7 +556,7 @@ LogicalResult getFilteredOps(
     if (!llvm::hasSingleElement(forOps)) return failure();
     scf::ForOp forOp = *(forOps.begin());
     if (auto tiledLoopInfo = isTiledAndDistributedLoop(forOp)) {
-      tiledLoops.emplace_back(std::move(tiledLoopInfo.getValue()));
+      tiledLoops.emplace_back(std::move(tiledLoopInfo.value()));
     }
     body = forOp.getBody();
     forOps = body->getOps<scf::ForOp>();
@@ -588,7 +588,7 @@ SmallVector<LoopTilingAndDistributionInfo> getTiledAndDistributedLoopInfo(
   SmallVector<LoopTilingAndDistributionInfo> info;
   funcOp.walk([&](scf::ForOp forOp) {
     if (auto tiledLoopInfo = isTiledAndDistributedLoop(forOp)) {
-      info.emplace_back(std::move(tiledLoopInfo.getValue()));
+      info.emplace_back(std::move(tiledLoopInfo.value()));
     }
   });
   return info;

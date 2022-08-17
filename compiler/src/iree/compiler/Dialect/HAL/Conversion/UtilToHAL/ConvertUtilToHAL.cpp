@@ -45,7 +45,7 @@ void populateUtilToHALPatterns(MLIRContext *context,
   conversionTarget.addDynamicallyLegalOp<IREE::Util::GlobalOp>(
       [&](IREE::Util::GlobalOp op) {
         return typeConverter.isLegal(op.getType()) &&
-               (!op.getInitialValue().hasValue() ||
+               (!op.getInitialValue().has_value() ||
                 typeConverter.isLegal(op.getInitialValueAttr().getType()));
       });
   addGenericLegalOp<IREE::Util::GlobalLoadOp>(conversionTarget, typeConverter);

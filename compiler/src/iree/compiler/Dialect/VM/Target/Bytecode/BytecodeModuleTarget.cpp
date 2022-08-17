@@ -263,9 +263,9 @@ static iree_vm_FunctionSignatureDef_ref_t makeImportFunctionSignatureDef(
     FlatbufferBuilder &fbb) {
   // Generate the signature calling convention string based on types.
   auto cconv = makeImportCallingConventionString(importOp);
-  if (!cconv.hasValue()) return {};
+  if (!cconv.has_value()) return {};
   return createFunctionSignatureDef(importOp.getFunctionType(), typeTable,
-                                    cconv.getValue(), /*attrsRef=*/0, fbb);
+                                    cconv.value(), /*attrsRef=*/0, fbb);
 }
 
 // Returns a serialized function signature.
@@ -274,7 +274,7 @@ static iree_vm_FunctionSignatureDef_ref_t makeExportFunctionSignatureDef(
     llvm::DenseMap<Type, int> &typeTable, FlatbufferBuilder &fbb) {
   // Generate the signature calling convention string based on types.
   auto cconv = makeCallingConventionString(funcOp);
-  if (!cconv.hasValue()) return {};
+  if (!cconv.has_value()) return {};
 
   // Reflection attributes.
   iree_vm_AttrDef_vec_ref_t attrsRef = 0;
@@ -295,7 +295,7 @@ static iree_vm_FunctionSignatureDef_ref_t makeExportFunctionSignatureDef(
   }
 
   return createFunctionSignatureDef(funcOp.getFunctionType(), typeTable,
-                                    cconv.getValue(), attrsRef, fbb);
+                                    cconv.value(), attrsRef, fbb);
 }
 
 // Returns a serialized function signature.
@@ -304,9 +304,9 @@ static iree_vm_FunctionSignatureDef_ref_t makeInternalFunctionSignatureDef(
     FlatbufferBuilder &fbb) {
   // Generate the signature calling convention string based on types.
   auto cconv = makeCallingConventionString(funcOp);
-  if (!cconv.hasValue()) return {};
+  if (!cconv.has_value()) return {};
   return createFunctionSignatureDef(funcOp.getFunctionType(), typeTable,
-                                    cconv.getValue(), /*attrsRef=*/0, fbb);
+                                    cconv.value(), /*attrsRef=*/0, fbb);
 }
 
 // Builds a complete BytecodeModuleDef FlatBuffer object in |fbb|.
@@ -421,13 +421,13 @@ static LogicalResult buildFlatBufferModule(
   SmallVector<iree_vm_RodataSegmentDef_ref_t, 8> rodataSegmentRefs;
   for (auto &rodataRef : llvm::reverse(rodataRefs)) {
     flatbuffers_uint8_vec_ref_t embedded_ref = 0;
-    if (!rodataRef.archiveFile.hasValue()) {
+    if (!rodataRef.archiveFile.has_value()) {
       embedded_ref = serializeEmbeddedData(
           rodataRef.rodataOp.getLoc(), rodataRef.rodataOp.getValue(),
           rodataRef.alignment, rodataRef.totalSize, fbb);
     }
     iree_vm_RodataSegmentDef_start(fbb);
-    if (rodataRef.archiveFile.hasValue()) {
+    if (rodataRef.archiveFile.has_value()) {
       iree_vm_RodataSegmentDef_external_data_offset_add(
           fbb, rodataRef.archiveFile->relativeOffset +
                    rodataRef.archiveFile->prefixLength);
@@ -638,7 +638,7 @@ LogicalResult translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
     // easier to work with as a user.
     uint64_t actualSize = rodataValue.getStorageSize();
     bool storeExternal =
-        archiveWriter->supportsFiles() && (rodataOp.getMimeType().hasValue() ||
+        archiveWriter->supportsFiles() && (rodataOp.getMimeType().has_value() ||
                                            actualSize >= kMaxEmbeddedDataSize);
 
     RodataRef rodataRef;

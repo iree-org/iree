@@ -149,8 +149,8 @@ class Verifier {
     // Check all op verifiers (usually used for interface checks).
     for (auto &opVerifier : opVerifiers) {
       auto legalOr = opVerifier(op);
-      if (legalOr.hasValue()) {
-        return legalOr.getValue();
+      if (legalOr.has_value()) {
+        return legalOr.value();
       }
     }
 

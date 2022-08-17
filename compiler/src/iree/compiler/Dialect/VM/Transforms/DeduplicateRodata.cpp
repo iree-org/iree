@@ -45,7 +45,7 @@ class DeduplicateRodataPass
     // Gather all rodata ops with the same value.
     DenseMap<RodataKey, SmallVector<IREE::VM::RodataOp>> bucketedOps;
     for (auto rodataOp : moduleOp.getOps<IREE::VM::RodataOp>()) {
-      if (rodataOp.getOrdinal().hasValue()) {
+      if (rodataOp.getOrdinal().has_value()) {
         rodataOp.emitError() << "rodata op already has an ordinal assigned; "
                                 "cannot perform deduplication";
         return signalPassFailure();

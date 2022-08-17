@@ -81,7 +81,7 @@ IREE::VM::RodataOp createExecutableBinaryRodata(
   auto rodataOp = builder.create<IREE::VM::RodataOp>(
       binaryOp.getLoc(), rodataName, binaryOp.getData());
   rodataOp.setPrivate();
-  if (binaryOp.getMimeType().hasValue()) {
+  if (binaryOp.getMimeType().has_value()) {
     rodataOp.setMimeTypeAttr(binaryOp.getMimeTypeAttr());
   }
 

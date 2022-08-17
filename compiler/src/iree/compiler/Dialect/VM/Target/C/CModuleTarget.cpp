@@ -79,7 +79,7 @@ static LogicalResult printRodataBuffers(IREE::VM::ModuleOp &moduleOp,
     constexpr size_t kDefaultRodataAlignment = 16;
     size_t alignment =
         rodataOp.getAlignment()
-            ? static_cast<size_t>(rodataOp.getAlignment().getValue())
+            ? static_cast<size_t>(rodataOp.getAlignment().value())
             : 0;
     if (alignment == 0) alignment = kDefaultRodataAlignment;
 

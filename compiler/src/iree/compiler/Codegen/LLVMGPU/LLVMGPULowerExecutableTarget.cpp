@@ -94,9 +94,9 @@ static LogicalResult verifyEntryPoint(
     IREE::HAL::ExecutableExportOp exportOp) {
   Optional<mlir::ArrayAttr> workgroupSizeAttr = exportOp.getWorkgroupSize();
 
-  if (workgroupSizeAttr.hasValue()) {
+  if (workgroupSizeAttr.has_value()) {
     std::array<int64_t, 3> workgroupSizes;
-    for (auto it : llvm::enumerate(workgroupSizeAttr.getValue())) {
+    for (auto it : llvm::enumerate(workgroupSizeAttr.value())) {
       workgroupSizes[it.index()] = it.value().cast<IntegerAttr>().getInt();
     }
 
@@ -139,7 +139,7 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
     if (IREE::Codegen::TranslationInfoAttr currTranslationInfo =
             getTranslationInfo(exportOp)) {
       if (translationInfo) {
-        if (currTranslationInfo != translationInfo.getValue()) {
+        if (currTranslationInfo != translationInfo.value()) {
           moduleOp.emitOpError(
               "unhandled compilation of entry point functions with different "
               "translation info");
@@ -156,8 +156,8 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
     }
   }
 
-  if (!testLoweringConfiguration && translationInfo.hasValue()) {
-    switch (translationInfo.getValue().getDispatchLoweringPassPipeline()) {
+  if (!testLoweringConfiguration && translationInfo.has_value()) {
+    switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
       case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute:
         addGPUSimpleDistributePassPipeline(executableLoweringPipeline);
         break;
@@ -170,7 +170,7 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
       case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore:
         addGPUMatmulTensorCorePassPipeline(
             executableLoweringPipeline,
-            translationInfo.getValue().getSoftwarePipelineDepth());
+            translationInfo.value().getSoftwarePipelineDepth());
         break;
       case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWarpReduction:
         addGPUWarpReductionPassPipeline(executableLoweringPipeline);

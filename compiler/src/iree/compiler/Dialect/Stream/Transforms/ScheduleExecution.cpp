@@ -279,7 +279,7 @@ class ScheduleExecutionPass
           auto awaitOp = builder.create<IREE::Stream::TimepointAwaitOp>(
               executeOp.getLoc(), newResult, newResultSize,
               executeOp.getResultTimepoint());
-          if (executeOp.getAffinity().hasValue()) {
+          if (executeOp.getAffinity().has_value()) {
             awaitOp.setAffinityAttr(executeOp.getAffinityAttr());
           }
 

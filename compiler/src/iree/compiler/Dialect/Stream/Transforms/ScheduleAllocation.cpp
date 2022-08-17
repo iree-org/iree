@@ -67,8 +67,8 @@ static ValueAliasingMap computeExecutionRegionValueAliases(
     auto innerResult = std::get<1>(it);
     auto tiedOperandIndex =
         tiedStreamOp.getTiedResultOperandIndex(outerResult.getResultNumber());
-    if (tiedOperandIndex.hasValue()) {
-      auto arg = streamBlock->getArgument(tiedOperandIndex.getValue());
+    if (tiedOperandIndex.has_value()) {
+      auto arg = streamBlock->getArgument(tiedOperandIndex.value());
       propagateAlias(innerResult, arg);
     }
   }
@@ -1024,7 +1024,7 @@ static LogicalResult allocateExecutionRegion(
   // constants within the region. Note that this removes ops from the region and
   // as such we want to run it first before we go allocate transients.
   auto constantAllocation = extractConstants(executeOp, externalBuilder);
-  if (constantAllocation.hasValue()) {
+  if (constantAllocation.has_value()) {
     bool anyCaptured = false;
     for (auto &reservation : constantAllocation->reservations) {
       if (reservation.capturedArg) {
@@ -1133,10 +1133,10 @@ static LogicalResult allocateExecutionRegion(
     // Early-exit if we are tied to an operand and have storage already.
     auto tiedOperandIndex =
         executeOp.getTiedResultOperandIndex(result.getResultNumber());
-    if (tiedOperandIndex.hasValue()) {
+    if (tiedOperandIndex.has_value()) {
       // Already tied; no need to modify just map.
-      auto tiedOperand = executeOp.getOperand(tiedOperandIndex.getValue());
-      auto arg = entryBlock.getArgument(tiedOperandIndex.getValue());
+      auto tiedOperand = executeOp.getOperand(tiedOperandIndex.value());
+      auto arg = entryBlock.getArgument(tiedOperandIndex.value());
       LLVM_DEBUG({
         AsmState asmState(executeOp->getParentOp());
         llvm::dbgs() << "  - tying operand ";
@@ -1240,7 +1240,7 @@ static LogicalResult allocateExecutionRegion(
   // Note that not all regions need transients.
   auto transientAllocation =
       allocateLocalTransients(executeOp, scope, externalBuilder);
-  if (transientAllocation.hasValue()) {
+  if (transientAllocation.has_value()) {
     auto awaitTimepoint = transientAllocation->awaitTimepoint;
     auto reservation = transientAllocation->reservation;
     auto reservationSize = transientAllocation->reservationSize;
@@ -1280,7 +1280,7 @@ static LogicalResult allocateExecutionRegion(
   // the results (besides the timepoint) as they are all aliased.
   auto newExecuteOp = executeBuilder.create<IREE::Stream::CmdExecuteOp>(
       executeOp.getLoc(), newAwaitTimepoint, newOperands, newOperandSizes);
-  if (executeOp.getAffinity().hasValue()) {
+  if (executeOp.getAffinity().has_value()) {
     newExecuteOp.setAffinityAttr(executeOp.getAffinityAttr());
   }
   newExecuteOp.getBody().takeBody(executeOp.getBody());

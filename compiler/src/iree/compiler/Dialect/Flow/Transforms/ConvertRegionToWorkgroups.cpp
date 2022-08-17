@@ -29,7 +29,7 @@ static void appendDynamicDims(OpBuilder &b, Location loc,
   // Fast-path for if the value comes from ops that support our dynamic
   // shape interfaces. Otherwise we have to insert tensor.dim ops.
   auto availableDims = IREE::Util::findDynamicDims(tensor);
-  if (availableDims.hasValue()) {
+  if (availableDims.has_value()) {
     argumentDims.append(availableDims->begin(), availableDims->end());
     assert(tensorType.getNumDynamicDims() == availableDims->size() &&
            "not enough dynamic dims found");
@@ -111,7 +111,7 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
   for (const auto &it : llvm::enumerate(terminator->getOperands())) {
     auto tiedArgument =
         findFirstTiedValueOutsideOfRegionOp(regionOp, it.value());
-    if (!tiedArgument.hasValue()) continue;
+    if (!tiedArgument.has_value()) continue;
     assert(argumentsSet.contains(*tiedArgument) &&
            "expected that tiedArgument is already an argument");
     // Do not tie an argument to multiple results.

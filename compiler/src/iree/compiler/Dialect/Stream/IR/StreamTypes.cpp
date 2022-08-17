@@ -241,12 +241,12 @@ Attribute PartitioningConfigAttr::parse(AsmParser &p, Type type) {
   }
   if (failed(p.parseGreater())) return {};
   auto favor = symbolizeFavor(favorStr);
-  if (!favor.hasValue()) {
+  if (!favor.has_value()) {
     p.emitError(p.getNameLoc(), "unknown favor value: ") << favorStr;
     return {};
   }
   return PartitioningConfigAttr::get(
-      FavorAttr::get(p.getContext(), favor.getValue()));
+      FavorAttr::get(p.getContext(), favor.value()));
 }
 
 void PartitioningConfigAttr::print(AsmPrinter &p) const {
@@ -314,11 +314,11 @@ Type ResourceType::parse(AsmParser &p) {
   }
   if (failed(p.parseGreater())) return {};
   auto lifetime = parseLifetime(lifetimeStr);
-  if (!lifetime.hasValue()) {
+  if (!lifetime.has_value()) {
     p.emitError(p.getNameLoc(), "unknown lifetime value: ") << lifetimeStr;
     return {};
   }
-  return ResourceType::get(p.getContext(), lifetime.getValue());
+  return ResourceType::get(p.getContext(), lifetime.value());
 }
 
 void ResourceType::print(AsmPrinter &p) const {

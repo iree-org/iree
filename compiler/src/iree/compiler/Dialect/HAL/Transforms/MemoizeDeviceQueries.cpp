@@ -51,7 +51,7 @@ class MemoizeDeviceQueriesPass
             {
                 StringAttr::get(moduleOp.getContext(),
                                 queryOp.getCategory() + queryOp.getKey()),
-                queryOp.getDefaultValue().hasValue()
+                queryOp.getDefaultValue().has_value()
                     ? queryOp.getDefaultValueAttr()
                     : Attribute{},
             });

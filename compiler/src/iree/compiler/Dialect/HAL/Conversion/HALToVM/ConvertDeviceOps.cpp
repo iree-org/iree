@@ -60,7 +60,7 @@ class DeviceQueryIntCastOpConversion
       }
     }
 
-    if (op.getDefaultValue().hasValue()) {
+    if (op.getDefaultValue().has_value()) {
       // Select the default value based on the converted type as that's the type
       // of the attribute we have is in. 'ok' result is set to true as we've
       // already handled the error case.
@@ -92,10 +92,10 @@ class DeviceQueryI64OpConversion
     if (!op.getValue().getType().isInteger(64)) return failure();
     auto results =
         rewriteToCall(op, adaptor, importOp, *getTypeConverter(), rewriter);
-    if (!results.hasValue()) return failure();
+    if (!results.has_value()) return failure();
     auto ok = results->front();
     auto value = results->back();
-    if (op.getDefaultValue().hasValue()) {
+    if (op.getDefaultValue().has_value()) {
       value = rewriter.createOrFold<arith::SelectOp>(
           op.getLoc(), ok, value,
           rewriter.createOrFold<IREE::VM::ConstI64Op>(
