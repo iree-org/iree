@@ -31,4 +31,6 @@ curl --silent --fail --show-error --location \
   */build_tools/github_actions/runner/config/
 
 chown -R runner:runner config/
+# TODO: remove this when setup script is updated
+cp -r ./config /home/runner/
 ./config/setup.sh
