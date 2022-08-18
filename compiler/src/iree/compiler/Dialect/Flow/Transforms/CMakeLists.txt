@@ -23,6 +23,7 @@ iree_cc_library(
   NAME
     Transforms
   HDRS
+    "ConvertRegionToWorkgroups.h"
     "DispatchLinalgOnTensors.h"
     "FusionUtils.h"
     "Passes.h"

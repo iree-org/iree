@@ -87,3 +87,29 @@ transform.with_pdl_patterns {
     transform.iree.clone_preceding_op_into_dispatch_region %1 into %dispatch_op {update_uses_outside_of_region = true}
   }
 }
+
+// -----
+
+// CHECK-LABEL: func @create_region_and_convert_to_workgroups
+//       CHECK:   linalg.init_tensor
+//       CHECK:   flow.dispatch.workgroups
+//       CHECK:     linalg.matmul
+//       CHECK:     flow.return
+func.func @create_region_and_convert_to_workgroups(
+    %A: tensor<5x3xf32>, %B: tensor<3x5xf32>) -> tensor<5x5xf32> {
+  %init = linalg.init_tensor [5, 5] : tensor<5x5xf32>
+  %matmul = linalg.matmul
+      ins(%A, %B : tensor<5x3xf32>, tensor<3x5xf32>)
+      outs(%init : tensor<5x5xf32>) -> tensor<5x5xf32>
+  return %matmul : tensor<5x5xf32>
+}
+
+transform.with_pdl_patterns {
+^bb0(%arg0: !pdl.operation):
+  transform.sequence %arg0 failures(propagate) {
+  ^bb1(%arg1: !pdl.operation):
+    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1
+    %region_op = transform.iree.wrap_in_dispatch_region %0
+    transform.iree.region_to_workgroups %region_op
+  }
+}

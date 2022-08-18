@@ -8,6 +8,7 @@
 
 #include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/Flow/Transforms/ConvertRegionToWorkgroups.h"
 #include "iree/compiler/Dialect/Flow/Transforms/DispatchLinalgOnTensors.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -441,6 +442,18 @@ transform_dialect::ForeachThreadToFlowDispatchWorkgroupsOp::applyToOne(
   SimplePatternRewriter rewriter(target->getContext());
   FailureOr<Flow::DispatchWorkgroupsOp> result =
       rewriteForeachThreadToFlowDispatchWorkgroups(target, rewriter);
+  if (failed(result))
+    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+  results.push_back(*result);
+  return DiagnosedSilenceableFailure(success());
+}
+
+DiagnosedSilenceableFailure transform_dialect::RegionToWorkgroupsOp::applyToOne(
+    Flow::DispatchRegionOp target, SmallVectorImpl<Operation *> &results,
+    transform::TransformState &state) {
+  IRRewriter rewriter(target->getContext());
+  FailureOr<Flow::DispatchWorkgroupsOp> result =
+      rewriteFlowDispatchRegionToFlowDispatchWorkgroups(target, rewriter);
   if (failed(result))
     return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
   results.push_back(*result);

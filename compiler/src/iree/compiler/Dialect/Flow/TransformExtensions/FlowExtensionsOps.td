@@ -50,6 +50,32 @@ def ForeachThreadToFlowDispatchWorkgroupsOp : Op<Transform_Dialect, "iree.foreac
   }];
 }
 
+def RegionToWorkgroupsOp : Op<Transform_Dialect, "iree.region_to_workgroups",
+    [FunctionalStyleTransformOpTrait,
+     MemoryEffectsOpInterface,
+     TransformOpInterface,
+     TransformEachOpTrait]> {
+  let description = [{
+    Convert a flow.dispatch.region op into a flow.dispatch.workgroups op.
+
+    Region ops can capture any values that are in scope in their body, whereas
+    workgroup ops are isolated from above and all values must be explicitly
+    captured via operands.
+  }];
+
+  let arguments = (ins PDL_Operation:$target);
+  let results = (outs PDL_Operation:$transformed);
+
+  let assemblyFormat = "$target attr-dict";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::iree_compiler::IREE::Flow::DispatchRegionOp target,
+        ::llvm::SmallVectorImpl<::mlir::Operation *> &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
 def WrapInDispatchRegionOp : Op<
     Transform_Dialect, "iree.wrap_in_dispatch_region",
     [FunctionalStyleTransformOpTrait, MemoryEffectsOpInterface,
