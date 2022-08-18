@@ -18,8 +18,8 @@ echo "Running setup script"
 # Change this to a different git reference to fetch from somewhere else.
 # For PRs, that would be refs/pull/<pr_number>/merge or for forks, you can
 # change the repo.
-REPO="gmngeoffrey/iree"
-CONFIG_REF="runner-root-dir"
+REPO="iree-org/iree"
+CONFIG_REF="main"
 
 echo "Fetching from ${CONFIG_REF}"
 

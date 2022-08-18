@@ -95,8 +95,7 @@ fi
 declare -a args=(
   --unattended \
   # Shut down after completing a single job
-  # DO NOT SUBMIT: make ephemeral again
-  # --ephemeral \
+  --ephemeral \
   # We don't immediately update each time we start. We handle our own
   # updates instead.
   --disableupdate \

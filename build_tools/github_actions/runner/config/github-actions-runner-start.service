@@ -10,8 +10,7 @@ Restart=no
 KillMode=process
 KillSignal=SIGTERM
 TimeoutStopSec=5min
-# DO NOT SUBMIT: re-enable
-# ExecStopPost=sudo /usr/sbin/shutdown -P now
+ExecStopPost=sudo /usr/sbin/shutdown -P now
 
 [Install]
 WantedBy=multi-user.target
