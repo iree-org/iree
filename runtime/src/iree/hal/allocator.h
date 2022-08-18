@@ -38,6 +38,9 @@ typedef uint64_t iree_hal_queue_affinity_t;
 // Specifies that any queue may be selected.
 #define IREE_HAL_QUEUE_AFFINITY_ANY ((iree_hal_queue_affinity_t)(-1))
 
+// TBD: placeholder for reserving unique pools.
+typedef uint32_t iree_hal_allocator_pool_id_t;
+
 // Parameters defining how a buffer should be allocated.
 //
 // Designed to be zero-initialized: any field with a 0 value will be assigned

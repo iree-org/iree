@@ -48,6 +48,10 @@ IREE_API_EXPORT iree_status_t iree_hal_deferred_command_buffer_create(
     iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
     iree_hal_command_buffer_t** out_command_buffer);
 
+// Returns true if |command_buffer| is a deferred command buffer.
+bool iree_hal_deferred_command_buffer_isa(
+    iree_hal_command_buffer_t* command_buffer);
+
 // Replays a recorded |command_buffer| against a |target_command_buffer|.
 // If the command buffer was recorded in one-shot mode it will be reset upon
 // return.

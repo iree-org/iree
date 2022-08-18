@@ -57,7 +57,7 @@ iree_status_t iree_hal_sync_semaphore_create(
 // batching up signals will reduce synchronization overhead.
 iree_status_t iree_hal_sync_semaphore_multi_signal(
     iree_hal_sync_semaphore_state_t* shared_state,
-    const iree_hal_semaphore_list_t* semaphore_list);
+    const iree_hal_semaphore_list_t semaphore_list);
 
 // Performs a multi-wait on one or more semaphores.
 // Returns IREE_STATUS_DEADLINE_EXCEEDED if the wait does not complete before
@@ -65,7 +65,7 @@ iree_status_t iree_hal_sync_semaphore_multi_signal(
 iree_status_t iree_hal_sync_semaphore_multi_wait(
     iree_hal_sync_semaphore_state_t* shared_state,
     iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t* semaphore_list, iree_timeout_t timeout);
+    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout);
 
 #ifdef __cplusplus
 }  // extern "C"

@@ -10,6 +10,10 @@
 
 #include "iree/base/tracing.h"
 
+//===----------------------------------------------------------------------===//
+// iree_hal_fence_t
+//===----------------------------------------------------------------------===//
+
 IREE_API_EXPORT iree_status_t iree_hal_fence_create(
     iree_host_size_t capacity, iree_allocator_t host_allocator,
     iree_hal_fence_t** out_fence) {
@@ -195,16 +199,8 @@ IREE_API_EXPORT iree_status_t iree_hal_fence_query(iree_hal_fence_t* fence) {
 
 IREE_API_EXPORT iree_status_t iree_hal_fence_signal(iree_hal_fence_t* fence) {
   IREE_TRACE_ZONE_BEGIN(z0);
-
-  iree_hal_semaphore_list_t semaphore_list =
-      iree_hal_fence_semaphore_list(fence);
-  iree_status_t status = iree_ok_status();
-  for (iree_host_size_t i = 0; i < semaphore_list.count; ++i) {
-    status = iree_hal_semaphore_signal(semaphore_list.semaphores[i],
-                                       semaphore_list.payload_values[i]);
-    if (!iree_status_is_ok(status)) break;
-  }
-
+  iree_status_t status =
+      iree_hal_semaphore_list_signal(iree_hal_fence_semaphore_list(fence));
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -212,56 +208,17 @@ IREE_API_EXPORT iree_status_t iree_hal_fence_signal(iree_hal_fence_t* fence) {
 IREE_API_EXPORT void iree_hal_fence_fail(iree_hal_fence_t* fence,
                                          iree_status_t signal_status) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_TEXT(
-      z0, iree_status_code_string(iree_status_code(signal_status)));
-
-  // This handles cases of empty lists by dropping signal_status if not
-  // consumed. Otherwise it clones the signal_status for each semaphore except
-  // the last, which in the common case of a single timepoint fence means no
-  // expensive clones.
-  iree_hal_semaphore_list_t semaphore_list =
-      iree_hal_fence_semaphore_list(fence);
-  for (iree_host_size_t i = 0; i < semaphore_list.count; ++i) {
-    const bool is_last = i == semaphore_list.count - 1;
-    iree_status_t semaphore_status;
-    if (is_last) {
-      // Can transfer ownership of the signal status.
-      semaphore_status = signal_status;
-      signal_status = iree_ok_status();
-    } else {
-      // Clone status for this particular signal.
-      semaphore_status = iree_status_clone(signal_status);
-    }
-    iree_hal_semaphore_fail(semaphore_list.semaphores[i], semaphore_status);
-  }
-  iree_status_ignore(signal_status);
-
+  iree_hal_semaphore_list_fail(iree_hal_fence_semaphore_list(fence),
+                               signal_status);
   IREE_TRACE_ZONE_END(z0);
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_fence_wait(iree_hal_fence_t* fence,
                                                   iree_timeout_t timeout) {
-  if (!fence) return iree_ok_status();
+  if (!fence || !fence->count) return iree_ok_status();
   IREE_TRACE_ZONE_BEGIN(z0);
-
-  // Ensure an absolute timeout so that as we loop through we don't drift from
-  // the user-intended relative timeout.
-  iree_convert_timeout_to_absolute(&timeout);
-
-  // Wait on all until done or we timeout.
-  // This is not the most efficient way to wait on semaphores as it performs
-  // no device-side batching. We should probably expose this as a device method
-  // instead or have a way to batch by semaphore implementation for heterogenous
-  // fences.
-  iree_hal_semaphore_list_t semaphore_list =
-      iree_hal_fence_semaphore_list(fence);
-  iree_status_t status = iree_ok_status();
-  for (iree_host_size_t i = 0; i < semaphore_list.count; ++i) {
-    status = iree_hal_semaphore_wait(semaphore_list.semaphores[i],
-                                     semaphore_list.payload_values[i], timeout);
-    if (!iree_status_is_ok(status)) break;
-  }
-
+  iree_status_t status = iree_hal_semaphore_list_wait(
+      iree_hal_fence_semaphore_list(fence), timeout);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

@@ -22,7 +22,7 @@ iree_hal_local_executable_layout_t* iree_hal_local_executable_layout_cast(
 
 iree_status_t iree_hal_local_executable_layout_create(
     iree_host_size_t push_constants, iree_host_size_t set_layout_count,
-    iree_hal_descriptor_set_layout_t** set_layouts,
+    iree_hal_descriptor_set_layout_t* const* set_layouts,
     iree_allocator_t host_allocator,
     iree_hal_executable_layout_t** out_executable_layout) {
   IREE_ASSERT_ARGUMENT(!set_layout_count || set_layouts);

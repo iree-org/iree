@@ -854,32 +854,20 @@ IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_alloca,  //
       (iree_hal_queue_affinity_t)args->i1;
   iree_hal_fence_t* wait_fence = iree_hal_fence_deref(args->r2);
   iree_hal_fence_t* signal_fence = iree_hal_fence_deref(args->r3);
-  uint32_t pool = args->i4;
+  iree_hal_allocator_pool_id_t pool_id = (iree_hal_allocator_pool_id_t)args->i4;
   iree_hal_memory_type_t memory_types = (iree_hal_memory_type_t)args->i5;
   iree_hal_buffer_usage_t buffer_usage = (iree_hal_buffer_usage_t)args->i6;
   iree_device_size_t allocation_size = iree_hal_cast_device_size(args->i7);
-
-  // TODO(benvanik): HAL APIs for queue-ordered allocations.
-  // For now we just perform a blocking wait to synchronize with the queue,
-  // allocate the buffer as normal, and then pass it back committed.
-  (void)queue_affinity;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_fence_wait(wait_fence, iree_infinite_timeout()));
-
-  // TODO(benvanik): enforce queue-ordered allocation restrictions on memory
-  // type and usage.
-  (void)pool;
 
   const iree_hal_buffer_params_t params = {
       .type = memory_types,
       .usage = buffer_usage,
   };
   iree_hal_buffer_t* buffer = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(
-      iree_hal_device_allocator(device), params, allocation_size,
-      iree_const_byte_span_empty(), &buffer));
-
-  IREE_RETURN_IF_ERROR(iree_hal_fence_signal(signal_fence));
+  IREE_RETURN_IF_ERROR(iree_hal_device_queue_alloca(
+      device, queue_affinity, iree_hal_fence_semaphore_list(wait_fence),
+      iree_hal_fence_semaphore_list(signal_fence), pool_id, params,
+      allocation_size, &buffer));
 
   rets->r0 = iree_hal_buffer_move_ref(buffer);
   return iree_ok_status();
@@ -896,16 +884,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_dealloca,  //
   iree_hal_fence_t* signal_fence = iree_hal_fence_deref(args->r3);
   iree_hal_buffer_t* buffer = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_check_deref(args->r4, &buffer));
-
-  // TODO(benvanik): HAL APIs for queue-ordered allocations.
-  // For now we just perform a blocking wait to synchronize with the queue and
-  // then ignore the buffer for GC to cleanup.
-  (void)queue_affinity;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_fence_wait(wait_fence, iree_infinite_timeout()));
-  IREE_RETURN_IF_ERROR(iree_hal_fence_signal(signal_fence));
-
-  return iree_ok_status();
+  return iree_hal_device_queue_dealloca(
+      device, queue_affinity, iree_hal_fence_semaphore_list(wait_fence),
+      iree_hal_fence_semaphore_list(signal_fence), buffer);
 }
 
 IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_execute,  //
@@ -921,17 +902,10 @@ IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_execute,  //
   iree_hal_command_buffer_t** command_buffers = NULL;
   IREE_VM_ABI_VLA_STACK_DEREF(args, a4_count, a4, iree_hal_command_buffer, 32,
                               &command_buffer_count, &command_buffers);
-
-  iree_hal_submission_batch_t batch = {
-      .wait_semaphores = iree_hal_fence_semaphore_list(wait_fence),
-      .signal_semaphores = iree_hal_fence_semaphore_list(signal_fence),
-      .command_buffer_count = command_buffer_count,
-      .command_buffers = command_buffers,
-  };
-  IREE_RETURN_IF_ERROR(iree_hal_device_queue_submit(
-      device, IREE_HAL_COMMAND_CATEGORY_ANY, queue_affinity, 1, &batch));
-
-  return iree_ok_status();
+  return iree_hal_device_queue_execute(
+      device, queue_affinity, iree_hal_fence_semaphore_list(wait_fence),
+      iree_hal_fence_semaphore_list(signal_fence), command_buffer_count,
+      command_buffers);
 }
 
 IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_flush,  //
@@ -941,14 +915,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_flush,  //
   IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
   iree_hal_queue_affinity_t queue_affinity =
       (iree_hal_queue_affinity_t)args->i1;
-
-  // TODO(benvanik): queue flush API.
-  // This will be most useful for backends that perform internal batching and
-  // require the explicit flush. For now we don't have this exposed.
-  (void)device;
-  (void)queue_affinity;
-
-  return iree_ok_status();
+  return iree_hal_device_queue_flush(device, queue_affinity);
 }
 
 //===--------------------------------------------------------------------===//

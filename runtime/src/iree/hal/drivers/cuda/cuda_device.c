@@ -306,7 +306,7 @@ static iree_status_t iree_hal_cuda_device_create_executable_cache(
 static iree_status_t iree_hal_cuda_device_create_executable_layout(
     iree_hal_device_t* base_device, iree_host_size_t push_constants,
     iree_host_size_t set_layout_count,
-    iree_hal_descriptor_set_layout_t** set_layouts,
+    iree_hal_descriptor_set_layout_t* const* set_layouts,
     iree_hal_executable_layout_t** out_executable_layout) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
   return iree_hal_cuda_executable_layout_create(
@@ -329,30 +329,58 @@ iree_hal_cuda_device_query_semaphore_compatibility(
   return IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_ONLY;
 }
 
-static iree_status_t iree_hal_cuda_device_queue_submit(
-    iree_hal_device_t* base_device,
-    iree_hal_command_category_t command_categories,
-    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
-    const iree_hal_submission_batch_t* batches) {
+static iree_status_t iree_hal_cuda_device_queue_alloca(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_allocator_pool_id_t pool_id, iree_hal_buffer_params_t params,
+    iree_device_size_t allocation_size,
+    iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
+  // TODO(benvanik): queue-ordered allocations.
+  IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_wait(wait_semaphore_list,
+                                                    iree_infinite_timeout()));
+  IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(
+      iree_hal_device_allocator(base_device), params, allocation_size,
+      iree_const_byte_span_empty(), out_buffer));
+  IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_signal(signal_semaphore_list));
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_cuda_device_queue_dealloca(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_buffer_t* buffer) {
+  // TODO(benvanik): queue-ordered allocations.
+  IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_wait(wait_semaphore_list,
+                                                    iree_infinite_timeout()));
+  IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_signal(signal_semaphore_list));
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_cuda_device_queue_execute(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_host_size_t command_buffer_count,
+    iree_hal_command_buffer_t* const* command_buffers) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
-  for (int i = 0; i < batch_count; i++) {
-    for (int j = 0; j < batches[i].command_buffer_count; j++) {
-      iree_hal_command_buffer_t* command_buffer = batches[i].command_buffers[j];
-      if (iree_hal_cuda_stream_command_buffer_isa(command_buffer)) {
-        // Nothing to do for an inline command buffer; all the work has already
-        // been submitted. When we support semaphores we'll still need to signal
-        // their completion but do not have to worry about any waits: if there
-        // were waits we wouldn't have been able to execute inline!
-      } else if (iree_hal_cuda_graph_command_buffer_isa(command_buffer)) {
-        CUgraphExec exec = iree_hal_cuda_graph_command_buffer_exec(
-            batches[i].command_buffers[j]);
-        CUDA_RETURN_IF_ERROR(device->context_wrapper.syms,
-                             cuGraphLaunch(exec, device->stream),
-                             "cuGraphLaunch");
-      } else {
-        IREE_RETURN_IF_ERROR(iree_hal_deferred_command_buffer_apply(
-            batches[i].command_buffers[j], device->stream_command_buffer));
-      }
+  for (iree_host_size_t i = 0; i < command_buffer_count; i++) {
+    iree_hal_command_buffer_t* command_buffer = command_buffers[i];
+    if (iree_hal_cuda_stream_command_buffer_isa(command_buffer)) {
+      // Nothing to do for an inline command buffer; all the work has already
+      // been submitted. When we support semaphores we'll still need to signal
+      // their completion but do not have to worry about any waits: if there
+      // were waits we wouldn't have been able to execute inline!
+    } else if (iree_hal_cuda_graph_command_buffer_isa(command_buffer)) {
+      CUgraphExec exec =
+          iree_hal_cuda_graph_command_buffer_exec(command_buffers[i]);
+      CUDA_RETURN_IF_ERROR(device->context_wrapper.syms,
+                           cuGraphLaunch(exec, device->stream),
+                           "cuGraphLaunch");
+    } else {
+      IREE_RETURN_IF_ERROR(iree_hal_deferred_command_buffer_apply(
+          command_buffers[i], device->stream_command_buffer));
     }
   }
   // TODO(thomasraoux): implement semaphores - for now this conservatively
@@ -363,23 +391,17 @@ static iree_status_t iree_hal_cuda_device_queue_submit(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_cuda_device_wait_semaphores(
-    iree_hal_device_t* base_device, iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t* semaphore_list, iree_timeout_t timeout) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "semaphore not implemented");
+static iree_status_t iree_hal_cuda_device_queue_flush(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity) {
+  // Currently unused; we flush as submissions are made.
+  return iree_ok_status();
 }
 
-static iree_status_t iree_hal_cuda_device_wait_idle(
-    iree_hal_device_t* base_device, iree_timeout_t timeout) {
-  iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
-  // Wait until the stream is done.
-  // TODO(thomasraoux): CUDA doesn't support a deadline for wait, figure out how
-  // to handle it better.
-  CUDA_RETURN_IF_ERROR(device->context_wrapper.syms,
-                       cuStreamSynchronize(device->stream),
-                       "cuStreamSynchronize");
-  return iree_ok_status();
+static iree_status_t iree_hal_cuda_device_wait_semaphores(
+    iree_hal_device_t* base_device, iree_hal_wait_mode_t wait_mode,
+    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout) {
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "semaphore not implemented");
 }
 
 static const iree_hal_device_vtable_t iree_hal_cuda_device_vtable = {
@@ -400,7 +422,9 @@ static const iree_hal_device_vtable_t iree_hal_cuda_device_vtable = {
     .query_semaphore_compatibility =
         iree_hal_cuda_device_query_semaphore_compatibility,
     .transfer_range = iree_hal_device_submit_transfer_range_and_wait,
-    .queue_submit = iree_hal_cuda_device_queue_submit,
+    .queue_alloca = iree_hal_cuda_device_queue_alloca,
+    .queue_dealloca = iree_hal_cuda_device_queue_dealloca,
+    .queue_execute = iree_hal_cuda_device_queue_execute,
+    .queue_flush = iree_hal_cuda_device_queue_flush,
     .wait_semaphores = iree_hal_cuda_device_wait_semaphores,
-    .wait_idle = iree_hal_cuda_device_wait_idle,
 };

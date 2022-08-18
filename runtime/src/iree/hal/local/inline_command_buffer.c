@@ -87,13 +87,18 @@ static void iree_hal_inline_command_buffer_reset(
       command_buffer->state.packed_binding_lengths;
 }
 
-iree_status_t iree_hal_inline_command_buffer_create(
+iree_host_size_t iree_hal_inline_command_buffer_size(void) {
+  return sizeof(iree_hal_inline_command_buffer_t);
+}
+
+iree_status_t iree_hal_inline_command_buffer_initialize(
     iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity, iree_allocator_t host_allocator,
-    iree_hal_command_buffer_t** out_command_buffer) {
+    iree_byte_span_t storage, iree_hal_command_buffer_t** out_command_buffer) {
   IREE_ASSERT_ARGUMENT(out_command_buffer);
   *out_command_buffer = NULL;
+
   if (!iree_all_bits_set(
           mode, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT |
                     IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION)) {
@@ -104,22 +109,62 @@ iree_status_t iree_hal_inline_command_buffer_create(
         IREE_STATUS_INVALID_ARGUMENT,
         "inline command buffers must have a mode with ALLOW_INLINE_EXECUTION");
   }
+  if (storage.data_length < iree_hal_inline_command_buffer_size()) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "storage must have at least the capacity as "
+                            "defined by iree_hal_inline_command_buffer_size");
+  }
 
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_hal_inline_command_buffer_t* command_buffer = NULL;
-  iree_status_t status = iree_allocator_malloc(
-      host_allocator, sizeof(*command_buffer), (void**)&command_buffer);
-  if (iree_status_is_ok(status)) {
-    iree_hal_command_buffer_initialize(
-        device, mode, command_categories, queue_affinity,
-        &iree_hal_inline_command_buffer_vtable, &command_buffer->base);
-    command_buffer->host_allocator = host_allocator;
-    iree_hal_inline_command_buffer_reset(command_buffer);
+  iree_hal_inline_command_buffer_t* command_buffer =
+      (iree_hal_inline_command_buffer_t*)storage.data;
+  memset(command_buffer, 0, sizeof(*command_buffer));
 
-    *out_command_buffer = &command_buffer->base;
+  iree_hal_command_buffer_initialize(
+      device, mode, command_categories, queue_affinity,
+      &iree_hal_inline_command_buffer_vtable, &command_buffer->base);
+  command_buffer->host_allocator = host_allocator;
+  iree_hal_inline_command_buffer_reset(command_buffer);
+
+  *out_command_buffer = &command_buffer->base;
+
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
+void iree_hal_inline_command_buffer_deinitialize(
+    iree_hal_command_buffer_t* base_command_buffer) {
+  iree_hal_inline_command_buffer_t* command_buffer =
+      iree_hal_inline_command_buffer_cast(base_command_buffer);
+  iree_hal_inline_command_buffer_reset(command_buffer);
+}
+
+iree_status_t iree_hal_inline_command_buffer_create(
+    iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
+    iree_hal_command_category_t command_categories,
+    iree_hal_queue_affinity_t queue_affinity, iree_allocator_t host_allocator,
+    iree_hal_command_buffer_t** out_command_buffer) {
+  IREE_ASSERT_ARGUMENT(out_command_buffer);
+  *out_command_buffer = NULL;
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  uint8_t* storage = NULL;
+  iree_status_t status = iree_allocator_malloc(
+      host_allocator, iree_hal_inline_command_buffer_size(), (void**)&storage);
+  iree_hal_command_buffer_t* command_buffer = NULL;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_inline_command_buffer_initialize(
+        device, mode, command_categories, queue_affinity, host_allocator,
+        iree_make_byte_span(storage, iree_hal_inline_command_buffer_size()),
+        &command_buffer);
   }
 
+  if (iree_status_is_ok(status)) {
+    *out_command_buffer = command_buffer;
+  } else {
+    iree_allocator_free(host_allocator, storage);
+  }
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -131,7 +176,7 @@ static void iree_hal_inline_command_buffer_destroy(
   iree_allocator_t host_allocator = command_buffer->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_hal_inline_command_buffer_reset(command_buffer);
+  iree_hal_inline_command_buffer_deinitialize(base_command_buffer);
   iree_allocator_free(host_allocator, command_buffer);
 
   IREE_TRACE_ZONE_END(z0);
@@ -155,9 +200,6 @@ static void* iree_hal_inline_command_buffer_dyn_cast(
 //===----------------------------------------------------------------------===//
 // iree_hal_inline_command_buffer_t recording
 //===----------------------------------------------------------------------===//
-
-static iree_status_t iree_hal_inline_command_buffer_flush_tasks(
-    iree_hal_inline_command_buffer_t* command_buffer);
 
 // Updates the cached processor ID field in the command buffer.
 static void iree_hal_inline_command_buffer_update_processor_id(
