@@ -45,12 +45,26 @@ llvm::Optional<std::string> compileSPIRVToWGSL(
     return llvm::None;
   }
 
-  // TODO(scotttodd): Refine this set of transforms
   tint::transform::Manager transformManager;
   tint::transform::DataMap transformInputs;
-  transformInputs.Add<tint::transform::FirstIndexOffset::BindingPoint>(0, 0);
-  transformManager.Add<tint::transform::FirstIndexOffset>();
-  transformManager.Add<tint::transform::FoldTrivialSingleUseLets>();
+  {
+    // TODO(scotttodd): Test on a few programs? Unclear if this affects our code
+    // transformInputs.Add<tint::transform::FirstIndexOffset::BindingPoint>(0,
+    // 0);
+    // transformManager.Add<tint::transform::FirstIndexOffset>();
+
+    // Cleans trivial `let`s produced by the SPIR-V reader by inlining them
+    transformManager.Add<tint::transform::FoldTrivialSingleUseLets>();
+
+    // Skip symbol renaming - we shouldn't have any conflicts with keywords
+    //     (the browser may still run this transform later though)
+    // transformManager.Add<tint::transform::Renamer>();
+
+    // Skip robustness transform - it clamps array accesses to within bounds
+    //     we can safely assume that our array accesses are safe
+    //     (the browser may still run this transform later though)
+    // transformManager.Add<tint::transform::Robustness>();
+  }
 
   auto output = transformManager.Run(program.get(), std::move(transformInputs));
   if (!output.program.IsValid()) {
