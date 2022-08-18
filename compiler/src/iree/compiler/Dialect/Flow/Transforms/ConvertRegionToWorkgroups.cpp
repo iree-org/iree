@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/Flow/Transforms/ConvertRegionToWorkgroups.h"
+
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
@@ -69,11 +71,13 @@ static Optional<Value> findFirstTiedValueOutsideOfRegionOp(
   return value;
 }
 
+}  // namespace
+
 /// Rewrite the DispatchRegionOp into a DispatchWorkgroupsOp. The
 /// DispatchRegionOp is not isolated from above and may capture any SSA value
 /// that is in scope. The generated DispatchWorkgroupsOp captures all SSA values
 /// explicitly and makes them available inside the region via block arguments.
-static FailureOr<Flow::DispatchWorkgroupsOp>
+FailureOr<Flow::DispatchWorkgroupsOp>
 rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
     Flow::DispatchRegionOp regionOp, RewriterBase &rewriter) {
   // Only ops with a single block are supported.
@@ -200,6 +204,7 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
   return workgroupsOp;
 }
 
+namespace {
 struct ConvertRegionToWorkgroupsPass
     : public ConvertRegionToWorkgroupsBase<ConvertRegionToWorkgroupsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -220,7 +225,6 @@ struct ConvertRegionToWorkgroupsPass
     }
   }
 };
-
 }  // namespace
 
 std::unique_ptr<Pass> createConvertRegionToWorkgroupsPass() {
