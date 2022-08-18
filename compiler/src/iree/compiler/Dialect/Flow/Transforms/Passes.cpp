@@ -82,7 +82,7 @@ static llvm::cl::opt<int> clLinalgOpsPaddingSize(
 static llvm::cl::opt<bool> clEnableLinalgDetensorize(
     "iree-flow-enable-linalg-detensorize",
     llvm::cl::desc("Enable detensorizing linalg ops to operate on primitives"),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 static llvm::cl::opt<std::string> clMmt4dTargetOptions(
     "iree-flow-mmt4d-target-options",
