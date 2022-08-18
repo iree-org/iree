@@ -455,7 +455,7 @@ struct SwapExtractSliceWithTiledProducer
     if (failed(tiledProducer)) {
       return failure();
     }
-    rewriter.replaceOp(sliceOp, tiledProducer.getValue());
+    rewriter.replaceOp(sliceOp, tiledProducer.value());
     return success();
   }
 };

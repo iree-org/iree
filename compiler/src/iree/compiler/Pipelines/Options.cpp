@@ -97,7 +97,13 @@ void SchedulingOptions::bindOptions(OptionsBinder &binder) {
                      "internally but exporting functions as if synchronous."),
           clEnumValN(ExecutionModel::AsyncExternal, "async-external",
                      "Full HAL using asynchronous host/device execution both "
-                     "internally and externally.")),
+                     "internally and externally."),
+          clEnumValN(ExecutionModel::InlineStatic, "inline-static",
+                     "Inline host-local in-process execution with executable "
+                     "code statically linked into the host program."),
+          clEnumValN(ExecutionModel::InlineDynamic, "inline-dynamic",
+                     "Inline host-local in-process execution using dynamic "
+                     "executables.")),
       llvm::cl::cat(category));
 
   binder.opt<DumpOutputFormat>(

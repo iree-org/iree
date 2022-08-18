@@ -176,10 +176,13 @@ struct ConvertHALInterfaceConstantLoadOp
     auto constantsArg = op->getParentOfType<mlir::func::FuncOp>().getArgument(
         kEntryArgConstants);
     assert(constantsArg && "entry point not conforming to requirements");
+    // HACK: we could find the total push constant count and avoid this size op
+    // but it'd require walking all the way up to the hal.executable export.
     auto constantsSize =
         rewriter.create<IREE::Util::BufferSizeOp>(op.getLoc(), constantsArg);
     auto resultType = getTypeConverter()->convertType(op.getResult().getType());
 
+    // Index -> byte offset.
     auto constantIndex = rewriter.createOrFold<arith::ConstantIndexOp>(
         op.getLoc(), op.getIndex().getZExtValue());
     auto elementSize =
@@ -254,7 +257,7 @@ struct ConvertHALInterfaceBindingSubspanOp
             .getResult();
 
     if (op.getByteOffset() && !matchPattern(op.getByteOffset(), m_Zero())) {
-      // Offsetted binding: replace with a BufferSpan.
+      // Offsetted binding: replace with a BufferSubspanOp.
       Value sourceSize = rewriter.createOrFold<IREE::Util::BufferSizeOp>(
           op.getLoc(), sourceBuffer);
 

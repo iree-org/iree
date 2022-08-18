@@ -18,6 +18,8 @@ iree_cc_library(
     "exports.inl"
   SRCS
     "module.c"
+  DEFINES
+    "IREE_HAVE_VMVX_MODULE"
   DEPS
     iree::base
     iree::base::tracing

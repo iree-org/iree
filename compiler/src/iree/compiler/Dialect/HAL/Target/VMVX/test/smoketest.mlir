@@ -50,7 +50,6 @@ stream.executable public @add_dispatch_0 {
 //  CHECK-NEXT:         vm.func private @add_dispatch_0(
 //  CHECK-SAME:             %[[SCRATCHPAD:.+]]: !vm.buffer, %[[CONSTANTS:.+]]: !vm.buffer,
 //  CHECK-SAME:             %[[BINDINGS:.+]]: !vm.list<!vm.buffer>
-//   CHECK-DAG:           %c16 = vm.const.i32 16
 //   CHECK-DAG:           %zero = vm.const.i32.zero
 //   CHECK-DAG:           %c1 = vm.const.i32 1
 //   CHECK-DAG:           %c2 = vm.const.i32 2

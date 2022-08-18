@@ -101,6 +101,14 @@ class Register {
     }
   }
 
+  // Encodes the hi register of the lo:hi pair into a uint16_t value used by the
+  // runtime VM. Only valid if the register is split (byteWidth() == 8).
+  uint16_t encodeHi() const {
+    assert(!null_ && !tombstone_ && "cannot encode a sentinel register");
+    assert(!isRef() && byteWidth() == 8 && "only valid with 64-bit values");
+    return ordinal() + 1;
+  }
+
   std::string toString() const {
     if (null_ || tombstone_) {
       return "<invalid>";
