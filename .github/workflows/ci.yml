@@ -70,7 +70,12 @@ jobs:
       - name: "Computing whether CI should run"
         id: should-run
         run: |
-          git log --oneline --graph
+          # Just informative logging. There should only be two commits in the
+          # history here, but limiting the depth helps when copying from a local
+          # repo instead of using checkout, e.g. with
+          # https://github.com/nektos/act where there will be more.
+          git log --oneline --graph --max-count=3
+
           ret=0
           ./build_tools/github_actions/should_ci_run.py || ret=$?
           if (( ret==0 )); then
