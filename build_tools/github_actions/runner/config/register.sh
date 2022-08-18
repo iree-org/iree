@@ -57,6 +57,7 @@ RUNNER_GROUP="$(get_attribute github-runner-group)"
 RUNNER_SCOPE="$(get_attribute github-runner-scope)"
 RUNNER_TRUST="$(get_attribute github-runner-trust)"
 TOKEN_PROXY_URL="$(get_attribute github-token-proxy-url)"
+CONFIG_REF="$(get_attribute runner-config-ref)"
 
 declare -a RUNNER_LABELS_ARRAY=(
   "os-family=${OS_FAMILY}"
@@ -68,7 +69,8 @@ declare -a RUNNER_LABELS_ARRAY=(
   "zone=${ZONE}"
   "cpu-platform=${CPU_PLATFORM}"
   "machine-type=${MACHINE_TYPE}"
-  # These attributes require guest attributes. See note above.
+  "config-ref=${CONFIG_REF}"
+  # These labels require guest attributes. See note above.
   # "arch=${ARCH}"
   # "${ARCH}"
   # "os=${OS_ID}"
