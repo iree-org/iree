@@ -9,7 +9,7 @@ include(FetchContent)
 FetchContent_Declare(
   tint
   GIT_REPOSITORY https://dawn.googlesource.com/tint
-  GIT_TAG 188b1fb8f5be52299fb7fbc6db17dbb0c07dbb7e # 2021-12-16
+  GIT_TAG 200492e32b94f042d9942154fb4fa7f93bb8289a # 2022-08-17
 )
 
 set(TINT_BUILD_SAMPLES OFF CACHE BOOL "" FORCE)
