@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_DIALECT_IREE_TRANSFORMS_PASSES_H_
 #define IREE_COMPILER_DIALECT_IREE_TRANSFORMS_PASSES_H_
 
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 
@@ -38,27 +39,7 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createTestConversionPass();
 std::unique_ptr<OperationPass<void>> createTestFloatRangeAnalysisPass();
 
 // Register all Passes
-// TODO: Switch this directory to declarative registration.
-inline void registerTransformPasses() {
-  createApplyPatternsPass();
-  createCombineInitializersPass();
-  createDropCompilerHintsPass();
-  createFixedPointIteratorPass(OpPassManager("dummy_op"));
-  createFoldGlobalsPass();
-  createFuseGlobalsPass();
-  createHoistIntoGlobalsPass();
-  createPropagateSubrangesPass();
-  createSimplifyGlobalAccessesPass();
-  createStripDebugOpsPass();
-
-  createDemoteI64ToI32Pass();
-  createDemoteF32ToF16Pass();
-  createDemoteF64ToF32Pass();
-  createPromoteF16ToF32Pass();
-
-  createTestConversionPass();
-  createTestFloatRangeAnalysisPass();
-}
+void registerTransformPasses();
 
 }  // namespace Util
 }  // namespace IREE

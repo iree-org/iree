@@ -15,6 +15,7 @@ iree_cc_library(
     Transforms
   HDRS
     "Passes.h"
+    "Passes.h.inc"
     "Patterns.h"
   SRCS
     "ApplyPatterns.cpp"
@@ -25,13 +26,16 @@ iree_cc_library(
     "FoldGlobals.cpp"
     "FuseGlobals.cpp"
     "HoistIntoGlobals.cpp"
+    "PassDetail.h"
+    "Passes.cpp"
     "Patterns.cpp"
-    "PropagateSubrange.cpp"
+    "PropagateSubranges.cpp"
     "SimplifyGlobalAccesses.cpp"
     "StripDebugOps.cpp"
     "TestConversion.cpp"
     "TestFloatRangeAnalysis.cpp"
   DEPS
+    ::PassesIncGen
     LLVMSupport
     MLIRAffineDialect
     MLIRAnalysis
@@ -55,6 +59,15 @@ iree_cc_library(
     iree::compiler::Dialect::Util::IR
     iree::compiler::Utils
   PUBLIC
+)
+
+iree_tablegen_library(
+  NAME
+    PassesIncGen
+  TD_FILE
+    "Passes.td"
+  OUTS
+    --gen-pass-decls Passes.h.inc
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

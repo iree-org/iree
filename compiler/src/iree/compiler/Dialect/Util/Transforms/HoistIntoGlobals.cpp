@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/Util/Analysis/Constant/ConstExpr.h"
 #include "iree/compiler/Dialect/Util/Analysis/Constant/OpOracle.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/SliceAnalysis.h"
@@ -33,19 +34,8 @@ using HoistedValueMap = llvm::DenseMap<Value, GlobalOp>;
 // necessary. Either this algorithm can be made smarter or a follow-on pass
 // can sink globals into the program where it is profitable to reduce
 // working set size.
-class HoistIntoGlobalsPass
-    : public PassWrapper<HoistIntoGlobalsPass, OperationPass<mlir::ModuleOp>> {
+class HoistIntoGlobalsPass : public HoistIntoGlobalsBase<HoistIntoGlobalsPass> {
  public:
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(HoistIntoGlobalsPass)
-
-  StringRef getArgument() const override {
-    return "iree-util-hoist-into-globals";
-  }
-
-  StringRef getDescription() const override {
-    return "Greedily hoists eligible constant expressions into globals";
-  }
-
   void getDependentDialects(DialectRegistry &registry) const override {
     registerConstExprDependentDialects(registry);
   }
@@ -241,8 +231,6 @@ class HoistIntoGlobalsPass
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createHoistIntoGlobalsPass() {
   return std::make_unique<HoistIntoGlobalsPass>();
 }
-
-static PassRegistration<HoistIntoGlobalsPass> pass;
 
 }  // namespace Util
 }  // namespace IREE

@@ -8,6 +8,7 @@
 #include "iree/compiler/Dialect/Util/Conversion/MemRefToUtil/ConvertMemRefToUtil.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arithmetic/Transforms/Passes.h"
@@ -23,19 +24,10 @@ namespace Util {
 
 namespace {
 
-class TestConversionPass
-    : public PassWrapper<TestConversionPass, OperationPass<ModuleOp>> {
+class TestConversionPass : public TestConversionBase<TestConversionPass> {
  public:
   TestConversionPass() = default;
   TestConversionPass(const TestConversionPass &) {}
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(TestConversionPass)
-
-  StringRef getArgument() const override { return "iree-util-test-conversion"; }
-
-  StringRef getDescription() const override {
-    return "Tests util dialect conversion patterns";
-  }
-
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Util::UtilDialect, func::FuncDialect,
                     mlir::arith::ArithmeticDialect, math::MathDialect,
@@ -87,8 +79,6 @@ class TestConversionPass
 std::unique_ptr<OperationPass<ModuleOp>> createTestConversionPass() {
   return std::make_unique<TestConversionPass>();
 }
-
-static PassRegistration<TestConversionPass> pass;
 
 }  // namespace Util
 }  // namespace IREE
