@@ -45,15 +45,12 @@ void LLVMCPUAArch64VectorLoweringPass::runOnOperation() {
   auto funcOp = getOperation();
 
   Optional<int64_t> numLoops;
-  auto walkRes = funcOp.walk([&](vector::ContractionOp op) -> WalkResult {
-    int64_t opNumLoops = op.getIndexingMapsArray()[0].getNumDims();
-    if (numLoops && *numLoops != opNumLoops) return WalkResult::interrupt();
-    numLoops = opNumLoops;
-    return WalkResult::advance();
+  funcOp.walk([&](vector::ContractionOp op) {
+    if (numLoops) return signalPassFailure();
+    numLoops = op.getIndexingMapsArray()[0].getNumDims();
   });
   // No vector.contract op to optimize.
   if (!numLoops) return;
-  if (walkRes.wasInterrupted()) return signalPassFailure();
 
   {
     // Fold consumer add ops into the contraction op itself.
