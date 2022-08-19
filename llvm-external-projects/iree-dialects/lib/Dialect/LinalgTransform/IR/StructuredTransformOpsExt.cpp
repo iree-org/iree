@@ -335,7 +335,7 @@ static linalg::LinalgOp findSingleLinalgOpDefiningAll(ValueRange range) {
     // mechanism of tracking op replacement at creation, or even different
     // patterns that identify the "main" result of a transformation.
     while (auto castOp = value.getDefiningOp<tensor::CastOp>())
-      value = castOp.source();
+      value = castOp.getSource();
 
     if (auto currentSourceOp = value.getDefiningOp<linalg::LinalgOp>()) {
       if (!sourceOp || sourceOp == currentSourceOp) {
