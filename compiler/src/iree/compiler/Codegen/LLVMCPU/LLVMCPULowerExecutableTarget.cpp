@@ -172,6 +172,12 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
               moduleOp, translationInfo.value(),
               verifyDoubleTilingExpertPassPipelineConfig);
           break;
+        case IREE::Codegen::DispatchLoweringPassPipeline::
+            CPUConvTileAndDecomposeExpert:
+          verificationStatus = verifyLoweringConfiguration(
+              moduleOp, translationInfo.value(),
+              verifyConvTileAndDecomposeExpertConfig);
+          break;
         default:;
       }
       if (failed(verificationStatus)) {
