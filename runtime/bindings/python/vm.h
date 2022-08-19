@@ -14,7 +14,6 @@
 #include "iree/base/api.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
-#include "iree/vm/ref.h"
 
 namespace iree {
 namespace python {

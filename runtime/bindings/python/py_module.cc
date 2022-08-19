@@ -9,7 +9,6 @@
 #include <string_view>
 
 #include "./vm.h"
-#include "iree/vm/native_module.h"
 
 namespace iree::python {
 
