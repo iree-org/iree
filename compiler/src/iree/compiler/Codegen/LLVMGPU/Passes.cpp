@@ -15,6 +15,7 @@
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
 #include "mlir/Dialect/Arithmetic/Transforms/Passes.h"
 #include "mlir/Dialect/Func/Transforms/Passes.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"
@@ -52,7 +53,12 @@ static LogicalResult gpuDeallocationFn(OpBuilder &builder, Location loc,
 
 static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
                                Value to) {
+  bool sharedMemCopy =
+      from.getType().cast<MemRefType>().getMemorySpaceAsInt() == 3 ||
+      to.getType().cast<MemRefType>().getMemorySpaceAsInt() == 3;
+  if (sharedMemCopy) builder.create<gpu::BarrierOp>(loc);
   createLinalgCopyOp(builder, loc, from, to);
+  if (sharedMemCopy) builder.create<gpu::BarrierOp>(loc);
   return success();
 }
 
@@ -75,6 +81,7 @@ static void tileAndBufferize(OpPassManager &pm) {
 
   addBufferizePasses(nestedModulePM);
 
+  nestedModulePM.addPass(createCSEPass());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 }
