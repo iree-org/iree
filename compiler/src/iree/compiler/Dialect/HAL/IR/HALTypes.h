@@ -87,11 +87,6 @@ struct CommandBufferType
   using Base::Base;
 };
 
-struct DescriptorSetType
-    : public Type::TypeBase<DescriptorSetType, Type, TypeStorage> {
-  using Base::Base;
-};
-
 struct DescriptorSetLayoutType
     : public Type::TypeBase<DescriptorSetLayoutType, Type, TypeStorage> {
   using Base::Base;

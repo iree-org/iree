@@ -419,21 +419,6 @@ static iree_status_t iree_hal_inline_command_buffer_push_descriptor_set(
 }
 
 //===----------------------------------------------------------------------===//
-// iree_hal_command_buffer_bind_descriptor_set
-//===----------------------------------------------------------------------===//
-// NOTE: command buffer state change only; enqueues no tasks.
-
-static iree_status_t iree_hal_inline_command_buffer_bind_descriptor_set(
-    iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_layout_t* executable_layout, uint32_t set,
-    iree_hal_descriptor_set_t* descriptor_set,
-    iree_host_size_t dynamic_offset_count,
-    const iree_device_size_t* dynamic_offsets) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "descriptor set binding not yet implemented");
-}
-
-//===----------------------------------------------------------------------===//
 // iree_hal_command_buffer_dispatch
 //===----------------------------------------------------------------------===//
 
@@ -595,8 +580,6 @@ static const iree_hal_command_buffer_vtable_t
         .push_constants = iree_hal_inline_command_buffer_push_constants,
         .push_descriptor_set =
             iree_hal_inline_command_buffer_push_descriptor_set,
-        .bind_descriptor_set =
-            iree_hal_inline_command_buffer_bind_descriptor_set,
         .dispatch = iree_hal_inline_command_buffer_dispatch,
         .dispatch_indirect = iree_hal_inline_command_buffer_dispatch_indirect,
 };

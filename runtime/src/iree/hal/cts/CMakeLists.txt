@@ -9,7 +9,6 @@ set(IREE_ALL_CTS_TESTS
   "buffer_mapping"
   "command_buffer"
   "command_buffer_dispatch"
-  "descriptor_set"
   "descriptor_set_layout"
   "driver"
   "event"
@@ -90,18 +89,6 @@ iree_cc_library(
     command_buffer_dispatch_test_library
   HDRS
     "command_buffer_dispatch_test.h"
-  DEPS
-    ::cts_test_base
-    iree::base
-    iree::hal
-    iree::testing::gtest
-)
-
-iree_cc_library(
-  NAME
-    descriptor_set_test_library
-  HDRS
-    "descriptor_set_test.h"
   DEPS
     ::cts_test_base
     iree::base

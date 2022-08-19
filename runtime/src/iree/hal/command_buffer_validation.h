@@ -103,14 +103,6 @@ iree_status_t iree_hal_command_buffer_push_descriptor_set_validation(
     iree_host_size_t binding_count,
     const iree_hal_descriptor_set_binding_t* bindings);
 
-iree_status_t iree_hal_command_buffer_bind_descriptor_set_validation(
-    iree_hal_command_buffer_t* command_buffer,
-    iree_hal_command_buffer_validation_state_t* validation_state,
-    iree_hal_executable_layout_t* executable_layout, uint32_t set,
-    iree_hal_descriptor_set_t* descriptor_set,
-    iree_host_size_t dynamic_offset_count,
-    const iree_device_size_t* dynamic_offsets);
-
 iree_status_t iree_hal_command_buffer_dispatch_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state,

@@ -540,9 +540,8 @@ void HALDialect::registerAttributes() {
 
 void HALDialect::registerTypes() {
   addTypes<AllocatorType, BufferType, BufferViewType, CommandBufferType,
-           DescriptorSetType, DescriptorSetLayoutType, DeviceType, EventType,
-           ExecutableType, ExecutableLayoutType, FenceType, RingBufferType,
-           SemaphoreType>();
+           DescriptorSetLayoutType, DeviceType, EventType, ExecutableType,
+           ExecutableLayoutType, FenceType, RingBufferType, SemaphoreType>();
 }
 
 //===----------------------------------------------------------------------===//
@@ -582,7 +581,6 @@ Type HALDialect::parseType(DialectAsmParser &parser) const {
           .Case("buffer", BufferType::get(getContext()))
           .Case("buffer_view", BufferViewType::get(getContext()))
           .Case("command_buffer", CommandBufferType::get(getContext()))
-          .Case("descriptor_set", DescriptorSetType::get(getContext()))
           .Case("descriptor_set_layout",
                 DescriptorSetLayoutType::get(getContext()))
           .Case("device", DeviceType::get(getContext()))
@@ -609,8 +607,6 @@ void HALDialect::printType(Type type, DialectAsmPrinter &p) const {
     p << "buffer_view";
   } else if (type.isa<CommandBufferType>()) {
     p << "command_buffer";
-  } else if (type.isa<DescriptorSetType>()) {
-    p << "descriptor_set";
   } else if (type.isa<DescriptorSetLayoutType>()) {
     p << "descriptor_set_layout";
   } else if (type.isa<DeviceType>()) {

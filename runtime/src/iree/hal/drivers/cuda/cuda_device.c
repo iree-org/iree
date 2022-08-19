@@ -267,16 +267,6 @@ static iree_status_t iree_hal_cuda_device_create_command_buffer(
   }
 }
 
-static iree_status_t iree_hal_cuda_device_create_descriptor_set(
-    iree_hal_device_t* base_device,
-    iree_hal_descriptor_set_layout_t* set_layout,
-    iree_host_size_t binding_count,
-    const iree_hal_descriptor_set_binding_t* bindings,
-    iree_hal_descriptor_set_t** out_descriptor_set) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "non-push descriptor sets still need work");
-}
-
 static iree_status_t iree_hal_cuda_device_create_descriptor_set_layout(
     iree_hal_device_t* base_device,
     iree_hal_descriptor_set_layout_usage_type_t usage_type,
@@ -411,7 +401,6 @@ static const iree_hal_device_vtable_t iree_hal_cuda_device_vtable = {
     .trim = iree_hal_cuda_device_trim,
     .query_i64 = iree_hal_cuda_device_query_i64,
     .create_command_buffer = iree_hal_cuda_device_create_command_buffer,
-    .create_descriptor_set = iree_hal_cuda_device_create_descriptor_set,
     .create_descriptor_set_layout =
         iree_hal_cuda_device_create_descriptor_set_layout,
     .create_event = iree_hal_cuda_device_create_event,

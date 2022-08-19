@@ -14,7 +14,6 @@ static iree_vm_ref_type_descriptor_t iree_hal_allocator_descriptor = {0};
 static iree_vm_ref_type_descriptor_t iree_hal_buffer_descriptor = {0};
 static iree_vm_ref_type_descriptor_t iree_hal_buffer_view_descriptor = {0};
 static iree_vm_ref_type_descriptor_t iree_hal_command_buffer_descriptor = {0};
-static iree_vm_ref_type_descriptor_t iree_hal_descriptor_set_descriptor = {0};
 static iree_vm_ref_type_descriptor_t iree_hal_descriptor_set_layout_descriptor =
     {0};
 static iree_vm_ref_type_descriptor_t iree_hal_device_descriptor = {0};
@@ -86,9 +85,6 @@ iree_hal_module_register_all_types(iree_vm_instance_t* instance) {
   IREE_VM_REGISTER_HAL_C_TYPE(iree_hal_command_buffer_t, "hal.command_buffer",
                               iree_hal_command_buffer_destroy,
                               iree_hal_command_buffer_descriptor);
-  IREE_VM_REGISTER_HAL_C_TYPE(iree_hal_descriptor_set_t, "hal.descriptor_set",
-                              iree_hal_descriptor_set_destroy,
-                              iree_hal_descriptor_set_descriptor);
   IREE_VM_REGISTER_HAL_C_TYPE(iree_hal_descriptor_set_layout_t,
                               "hal.descriptor_set_layout",
                               iree_hal_descriptor_set_layout_destroy,
@@ -123,8 +119,6 @@ IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_buffer, iree_hal_buffer_t);
 IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_buffer_view, iree_hal_buffer_view_t);
 IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_command_buffer,
                              iree_hal_command_buffer_t);
-IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_descriptor_set,
-                             iree_hal_descriptor_set_t);
 IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_descriptor_set_layout,
                              iree_hal_descriptor_set_layout_t);
 IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_device, iree_hal_device_t);

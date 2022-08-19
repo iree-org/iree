@@ -477,35 +477,6 @@ void CommandBufferPushDescriptorSetOp::build(
 }
 
 //===----------------------------------------------------------------------===//
-// hal.descriptor_set.create
-//===----------------------------------------------------------------------===//
-
-void DescriptorSetCreateOp::build(
-    OpBuilder &builder, OperationState &state, Value device, Value setLayout,
-    ArrayRef<DescriptorSetBindingValue> bindings) {
-  state.addOperands({device, setLayout});
-  SmallVector<Value, 4> bindingOrdinals;
-  SmallVector<Value, 4> bindingBuffers;
-  SmallVector<Value, 4> bindingOffsets;
-  SmallVector<Value, 4> bindingLengths;
-  for (auto binding : bindings) {
-    bindingOrdinals.push_back(binding.ordinal);
-    bindingBuffers.push_back(binding.buffer);
-    bindingOffsets.push_back(binding.byteOffset);
-    bindingLengths.push_back(binding.byteLength);
-  }
-  state.addOperands(bindingOrdinals);
-  state.addOperands(bindingBuffers);
-  state.addOperands(bindingOffsets);
-  state.addOperands(bindingLengths);
-}
-
-void DescriptorSetCreateOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(getResult(), "descriptor_set");
-}
-
-//===----------------------------------------------------------------------===//
 // hal.descriptor_set_layout.create
 //===----------------------------------------------------------------------===//
 

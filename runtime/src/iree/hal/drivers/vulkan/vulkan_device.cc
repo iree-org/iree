@@ -23,7 +23,6 @@
 #include "iree/hal/drivers/vulkan/dynamic_symbols.h"
 #include "iree/hal/drivers/vulkan/extensibility_util.h"
 #include "iree/hal/drivers/vulkan/handle_util.h"
-#include "iree/hal/drivers/vulkan/native_descriptor_set.h"
 #include "iree/hal/drivers/vulkan/native_descriptor_set_layout.h"
 #include "iree/hal/drivers/vulkan/native_event.h"
 #include "iree/hal/drivers/vulkan/native_executable_layout.h"
@@ -1006,17 +1005,6 @@ static iree_status_t iree_hal_vulkan_device_create_command_buffer(
       &device->block_pool, out_command_buffer);
 }
 
-static iree_status_t iree_hal_vulkan_device_create_descriptor_set(
-    iree_hal_device_t* base_device,
-    iree_hal_descriptor_set_layout_t* set_layout,
-    iree_host_size_t binding_count,
-    const iree_hal_descriptor_set_binding_t* bindings,
-    iree_hal_descriptor_set_t** out_descriptor_set) {
-  // TODO(benvanik): rework the create fn to take the bindings.
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "non-push descriptor sets still need work");
-}
-
 static iree_status_t iree_hal_vulkan_device_create_descriptor_set_layout(
     iree_hal_device_t* base_device,
     iree_hal_descriptor_set_layout_usage_type_t usage_type,
@@ -1150,7 +1138,6 @@ const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable = {
     /*.trim=*/iree_hal_vulkan_device_trim,
     /*.query_i64=*/iree_hal_vulkan_device_query_i64,
     /*.create_command_buffer=*/iree_hal_vulkan_device_create_command_buffer,
-    /*.create_descriptor_set=*/iree_hal_vulkan_device_create_descriptor_set,
     /*.create_descriptor_set_layout=*/
     iree_hal_vulkan_device_create_descriptor_set_layout,
     /*.create_event=*/iree_hal_vulkan_device_create_event,

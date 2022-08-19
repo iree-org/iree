@@ -37,8 +37,6 @@ iree_cc_library(
     "handle_util.h"
     "internal_vk_mem_alloc.cc"
     "internal_vk_mem_alloc.h"
-    "native_descriptor_set.cc"
-    "native_descriptor_set.h"
     "native_descriptor_set_layout.cc"
     "native_descriptor_set_layout.h"
     "native_event.cc"

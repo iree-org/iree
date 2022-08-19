@@ -202,16 +202,6 @@ static LogicalResult processOp(IREE::HAL::CommandBufferPushDescriptorSetOp op,
   return success();
 }
 
-static LogicalResult processOp(IREE::HAL::CommandBufferBindDescriptorSetOp op,
-                               CommandBufferState &state) {
-  // TODO(benvanik): descriptor set binding.
-  // For now we just nuke the state.
-  auto *setState = state.getDescriptorSet(op.getSet());
-  if (!setState) return failure();
-  setState->clear();
-  return success();
-}
-
 class ElideRedundantCommandsPass
     : public PassWrapper<ElideRedundantCommandsPass, OperationPass<void>> {
  public:
@@ -265,12 +255,6 @@ class ElideRedundantCommandsPass
                 }
               })
               .Case([&](IREE::HAL::CommandBufferPushDescriptorSetOp op) {
-                resetCommandBufferBarrierBit(op);
-                if (failed(processOp(op, stateMap[op.getCommandBuffer()]))) {
-                  invalidateState(op.getCommandBuffer());
-                }
-              })
-              .Case([&](IREE::HAL::CommandBufferBindDescriptorSetOp op) {
                 resetCommandBufferBarrierBit(op);
                 if (failed(processOp(op, stateMap[op.getCommandBuffer()]))) {
                   invalidateState(op.getCommandBuffer());

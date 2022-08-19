@@ -16,7 +16,6 @@
 #include "iree/hal/drivers/local_task/task_event.h"
 #include "iree/hal/drivers/local_task/task_queue.h"
 #include "iree/hal/drivers/local_task/task_semaphore.h"
-#include "iree/hal/local/local_descriptor_set.h"
 #include "iree/hal/local/local_descriptor_set_layout.h"
 #include "iree/hal/local/local_executable_cache.h"
 #include "iree/hal/local/local_executable_layout.h"
@@ -249,16 +248,6 @@ static iree_status_t iree_hal_task_device_create_command_buffer(
       out_command_buffer);
 }
 
-static iree_status_t iree_hal_task_device_create_descriptor_set(
-    iree_hal_device_t* base_device,
-    iree_hal_descriptor_set_layout_t* set_layout,
-    iree_host_size_t binding_count,
-    const iree_hal_descriptor_set_binding_t* bindings,
-    iree_hal_descriptor_set_t** out_descriptor_set) {
-  return iree_hal_local_descriptor_set_create(set_layout, binding_count,
-                                              bindings, out_descriptor_set);
-}
-
 static iree_status_t iree_hal_task_device_create_descriptor_set_layout(
     iree_hal_device_t* base_device,
     iree_hal_descriptor_set_layout_usage_type_t usage_type,
@@ -390,7 +379,6 @@ static const iree_hal_device_vtable_t iree_hal_task_device_vtable = {
     .trim = iree_hal_task_device_trim,
     .query_i64 = iree_hal_task_device_query_i64,
     .create_command_buffer = iree_hal_task_device_create_command_buffer,
-    .create_descriptor_set = iree_hal_task_device_create_descriptor_set,
     .create_descriptor_set_layout =
         iree_hal_task_device_create_descriptor_set_layout,
     .create_event = iree_hal_task_device_create_event,
