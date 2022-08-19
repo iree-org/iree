@@ -5,7 +5,7 @@ transform.with_pdl_patterns {
   transform.structured.canonicalized_sequence %arg0 {
   ^bb1(%arg1: !pdl.operation):
     %0 = transform.structured.match ops{["linalg.generic"]} in %arg1
-    
+    %fused_fill = transform.structured.match ops{["linalg.fill"]} in %arg1
     // Note: split by 32 to vector-distribute the tail combiner_op, but
     // split by 2 to vector-distribute the meaty %more_parallel_op
     %init_or_alloc_op, %fill_op, %more_parallel_op, %combiner_op = 
@@ -19,6 +19,8 @@ transform.with_pdl_patterns {
        transform.structured.tile_to_foreach_thread_op %more_parallel_op num_threads [4, 2] (mapped to dims [2, 1, 0])
     %foreach_thread_3, %tiled_combiner_op = 
       transform.structured.tile_to_foreach_thread_op %combiner_op num_threads [4] (mapped to dims [2, 1, 0])
+    %foreach_thread_4, %tiled_fused_fill_op = 
+      transform.structured.tile_to_foreach_thread_op %fused_fill num_threads [4] (mapped to dims [2, 1, 0])      
 
     %isolated_handle_1 = transform.get_closest_isolated_parent %foreach_thread_2
     %isolated_handle_2 = transform.structured.vectorize %isolated_handle_1

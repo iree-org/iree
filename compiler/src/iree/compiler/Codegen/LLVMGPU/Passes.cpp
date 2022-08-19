@@ -296,8 +296,22 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
 }
 
 extern llvm::cl::opt<std::string> clGPUCodegenTransformDialectFileName;
+extern llvm::cl::list<int64_t> clGPUCodegenTransformDialectTileSizes;
 
 void addGPUTransformDialectInterpreterPasses(OpPassManager &passManager) {
+  if (!clGPUCodegenTransformDialectTileSizes.empty()) {
+    // First do the tile and distribution to workgroups and remove the
+    // distributions loops. Then apply the transform dialect.
+    passManager.addPass(createTileAndDistributeToWorkgroupsPass());
+    auto &nestedModulePM = passManager.nest<ModuleOp>();
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createConvertToDestinationPassingStylePass());
+    nestedModulePM.addPass(createCanonicalizerPass());
+    nestedModulePM.addPass(createCSEPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createRemoveSingleIterationLoopPass());
+  }
+
   // Give control to the transform dialect.
   passManager.addPass(
       mlir::iree_compiler::createTransformDialectInterpreterPass(
