@@ -308,7 +308,7 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_alloca(
     iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_hal_allocator_pool_id_t pool_id, iree_hal_buffer_params_t params,
+    iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
     iree_device_size_t allocation_size,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer);
 
@@ -453,7 +453,7 @@ typedef struct iree_hal_device_vtable_t {
       iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
       const iree_hal_semaphore_list_t wait_semaphore_list,
       const iree_hal_semaphore_list_t signal_semaphore_list,
-      iree_hal_allocator_pool_id_t pool_id, iree_hal_buffer_params_t params,
+      iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
       iree_device_size_t allocation_size,
       iree_hal_buffer_t** IREE_RESTRICT out_buffer);
 

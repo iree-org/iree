@@ -854,7 +854,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_alloca,  //
       (iree_hal_queue_affinity_t)args->i1;
   iree_hal_fence_t* wait_fence = iree_hal_fence_deref(args->r2);
   iree_hal_fence_t* signal_fence = iree_hal_fence_deref(args->r3);
-  iree_hal_allocator_pool_id_t pool_id = (iree_hal_allocator_pool_id_t)args->i4;
+  iree_hal_allocator_pool_t pool = (iree_hal_allocator_pool_t)args->i4;
   iree_hal_memory_type_t memory_types = (iree_hal_memory_type_t)args->i5;
   iree_hal_buffer_usage_t buffer_usage = (iree_hal_buffer_usage_t)args->i6;
   iree_device_size_t allocation_size = iree_hal_cast_device_size(args->i7);
@@ -866,7 +866,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_alloca,  //
   iree_hal_buffer_t* buffer = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_device_queue_alloca(
       device, queue_affinity, iree_hal_fence_semaphore_list(wait_fence),
-      iree_hal_fence_semaphore_list(signal_fence), pool_id, params,
+      iree_hal_fence_semaphore_list(signal_fence), pool, params,
       allocation_size, &buffer));
 
   rets->r0 = iree_hal_buffer_move_ref(buffer);
