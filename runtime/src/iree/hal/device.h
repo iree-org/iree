@@ -347,6 +347,14 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_execute(
     iree_host_size_t command_buffer_count,
     iree_hal_command_buffer_t* const* command_buffers);
 
+// Enqueues a barrier waiting for |wait_semaphore_list| and signaling
+// |signal_semaphore_list| when reached.
+// Equivalent to iree_hal_device_queue_execute with no command buffers.
+IREE_API_EXPORT iree_status_t iree_hal_device_queue_barrier(
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list);
+
 // Flushes any locally-pending submissions in the queue.
 // When submitting many queue operations this can be used to eagerly flush
 // earlier submissions while later ones are still being constructed.
