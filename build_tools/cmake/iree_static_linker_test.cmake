@@ -9,7 +9,7 @@ include(CMakeParseArguments)
 # iree_static_linker_test()
 #
 # Creates a test with statically linked libraries. Assuming the target backend
-# is llvm-cpu and the driver is the sync driver.
+# is llvm-cpu and the driver is the local-sync driver.
 #
 # Parameters:
 #   NAME: Name of the target
@@ -24,7 +24,7 @@ include(CMakeParseArguments)
 #   COMPILER_FLAGS: additional flags to pass to the compiler. Bytecode output
 #       format and backend flags are passed automatically.
 #   LABELS: Additional labels to apply to the test. The package path and
-#       "driver=${DRIVER}" are added automatically.
+#       "driver=local-sync" are added automatically.
 #   TARGET_CPU_FEATURES: If specified, a string passed as argument to
 #       --iree-llvm-target-cpu-features.
 #
@@ -229,6 +229,8 @@ function(iree_static_linker_test)
       ${_RULE_NAME}
     SRC
       ::${_RULE_NAME}_run
+    DRIVER
+      local-sync
     LABELS
       ${_RULE_LABELS}
       ${_RULE_TARGET_CPU_FEATURES}

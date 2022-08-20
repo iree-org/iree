@@ -70,7 +70,7 @@ iree_status_t create_device_with_static_loader(iree_allocator_t host_allocator,
       &library_loader);
 
   // Use the default host allocator for buffer allocations.
-  iree_string_view_t identifier = iree_make_cstring_view("sync");
+  iree_string_view_t identifier = iree_make_cstring_view("local-sync");
   iree_hal_allocator_t* device_allocator = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_hal_allocator_create_heap(identifier, host_allocator,
@@ -121,7 +121,7 @@ iree_status_t Run() {
         iree_runtime_instance_host_allocator(instance), &session);
   }
 
-  // Load bytecode module from the embedded data. Append to the session.
+  // Load bytecode/c module from the embedded data. Append to the session.
   iree_vm_module_t* module = NULL;
 
   if (iree_status_is_ok(status)) {
