@@ -85,3 +85,42 @@ iree_check_single_backend_test_suite(
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+
+iree_static_linker_test(
+  NAME
+    mnist_fake_weights_llvm_cpu_static_bytecode_test
+  SRC
+    "mnist_fake_weights.mlir"
+  STATIC_LIB_PREFIX
+    mnist_fake_weights_linked_llvm_cpu
+  MAIN_FUNCTION
+    "module.predict"
+  INPUT_SHAPE
+    "1, 28, 28, 1"
+  INPUT_TYPE
+    float
+  HAL_TYPE
+    IREE_HAL_ELEMENT_TYPE_FLOAT_32
+  COMPILER_FLAGS
+    "--iree-input-type=mhlo"
+)
+
+iree_static_linker_test(
+  NAME
+    mnist_fake_weights_llvm_cpu_static_c_test
+  SRC
+    "mnist_fake_weights.mlir"
+  STATIC_LIB_PREFIX
+    mnist_fake_weights_linked_llvm_cpu
+  MAIN_FUNCTION
+    "module.predict"
+  INPUT_SHAPE
+    "1, 28, 28, 1"
+  INPUT_TYPE
+    float
+  HAL_TYPE
+    IREE_HAL_ELEMENT_TYPE_FLOAT_32
+  COMPILER_FLAGS
+    "--iree-input-type=mhlo"
+  EMITC
+)
