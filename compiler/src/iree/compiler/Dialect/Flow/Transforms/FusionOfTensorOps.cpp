@@ -74,9 +74,10 @@ struct FusionOfTensorOpsPass
     // operations. If an operation is used in a named op, it will be computed
     // anyway, so the consumers can just use that value.
     linalg::ControlFusionFn fuseElementwiseOpsControlFn =
-        [&](const OpResult &producerResult, OpOperand &consumerOperand) {
-          Operation *producer = producerResult.getOwner();
-          Operation *consumer = consumerOperand.getOwner();
+        [&](OpOperand *fusedOperand) {
+          Operation *producer = fusedOperand->get().getDefiningOp();
+          if (!producer) return false;
+          Operation *consumer = fusedOperand->getOwner();
 
           // Limit the number of operands. We have hard limit (32) of bindings
           // passing down to HAL. Set the number to be as same as the limit --
@@ -86,9 +87,9 @@ struct FusionOfTensorOpsPass
           operands.insert(producer->operand_begin(), producer->operand_end());
           operands.insert(consumer->operand_begin(),
                           std::next(consumer->operand_begin(),
-                                    consumerOperand.getOperandNumber()));
+                                    fusedOperand->getOperandNumber()));
           operands.insert(std::next(consumer->operand_begin(),
-                                    consumerOperand.getOperandNumber() + 1),
+                                    fusedOperand->getOperandNumber() + 1),
                           consumer->operand_end());
           if (operands.size() >= kIreeMaxOperandCount) return false;
 
@@ -99,10 +100,13 @@ struct FusionOfTensorOpsPass
 
     // Always fold reshape by expansion.
     linalg::ControlFusionFn fuseByExpansionControlFn =
-        [](const OpResult &producer, const OpOperand &consumer) {
+        [](OpOperand *fusedOperand) {
+          Operation *producer = fusedOperand->get().getDefiningOp();
+          if (!producer) {
+            return false;
+          }
           // Do not fuse producer generic op if it has more than one user.
-          if (auto producerGenericOp =
-                  dyn_cast<linalg::GenericOp>(producer.getOwner())) {
+          if (auto producerGenericOp = dyn_cast<linalg::GenericOp>(producer)) {
             return producerGenericOp->hasOneUse();
           }
           // Fuse in all other cases.
@@ -112,9 +116,9 @@ struct FusionOfTensorOpsPass
                                                       fuseByExpansionControlFn);
 
     // Constant fold Linalg operations.
-    auto constantFoldControlFn = [](const OpResult &producer,
-                                    OpOperand &consumer) {
-      return producer.getOwner()->hasOneUse();
+    auto constantFoldControlFn = [](OpOperand *fusedOperand) {
+      auto producer = fusedOperand->get().getDefiningOp();
+      return producer && producer->hasOneUse();
     };
     linalg::populateConstantFoldLinalgOperations(fusionPatterns,
                                                  constantFoldControlFn);
@@ -141,8 +145,13 @@ struct FusionOfTensorOpsPass
 
     // For fusion by collapsing, do so if the reshape is blocking tile and fuse.
     linalg::ControlFusionFn fuseByCollapsingControlFn =
-        [](const OpResult &producer, OpOperand &consumer) {
-          auto reshapeOp = dyn_cast<tensor::ExpandShapeOp>(producer.getOwner());
+        [](OpOperand *fusedOperand) {
+          auto producer = fusedOperand->get().getDefiningOp();
+          if (!producer) {
+            return false;
+          }
+
+          auto reshapeOp = dyn_cast<tensor::ExpandShapeOp>(producer);
           if (!reshapeOp) return true;
 
           return reshapeOp.getSrc().getDefiningOp<linalg::LinalgOp>() !=
