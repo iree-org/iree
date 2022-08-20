@@ -20,6 +20,7 @@ iree_cc_library(
   SRCS
     "ApplyPatterns.cpp"
     "CombineInitializers.cpp"
+    "CombineTempBuffers.cpp"
     "ConvertPrimitiveType.cpp"
     "DropCompilerHints.cpp"
     "FixedPointIterator.cpp"

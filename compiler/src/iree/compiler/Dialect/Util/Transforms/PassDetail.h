@@ -8,6 +8,7 @@
 #define IREE_COMPILER_DIALECT_UTIL_TRANSFORMS_PASS_DETAIL_H_
 
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/FunctionInterfaces.h"
 #include "mlir/Interfaces/CallInterfaces.h"
 #include "mlir/Pass/Pass.h"
 

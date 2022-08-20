@@ -8,6 +8,7 @@
 #define IREE_COMPILER_DIALECT_IREE_TRANSFORMS_PASSES_H_
 
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 
@@ -18,6 +19,8 @@ namespace Util {
 
 std::unique_ptr<OperationPass<void>> createApplyPatternsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createCombineInitializersPass();
+std::unique_ptr<InterfacePass<FunctionOpInterface>>
+createCombineTempBuffersPass();
 std::unique_ptr<OperationPass<void>> createDropCompilerHintsPass();
 std::unique_ptr<OperationPass<void>> createFixedPointIteratorPass(
     OpPassManager pipeline);

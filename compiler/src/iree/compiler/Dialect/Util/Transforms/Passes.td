@@ -23,6 +23,14 @@ def CombineInitializers : Pass<"iree-util-combine-initializers", "mlir::ModuleOp
   }];
 }
 
+def CombineTempBuffers : 
+    InterfacePass<"iree-util-combine-temp-buffers", "mlir::FunctionOpInterface"> {
+  let summary = "Combines temporary buffer allocations into a larger buffer";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Util::createCombineTempBuffersPass()
+  }];
+}
+
 def DropCompilerHints : Pass<"iree-util-drop-compiler-hints", ""> {
   let summary = "Deletes operations that have no runtime equivalent.";
   let description = [{
