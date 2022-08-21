@@ -12,8 +12,8 @@
 #cmakedefine IREE_EMITC_HDR "@IREE_EMITC_HDR@"
 #cmakedefine IREE_MODULE_MAIN_FN "@IREE_MODULE_MAIN_FN@"
 #cmakedefine IREE_INPUT_NUM @IREE_INPUT_NUM@
-#cmakedefine IREE_INPUT_DIM @IREE_INPUT_DIM@
-#cmakedefine IREE_INPUT_DIM_ARR {@IREE_INPUT_DIM@}
+#cmakedefine IREE_INPUT_DIM_MAX @IREE_INPUT_DIM_MAX@
+#cmakedefine IREE_INPUT_DIM_ARR {@IREE_INPUT_DIM_ARR@}
 #cmakedefine IREE_INPUT_TYPE @IREE_INPUT_TYPE@
 #cmakedefine IREE_INPUT_SHAPE_ARR @IREE_INPUT_SHAPE_ARR@
 #cmakedefine IREE_INPUT_SIZE_ARR {@IREE_INPUT_SIZE_ARR@}
@@ -145,7 +145,7 @@ iree_status_t Run() {
   }
 
   // Prepare input.
-  iree_hal_dim_t shape[IREE_INPUT_NUM][IREE_INPUT_DIM] = IREE_INPUT_SHAPE_ARR;
+  iree_hal_dim_t shape[][IREE_INPUT_DIM_MAX] = IREE_INPUT_SHAPE_ARR;
   iree_hal_dim_t size[] = IREE_INPUT_SIZE_ARR;
   iree_hal_buffer_view_t* arg_buffer_views[IREE_INPUT_NUM] = {NULL};
   IREE_INPUT_TYPE* arg_buffers[IREE_INPUT_NUM] = {NULL};

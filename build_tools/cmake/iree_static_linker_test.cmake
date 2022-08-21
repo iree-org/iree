@@ -179,12 +179,16 @@ function(iree_static_linker_test)
   set(_INPUT_DIM_LIST)
   set(_INPUT_SIZE_LIST)
   set(_INPUT_SHAPE_STR "{")
+  set(_INPUT_DIM_MAX 0)
   foreach(_INPUT_SHAPE_ENTRY ${_RULE_INPUT_SHAPE})
     set(_INPUT_SHAPE_STR "${_INPUT_SHAPE_STR}\{${_INPUT_SHAPE_ENTRY}\}, ")
 
     string(REPLACE "," ";" _INPUT_SHAPE_LIST "${_INPUT_SHAPE_ENTRY}")
     list(LENGTH _INPUT_SHAPE_LIST _INPUT_DIM)
     list(APPEND _INPUT_DIM_LIST ${_INPUT_DIM})
+    if(_INPUT_DIM GREATER _INPUT_DIM_MAX)
+      set(_INPUT_DIM_MAX ${_INPUT_DIM})
+    endif()
     set(_INPUT_SIZE 1)
     foreach(_INPUT_DIM_VAL ${_INPUT_SHAPE_LIST})
       math(EXPR _INPUT_SIZE "${_INPUT_SIZE} * ${_INPUT_DIM_VAL}")
@@ -204,7 +208,7 @@ function(iree_static_linker_test)
   set(IREE_EMITC_HDR "${_C_FILE_NAME}")
   set(IREE_MODULE_MAIN_FN "${_RULE_MAIN_FUNCTION}")
   set(IREE_INPUT_NUM "${_INPUT_NUM}")
-  set(IREE_INPUT_DIM "${_INPUT_DIM}")
+  set(IREE_INPUT_DIM_MAX "${_INPUT_DIM_MAX}")
   set(IREE_INPUT_DIM_ARR "${_INPUT_DIM_STR}")
   set(IREE_INPUT_TYPE "${_RULE_INPUT_TYPE}")
   set(IREE_INPUT_SIZE_ARR "${_INPUT_SIZE_STR}")
@@ -223,7 +227,6 @@ function(iree_static_linker_test)
       "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}.c"
     DEPS
       ::${_RULE_NAME}_lib
-      # ::${_MODULE_C_NAME}
       iree::runtime
       iree::hal::drivers::local_sync::sync_driver
       iree::hal::local::loaders::static_library_loader

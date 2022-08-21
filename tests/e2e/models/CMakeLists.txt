@@ -124,3 +124,40 @@ iree_static_linker_test(
     "--iree-input-type=mhlo"
   EMITC
 )
+
+iree_static_linker_test(
+  NAME
+    simple_mul_llvm_cpu_static_bytecode_test
+  SRC
+    "${IREE_ROOT_DIR}/samples/static_library/simple_mul.mlir"
+  STATIC_LIB_PREFIX
+    simple_mul_dispatch_0
+  MAIN_FUNCTION
+    "module.simple_mul"
+  INPUT_SHAPE
+    "4"
+    "4"
+  INPUT_TYPE
+    float
+  HAL_TYPE
+    IREE_HAL_ELEMENT_TYPE_FLOAT_32
+)
+
+iree_static_linker_test(
+  NAME
+    simple_mul_llvm_cpu_static_c_test
+  SRC
+    "${IREE_ROOT_DIR}/samples/static_library/simple_mul.mlir"
+  STATIC_LIB_PREFIX
+    simple_mul_dispatch_0
+  MAIN_FUNCTION
+    "module.simple_mul"
+  INPUT_SHAPE
+    "4"
+    "4"
+  INPUT_TYPE
+    float
+  HAL_TYPE
+    IREE_HAL_ELEMENT_TYPE_FLOAT_32
+  EMITC
+)
