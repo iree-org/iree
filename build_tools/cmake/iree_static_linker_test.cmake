@@ -14,7 +14,6 @@ include(CMakeParseArguments)
 # Parameters:
 #   NAME: Name of the target
 #   SRC: mlir source file to be compiled to an IREE module.
-#   INPUT_SHAPE: Module input shape, assuming "n, h, w, c" format.
 #   INPUT_TYPE: Module input type, assuming native c/c++ data types
 #   HAL_TYPE: HAL data type, see runtime/src/iree/hal/buffer_view.h for possible
 #       options.
@@ -23,6 +22,8 @@ include(CMakeParseArguments)
 #   EMITC: Optional, use emitC instead of vmfb module to define the vm contrl.
 #   COMPILER_FLAGS: additional flags to pass to the compiler. Bytecode output
 #       format and backend flags are passed automatically.
+#   INPUT_SHAPES: Module input shape, assuming "n, h, w, c" format. Support
+#       multiple entries.
 #   LABELS: Additional labels to apply to the test. The package path and
 #       "driver=local-sync" are added automatically.
 #   TARGET_CPU_FEATURES: If specified, a string passed as argument to
@@ -38,7 +39,7 @@ include(CMakeParseArguments)
 #       edge_detection_linked_llvm_cpu
 #     MAIN_FUNCTION
 #       "module.edge_detect_sobel_operator"
-#     INPUT_SHAPE
+#     INPUT_SHAPES
 #       "1, 128, 128, 1"
 #     INPUT_TYPE
 #       float
@@ -65,7 +66,7 @@ function(iree_static_linker_test)
     _RULE
     "EMITC"
     "NAME;SRC;DRIVER;STATIC_LIB_PREFIX;MAIN_FUNCTION;INPUT_TYPE;HAL_TYPE"
-    "COMPILER_FLAGS;LABELS;TARGET_CPU_FEATURES;INPUT_SHAPE"
+    "COMPILER_FLAGS;LABELS;TARGET_CPU_FEATURES;INPUT_SHAPES"
     ${ARGN}
   )
 
@@ -162,10 +163,10 @@ function(iree_static_linker_test)
     PROPERTIES
     LINKER_LANGUAGE C
   )
-  # Set alias for this static library to be used later.
+  # Set alias for this static library to be used later in the function.
   add_library(${_PACKAGE_NS}::${_RULE_NAME}_lib ALIAS ${_LIB_NAME})
 
-  if(NOT _RULE_INPUT_SHAPE OR
+  if(NOT _RULE_INPUT_SHAPES OR
      NOT _RULE_INPUT_TYPE OR
      NOT _RULE_HAL_TYPE OR
      NOT _RULE_MAIN_FUNCTION OR
@@ -174,13 +175,13 @@ function(iree_static_linker_test)
   endif()
 
   # Process module input configs
-  list(LENGTH _RULE_INPUT_SHAPE _INPUT_NUM)
+  list(LENGTH _RULE_INPUT_SHAPES _INPUT_NUM)
 
   set(_INPUT_DIM_LIST)
   set(_INPUT_SIZE_LIST)
-  set(_INPUT_SHAPE_STR "{")
+  set(_INPUT_SHAPE_STR "\{")
   set(_INPUT_DIM_MAX 0)
-  foreach(_INPUT_SHAPE_ENTRY ${_RULE_INPUT_SHAPE})
+  foreach(_INPUT_SHAPE_ENTRY ${_RULE_INPUT_SHAPES})
     set(_INPUT_SHAPE_STR "${_INPUT_SHAPE_STR}\{${_INPUT_SHAPE_ENTRY}\}, ")
 
     string(REPLACE "," ";" _INPUT_SHAPE_LIST "${_INPUT_SHAPE_ENTRY}")
@@ -195,7 +196,7 @@ function(iree_static_linker_test)
     endforeach()
     list(APPEND _INPUT_SIZE_LIST ${_INPUT_SIZE})
   endforeach()
-  set(_INPUT_SHAPE_STR "${_INPUT_SHAPE_STR}}")
+  set(_INPUT_SHAPE_STR "${_INPUT_SHAPE_STR}\}")
   string(REPLACE ";" ", " _INPUT_DIM_STR "${_INPUT_DIM_LIST}")
   string(REPLACE ";" ", " _INPUT_SIZE_STR "${_INPUT_SIZE_LIST}")
 

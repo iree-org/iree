@@ -95,7 +95,7 @@ iree_static_linker_test(
     mnist_fake_weights_linked_llvm_cpu
   MAIN_FUNCTION
     "module.predict"
-  INPUT_SHAPE
+  INPUT_SHAPES
     "1, 28, 28, 1"
   INPUT_TYPE
     float
@@ -114,7 +114,7 @@ iree_static_linker_test(
     mnist_fake_weights_linked_llvm_cpu
   MAIN_FUNCTION
     "module.predict"
-  INPUT_SHAPE
+  INPUT_SHAPES
     "1, 28, 28, 1"
   INPUT_TYPE
     float
@@ -134,7 +134,7 @@ iree_static_linker_test(
     simple_mul_dispatch_0
   MAIN_FUNCTION
     "module.simple_mul"
-  INPUT_SHAPE
+  INPUT_SHAPES
     "4"
     "4"
   INPUT_TYPE
@@ -152,7 +152,7 @@ iree_static_linker_test(
     simple_mul_dispatch_0
   MAIN_FUNCTION
     "module.simple_mul"
-  INPUT_SHAPE
+  INPUT_SHAPES
     "4"
     "4"
   INPUT_TYPE
