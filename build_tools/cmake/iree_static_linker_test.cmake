@@ -64,8 +64,8 @@ function(iree_static_linker_test)
   cmake_parse_arguments(
     _RULE
     "EMITC"
-    "NAME;SRC;DRIVER;STATIC_LIB_PREFIX;MAIN_FUNCTION;INPUT_SHAPE;INPUT_TYPE;HAL_TYPE"
-    "COMPILER_FLAGS;LABELS;TARGET_CPU_FEATURES"
+    "NAME;SRC;DRIVER;STATIC_LIB_PREFIX;MAIN_FUNCTION;INPUT_TYPE;HAL_TYPE"
+    "COMPILER_FLAGS;LABELS;TARGET_CPU_FEATURES;INPUT_SHAPE"
     ${ARGN}
   )
 
@@ -172,13 +172,28 @@ function(iree_static_linker_test)
      NOT _RULE_STATIC_LIB_PREFIX)
     return()
   endif()
-  # Process module configs
-  string(REPLACE "," ";" _INPUT_SHAPE_LIST "${_RULE_INPUT_SHAPE}")
-  list(LENGTH _INPUT_SHAPE_LIST _INPUT_DIM)
-  set(_INPUT_SIZE 1)
-  foreach(_INPUT_NUM ${_INPUT_SHAPE_LIST})
-    math(EXPR _INPUT_SIZE "${_INPUT_SIZE} * ${_INPUT_NUM}")
+
+  # Process module input configs
+  list(LENGTH _RULE_INPUT_SHAPE _INPUT_NUM)
+
+  set(_INPUT_DIM_LIST)
+  set(_INPUT_SIZE_LIST)
+  set(_INPUT_SHAPE_STR "{")
+  foreach(_INPUT_SHAPE_ENTRY ${_RULE_INPUT_SHAPE})
+    set(_INPUT_SHAPE_STR "${_INPUT_SHAPE_STR}\{${_INPUT_SHAPE_ENTRY}\}, ")
+
+    string(REPLACE "," ";" _INPUT_SHAPE_LIST "${_INPUT_SHAPE_ENTRY}")
+    list(LENGTH _INPUT_SHAPE_LIST _INPUT_DIM)
+    list(APPEND _INPUT_DIM_LIST ${_INPUT_DIM})
+    set(_INPUT_SIZE 1)
+    foreach(_INPUT_DIM_VAL ${_INPUT_SHAPE_LIST})
+      math(EXPR _INPUT_SIZE "${_INPUT_SIZE} * ${_INPUT_DIM_VAL}")
+    endforeach()
+    list(APPEND _INPUT_SIZE_LIST ${_INPUT_SIZE})
   endforeach()
+  set(_INPUT_SHAPE_STR "${_INPUT_SHAPE_STR}}")
+  string(REPLACE ";" ", " _INPUT_DIM_STR "${_INPUT_DIM_LIST}")
+  string(REPLACE ";" ", " _INPUT_SIZE_STR "${_INPUT_SIZE_LIST}")
 
   # Generate the source file.
   # TODO(scotttodd): Move to build time instead of configure time?
@@ -188,10 +203,12 @@ function(iree_static_linker_test)
   set(IREE_MODULE_CREATE_FN "${_NAME}_create")
   set(IREE_EMITC_HDR "${_C_FILE_NAME}")
   set(IREE_MODULE_MAIN_FN "${_RULE_MAIN_FUNCTION}")
+  set(IREE_INPUT_NUM "${_INPUT_NUM}")
   set(IREE_INPUT_DIM "${_INPUT_DIM}")
+  set(IREE_INPUT_DIM_ARR "${_INPUT_DIM_STR}")
   set(IREE_INPUT_TYPE "${_RULE_INPUT_TYPE}")
-  set(IREE_INPUT_SIZE "${_INPUT_SIZE}")
-  set(IREE_INPUT_SHAPE "${_RULE_INPUT_SHAPE}")
+  set(IREE_INPUT_SIZE_ARR "${_INPUT_SIZE_STR}")
+  set(IREE_INPUT_SHAPE_ARR "${_INPUT_SHAPE_STR}")
   set(IREE_HAL_TYPE "${_RULE_HAL_TYPE}")
   set(IREE_EXE_NAME ${_RULE_NAME})
   configure_file(

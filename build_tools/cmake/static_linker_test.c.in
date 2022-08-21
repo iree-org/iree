@@ -11,10 +11,12 @@
 #cmakedefine IREE_MODULE_HDR "@IREE_MODULE_HDR@"
 #cmakedefine IREE_EMITC_HDR "@IREE_EMITC_HDR@"
 #cmakedefine IREE_MODULE_MAIN_FN "@IREE_MODULE_MAIN_FN@"
+#cmakedefine IREE_INPUT_NUM @IREE_INPUT_NUM@
 #cmakedefine IREE_INPUT_DIM @IREE_INPUT_DIM@
+#cmakedefine IREE_INPUT_DIM_ARR {@IREE_INPUT_DIM@}
 #cmakedefine IREE_INPUT_TYPE @IREE_INPUT_TYPE@
-#cmakedefine IREE_INPUT_SHAPE {@IREE_INPUT_SHAPE@}
-#cmakedefine IREE_INPUT_SIZE @IREE_INPUT_SIZE@
+#cmakedefine IREE_INPUT_SHAPE_ARR @IREE_INPUT_SHAPE_ARR@
+#cmakedefine IREE_INPUT_SIZE_ARR {@IREE_INPUT_SIZE_ARR@}
 #cmakedefine IREE_HAL_TYPE @IREE_HAL_TYPE@
 #cmakedefine IREE_EXE_NAME "@IREE_EXE_NAME@"
 // clang-format on
@@ -143,37 +145,53 @@ iree_status_t Run() {
   }
 
   // Prepare input.
-  iree_hal_dim_t shape[IREE_INPUT_DIM] = IREE_INPUT_SHAPE;
-  iree_hal_buffer_view_t* arg0_buffer_view = NULL;
-  IREE_INPUT_TYPE kInput[IREE_INPUT_SIZE] = {0};
+  iree_hal_dim_t shape[IREE_INPUT_NUM][IREE_INPUT_DIM] = IREE_INPUT_SHAPE_ARR;
+  iree_hal_dim_t size[] = IREE_INPUT_SIZE_ARR;
+  iree_hal_buffer_view_t* arg_buffer_views[IREE_INPUT_NUM] = {NULL};
+  IREE_INPUT_TYPE* arg_buffers[IREE_INPUT_NUM] = {NULL};
 
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_buffer_view_allocate_buffer(
-        iree_hal_device_allocator(device), IREE_ARRAYSIZE(shape), shape,
-        IREE_HAL_TYPE, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
-        (iree_hal_buffer_params_t){
-            .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
-            .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
-        },
-        iree_make_const_byte_span((void*)kInput,
-                                  sizeof(IREE_INPUT_TYPE) * IREE_INPUT_SIZE),
-        &arg0_buffer_view);
-  }
+  for (int i = 0; i < IREE_INPUT_NUM; ++i) {
+    if (iree_status_is_ok(status)) {
+      arg_buffers[i] = (IREE_INPUT_TYPE*)aligned_alloc(
+          sizeof(iree_device_size_t), sizeof(IREE_INPUT_TYPE) * size[i]);
+      if (arg_buffers[i] == NULL) {
+        status = iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED);
+      }
+    }
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_buffer_view_allocate_buffer(
+          iree_hal_device_allocator(device), IREE_ARRAYSIZE(shape[i]), shape[i],
+          IREE_HAL_TYPE, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
+          (iree_hal_buffer_params_t){
+              .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
+              .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
+          },
+          iree_make_const_byte_span((void*)arg_buffers[i],
+                                    sizeof(IREE_INPUT_TYPE) * size[i]),
+          &arg_buffer_views[i]);
+    }
 
-  // Queue buffer views for input.
-  if (iree_status_is_ok(status)) {
-    status =
-        iree_runtime_call_inputs_push_back_buffer_view(&call, arg0_buffer_view);
+    // Queue buffer views for input.
+    if (iree_status_is_ok(status)) {
+      status =
+          iree_runtime_call_inputs_push_back_buffer_view(&call,
+                                                         arg_buffer_views[i]);
+    }
+    iree_hal_buffer_view_release(arg_buffer_views[i]);
   }
-  iree_hal_buffer_view_release(arg0_buffer_view);
 
   // Invoke call.
   if (iree_status_is_ok(status)) {
     status = iree_runtime_call_invoke(&call, /*flags=*/0);
   }
 
-  // Cleanup call.
+  // Cleanup call and buffers.
   iree_runtime_call_deinitialize(&call);
+  for (int i = 0; i < IREE_INPUT_NUM; ++i) {
+    if (arg_buffers[i] != NULL) {
+      free(arg_buffers[i]);
+    }
+  }
 
   // Cleanup session and instance.
   iree_hal_device_release(device);
