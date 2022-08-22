@@ -1,6 +1,6 @@
 // RUN: iree-opt --pass-pipeline='hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target{test-lowering-configuration=true}))' --split-input-file %s | FileCheck %s
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -16,7 +16,7 @@ hal.executable private @matmul_riscv  {
       native_vector_size = 0 : index,
       target_triple = "riscv32-unknown-unknown-eabi-elf"
     }> {
-    hal.executable.export public @matmul_riscv layout(#executable_layout)
+    hal.executable.export public @matmul_riscv layout(#pipeline_layout)
     builtin.module {
       func.func @matmul_riscv() {
         %cst = arith.constant 0.0 : f32

@@ -7,12 +7,12 @@
 // RUN: FileCheck %s --check-prefix=FOREACH-TO-GPU
 
 #device_target_cuda = #hal.device.target<"cuda", {executable_targets = [#hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_35"}>]}>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>]>]>
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>]>]>
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_35"}>
 module attributes {hal.device.targets = [#device_target_cuda]} {
   hal.executable private @matmul_static_dispatch_0 {
     hal.executable.variant public @cuda_nvptx_fb, target = #executable_target_cuda_nvptx_fb {
-      hal.executable.export public @matmul_static_dispatch_0 ordinal(0) layout(#executable_layout)
+      hal.executable.export public @matmul_static_dispatch_0 ordinal(0) layout(#pipeline_layout)
       builtin.module {
         func.func @matmul_static_dispatch_0() {
           %c0 = arith.constant 0 : index

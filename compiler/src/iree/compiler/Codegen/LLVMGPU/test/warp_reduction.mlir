@@ -1,7 +1,7 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(builtin.module(func.func(iree-llvmgpu-reduction-to-gpu))))' -cse %s | FileCheck %s
 
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -9,7 +9,7 @@
 ]>
 hal.executable private @simple_reduce  {
   hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
-    hal.executable.export @simple_reduce layout(#executable_layout) attributes {
+    hal.executable.export @simple_reduce layout(#pipeline_layout) attributes {
       workgroup_size = [32 : index, 1 : index, 1 : index]
     }
     builtin.module {
@@ -79,7 +79,7 @@ hal.executable private @simple_reduce  {
 // -----
 
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -87,7 +87,7 @@ hal.executable private @simple_reduce  {
 ]>
 hal.executable private @simple_reduce_multi_warp  {
   hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
-    hal.executable.export @simple_reduce_multi_warp layout(#executable_layout) attributes {
+    hal.executable.export @simple_reduce_multi_warp layout(#pipeline_layout) attributes {
       workgroup_size = [64 : index, 1 : index, 1 : index]
     }
     builtin.module {
@@ -163,7 +163,7 @@ hal.executable private @simple_reduce_multi_warp  {
 // -----
 
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -171,7 +171,7 @@ hal.executable private @simple_reduce_multi_warp  {
 ]>
 hal.executable private @reduce_then_broadcast  {
   hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
-    hal.executable.export @reduce_then_broadcast layout(#executable_layout) attributes {
+    hal.executable.export @reduce_then_broadcast layout(#pipeline_layout) attributes {
       workgroup_size = [64 : index, 1 : index, 1 : index]
     }
     builtin.module {

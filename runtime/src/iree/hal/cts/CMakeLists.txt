@@ -13,7 +13,7 @@ set(IREE_ALL_CTS_TESTS
   "driver"
   "event"
   "executable_cache"
-  "executable_layout"
+  "pipeline_layout"
   "semaphore"
   "semaphore_submission"
   PARENT_SCOPE
@@ -134,9 +134,9 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    executable_layout_test_library
+    executable_cache_test_library
   HDRS
-    "executable_layout_test.h"
+    "executable_cache_test.h"
   DEPS
     ::cts_test_base
     iree::base
@@ -146,9 +146,9 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    executable_cache_test_library
+    pipeline_layout_test_library
   HDRS
-    "executable_cache_test.h"
+    "pipeline_layout_test.h"
   DEPS
     ::cts_test_base
     iree::base

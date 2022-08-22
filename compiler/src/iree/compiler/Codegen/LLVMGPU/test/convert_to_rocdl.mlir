@@ -1,7 +1,7 @@
 // RUN: iree-opt --pass-pipeline="hal.executable(hal.executable.variant(builtin.module(iree-convert-to-rocdl)))" %s | FileCheck %s
 
 // Test that that standard and GPU ops are converted to LLVM and NVVM.
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<4, storage_buffer>
@@ -12,7 +12,7 @@
 ]>
 hal.executable @abs_ex_dispatch_0 {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.export @abs_ex_dispatch_0 layout(#executable_layout)
+    hal.executable.export @abs_ex_dispatch_0 layout(#pipeline_layout)
     builtin.module {
       func.func @abs_ex_dispatch_0() {
         %c0 = arith.constant 0 : index

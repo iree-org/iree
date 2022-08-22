@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_HAL_EXECUTABLE_LAYOUT_H_
-#define IREE_HAL_EXECUTABLE_LAYOUT_H_
+#ifndef IREE_HAL_PIPELINE_LAYOUT_H_
+#define IREE_HAL_PIPELINE_LAYOUT_H_
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -84,14 +84,14 @@ IREE_API_EXPORT void iree_hal_descriptor_set_layout_release(
     iree_hal_descriptor_set_layout_t* descriptor_set_layout);
 
 //===----------------------------------------------------------------------===//
-// iree_hal_executable_layout_t
+// iree_hal_pipeline_layout_t
 //===----------------------------------------------------------------------===//
 
 // Defines the resource binding layout used by an executable.
 // A "descriptor" is effectively a bound memory range and each dispatch can use
 // one or more "descriptor sets" to access their I/O memory. A "descriptor set
 // layout" defines the types and usage semantics of the descriptors that make up
-// one set. An "executable layout" defines all of the set layouts that will be
+// one set. An "pipeline layout" defines all of the set layouts that will be
 // used when dispatching. Implementations can use this to verify program
 // correctness and accelerate reservation/allocatation/computation of
 // descriptor-related operations.
@@ -103,24 +103,24 @@ IREE_API_EXPORT void iree_hal_descriptor_set_layout_release(
 //
 // Maps to VkPipelineLayout:
 // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPipelineLayout.html
-typedef struct iree_hal_executable_layout_t iree_hal_executable_layout_t;
+typedef struct iree_hal_pipeline_layout_t iree_hal_pipeline_layout_t;
 
-// Creates an executable layout composed of the given descriptor set layouts.
-// The returned executable layout can be used by multiple executables with the
+// Creates an pipeline layout composed of the given descriptor set layouts.
+// The returned pipeline layout can be used by multiple executables with the
 // same compatible resource binding layouts.
-IREE_API_EXPORT iree_status_t iree_hal_executable_layout_create(
+IREE_API_EXPORT iree_status_t iree_hal_pipeline_layout_create(
     iree_hal_device_t* device, iree_host_size_t push_constants,
     iree_host_size_t set_layout_count,
     iree_hal_descriptor_set_layout_t* const* set_layouts,
-    iree_hal_executable_layout_t** out_executable_layout);
+    iree_hal_pipeline_layout_t** out_pipeline_layout);
 
-// Retains the given |executable_layout| for the caller.
-IREE_API_EXPORT void iree_hal_executable_layout_retain(
-    iree_hal_executable_layout_t* executable_layout);
+// Retains the given |pipeline_layout| for the caller.
+IREE_API_EXPORT void iree_hal_pipeline_layout_retain(
+    iree_hal_pipeline_layout_t* pipeline_layout);
 
-// Releases the given |executable_layout| from the caller.
-IREE_API_EXPORT void iree_hal_executable_layout_release(
-    iree_hal_executable_layout_t* executable_layout);
+// Releases the given |pipeline_layout| from the caller.
+IREE_API_EXPORT void iree_hal_pipeline_layout_release(
+    iree_hal_pipeline_layout_t* pipeline_layout);
 
 //===----------------------------------------------------------------------===//
 // iree_hal_descriptor_set_layout_t implementation details
@@ -136,19 +136,19 @@ IREE_API_EXPORT void iree_hal_descriptor_set_layout_destroy(
     iree_hal_descriptor_set_layout_t* descriptor_set_layout);
 
 //===----------------------------------------------------------------------===//
-// iree_hal_executable_layout_t implementation details
+// iree_hal_pipeline_layout_t implementation details
 //===----------------------------------------------------------------------===//
 
-typedef struct iree_hal_executable_layout_vtable_t {
-  void(IREE_API_PTR* destroy)(iree_hal_executable_layout_t* executable_layout);
-} iree_hal_executable_layout_vtable_t;
-IREE_HAL_ASSERT_VTABLE_LAYOUT(iree_hal_executable_layout_vtable_t);
+typedef struct iree_hal_pipeline_layout_vtable_t {
+  void(IREE_API_PTR* destroy)(iree_hal_pipeline_layout_t* pipeline_layout);
+} iree_hal_pipeline_layout_vtable_t;
+IREE_HAL_ASSERT_VTABLE_LAYOUT(iree_hal_pipeline_layout_vtable_t);
 
-IREE_API_EXPORT void iree_hal_executable_layout_destroy(
-    iree_hal_executable_layout_t* executable_layout);
+IREE_API_EXPORT void iree_hal_pipeline_layout_destroy(
+    iree_hal_pipeline_layout_t* pipeline_layout);
 
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_HAL_EXECUTABLE_LAYOUT_H_
+#endif  // IREE_HAL_PIPELINE_LAYOUT_H_

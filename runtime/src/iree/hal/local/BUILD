@@ -91,14 +91,14 @@ iree_runtime_cc_library(
     srcs = [
         "inline_command_buffer.c",
         "local_executable_cache.c",
-        "local_executable_layout.c",
+        "local_pipeline_layout.c",
     ],
     hdrs = [
         "executable_loader.h",
         "inline_command_buffer.h",
         "local_executable.h",
         "local_executable_cache.h",
-        "local_executable_layout.h",
+        "local_pipeline_layout.h",
     ],
     deps = [
         ":executable_environment",

@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/hal/drivers/vulkan/native_executable_layout.h"
+#include "iree/hal/drivers/vulkan/native_pipeline_layout.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -167,28 +167,28 @@ const iree_hal_descriptor_set_layout_vtable_t
 }  // namespace
 
 //===----------------------------------------------------------------------===//
-// iree_hal_vulkan_native_executable_layout_t
+// iree_hal_vulkan_native_pipeline_layout_t
 //===----------------------------------------------------------------------===//
 
-typedef struct iree_hal_vulkan_native_executable_layout_t {
+typedef struct iree_hal_vulkan_native_pipeline_layout_t {
   iree_hal_resource_t resource;
   VkDeviceHandle* logical_device;
   VkPipelineLayout handle;
   iree_host_size_t set_layout_count;
   iree_hal_descriptor_set_layout_t* set_layouts[];
-} iree_hal_vulkan_native_executable_layout_t;
+} iree_hal_vulkan_native_pipeline_layout_t;
 
 namespace {
-extern const iree_hal_executable_layout_vtable_t
-    iree_hal_vulkan_native_executable_layout_vtable;
+extern const iree_hal_pipeline_layout_vtable_t
+    iree_hal_vulkan_native_pipeline_layout_vtable;
 }  // namespace
 
-static iree_hal_vulkan_native_executable_layout_t*
-iree_hal_vulkan_native_executable_layout_cast(
-    iree_hal_executable_layout_t* base_value) {
+static iree_hal_vulkan_native_pipeline_layout_t*
+iree_hal_vulkan_native_pipeline_layout_cast(
+    iree_hal_pipeline_layout_t* base_value) {
   IREE_HAL_ASSERT_TYPE(base_value,
-                       &iree_hal_vulkan_native_executable_layout_vtable);
-  return (iree_hal_vulkan_native_executable_layout_t*)base_value;
+                       &iree_hal_vulkan_native_pipeline_layout_vtable);
+  return (iree_hal_vulkan_native_pipeline_layout_t*)base_value;
 }
 
 static iree_status_t iree_hal_vulkan_create_pipeline_layout(
@@ -232,15 +232,15 @@ static void iree_hal_vulkan_destroy_pipeline_layout(
                                                   logical_device->allocator());
 }
 
-iree_status_t iree_hal_vulkan_native_executable_layout_create(
+iree_status_t iree_hal_vulkan_native_pipeline_layout_create(
     iree::hal::vulkan::VkDeviceHandle* logical_device,
     iree_host_size_t push_constant_count, iree_host_size_t set_layout_count,
     iree_hal_descriptor_set_layout_t* const* set_layouts,
-    iree_hal_executable_layout_t** out_executable_layout) {
+    iree_hal_pipeline_layout_t** out_pipeline_layout) {
   IREE_ASSERT_ARGUMENT(logical_device);
   IREE_ASSERT_ARGUMENT(!set_layout_count || set_layouts);
-  IREE_ASSERT_ARGUMENT(out_executable_layout);
-  *out_executable_layout = NULL;
+  IREE_ASSERT_ARGUMENT(out_pipeline_layout);
+  *out_pipeline_layout = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   VkPipelineLayout handle = VK_NULL_HANDLE;
@@ -249,24 +249,23 @@ iree_status_t iree_hal_vulkan_native_executable_layout_create(
               logical_device, push_constant_count, set_layout_count,
               set_layouts, &handle));
 
-  iree_hal_vulkan_native_executable_layout_t* executable_layout = NULL;
+  iree_hal_vulkan_native_pipeline_layout_t* pipeline_layout = NULL;
   iree_host_size_t total_size =
-      sizeof(*executable_layout) +
-      set_layout_count * sizeof(*executable_layout->set_layouts);
+      sizeof(*pipeline_layout) +
+      set_layout_count * sizeof(*pipeline_layout->set_layouts);
   iree_status_t status = iree_allocator_malloc(
-      logical_device->host_allocator(), total_size, (void**)&executable_layout);
+      logical_device->host_allocator(), total_size, (void**)&pipeline_layout);
   if (iree_status_is_ok(status)) {
-    iree_hal_resource_initialize(
-        &iree_hal_vulkan_native_executable_layout_vtable,
-        &executable_layout->resource);
-    executable_layout->logical_device = logical_device;
-    executable_layout->handle = handle;
-    executable_layout->set_layout_count = set_layout_count;
+    iree_hal_resource_initialize(&iree_hal_vulkan_native_pipeline_layout_vtable,
+                                 &pipeline_layout->resource);
+    pipeline_layout->logical_device = logical_device;
+    pipeline_layout->handle = handle;
+    pipeline_layout->set_layout_count = set_layout_count;
     for (iree_host_size_t i = 0; i < set_layout_count; ++i) {
-      executable_layout->set_layouts[i] = set_layouts[i];
+      pipeline_layout->set_layouts[i] = set_layouts[i];
       iree_hal_descriptor_set_layout_retain(set_layouts[i]);
     }
-    *out_executable_layout = (iree_hal_executable_layout_t*)executable_layout;
+    *out_pipeline_layout = (iree_hal_pipeline_layout_t*)pipeline_layout;
   } else {
     iree_hal_vulkan_destroy_pipeline_layout(logical_device, handle);
   }
@@ -275,52 +274,52 @@ iree_status_t iree_hal_vulkan_native_executable_layout_create(
   return status;
 }
 
-static void iree_hal_vulkan_native_executable_layout_destroy(
-    iree_hal_executable_layout_t* base_executable_layout) {
-  iree_hal_vulkan_native_executable_layout_t* executable_layout =
-      iree_hal_vulkan_native_executable_layout_cast(base_executable_layout);
+static void iree_hal_vulkan_native_pipeline_layout_destroy(
+    iree_hal_pipeline_layout_t* base_pipeline_layout) {
+  iree_hal_vulkan_native_pipeline_layout_t* pipeline_layout =
+      iree_hal_vulkan_native_pipeline_layout_cast(base_pipeline_layout);
   iree_allocator_t host_allocator =
-      executable_layout->logical_device->host_allocator();
+      pipeline_layout->logical_device->host_allocator();
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_hal_vulkan_destroy_pipeline_layout(executable_layout->logical_device,
-                                          executable_layout->handle);
-  for (iree_host_size_t i = 0; i < executable_layout->set_layout_count; ++i) {
-    iree_hal_descriptor_set_layout_release(executable_layout->set_layouts[i]);
+  iree_hal_vulkan_destroy_pipeline_layout(pipeline_layout->logical_device,
+                                          pipeline_layout->handle);
+  for (iree_host_size_t i = 0; i < pipeline_layout->set_layout_count; ++i) {
+    iree_hal_descriptor_set_layout_release(pipeline_layout->set_layouts[i]);
   }
-  iree_allocator_free(host_allocator, executable_layout);
+  iree_allocator_free(host_allocator, pipeline_layout);
 
   IREE_TRACE_ZONE_END(z0);
 }
 
-VkPipelineLayout iree_hal_vulkan_native_executable_layout_handle(
-    iree_hal_executable_layout_t* base_executable_layout) {
-  iree_hal_vulkan_native_executable_layout_t* executable_layout =
-      iree_hal_vulkan_native_executable_layout_cast(base_executable_layout);
-  return executable_layout->handle;
+VkPipelineLayout iree_hal_vulkan_native_pipeline_layout_handle(
+    iree_hal_pipeline_layout_t* base_pipeline_layout) {
+  iree_hal_vulkan_native_pipeline_layout_t* pipeline_layout =
+      iree_hal_vulkan_native_pipeline_layout_cast(base_pipeline_layout);
+  return pipeline_layout->handle;
 }
 
-iree_host_size_t iree_hal_vulkan_native_executable_layout_set_count(
-    iree_hal_executable_layout_t* base_executable_layout) {
-  iree_hal_vulkan_native_executable_layout_t* executable_layout =
-      iree_hal_vulkan_native_executable_layout_cast(base_executable_layout);
-  return executable_layout->set_layout_count;
+iree_host_size_t iree_hal_vulkan_native_pipeline_layout_set_count(
+    iree_hal_pipeline_layout_t* base_pipeline_layout) {
+  iree_hal_vulkan_native_pipeline_layout_t* pipeline_layout =
+      iree_hal_vulkan_native_pipeline_layout_cast(base_pipeline_layout);
+  return pipeline_layout->set_layout_count;
 }
 
-iree_hal_descriptor_set_layout_t* iree_hal_vulkan_native_executable_layout_set(
-    iree_hal_executable_layout_t* base_executable_layout,
+iree_hal_descriptor_set_layout_t* iree_hal_vulkan_native_pipeline_layout_set(
+    iree_hal_pipeline_layout_t* base_pipeline_layout,
     iree_host_size_t set_index) {
-  iree_hal_vulkan_native_executable_layout_t* executable_layout =
-      iree_hal_vulkan_native_executable_layout_cast(base_executable_layout);
-  if (IREE_UNLIKELY(set_index >= executable_layout->set_layout_count)) {
+  iree_hal_vulkan_native_pipeline_layout_t* pipeline_layout =
+      iree_hal_vulkan_native_pipeline_layout_cast(base_pipeline_layout);
+  if (IREE_UNLIKELY(set_index >= pipeline_layout->set_layout_count)) {
     return NULL;
   }
-  return executable_layout->set_layouts[set_index];
+  return pipeline_layout->set_layouts[set_index];
 }
 
 namespace {
-const iree_hal_executable_layout_vtable_t
-    iree_hal_vulkan_native_executable_layout_vtable = {
-        /*.destroy=*/iree_hal_vulkan_native_executable_layout_destroy,
+const iree_hal_pipeline_layout_vtable_t
+    iree_hal_vulkan_native_pipeline_layout_vtable = {
+        /*.destroy=*/iree_hal_vulkan_native_pipeline_layout_destroy,
 };
 }  // namespace

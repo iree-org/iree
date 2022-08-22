@@ -11,7 +11,7 @@
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/cuda/dynamic_symbols.h"
-#include "iree/hal/drivers/cuda/executable_layout.h"
+#include "iree/hal/drivers/cuda/pipeline_layout.h"
 #include "iree/hal/drivers/cuda/status_util.h"
 
 // flatcc schemas:
@@ -30,7 +30,7 @@ typedef struct iree_hal_cuda_native_executable_function_t {
 typedef struct iree_hal_cuda_native_executable_t {
   iree_hal_resource_t resource;
   iree_hal_cuda_context_wrapper_t* context;
-  iree_hal_executable_layout_t** executable_layouts;
+  iree_hal_pipeline_layout_t** pipeline_layouts;
   iree_host_size_t entry_count;
   CUmodule module;
   iree_hal_cuda_native_executable_function_t entry_functions[];
@@ -74,7 +74,7 @@ iree_status_t iree_hal_cuda_native_executable_create(
   iree_host_size_t total_size =
       sizeof(*executable) +
       entry_count * sizeof(iree_hal_cuda_native_executable_function_t) +
-      entry_count * sizeof(iree_hal_executable_layout_t*);
+      entry_count * sizeof(iree_hal_pipeline_layout_t*);
   iree_status_t status = iree_allocator_malloc(context->host_allocator,
                                                total_size, (void**)&executable);
   CUmodule module = NULL;
@@ -84,7 +84,7 @@ iree_status_t iree_hal_cuda_native_executable_create(
     executable->module = module;
     executable->context = context;
 
-    executable->executable_layouts =
+    executable->pipeline_layouts =
         (void*)((char*)executable + sizeof(*executable) +
                 entry_count *
                     sizeof(iree_hal_cuda_native_executable_function_t));
@@ -115,10 +115,8 @@ iree_status_t iree_hal_cuda_native_executable_create(
       executable->entry_functions[i].block_size_z = block_sizes_vec[i].z;
       executable->entry_functions[i].shared_memory_size =
           shared_memory_sizes[i];
-      executable->executable_layouts[i] =
-          executable_params->executable_layouts[i];
-      iree_hal_executable_layout_retain(
-          executable_params->executable_layouts[i]);
+      executable->pipeline_layouts[i] = executable_params->pipeline_layouts[i];
+      iree_hal_pipeline_layout_retain(executable_params->pipeline_layouts[i]);
     }
   }
 
@@ -140,7 +138,7 @@ static void iree_hal_cuda_native_executable_destroy(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   for (iree_host_size_t i = 0; i < executable->entry_count; ++i) {
-    iree_hal_executable_layout_release(executable->executable_layouts[i]);
+    iree_hal_pipeline_layout_release(executable->pipeline_layouts[i]);
   }
   iree_allocator_free(host_allocator, executable);
 
@@ -175,11 +173,11 @@ iree_status_t iree_hal_cuda_native_executable_shared_memory_size(
   return iree_ok_status();
 }
 
-iree_hal_executable_layout_t* iree_hal_cuda_executable_get_layout(
+iree_hal_pipeline_layout_t* iree_hal_cuda_executable_get_layout(
     iree_hal_executable_t* base_executable, int32_t entry_point) {
   iree_hal_cuda_native_executable_t* executable =
       iree_hal_cuda_native_executable_cast(base_executable);
-  return executable->executable_layouts[entry_point];
+  return executable->pipeline_layouts[entry_point];
 }
 
 static const iree_hal_executable_vtable_t

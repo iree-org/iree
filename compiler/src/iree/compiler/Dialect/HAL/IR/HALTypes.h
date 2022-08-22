@@ -105,8 +105,8 @@ struct ExecutableType
   using Base::Base;
 };
 
-struct ExecutableLayoutType
-    : public Type::TypeBase<ExecutableLayoutType, Type, TypeStorage> {
+struct PipelineLayoutType
+    : public Type::TypeBase<PipelineLayoutType, Type, TypeStorage> {
   using Base::Base;
 };
 

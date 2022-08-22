@@ -298,14 +298,14 @@ def HAL_Executable : DialectType<
   let builderCall = "$_builder.getType<IREE::HAL::ExecutableType>()";
 }
 
-def HAL_ExecutableLayout : DialectType<
+def HAL_PipelineLayout : DialectType<
     HAL_Dialect,
-    CPred<"$_self.isa<IREE::HAL::ExecutableLayoutType>()">,
-    "executable_layout"> {
+    CPred<"$_self.isa<IREE::HAL::PipelineLayoutType>()">,
+    "pipeline_layout"> {
   let description = [{
-    An executable layout describing the descriptor sets and push constants used.
+    An pipeline layout describing the descriptor sets and push constants used.
   }];
-  let builderCall = "$_builder.getType<IREE::HAL::ExecutableLayoutType>()";
+  let builderCall = "$_builder.getType<IREE::HAL::PipelineLayoutType>()";
 }
 
 def HAL_Fence : DialectType<
@@ -353,7 +353,7 @@ def HAL_ObjectType : AnyTypeOf<[
   HAL_Device,
   HAL_Event,
   HAL_Executable,
-  HAL_ExecutableLayout,
+  HAL_PipelineLayout,
   HAL_RingBuffer,
   HAL_Semaphore,
 ]>;
@@ -455,7 +455,7 @@ def HAL_DescriptorSetLayoutAttr :
   let summary = [{descriptor set layout specification}];
   let description = [{
     Specifies the layout information of a single set of descriptors used within
-    an executable layout. Multiple of these sets may be used by a single entry
+    an pipeline layout. Multiple of these sets may be used by a single entry
     point to allow for bindings with similar update frequencies to be grouped.
   }];
   let parameters = (ins
@@ -470,9 +470,9 @@ def HAL_DescriptorSetLayoutAttr :
   }];
 }
 
-def HAL_ExecutableLayoutAttr :
-    AttrDef<HAL_Dialect, "ExecutableLayout", []> {
-  let mnemonic = "executable.layout";
+def HAL_PipelineLayoutAttr :
+    AttrDef<HAL_Dialect, "PipelineLayout", []> {
+  let mnemonic = "pipeline.layout";
   let summary = [{executable entry point layout specification}];
   let description = [{
     Specifies the layout information used for interacting with executable

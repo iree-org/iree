@@ -90,12 +90,12 @@ class CommandBufferPushDescriptorSetOpConversion
 
     SmallVector<Value, 8> callOperands = {
         adaptor.getCommandBuffer(),
-        adaptor.getExecutableLayout(),
+        adaptor.getPipelineLayout(),
         adaptor.getSet(),
     };
     SmallVector<int16_t, 5> segmentSizes = {
         /*command_buffer=*/-1,
-        /*executable_layout=*/-1,
+        /*pipeline_layout=*/-1,
         /*set=*/-1,
         /*bindings=*/
         static_cast<int16_t>(adaptor.getBindingOrdinals().size()),

@@ -34,7 +34,7 @@ iree_status_t iree_hal_rocm_native_executable_block_size(
     uint32_t* y, uint32_t* z);
 
 /// Return the layout associated with the entry point.
-iree_hal_executable_layout_t* iree_hal_rocm_executable_get_layout(
+iree_hal_pipeline_layout_t* iree_hal_rocm_executable_get_layout(
     iree_hal_executable_t* executable, int32_t entry_point);
 
 #ifdef __cplusplus

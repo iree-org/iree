@@ -2,7 +2,7 @@
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[8, 64], [8, 4], [0, 0, 4]]>
 #translation = #iree_codegen.translation_info<SPIRVVectorize workload_per_wg = [64, 8]>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -11,7 +11,7 @@
 ]>
 hal.executable private @matmul_static_shape_f16 {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
-    hal.executable.export @matmul_static_shape_f16 layout(#executable_layout) attributes {
+    hal.executable.export @matmul_static_shape_f16 layout(#pipeline_layout) attributes {
       workgroup_size = [16: index, 1: index, 1: index],
       translation_info = #translation
     }
@@ -64,7 +64,7 @@ hal.executable private @matmul_static_shape_f16 {
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[8, 64], [8, 4], [0, 0, 4]]>
 #translation = #iree_codegen.translation_info<SPIRVVectorize workload_per_wg = [64, 8]>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -73,7 +73,7 @@ hal.executable private @matmul_static_shape_f16 {
 ]>
 hal.executable private @matmul_static_shape_f32 {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
-    hal.executable.export @matmul_static_shape_f32 layout(#executable_layout) attributes {
+    hal.executable.export @matmul_static_shape_f32 layout(#pipeline_layout) attributes {
       workgroup_size = [16: index, 1: index, 1: index],
       translation_info = #translation
     }

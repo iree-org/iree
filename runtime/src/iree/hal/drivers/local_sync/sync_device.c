@@ -16,7 +16,7 @@
 #include "iree/hal/drivers/local_sync/sync_semaphore.h"
 #include "iree/hal/local/inline_command_buffer.h"
 #include "iree/hal/local/local_executable_cache.h"
-#include "iree/hal/local/local_executable_layout.h"
+#include "iree/hal/local/local_pipeline_layout.h"
 #include "iree/hal/utils/buffer_transfer.h"
 #include "iree/hal/utils/deferred_command_buffer.h"
 
@@ -232,14 +232,14 @@ static iree_status_t iree_hal_sync_device_create_executable_cache(
       iree_hal_device_host_allocator(base_device), out_executable_cache);
 }
 
-static iree_status_t iree_hal_sync_device_create_executable_layout(
+static iree_status_t iree_hal_sync_device_create_pipeline_layout(
     iree_hal_device_t* base_device, iree_host_size_t push_constants,
     iree_host_size_t set_layout_count,
     iree_hal_descriptor_set_layout_t* const* set_layouts,
-    iree_hal_executable_layout_t** out_executable_layout) {
-  return iree_hal_local_executable_layout_create(
+    iree_hal_pipeline_layout_t** out_pipeline_layout) {
+  return iree_hal_local_pipeline_layout_create(
       push_constants, set_layout_count, set_layouts,
-      iree_hal_device_host_allocator(base_device), out_executable_layout);
+      iree_hal_device_host_allocator(base_device), out_pipeline_layout);
 }
 
 static iree_status_t iree_hal_sync_device_create_semaphore(
@@ -382,7 +382,7 @@ static const iree_hal_device_vtable_t iree_hal_sync_device_vtable = {
         iree_hal_sync_device_create_descriptor_set_layout,
     .create_event = iree_hal_sync_device_create_event,
     .create_executable_cache = iree_hal_sync_device_create_executable_cache,
-    .create_executable_layout = iree_hal_sync_device_create_executable_layout,
+    .create_pipeline_layout = iree_hal_sync_device_create_pipeline_layout,
     .create_semaphore = iree_hal_sync_device_create_semaphore,
     .query_semaphore_compatibility =
         iree_hal_sync_device_query_semaphore_compatibility,

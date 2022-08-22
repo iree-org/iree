@@ -2,7 +2,7 @@
 
 #config = #iree_codegen.lowering_config<tile_sizes = []>
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -11,7 +11,7 @@
 ]>
 hal.executable private @matmul_tensors {
   hal.executable.variant @llvm, target = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {}> {
-    hal.executable.export @illegal layout(#executable_layout) attributes {translation_info = #translation}
+    hal.executable.export @illegal layout(#pipeline_layout) attributes {translation_info = #translation}
     builtin.module {
       func.func @illegal() {
         %c0 = arith.constant 0 : index
@@ -31,7 +31,7 @@ hal.executable private @matmul_tensors {
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[4, 8], [8, 8, 0], [0, 0, 8]], tile_interchange = [[], [], []], native_vector_size = [0, 0, 4]>
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -40,7 +40,7 @@ hal.executable private @matmul_tensors {
 ]>
 hal.executable private @matmul_tensors {
   hal.executable.variant @llvm, target = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {}> {
-    hal.executable.export @illegal layout(#executable_layout) attributes {translation_info = #translation}
+    hal.executable.export @illegal layout(#pipeline_layout) attributes {translation_info = #translation}
     builtin.module {
       func.func @illegal() {
         %c0 = arith.constant 0 : index
@@ -60,7 +60,7 @@ hal.executable private @matmul_tensors {
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 64], [8, 32, 16], [0, 0, 16]]>
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -69,7 +69,7 @@ hal.executable private @matmul_tensors {
 ]>
 hal.executable private @matmul_tensors {
   hal.executable.variant @llvm, target = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {}> {
-    hal.executable.export @illegal layout(#executable_layout) attributes {translation_info = #translation}
+    hal.executable.export @illegal layout(#pipeline_layout) attributes {translation_info = #translation}
     builtin.module {
       func.func @illegal() {
         %c0 = arith.constant 0 : index
@@ -89,7 +89,7 @@ hal.executable private @matmul_tensors {
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 64], [8, 0, 0], [0, 16, 16]]>
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -98,7 +98,7 @@ hal.executable private @matmul_tensors {
 ]>
 hal.executable private @matmul_tensors {
   hal.executable.variant @llvm, target = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {}> {
-    hal.executable.export @illegal layout(#executable_layout) attributes {translation_info = #translation}
+    hal.executable.export @illegal layout(#pipeline_layout) attributes {translation_info = #translation}
     builtin.module {
       func.func @illegal() {
         %c0 = arith.constant 0 : index
@@ -118,7 +118,7 @@ hal.executable private @matmul_tensors {
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[4, 8], [8, 8, 0], [0, 0, 8]], tile_interchange = [[1], [], []]>
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -127,7 +127,7 @@ hal.executable private @matmul_tensors {
 ]>
 hal.executable private @matmul_tensors {
   hal.executable.variant @llvm, target = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {}> {
-    hal.executable.export @illegal layout(#executable_layout) attributes {translation_info = #translation}
+    hal.executable.export @illegal layout(#pipeline_layout) attributes {translation_info = #translation}
     builtin.module {
       func.func @illegal() {
         %c0 = arith.constant 0 : index
@@ -149,7 +149,7 @@ hal.executable private @matmul_tensors {
 // CPUDoubleTilingExpert, checking one test it enough.
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 64], [8, 32, 16], [0, 0, 16]]>
 #translation = #iree_codegen.translation_info<CPUDoubleTilingPadExpert>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -158,7 +158,7 @@ hal.executable private @matmul_tensors {
 ]>
 hal.executable private @matmul_tensors {
   hal.executable.variant @llvm, target = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {}> {
-    hal.executable.export @illegal layout(#executable_layout) attributes {translation_info = #translation}
+    hal.executable.export @illegal layout(#pipeline_layout) attributes {translation_info = #translation}
     builtin.module {
       func.func @illegal() {
         %c0 = arith.constant 0 : index

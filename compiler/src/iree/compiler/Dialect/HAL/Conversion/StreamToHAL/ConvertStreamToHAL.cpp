@@ -722,12 +722,12 @@ struct CmdDispatchOpPattern
   void recordParameters(Location loc, Value device, Value commandBuffer,
                         IREE::Stream::CmdDispatchOp dispatchOp,
                         OpAdaptor adaptor,
-                        IREE::HAL::ExecutableLayoutAttr layoutAttr,
+                        IREE::HAL::PipelineLayoutAttr layoutAttr,
                         OpBuilder &builder) const {
-    auto executableLayout =
+    auto pipelineLayout =
         builder
-            .create<IREE::HAL::ExecutableLayoutLookupOp>(
-                loc, IREE::HAL::ExecutableLayoutType::get(loc.getContext()),
+            .create<IREE::HAL::PipelineLayoutLookupOp>(
+                loc, IREE::HAL::PipelineLayoutType::get(loc.getContext()),
                 device, layoutAttr)
             .getResult();
 
@@ -744,7 +744,7 @@ struct CmdDispatchOpPattern
         pushConstants.push_back(operand);
       }
       builder.create<IREE::HAL::CommandBufferPushConstantsOp>(
-          loc, commandBuffer, executableLayout,
+          loc, commandBuffer, pipelineLayout,
           builder.getIndexAttr(pushConstantBase), pushConstants);
     }
 
@@ -759,7 +759,7 @@ struct CmdDispatchOpPattern
     SmallVector<IREE::HAL::DescriptorSetBindingValue> bindings;
     auto flushSet = [&]() {
       builder.create<IREE::HAL::CommandBufferPushDescriptorSetOp>(
-          loc, commandBuffer, executableLayout, currentSet, bindings);
+          loc, commandBuffer, pipelineLayout, currentSet, bindings);
       bindings.clear();
     };
     for (unsigned i = 0; i < adaptor.getResources().size(); ++i) {

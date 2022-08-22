@@ -17,9 +17,9 @@
 #include "iree/hal/drivers/cuda/cuda_event.h"
 #include "iree/hal/drivers/cuda/dynamic_symbols.h"
 #include "iree/hal/drivers/cuda/event_semaphore.h"
-#include "iree/hal/drivers/cuda/executable_layout.h"
 #include "iree/hal/drivers/cuda/graph_command_buffer.h"
 #include "iree/hal/drivers/cuda/nop_executable_cache.h"
+#include "iree/hal/drivers/cuda/pipeline_layout.h"
 #include "iree/hal/drivers/cuda/status_util.h"
 #include "iree/hal/drivers/cuda/stream_command_buffer.h"
 #include "iree/hal/utils/buffer_transfer.h"
@@ -292,15 +292,15 @@ static iree_status_t iree_hal_cuda_device_create_executable_cache(
       &device->context_wrapper, identifier, out_executable_cache);
 }
 
-static iree_status_t iree_hal_cuda_device_create_executable_layout(
+static iree_status_t iree_hal_cuda_device_create_pipeline_layout(
     iree_hal_device_t* base_device, iree_host_size_t push_constants,
     iree_host_size_t set_layout_count,
     iree_hal_descriptor_set_layout_t* const* set_layouts,
-    iree_hal_executable_layout_t** out_executable_layout) {
+    iree_hal_pipeline_layout_t** out_pipeline_layout) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
-  return iree_hal_cuda_executable_layout_create(
+  return iree_hal_cuda_pipeline_layout_create(
       &device->context_wrapper, set_layout_count, set_layouts, push_constants,
-      out_executable_layout);
+      out_pipeline_layout);
 }
 
 static iree_status_t iree_hal_cuda_device_create_semaphore(
@@ -404,7 +404,7 @@ static const iree_hal_device_vtable_t iree_hal_cuda_device_vtable = {
         iree_hal_cuda_device_create_descriptor_set_layout,
     .create_event = iree_hal_cuda_device_create_event,
     .create_executable_cache = iree_hal_cuda_device_create_executable_cache,
-    .create_executable_layout = iree_hal_cuda_device_create_executable_layout,
+    .create_pipeline_layout = iree_hal_cuda_device_create_pipeline_layout,
     .create_semaphore = iree_hal_cuda_device_create_semaphore,
     .query_semaphore_compatibility =
         iree_hal_cuda_device_query_semaphore_compatibility,

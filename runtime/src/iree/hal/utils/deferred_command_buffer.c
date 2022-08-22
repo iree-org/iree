@@ -33,7 +33,7 @@ typedef enum iree_hal_command_type_e {
 //
 // Each command is allocated from the arena and does *not* retain any resources.
 // We could elide some of these commands by keeping local state however that
-// requires knowing more about the target device (executable layouts, etc) and
+// requires knowing more about the target device (pipeline layouts, etc) and
 // prevents using this as a way to debug or benchmark command buffers. The
 // intent is that each command captures the exact information passed during the
 // call such that the target command buffer cannot tell they were deferred.
@@ -594,7 +594,7 @@ static iree_status_t iree_hal_deferred_command_buffer_apply_copy_buffer(
 
 typedef struct iree_hal_cmd_push_constants_t {
   iree_hal_cmd_header_t header;
-  iree_hal_executable_layout_t* executable_layout;
+  iree_hal_pipeline_layout_t* pipeline_layout;
   iree_host_size_t offset;
   iree_host_size_t values_length;
   uint8_t values[];
@@ -602,18 +602,18 @@ typedef struct iree_hal_cmd_push_constants_t {
 
 static iree_status_t iree_hal_deferred_command_buffer_push_constants(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_layout_t* executable_layout, iree_host_size_t offset,
+    iree_hal_pipeline_layout_t* pipeline_layout, iree_host_size_t offset,
     const void* values, iree_host_size_t values_length) {
   iree_hal_deferred_command_buffer_t* command_buffer =
       iree_hal_deferred_command_buffer_cast(base_command_buffer);
   iree_hal_cmd_list_t* cmd_list = &command_buffer->cmd_list;
   IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
-      command_buffer->resource_set, 1, &executable_layout));
+      command_buffer->resource_set, 1, &pipeline_layout));
   iree_hal_cmd_push_constants_t* cmd = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_cmd_list_append_command(
       cmd_list, IREE_HAL_CMD_PUSH_CONSTANTS,
       sizeof(*cmd) + sizeof(cmd->values[0]) * values_length, (void**)&cmd));
-  cmd->executable_layout = executable_layout;
+  cmd->pipeline_layout = pipeline_layout;
   cmd->offset = offset;
   cmd->values_length = values_length;
   memcpy(cmd->values, values, sizeof(cmd->values[0]) * values_length);
@@ -624,7 +624,7 @@ static iree_status_t iree_hal_deferred_command_buffer_apply_push_constants(
     iree_hal_command_buffer_t* target_command_buffer,
     const iree_hal_cmd_push_constants_t* cmd) {
   return iree_hal_command_buffer_push_constants(
-      target_command_buffer, cmd->executable_layout, cmd->offset, cmd->values,
+      target_command_buffer, cmd->pipeline_layout, cmd->offset, cmd->values,
       cmd->values_length);
 }
 
@@ -634,7 +634,7 @@ static iree_status_t iree_hal_deferred_command_buffer_apply_push_constants(
 
 typedef struct iree_hal_cmd_push_descriptor_set_t {
   iree_hal_cmd_header_t header;
-  iree_hal_executable_layout_t* executable_layout;
+  iree_hal_pipeline_layout_t* pipeline_layout;
   uint32_t set;
   iree_host_size_t binding_count;
   iree_hal_descriptor_set_binding_t bindings[];
@@ -642,14 +642,14 @@ typedef struct iree_hal_cmd_push_descriptor_set_t {
 
 static iree_status_t iree_hal_deferred_command_buffer_push_descriptor_set(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_layout_t* executable_layout, uint32_t set,
+    iree_hal_pipeline_layout_t* pipeline_layout, uint32_t set,
     iree_host_size_t binding_count,
     const iree_hal_descriptor_set_binding_t* bindings) {
   iree_hal_deferred_command_buffer_t* command_buffer =
       iree_hal_deferred_command_buffer_cast(base_command_buffer);
   iree_hal_cmd_list_t* cmd_list = &command_buffer->cmd_list;
   IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
-      command_buffer->resource_set, 1, &executable_layout));
+      command_buffer->resource_set, 1, &pipeline_layout));
   for (iree_host_size_t i = 0; i < binding_count; ++i) {
     IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
         command_buffer->resource_set, 1, &bindings[i].buffer));
@@ -658,7 +658,7 @@ static iree_status_t iree_hal_deferred_command_buffer_push_descriptor_set(
   IREE_RETURN_IF_ERROR(iree_hal_cmd_list_append_command(
       cmd_list, IREE_HAL_CMD_PUSH_DESCRIPTOR_SET,
       sizeof(*cmd) + sizeof(cmd->bindings[0]) * binding_count, (void**)&cmd));
-  cmd->executable_layout = executable_layout;
+  cmd->pipeline_layout = pipeline_layout;
   cmd->set = set;
   cmd->binding_count = binding_count;
   memcpy(cmd->bindings, bindings, sizeof(cmd->bindings[0]) * binding_count);
@@ -669,8 +669,8 @@ static iree_status_t iree_hal_deferred_command_buffer_apply_push_descriptor_set(
     iree_hal_command_buffer_t* target_command_buffer,
     const iree_hal_cmd_push_descriptor_set_t* cmd) {
   return iree_hal_command_buffer_push_descriptor_set(
-      target_command_buffer, cmd->executable_layout, cmd->set,
-      cmd->binding_count, cmd->bindings);
+      target_command_buffer, cmd->pipeline_layout, cmd->set, cmd->binding_count,
+      cmd->bindings);
 }
 
 //===----------------------------------------------------------------------===//

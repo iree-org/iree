@@ -10,7 +10,7 @@
 
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/vulkan/builtin/builtin_shaders_spv.h"
-#include "iree/hal/drivers/vulkan/native_executable_layout.h"
+#include "iree/hal/drivers/vulkan/native_pipeline_layout.h"
 #include "iree/hal/drivers/vulkan/status_util.h"
 
 namespace iree {
@@ -41,8 +41,8 @@ BuiltinExecutables::~BuiltinExecutables() {
                                                logical_device_->allocator());
   }
 
-  if (executable_layout_) {
-    iree_hal_executable_layout_destroy(executable_layout_);
+  if (pipeline_layout_) {
+    iree_hal_pipeline_layout_destroy(pipeline_layout_);
   }
 
   for (size_t i = 0; i < IREE_HAL_VULKAN_BUILTIN_DESCRIPTOR_SET_COUNT; ++i) {
@@ -89,10 +89,10 @@ iree_status_t BuiltinExecutables::InitializeExecutables() {
 
   // Create pipeline layout.
   if (iree_status_is_ok(status)) {
-    status = iree_hal_vulkan_native_executable_layout_create(
+    status = iree_hal_vulkan_native_pipeline_layout_create(
         logical_device_, IREE_HAL_VULKAN_BUILTIN_PUSH_CONSTANT_COUNT / 4,
         IREE_HAL_VULKAN_BUILTIN_DESCRIPTOR_SET_COUNT, descriptor_set_layouts_,
-        &executable_layout_);
+        &pipeline_layout_);
   }
 
   // Create pipeline.
@@ -102,7 +102,7 @@ iree_status_t BuiltinExecutables::InitializeExecutables() {
     pipeline_create_info.pNext = NULL;
     pipeline_create_info.flags = VK_PIPELINE_CREATE_ALLOW_DERIVATIVES_BIT;
     pipeline_create_info.layout =
-        iree_hal_vulkan_native_executable_layout_handle(executable_layout_);
+        iree_hal_vulkan_native_pipeline_layout_handle(pipeline_layout_);
     pipeline_create_info.basePipelineHandle = VK_NULL_HANDLE;
     pipeline_create_info.basePipelineIndex = 0;
     VkPipelineShaderStageCreateInfo* stage_create_info =
@@ -162,8 +162,8 @@ iree_status_t BuiltinExecutables::FillBufferUnaligned(
   binding.offset = 0;
   binding.length = IREE_WHOLE_BUFFER;
   IREE_RETURN_IF_ERROR(descriptor_set_arena->BindDescriptorSet(
-      command_buffer, executable_layout_,
-      IREE_HAL_VULKAN_BUILTIN_DESCRIPTOR_SET, /*binding_count=*/1, &binding));
+      command_buffer, pipeline_layout_, IREE_HAL_VULKAN_BUILTIN_DESCRIPTOR_SET,
+      /*binding_count=*/1, &binding));
 
   logical_device_->syms()->vkCmdBindPipeline(
       command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_);
@@ -173,7 +173,7 @@ iree_status_t BuiltinExecutables::FillBufferUnaligned(
   constants.fill_length_bytes = length;
   logical_device_->syms()->vkCmdPushConstants(
       command_buffer,
-      iree_hal_vulkan_native_executable_layout_handle(executable_layout_),
+      iree_hal_vulkan_native_pipeline_layout_handle(pipeline_layout_),
       VK_SHADER_STAGE_COMPUTE_BIT, /*offset=*/0,
       sizeof(iree_hal_vulkan_builtin_fill_unaligned_constants_t), &constants);
 
@@ -186,7 +186,7 @@ iree_status_t BuiltinExecutables::FillBufferUnaligned(
   // Restore push constants.
   logical_device_->syms()->vkCmdPushConstants(
       command_buffer,
-      iree_hal_vulkan_native_executable_layout_handle(executable_layout_),
+      iree_hal_vulkan_native_pipeline_layout_handle(pipeline_layout_),
       VK_SHADER_STAGE_COMPUTE_BIT, /*offset=*/0,
       sizeof(iree_hal_vulkan_builtin_fill_unaligned_constants_t),
       push_constants_to_restore);

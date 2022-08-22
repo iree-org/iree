@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass{test-lowering-configuration=true}))' %s | FileCheck %s
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -15,7 +15,7 @@ hal.executable @matmul_1x4096x9216 {
         max_compute_workgroup_size = [1024, 1024, 64],
         subgroup_size = 32>>
     }> {
-    hal.executable.export @matmul_1x4096x9216 layout(#executable_layout)
+    hal.executable.export @matmul_1x4096x9216 layout(#pipeline_layout)
     builtin.module {
       func.func @matmul_1x4096x9216() {
         %c36864 = arith.constant 36864 : index

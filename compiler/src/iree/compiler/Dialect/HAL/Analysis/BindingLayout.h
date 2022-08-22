@@ -26,7 +26,7 @@ struct DescriptorSetLayoutBinding {
 };
 
 struct DescriptorSetLayout {
-  // Ordinal of the set within the parent executable layout.
+  // Ordinal of the set within the parent pipeline layout.
   unsigned ordinal;
   // Usage of the descriptor set (such as whether it is persistent or push).
   IREE::HAL::DescriptorSetLayoutUsageType usage;
@@ -34,7 +34,7 @@ struct DescriptorSetLayout {
   SmallVector<DescriptorSetLayoutBinding> bindings;
 };
 
-struct ExecutableLayout {
+struct PipelineLayout {
   // Total number of 32-bit push constants allocated. Not all dispatchable
   // functions using this layout will use all constants.
   int64_t pushConstantCount;
@@ -57,7 +57,7 @@ class BindingLayoutAnalysis {
  public:
   using ExportDispatchMap =
       DenseMap<Operation *, SmallVector<IREE::Stream::CmdDispatchOp>>;
-  using ExportLayoutMap = DenseMap<Operation *, ExecutableLayout>;
+  using ExportLayoutMap = DenseMap<Operation *, PipelineLayout>;
 
   explicit BindingLayoutAnalysis(Operation *rootOp);
 
@@ -66,13 +66,13 @@ class BindingLayoutAnalysis {
       IREE::Stream::ExecutableExportOp exportOp) const;
 
   // Returns a layout used for the given executable export op.
-  const ExecutableLayout &getExecutableLayout(
+  const PipelineLayout &getPipelineLayout(
       IREE::Stream::ExecutableExportOp exportOp) const;
 
  private:
   // All dispatches to a particular executable IREE::Stream::ExecutableExportOp.
   ExportDispatchMap exportDispatches;
-  // Executable layout for each IREE::Stream::ExecutableExportOp.
+  // Pipeline layout for each IREE::Stream::ExecutableExportOp.
   // Many of these may be duplicates.
   ExportLayoutMap exportLayouts;
 };

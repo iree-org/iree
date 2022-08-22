@@ -2,7 +2,7 @@
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[16, 16, 16], [16, 16, 16]]>
 #translation = #iree_codegen.translation_info<SPIRVVectorizeToCooperativeOps workload_per_wg = [16, 16]>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -34,7 +34,7 @@ hal.executable public @matmul_256x1024x128_div_sub {
         max_compute_workgroup_size = [2147483647, 65535, 65535],
         subgroup_size = 32>
        >}> {
-    hal.executable.export public @matmul_256x1024x128_div_sub layout(#executable_layout) attributes {
+    hal.executable.export public @matmul_256x1024x128_div_sub layout(#pipeline_layout) attributes {
       translation_info = #translation,
       workgroup_size = [32 : index, 1 : index, 1 : index]
     } {

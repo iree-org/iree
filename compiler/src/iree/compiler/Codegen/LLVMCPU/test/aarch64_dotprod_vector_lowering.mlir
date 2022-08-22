@@ -2,7 +2,7 @@
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -13,7 +13,7 @@
 
 hal.executable private @foo {
 hal.executable.variant @system_elf_arm_64, target = <"llvm-cpu", "system-elf-arm_64", {cpu_features = "+dotprod", data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android29"}> {
-hal.executable.export @foo layout(#executable_layout)
+hal.executable.export @foo layout(#pipeline_layout)
 builtin.module attributes {llvm.data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", llvm.target_triple = "aarch64-none-linux-android29"} {
 
 func.func @mmt4d_kernel_dispatch() {
