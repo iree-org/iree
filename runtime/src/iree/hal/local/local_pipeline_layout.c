@@ -27,7 +27,7 @@ iree_hal_local_descriptor_set_layout_cast(
 }
 
 iree_status_t iree_hal_local_descriptor_set_layout_create(
-    iree_hal_descriptor_set_layout_usage_type_t usage_type,
+    iree_hal_descriptor_set_layout_flags_t flags,
     iree_host_size_t binding_count,
     const iree_hal_descriptor_set_layout_binding_t* bindings,
     iree_allocator_t host_allocator,
@@ -52,7 +52,7 @@ iree_status_t iree_hal_local_descriptor_set_layout_create(
     iree_hal_resource_initialize(&iree_hal_local_descriptor_set_layout_vtable,
                                  &layout->resource);
     layout->host_allocator = host_allocator;
-    layout->usage_type = usage_type;
+    layout->flags = flags;
     layout->binding_count = binding_count;
     memcpy(layout->bindings, bindings,
            binding_count * sizeof(iree_hal_descriptor_set_layout_binding_t));
@@ -128,8 +128,8 @@ iree_status_t iree_hal_local_pipeline_layout_create(
                                  &layout->resource);
     layout->host_allocator = host_allocator;
     layout->push_constants = push_constants;
-    layout->dynamic_binding_count = 0;
     layout->used_bindings = 0;
+    layout->read_only_bindings = 0;
     layout->set_layout_count = set_layout_count;
     for (iree_host_size_t i = 0; i < set_layout_count; ++i) {
       layout->set_layouts[i] = set_layouts[i];
@@ -138,17 +138,17 @@ iree_status_t iree_hal_local_pipeline_layout_create(
       iree_hal_local_descriptor_set_layout_t* local_set_layout =
           iree_hal_local_descriptor_set_layout_cast(set_layouts[i]);
       for (iree_host_size_t j = 0; j < local_set_layout->binding_count; ++j) {
+        // Track that this binding is used in the sparse set.
+        const iree_hal_local_binding_mask_t binding_bit =
+            1ull << (i * IREE_HAL_LOCAL_MAX_DESCRIPTOR_BINDING_COUNT + j);
+        layout->used_bindings |= binding_bit;
+        // Track which bindings are read-only so we can protect memory and
+        // verify usage.
         const iree_hal_descriptor_set_layout_binding_t* binding =
             &local_set_layout->bindings[j];
-        layout->used_bindings |=
-            1ull << (i * IREE_HAL_LOCAL_MAX_DESCRIPTOR_BINDING_COUNT + j);
-        switch (binding->type) {
-          case IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC:
-          case IREE_HAL_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC:
-            ++layout->dynamic_binding_count;
-            break;
-          default:
-            continue;
+        if (iree_all_bits_set(binding->flags,
+                              IREE_HAL_DESCRIPTOR_FLAG_READ_ONLY)) {
+          layout->read_only_bindings |= binding_bit;
         }
       }
     }

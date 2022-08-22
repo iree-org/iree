@@ -44,7 +44,7 @@ iree_hal_vulkan_native_descriptor_set_layout_cast(
 
 static iree_status_t iree_hal_vulkan_create_descriptor_set_layout(
     VkDeviceHandle* logical_device,
-    iree_hal_descriptor_set_layout_usage_type_t usage_type,
+    iree_hal_descriptor_set_layout_flags_t flags,
     iree_host_size_t binding_count,
     const iree_hal_descriptor_set_layout_binding_t* bindings,
     VkDescriptorSetLayout* out_handle) {
@@ -52,8 +52,7 @@ static iree_status_t iree_hal_vulkan_create_descriptor_set_layout(
   create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
   create_info.pNext = NULL;
   create_info.flags = 0;
-  if (usage_type == IREE_HAL_DESCRIPTOR_SET_LAYOUT_USAGE_TYPE_PUSH_ONLY &&
-      logical_device->enabled_extensions().push_descriptors) {
+  if (logical_device->enabled_extensions().push_descriptors) {
     // Note that we can *only* use push descriptor sets if we set this create
     // flag. If push descriptors aren't supported we emulate them with normal
     // descriptors so it's fine to have kPushOnly without support.
@@ -100,7 +99,7 @@ static void iree_hal_vulkan_destroy_descriptor_set_layout(
 
 iree_status_t iree_hal_vulkan_native_descriptor_set_layout_create(
     VkDeviceHandle* logical_device,
-    iree_hal_descriptor_set_layout_usage_type_t usage_type,
+    iree_hal_descriptor_set_layout_flags_t flags,
     iree_host_size_t binding_count,
     const iree_hal_descriptor_set_layout_binding_t* bindings,
     iree_hal_descriptor_set_layout_t** out_descriptor_set_layout) {
@@ -113,7 +112,7 @@ iree_status_t iree_hal_vulkan_native_descriptor_set_layout_create(
   VkDescriptorSetLayout handle = VK_NULL_HANDLE;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_vulkan_create_descriptor_set_layout(
-              logical_device, usage_type, binding_count, bindings, &handle));
+              logical_device, flags, binding_count, bindings, &handle));
 
   iree_hal_vulkan_native_descriptor_set_layout_t* descriptor_set_layout = NULL;
   iree_status_t status = iree_allocator_malloc(logical_device->host_allocator(),

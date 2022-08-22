@@ -23,7 +23,7 @@ extern "C" {
 
 iree_status_t iree_hal_rocm_descriptor_set_layout_create(
     iree_hal_rocm_context_wrapper_t* context,
-    iree_hal_descriptor_set_layout_usage_type_t usage_type,
+    iree_hal_descriptor_set_layout_flags_t flags,
     iree_host_size_t binding_count,
     const iree_hal_descriptor_set_layout_binding_t* bindings,
     iree_hal_descriptor_set_layout_t** out_descriptor_set_layout);

@@ -125,24 +125,30 @@ def HAL_CommandCategoryBitfieldAttr :
 
 def HAL_DescriptorType_UniformBuffer : I32EnumAttrCase<"UniformBuffer", 6, "uniform_buffer">;
 def HAL_DescriptorType_StorageBuffer : I32EnumAttrCase<"StorageBuffer", 7, "storage_buffer">;
-def HAL_DescriptorType_UniformBufferDynamic : I32EnumAttrCase<"UniformBufferDynamic", 8, "uniform_buffer_dynamic">;
-def HAL_DescriptorType_StorageBufferDynamic : I32EnumAttrCase<"StorageBufferDynamic", 9, "storage_buffer_dynamic">;
 def HAL_DescriptorTypeAttr :
-    I32EnumAttr<"DescriptorType", "IREE HAL DescriptorType", [
+    I32EnumAttr<"DescriptorType", "valid DescriptorType", [
       HAL_DescriptorType_UniformBuffer,
       HAL_DescriptorType_StorageBuffer,
-      HAL_DescriptorType_UniformBufferDynamic,
-      HAL_DescriptorType_StorageBufferDynamic,
     ]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
 }
 
-def HAL_DescriptorSetLayoutUsageType_Immutable : I32EnumAttrCase<"Immutable", 0, "immutable">;
-def HAL_DescriptorSetLayoutUsageType_PushOnly : I32EnumAttrCase<"PushOnly", 1, "push_only">;
-def HAL_DescriptorSetLayoutUsageTypeAttr :
-    I32EnumAttr<"DescriptorSetLayoutUsageType", "IREE HAL DescriptorSetLayoutType", [
-      HAL_DescriptorSetLayoutUsageType_Immutable,
-      HAL_DescriptorSetLayoutUsageType_PushOnly,
+def HAL_DescriptorFlags_None : I32BitEnumAttrCase<"None", 0x0000>;
+def HAL_DescriptorFlags_ReadOnly : I32BitEnumAttrCase<"ReadOnly", 0x0001>;
+def HAL_DescriptorFlagsAttr :
+    I32BitEnumAttr<"DescriptorFlags", "valid Descriptor flags", [
+      HAL_DescriptorFlags_None,
+      HAL_DescriptorFlags_ReadOnly,
+    ]> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
+}
+
+def HAL_DescriptorSetLayoutFlags_None : I32BitEnumAttrCase<"None", 0x0000>;
+def HAL_DescriptorSetLayoutFlags_Reserved : I32BitEnumAttrCase<"Reserved", 0x0001>;
+def HAL_DescriptorSetLayoutFlagsAttr :
+    I32BitEnumAttr<"DescriptorSetLayoutFlags", "valid DescriptorSetLayout flags", [
+      HAL_DescriptorSetLayoutFlags_None,
+      HAL_DescriptorSetLayoutFlags_Reserved,  // to make tblgen happy
     ]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
 }
@@ -438,10 +444,11 @@ def HAL_DescriptorSetBindingAttr :
   }];
   let parameters = (ins
     AttrParameter<"int64_t", "">:$ordinal,
-    AttrParameter<"DescriptorType", "">:$type
+    AttrParameter<"DescriptorType", "">:$type,
+    OptionalParameter<"mlir::Optional<DescriptorFlags>">:$flags
   );
   let assemblyFormat = [{
-    `<` $ordinal `,` $type `>`
+    `<` $ordinal `,` $type (`,` $flags^)? `>`
   }];
 }
 

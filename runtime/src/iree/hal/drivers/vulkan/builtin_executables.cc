@@ -61,11 +61,9 @@ iree_status_t BuiltinExecutables::InitializeExecutables() {
     iree_hal_descriptor_set_layout_binding_t layout_binding;
     layout_binding.binding = 0;
     layout_binding.type = IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    layout_binding.flags = IREE_HAL_DESCRIPTOR_FLAG_NONE;
     IREE_RETURN_IF_ERROR(iree_hal_vulkan_native_descriptor_set_layout_create(
-        logical_device_,
-        i < IREE_HAL_VULKAN_BUILTIN_DESCRIPTOR_SET
-            ? IREE_HAL_DESCRIPTOR_SET_LAYOUT_USAGE_TYPE_IMMUTABLE
-            : IREE_HAL_DESCRIPTOR_SET_LAYOUT_USAGE_TYPE_PUSH_ONLY,
+        logical_device_, IREE_HAL_DESCRIPTOR_SET_LAYOUT_FLAG_NONE,
         /*binding_count=*/1, &layout_binding, &layout));
     descriptor_set_layouts_[i] = layout;
   }

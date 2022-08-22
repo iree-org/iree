@@ -23,13 +23,15 @@ struct DescriptorSetLayoutBinding {
   unsigned ordinal;
   // Storage type of the descriptor resource.
   IREE::HAL::DescriptorType type;
+  // Flags defining how the descriptor behaves.
+  IREE::HAL::DescriptorFlags flags;
 };
 
 struct DescriptorSetLayout {
   // Ordinal of the set within the parent pipeline layout.
   unsigned ordinal;
   // Usage of the descriptor set (such as whether it is persistent or push).
-  IREE::HAL::DescriptorSetLayoutUsageType usage;
+  IREE::HAL::DescriptorSetLayoutFlags flags;
   // Bindings within the layout. Ordinals may be sparse.
   SmallVector<DescriptorSetLayoutBinding> bindings;
 };

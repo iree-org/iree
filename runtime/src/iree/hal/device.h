@@ -408,8 +408,7 @@ typedef struct iree_hal_device_vtable_t {
       iree_hal_command_buffer_t** out_command_buffer);
 
   iree_status_t(IREE_API_PTR* create_descriptor_set_layout)(
-      iree_hal_device_t* device,
-      iree_hal_descriptor_set_layout_usage_type_t usage_type,
+      iree_hal_device_t* device, iree_hal_descriptor_set_layout_flags_t flags,
       iree_host_size_t binding_count,
       const iree_hal_descriptor_set_layout_binding_t* bindings,
       iree_hal_descriptor_set_layout_t** out_descriptor_set_layout);

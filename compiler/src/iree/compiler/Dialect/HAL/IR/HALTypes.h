@@ -159,6 +159,27 @@ static inline AsmPrinter &operator<<(
   printer << mlir::iree_compiler::IREE::HAL::stringifyEnum(param);
   return printer;
 }
+template <>
+struct FieldParser<
+    mlir::Optional<mlir::iree_compiler::IREE::HAL::DescriptorFlags>> {
+  static FailureOr<mlir::iree_compiler::IREE::HAL::DescriptorFlags> parse(
+      AsmParser &parser) {
+    std::string value;
+    if (parser.parseKeywordOrString(&value)) return failure();
+    auto result = mlir::iree_compiler::IREE::HAL::symbolizeEnum<
+        mlir::iree_compiler::IREE::HAL::DescriptorFlags>(value);
+    if (!result.has_value()) return failure();
+    return result.value();
+  }
+};
+static inline AsmPrinter &operator<<(
+    AsmPrinter &printer,
+    mlir::Optional<mlir::iree_compiler::IREE::HAL::DescriptorFlags> param) {
+  printer << (param.has_value()
+                  ? mlir::iree_compiler::IREE::HAL::stringifyEnum(param.value())
+                  : StringRef{""});
+  return printer;
+}
 }  // namespace mlir
 
 // clang-format off: must be included after all LLVM/MLIR headers.

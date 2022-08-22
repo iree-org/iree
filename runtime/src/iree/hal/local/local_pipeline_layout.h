@@ -25,13 +25,13 @@ extern "C" {
 typedef struct iree_hal_local_descriptor_set_layout_t {
   iree_hal_resource_t resource;
   iree_allocator_t host_allocator;
-  iree_hal_descriptor_set_layout_usage_type_t usage_type;
+  iree_hal_descriptor_set_layout_flags_t flags;
   iree_host_size_t binding_count;
   iree_hal_descriptor_set_layout_binding_t bindings[];
 } iree_hal_local_descriptor_set_layout_t;
 
 iree_status_t iree_hal_local_descriptor_set_layout_create(
-    iree_hal_descriptor_set_layout_usage_type_t usage_type,
+    iree_hal_descriptor_set_layout_flags_t flags,
     iree_host_size_t binding_count,
     const iree_hal_descriptor_set_layout_binding_t* bindings,
     iree_allocator_t host_allocator,
@@ -57,8 +57,8 @@ typedef struct iree_hal_local_pipeline_layout_t {
   iree_hal_resource_t resource;
   iree_allocator_t host_allocator;
   iree_host_size_t push_constants;
-  iree_host_size_t dynamic_binding_count;
   iree_hal_local_binding_mask_t used_bindings;
+  iree_hal_local_binding_mask_t read_only_bindings;
   iree_host_size_t set_layout_count;
   iree_hal_descriptor_set_layout_t* set_layouts[];
 } iree_hal_local_pipeline_layout_t;

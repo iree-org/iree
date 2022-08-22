@@ -723,11 +723,11 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_dispatch_indirect,  //
 
 IREE_VM_ABI_EXPORT(iree_hal_module_descriptor_set_layout_create,  //
                    iree_hal_module_state_t,                       //
-                   riCiiD, r) {
+                   riCiiiD, r) {
   iree_hal_device_t* device = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
-  iree_hal_descriptor_set_layout_usage_type_t usage_type =
-      (iree_hal_descriptor_set_layout_usage_type_t)args->i1;
+  iree_hal_descriptor_set_layout_flags_t flags =
+      (iree_hal_descriptor_set_layout_flags_t)args->i1;
 
   iree_host_size_t binding_count = args->a2_count;
   if (IREE_UNLIKELY(binding_count >
@@ -742,11 +742,12 @@ IREE_VM_ABI_EXPORT(iree_hal_module_descriptor_set_layout_create,  //
   for (iree_host_size_t i = 0; i < binding_count; ++i) {
     bindings[i].binding = (uint32_t)args->a2[i].i0;
     bindings[i].type = (iree_hal_descriptor_type_t)args->a2[i].i1;
+    bindings[i].flags = (iree_hal_descriptor_flags_t)args->a2[i].i2;
   }
 
   iree_hal_descriptor_set_layout_t* descriptor_set_layout = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_descriptor_set_layout_create(
-      device, usage_type, binding_count, bindings, &descriptor_set_layout));
+      device, flags, binding_count, bindings, &descriptor_set_layout));
   rets->r0 = iree_hal_descriptor_set_layout_move_ref(descriptor_set_layout);
   return iree_ok_status();
 }

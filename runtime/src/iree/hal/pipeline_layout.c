@@ -24,8 +24,7 @@
 IREE_HAL_API_RETAIN_RELEASE(descriptor_set_layout);
 
 IREE_API_EXPORT iree_status_t iree_hal_descriptor_set_layout_create(
-    iree_hal_device_t* device,
-    iree_hal_descriptor_set_layout_usage_type_t usage_type,
+    iree_hal_device_t* device, iree_hal_descriptor_set_layout_flags_t flags,
     iree_host_size_t binding_count,
     const iree_hal_descriptor_set_layout_binding_t* bindings,
     iree_hal_descriptor_set_layout_t** out_descriptor_set_layout) {
@@ -36,7 +35,7 @@ IREE_API_EXPORT iree_status_t iree_hal_descriptor_set_layout_create(
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status = IREE_HAL_VTABLE_DISPATCH(device, iree_hal_device,
                                                   create_descriptor_set_layout)(
-      device, usage_type, binding_count, bindings, out_descriptor_set_layout);
+      device, flags, binding_count, bindings, out_descriptor_set_layout);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

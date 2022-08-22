@@ -23,21 +23,27 @@ typedef struct iree_hal_device_t iree_hal_device_t;
 // Types and Enums
 //===----------------------------------------------------------------------===//
 
+// A bitmask of flags controlling the behavior of a descriptor set.
+enum iree_hal_descriptor_set_layout_flag_bits_t {
+  IREE_HAL_DESCRIPTOR_SET_LAYOUT_FLAG_NONE = 0u,
+  // TODO(benvanik): add flag bits for binding table usage modes.
+};
+typedef uint32_t iree_hal_descriptor_set_layout_flags_t;
+
 // Specifies the type of a descriptor in a descriptor set.
 typedef enum iree_hal_descriptor_type_e {
   IREE_HAL_DESCRIPTOR_TYPE_UNIFORM_BUFFER = 6,
   IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER = 7,
-  IREE_HAL_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC = 8,
-  IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC = 9,
 } iree_hal_descriptor_type_t;
 
-// Specifies the usage type of the descriptor set.
-typedef enum iree_hal_descriptor_set_layout_usage_type_e {
-  // Descriptor set will be initialized once and never changed.
-  IREE_HAL_DESCRIPTOR_SET_LAYOUT_USAGE_TYPE_IMMUTABLE = 0,
-  // Descriptor set is never created and instead used with push descriptors.
-  IREE_HAL_DESCRIPTOR_SET_LAYOUT_USAGE_TYPE_PUSH_ONLY = 1,
-} iree_hal_descriptor_set_layout_usage_type_t;
+// A bitmask of flags controlling the behavior of a descriptor.
+enum iree_hal_descriptor_flag_bits_t {
+  IREE_HAL_DESCRIPTOR_FLAG_NONE = 0u,
+  // Indicates that the binding is treated as immutable within all dispatches
+  // using it.
+  IREE_HAL_DESCRIPTOR_FLAG_READ_ONLY = 1u << 0,
+};
+typedef uint32_t iree_hal_descriptor_flags_t;
 
 // Specifies a descriptor set layout binding.
 //
@@ -48,6 +54,8 @@ typedef struct iree_hal_descriptor_set_layout_binding_t {
   uint32_t binding;
   // Specifies which type of resource descriptors are used for this binding.
   iree_hal_descriptor_type_t type;
+  // Specifies how the descriptor is used.
+  iree_hal_descriptor_flags_t flags;
 } iree_hal_descriptor_set_layout_binding_t;
 
 //===----------------------------------------------------------------------===//
@@ -69,8 +77,7 @@ typedef struct iree_hal_descriptor_set_layout_t
 
 // Creates a descriptor set layout with the given bindings.
 IREE_API_EXPORT iree_status_t iree_hal_descriptor_set_layout_create(
-    iree_hal_device_t* device,
-    iree_hal_descriptor_set_layout_usage_type_t usage_type,
+    iree_hal_device_t* device, iree_hal_descriptor_set_layout_flags_t flags,
     iree_host_size_t binding_count,
     const iree_hal_descriptor_set_layout_binding_t* bindings,
     iree_hal_descriptor_set_layout_t** out_descriptor_set_layout);
@@ -93,7 +100,7 @@ IREE_API_EXPORT void iree_hal_descriptor_set_layout_release(
 // layout" defines the types and usage semantics of the descriptors that make up
 // one set. An "pipeline layout" defines all of the set layouts that will be
 // used when dispatching. Implementations can use this to verify program
-// correctness and accelerate reservation/allocatation/computation of
+// correctness and accelerate reservation/allocation/computation of
 // descriptor-related operations.
 //
 // Executables can share the same layout even if they do not use all of the
