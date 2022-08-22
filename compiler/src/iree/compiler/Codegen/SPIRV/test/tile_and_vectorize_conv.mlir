@@ -2,7 +2,7 @@
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 4, 4, 16], [0, 4, 1, 4], [0, 0, 0, 0, 1, 1, 4]]>
 #translation = #iree_codegen.translation_info<SPIRVVectorize workload_per_wg = [16, 4, 4]>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -11,7 +11,7 @@
 ]>
 hal.executable private @conv_static_shape_f32 {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
-    hal.executable.export @conv_static_shape_f32 layout(#executable_layout) attributes {
+    hal.executable.export @conv_static_shape_f32 layout(#pipeline_layout) attributes {
       workgroup_size = [4: index, 4: index, 1: index],
       translation_info = #translation
     }
@@ -90,7 +90,7 @@ hal.executable private @conv_static_shape_f32 {
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 4, 4, 16], [0, 1, 1, 4], [0, 0, 0, 0, 1, 1]]>
 #translation = #iree_codegen.translation_info<SPIRVVectorize workload_per_wg = [16, 4, 4]>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -99,7 +99,7 @@ hal.executable private @conv_static_shape_f32 {
 ]>
 hal.executable private @depthwise_conv_static_shape_f32 {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
-    hal.executable.export @depthwise_conv_static_shape_f32 layout(#executable_layout) attributes {
+    hal.executable.export @depthwise_conv_static_shape_f32 layout(#pipeline_layout) attributes {
       workgroup_size = [4: index, 4: index, 4: index],
       translation_info = #translation
     }
@@ -176,7 +176,7 @@ hal.executable private @depthwise_conv_static_shape_f32 {
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 1, 4, 32], [0, 1, 2, 4], [0, 0, 0, 0, 1, 1, 4]]>
 #translation = #iree_codegen.translation_info<SPIRVVectorize workload_per_wg = [32, 4, 1]>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -187,7 +187,7 @@ hal.executable private @depthwise_conv_static_shape_f32 {
 
 hal.executable private @low_padded_conv {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
-    hal.executable.export @low_padded_conv layout(#executable_layout) attributes {
+    hal.executable.export @low_padded_conv layout(#pipeline_layout) attributes {
       workgroup_size = [8: index, 2: index, 1: index],
       translation_info = #translation
     }
@@ -288,7 +288,7 @@ hal.executable private @low_padded_conv {
 
 #config =  #iree_codegen.lowering_config<tile_sizes = [[0, 1, 4, 32], [0, 1, 2, 4], [0, 0, 0, 0, 1, 1]]>
 #translation = #iree_codegen.translation_info<SPIRVVectorize workload_per_wg = [32, 4, 1]>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -299,7 +299,7 @@ hal.executable private @low_padded_conv {
 
 hal.executable private @low_high_padded_depthwise_conv {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
-    hal.executable.export @low_high_padded_depthwise_conv layout(#executable_layout) attributes {
+    hal.executable.export @low_high_padded_depthwise_conv layout(#pipeline_layout) attributes {
       workgroup_size = [8: index, 2: index, 1: index],
       translation_info = #translation
     }

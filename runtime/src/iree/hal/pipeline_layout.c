@@ -44,29 +44,29 @@ IREE_API_EXPORT iree_status_t iree_hal_descriptor_set_layout_create(
 #undef _VTABLE_DISPATCH
 
 //===----------------------------------------------------------------------===//
-// iree_hal_executable_layout_t
+// iree_hal_pipeline_layout_t
 //===----------------------------------------------------------------------===//
 
-#define _VTABLE_DISPATCH(executable_layout, method_name)                  \
-  IREE_HAL_VTABLE_DISPATCH(executable_layout, iree_hal_executable_layout, \
+#define _VTABLE_DISPATCH(pipeline_layout, method_name)                \
+  IREE_HAL_VTABLE_DISPATCH(pipeline_layout, iree_hal_pipeline_layout, \
                            method_name)
 
-IREE_HAL_API_RETAIN_RELEASE(executable_layout);
+IREE_HAL_API_RETAIN_RELEASE(pipeline_layout);
 
-IREE_API_EXPORT iree_status_t iree_hal_executable_layout_create(
+IREE_API_EXPORT iree_status_t iree_hal_pipeline_layout_create(
     iree_hal_device_t* device, iree_host_size_t push_constants,
     iree_host_size_t set_layout_count,
     iree_hal_descriptor_set_layout_t* const* set_layouts,
-    iree_hal_executable_layout_t** out_executable_layout) {
+    iree_hal_pipeline_layout_t** out_pipeline_layout) {
   IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(!set_layout_count || set_layouts);
-  IREE_ASSERT_ARGUMENT(out_executable_layout);
-  *out_executable_layout = NULL;
+  IREE_ASSERT_ARGUMENT(out_pipeline_layout);
+  *out_pipeline_layout = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
-  iree_status_t status = IREE_HAL_VTABLE_DISPATCH(device, iree_hal_device,
-                                                  create_executable_layout)(
-      device, push_constants, set_layout_count, set_layouts,
-      out_executable_layout);
+  iree_status_t status =
+      IREE_HAL_VTABLE_DISPATCH(device, iree_hal_device, create_pipeline_layout)(
+          device, push_constants, set_layout_count, set_layouts,
+          out_pipeline_layout);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

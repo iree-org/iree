@@ -5,7 +5,7 @@
 //   return %result : tensor<f32>
 // }
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -13,7 +13,7 @@
 ]>
 
 hal.executable.source public @executable {
-  hal.executable.export public @abs layout(#executable_layout) {
+  hal.executable.export public @abs layout(#pipeline_layout) {
   ^bb0(%arg0: !hal.device):
     %x, %y, %z = flow.dispatch.default_workgroup_count
     hal.return %x, %y, %z : index, index, index

@@ -2,7 +2,7 @@
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 16], [1, 1]]>
 #translation = #iree_codegen.translation_info<SPIRVDistribute workload_per_wg = [16, 1]>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -11,7 +11,7 @@
 ]>
 hal.executable private @static_scatter_update_slice  {
   hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb"> {
-    hal.executable.export @static_scatter_update_slice layout(#executable_layout) attributes {
+    hal.executable.export @static_scatter_update_slice layout(#pipeline_layout) attributes {
       translation_info = #translation,
       workgroup_size = [16 : index, 1 : index, 1 : index]
     }

@@ -37,7 +37,7 @@ class DescriptorSetArena final {
   // to it.
   iree_status_t BindDescriptorSet(
       VkCommandBuffer command_buffer,
-      iree_hal_executable_layout_t* executable_layout, uint32_t set,
+      iree_hal_pipeline_layout_t* pipeline_layout, uint32_t set,
       iree_host_size_t binding_count,
       const iree_hal_descriptor_set_binding_t* bindings);
 
@@ -51,7 +51,7 @@ class DescriptorSetArena final {
 
   // Pushes the descriptor set to the command buffer, if supported.
   void PushDescriptorSet(VkCommandBuffer command_buffer,
-                         iree_hal_executable_layout_t* executable_layout,
+                         iree_hal_pipeline_layout_t* pipeline_layout,
                          uint32_t set, iree_host_size_t binding_count,
                          const iree_hal_descriptor_set_binding_t* bindings);
 

@@ -221,7 +221,7 @@ vm.import @command_buffer.copy_buffer(
 // Pushes constants for consumption by dispatches.
 vm.import @command_buffer.push_constants(
   %command_buffer : !vm.ref<!hal.command_buffer>,
-  %executable_layout : !vm.ref<!hal.executable_layout>,
+  %pipeline_layout : !vm.ref<!hal.pipeline_layout>,
   %offset : i32,
   %values : i32 ...
 )
@@ -229,7 +229,7 @@ vm.import @command_buffer.push_constants(
 // Pushes a descriptor set to the given set number.
 vm.import @command_buffer.push_descriptor_set(
   %command_buffer : !vm.ref<!hal.command_buffer>,
-  %executable_layout : !vm.ref<!hal.executable_layout>,
+  %pipeline_layout : !vm.ref<!hal.pipeline_layout>,
   %set : i32,
   // <binding, buffer, offset, length>
   %bindings : tuple<i32, !vm.ref<!hal.buffer>, i64, i64>...
@@ -342,21 +342,8 @@ vm.import @executable.create(
   %executable_format : !vm.buffer,
   %executable_data : !vm.buffer,
   %constants : !vm.buffer,
-  %executable_layouts : !vm.ref<!hal.executable_layout>...
+  %pipeline_layouts : !vm.ref<!hal.pipeline_layout>...
 ) -> !vm.ref<!hal.executable>
-attributes {nosideeffects}
-
-//===----------------------------------------------------------------------===//
-// iree_hal_executable_layout_t
-//===----------------------------------------------------------------------===//
-
-// Creates an executable layout from the given descriptor sets and push constant
-// required size.
-vm.import @executable_layout.create(
-  %device : !vm.ref<!hal.device>,
-  %push_constants : i32,
-  %set_layouts : !vm.ref<!hal.descriptor_set_layout>...
-) -> !vm.ref<!hal.executable_layout>
 attributes {nosideeffects}
 
 //===----------------------------------------------------------------------===//
@@ -394,6 +381,19 @@ vm.import @fence.await(
   %fences : !vm.ref<!hal.fence> ...
 ) -> i32
 attributes {vm.yield}
+
+//===----------------------------------------------------------------------===//
+// iree_hal_pipeline_layout_t
+//===----------------------------------------------------------------------===//
+
+// Creates an pipeline layout from the given descriptor sets and push constant
+// required size.
+vm.import @pipeline_layout.create(
+  %device : !vm.ref<!hal.device>,
+  %push_constants : i32,
+  %set_layouts : !vm.ref<!hal.descriptor_set_layout>...
+) -> !vm.ref<!hal.pipeline_layout>
+attributes {nosideeffects}
 
 //===----------------------------------------------------------------------===//
 // iree_hal_semaphore_t

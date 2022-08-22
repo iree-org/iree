@@ -19,8 +19,8 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-void ExecutableLayout::print(llvm::raw_ostream &os) const {
-  os << "ExecutableLayout:\n";
+void PipelineLayout::print(llvm::raw_ostream &os) const {
+  os << "PipelineLayout:\n";
   os << "  push constants: " << pushConstantCount << "\n";
   os << "  sets:\n";
   for (auto &setLayout : setLayouts) {
@@ -53,8 +53,8 @@ static BindingLayoutAnalysis::ExportDispatchMap findAllDispatchSites(
   return dispatchMap;
 }
 
-// Derives an executable layout from all of the dispatches to |exportOp|.
-static ExecutableLayout deriveExportLayout(
+// Derives an pipeline layout from all of the dispatches to |exportOp|.
+static PipelineLayout deriveExportLayout(
     IREE::Stream::ExecutableExportOp exportOp,
     SmallVector<IREE::Stream::CmdDispatchOp> &dispatchOps) {
   auto funcOp = exportOp.lookupFunctionRef();
@@ -104,9 +104,9 @@ static ExecutableLayout deriveExportLayout(
     }
   }
 
-  ExecutableLayout executableLayout;
-  executableLayout.pushConstantCount = operandCount;
-  executableLayout.resourceMap.resize(bindingCount);
+  PipelineLayout pipelineLayout;
+  pipelineLayout.pushConstantCount = operandCount;
+  pipelineLayout.resourceMap.resize(bindingCount);
 
   // Only one set today - this creates a lot of pushes that we can't elide later
   // on once interfaces are materialized.
@@ -121,19 +121,19 @@ static ExecutableLayout deriveExportLayout(
                           ? IREE::HAL::DescriptorType::StorageBuffer
                           : IREE::HAL::DescriptorType::StorageBufferDynamic;
     setLayout.bindings[i] = setBinding;
-    executableLayout.resourceMap[i] =
+    pipelineLayout.resourceMap[i] =
         std::make_pair(setLayout.ordinal, setBinding.ordinal);
   }
-  executableLayout.setLayouts.push_back(setLayout);
+  pipelineLayout.setLayouts.push_back(setLayout);
 
   LLVM_DEBUG({
     auto executableOp = exportOp->getParentOfType<IREE::Stream::ExecutableOp>();
     llvm::dbgs() << "deriveExportLayout(@" << executableOp.getSymName() << "::@"
                  << exportOp.getSymName() << "):\n";
-    executableLayout.print(llvm::dbgs());
+    pipelineLayout.print(llvm::dbgs());
   });
 
-  return executableLayout;
+  return pipelineLayout;
 }
 
 static BindingLayoutAnalysis::ExportLayoutMap deriveExportLayouts(
@@ -159,7 +159,7 @@ BindingLayoutAnalysis::getExportDispatches(
   return it->second;
 }
 
-const ExecutableLayout &BindingLayoutAnalysis::getExecutableLayout(
+const PipelineLayout &BindingLayoutAnalysis::getPipelineLayout(
     IREE::Stream::ExecutableExportOp exportOp) const {
   auto it = exportLayouts.find(exportOp);
   assert(it != exportLayouts.end() && "unanalyzed export");

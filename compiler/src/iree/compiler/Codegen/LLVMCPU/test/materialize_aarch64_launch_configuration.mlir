@@ -1,6 +1,6 @@
 // RUN: iree-opt --pass-pipeline='hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target{test-lowering-configuration=true}))' --split-input-file %s | FileCheck %s
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -14,7 +14,7 @@ hal.executable private @matmul_tensors  {
     native_vector_size = 16 : index,
     target_triple = "aarch64-unknown-unknown-eabi-elf"
   }> {
-    hal.executable.export @matmul_tensors layout(#executable_layout)
+    hal.executable.export @matmul_tensors layout(#pipeline_layout)
     builtin.module {
       func.func @matmul_tensors() {
         %c0 = arith.constant 0 : index
@@ -53,7 +53,7 @@ hal.executable private @matmul_tensors  {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -66,7 +66,7 @@ hal.executable private @batch_matmul_tensors {
     native_vector_size = 16 : index,
     target_triple = "aarch64-unknown-unknown-eabi-elf"
   }> {
-    hal.executable.export @batch_matmul_tensors layout(#executable_layout)
+    hal.executable.export @batch_matmul_tensors layout(#pipeline_layout)
     builtin.module {
       func.func @batch_matmul_tensors() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -104,7 +104,7 @@ hal.executable private @batch_matmul_tensors {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -117,7 +117,7 @@ hal.executable private @matmul_static {
     native_vector_size = 16 : index,
     target_triple = "aarch64-none-linux-android30"
   }> {
-    hal.executable.export public @matmul_static layout(#executable_layout)
+    hal.executable.export public @matmul_static layout(#pipeline_layout)
     builtin.module {
       func.func @matmul_static() {
         %cst = arith.constant 0.0 : f32
@@ -152,7 +152,7 @@ hal.executable private @matmul_static {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -165,7 +165,7 @@ hal.executable private @conv_static {
     native_vector_size = 16 : index,
     target_triple = "aarch64-none-linux-android30"
   }> {
-    hal.executable.export public @conv_static layout(#executable_layout)
+    hal.executable.export public @conv_static layout(#pipeline_layout)
     builtin.module {
       func.func @conv_static() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -193,7 +193,7 @@ hal.executable private @conv_static {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -206,7 +206,7 @@ hal.executable private @restrict_num_workgroups {
     native_vector_size = 16 : index,
     target_triple = "aarch64-none-linux-android30"
   }> {
-    hal.executable.export public @restrict_num_workgroups layout(#executable_layout)
+    hal.executable.export public @restrict_num_workgroups layout(#pipeline_layout)
     builtin.module {
       func.func @restrict_num_workgroups() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -242,7 +242,7 @@ hal.executable private @restrict_num_workgroups {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -255,7 +255,7 @@ hal.executable private @matmul_aarch_i8_i8_i32_static  {
     native_vector_size = 16 : index,
     target_triple = "aarch64-none-linux-android30"
   }> {
-  hal.executable.export public @matmul_aarch_i8_i8_i32_static layout(#executable_layout)
+  hal.executable.export public @matmul_aarch_i8_i8_i32_static layout(#pipeline_layout)
     builtin.module {
       func.func @matmul_aarch_i8_i8_i32_static() {
         %c0_i32 = arith.constant 0 : i32
@@ -284,7 +284,7 @@ hal.executable private @matmul_aarch_i8_i8_i32_static  {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -297,7 +297,7 @@ hal.executable private @matmul_aarch_i8_i8_i32_dynamic  {
     native_vector_size = 16 : index,
     target_triple = "aarch64-none-linux-android30"
   }> {
-  hal.executable.export public @matmul_aarch_i8_i8_i32_dynamic layout(#executable_layout)
+  hal.executable.export public @matmul_aarch_i8_i8_i32_dynamic layout(#pipeline_layout)
     builtin.module {
       func.func @matmul_aarch_i8_i8_i32_dynamic() {
         %c0 = arith.constant 0 : index

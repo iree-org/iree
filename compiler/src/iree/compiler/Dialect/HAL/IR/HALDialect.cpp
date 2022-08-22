@@ -43,8 +43,8 @@ struct HALOpAsmInterface : public OpAsmDialectInterface {
     } else if (auto targetAttr = attr.dyn_cast<ExecutableTargetAttr>()) {
       os << "executable_target_" << targetAttr.getSymbolNameFragment();
       return AliasResult::OverridableAlias;
-    } else if (auto layoutAttr = attr.dyn_cast<ExecutableLayoutAttr>()) {
-      os << "executable_layout";
+    } else if (auto layoutAttr = attr.dyn_cast<PipelineLayoutAttr>()) {
+      os << "pipeline_layout";
       return AliasResult::OverridableAlias;
     }
     return AliasResult::NoAlias;

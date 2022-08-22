@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass{test-lowering-configuration=true}))' %s | FileCheck %s
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<1, storage_buffer>
   ]>
@@ -13,7 +13,7 @@ hal.executable private @static_1d_sort {
         max_compute_workgroup_size = [512, 512, 512],
         subgroup_size = 16>>
     }> {
-    hal.executable.export @static_1d_sort layout(#executable_layout)
+    hal.executable.export @static_1d_sort layout(#pipeline_layout)
     builtin.module {
       func.func @static_1d_sort() {
         %c0 = arith.constant 0 : index
@@ -44,7 +44,7 @@ hal.executable private @static_1d_sort {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -58,7 +58,7 @@ hal.executable private @static_3d_sort {
         max_compute_workgroup_size = [512, 512, 512],
         subgroup_size = 16>>
     }> {
-    hal.executable.export @static_3d_sort layout(#executable_layout)
+    hal.executable.export @static_3d_sort layout(#pipeline_layout)
     builtin.module {
       func.func @static_3d_sort() {
         %c64 = arith.constant 64 : index
@@ -93,7 +93,7 @@ hal.executable private @static_3d_sort {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -107,7 +107,7 @@ hal.executable private @static_1d_fft_stage2 {
         max_compute_workgroup_size = [512, 512, 512],
         subgroup_size = 16>>
     }> {
-    hal.executable.export @static_1d_fft_stage2 layout(#executable_layout)
+    hal.executable.export @static_1d_fft_stage2 layout(#pipeline_layout)
     builtin.module {
       func.func @static_1d_fft_stage2() {
         %c0 = arith.constant 0 : index
@@ -138,7 +138,7 @@ hal.executable private @static_1d_fft_stage2 {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -152,7 +152,7 @@ hal.executable private @static_3d_fft_stage3 {
         max_compute_workgroup_size = [512, 512, 512],
         subgroup_size = 16>>
     }> {
-    hal.executable.export @static_3d_fft_stage3 layout(#executable_layout)
+    hal.executable.export @static_3d_fft_stage3 layout(#pipeline_layout)
     builtin.module {
       func.func @static_3d_fft_stage3() {
         %c0 = arith.constant 0 : index

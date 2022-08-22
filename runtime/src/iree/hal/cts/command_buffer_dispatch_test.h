@@ -34,9 +34,9 @@ class command_buffer_dispatch_test : public CtsTestBase {
         device_, IREE_HAL_DESCRIPTOR_SET_LAYOUT_USAGE_TYPE_PUSH_ONLY,
         IREE_ARRAYSIZE(descriptor_set_layout_bindings),
         descriptor_set_layout_bindings, &descriptor_set_layout_));
-    IREE_ASSERT_OK(iree_hal_executable_layout_create(
+    IREE_ASSERT_OK(iree_hal_pipeline_layout_create(
         device_, /*push_constants=*/0, /*set_layout_count=*/1,
-        &descriptor_set_layout_, &executable_layout_));
+        &descriptor_set_layout_, &pipeline_layout_));
 
     iree_hal_executable_params_t executable_params;
     iree_hal_executable_params_initialize(&executable_params);
@@ -46,8 +46,8 @@ class command_buffer_dispatch_test : public CtsTestBase {
         iree_make_cstring_view(get_test_executable_format());
     executable_params.executable_data = get_test_executable_data(
         iree_make_cstring_view("command_buffer_dispatch_test.bin"));
-    executable_params.executable_layout_count = 1;
-    executable_params.executable_layouts = &executable_layout_;
+    executable_params.pipeline_layout_count = 1;
+    executable_params.pipeline_layouts = &pipeline_layout_;
 
     IREE_ASSERT_OK(iree_hal_executable_cache_prepare_executable(
         executable_cache_, &executable_params, &executable_));
@@ -55,7 +55,7 @@ class command_buffer_dispatch_test : public CtsTestBase {
 
   void CleanupExecutable() {
     iree_hal_executable_release(executable_);
-    iree_hal_executable_layout_release(executable_layout_);
+    iree_hal_pipeline_layout_release(pipeline_layout_);
     iree_hal_descriptor_set_layout_release(descriptor_set_layout_);
     iree_hal_executable_cache_release(executable_cache_);
     IREE_ASSERT_OK(loop_status_);
@@ -64,7 +64,7 @@ class command_buffer_dispatch_test : public CtsTestBase {
   iree_status_t loop_status_ = iree_ok_status();
   iree_hal_executable_cache_t* executable_cache_ = NULL;
   iree_hal_descriptor_set_layout_t* descriptor_set_layout_ = NULL;
-  iree_hal_executable_layout_t* executable_layout_ = NULL;
+  iree_hal_pipeline_layout_t* pipeline_layout_ = NULL;
   iree_hal_executable_t* executable_ = NULL;
 };
 
@@ -113,7 +113,7 @@ TEST_P(command_buffer_dispatch_test, DispatchAbs) {
   };
 
   IREE_ASSERT_OK(iree_hal_command_buffer_push_descriptor_set(
-      command_buffer, executable_layout_, /*set=*/0,
+      command_buffer, pipeline_layout_, /*set=*/0,
       IREE_ARRAYSIZE(descriptor_set_bindings), descriptor_set_bindings));
 
   IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(

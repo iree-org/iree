@@ -42,7 +42,7 @@ iree_hal_local_descriptor_set_layout_cast(
     iree_hal_descriptor_set_layout_t* base_value);
 
 //===----------------------------------------------------------------------===//
-// iree_hal_local_executable_layout_t
+// iree_hal_local_pipeline_layout_t
 //===----------------------------------------------------------------------===//
 
 #define IREE_HAL_LOCAL_MAX_DESCRIPTOR_SET_COUNT 2
@@ -53,7 +53,7 @@ typedef uint64_t iree_hal_local_binding_mask_t;
 #define IREE_HAL_LOCAL_BINDING_MASK_BITS \
   (sizeof(iree_hal_local_binding_mask_t) * 8)
 
-typedef struct iree_hal_local_executable_layout_t {
+typedef struct iree_hal_local_pipeline_layout_t {
   iree_hal_resource_t resource;
   iree_allocator_t host_allocator;
   iree_host_size_t push_constants;
@@ -61,16 +61,16 @@ typedef struct iree_hal_local_executable_layout_t {
   iree_hal_local_binding_mask_t used_bindings;
   iree_host_size_t set_layout_count;
   iree_hal_descriptor_set_layout_t* set_layouts[];
-} iree_hal_local_executable_layout_t;
+} iree_hal_local_pipeline_layout_t;
 
-iree_status_t iree_hal_local_executable_layout_create(
+iree_status_t iree_hal_local_pipeline_layout_create(
     iree_host_size_t push_constants, iree_host_size_t set_layout_count,
     iree_hal_descriptor_set_layout_t* const* set_layouts,
     iree_allocator_t host_allocator,
-    iree_hal_executable_layout_t** out_executable_layout);
+    iree_hal_pipeline_layout_t** out_pipeline_layout);
 
-iree_hal_local_executable_layout_t* iree_hal_local_executable_layout_cast(
-    iree_hal_executable_layout_t* base_value);
+iree_hal_local_pipeline_layout_t* iree_hal_local_pipeline_layout_cast(
+    iree_hal_pipeline_layout_t* base_value);
 
 #ifdef __cplusplus
 }  // extern "C"

@@ -19,7 +19,7 @@
 //    --binding=4xf32=0,0,0,0
 
 // lhs * rhs => dst / s0b0 * s0b1 => s0b2
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -36,7 +36,7 @@ hal.executable.source public @ex {
   //
   // The ordinal is used to specify the entry point on command line tools and
   // must be unique across all entry points within the same executable.
-  hal.executable.export public @elementwise_mul ordinal(0) layout(#executable_layout)
+  hal.executable.export public @elementwise_mul ordinal(0) layout(#pipeline_layout)
 
   // The inner module defining the executable. This may have any number of
   // private functions and only those with declared entry points will be

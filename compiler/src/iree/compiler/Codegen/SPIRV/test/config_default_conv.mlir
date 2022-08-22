@@ -10,7 +10,7 @@
 #map5 = affine_map<(d0)[s0] -> (-d0 + 32, s0)>
 #map6 = affine_map<(d0)[s0] -> (-d0 + 112, s0)>
 #map7 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -26,7 +26,7 @@ hal.executable private @conv_pointwise_112x112x32 {
         max_compute_workgroup_size = [128, 128, 64],
         subgroup_size = 32>>
     }> {
-    hal.executable.export public @conv_pointwise_112x112x32 layout(#executable_layout)
+    hal.executable.export public @conv_pointwise_112x112x32 layout(#pipeline_layout)
     builtin.module {
       func.func @conv_pointwise_112x112x32() {
         %c0 = arith.constant 0 : index

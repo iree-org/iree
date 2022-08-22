@@ -13,14 +13,14 @@ module attributes {hal.device.targets = [
 
 // CHECK: hal.executable private @ex_workgroups
 // CHECK:   hal.executable.variant public @embedded_elf_arm_64, target = #executable_target_embedded_elf_arm_64
-// CHECK:     hal.executable.export public @entry ordinal(0) layout(#executable_layout) {
+// CHECK:     hal.executable.export public @entry ordinal(0) layout(#pipeline_layout) {
 // CHECK-NEXT: ^bb0(%[[DEVICE:.+]]: !hal.device, %[[ARG0:.+]]: index, %[[ARG1:.+]]: index):
 // CHECK-NEXT:   hal.return %[[ARG0]], %[[ARG1]], %[[ARG0]] : index, index, index
 // CHECK-NEXT: }
 // CHECK:     builtin.module
 // CHECK-NEXT:  func.func @entry()
 // CHECK:   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64
-// CHECK:     hal.executable.export public @entry ordinal(0) layout(#executable_layout) {
+// CHECK:     hal.executable.export public @entry ordinal(0) layout(#pipeline_layout) {
 // CHECK-NEXT: ^bb0(%[[DEVICE:.+]]: !hal.device, %[[ARG0:.+]]: index, %[[ARG1:.+]]: index):
 // CHECK-NEXT:   hal.return %[[ARG0]], %[[ARG1]], %[[ARG0]] : index, index, index
 // CHECK-NEXT: }
@@ -66,7 +66,7 @@ module attributes {hal.device.targets = [
 ]} {
 
 hal.executable.source public @ex {
-  hal.executable.export public @entry layout(#hal.executable.layout<push_constants = 1, sets = [
+  hal.executable.export public @entry layout(#hal.pipeline.layout<push_constants = 1, sets = [
     #hal.descriptor_set.layout<0, bindings = [
       #hal.descriptor_set.binding<0, storage_buffer>
     ]>,
@@ -92,11 +92,11 @@ hal.executable.source public @ex {
 
 // CHECK: hal.executable public @ex
 // CHECK:   hal.executable.variant public @embedded_elf_arm_64, target = #executable_target_embedded_elf_arm_64
-// CHECK:     hal.executable.export public @entry layout(#executable_layout)
+// CHECK:     hal.executable.export public @entry layout(#pipeline_layout)
 // CHECK:     builtin.module
 // CHECK-NEXT:  func.func @entry()
 // CHECK:   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64
-// CHECK:     hal.executable.export public @entry layout(#executable_layout)
+// CHECK:     hal.executable.export public @entry layout(#pipeline_layout)
 // CHECK:     builtin.module
 // CHECK-NEXT:  func.func @entry()
 

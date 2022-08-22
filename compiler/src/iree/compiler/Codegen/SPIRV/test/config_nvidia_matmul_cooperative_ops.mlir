@@ -6,7 +6,7 @@
 #map3 = affine_map<(d0)[s0] -> (-d0 + 256, s0)>
 #map4 = affine_map<(d0)[s0] -> (-d0 + 1024, s0)>
 #map5 = affine_map<(d0, d1) -> (d0, d1)>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -38,7 +38,7 @@ hal.executable public @matmul_256x1024x128_div_sub {
         max_compute_workgroup_size = [2147483647, 65535, 65535],
         subgroup_size = 32>
        >}> {
-    hal.executable.export public @matmul_256x1024x128_div_sub layout(#executable_layout)
+    hal.executable.export public @matmul_256x1024x128_div_sub layout(#pipeline_layout)
     builtin.module {
       func.func @matmul_256x1024x128_div_sub() {
         %c0 = arith.constant 0 : index
@@ -98,7 +98,7 @@ hal.executable public @matmul_256x1024x128_div_sub {
 #map2 = affine_map<(d0)[s0] -> (s0, -d0 + 1024)>
 #map3 = affine_map<(d0)[s0] -> (-d0 + 256, s0)>
 #map4 = affine_map<(d0)[s0] -> (-d0 + 1024, s0)>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -128,7 +128,7 @@ hal.executable public @matmul_256x1024x8 {
         max_compute_workgroup_size = [2147483647, 65535, 65535],
         subgroup_size = 32>
        >}> {
-    hal.executable.export public @matmul_256x1024x8 layout(#executable_layout)
+    hal.executable.export public @matmul_256x1024x8 layout(#pipeline_layout)
     builtin.module {
       func.func @matmul_256x1024x8() {
         %c0 = arith.constant 0 : index

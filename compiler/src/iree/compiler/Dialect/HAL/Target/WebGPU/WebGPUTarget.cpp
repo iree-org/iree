@@ -126,7 +126,7 @@ class WebGPUTargetBackend : public TargetBackend {
       // We only have one shader module right now, so all point to index 0.
       // TODO(#7824): Support multiple shader modules per executable.
       uint64_t ordinal =
-          exportOp.getOrdinal().getValueOr(APInt(64, 0)).getZExtValue();
+          exportOp.getOrdinal().value_or(APInt(64, 0)).getZExtValue();
       entryPointOrdinals[ordinal] = 0;
     }
 
@@ -163,7 +163,7 @@ class WebGPUTargetBackend : public TargetBackend {
 
     // Compile SPIR-V to WGSL source code.
     auto wgsl = compileSPIRVToWGSL(spvBinary);
-    if (!wgsl.hasValue()) {
+    if (!wgsl.has_value()) {
       // TODO(scotttodd): restructure branching and write disassembled SPIR-V
       //                  to stderr / an error diagnostic (don't want to
       //                  disassemble if successful + option not set, also
@@ -174,7 +174,7 @@ class WebGPUTargetBackend : public TargetBackend {
     }
     if (!options.dumpBinariesPath.empty()) {
       dumpDataToPath(options.dumpBinariesPath, options.dumpBaseName,
-                     variantOp.getName(), ".wgsl", wgsl.getValue());
+                     variantOp.getName(), ".wgsl", wgsl.value());
     }
 
     // Pack the WGSL and metadata into a FlatBuffer.
@@ -182,7 +182,7 @@ class WebGPUTargetBackend : public TargetBackend {
     iree_WGSLExecutableDef_start_as_root(builder);
 
     iree_WGSLShaderModuleDef_start(builder);
-    auto wgslRef = builder.createString(wgsl.getValue());
+    auto wgslRef = builder.createString(wgsl.value());
     iree_WGSLShaderModuleDef_code_add(builder, wgslRef);
     // TODO(scotttodd): populate source map
     auto shaderModuleRef = iree_WGSLShaderModuleDef_end(builder);

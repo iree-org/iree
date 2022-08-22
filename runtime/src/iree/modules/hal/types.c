@@ -19,9 +19,8 @@ static iree_vm_ref_type_descriptor_t iree_hal_descriptor_set_layout_descriptor =
 static iree_vm_ref_type_descriptor_t iree_hal_device_descriptor = {0};
 static iree_vm_ref_type_descriptor_t iree_hal_event_descriptor = {0};
 static iree_vm_ref_type_descriptor_t iree_hal_executable_descriptor = {0};
-static iree_vm_ref_type_descriptor_t iree_hal_executable_layout_descriptor = {
-    0};
 static iree_vm_ref_type_descriptor_t iree_hal_fence_descriptor = {0};
+static iree_vm_ref_type_descriptor_t iree_hal_pipeline_layout_descriptor = {0};
 static iree_vm_ref_type_descriptor_t iree_hal_semaphore_descriptor = {0};
 
 #define IREE_VM_REGISTER_HAL_C_TYPE(type, name, destroy_fn, descriptor)   \
@@ -95,13 +94,12 @@ iree_hal_module_register_all_types(iree_vm_instance_t* instance) {
   IREE_VM_REGISTER_HAL_C_TYPE(iree_hal_event_t, "hal.event",
                               iree_hal_event_destroy,
                               iree_hal_event_descriptor);
-  IREE_VM_REGISTER_HAL_C_TYPE(iree_hal_executable_layout_t,
-                              "hal.executable_layout",
-                              iree_hal_executable_layout_destroy,
-                              iree_hal_executable_layout_descriptor);
   IREE_VM_REGISTER_HAL_C_TYPE(iree_hal_fence_t, "hal.fence",
                               iree_hal_fence_destroy,
                               iree_hal_fence_descriptor);
+  IREE_VM_REGISTER_HAL_C_TYPE(iree_hal_pipeline_layout_t, "hal.pipeline_layout",
+                              iree_hal_pipeline_layout_destroy,
+                              iree_hal_pipeline_layout_descriptor);
   IREE_VM_REGISTER_HAL_C_TYPE(iree_hal_semaphore_t, "hal.semaphore",
                               iree_hal_semaphore_destroy,
                               iree_hal_semaphore_descriptor);
@@ -124,8 +122,8 @@ IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_descriptor_set_layout,
 IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_device, iree_hal_device_t);
 IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_event, iree_hal_event_t);
 IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_executable, iree_hal_executable_t);
-IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_executable_layout,
-                             iree_hal_executable_layout_t);
+IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_pipeline_layout,
+                             iree_hal_pipeline_layout_t);
 IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_fence, iree_hal_fence_t);
 IREE_VM_DEFINE_TYPE_ADAPTERS(iree_hal_semaphore, iree_hal_semaphore_t);
 

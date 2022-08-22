@@ -649,7 +649,7 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_copy_buffer(
 
 static iree_status_t iree_hal_vulkan_direct_command_buffer_push_constants(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_layout_t* executable_layout, iree_host_size_t offset,
+    iree_hal_pipeline_layout_t* pipeline_layout, iree_host_size_t offset,
     const void* values, iree_host_size_t values_length) {
   iree_hal_vulkan_direct_command_buffer_t* command_buffer =
       iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
@@ -663,7 +663,7 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_push_constants(
 
   command_buffer->syms->vkCmdPushConstants(
       command_buffer->handle,
-      iree_hal_vulkan_native_executable_layout_handle(executable_layout),
+      iree_hal_vulkan_native_pipeline_layout_handle(pipeline_layout),
       VK_SHADER_STAGE_COMPUTE_BIT, (uint32_t)offset, (uint32_t)values_length,
       values);
 
@@ -672,7 +672,7 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_push_constants(
 
 static iree_status_t iree_hal_vulkan_direct_command_buffer_push_descriptor_set(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_layout_t* executable_layout, uint32_t set,
+    iree_hal_pipeline_layout_t* pipeline_layout, uint32_t set,
     iree_host_size_t binding_count,
     const iree_hal_descriptor_set_binding_t* bindings) {
   iree_hal_vulkan_direct_command_buffer_t* command_buffer =
@@ -687,7 +687,7 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_push_descriptor_set(
   // Either allocate, update, and bind a descriptor set or use push descriptor
   // sets to use the command buffer pool when supported.
   return command_buffer->descriptor_set_arena.BindDescriptorSet(
-      command_buffer->handle, executable_layout, set, binding_count, bindings);
+      command_buffer->handle, pipeline_layout, set, binding_count, bindings);
 }
 
 static iree_status_t iree_hal_vulkan_direct_command_buffer_dispatch(

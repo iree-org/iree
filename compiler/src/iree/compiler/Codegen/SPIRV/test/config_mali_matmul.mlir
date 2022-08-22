@@ -2,7 +2,7 @@
 
 // Large matmul that can match the best tiling scheme.
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -17,7 +17,7 @@ hal.executable @matmul_1024x2048x512 {
         max_compute_workgroup_size = [512, 512, 512],
        subgroup_size = 16>>
     }> {
-    hal.executable.export @matmul_1024x2048x512 layout(#executable_layout)
+    hal.executable.export @matmul_1024x2048x512 layout(#pipeline_layout)
     builtin.module {
       func.func @matmul_1024x2048x512() {
         %c0 = arith.constant 0 : index
@@ -54,7 +54,7 @@ hal.executable @matmul_1024x2048x512 {
 
 // Small matmul N that can still tile to all threads in a workgroup.
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -69,7 +69,7 @@ hal.executable @matmul_3136x24x96 {
         max_compute_workgroup_size = [512, 512, 512],
        subgroup_size = 16>>
     }> {
-    hal.executable.export @matmul_3136x24x96 layout(#executable_layout)
+    hal.executable.export @matmul_3136x24x96 layout(#pipeline_layout)
     builtin.module {
       func.func @matmul_3136x24x96() {
         %c0 = arith.constant 0 : index
@@ -107,7 +107,7 @@ hal.executable @matmul_3136x24x96 {
 
 // Small matmul M that can still tile to all threads in a workgroup.
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -122,7 +122,7 @@ hal.executable @matmul_196x64x192 {
         max_compute_workgroup_size = [512, 512, 512],
        subgroup_size = 16>>
     }> {
-    hal.executable.export @matmul_196x64x192 layout(#executable_layout)
+    hal.executable.export @matmul_196x64x192 layout(#pipeline_layout)
     builtin.module {
       func.func @matmul_196x64x192() {
         %c0 = arith.constant 0 : index
@@ -161,7 +161,7 @@ hal.executable @matmul_196x64x192 {
 
 // Small matmul K that can still tile to all threads in a workgroup.
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -176,7 +176,7 @@ hal.executable @matmul_12544x96x16 {
         max_compute_workgroup_size = [512, 512, 512],
        subgroup_size = 16>>
     }> {
-    hal.executable.export @matmul_12544x96x16 layout(#executable_layout)
+    hal.executable.export @matmul_12544x96x16 layout(#pipeline_layout)
     builtin.module {
       func.func @matmul_12544x96x16() {
         %c0 = arith.constant 0 : index
@@ -208,7 +208,7 @@ hal.executable @matmul_12544x96x16 {
 
 // Odd matmul M and small N that cannot utilize all threads in a workgroup.
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -223,7 +223,7 @@ hal.executable @matmul_49x160x576 {
         max_compute_workgroup_size = [512, 512, 512],
        subgroup_size = 16>>
     }> {
-    hal.executable.export @matmul_49x160x576 layout(#executable_layout)
+    hal.executable.export @matmul_49x160x576 layout(#pipeline_layout)
     builtin.module {
       func.func @matmul_49x160x576() {
         %c0 = arith.constant 0 : index
@@ -262,7 +262,7 @@ hal.executable @matmul_49x160x576 {
 
 // Small matmul M to "shift" parallelism to N.
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -278,7 +278,7 @@ hal.executable @matmul_1x1024x576 {
         max_compute_workgroup_size = [512, 512, 512],
        subgroup_size = 16>>
     }> {
-    hal.executable.export @matmul_1x1024x576 layout(#executable_layout)
+    hal.executable.export @matmul_1x1024x576 layout(#pipeline_layout)
     builtin.module {
       func.func @matmul_1x1024x576() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -319,7 +319,7 @@ hal.executable @matmul_1x1024x576 {
 
 // Large batch matmul.
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -334,7 +334,7 @@ hal.executable @batch_matmul_4x384x384 {
         max_compute_workgroup_size = [512, 512, 512],
        subgroup_size = 16>>
     }> {
-    hal.executable.export @batch_matmul_4x384x384 layout(#executable_layout)
+    hal.executable.export @batch_matmul_4x384x384 layout(#pipeline_layout)
     builtin.module {
       func.func @batch_matmul_4x384x384() {
         %c0 = arith.constant 0 : index
@@ -374,7 +374,7 @@ hal.executable @batch_matmul_4x384x384 {
 
 // Small batch matmul.
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -389,7 +389,7 @@ hal.executable @batch_matmul_4x2x8 {
         max_compute_workgroup_size = [512, 512, 512],
        subgroup_size = 16>>
     }> {
-    hal.executable.export @batch_matmul_4x2x8 layout(#executable_layout)
+    hal.executable.export @batch_matmul_4x2x8 layout(#pipeline_layout)
     builtin.module {
       func.func @batch_matmul_4x2x8() {
         %c0 = arith.constant 0 : index

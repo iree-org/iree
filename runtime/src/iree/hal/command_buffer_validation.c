@@ -365,7 +365,7 @@ iree_status_t iree_hal_command_buffer_copy_buffer_validation(
 iree_status_t iree_hal_command_buffer_push_constants_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state,
-    iree_hal_executable_layout_t* executable_layout, iree_host_size_t offset,
+    iree_hal_pipeline_layout_t* pipeline_layout, iree_host_size_t offset,
     const void* values, iree_host_size_t values_length) {
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
       command_buffer, validation_state, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
@@ -384,7 +384,7 @@ iree_status_t iree_hal_command_buffer_push_constants_validation(
 iree_status_t iree_hal_command_buffer_push_descriptor_set_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state,
-    iree_hal_executable_layout_t* executable_layout, uint32_t set,
+    iree_hal_pipeline_layout_t* pipeline_layout, uint32_t set,
     iree_host_size_t binding_count,
     const iree_hal_descriptor_set_binding_t* bindings) {
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(

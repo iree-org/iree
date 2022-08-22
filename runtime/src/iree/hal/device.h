@@ -16,8 +16,8 @@
 #include "iree/hal/command_buffer.h"
 #include "iree/hal/event.h"
 #include "iree/hal/executable_cache.h"
-#include "iree/hal/pipeline_layout.h"
 #include "iree/hal/fence.h"
+#include "iree/hal/pipeline_layout.h"
 #include "iree/hal/resource.h"
 #include "iree/hal/semaphore.h"
 
@@ -421,11 +421,11 @@ typedef struct iree_hal_device_vtable_t {
       iree_hal_device_t* device, iree_string_view_t identifier,
       iree_loop_t loop, iree_hal_executable_cache_t** out_executable_cache);
 
-  iree_status_t(IREE_API_PTR* create_executable_layout)(
+  iree_status_t(IREE_API_PTR* create_pipeline_layout)(
       iree_hal_device_t* device, iree_host_size_t push_constants,
       iree_host_size_t set_layout_count,
       iree_hal_descriptor_set_layout_t* const* set_layouts,
-      iree_hal_executable_layout_t** out_executable_layout);
+      iree_hal_pipeline_layout_t** out_pipeline_layout);
 
   iree_status_t(IREE_API_PTR* create_semaphore)(
       iree_hal_device_t* device, uint64_t initial_value,

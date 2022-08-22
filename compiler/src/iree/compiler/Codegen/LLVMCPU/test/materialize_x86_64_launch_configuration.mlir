@@ -1,6 +1,6 @@
 // RUN: iree-opt --pass-pipeline='hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target{test-lowering-configuration=true}))' --split-input-file %s | FileCheck %s
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -13,7 +13,7 @@ hal.executable private @matvec_static  {
     native_vector_size = 16 : index,
     target_triple = "x86_64-unknown-linux-gnu"
   }> {
-    hal.executable.export @matvec_static layout(#executable_layout)
+    hal.executable.export @matvec_static layout(#pipeline_layout)
     builtin.module {
       func.func @matvec_static() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -41,7 +41,7 @@ hal.executable private @matvec_static  {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -54,7 +54,7 @@ hal.executable private @matvec_dynamic  {
     native_vector_size = 16 : index,
     target_triple = "x86_64-unknown-linux-gnu"
   }> {
-    hal.executable.export @matvec_dynamic layout(#executable_layout)
+    hal.executable.export @matvec_dynamic layout(#pipeline_layout)
     builtin.module {
       func.func @matvec_dynamic() {
         %c0 = arith.constant 0 : index
@@ -90,7 +90,7 @@ hal.executable private @matvec_dynamic  {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -103,7 +103,7 @@ hal.executable private @dot_static  {
     native_vector_size = 16 : index,
     target_triple = "x86_64-unknown-linux-gnu"
   }> {
-    hal.executable.export @dot_static layout(#executable_layout)
+    hal.executable.export @dot_static layout(#pipeline_layout)
     builtin.module {
       func.func @dot_static() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -131,7 +131,7 @@ hal.executable private @dot_static  {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -144,7 +144,7 @@ hal.executable private @dot_dynamic  {
     native_vector_size = 16 : index,
     target_triple = "x86_64-unknown-linux-gnu"
   }> {
-    hal.executable.export @dot_dynamic layout(#executable_layout)
+    hal.executable.export @dot_dynamic layout(#pipeline_layout)
     builtin.module {
       func.func @dot_dynamic() {
         %c0 = arith.constant 0 : index
@@ -176,7 +176,7 @@ hal.executable private @dot_dynamic  {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -189,7 +189,7 @@ hal.executable private @add {
     native_vector_size = 16 : index,
     target_triple = "x86_64-unknown-linux-gnu"
   }> {
-    hal.executable.export @add layout(#executable_layout)
+    hal.executable.export @add layout(#pipeline_layout)
     builtin.module {
       func.func @add() {
         %c0 = arith.constant 0 : index
@@ -227,7 +227,7 @@ hal.executable private @add {
 // -----
 
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -241,7 +241,7 @@ hal.executable private @add4D  {
     native_vector_size = 16 : index,
     target_triple = "x86_64-unknown-linux-gnu"
   }> {
-    hal.executable.export @add4D layout(#executable_layout)
+    hal.executable.export @add4D layout(#pipeline_layout)
     builtin.module {
       func.func @add4D() {
         %d0 = hal.interface.constant.load[0] : index
@@ -284,7 +284,7 @@ hal.executable private @add4D  {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -297,7 +297,7 @@ hal.executable private @add_static {
     native_vector_size = 16 : index,
     target_triple = "x86_64-unknown-linux-gnu"
   }> {
-    hal.executable.export @add_static layout(#executable_layout)
+    hal.executable.export @add_static layout(#pipeline_layout)
     builtin.module {
       func.func @add_static() {
         %c0 = arith.constant 0 : index
@@ -329,7 +329,7 @@ hal.executable private @add_static {
     lowering_config = <tile_sizes = [[64, 64, 0], [32, 32, 0], [0, 0, 32]]>,
     translation_info  = <CPUDoubleTilingPadExpert>,
     workgroup_size = []>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -338,7 +338,7 @@ hal.executable private @add_static {
 ]>
 hal.executable private @preset_config_matmul_tensors  {
   hal.executable.variant @system_elf_x86_64, target = <"llvm-cpu", "system-elf-x86_64"> {
-    hal.executable.export @preset_config layout(#executable_layout)
+    hal.executable.export @preset_config layout(#pipeline_layout)
     builtin.module {
       func.func @preset_config() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -375,7 +375,7 @@ hal.executable private @preset_config_matmul_tensors  {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -383,7 +383,7 @@ hal.executable private @preset_config_matmul_tensors  {
 ]>
 hal.executable @copy_op_dynamic {
   hal.executable.variant @system_elf_x86_64, target = <"llvm-cpu", "system-elf-x86_64"> {
-    hal.executable.export @copy_op_dynamic layout(#executable_layout)
+    hal.executable.export @copy_op_dynamic layout(#pipeline_layout)
     builtin.module {
       func.func @copy_op_dynamic() {
         %d0 = hal.interface.constant.load[0] : index
@@ -417,7 +417,7 @@ hal.executable @copy_op_dynamic {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -425,7 +425,7 @@ hal.executable @copy_op_dynamic {
 ]>
 hal.executable private @static_1d_fft_stage2  {
   hal.executable.variant @system_elf_x86_64, target = <"llvm-cpu", "system-elf-x86_64"> {
-    hal.executable.export @static_1d_fft_stage2 layout(#executable_layout)
+    hal.executable.export @static_1d_fft_stage2 layout(#pipeline_layout)
     builtin.module {
       func.func @static_1d_fft_stage2() {
         %c0 = arith.constant 0 : index
@@ -455,7 +455,7 @@ hal.executable private @static_1d_fft_stage2  {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -463,7 +463,7 @@ hal.executable private @static_1d_fft_stage2  {
 ]>
 hal.executable private @static_3d_fft_stage3  {
   hal.executable.variant @system_elf_x86_64, target = <"llvm-cpu", "system-elf-x86_64"> {
-    hal.executable.export @static_3d_fft_stage3 layout(#executable_layout)
+    hal.executable.export @static_3d_fft_stage3 layout(#pipeline_layout)
     builtin.module {
       func.func @static_3d_fft_stage3() {
         %c3 = arith.constant 3 : index
@@ -492,7 +492,7 @@ hal.executable private @static_3d_fft_stage3  {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -501,7 +501,7 @@ hal.executable private @static_3d_fft_stage3  {
 ]>
 hal.executable private @outs_fusion {
   hal.executable.variant @system_elf_x86_64, target = <"llvm-cpu", "system-elf-x86_64"> {
-    hal.executable.export @outs_fusion_fn layout(#executable_layout)
+    hal.executable.export @outs_fusion_fn layout(#pipeline_layout)
     builtin.module {
       func.func @outs_fusion_fn() {
         %cst = arith.constant 0.0 : f32
@@ -556,7 +556,7 @@ hal.executable private @outs_fusion {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -569,7 +569,7 @@ hal.executable private @conv_dynamic {
     native_vector_size = 16 : index,
     target_triple = "x86_64-unknown-linux-gnu"
   }> {
-    hal.executable.export public @conv_dynamic layout(#executable_layout)
+    hal.executable.export public @conv_dynamic layout(#pipeline_layout)
     builtin.module {
       func.func @conv_dynamic() {
         %N = hal.interface.constant.load[0] : index
@@ -613,7 +613,7 @@ hal.executable private @conv_dynamic {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -626,7 +626,7 @@ hal.executable private @conv_static {
     native_vector_size = 16 : index,
     target_triple = "x86_64-unknown-linux-gnu"
   }> {
-    hal.executable.export public @conv_static layout(#executable_layout)
+    hal.executable.export public @conv_static layout(#pipeline_layout)
     builtin.module {
       func.func @conv_static() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -655,7 +655,7 @@ hal.executable private @conv_static {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -668,7 +668,7 @@ hal.executable private @depthwise_conv_static {
     native_vector_size = 64 : index,
     target_triple = "x86_64-unknown-linux-gnu"
   }> {
-    hal.executable.export public @depthwise_conv_static layout(#executable_layout)
+    hal.executable.export public @depthwise_conv_static layout(#pipeline_layout)
     builtin.module {
       func.func @depthwise_conv_static() {
         %cst = arith.constant 0.0 : f32
@@ -702,7 +702,7 @@ hal.executable private @depthwise_conv_static {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -714,7 +714,7 @@ hal.executable private @generic_static {
     native_vector_size = 64 : index,
     target_triple = "x86_64-pc-linux-gnu"
   }> {
-    hal.executable.export public @generic_static layout(#executable_layout)
+    hal.executable.export public @generic_static layout(#pipeline_layout)
     builtin.module {
       func.func @generic_static() {
         %input_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
@@ -747,7 +747,7 @@ hal.executable private @generic_static {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -762,7 +762,7 @@ hal.executable private @matmul_static  {
       native_vector_size = 16 : index,
       target_triple = "x86_64-unknown-unknown-eabi-elf"
     }> {
-    hal.executable.export public @matmul_static layout(#executable_layout)
+    hal.executable.export public @matmul_static layout(#pipeline_layout)
     builtin.module {
       func.func @matmul_static() {
         %cst = arith.constant 0.0 : f32
@@ -794,7 +794,7 @@ hal.executable private @matmul_static  {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 4, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 4, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -810,7 +810,7 @@ hal.executable private @matmul_static  {
 >
 hal.executable private @reduction {
   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.export public @predict_dispatch_86 ordinal(0) layout(#executable_layout)
+    hal.executable.export public @predict_dispatch_86 ordinal(0) layout(#pipeline_layout)
     builtin.module  {
       func.func @predict_dispatch_86(%arg0: !flow.dispatch.tensor<readonly:7x7x2048xf32>,
           %arg1: !flow.dispatch.tensor<writeonly:7xf32>) {
@@ -852,7 +852,7 @@ hal.executable private @reduction {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -867,7 +867,7 @@ hal.executable private @matmul_i8_i8_i32_static  {
       native_vector_size = 4 : index,
       target_triple = "x86_64-unknown-unknown-eabi-elf"
     }> {
-    hal.executable.export public @matmul_i8_i8_i32_static layout(#executable_layout)
+    hal.executable.export public @matmul_i8_i8_i32_static layout(#pipeline_layout)
     builtin.module {
       func.func @matmul_i8_i8_i32_static() {
         %c0_i32 = arith.constant 0 : i32
@@ -896,7 +896,7 @@ hal.executable private @matmul_i8_i8_i32_static  {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 4, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 4, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -914,7 +914,7 @@ hal.executable private @matmul_i8_i8_i32_static  {
 #map1 = affine_map<(d0)[s0, s1] -> (s1, -d0 + s0)>
 hal.executable private @gemm_unit_N {
   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.export public @gemm_unit_N ordinal(0) layout(#executable_layout)
+    hal.executable.export public @gemm_unit_N ordinal(0) layout(#pipeline_layout)
     builtin.module  {
       func.func @gemm_unit_N() {
         %c0 = arith.constant 0 : index
@@ -949,7 +949,7 @@ hal.executable private @gemm_unit_N {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 4, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 4, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -965,7 +965,7 @@ hal.executable private @gemm_unit_N {
 >
 hal.executable private @gemm_unit_M_unit_N {
   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.export public @gemm_unit_M_unit_N ordinal(0) layout(#executable_layout)
+    hal.executable.export public @gemm_unit_M_unit_N ordinal(0) layout(#pipeline_layout)
     builtin.module  {
       func.func @gemm_unit_M_unit_N() {
         %c0 = arith.constant 0 : index
@@ -996,7 +996,7 @@ hal.executable private @gemm_unit_M_unit_N {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 4, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 4, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -1012,7 +1012,7 @@ hal.executable private @gemm_unit_M_unit_N {
 >
 hal.executable private @matmul_odd {
   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.export public @matmul_odd ordinal(0) layout(#executable_layout)
+    hal.executable.export public @matmul_odd ordinal(0) layout(#pipeline_layout)
     builtin.module {
       func.func @matmul_odd() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -1042,7 +1042,7 @@ hal.executable private @matmul_odd {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -1055,7 +1055,7 @@ hal.executable private @generic_unit_dims_dynamic {
     native_vector_size = 16 : index,
     target_triple = "x86_64-unknown-linux-gnu"
   }> {
-    hal.executable.export @generic_unit_dims_dynamic layout(#executable_layout)
+    hal.executable.export @generic_unit_dims_dynamic layout(#pipeline_layout)
     builtin.module {
       func.func @generic_unit_dims_dynamic() {
         %c0 = arith.constant 0 : index
@@ -1097,7 +1097,7 @@ hal.executable private @generic_unit_dims_dynamic {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -1110,7 +1110,7 @@ hal.executable private @reduce_to_scalar_static {
     native_vector_size = 16 : index,
     target_triple = "x86_64-unknown-linux-gnu"
   }> {
-    hal.executable.export @reduce_to_scalar_static layout(#executable_layout)
+    hal.executable.export @reduce_to_scalar_static layout(#pipeline_layout)
     builtin.module {
       func.func @reduce_to_scalar_static() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -1140,7 +1140,7 @@ hal.executable private @reduce_to_scalar_static {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -1153,7 +1153,7 @@ hal.executable private @reduce_to_scalar_dynamic {
     native_vector_size = 16 : index,
     target_triple = "x86_64-unknown-linux-gnu"
   }> {
-    hal.executable.export @reduce_to_scalar_dynamic layout(#executable_layout)
+    hal.executable.export @reduce_to_scalar_dynamic layout(#pipeline_layout)
     builtin.module {
       func.func @reduce_to_scalar_dynamic() {
         %c0 = arith.constant 0 : index
@@ -1185,7 +1185,7 @@ hal.executable private @reduce_to_scalar_dynamic {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -1198,7 +1198,7 @@ hal.executable private @scalar {
     native_vector_size = 16 : index,
     target_triple = "x86_64-unknown-linux-gnu"
   }> {
-    hal.executable.export @scalar layout(#executable_layout)
+    hal.executable.export @scalar layout(#pipeline_layout)
     builtin.module {
       func.func @scalar() {
         %c0 = arith.constant 0 : index
@@ -1227,7 +1227,7 @@ hal.executable private @scalar {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -1245,7 +1245,7 @@ hal.executable private @scalar {
 
 hal.executable private @transpose_8x8 {
   hal.executable.variant @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.export @transpose_8x8 layout(#executable_layout)
+    hal.executable.export @transpose_8x8 layout(#pipeline_layout)
     builtin.module {
       func.func @transpose_8x8() {
         %cst = arith.constant 0.000000e+00 : f32

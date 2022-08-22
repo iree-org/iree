@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(iree-codegen-linalg-to-spirv-pipeline))' %s | FileCheck %s
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -15,7 +15,7 @@ hal.executable private @fuse_and_vectorize_fill_matmul {
         max_compute_workgroup_size = [512, 512, 512],
        subgroup_size = 16>>
     }> {
-    hal.executable.export @fuse_and_vectorize_fill_matmul layout(#executable_layout) {
+    hal.executable.export @fuse_and_vectorize_fill_matmul layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
@@ -50,7 +50,7 @@ hal.executable private @fuse_and_vectorize_fill_matmul {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -66,7 +66,7 @@ hal.executable private @fuse_and_vectorize_matmul_add {
         max_compute_workgroup_size = [512, 512, 512],
        subgroup_size = 16>>
     }> {
-    hal.executable.export @fuse_and_vectorize_matmul_add layout(#executable_layout) {
+    hal.executable.export @fuse_and_vectorize_matmul_add layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
       hal.return %x, %y, %z : index, index, index

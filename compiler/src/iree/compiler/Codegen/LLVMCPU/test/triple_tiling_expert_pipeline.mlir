@@ -1,6 +1,6 @@
 // RUN: iree-opt --pass-pipeline='hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target))' --iree-llvmcpu-enable-triple-tiling-pipeline --split-input-file %s | FileCheck %s
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -15,7 +15,7 @@ hal.executable private @matmul_128_384_1536  {
       native_vector_size = 4 : index,
       target_triple = "x86_64-unknown-unknown-eabi-elf"
     }> {
-    hal.executable.export @matmul_128_384_1536 layout(#executable_layout) {
+    hal.executable.export @matmul_128_384_1536 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
