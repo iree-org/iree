@@ -97,7 +97,8 @@ std::unique_ptr<Pass> createConvertLinalgMatmulToMmt4DPass(StringRef options);
 std::unique_ptr<Pass> createDetachElementwiseFromNamedOpsPass();
 
 // Creates a pass to fuse Linalg operations on tensors.
-std::unique_ptr<Pass> createFusionOfTensorOpsPass();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createFusionOfTensorOpsPass();
 
 // Infers and inserts util.numeric.optional_narrow ops at points that may be
 // beneficial.

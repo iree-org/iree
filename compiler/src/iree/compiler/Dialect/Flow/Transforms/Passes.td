@@ -92,7 +92,7 @@ def ExportBenchmarkFuncs :
 }
 
 def FusionOfTensorOps :
-    Pass<"iree-flow-fusion-of-tensor-ops", ""> {
+    InterfacePass<"iree-flow-fusion-of-tensor-ops", "mlir::FunctionOpInterface"> {
   let summary = "Fuse operations on tensors";
   let constructor = "mlir::iree_compiler::IREE::Flow::createFusionOfTensorOpsPass()";
 }
