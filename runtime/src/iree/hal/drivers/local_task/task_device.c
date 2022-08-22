@@ -16,7 +16,6 @@
 #include "iree/hal/drivers/local_task/task_event.h"
 #include "iree/hal/drivers/local_task/task_queue.h"
 #include "iree/hal/drivers/local_task/task_semaphore.h"
-#include "iree/hal/local/local_descriptor_set_layout.h"
 #include "iree/hal/local/local_executable_cache.h"
 #include "iree/hal/local/local_executable_layout.h"
 #include "iree/hal/utils/buffer_transfer.h"

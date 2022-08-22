@@ -11,7 +11,6 @@
 #include <string.h>
 
 #include "experimental/rocm/context_wrapper.h"
-#include "experimental/rocm/descriptor_set_layout.h"
 #include "experimental/rocm/direct_command_buffer.h"
 #include "experimental/rocm/dynamic_symbols.h"
 #include "experimental/rocm/event_semaphore.h"

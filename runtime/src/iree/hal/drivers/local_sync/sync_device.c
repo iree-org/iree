@@ -15,7 +15,6 @@
 #include "iree/hal/drivers/local_sync/sync_event.h"
 #include "iree/hal/drivers/local_sync/sync_semaphore.h"
 #include "iree/hal/local/inline_command_buffer.h"
-#include "iree/hal/local/local_descriptor_set_layout.h"
 #include "iree/hal/local/local_executable_cache.h"
 #include "iree/hal/local/local_executable_layout.h"
 #include "iree/hal/utils/buffer_transfer.h"

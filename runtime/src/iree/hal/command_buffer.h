@@ -13,7 +13,6 @@
 #include "iree/base/api.h"
 #include "iree/hal/allocator.h"
 #include "iree/hal/buffer.h"
-#include "iree/hal/descriptor_set_layout.h"
 #include "iree/hal/event.h"
 #include "iree/hal/executable.h"
 #include "iree/hal/executable_layout.h"

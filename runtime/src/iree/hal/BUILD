@@ -38,8 +38,6 @@ iree_runtime_cc_library(
         "command_buffer.h",
         "command_buffer_validation.c",
         "command_buffer_validation.h",
-        "descriptor_set_layout.c",
-        "descriptor_set_layout.h",
         "detail.h",
         "device.c",
         "device.h",

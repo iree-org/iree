@@ -33,8 +33,6 @@ iree_cc_library(
     "rocm_driver.c"
     "rocm_event.c"
     "rocm_event.h"
-    "descriptor_set_layout.c"
-    "descriptor_set_layout.h"
     "event_semaphore.c"
     "event_semaphore.h"
     "executable_layout.c"
