@@ -10,7 +10,6 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
-#include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -1425,7 +1424,7 @@ LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
     if (getTranslationInfo(exportOp)) continue;
 
     // If using the transform dialect interpreter, call the proper pipeline.
-    if (clCPUCodegenTransformDialectFileName.empty()) {
+    if (!clCPUCodegenTransformDialectFileName.empty()) {
       auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
           moduleOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
                                      TransformDialectInterpreterCodegen);
