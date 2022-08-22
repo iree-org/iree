@@ -155,7 +155,7 @@ Attribute VMDialect::parseAttribute(DialectAsmParser &parser, Type type) const {
   Attribute genAttr;
   OptionalParseResult parseResult =
       generatedAttributeParser(parser, &mnemonic, type, genAttr);
-  if (parseResult.hasValue()) return genAttr;
+  if (parseResult.has_value()) return genAttr;
   parser.emitError(parser.getNameLoc())
       << "unknown HAL attribute: " << mnemonic;
   return {};
