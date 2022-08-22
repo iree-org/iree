@@ -11,6 +11,7 @@
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/PDL/IR/PDLOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -100,10 +101,10 @@ static FailureOr<SmallVector<Value>> getThreadIndices(
 // Patterns for ForeachThreadToGpu rewrite.
 //===---------------------------------------------------------------------===//
 
-FailureOr<SmallVector<OpFoldResult>> rewriteForeachThreadToGpu(
+FailureOr<SmallVector<OpFoldResult>>
+mlir::iree_compiler::rewriteForeachThreadToGpu(
     scf::ForeachThreadOp foreachThreadOp,
-    const SmallVector<int64_t> &globalWorkgroupSizes,
-    PatternRewriter &rewriter) {
+    const SmallVector<int64_t> &globalWorkgroupSizes, RewriterBase &rewriter) {
   if (foreachThreadOp.getNumResults() > 0)
     return foreachThreadOp->emitError(
         "only bufferized scf.foreach_thread lowers to gpu.thread");
@@ -112,15 +113,10 @@ FailureOr<SmallVector<OpFoldResult>> rewriteForeachThreadToGpu(
         "scf.foreach_thread with rank > 3 does not lower to gpu.thread");
 
   auto maybeWorkgroupSizes = getNumThreads(rewriter, foreachThreadOp);
-  if (failed(maybeWorkgroupSizes) ||
-      llvm::any_of(*maybeWorkgroupSizes, [](OpFoldResult ofr) {
-        return !getConstantIntValue(ofr).has_value();
-      }))
-    return foreachThreadOp->emitError("unsupported dynamic workgroup size");
+  if (failed(maybeWorkgroupSizes))
+    return foreachThreadOp->emitError("can't extract number of threads");
 
-  SmallVector<int64_t> workgroupSizes;
-  for (OpFoldResult ofr : *maybeWorkgroupSizes)
-    workgroupSizes.push_back(getConstantIntValue(ofr).value());
+  SmallVector<OpFoldResult> workgroupSizes = *maybeWorkgroupSizes;
 
   // Step 1. Create the gpu.thread ops
   Location loc = foreachThreadOp.getLoc();
@@ -140,11 +136,14 @@ FailureOr<SmallVector<OpFoldResult>> rewriteForeachThreadToGpu(
     auto threadId = std::get<0>(it);
     auto workgroupSize = std::get<1>(it);
     auto globalWorkgroupSize = std::get<2>(it);
-    assert(workgroupSize <= globalWorkgroupSize && "workgroup size overflow");
-    if (workgroupSize == globalWorkgroupSize) continue;
+    auto cstWgSize = getConstantIntValue(workgroupSize);
+    if (cstWgSize) {
+      assert(*cstWgSize <= globalWorkgroupSize && "workgroup size overflow");
+      if (*cstWgSize == globalWorkgroupSize) continue;
+    }
     Value tmpPredicate = rewriter.create<arith::CmpIOp>(
         loc, arith::CmpIPredicate::ult, threadId,
-        rewriter.create<arith::ConstantIndexOp>(loc, workgroupSize));
+        linalg::materializeOpFoldResult(rewriter, loc, workgroupSize));
     predicate =
         predicate ? rewriter.create<arith::AndIOp>(loc, predicate, tmpPredicate)
                   : tmpPredicate;
