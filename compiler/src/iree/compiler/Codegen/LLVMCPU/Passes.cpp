@@ -288,6 +288,7 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager) {
     LinalgSingleTilingExpertPassOptions options;
     options.tilingLevel =
         static_cast<int64_t>(StrategyTilingLevel::ParallelTiles);
+    options.peel = true;
     options.vectorize = true;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLinalgSingleTilingExpertPass(options));
