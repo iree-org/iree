@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_HAL_ROCM_EXECUTABLE_LAYOUT_H_
-#define IREE_HAL_ROCM_EXECUTABLE_LAYOUT_H_
+#ifndef IREE_HAL_ROCM_PIPELINE_LAYOUT_H_
+#define IREE_HAL_ROCM_PIPELINE_LAYOUT_H_
 
 #include "experimental/rocm/context_wrapper.h"
 #include "iree/base/api.h"
@@ -59,4 +59,4 @@ iree_host_size_t iree_hal_rocm_executable_layout_num_constants(
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_HAL_ROCM_EXECUTABLE_LAYOUT_H_
+#endif  // IREE_HAL_ROCM_PIPELINE_LAYOUT_H_

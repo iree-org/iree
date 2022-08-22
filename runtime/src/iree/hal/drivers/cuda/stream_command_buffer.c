@@ -9,8 +9,8 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/cuda/cuda_buffer.h"
 #include "iree/hal/drivers/cuda/cuda_event.h"
-#include "iree/hal/drivers/cuda/executable_layout.h"
 #include "iree/hal/drivers/cuda/native_executable.h"
+#include "iree/hal/drivers/cuda/pipeline_layout.h"
 #include "iree/hal/drivers/cuda/status_util.h"
 
 #define IREE_HAL_CUDA_MAX_BINDING_COUNT 64

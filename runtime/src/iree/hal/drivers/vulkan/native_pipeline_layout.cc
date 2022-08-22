@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/hal/drivers/vulkan/native_executable_layout.h"
+#include "iree/hal/drivers/vulkan/native_pipeline_layout.h"
 
 #include <cstddef>
 #include <cstdint>

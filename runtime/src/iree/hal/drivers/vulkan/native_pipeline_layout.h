@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_HAL_DRIVERS_VULKAN_NATIVE_EXECUTABLE_LAYOUT_H_
-#define IREE_HAL_DRIVERS_VULKAN_NATIVE_EXECUTABLE_LAYOUT_H_
+#ifndef IREE_HAL_DRIVERS_VULKAN_NATIVE_PIPELINE_LAYOUT_H_
+#define IREE_HAL_DRIVERS_VULKAN_NATIVE_PIPELINE_LAYOUT_H_
 
 // clang-format off: must be included before all other headers.
 #include "iree/hal/drivers/vulkan/vulkan_headers.h"
@@ -64,4 +64,4 @@ iree_hal_descriptor_set_layout_t* iree_hal_vulkan_native_executable_layout_set(
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_HAL_DRIVERS_VULKAN_NATIVE_EXECUTABLE_LAYOUT_H_
+#endif  // IREE_HAL_DRIVERS_VULKAN_NATIVE_PIPELINE_LAYOUT_H_

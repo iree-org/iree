@@ -11,8 +11,8 @@
 #include <stdint.h>
 
 #include "experimental/rocm/dynamic_symbols.h"
-#include "experimental/rocm/executable_layout.h"
 #include "experimental/rocm/native_executable.h"
+#include "experimental/rocm/pipeline_layout.h"
 #include "experimental/rocm/rocm_buffer.h"
 #include "experimental/rocm/status_util.h"
 #include "iree/base/api.h"

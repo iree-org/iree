@@ -17,7 +17,7 @@
 #include "iree/hal/local/executable_environment.h"
 #include "iree/hal/local/executable_library.h"
 #include "iree/hal/local/local_executable.h"
-#include "iree/hal/local/local_executable_layout.h"
+#include "iree/hal/local/local_pipeline_layout.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_inline_command_buffer_t

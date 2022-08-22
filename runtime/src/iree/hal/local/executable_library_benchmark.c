@@ -18,7 +18,7 @@
 #include "iree/hal/local/executable_loader.h"
 #include "iree/hal/local/loaders/registration/init.h"
 #include "iree/hal/local/local_executable.h"
-#include "iree/hal/local/local_executable_layout.h"
+#include "iree/hal/local/local_pipeline_layout.h"
 #include "iree/testing/benchmark.h"
 
 IREE_FLAG(string, executable_format, "",

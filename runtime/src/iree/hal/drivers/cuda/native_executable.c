@@ -11,7 +11,7 @@
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/cuda/dynamic_symbols.h"
-#include "iree/hal/drivers/cuda/executable_layout.h"
+#include "iree/hal/drivers/cuda/pipeline_layout.h"
 #include "iree/hal/drivers/cuda/status_util.h"
 
 // flatcc schemas:

@@ -14,8 +14,8 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/cuda/cuda_buffer.h"
 #include "iree/hal/drivers/cuda/dynamic_symbols.h"
-#include "iree/hal/drivers/cuda/executable_layout.h"
 #include "iree/hal/drivers/cuda/native_executable.h"
+#include "iree/hal/drivers/cuda/pipeline_layout.h"
 #include "iree/hal/drivers/cuda/status_util.h"
 #include "iree/hal/utils/resource_set.h"
 

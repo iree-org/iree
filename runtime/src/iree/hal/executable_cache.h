@@ -12,7 +12,7 @@
 
 #include "iree/base/api.h"
 #include "iree/hal/executable.h"
-#include "iree/hal/executable_layout.h"
+#include "iree/hal/pipeline_layout.h"
 #include "iree/hal/resource.h"
 
 #ifdef __cplusplus

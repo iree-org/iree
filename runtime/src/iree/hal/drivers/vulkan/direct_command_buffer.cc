@@ -18,7 +18,7 @@
 #include "iree/hal/drivers/vulkan/dynamic_symbols.h"
 #include "iree/hal/drivers/vulkan/native_event.h"
 #include "iree/hal/drivers/vulkan/native_executable.h"
-#include "iree/hal/drivers/vulkan/native_executable_layout.h"
+#include "iree/hal/drivers/vulkan/native_pipeline_layout.h"
 #include "iree/hal/drivers/vulkan/status_util.h"
 #include "iree/hal/drivers/vulkan/util/ref_ptr.h"
 #include "iree/hal/drivers/vulkan/vma_buffer.h"

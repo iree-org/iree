@@ -24,7 +24,7 @@
 #include "iree/hal/drivers/vulkan/extensibility_util.h"
 #include "iree/hal/drivers/vulkan/handle_util.h"
 #include "iree/hal/drivers/vulkan/native_event.h"
-#include "iree/hal/drivers/vulkan/native_executable_layout.h"
+#include "iree/hal/drivers/vulkan/native_pipeline_layout.h"
 #include "iree/hal/drivers/vulkan/native_semaphore.h"
 #include "iree/hal/drivers/vulkan/nop_executable_cache.h"
 #include "iree/hal/drivers/vulkan/status_util.h"

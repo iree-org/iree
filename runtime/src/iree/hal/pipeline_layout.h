@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_HAL_EXECUTABLE_LAYOUT_H_
-#define IREE_HAL_EXECUTABLE_LAYOUT_H_
+#ifndef IREE_HAL_PIPELINE_LAYOUT_H_
+#define IREE_HAL_PIPELINE_LAYOUT_H_
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -151,4 +151,4 @@ IREE_API_EXPORT void iree_hal_executable_layout_destroy(
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_HAL_EXECUTABLE_LAYOUT_H_
+#endif  // IREE_HAL_PIPELINE_LAYOUT_H_
