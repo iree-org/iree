@@ -265,6 +265,10 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager);
 
 // Populates the passes needed to do tiling, decomposing, and vectorizing the
 // convolution ops using the Codegen drivers from sandbox.
+LogicalResult verifyConvTileAndDecomposeExpertConfig(
+    Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
+    IREE::Codegen::TranslationInfoAttr translationInfo,
+    ArrayRef<int64_t> workgroupSize = {});
 void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager);
 
 /// Populates the passes from Sandbox for testing transformations from sandbox.
