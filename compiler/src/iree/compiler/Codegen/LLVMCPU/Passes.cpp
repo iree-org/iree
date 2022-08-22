@@ -238,16 +238,18 @@ LogicalResult verifyConvTileAndDecomposeExpertConfig(
     for (auto en : llvm::enumerate(sizes)) {
       int i = en.index();
       int size = en.value();
+      if (size == 1) shape[i] = 1;
       if (shape[i] == -1 || size == 0) continue;
       if (shape[i] % size != 0) {
         shape[i] = -1;
+      } else {
+        shape[i] = size;
       }
-      shape[i] = size;
     }
   }
 
   int64_t khSize, kwSize, ohSize, owSize;
-  auto extractKH =
+  auto isSizeExtracted =
       TypeSwitch<Operation *, LogicalResult>(op)
           .Case<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp>(
               [&](auto) {
@@ -259,7 +261,7 @@ LogicalResult verifyConvTileAndDecomposeExpertConfig(
                 return success();
               })
           .Default([&](auto) { return failure(); });
-  if (failed(extractKH)) {
+  if (failed(isSizeExtracted)) {
     return op->emitOpError("unsupported conv types");
   }
 
