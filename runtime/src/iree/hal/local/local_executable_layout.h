@@ -16,6 +16,35 @@
 extern "C" {
 #endif  // __cplusplus
 
+//===----------------------------------------------------------------------===//
+// iree_hal_local_descriptor_set_layout_t
+//===----------------------------------------------------------------------===//
+
+#define IREE_HAL_LOCAL_MAX_DESCRIPTOR_BINDING_COUNT 32
+
+typedef struct iree_hal_local_descriptor_set_layout_t {
+  iree_hal_resource_t resource;
+  iree_allocator_t host_allocator;
+  iree_hal_descriptor_set_layout_usage_type_t usage_type;
+  iree_host_size_t binding_count;
+  iree_hal_descriptor_set_layout_binding_t bindings[];
+} iree_hal_local_descriptor_set_layout_t;
+
+iree_status_t iree_hal_local_descriptor_set_layout_create(
+    iree_hal_descriptor_set_layout_usage_type_t usage_type,
+    iree_host_size_t binding_count,
+    const iree_hal_descriptor_set_layout_binding_t* bindings,
+    iree_allocator_t host_allocator,
+    iree_hal_descriptor_set_layout_t** out_descriptor_set_layout);
+
+iree_hal_local_descriptor_set_layout_t*
+iree_hal_local_descriptor_set_layout_cast(
+    iree_hal_descriptor_set_layout_t* base_value);
+
+//===----------------------------------------------------------------------===//
+// iree_hal_local_executable_layout_t
+//===----------------------------------------------------------------------===//
+
 #define IREE_HAL_LOCAL_MAX_DESCRIPTOR_SET_COUNT 2
 #define IREE_HAL_LOCAL_MAX_PUSH_CONSTANT_COUNT 64
 

@@ -19,6 +19,26 @@
 extern "C" {
 #endif  // __cplusplus
 
+//===----------------------------------------------------------------------===//
+// iree_hal_vulkan_native_descriptor_set_layout_t
+//===----------------------------------------------------------------------===//
+
+// Creates a native Vulkan VkDescriptorSetLayout object.
+iree_status_t iree_hal_vulkan_native_descriptor_set_layout_create(
+    iree::hal::vulkan::VkDeviceHandle* logical_device,
+    iree_hal_descriptor_set_layout_usage_type_t usage_type,
+    iree_host_size_t binding_count,
+    const iree_hal_descriptor_set_layout_binding_t* bindings,
+    iree_hal_descriptor_set_layout_t** out_descriptor_set_layout);
+
+// Returns the native Vulkan VkDescriptorSetLayout handle.
+VkDescriptorSetLayout iree_hal_vulkan_native_descriptor_set_layout_handle(
+    iree_hal_descriptor_set_layout_t* base_descriptor_set_layout);
+
+//===----------------------------------------------------------------------===//
+// iree_hal_vulkan_native_executable_layout_t
+//===----------------------------------------------------------------------===//
+
 // Creates a VkPipelineLayout-based executable layout composed of one or more
 // descriptor set layouts.
 iree_status_t iree_hal_vulkan_native_executable_layout_create(
