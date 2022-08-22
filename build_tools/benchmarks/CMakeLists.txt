@@ -40,6 +40,7 @@ function(benchmark_tool_py_test)
 endfunction()
 
 add_subdirectory(common)
+add_subdirectory(suites)
 
 benchmark_tool_py_test(
   NAME

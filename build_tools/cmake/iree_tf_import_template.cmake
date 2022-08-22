@@ -1,0 +1,5 @@
+iree_import_tf_model(
+  TARGET_NAME "$${_PACKAGE_NAME}_$_TARGET_NAME_"
+  SOURCE "$_SOURCE_MODEL_PATH_"
+  OUTPUT_MLIR_FILE "$_OUTPUT_PATH_"
+)
