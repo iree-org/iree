@@ -257,16 +257,6 @@ def HAL_CommandBuffer : DialectType<
   let builderCall = "$_builder.getType<IREE::HAL::CommandBufferType>()";
 }
 
-def HAL_DescriptorSet : DialectType<
-    HAL_Dialect,
-    CPred<"$_self.isa<IREE::HAL::DescriptorSetType>()">,
-    "descriptor_set"> {
-  let description = [{
-    Descriptor set.
-  }];
-  let builderCall = "$_builder.getType<IREE::HAL::DescriptorSetType>()";
-}
-
 def HAL_DescriptorSetLayout : DialectType<
     HAL_Dialect,
     CPred<"$_self.isa<IREE::HAL::DescriptorSetLayoutType>()">,
@@ -359,7 +349,6 @@ def HAL_ObjectType : AnyTypeOf<[
   HAL_Buffer,
   HAL_BufferView,
   HAL_CommandBuffer,
-  HAL_DescriptorSet,
   HAL_DescriptorSetLayout,
   HAL_Device,
   HAL_Event,

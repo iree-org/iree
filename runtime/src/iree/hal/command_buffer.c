@@ -400,31 +400,6 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_push_descriptor_set(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_command_buffer_bind_descriptor_set(
-    iree_hal_command_buffer_t* command_buffer,
-    iree_hal_executable_layout_t* executable_layout, uint32_t set,
-    iree_hal_descriptor_set_t* descriptor_set,
-    iree_host_size_t dynamic_offset_count,
-    const iree_device_size_t* dynamic_offsets) {
-  IREE_ASSERT_ARGUMENT(command_buffer);
-  IREE_ASSERT_ARGUMENT(executable_layout);
-  IREE_ASSERT_ARGUMENT(descriptor_set);
-  IREE_ASSERT_ARGUMENT(!dynamic_offset_count || dynamic_offsets);
-  IREE_TRACE_ZONE_BEGIN(z0);
-  IF_VALIDATING(command_buffer, {
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0,
-        iree_hal_command_buffer_bind_descriptor_set_validation(
-            command_buffer, VALIDATION_STATE(command_buffer), executable_layout,
-            set, descriptor_set, dynamic_offset_count, dynamic_offsets));
-  });
-  iree_status_t status = _VTABLE_DISPATCH(command_buffer, bind_descriptor_set)(
-      command_buffer, executable_layout, set, descriptor_set,
-      dynamic_offset_count, dynamic_offsets);
-  IREE_TRACE_ZONE_END(z0);
-  return status;
-}
-
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,

@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTraits.h"
+#include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Pass/Pass.h"
@@ -19,17 +20,8 @@ namespace Util {
 
 namespace {
 
-class StripDebugOpsPass
-    : public PassWrapper<StripDebugOpsPass, OperationPass<void>> {
+class StripDebugOpsPass : public StripDebugOpsBase<StripDebugOpsPass> {
  public:
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(StripDebugOpsPass)
-
-  StringRef getArgument() const override { return "iree-util-strip-debug-ops"; }
-
-  StringRef getDescription() const override {
-    return "Strips debug ops, like assertions.";
-  }
-
   void runOnOperation() override {
     getOperation()->walk([](Operation *op) {
       if (isa<mlir::cf::AssertOp>(op) ||
@@ -45,8 +37,6 @@ class StripDebugOpsPass
 std::unique_ptr<OperationPass<void>> createStripDebugOpsPass() {
   return std::make_unique<StripDebugOpsPass>();
 }
-
-static PassRegistration<StripDebugOpsPass> pass;
 
 }  // namespace Util
 }  // namespace IREE

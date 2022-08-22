@@ -907,32 +907,6 @@ def HAL_CommandBufferPushDescriptorSetOp :
   let hasCanonicalizer = 1;
 }
 
-def HAL_CommandBufferBindDescriptorSetOp :
-    HAL_Op<"command_buffer.bind_descriptor_set"> {
-  let summary = [{command buffer descriptor set binding operation}];
-  let description = [{
-    Binds a descriptor set to the given set number. The provided descriptor set
-    must not be modified once bound to a command buffer.
-  }];
-
-  let arguments = (ins
-    HAL_CommandBuffer:$command_buffer,
-    HAL_ExecutableLayout:$executable_layout,
-    Index:$set,
-    HAL_DescriptorSet:$descriptor_set,
-    Variadic<HAL_DeviceSize>:$dynamic_offsets
-  );
-
-  let assemblyFormat = [{
-    `<` $command_buffer `:` type($command_buffer) `>`
-    `layout` `(` $executable_layout `:` type($executable_layout) `)`
-    `` `[` $set `]`
-    `set` `(` $descriptor_set `:` type($descriptor_set) `)`
-    (`offsets` `(` `[` $dynamic_offsets^ `]` `)`)?
-    attr-dict-with-keyword
-  }];
-}
-
 def HAL_CommandBufferDispatchSymbolOp : HAL_Op<"command_buffer.dispatch.symbol"> {
   let summary = [{command buffer dispatch recording operation, using symbolref}];
   let description = [{
@@ -1067,53 +1041,6 @@ def HAL_ConstantStorageOp : HAL_Op<"constant_storage", [
     ), [{
       build($_builder, $_state, nullptr, sym_name, value);
     }]>
-  ];
-}
-
-//===----------------------------------------------------------------------===//
-// !hal.descriptor_set / iree_hal_descriptor_set_layout_t
-//===----------------------------------------------------------------------===//
-
-def HAL_DescriptorSetCreateOp : HAL_PureOp<"descriptor_set.create", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-    SameVariadicOperandSize,
-  ]> {
-  let summary = [{allocates a descriptor set from the device pool}];
-  let description = [{
-    Creates a DescriptorSet from the device pool.
-  }];
-
-  let arguments = (ins
-    HAL_Device:$device,
-    HAL_DescriptorSetLayout:$set_layout,
-    Variadic<Index>:$binding_ordinals,
-    Variadic<HAL_BufferType>:$binding_buffers,
-    Variadic<HAL_DeviceSize>:$binding_offsets,
-    Variadic<HAL_DeviceSize>:$binding_lengths
-  );
-  let results = (outs
-    HAL_DescriptorSet:$result
-  );
-
-  let assemblyFormat = [{
-    `device` `(` $device `:` type($device) `)`
-    `layout` `(` $set_layout `:` type($set_layout) `)`
-    `bindings` `(` `[`
-    custom<DescriptorSetBindings>($binding_ordinals,
-                                  $binding_buffers,
-                                  type($binding_buffers),
-                                  $binding_offsets,
-                                  $binding_lengths)
-    `]` `)`
-    attr-dict-with-keyword
-  }];
-
-  let builders = [
-    OpBuilder<(ins
-      "Value":$device,
-      "Value":$setLayout,
-      "ArrayRef<DescriptorSetBindingValue>":$bindings
-    )>,
   ];
 }
 

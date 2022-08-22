@@ -14,7 +14,6 @@
 #include "iree/hal/allocator.h"
 #include "iree/hal/buffer.h"
 #include "iree/hal/command_buffer.h"
-#include "iree/hal/descriptor_set.h"
 #include "iree/hal/descriptor_set_layout.h"
 #include "iree/hal/event.h"
 #include "iree/hal/executable_cache.h"
@@ -408,12 +407,6 @@ typedef struct iree_hal_device_vtable_t {
       iree_hal_command_category_t command_categories,
       iree_hal_queue_affinity_t queue_affinity,
       iree_hal_command_buffer_t** out_command_buffer);
-
-  iree_status_t(IREE_API_PTR* create_descriptor_set)(
-      iree_hal_device_t* device, iree_hal_descriptor_set_layout_t* set_layout,
-      iree_host_size_t binding_count,
-      const iree_hal_descriptor_set_binding_t* bindings,
-      iree_hal_descriptor_set_t** out_descriptor_set);
 
   iree_status_t(IREE_API_PTR* create_descriptor_set_layout)(
       iree_hal_device_t* device,

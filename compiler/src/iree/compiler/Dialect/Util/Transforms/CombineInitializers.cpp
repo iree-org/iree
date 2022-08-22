@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTraits.h"
+#include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
@@ -30,19 +31,8 @@ namespace Util {
 namespace {
 
 class CombineInitializersPass
-    : public PassWrapper<CombineInitializersPass,
-                         OperationPass<mlir::ModuleOp>> {
+    : public CombineInitializersBase<CombineInitializersPass> {
  public:
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(CombineInitializersPass)
-
-  StringRef getArgument() const override {
-    return "iree-util-combine-initializers";
-  }
-
-  StringRef getDescription() const override {
-    return "Combines global initializers into one.";
-  }
-
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Util::UtilDialect>();
   }
@@ -91,8 +81,6 @@ class CombineInitializersPass
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createCombineInitializersPass() {
   return std::make_unique<CombineInitializersPass>();
 }
-
-static PassRegistration<CombineInitializersPass> pass;
 
 }  // namespace Util
 }  // namespace IREE

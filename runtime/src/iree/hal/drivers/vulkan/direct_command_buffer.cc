@@ -16,7 +16,6 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/vulkan/descriptor_set_arena.h"
 #include "iree/hal/drivers/vulkan/dynamic_symbols.h"
-#include "iree/hal/drivers/vulkan/native_descriptor_set.h"
 #include "iree/hal/drivers/vulkan/native_event.h"
 #include "iree/hal/drivers/vulkan/native_executable.h"
 #include "iree/hal/drivers/vulkan/native_executable_layout.h"
@@ -691,43 +690,6 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_push_descriptor_set(
       command_buffer->handle, executable_layout, set, binding_count, bindings);
 }
 
-static iree_status_t iree_hal_vulkan_direct_command_buffer_bind_descriptor_set(
-    iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_layout_t* executable_layout, uint32_t set,
-    iree_hal_descriptor_set_t* descriptor_set,
-    iree_host_size_t dynamic_offset_count,
-    const iree_device_size_t* dynamic_offsets) {
-  iree_hal_vulkan_direct_command_buffer_t* command_buffer =
-      iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
-  iree_allocator_t host_allocator =
-      command_buffer->logical_device->host_allocator();
-
-  IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
-      command_buffer->resource_set, 1, &descriptor_set));
-
-  // Vulkan takes uint32_t as the size here, unlike everywhere else.
-  iree_inline_array(uint32_t, dynamic_offsets_i32, dynamic_offset_count,
-                    host_allocator);
-  for (int i = 0; i < dynamic_offset_count; ++i) {
-    *iree_inline_array_at(dynamic_offsets_i32, i) =
-        (uint32_t)dynamic_offsets[i];
-  }
-
-  VkDescriptorSet descriptor_sets[1] = {
-      iree_hal_vulkan_native_descriptor_set_handle(descriptor_set),
-  };
-  command_buffer->syms->vkCmdBindDescriptorSets(
-      command_buffer->handle, VK_PIPELINE_BIND_POINT_COMPUTE,
-      iree_hal_vulkan_native_executable_layout_handle(executable_layout), set,
-      (uint32_t)IREE_ARRAYSIZE(descriptor_sets), descriptor_sets,
-      (uint32_t)dynamic_offset_count,
-      iree_inline_array_data(dynamic_offsets_i32));
-
-  iree_inline_array_deinitialize(dynamic_offsets_i32);
-
-  return iree_ok_status();
-}
-
 static iree_status_t iree_hal_vulkan_direct_command_buffer_dispatch(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
@@ -836,8 +798,6 @@ const iree_hal_command_buffer_vtable_t
         iree_hal_vulkan_direct_command_buffer_push_constants,
         /*.push_descriptor_set=*/
         iree_hal_vulkan_direct_command_buffer_push_descriptor_set,
-        /*.bind_descriptor_set=*/
-        iree_hal_vulkan_direct_command_buffer_bind_descriptor_set,
         /*.dispatch=*/iree_hal_vulkan_direct_command_buffer_dispatch,
         /*.dispatch_indirect=*/
         iree_hal_vulkan_direct_command_buffer_dispatch_indirect,

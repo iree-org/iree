@@ -682,29 +682,6 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_push_descriptor_set,  //
       command_buffer, executable_layout, set, binding_count, bindings);
 }
 
-IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_bind_descriptor_set,  //
-                   iree_hal_module_state_t,                             //
-                   rrirCID, v) {
-  iree_hal_command_buffer_t* command_buffer = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_command_buffer_check_deref(args->r0, &command_buffer));
-  iree_hal_executable_layout_t* executable_layout = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_executable_layout_check_deref(args->r1, &executable_layout));
-  int32_t set = args->i2;
-  iree_hal_descriptor_set_t* descriptor_set = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_descriptor_set_check_deref(args->r3, &descriptor_set));
-  iree_host_size_t dynamic_offset_count = 0;
-  iree_device_size_t* dynamic_offsets = NULL;
-  // TODO(benvanik): avoid the cast/alloca if not required.
-  IREE_VM_ABI_VLA_STACK_CAST(args, a4_count, a4, iree_device_size_t, 64,
-                             &dynamic_offset_count, &dynamic_offsets);
-  return iree_hal_command_buffer_bind_descriptor_set(
-      command_buffer, executable_layout, set, descriptor_set,
-      dynamic_offset_count, dynamic_offsets);
-}
-
 IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_dispatch,  //
                    iree_hal_module_state_t,                  //
                    rriiii, v) {
@@ -738,44 +715,6 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_dispatch_indirect,  //
   return iree_hal_command_buffer_dispatch_indirect(
       command_buffer, executable, entry_point, workgroups_buffer,
       workgroups_offset);
-}
-
-//===----------------------------------------------------------------------===//
-// iree_hal_descriptor_set_t
-//===----------------------------------------------------------------------===//
-
-IREE_VM_ABI_EXPORT(iree_hal_module_descriptor_set_create,  //
-                   iree_hal_module_state_t,                //
-                   rrCirIID, r) {
-  iree_hal_device_t* device = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
-  iree_hal_descriptor_set_layout_t* set_layout = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_descriptor_set_layout_check_deref(args->r1, &set_layout));
-
-  iree_host_size_t binding_count = args->a2_count;
-  if (IREE_UNLIKELY(binding_count >
-                    IREE_HAL_MODULE_MAX_DESCRIPTOR_BINDING_COUNT)) {
-    return iree_make_status(
-        IREE_STATUS_OUT_OF_RANGE, "binding count %" PRIhsz " > %" PRIhsz,
-        binding_count, IREE_HAL_MODULE_MAX_DESCRIPTOR_BINDING_COUNT);
-  }
-  iree_hal_descriptor_set_binding_t* bindings =
-      (iree_hal_descriptor_set_binding_t*)iree_alloca(
-          binding_count * sizeof(iree_hal_descriptor_set_binding_t));
-  for (iree_host_size_t i = 0; i < binding_count; ++i) {
-    IREE_RETURN_IF_ERROR(
-        iree_hal_buffer_check_deref(args->a2[i].r1, &bindings[i].buffer));
-    bindings[i].binding = (uint32_t)args->a2[i].i0;
-    bindings[i].offset = iree_hal_cast_device_size(args->a2[i].i2);
-    bindings[i].length = iree_hal_cast_device_size(args->a2[i].i3);
-  }
-
-  iree_hal_descriptor_set_t* descriptor_set = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_descriptor_set_create(
-      device, set_layout, binding_count, bindings, &descriptor_set));
-  rets->r0 = iree_hal_descriptor_set_move_ref(descriptor_set);
-  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//

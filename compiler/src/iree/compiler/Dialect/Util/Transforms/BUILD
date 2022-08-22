@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library")
+load("//build_tools/bazel:iree_tablegen.bzl", "iree_gentbl_cc_library")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -23,8 +24,10 @@ iree_compiler_cc_library(
         "FoldGlobals.cpp",
         "FuseGlobals.cpp",
         "HoistIntoGlobals.cpp",
+        "PassDetail.h",
+        "Passes.cpp",
         "Patterns.cpp",
-        "PropagateSubrange.cpp",
+        "PropagateSubranges.cpp",
         "SimplifyGlobalAccesses.cpp",
         "StripDebugOps.cpp",
         "TestConversion.cpp",
@@ -32,9 +35,11 @@ iree_compiler_cc_library(
     ],
     hdrs = [
         "Passes.h",
+        "Passes.h.inc",
         "Patterns.h",
     ],
     deps = [
+        ":PassesIncGen",
         "//compiler/src/iree/compiler/Dialect/Util/Analysis",
         "//compiler/src/iree/compiler/Dialect/Util/Analysis/Attributes",
         "//compiler/src/iree/compiler/Dialect/Util/Analysis/Constant",
@@ -57,5 +62,20 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:Transforms",
+    ],
+)
+
+iree_gentbl_cc_library(
+    name = "PassesIncGen",
+    tbl_outs = [
+        (
+            ["--gen-pass-decls"],
+            "Passes.h.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "Passes.td",
+    deps = [
+        "@llvm-project//mlir:PassBaseTdFiles",
     ],
 )

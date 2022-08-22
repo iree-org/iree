@@ -1177,12 +1177,47 @@ static LogicalResult setConvRootConfig(
       DispatchLoweringPassPipeline::CPUConvTileAndDecomposeExpert);
 }
 
+/// Main utility to compute the workgroup (vectorization/unrolling) tile sizes.
+/// Note that this only works for NHWC input and HWCF kernel/filter
+/// convolutions, where the shape is [N, OH, OW, OC, KH, KW, (IC)].
+/// TODO(hanchung): Drive the tiling sizes through heuristics. The parameters
+/// are derived from limit experiments.
+static SmallVector<int64_t> getConvWorkgroupSizes(func::FuncOp entryPointFn,
+                                                  linalg::LinalgOp op,
+                                                  int64_t vectorSize) {
+  bool isSupported =
+      isa<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp>(
+          op.getOperation());
+  (void)isSupported;
+  assert(isSupported && "expected conv with nhwc input and hwcf kernel/filter");
+
+  SmallVector<int64_t> tileSizes;
+  auto variantOp = getExecutableVariantOp(entryPointFn);
+  assert(succeeded(variantOp) && "ExecutableVariantOp not found");
+
+  if (isX86(*variantOp) || isRISCV(*variantOp)) {
+    tileSizes = {1, 1, 8, vectorSize * 2, 1, 1, 8};
+  }
+
+  if (isAArch64(*variantOp)) {
+    tileSizes = {1, 1, 32, 64, 1, 1, 16};
+  }
+
+  // Get default hard-coded tile sizes if we couldn't compute anything better.
+  if (tileSizes.empty()) {
+    tileSizes = {1, 1, vectorSize, vectorSize, 1, 1, vectorSize};
+  }
+
+  return tileSizes;
+}
+
 static LogicalResult setRootConfig(
     func::FuncOp entryPointFn, linalg::Conv2DNhwcHwcfOp convOp,
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
   int64_t vectorSize =
       getVectorSize(entryPointFn, convOp.getResult(0).getType());
-  SmallVector<int64_t> targetTileSizes = {1, 1, 8, vectorSize * 2, 1, 1, 8};
+  SmallVector<int64_t> targetTileSizes =
+      getConvWorkgroupSizes(entryPointFn, convOp, vectorSize);
   return setConvRootConfig(entryPointFn, convOp, tiledLoops, targetTileSizes,
                            vectorSize);
 }

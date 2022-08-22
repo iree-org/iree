@@ -44,7 +44,6 @@ EXPORT_FN("buffer_view.rank", iree_hal_module_buffer_view_rank, r, i)
 EXPORT_FN("buffer_view.trace", iree_hal_module_buffer_view_trace, rCrD, v)
 
 EXPORT_FN("command_buffer.begin_debug_group", iree_hal_module_command_buffer_begin_debug_group, rr, v)
-EXPORT_FN("command_buffer.bind_descriptor_set", iree_hal_module_command_buffer_bind_descriptor_set, rrirCID, v)
 EXPORT_FN("command_buffer.copy_buffer", iree_hal_module_command_buffer_copy_buffer, rrIrII, v)
 EXPORT_FN("command_buffer.create", iree_hal_module_command_buffer_create, rii, r)
 EXPORT_FN("command_buffer.dispatch", iree_hal_module_command_buffer_dispatch, rriiii, v)
@@ -55,8 +54,6 @@ EXPORT_FN("command_buffer.fill_buffer", iree_hal_module_command_buffer_fill_buff
 EXPORT_FN("command_buffer.finalize", iree_hal_module_command_buffer_finalize, r, v)
 EXPORT_FN("command_buffer.push_constants", iree_hal_module_command_buffer_push_constants, rriCiD, v)
 EXPORT_FN("command_buffer.push_descriptor_set", iree_hal_module_command_buffer_push_descriptor_set, rriCirIID, v)
-
-EXPORT_FN("descriptor_set.create", iree_hal_module_descriptor_set_create, rrCirIID, r)
 
 EXPORT_FN("descriptor_set_layout.create", iree_hal_module_descriptor_set_layout_create, riCiiD, r)
 

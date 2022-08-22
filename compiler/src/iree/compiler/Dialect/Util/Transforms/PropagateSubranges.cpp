@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Patterns.h"
 #include "iree/compiler/Utils/IndexSet.h"
@@ -597,19 +598,8 @@ static void expandSubranges(Operation *op, ExpandedGlobalMap &globalMap,
 // are always wrapped in a subrange op, with the elision/deduplication/etc left
 // until cleanup.
 class PropagateSubrangesPass
-    : public PassWrapper<PropagateSubrangesPass,
-                         OperationPass<mlir::ModuleOp>> {
+    : public PropagateSubrangesBase<PropagateSubrangesPass> {
  public:
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(PropagateSubrangesPass)
-
-  StringRef getArgument() const override {
-    return "iree-util-propagate-subranges";
-  }
-
-  StringRef getDescription() const override {
-    return "Propagates resource subranges across the program.";
-  }
-
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::arith::ArithmeticDialect>();
     registry.insert<mlir::func::FuncDialect>();
@@ -645,8 +635,6 @@ class PropagateSubrangesPass
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createPropagateSubrangesPass() {
   return std::make_unique<PropagateSubrangesPass>();
 }
-
-static PassRegistration<PropagateSubrangesPass> pass;
 
 }  // namespace Util
 }  // namespace IREE

@@ -107,28 +107,6 @@ func.func @command_buffer_copy_buffer(
 
 // -----
 
-// CHECK-LABEL: @command_buffer_bind_descriptor_set
-func.func @command_buffer_bind_descriptor_set(
-  %arg0: !hal.command_buffer,
-  %arg1: !hal.executable_layout,
-  %arg2: !hal.descriptor_set
-) {
-  %c0 = arith.constant 0 : index
-  %c100 = arith.constant 100 : index
-  // CHECK: vm.call.variadic @hal.command_buffer.bind_descriptor_set(%arg0, %arg1, %zero, %arg2, []) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable_layout>, i32, !vm.ref<!hal.descriptor_set>, i64 ...)
-  hal.command_buffer.bind_descriptor_set<%arg0 : !hal.command_buffer>
-      layout(%arg1 : !hal.executable_layout)[%c0]
-      set(%arg2 : !hal.descriptor_set)
-  // CHECK: vm.call.variadic @hal.command_buffer.bind_descriptor_set(%arg0, %arg1, %zero, %arg2, [%c100]) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable_layout>, i32, !vm.ref<!hal.descriptor_set>, i64 ...)
-  hal.command_buffer.bind_descriptor_set<%arg0 : !hal.command_buffer>
-      layout(%arg1 : !hal.executable_layout)[%c0]
-      set(%arg2 : !hal.descriptor_set)
-      offsets([%c100])
-  return
-}
-
-// -----
-
 // CHECK-LABEL: @command_buffer_dispatch
 func.func @command_buffer_dispatch(
   %arg0: !hal.command_buffer,
