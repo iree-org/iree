@@ -235,15 +235,6 @@ vm.import @command_buffer.push_descriptor_set(
   %bindings : tuple<i32, !vm.ref<!hal.buffer>, i64, i64>...
 )
 
-// Binds a descriptor set to the given set number.
-vm.import @command_buffer.bind_descriptor_set(
-  %command_buffer : !vm.ref<!hal.command_buffer>,
-  %executable_layout : !vm.ref<!hal.executable_layout>,
-  %set : i32,
-  %descriptor_set : !vm.ref<!hal.descriptor_set>,
-  %dynamic_offsets : i64 ...
-)
-
 // Dispatches an execution request.
 vm.import @command_buffer.dispatch(
   %command_buffer : !vm.ref<!hal.command_buffer>,
@@ -263,18 +254,6 @@ vm.import @command_buffer.dispatch.indirect(
   %workgroups_buffer : !vm.ref<!hal.buffer>,
   %workgroups_offset : i64
 )
-
-//===----------------------------------------------------------------------===//
-// iree_hal_descriptor_set_t
-//===----------------------------------------------------------------------===//
-
-// Creates a new immutable descriptor set based on the given layout.
-vm.import @descriptor_set.create(
-  %device : !vm.ref<!hal.device>,
-  %set_layout : !vm.ref<!hal.descriptor_set_layout>,
-  // <binding, buffer, offset, length>
-  %bindings : tuple<i32, !vm.ref<!hal.buffer>, i64, i64>...
-) -> !vm.ref<!hal.descriptor_set>
 
 //===----------------------------------------------------------------------===//
 // iree_hal_descriptor_set_layout_t

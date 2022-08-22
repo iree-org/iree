@@ -25,7 +25,6 @@ typedef enum iree_hal_command_type_e {
   IREE_HAL_CMD_COPY_BUFFER,
   IREE_HAL_CMD_PUSH_CONSTANTS,
   IREE_HAL_CMD_PUSH_DESCRIPTOR_SET,
-  IREE_HAL_CMD_BIND_DESCRIPTOR_SET,
   IREE_HAL_CMD_DISPATCH,
   IREE_HAL_CMD_DISPATCH_INDIRECT,
 } iree_hal_cmd_type_t;
@@ -675,53 +674,6 @@ static iree_status_t iree_hal_deferred_command_buffer_apply_push_descriptor_set(
 }
 
 //===----------------------------------------------------------------------===//
-// IREE_HAL_CMD_BIND_DESCRIPTOR_SET
-//===----------------------------------------------------------------------===//
-
-typedef struct iree_hal_cmd_bind_descriptor_set_t {
-  iree_hal_cmd_header_t header;
-  iree_hal_executable_layout_t* executable_layout;
-  uint32_t set;
-  iree_hal_descriptor_set_t* descriptor_set;
-  iree_host_size_t dynamic_offset_count;
-  iree_device_size_t dynamic_offsets[];
-} iree_hal_cmd_bind_descriptor_set_t;
-
-static iree_status_t iree_hal_deferred_command_buffer_bind_descriptor_set(
-    iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_layout_t* executable_layout, uint32_t set,
-    iree_hal_descriptor_set_t* descriptor_set,
-    iree_host_size_t dynamic_offset_count,
-    const iree_device_size_t* dynamic_offsets) {
-  iree_hal_deferred_command_buffer_t* command_buffer =
-      iree_hal_deferred_command_buffer_cast(base_command_buffer);
-  iree_hal_cmd_list_t* cmd_list = &command_buffer->cmd_list;
-  const void* resources[2] = {executable_layout, descriptor_set};
-  IREE_RETURN_IF_ERROR(
-      iree_hal_resource_set_insert(command_buffer->resource_set, 2, resources));
-  iree_hal_cmd_bind_descriptor_set_t* cmd = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_cmd_list_append_command(
-      cmd_list, IREE_HAL_CMD_BIND_DESCRIPTOR_SET,
-      sizeof(*cmd) + sizeof(cmd->dynamic_offsets[0]) * dynamic_offset_count,
-      (void**)&cmd));
-  cmd->executable_layout = executable_layout;
-  cmd->set = set;
-  cmd->descriptor_set = descriptor_set;
-  cmd->dynamic_offset_count = dynamic_offset_count;
-  memcpy(cmd->dynamic_offsets, dynamic_offsets,
-         sizeof(cmd->dynamic_offsets[0]) * dynamic_offset_count);
-  return iree_ok_status();
-}
-
-static iree_status_t iree_hal_deferred_command_buffer_apply_bind_descriptor_set(
-    iree_hal_command_buffer_t* target_command_buffer,
-    const iree_hal_cmd_bind_descriptor_set_t* cmd) {
-  return iree_hal_command_buffer_bind_descriptor_set(
-      target_command_buffer, cmd->executable_layout, cmd->set,
-      cmd->descriptor_set, cmd->dynamic_offset_count, cmd->dynamic_offsets);
-}
-
-//===----------------------------------------------------------------------===//
 // IREE_HAL_CMD_DISPATCH
 //===----------------------------------------------------------------------===//
 
@@ -828,8 +780,6 @@ static const iree_hal_cmd_apply_fn_t iree_hal_cmd_apply_table[] = {
         iree_hal_deferred_command_buffer_apply_push_constants,
     [IREE_HAL_CMD_PUSH_DESCRIPTOR_SET] = (iree_hal_cmd_apply_fn_t)
         iree_hal_deferred_command_buffer_apply_push_descriptor_set,
-    [IREE_HAL_CMD_BIND_DESCRIPTOR_SET] = (iree_hal_cmd_apply_fn_t)
-        iree_hal_deferred_command_buffer_apply_bind_descriptor_set,
     [IREE_HAL_CMD_DISPATCH] = (iree_hal_cmd_apply_fn_t)
         iree_hal_deferred_command_buffer_apply_dispatch,
     [IREE_HAL_CMD_DISPATCH_INDIRECT] = (iree_hal_cmd_apply_fn_t)
@@ -889,8 +839,6 @@ static const iree_hal_command_buffer_vtable_t
         .push_constants = iree_hal_deferred_command_buffer_push_constants,
         .push_descriptor_set =
             iree_hal_deferred_command_buffer_push_descriptor_set,
-        .bind_descriptor_set =
-            iree_hal_deferred_command_buffer_bind_descriptor_set,
         .dispatch = iree_hal_deferred_command_buffer_dispatch,
         .dispatch_indirect = iree_hal_deferred_command_buffer_dispatch_indirect,
 };

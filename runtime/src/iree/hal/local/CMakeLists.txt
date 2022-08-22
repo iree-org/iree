@@ -94,14 +94,12 @@ iree_cc_library(
   HDRS
     "executable_loader.h"
     "inline_command_buffer.h"
-    "local_descriptor_set.h"
     "local_descriptor_set_layout.h"
     "local_executable.h"
     "local_executable_cache.h"
     "local_executable_layout.h"
   SRCS
     "inline_command_buffer.c"
-    "local_descriptor_set.c"
     "local_descriptor_set_layout.c"
     "local_executable_cache.c"
     "local_executable_layout.c"
