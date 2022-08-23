@@ -64,6 +64,10 @@ function(iree_static_linker_test)
     ${ARGN}
   )
 
+  if(_RULE_EMITC AND NOT IREE_OUTPUT_FORMAT_C)
+    return()
+  endif()
+
   iree_get_executable_path(_COMPILER_TOOL "iree-compile")
   get_filename_component(_SRC_PATH "${_RULE_SRC}" REALPATH)
   iree_package_name(_PACKAGE_NAME)
