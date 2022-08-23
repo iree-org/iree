@@ -85,3 +85,61 @@ iree_check_single_backend_test_suite(
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+
+iree_static_linker_test(
+  NAME
+    mnist_fake_weights_llvm_cpu_static_bytecode_test
+  SRC
+    "mnist_fake_weights.mlir"
+  STATIC_LIB_PREFIX
+    mnist_fake_weights_linked_llvm_cpu
+  ENTRY_FUNCTION
+    "predict"
+  FUNCTION_INPUTS
+    "1x28x28x1xf32"
+  COMPILER_FLAGS
+    "--iree-input-type=mhlo"
+)
+
+iree_static_linker_test(
+  NAME
+    mnist_fake_weights_llvm_cpu_static_c_test
+  SRC
+    "mnist_fake_weights.mlir"
+  STATIC_LIB_PREFIX
+    mnist_fake_weights_linked_llvm_cpu
+  ENTRY_FUNCTION
+    "predict"
+  FUNCTION_INPUTS
+    "1x28x28x1xf32"
+  COMPILER_FLAGS
+    "--iree-input-type=mhlo"
+  EMITC
+)
+
+iree_static_linker_test(
+  NAME
+    simple_mul_llvm_cpu_static_bytecode_test
+  SRC
+    "${IREE_ROOT_DIR}/samples/static_library/simple_mul.mlir"
+  STATIC_LIB_PREFIX
+    simple_mul_dispatch_0
+  ENTRY_FUNCTION
+    "simple_mul"
+  FUNCTION_INPUTS
+    "4xf32,4xf32"
+)
+
+iree_static_linker_test(
+  NAME
+    simple_mul_llvm_cpu_static_c_test
+  SRC
+    "${IREE_ROOT_DIR}/samples/static_library/simple_mul.mlir"
+  STATIC_LIB_PREFIX
+    simple_mul_dispatch_0
+  ENTRY_FUNCTION
+    "simple_mul"
+  FUNCTION_INPUTS
+    "4xf32,4xf32"
+  EMITC
+)
