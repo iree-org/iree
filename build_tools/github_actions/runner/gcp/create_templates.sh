@@ -17,7 +17,7 @@ REF="${TEMPLATE_CONFIG_REF:-$(git rev-parse HEAD)}"
 SHORT_REF="${REF:0:10}"
 STARTUP_SCRIPT_PATH="/tmp/startup_script.${SHORT_REF}.sh"
 
-sed -E "s/CONFIG_REF=main/CONFIG_REF=${REF}/" -E "s@REPO=iree-org/iree@REPO=${REPO}@" "${SCRIPT_DIR}/startup_script.sh" > "${STARTUP_SCRIPT_PATH}"
+sed -e "s/CONFIG_REF=main/CONFIG_REF=${REF}/" -e "s@REPO=iree-org/iree@REPO=${REPO}@" "${SCRIPT_DIR}/startup_script.sh" > "${STARTUP_SCRIPT_PATH}"
 
 declare -a common_args=(
   --project=iree-oss
