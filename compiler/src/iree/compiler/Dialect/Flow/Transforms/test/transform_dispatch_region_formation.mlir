@@ -113,3 +113,41 @@ transform.with_pdl_patterns {
     transform.iree.region_to_workgroups %region_op
   }
 }
+
+// -----
+
+// CHECK-LABEL: func @move_multiple_preceding
+//   CHECK-DAG:   arith.constant
+//   CHECK-DAG:   arith.constant
+//   CHECK-DAG:   tensor.dim
+//   CHECK-DAG:   tensor.dim
+//  CHECK-NEXT:   "test.dummy_op"
+//  CHECK-NEXT:   "test.third_user"
+//  CHECK-NEXT:   flow.dispatch.region
+//  CHECK-NEXT:     "test.dummy_op"
+//  CHECK-NEXT:     "test.first_user"
+//  CHECK-NEXT:     "test.second_user"
+//  CHECK-NEXT:     "test.merge1"
+//  CHECK-NEXT:     "test.merge2"
+func.func @move_multiple_preceding(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>, %s1: index, %s2: index) -> (tensor<?x?xf32>) {
+  %0 = "test.dummy_op"(%arg0) {__tagged__} : (tensor<?x?xf32>) -> (tensor<?x?xf32>)
+  %1 = "test.first_user"(%0) {__tagged__} : (tensor<?x?xf32>) -> (tensor<?x?xf32>)
+  %2 = "test.second_user"(%0) {__tagged__} : (tensor<?x?xf32>) -> (tensor<?x?xf32>)
+  %u = "test.third_user"(%0) : (tensor<?x?xf32>) -> (tensor<?x?xf32>)
+  %3 = "test.merge1"(%1, %2) {__tagged__} : (tensor<?x?xf32>, tensor<?x?xf32>) -> (tensor<?x?xf32>)
+  %4 = "test.merge2"(%1, %3) {__tagged__} : (tensor<?x?xf32>, tensor<?x?xf32>) -> (tensor<?x?xf32>)
+  %5 = tensor.insert_slice %4 into %arg1 [5, 16] [%s1, %s2] [1, 1]
+      : tensor<?x?xf32> into tensor<?x?xf32>
+  return %5 : tensor<?x?xf32>
+}
+
+transform.with_pdl_patterns {
+^bb0(%arg0: !pdl.operation):
+  transform.sequence %arg0 failures(propagate) {
+  ^bb1(%arg1: !pdl.operation):
+    %0 = transform.structured.match ops{["tensor.insert_slice"]} in %arg1
+    %dispatch_op = transform.iree.wrap_in_dispatch_region %0
+    %1 = transform.structured.match attributes{"__tagged__"} in %arg1
+    transform.iree.clone_preceding_op_into_dispatch_region %1 into %dispatch_op
+  }
+}

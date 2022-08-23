@@ -16,6 +16,7 @@
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/Transforms/RegionUtils.h"
+#include "mlir/Transforms/TopologicalSortUtils.h"
 
 using namespace mlir;
 using namespace mlir::iree_compiler;
@@ -706,8 +707,7 @@ transform_dialect::ClonePrecedingOpIntoDispatchRegionOp::apply(
   ArrayRef<Operation *> dispatchRegion =
       state.getPayloadOps(getDispatchRegion());
 
-  // TODO: Multiple targetOps could be allowed.
-  if (targetOps.size() != 1 || dispatchRegion.size() != 1)
+  if (dispatchRegion.size() != 1)
     return DiagnosedSilenceableFailure(this->emitOpError(
         "requires exactly one target/dispatch region handle"));
 
@@ -716,15 +716,26 @@ transform_dialect::ClonePrecedingOpIntoDispatchRegionOp::apply(
     return DiagnosedSilenceableFailure(
         this->emitOpError("expected 'dispatch.region' operand"));
 
+  // We are cloning ops one-by-one, so the order must be inversed (as opposed
+  // to cloning all ops in one go).
+  SmallVector<Operation *> targetOpsList(targetOps.begin(), targetOps.end());
+  bool sortResult = computeTopologicalSorting(
+      dispatchRegion.front()->getBlock(), targetOpsList);
+  (void)sortResult;
+  assert(sortResult && "unable to sort topologically");
+  SmallVector<Operation *> orderedTargets =
+      llvm::to_vector(llvm::reverse(targetOps));
   IRRewriter rewriter(regionOp->getContext());
-  auto newRegionOp = clonePrecedingOpIntoDispatchRegion(
-      rewriter, targetOps.front(), regionOp, getUpdateUsesOutsideOfRegion());
-  if (failed(newRegionOp))
-    return DiagnosedSilenceableFailure(
-        reportUnknownTransformError(targetOps.front()));
+  for (Operation *target : orderedTargets) {
+    auto newRegionOp = clonePrecedingOpIntoDispatchRegion(
+        rewriter, target, regionOp, getUpdateUsesOutsideOfRegion());
+    if (failed(newRegionOp))
+      return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+    regionOp = *newRegionOp;
+  }
 
   transformResults.set(getTransformed().cast<OpResult>(),
-                       newRegionOp->getOperation());
+                       regionOp.getOperation());
   return DiagnosedSilenceableFailure(success());
 }
 

@@ -119,11 +119,6 @@ def ClonePrecedingOpIntoDispatchRegionOp : Op<
     region. The transform fails if there are uses that appear before the
     dispatch region.
 
-
-
-    TODO: Support multiple payload ops for the `target` handle. In that case,
-    the targets must be sorted topologically before cloning them.
-
     #### Return modes
 
     This transform consumes both the `target` handle and the `dispatch_region`
