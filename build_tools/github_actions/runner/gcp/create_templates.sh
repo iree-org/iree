@@ -21,7 +21,11 @@ sed -e "s/CONFIG_REF=main/CONFIG_REF=${REF}/" -e "s@REPO=iree-org/iree@REPO=${RE
 
 declare -a common_args=(
   --project=iree-oss
-  --network-interface=network=default,network-tier=PREMIUM
+  # `address=''` indicates an ephemeral IP. This *shouldn't* be necessary here,
+  # as the gcloud docs say that this is the default, but in fact if you leave it
+  # off the VM gets no external IP and is impossible to SSH into. This knowledge
+  # was hard won.
+  --network-interface=network=default,address='',network-tier=PREMIUM
   --provisioning-model=STANDARD
   --scopes=https://www.googleapis.com/auth/cloud-platform
   --no-shielded-secure-boot
