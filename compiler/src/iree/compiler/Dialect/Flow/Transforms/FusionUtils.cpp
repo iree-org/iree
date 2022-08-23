@@ -29,7 +29,7 @@ static llvm::cl::opt<bool> clEnsureInplaceableConsumer(
 static llvm::cl::opt<bool> clFuseReductionBroadcastElementwise(
     "iree-flow-fuse-reduction-broadcast-elementwise",
     llvm::cl::desc("Fuse reduction, broadcast, and elementwise op."),
-    llvm::cl::init(true));
+    llvm::cl::init(false));
 
 /// For the fusion of root op -> elementwise operation to be bufferized
 /// in-place without use of extra memory, the result of the root operation
