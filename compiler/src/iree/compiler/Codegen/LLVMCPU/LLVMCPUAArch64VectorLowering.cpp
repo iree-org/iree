@@ -46,8 +46,12 @@ void LLVMCPUAArch64VectorLoweringPass::runOnOperation() {
 
   Optional<int64_t> numLoops;
   funcOp.walk([&](vector::ContractionOp op) {
-    if (numLoops) return signalPassFailure();
-    numLoops = op.getIndexingMapsArray()[0].getNumDims();
+    if (!numLoops) {
+      numLoops = op.getIndexingMapsArray()[0].getNumDims();
+    } else {
+      if (*numLoops != op.getIndexingMapsArray()[0].getNumDims())
+        return signalPassFailure();
+    }
   });
   // No vector.contract op to optimize.
   if (!numLoops) return;
