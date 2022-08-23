@@ -103,6 +103,9 @@ class HALToVMConversionInterface : public VMConversionDialectInterface {
                           APInt(64, bindingAttr.getOrdinal())));
       fn(IREE::HAL::DescriptorTypeAttr::get(attr.getContext(),
                                             bindingAttr.getType()));
+      fn(IREE::HAL::DescriptorFlagsAttr::get(
+          attr.getContext(),
+          bindingAttr.getFlags().value_or(IREE::HAL::DescriptorFlags::None)));
     }
   }
 };

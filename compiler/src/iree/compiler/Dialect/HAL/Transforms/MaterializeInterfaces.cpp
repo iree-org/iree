@@ -122,7 +122,10 @@ static IREE::HAL::PipelineLayoutAttr makePipelineLayoutAttr(
     SmallVector<IREE::HAL::DescriptorSetBindingAttr> bindingAttrs;
     for (const auto &binding : setLayout.bindings) {
       bindingAttrs.push_back(IREE::HAL::DescriptorSetBindingAttr::get(
-          builder.getContext(), binding.ordinal, binding.type));
+          builder.getContext(), binding.ordinal, binding.type,
+          binding.flags != IREE::HAL::DescriptorFlags::None
+              ? binding.flags
+              : Optional<IREE::HAL::DescriptorFlags>{}));
     }
     setLayoutAttrs.push_back(IREE::HAL::DescriptorSetLayoutAttr::get(
         builder.getContext(), setLayout.ordinal, bindingAttrs));

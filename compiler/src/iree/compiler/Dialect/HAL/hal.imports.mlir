@@ -262,9 +262,9 @@ vm.import @command_buffer.dispatch.indirect(
 // Creates a descriptor set layout that defines the bindings used within a set.
 vm.import @descriptor_set_layout.create(
   %device : !vm.ref<!hal.device>,
-  %usage_type : i32,
-  // <binding, type>
-  %bindings : tuple<i32, i32>...
+  %flags : i32,
+  // <binding, type, flags>
+  %bindings : tuple<i32, i32, i32>...
 ) -> !vm.ref<!hal.descriptor_set_layout>
 attributes {nosideeffects}
 

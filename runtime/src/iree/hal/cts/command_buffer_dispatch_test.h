@@ -27,11 +27,19 @@ class command_buffer_dispatch_test : public CtsTestBase {
 
     iree_hal_descriptor_set_layout_binding_t descriptor_set_layout_bindings[] =
         {
-            {0, IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER},
-            {1, IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER},
+            {
+                0,
+                IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                IREE_HAL_DESCRIPTOR_FLAG_NONE,
+            },
+            {
+                1,
+                IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                IREE_HAL_DESCRIPTOR_FLAG_NONE,
+            },
         };
     IREE_ASSERT_OK(iree_hal_descriptor_set_layout_create(
-        device_, IREE_HAL_DESCRIPTOR_SET_LAYOUT_USAGE_TYPE_PUSH_ONLY,
+        device_, IREE_HAL_DESCRIPTOR_SET_LAYOUT_FLAG_NONE,
         IREE_ARRAYSIZE(descriptor_set_layout_bindings),
         descriptor_set_layout_bindings, &descriptor_set_layout_));
     IREE_ASSERT_OK(iree_hal_pipeline_layout_create(

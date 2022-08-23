@@ -1006,13 +1006,13 @@ static iree_status_t iree_hal_vulkan_device_create_command_buffer(
 
 static iree_status_t iree_hal_vulkan_device_create_descriptor_set_layout(
     iree_hal_device_t* base_device,
-    iree_hal_descriptor_set_layout_usage_type_t usage_type,
+    iree_hal_descriptor_set_layout_flags_t flags,
     iree_host_size_t binding_count,
     const iree_hal_descriptor_set_layout_binding_t* bindings,
     iree_hal_descriptor_set_layout_t** out_descriptor_set_layout) {
   iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
   return iree_hal_vulkan_native_descriptor_set_layout_create(
-      device->logical_device, usage_type, binding_count, bindings,
+      device->logical_device, flags, binding_count, bindings,
       out_descriptor_set_layout);
 }
 

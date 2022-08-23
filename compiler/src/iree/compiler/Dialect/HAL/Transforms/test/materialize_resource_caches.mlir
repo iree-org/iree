@@ -5,7 +5,7 @@
 // CHECK-NEXT:   %device = hal.ex.shared_device : !hal.device
 // CHECK-NEXT:   %descriptor_set_layout = hal.descriptor_set_layout.create
 // CHECK-SAME:     device(%device : !hal.device)
-// CHECK-SAME:     usage(push_only)
+// CHECK-SAME:     flags("None")
 // CHECK-SAME:     bindings([
 // CHECK-SAME:       #hal.descriptor_set.binding<0, storage_buffer>,
 // CHECK-SAME:       #hal.descriptor_set.binding<1, storage_buffer>
@@ -16,7 +16,7 @@
 func.func @descriptorSetLayoutLookup(%device : !hal.device) -> !hal.descriptor_set_layout {
   // CHECK-NEXT: %[[LAYOUT:.+]] = util.global.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
   %0 = hal.descriptor_set_layout.lookup device(%device : !hal.device)
-                                        usage(push_only)
+                                        flags("None")
                                         bindings([
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -91,7 +91,7 @@ func.func @sharedLayoutLookup(%device : !hal.device) -> !hal.pipeline_layout {
 func.func @otherDescriptorSetLayoutLookup(%device : !hal.device) -> !hal.descriptor_set_layout {
   // CHECK: %[[LAYOUT:.+]] = util.global.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
   %0 = hal.descriptor_set_layout.lookup device(%device : !hal.device)
-                                        usage(push_only)
+                                        flags(None)
                                         bindings([
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>

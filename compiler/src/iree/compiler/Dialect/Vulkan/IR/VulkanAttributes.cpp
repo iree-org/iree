@@ -293,8 +293,8 @@ Attribute VulkanDialect::parseAttribute(DialectAsmParser &parser,
   Attribute attr;
   OptionalParseResult result =
       generatedAttributeParser(parser, &attrKind, type, attr);
-  if (result.hasValue()) {
-    if (failed(result.getValue())) return {};
+  if (result.has_value()) {
+    if (failed(result.value())) return {};
     return attr;
   }
 

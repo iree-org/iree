@@ -1062,7 +1062,7 @@ def HAL_DescriptorSetLayoutCreateOp :
 
   let arguments = (ins
     HAL_Device:$device,
-    HAL_DescriptorSetLayoutUsageTypeAttr:$usage_type,
+    HAL_DescriptorSetLayoutFlagsAttr:$flags,
     HAL_DescriptorSetLayoutBindingArrayAttr:$bindings
   );
   let results = (outs
@@ -1071,7 +1071,7 @@ def HAL_DescriptorSetLayoutCreateOp :
 
   let assemblyFormat = [{
     `device` `(` $device `:` type($device) `)`
-    `usage` `(` $usage_type `)`
+    `flags` `(` $flags `)`
     `bindings` `(` $bindings `)`
     `:` type($result)
     attr-dict-with-keyword
@@ -1089,7 +1089,7 @@ def HAL_DescriptorSetLayoutLookupOp : HAL_PureOp<"descriptor_set_layout.lookup",
 
   let arguments = (ins
     HAL_Device:$device,
-    HAL_DescriptorSetLayoutUsageTypeAttr:$usage_type,
+    HAL_DescriptorSetLayoutFlagsAttr:$flags,
     HAL_DescriptorSetLayoutBindingArrayAttr:$bindings
   );
   let results = (outs
@@ -1098,7 +1098,7 @@ def HAL_DescriptorSetLayoutLookupOp : HAL_PureOp<"descriptor_set_layout.lookup",
 
   let assemblyFormat = [{
     `device` `(` $device `:` type($device) `)`
-    `usage` `(` $usage_type `)`
+    `flags` `(` $flags `)`
     `bindings` `(` $bindings `)`
     `:` type($result)
     attr-dict-with-keyword
