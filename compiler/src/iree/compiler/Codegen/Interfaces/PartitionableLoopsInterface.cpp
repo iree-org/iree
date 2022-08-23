@@ -94,7 +94,7 @@ struct OuterParallelAsPartitionableLoops
     // loops, but that needs the interface to return the static sizes of the
     // loops.
     SmallVector<unsigned> partitionableLoops;
-    auto interfaceOp = cast<OpTy>(op);
+    auto interfaceOp = cast<TilingInterface>(op);
     for (auto [index, iteratorType] :
          llvm::enumerate(interfaceOp.getLoopIteratorTypes())) {
       if (iteratorType != utils::IteratorType::parallel) {
@@ -240,6 +240,10 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
         AllParallelAsPartitionableLoops<IREE::LinalgExt::SoftmaxOp>>(*ctx);
     IREE::LinalgExt::AttentionOp::attachInterface<
         AllParallelAsPartitionableLoops<IREE::LinalgExt::AttentionOp>>(*ctx);
+  });
+  registry.addExtension(+[](MLIRContext *ctx, tensor::TensorDialect *dialect) {
+    tensor::PadOp::attachInterface<
+        OuterParallelAsPartitionableLoops<tensor::PadOp>>(*ctx);
   });
 }
 
