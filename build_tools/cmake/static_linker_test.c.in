@@ -208,6 +208,7 @@ int main() {
   const char* kName = IREE_EXE_NAME;
   const iree_status_t result = Run();
   if (!iree_status_is_ok(result)) {
+    fprintf(stderr, "%s encountered error:\n", kName);
     iree_status_fprint(stderr, result);
     iree_status_free(result);
     return -1;
