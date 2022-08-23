@@ -17,9 +17,8 @@
 #include "iree/hal/local/executable_library.h"
 #include "iree/hal/local/executable_loader.h"
 #include "iree/hal/local/loaders/registration/init.h"
-#include "iree/hal/local/local_descriptor_set_layout.h"
 #include "iree/hal/local/local_executable.h"
-#include "iree/hal/local/local_executable_layout.h"
+#include "iree/hal/local/local_pipeline_layout.h"
 #include "iree/testing/benchmark.h"
 
 IREE_FLAG(string, executable_format, "",
@@ -166,8 +165,8 @@ static iree_status_t iree_hal_executable_library_run(
   // Setup the layouts defining how each entry point is interpreted.
   // NOTE: we know for the embedded library loader that this is not required.
   // Other loaders may need it in which case it'll have to be provided.
-  executable_params.executable_layout_count = 0;
-  executable_params.executable_layouts = NULL;
+  executable_params.pipeline_layout_count = 0;
+  executable_params.pipeline_layouts = NULL;
 
   // Perform the load, which will fail if the executable cannot be loaded or
   // there was an issue with the layouts.

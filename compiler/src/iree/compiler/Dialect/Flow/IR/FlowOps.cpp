@@ -719,9 +719,9 @@ void DispatchWorkgroupsOp::build(OpBuilder &builder, OperationState &state,
   state.attributes.erase(IREE::Util::TiedOpInterface::getStorageAttrName());
   state.addAttribute(IREE::Util::TiedOpInterface::getStorageAttrName(),
                      builder.getIndexArrayAttr(tiedOperands));
-  state.attributes.erase("operand_segment_sizes");
-  state.addAttribute("operand_segment_sizes",
-                     builder.getI32VectorAttr({
+  state.attributes.erase(getOperandSegmentSizeAttr());
+  state.addAttribute(getOperandSegmentSizeAttr(),
+                     builder.getDenseI32ArrayAttr({
                          static_cast<int32_t>(workload.size()),
                          static_cast<int32_t>(arguments.size()),
                          static_cast<int32_t>(argumentDims.size()),
@@ -1187,9 +1187,9 @@ void DispatchOp::build(OpBuilder &builder, OperationState &state,
   state.attributes.erase(IREE::Util::TiedOpInterface::getStorageAttrName());
   state.addAttribute(IREE::Util::TiedOpInterface::getStorageAttrName(),
                      tiedOperands);
-  state.attributes.erase("operand_segment_sizes");
-  state.addAttribute("operand_segment_sizes",
-                     builder.getI32VectorAttr({
+  state.attributes.erase(getOperandSegmentSizeAttr());
+  state.addAttribute(getOperandSegmentSizeAttr(),
+                     builder.getDenseI32ArrayAttr({
                          static_cast<int32_t>(workload.size()),
                          static_cast<int32_t>(operands.size()),
                          static_cast<int32_t>(operandDims.size()),

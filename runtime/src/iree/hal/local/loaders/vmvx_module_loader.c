@@ -143,22 +143,22 @@ static iree_status_t iree_hal_vmvx_executable_create(
   IREE_ASSERT_ARGUMENT(context);
   IREE_ASSERT_ARGUMENT(bytecode_module);
   IREE_ASSERT_ARGUMENT(executable_params);
-  IREE_ASSERT_ARGUMENT(!executable_params->executable_layout_count ||
-                       executable_params->executable_layouts);
+  IREE_ASSERT_ARGUMENT(!executable_params->pipeline_layout_count ||
+                       executable_params->pipeline_layouts);
   IREE_ASSERT_ARGUMENT(out_executable);
   *out_executable = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // NOTE: executable layouts are optional but if provided must be consistent.
+  // NOTE: pipeline layouts are optional but if provided must be consistent.
   iree_host_size_t entry_count =
       iree_vm_module_signature(bytecode_module).export_function_count;
-  if (executable_params->executable_layout_count > 0 &&
-      entry_count != executable_params->executable_layout_count) {
+  if (executable_params->pipeline_layout_count > 0 &&
+      entry_count != executable_params->pipeline_layout_count) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                             "executable provides %zu entry points but caller "
                             "provided %zu; must match",
                             entry_count,
-                            executable_params->executable_layout_count);
+                            executable_params->pipeline_layout_count);
   }
 
   iree_hal_vmvx_executable_t* executable = NULL;
@@ -166,8 +166,8 @@ static iree_status_t iree_hal_vmvx_executable_create(
       sizeof(*executable) +
       entry_count * sizeof(*executable->entry_fn_ordinals) +
       entry_count * sizeof(*executable->base.dispatch_attrs) +
-      executable_params->executable_layout_count *
-          sizeof(iree_hal_executable_layout_t*);
+      executable_params->pipeline_layout_count *
+          sizeof(iree_hal_pipeline_layout_t*);
   iree_status_t status =
       iree_allocator_malloc(host_allocator, total_size, (void**)&executable);
   iree_hal_executable_dispatch_attrs_v0_t* dispatch_attrs = NULL;
@@ -176,12 +176,12 @@ static iree_status_t iree_hal_vmvx_executable_create(
                    entry_count * sizeof(*executable->entry_fn_ordinals);
     dispatch_attrs = (iree_hal_executable_dispatch_attrs_v0_t*)ptr;
     ptr += entry_count * sizeof(*executable->base.dispatch_attrs);
-    iree_hal_executable_layout_t** executable_layouts_ptr =
-        (iree_hal_executable_layout_t**)ptr;
+    iree_hal_pipeline_layout_t** pipeline_layouts_ptr =
+        (iree_hal_pipeline_layout_t**)ptr;
     iree_hal_local_executable_initialize(
         &iree_hal_vmvx_executable_vtable,
-        executable_params->executable_layout_count,
-        executable_params->executable_layouts, executable_layouts_ptr,
+        executable_params->pipeline_layout_count,
+        executable_params->pipeline_layouts, pipeline_layouts_ptr,
         host_allocator, &executable->base);
     executable->context = context;
     executable->base.dispatch_attrs = dispatch_attrs;
@@ -305,7 +305,7 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
       dispatch_state->binding_count * sizeof(iree_vm_buffer_t));
   for (iree_host_size_t i = 0; i < dispatch_state->binding_count; ++i) {
     iree_vm_buffer_t* binding_buffer = &binding_buffers[i];
-    // TODO(benvanik): executable layout contains the required access
+    // TODO(benvanik): pipeline layout contains the required access
     // information. We will likely want to encode a bitmap of mutable bindings
     // such that we can quickly set the access bit, though.
     iree_vm_buffer_access_t access =

@@ -358,10 +358,10 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_copy_buffer(
 
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_push_constants(
     iree_hal_command_buffer_t* command_buffer,
-    iree_hal_executable_layout_t* executable_layout, iree_host_size_t offset,
+    iree_hal_pipeline_layout_t* pipeline_layout, iree_host_size_t offset,
     const void* values, iree_host_size_t values_length) {
   IREE_ASSERT_ARGUMENT(command_buffer);
-  IREE_ASSERT_ARGUMENT(executable_layout);
+  IREE_ASSERT_ARGUMENT(pipeline_layout);
   IREE_ASSERT_ARGUMENT(values);
   if (IREE_UNLIKELY(values_length == 0)) {
     return iree_ok_status();
@@ -371,56 +371,31 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_push_constants(
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_hal_command_buffer_push_constants_validation(
                 command_buffer, VALIDATION_STATE(command_buffer),
-                executable_layout, offset, values, values_length));
+                pipeline_layout, offset, values, values_length));
   });
   iree_status_t status = _VTABLE_DISPATCH(command_buffer, push_constants)(
-      command_buffer, executable_layout, offset, values, values_length);
+      command_buffer, pipeline_layout, offset, values, values_length);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_push_descriptor_set(
     iree_hal_command_buffer_t* command_buffer,
-    iree_hal_executable_layout_t* executable_layout, uint32_t set,
+    iree_hal_pipeline_layout_t* pipeline_layout, uint32_t set,
     iree_host_size_t binding_count,
     const iree_hal_descriptor_set_binding_t* bindings) {
   IREE_ASSERT_ARGUMENT(command_buffer);
-  IREE_ASSERT_ARGUMENT(executable_layout);
+  IREE_ASSERT_ARGUMENT(pipeline_layout);
   IREE_ASSERT_ARGUMENT(!binding_count || bindings);
   IREE_TRACE_ZONE_BEGIN(z0);
   IF_VALIDATING(command_buffer, {
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_hal_command_buffer_push_descriptor_set_validation(
                 command_buffer, VALIDATION_STATE(command_buffer),
-                executable_layout, set, binding_count, bindings));
+                pipeline_layout, set, binding_count, bindings));
   });
   iree_status_t status = _VTABLE_DISPATCH(command_buffer, push_descriptor_set)(
-      command_buffer, executable_layout, set, binding_count, bindings);
-  IREE_TRACE_ZONE_END(z0);
-  return status;
-}
-
-IREE_API_EXPORT iree_status_t iree_hal_command_buffer_bind_descriptor_set(
-    iree_hal_command_buffer_t* command_buffer,
-    iree_hal_executable_layout_t* executable_layout, uint32_t set,
-    iree_hal_descriptor_set_t* descriptor_set,
-    iree_host_size_t dynamic_offset_count,
-    const iree_device_size_t* dynamic_offsets) {
-  IREE_ASSERT_ARGUMENT(command_buffer);
-  IREE_ASSERT_ARGUMENT(executable_layout);
-  IREE_ASSERT_ARGUMENT(descriptor_set);
-  IREE_ASSERT_ARGUMENT(!dynamic_offset_count || dynamic_offsets);
-  IREE_TRACE_ZONE_BEGIN(z0);
-  IF_VALIDATING(command_buffer, {
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0,
-        iree_hal_command_buffer_bind_descriptor_set_validation(
-            command_buffer, VALIDATION_STATE(command_buffer), executable_layout,
-            set, descriptor_set, dynamic_offset_count, dynamic_offsets));
-  });
-  iree_status_t status = _VTABLE_DISPATCH(command_buffer, bind_descriptor_set)(
-      command_buffer, executable_layout, set, descriptor_set,
-      dynamic_offset_count, dynamic_offsets);
+      command_buffer, pipeline_layout, set, binding_count, bindings);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

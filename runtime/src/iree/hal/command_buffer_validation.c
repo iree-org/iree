@@ -14,12 +14,11 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/allocator.h"
 #include "iree/hal/buffer.h"
-#include "iree/hal/descriptor_set.h"
 #include "iree/hal/detail.h"
 #include "iree/hal/device.h"
 #include "iree/hal/event.h"
 #include "iree/hal/executable.h"
-#include "iree/hal/executable_layout.h"
+#include "iree/hal/pipeline_layout.h"
 #include "iree/hal/resource.h"
 
 // Returns success iff the queue supports the given command categories.
@@ -366,7 +365,7 @@ iree_status_t iree_hal_command_buffer_copy_buffer_validation(
 iree_status_t iree_hal_command_buffer_push_constants_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state,
-    iree_hal_executable_layout_t* executable_layout, iree_host_size_t offset,
+    iree_hal_pipeline_layout_t* pipeline_layout, iree_host_size_t offset,
     const void* values, iree_host_size_t values_length) {
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
       command_buffer, validation_state, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
@@ -385,7 +384,7 @@ iree_status_t iree_hal_command_buffer_push_constants_validation(
 iree_status_t iree_hal_command_buffer_push_descriptor_set_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state,
-    iree_hal_executable_layout_t* executable_layout, uint32_t set,
+    iree_hal_pipeline_layout_t* pipeline_layout, uint32_t set,
     iree_host_size_t binding_count,
     const iree_hal_descriptor_set_binding_t* bindings) {
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
@@ -394,22 +393,6 @@ iree_status_t iree_hal_command_buffer_push_descriptor_set_validation(
   // TODO(benvanik): validate set index.
   // TODO(benvanik): validate binding_offset.
   // TODO(benvanik): validate bindings.
-
-  return iree_ok_status();
-}
-
-iree_status_t iree_hal_command_buffer_bind_descriptor_set_validation(
-    iree_hal_command_buffer_t* command_buffer,
-    iree_hal_command_buffer_validation_state_t* validation_state,
-    iree_hal_executable_layout_t* executable_layout, uint32_t set,
-    iree_hal_descriptor_set_t* descriptor_set,
-    iree_host_size_t dynamic_offset_count,
-    const iree_device_size_t* dynamic_offsets) {
-  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
-      command_buffer, validation_state, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
-
-  // TODO(benvanik): validate set index.
-  // TODO(benvanik): validate dynamic offsets (both count and offsets).
 
   return iree_ok_status();
 }

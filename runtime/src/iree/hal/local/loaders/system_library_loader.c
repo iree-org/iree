@@ -88,7 +88,7 @@ typedef struct iree_hal_system_executable_t {
     const iree_hal_executable_library_v0_t* v0;
   } library;
 
-  iree_hal_executable_layout_t* layouts[];
+  iree_hal_pipeline_layout_t* layouts[];
 } iree_hal_system_executable_t;
 
 static const iree_hal_local_executable_vtable_t
@@ -255,8 +255,8 @@ static iree_status_t iree_hal_system_executable_create(
   IREE_ASSERT_ARGUMENT(executable_params);
   IREE_ASSERT_ARGUMENT(executable_params->executable_data.data &&
                        executable_params->executable_data.data_length);
-  IREE_ASSERT_ARGUMENT(!executable_params->executable_layout_count ||
-                       executable_params->executable_layouts);
+  IREE_ASSERT_ARGUMENT(!executable_params->pipeline_layout_count ||
+                       executable_params->pipeline_layouts);
   IREE_ASSERT_ARGUMENT(!executable_params->constant_count ||
                        executable_params->constants);
   IREE_ASSERT_ARGUMENT(out_executable);
@@ -266,23 +266,22 @@ static iree_status_t iree_hal_system_executable_create(
   iree_hal_system_executable_t* executable = NULL;
   iree_host_size_t total_size =
       sizeof(*executable) +
-      executable_params->executable_layout_count *
-          sizeof(*executable->layouts) +
+      executable_params->pipeline_layout_count * sizeof(*executable->layouts) +
       executable_params->constant_count * sizeof(*executable_params->constants);
   iree_status_t status =
       iree_allocator_malloc(host_allocator, total_size, (void**)&executable);
   if (iree_status_is_ok(status)) {
     iree_hal_local_executable_initialize(
         &iree_hal_system_executable_vtable,
-        executable_params->executable_layout_count,
-        executable_params->executable_layouts, &executable->layouts[0],
+        executable_params->pipeline_layout_count,
+        executable_params->pipeline_layouts, &executable->layouts[0],
         host_allocator, &executable->base);
 
     // Copy executable constants so we own them.
     if (executable_params->constant_count > 0) {
       uint32_t* target_constants =
           (uint32_t*)((uint8_t*)executable + sizeof(*executable) +
-                      executable_params->executable_layout_count *
+                      executable_params->pipeline_layout_count *
                           sizeof(*executable->layouts));
       memcpy(target_constants, executable_params->constants,
              executable_params->constant_count *
@@ -310,17 +309,16 @@ static iree_status_t iree_hal_system_executable_create(
       iree_all_bits_set(executable_params->caching_mode,
                         IREE_HAL_EXECUTABLE_CACHING_MODE_DISABLE_VERIFICATION);
   if (iree_status_is_ok(status) &&
-      (!disable_verification &&
-       executable_params->executable_layout_count > 0)) {
-    // NOTE: executable layouts are optional but if provided must be consistent.
+      (!disable_verification && executable_params->pipeline_layout_count > 0)) {
+    // NOTE: pipeline layouts are optional but if provided must be consistent.
     if (executable->library.v0->exports.count !=
-        executable_params->executable_layout_count) {
+        executable_params->pipeline_layout_count) {
       status =
           iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                            "executable provides %u entry points but caller "
                            "provided %zu; must match",
                            executable->library.v0->exports.count,
-                           executable_params->executable_layout_count);
+                           executable_params->pipeline_layout_count);
     }
   }
   if (iree_status_is_ok(status) && !disable_verification) {

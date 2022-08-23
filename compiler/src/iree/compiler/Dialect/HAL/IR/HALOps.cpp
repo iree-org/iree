@@ -448,18 +448,18 @@ void CommandBufferCreateOp::getAsmResultNames(
 
 void CommandBufferPushDescriptorSetOp::build(
     OpBuilder &builder, OperationState &state, Value commandBuffer,
-    Value executableLayout, int64_t set,
+    Value pipelineLayout, int64_t set,
     ArrayRef<DescriptorSetBindingValue> bindings) {
-  build(builder, state, commandBuffer, executableLayout,
+  build(builder, state, commandBuffer, pipelineLayout,
         builder.createOrFold<arith::ConstantIndexOp>(state.location, set),
         bindings);
 }
 
 void CommandBufferPushDescriptorSetOp::build(
     OpBuilder &builder, OperationState &state, Value commandBuffer,
-    Value executableLayout, Value set,
+    Value pipelineLayout, Value set,
     ArrayRef<DescriptorSetBindingValue> bindings) {
-  state.addOperands({commandBuffer, executableLayout, set});
+  state.addOperands({commandBuffer, pipelineLayout, set});
   SmallVector<Value, 4> bindingOrdinals;
   SmallVector<Value, 4> bindingBuffers;
   SmallVector<Value, 4> bindingOffsets;
@@ -474,35 +474,6 @@ void CommandBufferPushDescriptorSetOp::build(
   state.addOperands(bindingBuffers);
   state.addOperands(bindingOffsets);
   state.addOperands(bindingLengths);
-}
-
-//===----------------------------------------------------------------------===//
-// hal.descriptor_set.create
-//===----------------------------------------------------------------------===//
-
-void DescriptorSetCreateOp::build(
-    OpBuilder &builder, OperationState &state, Value device, Value setLayout,
-    ArrayRef<DescriptorSetBindingValue> bindings) {
-  state.addOperands({device, setLayout});
-  SmallVector<Value, 4> bindingOrdinals;
-  SmallVector<Value, 4> bindingBuffers;
-  SmallVector<Value, 4> bindingOffsets;
-  SmallVector<Value, 4> bindingLengths;
-  for (auto binding : bindings) {
-    bindingOrdinals.push_back(binding.ordinal);
-    bindingBuffers.push_back(binding.buffer);
-    bindingOffsets.push_back(binding.byteOffset);
-    bindingLengths.push_back(binding.byteLength);
-  }
-  state.addOperands(bindingOrdinals);
-  state.addOperands(bindingBuffers);
-  state.addOperands(bindingOffsets);
-  state.addOperands(bindingLengths);
-}
-
-void DescriptorSetCreateOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(getResult(), "descriptor_set");
 }
 
 //===----------------------------------------------------------------------===//
@@ -697,7 +668,7 @@ ParseResult ExecutableExportOp::parse(OpAsmParser &parser,
   }
 
   StringAttr nameAttr;
-  IREE::HAL::ExecutableLayoutAttr layoutAttr;
+  IREE::HAL::PipelineLayoutAttr layoutAttr;
   if (failed(parser.parseSymbolName(nameAttr,
                                     mlir::SymbolTable::getSymbolAttrName(),
                                     result.attributes))) {
@@ -1071,21 +1042,21 @@ void InterfaceWorkgroupSizeOp::getAsmResultNames(
 }
 
 //===----------------------------------------------------------------------===//
-// hal.executable_layout.create
+// hal.pipeline_layout.create
 //===----------------------------------------------------------------------===//
 
-void ExecutableLayoutCreateOp::getAsmResultNames(
+void PipelineLayoutCreateOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(getResult(), "executable_layout");
+  setNameFn(getResult(), "pipeline_layout");
 }
 
 //===----------------------------------------------------------------------===//
-// hal.executable_layout.lookup
+// hal.pipeline_layout.lookup
 //===----------------------------------------------------------------------===//
 
-void ExecutableLayoutLookupOp::getAsmResultNames(
+void PipelineLayoutLookupOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(getResult(), "executable_layout");
+  setNameFn(getResult(), "pipeline_layout");
 }
 
 //===----------------------------------------------------------------------===//

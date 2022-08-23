@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(builtin.module(iree-convert-to-llvm)))' %s | FileCheck %s
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -16,7 +16,7 @@
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [2]>
 hal.executable private @apply_scale_no_vector_feature {
   hal.executable.variant public @embedded_elf_riscv_64, target = #executable_target_embedded_elf_riscv_64_ {
-    hal.executable.export public @apply_scale_no_vector_feature ordinal(0) layout(#executable_layout) attributes {translation_info = #translation} {
+    hal.executable.export public @apply_scale_no_vector_feature ordinal(0) layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
       %c1 = arith.constant 1 : index
       %0 = affine.apply #map()[%arg1]
@@ -48,7 +48,7 @@ hal.executable private @apply_scale_no_vector_feature {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -64,7 +64,7 @@ hal.executable private @apply_scale_no_vector_feature {
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [2]>
 hal.executable private @apply_scale_v {
   hal.executable.variant public @embedded_elf_riscv_64, target = #executable_target_embedded_elf_riscv_64_ {
-    hal.executable.export public @apply_scale_v ordinal(0) layout(#executable_layout) attributes {translation_info = #translation} {
+    hal.executable.export public @apply_scale_v ordinal(0) layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
       %c1 = arith.constant 1 : index
       %0 = affine.apply #map()[%arg1]
@@ -94,7 +94,7 @@ hal.executable private @apply_scale_v {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -110,7 +110,7 @@ hal.executable private @apply_scale_v {
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [2]>
 hal.executable private @apply_scale_zve64x {
   hal.executable.variant public @embedded_elf_riscv_64, target = #executable_target_embedded_elf_riscv_64_ {
-    hal.executable.export public @apply_scale_zve64x ordinal(0) layout(#executable_layout) attributes {translation_info = #translation} {
+    hal.executable.export public @apply_scale_zve64x ordinal(0) layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
       %c1 = arith.constant 1 : index
       %0 = affine.apply #map()[%arg1]
@@ -140,7 +140,7 @@ hal.executable private @apply_scale_zve64x {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -156,7 +156,7 @@ hal.executable private @apply_scale_zve64x {
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [2]>
 hal.executable private @apply_scale_zve32x {
   hal.executable.variant public @embedded_elf_riscv_64, target = #executable_target_embedded_elf_riscv_64_ {
-    hal.executable.export public @apply_scale_zve32x ordinal(0) layout(#executable_layout) attributes {translation_info = #translation} {
+    hal.executable.export public @apply_scale_zve32x ordinal(0) layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
       %c1 = arith.constant 1 : index
       %0 = affine.apply #map()[%arg1]

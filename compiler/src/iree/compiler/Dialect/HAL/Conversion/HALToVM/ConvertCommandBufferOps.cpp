@@ -90,12 +90,12 @@ class CommandBufferPushDescriptorSetOpConversion
 
     SmallVector<Value, 8> callOperands = {
         adaptor.getCommandBuffer(),
-        adaptor.getExecutableLayout(),
+        adaptor.getPipelineLayout(),
         adaptor.getSet(),
     };
     SmallVector<int16_t, 5> segmentSizes = {
         /*command_buffer=*/-1,
-        /*executable_layout=*/-1,
+        /*pipeline_layout=*/-1,
         /*set=*/-1,
         /*bindings=*/
         static_cast<int16_t>(adaptor.getBindingOrdinals().size()),
@@ -153,10 +153,6 @@ void populateHALCommandBufferToVMPatterns(MLIRContext *context,
   patterns.insert<CommandBufferPushDescriptorSetOpConversion>(
       context, importSymbols, typeConverter,
       "hal.command_buffer.push_descriptor_set");
-  patterns.insert<
-      VMImportOpConversion<IREE::HAL::CommandBufferBindDescriptorSetOp>>(
-      context, importSymbols, typeConverter,
-      "hal.command_buffer.bind_descriptor_set");
   patterns.insert<VMImportOpConversion<IREE::HAL::CommandBufferDispatchOp>>(
       context, importSymbols, typeConverter, "hal.command_buffer.dispatch");
   patterns

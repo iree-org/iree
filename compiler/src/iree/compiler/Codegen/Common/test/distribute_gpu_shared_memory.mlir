@@ -9,7 +9,7 @@
 
 #map0 = affine_map<()[s0, s1, s2] -> (s0 * 4 + s1 * 128 + s2 * 512)>
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -17,7 +17,7 @@
 ]>
 hal.executable private @shared_mem_cpy  {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.export @shared_mem_cpy layout(#executable_layout) attributes {
+    hal.executable.export @shared_mem_cpy layout(#pipeline_layout) attributes {
       workgroup_size = [32: index, 4: index, 1:index]
     } {
     ^bb0(%arg0: !hal.device, %arg1 : index, %arg2 : index):

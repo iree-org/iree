@@ -14,8 +14,8 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/cuda/cuda_buffer.h"
 #include "iree/hal/drivers/cuda/dynamic_symbols.h"
-#include "iree/hal/drivers/cuda/executable_layout.h"
 #include "iree/hal/drivers/cuda/native_executable.h"
+#include "iree/hal/drivers/cuda/pipeline_layout.h"
 #include "iree/hal/drivers/cuda/status_util.h"
 #include "iree/hal/utils/resource_set.h"
 
@@ -407,7 +407,7 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_copy_buffer(
 
 static iree_status_t iree_hal_cuda_graph_command_buffer_push_constants(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_layout_t* executable_layout, iree_host_size_t offset,
+    iree_hal_pipeline_layout_t* pipeline_layout, iree_host_size_t offset,
     const void* values, iree_host_size_t values_length) {
   iree_hal_cuda_graph_command_buffer_t* command_buffer =
       iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
@@ -436,13 +436,13 @@ static int compare_binding_index(const void* a, const void* b) {
 
 static iree_status_t iree_hal_cuda_graph_command_buffer_push_descriptor_set(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_layout_t* executable_layout, uint32_t set,
+    iree_hal_pipeline_layout_t* pipeline_layout, uint32_t set,
     iree_host_size_t binding_count,
     const iree_hal_descriptor_set_binding_t* bindings) {
   iree_hal_cuda_graph_command_buffer_t* command_buffer =
       iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
   iree_host_size_t base_binding =
-      iree_hal_cuda_base_binding_index(executable_layout, set);
+      iree_hal_cuda_base_binding_index(pipeline_layout, set);
   // Convention with the compiler side. We map bindings to kernel argument.
   // We compact the bindings to get a dense set of arguments and keep them order
   // based on the binding index.
@@ -472,16 +472,6 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_push_descriptor_set(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_cuda_graph_command_buffer_bind_descriptor_set(
-    iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_layout_t* executable_layout, uint32_t set,
-    iree_hal_descriptor_set_t* descriptor_set,
-    iree_host_size_t dynamic_offset_count,
-    const iree_device_size_t* dynamic_offsets) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "need cuda implementation");
-}
-
 static iree_status_t iree_hal_cuda_graph_command_buffer_dispatch(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
@@ -490,10 +480,10 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_dispatch(
       iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
   IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
       command_buffer->resource_set, 1, &executable));
-  iree_hal_executable_layout_t* layout =
+  iree_hal_pipeline_layout_t* layout =
       iree_hal_cuda_executable_get_layout(executable, entry_point);
   iree_host_size_t num_constants =
-      iree_hal_cuda_executable_layout_num_constants(layout);
+      iree_hal_cuda_pipeline_layout_num_constants(layout);
   iree_host_size_t constant_base_index =
       iree_hal_cuda_push_constant_index(layout);
   // Patch the push constants in the kernel arguments.
@@ -569,8 +559,6 @@ static const iree_hal_command_buffer_vtable_t
         .push_constants = iree_hal_cuda_graph_command_buffer_push_constants,
         .push_descriptor_set =
             iree_hal_cuda_graph_command_buffer_push_descriptor_set,
-        .bind_descriptor_set =
-            iree_hal_cuda_graph_command_buffer_bind_descriptor_set,
         .dispatch = iree_hal_cuda_graph_command_buffer_dispatch,
         .dispatch_indirect =
             iree_hal_cuda_graph_command_buffer_dispatch_indirect,

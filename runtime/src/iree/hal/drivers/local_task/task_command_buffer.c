@@ -15,9 +15,8 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/local/executable_environment.h"
 #include "iree/hal/local/executable_library.h"
-#include "iree/hal/local/local_descriptor_set_layout.h"
 #include "iree/hal/local/local_executable.h"
-#include "iree/hal/local/local_executable_layout.h"
+#include "iree/hal/local/local_pipeline_layout.h"
 #include "iree/hal/utils/resource_set.h"
 #include "iree/task/affinity_set.h"
 #include "iree/task/list.h"
@@ -706,7 +705,7 @@ static iree_status_t iree_hal_task_command_buffer_copy_buffer(
 
 static iree_status_t iree_hal_task_command_buffer_push_constants(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_layout_t* executable_layout, iree_host_size_t offset,
+    iree_hal_pipeline_layout_t* pipeline_layout, iree_host_size_t offset,
     const void* values, iree_host_size_t values_length) {
   iree_hal_task_command_buffer_t* command_buffer =
       iree_hal_task_command_buffer_cast(base_command_buffer);
@@ -731,7 +730,7 @@ static iree_status_t iree_hal_task_command_buffer_push_constants(
 
 static iree_status_t iree_hal_task_command_buffer_push_descriptor_set(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_layout_t* executable_layout, uint32_t set,
+    iree_hal_pipeline_layout_t* pipeline_layout, uint32_t set,
     iree_host_size_t binding_count,
     const iree_hal_descriptor_set_binding_t* bindings) {
   iree_hal_task_command_buffer_t* command_buffer =
@@ -769,21 +768,6 @@ static iree_status_t iree_hal_task_command_buffer_push_descriptor_set(
   }
 
   return iree_ok_status();
-}
-
-//===----------------------------------------------------------------------===//
-// iree_hal_command_buffer_bind_descriptor_set
-//===----------------------------------------------------------------------===//
-// NOTE: command buffer state change only; enqueues no tasks.
-
-static iree_status_t iree_hal_task_command_buffer_bind_descriptor_set(
-    iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_layout_t* executable_layout, uint32_t set,
-    iree_hal_descriptor_set_t* descriptor_set,
-    iree_host_size_t dynamic_offset_count,
-    const iree_device_size_t* dynamic_offsets) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "descriptor set binding not yet implemented");
 }
 
 //===----------------------------------------------------------------------===//
@@ -868,15 +852,15 @@ static iree_status_t iree_hal_task_command_buffer_build_dispatch(
 
   iree_hal_local_executable_t* local_executable =
       iree_hal_local_executable_cast(executable);
-  if (IREE_UNLIKELY(!local_executable->executable_layouts)) {
+  if (IREE_UNLIKELY(!local_executable->pipeline_layouts)) {
     return iree_make_status(
         IREE_STATUS_FAILED_PRECONDITION,
         "layouts not provided during executable creation; cannot dispatch");
   }
 
-  iree_hal_local_executable_layout_t* local_layout =
-      (iree_hal_local_executable_layout_t*)
-          local_executable->executable_layouts[entry_point];
+  iree_hal_local_pipeline_layout_t* local_layout =
+      (iree_hal_local_pipeline_layout_t*)
+          local_executable->pipeline_layouts[entry_point];
   iree_host_size_t push_constant_count = local_layout->push_constants;
   iree_hal_local_binding_mask_t used_binding_mask = local_layout->used_bindings;
   iree_host_size_t used_binding_count =
@@ -1020,7 +1004,6 @@ static const iree_hal_command_buffer_vtable_t
         .copy_buffer = iree_hal_task_command_buffer_copy_buffer,
         .push_constants = iree_hal_task_command_buffer_push_constants,
         .push_descriptor_set = iree_hal_task_command_buffer_push_descriptor_set,
-        .bind_descriptor_set = iree_hal_task_command_buffer_bind_descriptor_set,
         .dispatch = iree_hal_task_command_buffer_dispatch,
         .dispatch_indirect = iree_hal_task_command_buffer_dispatch_indirect,
 };

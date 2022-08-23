@@ -13,11 +13,9 @@
 #include "iree/base/api.h"
 #include "iree/hal/allocator.h"
 #include "iree/hal/buffer.h"
-#include "iree/hal/descriptor_set.h"
-#include "iree/hal/descriptor_set_layout.h"
 #include "iree/hal/event.h"
 #include "iree/hal/executable.h"
-#include "iree/hal/executable_layout.h"
+#include "iree/hal/pipeline_layout.h"
 #include "iree/hal/resource.h"
 
 #ifdef __cplusplus
@@ -173,6 +171,35 @@ typedef struct iree_hal_buffer_barrier_t {
   iree_device_size_t length;
 } iree_hal_buffer_barrier_t;
 
+// Specifies a descriptor set binding.
+// The range specified by [offset, length) will be made available to executables
+// on the given binding. If the descriptor type is dynamic then the range will
+// be [offset + dynamic_offset, length).
+//
+// The IREE HAL buffer type may internally be offset; such offset is applied
+// here as if it were the base address of the buffer. Note that the offset will
+// be applied at the time the binding is recording into the command buffer.
+//
+// Maps to VkDescriptorSetBinding.
+typedef struct iree_hal_descriptor_set_binding_t {
+  // The binding number of this entry and corresponds to a resource of the
+  // same binding number in the executable interface.
+  uint32_t binding;
+  // Buffer bound to the binding number.
+  // May be NULL if the binding is not used by the executable.
+  iree_hal_buffer_t* buffer;
+  // Offset, in bytes, into the buffer that the binding starts at.
+  // If the descriptor type is dynamic this will be added to the dynamic
+  // offset provided during binding.
+  iree_device_size_t offset;
+  // Length, in bytes, of the buffer that is available to the executable.
+  // This can be IREE_WHOLE_BUFFER, however note that if the entire buffer
+  // contents are larger than supported by the device (~128MiB, usually) this
+  // will fail. If the descriptor type is dynamic this will be used for all
+  // ranges regardless of offset.
+  iree_device_size_t length;
+} iree_hal_descriptor_set_binding_t;
+
 // An RGBA color.
 typedef struct iree_hal_label_color_t {
   uint8_t r;
@@ -212,7 +239,7 @@ typedef struct iree_hal_command_buffer_validation_state_t {
   uint32_t is_recording : 1;
   // Debug group depth for tracking proper begin/end pairing.
   int32_t debug_group_depth;
-  // TODO(benvanik): current executable layout/descriptor set layout info.
+  // TODO(benvanik): current pipeline layout/descriptor set layout info.
   // TODO(benvanik): valid push constant bit ranges.
 } iree_hal_command_buffer_validation_state_t;
 
@@ -415,14 +442,14 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_copy_buffer(
     iree_device_size_t target_offset, iree_device_size_t length);
 
 // Pushes an inline set of constants that can be accessed by subsequent
-// dispatches using a compatible executable layout.
+// dispatches using a compatible pipeline layout.
 //
 // Push constants are treated as opaque bytes, meaning that they may be
 // bit-casted floats, bit-packed booleans, etc. |offset| and |values_length| are
 // in bytes.
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_push_constants(
     iree_hal_command_buffer_t* command_buffer,
-    iree_hal_executable_layout_t* executable_layout, iree_host_size_t offset,
+    iree_hal_pipeline_layout_t* pipeline_layout, iree_host_size_t offset,
     const void* values, iree_host_size_t values_length);
 
 // Pushes a descriptor set and associates it with |set|.
@@ -434,26 +461,9 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_push_constants(
 // constant sizes).
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_push_descriptor_set(
     iree_hal_command_buffer_t* command_buffer,
-    iree_hal_executable_layout_t* executable_layout, uint32_t set,
+    iree_hal_pipeline_layout_t* pipeline_layout, uint32_t set,
     iree_host_size_t binding_count,
     const iree_hal_descriptor_set_binding_t* bindings);
-
-// Binds a descriptor set to the given |set| matching that used in the
-// executable layout interface.
-//
-// The descriptor set will remain bound and valid so long as the executable
-// layouts used by dispatches are compatible (same descriptor layouts and push
-// constant sizes).
-//
-// If any dynamic descriptor types are defined in the descriptor set layout then
-// the dynamic offsets must be provided. These offsets will be added to the base
-// offset of the descriptor layout binding.
-IREE_API_EXPORT iree_status_t iree_hal_command_buffer_bind_descriptor_set(
-    iree_hal_command_buffer_t* command_buffer,
-    iree_hal_executable_layout_t* executable_layout, uint32_t set,
-    iree_hal_descriptor_set_t* descriptor_set,
-    iree_host_size_t dynamic_offset_count,
-    const iree_device_size_t* dynamic_offsets);
 
 // Dispatches an execution request.
 // The request may execute overlapped with any other transfer operation or
@@ -616,21 +626,14 @@ typedef struct iree_hal_command_buffer_vtable_t {
 
   iree_status_t(IREE_API_PTR* push_constants)(
       iree_hal_command_buffer_t* command_buffer,
-      iree_hal_executable_layout_t* executable_layout, iree_host_size_t offset,
+      iree_hal_pipeline_layout_t* pipeline_layout, iree_host_size_t offset,
       const void* values, iree_host_size_t values_length);
 
   iree_status_t(IREE_API_PTR* push_descriptor_set)(
       iree_hal_command_buffer_t* command_buffer,
-      iree_hal_executable_layout_t* executable_layout, uint32_t set,
+      iree_hal_pipeline_layout_t* pipeline_layout, uint32_t set,
       iree_host_size_t binding_count,
       const iree_hal_descriptor_set_binding_t* bindings);
-
-  iree_status_t(IREE_API_PTR* bind_descriptor_set)(
-      iree_hal_command_buffer_t* command_buffer,
-      iree_hal_executable_layout_t* executable_layout, uint32_t set,
-      iree_hal_descriptor_set_t* descriptor_set,
-      iree_host_size_t dynamic_offset_count,
-      const iree_device_size_t* dynamic_offsets);
 
   iree_status_t(IREE_API_PTR* dispatch)(
       iree_hal_command_buffer_t* command_buffer,

@@ -125,24 +125,30 @@ def HAL_CommandCategoryBitfieldAttr :
 
 def HAL_DescriptorType_UniformBuffer : I32EnumAttrCase<"UniformBuffer", 6, "uniform_buffer">;
 def HAL_DescriptorType_StorageBuffer : I32EnumAttrCase<"StorageBuffer", 7, "storage_buffer">;
-def HAL_DescriptorType_UniformBufferDynamic : I32EnumAttrCase<"UniformBufferDynamic", 8, "uniform_buffer_dynamic">;
-def HAL_DescriptorType_StorageBufferDynamic : I32EnumAttrCase<"StorageBufferDynamic", 9, "storage_buffer_dynamic">;
 def HAL_DescriptorTypeAttr :
-    I32EnumAttr<"DescriptorType", "IREE HAL DescriptorType", [
+    I32EnumAttr<"DescriptorType", "valid DescriptorType", [
       HAL_DescriptorType_UniformBuffer,
       HAL_DescriptorType_StorageBuffer,
-      HAL_DescriptorType_UniformBufferDynamic,
-      HAL_DescriptorType_StorageBufferDynamic,
     ]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
 }
 
-def HAL_DescriptorSetLayoutUsageType_Immutable : I32EnumAttrCase<"Immutable", 0, "immutable">;
-def HAL_DescriptorSetLayoutUsageType_PushOnly : I32EnumAttrCase<"PushOnly", 1, "push_only">;
-def HAL_DescriptorSetLayoutUsageTypeAttr :
-    I32EnumAttr<"DescriptorSetLayoutUsageType", "IREE HAL DescriptorSetLayoutType", [
-      HAL_DescriptorSetLayoutUsageType_Immutable,
-      HAL_DescriptorSetLayoutUsageType_PushOnly,
+def HAL_DescriptorFlags_None : I32BitEnumAttrCase<"None", 0x0000>;
+def HAL_DescriptorFlags_ReadOnly : I32BitEnumAttrCase<"ReadOnly", 0x0001>;
+def HAL_DescriptorFlagsAttr :
+    I32BitEnumAttr<"DescriptorFlags", "valid Descriptor flags", [
+      HAL_DescriptorFlags_None,
+      HAL_DescriptorFlags_ReadOnly,
+    ]> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
+}
+
+def HAL_DescriptorSetLayoutFlags_None : I32BitEnumAttrCase<"None", 0x0000>;
+def HAL_DescriptorSetLayoutFlags_Reserved : I32BitEnumAttrCase<"Reserved", 0x0001>;
+def HAL_DescriptorSetLayoutFlagsAttr :
+    I32BitEnumAttr<"DescriptorSetLayoutFlags", "valid DescriptorSetLayout flags", [
+      HAL_DescriptorSetLayoutFlags_None,
+      HAL_DescriptorSetLayoutFlags_Reserved,  // to make tblgen happy
     ]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
 }
@@ -257,16 +263,6 @@ def HAL_CommandBuffer : DialectType<
   let builderCall = "$_builder.getType<IREE::HAL::CommandBufferType>()";
 }
 
-def HAL_DescriptorSet : DialectType<
-    HAL_Dialect,
-    CPred<"$_self.isa<IREE::HAL::DescriptorSetType>()">,
-    "descriptor_set"> {
-  let description = [{
-    Descriptor set.
-  }];
-  let builderCall = "$_builder.getType<IREE::HAL::DescriptorSetType>()";
-}
-
 def HAL_DescriptorSetLayout : DialectType<
     HAL_Dialect,
     CPred<"$_self.isa<IREE::HAL::DescriptorSetLayoutType>()">,
@@ -308,14 +304,14 @@ def HAL_Executable : DialectType<
   let builderCall = "$_builder.getType<IREE::HAL::ExecutableType>()";
 }
 
-def HAL_ExecutableLayout : DialectType<
+def HAL_PipelineLayout : DialectType<
     HAL_Dialect,
-    CPred<"$_self.isa<IREE::HAL::ExecutableLayoutType>()">,
-    "executable_layout"> {
+    CPred<"$_self.isa<IREE::HAL::PipelineLayoutType>()">,
+    "pipeline_layout"> {
   let description = [{
-    An executable layout describing the descriptor sets and push constants used.
+    An pipeline layout describing the descriptor sets and push constants used.
   }];
-  let builderCall = "$_builder.getType<IREE::HAL::ExecutableLayoutType>()";
+  let builderCall = "$_builder.getType<IREE::HAL::PipelineLayoutType>()";
 }
 
 def HAL_Fence : DialectType<
@@ -359,12 +355,11 @@ def HAL_ObjectType : AnyTypeOf<[
   HAL_Buffer,
   HAL_BufferView,
   HAL_CommandBuffer,
-  HAL_DescriptorSet,
   HAL_DescriptorSetLayout,
   HAL_Device,
   HAL_Event,
   HAL_Executable,
-  HAL_ExecutableLayout,
+  HAL_PipelineLayout,
   HAL_RingBuffer,
   HAL_Semaphore,
 ]>;
@@ -449,10 +444,11 @@ def HAL_DescriptorSetBindingAttr :
   }];
   let parameters = (ins
     AttrParameter<"int64_t", "">:$ordinal,
-    AttrParameter<"DescriptorType", "">:$type
+    AttrParameter<"DescriptorType", "">:$type,
+    OptionalParameter<"mlir::Optional<DescriptorFlags>">:$flags
   );
   let assemblyFormat = [{
-    `<` $ordinal `,` $type `>`
+    `<` $ordinal `,` $type (`,` $flags^)? `>`
   }];
 }
 
@@ -466,7 +462,7 @@ def HAL_DescriptorSetLayoutAttr :
   let summary = [{descriptor set layout specification}];
   let description = [{
     Specifies the layout information of a single set of descriptors used within
-    an executable layout. Multiple of these sets may be used by a single entry
+    an pipeline layout. Multiple of these sets may be used by a single entry
     point to allow for bindings with similar update frequencies to be grouped.
   }];
   let parameters = (ins
@@ -481,9 +477,9 @@ def HAL_DescriptorSetLayoutAttr :
   }];
 }
 
-def HAL_ExecutableLayoutAttr :
-    AttrDef<HAL_Dialect, "ExecutableLayout", []> {
-  let mnemonic = "executable.layout";
+def HAL_PipelineLayoutAttr :
+    AttrDef<HAL_Dialect, "PipelineLayout", []> {
+  let mnemonic = "pipeline.layout";
   let summary = [{executable entry point layout specification}];
   let description = [{
     Specifies the layout information used for interacting with executable

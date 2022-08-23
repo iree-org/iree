@@ -99,41 +99,9 @@ func.func @command_buffer_copy_buffer(
 
 // -----
 
-// CHECK-LABEL: @command_buffer_bind_descriptor_set
-//  CHECK-SAME: (%[[CMD:.+]]: !hal.command_buffer,
-//  CHECK-SAME: %[[LAYOUT:.+]]: !hal.executable_layout,
-//  CHECK-SAME: %[[SET:.+]]: !hal.descriptor_set,
-//  CHECK-SAME: %[[OFFSET:.+]]: index)
-func.func @command_buffer_bind_descriptor_set(
-    %cmd: !hal.command_buffer,
-    %layout: !hal.executable_layout,
-    %set: !hal.descriptor_set,
-    %offset: index
-  ) {
-  // CHECK: %[[SET_IDX:.+]] = arith.constant 0
-  %c0 = arith.constant 0 : index
-  //      CHECK: hal.command_buffer.bind_descriptor_set<%[[CMD]] : !hal.command_buffer>
-  // CHECK-SAME:   layout(%[[LAYOUT]] : !hal.executable_layout)[%[[SET_IDX]]]
-  // CHECK-SAME:   set(%[[SET]] : !hal.descriptor_set)
-  hal.command_buffer.bind_descriptor_set<%cmd : !hal.command_buffer>
-      layout(%layout : !hal.executable_layout)[%c0]
-      set(%set : !hal.descriptor_set)
-  //      CHECK: hal.command_buffer.bind_descriptor_set<%[[CMD]] : !hal.command_buffer>
-  // CHECK-SAME:   layout(%[[LAYOUT]] : !hal.executable_layout)[%[[SET_IDX]]]
-  // CHECK-SAME:   set(%[[SET]] : !hal.descriptor_set)
-  // CHECK-SAME:   offsets([%[[OFFSET]]])
-  hal.command_buffer.bind_descriptor_set<%cmd : !hal.command_buffer>
-      layout(%layout : !hal.executable_layout)[%c0]
-      set(%set : !hal.descriptor_set)
-      offsets([%offset])
-  return
-}
-
-// -----
-
 hal.executable @ex {
   hal.executable.variant @backend, target = <"backend", "format"> {
-    hal.executable.export @entry0 ordinal(0) layout(#hal.executable.layout<push_constants = 0, sets = [
+    hal.executable.export @entry0 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [
       #hal.descriptor_set.layout<0, bindings = [
         #hal.descriptor_set.binding<0, storage_buffer>,
         #hal.descriptor_set.binding<1, storage_buffer>
@@ -164,7 +132,7 @@ func.func @command_buffer_dispatch(
 
 hal.executable @ex {
   hal.executable.variant @backend, target = <"backend", "format"> {
-    hal.executable.export @entry0 ordinal(0) layout(#hal.executable.layout<push_constants = 0, sets = [
+    hal.executable.export @entry0 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [
       #hal.descriptor_set.layout<0, bindings = [
         #hal.descriptor_set.binding<0, storage_buffer>,
         #hal.descriptor_set.binding<1, storage_buffer>

@@ -637,15 +637,15 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_push_constants,  //
   iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_RETURN_IF_ERROR(
       iree_hal_command_buffer_check_deref(args->r0, &command_buffer));
-  iree_hal_executable_layout_t* executable_layout = NULL;
+  iree_hal_pipeline_layout_t* pipeline_layout = NULL;
   IREE_RETURN_IF_ERROR(
-      iree_hal_executable_layout_check_deref(args->r1, &executable_layout));
+      iree_hal_pipeline_layout_check_deref(args->r1, &pipeline_layout));
   iree_vm_size_t offset = (iree_vm_size_t)args->i2;
   iree_host_size_t value_count = args->a3_count;
   const uint32_t* values = (const uint32_t*)&args->a3[0].i0;
 
   return iree_hal_command_buffer_push_constants(
-      command_buffer, executable_layout, offset * sizeof(uint32_t), values,
+      command_buffer, pipeline_layout, offset * sizeof(uint32_t), values,
       value_count * sizeof(uint32_t));
 }
 
@@ -655,9 +655,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_push_descriptor_set,  //
   iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_RETURN_IF_ERROR(
       iree_hal_command_buffer_check_deref(args->r0, &command_buffer));
-  iree_hal_executable_layout_t* executable_layout = NULL;
+  iree_hal_pipeline_layout_t* pipeline_layout = NULL;
   IREE_RETURN_IF_ERROR(
-      iree_hal_executable_layout_check_deref(args->r1, &executable_layout));
+      iree_hal_pipeline_layout_check_deref(args->r1, &pipeline_layout));
   iree_vm_size_t set = args->i2;
 
   iree_host_size_t binding_count = args->a3_count;
@@ -679,30 +679,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_push_descriptor_set,  //
   }
 
   return iree_hal_command_buffer_push_descriptor_set(
-      command_buffer, executable_layout, set, binding_count, bindings);
-}
-
-IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_bind_descriptor_set,  //
-                   iree_hal_module_state_t,                             //
-                   rrirCID, v) {
-  iree_hal_command_buffer_t* command_buffer = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_command_buffer_check_deref(args->r0, &command_buffer));
-  iree_hal_executable_layout_t* executable_layout = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_executable_layout_check_deref(args->r1, &executable_layout));
-  int32_t set = args->i2;
-  iree_hal_descriptor_set_t* descriptor_set = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_descriptor_set_check_deref(args->r3, &descriptor_set));
-  iree_host_size_t dynamic_offset_count = 0;
-  iree_device_size_t* dynamic_offsets = NULL;
-  // TODO(benvanik): avoid the cast/alloca if not required.
-  IREE_VM_ABI_VLA_STACK_CAST(args, a4_count, a4, iree_device_size_t, 64,
-                             &dynamic_offset_count, &dynamic_offsets);
-  return iree_hal_command_buffer_bind_descriptor_set(
-      command_buffer, executable_layout, set, descriptor_set,
-      dynamic_offset_count, dynamic_offsets);
+      command_buffer, pipeline_layout, set, binding_count, bindings);
 }
 
 IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_dispatch,  //
@@ -741,54 +718,16 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_dispatch_indirect,  //
 }
 
 //===----------------------------------------------------------------------===//
-// iree_hal_descriptor_set_t
-//===----------------------------------------------------------------------===//
-
-IREE_VM_ABI_EXPORT(iree_hal_module_descriptor_set_create,  //
-                   iree_hal_module_state_t,                //
-                   rrCirIID, r) {
-  iree_hal_device_t* device = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
-  iree_hal_descriptor_set_layout_t* set_layout = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_descriptor_set_layout_check_deref(args->r1, &set_layout));
-
-  iree_host_size_t binding_count = args->a2_count;
-  if (IREE_UNLIKELY(binding_count >
-                    IREE_HAL_MODULE_MAX_DESCRIPTOR_BINDING_COUNT)) {
-    return iree_make_status(
-        IREE_STATUS_OUT_OF_RANGE, "binding count %" PRIhsz " > %" PRIhsz,
-        binding_count, IREE_HAL_MODULE_MAX_DESCRIPTOR_BINDING_COUNT);
-  }
-  iree_hal_descriptor_set_binding_t* bindings =
-      (iree_hal_descriptor_set_binding_t*)iree_alloca(
-          binding_count * sizeof(iree_hal_descriptor_set_binding_t));
-  for (iree_host_size_t i = 0; i < binding_count; ++i) {
-    IREE_RETURN_IF_ERROR(
-        iree_hal_buffer_check_deref(args->a2[i].r1, &bindings[i].buffer));
-    bindings[i].binding = (uint32_t)args->a2[i].i0;
-    bindings[i].offset = iree_hal_cast_device_size(args->a2[i].i2);
-    bindings[i].length = iree_hal_cast_device_size(args->a2[i].i3);
-  }
-
-  iree_hal_descriptor_set_t* descriptor_set = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_descriptor_set_create(
-      device, set_layout, binding_count, bindings, &descriptor_set));
-  rets->r0 = iree_hal_descriptor_set_move_ref(descriptor_set);
-  return iree_ok_status();
-}
-
-//===----------------------------------------------------------------------===//
 // iree_hal_descriptor_set_layout
 //===----------------------------------------------------------------------===//
 
 IREE_VM_ABI_EXPORT(iree_hal_module_descriptor_set_layout_create,  //
                    iree_hal_module_state_t,                       //
-                   riCiiD, r) {
+                   riCiiiD, r) {
   iree_hal_device_t* device = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
-  iree_hal_descriptor_set_layout_usage_type_t usage_type =
-      (iree_hal_descriptor_set_layout_usage_type_t)args->i1;
+  iree_hal_descriptor_set_layout_flags_t flags =
+      (iree_hal_descriptor_set_layout_flags_t)args->i1;
 
   iree_host_size_t binding_count = args->a2_count;
   if (IREE_UNLIKELY(binding_count >
@@ -803,11 +742,12 @@ IREE_VM_ABI_EXPORT(iree_hal_module_descriptor_set_layout_create,  //
   for (iree_host_size_t i = 0; i < binding_count; ++i) {
     bindings[i].binding = (uint32_t)args->a2[i].i0;
     bindings[i].type = (iree_hal_descriptor_type_t)args->a2[i].i1;
+    bindings[i].flags = (iree_hal_descriptor_flags_t)args->a2[i].i2;
   }
 
   iree_hal_descriptor_set_layout_t* descriptor_set_layout = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_descriptor_set_layout_create(
-      device, usage_type, binding_count, bindings, &descriptor_set_layout));
+      device, flags, binding_count, bindings, &descriptor_set_layout));
   rets->r0 = iree_hal_descriptor_set_layout_move_ref(descriptor_set_layout);
   return iree_ok_status();
 }
@@ -854,7 +794,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_alloca,  //
       (iree_hal_queue_affinity_t)args->i1;
   iree_hal_fence_t* wait_fence = iree_hal_fence_deref(args->r2);
   iree_hal_fence_t* signal_fence = iree_hal_fence_deref(args->r3);
-  iree_hal_allocator_pool_id_t pool_id = (iree_hal_allocator_pool_id_t)args->i4;
+  iree_hal_allocator_pool_t pool = (iree_hal_allocator_pool_t)args->i4;
   iree_hal_memory_type_t memory_types = (iree_hal_memory_type_t)args->i5;
   iree_hal_buffer_usage_t buffer_usage = (iree_hal_buffer_usage_t)args->i6;
   iree_device_size_t allocation_size = iree_hal_cast_device_size(args->i7);
@@ -866,7 +806,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_alloca,  //
   iree_hal_buffer_t* buffer = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_device_queue_alloca(
       device, queue_affinity, iree_hal_fence_semaphore_list(wait_fence),
-      iree_hal_fence_semaphore_list(signal_fence), pool_id, params,
+      iree_hal_fence_semaphore_list(signal_fence), pool, params,
       allocation_size, &buffer));
 
   rets->r0 = iree_hal_buffer_move_ref(buffer);
@@ -949,16 +889,16 @@ IREE_VM_ABI_EXPORT(iree_hal_module_executable_create,  //
     constant_count = constant_buffer->data.data_length / sizeof(uint32_t);
     constants = (const uint32_t*)constant_buffer->data.data;
   }
-  iree_host_size_t executable_layout_count = args->a4_count;
-  iree_hal_executable_layout_t** executable_layouts = NULL;
-  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-      state->host_allocator,
-      executable_layout_count * sizeof(executable_layouts[0]),
-      (void**)&executable_layouts));
+  iree_host_size_t pipeline_layout_count = args->a4_count;
+  iree_hal_pipeline_layout_t** pipeline_layouts = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_allocator_malloc(state->host_allocator,
+                            pipeline_layout_count * sizeof(pipeline_layouts[0]),
+                            (void**)&pipeline_layouts));
   iree_status_t status = iree_ok_status();
-  for (iree_host_size_t i = 0; i < executable_layout_count; ++i) {
-    status = iree_hal_executable_layout_check_deref(args->a4[i].r0,
-                                                    &executable_layouts[i]);
+  for (iree_host_size_t i = 0; i < pipeline_layout_count; ++i) {
+    status = iree_hal_pipeline_layout_check_deref(args->a4[i].r0,
+                                                  &pipeline_layouts[i]);
     if (!iree_status_is_ok(status)) break;
   }
 
@@ -973,41 +913,17 @@ IREE_VM_ABI_EXPORT(iree_hal_module_executable_create,  //
     executable_params.executable_format = executable_format_str;
     executable_params.executable_data = iree_make_const_byte_span(
         executable_data->data.data, executable_data->data.data_length);
-    executable_params.executable_layout_count = executable_layout_count;
-    executable_params.executable_layouts = executable_layouts;
+    executable_params.pipeline_layout_count = pipeline_layout_count;
+    executable_params.pipeline_layouts = pipeline_layouts;
     executable_params.constant_count = constant_count;
     executable_params.constants = constants;
     status = iree_hal_executable_cache_prepare_executable(
         state->executable_cache, &executable_params, &executable);
   }
 
-  iree_allocator_free(state->host_allocator, executable_layouts);
+  iree_allocator_free(state->host_allocator, pipeline_layouts);
   rets->r0 = iree_hal_executable_move_ref(executable);
   return status;
-}
-
-//===----------------------------------------------------------------------===//
-// iree_hal_executable_layout_t
-//===----------------------------------------------------------------------===//
-
-IREE_VM_ABI_EXPORT(iree_hal_module_executable_layout_create,  //
-                   iree_hal_module_state_t,                   //
-                   riCrD, r) {
-  iree_hal_device_t* device = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
-  int32_t push_constants = (int32_t)args->i1;
-  iree_host_size_t set_layout_count = 0;
-  iree_hal_descriptor_set_layout_t** set_layouts = NULL;
-  IREE_VM_ABI_VLA_STACK_DEREF(args, a2_count, a2,
-                              iree_hal_descriptor_set_layout, 32,
-                              &set_layout_count, &set_layouts);
-
-  iree_hal_executable_layout_t* executable_layout = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_executable_layout_create(
-      device, push_constants, set_layout_count, set_layouts,
-      &executable_layout));
-  rets->r0 = iree_hal_executable_layout_move_ref(executable_layout);
-  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//
@@ -1278,6 +1194,29 @@ IREE_VM_ABI_EXPORT(iree_hal_module_fence_await,  //
     if (zone_id) IREE_TRACE_ZONE_END(zone_id);
   });
   return status;
+}
+
+//===----------------------------------------------------------------------===//
+// iree_hal_pipeline_layout_t
+//===----------------------------------------------------------------------===//
+
+IREE_VM_ABI_EXPORT(iree_hal_module_pipeline_layout_create,  //
+                   iree_hal_module_state_t,                 //
+                   riCrD, r) {
+  iree_hal_device_t* device = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
+  int32_t push_constants = (int32_t)args->i1;
+  iree_host_size_t set_layout_count = 0;
+  iree_hal_descriptor_set_layout_t** set_layouts = NULL;
+  IREE_VM_ABI_VLA_STACK_DEREF(args, a2_count, a2,
+                              iree_hal_descriptor_set_layout, 32,
+                              &set_layout_count, &set_layouts);
+
+  iree_hal_pipeline_layout_t* pipeline_layout = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_pipeline_layout_create(
+      device, push_constants, set_layout_count, set_layouts, &pipeline_layout));
+  rets->r0 = iree_hal_pipeline_layout_move_ref(pipeline_layout);
+  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//

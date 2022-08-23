@@ -71,11 +71,11 @@ func.func @fold_buffer_subspan_into_copy_buffer(
 
 // CHECK-LABEL: @fold_buffer_subspan_into_push_descriptor_set
 //  CHECK-SAME: %[[CMD:.+]]: !hal.command_buffer,
-//  CHECK-SAME: %[[LAYOUT:.+]]: !hal.executable_layout,
+//  CHECK-SAME: %[[LAYOUT:.+]]: !hal.pipeline_layout,
 //  CHECK-SAME: %[[BASE_BUFFER:.+]]: !hal.buffer
 func.func @fold_buffer_subspan_into_push_descriptor_set(
     %cmd: !hal.command_buffer,
-    %layout: !hal.executable_layout,
+    %layout: !hal.pipeline_layout,
     %buffer: !hal.buffer
   ) {
   %c0 = arith.constant 0 : index
@@ -90,7 +90,7 @@ func.func @fold_buffer_subspan_into_push_descriptor_set(
   //      CHECK: hal.command_buffer.push_descriptor_set
   // CHECK-SAME:   bindings([
   hal.command_buffer.push_descriptor_set<%cmd : !hal.command_buffer>
-      layout(%layout : !hal.executable_layout)[%c0]
+      layout(%layout : !hal.pipeline_layout)[%c0]
       bindings([
         // 0 + 4096:
         // CHECK-NEXT: %c0 = (%[[BASE_BUFFER]] : !hal.buffer)[%c4096, %c8000]

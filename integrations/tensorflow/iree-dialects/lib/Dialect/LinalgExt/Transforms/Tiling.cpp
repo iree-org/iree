@@ -192,7 +192,7 @@ private:
 /// tensor.extract_slice` to `tensor.extract_slice -> `TilingInterface`.
 FailureOr<Operation *> SwapTilingInterfaceOp::returningMatchAndRewrite(
     tensor::ExtractSliceOp sliceOp, PatternRewriter &rewriter) const {
-  auto sourceOp = sliceOp.source().getDefiningOp<TilingInterface>();
+  auto sourceOp = sliceOp.getSource().getDefiningOp<TilingInterface>();
   if (!sourceOp)
     return failure();
   SmallVector<Operation *> tiledOps = sourceOp.getTiledImplementation(

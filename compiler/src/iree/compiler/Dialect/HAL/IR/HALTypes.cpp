@@ -540,9 +540,8 @@ void HALDialect::registerAttributes() {
 
 void HALDialect::registerTypes() {
   addTypes<AllocatorType, BufferType, BufferViewType, CommandBufferType,
-           DescriptorSetType, DescriptorSetLayoutType, DeviceType, EventType,
-           ExecutableType, ExecutableLayoutType, FenceType, RingBufferType,
-           SemaphoreType>();
+           DescriptorSetLayoutType, DeviceType, EventType, ExecutableType,
+           PipelineLayoutType, FenceType, RingBufferType, SemaphoreType>();
 }
 
 //===----------------------------------------------------------------------===//
@@ -555,7 +554,7 @@ Attribute HALDialect::parseAttribute(DialectAsmParser &parser,
   Attribute genAttr;
   OptionalParseResult parseResult =
       generatedAttributeParser(parser, &mnemonic, type, genAttr);
-  if (parseResult.hasValue()) return genAttr;
+  if (parseResult.has_value()) return genAttr;
   parser.emitError(parser.getNameLoc())
       << "unknown HAL attribute: " << mnemonic;
   return {};
@@ -582,13 +581,12 @@ Type HALDialect::parseType(DialectAsmParser &parser) const {
           .Case("buffer", BufferType::get(getContext()))
           .Case("buffer_view", BufferViewType::get(getContext()))
           .Case("command_buffer", CommandBufferType::get(getContext()))
-          .Case("descriptor_set", DescriptorSetType::get(getContext()))
           .Case("descriptor_set_layout",
                 DescriptorSetLayoutType::get(getContext()))
           .Case("device", DeviceType::get(getContext()))
           .Case("event", EventType::get(getContext()))
           .Case("executable", ExecutableType::get(getContext()))
-          .Case("executable_layout", ExecutableLayoutType::get(getContext()))
+          .Case("pipeline_layout", PipelineLayoutType::get(getContext()))
           .Case("fence", FenceType::get(getContext()))
           .Case("ring_buffer", RingBufferType::get(getContext()))
           .Case("semaphore", SemaphoreType::get(getContext()))
@@ -609,8 +607,6 @@ void HALDialect::printType(Type type, DialectAsmPrinter &p) const {
     p << "buffer_view";
   } else if (type.isa<CommandBufferType>()) {
     p << "command_buffer";
-  } else if (type.isa<DescriptorSetType>()) {
-    p << "descriptor_set";
   } else if (type.isa<DescriptorSetLayoutType>()) {
     p << "descriptor_set_layout";
   } else if (type.isa<DeviceType>()) {
@@ -619,8 +615,8 @@ void HALDialect::printType(Type type, DialectAsmPrinter &p) const {
     p << "event";
   } else if (type.isa<ExecutableType>()) {
     p << "executable";
-  } else if (type.isa<ExecutableLayoutType>()) {
-    p << "executable_layout";
+  } else if (type.isa<PipelineLayoutType>()) {
+    p << "pipeline_layout";
   } else if (type.isa<FenceType>()) {
     p << "fence";
   } else if (type.isa<RingBufferType>()) {

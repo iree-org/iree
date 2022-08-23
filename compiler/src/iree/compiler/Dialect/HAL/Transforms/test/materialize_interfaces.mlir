@@ -11,42 +11,61 @@ module attributes {hal.device.targets = [
   }>
 ]} {
 
-// CHECK: hal.executable private @ex_workgroups
-// CHECK:   hal.executable.variant public @embedded_elf_arm_64, target = #executable_target_embedded_elf_arm_64
-// CHECK:     hal.executable.export public @entry ordinal(0) layout(#executable_layout) {
-// CHECK-NEXT: ^bb0(%[[DEVICE:.+]]: !hal.device, %[[ARG0:.+]]: index, %[[ARG1:.+]]: index):
-// CHECK-NEXT:   hal.return %[[ARG0]], %[[ARG1]], %[[ARG0]] : index, index, index
-// CHECK-NEXT: }
-// CHECK:     builtin.module
-// CHECK-NEXT:  func.func @entry()
-// CHECK:   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64
-// CHECK:     hal.executable.export public @entry ordinal(0) layout(#executable_layout) {
-// CHECK-NEXT: ^bb0(%[[DEVICE:.+]]: !hal.device, %[[ARG0:.+]]: index, %[[ARG1:.+]]: index):
-// CHECK-NEXT:   hal.return %[[ARG0]], %[[ARG1]], %[[ARG0]] : index, index, index
-// CHECK-NEXT: }
-// CHECK:     builtin.module
-// CHECK-NEXT:  func.func @entry()
+  // CHECK: #pipeline_layout = #hal.pipeline.layout<
+  // CHECK-SAME: push_constants = 1
+  // CHECK-SAME: sets = [
+  // CHECK-SAME:   <0, bindings = [
+  // CHECK-SAME:     <0, storage_buffer, ReadOnly>
+  // CHECK-SAME:     <1, storage_buffer, ReadOnly>
+  // CHECK-SAME:     <2, storage_buffer>
 
-stream.executable private @ex_workgroups {
-  stream.executable.export public @entry workgroups(%arg0: index, %arg1: index) -> (index, index, index) {
-    stream.return %arg0, %arg1, %arg0 : index, index, index
-  }
-  builtin.module {
-    func.func @entry() {
-      return
+  // CHECK: hal.executable private @ex_workgroups
+  // CHECK:   hal.executable.variant public @embedded_elf_arm_64, target = #executable_target_embedded_elf_arm_64
+  // CHECK:     hal.executable.export public @entry ordinal(0) layout(#pipeline_layout) {
+  // CHECK-NEXT: ^bb0(%[[DEVICE:.+]]: !hal.device, %[[ARG0:.+]]: index, %[[ARG1:.+]]: index):
+  // CHECK-NEXT:   hal.return %[[ARG0]], %[[ARG1]], %[[ARG0]] : index, index, index
+  // CHECK-NEXT: }
+  // CHECK:     builtin.module
+  // CHECK-NEXT:  func.func @entry
+  // CHECK:   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64
+  // CHECK:     hal.executable.export public @entry ordinal(0) layout(#pipeline_layout) {
+  // CHECK-NEXT: ^bb0(%[[DEVICE:.+]]: !hal.device, %[[ARG0:.+]]: index, %[[ARG1:.+]]: index):
+  // CHECK-NEXT:   hal.return %[[ARG0]], %[[ARG1]], %[[ARG0]] : index, index, index
+  // CHECK-NEXT: }
+  // CHECK:     builtin.module
+  // CHECK-NEXT:  func.func @entry
+
+  stream.executable private @ex_workgroups {
+    stream.executable.export public @entry workgroups(%arg0: index, %arg1: index) -> (index, index, index) {
+      stream.return %arg0, %arg1, %arg0 : index, index, index
+    }
+    builtin.module {
+      func.func @entry(%operand: i32, %arg0: !stream.binding {stream.alignment = 64 : index}, %arg1: !stream.binding {stream.alignment = 64 : index}, %arg2: !stream.binding {stream.alignment = 64 : index}) {
+        return
+      }
     }
   }
-}
-
-// CHECK-LABEL: @main
-func.func @main(%arg0: !stream.resource<external>, %arg1: index) -> !stream.resource<external> {
-  %c1 = arith.constant 1 : index
-  %c2 = arith.constant 2 : index
-  %c4 = arith.constant 4 : index
-  %0 = stream.async.dispatch @ex_workgroups::@entry[%c1, %c2](%arg0, %c4) : (!stream.resource<external>{%arg1}, index) -> %arg0{%arg1}
-  return %0 : !stream.resource<external>
-}
-
+  func.func @main(%arg0: !stream.resource<constant>, %arg1: !stream.resource<transient>, %arg2: index, %arg3: i32) -> !stream.resource<transient> {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %c2 = arith.constant 2 : index
+    %0 = stream.resource.alloc uninitialized : !stream.resource<transient>{%arg2}
+    %1 = stream.cmd.execute with(%arg0 as %arg4: !stream.resource<constant>{%arg2}, %arg1 as %arg5: !stream.resource<transient>{%arg2}, %0 as %arg6: !stream.resource<transient>{%arg2}) {
+      // CHECK: stream.cmd.dispatch @ex_workgroups::@entry
+      // CHECK: attributes {
+      // CHECK-SAME: hal.interface.bindings = [
+      // CHECK-SAME:   #hal.interface.binding<0, 0>,
+      // CHECK-SAME:   #hal.interface.binding<0, 1>,
+      // CHECK-SAME:   #hal.interface.binding<0, 2>
+      stream.cmd.dispatch @ex_workgroups::@entry[%c1, %c2](%arg3 : i32) {
+        ro %arg4[%c0 for %arg2] : !stream.resource<constant>{%arg2},
+        ro %arg5[%c0 for %arg2] : !stream.resource<transient>{%arg2},
+        wo %arg6[%c0 for %arg2] : !stream.resource<transient>{%arg2}
+      }
+    } => !stream.timepoint
+    %2 = stream.timepoint.await %1 => %0 : !stream.resource<transient>{%arg2}
+    return %2 : !stream.resource<transient>
+  }
 }
 
 // -----
@@ -66,7 +85,7 @@ module attributes {hal.device.targets = [
 ]} {
 
 hal.executable.source public @ex {
-  hal.executable.export public @entry layout(#hal.executable.layout<push_constants = 1, sets = [
+  hal.executable.export public @entry layout(#hal.pipeline.layout<push_constants = 1, sets = [
     #hal.descriptor_set.layout<0, bindings = [
       #hal.descriptor_set.binding<0, storage_buffer>
     ]>,
@@ -92,11 +111,11 @@ hal.executable.source public @ex {
 
 // CHECK: hal.executable public @ex
 // CHECK:   hal.executable.variant public @embedded_elf_arm_64, target = #executable_target_embedded_elf_arm_64
-// CHECK:     hal.executable.export public @entry layout(#executable_layout)
+// CHECK:     hal.executable.export public @entry layout(#pipeline_layout)
 // CHECK:     builtin.module
 // CHECK-NEXT:  func.func @entry()
 // CHECK:   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64
-// CHECK:     hal.executable.export public @entry layout(#executable_layout)
+// CHECK:     hal.executable.export public @entry layout(#pipeline_layout)
 // CHECK:     builtin.module
 // CHECK-NEXT:  func.func @entry()
 

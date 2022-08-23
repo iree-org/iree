@@ -13,8 +13,7 @@
 #include "iree/base/internal/math.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/vulkan/extensibility_util.h"
-#include "iree/hal/drivers/vulkan/native_descriptor_set_layout.h"
-#include "iree/hal/drivers/vulkan/native_executable_layout.h"
+#include "iree/hal/drivers/vulkan/native_pipeline_layout.h"
 #include "iree/hal/drivers/vulkan/status_util.h"
 #include "iree/hal/drivers/vulkan/vma_buffer.h"
 
@@ -118,14 +117,13 @@ DescriptorSetArena::~DescriptorSetArena() {
 }
 
 iree_status_t DescriptorSetArena::BindDescriptorSet(
-    VkCommandBuffer command_buffer,
-    iree_hal_executable_layout_t* executable_layout, uint32_t set,
-    iree_host_size_t binding_count,
+    VkCommandBuffer command_buffer, iree_hal_pipeline_layout_t* pipeline_layout,
+    uint32_t set, iree_host_size_t binding_count,
     const iree_hal_descriptor_set_binding_t* bindings) {
   // Always prefer using push descriptors when available as we can avoid the
   // additional API overhead of updating/resetting pools.
   if (logical_device_->enabled_extensions().push_descriptors) {
-    PushDescriptorSet(command_buffer, executable_layout, set, binding_count,
+    PushDescriptorSet(command_buffer, pipeline_layout, set, binding_count,
                       bindings);
     return iree_ok_status();
   }
@@ -133,7 +131,7 @@ iree_status_t DescriptorSetArena::BindDescriptorSet(
   IREE_TRACE_SCOPE0("DescriptorSetArena::BindDescriptorSet");
 
   auto* set_layout =
-      iree_hal_vulkan_native_executable_layout_set(executable_layout, set);
+      iree_hal_vulkan_native_pipeline_layout_set(pipeline_layout, set);
 
   // Pick a bucket based on the number of descriptors required.
   // NOTE: right now we are 1:1 with bindings.
@@ -210,20 +208,19 @@ iree_status_t DescriptorSetArena::BindDescriptorSet(
   // Bind the descriptor set.
   syms().vkCmdBindDescriptorSets(
       command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-      iree_hal_vulkan_native_executable_layout_handle(executable_layout), set,
-      1, &descriptor_set, 0, nullptr);
+      iree_hal_vulkan_native_pipeline_layout_handle(pipeline_layout), set, 1,
+      &descriptor_set, 0, nullptr);
 
   return iree_ok_status();
 }
 
 void DescriptorSetArena::PushDescriptorSet(
-    VkCommandBuffer command_buffer,
-    iree_hal_executable_layout_t* executable_layout, uint32_t set,
-    iree_host_size_t binding_count,
+    VkCommandBuffer command_buffer, iree_hal_pipeline_layout_t* pipeline_layout,
+    uint32_t set, iree_host_size_t binding_count,
     const iree_hal_descriptor_set_binding_t* bindings) {
   IREE_TRACE_SCOPE0("DescriptorSetArena::PushDescriptorSet");
-  VkPipelineLayout device_executable_layout =
-      iree_hal_vulkan_native_executable_layout_handle(executable_layout);
+  VkPipelineLayout device_pipeline_layout =
+      iree_hal_vulkan_native_pipeline_layout_handle(pipeline_layout);
 
   // Get a list of VkWriteDescriptorSet structs with all bound buffers.
   iree_host_size_t write_info_count = 0;
@@ -235,7 +232,7 @@ void DescriptorSetArena::PushDescriptorSet(
   // Fast path using push descriptors. These are pooled internally by the
   // command buffer and prevent the need for our own pooling mechanisms.
   syms().vkCmdPushDescriptorSetKHR(
-      command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, device_executable_layout,
+      command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, device_pipeline_layout,
       set, static_cast<uint32_t>(write_info_count), write_infos);
 }
 

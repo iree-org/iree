@@ -156,7 +156,7 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_alloca(
     iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_hal_allocator_pool_id_t pool_id, iree_hal_buffer_params_t params,
+    iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
     iree_device_size_t allocation_size,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   IREE_ASSERT_ARGUMENT(device);
@@ -170,8 +170,8 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_alloca(
   *out_buffer = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status = _VTABLE_DISPATCH(device, queue_alloca)(
-      device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
-      pool_id, params, allocation_size, out_buffer);
+      device, queue_affinity, wait_semaphore_list, signal_semaphore_list, pool,
+      params, allocation_size, out_buffer);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -238,6 +238,19 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_execute(
       device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
       command_buffer_count, command_buffers);
 
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_device_queue_barrier(
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list) {
+  IREE_ASSERT_ARGUMENT(device);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_status_t status =
+      iree_hal_device_queue_execute(device, queue_affinity, wait_semaphore_list,
+                                    signal_semaphore_list, 0, NULL);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

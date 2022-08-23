@@ -1467,9 +1467,9 @@ void AsyncExecuteOp::build(OpBuilder &builder, OperationState &state,
   state.attributes.erase(IREE::Util::TiedOpInterface::getStorageAttrName());
   state.addAttribute(IREE::Util::TiedOpInterface::getStorageAttrName(),
                      builder.getIndexArrayAttr(tiedOperands));
-  state.attributes.erase("operand_segment_sizes");
-  state.addAttribute("operand_segment_sizes",
-                     builder.getI32VectorAttr({
+  state.attributes.erase(getOperandSegmentSizeAttr());
+  state.addAttribute(getOperandSegmentSizeAttr(),
+                     builder.getDenseI32ArrayAttr({
                          static_cast<int32_t>(operands.size()),
                          static_cast<int32_t>(operandSizes.size()),
                          static_cast<int32_t>(resultSizes.size()),
@@ -1585,9 +1585,9 @@ void AsyncConcurrentOp::build(OpBuilder &builder, OperationState &state,
   state.attributes.erase(IREE::Util::TiedOpInterface::getStorageAttrName());
   state.addAttribute(IREE::Util::TiedOpInterface::getStorageAttrName(),
                      builder.getIndexArrayAttr(tiedOperands));
-  state.attributes.erase("operand_segment_sizes");
-  state.addAttribute("operand_segment_sizes",
-                     builder.getI32VectorAttr({
+  state.attributes.erase(getOperandSegmentSizeAttr());
+  state.addAttribute(getOperandSegmentSizeAttr(),
+                     builder.getDenseI32ArrayAttr({
                          static_cast<int32_t>(operands.size()),
                          static_cast<int32_t>(operandSizes.size()),
                          static_cast<int32_t>(resultSizes.size()),
@@ -1922,9 +1922,9 @@ void CmdExecuteOp::build(OpBuilder &builder, OperationState &state,
   state.addOperands(operandSizes);
   if (awaitTimepoint) state.addOperands(awaitTimepoint);
   state.addAttributes(attributes);
-  state.attributes.erase("operand_segment_sizes");
-  state.addAttribute("operand_segment_sizes",
-                     builder.getI32VectorAttr({
+  state.attributes.erase(getOperandSegmentSizeAttr());
+  state.addAttribute(getOperandSegmentSizeAttr(),
+                     builder.getDenseI32ArrayAttr({
                          static_cast<int32_t>(operands.size()),
                          static_cast<int32_t>(operandSizes.size()),
                          awaitTimepoint ? 1 : 0,
@@ -2098,9 +2098,9 @@ void TimepointAwaitOp::build(OpBuilder &builder, OperationState &state,
   state.addOperands(operandSizes);
   state.addOperands(timepoint);
   state.addAttributes(attributes);
-  state.attributes.erase("operand_segment_sizes");
-  state.addAttribute("operand_segment_sizes",
-                     builder.getI32VectorAttr({
+  state.attributes.erase(getOperandSegmentSizeAttr());
+  state.addAttribute(getOperandSegmentSizeAttr(),
+                     builder.getDenseI32ArrayAttr({
                          static_cast<int32_t>(operands.size()),
                          static_cast<int32_t>(operandSizes.size()),
                          static_cast<int32_t>(1),  // timepoint

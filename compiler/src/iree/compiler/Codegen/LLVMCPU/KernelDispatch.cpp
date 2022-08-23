@@ -10,7 +10,6 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
-#include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -763,8 +762,7 @@ static SmallVector<int64_t> getMatmulWorkgroupSizes(func::FuncOp entryPointFn,
 /// Sets the lowering configuration for dispatch region with root op that
 /// implements the contraction operation interface.
 static LogicalResult setRootConfig(
-    func::FuncOp entryPointFn, linalg::ContractionOpInterface contractionOp,
-    ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
+    func::FuncOp entryPointFn, linalg::ContractionOpInterface contractionOp) {
   auto linalgOp = cast<linalg::LinalgOp>(contractionOp.getOperation());
   unsigned numLoops = linalgOp.getNumLoops();
   {
@@ -859,9 +857,8 @@ static LogicalResult setRootConfig(
 
 /// Sets the lowering configuration for dispatch region for linalg.mmt4d root
 /// op
-static LogicalResult setRootConfig(
-    func::FuncOp entryPointFn, linalg::Mmt4DOp mmt4dOp,
-    ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
+static LogicalResult setRootConfig(func::FuncOp entryPointFn,
+                                   linalg::Mmt4DOp mmt4dOp) {
   // TODO(ataei): These are hand tuned for some performance benchmarks for
   // now, we want to adapt the same strategy as matmul that dynamically sets
   // tile size.
@@ -903,9 +900,8 @@ static LogicalResult setRootConfig(
 
 /// Sets the lowering configuration for dispatch region for linalg_ext.fft
 /// root op.
-static LogicalResult setRootConfig(
-    func::FuncOp entryPointFn, IREE::LinalgExt::FftOp fftOp,
-    ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
+static LogicalResult setRootConfig(func::FuncOp entryPointFn,
+                                   IREE::LinalgExt::FftOp fftOp) {
   unsigned numLoops = fftOp.getLoopIteratorTypes().size();
   auto partitionedLoops =
       cast<PartitionableLoopsInterface>(fftOp.getOperation())
@@ -988,8 +984,7 @@ static bool isSupportedTransposeOp(linalg::GenericOp genericOp) {
 /// Sets the default lowering configuration for a generic op to use
 /// CPUDoubleTilingExpert pipeline.
 static LogicalResult setDefaultGenericOpRootConfig(
-    func::FuncOp entryPointFn, linalg::GenericOp genericOp,
-    ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
+    func::FuncOp entryPointFn, linalg::GenericOp genericOp) {
   if (getLoweringConfig(genericOp)) {
     return success();
   }
@@ -1046,9 +1041,8 @@ static LogicalResult setDefaultGenericOpRootConfig(
 
 /// Sets the lowering configuration for a generic op implementing a
 /// transposition to use CPUDoubleTilingExpert pipeline.
-static LogicalResult setTransposeLikeOpRootConfig(
-    func::FuncOp entryPointFn, linalg::GenericOp genericOp,
-    ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
+static LogicalResult setTransposeLikeOpRootConfig(func::FuncOp entryPointFn,
+                                                  linalg::GenericOp genericOp) {
   if (getLoweringConfig(genericOp)) {
     return success();
   }
@@ -1114,13 +1108,10 @@ static LogicalResult setTransposeLikeOpRootConfig(
 
 /// Sets the lowering configuration for a generic op to use
 /// CPUDoubleTilingExpert pipeline.
-static LogicalResult setRootConfig(
-    func::FuncOp entryPointFn, linalg::GenericOp genericOp,
-    ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
-  if (failed(
-          setTransposeLikeOpRootConfig(entryPointFn, genericOp, tiledLoops)) ||
-      failed(
-          setDefaultGenericOpRootConfig(entryPointFn, genericOp, tiledLoops))) {
+static LogicalResult setRootConfig(func::FuncOp entryPointFn,
+                                   linalg::GenericOp genericOp) {
+  if (failed(setTransposeLikeOpRootConfig(entryPointFn, genericOp)) ||
+      failed(setDefaultGenericOpRootConfig(entryPointFn, genericOp))) {
     return failure();
   }
   return success();
@@ -1128,10 +1119,10 @@ static LogicalResult setRootConfig(
 
 /// Sets the lowering configuration for linalg.conv_2d_nhwc_hwcf and
 /// linalg.depthwise_conv_2d_nhwc_hwc operations.
-static LogicalResult setConvRootConfig(
-    func::FuncOp entryPointFn, linalg::LinalgOp convOp,
-    ArrayRef<LoopTilingAndDistributionInfo> tiledLoops,
-    ArrayRef<int64_t> targetTileSizes, int64_t vectorSize) {
+static LogicalResult setConvRootConfig(func::FuncOp entryPointFn,
+                                       linalg::LinalgOp convOp,
+                                       ArrayRef<int64_t> targetTileSizes,
+                                       int64_t vectorSize) {
   if (!isa<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp>(
           convOp.getOperation())) {
     return failure();
@@ -1177,32 +1168,62 @@ static LogicalResult setConvRootConfig(
       DispatchLoweringPassPipeline::CPUConvTileAndDecomposeExpert);
 }
 
-static LogicalResult setRootConfig(
-    func::FuncOp entryPointFn, linalg::Conv2DNhwcHwcfOp convOp,
-    ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
+/// Main utility to compute the workgroup (vectorization/unrolling) tile sizes.
+/// Note that this only works for NHWC input and HWCF kernel/filter
+/// convolutions, where the shape is [N, OH, OW, OC, KH, KW, (IC)].
+/// TODO(hanchung): Drive the tiling sizes through heuristics. The parameters
+/// are derived from limit experiments.
+static SmallVector<int64_t> getConvWorkgroupSizes(func::FuncOp entryPointFn,
+                                                  linalg::LinalgOp op,
+                                                  int64_t vectorSize) {
+  bool isSupported =
+      isa<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp>(
+          op.getOperation());
+  (void)isSupported;
+  assert(isSupported && "expected conv with nhwc input and hwcf kernel/filter");
+
+  SmallVector<int64_t> tileSizes;
+  auto variantOp = getExecutableVariantOp(entryPointFn);
+  assert(succeeded(variantOp) && "ExecutableVariantOp not found");
+
+  if (isX86(*variantOp) || isRISCV(*variantOp)) {
+    tileSizes = {1, 1, 8, vectorSize * 2, 1, 1, 8};
+  }
+
+  if (isAArch64(*variantOp)) {
+    tileSizes = {1, 1, 32, 64, 1, 1, 16};
+  }
+
+  // Get default hard-coded tile sizes if we couldn't compute anything better.
+  if (tileSizes.empty()) {
+    tileSizes = {1, 1, vectorSize, vectorSize, 1, 1, vectorSize};
+  }
+
+  return tileSizes;
+}
+
+static LogicalResult setRootConfig(func::FuncOp entryPointFn,
+                                   linalg::Conv2DNhwcHwcfOp convOp) {
   int64_t vectorSize =
       getVectorSize(entryPointFn, convOp.getResult(0).getType());
-  SmallVector<int64_t> targetTileSizes = {1, 1, 8, vectorSize * 2, 1, 1, 8};
-  return setConvRootConfig(entryPointFn, convOp, tiledLoops, targetTileSizes,
-                           vectorSize);
+  SmallVector<int64_t> targetTileSizes =
+      getConvWorkgroupSizes(entryPointFn, convOp, vectorSize);
+  return setConvRootConfig(entryPointFn, convOp, targetTileSizes, vectorSize);
 }
 
 /// Sets the lowering configuration for linalg.depthwise_conv_2d_nhwc_hwc
 /// operations.
-static LogicalResult setRootConfig(
-    func::FuncOp entryPointFn, linalg::DepthwiseConv2DNhwcHwcOp convOp,
-    ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
+static LogicalResult setRootConfig(func::FuncOp entryPointFn,
+                                   linalg::DepthwiseConv2DNhwcHwcOp convOp) {
   int64_t vectorSize =
       getVectorSize(entryPointFn, convOp.getResult(0).getType());
   SmallVector<int64_t> targetTileSizes = {1, 1, 8, vectorSize * 2, 1, 3};
-  return setConvRootConfig(entryPointFn, convOp, tiledLoops, targetTileSizes,
-                           vectorSize);
+  return setConvRootConfig(entryPointFn, convOp, targetTileSizes, vectorSize);
 }
 
 /// Set default configuration for Linalg ops.
 static LogicalResult setRootConfig(
     func::FuncOp entryPointFn, linalg::LinalgOp linalgOp,
-    ArrayRef<LoopTilingAndDistributionInfo> tiledLoops,
     DispatchLoweringPassPipeline pipeline =
         DispatchLoweringPassPipeline::CPUDefault) {
   if (getLoweringConfig(linalgOp)) return success();
@@ -1221,7 +1242,6 @@ static LogicalResult setRootConfig(
 /// `TiledOpInterface`.
 static LogicalResult setRootConfig(
     func::FuncOp entryPointFn, TilingInterface tilingInterfaceOp,
-    ArrayRef<LoopTilingAndDistributionInfo> tiledLoops,
     DispatchLoweringPassPipeline pipeline =
         DispatchLoweringPassPipeline::CPUDefault) {
   if (getLoweringConfig(tilingInterfaceOp)) return success();
@@ -1250,9 +1270,8 @@ static LogicalResult setRootConfig(
 }
 
 /// Redirects to methods that set the configuration based on operation type.
-static LogicalResult setRootConfigImpl(
-    func::FuncOp entryPointFn, Operation *op,
-    ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
+static LogicalResult setRootConfigImpl(func::FuncOp entryPointFn,
+                                       Operation *op) {
   // Do not overwrite default configuration.
   if (getLoweringConfig(op)) return success();
 
@@ -1261,18 +1280,13 @@ static LogicalResult setRootConfigImpl(
     return TypeSwitch<Operation *, LogicalResult>(op)
         .Case<IREE::LinalgExt::FftOp, linalg::GenericOp, linalg::Mmt4DOp,
               linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp>(
-            [&](auto op) {
-              return setRootConfig(entryPointFn, op, tiledLoops);
-            })
-        .Case<linalg::ContractionOpInterface>([&](auto op) {
-          return setRootConfig(entryPointFn, op, tiledLoops);
-        })
-        .Case<linalg::LinalgOp>([&](auto op) {
-          return setRootConfig(entryPointFn, op, tiledLoops);
-        })
-        .Case<TilingInterface>([&](auto op) {
-          return setRootConfig(entryPointFn, op, tiledLoops);
-        })
+            [&](auto op) { return setRootConfig(entryPointFn, op); })
+        .Case<linalg::ContractionOpInterface>(
+            [&](auto op) { return setRootConfig(entryPointFn, op); })
+        .Case<linalg::LinalgOp>(
+            [&](auto op) { return setRootConfig(entryPointFn, op); })
+        .Case<TilingInterface>(
+            [&](auto op) { return setRootConfig(entryPointFn, op); })
         .Default([&](Operation *op) { return success(); });
   };
   return setRootConfigFn(op);
@@ -1280,20 +1294,19 @@ static LogicalResult setRootConfigImpl(
 
 /// Redirects to methods that set the configuration based on operation type for
 /// VMVX backend.
-static LogicalResult setVMVXRootConfigImpl(
-    func::FuncOp entryPointFn, Operation *op,
-    ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
+static LogicalResult setVMVXRootConfigImpl(func::FuncOp entryPointFn,
+                                           Operation *op) {
   if (getLoweringConfig(op)) return success();
 
   // Redirect to individual operations.
   auto setRootConfigFn = [&](Operation *op) -> LogicalResult {
     return TypeSwitch<Operation *, LogicalResult>(op)
         .Case<linalg::LinalgOp>([&](auto op) {
-          return setRootConfig(entryPointFn, op, tiledLoops,
+          return setRootConfig(entryPointFn, op,
                                DispatchLoweringPassPipeline::VMVXDefault);
         })
         .Case<TilingInterface>([&](auto op) {
-          return setRootConfig(entryPointFn, op, tiledLoops,
+          return setRootConfig(entryPointFn, op,
                                DispatchLoweringPassPipeline::VMVXDefault);
         })
         .Default([&](Operation *op) { return success(); });
@@ -1343,9 +1356,8 @@ static FailureOr<Operation *> getRootOperation(
 
 /// Finds the root operation in the given list of Linalg operations and sets
 /// its configuration. Returns error for multiple root operations.
-static LogicalResult setRootConfig(
-    func::FuncOp entryPointFn, ArrayRef<Operation *> computeOps,
-    ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
+static LogicalResult setRootConfig(func::FuncOp entryPointFn,
+                                   ArrayRef<Operation *> computeOps) {
   FailureOr<Operation *> rootOp = getRootOperation(computeOps);
   if (failed(rootOp)) {
     return failure();
@@ -1356,12 +1368,11 @@ static LogicalResult setRootConfig(
     auto variantOp = getExecutableVariantOp(entryPointFn);
     assert(succeeded(variantOp) && "ExecutableVariantOp not found");
     if (isVMVXBackend(*variantOp)) {
-      if (failed(
-              setVMVXRootConfigImpl(entryPointFn, rootOperation, tiledLoops))) {
+      if (failed(setVMVXRootConfigImpl(entryPointFn, rootOperation))) {
         return failure();
       }
     } else {
-      if (failed(setRootConfigImpl(entryPointFn, rootOperation, tiledLoops))) {
+      if (failed(setRootConfigImpl(entryPointFn, rootOperation))) {
         return failure();
       }
     }
@@ -1379,8 +1390,7 @@ static LogicalResult setRootConfig(
 
 /// Sets the translation information to use for a dispatch region.
 static LogicalResult setTranslationInfoAndRootConfig(
-    func::FuncOp entryPointFn, ArrayRef<Operation *> computeOps,
-    ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
+    func::FuncOp entryPointFn, ArrayRef<Operation *> computeOps) {
   // First check if the operations have a preset pipeline.
   for (auto computeOp : computeOps) {
     if (IREE::Codegen::CompilationInfoAttr compilationInfo =
@@ -1402,7 +1412,7 @@ static LogicalResult setTranslationInfoAndRootConfig(
   }
 
   // Next set the configuration of the operations.
-  return setRootConfig(entryPointFn, computeOps, tiledLoops);
+  return setRootConfig(entryPointFn, computeOps);
 }
 
 LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
@@ -1414,7 +1424,7 @@ LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
     if (getTranslationInfo(exportOp)) continue;
 
     // If using the transform dialect interpreter, call the proper pipeline.
-    if (clCPUCodegenTransformDialectFileName.size() > 0) {
+    if (!clCPUCodegenTransformDialectFileName.empty()) {
       auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
           moduleOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
                                      TransformDialectInterpreterCodegen);
@@ -1430,8 +1440,7 @@ LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
       return failure();
     }
 
-    if (failed(
-            setTranslationInfoAndRootConfig(funcOp, computeOps, tiledLoops))) {
+    if (failed(setTranslationInfoAndRootConfig(funcOp, computeOps))) {
       return failure();
     }
   }

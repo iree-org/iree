@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(builtin.module(iree-convert-to-spirv)))' %s | FileCheck %s
 
-#executable_layout = #hal.executable.layout<push_constants = 5, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 5, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<2, storage_buffer>
@@ -9,7 +9,7 @@
 hal.executable private @push_constant {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>, #spv.resource_limits<>>}> {
-    hal.executable.export @push_constant layout(#executable_layout) attributes {
+    hal.executable.export @push_constant layout(#pipeline_layout) attributes {
       workgroup_size = [32: index, 1: index, 1: index]
     }
     builtin.module {
@@ -31,7 +31,7 @@ hal.executable private @push_constant {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 5, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 5, sets = [
   #hal.descriptor_set.layout<1, bindings = [
     #hal.descriptor_set.binding<2, storage_buffer>,
     #hal.descriptor_set.binding<3, storage_buffer>
@@ -43,7 +43,7 @@ hal.executable private @push_constant {
 hal.executable private @resource_bindings_in_same_func {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>, #spv.resource_limits<>>}> {
-    hal.executable.export @resource_bindings_in_same_func layout(#executable_layout) attributes {
+    hal.executable.export @resource_bindings_in_same_func layout(#pipeline_layout) attributes {
       workgroup_size = [32: index, 1: index, 1: index]
     }
     builtin.module {
@@ -87,7 +87,7 @@ hal.executable private @resource_bindings_in_same_func {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 5, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 5, sets = [
   #hal.descriptor_set.layout<1, bindings = [
     #hal.descriptor_set.binding<2, storage_buffer>
   ]>,
@@ -98,10 +98,10 @@ hal.executable private @resource_bindings_in_same_func {
 hal.executable private @resource_bindings_in_multi_entry_func {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>, #spv.resource_limits<>>}> {
-    hal.executable.export @resource_bindings_in_entry_func1 layout(#executable_layout) attributes {
+    hal.executable.export @resource_bindings_in_entry_func1 layout(#pipeline_layout) attributes {
       workgroup_size = [32: index, 1: index, 1: index]
     }
-    hal.executable.export @resource_bindings_in_entry_func2 layout(#executable_layout) attributes {
+    hal.executable.export @resource_bindings_in_entry_func2 layout(#pipeline_layout) attributes {
       workgroup_size = [32: index, 1: index, 1: index]
     }
     builtin.module {
@@ -144,7 +144,7 @@ hal.executable private @resource_bindings_in_multi_entry_func {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -154,7 +154,7 @@ hal.executable private @resource_bindings_in_multi_entry_func {
 hal.executable private @interface_binding {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>, #spv.resource_limits<>>}> {
-    hal.executable.export @interface_binding layout(#executable_layout) attributes {
+    hal.executable.export @interface_binding layout(#pipeline_layout) attributes {
       workgroup_size = [32: index, 1: index, 1: index]
     }
     builtin.module {
@@ -187,7 +187,7 @@ hal.executable private @interface_binding {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -197,7 +197,7 @@ hal.executable private @interface_binding {
 hal.executable private @interface_wg_id {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>, #spv.resource_limits<>>}> {
-    hal.executable.export @interface_wg_id layout(#executable_layout) attributes {
+    hal.executable.export @interface_wg_id layout(#pipeline_layout) attributes {
       workgroup_size = [32: index, 1: index, 1: index]
     }
     builtin.module {
@@ -222,7 +222,7 @@ hal.executable private @interface_wg_id {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -232,7 +232,7 @@ hal.executable private @interface_wg_id {
 hal.executable private @interface_wg_count {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>, #spv.resource_limits<>>}> {
-    hal.executable.export @interface_wg_count layout(#executable_layout) attributes {
+    hal.executable.export @interface_wg_count layout(#pipeline_layout) attributes {
       workgroup_size = [32: index, 1: index, 1: index]
     }
     builtin.module {

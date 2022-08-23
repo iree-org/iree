@@ -14,12 +14,10 @@
 #include "iree/hal/allocator.h"
 #include "iree/hal/buffer.h"
 #include "iree/hal/command_buffer.h"
-#include "iree/hal/descriptor_set.h"
-#include "iree/hal/descriptor_set_layout.h"
 #include "iree/hal/event.h"
 #include "iree/hal/executable_cache.h"
-#include "iree/hal/executable_layout.h"
 #include "iree/hal/fence.h"
+#include "iree/hal/pipeline_layout.h"
 #include "iree/hal/resource.h"
 #include "iree/hal/semaphore.h"
 
@@ -308,7 +306,7 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_alloca(
     iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_hal_allocator_pool_id_t pool_id, iree_hal_buffer_params_t params,
+    iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
     iree_device_size_t allocation_size,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer);
 
@@ -346,6 +344,14 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_execute(
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_host_size_t command_buffer_count,
     iree_hal_command_buffer_t* const* command_buffers);
+
+// Enqueues a barrier waiting for |wait_semaphore_list| and signaling
+// |signal_semaphore_list| when reached.
+// Equivalent to iree_hal_device_queue_execute with no command buffers.
+IREE_API_EXPORT iree_status_t iree_hal_device_queue_barrier(
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list);
 
 // Flushes any locally-pending submissions in the queue.
 // When submitting many queue operations this can be used to eagerly flush
@@ -401,15 +407,8 @@ typedef struct iree_hal_device_vtable_t {
       iree_hal_queue_affinity_t queue_affinity,
       iree_hal_command_buffer_t** out_command_buffer);
 
-  iree_status_t(IREE_API_PTR* create_descriptor_set)(
-      iree_hal_device_t* device, iree_hal_descriptor_set_layout_t* set_layout,
-      iree_host_size_t binding_count,
-      const iree_hal_descriptor_set_binding_t* bindings,
-      iree_hal_descriptor_set_t** out_descriptor_set);
-
   iree_status_t(IREE_API_PTR* create_descriptor_set_layout)(
-      iree_hal_device_t* device,
-      iree_hal_descriptor_set_layout_usage_type_t usage_type,
+      iree_hal_device_t* device, iree_hal_descriptor_set_layout_flags_t flags,
       iree_host_size_t binding_count,
       const iree_hal_descriptor_set_layout_binding_t* bindings,
       iree_hal_descriptor_set_layout_t** out_descriptor_set_layout);
@@ -421,11 +420,11 @@ typedef struct iree_hal_device_vtable_t {
       iree_hal_device_t* device, iree_string_view_t identifier,
       iree_loop_t loop, iree_hal_executable_cache_t** out_executable_cache);
 
-  iree_status_t(IREE_API_PTR* create_executable_layout)(
+  iree_status_t(IREE_API_PTR* create_pipeline_layout)(
       iree_hal_device_t* device, iree_host_size_t push_constants,
       iree_host_size_t set_layout_count,
       iree_hal_descriptor_set_layout_t* const* set_layouts,
-      iree_hal_executable_layout_t** out_executable_layout);
+      iree_hal_pipeline_layout_t** out_pipeline_layout);
 
   iree_status_t(IREE_API_PTR* create_semaphore)(
       iree_hal_device_t* device, uint64_t initial_value,
@@ -445,7 +444,7 @@ typedef struct iree_hal_device_vtable_t {
       iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
       const iree_hal_semaphore_list_t wait_semaphore_list,
       const iree_hal_semaphore_list_t signal_semaphore_list,
-      iree_hal_allocator_pool_id_t pool_id, iree_hal_buffer_params_t params,
+      iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
       iree_device_size_t allocation_size,
       iree_hal_buffer_t** IREE_RESTRICT out_buffer);
 

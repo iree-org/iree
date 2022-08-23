@@ -66,6 +66,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgUtils",
         "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:PDLDialect",
         "@llvm-project//mlir:Pass",
