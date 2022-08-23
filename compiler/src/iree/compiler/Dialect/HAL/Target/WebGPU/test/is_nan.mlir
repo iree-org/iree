@@ -21,7 +21,8 @@ module attributes {
   ]
 } {
 
-// CHECK:      Tint reported 1 error(s) for a SPIR-V program, see diagnostics:
+// CHECK:      Tint reported 2 error(s) for a SPIR-V program, see diagnostics:
+// CHECK-NEXT: error: unknown function: 'isNan'
 // CHECK-NEXT: error: unknown function: 'isNan'
 //
 // expected-error @+3 {{failed to compile SPIR-V to WGSL}}
@@ -35,14 +36,18 @@ stream.executable public @min_dispatch {
   builtin.module {
     func.func @min_dispatch(%arg0: !stream.binding, %arg1: !stream.binding) {
       %c0 = arith.constant 0 : index
+      %cst = arith.constant 0x7FC00000 : f32
       %0 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:1x5xf32>
       %1 = stream.binding.subspan %arg1[%c0] : !stream.binding -> !flow.dispatch.tensor<readwrite:1x5xf32>
       %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1, 5], strides = [1, 1] : !flow.dispatch.tensor<readonly:1x5xf32> -> tensor<1x5xf32>
       %3 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [1, 5], strides = [1, 1] : !flow.dispatch.tensor<readwrite:1x5xf32> -> tensor<1x5xf32>
       %4 = linalg.generic {indexing_maps = [#map0, #map0], iterator_types = ["parallel", "parallel"]} ins(%2 : tensor<1x5xf32>) outs(%3 : tensor<1x5xf32>) {
       ^bb0(%arg2: f32, %arg3: f32):
-        %5 = arith.minf %arg3, %arg2 : f32
-        linalg.yield %5 : f32
+        %5 = arith.cmpf ogt, %arg2, %arg3 : f32
+        %6 = arith.select %5, %arg2, %arg3 : f32
+        %7 = arith.cmpf uno, %arg2, %arg3 : f32
+        %8 = arith.select %7, %cst, %6 : f32
+        linalg.yield %8 : f32
       } -> tensor<1x5xf32>
       flow.dispatch.tensor.store %4, %1, offsets = [0, 0], sizes = [1, 5], strides = [1, 1] : tensor<1x5xf32> -> !flow.dispatch.tensor<readwrite:1x5xf32>
       return
