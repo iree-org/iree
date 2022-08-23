@@ -87,21 +87,22 @@ function run_in_docker() {
       fi
       export PATH="${python_dir}/bin:${orig_path}"
       echo ":::: Python version $(python --version)"
+      package_suffix="$(jq '."package-suffix" | gsub("-"; "_")' /tmp/version_info.json)"
       case "${package}" in
         iree-runtime)
-          clean_wheels iree_runtime "${python_version}"
+          clean_wheels "iree_runtime${package_suffix}" "${python_version}"
           build_iree_runtime
-          run_audit_wheel iree_runtime "${python_version}"
+          run_audit_wheel "iree_runtime${package_suffix}" "${python_version}"
           ;;
         iree-runtime-instrumented)
-          clean_wheels iree_runtime_instrumented "${python_version}"
+          clean_wheels "iree_runtime_instrumented${package_suffix}" "${python_version}"
           build_iree_runtime_instrumented
-          run_audit_wheel iree_runtime_instrumented "${python_version}"
+          run_audit_wheel "iree_runtime_instrumented${package_suffix}" "${python_version}"
           ;;
         iree-compiler)
-          clean_wheels iree_compiler "${python_version}"
+          clean_wheels "iree_compiler${package_suffix}" "${python_version}"
           build_iree_compiler
-          run_audit_wheel iree_compiler "${python_version}"
+          run_audit_wheel "iree_compiler${package_suffix}" "${python_version}"
           ;;
         *)
           echo "Unrecognized package '${package}'"
