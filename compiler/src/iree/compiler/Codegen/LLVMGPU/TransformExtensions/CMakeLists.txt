@@ -37,6 +37,7 @@ iree_cc_library(
     MLIRFuncDialect
     MLIRGPUOps
     MLIRIR
+    MLIRLinalgUtils
     MLIRMemRefDialect
     MLIRPDLDialect
     MLIRPass

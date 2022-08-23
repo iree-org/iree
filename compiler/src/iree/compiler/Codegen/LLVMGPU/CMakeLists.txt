@@ -85,6 +85,7 @@ iree_cc_library(
     MLIRVectorTransforms
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Dialect::IREECodegenDialect
+    iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
     iree::compiler::Codegen::PassHeaders
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
