@@ -53,11 +53,11 @@ jobs:
             experimental: false
 
           # Macos packages.
-          - runs-on: macos-latest
+          - runs-on: macos-11
             build-family: macos
             build-package: py-compiler-pkg
             experimental: true
-          - runs-on: macos-latest
+          - runs-on: macos-11
             build-family: macos
             build-package: py-runtime-pkg
             experimental: true
