@@ -93,14 +93,10 @@ iree_static_linker_test(
     "mnist_fake_weights.mlir"
   STATIC_LIB_PREFIX
     mnist_fake_weights_linked_llvm_cpu
-  MAIN_FUNCTION
-    "module.predict"
-  INPUT_SHAPES
-    "1, 28, 28, 1"
-  INPUT_TYPE
-    float
-  HAL_TYPE
-    IREE_HAL_ELEMENT_TYPE_FLOAT_32
+  ENTRY_FUNCTION
+    "predict"
+  FUNCTION_INPUTS
+    "1x28x28x1xf32"
   COMPILER_FLAGS
     "--iree-input-type=mhlo"
 )
@@ -112,14 +108,10 @@ iree_static_linker_test(
     "mnist_fake_weights.mlir"
   STATIC_LIB_PREFIX
     mnist_fake_weights_linked_llvm_cpu
-  MAIN_FUNCTION
-    "module.predict"
-  INPUT_SHAPES
-    "1, 28, 28, 1"
-  INPUT_TYPE
-    float
-  HAL_TYPE
-    IREE_HAL_ELEMENT_TYPE_FLOAT_32
+  ENTRY_FUNCTION
+    "predict"
+  FUNCTION_INPUTS
+    "1x28x28x1xf32"
   COMPILER_FLAGS
     "--iree-input-type=mhlo"
   EMITC
@@ -132,15 +124,10 @@ iree_static_linker_test(
     "${IREE_ROOT_DIR}/samples/static_library/simple_mul.mlir"
   STATIC_LIB_PREFIX
     simple_mul_dispatch_0
-  MAIN_FUNCTION
-    "module.simple_mul"
-  INPUT_SHAPES
-    "4"
-    "4"
-  INPUT_TYPE
-    float
-  HAL_TYPE
-    IREE_HAL_ELEMENT_TYPE_FLOAT_32
+  ENTRY_FUNCTION
+    "simple_mul"
+  FUNCTION_INPUTS
+    "4xf32,4xf32"
 )
 
 iree_static_linker_test(
@@ -150,14 +137,9 @@ iree_static_linker_test(
     "${IREE_ROOT_DIR}/samples/static_library/simple_mul.mlir"
   STATIC_LIB_PREFIX
     simple_mul_dispatch_0
-  MAIN_FUNCTION
-    "module.simple_mul"
-  INPUT_SHAPES
-    "4"
-    "4"
-  INPUT_TYPE
-    float
-  HAL_TYPE
-    IREE_HAL_ELEMENT_TYPE_FLOAT_32
+  ENTRY_FUNCTION
+    "simple_mul"
+  FUNCTION_INPUTS
+    "4xf32,4xf32"
   EMITC
 )
