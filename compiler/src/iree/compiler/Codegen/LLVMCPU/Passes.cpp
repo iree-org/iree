@@ -714,14 +714,14 @@ void addCPUDataTilingPipeline(OpPassManager &passManager) {
 void addCPUDefaultPassPipeline(OpPassManager &passManager) {
   addTileAndDistributePasses(passManager);
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
-  addBufferizePasses(nestedModulePM);
   if (clEnablePadConsumerFusion) {
     nestedModulePM.addNestedPass<func::FuncOp>(
         createFuseTensorPadWithConsumerPass());
     nestedModulePM.addNestedPass<func::FuncOp>(
         createConcretizePadResultShapePass());
-    nestedModulePM.addNestedPass<func::FuncOp>(createVectorizePadPass());
   }
+  nestedModulePM.addNestedPass<func::FuncOp>(createVectorizePadPass());
+  addBufferizePasses(nestedModulePM);
 }
 
 void addTransformDialectPasses(OpPassManager &passManager) {

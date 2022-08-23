@@ -234,10 +234,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   passManager.addPass(IREE::Flow::createExpandTensorShapesPass());
   buildGlobalOptimizationPassPipeline(passManager, transformOptions);
 
-  // Pad tensors.
-  passManager.addPass(IREE::Flow::createTensorPadToTensorInsertSlicePass(
-      /*skipSingleLinalgOpUses=*/clEnableFusePaddingIntoLinalgConsumerOps));
-
   FunctionLikeNest(passManager)
       // Preprocess the input to a form more amenable for fusion
       // - Convert all elementwise ops to Linalg
