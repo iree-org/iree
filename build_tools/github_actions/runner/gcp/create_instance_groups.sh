@@ -12,10 +12,11 @@
 set -euo pipefail
 
 # For now, just change these parameters
-CONFIG_REF=91ffe357df
-TIME_STRING=2022-08-18-1660861240
+CONFIG_REF=a5d5a96098
+TIME_STRING=2022-08-23-1661287657
 REGION=us-west1
-ZONES=us-west1-b,us-west1-c,us-west1-a
+ZONES=us-west1-a,us-west1-b,us-west1-c
+AUTOSCALING=0
 MIN_SIZE=1
 MAX_SIZE=10
 
@@ -39,7 +40,7 @@ function create_mig() {
   (set -x; gcloud beta compute instance-groups managed create "${create_args[@]}")
   echo ""
 
-  if [[ "${type}" == cpu ]]; then
+  if (( AUTOSCALING == 1 )) && [[ "${type}" == cpu ]]; then
     local -a autoscaling_args=(
       "${GROUP_NAME}"
       --project=iree-oss
