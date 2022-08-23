@@ -113,10 +113,8 @@ static LogicalResult tileParallelDims(func::FuncOp funcOp,
     SmallVector<OpFoldResult> numThreads(numLoops, rewriter.getIndexAttr(0));
     int64_t id = 0;
     int64_t threadId = 0;
-    SmallVector<int64_t> blockTileSize = getTileSizes(op, 0);
     SmallVector<int64_t> idDims;
     for (unsigned loop : llvm::reverse(partitionedLoops)) {
-      if (loop >= blockTileSize.size()) continue;
       int64_t num = elementPerWorkgroup[id++];
       if (num > 1) {
         numThreads[loop] = rewriter.getIndexAttr(num);
