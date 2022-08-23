@@ -71,9 +71,9 @@ class CommonRuleFactory(object):
 
     if model_url.scheme == "https":
       cmake_rule = DOWNLOAD_ARTIFACT_CMAKE_TEMPLATE.substitute(
-          _TARGET_NAME_=target_name,
-          _OUTPUT_PATH_=model_path,
-          _SOURCE_URL_=model.source_url)
+          __TARGET_NAME=target_name,
+          __OUTPUT_PATH=model_path,
+          __SOURCE_URL=model.source_url)
     else:
       raise ValueError("Unsupported model url: {model.source_url}.")
 
@@ -135,15 +135,15 @@ class IreeRuleFactory(object):
 
     if model_source_type == common_definitions.ModelSourceType.EXPORTED_TFLITE:
       cmake_rule = TFLITE_IMPORT_CMAKE_TEMPLATE.substitute(
-          _TARGET_NAME_=target_name,
-          _SOURCE_MODEL_PATH_=source_model_rule.file_path,
-          _OUTPUT_PATH_=output_file_path)
+          __TARGET_NAME=target_name,
+          __SOURCE_MODEL_PATH=source_model_rule.file_path,
+          __OUTPUT_PATH=output_file_path)
       mlir_dialect_type = "tosa"
     elif model_source_type == common_definitions.ModelSourceType.EXPORTED_TF:
       cmake_rule = TF_IMPORT_CMAKE_TEMPLATE.substitute(
-          _TARGET_NAME_=target_name,
-          _SOURCE_MODEL_PATH_=source_model_rule.file_path,
-          _OUTPUT_PATH_=output_file_path)
+          __TARGET_NAME=target_name,
+          __SOURCE_MODEL_PATH=source_model_rule.file_path,
+          __OUTPUT_PATH=output_file_path)
       mlir_dialect_type = "mhlo"
     else:
       raise ValueError(

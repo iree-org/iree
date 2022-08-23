@@ -1,14 +1,15 @@
+# Fetch the model from "$__SOURCE_URL"
 add_custom_command(
-  OUTPUT "$_OUTPUT_PATH_"
+  OUTPUT "$__OUTPUT_PATH"
   COMMAND
     "$${Python3_EXECUTABLE}" "$${IREE_ROOT_DIR}/build_tools/scripts/download_file.py"
-    "$_SOURCE_URL_" -o "$_OUTPUT_PATH_"
+    "$__SOURCE_URL" -o "$__OUTPUT_PATH"
   DEPENDS
     "$${IREE_ROOT_DIR}/build_tools/scripts/download_file.py"
-  COMMENT "Downloading $_SOURCE_URL_"
+  COMMENT "Downloading $__SOURCE_URL"
 )
 add_custom_target(
-    "$${_PACKAGE_NAME}_$_TARGET_NAME_"
+    "$${_PACKAGE_NAME}_$__TARGET_NAME"
   DEPENDS
-    "$_OUTPUT_PATH_"
+    "$__OUTPUT_PATH"
 )

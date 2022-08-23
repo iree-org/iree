@@ -1,14 +1,14 @@
 iree_bytecode_module(
   NAME
-    "$_TARGET_NAME_"
+    "$__TARGET_NAME"
   MODULE_FILE_NAME
-    "$_MODULE_OUTPUT_PATH_"
+    "$__MODULE_OUTPUT_PATH"
   SRC
-    "$_SOURCE_MODEL_PATH_"
+    "$__SOURCE_MODEL_PATH"
   FLAGS
-    $_COMPILE_FLAGS_
+    $__COMPILE_FLAGS
   DEPENDS
-    "$${_PACKAGE_NAME}_$_SOURCE_MODEL_TARGET_"
+    "$${_PACKAGE_NAME}_$__SOURCE_MODEL_TARGET"
 )
 # Mark dependency so that we have one target to drive them all.
-add_dependencies(iree-benchmark-suites "$${_PACKAGE_NAME}_$_TARGET_NAME_")
+add_dependencies(iree-benchmark-suites "$${_PACKAGE_NAME}_$__TARGET_NAME")
