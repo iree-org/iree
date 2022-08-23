@@ -240,8 +240,7 @@ bool isClonableIntoDispatchOp(Operation *op) {
   // trivially clonable too, but they cause problems
   // with bufferization. Make them clonable when fixed.
   if (isa<AffineApplyOp, arith::IndexCastOp, linalg::FillOp, tensor::EmptyOp,
-          tensor::CastOp, tensor::ExtractOp, tensor::ExtractSliceOp,
-          tensor::PadOp>(op)) {
+          tensor::CastOp, tensor::ExtractOp, tensor::ExtractSliceOp>(op)) {
     return true;
   }
   if (auto constantOp = dyn_cast<arith::ConstantOp>(op)) {
@@ -501,9 +500,9 @@ static Optional<OpOperand *> getFusableUse(Operation *op,
 
 /// Returns true if the operands are fusable under the aggressive fusion
 /// heuristics.
-static bool areOpsAggresiveFusable(Operation *producer, Operation *consumer,
-                                   bool allowConsumerParallelismPessimization,
-                                   bool aggressiveFusion) {
+static bool areOpsFusable(Operation *producer, Operation *consumer,
+                          bool allowConsumerParallelismPessimization,
+                          bool aggressiveFusion) {
   // Collect all the uses from producer to consumer.
   SmallVector<OpOperand *> allUses;
   for (OpOperand &producerUse : producer->getUses()) {
@@ -546,6 +545,18 @@ static bool isFusableWithConsumer(OpOperand &fusedOperand,
            });
   }
 
+  // Fuse a `generic` op producer with a `tensor.pad` consumer. This can be
+  // generalized to any op that implements the `TilingInterface`.
+  if (isa<linalg::GenericOp>(producer) && isa<tensor::PadOp>(consumer)) {
+    return true;
+  }
+
+  // Also fuse a pad op with its consumer. Whether a pad gets fused with
+  // producer first, or consumer first depends on the traversal order.
+  if (isa<linalg::LinalgOp>(consumer) && isa<tensor::PadOp>(producer)) {
+    return true;
+  }
+
   auto producerLinalgOp = dyn_cast<linalg::LinalgOp>(producer);
   auto consumerLinalgOp = dyn_cast<linalg::LinalgOp>(consumer);
   if (!producerLinalgOp || !consumerLinalgOp) return false;
@@ -556,9 +567,9 @@ static bool isFusableWithConsumer(OpOperand &fusedOperand,
     return false;
   }
 
-  if (!areOpsAggresiveFusable(producer, consumer,
-                              /*allowConsumerParallelismPessimization=*/true,
-                              aggressiveFusion)) {
+  if (!areOpsFusable(producer, consumer,
+                     /*allowConsumerParallelismPessimization=*/true,
+                     aggressiveFusion)) {
     return false;
   }
 
@@ -634,9 +645,9 @@ static bool isFusableWithProducer(OpOperand &operand, bool aggressiveFusion) {
     return false;
   }
 
-  return areOpsAggresiveFusable(producer, consumer,
-                                /*allowConsumerParallelismPessimization=*/false,
-                                aggressiveFusion);
+  return areOpsFusable(producer, consumer,
+                       /*allowConsumerParallelismPessimization=*/false,
+                       aggressiveFusion);
 }
 
 /// Starting from the `root` op, traverse the operand use-def chain
@@ -714,7 +725,8 @@ static unsigned decideFusableLinalgOps(FunctionOpInterface funcOp,
       // Only look for Linalg ops here. Avoid moving `linalg.fill` that aren't
       // fused with anything else into their own dispatches since it is better
       // to convert them to splats.
-      if (!isa<linalg::LinalgOp>(op) || isa<linalg::FillOp>(op)) continue;
+      if (!isa<linalg::LinalgOp, tensor::PadOp>(op) || isa<linalg::FillOp>(op))
+        continue;
 
       unsigned newGroup = numRootOps++;
       setRootAttribute(context, &op, newGroup);

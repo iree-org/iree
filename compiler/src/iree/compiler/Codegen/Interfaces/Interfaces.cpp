@@ -19,6 +19,7 @@
 #include "iree/compiler/Dialect/Flow/TransformExtensions/FlowExtensions.h"
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/Linalg/Transforms/TilingInterfaceImpl.h"
+#include "mlir/Dialect/Tensor/IR/TensorTilingInterfaceImpl.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -38,6 +39,7 @@ void registerCodegenInterfaces(DialectRegistry &registry) {
   registerTransformDialectLLVMGPUExtension(registry);
   linalg::registerTransformDialectExtension(registry);
   linalg::registerTilingInterfaceExternalModels(registry);
+  tensor::registerTilingInterfaceExternalModels(registry);
 }
 
 }  // namespace iree_compiler

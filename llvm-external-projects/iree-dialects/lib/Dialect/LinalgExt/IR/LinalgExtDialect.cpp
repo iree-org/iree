@@ -7,6 +7,7 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpDefinition.h"
@@ -36,6 +37,8 @@ void IREELinalgExtDialect::initialize() {
   addOperations<
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.cpp.inc"
       >();
+
+  getContext()->getOrLoadDialect<tensor::TensorDialect>();
 }
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.cpp.inc"
