@@ -782,16 +782,13 @@ static LogicalResult legalizeDispatchWorkgroupOperands(
   }
 
   // Update the `operand_segment_sizes`.
-  auto operandSegmentSizes = dispatchOp->getAttrOfType<DenseIntElementsAttr>(
+  auto operandSegmentSizes = dispatchOp->getAttrOfType<DenseI32ArrayAttr>(
       dispatchOp.getOperandSegmentSizesAttrName());
-  auto newValues = llvm::to_vector<4>(llvm::map_range(
-      operandSegmentSizes.getValues<APInt>(),
-      [&](APInt val) -> int32_t { return val.getSExtValue(); }));
+  auto newValues = llvm::to_vector<4>(operandSegmentSizes.asArrayRef());
   newValues[1] = numOperands;
   newValues[2] = numOperandDims;
-  auto newAttr =
-      DenseIntElementsAttr::get(operandSegmentSizes.getType(), newValues);
-  dispatchOp->setAttr(dispatchOp.getOperandSegmentSizesAttrName(), newAttr);
+  dispatchOp->setAttr(dispatchOp.getOperandSegmentSizesAttrName(),
+                      b.getDenseI32ArrayAttr(newValues));
   return success();
 }
 
