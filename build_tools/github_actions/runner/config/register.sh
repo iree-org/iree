@@ -56,8 +56,9 @@ RUNNER_CUSTOM_LABELS="$(get_attribute github-runner-labels)"
 RUNNER_GROUP="$(get_attribute github-runner-group)"
 RUNNER_SCOPE="$(get_attribute github-runner-scope)"
 RUNNER_TRUST="$(get_attribute github-runner-trust)"
+RUNNER_VERSION="$(get_attribute github-runner-version)"
 TOKEN_PROXY_URL="$(get_attribute github-token-proxy-url)"
-CONFIG_REF="$(get_attribute runner-config-ref)"
+CONFIG_REF="$(get_attribute github-runner-config-ref)"
 
 declare -a RUNNER_LABELS_ARRAY=(
   "os-family=${OS_FAMILY}"
@@ -65,6 +66,7 @@ declare -a RUNNER_LABELS_ARRAY=(
   "${OS_FAMILY}"
   "hostname=${HOSTNAME}"
   "runner-group=${RUNNER_GROUP}"
+  "runner-version=${RUNNER_VERSION}"
   "trust=${RUNNER_TRUST}"
   "zone=${ZONE}"
   "cpu-platform=${CPU_PLATFORM}"
