@@ -352,7 +352,7 @@ jobs:
           echo "::set-output name=binaries-gcs-artifact::${BINARIES_GCS_ARTIFACT}"
 
   test_tf_integrations:
-    needs: [should_run, build_tf_integrations, build_all]
+    needs: [should_run, build_all, build_tf_integrations]
     if: needs.should_run.outputs.should-run == 'true'
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
@@ -391,7 +391,7 @@ jobs:
             "${BUILD_DIR}"
 
   test_tf_integrations_gpu:
-    needs: [should_run, build_tf_integrations, build_all]
+    needs: [should_run, build_all, build_tf_integrations]
     if: needs.should_run.outputs.should-run == 'true'
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
@@ -586,7 +586,7 @@ jobs:
             "./build_tools/cmake/build_riscv.sh && tests/riscv32/smoke.sh"
 
   riscv64:
-    needs: [should_run, build_all, build_all, build_tf_integrations]
+    needs: [should_run, build_all, build_tf_integrations]
     if: needs.should_run.outputs.should-run == 'true'
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
