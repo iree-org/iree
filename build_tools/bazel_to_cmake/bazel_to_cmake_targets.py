@@ -108,6 +108,10 @@ EXPLICIT_TARGET_MAPPING = {
         "tensorflow::external_mhlo_includes",
         "MhloToStandard",
     ],
+    "@mlir-hlo//:map_chlo_to_hlo_op": [
+        "ChloDialect",
+        "MhloDialect",
+    ],
     "@mlir-hlo//:map_lmhlo_to_scalar_op": [
         "tensorflow::external_mhlo_includes",
         "LmhloDialect",  # Unfortunate.
