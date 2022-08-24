@@ -47,6 +47,13 @@ declare -a METADATA=(
   "github-runner-scope=${GITHUB_RUNNER_SCOPE}"
   "github-token-proxy-url=${GITHUB_TOKEN_PROXY_URL}"
 )
+
+if (( TESTING==1 )); then
+  METADATA+=(github-runner-environment=testing)
+else
+  METADATA+=(github-runner-environment=prod)
+fi
+
 declare -a common_args=(
   --project=iree-oss
   # `address=''` indicates an ephemeral IP. This *shouldn't* be necessary here,
