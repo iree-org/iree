@@ -37,7 +37,7 @@
 #
 # It can be run on a workstation but recommend using a git worktree dedicated
 # to packaging to avoid stomping on development artifacts.
-set -eu -o errtrace
+set -xeu -o errtrace
 
 this_dir="$(cd $(dirname $0) && pwd)"
 script_name="$(basename $0)"
@@ -63,7 +63,7 @@ function run_on_host() {
     -e "override_python_versions=${python_versions}" \
     -e "packages=${packages}" \
     "${manylinux_docker_image}" \
-    -- "${this_dir}/${script_name}"
+    -- ${this_dir}/${script_name}
 
   echo "******************** BUILD COMPLETE ********************"
   echo "Generated binaries:"
