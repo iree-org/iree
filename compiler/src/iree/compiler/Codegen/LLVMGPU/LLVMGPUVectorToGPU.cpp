@@ -244,21 +244,12 @@ struct LLVMGPUVectorToGPUPass
 
     if (llvmgpuUseMMASync) {
       (void)convertVectorToNVVMCompatibleMMASync(funcOp);
-
-      // TODO: Remove once populateMmaSyncF32ToTF32Patterns is fixed to not add
-      // attribute tf32 attributes to none f32 ops.
-      bool hasFP32mma = false;
-      funcOp.walk([&hasFP32mma](nvgpu::MmaSyncOp op) {
-        if (op.getType().cast<VectorType>().getElementType().isF32())
-          hasFP32mma = true;
-      });
-      if (hasFP32mma) {
-        // Use TF32 for float32 case for now.
-        RewritePatternSet patterns(funcOp.getContext());
-        nvgpu::populateMmaSyncF32ToTF32Patterns(
-            patterns, nvgpu::MmaSyncF32Lowering::TF32);
-        (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
-      }
+      // Use TF32 for float32 case for now.
+      RewritePatternSet f32ToTF32patterns(funcOp.getContext());
+      nvgpu::populateMmaSyncF32ToTF32Patterns(f32ToTF32patterns,
+                                              nvgpu::MmaSyncF32Lowering::TF32);
+      (void)applyPatternsAndFoldGreedily(getOperation(),
+                                         std::move(f32ToTF32patterns));
     } else {
       convertVectorToMMAOps(funcOp);
     }
