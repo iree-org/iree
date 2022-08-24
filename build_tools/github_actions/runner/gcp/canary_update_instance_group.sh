@@ -36,7 +36,7 @@ function canary_update() {
 
   gcloud compute instance-groups managed rolling-action start-update \
     "${mig_name}" \
-    --version=template="github-runner-${runner_group}-${type}-${OLD_VERSION}",name=orig \
+    --version=template="github-runner-${runner_group}-${type}-${OLD_VERSION}",name=base \
     --canary-version=template="github-runner-${runner_group}-${type}-${NEW_VERSION}",target-size=10%,name=canary \
     --type=opportunistic \
     --region="${REGION}"
