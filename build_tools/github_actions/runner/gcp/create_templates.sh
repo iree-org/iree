@@ -10,12 +10,31 @@ set -euo pipefail
 
 SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")";
 
+TESTING="${TEMPLATE_TESTING:-0}"
+
 TEMPLATE_BASE_NAME="${TEMPLATE_BASE_NAME:-github-runner}"
+TEMPLATE_CONFIG_REPO="${TEMPLATE_CONFIG_REPO:-iree-org/iree}"
+TEMPLATE_CONFIG_REF="${TEMPLATE_CONFIG_REF:-$(git rev-parse HEAD)}"
+
+if (( TESTING==0 )); then
+  if [[ "${TEMPLATE_CONFIG_REPO}" != iree-org/iree ]]; then
+    echo "Expected default settings for non-testing template, but TEMPLATE_CONFIG_REPO='${TEMPLATE_CONFIG_REPO}'. Aborting"
+    exit 1
+  fi
+  if [[ "${TEMPLATE_BASE_NAME}" != github-runner ]]; then
+    echo "Expected default settings for non-testing template, but TEMPLATE_BASE_NAME='${TEMPLATE_BASE_NAME}'. Aborting"
+    exit 1
+  fi
+  if [[ "${TEMPLATE_CONFIG_REF}" != "$(git rev-parse main)" ]]; then
+    echo "Expected default settings for non-testing template, but TEMPLATE_CONFIG_REF='${TEMPLATE_CONFIG_REF}'. Aborting"
+    exit 1
+  fi
+fi
+
 TIME_STRING="$(date +%Y-%m-%d-%s)"
-REPO="${TEMPLATE_CONFIG_REPO:-iree-org/iree}"
-REF="${TEMPLATE_CONFIG_REF:-$(git rev-parse HEAD)}"
-SHORT_REF="${REF:0:10}"
+SHORT_REF="${TEMPLATE_CONFIG_REF:0:10}"
 STARTUP_SCRIPT_PATH="/tmp/startup_script.${SHORT_REF}.sh"
+GITHUB_RUNNER_SCOPE=iree-org
 GITHUB_RUNNER_VERSION="2.294.0"
 GITHUB_RUNNER_ARCHIVE_DIGEST="a19a09f4eda5716e5d48ba86b6b78fc014880c5619b9dba4a059eaf65e131780"
 GITHUB_TOKEN_PROXY_URL="https://ght-proxy-zbhz5clunq-ue.a.run.app"
@@ -23,9 +42,9 @@ GITHUB_TOKEN_PROXY_URL="https://ght-proxy-zbhz5clunq-ue.a.run.app"
 declare -a METADATA=(
   "github-runner-version=${GITHUB_RUNNER_VERSION}"
   "github-runner-archive-digest=${GITHUB_RUNNER_ARCHIVE_DIGEST}"
-  "github-runner-config-ref=${REF}"
-  "github-runner-config-repo=${REPO}"
-  "github-runner-scope=iree-org"
+  "github-runner-config-ref=${TEMPLATE_CONFIG_REF}"
+  "github-runner-config-repo=${TEMPLATE_CONFIG_REPO}"
+  "github-runner-scope=${GITHUB_RUNNER_SCOPE}"
   "github-token-proxy-url=${GITHUB_TOKEN_PROXY_URL}"
 )
 declare -a common_args=(

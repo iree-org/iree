@@ -57,6 +57,7 @@ RUNNER_GROUP="$(get_attribute github-runner-group)"
 RUNNER_SCOPE="$(get_attribute github-runner-scope)"
 RUNNER_TRUST="$(get_attribute github-runner-trust)"
 RUNNER_VERSION="$(get_attribute github-runner-version)"
+RUNNER_ENVIRONMENT"$(get_attribute github-runner-environment)"
 TOKEN_PROXY_URL="$(get_attribute github-token-proxy-url)"
 CONFIG_REF="$(get_attribute github-runner-config-ref)"
 
@@ -68,6 +69,7 @@ declare -a RUNNER_LABELS_ARRAY=(
   "runner-group=${RUNNER_GROUP}"
   "runner-version=${RUNNER_VERSION}"
   "trust=${RUNNER_TRUST}"
+  "environment=${RUNNER_ENVIRONMENT}"
   "zone=${ZONE}"
   "cpu-platform=${CPU_PLATFORM}"
   "machine-type=${MACHINE_TYPE}"
@@ -79,15 +81,6 @@ declare -a RUNNER_LABELS_ARRAY=(
   # "os-version=${OS_VERSION}"
   # "kernel-release=${KERNEL_RELEASE}"
 )
-
-# Yes this is kind of a hack, but if we inject this with any metadata, then it's
-# part of the instance template and we can't use the same instance template for
-# prod. The name is the only thing that's controlled by the instance group.
-if [[ "${HOSTNAME}" == *testing* ]]; then
-  RUNNER_LABELS+=(testing)
-else
-  RUNNER_LABELS+=(prod)
-fi
 
 RUNNER_LABELS="$(IFS="," ; echo "${RUNNER_LABELS_ARRAY[*]}")"
 # Append custom labels, taking care to only add a comma if there are any
