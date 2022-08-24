@@ -920,6 +920,53 @@ static void fuseRootsWithConsumers(MLIRContext *context,
   }
 }
 
+/// Method to check if two `linalg.generic` op with producer-consumer
+/// relationship through `operand` have compatible outer-parallel loops.
+static bool hasCompatibleOuterParallelLoops(OpOperand &operand) {
+  auto producer = operand.get().getDefiningOp<linalg::LinalgOp>();
+  auto consumer = dyn_cast<linalg::LinalgOp>(operand.getOwner());
+  if (!producer || !consumer) {
+    return false;
+  }
+
+  // Method to get number of outer parallel loops.
+  auto getNumOuterParallelLoops = [](ArrayRef<Attribute> iteratorTypes) {
+    return iteratorTypes
+        .take_while([](Attribute attr) { return isParallelIterator(attr); })
+        .size();
+  };
+  auto numProducerOuterParallelLoops =
+      getNumOuterParallelLoops(producer.getIteratorTypes().getValue());
+  auto numConsumerOuterParallelLoops =
+      getNumOuterParallelLoops(consumer.getIteratorTypes().getValue());
+  if (numProducerOuterParallelLoops != numConsumerOuterParallelLoops) {
+    return false;
+  }
+  auto producerIndexingMap =
+      producer.getTiedIndexingMapForResult(operand.get().cast<OpResult>());
+  auto consumerIndexingMap = consumer.getTiedIndexingMap(&operand);
+  if (!producerIndexingMap.isProjectedPermutation() ||
+      !consumerIndexingMap.isProjectedPermutation()) {
+    return false;
+  }
+
+  /// Project out the reduction dimensions in the producer and consumer indexing
+  /// maps.
+  llvm::SmallBitVector producerProjectedDims(numProducerOuterParallelLoops);
+  producerProjectedDims.resize(producer.getNumLoops(), true);
+  auto projectedProducerMap =
+      getProjectedMap(producerIndexingMap, producerProjectedDims);
+  llvm::SmallBitVector consumerProjectedDims(numConsumerOuterParallelLoops);
+  consumerProjectedDims.resize(consumer.getNumLoops(), true);
+  auto projectedConsumerMap =
+      getProjectedMap(consumerIndexingMap, consumerProjectedDims);
+  if (!projectedProducerMap.isProjectedPermutation() ||
+      projectedConsumerMap != projectedProducerMap) {
+    return false;
+  }
+  return true;
+}
+
 /// Method to check if the consumer of a use can be fused with its producer.
 static bool isFusableWithProducer(OpOperand &operand) {
   Operation *producer = operand.get().getDefiningOp();
@@ -932,6 +979,21 @@ static bool isFusableWithProducer(OpOperand &operand) {
         producerLinalgOp.getNumLoops() ==
             producerLinalgOp.getNumParallelLoops()) {
       return true;
+    }
+
+    if (consumerLinalgOp.isInputTensor(&operand) &&
+        isa<linalg::GenericOp>(consumer) && isa<linalg::GenericOp>(producer)) {
+      // Collect all uses from the producer to the consumer.
+      SmallVector<OpOperand *> allUses;
+      for (OpOperand &use : producer->getUses()) {
+        if (use.getOwner() != consumer) continue;
+        allUses.push_back(&use);
+      }
+      if (llvm::all_of(allUses, [](OpOperand *operand) {
+            return hasCompatibleOuterParallelLoops(*operand);
+          })) {
+        return true;
+      }
     }
   }
   return false;
