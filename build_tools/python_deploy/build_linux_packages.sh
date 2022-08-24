@@ -57,8 +57,8 @@ function run_on_host() {
   echo "Outputting to ${output_dir}"
   mkdir -p "${output_dir}"
   docker run --rm \
-    -v "${repo_root}:/main_checkout/iree" \
-    -v "${output_dir}:/wheelhouse" \
+    -v "${repo_root}:${repo_root}" \
+    -v "${output_dir}:${output_dir}" \
     -e __MANYLINUX_BUILD_WHEELS_IN_DOCKER=1 \
     -e "override_python_versions=${python_versions}" \
     -e "packages=${packages}" \
@@ -114,31 +114,31 @@ function run_in_docker() {
 }
 
 function build_wheel() {
-  python -m pip wheel --require-virtualenv --disable-pip-version-check -v -w /wheelhouse "$@"
+  python -m pip wheel --require-virtualenv --disable-pip-version-check -v -w "${output_dir}" "${repo_root}/$@"
 }
 
 function build_iree_runtime() {
   IREE_HAL_DRIVER_CUDA=ON \
-  build_wheel /main_checkout/iree/runtime/
+  build_wheel runtime/
 }
 
 function build_iree_runtime_instrumented() {
   IREE_HAL_DRIVER_CUDA=ON IREE_BUILD_TRACY=ON IREE_ENABLE_RUNTIME_TRACING=ON \
   IREE_RUNTIME_CUSTOM_PACKAGE_SUFFIX="-instrumented" \
-  build_wheel /main_checkout/iree/runtime/
+  build_wheel runtime/
 }
 
 function build_iree_compiler() {
   IREE_TARGET_BACKEND_CUDA=ON \
-  build_wheel /main_checkout/iree/compiler/
+  build_wheel compiler/
 }
 
 function run_audit_wheel() {
   local wheel_basename="$1"
   local python_version="$2"
-  generic_wheel="/wheelhouse/${wheel_basename}-*-${python_version}-linux_x86_64.whl"
+  generic_wheel="${output_dir}/${wheel_basename}-*-${python_version}-linux_x86_64.whl"
   echo ":::: Auditwheel ${generic_wheel}"
-  auditwheel repair -w /wheelhouse "${generic_wheel}"
+  auditwheel repair -w "${output_dir}" "${generic_wheel}"
   rm -v "${generic_wheel}"
 }
 
@@ -146,7 +146,7 @@ function clean_wheels() {
   local wheel_basename="$1"
   local python_version="$2"
   echo ":::: Clean wheels ${wheel_basename} ${python_version}"
-  rm -f -v "/wheelhouse/${wheel_basename}-*-${python_version}-*.whl"
+  rm -f -v "${output_dir}/${wheel_basename}-*-${python_version}-*.whl"
 }
 
 # Trampoline to the docker container if running on the host.
