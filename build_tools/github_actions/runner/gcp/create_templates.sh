@@ -18,9 +18,17 @@ SHORT_REF="${REF:0:10}"
 STARTUP_SCRIPT_PATH="/tmp/startup_script.${SHORT_REF}.sh"
 GITHUB_RUNNER_VERSION="2.294.0"
 GITHUB_RUNNER_ARCHIVE_DIGEST="a19a09f4eda5716e5d48ba86b6b78fc014880c5619b9dba4a059eaf65e131780"
+GITHUB_TOKEN_PROXY_URL="https://ght-proxy-zbhz5clunq-ue.a.run.app"
 
 sed -e "s/CONFIG_REF=main/CONFIG_REF=${REF}/" -e "s@REPO=iree-org/iree@REPO=${REPO}@" "${SCRIPT_DIR}/startup_script.sh" > "${STARTUP_SCRIPT_PATH}"
 
+declare -a METADATA=(
+  "github-runner-version=${GITHUB_RUNNER_VERSION}"
+  "github-runner-archive-digest=${GITHUB_RUNNER_ARCHIVE_DIGEST}"
+  "github-runner-config-ref=${REF}"
+  "github-runner-scope=iree-org"
+  "github-token-proxy-url=${GITHUB_TOKEN_PROXY_URL}"
+)
 declare -a common_args=(
   --project=iree-oss
   # `address=''` indicates an ephemeral IP. This *shouldn't* be necessary here,
@@ -50,11 +58,21 @@ function create_template() {
     exit 1
   fi
 
+  local -a metadata=(
+    "${METADATA[@]}"
+    "github-runner-group=${group}"
+    "github-runner-trust=${trust}"
+    "github-runner-labels=${type}"
+  )
+
+  # Join on commas
+  local metadata_string="$(IFS="," ; echo "${metadata[*]}")"
+
   local -a args=(
     "${TEMPLATE_BASE_NAME}-${group}-${type}-${SHORT_REF}-${TIME_STRING}"
     "${common_args[@]}"
     --service-account="github-runner-${trust}-trust@iree-oss.iam.gserviceaccount.com"
-    --metadata="github-runner-group=${group},github-runner-trust=${trust},github-runner-labels=${type},github-runner-version=${GITHUB_RUNNER_VERSION},github-runner-archive-digest=${GITHUB_RUNNER_ARCHIVE_DIGEST},github-runner-config-ref=${REF},github-runner-scope=iree-org,github-token-proxy-url=https://ght-proxy-zbhz5clunq-ue.a.run.app"
+    --metadata="${metadata_string}"
   )
 
   local disk_name="${TEMPLATE_BASE_NAME}-${group}-${type}-${SHORT_REF}-${TIME_STRING}"
