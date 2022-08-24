@@ -33,11 +33,11 @@ function canary_update() {
   fi
   mig_name+="-${runner_group}-${type}-${region}"
 
-  gcloud compute instance-groups managed rolling-action start-update \
+  (set -x; gcloud compute instance-groups managed rolling-action start-update \
     "${mig_name}" \
     --version=template="github-runner-${runner_group}-${type}-${NEW_VERSION}",name=base \
     --type=opportunistic \
-    --region="${REGION}"
+    --region="${REGION}")
 }
 
 canary_update "${RUNNER_GROUP}" "${TYPE}" "${REGION}"
