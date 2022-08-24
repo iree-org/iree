@@ -46,6 +46,7 @@ manylinux_docker_image="${manylinux_docker_image:-gcr.io/iree-oss/manylinux2014_
 python_versions="${override_python_versions:-cp37-cp37m cp38-cp38 cp39-cp39 cp310-cp310}"
 output_dir="${output_dir:-${this_dir}/wheelhouse}"
 packages="${packages:-iree-runtime iree-runtime-instrumented iree-compiler}"
+package_suffix="${package_suffix:-}"
 
 function run_on_host() {
   echo "Running on host"
@@ -62,6 +63,7 @@ function run_on_host() {
     -e __MANYLINUX_BUILD_WHEELS_IN_DOCKER=1 \
     -e "override_python_versions=${python_versions}" \
     -e "packages=${packages}" \
+    -e "package_suffix=${package_suffix}" \
     "${manylinux_docker_image}" \
     -- ${this_dir}/${script_name}
 
@@ -87,7 +89,6 @@ function run_in_docker() {
       fi
       export PATH="${python_dir}/bin:${orig_path}"
       echo ":::: Python version $(python --version)"
-      package_suffix="$(jq '."package-suffix" | gsub("-"; "_")' /tmp/version_info.json)"
       case "${package}" in
         iree-runtime)
           clean_wheels "iree_runtime${package_suffix}" "${python_version}"
