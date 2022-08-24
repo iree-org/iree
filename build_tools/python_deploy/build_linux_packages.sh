@@ -140,7 +140,8 @@ function build_iree_compiler() {
 function run_audit_wheel() {
   local wheel_basename="$1"
   local python_version="$2"
-  generic_wheel="${output_dir}/${wheel_basename}-"*"-${python_version}-linux_x86_64.whl"
+  # Force wildcard expansion here
+  generic_wheel="$(echo ${output_dir}/${wheel_basename}-"*"-${python_version}-linux_x86_64.whl")"
   echo ":::: Auditwheel ${generic_wheel}"
   auditwheel repair -w "${output_dir}" "${generic_wheel}"
   rm -v "${generic_wheel}"
