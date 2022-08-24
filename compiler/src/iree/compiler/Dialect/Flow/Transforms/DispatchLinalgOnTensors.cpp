@@ -14,7 +14,6 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
-#include "iree/compiler/Dialect/Flow/Transforms/FusionUtils.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "llvm/ADT/STLExtras.h"
@@ -59,11 +58,10 @@ static llvm::cl::opt<int> clInlineConstantByteLength(
                    "dispatch region"),
     llvm::cl::init(256));
 
-static llvm::cl::opt<bool> clEnableMultiResultDispatches(
-    "iree-flow-enable-multi-result-dispatches",
-    llvm::cl::desc(
-        "Enable dispatch region formation to enable multi-result dispatches"),
-    llvm::cl::init(false));
+static llvm::cl::opt<bool> clEnsureInplaceableConsumer(
+    "iree-flow-ensure-inplaceable-consumer",
+    llvm::cl::desc("Ensure the consumer is inplaceable for fusion."),
+    llvm::cl::init(true));
 
 static const char kRootOpAttr[] = "__root_op__";
 static const char kFusionGroupsAttr[] = "__fused_op__";
@@ -850,27 +848,94 @@ struct CreateDispatchRegionOp : Base<OpType> {
 // Heuristics for fusing dispatchble ops with root ops using tile + fuse.
 //===----------------------------------------------------------------------===//
 
-/// Checks if the producer and consumer LinalgOps can be fused.
-static bool areFusableLinalgOps(OpOperand &use) {
-  return areLinalgOpsFusableUsingTileAndFuse(use);
+/// For the fusion of root op -> elementwise operation to be bufferized
+/// in-place without use of extra memory, the result of the root operation
+/// must be able to reuse the buffer for the result of the elementwise
+/// operation. This is possible if input and output are accessed using the same
+/// indexing map.
+// TODO: This restriction can go away if we can vectorize always, but that has
+// a long tail of tasks.
+static bool canInsOperandTieWithOutsOperand(OpOperand *insOperand) {
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(insOperand->getOwner());
+  if (!linalgOp) return false;
+
+  AffineMap insOperandIndexingMap = linalgOp.getTiedIndexingMap(insOperand);
+
+  auto canTieWithOutsOperand = [&](OpOperand *outsOperand) {
+    if (linalgOp.getTiedIndexingMap(outsOperand) != insOperandIndexingMap) {
+      return false;
+    }
+    // TODO(#8411): Until ops are vectorized (always), we need
+    // to check that the elementtype matches for the operands to be tied.
+    // For now just doing this check for convolution ops since we expect
+    // contraction ops to be vectorized.
+    auto producer = insOperand->get().getDefiningOp();
+    if (isa<linalg::GenericOp, linalg::ConvolutionOpInterface>(producer) &&
+        insOperand->get().getType().cast<ShapedType>().getElementType() !=
+            outsOperand->get().getType().cast<ShapedType>().getElementType()) {
+      return false;
+    }
+    return true;
+  };
+  return llvm::any_of(linalgOp.getOutputOperands(), canTieWithOutsOperand);
 }
 
-/// Returns true if this is a fusable use.
-static bool isFusableWithConsumer(OpOperand &use) {
-  // Check for linalg producer -> consumer fusion with tile + fuse.
-  return areFusableLinalgOps(use);
+/// Method to check if two `linalg.generic` op with producer-consumer
+/// relationship through `operand` have compatible outer-parallel loops.
+static bool hasCompatibleOuterParallelLoops(
+    OpOperand &operand, bool allowConsumerParallelismPessimization) {
+  auto producer = operand.get().getDefiningOp<linalg::LinalgOp>();
+  auto consumer = dyn_cast<linalg::LinalgOp>(operand.getOwner());
+  if (!producer || !consumer) {
+    return false;
+  }
+
+  // Method to get number of outer parallel loops.
+  auto getNumOuterParallelLoops = [](ArrayRef<Attribute> iteratorTypes) {
+    return iteratorTypes
+        .take_while([](Attribute attr) { return isParallelIterator(attr); })
+        .size();
+  };
+  auto numProducerOuterParallelLoops =
+      getNumOuterParallelLoops(producer.getIteratorTypes().getValue());
+  auto numConsumerOuterParallelLoops =
+      getNumOuterParallelLoops(consumer.getIteratorTypes().getValue());
+  if (allowConsumerParallelismPessimization) {
+    if (numProducerOuterParallelLoops > numConsumerOuterParallelLoops) {
+      return false;
+    }
+  } else if (numProducerOuterParallelLoops != numConsumerOuterParallelLoops) {
+    return false;
+  }
+
+  auto producerIndexingMap =
+      producer.getTiedIndexingMapForResult(operand.get().cast<OpResult>());
+  auto consumerIndexingMap = consumer.getTiedIndexingMap(&operand);
+  if (!producerIndexingMap.isProjectedPermutation() ||
+      !consumerIndexingMap.isProjectedPermutation()) {
+    return false;
+  }
+
+  /// Project out the reduction dimensions in the producer and consumer indexing
+  /// maps.
+  llvm::SmallBitVector producerProjectedDims(numProducerOuterParallelLoops);
+  producerProjectedDims.resize(producer.getNumLoops(), true);
+  auto projectedProducerMap =
+      getProjectedMap(producerIndexingMap, producerProjectedDims);
+  llvm::SmallBitVector consumerProjectedDims(numProducerOuterParallelLoops);
+  consumerProjectedDims.resize(consumer.getNumLoops(), true);
+  auto projectedConsumerMap =
+      getProjectedMap(consumerIndexingMap, consumerProjectedDims);
+  if (!projectedProducerMap.isProjectedPermutation() ||
+      projectedConsumerMap != projectedProducerMap) {
+    return false;
+  }
+  return true;
 }
 
 /// For all uses of an operation, finds the use that dominates all other uses.
 static Optional<OpOperand *> getFusableUse(Operation *op,
                                            DominanceInfo const &dominanceInfo) {
-  if (!clEnableMultiResultDispatches) {
-    if (op->hasOneUse()) {
-      OpOperand &use = *(op->use_begin());
-      return &use;
-    }
-    return llvm::None;
-  }
   for (auto &use : op->getUses()) {
     Operation *user = use.getOwner();
     if (llvm::all_of(op->getUsers(), [&](Operation *c) {
@@ -880,6 +945,43 @@ static Optional<OpOperand *> getFusableUse(Operation *op,
     }
   }
   return llvm::None;
+}
+
+/// Returns true if this is a fusable use, while fusing a root with its
+/// consumer.
+static bool isFusableWithConsumer(OpOperand &fusedOperand) {
+  Operation *producer = fusedOperand.get().getDefiningOp();
+  Operation *consumer = fusedOperand.getOwner();
+
+  if (isa<linalg::LinalgOp>(producer) && isa<linalg::LinalgOp>(consumer)) {
+    auto consumerLinalgOp = cast<linalg::LinalgOp>(consumer);
+
+    // Check that the consumer is all parallel.
+    if (consumerLinalgOp.getNumLoops() !=
+        consumerLinalgOp.getNumParallelLoops()) {
+      return false;
+    }
+
+    // Collect all the uses from producer to consumer.
+    SmallVector<OpOperand *> allUses;
+    for (OpOperand &producerUse : producer->getUses()) {
+      if (producerUse.getOwner() != consumer) continue;
+      allUses.push_back(&producerUse);
+    }
+    // Check that the consumer and producer have compatible outer parallel loops
+    // even if the consumer parallelism is pessimized.
+    if (llvm::all_of(allUses, [](OpOperand *use) {
+          return !hasCompatibleOuterParallelLoops(
+              *use, /*allowConsumerParallelismPessimization=*/true);
+        })) {
+      return false;
+    }
+
+    // Finally only fuse if the `ins` operand can inplace with `outs` operand.
+    return !clEnsureInplaceableConsumer ||
+           canInsOperandTieWithOutsOperand(&fusedOperand);
+  }
+  return false;
 }
 
 /// Fuses roots with its consumers. If a root is fused with its consumer, it is
@@ -920,53 +1022,6 @@ static void fuseRootsWithConsumers(MLIRContext *context,
   }
 }
 
-/// Method to check if two `linalg.generic` op with producer-consumer
-/// relationship through `operand` have compatible outer-parallel loops.
-static bool hasCompatibleOuterParallelLoops(OpOperand &operand) {
-  auto producer = operand.get().getDefiningOp<linalg::LinalgOp>();
-  auto consumer = dyn_cast<linalg::LinalgOp>(operand.getOwner());
-  if (!producer || !consumer) {
-    return false;
-  }
-
-  // Method to get number of outer parallel loops.
-  auto getNumOuterParallelLoops = [](ArrayRef<Attribute> iteratorTypes) {
-    return iteratorTypes
-        .take_while([](Attribute attr) { return isParallelIterator(attr); })
-        .size();
-  };
-  auto numProducerOuterParallelLoops =
-      getNumOuterParallelLoops(producer.getIteratorTypes().getValue());
-  auto numConsumerOuterParallelLoops =
-      getNumOuterParallelLoops(consumer.getIteratorTypes().getValue());
-  if (numProducerOuterParallelLoops != numConsumerOuterParallelLoops) {
-    return false;
-  }
-  auto producerIndexingMap =
-      producer.getTiedIndexingMapForResult(operand.get().cast<OpResult>());
-  auto consumerIndexingMap = consumer.getTiedIndexingMap(&operand);
-  if (!producerIndexingMap.isProjectedPermutation() ||
-      !consumerIndexingMap.isProjectedPermutation()) {
-    return false;
-  }
-
-  /// Project out the reduction dimensions in the producer and consumer indexing
-  /// maps.
-  llvm::SmallBitVector producerProjectedDims(numProducerOuterParallelLoops);
-  producerProjectedDims.resize(producer.getNumLoops(), true);
-  auto projectedProducerMap =
-      getProjectedMap(producerIndexingMap, producerProjectedDims);
-  llvm::SmallBitVector consumerProjectedDims(numConsumerOuterParallelLoops);
-  consumerProjectedDims.resize(consumer.getNumLoops(), true);
-  auto projectedConsumerMap =
-      getProjectedMap(consumerIndexingMap, consumerProjectedDims);
-  if (!projectedProducerMap.isProjectedPermutation() ||
-      projectedConsumerMap != projectedProducerMap) {
-    return false;
-  }
-  return true;
-}
-
 /// Method to check if the consumer of a use can be fused with its producer.
 static bool isFusableWithProducer(OpOperand &operand) {
   Operation *producer = operand.get().getDefiningOp();
@@ -990,7 +1045,8 @@ static bool isFusableWithProducer(OpOperand &operand) {
         allUses.push_back(&use);
       }
       if (llvm::all_of(allUses, [](OpOperand *operand) {
-            return hasCompatibleOuterParallelLoops(*operand);
+            return hasCompatibleOuterParallelLoops(
+                *operand, /*allowConsumerParallelismPessimization=*/false);
           })) {
         return true;
       }
