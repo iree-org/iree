@@ -64,6 +64,7 @@ function run_on_host() {
     -e "override_python_versions=${python_versions}" \
     -e "packages=${packages}" \
     -e "package_suffix=${package_suffix}" \
+    -e "output_dir=${output_dir}" \
     "${manylinux_docker_image}" \
     -- ${this_dir}/${script_name}
 
