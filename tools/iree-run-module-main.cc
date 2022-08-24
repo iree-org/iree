@@ -6,6 +6,7 @@
 
 #include <array>
 #include <cstdio>
+#include <cstdlib>
 #include <iostream>
 #include <iterator>
 #include <string>
@@ -161,8 +162,15 @@ extern "C" int main(int argc, char** argv) {
                  " Use '--' instead.\n";
     return 1;
   }
-  IREE_CHECK_OK(Run());
-  return 0;
+
+  iree_status_t status = Run();
+  if (!iree_status_is_ok(status)) {
+    iree_status_fprint(stderr, status);
+    iree_status_free(status);
+    return EXIT_FAILURE;
+  }
+
+  return EXIT_SUCCESS;
 }
 
 }  // namespace iree
