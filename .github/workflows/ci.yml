@@ -133,7 +133,7 @@ jobs:
         run: |
           tar --exclude '*.a' --exclude '*.o' \
             -I 'zstd -T0' \
-            -cf ${BUILD_DIR_ARCHIVE} ${BUILD_DIR}
+            -cf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}"
           echo "::set-output name=build-dir-archive::${BUILD_DIR_ARCHIVE}"
       - name: "Uploading build dir archive"
         id: upload
@@ -270,7 +270,7 @@ jobs:
       # The upload action already does its own gzip compression, so no need to
       # do our own.
       - name: "Create build dir archive"
-        run: tar -cf ${BUILD_DIR}.tar ${BUILD_DIR}
+        run: tar -cf "${BUILD_DIR}.tar" "${BUILD_DIR}"
       - uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # v3.1.0
         with:
           name: "${{ env.BUILD_DIR }}.tar"
@@ -292,7 +292,8 @@ jobs:
         with:
           name: "${{ env.BUILD_DIR }}.tar"
       - name: "Extracting archive"
-        run: tar -xf ${BUILD_DIR}.tar
+        run: |
+          tar -xf "${BUILD_DIR}.tar"
       - name: "Testing runtime"
         run: |
           ./build_tools/github_actions/docker_run.sh \
@@ -486,7 +487,7 @@ jobs:
             ./build_tools/cmake/build_and_test_tsan.sh
 
   build_benchmarks:
-    needs: [should_run, build_all, build_tf_integrations]
+    needs: [should_run, host_tools_assertions, build_tf_integrations]
     if: needs.should_run.outputs.should-run == 'true'
     runs-on:
       # Hacks, and order matters. See the comment at the top of the file.
@@ -495,9 +496,8 @@ jobs:
       - cpu
       - os-family=Linux
     env:
-      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
-      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.gcs-artifact }}
+      HOST_BINARY_ROOT: ${{ needs.host_tools_assertions.outputs.host-binary-root }}
+      HOST_BINARY_ARCHIVE: ${{ needs.host_tools_assertions.outputs.host-binary-root }}.tar
       TF_BINARIES_DIR: ${{ needs.build_tf_integrations.outputs.binaries-dir }}
       TF_BINARIES_ARCHIVE: ${{ needs.build_tf_integrations.outputs.binaries-archive }}
       TF_BINARIES_GCS_ARTIFACT: ${{ needs.build_tf_integrations.outputs.gcs-artifact }}
@@ -510,17 +510,18 @@ jobs:
         run: gcloud alpha storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
       - name: "Extracting TF binaries archive"
         run: tar -xf "${TF_BINARIES_ARCHIVE}"
-        # TODO(#4662): building the benchmarks currently needs the entire build
-        # dir archive just to get the host tools. This is silly and we should
-        # make prebuilt host tools work even when not cross-compiling.
-      - name: "Downloading build dir archive"
-        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
-      - name: "Extracting archive"
-        run: tar -xf "${BUILD_DIR_ARCHIVE}"
-      - name: "Re-configuring"
+      - name: "Downloading host tools"
+        uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741 # v3.0.0
+        with:
+          name: "${{ env.HOST_BINARY_ARCHIVE }}"
+      - name: "Extracting host tools archive"
+        run: |
+          tar -xvf "${HOST_BINARY_ARCHIVE}"
+      - name: "Building benchmarks"
         run: |
           build_tools/github_actions/docker_run.sh \
             --env "IREE_TF_BINARIES_DIR=${TF_BINARIES_DIR}" \
+            --env "IREE_HOST_BINARY_ROOT=${HOST_BINARY_ROOT}"
             gcr.io/iree-oss/base@sha256:5d43683c6b50aebe1fca6c85f2012f3b0fa153bf4dd268e8767b619b1891423a \
             build_tools/cmake/build_benchmarks.sh \
             "${BUILD_DIR}"
@@ -553,7 +554,7 @@ jobs:
           name: "${{ env.HOST_BINARY_ARCHIVE }}"
       - name: "Extracting host tools archive"
         run: |
-          tar -xvf ${HOST_BINARY_ARCHIVE}
+          tar -xvf "${HOST_BINARY_ARCHIVE}"
       - name: "Building for Android"
         run: |
           build_tools/github_actions/docker_run.sh \
@@ -587,7 +588,7 @@ jobs:
           name: "${{ env.HOST_BINARY_ARCHIVE }}"
       - name: "Extracting host tools archive"
         run: |
-          tar -xvf ${HOST_BINARY_ARCHIVE}
+          tar -xvf "${HOST_BINARY_ARCHIVE}"
       - name: "Cross-compiling and testing riscv32"
         run: |
           ./build_tools/github_actions/docker_run.sh \
@@ -629,7 +630,7 @@ jobs:
           name: "${{ env.HOST_BINARY_ARCHIVE }}"
       - name: "Extracting host tools archive"
         run: |
-          tar -xvf ${HOST_BINARY_ARCHIVE}
+          tar -xvf "${HOST_BINARY_ARCHIVE}"
       - name: "Downloading TF binaries archive"
         run: gcloud alpha storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
       - name: "Extracting TF binaries archive"
