@@ -9,6 +9,7 @@
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree/compiler/Codegen/PassDetail.h"
+#include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/GPUToNVVM/GPUToNVVMPass.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
@@ -59,8 +60,11 @@ static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
       from.getType().cast<MemRefType>().getMemorySpaceAsInt() == 3 ||
       to.getType().cast<MemRefType>().getMemorySpaceAsInt() == 3;
   if (sharedMemCopy) builder.create<gpu::BarrierOp>(loc);
-  createLinalgCopyOp(builder, loc, from, to);
-  if (sharedMemCopy) builder.create<gpu::BarrierOp>(loc);
+  Operation *copy = createLinalgCopyOp(builder, loc, from, to);
+  if (sharedMemCopy) {
+    setMarker(copy, getCopyToWorkgroupMemoryMarker());
+    builder.create<gpu::BarrierOp>(loc);
+  }
   return success();
 }
 
@@ -115,17 +119,32 @@ void addGPUVectorizationPassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());
+
+  // tensor to memref
   addBufferizePasses(nestedModulePM);
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUDistribute());
 }
 
 void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
-  tileAndBufferize(pm);
-
+  tileAndDistributeToWorkgroup(pm);
   auto &nestedModulePM = pm.nest<ModuleOp>();
-  // Distribute linalg onto threads within the workgroup.
-  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUTileAndDistribute());
-  nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createRemoveSingleIterationLoopPass());
+
+  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUTensorAlloc());
+  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUTileTensor(false));
+
+  // Linalg -> vector
+  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUVectorizationPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+
+  // tensor to memref
+  addBufferizePasses(nestedModulePM);
+
+  // distribute foreach threads
+  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUDistribute());
+
   nestedModulePM.addNestedPass<func::FuncOp>(
       createGPUDistributeSharedMemoryCopy());
   nestedModulePM.addPass(createCanonicalizerPass());
@@ -134,16 +153,21 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMGPUReduceSharedMemoryBankConflicts());
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createRemoveSingleIterationLoopPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(
       createWorkGroupSwizzle(logSwizzleTile));
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
-  // Linalg -> vector
-  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUVectorizationPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      memref::createFoldSubViewOpsPass());
+  nestedModulePM.addPass(createCSEPass());
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+
+  // Even though we vectorize before bufferization we are not able to hoist
+  // accumulator load/store out of the K loop until distribution. Therefore we
+  // still rely on buffer level transformations for transfer ops hoisting and
+  // store to load forwarding. This relies on shacky alias analysis and we need
+  // to move this to tensor level once we have better abstractions.
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());
 
@@ -208,7 +232,7 @@ void addGPUWarpReductionPassPipeline(OpPassManager &pm) {
 
   // Linalg -> vector
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUVectorizationPass(
-      /*nativeVector=*/0, /*generateContract=*/false));
+      /*generateContract=*/false));
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLoopInvariantCodeMotionPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());

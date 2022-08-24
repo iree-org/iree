@@ -343,13 +343,15 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTileTensor(
 
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUDistribute();
 
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTensorAlloc();
+
 /// Create pass calling the dynamic pipeline for LLVMGPU.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createLLVMGPULowerExecutableTargetPass();
 
 /// Convert Linalg ops to Vector.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorizationPass(
-    int64_t nativeVector = 4, bool generateContract = true);
+    bool generateContract = true);
 
 /// Convert Linalg ops to Vector and prepare converstion to GPU MMA ops.
 std::unique_ptr<OperationPass<func::FuncOp>>
