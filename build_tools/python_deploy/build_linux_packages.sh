@@ -115,7 +115,7 @@ function run_in_docker() {
 }
 
 function build_wheel() {
-  python -m pip wheel --require-virtualenv --disable-pip-version-check -v -w "${output_dir}" "${repo_root}/$@"
+  python -m pip wheel --disable-pip-version-check -v -w "${output_dir}" "${repo_root}/$@"
 }
 
 function build_iree_runtime() {
