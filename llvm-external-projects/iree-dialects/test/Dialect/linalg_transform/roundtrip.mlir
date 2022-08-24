@@ -19,7 +19,7 @@ transform.structured.canonicalized_sequence {
   transform.structured.vectorize %5
   // CHECK: bufferize
   bufferize
-  // CHECK: lower_vectors {multireduction_lowering = "innerreduce"}
+  // CHECK: lower_vectors {contraction_lowering = "outerproduct", multireduction_lowering = "innerreduce", split_transfers = "linalg-copy", stages = [0, 1, 2, 3, 4, 5, 6], transpose_avx2_lowering = false, transpose_lowering = "eltwise", unroll_vector_transfers = true}
   lower_vectors { multireduction_lowering = "innerreduce"}
   // CHECK: lower_to_llvm
   lower_to_llvm
