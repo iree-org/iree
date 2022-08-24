@@ -140,7 +140,7 @@ function build_iree_compiler() {
 function run_audit_wheel() {
   local wheel_basename="$1"
   local python_version="$2"
-  generic_wheel="${output_dir}/${wheel_basename}-*-${python_version}-linux_x86_64.whl"
+  generic_wheel="${output_dir}/${wheel_basename}-"*"-${python_version}-linux_x86_64.whl"
   echo ":::: Auditwheel ${generic_wheel}"
   auditwheel repair -w "${output_dir}" "${generic_wheel}"
   rm -v "${generic_wheel}"
@@ -150,7 +150,7 @@ function clean_wheels() {
   local wheel_basename="$1"
   local python_version="$2"
   echo ":::: Clean wheels ${wheel_basename} ${python_version}"
-  rm -f -v "${output_dir}/${wheel_basename}-*-${python_version}-*.whl"
+  rm -f -v "${output_dir}/${wheel_basename}-"*"-${python_version}-"*".whl"
 }
 
 # Trampoline to the docker container if running on the host.
