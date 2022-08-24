@@ -240,16 +240,23 @@ struct LLVMGPUVectorToGPUPass
     }
     RewritePatternSet patterns(funcOp.getContext());
     populatePrepareVectorToMMAPatterns(patterns, llvmgpuUseMMASync);
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(patterns)))) {
+      return signalPassFailure();
+    }
 
     if (llvmgpuUseMMASync) {
-      (void)convertVectorToNVVMCompatibleMMASync(funcOp);
+      if (failed(convertVectorToNVVMCompatibleMMASync(funcOp))) {
+        return signalPassFailure();
+      }
       // Use TF32 for float32 case for now.
       RewritePatternSet f32ToTF32patterns(funcOp.getContext());
       nvgpu::populateMmaSyncF32ToTF32Patterns(f32ToTF32patterns,
                                               nvgpu::MmaSyncF32Lowering::TF32);
-      (void)applyPatternsAndFoldGreedily(getOperation(),
-                                         std::move(f32ToTF32patterns));
+      if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                              std::move(f32ToTF32patterns)))) {
+        return signalPassFailure();
+      }
     } else {
       convertVectorToMMAOps(funcOp);
     }
