@@ -9,7 +9,7 @@ transform.structured.canonicalized_sequence {
   %1, %loops1:3 = transform.structured.tile %0 [4, 4, 4]
   // CHECK: %[[TILED2:.*]], %{{.*}}:3 = transform.structured.tile %[[TILED]]
   %2, %loops2:3  = transform.structured.tile %1 [2, 2, 2]
-  // CHECK: %[[PADDED:.*]] = transform.structured.pad %[[TILED2]] {pack_paddings = [1, 1, 0]}
+  // CHECK: %[[PADDED:.*]] = transform.structured.pad %[[TILED2]] {hoist_paddings = [], pack_paddings = [1, 1, 0], padding_dimensions = [], padding_values = [], transpose_paddings = []}
   %3 = transform.structured.pad %2 {pack_paddings = [1, 1, 0]}
   // CHECK: %{{.*}} = transform.structured.vectorize %[[PADDED]] {vectorize_padding = true}
   %4 = transform.structured.vectorize %3 {vectorize_padding = true}
