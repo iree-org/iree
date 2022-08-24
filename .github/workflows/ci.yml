@@ -560,7 +560,7 @@ jobs:
             --env "ANDROID_ABI=${ANDROID_ABI}" \
             --env "IREE_HOST_BINARY_ROOT=${HOST_BINARY_ROOT}" \
             gcr.io/iree-oss/android@sha256:9bc723fc707a18bd0c1be9c12e01ea5bb7c7d77f607427879e10ffcffd7d2bb5 \
-            build_tools/build_android.sh
+            build_tools/cmake/build_android.sh
 
   riscv32:
     needs: [should_run, host_tools_assertions]
