@@ -80,6 +80,15 @@ declare -a RUNNER_LABELS_ARRAY=(
   # "kernel-release=${KERNEL_RELEASE}"
 )
 
+# Yes this is kind of a hack, but if we inject this with any metadata, then it's
+# part of the instance template and we can't use the same instance template for
+# prod. The name is the only thing that's controlled by the instance group.
+if [[ "${HOSTNAME}" == *testing* ]]; then
+  RUNNER_LABELS+=(testing)
+else
+  RUNNER_LABELS+=(prod)
+fi
+
 RUNNER_LABELS="$(IFS="," ; echo "${RUNNER_LABELS_ARRAY[*]}")"
 # Append custom labels, taking care to only add a comma if there are any
 RUNNER_LABELS="${RUNNER_LABELS}${RUNNER_CUSTOM_LABELS:+,${RUNNER_CUSTOM_LABELS}}"
