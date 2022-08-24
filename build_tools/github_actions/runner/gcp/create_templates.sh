@@ -20,14 +20,16 @@ GITHUB_RUNNER_VERSION="2.294.0"
 GITHUB_RUNNER_ARCHIVE_DIGEST="a19a09f4eda5716e5d48ba86b6b78fc014880c5619b9dba4a059eaf65e131780"
 GITHUB_TOKEN_PROXY_URL="https://ght-proxy-zbhz5clunq-ue.a.run.app"
 
-sed -e "s/CONFIG_REF=main/CONFIG_REF=${REF}/" -e "s@REPO=iree-org/iree@REPO=${REPO}@" "${SCRIPT_DIR}/startup_script.sh" > "${STARTUP_SCRIPT_PATH}"
+STARTUP_SCRIPT_URL="https://raw.githubusercontent.com/${REPO}/${REF}/${STARTUP_SCRIPT_PATH}"
 
 declare -a METADATA=(
   "github-runner-version=${GITHUB_RUNNER_VERSION}"
   "github-runner-archive-digest=${GITHUB_RUNNER_ARCHIVE_DIGEST}"
   "github-runner-config-ref=${REF}"
+  "github-runner-config-repo=${REPO}"
   "github-runner-scope=iree-org"
   "github-token-proxy-url=${GITHUB_TOKEN_PROXY_URL}"
+  "startup-script-url=${STARTUP_SCRIPT_URL}"
 )
 declare -a common_args=(
   --project=iree-oss
@@ -42,7 +44,6 @@ declare -a common_args=(
   --shielded-vtpm
   --shielded-integrity-monitoring
   --reservation-affinity=any
-  --metadata-from-file=startup-script="${STARTUP_SCRIPT_PATH}"
 )
 
 

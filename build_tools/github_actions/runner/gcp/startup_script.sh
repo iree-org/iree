@@ -13,12 +13,26 @@ set -xeuo pipefail
 
 echo "Running setup script"
 
-# Change this to a different git reference to fetch from somewhere else.
-# For PRs, that would be refs/pull/<pr_number>/merge or for forks, you can
-# change the repo. When deployed to the VM, the config reference is substituted
-# with an explicit commit digest.
-REPO="iree-org/iree"
-CONFIG_REF=main
+# Unfortunately this has to be duplicated from functions.sh because here we
+# haven't fetched that file yet.
+get_metadata() {
+  local url="http://metadata.google.internal/computeMetadata/v1/${1}"
+  ret=0
+  curl "${url}" \
+    --silent --fail --show-error \
+    --header "Metadata-Flavor: Google" || ret=$?
+  if [[ "${ret}" != 0 ]]; then
+    echo "Failed fetching ${url}" >&2
+    return "${ret}"
+  fi
+}
+
+get_attribute() {
+  get_metadata "instance/attributes/${1}"
+}
+
+REPO="$(get_attribute github-runner-config-repo)"
+CONFIG_REF="$(get_attribute github-runner-config-ref)"
 
 echo "Fetching from ${CONFIG_REF}"
 
