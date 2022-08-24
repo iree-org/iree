@@ -15,26 +15,32 @@
 set -euo pipefail
 
 # For now, just change these parameters
-VERSION=5d33335129-2022-08-23-1661292386
+VERSION=deadbeef12-2022-08-23-1661292386
 REGION=us-west1
 ZONES=us-west1-a,us-west1-b,us-west1-c
-AUTOSCALING=0
+AUTOSCALING=1
 MIN_SIZE=1
 MAX_SIZE=10
+# Whether this is a testing MIG (i.e. not prod)
+TESTING=1
 
 function create_mig() {
   local runner_group="$1"
   local type="$2"
 
-  GROUP_NAME="github-runner-${runner_group}-${type}-${REGION}"
-  TEMPLATE="github-runner-${runner_group}-${type}-${VERSION}"
+  local mig_name="github-runner"
+  if (( TESTING == 1 )); then
+    mig_name+="-testing"
+  fi
+  mig_name+="-${runner_group}-${type}-${region}"
+  template="github-runner-${runner_group}-${type}-${VERSION}"
 
   local -a create_args=(
-    "${GROUP_NAME}"
+    "${mig_name}"
     --project=iree-oss
-    --base-instance-name="${GROUP_NAME}"
+    --base-instance-name="${mig_name}"
     --size="${MIN_SIZE}"
-    --template="${TEMPLATE}"
+    --template="${template}"
     --zones="${ZONES}"
     --target-distribution-shape=EVEN
   )
@@ -44,7 +50,7 @@ function create_mig() {
 
   if (( AUTOSCALING == 1 )) && [[ "${type}" == cpu ]]; then
     local -a autoscaling_args=(
-      "${GROUP_NAME}"
+      "${mig_name}"
       --project=iree-oss
       --region="${REGION}"
       --cool-down-period=60
