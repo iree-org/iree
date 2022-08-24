@@ -22,9 +22,11 @@ BUILD_BENCHMARKS_DIR="${BUILD_BENCHMARKS_DIR:-$ROOT_DIR/build-benchmarks}"
 "$CMAKE_BIN" --version
 ninja --version
 
-if ! [[ -d "${BUILD_BENCHMARKS_DIR}" ]]; then
-  echo "Build directory '${BUILD_BENCHMARKS_DIR}' does not exist. Aborting"
-  exit 1
+if [[ -d "${BUILD_BENCHMARKS_DIR}" ]]; then
+  echo "${BUILD_BENCHMARKS_DIR} directory already exists. Will use cached results there."
+else
+  echo "${BUILD_BENCHMARKS_DIR} directory does not already exist. Creating a new one."
+  mkdir "${BUILD_BENCHMARKS_DIR}"
 fi
 
 echo "Configuring to build benchmarks"
