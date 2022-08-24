@@ -89,6 +89,8 @@ function run_in_docker() {
       fi
       export PATH="${python_dir}/bin:${orig_path}"
       echo ":::: Python version $(python --version)"
+      # replace dashes with underscores
+      package_suffix="${package_suffix//-/_}"
       case "${package}" in
         iree-runtime)
           clean_wheels "iree_runtime${package_suffix}" "${python_version}"
