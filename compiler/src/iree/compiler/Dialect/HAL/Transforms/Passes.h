@@ -154,6 +154,10 @@ std::unique_ptr<OperationPass<func::FuncOp>> createCSEVariableLoadsPass();
 // Elides stateful command buffer ops that set redundant state.
 std::unique_ptr<OperationPass<void>> createElideRedundantCommandsPass();
 
+// Removes push constants by replacing hal.interface.constant.loads with
+// hal.interface.binding.subspan + flow.dispatch.tensor.load.
+std::unique_ptr<OperationPass<func::FuncOp>> createReplacePushConstantsPass();
+
 // Repeats dispatches `iree-hal-repeat-dispatch-num` times, which is 1 by
 // default.
 std::unique_ptr<OperationPass<func::FuncOp>> createBenchmarkBatchDispatchesPass(
@@ -180,6 +184,7 @@ inline void registerHALPasses() {
   createMaterializeResourceCachesPass(targetOptions);
   createMaterializeTimelinesPass();
   createMemoizeDeviceQueriesPass();
+  createReplacePushConstantsPass();
   createResolveExportOrdinalsPass();
   createSerializeExecutablesPass();
   createSerializeTargetExecutablesPass("");

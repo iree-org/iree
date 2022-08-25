@@ -30,6 +30,7 @@ iree_cc_library(
     "MaterializeTimelines.cpp"
     "MemoizeDeviceQueries.cpp"
     "Passes.cpp"
+    "ReplacePushConstants.cpp"
     "ResolveExportOrdinals.cpp"
     "SerializeExecutables.cpp"
     "TranslateExecutables.cpp"
@@ -46,6 +47,7 @@ iree_cc_library(
     MLIRSCFDialect
     MLIRSCFToControlFlow
     MLIRSupport
+    MLIRTensorDialect
     MLIRTransforms
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Analysis
