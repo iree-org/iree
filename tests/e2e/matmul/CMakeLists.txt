@@ -172,7 +172,7 @@ iree_generated_trace_runner_test(
 
 iree_generated_trace_runner_test(
   NAME
-    e2e_matmul_direct_f32_small
+    e2e_matmul_direct_f32_small_ukernel
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -190,7 +190,7 @@ iree_generated_trace_runner_test(
 
 iree_generated_trace_runner_test(
   NAME
-    e2e_matmul_mmt4d_f32_small
+    e2e_matmul_mmt4d_f32_small_ukernel
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS

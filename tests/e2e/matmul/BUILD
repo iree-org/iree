@@ -114,9 +114,9 @@ py_binary(
     "small",
 ]]
 
-# Test VMVX
+# Test VMVX+ukernel
 [iree_generated_trace_runner_test(
-    name = "e2e_matmul_%s_%s_small" % (strategy, lhs_rhs_type),
+    name = "e2e_matmul_%s_%s_small_ukernel" % (strategy, lhs_rhs_type),
     compiler_flags = [
         "--iree-vmvx-enable-microkernels",
     ] + (["--iree-flow-mmt4d-target-options=enable_generic_slow #pass_options_variant#"] if (strategy == "mmt4d") else []),
