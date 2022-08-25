@@ -46,22 +46,13 @@ iree_status_t iree_task_worker_initialize(
   iree_task_queue_initialize(&out_worker->local_task_queue);
 
   iree_task_worker_state_t initial_state = IREE_TASK_WORKER_STATE_RUNNING;
-  if (executor->scheduling_mode &
-      IREE_TASK_SCHEDULING_MODE_DEFER_WORKER_STARTUP) {
-    // User is favoring startup latency vs. initial scheduling latency. Our
-    // thread will be created suspended and not first scheduled until work
-    // arrives for it, (almost) ensuring no context switches and 10x+ lower
-    // blocking startup time.
-    initial_state = IREE_TASK_WORKER_STATE_SUSPENDED;
-  }
   iree_atomic_store_int32(&out_worker->state, initial_state,
                           iree_memory_order_release);
 
   iree_thread_create_params_t thread_params;
   memset(&thread_params, 0, sizeof(thread_params));
   thread_params.name = iree_make_cstring_view(topology_group->name);
-  thread_params.create_suspended =
-      initial_state == IREE_TASK_WORKER_STATE_SUSPENDED;
+  thread_params.create_suspended = false;
   thread_params.priority_class = IREE_THREAD_PRIORITY_CLASS_NORMAL;
   thread_params.initial_affinity = out_worker->ideal_thread_affinity;
 
@@ -87,10 +78,6 @@ void iree_task_worker_request_exit(iree_task_worker_t* worker) {
           &worker->state, IREE_TASK_WORKER_STATE_EXITING,
           iree_memory_order_acq_rel);
   switch (prev_state) {
-    case IREE_TASK_WORKER_STATE_SUSPENDED:
-      // Worker was suspended; resume it so that it can exit itself.
-      iree_thread_resume(worker->thread);
-      break;
     case IREE_TASK_WORKER_STATE_ZOMBIE:
       // Worker already exited; reset state to ZOMBIE.
       iree_atomic_store_int32(&worker->state, IREE_TASK_WORKER_STATE_ZOMBIE,

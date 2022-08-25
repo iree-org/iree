@@ -17,13 +17,6 @@
 // Executor configuration
 //===----------------------------------------------------------------------===//
 
-IREE_FLAG(
-    bool, task_scheduling_defer_worker_startup, false,
-    "Creates all workers suspended and waits until work is first scheduled to\n"
-    "them to resume. This trades off initial blocking startup time waking the\n"
-    "threads for potential latency additions later on as threads take longer\n"
-    "to wake on their first use.");
-
 // TODO(benvanik): enable this when we use it - though hopefully we don't!
 IREE_FLAG(
     int32_t, task_worker_local_memory, 0,  // 64 * 1024,
@@ -74,9 +67,6 @@ iree_status_t iree_task_executor_create_from_flags(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_task_scheduling_mode_t scheduling_mode = 0;
-  if (FLAG_task_scheduling_defer_worker_startup) {
-    scheduling_mode |= IREE_TASK_SCHEDULING_MODE_DEFER_WORKER_STARTUP;
-  }
 
   iree_host_size_t worker_local_memory =
       (iree_host_size_t)FLAG_task_worker_local_memory;

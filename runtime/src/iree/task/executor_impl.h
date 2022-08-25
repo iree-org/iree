@@ -99,13 +99,6 @@ struct iree_task_executor_t {
   // live state without having to perform N expensive atomic ops.
   iree_atomic_task_affinity_set_t worker_live_mask;
 
-  // A bitset indicating which workers may be suspended and need to be resumed
-  // via iree_thread_resume prior to them being able to execute work.
-  //
-  // This mask is just a hint, accessed with memory_order_relaxed. See the
-  // comment on worker_live_mask.
-  iree_atomic_task_affinity_set_t worker_suspend_mask;
-
   // A bitset indicating which workers are currently idle. Used to bias incoming
   // tasks to workers that aren't doing much else. This is a balance of latency
   // to wake the idle workers vs. latency to wait for existing work to complete

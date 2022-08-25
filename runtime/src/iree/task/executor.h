@@ -265,23 +265,6 @@ enum iree_task_scheduling_mode_bits_t {
   // reach peak utilization or artificially limiting which tasks we allow
   // through to keep certain CPU cores asleep unless absolutely required.
   IREE_TASK_SCHEDULING_MODE_RESERVED = 0u,
-
-  // Creates all workers suspended and waits until work is first scheduled to
-  // them to resume. This trades off initial blocking startup time waking the
-  // threads for potential latency additions later on as threads take longer to
-  // wake on their first use.
-  //
-  // Prefer this setting in systems where startup time is the priority and work
-  // may not be scheduled for awhile or scheduled unevenly to start; otherwise
-  // the executor creation will take longer and a thundering herd will occur
-  // forcing context switches even if no work is needed.
-  //
-  // Avoid in systems where the latency from initial submission to worker
-  // execution is critical as this will ensure all worker threads are waiting
-  // for their respective wake notifications. The kernel then will be able to
-  // much faster schedule all worker quantums and in many cases all workers will
-  // begin processing simultaneously immediately after the submission is made.
-  IREE_TASK_SCHEDULING_MODE_DEFER_WORKER_STARTUP = 1u << 0,
 };
 typedef uint32_t iree_task_scheduling_mode_t;
 

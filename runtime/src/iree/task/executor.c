@@ -129,15 +129,10 @@ iree_status_t iree_task_executor_create(
 
     iree_task_affinity_set_t worker_idle_mask = 0;
     iree_task_affinity_set_t worker_live_mask = 0;
-    iree_task_affinity_set_t worker_suspend_mask = 0;
     for (iree_host_size_t i = 0; i < worker_count; ++i) {
       iree_task_affinity_set_t worker_bit = iree_task_affinity_for_worker(i);
       worker_idle_mask |= worker_bit;
       worker_live_mask |= worker_bit;
-      if (executor->scheduling_mode &
-          IREE_TASK_SCHEDULING_MODE_DEFER_WORKER_STARTUP) {
-        worker_suspend_mask |= worker_bit;
-      }
 
       iree_task_worker_t* worker = &executor->workers[i];
       status = iree_task_worker_initialize(
@@ -148,9 +143,6 @@ iree_status_t iree_task_executor_create(
       if (!iree_status_is_ok(status)) break;
     }
     // The masks are accessed with 'relaxed' order because they are just hints.
-    iree_atomic_task_affinity_set_store(&executor->worker_suspend_mask,
-                                        worker_suspend_mask,
-                                        iree_memory_order_relaxed);
     iree_atomic_task_affinity_set_store(&executor->worker_idle_mask,
                                         worker_idle_mask,
                                         iree_memory_order_relaxed);
