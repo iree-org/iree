@@ -27,9 +27,7 @@
 #   IREE_BUILD_TRACY
 #   IREE_ENABLE_CPUINFO
 
-from gettext import install
 import json
-from multiprocessing.spawn import prepare
 import os
 import platform
 import re
@@ -37,15 +35,18 @@ import shutil
 import subprocess
 import sys
 import sysconfig
-
 from distutils.command.build import build as _build
-from setuptools import find_namespace_packages, setup, Extension
+from gettext import install
+from multiprocessing.spawn import prepare
+
+from setuptools import Extension, find_namespace_packages, setup
 from setuptools.command.build_ext import build_ext as _build_ext
 from setuptools.command.build_py import build_py as _build_py
 
 
 def check_pip_version():
   from packaging import version
+
   # Pip versions < 22.0.3 default to out of tree builds, which is quite
   # incompatible with what we do (and has other issues). Pip >= 22.0.4
   # removed this option entirely and are only in-tree builds. Since the
@@ -360,7 +361,7 @@ if not custom_package_suffix:
   custom_package_suffix = ""
 
 setup(
-    name=f"iree-runtime{PACKAGE_SUFFIX}{custom_package_suffix}",
+    name=f"iree-runtime{custom_package_suffix}{PACKAGE_SUFFIX}",
     version=f"{PACKAGE_VERSION}",
     author="IREE Authors",
     author_email="iree-discuss@googlegroups.com",
