@@ -400,13 +400,18 @@ void iree_task_executor_flush(iree_task_executor_t* executor) {
 void iree_task_executor_coordinate(iree_task_executor_t* executor,
                                    iree_task_worker_t* current_worker) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  iree_slim_mutex_lock(&executor->coordinator_mutex);
 
   // We may be adding tasks/waiting/etc on each pass through coordination - to
   // ensure we completely drain the incoming queues and satisfied waits we loop
   // until there's nothing left to coordinate.
   bool schedule_dirty = true;
   do {
+    IREE_TRACE_ZONE_BEGIN_NAMED(z1, "iree_task_executor_coordinate_try");
+    // TODO(#10212): remove this lock or do something more clever to avoid
+    // contention when many workers try to coordinate at the same time. This can
+    // create very long serialized lock chains that slow down worker wakes.
+    iree_slim_mutex_lock(&executor->coordinator_mutex);
+
     // Check for incoming submissions and move their posted tasks into our
     // local lists. Any of the tasks here are ready to execute immediately and
     // ones we should be able to distribute to workers without delay. The
@@ -426,7 +431,11 @@ void iree_task_executor_coordinate(iree_task_executor_t* executor,
     iree_task_submission_t pending_submission;
     iree_task_submission_initialize_from_lifo_slist(
         &executor->incoming_ready_slist, &pending_submission);
-    if (iree_task_list_is_empty(&pending_submission.ready_list)) break;
+    if (iree_task_list_is_empty(&pending_submission.ready_list)) {
+      iree_slim_mutex_unlock(&executor->coordinator_mutex);
+      IREE_TRACE_ZONE_END(z1);
+      break;
+    }
 
     // Scratch coordinator submission batch used during scheduling to batch up
     // all tasks that will be posted to each worker. We could stash this on the
@@ -448,12 +457,14 @@ void iree_task_executor_coordinate(iree_task_executor_t* executor,
     iree_task_poller_enqueue(&executor->poller,
                              &pending_submission.waiting_list);
 
+    iree_slim_mutex_unlock(&executor->coordinator_mutex);
+    IREE_TRACE_ZONE_END(z1);
+
     // Post all new work to workers; they may wake and begin executing
     // immediately. Returns whether this worker has new tasks for it to work on.
     schedule_dirty = iree_task_post_batch_submit(post_batch);
   } while (schedule_dirty);
 
-  iree_slim_mutex_unlock(&executor->coordinator_mutex);
   IREE_TRACE_ZONE_END(z0);
 }
 
