@@ -10,21 +10,18 @@ func.func @matmul_f32f32f32(
     // OUT
     %arg6 : !util.buffer, %arg7 : index, %arg8 : index,
     // SIZE
-    %arg9 : index, %arg10 : index, %arg11 : index,
-    // SCALE
-    %arg12 : f32, %arg13 : f32) {
+    %arg9 : index, %arg10 : index, %arg11 : index) {
 
-  //  CHECK-DAG: %[[ZERO:.*]] = vm.const.i32.zero
+  //  CHECK-DAG: %[[FLAGS:.*]] = vm.const.i32 1
   //      CHECK: vm.call @vmvx.matmul.f32f32f32(
   // CHECK-SAME: %arg0, %arg1, %arg2,
   // CHECK-SAME: %arg3, %arg4, %arg5,
   // CHECK-SAME: %arg6, %arg7, %arg8,
-  // CHECK-SAME: %arg9, %arg10, %arg11, %arg12, %arg13, %[[ZERO]]) : (!vm.buffer, i64, i64, !vm.buffer, i64, i64, !vm.buffer, i64, i64, i64, i64, i64, f32, f32, i32) -> ()
+  // CHECK-SAME: %arg9, %arg10, %arg11, %[[FLAGS]]) : (!vm.buffer, i64, i64, !vm.buffer, i64, i64, !vm.buffer, i64, i64, i64, i64, i64, i32) -> ()
   vmvx.matmul lhs(%arg0 offset %arg1 row_stride %arg2 : !util.buffer)
               rhs(%arg3 offset %arg4 row_stride %arg5 : !util.buffer)
               out(%arg6 offset %arg7 row_stride %arg8 : !util.buffer)
               mnk(%arg9, %arg10, %arg11)
-              scale(%arg12 : f32, %arg13 : f32)
-              flags(0) : (f32, f32, f32)
+              flags(1) : (f32, f32, f32)
   func.return
 }
