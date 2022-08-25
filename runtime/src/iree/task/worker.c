@@ -149,9 +149,8 @@ iree_task_t* iree_task_worker_try_steal_task(iree_task_worker_t* worker,
                                              iree_host_size_t max_tasks) {
   // Try to grab tasks from the worker; if more than one task is stolen then the
   // first will be returned and the remaining will be added to the target queue.
-  iree_task_t* task = iree_task_queue_try_steal(
-      &worker->local_task_queue, target_queue,
-      /*max_tasks=*/IREE_TASK_EXECUTOR_MAX_THEFT_TASK_COUNT);
+  iree_task_t* task = iree_task_queue_try_steal(&worker->local_task_queue,
+                                                target_queue, max_tasks);
   if (task) return task;
 
   // If we still didn't steal any tasks then let's try the slist instead.
@@ -221,6 +220,7 @@ static bool iree_task_worker_pump_once(
                                                  &worker->mailbox_slist);
   }
 
+#if IREE_TASK_EXECUTOR_MAX_THEFT_ATTEMPTS_DIVISOR > 0
   // If we ran out of work assigned to this specific worker try to steal some
   // from other workers that we hopefully share some of the cache hierarchy
   // with. Their tasks will be moved from their local queue into ours and the
@@ -231,6 +231,7 @@ static bool iree_task_worker_pump_once(
         worker->max_theft_attempts, &worker->theft_prng,
         &worker->local_task_queue);
   }
+#endif  // IREE_TASK_EXECUTOR_MAX_THEFT_ATTEMPTS_DIVISOR > 0
 
   // No tasks to run; let the caller know we want to wait for more.
   if (!task) {
