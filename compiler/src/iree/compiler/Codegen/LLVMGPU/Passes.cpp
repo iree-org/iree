@@ -23,6 +23,8 @@
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
 
+#define DEBUG_TYPE "iree-llvm-gpu-lowering-pass-pipeline"
+
 namespace mlir {
 namespace iree_compiler {
 
@@ -323,6 +325,12 @@ void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM) {
   //   - The module contains the final llvm.module ready to be serialized.
   //===--------------------------------------------------------------------===//
   addLowerToLLVMGPUPasses(nestedModulePM, useROCM);
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "Using LLVMGPU pass pipeline:\n";
+    pm.printAsTextualPipeline(llvm::dbgs());
+    llvm::dbgs() << "\n";
+  });
 }
 
 }  // namespace iree_compiler
