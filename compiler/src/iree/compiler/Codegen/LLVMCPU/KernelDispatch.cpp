@@ -1106,11 +1106,78 @@ static LogicalResult setTransposeLikeOpRootConfig(func::FuncOp entryPointFn,
                                                tileSizes, passPipeline);
 }
 
+static LogicalResult setElementwiseGenericOpRootConfig(
+    func::FuncOp entryPointFn, linalg::GenericOp genericOp) {
+  if (getLoweringConfig(genericOp)) {
+    return success();
+  }
+
+  unsigned numLoops = genericOp.getNumLoops();
+  if (numLoops == 0) return success();
+  if (!linalg::isElementwise(genericOp)) return success();
+
+  // Set the flow level tiling to the default.
+  SmallVector<int64_t> minTileSizes =
+      getMinTilingSizesForEachDim(entryPointFn, genericOp);
+  SmallVector<int64_t> maxTileSizes(numLoops, defaultWorkgroupTileSize);
+  SmallVector<int64_t> flowTileSizes =
+      getDefaultDistributedLevelTileSizes(genericOp, minTileSizes, maxTileSizes,
+                                          /*allowIncompleteTile=*/true);
+
+  // Adjust the number of workload per workgroup to at least 4096.
+  constexpr int64_t kMinimumWorkload = 4096;
+  auto shape = genericOp.getStaticLoopRanges();
+  int64_t numWorkload = 1;
+  for (auto en : llvm::enumerate(shape)) {
+    int64_t size = en.value();
+    if (size == ShapedType::kDynamicSize) {
+      numWorkload = ShapedType::kDynamicSize;
+      break;
+    }
+    int index = en.index();
+    if (flowTileSizes[index]) {
+      size = flowTileSizes[index];
+    }
+    numWorkload *= size;
+  }
+  for (unsigned currDim = 0;
+       numWorkload < kMinimumWorkload && currDim < numLoops;) {
+    int64_t currSize = flowTileSizes[currDim];
+    if (currSize == shape[currDim] || currSize == 0 ||
+        shape[currDim] == ShapedType::kDynamicSize ||
+        numWorkload == ShapedType::kDynamicSize) {
+      currDim++;
+      continue;
+    }
+    int64_t newSize = std::min<int64_t>(currSize * 2, shape[currDim]);
+    numWorkload = numWorkload / currSize * newSize;
+    flowTileSizes[currDim] = newSize;
+  }
+
+  // Setting reduction tile sizes is a workaround to kick in peeling transform.
+  // The tiling won't happen because the sizes are zeros.
+  SmallVector<int64_t> vecTileSizes(minTileSizes.begin(), minTileSizes.end());
+  SmallVector<int64_t> zeros(numLoops, 0);
+
+  TileSizesListType tileSizes;
+  tileSizes.push_back(flowTileSizes);
+  tileSizes.push_back(vecTileSizes);
+  tileSizes.push_back(zeros);
+
+  auto passPipeline =
+      genericOp.hasTensorSemantics()
+          ? DispatchLoweringPassPipeline::CPUDoubleTilingPeelingExpert
+          : DispatchLoweringPassPipeline::CPUBufferOpsTileAndVectorize;
+  return setOpConfigAndEntryPointFnTranslation(entryPointFn, genericOp,
+                                               tileSizes, passPipeline);
+}
+
 /// Sets the lowering configuration for a generic op to use
 /// CPUDoubleTilingExpert pipeline.
 static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                    linalg::GenericOp genericOp) {
   if (failed(setTransposeLikeOpRootConfig(entryPointFn, genericOp)) ||
+      failed(setElementwiseGenericOpRootConfig(entryPointFn, genericOp)) ||
       failed(setDefaultGenericOpRootConfig(entryPointFn, genericOp))) {
     return failure();
   }
