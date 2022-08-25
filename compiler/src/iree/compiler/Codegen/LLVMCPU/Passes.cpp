@@ -24,6 +24,8 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
 
+#define DEBUG_TYPE "iree-llvm-cpu-lowering-pass-pipeline"
+
 namespace mlir {
 namespace iree_compiler {
 
@@ -640,6 +642,12 @@ void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager) {
   passManager.addPass(createLLVMCPULowerExecutableTargetPass());
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   addLowerToLLVMPasses(nestedModulePM);
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "Using LLVMCPU pass pipeline:\n";
+    passManager.printAsTextualPipeline(llvm::dbgs());
+    llvm::dbgs() << "\n";
+  });
 }
 
 }  // namespace iree_compiler
