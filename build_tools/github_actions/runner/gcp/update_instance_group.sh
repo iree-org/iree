@@ -22,7 +22,9 @@ RUNNER_GROUP=presubmit
 TYPE=cpu
 REGION=us-west1
 
-function canary_update() {
+# TODO: Update autoscaling, especially important for testing groups.
+
+function update() {
   local runner_group="$1"
   local type="$2"
   local region="$3"
@@ -40,4 +42,4 @@ function canary_update() {
     --region="${REGION}")
 }
 
-canary_update "${RUNNER_GROUP}" "${TYPE}" "${REGION}"
+update "${RUNNER_GROUP}" "${TYPE}" "${REGION}"

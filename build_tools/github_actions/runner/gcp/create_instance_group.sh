@@ -19,6 +19,8 @@ VERSION=deadbeef12-2022-08-23-1661292386
 REGION=us-west1
 ZONES=us-west1-a,us-west1-b,us-west1-c
 AUTOSCALING=1
+# For GPU groups, these should both be set to the target group size, as
+# autoscaling currently does not work for these.
 MIN_SIZE=1
 MAX_SIZE=10
 # Whether this is a testing MIG (i.e. not prod)
@@ -48,18 +50,16 @@ function create_mig() {
   (set -x; gcloud beta compute instance-groups managed create "${create_args[@]}")
   echo ""
 
-  if (( AUTOSCALING == 1 )) && [[ "${type}" == cpu ]]; then
-    local -a autoscaling_args=(
-      "${mig_name}"
-      --project=iree-oss
-      --region="${REGION}"
-      --cool-down-period=60
-      --min-num-replicas="${MIN_SIZE}"
-      --max-num-replicas="${MAX_SIZE}"
-      --mode=only-scale-out
-      --target-cpu-utilization=0.6
-    )
-
+  local -a autoscaling_args=(
+    "${mig_name}"
+    --project=iree-oss
+    --region="${REGION}"
+    --cool-down-period=60
+    --min-num-replicas="${MIN_SIZE}"
+    --max-num-replicas="${MAX_SIZE}"
+    --mode=only-scale-out
+    --target-cpu-utilization=0.6
+  )
 
     (set -x; gcloud beta compute instance-groups managed set-autoscaling "${autoscaling_args[@]}")
     echo ""
