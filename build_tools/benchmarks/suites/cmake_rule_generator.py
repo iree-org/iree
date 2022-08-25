@@ -15,11 +15,10 @@ import pathlib
 import string
 import urllib.parse
 
-from .definitions import common_definitions, iree_definitions
+from .definitions import common_definitions
 from . import iree_benchmarks
 
-# Template dir: build_tools/benchmarks/suites/../../cmake
-TEMPLATE_DIR = pathlib.Path(__file__).parents[2] / "cmake"
+TEMPLATE_DIR = pathlib.Path(__file__).parent
 DOWNLOAD_ARTIFACT_CMAKE_TEMPLATE = string.Template(
     open(TEMPLATE_DIR / "iree_download_artifact_template.cmake", "r").read())
 TFLITE_IMPORT_CMAKE_TEMPLATE = string.Template(
