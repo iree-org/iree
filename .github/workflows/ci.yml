@@ -501,7 +501,7 @@ jobs:
       - name: "Downloading build dir archive"
         run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting build dir archive"
-        run: tar -xf "${BUILD_DIR_ARCHIVE}"
+        run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
       - name: "Downloading TF binaries archive"
         run: gcloud alpha storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
       - name: "Extracting TF binaries archive"
