@@ -105,7 +105,16 @@ the job will non-deterministically try to run on presubmit or postsubmit
 runners. We do not currently have a solution for this problem other than careful
 code authorship and review.
 
-## Updating the Runners
+## Examining Runners
+
+The runners for iree-org can be viewed in the
+[GitHub UI](https://github.com/organizations/iree-org/settings/actions/runners).
+Unfortunately, only organization admins (currently @stellaraccident and
+@GMNGeoffrey) have access to this page. Organization admin gives very broad
+privileges, so this set is necessarily kept very small by Google security
+policy.
+
+ ## Updating the Runners
 
 We frequently need to update the runner instances. In particular, after a Runner
 release, the version of the program running on the runners must be updated
