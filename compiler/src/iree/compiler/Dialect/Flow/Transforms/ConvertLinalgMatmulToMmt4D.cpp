@@ -333,14 +333,16 @@ LinalgMatmulOpToLinalgMmt4DOpPattern::chooseTileParams(Value lhs, Value rhs,
                                   ArrayRef<int> m0k0n0ForMatVec,
                                   std::string comment) {
     assert(m0k0n0ForMatVec[2] == 1 && "not a matrix*vector shape");
-    if (shapeN == 1) {
-      return Mmt4DTileParams(m0k0n0ForMatVec, comment + ", matrix*vector");
-    } else if (shapeM == 1) {
+    if (shapeN != ShapedType::kDynamicSize && shapeN < 4) {
+      int config[3] = {m0k0n0ForMatVec[0], m0k0n0ForMatVec[1],
+                       std::max<int>(shapeN, m0k0n0ForMatVec[2])};
+      return Mmt4DTileParams(config, comment + ", matrix*vector");
+    } else if (shapeM != ShapedType::kDynamicSize && shapeM < 4) {
       // The vector*matrix case is intentionally derived from the matrix*vector
       // case by swapping M and N dims so that in kernel codegen we can reuse
       // matrix*vector kernels by swapping LHS and RHS.
-      int m0k0n0ForVecMat[3] = {m0k0n0ForMatVec[2], m0k0n0ForMatVec[1],
-                                m0k0n0ForMatVec[0]};
+      int m0k0n0ForVecMat[3] = {std::max<int>(shapeM, m0k0n0ForMatVec[2]),
+                                m0k0n0ForMatVec[1], m0k0n0ForMatVec[0]};
       return Mmt4DTileParams(m0k0n0ForVecMat, comment + ", vector*matrix");
     } else {
       return Mmt4DTileParams(m0k0n0, comment);
