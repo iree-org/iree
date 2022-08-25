@@ -1318,29 +1318,21 @@ static LogicalResult setVMVXRootConfigImpl(func::FuncOp entryPointFn,
 static FailureOr<Operation *> getRootOperation(
     ArrayRef<Operation *> computeOps) {
   Operation *rootOperation = nullptr;
-  auto updateRootOperation = [&](Operation *op) -> LogicalResult {
-    if (rootOperation) {
-      return op->emitOpError(
-          "unhandled multiple root operations in dispatch region");
-    }
-    rootOperation = op;
-    return success();
-  };
-  for (auto op : computeOps) {
+  for (auto op : llvm::reverse(computeOps)) {
     if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
       // Do not not treat linalg ops that are all parallel as root operations in
       // this sweep.
       if (linalgOp.getNumLoops() == linalgOp.getNumParallelLoops()) continue;
 
       // All other linalg ops are root ops.
-      if (failed(updateRootOperation(op))) return failure();
-      continue;
+      rootOperation = op;
+      break;
     }
 
     if (isa<TilingInterface>(op)) {
       // All other operations that implement this interface are root ops.
-      if (failed(updateRootOperation(op))) return failure();
-      continue;
+      rootOperation = op;
+      break;
     }
   }
   if (rootOperation) return rootOperation;
@@ -1348,7 +1340,8 @@ static FailureOr<Operation *> getRootOperation(
   // If no root operation is found yet. Look for linalg generic ops.
   for (auto op : llvm::reverse(computeOps)) {
     if (isa<linalg::LinalgOp>(op)) {
-      if (failed(updateRootOperation(op))) return failure();
+      rootOperation = op;
+      break;
     }
   }
   return rootOperation;
