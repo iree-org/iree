@@ -119,7 +119,7 @@ py_binary(
     name = "e2e_matmul_%s_%s_small" % (strategy, lhs_rhs_type),
     compiler_flags = [
         "--iree-vmvx-enable-microkernels",
-    ] + ["--iree-flow-mmt4d-target-options=enable_generic_slow #pass_options_variant#"] if (strategy == "mmt4d") else [],
+    ] + (["--iree-flow-mmt4d-target-options=enable_generic_slow #pass_options_variant#"] if (strategy == "mmt4d") else []),
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=%s" % lhs_rhs_type,

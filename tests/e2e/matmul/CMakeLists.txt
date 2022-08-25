@@ -185,7 +185,7 @@ iree_generated_trace_runner_test(
   DRIVERS
     "local-task"
   COMPILER_FLAGS
-
+    "--iree-vmvx-enable-microkernels"
 )
 
 iree_generated_trace_runner_test(
