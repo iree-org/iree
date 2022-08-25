@@ -500,7 +500,7 @@ jobs:
           submodules: true
       - name: "Downloading build dir archive"
         run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
-      - name: "Extracting build dir archive"
+      - name: "Extracting install from build dir archive"
         run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
       - name: "Downloading TF binaries archive"
         run: gcloud alpha storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
@@ -538,8 +538,8 @@ jobs:
           submodules: true
       - name: "Downloading build dir archive"
         run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
-      - name: "Extracting build dir archive"
-        run: tar -xf "${BUILD_DIR_ARCHIVE}"
+      - name: "Extracting install from build dir archive"
+        run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
       - name: "Building for Android"
         run: |
           build_tools/github_actions/docker_run.sh \
@@ -570,8 +570,8 @@ jobs:
           submodules: true
       - name: "Downloading build dir archive"
         run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
-      - name: "Extracting build dir archive"
-        run: tar -xf "${BUILD_DIR_ARCHIVE}"
+      - name: "Extracting install from build dir archive"
+        run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
       - name: "Cross-compiling and testing riscv32"
         run: |
           ./build_tools/github_actions/docker_run.sh \
@@ -607,8 +607,8 @@ jobs:
           submodules: true
       - name: "Downloading build dir archive"
         run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
-      - name: "Extracting archive"
-        run: tar -xf "${BUILD_DIR_ARCHIVE}"
+      - name: "Extracting install from build dir archive"
+        run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
       - name: "Downloading TF binaries archive"
         run: gcloud alpha storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
       - name: "Extracting TF binaries archive"
