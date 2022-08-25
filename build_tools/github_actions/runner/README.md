@@ -109,10 +109,9 @@ code authorship and review.
 
 The runners for iree-org can be viewed in the
 [GitHub UI](https://github.com/organizations/iree-org/settings/actions/runners).
-Unfortunately, only organization admins (currently @stellaraccident and
-@GMNGeoffrey) have access to this page. Organization admin gives very broad
-privileges, so this set is necessarily kept very small by Google security
-policy.
+Unfortunately, only organization admins have access to this page. Organization
+admin gives very broad privileges, so this set is necessarily kept very small by
+Google security policy.
 
  ## Updating the Runners
 
