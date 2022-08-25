@@ -98,14 +98,6 @@ enum class VectorPreProcStrategy {
   None
 };
 
-// Encodes the configuration logic strategy of distribution to be applied on a
-// Linalg operation.
-enum class DistributionConfigStrategy {
-  Reduction,
-  Elementwise,
-  None,
-};
-
 /// Returns true if all the input and output tensor operands of 'op' are fully
 /// dynamic.
 static bool isFullyDynamicOp(linalg::LinalgOp op) {
@@ -142,13 +134,6 @@ static VectorPreProcStrategy getVectorPreProcStrategy(linalg::LinalgOp op) {
   }
 
   return VectorPreProcStrategy::None;
-}
-
-static DistributionConfigStrategy getDistributionConfigStrategy(
-    linalg::LinalgOp op) {
-  if (op.getNumReductionLoops()) return DistributionConfigStrategy::Reduction;
-  if (linalg::isElementwise(op)) return DistributionConfigStrategy::Elementwise;
-  return DistributionConfigStrategy::None;
 }
 
 /// Looks for the `native_vector_size` attribute in the hal.executable.variant
@@ -193,7 +178,6 @@ static int64_t getVectorSize(func::FuncOp entryPointFn, ShapedType shapedType) {
 static SmallVector<int64_t> getMinTilingSizesForEachDim(
     func::FuncOp entryPointFn, linalg::LinalgOp op,
     unsigned maxUnrollFactor = 8) {
-  DistributionConfigStrategy strategy = getDistributionConfigStrategy(op);
   unsigned numLoops = op.getNumLoops();
   SmallVector<int64_t> minTileSizes(numLoops, 1);
   auto inputOutputOpOperands = op.getInputAndOutputOperands();
@@ -210,19 +194,12 @@ static SmallVector<int64_t> getMinTilingSizesForEachDim(
     auto operandType =
         inputOutputOpOperands[map.index()]->get().getType().cast<ShapedType>();
     int64_t tileSize = getVectorSize(entryPointFn, operandType);
-    if (op.isOutputTensor(inputOutputOpOperands[map.index()])) {
-      switch (strategy) {
-        // Vectorization of reductions is driven by input tensors and
-        // considering the output's fastest varying dim leads to large unroll
-        // factors. We limit the tile size for this case to 'maxUnrollFactor'.
-        case DistributionConfigStrategy::Reduction:
-        case DistributionConfigStrategy::Elementwise:
-          tileSize = std::min<int64_t>(tileSize, maxUnrollFactor);
-          break;
-        case DistributionConfigStrategy::None:
-          break;
-      }
-    }
+    // Vectorization of reductions is driven by input tensors and considering
+    // the output's fastest varying dim leads to large unroll factors. We limit
+    // the tile size for this case to 'maxUnrollFactor'.
+    if (op.isOutputTensor(inputOutputOpOperands[map.index()]) &&
+        op.getNumReductionLoops() > 0)
+      tileSize = std::min<int64_t>(tileSize, maxUnrollFactor);
 
     minTileSizes[fastestVaryingDim] =
         std::max<int64_t>(minTileSizes[fastestVaryingDim], tileSize);
@@ -1175,19 +1152,34 @@ static LogicalResult setElementwiseGenericOpRootConfig(
     flowTileSizes[currDim] = newSize;
   }
 
-  SmallVector<int64_t> parallelTileSizes;
-  setX86WorkgroupTileSizes(genericOp, flowTileSizes, minTileSizes,
-                           parallelTileSizes,
-                           /*allowIncompleteTile=*/true);
+  // Adjust tiling sizes of vector levels to avoid large unroll factors.
+  SmallVector<int64_t> vecTileSizes(minTileSizes.begin(), minTileSizes.end());
+  for (auto operand : genericOp.getOutputOperands()) {
+    constexpr int64_t kMaxUnrollFactor = 8;
+    AffineMap map = genericOp.getTiedIndexingMap(operand);
+    int64_t vecSize = getVectorSize(entryPointFn, operand->get().getType());
+    int64_t currSize = 1;
+    for (auto dimExpr : llvm::reverse(map.getResults().drop_back())) {
+      unsigned pos = dimExpr.cast<AffineDimExpr>().getPosition();
+      if (vecTileSizes[pos] * currSize > vecSize * kMaxUnrollFactor) {
+        vecTileSizes[pos] = 1;
+        currSize = vecSize * kMaxUnrollFactor;
+      }
+    }
+    int fastestPos =
+        map.getResults().back().cast<AffineDimExpr>().getPosition();
+    vecTileSizes[fastestPos] =
+        std::min<int64_t>(vecTileSizes[fastestPos], kMaxUnrollFactor);
+  }
 
   // Setting reduction tile sizes is a workaround to kick in peeling transform.
   // The tiling won't happen because the sizes are zeros.
-  SmallVector<int64_t> reductionTileSizes(numLoops, 0);
+  SmallVector<int64_t> zeros(numLoops, 0);
 
   TileSizesListType tileSizes;
   tileSizes.push_back(flowTileSizes);
-  tileSizes.push_back(parallelTileSizes);
-  tileSizes.push_back(reductionTileSizes);
+  tileSizes.push_back(vecTileSizes);
+  tileSizes.push_back(zeros);
 
   auto passPipeline =
       genericOp.hasTensorSemantics()
