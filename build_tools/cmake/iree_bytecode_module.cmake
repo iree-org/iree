@@ -96,11 +96,30 @@ function(iree_bytecode_module)
     get_filename_component(_FRIENDLY_NAME "${_RULE_SRC}" NAME)
   endif()
 
+  # Check LLVM static library setting.
+  foreach(_FLAG ${_RULE_FLAGS})
+    string(FIND
+      "${_FLAG}" "--iree-llvm-static-library-output-path=" _STATIC_OBJ_IDX
+    )
+    if(_STATIC_OBJ_IDX GREATER_EQUAL 0)
+      set(_STATIC_LIB TRUE)
+      string(REPLACE
+        "--iree-llvm-static-library-output-path=" "" _STATIC_OBJ_PATH "${_FLAG}"
+      )
+      string(REPLACE ".o" ".h" _STATIC_HDR_PATH "${_STATIC_OBJ_PATH}")
+    endif()
+  endforeach(_FLAG)
+
+  set(_OUTPUT_FILES "${_MODULE_FILE_NAME}")
+  if(_STATIC_LIB)
+    list(APPEND _OUTPUT_FILES "${_STATIC_OBJ_PATH}" "${_STATIC_HDR_PATH}")
+  endif()
+
   # Depending on the binary instead of the target here given we might not have
   # a target in this CMake invocation when cross-compiling.
   add_custom_command(
     OUTPUT
-      "${_MODULE_FILE_NAME}"
+      ${_OUTPUT_FILES}
     COMMAND
       ${_COMPILE_TOOL_EXECUTABLE}
       ${_ARGS}
