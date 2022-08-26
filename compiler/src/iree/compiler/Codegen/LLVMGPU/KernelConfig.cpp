@@ -547,11 +547,8 @@ static bool isTransposeOp(linalg::LinalgOp linalgOp) {
     return false;
   }
 
-  // Only transpose static sizes
-  if (inputShape[0] == ShapedType::kDynamicSize ||
-      inputShape[1] == ShapedType::kDynamicSize ||
-      outputShape[0] == ShapedType::kDynamicSize ||
-      outputShape[1] == ShapedType::kDynamicSize) {
+  // Only transpose static shapes
+  if (linalgOp.hasDynamicShape()) {
     return false;
   }
 

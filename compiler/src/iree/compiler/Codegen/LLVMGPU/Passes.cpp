@@ -224,7 +224,6 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
 }
 
 void addGPUTransposePassPipeline(OpPassManager &pm) {
-  llvm::dbgs() << "LLVMGPU::addGPUTransposePassPipeline()\n";
   tileAndBufferize(pm);
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
@@ -239,7 +238,7 @@ void addGPUTransposePassPipeline(OpPassManager &pm) {
 
   // May or may not need to reduce shared mememory conflicts
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMGPUReduceSharedMemoryBankConflicts());
+      createLLVMGPUReduceSharedMemoryBankConflicts(/*paddingSizeBits=*/32));
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
   nestedModulePM.addPass(createCanonicalizerPass());

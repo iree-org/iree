@@ -56,12 +56,12 @@ def DispatchLoweringPassPipelineEnum
                     CPU_DoubleTilingPadExpert, CPU_DoubleTilingPeelingExpert,
                     CPU_ConvTileAndDecomposeExpert, CPU_CPUAArchDoubleTilingExpert,
                     CPU_BufferOpsTileAndVectorize, CPU_TripleTilingExpert,
-                    Linalg_TransformInterpCodegen, LLVMGPU_SimpleDistribute,
-                    LLVMGPU_Vectorize, LLVMGPU_MatmulSimt,
+                    Linalg_TransformInterpCodegen, LLVMGPU_TransposeSharedMem,
+                    LLVMGPU_SimpleDistribute, LLVMGPU_Vectorize, LLVMGPU_MatmulSimt,
                     LLVMGPU_MatmulTensorCore, LLVMGPU_WarpReduction,
                     SPIRV_Distribute, SPIRV_Vectorize,
                     SPIRV_VectorizeToCooperativeOps,
-                    SPIRV_VectorizeWithWorkgroupMemory, VMVX_Default,LLVMGPU_TransposeSharedMem, None
+                    SPIRV_VectorizeWithWorkgroupMemory, VMVX_Default, None
                   ]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
   // Don't generate a C++ class! We want to use the AttrDef
