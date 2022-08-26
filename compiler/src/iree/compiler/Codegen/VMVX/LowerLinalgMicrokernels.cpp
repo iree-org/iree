@@ -876,20 +876,6 @@ struct LinalgMatmulConversion
       rhs = contract.rhs();
       out = op.outputs().front();
     }
-
-    Value getOneValue(PatternRewriter &rewriter) {
-      Location loc = op.getLoc();
-      Type elementType = out.getType().cast<MemRefType>().getElementType();
-      if (auto floatType = elementType.dyn_cast<FloatType>()) {
-        return rewriter.create<arith::ConstantOp>(
-            loc, FloatAttr::get(floatType, 1.0));
-      } else if (elementType.isa<IntegerType>()) {
-        return rewriter.create<arith::ConstantIntOp>(loc, 1, elementType);
-      }
-
-      assert(false && "unknown element type");
-      return nullptr;
-    }
   };
 
   LogicalResult matchAndRewrite(linalg::ContractionOpInterface op,
