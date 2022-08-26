@@ -22,8 +22,6 @@ RUNNER_GROUP=presubmit
 TYPE=cpu
 REGION=us-west1
 
-# TODO: Update autoscaling, especially important for testing groups.
-
 function update() {
   local runner_group="$1"
   local type="$2"

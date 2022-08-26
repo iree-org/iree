@@ -61,9 +61,8 @@ function create_mig() {
     --target-cpu-utilization=0.6
   )
 
-    (set -x; gcloud beta compute instance-groups managed set-autoscaling "${autoscaling_args[@]}")
-    echo ""
-  fi
+  (set -x; gcloud beta compute instance-groups managed set-autoscaling "${autoscaling_args[@]}")
+  echo ""
 }
 
 create_mig presubmit cpu
