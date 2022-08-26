@@ -49,6 +49,7 @@ iree_cc_library(
     MLIRArithmeticDialect
     MLIRArithmeticToLLVM
     MLIRArithmeticTransforms
+    MLIRBufferizationDialect
     MLIRControlFlowToLLVM
     MLIRFuncDialect
     MLIRFuncToLLVM

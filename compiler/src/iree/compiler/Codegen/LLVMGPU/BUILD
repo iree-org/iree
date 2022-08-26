@@ -61,6 +61,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:ArithmeticToLLVM",
         "@llvm-project//mlir:ArithmeticTransforms",
+        "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:ControlFlowToLLVM",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:FuncToLLVM",
