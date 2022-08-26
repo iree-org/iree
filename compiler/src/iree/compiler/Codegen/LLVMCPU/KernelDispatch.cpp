@@ -933,20 +933,22 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
 }
 
 static void setX86WorkgroupTileSizes(
-    linalg::GenericOp genericOp, ArrayRef<int64_t> flowTileSizes,
-    ArrayRef<int64_t> tileSizes, SmallVectorImpl<int64_t> &workgroupTileSizes,
-    bool allowIncompleteTile = false) {
-  unsigned numLoops = genericOp.getNumLoops();
+    linalg::GenericOp genericOp, unsigned numLoops,
+    ArrayRef<int64_t> flowTileSizes, ArrayRef<int64_t> minTileSizes,
+    ArrayRef<int64_t> maxTileSizes,
+    SmallVectorImpl<int64_t> &workgroupTileSizes) {
   workgroupTileSizes.append(numLoops, 0);
   SmallVector<int64_t, 4> staticLoopRanges = genericOp.getStaticLoopRanges();
-  for (auto i : llvm::seq<unsigned>(0, numLoops)) {
-    if (flowTileSizes[i]) {
-      workgroupTileSizes[i] = getMaxTileSize(0, flowTileSizes[i], tileSizes[i],
-                                             tileSizes[i], allowIncompleteTile);
+  for (auto loopNum : llvm::seq<unsigned>(0, numLoops)) {
+    if (flowTileSizes[loopNum]) {
+      workgroupTileSizes[loopNum] =
+          getMaxTileSize(0, flowTileSizes[loopNum], minTileSizes[loopNum],
+                         minTileSizes[loopNum]);
     } else {
-      // If the flow level tile size is zero, and static loop range is 1 as
+      // If the flow level tile size is zero, and static loop range is 0 as
       // well, set the tile sizes here to zero as well.
-      workgroupTileSizes[i] = staticLoopRanges[i] == 1 ? 0 : tileSizes[i];
+      workgroupTileSizes[loopNum] =
+          staticLoopRanges[loopNum] == 1 ? 0 : minTileSizes[loopNum];
     }
   }
 }
@@ -1008,8 +1010,8 @@ static LogicalResult setDefaultGenericOpRootConfig(
   // Set the next level tile sizes.
   SmallVector<int64_t> parallelTileSizes;
   SmallVector<int64_t> reductionTileSizes;
-  setX86WorkgroupTileSizes(genericOp, flowTileSizes, minTileSizes,
-                           parallelTileSizes);
+  setX86WorkgroupTileSizes(genericOp, numLoops, flowTileSizes, minTileSizes,
+                           maxTileSizes, parallelTileSizes);
   splitParallelAndReductionTiles(genericOp, parallelTileSizes,
                                  reductionTileSizes);
 
@@ -1087,8 +1089,8 @@ static LogicalResult setTransposeLikeOpRootConfig(func::FuncOp entryPointFn,
 
   // Set the next level tile sizes.
   SmallVector<int64_t> parallelTileSizes;
-  setX86WorkgroupTileSizes(genericOp, flowTileSizes, minTileSizes,
-                           parallelTileSizes);
+  setX86WorkgroupTileSizes(genericOp, numLoops, flowTileSizes, minTileSizes,
+                           maxTileSizes, parallelTileSizes);
 
   TileSizesListType tileSizes;
   tileSizes.push_back(flowTileSizes);
