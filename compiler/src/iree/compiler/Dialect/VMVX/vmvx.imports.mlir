@@ -426,8 +426,6 @@ vm.import @matmul.f32f32f32(
   %m : i64,
   %n : i64,
   %k : i64,
-  %alpha : f32,
-  %beta : f32,
   %flags : i32
 )
 
