@@ -53,7 +53,7 @@ func.func @fill2d(%arg0 : memref<384x128xf32>, %arg1 : f32) {
   func.return
 }
 
-// CHECK-LABEL: @matmul_row_major
+// CHECK-LABEL: @matmul_f32f32f32_row_major
 //   CHECK-DAG: %[[BB0:.*]], %[[OFFSET0:.*]], %[[SIZES0:.*]]:2, %[[STRIDES0:.*]]:2 = vmvx.get_buffer_descriptor %arg0
 //   CHECK-DAG: %[[BB1:.*]], %[[OFFSET1:.*]], %[[SIZES1:.*]]:2, %[[STRIDES1:.*]]:2 = vmvx.get_buffer_descriptor %arg1
 //   CHECK-DAG: %[[BB2:.*]], %[[OFFSET2:.*]], %[[SIZES2:.*]]:2, %[[STRIDES2:.*]]:2 = vmvx.get_buffer_descriptor %arg2
@@ -62,10 +62,26 @@ func.func @fill2d(%arg0 : memref<384x128xf32>, %arg1 : f32) {
 //  CHECK-SAME:   out(%[[BB0]] offset %[[OFFSET0]] row_stride %[[STRIDES0]]#0 : !util.buffer)
 //  CHECK-SAME:   mnk(%[[SIZES1]]#0, %[[SIZES2]]#1, %[[SIZES2]]#0)
 //  CHECK-SAME:   flags(1)
-func.func @matmul_row_major(%arg0 : memref<64x64xf32>, %arg1 : memref<64x384xf32>, %arg2 : memref<384x64xf32>) {
+func.func @matmul_f32f32f32_row_major(%arg0 : memref<64x64xf32>, %arg1 : memref<64x384xf32>, %arg2 : memref<384x64xf32>) {
   linalg.matmul
       ins(%arg1, %arg2 : memref<64x384xf32>, memref<384x64xf32>)
       outs(%arg0 : memref<64x64xf32>)
+  func.return
+}
+
+// CHECK-LABEL: @matmul_i8i8i32_row_major
+//   CHECK-DAG: %[[BB0:.*]], %[[OFFSET0:.*]], %[[SIZES0:.*]]:2, %[[STRIDES0:.*]]:2 = vmvx.get_buffer_descriptor %arg0
+//   CHECK-DAG: %[[BB1:.*]], %[[OFFSET1:.*]], %[[SIZES1:.*]]:2, %[[STRIDES1:.*]]:2 = vmvx.get_buffer_descriptor %arg1
+//   CHECK-DAG: %[[BB2:.*]], %[[OFFSET2:.*]], %[[SIZES2:.*]]:2, %[[STRIDES2:.*]]:2 = vmvx.get_buffer_descriptor %arg2
+//       CHECK: vmvx.matmul lhs(%[[BB1]] offset %[[OFFSET1]] row_stride %[[STRIDES1]]#0 : !util.buffer)
+//  CHECK-SAME:   rhs(%[[BB2]] offset %[[OFFSET2]] row_stride %[[STRIDES2]]#0 : !util.buffer)
+//  CHECK-SAME:   out(%[[BB0]] offset %[[OFFSET0]] row_stride %[[STRIDES0]]#0 : !util.buffer)
+//  CHECK-SAME:   mnk(%[[SIZES1]]#0, %[[SIZES2]]#1, %[[SIZES2]]#0)
+//  CHECK-SAME:   flags(1)
+func.func @matmul_i8i8i32_row_major(%arg0 : memref<64x64xi32>, %arg1 : memref<64x384xi8>, %arg2 : memref<384x64xi8>) {
+  linalg.matmul
+      ins(%arg1, %arg2 : memref<64x384xi8>, memref<384x64xi8>)
+      outs(%arg0 : memref<64x64xi32>)
   func.return
 }
 
