@@ -133,6 +133,7 @@ py_binary(
     "direct",
     "mmt4d",
 ] for lhs_rhs_type in [
+    "i8",
     "f32",
 ]]
 

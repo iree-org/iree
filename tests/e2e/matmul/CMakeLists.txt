@@ -172,6 +172,24 @@ iree_generated_trace_runner_test(
 
 iree_generated_trace_runner_test(
   NAME
+    e2e_matmul_direct_i8_small_ukernel
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=i8"
+    "--shapes=small"
+  TRACE_RUNNER
+    iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "vmvx"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-vmvx-enable-microkernels"
+)
+
+iree_generated_trace_runner_test(
+  NAME
     e2e_matmul_direct_f32_small_ukernel
   GENERATOR
     "generate_e2e_matmul_tests.py"
@@ -186,6 +204,25 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-vmvx-enable-microkernels"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_mmt4d_i8_small_ukernel
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=i8"
+    "--shapes=small"
+  TRACE_RUNNER
+    iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "vmvx"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-vmvx-enable-microkernels"
+    "--iree-flow-mmt4d-target-options=enable_generic_slow #pass_options_variant#"
 )
 
 iree_generated_trace_runner_test(

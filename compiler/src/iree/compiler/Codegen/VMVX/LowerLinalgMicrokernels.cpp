@@ -878,9 +878,28 @@ struct LinalgMatmulConversion
     }
   };
 
+  static bool isSupportedElementTypes(const OpInfo &info) {
+    Type lhsElType = info.lhs.getType().cast<ShapedType>().getElementType();
+    Type rhsElType = info.rhs.getType().cast<ShapedType>().getElementType();
+    Type outElType = info.out.getType().cast<ShapedType>().getElementType();
+    if (lhsElType.isF32() && rhsElType.isF32() && outElType.isF32()) {
+      return true;
+    }
+    if (lhsElType.isSignlessInteger(8) && rhsElType.isSignlessInteger(8) &&
+        outElType.isSignlessInteger(32)) {
+      return true;
+    }
+    return false;
+  }
+
   LogicalResult matchAndRewrite(linalg::ContractionOpInterface op,
                                 PatternRewriter &rewriter) const override {
     OpInfo info(op);
+
+    if (!isSupportedElementTypes(info)) {
+      return rewriter.notifyMatchFailure(
+          op, "unsupported combination of lhs/rhs/out element types");
+    }
 
     // Check that buffer descriptors could be computed.
     if (!info.lhsAnal.isValid() || !info.rhsAnal.isValid() ||
