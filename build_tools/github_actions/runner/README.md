@@ -139,7 +139,10 @@ successfully start up and register with the GitHub UI. Then send a PR or trigger
 a workflow dispatch (depending on what you're testing) targeting the testing
 environment, and ensure that your new runners work. Send and merge a PR updating
 the runner configuration. When you're done, make sure to set the testing group
-autoscaling back to 0-0.
+autoscaling back to 0-0. For now, you'll need to shut down the remaining
+runners. The easiest way to do this for now is to go to the UI for the managed
+instance group and delete all the instances. The necessity for manual deletion
+will go away with future improvements.
 
 ### Deploy to Prod
 
