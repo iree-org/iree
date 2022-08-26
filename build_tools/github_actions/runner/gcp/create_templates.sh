@@ -6,6 +6,9 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+# Creates instance templates for (cpu, gpu) x (presubmit, postsubmit) instances
+# according to the current configuration.
+
 set -euo pipefail
 
 SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")";
