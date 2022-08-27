@@ -860,6 +860,11 @@ static bool canInsOperandTieWithOutsOperand(OpOperand *insOperand) {
   if (!linalgOp) return false;
 
   AffineMap insOperandIndexingMap = linalgOp.getTiedIndexingMap(insOperand);
+  if (insOperandIndexingMap.isProjectedPermutation()) {
+    // If the operand is a projected permutation a small stack might be fine.
+    // So return true.
+    return true;
+  }
 
   auto canTieWithOutsOperand = [&](OpOperand *outsOperand) {
     if (linalgOp.getTiedIndexingMap(outsOperand) != insOperandIndexingMap) {
@@ -1062,18 +1067,25 @@ static void fuseRootsWithProducers(MLIRContext *context, Operation *root,
                                    DominanceInfo const &dominanceInfo) {
   // We probably want a worklist algorithm here, but for now just look at
   // immediate producers.
-  for (OpOperand &operand : root->getOpOperands()) {
-    Operation *producer = operand.get().getDefiningOp();
-    if (!producer) continue;
-    if (hasFusionGroupsAttribute(producer) || hasRootOpAttribute(producer)) {
-      continue;
-    }
+  SmallVector<Operation *> worklist;
+  worklist.push_back(root);
 
-    Optional<OpOperand *> fusableUse = getFusableUse(producer, dominanceInfo);
-    if (!fusableUse || fusableUse.value()->getOwner() != root) continue;
+  while (!worklist.empty()) {
+    Operation *candidate = worklist.pop_back_val();
+    for (OpOperand &operand : candidate->getOpOperands()) {
+      Operation *producer = operand.get().getDefiningOp();
+      if (!producer) continue;
+      if (hasFusionGroupsAttribute(producer) || hasRootOpAttribute(producer)) {
+        continue;
+      }
 
-    if (isFusableWithProducer(operand)) {
-      appendToFusionGroup(producer, groupNum);
+      Optional<OpOperand *> fusableUse = getFusableUse(producer, dominanceInfo);
+      if (!fusableUse || fusableUse.value()->getOwner() != candidate) continue;
+
+      if (isFusableWithProducer(operand)) {
+        appendToFusionGroup(producer, groupNum);
+      }
+      worklist.push_back(producer);
     }
   }
 }
