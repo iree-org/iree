@@ -558,7 +558,7 @@ jobs:
       - cpu
       - os-family=Linux
     env:
-      BUILD_RISCV_DIR: "build-riscv-rv32-baremetal"
+      BUILD_RISCV_DIR: "build-riscv32-baremetal"
       RISCV_CONFIG: "rv32-baremetal"
       BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
       BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
@@ -592,7 +592,7 @@ jobs:
       - cpu
       - os-family=Linux
     env:
-      BUILD_RISCV_DIR: "build-riscv-r64"
+      BUILD_RISCV_DIR: "build-riscv64"
       RISCV_CONFIG: "rv64"
       BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
       BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
