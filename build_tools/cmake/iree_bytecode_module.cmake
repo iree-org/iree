@@ -96,16 +96,16 @@ function(iree_bytecode_module)
     get_filename_component(_FRIENDLY_NAME "${_RULE_SRC}" NAME)
   endif()
 
-  # Check LLVM static library setting.
+  # Check LLVM static library setting. If the static libary output path is set,
+  # retrieve the object path and the corresponding header file path.
   foreach(_FLAG ${_RULE_FLAGS})
-    string(FIND
-      "${_FLAG}" "--iree-llvm-static-library-output-path=" _STATIC_OBJ_IDX
+    string(REGEX MATCH
+      "-iree-llvm-static-library-output-path=(.+)" _MATCH_STRING "${_FLAG}"
     )
-    if(_STATIC_OBJ_IDX GREATER_EQUAL 0)
+    if(_MATCH_STRING)
       set(_STATIC_LIB TRUE)
-      string(REPLACE
-        "--iree-llvm-static-library-output-path=" "" _STATIC_OBJ_PATH "${_FLAG}"
-      )
+      # Get the static object path from the regex match result.
+      set(_STATIC_OBJ_PATH ${CMAKE_MATCH_1})
       string(REPLACE ".o" ".h" _STATIC_HDR_PATH "${_STATIC_OBJ_PATH}")
     endif()
   endforeach(_FLAG)
