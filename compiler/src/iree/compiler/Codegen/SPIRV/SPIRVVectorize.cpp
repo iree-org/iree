@@ -122,6 +122,7 @@ void populateVectorizationPatterns(RewritePatternSet &patterns) {
   linalg::LinalgTransformationFilter f;
   VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(patterns,
                                                                    opt, f);
+  linalg::populateConvolutionVectorizationPatterns(patterns);
   patterns.add<LinalgVectorizationPattern>(
       patterns.getContext(), f.addOpFilter<linalg::ContractionOpInterface>(),
       opt);
@@ -160,7 +161,6 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       RewritePatternSet patterns(context);
       populateVectorizationPatterns(patterns);
       // Pull in additional vectorization patterns in IREE.
-      populateLinalgToVectorVectorizeConvPatterns(context, patterns);
       populateVectorizePadPatterns(patterns);
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
@@ -359,6 +359,7 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
     {
       RewritePatternSet patterns(context);
       vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
+      vector::populateVectorReorderTransferExtractInsertSlicePatterns(patterns);
       vector::InsertOp::getCanonicalizationPatterns(patterns, context);
       vector::ExtractOp::getCanonicalizationPatterns(patterns, context);
       vector::TransferReadOp::getCanonicalizationPatterns(patterns, context);
