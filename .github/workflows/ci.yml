@@ -656,7 +656,7 @@ jobs:
           echo "::set-output name=build-dir-gcs-artifact::${BUILD_RISCV_DIR_GCS_ARTIFACT}"
           echo "::set-output name=tools-gcs-artifact::${TOOLS_GCS_ARTIFACT}"
 
-  test-riscv64:
+  test_riscv64:
     needs: [should_run, build_all, build_riscv64, build_tf_integrations]
     if: needs.should_run.outputs.should-run == 'true'
     runs-on:
@@ -736,7 +736,8 @@ jobs:
       # Crosscompilation
       - android_arm64
       - riscv32
-      - riscv64
+      - build_riscv64
+      - test_riscv64
     steps:
       - name: Getting combined job status
         run: |
