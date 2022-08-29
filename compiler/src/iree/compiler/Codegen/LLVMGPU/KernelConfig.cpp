@@ -563,14 +563,16 @@ static bool isTransposeOp(linalg::LinalgOp linalgOp) {
 
 static LogicalResult setTransposeConfig(func::FuncOp entryPoint,
                                         Operation *op) {
+  int32_t tileM = 32;
+  int32_t tileN = 32;
   TileSizesListType tileSizes;
-  tileSizes.push_back({32, 32});
+  tileSizes.push_back({tileM, tileN});
 
   // Check alignment with tile size
   if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
     auto inputShape =
         genericOp.inputs()[0].getType().cast<ShapedType>().getShape();
-    if (inputShape[0] % 32 != 0 || inputShape[1] % 32 != 0) {
+    if (inputShape[0] % tileM != 0 || inputShape[1] % tileN != 0) {
       return failure();
     }
   } else {
