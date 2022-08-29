@@ -626,7 +626,7 @@ jobs:
             bash -euo pipefail -c "./build_tools/cmake/build_riscv.sh"
           echo "::set-output name=build-dir::${BUILD_RISCV_DIR}"
           echo "::set-output name=tools-dir::${BUILD_RISCV_DIR}/tools"
-      - name: "Creating riscv64 cross-compiled archives"
+      - name: "Creating riscv64 cross-compiled build dir and tool archives"
         id: archive
         env:
           BUILD_RISCV_DIR_ARCHIVE: ${{ env.BUILD_RISCV_DIR }}.tar.zst
@@ -643,7 +643,7 @@ jobs:
             ${BUILD_RISCV_DIR}/tools/iree-run-trace
           echo "::set-output name=build-dir-archive::${BUILD_RISCV_DIR_ARCHIVE}"
           echo "::set-output name=tools-archive::${TOOLS_ARCHIVE}"
-      - name: "Uploading riscv64 cross-compiled archives"
+      - name: "Uploading riscv64 cross-compiled build dir and tool archives"
         id: upload
         env:
           BUILD_RISCV_DIR_ARCHIVE: ${{ steps.archive.outputs.build-dir-archive }}
