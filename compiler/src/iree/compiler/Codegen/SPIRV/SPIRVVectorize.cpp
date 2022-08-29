@@ -122,6 +122,7 @@ void populateVectorizationPatterns(RewritePatternSet &patterns) {
   linalg::LinalgTransformationFilter f;
   VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(patterns,
                                                                    opt, f);
+  linalg::populateConvolutionVectorizationPatterns(patterns);
   patterns.add<LinalgVectorizationPattern>(
       patterns.getContext(), f.addOpFilter<linalg::ContractionOpInterface>(),
       opt);
@@ -160,7 +161,6 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       RewritePatternSet patterns(context);
       populateVectorizationPatterns(patterns);
       // Pull in additional vectorization patterns in IREE.
-      populateLinalgToVectorVectorizeConvPatterns(context, patterns);
       populateVectorizePadPatterns(patterns);
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
@@ -192,6 +192,25 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       llvm::dbgs() << "\n\n";
     });
 
+    // Fold tensor.extract_slice/insert_slice ops into transfer ops. This helps
+    // to remove those tensor slice ops so that we can enable further vector op
+    // transformations.
+    {
+      RewritePatternSet patterns(context);
+      vector::TransferReadOp::getCanonicalizationPatterns(patterns, context);
+      vector::TransferWriteOp::getCanonicalizationPatterns(patterns, context);
+
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
+      }
+    }
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "--- After folding tensor extract/insert slice ops ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
+
     // Lower vector.multi_dimension early if any operand is a transpose op.
     // The lowering itself generates transpose ops. This helps to cancel
     // transpose ops. vector.multi_reduction is arguably a higher level op and
@@ -209,8 +228,7 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       RewritePatternSet patterns(context);
       vector::populateVectorMultiReductionLoweringPatterns(
           patterns, vector::VectorMultiReductionLowering::InnerParallel);
-      FrozenRewritePatternSet frozenSet(std::move(patterns));
-      applyOpPatternsAndFold(reductionOps, frozenSet,
+      applyOpPatternsAndFold(reductionOps, std::move(patterns),
                              /*strict=*/false);
     }
 
