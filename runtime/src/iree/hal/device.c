@@ -152,61 +152,127 @@ IREE_API_EXPORT iree_status_t iree_hal_device_transfer_d2d(
       flags, timeout);
 }
 
-// Validates that the submission is well-formed.
-static iree_status_t iree_hal_device_validate_submission(
-    iree_host_size_t batch_count, const iree_hal_submission_batch_t* batches) {
-  for (iree_host_size_t i = 0; i < batch_count; ++i) {
-    for (iree_host_size_t j = 0; j < batches[i].command_buffer_count; ++j) {
-      if (batches[i].wait_semaphores.count > 0 &&
-          iree_all_bits_set(
-              iree_hal_command_buffer_mode(batches[i].command_buffers[j]),
-              IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION)) {
-        // Inline command buffers are not allowed to wait (as they could have
-        // already been executed!). This is a requirement of the API so we
-        // validate it across all backends even if they don't support inline
-        // execution and ignore it.
-        return iree_make_status(
-            IREE_STATUS_INVALID_ARGUMENT,
-            "inline command buffer submitted with a wait; inline command "
-            "buffers must be ready to execute immediately");
-      }
-    }
-  }
-  return iree_ok_status();
+IREE_API_EXPORT iree_status_t iree_hal_device_queue_alloca(
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
+    iree_device_size_t allocation_size,
+    iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
+  IREE_ASSERT_ARGUMENT(device);
+  IREE_ASSERT_ARGUMENT(
+      !wait_semaphore_list.count ||
+      (wait_semaphore_list.semaphores && wait_semaphore_list.payload_values));
+  IREE_ASSERT_ARGUMENT(!signal_semaphore_list.count ||
+                       (signal_semaphore_list.semaphores &&
+                        signal_semaphore_list.payload_values));
+  IREE_ASSERT_ARGUMENT(out_buffer);
+  *out_buffer = NULL;
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_status_t status = _VTABLE_DISPATCH(device, queue_alloca)(
+      device, queue_affinity, wait_semaphore_list, signal_semaphore_list, pool,
+      params, allocation_size, out_buffer);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_device_queue_submit(
-    iree_hal_device_t* device, iree_hal_command_category_t command_categories,
-    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
-    const iree_hal_submission_batch_t* batches) {
+IREE_API_EXPORT iree_status_t iree_hal_device_queue_dealloca(
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_buffer_t* buffer) {
   IREE_ASSERT_ARGUMENT(device);
-  IREE_ASSERT_ARGUMENT(!batch_count || batches);
+  IREE_ASSERT_ARGUMENT(
+      !wait_semaphore_list.count ||
+      (wait_semaphore_list.semaphores && wait_semaphore_list.payload_values));
+  IREE_ASSERT_ARGUMENT(!signal_semaphore_list.count ||
+                       (signal_semaphore_list.semaphores &&
+                        signal_semaphore_list.payload_values));
+  IREE_ASSERT_ARGUMENT(buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_device_validate_submission(batch_count, batches));
-  iree_status_t status = _VTABLE_DISPATCH(device, queue_submit)(
-      device, command_categories, queue_affinity, batch_count, batches);
+  iree_status_t status = _VTABLE_DISPATCH(device, queue_dealloca)(
+      device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
+      buffer);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_device_queue_execute(
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_host_size_t command_buffer_count,
+    iree_hal_command_buffer_t* const* command_buffers) {
+  IREE_ASSERT_ARGUMENT(device);
+  IREE_ASSERT_ARGUMENT(
+      !wait_semaphore_list.count ||
+      (wait_semaphore_list.semaphores && wait_semaphore_list.payload_values));
+  IREE_ASSERT_ARGUMENT(!signal_semaphore_list.count ||
+                       (signal_semaphore_list.semaphores &&
+                        signal_semaphore_list.payload_values));
+  IREE_ASSERT_ARGUMENT(!command_buffer_count || command_buffers);
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // TODO(benvanik): move into devices instead? then a synchronous/inline device
+  // could assert the waits are resolved instead of blanket failing on an
+  // already-resolved semaphore. This would make using stream-ordered
+  // allocations easier.
+  for (iree_host_size_t i = 0; i < command_buffer_count; ++i) {
+    if (wait_semaphore_list.count > 0 &&
+        iree_all_bits_set(
+            iree_hal_command_buffer_mode(command_buffers[i]),
+            IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION)) {
+      // Inline command buffers are not allowed to wait (as they could have
+      // already been executed!). This is a requirement of the API so we
+      // validate it across all backends even if they don't support inline
+      // execution and ignore it.
+      IREE_TRACE_ZONE_END(z0);
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "inline command buffer submitted with a wait; inline command "
+          "buffers must be ready to execute immediately");
+    }
+  }
+
+  iree_status_t status = _VTABLE_DISPATCH(device, queue_execute)(
+      device, queue_affinity, wait_semaphore_list, signal_semaphore_list,
+      command_buffer_count, command_buffers);
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_device_queue_barrier(
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list) {
+  IREE_ASSERT_ARGUMENT(device);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_status_t status =
+      iree_hal_device_queue_execute(device, queue_affinity, wait_semaphore_list,
+                                    signal_semaphore_list, 0, NULL);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_device_queue_flush(
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity) {
+  IREE_ASSERT_ARGUMENT(device);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_status_t status =
+      _VTABLE_DISPATCH(device, queue_flush)(device, queue_affinity);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_device_wait_semaphores(
     iree_hal_device_t* device, iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t* semaphore_list, iree_timeout_t timeout) {
+    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout) {
   IREE_ASSERT_ARGUMENT(device);
-  if (!semaphore_list || semaphore_list->count == 0) return iree_ok_status();
+  if (semaphore_list.count == 0) return iree_ok_status();
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status = _VTABLE_DISPATCH(device, wait_semaphores)(
       device, wait_mode, semaphore_list, timeout);
-  IREE_TRACE_ZONE_END(z0);
-  return status;
-}
-
-IREE_API_EXPORT iree_status_t
-iree_hal_device_wait_idle(iree_hal_device_t* device, iree_timeout_t timeout) {
-  IREE_ASSERT_ARGUMENT(device);
-  IREE_TRACE_ZONE_BEGIN(z0);
-  iree_status_t status = _VTABLE_DISPATCH(device, wait_idle)(device, timeout);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

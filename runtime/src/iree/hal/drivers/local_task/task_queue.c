@@ -237,7 +237,7 @@ static void iree_hal_task_queue_issue_cmd_cleanup(
 static iree_status_t iree_hal_task_queue_issue_cmd_allocate(
     iree_task_scope_t* scope, iree_hal_task_queue_t* queue,
     iree_task_t* retire_task, iree_host_size_t command_buffer_count,
-    iree_hal_command_buffer_t** const command_buffers,
+    iree_hal_command_buffer_t* const* command_buffers,
     iree_arena_allocator_t* arena, iree_hal_task_queue_issue_cmd_t** out_cmd) {
   iree_hal_task_queue_issue_cmd_t* cmd = NULL;
   iree_host_size_t total_cmd_size =

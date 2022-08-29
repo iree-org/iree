@@ -6,7 +6,7 @@
 #device_target_cpu = #hal.device.target<"llvm-cpu", {
   executable_targets = [#executable_target_embedded_elf_x86_64_]
 }>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -20,7 +20,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
   // CHECK: hal.executable private @ex
   hal.executable private @ex {
     hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-      hal.executable.export public @dispatch ordinal(0) layout(#executable_layout) attributes {
+      hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) attributes {
         translation_info = #iree_codegen.translation_info<CPUDefault workload_per_wg = [4]>
       } {
       ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):  // no predecessors
@@ -82,11 +82,11 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
 
       // CHECK: hal.device.switch<%[[DEVICE]] : !hal.device>
       // CHECK: #hal.device.match.executable.format<"embedded-elf-x86_64"> {
-      // CHECK:   %[[EXECUTABLE_LAYOUT:.+]] = hal.executable_layout.lookup
+      // CHECK:   %[[PIPELINE_LAYOUT:.+]] = hal.pipeline_layout.lookup
       // CHECK-SAME: device(%[[DEVICE]] : !hal.device)
-      // CHECK-SAME: layout(#executable_layout) : !hal.executable_layout
+      // CHECK-SAME: layout(#pipeline_layout) : !hal.pipeline_layout
       // CHECK:   hal.command_buffer.push_descriptor_set<%[[CMD]] : !hal.command_buffer>
-      // CHECK-SAME: layout(%[[EXECUTABLE_LAYOUT]] : !hal.executable_layout)[%c0]
+      // CHECK-SAME: layout(%[[PIPELINE_LAYOUT]] : !hal.pipeline_layout)[%c0]
       // CHECK-SAME: bindings([
       // CHECK:     %c0 = (%[[ARG0_BUFFER]] : !hal.buffer)[%c0, %c16],
       // CHECK:     %c1 = (%[[ARG1_BUFFER]] : !hal.buffer)[%c0, %c16],

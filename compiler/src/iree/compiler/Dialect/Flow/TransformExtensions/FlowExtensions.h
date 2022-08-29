@@ -21,6 +21,7 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 class DispatchWorkgroupsOp;
+class DispatchRegionOp;
 }  // namespace Flow
 }  // namespace IREE
 }  // namespace iree_compiler

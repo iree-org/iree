@@ -1,7 +1,7 @@
 // RUN: iree-opt --split-input-file --iree-hal-link-executables %s | FileCheck %s
 
 #vmvx_target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb">
-#executable_layout = #hal.executable.layout<push_constants = 1, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 1, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -10,7 +10,7 @@
 
 hal.executable private @dispatch_0 {
   hal.executable.variant @vmvx, target = #vmvx_target {
-    hal.executable.export @dispatch_0 ordinal(0) layout(#executable_layout) {
+    hal.executable.export @dispatch_0 ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device) :
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
@@ -27,7 +27,7 @@ hal.executable private @dispatch_0 {
 }
 hal.executable private @dispatch_1 {
   hal.executable.variant @vmvx, target = #vmvx_target {
-    hal.executable.export @dispatch_1 ordinal(0) layout(#executable_layout) {
+    hal.executable.export @dispatch_1 ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device) :
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
@@ -44,7 +44,7 @@ hal.executable private @dispatch_1 {
 }
 hal.executable private @dispatch_2 {
   hal.executable.variant @vmvx, target = #vmvx_target {
-    hal.executable.export @dispatch_2 ordinal(0) layout(#executable_layout) {
+    hal.executable.export @dispatch_2 ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device) :
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
@@ -134,7 +134,7 @@ util.initializer {
 // -----
 
 #vmvx_target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb">
-#executable_layout = #hal.executable.layout<push_constants = 1, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 1, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -143,7 +143,7 @@ util.initializer {
 
 hal.executable private @dispatch_0 {
   hal.executable.variant @vmvx, target = #vmvx_target {
-    hal.executable.export @dispatch_0 ordinal(0) layout(#executable_layout) {
+    hal.executable.export @dispatch_0 ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device) :
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
@@ -171,7 +171,7 @@ hal.executable private @dispatch_0 {
 }
 hal.executable private @dispatch_1 {
   hal.executable.variant @vmvx, target = #vmvx_target {
-    hal.executable.export @dispatch_1 ordinal(0) layout(#executable_layout) {
+    hal.executable.export @dispatch_1 ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device) :
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index

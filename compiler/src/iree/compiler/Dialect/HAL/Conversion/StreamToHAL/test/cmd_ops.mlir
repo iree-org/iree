@@ -106,7 +106,7 @@ func.func @cmdExecute(%arg0: !stream.resource<transient>, %arg1: index, %arg2: !
 #device_target_cpu = #hal.device.target<"llvm-cpu", {
   executable_targets = [#executable_target_embedded_elf_x86_64_]
 }>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<4, storage_buffer>
   ]>,
@@ -116,7 +116,7 @@ func.func @cmdExecute(%arg0: !stream.resource<transient>, %arg1: index, %arg2: !
 ]>
 hal.executable private @ex {
   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.export public @dispatch ordinal(0) layout(#executable_layout) attributes {
+    hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) attributes {
       translation_info = #iree_codegen.translation_info<CPUDefault workload_per_wg = [4]>
     } {
     ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):  // no predecessors
@@ -146,20 +146,20 @@ func.func @cmdDispatch(%arg0: !stream.resource<transient>, %arg1: index, %arg2: 
     // CHECK-NEXT: #hal.device.match.executable.format<"embedded-elf-x86_64">
 
     // Cache queries:
-    //  CHECK-DAG:   %[[LAYOUT:.+]] = hal.executable_layout.lookup {{.+}} layout(#executable_layout)
+    //  CHECK-DAG:   %[[LAYOUT:.+]] = hal.pipeline_layout.lookup {{.+}} layout(#pipeline_layout)
 
     // Push constants:
     //  CHECK-DAG:   hal.command_buffer.push_constants<%[[CMD]]
-    // CHECK-SAME:       layout(%[[LAYOUT]] : !hal.executable_layout)
+    // CHECK-SAME:       layout(%[[LAYOUT]] : !hal.pipeline_layout)
     // CHECK-SAME:       offset(0)
     // CHECK-SAME:       values([%c4_i32, %c5_i32]) : i32, i32
 
     // Descriptor sets:
     //  CHECK-DAG:   hal.command_buffer.push_descriptor_set<%[[CMD]]
-    // CHECK-SAME:       layout(%[[LAYOUT]] : !hal.executable_layout)[%c0
+    // CHECK-SAME:       layout(%[[LAYOUT]] : !hal.pipeline_layout)[%c0
     // CHECK-NEXT:     %c4 = (%arg0 : !hal.buffer)[%c0, %c128]
     //  CHECK-DAG:   hal.command_buffer.push_descriptor_set<%[[CMD]]
-    // CHECK-SAME:       layout(%[[LAYOUT]] : !hal.executable_layout)[%c1
+    // CHECK-SAME:       layout(%[[LAYOUT]] : !hal.pipeline_layout)[%c1
     // CHECK-NEXT:     %c5 = (%arg2 : !hal.buffer)[%c0, %c128]
 
     // Inlined workgroup count calculation:

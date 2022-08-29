@@ -65,7 +65,7 @@ def Util_TiedOpStorageAttr :
   let constBuilderCall = "$_builder.getI64ArrayAttr($0)";
 }
 
-def Util_GlobalRefAttr : Confined<FlatSymbolRefAttr, [
+def Util_GlobalRefAttr : ConfinedAttr<FlatSymbolRefAttr, [
   ReferToOp<"IREE::Util::GlobalOpInterface">,
 ]>;
 

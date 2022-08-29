@@ -7,14 +7,14 @@
 #device_target_cpu = #hal.device.target<"llvm-cpu", {
   executable_targets = [#executable_target_embedded_elf_x86_64_]
 }>
-#executable_layout_0 = #hal.executable.layout<push_constants = 2, sets = [
+#pipeline_layout_0 = #hal.pipeline.layout<push_constants = 2, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
     #hal.descriptor_set.binding<2, storage_buffer>
   ]>
 ]>
-#executable_layout_1 = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout_1 = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -27,7 +27,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
   // CHECK: hal.executable private @ex0
   hal.executable private @ex0 {
     hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-      hal.executable.export public @dispatch0 ordinal(0) layout(#executable_layout_0) attributes {
+      hal.executable.export public @dispatch0 ordinal(0) layout(#pipeline_layout_0) attributes {
         translation_info = #iree_codegen.translation_info<CPUDefault workload_per_wg = [4]>
       } {
       ^bb0(%device: !hal.device, %arg0: index):
@@ -40,7 +40,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
         }
       }
 
-      hal.executable.export public @dispatch1 ordinal(1) layout(#executable_layout_1) attributes {
+      hal.executable.export public @dispatch1 ordinal(1) layout(#pipeline_layout_1) attributes {
         translation_info = #iree_codegen.translation_info<CPUDefault workload_per_wg = [4]>
       } {
       ^bb0(%device: !hal.device, %arg0: index, %arg1: index):
@@ -74,9 +74,9 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
   // CHECK: %[[CMD:.+]] = hal.command_buffer.create
 
   // Setup dispatch constants and bindings:
-  // CHECK: hal.command_buffer.push_constants<%[[CMD]] : !hal.command_buffer> layout(%{{.+}} : !hal.executable_layout) offset(0) values([%c0_i32, %c0_i32]) : i32, i32
+  // CHECK: hal.command_buffer.push_constants<%[[CMD]] : !hal.command_buffer> layout(%{{.+}} : !hal.pipeline_layout) offset(0) values([%c0_i32, %c0_i32]) : i32, i32
   // CHECK: %[[BUFFER:.+]] = util.global.load @ex0_embedded_elf_x86_64_dispatch0_512_buffer
-  // CHECK: hal.command_buffer.push_descriptor_set<%[[CMD]] : !hal.command_buffer> layout(%{{.+}} : !hal.executable_layout)[%c0] bindings([
+  // CHECK: hal.command_buffer.push_descriptor_set<%[[CMD]] : !hal.command_buffer> layout(%{{.+}} : !hal.pipeline_layout)[%c0] bindings([
   // CHECK-NEXT:    %c0 = (%[[BUFFER]] : !hal.buffer)[%c0, %c32],
   // CHECK-NEXT:    %c1 = (%[[BUFFER]] : !hal.buffer)[%c256, %c32],
   // CHECK-NEXT:    %c2 = (%[[BUFFER]] : !hal.buffer)[%c512, %c32]

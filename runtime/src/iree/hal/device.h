@@ -11,14 +11,13 @@
 #include <stdint.h>
 
 #include "iree/base/api.h"
+#include "iree/hal/allocator.h"
 #include "iree/hal/buffer.h"
 #include "iree/hal/command_buffer.h"
-#include "iree/hal/descriptor_set.h"
-#include "iree/hal/descriptor_set_layout.h"
 #include "iree/hal/event.h"
 #include "iree/hal/executable_cache.h"
-#include "iree/hal/executable_layout.h"
 #include "iree/hal/fence.h"
+#include "iree/hal/pipeline_layout.h"
 #include "iree/hal/resource.h"
 #include "iree/hal/semaphore.h"
 
@@ -174,7 +173,7 @@ typedef struct iree_hal_submission_batch_t {
 
   // Command buffers to execute, in order.
   iree_host_size_t command_buffer_count;
-  iree_hal_command_buffer_t** command_buffers;
+  iree_hal_command_buffer_t* const* command_buffers;
 
   // Semaphores to signal once all command buffers have completed execution.
   iree_hal_semaphore_list_t signal_semaphores;
@@ -294,9 +293,39 @@ IREE_API_EXPORT iree_status_t iree_hal_device_transfer_d2d(
     iree_device_size_t target_offset, iree_device_size_t data_length,
     iree_hal_transfer_buffer_flags_t flags, iree_timeout_t timeout);
 
-// Submits one or more batches of work to a device queue.
+// Reserves and returns a queue-ordered transient buffer.
+// The allocation will not be committed until the entire |wait_semaphore_list|
+// has been reached. Once the storage is available for use the
+// |signal_semaphore_list| will be signaled.
 //
-// The queue is selected based on the flags set in |command_categories| and the
+// Usage:
+//   iree_hal_device_queue_alloca(wait(0), signal(1), &buffer);
+//   iree_hal_device_queue_execute(wait(1), signal(2), commands...);
+//   iree_hal_device_queue_dealloca(wait(2), signal(3), buffer);
+IREE_API_EXPORT iree_status_t iree_hal_device_queue_alloca(
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
+    iree_device_size_t allocation_size,
+    iree_hal_buffer_t** IREE_RESTRICT out_buffer);
+
+// Deallocates a queue-ordered transient buffer.
+// The deallocation will not be made until the entire |wait_semaphore_list| has
+// been reached. Once the storage is available for reuse the
+// |signal_semaphore_list| will be signaled.
+IREE_API_EXPORT iree_status_t iree_hal_device_queue_dealloca(
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_buffer_t* buffer);
+
+// Executes zero or more command buffers on a device queue.
+// The command buffers are executed in order as if they were recorded as one.
+// No commands will execute until the wait fence has been reached and the signal
+// fence will be signaled when all commands have completed.
+//
+// The queue is selected based on the command buffers submitted and the
 // |queue_affinity|. As the number of available queues can vary the
 // |queue_affinity| is used to hash into the available queues for the required
 // categories. For example if 2 queues support transfer commands and the
@@ -305,14 +334,30 @@ IREE_API_EXPORT iree_status_t iree_hal_device_transfer_d2d(
 // placed on to the same queue. Note that the exact hashing function is
 // implementation dependent.
 //
-// The submission behavior matches Vulkan's vkQueueSubmit, with each batch
+// The submission behavior matches Vulkan's vkQueueSubmit, with each submission
 // executing its command buffers in the order they are defined but allowing the
 // command buffers to complete out-of-order. See:
 // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/vkQueueSubmit.html
-IREE_API_EXPORT iree_status_t iree_hal_device_queue_submit(
-    iree_hal_device_t* device, iree_hal_command_category_t command_categories,
-    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
-    const iree_hal_submission_batch_t* batches);
+IREE_API_EXPORT iree_status_t iree_hal_device_queue_execute(
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_host_size_t command_buffer_count,
+    iree_hal_command_buffer_t* const* command_buffers);
+
+// Enqueues a barrier waiting for |wait_semaphore_list| and signaling
+// |signal_semaphore_list| when reached.
+// Equivalent to iree_hal_device_queue_execute with no command buffers.
+IREE_API_EXPORT iree_status_t iree_hal_device_queue_barrier(
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list);
+
+// Flushes any locally-pending submissions in the queue.
+// When submitting many queue operations this can be used to eagerly flush
+// earlier submissions while later ones are still being constructed.
+IREE_API_EXPORT iree_status_t iree_hal_device_queue_flush(
+    iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity);
 
 // Blocks the caller until the semaphores reach or exceed the specified payload
 // values or the |timeout| elapses. All semaphores in |semaphore_list| must be
@@ -334,20 +379,7 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_submit(
 // failed and get the status.
 IREE_API_EXPORT iree_status_t iree_hal_device_wait_semaphores(
     iree_hal_device_t* device, iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t* semaphore_list, iree_timeout_t timeout);
-
-// Blocks the caller until all outstanding requests on all queues have been
-// completed or the |timeout| elapses. This is equivalent to having waited
-// on all semaphores outstanding at the time of the call, meaning that if new
-// work is submitted by another thread it may not be waited on prior to this
-// call returning.
-//
-// Returns success if the device reaches an idle point during the call.
-//
-// Returns DEADLINE_EXCEEDED if the |timeout| elapses without the device having
-// become idle.
-IREE_API_EXPORT iree_status_t
-iree_hal_device_wait_idle(iree_hal_device_t* device, iree_timeout_t timeout);
+    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout);
 
 //===----------------------------------------------------------------------===//
 // iree_hal_device_t implementation details
@@ -373,17 +405,11 @@ typedef struct iree_hal_device_vtable_t {
       iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
       iree_hal_command_category_t command_categories,
       iree_hal_queue_affinity_t queue_affinity,
+      iree_host_size_t binding_capacity,
       iree_hal_command_buffer_t** out_command_buffer);
 
-  iree_status_t(IREE_API_PTR* create_descriptor_set)(
-      iree_hal_device_t* device, iree_hal_descriptor_set_layout_t* set_layout,
-      iree_host_size_t binding_count,
-      const iree_hal_descriptor_set_binding_t* bindings,
-      iree_hal_descriptor_set_t** out_descriptor_set);
-
   iree_status_t(IREE_API_PTR* create_descriptor_set_layout)(
-      iree_hal_device_t* device,
-      iree_hal_descriptor_set_layout_usage_type_t usage_type,
+      iree_hal_device_t* device, iree_hal_descriptor_set_layout_flags_t flags,
       iree_host_size_t binding_count,
       const iree_hal_descriptor_set_layout_binding_t* bindings,
       iree_hal_descriptor_set_layout_t** out_descriptor_set_layout);
@@ -395,11 +421,11 @@ typedef struct iree_hal_device_vtable_t {
       iree_hal_device_t* device, iree_string_view_t identifier,
       iree_loop_t loop, iree_hal_executable_cache_t** out_executable_cache);
 
-  iree_status_t(IREE_API_PTR* create_executable_layout)(
+  iree_status_t(IREE_API_PTR* create_pipeline_layout)(
       iree_hal_device_t* device, iree_host_size_t push_constants,
       iree_host_size_t set_layout_count,
-      iree_hal_descriptor_set_layout_t** set_layouts,
-      iree_hal_executable_layout_t** out_executable_layout);
+      iree_hal_descriptor_set_layout_t* const* set_layouts,
+      iree_hal_pipeline_layout_t** out_pipeline_layout);
 
   iree_status_t(IREE_API_PTR* create_semaphore)(
       iree_hal_device_t* device, uint64_t initial_value,
@@ -415,17 +441,33 @@ typedef struct iree_hal_device_vtable_t {
       iree_device_size_t target_offset, iree_device_size_t data_length,
       iree_hal_transfer_buffer_flags_t flags, iree_timeout_t timeout);
 
-  iree_status_t(IREE_API_PTR* queue_submit)(
-      iree_hal_device_t* device, iree_hal_command_category_t command_categories,
-      iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
-      const iree_hal_submission_batch_t* batches);
+  iree_status_t(IREE_API_PTR* queue_alloca)(
+      iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+      const iree_hal_semaphore_list_t wait_semaphore_list,
+      const iree_hal_semaphore_list_t signal_semaphore_list,
+      iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
+      iree_device_size_t allocation_size,
+      iree_hal_buffer_t** IREE_RESTRICT out_buffer);
+
+  iree_status_t(IREE_API_PTR* queue_dealloca)(
+      iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+      const iree_hal_semaphore_list_t wait_semaphore_list,
+      const iree_hal_semaphore_list_t signal_semaphore_list,
+      iree_hal_buffer_t* buffer);
+
+  iree_status_t(IREE_API_PTR* queue_execute)(
+      iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity,
+      const iree_hal_semaphore_list_t wait_semaphore_list,
+      const iree_hal_semaphore_list_t signal_semaphore_list,
+      iree_host_size_t command_buffer_count,
+      iree_hal_command_buffer_t* const* command_buffers);
+
+  iree_status_t(IREE_API_PTR* queue_flush)(
+      iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity);
 
   iree_status_t(IREE_API_PTR* wait_semaphores)(
       iree_hal_device_t* device, iree_hal_wait_mode_t wait_mode,
-      const iree_hal_semaphore_list_t* semaphore_list, iree_timeout_t timeout);
-
-  iree_status_t(IREE_API_PTR* wait_idle)(iree_hal_device_t* device,
-                                         iree_timeout_t timeout);
+      const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout);
 } iree_hal_device_vtable_t;
 IREE_HAL_ASSERT_VTABLE_LAYOUT(iree_hal_device_vtable_t);
 

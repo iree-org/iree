@@ -8,6 +8,7 @@
 #include "iree/compiler/Dialect/Util/Analysis/DFX/Solver.h"
 #include "iree/compiler/Dialect/Util/Analysis/DFX/State.h"
 #include "iree/compiler/Dialect/Util/Analysis/Explorer.h"
+#include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 
 namespace mlir {
@@ -18,20 +19,8 @@ namespace Util {
 namespace {
 
 class TestFloatRangeAnalysisPass
-    : public PassWrapper<TestFloatRangeAnalysisPass, OperationPass<void>> {
+    : public TestFloatRangeAnalysisBase<TestFloatRangeAnalysisPass> {
  public:
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(TestFloatRangeAnalysisPass)
-
-  StringRef getArgument() const override {
-    return "iree-util-test-float-range-analysis";
-  }
-
-  StringRef getDescription() const override {
-    return "Tests floating point range analysis by evaluating any "
-           "'iree_unregistered.test_fprange' op and setting the results on an "
-           "attribute";
-  }
-
   void runOnOperation() override {
     Explorer explorer(getOperation(), TraversalAction::SHALLOW);
     llvm::BumpPtrAllocator allocator;
@@ -71,8 +60,6 @@ class TestFloatRangeAnalysisPass
 std::unique_ptr<OperationPass<void>> createTestFloatRangeAnalysisPass() {
   return std::make_unique<TestFloatRangeAnalysisPass>();
 }
-
-static PassRegistration<TestFloatRangeAnalysisPass> pass;
 
 }  // namespace Util
 }  // namespace IREE

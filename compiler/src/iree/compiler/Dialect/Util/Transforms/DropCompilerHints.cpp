@@ -7,6 +7,7 @@
 #include <utility>
 
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "mlir/Pass/Pass.h"
 
@@ -16,18 +17,8 @@ namespace IREE {
 namespace Util {
 
 class DropCompilerHintsPass
-    : public PassWrapper<DropCompilerHintsPass, OperationPass<void>> {
+    : public DropCompilerHintsBase<DropCompilerHintsPass> {
  public:
-  StringRef getArgument() const override {
-    return "iree-util-drop-compiler-hints";
-  }
-
-  StringRef getDescription() const override {
-    return "Deletes operations that have no runtime equivalent and are only "
-           "used in the compiler. This should be performed after all other "
-           "compiler passes.";
-  }
-
   void runOnOperation() override {
     // We can't use patterns and applyPatternsAndFoldGreedily because that
     // automatically does canonicalization.
@@ -41,8 +32,6 @@ class DropCompilerHintsPass
 std::unique_ptr<OperationPass<void>> createDropCompilerHintsPass() {
   return std::make_unique<DropCompilerHintsPass>();
 }
-
-static PassRegistration<DropCompilerHintsPass> pass;
 
 }  // namespace Util
 }  // namespace IREE

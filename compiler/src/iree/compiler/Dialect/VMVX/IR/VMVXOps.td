@@ -198,10 +198,6 @@ def VMVX_MatmulOp : VMVX_Op<"matmul"> {
     VMVX_Index:$n,
     VMVX_Index:$k,
 
-    // Scale factors.
-    VMVX_ElementType:$alpha,
-    VMVX_ElementType:$beta,
-
     // Type and flag attributes.
     VMVX_ElementTypeAttr:$lhs_type,
     VMVX_ElementTypeAttr:$rhs_type,
@@ -214,7 +210,6 @@ def VMVX_MatmulOp : VMVX_Op<"matmul"> {
     `rhs` `` `(` $rhs_buffer `offset` $rhs_offset `row_stride` $rhs_row_stride `:` type($rhs_buffer)`)`
     `out` `` `(` $out_buffer `offset` $out_offset `row_stride` $out_row_stride `:` type($out_buffer) `)`
     `mnk` `` `(` $m `,` $n `,` $k `)`
-    `scale` `` `(` $alpha `:` type($alpha) `,` $beta `:` type($beta) `)`
     `flags` `` `(` $flags `)`
     `:` `(` $lhs_type `,` $rhs_type `,` $out_type `)`
     attr-dict

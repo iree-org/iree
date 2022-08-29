@@ -40,7 +40,7 @@ stream.executable public @add_dispatch_0 {
 // CHECK-LABEL: hal.executable public @add_dispatch_0
 //  CHECK-NEXT:   hal.executable.variant public @vmvx_bytecode_fb, target = <"vmvx", "vmvx-bytecode-fb"> {
 //  CHECK-NEXT:     hal.executable.export public @add_dispatch_0 ordinal(0)
-//  CHECK-SAME:       layout(#hal.executable.layout<push_constants = 0, sets = [
+//  CHECK-SAME:       layout(#hal.pipeline.layout<push_constants = 0, sets = [
 //  CHECK-SAME:         <0, bindings = [
 //  CHECK-SAME:           <0, storage_buffer>,
 //  CHECK-SAME:           <1, storage_buffer>,
@@ -50,7 +50,6 @@ stream.executable public @add_dispatch_0 {
 //  CHECK-NEXT:         vm.func private @add_dispatch_0(
 //  CHECK-SAME:             %[[SCRATCHPAD:.+]]: !vm.buffer, %[[CONSTANTS:.+]]: !vm.buffer,
 //  CHECK-SAME:             %[[BINDINGS:.+]]: !vm.list<!vm.buffer>
-//   CHECK-DAG:           %c16 = vm.const.i32 16
 //   CHECK-DAG:           %zero = vm.const.i32.zero
 //   CHECK-DAG:           %c1 = vm.const.i32 1
 //   CHECK-DAG:           %c2 = vm.const.i32 2

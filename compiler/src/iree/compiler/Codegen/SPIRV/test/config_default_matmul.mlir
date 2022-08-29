@@ -2,7 +2,7 @@
 
 // Odd K that forbids vectorization.
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -17,7 +17,7 @@ hal.executable @batch_matmul_1x3x32 {
         max_compute_workgroup_size = [128, 128, 64],
         subgroup_size = 32>>
     }> {
-    hal.executable.export public @batch_matmul_1x3x32 layout(#executable_layout)
+    hal.executable.export public @batch_matmul_1x3x32 layout(#pipeline_layout)
     builtin.module {
       func.func @batch_matmul_1x3x32() {
         %c0 = arith.constant 0 : index
@@ -57,7 +57,7 @@ hal.executable @batch_matmul_1x3x32 {
 
 // Non-16 / non-32 bit types cannot be vectorized right now.
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -72,7 +72,7 @@ hal.executable private @matmul_64x16 {
         max_compute_workgroup_size = [128, 128, 64],
         subgroup_size = 64>>
   }> {
-    hal.executable.export public @matmul_64x16 layout(#executable_layout)
+    hal.executable.export public @matmul_64x16 layout(#pipeline_layout)
     builtin.module {
       func.func @matmul_64x16() {
         %c0 = arith.constant 0 : index
@@ -111,7 +111,7 @@ hal.executable private @matmul_64x16 {
 
 // Odd N that forbids vectorization.
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -126,7 +126,7 @@ hal.executable @matmul_400x273 {
         max_compute_workgroup_size = [128, 128, 64],
         subgroup_size = 64>>
     }> {
-    hal.executable.export public @matmul_400x273 layout(#executable_layout)
+    hal.executable.export public @matmul_400x273 layout(#pipeline_layout)
     builtin.module {
       func.func @matmul_400x273() {
         %c0 = arith.constant 0 : index
@@ -176,7 +176,7 @@ hal.executable @matmul_400x273 {
 
 // Odd M and non-4-multiplier N
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -191,7 +191,7 @@ hal.executable @matmul_25x546 {
         max_compute_workgroup_size = [128, 128, 64],
         subgroup_size = 64>>
   }> {
-    hal.executable.export public @matmul_25x546 layout(#executable_layout)
+    hal.executable.export public @matmul_25x546 layout(#pipeline_layout)
     builtin.module {
       func.func @matmul_25x546() {
         %c0 = arith.constant 0 : index
@@ -248,7 +248,7 @@ hal.executable @matmul_25x546 {
 #map3 = affine_map<(d0)[s0] -> (-d0 + 256, s0)>
 #map4 = affine_map<(d0)[s0] -> (-d0 + 1024, s0)>
 #map5 = affine_map<(d0, d1) -> (d0, d1)>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -265,7 +265,7 @@ hal.executable private @matmul_pointwise_256x1024 {
         max_compute_workgroup_size = [128, 128, 64],
         subgroup_size = 32>>
     }> {
-    hal.executable.export public @matmul_pointwise_256x1024 layout(#executable_layout)
+    hal.executable.export public @matmul_pointwise_256x1024 layout(#pipeline_layout)
     builtin.module {
       func.func @matmul_pointwise_256x1024() {
         %c0 = arith.constant 0 : index

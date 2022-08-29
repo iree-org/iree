@@ -1,6 +1,6 @@
 // RUN: iree-opt -pass-pipeline='hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target{test-lowering-configuration=true}))' -split-input-file %s | FileCheck %s
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -9,7 +9,7 @@
 ]>
 hal.executable private @matmul_static  {
   hal.executable.variant @vmvx_bytecode_fb, target = <"vmvx", "vmvx-bytecode-fb"> {
-    hal.executable.export public @matmul_static layout(#executable_layout)
+    hal.executable.export public @matmul_static layout(#pipeline_layout)
     builtin.module {
       func.func @matmul_static() {
         %cst = arith.constant 0.0 : f32
@@ -41,7 +41,7 @@ hal.executable private @matmul_static  {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -49,7 +49,7 @@ hal.executable private @matmul_static  {
 ]>
 hal.executable @copy_op_dynamic {
   hal.executable.variant @vmvx_bytecode_fb, target = <"vmvx", "vmvx-bytecode-fb"> {
-    hal.executable.export @copy_op_dynamic layout(#executable_layout)
+    hal.executable.export @copy_op_dynamic layout(#pipeline_layout)
     builtin.module {
       func.func @copy_op_dynamic() {
         %d0 = hal.interface.constant.load[0] : index
@@ -82,7 +82,7 @@ hal.executable @copy_op_dynamic {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -90,7 +90,7 @@ hal.executable @copy_op_dynamic {
 ]>
 hal.executable private @static_1d_fft_stage2  {
   hal.executable.variant @vmvx_bytecode_fb, target = <"vmvx", "vmvx-bytecode-fb"> {
-    hal.executable.export @static_1d_fft_stage2 layout(#executable_layout)
+    hal.executable.export @static_1d_fft_stage2 layout(#pipeline_layout)
     builtin.module {
       func.func @static_1d_fft_stage2() {
         %c0 = arith.constant 0 : index

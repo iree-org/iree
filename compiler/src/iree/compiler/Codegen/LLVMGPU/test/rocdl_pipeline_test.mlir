@@ -3,7 +3,7 @@
 // Verify that a simple element wise op gets lowered succefully all the way to
 // nvvm/llvm dialect.
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -12,7 +12,7 @@
 ]>
 hal.executable @simpleMath_ex_dispatch_0 {
   hal.executable.variant @rocm, target = <"rocm", "rocm-hsaco-fb"> {
-  hal.executable.export @add_dispatch_0 layout(#executable_layout) {
+  hal.executable.export @add_dispatch_0 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1
       hal.return %x, %y, %z : index, index, index
@@ -47,7 +47,7 @@ hal.executable @simpleMath_ex_dispatch_0 {
 #map0 = affine_map<()[s0, s1] -> (s0 * s1)>
 #map1 = affine_map<(d0)[s0] -> (s0, -d0 + 1024)>
 #map2 = affine_map<(d0)[s0] -> (-d0 + 1024, s0)>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -56,7 +56,7 @@ hal.executable @simpleMath_ex_dispatch_0 {
 ]>
 hal.executable @dot_dispatch_0 {
   hal.executable.variant @rocm, target = <"rocm", "rocm-hsaco-fb"> {
-    hal.executable.export @dot_dispatch_0 layout(#executable_layout) {
+    hal.executable.export @dot_dispatch_0 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index

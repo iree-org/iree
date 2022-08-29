@@ -172,11 +172,57 @@ class VMVXTargetBackend final : public TargetBackend {
   }
 };
 
+class VMVXInlineTargetBackend final : public TargetBackend {
+ public:
+  VMVXInlineTargetBackend() = default;
+
+  std::string name() const override { return "vmvx-inline"; }
+
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry
+        .insert<IREE::Codegen::IREECodegenDialect, IREE::VMVX::VMVXDialect>();
+  }
+
+  IREE::HAL::DeviceTargetAttr getDefaultDeviceTarget(
+      MLIRContext *context) const override {
+    Builder b(context);
+    SmallVector<NamedAttribute> configItems;
+
+    configItems.emplace_back(b.getStringAttr("executable_targets"),
+                             getExecutableTargets(context));
+
+    auto configAttr = b.getDictionaryAttr(configItems);
+    return IREE::HAL::DeviceTargetAttr::get(
+        context, b.getStringAttr(deviceID()), configAttr);
+  }
+
+  void buildTranslationPassPipeline(OpPassManager &passManager) override {
+    IREE::VMVX::buildVMVXTransformPassPipeline(passManager);
+  }
+
+ private:
+  ArrayAttr getExecutableTargets(MLIRContext *context) const {
+    SmallVector<Attribute> targetAttrs;
+    // This is where we would multiversion.
+    targetAttrs.push_back(getExecutableTarget(context));
+    return ArrayAttr::get(context, targetAttrs);
+  }
+
+  IREE::HAL::ExecutableTargetAttr getExecutableTarget(
+      MLIRContext *context) const {
+    return IREE::HAL::ExecutableTargetAttr::get(context, "vmvx-inline",
+                                                "vmvx-ir");
+  }
+};
+
 void registerVMVXTargetBackends() {
   // #hal.device.target<"vmvx", ...
   // #hal.executable.target<"vmvx", ...
-  static TargetBackendRegistration registration(
+  static TargetBackendRegistration registration0(
       "vmvx", [=]() { return std::make_shared<VMVXTargetBackend>(); });
+  static TargetBackendRegistration registration1("vmvx-inline", [=]() {
+    return std::make_shared<VMVXInlineTargetBackend>();
+  });
 }
 
 }  // namespace HAL

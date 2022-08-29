@@ -14,12 +14,11 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/allocator.h"
 #include "iree/hal/buffer.h"
-#include "iree/hal/descriptor_set.h"
 #include "iree/hal/detail.h"
 #include "iree/hal/device.h"
 #include "iree/hal/event.h"
 #include "iree/hal/executable.h"
-#include "iree/hal/executable_layout.h"
+#include "iree/hal/pipeline_layout.h"
 #include "iree/hal/resource.h"
 
 // Returns success iff the queue supports the given command categories.
@@ -366,7 +365,7 @@ iree_status_t iree_hal_command_buffer_copy_buffer_validation(
 iree_status_t iree_hal_command_buffer_push_constants_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state,
-    iree_hal_executable_layout_t* executable_layout, iree_host_size_t offset,
+    iree_hal_pipeline_layout_t* pipeline_layout, iree_host_size_t offset,
     const void* values, iree_host_size_t values_length) {
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
       command_buffer, validation_state, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
@@ -385,31 +384,41 @@ iree_status_t iree_hal_command_buffer_push_constants_validation(
 iree_status_t iree_hal_command_buffer_push_descriptor_set_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state,
-    iree_hal_executable_layout_t* executable_layout, uint32_t set,
+    iree_hal_pipeline_layout_t* pipeline_layout, uint32_t set,
     iree_host_size_t binding_count,
     const iree_hal_descriptor_set_binding_t* bindings) {
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
       command_buffer, validation_state, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
 
   // TODO(benvanik): validate set index.
-  // TODO(benvanik): validate binding_offset.
-  // TODO(benvanik): validate bindings.
 
-  return iree_ok_status();
-}
+  // TODO(benvanik): allow indirect bindings on primary command buffers?
+  const bool has_binding_table =
+      iree_all_bits_set(iree_hal_command_buffer_mode(command_buffer),
+                        IREE_HAL_COMMAND_BUFFER_MODE_NESTED);
+  for (iree_host_size_t i = 0; i < binding_count; ++i) {
+    const iree_hal_descriptor_set_binding_t* binding = &bindings[i];
+    // TODO(benvanik): validate binding index.
+    // TODO(benvanik): validate binding buffer parameters/access.
+    // TODO(benvanik): validate binding range (if possible).
 
-iree_status_t iree_hal_command_buffer_bind_descriptor_set_validation(
-    iree_hal_command_buffer_t* command_buffer,
-    iree_hal_command_buffer_validation_state_t* validation_state,
-    iree_hal_executable_layout_t* executable_layout, uint32_t set,
-    iree_hal_descriptor_set_t* descriptor_set,
-    iree_host_size_t dynamic_offset_count,
-    const iree_device_size_t* dynamic_offsets) {
-  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
-      command_buffer, validation_state, IREE_HAL_COMMAND_CATEGORY_DISPATCH));
-
-  // TODO(benvanik): validate set index.
-  // TODO(benvanik): validate dynamic offsets (both count and offsets).
+    // Validate that indirect buffer references are supported and in bounds.
+    if (!binding->buffer) {
+      if (!has_binding_table) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "bindings[%" PRIhsz
+                                "] is indirect but the command buffer does not "
+                                "support binding tables",
+                                i);
+      } else if (binding->buffer_slot >= command_buffer->binding_capacity) {
+        return iree_make_status(
+            IREE_STATUS_OUT_OF_RANGE,
+            "bindings[%" PRIhsz
+            "] references binding table slot %u but table capacity is %u",
+            i, binding->buffer_slot, command_buffer->binding_capacity);
+      }
+    }
+  }
 
   return iree_ok_status();
 }
@@ -453,6 +462,28 @@ iree_status_t iree_hal_command_buffer_dispatch_indirect_validation(
 
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_dispatch_bindings(
       command_buffer, validation_state, executable, entry_point));
+
+  return iree_ok_status();
+}
+
+iree_status_t iree_hal_command_buffer_execute_commands_validation(
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_command_buffer_validation_state_t* validation_state,
+    iree_hal_command_buffer_t* commands,
+    iree_hal_buffer_binding_table_t binding_table) {
+  if (iree_all_bits_set(command_buffer->mode,
+                        IREE_HAL_COMMAND_BUFFER_MODE_NESTED)) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "command buffers can only be nested one level "
+                            "(nested cannot execute nested)");
+  }
+  if (!iree_all_bits_set(commands->mode, IREE_HAL_COMMAND_BUFFER_MODE_NESTED)) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "only nested command buffers can be executed as "
+                            "part of a primary command buffer");
+  }
+
+  // TODO(benvanik): validate bindings as with push descriptor sets.
 
   return iree_ok_status();
 }

@@ -33,6 +33,7 @@ iree_cc_library(
     iree::hal
     iree::hal::local
     iree::hal::utils::buffer_transfer
+    iree::hal::utils::deferred_command_buffer
     iree::hal::utils::semaphore_base
   PUBLIC
 )

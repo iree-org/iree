@@ -1214,7 +1214,7 @@ iree_status_t iree_vm_bytecode_disasm_op(
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.select.i64 "));
       EMIT_I32_REG_NAME(condition_reg);
-      EMIT_OPTIONAL_VALUE_I64(regs->i32[condition_reg]);
+      EMIT_OPTIONAL_VALUE_I32(regs->i32[condition_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, " ? "));
       EMIT_I64_REG_NAME(true_value_reg);
       EMIT_OPTIONAL_VALUE_I64(regs->i32[true_value_reg]);

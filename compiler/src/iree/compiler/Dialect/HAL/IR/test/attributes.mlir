@@ -10,15 +10,15 @@
 
 // -----
 
-// CHECK-LABEL: executable_layout.basic
-"executable_layout.basic"() {
-  // CHECK: layout0 = #hal.executable.layout<push_constants = 4, sets = [
+// CHECK-LABEL: pipeline_layout.basic
+"pipeline_layout.basic"() {
+  // CHECK: layout0 = #hal.pipeline.layout<push_constants = 4, sets = [
   // CHECK-SAME: <0, bindings = [
   // CHECK-SAME:   <0, storage_buffer>
   // CHECK-SAME:   <1, storage_buffer>
   // CHECK-SAME: <1, bindings = [
   // CHECK-SAME:   <0, uniform_buffer>
-  layout0 = #hal.executable.layout<push_constants = 4, sets = [
+  layout0 = #hal.pipeline.layout<push_constants = 4, sets = [
     #hal.descriptor_set.layout<0, bindings = [
       #hal.descriptor_set.binding<0, storage_buffer>,
       #hal.descriptor_set.binding<1, storage_buffer>

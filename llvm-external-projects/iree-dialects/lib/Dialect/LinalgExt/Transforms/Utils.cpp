@@ -81,7 +81,7 @@ Value mlir::iree_compiler::IREE::LinalgExt::createMatchingSubsetInsertOp(
     OpBuilder &b, Location loc, tensor::ExtractSliceOp subsetExtractOp,
     Value source, Value dest) {
   return b.create<tensor::InsertSliceOp>(
-      loc, subsetExtractOp.source().getType(), source, dest,
+      loc, subsetExtractOp.getSource().getType(), source, dest,
       subsetExtractOp.offsets(), subsetExtractOp.sizes(),
       subsetExtractOp.strides(), subsetExtractOp.static_offsets(),
       subsetExtractOp.static_sizes(), subsetExtractOp.static_strides());

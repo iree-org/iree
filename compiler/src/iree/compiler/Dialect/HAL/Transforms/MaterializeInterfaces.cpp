@@ -114,21 +114,24 @@ static LogicalResult verifyEntryPointTypes(mlir::func::FuncOp entryFuncOp) {
   return success();
 }
 
-// Creates an executable layout attr from the analysis results.
-static IREE::HAL::ExecutableLayoutAttr makeExecutableLayoutAttr(
-    const ExecutableLayout &executableLayout, OpBuilder &builder) {
+// Creates an pipeline layout attr from the analysis results.
+static IREE::HAL::PipelineLayoutAttr makePipelineLayoutAttr(
+    const PipelineLayout &pipelineLayout, OpBuilder &builder) {
   SmallVector<IREE::HAL::DescriptorSetLayoutAttr> setLayoutAttrs;
-  for (const auto &setLayout : executableLayout.setLayouts) {
+  for (const auto &setLayout : pipelineLayout.setLayouts) {
     SmallVector<IREE::HAL::DescriptorSetBindingAttr> bindingAttrs;
     for (const auto &binding : setLayout.bindings) {
       bindingAttrs.push_back(IREE::HAL::DescriptorSetBindingAttr::get(
-          builder.getContext(), binding.ordinal, binding.type));
+          builder.getContext(), binding.ordinal, binding.type,
+          binding.flags != IREE::HAL::DescriptorFlags::None
+              ? binding.flags
+              : Optional<IREE::HAL::DescriptorFlags>{}));
     }
     setLayoutAttrs.push_back(IREE::HAL::DescriptorSetLayoutAttr::get(
         builder.getContext(), setLayout.ordinal, bindingAttrs));
   }
-  return IREE::HAL::ExecutableLayoutAttr::get(
-      builder.getContext(), executableLayout.pushConstantCount, setLayoutAttrs);
+  return IREE::HAL::PipelineLayoutAttr::get(
+      builder.getContext(), pipelineLayout.pushConstantCount, setLayoutAttrs);
 }
 
 // Converts the usage of the given primitive |arg| to interface methods.
@@ -169,8 +172,8 @@ static void convertBindingUsage(
 // Clones |sourceFuncOp| and updates its signature to match the |interfaceOp|
 // and use the HAL interface access primitives.
 static mlir::func::FuncOp cloneFuncWithInterface(
-    mlir::func::FuncOp sourceFuncOp, const ExecutableLayout &executableLayout,
-    IREE::HAL::ExecutableLayoutAttr layoutAttr) {
+    mlir::func::FuncOp sourceFuncOp, const PipelineLayout &pipelineLayout,
+    IREE::HAL::PipelineLayoutAttr layoutAttr) {
   // Clone so that we can do a bunch of unsafe in-place updates.
   auto clonedFuncOp = sourceFuncOp.clone();
 
@@ -192,7 +195,7 @@ static mlir::func::FuncOp cloneFuncWithInterface(
   unsigned resourceIdx = 0;
   for (auto arg : entryBlock->getArguments()) {
     if (!arg.getType().isa<IREE::Stream::BindingType>()) continue;
-    auto setBinding = executableLayout.resourceMap[resourceIdx++];
+    auto setBinding = pipelineLayout.resourceMap[resourceIdx++];
     auto setLayoutAttr = layoutAttr.getSetLayouts()[setBinding.first];
     auto bindingAttr = setLayoutAttr.getBindings()[setBinding.second];
     convertBindingUsage(sourceFuncOp, arg, setLayoutAttr, bindingAttr);
@@ -207,9 +210,9 @@ static mlir::func::FuncOp cloneFuncWithInterface(
 // Annotates |dispatchOp| with resource binding to interface binding mappings.
 // TODO(benvanik): have a HAL op with structured information instead.
 static void annotateDispatchSite(IREE::Stream::CmdDispatchOp dispatchOp,
-                                 const ExecutableLayout &executableLayout) {
+                                 const PipelineLayout &pipelineLayout) {
   SmallVector<Attribute> bindingAttrs;
-  for (auto setBinding : executableLayout.resourceMap) {
+  for (auto setBinding : pipelineLayout.resourceMap) {
     bindingAttrs.push_back(IREE::HAL::InterfaceBindingAttr::get(
         dispatchOp.getContext(), setBinding.first, setBinding.second));
   }
@@ -238,16 +241,15 @@ static LogicalResult declareEntryPointOps(
             exportOp.getFunctionRef());
     if (failed(verifyEntryPointTypes(sourceFuncOp))) return failure();
 
-    const auto &executableLayout = layoutAnalysis.getExecutableLayout(exportOp);
+    const auto &pipelineLayout = layoutAnalysis.getPipelineLayout(exportOp);
 
     // Create the interface for this entry point based on the analysis of its
     // usage within the program.
-    auto layoutAttr =
-        makeExecutableLayoutAttr(executableLayout, executableBuilder);
+    auto layoutAttr = makePipelineLayoutAttr(pipelineLayout, executableBuilder);
 
     // Clone the source function and update it to use the new interface.
     auto baseFuncOp =
-        cloneFuncWithInterface(sourceFuncOp, executableLayout, layoutAttr);
+        cloneFuncWithInterface(sourceFuncOp, pipelineLayout, layoutAttr);
 
     // Clone the updated function into each variant.
     for (auto variantOp : variantOps) {
@@ -277,7 +279,7 @@ static LogicalResult declareEntryPointOps(
 
     // Update all dispatch sites with the binding information.
     for (auto dispatchOp : layoutAnalysis.getExportDispatches(exportOp)) {
-      annotateDispatchSite(dispatchOp, executableLayout);
+      annotateDispatchSite(dispatchOp, pipelineLayout);
     }
 
     baseFuncOp.erase();

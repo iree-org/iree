@@ -87,3 +87,136 @@ transform.with_pdl_patterns {
     transform.iree.clone_preceding_op_into_dispatch_region %1 into %dispatch_op {update_uses_outside_of_region = true}
   }
 }
+
+// -----
+
+// CHECK-LABEL: func @create_region_and_convert_to_workgroups
+//       CHECK:   linalg.init_tensor
+//       CHECK:   flow.dispatch.workgroups
+//       CHECK:     linalg.matmul
+//       CHECK:     flow.return
+func.func @create_region_and_convert_to_workgroups(
+    %A: tensor<5x3xf32>, %B: tensor<3x5xf32>) -> tensor<5x5xf32> {
+  %init = linalg.init_tensor [5, 5] : tensor<5x5xf32>
+  %matmul = linalg.matmul
+      ins(%A, %B : tensor<5x3xf32>, tensor<3x5xf32>)
+      outs(%init : tensor<5x5xf32>) -> tensor<5x5xf32>
+  return %matmul : tensor<5x5xf32>
+}
+
+transform.with_pdl_patterns {
+^bb0(%arg0: !pdl.operation):
+  transform.sequence %arg0 failures(propagate) {
+  ^bb1(%arg1: !pdl.operation):
+    %0 = transform.structured.match ops{["linalg.matmul"]} in %arg1
+    %region_op = transform.iree.wrap_in_dispatch_region %0
+    transform.iree.region_to_workgroups %region_op
+  }
+}
+
+// -----
+
+// CHECK-LABEL: func @move_multiple_preceding
+//   CHECK-DAG:   arith.constant
+//   CHECK-DAG:   arith.constant
+//   CHECK-DAG:   tensor.dim
+//   CHECK-DAG:   tensor.dim
+//  CHECK-NEXT:   "test.dummy_op"
+//  CHECK-NEXT:   "test.third_user"
+//  CHECK-NEXT:   flow.dispatch.region
+//  CHECK-NEXT:     "test.dummy_op"
+//  CHECK-NEXT:     "test.first_user"
+//  CHECK-NEXT:     "test.second_user"
+//  CHECK-NEXT:     "test.merge1"
+//  CHECK-NEXT:     "test.merge2"
+func.func @move_multiple_preceding(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>, %s1: index, %s2: index) -> (tensor<?x?xf32>) {
+  %0 = "test.dummy_op"(%arg0) {__tagged__} : (tensor<?x?xf32>) -> (tensor<?x?xf32>)
+  %1 = "test.first_user"(%0) {__tagged__} : (tensor<?x?xf32>) -> (tensor<?x?xf32>)
+  %2 = "test.second_user"(%0) {__tagged__} : (tensor<?x?xf32>) -> (tensor<?x?xf32>)
+  %u = "test.third_user"(%0) : (tensor<?x?xf32>) -> (tensor<?x?xf32>)
+  %3 = "test.merge1"(%1, %2) {__tagged__} : (tensor<?x?xf32>, tensor<?x?xf32>) -> (tensor<?x?xf32>)
+  %4 = "test.merge2"(%1, %3) {__tagged__} : (tensor<?x?xf32>, tensor<?x?xf32>) -> (tensor<?x?xf32>)
+  %5 = tensor.insert_slice %4 into %arg1 [5, 16] [%s1, %s2] [1, 1]
+      : tensor<?x?xf32> into tensor<?x?xf32>
+  return %5 : tensor<?x?xf32>
+}
+
+transform.with_pdl_patterns {
+^bb0(%arg0: !pdl.operation):
+  transform.sequence %arg0 failures(propagate) {
+  ^bb1(%arg1: !pdl.operation):
+    %0 = transform.structured.match ops{["tensor.insert_slice"]} in %arg1
+    %dispatch_op = transform.iree.wrap_in_dispatch_region %0
+    %1 = transform.structured.match attributes{"__tagged__"} in %arg1
+    transform.iree.clone_preceding_op_into_dispatch_region %1 into %dispatch_op
+  }
+}
+
+// -----
+
+// CHECK-LABEL: func @move_succeeding(
+//  CHECK-SAME:   %[[arg0:.*]]: tensor<?x?xf32>, %[[arg1:.*]]: tensor<?x?xf32>, %[[s1:.*]]: index, %[[s2:.*]]: index
+func.func @move_succeeding(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>, %s1: index, %s2: index) -> (tensor<?x?xf32>, tensor<?x?xf32>) {
+  // CHECK-DAG: %[[c0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[c1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[dim0:.*]] = tensor.dim %[[arg1]], %[[c0]]
+  // CHECK-DAG: %[[dim1:.*]] = tensor.dim %[[arg1]], %[[c1]]
+  // CHECK: %[[region:.*]]:2 = flow.dispatch.region -> (tensor<?x?xf32>{%[[s1]], %[[s2]]}, tensor<?x?xf32>{%[[dim0]], %[[dim1]]}) {
+  // CHECK:   %[[slice:.*]] = tensor.extract_slice %[[arg0]]
+  // CHECK:   %[[insert:.*]] = tensor.insert_slice %[[slice]] into %[[arg1]]
+  // CHECK:   flow.return %[[slice]], %[[insert]]
+  // CHECK: }
+  // CHECK: return %[[region]]#1, %[[region]]#0
+  %0 = tensor.extract_slice %arg0 [0, 10] [%s1, %s2] [1, 1]
+      : tensor<?x?xf32> to tensor<?x?xf32>
+  %1 = tensor.insert_slice %0 into %arg1 [5, 16] [%s1, %s2] [1, 1]
+      : tensor<?x?xf32> into tensor<?x?xf32>
+  return %1, %0 : tensor<?x?xf32>, tensor<?x?xf32>
+}
+
+transform.with_pdl_patterns {
+^bb0(%arg0: !pdl.operation):
+  transform.sequence %arg0 failures(propagate) {
+  ^bb1(%arg1: !pdl.operation):
+    %0 = transform.structured.match ops{["tensor.extract_slice"]} in %arg1
+    %dispatch_op = transform.iree.wrap_in_dispatch_region %0
+    %1 = transform.structured.match ops{["tensor.insert_slice"]} in %arg1
+    transform.iree.clone_succeeding_op_into_dispatch_region %1 into %dispatch_op
+  }
+}
+
+// -----
+
+// CHECK-LABEL: func @move_multiple_succeeding
+//  CHECK-NEXT:   flow.dispatch.region -> (tensor<50x90xf32>, tensor<50x90xf32>, tensor<50x90xf32>, tensor<50x90xf32>, tensor<50x90xf32>, tensor<600x700xf32>)
+//  CHECK-NEXT:   "test.dummy_op"
+//  CHECK-NEXT:   "test.first_user"
+//  CHECK-NEXT:   "test.second_user"
+//  CHECK-NEXT:   "test.merge1"
+//  CHECK-NEXT:   "test.merge2"
+//  CHECK-NEXT:   tensor.insert_slice
+//  CHECK-NEXT:   flow.return
+//  CHECK-NEXT: }
+//  CHECK-NEXT: "test.third_user"
+func.func @move_multiple_succeeding(%arg0: tensor<50x90xf32>, %arg1: tensor<600x700xf32>) -> (tensor<600x700xf32>, tensor<50x90xf32>) {
+  %0 = "test.dummy_op"(%arg0) : (tensor<50x90xf32>) -> (tensor<50x90xf32>)
+  %1 = "test.first_user"(%0) {__tagged__} : (tensor<50x90xf32>) -> (tensor<50x90xf32>)
+  %2 = "test.second_user"(%0) {__tagged__} : (tensor<50x90xf32>) -> (tensor<50x90xf32>)
+  %u = "test.third_user"(%0) : (tensor<50x90xf32>) -> (tensor<50x90xf32>)
+  %3 = "test.merge1"(%1, %2) {__tagged__} : (tensor<50x90xf32>, tensor<50x90xf32>) -> (tensor<50x90xf32>)
+  %4 = "test.merge2"(%1, %3) {__tagged__} : (tensor<50x90xf32>, tensor<50x90xf32>) -> (tensor<50x90xf32>)
+  %5 = tensor.insert_slice %4 into %arg1 [5, 16] [50, 90] [1, 1] {__tagged__}
+      : tensor<50x90xf32> into tensor<600x700xf32>
+  return %5, %u : tensor<600x700xf32>, tensor<50x90xf32>
+}
+
+transform.with_pdl_patterns {
+^bb0(%arg0: !pdl.operation):
+  transform.sequence %arg0 failures(propagate) {
+  ^bb1(%arg1: !pdl.operation):
+    %0 = transform.structured.match ops{["test.dummy_op"]} in %arg1
+    %dispatch_op = transform.iree.wrap_in_dispatch_region %0
+    %1 = transform.structured.match attributes{"__tagged__"} in %arg1
+    transform.iree.clone_succeeding_op_into_dispatch_region %1 into %dispatch_op
+  }
+}

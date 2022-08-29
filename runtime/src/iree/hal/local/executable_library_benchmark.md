@@ -64,7 +64,7 @@ iree/hal/local/executable_library_benchmark --flagfile=iree/hal/local/testdata/e
 ### Running standalone HAL executables
 
 This approach uses an explicitly specified HAL executable without any associated
-host code. When doing this the executable layout specifying the bindings and
+host code. When doing this the pipeline layout specifying the bindings and
 push constants is chosen by the user instead of being automatically derived by
 the compiler. The design of the layout can have performance implications and
 it's important to try to match the kind of layout the compiler would produce or
@@ -161,7 +161,7 @@ This maps to the following flags defining the executable entry point and counts:
 
 ```mlir
   hal.command_buffer.push_descriptor_set<%cmd : !hal.command_buffer>
-      layout(%0 : !hal.executable_layout)[%c0]
+      layout(%0 : !hal.pipeline_layout)[%c0]
       bindings([
         %c0 = (%buffer : !hal.buffer)[%c0, %c16],
         %c1 = (%buffer_0 : !hal.buffer)[%c0, %c16],
@@ -206,7 +206,7 @@ good candidates for this tool.
 
 ```mlir
   hal.command_buffer.push_constants<%cmd : !hal.command_buffer>
-      layout(%0 : !hal.executable_layout)
+      layout(%0 : !hal.pipeline_layout)
       offset(0)
       values(%c1, %c2, %c3, %c4) : i32, i32, i32, i32
 ```

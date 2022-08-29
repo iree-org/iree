@@ -11,8 +11,8 @@
 #include <stdint.h>
 
 #include "experimental/rocm/dynamic_symbols.h"
-#include "experimental/rocm/executable_layout.h"
 #include "experimental/rocm/native_executable.h"
+#include "experimental/rocm/pipeline_layout.h"
 #include "experimental/rocm/rocm_buffer.h"
 #include "experimental/rocm/status_util.h"
 #include "iree/base/api.h"
@@ -50,12 +50,19 @@ iree_status_t iree_hal_rocm_direct_command_buffer_create(
     iree_hal_device_t* device, iree_hal_rocm_context_wrapper_t* context,
     iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
-    iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
     iree_arena_block_pool_t* block_pool,
     iree_hal_command_buffer_t** out_command_buffer) {
   IREE_ASSERT_ARGUMENT(context);
   IREE_ASSERT_ARGUMENT(block_pool);
   IREE_ASSERT_ARGUMENT(out_command_buffer);
+  *out_command_buffer = NULL;
+
+  if (binding_capacity > 0) {
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "indirect command buffers not yet implemented");
+  }
+
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_rocm_direct_command_buffer_t* command_buffer = NULL;
@@ -66,7 +73,7 @@ iree_status_t iree_hal_rocm_direct_command_buffer_create(
       context->host_allocator, total_size, (void**)&command_buffer);
   if (iree_status_is_ok(status)) {
     iree_hal_command_buffer_initialize(
-        device, mode, command_categories, queue_affinity,
+        device, mode, command_categories, queue_affinity, binding_capacity,
         &iree_hal_rocm_direct_command_buffer_vtable, &command_buffer->base);
     command_buffer->context = context;
     command_buffer->block_pool = block_pool;
@@ -257,7 +264,7 @@ static iree_status_t iree_hal_rocm_direct_command_buffer_copy_buffer(
 
 static iree_status_t iree_hal_rocm_direct_command_buffer_push_constants(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_layout_t* executable_layout, iree_host_size_t offset,
+    iree_hal_pipeline_layout_t* pipeline_layout, iree_host_size_t offset,
     const void* values, iree_host_size_t values_length) {
   iree_hal_rocm_direct_command_buffer_t* command_buffer =
       iree_hal_rocm_direct_command_buffer_cast(base_command_buffer);
@@ -286,13 +293,13 @@ static int compare_binding_index(const void* a, const void* b) {
 
 static iree_status_t iree_hal_rocm_direct_command_buffer_push_descriptor_set(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_layout_t* executable_layout, uint32_t set,
+    iree_hal_pipeline_layout_t* pipeline_layout, uint32_t set,
     iree_host_size_t binding_count,
     const iree_hal_descriptor_set_binding_t* bindings) {
   iree_hal_rocm_direct_command_buffer_t* command_buffer =
       iree_hal_rocm_direct_command_buffer_cast(base_command_buffer);
   iree_host_size_t base_binding =
-      iree_hal_rocm_base_binding_index(executable_layout, set);
+      iree_hal_rocm_base_binding_index(pipeline_layout, set);
   // Convention with the compiler side. We map bindings to kernel argument.
   // We compact the bindings to get a dense set of arguments and keep them order
   // based on the binding index.
@@ -310,23 +317,15 @@ static iree_status_t iree_hal_rocm_direct_command_buffer_push_descriptor_set(
   for (iree_host_size_t i = 0; i < binding_count; i++) {
     iree_hal_descriptor_set_binding_t binding = bindings[binding_used[i].index];
     hipDeviceptr_t device_ptr =
-        iree_hal_rocm_buffer_device_pointer(
-            iree_hal_buffer_allocated_buffer(binding.buffer)) +
-        iree_hal_buffer_byte_offset(binding.buffer) + binding.offset;
+        binding.buffer
+            ? (iree_hal_rocm_buffer_device_pointer(
+                   iree_hal_buffer_allocated_buffer(binding.buffer)) +
+               iree_hal_buffer_byte_offset(binding.buffer) + binding.offset)
+            : 0;
     *((hipDeviceptr_t*)command_buffer->current_descriptor[i + base_binding]) =
         device_ptr;
   }
   return iree_ok_status();
-}
-
-static iree_status_t iree_hal_rocm_direct_command_buffer_bind_descriptor_set(
-    iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_layout_t* executable_layout, uint32_t set,
-    iree_hal_descriptor_set_t* descriptor_set,
-    iree_host_size_t dynamic_offset_count,
-    const iree_device_size_t* dynamic_offsets) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "need rocm implementation");
 }
 
 static iree_status_t iree_hal_rocm_direct_command_buffer_dispatch(
@@ -336,10 +335,10 @@ static iree_status_t iree_hal_rocm_direct_command_buffer_dispatch(
   iree_hal_rocm_direct_command_buffer_t* command_buffer =
       iree_hal_rocm_direct_command_buffer_cast(base_command_buffer);
   iree_hal_rocm_direct_command_buffer_cast(base_command_buffer);
-  iree_hal_executable_layout_t* layout =
+  iree_hal_pipeline_layout_t* layout =
       iree_hal_rocm_executable_get_layout(executable, entry_point);
   iree_host_size_t num_constants =
-      iree_hal_rocm_executable_layout_num_constants(layout);
+      iree_hal_rocm_pipeline_layout_num_constants(layout);
   iree_host_size_t constant_base_index =
       iree_hal_rocm_push_constant_index(layout);
   // Patch the push constants in the kernel arguments.
@@ -373,6 +372,14 @@ static iree_status_t iree_hal_rocm_direct_command_buffer_dispatch_indirect(
                           "need rocm implementation");
 }
 
+static iree_status_t iree_hal_rocm_direct_command_buffer_execute_commands(
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_command_buffer_t* base_commands,
+    iree_hal_buffer_binding_table_t binding_table) {
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "indirect command buffers not yet implemented");
+}
+
 static const iree_hal_command_buffer_vtable_t
     iree_hal_rocm_direct_command_buffer_vtable = {
         .destroy = iree_hal_rocm_direct_command_buffer_destroy,
@@ -394,9 +401,9 @@ static const iree_hal_command_buffer_vtable_t
         .push_constants = iree_hal_rocm_direct_command_buffer_push_constants,
         .push_descriptor_set =
             iree_hal_rocm_direct_command_buffer_push_descriptor_set,
-        .bind_descriptor_set =
-            iree_hal_rocm_direct_command_buffer_bind_descriptor_set,
         .dispatch = iree_hal_rocm_direct_command_buffer_dispatch,
         .dispatch_indirect =
             iree_hal_rocm_direct_command_buffer_dispatch_indirect,
+        .execute_commands =
+            iree_hal_rocm_direct_command_buffer_execute_commands,
 };

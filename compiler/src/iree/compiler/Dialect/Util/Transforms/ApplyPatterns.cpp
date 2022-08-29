@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Patterns.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -20,15 +21,8 @@ namespace iree_compiler {
 namespace IREE {
 namespace Util {
 
-class ApplyPatternsPass
-    : public PassWrapper<ApplyPatternsPass, OperationPass<void>> {
+class ApplyPatternsPass : public ApplyPatternsBase<ApplyPatternsPass> {
  public:
-  StringRef getArgument() const override { return "iree-util-apply-patterns"; }
-
-  StringRef getDescription() const override {
-    return "Applies some risky/IREE-specific canonicalization patterns.";
-  }
-
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
         .insert<BuiltinDialect, func::FuncDialect, IREE::Util::UtilDialect>();
@@ -59,8 +53,6 @@ class ApplyPatternsPass
 std::unique_ptr<OperationPass<void>> createApplyPatternsPass() {
   return std::make_unique<ApplyPatternsPass>();
 }
-
-static PassRegistration<ApplyPatternsPass> pass;
 
 }  // namespace Util
 }  // namespace IREE

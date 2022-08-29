@@ -15,12 +15,11 @@
 #include "iree/hal/drivers/cuda/context_wrapper.h"
 #include "iree/hal/drivers/cuda/cuda_allocator.h"
 #include "iree/hal/drivers/cuda/cuda_event.h"
-#include "iree/hal/drivers/cuda/descriptor_set_layout.h"
 #include "iree/hal/drivers/cuda/dynamic_symbols.h"
 #include "iree/hal/drivers/cuda/event_semaphore.h"
-#include "iree/hal/drivers/cuda/executable_layout.h"
 #include "iree/hal/drivers/cuda/graph_command_buffer.h"
 #include "iree/hal/drivers/cuda/nop_executable_cache.h"
+#include "iree/hal/drivers/cuda/pipeline_layout.h"
 #include "iree/hal/drivers/cuda/status_util.h"
 #include "iree/hal/drivers/cuda/stream_command_buffer.h"
 #include "iree/hal/utils/buffer_transfer.h"
@@ -120,8 +119,8 @@ static iree_status_t iree_hal_cuda_device_create_internal(
     status = iree_hal_cuda_stream_command_buffer_create(
         (iree_hal_device_t*)device, &device->context_wrapper,
         IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION,
-        IREE_HAL_COMMAND_CATEGORY_ANY, device->stream, /*block_pool=*/NULL,
-        &device->stream_command_buffer);
+        IREE_HAL_COMMAND_CATEGORY_ANY, /*binding_capacity=*/0, device->stream,
+        /*block_pool=*/NULL, &device->stream_command_buffer);
   }
 
   if (iree_status_is_ok(status)) {
@@ -238,7 +237,7 @@ static iree_status_t iree_hal_cuda_device_query_i64(
 static iree_status_t iree_hal_cuda_device_create_command_buffer(
     iree_hal_device_t* base_device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
-    iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
     iree_hal_command_buffer_t** out_command_buffer) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
   if (device->params.allow_inline_execution &&
@@ -250,42 +249,35 @@ static iree_status_t iree_hal_cuda_device_create_command_buffer(
     // directly route commands to a CUDA stream and let it eagerly flush.
     return iree_hal_cuda_stream_command_buffer_create(
         base_device, &device->context_wrapper, mode, command_categories,
-        device->stream, &device->block_pool, out_command_buffer);
+        binding_capacity, device->stream, &device->block_pool,
+        out_command_buffer);
   }
   switch (device->params.command_buffer_mode) {
     case IREE_HAL_CUDA_COMMAND_BUFFER_MODE_GRAPH:
       return iree_hal_cuda_graph_command_buffer_create(
           base_device, &device->context_wrapper, mode, command_categories,
-          queue_affinity, &device->block_pool, out_command_buffer);
+          queue_affinity, binding_capacity, &device->block_pool,
+          out_command_buffer);
     case IREE_HAL_CUDA_COMMAND_BUFFER_MODE_STREAM:
       return iree_hal_deferred_command_buffer_create(
-          base_device, mode, command_categories, &device->block_pool,
-          iree_hal_device_host_allocator(base_device), out_command_buffer);
+          base_device, mode, command_categories, binding_capacity,
+          &device->block_pool, iree_hal_device_host_allocator(base_device),
+          out_command_buffer);
     default:
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "invalid command buffer mode");
   }
 }
 
-static iree_status_t iree_hal_cuda_device_create_descriptor_set(
-    iree_hal_device_t* base_device,
-    iree_hal_descriptor_set_layout_t* set_layout,
-    iree_host_size_t binding_count,
-    const iree_hal_descriptor_set_binding_t* bindings,
-    iree_hal_descriptor_set_t** out_descriptor_set) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "non-push descriptor sets still need work");
-}
-
 static iree_status_t iree_hal_cuda_device_create_descriptor_set_layout(
     iree_hal_device_t* base_device,
-    iree_hal_descriptor_set_layout_usage_type_t usage_type,
+    iree_hal_descriptor_set_layout_flags_t flags,
     iree_host_size_t binding_count,
     const iree_hal_descriptor_set_layout_binding_t* bindings,
     iree_hal_descriptor_set_layout_t** out_descriptor_set_layout) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
   return iree_hal_cuda_descriptor_set_layout_create(
-      &device->context_wrapper, usage_type, binding_count, bindings,
+      &device->context_wrapper, flags, binding_count, bindings,
       out_descriptor_set_layout);
 }
 
@@ -303,15 +295,15 @@ static iree_status_t iree_hal_cuda_device_create_executable_cache(
       &device->context_wrapper, identifier, out_executable_cache);
 }
 
-static iree_status_t iree_hal_cuda_device_create_executable_layout(
+static iree_status_t iree_hal_cuda_device_create_pipeline_layout(
     iree_hal_device_t* base_device, iree_host_size_t push_constants,
     iree_host_size_t set_layout_count,
-    iree_hal_descriptor_set_layout_t** set_layouts,
-    iree_hal_executable_layout_t** out_executable_layout) {
+    iree_hal_descriptor_set_layout_t* const* set_layouts,
+    iree_hal_pipeline_layout_t** out_pipeline_layout) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
-  return iree_hal_cuda_executable_layout_create(
+  return iree_hal_cuda_pipeline_layout_create(
       &device->context_wrapper, set_layout_count, set_layouts, push_constants,
-      out_executable_layout);
+      out_pipeline_layout);
 }
 
 static iree_status_t iree_hal_cuda_device_create_semaphore(
@@ -329,30 +321,58 @@ iree_hal_cuda_device_query_semaphore_compatibility(
   return IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_ONLY;
 }
 
-static iree_status_t iree_hal_cuda_device_queue_submit(
-    iree_hal_device_t* base_device,
-    iree_hal_command_category_t command_categories,
-    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
-    const iree_hal_submission_batch_t* batches) {
+static iree_status_t iree_hal_cuda_device_queue_alloca(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
+    iree_device_size_t allocation_size,
+    iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
+  // TODO(benvanik): queue-ordered allocations.
+  IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_wait(wait_semaphore_list,
+                                                    iree_infinite_timeout()));
+  IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(
+      iree_hal_device_allocator(base_device), params, allocation_size,
+      iree_const_byte_span_empty(), out_buffer));
+  IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_signal(signal_semaphore_list));
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_cuda_device_queue_dealloca(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_buffer_t* buffer) {
+  // TODO(benvanik): queue-ordered allocations.
+  IREE_RETURN_IF_ERROR(iree_hal_device_queue_barrier(
+      base_device, queue_affinity, wait_semaphore_list, signal_semaphore_list));
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_cuda_device_queue_execute(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_semaphore_list_t wait_semaphore_list,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_host_size_t command_buffer_count,
+    iree_hal_command_buffer_t* const* command_buffers) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
-  for (int i = 0; i < batch_count; i++) {
-    for (int j = 0; j < batches[i].command_buffer_count; j++) {
-      iree_hal_command_buffer_t* command_buffer = batches[i].command_buffers[j];
-      if (iree_hal_cuda_stream_command_buffer_isa(command_buffer)) {
-        // Nothing to do for an inline command buffer; all the work has already
-        // been submitted. When we support semaphores we'll still need to signal
-        // their completion but do not have to worry about any waits: if there
-        // were waits we wouldn't have been able to execute inline!
-      } else if (iree_hal_cuda_graph_command_buffer_isa(command_buffer)) {
-        CUgraphExec exec = iree_hal_cuda_graph_command_buffer_exec(
-            batches[i].command_buffers[j]);
-        CUDA_RETURN_IF_ERROR(device->context_wrapper.syms,
-                             cuGraphLaunch(exec, device->stream),
-                             "cuGraphLaunch");
-      } else {
-        IREE_RETURN_IF_ERROR(iree_hal_deferred_command_buffer_apply(
-            batches[i].command_buffers[j], device->stream_command_buffer));
-      }
+  for (iree_host_size_t i = 0; i < command_buffer_count; i++) {
+    iree_hal_command_buffer_t* command_buffer = command_buffers[i];
+    if (iree_hal_cuda_stream_command_buffer_isa(command_buffer)) {
+      // Nothing to do for an inline command buffer; all the work has already
+      // been submitted. When we support semaphores we'll still need to signal
+      // their completion but do not have to worry about any waits: if there
+      // were waits we wouldn't have been able to execute inline!
+    } else if (iree_hal_cuda_graph_command_buffer_isa(command_buffer)) {
+      CUgraphExec exec =
+          iree_hal_cuda_graph_command_buffer_handle(command_buffers[i]);
+      CUDA_RETURN_IF_ERROR(device->context_wrapper.syms,
+                           cuGraphLaunch(exec, device->stream),
+                           "cuGraphLaunch");
+    } else {
+      IREE_RETURN_IF_ERROR(iree_hal_deferred_command_buffer_apply(
+          command_buffers[i], device->stream_command_buffer,
+          iree_hal_buffer_binding_table_empty()));
     }
   }
   // TODO(thomasraoux): implement semaphores - for now this conservatively
@@ -363,23 +383,17 @@ static iree_status_t iree_hal_cuda_device_queue_submit(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_cuda_device_wait_semaphores(
-    iree_hal_device_t* base_device, iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t* semaphore_list, iree_timeout_t timeout) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "semaphore not implemented");
+static iree_status_t iree_hal_cuda_device_queue_flush(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity) {
+  // Currently unused; we flush as submissions are made.
+  return iree_ok_status();
 }
 
-static iree_status_t iree_hal_cuda_device_wait_idle(
-    iree_hal_device_t* base_device, iree_timeout_t timeout) {
-  iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
-  // Wait until the stream is done.
-  // TODO(thomasraoux): CUDA doesn't support a deadline for wait, figure out how
-  // to handle it better.
-  CUDA_RETURN_IF_ERROR(device->context_wrapper.syms,
-                       cuStreamSynchronize(device->stream),
-                       "cuStreamSynchronize");
-  return iree_ok_status();
+static iree_status_t iree_hal_cuda_device_wait_semaphores(
+    iree_hal_device_t* base_device, iree_hal_wait_mode_t wait_mode,
+    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout) {
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "semaphore not implemented");
 }
 
 static const iree_hal_device_vtable_t iree_hal_cuda_device_vtable = {
@@ -390,17 +404,18 @@ static const iree_hal_device_vtable_t iree_hal_cuda_device_vtable = {
     .trim = iree_hal_cuda_device_trim,
     .query_i64 = iree_hal_cuda_device_query_i64,
     .create_command_buffer = iree_hal_cuda_device_create_command_buffer,
-    .create_descriptor_set = iree_hal_cuda_device_create_descriptor_set,
     .create_descriptor_set_layout =
         iree_hal_cuda_device_create_descriptor_set_layout,
     .create_event = iree_hal_cuda_device_create_event,
     .create_executable_cache = iree_hal_cuda_device_create_executable_cache,
-    .create_executable_layout = iree_hal_cuda_device_create_executable_layout,
+    .create_pipeline_layout = iree_hal_cuda_device_create_pipeline_layout,
     .create_semaphore = iree_hal_cuda_device_create_semaphore,
     .query_semaphore_compatibility =
         iree_hal_cuda_device_query_semaphore_compatibility,
     .transfer_range = iree_hal_device_submit_transfer_range_and_wait,
-    .queue_submit = iree_hal_cuda_device_queue_submit,
+    .queue_alloca = iree_hal_cuda_device_queue_alloca,
+    .queue_dealloca = iree_hal_cuda_device_queue_dealloca,
+    .queue_execute = iree_hal_cuda_device_queue_execute,
+    .queue_flush = iree_hal_cuda_device_queue_flush,
     .wait_semaphores = iree_hal_cuda_device_wait_semaphores,
-    .wait_idle = iree_hal_cuda_device_wait_idle,
 };

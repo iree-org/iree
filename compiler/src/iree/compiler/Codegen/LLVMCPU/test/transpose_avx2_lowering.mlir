@@ -1,6 +1,6 @@
 // RUN: iree-opt --pass-pipeline='hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target{test-lowering-configuration=false}))' --split-input-file %s | FileCheck %s
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -18,7 +18,7 @@
 
 hal.executable private @transpose_10_8x8_pattern {
   hal.executable.variant @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.export @transpose_10_8x8_pattern layout(#executable_layout) {
+    hal.executable.export @transpose_10_8x8_pattern layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
@@ -58,7 +58,7 @@ hal.executable private @transpose_10_8x8_pattern {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -76,7 +76,7 @@ hal.executable private @transpose_10_8x8_pattern {
 
 hal.executable private @transpose_021_8x8_pattern {
   hal.executable.variant @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.export @transpose_021_8x8_pattern layout(#executable_layout) {
+    hal.executable.export @transpose_021_8x8_pattern layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
@@ -116,7 +116,7 @@ hal.executable private @transpose_021_8x8_pattern {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -134,7 +134,7 @@ hal.executable private @transpose_021_8x8_pattern {
 
 hal.executable private @transpose_201_8x8_pattern {
   hal.executable.variant @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.export @transpose_201_8x8_pattern layout(#executable_layout) {
+    hal.executable.export @transpose_201_8x8_pattern layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
@@ -174,7 +174,7 @@ hal.executable private @transpose_201_8x8_pattern {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -192,7 +192,7 @@ hal.executable private @transpose_201_8x8_pattern {
 
 hal.executable private @transpose_210_8x8_pattern {
   hal.executable.variant @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.export @transpose_210_8x8_pattern layout(#executable_layout) {
+    hal.executable.export @transpose_210_8x8_pattern layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
@@ -232,7 +232,7 @@ hal.executable private @transpose_210_8x8_pattern {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -250,7 +250,7 @@ hal.executable private @transpose_210_8x8_pattern {
 
 hal.executable private @transpose_120_8x8_pattern {
   hal.executable.variant @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.export @transpose_120_8x8_pattern layout(#executable_layout) {
+    hal.executable.export @transpose_120_8x8_pattern layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
@@ -290,7 +290,7 @@ hal.executable private @transpose_120_8x8_pattern {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -308,7 +308,7 @@ hal.executable private @transpose_120_8x8_pattern {
 
 hal.executable private @transpose_102 {
   hal.executable.variant @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.export @transpose_102 layout(#executable_layout) {
+    hal.executable.export @transpose_102 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
@@ -340,7 +340,7 @@ hal.executable private @transpose_102 {
 //   CHECK-NOT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -358,7 +358,7 @@ hal.executable private @transpose_102 {
 
 hal.executable private @test_no_avx2_feature {
   hal.executable.variant @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.export @test_no_avx2_feature layout(#executable_layout) {
+    hal.executable.export @test_no_avx2_feature layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
       hal.return %x, %y, %z : index, index, index

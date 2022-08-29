@@ -21,6 +21,8 @@
 #include "iree/compiler/Codegen/Interfaces/Interfaces.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
+#include "iree/compiler/Dialect/Modules/HAL/Inline/IR/HALInlineDialect.h"
+#include "iree/compiler/Dialect/Modules/HAL/Loader/IR/HALLoaderDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilExternalModels.h"
@@ -38,6 +40,8 @@ inline void registerIreeDialects(DialectRegistry &registry) {
   registry.insert<IREE::Codegen::IREECodegenDialect,
                   IREE::Flow::FlowDialect,
                   IREE::HAL::HALDialect,
+                  IREE::HAL::Inline::HALInlineDialect,
+                  IREE::HAL::Loader::HALLoaderDialect,
                   IREE::LinalgExt::IREELinalgExtDialect,
                   mlir::linalg::transform::LinalgTransformDialect,
                   IREE::Stream::StreamDialect,

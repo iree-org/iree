@@ -50,6 +50,32 @@ def ForeachThreadToFlowDispatchWorkgroupsOp : Op<Transform_Dialect, "iree.foreac
   }];
 }
 
+def RegionToWorkgroupsOp : Op<Transform_Dialect, "iree.region_to_workgroups",
+    [FunctionalStyleTransformOpTrait,
+     MemoryEffectsOpInterface,
+     TransformOpInterface,
+     TransformEachOpTrait]> {
+  let description = [{
+    Convert a flow.dispatch.region op into a flow.dispatch.workgroups op.
+
+    Region ops can capture any values that are in scope in their body, whereas
+    workgroup ops are isolated from above and all values must be explicitly
+    captured via operands.
+  }];
+
+  let arguments = (ins PDL_Operation:$target);
+  let results = (outs PDL_Operation:$transformed);
+
+  let assemblyFormat = "$target attr-dict";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::iree_compiler::IREE::Flow::DispatchRegionOp target,
+        ::llvm::SmallVectorImpl<::mlir::Operation *> &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
 def WrapInDispatchRegionOp : Op<
     Transform_Dialect, "iree.wrap_in_dispatch_region",
     [FunctionalStyleTransformOpTrait, MemoryEffectsOpInterface,
@@ -87,16 +113,11 @@ def ClonePrecedingOpIntoDispatchRegionOp : Op<
     All uses of the target inside of the dispatch region are replaced with the
     results of the cloned op.
 
-    If `update_uses_outside_of_region` is set, all uses outside of the dispatch
-    region are also replaced: The results of the cloned target op are yielded
-    from the dispatch region and used in all uses outside of the dispatch
-    region. The transform fails if there are uses that appear before the
-    dispatch region.
-
-
-
-    TODO: Support multiple payload ops for the `target` handle. In that case,
-    the targets must be sorted topologically before cloning them.
+    If `update_uses_outside_of_region` is set (default value: `false`), all
+    uses outside of the dispatch region are also replaced: The results of the
+    cloned target op are yielded from the dispatch region and used in all uses
+    outside of the dispatch region. The transform fails if there are uses that
+    appear before the dispatch region.
 
     #### Return modes
 
@@ -111,6 +132,46 @@ def ClonePrecedingOpIntoDispatchRegionOp : Op<
                            [TransformMappingRead,
                             TransformMappingFree]>:$dispatch_region,
                        DefaultValuedAttr<BoolAttr, "false">:$update_uses_outside_of_region);
+  let results = (outs Res<PDL_Operation, "",
+                           [TransformMappingAlloc,
+                            TransformMappingWrite]>:$transformed);
+  let assemblyFormat = "$target `into` $dispatch_region attr-dict";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure apply(
+        ::mlir::transform::TransformResults &transformResults,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
+def CloneSucceedingOpIntoDispatchRegionOp : Op<
+    Transform_Dialect, "iree.clone_succeeding_op_into_dispatch_region",
+    [TransformOpInterface]> {
+  let description = [{
+    Clone the `target` op into the given dispatch region op. The dispatch region
+    handle must be mapped to exactly one payload op.
+
+    All operands of the target are replaced with values that are defined inside
+    of the dispatch region when possible. 
+
+    If `update_uses_outside_of_region` is set (default value: `true`), all uses
+    of the original target op are replaced: The results of the cloned target op
+    are yielded from the dispatch region and used instead of results of the
+    original target op.
+
+    #### Return modes
+
+    This transform consumes both the `target` handle and the `dispatch_region`
+    handle. It produces a new handle to the extended dispatch region.
+  }];
+
+  let arguments = (ins Arg<PDL_Operation, "",
+                           [TransformMappingRead,
+                            TransformMappingFree]>:$target,
+                       Arg<PDL_Operation, "",
+                           [TransformMappingRead,
+                            TransformMappingFree]>:$dispatch_region,
+                       DefaultValuedAttr<BoolAttr, "true">:$update_uses_outside_of_region);
   let results = (outs Res<PDL_Operation, "",
                            [TransformMappingAlloc,
                             TransformMappingWrite]>:$transformed);

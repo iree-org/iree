@@ -1,7 +1,7 @@
 // RUN: iree-opt --pass-pipeline='hal.executable(hal.executable.variant(iree-codegen-tile-and-distribute-to-workgroups)), canonicalize, cse' --split-input-file %s | FileCheck %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0], [16, 4, 0], [0, 0, 64]]>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -17,7 +17,7 @@
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 hal.executable private @matmul_tensors {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_arm_64_ {
-    hal.executable.export public @matmul_tensors layout(#executable_layout) attributes {translation_info = #translation} {
+    hal.executable.export public @matmul_tensors layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
@@ -96,7 +96,7 @@ hal.executable private @matmul_tensors {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 64], [1, 4], [0, 0]]>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -113,7 +113,7 @@ hal.executable private @matmul_tensors {
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 hal.executable private @add {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.export public @add layout(#executable_layout) attributes {translation_info = #translation} {
+    hal.executable.export public @add layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
@@ -169,7 +169,7 @@ hal.executable private @add {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 64, 64, 64], [1, 1, 1, 4], [0, 0, 0, 0]]>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -185,7 +185,7 @@ hal.executable private @add {
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 hal.executable private @add4D {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.export public @add4D layout(#executable_layout) attributes {translation_info = #translation} {
+    hal.executable.export public @add4D layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 :index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3, %arg4
       hal.return %x, %y, %z : index, index, index
@@ -245,7 +245,7 @@ hal.executable private @add4D {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 64, 64, 0], [1, 16, 4, 0], [0, 0, 0, 64]]>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -259,7 +259,7 @@ hal.executable private @add4D {
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 hal.executable private @batch_matmul_tensors {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_arm_64_ {
-    hal.executable.export public @batch_matmul_tensors layout(#executable_layout) attributes {translation_info = #translation} {
+    hal.executable.export public @batch_matmul_tensors layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 : index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3, %arg4
       hal.return %x, %y, %z : index, index, index
@@ -315,7 +315,7 @@ hal.executable private @batch_matmul_tensors {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 16, 0], [16, 8, 0], [0, 0, 2]]>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -326,7 +326,7 @@ hal.executable private @batch_matmul_tensors {
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 hal.executable private @preset_config_matmul_tensors {
   hal.executable.variant public @system_elf_x86_64, target = #executable_target_system_elf_x86_64_ {
-    hal.executable.export public @preset_config layout(#executable_layout) attributes {translation_info = #translation} {
+    hal.executable.export public @preset_config layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
@@ -383,7 +383,7 @@ hal.executable private @preset_config_matmul_tensors {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 64]]>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -393,7 +393,7 @@ hal.executable private @preset_config_matmul_tensors {
 #translation = #iree_codegen.translation_info<CPUBufferOpsTileAndVectorize>
 hal.executable public @copy_op {
   hal.executable.variant public @system_elf_x86_64, target = #executable_target_system_elf_x86_64_ {
-    hal.executable.export public @copy_op layout(#executable_layout) attributes {translation_info = #translation} {
+    hal.executable.export public @copy_op layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
@@ -477,7 +477,7 @@ hal.executable public @copy_op {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[64]]>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -487,7 +487,7 @@ hal.executable public @copy_op {
 #translation = #iree_codegen.translation_info<CPUDefault>
 hal.executable private @static_1d_fft_stage2 {
   hal.executable.variant public @system_elf_x86_64, target = #executable_target_system_elf_x86_64_ {
-    hal.executable.export public @static_1d_fft_stage2 layout(#executable_layout) attributes {translation_info = #translation} {
+    hal.executable.export public @static_1d_fft_stage2 layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1
       hal.return %x, %y, %z : index, index, index
@@ -535,7 +535,7 @@ hal.executable private @static_1d_fft_stage2 {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 64]]>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -545,7 +545,7 @@ hal.executable private @static_1d_fft_stage2 {
 #translation = #iree_codegen.translation_info<CPUDefault>
 hal.executable private @static_3d_fft_stage3 {
   hal.executable.variant public @system_elf_x86_64, target = #executable_target_system_elf_x86_64_ {
-    hal.executable.export public @static_3d_fft_stage3 layout(#executable_layout) attributes {translation_info = #translation} {
+    hal.executable.export public @static_3d_fft_stage3 layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
@@ -593,7 +593,7 @@ hal.executable private @static_3d_fft_stage3 {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0], [1, 4, 0], [0, 0, 4]]>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -608,7 +608,7 @@ hal.executable private @static_3d_fft_stage3 {
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 hal.executable private @outs_fusion {
   hal.executable.variant public @system_elf_x86_64, target = #executable_target_system_elf_x86_64_ {
-    hal.executable.export public @outs_fusion_fn layout(#executable_layout) attributes {translation_info = #translation} {
+    hal.executable.export public @outs_fusion_fn layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
@@ -675,7 +675,7 @@ hal.executable private @outs_fusion {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 64, 64, 64, 0, 0, 0]]>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -689,7 +689,7 @@ hal.executable private @outs_fusion {
 #translation = #iree_codegen.translation_info<CPUDefault>
 hal.executable private @conv {
   hal.executable.variant public @system_elf_x86_64, target = #executable_target_system_elf_x86_64_ {
-    hal.executable.export public @conv layout(#executable_layout) attributes {translation_info = #translation} {
+    hal.executable.export public @conv layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 : index, %arg5 : index, %arg6 : index, %arg7 : index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3, %arg4, %arg5, %arg6, %arg7
       hal.return %x, %y, %z : index, index, index
@@ -756,7 +756,7 @@ hal.executable private @conv {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 20, 40, 48, 0, 0]]>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -770,7 +770,7 @@ hal.executable private @conv {
 #translation = #iree_codegen.translation_info<CPUDefault>
 hal.executable private @conv_static {
   hal.executable.variant public @system_elf_x86_64, target = #executable_target_system_elf_x86_64_ {
-    hal.executable.export public @conv_static layout(#executable_layout) attributes {translation_info = #translation} {
+    hal.executable.export public @conv_static layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 : index, %arg5 : index, %arg6 : index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3, %arg4, %arg5, %arg6
       hal.return %x, %y, %z : index, index, index
@@ -831,7 +831,7 @@ hal.executable private @conv_static {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[16, 32], [16, 16], [0, 0]]>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -846,7 +846,7 @@ hal.executable private @conv_static {
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 hal.executable private @generic_static {
   hal.executable.variant public @system_elf_x86_64, target = #executable_target_system_elf_x86_64_ {
-    hal.executable.export public @generic_static layout(#executable_layout) attributes {translation_info = #translation} {
+    hal.executable.export public @generic_static layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
@@ -895,7 +895,7 @@ hal.executable private @generic_static {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[28, 8, 0], [4, 4, 0], [0, 0, 60]]>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -909,7 +909,7 @@ hal.executable private @generic_static {
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 hal.executable private @matmul_static {
   hal.executable.variant public @system_elf_arm_64, target = #executable_target_system_elf_arm_64_ {
-    hal.executable.export public @matmul_static layout(#executable_layout) attributes {translation_info = #translation} {
+    hal.executable.export public @matmul_static layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
@@ -956,7 +956,7 @@ hal.executable private @matmul_static {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 1, 7, 64, 0, 0]]>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -970,7 +970,7 @@ hal.executable private @matmul_static {
 #translation = #iree_codegen.translation_info<CPUDefault>
 hal.executable private @restrict_num_workgroups {
   hal.executable.variant public @system_elf_arm_64, target = #executable_target_system_elf_arm_64_ {
-    hal.executable.export public @restrict_num_workgroups layout(#executable_layout) attributes {translation_info = #translation} {
+    hal.executable.export public @restrict_num_workgroups layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 :index, %arg4 : index, %arg5 : index, %arg6 : index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3, %arg4, %arg5, %arg6
       hal.return %x, %y, %z : index, index, index
@@ -1019,7 +1019,7 @@ hal.executable private @restrict_num_workgroups {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[4, 0, 0], [4, 0, 0], [0, 1, 4]]>
-#executable_layout = #hal.executable.layout<push_constants = 4, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 4, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -1036,7 +1036,7 @@ hal.executable private @restrict_num_workgroups {
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 hal.executable private @reduction {
   hal.executable.variant public @reduction, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.export public @reduction ordinal(0) layout(#executable_layout) attributes {translation_info = #translation} {
+    hal.executable.export public @reduction ordinal(0) layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1
       hal.return %x, %y, %z : index, index, index
@@ -1094,7 +1094,7 @@ hal.executable private @reduction {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 0, 0], [8, 0, 0], [0, 0, 16]]>
-#executable_layout = #hal.executable.layout<push_constants = 4, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 4, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -1108,7 +1108,7 @@ hal.executable private @reduction {
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 hal.executable private @gemm_unit_N {
   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.export public @gemm_unit_N ordinal(0) layout(#executable_layout) attributes {translation_info = #translation} {
+    hal.executable.export public @gemm_unit_N ordinal(0) layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
@@ -1165,7 +1165,7 @@ hal.executable private @gemm_unit_N {
 
 // -----
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 0, 0], [0, 0, 0], [0, 0, 16]]>
-#executable_layout = #hal.executable.layout<push_constants = 4, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 4, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -1179,7 +1179,7 @@ hal.executable private @gemm_unit_N {
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 hal.executable private @gemm_unit_M_unit_N {
   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.export public @gemm_unit_M_unit_N ordinal(0) layout(#executable_layout) attributes {translation_info = #translation} {
+    hal.executable.export public @gemm_unit_M_unit_N ordinal(0) layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
@@ -1227,7 +1227,7 @@ hal.executable private @gemm_unit_M_unit_N {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 0, 0, 0, 64, 64, 0, 64], [0, 1, 0, 0, 1, 1, 0, 4], [0, 0, 0, 0, 0, 0, 0, 0]]>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -1242,7 +1242,7 @@ hal.executable private @gemm_unit_M_unit_N {
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 hal.executable private @generic_unit_dims {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.export public @generic_unit_dims layout(#executable_layout) attributes {translation_info = #translation} {
+    hal.executable.export public @generic_unit_dims layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 : index, %arg5 : index, %arg6 : index, %arg7 : index, %arg8 : index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3, %arg4, %arg5, %arg6, %arg7, %arg8
       hal.return %x, %y, %z : index, index, index
@@ -1302,7 +1302,7 @@ hal.executable private @generic_unit_dims {
 
 // -----
 #config = #iree_codegen.lowering_config<tile_sizes = [[0], [0], [4]]>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -1318,7 +1318,7 @@ hal.executable private @generic_unit_dims {
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 hal.executable private @reduce_to_scalar {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.export public @reduce_to_scalar layout(#executable_layout) attributes {translation_info = #translation} {
+    hal.executable.export public @reduce_to_scalar layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1
       hal.return %x, %y, %z : index, index, index
@@ -1362,7 +1362,7 @@ hal.executable private @reduce_to_scalar {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[]]>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -1377,7 +1377,7 @@ hal.executable private @reduce_to_scalar {
 #translation = #iree_codegen.translation_info<CPUDefault>
 hal.executable private @scalar {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.export public @scalar layout(#executable_layout) attributes {translation_info = #translation} {
+    hal.executable.export public @scalar layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device):
       %x, %y, %z = flow.dispatch.default_workgroup_count
       hal.return %x, %y, %z : index, index, index
@@ -1420,7 +1420,7 @@ hal.executable private @scalar {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[2], [2], [0]]>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -1434,7 +1434,7 @@ hal.executable private @scalar {
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 hal.executable private @rank_reduced_slice {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_arm_64_ {
-    hal.executable.export public @rank_reduced_slice layout(#executable_layout) attributes {translation_info = #translation} {
+    hal.executable.export public @rank_reduced_slice layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1
       hal.return %x, %y, %z : index, index, index
@@ -1487,7 +1487,7 @@ hal.executable private @rank_reduced_slice {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 64, 0], [8, 32, 0], [0, 0, 16]], tile_interchange = [[1, 0, 2], [], []]>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -1502,7 +1502,7 @@ hal.executable private @rank_reduced_slice {
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 hal.executable private @matmul_interchange {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_x86_64_ {
-    hal.executable.export public @matmul_interchange layout(#executable_layout) attributes {translation_info = #translation} {
+    hal.executable.export public @matmul_interchange layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
@@ -1558,7 +1558,7 @@ hal.executable private @matmul_interchange {
 
 hal.executable private @no_compute {
   hal.executable.variant public @embedded_elf_x86_64, target = <"llvm-cpu", "embedded-elf-x86_64", {}> {
-    hal.executable.export public @no_compute ordinal(0) layout(#hal.executable.layout<push_constants = 5, sets = [<0, bindings = [<0, storage_buffer>, <1, storage_buffer>]>]>) attributes {translation_info = #iree_codegen.translation_info<CPUDefault>} {
+    hal.executable.export public @no_compute ordinal(0) layout(#hal.pipeline.layout<push_constants = 5, sets = [<0, bindings = [<0, storage_buffer>, <1, storage_buffer>]>]>) attributes {translation_info = #iree_codegen.translation_info<CPUDefault>} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index

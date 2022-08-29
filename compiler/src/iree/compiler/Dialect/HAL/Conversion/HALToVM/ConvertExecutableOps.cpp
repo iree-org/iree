@@ -144,7 +144,7 @@ class ExecutableCreateOpConversion
         /*executable_format=*/-1,
         /*executable_data=*/-1,
         /*constants=*/-1,
-        /*executable_layouts=*/
+        /*pipeline_layouts=*/
         static_cast<int16_t>(llvm::size(adaptor.getLayouts())),
     };
     SmallVector<Value, 8> callOperands = {
@@ -185,8 +185,8 @@ void populateHALExecutableToVMPatterns(MLIRContext *context,
   patterns.insert<VMImportOpConversion<IREE::HAL::DescriptorSetLayoutCreateOp>>(
       context, importSymbols, typeConverter,
       "hal.descriptor_set_layout.create");
-  patterns.insert<VMImportOpConversion<IREE::HAL::ExecutableLayoutCreateOp>>(
-      context, importSymbols, typeConverter, "hal.executable_layout.create");
+  patterns.insert<VMImportOpConversion<IREE::HAL::PipelineLayoutCreateOp>>(
+      context, importSymbols, typeConverter, "hal.pipeline_layout.create");
 }
 
 }  // namespace iree_compiler

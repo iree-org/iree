@@ -16,10 +16,9 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/vulkan/descriptor_set_arena.h"
 #include "iree/hal/drivers/vulkan/dynamic_symbols.h"
-#include "iree/hal/drivers/vulkan/native_descriptor_set.h"
 #include "iree/hal/drivers/vulkan/native_event.h"
 #include "iree/hal/drivers/vulkan/native_executable.h"
-#include "iree/hal/drivers/vulkan/native_executable_layout.h"
+#include "iree/hal/drivers/vulkan/native_pipeline_layout.h"
 #include "iree/hal/drivers/vulkan/status_util.h"
 #include "iree/hal/drivers/vulkan/util/ref_ptr.h"
 #include "iree/hal/drivers/vulkan/vma_buffer.h"
@@ -82,7 +81,7 @@ iree_status_t iree_hal_vulkan_direct_command_buffer_allocate(
     iree::hal::vulkan::VkCommandPoolHandle* command_pool,
     iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
-    iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
     iree_hal_vulkan_tracing_context_t* tracing_context,
     iree::hal::vulkan::DescriptorPoolCache* descriptor_pool_cache,
     iree::hal::vulkan::BuiltinExecutables* builtin_executables,
@@ -93,6 +92,14 @@ iree_status_t iree_hal_vulkan_direct_command_buffer_allocate(
   IREE_ASSERT_ARGUMENT(descriptor_pool_cache);
   IREE_ASSERT_ARGUMENT(block_pool);
   IREE_ASSERT_ARGUMENT(out_command_buffer);
+  *out_command_buffer = NULL;
+
+  if (binding_capacity > 0) {
+    // TODO(#10144): support indirect command buffers with binding tables.
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "indirect command buffers not yet implemented");
+  }
+
   IREE_TRACE_ZONE_BEGIN(z0);
 
   VkCommandBufferAllocateInfo allocate_info;
@@ -112,7 +119,7 @@ iree_status_t iree_hal_vulkan_direct_command_buffer_allocate(
                             sizeof(*command_buffer), (void**)&command_buffer);
   if (iree_status_is_ok(status)) {
     iree_hal_command_buffer_initialize(
-        device, mode, command_categories, queue_affinity,
+        device, mode, command_categories, queue_affinity, binding_capacity,
         &iree_hal_vulkan_direct_command_buffer_vtable, &command_buffer->base);
     command_buffer->logical_device = logical_device;
     command_buffer->tracing_context = tracing_context;
@@ -650,7 +657,7 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_copy_buffer(
 
 static iree_status_t iree_hal_vulkan_direct_command_buffer_push_constants(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_layout_t* executable_layout, iree_host_size_t offset,
+    iree_hal_pipeline_layout_t* pipeline_layout, iree_host_size_t offset,
     const void* values, iree_host_size_t values_length) {
   iree_hal_vulkan_direct_command_buffer_t* command_buffer =
       iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
@@ -664,7 +671,7 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_push_constants(
 
   command_buffer->syms->vkCmdPushConstants(
       command_buffer->handle,
-      iree_hal_vulkan_native_executable_layout_handle(executable_layout),
+      iree_hal_vulkan_native_pipeline_layout_handle(pipeline_layout),
       VK_SHADER_STAGE_COMPUTE_BIT, (uint32_t)offset, (uint32_t)values_length,
       values);
 
@@ -673,7 +680,7 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_push_constants(
 
 static iree_status_t iree_hal_vulkan_direct_command_buffer_push_descriptor_set(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_layout_t* executable_layout, uint32_t set,
+    iree_hal_pipeline_layout_t* pipeline_layout, uint32_t set,
     iree_host_size_t binding_count,
     const iree_hal_descriptor_set_binding_t* bindings) {
   iree_hal_vulkan_direct_command_buffer_t* command_buffer =
@@ -681,51 +688,16 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_push_descriptor_set(
 
   // TODO(benvanik): batch insert by getting the resources in their own list.
   for (iree_host_size_t i = 0; i < binding_count; ++i) {
-    IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
-        command_buffer->resource_set, 1, &bindings[i].buffer));
+    if (bindings[i].buffer) {
+      IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
+          command_buffer->resource_set, 1, &bindings[i].buffer));
+    }
   }
 
   // Either allocate, update, and bind a descriptor set or use push descriptor
   // sets to use the command buffer pool when supported.
   return command_buffer->descriptor_set_arena.BindDescriptorSet(
-      command_buffer->handle, executable_layout, set, binding_count, bindings);
-}
-
-static iree_status_t iree_hal_vulkan_direct_command_buffer_bind_descriptor_set(
-    iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_layout_t* executable_layout, uint32_t set,
-    iree_hal_descriptor_set_t* descriptor_set,
-    iree_host_size_t dynamic_offset_count,
-    const iree_device_size_t* dynamic_offsets) {
-  iree_hal_vulkan_direct_command_buffer_t* command_buffer =
-      iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
-  iree_allocator_t host_allocator =
-      command_buffer->logical_device->host_allocator();
-
-  IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
-      command_buffer->resource_set, 1, &descriptor_set));
-
-  // Vulkan takes uint32_t as the size here, unlike everywhere else.
-  iree_inline_array(uint32_t, dynamic_offsets_i32, dynamic_offset_count,
-                    host_allocator);
-  for (int i = 0; i < dynamic_offset_count; ++i) {
-    *iree_inline_array_at(dynamic_offsets_i32, i) =
-        (uint32_t)dynamic_offsets[i];
-  }
-
-  VkDescriptorSet descriptor_sets[1] = {
-      iree_hal_vulkan_native_descriptor_set_handle(descriptor_set),
-  };
-  command_buffer->syms->vkCmdBindDescriptorSets(
-      command_buffer->handle, VK_PIPELINE_BIND_POINT_COMPUTE,
-      iree_hal_vulkan_native_executable_layout_handle(executable_layout), set,
-      (uint32_t)IREE_ARRAYSIZE(descriptor_sets), descriptor_sets,
-      (uint32_t)dynamic_offset_count,
-      iree_inline_array_data(dynamic_offsets_i32));
-
-  iree_inline_array_deinitialize(dynamic_offsets_i32);
-
-  return iree_ok_status();
+      command_buffer->handle, pipeline_layout, set, binding_count, bindings);
 }
 
 static iree_status_t iree_hal_vulkan_direct_command_buffer_dispatch(
@@ -809,6 +781,38 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_dispatch_indirect(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_vulkan_direct_command_buffer_execute_commands(
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_command_buffer_t* base_commands,
+    iree_hal_buffer_binding_table_t binding_table) {
+  iree_hal_vulkan_direct_command_buffer_t* command_buffer =
+      iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
+
+  if (binding_table.count > 0) {
+    // TODO(#10144): support indirect command buffers with binding tables.
+    // Since Vulkan doesn't natively support this we'd need to emulate things
+    // with an iree_hal_vulkan_indirect_command_buffer_t type that captured the
+    // command buffer using deferred command buffer and allowed replay with a
+    // binding table. If we wanted to actually reuse the command buffers we'd
+    // need to use update-after-bind (where supported), device pointers (where
+    // supported), or descriptor indexing and a big ringbuffer (make a 1024
+    // element descriptor array and cycle through it with each submission).
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "indirect command buffers not yet implemented");
+  }
+
+  IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
+      command_buffer->resource_set, 1, &base_commands));
+
+  iree_hal_vulkan_direct_command_buffer_t* commands =
+      iree_hal_vulkan_direct_command_buffer_cast(base_commands);
+
+  command_buffer->syms->vkCmdExecuteCommands(command_buffer->handle, 1,
+                                             &commands->handle);
+
+  return iree_ok_status();
+}
+
 namespace {
 const iree_hal_command_buffer_vtable_t
     iree_hal_vulkan_direct_command_buffer_vtable = {
@@ -836,10 +840,10 @@ const iree_hal_command_buffer_vtable_t
         iree_hal_vulkan_direct_command_buffer_push_constants,
         /*.push_descriptor_set=*/
         iree_hal_vulkan_direct_command_buffer_push_descriptor_set,
-        /*.bind_descriptor_set=*/
-        iree_hal_vulkan_direct_command_buffer_bind_descriptor_set,
         /*.dispatch=*/iree_hal_vulkan_direct_command_buffer_dispatch,
         /*.dispatch_indirect=*/
         iree_hal_vulkan_direct_command_buffer_dispatch_indirect,
+        /*.execute_commands=*/
+        iree_hal_vulkan_direct_command_buffer_execute_commands,
 };
 }  // namespace

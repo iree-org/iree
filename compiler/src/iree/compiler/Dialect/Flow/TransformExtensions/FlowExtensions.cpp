@@ -8,6 +8,7 @@
 
 #include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/Flow/Transforms/ConvertRegionToWorkgroups.h"
 #include "iree/compiler/Dialect/Flow/Transforms/DispatchLinalgOnTensors.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -15,6 +16,7 @@
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/Transforms/RegionUtils.h"
+#include "mlir/Transforms/TopologicalSortUtils.h"
 
 using namespace mlir;
 using namespace mlir::iree_compiler;
@@ -447,6 +449,18 @@ transform_dialect::ForeachThreadToFlowDispatchWorkgroupsOp::applyToOne(
   return DiagnosedSilenceableFailure(success());
 }
 
+DiagnosedSilenceableFailure transform_dialect::RegionToWorkgroupsOp::applyToOne(
+    Flow::DispatchRegionOp target, SmallVectorImpl<Operation *> &results,
+    transform::TransformState &state) {
+  IRRewriter rewriter(target->getContext());
+  FailureOr<Flow::DispatchWorkgroupsOp> result =
+      rewriteFlowDispatchRegionToFlowDispatchWorkgroups(target, rewriter);
+  if (failed(result))
+    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+  results.push_back(*result);
+  return DiagnosedSilenceableFailure(success());
+}
+
 /// Return `true` if the given type is a ShapedType and has at least one
 /// dynamic dimension.
 static bool hasDynamicShape(Type t) {
@@ -693,8 +707,7 @@ transform_dialect::ClonePrecedingOpIntoDispatchRegionOp::apply(
   ArrayRef<Operation *> dispatchRegion =
       state.getPayloadOps(getDispatchRegion());
 
-  // TODO: Multiple targetOps could be allowed.
-  if (targetOps.size() != 1 || dispatchRegion.size() != 1)
+  if (dispatchRegion.size() != 1)
     return DiagnosedSilenceableFailure(this->emitOpError(
         "requires exactly one target/dispatch region handle"));
 
@@ -703,15 +716,149 @@ transform_dialect::ClonePrecedingOpIntoDispatchRegionOp::apply(
     return DiagnosedSilenceableFailure(
         this->emitOpError("expected 'dispatch.region' operand"));
 
+  // We are cloning ops one-by-one, so the order must be inversed (as opposed
+  // to cloning all ops in one go).
+  SmallVector<Operation *> targetOpsList(targetOps.begin(), targetOps.end());
+  bool sortResult = computeTopologicalSorting(
+      dispatchRegion.front()->getBlock(), targetOpsList);
+  (void)sortResult;
+  assert(sortResult && "unable to sort topologically");
+  SmallVector<Operation *> orderedTargets =
+      llvm::to_vector(llvm::reverse(targetOps));
   IRRewriter rewriter(regionOp->getContext());
-  auto newRegionOp = clonePrecedingOpIntoDispatchRegion(
-      rewriter, targetOps.front(), regionOp, getUpdateUsesOutsideOfRegion());
-  if (failed(newRegionOp))
-    return DiagnosedSilenceableFailure(
-        reportUnknownTransformError(targetOps.front()));
+  for (Operation *target : orderedTargets) {
+    auto newRegionOp = clonePrecedingOpIntoDispatchRegion(
+        rewriter, target, regionOp, getUpdateUsesOutsideOfRegion());
+    if (failed(newRegionOp))
+      return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+    regionOp = *newRegionOp;
+  }
 
   transformResults.set(getTransformed().cast<OpResult>(),
-                       newRegionOp->getOperation());
+                       regionOp.getOperation());
+  return DiagnosedSilenceableFailure(success());
+}
+
+// Clone a `target` op that is succeeding the given dispatch region op into the
+// dispatch region.
+//
+// All operands of the target are replaced with values defined inside of the
+// dispatch region when possible.
+//
+// If `updateUsesOutsideOfRegion` is set, all uses of the target op after the
+// dispatch region, are updated: The target op's results are returned from the
+// the dispatch region an used in those places.
+//
+// Example when `updateUsesOutsideOfRegion` is set:
+//
+// %r = flow.dispatch.region -> (tensor<?xf32>{%d0}) {
+//   %1 = "another_op"() : () -> (tensor<?xf32>)
+//   flow.return %1 : tensor<?xf32>
+// }
+// %0 = "some_op"(%r) : (tensor<?xf32>) -> (tensor<?xf32>)
+// %2 = "yet_another_use"(%0) : (tensor<?xf32>) -> (tensor<?xf32>)
+//
+// In this example, "some_op" will be cloned into the dispatch region and the
+// OpOperand of "yet_another_use" will be replaced:
+//
+// %r:2 = flow.dispatch.region -> (tensor<?xf32>{%d0}) {
+//   %1 = "another_op"() : () -> (tensor<?xf32>)
+//   %0_clone = "some_op"(%1) : (tensor<?xf32>) -> (tensor<?xf32>)
+//   flow.return %1, %0_clone : tensor<?xf32>, tensor<?xf32>
+// }
+// %2 = "yet_another_use"(%r#1) : (tensor<?xf32>) -> (tensor<?xf32>)
+static FailureOr<Flow::DispatchRegionOp> cloneSucceedingOpIntoDispatchRegion(
+    RewriterBase &rewriter, Operation *target, Flow::DispatchRegionOp regionOp,
+    bool updateUsesOutsideOfRegion) {
+  assert(regionOp->isBeforeInBlock(target) &&
+         "expected that region op comes first");
+  Block &body = regionOp.getBody().front();
+
+  // Gather all uses of `target`.
+  SmallVector<OpOperand *> usesOutsideOfRegion;
+  for (OpOperand &use : target->getUses()) usesOutsideOfRegion.push_back(&use);
+
+  // Clone op into dispatch region.
+  auto returnOp = cast<Flow::ReturnOp>(body.getTerminator());
+  Operation *newTargetOp;
+  if (updateUsesOutsideOfRegion) {
+    // Optimization: If all uses outside of the region are updated, the target
+    // can simply be moved instead of cloned.
+    target->moveBefore(returnOp);
+    newTargetOp = target;
+  } else {
+    OpBuilder::InsertionGuard guard(rewriter);
+    rewriter.setInsertionPoint(returnOp);
+    newTargetOp = rewriter.clone(*target);
+  }
+
+  // Replace all operands that are results of the regionOp.
+  for (OpOperand &operand : newTargetOp->getOpOperands()) {
+    if (operand.get().getDefiningOp() == regionOp) {
+      unsigned resultNumber = operand.get().cast<OpResult>().getResultNumber();
+      operand.set(returnOp->getOperand(resultNumber));
+    }
+  }
+
+  // Replace all uses outside of the dispatch region.
+  if (updateUsesOutsideOfRegion) {
+    unsigned previousNumResults = regionOp->getNumResults();
+
+    // Note: Appending results one-by-one here so that this can be extended to
+    // specific results in the future. Many ops have just one result, so this
+    // should not be a large overhead.
+    for (Value v : newTargetOp->getResults()) {
+      auto newRegionOp = appendDispatchRegionResult(rewriter, regionOp, v);
+      if (failed(newRegionOp)) return failure();
+      regionOp = *newRegionOp;
+    }
+
+    // Replace uses of `target` after the dispatch region.
+    for (OpOperand *use : usesOutsideOfRegion) {
+      rewriter.updateRootInPlace(use->getOwner(), [&]() {
+        use->set(
+            regionOp->getResult(previousNumResults +
+                                use->get().cast<OpResult>().getResultNumber()));
+      });
+    }
+  }
+
+  return regionOp;
+}
+
+DiagnosedSilenceableFailure
+transform_dialect::CloneSucceedingOpIntoDispatchRegionOp::apply(
+    transform::TransformResults &transformResults,
+    transform::TransformState &state) {
+  ArrayRef<Operation *> targetOps = state.getPayloadOps(getTarget());
+  ArrayRef<Operation *> dispatchRegion =
+      state.getPayloadOps(getDispatchRegion());
+
+  if (dispatchRegion.size() != 1)
+    return DiagnosedSilenceableFailure(this->emitOpError(
+        "requires exactly one target/dispatch region handle"));
+
+  auto regionOp = dyn_cast<Flow::DispatchRegionOp>(dispatchRegion.front());
+  if (!regionOp)
+    return DiagnosedSilenceableFailure(
+        this->emitOpError("expected 'dispatch.region' operand"));
+
+  SmallVector<Operation *> orderedTargets(targetOps.begin(), targetOps.end());
+  bool sortResult = computeTopologicalSorting(
+      dispatchRegion.front()->getBlock(), orderedTargets);
+  (void)sortResult;
+  assert(sortResult && "unable to sort topologically");
+  IRRewriter rewriter(regionOp->getContext());
+  for (Operation *target : orderedTargets) {
+    auto newRegionOp = cloneSucceedingOpIntoDispatchRegion(
+        rewriter, target, regionOp, getUpdateUsesOutsideOfRegion());
+    if (failed(newRegionOp))
+      return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+    regionOp = *newRegionOp;
+  }
+
+  transformResults.set(getTransformed().cast<OpResult>(),
+                       regionOp.getOperation());
   return DiagnosedSilenceableFailure(success());
 }
 

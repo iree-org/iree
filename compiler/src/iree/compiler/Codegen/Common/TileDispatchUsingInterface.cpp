@@ -445,7 +445,7 @@ struct SwapExtractSliceWithTiledProducer
 
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
-    OpResult producer = sliceOp.source().dyn_cast<OpResult>();
+    OpResult producer = sliceOp.getSource().dyn_cast<OpResult>();
     if (!producer) {
       return rewriter.notifyMatchFailure(sliceOp, "source uses bb arg");
     }
@@ -455,7 +455,7 @@ struct SwapExtractSliceWithTiledProducer
     if (failed(tiledProducer)) {
       return failure();
     }
-    rewriter.replaceOp(sliceOp, tiledProducer.getValue());
+    rewriter.replaceOp(sliceOp, tiledProducer.value());
     return success();
   }
 };
@@ -473,7 +473,7 @@ struct SwapExtractSliceWithDispatchTensorLoad
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
     auto loadOp =
-        sliceOp.source().getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
+        sliceOp.getSource().getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
     if (!loadOp) return failure();
 
     SmallVector<OpFoldResult> combinedOffsets, combinedSizes, combinedStrides;

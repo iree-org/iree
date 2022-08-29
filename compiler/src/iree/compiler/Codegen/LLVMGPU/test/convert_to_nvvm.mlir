@@ -1,7 +1,7 @@
 // RUN: iree-opt --pass-pipeline="hal.executable(hal.executable.variant(builtin.module(iree-convert-to-nvvm)))" --split-input-file %s | FileCheck %s
 
 // Test that that standard and GPU ops are converted to LLVM and NVVM.
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<4, storage_buffer>
@@ -12,7 +12,7 @@
 ]>
 hal.executable @abs_ex_dispatch_0 {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.export @abs_ex_dispatch_0 layout(#executable_layout)
+    hal.executable.export @abs_ex_dispatch_0 layout(#pipeline_layout)
     builtin.module {
       func.func @abs_ex_dispatch_0() {
         %c0 = arith.constant 0 : index
@@ -50,7 +50,7 @@ hal.executable @abs_ex_dispatch_0 {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 1, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 1, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<4, storage_buffer>
@@ -61,7 +61,7 @@ hal.executable @abs_ex_dispatch_0 {
 ]>
 hal.executable @abs_dynamic {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.export @abs_dynamic layout(#executable_layout)
+    hal.executable.export @abs_dynamic layout(#pipeline_layout)
     builtin.module {
       func.func @abs_dynamic() {
         %c0 = arith.constant 0 : index
@@ -103,7 +103,7 @@ hal.executable @abs_dynamic {
 
 // Test that we handle correctly the case where bindings are sparse (set 0
 // binding 0 is not used).
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<1, storage_buffer>
   ]>,
@@ -113,7 +113,7 @@ hal.executable @abs_dynamic {
 ]>
 hal.executable @dead_symbol {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.export @dead_symbol layout(#executable_layout)
+    hal.executable.export @dead_symbol layout(#pipeline_layout)
     builtin.module {
       func.func @dead_symbol() {
         %c0 = arith.constant 0 : index
@@ -143,7 +143,7 @@ hal.executable @dead_symbol {
 
 // A single binding may contain different data types.
 // Test that we cast pointers correctly.
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -151,7 +151,7 @@ hal.executable @dead_symbol {
 ]>
 hal.executable @mixed_type {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.export @mixed_type layout(#executable_layout)
+    hal.executable.export @mixed_type layout(#pipeline_layout)
     builtin.module {
       func.func @mixed_type() {
         %c0 = arith.constant 0 : index
@@ -189,14 +189,14 @@ hal.executable @mixed_type {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>
   ]>
 ]>
 hal.executable @shared_memory_lowering {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.export @shared_memory_lowering layout(#executable_layout)
+    hal.executable.export @shared_memory_lowering layout(#pipeline_layout)
     builtin.module {
       func.func @shared_memory_lowering() {
         %c0 = arith.constant 0 : index
@@ -232,14 +232,14 @@ hal.executable @shared_memory_lowering {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>
   ]>
 ]>
 hal.executable @shared_memory_dealloc_elision {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.export @shared_memory_dealloc_elision layout(#executable_layout)
+    hal.executable.export @shared_memory_dealloc_elision layout(#pipeline_layout)
     builtin.module {
       func.func @shared_memory_dealloc_elision() {
         %f0 = arith.constant 0.0 : f32

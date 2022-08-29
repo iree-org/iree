@@ -78,7 +78,7 @@ FailureOr<FusionResult> LinalgExtFusionPattern::returningMatchAndRewrite(
                        .getDefiningOp<tensor::ExtractSliceOp>();
     if (!sliceOp)
       return failure();
-    auto producerOp = sliceOp.source().getDefiningOp<TilingInterface>();
+    auto producerOp = sliceOp.getSource().getDefiningOp<TilingInterface>();
     if (!producerOp || producerOp->getNumResults() != 1)
       return failure();
 

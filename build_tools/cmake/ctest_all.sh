@@ -25,6 +25,10 @@ export IREE_CUDA_DISABLE=${IREE_CUDA_DISABLE:-1}
 # The VK_KHR_shader_float16_int8 extension is optional prior to Vulkan 1.2.
 # We test on SwiftShader as a baseline, which does not support this extension.
 export IREE_VULKAN_F16_DISABLE=${IREE_VULKAN_F16_DISABLE:-1}
+# Respect the user setting, default to no --repeat-until-fail.
+export IREE_CTEST_REPEAT_UNTIL_FAIL_COUNT=${IREE_CTEST_REPEAT_UNTIL_FAIL_COUNT:-}
+# Respect the user setting, default to no --tests-regex.
+export IREE_CTEST_TESTS_REGEX=${IREE_CTEST_TESTS_REGEX:-}
 
 # Tests to exclude by label. In addition to any custom labels (which are carried
 # over from Bazel tags), every test should be labeled with its directory.
@@ -61,13 +65,28 @@ fi
 IFS=',' read -ra extra_label_exclude_args <<< "${IREE_EXTRA_COMMA_SEPARATED_CTEST_LABELS_TO_EXCLUDE:-}"
 label_exclude_args+=(${extra_label_exclude_args[@]})
 
-# Join on "|"
-label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]}"))"
+ctest_args=(
+  "--test-dir ${BUILD_DIR}"
+  "--timeout 900"
+  "--output-on-failure"
+  "--no-tests=error"
+)
 
-echo "******************** Running main project ctests ************************"
-ctest \
-  --test-dir "${BUILD_DIR}" \
-  --timeout 900 \
-  --output-on-failure \
-  --no-tests=error \
-  --label-exclude "${label_exclude_regex}"
+if [[ -n "${IREE_CTEST_TESTS_REGEX}" ]]; then
+  ctest_args+=("--tests-regex ${IREE_CTEST_TESTS_REGEX}")
+fi
+
+if [[ -n "${IREE_CTEST_REPEAT_UNTIL_FAIL_COUNT}" ]]; then
+  ctest_args+=("--repeat-until-fail ${IREE_CTEST_REPEAT_UNTIL_FAIL_COUNT}")
+fi
+
+if (( ${#label_exclude_args[@]} )); then
+  # Join on "|"
+  label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]}"))"
+  ctest_args+=("--label-exclude ${label_exclude_regex}")
+fi
+
+echo "*************** Running CTest ***************"
+
+set -x
+ctest ${ctest_args[@]}

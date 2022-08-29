@@ -21,11 +21,13 @@ iree_cc_library(
     "ConvertToNVVM.cpp"
     "ConvertToROCDL.cpp"
     "KernelConfig.cpp"
+    "LLVMGPUDistribute.cpp"
     "LLVMGPULowerExecutableTarget.cpp"
     "LLVMGPUMultiBuffering.cpp"
     "LLVMGPUReduceBankConflicts.cpp"
     "LLVMGPUTensorCoreVectorization.cpp"
     "LLVMGPUTileAndDistribute.cpp"
+    "LLVMGPUTileTensor.cpp"
     "LLVMGPUVectorLowering.cpp"
     "LLVMGPUVectorToGPU.cpp"
     "LLVMGPUVectorization.cpp"
@@ -83,6 +85,7 @@ iree_cc_library(
     MLIRVectorTransforms
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Dialect::IREECodegenDialect
+    iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
     iree::compiler::Codegen::PassHeaders
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils

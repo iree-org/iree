@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -24,25 +26,16 @@ namespace {
 // iteration terminates. If a sub-pass removes it, then iteration will
 // continue.
 class FixedPointIteratorPass
-    : public PassWrapper<FixedPointIteratorPass, OperationPass<void>> {
+    : public FixedPointIteratorBase<FixedPointIteratorPass> {
  public:
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(FixedPointIteratorPass)
-
   FixedPointIteratorPass() = default;
   FixedPointIteratorPass(const FixedPointIteratorPass &other)
-      : PassWrapper(other) {}
+      : FixedPointIteratorBase<FixedPointIteratorPass>(other) {}
   FixedPointIteratorPass(OpPassManager pipeline);
 
  private:
   LogicalResult initializeOptions(StringRef options) override;
   void getDependentDialects(DialectRegistry &registry) const override;
-  StringRef getArgument() const override {
-    return "iree-util-fixed-point-iterator";
-  }
-  StringRef getDescription() const override {
-    return "Iterates a sub-pipeline to a fixed point";
-  }
-
   void runOnOperation() override;
 
   Optional<OpPassManager> pipeline;
@@ -125,7 +118,6 @@ void FixedPointIteratorPass::runOnOperation() {
 
 std::unique_ptr<OperationPass<void>> createFixedPointIteratorPass(
     OpPassManager pipeline) {
-  static PassRegistration<FixedPointIteratorPass> pass;
   return std::make_unique<FixedPointIteratorPass>(std::move(pipeline));
 }
 

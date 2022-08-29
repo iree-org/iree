@@ -399,10 +399,20 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
       }
     }
   }
+
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
   // Pick a vectorSize of 1 for op that we know won't get vectorizedd.
   // TODO(thomasraoux): This could be improved by checking if the linalg op
   // would fail vectorization.
-  if (!isa<linalg::LinalgOp>(op)) vectorSize = 1;
+  if (!linalgOp || op->getNumResults() > 1 ||
+      llvm::any_of(linalgOp.getInputAndOutputOperands(), [&](OpOperand *input) {
+        return !linalgOp.getTiedIndexingMap(input).isProjectedPermutation();
+      })) {
+    vectorSize = 1;
+  } else {
+    passPipeline =
+        IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorize;
+  }
 
   // Set the inner most parallel loop to `lowerTs`.
   for (int64_t depth = numLoops; depth > 0; depth--) {
@@ -411,16 +421,14 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
       break;
     }
   }
-  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
+  if (linalgOp) {
     // Tile reduction dimension to 4 to allow doing load4 if the reduction size
     // is the most inner dimension.
     workgroupTileSizes.append(linalgOp.getNumReductionLoops(), 4);
   }
   tileSizes.emplace_back(std::move(workgroupTileSizes));  // Workgroup level
-  return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, op, tileSizes,
-      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorize,
-      workgroupSize);
+  return setOpConfigAndEntryPointFnTranslation(entryPoint, op, tileSizes,
+                                               passPipeline, workgroupSize);
 }
 
 /// Propagate the configuration annotated in the incoming IR.

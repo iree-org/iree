@@ -43,8 +43,8 @@ struct HALOpAsmInterface : public OpAsmDialectInterface {
     } else if (auto targetAttr = attr.dyn_cast<ExecutableTargetAttr>()) {
       os << "executable_target_" << targetAttr.getSymbolNameFragment();
       return AliasResult::OverridableAlias;
-    } else if (auto layoutAttr = attr.dyn_cast<ExecutableLayoutAttr>()) {
-      os << "executable_layout";
+    } else if (auto layoutAttr = attr.dyn_cast<PipelineLayoutAttr>()) {
+      os << "pipeline_layout";
       return AliasResult::OverridableAlias;
     }
     return AliasResult::NoAlias;
@@ -103,6 +103,9 @@ class HALToVMConversionInterface : public VMConversionDialectInterface {
                           APInt(64, bindingAttr.getOrdinal())));
       fn(IREE::HAL::DescriptorTypeAttr::get(attr.getContext(),
                                             bindingAttr.getType()));
+      fn(IREE::HAL::DescriptorFlagsAttr::get(
+          attr.getContext(),
+          bindingAttr.getFlags().value_or(IREE::HAL::DescriptorFlags::None)));
     }
   }
 };

@@ -7,7 +7,6 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/Pass.h"
 
@@ -17,7 +16,7 @@ namespace IREE {
 namespace HAL {
 namespace {
 
-// A pass converting the IREE flow dialect into the IREE HAL dialect.
+// Repeats dispatches a specified number of times.
 class BenchmarkBatchDispatchesPass
     : public PassWrapper<BenchmarkBatchDispatchesPass,
                          OperationPass<func::FuncOp>> {
@@ -28,8 +27,7 @@ class BenchmarkBatchDispatchesPass
       : repeatCount_(repeatCount) {}
 
   void getDependentDialects(DialectRegistry& registry) const override {
-    registry.insert<HALDialect, func::FuncDialect,
-                    mlir::arith::ArithmeticDialect>();
+    registry.insert<func::FuncDialect, IREE::HAL::HALDialect>();
   }
 
   StringRef getArgument() const override {
@@ -41,10 +39,7 @@ class BenchmarkBatchDispatchesPass
   }
 
   void runOnOperation() override {
-    func::FuncOp f = getOperation();
-    SmallVector<HAL::CommandBufferDispatchOp> ops;
-    f.walk([&](HAL::CommandBufferDispatchOp op) { ops.push_back(op); });
-
+    auto ops = getOperation().getOps<IREE::HAL::CommandBufferDispatchOp>();
     for (auto op : ops) {
       OpBuilder builder(op);
       for (unsigned i = 1; i < repeatCount_; ++i) {

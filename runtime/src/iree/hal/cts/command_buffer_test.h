@@ -57,7 +57,7 @@ class command_buffer_test : public CtsTestBase {
     IREE_CHECK_OK(iree_hal_command_buffer_create(
         device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
         IREE_HAL_COMMAND_CATEGORY_ANY, IREE_HAL_QUEUE_AFFINITY_ANY,
-        &command_buffer));
+        /*binding_capacity=*/0, &command_buffer));
     IREE_CHECK_OK(iree_hal_command_buffer_begin(command_buffer));
 
     // Fill the pattern.
@@ -65,8 +65,7 @@ class command_buffer_test : public CtsTestBase {
         command_buffer, device_buffer, target_offset, fill_length, pattern,
         pattern_length));
     IREE_CHECK_OK(iree_hal_command_buffer_end(command_buffer));
-    IREE_CHECK_OK(SubmitCommandBufferAndWait(IREE_HAL_COMMAND_CATEGORY_ANY,
-                                             command_buffer));
+    IREE_CHECK_OK(SubmitCommandBufferAndWait(command_buffer));
 
     // Read data for returning.
     std::vector<uint8_t> actual_data(buffer_size);
@@ -88,7 +87,7 @@ TEST_P(command_buffer_test, Create) {
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
       IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
-      &command_buffer));
+      /*binding_capacity=*/0, &command_buffer));
 
   EXPECT_TRUE((iree_hal_command_buffer_allowed_categories(command_buffer) &
                IREE_HAL_COMMAND_CATEGORY_DISPATCH) ==
@@ -102,7 +101,7 @@ TEST_P(command_buffer_test, BeginEnd) {
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
       IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
-      &command_buffer));
+      /*binding_capacity=*/0, &command_buffer));
 
   IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
@@ -115,13 +114,12 @@ TEST_P(command_buffer_test, SubmitEmpty) {
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
       IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
-      &command_buffer));
+      /*binding_capacity=*/0, &command_buffer));
 
   IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
 
-  IREE_ASSERT_OK(SubmitCommandBufferAndWait(IREE_HAL_COMMAND_CATEGORY_DISPATCH,
-                                            command_buffer));
+  IREE_ASSERT_OK(SubmitCommandBufferAndWait(command_buffer));
 
   iree_hal_command_buffer_release(command_buffer);
 }
@@ -131,7 +129,7 @@ TEST_P(command_buffer_test, CopyWholeBuffer) {
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
       IREE_HAL_COMMAND_CATEGORY_TRANSFER, IREE_HAL_QUEUE_AFFINITY_ANY,
-      &command_buffer));
+      /*binding_capacity=*/0, &command_buffer));
 
   uint8_t i8_val = 0x54;
   std::vector<uint8_t> reference_buffer(kDefaultAllocationSize);
@@ -171,8 +169,7 @@ TEST_P(command_buffer_test, CopyWholeBuffer) {
       /*length=*/kDefaultAllocationSize));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
 
-  IREE_ASSERT_OK(SubmitCommandBufferAndWait(IREE_HAL_COMMAND_CATEGORY_TRANSFER,
-                                            command_buffer));
+  IREE_ASSERT_OK(SubmitCommandBufferAndWait(command_buffer));
 
   // Read the device buffer and compare.
   std::vector<uint8_t> actual_data(kDefaultAllocationSize);
@@ -194,7 +191,7 @@ TEST_P(command_buffer_test, CopySubBuffer) {
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
       IREE_HAL_COMMAND_CATEGORY_TRANSFER, IREE_HAL_QUEUE_AFFINITY_ANY,
-      &command_buffer));
+      /*binding_capacity=*/0, &command_buffer));
 
   iree_hal_buffer_params_t device_params = {0};
   device_params.type =
@@ -245,8 +242,7 @@ TEST_P(command_buffer_test, CopySubBuffer) {
       /*pattern_length=*/sizeof(zero_val)));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
 
-  IREE_ASSERT_OK(SubmitCommandBufferAndWait(IREE_HAL_COMMAND_CATEGORY_TRANSFER,
-                                            command_buffer));
+  IREE_ASSERT_OK(SubmitCommandBufferAndWait(command_buffer));
 
   // Read the device buffer and compare.
   std::vector<uint8_t> actual_data(kDefaultAllocationSize);
@@ -446,7 +442,7 @@ TEST_P(command_buffer_test, UpdateBufferWholeBuffer) {
   IREE_CHECK_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
       IREE_HAL_COMMAND_CATEGORY_ANY, IREE_HAL_QUEUE_AFFINITY_ANY,
-      &command_buffer));
+      /*binding_capacity=*/0, &command_buffer));
   IREE_CHECK_OK(iree_hal_command_buffer_begin(command_buffer));
 
   // Issue the update_buffer command.
@@ -454,8 +450,7 @@ TEST_P(command_buffer_test, UpdateBufferWholeBuffer) {
       command_buffer, source_buffer.data(), /*source_offset=*/0, device_buffer,
       /*target_offset=*/0, /*length=*/target_buffer_size));
   IREE_CHECK_OK(iree_hal_command_buffer_end(command_buffer));
-  IREE_CHECK_OK(SubmitCommandBufferAndWait(IREE_HAL_COMMAND_CATEGORY_ANY,
-                                           command_buffer));
+  IREE_CHECK_OK(SubmitCommandBufferAndWait(command_buffer));
 
   // Check that the contents match what we expect.
   std::vector<uint8_t> actual_data(target_buffer_size);
@@ -483,7 +478,7 @@ TEST_P(command_buffer_test, UpdateBufferWithOffsets) {
   IREE_CHECK_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
       IREE_HAL_COMMAND_CATEGORY_ANY, IREE_HAL_QUEUE_AFFINITY_ANY,
-      &command_buffer));
+      /*binding_capacity=*/0, &command_buffer));
   IREE_CHECK_OK(iree_hal_command_buffer_begin(command_buffer));
 
   // Issue the update_buffer command.
@@ -491,8 +486,7 @@ TEST_P(command_buffer_test, UpdateBufferWithOffsets) {
       command_buffer, source_buffer.data(), /*source_offset=*/4, device_buffer,
       /*target_offset=*/4, /*length=*/8));
   IREE_CHECK_OK(iree_hal_command_buffer_end(command_buffer));
-  IREE_CHECK_OK(SubmitCommandBufferAndWait(IREE_HAL_COMMAND_CATEGORY_ANY,
-                                           command_buffer));
+  IREE_CHECK_OK(SubmitCommandBufferAndWait(command_buffer));
 
   // Check that the contents match what we expect.
   std::vector<uint8_t> actual_data(target_buffer_size);
@@ -530,7 +524,7 @@ TEST_P(command_buffer_test, UpdateBufferSubspan) {
   IREE_CHECK_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
       IREE_HAL_COMMAND_CATEGORY_ANY, IREE_HAL_QUEUE_AFFINITY_ANY,
-      &command_buffer));
+      /*binding_capacity=*/0, &command_buffer));
   IREE_CHECK_OK(iree_hal_command_buffer_begin(command_buffer));
 
   // Issue the update_buffer command.
@@ -538,8 +532,7 @@ TEST_P(command_buffer_test, UpdateBufferSubspan) {
       command_buffer, source_buffer.data(), /*source_offset=*/4, buffer_subspan,
       /*target_offset=*/4, /*length=*/4));
   IREE_CHECK_OK(iree_hal_command_buffer_end(command_buffer));
-  IREE_CHECK_OK(SubmitCommandBufferAndWait(IREE_HAL_COMMAND_CATEGORY_ANY,
-                                           command_buffer));
+  IREE_CHECK_OK(SubmitCommandBufferAndWait(command_buffer));
 
   // Check that the contents match what we expect.
   std::vector<uint8_t> actual_data(target_buffer_size);

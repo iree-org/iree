@@ -325,15 +325,14 @@ static iree_status_t iree_hal_task_semaphore_wait(
 
 iree_status_t iree_hal_task_semaphore_multi_wait(
     iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t* semaphore_list, iree_timeout_t timeout,
+    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout,
     iree_event_pool_t* event_pool, iree_arena_block_pool_t* block_pool) {
-  IREE_ASSERT_ARGUMENT(semaphore_list);
-  if (semaphore_list->count == 0) {
+  if (semaphore_list.count == 0) {
     return iree_ok_status();
-  } else if (semaphore_list->count == 1) {
+  } else if (semaphore_list.count == 1) {
     // Fast-path for a single semaphore.
-    return iree_hal_semaphore_wait(semaphore_list->semaphores[0],
-                                   semaphore_list->payload_values[0], timeout);
+    return iree_hal_semaphore_wait(semaphore_list.semaphores[0],
+                                   semaphore_list.payload_values[0], timeout);
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -345,7 +344,7 @@ iree_status_t iree_hal_task_semaphore_multi_wait(
   iree_arena_initialize(block_pool, &arena);
   iree_wait_set_t* wait_set = NULL;
   iree_status_t status = iree_wait_set_allocate(
-      semaphore_list->count, iree_arena_allocator(&arena), &wait_set);
+      semaphore_list.count, iree_arena_allocator(&arena), &wait_set);
 
   // Acquire a wait handle for each semaphore timepoint we are to wait on.
   // TODO(benvanik): flip this API around so we can batch request events from
@@ -354,22 +353,22 @@ iree_status_t iree_hal_task_semaphore_multi_wait(
   iree_host_size_t timepoint_count = 0;
   iree_hal_task_timepoint_t* timepoints = NULL;
   iree_host_size_t total_timepoint_size =
-      semaphore_list->count * sizeof(timepoints[0]);
+      semaphore_list.count * sizeof(timepoints[0]);
   status =
       iree_arena_allocate(&arena, total_timepoint_size, (void**)&timepoints);
   if (iree_status_is_ok(status)) {
     memset(timepoints, 0, total_timepoint_size);
-    for (iree_host_size_t i = 0; i < semaphore_list->count; ++i) {
+    for (iree_host_size_t i = 0; i < semaphore_list.count; ++i) {
       iree_hal_task_semaphore_t* semaphore =
-          iree_hal_task_semaphore_cast(semaphore_list->semaphores[i]);
+          iree_hal_task_semaphore_cast(semaphore_list.semaphores[i]);
       iree_slim_mutex_lock(&semaphore->mutex);
-      if (semaphore->current_value >= semaphore_list->payload_values[i]) {
+      if (semaphore->current_value >= semaphore_list.payload_values[i]) {
         // Fast path: already satisfied.
       } else {
         // Slow path: get a native wait handle for the timepoint.
         iree_hal_task_timepoint_t* timepoint = &timepoints[timepoint_count++];
         status = iree_hal_task_semaphore_acquire_timepoint(
-            semaphore, semaphore_list->payload_values[i], timeout, timepoint);
+            semaphore, semaphore_list.payload_values[i], timeout, timepoint);
         if (iree_status_is_ok(status)) {
           status = iree_wait_set_insert(wait_set, timepoint->event);
         }

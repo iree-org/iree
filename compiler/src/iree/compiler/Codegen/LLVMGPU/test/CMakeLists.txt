@@ -16,6 +16,7 @@ iree_lit_test_suite(
   SRCS
     "convert_to_nvvm.mlir"
     "convert_to_rocdl.mlir"
+    "distribute_foreach.mlir"
     "distribute_to_thread.mlir"
     "gpu_set_num_workgroups.mlir"
     "illegal_configuration.mlir"
@@ -25,6 +26,7 @@ iree_lit_test_suite(
     "reduce_bank_conflicts.mlir"
     "rocdl_pipeline_test.mlir"
     "tensorcore_vectorization.mlir"
+    "tile_on_tensor.mlir"
     "transform_dialect_bufferize.mlir"
     "transform_dialect_vector_distribution.mlir"
     "vector_to_gpu.mlir"

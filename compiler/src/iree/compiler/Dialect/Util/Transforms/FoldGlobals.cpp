@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTraits.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/EquivalenceClasses.h"
@@ -390,19 +391,10 @@ static bool deduplicateConstantGlobals(GlobalTable &globalTable) {
   return didChange;
 }
 
-class FoldGlobalsPass
-    : public PassWrapper<FoldGlobalsPass, OperationPass<mlir::ModuleOp>> {
+class FoldGlobalsPass : public FoldGlobalsBase<FoldGlobalsPass> {
  public:
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(FoldGlobalsPass)
-
   explicit FoldGlobalsPass() = default;
   FoldGlobalsPass(const FoldGlobalsPass &pass) {}
-
-  StringRef getArgument() const override { return "iree-util-fold-globals"; }
-
-  StringRef getDescription() const override {
-    return "Folds duplicate globals and propagates constants.";
-  }
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::func::FuncDialect>();
@@ -490,8 +482,6 @@ class FoldGlobalsPass
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createFoldGlobalsPass() {
   return std::make_unique<FoldGlobalsPass>();
 }
-
-static PassRegistration<FoldGlobalsPass> pass;
 
 }  // namespace Util
 }  // namespace IREE

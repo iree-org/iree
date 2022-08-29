@@ -10,6 +10,8 @@
 #include "iree/compiler/Bindings/TFLite/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Modules/HAL/Inline/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Modules/HAL/Loader/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
@@ -126,6 +128,14 @@ void buildIREEVMTransformPassPipeline(
     case SchedulingOptions::ExecutionModel::AsyncInternal:
     case SchedulingOptions::ExecutionModel::AsyncExternal:
       IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions);
+      break;
+    case SchedulingOptions::ExecutionModel::InlineStatic:
+      IREE::HAL::Inline::buildHALInlineStaticTransformPassPipeline(
+          passManager, executableOptions);
+      break;
+    case SchedulingOptions::ExecutionModel::InlineDynamic:
+      IREE::HAL::Loader::buildHALInlineDynamicTransformPassPipeline(
+          passManager, executableOptions);
       break;
   }
 

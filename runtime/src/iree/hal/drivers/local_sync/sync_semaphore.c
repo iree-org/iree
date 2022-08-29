@@ -209,26 +209,25 @@ static void iree_hal_sync_semaphore_fail(iree_hal_semaphore_t* base_semaphore,
 
 iree_status_t iree_hal_sync_semaphore_multi_signal(
     iree_hal_sync_semaphore_state_t* shared_state,
-    const iree_hal_semaphore_list_t* semaphore_list) {
+    const iree_hal_semaphore_list_t semaphore_list) {
   IREE_ASSERT_ARGUMENT(shared_state);
-  IREE_ASSERT_ARGUMENT(semaphore_list);
-  if (semaphore_list->count == 0) {
+  if (semaphore_list.count == 0) {
     return iree_ok_status();
-  } else if (semaphore_list->count == 1) {
+  } else if (semaphore_list.count == 1) {
     // Fast-path for a single semaphore.
-    return iree_hal_semaphore_signal(semaphore_list->semaphores[0],
-                                     semaphore_list->payload_values[0]);
+    return iree_hal_semaphore_signal(semaphore_list.semaphores[0],
+                                     semaphore_list.payload_values[0]);
   }
 
   // Try to signal all semaphores, stopping if we encounter any issues.
   iree_status_t status = iree_ok_status();
-  for (iree_host_size_t i = 0; i < semaphore_list->count; ++i) {
+  for (iree_host_size_t i = 0; i < semaphore_list.count; ++i) {
     iree_hal_sync_semaphore_t* semaphore =
-        iree_hal_sync_semaphore_cast(semaphore_list->semaphores[i]);
+        iree_hal_sync_semaphore_cast(semaphore_list.semaphores[i]);
 
     iree_slim_mutex_lock(&semaphore->mutex);
     status = iree_hal_sync_semaphore_signal_unsafe(
-        semaphore, semaphore_list->payload_values[i]);
+        semaphore, semaphore_list.payload_values[i]);
     if (!iree_status_is_ok(status)) {
       iree_slim_mutex_unlock(&semaphore->mutex);
       break;
@@ -237,9 +236,8 @@ iree_status_t iree_hal_sync_semaphore_multi_signal(
     iree_slim_mutex_unlock(&semaphore->mutex);
 
     // Notify timepoints that the new value has been reached.
-    iree_hal_semaphore_notify(semaphore_list->semaphores[i],
-                              semaphore_list->payload_values[i],
-                              IREE_STATUS_OK);
+    iree_hal_semaphore_notify(semaphore_list.semaphores[i],
+                              semaphore_list.payload_values[i], IREE_STATUS_OK);
   }
 
   // Notify all waiters that we've updated semaphores. They'll wake and check
@@ -358,13 +356,13 @@ static bool iree_hal_sync_semaphore_all_signaled(
 // - IREE_STATUS_DEADLINE_EXCEEDED: any or all semaphores unsignaled.
 static iree_status_t iree_hal_sync_semaphore_result_from_state(
     iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t* semaphore_list) {
+    const iree_hal_semaphore_list_t semaphore_list) {
   bool any_signaled = false;
   bool all_signaled = true;
   bool any_failed = false;
-  for (iree_host_size_t i = 0; i < semaphore_list->count; ++i) {
+  for (iree_host_size_t i = 0; i < semaphore_list.count; ++i) {
     iree_hal_sync_semaphore_t* semaphore =
-        iree_hal_sync_semaphore_cast(semaphore_list->semaphores[i]);
+        iree_hal_sync_semaphore_cast(semaphore_list.semaphores[i]);
     iree_slim_mutex_lock(&semaphore->mutex);
     const uint64_t current_value = semaphore->current_value;
     const iree_status_code_t current_status_code =
@@ -372,7 +370,7 @@ static iree_status_t iree_hal_sync_semaphore_result_from_state(
     if (current_status_code != IREE_STATUS_OK) {
       // Semaphore has failed.
       any_failed = true;
-    } else if (current_value < semaphore_list->payload_values[i]) {
+    } else if (current_value < semaphore_list.payload_values[i]) {
       // Deadline expired before the semaphore was signaled.
       all_signaled = false;
     } else {
@@ -401,14 +399,13 @@ static iree_status_t iree_hal_sync_semaphore_result_from_state(
 iree_status_t iree_hal_sync_semaphore_multi_wait(
     iree_hal_sync_semaphore_state_t* shared_state,
     iree_hal_wait_mode_t wait_mode,
-    const iree_hal_semaphore_list_t* semaphore_list, iree_timeout_t timeout) {
-  IREE_ASSERT_ARGUMENT(semaphore_list);
-  if (semaphore_list->count == 0) {
+    const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout) {
+  if (semaphore_list.count == 0) {
     return iree_ok_status();
-  } else if (semaphore_list->count == 1) {
+  } else if (semaphore_list.count == 1) {
     // Fast-path for a single semaphore.
-    return iree_hal_semaphore_wait(semaphore_list->semaphores[0],
-                                   semaphore_list->payload_values[0], timeout);
+    return iree_hal_semaphore_wait(semaphore_list.semaphores[0],
+                                   semaphore_list.payload_values[0], timeout);
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -427,7 +424,7 @@ iree_status_t iree_hal_sync_semaphore_multi_wait(
       wait_mode == IREE_HAL_WAIT_MODE_ALL
           ? (iree_condition_fn_t)iree_hal_sync_semaphore_all_signaled
           : (iree_condition_fn_t)iree_hal_sync_semaphore_any_signaled,
-      (void*)semaphore_list, iree_infinite_timeout());
+      (void*)&semaphore_list, iree_infinite_timeout());
 
   // We may have been successful - or may have a partial failure.
   iree_status_t status =

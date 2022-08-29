@@ -309,7 +309,7 @@ ParseResult parseShapedTiedResult(
   OpAsmParser::UnresolvedOperand tiedResult;
   auto res = parser.parseOptionalOperand(tiedResult);
   int64_t tiedOperandIndex = IREE::Util::TiedOpInterface::kUntiedIndex;
-  if (res.hasValue() && succeeded(res.getValue())) {
+  if (res.has_value() && succeeded(res.value())) {
     tiedOperandIndex = 0;
     if (failed(parser.parseKeyword("as"))) return failure();
   }
@@ -442,7 +442,7 @@ ParseResult parseShapedResultList(
     auto res = parser.parseOptionalOperand(tiedResult);
     Type type;
     int64_t tiedOperandIndex = IREE::Util::TiedOpInterface::kUntiedIndex;
-    if (res.hasValue() && succeeded(res.getValue())) {
+    if (res.has_value() && succeeded(res.value())) {
       tiedOperandIndex = findTiedOperand(tiedResult, operands);
       if (tiedOperandIndex == IREE::Util::TiedOpInterface::kUntiedIndex) {
         return parser.emitError(tiedResult.location,

@@ -80,17 +80,17 @@ TEST_P(semaphore_test, Failure) {
 // Tests waiting on no semaphores.
 TEST_P(semaphore_test, EmptyWait) {
   IREE_ASSERT_OK(iree_hal_device_wait_semaphores(
-      device_, IREE_HAL_WAIT_MODE_ANY, NULL,
+      device_, IREE_HAL_WAIT_MODE_ANY, iree_hal_semaphore_list_empty(),
       iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
   IREE_ASSERT_OK(iree_hal_device_wait_semaphores(
-      device_, IREE_HAL_WAIT_MODE_ALL, NULL,
+      device_, IREE_HAL_WAIT_MODE_ALL, iree_hal_semaphore_list_empty(),
       iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
 
   IREE_ASSERT_OK(iree_hal_device_wait_semaphores(
-      device_, IREE_HAL_WAIT_MODE_ANY, NULL,
+      device_, IREE_HAL_WAIT_MODE_ANY, iree_hal_semaphore_list_empty(),
       iree_make_timeout_ns(IREE_DURATION_INFINITE)));
   IREE_ASSERT_OK(iree_hal_device_wait_semaphores(
-      device_, IREE_HAL_WAIT_MODE_ALL, NULL,
+      device_, IREE_HAL_WAIT_MODE_ALL, iree_hal_semaphore_list_empty(),
       iree_make_timeout_ns(IREE_DURATION_INFINITE)));
 }
 
@@ -149,7 +149,7 @@ TEST_P(semaphore_test, WaitAllButNotAllSignaled) {
   // Result status is undefined - some backends may return DeadlineExceededError
   // while others may return success.
   IREE_IGNORE_ERROR(iree_hal_device_wait_semaphores(
-      device_, IREE_HAL_WAIT_MODE_ALL, &semaphore_list,
+      device_, IREE_HAL_WAIT_MODE_ALL, semaphore_list,
       iree_make_deadline(IREE_TIME_INFINITE_PAST)));
 
   iree_hal_semaphore_release(semaphore_a);
@@ -174,7 +174,7 @@ TEST_P(semaphore_test, WaitAllAndAllSignaled) {
   // Result status is undefined - some backends may return DeadlineExceededError
   // while others may return success.
   IREE_IGNORE_ERROR(iree_hal_device_wait_semaphores(
-      device_, IREE_HAL_WAIT_MODE_ALL, &semaphore_list,
+      device_, IREE_HAL_WAIT_MODE_ALL, semaphore_list,
       iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
 
   iree_hal_semaphore_release(semaphore_a);
@@ -197,7 +197,7 @@ TEST_P(semaphore_test, DISABLED_WaitAny) {
   semaphore_list.payload_values = payload_values;
 
   IREE_ASSERT_OK(iree_hal_device_wait_semaphores(
-      device_, IREE_HAL_WAIT_MODE_ANY, &semaphore_list,
+      device_, IREE_HAL_WAIT_MODE_ANY, semaphore_list,
       iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
 
   iree_hal_semaphore_release(semaphore_a);

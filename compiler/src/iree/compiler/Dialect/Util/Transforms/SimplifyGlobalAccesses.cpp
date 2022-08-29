@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTraits.h"
+#include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
@@ -230,20 +231,8 @@ static bool rearrangeBlockGlobalAccesses(
 namespace {
 
 class SimplifyGlobalAccessesPass
-    : public PassWrapper<SimplifyGlobalAccessesPass,
-                         InterfacePass<CallableOpInterface>> {
+    : public SimplifyGlobalAccessesBase<SimplifyGlobalAccessesPass> {
  public:
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(SimplifyGlobalAccessesPass)
-
-  StringRef getArgument() const override {
-    return "iree-util-simplify-global-accesses";
-  }
-
-  StringRef getDescription() const override {
-    return "Hoists loads and sinks stores to variables to decrease data "
-           "dependency regions.";
-  }
-
   void runOnOperation() override {
     auto callableOp = getOperation();
     if (!callableOp.getCallableRegion() ||
@@ -301,8 +290,6 @@ class SimplifyGlobalAccessesPass
 std::unique_ptr<OperationPass<void>> createSimplifyGlobalAccessesPass() {
   return std::make_unique<SimplifyGlobalAccessesPass>();
 }
-
-static PassRegistration<SimplifyGlobalAccessesPass> pass;
 
 }  // namespace Util
 }  // namespace IREE
