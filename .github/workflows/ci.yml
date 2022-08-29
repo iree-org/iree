@@ -98,7 +98,7 @@ jobs:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
       - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
-      - ramdisk
+      - cpu
       - os-family=Linux
     env:
       BUILD_DIR: full-build-dir
@@ -151,7 +151,7 @@ jobs:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
       - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
-      - ramdisk
+      - cpu
       - os-family=Linux
     steps:
       - name: "Checking out repository"
@@ -178,7 +178,7 @@ jobs:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
       - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
-      - ramdisk
+      - cpu
       - os-family=Linux
     env:
       BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
@@ -311,7 +311,7 @@ jobs:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
       - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
-      - ramdisk
+      - cpu
       - os-family=Linux
     outputs:
       binaries-dir: ${{ steps.build.outputs.binaries-dir }}
@@ -358,7 +358,7 @@ jobs:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
       - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
-      - ramdisk
+      - cpu
       - os-family=Linux
     env:
       BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
@@ -444,7 +444,7 @@ jobs:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
       - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
-      - ramdisk
+      - cpu
       - os-family=Linux
     steps:
       - name: "Checking out repository"
@@ -464,7 +464,7 @@ jobs:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
       - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
-      - ramdisk
+      - cpu
       - os-family=Linux
     steps:
       - name: "Checking out repository"
@@ -484,7 +484,7 @@ jobs:
       # Hacks, and order matters. See the comment at the top of the file.
       - self-hosted
       - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
-      - ramdisk
+      - cpu
       - os-family=Linux
     env:
       BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
@@ -524,7 +524,7 @@ jobs:
       # Hacks, and order matters. See the comment at the top of the file.
       - self-hosted
       - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
-      - ramdisk
+      - cpu
       - os-family=Linux
     env:
       ANDROID_ABI: "arm64-v8a"
@@ -555,7 +555,7 @@ jobs:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
       - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
-      - ramdisk
+      - cpu
       - os-family=Linux
     env:
       BUILD_RISCV_DIR: "build-riscv-rv32-baremetal"
@@ -589,7 +589,7 @@ jobs:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
       - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
-      - ramdisk
+      - cpu
       - os-family=Linux
     env:
       BUILD_RISCV_DIR: "build-riscv-r64"
