@@ -693,7 +693,7 @@ jobs:
         run: gcloud alpha storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
       - name: "Extracting TF binaries archive"
         run: tar -xf "${TF_BINARIES_ARCHIVE}"
-      - name: "Cross-compiling and testing riscv64"
+      - name: "Testing riscv64"
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "RISCV_CONFIG=${RISCV_CONFIG}" \
