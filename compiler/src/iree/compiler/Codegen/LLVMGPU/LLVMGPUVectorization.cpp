@@ -31,7 +31,8 @@ static void populateVectorizationPatterns(RewritePatternSet &patterns) {
   linalg::LinalgVectorizationOptions opt;
   linalg::LinalgTransformationFilter f(
       {StringAttr::get(ctx, getWorkgroupKTiledMarker()),
-       StringAttr::get(ctx, getVectorizeMarker())});
+       StringAttr::get(ctx, getVectorizeMarker())},
+      llvm::None);
   f.setMatchByDefault();
   linalg::VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(
       patterns, opt, f);
