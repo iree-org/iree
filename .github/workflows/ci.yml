@@ -585,6 +585,68 @@ jobs:
             "./build_tools/cmake/build_riscv.sh && tests/riscv32/smoke.sh"
 
   riscv64:
+    needs: [should_run, build_all]
+    if: needs.should_run.outputs.should-run == 'true'
+    runs-on:
+      # Pseudo-ternary hack and order matters. See comment at top of file.
+      - self-hosted
+      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - cpu
+      - os-family=Linux
+    outputs:
+      tools-dir: ${{ steps.build.outputs.tools-dir }}
+      tools-archive: ${{ steps.archive.outputs.tools-archive }}
+      tools-gcs-artifact: ${{ steps.upload.outputs.tools-gcs-artifact }}
+    env:
+      BUILD_RISCV_DIR: "build-riscv64"
+      RISCV_CONFIG: "rv64"
+      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
+      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
+      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
+        with:
+          submodules: true
+      - name: "Downloading build dir archive"
+        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+      - name: "Extracting build dir archive"
+        run: tar -xf "${BUILD_DIR_ARCHIVE}"
+      - name: "Cross-compiling and testing riscv64"
+        id: build
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "RISCV_CONFIG=${RISCV_CONFIG}" \
+            --env "BUILD_RISCV_DIR=${BUILD_RISCV_DIR}" \
+            --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
+            --env "IREE_IMPORT_TFLITE_BIN=${TF_BINARIES_DIR}/iree-import-tflite" \
+            --env "LLVM_BIN_DIR=${BUILD_DIR}/third_party/llvm-project/llvm/bin" \
+            gcr.io/iree-oss/riscv@sha256:720bc0215d8462ea14352edc22710a6ce4c0c1daff581d179dd173885f1d8a35 \
+            bash -euo pipefail -c \
+              "./build_tools/cmake/build_riscv.sh"
+          echo "::set-output name=tools-dir::${BUILD_RISCV_DIR}/tools"
+      - name: "Creating riscv64 cross-compiled tools archive"
+        id: archive
+        env:
+          TOOLS_ARCHIVE: riscv64-tools.tar
+        run: |
+          tar -cf ${TOOLS_ARCHIVE} \
+            ${BUILD_RISCV_DIR}/tools/iree-benchmark-module \
+            ${BUILD_RISCV_DIR}/tools/iree-benchmark-trace \
+            ${BUILD_RISCV_DIR}/tools/iree-check-module \
+            ${BUILD_RISCV_DIR}/tools/iree-run-module \
+            ${BUILD_RISCV_DIR}/tools/iree-run-trace
+          echo "::set-output name=tools-archive::${TOOLS_ARCHIVE}"
+      - name: "Uploading riscv64 cross-compiled tools archive"
+        id: upload
+        env:
+          TOOLS_ARCHIVE: ${{ steps.archive.outputs.tools-archive }}
+          TOOLS_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.tools-archive }}
+        run: |
+          gcloud alpha storage cp "${TOOLS_ARCHIVE}" "${TOOLS_GCS_ARTIFACT}"
+          echo "::set-output name=tools-gcs-artifact::${TOOLS_GCS_ARTIFACT}"
+
+  test-riscv64:
     needs: [should_run, build_all, build_tf_integrations]
     if: needs.should_run.outputs.should-run == 'true'
     runs-on:
