@@ -1106,6 +1106,9 @@ static LogicalResult setTransposeLikeOpRootConfig(func::FuncOp entryPointFn,
                                                tileSizes, passPipeline);
 }
 
+/// Sets elementwise dispatches to use peeling approach. It scales the number of
+/// workload per workgroup to a larger number, which prevents runtime overheads
+/// from tiny dispatches.
 static LogicalResult setElementwiseGenericOpRootConfig(
     func::FuncOp entryPointFn, linalg::GenericOp genericOp) {
   if (getLoweringConfig(genericOp)) {
@@ -1124,7 +1127,9 @@ static LogicalResult setElementwiseGenericOpRootConfig(
       getDefaultDistributedLevelTileSizes(genericOp, minTileSizes, maxTileSizes,
                                           /*allowIncompleteTile=*/true);
 
-  // Adjust the number of workload per workgroup to at least 4096.
+  // Adjust the number of workload per workgroup to at least 4096. This
+  // prevents the runtime overheads domiating the execution time. The number is
+  // derived from experimients. We should be able to make it related to target.
   constexpr int64_t kMinimumWorkload = 4096;
   auto shape = genericOp.getStaticLoopRanges();
   int64_t numWorkload = 1;
