@@ -9,6 +9,7 @@
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/LLVMGPU/KernelConfig.h"
+#include "iree/compiler/Codegen/LLVMGPU/TilingUtils.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
@@ -273,27 +274,11 @@ struct LLVMGPUTileAndDistributePass
       propagateFillIntoPromotionAlloc(funcOp);
     }
 
-    {
-      // Tile again at the workgroup level since redution dimension were
-      // ignored. Dimensions already tiled will be ignore since we tile to the
-      // same size.
-      RewritePatternSet wgTilingPatterns(context);
-      populateTilingReductionPatterns(wgTilingPatterns);
-      if (failed(applyPatternsAndFoldGreedily(funcOp,
-                                              std::move(wgTilingPatterns)))) {
-        return signalPassFailure();
-      }
-    }
-
-    {
-      RewritePatternSet wgTilingCanonicalizationPatterns =
-          linalg::getLinalgTilingCanonicalizationPatterns(context);
-      populateAffineMinSCFCanonicalizationPattern(
-          wgTilingCanonicalizationPatterns);
-      if (failed(applyPatternsAndFoldGreedily(
-              funcOp, std::move(wgTilingCanonicalizationPatterns)))) {
-        return signalPassFailure();
-      }
+    // Tile again at the workgroup level since redution dimension were
+    // ignored. Dimensions already tiled will be ignore since we tile to the
+    // same size.
+    if (failed(tileReduction(funcOp))) {
+      return signalPassFailure();
     }
 
     LLVM_DEBUG({

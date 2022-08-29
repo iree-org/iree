@@ -18,15 +18,16 @@
 // Include the ukernel support library so that we can use its implementations
 // as fixed-function components of the runtime.
 #include "iree/builtins/ukernel/elementwise.h"
-#include "iree/builtins/ukernel/mmt4d.h"
 
-// Temporary switch between a blas-style matmul kernel and an mmt4d style.
-// We omit the latter for the time being since it is experimental and keeps
-// the binary size down.
-#define IREE_VMVX_USE_BLAS_MATMUL 1
+#if 0  // TODO: implement mmt4d ukernel
+#include "iree/builtins/ukernel/mmt4d.h"
+#endif
 
 #define IREE_VMVX_MODULE_VERSION_0_0 0x00000000u
 #define IREE_VMVX_MODULE_VERSION_LATEST IREE_VMVX_MODULE_VERSION_0_0
+
+// TODO: move these flags to a header file shared with compiler/.
+#define IREE_VMVX_MATMUL_FLAG_ACCUMULATE 1
 
 //===----------------------------------------------------------------------===//
 // Module type definitions
@@ -490,9 +491,7 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_fill2d_x32, fill2d_x32, v) {
 // Exported matmul function definitions
 //===----------------------------------------------------------------------===//
 
-#if IREE_VMVX_USE_BLAS_MATMUL
-
-IREE_VMVX_ABI_FIXED_STRUCT(matmul_f32, rIIrIIrIIIIIffi, {
+IREE_VMVX_ABI_FIXED_STRUCT(matmul, rIIrIIrIIIIIffi, {
   iree_vm_ref_t lhs_ref;
   int64_t lhs_offset;
   int64_t lhs_row_stride;
@@ -505,12 +504,11 @@ IREE_VMVX_ABI_FIXED_STRUCT(matmul_f32, rIIrIIrIIIIIffi, {
   int64_t m;
   int64_t n;
   int64_t k;
-  float alpha;
-  float beta;
   int32_t flags;
 });
-IREE_VMVX_ABI_DEFINE_SHIM(matmul_f32, v);
-IREE_VMVX_ABI_EXPORT(iree_vmvx_matmul_f32f32f32, matmul_f32, v) {
+IREE_VMVX_ABI_DEFINE_SHIM(matmul, v);
+
+IREE_VMVX_ABI_EXPORT(iree_vmvx_matmul_f32f32f32, matmul, v) {
   IREE_TRACE_ZONE_BEGIN(z0);
   MAP_BUFFER_2D_RO(lhs, float,
                    /*buffer_ref=*/args->lhs_ref,
@@ -538,36 +536,88 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_matmul_f32f32f32, matmul_f32, v) {
   iree_host_size_t N = (iree_host_size_t)args->n;
   iree_host_size_t K = (iree_host_size_t)args->k;
 
-  // TODO: define flags more robustly.
-  if (args->flags == 0) {
-    // Row major.
-    for (iree_host_size_t i = 0; i < M; ++i) {
-      for (iree_host_size_t k = 0; k < K; ++k) {
-        float apart = args->alpha * lhs[i * lhs_stride0 + k];
-        for (iree_host_size_t j = 0; j < N; ++j) {
-          out[i * out_stride0 + j] +=
-              args->beta * apart * rhs[k * rhs_stride0 + j];
-        }
-      }
-    }
-  } else {
+  // TODO: define flags more robustly
+  unsigned accumulate_flag = args->flags & IREE_VMVX_MATMUL_FLAG_ACCUMULATE;
+  unsigned unhandled_flags = args->flags ^ accumulate_flag;
+  if (unhandled_flags) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "unsupported matmul flags: %x",
-                            (unsigned)args->flags);
+                            "unsupported matmul flags: 0x%x", unhandled_flags);
+  }
+  for (iree_host_size_t i = 0; i < M; ++i) {
+    for (iree_host_size_t j = 0; j < N; ++j) {
+      float* out_ptr = out + i * out_stride0 + j;
+      float acc = accumulate_flag ? *out_ptr : 0.f;
+      for (iree_host_size_t k = 0; k < K; ++k) {
+        acc += lhs[i * lhs_stride0 + k] * rhs[k * rhs_stride0 + j];
+      }
+      *out_ptr = acc;
+    }
   }
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 
-#endif  // IREE_VMVX_USE_BLAS_MATMUL
+IREE_VMVX_ABI_EXPORT(iree_vmvx_matmul_i8i8i32, matmul, v) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  MAP_BUFFER_2D_RO(lhs, int8_t,
+                   /*buffer_ref=*/args->lhs_ref,
+                   /*offset=*/args->lhs_offset,
+                   /*stride0=*/args->lhs_row_stride,
+                   /*stride1=*/1,
+                   /*size0=*/args->m,
+                   /*size1=*/args->k);
+  MAP_BUFFER_2D_RO(rhs, int8_t,
+                   /*buffer_ref=*/args->rhs_ref,
+                   /*offset=*/args->rhs_offset,
+                   /*stride0=*/args->rhs_row_stride,
+                   /*stride1=*/1,
+                   /*size0=*/args->k,
+                   /*size1=*/args->n);
+  MAP_BUFFER_2D_RW(out, int32_t,
+                   /*buffer_ref=*/args->out_ref,
+                   /*offset=*/args->out_offset,
+                   /*stride0=*/args->out_row_stride,
+                   /*stride1=*/1,
+                   /*size0=*/args->m,
+                   /*size1=*/args->n);
+
+  iree_host_size_t M = (iree_host_size_t)args->m;
+  iree_host_size_t N = (iree_host_size_t)args->n;
+  iree_host_size_t K = (iree_host_size_t)args->k;
+
+  // TODO: define flags more robustly
+  unsigned accumulate_flag = args->flags & IREE_VMVX_MATMUL_FLAG_ACCUMULATE;
+  unsigned unhandled_flags = args->flags ^ accumulate_flag;
+  if (unhandled_flags) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "unsupported matmul flags: 0x%x", unhandled_flags);
+  }
+  for (iree_host_size_t i = 0; i < M; ++i) {
+    for (iree_host_size_t j = 0; j < N; ++j) {
+      int32_t* out_ptr = out + i * out_stride0 + j;
+      int32_t acc = accumulate_flag ? *out_ptr : 0.f;
+      for (iree_host_size_t k = 0; k < K; ++k) {
+        // C's implicit promotion to int saves skin, but let's be explicit.
+        int32_t lhs_val_int32 = lhs[i * lhs_stride0 + k];
+        int32_t rhs_val_int32 = rhs[k * rhs_stride0 + j];
+        acc += lhs_val_int32 * rhs_val_int32;
+      }
+      *out_ptr = acc;
+    }
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
 
 //===----------------------------------------------------------------------===//
 // MMT4D
 //===----------------------------------------------------------------------===//
 
-#if !IREE_VMVX_USE_BLAS_MATMUL
+#if 0  // TODO: implement mmt4d ukernel
 
 // NOTE: for demo purposes this reuses the matmul signature.
 IREE_VMVX_ABI_FIXED_STRUCT(mmt4d_f32, rIIrIIrIIIIIffi, {
@@ -624,7 +674,7 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_mmt4d_f32f32f32, mmt4d_f32, v) {
                                      "unsupported mmt4d parameters");
 }
 
-#endif  // !IREE_VMVX_USE_BLAS_MATMUL
+#endif  // TODO: implement mmt4d ukernel
 
 //===----------------------------------------------------------------------===//
 // VM module interface implementation
