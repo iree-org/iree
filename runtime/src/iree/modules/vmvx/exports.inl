@@ -40,7 +40,8 @@ EXPORT_FN("exp.2d.f32", iree_ukernel_x32u_expf_2d, ukernel_x32u_2d, rIIIrIIIII, 
 EXPORT_FN("fill.2d.x32", iree_vmvx_fill2d_x32, fill2d_x32, irIIII, v)
 EXPORT_FN("floor.2d.f32", iree_ukernel_x32u_floorf_2d, ukernel_x32u_2d, rIIIrIIIII, v)
 EXPORT_FN("log.2d.f32", iree_ukernel_x32u_logf_2d, ukernel_x32u_2d, rIIIrIIIII, v)
-EXPORT_FN("matmul.f32f32f32", iree_vmvx_matmul_f32f32f32, matmul_f32, rIIrIIrIIIIIi, v)
+EXPORT_FN("matmul.f32f32f32", iree_vmvx_matmul_f32f32f32, matmul, rIIrIIrIIIIIi, v)
+EXPORT_FN("matmul.i8i8i32", iree_vmvx_matmul_i8i8i32, matmul, rIIrIIrIIIIIi, v)
 // NOTE: must still be in alphabetical order with all other exports.
 #if 0 // TODO: implement mmt4d ukernel
 EXPORT_FN("mmt4d.f32f32f32", iree_vmvx_mmt4d_f32f32f32, mmt4d_f32, rIIrIIrIIIIIffi, v)
