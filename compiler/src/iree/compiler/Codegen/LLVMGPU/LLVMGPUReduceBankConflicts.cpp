@@ -15,14 +15,14 @@ namespace iree_compiler {
 
 /// Padd out the inner dimension of the allocOp in order reduce the chances to
 /// have bank conflicts when reading 2D shapes within shared memory.
-static void padAlloc(memref::AllocOp allocOp) {
+static void padAlloc(memref::AllocOp allocOp, int64_t paddingSizeBits) {
   int64_t innerDim = allocOp.getType().getShape().back();
   if (ShapedType::isDynamic(innerDim)) return;
   Type elType = allocOp.getType().getElementType();
   unsigned bitwidth =
       mlir::DataLayout::closest(allocOp).getTypeSizeInBits(elType);
   // Pad with 128bits==16bytes so that accesses are still aligned on 16bytes.
-  int64_t paddingSize = 128 / bitwidth;
+  int64_t paddingSize = paddingSizeBits / bitwidth;
   SmallVector<int64_t> shape = llvm::to_vector(allocOp.getType().getShape());
   shape.back() = shape.back() + paddingSize;
   MemRefType allocType = MemRefType::get(
@@ -48,6 +48,13 @@ namespace {
 /// be removed once the better solution is implemented.
 struct LLVMGPUReduceBankConflictsPass
     : public LLVMGPUReduceBankConflictsBase<LLVMGPUReduceBankConflictsPass> {
+ private:
+  int64_t paddingSizeBits;
+
+ public:
+  LLVMGPUReduceBankConflictsPass(int64_t paddingSizeBits)
+      : paddingSizeBits(paddingSizeBits) {}
+
   void runOnOperation() override {
     auto funcOp = getOperation();
     SmallVector<memref::AllocOp> sharedMemAllocs;
@@ -58,14 +65,15 @@ struct LLVMGPUReduceBankConflictsPass
         sharedMemAllocs.push_back(allocOp);
       }
     });
-    for (memref::AllocOp alloc : sharedMemAllocs) padAlloc(alloc);
+    for (memref::AllocOp alloc : sharedMemAllocs)
+      padAlloc(alloc, paddingSizeBits);
   }
 };
 }  // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-createLLVMGPUReduceSharedMemoryBankConflicts() {
-  return std::make_unique<LLVMGPUReduceBankConflictsPass>();
+createLLVMGPUReduceSharedMemoryBankConflicts(int64_t paddingSizeBits) {
+  return std::make_unique<LLVMGPUReduceBankConflictsPass>(paddingSizeBits);
 }
 
 }  // namespace iree_compiler
