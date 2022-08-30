@@ -52,7 +52,8 @@ static iree_status_t iree_hal_vmvx_executable_verify_entry_point(
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "executable entry point does not match the expected calling "
-        "convention; expected '" IREE_VMVX_ENTRY_SIGNATURE "' but got '%.*s'",
+        "convention; expected '" IREE_VMVX_ENTRY_SIGNATURE
+        "' but got '%.*s', possible ABI version mismatch",
         (int)signature.calling_convention.size,
         signature.calling_convention.data);
   }
