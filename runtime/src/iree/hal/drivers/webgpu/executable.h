@@ -11,8 +11,7 @@
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
-#include "iree/hal/drivers/webgpu/descriptor_set_layout.h"
-#include "iree/hal/drivers/webgpu/executable_layout.h"
+#include "iree/hal/drivers/webgpu/pipeline_layout.h"
 #include "iree/hal/drivers/webgpu/platform/webgpu.h"
 
 #ifdef __cplusplus
@@ -25,7 +24,7 @@ typedef struct iree_hal_webgpu_entry_point_t {
   // info, etc) instead so that we avoid needing to query it per dispatch from
   // the layout. The extra ~32B per entry point feels like it may be worth it to
   // avoid a guaranteed cache miss.
-  iree_hal_executable_layout_t* layout;
+  iree_hal_pipeline_layout_t* layout;
 } iree_hal_webgpu_entry_point_t;
 
 iree_status_t iree_hal_webgpu_executable_create(
