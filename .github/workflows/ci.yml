@@ -161,7 +161,7 @@ jobs:
       - name: "Building with Bazel"
         env:
           # Psuedo-ternary hack. Don't swap the condition! See comment at top of file.
-          IREE_BAZEL_WRITE_REMOTE_CACHE: ${{ github.event_name != 'pull_request' && 1 || 0 }}
+          IREE_BAZEL_WRITE_REMOTE_CACHE: 1
         # This doesn't really need everything in the frontends image, but we
         # want the cache to be shared with the integrations build (no point
         # building LLVM twice) and the cache key is the docker container it's
@@ -328,7 +328,7 @@ jobs:
         env:
           IREE_TF_BINARIES_OUTPUT_DIR: iree-tf-binaries
           # Psuedo-ternary hack. Don't swap the condition! See comment at top of file.
-          IREE_BAZEL_WRITE_REMOTE_CACHE: ${{ github.event_name != 'pull_request' && 1 || 0 }}
+          IREE_BAZEL_WRITE_REMOTE_CACHE: 1
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "IREE_BAZEL_WRITE_REMOTE_CACHE=${IREE_BAZEL_WRITE_REMOTE_CACHE}" \
