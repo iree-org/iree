@@ -68,20 +68,18 @@ function(iree_c_module)
   list(APPEND _ARGS "-o")
   list(APPEND _ARGS "${_RULE_H_FILE_OUTPUT}")
 
+  set(_OUTPUT_FILES "${_RULE_H_FILE_OUTPUT}")
   # Check LLVM static library setting. If the static libary output path is set,
   # retrieve the object path and the corresponding header file path.
   if(_RULE_STATIC_LIB_PATH)
-    list(APPEND _ARGS "--iree-hal-target-backends=llvm-cpu")
     list(APPEND _ARGS "--iree-llvm-link-embedded=false")
     list(APPEND _ARGS "--iree-llvm-link-static")
     list(APPEND _ARGS "--iree-llvm-static-library-output-path=${_RULE_STATIC_LIB_PATH}")
-    string(REPLACE ".o" ".h" _STATIC_HDR_PATH "${_RULE_STATIC_LIB_PATH}")
-  endif()
 
-  set(_OUTPUT_FILES "${_RULE_H_FILE_OUTPUT}")
-  if(_RULE_STATIC_LIB_PATH)
+    string(REPLACE ".o" ".h" _STATIC_HDR_PATH "${_RULE_STATIC_LIB_PATH}")
     list(APPEND _OUTPUT_FILES "${_RULE_STATIC_LIB_PATH}" "${_STATIC_HDR_PATH}")
   endif()
+
   add_custom_command(
     OUTPUT ${_OUTPUT_FILES}
     COMMAND ${_COMPILE_TOOL_EXECUTABLE} ${_ARGS}

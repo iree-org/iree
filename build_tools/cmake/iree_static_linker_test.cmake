@@ -80,6 +80,7 @@ function(iree_static_linker_test)
 
   # Set common iree-compile flags
   set(_COMPILER_ARGS ${_RULE_COMPILER_FLAGS})
+  list(APPEND _COMPILER_ARGS "--iree-hal-target-backends=llvm-cpu")
   if(_RULE_TARGET_CPU_FEATURES)
     list(APPEND _COMPILER_ARGS "--iree-llvm-target-cpu-features=${_RULE_TARGET_CPU_FEATURES}")
   endif()
