@@ -168,7 +168,7 @@ class InlineExecutablesPass
   // this out to keep things vanilla and have fewer places making assumptions
   // about the function signatures.
   LogicalResult rewriteWorkgroupSignature(
-      IREE::HAL::ExecutableLayoutAttr layoutAttr, size_t totalBindingCount,
+      IREE::HAL::PipelineLayoutAttr layoutAttr, size_t totalBindingCount,
       func::FuncOp bodyFuncOp) {
     auto *entryBlock = &bodyFuncOp.front();
     auto builder = OpBuilder::atBlockBegin(entryBlock);
@@ -318,7 +318,7 @@ class InlineExecutablesPass
   //    workgroup_size_x, workgroup_size_y, workgroup_size_z,
   //    workgroup_count_x, workgroup_count_y, workgroup_count_z)
   void buildDispatchFunc(IREE::HAL::ExecutableExportOp exportOp,
-                         IREE::HAL::ExecutableLayoutAttr layoutAttr,
+                         IREE::HAL::PipelineLayoutAttr layoutAttr,
                          size_t totalBindingCount, func::FuncOp bodyFuncOp,
                          func::FuncOp dispatchFuncOp) {
     auto loc = exportOp.getLoc();

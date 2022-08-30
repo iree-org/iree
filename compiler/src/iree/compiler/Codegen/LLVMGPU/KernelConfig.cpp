@@ -399,10 +399,20 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
       }
     }
   }
+
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
   // Pick a vectorSize of 1 for op that we know won't get vectorizedd.
   // TODO(thomasraoux): This could be improved by checking if the linalg op
   // would fail vectorization.
-  if (!isa<linalg::LinalgOp>(op)) vectorSize = 1;
+  if (!linalgOp || op->getNumResults() > 1 ||
+      llvm::any_of(linalgOp.getInputAndOutputOperands(), [&](OpOperand *input) {
+        return !linalgOp.getTiedIndexingMap(input).isProjectedPermutation();
+      })) {
+    vectorSize = 1;
+  } else {
+    passPipeline =
+        IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorize;
+  }
 
   // Set the inner most parallel loop to `lowerTs`.
   for (int64_t depth = numLoops; depth > 0; depth--) {
@@ -411,16 +421,14 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
       break;
     }
   }
-  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
+  if (linalgOp) {
     // Tile reduction dimension to 4 to allow doing load4 if the reduction size
     // is the most inner dimension.
     workgroupTileSizes.append(linalgOp.getNumReductionLoops(), 4);
   }
   tileSizes.emplace_back(std::move(workgroupTileSizes));  // Workgroup level
-  return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, op, tileSizes,
-      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorize,
-      workgroupSize);
+  return setOpConfigAndEntryPointFnTranslation(entryPoint, op, tileSizes,
+                                               passPipeline, workgroupSize);
 }
 
 /// Propagate the configuration annotated in the incoming IR.
@@ -513,6 +521,75 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   return success();
 }
 
+/// Returns true if the operation is a GenericOp implementing a 2D transpose.
+static bool isTransposeOp(linalg::LinalgOp linalgOp) {
+  if (!isa<linalg::GenericOp>(linalgOp)) return false;
+  // Check that the op has 2 parallel loops.
+  if (linalgOp.getNumParallelLoops() != 2) {
+    return false;
+  }
+
+  // Check that all the iterators are parallel.
+  if (linalgOp.getNumParallelLoops() != linalgOp.getNumLoops()) {
+    return false;
+  }
+
+  // Check that the op has only one input and one output.
+  if ((linalgOp.getNumInputs() != 1) || (linalgOp.getNumOutputs() != 1)) {
+    return false;
+  }
+  // Check for 2D operations
+  auto inputShape =
+      linalgOp.inputs()[0].getType().cast<ShapedType>().getShape();
+  auto outputShape =
+      linalgOp.outputs()[0].getType().cast<ShapedType>().getShape();
+  if (inputShape.size() != 2 || outputShape.size() != 2) {
+    return false;
+  }
+
+  // Only transpose static shapes
+  if (linalgOp.hasDynamicShape()) {
+    return false;
+  }
+
+  // Check that the two indexing maps are a permutation of each other.
+  auto indexing_maps = linalgOp.getIndexingMapsArray();
+  return !indexing_maps[0].isEmpty() && !indexing_maps[1].isEmpty() &&
+         ((indexing_maps[0].isIdentity() && !indexing_maps[1].isIdentity() &&
+           indexing_maps[1].isPermutation()) ||
+          (!indexing_maps[0].isIdentity() && indexing_maps[0].isPermutation() &&
+           indexing_maps[1].isIdentity()));
+}
+
+static LogicalResult setTransposeConfig(func::FuncOp entryPoint,
+                                        Operation *op) {
+  int32_t tileM = 32;
+  int32_t tileN = 32;
+  TileSizesListType tileSizes;
+  tileSizes.push_back({tileM, tileN});
+
+  // Check alignment with tile size
+  if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
+    auto inputShape =
+        genericOp.inputs()[0].getType().cast<ShapedType>().getShape();
+    if (inputShape[0] % tileM != 0 || inputShape[1] % tileN != 0) {
+      return failure();
+    }
+  } else {
+    return failure();
+  }
+
+  // Workgroup size contains 8 warps. Configured with 8 threads on fastest
+  // moving dimension so each thread can execute a vectorized copy of 4
+  // contigious elements at a time from the 32 block.
+  std::array<int64_t, 3> workgroupSize = {8, 32, 1};
+
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, op, tileSizes,
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTransposeSharedMem,
+      workgroupSize);
+}
+
 static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                    Operation *computeOp) {
   if (IREE::Codegen::CompilationInfoAttr compilationInfo =
@@ -526,8 +603,13 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
         linalgOp.getNumParallelLoops() >= 2) {
       return setContractConfig(entryPointFn, linalgOp);
     }
-    if (succeeded(setWarpReductionConfig(entryPointFn, linalgOp)))
+    if (succeeded(setWarpReductionConfig(entryPointFn, linalgOp))) {
       return success();
+    }
+    if (isTransposeOp(linalgOp) &&
+        succeeded(setTransposeConfig(entryPointFn, linalgOp))) {
+      return success();
+    }
   }
   if (auto fftOp = dyn_cast<IREE::LinalgExt::FftOp>(computeOp)) {
     return setFftConfig(entryPointFn, fftOp);

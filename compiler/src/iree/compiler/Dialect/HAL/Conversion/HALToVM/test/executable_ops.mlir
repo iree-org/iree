@@ -17,10 +17,10 @@ hal.executable @exe {
 func.func @executableCreate(
     // CHECK-SAME: %[[DEV:.+]]: !vm.ref<!hal.device>
     %device: !hal.device,
-    // CHECK-SAME: %[[LAYOUT0:.+]]: !vm.ref<!hal.executable_layout>,
-    %layout0: !hal.executable_layout,
-    // CHECK-SAME: %[[LAYOUT1:.+]]: !vm.ref<!hal.executable_layout>
-    %layout1: !hal.executable_layout
+    // CHECK-SAME: %[[LAYOUT0:.+]]: !vm.ref<!hal.pipeline_layout>,
+    %layout0: !hal.pipeline_layout,
+    // CHECK-SAME: %[[LAYOUT1:.+]]: !vm.ref<!hal.pipeline_layout>
+    %layout1: !hal.pipeline_layout
   ) -> (!hal.executable, !hal.executable) {
 
   // CHECK-DAG: %[[FORMAT1:.+]] = vm.rodata.inline "_utf8_format1_
@@ -28,7 +28,7 @@ func.func @executableCreate(
   // CHECK-DAG: %[[NULL1:.+]] = vm.const.ref.zero : !vm.buffer
   // CHECK: %[[EXE1:.+]] = vm.call.variadic @hal.executable.create(
   // CHECK-SAME: %[[DEV]], %[[FORMAT1]], %[[BINARY1]], %[[NULL1]], [%[[LAYOUT0]], %[[LAYOUT1]]]
-  // CHECK-SAME: ) {nosideeffects} : (!vm.ref<!hal.device>, !vm.buffer, !vm.buffer, !vm.buffer, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
+  // CHECK-SAME: ) {nosideeffects} : (!vm.ref<!hal.device>, !vm.buffer, !vm.buffer, !vm.buffer, !vm.ref<!hal.pipeline_layout> ...) -> !vm.ref<!hal.executable>
   %0 = hal.executable.create device(%device : !hal.device) target(@exe::@binary1) layouts([%layout0, %layout1]) : !hal.executable
 
   // CHECK-DAG: %[[FORMAT2:.+]] = vm.rodata.inline "_utf8_format2_
@@ -36,7 +36,7 @@ func.func @executableCreate(
   // CHECK-DAG: %[[NULL2:.+]] = vm.const.ref.zero : !vm.buffer
   // CHECK: %[[EXE2:.+]] = vm.call.variadic @hal.executable.create(
   // CHECK-SAME: %[[DEV]], %[[FORMAT2]], %[[BINARY2]], %[[NULL2]], [%[[LAYOUT1]], %[[LAYOUT0]]]
-  // CHECK-SAME: ) {nosideeffects} : (!vm.ref<!hal.device>, !vm.buffer, !vm.buffer, !vm.buffer, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
+  // CHECK-SAME: ) {nosideeffects} : (!vm.ref<!hal.device>, !vm.buffer, !vm.buffer, !vm.buffer, !vm.ref<!hal.pipeline_layout> ...) -> !vm.ref<!hal.executable>
   %1 = hal.executable.create device(%device : !hal.device) target(@exe::@binary2) layouts([%layout1, %layout0]) : !hal.executable
 
   // CHECK: vm.return %[[EXE1]], %[[EXE2]]
@@ -63,8 +63,8 @@ hal.executable @exe2 {
 // CHECK-LABEL: @multipleExecutables
 func.func @multipleExecutables(
     %device: !hal.device,
-    %layout0: !hal.executable_layout,
-    %layout1: !hal.executable_layout
+    %layout0: !hal.pipeline_layout,
+    %layout1: !hal.pipeline_layout
   ) -> (!hal.executable, !hal.executable) {
   // CHECK-DAG: %[[FORMAT1:.+]] = vm.rodata.inline "_utf8_format_
   // CHECK-DAG: %[[BINARY1:.+]] = vm.const.ref.rodata @exe1_binary1 : !vm.buffer
@@ -89,8 +89,8 @@ hal.executable @exe {
 func.func @executableConstants(
     // CHECK-SAME: %[[DEV:.+]]: !vm.ref<!hal.device>
     %device: !hal.device,
-    // CHECK-SAME: %[[LAYOUT:.+]]: !vm.ref<!hal.executable_layout>
-    %layout: !hal.executable_layout,
+    // CHECK-SAME: %[[LAYOUT:.+]]: !vm.ref<!hal.pipeline_layout>
+    %layout: !hal.pipeline_layout,
     // CHECK-SAME: %[[CONSTANT0:.+]]: i32, %[[CONSTANT1:.+]]: i32
     %constant0: i32, %constant1: i32
   ) -> !hal.executable {
@@ -109,7 +109,7 @@ func.func @executableConstants(
 
   // CHECK: %[[EXE:.+]] = vm.call.variadic @hal.executable.create(
   // CHECK-SAME: %[[DEV]], %[[FORMAT]], %[[BINARY]], %[[CONSTANTS]], [%[[LAYOUT]]]
-  // CHECK-SAME: ) {nosideeffects} : (!vm.ref<!hal.device>, !vm.buffer, !vm.buffer, !vm.buffer, !vm.ref<!hal.executable_layout> ...) -> !vm.ref<!hal.executable>
+  // CHECK-SAME: ) {nosideeffects} : (!vm.ref<!hal.device>, !vm.buffer, !vm.buffer, !vm.buffer, !vm.ref<!hal.pipeline_layout> ...) -> !vm.ref<!hal.executable>
   %0 = hal.executable.create
       device(%device : !hal.device)
       target(@exe::@binary)

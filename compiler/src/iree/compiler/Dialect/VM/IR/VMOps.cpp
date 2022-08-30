@@ -1263,7 +1263,7 @@ ParseResult CondFailOp::parse(OpAsmParser &parser, OperationState &result) {
   bool trailingComma = false;
   OpAsmParser::UnresolvedOperand status = condition;
   if (succeeded(parser.parseOptionalComma()) &&
-      !parser.parseOptionalOperand(status).hasValue()) {
+      !parser.parseOptionalOperand(status).has_value()) {
     trailingComma = true;
   }
 

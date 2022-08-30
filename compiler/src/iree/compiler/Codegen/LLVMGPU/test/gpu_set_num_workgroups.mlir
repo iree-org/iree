@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target-pass{test-lowering-configuration}))' %s | FileCheck %s
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -9,7 +9,7 @@
 ]>
 hal.executable @add_dispatch_0 {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-  hal.executable.export @add_dispatch_0 layout(#executable_layout)
+  hal.executable.export @add_dispatch_0 layout(#pipeline_layout)
   builtin.module {
     func.func @add_dispatch_0() {
       %c0 = arith.constant 0 : index
@@ -42,7 +42,7 @@ hal.executable @add_dispatch_0 {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -51,7 +51,7 @@ hal.executable @add_dispatch_0 {
 ]>
 hal.executable private @dot_dispatch_1  {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.export @dot_dispatch_1 layout(#executable_layout)
+    hal.executable.export @dot_dispatch_1 layout(#pipeline_layout)
     builtin.module {
       func.func @dot_dispatch_1() {
         %c0 = arith.constant 0 : index
@@ -82,7 +82,7 @@ hal.executable private @dot_dispatch_1  {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -90,7 +90,7 @@ hal.executable private @dot_dispatch_1  {
 ]>
 hal.executable @reduction_dispatch {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.export @predict_dispatch_153 layout(#executable_layout)
+    hal.executable.export @predict_dispatch_153 layout(#pipeline_layout)
     builtin.module {
       func.func @predict_dispatch_153() {
         %c0 = arith.constant 0 : index
@@ -123,7 +123,7 @@ hal.executable @reduction_dispatch {
 // CHECK-SAME:   lowering_config = #[[CONFIG]]
 
 // -----
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -131,7 +131,7 @@ hal.executable @reduction_dispatch {
 ]>
 hal.executable private @reduction_aligned2 {
   hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.export public @reduction_aligned2 ordinal(0) layout(#executable_layout)
+    hal.executable.export public @reduction_aligned2 ordinal(0) layout(#pipeline_layout)
     builtin.module {
       func.func @reduction_aligned2() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -168,7 +168,7 @@ hal.executable private @reduction_aligned2 {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -176,7 +176,7 @@ hal.executable private @reduction_aligned2 {
 ]>
 hal.executable @copy_as_generic {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.export @copy_as_generic layout(#executable_layout)
+    hal.executable.export @copy_as_generic layout(#pipeline_layout)
     builtin.module {
       func.func @copy_as_generic() {
         %c0 = arith.constant 0 : index
@@ -204,7 +204,7 @@ hal.executable @copy_as_generic {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -212,7 +212,7 @@ hal.executable @copy_as_generic {
 ]>
 hal.executable private @static_1d_fft_stage2 {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.export @static_1d_fft_stage2 layout(#executable_layout)
+    hal.executable.export @static_1d_fft_stage2 layout(#pipeline_layout)
     builtin.module {
       func.func @static_1d_fft_stage2() {
         %c0 = arith.constant 0 : index
@@ -241,7 +241,7 @@ hal.executable private @static_1d_fft_stage2 {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -249,7 +249,7 @@ hal.executable private @static_1d_fft_stage2 {
 ]>
 hal.executable private @static_3d_fft_stage3 {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.export @static_3d_fft_stage3 layout(#executable_layout)
+    hal.executable.export @static_3d_fft_stage3 layout(#pipeline_layout)
     builtin.module {
       func.func @static_3d_fft_stage3() {
         %c0 = arith.constant 0 : index
@@ -285,7 +285,7 @@ hal.executable private @static_3d_fft_stage3 {
     lowering_config  = <tile_sizes = [[32, 128, 64]]>,
     translation_info = <LLVMGPUMatmulSimt workload_per_wg = [256, 32]>,
     workgroup_size = [16, 8, 1]>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -294,7 +294,7 @@ hal.executable private @static_3d_fft_stage3 {
 ]>
 hal.executable @user_config {
 hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb"> {
-  hal.executable.export public @_lowering_config_test_dispatch_1 layout(#executable_layout)
+  hal.executable.export public @_lowering_config_test_dispatch_1 layout(#pipeline_layout)
   builtin.module {
     func.func @_lowering_config_test_dispatch_1() {
       %cst = arith.constant 0.000000e+00 : f32
@@ -331,7 +331,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb">
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -341,7 +341,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb">
 ]>
 hal.executable private @sort_op {
   hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_35"}> {
-    hal.executable.export public @sort_op layout(#executable_layout)
+    hal.executable.export public @sort_op layout(#pipeline_layout)
     builtin.module {
       func.func @sort_op() {
         %c1 = arith.constant 1 : index

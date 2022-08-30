@@ -461,7 +461,7 @@ struct ConvertMHLOToLinalgOnTensorsPass
     RewritePatternSet patterns(&getContext());
     MLIRContext *context = &getContext();
 
-    auto typeConverter = mhlo::createHloToLinalgSignedIntegerConverter();
+    auto typeConverter = mhlo::createHloToLinalgTypeConverter();
     typeConverter->addArgumentMaterialization(scalarToTensor);
     // NOTE: not using corresponding setupMHLOToFlowPatterns because the entire
     // MHLO dialects are marked illegal by this pass.

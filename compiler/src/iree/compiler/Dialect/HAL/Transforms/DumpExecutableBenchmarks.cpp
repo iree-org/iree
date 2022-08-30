@@ -224,16 +224,17 @@ static void appendDispatchBenchmark(IREE::HAL::ExecutableOp executableOp,
       funcBuilder
           .create<IREE::HAL::CommandBufferCreateOp>(
               loc, funcBuilder.getType<IREE::HAL::CommandBufferType>(), device,
-              commandBufferModes, IREE::HAL::CommandCategoryBitfield::Dispatch)
+              commandBufferModes, IREE::HAL::CommandCategoryBitfield::Dispatch,
+              /*binding_capacity=*/Value{})
           .getResult();
 
   // Get the layout required to set up the dispatches.
   auto layoutAttr = exportOp.getLayoutAttr();
-  auto executableLayout =
+  auto pipelineLayout =
       funcBuilder
-          .create<IREE::HAL::ExecutableLayoutLookupOp>(
-              loc, IREE::HAL::ExecutableLayoutType::get(loc.getContext()),
-              device, layoutAttr)
+          .create<IREE::HAL::PipelineLayoutLookupOp>(
+              loc, IREE::HAL::PipelineLayoutType::get(loc.getContext()), device,
+              layoutAttr)
           .getResult();
 
   // Push constant values.
@@ -245,7 +246,7 @@ static void appendDispatchBenchmark(IREE::HAL::ExecutableOp executableOp,
                                      funcBuilder.create<arith::ConstantIntOp>(
                                          loc, 0, funcBuilder.getI32Type()));
     funcBuilder.create<IREE::HAL::CommandBufferPushConstantsOp>(
-        loc, commandBuffer, executableLayout,
+        loc, commandBuffer, pipelineLayout,
         funcBuilder.getIndexAttr(pushConstantBase), pushConstants);
   }
 
@@ -257,7 +258,7 @@ static void appendDispatchBenchmark(IREE::HAL::ExecutableOp executableOp,
   SmallVector<IREE::HAL::DescriptorSetBindingValue> bindingValues;
   auto flushSet = [&]() {
     funcBuilder.create<IREE::HAL::CommandBufferPushDescriptorSetOp>(
-        loc, commandBuffer, executableLayout, currentSet, bindingValues);
+        loc, commandBuffer, pipelineLayout, currentSet, bindingValues);
     bindingValues.clear();
   };
   int64_t bufferOffset = 0;

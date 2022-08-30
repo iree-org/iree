@@ -15,7 +15,7 @@
 #include "iree/hal/drivers/vulkan/dynamic_symbol_tables.h"
 #include "iree/hal/drivers/vulkan/dynamic_symbols.h"
 #include "iree/hal/drivers/vulkan/handle_util.h"
-#include "iree/hal/drivers/vulkan/native_executable_layout.h"
+#include "iree/hal/drivers/vulkan/native_pipeline_layout.h"
 #include "iree/hal/drivers/vulkan/status_util.h"
 #include "iree/hal/drivers/vulkan/util/ref_ptr.h"
 
@@ -105,8 +105,8 @@ static iree_status_t iree_hal_vulkan_create_pipelines(
     } else {
       create_info->flags |= VK_PIPELINE_CREATE_DERIVATIVE_BIT;
     }
-    create_info->layout = iree_hal_vulkan_native_executable_layout_handle(
-        executable_params->executable_layouts[entry_ordinal]);
+    create_info->layout = iree_hal_vulkan_native_pipeline_layout_handle(
+        executable_params->pipeline_layouts[entry_ordinal]);
     create_info->basePipelineHandle = VK_NULL_HANDLE;
     create_info->basePipelineIndex = 0;
 
@@ -235,7 +235,7 @@ iree_status_t iree_hal_vulkan_native_executable_create(
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_spirv_executable_flatbuffer_verify(
               executable_params->executable_data,
-              executable_params->executable_layout_count));
+              executable_params->pipeline_layout_count));
   iree_SpirVExecutableDef_table_t executable_def =
       iree_SpirVExecutableDef_as_root(executable_params->executable_data.data);
 

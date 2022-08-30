@@ -7,7 +7,7 @@
 // push constants available and the descriptor sets and their bindings.
 // Push constants are dense (0..N) while the sets/bindings are sparse and may
 // contain unused or omitted entries.
-#executable_layout = #hal.executable.layout<push_constants = 1, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 1, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -21,7 +21,7 @@ hal.executable.source public @executable {
   // Exported functions are declared with the layout they use and may optionally
   // contain other information - though when hand-authoring that's usually
   // omitted.
-  hal.executable.export public @mul layout(#executable_layout)
+  hal.executable.export public @mul layout(#pipeline_layout)
 
   // The inner module defining the executable. This may have any number of
   // private functions and only those with declared entry points will be

@@ -19,15 +19,15 @@ typedef struct iree_hal_local_executable_t {
   iree_hal_resource_t resource;
   iree_allocator_t host_allocator;
 
-  // Optional executable layouts.
+  // Optional pipeline layout
   // Not all users require the layouts (such as when directly calling executable
   // functions) and in those cases they can be omitted. Users routing through
   // the HAL command buffer APIs will usually require them.
   //
   // TODO(benvanik): make this a flag we set and can query instead - poking into
   // this from dispatch code is a layering violation.
-  iree_host_size_t executable_layout_count;
-  iree_hal_executable_layout_t** executable_layouts;
+  iree_host_size_t pipeline_layout_count;
+  iree_hal_pipeline_layout_t** pipeline_layouts;
 
   // Defines per-entry point how much workgroup local memory is required.
   // Contains entries with 0 to indicate no local memory is required or >0 in
@@ -50,13 +50,13 @@ typedef struct iree_hal_local_executable_vtable_t {
 
 // Initializes the local executable base type.
 //
-// Callers must allocate memory for |target_executable_layouts| with at least
-// `executable_layout_count * sizeof(*target_executable_layouts)` bytes.
+// Callers must allocate memory for |target_pipeline_layouts| with at least
+// `pipeline_layout_count * sizeof(*target_pipeline_layouts)` bytes.
 void iree_hal_local_executable_initialize(
     const iree_hal_local_executable_vtable_t* vtable,
-    iree_host_size_t executable_layout_count,
-    iree_hal_executable_layout_t* const* source_executable_layouts,
-    iree_hal_executable_layout_t** target_executable_layouts,
+    iree_host_size_t pipeline_layout_count,
+    iree_hal_pipeline_layout_t* const* source_pipeline_layouts,
+    iree_hal_pipeline_layout_t** target_pipeline_layouts,
     iree_allocator_t host_allocator,
     iree_hal_local_executable_t* out_base_executable);
 

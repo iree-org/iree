@@ -58,7 +58,7 @@ class BuiltinExecutables {
   iree_hal_descriptor_set_layout_t*
       descriptor_set_layouts_[IREE_HAL_VULKAN_BUILTIN_DESCRIPTOR_SET_COUNT] = {
           NULL};
-  iree_hal_executable_layout_t* executable_layout_ = NULL;
+  iree_hal_pipeline_layout_t* pipeline_layout_ = NULL;
   VkPipeline pipeline_ = VK_NULL_HANDLE;
 };
 

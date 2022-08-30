@@ -9,6 +9,7 @@
 
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/STLExtras.h"
@@ -215,8 +216,8 @@ struct ConvertTypeSensitiveArithCastOp : public OpConversionPattern<OpTy> {
   }
 };
 
-template <typename T, typename Converter>
-struct ConvertTypesPass : public PassWrapper<T, OperationPass<mlir::ModuleOp>> {
+template <typename Base, typename Converter>
+struct ConvertTypesPass : public Base {
   void runOnOperation() override {
     MLIRContext *context = &this->getContext();
     RewritePatternSet patterns(context);
@@ -285,22 +286,13 @@ struct DemoteI64ToI32Converter
   }
 };
 struct DemoteI64ToI32Pass
-    : public ConvertTypesPass<DemoteI64ToI32Pass, DemoteI64ToI32Converter> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(DemoteI64ToI32Pass)
-
-  StringRef getArgument() const override {
-    return "iree-util-demote-i64-to-i32";
-  }
-  StringRef getDescription() const override {
-    return "Demotes i64 types to i32 types.";
-  }
-};
+    : public ConvertTypesPass<DemoteI64ToI32Base<DemoteI64ToI32Pass>,
+                              DemoteI64ToI32Converter> {};
 }  // namespace
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createDemoteI64ToI32Pass() {
   return std::make_unique<DemoteI64ToI32Pass>();
 }
-static PassRegistration<DemoteI64ToI32Pass> demoteI64ToI32Pass;
 
 namespace {
 struct DemoteF32ToF16Converter
@@ -310,22 +302,13 @@ struct DemoteF32ToF16Converter
   }
 };
 struct DemoteF32ToF16Pass
-    : public ConvertTypesPass<DemoteF32ToF16Pass, DemoteF32ToF16Converter> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(DemoteF32ToF16Pass)
-
-  StringRef getArgument() const override {
-    return "iree-util-demote-f32-to-f16";
-  }
-  StringRef getDescription() const override {
-    return "Demotes f32 types to f16 types.";
-  }
-};
+    : public ConvertTypesPass<DemoteF32ToF16Base<DemoteF32ToF16Pass>,
+                              DemoteF32ToF16Converter> {};
 }  // namespace
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createDemoteF32ToF16Pass() {
   return std::make_unique<DemoteF32ToF16Pass>();
 }
-static PassRegistration<DemoteF32ToF16Pass> demoteF32ToF16Pass;
 
 namespace {
 struct PromoteF16ToF32Converter
@@ -335,22 +318,13 @@ struct PromoteF16ToF32Converter
   }
 };
 struct PromoteF16ToF32Pass
-    : public ConvertTypesPass<PromoteF16ToF32Pass, PromoteF16ToF32Converter> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(PromoteF16ToF32Pass)
-
-  StringRef getArgument() const override {
-    return "iree-util-promote-f16-to-f32";
-  }
-  StringRef getDescription() const override {
-    return "Promotes f16 types to f32 types.";
-  }
-};
+    : public ConvertTypesPass<PromoteF16ToF32Base<PromoteF16ToF32Pass>,
+                              PromoteF16ToF32Converter> {};
 }  // namespace
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createPromoteF16ToF32Pass() {
   return std::make_unique<PromoteF16ToF32Pass>();
 }
-static PassRegistration<PromoteF16ToF32Pass> promoteF16ToF32Pass;
 
 namespace {
 struct DemoteF64ToF32Converter
@@ -360,22 +334,13 @@ struct DemoteF64ToF32Converter
   }
 };
 struct DemoteF64ToF32Pass
-    : public ConvertTypesPass<DemoteF64ToF32Pass, DemoteF64ToF32Converter> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(DemoteF64ToF32Pass)
-
-  StringRef getArgument() const override {
-    return "iree-util-demote-f64-to-f32";
-  }
-  StringRef getDescription() const override {
-    return "Demotes f64 types to f32 types.";
-  }
-};
+    : public ConvertTypesPass<DemoteF64ToF32Base<DemoteF64ToF32Pass>,
+                              DemoteF64ToF32Converter> {};
 }  // namespace
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createDemoteF64ToF32Pass() {
   return std::make_unique<DemoteF64ToF32Pass>();
 }
-static PassRegistration<DemoteF64ToF32Pass> demoteF64ToF32Pass;
 
 }  // namespace Util
 }  // namespace IREE

@@ -12,7 +12,7 @@
 
 #include "iree/base/api.h"
 #include "iree/hal/executable.h"
-#include "iree/hal/executable_layout.h"
+#include "iree/hal/pipeline_layout.h"
 #include "iree/hal/resource.h"
 
 #ifdef __cplusplus
@@ -63,7 +63,7 @@ enum iree_hal_executable_caching_mode_bits_t {
   // Device must support the IREE_HAL_DEVICE_FEATURE_SUPPORTS_PROFILING feature
   // and executables must support the ExecutableFeature::kProfiling feature.
   IREE_HAL_EXECUTABLE_CACHING_MODE_ENABLE_PROFILING = 1u << 5,
-  // Disables verification of executable layouts and modes.
+  // Disables verification of pipeline layouts and modes.
   // This is useful when debugging with partial information but should never
   // be enabled for real usage as the verification is the best way to catch
   // API misuse.
@@ -92,12 +92,12 @@ typedef struct iree_hal_executable_params_t {
   // to any executable created using it still held by the caller.
   iree_const_byte_span_t executable_data;
 
-  // A set of executable layouts for each entry point in the executable.
+  // A set of pipeline layouts for each entry point in the executable.
   // The order matches that produced by the compiler. As multiple entry points
   // may share the same layout some entries in this list may reference the same
-  // executable layout objects.
-  iree_host_size_t executable_layout_count;
-  iree_hal_executable_layout_t* const* executable_layouts;
+  // pipeline layout objects.
+  iree_host_size_t pipeline_layout_count;
+  iree_hal_pipeline_layout_t* const* pipeline_layouts;
 
   // Executable-level constants table used to perform runtime specialization
   // when information is not available statically during compilation. The
@@ -176,7 +176,7 @@ IREE_API_EXPORT bool iree_hal_executable_cache_can_prepare_format(
 // or prepare a new one.
 //
 // Each entry point in the executable requires a corresponding value in
-// |executable_layouts| defining the layout used by the entry point. If multiple
+// |pipeline_layouts| defining the layout used by the entry point. If multiple
 // entry points use the same layouts they can reuse the same values.
 //
 // Depending on the driver preparation may take a non-trivial amount of time

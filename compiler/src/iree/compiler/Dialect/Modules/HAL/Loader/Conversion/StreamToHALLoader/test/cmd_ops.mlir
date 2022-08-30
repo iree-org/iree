@@ -3,7 +3,7 @@
 // NOTE: all other stream.cmd.* ops are handled by the hal_inline conversions.
 
 // Executables are required to translate the dispatch calls.
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<4, storage_buffer>
   ]>,
@@ -13,7 +13,7 @@
 ]>
 hal.executable private @ex {
   hal.executable.variant public @variant, target = #hal.executable.target<"llvm", "embedded-elf-x86_64"> {
-    hal.executable.export public @dispatch ordinal(16) layout(#executable_layout) {
+    hal.executable.export public @dispatch ordinal(16) layout(#pipeline_layout) {
     ^bb0(%device: !hal.device, %workload_x: index, %workload_y: index):
       %count_x = affine.apply affine_map<()[s0] -> (s0 ceildiv 4)>()[%workload_x]
       %count_y = affine.apply affine_map<()[s0] -> (s0 ceildiv 4)>()[%workload_y]

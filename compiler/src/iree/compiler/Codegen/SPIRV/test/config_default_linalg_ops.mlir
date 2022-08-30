@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass{test-lowering-configuration=true}))' %s | FileCheck %s
 
-#executable_layout = #hal.executable.layout<push_constants = 2, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 2, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -14,7 +14,7 @@ hal.executable @copy_as_generic {
         max_compute_workgroup_size = [512, 512, 512],
         subgroup_size = 16>>
     }> {
-    hal.executable.export @copy_as_generic layout(#executable_layout)
+    hal.executable.export @copy_as_generic layout(#pipeline_layout)
     builtin.module {
       func.func @copy_as_generic() {
         %c0 = arith.constant 0 : index
@@ -44,7 +44,7 @@ hal.executable @copy_as_generic {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -58,7 +58,7 @@ hal.executable @tensor_insert {
         max_compute_workgroup_size = [512, 512, 512],
         subgroup_size = 64>>
     }> {
-    hal.executable.export @copy layout(#executable_layout)
+    hal.executable.export @copy layout(#pipeline_layout)
     builtin.module {
       func.func @copy() {
         %c0 = arith.constant 0 : index
@@ -90,7 +90,7 @@ hal.executable @tensor_insert {
 
 // Average pooling op with nice tilable input.
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -104,7 +104,7 @@ hal.executable @avg_pool {
         max_compute_workgroup_size = [512, 512, 512],
         subgroup_size = 32>>
     }> {
-    hal.executable.export public @avg_pool layout(#executable_layout)
+    hal.executable.export public @avg_pool layout(#pipeline_layout)
     builtin.module {
       func.func @avg_pool() {
         %c0 = arith.constant 0 : index
@@ -140,7 +140,7 @@ hal.executable @avg_pool {
 
 // Polling vectorization is not supported for now.
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -154,7 +154,7 @@ hal.executable @avg_pool {
         max_compute_workgroup_size = [512, 512, 512],
         subgroup_size = 4>>
     }> {
-    hal.executable.export public @avg_pool layout(#executable_layout)
+    hal.executable.export public @avg_pool layout(#pipeline_layout)
     builtin.module {
       func.func @avg_pool() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -197,7 +197,7 @@ hal.executable @avg_pool {
 
 // Max pooling op with odd size-1 dimension sizes.
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -211,7 +211,7 @@ hal.executable @max_pool {
         max_compute_workgroup_size = [512, 512, 512],
         subgroup_size = 32>>
     }> {
-    hal.executable.export public @max_pool layout(#executable_layout)
+    hal.executable.export public @max_pool layout(#pipeline_layout)
     builtin.module  {
       func.func @max_pool() {
         %cst = arith.constant 0xFF800000 : f32
@@ -249,7 +249,7 @@ hal.executable @max_pool {
 
 // Element wise op with mismatched input and output rank.
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -265,7 +265,7 @@ hal.executable @elementwise {
         max_compute_workgroup_size = [512, 512, 512],
         subgroup_size = 32>>
     }> {
-    hal.executable.export public @elementwise layout(#executable_layout)
+    hal.executable.export public @elementwise layout(#pipeline_layout)
     builtin.module {
       func.func @elementwise() {
         %c0 = arith.constant 0 : index
@@ -302,7 +302,7 @@ hal.executable @elementwise {
 
 // Fused depthwise convolution and element wise ops: don't vectorize with partially active subgroups.
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -318,7 +318,7 @@ hal.executable @dwconv_elementwise {
         max_compute_workgroup_size = [512, 512, 512],
         subgroup_size = 32>>
     }> {
-    hal.executable.export public @dwconv_elementwise layout(#executable_layout)
+    hal.executable.export public @dwconv_elementwise layout(#pipeline_layout)
     builtin.module  {
       func.func @dwconv_elementwise() {
         %cst = arith.constant dense_resource<__elided__> : tensor<3x3x1x4xf32>
@@ -364,7 +364,7 @@ hal.executable @dwconv_elementwise {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -381,7 +381,7 @@ hal.executable @outermost_reduction {
         max_compute_workgroup_size = [512, 512, 512],
         subgroup_size = 32>>
     }> {
-    hal.executable.export @outermost_reduction layout(#executable_layout)
+    hal.executable.export @outermost_reduction layout(#pipeline_layout)
     builtin.module {
       func.func @outermost_reduction() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -415,7 +415,7 @@ hal.executable @outermost_reduction {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -432,7 +432,7 @@ hal.executable private @innermost_reduction {
         max_compute_workgroup_size = [512, 512, 512],
         subgroup_size = 32>>
     }> {
-    hal.executable.export public @innermost_reduction ordinal(0) layout(#executable_layout)
+    hal.executable.export public @innermost_reduction ordinal(0) layout(#pipeline_layout)
     builtin.module {
       func.func @innermost_reduction() {
         %cst = arith.constant -0.000000e+00 : f32
@@ -475,7 +475,7 @@ hal.executable private @innermost_reduction {
 
 // -----
 
-#executable_layout = #hal.executable.layout<push_constants = 2, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 2, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
@@ -489,7 +489,7 @@ hal.executable @four_dim_elementwise {
         max_compute_workgroup_size = [512, 512, 512],
         subgroup_size = 16>>
     }> {
-    hal.executable.export public @four_dim_elementwise ordinal(0) layout(#executable_layout) {
+    hal.executable.export public @four_dim_elementwise ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3, %arg4
       hal.return %x, %y, %z : index, index, index

@@ -55,17 +55,25 @@ TEST_P(executable_cache_test, PrepareExecutable) {
   // Note: this layout must match the testdata executable.
   iree_hal_descriptor_set_layout_t* descriptor_set_layout = NULL;
   iree_hal_descriptor_set_layout_binding_t descriptor_set_layout_bindings[] = {
-      {0, IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER},
-      {1, IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER},
+      {
+          0,
+          IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+          IREE_HAL_DESCRIPTOR_FLAG_NONE,
+      },
+      {
+          1,
+          IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+          IREE_HAL_DESCRIPTOR_FLAG_NONE,
+      },
   };
   IREE_ASSERT_OK(iree_hal_descriptor_set_layout_create(
-      device_, IREE_HAL_DESCRIPTOR_SET_LAYOUT_USAGE_TYPE_IMMUTABLE,
+      device_, IREE_HAL_DESCRIPTOR_SET_LAYOUT_FLAG_NONE,
       IREE_ARRAYSIZE(descriptor_set_layout_bindings),
       descriptor_set_layout_bindings, &descriptor_set_layout));
-  iree_hal_executable_layout_t* executable_layout;
-  IREE_ASSERT_OK(iree_hal_executable_layout_create(
+  iree_hal_pipeline_layout_t* pipeline_layout;
+  IREE_ASSERT_OK(iree_hal_pipeline_layout_create(
       device_, /*push_constants=*/0, /*set_layout_count=*/1,
-      &descriptor_set_layout, &executable_layout));
+      &descriptor_set_layout, &pipeline_layout));
 
   iree_hal_executable_params_t executable_params;
   iree_hal_executable_params_initialize(&executable_params);
@@ -75,15 +83,15 @@ TEST_P(executable_cache_test, PrepareExecutable) {
       iree_make_cstring_view(get_test_executable_format());
   executable_params.executable_data = get_test_executable_data(
       iree_make_cstring_view("executable_cache_test.bin"));
-  executable_params.executable_layout_count = 1;
-  executable_params.executable_layouts = &executable_layout;
+  executable_params.pipeline_layout_count = 1;
+  executable_params.pipeline_layouts = &pipeline_layout;
 
   iree_hal_executable_t* executable = NULL;
   IREE_ASSERT_OK(iree_hal_executable_cache_prepare_executable(
       executable_cache, &executable_params, &executable));
 
   iree_hal_executable_release(executable);
-  iree_hal_executable_layout_release(executable_layout);
+  iree_hal_pipeline_layout_release(pipeline_layout);
   iree_hal_descriptor_set_layout_release(descriptor_set_layout);
   iree_hal_executable_cache_release(executable_cache);
   IREE_ASSERT_OK(loop_status);

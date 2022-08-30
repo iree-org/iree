@@ -199,7 +199,7 @@ Type FlowDialect::parseType(DialectAsmParser &parser) const {
   Type type;
   OptionalParseResult parseResult =
       generatedTypeParser(parser, &mnemonic, type);
-  if (parseResult.hasValue()) return type;
+  if (parseResult.has_value()) return type;
   if (mnemonic == "dispatch.tensor") {
     return DispatchTensorType::parse(parser);
   }

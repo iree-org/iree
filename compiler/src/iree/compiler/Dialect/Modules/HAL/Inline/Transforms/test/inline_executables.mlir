@@ -8,7 +8,7 @@
 hal.executable private @ex {
   hal.executable.variant public @vmvx_ir, target = <"vmvx-inline", "vmvx-ir"> {
     hal.executable.export public @dispatch_0 ordinal(0) layout(
-         #hal.executable.layout<push_constants = 2,
+         #hal.pipeline.layout<push_constants = 2,
                                 sets = [
                                   <0, bindings = [
                                     <0, storage_buffer>,

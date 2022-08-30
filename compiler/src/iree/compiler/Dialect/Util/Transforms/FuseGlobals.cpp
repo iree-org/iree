@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTraits.h"
+#include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/EquivalenceClasses.h"
@@ -98,17 +99,8 @@ static llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 //  util.global mutable @fused : i32
 //  builtin.func @foo(%arg0: i32) {
 //    util.global.store %arg0, @fused : i32
-class FuseGlobalsPass
-    : public PassWrapper<FuseGlobalsPass, OperationPass<mlir::ModuleOp>> {
+class FuseGlobalsPass : public FuseGlobalsBase<FuseGlobalsPass> {
  public:
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(FuseGlobalsPass)
-
-  StringRef getArgument() const override { return "iree-util-fuse-globals"; }
-
-  StringRef getDescription() const override {
-    return "Fuses correlated globals together.";
-  }
-
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Util::UtilDialect>();
   }
@@ -288,8 +280,6 @@ class FuseGlobalsPass
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createFuseGlobalsPass() {
   return std::make_unique<FuseGlobalsPass>();
 }
-
-static PassRegistration<FuseGlobalsPass> pass;
 
 }  // namespace Util
 }  // namespace IREE

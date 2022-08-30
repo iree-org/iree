@@ -65,32 +65,28 @@ fi
 IFS=',' read -ra extra_label_exclude_args <<< "${IREE_EXTRA_COMMA_SEPARATED_CTEST_LABELS_TO_EXCLUDE:-}"
 label_exclude_args+=(${extra_label_exclude_args[@]})
 
-important_ctest_args=()
+ctest_args=(
+  "--test-dir ${BUILD_DIR}"
+  "--timeout 900"
+  "--output-on-failure"
+  "--no-tests=error"
+)
 
 if [[ -n "${IREE_CTEST_TESTS_REGEX}" ]]; then
-  important_ctest_args+=("--tests-regex ${IREE_CTEST_TESTS_REGEX}")
+  ctest_args+=("--tests-regex ${IREE_CTEST_TESTS_REGEX}")
 fi
 
 if [[ -n "${IREE_CTEST_REPEAT_UNTIL_FAIL_COUNT}" ]]; then
-  important_ctest_args+=("--repeat-until-fail ${IREE_CTEST_REPEAT_UNTIL_FAIL_COUNT}")
+  ctest_args+=("--repeat-until-fail ${IREE_CTEST_REPEAT_UNTIL_FAIL_COUNT}")
 fi
 
 if (( ${#label_exclude_args[@]} )); then
   # Join on "|"
   label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]}"))"
-  important_ctest_args+=("--label-exclude ${label_exclude_regex}")
+  ctest_args+=("--label-exclude ${label_exclude_regex}")
 fi
 
-echo "************************************************************************"
-echo "Running CTest with these important args:"
-for important_arg in "${important_ctest_args[@]}"; do
-  echo "  ${important_arg}"
-done
-echo "************************************************************************"
+echo "*************** Running CTest ***************"
 
-ctest \
-  --test-dir "${BUILD_DIR}" \
-  --timeout 900 \
-  --output-on-failure \
-  --no-tests=error \
-  ${important_ctest_args[@]}
+set -x
+ctest ${ctest_args[@]}

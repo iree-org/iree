@@ -304,14 +304,29 @@ def LLVMGPUTileAndDistribute :
   let constructor = "mlir::iree_compiler::createLLVMGPUTileAndDistribute()";
 }
 
+def LLVMGPUTileTensor :
+    Pass<"iree-llvmgpu-tile-tensor", "func::FuncOp"> {
+  let summary = "Pass to tile linalg on tensor ops within a workgroup.";
+  let constructor = "mlir::iree_compiler::createLLVMGPUTileTensor()";
+}
+
+def LLVMGPUDistribute :
+    Pass<"iree-llvmgpu-distribute", "func::FuncOp"> {
+  let summary = "Pass to distribute foreachthread ops.";
+  let constructor = "mlir::iree_compiler::createLLVMGPUDistribute()";
+}
+
+def LLVMGPUTensorAlloc :
+    Pass<"iree-llvmgpu-alloc", "func::FuncOp"> {
+  let summary = "Pass to create allocation for some values.";
+  let constructor = "mlir::iree_compiler::createLLVMGPUTensorAlloc()";
+}
+
 def LLVMGPUVectorization :
     Pass<"iree-llvmgpu-vectorization", "func::FuncOp"> {
   let summary = "Pass to convert linalg into Vector.";
   let constructor = "mlir::iree_compiler::createLLVMGPUVectorizationPass()";
   let options = [
-    Option<"nativeVector", "native-vector", "int64_t",
-            /*default=*/"4",
-           "Pick the native size being targeted.">,
     Option<"generateContract", "generate-contract", "bool",
             /*default=*/"true",
            "Try to convert reduction to vector.contract.">,

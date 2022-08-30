@@ -11,19 +11,19 @@
 
 void iree_hal_local_executable_initialize(
     const iree_hal_local_executable_vtable_t* vtable,
-    iree_host_size_t executable_layout_count,
-    iree_hal_executable_layout_t* const* source_executable_layouts,
-    iree_hal_executable_layout_t** target_executable_layouts,
+    iree_host_size_t pipeline_layout_count,
+    iree_hal_pipeline_layout_t* const* source_pipeline_layouts,
+    iree_hal_pipeline_layout_t** target_pipeline_layouts,
     iree_allocator_t host_allocator,
     iree_hal_local_executable_t* out_base_executable) {
   iree_hal_resource_initialize(vtable, &out_base_executable->resource);
   out_base_executable->host_allocator = host_allocator;
 
-  out_base_executable->executable_layout_count = executable_layout_count;
-  out_base_executable->executable_layouts = target_executable_layouts;
-  for (iree_host_size_t i = 0; i < executable_layout_count; ++i) {
-    target_executable_layouts[i] = source_executable_layouts[i];
-    iree_hal_executable_layout_retain(source_executable_layouts[i]);
+  out_base_executable->pipeline_layout_count = pipeline_layout_count;
+  out_base_executable->pipeline_layouts = target_pipeline_layouts;
+  for (iree_host_size_t i = 0; i < pipeline_layout_count; ++i) {
+    target_pipeline_layouts[i] = source_pipeline_layouts[i];
+    iree_hal_pipeline_layout_retain(source_pipeline_layouts[i]);
   }
 
   // Function attributes are optional and populated by the parent type.
@@ -36,9 +36,9 @@ void iree_hal_local_executable_initialize(
 
 void iree_hal_local_executable_deinitialize(
     iree_hal_local_executable_t* base_executable) {
-  for (iree_host_size_t i = 0; i < base_executable->executable_layout_count;
+  for (iree_host_size_t i = 0; i < base_executable->pipeline_layout_count;
        ++i) {
-    iree_hal_executable_layout_release(base_executable->executable_layouts[i]);
+    iree_hal_pipeline_layout_release(base_executable->pipeline_layouts[i]);
   }
 }
 

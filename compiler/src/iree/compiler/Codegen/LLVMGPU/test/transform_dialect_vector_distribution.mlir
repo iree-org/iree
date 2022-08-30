@@ -8,12 +8,12 @@
 // RUN: --allow-unregistered-dialect | \
 // RUN: FileCheck %s
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>, #hal.descriptor_set.binding<1, storage_buffer>]>]>
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>, #hal.descriptor_set.binding<1, storage_buffer>]>]>
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_35"}>
 
 hal.executable private @reduce_dispatch_0 {
   hal.executable.variant public @cuda_nvptx_fb, target = #executable_target_cuda_nvptx_fb {
-    hal.executable.export public @reduce_dispatch_0 ordinal(0) layout(#executable_layout) attributes { workgroup_size = [64: index, 1: index, 1: index] }
+    hal.executable.export public @reduce_dispatch_0 ordinal(0) layout(#pipeline_layout) attributes { workgroup_size = [64: index, 1: index, 1: index] }
     builtin.module {
       func.func @reduce_dispatch_0() {
         %c0 = arith.constant 0 : index

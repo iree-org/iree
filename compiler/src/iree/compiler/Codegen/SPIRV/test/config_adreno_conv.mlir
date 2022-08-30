@@ -2,7 +2,7 @@
 
 // Conv - large OC - distribute to only one workgroup dimension.
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -17,7 +17,7 @@ hal.executable @conv_112x112x512 {
         max_compute_workgroup_size = [1024, 1024, 64],
         subgroup_size = 64>>
     }> {
-    hal.executable.export public @conv_112x112x512 layout(#executable_layout)
+    hal.executable.export public @conv_112x112x512 layout(#pipeline_layout)
     builtin.module {
       func.func @conv_112x112x512() {
         %c0 = arith.constant 0 : index
@@ -56,7 +56,7 @@ hal.executable @conv_112x112x512 {
 
 // Conv - medium OC/OW/OH - distribute to two workgroup dimensions.
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -71,7 +71,7 @@ hal.executable @conv_112x112x32 {
         max_compute_workgroup_size = [1024, 1024, 64],
         subgroup_size = 64>>
     }> {
-    hal.executable.export public @conv_112x112x32 layout(#executable_layout)
+    hal.executable.export public @conv_112x112x32 layout(#pipeline_layout)
     builtin.module {
       func.func @conv_112x112x32() {
         %c0 = arith.constant 0 : index
@@ -110,7 +110,7 @@ hal.executable @conv_112x112x32 {
 
 // Conv - small OC/OW/OH - distribute to all three workgroup dimensions.
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -125,7 +125,7 @@ hal.executable @conv_16x16x16 {
         max_compute_workgroup_size = [1024, 1024, 64],
         subgroup_size = 64>>
     }> {
-    hal.executable.export public @conv_16x16x16 layout(#executable_layout)
+    hal.executable.export public @conv_16x16x16 layout(#pipeline_layout)
     builtin.module {
       func.func @conv_16x16x16() {
         %c0 = arith.constant 0 : index
@@ -164,7 +164,7 @@ hal.executable @conv_16x16x16 {
 
 // Depthwise conv - small OC/OW/OH - distribute to all three workgroup dimensions.
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -179,7 +179,7 @@ hal.executable @dwconv_28x28x144 {
         max_compute_workgroup_size = [1024, 1024, 64],
         subgroup_size = 64>>
     }> {
-    hal.executable.export public @dwconv_28x28x144 layout(#executable_layout)
+    hal.executable.export public @dwconv_28x28x144 layout(#pipeline_layout)
     builtin.module {
       func.func @dwconv_28x28x144() {
         %c0 = arith.constant 0 : index
@@ -218,7 +218,7 @@ hal.executable @dwconv_28x28x144 {
 
 // Depthwise conv - tiny OC/OW/OH - starving the GPU.
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -233,7 +233,7 @@ hal.executable @dwconv_4x4x8 {
         max_compute_workgroup_size = [1024, 1024, 64],
         subgroup_size = 64>>
     }> {
-    hal.executable.export public @dwconv_4x4x8 layout(#executable_layout)
+    hal.executable.export public @dwconv_4x4x8 layout(#pipeline_layout)
     builtin.module {
       func.func @dwconv_4x4x8() {
         %c0 = arith.constant 0 : index

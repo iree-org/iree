@@ -19,14 +19,13 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-void ExecutableLayout::print(llvm::raw_ostream &os) const {
-  os << "ExecutableLayout:\n";
+void PipelineLayout::print(llvm::raw_ostream &os) const {
+  os << "PipelineLayout:\n";
   os << "  push constants: " << pushConstantCount << "\n";
   os << "  sets:\n";
   for (auto &setLayout : setLayouts) {
     os << "    set[" << setLayout.ordinal
-       << "]: " << stringifyDescriptorSetLayoutUsageType(setLayout.usage)
-       << "\n";
+       << "]: " << stringifyDescriptorSetLayoutFlags(setLayout.flags) << "\n";
     for (auto &binding : setLayout.bindings) {
       os << "      binding[" << binding.ordinal
          << "]: " << stringifyDescriptorType(binding.type) << "\n";
@@ -53,8 +52,8 @@ static BindingLayoutAnalysis::ExportDispatchMap findAllDispatchSites(
   return dispatchMap;
 }
 
-// Derives an executable layout from all of the dispatches to |exportOp|.
-static ExecutableLayout deriveExportLayout(
+// Derives an pipeline layout from all of the dispatches to |exportOp|.
+static PipelineLayout deriveExportLayout(
     IREE::Stream::ExecutableExportOp exportOp,
     SmallVector<IREE::Stream::CmdDispatchOp> &dispatchOps) {
   auto funcOp = exportOp.lookupFunctionRef();
@@ -87,53 +86,54 @@ static ExecutableLayout deriveExportLayout(
     }
   }
 
-  // In lieu of actual analysis we just check per dispatch-site which bindings
-  // need to be dynamic vs those that are at a constant uniform offset.
-  // The number of dynamic storage buffer bindings available is limited:
-  // https://vulkan.gpuinfo.org/displaydevicelimit.php?name=maxDescriptorSetStorageBuffersDynamic&platform=all
-  // Earlier optimizations in the stream dialect try to rebase bindings to 0 to
-  // make this possible.
-  // NOTE: we could check the actual constant values being uniform within a
-  // single command buffer (as that's all that really matters) but this is all
-  // just a temporary hack so ¯\_(ツ)_/¯.
-  llvm::BitVector staticBindings(bindingCount, /*t=*/true);
+  // Check the usage of each binding at each dispatch site.
+  SmallVector<DescriptorFlags> bindingFlags(bindingCount);
   for (auto dispatchOp : dispatchOps) {
-    auto resourceOffsets = dispatchOp.getResourceOffsets();
+    auto resourceAccessesAttrs = dispatchOp.getResourceAccesses().getValue();
     for (unsigned i = 0; i < bindingCount; ++i) {
-      if (!matchPattern(resourceOffsets[i], m_Zero())) staticBindings.reset(i);
+      auto resourceAccessAttr =
+          resourceAccessesAttrs[i]
+              .cast<IREE::Stream::ResourceAccessBitfieldAttr>();
+      auto resourceAccess = static_cast<IREE::Stream::ResourceAccessBitfield>(
+          resourceAccessAttr.getInt());
+      if (!bitEnumContains(resourceAccess,
+                           IREE::Stream::ResourceAccessBitfield::Write)) {
+        // Read-only.
+        bindingFlags[i] =
+            bindingFlags[i] | IREE::HAL::DescriptorFlags::ReadOnly;
+      }
     }
   }
 
-  ExecutableLayout executableLayout;
-  executableLayout.pushConstantCount = operandCount;
-  executableLayout.resourceMap.resize(bindingCount);
+  PipelineLayout pipelineLayout;
+  pipelineLayout.pushConstantCount = operandCount;
+  pipelineLayout.resourceMap.resize(bindingCount);
 
   // Only one set today - this creates a lot of pushes that we can't elide later
   // on once interfaces are materialized.
   DescriptorSetLayout setLayout;
   setLayout.ordinal = 0;
-  setLayout.usage = IREE::HAL::DescriptorSetLayoutUsageType::PushOnly;
+  setLayout.flags = IREE::HAL::DescriptorSetLayoutFlags::None;
   setLayout.bindings.resize(bindingCount);
   for (unsigned i = 0; i < bindingCount; ++i) {
     DescriptorSetLayoutBinding setBinding;
     setBinding.ordinal = i;
-    setBinding.type = staticBindings.test(i)
-                          ? IREE::HAL::DescriptorType::StorageBuffer
-                          : IREE::HAL::DescriptorType::StorageBufferDynamic;
+    setBinding.type = IREE::HAL::DescriptorType::StorageBuffer;
+    setBinding.flags = bindingFlags[i];
     setLayout.bindings[i] = setBinding;
-    executableLayout.resourceMap[i] =
+    pipelineLayout.resourceMap[i] =
         std::make_pair(setLayout.ordinal, setBinding.ordinal);
   }
-  executableLayout.setLayouts.push_back(setLayout);
+  pipelineLayout.setLayouts.push_back(setLayout);
 
   LLVM_DEBUG({
     auto executableOp = exportOp->getParentOfType<IREE::Stream::ExecutableOp>();
     llvm::dbgs() << "deriveExportLayout(@" << executableOp.getSymName() << "::@"
                  << exportOp.getSymName() << "):\n";
-    executableLayout.print(llvm::dbgs());
+    pipelineLayout.print(llvm::dbgs());
   });
 
-  return executableLayout;
+  return pipelineLayout;
 }
 
 static BindingLayoutAnalysis::ExportLayoutMap deriveExportLayouts(
@@ -159,7 +159,7 @@ BindingLayoutAnalysis::getExportDispatches(
   return it->second;
 }
 
-const ExecutableLayout &BindingLayoutAnalysis::getExecutableLayout(
+const PipelineLayout &BindingLayoutAnalysis::getPipelineLayout(
     IREE::Stream::ExecutableExportOp exportOp) const {
   auto it = exportLayouts.find(exportOp);
   assert(it != exportLayouts.end() && "unanalyzed export");

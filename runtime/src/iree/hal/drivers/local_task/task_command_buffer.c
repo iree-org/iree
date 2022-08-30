@@ -15,9 +15,8 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/local/executable_environment.h"
 #include "iree/hal/local/executable_library.h"
-#include "iree/hal/local/local_descriptor_set_layout.h"
 #include "iree/hal/local/local_executable.h"
-#include "iree/hal/local/local_executable_layout.h"
+#include "iree/hal/local/local_pipeline_layout.h"
 #include "iree/hal/utils/resource_set.h"
 #include "iree/task/affinity_set.h"
 #include "iree/task/list.h"
@@ -111,11 +110,12 @@ iree_status_t iree_hal_task_command_buffer_create(
     iree_hal_device_t* device, iree_task_scope_t* scope,
     iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
-    iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
     iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
     iree_hal_command_buffer_t** out_command_buffer) {
   IREE_ASSERT_ARGUMENT(out_command_buffer);
   *out_command_buffer = NULL;
+
   if (!iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT)) {
     // If we want reuse we'd need to support duplicating the task DAG after
     // recording or have some kind of copy-on-submit behavior that does so if
@@ -129,6 +129,11 @@ iree_status_t iree_hal_task_command_buffer_create(
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                             "only one-shot command buffer usage is supported");
   }
+  if (binding_capacity > 0) {
+    // TODO(#10144): support indirect command buffers with binding tables.
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "indirect command buffers not yet implemented");
+  }
 
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -137,7 +142,7 @@ iree_status_t iree_hal_task_command_buffer_create(
       host_allocator, sizeof(*command_buffer), (void**)&command_buffer);
   if (iree_status_is_ok(status)) {
     iree_hal_command_buffer_initialize(
-        device, mode, command_categories, queue_affinity,
+        device, mode, command_categories, queue_affinity, binding_capacity,
         &iree_hal_task_command_buffer_vtable, &command_buffer->base);
     command_buffer->host_allocator = host_allocator;
     command_buffer->scope = scope;
@@ -706,7 +711,7 @@ static iree_status_t iree_hal_task_command_buffer_copy_buffer(
 
 static iree_status_t iree_hal_task_command_buffer_push_constants(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_layout_t* executable_layout, iree_host_size_t offset,
+    iree_hal_pipeline_layout_t* pipeline_layout, iree_host_size_t offset,
     const void* values, iree_host_size_t values_length) {
   iree_hal_task_command_buffer_t* command_buffer =
       iree_hal_task_command_buffer_cast(base_command_buffer);
@@ -731,7 +736,7 @@ static iree_status_t iree_hal_task_command_buffer_push_constants(
 
 static iree_status_t iree_hal_task_command_buffer_push_descriptor_set(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_layout_t* executable_layout, uint32_t set,
+    iree_hal_pipeline_layout_t* pipeline_layout, uint32_t set,
     iree_host_size_t binding_count,
     const iree_hal_descriptor_set_binding_t* bindings) {
   iree_hal_task_command_buffer_t* command_buffer =
@@ -758,32 +763,23 @@ static iree_status_t iree_hal_task_command_buffer_push_descriptor_set(
 
     // TODO(benvanik): track mapping so we can properly map/unmap/flush/etc.
     iree_hal_buffer_mapping_t buffer_mapping = {{0}};
-    IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-        bindings[i].buffer, IREE_HAL_MAPPING_MODE_PERSISTENT,
-        IREE_HAL_MEMORY_ACCESS_ANY, bindings[i].offset, bindings[i].length,
-        &buffer_mapping));
-    command_buffer->state.bindings[binding_ordinal] =
-        buffer_mapping.contents.data;
-    command_buffer->state.binding_lengths[binding_ordinal] =
-        buffer_mapping.contents.data_length;
+    if (bindings[i].buffer) {
+      IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
+          bindings[i].buffer, IREE_HAL_MAPPING_MODE_PERSISTENT,
+          IREE_HAL_MEMORY_ACCESS_ANY, bindings[i].offset, bindings[i].length,
+          &buffer_mapping));
+      command_buffer->state.bindings[binding_ordinal] =
+          buffer_mapping.contents.data;
+      command_buffer->state.binding_lengths[binding_ordinal] =
+          buffer_mapping.contents.data_length;
+    } else {
+      // TODO(#10144): stash indirect binding reference in the state table.
+      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                              "binding table lookup not yet supported");
+    }
   }
 
   return iree_ok_status();
-}
-
-//===----------------------------------------------------------------------===//
-// iree_hal_command_buffer_bind_descriptor_set
-//===----------------------------------------------------------------------===//
-// NOTE: command buffer state change only; enqueues no tasks.
-
-static iree_status_t iree_hal_task_command_buffer_bind_descriptor_set(
-    iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_layout_t* executable_layout, uint32_t set,
-    iree_hal_descriptor_set_t* descriptor_set,
-    iree_host_size_t dynamic_offset_count,
-    const iree_device_size_t* dynamic_offsets) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "descriptor set binding not yet implemented");
 }
 
 //===----------------------------------------------------------------------===//
@@ -868,15 +864,15 @@ static iree_status_t iree_hal_task_command_buffer_build_dispatch(
 
   iree_hal_local_executable_t* local_executable =
       iree_hal_local_executable_cast(executable);
-  if (IREE_UNLIKELY(!local_executable->executable_layouts)) {
+  if (IREE_UNLIKELY(!local_executable->pipeline_layouts)) {
     return iree_make_status(
         IREE_STATUS_FAILED_PRECONDITION,
         "layouts not provided during executable creation; cannot dispatch");
   }
 
-  iree_hal_local_executable_layout_t* local_layout =
-      (iree_hal_local_executable_layout_t*)
-          local_executable->executable_layouts[entry_point];
+  iree_hal_local_pipeline_layout_t* local_layout =
+      (iree_hal_local_pipeline_layout_t*)
+          local_executable->pipeline_layouts[entry_point];
   iree_host_size_t push_constant_count = local_layout->push_constants;
   iree_hal_local_binding_mask_t used_binding_mask = local_layout->used_bindings;
   iree_host_size_t used_binding_count =
@@ -998,6 +994,22 @@ static iree_status_t iree_hal_task_command_buffer_dispatch_indirect(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_task_command_buffer_execute_commands(
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_command_buffer_t* base_commands,
+    iree_hal_buffer_binding_table_t binding_table) {
+  // TODO(#10144): support indirect command buffers by using deferred command
+  // buffers or caching the task topology (probably not worth the tracking).
+  // If we could separate the topology that referenced the binding table we'd
+  // be able to reissue but not concurrently (as each task can only be in flight
+  // as a singleton) - which may be enough in many cases but adds complexity to
+  // tracking as we'd need to either enforce serialization of subsequent
+  // submissions or copy-on-write-style clone the topology for each additional
+  // concurrent submission.
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "indirect command buffers not yet implemented");
+}
+
 //===----------------------------------------------------------------------===//
 // iree_hal_command_buffer_vtable_t
 //===----------------------------------------------------------------------===//
@@ -1020,7 +1032,7 @@ static const iree_hal_command_buffer_vtable_t
         .copy_buffer = iree_hal_task_command_buffer_copy_buffer,
         .push_constants = iree_hal_task_command_buffer_push_constants,
         .push_descriptor_set = iree_hal_task_command_buffer_push_descriptor_set,
-        .bind_descriptor_set = iree_hal_task_command_buffer_bind_descriptor_set,
         .dispatch = iree_hal_task_command_buffer_dispatch,
         .dispatch_indirect = iree_hal_task_command_buffer_dispatch_indirect,
+        .execute_commands = iree_hal_task_command_buffer_execute_commands,
 };

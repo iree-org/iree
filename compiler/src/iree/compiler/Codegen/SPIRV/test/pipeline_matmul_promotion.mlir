@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(iree-codegen-linalg-to-spirv-pipeline))' %s | FileCheck %s
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -17,7 +17,7 @@ hal.executable @matmul_128x256x64 {
       max_compute_workgroup_invocations = 1024,
       max_compute_workgroup_size = [65535, 65535, 65535],
       subgroup_size = 32>>}> {
-    hal.executable.export public @matmul_128x256x64 ordinal(0) layout(#executable_layout) {
+    hal.executable.export public @matmul_128x256x64 ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
       %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
       hal.return %x, %y, %z : index, index, index

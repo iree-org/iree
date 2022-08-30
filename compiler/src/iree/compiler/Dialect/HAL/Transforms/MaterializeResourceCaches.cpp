@@ -46,7 +46,7 @@ class MaterializeResourceCachesPass
     auto executableOps = llvm::to_vector<8>(moduleOp.getOps<ExecutableOp>());
 
     // Declare all layouts used by the executables. This will ensure that the
-    // initialization order is correct as any executable layout needed (and its
+    // initialization order is correct as any pipeline layout needed (and its
     // dependencies) will be created prior to the executable cache below. The
     // other nice thing is that we get ordering similar to the executable
     // variables above.
@@ -55,7 +55,7 @@ class MaterializeResourceCachesPass
            executableOp.getOps<IREE::HAL::ExecutableVariantOp>()) {
         for (auto exportOp :
              variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
-          defineExecutableLayoutOp(exportOp.getLoc(), exportOp.getLayout());
+          definePipelineLayoutOp(exportOp.getLoc(), exportOp.getLayout());
         }
       }
     }
@@ -78,8 +78,8 @@ class MaterializeResourceCachesPass
         block.walk([&](Operation *op) {
           if (auto lookupOp = dyn_cast<DescriptorSetLayoutLookupOp>(op)) {
             replaceDescriptorSetLayoutLookupOp(lookupOp);
-          } else if (auto lookupOp = dyn_cast<ExecutableLayoutLookupOp>(op)) {
-            replaceExecutableLayoutLookupOp(lookupOp);
+          } else if (auto lookupOp = dyn_cast<PipelineLayoutLookupOp>(op)) {
+            replacePipelineLayoutLookupOp(lookupOp);
           } else if (auto lookupOp = dyn_cast<ExecutableLookupOp>(op)) {
             replaceExecutableLookupOp(lookupOp);
           }
@@ -111,9 +111,9 @@ class MaterializeResourceCachesPass
     OpBuilder blockBuilder =
         OpBuilder::atBlockEnd(initializerOp.addEntryBlock());
     auto deviceValue = blockBuilder.createOrFold<ExSharedDeviceOp>(loc);
-    auto layoutUsage = IREE::HAL::DescriptorSetLayoutUsageType::PushOnly;
+    auto layoutFlags = IREE::HAL::DescriptorSetLayoutFlags::None;
     auto layoutValue = blockBuilder.createOrFold<DescriptorSetLayoutCreateOp>(
-        loc, layoutType, deviceValue, layoutUsage, bindingAttrs);
+        loc, layoutType, deviceValue, layoutFlags, bindingAttrs);
     blockBuilder.create<IREE::Util::GlobalStoreOp>(loc, layoutValue,
                                                    globalOp.getName());
     blockBuilder.create<IREE::Util::InitializerReturnOp>(loc);
@@ -121,10 +121,10 @@ class MaterializeResourceCachesPass
     return globalOp;
   }
 
-  IREE::Util::GlobalOp defineExecutableLayoutOp(
-      Location loc, IREE::HAL::ExecutableLayoutAttr layoutAttr) {
-    auto existingIt = executableLayoutCache_.find(layoutAttr);
-    if (existingIt != executableLayoutCache_.end()) {
+  IREE::Util::GlobalOp definePipelineLayoutOp(
+      Location loc, IREE::HAL::PipelineLayoutAttr layoutAttr) {
+    auto existingIt = pipelineLayoutCache_.find(layoutAttr);
+    if (existingIt != pipelineLayoutCache_.end()) {
       return existingIt->second;
     }
 
@@ -140,15 +140,15 @@ class MaterializeResourceCachesPass
           loc, ArrayAttr::get(loc.getContext(), bindingAttrs)));
     }
 
-    auto symbolName = (StringRef("_executable_layout_") +
-                       std::to_string(nextUniqueExecutableLayoutId++))
+    auto symbolName = (StringRef("_pipeline_layout_") +
+                       std::to_string(nextUniquePipelineLayoutId++))
                           .str();
 
-    auto layoutType = ExecutableLayoutType::get(loc.getContext());
+    auto layoutType = PipelineLayoutType::get(loc.getContext());
     auto globalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
         loc, symbolName, /*isMutable=*/false, layoutType);
     globalOp.setPrivate();
-    executableLayoutCache_.try_emplace(layoutAttr, globalOp);
+    pipelineLayoutCache_.try_emplace(layoutAttr, globalOp);
 
     auto initializerOp = moduleBuilder.create<IREE::Util::InitializerOp>(loc);
     OpBuilder blockBuilder =
@@ -161,7 +161,7 @@ class MaterializeResourceCachesPass
       setLayoutValues.push_back(setLayoutValue);
     }
     auto deviceValue = blockBuilder.createOrFold<ExSharedDeviceOp>(loc);
-    auto layoutValue = blockBuilder.createOrFold<ExecutableLayoutCreateOp>(
+    auto layoutValue = blockBuilder.createOrFold<PipelineLayoutCreateOp>(
         loc, layoutType, deviceValue,
         blockBuilder.getIndexAttr(layoutAttr.getPushConstants()),
         setLayoutValues);
@@ -202,17 +202,17 @@ class MaterializeResourceCachesPass
       auto &entryBlock = region->front();
       auto caseBuilder = OpBuilder::atBlockBegin(&entryBlock);
 
-      // Gather each of the executable layouts needed for each entry point in
+      // Gather each of the pipeline layouts needed for each entry point in
       // the executable.
-      SmallVector<Value, 8> executableLayoutValues;
+      SmallVector<Value, 8> pipelineLayoutValues;
       for (auto exportOp :
            executableVariantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
-        auto executableLayoutGlobalOp = defineExecutableLayoutOp(
-            executableOp.getLoc(), exportOp.getLayout());
-        executableLayoutValues.push_back(
+        auto pipelineLayoutGlobalOp =
+            definePipelineLayoutOp(executableOp.getLoc(), exportOp.getLayout());
+        pipelineLayoutValues.push_back(
             caseBuilder.createOrFold<IREE::Util::GlobalLoadOp>(
-                loc, ExecutableLayoutType::get(loc.getContext()),
-                executableLayoutGlobalOp.getSymName()));
+                loc, PipelineLayoutType::get(loc.getContext()),
+                pipelineLayoutGlobalOp.getSymName()));
       }
 
       // Inline constant initializer from the variant.
@@ -226,7 +226,7 @@ class MaterializeResourceCachesPass
           SymbolRefAttr::get(
               executableOp.getSymNameAttr(),
               {SymbolRefAttr::get(executableVariantOp.getSymNameAttr())}),
-          executableLayoutValues, constantValues);
+          pipelineLayoutValues, constantValues);
 
       caseBuilder.create<IREE::HAL::ReturnOp>(loc, executableValue);
     }
@@ -259,12 +259,12 @@ class MaterializeResourceCachesPass
     lookupOp.erase();
   }
 
-  void replaceExecutableLayoutLookupOp(ExecutableLayoutLookupOp &lookupOp) {
+  void replacePipelineLayoutLookupOp(PipelineLayoutLookupOp &lookupOp) {
     OpBuilder builder(lookupOp);
     auto globalOp =
-        defineExecutableLayoutOp(lookupOp.getLoc(), lookupOp.getLayout());
+        definePipelineLayoutOp(lookupOp.getLoc(), lookupOp.getLayout());
     auto loadOp = builder.create<IREE::Util::GlobalLoadOp>(
-        lookupOp.getLoc(), ExecutableLayoutType::get(lookupOp.getContext()),
+        lookupOp.getLoc(), PipelineLayoutType::get(lookupOp.getContext()),
         globalOp.getSymName());
     lookupOp.replaceAllUsesWith(loadOp.getOperation());
     lookupOp.erase();
@@ -287,10 +287,10 @@ class MaterializeResourceCachesPass
 
   OpBuilder moduleBuilder{static_cast<MLIRContext *>(nullptr)};
   DenseMap<Attribute, IREE::Util::GlobalOp> descriptorSetLayoutCache_;
-  DenseMap<Attribute, IREE::Util::GlobalOp> executableLayoutCache_;
+  DenseMap<Attribute, IREE::Util::GlobalOp> pipelineLayoutCache_;
   DenseMap<StringRef, IREE::Util::GlobalOp> executableCache_;
 
-  int nextUniqueExecutableLayoutId = 0;
+  int nextUniquePipelineLayoutId = 0;
   int nextUniqueDescriptorSetLayoutId = 0;
 };
 

@@ -24,7 +24,7 @@ class descriptor_set_layout_test : public CtsTestBase {};
 TEST_P(descriptor_set_layout_test, CreateWithNoBindings) {
   iree_hal_descriptor_set_layout_t* descriptor_set_layout = NULL;
   IREE_ASSERT_OK(iree_hal_descriptor_set_layout_create(
-      device_, IREE_HAL_DESCRIPTOR_SET_LAYOUT_USAGE_TYPE_IMMUTABLE,
+      device_, IREE_HAL_DESCRIPTOR_SET_LAYOUT_FLAG_NONE,
       /*binding_count=*/0,
       /*bindings=*/NULL, &descriptor_set_layout));
   iree_hal_descriptor_set_layout_release(descriptor_set_layout);
@@ -33,10 +33,14 @@ TEST_P(descriptor_set_layout_test, CreateWithNoBindings) {
 TEST_P(descriptor_set_layout_test, CreateWithOneBinding) {
   iree_hal_descriptor_set_layout_t* descriptor_set_layout = NULL;
   iree_hal_descriptor_set_layout_binding_t descriptor_set_layout_bindings[] = {
-      {/*binding=*/0, /*type=*/IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER},
+      {
+          /*binding=*/0,
+          /*type=*/IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+          /*flags=*/IREE_HAL_DESCRIPTOR_FLAG_NONE,
+      },
   };
   IREE_ASSERT_OK(iree_hal_descriptor_set_layout_create(
-      device_, IREE_HAL_DESCRIPTOR_SET_LAYOUT_USAGE_TYPE_IMMUTABLE,
+      device_, IREE_HAL_DESCRIPTOR_SET_LAYOUT_FLAG_NONE,
       IREE_ARRAYSIZE(descriptor_set_layout_bindings),
       descriptor_set_layout_bindings, &descriptor_set_layout));
   iree_hal_descriptor_set_layout_release(descriptor_set_layout);
@@ -45,11 +49,19 @@ TEST_P(descriptor_set_layout_test, CreateWithOneBinding) {
 TEST_P(descriptor_set_layout_test, CreateWithTwoBindings) {
   iree_hal_descriptor_set_layout_t* descriptor_set_layout = NULL;
   iree_hal_descriptor_set_layout_binding_t descriptor_set_layout_bindings[] = {
-      {/*binding=*/0, /*type=*/IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER},
-      {/*binding=*/1, /*type=*/IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER},
+      {
+          /*binding=*/0,
+          /*type=*/IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+          /*flags=*/IREE_HAL_DESCRIPTOR_FLAG_NONE,
+      },
+      {
+          /*binding=*/1,
+          /*type=*/IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+          /*flags=*/IREE_HAL_DESCRIPTOR_FLAG_NONE,
+      },
   };
   IREE_ASSERT_OK(iree_hal_descriptor_set_layout_create(
-      device_, IREE_HAL_DESCRIPTOR_SET_LAYOUT_USAGE_TYPE_IMMUTABLE,
+      device_, IREE_HAL_DESCRIPTOR_SET_LAYOUT_FLAG_NONE,
       IREE_ARRAYSIZE(descriptor_set_layout_bindings),
       descriptor_set_layout_bindings, &descriptor_set_layout));
   iree_hal_descriptor_set_layout_release(descriptor_set_layout);
@@ -58,11 +70,19 @@ TEST_P(descriptor_set_layout_test, CreateWithTwoBindings) {
 TEST_P(descriptor_set_layout_test, CreateWithPushDescriptorType) {
   iree_hal_descriptor_set_layout_t* descriptor_set_layout = NULL;
   iree_hal_descriptor_set_layout_binding_t descriptor_set_layout_bindings[] = {
-      {/*binding=*/0, /*type=*/IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER},
-      {/*binding=*/1, /*type=*/IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER},
+      {
+          /*binding=*/0,
+          /*type=*/IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+          /*flags=*/IREE_HAL_DESCRIPTOR_FLAG_NONE,
+      },
+      {
+          /*binding=*/1,
+          /*type=*/IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+          /*flags=*/IREE_HAL_DESCRIPTOR_FLAG_NONE,
+      },
   };
   IREE_ASSERT_OK(iree_hal_descriptor_set_layout_create(
-      device_, IREE_HAL_DESCRIPTOR_SET_LAYOUT_USAGE_TYPE_PUSH_ONLY,
+      device_, IREE_HAL_DESCRIPTOR_SET_LAYOUT_FLAG_NONE,
       IREE_ARRAYSIZE(descriptor_set_layout_bindings),
       descriptor_set_layout_bindings, &descriptor_set_layout));
   iree_hal_descriptor_set_layout_release(descriptor_set_layout);

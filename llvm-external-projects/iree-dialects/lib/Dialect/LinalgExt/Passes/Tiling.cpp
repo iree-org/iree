@@ -362,8 +362,7 @@ void TilingInterfaceTilingPass::runOnOperation() {
               buildFlowWorkgroupInfoOp<IREE::Input::DispatchWorkgroupIDOp>(
                   builder, dim),
               buildFlowWorkgroupInfoOp<IREE::Input::DispatchWorkgroupCountOp>(
-                  builder, dim),
-              linalg::DistributionMethod::Cyclic};
+                  builder, dim)};
         }
         return procInfo;
       }};

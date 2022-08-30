@@ -13,6 +13,7 @@
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Sandbox/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
@@ -22,6 +23,8 @@
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
+
+#define DEBUG_TYPE "iree-llvm-cpu-lowering-pass-pipeline"
 
 namespace mlir {
 namespace iree_compiler {
@@ -221,6 +224,58 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
   return success();
 }
 
+LogicalResult verifyConvTileAndDecomposeExpertConfig(
+    Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
+    IREE::Codegen::TranslationInfoAttr translationInfo,
+    ArrayRef<int64_t> workgroupSize) {
+  if (loweringConfig.getTileSizes().size() !=
+      static_cast<unsigned>(StrategyTilingLevel::NumStrategyTileLevels)) {
+    return op->emitOpError("expected three tiling sizes, got ")
+           << loweringConfig.getTileSizes().size();
+  }
+
+  linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(op);
+  SmallVector<int64_t> shape = linalgOp.getStaticLoopRanges();
+  for (auto sizes : loweringConfig.getTileSizeVals()) {
+    for (auto en : llvm::enumerate(sizes)) {
+      int i = en.index();
+      int size = en.value();
+      if (size == 1) shape[i] = 1;
+      if (shape[i] == -1 || size == 0) continue;
+      if (shape[i] % size != 0) {
+        shape[i] = -1;
+      } else {
+        shape[i] = size;
+      }
+    }
+  }
+
+  int64_t khSize, kwSize, ohSize, owSize;
+  auto isSizeExtracted =
+      TypeSwitch<Operation *, LogicalResult>(op)
+          .Case<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp>(
+              [&](auto) {
+                // Shape: N, OH, OW, OC, KH, KW, (IC)
+                khSize = shape[4];
+                kwSize = shape[5];
+                ohSize = shape[1];
+                owSize = shape[2];
+                return success();
+              })
+          .Default([&](auto) { return failure(); });
+  if (failed(isSizeExtracted)) {
+    return op->emitOpError("unsupported conv types");
+  }
+
+  bool removeH = (khSize == 1 && ohSize == 1);
+  bool removeW = (kwSize == 1 && owSize == 1);
+  if (!removeH && !removeW) {
+    return op->emitOpError("can't decompose the conv op");
+  }
+
+  return success();
+}
+
 //===---------------------------------------------------------------------===//
 // Codegen pipelines.
 //===---------------------------------------------------------------------===//
@@ -235,6 +290,7 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager) {
     LinalgSingleTilingExpertPassOptions options;
     options.tilingLevel =
         static_cast<int64_t>(StrategyTilingLevel::ParallelTiles);
+    options.peel = true;
     options.vectorize = true;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLinalgSingleTilingExpertPass(options));
@@ -587,6 +643,12 @@ void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager) {
   passManager.addPass(createLLVMCPULowerExecutableTargetPass());
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   addLowerToLLVMPasses(nestedModulePM);
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "Using LLVMCPU pass pipeline:\n";
+    passManager.printAsTextualPipeline(llvm::dbgs());
+    llvm::dbgs() << "\n";
+  });
 }
 
 }  // namespace iree_compiler

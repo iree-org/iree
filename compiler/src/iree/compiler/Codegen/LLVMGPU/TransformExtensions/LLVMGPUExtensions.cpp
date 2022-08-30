@@ -11,6 +11,7 @@
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/PDL/IR/PDLOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -100,10 +101,11 @@ static FailureOr<SmallVector<Value>> getThreadIndices(
 // Patterns for ForeachThreadToGpu rewrite.
 //===---------------------------------------------------------------------===//
 
-FailureOr<SmallVector<OpFoldResult>> rewriteForeachThreadToGpu(
+FailureOr<SmallVector<OpFoldResult>>
+mlir::iree_compiler::rewriteForeachThreadToGpu(
     scf::ForeachThreadOp foreachThreadOp,
-    const SmallVector<int64_t> &globalWorkgroupSizes,
-    PatternRewriter &rewriter) {
+    const SmallVector<int64_t> &globalWorkgroupSizes, RewriterBase &rewriter,
+    bool syncAfterDistribute) {
   if (foreachThreadOp.getNumResults() > 0)
     return foreachThreadOp->emitError(
         "only bufferized scf.foreach_thread lowers to gpu.thread");
@@ -179,7 +181,9 @@ FailureOr<SmallVector<OpFoldResult>> rewriteForeachThreadToGpu(
   }
 
   // Step 5. syncthreads.
-  rewriter.create<gpu::BarrierOp>(loc);
+  if (syncAfterDistribute) {
+    rewriter.create<gpu::BarrierOp>(loc);
+  }
 
   // Step 6. Erase old op.
   rewriter.eraseOp(foreachThreadOp);

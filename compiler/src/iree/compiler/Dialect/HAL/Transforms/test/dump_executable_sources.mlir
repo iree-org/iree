@@ -7,7 +7,7 @@
 #device_target_cpu = #hal.device.target<"llvm-cpu", {
   executable_targets = [#executable_target_embedded_elf_x86_64_]
 }>
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>,
@@ -22,7 +22,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
     // We expect local outputs with attributes inlined:
     // CHECK-NEXT: hal.executable.variant {{.+}}, target = <"llvm-cpu"
     hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-      hal.executable.export public @dispatch0 ordinal(0) layout(#executable_layout) attributes {
+      hal.executable.export public @dispatch0 ordinal(0) layout(#pipeline_layout) attributes {
         translation_info = #iree_codegen.translation_info<CPUDefault workload_per_wg = [4]>
       } {
       ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):  // no predecessors
@@ -41,7 +41,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
   // CHECK: hal.executable private @ex1
   hal.executable private @ex1 {
     hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-      hal.executable.export public @dispatch1 ordinal(0) layout(#executable_layout) attributes {
+      hal.executable.export public @dispatch1 ordinal(0) layout(#pipeline_layout) attributes {
         translation_info = #iree_codegen.translation_info<CPUDefault workload_per_wg = [4]>
       } {
       ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):  // no predecessors

@@ -1486,7 +1486,7 @@ struct FoldTensorCastOp : public OpInterfaceRewritePattern<LinalgExtOp> {
     for (OpOperand *opOperand : op.getInputOperands()) {
       auto tensorCastOp = opOperand->get().getDefiningOp<tensor::CastOp>();
       newOperands.push_back(canFoldIntoConsumerOp(tensorCastOp)
-                                ? tensorCastOp.source()
+                                ? tensorCastOp.getSource()
                                 : opOperand->get());
     }
     // Init tensors may fold, in which case the resultType must also change.
