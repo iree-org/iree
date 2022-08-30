@@ -247,6 +247,7 @@ static SmallVector<int64_t> getDefaultDistributedLoopTileSizes(
   SmallVector<int64_t> distributedTileSizes(numDims, 1);
   SmallVector<int64_t> numWorkgroupsPerDim(numDims, 1);
   SmallVector<int64_t> workload(numDims, 1);
+  int64_t numThreads = clNumberOfRuntimeThreads * 2;
   for (auto i : llvm::seq<size_t>(0, numDims)) {
     if (maxTileSizes[i] == 0 || ShapedType::isDynamic(lbs[i]) ||
         ShapedType::isDynamic(ubs[i])) {
@@ -258,7 +259,8 @@ static SmallVector<int64_t> getDefaultDistributedLoopTileSizes(
     assert(lbs[i] <= ubs[i]);
     workload[i] = ubs[i] - lbs[i];
     int64_t candidateTileSize = 1;
-    int64_t targetSize = std::min(workload[i] / 2, maxTileSizes[i]);
+    int64_t targetSize = std::min(
+        workload[i] / std::max<int64_t>(numThreads, 1), maxTileSizes[i]);
     int64_t vectorSize = vectorSizeHints[i];
     if (vectorSize > 1) {
       // Pick the factor of dim which is closest to the target tile size and
@@ -281,6 +283,7 @@ static SmallVector<int64_t> getDefaultDistributedLoopTileSizes(
         std::min<int64_t>(candidateTileSize, maxTileSizes[i]);
     numWorkgroupsPerDim[i] =
         llvm::divideCeil(workload[i], distributedTileSizes[i]);
+    numThreads /= numWorkgroupsPerDim[i];
   }
 
   // Reduce the number of workgroups in cases where we are dividing the work too
@@ -318,6 +321,7 @@ static SmallVector<int64_t> getDefaultDistributedLoopTileSizes(
     if (nwg < numWorkgroupsPerDim[index]) {
       numWorkgroups /= numWorkgroupsPerDim[index];
       numWorkgroups *= nwg;
+      numWorkgroupsPerDim[index] = nwg;
     } else {
       currDim--;
     }
@@ -867,6 +871,10 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
       return SmallVector<int64_t>(mmt4dWorkgroupTileSizes.begin(),
                                   mmt4dWorkgroupTileSizes.end());
     }
+
+    unsigned numLoops = mmt4dOp.getNumLoops();
+    SmallVector<int64_t> minTileSizes(numLoops, 0);
+    SmallVector<int64_t> maxTileSizes(numLoops, 0);
     return {48, 32};
   };
 
