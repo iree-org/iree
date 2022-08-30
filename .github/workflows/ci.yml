@@ -642,9 +642,6 @@ jobs:
       matrix:
         target:
           - platform: riscv
-            architecture: rv32-baremetal
-            docker_image: gcr.io/iree-oss/riscv@sha256:720bc0215d8462ea14352edc22710a6ce4c0c1daff581d179dd173885f1d8a35
-          - platform: riscv
             architecture: rv64
             docker_image: gcr.io/iree-oss/riscv@sha256:720bc0215d8462ea14352edc22710a6ce4c0c1daff581d179dd173885f1d8a35
     outputs:
