@@ -22,6 +22,8 @@ include(CMakeParseArguments)
 #     "iree-compile".
 # C_IDENTIFIER: Identifier to use for generate c embed code.
 #     If omitted then no C embed code will be generated.
+# STATIC_LIB_PATH: When added, the module is compiled into a LLVM static
+#     library with the specified library path.
 # FRIENDLY_NAME: Optional. Name to use to display build progress info.
 # PUBLIC: Add this so that this library will be exported under ${PACKAGE}::
 #     Also in IDE, target will appear in ${PACKAGE} folder while non PUBLIC
@@ -39,13 +41,17 @@ function(iree_bytecode_module)
   cmake_parse_arguments(
     _RULE
     "PUBLIC;TESTONLY"
-    "NAME;SRC;MODULE_FILE_NAME;COMPILE_TOOL;C_IDENTIFIER;FRIENDLY_NAME"
+    "NAME;SRC;MODULE_FILE_NAME;COMPILE_TOOL;C_IDENTIFIER;FRIENDLY_NAME;STATIC_LIB_PATH"
     "FLAGS;DEPENDS;DEPS"
     ${ARGN}
   )
 
   if(_RULE_TESTONLY AND NOT IREE_BUILD_TESTS)
     return()
+  endif()
+
+  if(_RULE_STATIC_LIB_PATH AND NOT IREE_TARGET_BACKEND_LLVM_CPU)
+    message(SEND_ERROR "Static library only supports llvm-cpu backend")
   endif()
 
   # Set default for COMPILE_TOOL.
@@ -96,23 +102,16 @@ function(iree_bytecode_module)
     get_filename_component(_FRIENDLY_NAME "${_RULE_SRC}" NAME)
   endif()
 
+  set(_OUTPUT_FILES "${_MODULE_FILE_NAME}")
   # Check LLVM static library setting. If the static libary output path is set,
   # retrieve the object path and the corresponding header file path.
-  foreach(_FLAG ${_RULE_FLAGS})
-    string(REGEX MATCH
-      "-iree-llvm-static-library-output-path=(.+)" _MATCH_STRING "${_FLAG}"
-    )
-    if(_MATCH_STRING)
-      set(_STATIC_LIB TRUE)
-      # Get the static object path from the regex match result.
-      set(_STATIC_OBJ_PATH ${CMAKE_MATCH_1})
-      string(REPLACE ".o" ".h" _STATIC_HDR_PATH "${_STATIC_OBJ_PATH}")
-    endif()
-  endforeach(_FLAG)
+  if(_RULE_STATIC_LIB_PATH)
+    list(APPEND _ARGS "--iree-llvm-link-embedded=false")
+    list(APPEND _ARGS "--iree-llvm-link-static")
+    list(APPEND _ARGS "--iree-llvm-static-library-output-path=${_RULE_STATIC_LIB_PATH}")
 
-  set(_OUTPUT_FILES "${_MODULE_FILE_NAME}")
-  if(_STATIC_LIB)
-    list(APPEND _OUTPUT_FILES "${_STATIC_OBJ_PATH}" "${_STATIC_HDR_PATH}")
+    string(REPLACE ".o" ".h" _STATIC_HDR_PATH "${_RULE_STATIC_LIB_PATH}")
+    list(APPEND _OUTPUT_FILES "${_RULE_STATIC_LIB_PATH}" "${_STATIC_HDR_PATH}")
   endif()
 
   # Depending on the binary instead of the target here given we might not have

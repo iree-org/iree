@@ -444,6 +444,7 @@ class BuildFileFunctions(object):
                            flags=None,
                            compile_tool=None,
                            c_identifier=None,
+                           static_lib_path=None,
                            deps=None,
                            testonly=None):
     name_block = _convert_string_arg_block("NAME", name, quote=False)
@@ -451,6 +452,8 @@ class BuildFileFunctions(object):
     module_name_block = _convert_string_arg_block("MODULE_FILE_NAME",
                                                   module_name)
     c_identifier_block = _convert_string_arg_block("C_IDENTIFIER", c_identifier)
+    static_lib_block = _convert_string_arg_block("STATIC_LIB_PATH",
+                                                 static_lib_path)
     compile_tool_block = _convert_target_block("COMPILE_TOOL", compile_tool)
     flags_block = _convert_string_list_block("FLAGS", flags)
     deps_block = _convert_target_list_block("DEPS", deps)
@@ -462,6 +465,7 @@ class BuildFileFunctions(object):
                             f"{module_name_block}"
                             f"{c_identifier_block}"
                             f"{compile_tool_block}"
+                            f"{static_lib_block}"
                             f"{flags_block}"
                             f"{deps_block}"
                             f"{testonly_block}"

@@ -81,9 +81,6 @@ function(iree_static_linker_test)
   # Set common iree-compile flags
   set(_COMPILER_ARGS ${_RULE_COMPILER_FLAGS})
   list(APPEND _COMPILER_ARGS "--iree-hal-target-backends=llvm-cpu")
-  list(APPEND _COMPILER_ARGS "--iree-llvm-link-embedded=false")
-  list(APPEND _COMPILER_ARGS "--iree-llvm-link-static")
-  list(APPEND _COMPILER_ARGS "--iree-llvm-static-library-output-path=${_O_FILE_NAME}")
   if(_RULE_TARGET_CPU_FEATURES)
     list(APPEND _COMPILER_ARGS "--iree-llvm-target-cpu-features=${_RULE_TARGET_CPU_FEATURES}")
   endif()
@@ -99,6 +96,8 @@ function(iree_static_linker_test)
         ${_COMPILER_ARGS}
       H_FILE_OUTPUT
         "${_C_FILE_NAME}"
+      STATIC_LIB_PATH
+        "${_O_FILE_NAME}"
       NO_RUNTIME
 
     )
@@ -113,6 +112,8 @@ function(iree_static_linker_test)
         "${_RULE_SRC}"
       FLAGS
         ${_COMPILER_ARGS}
+      STATIC_LIB_PATH
+        "${_O_FILE_NAME}"
       C_IDENTIFIER
         "${_NAME}"
       PUBLIC

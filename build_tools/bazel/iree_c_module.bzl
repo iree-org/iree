@@ -20,6 +20,8 @@ def iree_c_module(
             "//runtime/src/iree/vm:shims_emitc",
         ],
         compile_tool = "//tools:iree-compile",
+        no_runtime = None,
+        static_lib_path = "",
         **kwargs):
     """Builds an IREE C module.
 
@@ -32,17 +34,32 @@ def iree_c_module(
         deps: Optional. Dependencies to add to the generated library.
         compile_tool: the compiler to use to generate the module.
             Defaults to iree-compile.
+        static_lib_path: When set, the module is compiled into a LLVM static
+            library with the specified library path.
+        no_runtime: When set, this target will be built without the
+            runtime library support.
         **kwargs: any additional attributes to pass to the underlying rules.
     """
+
+    out_files = [h_file_output]
+    flags.append("--output-format=vm-c")
+    if static_lib_path:
+        static_header_path = static_lib_path.replace(".o", ".h")
+        out_files.extend([static_lib_path, static_header_path])
+        flags += [
+            "--iree-llvm-link-embedded=false",
+            "--iree-llvm-link-static",
+            "--iree-llvm-static-library-output-path=$(location %s)" % (static_lib_path),
+        ]
 
     native.genrule(
         name = name + "_gen",
         srcs = [src],
-        outs = [h_file_output],
+        outs = out_files,
         cmd = " && ".join([
             " ".join([
                 "$(location %s)" % (compile_tool),
-                " ".join(["--output-format=vm-c"] + flags),
+                " ".join(flags),
                 "-o $(location %s)" % (h_file_output),
                 "$(location %s)" % (src),
             ]),
@@ -52,13 +69,19 @@ def iree_c_module(
         output_to_bindir = 1,
         **kwargs
     )
+    src_files = [h_file_output]
+    deps_list = None
+    if not no_runtime:
+        src_files.append("//runtime/src/iree/vm:module_impl_emitc.c")
+        deps_list = deps
+
     iree_runtime_cc_library(
         name = name,
         hdrs = [h_file_output],
-        srcs = ["//runtime/src/iree/vm:module_impl_emitc.c", h_file_output],
+        srcs = src_files,
         copts = [
             "-DEMITC_IMPLEMENTATION='\"$(location %s)\"'" % h_file_output,
         ],
-        deps = deps,
+        deps = deps_list,
         **kwargs
     )
