@@ -292,10 +292,9 @@ class TransposeReshapeGenericDotGeneral
         b.getI64TensorAttr(targetOrder));
   }
 
-  Value ReshapeIfMorethan3D(OpBuilder &b, Location loc, Value src,
-                            size_t dimsBorder0, size_t dimsBorder1) const {
+  Value ReshapeOptional(OpBuilder &b, Location loc, Value src,
+                        size_t dimsBorder0, size_t dimsBorder1) const {
     auto type = src.getType().cast<RankedTensorType>();
-    if (type.getRank() <= 3) return src;
     auto shape = type.getShape();
     SmallVector<int64_t, 4> result_shape = {
         std::accumulate(shape.begin(), shape.begin() + dimsBorder0, 1,
@@ -305,8 +304,9 @@ class TransposeReshapeGenericDotGeneral
                         std::multiplies<int64_t>()),
         std::accumulate(shape.begin() + dimsBorder1, shape.end(), 1,
                         std::multiplies<int64_t>())};
-    return b.create<mhlo::ReshapeOp>(
-        loc, RankedTensorType::get(result_shape, type.getElementType()), src);
+    auto new_ty = RankedTensorType::get(result_shape, type.getElementType());
+    if (new_ty == src.getType()) return src;
+    return b.create<mhlo::ReshapeOp>(loc, new_ty, src);
   }
 
   LogicalResult matchAndRewrite(mhlo::DotGeneralOp op,
@@ -320,6 +320,9 @@ class TransposeReshapeGenericDotGeneral
     mhlo::DotDimensionNumbersAttr dimNumbers = op.dot_dimension_numbers();
     auto lhsBatchingDims = dimNumbers.getLhsBatchingDimensions();
     auto lhsContractingDims = dimNumbers.getLhsContractingDimensions();
+    auto rhsBatchingDims = dimNumbers.getRhsBatchingDimensions();
+    auto rhsContractingDims = dimNumbers.getRhsContractingDimensions();
+
     SmallVector<bool> isLhsParallel(lhsShapeType.getRank(), true);
     for (auto i : lhsBatchingDims) {
       lhsTargetOrder.push_back(i);
@@ -338,8 +341,7 @@ class TransposeReshapeGenericDotGeneral
     }
 
     SmallVector<bool> isRhsParallel(rhsShapeType.getRank(), true);
-    auto rhsBatchingDims = dimNumbers.getRhsBatchingDimensions();
-    auto rhsContractingDims = dimNumbers.getRhsContractingDimensions();
+
     for (auto i : rhsBatchingDims) {
       rhsTargetOrder.push_back(i);
       isRhsParallel[i] = false;
@@ -370,10 +372,10 @@ class TransposeReshapeGenericDotGeneral
     int64_t numRhsContractionDims =
         rhsContractionBase + rhsContractingDims.size();
 
-    lhs = ReshapeIfMorethan3D(rewriter, op.getLoc(), lhs,
-                              rhsBatchingDims.size(), lhsContractionBase);
-    rhs = ReshapeIfMorethan3D(rewriter, op.getLoc(), rhs,
-                              rhsBatchingDims.size(), numRhsContractionDims);
+    lhs = ReshapeOptional(rewriter, op.getLoc(), lhs, rhsBatchingDims.size(),
+                          lhsContractionBase);
+    rhs = ReshapeOptional(rewriter, op.getLoc(), rhs, rhsBatchingDims.size(),
+                          numRhsContractionDims);
 
     if (lhs == op.lhs() && rhs == op.rhs()) return failure();
 

@@ -266,3 +266,20 @@ func.func @dot_general_to_mul_cast(%arg0: tensor<4x17x1xf16>, %arg1: tensor<4x1x
   // CHECK: return %[[MUL]]
   return %0 : tensor<4x17x309xf32>
 }
+
+// -----
+
+// CHECK-LABEL: @dot_general_no_contracting
+func.func @dot_general_no_contracting(%arg0: tensor<3x3xf32>, %arg1: tensor<3x3xf32>) -> tensor<3x3x3xf32> {
+  // CHECK: %[[SHP:.+]] = mhlo.constant dense<3> : tensor<3xi32>
+  // CHECK: %[[TRANSPOSE:.+]] = "mhlo.transpose"(%arg0) {permutation = dense<[1, 0]> : tensor<2xi64>} : (tensor<3x3xf32>) -> tensor<3x3xf32>
+  // CHECK: %[[RLHS:.+]] = mhlo.reshape %[[TRANSPOSE]] : (tensor<3x3xf32>) -> tensor<3x3x1xf32>
+  // CHECK: %[[RRHS:.+]] = mhlo.reshape %arg1 : (tensor<3x3xf32>) -> tensor<3x1x3xf32>
+  // CHECK: %[[LHS:.+]] = "mhlo.dynamic_broadcast_in_dim"(%[[RLHS]], %[[SHP]]) {broadcast_dimensions = dense<[0, 1, 2]> : tensor<3xi64>} : (tensor<3x3x1xf32>, tensor<3xi32>) -> tensor<3x3x3xf32>
+  // CHECK: %[[RHS:.+]] = "mhlo.dynamic_broadcast_in_dim"(%[[RRHS]], %[[SHP]]) {broadcast_dimensions = dense<[0, 1, 2]> : tensor<3xi64>} : (tensor<3x1x3xf32>, tensor<3xi32>) -> tensor<3x3x3xf32>
+  // CHECK: %[[MUL:.+]] = mhlo.multiply %[[LHS]], %[[RHS]] : tensor<3x3x3xf32>
+  %4 = "mhlo.dot_general"(%arg0, %arg1) {dot_dimension_numbers = #mhlo.dot<lhs_batching_dimensions = [1], rhs_batching_dimensions = [0]>, precision_config = [#mhlo<precision DEFAULT>, #mhlo<precision DEFAULT>]} : (tensor<3x3xf32>, tensor<3x3xf32>) -> tensor<3x3x3xf32>
+
+  // CHECK: return %[[MUL]]
+  return %4 : tensor<3x3x3xf32>
+}
