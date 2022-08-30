@@ -158,7 +158,7 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
   nestedModulePM.addPass(createCSEPass());
 
   nestedModulePM.addNestedPass<func::FuncOp>(
-      memref::createFoldSubViewOpsPass());
+      memref::createFoldMemRefAliasOpsPass());
   nestedModulePM.addPass(createCSEPass());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
@@ -213,7 +213,7 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
 
   // Vector -> MMA ops
   nestedModulePM.addNestedPass<func::FuncOp>(
-      memref::createFoldSubViewOpsPass());
+      memref::createFoldMemRefAliasOpsPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUVectorToGPU());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
@@ -273,7 +273,7 @@ void addGPUWarpReductionPassPipeline(OpPassManager &pm) {
       createOptimizeVectorTransferPass());
 
   nestedModulePM.addNestedPass<func::FuncOp>(
-      memref::createFoldSubViewOpsPass());
+      memref::createFoldMemRefAliasOpsPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLoopInvariantCodeMotionPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
