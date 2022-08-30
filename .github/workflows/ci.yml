@@ -662,29 +662,29 @@ jobs:
         run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting build dir archive"
         run: tar -xf "${BUILD_DIR_ARCHIVE}"
-      - name: "Cross-compiling the benchmark tools"
+      - name: "Compiling the benchmark tools"
         id: build
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "RISCV_CONFIG=${TARGET_CONFIG}" \
             --env "BUILD_RISCV_DIR=${BUILD_TOOLS_DIR}" \
-            --env "BUILD_PRESET=benchmarks" \
+            --env "BUILD_PRESET=benchmark" \
             --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
             gcr.io/iree-oss/riscv@sha256:720bc0215d8462ea14352edc22710a6ce4c0c1daff581d179dd173885f1d8a35 \
             bash -euo pipefail -c "./build_tools/cmake/build_riscv.sh"
           echo "::set-output name=benchmark-tools-dir::${BUILD_TOOLS_DIR}"
-      - name: "Cross-compiling the benchmark tools with tracing"
+      - name: "Compiling the benchmark tools with tracing"
         id: build-with-tracing
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "RISCV_CONFIG=${TARGET_CONFIG}" \
             --env "BUILD_RISCV_DIR=${BUILD_TRACED_TOOLS_DIR}" \
-            --env "BUILD_PRESET=benchmarks-with-tracing" \
+            --env "BUILD_PRESET=benchmark-with-tracing" \
             --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
             gcr.io/iree-oss/riscv@sha256:720bc0215d8462ea14352edc22710a6ce4c0c1daff581d179dd173885f1d8a35 \
             bash -euo pipefail -c "./build_tools/cmake/build_riscv.sh"
           echo "::set-output name=traced-benchmark-tools-dir::${BUILD_TRACED_TOOLS_DIR}"
-      - name: "Creating the cross-compiled benchmark tools archive"
+      - name: "Creating the benchmark tools archive"
         id: archive
         env:
           BENCHMARK_TOOLS_DIR: ${{ steps.build.outputs.benchmark-tools-dir }}
@@ -695,7 +695,7 @@ jobs:
             ${BENCHMARK_TOOLS_DIR}/tools/iree-benchmark-module \
             ${TRACED_BENCHMARK_TOOLS_DIR}/tools/iree-benchmark-module
           echo "::set-output name=benchmark-tools-archive::${BENCHMARK_TOOLS_ARCHIVE}"
-      - name: "Uploading the cross-compiled benchmark tools archive"
+      - name: "Uploading the benchmark tools archive"
         id: upload
         env:
           BENCHMARK_TOOLS_ARCHIVE: ${{ steps.archive.outputs.benchmark-tools-archive }}

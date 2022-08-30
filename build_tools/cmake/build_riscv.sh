@@ -72,7 +72,6 @@ case "${BUILD_PRESET}" in
     args+=(
       -DIREE_ENABLE_ASSERTIONS=ON
       -DIREE_BUILD_SAMPLES=ON
-      -DIREE_BUILD_TESTS=ON
     )
     ;;
   benchmark)
