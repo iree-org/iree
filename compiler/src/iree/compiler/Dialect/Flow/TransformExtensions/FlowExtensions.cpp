@@ -98,7 +98,7 @@ static void rewriteParallelInsertSlices(
     rewriter.create<Flow::DispatchTensorStoreOp>(
         loc,
         parallelInsertOp.getSource(),
-        tensorToFlowBvm.lookup(parallelInsertOp.getDest()),
+        tensorToFlowBvm.lookup(cast<Value>(parallelInsertOp.getDest())),
         dynamicDims,
         parallelInsertOp.getMixedOffsets(),
         parallelInsertOp.getMixedSizes(),
