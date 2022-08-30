@@ -312,6 +312,14 @@ LogicalResult verifyGPUMatmulTensorCorePipeline(
 void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
                                         unsigned pipelineDepth);
 
+enum class GPUPromoteSharedMemPattern {
+  ContractionOpPattern = 0,
+  TransposeOpPattern = 1,
+};
+
+/// Lowering transpose using shared memory.
+void addGPUTransposePassPipeline(OpPassManager &pm);
+
 /// Lowering reductions to warp reductions.
 void addGPUWarpReductionPassPipeline(OpPassManager &pm);
 
@@ -336,7 +344,9 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToROCDLPass();
 
 /// Perform tiling and distribution to threads.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTileAndDistribute(
-    bool distributeToWarp = false);
+    bool distributeToWarp = false,
+    GPUPromoteSharedMemPattern promoteSharedMemPattern =
+        GPUPromoteSharedMemPattern::ContractionOpPattern);
 
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTileTensor(
     bool distributeToWarp = false);
@@ -365,9 +375,9 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUMultiBuffering(
     unsigned numBuffers = 5);
 
 /// Apply transformation to reduce the number of bank conflicts when accessing
-/// shared memory.
+/// shared memory by padding fastest moving dimension with the specified size.
 std::unique_ptr<OperationPass<func::FuncOp>>
-createLLVMGPUReduceSharedMemoryBankConflicts();
+createLLVMGPUReduceSharedMemoryBankConflicts(int64_t paddingSizeBits = 128);
 
 /// Converts vector ops to gpu dialect.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorToGPU();

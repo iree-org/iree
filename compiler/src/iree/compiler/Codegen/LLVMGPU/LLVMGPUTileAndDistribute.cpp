@@ -185,9 +185,10 @@ static LogicalResult copyToWorkgroupMemory(OpBuilder &b, Value src, Value dst) {
 template <typename T>
 using LinalgPromotionPattern =
     mlir::iree_compiler::IREE::LinalgExt::LinalgPromotionPattern<T>;
-static void populatePromotionPatterns(MLIRContext *context,
-                                      RewritePatternSet &patterns,
-                                      ArrayRef<int64_t> operandsToPromote) {
+static void populatePromotionPatterns(
+    MLIRContext *context, RewritePatternSet &patterns,
+    GPUPromoteSharedMemPattern promoteSharedMemPattern,
+    ArrayRef<int64_t> operandsToPromote) {
   patterns.insert<LinalgPromotionPattern<linalg::MatmulOp>,
                   LinalgPromotionPattern<linalg::BatchMatmulOp>,
                   LinalgPromotionPattern<linalg::GenericOp>>(
@@ -202,9 +203,13 @@ static void populatePromotionPatterns(MLIRContext *context,
           {StringAttr::get(context, getWorkgroupKTiledMarker())},
           StringAttr::get(context, getWorkgroupMemoryMarker()))
           .setMatchByDefault()
-          .addFilter([](Operation *op) {
+          .addFilter([promoteSharedMemPattern](Operation *op) {
             auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
             if (!linalgOp) return failure();
+            if (promoteSharedMemPattern ==
+                GPUPromoteSharedMemPattern::TransposeOpPattern) {
+              return success(linalgOp.getNumParallelLoops() == 2);
+            }
             // Limit promotion to matmul and batch matmul, there may be generic
             // ops with more batch dimensions we didn't distribute and therefore
             // cannot find a higher bound.
@@ -250,10 +255,14 @@ struct LLVMGPUTileAndDistributePass
  private:
   // Distribute the workloads to warp if true otherwise distribute to threads.
   bool distributeToWarp = false;
+  GPUPromoteSharedMemPattern promoteSharedMemPattern =
+      GPUPromoteSharedMemPattern::ContractionOpPattern;
 
  public:
-  LLVMGPUTileAndDistributePass(bool distributeToWarp)
-      : distributeToWarp(distributeToWarp) {}
+  LLVMGPUTileAndDistributePass(
+      bool distributeToWarp, GPUPromoteSharedMemPattern promoteSharedMemPattern)
+      : distributeToWarp(distributeToWarp),
+        promoteSharedMemPattern(promoteSharedMemPattern) {}
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<AffineDialect, gpu::GPUDialect>();
   }
@@ -266,7 +275,8 @@ struct LLVMGPUTileAndDistributePass
     // allocation. This needs to be done before reduction tiling.
     if (llvmgpuUseMMASync) {
       RewritePatternSet promotionPatterns(&getContext());
-      populatePromotionPatterns(context, promotionPatterns, {2});
+      populatePromotionPatterns(context, promotionPatterns,
+                                promoteSharedMemPattern, {2});
       if (failed(applyPatternsAndFoldGreedily(funcOp,
                                               std::move(promotionPatterns)))) {
         return signalPassFailure();
@@ -274,7 +284,7 @@ struct LLVMGPUTileAndDistributePass
       propagateFillIntoPromotionAlloc(funcOp);
     }
 
-    // Tile again at the workgroup level since redution dimension were
+    // Tile again at the workgroup level since reduction dimension were
     // ignored. Dimensions already tiled will be ignore since we tile to the
     // same size.
     if (failed(tileReduction(funcOp))) {
@@ -295,7 +305,19 @@ struct LLVMGPUTileAndDistributePass
     // Only promote to workgroup size if there are multiple warps.
     if (flatWorkgroupSize > kWarpSize) {
       RewritePatternSet promotionPatterns(&getContext());
-      populatePromotionPatterns(context, promotionPatterns, {0, 1});
+
+      switch (promoteSharedMemPattern) {
+        case GPUPromoteSharedMemPattern::ContractionOpPattern:
+          populatePromotionPatterns(context, promotionPatterns,
+                                    promoteSharedMemPattern, {0, 1});
+
+          break;
+        case GPUPromoteSharedMemPattern::TransposeOpPattern:
+          populatePromotionPatterns(context, promotionPatterns,
+                                    promoteSharedMemPattern, {0});
+
+          break;
+      }
       if (failed(applyPatternsAndFoldGreedily(funcOp,
                                               std::move(promotionPatterns)))) {
         return signalPassFailure();
@@ -373,8 +395,9 @@ struct LLVMGPUTileAndDistributePass
 }  // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTileAndDistribute(
-    bool distributeToWarp) {
-  return std::make_unique<LLVMGPUTileAndDistributePass>(distributeToWarp);
+    bool distributeToWarp, GPUPromoteSharedMemPattern promoteSharedMemPattern) {
+  return std::make_unique<LLVMGPUTileAndDistributePass>(
+      distributeToWarp, promoteSharedMemPattern);
 }
 
 }  // namespace iree_compiler
