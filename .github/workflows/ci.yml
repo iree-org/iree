@@ -652,7 +652,7 @@ jobs:
             docker_image: "gcr.io/iree-oss/riscv@sha256:720bc0215d8462ea14352edc22710a6ce4c0c1daff581d179dd173885f1d8a35"
             enable_tracing: true
     outputs:
-      benchmark-tools-gcs-artifacts: ${{ steps.upload.outputs }}
+      benchmark-tools-gcs-artifacts: ${{ toJSON(steps.upload.outputs) }}
     env:
       PLATFORM: ${{ matrix.target.platform }}
       ARCHITECTURE: ${{ matrix.target.architecture }}
