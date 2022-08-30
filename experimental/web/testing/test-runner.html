@@ -16,14 +16,25 @@ SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
   <link rel="icon" href="./ghost.svg" type="image/svg+xml">
 
   <style>
-    .test-output {
+    .test-output-container {
       font-family: monospace;
-      white-space: pre;
-      overflow-x: scroll;
+      background-color: #111122;
+      color: #88EE33;
+      overflow-wrap: anywhere;
+    }
+
+    .test-output {
+      white-space: pre-wrap;
+      display: inline;
     }
 
     .stderr {
       color: red;
+    }
+
+    .start-of-line {
+      user-select: none;
+      color: #eeeeff;
     }
   </style>
 
@@ -33,18 +44,22 @@ SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 </head>
 
 <body class="bg-dark bg-opacity-10">
-  <div class="container p-2 mx-2">
-    <div style="font-family: monospace;">
+  <div class="container-fluid p-2" style="font-family: monospace;">
+    <div>
       Test name: <span id="test-name"></span>
       <br>
       Test output:
     </div>
-    <div id="test-output" class="test-output border border-dark shadow-sm p-3 mb-3 bg-body rounded"></div>
+    <div id="test-output" class="test-output-container border border-dark shadow-sm p-3 mb-2 rounded"></div>
+    <div>
+      Test result: <span id="test-result"></span>
+    </div>
   </div>
 
   <script>
     const testNameElement = document.getElementById("test-name");
     const testOutputElement = document.getElementById("test-output");
+    const testResultElement = document.getElementById("test-result")
 
     const searchParams = new URLSearchParams(window.location.search);
     const testName = searchParams.get("testName");
@@ -73,18 +88,40 @@ SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
     function handleMessageFromWorker(messageEvent) {
       const {messageType, payload} = messageEvent.data;
 
+      function addStartOfLine() {
+        const startOfLine = document.createElement("span");
+        startOfLine.textContent = "> ";
+        startOfLine.classList.add("start-of-line");
+        testOutputElement.appendChild(startOfLine);
+      }
+
+      function addEndOfLine() {
+        const endOfLine = document.createElement("br");
+        testOutputElement.appendChild(endOfLine);
+      }
+
       if (messageType == "testResult") {
-        // TODO(scotttodd): handle result (check in UI, pass/fail #s for suites)
-        console.log("test result:", payload);
+        // TODO(scotttodd): do more with result (pass/fail #s for suites)
+        if (payload == 0) {
+          testResultElement.innerText = "PASS";
+        } else {
+          testResultElement.innerText = "FAIL";
+        }
       } else if (messageType == "print") {
+        addStartOfLine();
         const div = document.createElement("div");
         div.textContent = payload;
+        div.classList.add("test-output");
         testOutputElement.appendChild(div);
+        addEndOfLine();
       } else if (messageType == "printErr") {
+        addStartOfLine();
         const div = document.createElement("div");
         div.textContent = payload;
+        div.classList.add("test-output");
         div.classList.add("stderr");
         testOutputElement.appendChild(div);
+        addEndOfLine();
       }
     }
 
