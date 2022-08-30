@@ -30,9 +30,8 @@ iree_host_size_t iree_hal_inline_command_buffer_size(void);
 iree_status_t iree_hal_inline_command_buffer_initialize(
     iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
-    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
-    iree_allocator_t host_allocator, iree_byte_span_t storage,
-    iree_hal_command_buffer_t** out_command_buffer);
+    iree_hal_queue_affinity_t queue_affinity, iree_allocator_t host_allocator,
+    iree_byte_span_t storage, iree_hal_command_buffer_t** out_command_buffer);
 
 // Deinitializes an inline command buffer previously initialized with
 // iree_hal_inline_command_buffer_initialize.
@@ -51,8 +50,7 @@ void iree_hal_inline_command_buffer_deinitialize(
 iree_status_t iree_hal_inline_command_buffer_create(
     iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
-    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
-    iree_allocator_t host_allocator,
+    iree_hal_queue_affinity_t queue_affinity, iree_allocator_t host_allocator,
     iree_hal_command_buffer_t** out_command_buffer);
 
 // Returns true if |command_buffer| is an inline command buffer.

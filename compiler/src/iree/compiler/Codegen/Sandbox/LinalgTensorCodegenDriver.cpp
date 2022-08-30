@@ -436,6 +436,8 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
   strategy.tileIf(doTiling, anchorOpName, tilingOptions)
       .padIf(pad, anchorOpName, paddingOptions)
       .decomposeIf(decomposeToLowerDimOp)
+      .generalizeIf(generalize, anchorOpName)
+      .interchangeIf(!iteratorInterchange.empty(), iteratorInterchange)
       .peelIf(peel, generalize ? genericOpName : anchorOpName, peelingOptions)
       .vectorizeIf(vectorize, generalize ? genericOpName : anchorOpName,
                    nullptr, vectorizePadding);

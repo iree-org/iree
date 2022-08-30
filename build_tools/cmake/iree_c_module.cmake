@@ -18,8 +18,6 @@ include(CMakeParseArguments)
 #     `--output-format=vm-c` is included automatically.
 # TESTONLY: When added, this target will only be built if user passes
 #     -DIREE_BUILD_TESTS=ON to CMake.
-# NO_RUNTIME: When added, this target will be built without the runtime library
-#     support.
 #
 # Note:
 # By default, iree_c_module will create a library named ${NAME},
@@ -28,7 +26,7 @@ include(CMakeParseArguments)
 function(iree_c_module)
   cmake_parse_arguments(
     _RULE
-    "TESTONLY;NO_RUNTIME"
+    "TESTONLY"
     "NAME;SRC;H_FILE_OUTPUT;COMPILE_TOOL"
     "FLAGS"
     ${ARGN}
@@ -54,61 +52,32 @@ function(iree_c_module)
   endif()
 
   iree_get_executable_path(_COMPILE_TOOL_EXECUTABLE ${_COMPILE_TOOL})
-  get_filename_component(_SRC_PATH "${_RULE_SRC}" REALPATH)
 
   set(_ARGS "--output-format=vm-c")
   list(APPEND _ARGS "${_RULE_FLAGS}")
-  list(APPEND _ARGS "${_SRC_PATH}")
+  list(APPEND _ARGS "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_SRC}")
   list(APPEND _ARGS "-o")
   list(APPEND _ARGS "${_RULE_H_FILE_OUTPUT}")
 
-  # Check LLVM static library setting. If the static libary output path is set,
-  # retrieve the object path and the corresponding header file path.
-  foreach(_FLAG ${_RULE_FLAGS})
-    string(REGEX MATCH
-      "-iree-llvm-static-library-output-path=(.+)" _MATCH_STRING "${_FLAG}"
-    )
-    if(_MATCH_STRING)
-      set(_STATIC_LIB TRUE)
-      # Get the static object path from the regex match result.
-      set(_STATIC_OBJ_PATH ${CMAKE_MATCH_1})
-      string(REPLACE ".o" ".h" _STATIC_HDR_PATH "${_STATIC_OBJ_PATH}")
-    endif()
-  endforeach(_FLAG)
-
-  set(_OUTPUT_FILES "${_RULE_H_FILE_OUTPUT}")
-  if(_STATIC_LIB)
-    list(APPEND _OUTPUT_FILES "${_STATIC_OBJ_PATH}" "${_STATIC_HDR_PATH}")
-  endif()
   add_custom_command(
-    OUTPUT ${_OUTPUT_FILES}
+    OUTPUT "${_RULE_H_FILE_OUTPUT}"
     COMMAND ${_COMPILE_TOOL_EXECUTABLE} ${_ARGS}
     # Changes to either the compiler tool or the input source should rebuild.
-    DEPENDS ${_COMPILE_TOOL_EXECUTABLE} ${_SRC_PATH}
+    DEPENDS ${_COMPILE_TOOL_EXECUTABLE} ${_RULE_SRC}
   )
-
-  if(NOT _RULE_NO_RUNTIME)
-    set(_LIB_RUNTIME_SRC
-      "${IREE_SOURCE_DIR}/runtime/src/iree/vm/module_impl_emitc.c")
-    # Include paths and options for the runtime sources.
-    set(_LIB_RUNTIME_DEP iree::runtime::src::defs)
-  endif()
 
   iree_cc_library(
     NAME ${_RULE_NAME}
     HDRS "${_RULE_H_FILE_OUTPUT}"
-    SRCS "${_LIB_RUNTIME_SRC}"
+    SRCS "${IREE_SOURCE_DIR}/runtime/src/iree/vm/module_impl_emitc.c"
     INCLUDES "${CMAKE_CURRENT_BINARY_DIR}"
     COPTS
       "-DEMITC_IMPLEMENTATION=\"${_RULE_H_FILE_OUTPUT}\""
       "${_TESTONLY_ARG}"
     DEPS
-      ${_LIB_RUNTIME_DEP}
+      # Include paths and options for the runtime sources.
+      iree::runtime::src::defs
   )
-
-  if(_RULE_NO_RUNTIME)
-    return()
-  endif()
 
   set(_GEN_TARGET "${_NAME}_gen")
   add_custom_target(

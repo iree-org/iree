@@ -620,9 +620,9 @@ static iree_status_t check_matmul_failure(
                               context_env);
     }
   }
-  int m_start = iree_max(0, (int)row - (int)context);
+  int m_start = iree_max(0, row - context);
   int m_end = iree_min(m_size, row + context);
-  int n_start = iree_max(0, (int)col - (int)context);
+  int n_start = iree_max(0, col - context);
   int n_end = iree_min(n_size, col + context);
   // We have a lot more freedom to pick k_start, k_end, since these parameters
   // only affect which regions of the input lhs and rhs matrices are printed.

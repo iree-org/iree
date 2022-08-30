@@ -48,7 +48,6 @@ jobs:
         with:
           tag_name: ${{ env.tag_name }}
           release_name: iree candidate ${{ env.tag_name }}
-          commitish: ${{ steps.last_green_commit.outputs.result }}
           body: |
             Automatic candidate release of iree.
           draft: true

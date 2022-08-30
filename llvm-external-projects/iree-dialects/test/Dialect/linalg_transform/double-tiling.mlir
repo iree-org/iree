@@ -52,6 +52,8 @@ transform.with_pdl_patterns {
 func.func @matmul_tensors_pad(
   %arg0: tensor<128x128xf32>, %arg1: tensor<128x128xf32>, %arg2: tensor<128x128xf32> { linalg.inplaceable = true})
     -> tensor<128x128xf32> {
+  //     CHECK:       tensor.pad
+
   //     CHECK:       scf.for
   //     CHECK:         scf.for
   //     CHECK:           scf.for

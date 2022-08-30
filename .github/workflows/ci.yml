@@ -107,7 +107,7 @@ jobs:
       # dependent jobs.
       build-dir: ${{ env.BUILD_DIR }}
       build-dir-archive: ${{ steps.archive.outputs.build-dir-archive }}
-      build-dir-gcs-artifact: ${{ steps.upload.outputs.build-dir-gcs-artifact }}
+      gcs-artifact: ${{ steps.upload.outputs.gcs-artifact }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
@@ -138,11 +138,11 @@ jobs:
       - name: "Uploading build dir archive"
         id: upload
         env:
+          GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.build-dir-archive }}
           BUILD_DIR_ARCHIVE: ${{ steps.archive.outputs.build-dir-archive }}
-          BUILD_DIR_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.build-dir-archive }}
         run: |
-          gcloud alpha storage cp "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR_GCS_ARTIFACT}"
-          echo "::set-output name=build-dir-gcs-artifact::${BUILD_DIR_GCS_ARTIFACT}"
+          gcloud alpha storage cp "${BUILD_DIR_ARCHIVE}" "${GCS_ARTIFACT}"
+          echo "::set-output name=gcs-artifact::${GCS_ARTIFACT}"
 
   build_test_all_bazel:
     needs: should_run
@@ -183,15 +183,15 @@ jobs:
     env:
       BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
       BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+      GCS_ARTIFACT: ${{ needs.build_all.outputs.gcs-artifact }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
         with:
           submodules: true
       - name: "Downloading build dir archive"
-        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
-      - name: "Extracting build dir archive"
+        run: gcloud alpha storage cp "${GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+      - name: "Extracting archive"
         run: tar -xf "${BUILD_DIR_ARCHIVE}"
       - name: "Testing all"
         run: |
@@ -213,7 +213,7 @@ jobs:
     env:
       BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
       BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+      GCS_ARTIFACT: ${{ needs.build_all.outputs.gcs-artifact }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
@@ -224,8 +224,8 @@ jobs:
           ./build_tools/scripts/check_cuda.sh
           ./build_tools/scripts/check_vulkan.sh
       - name: "Downloading build dir archive"
-        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
-      - name: "Extracting build dir archive"
+        run: gcloud alpha storage cp "${GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+      - name: "Extracting archive"
         run: tar -xf "${BUILD_DIR_ARCHIVE}"
       - name: "Testing with GPU"
         run: |
@@ -287,11 +287,11 @@ jobs:
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
         with:
           submodules: true
-      - name: "Downloading runtime build dir archive"
+      - name: "Downloading runtime build directory"
         uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741 # v3.0.0
         with:
           name: "${{ env.BUILD_DIR }}.tar"
-      - name: "Extracting runtime build dir archive"
+      - name: "Extracting archive"
         run: tar -xf ${BUILD_DIR}.tar
       - name: "Testing runtime"
         run: |
@@ -300,6 +300,14 @@ jobs:
             gcr.io/iree-oss/base@sha256:5d43683c6b50aebe1fca6c85f2012f3b0fa153bf4dd268e8767b619b1891423a \
             ./build_tools/cmake/ctest_all.sh \
             "${BUILD_DIR}"
+
+  host_tools_assertions:
+    needs: should_run
+    if: needs.should_run.outputs.should-run == 'true'
+    uses: ./.github/workflows/host_tools.yml
+    with:
+      host-binary-root: host-tools-assertions
+      enable-assertions: "ON"
 
   ################################# Tensorflow #################################
   # Jobs that build the IREE-Tensorflow integrations
@@ -316,7 +324,7 @@ jobs:
     outputs:
       binaries-dir: ${{ steps.build.outputs.binaries-dir }}
       binaries-archive: ${{ steps.archive.outputs.binaries-archive }}
-      binaries-gcs-artifact: ${{ steps.upload.outputs.binaries-gcs-artifact }}
+      gcs-artifact: ${{ steps.upload.outputs.gcs-artifact }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
@@ -345,14 +353,14 @@ jobs:
       - name: "Uploading binaries archive"
         id: upload
         env:
+          GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.binaries-archive }}
           BINARIES_ARCHIVE: ${{ steps.archive.outputs.binaries-archive }}
-          BINARIES_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.binaries-archive }}
         run: |
-          gcloud alpha storage cp "${BINARIES_ARCHIVE}" "${BINARIES_GCS_ARTIFACT}"
-          echo "::set-output name=binaries-gcs-artifact::${BINARIES_GCS_ARTIFACT}"
+          gcloud alpha storage cp "${BINARIES_ARCHIVE}" "${GCS_ARTIFACT}"
+          echo "::set-output name=gcs-artifact::${GCS_ARTIFACT}"
 
   test_tf_integrations:
-    needs: [should_run, build_all, build_tf_integrations]
+    needs: [should_run, build_tf_integrations, build_all]
     if: needs.should_run.outputs.should-run == 'true'
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
@@ -363,10 +371,10 @@ jobs:
     env:
       BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
       BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.gcs-artifact }}
       TF_BINARIES_DIR: ${{ needs.build_tf_integrations.outputs.binaries-dir }}
       TF_BINARIES_ARCHIVE: ${{ needs.build_tf_integrations.outputs.binaries-archive }}
-      TF_BINARIES_GCS_ARTIFACT: ${{ needs.build_tf_integrations.outputs.binaries-gcs-artifact }}
+      TF_BINARIES_GCS_ARTIFACT: ${{ needs.build_tf_integrations.outputs.gcs-artifact }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
@@ -391,7 +399,7 @@ jobs:
             "${BUILD_DIR}"
 
   test_tf_integrations_gpu:
-    needs: [should_run, build_all, build_tf_integrations]
+    needs: [should_run, build_tf_integrations, build_all]
     if: needs.should_run.outputs.should-run == 'true'
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
@@ -402,10 +410,10 @@ jobs:
     env:
       BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
       BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.gcs-artifact }}
       TF_BINARIES_DIR: ${{ needs.build_tf_integrations.outputs.binaries-dir }}
       TF_BINARIES_ARCHIVE: ${{ needs.build_tf_integrations.outputs.binaries-archive }}
-      TF_BINARIES_GCS_ARTIFACT: ${{ needs.build_tf_integrations.outputs.binaries-gcs-artifact }}
+      TF_BINARIES_GCS_ARTIFACT: ${{ needs.build_tf_integrations.outputs.gcs-artifact }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
@@ -489,36 +497,39 @@ jobs:
     env:
       BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
       BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.gcs-artifact }}
       TF_BINARIES_DIR: ${{ needs.build_tf_integrations.outputs.binaries-dir }}
       TF_BINARIES_ARCHIVE: ${{ needs.build_tf_integrations.outputs.binaries-archive }}
-      TF_BINARIES_GCS_ARTIFACT: ${{ needs.build_tf_integrations.outputs.binaries-gcs-artifact }}
+      TF_BINARIES_GCS_ARTIFACT: ${{ needs.build_tf_integrations.outputs.gcs-artifact }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
         with:
           submodules: true
-      - name: "Downloading build dir archive"
-        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
-      - name: "Extracting install from build dir archive"
-        run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
       - name: "Downloading TF binaries archive"
         run: gcloud alpha storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
       - name: "Extracting TF binaries archive"
         run: tar -xf "${TF_BINARIES_ARCHIVE}"
-      - name: "Building benchmarks"
+        # TODO(#4662): building the benchmarks currently needs the entire build
+        # dir archive just to get the host tools. This is silly and we should
+        # make prebuilt host tools work even when not cross-compiling.
+      - name: "Downloading build dir archive"
+        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+      - name: "Extracting archive"
+        run: tar -xf "${BUILD_DIR_ARCHIVE}"
+      - name: "Re-configuring"
         run: |
           build_tools/github_actions/docker_run.sh \
             --env "IREE_TF_BINARIES_DIR=${TF_BINARIES_DIR}" \
-            --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
             gcr.io/iree-oss/base@sha256:5d43683c6b50aebe1fca6c85f2012f3b0fa153bf4dd268e8767b619b1891423a \
-            build_tools/cmake/build_benchmarks.sh
+            build_tools/cmake/build_benchmarks.sh \
+            "${BUILD_DIR}"
 
   ############################## Crosscompilation ##############################
   # Jobs that cross-compile IREE for other platforms
   ##############################################################################
   android_arm64:
-    needs: [should_run, build_all]
+    needs: [should_run, host_tools_assertions]
     if: needs.should_run.outputs.should-run == 'true'
     runs-on:
       # Hacks, and order matters. See the comment at the top of the file.
@@ -527,29 +538,32 @@ jobs:
       - cpu
       - os-family=Linux
     env:
+      BUILD_DIR: "build-android-arm64"
       ANDROID_ABI: "arm64-v8a"
-      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
-      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+      HOST_BINARY_ROOT: ${{ needs.host_tools_assertions.outputs.host-binary-root }}
+      HOST_BINARY_ARCHIVE: ${{ needs.host_tools_assertions.outputs.host-binary-root }}.tar
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
         with:
           submodules: true
-      - name: "Downloading build dir archive"
-        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
-      - name: "Extracting install from build dir archive"
-        run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
+      - name: "Downloading host tools"
+        uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741 # v3.0.0
+        with:
+          name: "${{ env.HOST_BINARY_ARCHIVE }}"
+      - name: "Extracting host tools archive"
+        run: |
+          tar -xvf ${HOST_BINARY_ARCHIVE}
       - name: "Building for Android"
         run: |
           build_tools/github_actions/docker_run.sh \
             --env "ANDROID_ABI=${ANDROID_ABI}" \
-            --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
+            --env "IREE_HOST_BINARY_ROOT=${HOST_BINARY_ROOT}" \
             gcr.io/iree-oss/android@sha256:9bc723fc707a18bd0c1be9c12e01ea5bb7c7d77f607427879e10ffcffd7d2bb5 \
-            build_tools/cmake/build_android.sh
+            build_tools/build_android.sh
 
   riscv32:
-    needs: [should_run, build_all]
+    needs: [should_run, host_tools_assertions]
     if: needs.should_run.outputs.should-run == 'true'
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
@@ -558,32 +572,34 @@ jobs:
       - cpu
       - os-family=Linux
     env:
-      BUILD_RISCV_DIR: "build-riscv32-baremetal"
+      BUILD_RISCV_DIR: "build-riscv-rv32-baremetal"
       RISCV_CONFIG: "rv32-baremetal"
-      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
-      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+      HOST_BINARY_ROOT: ${{ needs.host_tools_assertions.outputs.host-binary-root }}
+      HOST_BINARY_ARCHIVE: ${{ needs.host_tools_assertions.outputs.host-binary-root }}.tar
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
         with:
           submodules: true
-      - name: "Downloading build dir archive"
-        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
-      - name: "Extracting install from build dir archive"
-        run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
+      - name: "Downloading host tools"
+        uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741 # v3.0.0
+        with:
+          name: "${{ env.HOST_BINARY_ARCHIVE }}"
+      - name: "Extracting host tools archive"
+        run: |
+          tar -xvf ${HOST_BINARY_ARCHIVE}
       - name: "Cross-compiling and testing riscv32"
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "RISCV_CONFIG=${RISCV_CONFIG}" \
             --env "BUILD_RISCV_DIR=${BUILD_RISCV_DIR}" \
-            --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
+            --env "IREE_HOST_BINARY_ROOT=${HOST_BINARY_ROOT}" \
             gcr.io/iree-oss/riscv@sha256:720bc0215d8462ea14352edc22710a6ce4c0c1daff581d179dd173885f1d8a35 \
             bash -euo pipefail -c \
             "./build_tools/cmake/build_riscv.sh && tests/riscv32/smoke.sh"
 
   riscv64:
-    needs: [should_run, build_all, build_tf_integrations]
+    needs: [should_run, build_all, host_tools_assertions, build_tf_integrations]
     if: needs.should_run.outputs.should-run == 'true'
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
@@ -592,33 +608,45 @@ jobs:
       - cpu
       - os-family=Linux
     env:
-      BUILD_RISCV_DIR: "build-riscv64"
+      BUILD_RISCV_DIR: "build-riscv-r64"
       RISCV_CONFIG: "rv64"
+      HOST_BINARY_ROOT: ${{ needs.host_tools_assertions.outputs.host-binary-root }}
+      HOST_BINARY_ARCHIVE: ${{ needs.host_tools_assertions.outputs.host-binary-root }}.tar
       BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
       BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.gcs-artifact }}
       TF_BINARIES_DIR: ${{ needs.build_tf_integrations.outputs.binaries-dir }}
       TF_BINARIES_ARCHIVE: ${{ needs.build_tf_integrations.outputs.binaries-archive }}
-      TF_BINARIES_GCS_ARTIFACT: ${{ needs.build_tf_integrations.outputs.binaries-gcs-artifact }}
+      TF_BINARIES_GCS_ARTIFACT: ${{ needs.build_tf_integrations.outputs.gcs-artifact }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
         with:
           submodules: true
-      - name: "Downloading build dir archive"
-        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
-      - name: "Extracting build dir archive"
-        run: tar -xf "${BUILD_DIR_ARCHIVE}"
+      - name: "Downloading host tools"
+        uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741 # v3.0.0
+        with:
+          name: "${{ env.HOST_BINARY_ARCHIVE }}"
+      - name: "Extracting host tools archive"
+        run: |
+          tar -xvf ${HOST_BINARY_ARCHIVE}
       - name: "Downloading TF binaries archive"
         run: gcloud alpha storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
       - name: "Extracting TF binaries archive"
         run: tar -xf "${TF_BINARIES_ARCHIVE}"
+        # FIXME: The riscv64 tests currently need the entire build dir archive
+        # just to get FileCheck from LLVM's bin directory. This is silly and we
+        # should make FileCheck available another way.
+      - name: "Downloading build dir archive"
+        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+      - name: "Extracting archive"
+        run: tar -xf "${BUILD_DIR_ARCHIVE}"
       - name: "Cross-compiling and testing riscv64"
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "RISCV_CONFIG=${RISCV_CONFIG}" \
             --env "BUILD_RISCV_DIR=${BUILD_RISCV_DIR}" \
-            --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
+            --env "IREE_HOST_BINARY_ROOT=${HOST_BINARY_ROOT}" \
             --env "IREE_IMPORT_TFLITE_BIN=${TF_BINARIES_DIR}/iree-import-tflite" \
             --env "LLVM_BIN_DIR=${BUILD_DIR}/third_party/llvm-project/llvm/bin" \
             gcr.io/iree-oss/riscv@sha256:720bc0215d8462ea14352edc22710a6ce4c0c1daff581d179dd173885f1d8a35 \
@@ -644,6 +672,7 @@ jobs:
       # Subsets
       - build_runtime
       - test_runtime
+      - host_tools_assertions
 
       # Tensorflow
       - test_tf_integrations

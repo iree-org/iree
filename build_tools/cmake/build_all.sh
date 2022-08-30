@@ -15,7 +15,6 @@ cd "${ROOT_DIR}"
 
 CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
 BUILD_DIR="${1:-${IREE_BUILD_DIR:-build}}"
-INSTALL_DIR="${IREE_INSTALL_DIR:-${BUILD_DIR}/install}"
 IREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS:-ON}"
 IREE_ENABLE_CCACHE="${IREE_ENABLE_CCACHE:-OFF}"
 
@@ -32,14 +31,9 @@ fi
 declare -a CMAKE_ARGS=(
   "-G" "Ninja"
   "-B" "${BUILD_DIR}"
-
-  "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
-  "-DCMAKE_INSTALL_PREFIX=$(realpath ${INSTALL_DIR})"
-  "-DIREE_ENABLE_ASSERTIONS=${IREE_ENABLE_ASSERTIONS}"
-  "-DIREE_ENABLE_CCACHE=${IREE_ENABLE_CCACHE}"
-
-  # Use `lld` for faster linking.
+  # Let's make linking fast
   "-DIREE_ENABLE_LLD=ON"
+  "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
 
   # Enable docs build on the CI. The additional builds are pretty fast and
   # give us early warnings for some types of website publication errors.
@@ -48,12 +42,14 @@ declare -a CMAKE_ARGS=(
   # Enable building the python bindings on CI.
   "-DIREE_BUILD_PYTHON_BINDINGS=ON"
 
+  "-DIREE_ENABLE_ASSERTIONS=${IREE_ENABLE_ASSERTIONS}"
+  "-DIREE_ENABLE_CCACHE=${IREE_ENABLE_CCACHE}"
+
   # Enable CUDA compiler and runtime builds unconditionally. Our CI images all
   # have enough deps to at least build CUDA support and compile CUDA binaries
   # (but not necessarily test on real hardware).
   "-DIREE_HAL_DRIVER_CUDA=ON"
   "-DIREE_TARGET_BACKEND_CUDA=ON"
-
   "${ROOT_DIR}"
 )
 
@@ -61,10 +57,6 @@ declare -a CMAKE_ARGS=(
 echo "Building all"
 echo "------------"
 "$CMAKE_BIN" --build "${BUILD_DIR}" -- -k 0
-
-echo "Building 'install'"
-echo "------------------"
-"${CMAKE_BIN}" --build "${BUILD_DIR}" --target install -- -k 0
 
 echo "Building test deps"
 echo "------------------"

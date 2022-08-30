@@ -6,43 +6,37 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Build benchmark suites for IREE using a host tools directory.
+# Build benchmark suites for IREE using an *already built* build directory.
 # Designed for CI, but can be run locally.
+# TODO(#4662): this should just allow passing in host tools.
 
 set -xeuo pipefail
 
 ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
 cd "${ROOT_DIR}"
 
+BUILD_DIR="${1:-${IREE_BUILD_DIR:-build}}"
 CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
-IREE_HOST_BINARY_ROOT="$(realpath ${IREE_HOST_BINARY_ROOT})"
 IREE_TF_BINARIES_DIR="${IREE_TF_BINARIES_DIR:-integrations/tensorflow/bazel-bin/iree_tf_compiler}"
-BUILD_BENCHMARKS_DIR="${BUILD_BENCHMARKS_DIR:-$ROOT_DIR/build-benchmarks}"
 
 "$CMAKE_BIN" --version
 ninja --version
 
-if [[ -d "${BUILD_BENCHMARKS_DIR}" ]]; then
-  echo "${BUILD_BENCHMARKS_DIR} directory already exists. Will use cached results there."
-else
-  echo "${BUILD_BENCHMARKS_DIR} directory does not already exist. Creating a new one."
-  mkdir "${BUILD_BENCHMARKS_DIR}"
+if ! [[ -d "${BUILD_DIR}" ]]; then
+  echo "Build directory '${BUILD_DIR}' does not exist. Aborting"
+  exit 1
 fi
 
-echo "Configuring to build benchmarks"
-"${CMAKE_BIN}" -B "${BUILD_BENCHMARKS_DIR}" \
-  -G Ninja \
-  -DIREE_HOST_BINARY_ROOT="${IREE_HOST_BINARY_ROOT}" \
+echo "Reconfiguring to enable benchmarks"
+# Note that we're relying on CMake caching here
+"${CMAKE_BIN}" -B "${BUILD_DIR}" \
   -DIREE_BUILD_BENCHMARKS=ON \
   -DIREE_BUILD_MICROBENCHMARKS=ON \
-  -DIREE_BUILD_COMPILER=OFF \
-  -DIREE_BUILD_SAMPLES=OFF \
-  -DIREE_BUILD_TESTS=OFF \
   -DIREE_IMPORT_TFLITE_PATH="${IREE_TF_BINARIES_DIR}/iree-import-tflite" \
   -DIREE_IMPORT_TF_PATH="${IREE_TF_BINARIES_DIR}/iree-import-tf"
 
 echo "Building benchmark artifacts"
 "${CMAKE_BIN}" \
-  --build "${BUILD_BENCHMARKS_DIR}" \
+  --build "${BUILD_DIR}" \
   --target iree-benchmark-suites iree-microbenchmark-suites \
   -- -k 0

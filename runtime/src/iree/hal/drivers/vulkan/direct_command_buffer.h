@@ -30,7 +30,7 @@ iree_status_t iree_hal_vulkan_direct_command_buffer_allocate(
     iree::hal::vulkan::VkCommandPoolHandle* command_pool,
     iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
-    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
+    iree_hal_queue_affinity_t queue_affinity,
     iree_hal_vulkan_tracing_context_t* tracing_context,
     iree::hal::vulkan::DescriptorPoolCache* descriptor_pool_cache,
     iree::hal::vulkan::BuiltinExecutables* builtin_executables,

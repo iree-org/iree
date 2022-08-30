@@ -27,39 +27,39 @@ on:
 
 jobs:
   build_core:
-    name: "${{ matrix.build-family }} :: Build ${{ matrix.build-package }} Package"
-    runs-on: ${{ matrix.runs-on }}
+    name: "${{ matrix.os }} :: Build ${{ matrix.build_package }} Package"
+    runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.experimental }}
     strategy:
       fail-fast: false
       matrix:
         include:
           # Ubuntu packages.
-          - runs-on: [managed-releaser, os-family=Linux, runner-group=releaser]
-            build-family: linux
-            build-package: main-dist-linux
+          - os: ubuntu-20.04
+            build_family: linux
+            build_package: main-dist-linux
             experimental: false
-          - runs-on: [managed-releaser, os-family=Linux, runner-group=releaser]
-            build-family: linux
-            build-package: py-compiler-pkg
+          - os: ubuntu-20.04
+            build_family: linux
+            build_package: py-compiler-pkg
             experimental: false
-          - runs-on: [managed-releaser, os-family=Linux, runner-group=releaser]
-            build-family: linux
-            build-package: py-runtime-pkg
+          - os: ubuntu-20.04
+            build_family: linux
+            build_package: py-runtime-pkg
             experimental: false
-          - runs-on: [managed-releaser, os-family=Linux, runner-group=releaser]
-            build-family: linux
-            build-package: py-tf-compiler-tools-pkg
+          - os: ubuntu-20.04
+            build_family: linux
+            build_package: py-tf-compiler-tools-pkg
             experimental: false
 
           # Macos packages.
-          - runs-on: macos-11
-            build-family: macos
-            build-package: py-compiler-pkg
+          - os: macos-latest
+            build_family: macos
+            build_package: py-compiler-pkg
             experimental: true
-          - runs-on: macos-11
-            build-family: macos
-            build-package: py-runtime-pkg
+          - os: macos-latest
+            build_family: macos
+            build_package: py-runtime-pkg
             experimental: true
     env:
       MANYLINUX_X86_64_IMAGE: gcr.io/iree-oss/manylinux2014_x86_64-release@sha256:b09c10868f846308bad2eab253a77d0a3f097816c40342bc289d8e62509bc5f9
@@ -75,7 +75,7 @@ jobs:
       # OS specific setup
       ##########################################################################
       - name: Install MacOS Deps
-        if: "matrix.build-family == 'macos'"
+        if: "matrix.build_family == 'macos'"
         shell: bash
         run: |
           sudo ./main_checkout/build_tools/python_deploy/install_macos_deps.sh
@@ -109,7 +109,7 @@ jobs:
       # console scripts (like cmake, ninja) will not be on the path.
       ##########################################################################
       - name: Main distribution (Linux)
-        if: "matrix.build-package == 'main-dist-linux'"
+        if: "matrix.build_package == 'main-dist-linux'"
         shell: bash
         run: |
           docker run --rm -w=/work \
@@ -124,23 +124,19 @@ jobs:
       ##########################################################################
 
       - name: Build runtime wheels (Linux)
-        if: "matrix.build-package == 'py-runtime-pkg' && matrix.build-family == 'linux'"
+        if: "matrix.build_package == 'py-runtime-pkg' && matrix.build_family == 'linux'"
         shell: bash
-        env:
-          package_suffix: ${{ github.event.inputs.package_suffix }}
-          packages: "iree-runtime iree-runtime-instrumented"
-          output_dir: "${{ github.workspace }}/bindist"
         run: |
+          packages="iree-runtime iree-runtime-instrumented" \
+          output_dir="$PWD/bindist" \
           ./main_checkout/build_tools/python_deploy/build_linux_packages.sh
 
       - name: Build runtime wheels (MacOS)
-        if: "matrix.build-package == 'py-runtime-pkg' && matrix.build-family == 'macos'"
+        if: "matrix.build_package == 'py-runtime-pkg' && matrix.build_family == 'macos'"
         shell: bash
-        env:
-          package_suffix: ${{ github.event.inputs.package_suffix }}
-          packages: "iree-runtime iree-runtime-instrumented"
-          output_dir: "${{ github.workspace }}/bindist"
         run: |
+          packages="iree-runtime iree-runtime-instrumented" \
+          output_dir="$PWD/bindist" \
           ./main_checkout/build_tools/python_deploy/build_macos_packages.sh
 
       ##########################################################################
@@ -149,28 +145,24 @@ jobs:
       # One step per OS.
       ##########################################################################
       - name: Build compiler wheels (Linux)
-        if: "matrix.build-package == 'py-compiler-pkg' && matrix.build-family == 'linux'"
+        if: "matrix.build_package == 'py-compiler-pkg' && matrix.build_family == 'linux'"
         shell: bash
-        env:
-          package_suffix: ${{ github.event.inputs.package_suffix }}
-          packages: "iree-compiler"
-          output_dir: "${{ github.workspace }}/bindist"
         run: |
+          packages="iree-compiler" \
+          output_dir="$PWD/bindist" \
           ./main_checkout/build_tools/python_deploy/build_linux_packages.sh
 
       - name: Build compiler wheels (MacOS)
-        if: "matrix.build-package == 'py-compiler-pkg' && matrix.build-family == 'macos'"
+        if: "matrix.build_package == 'py-compiler-pkg' && matrix.build_family == 'macos'"
         shell: bash
-        env:
-          package_suffix: ${{ github.event.inputs.package_suffix }}
-          packages: "iree-compiler"
-          output_dir: "${{ github.workspace }}/bindist"
         run: |
           # libzstd on GitHub Action bots is not compatible with MacOS universal.
           # https://github.com/iree-org/iree/issues/9955
           sudo rm -rf /usr/local/lib/libzstd.*.dylib
           sudo rm -rf /usr/local/lib/cmake/zstd/*
 
+          packages="iree-compiler" \
+          output_dir="$PWD/bindist" \
           ./main_checkout/build_tools/python_deploy/build_macos_packages.sh
 
       ##########################################################################
@@ -181,7 +173,7 @@ jobs:
       ##########################################################################
 
       - name: Build TF Compiler Tools wheels
-        if: "matrix.build-package == 'py-tf-compiler-tools-pkg'"
+        if: "matrix.build_package == 'py-tf-compiler-tools-pkg'"
         shell: bash
         run: |
           docker run --rm -w=/work \
@@ -211,7 +203,6 @@ jobs:
   validate_and_publish:
     name: "Invoke workflow to validate and publish release"
     needs: build_core
-    if: github.event.inputs.release_id != ''
     runs-on: ubuntu-20.04
     steps:
       - name: "Invoke workflow :: Validate and Publish Release"

@@ -37,10 +37,8 @@ static void PopulateDescriptorSetWriteInfos(
     const auto& binding = bindings[i];
 
     auto& buffer_info = buffer_infos[i];
-    buffer_info.buffer =
-        binding.buffer ? iree_hal_vulkan_vma_buffer_handle(
-                             iree_hal_buffer_allocated_buffer(binding.buffer))
-                       : VK_NULL_HANDLE;
+    buffer_info.buffer = iree_hal_vulkan_vma_buffer_handle(
+        iree_hal_buffer_allocated_buffer(binding.buffer));
     buffer_info.offset =
         iree_hal_buffer_byte_offset(binding.buffer) + binding.offset;
     if (binding.length == IREE_WHOLE_BUFFER) {

@@ -168,8 +168,7 @@ vm.import @buffer_view.trace(
 vm.import @command_buffer.create(
   %device : !vm.ref<!hal.device>,
   %modes : i32,
-  %command_categories : i32,
-  %binding_capacity : i32
+  %command_categories : i32
 ) -> !vm.ref<!hal.command_buffer>
 
 // Finalizes recording into the command buffer and prepares it for submission.
@@ -232,9 +231,10 @@ vm.import @command_buffer.push_descriptor_set(
   %command_buffer : !vm.ref<!hal.command_buffer>,
   %pipeline_layout : !vm.ref<!hal.pipeline_layout>,
   %set : i32,
-  // <binding, slot, buffer, offset, length>
-  %bindings : tuple<i32, i32, !vm.ref<!hal.buffer>, i64, i64>...
+  // <binding, buffer, offset, length>
+  %bindings : tuple<i32, !vm.ref<!hal.buffer>, i64, i64>...
 )
+
 // Dispatches an execution request.
 vm.import @command_buffer.dispatch(
   %command_buffer : !vm.ref<!hal.command_buffer>,
@@ -253,14 +253,6 @@ vm.import @command_buffer.dispatch.indirect(
   %entry_point : i32,
   %workgroups_buffer : !vm.ref<!hal.buffer>,
   %workgroups_offset : i64
-)
-
-// Executes a secondary command buffer with the given binding table.
-vm.import @command_buffer.execute.commands(
-  %command_buffer : !vm.ref<!hal.command_buffer>,
-  %commands : !vm.ref<!hal.command_buffer>,
-  // <buffer, offset, length>
-  %bindings : tuple<!vm.ref<!hal.buffer>, i64, i64>...
 )
 
 //===----------------------------------------------------------------------===//

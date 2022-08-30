@@ -191,18 +191,18 @@ static iree_status_t iree_hal_sync_device_query_i64(
 static iree_status_t iree_hal_sync_device_create_command_buffer(
     iree_hal_device_t* base_device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
-    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
+    iree_hal_queue_affinity_t queue_affinity,
     iree_hal_command_buffer_t** out_command_buffer) {
   if (iree_all_bits_set(mode,
                         IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION)) {
     return iree_hal_inline_command_buffer_create(
-        base_device, mode, command_categories, queue_affinity, binding_capacity,
+        base_device, mode, command_categories, queue_affinity,
         iree_hal_device_host_allocator(base_device), out_command_buffer);
   } else {
     iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
     return iree_hal_deferred_command_buffer_create(
-        base_device, mode, command_categories, binding_capacity,
-        &device->large_block_pool, device->host_allocator, out_command_buffer);
+        base_device, mode, command_categories, &device->large_block_pool,
+        device->host_allocator, out_command_buffer);
   }
 }
 
@@ -315,11 +315,9 @@ static iree_status_t iree_hal_sync_device_apply_deferred_command_buffers(
           iree_hal_command_buffer_mode(command_buffer) |
               IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION,
           IREE_HAL_COMMAND_CATEGORY_ANY, IREE_HAL_QUEUE_AFFINITY_ANY,
-          /*binding_capacity=*/0, device->host_allocator, storage,
-          &inline_command_buffer));
+          device->host_allocator, storage, &inline_command_buffer));
       iree_status_t status = iree_hal_deferred_command_buffer_apply(
-          command_buffer, inline_command_buffer,
-          iree_hal_buffer_binding_table_empty());
+          command_buffer, inline_command_buffer);
       iree_hal_inline_command_buffer_deinitialize(inline_command_buffer);
       IREE_RETURN_IF_ERROR(status);
     }

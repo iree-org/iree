@@ -224,8 +224,7 @@ static void appendDispatchBenchmark(IREE::HAL::ExecutableOp executableOp,
       funcBuilder
           .create<IREE::HAL::CommandBufferCreateOp>(
               loc, funcBuilder.getType<IREE::HAL::CommandBufferType>(), device,
-              commandBufferModes, IREE::HAL::CommandCategoryBitfield::Dispatch,
-              /*binding_capacity=*/Value{})
+              commandBufferModes, IREE::HAL::CommandCategoryBitfield::Dispatch)
           .getResult();
 
   // Get the layout required to set up the dispatches.

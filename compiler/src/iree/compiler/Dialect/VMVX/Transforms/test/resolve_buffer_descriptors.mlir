@@ -21,21 +21,6 @@ module @resolve_subview{
 
 // -----
 
-// CHECK-LABEL: @resolve_subview_rankreducing
-#map0 = affine_map<(d0)[s0] -> (d0 * 128 + s0)>
-func.func @resolve_subview_rankreducing(%arg0: memref<384x128xf32>, %arg1 : index, %arg2 : index) -> (!util.buffer, index, index, index) {
-  // CHECK-DAG: %[[BASE_BUFFER:.*]], %[[BASE_OFFSET:.*]], %[[BASE_SIZES:.*]]:2, %[[BASE_STRIDES:.*]]:2 = vmvx.get_buffer_descriptor %arg0
-  // CHECK-DAG: %[[C64:.*]] = arith.constant 64 : index
-  // CHECK-DAG: %[[I0:.*]] = arith.muli %arg1, %[[BASE_STRIDES]]#0 : index
-  // CHECK:     %[[I1:.*]] = arith.addi %[[BASE_OFFSET]], %[[I0]] : index
-  // CHECK:     return %[[BASE_BUFFER]], %[[I1]], %[[C64]], %[[BASE_STRIDES]]#0
-  %0 = memref.subview %arg0[%arg1, %arg2] [64, 1] [1, 1] : memref<384x128xf32> to memref<64xf32, #map0>
-  %base_buffer, %offset, %size, %stride = vmvx.get_buffer_descriptor %0 : memref<64xf32, #map0> -> !util.buffer, index, index, index
-  return %base_buffer, %offset, %size, %stride : !util.buffer, index, index, index
-}
-
-// -----
-
 // CHECK-LABEL: @resolve_binding_subspan_zero_offset
 func.func @resolve_binding_subspan_zero_offset() -> (!util.buffer, index, index, index, index, index) {
   // CHECK-DAG: %[[C512:.*]] = arith.constant 512 : index

@@ -73,6 +73,7 @@ iree_benchmark_suite(
     "linux-riscv"
 
   MODULES
+    "${MOBILEBERT_INT8_MODULE}"
     "${PERSON_DETECT_INT8_MODULE}"
     "${EFFICIENTNET_INT8_MODULE}"
 

@@ -965,7 +965,7 @@ static CommandQueue* iree_hal_vulkan_device_select_queue(
 static iree_status_t iree_hal_vulkan_device_create_command_buffer(
     iree_hal_device_t* base_device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
-    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
+    iree_hal_queue_affinity_t queue_affinity,
     iree_hal_command_buffer_t** out_command_buffer) {
   iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
 
@@ -999,9 +999,9 @@ static iree_status_t iree_hal_vulkan_device_create_command_buffer(
 
   return iree_hal_vulkan_direct_command_buffer_allocate(
       base_device, device->logical_device, command_pool, mode,
-      command_categories, queue_affinity, binding_capacity,
-      queue->tracing_context(), device->descriptor_pool_cache,
-      device->builtin_executables, &device->block_pool, out_command_buffer);
+      command_categories, queue_affinity, queue->tracing_context(),
+      device->descriptor_pool_cache, device->builtin_executables,
+      &device->block_pool, out_command_buffer);
 }
 
 static iree_status_t iree_hal_vulkan_device_create_descriptor_set_layout(

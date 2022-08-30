@@ -93,9 +93,8 @@ iree_host_size_t iree_hal_inline_command_buffer_size(void) {
 iree_status_t iree_hal_inline_command_buffer_initialize(
     iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
-    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
-    iree_allocator_t host_allocator, iree_byte_span_t storage,
-    iree_hal_command_buffer_t** out_command_buffer) {
+    iree_hal_queue_affinity_t queue_affinity, iree_allocator_t host_allocator,
+    iree_byte_span_t storage, iree_hal_command_buffer_t** out_command_buffer) {
   IREE_ASSERT_ARGUMENT(out_command_buffer);
   *out_command_buffer = NULL;
 
@@ -108,12 +107,6 @@ iree_status_t iree_hal_inline_command_buffer_initialize(
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "inline command buffers must have a mode with ALLOW_INLINE_EXECUTION");
-  }
-  if (binding_capacity > 0) {
-    // We execute as we record and can't use binding tables to do that.
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "indirect command buffers do not support binding tables");
   }
   if (storage.data_length < iree_hal_inline_command_buffer_size()) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -128,7 +121,7 @@ iree_status_t iree_hal_inline_command_buffer_initialize(
   memset(command_buffer, 0, sizeof(*command_buffer));
 
   iree_hal_command_buffer_initialize(
-      device, mode, command_categories, queue_affinity, binding_capacity,
+      device, mode, command_categories, queue_affinity,
       &iree_hal_inline_command_buffer_vtable, &command_buffer->base);
   command_buffer->host_allocator = host_allocator;
   iree_hal_inline_command_buffer_reset(command_buffer);
@@ -149,8 +142,7 @@ void iree_hal_inline_command_buffer_deinitialize(
 iree_status_t iree_hal_inline_command_buffer_create(
     iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
-    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
-    iree_allocator_t host_allocator,
+    iree_hal_queue_affinity_t queue_affinity, iree_allocator_t host_allocator,
     iree_hal_command_buffer_t** out_command_buffer) {
   IREE_ASSERT_ARGUMENT(out_command_buffer);
   *out_command_buffer = NULL;
@@ -162,8 +154,7 @@ iree_status_t iree_hal_inline_command_buffer_create(
   iree_hal_command_buffer_t* command_buffer = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_hal_inline_command_buffer_initialize(
-        device, mode, command_categories, queue_affinity, binding_capacity,
-        host_allocator,
+        device, mode, command_categories, queue_affinity, host_allocator,
         iree_make_byte_span(storage, iree_hal_inline_command_buffer_size()),
         &command_buffer);
   }
@@ -413,12 +404,10 @@ static iree_status_t iree_hal_inline_command_buffer_push_descriptor_set(
 
     // TODO(benvanik): track mapping so we can properly map/unmap/flush/etc.
     iree_hal_buffer_mapping_t buffer_mapping = {{0}};
-    if (bindings[i].buffer) {
-      IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-          bindings[i].buffer, IREE_HAL_MAPPING_MODE_PERSISTENT,
-          IREE_HAL_MEMORY_ACCESS_ANY, bindings[i].offset, bindings[i].length,
-          &buffer_mapping));
-    }
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
+        bindings[i].buffer, IREE_HAL_MAPPING_MODE_PERSISTENT,
+        IREE_HAL_MEMORY_ACCESS_ANY, bindings[i].offset, bindings[i].length,
+        &buffer_mapping));
     command_buffer->state.full_bindings[binding_ordinal] =
         buffer_mapping.contents.data;
     command_buffer->state.full_binding_lengths[binding_ordinal] =
@@ -567,18 +556,6 @@ static iree_status_t iree_hal_inline_command_buffer_dispatch_indirect(
       workgroup_count.y, workgroup_count.z);
 }
 
-static iree_status_t iree_hal_inline_command_buffer_execute_commands(
-    iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_command_buffer_t* base_commands,
-    iree_hal_buffer_binding_table_t binding_table) {
-  // TODO(#10144): decide how to execute the inline command buffer; it is
-  // definitely a deferred command buffer but we don't want to force that
-  // dependency here. We could allow injection of a function to call to execute
-  // command buffers so that the device can decide how it wants to handle them.
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "indirect command buffers not yet implemented");
-}
-
 //===----------------------------------------------------------------------===//
 // iree_hal_command_buffer_vtable_t
 //===----------------------------------------------------------------------===//
@@ -604,5 +581,4 @@ static const iree_hal_command_buffer_vtable_t
             iree_hal_inline_command_buffer_push_descriptor_set,
         .dispatch = iree_hal_inline_command_buffer_dispatch,
         .dispatch_indirect = iree_hal_inline_command_buffer_dispatch_indirect,
-        .execute_commands = iree_hal_inline_command_buffer_execute_commands,
 };

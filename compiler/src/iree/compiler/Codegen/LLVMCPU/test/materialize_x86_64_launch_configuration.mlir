@@ -217,7 +217,7 @@ hal.executable private @add {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64], [1, 4], [0, 0]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 32], [1, 4], [0, 0]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
 //      CHECK: hal.executable.export public @add
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -275,7 +275,7 @@ hal.executable private @add4D  {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 64, 64, 64], [1, 1, 1, 4], [0, 0, 0, 0]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 32, 32, 32], [1, 1, 1, 4], [0, 0, 0, 0]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
 //      CHECK: hal.executable.export public @add4D
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -316,8 +316,8 @@ hal.executable private @add_static {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 8, 16, 64], [1, 1, 1, 4], [0, 0, 0, 0]]>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 8, 16, 32], [1, 1, 1, 4], [0, 0, 0, 0]]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.export public @add_static
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.generic
@@ -408,7 +408,7 @@ hal.executable @copy_op_dynamic {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64], [1, 4], [0, 0]{{\]}}>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 32], [1, 1], [0, 0]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUBufferOpsTileAndVectorize>
 //      CHECK: hal.executable.export public @copy_op_dynamic
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -738,8 +738,8 @@ hal.executable private @generic_static {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[16, 96], [16, 8], [0, 0]]>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[16, 32], [16, 16], [0, 0]]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.export public @generic_static
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.generic
@@ -1088,8 +1088,8 @@ hal.executable private @generic_unit_dims_dynamic {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 0, 0, 0, 64, 64, 0, 64], [1, 1, 1, 1, 1, 1, 1, 4], [0, 0, 0, 0, 0, 0, 0, 0]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 0, 0, 0, 32, 32, 0, 32], [0, 1, 0, 0, 1, 1, 0, 1], [0, 0, 0, 0, 0, 0, 0, 0]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.export public @generic_unit_dims_dynamic
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.generic
@@ -1270,71 +1270,3 @@ hal.executable private @transpose_8x8 {
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64], [8, 8], []{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
-
-// -----
-
-hal.executable private @multi_root {
-  hal.executable.variant public @embedded_elf_x86_64, target = <"llvm-cpu", "embedded-elf-x86_64", {
-      cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
-      native_vector_size = 16 : index, target_triple = "x86_64-unknown-unknown-eabi-elf"}> {
-    hal.executable.export public @multi_root ordinal(0)
-        layout(#hal.pipeline.layout<
-            push_constants = 0, 
-            sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
-    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
-      hal.return %x, %y, %z : index, index, index
-    }
-    builtin.module {
-      func.func @multi_root() {
-        %c0 = arith.constant 0 : index
-        %c6144 = arith.constant 6144 : index
-        %c792576 = arith.constant 792576 : index
-        %cst = arith.constant 0.000000e+00 : f32
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64)
-            : !flow.dispatch.tensor<readonly:12x128x128xf32>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64)
-            : !flow.dispatch.tensor<readonly:12x128xf32>
-        %3 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c792576) alignment(64)
-            : !flow.dispatch.tensor<writeonly:12x128xf32>
-        %4 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [12, 128, 128], strides = [1, 1, 1]
-            : !flow.dispatch.tensor<readonly:12x128x128xf32> -> tensor<12x128x128xf32>
-        %5 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [12, 128], strides = [1, 1]
-            : !flow.dispatch.tensor<readonly:12x128xf32> -> tensor<12x128xf32>
-        %7 = linalg.init_tensor [12, 128] : tensor<12x128xf32>
-        %8 = linalg.fill ins(%cst : f32) outs(%7 : tensor<12x128xf32>) -> tensor<12x128xf32>
-        %9 = linalg.generic {
-            indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], 
-            iterator_types = ["parallel", "parallel", "reduction"]}
-            ins(%4 : tensor<12x128x128xf32>) outs(%5 : tensor<12x128xf32>) {
-        ^bb0(%arg0: f32, %arg1: f32):
-          %11 = arith.maxf %arg0, %arg1 : f32
-          linalg.yield %11 : f32
-        } -> tensor<12x128xf32>
-        %10 = linalg.generic {
-            indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>,
-                             affine_map<(d0, d1, d2) -> (d0, d1)>],
-            iterator_types = ["parallel", "parallel", "reduction"]}
-            ins(%4, %9 : tensor<12x128x128xf32>, tensor<12x128xf32>)
-            outs(%8 : tensor<12x128xf32>) {
-        ^bb0(%arg0: f32, %arg1: f32, %arg3: f32):
-          %11 = arith.subf %arg0, %arg1 : f32
-          %12 = math.exp %11 : f32
-          %13 = arith.addf %12, %arg3 : f32
-          linalg.yield %13 : f32
-        } -> tensor<12x128xf32>
-        flow.dispatch.tensor.store %10, %3, offsets = [0, 0], sizes = [12, 128], strides = [1, 1] 
-            : tensor<12x128xf32> -> !flow.dispatch.tensor<writeonly:12x128xf32>
-        return
-      }
-    }
-  }
-}
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[4, 32, 0], [1, 4, 0], [0, 0, 4]{{\]}}
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
-//      CHECK: hal.executable.export public @multi_root
-// CHECK-SAME:     translation_info = #[[TRANSLATION]]
-//      CHECK: linalg.generic
-//  CHECK-NOT: lowering_config
-//      CHECK: linalg.generic
-// CHECK-SAME:     lowering_config = #[[CONFIG]]

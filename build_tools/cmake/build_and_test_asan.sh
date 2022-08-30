@@ -125,7 +125,6 @@ label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]?}"))"
 declare -a excluded_tests=(
   "iree/samples/simple_embedding/simple_embedding_vulkan_test"
   "iree/tests/e2e/models/fragment_000.mlir.test"
-  "iree/tests/e2e/models/fully_connected.mlir.test"
   "iree/tools/test/iree-benchmark-module.mlir.test"
   "iree/tools/test/iree-run-module.mlir.test"
   "iree/tools/test/multiple_exported_functions.mlir.test"

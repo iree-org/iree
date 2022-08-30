@@ -85,7 +85,7 @@ TEST_P(command_buffer_dispatch_test, DispatchAbs) {
       IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT |
           IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION,
       IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
-      /*binding_capacity=*/0, &command_buffer));
+      &command_buffer));
 
   IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
 
@@ -114,20 +114,10 @@ TEST_P(command_buffer_dispatch_test, DispatchAbs) {
       iree_const_byte_span_empty(), &output_buffer));
 
   iree_hal_descriptor_set_binding_t descriptor_set_bindings[] = {
-      {
-          /*binding=*/0,
-          /*buffer_slot=*/0,
-          iree_hal_buffer_view_buffer(input_buffer_view),
-          /*offset=*/0,
-          iree_hal_buffer_view_byte_length(input_buffer_view),
-      },
-      {
-          /*binding=*/1,
-          /*buffer_slot=*/0,
-          output_buffer,
-          iree_hal_buffer_byte_offset(output_buffer),
-          iree_hal_buffer_byte_length(output_buffer),
-      },
+      {/*binding=*/0, iree_hal_buffer_view_buffer(input_buffer_view),
+       /*offset=*/0, iree_hal_buffer_view_byte_length(input_buffer_view)},
+      {/*binding=*/1, output_buffer, iree_hal_buffer_byte_offset(output_buffer),
+       iree_hal_buffer_byte_length(output_buffer)},
   };
 
   IREE_ASSERT_OK(iree_hal_command_buffer_push_descriptor_set(

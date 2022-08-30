@@ -99,38 +99,6 @@ func.func @command_buffer_copy_buffer(
 
 // -----
 
-// CHECK-LABEL: @command_buffer_push_descriptor_set
-//  CHECK-SAME: %[[CMD:.+]]: !hal.command_buffer,
-//  CHECK-SAME: %[[LAYOUT:.+]]: !hal.pipeline_layout,
-//  CHECK-SAME: %[[BUFFER:.+]]: !hal.buffer,
-//  CHECK-SAME: %[[SLOT:.+]]: index
-func.func @command_buffer_push_descriptor_set(
-    %cmd: !hal.command_buffer,
-    %layout: !hal.pipeline_layout,
-    %buffer: !hal.buffer,
-    %slot: index
-  ) {
-  %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
-  %c4 = arith.constant 4 : index
-  %c4096 = arith.constant 4096 : index
-  %c8000 = arith.constant 8000 : index
-  // CHECK: hal.command_buffer.push_descriptor_set<%[[CMD]] : !hal.command_buffer>
-  hal.command_buffer.push_descriptor_set<%cmd : !hal.command_buffer>
-      // CHECK-SAME: layout(%[[LAYOUT]] : !hal.pipeline_layout)[%c1]
-      layout(%layout : !hal.pipeline_layout)[%c1]
-      // CHECK-SAME: bindings([
-      bindings([
-        // CHECK-NEXT: %c0 = (%[[BUFFER]] : !hal.buffer)[%c4096, %c8000]
-        %c0 = (%buffer : !hal.buffer)[%c4096, %c8000],
-        // CHECK-NEXT: %c1 = (%[[SLOT]] : index)[%c4, %c4096]
-        %c1 = (%slot : index)[%c4, %c4096]
-      ])
-  return
-}
-
-// -----
-
 hal.executable @ex {
   hal.executable.variant @backend, target = <"backend", "format"> {
     hal.executable.export @entry0 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [

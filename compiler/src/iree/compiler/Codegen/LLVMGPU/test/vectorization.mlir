@@ -15,7 +15,7 @@ func.func @add_dispatch_0(%arg0: memref<1x8x4xf32>, %arg1: memref<1x4x8xf32>, %a
   return
 }
 // CHECK-LABEL: func.func @add_dispatch_0
-// CHECK: vector.transfer_read {{.*}} : memref<1x8x4xf32>, vector<1x8x4xf32>
-// CHECK: vector.transfer_read {{.*}} : memref<1x4x8xf32>, vector<1x4x8xf32>
-// CHECK: addf %{{.*}}, %{{.*}} : vector<1x4x8xf32>
-// CHECK: vector.transfer_write {{.*}} : vector<1x4x8xf32>, memref<1x4x8xf32>
+// CHECK-COUNT-8: vector.transfer_read {{.*}} : memref<1x8x4xf32>, vector<1x1x4xf32>
+// CHECK-COUNT-8: vector.transfer_read {{.*}} : memref<1x4x8xf32>, vector<1x1x4xf32>
+// CHECK-COUNT-8: addf %{{.*}}, %{{.*}} : vector<1x1x4xf32>
+// CHECK-COUNT-8: vector.transfer_write {{.*}} : vector<1x1x4xf32>, memref<1x4x8xf32>

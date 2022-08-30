@@ -69,7 +69,7 @@ function(iree_static_linker_test)
   endif()
 
   iree_get_executable_path(_COMPILER_TOOL "iree-compile")
-
+  get_filename_component(_SRC_PATH "${_RULE_SRC}" REALPATH)
   iree_package_name(_PACKAGE_NAME)
   iree_package_ns(_PACKAGE_NS)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
@@ -87,34 +87,66 @@ function(iree_static_linker_test)
   if(_RULE_TARGET_CPU_FEATURES)
     list(APPEND _COMPILER_ARGS "--iree-llvm-target-cpu-features=${_RULE_TARGET_CPU_FEATURES}")
   endif()
+  list(APPEND _COMPILER_ARGS "${_SRC_PATH}")
 
   if(_RULE_EMITC)
     set(_C_FILE_NAME "${_RULE_NAME}_emitc.h")
-    iree_c_module(
-      NAME
-        ${_RULE_NAME}_emitc
-      SRC
-        "${_RULE_SRC}"
-      FLAGS
-        ${_COMPILER_ARGS}
-      H_FILE_OUTPUT
-        "${_C_FILE_NAME}"
-      NO_RUNTIME
+    list(APPEND _COMPILER_ARGS "--output-format=vm-c")
+    list(APPEND _COMPILER_ARGS "-o")
+    list(APPEND _COMPILER_ARGS "${_C_FILE_NAME}")
 
+    # Custom command for iree-compile to generate static library and C module.
+    add_custom_command(
+      OUTPUT
+        ${_H_FILE_NAME}
+        ${_O_FILE_NAME}
+        ${_C_FILE_NAME}
+      COMMAND ${_COMPILER_TOOL} ${_COMPILER_ARGS}
+      DEPENDS ${_COMPILER_TOOL} ${_RULE_SRC}
+    )
+
+    set(_EMITC_LIB_NAME "${_NAME}_emitc")
+    add_library(${_EMITC_LIB_NAME}
+      STATIC
+      ${_C_FILE_NAME}
+    )
+    target_compile_definitions(${_EMITC_LIB_NAME} PUBLIC EMITC_IMPLEMENTATION)
+    SET_TARGET_PROPERTIES(
+      ${_EMITC_LIB_NAME}
+      PROPERTIES
+        LINKER_LANGUAGE C
     )
   else()  # bytecode module path
+    set(_VMFB_FILE_NAME ${_RULE_NAME}.vmfb)
+    list(APPEND _COMPILER_ARGS "-o")
+    list(APPEND _COMPILER_ARGS "${_VMFB_FILE_NAME}")
+
+    # Custom command for iree-compile to generate static library and VM module.
+    add_custom_command(
+      OUTPUT
+        ${_H_FILE_NAME}
+        ${_O_FILE_NAME}
+        ${_VMFB_FILE_NAME}
+      COMMAND ${_COMPILER_TOOL} ${_COMPILER_ARGS}
+      DEPENDS ${_COMPILER_TOOL} ${_RULE_SRC}
+    )
+
     # Generate the embed data with the bytecode module.
-    set(_MODULE_NAME "${_RULE_NAME}_module")
-    set(_EMBED_H_FILE_NAME ${_MODULE_NAME}_c.h)
-    iree_bytecode_module(
+    set(_MODULE_C_NAME "${_RULE_NAME}_module_c")
+    set(_EMBED_H_FILE_NAME ${_MODULE_C_NAME}.h)
+    set(_EMBED_C_FILE_NAME ${_MODULE_C_NAME}.c)
+    iree_c_embed_data(
       NAME
-        ${_MODULE_NAME}
-      SRC
-        "${_RULE_SRC}"
-      FLAGS
-        ${_COMPILER_ARGS}
-      C_IDENTIFIER
+        "${_MODULE_C_NAME}"
+      IDENTIFIER
         "${_NAME}"
+      GENERATED_SRCS
+        "${_VMFB_FILE_NAME}"
+      C_FILE_OUTPUT
+        "${_EMBED_C_FILE_NAME}"
+      H_FILE_OUTPUT
+        "${_EMBED_H_FILE_NAME}"
+      FLATTEN
       PUBLIC
     )
   endif(_RULE_EMITC)
@@ -245,11 +277,7 @@ function(iree_static_linker_test)
     target_link_libraries(${_NAME}_run
         PRIVATE
           iree_vm_shims_emitc
-          ${_NAME}_emitc
-    )
-    target_compile_definitions(${_NAME}_run
-      PRIVATE
-      EMITC_IMPLEMENTATION=\"${_C_FILE_NAME}\"
+          ${_EMITC_LIB_NAME}
     )
   else()
     target_link_libraries(${_NAME}_run PRIVATE ${_NAME}_module_c)

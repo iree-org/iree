@@ -119,8 +119,8 @@ static iree_status_t iree_hal_cuda_device_create_internal(
     status = iree_hal_cuda_stream_command_buffer_create(
         (iree_hal_device_t*)device, &device->context_wrapper,
         IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION,
-        IREE_HAL_COMMAND_CATEGORY_ANY, /*binding_capacity=*/0, device->stream,
-        /*block_pool=*/NULL, &device->stream_command_buffer);
+        IREE_HAL_COMMAND_CATEGORY_ANY, device->stream, /*block_pool=*/NULL,
+        &device->stream_command_buffer);
   }
 
   if (iree_status_is_ok(status)) {
@@ -237,7 +237,7 @@ static iree_status_t iree_hal_cuda_device_query_i64(
 static iree_status_t iree_hal_cuda_device_create_command_buffer(
     iree_hal_device_t* base_device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
-    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
+    iree_hal_queue_affinity_t queue_affinity,
     iree_hal_command_buffer_t** out_command_buffer) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
   if (device->params.allow_inline_execution &&
@@ -249,20 +249,17 @@ static iree_status_t iree_hal_cuda_device_create_command_buffer(
     // directly route commands to a CUDA stream and let it eagerly flush.
     return iree_hal_cuda_stream_command_buffer_create(
         base_device, &device->context_wrapper, mode, command_categories,
-        binding_capacity, device->stream, &device->block_pool,
-        out_command_buffer);
+        device->stream, &device->block_pool, out_command_buffer);
   }
   switch (device->params.command_buffer_mode) {
     case IREE_HAL_CUDA_COMMAND_BUFFER_MODE_GRAPH:
       return iree_hal_cuda_graph_command_buffer_create(
           base_device, &device->context_wrapper, mode, command_categories,
-          queue_affinity, binding_capacity, &device->block_pool,
-          out_command_buffer);
+          queue_affinity, &device->block_pool, out_command_buffer);
     case IREE_HAL_CUDA_COMMAND_BUFFER_MODE_STREAM:
       return iree_hal_deferred_command_buffer_create(
-          base_device, mode, command_categories, binding_capacity,
-          &device->block_pool, iree_hal_device_host_allocator(base_device),
-          out_command_buffer);
+          base_device, mode, command_categories, &device->block_pool,
+          iree_hal_device_host_allocator(base_device), out_command_buffer);
     default:
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "invalid command buffer mode");
@@ -365,14 +362,13 @@ static iree_status_t iree_hal_cuda_device_queue_execute(
       // were waits we wouldn't have been able to execute inline!
     } else if (iree_hal_cuda_graph_command_buffer_isa(command_buffer)) {
       CUgraphExec exec =
-          iree_hal_cuda_graph_command_buffer_handle(command_buffers[i]);
+          iree_hal_cuda_graph_command_buffer_exec(command_buffers[i]);
       CUDA_RETURN_IF_ERROR(device->context_wrapper.syms,
                            cuGraphLaunch(exec, device->stream),
                            "cuGraphLaunch");
     } else {
       IREE_RETURN_IF_ERROR(iree_hal_deferred_command_buffer_apply(
-          command_buffers[i], device->stream_command_buffer,
-          iree_hal_buffer_binding_table_empty()));
+          command_buffers[i], device->stream_command_buffer));
     }
   }
   // TODO(thomasraoux): implement semaphores - for now this conservatively

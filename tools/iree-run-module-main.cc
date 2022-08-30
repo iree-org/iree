@@ -6,7 +6,6 @@
 
 #include <array>
 #include <cstdio>
-#include <cstdlib>
 #include <iostream>
 #include <iterator>
 #include <string>
@@ -58,13 +57,9 @@ static std::vector<std::string> FLAG_function_inputs;
 IREE_FLAG_CALLBACK(
     parse_function_input, print_function_input, &FLAG_function_inputs,
     function_input,
-    "An input (a) value or (b) buffer of the format:\n"
-    "  (a) scalar value\n"
-    "     value\n"
-    "     e.g.: --function_input=\"3.14\"\n"
-    "  (b) buffer:\n"
-    "     [shape]xtype=[value]\n"
-    "     e.g.: --function_input=\"2x2xi32=1 2 3 4\"\n"
+    "An input value or buffer of the format:\n"
+    "  [shape]xtype=[value]\n"
+    "  2x2xi32=1 2 3 4\n"
     "Optionally, brackets may be used to separate the element values:\n"
     "  2x2xi32=[[1 2][3 4]]\n"
     "Raw binary files can be read to provide buffer contents:\n"
@@ -162,15 +157,8 @@ extern "C" int main(int argc, char** argv) {
                  " Use '--' instead.\n";
     return 1;
   }
-
-  iree_status_t status = Run();
-  if (!iree_status_is_ok(status)) {
-    iree_status_fprint(stderr, status);
-    iree_status_free(status);
-    return EXIT_FAILURE;
-  }
-
-  return EXIT_SUCCESS;
+  IREE_CHECK_OK(Run());
+  return 0;
 }
 
 }  // namespace iree

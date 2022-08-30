@@ -123,8 +123,8 @@ func.func @compare_eq(%arg0 : tensor<2xf32>, %arg1 : tensor<2xf32>,
                  %arg2 : tensor<2xf32>, %arg3 : tensor<2xf32>) -> (tensor<2xi1>) {
   %lhs = "mhlo.complex"(%arg0, %arg1) : (tensor<2xf32>, tensor<2xf32>) -> (tensor<2xcomplex<f32>>)
   %rhs = "mhlo.complex"(%arg2, %arg3) : (tensor<2xf32>, tensor<2xf32>) -> (tensor<2xcomplex<f32>>)
-  // CHECK-DAG: %[[OUTR:.+]] = chlo.broadcast_compare %arg0, %arg2 {comparison_direction = #chlo<comparison_direction EQ>}
-  // CHECK-DAG: %[[OUTI:.+]] = chlo.broadcast_compare %arg1, %arg3 {comparison_direction = #chlo<comparison_direction EQ>}
+  // CHECK-DAG: %[[OUTR:.+]] = chlo.broadcast_compare %arg0, %arg2 {comparison_direction = #mhlo<comparison_direction EQ>}
+  // CHECK-DAG: %[[OUTI:.+]] = chlo.broadcast_compare %arg1, %arg3 {comparison_direction = #mhlo<comparison_direction EQ>}
   // CHECK-DAG: %[[OUT:.+]] = mhlo.and %[[OUTR]], %[[OUTI]]
   %0 = "mhlo.compare"(%lhs, %rhs) {comparison_direction = #mhlo<comparison_direction EQ>} : (tensor<2xcomplex<f32>>, tensor<2xcomplex<f32>>) -> tensor<2xi1>
 
@@ -137,8 +137,8 @@ func.func @compare_ne(%arg0 : tensor<2xf32>, %arg1 : tensor<2xf32>,
                  %arg2 : tensor<2xf32>, %arg3 : tensor<2xf32>) -> (tensor<2xi1>) {
   %lhs = "mhlo.complex"(%arg0, %arg1) : (tensor<2xf32>, tensor<2xf32>) -> (tensor<2xcomplex<f32>>)
   %rhs = "mhlo.complex"(%arg2, %arg3) : (tensor<2xf32>, tensor<2xf32>) -> (tensor<2xcomplex<f32>>)
-  // CHECK-DAG: %[[OUTR:.+]] = chlo.broadcast_compare %arg0, %arg2 {comparison_direction = #chlo<comparison_direction NE>}
-  // CHECK-DAG: %[[OUTI:.+]] = chlo.broadcast_compare %arg1, %arg3 {comparison_direction = #chlo<comparison_direction NE>}
+  // CHECK-DAG: %[[OUTR:.+]] = chlo.broadcast_compare %arg0, %arg2 {comparison_direction = #mhlo<comparison_direction NE>}
+  // CHECK-DAG: %[[OUTI:.+]] = chlo.broadcast_compare %arg1, %arg3 {comparison_direction = #mhlo<comparison_direction NE>}
   // CHECK-DAG: %[[OUT:.+]] = mhlo.or %[[OUTR]], %[[OUTI]]
   %0 = "mhlo.compare"(%lhs, %rhs) {comparison_direction = #mhlo<comparison_direction NE>} : (tensor<2xcomplex<f32>>, tensor<2xcomplex<f32>>) -> tensor<2xi1>
 

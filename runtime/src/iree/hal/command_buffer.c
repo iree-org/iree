@@ -72,14 +72,13 @@ IREE_HAL_API_RETAIN_RELEASE(command_buffer);
 IREE_API_EXPORT void iree_hal_command_buffer_initialize(
     iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
-    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
+    iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_command_buffer_vtable_t* vtable,
     iree_hal_command_buffer_t* command_buffer) {
   iree_hal_resource_initialize(vtable, &command_buffer->resource);
   command_buffer->mode = mode;
   command_buffer->allowed_categories = command_categories;
   command_buffer->queue_affinity = queue_affinity;
-  command_buffer->binding_capacity = binding_capacity;
 
   // Perform initialization validation after we allocate/initialize the concrete
   // implementation.
@@ -92,7 +91,7 @@ IREE_API_EXPORT void iree_hal_command_buffer_initialize(
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_create(
     iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
-    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
+    iree_hal_queue_affinity_t queue_affinity,
     iree_hal_command_buffer_t** out_command_buffer) {
   IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(out_command_buffer);
@@ -100,26 +99,18 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_create(
 
   if (iree_all_bits_set(mode,
                         IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION)) {
+    // Inline command buffers must be one-shot and primary.
     if (!iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT)) {
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "inline command buffers must be one-shot");
-    } else if (iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_NESTED)) {
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "inline command buffers cannot be nested");
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "inline command buffers must be one-shot and primary");
     }
-  }
-  if (binding_capacity > 0 &&
-      !iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_NESTED)) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "command buffer bindings are only supported for "
-                            "nested command buffers (today)");
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status =
       IREE_HAL_VTABLE_DISPATCH(device, iree_hal_device, create_command_buffer)(
-          device, mode, command_categories, queue_affinity, binding_capacity,
-          out_command_buffer);
+          device, mode, command_categories, queue_affinity, out_command_buffer);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -451,26 +442,6 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch_indirect(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_command_buffer_execute_commands(
-    iree_hal_command_buffer_t* command_buffer,
-    iree_hal_command_buffer_t* commands,
-    iree_hal_buffer_binding_table_t binding_table) {
-  IREE_ASSERT_ARGUMENT(command_buffer);
-  IREE_ASSERT_ARGUMENT(commands);
-  IREE_ASSERT_ARGUMENT(!binding_table.count || binding_table.bindings);
-  IREE_TRACE_ZONE_BEGIN(z0);
-  IF_VALIDATING(command_buffer, {
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_hal_command_buffer_execute_commands_validation(
-                command_buffer, VALIDATION_STATE(command_buffer), commands,
-                binding_table));
-  });
-  iree_status_t status = _VTABLE_DISPATCH(command_buffer, execute_commands)(
-      command_buffer, commands, binding_table);
-  IREE_TRACE_ZONE_END(z0);
-  return status;
-}
-
 //===----------------------------------------------------------------------===//
 // Utilities for command buffer creation
 //===----------------------------------------------------------------------===//
@@ -484,9 +455,9 @@ IREE_API_EXPORT iree_status_t iree_hal_create_transfer_command_buffer(
 
   iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_command_buffer_create(
-              device, mode, IREE_HAL_COMMAND_CATEGORY_TRANSFER, queue_affinity,
-              /*binding_capacity=*/0, &command_buffer));
+      z0, iree_hal_command_buffer_create(device, mode,
+                                         IREE_HAL_COMMAND_CATEGORY_TRANSFER,
+                                         queue_affinity, &command_buffer));
 
   iree_status_t status = iree_hal_command_buffer_begin(command_buffer);
   if (iree_status_is_ok(status)) {

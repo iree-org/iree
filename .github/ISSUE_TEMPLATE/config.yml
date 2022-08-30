@@ -1,4 +1,4 @@
-blank_issues_enabled: true
+blank_issues_enabled: false
 contact_links:
   - name: 📄 Blank Issue
     url: https://github.com/iree-org/iree/issues/new

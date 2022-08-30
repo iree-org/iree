@@ -28,6 +28,7 @@ py_binary(
     ],
     target_backends_and_drivers = [
         ("llvm-cpu", "local-task"),
+        ("vmvx", "local-task"),
     ],
     trace_runner = "//tools:iree-e2e-matmul-test",
 ) for lhs_rhs_type in [
@@ -112,29 +113,6 @@ py_binary(
     "f32",
 ] for size in [
     "small",
-]]
-
-# Test VMVX+ukernel
-[iree_generated_trace_runner_test(
-    name = "e2e_matmul_%s_%s_small_ukernel" % (strategy, lhs_rhs_type),
-    compiler_flags = [
-        "--iree-vmvx-enable-microkernels",
-    ] + (["--iree-flow-mmt4d-target-options=enable_generic_slow #pass_options_variant#"] if (strategy == "mmt4d") else []),
-    generator = ":generate_e2e_matmul_tests",
-    generator_args = [
-        "--lhs_rhs_type=%s" % lhs_rhs_type,
-        "--shapes=small",
-    ],
-    target_backends_and_drivers = [
-        ("vmvx", "local-task"),
-    ],
-    trace_runner = "//tools:iree-e2e-matmul-test",
-) for strategy in [
-    "direct",
-    "mmt4d",
-] for lhs_rhs_type in [
-    "i8",
-    "f32",
 ]]
 
 [iree_generated_trace_runner_test(

@@ -81,7 +81,7 @@ iree_status_t iree_hal_vulkan_direct_command_buffer_allocate(
     iree::hal::vulkan::VkCommandPoolHandle* command_pool,
     iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
-    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
+    iree_hal_queue_affinity_t queue_affinity,
     iree_hal_vulkan_tracing_context_t* tracing_context,
     iree::hal::vulkan::DescriptorPoolCache* descriptor_pool_cache,
     iree::hal::vulkan::BuiltinExecutables* builtin_executables,
@@ -92,14 +92,6 @@ iree_status_t iree_hal_vulkan_direct_command_buffer_allocate(
   IREE_ASSERT_ARGUMENT(descriptor_pool_cache);
   IREE_ASSERT_ARGUMENT(block_pool);
   IREE_ASSERT_ARGUMENT(out_command_buffer);
-  *out_command_buffer = NULL;
-
-  if (binding_capacity > 0) {
-    // TODO(#10144): support indirect command buffers with binding tables.
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                            "indirect command buffers not yet implemented");
-  }
-
   IREE_TRACE_ZONE_BEGIN(z0);
 
   VkCommandBufferAllocateInfo allocate_info;
@@ -119,7 +111,7 @@ iree_status_t iree_hal_vulkan_direct_command_buffer_allocate(
                             sizeof(*command_buffer), (void**)&command_buffer);
   if (iree_status_is_ok(status)) {
     iree_hal_command_buffer_initialize(
-        device, mode, command_categories, queue_affinity, binding_capacity,
+        device, mode, command_categories, queue_affinity,
         &iree_hal_vulkan_direct_command_buffer_vtable, &command_buffer->base);
     command_buffer->logical_device = logical_device;
     command_buffer->tracing_context = tracing_context;
@@ -688,10 +680,8 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_push_descriptor_set(
 
   // TODO(benvanik): batch insert by getting the resources in their own list.
   for (iree_host_size_t i = 0; i < binding_count; ++i) {
-    if (bindings[i].buffer) {
-      IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
-          command_buffer->resource_set, 1, &bindings[i].buffer));
-    }
+    IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
+        command_buffer->resource_set, 1, &bindings[i].buffer));
   }
 
   // Either allocate, update, and bind a descriptor set or use push descriptor
@@ -781,38 +771,6 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_dispatch_indirect(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_vulkan_direct_command_buffer_execute_commands(
-    iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_command_buffer_t* base_commands,
-    iree_hal_buffer_binding_table_t binding_table) {
-  iree_hal_vulkan_direct_command_buffer_t* command_buffer =
-      iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
-
-  if (binding_table.count > 0) {
-    // TODO(#10144): support indirect command buffers with binding tables.
-    // Since Vulkan doesn't natively support this we'd need to emulate things
-    // with an iree_hal_vulkan_indirect_command_buffer_t type that captured the
-    // command buffer using deferred command buffer and allowed replay with a
-    // binding table. If we wanted to actually reuse the command buffers we'd
-    // need to use update-after-bind (where supported), device pointers (where
-    // supported), or descriptor indexing and a big ringbuffer (make a 1024
-    // element descriptor array and cycle through it with each submission).
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                            "indirect command buffers not yet implemented");
-  }
-
-  IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
-      command_buffer->resource_set, 1, &base_commands));
-
-  iree_hal_vulkan_direct_command_buffer_t* commands =
-      iree_hal_vulkan_direct_command_buffer_cast(base_commands);
-
-  command_buffer->syms->vkCmdExecuteCommands(command_buffer->handle, 1,
-                                             &commands->handle);
-
-  return iree_ok_status();
-}
-
 namespace {
 const iree_hal_command_buffer_vtable_t
     iree_hal_vulkan_direct_command_buffer_vtable = {
@@ -843,7 +801,5 @@ const iree_hal_command_buffer_vtable_t
         /*.dispatch=*/iree_hal_vulkan_direct_command_buffer_dispatch,
         /*.dispatch_indirect=*/
         iree_hal_vulkan_direct_command_buffer_dispatch_indirect,
-        /*.execute_commands=*/
-        iree_hal_vulkan_direct_command_buffer_execute_commands,
 };
 }  // namespace

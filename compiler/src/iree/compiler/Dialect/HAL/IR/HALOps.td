@@ -663,8 +663,7 @@ def HAL_CommandBufferCreateOp : HAL_Op<"command_buffer.create", [
   let arguments = (ins
     HAL_Device:$device,
     HAL_CommandBufferModeBitfieldAttr:$modes,
-    HAL_CommandCategoryBitfieldAttr:$command_categories,
-    Optional<Index>:$binding_capacity
+    HAL_CommandCategoryBitfieldAttr:$command_categories
   );
   let results = (outs
     HAL_CommandBuffer:$result
@@ -674,7 +673,6 @@ def HAL_CommandBufferCreateOp : HAL_Op<"command_buffer.create", [
     `device` `(` $device `:` type($device) `)`
     `mode` `(` $modes `)`
     `categories` `(` $command_categories `)`
-    (`bindings` `(` $binding_capacity^ `)`)?
     `:` type($result)
     attr-dict-with-keyword
   }];
@@ -872,8 +870,6 @@ def HAL_CommandBufferPushDescriptorSetOp :
   let summary = [{command buffer descriptor set push binding operation}];
   let description = [{
     Pushes an inline-defined descriptor set to the command buffer.
-    The provided buffers may either be HAL buffers or indirect references into
-    the command buffer binding table.
   }];
 
   let arguments = (ins
@@ -881,7 +877,7 @@ def HAL_CommandBufferPushDescriptorSetOp :
     HAL_PipelineLayout:$pipeline_layout,
     Index:$set,
     Variadic<Index>:$binding_ordinals,
-    Variadic<AnyTypeOf<[Index, HAL_BufferType]>>:$binding_buffers,
+    Variadic<HAL_BufferType>:$binding_buffers,
     Variadic<HAL_DeviceSize>:$binding_offsets,
     Variadic<HAL_DeviceSize>:$binding_lengths
   );

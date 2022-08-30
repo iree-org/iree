@@ -138,11 +138,18 @@ createSerializeTargetExecutablesPass(StringRef target, int debugLevel = 2,
 // Resource initialization, caching, and optimization
 //===----------------------------------------------------------------------===//
 
+// Performs packing and materializes runtime packing code when required.
+std::unique_ptr<OperationPass<func::FuncOp>> createPackAllocationsPass();
+
 // Finds all resource lookups (such as hal.executable.lookup), materializes
 // their cache storage and initialization, and rewrites the lookups to
 // references.
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createMaterializeResourceCachesPass(TargetOptions targetOptions);
+
+// Eliminates redundant 'load's of variables within functions with no 'store'.
+// TODO(#1124): replace with memory side effects once supported upstream.
+std::unique_ptr<OperationPass<func::FuncOp>> createCSEVariableLoadsPass();
 
 // Elides stateful command buffer ops that set redundant state.
 std::unique_ptr<OperationPass<void>> createElideRedundantCommandsPass();

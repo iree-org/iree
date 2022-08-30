@@ -32,7 +32,7 @@ struct EncodedBytecodeFunction {
 class BytecodeEncoder : public VMFuncEncoder {
  public:
   // Matches IREE_VM_BYTECODE_VERSION_MAJOR.
-  static constexpr uint32_t kVersionMajor = 10;
+  static constexpr uint32_t kVersionMajor = 9;
   // Matches IREE_VM_BYTECODE_VERSION_MINOR.
   static constexpr uint32_t kVersionMinor = 0;
   static constexpr uint32_t kVersion = (kVersionMajor << 16) | kVersionMinor;

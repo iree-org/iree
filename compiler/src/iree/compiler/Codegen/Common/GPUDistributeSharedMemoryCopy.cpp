@@ -95,11 +95,9 @@ static void populateVectorizationPatterns(RewritePatternSet &patterns) {
 /// Compute a vector size so that the numer of elements is equal to the flat
 /// workgroup size.
 static Optional<SmallVector<int64_t, 4>> getGPUNativeVectorSize(
-    Operation *op, int64_t flatWorkgroupSize,
-    const llvm::SmallDenseSet<VectorTransferOpInterface> &opsToIgnore) {
+    Operation *op, int64_t flatWorkgroupSize) {
   auto vt = dyn_cast<VectorTransferOpInterface>(op);
   if (!vt) return llvm::None;
-  if (opsToIgnore.count(vt)) return llvm::None;
   if (!vt.permutation_map().isMinorIdentity()) return llvm::None;
   ArrayRef<int64_t> shape = vt.getVectorType().getShape();
   int targetVectorSize =
@@ -123,11 +121,10 @@ static Optional<SmallVector<int64_t, 4>> getGPUNativeVectorSize(
   return unroll;
 }
 
-static void populateVectorUnrollPatterns(
-    RewritePatternSet &patterns, int64_t flatWorkgroupSize,
-    const llvm::SmallDenseSet<VectorTransferOpInterface> &opsToIgnore) {
-  auto getShape = [flatWorkgroupSize, &opsToIgnore](Operation *op) {
-    return getGPUNativeVectorSize(op, flatWorkgroupSize, opsToIgnore);
+static void populateVectorUnrollPatterns(RewritePatternSet &patterns,
+                                         int64_t flatWorkgroupSize) {
+  auto getShape = [flatWorkgroupSize](Operation *op) {
+    return getGPUNativeVectorSize(op, flatWorkgroupSize);
   };
   vector::populateVectorUnrollPatterns(
       patterns, vector::UnrollVectorOptions().setNativeShapeFn(getShape));
@@ -155,13 +152,9 @@ static Value createFlatId(func::FuncOp funcOp,
 }
 
 /// Distribute a transfer read operations on the given thread ids.
-static void distributeTransferRead(
-    func::FuncOp funcOp, Value flatThreadId, int64_t flatWorkgroupSize,
-    const llvm::SmallDenseSet<VectorTransferOpInterface> &opsToIgnore) {
+static void distributeTransferRead(func::FuncOp funcOp, Value flatThreadId,
+                                   int64_t flatWorkgroupSize) {
   funcOp.walk([&](vector::TransferReadOp readOp) {
-    if (opsToIgnore.count(
-            cast<VectorTransferOpInterface>(readOp.getOperation())))
-      return WalkResult::advance();
     OpBuilder b(readOp);
     Value id = flatThreadId;
     SmallVector<int64_t, 2> multiplier;
@@ -202,40 +195,6 @@ static void distributeTransferRead(
       readOp.getResult().replaceAllUsesExcept(ops->insert.getResult(),
                                               extractOp);
     }
-    return WalkResult::advance();
-  });
-}
-
-/// Hoist allocations to the top of the loop if they have no dependencies.
-static void hoistAlloc(func::FuncOp funcOp) {
-  SmallVector<memref::AllocOp> allocs;
-  funcOp.walk([&](memref::AllocOp alloc) {
-    if (alloc.getOperands().empty()) allocs.push_back(alloc);
-  });
-  for (memref::AllocOp alloc : allocs) {
-    alloc->moveBefore(&(*funcOp.getBlocks().begin()),
-                      funcOp.getBlocks().begin()->begin());
-  }
-}
-
-/// We insert barriers conservatively, remove barriers that are obviously not
-/// needed.
-static void removeRedundantBarriers(func::FuncOp funcOp) {
-  funcOp.walk([](linalg::GenericOp copyOp) {
-    if (hasMarker(copyOp, getCopyToWorkgroupMemoryMarker())) {
-      Operation *prevOp = copyOp->getPrevNode();
-      SmallVector<Operation *> redundantBarriers;
-      while (prevOp) {
-        if (isa<gpu::BarrierOp>(prevOp))
-          redundantBarriers.push_back(prevOp);
-        else
-          break;
-        prevOp = prevOp->getPrevNode();
-      }
-      if (prevOp && hasMarker(prevOp, getCopyToWorkgroupMemoryMarker())) {
-        for (Operation *op : redundantBarriers) op->erase();
-      }
-    }
   });
 }
 
@@ -260,11 +219,6 @@ class GPUDistributeSharedMemoryCopyPass
         copiesToWorkgroupMem.push_back(copyOp);
     });
     if (copiesToWorkgroupMem.empty()) return;
-
-    // Step 0. First clean up the IR.
-    hoistAlloc(funcOp);
-    removeRedundantBarriers(funcOp);
-
     int64_t flatWorkgroupSize =
         workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
     bool isAligned = llvm::all_of(
@@ -278,11 +232,6 @@ class GPUDistributeSharedMemoryCopyPass
                                                        targetVectorSize);
         });
     if (isAligned) {
-      // Ignore all the exisiting vector transfer ops.
-      llvm::SmallDenseSet<VectorTransferOpInterface> opsToIgnore;
-      funcOp.walk([&](VectorTransferOpInterface transferOp) {
-        opsToIgnore.insert(transferOp);
-      });
       // Step 1. Vectorize the shared memory copy.
       RewritePatternSet vectorizationPatterns(context);
       populateVectorizationPatterns(vectorizationPatterns);
@@ -296,15 +245,14 @@ class GPUDistributeSharedMemoryCopyPass
       // transfer op generated can. then be distributed to a single op of target
       // size.
       RewritePatternSet vectorUnrollPatterns(context);
-      populateVectorUnrollPatterns(vectorUnrollPatterns, flatWorkgroupSize,
-                                   opsToIgnore);
+      populateVectorUnrollPatterns(vectorUnrollPatterns, flatWorkgroupSize);
       if (failed(applyPatternsAndFoldGreedily(
               funcOp, std::move(vectorUnrollPatterns)))) {
         return signalPassFailure();
       }
       // Step 3. Distribute the transfer ops onto the flat ids.
       Value flatId = createFlatId(funcOp, workgroupSize);
-      distributeTransferRead(funcOp, flatId, flatWorkgroupSize, opsToIgnore);
+      distributeTransferRead(funcOp, flatId, flatWorkgroupSize);
       // Propagate vector distribution to the chain of ops.
       RewritePatternSet distributePatterns(context);
       vector::populatePropagateVectorDistributionPatterns(distributePatterns);

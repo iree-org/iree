@@ -128,8 +128,6 @@ struct SemaphoreType : public Type::TypeBase<SemaphoreType, Type, TypeStorage> {
 //===----------------------------------------------------------------------===//
 
 // A tuple containing runtime values for a descriptor set binding.
-// The buffer specified may be either a !hal.buffer or an index of a binding
-// table slot to source the buffer from.
 struct DescriptorSetBindingValue {
   Value ordinal;
   Value buffer;

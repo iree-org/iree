@@ -19,44 +19,6 @@ namespace MHLO {
 
 namespace {
 
-inline llvm::Optional<chlo::ComparisonDirection> chloComparisonDirection(
-    mhlo::ComparisonDirection value) {
-  switch (value) {
-    case mhlo::ComparisonDirection::EQ:
-      return chlo::ComparisonDirection::EQ;
-    case mhlo::ComparisonDirection::NE:
-      return chlo::ComparisonDirection::NE;
-    case mhlo::ComparisonDirection::GE:
-      return chlo::ComparisonDirection::GE;
-    case mhlo::ComparisonDirection::GT:
-      return chlo::ComparisonDirection::GT;
-    case mhlo::ComparisonDirection::LE:
-      return chlo::ComparisonDirection::LE;
-    case mhlo::ComparisonDirection::LT:
-      return chlo::ComparisonDirection::LT;
-    default:
-      return {};
-  }
-}
-
-inline llvm::Optional<chlo::ComparisonType> chloComparisonType(
-    mhlo::ComparisonType value) {
-  switch (value) {
-    case mhlo::ComparisonType::NOTYPE:
-      return chlo::ComparisonType::NOTYPE;
-    case mhlo::ComparisonType::FLOAT:
-      return chlo::ComparisonType::FLOAT;
-    case mhlo::ComparisonType::TOTALORDER:
-      return chlo::ComparisonType::TOTALORDER;
-    case mhlo::ComparisonType::SIGNED:
-      return chlo::ComparisonType::SIGNED;
-    case mhlo::ComparisonType::UNSIGNED:
-      return chlo::ComparisonType::UNSIGNED;
-    default:
-      return {};
-  }
-}
-
 bool isComplexTensor(Value v) {
   if (auto tt = v.getType().dyn_cast<TensorType>()) {
     return tt.getElementType().isa<ComplexType>();
@@ -262,10 +224,10 @@ struct ConvertExpOp : public OpConversionPattern<mhlo::ExpOp> {
 };
 
 template <typename CompareOpTy, typename ComparatorOpTy>
-struct ConvertCHLOCompareOp : public OpConversionPattern<CompareOpTy> {
+struct ConvertCompareOp : public OpConversionPattern<CompareOpTy> {
   using OpConversionPattern<CompareOpTy>::OpConversionPattern;
-  ConvertCHLOCompareOp(TypeConverter &typeConverter, MLIRContext *context,
-                       chlo::ComparisonDirection direction)
+  ConvertCompareOp(TypeConverter &typeConverter, MLIRContext *context,
+                   mhlo::ComparisonDirection direction)
       : OpConversionPattern<CompareOpTy>(typeConverter, context),
         direction(direction) {}
 
@@ -292,65 +254,12 @@ struct ConvertCHLOCompareOp : public OpConversionPattern<CompareOpTy> {
         op,
         rewriter.create<chlo::BroadcastCompareOp>(
             loc, lhsReal, rhsReal,
-            /*broadcast_dimensions=*/nullptr,
-            adaptor.comparison_directionAttr(), adaptor.compare_typeAttr()),
+            /*broadcast_dimensions=*/nullptr, op.comparison_directionAttr(),
+            op.compare_typeAttr()),
         rewriter.create<chlo::BroadcastCompareOp>(
             loc, lhsImag, rhsImag,
-            /*broadcast_dimensions=*/nullptr,
-            adaptor.comparison_directionAttr(), adaptor.compare_typeAttr()));
-
-    return success();
-  }
-
-  chlo::ComparisonDirection direction;
-};
-
-template <typename CompareOpTy, typename ComparatorOpTy>
-struct ConvertMHLOCompareOp : public OpConversionPattern<CompareOpTy> {
-  using OpConversionPattern<CompareOpTy>::OpConversionPattern;
-  ConvertMHLOCompareOp(TypeConverter &typeConverter, MLIRContext *context,
-                       mhlo::ComparisonDirection direction)
-      : OpConversionPattern<CompareOpTy>(typeConverter, context),
-        direction(direction) {}
-
-  LogicalResult matchAndRewrite(
-      CompareOpTy op, typename CompareOpTy::Adaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
-    Location loc = op.getLoc();
-
-    if (!isComplexTensor(adaptor.lhs()) || !isComplexTensor(adaptor.rhs())) {
-      return rewriter.notifyMatchFailure(op, "not complex tensor");
-    }
-    if (direction != op.comparison_direction()) {
-      return rewriter.notifyMatchFailure(op, "not matching direction");
-    }
-
-    auto lhs = adaptor.lhs();
-    auto rhs = adaptor.rhs();
-    auto lhsReal = rewriter.createOrFold<mhlo::RealOp>(loc, lhs);
-    auto lhsImag = rewriter.createOrFold<mhlo::ImagOp>(loc, lhs);
-    auto rhsReal = rewriter.createOrFold<mhlo::RealOp>(loc, rhs);
-    auto rhsImag = rewriter.createOrFold<mhlo::ImagOp>(loc, rhs);
-
-    // If the input op is an mhlo op, we need to convert the attributes to the
-    // corresponding chlo one..
-    chlo::ComparisonDirection chloCmpDirection =
-        *chloComparisonDirection(adaptor.comparison_direction());
-
-    Optional<mhlo::ComparisonType> mhloCmpType = adaptor.compare_type();
-    chlo::ComparisonTypeAttr chloCmpType;
-    if (mhloCmpType)
-      chloCmpType = chlo::ComparisonTypeAttr::get(
-          rewriter.getContext(), *chloComparisonType(*mhloCmpType));
-
-    rewriter.replaceOpWithNewOp<ComparatorOpTy>(
-        op,
-        rewriter.create<chlo::BroadcastCompareOp>(
-            loc, lhsReal, rhsReal,
-            /*broadcast_dimensions=*/nullptr, chloCmpDirection, chloCmpType),
-        rewriter.create<chlo::BroadcastCompareOp>(
-            loc, lhsImag, rhsImag,
-            /*broadcast_dimensions=*/nullptr, chloCmpDirection, chloCmpType));
+            /*broadcast_dimensions=*/nullptr, op.comparison_directionAttr(),
+            op.compare_typeAttr()));
 
     return success();
   }
@@ -424,14 +333,14 @@ void populateMHLOComplexToRealPatterns(MLIRContext *context,
   patterns.insert<ConvertExpOp>(typeConverter, context);
 
   // Compare ops.
-  patterns.insert<ConvertMHLOCompareOp<mhlo::CompareOp, mhlo::OrOp>>(
+  patterns.insert<ConvertCompareOp<mhlo::CompareOp, mhlo::OrOp>>(
       typeConverter, context, mhlo::ComparisonDirection::NE);
-  patterns.insert<ConvertMHLOCompareOp<mhlo::CompareOp, mhlo::AndOp>>(
+  patterns.insert<ConvertCompareOp<mhlo::CompareOp, mhlo::AndOp>>(
       typeConverter, context, mhlo::ComparisonDirection::EQ);
-  patterns.insert<ConvertCHLOCompareOp<chlo::BroadcastCompareOp, mhlo::OrOp>>(
-      typeConverter, context, chlo::ComparisonDirection::NE);
-  patterns.insert<ConvertCHLOCompareOp<chlo::BroadcastCompareOp, mhlo::AndOp>>(
-      typeConverter, context, chlo::ComparisonDirection::EQ);
+  patterns.insert<ConvertCompareOp<chlo::BroadcastCompareOp, mhlo::OrOp>>(
+      typeConverter, context, mhlo::ComparisonDirection::NE);
+  patterns.insert<ConvertCompareOp<chlo::BroadcastCompareOp, mhlo::AndOp>>(
+      typeConverter, context, mhlo::ComparisonDirection::EQ);
 
   // Complex/Real/Imag conversions should fold away.
   // Note that this is an opinion taken because these patterns are targeted

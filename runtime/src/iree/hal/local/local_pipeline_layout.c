@@ -142,7 +142,6 @@ iree_status_t iree_hal_local_pipeline_layout_create(
         const iree_hal_local_binding_mask_t binding_bit =
             1ull << (i * IREE_HAL_LOCAL_MAX_DESCRIPTOR_BINDING_COUNT + j);
         layout->used_bindings |= binding_bit;
-
         // Track which bindings are read-only so we can protect memory and
         // verify usage.
         const iree_hal_descriptor_set_layout_binding_t* binding =

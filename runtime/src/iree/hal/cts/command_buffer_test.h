@@ -57,7 +57,7 @@ class command_buffer_test : public CtsTestBase {
     IREE_CHECK_OK(iree_hal_command_buffer_create(
         device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
         IREE_HAL_COMMAND_CATEGORY_ANY, IREE_HAL_QUEUE_AFFINITY_ANY,
-        /*binding_capacity=*/0, &command_buffer));
+        &command_buffer));
     IREE_CHECK_OK(iree_hal_command_buffer_begin(command_buffer));
 
     // Fill the pattern.
@@ -87,7 +87,7 @@ TEST_P(command_buffer_test, Create) {
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
       IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
-      /*binding_capacity=*/0, &command_buffer));
+      &command_buffer));
 
   EXPECT_TRUE((iree_hal_command_buffer_allowed_categories(command_buffer) &
                IREE_HAL_COMMAND_CATEGORY_DISPATCH) ==
@@ -101,7 +101,7 @@ TEST_P(command_buffer_test, BeginEnd) {
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
       IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
-      /*binding_capacity=*/0, &command_buffer));
+      &command_buffer));
 
   IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
@@ -114,7 +114,7 @@ TEST_P(command_buffer_test, SubmitEmpty) {
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
       IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
-      /*binding_capacity=*/0, &command_buffer));
+      &command_buffer));
 
   IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
@@ -129,7 +129,7 @@ TEST_P(command_buffer_test, CopyWholeBuffer) {
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
       IREE_HAL_COMMAND_CATEGORY_TRANSFER, IREE_HAL_QUEUE_AFFINITY_ANY,
-      /*binding_capacity=*/0, &command_buffer));
+      &command_buffer));
 
   uint8_t i8_val = 0x54;
   std::vector<uint8_t> reference_buffer(kDefaultAllocationSize);
@@ -191,7 +191,7 @@ TEST_P(command_buffer_test, CopySubBuffer) {
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
       IREE_HAL_COMMAND_CATEGORY_TRANSFER, IREE_HAL_QUEUE_AFFINITY_ANY,
-      /*binding_capacity=*/0, &command_buffer));
+      &command_buffer));
 
   iree_hal_buffer_params_t device_params = {0};
   device_params.type =
@@ -442,7 +442,7 @@ TEST_P(command_buffer_test, UpdateBufferWholeBuffer) {
   IREE_CHECK_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
       IREE_HAL_COMMAND_CATEGORY_ANY, IREE_HAL_QUEUE_AFFINITY_ANY,
-      /*binding_capacity=*/0, &command_buffer));
+      &command_buffer));
   IREE_CHECK_OK(iree_hal_command_buffer_begin(command_buffer));
 
   // Issue the update_buffer command.
@@ -478,7 +478,7 @@ TEST_P(command_buffer_test, UpdateBufferWithOffsets) {
   IREE_CHECK_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
       IREE_HAL_COMMAND_CATEGORY_ANY, IREE_HAL_QUEUE_AFFINITY_ANY,
-      /*binding_capacity=*/0, &command_buffer));
+      &command_buffer));
   IREE_CHECK_OK(iree_hal_command_buffer_begin(command_buffer));
 
   // Issue the update_buffer command.
@@ -524,7 +524,7 @@ TEST_P(command_buffer_test, UpdateBufferSubspan) {
   IREE_CHECK_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
       IREE_HAL_COMMAND_CATEGORY_ANY, IREE_HAL_QUEUE_AFFINITY_ANY,
-      /*binding_capacity=*/0, &command_buffer));
+      &command_buffer));
   IREE_CHECK_OK(iree_hal_command_buffer_begin(command_buffer));
 
   // Issue the update_buffer command.

@@ -106,7 +106,6 @@ iree_compiler_cc_library(
         "@mlir-hlo//:legalize_shape_computations",
         "@mlir-hlo//:legalize_to_linalg",
         "@mlir-hlo//:legalize_to_standard",
-        "@mlir-hlo//:map_chlo_to_hlo_op",
         "@mlir-hlo//:map_lmhlo_to_scalar_op",
         "@mlir-hlo//:map_mhlo_to_scalar_op",
         "@mlir-hlo//:materialize_broadcasts",

@@ -104,8 +104,7 @@ static FailureOr<SmallVector<Value>> getThreadIndices(
 FailureOr<SmallVector<OpFoldResult>>
 mlir::iree_compiler::rewriteForeachThreadToGpu(
     scf::ForeachThreadOp foreachThreadOp,
-    const SmallVector<int64_t> &globalWorkgroupSizes, RewriterBase &rewriter,
-    bool syncAfterDistribute) {
+    const SmallVector<int64_t> &globalWorkgroupSizes, RewriterBase &rewriter) {
   if (foreachThreadOp.getNumResults() > 0)
     return foreachThreadOp->emitError(
         "only bufferized scf.foreach_thread lowers to gpu.thread");
@@ -181,9 +180,7 @@ mlir::iree_compiler::rewriteForeachThreadToGpu(
   }
 
   // Step 5. syncthreads.
-  if (syncAfterDistribute) {
-    rewriter.create<gpu::BarrierOp>(loc);
-  }
+  rewriter.create<gpu::BarrierOp>(loc);
 
   // Step 6. Erase old op.
   rewriter.eraseOp(foreachThreadOp);

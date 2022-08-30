@@ -22,7 +22,7 @@ iree_status_t iree_hal_task_command_buffer_create(
     iree_hal_device_t* device, iree_task_scope_t* scope,
     iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
-    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
+    iree_hal_queue_affinity_t queue_affinity,
     iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
     iree_hal_command_buffer_t** out_command_buffer);
 

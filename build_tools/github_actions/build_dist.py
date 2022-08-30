@@ -84,7 +84,7 @@ def load_version_info():
 try:
   version_info = load_version_info()
 except FileNotFoundError:
-  print("version_info.json not found. Using defaults")
+  print("version_info.json found. Using defaults")
   version_info = {
       "package-version": "0.1dev1",
       "package-suffix": "-dev",

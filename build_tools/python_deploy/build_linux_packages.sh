@@ -37,79 +37,75 @@
 #
 # It can be run on a workstation but recommend using a git worktree dedicated
 # to packaging to avoid stomping on development artifacts.
-set -xeu -o errtrace
+set -eu -o errtrace
 
 this_dir="$(cd $(dirname $0) && pwd)"
 script_name="$(basename $0)"
-repo_root="$(cd "${this_dir}" && git rev-parse --show-toplevel)"
+repo_root="$(cd $this_dir/../../ && pwd)"
+script_name="$(basename $0)"
 manylinux_docker_image="${manylinux_docker_image:-gcr.io/iree-oss/manylinux2014_x86_64-release@sha256:b09c10868f846308bad2eab253a77d0a3f097816c40342bc289d8e62509bc5f9}"
 python_versions="${override_python_versions:-cp37-cp37m cp38-cp38 cp39-cp39 cp310-cp310}"
 output_dir="${output_dir:-${this_dir}/wheelhouse}"
 packages="${packages:-iree-runtime iree-runtime-instrumented iree-compiler}"
-package_suffix="${package_suffix:-}"
 
 function run_on_host() {
   echo "Running on host"
   echo "Launching docker image ${manylinux_docker_image}"
 
   # Canonicalize paths.
-  mkdir -p "${output_dir}"
-  output_dir="$(cd "${output_dir}" && pwd)"
+  mkdir -p "$output_dir"
+  output_dir="$(cd $output_dir && pwd)"
   echo "Outputting to ${output_dir}"
   mkdir -p "${output_dir}"
   docker run --rm \
-    -v "${repo_root}:${repo_root}" \
-    -v "${output_dir}:${output_dir}" \
+    -v "${repo_root}:/main_checkout/iree" \
+    -v "${output_dir}:/wheelhouse" \
     -e __MANYLINUX_BUILD_WHEELS_IN_DOCKER=1 \
     -e "override_python_versions=${python_versions}" \
     -e "packages=${packages}" \
-    -e "package_suffix=${package_suffix}" \
-    -e "output_dir=${output_dir}" \
-    "${manylinux_docker_image}" \
-    -- ${this_dir}/${script_name}
+    ${manylinux_docker_image} \
+    -- bash /main_checkout/iree/build_tools/python_deploy/build_linux_packages.sh
 
   echo "******************** BUILD COMPLETE ********************"
   echo "Generated binaries:"
-  ls -l "${output_dir}"
+  ls -l $output_dir
 }
 
 function run_in_docker() {
   echo "Running in docker"
   echo "Using python versions: ${python_versions}"
 
-  local orig_path="${PATH}"
+  local orig_path="$PATH"
 
   # Build phase.
-  for package in ${packages}; do
+  for package in $packages; do
     echo "******************** BUILDING PACKAGE ${package} ********************"
-    for python_version in ${python_versions}; do
-      python_dir="/opt/python/${python_version}"
-      if ! [ -x "${python_dir}/bin/python" ]; then
-        echo "ERROR: Could not find python: ${python_dir} (skipping)"
+    for python_version in $python_versions; do
+      python_dir="/opt/python/$python_version"
+      if ! [ -x "$python_dir/bin/python" ]; then
+        echo "ERROR: Could not find python: $python_dir (skipping)"
         continue
       fi
-      export PATH="${python_dir}/bin:${orig_path}"
+      export PATH=$python_dir/bin:$orig_path
       echo ":::: Python version $(python --version)"
-      # replace dashes with underscores
-      package_suffix="${package_suffix//-/_}"
-      case "${package}" in
+      case "$package" in
         iree-runtime)
-          clean_wheels "iree_runtime${package_suffix}" "${python_version}"
+          clean_wheels iree_runtime $python_version
           build_iree_runtime
-          run_audit_wheel "iree_runtime${package_suffix}" "${python_version}"
+          run_audit_wheel iree_runtime $python_version
           ;;
         iree-runtime-instrumented)
-          clean_wheels "iree_runtime_instrumented${package_suffix}" "${python_version}"
+          clean_wheels iree_runtime_instrumented $python_version
           build_iree_runtime_instrumented
-          run_audit_wheel "iree_runtime_instrumented${package_suffix}" "${python_version}"
+          run_audit_wheel iree_runtime_instrumented $python_version
           ;;
         iree-compiler)
-          clean_wheels "iree_compiler${package_suffix}" "${python_version}"
+          clean_wheels iree_compiler $python_version
           build_iree_compiler
-          run_audit_wheel "iree_compiler${package_suffix}" "${python_version}"
+          run_audit_wheel iree_compiler $python_version
           ;;
         *)
-          echo "Unrecognized package '${package}'"
+          echo "Unrecognized package '$package'"
           exit 1
           ;;
       esac
@@ -117,42 +113,36 @@ function run_in_docker() {
   done
 }
 
-function build_wheel() {
-  python -m pip wheel --disable-pip-version-check -v -w "${output_dir}" "${repo_root}/$@"
-}
-
 function build_iree_runtime() {
   IREE_HAL_DRIVER_CUDA=ON \
-  build_wheel runtime/
+  python -m pip wheel -v -w /wheelhouse /main_checkout/iree/runtime/
 }
 
 function build_iree_runtime_instrumented() {
   IREE_HAL_DRIVER_CUDA=ON IREE_BUILD_TRACY=ON IREE_ENABLE_RUNTIME_TRACING=ON \
   IREE_RUNTIME_CUSTOM_PACKAGE_SUFFIX="-instrumented" \
-  build_wheel runtime/
+  python -m pip wheel -v -w /wheelhouse /main_checkout/iree/runtime/
 }
 
 function build_iree_compiler() {
   IREE_TARGET_BACKEND_CUDA=ON \
-  build_wheel compiler/
+  python -m pip wheel -v -w /wheelhouse /main_checkout/iree/compiler/
 }
 
 function run_audit_wheel() {
   local wheel_basename="$1"
   local python_version="$2"
-  # Force wildcard expansion here
-  generic_wheel="$(echo "${output_dir}/${wheel_basename}-"*"-${python_version}-linux_x86_64.whl")"
-  ls "${generic_wheel}"
-  echo ":::: Auditwheel ${generic_wheel}"
-  auditwheel repair -w "${output_dir}" "${generic_wheel}"
-  rm -v "${generic_wheel}"
+  generic_wheel="/wheelhouse/${wheel_basename}-*-${python_version}-linux_x86_64.whl"
+  echo ":::: Auditwheel $generic_wheel"
+  auditwheel repair -w /wheelhouse $generic_wheel
+  rm -v $generic_wheel
 }
 
 function clean_wheels() {
   local wheel_basename="$1"
   local python_version="$2"
-  echo ":::: Clean wheels ${wheel_basename} ${python_version}"
-  rm -f -v "${output_dir}/${wheel_basename}-"*"-${python_version}-"*".whl"
+  echo ":::: Clean wheels $wheel_basename $python_version"
+  rm -f -v /wheelhouse/${wheel_basename}-*-${python_version}-*.whl
 }
 
 # Trampoline to the docker container if running on the host.

@@ -12,7 +12,6 @@
 #include "iree/compiler/InputConversion/MHLO/Rewriters.h"
 #include "mlir-hlo/Dialect/mhlo/IR/chlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
-#include "mlir-hlo/Dialect/mhlo/transforms/map_chlo_to_hlo_op.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/rewriters.h"
 #include "mlir-hlo/utils/broadcast_utils.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
@@ -429,15 +428,9 @@ struct CompareBinaryBroadcastingAdaptor : public BinaryBroadcastingAdaptor {
                                    BroadcastValues broadcastValues,
                                    OpBuilder &builder) override {
     chlo::BroadcastCompareOpAdaptor adaptor(operands, op->getAttrDictionary());
-    Optional<chlo::ComparisonType> chloCmpType = adaptor.compare_type();
-    mhlo::ComparisonTypeAttr mhloCmpType;
-    if (chloCmpType)
-      mhloCmpType = mhlo::ComparisonTypeAttr::get(
-          builder.getContext(), *chlo::mhloComparisonType(*chloCmpType));
     return builder.create<mhlo::CompareOp>(
         loc, resultType, broadcastValues.first, broadcastValues.second,
-        *chlo::mhloComparisonDirection(adaptor.comparison_direction()),
-        mhloCmpType);
+        adaptor.comparison_direction(), adaptor.compare_typeAttr());
   }
 };
 

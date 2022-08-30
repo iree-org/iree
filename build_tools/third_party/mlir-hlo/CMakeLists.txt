@@ -8,7 +8,7 @@ set(TF_MLIR_HLO_SOURCE_DIR
   "${IREE_SOURCE_DIR}/third_party/mlir-hlo/"
 )
 set(TF_MLIR_HLO_BINARY_DIR
-  "${IREE_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir-hlo/"
+  "${IREE_BINARY_DIR}/third_party/mlir-hlo/"
 )
 
 external_cc_library(
@@ -19,9 +19,9 @@ external_cc_library(
   ROOT
     ${TF_MLIR_HLO_SOURCE_DIR}
   INCLUDES
+    "${TF_MLIR_HLO_SOURCE_DIR}/"
     "${TF_MLIR_HLO_SOURCE_DIR}/include/"
-    "${TF_MLIR_HLO_SOURCE_DIR}/stablehlo/"
+    "${TF_MLIR_HLO_BINARY_DIR}/"
     "${TF_MLIR_HLO_BINARY_DIR}/include/"
-    "${TF_MLIR_HLO_BINARY_DIR}/stablehlo/"
   PUBLIC
 )

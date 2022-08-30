@@ -21,9 +21,6 @@
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-// TODO: move these flags to a header file shared with runtime/.
-#define IREE_VMVX_MATMUL_FLAG_ACCUMULATE 1
-
 namespace mlir {
 namespace iree_compiler {
 
@@ -72,19 +69,7 @@ void leftPadToRank(Location loc, SmallVectorImpl<Value> &indices,
   }
 }
 
-// Returns true if all inner dimensions (that is, all but the outer-most dim)
-// are statically known to be contiguous row-major. This is vacuously true for
-// rank<=1 (as there are no inner dims). For rank 2, this is equivalent to
-// asking for the inner dimension to have unit stride. For rank>=3, this is
-// asking for the strides of all but the outermost dimension to equal the
-// product of the static sizes inner dimensions past them --- so in particular,
-// this is requiring all but the outer two dimensions to have a static size.
-bool verifyMemRefInnerDimsContiguousRowMajor(MemRefType type) {
-  int rank = type.getRank();
-  if (rank <= 1) {
-    return true;
-  }
-
+bool isMemRefUnitInnerStride(MemRefType type) {
   SmallVector<int64_t> strides;
   int64_t offset;
   if (type.getLayout().isIdentity()) {
@@ -94,24 +79,7 @@ bool verifyMemRefInnerDimsContiguousRowMajor(MemRefType type) {
   if (failed(mlir::getStridesAndOffset(type, strides, offset))) {
     return false;
   }
-
-  ArrayRef<int64_t> sizes = type.getShape();
-  assert(rank >= 2);  // Ensured by above early return.
-  if (strides[rank - 1] != 1) {
-    return false;
-  }
-  int64_t product_of_inner_sizes = 1;
-  for (int i = rank - 1; i >= 2; --i) {
-    if (sizes[i] == ShapedType::kDynamicSize) {
-      return false;
-    }
-    product_of_inner_sizes *= sizes[i];
-    if (strides[i - 1] != product_of_inner_sizes) {
-      return false;
-    }
-  }
-
-  return true;
+  return strides.back() == 1;
 }
 
 struct StridedBufferDescriptor {
@@ -128,11 +96,9 @@ struct StridedBufferDescriptor {
   Type getElementType() { return memRefType.getElementType(); }
   TypeAttr getElementTypeAttr() { return TypeAttr::get(getElementType()); }
 
-  // Returns true if all inner dimensions (that is, all but the outer-most dim)
-  // are statically known to be contiguous row-major.
-  bool areInnerDimsContiguousRowMajor() const {
-    return verifyMemRefInnerDimsContiguousRowMajor(memRefType);
-  }
+  /// Returns whether the innermost stride is statically 1. Many kernels
+  /// require this, so we provide the convenience here.
+  bool isUnitInnerStride() { return isMemRefUnitInnerStride(memRefType); }
 
   /// Casts the memref to a memref<?x...> that is safe for linear access
   /// with element-based addressing.
@@ -165,11 +131,9 @@ class StridedBufferAnalysis {
   // Gets the rank of the buffer being analyzed.
   unsigned getRank() { return getType().getRank(); }
 
-  // Returns true if all inner dimensions (that is, all but the outer-most dim)
-  // are statically known to be contiguous row-major.
-  bool areInnerDimsContiguousRowMajor() {
-    return verifyMemRefInnerDimsContiguousRowMajor(getType());
-  }
+  /// Returns whether the innermost stride is statically 1. Many kernels
+  /// require this, so we provide the convenience here.
+  bool isUnitInnerStride() { return isMemRefUnitInnerStride(getType()); }
 
   StridedBufferDescriptor &getDesc(OpBuilder &builder) {
     assert(isValid() && "invalid StridedBufferAnalysis");
@@ -862,7 +826,7 @@ struct LinalgFillConversion : public OpRewritePattern<linalg::FillOp> {
     }
 
     // Switch based on specialization.
-    if (info.getRank() == 2 && info.outAnal.areInnerDimsContiguousRowMajor()) {
+    if (info.getRank() == 2 && info.outAnal.isUnitInnerStride()) {
       return handle2DTile(info, rewriter);
     }
 
@@ -883,37 +847,8 @@ struct LinalgFillConversion : public OpRewritePattern<linalg::FillOp> {
   }
 };
 
-bool isMmt4d(ArrayAttr indexingMaps) {
-  if (indexingMaps.size() != 3) return false;
-
-  auto map0 = indexingMaps[0].cast<AffineMapAttr>().getValue();
-  auto map1 = indexingMaps[1].cast<AffineMapAttr>().getValue();
-  auto map2 = indexingMaps[2].cast<AffineMapAttr>().getValue();
-
-  if (map0.getNumResults() != 4 || map1.getNumResults() != 4 ||
-      map2.getNumResults() != 4 || map0.getNumInputs() != 6 ||
-      map1.getNumInputs() != 6 || map2.getNumInputs() != 6) {
-    return false;
-  }
-
-  // Extract dimensions for MxK * KxN -> MxN
-  AffineExpr m = map2.getResult(0);
-  AffineExpr n = map2.getResult(1);
-  AffineExpr k = map0.getResult(1);
-  AffineExpr m0 = map2.getResult(2);
-  AffineExpr n0 = map2.getResult(3);
-  AffineExpr k0 = map0.getResult(3);
-
-  auto *context = indexingMaps.getContext();
-  auto mapA = AffineMapAttr::get(AffineMap::get(6, 0, {m, k, m0, k0}, context));
-  auto mapB = AffineMapAttr::get(AffineMap::get(6, 0, {n, k, n0, k0}, context));
-  auto mapC = AffineMapAttr::get(AffineMap::get(6, 0, {m, n, m0, n0}, context));
-  auto maps = ArrayAttr::get(context, {mapA, mapB, mapC});
-  return indexingMaps == maps;
-}
-
-/// Convert supported linalg contraction ops like matmul and mmt4d.
-struct LinalgContractionConversion
+/// Convert a linalg.matmul.
+struct LinalgMatmulConversion
     : public OpInterfaceRewritePattern<linalg::ContractionOpInterface> {
   using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
   struct OpInfo {
@@ -938,30 +873,25 @@ struct LinalgContractionConversion
       rhs = contract.rhs();
       out = op.outputs().front();
     }
-  };
 
-  static bool isSupportedElementTypes(const OpInfo &info) {
-    Type lhsElType = info.lhs.getType().cast<ShapedType>().getElementType();
-    Type rhsElType = info.rhs.getType().cast<ShapedType>().getElementType();
-    Type outElType = info.out.getType().cast<ShapedType>().getElementType();
-    if (lhsElType.isF32() && rhsElType.isF32() && outElType.isF32()) {
-      return true;
+    Value getOneValue(PatternRewriter &rewriter) {
+      Location loc = op.getLoc();
+      Type elementType = out.getType().cast<MemRefType>().getElementType();
+      if (auto floatType = elementType.dyn_cast<FloatType>()) {
+        return rewriter.create<arith::ConstantOp>(
+            loc, FloatAttr::get(floatType, 1.0));
+      } else if (elementType.isa<IntegerType>()) {
+        return rewriter.create<arith::ConstantIntOp>(loc, 1, elementType);
+      }
+
+      assert(false && "unknown element type");
+      return nullptr;
     }
-    if (lhsElType.isSignlessInteger(8) && rhsElType.isSignlessInteger(8) &&
-        outElType.isSignlessInteger(32)) {
-      return true;
-    }
-    return false;
-  }
+  };
 
   LogicalResult matchAndRewrite(linalg::ContractionOpInterface op,
                                 PatternRewriter &rewriter) const override {
     OpInfo info(op);
-
-    if (!isSupportedElementTypes(info)) {
-      return rewriter.notifyMatchFailure(
-          op, "unsupported combination of lhs/rhs/out element types");
-    }
 
     // Check that buffer descriptors could be computed.
     if (!info.lhsAnal.isValid() || !info.rhsAnal.isValid() ||
@@ -971,23 +901,20 @@ struct LinalgContractionConversion
     }
 
     // Check for unit inner strides.
-    if (!info.lhsAnal.areInnerDimsContiguousRowMajor()) {
+    if (!info.lhsAnal.isUnitInnerStride()) {
       return rewriter.notifyMatchFailure(op, "lhs has non-unit inner stride");
     }
-    if (!info.rhsAnal.areInnerDimsContiguousRowMajor()) {
+    if (!info.rhsAnal.isUnitInnerStride()) {
       return rewriter.notifyMatchFailure(op, "rhs has non-unit inner stride");
     }
-    if (!info.outAnal.areInnerDimsContiguousRowMajor()) {
+    if (!info.outAnal.isUnitInnerStride()) {
       return rewriter.notifyMatchFailure(op, "out has non-unit inner stride");
     }
 
     // Switch on contraction type.
-    if (info.contract.isRowMajorMatmul()) {
+    if (info.contract.isRowMajorMatmul() ||
+        info.contract.isColumnMajorMatmul()) {
       if (succeeded(handleConformingMatmul2D(info, rewriter))) {
-        return success();
-      }
-    } else if (isMmt4d(info.op.getIndexingMaps())) {
-      if (succeeded(handleConformingMmt4d(info, rewriter))) {
         return success();
       }
     }
@@ -1002,12 +929,27 @@ struct LinalgContractionConversion
     auto &lhsDesc = info.lhsAnal.getDesc(rewriter);
     auto &rhsDesc = info.rhsAnal.getDesc(rewriter);
     auto &outDesc = info.outAnal.getDesc(rewriter);
+    // Determine m, n, k based on dims.
+    int flags = 0;
+    Value m, n, k;
+    if (info.contract.isRowMajorMatmul()) {
+      m = lhsDesc.sizes[0];
+      k = rhsDesc.sizes[0];
+      n = rhsDesc.sizes[1];
+    } else if (info.contract.isColumnMajorMatmul()) {
+      m = lhsDesc.sizes[0];
+      k = rhsDesc.sizes[1];
+      n = rhsDesc.sizes[0];
+      // TODO: Flag constants somewhere.
+      flags |= 1;
+    } else {
+      return failure();
+    }
 
-    int flags = IREE_VMVX_MATMUL_FLAG_ACCUMULATE;
-
-    Value m = lhsDesc.sizes[0];
-    Value k = rhsDesc.sizes[0];
-    Value n = rhsDesc.sizes[1];
+    // Alpha/beta: We always start the lowering with alpha/beta set to 1.
+    // Simplification patterns within VMVX will simplify this if possible.
+    Value alpha = info.getOneValue(rewriter);
+    Value beta = alpha;
 
     auto lhsBuffer = lhsDesc.castToLinear(loc, rewriter);
     auto rhsBuffer = rhsDesc.castToLinear(loc, rewriter);
@@ -1023,42 +965,8 @@ struct LinalgContractionConversion
         outBuffer, outDesc.offset, outDesc.strides[0],
         // m,n,k
         m, n, k,
-        // flags
-        lhsDesc.getElementTypeAttr(), rhsDesc.getElementTypeAttr(),
-        outDesc.getElementTypeAttr(), rewriter.getI32IntegerAttr(flags));
-    return success();
-  }
-
-  LogicalResult handleConformingMmt4d(OpInfo &info,
-                                      PatternRewriter &rewriter) const {
-    auto loc = info.op.getLoc();
-    auto &lhsDesc = info.lhsAnal.getDesc(rewriter);
-    auto &rhsDesc = info.rhsAnal.getDesc(rewriter);
-    auto &outDesc = info.outAnal.getDesc(rewriter);
-    int flags = IREE_VMVX_MATMUL_FLAG_ACCUMULATE;
-    Value m = lhsDesc.sizes[0];
-    Value n = rhsDesc.sizes[0];
-    Value k = rhsDesc.sizes[1];
-    Value m0 = lhsDesc.sizes[2];
-    Value n0 = rhsDesc.sizes[2];
-    Value k0 = rhsDesc.sizes[3];
-
-    auto lhsBuffer = lhsDesc.castToLinear(loc, rewriter);
-    auto rhsBuffer = rhsDesc.castToLinear(loc, rewriter);
-    auto outBuffer = outDesc.castToLinear(loc, rewriter);
-
-    rewriter.replaceOpWithNewOp<IREE::VMVX::Mmt4dOp>(
-        info.op,
-        // LHS
-        lhsBuffer, lhsDesc.offset, lhsDesc.strides[0],
-        // RHS
-        rhsBuffer, rhsDesc.offset, rhsDesc.strides[0],
-        // Out
-        outBuffer, outDesc.offset, outDesc.strides[0],
-        // m,n,k
-        m, n, k,
-        // m0,n0,k0
-        m0, n0, k0,
+        // alpha, beta
+        alpha, beta,
         // flags
         lhsDesc.getElementTypeAttr(), rhsDesc.getElementTypeAttr(),
         outDesc.getElementTypeAttr(), rewriter.getI32IntegerAttr(flags));
@@ -1078,7 +986,7 @@ class VMVXLowerLinalgMicrokernelsPass
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     patterns.insert<LinalgBinaryGenericConversion, LinalgFillConversion,
-                    LinalgContractionConversion, LinalgTrivialGenericConversion,
+                    LinalgMatmulConversion, LinalgTrivialGenericConversion,
                     LinalgUnaryGenericConversion>(&getContext());
 
     if (failed(applyPatternsAndFoldGreedily(getOperation(),

@@ -45,8 +45,7 @@ typedef struct iree_arena_block_pool_t iree_arena_block_pool_t;
 IREE_API_EXPORT iree_status_t iree_hal_deferred_command_buffer_create(
     iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
-    iree_host_size_t binding_capacity, iree_arena_block_pool_t* block_pool,
-    iree_allocator_t host_allocator,
+    iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
     iree_hal_command_buffer_t** out_command_buffer);
 
 // Returns true if |command_buffer| is a deferred command buffer.
@@ -55,12 +54,10 @@ bool iree_hal_deferred_command_buffer_isa(
 
 // Replays a recorded |command_buffer| against a |target_command_buffer|.
 // If the command buffer was recorded in one-shot mode it will be reset upon
-// return. The provided |binding_table| will be used for indirect bindings
-// referenced in the command buffer.
+// return.
 IREE_API_EXPORT iree_status_t iree_hal_deferred_command_buffer_apply(
     iree_hal_command_buffer_t* command_buffer,
-    iree_hal_command_buffer_t* target_command_buffer,
-    iree_hal_buffer_binding_table_t binding_table);
+    iree_hal_command_buffer_t* target_command_buffer);
 
 #ifdef __cplusplus
 }  // extern "C"

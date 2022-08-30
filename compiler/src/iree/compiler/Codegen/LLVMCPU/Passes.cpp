@@ -24,8 +24,6 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
 
-#define DEBUG_TYPE "iree-llvm-cpu-lowering-pass-pipeline"
-
 namespace mlir {
 namespace iree_compiler {
 
@@ -290,7 +288,6 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager) {
     LinalgSingleTilingExpertPassOptions options;
     options.tilingLevel =
         static_cast<int64_t>(StrategyTilingLevel::ParallelTiles);
-    options.peel = true;
     options.vectorize = true;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLinalgSingleTilingExpertPass(options));
@@ -643,12 +640,6 @@ void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager) {
   passManager.addPass(createLLVMCPULowerExecutableTargetPass());
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   addLowerToLLVMPasses(nestedModulePM);
-
-  LLVM_DEBUG({
-    llvm::dbgs() << "Using LLVMCPU pass pipeline:\n";
-    passManager.printAsTextualPipeline(llvm::dbgs());
-    llvm::dbgs() << "\n";
-  });
 }
 
 }  // namespace iree_compiler

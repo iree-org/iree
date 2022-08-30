@@ -920,46 +920,6 @@ static void fuseRootsWithConsumers(MLIRContext *context,
   }
 }
 
-/// Method to check if the consumer of a use can be fused with its producer.
-static bool isFusableWithProducer(OpOperand &operand) {
-  Operation *producer = operand.get().getDefiningOp();
-  Operation *consumer = operand.getOwner();
-
-  if (isa<linalg::LinalgOp>(consumer) && isa<linalg::LinalgOp>(producer)) {
-    auto consumerLinalgOp = cast<linalg::LinalgOp>(consumer);
-    auto producerLinalgOp = cast<linalg::LinalgOp>(producer);
-    if (consumerLinalgOp.isOutputTensor(&operand) &&
-        producerLinalgOp.getNumLoops() ==
-            producerLinalgOp.getNumParallelLoops()) {
-      return true;
-    }
-  }
-  return false;
-}
-
-/// Starting from the `root` op, traverse the operand use-def chain
-/// in reverse to fuse with producers.
-static void fuseRootsWithProducers(MLIRContext *context, Operation *root,
-                                   unsigned groupNum,
-                                   DominanceInfo const &dominanceInfo) {
-  // We probably want a worklist algorithm here, but for now just look at
-  // immediate producers.
-  for (OpOperand &operand : root->getOpOperands()) {
-    Operation *producer = operand.get().getDefiningOp();
-    if (!producer) continue;
-    if (hasFusionGroupsAttribute(producer) || hasRootOpAttribute(producer)) {
-      continue;
-    }
-
-    Optional<OpOperand *> fusableUse = getFusableUse(producer, dominanceInfo);
-    if (!fusableUse || fusableUse.value()->getOwner() != root) continue;
-
-    if (isFusableWithProducer(operand)) {
-      appendToFusionGroup(producer, groupNum);
-    }
-  }
-}
-
 /// Some heuristic is needed to fuse a dispatchable op with root operations
 /// using tile + fuse. Using some heuristic, each root operation is tagged with
 /// an ID (using an IntegerAttr with name `kRootOpAttr`) and all dispatchable
@@ -986,7 +946,28 @@ static unsigned decideFusableLinalgOps(FunctionOpInterface funcOp,
       unsigned newGroup = numRootOps++;
       setRootAttribute(context, &op, newGroup);
 
-      fuseRootsWithProducers(context, &op, newGroup, dominanceInfo);
+      linalg::OpOperandVector outOperands =
+          TypeSwitch<Operation *, linalg::OpOperandVector>(&op)
+              .Case<linalg::LinalgOp>([&](auto linalgOp) {
+                return linalgOp.getOutputTensorOperands();
+              })
+              .Default(
+                  [&](Operation *) -> linalg::OpOperandVector { return {}; });
+      for (OpOperand *operand : outOperands) {
+        // Currently only fuse with producer ops that are `LinalgOp`s.
+        auto producer = operand->get().getDefiningOp<linalg::LinalgOp>();
+        if (!producer) continue;
+
+        // Fuse with the consumer if all uses of producer are dominated by it.
+        Optional<OpOperand *> fusableUse =
+            getFusableUse(producer, dominanceInfo);
+        if (!fusableUse || fusableUse.value() != operand) continue;
+
+        if (producer.getNumLoops() != producer.getNumParallelLoops()) {
+          continue;
+        }
+        appendToFusionGroup(producer, newGroup);
+      }
       roots.push_back(&op);
     }
     roots = llvm::to_vector(llvm::reverse(roots));

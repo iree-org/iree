@@ -1,0 +1,71 @@
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+on:
+  workflow_call:
+    inputs:
+      host-binary-root:
+        required: true
+        type: string
+      enable-assertions:
+        required: false
+        type: string # Thanks CMake and Bash for not having proper booleans
+        default: "OFF"
+    outputs:
+      host-binary-root:
+        # Pass through the root directory as an output, so it's available to
+        # dependent jobs.
+        # For some incomprehensible reason, even though the inputs context is
+        # available here, if you use it directly this will just be an empty
+        # string. Not an error, just a silent failure. So we have pass the input
+        # down to a job and then make it an output of that job and then make it
+        # an output of this. Of course, the only reason we need to pass this
+        # around at all is because we can't have variables or directly access
+        # the inputs to this workflow in dependen workflows. Because why have a
+        # simple programming model when you could have one that is just the
+        # minimal union of use cases you could come up with.
+        value: ${{ jobs.host_tools.outputs.host-binary-root }}
+
+jobs:
+  host_tools:
+    runs-on:
+      # self-hosted has to be listed first. See
+      # https://docs.github.com/en/actions/hosting-your-own-runners/using-self-hosted-runners-in-a-workflow
+      - self-hosted
+      # Have to do a weird hack to get a pseudo-ternary operator. See
+      # https://github.com/actions/runner/issues/409. Also note that
+      # `github.event_name` for workflow_call is the name of the calling event,
+      # which is poorly documented, but useful for us here. See
+      # https://github.com/github/docs/issues/16515
+      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - cpu
+      - os-family=Linux
+    env:
+      HOST_BINARY_ROOT: ${{ inputs.host-binary-root }}
+      HOST_BINARY_ARCHIVE: ${{ inputs.host-binary-root }}.tar
+    outputs:
+      host-binary-root: ${{ inputs.host-binary-root }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
+        with:
+          submodules: true
+      - name: "Building host tools"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "INSTALL_DIR=${HOST_BINARY_ROOT}" \
+            gcr.io/iree-oss/base@sha256:5d43683c6b50aebe1fca6c85f2012f3b0fa153bf4dd268e8767b619b1891423a \
+            ./build_tools/cmake/build_host_tools.sh
+      # Using a tar archive is necessary to preserve file permissions. See
+      # https://github.com/actions/upload-artifact#maintaining-file-permissions-and-case-sensitive-files
+      # The upload action already does its own gzip compression, so no need to
+      # do our own.
+      - name: "Creating host tools archive"
+        run: tar -cvf "${HOST_BINARY_ARCHIVE}" "${HOST_BINARY_ROOT}"
+      - uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # v3.1.0
+        with:
+          name: "${{ env.HOST_BINARY_ARCHIVE }}"
+          path: "${{ env.HOST_BINARY_ARCHIVE }}"

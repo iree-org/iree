@@ -34,17 +34,17 @@ def LLVMGPU_SimpleDistribute : I32EnumAttrCase<"LLVMGPUDistribute", 9>;
 def LLVMGPU_Vectorize : I32EnumAttrCase<"LLVMGPUVectorize", 10>;
 def LLVMGPU_MatmulSimt : I32EnumAttrCase<"LLVMGPUMatmulSimt", 11>;
 def LLVMGPU_MatmulTensorCore : I32EnumAttrCase<"LLVMGPUMatmulTensorCore", 12>;
-def LLVMGPU_TransposeSharedMem : I32EnumAttrCase<"LLVMGPUTransposeSharedMem", 13>;
-def LLVMGPU_WarpReduction : I32EnumAttrCase<"LLVMGPUWarpReduction", 14>;
+def LLVMGPU_WarpReduction : I32EnumAttrCase<"LLVMGPUWarpReduction", 13>;
 
-def SPIRV_Distribute : I32EnumAttrCase<"SPIRVDistribute", 15>;
-def SPIRV_Vectorize : I32EnumAttrCase<"SPIRVVectorize", 16>;
+def SPIRV_Distribute : I32EnumAttrCase<"SPIRVDistribute", 14>;
+def SPIRV_Vectorize : I32EnumAttrCase<"SPIRVVectorize", 15>;
 def SPIRV_VectorizeToCooperativeOps
-    : I32EnumAttrCase<"SPIRVVectorizeToCooperativeOps", 17>;
+    : I32EnumAttrCase<"SPIRVVectorizeToCooperativeOps", 16>;
 def SPIRV_VectorizeWithWorkgroupMemory
-    : I32EnumAttrCase<"SPIRVVectorizeWithWorkgroupMemory", 18>;
+    : I32EnumAttrCase<"SPIRVVectorizeWithWorkgroupMemory", 17>;
 
-def VMVX_Default : I32EnumAttrCase<"VMVXDefault", 19>;
+def VMVX_Default : I32EnumAttrCase<"VMVXDefault", 18>;
+
 def None : I32EnumAttrCase<"None", 0xff>;
 
 // EnumAttrCase for all known lowerings for ops within dispatch region
@@ -57,8 +57,8 @@ def DispatchLoweringPassPipelineEnum
                     CPU_ConvTileAndDecomposeExpert, CPU_CPUAArchDoubleTilingExpert,
                     CPU_BufferOpsTileAndVectorize, CPU_TripleTilingExpert,
                     Linalg_TransformInterpCodegen, LLVMGPU_SimpleDistribute,
-                    LLVMGPU_Vectorize, LLVMGPU_MatmulSimt, LLVMGPU_MatmulTensorCore,
-                    LLVMGPU_TransposeSharedMem, LLVMGPU_WarpReduction,
+                    LLVMGPU_Vectorize, LLVMGPU_MatmulSimt,
+                    LLVMGPU_MatmulTensorCore, LLVMGPU_WarpReduction,
                     SPIRV_Distribute, SPIRV_Vectorize,
                     SPIRV_VectorizeToCooperativeOps,
                     SPIRV_VectorizeWithWorkgroupMemory, VMVX_Default, None

@@ -521,75 +521,6 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   return success();
 }
 
-/// Returns true if the operation is a GenericOp implementing a 2D transpose.
-static bool isTransposeOp(linalg::LinalgOp linalgOp) {
-  if (!isa<linalg::GenericOp>(linalgOp)) return false;
-  // Check that the op has 2 parallel loops.
-  if (linalgOp.getNumParallelLoops() != 2) {
-    return false;
-  }
-
-  // Check that all the iterators are parallel.
-  if (linalgOp.getNumParallelLoops() != linalgOp.getNumLoops()) {
-    return false;
-  }
-
-  // Check that the op has only one input and one output.
-  if ((linalgOp.getNumInputs() != 1) || (linalgOp.getNumOutputs() != 1)) {
-    return false;
-  }
-  // Check for 2D operations
-  auto inputShape =
-      linalgOp.inputs()[0].getType().cast<ShapedType>().getShape();
-  auto outputShape =
-      linalgOp.outputs()[0].getType().cast<ShapedType>().getShape();
-  if (inputShape.size() != 2 || outputShape.size() != 2) {
-    return false;
-  }
-
-  // Only transpose static shapes
-  if (linalgOp.hasDynamicShape()) {
-    return false;
-  }
-
-  // Check that the two indexing maps are a permutation of each other.
-  auto indexing_maps = linalgOp.getIndexingMapsArray();
-  return !indexing_maps[0].isEmpty() && !indexing_maps[1].isEmpty() &&
-         ((indexing_maps[0].isIdentity() && !indexing_maps[1].isIdentity() &&
-           indexing_maps[1].isPermutation()) ||
-          (!indexing_maps[0].isIdentity() && indexing_maps[0].isPermutation() &&
-           indexing_maps[1].isIdentity()));
-}
-
-static LogicalResult setTransposeConfig(func::FuncOp entryPoint,
-                                        Operation *op) {
-  int32_t tileM = 32;
-  int32_t tileN = 32;
-  TileSizesListType tileSizes;
-  tileSizes.push_back({tileM, tileN});
-
-  // Check alignment with tile size
-  if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
-    auto inputShape =
-        genericOp.inputs()[0].getType().cast<ShapedType>().getShape();
-    if (inputShape[0] % tileM != 0 || inputShape[1] % tileN != 0) {
-      return failure();
-    }
-  } else {
-    return failure();
-  }
-
-  // Workgroup size contains 8 warps. Configured with 8 threads on fastest
-  // moving dimension so each thread can execute a vectorized copy of 4
-  // contigious elements at a time from the 32 block.
-  std::array<int64_t, 3> workgroupSize = {8, 32, 1};
-
-  return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, op, tileSizes,
-      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTransposeSharedMem,
-      workgroupSize);
-}
-
 static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                    Operation *computeOp) {
   if (IREE::Codegen::CompilationInfoAttr compilationInfo =
@@ -603,13 +534,8 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
         linalgOp.getNumParallelLoops() >= 2) {
       return setContractConfig(entryPointFn, linalgOp);
     }
-    if (succeeded(setWarpReductionConfig(entryPointFn, linalgOp))) {
+    if (succeeded(setWarpReductionConfig(entryPointFn, linalgOp)))
       return success();
-    }
-    if (isTransposeOp(linalgOp) &&
-        succeeded(setTransposeConfig(entryPointFn, linalgOp))) {
-      return success();
-    }
   }
   if (auto fftOp = dyn_cast<IREE::LinalgExt::FftOp>(computeOp)) {
     return setFftConfig(entryPointFn, fftOp);

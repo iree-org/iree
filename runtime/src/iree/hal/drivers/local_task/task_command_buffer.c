@@ -110,12 +110,11 @@ iree_status_t iree_hal_task_command_buffer_create(
     iree_hal_device_t* device, iree_task_scope_t* scope,
     iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
-    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
+    iree_hal_queue_affinity_t queue_affinity,
     iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
     iree_hal_command_buffer_t** out_command_buffer) {
   IREE_ASSERT_ARGUMENT(out_command_buffer);
   *out_command_buffer = NULL;
-
   if (!iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT)) {
     // If we want reuse we'd need to support duplicating the task DAG after
     // recording or have some kind of copy-on-submit behavior that does so if
@@ -129,11 +128,6 @@ iree_status_t iree_hal_task_command_buffer_create(
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                             "only one-shot command buffer usage is supported");
   }
-  if (binding_capacity > 0) {
-    // TODO(#10144): support indirect command buffers with binding tables.
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                            "indirect command buffers not yet implemented");
-  }
 
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -142,7 +136,7 @@ iree_status_t iree_hal_task_command_buffer_create(
       host_allocator, sizeof(*command_buffer), (void**)&command_buffer);
   if (iree_status_is_ok(status)) {
     iree_hal_command_buffer_initialize(
-        device, mode, command_categories, queue_affinity, binding_capacity,
+        device, mode, command_categories, queue_affinity,
         &iree_hal_task_command_buffer_vtable, &command_buffer->base);
     command_buffer->host_allocator = host_allocator;
     command_buffer->scope = scope;
@@ -763,20 +757,14 @@ static iree_status_t iree_hal_task_command_buffer_push_descriptor_set(
 
     // TODO(benvanik): track mapping so we can properly map/unmap/flush/etc.
     iree_hal_buffer_mapping_t buffer_mapping = {{0}};
-    if (bindings[i].buffer) {
-      IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-          bindings[i].buffer, IREE_HAL_MAPPING_MODE_PERSISTENT,
-          IREE_HAL_MEMORY_ACCESS_ANY, bindings[i].offset, bindings[i].length,
-          &buffer_mapping));
-      command_buffer->state.bindings[binding_ordinal] =
-          buffer_mapping.contents.data;
-      command_buffer->state.binding_lengths[binding_ordinal] =
-          buffer_mapping.contents.data_length;
-    } else {
-      // TODO(#10144): stash indirect binding reference in the state table.
-      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                              "binding table lookup not yet supported");
-    }
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
+        bindings[i].buffer, IREE_HAL_MAPPING_MODE_PERSISTENT,
+        IREE_HAL_MEMORY_ACCESS_ANY, bindings[i].offset, bindings[i].length,
+        &buffer_mapping));
+    command_buffer->state.bindings[binding_ordinal] =
+        buffer_mapping.contents.data;
+    command_buffer->state.binding_lengths[binding_ordinal] =
+        buffer_mapping.contents.data_length;
   }
 
   return iree_ok_status();
@@ -994,22 +982,6 @@ static iree_status_t iree_hal_task_command_buffer_dispatch_indirect(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_task_command_buffer_execute_commands(
-    iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_command_buffer_t* base_commands,
-    iree_hal_buffer_binding_table_t binding_table) {
-  // TODO(#10144): support indirect command buffers by using deferred command
-  // buffers or caching the task topology (probably not worth the tracking).
-  // If we could separate the topology that referenced the binding table we'd
-  // be able to reissue but not concurrently (as each task can only be in flight
-  // as a singleton) - which may be enough in many cases but adds complexity to
-  // tracking as we'd need to either enforce serialization of subsequent
-  // submissions or copy-on-write-style clone the topology for each additional
-  // concurrent submission.
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "indirect command buffers not yet implemented");
-}
-
 //===----------------------------------------------------------------------===//
 // iree_hal_command_buffer_vtable_t
 //===----------------------------------------------------------------------===//
@@ -1034,5 +1006,4 @@ static const iree_hal_command_buffer_vtable_t
         .push_descriptor_set = iree_hal_task_command_buffer_push_descriptor_set,
         .dispatch = iree_hal_task_command_buffer_dispatch,
         .dispatch_indirect = iree_hal_task_command_buffer_dispatch_indirect,
-        .execute_commands = iree_hal_task_command_buffer_execute_commands,
 };

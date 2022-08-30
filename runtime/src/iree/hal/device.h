@@ -405,7 +405,6 @@ typedef struct iree_hal_device_vtable_t {
       iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
       iree_hal_command_category_t command_categories,
       iree_hal_queue_affinity_t queue_affinity,
-      iree_host_size_t binding_capacity,
       iree_hal_command_buffer_t** out_command_buffer);
 
   iree_status_t(IREE_API_PTR* create_descriptor_set_layout)(
