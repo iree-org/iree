@@ -63,12 +63,12 @@
 // If the contents of |address| do not match |expected_value| the wait will
 // fail and return IREE_STATUS_UNAVAILABLE and should be retried.
 //
-// |timeout_ms| can be either IREE_INFINITE_TIMEOUT_MS to wait forever or a
-// relative number of milliseconds to wait prior to returning early with
+// |deadline_ns| can be either IREE_TIME_INFINITE_FUTURE to wait forever or an
+// absolute time to wait until prior to returning early with
 // IREE_STATUS_DEADLINE_EXCEEDED.
 static inline iree_status_code_t iree_futex_wait(void* address,
                                                  uint32_t expected_value,
-                                                 uint32_t timeout_ms);
+                                                 iree_time_t deadline_ns);
 
 // Wakes at most |count| threads waiting for the |address| to change.
 // Use IREE_ALL_WAITERS to wake all waiters. Which waiters are woken is
@@ -80,7 +80,8 @@ static inline void iree_futex_wake(void* address, int32_t count);
 
 static inline iree_status_code_t iree_futex_wait(void* address,
                                                  uint32_t expected_value,
-                                                 uint32_t timeout_ms) {
+                                                 iree_time_t deadline_ns) {
+  uint32_t timeout_ms = iree_absolute_deadline_to_timeout_ms(deadline_ns);
   int rc = emscripten_futex_wait(address, expected_value, (double)timeout_ms);
   switch (rc) {
     default:
@@ -102,7 +103,8 @@ static inline void iree_futex_wake(void* address, int32_t count) {
 
 static inline iree_status_code_t iree_futex_wait(void* address,
                                                  uint32_t expected_value,
-                                                 uint32_t timeout_ms) {
+                                                 iree_time_t deadline_ns) {
+  uint32_t timeout_ms = iree_absolute_deadline_to_timeout_ms(deadline_ns);
   if (IREE_LIKELY(WaitOnAddress(address, &expected_value,
                                 sizeof(expected_value), timeout_ms) == TRUE)) {
     return IREE_STATUS_OK;
@@ -127,7 +129,8 @@ static inline void iree_futex_wake(void* address, int32_t count) {
 
 static inline iree_status_code_t iree_futex_wait(void* address,
                                                  uint32_t expected_value,
-                                                 uint32_t timeout_ms) {
+                                                 iree_time_t deadline_ns) {
+  uint32_t timeout_ms = iree_absolute_deadline_to_timeout_ms(deadline_ns);
   struct timespec timeout = {
       .tv_sec = timeout_ms / 1000,
       .tv_nsec = (timeout_ms % 1000) * 1000000,
@@ -478,7 +481,7 @@ void iree_slim_mutex_lock(iree_slim_mutex_t* mutex)
     while (iree_slim_mutex_is_locked(value)) {
       // NOTE: we don't care about wait failure here as we are going to loop
       // and check again anyway.
-      iree_futex_wait(&mutex->value, value, IREE_INFINITE_TIMEOUT_MS);
+      iree_futex_wait(&mutex->value, value, IREE_TIME_INFINITE_FUTURE);
       value = iree_atomic_load_int32(&mutex->value, iree_memory_order_relaxed);
     }
   }
@@ -735,12 +738,8 @@ bool iree_notification_commit_wait(iree_notification_t* notification,
   while ((iree_atomic_load_int64(&notification->value,
                                  iree_memory_order_acquire) >>
           IREE_NOTIFICATION_EPOCH_SHIFT) == wait_token) {
-    // NOTE: we do an abs->rel conversion within the loop so that we can account
-    // for spurious wakes that may cause us to loop several times with waits of
-    // various time inbetween.
-    uint32_t timeout_ms = iree_absolute_deadline_to_timeout_ms(deadline_ns);
     iree_status_code_t status_code = iree_futex_wait(
-        iree_notification_epoch_address(notification), wait_token, timeout_ms);
+        iree_notification_epoch_address(notification), wait_token, deadline_ns);
     if (status_code != IREE_STATUS_OK) {
       result = false;
       break;
