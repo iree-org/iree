@@ -199,6 +199,7 @@ static void BenchmarkGenericFunction(const std::string& benchmark_name,
         inputs, outputs.get(), iree_allocator_system()));
     IREE_CHECK_OK(iree_vm_list_resize(outputs.get(), 0));
   }
+  state.SetItemsProcessed(state.iterations());
 }
 
 void RegisterGenericBenchmark(const std::string& function_name,
@@ -251,6 +252,7 @@ static void BenchmarkDispatchFunction(const std::string& benchmark_name,
         inputs.get(), outputs.get(), iree_allocator_system()));
     IREE_CHECK_OK(iree_vm_list_resize(outputs.get(), 0));
   }
+  state.SetItemsProcessed(state.iterations());
 }
 
 void RegisterDispatchBenchmark(const std::string& function_name,
