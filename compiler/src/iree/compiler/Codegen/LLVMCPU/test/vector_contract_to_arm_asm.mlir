@@ -168,6 +168,45 @@ func.func @mmt_1x1x8_f32f32f32_vecmat(
 // AARCH64-BASELINE-SAME:      {{\((vector<4xf32>, ){2}(f32, ){1}(vector<4xf32>(, )?){2}\)}}
 
 // -----
+func.func @mmt_8x1x2_f32f32f32_matvec(
+    %lhs: vector<8x1xf32>,
+    %rhs: vector<2x1xf32>,
+    %acc: vector<8x2xf32>) -> vector<8x2xf32> {
+  %res = vector.contract {
+      indexing_maps = [
+          affine_map<(d0, d1, d2) -> (d0, d2)>,
+          affine_map<(d0, d1, d2) -> (d1, d2)>,
+          affine_map<(d0, d1, d2) -> (d0, d1)>
+      ], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>
+  } %lhs, %rhs, %acc : vector<8x1xf32>, vector<2x1xf32> into vector<8x2xf32>
+  return %res : vector<8x2xf32>
+}
+// AARCH64-BASELINE-LABEL:  @mmt_8x1x2_f32f32f32_matvec(
+// AARCH64-BASELINE:     llvm.inline_asm
+// AARCH64-BASELINE-SAME:      {{((.*fmla){4})}}
+// AARCH64-BASELINE-SAME:      vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>
+
+// -----
+
+func.func @mmt_2x1x8_f32f32f32_vecmat(
+    %lhs: vector<2x1xf32>,
+    %rhs: vector<8x1xf32>,
+    %acc: vector<2x8xf32>) -> vector<2x8xf32> {
+  %res = vector.contract {
+      indexing_maps = [
+          affine_map<(d0, d1, d2) -> (d0, d2)>,
+          affine_map<(d0, d1, d2) -> (d1, d2)>,
+          affine_map<(d0, d1, d2) -> (d0, d1)>
+      ], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>
+  } %lhs, %rhs, %acc : vector<2x1xf32>, vector<8x1xf32> into vector<2x8xf32>
+  return %res : vector<2x8xf32>
+}
+// AARCH64-BASELINE-LABEL:  @mmt_2x1x8_f32f32f32_vecmat(
+// AARCH64-BASELINE:     llvm.inline_asm
+// AARCH64-BASELINE-SAME:      {{((.*fmla){4})}}
+// AARCH64-BASELINE-SAME:      vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>
+
+// -----
 func.func @mmt_8x1x8_i8i8i32(
     %lhs: vector<8x1xi8>,
     %rhs: vector<8x1xi8>,
