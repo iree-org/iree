@@ -116,8 +116,9 @@ iree_status_t iree_hal_webgpu_staging_buffer_reserve(
   if (aligned_length > staging_buffer->capacity) {
     // Will never fit in the staging buffer.
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "reservation (%zu) exceeds the maximum capacity of "
-                            "the staging buffer (%zu)",
+                            "reservation (%" PRIhsz
+                            ") exceeds the maximum capacity of "
+                            "the staging buffer (%" PRIu32 ")",
                             length, staging_buffer->capacity);
   } else if (staging_buffer->offset + aligned_length >
              staging_buffer->capacity) {

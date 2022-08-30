@@ -115,13 +115,14 @@ WGPUBindGroup iree_hal_webgpu_bind_group_cache_acquire(
   WGPUBindGroupEntry entries[IREE_HAL_WEBGPU_MAX_DESCRIPTOR_SET_BINDING_COUNT];
   for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(entries); ++i) {
     if (!(binding_mask & (1u << i))) continue;
-    entries[binding_count++] = (WGPUBindGroupEntry){
+    entries[binding_count] = (WGPUBindGroupEntry){
         .nextInChain = NULL,
         .binding = binding_count,
         .buffer = bindings[i].buffer,
         .offset = (uint64_t)bindings[i].offset,
         .size = bindings[i].length,
     };
+    ++binding_count;
   }
 
   const WGPUBindGroupDescriptor descriptor = {
