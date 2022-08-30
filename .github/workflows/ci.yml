@@ -691,7 +691,7 @@ jobs:
           TRACED_BENCHMARK_TOOLS_DIR: ${{ steps.build-with-tracing.outputs.traced-benchmark-tools-dir }}
           BENCHMARK_TOOLS_ARCHIVE: ${{ matrix.target.platform }}-${{ matrix.target.config }}-benchmarks-tools.tar
         run: |
-          tar -cf ${TOOLS_ARCHIVE} \
+          tar -cf ${BENCHMARK_TOOLS_ARCHIVE} \
             ${BENCHMARK_TOOLS_DIR}/tools/iree-benchmark-module \
             ${TRACED_BENCHMARK_TOOLS_DIR}/tools/iree-benchmark-module
           echo "::set-output name=benchmark-tools-archive::${BENCHMARK_TOOLS_ARCHIVE}"
