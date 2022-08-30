@@ -167,7 +167,7 @@ func.func @check_target_specific_mmt4d_f32_dynamic_matvec(%arg0: tensor<?x?xf32>
 }
 // AARCH64-BASELINE-LABEL:  @check_target_specific_mmt4d_f32_dynamic_matvec(
 // AARCH64-BASELINE:        linalg.mmt4d
-// AARCH64-BASELINE-SAME:     {comment =  "f32*f32->f32, aarch64, matrix*vector"}
+// AARCH64-BASELINE-SAME:     {comment =  "f32*f32->f32, aarch64, matrix*vector, where the vector has 1 column(s)"}
 // AARCH64-BASELINE-SAME:     ins({{.*}} : tensor<?x?x8x1xf32>, tensor<1x?x1x1xf32>) outs({{.*}} : tensor<?x1x8x1xf32>) -> tensor<?x1x8x1xf32>
 // -----
 func.func @check_target_specific_mmt4d_f32_dynamic_matvec2(%arg0: tensor<?x?xf32>, %arg1: tensor<?x2xf32>, %arg2: tensor<?x2xf32>) -> tensor<?x2xf32> {
@@ -176,7 +176,7 @@ func.func @check_target_specific_mmt4d_f32_dynamic_matvec2(%arg0: tensor<?x?xf32
 }
 // AARCH64-BASELINE-LABEL:  @check_target_specific_mmt4d_f32_dynamic_matvec2(
 // AARCH64-BASELINE:        linalg.mmt4d
-// AARCH64-BASELINE-SAME:     {comment =  "f32*f32->f32, aarch64, matrix*vector"}
+// AARCH64-BASELINE-SAME:     {comment =  "f32*f32->f32, aarch64, matrix*vector, where the vector has 2 column(s)"}
 // AARCH64-BASELINE-SAME:     ins({{.*}} : tensor<?x?x8x1xf32>, tensor<1x?x2x1xf32>) outs({{.*}} : tensor<?x1x8x2xf32>) -> tensor<?x1x8x2xf32>
 
 // -----
@@ -186,7 +186,7 @@ func.func @check_target_specific_mmt4d_f32_dynamic_vecmat(%arg0: tensor<1x?xf32>
 }
 // AARCH64-BASELINE-LABEL:  @check_target_specific_mmt4d_f32_dynamic_vecmat(
 // AARCH64-BASELINE:        linalg.mmt4d
-// AARCH64-BASELINE-SAME:     {comment =  "f32*f32->f32, aarch64, vector*matrix"}
+// AARCH64-BASELINE-SAME:     {comment =  "f32*f32->f32, aarch64, vector*matrix, where the vector has 1 column(s)"}
 // AARCH64-BASELINE-SAME:     ins({{.*}} : tensor<1x?x1x1xf32>, tensor<?x?x8x1xf32>) outs({{.*}} : tensor<1x?x1x8xf32>) -> tensor<1x?x1x8xf32>
 
 // -----
@@ -196,7 +196,7 @@ func.func @check_target_specific_mmt4d_f32_dynamic_vecmat2(%arg0: tensor<2x?xf32
 }
 // AARCH64-BASELINE-LABEL:  @check_target_specific_mmt4d_f32_dynamic_vecmat2(
 // AARCH64-BASELINE:        linalg.mmt4d
-// AARCH64-BASELINE-SAME:     {comment =  "f32*f32->f32, aarch64, vector*matrix"}
+// AARCH64-BASELINE-SAME:     {comment =  "f32*f32->f32, aarch64, vector*matrix, where the vector has 2 column(s)"}
 // AARCH64-BASELINE-SAME:     ins({{.*}} : tensor<1x?x2x1xf32>, tensor<?x?x8x1xf32>) outs({{.*}} : tensor<1x?x2x8xf32>) -> tensor<1x?x2x8xf32>
 
 // -----
@@ -226,12 +226,12 @@ func.func @check_target_specific_mmt4d_i8_dynamic_matvec(%arg0: tensor<?x?xi8>, 
 }
 // AARCH64-BASELINE-LABEL:  @check_target_specific_mmt4d_i8_dynamic_matvec(
 // AARCH64-BASELINE:        linalg.mmt4d
-// AARCH64-BASELINE-SAME:     {comment = "i8*i8->i32, aarch64, matrix*vector"}
+// AARCH64-BASELINE-SAME:     {comment = "i8*i8->i32, aarch64, matrix*vector, where the vector has 1 column(s)"}
 // AARCH64-BASELINE-SAME:     ins({{.*}} : tensor<?x?x8x8xi8>, tensor<1x?x1x8xi8>) outs({{.*}} : tensor<?x1x8x1xi32>) -> tensor<?x1x8x1xi32>
 
 // AARCH64-DOTPROD-LABEL:  @check_target_specific_mmt4d_i8_dynamic_matvec(
 // AARCH64-DOTPROD:        linalg.mmt4d
-// AARCH64-DOTPROD-SAME:     {comment = "i8*i8->i32, aarch64 +dotprod, matrix*vector"}
+// AARCH64-DOTPROD-SAME:     {comment = "i8*i8->i32, aarch64 +dotprod, matrix*vector, where the vector has 1 column(s)"}
 // AARCH64-DOTPROD-SAME:     ins({{.*}} : tensor<?x?x8x4xi8>, tensor<1x?x1x4xi8>) outs({{.*}} : tensor<?x1x8x1xi32>) -> tensor<?x1x8x1xi32>
 
 // -----
@@ -241,10 +241,10 @@ func.func @check_target_specific_mmt4d_i8_dynamic_vecmat(%arg0: tensor<1x?xi8>, 
 }
 // AARCH64-BASELINE-LABEL:  @check_target_specific_mmt4d_i8_dynamic_vecmat(
 // AARCH64-BASELINE:        linalg.mmt4d
-// AARCH64-BASELINE-SAME:     {comment = "i8*i8->i32, aarch64, vector*matrix"}
+// AARCH64-BASELINE-SAME:     {comment = "i8*i8->i32, aarch64, vector*matrix, where the vector has 1 column(s)"}
 // AARCH64-BASELINE-SAME:     ins({{.*}} : tensor<1x?x1x8xi8>, tensor<?x?x8x8xi8>) outs({{.*}} : tensor<1x?x1x8xi32>) -> tensor<1x?x1x8xi32>
 
 // AARCH64-DOTPROD-LABEL:  @check_target_specific_mmt4d_i8_dynamic_vecmat(
 // AARCH64-DOTPROD:        linalg.mmt4d
-// AARCH64-DOTPROD-SAME:     {comment = "i8*i8->i32, aarch64 +dotprod, vector*matrix"}
+// AARCH64-DOTPROD-SAME:     {comment = "i8*i8->i32, aarch64 +dotprod, vector*matrix, where the vector has 1 column(s)"}
 // AARCH64-DOTPROD-SAME:     ins({{.*}} : tensor<1x?x1x4xi8>, tensor<?x?x8x4xi8>) outs({{.*}} : tensor<1x?x1x8xi32>) -> tensor<1x?x1x8xi32>

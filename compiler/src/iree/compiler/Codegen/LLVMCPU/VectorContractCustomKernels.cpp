@@ -683,30 +683,6 @@ MMTKernel MMTKernel_8x1x1_f32f32f32_Aarch64_Baseline_InlineAsm() {
   return kernel;
 }
 
-MMTKernel MMTKernel_8x1x2_f32f32f32_Aarch64_Baseline_InlineAsm() {
-  MMTKernel kernel;
-  kernel.arch = CustomKernelTargetArch::Aarch64;
-  kernel.lhsType = MMTKernel::ScalarType::F32;
-  kernel.rhsType = MMTKernel::ScalarType::F32;
-  kernel.accType = MMTKernel::ScalarType::F32;
-  kernel.m0 = 8;
-  kernel.k0 = 1;
-  kernel.n0 = 2;
-  kernel.lhsRegSize = 4;
-  kernel.rhsRegSize = 1;
-  kernel.accRegSize = 4;
-  kernel.lhsRegs = 2;
-  kernel.rhsRegs = 2;
-  kernel.accRegs = 4;
-  kernel.asmImpl = R"ASM(
-      fmla $(acc:0).4s, $(lhs:0).4s, $(rhs:0).s[0]
-      fmla $(acc:1).4s, $(lhs:0).4s, $(rhs:0).s[1]
-      fmla $(acc:2).4s, $(lhs:1).4s, $(rhs:0).s[0]
-      fmla $(acc:3).4s, $(lhs:1).4s, $(rhs:0).s[1]
-    )ASM";
-  return kernel;
-}
-
 // Constructs the mlir::Type corresponding to a scalar type.
 Type mlirType(MLIRContext *context, MMTKernel::ScalarType t) {
   switch (t) {
@@ -973,6 +949,7 @@ class MMTCustomKernelPattern : public OpRewritePattern<vector::ContractionOp> {
     // destination scalar type is one that we know how to handle.
     VectorType flatAccVectorType =
         VectorType::get({accType.getNumElements()}, accType.getElementType());
+    ;
     Attribute resultInitializer;
     if (accElemType.isSignlessInteger()) {
       resultInitializer = DenseIntElementsAttr::get(flatAccVectorType, 0);
@@ -1198,8 +1175,6 @@ void populateVectorContractCustomKernelsPatterns(
         context, MMTKernel_8x1x8_f32f32f32_Aarch64_Baseline_InlineAsm());
     patterns.add<MMTCustomKernelPattern>(
         context, MMTKernel_8x1x1_f32f32f32_Aarch64_Baseline_InlineAsm());
-    patterns.add<MMTCustomKernelPattern>(
-        context, MMTKernel_8x1x2_f32f32f32_Aarch64_Baseline_InlineAsm());
     patterns.add<MMTCustomKernelPattern>(
         context, MMTKernel_8x1x8_i8i8i32_Aarch64_Baseline_InlineAsm());
     patterns.add<MMTCustomKernelPattern>(

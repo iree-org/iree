@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <algorithm>
 #include <array>
 
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
@@ -331,39 +332,50 @@ LinalgMatmulOpToLinalgMmt4DOpPattern::chooseTileParams(Value lhs, Value rhs,
   int64_t shapeN = rhsType.getShape()[1];
   auto chooseMatMulOrMatVec = [=](ArrayRef<int> m0k0n0,
                                   ArrayRef<int> m0k0n0ForMatVec,
+                                  ArrayRef<int> m0k0n0ForWhenRhsHas2Columns,
                                   std::string comment) {
     assert(m0k0n0ForMatVec[2] == 1 && "not a matrix*vector shape");
-    if (shapeN == 1 || shapeN == 2) {
-      int config[3] = {m0k0n0ForMatVec[0], m0k0n0ForMatVec[1],
-                       static_cast<int>(shapeN)};
-      return Mmt4DTileParams(config, comment + ", matrix*vector");
-    } else if (shapeM == 1 || shapeM == 2) {
-      // The vector*matrix case is intentionally derived from the matrix*vector
-      // case by swapping M and N dims so that in kernel codegen we can reuse
-      // matrix*vector kernels by swapping LHS and RHS.
-      int config[3] = {static_cast<int>(shapeM), m0k0n0ForMatVec[1],
-                       m0k0n0ForMatVec[0]};
-      return Mmt4DTileParams(config, comment + ", vector*matrix");
+    assert(m0k0n0ForWhenRhsHas2Columns[2] == 2 && "not a matrix*vector2 shape");
+
+    SmallVector<int> config;
+    if (shapeN == 1 || shapeM == 1) {
+      config.assign(m0k0n0ForMatVec.begin(), m0k0n0ForMatVec.end());
+    } else if (shapeN == 2 || shapeM == 2) {
+      config.assign(m0k0n0ForWhenRhsHas2Columns.begin(),
+                    m0k0n0ForWhenRhsHas2Columns.end());
     } else {
       return Mmt4DTileParams(m0k0n0, comment);
     }
+
+    if (shapeN == 1 || shapeN == 2) {
+      comment += ", matrix*vector, where the vector has " +
+                 std::to_string(shapeN) + " column(s)";
+    } else {
+      // The vector*matrix case is intentionally derived from the matrix*vector
+      // case by swapping M and N dims so that in kernel codegen we can reuse
+      // matrix*vector kernels by swapping LHS and RHS.
+      std::reverse(config.begin(), config.end());
+      comment += ", vector*matrix, where the vector has " +
+                 std::to_string(shapeM) + " column(s)";
+    }
+    return Mmt4DTileParams(config, comment);
   };
   if (targetInfo.is(CustomKernelTargetArch::Aarch64)) {
     if (lhsElemType.isSignlessInteger(8) && rhsElemType.isSignlessInteger(8) &&
         accElemType.isSignlessInteger(32)) {
       if (targetInfo.has(CustomKernelTargetFeature::Aarch64I8mm)) {
-        return chooseMatMulOrMatVec({8, 8, 8}, {8, 8, 1},
+        return chooseMatMulOrMatVec({8, 8, 8}, {8, 8, 1}, {8, 8, 2},
                                     "i8*i8->i32, aarch64 +i8mm");
       } else if (targetInfo.has(CustomKernelTargetFeature::Aarch64Dotprod)) {
-        return chooseMatMulOrMatVec({8, 4, 8}, {8, 4, 1},
+        return chooseMatMulOrMatVec({8, 4, 8}, {8, 4, 1}, {8, 4, 2},
                                     "i8*i8->i32, aarch64 +dotprod");
       } else {
-        return chooseMatMulOrMatVec({8, 1, 8}, {8, 8, 1},
+        return chooseMatMulOrMatVec({8, 1, 8}, {8, 8, 1}, {8, 8, 2},
                                     "i8*i8->i32, aarch64");
       }
     }
     if (lhsElemType.isF32() && rhsElemType.isF32() && accElemType.isF32()) {
-      return chooseMatMulOrMatVec({8, 1, 8}, {8, 1, 1},
+      return chooseMatMulOrMatVec({8, 1, 8}, {8, 1, 1}, {8, 1, 2},
                                   "f32*f32->f32, aarch64");
     }
   }
@@ -371,7 +383,7 @@ LinalgMatmulOpToLinalgMmt4DOpPattern::chooseTileParams(Value lhs, Value rhs,
   // test coverage for Mmt4d where we do not currently have kernels.
   if (enableGenericSlow) {
     return chooseMatMulOrMatVec(
-        {8, 2, 4}, {8, 2, 1},  // arbitrary values.
+        {8, 2, 4}, {8, 2, 1}, {8, 2, 2},  // arbitrary values.
         "generic tiling parameters, as no known kernel was "
         "matched for this matmul and target");
   }
