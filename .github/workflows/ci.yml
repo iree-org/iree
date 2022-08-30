@@ -643,14 +643,8 @@ jobs:
       matrix:
         target:
           - platform: "riscv"
-            architecture: "rv32-baremetal"
-            docker_image: "gcr.io/iree-oss/riscv@sha256:720bc0215d8462ea14352edc22710a6ce4c0c1daff581d179dd173885f1d8a35"
-            # Tracy runtime can't be built on baremetal yet.
-            enable_tracing: false
-          - platform: "riscv"
             architecture: "rv64"
             docker_image: "gcr.io/iree-oss/riscv@sha256:720bc0215d8462ea14352edc22710a6ce4c0c1daff581d179dd173885f1d8a35"
-            enable_tracing: true
     outputs:
       benchmark-tools-gcs-artifacts: ${{ toJSON(steps.upload.outputs) }}
     env:
@@ -682,7 +676,6 @@ jobs:
             bash -euo pipefail -c "./build_tools/cmake/build_${PLATFORM}.sh"
       - name: "Compiling the benchmark tools with tracing"
         id: build-with-tracing
-        if: ${{ matrix.target.enable_tracing }}
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "BUILD_ARCH=${ARCHITECTURE}" \
@@ -697,7 +690,7 @@ jobs:
           BENCHMARK_TOOLS_ARCHIVE: ${{ matrix.target.platform }}-${{ matrix.target.architecture }}-benchmarks-tools.tar
         run: |
           tar -cf ${BENCHMARK_TOOLS_ARCHIVE} \
-            ${BUILD_TOOLS_DIR}/normal/tools/iree-benchmark-module
+            ${BUILD_TOOLS_DIR}/*/tools/iree-benchmark-module
           echo "::set-output name=benchmark-tools-archive::${BENCHMARK_TOOLS_ARCHIVE}"
       - name: "Uploading the benchmark tools archive"
         id: upload
