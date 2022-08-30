@@ -89,6 +89,7 @@ iree_cc_library(
     MhloToLinalg
     MhloToMemrefConversion
     MhloToStandard
+    StablehloBroadcastUtils
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
