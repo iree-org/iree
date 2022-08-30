@@ -292,7 +292,7 @@ class IREEBenchmark {
     iree_vm_instance_release(instance_);
 
     // Tear down device last in order to get accurate statistics.
-    if (FLAG_print_statistics) {
+    if (device_allocator_ && FLAG_print_statistics) {
       IREE_IGNORE_ERROR(
           iree_hal_allocator_statistics_fprint(stderr, device_allocator_));
     }
