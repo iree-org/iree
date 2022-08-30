@@ -42,15 +42,15 @@ def iree_c_module(
     """
 
     out_files = [h_file_output]
-    module_flags = ["--output-format=vm-c"]
+    flags.append("--output-format=vm-c")
     if static_lib_path:
         static_header_path = static_lib_path.replace(".o", ".h")
         out_files.extend([static_lib_path, static_header_path])
-        module_flags.extend([
+        flags += [
             "--iree-llvm-link-embedded=false",
             "--iree-llvm-link-static",
             "--iree-llvm-static-library-output-path=$(location %s)" % (static_lib_path),
-        ])
+        ]
 
     native.genrule(
         name = name + "_gen",
@@ -59,7 +59,7 @@ def iree_c_module(
         cmd = " && ".join([
             " ".join([
                 "$(location %s)" % (compile_tool),
-                " ".join(module_flags + flags),
+                " ".join(flags),
                 "-o $(location %s)" % (h_file_output),
                 "$(location %s)" % (src),
             ]),
@@ -69,24 +69,19 @@ def iree_c_module(
         output_to_bindir = 1,
         **kwargs
     )
+    src_files = [h_file_output]
+    deps_list = None
+    if not no_runtime:
+        src_files.append("//runtime/src/iree/vm:module_impl_emitc.c")
+        deps_list = deps
 
-    if no_runtime:
-        iree_runtime_cc_library(
-            name = name,
-            hdrs = [h_file_output],
-            copts = [
-                "-DEMITC_IMPLEMENTATION='\"$(location %s)\"'" % h_file_output,
-            ],
-            **kwargs
-        )
-    else:
-        iree_runtime_cc_library(
-            name = name,
-            hdrs = [h_file_output],
-            srcs = ["//runtime/src/iree/vm:module_impl_emitc.c", h_file_output],
-            copts = [
-                "-DEMITC_IMPLEMENTATION='\"$(location %s)\"'" % h_file_output,
-            ],
-            deps = deps,
-            **kwargs
-        )
+    iree_runtime_cc_library(
+        name = name,
+        hdrs = [h_file_output],
+        srcs = src_files,
+        copts = [
+            "-DEMITC_IMPLEMENTATION='\"$(location %s)\"'" % h_file_output,
+        ],
+        deps = deps_list,
+        **kwargs
+    )

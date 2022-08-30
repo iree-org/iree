@@ -45,15 +45,15 @@ def iree_bytecode_module(
         module_name = "%s.vmfb" % (name)
 
     out_files = [module_name]
-    module_flags = ["--output-format=vm-bytecode"]
+    flags.append("--output-format=vm-bytecode")
     if static_lib_path:
         static_header_path = static_lib_path.replace(".o", ".h")
         out_files.extend([static_lib_path, static_header_path])
-        module_flags.extend([
+        flags += [
             "--iree-llvm-link-embedded=false",
             "--iree-llvm-link-static",
             "--iree-llvm-static-library-output-path=$(location %s)" % (static_lib_path),
-        ])
+        ]
 
     native.genrule(
         name = name,
@@ -62,7 +62,7 @@ def iree_bytecode_module(
         cmd = " && ".join([
             " ".join([
                 "$(location %s)" % (compile_tool),
-                " ".join(module_flags + flags),
+                " ".join(flags),
                 "--iree-llvm-embedded-linker-path=$(location %s)" % (linker_tool),
                 "--iree-llvm-wasm-linker-path=$(location %s)" % (linker_tool),
                 # Note: --iree-llvm-system-linker-path is left unspecified.
