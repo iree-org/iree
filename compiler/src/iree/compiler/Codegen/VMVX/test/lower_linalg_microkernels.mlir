@@ -93,7 +93,7 @@ func.func @matmul_i8i8i32_row_major(%arg0 : memref<64x64xi32>, %arg1 : memref<64
 //  CHECK-SAME:   rhs(%[[BB2]] offset %[[OFFSET2]] row_stride %[[STRIDES2]]#0 : !util.buffer)
 //  CHECK-SAME:   out(%[[BB0]] offset %[[OFFSET0]] row_stride %[[STRIDES0]]#0 : !util.buffer)
 //  CHECK-SAME:   mnk(%[[SIZES1]]#0, %[[SIZES2]]#0, %[[SIZES2]]#1)
-//  CHECK-SAME:   m0n0k0(%[[SIZES1]]#2, %[[SIZES2]]#2, %[[SIZES2]]#3)
+//  CHECK-SAME:   tile_mnk(%[[SIZES1]]#2, %[[SIZES2]]#2, %[[SIZES2]]#3)
 //  CHECK-SAME:   flags(1)
 func.func @mmt4d_f32f32f32(%arg0 : memref<5x4x7x3xf32>, %arg1 : memref<5x6x7x8xf32>, %arg2 : memref<4x6x3x8xf32>) {
   linalg.mmt4d
@@ -110,7 +110,7 @@ func.func @mmt4d_f32f32f32(%arg0 : memref<5x4x7x3xf32>, %arg1 : memref<5x6x7x8xf
 //  CHECK-SAME:   rhs(%[[BB2]] offset %[[OFFSET2]] row_stride %[[STRIDES2]]#0 : !util.buffer)
 //  CHECK-SAME:   out(%[[BB0]] offset %[[OFFSET0]] row_stride %[[STRIDES0]]#0 : !util.buffer)
 //  CHECK-SAME:   mnk(%[[SIZES1]]#0, %[[SIZES2]]#0, %[[SIZES2]]#1)
-//  CHECK-SAME:   m0n0k0(%[[SIZES1]]#2, %[[SIZES2]]#2, %[[SIZES2]]#3)
+//  CHECK-SAME:   tile_mnk(%[[SIZES1]]#2, %[[SIZES2]]#2, %[[SIZES2]]#3)
 //  CHECK-SAME:   flags(1)
 func.func @mmt4d_i8i8i32(%arg0 : memref<5x4x7x3xi32>, %arg1 : memref<5x6x7x8xi8>, %arg2 : memref<4x6x3x8xi8>) {
   linalg.mmt4d

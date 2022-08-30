@@ -11,7 +11,7 @@ func.func @mmt4d_f32f32f32(
     %arg6 : !util.buffer, %arg7 : index, %arg8 : index,
     // MNK
     %arg9 : index, %arg10 : index, %arg11 : index,
-    // M0N0K0
+    // TILE_MNK
     %arg12 : index, %arg13 : index, %arg14 : index
     ) {
 
@@ -26,7 +26,7 @@ func.func @mmt4d_f32f32f32(
              rhs(%arg3 offset %arg4 row_stride %arg5 : !util.buffer)
              out(%arg6 offset %arg7 row_stride %arg8 : !util.buffer)
              mnk(%arg9, %arg10, %arg11)
-             m0n0k0(%arg12, %arg13, %arg14)
+             tile_mnk(%arg12, %arg13, %arg14)
              flags(1) : (f32, f32, f32)
   func.return
 }
@@ -41,7 +41,7 @@ func.func @mmt4d_i8i8i32(
     %arg6 : !util.buffer, %arg7 : index, %arg8 : index,
     // MNK
     %arg9 : index, %arg10 : index, %arg11 : index,
-    // M0N0K0
+    // TILE_MNK
     %arg12 : index, %arg13 : index, %arg14 : index
     ) {
 
@@ -56,7 +56,7 @@ func.func @mmt4d_i8i8i32(
              rhs(%arg3 offset %arg4 row_stride %arg5 : !util.buffer)
              out(%arg6 offset %arg7 row_stride %arg8 : !util.buffer)
              mnk(%arg9, %arg10, %arg11)
-             m0n0k0(%arg12, %arg13, %arg14)
+             tile_mnk(%arg12, %arg13, %arg14)
              flags(1) : (i8, i8, i32)
   func.return
 }

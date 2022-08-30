@@ -79,7 +79,7 @@ void leftPadToRank(Location loc, SmallVectorImpl<Value> &indices,
 // asking for the strides of all but the outermost dimension to equal the
 // product of the static sizes inner dimensions past them --- so in particular,
 // this is requiring all but the outer two dimensions to have a static size.
-bool areInnerDimsContiguousRowMajor(MemRefType type) {
+bool verifyMemRefInnerDimsContiguousRowMajor(MemRefType type) {
   int rank = type.getRank();
   if (rank <= 1) {
     return true;
@@ -131,7 +131,7 @@ struct StridedBufferDescriptor {
   // Returns true if all inner dimensions (that is, all but the outer-most dim)
   // are statically known to be contiguous row-major.
   bool areInnerDimsContiguousRowMajor() const {
-    return ::mlir::iree_compiler::areInnerDimsContiguousRowMajor(memRefType);
+    return verifyMemRefInnerDimsContiguousRowMajor(memRefType);
   }
 
   /// Casts the memref to a memref<?x...> that is safe for linear access
@@ -168,7 +168,7 @@ class StridedBufferAnalysis {
   // Returns true if all inner dimensions (that is, all but the outer-most dim)
   // are statically known to be contiguous row-major.
   bool areInnerDimsContiguousRowMajor() {
-    return ::mlir::iree_compiler::areInnerDimsContiguousRowMajor(getType());
+    return verifyMemRefInnerDimsContiguousRowMajor(getType());
   }
 
   StridedBufferDescriptor &getDesc(OpBuilder &builder) {
