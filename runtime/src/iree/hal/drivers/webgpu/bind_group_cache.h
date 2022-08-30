@@ -9,7 +9,7 @@
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
-#include "iree/hal/drivers/webgpu/descriptor_set_layout.h"
+#include "iree/hal/drivers/webgpu/pipeline_layout.h"
 #include "iree/hal/drivers/webgpu/platform/webgpu.h"
 
 #ifdef __cplusplus

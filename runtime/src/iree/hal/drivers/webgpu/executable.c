@@ -11,7 +11,6 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/inline_array.h"
 #include "iree/base/tracing.h"
-#include "iree/hal/drivers/webgpu/executable_layout.h"
 
 // flatcc schemas:
 #include "iree/base/internal/flatcc/parsing.h"
@@ -164,10 +163,10 @@ static void iree_hal_webgpu_make_entry_name(uint32_t entry_ordinal,
 // them all synchronously.
 static iree_status_t iree_hal_webgpu_create_pipeline(
     WGPUDevice device, WGPUShaderModule shader_module, uint32_t entry_ordinal,
-    iree_hal_executable_layout_t* executable_layout,
+    iree_hal_pipeline_layout_t* pipeline_layout,
     iree_hal_webgpu_entry_point_t* out_entry_point) {
   IREE_ASSERT_ARGUMENT(shader_module);
-  IREE_ASSERT_ARGUMENT(executable_layout);
+  IREE_ASSERT_ARGUMENT(pipeline_layout);
   IREE_ASSERT_ARGUMENT(out_entry_point);
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -177,7 +176,7 @@ static iree_status_t iree_hal_webgpu_create_pipeline(
   const WGPUComputePipelineDescriptor pipeline_descriptor = {
       .nextInChain = NULL,
       .label = WGPU_DEBUG_LABEL(entry_name),
-      .layout = iree_hal_webgpu_executable_layout_handle(executable_layout),
+      .layout = iree_hal_webgpu_pipeline_layout_handle(pipeline_layout),
       .compute =
           {
               .nextInChain = NULL,
@@ -198,8 +197,8 @@ static iree_status_t iree_hal_webgpu_create_pipeline(
 
   if (iree_status_is_ok(status)) {
     out_entry_point->pipeline = pipeline;
-    out_entry_point->layout = executable_layout;
-    iree_hal_executable_layout_retain(executable_layout);
+    out_entry_point->layout = pipeline_layout;
+    iree_hal_pipeline_layout_retain(pipeline_layout);
   }
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -229,7 +228,7 @@ iree_status_t iree_hal_webgpu_executable_create(
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_webgpu_executable_flatbuffer_verify(
               executable_params->executable_data,
-              executable_params->executable_layout_count));
+              executable_params->pipeline_layout_count));
   iree_WGSLExecutableDef_table_t executable_def =
       iree_WGSLExecutableDef_as_root(executable_params->executable_data.data);
 
@@ -256,7 +255,7 @@ iree_status_t iree_hal_webgpu_executable_create(
   iree_hal_webgpu_executable_t* executable = NULL;
   if (iree_status_is_ok(status)) {
     iree_host_size_t total_size =
-        sizeof(*executable) + executable_params->executable_layout_count *
+        sizeof(*executable) + executable_params->pipeline_layout_count *
                                   sizeof(iree_hal_webgpu_entry_point_t);
     status =
         iree_allocator_malloc(host_allocator, total_size, (void**)&executable);
@@ -266,7 +265,7 @@ iree_status_t iree_hal_webgpu_executable_create(
     iree_hal_resource_initialize(&iree_hal_webgpu_executable_vtable,
                                  &executable->resource);
     executable->host_allocator = host_allocator;
-    executable->entry_point_count = executable_params->executable_layout_count;
+    executable->entry_point_count = executable_params->pipeline_layout_count;
 
     // Create one pipeline per entry point.
     flatbuffers_uint32_vec_t entry_points_vec =
@@ -275,8 +274,7 @@ iree_status_t iree_hal_webgpu_executable_create(
       uint32_t module_ordinal = flatbuffers_uint32_vec_at(entry_points_vec, i);
       status = iree_hal_webgpu_create_pipeline(
           device, *iree_inline_array_at(shader_modules, module_ordinal), i,
-          executable_params->executable_layouts[i],
-          &executable->entry_points[i]);
+          executable_params->pipeline_layouts[i], &executable->entry_points[i]);
       if (!iree_status_is_ok(status)) break;
     }
   }
@@ -304,7 +302,7 @@ static void iree_hal_webgpu_executable_destroy(
 
   for (iree_host_size_t i = 0; i < executable->entry_point_count; i++) {
     iree_hal_webgpu_entry_point_t* entry_point = &executable->entry_points[i];
-    iree_hal_executable_layout_release(entry_point->layout);
+    iree_hal_pipeline_layout_release(entry_point->layout);
     iree_wgpuComputePipelineDrop(entry_point->pipeline);
   }
   iree_allocator_free(host_allocator, executable);

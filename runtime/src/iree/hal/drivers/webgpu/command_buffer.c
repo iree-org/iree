@@ -14,7 +14,7 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/webgpu/buffer.h"
 #include "iree/hal/drivers/webgpu/executable.h"
-#include "iree/hal/drivers/webgpu/executable_layout.h"
+#include "iree/hal/drivers/webgpu/pipeline_layout.h"
 
 //===----------------------------------------------------------------------===//
 // Segmented submission management
@@ -180,7 +180,7 @@ iree_status_t iree_hal_webgpu_command_buffer_create(
     iree_hal_device_t* device, WGPUDevice device_handle,
     iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
-    iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
     iree_arena_block_pool_t* block_pool,
     iree_hal_webgpu_staging_buffer_t* staging_buffer,
     iree_hal_webgpu_bind_group_cache_t* bind_group_cache,
@@ -193,6 +193,13 @@ iree_status_t iree_hal_webgpu_command_buffer_create(
   IREE_ASSERT_ARGUMENT(builtins);
   IREE_ASSERT_ARGUMENT(out_command_buffer);
   *out_command_buffer = NULL;
+
+  if (binding_capacity > 0) {
+    // TODO(#10144): support indirect command buffers with binding tables.
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "indirect command buffers not yet implemented");
+  }
+
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_webgpu_command_buffer_t* command_buffer = NULL;
@@ -200,7 +207,7 @@ iree_status_t iree_hal_webgpu_command_buffer_create(
       host_allocator, sizeof(*command_buffer), (void**)&command_buffer);
   if (iree_status_is_ok(status)) {
     iree_hal_command_buffer_initialize(
-        device, mode, command_categories, queue_affinity,
+        device, mode, command_categories, queue_affinity, binding_capacity,
         &iree_hal_webgpu_command_buffer_vtable, &command_buffer->base);
     command_buffer->host_allocator = host_allocator;
     command_buffer->device = device_handle;
@@ -711,7 +718,7 @@ static iree_status_t iree_hal_webgpu_command_buffer_copy_buffer(
 
 static iree_status_t iree_hal_webgpu_command_buffer_push_constants(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_layout_t* executable_layout, iree_host_size_t offset,
+    iree_hal_pipeline_layout_t* pipeline_layout, iree_host_size_t offset,
     const void* values, iree_host_size_t values_length) {
   iree_hal_webgpu_command_buffer_t* command_buffer =
       iree_hal_webgpu_command_buffer_cast(base_command_buffer);
@@ -732,7 +739,7 @@ static iree_status_t iree_hal_webgpu_command_buffer_push_constants(
 
 static iree_status_t iree_hal_webgpu_command_buffer_push_descriptor_set(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_layout_t* executable_layout, uint32_t set,
+    iree_hal_pipeline_layout_t* pipeline_layout, uint32_t set,
     iree_host_size_t binding_count,
     const iree_hal_descriptor_set_binding_t* bindings) {
   iree_hal_webgpu_command_buffer_t* command_buffer =
@@ -758,23 +765,14 @@ static iree_status_t iree_hal_webgpu_command_buffer_push_descriptor_set(
     // tagging whether it's dynamic here.
     group_binding->type = WGPUBufferBindingType_Storage;
 
-    group_binding->buffer = iree_hal_webgpu_buffer_handle(bindings[i].buffer);
+    group_binding->buffer =
+        bindings[i].buffer ? iree_hal_webgpu_buffer_handle(bindings[i].buffer)
+                           : NULL;
     group_binding->offset = bindings[i].offset;
     group_binding->length = bindings[i].length;
   }
 
   return iree_ok_status();
-}
-
-static iree_status_t iree_hal_webgpu_command_buffer_bind_descriptor_set(
-    iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_layout_t* executable_layout, uint32_t set,
-    iree_hal_descriptor_set_t* descriptor_set,
-    iree_host_size_t dynamic_offset_count,
-    const iree_device_size_t* dynamic_offsets) {
-  return iree_make_status(
-      IREE_STATUS_UNIMPLEMENTED,
-      "iree_hal_webgpu_command_buffer_bind_descriptor_set not yet implemented");
 }
 
 static iree_status_t iree_hal_webgpu_command_buffer_prepare_dispatch(
@@ -787,8 +785,7 @@ static iree_status_t iree_hal_webgpu_command_buffer_prepare_dispatch(
   // Upload push constant data - this may incur a segment flush if the staging
   // buffer is exhausted.
   iree_host_size_t push_constant_count =
-      iree_hal_webgpu_executable_layout_push_constant_count(
-          entry_point->layout);
+      iree_hal_webgpu_pipeline_layout_push_constant_count(entry_point->layout);
   iree_const_byte_span_t push_constant_data = iree_make_const_byte_span(
       command_buffer->state.push_constants,
       push_constant_count * sizeof(command_buffer->state.push_constants[0]));
@@ -811,7 +808,7 @@ static iree_status_t iree_hal_webgpu_command_buffer_prepare_dispatch(
 
   // Set all bindings.
   const iree_hal_webgpu_set_binding_info_t* binding_info =
-      iree_hal_webgpu_executable_layout_set_binding_info(entry_point->layout);
+      iree_hal_webgpu_pipeline_layout_set_binding_info(entry_point->layout);
   for (iree_host_size_t i = 0; i < binding_info->set_count; ++i) {
     // If there are no bindings in this set we can skip it.
     if (binding_info->set_masks[i] == 0) continue;
@@ -875,6 +872,18 @@ static iree_status_t iree_hal_webgpu_command_buffer_dispatch_indirect(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_webgpu_command_buffer_execute_commands(
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_command_buffer_t* base_commands,
+    iree_hal_buffer_binding_table_t binding_table) {
+  // TODO(#10144): support indirect command buffers via deferred command buffers
+  // as WebGPU has no concept of reusable dispatch command encoders. One day
+  // hopefully there's an equivalent of GPURenderBundle but given WebGPU's other
+  // limitations it may not be useful.
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "indirect command buffers not yet implemented");
+}
+
 const iree_hal_command_buffer_vtable_t iree_hal_webgpu_command_buffer_vtable = {
     .destroy = iree_hal_webgpu_command_buffer_destroy,
     .dyn_cast = iree_hal_webgpu_command_buffer_dyn_cast,
@@ -892,7 +901,7 @@ const iree_hal_command_buffer_vtable_t iree_hal_webgpu_command_buffer_vtable = {
     .copy_buffer = iree_hal_webgpu_command_buffer_copy_buffer,
     .push_constants = iree_hal_webgpu_command_buffer_push_constants,
     .push_descriptor_set = iree_hal_webgpu_command_buffer_push_descriptor_set,
-    .bind_descriptor_set = iree_hal_webgpu_command_buffer_bind_descriptor_set,
     .dispatch = iree_hal_webgpu_command_buffer_dispatch,
     .dispatch_indirect = iree_hal_webgpu_command_buffer_dispatch_indirect,
+    .execute_commands = iree_hal_webgpu_command_buffer_execute_commands,
 };
