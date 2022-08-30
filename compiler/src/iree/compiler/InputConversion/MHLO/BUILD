@@ -113,5 +113,7 @@ iree_compiler_cc_library(
         "@mlir-hlo//:mhlo_to_mhlo_lowering_patterns",
         "@mlir-hlo//:mlir_hlo",
         "@mlir-hlo//:unfuse_batch_norm",
+        "@mlir-hlo//stablehlo:broadcast_utils",
+        "@mlir-hlo//stablehlo:chlo_ops",
     ],
 )

@@ -64,7 +64,7 @@ EXPLICIT_TARGET_MAPPING = {
     ],
     "@mlir-hlo//:mlir_hlo": [
         "tensorflow::external_mhlo_includes",
-        "ChloDialect",
+        "ChloOps",
         "MhloDialect",
         "MLIRMhloUtils",
     ],
@@ -109,7 +109,7 @@ EXPLICIT_TARGET_MAPPING = {
         "MhloToStandard",
     ],
     "@mlir-hlo//:map_chlo_to_hlo_op": [
-        "ChloDialect",
+        "ChloOps",
         "MhloDialect",
     ],
     "@mlir-hlo//:map_lmhlo_to_scalar_op": [

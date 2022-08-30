@@ -53,7 +53,7 @@ iree_cc_library(
   DEPS
     ::PassHeaders
     ::PassesIncGen
-    ChloDialect
+    ChloOps
     ChloPasses
     IREELinalgExtDialect
     IREELinalgExtPasses
