@@ -168,6 +168,7 @@ jobs:
         # run in (to ensure correct cache hits).
         run: |
           ./build_tools/github_actions/docker_run.sh \
+            --env "IREE_BAZEL_WRITE_REMOTE_CACHE=${IREE_BAZEL_WRITE_REMOTE_CACHE}" \
             gcr.io/iree-oss/frontends-swiftshader@sha256:41e516b8c1b432e3c02896c4bf4b7f06df6a67371aa167b88767b8d4d2018ea6 \
             ./build_tools/bazel/build_core.sh
 
@@ -330,6 +331,7 @@ jobs:
           IREE_BAZEL_WRITE_REMOTE_CACHE: ${{ github.event_name != 'pull_request' && 1 || 0 }}
         run: |
           ./build_tools/github_actions/docker_run.sh \
+            --env "IREE_BAZEL_WRITE_REMOTE_CACHE=${IREE_BAZEL_WRITE_REMOTE_CACHE}" \
             --env "IREE_TF_BINARIES_OUTPUT_DIR=$(realpath "${IREE_TF_BINARIES_OUTPUT_DIR}")" \
             gcr.io/iree-oss/frontends-swiftshader@sha256:3090418a8d8a64c356d35eff285af32570a72f41127aa123209c1562f57abb01 \
             build_tools/cmake/build_tf_binaries.sh
