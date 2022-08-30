@@ -13,7 +13,7 @@
 # Host binaries (e.g. compiler tools) will be built and installed in build-host/
 # RISCV binaries (e.g. tests) will be built in build-riscv/.
 #
-# BUILD_PRESET can be: test, benchmark, benchmark_with_tracing to build with
+# BUILD_PRESET can be: test, benchmark, benchmark-with-tracing to build with
 # different flags.
 
 set -xeuo pipefail
@@ -81,7 +81,7 @@ case "${BUILD_PRESET}" in
       -DIREE_BUILD_TESTS=OFF
     )
     ;;
-  benchmark_with_tracing)
+  benchmark-with-tracing)
     args+=(
       -DIREE_ENABLE_ASSERTIONS=OFF
       -DIREE_BUILD_SAMPLES=OFF
