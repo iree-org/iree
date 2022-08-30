@@ -12,6 +12,9 @@
 #
 # Host binaries (e.g. compiler tools) will be built and installed in build-host/
 # RISCV binaries (e.g. tests) will be built in build-riscv/.
+#
+# BUILD_PRESET can be: test, benchmark, benchmark_with_tracing to build with
+# different flags.
 
 set -xeuo pipefail
 
@@ -23,6 +26,7 @@ RISCV_CONFIG="${RISCV_CONFIG:-rv64}"
 RISCV_COMPILER_FLAGS="${RISCV_COMPILER_FLAGS:--O3}"
 IREE_HOST_BINARY_ROOT="$(realpath ${IREE_HOST_BINARY_ROOT})"
 BUILD_RISCV_DIR="${BUILD_RISCV_DIR:-$ROOT_DIR/build-riscv}"
+BUILD_PRESET="${BUILD_PRESET:-test}"
 
 # --------------------------------------------------------------------------- #
 # Build for the target (riscv).
@@ -43,11 +47,9 @@ args=(
   -DIREE_HOST_BINARY_ROOT="${IREE_HOST_BINARY_ROOT}"
   -DRISCV_CPU="${RISCV_CONFIG}"
   -DRISCV_COMPILER_FLAGS="${RISCV_COMPILER_FLAGS}"
-  -DIREE_ENABLE_ASSERTIONS=ON
   -DIREE_BUILD_COMPILER=OFF
   # CPU info doesn't work on RISCV
   -DIREE_ENABLE_CPUINFO=OFF
-  -DIREE_BUILD_SAMPLES=ON
 )
 
 if [[ "${RISCV_CONFIG}" == "rv64" ]]; then
@@ -64,6 +66,35 @@ else
   echo "riscv config not supported yet"
   return -1
 fi
+
+case "${BUILD_PRESET}" in
+  test)
+    args+=(
+      -DIREE_ENABLE_ASSERTIONS=ON
+      -DIREE_BUILD_SAMPLES=ON
+      -DIREE_BUILD_TESTS=ON
+    )
+    ;;
+  benchmark)
+    args+=(
+      -DIREE_ENABLE_ASSERTIONS=OFF
+      -DIREE_BUILD_SAMPLES=OFF
+      -DIREE_BUILD_TESTS=OFF
+    )
+    ;;
+  benchmark_with_tracing)
+    args+=(
+      -DIREE_ENABLE_ASSERTIONS=OFF
+      -DIREE_BUILD_SAMPLES=OFF
+      -DIREE_BUILD_TESTS=OFF
+      -DIREE_ENABLE_RUNTIME_TRACING=ON
+    )
+    ;;
+  *)
+    echo "Unknown build preset: ${BUILD_PRESET}"
+    exit 1
+    ;;
+esac
 
 args_str=$(IFS=' ' ; echo "${args[*]}")
 "${CMAKE_BIN}" ${args_str} "${ROOT_DIR}"
