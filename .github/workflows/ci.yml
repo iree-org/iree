@@ -621,6 +621,7 @@ jobs:
           ./build_tools/github_actions/docker_run.sh \
             --env "BUILD_ARCH=${BUILD_ARCH}" \
             --env "BUILD_TARGET_DIR=${BUILD_TARGET_DIR}" \
+            --env "BUILD_RISCV_DIR=${BUILD_TARGET_DIR}" \
             --env "BUILD_PRESET=test" \
             --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
             --env "IREE_IMPORT_TFLITE_BIN=${TF_BINARIES_DIR}/iree-import-tflite" \
