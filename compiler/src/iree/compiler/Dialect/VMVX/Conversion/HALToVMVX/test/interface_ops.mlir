@@ -18,7 +18,8 @@ memref.global "private" constant @__constant_5xi32 : memref<5xi32> = dense<[1, 2
 //  CHECK-SAME:   %[[WORKGROUP_SIZE_Z:[a-z0-9]+]]: index,
 //  CHECK-SAME:   %[[WORKGROUP_COUNT_X:[a-z0-9]+]]: index,
 //  CHECK-SAME:   %[[WORKGROUP_COUNT_Y:[a-z0-9]+]]: index,
-//  CHECK-SAME:   %[[WORKGROUP_COUNT_Z:[a-z0-9]+]]: index) {
+//  CHECK-SAME:   %[[WORKGROUP_COUNT_Z:[a-z0-9]+]]: index,
+//  CHECK-SAME:   %[[PROCESSOR_ID:.+]]: i32) {
 func.func @entry() {
   %cst = arith.constant 0.000000e+00 : f32
   %c5 = arith.constant 5 : index

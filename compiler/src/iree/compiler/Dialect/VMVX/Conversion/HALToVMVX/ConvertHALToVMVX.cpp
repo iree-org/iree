@@ -64,7 +64,8 @@ enum EntryArgOrdinals {
 ///       %workgroup_size_z: index,
 ///       %workgroup_count_x: index,
 ///       %workgroup_count_y: index,
-///       %workgroup_count_z: index
+///       %workgroup_count_z: index,
+///       %processor_id: i32
 ///   )
 LogicalResult updateHALToVMVXEntryFuncOp(func::FuncOp funcOp,
                                          TypeConverter &typeConverter) {
@@ -76,6 +77,7 @@ LogicalResult updateHALToVMVXEntryFuncOp(func::FuncOp funcOp,
   auto bufferType = IREE::Util::BufferType::get(funcOp.getContext());
   auto bindingsType = IREE::Util::ListType::get(bufferType);  // of i8
   auto indexType = IndexType::get(funcOp.getContext());
+  auto i32Type = IntegerType::get(funcOp.getContext(), 32);
   auto newType = FunctionType::get(funcOp.getContext(),
                                    {
                                        /*local_memory=*/bufferType,  // of i8
@@ -90,6 +92,7 @@ LogicalResult updateHALToVMVXEntryFuncOp(func::FuncOp funcOp,
                                        /*workgroup_count_x=*/indexType,
                                        /*workgroup_count_y=*/indexType,
                                        /*workgroup_count_z=*/indexType,
+                                       /*processor_id=*/i32Type,
                                    },
                                    {});
 
