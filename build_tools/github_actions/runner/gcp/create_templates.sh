@@ -18,6 +18,8 @@ TESTING="${TEMPLATE_TESTING:-0}"
 TEMPLATE_BASE_NAME="${TEMPLATE_BASE_NAME:-github-runner}"
 TEMPLATE_CONFIG_REPO="${TEMPLATE_CONFIG_REPO:-iree-org/iree}"
 TEMPLATE_CONFIG_REF="${TEMPLATE_CONFIG_REF:-$(git rev-parse HEAD)}"
+GPU_IMAGE="github-runner-gpu-2022-08-15-1660603500"
+CPU_IMAGE="github-runner-2022-07-28-1659048799"
 
 if (( TESTING==0 )); then
   if [[ "${TEMPLATE_CONFIG_REPO}" != iree-org/iree ]]; then
@@ -36,6 +38,7 @@ fi
 
 TIME_STRING="$(date +%Y-%m-%d-%s)"
 SHORT_REF="${TEMPLATE_CONFIG_REF:0:10}"
+VERSION="${SHORT_REF}-${TIME_STRING}"
 STARTUP_SCRIPT_PATH="/tmp/startup_script.${SHORT_REF}.sh"
 GITHUB_RUNNER_SCOPE=iree-org
 GITHUB_RUNNER_VERSION="2.294.0"
@@ -97,26 +100,26 @@ function create_template() {
   local metadata_string="$(IFS="," ; echo "${metadata[*]}")"
 
   local -a args=(
-    "${TEMPLATE_BASE_NAME}-${group}-${type}-${SHORT_REF}-${TIME_STRING}"
+    "${TEMPLATE_BASE_NAME}-${group}-${type}-${VERSION}"
     "${common_args[@]}"
     --service-account="github-runner-${trust}-trust@iree-oss.iam.gserviceaccount.com"
     --metadata="${metadata_string}"
   )
 
-  local disk_name="${TEMPLATE_BASE_NAME}-${group}-${type}-${SHORT_REF}-${TIME_STRING}"
+  local disk_name="${TEMPLATE_BASE_NAME}-${group}-${type}-${VERSION}"
 
   if [[ "${type}" == gpu ]]; then
     args+=(
       --machine-type=a2-highgpu-1g
       --maintenance-policy=TERMINATE
       --accelerator=count=1,type=nvidia-tesla-a100
-      --create-disk="auto-delete=yes,boot=yes,device-name=${disk_name},image=projects/iree-oss/global/images/github-runner-gpu-2022-08-15-1660603500,mode=rw,size=1000,type=pd-balanced"
+      --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${GPU_IMAGE},mode=rw,size=1000,type=pd-balanced"
     )
   elif [[ "${type}" == cpu ]]; then
     args+=(
       --machine-type=n1-standard-96
       --maintenance-policy=MIGRATE
-      --create-disk="auto-delete=yes,boot=yes,device-name=${disk_name},image=projects/iree-oss/global/images/github-runner-2022-07-28-1659048799,mode=rw,size=1000,type=pd-balanced"
+      --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${CPU_IMAGE},mode=rw,size=1000,type=pd-balanced"
     )
   else
     echo "Got unrecognized type '${type}'" >2
@@ -131,3 +134,4 @@ for group in presubmit postsubmit; do
     create_template "${group}" "${type}"
   done
 done
+echo "Created new templates for version: ${VERSION}"
