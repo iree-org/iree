@@ -8,7 +8,10 @@
 
 # Due to limitations in MIGs, we quite frequently want to manually bring down
 # instances that aren't currently running a job. This script automates that.
-# Note that there is totally the potential for a race here. Sorry.
+# Note that there is totally the potential for a race here: we could identify
+# the runner as idle and it could pick up a job before its deletion causes it to
+# deregister on shutdown. This is also a (bigger) problem with the manual
+# removal that this script automates.
 
 set -euo pipefail
 
