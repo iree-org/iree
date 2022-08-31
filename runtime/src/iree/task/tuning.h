@@ -57,6 +57,7 @@ extern "C" {
 // steal tasks from other workers. By default all other workers will be
 // attempted while setting this to 2, for example, will try for only half of
 // the available workers.
+// Setting this to 0 will disable thefts.
 #define IREE_TASK_EXECUTOR_MAX_THEFT_ATTEMPTS_DIVISOR (1)
 
 // Maximum number of tasks that will be stolen in one go from another worker.

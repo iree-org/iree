@@ -46,22 +46,13 @@ iree_status_t iree_task_worker_initialize(
   iree_task_queue_initialize(&out_worker->local_task_queue);
 
   iree_task_worker_state_t initial_state = IREE_TASK_WORKER_STATE_RUNNING;
-  if (executor->scheduling_mode &
-      IREE_TASK_SCHEDULING_MODE_DEFER_WORKER_STARTUP) {
-    // User is favoring startup latency vs. initial scheduling latency. Our
-    // thread will be created suspended and not first scheduled until work
-    // arrives for it, (almost) ensuring no context switches and 10x+ lower
-    // blocking startup time.
-    initial_state = IREE_TASK_WORKER_STATE_SUSPENDED;
-  }
   iree_atomic_store_int32(&out_worker->state, initial_state,
                           iree_memory_order_release);
 
   iree_thread_create_params_t thread_params;
   memset(&thread_params, 0, sizeof(thread_params));
   thread_params.name = iree_make_cstring_view(topology_group->name);
-  thread_params.create_suspended =
-      initial_state == IREE_TASK_WORKER_STATE_SUSPENDED;
+  thread_params.create_suspended = false;
   thread_params.priority_class = IREE_THREAD_PRIORITY_CLASS_NORMAL;
   thread_params.initial_affinity = out_worker->ideal_thread_affinity;
 
@@ -87,10 +78,6 @@ void iree_task_worker_request_exit(iree_task_worker_t* worker) {
           &worker->state, IREE_TASK_WORKER_STATE_EXITING,
           iree_memory_order_acq_rel);
   switch (prev_state) {
-    case IREE_TASK_WORKER_STATE_SUSPENDED:
-      // Worker was suspended; resume it so that it can exit itself.
-      iree_thread_resume(worker->thread);
-      break;
     case IREE_TASK_WORKER_STATE_ZOMBIE:
       // Worker already exited; reset state to ZOMBIE.
       iree_atomic_store_int32(&worker->state, IREE_TASK_WORKER_STATE_ZOMBIE,
@@ -162,9 +149,8 @@ iree_task_t* iree_task_worker_try_steal_task(iree_task_worker_t* worker,
                                              iree_host_size_t max_tasks) {
   // Try to grab tasks from the worker; if more than one task is stolen then the
   // first will be returned and the remaining will be added to the target queue.
-  iree_task_t* task = iree_task_queue_try_steal(
-      &worker->local_task_queue, target_queue,
-      /*max_tasks=*/IREE_TASK_EXECUTOR_MAX_THEFT_TASK_COUNT);
+  iree_task_t* task = iree_task_queue_try_steal(&worker->local_task_queue,
+                                                target_queue, max_tasks);
   if (task) return task;
 
   // If we still didn't steal any tasks then let's try the slist instead.
@@ -234,6 +220,7 @@ static bool iree_task_worker_pump_once(
                                                  &worker->mailbox_slist);
   }
 
+#if IREE_TASK_EXECUTOR_MAX_THEFT_ATTEMPTS_DIVISOR > 0
   // If we ran out of work assigned to this specific worker try to steal some
   // from other workers that we hopefully share some of the cache hierarchy
   // with. Their tasks will be moved from their local queue into ours and the
@@ -244,6 +231,7 @@ static bool iree_task_worker_pump_once(
         worker->max_theft_attempts, &worker->theft_prng,
         &worker->local_task_queue);
   }
+#endif  // IREE_TASK_EXECUTOR_MAX_THEFT_ATTEMPTS_DIVISOR > 0
 
   // No tasks to run; let the caller know we want to wait for more.
   if (!task) {
@@ -338,10 +326,14 @@ static void iree_task_worker_pump_until_exit(iree_task_worker_t* worker) {
       // Have more work to do; loop around to try another pump.
       iree_notification_cancel_wait(&worker->wake_notification);
     } else {
+      // Spin/wait in the kernel. We don't care if the condition fails as we're
+      // just using it as a pulse.
       IREE_TRACE_ZONE_BEGIN_NAMED(z_wait,
                                   "iree_task_worker_main_pump_wake_wait");
-      iree_notification_commit_wait(&worker->wake_notification, wait_token,
-                                    IREE_TIME_INFINITE_FUTURE);
+      iree_notification_commit_wait(
+          &worker->wake_notification, wait_token,
+          /*spin_ns=*/worker->executor->worker_spin_ns,
+          /*deadline_ns=*/IREE_TIME_INFINITE_FUTURE);
       IREE_TRACE_ZONE_END(z_wait);
 
       // Woke from a wait - query the processor ID in case we migrated during
