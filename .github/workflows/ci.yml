@@ -679,7 +679,7 @@ jobs:
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "BUILD_ARCH=${ARCHITECTURE}" \
-            --env "BUILD_TARGET_DIR=${BUILD_TOOLS_DIR}/traced" \
+            --env "BUILD_${PLATFORM^^}_DIR=${BUILD_TOOLS_DIR}/traced" \
             --env "BUILD_PRESET=benchmark-with-tracing" \
             --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
             "${DOCKER_IMAGE}" \
