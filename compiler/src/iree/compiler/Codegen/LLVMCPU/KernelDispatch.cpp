@@ -859,15 +859,21 @@ static LogicalResult setRootConfig(
 /// op
 static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                    linalg::Mmt4DOp mmt4dOp) {
-  // TODO(ataei): These are hand tuned for some performance benchmarks for
-  // now, we want to adapt the same strategy as matmul that dynamically sets
-  // tile size.
   auto getWorkgroupTileSizes = [&]() -> SmallVector<int64_t> {
     if (!mmt4dWorkgroupTileSizes.empty()) {
       return SmallVector<int64_t>(mmt4dWorkgroupTileSizes.begin(),
                                   mmt4dWorkgroupTileSizes.end());
     }
-    return {48, 32};
+    unsigned numLoops = mmt4dOp.getNumLoops();
+    SmallVector<int64_t> minTileSizes(numLoops, 0);
+    SmallVector<int64_t> maxTileSizes(numLoops, 0);
+    minTileSizes[0] = 4;
+    minTileSizes[1] = 4;
+    maxTileSizes[0] = 48;
+    maxTileSizes[1] = 32;
+    SmallVector<int64_t> flowTileSizes = getDefaultDistributedLevelTileSizes(
+        mmt4dOp, minTileSizes, maxTileSizes);
+    return flowTileSizes;
   };
 
   auto getL1TileSizes = [&]() -> SmallVector<int64_t> {
