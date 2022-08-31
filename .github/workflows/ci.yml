@@ -560,7 +560,7 @@ jobs:
       - cpu
       - os-family=Linux
     env:
-      BUILD_TARGET_DIR: "build-riscv32-baremetal"
+      BUILD_RISCV_DIR: "build-riscv32-baremetal"
       BUILD_ARCH: "rv32-baremetal"
       BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
       BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
@@ -578,7 +578,7 @@ jobs:
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "RISCV_ARCH=${BUILD_ARCH}" \
-            --env "BUILD_RISCV_DIR=${BUILD_TARGET_DIR}" \
+            --env "BUILD_RISCV_DIR=${BUILD_RISCV_DIR}" \
             --env "BUILD_PRESET=test" \
             --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
             gcr.io/iree-oss/riscv@sha256:720bc0215d8462ea14352edc22710a6ce4c0c1daff581d179dd173885f1d8a35 \
@@ -595,7 +595,7 @@ jobs:
       - cpu
       - os-family=Linux
     env:
-      BUILD_TARGET_DIR: "build-riscv64"
+      BUILD_RISCV_DIR: "build-riscv64"
       BUILD_ARCH: "rv64"
       BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
       BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
@@ -620,7 +620,7 @@ jobs:
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "RISCV_ARCH=${BUILD_ARCH}" \
-            --env "BUILD_RISCV_DIR=${BUILD_TARGET_DIR}" \
+            --env "BUILD_RISCV_DIR=${BUILD_RISCV_DIR}" \
             --env "BUILD_PRESET=test" \
             --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
             --env "IREE_IMPORT_TFLITE_BIN=${TF_BINARIES_DIR}/iree-import-tflite" \
