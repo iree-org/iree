@@ -619,8 +619,8 @@ jobs:
       - name: "Cross-compiling and testing riscv64"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            --env "BUILD_ARCH=${BUILD_ARCH}" \
-            --env "BUILD_TARGET_DIR=${BUILD_TARGET_DIR}" \
+            --env "${PLATFORM^^}_ARCH=${BUILD_ARCH}" \
+            --env "BUILD_${ARCH^^}_DIR=${BUILD_TARGET_DIR}" \
             --env "BUILD_RISCV_DIR=${BUILD_TARGET_DIR}" \
             --env "BUILD_PRESET=test" \
             --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
@@ -668,8 +668,8 @@ jobs:
         id: build
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            --env "BUILD_ARCH=${ARCHITECTURE}" \
-            --env "BUILD_TARGET_DIR=${BUILD_TOOLS_DIR}/normal" \
+            --env "${PLATFORM^^}_ARCH=${ARCHITECTURE}" \
+            --env "BUILD_${PLATFORM^^}_DIR=${BUILD_TOOLS_DIR}/normal" \
             --env "BUILD_PRESET=benchmark" \
             --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
             "${DOCKER_IMAGE}" \
@@ -678,7 +678,7 @@ jobs:
         id: build-with-tracing
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            --env "BUILD_ARCH=${ARCHITECTURE}" \
+            --env "${PLATFORM^^}_ARCH=${ARCHITECTURE}" \
             --env "BUILD_${PLATFORM^^}_DIR=${BUILD_TOOLS_DIR}/traced" \
             --env "BUILD_PRESET=benchmark-with-tracing" \
             --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
