@@ -46,6 +46,7 @@ cc_binary(
         "@org_tensorflow//tensorflow/compiler/mlir/tosa:tfl_passes",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_tf",
         "@org_tensorflow//tensorflow/compiler/xla/mlir_hlo",
+        "@org_tensorflow//tensorflow/compiler/xla/mlir_hlo/stablehlo:chlo_ops",
     ],
 )
 
