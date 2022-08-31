@@ -13,6 +13,10 @@
 
 // Disabled.
 
+#elif defined(IREE_PLATFORM_WINDOWS)
+
+#include <intrin.h>
+
 #elif defined(IREE_PLATFORM_EMSCRIPTEN)
 
 #include <emscripten/threading.h>
@@ -52,6 +56,42 @@
 // clang cannot reason about lock-free magic.
 #define IREE_DISABLE_THREAD_SAFETY_ANALYSIS \
   IREE_THREAD_ANNOTATION_ATTRIBUTE(no_thread_safety_analysis)
+
+//==============================================================================
+// Cross-platform processor yield (where supported)
+//==============================================================================
+
+#if defined(IREE_COMPILER_MSVC)
+
+// MSVC uses architecture-specific intrinsics.
+
+static inline void iree_processor_yield(void) {
+#if defined(IREE_ARCH_X86_32) || defined(IREE_ARCH_X86_64)
+  // https://docs.microsoft.com/en-us/cpp/intrinsics/x86-intrinsics-list
+  _mm_pause();
+#elif defined(IREE_ARCH_ARM_64)
+  // https://docs.microsoft.com/en-us/cpp/intrinsics/arm64-intrinsics
+  __yield();
+#else
+  // None available; we'll spin hard.
+#endif  // IREE_ARCH_*
+}
+
+#else
+
+// Clang/GCC and compatibles use architecture-specific inline assembly.
+
+static inline void iree_processor_yield(void) {
+#if defined(IREE_ARCH_X86_32) || defined(IREE_ARCH_X86_64)
+  asm volatile("pause");
+#elif defined(IREE_ARCH_ARM_32) || defined(IREE_ARCH_ARM_64)
+  asm volatile("yield");
+#else
+  // None available; we'll spin hard.
+#endif  // IREE_ARCH_*
+}
+
+#endif  // IREE_COMPILER_*
 
 //==============================================================================
 // Cross-platform futex mappings (where supported)
@@ -472,6 +512,7 @@ void iree_slim_mutex_lock(iree_slim_mutex_t* mutex)
       // TODO(benvanik): measure on real workload on ARM; maybe remove entirely.
       int spin_count = 100;
       for (int i = 0; i < spin_count && iree_slim_mutex_is_locked(value); ++i) {
+        iree_processor_yield();
         value =
             iree_atomic_load_int32(&mutex->value, iree_memory_order_relaxed);
       }
