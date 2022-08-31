@@ -87,23 +87,17 @@ function(iree_c_module)
     DEPENDS ${_COMPILE_TOOL_EXECUTABLE} ${_SRC_PATH}
   )
 
-  if(NOT _RULE_NO_RUNTIME)
-    set(_LIB_RUNTIME_SRC
-      "${IREE_SOURCE_DIR}/runtime/src/iree/vm/module_impl_emitc.c")
-    # Include paths and options for the runtime sources.
-    set(_LIB_RUNTIME_DEP iree::runtime::src::defs)
-  endif()
-
   iree_cc_library(
     NAME ${_RULE_NAME}
     HDRS "${_RULE_H_FILE_OUTPUT}"
-    SRCS "${_LIB_RUNTIME_SRC}"
+    SRCS "${IREE_SOURCE_DIR}/runtime/src/iree/vm/module_impl_emitc.c"
     INCLUDES "${CMAKE_CURRENT_BINARY_DIR}"
     COPTS
       "-DEMITC_IMPLEMENTATION=\"${_RULE_H_FILE_OUTPUT}\""
       "${_TESTONLY_ARG}"
     DEPS
-      ${_LIB_RUNTIME_DEP}
+      # Include paths and options for the runtime sources.
+      iree::runtime::src::defs
   )
 
   if(_RULE_NO_RUNTIME)

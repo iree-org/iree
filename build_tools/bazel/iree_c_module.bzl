@@ -69,16 +69,15 @@ def iree_c_module(
         output_to_bindir = 1,
         **kwargs
     )
-    src_files = [h_file_output]
+
     deps_list = None
     if not no_runtime:
-        src_files.append("//runtime/src/iree/vm:module_impl_emitc.c")
         deps_list = deps
 
     iree_runtime_cc_library(
         name = name,
         hdrs = [h_file_output],
-        srcs = src_files,
+        srcs = ["//runtime/src/iree/vm:module_impl_emitc.c", h_file_output],
         copts = [
             "-DEMITC_IMPLEMENTATION='\"$(location %s)\"'" % h_file_output,
         ],
