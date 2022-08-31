@@ -60,6 +60,7 @@ iree_compiler_cc_library(
     deps = [
         ":CommonExtensionsOpGen",
         "//compiler/src/iree/compiler/Codegen:PassHeaders",
+        "//compiler/src/iree/compiler/Codegen/Common:CommonPasses",
         "//compiler/src/iree/compiler/Codegen/Interfaces:BufferizationInterfaces",
         "//compiler/src/iree/compiler/Dialect/HAL/IR",
         "//llvm-external-projects/iree-dialects:IREEDialectsTransforms",
