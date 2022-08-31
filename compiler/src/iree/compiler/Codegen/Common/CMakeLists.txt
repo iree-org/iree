@@ -153,6 +153,7 @@ iree_cc_library(
     "TestPartitionableLoopsInterface.cpp"
     "TileAndDistributeToWorkgroupsPass.cpp"
     "TileDispatchUsingInterface.cpp"
+    "VectorReductionToGPU.cpp"
     "VectorizeConv.cpp"
     "WorkGroupSwizzle.cpp"
   DEPS

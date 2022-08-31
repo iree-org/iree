@@ -17,7 +17,7 @@
 #include "mlir/Transforms/Passes.h"
 #include "mlir/Transforms/SideEffectUtils.h"
 
-#define DEBUG_TYPE "iree-llvmgpu-reduction-distribution"
+#define DEBUG_TYPE "iree-codegen-reduction-distribution"
 
 namespace mlir {
 namespace iree_compiler {
@@ -144,8 +144,8 @@ class InsertElementToBroadcast final
   }
 };
 
-struct LLVMGPUReduceToGPUPass
-    : public LLVMGPUReduceToGPUBase<LLVMGPUReduceToGPUPass> {
+struct VectorReduceToGPUPass
+    : public VectorReduceToGPUBase<VectorReduceToGPUPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<scf::SCFDialect, memref::MemRefDialect, gpu::GPUDialect,
                     AffineDialect>();
@@ -276,7 +276,7 @@ struct LLVMGPUReduceToGPUPass
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createConvertVectorReductionToGPUPass() {
-  return std::make_unique<LLVMGPUReduceToGPUPass>();
+  return std::make_unique<VectorReduceToGPUPass>();
 }
 
 }  // namespace iree_compiler

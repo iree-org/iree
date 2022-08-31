@@ -196,6 +196,12 @@ def TransformDialectInterpreter :
   ];
 }
 
+def VectorReduceToGPU :
+    Pass<"iree-codegen-reduction-to-gpu", "func::FuncOp"> {
+  let summary = "Convert vector reduction to gpu ops.";
+  let constructor = "mlir::iree_compiler::createConvertVectorReductionToGPUPass()";
+}
+
 //------------------------------------------------------------------------------
 // LLVMCPU
 //------------------------------------------------------------------------------
@@ -361,12 +367,6 @@ def LLVMGPUVectorToGPU :
     Pass<"iree-llvmgpu-vector-to-gpu", "func::FuncOp"> {
   let summary = "Pass to convert vector to gpu.";
   let constructor = "mlir::iree_compiler::createLLVMGPUVectorToGPU()";
-}
-
-def LLVMGPUReduceToGPU :
-    Pass<"iree-llvmgpu-reduction-to-gpu", "func::FuncOp"> {
-  let summary = "Convert vector reduction to gpu ops.";
-  let constructor = "mlir::iree_compiler::createConvertVectorReductionToGPUPass()";
 }
 
 //------------------------------------------------------------------------------

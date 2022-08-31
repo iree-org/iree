@@ -183,6 +183,7 @@ iree_compiler_cc_library(
         "TileAndDistributeToWorkgroupsPass.cpp",
         "TileDispatchUsingInterface.cpp",
         "VectorizeConv.cpp",
+        "VectorReductionToGPU.cpp",
         "WorkGroupSwizzle.cpp",
     ],
     deps = [

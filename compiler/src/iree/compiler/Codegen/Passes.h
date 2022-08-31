@@ -147,6 +147,10 @@ std::unique_ptr<OperationPass<func::FuncOp>> createPadDynamicAlloc();
 std::unique_ptr<Pass> createTransformDialectInterpreterPass(
     llvm::StringRef transformFileName = llvm::StringRef());
 
+// Distribute vector ops.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createConvertVectorReductionToGPUPass();
+
 //----------------------------------------------------------------------------//
 // Common codegen patterns.
 //----------------------------------------------------------------------------//
@@ -381,10 +385,6 @@ createLLVMGPUReduceSharedMemoryBankConflicts(int64_t paddingSizeBits = 128);
 
 /// Converts vector ops to gpu dialect.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorToGPU();
-
-// Distribute vector ops.
-std::unique_ptr<OperationPass<func::FuncOp>>
-createConvertVectorReductionToGPUPass();
 
 //------------------------------------------------------------------------------
 // SPIR-V Passes

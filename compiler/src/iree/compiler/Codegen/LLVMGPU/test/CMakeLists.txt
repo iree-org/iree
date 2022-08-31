@@ -33,7 +33,6 @@ iree_lit_test_suite(
     "transpose_pipeline_test.mlir"
     "vector_to_gpu.mlir"
     "vectorization.mlir"
-    "warp_reduction.mlir"
   TOOLS
     FileCheck
     iree-opt
