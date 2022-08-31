@@ -22,41 +22,41 @@ ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
 cd "${ROOT_DIR}"
 
 CMAKE_BIN="${CMAKE_BIN:-$(which cmake)}"
-BUILD_ARCH="${BUILD_ARCH:-rv64}"
+RISCV_ARCH="${RISCV_ARCH:-rv64}"
 RISCV_COMPILER_FLAGS="${RISCV_COMPILER_FLAGS:--O3}"
 IREE_HOST_BINARY_ROOT="$(realpath ${IREE_HOST_BINARY_ROOT})"
-BUILD_TARGET_DIR="${BUILD_TARGET_DIR:-$ROOT_DIR/build-riscv}"
+BUILD_RISCV_DIR="${BUILD_RISCV_DIR:-$ROOT_DIR/build-riscv}"
 BUILD_PRESET="${BUILD_PRESET:-test}"
 
 # --------------------------------------------------------------------------- #
 # Build for the target (riscv).
-if [[ -d "${BUILD_TARGET_DIR}" ]]; then
+if [[ -d "${BUILD_RISCV_DIR}" ]]; then
   echo "build-riscv directory already exists. Will use cached results there."
 else
   echo "build-riscv directory does not already exist. Creating a new one."
-  mkdir -p "${BUILD_TARGET_DIR}"
+  mkdir -p "${BUILD_RISCV_DIR}"
 fi
 
-echo "Build riscv target with the config of ${BUILD_ARCH}"
+echo "Build riscv target with the config of ${RISCV_ARCH}"
 TOOLCHAIN_FILE="$(realpath ${ROOT_DIR}/build_tools/cmake/riscv.toolchain.cmake)"
 declare -a args
 args=(
   "-G" "Ninja"
-  "-B" "${BUILD_TARGET_DIR}"
+  "-B" "${BUILD_RISCV_DIR}"
   -DCMAKE_TOOLCHAIN_FILE="${TOOLCHAIN_FILE}"
   -DIREE_HOST_BINARY_ROOT="${IREE_HOST_BINARY_ROOT}"
-  -DRISCV_CPU="${BUILD_ARCH}"
+  -DRISCV_CPU="${RISCV_ARCH}"
   -DRISCV_COMPILER_FLAGS="${RISCV_COMPILER_FLAGS}"
   -DIREE_BUILD_COMPILER=OFF
   # CPU info doesn't work on RISCV
   -DIREE_ENABLE_CPUINFO=OFF
 )
 
-if [[ "${BUILD_ARCH}" == "rv64" ]]; then
+if [[ "${RISCV_ARCH}" == "rv64" ]]; then
   args+=(
     -DRISCV_TOOLCHAIN_ROOT="${RISCV_RV64_LINUX_TOOLCHAIN_ROOT}"
   )
-elif [[ "${BUILD_ARCH}" == "rv32-baremetal" ]]; then
+elif [[ "${RISCV_ARCH}" == "rv32-baremetal" ]]; then
   args+=(
     # TODO(#6353): Off until tools/ are refactored to support threadless config.
     -DIREE_BUILD_TESTS=OFF
@@ -97,4 +97,4 @@ esac
 
 args_str=$(IFS=' ' ; echo "${args[*]}")
 "${CMAKE_BIN}" ${args_str} "${ROOT_DIR}"
-"${CMAKE_BIN}" --build "${BUILD_TARGET_DIR}" -- -k 0
+"${CMAKE_BIN}" --build "${BUILD_RISCV_DIR}" -- -k 0

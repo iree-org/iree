@@ -577,9 +577,9 @@ jobs:
       - name: "Cross-compiling and testing riscv32"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            --env "BUILD_ARCH=${BUILD_ARCH}" \
-            --env "BUILD_TARGET_DIR=${BUILD_TARGET_DIR}" \
+            --env "RISCV_ARCH=${BUILD_ARCH}" \
             --env "BUILD_RISCV_DIR=${BUILD_TARGET_DIR}" \
+            --env "BUILD_PRESET=test" \
             --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
             gcr.io/iree-oss/riscv@sha256:720bc0215d8462ea14352edc22710a6ce4c0c1daff581d179dd173885f1d8a35 \
             bash -euo pipefail -c \
@@ -619,8 +619,7 @@ jobs:
       - name: "Cross-compiling and testing riscv64"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            --env "${PLATFORM^^}_ARCH=${BUILD_ARCH}" \
-            --env "BUILD_${ARCH^^}_DIR=${BUILD_TARGET_DIR}" \
+            --env "RISCV_ARCH=${BUILD_ARCH}" \
             --env "BUILD_RISCV_DIR=${BUILD_TARGET_DIR}" \
             --env "BUILD_PRESET=test" \
             --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
@@ -662,8 +661,8 @@ jobs:
           submodules: true
       - name: "Downloading build dir archive"
         run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
-      - name: "Extracting build dir archive"
-        run: tar -xf "${BUILD_DIR_ARCHIVE}"
+      - name: "Extracting host binaries"
+        run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
       - name: "Compiling the benchmark tools"
         id: build
         run: |
