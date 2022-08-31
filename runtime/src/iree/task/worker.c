@@ -326,10 +326,14 @@ static void iree_task_worker_pump_until_exit(iree_task_worker_t* worker) {
       // Have more work to do; loop around to try another pump.
       iree_notification_cancel_wait(&worker->wake_notification);
     } else {
+      // Spin/wait in the kernel. We don't care if the condition fails as we're
+      // just using it as a pulse.
       IREE_TRACE_ZONE_BEGIN_NAMED(z_wait,
                                   "iree_task_worker_main_pump_wake_wait");
-      iree_notification_commit_wait(&worker->wake_notification, wait_token,
-                                    IREE_TIME_INFINITE_FUTURE);
+      iree_notification_commit_wait(
+          &worker->wake_notification, wait_token,
+          /*spin_ns=*/worker->executor->worker_spin_ns,
+          /*deadline_ns=*/IREE_TIME_INFINITE_FUTURE);
       IREE_TRACE_ZONE_END(z_wait);
 
       // Woke from a wait - query the processor ID in case we migrated during

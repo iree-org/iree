@@ -268,24 +268,45 @@ enum iree_task_scheduling_mode_bits_t {
 };
 typedef uint32_t iree_task_scheduling_mode_t;
 
+// Options controlling task executor behavior.
+typedef struct iree_task_executor_options_t {
+  // Specifies the schedule mode used for worker and workload balancing.
+  iree_task_scheduling_mode_t scheduling_mode;
+
+  // TODO(benvanik): add a scope_spin_ns to control wait-idle and other
+  // scope-related waits coming from outside of the task system.
+
+  // Maximum duration in nanoseconds each worker should spin waiting for
+  // additional work. In almost all cases this should be IREE_DURATION_ZERO as
+  // spinning is often extremely harmful to system health. Only set to non-zero
+  // values when latency is the #1 priority (over thermals, system-wide
+  // scheduling, and the environment).
+  iree_duration_t worker_spin_ns;
+
+  // Defines the bytes to be allocated and reserved by each worker to use for
+  // local memory operations. Will be rounded up to the next power of two.
+  // Dispatches performed will be able to request up to this amount of memory
+  // for their invocations and no more. May be 0 if no worker local memory is
+  // required.
+  iree_host_size_t worker_local_memory_size;
+} iree_task_executor_options_t;
+
+// Initializes |out_options| to default values.
+void iree_task_executor_options_initialize(
+    iree_task_executor_options_t* out_options);
+
 // Base task system executor interface.
 typedef struct iree_task_executor_t iree_task_executor_t;
 
 // Creates a task executor using the specified topology.
-//
-// |worker_local_memory_size| defines the bytes to be allocated and reserved for
-// each worker to use for local memory operations. Will be rounded up to the
-// next power of two. Dispatches performed will be able to request up to this
-// amount of memory for their invocations and no more. May be 0 if no worker
-// local memory is required.
-//
+// |options| must be initialized with iree_task_executor_options_initialize by
+// callers and then overridden as required.
 // |topology| is only used during creation and need not live beyond this call.
 // |out_executor| must be released by the caller.
-iree_status_t iree_task_executor_create(
-    iree_task_scheduling_mode_t scheduling_mode,
-    const iree_task_topology_t* topology,
-    iree_host_size_t worker_local_memory_size, iree_allocator_t allocator,
-    iree_task_executor_t** out_executor);
+iree_status_t iree_task_executor_create(iree_task_executor_options_t options,
+                                        const iree_task_topology_t* topology,
+                                        iree_allocator_t allocator,
+                                        iree_task_executor_t** out_executor);
 
 // Retains the given |executor| for the caller.
 void iree_task_executor_retain(iree_task_executor_t* executor);
