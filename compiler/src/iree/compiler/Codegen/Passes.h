@@ -147,6 +147,10 @@ std::unique_ptr<OperationPass<func::FuncOp>> createPadDynamicAlloc();
 std::unique_ptr<Pass> createTransformDialectInterpreterPass(
     llvm::StringRef transformFileName = llvm::StringRef());
 
+/// Convert Linalg ops to Vector.
+std::unique_ptr<OperationPass<func::FuncOp>> createGPUVectorizationPass(
+    bool generateContract = true);
+
 // Distribute vector ops.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createConvertVectorReductionToGPUPass();
@@ -362,10 +366,6 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTensorAlloc();
 /// Create pass calling the dynamic pipeline for LLVMGPU.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createLLVMGPULowerExecutableTargetPass();
-
-/// Convert Linalg ops to Vector.
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorizationPass(
-    bool generateContract = true);
 
 /// Convert Linalg ops to Vector and prepare converstion to GPU MMA ops.
 std::unique_ptr<OperationPass<func::FuncOp>>

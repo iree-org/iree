@@ -17,7 +17,7 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 
-#define DEBUG_TYPE "iree-llvmgpu-vectorization"
+#define DEBUG_TYPE "iree-codegen-gpu-vectorization"
 
 namespace mlir {
 namespace iree_compiler {
@@ -42,9 +42,9 @@ static void populateVectorizationPatterns(RewritePatternSet &patterns) {
 }
 
 namespace {
-struct LLVMGPUVectorizationPass
-    : public LLVMGPUVectorizationBase<LLVMGPUVectorizationPass> {
-  LLVMGPUVectorizationPass(bool generateContract) {
+struct GPUVectorizationPass
+    : public GPUVectorizationBase<GPUVectorizationPass> {
+  GPUVectorizationPass(bool generateContract) {
     this->generateContract = generateContract;
   }
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -68,9 +68,9 @@ struct LLVMGPUVectorizationPass
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorizationPass(
+std::unique_ptr<OperationPass<func::FuncOp>> createGPUVectorizationPass(
     bool generateContract) {
-  return std::make_unique<LLVMGPUVectorizationPass>(generateContract);
+  return std::make_unique<GPUVectorizationPass>(generateContract);
 }
 
 }  // namespace iree_compiler

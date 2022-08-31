@@ -114,7 +114,7 @@ void addGPUVectorizationPassPipeline(OpPassManager &pm) {
       createRemoveSingleIterationLoopPass());
 
   // Linalg -> vector
-  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUVectorizationPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createGPUVectorizationPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -135,7 +135,7 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUTileTensor(false));
 
   // Linalg -> vector
-  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUVectorizationPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createGPUVectorizationPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
 
@@ -247,7 +247,7 @@ void addGPUTransposePassPipeline(OpPassManager &pm) {
   nestedModulePM.addPass(createCSEPass());
 
   // Linalg -> vector
-  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUVectorizationPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createGPUVectorizationPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -262,7 +262,7 @@ void addGPUWarpReductionPassPipeline(OpPassManager &pm) {
       createRemoveSingleIterationLoopPass());
 
   // Linalg -> vector
-  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUVectorizationPass(
+  nestedModulePM.addNestedPass<func::FuncOp>(createGPUVectorizationPass(
       /*generateContract=*/false));
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLoopInvariantCodeMotionPass());

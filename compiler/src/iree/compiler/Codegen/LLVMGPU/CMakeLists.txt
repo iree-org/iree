@@ -32,7 +32,6 @@ iree_cc_library(
     "LLVMGPUTileTensor.cpp"
     "LLVMGPUVectorLowering.cpp"
     "LLVMGPUVectorToGPU.cpp"
-    "LLVMGPUVectorization.cpp"
     "Passes.cpp"
     "Verifiers.cpp"
   DEPS
