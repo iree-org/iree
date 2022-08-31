@@ -143,3 +143,30 @@ iree_static_linker_test(
     "4xf32,4xf32"
   EMITC
 )
+
+iree_vmvx_linker_test(
+  NAME
+    mnist_fake_weights_vmvx_bytecode_test
+  SRC
+    "mnist_fake_weights.mlir"
+  ENTRY_FUNCTION
+    "predict"
+  FUNCTION_INPUTS
+    "1x28x28x1xf32"
+  COMPILER_FLAGS
+    "--iree-input-type=mhlo"
+)
+
+iree_vmvx_linker_test(
+  NAME
+    mnist_fake_weights_vmvx_c_test
+  SRC
+    "mnist_fake_weights.mlir"
+  ENTRY_FUNCTION
+    "predict"
+  FUNCTION_INPUTS
+    "1x28x28x1xf32"
+  COMPILER_FLAGS
+    "--iree-input-type=mhlo"
+  EMITC
+)

@@ -10,6 +10,7 @@
 #cmakedefine IREE_MODULE_CREATE_FN @IREE_MODULE_CREATE_FN@
 #cmakedefine IREE_MODULE_HDR "@IREE_MODULE_HDR@"
 #cmakedefine IREE_EMITC_HDR "@IREE_EMITC_HDR@"
+#cmakedefine IREE_BACKEND_VMVX @IREE_BACKEND_VMVX@
 #cmakedefine IREE_MODULE_MAIN_FN @IREE_MODULE_MAIN_FN@
 #cmakedefine IREE_INPUT_NUM @IREE_INPUT_NUM@
 #cmakedefine IREE_INPUT_DIM_MAX @IREE_INPUT_DIM_MAX@
@@ -23,12 +24,17 @@
 
 #include <stdio.h>
 
-#include IREE_STATIC_LIB_HDR
-
 #include "iree/hal/drivers/local_sync/sync_device.h"
-#include "iree/hal/local/loaders/static_library_loader.h"
 #include "iree/modules/hal/module.h"
 #include "iree/runtime/api.h"
+
+#ifdef IREE_BACKEND_VMVX
+#include "iree/hal/local/loaders/vmvx_module_loader.h"
+#include "iree/vm/api.h"
+#else
+#include IREE_STATIC_LIB_HDR
+#include "iree/hal/local/loaders/static_library_loader.h"
+#endif
 
 #ifdef EMITC_IMPLEMENTATION
 #include IREE_EMITC_HDR
@@ -55,21 +61,34 @@ iree_status_t create_module(iree_vm_instance_t* instance,
 #endif
 }
 
-iree_status_t create_device_with_static_loader(iree_allocator_t host_allocator,
+iree_status_t create_device(iree_allocator_t host_allocator,
                                                iree_hal_device_t** out_device) {
   // Set paramters for the device created in the next step.
   iree_hal_sync_device_params_t params;
   iree_hal_sync_device_params_initialize(&params);
 
+#ifdef IREE_BACKEND_VMVX
+  iree_vm_instance_t* instance = NULL;
+  iree_status_t status = iree_vm_instance_create(host_allocator, &instance);
+
+  iree_hal_executable_loader_t* loader = NULL;
+  if(iree_status_is_ok(status)) {
+    status = iree_hal_vmvx_module_loader_create(
+        instance, /*user_module_count=*/0, /*user_modules=*/NULL, host_allocator,
+        &loader);
+  }
+  iree_vm_instance_release(instance);
+#else  // llvm-cpu backend
   // Register the statically linked executable library.
   const iree_hal_executable_library_query_fn_t libraries[] = {
       IREE_STATIC_LIB_QUERY_FN,
   };
-  iree_hal_executable_loader_t* library_loader = NULL;
+  iree_hal_executable_loader_t* loader = NULL;
   iree_status_t status = iree_hal_static_library_loader_create(
       IREE_ARRAYSIZE(libraries), libraries,
       iree_hal_executable_import_provider_null(), host_allocator,
-      &library_loader);
+      &loader);
+#endif
 
   // Use the default host allocator for buffer allocations.
   iree_string_view_t identifier = iree_make_cstring_view("local-sync");
@@ -82,12 +101,12 @@ iree_status_t create_device_with_static_loader(iree_allocator_t host_allocator,
   // Create the device and release the executor and loader afterwards.
   if (iree_status_is_ok(status)) {
     status = iree_hal_sync_device_create(
-        identifier, &params, /*loader_count=*/1, &library_loader,
+        identifier, &params, /*loader_count=*/1, &loader,
         device_allocator, host_allocator, out_device);
   }
 
   iree_hal_allocator_release(device_allocator);
-  iree_hal_executable_loader_release(library_loader);
+  iree_hal_executable_loader_release(loader);
   return status;
 }
 
@@ -107,10 +126,10 @@ iree_status_t Run() {
                                           iree_allocator_system(), &instance);
   }
 
-  // Create local device with static loader.
+  // Create local device.
   iree_hal_device_t* device = NULL;
   if (iree_status_is_ok(status)) {
-    status = create_device_with_static_loader(iree_allocator_system(), &device);
+    status = create_device(iree_allocator_system(), &device);
   }
 
   // Session configuration (one per loaded module to hold module state).
