@@ -1170,8 +1170,8 @@ static LogicalResult setElementwiseGenericOpRootConfig(
       unsigned pos = dimExpr.cast<AffineDimExpr>().getPosition();
       if (vecTileSizes[pos] * currSize > vecSize * kMaxUnrollFactor) {
         vecTileSizes[pos] = 1;
-        currSize = vecSize * kMaxUnrollFactor;
       }
+      currSize *= vecTileSizes[pos];
     }
     int fastestPos =
         map.getResults().back().cast<AffineDimExpr>().getPosition();
