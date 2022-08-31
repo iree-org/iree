@@ -19,6 +19,8 @@ VERSION=deadbeef12-2022-08-23-1661292386
 REGION=us-west1
 ZONES=us-west1-a,us-west1-b,us-west1-c
 AUTOSCALING=1
+GROUP=presubmit
+TYPE=cpu
 # For GPU groups, these should both be set to the target group size, as
 # autoscaling currently does not work for these.
 MIN_SIZE=1
@@ -34,7 +36,7 @@ function create_mig() {
   if (( TESTING == 1 )); then
     mig_name+="-testing"
   fi
-  mig_name+="-${runner_group}-${type}-${region}"
+  mig_name+="-${runner_group}-${type}-${REGION}"
   template="github-runner-${runner_group}-${type}-${VERSION}"
 
   local -a create_args=(
@@ -44,6 +46,7 @@ function create_mig() {
     --size="${MIN_SIZE}"
     --template="${template}"
     --zones="${ZONES}"
+    --region="${REGION}"
     --target-distribution-shape=EVEN
   )
 
@@ -65,4 +68,4 @@ function create_mig() {
   echo ""
 }
 
-create_mig presubmit cpu
+create_mig "${GROUP}" "${TYPE}"

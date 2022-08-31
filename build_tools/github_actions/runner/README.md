@@ -124,7 +124,7 @@ rolling out these updates involves a few steps.
 ### MIG Rolling Updates
 
 See https://cloud.google.com/compute/docs/instance-groups/updating-migs for the
-main documentation. There are two modes for a roling MIG update, "proactive" and
+main documentation. There are two modes for a rolling MIG update, "proactive" and
 "opportunistic" (AKA "selective"). There are also three different actions the
 MIG can take to update an instance: "refresh", "restart", and "replace". A
 "refresh" update only allows updating instance metadata or adding extra disks,
@@ -140,9 +140,9 @@ our instances shut themselves down when they're done with a job, but apparently
 it *doesn't* apply updates if it's recreating an instance deemed "unhealthy"
 which is unfortunately the case for instances that shut themselves down. So
 these sorts of updates need to be done as "opportunistic" updates which will
-need to be manually managed. Use the GitHub runners UI to check which instances
-are currently running jobs and manually bring down instances (either via the UI
-or gcloud) when they are not running jobs.
+need to be manually managed. You can use
+[`remove_idle_runners.sh`](./gcp/remove_idle_runners.sh) to relatively safely
+bring down instances that aren't currently processing a job.
 
 ### Test Runners
 
