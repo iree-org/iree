@@ -19,6 +19,12 @@ NEW_VERSION=deadbeef34-2022-08-23-1661296461
 # If this MIG is for testing (i.e. not prod)
 TESTING=1
 
+# See README on correct use of these settings
+UPDATE_TYPE=proactive # proactive or opportunistic
+ACTION=refresh # refresh, restart, or replace
+
+CANARY_TARGET_SIZE=1
+
 RUNNER_GROUP=presubmit
 TYPE=cpu
 REGION=us-west1
@@ -34,12 +40,14 @@ function canary_update() {
   fi
   mig_name+="-${runner_group}-${type}-${region}"
 
-  gcloud compute instance-groups managed rolling-action start-update \
+  (set -x; gcloud compute instance-groups managed rolling-action start-update \
     "${mig_name}" \
     --version=template="github-runner-${runner_group}-${type}-${OLD_VERSION}",name=base \
-    --canary-version=template="github-runner-${runner_group}-${type}-${NEW_VERSION}",target-size=10%,name=canary \
-    --type=opportunistic \
-    --region="${REGION}"
+    --canary-version=template="github-runner-${runner_group}-${type}-${NEW_VERSION},target-size=${CANARY_TARGET_SIZE},name=canary" \
+    --minimal-action="${ACTION}" \
+    --most-disruptive-allowed-action="${ACTION}" \
+    --type="${UPDATE_TYPE}" \
+    --region="${REGION}")
 }
 
 canary_update "${RUNNER_GROUP}" "${TYPE}" "${REGION}"

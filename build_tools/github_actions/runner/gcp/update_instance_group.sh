@@ -18,6 +18,10 @@ NEW_VERSION=deadbeef34-2022-08-23-1661296461
 # If this MIG is for testing (i.e. not prod)
 TESTING=1
 
+# See README on correct use of these settings
+UPDATE_TYPE=proactive # proactive or opportunistic
+ACTION=refresh # refresh, restart, or replace
+
 RUNNER_GROUP=presubmit
 TYPE=cpu
 REGION=us-west1
@@ -36,7 +40,9 @@ function update() {
   (set -x; gcloud compute instance-groups managed rolling-action start-update \
     "${mig_name}" \
     --version=template="github-runner-${runner_group}-${type}-${NEW_VERSION}",name=base \
-    --type=opportunistic \
+    --minimal-action="${ACTION}" \
+    --most-disruptive-allowed-action="${ACTION}" \
+    --type="${UPDATE_TYPE}" \
     --region="${REGION}")
 }
 
