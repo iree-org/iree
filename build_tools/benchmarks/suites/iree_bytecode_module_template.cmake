@@ -1,3 +1,4 @@
+# Compile the module "$__MODULE_OUTPUT_PATH"
 iree_bytecode_module(
   NAME
     "$__TARGET_NAME"
