@@ -17,13 +17,15 @@ iree_runtime_cc_library(
     srcs = [
         "elementwise_generic.c",
         "elementwise_impl.c.inc",
-        "mmt4d_arm_64.c",
+        "mmt4d.c",
+        "mmt4d_arm64.c",
         "mmt4d_generic.c",
     ],
     hdrs = [
         "common.h",
         "elementwise.h",
         "mmt4d.h",
+        "mmt4d_arm64.h",
         "mmt4d_generic.h",
     ],
     copts = [
