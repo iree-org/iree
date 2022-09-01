@@ -639,38 +639,6 @@ IREE_VMVX_ABI_DEFINE_SHIM(mmt4d, v);
 
 IREE_VMVX_ABI_EXPORT(iree_vmvx_mmt4d_f32f32f32, mmt4d, v) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  // Here are abusing the 2D-specific macros MAP_BUFFER_2D_* to query 4D arrays
-  // in the sense of "query the outer 2 dimensions of this 4D array".
-  // All we need is the base pointer and the outer-most _stride0. This comes
-  // down to the fact that mmt4d requires the inner 3 dimensions of each 4D
-  // buffer operand to be contiguous row-major, as the whole point of mmt4d
-  // is to be able to assume an optimal memory layout.
-  // So far, mmt4d is always bufferized with all 4 dimensions of all
-  // 4D buffers contiguous row-major, but it's not a bad idea to keep the
-  // stride generality on the outer-most dimension (_stride0) as that could be
-  // handy for a few things (splitting the K dimension, extra alignment).
-  MAP_BUFFER_2D_RO(lhs, float,
-                   /*buffer_ref=*/args->lhs_ref,
-                   /*offset=*/args->lhs_offset,
-                   /*stride0=*/args->lhs_row_stride,
-                   /*stride1=*/1,
-                   /*size0=*/args->m,
-                   /*size1=*/args->k);
-  MAP_BUFFER_2D_RO(rhs, float,
-                   /*buffer_ref=*/args->rhs_ref,
-                   /*offset=*/args->rhs_offset,
-                   /*stride0=*/args->rhs_row_stride,
-                   /*stride1=*/1,
-                   /*size0=*/args->n,
-                   /*size1=*/args->k);
-  MAP_BUFFER_2D_RW(out, float,
-                   /*buffer_ref=*/args->out_ref,
-                   /*offset=*/args->out_offset,
-                   /*stride0=*/args->out_row_stride,
-                   /*stride1=*/1,
-                   /*size0=*/args->m,
-                   /*size1=*/args->n);
-
   iree_host_size_t M = (iree_host_size_t)args->m;
   iree_host_size_t N = (iree_host_size_t)args->n;
   iree_host_size_t K = (iree_host_size_t)args->k;
@@ -680,6 +648,33 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_mmt4d_f32f32f32, mmt4d, v) {
   iree_host_size_t lhs_tile_size = M0 * K0;
   iree_host_size_t rhs_tile_size = N0 * K0;
   iree_host_size_t out_tile_size = M0 * N0;
+
+  // Here are abusing the 2D-specific macros MAP_BUFFER_2D_* to query 4D arrays.
+  // Thanks to the requirement that all dimensions but the outer-most one are
+  // contiguous row-major, the outer-most stride is the only nontrivial stride,
+  // we can correctly coalesce the inner 3 dimensions without changing the
+  // mapped span.
+  MAP_BUFFER_2D_RO(lhs, float,
+                   /*buffer_ref=*/args->lhs_ref,
+                   /*offset=*/args->lhs_offset,
+                   /*stride0=*/args->lhs_row_stride,
+                   /*stride1=*/1,
+                   /*size0=*/M,
+                   /*size1=*/K* lhs_tile_size);
+  MAP_BUFFER_2D_RO(rhs, float,
+                   /*buffer_ref=*/args->rhs_ref,
+                   /*offset=*/args->rhs_offset,
+                   /*stride0=*/args->rhs_row_stride,
+                   /*stride1=*/1,
+                   /*size0=*/N,
+                   /*size1=*/K* rhs_tile_size);
+  MAP_BUFFER_2D_RW(out, float,
+                   /*buffer_ref=*/args->out_ref,
+                   /*offset=*/args->out_offset,
+                   /*stride0=*/args->out_row_stride,
+                   /*stride1=*/1,
+                   /*size0=*/M,
+                   /*size1=*/N* out_tile_size);
 
   unsigned accumulate_flag = args->flags & IREE_VMVX_MATMUL_FLAG_ACCUMULATE;
   unsigned unhandled_flags = args->flags ^ accumulate_flag;
@@ -721,38 +716,6 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_mmt4d_f32f32f32, mmt4d, v) {
 
 IREE_VMVX_ABI_EXPORT(iree_vmvx_mmt4d_i8i8i32, mmt4d, v) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  // Here are abusing the 2D-specific macros MAP_BUFFER_2D_* to query 4D arrays
-  // in the sense of "query the outer 2 dimensions of this 4D array".
-  // All we need is the base pointer and the outer-most _stride0. This comes
-  // down to the fact that mmt4d requires the inner 3 dimensions of each 4D
-  // buffer operand to be contiguous row-major, as the whole point of mmt4d
-  // is to be able to assume an optimal memory layout.
-  // So far, mmt4d is always bufferized with all 4 dimensions of all
-  // 4D buffers contiguous row-major, but it's not a bad idea to keep the
-  // stride generality on the outer-most dimension (_stride0) as that could be
-  // handy for a few things (splitting the K dimension, extra alignment).
-  MAP_BUFFER_2D_RO(lhs, int8_t,
-                   /*buffer_ref=*/args->lhs_ref,
-                   /*offset=*/args->lhs_offset,
-                   /*stride0=*/args->lhs_row_stride,
-                   /*stride1=*/1,
-                   /*size0=*/args->m,
-                   /*size1=*/args->k);
-  MAP_BUFFER_2D_RO(rhs, int8_t,
-                   /*buffer_ref=*/args->rhs_ref,
-                   /*offset=*/args->rhs_offset,
-                   /*stride0=*/args->rhs_row_stride,
-                   /*stride1=*/1,
-                   /*size0=*/args->n,
-                   /*size1=*/args->k);
-  MAP_BUFFER_2D_RW(out, int32_t,
-                   /*buffer_ref=*/args->out_ref,
-                   /*offset=*/args->out_offset,
-                   /*stride0=*/args->out_row_stride,
-                   /*stride1=*/1,
-                   /*size0=*/args->m,
-                   /*size1=*/args->n);
-
   iree_host_size_t M = (iree_host_size_t)args->m;
   iree_host_size_t N = (iree_host_size_t)args->n;
   iree_host_size_t K = (iree_host_size_t)args->k;
@@ -762,6 +725,33 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_mmt4d_i8i8i32, mmt4d, v) {
   iree_host_size_t lhs_tile_size = M0 * K0;
   iree_host_size_t rhs_tile_size = N0 * K0;
   iree_host_size_t out_tile_size = M0 * N0;
+
+  // Here are abusing the 2D-specific macros MAP_BUFFER_2D_* to query 4D arrays.
+  // Thanks to the requirement that all dimensions but the outer-most one are
+  // contiguous row-major, the outer-most stride is the only nontrivial stride,
+  // we can correctly coalesce the inner 3 dimensions without changing the
+  // mapped span.
+  MAP_BUFFER_2D_RO(lhs, int8_t,
+                   /*buffer_ref=*/args->lhs_ref,
+                   /*offset=*/args->lhs_offset,
+                   /*stride0=*/args->lhs_row_stride,
+                   /*stride1=*/1,
+                   /*size0=*/M,
+                   /*size1=*/K * lhs_tile_size);
+  MAP_BUFFER_2D_RO(rhs, int8_t,
+                   /*buffer_ref=*/args->rhs_ref,
+                   /*offset=*/args->rhs_offset,
+                   /*stride0=*/args->rhs_row_stride,
+                   /*stride1=*/1,
+                   /*size0=*/N,
+                   /*size1=*/K * rhs_tile_size);
+  MAP_BUFFER_2D_RW(out, int32_t,
+                   /*buffer_ref=*/args->out_ref,
+                   /*offset=*/args->out_offset,
+                   /*stride0=*/args->out_row_stride,
+                   /*stride1=*/1,
+                   /*size0=*/M,
+                   /*size1=*/N * out_tile_size);
 
   unsigned accumulate_flag = args->flags & IREE_VMVX_MATMUL_FLAG_ACCUMULATE;
   unsigned unhandled_flags = args->flags ^ accumulate_flag;
