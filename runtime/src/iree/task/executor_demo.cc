@@ -51,13 +51,12 @@ extern "C" int main(int argc, char* argv) {
   iree_task_topology_initialize_from_group_count(/*group_count=*/6, &topology);
 #endif
 
+  iree_task_executor_options_t options;
+  iree_task_executor_options_initialize(&options);
+  options.worker_local_memory_size = 0;  // 64 * 1024;
   iree_task_executor_t* executor = NULL;
-  iree_task_scheduling_mode_t scheduling_mode =
-      IREE_TASK_SCHEDULING_MODE_RESERVED;
-  iree_host_size_t worker_local_memory_size = 0;  // 64 * 1024;
-  IREE_CHECK_OK(iree_task_executor_create(scheduling_mode, &topology,
-                                          worker_local_memory_size, allocator,
-                                          &executor));
+  IREE_CHECK_OK(
+      iree_task_executor_create(options, &topology, allocator, &executor));
   iree_task_topology_deinitialize(&topology);
 
   //

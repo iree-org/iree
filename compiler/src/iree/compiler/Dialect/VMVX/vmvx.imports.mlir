@@ -413,6 +413,10 @@ vm.import @fill.2d.x32(
   %size_n : i64
 )
 
+//==============================================================================
+// matmul ops
+//==============================================================================
+
 vm.import @matmul.f32f32f32(
   %lhs_buffer : !vm.buffer,
   %lhs_offset : i64,
@@ -426,8 +430,64 @@ vm.import @matmul.f32f32f32(
   %m : i64,
   %n : i64,
   %k : i64,
-  %alpha : f32,
-  %beta : f32,
+  %flags : i32
+)
+
+vm.import @matmul.i8i8i32(
+  %lhs_buffer : !vm.buffer,
+  %lhs_offset : i64,
+  %lhs_row_stride : i64,
+  %rhs_buffer : !vm.buffer,
+  %rhs_offset : i64,
+  %rhs_row_stride : i64,
+  %out_buffer : !vm.buffer,
+  %out_offset : i64,
+  %out_row_stride : i64,
+  %m : i64,
+  %n : i64,
+  %k : i64,
+  %flags : i32
+)
+
+//==============================================================================
+// mmt4d ops
+//==============================================================================
+
+vm.import @mmt4d.f32f32f32(
+  %lhs_buffer : !vm.buffer,
+  %lhs_offset : i64,
+  %lhs_row_stride : i64,
+  %rhs_buffer : !vm.buffer,
+  %rhs_offset : i64,
+  %rhs_row_stride : i64,
+  %out_buffer : !vm.buffer,
+  %out_offset : i64,
+  %out_row_stride : i64,
+  %m : i64,
+  %n : i64,
+  %k : i64,
+  %m0 : i32,
+  %n0 : i32,
+  %k0 : i32,
+  %flags : i32
+)
+
+vm.import @mmt4d.i8i8i32(
+  %lhs_buffer : !vm.buffer,
+  %lhs_offset : i64,
+  %lhs_row_stride : i64,
+  %rhs_buffer : !vm.buffer,
+  %rhs_offset : i64,
+  %rhs_row_stride : i64,
+  %out_buffer : !vm.buffer,
+  %out_offset : i64,
+  %out_row_stride : i64,
+  %m : i64,
+  %n : i64,
+  %k : i64,
+  %m0 : i32,
+  %n0 : i32,
+  %k0 : i32,
   %flags : i32
 )
 

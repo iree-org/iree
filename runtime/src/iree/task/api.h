@@ -16,6 +16,20 @@ extern "C" {
 #endif  // __cplusplus
 
 //===----------------------------------------------------------------------===//
+// Flag parsing
+//===----------------------------------------------------------------------===//
+
+// Initializes |out_options| from the command line flags.
+// Used in place of iree_task_executor_options_initialize.
+iree_status_t iree_task_executor_options_initialize_from_flags(
+    iree_task_executor_options_t* out_options);
+
+// Initializes |out_topology| from the command line flags.
+// Used in place of iree_task_topology_initialize.
+iree_status_t iree_task_topology_initialize_from_flags(
+    iree_task_topology_t* out_topology);
+
+//===----------------------------------------------------------------------===//
 // Task system factory functions
 //===----------------------------------------------------------------------===//
 

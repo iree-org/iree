@@ -15,5 +15,9 @@ void populateTileAndDistributeToWorkgroupsPatterns(
     RewritePatternSet &patterns, linalg::LinalgTilingOptions options,
     linalg::LinalgTransformationFilter filter);
 
+/// Populate patterns that fold tensor.expand/collapse_shape into the source
+/// hal.interface.binding.subspan.
+void populateReshapeToInterfaceTensorPatterns(RewritePatternSet &patterns);
+
 }  // namespace iree_compiler
 }  // namespace mlir

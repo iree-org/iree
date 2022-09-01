@@ -18,6 +18,7 @@ def iree_bytecode_module(
         compile_tool = "//tools:iree-compile",
         linker_tool = "@llvm-project//lld:lld",
         c_identifier = "",
+        static_lib_path = "",
         deps = [],
         **kwargs):
     """Builds an IREE bytecode module.
@@ -34,6 +35,8 @@ def iree_bytecode_module(
         linker_tool: the linker to use.
             Defaults to the lld from the llvm-project directory.
         c_identifier: Optional. Enables embedding the module as C data.
+        static_lib_path: When set, the module is compiled into a LLVM static
+            library with the specified library path.
         deps: Optional. Dependencies to add to the generated library.
         **kwargs: any additional attributes to pass to the underlying rules.
     """
@@ -41,16 +44,25 @@ def iree_bytecode_module(
     if not module_name:
         module_name = "%s.vmfb" % (name)
 
+    out_files = [module_name]
+    flags.append("--output-format=vm-bytecode")
+    if static_lib_path:
+        static_header_path = static_lib_path.replace(".o", ".h")
+        out_files.extend([static_lib_path, static_header_path])
+        flags += [
+            "--iree-llvm-link-embedded=false",
+            "--iree-llvm-link-static",
+            "--iree-llvm-static-library-output-path=$(location %s)" % (static_lib_path),
+        ]
+
     native.genrule(
         name = name,
         srcs = [src],
-        outs = [
-            module_name,
-        ],
+        outs = out_files,
         cmd = " && ".join([
             " ".join([
                 "$(location %s)" % (compile_tool),
-                " ".join(["--output-format=vm-bytecode"] + flags),
+                " ".join(flags),
                 "--iree-llvm-embedded-linker-path=$(location %s)" % (linker_tool),
                 "--iree-llvm-wasm-linker-path=$(location %s)" % (linker_tool),
                 # Note: --iree-llvm-system-linker-path is left unspecified.

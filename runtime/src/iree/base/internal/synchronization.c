@@ -13,6 +13,10 @@
 
 // Disabled.
 
+#elif defined(IREE_PLATFORM_WINDOWS)
+
+#include <intrin.h>
+
 #elif defined(IREE_PLATFORM_EMSCRIPTEN)
 
 #include <emscripten/threading.h>
@@ -54,6 +58,42 @@
   IREE_THREAD_ANNOTATION_ATTRIBUTE(no_thread_safety_analysis)
 
 //==============================================================================
+// Cross-platform processor yield (where supported)
+//==============================================================================
+
+#if defined(IREE_COMPILER_MSVC)
+
+// MSVC uses architecture-specific intrinsics.
+
+static inline void iree_processor_yield(void) {
+#if defined(IREE_ARCH_X86_32) || defined(IREE_ARCH_X86_64)
+  // https://docs.microsoft.com/en-us/cpp/intrinsics/x86-intrinsics-list
+  _mm_pause();
+#elif defined(IREE_ARCH_ARM_64)
+  // https://docs.microsoft.com/en-us/cpp/intrinsics/arm64-intrinsics
+  __yield();
+#else
+  // None available; we'll spin hard.
+#endif  // IREE_ARCH_*
+}
+
+#else
+
+// Clang/GCC and compatibles use architecture-specific inline assembly.
+
+static inline void iree_processor_yield(void) {
+#if defined(IREE_ARCH_X86_32) || defined(IREE_ARCH_X86_64)
+  asm volatile("pause");
+#elif defined(IREE_ARCH_ARM_32) || defined(IREE_ARCH_ARM_64)
+  asm volatile("yield");
+#else
+  // None available; we'll spin hard.
+#endif  // IREE_ARCH_*
+}
+
+#endif  // IREE_COMPILER_*
+
+//==============================================================================
 // Cross-platform futex mappings (where supported)
 //==============================================================================
 
@@ -63,12 +103,12 @@
 // If the contents of |address| do not match |expected_value| the wait will
 // fail and return IREE_STATUS_UNAVAILABLE and should be retried.
 //
-// |timeout_ms| can be either IREE_INFINITE_TIMEOUT_MS to wait forever or a
-// relative number of milliseconds to wait prior to returning early with
+// |deadline_ns| can be either IREE_TIME_INFINITE_FUTURE to wait forever or an
+// absolute time to wait until prior to returning early with
 // IREE_STATUS_DEADLINE_EXCEEDED.
 static inline iree_status_code_t iree_futex_wait(void* address,
                                                  uint32_t expected_value,
-                                                 uint32_t timeout_ms);
+                                                 iree_time_t deadline_ns);
 
 // Wakes at most |count| threads waiting for the |address| to change.
 // Use IREE_ALL_WAITERS to wake all waiters. Which waiters are woken is
@@ -80,7 +120,8 @@ static inline void iree_futex_wake(void* address, int32_t count);
 
 static inline iree_status_code_t iree_futex_wait(void* address,
                                                  uint32_t expected_value,
-                                                 uint32_t timeout_ms) {
+                                                 iree_time_t deadline_ns) {
+  uint32_t timeout_ms = iree_absolute_deadline_to_timeout_ms(deadline_ns);
   int rc = emscripten_futex_wait(address, expected_value, (double)timeout_ms);
   switch (rc) {
     default:
@@ -102,7 +143,8 @@ static inline void iree_futex_wake(void* address, int32_t count) {
 
 static inline iree_status_code_t iree_futex_wait(void* address,
                                                  uint32_t expected_value,
-                                                 uint32_t timeout_ms) {
+                                                 iree_time_t deadline_ns) {
+  uint32_t timeout_ms = iree_absolute_deadline_to_timeout_ms(deadline_ns);
   if (IREE_LIKELY(WaitOnAddress(address, &expected_value,
                                 sizeof(expected_value), timeout_ms) == TRUE)) {
     return IREE_STATUS_OK;
@@ -127,7 +169,8 @@ static inline void iree_futex_wake(void* address, int32_t count) {
 
 static inline iree_status_code_t iree_futex_wait(void* address,
                                                  uint32_t expected_value,
-                                                 uint32_t timeout_ms) {
+                                                 iree_time_t deadline_ns) {
+  uint32_t timeout_ms = iree_absolute_deadline_to_timeout_ms(deadline_ns);
   struct timespec timeout = {
       .tv_sec = timeout_ms / 1000,
       .tv_nsec = (timeout_ms % 1000) * 1000000,
@@ -469,6 +512,7 @@ void iree_slim_mutex_lock(iree_slim_mutex_t* mutex)
       // TODO(benvanik): measure on real workload on ARM; maybe remove entirely.
       int spin_count = 100;
       for (int i = 0; i < spin_count && iree_slim_mutex_is_locked(value); ++i) {
+        iree_processor_yield();
         value =
             iree_atomic_load_int32(&mutex->value, iree_memory_order_relaxed);
       }
@@ -478,7 +522,7 @@ void iree_slim_mutex_lock(iree_slim_mutex_t* mutex)
     while (iree_slim_mutex_is_locked(value)) {
       // NOTE: we don't care about wait failure here as we are going to loop
       // and check again anyway.
-      iree_futex_wait(&mutex->value, value, IREE_INFINITE_TIMEOUT_MS);
+      iree_futex_wait(&mutex->value, value, IREE_TIME_INFINITE_FUTURE);
       value = iree_atomic_load_int32(&mutex->value, iree_memory_order_relaxed);
     }
   }
@@ -568,6 +612,7 @@ iree_wait_token_t iree_notification_prepare_wait(
 
 bool iree_notification_commit_wait(iree_notification_t* notification,
                                    iree_wait_token_t wait_token,
+                                   iree_duration_t spin_ns,
                                    iree_time_t deadline_ns) {
   return true;
 }
@@ -623,6 +668,7 @@ iree_wait_token_t iree_notification_prepare_wait(
 
 bool iree_notification_commit_wait(iree_notification_t* notification,
                                    iree_wait_token_t wait_token,
+                                   iree_duration_t spin_ns,
                                    iree_time_t deadline_ns) {
   struct timespec abs_ts = {
       .tv_sec = (time_t)(deadline_ns / 1000000000ull),
@@ -725,25 +771,59 @@ iree_wait_token_t iree_notification_prepare_wait(
   return (iree_wait_token_t)(previous_value >> IREE_NOTIFICATION_EPOCH_SHIFT);
 }
 
+typedef enum iree_notification_result_e {
+  IREE_NOTIFICATION_RESULT_UNRESOLVED = 0,
+  IREE_NOTIFICATION_RESULT_RESOLVED,
+  IREE_NOTIFICATION_RESULT_REJECTED,
+} iree_notification_result_t;
+
+static iree_notification_result_t iree_notification_test_wait_condition(
+    iree_notification_t* notification, iree_wait_token_t wait_token) {
+  return (iree_atomic_load_int64(&notification->value,
+                                 iree_memory_order_acquire) >>
+          IREE_NOTIFICATION_EPOCH_SHIFT) != wait_token
+             ? IREE_NOTIFICATION_RESULT_RESOLVED
+             : IREE_NOTIFICATION_RESULT_UNRESOLVED;
+}
+
 bool iree_notification_commit_wait(iree_notification_t* notification,
                                    iree_wait_token_t wait_token,
+                                   iree_duration_t spin_ns,
                                    iree_time_t deadline_ns) {
-  bool result = true;
+  // Quick check to see if the wait has already succeeded (the epoch advances
+  // from when it was captured in iree_notification_prepare_wait).
+  iree_notification_result_t result =
+      iree_notification_test_wait_condition(notification, wait_token);
 
-  // Spin until notified and the epoch increments from what we captured during
-  // iree_notification_prepare_wait.
-  while ((iree_atomic_load_int64(&notification->value,
-                                 iree_memory_order_acquire) >>
-          IREE_NOTIFICATION_EPOCH_SHIFT) == wait_token) {
-    // NOTE: we do an abs->rel conversion within the loop so that we can account
-    // for spurious wakes that may cause us to loop several times with waits of
-    // various time inbetween.
-    uint32_t timeout_ms = iree_absolute_deadline_to_timeout_ms(deadline_ns);
-    iree_status_code_t status_code = iree_futex_wait(
-        iree_notification_epoch_address(notification), wait_token, timeout_ms);
-    if (status_code != IREE_STATUS_OK) {
-      result = false;
-      break;
+  // If not already reached and spinning is enabled then we'll try that first.
+  if (result == IREE_NOTIFICATION_RESULT_UNRESOLVED &&
+      spin_ns != IREE_DURATION_ZERO) {
+    // If spinning we need to compute the absolute deadline that we'll spin
+    // until (as we may be descheduled while spinning and time may drift).
+    const iree_time_t spin_deadline_ns = iree_time_now() + spin_ns;
+    IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_notification_commit_wait_spin");
+    do {
+      // Try to be nice to the processor when using SMT.
+      iree_processor_yield();
+      result = iree_notification_test_wait_condition(notification, wait_token);
+    } while (result == IREE_NOTIFICATION_RESULT_UNRESOLVED &&
+             iree_time_now() < spin_deadline_ns);
+    IREE_TRACE_ZONE_END(z0);
+  }
+
+  // If spinning failed let the kernel do what it does ... okish at.
+  // We loop until notified and the epoch increments from what we captured
+  // during iree_notification_prepare_wait.
+  if (deadline_ns != IREE_TIME_INFINITE_PAST) {
+    while (result == IREE_NOTIFICATION_RESULT_UNRESOLVED) {
+      iree_status_code_t status_code =
+          iree_futex_wait(iree_notification_epoch_address(notification),
+                          wait_token, deadline_ns);
+      if (status_code != IREE_STATUS_OK) {
+        result = IREE_NOTIFICATION_RESULT_REJECTED;
+        break;
+      }
+      result = iree_notification_test_wait_condition(notification, wait_token);
     }
   }
 
@@ -755,7 +835,7 @@ bool iree_notification_commit_wait(iree_notification_t* notification,
       iree_memory_order_acq_rel);
   SYNC_ASSERT((previous_value & IREE_NOTIFICATION_WAITER_MASK) != 0);
 
-  return result;
+  return result == IREE_NOTIFICATION_RESULT_RESOLVED;
 }
 
 void iree_notification_cancel_wait(iree_notification_t* notification) {
@@ -793,6 +873,7 @@ bool iree_notification_await(iree_notification_t* notification,
       return true;
     } else {
       if (!iree_notification_commit_wait(notification, wait_token,
+                                         /*spin_ns=*/IREE_DURATION_ZERO,
                                          deadline_ns)) {
         // Wait hit the deadline before we hit the condition.
         return false;

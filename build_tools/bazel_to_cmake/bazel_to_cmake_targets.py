@@ -64,7 +64,6 @@ EXPLICIT_TARGET_MAPPING = {
     ],
     "@mlir-hlo//:mlir_hlo": [
         "tensorflow::external_mhlo_includes",
-        "ChloDialect",
         "MhloDialect",
         "MLIRMhloUtils",
     ],
@@ -108,6 +107,10 @@ EXPLICIT_TARGET_MAPPING = {
         "tensorflow::external_mhlo_includes",
         "MhloToStandard",
     ],
+    "@mlir-hlo//:map_chlo_to_hlo_op": [
+        "ChloOps",
+        "MhloDialect",
+    ],
     "@mlir-hlo//:map_lmhlo_to_scalar_op": [
         "tensorflow::external_mhlo_includes",
         "LmhloDialect",  # Unfortunate.
@@ -133,6 +136,8 @@ EXPLICIT_TARGET_MAPPING = {
         "tensorflow::external_mhlo_includes",
         "MhloPasses",
     ],
+    "@mlir-hlo//stablehlo:chlo_ops": ["ChloOps",],
+    "@mlir-hlo//stablehlo:broadcast_utils": ["StablehloBroadcastUtils",],
 
     # Torch-MLIR.
     "@torch-mlir-dialects//:TorchMLIRTMTensorDialect": [

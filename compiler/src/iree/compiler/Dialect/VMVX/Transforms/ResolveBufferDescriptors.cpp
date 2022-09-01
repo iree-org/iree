@@ -31,16 +31,13 @@ struct FromMemRefSubView : public OpRewritePattern<GetBufferDescriptorOp> {
     auto subType = subview.getResult().getType().cast<MemRefType>();
     Value source = subview.getSource();
     auto sourceType = source.getType().cast<MemRefType>();
-    if (sourceType.getRank() != subType.getRank()) {
-      return rewriter.notifyMatchFailure(op,
-                                         "rank reducing subview not supported");
-    }
-    int rank = sourceType.getRank();
+    int sourceRank = sourceType.getRank();
+    int subRank = subType.getRank();
 
     // Create a descriptor for the source.
     IndexType indexType = rewriter.getIndexType();
     SmallVector<Type> sizeStrideTypes;
-    for (int i = 0; i < rank; i++) {
+    for (int i = 0; i < sourceRank; i++) {
       sizeStrideTypes.push_back(indexType);
     }
     auto sourceDesc = rewriter.create<IREE::VMVX::GetBufferDescriptorOp>(
@@ -49,7 +46,7 @@ struct FromMemRefSubView : public OpRewritePattern<GetBufferDescriptorOp> {
 
     // For sizes, we just use the new ones, discarding the source.
     SmallVector<Value> newSizes;
-    for (int i = 0; i < rank; ++i) {
+    for (int i = 0; i < subRank; ++i) {
       if (subview.isDynamicSize(i)) {
         newSizes.push_back(subview.getDynamicSize(i));
       } else {
@@ -60,7 +57,7 @@ struct FromMemRefSubView : public OpRewritePattern<GetBufferDescriptorOp> {
 
     // Apply stride multipliers.
     SmallVector<Value> strides;
-    for (int i = 0; i < rank; ++i) {
+    for (int i = 0; i < subRank; ++i) {
       Value currentStride;
       if (subview.isDynamicStride(i)) {
         currentStride = subview.getDynamicStride(i);
@@ -75,7 +72,7 @@ struct FromMemRefSubView : public OpRewritePattern<GetBufferDescriptorOp> {
 
     // Offsets.
     Value offset = sourceDesc.getOffset();
-    for (int i = 0; i < rank; ++i) {
+    for (int i = 0; i < subRank; ++i) {
       Value logicalOffset;
       if (subview.isDynamicOffset(i)) {
         logicalOffset = subview.getDynamicOffset(i);
@@ -109,6 +106,7 @@ struct FromHalInterfaceBindingSubspan
     auto binding =
         op.getSource().getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
     if (!binding) return failure();
+
     auto loc = op.getLoc();
     IndexSet indexSet(loc, rewriter);
 

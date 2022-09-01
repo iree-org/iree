@@ -24,11 +24,15 @@
 
 static void iree_task_executor_destroy(iree_task_executor_t* executor);
 
-iree_status_t iree_task_executor_create(
-    iree_task_scheduling_mode_t scheduling_mode,
-    const iree_task_topology_t* topology,
-    iree_host_size_t worker_local_memory_size, iree_allocator_t allocator,
-    iree_task_executor_t** out_executor) {
+void iree_task_executor_options_initialize(
+    iree_task_executor_options_t* out_options) {
+  memset(out_options, 0, sizeof(*out_options));
+}
+
+iree_status_t iree_task_executor_create(iree_task_executor_options_t options,
+                                        const iree_task_topology_t* topology,
+                                        iree_allocator_t allocator,
+                                        iree_task_executor_t** out_executor) {
   iree_host_size_t worker_count = iree_task_topology_group_count(topology);
   if (worker_count > IREE_TASK_EXECUTOR_MAX_WORKER_COUNT) {
     return iree_make_status(
@@ -52,17 +56,19 @@ iree_status_t iree_task_executor_create(
   // The executor is followed in memory by worker[] + worker_local_memory[].
   // The whole point is that we don't want destructive sharing between workers
   // so ensure we are aligned to at least the destructive interference size.
-  worker_local_memory_size = iree_host_align(
-      worker_local_memory_size, iree_hardware_destructive_interference_size);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, (int64_t)worker_local_memory_size);
+  options.worker_local_memory_size =
+      iree_host_align(options.worker_local_memory_size,
+                      iree_hardware_destructive_interference_size);
+  IREE_TRACE_ZONE_APPEND_VALUE(z0, (int64_t)options.worker_local_memory_size);
   iree_host_size_t executor_base_size =
       iree_host_align(sizeof(iree_task_executor_t),
                       iree_hardware_destructive_interference_size);
   iree_host_size_t worker_list_size =
       iree_host_align(worker_count * sizeof(iree_task_worker_t),
                       iree_hardware_destructive_interference_size);
-  iree_host_size_t executor_size = executor_base_size + worker_list_size +
-                                   worker_count * worker_local_memory_size;
+  iree_host_size_t executor_size =
+      executor_base_size + worker_list_size +
+      worker_count * options.worker_local_memory_size;
 
   iree_task_executor_t* executor = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -70,7 +76,8 @@ iree_status_t iree_task_executor_create(
   memset(executor, 0, executor_size);
   iree_atomic_ref_count_init(&executor->ref_count);
   executor->allocator = allocator;
-  executor->scheduling_mode = scheduling_mode;
+  executor->scheduling_mode = options.scheduling_mode;
+  executor->worker_spin_ns = options.worker_spin_ns;
   iree_atomic_task_slist_initialize(&executor->incoming_ready_slist);
   iree_slim_mutex_initialize(&executor->coordinator_mutex);
 
@@ -129,28 +136,21 @@ iree_status_t iree_task_executor_create(
 
     iree_task_affinity_set_t worker_idle_mask = 0;
     iree_task_affinity_set_t worker_live_mask = 0;
-    iree_task_affinity_set_t worker_suspend_mask = 0;
     for (iree_host_size_t i = 0; i < worker_count; ++i) {
       iree_task_affinity_set_t worker_bit = iree_task_affinity_for_worker(i);
       worker_idle_mask |= worker_bit;
       worker_live_mask |= worker_bit;
-      if (executor->scheduling_mode &
-          IREE_TASK_SCHEDULING_MODE_DEFER_WORKER_STARTUP) {
-        worker_suspend_mask |= worker_bit;
-      }
 
       iree_task_worker_t* worker = &executor->workers[i];
       status = iree_task_worker_initialize(
           executor, i, iree_task_topology_get_group(topology, i),
-          iree_make_byte_span(worker_local_memory, worker_local_memory_size),
+          iree_make_byte_span(worker_local_memory,
+                              options.worker_local_memory_size),
           &seed_prng, worker);
-      worker_local_memory += worker_local_memory_size;
+      worker_local_memory += options.worker_local_memory_size;
       if (!iree_status_is_ok(status)) break;
     }
     // The masks are accessed with 'relaxed' order because they are just hints.
-    iree_atomic_task_affinity_set_store(&executor->worker_suspend_mask,
-                                        worker_suspend_mask,
-                                        iree_memory_order_relaxed);
     iree_atomic_task_affinity_set_store(&executor->worker_idle_mask,
                                         worker_idle_mask,
                                         iree_memory_order_relaxed);
@@ -408,13 +408,18 @@ void iree_task_executor_flush(iree_task_executor_t* executor) {
 void iree_task_executor_coordinate(iree_task_executor_t* executor,
                                    iree_task_worker_t* current_worker) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  iree_slim_mutex_lock(&executor->coordinator_mutex);
 
   // We may be adding tasks/waiting/etc on each pass through coordination - to
   // ensure we completely drain the incoming queues and satisfied waits we loop
   // until there's nothing left to coordinate.
   bool schedule_dirty = true;
   do {
+    IREE_TRACE_ZONE_BEGIN_NAMED(z1, "iree_task_executor_coordinate_try");
+    // TODO(#10212): remove this lock or do something more clever to avoid
+    // contention when many workers try to coordinate at the same time. This can
+    // create very long serialized lock chains that slow down worker wakes.
+    iree_slim_mutex_lock(&executor->coordinator_mutex);
+
     // Check for incoming submissions and move their posted tasks into our
     // local lists. Any of the tasks here are ready to execute immediately and
     // ones we should be able to distribute to workers without delay. The
@@ -434,7 +439,11 @@ void iree_task_executor_coordinate(iree_task_executor_t* executor,
     iree_task_submission_t pending_submission;
     iree_task_submission_initialize_from_lifo_slist(
         &executor->incoming_ready_slist, &pending_submission);
-    if (iree_task_list_is_empty(&pending_submission.ready_list)) break;
+    if (iree_task_list_is_empty(&pending_submission.ready_list)) {
+      iree_slim_mutex_unlock(&executor->coordinator_mutex);
+      IREE_TRACE_ZONE_END(z1);
+      break;
+    }
 
     // Scratch coordinator submission batch used during scheduling to batch up
     // all tasks that will be posted to each worker. We could stash this on the
@@ -456,12 +465,14 @@ void iree_task_executor_coordinate(iree_task_executor_t* executor,
     iree_task_poller_enqueue(&executor->poller,
                              &pending_submission.waiting_list);
 
+    iree_slim_mutex_unlock(&executor->coordinator_mutex);
+    IREE_TRACE_ZONE_END(z1);
+
     // Post all new work to workers; they may wake and begin executing
     // immediately. Returns whether this worker has new tasks for it to work on.
     schedule_dirty = iree_task_post_batch_submit(post_batch);
   } while (schedule_dirty);
 
-  iree_slim_mutex_unlock(&executor->coordinator_mutex);
   IREE_TRACE_ZONE_END(z0);
 }
 

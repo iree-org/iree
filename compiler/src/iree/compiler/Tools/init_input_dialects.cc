@@ -7,8 +7,8 @@
 #include "iree/compiler/Tools/init_input_dialects.h"
 
 #ifdef IREE_HAVE_MHLO_INPUT
-#include "mlir-hlo/Dialect/mhlo/IR/chlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
+#include "stablehlo/dialect/ChloOps.h"
 #endif  // IREE_HAVE_MHLO_INPUT
 #ifdef IREE_HAVE_TORCH_INPUT
 #include "torch-mlir-dialects/Dialect/TMTensor/IR/TMTensorDialect.h"

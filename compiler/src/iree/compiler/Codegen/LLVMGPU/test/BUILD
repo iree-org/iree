@@ -29,6 +29,7 @@ iree_lit_test_suite(
             "illegal_configuration.mlir",
             "linalg_transform.mlir",
             "legalize.mlir",
+            "tensor_alloc.mlir",
             "tensorcore_vectorization.mlir",
             "tile_on_tensor.mlir",
             "transform_dialect_vector_distribution.mlir",

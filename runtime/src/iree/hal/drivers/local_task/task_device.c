@@ -16,6 +16,7 @@
 #include "iree/hal/drivers/local_task/task_event.h"
 #include "iree/hal/drivers/local_task/task_queue.h"
 #include "iree/hal/drivers/local_task/task_semaphore.h"
+#include "iree/hal/local/executable_environment.h"
 #include "iree/hal/local/local_executable_cache.h"
 #include "iree/hal/local/local_pipeline_layout.h"
 #include "iree/hal/utils/buffer_transfer.h"
@@ -191,26 +192,28 @@ static iree_status_t iree_hal_task_device_query_i64(
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
   *out_value = 0;
 
-  if (iree_string_view_equal(category,
-                             iree_make_cstring_view("hal.executable.format"))) {
+  if (iree_string_view_equal(category, IREE_SV("hal.executable.format"))) {
     *out_value =
         iree_hal_query_any_executable_loader_support(
             device->loader_count, device->loaders, /*caching_mode=*/0, key)
             ? 1
             : 0;
     return iree_ok_status();
-  } else if (iree_string_view_equal(category,
-                                    iree_make_cstring_view("hal.device"))) {
-    if (iree_string_view_equal(key, iree_make_cstring_view("concurrency"))) {
+  } else if (iree_string_view_equal(category, IREE_SV("hal.device"))) {
+    if (iree_string_view_equal(key, IREE_SV("concurrency"))) {
       *out_value = (int64_t)device->queue_count;
       return iree_ok_status();
     }
-  } else if (iree_string_view_equal(category,
-                                    iree_make_cstring_view("hal.dispatch"))) {
-    if (iree_string_view_equal(key, iree_make_cstring_view("concurrency"))) {
+  } else if (iree_string_view_equal(category, IREE_SV("hal.dispatch"))) {
+    if (iree_string_view_equal(key, IREE_SV("concurrency"))) {
       *out_value = (int64_t)iree_task_executor_worker_count(device->executor);
       return iree_ok_status();
     }
+  } else if (iree_string_view_equal(category, IREE_SV("hal.processor"))) {
+    // TODO(benvanik): memoize processor information.
+    iree_hal_processor_v0_t processor;
+    iree_hal_processor_query(device->host_allocator, &processor);
+    return iree_hal_processor_lookup_by_key(&processor, key, out_value);
   }
 
   return iree_make_status(
@@ -236,15 +239,15 @@ static iree_host_size_t iree_hal_task_device_select_queue(
 static iree_status_t iree_hal_task_device_create_command_buffer(
     iree_hal_device_t* base_device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
-    iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
     iree_hal_command_buffer_t** out_command_buffer) {
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
   iree_host_size_t queue_index = iree_hal_task_device_select_queue(
       device, command_categories, queue_affinity);
   return iree_hal_task_command_buffer_create(
       base_device, &device->queues[queue_index].scope, mode, command_categories,
-      queue_affinity, &device->large_block_pool, device->host_allocator,
-      out_command_buffer);
+      queue_affinity, binding_capacity, &device->large_block_pool,
+      device->host_allocator, out_command_buffer);
 }
 
 static iree_status_t iree_hal_task_device_create_descriptor_set_layout(

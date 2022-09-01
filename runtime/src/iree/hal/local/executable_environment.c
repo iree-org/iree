@@ -25,6 +25,15 @@ void iree_hal_processor_query(iree_allocator_t temp_allocator,
   IREE_TRACE_ZONE_END(z0);
 }
 
+iree_status_t iree_hal_processor_lookup_by_key(
+    const iree_hal_processor_v0_t* processor, iree_string_view_t key,
+    int64_t* IREE_RESTRICT out_value) {
+  // TODO(benvanik): arch-specific switches here to poke into processor info.
+  return iree_make_status(IREE_STATUS_NOT_FOUND,
+                          "processor information key '%.*s' not found",
+                          (int)key.size, key.data);
+}
+
 //===----------------------------------------------------------------------===//
 // iree_hal_executable_environment_*_t
 //===----------------------------------------------------------------------===//

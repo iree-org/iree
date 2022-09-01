@@ -172,6 +172,10 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
             executableLoweringPipeline,
             translationInfo.value().getSoftwarePipelineDepth());
         break;
+      case IREE::Codegen::DispatchLoweringPassPipeline::
+          LLVMGPUTransposeSharedMem:
+        addGPUTransposePassPipeline(executableLoweringPipeline);
+        break;
       case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWarpReduction:
         addGPUWarpReductionPassPipeline(executableLoweringPipeline);
         break;

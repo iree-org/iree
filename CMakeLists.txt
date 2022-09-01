@@ -367,6 +367,7 @@ include(iree_cc_binary_benchmark)
 include(iree_benchmark_suite)
 include(iree_microbenchmark_suite)
 include(iree_hal_cts_test_suite)
+include(iree_static_linker_test)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 

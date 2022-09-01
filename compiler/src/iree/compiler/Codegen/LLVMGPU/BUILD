@@ -23,6 +23,7 @@ iree_compiler_cc_library(
         "LLVMGPULowerExecutableTarget.cpp",
         "LLVMGPUMultiBuffering.cpp",
         "LLVMGPUReduceBankConflicts.cpp",
+        "LLVMGPUTensorAlloc.cpp",
         "LLVMGPUTensorCoreVectorization.cpp",
         "LLVMGPUTileAndDistribute.cpp",
         "LLVMGPUTileTensor.cpp",
@@ -36,6 +37,7 @@ iree_compiler_cc_library(
     hdrs = [
         "ConvertToLLVM.h",
         "KernelConfig.h",
+        "TilingUtils.h",
     ],
     deps = [
         "//compiler/src/iree/compiler/Codegen:PassHeaders",
@@ -59,6 +61,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:ArithmeticToLLVM",
         "@llvm-project//mlir:ArithmeticTransforms",
+        "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:ControlFlowToLLVM",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:FuncToLLVM",
