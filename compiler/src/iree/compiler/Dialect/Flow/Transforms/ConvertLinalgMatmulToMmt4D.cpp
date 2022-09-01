@@ -335,7 +335,8 @@ LinalgMatmulOpToLinalgMmt4DOpPattern::chooseTileParams(Value lhs, Value rhs,
                                   ArrayRef<int> m0k0n0ForWhenRhsHas2Columns,
                                   std::string comment) {
     assert(m0k0n0ForMatVec[2] == 1 && "not a matrix*vector shape");
-    assert(m0k0n0ForWhenRhsHas2Columns[2] == 2 && "not a matrix*vector2 shape");
+    assert(m0k0n0ForWhenRhsHas2Columns[2] == 2 &&
+           "N=2 is expected when RHS has 2 columns");
 
     SmallVector<int> params;
     if (shapeN == 1 || shapeM == 1) {
@@ -354,7 +355,7 @@ LinalgMatmulOpToLinalgMmt4DOpPattern::chooseTileParams(Value lhs, Value rhs,
       // The vector*matrix case is intentionally derived from the matrix*vector
       // case by swapping M and N dims so that in kernel codegen we can reuse
       // matrix*vector kernels by swapping LHS and RHS.
-      std::swap(params.front(), params.back());
+      std::swap(params[0], params[2]);
       comment += ", narrow matrix * matrix, where the narrow matrix has " +
                  std::to_string(shapeM) + " column(s)";
     }
