@@ -182,6 +182,7 @@ static void iree_task_worker_execute(
     case IREE_TASK_TYPE_DISPATCH_SHARD: {
       iree_task_dispatch_shard_execute(
           (iree_task_dispatch_shard_t*)task, worker->processor_id,
+          iree_task_affinity_set_count_trailing_zeros(worker->worker_bit),
           worker->local_memory, pending_submission);
       break;
     }

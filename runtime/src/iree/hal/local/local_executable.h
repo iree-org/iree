@@ -45,7 +45,8 @@ typedef struct iree_hal_local_executable_vtable_t {
   iree_status_t(IREE_API_PTR* issue_call)(
       iree_hal_local_executable_t* executable, iree_host_size_t ordinal,
       const iree_hal_executable_dispatch_state_v0_t* dispatch_state,
-      const iree_hal_executable_workgroup_state_v0_t* workgroup_state);
+      const iree_hal_executable_workgroup_state_v0_t* workgroup_state,
+      uint32_t worker_id);
 } iree_hal_local_executable_vtable_t;
 
 // Initializes the local executable base type.
@@ -69,7 +70,8 @@ iree_hal_local_executable_t* iree_hal_local_executable_cast(
 iree_status_t iree_hal_local_executable_issue_call(
     iree_hal_local_executable_t* executable, iree_host_size_t ordinal,
     const iree_hal_executable_dispatch_state_v0_t* dispatch_state,
-    const iree_hal_executable_workgroup_state_v0_t* workgroup_state);
+    const iree_hal_executable_workgroup_state_v0_t* workgroup_state,
+    uint32_t worker_id);
 
 iree_status_t iree_hal_local_executable_issue_dispatch_inline(
     iree_hal_local_executable_t* executable, iree_host_size_t ordinal,

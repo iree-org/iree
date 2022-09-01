@@ -18,55 +18,24 @@
 #include "iree/modules/vmvx/module.h"
 #include "iree/vm/bytecode_module.h"
 
-//===----------------------------------------------------------------------===//
-// iree_hal_vmvx_executable_t
-//===----------------------------------------------------------------------===//
-
 #define IREE_VMVX_ENTRY_SIGNATURE "0rrriiiiiiiii_v"
 
-typedef struct iree_hal_vmvx_executable_t {
-  iree_hal_local_executable_t base;
+// Index of the module in the context_modules list.
+// This should always be first so that it can be overridden by user modules.
+#define IREE_VMVX_MODULE_INDEX 0
 
-  // Context containing both the VMVX module and the loaded executable.
-  // This context may also contain custom user modules available for the
-  // generated VMVX modules to use.
-  iree_vm_context_t* context;
+//===----------------------------------------------------------------------===//
+// Built-in executable helpers
+//===----------------------------------------------------------------------===//
 
-  // Resolved entry function export ordinals from the bytecode module.
-  iree_vm_module_t* bytecode_module;
-  iree_host_size_t entry_fn_count;
-  uint16_t entry_fn_ordinals[];
-} iree_hal_vmvx_executable_t;
-
-static const iree_hal_local_executable_vtable_t iree_hal_vmvx_executable_vtable;
-
-// Verifies that an entry point function exported by the bytecode module matches
-// the calling convention we expect. This avoids the need to check it during
-// dispatch (where returning errors is hard and it'd be expensive).
-static iree_status_t iree_hal_vmvx_executable_verify_entry_point(
-    iree_vm_function_t* entry_fn) {
-  iree_vm_function_signature_t signature = iree_vm_function_signature(entry_fn);
-  if (!iree_string_view_equal(
-          signature.calling_convention,
-          iree_make_cstring_view(IREE_VMVX_ENTRY_SIGNATURE))) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "executable entry point does not match the expected calling "
-        "convention; expected '" IREE_VMVX_ENTRY_SIGNATURE
-        "' but got '%.*s', possible ABI version mismatch",
-        (int)signature.calling_convention.size,
-        signature.calling_convention.data);
-  }
-  return iree_ok_status();
-}
-
-// Calls the __set_constants method on |executable| with the given |constants|.
-// We wrap the data in VM buffer and require that it is not retained by the
-// module; the constant values should be extracted and stored in globals.
-// Fails if the constant table is not of the required size.
+// Calls the __set_constants method in |bytecode_module| with the given
+// |constants|. We wrap the data in VM buffer and require that it is not
+// retained by the module; the constant values should be extracted and stored in
+// globals. Fails if the constant table is not of the required size.
 static iree_status_t iree_hal_vmvx_executable_set_constants(
-    iree_hal_vmvx_executable_t* executable, iree_vm_module_t* bytecode_module,
-    iree_host_size_t constant_count, const uint32_t* constants) {
+    iree_vm_context_t* context, iree_vm_module_t* bytecode_module,
+    iree_host_size_t constant_count, const uint32_t* constants,
+    iree_allocator_t host_allocator) {
   // Look for the exported function. If it's not present then no constants are
   // required and if it is then we must have at least one constant.
   iree_vm_function_t set_function;
@@ -119,10 +88,10 @@ static iree_status_t iree_hal_vmvx_executable_set_constants(
 
   // Copy the executable constants into the module state.
   if (iree_status_is_ok(status)) {
-    status = iree_vm_invoke(executable->context, set_function,
+    status = iree_vm_invoke(context, set_function,
                             IREE_VM_INVOCATION_FLAG_TRACE_INLINE,
                             /*policy=*/NULL, inputs,
-                            /*outputs=*/NULL, executable->base.host_allocator);
+                            /*outputs=*/NULL, host_allocator);
   }
 
   // Inputs *must* be released here as we allocated it on the stack.
@@ -138,11 +107,120 @@ static iree_status_t iree_hal_vmvx_executable_set_constants(
   return status;
 }
 
+//===----------------------------------------------------------------------===//
+// iree_hal_vmvx_worker_state_t
+//===----------------------------------------------------------------------===//
+
+typedef struct iree_hal_vmvx_worker_state_t {
+  // Context containing both the VMVX module and the loaded executable.
+  // This context may also contain custom user modules available for the
+  // generated VMVX modules to use.
+  iree_vm_context_t* context;
+
+  // Pointer into the VMVX module state for the worker context.
+  // This is used to update module state directly.
+  iree_vm_module_state_t* vmvx_module_state;
+} iree_hal_vmvx_worker_state_t;
+
+static iree_status_t iree_hal_vmvx_worker_state_initialize(
+    iree_vm_instance_t* instance, iree_host_size_t module_count,
+    iree_vm_module_t** modules, iree_vm_module_t* bytecode_module,
+    const iree_hal_executable_params_t* executable_params,
+    iree_allocator_t host_allocator, iree_hal_vmvx_worker_state_t* out_state) {
+  IREE_ASSERT_ARGUMENT(out_state);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  memset(out_state, 0, sizeof(*out_state));
+
+  // Create the context unique to this worker.
+  iree_vm_context_t* context = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_vm_context_create_with_modules(
+              instance, IREE_VM_CONTEXT_FLAG_NONE, module_count, modules,
+              host_allocator, &context));
+
+  // Fetch the VMVX module state so that we can quickly access it to set
+  // per-call state.
+  iree_vm_module_t* vmvx_module = modules[IREE_VMVX_MODULE_INDEX];
+  iree_vm_module_state_t* vmvx_module_state = NULL;
+  iree_status_t status = iree_vm_context_resolve_module_state(
+      context, vmvx_module, &vmvx_module_state);
+
+  // Set executable-level constants.
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_vmvx_executable_set_constants(
+        context, bytecode_module, executable_params->constant_count,
+        executable_params->constants, host_allocator);
+  }
+
+  if (iree_status_is_ok(status)) {
+    out_state->context = context;
+    out_state->vmvx_module_state = vmvx_module_state;
+  } else {
+    iree_vm_context_release(context);
+  }
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+static void iree_hal_vmvx_worker_state_deinitialize(
+    iree_hal_vmvx_worker_state_t* state) {
+  IREE_ASSERT_ARGUMENT(state);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  if (state->context) {
+    iree_vm_context_release(state->context);
+    state->context = NULL;
+  }
+  IREE_TRACE_ZONE_END(z0);
+}
+
+//===----------------------------------------------------------------------===//
+// iree_hal_vmvx_executable_t
+//===----------------------------------------------------------------------===//
+
+typedef struct iree_hal_vmvx_executable_t {
+  iree_hal_local_executable_t base;
+
+  // Loaded VMVX module shared across all workers.
+  iree_vm_module_t* bytecode_module;
+
+  // Preallocated per-worker states that are used to emulate TLS.
+  iree_host_size_t worker_capacity;
+  iree_hal_vmvx_worker_state_t* worker_states;
+
+  // Resolved entry function export ordinals from the bytecode module.
+  iree_host_size_t entry_fn_count;
+  uint16_t entry_fn_ordinals[];
+} iree_hal_vmvx_executable_t;
+
+static const iree_hal_local_executable_vtable_t iree_hal_vmvx_executable_vtable;
+
+// Verifies that an entry point function exported by the bytecode module matches
+// the calling convention we expect. This avoids the need to check it during
+// dispatch (where returning errors is hard and it'd be expensive).
+static iree_status_t iree_hal_vmvx_executable_verify_entry_point(
+    iree_vm_function_t* entry_fn) {
+  iree_vm_function_signature_t signature = iree_vm_function_signature(entry_fn);
+  if (!iree_string_view_equal(
+          signature.calling_convention,
+          iree_make_cstring_view(IREE_VMVX_ENTRY_SIGNATURE))) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "executable entry point does not match the expected calling "
+        "convention; expected '" IREE_VMVX_ENTRY_SIGNATURE
+        "' but got '%.*s', possible ABI version mismatch",
+        (int)signature.calling_convention.size,
+        signature.calling_convention.data);
+  }
+  return iree_ok_status();
+}
+
 static iree_status_t iree_hal_vmvx_executable_create(
-    iree_vm_context_t* context, iree_vm_module_t* bytecode_module,
+    iree_vm_instance_t* instance, iree_host_size_t module_count,
+    iree_vm_module_t** modules, iree_vm_module_t* bytecode_module,
+    iree_host_size_t worker_capacity,
     const iree_hal_executable_params_t* executable_params,
     iree_allocator_t host_allocator, iree_hal_executable_t** out_executable) {
-  IREE_ASSERT_ARGUMENT(context);
+  IREE_ASSERT_ARGUMENT(instance);
   IREE_ASSERT_ARGUMENT(bytecode_module);
   IREE_ASSERT_ARGUMENT(executable_params);
   IREE_ASSERT_ARGUMENT(!executable_params->pipeline_layout_count ||
@@ -164,30 +242,40 @@ static iree_status_t iree_hal_vmvx_executable_create(
   }
 
   iree_hal_vmvx_executable_t* executable = NULL;
-  iree_host_size_t total_size =
-      sizeof(*executable) +
-      entry_count * sizeof(*executable->entry_fn_ordinals) +
-      entry_count * sizeof(*executable->base.dispatch_attrs) +
-      executable_params->pipeline_layout_count *
-          sizeof(iree_hal_pipeline_layout_t*);
+  const iree_host_size_t entry_fn_ordinals_size =
+      iree_host_align(entry_count * sizeof(*executable->entry_fn_ordinals), 8);
+  const iree_host_size_t dispatch_attrs_size = iree_host_align(
+      entry_count * sizeof(*executable->base.dispatch_attrs), 8);
+  const iree_host_size_t pipeline_layouts_size =
+      iree_host_align(executable_params->pipeline_layout_count *
+                          sizeof(iree_hal_pipeline_layout_t*),
+                      8);
+  const iree_host_size_t worker_states_size =
+      iree_host_align(worker_capacity * sizeof(*executable->worker_states), 8);
+  const iree_host_size_t total_size =
+      sizeof(*executable) + entry_fn_ordinals_size + dispatch_attrs_size +
+      pipeline_layouts_size + worker_states_size;
   iree_status_t status =
       iree_allocator_malloc(host_allocator, total_size, (void**)&executable);
   iree_hal_executable_dispatch_attrs_v0_t* dispatch_attrs = NULL;
   if (iree_status_is_ok(status)) {
-    uint8_t* ptr = (uint8_t*)executable + sizeof(*executable) +
-                   entry_count * sizeof(*executable->entry_fn_ordinals);
+    uint8_t* ptr =
+        (uint8_t*)executable + sizeof(*executable) + entry_fn_ordinals_size;
     dispatch_attrs = (iree_hal_executable_dispatch_attrs_v0_t*)ptr;
-    ptr += entry_count * sizeof(*executable->base.dispatch_attrs);
+    ptr += dispatch_attrs_size;
     iree_hal_pipeline_layout_t** pipeline_layouts_ptr =
         (iree_hal_pipeline_layout_t**)ptr;
+    ptr += pipeline_layouts_size;
     iree_hal_local_executable_initialize(
         &iree_hal_vmvx_executable_vtable,
         executable_params->pipeline_layout_count,
         executable_params->pipeline_layouts, pipeline_layouts_ptr,
         host_allocator, &executable->base);
-    executable->context = context;
     executable->base.dispatch_attrs = dispatch_attrs;
-    iree_vm_context_retain(executable->context);
+
+    executable->worker_capacity = worker_capacity;
+    executable->worker_states = (iree_hal_vmvx_worker_state_t*)ptr;
+    ptr += worker_states_size;
 
     executable->bytecode_module = bytecode_module;
     executable->entry_fn_count = entry_count;
@@ -227,11 +315,14 @@ static iree_status_t iree_hal_vmvx_executable_create(
     }
   }
 
-  // Provide executable constants to the module.
+  // Initialize a context per worker requested.
   if (iree_status_is_ok(status)) {
-    status = iree_hal_vmvx_executable_set_constants(
-        executable, bytecode_module, executable_params->constant_count,
-        executable_params->constants);
+    for (iree_host_size_t i = 0; i < worker_capacity; ++i) {
+      status = iree_hal_vmvx_worker_state_initialize(
+          instance, module_count, modules, bytecode_module, executable_params,
+          host_allocator, &executable->worker_states[i]);
+      if (!iree_status_is_ok(status)) break;
+    }
   }
 
   if (iree_status_is_ok(status)) {
@@ -250,7 +341,9 @@ static void iree_hal_vmvx_executable_destroy(
   iree_allocator_t host_allocator = executable->base.host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_vm_context_release(executable->context);
+  for (iree_host_size_t i = 0; i < executable->worker_capacity; ++i) {
+    iree_hal_vmvx_worker_state_deinitialize(&executable->worker_states[i]);
+  }
   iree_hal_local_executable_deinitialize(
       (iree_hal_local_executable_t*)base_executable);
   iree_allocator_free(host_allocator, executable);
@@ -261,10 +354,12 @@ static void iree_hal_vmvx_executable_destroy(
 static iree_status_t iree_hal_vmvx_executable_issue_call(
     iree_hal_local_executable_t* base_executable, iree_host_size_t ordinal,
     const iree_hal_executable_dispatch_state_v0_t* dispatch_state,
-    const iree_hal_executable_workgroup_state_v0_t* workgroup_state) {
+    const iree_hal_executable_workgroup_state_v0_t* workgroup_state,
+    uint32_t worker_id) {
   iree_hal_vmvx_executable_t* executable =
       (iree_hal_vmvx_executable_t*)base_executable;
 
+  // Map the export ordinal to the exported function in the bytecode module.
   if (IREE_UNLIKELY(ordinal >= executable->entry_fn_count)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "entry point ordinal out of bounds");
@@ -275,14 +370,16 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
       .ordinal = executable->entry_fn_ordinals[ordinal],
   };
 
-#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
-  iree_string_view_t entry_point_name = iree_vm_function_name(&entry_fn);
-  if (iree_string_view_is_empty(entry_point_name)) {
-    entry_point_name = iree_make_cstring_view("unknown_vmvx_call");
+  // Fetch worker-local state. This caller is the only one able to access it so
+  // no synchronization is required.
+  if (IREE_UNLIKELY(worker_id >= executable->worker_capacity)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "worker_id out of bounds");
   }
-  IREE_TRACE_ZONE_BEGIN_NAMED_DYNAMIC(z0, entry_point_name.data,
-                                      entry_point_name.size);
-#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+  iree_hal_vmvx_worker_state_t* worker_state =
+      &executable->worker_states[worker_id];
+  iree_vmvx_module_state_update_workgroup_state(worker_state->vmvx_module_state,
+                                                workgroup_state->processor_id);
 
   // On-stack interface local to this invocation.
   // Note that we _could_ share this across all invocations in a dispatch, but
@@ -296,13 +393,12 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
       iree_vm_list_storage_size(&buffer_type, dispatch_state->binding_count);
   void* binding_list_storage = iree_alloca(binding_list_size);
   iree_vm_list_t* binding_list = NULL;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_vm_list_initialize(
-              iree_make_byte_span(binding_list_storage, binding_list_size),
-              &buffer_type, dispatch_state->binding_count, &binding_list));
-  iree_vm_list_retain(binding_list);  // for call
+  IREE_RETURN_IF_ERROR(iree_vm_list_initialize(
+      iree_make_byte_span(binding_list_storage, binding_list_size),
+      &buffer_type, dispatch_state->binding_count, &binding_list));
 
   // Map bindings into on-stack VMVX buffers.
+  iree_status_t status = iree_ok_status();
   iree_vm_buffer_t* binding_buffers = (iree_vm_buffer_t*)iree_alloca(
       dispatch_state->binding_count * sizeof(iree_vm_buffer_t));
   for (iree_host_size_t i = 0; i < dispatch_state->binding_count; ++i) {
@@ -318,11 +414,15 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
                             dispatch_state->binding_lengths[i]),
         iree_allocator_null(), binding_buffer);
     iree_vm_ref_t ref = {0};
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_vm_ref_wrap_assign(binding_buffer, iree_vm_buffer_type_id(),
-                                    &ref));
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_vm_list_push_ref_retain(binding_list, &ref));
+    status =
+        iree_vm_ref_wrap_assign(binding_buffer, iree_vm_buffer_type_id(), &ref);
+    if (!iree_status_is_ok(status)) break;
+    status = iree_vm_list_push_ref_retain(binding_list, &ref);
+    if (!iree_status_is_ok(status)) break;
+  }
+  if (!iree_status_is_ok(status)) {
+    iree_vm_list_deinitialize(binding_list);
+    return status;
   }
 
   // Acquire workgroup local memory for the dispatch.
@@ -332,7 +432,6 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
       iree_make_byte_span(workgroup_state->local_memory,
                           workgroup_state->local_memory_size),
       iree_allocator_null(), &local_memory_buffer);
-  iree_vm_buffer_retain(&local_memory_buffer);  // for call
 
   // Map the push constant memory directly from the dispatch state.
   iree_vm_buffer_t constants_buffer;
@@ -342,7 +441,6 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
           (void*)dispatch_state->push_constants,
           sizeof(uint32_t) * dispatch_state->push_constant_count),
       iree_allocator_null(), &constants_buffer);
-  iree_vm_buffer_retain(&constants_buffer);  // for call
 
   // Prepare call argument buffer. We've verified the signature on creation and
   // know the exact format we can assume here.
@@ -407,12 +505,18 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
       .workgroup_count_z = dispatch_state->workgroup_count_z,
   };
 
-  // On-stack stack. We really do abuse the stack too much here.
+  // Call arguments are retained by the caller.
+  iree_vm_list_retain(binding_list);            // for call
+  iree_vm_buffer_retain(&local_memory_buffer);  // for call
+  iree_vm_buffer_retain(&constants_buffer);     // for call
+
+  // VM stack stored on native stack. We really do abuse the stack too much
+  // here but it's 8KB and that should be reasonable given that there isn't too
+  // much above us in the stack.
   // TODO(benvanik): pass in an iree_arena_t that can be used for this.
-  // TODO(benvanik): invocation flag that prevents global stores.
   IREE_VM_INLINE_STACK_INITIALIZE(
       stack, IREE_VM_INVOCATION_FLAG_TRACE_INLINE,
-      iree_vm_context_state_resolver(executable->context),
+      iree_vm_context_state_resolver(worker_state->context),
       executable->base.host_allocator);
 
   // Direct call interface.
@@ -423,9 +527,9 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
   call.function = entry_fn;
   call.arguments = iree_make_byte_span(&call_args, sizeof(call_args));
   call.results = iree_make_byte_span(NULL, 0);
-  iree_status_t status =
-      entry_fn.module->begin_call(entry_fn.module->self, stack, call);
+  status = entry_fn.module->begin_call(entry_fn.module->self, stack, call);
 
+  // Clean up the stack if needed, such as when the call fails.
   iree_vm_stack_deinitialize(stack);
 
   iree_vm_buffer_deinitialize(&local_memory_buffer);
@@ -435,7 +539,6 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
     iree_vm_buffer_deinitialize(&binding_buffers[i]);
   }
 
-  IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
@@ -497,7 +600,7 @@ iree_status_t iree_hal_vmvx_module_loader_create(
     // This yields a single ordered list of modules to pass into contexts with
     // the generated module coming last so it can resolve imports from all.
     executable_loader->common_module_count = common_module_count;
-    executable_loader->common_modules[0] = vmvx_module;
+    executable_loader->common_modules[IREE_VMVX_MODULE_INDEX] = vmvx_module;
     iree_vm_module_retain(vmvx_module);
     for (iree_host_size_t i = 0; i < user_module_count; ++i) {
       executable_loader->common_modules[1 + i] = user_modules[i];
@@ -560,7 +663,7 @@ static bool iree_hal_vmvx_module_loader_query_support(
 static iree_status_t iree_hal_vmvx_module_loader_try_load(
     iree_hal_executable_loader_t* base_executable_loader,
     const iree_hal_executable_params_t* executable_params,
-    iree_hal_executable_t** out_executable) {
+    iree_host_size_t worker_capacity, iree_hal_executable_t** out_executable) {
   iree_hal_vmvx_module_loader_t* executable_loader =
       (iree_hal_vmvx_module_loader_t*)base_executable_loader;
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -593,12 +696,12 @@ static iree_status_t iree_hal_vmvx_module_loader_try_load(
       bytecode_module_allocator, executable_loader->host_allocator,
       &bytecode_module);
 
-  // Create the context tying together the shared VMVX module and the
-  // user-provided module that references it. We always link the compiled module
-  // in last so that it can use the VMVX module as well as any user-provided
-  // modules.
-  iree_vm_context_t* context = NULL;
+  // Executable takes ownership of the entire context (including the bytecode
+  // module, which itself may own the underlying allocation).
   if (iree_status_is_ok(status)) {
+    // Merge the context modules into a single flat list (as we have to pass
+    // that down the API chain). If we had more than 2 modules this would be
+    // worth fixing.
     iree_host_size_t context_module_count =
         executable_loader->common_module_count + 1;
     iree_vm_module_t** context_modules = (iree_vm_module_t**)iree_alloca(
@@ -607,21 +710,14 @@ static iree_status_t iree_hal_vmvx_module_loader_try_load(
            executable_loader->common_module_count *
                sizeof(executable_loader->common_modules[0]));
     context_modules[context_module_count - 1] = bytecode_module;
-    status = iree_vm_context_create_with_modules(
-        executable_loader->instance, IREE_VM_CONTEXT_FLAG_CONCURRENT,
-        context_module_count, context_modules,
-        executable_loader->host_allocator, &context);
-  }
 
-  // Executable takes ownership of the entire context (including the bytecode
-  // module, which itself may own the underlying allocation).
-  if (iree_status_is_ok(status)) {
+    // Create the executable, including the VM contexts for each worker.
     status = iree_hal_vmvx_executable_create(
-        context, bytecode_module, executable_params,
+        executable_loader->instance, context_module_count, context_modules,
+        bytecode_module, worker_capacity, executable_params,
         executable_loader->host_allocator, out_executable);
   }
 
-  iree_vm_context_release(context);
   iree_vm_module_release(bytecode_module);
 
   IREE_TRACE_ZONE_END(z0);

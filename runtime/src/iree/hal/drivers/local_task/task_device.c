@@ -272,7 +272,8 @@ static iree_status_t iree_hal_task_device_create_executable_cache(
     iree_loop_t loop, iree_hal_executable_cache_t** out_executable_cache) {
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
   return iree_hal_local_executable_cache_create(
-      identifier, device->loader_count, device->loaders,
+      identifier, iree_task_executor_worker_count(device->executor),
+      device->loader_count, device->loaders,
       iree_hal_device_host_allocator(base_device), out_executable_cache);
 }
 
