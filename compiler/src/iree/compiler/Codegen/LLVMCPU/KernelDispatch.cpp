@@ -871,10 +871,6 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
       return SmallVector<int64_t>(mmt4dWorkgroupTileSizes.begin(),
                                   mmt4dWorkgroupTileSizes.end());
     }
-
-    unsigned numLoops = mmt4dOp.getNumLoops();
-    SmallVector<int64_t> minTileSizes(numLoops, 0);
-    SmallVector<int64_t> maxTileSizes(numLoops, 0);
     return {48, 32};
   };
 
