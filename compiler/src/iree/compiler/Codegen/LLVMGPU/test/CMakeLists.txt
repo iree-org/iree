@@ -30,6 +30,7 @@ iree_lit_test_suite(
     "tile_on_tensor.mlir"
     "transform_dialect_bufferize.mlir"
     "transform_dialect_vector_distribution.mlir"
+    "transpose_pipeline_test.mlir"
     "vector_to_gpu.mlir"
     "vectorization.mlir"
     "warp_reduction.mlir"
