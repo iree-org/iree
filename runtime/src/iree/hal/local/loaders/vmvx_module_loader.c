@@ -22,7 +22,7 @@
 // iree_hal_vmvx_executable_t
 //===----------------------------------------------------------------------===//
 
-#define IREE_VMVX_ENTRY_SIGNATURE "0rrriiiiiiiiii_v"
+#define IREE_VMVX_ENTRY_SIGNATURE "0rrriiiiiiiii_v"
 
 typedef struct iree_hal_vmvx_executable_t {
   iree_hal_local_executable_t base;
@@ -359,8 +359,7 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
   //       %workgroup_size_z: i32,
   //       %workgroup_count_x: i32,
   //       %workgroup_count_y: i32,
-  //       %workgroup_count_z: i32,
-  //       %processor_id: i32
+  //       %workgroup_count_z: i32
   //    )
   //
   // NOTE: this level of the VM ABI is supported - but may change in the future.
@@ -378,7 +377,6 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
     uint32_t workgroup_count_x;
     uint32_t workgroup_count_y;
     uint32_t workgroup_count_z;
-    uint32_t processor_id;
   } call_args = {
       .local_memory =
           {
@@ -407,7 +405,6 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
       .workgroup_count_x = dispatch_state->workgroup_count_x,
       .workgroup_count_y = dispatch_state->workgroup_count_y,
       .workgroup_count_z = dispatch_state->workgroup_count_z,
-      .processor_id = workgroup_state->processor_id,
   };
 
   // On-stack stack. We really do abuse the stack too much here.

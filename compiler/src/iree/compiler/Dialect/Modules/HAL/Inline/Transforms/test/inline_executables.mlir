@@ -35,8 +35,7 @@ hal.executable private @ex {
           %bindings: !util.list<!util.buffer>,
           %workgroup_x: i32, %workgroup_y: i32, %workgroup_z: i32,
           %workgroup_size_x: i32, %workgroup_size_y: i32, %workgroup_size_z: i32,
-          %workgroup_count_x: i32, %workgroup_count_y: i32, %workgroup_count_z: i32,
-          %processor_id: i32) {
+          %workgroup_count_x: i32, %workgroup_count_y: i32, %workgroup_count_z: i32) {
         // Unpack push constants:
         %constants_size = util.buffer.size %constants : !util.buffer
         %constant1_offset = arith.constant 4 : index
@@ -58,8 +57,6 @@ hal.executable private @ex {
         %global_constant = util.global.load @global_constant : !util.buffer
         util.do_not_optimize(%global_constant) : !util.buffer
 
-        // Use processor ID.
-        util.do_not_optimize(%processor_id) : i32
 
         %c4 = arith.constant 4 : index
         %workgroup_x_idx = arith.index_cast %workgroup_x : i32 to index
@@ -93,8 +90,7 @@ func.func private @dispatch_0()
 // CHECK-SAME:  %[[BINDING0:.+]]: !util.buffer, %[[BINDING1:.+]]: !util.buffer, %[[BINDING2:.+]]: !util.buffer,
 // CHECK-SAME:  %[[X:[a-z0-9]+]]: index, %[[Y:[a-z0-9]+]]: index, %[[Z:[a-z0-9]+]]: index,
 // CHECK-SAME:  %[[SIZE_XYZ:[a-z0-9]+]]: index, %[[SIZE_XYZ:[a-z0-9]+]]: index, %[[SIZE_XYZ:[a-z0-9]+]]: index,
-// CHECK-SAME:  %[[COUNT_X:[a-z0-9]+]]: index, %[[COUNT_Y:[a-z0-9]+]]: index, %[[COUNT_Z:[a-z0-9]+]]: index,
-// CHECK-SAME:  %[[PROCESSOR_ID:[a-z0-9]+]]: index)
+// CHECK-SAME:  %[[COUNT_X:[a-z0-9]+]]: index, %[[COUNT_Y:[a-z0-9]+]]: index, %[[COUNT_Z:[a-z0-9]+]]: index)
 
 // Type conversion; most of these will fold away.
 // CHECK: %[[X_I32:.+]] = arith.index_cast %[[X]]
@@ -154,8 +150,7 @@ func.func private @dispatch_0()
 // CHECK-SAME:         %[[BINDING0_SPAN]], %[[BINDING1_SPAN]], %[[BINDING2_SPAN]],
 // CHECK-SAME:         %[[X]], %[[Y]], %[[Z]],
 // CHECK-SAME:         %[[SIZE_XYZ]], %[[SIZE_XYZ]], %[[SIZE_XYZ]],
-// CHECK-SAME:         %[[COUNT_X]], %[[COUNT_Y]], %[[COUNT_Z]],
-// CHECK-SAME:         %c0)
+// CHECK-SAME:         %[[COUNT_X]], %[[COUNT_Y]], %[[COUNT_Z]])
 // CHECK:   return
 
 // CHECK-LABEL: @dispatch0
