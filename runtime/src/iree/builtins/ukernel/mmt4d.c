@@ -7,7 +7,7 @@
 #include "iree/builtins/ukernel/mmt4d.h"
 
 #if defined(IREE_UKERNEL_ARCH_ARM_64)
-#include "iree/builtins/ukernel/mmt4d_arm64.h"
+#include "iree/builtins/ukernel/mmt4d_arm_64.h"
 #endif
 
 #if defined(IREE_UKERNEL_ARCH_GENERIC_32) || \
@@ -22,7 +22,7 @@ IREE_UKERNEL_EXPORT int iree_ukernel_mmt4d_f32f32f32(
   }
 
 #if defined(IREE_UKERNEL_ARCH_ARM_64)
-  return iree_ukernel_mmt4d_f32f32f32_arm64(params);
+  return iree_ukernel_mmt4d_f32f32f32_arm_64(params);
 #endif
 
 #if defined(IREE_UKERNEL_ARCH_GENERIC_32) || \
@@ -40,7 +40,7 @@ IREE_UKERNEL_EXPORT int iree_ukernel_mmt4d_i8i8i32(
   }
 
 #if defined(IREE_UKERNEL_ARCH_ARM_64)
-  return iree_ukernel_mmt4d_i8i8i32_arm64(params);
+  return iree_ukernel_mmt4d_i8i8i32_arm_64(params);
 #endif
 
 #if defined(IREE_UKERNEL_ARCH_GENERIC_32) || \

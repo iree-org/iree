@@ -8,7 +8,7 @@
 
 #include <stdbool.h>
 
-IREE_UKERNEL_EXPORT int iree_ukernel_mmt4d_f32f32f32_generic(
+int iree_ukernel_mmt4d_f32f32f32_generic(
     const iree_ukernel_mmt4d_f32f32f32_params_t* params) {
   bool accumulate = params->flags & IREE_VMVX_MATMUL_FLAG_ACCUMULATE;
   iree_ukernel_size_t lhs_tile_size = params->M0 * params->K0;
@@ -43,7 +43,7 @@ IREE_UKERNEL_EXPORT int iree_ukernel_mmt4d_f32f32f32_generic(
   return 0;
 }
 
-IREE_UKERNEL_EXPORT int iree_ukernel_mmt4d_i8i8i32_generic(
+int iree_ukernel_mmt4d_i8i8i32_generic(
     const iree_ukernel_mmt4d_i8i8i32_params_t* params) {
   bool accumulate = params->flags & IREE_VMVX_MATMUL_FLAG_ACCUMULATE;
   iree_ukernel_size_t lhs_tile_size = params->M0 * params->K0;

@@ -9,9 +9,9 @@
 
 #include "iree/builtins/ukernel/mmt4d.h"
 
-IREE_UKERNEL_EXPORT int iree_ukernel_mmt4d_f32f32f32_generic(
+int iree_ukernel_mmt4d_f32f32f32_generic(
     const iree_ukernel_mmt4d_f32f32f32_params_t* params);
-IREE_UKERNEL_EXPORT int iree_ukernel_mmt4d_i8i8i32_generic(
+int iree_ukernel_mmt4d_i8i8i32_generic(
     const iree_ukernel_mmt4d_i8i8i32_params_t* params);
 
 #endif  // IREE_BUILTINS_UKERNEL_MMT4D_GENERIC_H_
