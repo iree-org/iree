@@ -35,5 +35,6 @@ iree_runtime_cc_library(
     ],
     deps = [
         "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/schemas:cpu_data",
     ],
 )

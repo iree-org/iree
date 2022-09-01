@@ -38,6 +38,7 @@
 // These two headers are clean and do not include any other headers:
 #include "iree/base/attributes.h"
 #include "iree/base/target_platform.h"
+#include "iree/schemas/cpu_data.h"
 
 #ifdef __cplusplus
 extern "C" {

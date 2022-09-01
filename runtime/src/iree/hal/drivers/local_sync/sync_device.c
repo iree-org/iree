@@ -11,6 +11,7 @@
 #include <string.h>
 
 #include "iree/base/internal/arena.h"
+#include "iree/base/internal/cpu.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/local_sync/sync_event.h"
 #include "iree/hal/drivers/local_sync/sync_semaphore.h"
@@ -178,11 +179,8 @@ static iree_status_t iree_hal_sync_device_query_i64(
       *out_value = 1;
       return iree_ok_status();
     }
-  } else if (iree_string_view_equal(category, IREE_SV("hal.processor"))) {
-    // TODO(benvanik): memoize processor information.
-    iree_hal_processor_v0_t processor;
-    iree_hal_processor_query(device->host_allocator, &processor);
-    return iree_hal_processor_lookup_by_key(&processor, key, out_value);
+  } else if (iree_string_view_equal(category, IREE_SV("hal.cpu"))) {
+    return iree_cpu_lookup_data_by_key(key, out_value);
   }
 
   return iree_make_status(

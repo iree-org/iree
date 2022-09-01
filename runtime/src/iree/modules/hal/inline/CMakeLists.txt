@@ -21,9 +21,9 @@ iree_cc_library(
     "module.c"
   DEPS
     iree::base
+    iree::base::internal::cpu
     iree::base::tracing
     iree::hal
-    iree::hal::local::executable_environment
     iree::modules::hal::types
     iree::modules::hal::utils::buffer_diagnostics
     iree::vm

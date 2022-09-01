@@ -102,6 +102,8 @@ iree_cc_library(
   DEPS
     iree::base
     iree::base::core_headers
+    iree::base::tracing
+    iree::schemas::cpu_data
   PUBLIC
 )
 
