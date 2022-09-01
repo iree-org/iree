@@ -1159,25 +1159,14 @@ static LogicalResult setElementwiseGenericOpRootConfig(
     flowTileSizes[currDim] = newSize;
   }
 
-  // Adjust tiling sizes of vector levels to avoid large unroll factors.
+  // Adjust tiling sizes of vector levels to avoid large unroll factors. Most of
+  // the cases are f32 and i32, so we divide it by 4.
+  auto nativeVecSize = getNativeVectorSizeInBytes(entryPointFn);
+  int64_t vecSize =
+      nativeVecSize ? nativeVecSize.value() : clNativeVectorSizeInBytes;
+  vecSize /= 4;
   SmallVector<int64_t> vecTileSizes(minTileSizes.begin(), minTileSizes.end());
-  for (auto operand : genericOp.getOutputOperands()) {
-    constexpr int64_t kMaxUnrollFactor = 8;
-    AffineMap map = genericOp.getTiedIndexingMap(operand);
-    int64_t vecSize = getVectorSize(entryPointFn, operand->get().getType());
-    int64_t currSize = 1;
-    for (auto dimExpr : llvm::reverse(map.getResults().drop_back())) {
-      unsigned pos = dimExpr.cast<AffineDimExpr>().getPosition();
-      if (vecTileSizes[pos] * currSize > vecSize * kMaxUnrollFactor) {
-        vecTileSizes[pos] = 1;
-        currSize = vecSize * kMaxUnrollFactor;
-      }
-    }
-    int fastestPos =
-        map.getResults().back().cast<AffineDimExpr>().getPosition();
-    vecTileSizes[fastestPos] =
-        std::min<int64_t>(vecTileSizes[fastestPos], kMaxUnrollFactor);
-  }
+  for (auto &i : vecTileSizes) i = std::min(i, vecSize);
 
   // Setting reduction tile sizes is a workaround to kick in peeling transform.
   // The tiling won't happen because the sizes are zeros.
