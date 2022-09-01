@@ -681,7 +681,8 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_mmt4d_f32f32f32, mmt4d, v) {
       .M0 = M0,
       .N0 = N0,
       .K0 = K0,
-      .flags = args->flags,};
+      .flags = args->flags,
+  };
   int ukernel_retcode = iree_ukernel_mmt4d_f32f32f32(&ukernel_params);
   IREE_TRACE_ZONE_END(z0);
   if (ukernel_retcode) {
@@ -741,7 +742,8 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_mmt4d_i8i8i32, mmt4d, v) {
       .M0 = M0,
       .N0 = N0,
       .K0 = K0,
-      .flags = args->flags,};
+      .flags = args->flags,
+  };
   int ukernel_retcode = iree_ukernel_mmt4d_i8i8i32(&ukernel_params);
   IREE_TRACE_ZONE_END(z0);
   if (ukernel_retcode) {
