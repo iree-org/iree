@@ -5,7 +5,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-from suites.definitions import common_definitions
+from suites.definitions import common_definitions, iree_definitions
 from suites import cmake_rule_generator
 import unittest
 
@@ -91,25 +91,65 @@ class IreeRuleFactoryTest(unittest.TestCase):
     self.assertEqual(rule.mlir_dialect_type, "linalg")
     self.assertEqual(rule.output_file_path, model_rule.file_path)
 
+  def test_add_compile_module_rule(self):
+    model_rule = cmake_rule_generator.IreeModelImportRule(
+        target_name="iree-import-model-1234",
+        model_id="1234",
+        model_name="abcd",
+        output_file_path="root/models/1234.mlir",
+        mlir_dialect_type="linalg",
+        cmake_rule="bbb")
+    compile_config = iree_definitions.CompileConfig(
+        id="compa",
+        tags=["defaults"],
+        compile_targets=[
+            iree_definitions.CompileTarget(
+                target_architecture=common_definitions.DeviceArchitecture.
+                X86_64_CASCADELAKE,
+                target_platform=common_definitions.DevicePlatform.LINUX_GNU,
+                target_backend=iree_definitions.TargetBackend.LLVM_CPU)
+        ],
+        extra_flags=[])
+
+    rule = self._factory.add_compile_module_rule(compile_config=compile_config,
+                                                 model_import_rule=model_rule)
+
+    self.assertEqual(rule.target_name, "iree-module-1234-compa")
+    self.assertEqual(rule.output_module_path, "root/iree/1234_abcd/compa.vmfb")
+
   def test_generate_cmake_rules(self):
-    rule_1 = self._factory.add_import_model_rule(
+    import_rule_1 = self._factory.add_import_model_rule(
         model_id="1234",
         model_name="abcd",
         model_source_type=common_definitions.ModelSourceType.EXPORTED_TFLITE,
         source_model_rule=cmake_rule_generator.ModelRule(
             target_name="model-1234", file_path="aaa", cmake_rule="bbb"))
-    rule_2 = self._factory.add_import_model_rule(
+    import_rule_2 = self._factory.add_import_model_rule(
         model_id="5678",
         model_name="efgh",
         model_source_type=common_definitions.ModelSourceType.EXPORTED_TF,
         source_model_rule=cmake_rule_generator.ModelRule(
             target_name="model-5678", file_path="ccc", cmake_rule="eee"))
+    compile_config = iree_definitions.CompileConfig(
+        id="compa",
+        tags=["defaults"],
+        compile_targets=[
+            iree_definitions.CompileTarget(
+                target_architecture=common_definitions.DeviceArchitecture.
+                X86_64_CASCADELAKE,
+                target_platform=common_definitions.DevicePlatform.LINUX_GNU,
+                target_backend=iree_definitions.TargetBackend.LLVM_CPU)
+        ],
+        extra_flags=[])
+    compile_rule = self._factory.add_compile_module_rule(
+        compile_config=compile_config, model_import_rule=import_rule_1)
 
     rules = self._factory.generate_cmake_rules()
 
-    self.assertEqual(len(rules), 2)
-    self.assertRegex(rules[0], rule_1.target_name)
-    self.assertRegex(rules[1], rule_2.target_name)
+    self.assertEqual(len(rules), 3)
+    self.assertRegex(rules[0], import_rule_1.target_name)
+    self.assertRegex(rules[1], import_rule_2.target_name)
+    self.assertRegex(rules[2], compile_rule.target_name)
 
 
 if __name__ == "__main__":
