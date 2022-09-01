@@ -330,37 +330,36 @@ LinalgMatmulOpToLinalgMmt4DOpPattern::chooseTileParams(Value lhs, Value rhs,
   Type accElemType = accType.getElementType();
   int64_t shapeM = lhsType.getShape()[0];
   int64_t shapeN = rhsType.getShape()[1];
-  auto chooseMatMulOrMatVec = [=](ArrayRef<int> m0k0n0,
-                                  ArrayRef<int> m0k0n0ForMatVec,
-                                  ArrayRef<int> m0k0n0ForWhenRhsHas2Columns,
-                                  std::string comment) {
-    assert(m0k0n0ForMatVec[2] == 1 && "not a matrix*vector shape");
-    assert(m0k0n0ForWhenRhsHas2Columns[2] == 2 &&
-           "N=2 is expected when RHS has 2 columns");
+  auto chooseMatMulOrMatVec =
+      [=](ArrayRef<int> m0k0n0, ArrayRef<int> m0k0n0ForMatVec,
+          ArrayRef<int> m0k0n0ForWhenRhsHas2Columns, std::string comment) {
+        assert(m0k0n0ForMatVec[2] == 1 && "not a matrix*vector shape");
+        assert(m0k0n0ForWhenRhsHas2Columns[2] == 2 &&
+               "N=2 is expected when RHS has 2 columns");
 
-    SmallVector<int> params;
-    if (shapeN == 1 || shapeM == 1) {
-      params.assign(m0k0n0ForMatVec.begin(), m0k0n0ForMatVec.end());
-    } else if (shapeN == 2 || shapeM == 2) {
-      params.assign(m0k0n0ForWhenRhsHas2Columns.begin(),
-                    m0k0n0ForWhenRhsHas2Columns.end());
-    } else {
-      return Mmt4DTileParams(m0k0n0, comment);
-    }
+        SmallVector<int> params;
+        if (shapeN == 1 || shapeM == 1) {
+          params.assign(m0k0n0ForMatVec.begin(), m0k0n0ForMatVec.end());
+        } else if (shapeN == 2 || shapeM == 2) {
+          params.assign(m0k0n0ForWhenRhsHas2Columns.begin(),
+                        m0k0n0ForWhenRhsHas2Columns.end());
+        } else {
+          return Mmt4DTileParams(m0k0n0, comment);
+        }
 
-    if (shapeN == 1 || shapeN == 2) {
-      comment += ", matrix * narrow matrix, where the narrow matrix has " +
-                 std::to_string(shapeN) + " column(s)";
-    } else {
-      // The vector*matrix case is intentionally derived from the matrix*vector
-      // case by swapping M and N dims so that in kernel codegen we can reuse
-      // matrix*vector kernels by swapping LHS and RHS.
-      std::swap(params[0], params[2]);
-      comment += ", narrow matrix * matrix, where the narrow matrix has " +
-                 std::to_string(shapeM) + " column(s)";
-    }
-    return Mmt4DTileParams(params, comment);
-  };
+        if (shapeN == 1 || shapeN == 2) {
+          comment += ", matrix * narrow matrix, where the narrow matrix has " +
+                     std::to_string(shapeN) + " column(s)";
+        } else {
+          // The vector*matrix case is intentionally derived from the
+          // matrix*vector case by swapping M and N dims so that in kernel
+          // codegen we can reuse matrix*vector kernels by swapping LHS and RHS.
+          std::swap(params[0], params[2]);
+          comment += ", narrow matrix * matrix, where the narrow matrix has " +
+                     std::to_string(shapeM) + " column(s)";
+        }
+        return Mmt4DTileParams(params, comment);
+      };
   if (targetInfo.is(CustomKernelTargetArch::Aarch64)) {
     if (lhsElemType.isSignlessInteger(8) && rhsElemType.isSignlessInteger(8) &&
         accElemType.isSignlessInteger(32)) {
