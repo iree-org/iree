@@ -1564,7 +1564,11 @@ AsyncExecuteOp::cloneReplacementExcludingOperandsAndResults(
   auto &newBody = newOp.getClosureBodyRegion();
   newBody.takeBody(getClosureBodyRegion());
   eraseStreamRegionResults(newBody, excludedResultIndices);
-  newBody.front().eraseArguments(excludedOperandIndices);
+
+  auto &block = newBody.front();
+  BitVector eraseIndices(block.getNumArguments());
+  for (auto i : excludedOperandIndices) eraseIndices.set(i);
+  block.eraseArguments(eraseIndices);
   return newOp;
 }
 
@@ -1676,7 +1680,10 @@ AsyncConcurrentOp::cloneReplacementExcludingOperandsAndResults(
   auto &newBody = newOp.getClosureBodyRegion();
   newBody.takeBody(getClosureBodyRegion());
   eraseStreamRegionResults(newBody, excludedResultIndices);
-  newBody.front().eraseArguments(excludedOperandIndices);
+  auto &block = newBody.front();
+  BitVector eraseIndices(block.getNumArguments());
+  for (auto i : excludedOperandIndices) eraseIndices.set(i);
+  block.eraseArguments(eraseIndices);
   return newOp;
 }
 
@@ -2019,7 +2026,10 @@ CmdExecuteOp::cloneReplacementExcludingOperandsAndResults(
                                              getOperation()->getAttrs());
   auto &newBody = newOp.getClosureBodyRegion();
   newBody.takeBody(getClosureBodyRegion());
-  newBody.front().eraseArguments(excludedOperandIndices);
+  auto &block = newBody.front();
+  BitVector eraseIndices(block.getNumArguments());
+  for (auto i : excludedOperandIndices) eraseIndices.set(i);
+  block.eraseArguments(eraseIndices);
   return newOp;
 }
 
