@@ -38,11 +38,11 @@ module {
         %4 = affine.apply #map2(%0, %3)
         %5 = affine.min #map3(%4, %arg0)
 
-        %6 = memref.subview %arg2[%3] [%5] [%c1] : memref<?xf32> to memref<?xf32, offset:?, strides:[?]>
-        %7 = memref.subview %arg1[%3] [%5] [1] : memref<?xf32> to memref<?xf32, offset:?, strides:[?]>
+        %6 = memref.subview %arg2[%3] [%5] [%c1] : memref<?xf32> to memref<?xf32, strided<[?], offset:?>>
+        %7 = memref.subview %arg1[%3] [%5] [1] : memref<?xf32> to memref<?xf32, strided<[?], offset:?>>
 
         linalg.generic {indexing_maps = [#map4, #map4], iterator_types = ["parallel"]}
-          ins(%7 : memref<?xf32, offset:?, strides:[?]>) outs(%6 : memref<?xf32, offset:?, strides:[?]>) {
+          ins(%7 : memref<?xf32, strided<[?], offset:?>>) outs(%6 : memref<?xf32, strided<[?], offset:?>>) {
         ^bb0(%arg4: f32, %arg5: f32):  // no predecessors
           %9 = arith.mulf %arg4, %cst : f32
           linalg.yield %9 : f32

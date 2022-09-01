@@ -412,13 +412,13 @@ hal.executable public @copy_op {
         %slice_size_x = hal.interface.constant.load[9] : index
         %source = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<?x?xi32>{%source_size_y, %source_size_x}
         %dest = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<?x?xi32>{%dest_size_y, %dest_size_x}
-        %source_subview = memref.subview %source[%source_offset_y, %source_offset_x] [%slice_size_y, %slice_size_x] [1, 1] : memref<?x?xi32> to memref<?x?xi32, offset : ?, strides : [?, ?]>
-        %dest_subview = memref.subview %dest[%dest_offset_y, %dest_offset_x] [%slice_size_y, %slice_size_x] [1, 1] : memref<?x?xi32> to memref<?x?xi32, offset : ?, strides : [?, ?]>
+        %source_subview = memref.subview %source[%source_offset_y, %source_offset_x] [%slice_size_y, %slice_size_x] [1, 1] : memref<?x?xi32> to memref<?x?xi32, strided<[?, ?], offset : ?>>
+        %dest_subview = memref.subview %dest[%dest_offset_y, %dest_offset_x] [%slice_size_y, %slice_size_x] [1, 1] : memref<?x?xi32> to memref<?x?xi32, strided<[?, ?], offset : ?>>
         linalg.generic {
             indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
             iterator_types = ["parallel", "parallel"]}
-            ins(%source_subview : memref<?x?xi32, offset : ?, strides : [?, ?]>)
-            outs(%dest_subview : memref<?x?xi32, offset : ?, strides : [?, ?]>)
+            ins(%source_subview : memref<?x?xi32, strided<[?, ?], offset : ?>>)
+            outs(%dest_subview : memref<?x?xi32, strided<[?, ?], offset : ?>>)
             attrs = {lowering_config = #config} {
           ^bb0(%arg0: i32, %arg1: i32):
             linalg.yield %arg0 : i32
