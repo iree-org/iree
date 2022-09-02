@@ -102,6 +102,23 @@ static void createAsyncGroups(func::FuncOp funcOp) {
   }
 }
 
+static void swizzleSharedMemory(func::FuncOp funcOp) {
+  SmallVector<memref::AllocOp> shmAllocOps;
+  funcOp->walk([&](memref::AllocOp allocOp) {
+    auto memrefType = allocOp.getMemref().getType().cast<MemRefType>();
+    // Only apply it to shared memory of input operands.
+    if (memrefType.getMemorySpaceAsInt() !=
+            gpu::GPUDialect::getWorkgroupAddressSpace() ||
+        memrefType.getRank() < 3)
+      return;
+    shmAllocOps.push_back(allocOp);
+  });
+  for (auto allocOp : shmAllocOps) {
+    (void)nvgpu::optimizeSharedMemoryReadsAndWrites(funcOp,
+                                                    allocOp.getMemref());
+  }
+}
+
 namespace {
 /// Apply tranformation to drop unit dims in destination of vector.transfer_read
 /// Ops such that the resulting vector is 2D
@@ -261,6 +278,10 @@ struct LLVMGPUVectorToGPUPass
       convertVectorToMMAOps(funcOp);
     }
     createAsyncGroups(funcOp);
+
+    if (llvmgpuUseMMASync) {
+      swizzleSharedMemory(funcOp);
+    }
   }
 };
 }  // namespace
