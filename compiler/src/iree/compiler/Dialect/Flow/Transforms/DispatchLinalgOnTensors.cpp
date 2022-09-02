@@ -1082,9 +1082,9 @@ static void fuseRootsWithProducers(MLIRContext *context, Operation *root,
       Optional<OpOperand *> fusableUse = getFusableUse(producer, dominanceInfo);
       if (!fusableUse || fusableUse.value()->getOwner() != candidate) continue;
 
-      if (isFusableWithProducer(operand)) {
-        appendToFusionGroup(producer, groupNum);
-      }
+      if (!isFusableWithProducer(operand)) continue;
+
+      appendToFusionGroup(producer, groupNum);
       worklist.push_back(producer);
     }
   }
