@@ -18,7 +18,7 @@
 
 set(ANDROID_ADRENO_GPU_COMPILATION_FLAGS
   "--iree-input-type=tosa"
-  "--iree-vulkan-target-triple=adreno-unknown-android11"
+  "--iree-vulkan-target-triple=adreno-unknown-android31"
 )
 
 # GPU, Vulkan, Adreno, full-inference

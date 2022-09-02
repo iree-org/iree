@@ -103,7 +103,7 @@ for i in $(ls ${ROOT_DIR}/models/tflite/); do
     "${IREE_COMPILE_PATH}" \
       --iree-input-type=tosa \
       --iree-hal-target-backends=vulkan-spirv \
-      --iree-vulkan-target-triple=valhall-unknown-android11 \
+      --iree-vulkan-target-triple=valhall-unknown-android31 \
       --iree-llvm-debug-symbols=false \
       --iree-vm-bytecode-module-strip-source-map=true \
       --iree-vm-emit-polyglot-zip=false \
@@ -114,7 +114,7 @@ for i in $(ls ${ROOT_DIR}/models/tflite/); do
     "${IREE_COMPILE_PATH}" \
       --iree-input-type=tosa \
       --iree-hal-target-backends=vulkan-spirv \
-      --iree-vulkan-target-triple=adreno-unknown-android11 \
+      --iree-vulkan-target-triple=adreno-unknown-android31 \
       --iree-llvm-debug-symbols=false \
       --iree-vm-bytecode-module-strip-source-map=true \
       --iree-vm-emit-polyglot-zip=false \
