@@ -80,7 +80,7 @@ spirv::DeviceType getDeviceType(const TargetTriple &triple) {
 
 /// Returns the Vulkan version for the given target `triple`.
 Vulkan::Version getVersion(const TargetTriple &triple) {
-  // Android 11/12 stays at Vulkan 1.1.
+  // Android 11/12 (API level 30/31) stays at Vulkan 1.1.
   if (triple.getOS() == TargetTripleOS::Android30 ||
       triple.getOS() == TargetTripleOS::Android31) {
     return Version::V_1_1;
