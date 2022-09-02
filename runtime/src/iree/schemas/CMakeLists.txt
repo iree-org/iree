@@ -88,4 +88,14 @@ flatbuffer_c_library(
   PUBLIC
 )
 
+iree_cc_library(
+  NAME
+    cpu_data
+  HDRS
+    "cpu_data.h"
+  DEPS
+
+  PUBLIC
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

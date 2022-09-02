@@ -10,6 +10,7 @@
 #include <string.h>
 
 #include "iree/base/api.h"
+#include "iree/base/internal/cpu.h"
 #include "iree/hal/local/executable_environment.h"
 #include "iree/hal/local/executable_library_demo.h"
 

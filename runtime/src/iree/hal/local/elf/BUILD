@@ -51,6 +51,7 @@ cc_binary(
         ":elf_module",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base/internal:cpu",
         "//runtime/src/iree/hal/local:executable_environment",
         "//runtime/src/iree/hal/local:executable_library",
         "//runtime/src/iree/hal/local/elf/testdata:elementwise_mul",

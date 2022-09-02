@@ -848,7 +848,8 @@ static iree_status_t iree_hal_cmd_dispatch_tile(
           .local_memory_size = (size_t)tile_context->local_memory.data_length,
       };
   iree_status_t status = iree_hal_local_executable_issue_call(
-      cmd->executable, cmd->ordinal, &dispatch_state, &workgroup_state);
+      cmd->executable, cmd->ordinal, &dispatch_state, &workgroup_state,
+      tile_context->worker_id);
 
   IREE_TRACE_ZONE_END(z0);
   return status;

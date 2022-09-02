@@ -536,6 +536,9 @@ typedef iree_alignas(iree_max_align_t) struct {
   // May be slightly out of date or 0 if the processor could not be queried.
   iree_cpu_processor_id_t processor_id;
 
+  // Worker that is processing the tile, [0, worker_capacity).
+  uint32_t worker_id;
+
   // Tile-local memory that is pinned to each worker ensuring no cache
   // thrashing. Aligned to at least the natural pointer size of the machine.
   // Contents are (today) undefined upon entry.

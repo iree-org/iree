@@ -11,6 +11,7 @@
 #include <string.h>
 
 #include "iree/base/internal/arena.h"
+#include "iree/base/internal/cpu.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/local_task/task_command_buffer.h"
 #include "iree/hal/drivers/local_task/task_event.h"
@@ -209,11 +210,8 @@ static iree_status_t iree_hal_task_device_query_i64(
       *out_value = (int64_t)iree_task_executor_worker_count(device->executor);
       return iree_ok_status();
     }
-  } else if (iree_string_view_equal(category, IREE_SV("hal.processor"))) {
-    // TODO(benvanik): memoize processor information.
-    iree_hal_processor_v0_t processor;
-    iree_hal_processor_query(device->host_allocator, &processor);
-    return iree_hal_processor_lookup_by_key(&processor, key, out_value);
+  } else if (iree_string_view_equal(category, IREE_SV("hal.cpu"))) {
+    return iree_cpu_lookup_data_by_key(key, out_value);
   }
 
   return iree_make_status(
@@ -272,7 +270,8 @@ static iree_status_t iree_hal_task_device_create_executable_cache(
     iree_loop_t loop, iree_hal_executable_cache_t** out_executable_cache) {
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
   return iree_hal_local_executable_cache_create(
-      identifier, device->loader_count, device->loaders,
+      identifier, iree_task_executor_worker_count(device->executor),
+      device->loader_count, device->loaders,
       iree_hal_device_host_allocator(base_device), out_executable_cache);
 }
 

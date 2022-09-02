@@ -24,8 +24,9 @@ extern "C" {
 // situations we're likely to want that isolation _and_ sharing.
 
 iree_status_t iree_hal_local_executable_cache_create(
-    iree_string_view_t identifier, iree_host_size_t loader_count,
-    iree_hal_executable_loader_t** loaders, iree_allocator_t host_allocator,
+    iree_string_view_t identifier, iree_host_size_t worker_capacity,
+    iree_host_size_t loader_count, iree_hal_executable_loader_t** loaders,
+    iree_allocator_t host_allocator,
     iree_hal_executable_cache_t** out_executable_cache);
 
 #ifdef __cplusplus
