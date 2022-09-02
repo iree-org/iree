@@ -246,10 +246,11 @@ SmallVector<Range> ScatterOp::getIterationDomain(OpBuilder &builder) {
   return ranges;
 }
 
-SmallVector<Operation *> ScatterOp::getTiledImplementation(
-    OpBuilder &builder, ValueRange outputs, ArrayRef<OpFoldResult> offsets,
-    ArrayRef<OpFoldResult> sizes, bool /*tileDestOperands*/) {
-  assert(outputs.size() >= 1 && offsets.size() >= 1 && sizes.size() >= 1);
+SmallVector<Operation *>
+ScatterOp::getTiledImplementation(OpBuilder &builder,
+                                  ArrayRef<OpFoldResult> offsets,
+                                  ArrayRef<OpFoldResult> sizes) {
+  assert(offsets.size() >= 1 && sizes.size() >= 1);
   Location loc = getLoc();
   auto zeroAttr = builder.getI64IntegerAttr(0);
   auto oneAttr = builder.getI64IntegerAttr(1);
@@ -283,7 +284,7 @@ SmallVector<Operation *> ScatterOp::getTiledImplementation(
   }
   auto originalRank = getOriginalType().getRank();
   SmallVector<OpFoldResult> originalStrides(originalRank, oneAttr);
-  Value tiledOriginal = getSlice(builder, loc, outputs[0], originalOffsets,
+  Value tiledOriginal = getSlice(builder, loc, original(), originalOffsets,
                                  originalSizes, originalStrides);
   assert(tiledOriginal && "failed to get slice of original tensor");
 
@@ -452,18 +453,18 @@ SmallVector<Range> SortOp::getIterationDomain(OpBuilder &builder) {
   return loopBounds;
 }
 
-SmallVector<Operation *> SortOp::getTiledImplementation(
-    OpBuilder &builder, ValueRange outputs, ArrayRef<OpFoldResult> offsets,
-    ArrayRef<OpFoldResult> sizes, bool /*tileDestOperands*/) {
-  assert(outputs.size() == this->outputs().size());
+SmallVector<Operation *>
+SortOp::getTiledImplementation(OpBuilder &builder,
+                               ArrayRef<OpFoldResult> offsets,
+                               ArrayRef<OpFoldResult> sizes) {
   int64_t rank = getOperandRank();
   assert(offsets.size() == static_cast<size_t>(rank) &&
          sizes.size() == static_cast<size_t>(rank));
   auto oneAttr = builder.getI64IntegerAttr(1);
   SmallVector<OpFoldResult> strides(rank, oneAttr);
   Location loc = getLoc();
-  SmallVector<Value> tiledOperands(outputs.size());
-  for (auto en : llvm::enumerate(outputs)) {
+  SmallVector<Value> tiledOperands(outputs().size());
+  for (auto en : llvm::enumerate(outputs())) {
     tiledOperands[en.index()] =
         getSlice(builder, getLoc(), en.value(), offsets, sizes, strides);
     assert(tiledOperands[en.index()] && "failed to get slice of operand");
@@ -769,9 +770,10 @@ LogicalResult FftOp::generateScalarImplementation(OpBuilder &b, Location loc,
   return success();
 }
 
-SmallVector<Operation *> FftOp::getTiledImplementation(
-    OpBuilder &builder, ValueRange outputs, ArrayRef<OpFoldResult> offsets,
-    ArrayRef<OpFoldResult> sizes, bool /*tileDestOperands*/) {
+SmallVector<Operation *>
+FftOp::getTiledImplementation(OpBuilder &builder,
+                              ArrayRef<OpFoldResult> offsets,
+                              ArrayRef<OpFoldResult> sizes) {
   int64_t rank = getOperandRank();
   SmallVector<OpFoldResult> strides(rank, builder.getI64IntegerAttr(1));
   Location loc = getLoc();
@@ -781,7 +783,7 @@ SmallVector<Operation *> FftOp::getTiledImplementation(
   tiledOperands[2] = getImagCoeff();
   SmallVector<Type, 4> resultTypes;
 
-  for (auto out : outputs) {
+  for (auto out : outputs()) {
     tiledOperands.push_back(
         getSlice(builder, getLoc(), out, offsets, sizes, strides));
     if (hasTensorSemantics()) {
@@ -961,10 +963,10 @@ LogicalResult ScanOp::generateScalarImplementation(OpBuilder &b, Location loc,
   return success();
 }
 
-SmallVector<Operation *> ScanOp::getTiledImplementation(
-    OpBuilder &builder, ValueRange outputs, ArrayRef<OpFoldResult> offsets,
-    ArrayRef<OpFoldResult> sizes, bool /*tileDestOperands*/) {
-  assert(outputs.size() == this->outputs().size());
+SmallVector<Operation *>
+ScanOp::getTiledImplementation(OpBuilder &builder,
+                               ArrayRef<OpFoldResult> offsets,
+                               ArrayRef<OpFoldResult> sizes) {
   int64_t rank = getOperandRank();
   assert(offsets.size() == static_cast<size_t>(rank) &&
          sizes.size() == static_cast<size_t>(rank));
@@ -975,7 +977,7 @@ SmallVector<Operation *> ScanOp::getTiledImplementation(
   tiledOperands.emplace_back(
       getSlice(builder, getLoc(), input(), offsets, sizes, strides));
   tiledOperands.emplace_back(
-      getSlice(builder, getLoc(), outputs[0], offsets, sizes, strides));
+      getSlice(builder, getLoc(), outputs()[0], offsets, sizes, strides));
   if (rank > 1) {
     SmallVector<OpFoldResult> accumOffsets, accumSizes;
     if (failed(getResultTilePosition(builder, 1, offsets, sizes, accumOffsets,
@@ -983,10 +985,11 @@ SmallVector<Operation *> ScanOp::getTiledImplementation(
       return {};
     }
     SmallVector<OpFoldResult> accumStrides(rank - 1, oneAttr);
-    tiledOperands.emplace_back(getSlice(
-        builder, getLoc(), outputs[1], accumOffsets, accumSizes, accumStrides));
+    tiledOperands.emplace_back(getSlice(builder, getLoc(), outputs()[1],
+                                        accumOffsets, accumSizes,
+                                        accumStrides));
   } else {
-    tiledOperands.emplace_back(outputs[1]);
+    tiledOperands.emplace_back(outputs()[1]);
   }
 
   SmallVector<Type, 4> resultTypes;
@@ -1122,9 +1125,10 @@ LogicalResult ReverseOp::generateScalarImplementation(OpBuilder &b,
   return success();
 }
 
-SmallVector<Operation *> ReverseOp::getTiledImplementation(
-    OpBuilder &builder, ValueRange outputs, ArrayRef<OpFoldResult> offsets,
-    ArrayRef<OpFoldResult> sizes, bool /*tileDestOperands*/) {
+SmallVector<Operation *>
+ReverseOp::getTiledImplementation(OpBuilder &builder,
+                                  ArrayRef<OpFoldResult> offsets,
+                                  ArrayRef<OpFoldResult> sizes) {
   int64_t rank = getOperandRank();
   SmallVector<OpFoldResult> strides(rank, builder.getI64IntegerAttr(1));
   Location loc = getLoc();
@@ -1387,10 +1391,10 @@ LogicalResult TopkOp::generateScalarImplementation(OpBuilder &b, Location loc,
   return success();
 }
 
-SmallVector<Operation *> TopkOp::getTiledImplementation(
-    OpBuilder &builder, ValueRange outputs, ArrayRef<OpFoldResult> offsets,
-    ArrayRef<OpFoldResult> sizes, bool /*tileDestOperands*/) {
-  assert(outputs.size() == this->outputs().size());
+SmallVector<Operation *>
+TopkOp::getTiledImplementation(OpBuilder &builder,
+                               ArrayRef<OpFoldResult> offsets,
+                               ArrayRef<OpFoldResult> sizes) {
   int64_t rank = getInputRank();
   assert(offsets.size() == static_cast<size_t>(rank) &&
          sizes.size() == static_cast<size_t>(rank));
@@ -1417,9 +1421,9 @@ SmallVector<Operation *> TopkOp::getTiledImplementation(
   outputSizes[dimension()] = getAsOpFoldResult(kSize);
 
   tiledOperands.emplace_back(
-      getSlice(builder, loc, outputs[0], offsets, outputSizes, strides));
+      getSlice(builder, loc, outputs()[0], offsets, outputSizes, strides));
   tiledOperands.emplace_back(
-      getSlice(builder, loc, outputs[1], offsets, outputSizes, strides));
+      getSlice(builder, loc, outputs()[1], offsets, outputSizes, strides));
   SmallVector<Type, 2> resultTypes;
   if (hasTensorSemantics()) {
     resultTypes.push_back(tiledOperands[tiledOperands.size() - 2].getType());

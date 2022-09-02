@@ -196,9 +196,7 @@ FailureOr<Operation *> SwapTilingInterfaceOp::returningMatchAndRewrite(
   if (!sourceOp)
     return failure();
   SmallVector<Operation *> tiledOps = sourceOp.getTiledImplementation(
-      rewriter, sourceOp.getDestinationOperands(rewriter),
-      sliceOp.getMixedOffsets(), sliceOp.getMixedSizes(),
-      /*tileDestOperands=*/true);
+      rewriter, sliceOp.getMixedOffsets(), sliceOp.getMixedSizes());
   assert(tiledOps.size() && "expected single tiled op");
   Operation *tiledOp = tiledOps.front();
   rewriter.replaceOp(sliceOp, tiledOp->getResults());

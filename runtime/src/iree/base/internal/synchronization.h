@@ -401,6 +401,9 @@ iree_wait_token_t iree_notification_prepare_wait(
 // is reached. Returns false if the deadline is reached before a notification is
 // posted.
 //
+// If |spin_ns| is not IREE_DURATION_ZERO the wait _may_ spin for at least the
+// specified duration before entering the system wait API.
+//
 // Acts as (at least) a memory_order_acquire operation on the notification
 // object. This is meant to be paired with iree_notification_post, which is a
 // memory_order_release operation. This means the following guarantee:
@@ -411,6 +414,7 @@ iree_wait_token_t iree_notification_prepare_wait(
 // memory read or write on thread T1.
 bool iree_notification_commit_wait(iree_notification_t* notification,
                                    iree_wait_token_t wait_token,
+                                   iree_duration_t spin_ns,
                                    iree_time_t deadline_ns);
 
 // Cancels a pending wait operation without blocking.

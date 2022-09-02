@@ -22,13 +22,12 @@ TEST(ExecutorTest, Lifetime) {
   iree_task_topology_initialize_from_group_count(/*group_count=*/4, &topology);
 
   for (int i = 0; i < 100; ++i) {
+    iree_task_executor_options_t options;
+    iree_task_executor_options_initialize(&options);
+    options.worker_local_memory_size = 64 * 1024;
     iree_task_executor_t* executor = NULL;
-    iree_task_scheduling_mode_t scheduling_mode =
-        IREE_TASK_SCHEDULING_MODE_RESERVED;
-    iree_host_size_t worker_local_memory_size = 64 * 1024;
     IREE_ASSERT_OK(iree_task_executor_create(
-        scheduling_mode, &topology, worker_local_memory_size,
-        iree_allocator_system(), &executor));
+        options, &topology, iree_allocator_system(), &executor));
     // -- idle --
     iree_task_executor_release(executor);
   }
@@ -43,13 +42,12 @@ TEST(ExecutorTest, LifetimeStress) {
   iree_task_topology_initialize_from_group_count(/*group_count=*/4, &topology);
 
   for (int i = 0; i < 100; ++i) {
+    iree_task_executor_options_t options;
+    iree_task_executor_options_initialize(&options);
+    options.worker_local_memory_size = 64 * 1024;
     iree_task_executor_t* executor = NULL;
-    iree_task_scheduling_mode_t scheduling_mode =
-        IREE_TASK_SCHEDULING_MODE_RESERVED;
-    iree_host_size_t worker_local_memory_size = 64 * 1024;
     IREE_ASSERT_OK(iree_task_executor_create(
-        scheduling_mode, &topology, worker_local_memory_size,
-        iree_allocator_system(), &executor));
+        options, &topology, iree_allocator_system(), &executor));
     iree_task_scope_t scope;
     iree_task_scope_initialize(iree_make_cstring_view("scope"), &scope);
 
@@ -90,14 +88,13 @@ TEST(ExecutorTest, LifetimeStress) {
 // Tests heavily serialized submission to an executor.
 // This puts pressure on the overheads involved in spilling up threads.
 TEST(ExecutorTest, SubmissionStress) {
+  iree_task_executor_options_t options;
+  iree_task_executor_options_initialize(&options);
+  options.worker_local_memory_size = 64 * 1024;
   iree_task_topology_t topology;
   iree_task_topology_initialize_from_group_count(/*group_count=*/4, &topology);
   iree_task_executor_t* executor = NULL;
-  iree_task_scheduling_mode_t scheduling_mode =
-      IREE_TASK_SCHEDULING_MODE_RESERVED;
-  iree_host_size_t worker_local_memory_size = 64 * 1024;
-  IREE_ASSERT_OK(iree_task_executor_create(scheduling_mode, &topology,
-                                           worker_local_memory_size,
+  IREE_ASSERT_OK(iree_task_executor_create(options, &topology,
                                            iree_allocator_system(), &executor));
   iree_task_scope_t scope;
   iree_task_scope_initialize(iree_make_cstring_view("scope"), &scope);

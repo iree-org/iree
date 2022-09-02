@@ -32,7 +32,13 @@ llvm::cl::opt<std::string> clGPUCodegenTransformDialectFileName(
     llvm::cl::desc(
         "MLIR file containing a transform dialect specification to apply"),
     llvm::cl::init(""));
-}
+
+llvm::cl::list<int64_t> clGPUCodegenTransformDialectTileSizes(
+    "iree-codegen-llvmgpu-workgroup-tile-sizes",
+    llvm::cl::desc("Fixed tile sizes when using the transform dialect starting "
+                   "from IR already workgroup distributed"),
+    llvm::cl::CommaSeparated);
+}  // namespace iree_compiler
 }  // namespace mlir
 
 namespace {
@@ -521,8 +527,88 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   return success();
 }
 
+/// Returns true if the operation is a GenericOp implementing a 2D transpose.
+static bool isTransposeOp(linalg::LinalgOp linalgOp) {
+  if (!isa<linalg::GenericOp>(linalgOp)) return false;
+  // Check that the op has 2 parallel loops.
+  if (linalgOp.getNumParallelLoops() != 2) {
+    return false;
+  }
+
+  // Check that all the iterators are parallel.
+  if (linalgOp.getNumParallelLoops() != linalgOp.getNumLoops()) {
+    return false;
+  }
+
+  // Check that the op has only one input and one output.
+  if ((linalgOp.getNumInputs() != 1) || (linalgOp.getNumOutputs() != 1)) {
+    return false;
+  }
+  // Check for 2D operations
+  auto inputShape =
+      linalgOp.inputs()[0].getType().cast<ShapedType>().getShape();
+  auto outputShape =
+      linalgOp.outputs()[0].getType().cast<ShapedType>().getShape();
+  if (inputShape.size() != 2 || outputShape.size() != 2) {
+    return false;
+  }
+
+  // Only transpose static shapes
+  if (linalgOp.hasDynamicShape()) {
+    return false;
+  }
+
+  // Check that the two indexing maps are a permutation of each other.
+  auto indexing_maps = linalgOp.getIndexingMapsArray();
+  return !indexing_maps[0].isEmpty() && !indexing_maps[1].isEmpty() &&
+         ((indexing_maps[0].isIdentity() && !indexing_maps[1].isIdentity() &&
+           indexing_maps[1].isPermutation()) ||
+          (!indexing_maps[0].isIdentity() && indexing_maps[0].isPermutation() &&
+           indexing_maps[1].isIdentity()));
+}
+
+static LogicalResult setTransposeConfig(func::FuncOp entryPoint,
+                                        Operation *op) {
+  int32_t tileM = 32;
+  int32_t tileN = 32;
+  TileSizesListType tileSizes;
+  tileSizes.push_back({tileM, tileN});
+
+  // Check alignment with tile size
+  if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
+    auto inputShape =
+        genericOp.inputs()[0].getType().cast<ShapedType>().getShape();
+    if (inputShape[0] % tileM != 0 || inputShape[1] % tileN != 0) {
+      return failure();
+    }
+  } else {
+    return failure();
+  }
+
+  // Workgroup size contains 8 warps. Configured with 8 threads on fastest
+  // moving dimension so each thread can execute a vectorized copy of 4
+  // contigious elements at a time from the 32 block.
+  std::array<int64_t, 3> workgroupSize = {8, 32, 1};
+
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, op, tileSizes,
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTransposeSharedMem,
+      workgroupSize);
+}
+
 static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                    Operation *computeOp) {
+  if (!clGPUCodegenTransformDialectTileSizes.empty()) {
+    SmallVector<int64_t, 4> workgroupTileSizes(
+        clGPUCodegenTransformDialectTileSizes.begin(),
+        clGPUCodegenTransformDialectTileSizes.end());
+    TileSizesListType tileSizes;
+    tileSizes.emplace_back(std::move(workgroupTileSizes));
+    auto config = IREE::Codegen::LoweringConfigAttr::get(
+        computeOp->getContext(), tileSizes);
+    setLoweringConfig(computeOp, config);
+    return success();
+  }
   if (IREE::Codegen::CompilationInfoAttr compilationInfo =
           getCompilationInfo(computeOp)) {
     // If the op already has a lowering config coming from the IR use this and
@@ -534,8 +620,13 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
         linalgOp.getNumParallelLoops() >= 2) {
       return setContractConfig(entryPointFn, linalgOp);
     }
-    if (succeeded(setWarpReductionConfig(entryPointFn, linalgOp)))
+    if (succeeded(setWarpReductionConfig(entryPointFn, linalgOp))) {
       return success();
+    }
+    if (isTransposeOp(linalgOp) &&
+        succeeded(setTransposeConfig(entryPointFn, linalgOp))) {
+      return success();
+    }
   }
   if (auto fftOp = dyn_cast<IREE::LinalgExt::FftOp>(computeOp)) {
     return setFftConfig(entryPointFn, fftOp);
@@ -570,7 +661,7 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
           moduleOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
                                      TransformDialectInterpreterCodegen);
       setTranslationInfo(funcOp, translationInfo);
-      continue;
+      if (clGPUCodegenTransformDialectTileSizes.empty()) continue;
     }
 
     Operation *rootOperation = nullptr;

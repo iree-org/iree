@@ -45,6 +45,8 @@ curl --silent --fail --show-error --location \
   */build_tools/github_actions/runner/config/
 
 chown -R runner:runner config/
+# The setup script currently expects the config to be in the runner home
+# directory, but we're making that configurable.
 # TODO: remove this when setup script is updated
 cp -r ./config /home/runner/
 ./config/setup.sh

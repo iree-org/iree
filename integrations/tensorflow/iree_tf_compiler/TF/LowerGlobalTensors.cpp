@@ -91,7 +91,13 @@ class ResourceAnalysis : public ::mlir::dataflow::SparseDataFlowAnalysis<
   void visitOperation(Operation *op, ArrayRef<const StateT *> operands,
                       ArrayRef<StateT *> results) override {
     LLVM_DEBUG(llvm::dbgs() << "ResAn: Visiting operation: " << *op << "\n");
-    markAllPessimisticFixpoint(results);
+    setAllToEntryStates(results);
+  }
+
+  void setToEntryState(StateT *lattice) {
+    propagateIfChanged(
+        lattice, lattice->join(ResourceLatticeValue::getPessimisticValueState(
+                     lattice->getPoint())));
   }
 };
 

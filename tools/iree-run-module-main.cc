@@ -139,7 +139,7 @@ iree_status_t Run() {
   iree_vm_module_release(main_module);
   iree_vm_context_release(context);
 
-  if (FLAG_print_statistics) {
+  if (device_allocator && FLAG_print_statistics) {
     IREE_IGNORE_ERROR(
         iree_hal_allocator_statistics_fprint(stderr, device_allocator));
   }

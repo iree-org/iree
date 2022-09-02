@@ -10,15 +10,16 @@ memref.global "private" constant @__constant_5xi32 : memref<5xi32> = dense<[1, 2
 //  CHECK-SAME:   %[[SCRATCHPAD:[a-z0-9]+]]: !util.buffer,
 //  CHECK-SAME:   %[[CONSTANTS:[a-z0-9]+]]: !util.buffer,
 //  CHECK-SAME:   %[[BINDINGS:[a-z0-9]+]]: !util.list<!util.buffer>,
-//  CHECK-SAME:   %[[WORKGROUP_X:[a-z0-9]+]]: index,
-//  CHECK-SAME:   %[[WORKGROUP_Y:[a-z0-9]+]]: index,
-//  CHECK-SAME:   %[[WORKGROUP_Z:[a-z0-9]+]]: index,
-//  CHECK-SAME:   %[[WORKGROUP_SIZE_X:[a-z0-9]+]]: index,
-//  CHECK-SAME:   %[[WORKGROUP_SIZE_Y:[a-z0-9]+]]: index,
-//  CHECK-SAME:   %[[WORKGROUP_SIZE_Z:[a-z0-9]+]]: index,
-//  CHECK-SAME:   %[[WORKGROUP_COUNT_X:[a-z0-9]+]]: index,
-//  CHECK-SAME:   %[[WORKGROUP_COUNT_Y:[a-z0-9]+]]: index,
-//  CHECK-SAME:   %[[WORKGROUP_COUNT_Z:[a-z0-9]+]]: index) {
+//  CHECK-SAME:   %[[WORKGROUP_X:[a-z0-9]+]]: i32,
+//  CHECK-SAME:   %[[WORKGROUP_Y:[a-z0-9]+]]: i32,
+//  CHECK-SAME:   %[[WORKGROUP_Z:[a-z0-9]+]]: i32,
+//  CHECK-SAME:   %[[WORKGROUP_SIZE_X:[a-z0-9]+]]: i32,
+//  CHECK-SAME:   %[[WORKGROUP_SIZE_Y:[a-z0-9]+]]: i32,
+//  CHECK-SAME:   %[[WORKGROUP_SIZE_Z:[a-z0-9]+]]: i32,
+//  CHECK-SAME:   %[[WORKGROUP_COUNT_X:[a-z0-9]+]]: i32,
+//  CHECK-SAME:   %[[WORKGROUP_COUNT_Y:[a-z0-9]+]]: i32,
+//  CHECK-SAME:   %[[WORKGROUP_COUNT_Z:[a-z0-9]+]]: i32,
+//  CHECK-SAME:   %[[PROCESSOR_ID:.+]]: i32) {
 func.func @entry() {
   %cst = arith.constant 0.000000e+00 : f32
   %c5 = arith.constant 5 : index
@@ -32,9 +33,12 @@ func.func @entry() {
   %workgroup_size_x = hal.interface.workgroup.size[0] : index
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_count_x = hal.interface.workgroup.count[0] : index
-  //      CHECK: = affine.apply #{{.+}}[%[[WORKGROUP_X]], %[[WORKGROUP_SIZE_X]]]
+  //  CHECK-DAG: %[[WORKGROUP_X_IDX:.+]] = arith.index_cast %[[WORKGROUP_X]]
+  //  CHECK-DAG: %[[WORKGROUP_SIZE_X_IDX:.+]] = arith.index_cast %[[WORKGROUP_SIZE_X]]
+  //  CHECK-DAG: %[[WORKGROUP_COUNT_X_IDX:.+]] = arith.index_cast %[[WORKGROUP_COUNT_X]]
+  //      CHECK: = affine.apply #{{.+}}[%[[WORKGROUP_X_IDX]], %[[WORKGROUP_SIZE_X_IDX]]]
   %3 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_x, %workgroup_size_x]
-  // CHECK-NEXT: = affine.apply #{{.+}}[%[[WORKGROUP_COUNT_X]], %[[WORKGROUP_SIZE_X]]]
+  //      CHECK: = affine.apply #{{.+}}[%[[WORKGROUP_COUNT_X_IDX]], %[[WORKGROUP_SIZE_X_IDX]]]
   %4 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_x, %workgroup_size_x]
   scf.for %arg0 = %3 to %c5 step %4 {
     %5 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 5)>(%arg0)[%workgroup_size_x]

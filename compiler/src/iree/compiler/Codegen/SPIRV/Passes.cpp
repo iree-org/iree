@@ -153,7 +153,7 @@ static void addMemRefLoweringPasses(OpPassManager &pm) {
   // Fold load/store from/to subview ops into the original memref when possible.
   // In SPIR-V we don't use memref descriptor so it's not possible to handle
   // subview ops.
-  pm.addPass(memref::createFoldSubViewOpsPass());
+  pm.addPass(memref::createFoldMemRefAliasOpsPass());
   pm.addNestedPass<func::FuncOp>(memref::createExpandOpsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
@@ -258,7 +258,7 @@ void addSPIRVTileAndVectorizeToCooperativeOpsPassPipeline(OpPassManager &pm) {
 
   // Fold subview ops is reqiured for converting vector transfer ops into SPIR-V
   // cooperative ops in the next step.
-  nestedModulePM.addPass(memref::createFoldSubViewOpsPass());
+  nestedModulePM.addPass(memref::createFoldMemRefAliasOpsPass());
 
   nestedModulePM.addNestedPass<func::FuncOp>(
       createSPIRVVectorToCooperativeOpsPass());

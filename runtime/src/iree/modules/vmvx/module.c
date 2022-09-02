@@ -18,15 +18,16 @@
 // Include the ukernel support library so that we can use its implementations
 // as fixed-function components of the runtime.
 #include "iree/builtins/ukernel/elementwise.h"
-#include "iree/builtins/ukernel/mmt4d.h"
 
-// Temporary switch between a blas-style matmul kernel and an mmt4d style.
-// We omit the latter for the time being since it is experimental and keeps
-// the binary size down.
-#define IREE_VMVX_USE_BLAS_MATMUL 1
+#if 0  // TODO: implement mmt4d ukernel
+#include "iree/builtins/ukernel/mmt4d.h"
+#endif
 
 #define IREE_VMVX_MODULE_VERSION_0_0 0x00000000u
 #define IREE_VMVX_MODULE_VERSION_LATEST IREE_VMVX_MODULE_VERSION_0_0
+
+// TODO: move these flags to a header file shared with compiler/.
+#define IREE_VMVX_MATMUL_FLAG_ACCUMULATE 1
 
 //===----------------------------------------------------------------------===//
 // Module type definitions
@@ -490,9 +491,7 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_fill2d_x32, fill2d_x32, v) {
 // Exported matmul function definitions
 //===----------------------------------------------------------------------===//
 
-#if IREE_VMVX_USE_BLAS_MATMUL
-
-IREE_VMVX_ABI_FIXED_STRUCT(matmul_f32, rIIrIIrIIIIIffi, {
+IREE_VMVX_ABI_FIXED_STRUCT(matmul, rIIrIIrIIIIIi, {
   iree_vm_ref_t lhs_ref;
   int64_t lhs_offset;
   int64_t lhs_row_stride;
@@ -505,12 +504,11 @@ IREE_VMVX_ABI_FIXED_STRUCT(matmul_f32, rIIrIIrIIIIIffi, {
   int64_t m;
   int64_t n;
   int64_t k;
-  float alpha;
-  float beta;
   int32_t flags;
 });
-IREE_VMVX_ABI_DEFINE_SHIM(matmul_f32, v);
-IREE_VMVX_ABI_EXPORT(iree_vmvx_matmul_f32f32f32, matmul_f32, v) {
+IREE_VMVX_ABI_DEFINE_SHIM(matmul, v);
+
+IREE_VMVX_ABI_EXPORT(iree_vmvx_matmul_f32f32f32, matmul, v) {
   IREE_TRACE_ZONE_BEGIN(z0);
   MAP_BUFFER_2D_RO(lhs, float,
                    /*buffer_ref=*/args->lhs_ref,
@@ -538,39 +536,88 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_matmul_f32f32f32, matmul_f32, v) {
   iree_host_size_t N = (iree_host_size_t)args->n;
   iree_host_size_t K = (iree_host_size_t)args->k;
 
-  // TODO: define flags more robustly.
-  if (args->flags == 0) {
-    // Row major.
-    for (iree_host_size_t i = 0; i < M; ++i) {
-      for (iree_host_size_t k = 0; k < K; ++k) {
-        float apart = args->alpha * lhs[i * lhs_stride0 + k];
-        for (iree_host_size_t j = 0; j < N; ++j) {
-          out[i * out_stride0 + j] +=
-              args->beta * apart * rhs[k * rhs_stride0 + j];
-        }
-      }
-    }
-  } else {
+  // TODO: define flags more robustly
+  unsigned accumulate_flag = args->flags & IREE_VMVX_MATMUL_FLAG_ACCUMULATE;
+  unsigned unhandled_flags = args->flags ^ accumulate_flag;
+  if (unhandled_flags) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "unsupported matmul flags: %x",
-                            (unsigned)args->flags);
+                            "unsupported matmul flags: 0x%x", unhandled_flags);
+  }
+  for (iree_host_size_t i = 0; i < M; ++i) {
+    for (iree_host_size_t j = 0; j < N; ++j) {
+      float* out_ptr = out + i * out_stride0 + j;
+      float acc = accumulate_flag ? *out_ptr : 0.f;
+      for (iree_host_size_t k = 0; k < K; ++k) {
+        acc += lhs[i * lhs_stride0 + k] * rhs[k * rhs_stride0 + j];
+      }
+      *out_ptr = acc;
+    }
   }
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 
-#endif  // IREE_VMVX_USE_BLAS_MATMUL
+IREE_VMVX_ABI_EXPORT(iree_vmvx_matmul_i8i8i32, matmul, v) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  MAP_BUFFER_2D_RO(lhs, int8_t,
+                   /*buffer_ref=*/args->lhs_ref,
+                   /*offset=*/args->lhs_offset,
+                   /*stride0=*/args->lhs_row_stride,
+                   /*stride1=*/1,
+                   /*size0=*/args->m,
+                   /*size1=*/args->k);
+  MAP_BUFFER_2D_RO(rhs, int8_t,
+                   /*buffer_ref=*/args->rhs_ref,
+                   /*offset=*/args->rhs_offset,
+                   /*stride0=*/args->rhs_row_stride,
+                   /*stride1=*/1,
+                   /*size0=*/args->k,
+                   /*size1=*/args->n);
+  MAP_BUFFER_2D_RW(out, int32_t,
+                   /*buffer_ref=*/args->out_ref,
+                   /*offset=*/args->out_offset,
+                   /*stride0=*/args->out_row_stride,
+                   /*stride1=*/1,
+                   /*size0=*/args->m,
+                   /*size1=*/args->n);
+
+  iree_host_size_t M = (iree_host_size_t)args->m;
+  iree_host_size_t N = (iree_host_size_t)args->n;
+  iree_host_size_t K = (iree_host_size_t)args->k;
+
+  // TODO: define flags more robustly
+  unsigned accumulate_flag = args->flags & IREE_VMVX_MATMUL_FLAG_ACCUMULATE;
+  unsigned unhandled_flags = args->flags ^ accumulate_flag;
+  if (unhandled_flags) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "unsupported matmul flags: 0x%x", unhandled_flags);
+  }
+  for (iree_host_size_t i = 0; i < M; ++i) {
+    for (iree_host_size_t j = 0; j < N; ++j) {
+      int32_t* out_ptr = out + i * out_stride0 + j;
+      int32_t acc = accumulate_flag ? *out_ptr : 0.f;
+      for (iree_host_size_t k = 0; k < K; ++k) {
+        // C's implicit promotion to int saves skin, but let's be explicit.
+        int32_t lhs_val_int32 = lhs[i * lhs_stride0 + k];
+        int32_t rhs_val_int32 = rhs[k * rhs_stride0 + j];
+        acc += lhs_val_int32 * rhs_val_int32;
+      }
+      *out_ptr = acc;
+    }
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
 
 //===----------------------------------------------------------------------===//
-// MMT4D
+// Exported mmt4d function definitions
 //===----------------------------------------------------------------------===//
 
-#if !IREE_VMVX_USE_BLAS_MATMUL
-
-// NOTE: for demo purposes this reuses the matmul signature.
-IREE_VMVX_ABI_FIXED_STRUCT(mmt4d_f32, rIIrIIrIIIIIffi, {
+IREE_VMVX_ABI_FIXED_STRUCT(mmt4d, rIIrIIrIIIIIiiii, {
   iree_vm_ref_t lhs_ref;
   int64_t lhs_offset;
   int64_t lhs_row_stride;
@@ -583,48 +630,167 @@ IREE_VMVX_ABI_FIXED_STRUCT(mmt4d_f32, rIIrIIrIIIIIffi, {
   int64_t m;
   int64_t n;
   int64_t k;
-  float alpha;
-  float beta;
+  int32_t m0;
+  int32_t n0;
+  int32_t k0;
   int32_t flags;
 });
-IREE_VMVX_ABI_DEFINE_SHIM(mmt4d_f32, v);
-IREE_VMVX_ABI_EXPORT(iree_vmvx_mmt4d_f32f32f32, mmt4d_f32, v) {
+IREE_VMVX_ABI_DEFINE_SHIM(mmt4d, v);
+
+IREE_VMVX_ABI_EXPORT(iree_vmvx_mmt4d_f32f32f32, mmt4d, v) {
   IREE_TRACE_ZONE_BEGIN(z0);
+  iree_host_size_t M = (iree_host_size_t)args->m;
+  iree_host_size_t N = (iree_host_size_t)args->n;
+  iree_host_size_t K = (iree_host_size_t)args->k;
+  iree_host_size_t M0 = (iree_host_size_t)args->m0;
+  iree_host_size_t N0 = (iree_host_size_t)args->n0;
+  iree_host_size_t K0 = (iree_host_size_t)args->k0;
+  iree_host_size_t lhs_tile_size = M0 * K0;
+  iree_host_size_t rhs_tile_size = N0 * K0;
+  iree_host_size_t out_tile_size = M0 * N0;
+
+  // Here are abusing the 2D-specific macros MAP_BUFFER_2D_* to query 4D arrays.
+  // Thanks to the requirement that all dimensions but the outer-most one are
+  // contiguous row-major, the outer-most stride is the only nontrivial stride,
+  // we can correctly coalesce the inner 3 dimensions without changing the
+  // mapped span.
   MAP_BUFFER_2D_RO(lhs, float,
                    /*buffer_ref=*/args->lhs_ref,
                    /*offset=*/args->lhs_offset,
                    /*stride0=*/args->lhs_row_stride,
                    /*stride1=*/1,
-                   /*size0=*/args->m,
-                   /*size1=*/args->k);
+                   /*size0=*/M,
+                   /*size1=*/K* lhs_tile_size);
   MAP_BUFFER_2D_RO(rhs, float,
                    /*buffer_ref=*/args->rhs_ref,
                    /*offset=*/args->rhs_offset,
                    /*stride0=*/args->rhs_row_stride,
                    /*stride1=*/1,
-                   /*size0=*/args->k,
-                   /*size1=*/args->n);
+                   /*size0=*/N,
+                   /*size1=*/K* rhs_tile_size);
   MAP_BUFFER_2D_RW(out, float,
                    /*buffer_ref=*/args->out_ref,
                    /*offset=*/args->out_offset,
                    /*stride0=*/args->out_row_stride,
                    /*stride1=*/1,
-                   /*size0=*/args->m,
-                   /*size1=*/args->n);
+                   /*size0=*/M,
+                   /*size1=*/N* out_tile_size);
 
-  // Example of using methods in the MMT4D library.
-  // Remove once any other method is available.
-  int ret = iree_mmt4d_example_matmul_f32(lhs, lhs_stride0, rhs, rhs_stride0,
-                                          out, out_stride0, args->m, args->n,
-                                          args->k, args->alpha, args->beta);
+  unsigned accumulate_flag = args->flags & IREE_VMVX_MATMUL_FLAG_ACCUMULATE;
+  unsigned unhandled_flags = args->flags ^ accumulate_flag;
+  if (unhandled_flags) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "unsupported mmt4d flags: 0x%x", unhandled_flags);
+  }
+
+  for (iree_host_size_t i = 0; i < M; ++i) {
+    for (iree_host_size_t j = 0; j < N; ++j) {
+      float* out_tile_ptr = out + i * out_stride0 + j * out_tile_size;
+      const float* lhs_panel_ptr = lhs + i * lhs_stride0;
+      const float* rhs_panel_ptr = rhs + j * rhs_stride0;
+      for (iree_host_size_t i0 = 0; i0 < M0; ++i0) {
+        for (iree_host_size_t j0 = 0; j0 < N0; ++j0) {
+          const float* lhs_tile_ptr = lhs_panel_ptr;
+          const float* rhs_tile_ptr = rhs_panel_ptr;
+          float* out_ptr = out_tile_ptr + i0 * N0 + j0;
+          float acc = accumulate_flag ? *out_ptr : 0.f;
+          for (iree_host_size_t k = 0; k < K; ++k) {
+            for (iree_host_size_t k0 = 0; k0 < K0; ++k0) {
+              float lhs_val = lhs_tile_ptr[i0 * K0 + k0];
+              float rhs_val = rhs_tile_ptr[j0 * K0 + k0];
+              acc += lhs_val * rhs_val;
+            }
+            lhs_tile_ptr += lhs_tile_size;
+            rhs_tile_ptr += rhs_tile_size;
+          }
+          *out_ptr = acc;
+        }
+      }
+    }
+  }
 
   IREE_TRACE_ZONE_END(z0);
-  return ret == 0 ? iree_ok_status()
-                  : iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                                     "unsupported mmt4d parameters");
+  return iree_ok_status();
 }
 
-#endif  // !IREE_VMVX_USE_BLAS_MATMUL
+IREE_VMVX_ABI_EXPORT(iree_vmvx_mmt4d_i8i8i32, mmt4d, v) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_host_size_t M = (iree_host_size_t)args->m;
+  iree_host_size_t N = (iree_host_size_t)args->n;
+  iree_host_size_t K = (iree_host_size_t)args->k;
+  iree_host_size_t M0 = (iree_host_size_t)args->m0;
+  iree_host_size_t N0 = (iree_host_size_t)args->n0;
+  iree_host_size_t K0 = (iree_host_size_t)args->k0;
+  iree_host_size_t lhs_tile_size = M0 * K0;
+  iree_host_size_t rhs_tile_size = N0 * K0;
+  iree_host_size_t out_tile_size = M0 * N0;
+
+  // Here are abusing the 2D-specific macros MAP_BUFFER_2D_* to query 4D arrays.
+  // Thanks to the requirement that all dimensions but the outer-most one are
+  // contiguous row-major, the outer-most stride is the only nontrivial stride,
+  // we can correctly coalesce the inner 3 dimensions without changing the
+  // mapped span.
+  MAP_BUFFER_2D_RO(lhs, int8_t,
+                   /*buffer_ref=*/args->lhs_ref,
+                   /*offset=*/args->lhs_offset,
+                   /*stride0=*/args->lhs_row_stride,
+                   /*stride1=*/1,
+                   /*size0=*/M,
+                   /*size1=*/K * lhs_tile_size);
+  MAP_BUFFER_2D_RO(rhs, int8_t,
+                   /*buffer_ref=*/args->rhs_ref,
+                   /*offset=*/args->rhs_offset,
+                   /*stride0=*/args->rhs_row_stride,
+                   /*stride1=*/1,
+                   /*size0=*/N,
+                   /*size1=*/K * rhs_tile_size);
+  MAP_BUFFER_2D_RW(out, int32_t,
+                   /*buffer_ref=*/args->out_ref,
+                   /*offset=*/args->out_offset,
+                   /*stride0=*/args->out_row_stride,
+                   /*stride1=*/1,
+                   /*size0=*/M,
+                   /*size1=*/N * out_tile_size);
+
+  unsigned accumulate_flag = args->flags & IREE_VMVX_MATMUL_FLAG_ACCUMULATE;
+  unsigned unhandled_flags = args->flags ^ accumulate_flag;
+  if (unhandled_flags) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "unsupported mmt4d flags: 0x%x", unhandled_flags);
+  }
+
+  for (iree_host_size_t i = 0; i < M; ++i) {
+    for (iree_host_size_t j = 0; j < N; ++j) {
+      int32_t* out_tile_ptr = out + i * out_stride0 + j * out_tile_size;
+      const int8_t* lhs_panel_ptr = lhs + i * lhs_stride0;
+      const int8_t* rhs_panel_ptr = rhs + j * rhs_stride0;
+      for (iree_host_size_t i0 = 0; i0 < M0; ++i0) {
+        for (iree_host_size_t j0 = 0; j0 < N0; ++j0) {
+          const int8_t* lhs_tile_ptr = lhs_panel_ptr;
+          const int8_t* rhs_tile_ptr = rhs_panel_ptr;
+          int32_t* out_ptr = out_tile_ptr + i0 * N0 + j0;
+          int32_t acc = accumulate_flag ? *out_ptr : 0.f;
+          for (iree_host_size_t k = 0; k < K; ++k) {
+            for (iree_host_size_t k0 = 0; k0 < K0; ++k0) {
+              // C's implicit promotion to int saves skin, but let's be explicit
+              int32_t lhs_val_int32 = lhs_tile_ptr[i0 * K0 + k0];
+              int32_t rhs_val_int32 = rhs_tile_ptr[j0 * K0 + k0];
+              acc += lhs_val_int32 * rhs_val_int32;
+            }
+            lhs_tile_ptr += lhs_tile_size;
+            rhs_tile_ptr += rhs_tile_size;
+          }
+          *out_ptr = acc;
+        }
+      }
+    }
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
 
 //===----------------------------------------------------------------------===//
 // VM module interface implementation

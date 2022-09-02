@@ -59,7 +59,7 @@ hosted on [Google Cloud Run](https://cloud.google.com/run). The proxy has the
 app token for a GitHub App with permission to manage self-hosted runners for the
 "iree-org" GitHub organization. It receives requests from the runners when they
 are trying to register or deregister and returns them the much more narrowly
-scoped [de]registration token. We
+scoped [de]registration token. We use
 https://github.com/google-github-actions/github-runner-token-proxy for the
 proxy. You can see its docs for more details.
 
@@ -121,6 +121,29 @@ release, the version of the program running on the runners must be updated
 otherwise the GitHub control plane will refuse their connection. Testing and
 rolling out these updates involves a few steps.
 
+### MIG Rolling Updates
+
+See https://cloud.google.com/compute/docs/instance-groups/updating-migs for the
+main documentation. There are two modes for a rolling MIG update, "proactive" and
+"opportunistic" (AKA "selective"). There are also three different actions the
+MIG can take to update an instance: "refresh", "restart", and "replace". A
+"refresh" update only allows updating instance metadata or adding extra disks,
+but is mostly safe to run as a "proactive" update. Instances will pick up the
+changes to the startup script when they restart naturally. If there are changes
+to metadata that is accessed outside of startup, make sure it's compatible with
+the old configuration. If it's not or you need to change something like the boot
+disk image, you need to do a replacement of the VM, which brings it down along
+with any jobs it's in the middle of running. That means it is not safe to do a
+"proactive" update. In an "opportunistic" update, the MIG is *supposed* to apply
+the update when the instances are created, which would work great for us since
+our instances shut themselves down when they're done with a job, but apparently
+it *doesn't* apply updates if it's recreating an instance deemed "unhealthy"
+which is unfortunately the case for instances that shut themselves down. So
+these sorts of updates need to be done as "opportunistic" updates which will
+need to be manually managed. You can use
+[`remove_idle_runners.sh`](./gcp/remove_idle_runners.sh) to relatively safely
+bring down instances that aren't currently processing a job.
+
 ### Test Runners
 
 We have groups of testing runners (tagged with the `environment=testing` label),
@@ -130,11 +153,19 @@ targeting jobs using the label. Create templates using the
 `TEMPLATE_CONFIG_REPO` and/or `TEMPLATE_CONFIG_REF` environment variables to
 point to your new configurations. Update the testing instance group to your new
 template using [`update_instance_group.sh`](./gcp/update_instance_group.sh) (no
-need to canary to the test group). Check that your runners successfully start up
-and register with the GitHub UI. Then send a PR or trigger a workflow dispatch
-(depending on what you're testing) targeting the testing environment, and ensure
-that your new runners work. Send and merge a PR updating the runner
-configuration.
+need to canary to the test group). The autoscaling configuration for the testing
+group usually has both min and max replicas set to 0, so there aren't any
+instances running. Update the configuration to something appropriate for your
+testing (probably something like 1-10) using
+[`update_autoscaling.sh`](./gcp/update_autoscaling.sh). Check that your runners
+successfully start up and register with the GitHub UI. Then send a PR or trigger
+a workflow dispatch (depending on what you're testing) targeting the testing
+environment, and ensure that your new runners work. Send and merge a PR updating
+the runner configuration. When you're done, make sure to set the testing group
+autoscaling back to 0-0. For now, you'll need to shut down the remaining
+runners. The easiest way to do this for now is to go to the UI for the managed
+instance group and delete all the instances. The necessity for manual deletion
+will go away with future improvements.
 
 ### Deploy to Prod
 
@@ -145,13 +176,12 @@ anything that is picked up directly from tip of tree (such as workflow files).
 These should be changed in separate PRs.
 
 To deploy to prod, create new prod templates. Then use the
-[`canary_update_instance_group.sh`](./gcp/canary_update_instance_group.sh) script
-to canary an update to 10% of runners. Watch to make sure that your new runners
-are starting up and registering as expected and there aren't any additional
-failures. It is probably best to wait on the order of days before proceeding.
-
-When you are satisfied that your new configuration is good, complete the update
-with your new template, using `update_instance_group.sh`.
+[`canary_update_instance_group.sh`](./gcp/canary_update_instance_group.sh)
+script to canary an update to 10% of runners. Watch to make sure that your new
+runners are starting up and registering as expected and there aren't any
+additional failures. It is probably best to wait on the order of days before
+proceeding. When you are satisfied that your new configuration is good, complete
+the update with your new template, using `update_instance_group.sh`.
 
 
 ## Known Issues / Future Work
@@ -183,3 +213,7 @@ There are number of known issues and areas of improvement for the runners:
   uploading artifacts). Job queue based autoscaling would probably help, but the
   same problem would exist. We likely need to implement functionality in the
   instance to shut itself down after some period of inactivity.
+- MIG "opportunistic" or "selective" autoscaling will not update an instance
+  when it replaces it for being unhealthy. Unfortunately for us, this includes
+  cases where the instance shut itself down. This means that any updates
+  requiring a restart need to be managed manually.

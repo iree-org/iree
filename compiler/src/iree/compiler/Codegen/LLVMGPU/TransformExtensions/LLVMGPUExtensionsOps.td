@@ -25,7 +25,7 @@ def ForeachThreadToGpuAndTranslationInfo :
 
     The mapping of threads to gpu.thread_id is currently one-to-one and in order.
     Only **bufferized** scf.foreach_thread are currently supported.
-    Only scf.foreach_thread distributed to *8at most 3 dimensions** are currently
+    Only scf.foreach_thread distributed to **at most 3 dimensions** are currently
     supported.
 
     Multiple scf.foreach_thread are supported per function in which case, the
@@ -39,7 +39,10 @@ def ForeachThreadToGpuAndTranslationInfo :
     =============
     This operation ignores non-Func ops and drops them in the return.
 
-    If all the scf::ForeachThread operations contained within the FuncOp 
+    If any scf.foreach_thread with tensors is found, the transform definitely 
+    fails.    
+
+    If all the scf.foreach_thread operations contained within the FuncOp 
     referred to by the `target` PDLOperation lower to GPU properly, the 
     transform succeeds. Otherwise the transform definitely fails.
     

@@ -14,6 +14,7 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/local_sync/sync_event.h"
 #include "iree/hal/drivers/local_sync/sync_semaphore.h"
+#include "iree/hal/local/executable_environment.h"
 #include "iree/hal/local/inline_command_buffer.h"
 #include "iree/hal/local/local_executable_cache.h"
 #include "iree/hal/local/local_pipeline_layout.h"
@@ -160,26 +161,28 @@ static iree_status_t iree_hal_sync_device_query_i64(
   iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
   *out_value = 0;
 
-  if (iree_string_view_equal(category,
-                             iree_make_cstring_view("hal.executable.format"))) {
+  if (iree_string_view_equal(category, IREE_SV("hal.executable.format"))) {
     *out_value =
         iree_hal_query_any_executable_loader_support(
             device->loader_count, device->loaders, /*caching_mode=*/0, key)
             ? 1
             : 0;
     return iree_ok_status();
-  } else if (iree_string_view_equal(category,
-                                    iree_make_cstring_view("hal.device"))) {
-    if (iree_string_view_equal(key, iree_make_cstring_view("concurrency"))) {
+  } else if (iree_string_view_equal(category, IREE_SV("hal.device"))) {
+    if (iree_string_view_equal(key, IREE_SV("concurrency"))) {
       *out_value = 1;
       return iree_ok_status();
     }
-  } else if (iree_string_view_equal(category,
-                                    iree_make_cstring_view("hal.dispatch"))) {
-    if (iree_string_view_equal(key, iree_make_cstring_view("concurrency"))) {
+  } else if (iree_string_view_equal(category, IREE_SV("hal.dispatch"))) {
+    if (iree_string_view_equal(key, IREE_SV("concurrency"))) {
       *out_value = 1;
       return iree_ok_status();
     }
+  } else if (iree_string_view_equal(category, IREE_SV("hal.processor"))) {
+    // TODO(benvanik): memoize processor information.
+    iree_hal_processor_v0_t processor;
+    iree_hal_processor_query(device->host_allocator, &processor);
+    return iree_hal_processor_lookup_by_key(&processor, key, out_value);
   }
 
   return iree_make_status(

@@ -20,7 +20,9 @@ iree_lit_test_suite(
     # transform dialect spec files are MLIR files that specify a transformation,
     # they need to be included as data.
     data = [
+        "matmul_codegen_spec.mlir",
         "matmul_dispatch_spec.mlir",
+        "matmul_tiled_dispatch_spec.mlir",
     ],
     tags = [
         "noasan",
@@ -31,6 +33,8 @@ iree_lit_test_suite(
     tools = [
         "//tools:iree-benchmark-module",
         "//tools:iree-compile",
+        "//tools:iree-opt",
+        "//tools:iree-run-module",
         "@llvm-project//llvm:FileCheck",
     ],
 )

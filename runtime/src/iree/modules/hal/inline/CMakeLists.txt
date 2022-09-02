@@ -23,6 +23,7 @@ iree_cc_library(
     iree::base
     iree::base::tracing
     iree::hal
+    iree::hal::local::executable_environment
     iree::modules::hal::types
     iree::modules::hal::utils::buffer_diagnostics
     iree::vm

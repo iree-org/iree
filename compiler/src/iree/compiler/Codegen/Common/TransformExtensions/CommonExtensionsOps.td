@@ -96,4 +96,59 @@ def IREEBufferizeOp : Op<Transform_Dialect, "iree.bufferize",
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 }
 
+def ForeachThreadToWorkgroupOp : Op<Transform_Dialect, 
+    "iree.foreach_thread_to_workgroup",
+    [FunctionalStyleTransformOpTrait,
+     MemoryEffectsOpInterface,
+     TransformOpInterface,
+     TransformEachOpTrait]> {
+  let description = [{
+    Target the whole hal.executable_variant op and rewrite the unique topLevel
+    scf.foreach_thread to distributed workgroup_id and workgroup_count.
+
+    The mapping of threads to workgroup_id is currently one-to-one and in order.
+    Only **bufferized** scf.foreach_thread are currently supported.
+    Only scf.foreach_thread distributed to **at most 3 dimensions** are currently
+    supported.
+
+    Return modes:
+    =============
+    This operation ignores non-Func ops and drops them in the return.
+
+    If no unique scf.foreach_thread topLevel operation is found, then the 
+    transform definitely fails.
+    If the unique topLevel scf.foreach_thread has results (i.e. tensors), then
+    the transform definitely fails.
+    
+    If the unique topLevel scf.foreach_thread maps to a dynamic number of 
+    threads, then the transform definitely fails. This is a temporary 
+    limitation until the backward slice computing scf.foreach_thread.num_threads
+    can be extracted into the hal::executable_export workgroup_count region.
+    This region may require arbitrary computations and cannot magically match 
+    what the `stream.cmd.dispatch` has already imposed on us at a distance. 
+    For now we must specify the number of values properly when applying the 
+    topLevel tile_to_foreach_thread_op.
+    
+    If the unique topLevel scf.foreach_thread operation contained within the 
+    FuncOp referred to by the `target` PDLOperation lowers to workgroup properly,
+    the transform succeeds. Otherwise the transform definitely fails.
+    
+    The returned handle points to the same FuncOp operand, consuming it and
+    producing a new SSA value to satisfy chaining and linearity of the IR 
+    properties.
+  }];
+
+  let arguments = (ins PDL_Operation:$target);
+  let results = (outs PDL_Operation:$transformed);
+
+  let assemblyFormat = "$target attr-dict";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::func::FuncOp target,
+        ::llvm::SmallVectorImpl<::mlir::Operation *> &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
 #endif // IREE_COMPILER_CODEGEN_COMMON_TRANSFORMEXTENSIONS_COMMONEXTENSIONS

@@ -22,7 +22,7 @@
 // iree_hal_vmvx_executable_t
 //===----------------------------------------------------------------------===//
 
-#define IREE_VMVX_ENTRY_SIGNATURE "0rrriiiiiiiii_v"
+#define IREE_VMVX_ENTRY_SIGNATURE "0rrriiiiiiiiii_v"
 
 typedef struct iree_hal_vmvx_executable_t {
   iree_hal_local_executable_t base;
@@ -52,7 +52,8 @@ static iree_status_t iree_hal_vmvx_executable_verify_entry_point(
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "executable entry point does not match the expected calling "
-        "convention; expected '" IREE_VMVX_ENTRY_SIGNATURE "' but got '%.*s'",
+        "convention; expected '" IREE_VMVX_ENTRY_SIGNATURE
+        "' but got '%.*s', possible ABI version mismatch",
         (int)signature.calling_convention.size,
         signature.calling_convention.data);
   }
@@ -103,6 +104,7 @@ static iree_status_t iree_hal_vmvx_executable_set_constants(
       iree_allocator_null(), &buffer);
 
   // Setup input list.
+  // TODO(benvanik): replace with direct call.
   uint8_t input_storage[64] = {0};
   iree_vm_list_t* inputs = NULL;
   iree_vm_type_def_t element_type =
@@ -349,15 +351,16 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
   //       %local_memory: !vmvx.buffer,
   //       %constants: !vmvx.buffer,
   //       %bindings: !util.list<!vmvx.buffer>,
-  //       %workgroup_id_x: index,
-  //       %workgroup_id_y: index,
-  //       %workgroup_id_z: index,
-  //       %workgroup_size_x: index,
-  //       %workgroup_size_y: index,
-  //       %workgroup_size_z: index,
-  //       %workgroup_count_x: index,
-  //       %workgroup_count_y: index,
-  //       %workgroup_count_z: index
+  //       %workgroup_id_x: i32,
+  //       %workgroup_id_y: i32,
+  //       %workgroup_id_z: i32,
+  //       %workgroup_size_x: i32,
+  //       %workgroup_size_y: i32,
+  //       %workgroup_size_z: i32,
+  //       %workgroup_count_x: i32,
+  //       %workgroup_count_y: i32,
+  //       %workgroup_count_z: i32,
+  //       %processor_id: i32
   //    )
   //
   // NOTE: this level of the VM ABI is supported - but may change in the future.
@@ -375,6 +378,7 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
     uint32_t workgroup_count_x;
     uint32_t workgroup_count_y;
     uint32_t workgroup_count_z;
+    uint32_t processor_id;
   } call_args = {
       .local_memory =
           {
@@ -403,6 +407,7 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
       .workgroup_count_x = dispatch_state->workgroup_count_x,
       .workgroup_count_y = dispatch_state->workgroup_count_y,
       .workgroup_count_z = dispatch_state->workgroup_count_z,
+      .processor_id = workgroup_state->processor_id,
   };
 
   // On-stack stack. We really do abuse the stack too much here.

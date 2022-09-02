@@ -154,13 +154,15 @@ class InlineExecutablesPass
   //   (local_memory, [constants], [bindings],
   //    workgroup_x, workgroup_y, workgroup_z,
   //    workgroup_size_x, workgroup_size_y, workgroup_size_z,
-  //    workgroup_count_x, workgroup_count_y, workgroup_count_z)
+  //    workgroup_count_x, workgroup_count_y, workgroup_count_z,
+  //    processor_id)
   //
   // Body after rewrite:
   //   (local_memory, constants..., bindings...,
   //    workgroup_x, workgroup_y, workgroup_z,
   //    workgroup_size_x, workgroup_size_y, workgroup_size_z,
-  //    workgroup_count_x, workgroup_count_y, workgroup_count_z)
+  //    workgroup_count_x, workgroup_count_y, workgroup_count_z,
+  //    processor_id)
   //
   // To make this process easier and lighten the load on the downstream passes
   // we muck with the ABI to pass a flattened list of constants and bindings.
@@ -216,11 +218,22 @@ class InlineExecutablesPass
     }
 
     // Take care of the workgroup id/size/count tuples.
+    auto entryBuilder = OpBuilder::atBlockBegin(entryBlock);
     for (unsigned i = 0; i < 3 * /*xyz=*/3; ++i) {
       newArgTypes.push_back(indexType);
       auto oldArg = entryBlock->getArgument(argOffset++);
-      oldArg.replaceAllUsesWith(
-          entryBlock->addArgument(indexType, oldArg.getLoc()));
+      auto newArg = entryBlock->addArgument(indexType, oldArg.getLoc());
+      oldArg.replaceAllUsesWith(entryBuilder.create<arith::IndexCastOp>(
+          oldArg.getLoc(), i32Type, newArg));
+    }
+
+    // Add processor ID (which may be zero for now).
+    {
+      newArgTypes.push_back(indexType);
+      auto oldArg = entryBlock->getArgument(argOffset++);
+      auto newArg = entryBlock->addArgument(indexType, oldArg.getLoc());
+      oldArg.replaceAllUsesWith(entryBuilder.create<arith::IndexCastOp>(
+          oldArg.getLoc(), i32Type, newArg));
     }
 
     // Erase the original args.
@@ -316,7 +329,8 @@ class InlineExecutablesPass
   //   (local_memory, [constants], [bindings],
   //    workgroup_x, workgroup_y, workgroup_z,
   //    workgroup_size_x, workgroup_size_y, workgroup_size_z,
-  //    workgroup_count_x, workgroup_count_y, workgroup_count_z)
+  //    workgroup_count_x, workgroup_count_y, workgroup_count_z,
+  //    processor_id)
   void buildDispatchFunc(IREE::HAL::ExecutableExportOp exportOp,
                          IREE::HAL::PipelineLayoutAttr layoutAttr,
                          size_t totalBindingCount, func::FuncOp bodyFuncOp,
@@ -376,6 +390,7 @@ class InlineExecutablesPass
     workgroupArgs.push_back(workgroupCount[0]);  // workgroup_count_x
     workgroupArgs.push_back(workgroupCount[1]);  // workgroup_count_y
     workgroupArgs.push_back(workgroupCount[2]);  // workgroup_count_z
+    workgroupArgs.push_back(indexSet.get(0));    // processor_id
 
     // Z -> Y -> Z loop nest.
     builder.create<scf::ForOp>(

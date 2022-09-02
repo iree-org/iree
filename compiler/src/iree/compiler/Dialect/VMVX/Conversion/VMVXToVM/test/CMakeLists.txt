@@ -18,6 +18,7 @@ iree_lit_test_suite(
     "copy.mlir"
     "fill.mlir"
     "matmul.mlir"
+    "mmt4d.mlir"
     "unary.mlir"
   TOOLS
     FileCheck

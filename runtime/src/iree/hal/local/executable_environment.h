@@ -29,6 +29,11 @@ extern "C" {
 void iree_hal_processor_query(iree_allocator_t temp_allocator,
                               iree_hal_processor_v0_t* out_processor);
 
+// Looks up a field of the processor information by canonicalized string key.
+iree_status_t iree_hal_processor_lookup_by_key(
+    const iree_hal_processor_v0_t* processor, iree_string_view_t key,
+    int64_t* IREE_RESTRICT out_value);
+
 //===----------------------------------------------------------------------===//
 // iree_hal_executable_environment_*_t
 //===----------------------------------------------------------------------===//

@@ -56,15 +56,16 @@ enum EntryArgOrdinals {
 ///       %local_memory: !vmvx.buffer,
 ///       %constants: !vmvx.buffer,
 ///       %bindings: !util.list<!vmvx.buffer>,
-///       %workgroup_id_x: index,
-///       %workgroup_id_y: index,
-///       %workgroup_id_z: index,
-///       %workgroup_size_x: index,
-///       %workgroup_size_y: index,
-///       %workgroup_size_z: index,
-///       %workgroup_count_x: index,
-///       %workgroup_count_y: index,
-///       %workgroup_count_z: index
+///       %workgroup_id_x: i32,
+///       %workgroup_id_y: i32,
+///       %workgroup_id_z: i32,
+///       %workgroup_size_x: i32,
+///       %workgroup_size_y: i32,
+///       %workgroup_size_z: i32,
+///       %workgroup_count_x: i32,
+///       %workgroup_count_y: i32,
+///       %workgroup_count_z: i32,
+///       %processor_id: i32
 ///   )
 LogicalResult updateHALToVMVXEntryFuncOp(func::FuncOp funcOp,
                                          TypeConverter &typeConverter) {
@@ -75,21 +76,22 @@ LogicalResult updateHALToVMVXEntryFuncOp(func::FuncOp funcOp,
 
   auto bufferType = IREE::Util::BufferType::get(funcOp.getContext());
   auto bindingsType = IREE::Util::ListType::get(bufferType);  // of i8
-  auto indexType = IndexType::get(funcOp.getContext());
+  auto i32Type = IntegerType::get(funcOp.getContext(), 32);
   auto newType = FunctionType::get(funcOp.getContext(),
                                    {
                                        /*local_memory=*/bufferType,  // of i8
                                        /*constants=*/bufferType,     // of i32
                                        /*bindings=*/bindingsType,
-                                       /*workgroup_id_x=*/indexType,
-                                       /*workgroup_id_y=*/indexType,
-                                       /*workgroup_id_z=*/indexType,
-                                       /*workgroup_size_x=*/indexType,
-                                       /*workgroup_size_y=*/indexType,
-                                       /*workgroup_size_z=*/indexType,
-                                       /*workgroup_count_x=*/indexType,
-                                       /*workgroup_count_y=*/indexType,
-                                       /*workgroup_count_z=*/indexType,
+                                       /*workgroup_id_x=*/i32Type,
+                                       /*workgroup_id_y=*/i32Type,
+                                       /*workgroup_id_z=*/i32Type,
+                                       /*workgroup_size_x=*/i32Type,
+                                       /*workgroup_size_y=*/i32Type,
+                                       /*workgroup_size_z=*/i32Type,
+                                       /*workgroup_count_x=*/i32Type,
+                                       /*workgroup_count_y=*/i32Type,
+                                       /*workgroup_count_z=*/i32Type,
+                                       /*processor_id=*/i32Type,
                                    },
                                    {});
 
@@ -116,8 +118,11 @@ struct ConvertHALInterfaceWorkgroupIDOp
     }
 
     // Get the argument to the function corresponding to the workgroup dim.
-    auto workgroupDim = op->getParentOfType<mlir::func::FuncOp>().getArgument(
-        kEntryArgWorkgroupX + dim);
+    Value workgroupDimI32 =
+        op->getParentOfType<mlir::func::FuncOp>().getArgument(
+            kEntryArgWorkgroupX + dim);
+    Value workgroupDim = rewriter.create<arith::IndexCastOp>(
+        op.getLoc(), rewriter.getIndexType(), workgroupDimI32);
     rewriter.replaceOp(op, workgroupDim);
     return success();
   }
@@ -137,8 +142,11 @@ struct ConvertHALInterfaceWorkgroupSizeOp
     }
 
     // Get the argument to the function corresponding to the workgroup dim.
-    auto workgroupDim = op->getParentOfType<mlir::func::FuncOp>().getArgument(
-        kEntryArgWorkgroupSizeX + dim);
+    Value workgroupDimI32 =
+        op->getParentOfType<mlir::func::FuncOp>().getArgument(
+            kEntryArgWorkgroupSizeX + dim);
+    Value workgroupDim = rewriter.create<arith::IndexCastOp>(
+        op.getLoc(), rewriter.getIndexType(), workgroupDimI32);
     rewriter.replaceOp(op, workgroupDim);
     return success();
   }
@@ -158,8 +166,11 @@ struct ConvertHALInterfaceWorkgroupCountOp
     }
 
     // Get the argument to the function corresponding to the workgroup dim.
-    auto workgroupDim = op->getParentOfType<mlir::func::FuncOp>().getArgument(
-        kEntryArgWorkgroupCountX + dim);
+    Value workgroupDimI32 =
+        op->getParentOfType<mlir::func::FuncOp>().getArgument(
+            kEntryArgWorkgroupCountX + dim);
+    Value workgroupDim = rewriter.create<arith::IndexCastOp>(
+        op.getLoc(), rewriter.getIndexType(), workgroupDimI32);
     rewriter.replaceOp(op, workgroupDim);
     return success();
   }
