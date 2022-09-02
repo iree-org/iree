@@ -10,9 +10,151 @@
 #include "iree/base/internal/cpu.h"
 
 #include "iree/base/target_platform.h"
+#include "iree/base/tracing.h"
 
 //===----------------------------------------------------------------------===//
-// iree_cpu_*
+// Platform-specific processor data queries
+//===----------------------------------------------------------------------===//
+
+#if defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_LINUX)
+
+// NOTE: not all kernel versions have all of the cap bits we need defined so as
+// a practice we always define the feature bits we need locally.
+#include <sys/auxv.h>
+
+// OR's |field_bit| into |field_value| if |hwcap_bit| is set in |hwcap_value|.
+#define IREE_SET_IF_HWCAP(hwcap_value, hwcap_bit, field_value, field_bit)   \
+  (field_value) = (field_value) | iree_all_bits_set(hwcap_value, hwcap_bit) \
+                      ? field_bit                                           \
+                      : 0
+
+#if defined(IREE_ARCH_ARM_64)
+
+// TODO: support the code in iree/tooling/cpu_features.c that checks to see if
+// HWCAP_CPUID is available and directly queries the architectural registers.
+// We'll still need the fallback to HWCAP checks but it would allow us to
+// detect features even on kernel versions that don't yet understand them.
+
+// https://docs.kernel.org/arm64/elf_hwcaps.html
+#define IREE_HWCAP_ASIMDDP (1 << 20)
+#define IREE_HWCAP2_I8MM (1 << 13)
+static void iree_cpu_query_data_arch_hwcaps(uint32_t hwcap, uint32_t hwcap2,
+                                            uint64_t* out_fields) {
+  IREE_SET_IF_HWCAP(hwcap, IREE_HWCAP_ASIMDDP, out_fields[0],
+                    IREE_CPU_DATA_FIELD_0_AARCH64_HAVE_DOTPROD);
+  IREE_SET_IF_HWCAP(hwcap2, IREE_HWCAP2_I8MM, out_fields[0],
+                    IREE_CPU_DATA_FIELD_0_AARCH64_HAVE_I8MM);
+}
+
+#else
+static void iree_cpu_query_data_arch_hwcaps(uint32_t hwcap, uint32_t hwcap2,
+                                            uint64_t* out_fields) {
+  // Not supported on this arch.
+}
+#endif  // IREE_ARCH_*
+
+#undef IREE_SET_IF_HWCAP
+
+static void iree_cpu_initialize_from_platform(iree_allocator_t temp_allocator,
+                                              uint64_t* out_fields) {
+  uint32_t hwcap = getauxval(AT_HWCAP);
+  uint32_t hwcap2 = getauxval(AT_HWCAP2);
+  iree_cpu_query_data_arch_hwcaps(hwcap, hwcap2, out_fields);
+}
+
+#else
+
+static void iree_cpu_initialize_from_platform(iree_allocator_t temp_allocator,
+                                              uint64_t* out_fields) {
+  // No implementation available. CPU data will be all zeros.
+}
+
+#endif  // IREE_PLATFORM_*
+
+//===----------------------------------------------------------------------===//
+// Architecture-specific string lookup
+//===----------------------------------------------------------------------===//
+
+#define IREE_TEST_FIELD_BIT(field_key, field_value, bit_value)          \
+  if (iree_string_view_equal(key, IREE_SV(field_key))) {                \
+    *out_value = iree_all_bits_set((field_value), (bit_value)) ? 1 : 0; \
+    return true;                                                        \
+  }
+
+#if defined(IREE_ARCH_ARM_64)
+
+static bool iree_cpu_lookup_data_by_key_for_arch(
+    const uint64_t* fields, iree_string_view_t key,
+    int64_t* IREE_RESTRICT out_value) {
+  IREE_TEST_FIELD_BIT("dotprod", fields[0],
+                      IREE_CPU_DATA_FIELD_0_AARCH64_HAVE_DOTPROD);
+  IREE_TEST_FIELD_BIT("i8mm", fields[0],
+                      IREE_CPU_DATA_FIELD_0_AARCH64_HAVE_I8MM);
+  return false;
+}
+
+#else
+
+static bool iree_cpu_lookup_data_by_key_for_arch(
+    const uint64_t* fields, iree_string_view_t key,
+    int64_t* IREE_RESTRICT out_value) {
+  // Not yet implemented for this architecture.
+  return false;
+}
+
+#endif  // IREE_ARCH_*
+
+#undef IREE_TEST_FIELD_BIT
+
+//===----------------------------------------------------------------------===//
+// Processor data query
+//===----------------------------------------------------------------------===//
+
+static iree_alignas(64) uint64_t
+    iree_cpu_data_cache_[IREE_CPU_DATA_FIELD_COUNT] = {0};
+
+void iree_cpu_initialize(iree_allocator_t temp_allocator) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  memset(iree_cpu_data_cache_, 0, sizeof(iree_cpu_data_cache_));
+  iree_cpu_initialize_from_platform(temp_allocator, iree_cpu_data_cache_);
+  IREE_TRACE_ZONE_END(z0);
+}
+
+void iree_cpu_initialize_with_data(iree_host_size_t field_count,
+                                   const uint64_t* fields) {
+  memset(iree_cpu_data_cache_, 0, sizeof(iree_cpu_data_cache_));
+  memcpy(iree_cpu_data_cache_, fields,
+         iree_min(field_count, IREE_ARRAYSIZE(iree_cpu_data_cache_)) *
+             sizeof(*iree_cpu_data_cache_));
+}
+
+const uint64_t* iree_cpu_data_fields(void) { return iree_cpu_data_cache_; }
+
+uint64_t iree_cpu_data_field(iree_host_size_t field) {
+  if (IREE_UNLIKELY(field >= IREE_ARRAYSIZE(iree_cpu_data_cache_))) return 0;
+  return iree_cpu_data_cache_[field];
+}
+
+void iree_cpu_read_data(iree_host_size_t field_count, uint64_t* out_fields) {
+  memset(out_fields, 0, field_count * sizeof(*out_fields));
+  memcpy(out_fields, iree_cpu_data_cache_,
+         iree_min(field_count, IREE_ARRAYSIZE(iree_cpu_data_cache_)) *
+             sizeof(*out_fields));
+}
+
+iree_status_t iree_cpu_lookup_data_by_key(iree_string_view_t key,
+                                          int64_t* IREE_RESTRICT out_value) {
+  if (!iree_cpu_lookup_data_by_key_for_arch(iree_cpu_data_cache_, key,
+                                            out_value)) {
+    return iree_make_status(IREE_STATUS_NOT_FOUND,
+                            "CPU data key '%.*s' not found", (int)key.size,
+                            key.data);
+  }
+  return iree_ok_status();
+}
+
+//===----------------------------------------------------------------------===//
+// Processor identification
 //===----------------------------------------------------------------------===//
 
 #if defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_LINUX)

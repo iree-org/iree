@@ -122,7 +122,7 @@ iree_task_dispatch_shard_t* iree_task_dispatch_shard_allocate(
 // all shards have completed.
 void iree_task_dispatch_shard_execute(
     iree_task_dispatch_shard_t* task, iree_cpu_processor_id_t processor_id,
-    iree_byte_span_t worker_local_memory,
+    uint32_t worker_id, iree_byte_span_t worker_local_memory,
     iree_task_submission_t* pending_submission);
 
 #ifdef __cplusplus

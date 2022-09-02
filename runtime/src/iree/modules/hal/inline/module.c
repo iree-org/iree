@@ -7,9 +7,9 @@
 #include "iree/modules/hal/inline/module.h"
 
 #include "iree/base/api.h"
+#include "iree/base/internal/cpu.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
-#include "iree/hal/local/executable_environment.h"
 #include "iree/modules/hal/utils/buffer_diagnostics.h"
 #include "iree/vm/api.h"
 
@@ -503,12 +503,8 @@ IREE_VM_ABI_EXPORT(iree_hal_inline_module_device_query_i64,  //
 
   iree_status_t query_status = iree_status_from_code(IREE_STATUS_NOT_FOUND);
   int64_t value = 0;
-  if (iree_string_view_equal(category_str, IREE_SV("hal.processor"))) {
-    // TODO(benvanik): memoize processor information.
-    iree_hal_processor_v0_t processor;
-    iree_hal_processor_query(state->host_allocator, &processor);
-    query_status =
-        iree_hal_processor_lookup_by_key(&processor, key_str, &value);
+  if (iree_string_view_equal(category_str, IREE_SV("hal.cpu"))) {
+    query_status = iree_cpu_lookup_data_by_key(key_str, &value);
   }
 
   rets->i0 = iree_status_consume_code(query_status) == IREE_STATUS_OK ? 1 : 0;

@@ -156,7 +156,7 @@ static iree_status_t iree_hal_loader_module_try_load(
     // supported then the try will fail with IREE_STATUS_CANCELLED and we should
     // continue trying other loaders.
     iree_status_t status = iree_hal_executable_loader_try_load(
-        loader, executable_params, out_executable);
+        loader, executable_params, /*worker_capacity=*/1, out_executable);
     if (iree_status_is_ok(status)) {
       // Executable was successfully loaded.
       return status;

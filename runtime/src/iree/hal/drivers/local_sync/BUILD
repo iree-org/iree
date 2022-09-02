@@ -32,6 +32,7 @@ iree_runtime_cc_library(
         "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/base/internal",
         "//runtime/src/iree/base/internal:arena",
+        "//runtime/src/iree/base/internal:cpu",
         "//runtime/src/iree/base/internal:synchronization",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/local",

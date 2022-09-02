@@ -29,6 +29,7 @@ iree_cc_library(
     "mmt4d_generic.c"
   DEPS
     iree::base::core_headers
+    iree::schemas::cpu_data
   DEFINES
     "IREE_HAVE_UKERNEL_BUILTINS=1"
   PUBLIC

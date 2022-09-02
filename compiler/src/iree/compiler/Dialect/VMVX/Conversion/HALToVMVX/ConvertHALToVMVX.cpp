@@ -64,8 +64,7 @@ enum EntryArgOrdinals {
 ///       %workgroup_size_z: i32,
 ///       %workgroup_count_x: i32,
 ///       %workgroup_count_y: i32,
-///       %workgroup_count_z: i32,
-///       %processor_id: i32
+///       %workgroup_count_z: i32
 ///   )
 LogicalResult updateHALToVMVXEntryFuncOp(func::FuncOp funcOp,
                                          TypeConverter &typeConverter) {
@@ -91,7 +90,6 @@ LogicalResult updateHALToVMVXEntryFuncOp(func::FuncOp funcOp,
                                        /*workgroup_count_x=*/i32Type,
                                        /*workgroup_count_y=*/i32Type,
                                        /*workgroup_count_z=*/i32Type,
-                                       /*processor_id=*/i32Type,
                                    },
                                    {});
 

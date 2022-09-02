@@ -38,6 +38,11 @@ typedef struct iree_vmvx_module_t {
 typedef struct iree_vmvx_module_state_t {
   iree_allocator_t host_allocator;
 
+  // Logical processor identifier used to index into processor info fields.
+  // Depending on the implementation this may be an ordinal, a bitfield, or an
+  // opaque unique identifier.
+  uint32_t processor_id;
+
   // If we have any external libraries we want to interact with that are
   // stateful we could store their state here. Note that VMVX invocations may
   // happen from any thread and concurrently and if the state is not thread-safe
@@ -838,4 +843,10 @@ IREE_API_EXPORT iree_status_t iree_vmvx_module_create(
 
   *out_module = base_module;
   return iree_ok_status();
+}
+
+IREE_API_EXPORT void iree_vmvx_module_state_update_workgroup_state(
+    iree_vm_module_state_t* module_state, uint32_t processor_id) {
+  iree_vmvx_module_state_t* state = (iree_vmvx_module_state_t*)module_state;
+  state->processor_id = processor_id;
 }

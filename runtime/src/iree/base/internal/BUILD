@@ -109,6 +109,8 @@ iree_runtime_cc_library(
     deps = [
         "//runtime/src/iree/base",
         "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/schemas:cpu_data",
     ],
 )
 
