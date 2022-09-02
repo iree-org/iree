@@ -951,25 +951,6 @@ void ConvertToLLVMPass::runOnOperation() {
   LLVMTypeConverter converter(&getContext(), options, &dataLayoutAnalysis);
 
   RewritePatternSet patterns(&getContext());
-
-  // Use the default 64-bit lowering for TOSA's ApplyScale operator:
-  //   This lowering widens integer types to 64-bit an performs the non-fused
-  //   operations, specifically multiply, add, and shift. Bit-widening
-  //   is used to guarantee higher-order bits are not truncated during the
-  //   multiply or add.
-  //
-  // TODO(bjacob): Use a lowering that uses specific ARM/X86 intrinsics.
-  bool use32BitImpl = false;
-  auto variantOp = getExecutableVariantOp(module);
-  if (succeeded(variantOp) && isRISCV(*variantOp)) {
-    // Use the 32-bit lowering for RISC-V if 'zve32x' is specified and there is
-    // no 64-bit integer vector support.
-    // TODO(#9440) Simplify logic when 'cpu_features' is simplified.
-    use32BitImpl = hasZve32xFeature(*variantOp) && !hasVFeature(*variantOp) &&
-                   !hasZve64xFeature(*variantOp);
-  }
-  tosa::populateTosaRescaleToArithConversionPatterns(&patterns, use32BitImpl);
-
   populateAffineToStdConversionPatterns(patterns);
   populateSCFToControlFlowConversionPatterns(patterns);
   cf::populateControlFlowToLLVMConversionPatterns(converter, patterns);

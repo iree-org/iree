@@ -211,6 +211,10 @@ createLLVMCPUCheckIRBeforeLLVMConversionPass();
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createLLVMCPULowerExecutableTargetPass();
 
+/// Lower CPU target dependent operations.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMCPULowerTargetDependentTosaPass();
+
 /// Synchronizes LLVM linkage with MLIR symbol visibility.
 std::unique_ptr<OperationPass<ModuleOp>>
 createLLVMCPUSynchronizeSymbolVisibilityPass();
