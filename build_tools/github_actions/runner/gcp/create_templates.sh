@@ -106,8 +106,6 @@ function create_template() {
     --metadata="${metadata_string}"
   )
 
-  local disk_name="${TEMPLATE_BASE_NAME}-${group}-${type}-${VERSION}"
-
   if [[ "${type}" == gpu ]]; then
     args+=(
       --machine-type=a2-highgpu-1g
