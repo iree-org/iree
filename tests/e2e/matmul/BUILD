@@ -235,7 +235,7 @@ py_binary(
     ],
     trace_runner = "//tools:iree-e2e-matmul-test",
 ) for vulkan_target in [
-    "valhall-unknown-android11",
+    "valhall-unknown-android31",
     "ampere-unknown-linux",
 ]]
 

@@ -161,8 +161,8 @@ currently recognized ones:
 
 GPU Vendor | Target Triple
 :--------: | :-----------:
-ARM Mali GPU | `valhall-g78-android11`
-Qualcomm Adreno GPU | `adreno-unknown-android11`
+ARM Mali GPU | `valhall-g78-android30`
+Qualcomm Adreno GPU | `adreno-unknown-android30`
 AMD GPU | e.g., `rdna1-5700xt-linux`
 NVIDIA GPU | e..g, `ampere-rtx3080-windows`
 SwiftShader CPU | `cpu-swiftshader-unknown`
