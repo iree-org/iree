@@ -18,16 +18,10 @@
 // Include the ukernel support library so that we can use its implementations
 // as fixed-function components of the runtime.
 #include "iree/builtins/ukernel/elementwise.h"
-
-#if 0  // TODO: implement mmt4d ukernel
 #include "iree/builtins/ukernel/mmt4d.h"
-#endif
 
 #define IREE_VMVX_MODULE_VERSION_0_0 0x00000000u
 #define IREE_VMVX_MODULE_VERSION_LATEST IREE_VMVX_MODULE_VERSION_0_0
-
-// TODO: move these flags to a header file shared with compiler/.
-#define IREE_VMVX_MATMUL_FLAG_ACCUMULATE 1
 
 //===----------------------------------------------------------------------===//
 // Module type definitions
@@ -633,7 +627,7 @@ IREE_VMVX_ABI_FIXED_STRUCT(mmt4d, rIIrIIrIIIIIiiii, {
   int32_t m0;
   int32_t n0;
   int32_t k0;
-  int32_t flags;
+  uint32_t flags;
 });
 IREE_VMVX_ABI_DEFINE_SHIM(mmt4d, v);
 
@@ -648,7 +642,6 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_mmt4d_f32f32f32, mmt4d, v) {
   iree_host_size_t lhs_tile_size = M0 * K0;
   iree_host_size_t rhs_tile_size = N0 * K0;
   iree_host_size_t out_tile_size = M0 * N0;
-
   // Here are abusing the 2D-specific macros MAP_BUFFER_2D_* to query 4D arrays.
   // Thanks to the requirement that all dimensions but the outer-most one are
   // contiguous row-major, the outer-most stride is the only nontrivial stride,
@@ -675,42 +668,27 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_mmt4d_f32f32f32, mmt4d, v) {
                    /*stride1=*/1,
                    /*size0=*/M,
                    /*size1=*/N* out_tile_size);
-
-  unsigned accumulate_flag = args->flags & IREE_VMVX_MATMUL_FLAG_ACCUMULATE;
-  unsigned unhandled_flags = args->flags ^ accumulate_flag;
-  if (unhandled_flags) {
-    IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "unsupported mmt4d flags: 0x%x", unhandled_flags);
-  }
-
-  for (iree_host_size_t i = 0; i < M; ++i) {
-    for (iree_host_size_t j = 0; j < N; ++j) {
-      float* out_tile_ptr = out + i * out_stride0 + j * out_tile_size;
-      const float* lhs_panel_ptr = lhs + i * lhs_stride0;
-      const float* rhs_panel_ptr = rhs + j * rhs_stride0;
-      for (iree_host_size_t i0 = 0; i0 < M0; ++i0) {
-        for (iree_host_size_t j0 = 0; j0 < N0; ++j0) {
-          const float* lhs_tile_ptr = lhs_panel_ptr;
-          const float* rhs_tile_ptr = rhs_panel_ptr;
-          float* out_ptr = out_tile_ptr + i0 * N0 + j0;
-          float acc = accumulate_flag ? *out_ptr : 0.f;
-          for (iree_host_size_t k = 0; k < K; ++k) {
-            for (iree_host_size_t k0 = 0; k0 < K0; ++k0) {
-              float lhs_val = lhs_tile_ptr[i0 * K0 + k0];
-              float rhs_val = rhs_tile_ptr[j0 * K0 + k0];
-              acc += lhs_val * rhs_val;
-            }
-            lhs_tile_ptr += lhs_tile_size;
-            rhs_tile_ptr += rhs_tile_size;
-          }
-          *out_ptr = acc;
-        }
-      }
-    }
-  }
-
+  iree_ukernel_mmt4d_f32f32f32_params_t ukernel_params = {
+      .lhs_buffer = lhs,
+      .rhs_buffer = rhs,
+      .out_buffer = out,
+      .lhs_stride = lhs_stride0,
+      .rhs_stride = rhs_stride0,
+      .out_stride = out_stride0,
+      .M = M,
+      .N = N,
+      .K = K,
+      .M0 = M0,
+      .N0 = N0,
+      .K0 = K0,
+      .flags = args->flags,
+  };
+  int ukernel_retcode = iree_ukernel_mmt4d_f32f32f32(&ukernel_params);
   IREE_TRACE_ZONE_END(z0);
+  if (ukernel_retcode) {
+    return iree_make_status(IREE_STATUS_INTERNAL,
+                            iree_ukernel_mmt4d_error_message(ukernel_retcode));
+  }
   return iree_ok_status();
 }
 
@@ -725,7 +703,6 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_mmt4d_i8i8i32, mmt4d, v) {
   iree_host_size_t lhs_tile_size = M0 * K0;
   iree_host_size_t rhs_tile_size = N0 * K0;
   iree_host_size_t out_tile_size = M0 * N0;
-
   // Here are abusing the 2D-specific macros MAP_BUFFER_2D_* to query 4D arrays.
   // Thanks to the requirement that all dimensions but the outer-most one are
   // contiguous row-major, the outer-most stride is the only nontrivial stride,
@@ -752,43 +729,27 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_mmt4d_i8i8i32, mmt4d, v) {
                    /*stride1=*/1,
                    /*size0=*/M,
                    /*size1=*/N * out_tile_size);
-
-  unsigned accumulate_flag = args->flags & IREE_VMVX_MATMUL_FLAG_ACCUMULATE;
-  unsigned unhandled_flags = args->flags ^ accumulate_flag;
-  if (unhandled_flags) {
-    IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "unsupported mmt4d flags: 0x%x", unhandled_flags);
-  }
-
-  for (iree_host_size_t i = 0; i < M; ++i) {
-    for (iree_host_size_t j = 0; j < N; ++j) {
-      int32_t* out_tile_ptr = out + i * out_stride0 + j * out_tile_size;
-      const int8_t* lhs_panel_ptr = lhs + i * lhs_stride0;
-      const int8_t* rhs_panel_ptr = rhs + j * rhs_stride0;
-      for (iree_host_size_t i0 = 0; i0 < M0; ++i0) {
-        for (iree_host_size_t j0 = 0; j0 < N0; ++j0) {
-          const int8_t* lhs_tile_ptr = lhs_panel_ptr;
-          const int8_t* rhs_tile_ptr = rhs_panel_ptr;
-          int32_t* out_ptr = out_tile_ptr + i0 * N0 + j0;
-          int32_t acc = accumulate_flag ? *out_ptr : 0.f;
-          for (iree_host_size_t k = 0; k < K; ++k) {
-            for (iree_host_size_t k0 = 0; k0 < K0; ++k0) {
-              // C's implicit promotion to int saves skin, but let's be explicit
-              int32_t lhs_val_int32 = lhs_tile_ptr[i0 * K0 + k0];
-              int32_t rhs_val_int32 = rhs_tile_ptr[j0 * K0 + k0];
-              acc += lhs_val_int32 * rhs_val_int32;
-            }
-            lhs_tile_ptr += lhs_tile_size;
-            rhs_tile_ptr += rhs_tile_size;
-          }
-          *out_ptr = acc;
-        }
-      }
-    }
-  }
-
+  iree_ukernel_mmt4d_i8i8i32_params_t ukernel_params = {
+      .lhs_buffer = lhs,
+      .rhs_buffer = rhs,
+      .out_buffer = out,
+      .lhs_stride = lhs_stride0,
+      .rhs_stride = rhs_stride0,
+      .out_stride = out_stride0,
+      .M = M,
+      .N = N,
+      .K = K,
+      .M0 = M0,
+      .N0 = N0,
+      .K0 = K0,
+      .flags = args->flags,
+  };
+  int ukernel_retcode = iree_ukernel_mmt4d_i8i8i32(&ukernel_params);
   IREE_TRACE_ZONE_END(z0);
+  if (ukernel_retcode) {
+    return iree_make_status(IREE_STATUS_INTERNAL,
+                            iree_ukernel_mmt4d_error_message(ukernel_retcode));
+  }
   return iree_ok_status();
 }
 

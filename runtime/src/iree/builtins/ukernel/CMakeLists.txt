@@ -19,10 +19,12 @@ iree_cc_library(
     "common.h"
     "elementwise.h"
     "mmt4d.h"
+    "mmt4d_arm_64.h"
     "mmt4d_generic.h"
   SRCS
     "elementwise_generic.c"
     "elementwise_impl.c.inc"
+    "mmt4d.c"
     "mmt4d_arm_64.c"
     "mmt4d_generic.c"
   DEPS
