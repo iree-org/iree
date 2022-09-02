@@ -183,8 +183,8 @@ iree_compiler_cc_library(
         "TestPartitionableLoopsInterface.cpp",
         "TileAndDistributeToWorkgroupsPass.cpp",
         "TileDispatchUsingInterface.cpp",
-        "VectorizeConv.cpp",
         "VectorReductionToGPU.cpp",
+        "VectorizeConv.cpp",
         "WorkGroupSwizzle.cpp",
     ],
     deps = [
@@ -238,6 +238,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:TilingInterface",
         "@llvm-project//mlir:Transforms",
         "@llvm-project//mlir:VectorDialect",
+        "@llvm-project//mlir:VectorToSCF",
         "@llvm-project//mlir:VectorTransforms",
         "@llvm-project//mlir:ViewLikeInterface",
     ],

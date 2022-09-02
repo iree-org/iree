@@ -12,6 +12,7 @@
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/VectorDistribution.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
@@ -57,8 +58,8 @@ static Value warpReduction(Location loc, OpBuilder &builder, Value input,
 
 /// Emit reduction across a group for a given input.
 static Value groupReduction(Location loc, OpBuilder &builder, Value input,
-                            vector::CombiningKind kind, uint32_t size) {
-  const int warpSize = 32;
+                            vector::CombiningKind kind, uint32_t size,
+                            const int warpSize) {
   assert(
       size % warpSize == 0 &&
       "Group reduction only support for sizes aligned on warp size for now.");
@@ -80,7 +81,8 @@ static Value groupReduction(Location loc, OpBuilder &builder, Value input,
     builder.create<gpu::BarrierOp>(loc);
     VectorType vecType = VectorType::get(numWarp, input.getType());
     Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
-    Value vec = builder.create<vector::LoadOp>(loc, vecType, alloc, zero);
+    Value vec =
+        builder.create<vector::TransferReadOp>(loc, vecType, alloc, zero);
     laneVal = builder.create<vector::ReductionOp>(loc, kind, vec);
   }
   return laneVal;
@@ -144,12 +146,17 @@ class InsertElementToBroadcast final
   }
 };
 
-struct VectorReduceToGPUPass
+class VectorReduceToGPUPass
     : public VectorReduceToGPUBase<VectorReduceToGPUPass> {
+ public:
+  explicit VectorReduceToGPUPass(std::function<int(func::FuncOp)> getWarpSize)
+      : getWarpSize(getWarpSize) {}
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<scf::SCFDialect, memref::MemRefDialect, gpu::GPUDialect,
                     AffineDialect>();
   }
+
   void runOnOperation() override {
     func::FuncOp funcOp = getOperation();
     MLIRContext *ctx = &getContext();
@@ -241,7 +248,14 @@ struct VectorReduceToGPUPass
     {
       RewritePatternSet patterns(ctx);
       vector::populatePropagateWarpVectorDistributionPatterns(patterns);
-      vector::populateDistributeReduction(patterns, groupReduction);
+      auto getWarpSize = this->getWarpSize ? this->getWarpSize
+                                           : [](func::FuncOp) { return 32; };
+      auto groupReductionFn = [&](Location loc, OpBuilder &builder, Value input,
+                                  vector::CombiningKind kind, uint32_t size) {
+        return groupReduction(loc, builder, input, kind, size,
+                              getWarpSize(funcOp));
+      };
+      vector::populateDistributeReduction(patterns, groupReductionFn);
       (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     }
 
@@ -270,13 +284,17 @@ struct VectorReduceToGPUPass
       llvm::dbgs() << "\n\n";
     });
   }
+
+ private:
+  std::function<int(func::FuncOp)> getWarpSize;
 };
 
 }  // anonymous namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-createConvertVectorReductionToGPUPass() {
-  return std::make_unique<VectorReduceToGPUPass>();
+createConvertVectorReductionToGPUPass(
+    std::function<int(func::FuncOp)> getWarpSize) {
+  return std::make_unique<VectorReduceToGPUPass>(getWarpSize);
 }
 
 }  // namespace iree_compiler

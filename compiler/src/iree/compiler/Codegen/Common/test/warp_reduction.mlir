@@ -147,7 +147,7 @@ hal.executable private @simple_reduce_multi_warp  {
 //       CHECK:     %[[WID:.*]] = arith.divui %[[TID]], %[[C32I]] : index
 //       CHECK:     memref.store %[[S9]], %[[A]][%[[WID]]] : memref<2xf32, 3>
 //       CHECK:     gpu.barrier
-//       CHECK:     %[[VL:.*]] = vector.load %[[A]][%[[C0]]] : memref<2xf32, 3>, vector<2xf32>
+//       CHECK:     %[[VL:.*]] = vector.transfer_read %[[A]][%[[C0]]], %{{.*}} {in_bounds = [true]} : memref<2xf32, 3>, vector<2xf32>
 //       CHECK:     %[[S10:.*]] = vector.reduction <add>, %[[VL]] : vector<2xf32> into f32
 //       CHECK:     %[[S11:.*]] = arith.addf %[[S10]], %[[E]] : f32
 //       CHECK:     %[[B:.*]] = vector.broadcast %[[S11]] : f32 to vector<1xf32>

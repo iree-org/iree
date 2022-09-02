@@ -151,9 +151,13 @@ std::unique_ptr<Pass> createTransformDialectInterpreterPass(
 std::unique_ptr<OperationPass<func::FuncOp>> createGPUVectorizationPass(
     bool generateContract = true);
 
-// Distribute vector ops.
+// Distributes vector ops to all threads/warps in a GPU workgroup.
+// `getWarpSize` is for deciding the warp size to use; it takes the
+// current function containing those vector ops as the argument.
+// If nullptr, warp size 32 will be used.
 std::unique_ptr<OperationPass<func::FuncOp>>
-createConvertVectorReductionToGPUPass();
+createConvertVectorReductionToGPUPass(
+    std::function<int(func::FuncOp)> getWarpSize = nullptr);
 
 //----------------------------------------------------------------------------//
 // Common codegen patterns.
@@ -390,26 +394,29 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorToGPU();
 // SPIR-V Passes
 //------------------------------------------------------------------------------
 
-/// Pass pipeline to lower IREE HAL executables with workgroup tiled and
-/// distributed Linalg ops to SPIR-V scalar code. Additionally performs
-/// distribution to threads without vectorization.
+/// Pass pipeline to lower IREE HAL executables by tiling and distributing to
+/// workgroups and invocations. Each invocation handles a scalar.
 void addSPIRVTileAndDistributePassPipeline(OpPassManager &pm);
 
-/// Pass pipeline to lower IREE HAL executables with workgroup tiled and
-/// distributed Linalg ops to SPIR-V scalar and vector code. Additionally
-/// performs distribution to threads with vectorization.
+/// Pass pipeline to lower IREE HAL executables by tiling and distributing to
+/// workgroups and invocations and vectorizing. Each invocation handles a
+/// vector.
 void addSPIRVTileAndVectorizePassPipeline(OpPassManager &pm);
 
-/// Pass pipeline to lower IREE HAL executables with workgroup tiled and
-/// distributed Linalg ops to SPIR-V cooperative matrix code. Additionally
-/// performs distribution to threads with vectorization.
+/// Pass pipeline to lower IREE HAL executables by tiling and distributing
+/// to workgroups and subgroups and then vectorizing to SPIR-V cooperative
+/// matrix code.
 void addSPIRVTileAndVectorizeToCooperativeOpsPassPipeline(OpPassManager &pm);
 
-/// Pass pipeline to lower IREE HAL executables with workgroup tiled and
-/// distributed Linalg ops to SPIR-V scalar and vector code. Additionally
-/// performs distribution to threads with vectorization and promotion to use
-/// workgroup memory.
+/// Pass pipeline to lower IREE HAL executables by tiling and distributing to
+/// workgroups, promoting to use workgroup memory, and then tiling and
+/// distributing to invocations and vectorizing. Each invocation handles a
+/// vector.
 void addSPIRVTileAndVectorizeWithWorkgroupMemoryPassPipeline(OpPassManager &pm);
+
+/// Pass pipeline to lower IREE HAL executables by tiling and distributing
+/// reduction to workgroups and then subgroups.
+void addSPIRVSubgroupReducePassPipeline(OpPassManager &pm);
 
 /// Pass to perform the final conversion to SPIR-V dialect.
 ///
