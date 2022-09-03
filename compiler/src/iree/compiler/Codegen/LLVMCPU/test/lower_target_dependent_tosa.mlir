@@ -1,35 +1,190 @@
-// RUN: iree-opt --pass-pipeline='hal.executable(hal.executable.variant(builtin.module(func.func(iree-llvmcpu-lower-target-dependent-tosa))))' %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline='hal.executable(hal.executable.variant(builtin.module(func.func(iree-llvmcpu-lower-target-dependent-tosa))))' --split-input-file %s | FileCheck %s
 
 // Test LLVMCPULowerTargetDependentTosa pass.
 
-#device_target_llvm_cpu = #hal.device.target<"llvm-cpu", {executable_targets = [#hal.executable.target<"llvm-cpu", "system-elf-riscv_64", {cpu_features = "+m,+a,+f,+d,+v", data_layout = "e-m:e-p:64:64-i64:64-i128:128-n64-S128", native_vector_size = 64 : index, target_triple = "riscv64"}>], legacy_sync}>
-#executable_target_system_elf_riscv_64_ = #hal.executable.target<"llvm-cpu", "system-elf-riscv_64", {cpu_features = "+m,+a,+f,+d,+v", data_layout = "e-m:e-p:64:64-i64:64-i128:128-n64-S128", native_vector_size = 64 : index, target_triple = "riscv64"}>
-#map0 = affine_map<()[s0] -> (s0 ceildiv 4)>
-#map1 = affine_map<()[s0] -> (s0 ceildiv 64)>
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>
-#translation = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert workload_per_wg = [64, 64, 4]>
-module attributes {hal.device.targets = [#device_target_llvm_cpu]} {
-  hal.executable private @apply_scale_double_round {
-    hal.executable.variant public @system_elf_riscv_64, target = #executable_target_system_elf_riscv_64_ {
-      hal.executable.export public @apply_scale_double_round ordinal(0) layout(#pipeline_layout) attributes {translation_info = #translation} {
-      ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index):
-        %0 = affine.apply #map0()[%arg1]
-        %1 = affine.apply #map1()[%arg2]
-        %2 = affine.apply #map1()[%arg4]
-        hal.return %2, %1, %0 : index, index, index
-      }
-      builtin.module {
-        func.func @apply_scale_double_round(%arg0: vector<8xi32>) -> vector<8xi32> {
-          %cst = arith.constant dense<1559761830> : vector<8xi32>
-          %cst_0 = arith.constant dense<50> : vector<8xi8>
-          %0 = "tosa.apply_scale"(%arg0, %cst, %cst_0) {double_round = true} : (vector<8xi32>, vector<8xi32>, vector<8xi8>) -> vector<8xi32>
-          return %0 : vector<8xi32>
-        }
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+#executable_target_embedded_elf_riscv_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {
+  cpu_features = "+m,+a,+f,+d,+c",
+  data_layout = "e-m:e-p:64:64-i64:64-i128:128-n64-S128",
+  native_vector_size = 256 : index,
+  target_triple = "riscv64-unknown-unknown-eabi-elf"
+}>
+#map = affine_map<()[s0] -> (s0 ceildiv 2)>
+#translation = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [2]>
+hal.executable private @apply_scale_no_vector_feature {
+  hal.executable.variant public @embedded_elf_riscv_64, target = #executable_target_embedded_elf_riscv_64_ {
+    hal.executable.export public @apply_scale_no_vector_feature ordinal(0) layout(#pipeline_layout) attributes {translation_info = #translation} {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
+      %c1 = arith.constant 1 : index
+      %0 = affine.apply #map()[%arg1]
+      hal.return %0, %c1, %c1 : index, index, index
+    }
+    builtin.module {
+      func.func @apply_scale_no_vector_feature() {
+        %cst = arith.constant dense<19689> : vector<2xi32>
+        %cst_0 = arith.constant dense<15> : vector<2xi8>
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : memref<2xi32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : memref<2xi32>
+        %2 = vector.load %0[%c0] : memref<2xi32>, vector<2xi32>
+        %3 = "tosa.apply_scale"(%2, %cst, %cst_0) {double_round = false} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
+        vector.store %3, %1[%c0] : memref<2xi32>, vector<2xi32>
+        return
       }
     }
   }
 }
 
-// CHECK-LABEL: @apply_scale_double_round
-//   CHECK-NOT: tosa.apply_scale
+// 64-bit lowering is used by default if no vector features are provided.
+// TODO(diegocaballero): We shouldn't vectorize the code if no vector features
+// are provided.
+// CHECK-LABEL: @apply_scale_no_vector_feature
+//       CHECK:   %[[ADD:.*]] = arith.addi %{{.*}}, %{{.*}} : vector<2xi64>
+//  CHECK-NEXT:   %[[SHR:.*]] = arith.shrsi %[[ADD]], %{{.*}} : vector<2xi64>
+//  CHECK-NEXT:   arith.trunci %[[SHR]] : vector<2xi64> to vector<2xi32>
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+#executable_target_embedded_elf_riscv_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {
+  cpu_features = "+m,+a,+f,+d,+c,+v",
+  data_layout = "e-m:e-p:64:64-i64:64-i128:128-n64-S128",
+  native_vector_size = 256 : index,
+  target_triple = "riscv64-unknown-unknown-eabi-elf"
+}>
+#map = affine_map<()[s0] -> (s0 ceildiv 2)>
+#translation = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [2]>
+hal.executable private @apply_scale_v {
+  hal.executable.variant public @embedded_elf_riscv_64, target = #executable_target_embedded_elf_riscv_64_ {
+    hal.executable.export public @apply_scale_v ordinal(0) layout(#pipeline_layout) attributes {translation_info = #translation} {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
+      %c1 = arith.constant 1 : index
+      %0 = affine.apply #map()[%arg1]
+      hal.return %0, %c1, %c1 : index, index, index
+    }
+    builtin.module {
+      func.func @apply_scale_v() {
+        %cst = arith.constant dense<19689> : vector<2xi32>
+        %cst_0 = arith.constant dense<15> : vector<2xi8>
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : memref<2xi32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : memref<2xi32>
+        %2 = vector.load %0[%c0] : memref<2xi32>, vector<2xi32>
+        %3 = "tosa.apply_scale"(%2, %cst, %cst_0) {double_round = false} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
+        vector.store %3, %1[%c0] : memref<2xi32>, vector<2xi32>
+        return
+      }
+    }
+  }
+}
+
+// 64-bit lowering is used with '+v'.
+// CHECK-LABEL: @apply_scale_v
+//       CHECK:   %[[ADD:.*]] = arith.addi %{{.*}}, %{{.*}} : vector<2xi64>
+//  CHECK-NEXT:   %[[SHR:.*]] = arith.shrsi %[[ADD]], %{{.*}} : vector<2xi64>
+//  CHECK-NEXT:   arith.trunci %[[SHR]] : vector<2xi64> to vector<2xi32>
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+#executable_target_embedded_elf_riscv_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {
+  cpu_features = "+m,+a,+f,+d,+c,+zve64x",
+  data_layout = "e-m:e-p:64:64-i64:64-i128:128-n64-S128",
+  native_vector_size = 256 : index,
+  target_triple = "riscv64-unknown-unknown-eabi-elf"
+}>
+#map = affine_map<()[s0] -> (s0 ceildiv 2)>
+#translation = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [2]>
+hal.executable private @apply_scale_zve64x {
+  hal.executable.variant public @embedded_elf_riscv_64, target = #executable_target_embedded_elf_riscv_64_ {
+    hal.executable.export public @apply_scale_zve64x ordinal(0) layout(#pipeline_layout) attributes {translation_info = #translation} {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
+      %c1 = arith.constant 1 : index
+      %0 = affine.apply #map()[%arg1]
+      hal.return %0, %c1, %c1 : index, index, index
+    }
+    builtin.module {
+      func.func @apply_scale_zve64x() {
+        %cst = arith.constant dense<19689> : vector<2xi32>
+        %cst_0 = arith.constant dense<15> : vector<2xi8>
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : memref<2xi32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : memref<2xi32>
+        %2 = vector.load %0[%c0] : memref<2xi32>, vector<2xi32>
+        %3 = "tosa.apply_scale"(%2, %cst, %cst_0) {double_round = false} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
+        vector.store %3, %1[%c0] : memref<2xi32>, vector<2xi32>
+        return
+      }
+    }
+  }
+}
+
+// 64-bit lowering is used with '+zve64x'.
+// CHECK-LABEL: @apply_scale_zve64x
+//       CHECK:   %[[ADD:.*]] = arith.addi %{{.*}}, %{{.*}} : vector<2xi64>
+//  CHECK-NEXT:   %[[SHR:.*]] = arith.shrsi %[[ADD]], %{{.*}} : vector<2xi64>
+//  CHECK-NEXT:   arith.trunci %[[SHR]] : vector<2xi64> to vector<2xi32>
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+#executable_target_embedded_elf_riscv_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {
+  cpu_features = "+m,+a,+f,+d,+c,+zve32x",
+  data_layout = "e-m:e-p:64:64-i64:64-i128:128-n64-S128",
+  native_vector_size = 256 : index,
+  target_triple = "riscv64-unknown-unknown-eabi-elf"
+}>
+#map = affine_map<()[s0] -> (s0 ceildiv 2)>
+#translation = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [2]>
+hal.executable private @apply_scale_zve32x {
+  hal.executable.variant public @embedded_elf_riscv_64, target = #executable_target_embedded_elf_riscv_64_ {
+    hal.executable.export public @apply_scale_zve32x ordinal(0) layout(#pipeline_layout) attributes {translation_info = #translation} {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
+      %c1 = arith.constant 1 : index
+      %0 = affine.apply #map()[%arg1]
+      hal.return %0, %c1, %c1 : index, index, index
+    }
+    builtin.module {
+      func.func @apply_scale_zve32x() {
+        %cst = arith.constant dense<19689> : vector<2xi32>
+        %cst_0 = arith.constant dense<15> : vector<2xi8>
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : memref<2xi32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : memref<2xi32>
+        %2 = vector.load %0[%c0] : memref<2xi32>, vector<2xi32>
+        %3 = "tosa.apply_scale"(%2, %cst, %cst_0) {double_round = false} : (vector<2xi32>, vector<2xi32>, vector<2xi8>) -> vector<2xi32>
+        vector.store %3, %1[%c0] : memref<2xi32>, vector<2xi32>
+        return
+      }
+    }
+  }
+}
+
+// 32-bit lowering is used with '+zve32x'. Note that the 32-bit lowering
+// generates 64-bit mul operations that are decomposed into 32-bit operations by
+// the LLVM backend.
+// CHECK-LABEL: @apply_scale_zve32x
+//       CHECK:   %[[MUL:.*]] = arith.muli %{{.*}}, %{{.*}} : vector<2xi64>
+//  CHECK-NEXT:   %[[SHR:.*]] = arith.shrui %{{.*}}, %{{.*}} : vector<2xi64>
+//  CHECK-NEXT:   arith.trunci %[[SHR]] : vector<2xi64> to vector<2xi32>
 

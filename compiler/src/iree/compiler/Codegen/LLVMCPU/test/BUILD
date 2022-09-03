@@ -21,7 +21,6 @@ iree_lit_test_suite(
         [
             "aarch64_dotprod_vector_lowering.mlir",
             "aarch64_vector_lowering.mlir",
-            "apply_scale_lowering.mlir",
             "check_ir_before_llvm_conversion.mlir",
             "convert_to_llvm.mlir",
             "emit_vectorization_remarks.mlir",
