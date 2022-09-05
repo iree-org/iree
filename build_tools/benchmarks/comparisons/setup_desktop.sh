@@ -23,7 +23,14 @@ mkdir "${ROOT_DIR}/output"
 
 wget https://storage.googleapis.com/iree-model-artifacts/tflite_squad_test_data.zip -O /tmp/tflite_squad_test_data.zip
 unzip /tmp/tflite_squad_test_data.zip -d "${ROOT_DIR}/test_data/"
-wget https://storage.googleapis.com/iree-model-artifacts/mobilebert_float_384_gpu.tflite -O "${ROOT_DIR}/models/tflite/mobilebert_float_384_gpu.tflite"
+wget https://storage.googleapis.com/iree-model-artifacts/mobilebert-baseline-tf2-quant.tflite -P "${ROOT_DIR}/models/tflite/"
+wget https://storage.googleapis.com/iree-model-artifacts/mobilebert_float_384_gpu.tflite -P "${ROOT_DIR}/models/tflite/"
+wget https://storage.googleapis.com/iree-model-artifacts/mobilenet_v2_224_1.0_uint8.tflite -P "${ROOT_DIR}/models/tflite/"
+wget https://storage.googleapis.com/iree-model-artifacts/mobilenet_v2_1.0_224.tflite -P "${ROOT_DIR}/models/tflite/"
+wget https://storage.googleapis.com/iree-model-artifacts/deeplabv3.tflite -P "${ROOT_DIR}/models/tflite/"
+wget https://storage.googleapis.com/iree-model-artifacts/person_detect.tflite -P "${ROOT_DIR}/models/tflite/"
+wget https://storage.googleapis.com/iree-model-artifacts/ssd_mobilenet_v2_static_1.0_int8.tflite -P "${ROOT_DIR}/models/tflite/"
+wget https://storage.googleapis.com/iree-model-artifacts/resnet_v2_101_1_default_1.tflite -P "${ROOT_DIR}/models/tflite/"
 
 # Build IREE source.
 SOURCE_DIR=/tmp/github
@@ -112,3 +119,4 @@ python3.9 build_tools/benchmarks/comparisons/run_benchmarks.py \
   --output_dir=${ROOT_DIR}/output --mode=desktop
 
 cat "${ROOT_DIR}/output/results.csv"
+
