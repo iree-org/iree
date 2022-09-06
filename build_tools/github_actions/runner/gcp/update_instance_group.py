@@ -154,14 +154,14 @@ def main(args):
       if len(current_templates) > 1:
         error(f"Instance group '{mig.name}' has multiple versions, but canary"
               f" requires it start with exactly one. Current versions:"
-              f" {summarize_versions(versions)}")
+              f" {summarize_versions(mig.versions)}")
 
       base_template = current_templates.get(args.base_version_name)
       if not base_template:
         error(f"Instance group '{mig.name}' does not have a current version"
               f" named '{args.base_version_name}', which is required for an"
               f" automatic canary. Current versions:"
-              f" {summarize_versions(versions)}")
+              f" {summarize_versions(mig.versions)}")
 
       new_versions = [
           compute.InstanceGroupManagerVersion(name=args.base_version_name,
