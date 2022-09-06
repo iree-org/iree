@@ -104,11 +104,11 @@ static Optional<SmallVector<int64_t, 4>> getGPUTCNativeVectorSize(
   // Currently hardcode the size of wmma operation. When more cases are
   // supported this should be picked based on what the backend supports.
   int64_t m = 16;
-  int64_t n = llvmgpuUseMMASync ? 8 : 16;
+  int64_t n = 16;
   if (auto contract = dyn_cast<vector::ContractionOp>(op)) {
     int64_t k;
     if (llvmgpuUseMMASync)
-      k = contract.getLhsType().getElementType().isF16() ? 8 : 4;
+      k = 16;
     else
       k = contract.getLhsType().getElementType().isF16() ? 16 : 8;
     SmallVector<int64_t, 4> nativeSize(contract.getIteratorTypes().size() - 3,
