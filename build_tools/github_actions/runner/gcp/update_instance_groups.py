@@ -155,6 +155,7 @@ def main(args):
       error(f"Found no template versions for '{mig.name}'."
             f" This shouldn't be possible.")
 
+    # TODO(gcmn): These should probably be factored into functions
     if args.command == CANARY_COMMAND_NAME:
       if len(current_templates) > 1:
         error(f"Instance group '{mig.name}' has multiple versions, but canary"
