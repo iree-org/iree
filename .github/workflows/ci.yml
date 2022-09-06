@@ -104,8 +104,7 @@ jobs:
     needs: should_run
     if: needs.should_run.outputs.should-run == 'true'
     runs-on:
-      # Pseudo-ternary hack and order matters. See comment at top of file.
-      - self-hosted
+      - self-hosted  # must come first
       - runner-group=${{ needs.should_run.outputs.runner-group }}
       - environment=${{ needs.should_run.outputs.environment }}
       - cpu
@@ -158,8 +157,7 @@ jobs:
     needs: should_run
     if: needs.should_run.outputs.should-run == 'true'
     runs-on:
-      # Pseudo-ternary hack and order matters. See comment at top of file.
-      - self-hosted
+      - self-hosted  # must come first
       - runner-group=${{ needs.should_run.outputs.runner-group }}
       - environment=${{ needs.should_run.outputs.environment }}
       - cpu
@@ -187,8 +185,7 @@ jobs:
     needs: [should_run, build_all]
     if: needs.should_run.outputs.should-run == 'true'
     runs-on:
-      # Pseudo-ternary hack and order matters. See comment at top of file.
-      - self-hosted
+      - self-hosted  # must come first
       - runner-group=${{ needs.should_run.outputs.runner-group }}
       - environment=${{ needs.should_run.outputs.environment }}
       - cpu
@@ -218,8 +215,7 @@ jobs:
     needs: [should_run, build_all]
     if: needs.should_run.outputs.should-run == 'true'
     runs-on:
-      # Pseudo-ternary hack and order matters. See comment at top of file.
-      - self-hosted
+      - self-hosted  # must come first
       - runner-group=${{ needs.should_run.outputs.runner-group }}
       - environment=${{ needs.should_run.outputs.environment }}
       - gpu
@@ -322,8 +318,7 @@ jobs:
     needs: should_run
     if: needs.should_run.outputs.should-run == 'true'
     runs-on:
-      # Pseudo-ternary hack and order matters. See comment at top of file.
-      - self-hosted
+      - self-hosted  # must come first
       - runner-group=${{ needs.should_run.outputs.runner-group }}
       - environment=${{ needs.should_run.outputs.environment }}
       - cpu
@@ -371,8 +366,7 @@ jobs:
     needs: [should_run, build_all, build_tf_integrations]
     if: needs.should_run.outputs.should-run == 'true'
     runs-on:
-      # Pseudo-ternary hack and order matters. See comment at top of file.
-      - self-hosted
+      - self-hosted  # must come first
       - runner-group=${{ needs.should_run.outputs.runner-group }}
       - environment=${{ needs.should_run.outputs.environment }}
       - cpu
@@ -411,8 +405,7 @@ jobs:
     needs: [should_run, build_all, build_tf_integrations]
     if: needs.should_run.outputs.should-run == 'true'
     runs-on:
-      # Pseudo-ternary hack and order matters. See comment at top of file.
-      - self-hosted
+      - self-hosted  # must come first
       - runner-group=${{ needs.should_run.outputs.runner-group }}
       - environment=${{ needs.should_run.outputs.environment }}
       - gpu
@@ -459,8 +452,7 @@ jobs:
     needs: should_run
     if: needs.should_run.outputs.should-run == 'true'
     runs-on:
-      # Pseudo-ternary hack and order matters. See comment at top of file.
-      - self-hosted
+      - self-hosted  # must come first
       - runner-group=${{ needs.should_run.outputs.runner-group }}
       - environment=${{ needs.should_run.outputs.environment }}
       - cpu
@@ -480,8 +472,7 @@ jobs:
     needs: should_run
     if: needs.should_run.outputs.should-run == 'true'
     runs-on:
-      # Pseudo-ternary hack and order matters. See comment at top of file.
-      - self-hosted
+      - self-hosted  # must come first
       - runner-group=${{ needs.should_run.outputs.runner-group }}
       - environment=${{ needs.should_run.outputs.environment }}
       - cpu
@@ -574,8 +565,7 @@ jobs:
     needs: [should_run, build_all]
     if: needs.should_run.outputs.should-run == 'true'
     runs-on:
-      # Pseudo-ternary hack and order matters. See comment at top of file.
-      - self-hosted
+      - self-hosted  # must come first
       - runner-group=${{ needs.should_run.outputs.runner-group }}
       - environment=${{ needs.should_run.outputs.environment }}
       - cpu
@@ -610,8 +600,7 @@ jobs:
     needs: [should_run, build_all, build_tf_integrations]
     if: needs.should_run.outputs.should-run == 'true'
     runs-on:
-      # Pseudo-ternary hack and order matters. See comment at top of file.
-      - self-hosted
+      - self-hosted  # must come first
       - runner-group=${{ needs.should_run.outputs.runner-group }}
       - environment=${{ needs.should_run.outputs.environment }}
       - cpu
@@ -655,8 +644,7 @@ jobs:
     needs: [should_run, build_all]
     if: needs.should_run.outputs.should-run == 'true'
     runs-on:
-      # Pseudo-ternary hack and order matters. See comment at top of file.
-      - self-hosted
+      - self-hosted  # must come first
       - runner-group=${{ needs.should_run.outputs.runner-group }}
       - environment=${{ needs.should_run.outputs.environment }}
       - cpu
