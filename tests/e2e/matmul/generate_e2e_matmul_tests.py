@@ -531,9 +531,9 @@ def write_trace_file(traces, filename, module_path, requirements):
   ]
   if requirements:
     yaml_documents.append({
-          "type": "requirements",
-          "target_features": [ req.lstrip("+") for req in requirements.split(",")],
-      })
+        "type": "requirements",
+        "target_features": [req.lstrip("+") for req in requirements.split(",")],
+    })
 
   for trace in traces:
     yaml_documents.append(trace)
