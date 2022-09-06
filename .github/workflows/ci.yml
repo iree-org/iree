@@ -8,23 +8,28 @@ name: CI
 
 # A few notes:
 #
+# Variables:
 # GitHub actions don't have variables or even support normal yaml anchors (they
 # are specially disabled because...reasons?):
 # See https://github.com/github-community/community/discussions/4501
 # https://github.community/t/support-for-yaml-anchors/16128/92
 # https://github.com/actions/runner/issues/1182
-#
-# Neither does it have any variables that are available everywhere. The
-# top-level `env` field is available in many places, but not all
+# Neither does it have any contexts that are available everywhere. The
+# top-level `env` field is available in many places, but not all. We already
+# have a "should-run" job that every other job depends on, so we leverage that
+# for variables that every other job can use, since that *is* available in all
+# sub-fields of the job.
 # See https://docs.github.com/en/actions/learn-github-actions/contexts#context-availability
 # and https://github.com/community/community/discussions/27370
 #
 # So there are some odd patterns that are repeated in many places. To avoid
 # repeating the comments, they are mentioned here:
 #
+# Runner label ordering:
 # - self-hosted always has to be listed first in a runs-on block:
 # https://docs.github.com/en/actions/hosting-your-own-runners/using-self-hosted-runners-in-a-workflow
 #
+# Pseudo-ternary hack:
 # - We have to do a weird hack to get a pseudo-ternary operator. See
 # https://github.com/actions/runner/issues/409, hence patterns like:
 # `github.event_name == 'pull_request' && 'presubmit' || 'postsubmit'`
@@ -61,6 +66,10 @@ jobs:
       PR_DESCRIPTION: ${{ github.event.pull_request.body }}
     outputs:
       should-run: ${{ steps.should-run.outputs.should-run }}
+      # Variables for dependent jobs. See comment at top.
+      environment: prod
+      # pseudo-ternary hack. See comment at top
+      runner-group: ${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
@@ -97,7 +106,8 @@ jobs:
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - runner-group=${{ needs.should_run.outputs.runner-group }}
+      - environment=${{ needs.should_run.outputs.environment }}
       - cpu
       - os-family=Linux
     env:
@@ -150,7 +160,8 @@ jobs:
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - runner-group=${{ needs.should_run.outputs.runner-group }}
+      - environment=${{ needs.should_run.outputs.environment }}
       - cpu
       - os-family=Linux
     steps:
@@ -178,7 +189,8 @@ jobs:
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - runner-group=${{ needs.should_run.outputs.runner-group }}
+      - environment=${{ needs.should_run.outputs.environment }}
       - cpu
       - os-family=Linux
     env:
@@ -208,7 +220,8 @@ jobs:
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - runner-group=${{ needs.should_run.outputs.runner-group }}
+      - environment=${{ needs.should_run.outputs.environment }}
       - gpu
       - os-family=Linux
     env:
@@ -311,7 +324,8 @@ jobs:
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - runner-group=${{ needs.should_run.outputs.runner-group }}
+      - environment=${{ needs.should_run.outputs.environment }}
       - cpu
       - os-family=Linux
     outputs:
@@ -359,7 +373,8 @@ jobs:
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - runner-group=${{ needs.should_run.outputs.runner-group }}
+      - environment=${{ needs.should_run.outputs.environment }}
       - cpu
       - os-family=Linux
     env:
@@ -398,7 +413,8 @@ jobs:
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - runner-group=${{ needs.should_run.outputs.runner-group }}
+      - environment=${{ needs.should_run.outputs.environment }}
       - gpu
       - os-family=Linux
     env:
@@ -445,7 +461,8 @@ jobs:
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - runner-group=${{ needs.should_run.outputs.runner-group }}
+      - environment=${{ needs.should_run.outputs.environment }}
       - cpu
       - os-family=Linux
     steps:
@@ -465,7 +482,8 @@ jobs:
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - runner-group=${{ needs.should_run.outputs.runner-group }}
+      - environment=${{ needs.should_run.outputs.environment }}
       - cpu
       - os-family=Linux
     steps:
@@ -485,7 +503,8 @@ jobs:
     runs-on:
       # Hacks, and order matters. See the comment at the top of the file.
       - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - runner-group=${{ needs.should_run.outputs.runner-group }}
+      - environment=${{ needs.should_run.outputs.environment }}
       - cpu
       - os-family=Linux
     env:
@@ -525,7 +544,8 @@ jobs:
     runs-on:
       # Hacks, and order matters. See the comment at the top of the file.
       - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - runner-group=${{ needs.should_run.outputs.runner-group }}
+      - environment=${{ needs.should_run.outputs.environment }}
       - cpu
       - os-family=Linux
     env:
@@ -556,7 +576,8 @@ jobs:
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - runner-group=${{ needs.should_run.outputs.runner-group }}
+      - environment=${{ needs.should_run.outputs.environment }}
       - cpu
       - os-family=Linux
     env:
@@ -591,7 +612,8 @@ jobs:
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - runner-group=${{ needs.should_run.outputs.runner-group }}
+      - environment=${{ needs.should_run.outputs.environment }}
       - cpu
       - os-family=Linux
     env:
@@ -635,7 +657,8 @@ jobs:
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - runner-group=${{ needs.should_run.outputs.runner-group }}
+      - environment=${{ needs.should_run.outputs.environment }}
       - cpu
       - os-family=Linux
     strategy:
