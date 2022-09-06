@@ -41,9 +41,8 @@ IREE_API_EXPORT void iree_hal_webgpu_device_options_initialize(
 
 IREE_API_EXPORT iree_status_t iree_hal_webgpu_wrap_device(
     iree_string_view_t identifier,
-    const iree_hal_webgpu_device_options_t* options, WGPUInstance instance,
-    WGPUAdapter adapter, WGPUDevice handle, iree_allocator_t host_allocator,
-    iree_hal_device_t** out_device);
+    const iree_hal_webgpu_device_options_t* options, WGPUDevice handle,
+    iree_allocator_t host_allocator, iree_hal_device_t** out_device);
 
 //===----------------------------------------------------------------------===//
 // iree_hal_webgpu_driver_t
