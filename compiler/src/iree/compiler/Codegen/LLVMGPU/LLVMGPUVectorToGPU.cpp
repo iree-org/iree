@@ -241,6 +241,57 @@ struct FlattenTransferReadOp : public OpRewritePattern<vector::TransferReadOp> {
   }
 };
 
+/// Pattern to break down mma.sync that are bigger than the native size.
+struct UnrollMMASync : public OpRewritePattern<nvgpu::MmaSyncOp> {
+  using OpRewritePattern<nvgpu::MmaSyncOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(nvgpu::MmaSyncOp op,
+                                PatternRewriter& rewriter) const override {
+    int64_t m = op.getMmaShape()[0].cast<IntegerAttr>().getInt();
+    int64_t n = op.getMmaShape()[1].cast<IntegerAttr>().getInt();
+    int64_t k = op.getMmaShape()[2].cast<IntegerAttr>().getInt();
+    std::array<int64_t, 3> gemmShape{m, n, k};
+    std::array<int64_t, 3> nativeShape{16, 8, 16};
+    std::array<int64_t, 2> strides = {1, 1};
+    std::array<int64_t, 2> bShape = {2, 2};
+    std::array<int64_t, 2> cShape = {2, 2};
+
+    if (gemmShape == nativeShape) return failure();
+    Location loc = op.getLoc();
+    llvm::MapVector<int64_t, Value> accCache;
+    int64_t nElements = n / nativeShape[1];
+    for (int64_t ni = 0; ni < nElements; ni++) {
+      std::array<int64_t, 2> offsetB = {2 * ni, 0};
+      Value b = rewriter.create<vector::ExtractStridedSliceOp>(
+          loc, op.getOperand(1), offsetB, bShape, strides);
+      std::array<int64_t, 2> offsetC = {2 * ni, 0};
+      auto it = accCache.find(ni);
+      Value acc;
+      if (it == accCache.end())
+        acc = rewriter.create<vector::ExtractStridedSliceOp>(
+            loc, op.getOperand(2), offsetC, cShape, strides);
+      else
+        acc = it->second;
+      acc = rewriter.create<nvgpu::MmaSyncOp>(
+          loc, op.getOperand(0), b, acc,
+          rewriter.getI64ArrayAttr(
+              {nativeShape[0], nativeShape[1], nativeShape[2]}));
+      accCache[ni] = acc;
+    }
+    auto dstVecType = op.getMatrixC().getType().cast<VectorType>();
+
+    Value result = rewriter.create<arith::ConstantOp>(
+        loc, dstVecType, rewriter.getZeroAttr(dstVecType));
+    for (const auto& it : accCache) {
+      std::array<int64_t, 2> offsetC = {it.first * 2, 0};
+      result = rewriter.create<vector::InsertStridedSliceOp>(
+          loc, it.second, result, offsetC, strides);
+    }
+    rewriter.replaceOp(op, result);
+    return success();
+  }
+};
+
 struct LLVMGPUVectorToGPUPass
     : public LLVMGPUVectorToGPUBase<LLVMGPUVectorToGPUPass> {
   void getDependentDialects(DialectRegistry& registry) const override {
@@ -281,7 +332,26 @@ struct LLVMGPUVectorToGPUPass
     createAsyncGroups(funcOp);
 
     if (llvmgpuUseMMASync) {
+      SmallVector<Operation*> opsToErase;
+      do {
+      opsToErase.clear();
+      funcOp.walk([&](Operation* op) {
+        if (isOpTriviallyDead(op))
+          opsToErase.push_back(op);
+      });
+      for(Operation* op : opsToErase)
+        op->erase();
+      } while(!opsToErase.empty());
+
       swizzleSharedMemory(funcOp);
+
+      // Make the mma.sync a legal size.
+      RewritePatternSet mmaSyncUnrollPatterns(funcOp.getContext());
+      mmaSyncUnrollPatterns.insert<UnrollMMASync>(funcOp.getContext());
+      if (failed(applyPatternsAndFoldGreedily(funcOp,
+                                            std::move(mmaSyncUnrollPatterns)))) {
+        return signalPassFailure();
+      }
     }
   }
 };
