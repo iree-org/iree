@@ -20,9 +20,6 @@ DIRECT_UPDATE_COMMAND_NAME = "direct-update"
 
 CANARY_SIZE = compute.FixedOrPercent(fixed=1)
 
-GROUPS = ["presubmit", "postsubmit"]
-TYPES = ["cpu", "gpu"]
-
 
 def resource_basename(resource):
   return os.path.basename(urllib.parse.urlparse(resource).path)
@@ -106,7 +103,8 @@ def main(args):
       project=args.project,
   )
 
-  modifier = args.testing_name_modifier if args.testing else None
+  # Prod instances just have the bare name
+  modifier = None if args.env == "prod" else args.env
   migs = updater.get_migs(regions=args.region,
                           types=args.type,
                           groups=args.group,
@@ -134,10 +132,8 @@ def main(args):
         raise ValueError(f"MIG name does not end with '{strip}' as expected")
       template_name = f"{mig.name[:-len(strip)]}-{args.version}"
 
-      # TODO: Make testing template naming consistent (ran into length limits)
-      if args.testing:
-        template_name = template_name.replace(f"-{args.testing_name_modifier}-",
-                                              "-")
+      # TODO(gcmn): Make template naming consistent (ran into length limits)
+      template_name = template_name.replace(f"-{args.env}-", "-")
       template_url = templates_client.get(
           project=args.project, instance_template=template_name).self_link
 
@@ -207,43 +203,93 @@ def main(args):
 
 
 def parse_args():
-  parser = argparse.ArgumentParser()
+  parser = argparse.ArgumentParser(help=(
+      "Updates one or more GCP Managed Instance Groups (MIGs) to new"
+      " instance template versions. Wraps the GCP API with shortcuts for the"
+      " patterns we have in our MIGs. See the README and"
+      " https://cloud.google.com/compute/docs/instance-groups/updating-migs for"
+      " more details."))
 
   # Makes global options come *after* command.
   # See https://stackoverflow.com/q/23296695
   subparser_base = argparse.ArgumentParser(add_help=False)
-  subparser_base.add_argument("--project", default="iree-oss")
-  subparser_base.add_argument("--region")
-  subparser_base.add_argument("--group", required=True)
-  subparser_base.add_argument("--type", required=True)
-  subparser_base.add_argument("--mode", choices=["opportunistic", "proactive"])
-  subparser_base.add_argument("--action",
-                              default="refresh",
-                              choices=["refresh", "restart", "replace"])
-  # These shouldn't be common, but it's just as easy to make them flags as it is
-  # to make them global constants.
-  subparser_base.add_argument("--testing-name-modifier", default="testing")
-  subparser_base.add_argument("--name-prefix", default="github-runner")
-  subparser_base.add_argument("--base-version-name", default="base")
-  subparser_base.add_argument("--canary-version-name", default="canary")
-
-  testing = subparser_base.add_mutually_exclusive_group()
-  testing.add_argument("--testing", action="store_true", default=True)
-  testing.add_argument("--prod", dest="testing", action="store_false")
+  subparser_base.add_argument("--project",
+                              default="iree-oss",
+                              help="The cloud project for the MIGs.")
+  subparser_base.add_argument(
+      "--region",
+      help=("The cloud region (e.g. 'us-west1') of the MIG to update or 'all'"
+            " to search for matching MIGs in all regions."))
+  subparser_base.add_argument(
+      "--group",
+      required=True,
+      help=("The runner group of the MIGs to update (e.g. 'presubmit') or 'all'"
+            " to search for MIGs for all groups."),
+  )
+  subparser_base.add_argument(
+      "--type",
+      required=True,
+      help=("The runner type of the MIGs to update (e.g. 'cpu') or 'all' to"
+            " search for MIGs for all groups."),
+  )
+  subparser_base.add_argument(
+      "--mode",
+      choices=["opportunistic", "proactive"],
+      help=(
+          "The mode in which to update instances. See README and"
+          " https://cloud.google.com/compute/docs/instance-groups/updating-migs."
+      ))
+  subparser_base.add_argument(
+      "--action",
+      default="refresh",
+      choices=["refresh", "restart", "replace"],
+      help=(
+          "What action to take when updating an instance. See README and"
+          " https://cloud.google.com/compute/docs/instance-groups/updating-migs."
+      ))
+  # These shouldn't be set very often, but it's just as easy to make them flags
+  # as it is to make them global constants.
+  subparser_base.add_argument("--name-prefix",
+                              default="github-runner",
+                              help="The first part of MIG and template names.")
+  subparser_base.add_argument(
+      "--base-version-name",
+      default="base",
+      help="The name given to the MIG instance version that isn't in canary.")
+  subparser_base.add_argument(
+      "--canary-version-name",
+      default="canary",
+      help="The name given to the MIG instance version that is being canaried.")
+  subparser_base.add_argument("--env",
+                              default="testing",
+                              help="The environment for the MIGs.",
+                              choices=["prod", "testing"])
 
   subparsers = parser.add_subparsers(required=True, dest="command")
 
   canary_sp = subparsers.add_parser(CANARY_COMMAND_NAME,
-                                    parents=[subparser_base])
-  rollback_sp = subparsers.add_parser(ROLLBACK_CANARY_COMMAND_NAME,
-                                      parents=[subparser_base])
-  promote_sp = subparsers.add_parser(PROMOTE_CANARY_COMMAND_NAME,
-                                     parents=[subparser_base])
-  direct_sp = subparsers.add_parser(DIRECT_UPDATE_COMMAND_NAME,
-                                    parents=[subparser_base])
+                                    parents=[subparser_base],
+                                    help="Canary a new template version.")
+  rollback_sp = subparsers.add_parser(
+      ROLLBACK_CANARY_COMMAND_NAME,
+      parents=[subparser_base],
+      help=("Rollback a previous canary, restoring all instances to the base"
+            " version."))
+  promote_sp = subparsers.add_parser(
+      PROMOTE_CANARY_COMMAND_NAME,
+      parents=[subparser_base],
+      help="Promote the current canary version to be the base version.")
+  direct_sp = subparsers.add_parser(
+      DIRECT_UPDATE_COMMAND_NAME,
+      parents=[subparser_base],
+      help=("Update all instances in the MIG to a new version. Generally should"
+            " not be used for prod."))
 
   for sp in [canary_sp, direct_sp]:
-    sp.add_argument("--version")
+    sp.add_argument(
+        "--version",
+        help=("The new instance template version. Usually git hash + ISO date +"
+              " timestamp, e.g. b213037174-2022-09-06-1662502818"))
 
   # TODO: Add this argument with a custom parser
   # canary_sp.add_argument("--canary-size", type=int, default=1)
