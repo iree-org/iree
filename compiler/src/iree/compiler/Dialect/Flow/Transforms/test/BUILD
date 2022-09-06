@@ -27,7 +27,8 @@ iree_lit_test_suite(
             "dispatch_linalg_on_tensors_fusion.mlir",
             "dispatch_linalg_on_tensors_fusion_reduction_broadcast_elementwise.mlir",
             "dispatch_linalg_on_tensors_fusion_with_transpose.mlir",
-            "dispatch_linalg_transform_dialect.mlir",
+            # TODO(#10309): Enable the test.
+            # "dispatch_linalg_transform_dialect.mlir",
             "expand_tensor_shapes.mlir",
             "export_benchmark_funcs.mlir",
             "infer_numeric_narrowing.mlir",
