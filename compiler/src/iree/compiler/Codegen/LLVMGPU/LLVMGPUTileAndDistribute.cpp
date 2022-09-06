@@ -330,7 +330,6 @@ struct LLVMGPUTileAndDistributePass
           Operation *prevOp = copyOp->getPrevNode();
           if (!prevOp || !hasMarker(prevOp, getCopyToWorkgroupMemoryMarker())) {
             builder.setInsertionPoint(copyOp);
-            builder.create<gpu::BarrierOp>(copyOp.getLoc());
           }
           Operation *nextOp = copyOp->getNextNode();
           if (!nextOp || !hasMarker(nextOp, getCopyToWorkgroupMemoryMarker())) {
