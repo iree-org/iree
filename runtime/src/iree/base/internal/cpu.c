@@ -23,10 +23,8 @@
 #include <sys/auxv.h>
 
 // OR's |field_bit| into |field_value| if |hwcap_bit| is set in |hwcap_value|.
-#define IREE_SET_IF_HWCAP(hwcap_value, hwcap_bit, field_value, field_bit)   \
-  (field_value) = (field_value) | iree_all_bits_set(hwcap_value, hwcap_bit) \
-                      ? field_bit                                           \
-                      : 0
+#define IREE_SET_IF_HWCAP(hwcap_value, hwcap_bit, field_value, field_bit) \
+  if (iree_all_bits_set(hwcap_value, hwcap_bit)) (field_value) |= (field_bit)
 
 #if defined(IREE_ARCH_ARM_64)
 

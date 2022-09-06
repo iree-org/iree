@@ -163,7 +163,6 @@ iree_cc_binary(
     iree::base::tracing
     iree::hal
     iree::modules::hal
-    iree::tooling::cpu_features
     iree::tooling::device_util
     iree::tooling::trace_replay
     iree::tooling::yaml_util

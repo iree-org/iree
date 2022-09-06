@@ -193,7 +193,6 @@ cc_binary(
         "//runtime/src/iree/base/internal:path",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/modules/hal",
-        "//runtime/src/iree/tooling:cpu_features",
         "//runtime/src/iree/tooling:device_util",
         "//runtime/src/iree/tooling:trace_replay",
         "//runtime/src/iree/tooling:yaml_util",
