@@ -96,9 +96,6 @@ class MigFetcher():
       migs.extend([mig for mig in region_migs])
     return migs
 
-  def update(args):
-    pass
-
 
 def main(args):
   templates_client = compute.InstanceTemplatesClient()
