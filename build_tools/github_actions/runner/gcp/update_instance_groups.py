@@ -39,6 +39,15 @@ def confirm(msg):
     sys.exit(1)
 
 
+def check_scary_action(action, skip_confirmation):
+  if skip_confirmation:
+    print(f"WARNING: Performing {action}.\n"
+          f"Proceeding because '--skip-confirmation' is set.")
+  else:
+    confirm(f"You are about to perform {action}.\n"
+            f" Are you sure you want to proceed?")
+
+
 def summarize_versions(versions):
   return {v.name: resource_basename(v.instance_template) for v in versions}
 
@@ -115,14 +124,17 @@ def main(args):
     sys.exit(1)
 
   print(f"Found:\n  ", "\n  ".join([m.name for m in migs]), sep="")
-  confirm("Proceed with updating these MIGs?")
+  if args.skip_confirmation:
+    print("Proceeding with update as --skip-confirmation is set")
+  else:
+    confirm("Proceed with updating these MIGs?")
 
   if args.mode == "proactive" and args.action != "refresh":
-    warning_text = f"'{migs[0].name}'" if len(
-        migs) == 1 else f"{len(migs)} groups"
-    confirm(f"You are about to perform an update on {warning_text} that will"
-            f" shut down instances even if they're in the middle of running a"
-            f" job. Are you sure you want to proceed?")
+    mig_desc = f"'{migs[0].name}'" if len(migs) == 1 else f"{len(migs)} groups"
+    scary_action = (
+        f"an update on {mig_desc} that will shut down instances even if"
+        f" they're in the middle of running a job")
+    check_scary_action(scary_action, args.skip_confirmation)
 
   for mig in migs:
     region = resource_basename(mig.region)
@@ -164,8 +176,10 @@ def main(args):
                                               target_size=CANARY_SIZE)
       ]
     elif args.command == DIRECT_UPDATE_COMMAND_NAME:
-      confirm(f"You are about to update all instances in '{mig.name}' directly"
-              f" without doing a canary. Are you sure you want to proceed?")
+      scary_action = (f"an update of all instances in '{mig.name}' directly"
+                      f" without doing a canary")
+      check_scary_action(scary_action, args.skip_confirmation)
+
       new_versions = [
           compute.InstanceGroupManagerVersion(name=args.base_version_name,
                                               instance_template=template_url)
@@ -203,7 +217,7 @@ def main(args):
 
 
 def parse_args():
-  parser = argparse.ArgumentParser(help=(
+  parser = argparse.ArgumentParser(description=(
       "Updates one or more GCP Managed Instance Groups (MIGs) to new"
       " instance template versions. Wraps the GCP API with shortcuts for the"
       " patterns we have in our MIGs. See the README and"
@@ -218,6 +232,7 @@ def parse_args():
                               help="The cloud project for the MIGs.")
   subparser_base.add_argument(
       "--region",
+      required=True,
       help=("The cloud region (e.g. 'us-west1') of the MIG to update or 'all'"
             " to search for matching MIGs in all regions."))
   subparser_base.add_argument(
@@ -247,6 +262,14 @@ def parse_args():
           "What action to take when updating an instance. See README and"
           " https://cloud.google.com/compute/docs/instance-groups/updating-migs."
       ))
+  subparser_base.add_argument("--env",
+                              default="testing",
+                              help="The environment for the MIGs.",
+                              choices=["prod", "testing"])
+  subparser_base.add_argument("--skip-confirmation",
+                              "--force",
+                              action="store_true",
+                              help="Skip all confirmation prompts. Be careful.")
   # These shouldn't be set very often, but it's just as easy to make them flags
   # as it is to make them global constants.
   subparser_base.add_argument("--name-prefix",
@@ -260,10 +283,6 @@ def parse_args():
       "--canary-version-name",
       default="canary",
       help="The name given to the MIG instance version that is being canaried.")
-  subparser_base.add_argument("--env",
-                              default="testing",
-                              help="The environment for the MIGs.",
-                              choices=["prod", "testing"])
 
   subparsers = parser.add_subparsers(required=True, dest="command")
 
