@@ -70,6 +70,8 @@ jobs:
       environment: prod
       # pseudo-ternary hack. See comment at top
       runner-group: ${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      # Note that we can't flip the condition here because 0 is falsey
+      write-caches: ${{ github.event_name != 'pull_request' && 1 || 0 }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
@@ -169,8 +171,7 @@ jobs:
           submodules: true
       - name: "Building with Bazel"
         env:
-          # Psuedo-ternary hack. Don't swap the condition! See comment at top of file.
-          IREE_BAZEL_WRITE_REMOTE_CACHE: ${{ github.event_name != 'pull_request' && 1 || 0 }}
+          IREE_BAZEL_WRITE_REMOTE_CACHE: ${{ needs.should_run.outputs.write-caches }}
         # This doesn't really need everything in the frontends image, but we
         # want the cache to be shared with the integrations build (no point
         # building LLVM twice) and the cache key is the docker container it's
@@ -336,8 +337,7 @@ jobs:
         id: build
         env:
           IREE_TF_BINARIES_OUTPUT_DIR: iree-tf-binaries
-          # Psuedo-ternary hack. Don't swap the condition! See comment at top of file.
-          IREE_BAZEL_WRITE_REMOTE_CACHE: ${{ github.event_name != 'pull_request' && 1 || 0 }}
+          IREE_BAZEL_WRITE_REMOTE_CACHE: ${{ needs.should_run.outputs.write-caches }}
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "IREE_BAZEL_WRITE_REMOTE_CACHE=${IREE_BAZEL_WRITE_REMOTE_CACHE}" \
