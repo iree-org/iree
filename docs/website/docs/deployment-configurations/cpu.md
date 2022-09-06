@@ -86,7 +86,7 @@ weights from [TensorFlow Hub][tf-hub-mobilenetv2] and convert it using IREE's
 Run the following command (passing the `--iree-input-type=` appropriate for
 whichever import tool used):
 
-``` shell hl_lines="3"
+``` shell hl_lines="2"
 iree-compile \
     --iree-hal-target-backends=llvm-cpu \
     --iree-input-type=mhlo \
