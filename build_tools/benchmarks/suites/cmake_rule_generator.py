@@ -53,13 +53,6 @@ class IreeModuleCompileRule(object):
   cmake_rule: str
 
 
-@dataclass
-class IreeGenerateBenchmarkFlagfileRule(object):
-  target_name: str
-  output_flagfile_path: str
-  cmake_rule: str
-
-
 class CommonRuleFactory(object):
   """Generates common cmake rules."""
 
@@ -119,7 +112,6 @@ class IreeRuleFactory(object):
     self._iree_artifacts_dir = iree_artifacts_dir
     self._import_model_rules = {}
     self._compile_module_rules = {}
-    self._generate_flagfile_rules = {}
 
   def add_import_model_rule(
       self,
