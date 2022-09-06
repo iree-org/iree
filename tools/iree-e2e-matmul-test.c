@@ -1064,8 +1064,6 @@ static iree_status_t iree_cpu_has_required_target_features(
     iree_string_view_t required_feature = iree_yaml_node_as_string(item_node);
     if (iree_string_view_is_empty(required_feature)) continue;
     int64_t feature_is_supported = 0;
-    fprintf(stderr, "Looking up feature by key: %.*s\n",
-            (int)required_feature.size, required_feature.data);
     IREE_RETURN_IF_ERROR(
         iree_cpu_lookup_data_by_key(required_feature, &feature_is_supported));
     if (!feature_is_supported) {
