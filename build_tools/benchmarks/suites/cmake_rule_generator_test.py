@@ -67,6 +67,7 @@ class IreeRuleFactoryTest(unittest.TestCase):
         model_id="1234",
         model_name="abcd",
         model_source_type=common_definitions.ModelSourceType.EXPORTED_TFLITE,
+        model_entry_function="main",
         source_model_rule=cmake_rule_generator.ModelRule(
             target_name="model-1234", file_path="aaa", cmake_rule="bbb"))
 
@@ -85,6 +86,7 @@ class IreeRuleFactoryTest(unittest.TestCase):
         model_name="abcd",
         model_source_type=common_definitions.ModelSourceType.
         EXPORTED_LINALG_MLIR,
+        model_entry_function="main",
         source_model_rule=model_rule)
 
     self.assertEqual(rule.target_name, model_rule.target_name)
@@ -122,12 +124,14 @@ class IreeRuleFactoryTest(unittest.TestCase):
         model_id="1234",
         model_name="abcd",
         model_source_type=common_definitions.ModelSourceType.EXPORTED_TFLITE,
+        model_entry_function="main",
         source_model_rule=cmake_rule_generator.ModelRule(
             target_name="model-1234", file_path="aaa", cmake_rule="bbb"))
     import_rule_2 = self._factory.add_import_model_rule(
         model_id="5678",
         model_name="efgh",
         model_source_type=common_definitions.ModelSourceType.EXPORTED_TF,
+        model_entry_function="main",
         source_model_rule=cmake_rule_generator.ModelRule(
             target_name="model-5678", file_path="ccc", cmake_rule="eee"))
     compile_config = iree_definitions.CompileConfig(
