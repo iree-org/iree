@@ -54,7 +54,7 @@ env:
 
 # Jobs are organized into groups and topologically sorted by dependencies
 jobs:
-  should_run:
+  setup:
     runs-on: ubuntu-20.04
     env:
       # The commit being checked out is the merge commit for the PR. Its first
@@ -100,12 +100,12 @@ jobs:
   # Jobs that build all of IREE "normally"
   ##############################################################################
   build_all:
-    needs: should_run
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: setup
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
       - self-hosted  # must come first
-      - runner-group=${{ needs.should_run.outputs.runner-group }}
-      - environment=${{ needs.should_run.outputs.environment }}
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.environment }}
       - cpu
       - os-family=Linux
     env:
@@ -153,12 +153,12 @@ jobs:
           echo "::set-output name=build-dir-gcs-artifact::${BUILD_DIR_GCS_ARTIFACT}"
 
   build_test_all_bazel:
-    needs: should_run
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: setup
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
       - self-hosted  # must come first
-      - runner-group=${{ needs.should_run.outputs.runner-group }}
-      - environment=${{ needs.should_run.outputs.environment }}
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.environment }}
       - cpu
       - os-family=Linux
     steps:
@@ -168,7 +168,7 @@ jobs:
           submodules: true
       - name: "Building with Bazel"
         env:
-          IREE_BAZEL_WRITE_REMOTE_CACHE: ${{ needs.should_run.outputs.write-caches }}
+          IREE_BAZEL_WRITE_REMOTE_CACHE: ${{ needs.setup.outputs.write-caches }}
         # This doesn't really need everything in the frontends image, but we
         # want the cache to be shared with the integrations build (no point
         # building LLVM twice) and the cache key is the docker container it's
@@ -180,12 +180,12 @@ jobs:
             ./build_tools/bazel/build_core.sh
 
   test_all:
-    needs: [should_run, build_all]
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: [setup, build_all]
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
       - self-hosted  # must come first
-      - runner-group=${{ needs.should_run.outputs.runner-group }}
-      - environment=${{ needs.should_run.outputs.environment }}
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.environment }}
       - cpu
       - os-family=Linux
     env:
@@ -210,12 +210,12 @@ jobs:
             "${BUILD_DIR}"
 
   test_gpu:
-    needs: [should_run, build_all]
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: [setup, build_all]
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
       - self-hosted  # must come first
-      - runner-group=${{ needs.should_run.outputs.runner-group }}
-      - environment=${{ needs.should_run.outputs.environment }}
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.environment }}
       - gpu
       - os-family=Linux
     env:
@@ -253,8 +253,8 @@ jobs:
   # Jobs that build some subset of IREE
   ##############################################################################
   build_runtime:
-    needs: should_run
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: setup
+    if: needs.setup.outputs.should-run == 'true'
     runs-on: ubuntu-20.04
     env:
       BUILD_DIR: build-runtime
@@ -285,8 +285,8 @@ jobs:
           path: "${{ env.BUILD_DIR }}.tar"
 
   test_runtime:
-    needs: [should_run, build_runtime]
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: [setup, build_runtime]
+    if: needs.setup.outputs.should-run == 'true'
     runs-on: ubuntu-20.04
     env:
       BUILD_DIR: ${{ needs.build_runtime.outputs.build-dir }}
@@ -313,12 +313,12 @@ jobs:
   # Jobs that build the IREE-Tensorflow integrations
   ##############################################################################
   build_tf_integrations:
-    needs: should_run
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: setup
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
       - self-hosted  # must come first
-      - runner-group=${{ needs.should_run.outputs.runner-group }}
-      - environment=${{ needs.should_run.outputs.environment }}
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.environment }}
       - cpu
       - os-family=Linux
     outputs:
@@ -334,7 +334,7 @@ jobs:
         id: build
         env:
           IREE_TF_BINARIES_OUTPUT_DIR: iree-tf-binaries
-          IREE_BAZEL_WRITE_REMOTE_CACHE: ${{ needs.should_run.outputs.write-caches }}
+          IREE_BAZEL_WRITE_REMOTE_CACHE: ${{ needs.setup.outputs.write-caches }}
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "IREE_BAZEL_WRITE_REMOTE_CACHE=${IREE_BAZEL_WRITE_REMOTE_CACHE}" \
@@ -360,12 +360,12 @@ jobs:
           echo "::set-output name=binaries-gcs-artifact::${BINARIES_GCS_ARTIFACT}"
 
   test_tf_integrations:
-    needs: [should_run, build_all, build_tf_integrations]
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: [setup, build_all, build_tf_integrations]
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
       - self-hosted  # must come first
-      - runner-group=${{ needs.should_run.outputs.runner-group }}
-      - environment=${{ needs.should_run.outputs.environment }}
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.environment }}
       - cpu
       - os-family=Linux
     env:
@@ -399,12 +399,12 @@ jobs:
             "${BUILD_DIR}"
 
   test_tf_integrations_gpu:
-    needs: [should_run, build_all, build_tf_integrations]
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: [setup, build_all, build_tf_integrations]
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
       - self-hosted  # must come first
-      - runner-group=${{ needs.should_run.outputs.runner-group }}
-      - environment=${{ needs.should_run.outputs.environment }}
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.environment }}
       - gpu
       - os-family=Linux
     env:
@@ -446,12 +446,12 @@ jobs:
   # Jobs that build IREE in some non-default configuration
   ##############################################################################
   asan:
-    needs: should_run
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: setup
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
       - self-hosted  # must come first
-      - runner-group=${{ needs.should_run.outputs.runner-group }}
-      - environment=${{ needs.should_run.outputs.environment }}
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.environment }}
       - cpu
       - os-family=Linux
     steps:
@@ -466,12 +466,12 @@ jobs:
             ./build_tools/cmake/build_and_test_asan.sh
 
   tsan:
-    needs: should_run
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: setup
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
       - self-hosted  # must come first
-      - runner-group=${{ needs.should_run.outputs.runner-group }}
-      - environment=${{ needs.should_run.outputs.environment }}
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.environment }}
       - cpu
       - os-family=Linux
     steps:
@@ -486,13 +486,13 @@ jobs:
             ./build_tools/cmake/build_and_test_tsan.sh
 
   build_benchmarks:
-    needs: [should_run, build_all, build_tf_integrations]
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: [setup, build_all, build_tf_integrations]
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
       # Hacks, and order matters. See the comment at the top of the file.
       - self-hosted
-      - runner-group=${{ needs.should_run.outputs.runner-group }}
-      - environment=${{ needs.should_run.outputs.environment }}
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.environment }}
       - cpu
       - os-family=Linux
     env:
@@ -527,13 +527,13 @@ jobs:
   # Jobs that cross-compile IREE for other platforms
   ##############################################################################
   android_arm64:
-    needs: [should_run, build_all]
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: [setup, build_all]
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
       # Hacks, and order matters. See the comment at the top of the file.
       - self-hosted
-      - runner-group=${{ needs.should_run.outputs.runner-group }}
-      - environment=${{ needs.should_run.outputs.environment }}
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.environment }}
       - cpu
       - os-family=Linux
     env:
@@ -559,12 +559,12 @@ jobs:
             build_tools/cmake/build_android.sh
 
   riscv32:
-    needs: [should_run, build_all]
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: [setup, build_all]
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
       - self-hosted  # must come first
-      - runner-group=${{ needs.should_run.outputs.runner-group }}
-      - environment=${{ needs.should_run.outputs.environment }}
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.environment }}
       - cpu
       - os-family=Linux
     env:
@@ -594,12 +594,12 @@ jobs:
             "./build_tools/cmake/build_riscv.sh && tests/riscv32/smoke.sh"
 
   riscv64:
-    needs: [should_run, build_all, build_tf_integrations]
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: [setup, build_all, build_tf_integrations]
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
       - self-hosted  # must come first
-      - runner-group=${{ needs.should_run.outputs.runner-group }}
-      - environment=${{ needs.should_run.outputs.environment }}
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.environment }}
       - cpu
       - os-family=Linux
     env:
@@ -638,12 +638,12 @@ jobs:
               "./build_tools/cmake/build_riscv.sh && ./tests/riscv64/smoke.sh"
 
   build_benchmark_tools:
-    needs: [should_run, build_all]
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: [setup, build_all]
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
       - self-hosted  # must come first
-      - runner-group=${{ needs.should_run.outputs.runner-group }}
-      - environment=${{ needs.should_run.outputs.environment }}
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.environment }}
       - cpu
       - os-family=Linux
     strategy:
