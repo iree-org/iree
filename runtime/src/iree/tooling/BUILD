@@ -34,16 +34,6 @@ cc_library(
 )
 
 cc_library(
-    name = "cpu_features",
-    srcs = ["cpu_features.c"],
-    hdrs = ["cpu_features.h"],
-    deps = [
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/base:target_platform",
-    ],
-)
-
-cc_library(
     name = "device_util",
     srcs = ["device_util.c"],
     hdrs = ["device_util.h"],

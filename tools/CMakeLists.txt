@@ -158,12 +158,12 @@ iree_cc_binary(
     "iree-e2e-matmul-test.c"
   DEPS
     iree::base
+    iree::base::internal::cpu
     iree::base::internal::flags
     iree::base::internal::path
     iree::base::tracing
     iree::hal
     iree::modules::hal
-    iree::tooling::cpu_features
     iree::tooling::device_util
     iree::tooling::trace_replay
     iree::tooling::yaml_util
