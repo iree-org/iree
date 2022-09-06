@@ -56,7 +56,10 @@ RUNNER_CUSTOM_LABELS="$(get_attribute github-runner-labels)"
 RUNNER_GROUP="$(get_attribute github-runner-group)"
 RUNNER_SCOPE="$(get_attribute github-runner-scope)"
 RUNNER_TRUST="$(get_attribute github-runner-trust)"
+RUNNER_VERSION="$(get_attribute github-runner-version)"
+RUNNER_ENVIRONMENT="$(get_attribute github-runner-environment)"
 TOKEN_PROXY_URL="$(get_attribute github-token-proxy-url)"
+CONFIG_REF="$(get_attribute github-runner-config-ref)"
 
 declare -a RUNNER_LABELS_ARRAY=(
   "os-family=${OS_FAMILY}"
@@ -64,11 +67,14 @@ declare -a RUNNER_LABELS_ARRAY=(
   "${OS_FAMILY}"
   "hostname=${HOSTNAME}"
   "runner-group=${RUNNER_GROUP}"
+  "runner-version=${RUNNER_VERSION}"
   "trust=${RUNNER_TRUST}"
+  "environment=${RUNNER_ENVIRONMENT}"
   "zone=${ZONE}"
   "cpu-platform=${CPU_PLATFORM}"
   "machine-type=${MACHINE_TYPE}"
-  # These attributes require guest attributes. See note above.
+  "config-ref=${CONFIG_REF}"
+  # These labels require guest attributes. See note above.
   # "arch=${ARCH}"
   # "${ARCH}"
   # "os=${OS_ID}"
@@ -101,7 +107,7 @@ declare -a args=(
   --disableupdate \
   --url "https://github.com/${RUNNER_SCOPE}" \
   --name "${HOSTNAME}" \
-  # If we end up with name conflicts, just replace the old entry. 
+  # If we end up with name conflicts, just replace the old entry.
   --replace \
   --runnergroup "${RUNNER_GROUP}" \
   --labels "${RUNNER_LABELS}"
