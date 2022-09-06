@@ -141,12 +141,13 @@ weights from [TensorFlow Hub][tf-hub-mobilenetv2] and convert it using IREE's
 
 #### Compile using the command-line
 
-Run the following command (assuming the path to `iree-compile` is in your
-system's `PATH`):
+Run the following command (passing the `--iree-input-type=` appropriate for
+whichever import tool used):
 
 ``` shell hl_lines="3 4"
 iree-compile \
     --iree-hal-target-backends=vulkan-spirv \
+    --iree-input-type=mhlo \
     --iree-vulkan-target-triple=<...> \
     iree_input.mlir -o mobilenet-vulkan.vmfb
 ```
