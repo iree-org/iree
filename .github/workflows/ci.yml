@@ -50,7 +50,10 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GCS_DIR: gs://iree-github-actions-${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}-artifacts/${{ github.run_id }}/${{ github.run_attempt }}
+  # This is mostly here so we can compute it once and use it in outputs below.
+  # See note above regarding lack of proper variables. Also see note about
+  # pseudo-ternary hack.
+  _CI_STAGE: ${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
 
 # Jobs are organized into groups and topologically sorted by dependencies
 jobs:
@@ -64,10 +67,11 @@ jobs:
     outputs:
       should-run: ${{ steps.should-run.outputs.should-run }}
       # Variables for dependent jobs. See comment at top.
-      environment: prod
-      # pseudo-ternary hack. See comment at top
-      runner-group: ${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
-      # Note that we can't flip the condition here because 0 is falsey
+      runner-env: prod
+      gcs-dir: gs://iree-github-actions-${{ env._CI_STAGE }}-artifacts/${{ github.run_id }}/${{ github.run_attempt }}
+      runner-group: ${{ env._CI_STAGE }}
+      # Note that we can't flip the condition here because 0 is falsey. See
+      # comment at top.
       write-caches: ${{ github.event_name != 'pull_request' && 1 || 0 }}
     steps:
       - name: "Checking out repository"
@@ -105,7 +109,7 @@ jobs:
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.environment }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
     env:
@@ -147,7 +151,7 @@ jobs:
         id: upload
         env:
           BUILD_DIR_ARCHIVE: ${{ steps.archive.outputs.build-dir-archive }}
-          BUILD_DIR_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.build-dir-archive }}
+          BUILD_DIR_GCS_ARTIFACT: ${{ needs.setup.outputs.gcs-dir }}/${{ steps.archive.outputs.build-dir-archive }}
         run: |
           gcloud alpha storage cp "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR_GCS_ARTIFACT}"
           echo "::set-output name=build-dir-gcs-artifact::${BUILD_DIR_GCS_ARTIFACT}"
@@ -158,7 +162,7 @@ jobs:
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.environment }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
     steps:
@@ -185,7 +189,7 @@ jobs:
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.environment }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
     env:
@@ -215,7 +219,7 @@ jobs:
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.environment }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - gpu
       - os-family=Linux
     env:
@@ -318,7 +322,7 @@ jobs:
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.environment }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
     outputs:
@@ -354,7 +358,7 @@ jobs:
         id: upload
         env:
           BINARIES_ARCHIVE: ${{ steps.archive.outputs.binaries-archive }}
-          BINARIES_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.binaries-archive }}
+          BINARIES_GCS_ARTIFACT: ${{ needs.setup.outputs.gcs-dir }}/${{ steps.archive.outputs.binaries-archive }}
         run: |
           gcloud alpha storage cp "${BINARIES_ARCHIVE}" "${BINARIES_GCS_ARTIFACT}"
           echo "::set-output name=binaries-gcs-artifact::${BINARIES_GCS_ARTIFACT}"
@@ -365,7 +369,7 @@ jobs:
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.environment }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
     env:
@@ -404,7 +408,7 @@ jobs:
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.environment }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - gpu
       - os-family=Linux
     env:
@@ -451,7 +455,7 @@ jobs:
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.environment }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
     steps:
@@ -471,7 +475,7 @@ jobs:
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.environment }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
     steps:
@@ -492,7 +496,7 @@ jobs:
       # Hacks, and order matters. See the comment at the top of the file.
       - self-hosted
       - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.environment }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
     env:
@@ -533,7 +537,7 @@ jobs:
       # Hacks, and order matters. See the comment at the top of the file.
       - self-hosted
       - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.environment }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
     env:
@@ -564,7 +568,7 @@ jobs:
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.environment }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
     env:
@@ -599,7 +603,7 @@ jobs:
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.environment }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
     env:
@@ -643,7 +647,7 @@ jobs:
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.environment }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
     strategy:
@@ -703,7 +707,7 @@ jobs:
         id: upload
         env:
           BENCHMARK_TOOLS_ARCHIVE: ${{ steps.archive.outputs.benchmark-tools-archive }}
-          BENCHMARK_TOOLS_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.benchmark-tools-archive }}
+          BENCHMARK_TOOLS_GCS_ARTIFACT: ${{ needs.setup.outputs.gcs-dir }}/${{ steps.archive.outputs.benchmark-tools-archive }}
         run: |
           gcloud alpha storage cp "${BENCHMARK_TOOLS_ARCHIVE}" "${BENCHMARK_TOOLS_GCS_ARTIFACT}"
           echo "::set-output name=${PLATFORM}-${ARCHITECTURE}-benchmark-tools-gcs-artifact::${BENCHMARK_TOOLS_GCS_ARTIFACT}"
