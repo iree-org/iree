@@ -50,6 +50,7 @@ iree_runtime_cc_library(
         "//runtime/src/iree/base:core_headers",
         "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/base/internal:arena",
         "//runtime/src/iree/base/internal/flatcc:parsing",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/drivers/webgpu/platform",
