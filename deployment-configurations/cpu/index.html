@@ -1310,12 +1310,13 @@ corresponding framework's import tool to convert into a format (i.e.,
 weights from <a href="https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification">TensorFlow Hub</a> and convert it using IREE's
 <a href="../../getting-started/tensorflow/">TensorFlow importer</a>. Then,</p>
 <h4 id="compile-using-the-command-line">Compile using the command-line<a class="headerlink" href="#compile-using-the-command-line" title="Permanent link">&para;</a></h4>
-<p>Run the following command (assuming the path to <code>iree-compile</code> is in your
-system's <code>PATH</code>):</p>
+<p>Run the following command (passing the <code>--iree-input-type=</code> appropriate for
+whichever import tool used):</p>
 <div class="highlight"><pre><span></span><code>iree-compile <span class="se">\</span>
     --iree-hal-target-backends<span class="o">=</span>llvm-cpu <span class="se">\</span>
-<span class="hll">    iree_input.mlir -o mobilenet_cpu.vmfb
-</span></code></pre></div>
+<span class="hll">    --iree-input-type<span class="o">=</span>mhlo <span class="se">\</span>
+</span>    iree_input.mlir -o mobilenet_cpu.vmfb
+</code></pre></div>
 <div class="admonition todo">
 <p class="admonition-title">Todo</p>
 <p>Choose the suitable target triple for the current CPU</p>
