@@ -8,23 +8,25 @@ name: CI
 
 # A few notes:
 #
+# Variables:
 # GitHub actions don't have variables or even support normal yaml anchors (they
 # are specially disabled because...reasons?):
 # See https://github.com/github-community/community/discussions/4501
 # https://github.community/t/support-for-yaml-anchors/16128/92
 # https://github.com/actions/runner/issues/1182
-#
-# Neither does it have any variables that are available everywhere. The
-# top-level `env` field is available in many places, but not all
+# Neither does it have any contexts that are available everywhere. The
+# top-level `env` field is available in many places, but not all. We already
+# have a "should-run" job that every other job depends on, so we leverage that
+# for variables that every other job can use, since that *is* available in all
+# sub-fields of the job.
 # See https://docs.github.com/en/actions/learn-github-actions/contexts#context-availability
 # and https://github.com/community/community/discussions/27370
 #
-# So there are some odd patterns that are repeated in many places. To avoid
-# repeating the comments, they are mentioned here:
-#
+# Runner label ordering:
 # - self-hosted always has to be listed first in a runs-on block:
 # https://docs.github.com/en/actions/hosting-your-own-runners/using-self-hosted-runners-in-a-workflow
 #
+# Pseudo-ternary hack:
 # - We have to do a weird hack to get a pseudo-ternary operator. See
 # https://github.com/actions/runner/issues/409, hence patterns like:
 # `github.event_name == 'pull_request' && 'presubmit' || 'postsubmit'`
@@ -48,11 +50,14 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GCS_DIR: gs://iree-github-actions-${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}-artifacts/${{ github.run_id }}/${{ github.run_attempt }}
+  # This is mostly here so we can compute it once and use it in outputs below.
+  # See note above regarding lack of proper variables. Also see note about
+  # pseudo-ternary hack.
+  _CI_STAGE: ${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
 
 # Jobs are organized into groups and topologically sorted by dependencies
 jobs:
-  should_run:
+  setup:
     runs-on: ubuntu-20.04
     env:
       # The commit being checked out is the merge commit for the PR. Its first
@@ -61,6 +66,13 @@ jobs:
       PR_DESCRIPTION: ${{ github.event.pull_request.body }}
     outputs:
       should-run: ${{ steps.should-run.outputs.should-run }}
+      # Variables for dependent jobs. See comment at top.
+      runner-env: prod
+      gcs-dir: gs://iree-github-actions-${{ env._CI_STAGE }}-artifacts/${{ github.run_id }}/${{ github.run_attempt }}
+      runner-group: ${{ env._CI_STAGE }}
+      # Note that we can't flip the condition here because 0 is falsey. See
+      # comment at top.
+      write-caches: ${{ github.event_name != 'pull_request' && 1 || 0 }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
@@ -92,12 +104,12 @@ jobs:
   # Jobs that build all of IREE "normally"
   ##############################################################################
   build_all:
-    needs: should_run
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: setup
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
-      # Pseudo-ternary hack and order matters. See comment at top of file.
-      - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
     env:
@@ -139,18 +151,18 @@ jobs:
         id: upload
         env:
           BUILD_DIR_ARCHIVE: ${{ steps.archive.outputs.build-dir-archive }}
-          BUILD_DIR_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.build-dir-archive }}
+          BUILD_DIR_GCS_ARTIFACT: ${{ needs.setup.outputs.gcs-dir }}/${{ steps.archive.outputs.build-dir-archive }}
         run: |
           gcloud alpha storage cp "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR_GCS_ARTIFACT}"
           echo "::set-output name=build-dir-gcs-artifact::${BUILD_DIR_GCS_ARTIFACT}"
 
   build_test_all_bazel:
-    needs: should_run
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: setup
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
-      # Pseudo-ternary hack and order matters. See comment at top of file.
-      - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
     steps:
@@ -160,8 +172,7 @@ jobs:
           submodules: true
       - name: "Building with Bazel"
         env:
-          # Psuedo-ternary hack. Don't swap the condition! See comment at top of file.
-          IREE_BAZEL_WRITE_REMOTE_CACHE: ${{ github.event_name != 'pull_request' && 1 || 0 }}
+          IREE_BAZEL_WRITE_REMOTE_CACHE: ${{ needs.setup.outputs.write-caches }}
         # This doesn't really need everything in the frontends image, but we
         # want the cache to be shared with the integrations build (no point
         # building LLVM twice) and the cache key is the docker container it's
@@ -173,12 +184,12 @@ jobs:
             ./build_tools/bazel/build_core.sh
 
   test_all:
-    needs: [should_run, build_all]
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: [setup, build_all]
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
-      # Pseudo-ternary hack and order matters. See comment at top of file.
-      - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
     env:
@@ -203,12 +214,12 @@ jobs:
             "${BUILD_DIR}"
 
   test_gpu:
-    needs: [should_run, build_all]
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: [setup, build_all]
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
-      # Pseudo-ternary hack and order matters. See comment at top of file.
-      - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - gpu
       - os-family=Linux
     env:
@@ -246,8 +257,8 @@ jobs:
   # Jobs that build some subset of IREE
   ##############################################################################
   build_runtime:
-    needs: should_run
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: setup
+    if: needs.setup.outputs.should-run == 'true'
     runs-on: ubuntu-20.04
     env:
       BUILD_DIR: build-runtime
@@ -278,8 +289,8 @@ jobs:
           path: "${{ env.BUILD_DIR }}.tar"
 
   test_runtime:
-    needs: [should_run, build_runtime]
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: [setup, build_runtime]
+    if: needs.setup.outputs.should-run == 'true'
     runs-on: ubuntu-20.04
     env:
       BUILD_DIR: ${{ needs.build_runtime.outputs.build-dir }}
@@ -306,12 +317,12 @@ jobs:
   # Jobs that build the IREE-Tensorflow integrations
   ##############################################################################
   build_tf_integrations:
-    needs: should_run
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: setup
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
-      # Pseudo-ternary hack and order matters. See comment at top of file.
-      - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
     outputs:
@@ -327,8 +338,7 @@ jobs:
         id: build
         env:
           IREE_TF_BINARIES_OUTPUT_DIR: iree-tf-binaries
-          # Psuedo-ternary hack. Don't swap the condition! See comment at top of file.
-          IREE_BAZEL_WRITE_REMOTE_CACHE: ${{ github.event_name != 'pull_request' && 1 || 0 }}
+          IREE_BAZEL_WRITE_REMOTE_CACHE: ${{ needs.setup.outputs.write-caches }}
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "IREE_BAZEL_WRITE_REMOTE_CACHE=${IREE_BAZEL_WRITE_REMOTE_CACHE}" \
@@ -348,18 +358,18 @@ jobs:
         id: upload
         env:
           BINARIES_ARCHIVE: ${{ steps.archive.outputs.binaries-archive }}
-          BINARIES_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.binaries-archive }}
+          BINARIES_GCS_ARTIFACT: ${{ needs.setup.outputs.gcs-dir }}/${{ steps.archive.outputs.binaries-archive }}
         run: |
           gcloud alpha storage cp "${BINARIES_ARCHIVE}" "${BINARIES_GCS_ARTIFACT}"
           echo "::set-output name=binaries-gcs-artifact::${BINARIES_GCS_ARTIFACT}"
 
   test_tf_integrations:
-    needs: [should_run, build_all, build_tf_integrations]
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: [setup, build_all, build_tf_integrations]
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
-      # Pseudo-ternary hack and order matters. See comment at top of file.
-      - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
     env:
@@ -393,12 +403,12 @@ jobs:
             "${BUILD_DIR}"
 
   test_tf_integrations_gpu:
-    needs: [should_run, build_all, build_tf_integrations]
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: [setup, build_all, build_tf_integrations]
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
-      # Pseudo-ternary hack and order matters. See comment at top of file.
-      - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - gpu
       - os-family=Linux
     env:
@@ -440,12 +450,12 @@ jobs:
   # Jobs that build IREE in some non-default configuration
   ##############################################################################
   asan:
-    needs: should_run
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: setup
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
-      # Pseudo-ternary hack and order matters. See comment at top of file.
-      - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
     steps:
@@ -460,12 +470,12 @@ jobs:
             ./build_tools/cmake/build_and_test_asan.sh
 
   tsan:
-    needs: should_run
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: setup
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
-      # Pseudo-ternary hack and order matters. See comment at top of file.
-      - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
     steps:
@@ -480,12 +490,13 @@ jobs:
             ./build_tools/cmake/build_and_test_tsan.sh
 
   build_benchmarks:
-    needs: [should_run, build_all, build_tf_integrations]
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: [setup, build_all, build_tf_integrations]
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
       # Hacks, and order matters. See the comment at the top of the file.
       - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
     env:
@@ -520,12 +531,13 @@ jobs:
   # Jobs that cross-compile IREE for other platforms
   ##############################################################################
   android_arm64:
-    needs: [should_run, build_all]
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: [setup, build_all]
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
       # Hacks, and order matters. See the comment at the top of the file.
       - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
     env:
@@ -551,12 +563,12 @@ jobs:
             build_tools/cmake/build_android.sh
 
   riscv32:
-    needs: [should_run, build_all]
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: [setup, build_all]
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
-      # Pseudo-ternary hack and order matters. See comment at top of file.
-      - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
     env:
@@ -586,12 +598,12 @@ jobs:
             "./build_tools/cmake/build_riscv.sh && tests/riscv32/smoke.sh"
 
   riscv64:
-    needs: [should_run, build_all, build_tf_integrations]
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: [setup, build_all, build_tf_integrations]
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
-      # Pseudo-ternary hack and order matters. See comment at top of file.
-      - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
     env:
@@ -630,12 +642,12 @@ jobs:
               "./build_tools/cmake/build_riscv.sh && ./tests/riscv64/smoke.sh"
 
   build_benchmark_tools:
-    needs: [should_run, build_all]
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: [setup, build_all]
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
-      # Pseudo-ternary hack and order matters. See comment at top of file.
-      - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
     strategy:
@@ -695,7 +707,7 @@ jobs:
         id: upload
         env:
           BENCHMARK_TOOLS_ARCHIVE: ${{ steps.archive.outputs.benchmark-tools-archive }}
-          BENCHMARK_TOOLS_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.benchmark-tools-archive }}
+          BENCHMARK_TOOLS_GCS_ARTIFACT: ${{ needs.setup.outputs.gcs-dir }}/${{ steps.archive.outputs.benchmark-tools-archive }}
         run: |
           gcloud alpha storage cp "${BENCHMARK_TOOLS_ARCHIVE}" "${BENCHMARK_TOOLS_GCS_ARTIFACT}"
           echo "::set-output name=${PLATFORM}-${ARCHITECTURE}-benchmark-tools-gcs-artifact::${BENCHMARK_TOOLS_GCS_ARTIFACT}"
