@@ -72,14 +72,14 @@ class MigFetcher():
     regions = [r.name for r in self._regions_client.list(request)]
 
     if type == "all":
-      type = f"({'|'.join(TYPES)})"
+      type = r"\w+"
 
     if group == "all":
-      group = f"({'|'.join(GROUPS)})"
+      group = r"\w+"
 
     for region in regions:
       filter_parts = [p for p in [prefix, modifier, group, type, region] if p]
-      filter = f"name eq {'-'.join(filter_parts)}"
+      filter = f"name eq '{'-'.join(filter_parts)}'"
       list_mig_request = compute.ListRegionInstanceGroupManagersRequest(
           project=self._project,
           region=region,
@@ -229,7 +229,6 @@ def parse_args():
   subparser_base.add_argument(
       "--group",
       "--groups",
-      choices=GROUPS + ["all"],
       required=True,
       help=("The runner group of the MIGs to update, an RE2 regex for matching"
             " the group (e.g. 'cpu|gpu'), or 'all' to search for MIGs for all"
@@ -239,7 +238,6 @@ def parse_args():
       "--type",
       "--types",
       required=True,
-      choices=TYPES + ["all"],
       help=("The runner type of the MIGs to update, an RE2 regex for matching"
             " the type (e.g. 'presubmit|postsubmit'), or 'all' to search for"
             " MIGs for all types."),
