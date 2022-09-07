@@ -344,16 +344,17 @@ struct TilingResult {
   }
 };
 
-/// Get the integer tile sizes from the requestedTileSizes
+/// Get the integer tile sizes from the tileSizesForTiledloops
 static FailureOr<SmallVector<int64_t>> getTileSizesAsInt64(
-    ArrayRef<Value> requestedTileSizes) {
+    ArrayRef<Value> tileSizesForTiledLoops) {
   SmallVector<int64_t> tileSizes;
 
-  for (Value val : requestedTileSizes) {
+  for (Value val : tileSizesForTiledLoops) {
     if (auto constIndexOp = val.getDefiningOp<arith::ConstantIndexOp>()) {
       int64_t v = constIndexOp.value();
-      // When tiling is not defined, let's use 1 here.
-      tileSizes.push_back(v == 0 ? 1 : v);
+      // The tile sizes are tied to the tiled loop nest and they can't be zero.
+      assert(v != 0);
+      tileSizes.push_back(v);
     } else {
       return failure();
     }
