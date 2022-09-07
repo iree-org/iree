@@ -33,7 +33,7 @@ module {
     // CHECK:   async.add_to_group %[[token]], %[[group]] : !async.token
     // CHECK: }
     // CHECK: async.await_all %[[group]]
-    scf.foreach_thread (%arg3) in (%1) -> () {
+    scf.foreach_thread (%arg3) in (%1) shared_outs() -> () {
         %3 = affine.apply #map1(%arg3)[%arg0]
         %4 = affine.apply #map2(%0, %3)
         %5 = affine.min #map3(%4, %arg0)
