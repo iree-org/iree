@@ -349,9 +349,9 @@ static FailureOr<SmallVector<int64_t>> getTileSizesAsInt64(
     ArrayRef<Value> requestedTileSizes) {
   SmallVector<int64_t> tileSizes;
 
-  for (auto val : requestedTileSizes) {
+  for (Value val : requestedTileSizes) {
     if (auto constIndexOp = val.getDefiningOp<arith::ConstantIndexOp>()) {
-      auto v = constIndexOp.value();
+      int64_t v = constIndexOp.value();
       // When tiling is not defined, let's use 1 here.
       tileSizes.push_back(v == 0 ? 1 : v);
     } else {
@@ -365,7 +365,7 @@ static SmallVector<AffineMinOp> collectTileSizeMinOps(
     ArrayRef<OpFoldResult> tileSizes) {
   SmallVector<AffineMinOp> res;
 
-  for (auto ofr : tileSizes) {
+  for (OpFoldResult ofr : tileSizes) {
     if (auto value = ofr.dyn_cast<Value>()) {
       if (auto minOp = value.getDefiningOp<AffineMinOp>()) {
         res.push_back(minOp);
@@ -400,7 +400,7 @@ static SmallVector<AffineMinOp> collectTileSizeMinOps(
 //   5. clone the updated loop nest in the then block.
 static LogicalResult specializeDistributionLoops(TilingResult &tilingResult,
                                                  PatternRewriter &rewriter) {
-  auto &distLoops = tilingResult.loops;
+  SmallVector<scf::ForOp> &distLoops = tilingResult.loops;
   auto tileSizes = getTileSizesAsInt64(tilingResult.tileSizesForLoops);
   if (failed(tileSizes)) return failure();
 
@@ -412,15 +412,15 @@ static LogicalResult specializeDistributionLoops(TilingResult &tilingResult,
   //   3. UB == a multiple of the tile size
   bool isAlreadyMultiple = true;
   for (auto it : zip(distLoops, *tileSizes)) {
-    auto loop = std::get<0>(it);
+    scf::ForOp loop = std::get<0>(it);
     auto ubOp = loop.getUpperBound().getDefiningOp<arith::ConstantIndexOp>();
     if (!ubOp) {
       // TODO: handle dynamic cases by adding more code to check the
       // conditions.
       return success();
     }
-    auto ub = ubOp.value();
-    auto tileSize = std::get<1>(it);
+    int64_t ub = ubOp.value();
+    int64_t tileSize = std::get<1>(it);
     if (ub % tileSize != 0) {
       isAlreadyMultiple = false;
     }
@@ -436,7 +436,7 @@ static LogicalResult specializeDistributionLoops(TilingResult &tilingResult,
   LLVM_DEBUG({ tilingResult.dump(); });
 
   PatternRewriter::InsertionGuard guard(rewriter);
-  auto distLoop0 = distLoops[0];  // the outermost loop
+  scf::ForOp distLoop0 = distLoops[0];  // the outermost loop
   auto loc = distLoop0.getLoc();
   rewriter.setInsertionPoint(distLoop0);
 
@@ -444,15 +444,15 @@ static LogicalResult specializeDistributionLoops(TilingResult &tilingResult,
   Value cond;
   SmallVector<Value> constantOps;  // ConstantIndexOps for tile sizes
   for (unsigned i = 0, e = distLoops.size(); i != e; ++i) {
-    auto tileSize = (*tileSizes)[i];
+    int64_t tileSize = (*tileSizes)[i];
     if (tileSize == 0 || tileSize == 1) {
       constantOps.push_back(Value());
       continue;
     }
 
     // clone the minSize op in the loop and place it before scf.if
-    auto minOp = minSizeOps[i];
-    auto distLoop = distLoops[i];
+    AffineMinOp minOp = minSizeOps[i];
+    scf::ForOp distLoop = distLoops[i];
     // clone the lower bound and put before the nested loops.
     BlockAndValueMapping mapperForLB;
     Operation *lb =
@@ -462,7 +462,7 @@ static LogicalResult specializeDistributionLoops(TilingResult &tilingResult,
     // place it before the nested loops. The induction variable is replaced by
     // the cloned lower-bound above.
     BlockAndValueMapping mapperForIV;
-    auto iv = distLoop.getInductionVar();
+    Value iv = distLoop.getInductionVar();
     mapperForIV.map(iv, lb->getResult(0));
     Value size =
         rewriter.clone(*minOp.getOperation(), mapperForIV)->getResult(0);
@@ -482,7 +482,7 @@ static LogicalResult specializeDistributionLoops(TilingResult &tilingResult,
 
   // Specialize the size operations (affine min) in each for loop.
   for (int i = 0, e = distLoops.size(); i != e; ++i) {
-    auto minOp = minSizeOps[i];
+    AffineMinOp minOp = minSizeOps[i];
     if (!minOp) {
       assert((*tileSizes)[i] == 0 || (*tileSizes)[i] == 1);
       continue;
