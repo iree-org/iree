@@ -13,7 +13,7 @@ namespace iree_compiler {
 /// Populate patterns related to tile and distribute to workgroups.
 void populateTileAndDistributeToWorkgroupsPatterns(
     RewritePatternSet &patterns, linalg::LinalgTilingOptions options,
-    linalg::LinalgTransformationFilter filter);
+    linalg::LinalgTransformationFilter filter, bool specialize);
 
 /// Populate patterns that fold tensor.expand/collapse_shape into the source
 /// hal.interface.binding.subspan.

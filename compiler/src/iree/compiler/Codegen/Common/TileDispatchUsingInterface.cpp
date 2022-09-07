@@ -29,12 +29,6 @@
 
 namespace mlir {
 namespace iree_compiler {
-
-static llvm::cl::opt<bool> clSpecializeWorkgroupDistribution(
-    "iree-codegen-specialize-workgroup-distribution",
-    llvm::cl::desc("Specialize workgroup distribution with tile size"),
-    llvm::cl::init(true));
-
 /// Method to check if a value is zero
 static bool isZero(Value val) {
   OpFoldResult ofr = getAsOpFoldResult(val);
@@ -510,19 +504,21 @@ struct TileDispatchUsingSCFForOp
   TileDispatchUsingSCFForOp(MLIRContext *context,
                             linalg::LinalgTilingOptions options,
                             linalg::LinalgTransformationFilter filter,
-                            PatternBenefit benefit = 1)
+                            bool specialize, PatternBenefit benefit = 1)
       : OpInterfaceRewritePattern<TilingInterface>(context, benefit),
         options(std::move(options)),
-        filter(std::move(filter)) {}
+        filter(std::move(filter)),
+        specialize(specialize) {}
 
   /// Construct a generic pattern applied to `opName`.
   TileDispatchUsingSCFForOp(StringRef opName, MLIRContext *context,
                             linalg::LinalgTilingOptions options,
                             linalg::LinalgTransformationFilter filter,
-                            PatternBenefit benefit = 1)
+                            bool specialize, PatternBenefit benefit = 1)
       : OpInterfaceRewritePattern<TilingInterface>(context, benefit),
         options(std::move(options)),
-        filter(std::move(filter)) {}
+        filter(std::move(filter)),
+        specialize(specialize) {}
 
   /// `matchAndRewrite` implementation that returns the significant transformed
   /// pieces of IR.
@@ -534,7 +530,7 @@ struct TileDispatchUsingSCFForOp
     auto result = returningMatchAndRewrite(op, rewriter);
     if (failed(result)) return failure();
 
-    if (clSpecializeWorkgroupDistribution) {
+    if (specialize) {
       if (failed(specializeDistributionLoops(*result, rewriter)))
         return failure();
     }
@@ -548,6 +544,9 @@ struct TileDispatchUsingSCFForOp
 
   /// Filter to control transformation.
   linalg::LinalgTransformationFilter filter;
+
+  /// Option to control specialization
+  bool specialize;
 };
 }  // namespace
 
@@ -743,17 +742,19 @@ struct TileAndFuseDispatchUsingSCFForOp
   TileAndFuseDispatchUsingSCFForOp(MLIRContext *context,
                                    linalg::LinalgTilingOptions options,
                                    linalg::LinalgTransformationFilter filter,
-                                   PatternBenefit benefit = 1)
+                                   bool specialize, PatternBenefit benefit = 1)
       : OpInterfaceRewritePattern<TilingInterface>(context, benefit),
-        tilingPattern(context, options, filter) {}
+        tilingPattern(context, options, filter, /*specialize=*/false),
+        specialize(specialize) {}
 
   /// Construct a generic pattern applied to `opName`.
   TileAndFuseDispatchUsingSCFForOp(StringRef opName, MLIRContext *context,
                                    linalg::LinalgTilingOptions options,
                                    linalg::LinalgTransformationFilter filter,
-                                   PatternBenefit benefit = 1)
+                                   bool specialize, PatternBenefit benefit = 1)
       : OpInterfaceRewritePattern<TilingInterface>(context, benefit),
-        tilingPattern(context, options, filter) {}
+        tilingPattern(context, options, filter, /*specialize=*/false),
+        specialize(specialize) {}
 
   FailureOr<TileAndFuseResult> returningMatchAndRewrite(
       TilingInterface op, PatternRewriter &rewriter) const;
@@ -761,7 +762,7 @@ struct TileAndFuseDispatchUsingSCFForOp
   LogicalResult matchAndRewrite(TilingInterface op,
                                 PatternRewriter &rewriter) const override {
     auto result = returningMatchAndRewrite(op, rewriter);
-    if (clSpecializeWorkgroupDistribution && succeeded(result) &&
+    if (specialize && succeeded(result) &&
         !result->tilingResult->loops.empty()) {
       return specializeDistributionLoops(*(result->tilingResult), rewriter);
     }
@@ -771,6 +772,7 @@ struct TileAndFuseDispatchUsingSCFForOp
 
  private:
   TileDispatchUsingSCFForOp tilingPattern;
+  bool specialize;
 };
 }  // namespace
 
@@ -1011,10 +1013,10 @@ struct SwapExtractSliceWithInitTensor
 
 void populateTileAndDistributeToWorkgroupsPatterns(
     RewritePatternSet &patterns, linalg::LinalgTilingOptions options,
-    linalg::LinalgTransformationFilter filter) {
+    linalg::LinalgTransformationFilter filter, bool specialize) {
   MLIRContext *context = patterns.getContext();
-  patterns.insert<TileAndFuseDispatchUsingSCFForOp>(context, std::move(options),
-                                                    std::move(filter));
+  patterns.insert<TileAndFuseDispatchUsingSCFForOp>(
+      context, std::move(options), std::move(filter), specialize);
   patterns.insert<SwapExtractSliceWithDispatchTensorLoad,
                   SwapExtractSliceWithInitTensor,
                   SwapExtractSliceWithTiledProducer>(context);

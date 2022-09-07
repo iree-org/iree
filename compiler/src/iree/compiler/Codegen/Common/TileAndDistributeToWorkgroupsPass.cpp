@@ -320,7 +320,7 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
       RewritePatternSet patterns(context);
       populateTileAndDistributeToWorkgroupsPatterns(
           patterns, linalgTilingOptions,
-          linalg::LinalgTransformationFilter(marker));
+          linalg::LinalgTransformationFilter(marker), specialize);
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         funcOp.emitOpError("Tile+Distribute failed");
         return signalPassFailure();
