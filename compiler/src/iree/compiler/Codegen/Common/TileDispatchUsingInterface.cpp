@@ -483,9 +483,7 @@ static LogicalResult specializeDistributionLoops(TilingResult &tilingResult,
     });
     rewriter.replaceOp(minOp, constantOps[i]);
   }
-  ifOp.getThenBodyBuilder().clone(*distLoop0.getOperation());
-
-  rewriter.eraseOp(distLoop0);
+  distLoop0->moveBefore(&ifOp.getThenRegion().front().front());
   return success();
 }
 
