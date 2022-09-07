@@ -379,15 +379,6 @@ static SmallVector<AffineMinOp> collectTileSizeMinOps(
   return res;
 }
 
-static SmallVector<scf::ForOp> collectNestedLoops(scf::ForOp outerLoop) {
-  SmallVector<scf::ForOp> loops;
-
-  outerLoop.getOperation()->walk<WalkOrder::PreOrder>(
-      [&](scf::ForOp op) { loops.push_back(op); });
-
-  return loops;
-}
-
 // Specialize the tiled distribution loops with the main tile sizes.
 //
 // Inputs:
