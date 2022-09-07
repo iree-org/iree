@@ -87,7 +87,6 @@ class MigFetcher():
       )
       region_migs = self._migs_client.list(list_mig_request)
       migs.extend([mig for mig in region_migs])
-    sys.exit(0)
     return migs
 
 
