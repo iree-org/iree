@@ -20,9 +20,6 @@ DIRECT_UPDATE_COMMAND_NAME = "direct-update"
 
 CANARY_SIZE = compute.FixedOrPercent(fixed=1)
 
-GROUPS = ["presubmit", "postsubmit"]
-TYPES = ["cpu", "gpu"]
-
 
 def resource_basename(resource):
   return os.path.basename(urllib.parse.urlparse(resource).path)
