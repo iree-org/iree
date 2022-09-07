@@ -20,6 +20,9 @@ DIRECT_UPDATE_COMMAND_NAME = "direct-update"
 
 CANARY_SIZE = compute.FixedOrPercent(fixed=1)
 
+GROUPS = ["presubmit", "postsubmit"]
+TYPES = ["cpu", "gpu"]
+
 
 def resource_basename(resource):
   return os.path.basename(urllib.parse.urlparse(resource).path)
@@ -59,39 +62,23 @@ class MigFetcher():
     self._regions_client = regions_client
     self._project = project
 
-  def get_migs(self, *, regions, types, groups, prefix, modifier=None):
+  def get_migs(self, *, region, type, group, prefix, modifier=None):
     print("Finding matching MIGs")
     migs = []
-    if isinstance(regions, str):
-      if regions == "all":
-        # Yeah apparently we have to iterate through regions ourselves
-        regions = [
-            r.name for r in self._regions_client.list(project=self._project)
-        ]
-      else:
-        regions = [regions]
 
-    if isinstance(types, str):
-      if types == "all":
-        types = [".*"]
-      else:
-        types = [types]
-    types_filter = f"({'|'.join(types)})"
+    request = compute.ListRegionsRequest(project=self._project)
+    if region != "all":
+      request.filter = f"name eq {region}"
+    regions = [r.name for r in self._regions_client.list(request)]
 
-    groups_filter = groups
-    if isinstance(groups, str):
-      if groups == "all":
-        groups = [".*"]
-      else:
-        groups = [groups]
-    groups_filter = f"({'|'.join(groups)})"
+    if type == "all":
+      type = f"({'|'.join(TYPES)})"
+
+    if group == "all":
+      group = f"({'|'.join(GROUPS)})"
 
     for region in regions:
-      # type_filter = ".*"
-      filter_parts = [
-          p for p in [prefix, modifier, groups_filter, types_filter, region]
-          if p
-      ]
+      filter_parts = [p for p in [prefix, modifier, group, type, region] if p]
       filter = f"name eq {'-'.join(filter_parts)}"
       list_mig_request = compute.ListRegionInstanceGroupManagersRequest(
           project=self._project,
@@ -100,6 +87,7 @@ class MigFetcher():
       )
       region_migs = self._migs_client.list(list_mig_request)
       migs.extend([mig for mig in region_migs])
+    sys.exit(0)
     return migs
 
 
@@ -114,9 +102,9 @@ def main(args):
 
   # Prod instances just have the bare name
   modifier = None if args.env == "prod" else args.env
-  migs = updater.get_migs(regions=args.region,
-                          types=args.type,
-                          groups=args.group,
+  migs = updater.get_migs(region=args.region,
+                          type=args.type,
+                          group=args.group,
                           prefix=args.name_prefix,
                           modifier=modifier)
   if len(migs) == 0:
@@ -208,12 +196,13 @@ def main(args):
     print(f"Updating {mig.name} to new versions:"
           f" {summarize_versions(new_versions)}")
 
-    migs_client.patch(
-        project=args.project,
-        region=region,
-        instance_group_manager=mig.name,
-        instance_group_manager_resource=compute.InstanceGroupManager(
-            versions=new_versions, update_policy=update_policy))
+    if not args.dry_run:
+      migs_client.patch(
+          project=args.project,
+          region=region,
+          instance_group_manager=mig.name,
+          instance_group_manager_resource=compute.InstanceGroupManager(
+              versions=new_versions, update_policy=update_policy))
     print(f"Successfully updated {mig.name}")
 
 
@@ -233,20 +222,28 @@ def parse_args():
                               help="The cloud project for the MIGs.")
   subparser_base.add_argument(
       "--region",
+      "--regions",
       required=True,
-      help=("The cloud region (e.g. 'us-west1') of the MIG to update or 'all'"
-            " to search for matching MIGs in all regions."))
+      help=("The cloud region (e.g. 'us-west1') of the MIG to update, an RE2"
+            " regex for matching region names (e.g. 'us-.*'), or 'all' to"
+            " search for MIGs in all regions."))
   subparser_base.add_argument(
       "--group",
+      "--groups",
+      choices=GROUPS + ["all"],
       required=True,
-      help=("The runner group of the MIGs to update (e.g. 'presubmit') or 'all'"
-            " to search for MIGs for all groups."),
+      help=("The runner group of the MIGs to update, an RE2 regex for matching"
+            " the group (e.g. 'cpu|gpu'), or 'all' to search for MIGs for all"
+            " groups."),
   )
   subparser_base.add_argument(
       "--type",
+      "--types",
       required=True,
-      help=("The runner type of the MIGs to update (e.g. 'cpu') or 'all' to"
-            " search for MIGs for all groups."),
+      choices=TYPES + ["all"],
+      help=("The runner type of the MIGs to update, an RE2 regex for matching"
+            " the type (e.g. 'presubmit|postsubmit'), or 'all' to search for"
+            " MIGs for all types."),
   )
   subparser_base.add_argument(
       "--mode",
@@ -267,6 +264,11 @@ def parse_args():
                               default="testing",
                               help="The environment for the MIGs.",
                               choices=["prod", "testing"])
+  subparser_base.add_argument(
+      "--dry-run",
+      action="store_true",
+      default=False,
+      help="Print all output but don't actually send the update request.")
   subparser_base.add_argument("--skip-confirmation",
                               "--force",
                               action="store_true",
