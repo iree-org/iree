@@ -1,3 +1,23 @@
+func.func @reduce() -> (tensor<8xf32>) {
+  %cst = arith.constant -0.000000e+00 : f32
+
+  // Note: arith.constant is good for our purposes here but it may be useful to use
+  // util.unfoldable_constant.
+  %arg = arith.constant dense<1.0> : tensor<8x64xf32>
+  %0 = linalg.init_tensor [8] : tensor<8xf32>
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<8xf32>) ->   tensor<8xf32>
+  %2 = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                     affine_map<(d0, d1) -> (d0)>],
+    iterator_types = ["parallel", "reduction"]}
+    ins(%arg : tensor<8x64xf32>) outs(%1 : tensor<8xf32>) {
+      ^bb0(%arg3: f32, %arg4: f32):
+        %3 = arith.addf %arg3, %arg4 : f32
+        linalg.yield %3 : f32
+      } -> tensor<8xf32>
+  return %2 : tensor<8xf32>
+}
+
 // RUN: iree-opt %s --iree-hal-target-backends=cuda \
 // RUN:     --iree-abi-transformation-pipeline \
 // RUN:     --iree-flow-transformation-pipeline  \
@@ -29,15 +49,6 @@
 // RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/reduction_codegen_spec.mlir | \
 // RUN: iree-run-module --entry_function=reduce --device=cuda |\
 // RUN: FileCheck %s --check-prefix=EXEC
-
-func.func @reduce() -> (tensor<8xf32>) {
-  %cst = arith.constant -0.000000e+00 : f32
-
-  // Note: arith.constant is good for our purposes here but it may be useful to use
-  // util.unfoldable_constant.
-  %arg = arith.constant dense<1.0> : tensor<8x64xf32>
-  %0 = linalg.init_tensor [8] : tensor<8xf32>
-  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<8xf32>) ->   tensor<8xf32>
 
   //     CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
   //     CHECK-DAG: %[[C1:.*]] = arith.constant 1 : index
@@ -101,17 +112,7 @@ func.func @reduce() -> (tensor<8xf32>) {
   //         CHECK:   vector.transfer_write
   //         CHECK: gpu.barrier
   //         CHECK: memref.dealloc %[[SHMEM_ALLOC]] : memref<4x2xf32, 3>
-  %2 = linalg.generic {
-    indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
-                     affine_map<(d0, d1) -> (d0)>],
-    iterator_types = ["parallel", "reduction"]}
-    ins(%arg : tensor<8x64xf32>) outs(%1 : tensor<8xf32>) {
-      ^bb0(%arg3: f32, %arg4: f32):
-        %3 = arith.addf %arg3, %arg4 : f32
-        linalg.yield %3 : f32
-      } -> tensor<8xf32>
-  return %2 : tensor<8xf32>
-}
+
 
 //      EXEC: result[0]: hal.buffer_view
 // EXEC-NEXT: 8xf32=64 64 64 64 64 64 64 64
