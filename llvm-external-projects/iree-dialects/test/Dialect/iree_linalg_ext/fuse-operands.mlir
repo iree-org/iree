@@ -16,7 +16,7 @@ module {
 
     %2 = affine.apply #map0()[%arg0]
     // CHECK: scf.foreach_thread
-    %3 = scf.foreach_thread (%arg3) in (%2) -> (tensor<64xf32>) {
+    %3 = scf.foreach_thread (%arg3) in (%2) shared_outs(%O = %arg2) -> (tensor<64xf32>) {
       // CHECK:    %[[OFFSET:.*]] = affine.apply
       // CHECK:    %[[SIZE:.*]] = affine.min
       %4 = affine.apply #map1(%arg3)[%arg0]
@@ -32,7 +32,7 @@ module {
       // CHECK:    %[[T4:.*]] = linalg.elemwise_unary ins(%[[T1]] {{.*}} outs(%[[T3]]
       %8 = linalg.elemwise_unary ins(%6 : tensor<?xf32>) outs(%7 : tensor<?xf32>) -> tensor<?xf32>
       scf.foreach_thread.perform_concurrently {
-        tensor.parallel_insert_slice %8 into %arg2[%4] [%5] [1] : tensor<?xf32> into tensor<64xf32>
+        tensor.parallel_insert_slice %8 into %O[%4] [%5] [1] : tensor<?xf32> into tensor<64xf32>
       }
     }
     func.return %3 : tensor<64xf32>
@@ -79,7 +79,7 @@ module {
     %d0 = tensor.dim %arg1, %c0 : tensor<?xf32>
     %1 = affine.apply #map0()[%d0, %arg0]
     // CHECK: scf.foreach_thread
-    %2 = scf.foreach_thread (%arg3) in (%1)  -> (tensor<?xf32>) {
+    %2 = scf.foreach_thread (%arg3) in (%1) shared_outs(%O = %arg2) -> (tensor<?xf32>) {
       // CHECK:    %[[OFFSET:.*]] = affine.apply
       // CHECK:    %[[SIZE:.*]] = affine.min
       %3 = affine.apply #map1(%arg3)[%arg0]
@@ -93,7 +93,7 @@ module {
       // CHECK:    %[[T2:.*]] = linalg.elemwise_unary ins(%[[T1]]
       %7 = linalg.elemwise_unary ins(%6 : tensor<?xf32>) outs(%5 : tensor<?xf32>) -> tensor<?xf32>
       scf.foreach_thread.perform_concurrently {
-        tensor.parallel_insert_slice %7 into %arg2[%3] [%4] [1] : tensor<?xf32> into tensor<?xf32>
+        tensor.parallel_insert_slice %7 into %O[%3] [%4] [1] : tensor<?xf32> into tensor<?xf32>
       }
     }
     func.return %2 : tensor<?xf32>

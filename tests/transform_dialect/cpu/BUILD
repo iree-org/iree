@@ -6,35 +6,36 @@
 
 # Tests for end-to-end IREE support of entire models or their close derivatives.
 
-load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
+# load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 
 package(
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
 )
 
-iree_lit_test_suite(
-    name = "lit",
-    srcs = ["matmul.mlir"],
-    cfg = "//tests:lit.cfg.py",
-    # transform dialect spec files are MLIR files that specify a transformation,
-    # they need to be included as data.
-    data = [
-        "matmul_codegen_spec.mlir",
-        "matmul_dispatch_spec.mlir",
-        "matmul_tiled_dispatch_spec.mlir",
-    ],
-    tags = [
-        "noasan",
-        "nomsan",
-        "notsan",
-        "noubsan",
-    ],
-    tools = [
-        "//tools:iree-benchmark-module",
-        "//tools:iree-compile",
-        "//tools:iree-opt",
-        "//tools:iree-run-module",
-        "@llvm-project//llvm:FileCheck",
-    ],
-)
+# TODO(#10309): Enable the test
+# iree_lit_test_suite(
+#     name = "lit",
+#     srcs = ["matmul.mlir"],
+#     cfg = "//tests:lit.cfg.py",
+#     # transform dialect spec files are MLIR files that specify a transformation,
+#     # they need to be included as data.
+#     data = [
+#         "matmul_codegen_spec.mlir",
+#         "matmul_dispatch_spec.mlir",
+#         "matmul_tiled_dispatch_spec.mlir",
+#     ],
+#     tags = [
+#         "noasan",
+#         "nomsan",
+#         "notsan",
+#         "noubsan",
+#     ],
+#     tools = [
+#         "//tools:iree-benchmark-module",
+#         "//tools:iree-compile",
+#         "//tools:iree-opt",
+#         "//tools:iree-run-module",
+#         "@llvm-project//llvm:FileCheck",
+#     ],
+# )

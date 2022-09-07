@@ -7,7 +7,7 @@
 # Tests for end-to-end IREE support of entire models or their close derivatives.
 
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content")
-load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
+# load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 
 package(
     features = ["layering_check"],
@@ -23,34 +23,35 @@ endif()
     inline = True,
 )
 
-iree_lit_test_suite(
-    name = "lit",
-    srcs = [
-        "reduction.mlir",
-        "softmax.mlir",
-    ],
-    cfg = "//tests:lit.cfg.py",
-    # transform dialect spec files are MLIR files that specify a transformation,
-    # they need to be included as data.
-    data = [
-        "reduction_codegen_spec.mlir",
-        "reduction_dispatch_spec.mlir",
-        "softmax_codegen_spec.mlir",
-        "softmax_dispatch_spec.mlir",
-    ],
-    tags = [
-        # CUDA cuInit fails with sanitizer on.
-        "noasan",
-        "nomsan",
-        "notsan",
-        "noubsan",
-        "requires-gpu-nvidia",
-        "driver=cuda",
-    ],
-    tools = [
-        "//tools:iree-compile",
-        "//tools:iree-opt",
-        "//tools:iree-run-module",
-        "@llvm-project//llvm:FileCheck",
-    ],
-)
+# TODO(#10309): Enable the test
+# iree_lit_test_suite(
+#     name = "lit",
+#     srcs = [
+#         "reduction.mlir",
+#         "softmax.mlir",
+#     ],
+#     cfg = "//tests:lit.cfg.py",
+#     # transform dialect spec files are MLIR files that specify a transformation,
+#     # they need to be included as data.
+#     data = [
+#         "reduction_codegen_spec.mlir",
+#         "reduction_dispatch_spec.mlir",
+#         "softmax_codegen_spec.mlir",
+#         "softmax_dispatch_spec.mlir",
+#     ],
+#     tags = [
+#         # CUDA cuInit fails with sanitizer on.
+#         "noasan",
+#         "nomsan",
+#         "notsan",
+#         "noubsan",
+#         "requires-gpu-nvidia",
+#         "driver=cuda",
+#     ],
+#     tools = [
+#         "//tools:iree-compile",
+#         "//tools:iree-opt",
+#         "//tools:iree-run-module",
+#         "@llvm-project//llvm:FileCheck",
+#     ],
+# )
