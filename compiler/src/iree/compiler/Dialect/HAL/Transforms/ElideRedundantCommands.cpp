@@ -87,6 +87,15 @@ using CommandBufferStateMap = DenseMap<Value, CommandBufferState>;
 
 }  // namespace
 
+// XXX(#10329): The behavior of bitEnumContains was changed in
+// https://github.com/llvm/llvm-project/commit/839b436c93604e042f74050cf2adadd75f30e898
+// This is a workaounrd to keep the same behavior.
+inline static bool legacyBitEnumContains(
+    IREE::HAL::ExecutionStageBitfield bits,
+    IREE::HAL::ExecutionStageBitfield bit) {
+  return (static_cast<uint32_t>(bits) & static_cast<uint32_t>(bit)) != 0;
+}
+
 static void processOp(IREE::HAL::CommandBufferExecutionBarrierOp op,
                       CommandBufferState &state) {
   if (state.previousFullBarrier) {
@@ -98,14 +107,14 @@ static void processOp(IREE::HAL::CommandBufferExecutionBarrierOp op,
 
   // See if this is a full barrier. These are all we emit today so this simple
   // analysis can remain simple by pattern matching.
-  if (bitEnumContains(op.getSourceStageMask(),
-                      IREE::HAL::ExecutionStageBitfield::CommandRetire |
-                          IREE::HAL::ExecutionStageBitfield::Transfer |
-                          IREE::HAL::ExecutionStageBitfield::Dispatch) &&
-      bitEnumContains(op.getTargetStageMask(),
-                      IREE::HAL::ExecutionStageBitfield::CommandRetire |
-                          IREE::HAL::ExecutionStageBitfield::Transfer |
-                          IREE::HAL::ExecutionStageBitfield::Dispatch)) {
+  if (legacyBitEnumContains(op.getSourceStageMask(),
+                            IREE::HAL::ExecutionStageBitfield::CommandRetire |
+                                IREE::HAL::ExecutionStageBitfield::Transfer |
+                                IREE::HAL::ExecutionStageBitfield::Dispatch) &&
+      legacyBitEnumContains(op.getTargetStageMask(),
+                            IREE::HAL::ExecutionStageBitfield::CommandRetire |
+                                IREE::HAL::ExecutionStageBitfield::Transfer |
+                                IREE::HAL::ExecutionStageBitfield::Dispatch)) {
     state.previousFullBarrier = op;
   } else {
     state.previousFullBarrier = {};
