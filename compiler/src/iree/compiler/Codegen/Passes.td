@@ -110,6 +110,9 @@ def TileAndDistributeToWorkgroups :
     Pass<"iree-codegen-tile-and-distribute-to-workgroups", "IREE::HAL::ExecutableVariantOp"> {
   let summary = "Tile and distribute operations to workgroups";
   let constructor = "mlir::iree_compiler::createTileAndDistributeToWorkgroupsPass()";
+  let options = [
+    Option<"specialize", "specialize", "bool", "true", "Specialize the tiled loops with the tile sizes.">
+  ];
 }
 
 def TypePropagation :
