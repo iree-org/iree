@@ -25,7 +25,7 @@ def TMTensorInterface : OpInterface<"TMTensorOp"> {
         Return the input shape operands.
       }],
       /*retTy=*/"ValueRange",
-      /*methodName=*/"inputs",
+      /*methodName=*/"getInputs",
       /*args=*/(ins)
     >,
     // These special methods rely on `inputs` and `outputs` being defined by
@@ -39,7 +39,7 @@ def TMTensorInterface : OpInterface<"TMTensorOp"> {
       /*args=*/(ins),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
-        return $_op.inputs().size();
+        return $_op.getInputs().size();
       }]
     >,
     // `outputs` must be defined by each op that wants to implement the
@@ -49,7 +49,7 @@ def TMTensorInterface : OpInterface<"TMTensorOp"> {
         Return the output shape operands.
       }],
       /*retTy=*/"ValueRange",
-      /*methodName=*/"outputs",
+      /*methodName=*/"getOutputs",
       /*args=*/(ins)
     >,
     InterfaceMethod<
@@ -61,7 +61,7 @@ def TMTensorInterface : OpInterface<"TMTensorOp"> {
       /*args=*/(ins),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
-        return $_op.outputs().size();
+        return $_op.getOutputs().size();
       }]
     >,
     InterfaceMethod<
