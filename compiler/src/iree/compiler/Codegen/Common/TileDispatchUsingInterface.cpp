@@ -283,10 +283,8 @@ struct TilingResult {
   SmallVector<OpFoldResult> tileOffsets;
   // tile sizes for the input loop range
   SmallVector<OpFoldResult> tileSizes;
-  // tile sizes requested for the input loop range
-  SmallVector<Value> requestedTileSizes;
 
-  // The result information
+  // The information about the tiled loops
   //
   // tiled loops.
   SmallVector<scf::ForOp> loops;
@@ -313,11 +311,6 @@ struct TilingResult {
     llvm::errs() << "\ntileSizes:\n";
     for (auto tileSize : tileSizes) {
       tileSize.dump();
-    }
-
-    llvm::errs() << "\nrequestedTileSizes:\n";
-    for (auto size : requestedTileSizes) {
-      size.dump();
     }
 
     llvm::errs() << "# of loops = " << loops.size() << "\n";
@@ -703,7 +696,6 @@ FailureOr<TilingResult> TileDispatchUsingSCFForOp::returningMatchAndRewrite(
     });
     std::swap(tilingResult.tileOffsets, offsets);
     std::swap(tilingResult.tileSizes, sizes);
-    std::swap(tilingResult.requestedTileSizes, tileSizeVector);
   }
 
   // Update the filter.
