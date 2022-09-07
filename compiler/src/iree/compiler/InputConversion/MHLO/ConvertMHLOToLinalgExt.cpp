@@ -198,9 +198,6 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
   /// * Scatter dims to operand dims order: (0, ... , n)
   /// * Inserted window dims order: (0, ... , d)
   /// * Update window dims order: (d + 1, ... , m)
-  ///
-  /// TODO(hanchung): Add a pattern for legalizing mhlo.scatter to canonical
-  /// form to MHLOToMHLOPreprocessingPass.
   static bool hasCanonicalDimensionNumbers(mhlo::ScatterOp op) {
     auto dimNumbers = op.scatter_dimension_numbers();
     auto indicesType = op.scatter_indices().getType().cast<ShapedType>();
@@ -209,15 +206,10 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
     auto indexDepth = indicesType.getShape().back();
     auto scatterDimsToOperandDims = dimNumbers.getScatterDimsToOperandDims();
 
-    // When the indices have an implicit trailing dim, the last dim is the index
-    // depth.
-    if (indexVectorDim == indicesRank) {
-      if (indicesRank < 1) return false;
-    } else {
-      if (indicesRank < 2) return false;
-      if (indexVectorDim != indicesRank - 1) return false;
-      if (scatterDimsToOperandDims.size() != indexDepth) return false;
-    }
+    if (indicesRank != 2) return false;
+    if (indexVectorDim != indicesRank - 1) return false;
+    if (scatterDimsToOperandDims.size() != indexDepth) return false;
+
     for (auto en : llvm::enumerate(scatterDimsToOperandDims)) {
       if (en.index() != en.value()) return false;
     }
@@ -227,87 +219,12 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
       if (en.index() != en.value()) return false;
     }
 
+    // Check that there is only one batch dimension in the updates.
     for (auto en : llvm::enumerate(dimNumbers.getUpdateWindowDims())) {
-      if (en.index() + insertedWindowDims.size() != en.value()) return false;
+      if (en.index() + 1 != en.value()) return false;
     }
 
     return true;
-  }
-
-  static Value insertImplicitTrailingDimIfNeeded(
-      mhlo::ScatterOp op, ConversionPatternRewriter &rewriter,
-      OpAdaptor adaptor) {
-    auto scatterIndices = adaptor.scatter_indices();
-    auto scatterDims = adaptor.scatter_dimension_numbers();
-    auto indicesType = scatterIndices.getType().cast<ShapedType>();
-    auto indicesShape = indicesType.getShape();
-    auto indicesRank = indicesType.getRank();
-    auto indexVectorDim = scatterDims.getIndexVectorDim();
-
-    if (indexVectorDim == indicesRank) {
-      SmallVector<ReassociationExprs, 4> reassociationMap;
-      reassociationMap.resize(indicesRank);
-      SmallVector<int64_t> newShape;
-      for (int i = 0; i < indicesRank; i++) {
-        reassociationMap[i].push_back(rewriter.getAffineDimExpr(i));
-        newShape.push_back(indicesShape[i]);
-      }
-      reassociationMap[indicesRank - 1].push_back(
-          rewriter.getAffineDimExpr(indicesRank));
-      newShape.push_back(1);
-      Type newType =
-          RankedTensorType::get(newShape, indicesType.getElementType());
-      return rewriter
-          .create<tensor::ExpandShapeOp>(op.getLoc(), newType, scatterIndices,
-                                         reassociationMap)
-          .getResult();
-    }
-    return scatterIndices;
-  }
-
-  static SmallVector<int64_t> getTiedResultOperandIndices(ValueRange operands) {
-    // Mark linalg_ext.scatter::orinigal as readwrite tensor.
-    return {0};
-  }
-
-  static LogicalResult collapseBatchDimsIfNeeded(Value &indices, Value &updates,
-                                                 ImplicitLocOpBuilder &b) {
-    auto indicesType = indices.getType().cast<ShapedType>();
-    auto updatesType = updates.getType().cast<ShapedType>();
-    if (indicesType.getRank() == 2) return success();
-
-    int64_t batchSize = 1;
-    auto indicesRank = indicesType.getRank();
-    auto shape = indicesType.getShape();
-    for (auto i : shape.drop_back(1)) {  // drop index_detph_dim
-      if (i == ShapedType::kDynamicSize) {
-        batchSize = ShapedType::kDynamicSize;
-      } else if (batchSize != ShapedType::kDynamicSize) {
-        batchSize *= i;
-      }
-    }
-
-    SmallVector<ReassociationIndices> map;
-    map.emplace_back(
-        llvm::to_vector<4>(llvm::seq<int64_t>(0, indicesRank - 1)));
-    map.emplace_back(1, indicesRank - 1);
-    auto resultType = RankedTensorType::get({batchSize, shape.back()},
-                                            indicesType.getElementType());
-    indices = b.create<tensor::CollapseShapeOp>(resultType, indices, map);
-
-    auto updateShape = updatesType.getShape().drop_front(shape.size() - 1);
-    SmallVector<int64_t> collapsedUpdateShape = {batchSize};
-    collapsedUpdateShape.append(updateShape.begin(), updateShape.end());
-    resultType = RankedTensorType::get(collapsedUpdateShape,
-                                       updatesType.getElementType());
-    // The batching dims are identical.
-    map.pop_back();
-    for (auto i : llvm::seq<int64_t>(indicesRank - 1, updatesType.getRank())) {
-      map.emplace_back(1, i);
-    }
-    updates = b.create<tensor::CollapseShapeOp>(resultType, updates, map);
-
-    return success();
   }
 
   LogicalResult matchAndRewrite(
@@ -322,12 +239,8 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
     ImplicitLocOpBuilder b(op.getLoc(), rewriter);
 
     Value original = adaptor.operands().front();
-    Value indices = insertImplicitTrailingDimIfNeeded(op, rewriter, adaptor);
+    Value indices = adaptor.scatter_indices();
     Value updates = adaptor.updates().front();
-
-    if (failed(collapseBatchDimsIfNeeded(indices, updates, b))) {
-      return failure();
-    }
 
     auto scatterOp = rewriter.create<IREE::LinalgExt::ScatterOp>(
         op.getLoc(), op->getResultTypes(), ValueRange{updates, indices},
