@@ -22,9 +22,9 @@ iree_c_embed_data(
   SRCS
     "${IREE_CUDA_LIBDEVICE_PATH}"
   C_FILE_OUTPUT
-    "libdevice.c"
+    "cuda_libdevice.c"
   H_FILE_OUTPUT
-    "libdevice.h"
+    "cuda_libdevice.h"
   FLATTEN
   PUBLIC
 )

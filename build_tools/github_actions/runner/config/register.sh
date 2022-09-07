@@ -120,4 +120,4 @@ declare -a args=(
 # functionality.
 (set -x; : Running configuration with additional args: "${args[@]}")
 
-~runner/actions-runner/config.sh --token "${REGISTER_TOKEN}" "${args[@]}"
+/runner-root/actions-runner/config.sh --token "${REGISTER_TOKEN}" "${args[@]}"

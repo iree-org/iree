@@ -25,7 +25,7 @@ module {
     // CHECK: %[[C1:.*]] = arith.constant 1 : index
     // CHECK: %[[M:.*]] = memref.dim %{{.*}}, %{{.*}} : memref<?xf32>
     // CHECK: scf.for %[[IV:.*]] = {{.*}} step %[[C1]] {
-    scf.foreach_thread (%arg3) in (%1) -> () {
+    scf.foreach_thread (%arg3) in (%1) shared_outs() -> () {
         %3 = affine.apply #map1(%arg3)[%arg0]
         %4 = affine.apply #map2(%0, %3)
         %5 = affine.min #map3(%4, %arg0)

@@ -23,8 +23,9 @@ ALLOWED_EVENTS=(
 
 if ! is_contained "${GITHUB_EVENT_NAME}" "${ALLOWED_EVENTS[@]}"; then
   echo "Event type '${GITHUB_EVENT_NAME}' is not allowed on this runner. Aborting workflow."
-  # clean up any nefarious stuff we may have fetched in job setup
-  cd /home/runner/actions-runner/_work
-  rm -rf _actions/ _temp/
+  # clean up any nefarious stuff we may have fetched in job setup. This
+  # shouldn't be necessary with ephemeral runners, but shouldn't hurt either.
+  cd /runner-root/actions-runner/_work
+  rm -rfv _actions/ _temp/
   exit 1
 fi

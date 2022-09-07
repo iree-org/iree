@@ -88,6 +88,7 @@ static void createAsyncGroups(func::FuncOp funcOp) {
           writeOp.getSource(), writeOp.getIndices(), readOp.getSource(),
           readOp.getIndices(),
           builder.getIndexAttr(readOp.getVectorType().getNumElements()),
+          Value(),
           /*bypassL1=*/llvmgpuUseMMASync ? builder.getUnitAttr() : UnitAttr());
       tokens.push_back(token);
     }
