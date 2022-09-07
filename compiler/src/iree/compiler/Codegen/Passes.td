@@ -111,7 +111,7 @@ def TileAndDistributeToWorkgroups :
   let summary = "Tile and distribute operations to workgroups";
   let constructor = "mlir::iree_compiler::createTileAndDistributeToWorkgroupsPass()";
   let options = [
-    Option<"specialize", "specialize", "bool", "true", "Specialize the tiled loops with the tile sizes.">
+    Option<"specialize", "specialize", "bool", "false", "Specialize the tiled loops with the tile sizes.">
   ];
 }
 
