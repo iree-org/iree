@@ -5,7 +5,7 @@ After=network.target
 [Service]
 User=runner
 Group=runner
-ExecStart=/home/runner/config/start.sh
+ExecStart=/runner-root/config/start.sh
 Restart=no
 KillMode=process
 KillSignal=SIGTERM
