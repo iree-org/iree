@@ -302,45 +302,45 @@ struct TilingResult {
   SmallVector<OpFoldResult> boundedSizesForLoops;
 
   void dump() {
-    llvm::dbgs() << "<TilingResult>\n"
+    llvm::errs() << "<TilingResult>\n"
                  << "tiledOp =\n";
     if (tiledOp) {
       tiledOp->dump();
-      llvm::dbgs() << "\n";
+      llvm::errs() << "\n";
     } else {
-      llvm::dbgs() << "nullptr\n";
+      llvm::errs() << "nullptr\n";
     }
 
-    llvm::dbgs() << "\ntileOffsets:\n";
+    llvm::errs() << "\ntileOffsets:\n";
     for (auto tileOffset : tileOffsets) {
       tileOffset.dump();
     }
 
-    llvm::dbgs() << "\ntileSizes:\n";
+    llvm::errs() << "\ntileSizes:\n";
     for (auto tileSize : tileSizes) {
       tileSize.dump();
     }
 
-    llvm::dbgs() << "\nrequestedTileSizes:\n";
+    llvm::errs() << "\nrequestedTileSizes:\n";
     for (auto size : requestedTileSizes) {
       size.dump();
     }
 
-    llvm::dbgs() << "# of loops = " << loops.size() << "\n";
+    llvm::errs() << "# of loops = " << loops.size() << "\n";
     if (!loops.empty()) {
       loops[0].dump();
     }
 
-    llvm::dbgs() << "\ntileSizesForLoops:\n";
+    llvm::errs() << "\ntileSizesForLoops:\n";
     for (auto size : tileSizesForLoops) {
       size.dump();
     }
 
-    llvm::dbgs() << "\nboundedSizesForLoops:\n";
+    llvm::errs() << "\nboundedSizesForLoops:\n";
     for (auto size : boundedSizesForLoops) {
       size.dump();
     }
-    llvm::dbgs() << "</TilingResult>\n";
+    llvm::errs() << "</TilingResult>\n";
   }
 };
 
@@ -488,9 +488,9 @@ static LogicalResult specializeDistributionLoops(TilingResult &tilingResult,
       continue;
     }
     LLVM_DEBUG({
-      llvm::dbgs() << "Replacing ";
+      llvm::errs() << "Replacing ";
       minOp.dump();
-      llvm::dbgs() << "with ";
+      llvm::errs() << "with ";
       constantOps[i].dump();
     });
     rewriter.replaceOp(minOp, constantOps[i]);
