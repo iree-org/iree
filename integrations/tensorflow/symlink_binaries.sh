@@ -23,8 +23,7 @@ function symlink_import_binary() {
   if [ -f "${import_binary}" ]; then
     local to="${SCRIPT_DIR}/python_projects/iree_${type}/iree/tools/${type}"
     local from="$(realpath --no-symlinks --relative-to=${to} --relative-base="${ROOT_DIR}" "${import_binary}")"
-    ln -svf "${from}" "${to}"
-    ls -lht --color "${to}/iree-import-${type}"
+    ln --symbolic --verbose --force "${from}" "${to}"
   fi
 }
 
