@@ -40,13 +40,6 @@ on:
         required: true
         type: string
 
-concurrency:
-  # A PR number if a pull request and otherwise the commit hash. This cancels
-  # queued and in-progress runs for the same PR (presubmit) or commit
-  # (postsubmit).
-  group: ${{ github.event.number || github.sha }}
-  cancel-in-progress: true
-
 jobs:
   build_benchmark_suites:
     runs-on:
