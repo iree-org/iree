@@ -15,7 +15,7 @@
 hal.executable.source public @executable {
   hal.executable.export public @abs layout(#pipeline_layout) {
   ^bb0(%arg0: !hal.device):
-    %x, %y, %z = flow.dispatch.default_workgroup_count
+    %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root
     hal.return %x, %y, %z : index, index, index
   }
   builtin.module {
