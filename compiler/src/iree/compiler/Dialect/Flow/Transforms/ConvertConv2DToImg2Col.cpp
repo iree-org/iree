@@ -11,6 +11,7 @@
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -18,6 +19,11 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace Flow {
+
+static bool hasAllOneValues(DenseIntElementsAttr attr) {
+  return llvm::all_of(
+      attr, [](APInt element) { return element.getSExtValue() == 1; });
+}
 
 namespace {
 
@@ -65,17 +71,15 @@ class ConvertConv2DNhwcHwcf final
     auto filterType = convOp.getInputs()[1].getType().cast<ShapedType>();
     auto outputType = convOp.getOutputs()[0].getType().cast<ShapedType>();
 
-    if (!filterType.hasStaticShape() || !inputType.hasStaticShape())
+    if (!filterType.hasStaticShape() || !inputType.hasStaticShape()) {
       return failure();
+    }
 
     // TODO: Support for batched version.
     if (inputType.getShape()[0] > 1) return failure();
 
-    // TODO: Support padding & dilation.
-    if (!llvm::all_of(convOp.getDilations(), [](APInt element) {
-          return element.getSExtValue() == 1;
-        }))
-      return failure();
+    // TODO: Support dilation.
+    if (!hasAllOneValues(convOp.getDilations())) return failure();
 
     Value input = convOp.getInputs()[0];
     Value filter = convOp.getInputs()[1];
@@ -182,14 +186,12 @@ class ConvertDepthwiseConv2DNhwcHwc final
     auto filterType = convOp.getInputs()[1].getType().cast<RankedTensorType>();
     auto outputType = convOp.getOutputs()[0].getType().cast<RankedTensorType>();
 
-    if (!filterType.hasStaticShape() || !inputType.hasStaticShape())
+    if (!filterType.hasStaticShape() || !inputType.hasStaticShape()) {
       return failure();
+    }
 
-    // TODO: Support padding & dilation.
-    if (!llvm::all_of(convOp.getDilations(), [](APInt element) {
-          return element.getSExtValue() == 1;
-        }))
-      return failure();
+    // TODO: Support dilation.
+    if (!hasAllOneValues(convOp.getDilations())) return failure();
 
     auto loc = convOp.getLoc();
 
