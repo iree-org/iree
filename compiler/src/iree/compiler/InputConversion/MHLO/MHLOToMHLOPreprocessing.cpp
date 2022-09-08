@@ -495,7 +495,7 @@ struct ScatterOpImplicitBatch : public OpRewritePattern<mhlo::ScatterOp> {
     auto indices = op.scatter_indices();
     auto indicesTy = indices.getType().cast<ShapedType>();
 
-    // Check whether indices
+    // Check whether indices has no batch dimension.
     if (!indicesTy.hasRank()) return failure();
     if (indicesTy.getRank() != 1 && indexVectorDim != 0) {
       return rewriter.notifyMatchFailure(op,
