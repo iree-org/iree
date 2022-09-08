@@ -72,6 +72,7 @@ args=(
   -DIREE_ENABLE_ASSERTIONS=ON
   -DIREE_BUILD_COMPILER=OFF
   -DIREE_BUILD_SAMPLES=ON
+  -DIREE_ENABLE_CPUINFO=OFF
 )
 
 if [[ "${RISCV_CONFIG?}" == "rv64" ]]; then
@@ -92,3 +93,7 @@ fi
 args_str=$(IFS=' ' ; echo "${args[*]}")
 "${CMAKE_BIN?}" ${args_str} "${ROOT_DIR?}"
 "${CMAKE_BIN?}" --build "${BUILD_RISCV_DIR?}" -- -k 0
+
+if [[ "${RISCV_CONFIG?}" == "rv64" ]]; then
+  "${CMAKE_BIN?}" --build "${BUILD_RISCV_DIR?}" --target iree-test-deps -- -k 0
+fi

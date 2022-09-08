@@ -95,6 +95,11 @@ case "${BUILD_PRESET}" in
     ;;
 esac
 
-args_str=$(IFS=' ' ; echo "${args[*]}")
-"${CMAKE_BIN}" ${args_str} "${ROOT_DIR}"
+"${CMAKE_BIN}" "${args[@]}" "${ROOT_DIR}"
 "${CMAKE_BIN}" --build "${BUILD_RISCV_DIR}" -- -k 0
+
+if [[ "${RISCV_ARCH}" == "rv64" ]]; then
+  echo "Building test deps for RISC-V"
+  echo "-----------------------------"
+  "${CMAKE_BIN}" --build "${BUILD_RISCV_DIR}" --target iree-test-deps -- -k 0
+fi

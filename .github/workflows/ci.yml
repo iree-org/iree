@@ -639,7 +639,7 @@ jobs:
             --env "LLVM_BIN_DIR=${BUILD_DIR}/third_party/llvm-project/llvm/bin" \
             gcr.io/iree-oss/riscv@sha256:720bc0215d8462ea14352edc22710a6ce4c0c1daff581d179dd173885f1d8a35 \
             bash -euo pipefail -c \
-              "./build_tools/cmake/build_riscv.sh && ./tests/riscv64/smoke.sh"
+              "./build_tools/cmake/build_riscv.sh && ./build_tools/cmake/test_riscv64.sh"
 
   build_benchmark_tools:
     needs: [setup, build_all]

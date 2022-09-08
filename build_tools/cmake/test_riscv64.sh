@@ -6,7 +6,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Test the cross-compiled RISCV targets using Kokoro.
+# Test the cross-compiled RISCV 64-bit Linux targets.
 
 set -xeuo pipefail
 
@@ -73,3 +73,10 @@ generate_llvm_cpu_vmfb tosa-rvv \
 
 ${PYTHON_BIN} "${ROOT_DIR}/third_party/llvm-project/llvm/utils/lit/lit.py" \
   -v --path "${LLVM_BIN_DIR}" "${ROOT_DIR}/tests/riscv64"
+
+# Test e2e models. Excluding mobilebert for now.
+ctest --test-dir ${BUILD_RISCV_DIR}/tests/e2e/models -R llvm-cpu_local-task_mobilenet -E bert
+# Test all tosa ops
+ctest --test-dir ${BUILD_RISCV_DIR}/tests/e2e/tosa_ops -R check_llvm-cpu_local-task
+# Test all xla ops except fp16, which is not supported properly
+ctest --test-dir ${BUILD_RISCV_DIR}/tests/e2e/xla_ops -R check_llvm-cpu_local-task -E fp16
