@@ -30,12 +30,12 @@ IREE::LinalgExt::detail::verifyLinalgExtOpInterface(Operation *op) {
           "expected inputs and outputs to be RankedTensorType or scalar");
     }
 
-    if (op->getNumResults() != linalgExtOp.outputs().size()) {
+    if (op->getNumResults() != linalgExtOp.getNumOutputs()) {
       return linalgExtOp.emitOpError(
           "expected number of outputs to be same as the number of results");
     }
     for (auto en : llvm::enumerate(op->getResultTypes())) {
-      Type outputType = linalgExtOp.outputs()[en.index()].getType();
+      Type outputType = linalgExtOp.getOutputs()[en.index()].getType();
       if (en.value() != outputType) {
         return linalgExtOp.emitOpError("expected type of `outs` operand #")
                << en.index() << " " << outputType
@@ -68,7 +68,7 @@ static void getDimValues(OpBuilder &b, Location loc, Value v, Ty t,
 LogicalResult LinalgExtOp::reifyResultShapes(
     OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
   Operation *op = getOperation();
-  for (auto output : outputs()) {
+  for (auto output : getOutputs()) {
     SmallVector<Value> dims;
     Type outputType = output.getType();
     if (auto rankedTensorType = outputType.dyn_cast<RankedTensorType>()) {

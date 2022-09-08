@@ -186,8 +186,8 @@ computeParallelTopk(Location loc, PatternRewriter &rewriter,
       parallelTopkResultTypes,
       /*ins=*/parallelTopkIns,
       /*outs=*/parallelTopkOuts, kDimParallel);
-  rewriter.cloneRegionBefore(topkOp.region(), parallelTopkOp.region(),
-                             parallelTopkOp.region().end());
+  rewriter.cloneRegionBefore(topkOp.getRegion(), parallelTopkOp.getRegion(),
+                             parallelTopkOp.getRegion().end());
 
   return parallelTopkOp;
 }
@@ -262,9 +262,9 @@ TopkOp computeReductionTopk(Location loc, PatternRewriter &rewriter,
           loc,
           /*resultTypes=*/topkOp->getResultTypes(),
           /*ins=*/ValueRange{valuesCollapsed, indicesCollapsed},
-          /*outs=*/topkOp.outputs(), kDimOrig);
-  rewriter.cloneRegionBefore(topkOp.region(), reductionTopkOp.region(),
-                             reductionTopkOp.region().end());
+          /*outs=*/topkOp.getOutputs(), kDimOrig);
+  rewriter.cloneRegionBefore(topkOp.getRegion(), reductionTopkOp.getRegion(),
+                             reductionTopkOp.getRegion().end());
   return reductionTopkOp;
 }
 
@@ -310,7 +310,7 @@ struct TopkOpSplitReduction : public OpRewritePattern<TopkOp> {
     }
     Location loc = topkOp.getLoc();
     // Original reduction dimension used for the final combined reduction
-    int64_t kDimOrig = topkOp.dimension();
+    int64_t kDimOrig = topkOp.getDimension();
     // For parallel topk: the dimension that we compute parallel reductions
     int64_t splitDimParallel = kDimOrig;
     // For parallel topk: the dimension that we reduce
