@@ -16,6 +16,7 @@
 #include "iree/compiler/Codegen/Passes.h"
 #include "llvm/ADT/StringSet.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/Pass/PassManager.h"
 
 using namespace mlir;
@@ -152,8 +153,24 @@ static LogicalResult gpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
   return success();
 }
 
+void transform_dialect::IREEBufferizeOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::consumesHandle(getTarget(), effects);
+  transform::producesHandle(getResult(), effects);
+  transform::modifiesPayload(effects);
+}
+
 DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
     transform::TransformResults &results, transform::TransformState &state) {
+  ArrayRef<Operation *> payload = state.getPayloadOps(getTarget());
+  if (payload.size() != 1 ||
+      !isa<ModuleOp, HAL::ExecutableOp, HAL::ExecutableVariantOp>(
+          payload.front())) {
+    state.getTopLevel()->emitOpError(
+        "requires exactly a single HAL::ExecutableOp or "
+        "HAL::ExecutableVariantOp target op.");
+    return DiagnosedSilenceableFailure(failure());
+  }
   PassManager pm(getContext());
   // Bufferize the dispatch.
   using mlir::bufferization::BufferizationOptions;
@@ -179,6 +196,7 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
     }
     return WalkResult::advance();
   });
+  results.set(getOperation()->getOpResult(0), payload.front());
   return DiagnosedSilenceableFailure(failure(res.wasInterrupted()));
 }
 /// Populate the workgroup_count region of `dispatchOp`.
@@ -362,8 +380,9 @@ transform_dialect::ForeachThreadToWorkgroupOp::applyToOne(
     transform::TransformState &state) {
   if (!isa<HAL::ExecutableOp, HAL::ExecutableVariantOp>(state.getTopLevel())) {
     state.getTopLevel()->emitOpError(
-        "requires HAL::ExecutableOp or HAL::ExecutableVariantOp toplevel to "
-        "attach the workgroup size information to a nested ExecutableExportOp");
+        "requires HAL::ExecutableOp or HAL::ExecutableVariantOp toplevel "
+        "to attach the workgroup size information to a nested "
+        "ExecutableExportOp");
     return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
   }
 
@@ -377,8 +396,8 @@ transform_dialect::ForeachThreadToWorkgroupOp::applyToOne(
   }
   if (!exportOp.getWorkgroupCount().empty())
     return emitDefaultSilenceableFailure(target)
-           << "export op must have an empty workgroup count region that the "
-              "transform fills --- the transform is not applied";
+           << "export op must have an empty workgroup count region that "
+              "the transform fills --- the transform is not applied";
 
   scf::ForeachThreadOp topLevelForeachThreadOp;
   auto walkResult = target->walk([&](scf::ForeachThreadOp foreachThreadOp) {
