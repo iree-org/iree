@@ -9,7 +9,9 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
+#include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -18,15 +20,20 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
+static bool hasAllOneValues(DenseIntElementsAttr attr) {
+  return llvm::all_of(
+      attr, [](APInt element) { return element.getSExtValue() == 1; });
+}
+
 namespace {
 
-// clang-format off
+// Convert linalg.conv_2d_nhwc_hwcf into linalg.generic (for img2col packing)
+// and linalg.matmul.
 //
-// Convert linalg.conv_2d_nhwc_hwcf op into img2col packing
-// operation (linalg.generic) + linalg.matmul. See details below:
 // A convolution operaton can be written as a matrix-matrix multiplication by
 // unfolding the cross corrolation between input and filter and explicitly copy
 // overlapped sliding window inputs.
+//
 // Consider 2D input X with single channel input and output and 2x2 filter W:
 // [x(0, 0)  , x(0, 1)  , ...,   x(0, n)  ]
 // [x(1, 0)  , x(1, 1)  , ...,   x(1, n)  ]
@@ -34,80 +41,83 @@ namespace {
 // [.        ,  .       , .  ,      .     ]    (conv)  [w(1, 0), w(1, 1)]
 // [.        ,  .       ,   .,      .     ]
 // [x(n-1, 0), x(n-1, 1), ..., x(n-1, n-1)]
+//
 // The packed input data (img2col) is a matrix with |rows| = output spatial
 // size, |columns| = filter spatial size. To compute the output Y(i, j) we need
 // to calculate the dot product between filter window at input X(x, y)) and the
-// filter which will look like the following where r.h.s is the img2col matrix and
-// l.h.s is the flattned filter:
+// filter which will look like the following where r.h.s is the img2col matrix
+// and l.h.s is the flattned filter:
+//
+// clang-format off
 // [x(0, 0), x(0, 1), x(1, 0), x(1, 1)]
 // [x(0, 1), x(1, 1), x(0, 2), x(1, 2)] (matmul) [w(0, 0), w(0, 1), w(1, 0), w(1, 1)]
 // [x(0, 1), x(1, 1), x(0, 2), x(1, 2)]
 // [   .   ,    .   ,    .   ,    .   ]
-// In general for 2D case with (N, H, W, C) input and (Kh, Kw, C, D) filter
-// and output (N, Ho, Wo, D) the convolutin is the following matrix-matrix multiplication
-// (Ho x Wo, Kh x Kw x C) * (Kh x Kw x C, D) for each input in the N input.
-// For the case where N > 1 its a batched matrxi-matrix multplication.
-//
 // clang-format on
-class Conv2DImg2ColMatmulConversion
+//
+// In general for 2D case with (N, H, W, C) input and (Kh, Kw, C, D) filter
+// and output (N, Ho, Wo, D) the convolutin is the following matrix-matrix
+// multiplication (Ho x Wo, Kh x Kw x C) * (Kh x Kw x C, D) for each input in
+// the N input. For the case where N > 1 its a batched matrxi-matrix
+// multplication.
+class ConvertConv2DNhwcHwcf final
     : public OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
  public:
-  using OpRewritePattern<linalg::Conv2DNhwcHwcfOp>::OpRewritePattern;
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::Conv2DNhwcHwcfOp convOp,
                                 PatternRewriter &rewriter) const override {
-    ShapedType inputShapeType =
-        convOp.getInputOperand(0)->get().getType().cast<ShapedType>();
-    ShapedType filterShapeType =
-        convOp.getInputOperand(1)->get().getType().cast<ShapedType>();
-    ShapedType outputShapeType =
-        convOp.getOutputOperand(0)->get().getType().cast<ShapedType>();
+    auto inputType = convOp.getInputs()[0].getType().cast<ShapedType>();
+    auto filterType = convOp.getInputs()[1].getType().cast<ShapedType>();
+    auto outputType = convOp.getOutputs()[0].getType().cast<ShapedType>();
 
-    if (!filterShapeType || !inputShapeType) return failure();
-    if (!filterShapeType.hasStaticShape() || !inputShapeType.hasStaticShape())
+    if (!filterType.hasStaticShape() || !inputType.hasStaticShape()) {
       return failure();
+    }
 
-    Value input = convOp.getInputOperand(0)->get();
-    Value filter = convOp.getInputOperand(1)->get();
-    Value output = convOp.getOutputOperand(0)->get();
-    auto filterShape = filterShapeType.getShape();
-    auto outputShape = outputShapeType.getShape();
+    // TODO: Support for batched version.
+    if (inputType.getShape()[0] > 1) return failure();
 
-    // TODO(ataei): Support for batched version.
-    if (inputShapeType.getShape()[0] > 1) return failure();
+    // TODO: Support dilation.
+    if (!hasAllOneValues(convOp.getDilations())) return failure();
 
-    // TODO(ataei) : Support padding & dilation.
-    if (!llvm::all_of(convOp.getDilations(), [](APInt element) {
-          return element.getSExtValue() == 1;
-        }))
-      return failure();
+    Value input = convOp.getInputs()[0];
+    Value filter = convOp.getInputs()[1];
+    Value output = convOp.getOutputs()[0];
+
+    auto filterShape = filterType.getShape();
+    auto outputShape = outputType.getShape();
+
+    const int n = outputShape[0];
+    const int oh = outputShape[1];
+    const int ow = outputShape[2];
+    const int oc = outputShape[3];
+    const int fh = filterShape[0];
+    const int fw = filterShape[1];
+    const int ic = filterShape[2];
 
     auto loc = convOp.getLoc();
 
-    // col tensor shape (n, d1, d1, k1, k2, ci)
-    SmallVector<int64_t, 4> colTensorShape = {outputShape[0], outputShape[1],
-                                              outputShape[2], filterShape[0],
-                                              filterShape[1], filterShape[2]};
+    SmallVector<int64_t, 4> colTensorShape = {n, oh, ow, fh, fw, ic};
 
     Value colTensor = rewriter.create<linalg::InitTensorOp>(
-        loc, colTensorShape, inputShapeType.getElementType());
+        loc, colTensorShape, inputType.getElementType());
 
-    auto n = rewriter.getAffineDimExpr(0);
-    auto d = [&](int i) { return rewriter.getAffineDimExpr(i); };
-    auto k = [&](int i) { return rewriter.getAffineDimExpr(i + 2); };
-    auto ci = rewriter.getAffineDimExpr(5);
+    AffineExpr nDim, ohDim, owDim, khDim, kwDim, icDim;
+    bindDims(getContext(), nDim, ohDim, owDim, khDim, kwDim, icDim);
 
-    auto s = [&](unsigned i) {
-      return rewriter.getAffineConstantExpr(
-          convOp.getStrides().getValues<int64_t>()[i]);
-    };
+    auto shSym = rewriter.getAffineConstantExpr(
+        convOp.getStrides().getValues<int64_t>()[0]);
+    auto swSym = rewriter.getAffineConstantExpr(
+        convOp.getStrides().getValues<int64_t>()[1]);
 
-    SmallVector<AffineExpr, 4> inputExprs = {n, d(1) * s(0) + k(1),
-                                             d(2) * s(1) + k(2), ci};
+    SmallVector<AffineExpr, 4> inputExprs = {nDim, ohDim * shSym + khDim,
+                                             owDim * swSym + kwDim, icDim};
 
     auto nloops = colTensorShape.size();
 
-    SmallVector<StringRef, 3> loopAttributeTypes(nloops, "parallel");
+    SmallVector<StringRef, 3> loopAttributeTypes(nloops,
+                                                 getParallelIteratorTypeName());
 
     SmallVector<AffineMap, 4> indexingMaps = {
         AffineMap::get(nloops, 0, inputExprs, rewriter.getContext()),
@@ -128,17 +138,13 @@ class Conv2DImg2ColMatmulConversion
         {0, 1, 2}, {3}};
 
     auto reshapedImg2ColTensorType = RankedTensorType::get(
-        {outputShape[1] * outputShape[2],
-         filterShape[0] * filterShape[1] * filterShape[2]},
-        inputShapeType.getElementType());
+        {oh * ow, fh * fw * ic}, inputType.getElementType());
 
-    auto reshapedFilterType = RankedTensorType::get(
-        {filterShape[0] * filterShape[1] * filterShape[2], filterShape[3]},
-        inputShapeType.getElementType());
+    auto reshapedFilterType =
+        RankedTensorType::get({fh * fw * ic, oc}, inputType.getElementType());
 
     auto reshapedOutputType =
-        RankedTensorType::get({outputShape[1] * outputShape[2], outputShape[3]},
-                              outputShapeType.getElementType());
+        RankedTensorType::get({oh * ow, oc}, outputType.getElementType());
 
     Value reshapedImg2ColTensor = rewriter.create<tensor::CollapseShapeOp>(
         loc, reshapedImg2ColTensorType, img2ColTensor.getResult(0),
@@ -156,7 +162,7 @@ class Conv2DImg2ColMatmulConversion
         ArrayRef<Value>{reshapedOutput});
 
     auto reshapedResult = rewriter.create<tensor::ExpandShapeOp>(
-        loc, outputShapeType, matmulResult.getResults()[0],
+        loc, outputType, matmulResult.getResults()[0],
         filterAndOutputReassociationIndices);
 
     rewriter.replaceOp(convOp, ArrayRef<Value>{reshapedResult});
@@ -169,38 +175,28 @@ class Conv2DImg2ColMatmulConversion
 // input channles so each convolution can be a matrix-vector product and
 // by transposing both input filter so channles are outer most the computation
 // is a batched matrix-vector product.
-class DepthwiseConv2DNHWCHWCImg2ColMatmulConversion
+class ConvertDepthwiseConv2DNhwcHwc final
     : public OpRewritePattern<linalg::DepthwiseConv2DNhwcHwcOp> {
  public:
   using OpRewritePattern<linalg::DepthwiseConv2DNhwcHwcOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::DepthwiseConv2DNhwcHwcOp convOp,
                                 PatternRewriter &rewriter) const override {
-    RankedTensorType inputTensorType =
-        convOp.getInputOperand(0)->get().getType().dyn_cast<RankedTensorType>();
-    RankedTensorType filterTensorType =
-        convOp.getInputOperand(1)->get().getType().dyn_cast<RankedTensorType>();
-    RankedTensorType outputTensorType = convOp.getOutputOperand(0)
-                                            ->get()
-                                            .getType()
-                                            .dyn_cast<RankedTensorType>();
+    auto inputType = convOp.getInputs()[0].getType().cast<RankedTensorType>();
+    auto filterType = convOp.getInputs()[1].getType().cast<RankedTensorType>();
+    auto outputType = convOp.getOutputs()[0].getType().cast<RankedTensorType>();
 
-    if (!filterTensorType || !inputTensorType) return failure();
-    if (!filterTensorType.hasStaticShape() || !inputTensorType.hasStaticShape())
+    if (!filterType.hasStaticShape() || !inputType.hasStaticShape()) {
       return failure();
+    }
 
-    // TODO(ataei) : Support padding & dilation.
-    if (!llvm::all_of(convOp.getDilations(), [](APInt element) {
-          return element.getSExtValue() == 1;
-        }))
-      return failure();
+    // TODO: Support dilation.
+    if (!hasAllOneValues(convOp.getDilations())) return failure();
 
     auto loc = convOp.getLoc();
 
-    auto transposeOperand = [&](Value operand,
-                                ArrayRef<int64_t> indices) -> Value {
-      RankedTensorType operandTensorType =
-          operand.getType().cast<RankedTensorType>();
+    auto transposeOperand = [&](Value operand, ArrayRef<int64_t> indices) {
+      auto operandTensorType = operand.getType().cast<RankedTensorType>();
       auto nloops = indices.size();
       auto inputShape = operandTensorType.getShape();
 
@@ -216,7 +212,8 @@ class DepthwiseConv2DNHWCHWCImg2ColMatmulConversion
       Value outputTensor = rewriter.create<linalg::InitTensorOp>(
           loc, targetShape, operandTensorType.getElementType());
 
-      SmallVector<StringRef> loopAttributeTypes(nloops, "parallel");
+      SmallVector<StringRef> loopAttributeTypes(nloops,
+                                                getParallelIteratorTypeName());
 
       SmallVector<AffineMap> indexingMaps = {
           inversePermutation(
@@ -234,55 +231,52 @@ class DepthwiseConv2DNHWCHWCImg2ColMatmulConversion
       return transposedOp.getResult(0);
     };
 
-    Value input = convOp.getInputOperand(0)->get();
-    Value filter = convOp.getInputOperand(1)->get();
-    Value output = convOp.getOutputOperand(0)->get();
+    Value input = convOp.getInputs()[0];
+    Value filter = convOp.getInputs()[1];
+    Value output = convOp.getOutputs()[0];
 
     // Transpose input, filter so channels are outermost
-    auto transposedInput = transposeOperand(input, {0, 3, 1, 2});
-    auto transposedFilter = transposeOperand(filter, {2, 0, 1});
-    auto transposedFilterShape =
-        transposedFilter.getType().cast<RankedTensorType>().getShape();
-    auto outputShape = output.getType().cast<RankedTensorType>().getShape();
+    auto inputT = transposeOperand(input, {0, 3, 1, 2});
+    auto filterT = transposeOperand(filter, {2, 0, 1});
+    auto filterTShape = filterT.getType().cast<RankedTensorType>().getShape();
+    auto outputShape = outputType.getShape();
 
-    // Transposed output tensor shape (n, ci, d1, d2)
-    SmallVector<int64_t, 4> transposedOutputTensorShape = {
-        outputShape[0], transposedFilterShape[0], outputShape[1],
-        outputShape[2]};
+    const int n = outputShape[0];
+    const int oh = outputShape[1];
+    const int ow = outputShape[2];
+    const int c = outputShape[3];
+    const int fh = filterTShape[1];
+    const int fw = filterTShape[2];
 
-    // col tensor shape (n, ci, d1, d2, k1, k2)
-    SmallVector<int64_t, 4> colTensorShape = {
-        outputShape[0], transposedFilterShape[0], outputShape[1],
-        outputShape[2], transposedFilterShape[1], transposedFilterShape[2]};
+    SmallVector<int64_t, 4> colTensorShape = {n, c, oh, ow, fh, fw};
     Value transposedOutputTensor = transposeOperand(output, {0, 3, 1, 2});
 
-    auto n = rewriter.getAffineDimExpr(0);
-    auto ci = rewriter.getAffineDimExpr(1);
-    auto d = [&](int i) { return rewriter.getAffineDimExpr(i + 1); };
-    auto k = [&](int i) { return rewriter.getAffineDimExpr(i + 3); };
+    AffineExpr nDim, cDim, ohDim, owDim, khDim, kwDim;
+    bindDims(getContext(), nDim, cDim, ohDim, owDim, khDim, kwDim);
 
-    auto s = [&](unsigned i) {
-      return rewriter.getAffineConstantExpr(
-          convOp.getStrides().getValues<int64_t>()[i]);
-    };
+    auto shSym = rewriter.getAffineConstantExpr(
+        convOp.getStrides().getValues<int64_t>()[0]);
+    auto swSym = rewriter.getAffineConstantExpr(
+        convOp.getStrides().getValues<int64_t>()[1]);
 
-    SmallVector<AffineExpr> inputExprs = {n, ci, d(1) * s(0) + k(1),
-                                          d(2) * s(1) + k(2)};
+    SmallVector<AffineExpr> inputExprs = {nDim, cDim, ohDim * shSym + khDim,
+                                          owDim * swSym + kwDim};
 
     auto nloops = colTensorShape.size();
 
-    SmallVector<StringRef> loopAttributeTypes(nloops, "parallel");
+    SmallVector<StringRef> loopAttributeTypes(nloops,
+                                              getParallelIteratorTypeName());
 
     SmallVector<AffineMap> indexingMaps = {
         AffineMap::get(nloops, 0, inputExprs, rewriter.getContext()),
         AffineMap::getMultiDimIdentityMap(nloops, rewriter.getContext())};
 
     Value colTensor = rewriter.create<linalg::InitTensorOp>(
-        loc, colTensorShape, inputTensorType.getElementType());
+        loc, colTensorShape, inputType.getElementType());
 
     auto img2ColTensor = rewriter.create<linalg::GenericOp>(
         loc, colTensor.getType(),
-        /*inputs=*/transposedInput, /*outputs=*/colTensor, indexingMaps,
+        /*inputs=*/inputT, /*outputs=*/colTensor, indexingMaps,
         loopAttributeTypes,
         [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
           nestedBuilder.create<linalg::YieldOp>(nestedLoc, args[0]);
@@ -295,25 +289,17 @@ class DepthwiseConv2DNHWCHWCImg2ColMatmulConversion
                                                                    {2, 3}};
 
     auto reshapedImg2ColTensorType = RankedTensorType::get(
-        {outputShape[0] * transposedFilterShape[0],
-         outputShape[1] * outputShape[2],
-         transposedFilterShape[1] * transposedFilterShape[2]},
-        inputTensorType.getElementType());
-    auto reshapedFilterTensorType = RankedTensorType::get(
-        {transposedFilterShape[0],
-         transposedFilterShape[1] * transposedFilterShape[2]},
-        filterTensorType.getElementType());
-    auto reshapedOutputTensorType = RankedTensorType::get(
-        {transposedOutputTensorShape[0] * transposedOutputTensorShape[1],
-         transposedOutputTensorShape[2] * transposedOutputTensorShape[3]},
-        outputTensorType.getElementType());
+        {n * c, oh * ow, fh * fw}, inputType.getElementType());
+    auto reshapedFilterTensorType =
+        RankedTensorType::get({c, fh * fw}, filterType.getElementType());
+    auto reshapedOutputTensorType =
+        RankedTensorType::get({n * c, oh * ow}, outputType.getElementType());
 
     Value reshapedImg2ColTensor = rewriter.create<tensor::CollapseShapeOp>(
         loc, reshapedImg2ColTensorType, img2ColTensor.getResult(0),
         img2ColTensorReassociationIndices);
     Value reshapedFilterTensor = rewriter.create<tensor::CollapseShapeOp>(
-        loc, reshapedFilterTensorType, transposedFilter,
-        filterReassociationIndice);
+        loc, reshapedFilterTensorType, filterT, filterReassociationIndice);
     Value reshapedoutputTensor = rewriter.create<tensor::CollapseShapeOp>(
         loc, reshapedOutputTensorType, transposedOutputTensor,
         outputReassociationIndice);
@@ -346,8 +332,8 @@ struct ConvertConv2DToImg2ColPass
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(&getContext());
-    patterns.insert<Conv2DImg2ColMatmulConversion,
-                    DepthwiseConv2DNHWCHWCImg2ColMatmulConversion>(context);
+    patterns.insert<ConvertConv2DNhwcHwcf, ConvertDepthwiseConv2DNhwcHwc>(
+        context);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       return signalPassFailure();
