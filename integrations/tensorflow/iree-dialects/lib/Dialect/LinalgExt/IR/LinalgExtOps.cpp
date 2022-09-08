@@ -112,10 +112,10 @@ OpFoldResult IREE::LinalgExt::getDim(OpBuilder &builder, Location loc, Value v,
 //===----------------------------------------------------------------------===//
 LogicalResult ScatterOp::verify() {
   Operation *op = getOperation();
-  if (inputs().size() != 2) {
+  if (getInputs().size() != 2) {
     return op->emitOpError("expected two input operands");
   }
-  if (outputs().size() != 1) {
+  if (getOutputs().size() != 1) {
     return op->emitOpError("expected one output operand");
   }
   auto checkDimensionsMatch = [&](ShapedType t1, ShapedType t2, unsigned dim) {
@@ -188,7 +188,7 @@ LogicalResult ScatterOp::verify() {
     }
   }
 
-  Region &region = this->region();
+  Region &region = this->getRegion();
   Block *body = &region.front();
   if (body->getNumArguments() != 2) {
     return op->emitOpError("expected region to have two arguments");
@@ -228,7 +228,7 @@ LogicalResult ScatterOp::verify() {
 SmallVector<StringRef> ScatterOp::getLoopIteratorTypes() {
   SmallVector<StringRef> iteratorTypes(getUpdateType().getRank(),
                                        getParallelIteratorTypeName());
-  if (!unique_indices()) {
+  if (!getUniqueIndices()) {
     iteratorTypes[0] = getReductionIteratorTypeName();
   }
   return iteratorTypes;
@@ -246,10 +246,11 @@ SmallVector<Range> ScatterOp::getIterationDomain(OpBuilder &builder) {
   return ranges;
 }
 
-SmallVector<Operation *> ScatterOp::getTiledImplementation(
-    OpBuilder &builder, ValueRange outputs, ArrayRef<OpFoldResult> offsets,
-    ArrayRef<OpFoldResult> sizes, bool /*tileDestOperands*/) {
-  assert(outputs.size() >= 1 && offsets.size() >= 1 && sizes.size() >= 1);
+SmallVector<Operation *>
+ScatterOp::getTiledImplementation(OpBuilder &builder,
+                                  ArrayRef<OpFoldResult> offsets,
+                                  ArrayRef<OpFoldResult> sizes) {
+  assert(offsets.size() >= 1 && sizes.size() >= 1);
   Location loc = getLoc();
   auto zeroAttr = builder.getI64IntegerAttr(0);
   auto oneAttr = builder.getI64IntegerAttr(1);
@@ -283,7 +284,7 @@ SmallVector<Operation *> ScatterOp::getTiledImplementation(
   }
   auto originalRank = getOriginalType().getRank();
   SmallVector<OpFoldResult> originalStrides(originalRank, oneAttr);
-  Value tiledOriginal = getSlice(builder, loc, outputs[0], originalOffsets,
+  Value tiledOriginal = getSlice(builder, loc, original(), originalOffsets,
                                  originalSizes, originalStrides);
   assert(tiledOriginal && "failed to get slice of original tensor");
 
@@ -354,7 +355,7 @@ LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
   Value init = b.create<memref::LoadOp>(loc, original(), starts);
 
   BlockAndValueMapping bvm;
-  Block &block = region().front();
+  Block &block = getRegion().front();
   bvm.map(block.getArgument(0), update);
   bvm.map(block.getArgument(1), init);
   for (auto &blockOp : block.without_terminator()) {
@@ -381,7 +382,7 @@ LogicalResult SortOp::verify() {
     return op->emitOpError("expected at least one `outs` operand");
   }
 
-  Block &block = region().front();
+  Block &block = getRegion().front();
   size_t numOutputs = getNumOutputs();
   if (block.getNumArguments() != 2 * numOutputs) {
     return op->emitOpError("region block should have ")
@@ -389,13 +390,13 @@ LogicalResult SortOp::verify() {
   }
 
   int64_t rank = getOperandRank();
-  int sortDim = dimension();
+  int sortDim = getDimension();
   if (sortDim < 0 || sortDim >= rank) {
     return op->emitOpError("dimension must be within (0, ") << rank << "]";
   }
 
   ArrayRef<int64_t> shape = getOperandShape();
-  for (auto indexedOperand : llvm::enumerate(outputs())) {
+  for (auto indexedOperand : llvm::enumerate(getOutputs())) {
     int index = indexedOperand.index();
     auto operandType = getOperandType(index);
     if (operandType.getRank() != rank) {
@@ -433,7 +434,7 @@ SmallVector<StringRef> SortOp::getLoopIteratorTypes() {
   // All loops except the dimension to sort along are parallel.
   SmallVector<StringRef> iteratorTypes(getOperandRank(),
                                        getParallelIteratorTypeName());
-  iteratorTypes[dimension()] = getReductionIteratorTypeName();
+  iteratorTypes[getDimension()] = getReductionIteratorTypeName();
   return iteratorTypes;
 }
 
@@ -452,18 +453,18 @@ SmallVector<Range> SortOp::getIterationDomain(OpBuilder &builder) {
   return loopBounds;
 }
 
-SmallVector<Operation *> SortOp::getTiledImplementation(
-    OpBuilder &builder, ValueRange outputs, ArrayRef<OpFoldResult> offsets,
-    ArrayRef<OpFoldResult> sizes, bool /*tileDestOperands*/) {
-  assert(outputs.size() == this->outputs().size());
+SmallVector<Operation *>
+SortOp::getTiledImplementation(OpBuilder &builder,
+                               ArrayRef<OpFoldResult> offsets,
+                               ArrayRef<OpFoldResult> sizes) {
   int64_t rank = getOperandRank();
   assert(offsets.size() == static_cast<size_t>(rank) &&
          sizes.size() == static_cast<size_t>(rank));
   auto oneAttr = builder.getI64IntegerAttr(1);
   SmallVector<OpFoldResult> strides(rank, oneAttr);
   Location loc = getLoc();
-  SmallVector<Value> tiledOperands(outputs.size());
-  for (auto en : llvm::enumerate(outputs)) {
+  SmallVector<Value> tiledOperands(getOutputs().size());
+  for (auto en : llvm::enumerate(getOutputs())) {
     tiledOperands[en.index()] =
         getSlice(builder, getLoc(), en.value(), offsets, sizes, strides);
     assert(tiledOperands[en.index()] && "failed to get slice of operand");
@@ -489,7 +490,7 @@ LogicalResult SortOp::getResultTilePosition(
 
 LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
                                                    ValueRange ivs) {
-  auto sortDim = dimension();
+  auto sortDim = getDimension();
   SmallVector<Value> indices, sortBlkArgs;
   indices.append(ivs.begin(), ivs.end());
   // Bubble sort innermost loop.
@@ -518,7 +519,7 @@ LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
         }
       });
 
-  auto &srcBlock = region().front();
+  auto &srcBlock = getRegion().front();
   Region &region = scfFor.getRegion();
   BlockAndValueMapping bvm;
   {
@@ -769,9 +770,10 @@ LogicalResult FftOp::generateScalarImplementation(OpBuilder &b, Location loc,
   return success();
 }
 
-SmallVector<Operation *> FftOp::getTiledImplementation(
-    OpBuilder &builder, ValueRange outputs, ArrayRef<OpFoldResult> offsets,
-    ArrayRef<OpFoldResult> sizes, bool /*tileDestOperands*/) {
+SmallVector<Operation *>
+FftOp::getTiledImplementation(OpBuilder &builder,
+                              ArrayRef<OpFoldResult> offsets,
+                              ArrayRef<OpFoldResult> sizes) {
   int64_t rank = getOperandRank();
   SmallVector<OpFoldResult> strides(rank, builder.getI64IntegerAttr(1));
   Location loc = getLoc();
@@ -781,7 +783,7 @@ SmallVector<Operation *> FftOp::getTiledImplementation(
   tiledOperands[2] = getImagCoeff();
   SmallVector<Type, 4> resultTypes;
 
-  for (auto out : outputs) {
+  for (auto out : getOutputs()) {
     tiledOperands.push_back(
         getSlice(builder, getLoc(), out, offsets, sizes, strides));
     if (hasTensorSemantics()) {
@@ -834,7 +836,7 @@ LogicalResult ScanOp::verify() {
   }
   SmallVector<int64_t> expectedAccumulatorShape;
   for (int i = 0; i < inputType.getRank(); i++) {
-    if (i != dimension())
+    if (i != getDimension())
       expectedAccumulatorShape.push_back(inputShapes[i]);
   }
   if (llvm::any_of(llvm::zip(expectedAccumulatorShape, accumulatorShape),
@@ -881,7 +883,7 @@ SmallVector<Range> ScanOp::getIterationDomain(OpBuilder &builder) {
 SmallVector<StringRef> ScanOp::getLoopIteratorTypes() {
   SmallVector<StringRef> iteratorTypes(getOperandRank(),
                                        getParallelIteratorTypeName());
-  iteratorTypes[dimension()] = getReductionIteratorTypeName();
+  iteratorTypes[getDimension()] = getReductionIteratorTypeName();
   return iteratorTypes;
 }
 
@@ -900,10 +902,10 @@ LogicalResult ScanOp::generateScalarImplementation(OpBuilder &b, Location loc,
   indices.append(ivs.begin(), ivs.end());
   Value zero = b.create<arith::ConstantIndexOp>(loc, 0);
   Value one = b.create<arith::ConstantIndexOp>(loc, 1);
-  auto scanDim = dimension();
+  auto scanDim = getDimension();
   auto cond = b.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq,
                                       indices[scanDim], zero);
-  bool isInclusive = inclusive();
+  bool isInclusive = getInclusive();
   SmallVector<Value> accIndices;
   for (int i = 0; i < indices.size(); i++) {
     if (i != scanDim)
@@ -937,7 +939,7 @@ LogicalResult ScanOp::generateScalarImplementation(OpBuilder &b, Location loc,
         scanBlkArgs.push_back(i0);
       });
 
-  auto &srcBlock = region().front();
+  auto &srcBlock = getRegion().front();
   Region &region = scfIf.getElseRegion();
   BlockAndValueMapping bvm;
   {
@@ -961,10 +963,10 @@ LogicalResult ScanOp::generateScalarImplementation(OpBuilder &b, Location loc,
   return success();
 }
 
-SmallVector<Operation *> ScanOp::getTiledImplementation(
-    OpBuilder &builder, ValueRange outputs, ArrayRef<OpFoldResult> offsets,
-    ArrayRef<OpFoldResult> sizes, bool /*tileDestOperands*/) {
-  assert(outputs.size() == this->outputs().size());
+SmallVector<Operation *>
+ScanOp::getTiledImplementation(OpBuilder &builder,
+                               ArrayRef<OpFoldResult> offsets,
+                               ArrayRef<OpFoldResult> sizes) {
   int64_t rank = getOperandRank();
   assert(offsets.size() == static_cast<size_t>(rank) &&
          sizes.size() == static_cast<size_t>(rank));
@@ -975,7 +977,7 @@ SmallVector<Operation *> ScanOp::getTiledImplementation(
   tiledOperands.emplace_back(
       getSlice(builder, getLoc(), input(), offsets, sizes, strides));
   tiledOperands.emplace_back(
-      getSlice(builder, getLoc(), outputs[0], offsets, sizes, strides));
+      getSlice(builder, getLoc(), getOutputs()[0], offsets, sizes, strides));
   if (rank > 1) {
     SmallVector<OpFoldResult> accumOffsets, accumSizes;
     if (failed(getResultTilePosition(builder, 1, offsets, sizes, accumOffsets,
@@ -983,10 +985,11 @@ SmallVector<Operation *> ScanOp::getTiledImplementation(
       return {};
     }
     SmallVector<OpFoldResult> accumStrides(rank - 1, oneAttr);
-    tiledOperands.emplace_back(getSlice(
-        builder, getLoc(), outputs[1], accumOffsets, accumSizes, accumStrides));
+    tiledOperands.emplace_back(getSlice(builder, getLoc(), getOutputs()[1],
+                                        accumOffsets, accumSizes,
+                                        accumStrides));
   } else {
-    tiledOperands.emplace_back(outputs[1]);
+    tiledOperands.emplace_back(getOutputs()[1]);
   }
 
   SmallVector<Type, 4> resultTypes;
@@ -1013,7 +1016,7 @@ LogicalResult ScanOp::getResultTilePosition(
     int64_t rank = getOperandRank();
     if (rank > 1) {
       for (auto i : llvm::seq<int64_t>(0, rank)) {
-        if (i == dimension())
+        if (i == getDimension())
           continue;
         resultOffsets.push_back(offsets[i]);
         resultSizes.push_back(sizes[i]);
@@ -1122,9 +1125,10 @@ LogicalResult ReverseOp::generateScalarImplementation(OpBuilder &b,
   return success();
 }
 
-SmallVector<Operation *> ReverseOp::getTiledImplementation(
-    OpBuilder &builder, ValueRange outputs, ArrayRef<OpFoldResult> offsets,
-    ArrayRef<OpFoldResult> sizes, bool /*tileDestOperands*/) {
+SmallVector<Operation *>
+ReverseOp::getTiledImplementation(OpBuilder &builder,
+                                  ArrayRef<OpFoldResult> offsets,
+                                  ArrayRef<OpFoldResult> sizes) {
   int64_t rank = getOperandRank();
   SmallVector<OpFoldResult> strides(rank, builder.getI64IntegerAttr(1));
   Location loc = getLoc();
@@ -1190,7 +1194,7 @@ LogicalResult TopkOp::verify() {
   if (getNumOutputs() != 2) {
     return op->emitOpError("expected two output operands");
   }
-  if (dimension() >= getInputRank()) {
+  if (getDimension() >= getInputRank()) {
     return op->emitOpError("dimension exceeds rank");
   }
   // Ensure input/output element types match
@@ -1239,7 +1243,7 @@ LogicalResult TopkOp::verify() {
     return op->emitOpError("output indices/values shape must match");
   }
   // Input shape must match the output shape except for the dimension()
-  uint64_t dim = dimension();
+  uint64_t dim = getDimension();
   if (llvm::any_of(llvm::enumerate(llvm::zip(inputValuesType.getShape(),
                                              outputValuesType.getShape())),
                    [dim](auto e) {
@@ -1253,7 +1257,7 @@ LogicalResult TopkOp::verify() {
     return op->emitOpError("incompatible input/output shapes");
   }
   // Check region compatibility
-  Block &block = region().front();
+  Block &block = getRegion().front();
   if (block.getNumArguments() != 2) {
     return op->emitOpError("region block should have 2 arguments");
   }
@@ -1287,13 +1291,13 @@ SmallVector<Range> TopkOp::getIterationDomain(OpBuilder &builder) {
 SmallVector<StringRef> TopkOp::getLoopIteratorTypes() {
   SmallVector<StringRef> iteratorTypes(getInputRank(),
                                        getParallelIteratorTypeName());
-  iteratorTypes[dimension()] = getReductionIteratorTypeName();
+  iteratorTypes[getDimension()] = getReductionIteratorTypeName();
   return iteratorTypes;
 }
 
 LogicalResult TopkOp::generateScalarImplementation(OpBuilder &b, Location loc,
                                                    ValueRange ivs) {
-  uint64_t kDim = dimension();
+  uint64_t kDim = getDimension();
   Value zero = b.create<arith::ConstantIndexOp>(loc, 0);
   Value one = b.create<arith::ConstantIndexOp>(loc, 1);
   Value initialValue = b.create<memref::LoadOp>(loc, values(), ivs);
@@ -1310,7 +1314,7 @@ LogicalResult TopkOp::generateScalarImplementation(OpBuilder &b, Location loc,
   }
 
   // Compute K (ub) from the selected dim of the output
-  Value ub = b.create<memref::DimOp>(loc, outputValues(), dimension());
+  Value ub = b.create<memref::DimOp>(loc, outputValues(), getDimension());
 
   // Inner K loop functions:
   //   Load current K value and index
@@ -1335,7 +1339,7 @@ LogicalResult TopkOp::generateScalarImplementation(OpBuilder &b, Location loc,
   auto loopCarryValues = scfFor.getRegionIterArgs();
 
   // Retrieve region as black box comparision function f(x,y). Plug into op.
-  auto &srcBlock = region().front();
+  auto &srcBlock = getRegion().front();
   BlockAndValueMapping bvmF; // f(x,y)
   BlockAndValueMapping bvmR; // f(y,x)
   {
@@ -1387,10 +1391,10 @@ LogicalResult TopkOp::generateScalarImplementation(OpBuilder &b, Location loc,
   return success();
 }
 
-SmallVector<Operation *> TopkOp::getTiledImplementation(
-    OpBuilder &builder, ValueRange outputs, ArrayRef<OpFoldResult> offsets,
-    ArrayRef<OpFoldResult> sizes, bool /*tileDestOperands*/) {
-  assert(outputs.size() == this->outputs().size());
+SmallVector<Operation *>
+TopkOp::getTiledImplementation(OpBuilder &builder,
+                               ArrayRef<OpFoldResult> offsets,
+                               ArrayRef<OpFoldResult> sizes) {
   int64_t rank = getInputRank();
   assert(offsets.size() == static_cast<size_t>(rank) &&
          sizes.size() == static_cast<size_t>(rank));
@@ -1413,13 +1417,13 @@ SmallVector<Operation *> TopkOp::getTiledImplementation(
 
   // Replace the tile size for the K dimension to use the output size instead of
   // the input size.
-  Value kSize = getDimValue(builder, getLoc(), outputValues(), dimension());
-  outputSizes[dimension()] = getAsOpFoldResult(kSize);
+  Value kSize = getDimValue(builder, getLoc(), outputValues(), getDimension());
+  outputSizes[getDimension()] = getAsOpFoldResult(kSize);
 
   tiledOperands.emplace_back(
-      getSlice(builder, loc, outputs[0], offsets, outputSizes, strides));
+      getSlice(builder, loc, getOutputs()[0], offsets, outputSizes, strides));
   tiledOperands.emplace_back(
-      getSlice(builder, loc, outputs[1], offsets, outputSizes, strides));
+      getSlice(builder, loc, getOutputs()[1], offsets, outputSizes, strides));
   SmallVector<Type, 2> resultTypes;
   if (hasTensorSemantics()) {
     resultTypes.push_back(tiledOperands[tiledOperands.size() - 2].getType());
@@ -1437,8 +1441,9 @@ LogicalResult TopkOp::getResultTilePosition(
     SmallVector<OpFoldResult> &resultSizes) {
   resultOffsets.assign(offsets.begin(), offsets.end());
   resultSizes.assign(sizes.begin(), sizes.end());
-  Value kSize = getDimValue(builder, getLoc(), outputValues(), dimension());
-  resultSizes[dimension()] = getAsOpFoldResult(kSize);
+  Value kSize = getDimValue(
+      builder, getLoc(), getOutputOperand(resultNumber)->get(), getDimension());
+  resultSizes[getDimension()] = getAsOpFoldResult(kSize);
   return success();
 }
 

@@ -18,7 +18,7 @@ FailureOr<SmallVector<Operation *>> unwrapScope(ScopeOp scope);
 template <typename TransformT>
 auto scoped(Operation *target, TransformT &&transform) {
   auto scope = wrapInScope(target);
-  Operation &op = *scope.body().front().begin();
+  Operation &op = *scope.getBody().front().begin();
   auto result = transform(scope, &op);
   if (failed(unwrapScope(scope)) || failed(result))
     return decltype(result)(failure());

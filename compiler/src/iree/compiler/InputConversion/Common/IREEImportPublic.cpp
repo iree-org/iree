@@ -90,21 +90,22 @@ class BufferViewToTensorPattern
   LogicalResult matchAndRewrite(
       IREE::Input::BufferViewToTensorOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    TensorType resultType = typeConverter->convertType(srcOp.target().getType())
-                                .dyn_cast_or_null<TensorType>();
+    TensorType resultType =
+        typeConverter->convertType(srcOp.getTarget().getType())
+            .dyn_cast_or_null<TensorType>();
     if (!resultType) return failure();
-    if (adaptor.target_dims().empty() && !resultType.hasStaticShape()) {
+    if (adaptor.getTargetDims().empty() && !resultType.hasStaticShape()) {
       // For the input dialect, we allow ops that don't have their dims
       // specified and we reify them here with the specific builder that does
       // the work.
-      rewriter.replaceOpWithNewOp<IREE::HAL::TensorImportOp>(srcOp, resultType,
-                                                             adaptor.source());
+      rewriter.replaceOpWithNewOp<IREE::HAL::TensorImportOp>(
+          srcOp, resultType, adaptor.getSource());
     } else {
       // Dynamic dims explicitly provided (or wrong, in which case the verifier
       // will get it).
       rewriter.replaceOpWithNewOp<IREE::HAL::TensorImportOp>(
-          srcOp, resultType, adaptor.source(), TypeAttr::get(resultType),
-          adaptor.target_dims());
+          srcOp, resultType, adaptor.getSource(), TypeAttr::get(resultType),
+          adaptor.getTargetDims());
     }
     return success();
   }
@@ -117,21 +118,21 @@ class TensorToBufferViewPattern
   LogicalResult matchAndRewrite(
       IREE::Input::TensorToBufferViewOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    Type resultType = typeConverter->convertType(srcOp.target().getType());
-    TensorType sourceType = adaptor.source().getType().dyn_cast<TensorType>();
+    Type resultType = typeConverter->convertType(srcOp.getTarget().getType());
+    auto sourceType = adaptor.getSource().getType().dyn_cast<TensorType>();
     if (!resultType || !sourceType) return failure();
-    if (adaptor.source_dims().empty() && !sourceType.hasStaticShape()) {
+    if (adaptor.getSourceDims().empty() && !sourceType.hasStaticShape()) {
       // For the input dialect, we allow ops that don't have their dims
       // specified and we reify them here with the specific builder that does
       // the work.
-      rewriter.replaceOpWithNewOp<IREE::HAL::TensorExportOp>(srcOp, resultType,
-                                                             adaptor.source());
+      rewriter.replaceOpWithNewOp<IREE::HAL::TensorExportOp>(
+          srcOp, resultType, adaptor.getSource());
     } else {
       // Dynamic dims explicitly provided (or wrong, in which case the verifier
       // will get it).
       rewriter.replaceOpWithNewOp<IREE::HAL::TensorExportOp>(
-          srcOp, resultType, adaptor.source(),
-          TypeAttr::get(adaptor.source().getType()), adaptor.source_dims(),
+          srcOp, resultType, adaptor.getSource(),
+          TypeAttr::get(adaptor.getSource().getType()), adaptor.getSourceDims(),
           /*target_storage=*/nullptr);
     }
     return success();
@@ -201,19 +202,19 @@ class GlobalOpPattern : public OpConversionPattern<IREE::Input::GlobalOp> {
   LogicalResult matchAndRewrite(
       IREE::Input::GlobalOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    Type newType = typeConverter->convertType(srcOp.type());
+    Type newType = typeConverter->convertType(srcOp.getType());
     if (!newType) return failure();
     auto globalOp = rewriter.replaceOpWithNewOp<IREE::Util::GlobalOp>(
-        srcOp, srcOp.getName(), srcOp.is_mutable(), newType,
-        srcOp.initial_value());
+        srcOp, srcOp.getName(), srcOp.getIsMutable(), newType,
+        srcOp.getInitialValue());
     globalOp.setVisibility(srcOp.getVisibility());
-    if (srcOp.initializer().has_value()) {
+    if (srcOp.getInitializer().has_value()) {
       auto initializerOp =
           rewriter.create<IREE::Util::InitializerOp>(srcOp.getLoc());
       auto ip = rewriter.saveInsertionPoint();
       rewriter.setInsertionPointToStart(initializerOp.addEntryBlock());
       auto callOp = rewriter.create<mlir::func::CallOp>(
-          srcOp.getLoc(), srcOp.initializerAttr(), TypeRange{newType});
+          srcOp.getLoc(), srcOp.getInitializerAttr(), TypeRange{newType});
       rewriter.create<IREE::Util::GlobalStoreOp>(
           srcOp.getLoc(), callOp.getResult(0), srcOp.getName());
       rewriter.create<IREE::Util::InitializerReturnOp>(srcOp.getLoc());

@@ -165,9 +165,9 @@ struct SortOpConversion : public OpConversionPattern<mhlo::SortOp> {
         loc, resultTypes,
         /*inputs=*/ValueRange{}, adaptor.getOperands(),
         mhloSortOp.dimensionAttr());
-    rewriter.inlineRegionBefore(mhloSortOp.comparator(), sortOp.region(),
-                                sortOp.region().begin());
-    Region &region = sortOp.region();
+    rewriter.inlineRegionBefore(mhloSortOp.comparator(), sortOp.getRegion(),
+                                sortOp.getRegion().begin());
+    Region &region = sortOp.getRegion();
     Block &block = region.front();
     TypeConverter::SignatureConversion signature_converter(
         block.getNumArguments());
@@ -333,9 +333,9 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
         op.getLoc(), op->getResultTypes(), ValueRange{updates, indices},
         ValueRange{original}, op.unique_indices());
 
-    rewriter.inlineRegionBefore(op.update_computation(), scatterOp.region(),
-                                scatterOp.region().begin());
-    Region &region = scatterOp.region();
+    rewriter.inlineRegionBefore(op.update_computation(), scatterOp.getRegion(),
+                                scatterOp.getRegion().begin());
+    Region &region = scatterOp.getRegion();
     TypeConverter::SignatureConversion signatureConverter(2);
     Type argType = getElementTypeOrSelf(original.getType());
     // mhlo.scatter ops takes:
@@ -585,7 +585,8 @@ struct TopkOpConversion : public OpConversionPattern<chlo::TopKOp> {
     // Define the region of TopK with a GT comparison
     SmallVector<Type> types(2, valueElementType);
     SmallVector<Location> locations(2, loc);
-    Block *block = rewriter.createBlock(&topkOp.region(), {}, types, locations);
+    Block *block =
+        rewriter.createBlock(&topkOp.getRegion(), {}, types, locations);
     {
       OpBuilder::InsertionGuard guard(rewriter);
       rewriter.setInsertionPointToStart(block);
