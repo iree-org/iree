@@ -252,13 +252,6 @@ def LLVMCPULowerExecutableTarget :
       "mlir::iree_compiler::createLLVMCPULowerExecutableTargetPass()";
 }
 
-def LLVMCPULowerTargetDependentTosa :
-    Pass<"iree-llvmcpu-lower-target-dependent-tosa", "func::FuncOp"> {
-  let summary = "Lower CPU target dependent TOSA operations";
-  let constructor =
-      "mlir::iree_compiler::createLLVMCPULowerTargetDependentTosaPass()";
-}
-
 def LLVMCPUSynchronizeSymbolVisibility :
     Pass<"iree-llvmcpu-synchronize-symbol-visibility", "ModuleOp"> {
   let summary = "Synchronizes LLVM linkage with MLIR symbol visibility";

@@ -585,11 +585,6 @@ void addTransformDialectInterpreterPasses(OpPassManager &passManager) {
 }
 
 static void addLowerToLLVMPasses(OpPassManager &passManager) {
-  // TODO(dcaballe): Move this lowering up the pipeline, before vectorization?
-  // TOSA -> Arith.
-  passManager.addNestedPass<func::FuncOp>(
-      createLLVMCPULowerTargetDependentTosaPass());
-
   // LinalgExt -> SCF
   passManager.addNestedPass<func::FuncOp>(
       IREE::LinalgExt::createLinalgExtToLoopsPass());

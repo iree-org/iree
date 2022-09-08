@@ -22,7 +22,6 @@ iree_cc_library(
     "LLVMCPUCheckIRBeforeLLVMConversion.cpp"
     "LLVMCPUEmitVectorizationRemarks.cpp"
     "LLVMCPULowerExecutableTarget.cpp"
-    "LLVMCPULowerTargetDependentTosa.cpp"
     "LLVMCPUSynchronizeSymbolVisibility.cpp"
     "LLVMCPUUnfuseFMAOps.cpp"
     "Passes.cpp"
