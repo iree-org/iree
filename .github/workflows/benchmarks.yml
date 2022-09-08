@@ -42,10 +42,9 @@ on:
         type: string
 
 jobs:
-  build_benchmark_suites:
+  build_suites:
     runs-on:
-      # Hacks, and order matters. See the comment at the top of the ci.yml.
-      - self-hosted
+      - self-hosted # must come first
       - runner-group=${{ inputs.runner-group }}
       - environment=${{ inputs.runner-env }}
       - cpu
@@ -78,10 +77,9 @@ jobs:
             gcr.io/iree-oss/base@sha256:5d43683c6b50aebe1fca6c85f2012f3b0fa153bf4dd268e8767b619b1891423a \
             build_tools/cmake/build_benchmarks.sh
 
-  build_benchmark_tools:
+  build_tools:
     runs-on:
-      # Hacks, and order matters. See the comment at the top of the ci.yml.
-      - self-hosted
+      - self-hosted  # must come first
       - runner-group=${{ inputs.runner-group }}
       - environment=${{ inputs.runner-env }}
       - cpu
