@@ -98,6 +98,11 @@ Optional<SmallVector<int64_t, 4>> getNativeVectorShape(Operation *op) {
       nativeSize[dimAttr.getZExtValue()] = 1;
     }
     return nativeSize;
+  } else if (auto reductionOp = dyn_cast<vector::ReductionOp>(op)) {
+    auto srcVectorType = reductionOp.getVectorType();
+    assert(srcVectorType.getRank() == 1);  // Guaranteed by semantics
+    int64_t vectorSize = getComputeVectorSize(srcVectorType.getDimSize(0));
+    return SmallVector<int64_t, 4>{vectorSize};
   } else if (auto transposeOp = dyn_cast<vector::TransposeOp>(op)) {
     auto vectorType = transposeOp.getResultType();
     SmallVector<int64_t, 4> nativeSize(vectorType.getRank(), 1);

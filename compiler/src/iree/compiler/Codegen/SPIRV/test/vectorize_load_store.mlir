@@ -208,6 +208,28 @@ func.func @scalarize_vector_transfer_op(%arg: vector<3xf32>) -> (vector<3xf32>) 
 
 // -----
 
+// CHECK-LABEL: func.func @scalarize_non_minor_identity_transfer_read
+// CHECK: (%[[MEM:.+]]: memref<4x2x3xi32>, %[[I1:.+]]: index, %[[I2:.+]]: index, %[[I3:.+]]: index)
+func.func @scalarize_non_minor_identity_transfer_read(%memory: memref<4x2x3xi32>, %i1: index, %i2: index, %i3: index) -> vector<3xi32> {
+  %c0 = arith.constant 0 : i32
+  %0 = vector.transfer_read %memory[%i1, %i2, %i3], %c0 {
+    in_bounds = [true], permutation_map = affine_map<(d0, d1, d2) -> (d0)>
+  } : memref<4x2x3xi32>, vector<3xi32>
+  return %0: vector<3xi32>
+}
+
+// CHECK: %[[INIT:.+]] = arith.constant dense<0> : vector<3xi32>
+// CHECK: %[[LD0:.+]] = memref.load %[[MEM]][%[[I1]], %[[I2]], %[[I3]]]
+// CHECK: %[[INSERT0:.+]] = vector.insert %[[LD0]], %[[INIT]] [0] : i32 into vector<3xi32>
+// CHECK: %[[IDX1:.+]] = affine.apply affine_map<()[s0] -> (s0 + 1)>()[%[[I1]]]
+// CHECK: %[[LD1:.+]] = memref.load %[[MEM]][%[[IDX1]], %[[I2]], %[[I3]]]
+// CHECK: %[[INSERT1:.+]] = vector.insert %[[LD1]], %[[INSERT0]] [1] : i32 into vector<3xi32>
+// CHECK: %[[IDX2:.+]] = affine.apply affine_map<()[s0] -> (s0 + 2)>()[%[[I1]]]
+// CHECK: %[[LD2:.+]] = memref.load %[[MEM]][%[[IDX2]], %[[I2]], %[[I3]]]
+// CHECK: %[[INSERT2:.+]] = vector.insert %[[LD2]], %[[INSERT1]] [2] : i32 into vector<3xi32>
+// CHECK: return %[[INSERT2]] : vector<3xi32>
+
+// -----
 
 // CHECK-LABEL: func.func @scalarize_non_minor_identity_transfer_write
 //  CHECK-SAME: (%[[VALUE:.+]]: vector<4xf32>, %[[I1:.+]]: index, %[[I2:.+]]: index)
@@ -231,3 +253,29 @@ func.func @scalarize_non_minor_identity_transfer_write(%value: vector<4xf32>, %i
 // CHECK: %[[PLUS3:.+]] = affine.apply affine_map<()[s0] -> (s0 + 3)>()[%[[I2]]]
 // CHECK: %[[E3:.+]] = vector.extract %[[VALUE]][3] : vector<4xf32>
 // CHECK: memref.store %[[E3]], %[[BUFFER]][%[[C0]], %[[I1]], %[[PLUS3]], %[[C0]]]
+
+// -----
+
+// CHECK-LABEL: func.func @scalarize_0d_transfer_read
+//  CHECK-SAME: (%[[MEM:.+]]: memref<4xf32>, %[[I:.+]]: index)
+func.func @scalarize_0d_transfer_read(%memory: memref<4xf32>, %i: index) -> vector<f32> {
+  %f0 = arith.constant 0.0 : f32
+  %v = vector.transfer_read %memory[%i], %f0 : memref<4xf32>, vector<f32>
+  return %v : vector<f32>
+}
+
+// CHECK: %[[S:.+]] = memref.load %[[MEM]][%[[I]]] : memref<4xf32>
+// CHECK: %[[V:.+]] = vector.splat %[[S]] : vector<f32>
+// CHECK: return %[[V]]
+
+// -----
+
+// CHECK-LABEL: func.func @scalarize_0d_transfer_write
+//  CHECK-SAME: (%[[V:.+]]: vector<f32>, %[[MEM:.+]]: memref<4xf32>, %[[I:.+]]: index)
+func.func @scalarize_0d_transfer_write(%val: vector<f32>, %memory: memref<4xf32>, %i: index) {
+  vector.transfer_write %val, %memory[%i] : vector<f32>, memref<4xf32>
+  return
+}
+
+// CHECK: %[[S:.+]] = vector.extractelement %[[V]][] : vector<f32>
+// CHECK: memref.store %[[S]], %[[MEM]][%[[I]]] : memref<4xf32>

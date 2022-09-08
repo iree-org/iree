@@ -419,26 +419,37 @@ struct ScalarizeVectorTransferRead final
   LogicalResult matchAndRewrite(vector::TransferReadOp readOp,
                                 PatternRewriter &rewriter) const override {
     VectorType vectorType = readOp.getType();
-    Type scalarType = vectorType.getElementType();
-    if (vectorType.getRank() != 1 ||
-        !readOp.getPermutationMap().isMinorIdentity())
+    auto map = readOp.getPermutationMap();
+    if (vectorType.getRank() > 1 || !map.isProjectedPermutation())
       return failure();
+
+    Location loc = readOp.getLoc();
+    if (vectorType.getRank() == 0) {
+      Value scalar = rewriter.create<memref::LoadOp>(loc, readOp.getSource(),
+                                                     readOp.getIndices());
+      rewriter.replaceOpWithNewOp<vector::SplatOp>(readOp, vectorType, scalar);
+      return success();
+    }
 
     MLIRContext *context = rewriter.getContext();
     AffineExpr sym0, sym1;
     bindSymbols(context, sym0, sym1);
     auto addMap = AffineMap::get(0, 2, {sym0 + sym1}, context);
 
-    Location loc = readOp.getLoc();
+    // The result vector is 1-D and we have a projected permutation.
+    unsigned dimPos = map.getDimPosition(0);
+
+    auto indices = llvm::to_vector<4>(readOp.getIndices());
+    Value oldIndex = indices[dimPos];
+
     Value newVector = rewriter.create<arith::ConstantOp>(
         loc, vectorType, rewriter.getZeroAttr(vectorType));
     for (int i = 0; i < vectorType.getDimSize(0); ++i) {
       Value iVal = rewriter.create<arith::ConstantIndexOp>(loc, i);
-      auto indices = llvm::to_vector<4>(readOp.getIndices());
-      indices.back() = rewriter.create<AffineApplyOp>(
-          loc, addMap, ValueRange{indices.back(), iVal});
-      Value scalar = rewriter.create<memref::LoadOp>(
-          loc, scalarType, readOp.getSource(), indices);
+      indices[dimPos] = rewriter.create<AffineApplyOp>(
+          loc, addMap, ValueRange{oldIndex, iVal});
+      Value scalar =
+          rewriter.create<memref::LoadOp>(loc, readOp.getSource(), indices);
       newVector = rewriter.create<vector::InsertOp>(loc, scalar, newVector, i);
     }
     rewriter.replaceOp(readOp, newVector);
@@ -454,10 +465,19 @@ struct ScalarizeVectorTransferWrite final
                                 PatternRewriter &rewriter) const override {
     VectorType vectorType = writeOp.getVectorType();
     auto map = writeOp.getPermutationMap();
-    if (vectorType.getRank() != 1 || !map.isProjectedPermutation())
+    if (vectorType.getRank() > 1 || !map.isProjectedPermutation())
       return failure();
 
     Location loc = writeOp.getLoc();
+    if (vectorType.getRank() == 0) {
+      Value scalar =
+          rewriter.create<vector::ExtractElementOp>(loc, writeOp.getVector());
+      rewriter.create<memref::StoreOp>(loc, scalar, writeOp.getSource(),
+                                       writeOp.getIndices());
+      rewriter.eraseOp(writeOp);
+      return success();
+    }
+
     MLIRContext *context = rewriter.getContext();
     AffineExpr sym0, sym1;
     bindSymbols(context, sym0, sym1);

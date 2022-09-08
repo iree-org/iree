@@ -17,6 +17,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVEnums.h"
@@ -333,13 +334,74 @@ static LogicalResult setFftOpConfig(spirv::ResourceLimitsAttr limits,
 }
 
 //===----------------------------------------------------------------------===//
+// Reduction Default Configuration
+//===----------------------------------------------------------------------===//
+
+/// Set the configuration for reductions that can be mapped to warp reductions.
+static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
+                                        linalg::GenericOp op) {
+  if (op.hasDynamicShape()) return failure();
+  // This pipeline eventually generates non-uniform group shuffle ops, which
+  // requires special capability.
+  if (!targetEnv.allows(spirv::Capability::GroupNonUniformShuffle))
+    return failure();
+
+  SmallVector<unsigned> reductionDims;
+  op.getReductionDims(reductionDims);
+  if (reductionDims.size() != 1 || reductionDims[0] != op.getNumLoops() - 1)
+    return failure();
+  if (op.getRegionOutputArgs().size() != 1) return failure();
+
+  // Only support projected permutation for now. This could be extended to
+  // projected permutated with broadcast.
+  if (llvm::any_of(op.getInputOperands(), [&](OpOperand *input) {
+        return !op.getTiedIndexingMap(input).isProjectedPermutation();
+      })) {
+    return failure();
+  }
+
+  // Only support single combiner operations for now.
+  SmallVector<Operation *, 4> combinerOps;
+  if (!matchReduction(op.getRegionOutputArgs(), 0, combinerOps) ||
+      combinerOps.size() != 1) {
+    return failure();
+  }
+
+  const int subgroupSize = targetEnv.getResourceLimits().getSubgroupSize();
+  Optional<int64_t> dimSize = op.getStaticLoopRanges()[reductionDims[0]];
+  if (!dimSize || *dimSize % subgroupSize != 0) return failure();
+
+  // Let each thread handle `vectorSize` elements.
+  unsigned vectorSize = 4;
+  while ((*dimSize / vectorSize) % subgroupSize != 0) vectorSize /= 2;
+
+  std::array<int64_t, 3> workgroupSize = {*dimSize / vectorSize, 1, 1};
+
+  // Tile all the parallel dimension to 1.
+  SmallVector<unsigned> partitionedLoops =
+      cast<PartitionableLoopsInterface>(op.getOperation())
+          .getPartitionableLoops(kNumMaxParallelDims);
+  llvm::SmallDenseSet<unsigned, 4> partitionedLoopsSet;
+  partitionedLoopsSet.insert(partitionedLoops.begin(), partitionedLoops.end());
+  size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
+  SmallVector<int64_t, 4> workgroupTileSizes(numLoops, 1);
+
+  TileSizesListType tileSizes;
+  tileSizes.emplace_back(std::move(workgroupTileSizes));  // Workgroup level
+
+  return setOpConfigAndEntryPointFnTranslation(
+      op->getParentOfType<func::FuncOp>(), op, tileSizes,
+      IREE::Codegen::DispatchLoweringPassPipeline::SPIRVSubgroupReduce,
+      workgroupSize);
+}
+
+//===----------------------------------------------------------------------===//
 // Everything Default Configuration
 //===----------------------------------------------------------------------===//
 
 static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
                                         Operation *op,
                                         bool allowVectorization = true) {
-  LLVM_DEBUG(llvm::dbgs() << "Using default config for op: " << *op << "\n");
   func::FuncOp funcOp = op->getParentOfType<func::FuncOp>();
   auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
   auto partitionedLoops =
@@ -617,7 +679,10 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
         // Other convolution/pooling op vectorization is not wired up.
         return setDefaultOpConfig(limits, op, /*allowVectorization=*/false);
       })
-      .Case<linalg::GenericOp>([limits](linalg::GenericOp op) {
+      .Case<linalg::GenericOp>([&](linalg::GenericOp op) {
+        LLVM_DEBUG(llvm::dbgs() << "figuring configuration for generic op\n");
+        if (succeeded(setReductionConfig(targetEnv, op))) return success();
+
         // If a generic op has reduction iterator types, it can be treated as a
         // root op for configuration as well. Use the default configuration,
         // which will mark it as a root.

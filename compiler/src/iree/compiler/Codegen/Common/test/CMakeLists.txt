@@ -25,6 +25,7 @@ iree_lit_test_suite(
     "fold_affine_min_in_distributed_loops.mlir"
     "fold_tensor_extract_op.mlir"
     "forop_canonicalization.mlir"
+    "gpu_vectorization.mlir"
     "iree_comprehensive_bufferize.mlir"
     "pad_dynamic_alloc.mlir"
     "remove_dead_allocs.mlir"
@@ -36,6 +37,7 @@ iree_lit_test_suite(
     "transpose_canonicalization.mlir"
     "type_propagation.mlir"
     "vectorize_linalg_conv.mlir"
+    "warp_reduction.mlir"
   TOOLS
     FileCheck
     iree-opt
