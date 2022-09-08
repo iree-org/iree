@@ -202,7 +202,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
 
   // Special case peephole optimizations.
   FunctionLikeNest(passManager)
-      .addPass(IREE::Flow::createConvertConv2D1x1ToMatmulPass)
+      .addPass(IREE::Flow::createConvert1X1FilterConv2DToMatmulPass)
       .addPredicatedPass(clEnableConvToImg2Col,
                          IREE::Flow::createConvertConv2DToImg2ColPass)
       .addPredicatedPass(
