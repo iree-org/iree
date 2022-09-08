@@ -192,13 +192,17 @@ def main(args):
     print(f"Updating {mig.name} to new versions:"
           f" {summarize_versions(new_versions)}")
 
+    request = compute.PatchRegionInstanceGroupManagerRequest(
+        project=args.project,
+        region=region,
+        instance_group_manager=mig.name,
+        instance_group_manager_resource=compute.InstanceGroupManager(
+            versions=new_versions, update_policy=update_policy))
+
     if not args.dry_run:
-      migs_client.patch(
-          project=args.project,
-          region=region,
-          instance_group_manager=mig.name,
-          instance_group_manager_resource=compute.InstanceGroupManager(
-              versions=new_versions, update_policy=update_policy))
+      migs_client.patch(request)
+    else:
+      print(f"Dry run, so not sending this patch request:\n```\n{request}```")
     print(f"Successfully updated {mig.name}")
 
 
