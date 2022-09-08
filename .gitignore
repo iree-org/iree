@@ -70,3 +70,6 @@ iree/builtins/**/bin/*.ll
 # Archive files
 *.tar
 *.tar.*
+
+# Local cache files
+llvm-external-projects/iree-dialects/.cache
