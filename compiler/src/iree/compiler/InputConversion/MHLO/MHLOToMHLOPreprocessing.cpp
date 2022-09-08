@@ -444,8 +444,10 @@ struct ScatterOpImplicitIndex : public OpRewritePattern<mhlo::ScatterOp> {
       reassociationMap[i].push_back(rewriter.getAffineDimExpr(i));
       newShape.push_back(indicesTy.getDimSize(i));
     }
-    reassociationMap.back().push_back(
-        rewriter.getAffineDimExpr(indicesTy.getRank()));
+    if (!reassociationMap.empty()) {
+      reassociationMap.back().push_back(
+          rewriter.getAffineDimExpr(indicesTy.getRank()));
+    }
     newShape.push_back(1);
     indicesTy = RankedTensorType::get(newShape, indicesTy.getElementType());
     indices = rewriter.create<tensor::ExpandShapeOp>(op.getLoc(), indicesTy,
@@ -471,7 +473,9 @@ struct ScatterOpImplicitBatch : public OpRewritePattern<mhlo::ScatterOp> {
 
     // Materialize the implicit indices dim.
     SmallVector<ReassociationExprs, 4> reassociationMap(valueTy.getRank());
-    reassociationMap.front().push_back(rewriter.getAffineDimExpr(0));
+    if (!reassociationMap.empty()) {
+      reassociationMap.front().push_back(rewriter.getAffineDimExpr(0));
+    }
 
     SmallVector<int64_t> newShape = {1};
     for (int i = 0, s = valueTy.getRank(); i < s; i++) {
