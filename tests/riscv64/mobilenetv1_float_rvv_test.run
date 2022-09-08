@@ -1,0 +1,7 @@
+// RUN: ${TEST_MODULE_CMD} \
+// RUN:   --module_file="${BUILD_RISCV_DIR}/tests/e2e/models/tflite_llvm-cpu_local-task_mobilenet_v1_224_1.0_float.tflite_module.vmfb" \
+// RUN:   --entry_function=main --function_input="1x224x224x3xf32=0" | FileCheck %s
+// Only check the first 16 entries.
+// CHECK:1x1001xf32=[0.000268968 0.000481336 0.00131741 0.000940145 0.00096833 0.00297683 0.00218184
+// CHECK-SAME: 0.000806769 0.000280723 0.000171147 0.000345219 0.000892759 0.000576722 0.000428793
+// CHECK-SAME: 0.000316769 0.000701366

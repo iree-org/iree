@@ -1,0 +1,6 @@
+// RUN: ${TEST_MODULE_CMD} \
+// RUN:   --module_file="${BUILD_RISCV_DIR}/tests/e2e/models/tflite_llvm-cpu_local-task_efficientnet_lite0_int8_2.tflite_module.vmfb" \
+// RUN:   --entry_function=main --function_input="1x224x224x3xui8=0" > %t
+// RUN: ${HOST_TEST_MODULE_CMD} \
+// RUN:   --module_file="${BUILD_RISCV_DIR}/tests/e2e/models/tflite_llvm-cpu_local-task_x86_64_efficientnet_lite0_int8_2.tflite_module.vmfb" \
+// RUN:   --entry_function=main --function_input="1x224x224x3xui8=0" | diff %t -

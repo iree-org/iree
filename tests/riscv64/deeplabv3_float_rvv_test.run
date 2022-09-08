@@ -1,0 +1,4 @@
+// RUN: ${TEST_MODULE_CMD} \
+// RUN:   --module_file="${BUILD_RISCV_DIR}/tests/e2e/models/tflite_llvm-cpu_local-task_deeplabv3.tflite_module.vmfb" \
+// RUN:   --entry_function=main --function_input="1x257x257x3xf32=0"
+// iree-run-module can't printout the output selectively. Skip the numerical check.

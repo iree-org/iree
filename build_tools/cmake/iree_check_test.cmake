@@ -19,7 +19,7 @@ function(iree_bytecode_module_for_iree_check_test_and_friends)
     _RULE
     ""
     "MODULE_NAME;SRC;TARGET_BACKEND;MODULE_FILE_NAME"
-    "FLAGS;TARGET_CPU_FEATURES"
+    "FLAGS;TARGET_CPU_FEATURES;DEPENDS"
     ${ARGN}
   )
 
@@ -75,6 +75,8 @@ TARGET_BACKEND=${_RULE_TARGET_BACKEND}.")
       "--mlir-print-op-on-diagnostic=false"
       "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}"
       ${_RULE_FLAGS}
+    DEPENDS
+      ${_RULE_DEPENDS}
     TESTONLY
   )
 endfunction()
@@ -140,6 +142,72 @@ function(iree_check_test)
   endif()
 
   iree_package_name(_PACKAGE_NAME)
+
+  # If the source file is from the web, create a custom command to download
+  # it and wrap that with a custom target so later we can use for dependency.
+  if("${_RULE_SRC}" MATCHES "^https?://")
+    set(_SRC_URL "${_RULE_SRC}")
+    # Update the source file to the downloaded-to place.
+    string(REPLACE "/" ";" _SRC_URL_SEGMENTS "${_SRC_URL}")
+    list(POP_BACK _SRC_URL_SEGMENTS _LAST_URL_SEGMENT)
+    set(_DOWNLOAD_TARGET "${_PACKAGE_NAME}_${_LAST_URL_SEGMENT}")
+
+    # Strip off gzip/tar suffix if present (downloader unpacks if necessary)
+    string(REGEX REPLACE "(\.gz)|(\.tar\.gz)$" "" _SRC_BASENAME "${_LAST_URL_SEGMENT}")
+    set(_RULE_SRC "${CMAKE_CURRENT_BINARY_DIR}/${_SRC_BASENAME}")
+    string(REGEX REPLACE "(https?://.*)$" ""  _NAME_BASE "${_RULE_NAME}")
+    set(_RULE_NAME "${_NAME_BASE}${_SRC_BASENAME}")
+    if(NOT TARGET "${_DOWNLOAD_TARGET}")
+      add_custom_command(
+        OUTPUT "${_RULE_SRC}"
+        COMMAND
+          "${Python3_EXECUTABLE}" "${IREE_ROOT_DIR}/build_tools/scripts/download_file.py"
+          "${_SRC_URL}" -o "${_RULE_SRC}"
+        DEPENDS
+          "${IREE_ROOT_DIR}/build_tools/scripts/download_file.py"
+        COMMENT "Downloading ${_SRC_URL}"
+      )
+      add_custom_target("${_DOWNLOAD_TARGET}"
+        DEPENDS "${_RULE_SRC}"
+      )
+    endif()
+    set(_MODULE_SOURCE_TARGET "${_DOWNLOAD_TARGET}")
+  endif()
+
+  # If the source is a TFLite file, import it. The iree-tflite-tool must be
+  # found under PATH or specified by the `IREE_IMPORT_TFLITE_BIN` environment
+  # variable.
+  if("${_RULE_SRC}" MATCHES "\.tflite$")
+    if(NOT DEFINED ENV{IREE_IMPORT_TFLITE_BIN})
+      find_program(IREE_IMPORT_TFLITE_BIN
+        "iree-import-tflite" HINTS ENV PATH REQUIRED)
+    else()
+      get_filename_component(IREE_IMPORT_TFLITE_BIN
+        "$ENV{IREE_IMPORT_TFLITE_BIN}" REALPATH)
+    endif()
+    cmake_path(GET _RULE_SRC FILENAME _MODEL_BASENAME)
+    set(_MODULE_SOURCE_TARGET "${_PACKAGE_NAME}_iree-import-tf-${_MODEL_BASENAME}")
+    if(NOT TARGET "${_MODULE_SOURCE_TARGET}")
+      add_custom_command(
+        OUTPUT "${_RULE_SRC}.mlir"
+        COMMAND
+          "${IREE_IMPORT_TFLITE_BIN}"
+          "${_RULE_SRC}"
+          "-o=${_RULE_SRC}.mlir"
+        DEPENDS
+          "${_RULE_SRC}"
+        COMMENT "Importing TFLite model ${_MODEL_BASENAME}"
+      )
+      add_custom_target("${_MODULE_SOURCE_TARGET}"
+        DEPENDS
+          "${_RULE_SRC}.mlir"
+        COMMENT
+          "Importing ${_MODEL_BASENAME} into MLIR"
+      )
+    endif()
+    set(_RULE_SRC "${_RULE_SRC}.mlir")
+  endif()
+
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
 
   set(_MODULE_NAME "${_RULE_NAME}_module")
@@ -159,6 +227,8 @@ function(iree_check_test)
       "${_RULE_SRC}"
     TARGET_BACKEND
       "${_RULE_TARGET_BACKEND}"
+    DEPENDS
+      "${_MODULE_SOURCE_TARGET}"
     FLAGS
       ${_RULE_COMPILER_FLAGS}
     TARGET_CPU_FEATURES
