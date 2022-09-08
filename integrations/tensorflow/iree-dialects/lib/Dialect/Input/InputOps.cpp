@@ -138,21 +138,21 @@ static bool isGlobalTypeCompatible(Type globalType, Type accessType) {
 LogicalResult
 GlobalLoadOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
   auto globalOp =
-      symbolTable.lookupNearestSymbolFrom<GlobalOp>(*this, globalAttr());
+      symbolTable.lookupNearestSymbolFrom<GlobalOp>(*this, getGlobalAttr());
   if (!globalOp) {
-    return emitOpError() << "undefined global: " << global();
+    return emitOpError() << "undefined global: " << getGlobal();
   }
   auto loadType = getResult().getType();
-  if (!isGlobalTypeCompatible(globalOp.type(), loadType)) {
-    return emitOpError() << "global type mismatch; global " << global()
-                         << " is " << globalOp.type() << " but load is "
+  if (!isGlobalTypeCompatible(globalOp.getType(), loadType)) {
+    return emitOpError() << "global type mismatch; global " << getGlobal()
+                         << " is " << globalOp.getType() << " but load is "
                          << loadType;
   }
   return success();
 }
 
 LogicalResult GlobalLoadIndirectOp::verify() {
-  auto globalType = global().getType().cast<PtrType>().getTargetType();
+  auto globalType = getGlobal().getType().cast<PtrType>().getTargetType();
   auto loadType = getResult().getType();
   if (!isGlobalTypeCompatible(globalType, loadType)) {
     return emitOpError() << "global type mismatch; global pointer is "
@@ -164,22 +164,22 @@ LogicalResult GlobalLoadIndirectOp::verify() {
 LogicalResult
 GlobalStoreOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
   auto globalOp =
-      symbolTable.lookupNearestSymbolFrom<GlobalOp>(*this, globalAttr());
+      symbolTable.lookupNearestSymbolFrom<GlobalOp>(*this, getGlobalAttr());
   if (!globalOp) {
-    return emitOpError() << "undefined global: " << global();
+    return emitOpError() << "undefined global: " << getGlobal();
   }
-  auto storeType = value().getType();
-  if (!isGlobalTypeCompatible(globalOp.type(), storeType)) {
-    return emitOpError() << "global type mismatch; global " << global()
-                         << " is " << globalOp.type() << " but store is "
+  auto storeType = getValue().getType();
+  if (!isGlobalTypeCompatible(globalOp.getType(), storeType)) {
+    return emitOpError() << "global type mismatch; global " << getGlobal()
+                         << " is " << globalOp.getType() << " but store is "
                          << storeType;
   }
   return success();
 }
 
 LogicalResult GlobalStoreIndirectOp::verify() {
-  auto globalType = global().getType().cast<PtrType>().getTargetType();
-  auto storeType = value().getType();
+  auto globalType = getGlobal().getType().cast<PtrType>().getTargetType();
+  auto storeType = getValue().getType();
   if (!isGlobalTypeCompatible(globalType, storeType)) {
     return emitOpError() << "global type mismatch; global pointer is "
                          << globalType << " but store is " << storeType;

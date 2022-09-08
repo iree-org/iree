@@ -26,6 +26,7 @@ iree_runtime_cc_library(
     deps = [
         "//runtime/src/iree/base",
         "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/base/internal:cpu",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/modules/hal:types",
         "//runtime/src/iree/modules/hal/utils:buffer_diagnostics",

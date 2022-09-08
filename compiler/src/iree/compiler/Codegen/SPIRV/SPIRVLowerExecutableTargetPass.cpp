@@ -62,8 +62,7 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
   IREE::HAL::ExecutableVariantOp variantOp = getOperation();
   ModuleOp moduleOp = variantOp.getInnerModule();
 
-  OpPassManager executableLoweringPipeline(
-      IREE::HAL::ExecutableVariantOp::getOperationName());
+  OpPassManager pipeline(IREE::HAL::ExecutableVariantOp::getOperationName());
 
   if (failed(initSPIRVLaunchConfig(moduleOp))) {
     return signalPassFailure();
@@ -98,20 +97,21 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
   if (!testLoweringConfiguration && passPipeline.has_value()) {
     switch (*passPipeline) {
       case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistribute:
-        addSPIRVTileAndDistributePassPipeline(executableLoweringPipeline);
+        addSPIRVTileAndDistributePassPipeline(pipeline);
         break;
       case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVVectorize:
-        addSPIRVTileAndVectorizePassPipeline(executableLoweringPipeline);
+        addSPIRVTileAndVectorizePassPipeline(pipeline);
         break;
       case IREE::Codegen::DispatchLoweringPassPipeline::
           SPIRVVectorizeToCooperativeOps:
-        addSPIRVTileAndVectorizeToCooperativeOpsPassPipeline(
-            executableLoweringPipeline);
+        addSPIRVTileAndVectorizeToCooperativeOpsPassPipeline(pipeline);
         break;
       case IREE::Codegen::DispatchLoweringPassPipeline::
           SPIRVVectorizeWithWorkgroupMemory:
-        addSPIRVTileAndVectorizeWithWorkgroupMemoryPassPipeline(
-            executableLoweringPipeline);
+        addSPIRVTileAndVectorizeWithWorkgroupMemoryPassPipeline(pipeline);
+        break;
+      case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVSubgroupReduce:
+        addSPIRVSubgroupReducePassPipeline(pipeline);
         break;
       default:
         variantOp.emitOpError("Unsupported pipeline on GPU target.");
@@ -121,11 +121,11 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
 
   LLVM_DEBUG({
     llvm::dbgs() << "Using SPIR-V lowering pass pipeline:\n";
-    executableLoweringPipeline.printAsTextualPipeline(llvm::dbgs());
+    pipeline.printAsTextualPipeline(llvm::dbgs());
     llvm::dbgs() << "\n";
   });
 
-  if (failed(runPipeline(executableLoweringPipeline, variantOp))) {
+  if (failed(runPipeline(pipeline, variantOp))) {
     return signalPassFailure();
   }
 }

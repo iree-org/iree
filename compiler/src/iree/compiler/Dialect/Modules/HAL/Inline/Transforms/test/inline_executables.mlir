@@ -33,9 +33,9 @@ hal.executable private @ex {
           %local_memory: !util.buffer,
           %constants: !util.buffer,
           %bindings: !util.list<!util.buffer>,
-          %workgroup_x: index, %workgroup_y: index, %workgroup_z: index,
-          %workgroup_size_x: index, %workgroup_size_y: index, %workgroup_size_z: index,
-          %workgroup_count_x: index, %workgroup_count_y: index, %workgroup_count_z: index) {
+          %workgroup_x: i32, %workgroup_y: i32, %workgroup_z: i32,
+          %workgroup_size_x: i32, %workgroup_size_y: i32, %workgroup_size_z: i32,
+          %workgroup_count_x: i32, %workgroup_count_y: i32, %workgroup_count_z: i32) {
         // Unpack push constants:
         %constants_size = util.buffer.size %constants : !util.buffer
         %constant1_offset = arith.constant 4 : index
@@ -57,8 +57,10 @@ hal.executable private @ex {
         %global_constant = util.global.load @global_constant : !util.buffer
         util.do_not_optimize(%global_constant) : !util.buffer
 
+
         %c4 = arith.constant 4 : index
-        scf.for %i = %c0 to %workgroup_x step %c1 {
+        %workgroup_x_idx = arith.index_cast %workgroup_x : i32 to index
+        scf.for %i = %c0 to %workgroup_x_idx step %c1 {
           %idx = arith.muli %i, %c4 : index
           %lhs = util.buffer.load %buffer0[%idx] : !util.buffer{%buffer0_size} -> f32
           %rhs = util.buffer.load %buffer1[%idx] : !util.buffer{%buffer1_size} -> f32
@@ -90,6 +92,9 @@ func.func private @dispatch_0()
 // CHECK-SAME:  %[[SIZE_XYZ:[a-z0-9]+]]: index, %[[SIZE_XYZ:[a-z0-9]+]]: index, %[[SIZE_XYZ:[a-z0-9]+]]: index,
 // CHECK-SAME:  %[[COUNT_X:[a-z0-9]+]]: index, %[[COUNT_Y:[a-z0-9]+]]: index, %[[COUNT_Z:[a-z0-9]+]]: index)
 
+// Type conversion; most of these will fold away.
+// CHECK: %[[X_I32:.+]] = arith.index_cast %[[X]]
+
 // Push constant rewritten to use args:
 // CHECK: %[[CONSTANT1_F32:.+]] = arith.sitofp %[[CONSTANT1]] : i32 to f32
 
@@ -102,7 +107,8 @@ func.func private @dispatch_0()
 // CHECK: %[[GLOBAL_CONSTANT:.+]] = util.global.load @global_constant_0 : !util.buffer
 // CHECK: util.do_not_optimize(%[[GLOBAL_CONSTANT]])
 
-// CHECK: scf.for %[[ELEMENT_INDEX:.+]] = %c0 to %[[X]]
+// CHECK: %[[X_IDX:.+]] = arith.index_cast %[[X_I32]]
+// CHECK: scf.for %[[ELEMENT_INDEX:.+]] = %c0 to %[[X_IDX]]
 // CHECK:   %[[ELEMENT_OFFSET:.+]] = arith.muli %[[ELEMENT_INDEX]]
 // CHECK:   %[[LHS:.+]] = util.buffer.load %[[BINDING0]][%[[ELEMENT_OFFSET]]] : !util.buffer{%[[BINDING0_SIZE]]} -> f32
 // CHECK:   %[[RHS:.+]] = util.buffer.load %[[BINDING1]][%[[ELEMENT_OFFSET]]] : !util.buffer{%[[BINDING1_SIZE]]} -> f32

@@ -89,31 +89,31 @@ func.func @check_mmt4d_with_init_tensor_and_fill(%arg0: tensor<24x8xf32>, %arg1:
 // CHECK-SAME:   outs(%[[DST_INIT]] :
 
 // -----
-func.func @check_mmt4d_i8_static_pad(%arg0: tensor<3x5xi8>, %arg1: tensor<5x2xi8>, %arg2: tensor<3x2xi32>) -> tensor<3x2xi32> {
-    %0 = linalg.matmul ins(%arg0, %arg1 : tensor<3x5xi8>, tensor<5x2xi8>) outs(%arg2 : tensor<3x2xi32>) -> tensor<3x2xi32>
-    return %0 : tensor<3x2xi32>
+func.func @check_mmt4d_i8_static_pad(%arg0: tensor<13x15xi8>, %arg1: tensor<15x12xi8>, %arg2: tensor<13x12xi32>) -> tensor<13x12xi32> {
+    %0 = linalg.matmul ins(%arg0, %arg1 : tensor<13x15xi8>, tensor<15x12xi8>) outs(%arg2 : tensor<13x12xi32>) -> tensor<13x12xi32>
+    return %0 : tensor<13x12xi32>
 }
 //CHECK-LABEL: @check_mmt4d_i8_static_pad(
-// CHECK-SAME: %[[LHS:.+]]: tensor<3x5xi8>, %[[RHS:.+]]: tensor<5x2xi8>, %[[ACC:.+]]: tensor<3x2xi32>)
-//      CHECK: %[[LHSPAD:.+]] = tensor.pad %[[LHS]] low[0, 0] high[5, 1]
-//      CHECK: tensor<3x5xi8> to tensor<8x6xi8>
-//      CHECK: %[[RHSPAD:.+]] = tensor.pad %[[RHS]] low[0, 0] high[1, 2]
-//      CHECK: tensor<5x2xi8> to tensor<6x4xi8>
-//      CHECK: %[[ACCPAD:.+]] = tensor.pad %[[ACC]] low[0, 0] high[5, 2]
-//      CHECK: tensor<3x2xi32> to tensor<8x4xi32>
+// CHECK-SAME: %[[LHS:.+]]: tensor<13x15xi8>, %[[RHS:.+]]: tensor<15x12xi8>, %[[ACC:.+]]: tensor<13x12xi32>)
+//      CHECK: %[[LHSPAD:.+]] = tensor.pad %[[LHS]] low[0, 0] high[3, 1]
+//      CHECK: tensor<13x15xi8> to tensor<16x16xi8>
+//      CHECK: %[[RHSPAD:.+]] = tensor.pad %[[RHS]] low[0, 0] high[1, 0]
+//      CHECK: tensor<15x12xi8> to tensor<16x12xi8>
+//      CHECK: %[[ACCPAD:.+]] = tensor.pad %[[ACC]] low[0, 0] high[3, 0]
+//      CHECK: tensor<13x12xi32> to tensor<16x12xi32>
 //      CHECK: %[[LHS4D:.+]] = tensor.expand_shape %[[LHSPAD]]
-// CHECK-SAME: tensor<8x6xi8> into tensor<1x8x3x2xi8>
+// CHECK-SAME: tensor<16x16xi8> into tensor<2x8x8x2xi8>
 //      CHECK: %[[RHS4D:.+]] = tensor.expand_shape %[[RHSPAD]]
-// CHECK-SAME: tensor<6x4xi8> into tensor<3x2x1x4xi8>
+// CHECK-SAME: tensor<16x12xi8> into tensor<8x2x3x4xi8>
 //      CHECK: %[[ACC4D:.+]] = tensor.expand_shape %[[ACCPAD]]
-// CHECK-SAME: tensor<8x4xi32> into tensor<1x8x1x4xi32>
+// CHECK-SAME: tensor<16x12xi32> into tensor<2x8x3x4xi32>
 //  ... After the above padding, we are reduced to the same stuff as we have
 //  ... already checked in the above testcases, so we skip checking that again.
 //      CHECK: %[[RESPAD:.+]] = tensor.collapse_shape
-// CHECK-SAME: tensor<1x8x1x4xi32> into tensor<8x4xi32>
-//      CHECK: %[[RES:.+]] = tensor.extract_slice %[[RESPAD]][0, 0] [3, 2] [1, 1]
-// CHECK-SAME: tensor<8x4xi32> to tensor<3x2xi32>
-//      CHECK: return %[[RES]] : tensor<3x2xi32>
+// CHECK-SAME: tensor<2x8x3x4xi32> into tensor<16x12xi32>
+//      CHECK: %[[RES:.+]] = tensor.extract_slice %[[RESPAD]][0, 0] [13, 12] [1, 1]
+// CHECK-SAME: tensor<16x12xi32> to tensor<13x12xi32>
+//      CHECK: return %[[RES]] : tensor<13x12xi32>
 
 // -----
 func.func @check_mmt4d_i8_dynamic(%arg0: tensor<?x?xi8>, %arg1: tensor<?x?xi8>, %arg2: tensor<?x?xi32>) -> tensor<?x?xi32> {
@@ -167,18 +167,37 @@ func.func @check_target_specific_mmt4d_f32_dynamic_matvec(%arg0: tensor<?x?xf32>
 }
 // AARCH64-BASELINE-LABEL:  @check_target_specific_mmt4d_f32_dynamic_matvec(
 // AARCH64-BASELINE:        linalg.mmt4d
-// AARCH64-BASELINE-SAME:     {comment =  "f32*f32->f32, aarch64, matrix*vector"}
+// AARCH64-BASELINE-SAME:     {comment =  "f32*f32->f32, aarch64, matrix * narrow matrix, where the narrow matrix has 1 column(s)"}
 // AARCH64-BASELINE-SAME:     ins({{.*}} : tensor<?x?x8x1xf32>, tensor<1x?x1x1xf32>) outs({{.*}} : tensor<?x1x8x1xf32>) -> tensor<?x1x8x1xf32>
+// -----
+func.func @check_target_specific_mmt4d_f32_dynamic_matrix_narrow_matrix(%arg0: tensor<?x?xf32>, %arg1: tensor<?x2xf32>, %arg2: tensor<?x2xf32>) -> tensor<?x2xf32> {
+    %0 = linalg.matmul ins(%arg0, %arg1 : tensor<?x?xf32>, tensor<?x2xf32>) outs(%arg2 : tensor<?x2xf32>) -> tensor<?x2xf32>
+    return %0 : tensor<?x2xf32>
+}
+// AARCH64-BASELINE-LABEL:  @check_target_specific_mmt4d_f32_dynamic_matrix_narrow_matrix(
+// AARCH64-BASELINE:        linalg.mmt4d
+// AARCH64-BASELINE-SAME:     {comment =  "f32*f32->f32, aarch64, matrix * narrow matrix, where the narrow matrix has 2 column(s)"}
+// AARCH64-BASELINE-SAME:     ins({{.*}} : tensor<?x?x8x1xf32>, tensor<1x?x2x1xf32>) outs({{.*}} : tensor<?x1x8x2xf32>) -> tensor<?x1x8x2xf32>
 
 // -----
-func.func @check_target_specific_mmt4d_f32_dynamic_vecmat(%arg0: tensor<1x?xf32>, %arg1: tensor<?x?xf32>, %arg2: tensor<1x?xf32>) -> tensor<1x?xf32> {
+func.func @check_target_specific_mmt4d_f32_dynamic_narrow_matrix_matrix(%arg0: tensor<1x?xf32>, %arg1: tensor<?x?xf32>, %arg2: tensor<1x?xf32>) -> tensor<1x?xf32> {
     %0 = linalg.matmul ins(%arg0, %arg1 : tensor<1x?xf32>, tensor<?x?xf32>) outs(%arg2 : tensor<1x?xf32>) -> tensor<1x?xf32>
     return %0 : tensor<1x?xf32>
 }
-// AARCH64-BASELINE-LABEL:  @check_target_specific_mmt4d_f32_dynamic_vecmat(
+// AARCH64-BASELINE-LABEL:  @check_target_specific_mmt4d_f32_dynamic_narrow_matrix_matrix(
 // AARCH64-BASELINE:        linalg.mmt4d
-// AARCH64-BASELINE-SAME:     {comment =  "f32*f32->f32, aarch64, vector*matrix"}
+// AARCH64-BASELINE-SAME:     {comment =  "f32*f32->f32, aarch64, narrow matrix * matrix, where the narrow matrix has 1 column(s)"}
 // AARCH64-BASELINE-SAME:     ins({{.*}} : tensor<1x?x1x1xf32>, tensor<?x?x8x1xf32>) outs({{.*}} : tensor<1x?x1x8xf32>) -> tensor<1x?x1x8xf32>
+
+// -----
+func.func @check_target_specific_mmt4d_f32_dynamic_vecmat2(%arg0: tensor<2x?xf32>, %arg1: tensor<?x?xf32>, %arg2: tensor<2x?xf32>) -> tensor<2x?xf32> {
+    %0 = linalg.matmul ins(%arg0, %arg1 : tensor<2x?xf32>, tensor<?x?xf32>) outs(%arg2 : tensor<2x?xf32>) -> tensor<2x?xf32>
+    return %0 : tensor<2x?xf32>
+}
+// AARCH64-BASELINE-LABEL:  @check_target_specific_mmt4d_f32_dynamic_vecmat2(
+// AARCH64-BASELINE:        linalg.mmt4d
+// AARCH64-BASELINE-SAME:     {comment =  "f32*f32->f32, aarch64, narrow matrix * matrix, where the narrow matrix has 2 column(s)"}
+// AARCH64-BASELINE-SAME:     ins({{.*}} : tensor<1x?x2x1xf32>, tensor<?x?x8x1xf32>) outs({{.*}} : tensor<1x?x2x8xf32>) -> tensor<1x?x2x8xf32>
 
 // -----
 func.func @check_target_specific_mmt4d_i8_dynamic(%arg0: tensor<?x?xi8>, %arg1: tensor<?x?xi8>, %arg2: tensor<?x?xi32>) -> tensor<?x?xi32> {
@@ -207,12 +226,12 @@ func.func @check_target_specific_mmt4d_i8_dynamic_matvec(%arg0: tensor<?x?xi8>, 
 }
 // AARCH64-BASELINE-LABEL:  @check_target_specific_mmt4d_i8_dynamic_matvec(
 // AARCH64-BASELINE:        linalg.mmt4d
-// AARCH64-BASELINE-SAME:     {comment = "i8*i8->i32, aarch64, matrix*vector"}
+// AARCH64-BASELINE-SAME:     {comment = "i8*i8->i32, aarch64, matrix * narrow matrix, where the narrow matrix has 1 column(s)"}
 // AARCH64-BASELINE-SAME:     ins({{.*}} : tensor<?x?x8x8xi8>, tensor<1x?x1x8xi8>) outs({{.*}} : tensor<?x1x8x1xi32>) -> tensor<?x1x8x1xi32>
 
 // AARCH64-DOTPROD-LABEL:  @check_target_specific_mmt4d_i8_dynamic_matvec(
 // AARCH64-DOTPROD:        linalg.mmt4d
-// AARCH64-DOTPROD-SAME:     {comment = "i8*i8->i32, aarch64 +dotprod, matrix*vector"}
+// AARCH64-DOTPROD-SAME:     {comment = "i8*i8->i32, aarch64 +dotprod, matrix * narrow matrix, where the narrow matrix has 1 column(s)"}
 // AARCH64-DOTPROD-SAME:     ins({{.*}} : tensor<?x?x8x4xi8>, tensor<1x?x1x4xi8>) outs({{.*}} : tensor<?x1x8x1xi32>) -> tensor<?x1x8x1xi32>
 
 // -----
@@ -222,10 +241,10 @@ func.func @check_target_specific_mmt4d_i8_dynamic_vecmat(%arg0: tensor<1x?xi8>, 
 }
 // AARCH64-BASELINE-LABEL:  @check_target_specific_mmt4d_i8_dynamic_vecmat(
 // AARCH64-BASELINE:        linalg.mmt4d
-// AARCH64-BASELINE-SAME:     {comment = "i8*i8->i32, aarch64, vector*matrix"}
+// AARCH64-BASELINE-SAME:     {comment = "i8*i8->i32, aarch64, narrow matrix * matrix, where the narrow matrix has 1 column(s)"}
 // AARCH64-BASELINE-SAME:     ins({{.*}} : tensor<1x?x1x8xi8>, tensor<?x?x8x8xi8>) outs({{.*}} : tensor<1x?x1x8xi32>) -> tensor<1x?x1x8xi32>
 
 // AARCH64-DOTPROD-LABEL:  @check_target_specific_mmt4d_i8_dynamic_vecmat(
 // AARCH64-DOTPROD:        linalg.mmt4d
-// AARCH64-DOTPROD-SAME:     {comment = "i8*i8->i32, aarch64 +dotprod, vector*matrix"}
+// AARCH64-DOTPROD-SAME:     {comment = "i8*i8->i32, aarch64 +dotprod, narrow matrix * matrix, where the narrow matrix has 1 column(s)"}
 // AARCH64-DOTPROD-SAME:     ins({{.*}} : tensor<1x?x1x4xi8>, tensor<?x?x8x4xi8>) outs({{.*}} : tensor<1x?x1x8xi32>) -> tensor<1x?x1x8xi32>

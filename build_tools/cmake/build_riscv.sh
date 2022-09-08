@@ -12,6 +12,9 @@
 #
 # Host binaries (e.g. compiler tools) will be built and installed in build-host/
 # RISCV binaries (e.g. tests) will be built in build-riscv/.
+#
+# BUILD_PRESET can be: test, benchmark, benchmark-with-tracing to build with
+# different flags.
 
 set -xeuo pipefail
 
@@ -19,10 +22,11 @@ ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
 cd "${ROOT_DIR}"
 
 CMAKE_BIN="${CMAKE_BIN:-$(which cmake)}"
-RISCV_CONFIG="${RISCV_CONFIG:-rv64}"
+RISCV_ARCH="${RISCV_ARCH:-rv64}"
 RISCV_COMPILER_FLAGS="${RISCV_COMPILER_FLAGS:--O3}"
 IREE_HOST_BINARY_ROOT="$(realpath ${IREE_HOST_BINARY_ROOT})"
 BUILD_RISCV_DIR="${BUILD_RISCV_DIR:-$ROOT_DIR/build-riscv}"
+BUILD_PRESET="${BUILD_PRESET:-test}"
 
 # --------------------------------------------------------------------------- #
 # Build for the target (riscv).
@@ -33,7 +37,7 @@ else
   mkdir -p "${BUILD_RISCV_DIR}"
 fi
 
-echo "Build riscv target with the config of ${RISCV_CONFIG}"
+echo "Build riscv target with the config of ${RISCV_ARCH}"
 TOOLCHAIN_FILE="$(realpath ${ROOT_DIR}/build_tools/cmake/riscv.toolchain.cmake)"
 declare -a args
 args=(
@@ -41,20 +45,18 @@ args=(
   "-B" "${BUILD_RISCV_DIR}"
   -DCMAKE_TOOLCHAIN_FILE="${TOOLCHAIN_FILE}"
   -DIREE_HOST_BINARY_ROOT="${IREE_HOST_BINARY_ROOT}"
-  -DRISCV_CPU="${RISCV_CONFIG}"
+  -DRISCV_CPU="${RISCV_ARCH}"
   -DRISCV_COMPILER_FLAGS="${RISCV_COMPILER_FLAGS}"
-  -DIREE_ENABLE_ASSERTIONS=ON
   -DIREE_BUILD_COMPILER=OFF
   # CPU info doesn't work on RISCV
   -DIREE_ENABLE_CPUINFO=OFF
-  -DIREE_BUILD_SAMPLES=ON
 )
 
-if [[ "${RISCV_CONFIG}" == "rv64" ]]; then
+if [[ "${RISCV_ARCH}" == "rv64" ]]; then
   args+=(
     -DRISCV_TOOLCHAIN_ROOT="${RISCV_RV64_LINUX_TOOLCHAIN_ROOT}"
   )
-elif [[ "${RISCV_CONFIG}" == "rv32-baremetal" ]]; then
+elif [[ "${RISCV_ARCH}" == "rv32-baremetal" ]]; then
   args+=(
     # TODO(#6353): Off until tools/ are refactored to support threadless config.
     -DIREE_BUILD_TESTS=OFF
@@ -64,6 +66,34 @@ else
   echo "riscv config not supported yet"
   return -1
 fi
+
+case "${BUILD_PRESET}" in
+  test)
+    args+=(
+      -DIREE_ENABLE_ASSERTIONS=ON
+      -DIREE_BUILD_SAMPLES=ON
+    )
+    ;;
+  benchmark)
+    args+=(
+      -DIREE_ENABLE_ASSERTIONS=OFF
+      -DIREE_BUILD_SAMPLES=OFF
+      -DIREE_BUILD_TESTS=OFF
+    )
+    ;;
+  benchmark-with-tracing)
+    args+=(
+      -DIREE_ENABLE_ASSERTIONS=OFF
+      -DIREE_BUILD_SAMPLES=OFF
+      -DIREE_BUILD_TESTS=OFF
+      -DIREE_ENABLE_RUNTIME_TRACING=ON
+    )
+    ;;
+  *)
+    echo "Unknown build preset: ${BUILD_PRESET}"
+    exit 1
+    ;;
+esac
 
 args_str=$(IFS=' ' ; echo "${args[*]}")
 "${CMAKE_BIN}" ${args_str} "${ROOT_DIR}"

@@ -60,10 +60,13 @@ iree_compiler_cc_library(
     deps = [
         ":CommonExtensionsOpGen",
         "//compiler/src/iree/compiler/Codegen:PassHeaders",
+        "//compiler/src/iree/compiler/Codegen/Common:CommonPasses",
         "//compiler/src/iree/compiler/Codegen/Interfaces:BufferizationInterfaces",
+        "//compiler/src/iree/compiler/Dialect/HAL/IR",
         "//llvm-external-projects/iree-dialects:IREEDialectsTransforms",
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:BufferizationTransforms",
         "@llvm-project//mlir:Pass",

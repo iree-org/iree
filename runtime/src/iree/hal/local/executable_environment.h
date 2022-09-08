@@ -10,24 +10,12 @@
 #include <stdint.h>
 
 #include "iree/base/api.h"
-#include "iree/base/internal/cpu.h"
 #include "iree/hal/api.h"
 #include "iree/hal/local/executable_library.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
-
-//===----------------------------------------------------------------------===//
-// iree_hal_processor_*_t
-//===----------------------------------------------------------------------===//
-
-// Queries the current processor information and writes it to |out_processor|.
-// |temp_allocator| may be used for temporary allocations required while
-// querying. If the processor cannot be queried then |out_processor| will be
-// zeroed.
-void iree_hal_processor_query(iree_allocator_t temp_allocator,
-                              iree_hal_processor_v0_t* out_processor);
 
 //===----------------------------------------------------------------------===//
 // iree_hal_executable_environment_*_t

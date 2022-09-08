@@ -22,12 +22,12 @@ mlir::torch::TMTensor::detail::verifyTMTensorOpInterface(Operation *op) {
           "expected inputs and outputs to be RankedTensorType or scalar");
     }
 
-    if (op->getNumResults() != mtTensorOp.outputs().size()) {
+    if (op->getNumResults() != mtTensorOp.getOutputs().size()) {
       return mtTensorOp.emitOpError(
           "expected number of outputs to be same as the number of results");
     }
     for (auto en : llvm::enumerate(op->getResultTypes())) {
-      Type outputType = mtTensorOp.outputs()[en.index()].getType();
+      Type outputType = mtTensorOp.getOutputs()[en.index()].getType();
       if (en.value() != outputType) {
         return mtTensorOp.emitOpError("expected type of `outs` operand #")
                << en.index() << " " << outputType

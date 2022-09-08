@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+// THIS IS STILL JUST A PLACEHOLDER - NOT AN ACTUAL TEST YET.
+
 #include <stdint.h>
 
 // Include in expected order with stdint and other system headers first.
@@ -13,14 +15,11 @@
 
 #include "iree/base/api.h"
 #include "iree/builtins/ukernel/mmt4d.h"
-#include "iree/builtins/ukernel/mmt4d_generic.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
 TEST(MMT4DTest, iree_mmt4d_example_matmul_f32) {
-  // Just ensuring that the code links today.
-  // This should call iree_mmt4d_example_matmul_f32_generic and compare the
-  // results to that.
-  EXPECT_EQ(0, iree_mmt4d_example_matmul_f32(NULL, 0, NULL, 0, NULL, 0, 0, 0, 0,
-                                             0.0f, 0.0f));
+  iree_ukernel_mmt4d_f32f32f32_params_t params;
+  memset(&params, 0, sizeof params);
+  EXPECT_EQ(0, iree_ukernel_mmt4d_f32f32f32(&params));
 }

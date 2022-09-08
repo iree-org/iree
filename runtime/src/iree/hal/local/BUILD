@@ -63,6 +63,7 @@ iree_runtime_cc_test(
         ":executable_library",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base/internal:cpu",
     ],
 )
 
@@ -107,6 +108,7 @@ iree_runtime_cc_library(
         "//runtime/src/iree/base:core_headers",
         "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/base/internal:cpu",
         "//runtime/src/iree/base/internal:fpu_state",
         "//runtime/src/iree/hal",
     ],

@@ -10,7 +10,7 @@
 
 set -euo pipefail
 
-export DOCKER_WORKDIR="${GITHUB_WORKSPACE}"
-export DOCKER_TMPDIR="${RUNNER_TEMP}"
+export DOCKER_HOST_WORKDIR="${GITHUB_WORKSPACE}"
+export DOCKER_HOST_TMPDIR="${RUNNER_TEMP}"
 
 "${GITHUB_WORKSPACE}/build_tools/docker/docker_run.sh" "$@"

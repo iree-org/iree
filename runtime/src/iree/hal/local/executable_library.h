@@ -220,13 +220,15 @@ typedef struct iree_hal_executable_import_table_v0_t {
 // allows us to simplify this interface as we can't for example load the same
 // executable library for both aarch64 on riscv32 and don't need to normalize
 // any of the fields across them both.
+//
+// See iree/schemas/cpu_data.h for details.
 typedef struct iree_hal_processor_v0_t {
   // Opaque architecture-specific encoding in 64-bit words.
   // This may represent a fixed-length data structure, a series of hardware
   // registers, or key-value pairs.
   //
   // The contents are opaque here as to support out-of-tree architectures. The
-  // runtime code deriving the identifier/flags and providing it here is losely
+  // runtime code deriving the identifier/flags and providing it here is loosely
   // coupled with the compiler code emitting checks based on the identifier and
   // only those two places ever need to change.
   uint64_t data[IREE_HAL_PROCESSOR_DATA_CAPACITY_V0];

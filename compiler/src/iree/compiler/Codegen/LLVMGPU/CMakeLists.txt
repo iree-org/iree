@@ -16,6 +16,7 @@ iree_cc_library(
   HDRS
     "ConvertToLLVM.h"
     "KernelConfig.h"
+    "TilingUtils.h"
   SRCS
     "ConvertToLLVM.cpp"
     "ConvertToNVVM.cpp"
@@ -25,14 +26,13 @@ iree_cc_library(
     "LLVMGPULowerExecutableTarget.cpp"
     "LLVMGPUMultiBuffering.cpp"
     "LLVMGPUReduceBankConflicts.cpp"
+    "LLVMGPUTensorAlloc.cpp"
     "LLVMGPUTensorCoreVectorization.cpp"
     "LLVMGPUTileAndDistribute.cpp"
     "LLVMGPUTileTensor.cpp"
     "LLVMGPUVectorLowering.cpp"
     "LLVMGPUVectorToGPU.cpp"
-    "LLVMGPUVectorization.cpp"
     "Passes.cpp"
-    "VectorReductionToGPU.cpp"
     "Verifiers.cpp"
   DEPS
     IREELinalgExtDialect
@@ -47,6 +47,7 @@ iree_cc_library(
     MLIRArithmeticDialect
     MLIRArithmeticToLLVM
     MLIRArithmeticTransforms
+    MLIRBufferizationDialect
     MLIRControlFlowToLLVM
     MLIRFuncDialect
     MLIRFuncToLLVM

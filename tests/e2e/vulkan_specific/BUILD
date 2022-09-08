@@ -21,7 +21,7 @@ iree_check_single_backend_test_suite(
     ],
     compiler_flags = [
         "--iree-input-type=mhlo",
-        "--iree-vulkan-target-triple=valhall-unknown-android11",
+        "--iree-vulkan-target-triple=valhall-unknown-android31",
     ],
     driver = "vulkan",
     tags = [
@@ -39,7 +39,7 @@ iree_check_single_backend_test_suite(
     ],
     compiler_flags = [
         "--iree-input-type=mhlo",
-        "--iree-vulkan-target-triple=valhall-unknown-android11",
+        "--iree-vulkan-target-triple=valhall-unknown-android31",
     ],
     driver = "vulkan",
     target_backend = "vulkan-spirv",

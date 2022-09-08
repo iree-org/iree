@@ -22,7 +22,7 @@ iree_check_single_backend_test_suite(
     "vulkan"
   COMPILER_FLAGS
     "--iree-input-type=mhlo"
-    "--iree-vulkan-target-triple=valhall-unknown-android11"
+    "--iree-vulkan-target-triple=valhall-unknown-android31"
   LABELS
     "manual"
     "notap"
@@ -40,7 +40,7 @@ iree_check_single_backend_test_suite(
     "vulkan"
   COMPILER_FLAGS
     "--iree-input-type=mhlo"
-    "--iree-vulkan-target-triple=valhall-unknown-android11"
+    "--iree-vulkan-target-triple=valhall-unknown-android31"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

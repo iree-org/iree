@@ -7,6 +7,7 @@
 #include "iree/modules/hal/inline/module.h"
 
 #include "iree/base/api.h"
+#include "iree/base/internal/cpu.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/utils/buffer_diagnostics.h"
@@ -499,13 +500,13 @@ IREE_VM_ABI_EXPORT(iree_hal_inline_module_device_query_i64,  //
   // properties or user-provided ones. For now we could at least provide
   // compile-time configuration (like hosting architecture) but nothing dynamic
   // (like cache sizes).
-  // The full HAL asks iree_hal_device_t but we don't have that here:
-  //   iree_hal_device_query_i64(device, category_str, key_str, &value);
-  (void)category_str;
-  (void)key_str;
 
-  int64_t value = 0;
   iree_status_t query_status = iree_status_from_code(IREE_STATUS_NOT_FOUND);
+  int64_t value = 0;
+  if (iree_string_view_equal(category_str, IREE_SV("hal.cpu"))) {
+    query_status = iree_cpu_lookup_data_by_key(key_str, &value);
+  }
+
   rets->i0 = iree_status_consume_code(query_status) == IREE_STATUS_OK ? 1 : 0;
   rets->i1 = value;
   return iree_ok_status();

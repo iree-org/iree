@@ -216,11 +216,13 @@ class InlineExecutablesPass
     }
 
     // Take care of the workgroup id/size/count tuples.
+    auto entryBuilder = OpBuilder::atBlockBegin(entryBlock);
     for (unsigned i = 0; i < 3 * /*xyz=*/3; ++i) {
       newArgTypes.push_back(indexType);
       auto oldArg = entryBlock->getArgument(argOffset++);
-      oldArg.replaceAllUsesWith(
-          entryBlock->addArgument(indexType, oldArg.getLoc()));
+      auto newArg = entryBlock->addArgument(indexType, oldArg.getLoc());
+      oldArg.replaceAllUsesWith(entryBuilder.create<arith::IndexCastOp>(
+          oldArg.getLoc(), i32Type, newArg));
     }
 
     // Erase the original args.

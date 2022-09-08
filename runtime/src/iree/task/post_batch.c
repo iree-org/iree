@@ -100,29 +100,6 @@ static void iree_task_post_batch_wake_workers(
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE(z0, iree_math_count_ones_u64(wake_mask));
 
-  iree_task_executor_t* executor = post_batch->executor;
-
-  // Wake workers that may be suspended. We fetch the set of workers we need to
-  // wake (hopefully none in the common case) and mark that we've woken them so
-  // that we don't double-resume.
-  // The masks are accessed with 'relaxed' order because they are just hints.
-  iree_task_affinity_set_t resume_mask =
-      iree_atomic_task_affinity_set_fetch_and(&executor->worker_suspend_mask,
-                                              ~wake_mask,
-                                              iree_memory_order_relaxed);
-  resume_mask &= wake_mask;
-  if (IREE_UNLIKELY(resume_mask)) {
-    int resume_count = iree_task_affinity_set_count_ones(resume_mask);
-    int worker_index = 0;
-    for (int i = 0; i < resume_count; ++i) {
-      int offset = iree_task_affinity_set_count_trailing_zeros(resume_mask) + 1;
-      int resume_index = worker_index + offset;
-      worker_index += offset + 1;
-      resume_mask = iree_shr(resume_mask, offset + 1);
-      iree_thread_resume(executor->workers[resume_index].thread);
-    }
-  }
-
   // TODO(#4016): use a FUTEX_WAKE_BITSET here to wake all of the workers that
   // have pending work in a single syscall (vs. popcnt(worker_pending_mask)
   // syscalls). This will reduce wake latency for workers later in the set;
@@ -131,6 +108,7 @@ static void iree_task_post_batch_wake_workers(
   // information the kernel could use to avoid core migration as it knows when N
   // threads will be needed simultaneously and can hopefully perform any needed
   // migrations prior to beginning execution.
+  iree_task_executor_t* executor = post_batch->executor;
   int wake_count = iree_task_affinity_set_count_ones(wake_mask);
   int worker_index = 0;
   for (int i = 0; i < wake_count; ++i) {

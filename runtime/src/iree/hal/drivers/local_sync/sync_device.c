@@ -11,9 +11,11 @@
 #include <string.h>
 
 #include "iree/base/internal/arena.h"
+#include "iree/base/internal/cpu.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/local_sync/sync_event.h"
 #include "iree/hal/drivers/local_sync/sync_semaphore.h"
+#include "iree/hal/local/executable_environment.h"
 #include "iree/hal/local/inline_command_buffer.h"
 #include "iree/hal/local/local_executable_cache.h"
 #include "iree/hal/local/local_pipeline_layout.h"
@@ -160,26 +162,25 @@ static iree_status_t iree_hal_sync_device_query_i64(
   iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
   *out_value = 0;
 
-  if (iree_string_view_equal(category,
-                             iree_make_cstring_view("hal.executable.format"))) {
+  if (iree_string_view_equal(category, IREE_SV("hal.executable.format"))) {
     *out_value =
         iree_hal_query_any_executable_loader_support(
             device->loader_count, device->loaders, /*caching_mode=*/0, key)
             ? 1
             : 0;
     return iree_ok_status();
-  } else if (iree_string_view_equal(category,
-                                    iree_make_cstring_view("hal.device"))) {
-    if (iree_string_view_equal(key, iree_make_cstring_view("concurrency"))) {
+  } else if (iree_string_view_equal(category, IREE_SV("hal.device"))) {
+    if (iree_string_view_equal(key, IREE_SV("concurrency"))) {
       *out_value = 1;
       return iree_ok_status();
     }
-  } else if (iree_string_view_equal(category,
-                                    iree_make_cstring_view("hal.dispatch"))) {
-    if (iree_string_view_equal(key, iree_make_cstring_view("concurrency"))) {
+  } else if (iree_string_view_equal(category, IREE_SV("hal.dispatch"))) {
+    if (iree_string_view_equal(key, IREE_SV("concurrency"))) {
       *out_value = 1;
       return iree_ok_status();
     }
+  } else if (iree_string_view_equal(category, IREE_SV("hal.cpu"))) {
+    return iree_cpu_lookup_data_by_key(key, out_value);
   }
 
   return iree_make_status(
@@ -191,18 +192,18 @@ static iree_status_t iree_hal_sync_device_query_i64(
 static iree_status_t iree_hal_sync_device_create_command_buffer(
     iree_hal_device_t* base_device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
-    iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
     iree_hal_command_buffer_t** out_command_buffer) {
   if (iree_all_bits_set(mode,
                         IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION)) {
     return iree_hal_inline_command_buffer_create(
-        base_device, mode, command_categories, queue_affinity,
+        base_device, mode, command_categories, queue_affinity, binding_capacity,
         iree_hal_device_host_allocator(base_device), out_command_buffer);
   } else {
     iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
     return iree_hal_deferred_command_buffer_create(
-        base_device, mode, command_categories, &device->large_block_pool,
-        device->host_allocator, out_command_buffer);
+        base_device, mode, command_categories, binding_capacity,
+        &device->large_block_pool, device->host_allocator, out_command_buffer);
   }
 }
 
@@ -228,7 +229,7 @@ static iree_status_t iree_hal_sync_device_create_executable_cache(
     iree_loop_t loop, iree_hal_executable_cache_t** out_executable_cache) {
   iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
   return iree_hal_local_executable_cache_create(
-      identifier, device->loader_count, device->loaders,
+      identifier, /*worker_capacity=*/1, device->loader_count, device->loaders,
       iree_hal_device_host_allocator(base_device), out_executable_cache);
 }
 
@@ -315,9 +316,11 @@ static iree_status_t iree_hal_sync_device_apply_deferred_command_buffers(
           iree_hal_command_buffer_mode(command_buffer) |
               IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION,
           IREE_HAL_COMMAND_CATEGORY_ANY, IREE_HAL_QUEUE_AFFINITY_ANY,
-          device->host_allocator, storage, &inline_command_buffer));
+          /*binding_capacity=*/0, device->host_allocator, storage,
+          &inline_command_buffer));
       iree_status_t status = iree_hal_deferred_command_buffer_apply(
-          command_buffer, inline_command_buffer);
+          command_buffer, inline_command_buffer,
+          iree_hal_buffer_binding_table_empty());
       iree_hal_inline_command_buffer_deinitialize(inline_command_buffer);
       IREE_RETURN_IF_ERROR(status);
     }

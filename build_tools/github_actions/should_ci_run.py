@@ -26,7 +26,6 @@ SKIP_CI_TAG = "skip-ci"
 SKIP_PATH_PATTERNS = [
     "docs/*",
     "experimental/*",
-    "build_tools/kokoro/*",
     "build_tools/buildkite/*",
     ".github/ISSUE_TEMPLATE/*",
     "*.cff",

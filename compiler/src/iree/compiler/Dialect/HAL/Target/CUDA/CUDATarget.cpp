@@ -9,7 +9,7 @@
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/CUDA/LLVMPasses.h"
-#include "iree/compiler/Dialect/HAL/Target/CUDA/libdevice.h"
+#include "iree/compiler/Dialect/HAL/Target/CUDA/cuda_libdevice.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
 #include "iree/schemas/cuda_executable_def_builder.h"
@@ -37,11 +37,13 @@ static llvm::cl::opt<bool> dumpPtx(
     "iree-hal-cuda-dump-ptx", llvm::cl::init(false),
     llvm::cl::desc("Dump ptx to the debug stream."));
 
+// TODO: remove this workaround altogether once we decide not to support
+// CUDA 11.3
 static llvm::cl::opt<bool> clDisableLoopNounrollWa(
     "iree-hal-cuda-disable-loop-nounroll-wa",
     llvm::cl::desc("Disable the workaround for bug in ptxas for CUDA version "
                    "before 11.4."),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 static llvm::cl::opt<std::string> clTargetChip(
     "iree-hal-cuda-llvm-target-arch", llvm::cl::desc("LLVM target chip."),

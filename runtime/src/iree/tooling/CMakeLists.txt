@@ -36,19 +36,6 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    cpu_features
-  HDRS
-    "cpu_features.h"
-  SRCS
-    "cpu_features.c"
-  DEPS
-    iree::base
-    iree::base::target_platform
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     device_util
   HDRS
     "device_util.h"

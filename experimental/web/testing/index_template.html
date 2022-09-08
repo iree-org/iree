@@ -31,6 +31,12 @@ SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
     .monospace {
       font-family: monospace;
     }
+
+    .tests-list {
+      max-height: 100%;
+      overflow-y: scroll;
+      overflow-wrap: anywhere;
+    }
   </style>
 
   <!-- https://getbootstrap.com/ for some webpage styling-->
@@ -39,14 +45,15 @@ SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 </head>
 
 <body class="d-flex">
-  <div class="container full-height d-flex flex-column">
+  <div class="container-fluid full-height d-flex flex-column">
     <h1>IREE Web Test Runner</h1>
 
-    <!-- TODO(scotttodd): adjust CSS overflow/wrapping for these columns -->
-    <div class="row flex-1">
+    <div class="row flex-1" style="overflow: hidden">
       <!-- Left column: list of tests -->
-      <div class="col-4 bg-dark bg-opacity-10">
-        <ul class="monospace">
+      <!-- TODO(scotttodd): search/filtering -->
+      <!-- TODO(scotttodd): tree view with "run tests in subtree" -->
+      <div class="col-4 bg-dark bg-opacity-10 tests-list pt-2">
+        <ul class="monospace" style="font-size: small;">
           {{TEST_LIST}}
         </ul>
       </div>

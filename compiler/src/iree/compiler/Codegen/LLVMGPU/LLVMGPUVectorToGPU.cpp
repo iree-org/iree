@@ -88,6 +88,7 @@ static void createAsyncGroups(func::FuncOp funcOp) {
           writeOp.getSource(), writeOp.getIndices(), readOp.getSource(),
           readOp.getIndices(),
           builder.getIndexAttr(readOp.getVectorType().getNumElements()),
+          Value(),
           /*bypassL1=*/llvmgpuUseMMASync ? builder.getUnitAttr() : UnitAttr());
       tokens.push_back(token);
     }
@@ -99,6 +100,23 @@ static void createAsyncGroups(func::FuncOp funcOp) {
                                              nullptr);
     // Clean up old stores.
     for (vector::TransferWriteOp writeOp : group) writeOp.erase();
+  }
+}
+
+static void swizzleSharedMemory(func::FuncOp funcOp) {
+  SmallVector<memref::AllocOp> shmAllocOps;
+  funcOp->walk([&](memref::AllocOp allocOp) {
+    auto memrefType = allocOp.getMemref().getType().cast<MemRefType>();
+    // Only apply it to shared memory of input operands.
+    if (memrefType.getMemorySpaceAsInt() !=
+            gpu::GPUDialect::getWorkgroupAddressSpace() ||
+        memrefType.getRank() < 3)
+      return;
+    shmAllocOps.push_back(allocOp);
+  });
+  for (auto allocOp : shmAllocOps) {
+    (void)nvgpu::optimizeSharedMemoryReadsAndWrites(funcOp,
+                                                    allocOp.getMemref());
   }
 }
 
@@ -240,29 +258,31 @@ struct LLVMGPUVectorToGPUPass
     }
     RewritePatternSet patterns(funcOp.getContext());
     populatePrepareVectorToMMAPatterns(patterns, llvmgpuUseMMASync);
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(patterns)))) {
+      return signalPassFailure();
+    }
 
     if (llvmgpuUseMMASync) {
-      (void)convertVectorToNVVMCompatibleMMASync(funcOp);
-
-      // TODO: Remove once populateMmaSyncF32ToTF32Patterns is fixed to not add
-      // attribute tf32 attributes to none f32 ops.
-      bool hasFP32mma = false;
-      funcOp.walk([&hasFP32mma](nvgpu::MmaSyncOp op) {
-        if (op.getType().cast<VectorType>().getElementType().isF32())
-          hasFP32mma = true;
-      });
-      if (hasFP32mma) {
-        // Use TF32 for float32 case for now.
-        RewritePatternSet patterns(funcOp.getContext());
-        nvgpu::populateMmaSyncF32ToTF32Patterns(
-            patterns, nvgpu::MmaSyncF32Lowering::TF32);
-        (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+      if (failed(convertVectorToNVVMCompatibleMMASync(funcOp))) {
+        return signalPassFailure();
+      }
+      // Use TF32 for float32 case for now.
+      RewritePatternSet f32ToTF32patterns(funcOp.getContext());
+      nvgpu::populateMmaSyncF32ToTF32Patterns(f32ToTF32patterns,
+                                              nvgpu::MmaSyncF32Lowering::TF32);
+      if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                              std::move(f32ToTF32patterns)))) {
+        return signalPassFailure();
       }
     } else {
       convertVectorToMMAOps(funcOp);
     }
     createAsyncGroups(funcOp);
+
+    if (llvmgpuUseMMASync) {
+      swizzleSharedMemory(funcOp);
+    }
   }
 };
 }  // namespace

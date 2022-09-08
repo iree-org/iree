@@ -171,8 +171,9 @@ static iree_status_t iree_hal_executable_library_run(
   // Perform the load, which will fail if the executable cannot be loaded or
   // there was an issue with the layouts.
   iree_hal_executable_t* executable = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_executable_loader_try_load(
-      executable_loader, &executable_params, &executable));
+  IREE_RETURN_IF_ERROR(
+      iree_hal_executable_loader_try_load(executable_loader, &executable_params,
+                                          /*worker_capacity=*/1, &executable));
   iree_hal_local_executable_t* local_executable =
       iree_hal_local_executable_cast(executable);
 

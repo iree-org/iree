@@ -22,7 +22,7 @@ linalg::transform::ScopeOp linalg::transform::wrapInScope(Operation *op) {
 
   auto scope = rewriter.create<linalg::transform::ScopeOp>(
       op->getLoc(), op->getResultTypes(), op->getOperands());
-  Region &body = scope.body();
+  Region &body = scope.getBody();
   rewriter.setInsertionPointToStart(&body.emplaceBlock());
   BlockAndValueMapping bv;
   SmallVector<Location> locs(op->getOperandTypes().size(), op->getLoc());
@@ -72,9 +72,10 @@ FailureOr<SmallVector<Operation *>>
 linalg::transform::unwrapScope(linalg::transform::ScopeOp scope) {
   ScopeInliner interface(scope->getContext());
   SmallVector<Operation *> ops;
-  scope.body().walk([&](Operation *op) { ops.push_back(op); });
-  if (failed(inlineRegion(interface, &scope.body(), scope, scope.getOperands(),
-                          scope.getResults(), /*inlineLoc=*/{},
+  scope.getBody().walk([&](Operation *op) { ops.push_back(op); });
+  if (failed(inlineRegion(interface, &scope.getBody(), scope,
+                          scope.getOperands(), scope.getResults(),
+                          /*inlineLoc=*/{},
                           /*shouldCloneInlinedRegion=*/false)))
     return failure();
   Rewriter(scope->getContext()).eraseOp(scope);

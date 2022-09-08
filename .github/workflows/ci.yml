@@ -8,23 +8,25 @@ name: CI
 
 # A few notes:
 #
+# Variables:
 # GitHub actions don't have variables or even support normal yaml anchors (they
 # are specially disabled because...reasons?):
 # See https://github.com/github-community/community/discussions/4501
 # https://github.community/t/support-for-yaml-anchors/16128/92
 # https://github.com/actions/runner/issues/1182
-#
-# Neither does it have any variables that are available everywhere. The
-# top-level `env` field is available in many places, but not all
+# Neither does it have any contexts that are available everywhere. The
+# top-level `env` field is available in many places, but not all. We already
+# have a "should-run" job that every other job depends on, so we leverage that
+# for variables that every other job can use, since that *is* available in all
+# sub-fields of the job.
 # See https://docs.github.com/en/actions/learn-github-actions/contexts#context-availability
 # and https://github.com/community/community/discussions/27370
 #
-# So there are some odd patterns that are repeated in many places. To avoid
-# repeating the comments, they are mentioned here:
-#
+# Runner label ordering:
 # - self-hosted always has to be listed first in a runs-on block:
 # https://docs.github.com/en/actions/hosting-your-own-runners/using-self-hosted-runners-in-a-workflow
 #
+# Pseudo-ternary hack:
 # - We have to do a weird hack to get a pseudo-ternary operator. See
 # https://github.com/actions/runner/issues/409, hence patterns like:
 # `github.event_name == 'pull_request' && 'presubmit' || 'postsubmit'`
@@ -48,11 +50,14 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GCS_DIR: gs://iree-github-actions-${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}-artifacts/${{ github.run_id }}/${{ github.run_attempt }}
+  # This is mostly here so we can compute it once and use it in outputs below.
+  # See note above regarding lack of proper variables. Also see note about
+  # pseudo-ternary hack.
+  _CI_STAGE: ${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
 
 # Jobs are organized into groups and topologically sorted by dependencies
 jobs:
-  should_run:
+  setup:
     runs-on: ubuntu-20.04
     env:
       # The commit being checked out is the merge commit for the PR. Its first
@@ -61,6 +66,13 @@ jobs:
       PR_DESCRIPTION: ${{ github.event.pull_request.body }}
     outputs:
       should-run: ${{ steps.should-run.outputs.should-run }}
+      # Variables for dependent jobs. See comment at top.
+      runner-env: prod
+      gcs-dir: gs://iree-github-actions-${{ env._CI_STAGE }}-artifacts/${{ github.run_id }}/${{ github.run_attempt }}
+      runner-group: ${{ env._CI_STAGE }}
+      # Note that we can't flip the condition here because 0 is falsey. See
+      # comment at top.
+      write-caches: ${{ github.event_name != 'pull_request' && 1 || 0 }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
@@ -92,12 +104,12 @@ jobs:
   # Jobs that build all of IREE "normally"
   ##############################################################################
   build_all:
-    needs: should_run
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: setup
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
-      # Pseudo-ternary hack and order matters. See comment at top of file.
-      - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
     env:
@@ -107,7 +119,7 @@ jobs:
       # dependent jobs.
       build-dir: ${{ env.BUILD_DIR }}
       build-dir-archive: ${{ steps.archive.outputs.build-dir-archive }}
-      gcs-artifact: ${{ steps.upload.outputs.gcs-artifact }}
+      build-dir-gcs-artifact: ${{ steps.upload.outputs.build-dir-gcs-artifact }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
@@ -138,19 +150,19 @@ jobs:
       - name: "Uploading build dir archive"
         id: upload
         env:
-          GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.build-dir-archive }}
           BUILD_DIR_ARCHIVE: ${{ steps.archive.outputs.build-dir-archive }}
+          BUILD_DIR_GCS_ARTIFACT: ${{ needs.setup.outputs.gcs-dir }}/${{ steps.archive.outputs.build-dir-archive }}
         run: |
-          gcloud alpha storage cp "${BUILD_DIR_ARCHIVE}" "${GCS_ARTIFACT}"
-          echo "::set-output name=gcs-artifact::${GCS_ARTIFACT}"
+          gcloud alpha storage cp "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR_GCS_ARTIFACT}"
+          echo "::set-output name=build-dir-gcs-artifact::${BUILD_DIR_GCS_ARTIFACT}"
 
   build_test_all_bazel:
-    needs: should_run
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: setup
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
-      # Pseudo-ternary hack and order matters. See comment at top of file.
-      - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
     steps:
@@ -160,38 +172,38 @@ jobs:
           submodules: true
       - name: "Building with Bazel"
         env:
-          # Psuedo-ternary hack. Don't swap the condition! See comment at top of file.
-          IREE_BAZEL_WRITE_REMOTE_CACHE: ${{ github.event_name != 'pull_request' && 1 || 0 }}
+          IREE_BAZEL_WRITE_REMOTE_CACHE: ${{ needs.setup.outputs.write-caches }}
         # This doesn't really need everything in the frontends image, but we
         # want the cache to be shared with the integrations build (no point
         # building LLVM twice) and the cache key is the docker container it's
         # run in (to ensure correct cache hits).
         run: |
           ./build_tools/github_actions/docker_run.sh \
+            --env "IREE_BAZEL_WRITE_REMOTE_CACHE=${IREE_BAZEL_WRITE_REMOTE_CACHE}" \
             gcr.io/iree-oss/frontends-swiftshader@sha256:41e516b8c1b432e3c02896c4bf4b7f06df6a67371aa167b88767b8d4d2018ea6 \
             ./build_tools/bazel/build_core.sh
 
   test_all:
-    needs: [should_run, build_all]
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: [setup, build_all]
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
-      # Pseudo-ternary hack and order matters. See comment at top of file.
-      - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
     env:
       BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
       BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-      GCS_ARTIFACT: ${{ needs.build_all.outputs.gcs-artifact }}
+      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
         with:
           submodules: true
       - name: "Downloading build dir archive"
-        run: gcloud alpha storage cp "${GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
-      - name: "Extracting archive"
+        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+      - name: "Extracting build dir archive"
         run: tar -xf "${BUILD_DIR_ARCHIVE}"
       - name: "Testing all"
         run: |
@@ -202,18 +214,18 @@ jobs:
             "${BUILD_DIR}"
 
   test_gpu:
-    needs: [should_run, build_all]
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: [setup, build_all]
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
-      # Pseudo-ternary hack and order matters. See comment at top of file.
-      - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - gpu
       - os-family=Linux
     env:
       BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
       BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-      GCS_ARTIFACT: ${{ needs.build_all.outputs.gcs-artifact }}
+      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
@@ -224,8 +236,8 @@ jobs:
           ./build_tools/scripts/check_cuda.sh
           ./build_tools/scripts/check_vulkan.sh
       - name: "Downloading build dir archive"
-        run: gcloud alpha storage cp "${GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
-      - name: "Extracting archive"
+        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+      - name: "Extracting build dir archive"
         run: tar -xf "${BUILD_DIR_ARCHIVE}"
       - name: "Testing with GPU"
         run: |
@@ -245,8 +257,8 @@ jobs:
   # Jobs that build some subset of IREE
   ##############################################################################
   build_runtime:
-    needs: should_run
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: setup
+    if: needs.setup.outputs.should-run == 'true'
     runs-on: ubuntu-20.04
     env:
       BUILD_DIR: build-runtime
@@ -277,8 +289,8 @@ jobs:
           path: "${{ env.BUILD_DIR }}.tar"
 
   test_runtime:
-    needs: [should_run, build_runtime]
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: [setup, build_runtime]
+    if: needs.setup.outputs.should-run == 'true'
     runs-on: ubuntu-20.04
     env:
       BUILD_DIR: ${{ needs.build_runtime.outputs.build-dir }}
@@ -287,11 +299,11 @@ jobs:
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
         with:
           submodules: true
-      - name: "Downloading runtime build directory"
+      - name: "Downloading runtime build dir archive"
         uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741 # v3.0.0
         with:
           name: "${{ env.BUILD_DIR }}.tar"
-      - name: "Extracting archive"
+      - name: "Extracting runtime build dir archive"
         run: tar -xf ${BUILD_DIR}.tar
       - name: "Testing runtime"
         run: |
@@ -301,30 +313,22 @@ jobs:
             ./build_tools/cmake/ctest_all.sh \
             "${BUILD_DIR}"
 
-  host_tools_assertions:
-    needs: should_run
-    if: needs.should_run.outputs.should-run == 'true'
-    uses: ./.github/workflows/host_tools.yml
-    with:
-      host-binary-root: host-tools-assertions
-      enable-assertions: "ON"
-
   ################################# Tensorflow #################################
   # Jobs that build the IREE-Tensorflow integrations
   ##############################################################################
   build_tf_integrations:
-    needs: should_run
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: setup
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
-      # Pseudo-ternary hack and order matters. See comment at top of file.
-      - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
     outputs:
       binaries-dir: ${{ steps.build.outputs.binaries-dir }}
       binaries-archive: ${{ steps.archive.outputs.binaries-archive }}
-      gcs-artifact: ${{ steps.upload.outputs.gcs-artifact }}
+      binaries-gcs-artifact: ${{ steps.upload.outputs.binaries-gcs-artifact }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
@@ -334,11 +338,11 @@ jobs:
         id: build
         env:
           IREE_TF_BINARIES_OUTPUT_DIR: iree-tf-binaries
-          # Psuedo-ternary hack. Don't swap the condition! See comment at top of file.
-          IREE_BAZEL_WRITE_REMOTE_CACHE: ${{ github.event_name != 'pull_request' && 1 || 0 }}
+          IREE_BAZEL_WRITE_REMOTE_CACHE: ${{ needs.setup.outputs.write-caches }}
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            --env "IREE_TF_BINARIES_OUTPUT_DIR=$(realpath "${IREE_TF_BINARIES_OUTPUT_DIR}")" \
+            --env "IREE_BAZEL_WRITE_REMOTE_CACHE=${IREE_BAZEL_WRITE_REMOTE_CACHE}" \
+            --env "IREE_TF_BINARIES_OUTPUT_DIR=${IREE_TF_BINARIES_OUTPUT_DIR}" \
             gcr.io/iree-oss/frontends-swiftshader@sha256:3090418a8d8a64c356d35eff285af32570a72f41127aa123209c1562f57abb01 \
             build_tools/cmake/build_tf_binaries.sh
           echo "::set-output name=binaries-dir::${IREE_TF_BINARIES_OUTPUT_DIR}"
@@ -353,28 +357,28 @@ jobs:
       - name: "Uploading binaries archive"
         id: upload
         env:
-          GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.binaries-archive }}
           BINARIES_ARCHIVE: ${{ steps.archive.outputs.binaries-archive }}
+          BINARIES_GCS_ARTIFACT: ${{ needs.setup.outputs.gcs-dir }}/${{ steps.archive.outputs.binaries-archive }}
         run: |
-          gcloud alpha storage cp "${BINARIES_ARCHIVE}" "${GCS_ARTIFACT}"
-          echo "::set-output name=gcs-artifact::${GCS_ARTIFACT}"
+          gcloud alpha storage cp "${BINARIES_ARCHIVE}" "${BINARIES_GCS_ARTIFACT}"
+          echo "::set-output name=binaries-gcs-artifact::${BINARIES_GCS_ARTIFACT}"
 
   test_tf_integrations:
-    needs: [should_run, build_tf_integrations, build_all]
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: [setup, build_all, build_tf_integrations]
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
-      # Pseudo-ternary hack and order matters. See comment at top of file.
-      - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
     env:
       BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
       BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.gcs-artifact }}
+      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
       TF_BINARIES_DIR: ${{ needs.build_tf_integrations.outputs.binaries-dir }}
       TF_BINARIES_ARCHIVE: ${{ needs.build_tf_integrations.outputs.binaries-archive }}
-      TF_BINARIES_GCS_ARTIFACT: ${{ needs.build_tf_integrations.outputs.gcs-artifact }}
+      TF_BINARIES_GCS_ARTIFACT: ${{ needs.build_tf_integrations.outputs.binaries-gcs-artifact }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
@@ -383,10 +387,10 @@ jobs:
       - name: "Downloading TF binaries archive"
         run: gcloud alpha storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
       - name: "Extracting TF binaries archive"
-        run: tar -xf "${TF_BINARIES_ARCHIVE}"
+        run: tar -xvf "${TF_BINARIES_ARCHIVE}"
       - name: "Symlinking TF binaries"
         run: |
-          ./integrations/tensorflow/symlink_binaries.sh "$(realpath "${TF_BINARIES_DIR}")"
+          ./integrations/tensorflow/symlink_binaries.sh "${TF_BINARIES_DIR}"
       - name: "Downloading build dir archive"
         run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting build dir archive"
@@ -399,21 +403,21 @@ jobs:
             "${BUILD_DIR}"
 
   test_tf_integrations_gpu:
-    needs: [should_run, build_tf_integrations, build_all]
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: [setup, build_all, build_tf_integrations]
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
-      # Pseudo-ternary hack and order matters. See comment at top of file.
-      - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - gpu
       - os-family=Linux
     env:
       BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
       BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.gcs-artifact }}
+      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
       TF_BINARIES_DIR: ${{ needs.build_tf_integrations.outputs.binaries-dir }}
       TF_BINARIES_ARCHIVE: ${{ needs.build_tf_integrations.outputs.binaries-archive }}
-      TF_BINARIES_GCS_ARTIFACT: ${{ needs.build_tf_integrations.outputs.gcs-artifact }}
+      TF_BINARIES_GCS_ARTIFACT: ${{ needs.build_tf_integrations.outputs.binaries-gcs-artifact }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
@@ -422,10 +426,10 @@ jobs:
       - name: "Downloading TF binaries archive"
         run: gcloud alpha storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
       - name: "Extracting TF binaries archive"
-        run: tar -xf "${TF_BINARIES_ARCHIVE}"
+        run: tar -xvf "${TF_BINARIES_ARCHIVE}"
       - name: "Symlinking TF binaries"
         run: |
-          ./integrations/tensorflow/symlink_binaries.sh "$(realpath "${TF_BINARIES_DIR}")"
+          ./integrations/tensorflow/symlink_binaries.sh "${TF_BINARIES_DIR}"
       - name: "Downloading build dir archive"
         run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting build dir archive"
@@ -446,12 +450,12 @@ jobs:
   # Jobs that build IREE in some non-default configuration
   ##############################################################################
   asan:
-    needs: should_run
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: setup
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
-      # Pseudo-ternary hack and order matters. See comment at top of file.
-      - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
     steps:
@@ -466,12 +470,12 @@ jobs:
             ./build_tools/cmake/build_and_test_asan.sh
 
   tsan:
-    needs: should_run
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: setup
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
-      # Pseudo-ternary hack and order matters. See comment at top of file.
-      - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
     steps:
@@ -486,172 +490,227 @@ jobs:
             ./build_tools/cmake/build_and_test_tsan.sh
 
   build_benchmarks:
-    needs: [should_run, build_all, build_tf_integrations]
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: [setup, build_all, build_tf_integrations]
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
       # Hacks, and order matters. See the comment at the top of the file.
       - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
     env:
       BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
       BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.gcs-artifact }}
+      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
       TF_BINARIES_DIR: ${{ needs.build_tf_integrations.outputs.binaries-dir }}
       TF_BINARIES_ARCHIVE: ${{ needs.build_tf_integrations.outputs.binaries-archive }}
-      TF_BINARIES_GCS_ARTIFACT: ${{ needs.build_tf_integrations.outputs.gcs-artifact }}
+      TF_BINARIES_GCS_ARTIFACT: ${{ needs.build_tf_integrations.outputs.binaries-gcs-artifact }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
         with:
           submodules: true
+      - name: "Downloading build dir archive"
+        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+      - name: "Extracting install from build dir archive"
+        run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
       - name: "Downloading TF binaries archive"
         run: gcloud alpha storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
       - name: "Extracting TF binaries archive"
         run: tar -xf "${TF_BINARIES_ARCHIVE}"
-        # TODO(#4662): building the benchmarks currently needs the entire build
-        # dir archive just to get the host tools. This is silly and we should
-        # make prebuilt host tools work even when not cross-compiling.
-      - name: "Downloading build dir archive"
-        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
-      - name: "Extracting archive"
-        run: tar -xf "${BUILD_DIR_ARCHIVE}"
-      - name: "Re-configuring"
+      - name: "Building benchmarks"
         run: |
           build_tools/github_actions/docker_run.sh \
             --env "IREE_TF_BINARIES_DIR=${TF_BINARIES_DIR}" \
+            --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
             gcr.io/iree-oss/base@sha256:5d43683c6b50aebe1fca6c85f2012f3b0fa153bf4dd268e8767b619b1891423a \
-            build_tools/cmake/build_benchmarks.sh \
-            "${BUILD_DIR}"
+            build_tools/cmake/build_benchmarks.sh
 
   ############################## Crosscompilation ##############################
   # Jobs that cross-compile IREE for other platforms
   ##############################################################################
   android_arm64:
-    needs: [should_run, host_tools_assertions]
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: [setup, build_all]
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
       # Hacks, and order matters. See the comment at the top of the file.
       - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
     env:
-      BUILD_DIR: "build-android-arm64"
       ANDROID_ABI: "arm64-v8a"
-      HOST_BINARY_ROOT: ${{ needs.host_tools_assertions.outputs.host-binary-root }}
-      HOST_BINARY_ARCHIVE: ${{ needs.host_tools_assertions.outputs.host-binary-root }}.tar
+      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
+      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
+      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
         with:
           submodules: true
-      - name: "Downloading host tools"
-        uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741 # v3.0.0
-        with:
-          name: "${{ env.HOST_BINARY_ARCHIVE }}"
-      - name: "Extracting host tools archive"
-        run: |
-          tar -xvf ${HOST_BINARY_ARCHIVE}
+      - name: "Downloading build dir archive"
+        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+      - name: "Extracting install from build dir archive"
+        run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
       - name: "Building for Android"
         run: |
           build_tools/github_actions/docker_run.sh \
             --env "ANDROID_ABI=${ANDROID_ABI}" \
-            --env "IREE_HOST_BINARY_ROOT=${HOST_BINARY_ROOT}" \
+            --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
             gcr.io/iree-oss/android@sha256:9bc723fc707a18bd0c1be9c12e01ea5bb7c7d77f607427879e10ffcffd7d2bb5 \
-            build_tools/build_android.sh
+            build_tools/cmake/build_android.sh
 
   riscv32:
-    needs: [should_run, host_tools_assertions]
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: [setup, build_all]
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
-      # Pseudo-ternary hack and order matters. See comment at top of file.
-      - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
     env:
-      BUILD_RISCV_DIR: "build-riscv-rv32-baremetal"
-      RISCV_CONFIG: "rv32-baremetal"
-      HOST_BINARY_ROOT: ${{ needs.host_tools_assertions.outputs.host-binary-root }}
-      HOST_BINARY_ARCHIVE: ${{ needs.host_tools_assertions.outputs.host-binary-root }}.tar
+      BUILD_RISCV_DIR: "build-riscv32-baremetal"
+      BUILD_ARCH: "rv32-baremetal"
+      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
+      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
+      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
         with:
           submodules: true
-      - name: "Downloading host tools"
-        uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741 # v3.0.0
-        with:
-          name: "${{ env.HOST_BINARY_ARCHIVE }}"
-      - name: "Extracting host tools archive"
-        run: |
-          tar -xvf ${HOST_BINARY_ARCHIVE}
+      - name: "Downloading build dir archive"
+        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+      - name: "Extracting install from build dir archive"
+        run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
       - name: "Cross-compiling and testing riscv32"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            --env "RISCV_CONFIG=${RISCV_CONFIG}" \
+            --env "RISCV_ARCH=${BUILD_ARCH}" \
             --env "BUILD_RISCV_DIR=${BUILD_RISCV_DIR}" \
-            --env "IREE_HOST_BINARY_ROOT=${HOST_BINARY_ROOT}" \
+            --env "BUILD_PRESET=test" \
+            --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
             gcr.io/iree-oss/riscv@sha256:720bc0215d8462ea14352edc22710a6ce4c0c1daff581d179dd173885f1d8a35 \
             bash -euo pipefail -c \
             "./build_tools/cmake/build_riscv.sh && tests/riscv32/smoke.sh"
 
   riscv64:
-    needs: [should_run, build_all, host_tools_assertions, build_tf_integrations]
-    if: needs.should_run.outputs.should-run == 'true'
+    needs: [setup, build_all, build_tf_integrations]
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
-      # Pseudo-ternary hack and order matters. See comment at top of file.
-      - self-hosted
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
     env:
-      BUILD_RISCV_DIR: "build-riscv-r64"
-      RISCV_CONFIG: "rv64"
-      HOST_BINARY_ROOT: ${{ needs.host_tools_assertions.outputs.host-binary-root }}
-      HOST_BINARY_ARCHIVE: ${{ needs.host_tools_assertions.outputs.host-binary-root }}.tar
+      BUILD_RISCV_DIR: "build-riscv64"
+      BUILD_ARCH: "rv64"
       BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
       BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.gcs-artifact }}
+      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
       TF_BINARIES_DIR: ${{ needs.build_tf_integrations.outputs.binaries-dir }}
       TF_BINARIES_ARCHIVE: ${{ needs.build_tf_integrations.outputs.binaries-archive }}
-      TF_BINARIES_GCS_ARTIFACT: ${{ needs.build_tf_integrations.outputs.gcs-artifact }}
+      TF_BINARIES_GCS_ARTIFACT: ${{ needs.build_tf_integrations.outputs.binaries-gcs-artifact }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
         with:
           submodules: true
-      - name: "Downloading host tools"
-        uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741 # v3.0.0
-        with:
-          name: "${{ env.HOST_BINARY_ARCHIVE }}"
-      - name: "Extracting host tools archive"
-        run: |
-          tar -xvf ${HOST_BINARY_ARCHIVE}
+      - name: "Downloading build dir archive"
+        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+      - name: "Extracting build dir archive"
+        run: tar -xf "${BUILD_DIR_ARCHIVE}"
       - name: "Downloading TF binaries archive"
         run: gcloud alpha storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
       - name: "Extracting TF binaries archive"
         run: tar -xf "${TF_BINARIES_ARCHIVE}"
-        # FIXME: The riscv64 tests currently need the entire build dir archive
-        # just to get FileCheck from LLVM's bin directory. This is silly and we
-        # should make FileCheck available another way.
-      - name: "Downloading build dir archive"
-        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
-      - name: "Extracting archive"
-        run: tar -xf "${BUILD_DIR_ARCHIVE}"
       - name: "Cross-compiling and testing riscv64"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            --env "RISCV_CONFIG=${RISCV_CONFIG}" \
+            --env "RISCV_ARCH=${BUILD_ARCH}" \
             --env "BUILD_RISCV_DIR=${BUILD_RISCV_DIR}" \
-            --env "IREE_HOST_BINARY_ROOT=${HOST_BINARY_ROOT}" \
+            --env "BUILD_PRESET=test" \
+            --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
             --env "IREE_IMPORT_TFLITE_BIN=${TF_BINARIES_DIR}/iree-import-tflite" \
             --env "LLVM_BIN_DIR=${BUILD_DIR}/third_party/llvm-project/llvm/bin" \
             gcr.io/iree-oss/riscv@sha256:720bc0215d8462ea14352edc22710a6ce4c0c1daff581d179dd173885f1d8a35 \
             bash -euo pipefail -c \
               "./build_tools/cmake/build_riscv.sh && ./tests/riscv64/smoke.sh"
+
+  build_benchmark_tools:
+    needs: [setup, build_all]
+    if: needs.setup.outputs.should-run == 'true'
+    runs-on:
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - cpu
+      - os-family=Linux
+    strategy:
+      matrix:
+        target:
+          - platform: "riscv"
+            architecture: "rv64"
+            docker_image: "gcr.io/iree-oss/riscv@sha256:720bc0215d8462ea14352edc22710a6ce4c0c1daff581d179dd173885f1d8a35"
+    outputs:
+      benchmark-tools-gcs-artifacts: ${{ toJSON(steps.upload.outputs) }}
+    env:
+      PLATFORM: ${{ matrix.target.platform }}
+      ARCHITECTURE: ${{ matrix.target.architecture }}
+      DOCKER_IMAGE: ${{ matrix.target.docker_image }}
+      BUILD_TOOLS_DIR: ${{ matrix.target.platform }}-${{ matrix.target.architecture }}-benchmark-tools-dir
+      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
+      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
+      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
+        with:
+          submodules: true
+      - name: "Downloading build dir archive"
+        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+      - name: "Extracting host binaries"
+        run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
+      - name: "Compiling the benchmark tools"
+        id: build
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "${PLATFORM^^}_ARCH=${ARCHITECTURE}" \
+            --env "BUILD_${PLATFORM^^}_DIR=${BUILD_TOOLS_DIR}/build" \
+            --env "BUILD_PRESET=benchmark" \
+            --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
+            "${DOCKER_IMAGE}" \
+            bash -euo pipefail -c "./build_tools/cmake/build_${PLATFORM}.sh"
+      - name: "Compiling the benchmark tools with tracing"
+        id: build-with-tracing
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "${PLATFORM^^}_ARCH=${ARCHITECTURE}" \
+            --env "BUILD_${PLATFORM^^}_DIR=${BUILD_TOOLS_DIR}/build-traced" \
+            --env "BUILD_PRESET=benchmark-with-tracing" \
+            --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
+            "${DOCKER_IMAGE}" \
+            bash -euo pipefail -c "./build_tools/cmake/build_${PLATFORM}.sh"
+      - name: "Creating the benchmark tools archive"
+        id: archive
+        env:
+          BENCHMARK_TOOLS_ARCHIVE: ${{ matrix.target.platform }}-${{ matrix.target.architecture }}-benchmarks-tools.tar
+        run: |
+          tar -cf ${BENCHMARK_TOOLS_ARCHIVE} \
+            ${BUILD_TOOLS_DIR}/*/tools/iree-benchmark-module
+          echo "::set-output name=benchmark-tools-archive::${BENCHMARK_TOOLS_ARCHIVE}"
+      - name: "Uploading the benchmark tools archive"
+        id: upload
+        env:
+          BENCHMARK_TOOLS_ARCHIVE: ${{ steps.archive.outputs.benchmark-tools-archive }}
+          BENCHMARK_TOOLS_GCS_ARTIFACT: ${{ needs.setup.outputs.gcs-dir }}/${{ steps.archive.outputs.benchmark-tools-archive }}
+        run: |
+          gcloud alpha storage cp "${BENCHMARK_TOOLS_ARCHIVE}" "${BENCHMARK_TOOLS_GCS_ARTIFACT}"
+          echo "::set-output name=${PLATFORM}-${ARCHITECTURE}-benchmark-tools-gcs-artifact::${BENCHMARK_TOOLS_GCS_ARTIFACT}"
 
   ##############################################################################
 
@@ -672,7 +731,6 @@ jobs:
       # Subsets
       - build_runtime
       - test_runtime
-      - host_tools_assertions
 
       # Tensorflow
       - test_tf_integrations
@@ -687,6 +745,9 @@ jobs:
       - android_arm64
       - riscv32
       - riscv64
+
+      # Benchmark tools
+      - build_benchmark_tools
     steps:
       - name: Getting combined job status
         run: |

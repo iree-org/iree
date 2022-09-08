@@ -21,6 +21,7 @@ iree_cc_library(
     "module.c"
   DEPS
     iree::base
+    iree::base::internal::cpu
     iree::base::tracing
     iree::hal
     iree::modules::hal::types

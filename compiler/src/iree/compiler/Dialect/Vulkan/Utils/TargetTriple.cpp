@@ -80,8 +80,9 @@ spirv::DeviceType getDeviceType(const TargetTriple &triple) {
 
 /// Returns the Vulkan version for the given target `triple`.
 Vulkan::Version getVersion(const TargetTriple &triple) {
-  // Android 11 stays at Vulkan 1.1.
-  if (triple.getOS() == TargetTripleOS::Android11) {
+  // Android 11/12 (API level 30/31) stays at Vulkan 1.1.
+  if (triple.getOS() == TargetTripleOS::Android30 ||
+      triple.getOS() == TargetTripleOS::Android31) {
     return Version::V_1_1;
   }
 
@@ -91,7 +92,7 @@ Vulkan::Version getVersion(const TargetTriple &triple) {
     return Version::V_1_1;
   }
 
-  return Version::V_1_2;
+  return Version::V_1_3;
 }
 
 /// Writes the Vulkan extensions supported by the given `triple` into
@@ -130,7 +131,8 @@ void getExtensions(const TargetTriple &triple,
       return extensions.append(list.begin(), list.end());
     }
     case TargetTripleArch::QC_Adreno: {
-      // Example: https://vulkan.gpuinfo.org/displayreport.php?id=10983
+      // Example: https://vulkan.gpuinfo.org/displayreport.php?id=10983 (11)
+      // Example: https://vulkan.gpuinfo.org/displayreport.php?id=16312 (12)
       const std::array<Extension, 5> list = {
           Extension::VK_KHR_16bit_storage,
           Extension::VK_KHR_shader_float16_int8,
@@ -138,7 +140,11 @@ void getExtensions(const TargetTriple &triple,
           Extension::VK_KHR_storage_buffer_storage_class,
           Extension::VK_KHR_variable_pointers,
       };
-      return extensions.append(list.begin(), list.end());
+      extensions.append(list.begin(), list.end());
+      if (triple.getOS() == TargetTripleOS::Android31) {
+        extensions.push_back(Extension::VK_KHR_8bit_storage);
+      }
+      return;
     }
     default:
       break;
@@ -249,7 +255,8 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
       variablePointers = variablePointersStorageBuffer = true;
       break;
     case TargetTripleArch::ARM_Valhall:
-      // Example: https://vulkan.gpuinfo.org/displayreport.php?id=10312
+      // Example: https://vulkan.gpuinfo.org/displayreport.php?id=10312 (11)
+      // Example: https://vulkan.gpuinfo.org/displayreport.php?id=15142 (12)
       maxComputeSharedMemorySize = 32768;
       maxComputeWorkGroupInvocations = 512;
       maxComputeWorkGroupSize = {512, 512, 512};
@@ -258,6 +265,11 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
       subgroupFeatures = SubgroupFeature::Basic | SubgroupFeature::Vote |
                          SubgroupFeature::Arithmetic | SubgroupFeature::Ballot |
                          SubgroupFeature::Clustered | SubgroupFeature::Quad;
+
+      if (triple.getOS() == TargetTripleOS::Android31) {
+        subgroupFeatures = subgroupFeatures | SubgroupFeature::Shuffle |
+                           SubgroupFeature::ShuffleRelative;
+      }
 
       shaderFloat16 = shaderInt8 = shaderInt16 = true;
 
@@ -324,7 +336,8 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
           /*bType=*/f16t, /*cType=*/f32t, /*resultType=*/f32t, scope));
     } break;
     case TargetTripleArch::QC_Adreno:
-      // Example: https://vulkan.gpuinfo.org/displayreport.php?id=10983
+      // Example: https://vulkan.gpuinfo.org/displayreport.php?id=10983 (11)
+      // Example: https://vulkan.gpuinfo.org/displayreport.php?id=16312 (12)
       maxComputeSharedMemorySize = 32768;
       maxComputeWorkGroupInvocations = 1024;
       maxComputeWorkGroupSize = {1024, 1024, 64};
@@ -339,6 +352,10 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
       shaderFloat16 = shaderInt8 = shaderInt16 = true;
 
       storageBuffer16BitAccess = true;
+      if (triple.getOS() == TargetTripleOS::Android31) {
+        storageBuffer8BitAccess = true;
+      }
+
       variablePointers = variablePointersStorageBuffer = true;
       break;
   }

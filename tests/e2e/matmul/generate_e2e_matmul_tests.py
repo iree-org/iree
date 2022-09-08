@@ -514,10 +514,6 @@ def write_trace_file(traces, filename, module_path, requirements):
           "type": "context_load",
       },
       {
-          "type": "requirements",
-          "target_features": requirements.split(",") if requirements else [],
-      },
-      {
           "type": "module_load",
           "module": {
               "name": "hal",
@@ -533,11 +529,16 @@ def write_trace_file(traces, filename, module_path, requirements):
           }
       },
   ]
+  if requirements:
+    yaml_documents.append({
+        "type": "requirements",
+        "target_features": [req.lstrip("+") for req in requirements.split(",")],
+    })
 
   for trace in traces:
     yaml_documents.append(trace)
 
-  dumped_yaml = yaml.dump_all(yaml_documents, sort_keys=False)
+  dumped_yaml = yaml.dump_all(yaml_documents)
 
   # TODO: This regex substitution is a hack as I couldn't figure how to have
   # PyYAML dump our custom contents_generator into the desired format, e.g.
