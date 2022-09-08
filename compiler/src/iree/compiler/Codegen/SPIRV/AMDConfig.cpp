@@ -47,10 +47,8 @@ LogicalResult setAMDCodeGenConfig(const spirv::TargetEnv &targetEnv,
   int subgroupSize = targetEnv.getResourceLimits().getSubgroupSize();
 
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp)) {
-    if (linalg::isaContractionOpInterface(linalgOp) &&
-        llvm::is_contained({2u, 3u}, linalgOp.getNumParallelLoops())) {
+    if (isMatmulOrBatchMatmul(linalgOp))
       return setAMDMatmulConfig(linalgOp, subgroupSize);
-    }
   }
 
   return TypeSwitch<Operation *, LogicalResult>(rootOp)

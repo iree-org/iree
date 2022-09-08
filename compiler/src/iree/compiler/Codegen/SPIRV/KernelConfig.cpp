@@ -33,6 +33,15 @@ namespace mlir {
 namespace iree_compiler {
 
 //===----------------------------------------------------------------------===//
+// Utility Functions
+//===----------------------------------------------------------------------===//
+
+bool isMatmulOrBatchMatmul(linalg::LinalgOp linalgOp) {
+  return linalg::isaContractionOpInterface(linalgOp) &&
+         llvm::is_contained({2u, 3u}, linalgOp.getNumParallelLoops());
+}
+
+//===----------------------------------------------------------------------===//
 // Convolution Default Configuration
 //===----------------------------------------------------------------------===//
 
