@@ -123,9 +123,9 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
 
   OpPassManager executableLoweringPipeline(
       IREE::HAL::ExecutableVariantOp::getOperationName());
-  OpPassManager &nestedModulePM = executableLoweringPipeline.nest<ModuleOp>();
 
   if (!useLoweringPipeline.empty()) {
+    OpPassManager &nestedModulePM = executableLoweringPipeline.nest<ModuleOp>();
     if (failed(parsePassPipeline(sanitizePipelineString(useLoweringPipeline),
                                  nestedModulePM))) {
       return signalPassFailure();
@@ -184,18 +184,6 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
       if (failed(verificationStatus)) {
         return signalPassFailure();
       }
-
-      // Use the default 64-bit lowering for TOSA's ApplyScale operator:
-      // This lowering widens integer types to 64-bit an performs the non-fused
-      // operations, specifically multiply, add, and shift. Bit-widening
-      // is used to guarantee higher-order bits are not truncated during the
-      // multiply or add. Use the 32-bit lowering for RISC-V if 'zve32x' is
-      // specified and there is no 64-bit integer vector support.
-      bool useApplyScale32BitImpl =
-          isRISCV(variantOp) && hasZve32xFeature(variantOp) &&
-          !hasVFeature(variantOp) && !hasZve64xFeature(variantOp);
-      nestedModulePM.addNestedPass<func::FuncOp>(tosa::createTosaToArith(
-          /*includeApplyScale=*/true, useApplyScale32BitImpl));
 
       bool lowerToAVX2 = hasAVX2Feature(variantOp);
       if (!testLoweringConfiguration) {
@@ -257,6 +245,19 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
       }
     }
   }
+
+  // Use the default 64-bit lowering for TOSA's ApplyScale operator:
+  // This lowering widens integer types to 64-bit an performs the non-fused
+  // operations, specifically multiply, add, and shift. Bit-widening
+  // is used to guarantee higher-order bits are not truncated during the
+  // multiply or add. Use the 32-bit lowering for RISC-V if 'zve32x' is
+  // specified and there is no 64-bit integer vector support.
+  bool useApplyScale32BitImpl =
+      isRISCV(variantOp) && hasZve32xFeature(variantOp) &&
+      !hasVFeature(variantOp) && !hasZve64xFeature(variantOp);
+  OpPassManager &nestedModulePM = executableLoweringPipeline.nest<ModuleOp>();
+  nestedModulePM.addNestedPass<func::FuncOp>(tosa::createTosaToArith(
+      /*includeApplyScale=*/true, useApplyScale32BitImpl));
 
   if (failed(runPipeline(executableLoweringPipeline, variantOp))) {
     return signalPassFailure();
