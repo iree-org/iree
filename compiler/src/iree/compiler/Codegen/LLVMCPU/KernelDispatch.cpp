@@ -170,22 +170,37 @@ static int64_t getVectorSize(func::FuncOp entryPointFn, ShapedType shapedType) {
   return getVectorSize(entryPointFn, byteWidth);
 }
 
-struct LinalgOpTransposeInfo {
-  bool hasInputTranspose = false;
-  bool hasOutputTranspose = false;
-};
+/// Returns true if `map` is a tranposition.
+// TODO(dcaballe): Discern between "memcopy" transposes and "shuffle"
+// transposes.
+// TODO(dcaballe): Shouldn't there be a utility for this somewhere in Affine?
+static bool isTransposeMap(AffineMap map) {
+  unsigned prevDim = 0;
+  for (AffineExpr expr : map.getResults()) {
+    if (expr.isa<AffineConstantExpr>())
+      continue;
 
+    if (auto dimExpr = expr.dyn_cast<AffineDimExpr>()) {
+      if (prevDim > dimExpr.getPosition()) {
+        return true;
+      }
+      prevDim = dimExpr.getPosition();
+      continue;
+    }
+
+    llvm_unreachable("Unexpected AffineExpr");
+  }
+
+  return false;
+}
+
+/// Returns true if a LinalgOp implements a transpose.
 // TODO(dcaballe):
 //   * Consider transpose + reductions.
 //   * Consider input and output transposes.
-static LinalgOpTransposeInfo getTransposeInfo(linalg::LinalgOp op) {
-  auto indexingMaps = op.getIndexingMapsArray();
-
-  if (op.getNumReductionLoops() > 0) return {};
-
-  if (llvm::any_of(indexingMaps,
-                   [](AffineMap map) { return !map.isProjectedPermutation(); })) {
-    llvm::outs() << "Not permutation: " << op << "\n";
+static bool isTransposeLinalgOp(linalg::LinalgOp op) {
+  // Reductions are not supported.
+  if (op.getNumReductionLoops() > 0) {
     return {};
   }
 
@@ -195,22 +210,20 @@ static LinalgOpTransposeInfo getTransposeInfo(linalg::LinalgOp op) {
     return {};
   }
 
-  // TODO: Revisit.
-  SmallVector<AffineMap> inputIndexingMaps;
-  AffineMap outputIndexingMap = op.getTiedIndexingMap(op.getOutputOperand(0));
+  // Inverse map to use transfer op permutation logic.
+  AffineMap outputInversedMap =
+      inversePermutation(op.getTiedIndexingMap(op.getOutputOperand(0)));
+  SmallVector<AffineMap> inputInversedMaps;
   for (OpOperand *operand : op.getInputOperands()) {
-    inputIndexingMaps.push_back(op.getTiedIndexingMap(operand));
-    llvm::outs() << "Input map: " << op.getTiedIndexingMap(operand) << "\n";
+    inputInversedMaps.push_back(inverseAndBroadcastProjectedPermutation(
+        op.getTiedIndexingMap(operand)));
   }
-  llvm::outs() << "Output map: " << outputIndexingMap << "\n";
 
-  // TODO: Refine.
-  bool isInputTransposed = !llvm::all_equal(inputIndexingMaps);
-  bool isOutputTransposed = !inputIndexingMaps.empty() && llvm::all_of(
-      inputIndexingMaps,
-      [&](AffineMap inputIdx) { return outputIndexingMap != inputIdx; });
+  bool isInputTransposed = llvm::any_of(
+      inputInversedMaps, [](AffineMap map) { return isTransposeMap(map); });
+  bool isOutputTransposed = isTransposeMap(outputInversedMap);
 
-  return {isInputTransposed, isOutputTransposed};
+  return isInputTransposed || isOutputTransposed;
 }
 
 /// Returns minimum tiling sizes for each dimension. One dimension is possible
@@ -220,15 +233,15 @@ static LinalgOpTransposeInfo getTransposeInfo(linalg::LinalgOp op) {
 // tile sizes for vectorization/unrolling in one shot.
 static SmallVector<int64_t> getMinTilingSizesForEachDim(
     func::FuncOp entryPointFn, linalg::LinalgOp op,
-    unsigned maxUnrollFactor = 8) {
+    unsigned maxReductionUnrollFactor = 8,
+    unsigned maxTransposeUnrollFactor = 1) {
   unsigned numLoops = op.getNumLoops();
   SmallVector<int64_t> minTileSizes(numLoops, 1);
   auto inputOutputOpOperands = op.getInputAndOutputOperands();
 
   // TODO(dcaballe): Move all these properties to LinalgOpInfo analysis.
   bool isReduction = op.getNumReductionLoops() > 0;
-  // TODO(dcaballe): Improve isTranspose logic. It's currently too conservative.
-  LinalgOpTransposeInfo transposeInfo = getTransposeInfo(op);
+  bool isTranspose = isTransposeLinalgOp(op);
 
   for (auto map : llvm::enumerate(op.getIndexingMapsArray())) {
     // Check the fastest varying dimension of the operand. Set the vector size
@@ -247,30 +260,29 @@ static SmallVector<int64_t> getMinTilingSizesForEachDim(
     // the output's fastest varying dim leads to large unroll factors. We limit
     // the tile size for this case to 'maxUnrollFactor'.
     if (isReduction && op.isOutputTensor(inputOutputOpOperands[map.index()])) {
-      tileSize = std::min<int64_t>(tileSize, maxUnrollFactor);
+      tileSize = std::min<int64_t>(tileSize, maxReductionUnrollFactor);
     }
 
-    // TODO: Transpose.
-    if (transposeInfo.hasOutputTranspose &&
-        op.isOutputTensor(inputOutputOpOperands[map.index()])) {
-      llvm::outs() << "Output transpose detected\n";
-      tileSize = std::min<int64_t>(tileSize, maxUnrollFactor);
-    }
-
-    if (transposeInfo.hasInputTranspose &&
-        op.isInputTensor(inputOutputOpOperands[map.index()])) {
-      llvm::outs() << "Input transpose detected\n";
-      tileSize = std::min<int64_t>(tileSize, maxUnrollFactor);
-    }
-
-    minTileSizes[fastestVaryingDim] =
-        std::max<int64_t>(minTileSizes[fastestVaryingDim], tileSize);
+    tileSize = std::max<int64_t>(minTileSizes[fastestVaryingDim], tileSize);
+    minTileSizes[fastestVaryingDim] = tileSize;
   }
 
-  if (transposeInfo.hasInputTranspose || transposeInfo.hasOutputTranspose) {
-    llvm::outs() << "Min tile sizes for: " << op << "\n";
-    for (int64_t size : minTileSizes) llvm::outs() << size << " ";
-    llvm::outs() << "\n";
+  // Limit unrolling on transpose operations. For know, we assume the rightmost
+  // non-one tiled dimension is for vectorization and any other non-one
+  // dimension is for unrolling.
+  // TODO(dcaballe): Improve with LinalgOpAnalysis.
+  if (isTranspose) {
+    int vecDim;
+    for (vecDim = minTileSizes.size() - 1; vecDim >= 0; --vecDim) {
+      if (minTileSizes[vecDim] > 1) {
+        break;
+      }
+    }
+
+    for (int unrollDim = vecDim - 1; unrollDim >= 0; --unrollDim) {
+      minTileSizes[unrollDim] =
+          std::min<int64_t>(minTileSizes[unrollDim], maxTransposeUnrollFactor);
+    }
   }
 
   return minTileSizes;
