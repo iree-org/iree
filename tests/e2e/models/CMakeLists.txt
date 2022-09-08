@@ -170,7 +170,9 @@ iree_check_single_backend_test_suite(
   NAME
     tflite_llvm-cpu_local-task_x86_64
   SRCS
+    "https://storage.googleapis.com/iree-model-artifacts/mobilenet_v1_224_1.0_float.tflite"
     "https://storage.googleapis.com/iree-model-artifacts/efficientnet_lite0_int8_2.tflite"
+    "https://storage.googleapis.com/iree-model-artifacts/deeplabv3.tflite"
   TARGET_BACKEND
     "llvm-cpu"
   COMPILER_FLAGS

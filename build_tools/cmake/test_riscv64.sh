@@ -72,7 +72,7 @@ generate_llvm_cpu_vmfb tosa-rvv \
   -o "${BUILD_RISCV_DIR}/person_detect_rvv.vmfb"
 
 ${PYTHON_BIN} "${ROOT_DIR}/third_party/llvm-project/llvm/utils/lit/lit.py" \
-  -v --path "${LLVM_BIN_DIR}" "${ROOT_DIR}/tests/riscv64"
+  --path "${LLVM_BIN_DIR}" "${ROOT_DIR}/tests/riscv64"
 
 # Test e2e models. Excluding mobilebert for now.
 ctest --test-dir ${BUILD_RISCV_DIR}/tests/e2e/models -R llvm-cpu_local-task_mobilenet -E bert

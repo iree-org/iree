@@ -1,4 +1,13 @@
 // RUN: ${TEST_MODULE_CMD} \
 // RUN:   --module_file="${BUILD_RISCV_DIR}/tests/e2e/models/tflite_llvm-cpu_local-task_deeplabv3.tflite_module.vmfb" \
-// RUN:   --entry_function=main --function_input="1x257x257x3xf32=0"
-// iree-run-module can't printout the output selectively. Skip the numerical check.
+// RUN:   --entry_function=main --function_input="1x257x257x3xf32=0" --print_max_element_count=1008 | \
+// RUN:   grep "=\[" | tee %t
+//
+// RUN: ${HOST_TEST_MODULE_CMD} \
+// RUN:   --module_file="${BUILD_RISCV_DIR}/tests/e2e/models/tflite_llvm-cpu_local-task_x86_64_deeplabv3.tflite_module.vmfb" \
+// RUN:   --entry_function=main --function_input="1x257x257x3xf32=0" --print_max_element_count=1008 | \
+// RUN:   grep "=\[" | tee %t.x86_64
+//
+// Compare numerical results.
+// RUN: python ${IREE_ROOT_DIR}/build_tools/testing/compare_run_module_output.py \
+// RUN:   --tol=0.001 %t %t.x86_64

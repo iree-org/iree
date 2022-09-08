@@ -30,11 +30,14 @@ test_module_cmd = test_cmd + [
 
 config.environment["TEST_MODULE_CMD"] = " ".join(test_module_cmd)
 
-HOST_BINARY_ROOT = os.path.abspath(os.environ["IREE_HOST_BINARY_ROOT"])
+HOST_BINARY_ROOT = os.path.realpath(os.environ["IREE_HOST_BINARY_ROOT"])
 
 config.environment["HOST_TEST_MODULE_CMD"] = " ".join([
     os.path.join(HOST_BINARY_ROOT, "bin/iree-run-module"), "--device=local-task"
 ])
+
+config.environment["IREE_ROOT_DIR"] = os.path.dirname(
+    os.path.realpath(__file__)) + "/../.."
 
 # Use the most preferred temp directory.
 config.test_exec_root = (os.environ.get("TEST_UNDECLARED_OUTPUTS_DIR") or
