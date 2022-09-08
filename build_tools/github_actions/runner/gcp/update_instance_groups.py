@@ -153,6 +153,11 @@ def main(args):
               f" automatic canary. Current versions:"
               f" {summarize_versions(mig.versions)}")
 
+      if base_template == template_url:
+        error(f"Instance group '{mig.name}' already has the requested canary"
+              f" version '{template_name}' as its base version. Current"
+              " versions:"
+              f" {summarize_versions(mig.versions)}")
       new_versions = [
           compute.InstanceGroupManagerVersion(name=args.base_version_name,
                                               instance_template=base_template),
@@ -171,12 +176,22 @@ def main(args):
       ]
     elif args.command == PROMOTE_CANARY_COMMAND_NAME:
       new_base_template = current_templates.get(args.canary_version_name)
+      if new_base_template is None:
+        error(f"Instance group '{mig.name}' does not have a current version"
+              f" named '{args.canary_version_name}', which is required for an"
+              f" automatic canary promotion. Current versions:"
+              f" {summarize_versions(mig.versions)}")
       new_versions = [
           compute.InstanceGroupManagerVersion(
               name=args.base_version_name, instance_template=new_base_template)
       ]
     elif args.command == ROLLBACK_CANARY_COMMAND_NAME:
       base_template = current_templates.get(args.base_version_name)
+      if base_template is None:
+        error(f"Instance group '{mig.name}' does not have a current version"
+              f" named '{args.base_version_name}', which is required for an"
+              f" automatic canary rollback. Current versions:"
+              f" {summarize_versions(mig.versions)}")
       new_versions = [
           compute.InstanceGroupManagerVersion(name=args.base_version_name,
                                               instance_template=base_template)
