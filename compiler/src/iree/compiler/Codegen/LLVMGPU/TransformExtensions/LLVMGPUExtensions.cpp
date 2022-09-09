@@ -179,9 +179,7 @@ mlir::iree_compiler::rewriteForeachThreadToGpu(
   }
 
   // Step 5. syncthreads.
-  if (syncAfterDistribute) {
-    rewriter.create<gpu::BarrierOp>(loc);
-  }
+  if (syncAfterDistribute) rewriter.create<gpu::BarrierOp>(loc);
 
   // Step 6. Erase old op.
   rewriter.eraseOp(foreachThreadOp);
@@ -489,6 +487,23 @@ static Value warpReduction(Location loc, OpBuilder &builder, Value input,
   return laneVal;
 }
 
+/// Return a value yielded by `warpOp` which statifies the filter lamdba
+/// condition and is not dead.
+static OpOperand *getWarpResult(vector::WarpExecuteOnLane0Op warpOp,
+                                function_ref<bool(Operation *)> fn) {
+  auto yield = cast<vector::YieldOp>(
+      warpOp.getBodyRegion().getBlocks().begin()->getTerminator());
+  for (OpOperand &yieldOperand : yield->getOpOperands()) {
+    Value yieldValues = yieldOperand.get();
+    Operation *definedOp = yieldValues.getDefiningOp();
+    if (definedOp && fn(definedOp)) {
+      if (!warpOp.getResult(yieldOperand.getOperandNumber()).use_empty())
+        return &yieldOperand;
+    }
+  }
+  return {};
+}
+
 namespace {
 
 /// Pattern to convert InsertElement to broadcast, this is a workaround until
@@ -507,60 +522,113 @@ class InsertElementToBroadcast final
   }
 };
 
+/// Sink out load op feeding into a warp op yield.
+/// ```
+/// %0 = vector.warp_execute_on_lane_0(%arg0) -> (f32) {
+///   ...
+//    %2 = memref.load %src[%c0] : memref<1024xf32>
+///   vector.yield %2 : f32
+/// }
+/// ```
+/// To
+/// ```
+/// %dead = vector.warp_execute_on_lane_0(%arg0) -> (f32) {
+///   ...
+//    %2 = memref.load %src[%c0] : memref<1024xf32>
+///   vector.yield %2 : f32
+/// }
+/// gpu.synchronize
+/// %0 = memref.load %src[%c0] : memref<1024xf32>
+struct WarpOpLoad : public OpRewritePattern<vector::WarpExecuteOnLane0Op> {
+  using OpRewritePattern<vector::WarpExecuteOnLane0Op>::OpRewritePattern;
+  LogicalResult matchAndRewrite(vector::WarpExecuteOnLane0Op warpOp,
+                                PatternRewriter &rewriter) const override {
+    OpOperand *operand = getWarpResult(
+        warpOp, [](Operation *op) { return isa<memref::LoadOp>(op); });
+    if (!operand) return failure();
+    auto load = operand->get().getDefiningOp<memref::LoadOp>();
+    unsigned operandIndex = operand->getOperandNumber();
+    Value distributedVal = warpOp.getResult(operandIndex);
+
+    SmallVector<Value, 4> indices(load.getIndices().begin(),
+                                  load.getIndices().end());
+    if (!indices.empty()) return failure();
+
+    OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPointAfter(warpOp);
+    // TODO: generalize this.
+    // options.warpSyncronizationFn currently must take a WarpExecuteOnLane0Op
+    // which we don't have here.
+    rewriter.create<gpu::BarrierOp>(load.getLoc());
+    Value newRead = rewriter.create<memref::LoadOp>(
+        load.getLoc(), distributedVal.getType(), load.getMemref(), indices);
+
+    // The result type of WarpExecuteOnLane0Op may or may not match the yielded
+    // type depending on whether the op has "broadcast" behavior (see the doc
+    // of WarpExecuteOnLane0Op).
+    for (OpOperand &use : distributedVal.getUses()) {
+      rewriter.startRootUpdate(use.getOwner());
+      Value replacement = newRead;
+      if (use.get().getType() != newRead.getType()) {
+        replacement = rewriter.create<vector::BroadcastOp>(
+            load.getLoc(), use.get().getType(), newRead);
+      }
+      use.getOwner()->setOperand(use.getOperandNumber(), replacement);
+      rewriter.finalizeRootUpdate(use.getOwner());
+    }
+    return success();
+  }
+};
 }  // namespace
 
-static LogicalResult applyMultiReductionLoweringPatterns(Operation *target) {
+static void populateMultiReductionLoweringPatterns(Operation *target,
+                                                   RewritePatternSet &patterns,
+                                                   PatternBenefit benefit) {
   assert(target->hasTrait<OpTrait::IsIsolatedFromAbove>());
-
-  MLIRContext *ctx = target->getContext();
-  RewritePatternSet patterns(ctx);
 
   vector::populateVectorMultiReductionLoweringPatterns(
-      patterns, vector::VectorMultiReductionLowering::InnerReduction);
-  patterns.add<InsertElementToBroadcast>(ctx);
-  return applyPatternsAndFoldGreedily(target, std::move(patterns));
+      patterns, vector::VectorMultiReductionLowering::InnerReduction, benefit);
+  patterns.add<InsertElementToBroadcast>(target->getContext(), benefit);
 }
 
-static LogicalResult applyVectorTransferWriteDistribution(Operation *target) {
-  assert(target->hasTrait<OpTrait::IsIsolatedFromAbove>());
-
-  auto distributionFn = [](vector::TransferWriteOp writeOp) {
-    // Create a map (d0, d1) -> (d1) to distribute along the inner
-    // dimension. Once we support n-d distribution we can add more
-    // complex cases.
-    int64_t vecRank = writeOp.getVectorType().getRank();
-    OpBuilder builder(writeOp.getContext());
-    auto map =
-        AffineMap::get(vecRank, 0, builder.getAffineDimExpr(vecRank - 1));
-    return map;
-  };
-  MLIRContext *ctx = target->getContext();
-  RewritePatternSet patterns(ctx);
-  vector::populateDistributeTransferWriteOpPatterns(patterns, distributionFn);
-  return applyPatternsAndFoldGreedily(target, std::move(patterns));
+static AffineMap simpleDistributionFunction(vector::TransferWriteOp writeOp) {
+  // Create a map (d0, d1) -> (d1) to distribute along the inner
+  // dimension. Once we support n-d distribution we can add more
+  // complex cases.
+  int64_t vecRank = writeOp.getVectorType().getRank();
+  OpBuilder builder(writeOp.getContext());
+  auto map = AffineMap::get(vecRank, 0, builder.getAffineDimExpr(vecRank - 1));
+  return map;
 }
 
-static LogicalResult applyPropagateVectorDistribution(Operation *target) {
+static void populateVectorTransferWriteDistribution(Operation *target,
+                                                    RewritePatternSet &patterns,
+                                                    PatternBenefit benefit) {
   assert(target->hasTrait<OpTrait::IsIsolatedFromAbove>());
-
-  MLIRContext *ctx = target->getContext();
-  RewritePatternSet patterns(ctx);
-  vector::populatePropagateWarpVectorDistributionPatterns(patterns);
-  vector::populateDistributeReduction(patterns, warpReduction);
-  return applyPatternsAndFoldGreedily(target, std::move(patterns));
+  vector::populateDistributeTransferWriteOpPatterns(
+      patterns, simpleDistributionFunction, benefit);
 }
 
-static LogicalResult applyWarpExecuteOnLane0ToScf(Operation *target) {
+static void populatePropagateVectorDistribution(Operation *target,
+                                                RewritePatternSet &patterns,
+                                                PatternBenefit benefit) {
   assert(target->hasTrait<OpTrait::IsIsolatedFromAbove>());
+  vector::populatePropagateWarpVectorDistributionPatterns(patterns, benefit);
+  vector::populateDistributeReduction(patterns, warpReduction, benefit);
+  patterns.add<WarpOpLoad>(target->getContext(), benefit);
+}
 
-  MLIRContext *ctx = target->getContext();
-  RewritePatternSet patterns(ctx);
-  vector::WarpExecuteOnLane0LoweringOptions options;
-  options.warpAllocationFn = allocateGlobalSharedMemory;
-  options.warpSyncronizationFn = [](Location loc, OpBuilder &builder,
-                                    vector::WarpExecuteOnLane0Op warpOp) {};
-  vector::populateWarpExecuteOnLane0OpToScfForPattern(patterns, options);
-  return applyPatternsAndFoldGreedily(target, std::move(patterns));
+static void warpSyncronizationFn(Location loc, OpBuilder &builder,
+                                 vector::WarpExecuteOnLane0Op warpOp) {
+  builder.create<gpu::BarrierOp>(loc);
+};
+
+static void populateWarpExecuteOnLane0ToScf(
+    Operation *target, RewritePatternSet &patterns,
+    vector::WarpExecuteOnLane0LoweringOptions options, PatternBenefit benefit) {
+  assert(target->hasTrait<OpTrait::IsIsolatedFromAbove>());
+  vector::populateWarpExecuteOnLane0OpToScfForPattern(patterns, options,
+                                                      benefit);
 }
 
 DiagnosedSilenceableFailure
@@ -577,22 +645,24 @@ transform_dialect::VectorWarpDistributionOp::applyToOne(
   // TODO: Hook up into the ApplyPatternOp in CommonExtensions.cpp to
   // automatically get listening capabilities.
 
+  MLIRContext *ctx = target->getContext();
+  RewritePatternSet patterns(ctx);
   // MultiReduction lowering is necessary until we have explicit support for
   // distributing that op.
-  if (failed(applyMultiReductionLoweringPatterns(target))) {
-    target->emitOpError("multi-reduction lowering patterns failed to apply");
+  populateMultiReductionLoweringPatterns(target, patterns, /*benefit=*/3);
+  populateVectorTransferWriteDistribution(target, patterns, /*benefit=*/2);
+  populatePropagateVectorDistribution(target, patterns, /*benefit=*/1);
+  if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns)))) {
+    target->emitOpError("warp distribution patterns failed to apply");
     return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
   }
-  if (failed(applyVectorTransferWriteDistribution(target))) {
-    target->emitOpError("transfer write distribution patterns failed to apply");
-    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
-  }
-  if (failed(applyPropagateVectorDistribution(target))) {
-    target->emitOpError(
-        "propagate vector distribution patterns failed to apply");
-    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
-  }
-  if (failed(applyWarpExecuteOnLane0ToScf(target))) {
+
+  RewritePatternSet endPatterns(ctx);
+  vector::WarpExecuteOnLane0LoweringOptions options;
+  options.warpAllocationFn = allocateGlobalSharedMemory;
+  options.warpSyncronizationFn = warpSyncronizationFn;
+  populateWarpExecuteOnLane0ToScf(target, endPatterns, options, /*benefit=*/0);
+  if (failed(applyPatternsAndFoldGreedily(target, std::move(endPatterns)))) {
     target->emitOpError(
         "warp execute on lane 0 to scf patterns failed to apply");
     return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
