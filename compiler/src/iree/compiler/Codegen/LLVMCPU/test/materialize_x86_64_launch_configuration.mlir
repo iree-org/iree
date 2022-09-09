@@ -1282,7 +1282,7 @@ hal.executable private @multi_root {
             push_constants = 0, 
             sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {

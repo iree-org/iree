@@ -16,7 +16,7 @@ hal.executable private @subgroup_reduce {
     }> {
     hal.executable.export public @subgroup_reduce ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -113,7 +113,7 @@ hal.executable private @subgroup_reduce {
     }> {
     hal.executable.export public @subgroup_reduce ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {

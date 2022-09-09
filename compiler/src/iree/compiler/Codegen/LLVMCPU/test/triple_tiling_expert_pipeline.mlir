@@ -17,7 +17,7 @@ hal.executable private @matmul_128_384_1536  {
     }> {
     hal.executable.export @matmul_128_384_1536 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
