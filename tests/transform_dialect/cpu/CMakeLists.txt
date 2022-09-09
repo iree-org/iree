@@ -10,4 +10,26 @@
 
 iree_add_all_subdirs()
 
+iree_lit_test_suite(
+  NAME
+    lit
+  SRCS
+    "matmul.mlir"
+  TOOLS
+    FileCheck
+    iree-benchmark-module
+    iree-compile
+    iree-opt
+    iree-run-module
+  DATA
+    matmul_codegen_spec.mlir
+    matmul_dispatch_spec.mlir
+    matmul_tiled_dispatch_spec.mlir
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

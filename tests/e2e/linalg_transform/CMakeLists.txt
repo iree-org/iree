@@ -10,4 +10,20 @@
 
 iree_add_all_subdirs()
 
+iree_lit_test_suite(
+  NAME
+    check_linalg_transform
+  SRCS
+    "linalg_transform.mlir"
+  TOOLS
+    ${IREE_LLD_TARGET}
+    FileCheck
+    iree-run-mlir
+  DATA
+    iree::tests::e2e::linalg_transform::transform_dialect_codegen_spec.mlir
+    iree::tests::e2e::linalg_transform::transform_dialect_dispatch_spec.mlir
+  LABELS
+    "hostonly"
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

@@ -59,7 +59,7 @@ module {
       %2 = operation "scf.foreach_thread"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
       rewrite %2 with "transform.dialect"
     }
-    transform.structured.canonicalized_sequence %arg0 {
+    transform.structured.canonicalized_sequence %arg0 failures(propagate) {
     ^bb1(%arg1: !pdl.operation):
       %0 = pdl_match @match_foreach_thread in %arg1
       %1 = foreach_thread_to_async %0
