@@ -1,6 +1,6 @@
 transform.with_pdl_patterns {
 ^bb0(%arg0: !pdl.operation):
-  transform.structured.canonicalized_sequence %arg0 {
+  transform.structured.canonicalized_sequence %arg0 failures(propagate) {
   ^bb1(%variant_op: !pdl.operation):
     %0 = transform.structured.match ops{["linalg.fill"]} in %variant_op
     %foreach_thread, %tiled_fill = transform.structured.tile_to_foreach_thread_op %0 num_threads [5, 1] (mapped to dims [1, 0, 2])

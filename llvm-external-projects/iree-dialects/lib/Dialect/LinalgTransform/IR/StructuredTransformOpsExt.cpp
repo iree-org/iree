@@ -551,9 +551,16 @@ DiagnosedSilenceableFailure transform_ext::CanonicalizedSequenceOp::apply(
   for (Operation &transform : getBodyBlock()->without_terminator()) {
     DiagnosedSilenceableFailure result =
         state.applyTransform(cast<transform::TransformOpInterface>(transform));
-    if (!result.succeeded()) {
+    if (result.isDefiniteFailure()) {
       LLVM_DEBUG(DBGS() << "failed: " << transform << "\n");
       return result;
+    }
+    if (result.isSilenceableFailure()) {
+      LLVM_DEBUG(DBGS() << "failed silently: " << transform << "\n");
+      if (getFailurePropagationMode() ==
+          transform::FailurePropagationMode::Propagate)
+        return result;
+      (void)result.silence();
     }
     LLVM_DEBUG(DBGS() << "successfully performed: " << transform << "\n");
 

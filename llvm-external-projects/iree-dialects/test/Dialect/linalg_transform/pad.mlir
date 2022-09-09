@@ -44,7 +44,7 @@ transform.with_pdl_patterns {
     rewrite %0 with "transform.dialect"
   }
 
-  transform.structured.canonicalized_sequence %arg0 {
+  transform.structured.canonicalized_sequence %arg0 failures(propagate) {
   ^bb1(%arg1: !pdl.operation):
     %0 = pdl_match @pdl_target in %arg1
     %1 = transform.structured.pad %0 {padding_values=[0.0 : f32, 0.0 : f32], padding_dimensions=[1], pack_paddings=[1, 1], hoist_paddings=[1, 0], transpose_paddings=[[1, 0], [0, 1]]}

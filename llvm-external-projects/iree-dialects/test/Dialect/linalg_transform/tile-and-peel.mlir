@@ -37,7 +37,7 @@ transform.with_pdl_patterns {
     rewrite %0 with "transform.dialect"
   }
 
-  transform.structured.canonicalized_sequence %arg0 {
+  transform.structured.canonicalized_sequence %arg0 failures(propagate) {
   ^bb1(%arg1: !pdl.operation):
     %0 = pdl_match @pdl_target in %arg1
     %linalg_op, %loops:3 = transform.structured.tile %0 [4, 4, 4]
@@ -47,7 +47,7 @@ transform.with_pdl_patterns {
     // version of %loop#2.
     // Peeling #0 first is currently not possible as it will invalidate all the
     // nested handles.
-    // TODO: extra arguments to specify parts of IR that should not be 
+    // TODO: extra arguments to specify parts of IR that should not be
     // invalidated when we know that the transform updates in-place.
     transform.loop.peel %loops#2
     transform.loop.peel %loops#0

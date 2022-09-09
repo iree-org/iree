@@ -1,14 +1,14 @@
-// RUN: iree-opt %s 
+// RUN: iree-opt %s
 
 // Dispatch softmax.
 transform.with_pdl_patterns {
 ^bb0(%arg0: !pdl.operation):
-  transform.structured.canonicalized_sequence %arg0 {
+  transform.structured.canonicalized_sequence %arg0 failures(propagate){
   ^bb1(%arg1: !pdl.operation):
-    %root = transform.structured.match interface{LinalgOp} 
+    %root = transform.structured.match interface{LinalgOp}
       attributes{iterator_types = ["parallel", "parallel", "parallel"]} in %arg1
     %fill = transform.structured.match ops{["linalg.fill"]} in %arg1
-    %red = transform.structured.match interface{LinalgOp} 
+    %red = transform.structured.match interface{LinalgOp}
       attributes{iterator_types = ["parallel", "parallel", "reduction"]} in %arg1
 
     // TODO: this could be replaced by a C++ only version.
