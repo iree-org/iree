@@ -43,5 +43,5 @@ iree_cc_test(
     iree::testing::gtest
     iree::testing::gtest_main
   LABELS
-    "no-qemu"
+    "requires-filesystem"
 )
