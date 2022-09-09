@@ -1242,16 +1242,17 @@ def Flow_DispatchWorkgroupCountFromDagRootOp :
     FLOW_PureOp<"dispatch.workgroup_count_from_dag_root"> {
   let summary = [{
     workgroup count computed based on iteration range of the root of the DAG
-    for ops within dispatch
+    for ops within the dispatch.
   }];
   let description = [{
     By default the IREEs backend relies on tile + distribution of the root
-    of the DAG of ops within the dispatch to split the work amongst workgroups.
-    So the workload captured is the size of the iteration space of the root
-    of the DAG. This op represents the computation that given the workload
-    returns the number of workgroups to use. The backends are responsible
-    for lowering this op into actual computation (typically based on the
-    tile sizes used to tile and distribute the root of the DAG).
+    of the DAG (Directed AcyclicGraph) of ops within the dispatch to split
+    the work amongst workgroups. The workload captured is the size of the
+    iteration space of the root of the DAG. This op represents the computation
+    that given the workload returns the number of workgroups to use. The
+    backends are responsible for lowering this op into actual computation
+    (typically based on the tile sizes used to tile and distribute the root of
+    the DAG).
   }];
 
   let arguments = (ins Variadic<Index>:$operands);
