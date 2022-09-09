@@ -288,15 +288,19 @@ struct RemoveIdentityConversionCast final
 /// This pass converts remaining interface ops into SPIR-V global variables,
 /// GPU processor ID ops into SPIR-V global variables, loop/standard ops into
 /// corresponding SPIR-V ops.
-struct ConvertToSPIRVPass : public ConvertToSPIRVBase<ConvertToSPIRVPass> {
+class ConvertToSPIRVPass : public ConvertToSPIRVBase<ConvertToSPIRVPass> {
+ public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<spirv::SPIRVDialect>();
   }
 
-  ConvertToSPIRVPass() {}
-  ConvertToSPIRVPass(const ConvertToSPIRVPass &pass) {}
+  explicit ConvertToSPIRVPass(bool enableFastMath)
+      : enableFastMath(enableFastMath) {}
 
   void runOnOperation() override;
+
+ private:
+  bool enableFastMath;
 };
 }  // namespace
 
@@ -327,7 +331,10 @@ void ConvertToSPIRVPass::runOnOperation() {
 
   spirv::TargetEnvAttr targetAttr = getSPIRVTargetEnvAttr(moduleOp);
   moduleOp->setAttr(spirv::getTargetEnvAttrName(), targetAttr);
-  SPIRVTypeConverter typeConverter(targetAttr);
+
+  SPIRVConversionOptions options = {};
+  options.enableFastMathMode = this->enableFastMath;
+  SPIRVTypeConverter typeConverter(targetAttr, options);
   RewritePatternSet patterns(&getContext());
   ScfToSPIRVContext scfToSPIRVContext;
 
@@ -432,8 +439,9 @@ void ConvertToSPIRVPass::runOnOperation() {
 // Pass entry point and registration
 //===----------------------------------------------------------------------===//
 
-std::unique_ptr<OperationPass<ModuleOp>> createConvertToSPIRVPass() {
-  return std::make_unique<ConvertToSPIRVPass>();
+std::unique_ptr<OperationPass<ModuleOp>> createConvertToSPIRVPass(
+    bool enableFastMath) {
+  return std::make_unique<ConvertToSPIRVPass>(enableFastMath);
 }
 
 }  // namespace iree_compiler

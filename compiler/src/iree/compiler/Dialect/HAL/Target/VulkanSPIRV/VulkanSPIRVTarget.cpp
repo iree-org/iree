@@ -139,7 +139,7 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
   }
 
   void buildTranslationPassPipeline(OpPassManager &passManager) override {
-    buildSPIRVCodegenPassPipeline(passManager);
+    buildSPIRVCodegenPassPipeline(passManager, /*enableFastMath=*/false);
   }
 
   // TODO(antiagainst): Re-enable SPIR-V linking once the tensorflow integration

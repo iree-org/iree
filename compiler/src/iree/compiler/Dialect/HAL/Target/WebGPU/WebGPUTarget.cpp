@@ -84,7 +84,7 @@ class WebGPUTargetBackend : public TargetBackend {
   }
 
   void buildTranslationPassPipeline(OpPassManager &passManager) override {
-    buildSPIRVCodegenPassPipeline(passManager);
+    buildSPIRVCodegenPassPipeline(passManager, /*enableFastMath=*/true);
     // TODO(scotttodd): additional passes for WebGPU/WGSL
     //                  (here or during serialization?)
   }
