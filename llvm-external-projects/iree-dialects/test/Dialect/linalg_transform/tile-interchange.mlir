@@ -30,7 +30,7 @@ transform.with_pdl_patterns {
     rewrite %2 with "transform.dialect"
   }
 
-  transform.structured.canonicalized_sequence %arg0 {
+  transform.structured.canonicalized_sequence %arg0 failures(propagate) {
   ^bb1(%arg1: !pdl.operation):
     %0 = pdl_match @target_pattern in %arg1
     %1, %loops1:3 = transform.structured.tile %0 [3, 5, 14] {interchange = [0, 2, 1]}
@@ -72,7 +72,7 @@ transform.with_pdl_patterns {
     rewrite %2 with "transform.dialect"
   }
 
-  transform.structured.canonicalized_sequence %arg0 {
+  transform.structured.canonicalized_sequence %arg0 failures(propagate) {
   ^bb1(%arg1: !pdl.operation):
     %0 = pdl_match @target_pattern in %arg1
     %1, %loops1:3 = transform.structured.tile %0 [3, 5, 14] {interchange = [2, 1, 0]}

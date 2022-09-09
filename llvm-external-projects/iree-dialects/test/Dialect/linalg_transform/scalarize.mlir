@@ -20,7 +20,7 @@ transform.with_pdl_patterns {
     rewrite %2 with "transform.dialect"
   }
 
-  transform.structured.canonicalized_sequence %arg0 {
+  transform.structured.canonicalized_sequence %arg0 failures(propagate) {
   ^bb1(%arg1: !pdl.operation):
     %0 = pdl_match @isa_linalg.matmul in %arg1
     %tiled_linalg_op, %loops:3 = transform.structured.tile %0 [6, 16, 32] {interchange = [1, 0, 2]}

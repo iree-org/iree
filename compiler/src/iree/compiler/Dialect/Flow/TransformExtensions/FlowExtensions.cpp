@@ -82,9 +82,10 @@ static LogicalResult populateWorkgroupCountComputingRegion(
 /// DispatchTensorStoreOps.
 /// Ops are inserted just before the `block` terminator.
 static void rewriteParallelInsertSlices(
-    PatternRewriter &rewriter, scf::PerformConcurrentlyOp performConcurrentlyOp,
-    Block &block, ValueRange resultTensorOperands,
-    ValueRange resultTensorsDynamicDims, BlockAndValueMapping tensorToFlowBvm) {
+    PatternRewriter &rewriter, scf::ForeachThreadOp foreachThreadOp,
+    scf::PerformConcurrentlyOp performConcurrentlyOp, Block &block,
+    ValueRange resultTensorOperands, ValueRange resultTensorsDynamicDims,
+    BlockAndValueMapping tensorToFlowBvm) {
   Location loc = performConcurrentlyOp.getLoc();
   int64_t resultIndex = 0;
   for (const Operation &yieldingOp :
@@ -94,11 +95,15 @@ static void rewriteParallelInsertSlices(
     rewriter.setInsertionPoint(block.getTerminator());
     auto dynamicDims = Util::findVariadicDynamicDims(
         resultIndex, resultTensorOperands, resultTensorsDynamicDims);
+    BlockArgument destBbArg = parallelInsertOp.getDest().cast<BlockArgument>();
+    assert(destBbArg.getOwner()->getParentOp() == foreachThreadOp &&
+           "expected that dest is an output bbArg");
+    Value dest = foreachThreadOp.getTiedOpOperand(destBbArg)->get();
     // clang-format off
     rewriter.create<Flow::DispatchTensorStoreOp>(
         loc,
         parallelInsertOp.getSource(),
-        tensorToFlowBvm.lookup(cast<Value>(parallelInsertOp.getDest())),
+        tensorToFlowBvm.lookup(dest),
         dynamicDims,
         parallelInsertOp.getMixedOffsets(),
         parallelInsertOp.getMixedSizes(),
@@ -114,12 +119,18 @@ static void rewriteParallelInsertSlices(
 /// dispatchOp as well as a BlockAndValueMapping from tensor operands to the
 /// corresponding Flow dispatch tensor bbArgs.
 static void rewriteExtractSlices(PatternRewriter &rewriter,
+                                 scf::ForeachThreadOp foreachThreadOp,
                                  Flow::DispatchWorkgroupsOp dispatchOp,
                                  ValueRange tensorOperands,
                                  ValueRange tensorDynamicDims,
                                  BlockAndValueMapping tensorToFlowBvm) {
   dispatchOp->walk([&](tensor::ExtractSliceOp extractSliceOp) {
     Value source = extractSliceOp.getSource();
+    if (auto sourceBbArg = source.dyn_cast<BlockArgument>())
+      if (sourceBbArg.getOwner()->getParentOp() ==
+          foreachThreadOp.getOperation())
+        source = foreachThreadOp.getTiedOpOperand(sourceBbArg)->get();
+
     auto it = llvm::find(tensorOperands, source);
     if (it == tensorOperands.end()) return;
     int64_t index = std::distance(tensorOperands.begin(), it);
@@ -251,7 +262,8 @@ rewriteForeachThreadToFlowDispatchWorkgroups(
   llvm::SetVector<Value> resultTensorOperands, resultTensorsDynamicDims;
   for (const Operation &yieldingOp : performConcurrentlyOp.getYieldingOps()) {
     auto parallelInsertOp = cast<tensor::ParallelInsertSliceOp>(&yieldingOp);
-    Value dest = parallelInsertOp.getDest();
+    BlockArgument destBbArg = parallelInsertOp.getDest().cast<BlockArgument>();
+    Value dest = foreachThreadOp.getTiedOpOperand(destBbArg)->get();
     bool inserted = resultTensorOperands.insert(dest);
     if (!inserted) continue;
     auto dynamicDims =
@@ -278,6 +290,15 @@ rewriteForeachThreadToFlowDispatchWorkgroups(
       nonTensorOperands.push_back(v);
       continue;
     }
+    if (resultTensorOperands.contains(v)) continue;
+    tensorOperands.push_back(v);
+    for (int64_t dim : getIndicesOfDynamicDims(tensorType))
+      tensorDynamicDims.push_back(rewriter.create<tensor::DimOp>(loc, v, dim));
+  }
+  // Also add shared outputs. (These are usually already added as result
+  // tensor operands.)
+  for (Value v : foreachThreadOp.getOutputs()) {
+    auto tensorType = v.getType().cast<RankedTensorType>();
     if (resultTensorOperands.contains(v)) continue;
     tensorOperands.push_back(v);
     for (int64_t dim : getIndicesOfDynamicDims(tensorType))
@@ -409,11 +430,11 @@ rewriteForeachThreadToFlowDispatchWorkgroups(
 
   // Step 9. Rewrite tensor::ExtractSlice and ParallelInsert ops to the
   // relevant Flow DispatchTensorLoad/Store version.
-  rewriteParallelInsertSlices(rewriter, performConcurrentlyOp, *block,
-                              resultTensorOperands.getArrayRef(),
+  rewriteParallelInsertSlices(rewriter, foreachThreadOp, performConcurrentlyOp,
+                              *block, resultTensorOperands.getArrayRef(),
                               resultTensorsDynamicDims.getArrayRef(),
                               tensorToFlowBvm);
-  rewriteExtractSlices(rewriter, dispatchOp, allTensorOperands,
+  rewriteExtractSlices(rewriter, foreachThreadOp, dispatchOp, allTensorOperands,
                        allTensorDynamicDims, tensorToFlowBvm);
 
   // Step 10. Perform RAUWIf.
