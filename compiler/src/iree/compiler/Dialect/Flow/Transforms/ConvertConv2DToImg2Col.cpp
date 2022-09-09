@@ -188,6 +188,10 @@ class ConvertConv2DNhwcHwcf final
           ArrayRef<Value>{reshapedOutput});
       result = matmulOp.getResults().front();
     } else {
+      // For cases where batch is not 1, we need to keep the batch dimension
+      // separate. However the batch dimension is only used in indexing the
+      // input and output. So we cannot use existing linalg named ops like
+      // linalg.batch_matmul; doing it with a linalg.generic instead.
       AffineExpr bDim, mDim, nDim, kDim;
       bindDims(getContext(), bDim, mDim, nDim, kDim);
       auto lhsMap = AffineMap::get(4, 0, {bDim, mDim, kDim}, getContext());
