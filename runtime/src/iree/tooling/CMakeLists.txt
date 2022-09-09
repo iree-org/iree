@@ -78,7 +78,7 @@ iree_cc_test(
     iree::testing::gtest_main
     iree::tooling::testdata::npy
   LABELS
-    "no-qemu"
+    "requires-filesystem"
 )
 
 iree_cc_library(

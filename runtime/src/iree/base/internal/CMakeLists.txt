@@ -151,7 +151,7 @@ iree_cc_test(
     iree::testing::gtest
     iree::testing::gtest_main
   LABELS
-    "no-qemu"
+    "requires-filesystem"
 )
 
 iree_cc_library(
@@ -228,7 +228,7 @@ iree_cc_test(
     iree::testing::gtest
     iree::testing::gtest_main
   LABELS
-    "no-riscv"
+    "requires-dtz"
 )
 
 iree_cc_library(

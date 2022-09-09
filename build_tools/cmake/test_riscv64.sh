@@ -83,4 +83,4 @@ ctest --test-dir ${BUILD_RISCV_DIR}/tests/e2e/xla_ops -R check_llvm-cpu_local-ta
 # Test runtime unit tests
 ctest --test-dir ${BUILD_RISCV_DIR}/runtime/ --timeout 900 --output-on-failure \
   --no-tests=error --label-exclude \
-  '(^nokokoro$|^driver=vulkan$|^driver=cuda$|^vulkan_uses_vk_khr_shader_float16_int8$|^no-qemu$|^no-riscv$)'
+  '(^nokokoro$|^driver=vulkan$|^driver=cuda$|^vulkan_uses_vk_khr_shader_float16_int8$|^requires-filesystem$|^requires-dtz$)'

@@ -44,14 +44,7 @@ function(iree_bytecode_module_for_iree_check_test_and_friends)
     # RV64 Linux crosscompile toolchain can support iree_check_test with
     # specific CPU flags. Add the llvm flags to support RV64 RVV codegen if
     # llvm-target-triple is not specified.
-    list(APPEND _RULE_FLAGS "--iree-llvm-target-triple=riscv64")
-    list(APPEND _RULE_FLAGS "--iree-llvm-target-cpu=generic-rv64")
-    list(APPEND _RULE_FLAGS "--iree-llvm-target-abi=lp64d")
-    if(NOT _RULE_TARGET_CPU_FEATURES)
-      list(APPEND _RULE_FLAGS "--iree-llvm-target-cpu-features=+m,+a,+f,+d,+c,+v")
-      list(APPEND _RULE_FLAGS "--riscv-v-fixed-length-vector-lmul-max=8")
-      list(APPEND _RULE_FLAGS "--riscv-v-vector-bits-min=512")
-    endif()
+    list(APPEND _RULE_FLAGS ${RISCV64_TEST_DEFAULT_LLVM_FLAGS})
   endif()
 
   if(_RULE_TARGET_CPU_FEATURES)
