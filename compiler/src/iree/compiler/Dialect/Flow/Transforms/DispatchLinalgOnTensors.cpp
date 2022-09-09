@@ -29,6 +29,7 @@
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/Block.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
@@ -885,6 +886,41 @@ static bool canInsOperandTieWithOutsOperand(OpOperand *insOperand) {
   return llvm::any_of(linalgOp.getOutputOperands(), canTieWithOutsOperand);
 }
 
+/// Returns a bit vector of size number of loops of the `interfaceOp` with
+/// the bits corresponding to outer parallel loops set to `true`.
+static llvm::SmallBitVector getOuterParallelLoops(TilingInterface interfaceOp) {
+  SmallVector<StringRef> loopIteratorTypes = interfaceOp.getLoopIteratorTypes();
+  llvm::SmallBitVector parallelLoops(loopIteratorTypes.size());
+  for (auto iteratorType : llvm::enumerate(loopIteratorTypes)) {
+    if (iteratorType.value() != getParallelIteratorTypeName()) break;
+    parallelLoops.set(iteratorType.index());
+  }
+  return parallelLoops;
+}
+
+/// Returns true if `map` is an identity map with zeros, i.e. if you
+/// drop the result exprs that are constant zeros, the `map` will become an
+/// identity.
+static bool isIdentityMapWithZeros(AffineMap map) {
+  if (map.getNumSymbols() != 0) return false;
+  unsigned dimsSeen = 0;
+  for (auto result : map.getResults()) {
+    bool isValidExpr = TypeSwitch<AffineExpr, bool>(result)
+                           .Case<AffineDimExpr>([&dimsSeen](auto dimExpr) {
+                             if (dimExpr.getPosition() != dimsSeen)
+                               return false;
+                             dimsSeen++;
+                             return true;
+                           })
+                           .Case<AffineConstantExpr>([](auto constExpr) {
+                             return constExpr.getValue() == 0;
+                           })
+                           .Default([](AffineExpr) { return false; });
+    if (!isValidExpr) return false;
+  }
+  return dimsSeen == map.getNumDims();
+}
+
 /// Method to check if two `linalg.generic` op with producer-consumer
 /// relationship through `operand` have compatible outer-parallel loops.
 static bool hasCompatibleOuterParallelLoops(
@@ -895,21 +931,16 @@ static bool hasCompatibleOuterParallelLoops(
     return false;
   }
 
-  // Method to get number of outer parallel loops.
-  auto getNumOuterParallelLoops = [](ArrayRef<Attribute> iteratorTypes) {
-    return iteratorTypes
-        .take_while([](Attribute attr) { return isParallelIterator(attr); })
-        .size();
-  };
-  auto numProducerOuterParallelLoops =
-      getNumOuterParallelLoops(producer.getIteratorTypes().getValue());
-  auto numConsumerOuterParallelLoops =
-      getNumOuterParallelLoops(consumer.getIteratorTypes().getValue());
+  llvm::SmallBitVector producerParallelLoops =
+      getOuterParallelLoops(cast<TilingInterface>(producer.getOperation()));
+  llvm::SmallBitVector consumerParallelLoops =
+      getOuterParallelLoops(cast<TilingInterface>(consumer.getOperation()));
+
   if (allowConsumerParallelismPessimization) {
-    if (numProducerOuterParallelLoops > numConsumerOuterParallelLoops) {
+    if (producerParallelLoops.count() > consumerParallelLoops.count()) {
       return false;
     }
-  } else if (numProducerOuterParallelLoops != numConsumerOuterParallelLoops) {
+  } else if (producerParallelLoops.count() != consumerParallelLoops.count()) {
     return false;
   }
 
@@ -921,21 +952,20 @@ static bool hasCompatibleOuterParallelLoops(
     return false;
   }
 
-  /// Project out the reduction dimensions in the producer and consumer indexing
-  /// maps.
-  llvm::SmallBitVector producerProjectedDims(numProducerOuterParallelLoops);
-  producerProjectedDims.resize(producer.getNumLoops(), true);
+  /// Project out the non-parallel dimensions.
+  llvm::SmallBitVector producerProjectedDims(producerParallelLoops);
+  producerProjectedDims.flip();
   auto projectedProducerMap =
       getProjectedMap(producerIndexingMap, producerProjectedDims);
-  llvm::SmallBitVector consumerProjectedDims(numProducerOuterParallelLoops);
+
+  llvm::SmallBitVector consumerProjectedDims(producerParallelLoops);
+  consumerProjectedDims.flip();
   consumerProjectedDims.resize(consumer.getNumLoops(), true);
   auto projectedConsumerMap =
       getProjectedMap(consumerIndexingMap, consumerProjectedDims);
-  if (!projectedProducerMap.isProjectedPermutation() ||
-      projectedConsumerMap != projectedProducerMap) {
-    return false;
-  }
-  return true;
+
+  return isIdentityMapWithZeros(projectedProducerMap) &&
+         isIdentityMapWithZeros(projectedConsumerMap);
 }
 
 /// For all uses of an operation, finds the use that dominates all other uses.
@@ -1065,8 +1095,6 @@ static bool isFusableWithProducer(OpOperand &operand) {
 static void fuseRootsWithProducers(MLIRContext *context, Operation *root,
                                    unsigned groupNum,
                                    DominanceInfo const &dominanceInfo) {
-  // We probably want a worklist algorithm here, but for now just look at
-  // immediate producers.
   SmallVector<Operation *> worklist;
   worklist.push_back(root);
 
