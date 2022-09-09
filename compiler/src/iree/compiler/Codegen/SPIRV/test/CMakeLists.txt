@@ -46,7 +46,6 @@ iree_lit_test_suite(
     "vectorize_load_store.mlir"
     "vectorize_matmul.mlir"
     "vectorize_reduction.mlir"
-    "vectorize_tensor_pad.mlir"
   TOOLS
     FileCheck
     iree-opt
