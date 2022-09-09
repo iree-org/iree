@@ -80,3 +80,7 @@ ctest --test-dir ${BUILD_RISCV_DIR}/tests/e2e/models -R llvm-cpu_local-task_mobi
 ctest --test-dir ${BUILD_RISCV_DIR}/tests/e2e/tosa_ops -R check_llvm-cpu_local-task
 # Test all xla ops except fp16, which is not supported properly
 ctest --test-dir ${BUILD_RISCV_DIR}/tests/e2e/xla_ops -R check_llvm-cpu_local-task -E fp16
+# Test runtime unit tests
+ctest --test-dir ${BUILD_RISCV_DIR}/runtime/ --timeout 900 --output-on-failure \
+  --no-tests=error --label-exclude \
+  '(^nokokoro$|^driver=vulkan$|^driver=cuda$|^vulkan_uses_vk_khr_shader_float16_int8$|^no-qemu$|^no-riscv$)'
