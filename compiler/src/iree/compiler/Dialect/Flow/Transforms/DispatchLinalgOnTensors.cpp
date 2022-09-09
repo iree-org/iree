@@ -732,7 +732,8 @@ static bool canInsOperandTieWithOutsOperand(OpOperand *insOperand) {
   if (!linalgOp) return false;
 
   AffineMap insOperandIndexingMap = linalgOp.getTiedIndexingMap(insOperand);
-  if (insOperandIndexingMap.isProjectedPermutation()) {
+  if (insOperandIndexingMap.isProjectedPermutation() &&
+      !insOperandIndexingMap.isIdentity()) {
     // If the operand is a projected permutation a small stack might be fine.
     // So return true.
     return true;
