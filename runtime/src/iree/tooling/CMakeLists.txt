@@ -77,6 +77,8 @@ iree_cc_test(
     iree::testing::gtest
     iree::testing::gtest_main
     iree::tooling::testdata::npy
+  LABELS
+    "no-qemu"
 )
 
 iree_cc_library(

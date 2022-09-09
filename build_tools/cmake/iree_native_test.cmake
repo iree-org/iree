@@ -116,7 +116,7 @@ function(iree_native_test)
   elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv" AND RISCV_CPU STREQUAL "rv64")
     # The test target needs to run within the QEMU emulator for RV64 Linux
     # crosscompile build. A QEMU 64 Linux emulator must be available at the
-    # path specified by the  `QEMU_RV64_BIN` environment variable.
+    # path specified by the `QEMU_RV64_BIN` environment variable.
     if(DEFINED ENV{QEMU_RV64_BIN})
       add_test(
         NAME
@@ -130,7 +130,7 @@ function(iree_native_test)
       )
       iree_configure_test(${_TEST_NAME})
     else()
-      message(SEND_ERROR "QEMU not found.")
+      return()
     endif()
   else()
     add_test(

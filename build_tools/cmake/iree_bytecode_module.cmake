@@ -70,6 +70,20 @@ function(iree_bytecode_module)
 
   iree_get_executable_path(_COMPILE_TOOL_EXECUTABLE ${_COMPILE_TOOL})
 
+  if(CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv" AND
+    RISCV_CPU STREQUAL "rv64" AND
+    NOT _RULE_FLAGS MATCHES "iree-llvm-target-triple")
+    # RV64 Linux crosscompile toolchain can support iree-compile with
+    # specific CPU flags. Add the llvm flags to support RV64 RVV codegen if
+    # llvm-target-triple is not specified.
+    list(APPEND _RULE_FLAGS "--iree-llvm-target-triple=riscv64")
+    list(APPEND _RULE_FLAGS "--iree-llvm-target-cpu=generic-rv64")
+    list(APPEND _RULE_FLAGS "--iree-llvm-target-abi=lp64d")
+    list(APPEND _RULE_FLAGS "--iree-llvm-target-cpu-features=+m,+a,+f,+d,+c,+v")
+    list(APPEND _RULE_FLAGS "--riscv-v-fixed-length-vector-lmul-max=8")
+    list(APPEND _RULE_FLAGS "--riscv-v-vector-bits-min=512")
+  endif()
+
   set(_ARGS "--output-format=vm-bytecode")
   list(APPEND _ARGS "${_RULE_FLAGS}")
 
