@@ -41,6 +41,7 @@ iree_lit_test_suite(
             "transpose_canonicalization.mlir",
             "type_propagation.mlir",
             "vectorize_linalg_conv.mlir",
+            "vectorize_tensor_pad.mlir",
             "warp_reduction.mlir",
         ],
         include = ["*.mlir"],

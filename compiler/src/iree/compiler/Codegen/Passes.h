@@ -159,6 +159,15 @@ std::unique_ptr<OperationPass<func::FuncOp>>
 createConvertVectorReductionToGPUPass(
     std::function<int(func::FuncOp)> getWarpSize = nullptr);
 
+/// Fuses tensor.pad ops into their consumer ops' tiled loop nests.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createFuseTensorPadWithConsumerPass();
+
+/// Concretizes tensor.pad op's result shape if its source op implements
+/// OffsetSizeAndStrideOpInterface. For example, pad(extract_slice).
+std::unique_ptr<OperationPass<func::FuncOp>>
+createConcretizePadResultShapePass();
+
 //----------------------------------------------------------------------------//
 // Common codegen patterns.
 //----------------------------------------------------------------------------//
@@ -185,6 +194,11 @@ void populateLinalgToVectorVectorizeConvPatterns(MLIRContext *context,
 /// out of bound semantics.
 void populateVectorizePadPatterns(RewritePatternSet &patterns,
                                   PatternBenefit baseBenefit = 1);
+
+/// Populates patterns with patterns to concretize tensor.pad op'ss result
+/// shape.
+void populateConcretizePadResultShapePatterns(MLIRContext *context,
+                                              RewritePatternSet &patterns);
 
 //------------------------------------------------------------------------------
 // LLVMCPU
@@ -465,10 +479,6 @@ std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVVectorizePass();
 /// allow to convert memory accesses to vector load/store in SPIR-V without
 /// having pointer bitcast.
 std::unique_ptr<OperationPass<ModuleOp>> createSPIRVVectorizeLoadStore();
-
-/// Fuses tensor.pad ops into their consumer ops' tiled loop nests.
-std::unique_ptr<OperationPass<func::FuncOp>>
-createSPIRVFuseTensorPadWithConsumerPass();
 
 // Uses `tensor.pad` ops as anchors to create separate fast and slow paths
 // inside the kernel. The fast path is for inner tiles where we don't need

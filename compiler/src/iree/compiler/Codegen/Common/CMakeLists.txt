@@ -77,16 +77,19 @@ iree_cc_library(
     "BufferizationAnalysis.cpp"
     "BufferizeCopyOnlyDispatchesPass.cpp"
     "CleanupBufferAllocViewPass.cpp"
+    "ConcretizePadResultShape.cpp"
     "ConvertToDestinationPassingStylePass.cpp"
     "FlattenMemRefSubspanPass.cpp"
     "FoldTensorExtractOpPass.cpp"
     "ForOpCanonicalizationPass.cpp"
+    "FuseTensorPadWithConsumer.cpp"
     "IREEComprehensiveBufferizePass.cpp"
     "OptimizeVectorTransferPass.cpp"
     "PolynomialApproximationPass.cpp"
     "TestPartitionableLoopsInterface.cpp"
     "TileAndDistributeToWorkgroupsPass.cpp"
     "TypePropagationPass.cpp"
+    "VectorizePad.cpp"
   DEPS
     IREELinalgExtDialect
     IREELinalgExtPasses

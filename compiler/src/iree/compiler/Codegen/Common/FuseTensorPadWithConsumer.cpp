@@ -15,9 +15,8 @@ namespace iree_compiler {
 
 namespace {
 
-struct SPIRVFuseTensorPadWithConsumerPass final
-    : public SPIRVFuseTensorPadWithConsumerBase<
-          SPIRVFuseTensorPadWithConsumerPass> {
+struct FuseTensorPadWithConsumerPass final
+    : public FuseTensorPadWithConsumerBase<FuseTensorPadWithConsumerPass> {
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     func::FuncOp funcOp = getOperation();
@@ -34,8 +33,8 @@ struct SPIRVFuseTensorPadWithConsumerPass final
 }  // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-createSPIRVFuseTensorPadWithConsumerPass() {
-  return std::make_unique<SPIRVFuseTensorPadWithConsumerPass>();
+createFuseTensorPadWithConsumerPass() {
+  return std::make_unique<FuseTensorPadWithConsumerPass>();
 }
 
 }  // namespace iree_compiler

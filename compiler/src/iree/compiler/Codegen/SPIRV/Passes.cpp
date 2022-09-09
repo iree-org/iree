@@ -101,7 +101,7 @@ static void addTileAndDistributeToWorkgroupsPasses(
   auto &nestedModulePM = passManager.nest<ModuleOp>();
   if (useFuseTensorPadWithConsumerPass) {
     nestedModulePM.addNestedPass<func::FuncOp>(
-        createSPIRVFuseTensorPadWithConsumerPass());
+        createFuseTensorPadWithConsumerPass());
   }
   nestedModulePM.addNestedPass<func::FuncOp>(
       createConvertToDestinationPassingStylePass());
