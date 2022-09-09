@@ -103,9 +103,14 @@ static void addBufferizePasses(OpPassManager &passManager) {
                                       memcpyFn);
 }
 
-static void addTileAndDistributePasses(OpPassManager &pm) {
+static void addTileAndDistributePasses(
+    OpPassManager &pm, bool useFuseTensorPadWithConsumerPass = true) {
   pm.addPass(createTileAndDistributeToWorkgroupsPass());
   auto &nestedModulePM = pm.nest<ModuleOp>();
+  if (useFuseTensorPadWithConsumerPass) {
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createFuseTensorPadWithConsumerPass());
+  }
   nestedModulePM.addNestedPass<func::FuncOp>(
       createConvertToDestinationPassingStylePass());
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -444,6 +449,15 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
   }
 
   {
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createFuseTensorPadWithConsumerPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createConcretizePadResultShapePass());
+    nestedModulePM.addNestedPass<func::FuncOp>(createVectorizePadPass());
+  }
+
+
+  {
     LinalgSingleTilingExpertPassOptions options;
     options.peel = enablePeeling;
     options.vectorize = true;
@@ -470,7 +484,8 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
 }
 
 void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
-  addTileAndDistributePasses(passManager);
+  addTileAndDistributePasses(passManager,
+                             /*useFuseTensorPadWithConsumerPass=*/true);
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   // Run LinalgFusePass firstly in case that we have fill + conv + generic
@@ -498,6 +513,14 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
+  {
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createFuseTensorPadWithConsumerPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createConcretizePadResultShapePass());
+    nestedModulePM.addNestedPass<func::FuncOp>(createVectorizePadPass());
+  }
+
   // Add the sandbox single tiling expert to vectorize.
   // We can't do the vectorization in the tiling expert above due to an issue in
   // codegen strategy pipeline. Since we are moving to the transform dialect, we
@@ -512,11 +535,11 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
-  addBufferizePasses(nestedModulePM);
-  nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass(/*flatten=*/true));
+  nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  addBufferizePasses(nestedModulePM);
 
   // Run IREE specific passes before vector lowering expert.
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -548,6 +571,14 @@ void addCPUAArchDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
         static_cast<int64_t>(StrategyTilingLevel::ReductionTiles);
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLinalgSingleTilingExpertPass(options));
+  }
+
+  {
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createFuseTensorPadWithConsumerPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createConcretizePadResultShapePass());
+    nestedModulePM.addNestedPass<func::FuncOp>(createVectorizePadPass());
   }
 
   {

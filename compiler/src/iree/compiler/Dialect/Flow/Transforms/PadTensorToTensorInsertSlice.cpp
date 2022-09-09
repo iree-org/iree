@@ -50,6 +50,12 @@ struct PadTensorOpConversion : public OpRewritePattern<tensor::PadOp> {
                      [&](Value v) { return v == yieldVal; })) {
       return failure();
     }
+    if (padTensorOp->hasOneUse()) {
+      Operation *use = padTensorOp->use_begin()->getOwner();
+      if (isa<linalg::LinalgOp>(use)) {
+        return failure();
+      }
+    }
 
     OpBuilder::InsertionGuard g(rewriter);
     Location loc = padTensorOp.getLoc();
