@@ -395,7 +395,7 @@ static SmallVector<Operation *> getOperationsToMoveIntoDispatch(
       dispatchOps.push_back(producer);
     }
   }
-  return dispatchOps;
+  return llvm::to_vector(llvm::reverse(orderOperations(dispatchOps)));
 }
 
 //===---------------------------------------------------------------------===//
