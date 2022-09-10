@@ -6,25 +6,7 @@
 
 #include "iree/compiler/Codegen/LLVMCPU/LinalgOpInfo.h"
 
-//#include <numeric>
-
-//#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
-//#include "iree/compiler/Codegen/LLVMCPU/TargetMLTransformInfo.h"
-//#include "iree/compiler/Codegen/Transforms/Transforms.h"
-//#include "iree/compiler/Codegen/Utils/Utils.h"
-//#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-//#include "llvm/ADT/TypeSwitch.h"
-//#include "llvm/Support/CommandLine.h"
-//#include "llvm/Support/TargetSelect.h"
-//#include "mlir/Dialect/Func/IR/FuncOps.h"
-//#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
-//#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
-//#include "mlir/Dialect/MemRef/IR/MemRef.h"
-//#include "mlir/Dialect/MemRef/Transforms/Passes.h"
-//#include "mlir/Dialect/Utils/StaticValueUtils.h"
-//#include "mlir/IR/Matchers.h"
-//#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 using namespace mlir::linalg;
 

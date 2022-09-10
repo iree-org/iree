@@ -213,7 +213,7 @@ static SmallVector<int64_t> getMinTilingSizesForEachDim(
   // Limit unrolling on transpose operations. For know, we assume the rightmost
   // non-one tiled dimension is for vectorization and any other non-one
   // dimension is for unrolling.
-  // TODO(dcaballe): Improve with LinalgOpAnalysis.
+  // TODO(dcaballe): Consider input and output transposes.
   if (linalgOpInfo.isTranspose()) {
     int vecDim;
     for (vecDim = minTileSizes.size() - 1; vecDim >= 0; --vecDim) {
