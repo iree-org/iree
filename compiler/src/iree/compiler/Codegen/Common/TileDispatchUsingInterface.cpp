@@ -403,18 +403,17 @@ static LogicalResult specializeDistributionLoops(TilingResult &tilingResult,
     scf::ForOp loop = std::get<0>(it);
     auto ubOp = loop.getUpperBound().getDefiningOp<arith::ConstantIndexOp>();
     if (!ubOp) {
-      // TODO: handle dynamic cases by adding more code to check the
-      // conditions.
-      return success();
+      isAlreadyMultiple = false;
+      break;
     }
     int64_t ub = ubOp.value();
     int64_t tileSize = std::get<1>(it);
     if (ub % tileSize != 0) {
       isAlreadyMultiple = false;
     }
-    if (ub < tileSize) {
-      return success();
-    }
+    // if (ub < tileSize) {
+    //   return success();
+    // }
   }
 
   if (isAlreadyMultiple) return success();
