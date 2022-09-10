@@ -8,6 +8,7 @@
 #define IREE_COMPILER_CODEGEN_LLVMCPU_TARGETMLTRANSFORMINFO_H_
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include <limits>
 
 namespace mlir {
 namespace iree_compiler {
@@ -16,14 +17,15 @@ namespace iree_compiler {
 // TODO(dcaballe): Move to a Concept-Model implementation when it's worth it.
 struct TargetMLTransformInfo {
   unsigned defaultMaxReductionUnrollFactor = 8;
-  unsigned defaultMaxTransposeUnrollFactor = 128;
+  unsigned defaultMaxTransposeUnrollFactor =
+      std::numeric_limits<unsigned>::max();
 
   static const TargetMLTransformInfo getTargetMLTransformInfo(
       IREE::HAL::ExecutableVariantOp variantOp);
 };
 
-struct RISCVTargetTransformInfo : TargetMLTransformInfo {
-  RISCVTargetTransformInfo() {
+struct RISCVTargetMLTransformInfo : TargetMLTransformInfo {
+  RISCVTargetMLTransformInfo() {
     defaultMaxReductionUnrollFactor = 8;
     defaultMaxTransposeUnrollFactor = 1;
   }
@@ -32,7 +34,7 @@ struct RISCVTargetTransformInfo : TargetMLTransformInfo {
 const TargetMLTransformInfo TargetMLTransformInfo::getTargetMLTransformInfo(
     IREE::HAL::ExecutableVariantOp variantOp) {
   if (isRISCV(variantOp)) {
-    return RISCVTargetTransformInfo();
+    return RISCVTargetMLTransformInfo();
   }
 
   return TargetMLTransformInfo();

@@ -206,8 +206,8 @@ static SmallVector<int64_t> getMinTilingSizesForEachDim(
           std::min<int64_t>(tileSize, TMLTI.defaultMaxReductionUnrollFactor);
     }
 
-    tileSize = std::max<int64_t>(minTileSizes[fastestVaryingDim], tileSize);
-    minTileSizes[fastestVaryingDim] = tileSize;
+    minTileSizes[fastestVaryingDim] =
+        std::max<int64_t>(minTileSizes[fastestVaryingDim], tileSize);
   }
 
   // Limit unrolling on transpose operations. For know, we assume the rightmost

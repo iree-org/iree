@@ -55,7 +55,7 @@ static bool isTransposeLinalgOp(linalg::LinalgOp linalgOp) {
     return false;
   }
 
-  // Inverse map to use transfer linalgOp permutation logic.
+  // Inverse map to use transfer op permutation logic.
   AffineMap outputInversedMap = inversePermutation(
       linalgOp.getTiedIndexingMap(linalgOp.getOutputOperand(0)));
   SmallVector<AffineMap> inputInversedMaps;
