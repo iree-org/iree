@@ -416,39 +416,6 @@ buildOperandLessFlowDispatchWorkgroupOp(PatternRewriter &rewriter, Location loc,
   return clonedOps;
 }
 
-/// Returns the list of operations that are to be cloned into the dispatch
-/// based on the root operation.
-static SmallVector<Operation *> getOperationsToMoveIntoDispatch(
-    Operation *rootOp) {
-  SmallVector<Operation *> dispatchOps;
-  dispatchOps.push_back(rootOp);
-  if (!hasRootOpAttribute(rootOp)) return dispatchOps;
-
-  int64_t groupNum = getRootNumber(rootOp);
-  std::deque<Operation *> worklist;
-  worklist.push_back(rootOp);
-  llvm::SmallDenseSet<Operation *, 2> movedOps;
-  movedOps.insert(rootOp);
-
-  while (!worklist.empty()) {
-    Operation *currRoot = worklist.front();
-    worklist.pop_front();
-    for (auto operand : currRoot->getOperands()) {
-      auto producer = operand.getDefiningOp();
-      if (movedOps.count(producer)) continue;
-      if (!producer || !isInFusionGroup(producer, groupNum)) continue;
-      movedOps.insert(producer);
-      worklist.push_back(producer);
-      dispatchOps.push_back(producer);
-    }
-  }
-  return dispatchOps;
-}
-
-//===---------------------------------------------------------------------===//
-// Methods to legalize a dispatch region op, i.e. make it isolated from above.
-//===---------------------------------------------------------------------===//
-
 /// Reorders the operations in `ops` such that they could be inlined into the
 /// dispatch region in that order to satisfy dependencies.
 static SmallVector<Operation *> orderOperations(ArrayRef<Operation *> ops) {
@@ -530,6 +497,39 @@ static SmallVector<Operation *> orderOperations(ArrayRef<Operation *> ops) {
          "ordering of inlined operations failed");
   return orderedOps;
 }
+
+/// Returns the list of operations that are to be cloned into the dispatch
+/// based on the root operation.
+static SmallVector<Operation *> getOperationsToMoveIntoDispatch(
+    Operation *rootOp) {
+  SmallVector<Operation *> dispatchOps;
+  dispatchOps.push_back(rootOp);
+  if (!hasRootOpAttribute(rootOp)) return dispatchOps;
+
+  int64_t groupNum = getRootNumber(rootOp);
+  std::deque<Operation *> worklist;
+  worklist.push_back(rootOp);
+  llvm::SmallDenseSet<Operation *, 2> movedOps;
+  movedOps.insert(rootOp);
+
+  while (!worklist.empty()) {
+    Operation *currRoot = worklist.front();
+    worklist.pop_front();
+    for (auto operand : currRoot->getOperands()) {
+      auto producer = operand.getDefiningOp();
+      if (movedOps.count(producer)) continue;
+      if (!producer || !isInFusionGroup(producer, groupNum)) continue;
+      movedOps.insert(producer);
+      worklist.push_back(producer);
+      dispatchOps.push_back(producer);
+    }
+  }
+  return llvm::to_vector(llvm::reverse(orderOperations(dispatchOps)));
+}
+
+//===---------------------------------------------------------------------===//
+// Methods to legalize a dispatch region op, i.e. make it isolated from above.
+//===---------------------------------------------------------------------===//
 
 /// Checks if the `Value` has a use within the dispatch that is unfusable.
 static bool hasUnfusableUseInDispatch(
