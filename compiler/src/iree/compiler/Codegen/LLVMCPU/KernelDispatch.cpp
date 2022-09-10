@@ -9,6 +9,7 @@
 #include <numeric>
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Codegen/LLVMCPU/LinalgOpInfo.h"
 #include "iree/compiler/Codegen/LLVMCPU/TargetMLTransformInfo.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -171,62 +172,6 @@ static int64_t getVectorSize(func::FuncOp entryPointFn, ShapedType shapedType) {
   return getVectorSize(entryPointFn, byteWidth);
 }
 
-/// Returns true if `map` is a tranposition.
-// TODO(dcaballe): Discern between "memcopy" transposes and "shuffle"
-// transposes.
-// TODO(dcaballe): Shouldn't there be a utility for this somewhere in Affine?
-static bool isTransposeMap(AffineMap map) {
-  unsigned prevDim = 0;
-  for (AffineExpr expr : map.getResults()) {
-    if (expr.isa<AffineConstantExpr>()) {
-      continue;
-    }
-
-    if (auto dimExpr = expr.dyn_cast<AffineDimExpr>()) {
-      if (prevDim > dimExpr.getPosition()) {
-        return true;
-      }
-      prevDim = dimExpr.getPosition();
-      continue;
-    }
-
-    llvm_unreachable("Unexpected AffineExpr");
-  }
-
-  return false;
-}
-
-/// Returns true if a LinalgOp implements a transpose.
-// TODO(dcaballe):
-//   * Consider transpose + reductions.
-//   * Consider input and output transposes.
-static bool isTransposeLinalgOp(linalg::LinalgOp op) {
-  // Reductions are not supported.
-  if (op.getNumReductionLoops() > 0) {
-    return false;
-  }
-
-  // Multiple outputs are not supported yet.
-  if (op.getNumOutputs() != 1) {
-    return false;
-  }
-
-  // Inverse map to use transfer op permutation logic.
-  AffineMap outputInversedMap =
-      inversePermutation(op.getTiedIndexingMap(op.getOutputOperand(0)));
-  SmallVector<AffineMap> inputInversedMaps;
-  for (OpOperand *operand : op.getInputOperands()) {
-    inputInversedMaps.push_back(inverseAndBroadcastProjectedPermutation(
-        op.getTiedIndexingMap(operand)));
-  }
-
-  bool isInputTransposed = llvm::any_of(
-      inputInversedMaps, [](AffineMap map) { return isTransposeMap(map); });
-  bool isOutputTransposed = isTransposeMap(outputInversedMap);
-
-  return isInputTransposed || isOutputTransposed;
-}
-
 /// Returns minimum tiling sizes for each dimension. One dimension is possible
 /// to access at different element types. It determines the tiling sizes by
 /// looking into all the operands.
@@ -234,14 +179,10 @@ static bool isTransposeLinalgOp(linalg::LinalgOp op) {
 // tile sizes for vectorization/unrolling in one shot.
 static SmallVector<int64_t> getMinTilingSizesForEachDim(
     func::FuncOp entryPointFn, linalg::LinalgOp op,
-    const TargetMLTransformInfo &TMLTI) {
+    const LinalgOpInfo &linalgOpInfo, const TargetMLTransformInfo &TMLTI) {
   unsigned numLoops = op.getNumLoops();
   SmallVector<int64_t> minTileSizes(numLoops, 1);
   auto inputOutputOpOperands = op.getInputAndOutputOperands();
-
-  // TODO(dcaballe): Move all these properties to LinalgOpInfo analysis.
-  bool isReduction = op.getNumReductionLoops() > 0;
-  bool isTranspose = isTransposeLinalgOp(op);
 
   for (auto map : llvm::enumerate(op.getIndexingMapsArray())) {
     // Check the fastest varying dimension of the operand. Set the vector size
@@ -259,7 +200,8 @@ static SmallVector<int64_t> getMinTilingSizesForEachDim(
     // Vectorization of reductions is driven by input tensors and considering
     // the output's fastest varying dim leads to large unroll factors. We limit
     // the tile size for this case to 'maxUnrollFactor'.
-    if (isReduction && op.isOutputTensor(inputOutputOpOperands[map.index()])) {
+    if (linalgOpInfo.isReduction() &&
+        op.isOutputTensor(inputOutputOpOperands[map.index()])) {
       tileSize =
           std::min<int64_t>(tileSize, TMLTI.defaultMaxReductionUnrollFactor);
     }
@@ -272,7 +214,7 @@ static SmallVector<int64_t> getMinTilingSizesForEachDim(
   // non-one tiled dimension is for vectorization and any other non-one
   // dimension is for unrolling.
   // TODO(dcaballe): Improve with LinalgOpAnalysis.
-  if (isTranspose) {
+  if (linalgOpInfo.isTranspose()) {
     int vecDim;
     for (vecDim = minTileSizes.size() - 1; vecDim >= 0; --vecDim) {
       if (minTileSizes[vecDim] > 1) {
@@ -1073,7 +1015,7 @@ static bool isSupportedTransposeOp(linalg::GenericOp genericOp) {
 /// CPUDoubleTilingExpert pipeline.
 static LogicalResult setDefaultGenericOpRootConfig(
     func::FuncOp entryPointFn, linalg::GenericOp genericOp,
-    const TargetMLTransformInfo &TMLTI) {
+    const LinalgOpInfo &linalgOpInfo, const TargetMLTransformInfo &TMLTI) {
   if (getLoweringConfig(genericOp)) {
     return success();
   }
@@ -1087,7 +1029,7 @@ static LogicalResult setDefaultGenericOpRootConfig(
   }
 
   SmallVector<int64_t> minTileSizes =
-      getMinTilingSizesForEachDim(entryPointFn, genericOp, TMLTI);
+      getMinTilingSizesForEachDim(entryPointFn, genericOp, linalgOpInfo, TMLTI);
   // For generic ops we'll use the default divided by 2 to control the stack
   // allocation limit See #9469 for example.
   SmallVector<int64_t> maxTileSizes(numLoops, defaultWorkgroupTileSize / 2);
@@ -1132,7 +1074,7 @@ static LogicalResult setDefaultGenericOpRootConfig(
 /// transposition to use CPUDoubleTilingExpert pipeline.
 static LogicalResult setTransposeLikeOpRootConfig(
     func::FuncOp entryPointFn, linalg::GenericOp genericOp,
-    const TargetMLTransformInfo &TMLTI) {
+    const LinalgOpInfo &linalgOpInfo, const TargetMLTransformInfo &TMLTI) {
   if (getLoweringConfig(genericOp)) {
     return success();
   }
@@ -1145,7 +1087,7 @@ static LogicalResult setTransposeLikeOpRootConfig(
 
   unsigned numLoops = genericOp.getNumLoops();
   SmallVector<int64_t> minTileSizes =
-      getMinTilingSizesForEachDim(entryPointFn, genericOp, TMLTI);
+      getMinTilingSizesForEachDim(entryPointFn, genericOp, linalgOpInfo, TMLTI);
   SmallVector<int64_t> maxTileSizes(numLoops, defaultWorkgroupTileSize);
   if (llvm::all_of(minTileSizes, [](int64_t vs) { return vs == 1; })) {
     // Nothing to vectorize just lower to loops.
@@ -1201,7 +1143,7 @@ static LogicalResult setTransposeLikeOpRootConfig(
 /// from tiny dispatches.
 static LogicalResult setElementwiseGenericOpRootConfig(
     func::FuncOp entryPointFn, linalg::GenericOp genericOp,
-    const TargetMLTransformInfo &TMLTI) {
+    const LinalgOpInfo &linalgOpInfo, const TargetMLTransformInfo &TMLTI) {
   if (getLoweringConfig(genericOp)) {
     return success();
   }
@@ -1212,7 +1154,7 @@ static LogicalResult setElementwiseGenericOpRootConfig(
 
   // Set the flow level tiling to the default.
   SmallVector<int64_t> minTileSizes =
-      getMinTilingSizesForEachDim(entryPointFn, genericOp, TMLTI);
+      getMinTilingSizesForEachDim(entryPointFn, genericOp, linalgOpInfo, TMLTI);
   SmallVector<int64_t> maxTileSizes(numLoops, defaultWorkgroupTileSize);
   SmallVector<int64_t> flowTileSizes =
       getDefaultDistributedLevelTileSizes(genericOp, minTileSizes, maxTileSizes,
@@ -1280,11 +1222,14 @@ static LogicalResult setElementwiseGenericOpRootConfig(
 /// CPUDoubleTilingExpert pipeline.
 static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                    linalg::GenericOp genericOp,
+                                   const LinalgOpInfo &linalgOpInfo,
                                    const TargetMLTransformInfo &TMLTI) {
-  if (failed(setTransposeLikeOpRootConfig(entryPointFn, genericOp, TMLTI)) ||
-      failed(
-          setElementwiseGenericOpRootConfig(entryPointFn, genericOp, TMLTI)) ||
-      failed(setDefaultGenericOpRootConfig(entryPointFn, genericOp, TMLTI))) {
+  if (failed(setTransposeLikeOpRootConfig(entryPointFn, genericOp, linalgOpInfo,
+                                          TMLTI)) ||
+      failed(setElementwiseGenericOpRootConfig(entryPointFn, genericOp,
+                                               linalgOpInfo, TMLTI)) ||
+      failed(setDefaultGenericOpRootConfig(entryPointFn, genericOp,
+                                           linalgOpInfo, TMLTI))) {
     return failure();
   }
   return success();
@@ -1451,8 +1396,9 @@ static LogicalResult setRootConfigImpl(func::FuncOp entryPointFn, Operation *op,
   // Redirect to individual operations.
   auto setRootConfigFn = [&](Operation *op) -> LogicalResult {
     return TypeSwitch<Operation *, LogicalResult>(op)
-        .Case<linalg::GenericOp>(
-            [&](auto op) { return setRootConfig(entryPointFn, op, TMLTI); })
+        .Case<linalg::GenericOp>([&](auto op) {
+          return setRootConfig(entryPointFn, op, LinalgOpInfo(op), TMLTI);
+        })
         .Case<IREE::LinalgExt::FftOp, linalg::Mmt4DOp, linalg::Conv2DNhwcHwcfOp,
               linalg::DepthwiseConv2DNhwcHwcOp>(
             [&](auto op) { return setRootConfig(entryPointFn, op); })
