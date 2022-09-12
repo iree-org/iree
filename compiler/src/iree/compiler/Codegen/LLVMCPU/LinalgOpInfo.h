@@ -19,14 +19,14 @@ class LinalgOpInfo {
  public:
   LinalgOpInfo(linalg::LinalgOp linalgOp);
 
-  bool isTranspose() const { return hasTransposeTrait; }
-  bool isReduction() const { return hasReductionTrait; }
+  bool isTranspose() const { return transposeTrait; }
+  bool isReduction() const { return reductionTrait; }
 
  private:
   void computeInfo(linalg::LinalgOp);
 
-  bool hasTransposeTrait;
-  bool hasReductionTrait;
+  bool transposeTrait;
+  bool reductionTrait;
 };
 
 }  // namespace iree_compiler

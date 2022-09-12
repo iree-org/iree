@@ -80,8 +80,8 @@ static bool computeReductionInfo(LinalgOp linalgOp) {
 }
 
 void LinalgOpInfo::computeInfo(LinalgOp linalgOp) {
-  hasTransposeTrait = computeTransposeInfo(linalgOp);
-  hasReductionTrait = computeReductionInfo(linalgOp);
+  transposeTrait = computeTransposeInfo(linalgOp);
+  reductionTrait = computeReductionInfo(linalgOp);
 }
 
 }  // namespace iree_compiler

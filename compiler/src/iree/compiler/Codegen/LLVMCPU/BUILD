@@ -25,6 +25,7 @@ iree_compiler_cc_library(
         "LLVMCPUUnfuseFMAOps.cpp",
         "LinalgOpInfo.cpp",
         "Passes.cpp",
+        "TargetMLTransformInfo.cpp",
         "VectorContractCustomKernels.cpp",
         "VerifyLinalgTransformLegality.cpp",
     ],

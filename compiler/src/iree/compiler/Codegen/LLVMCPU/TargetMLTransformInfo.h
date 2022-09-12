@@ -25,22 +25,6 @@ struct TargetMLTransformInfo {
       IREE::HAL::ExecutableVariantOp variantOp);
 };
 
-struct RISCVTargetMLTransformInfo : TargetMLTransformInfo {
-  RISCVTargetMLTransformInfo() {
-    defaultMaxReductionUnrollFactor = 8;
-    defaultMaxTransposeUnrollFactor = 1;
-  }
-};
-
-const TargetMLTransformInfo TargetMLTransformInfo::getTargetMLTransformInfo(
-    IREE::HAL::ExecutableVariantOp variantOp) {
-  if (isRISCV(variantOp)) {
-    return RISCVTargetMLTransformInfo();
-  }
-
-  return TargetMLTransformInfo();
-};
-
 }  // namespace iree_compiler
 }  // namespace mlir
 

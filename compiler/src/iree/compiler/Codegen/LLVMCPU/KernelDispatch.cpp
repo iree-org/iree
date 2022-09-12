@@ -179,7 +179,8 @@ static int64_t getVectorSize(func::FuncOp entryPointFn, ShapedType shapedType) {
 // tile sizes for vectorization/unrolling in one shot.
 static SmallVector<int64_t> getMinTilingSizesForEachDim(
     func::FuncOp entryPointFn, linalg::LinalgOp op,
-    const LinalgOpInfo &linalgOpInfo, const TargetMLTransformInfo &TMLTI) {
+    const LinalgOpInfo &linalgOpInfo,
+    const TargetMLTransformInfo &targetMLTransInfo) {
   unsigned numLoops = op.getNumLoops();
   SmallVector<int64_t> minTileSizes(numLoops, 1);
   auto inputOutputOpOperands = op.getInputAndOutputOperands();
@@ -202,8 +203,8 @@ static SmallVector<int64_t> getMinTilingSizesForEachDim(
     // the tile size for this case to 'maxUnrollFactor'.
     if (linalgOpInfo.isReduction() &&
         op.isOutputTensor(inputOutputOpOperands[map.index()])) {
-      tileSize =
-          std::min<int64_t>(tileSize, TMLTI.defaultMaxReductionUnrollFactor);
+      tileSize = std::min<int64_t>(
+          tileSize, targetMLTransInfo.defaultMaxReductionUnrollFactor);
     }
 
     minTileSizes[fastestVaryingDim] =
@@ -223,8 +224,9 @@ static SmallVector<int64_t> getMinTilingSizesForEachDim(
     }
 
     for (int unrollDim = vecDim - 1; unrollDim >= 0; --unrollDim) {
-      minTileSizes[unrollDim] = std::min<int64_t>(
-          minTileSizes[unrollDim], TMLTI.defaultMaxTransposeUnrollFactor);
+      minTileSizes[unrollDim] =
+          std::min<int64_t>(minTileSizes[unrollDim],
+                            targetMLTransInfo.defaultMaxTransposeUnrollFactor);
     }
   }
 
@@ -1015,7 +1017,8 @@ static bool isSupportedTransposeOp(linalg::GenericOp genericOp) {
 /// CPUDoubleTilingExpert pipeline.
 static LogicalResult setDefaultGenericOpRootConfig(
     func::FuncOp entryPointFn, linalg::GenericOp genericOp,
-    const LinalgOpInfo &linalgOpInfo, const TargetMLTransformInfo &TMLTI) {
+    const LinalgOpInfo &linalgOpInfo,
+    const TargetMLTransformInfo &targetMLTransInfo) {
   if (getLoweringConfig(genericOp)) {
     return success();
   }
@@ -1028,8 +1031,8 @@ static LogicalResult setDefaultGenericOpRootConfig(
         DispatchLoweringPassPipeline::CPUDefault);
   }
 
-  SmallVector<int64_t> minTileSizes =
-      getMinTilingSizesForEachDim(entryPointFn, genericOp, linalgOpInfo, TMLTI);
+  SmallVector<int64_t> minTileSizes = getMinTilingSizesForEachDim(
+      entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo);
   // For generic ops we'll use the default divided by 2 to control the stack
   // allocation limit See #9469 for example.
   SmallVector<int64_t> maxTileSizes(numLoops, defaultWorkgroupTileSize / 2);
@@ -1074,7 +1077,8 @@ static LogicalResult setDefaultGenericOpRootConfig(
 /// transposition to use CPUDoubleTilingExpert pipeline.
 static LogicalResult setTransposeLikeOpRootConfig(
     func::FuncOp entryPointFn, linalg::GenericOp genericOp,
-    const LinalgOpInfo &linalgOpInfo, const TargetMLTransformInfo &TMLTI) {
+    const LinalgOpInfo &linalgOpInfo,
+    const TargetMLTransformInfo &targetMLTransInfo) {
   if (getLoweringConfig(genericOp)) {
     return success();
   }
@@ -1086,8 +1090,8 @@ static LogicalResult setTransposeLikeOpRootConfig(
   }
 
   unsigned numLoops = genericOp.getNumLoops();
-  SmallVector<int64_t> minTileSizes =
-      getMinTilingSizesForEachDim(entryPointFn, genericOp, linalgOpInfo, TMLTI);
+  SmallVector<int64_t> minTileSizes = getMinTilingSizesForEachDim(
+      entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo);
   SmallVector<int64_t> maxTileSizes(numLoops, defaultWorkgroupTileSize);
   if (llvm::all_of(minTileSizes, [](int64_t vs) { return vs == 1; })) {
     // Nothing to vectorize just lower to loops.
@@ -1143,7 +1147,8 @@ static LogicalResult setTransposeLikeOpRootConfig(
 /// from tiny dispatches.
 static LogicalResult setElementwiseGenericOpRootConfig(
     func::FuncOp entryPointFn, linalg::GenericOp genericOp,
-    const LinalgOpInfo &linalgOpInfo, const TargetMLTransformInfo &TMLTI) {
+    const LinalgOpInfo &linalgOpInfo,
+    const TargetMLTransformInfo &targetMLTransInfo) {
   if (getLoweringConfig(genericOp)) {
     return success();
   }
@@ -1153,8 +1158,8 @@ static LogicalResult setElementwiseGenericOpRootConfig(
   if (!linalg::isElementwise(genericOp)) return success();
 
   // Set the flow level tiling to the default.
-  SmallVector<int64_t> minTileSizes =
-      getMinTilingSizesForEachDim(entryPointFn, genericOp, linalgOpInfo, TMLTI);
+  SmallVector<int64_t> minTileSizes = getMinTilingSizesForEachDim(
+      entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo);
   SmallVector<int64_t> maxTileSizes(numLoops, defaultWorkgroupTileSize);
   SmallVector<int64_t> flowTileSizes =
       getDefaultDistributedLevelTileSizes(genericOp, minTileSizes, maxTileSizes,
@@ -1220,16 +1225,16 @@ static LogicalResult setElementwiseGenericOpRootConfig(
 
 /// Sets the lowering configuration for a generic op to use
 /// CPUDoubleTilingExpert pipeline.
-static LogicalResult setRootConfig(func::FuncOp entryPointFn,
-                                   linalg::GenericOp genericOp,
-                                   const LinalgOpInfo &linalgOpInfo,
-                                   const TargetMLTransformInfo &TMLTI) {
+static LogicalResult setRootConfig(
+    func::FuncOp entryPointFn, linalg::GenericOp genericOp,
+    const LinalgOpInfo &linalgOpInfo,
+    const TargetMLTransformInfo &targetMLTransInfo) {
   if (failed(setTransposeLikeOpRootConfig(entryPointFn, genericOp, linalgOpInfo,
-                                          TMLTI)) ||
-      failed(setElementwiseGenericOpRootConfig(entryPointFn, genericOp,
-                                               linalgOpInfo, TMLTI)) ||
+                                          targetMLTransInfo)) ||
+      failed(setElementwiseGenericOpRootConfig(
+          entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo)) ||
       failed(setDefaultGenericOpRootConfig(entryPointFn, genericOp,
-                                           linalgOpInfo, TMLTI))) {
+                                           linalgOpInfo, targetMLTransInfo))) {
     return failure();
   }
   return success();
@@ -1388,8 +1393,9 @@ static LogicalResult setRootConfig(
 }
 
 /// Redirects to methods that set the configuration based on operation type.
-static LogicalResult setRootConfigImpl(func::FuncOp entryPointFn, Operation *op,
-                                       const TargetMLTransformInfo &TMLTI) {
+static LogicalResult setRootConfigImpl(
+    func::FuncOp entryPointFn, Operation *op,
+    const TargetMLTransformInfo &targetMLTransInfo) {
   // Do not overwrite default configuration.
   if (getLoweringConfig(op)) return success();
 
@@ -1397,7 +1403,8 @@ static LogicalResult setRootConfigImpl(func::FuncOp entryPointFn, Operation *op,
   auto setRootConfigFn = [&](Operation *op) -> LogicalResult {
     return TypeSwitch<Operation *, LogicalResult>(op)
         .Case<linalg::GenericOp>([&](auto op) {
-          return setRootConfig(entryPointFn, op, LinalgOpInfo(op), TMLTI);
+          return setRootConfig(entryPointFn, op, LinalgOpInfo(op),
+                               targetMLTransInfo);
         })
         .Case<IREE::LinalgExt::FftOp, linalg::Mmt4DOp, linalg::Conv2DNhwcHwcfOp,
               linalg::DepthwiseConv2DNhwcHwcOp>(
@@ -1486,8 +1493,10 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
         return failure();
       }
     } else {
-      auto TMLTI = TargetMLTransformInfo::getTargetMLTransformInfo(*variantOp);
-      if (failed(setRootConfigImpl(entryPointFn, rootOperation, TMLTI))) {
+      auto targetMLTransInfo =
+          TargetMLTransformInfo::getTargetMLTransformInfo(*variantOp);
+      if (failed(setRootConfigImpl(entryPointFn, rootOperation,
+                                   targetMLTransInfo))) {
         return failure();
       }
     }
