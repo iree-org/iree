@@ -186,8 +186,6 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-vmvx-enable-microkernels"
-  TARGET_CPU_FEATURES_VARIANTS
-    "default"
 )
 
 iree_generated_trace_runner_test(
@@ -206,8 +204,6 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-vmvx-enable-microkernels"
-  TARGET_CPU_FEATURES_VARIANTS
-    "default"
 )
 
 iree_generated_trace_runner_test(
