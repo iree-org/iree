@@ -19,14 +19,21 @@ from .definitions import common_definitions, iree_definitions
 from . import iree_benchmarks
 
 TEMPLATE_DIR = pathlib.Path(__file__).parent
-DOWNLOAD_ARTIFACT_CMAKE_TEMPLATE = string.Template(
-    open(TEMPLATE_DIR / "iree_download_artifact_template.cmake", "r").read())
-TFLITE_IMPORT_CMAKE_TEMPLATE = string.Template(
-    open(TEMPLATE_DIR / "iree_tflite_import_template.cmake", "r").read())
-TF_IMPORT_CMAKE_TEMPLATE = string.Template(
-    open(TEMPLATE_DIR / "iree_tf_import_template.cmake", "r").read())
-IREE_BYTECODE_MODULE_CMAKE_TEMPLATE = string.Template(
-    open(TEMPLATE_DIR / "iree_bytecode_module_template.cmake", "r").read())
+
+
+def read_template_from_file(template_name: str) -> string.Template:
+  with open(TEMPLATE_DIR / template_name, "r") as f:
+    return string.Template(f.read())
+
+
+DOWNLOAD_ARTIFACT_CMAKE_TEMPLATE = read_template_from_file(
+    "iree_download_artifact_template.cmake")
+TFLITE_IMPORT_CMAKE_TEMPLATE = read_template_from_file(
+    "iree_tflite_import_template.cmake")
+TF_IMPORT_CMAKE_TEMPLATE = read_template_from_file(
+    "iree_tf_import_template.cmake")
+IREE_BYTECODE_MODULE_CMAKE_TEMPLATE = read_template_from_file(
+    "iree_bytecode_module_template.cmake")
 
 
 @dataclass
@@ -189,7 +196,7 @@ class IreeRuleFactory(object):
 
     # Module path: <iree_artifacts_dir>/<model_id>_<model_name>/<compile_config_id>.vmfb
     output_path = os.path.join(self._iree_artifacts_dir,
-                               f"{model_id}_{model_name},
+                               f"{model_id}_{model_name}",
                                f"{compile_config.id}.vmfb")
 
     compile_flags = self._generate_iree_compile_flags(
