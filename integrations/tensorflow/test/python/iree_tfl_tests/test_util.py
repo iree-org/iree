@@ -63,14 +63,14 @@ class TFLiteModelTest(testing.absltest.TestCase):
       return
     self.workdir = _setup_artifacts_dir("download")
     print(f"TMPDIR = {self.workdir}")
-    self.tflite_file = '/'.join([self.workdir, 'model.tflite'])
-    self.tflite_ir = '/'.join([self.workdir, 'tflite.mlir'])
-    self.iree_ir = '/'.join([self.workdir, 'tosa.mlir'])
+    self.tflite_file = '/'.join([self.workdir, 'model.mlirbc'])
+    self.tflite_ir = '/'.join([self.workdir, 'tflite.mlirbc'])
+    self.iree_ir = '/'.join([self.workdir, 'tosa.mlirbc'])
     if os.path.exists(self.model_path):
       self.tflite_file = self.model_path
     else:
       urllib.request.urlretrieve(self.model_path, self.tflite_file)
-    self.binary = '/'.join([self.workdir, 'module.bytecode'])
+    self.binary = '/'.join([self.workdir, 'module.vmfb'])
 
   def generate_inputs(self, input_details):
     args = []
