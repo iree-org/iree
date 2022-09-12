@@ -7,7 +7,7 @@
 #ifndef IREE_COMPILER_TOOLS_INIT_COMPILER_MODULES_H_
 #define IREE_COMPILER_TOOLS_INIT_COMPILER_MODULES_H_
 
-#include "iree/compiler/Dialect/Modules/Check/IR/CheckDialect.h"
+#include "iree/compiler/Modules/Check/IR/CheckDialect.h"
 
 namespace mlir {
 namespace iree_compiler {
