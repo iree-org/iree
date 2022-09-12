@@ -42,6 +42,12 @@ enum ImportType {
   savedmodel_v1,
 };
 
+enum class OutputFormat {
+  none,
+  mlir_ir,
+  mlir_bytecode,
+};
+
 }  // namespace
 
 static OwningOpRef<mlir::ModuleOp> importSavedModelV2(
@@ -135,6 +141,15 @@ int main(int argc, char **argv) {
                  clEnumVal(savedmodel_v1,
                            "Import a TensorFlow SavedModel V1 (directory)")));
 
+  // The output format flag is the master control for what we do with the
+  // in-memory compiled form.
+  llvm::cl::opt<OutputFormat> outputFormat(
+      "output-format", llvm::cl::desc("Format of imported output"),
+      llvm::cl::values(clEnumValN(OutputFormat::mlir_bytecode, "mlir-bytecode",
+                                  "MLIR Bytecode (default)"),
+                       clEnumValN(OutputFormat::mlir_ir, "mlir-ir", "MLIR IR")),
+      llvm::cl::init(OutputFormat::mlir_bytecode));
+
   static llvm::cl::opt<std::string> savedModelExportedNames(
       "tf-savedmodel-exported-names",
       llvm::cl::desc("Names to export from SavedModel, separated by ','. Empty "
@@ -190,14 +205,21 @@ int main(int argc, char **argv) {
       llvm::errs() << "Could not open output file: " << savePath << "\n";
       return failure();
     }
-    OpPrintingFlags printFlags;
-    // TODO: Re-enable custom assembly format once fixed:
-    // https://github.com/tensorflow/mlir-hlo/issues/25
-    printFlags.printGenericOpForm();
-    module->print(outputFile->os(), printFlags);
-    outputFile->os() << "\n";
-    outputFile->keep();
-    return success();
+
+    if (outputFormat == OutputFormat::mlir_ir) {
+      OpPrintingFlags printFlags;
+      module->print(outputFile->os(), printFlags);
+      outputFile->os() << "\n";
+      outputFile->keep();
+      return success();
+    }
+
+    if (outputFormat == OutputFormat::mlir_bytecode) {
+      mlir::writeCodeToFile(module, outputFile->os()) outputFile->keep();
+      return success();
+    }
+    llvm::errs() << "Unkonwn output format" << outputFormat << "\n";
+    return failure();
   };
 
   // First stage import.
