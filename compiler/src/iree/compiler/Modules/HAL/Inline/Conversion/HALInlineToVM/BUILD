@@ -21,11 +21,11 @@ iree_compiler_cc_library(
         "ConvertHALInlineToVM.h",
     ],
     deps = [
-        "//compiler/src/iree/compiler/Modules/HAL/Inline/IR",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
         "//compiler/src/iree/compiler/Dialect/VM/Conversion",
         "//compiler/src/iree/compiler/Dialect/VM/Conversion/StandardToVM",
         "//compiler/src/iree/compiler/Dialect/VM/IR",
+        "//compiler/src/iree/compiler/Modules/HAL/Inline/IR",
         "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",

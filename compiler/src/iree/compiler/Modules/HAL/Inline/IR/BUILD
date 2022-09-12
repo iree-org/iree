@@ -68,9 +68,9 @@ iree_compiler_cc_library(
     hdrs = ["HALInlineDialect.h"],
     deps = [
         ":IR",
+        "//compiler/src/iree/compiler/Dialect/VM/Conversion",
         "//compiler/src/iree/compiler/Modules/HAL/Inline:hal_inline_imports",
         "//compiler/src/iree/compiler/Modules/HAL/Inline/Conversion/HALInlineToVM",
-        "//compiler/src/iree/compiler/Dialect/VM/Conversion",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",

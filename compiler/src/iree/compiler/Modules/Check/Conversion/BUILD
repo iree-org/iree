@@ -22,8 +22,8 @@ iree_compiler_cc_library(
     ],
     deps = [
         "//compiler/src/iree/compiler/Dialect/HAL/Conversion",
-        "//compiler/src/iree/compiler/Modules/Check/IR",
         "//compiler/src/iree/compiler/Dialect/VM/Conversion",
+        "//compiler/src/iree/compiler/Modules/Check/IR",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Transforms",
     ],
