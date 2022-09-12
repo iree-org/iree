@@ -133,7 +133,7 @@ createGPUDistributeSharedMemoryCopy();
 
 /// Apply software pipelining.
 std::unique_ptr<OperationPass<func::FuncOp>> createGPUPipeliningPass(
-    unsigned depth = 1);
+    bool epiloguePeeling = true, unsigned depth = 1);
 
 /// Converts vector ops to gpu dialect.
 std::unique_ptr<OperationPass<func::FuncOp>> createWorkGroupSwizzle(
