@@ -320,6 +320,17 @@ class TransposeReshapeGenericDotGeneral
     mhlo::DotDimensionNumbersAttr dimNumbers = op.dot_dimension_numbers();
     auto lhsBatchingDims = dimNumbers.getLhsBatchingDimensions();
     auto lhsContractingDims = dimNumbers.getLhsContractingDimensions();
+    auto rhsBatchingDims = dimNumbers.getRhsBatchingDimensions();
+    auto rhsContractingDims = dimNumbers.getRhsContractingDimensions();
+
+    // No contraction dims means this can be represented as a mul.
+    if (lhsContractingDims.size() == 0) return failure();
+    if (rhsContractingDims.size() == 0) return failure();
+
+    // No batching dimensions means this can be represented a dot.
+    if (lhsBatchingDims.size() == 0) return failure();
+    if (rhsBatchingDims.size() == 0) return failure();
+
     SmallVector<bool> isLhsParallel(lhsShapeType.getRank(), true);
     for (auto i : lhsBatchingDims) {
       lhsTargetOrder.push_back(i);
@@ -338,8 +349,7 @@ class TransposeReshapeGenericDotGeneral
     }
 
     SmallVector<bool> isRhsParallel(rhsShapeType.getRank(), true);
-    auto rhsBatchingDims = dimNumbers.getRhsBatchingDimensions();
-    auto rhsContractingDims = dimNumbers.getRhsContractingDimensions();
+
     for (auto i : rhsBatchingDims) {
       rhsTargetOrder.push_back(i);
       isRhsParallel[i] = false;
@@ -967,7 +977,7 @@ struct DotToMul : public OpRewritePattern<mhlo::DotOp> {
   }
 };
 
-// Similar to DotIsMul, this finds the case where a canonical dot general
+// Similar to DotIsMul, this finds the case where a dot general
 // can be represented using a mul operation. This includes possibly making
 // an implicit cast explicit prior the mul.
 struct DotGeneralIsMul : public OpRewritePattern<mhlo::DotGeneralOp> {
@@ -990,44 +1000,117 @@ struct DotGeneralIsMul : public OpRewritePattern<mhlo::DotGeneralOp> {
     auto contractDimsL = dNums.getLhsContractingDimensions();
     auto contractDimsR = dNums.getRhsContractingDimensions();
 
-    // Check there are canonical number of dimensions.
-    if (batchDimsL.size() != 1 || batchDimsR.size() != 1 ||
-        contractDimsL.size() != 1 || contractDimsR.size() != 1) {
-      return rewriter.notifyMatchFailure(
-          op, "Incorrect number of Dot Dimension Numbers");
+    llvm::SmallVector<bool> isLhsParallelDim(lhsTy.getRank(), true);
+    llvm::SmallVector<bool> isRhsParallelDim(rhsTy.getRank(), true);
+
+    for (auto dim : batchDimsL) isLhsParallelDim[dim] = false;
+    for (auto dim : batchDimsR) isRhsParallelDim[dim] = false;
+    for (auto dim : contractDimsL) isLhsParallelDim[dim] = false;
+    for (auto dim : contractDimsR) isRhsParallelDim[dim] = false;
+
+    for (auto dim : contractDimsL) {
+      if (lhsTy.getDimSize(dim) != 1) {
+        return rewriter.notifyMatchFailure(op, "Non unit contract dimensions");
+      }
     }
 
-    // Check the dimensions are the valid members.
-    if (batchDimsL.front() != 0 || batchDimsR.front() != 0 ||
-        contractDimsL.front() != 2 || contractDimsR.front() != 1) {
-      return rewriter.notifyMatchFailure(op,
-                                         "Dot Dimension Numbers not canonical");
+    // Generate the permutation matrix to order BatchDims, ParallelDims,
+    // ContractDims.
+    llvm::SmallVector<int64_t> permLhs;
+    llvm::SmallVector<int64_t> permRhs;
+    permLhs.append(batchDimsL.begin(), batchDimsL.end());
+    permRhs.append(batchDimsR.begin(), batchDimsR.end());
+
+    for (auto it : llvm::enumerate(isLhsParallelDim)) {
+      if (it.value()) permLhs.push_back(it.index());
     }
 
-    // Check that the contraction dimension is degenerate.
-    if (lhsTy.getDimSize(2) != 1 || rhsTy.getDimSize(1) != 1) {
-      return rewriter.notifyMatchFailure(op, "contraction dim not length-1");
+    for (auto it : llvm::enumerate(isRhsParallelDim)) {
+      if (it.value()) permRhs.push_back(it.index());
     }
 
-    // Determine the output size of the result.
-    auto r1i32Ty = RankedTensorType::get({1}, builder.getI32Type());
-    auto batchSize = builder.create<mhlo::GetDimensionSizeOp>(r1i32Ty, lhs, 0);
-    auto leftSize = builder.create<mhlo::GetDimensionSizeOp>(r1i32Ty, lhs, 1);
-    auto rightSize = builder.create<mhlo::GetDimensionSizeOp>(r1i32Ty, rhs, 2);
-    auto dynSize = builder.create<mhlo::ConcatenateOp>(
-        RankedTensorType::get({3}, builder.getI32Type()),
-        ValueRange{batchSize, leftSize, rightSize}, 0);
+    permLhs.append(contractDimsL.begin(), contractDimsL.end());
+    permRhs.append(contractDimsR.begin(), contractDimsR.end());
 
-    auto i64Iota = builder.getI64TensorAttr({0, 1, 2});
+    // Determine the transpose shape based on the generate permutations.
+    llvm::SmallVector<int64_t> lhsTransposeShape;
+    llvm::SmallVector<int64_t> rhsTransposeShape;
+    for (auto dim : permLhs) lhsTransposeShape.push_back(lhsTy.getDimSize(dim));
+    for (auto dim : permRhs) rhsTransposeShape.push_back(rhsTy.getDimSize(dim));
+
+    // Transpose the left hand side and the right hand side.
+    lhs = builder.create<mhlo::TransposeOp>(
+        RankedTensorType::get(lhsTransposeShape, lhsTy.getElementType()), lhs,
+        builder.getI64TensorAttr(permLhs));
+    lhsTy = lhs.getType().cast<RankedTensorType>();
+
+    rhs = builder.create<mhlo::TransposeOp>(
+        RankedTensorType::get(rhsTransposeShape, rhsTy.getElementType()), rhs,
+        builder.getI64TensorAttr(permRhs));
+    rhsTy = rhs.getType().cast<RankedTensorType>();
+
+    auto dimI32Ty = RankedTensorType::get({1}, builder.getI32Type());
+
+    // Drop all of the non-concat dimensions from the lhs.
+    llvm::SmallVector<Value> lhsReshapeDims;
+    for (int i = 0, s = lhsTy.getRank() - contractDimsL.size(); i < s; i++) {
+      lhsReshapeDims.push_back(
+          builder.create<mhlo::GetDimensionSizeOp>(dimI32Ty, lhs, i));
+    }
+    Value lhsDynShape = builder.create<mhlo::ConcatenateOp>(
+        RankedTensorType::get({static_cast<int64_t>(lhsReshapeDims.size())},
+                              builder.getI32Type()),
+        lhsReshapeDims, 0);
+    lhsTy =
+        RankedTensorType::get(lhsTy.getShape().drop_back(contractDimsL.size()),
+                              lhsTy.getElementType());
+    lhs = builder.create<mhlo::DynamicReshapeOp>(lhsTy, lhs, lhsDynShape);
+
+    // Drop all of the non concat dimensions from the rhs.
+    llvm::SmallVector<Value> rhsReshapeDims;
+    for (int i = 0, s = rhsTy.getRank() - contractDimsR.size(); i < s; i++) {
+      rhsReshapeDims.push_back(
+          builder.create<mhlo::GetDimensionSizeOp>(dimI32Ty, rhs, i));
+    }
+    Value rhsDynShape = builder.create<mhlo::ConcatenateOp>(
+        RankedTensorType::get({static_cast<int64_t>(rhsReshapeDims.size())},
+                              builder.getI32Type()),
+        rhsReshapeDims, 0);
+    rhsTy =
+        RankedTensorType::get(rhsTy.getShape().drop_back(contractDimsR.size()),
+                              rhsTy.getElementType());
+    rhs = builder.create<mhlo::DynamicReshapeOp>(rhsTy, rhs, rhsDynShape);
+
+    // Compute the size of the output shape with dynamic shape support using the
+    // lhs and rhs dimensions.
+    llvm::SmallVector<Value> outputDims;
+    outputDims.append(lhsReshapeDims);
+    outputDims.append(rhsReshapeDims.begin() + batchDimsR.size(),
+                      rhsReshapeDims.end());
+    Value outputShape = builder.create<mhlo::ConcatenateOp>(
+        RankedTensorType::get({resultTy.getRank()}, builder.getI32Type()),
+        outputDims, 0);
+
+    // Broadcast the left hand side to match the expect output shape.
+    llvm::SmallVector<int64_t> lhsDimMapping(lhsTy.getRank());
+    std::iota(lhsDimMapping.begin(), lhsDimMapping.end(), 0);
     auto lhsBroadcastTy =
         RankedTensorType::get(resultTy.getShape(), lhsTy.getElementType());
     lhs = builder.createOrFold<mhlo::DynamicBroadcastInDimOp>(
-        lhsBroadcastTy, lhs, dynSize, i64Iota);
+        lhsBroadcastTy, lhs, outputShape,
+        rewriter.getI64TensorAttr(lhsDimMapping));
 
+    // Broadcast the right hand side to match the expected output shape.
+    llvm::SmallVector<int64_t> rhsDimMapping(rhsTy.getRank());
+    std::iota(rhsDimMapping.begin(), rhsDimMapping.begin() + batchDimsR.size(),
+              0);
+    std::iota(rhsDimMapping.begin() + batchDimsR.size(), rhsDimMapping.end(),
+              lhsTy.getRank());
     auto rhsBroadcastTy =
         RankedTensorType::get(resultTy.getShape(), rhsTy.getElementType());
     rhs = builder.createOrFold<mhlo::DynamicBroadcastInDimOp>(
-        rhsBroadcastTy, rhs, dynSize, i64Iota);
+        rhsBroadcastTy, rhs, outputShape,
+        rewriter.getI64TensorAttr(rhsDimMapping));
 
     lhs = builder.createOrFold<mhlo::ConvertOp>(resultTy, lhs);
     rhs = builder.createOrFold<mhlo::ConvertOp>(resultTy, rhs);
@@ -1075,14 +1158,15 @@ struct MHLOToMHLOPreprocessingPass
 
     // dot_general canoncalization patterns.
     mhlo::populateGeneralDotOpLoweringPatterns(&patterns, context);
-    patterns.insert<TransposeReshapeGenericDotGeneral>(context);
-    patterns.insert<DotGeneralIsMul>(context);
+    patterns.insert<TransposeReshapeGenericDotGeneral>(context,
+                                                       /*benefit=*/200);
+    patterns.insert<DotGeneralIsMul>(context, /*benefit=*/300);
 
     // Fusion operations.
     patterns.insert<FuseWidenOperands<mhlo::DotOp>,
                     FuseWidenOperands<mhlo::DotGeneralOp>,
                     FuseWidenOperands<mhlo::ConvolutionOp>>(context,
-                                                            /*benefit=*/100);
+                                                            /*benefit=*/400);
 
     // Additional canonicalizers that simplify to computationally
     // less-complex operations.
