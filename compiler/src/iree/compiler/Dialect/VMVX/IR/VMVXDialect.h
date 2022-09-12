@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_DIALECT_MODULES_VMVX_IR_VMVXDIALECT_H_
-#define IREE_COMPILER_DIALECT_MODULES_VMVX_IR_VMVXDIALECT_H_
+#ifndef IREE_COMPILER_DIALECT_VMVX_IR_VMVXDIALECT_H_
+#define IREE_COMPILER_DIALECT_VMVX_IR_VMVXDIALECT_H_
 
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
@@ -26,4 +26,4 @@ class VMVXDialect : public Dialect {
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_MODULES_VMVX_IR_VMVXDIALECT_H_
+#endif  // IREE_COMPILER_DIALECT_VMVX_IR_VMVXDIALECT_H_

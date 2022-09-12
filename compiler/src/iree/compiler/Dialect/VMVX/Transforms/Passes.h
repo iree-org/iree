@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_DIALECT_MODULES_VMVX_TRANSFORMS_PASSES_H_
-#define IREE_COMPILER_DIALECT_MODULES_VMVX_TRANSFORMS_PASSES_H_
+#ifndef IREE_COMPILER_DIALECT_VMVX_TRANSFORMS_PASSES_H_
+#define IREE_COMPILER_DIALECT_VMVX_TRANSFORMS_PASSES_H_
 
 #include "iree/compiler/Dialect/VMVX/IR/VMVXOps.h"
 #include "llvm/ADT/StringMap.h"
@@ -56,4 +56,4 @@ void registerVMVXPasses();
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_MODULES_VMVX_TRANSFORMS_PASSES_H_
+#endif  // IREE_COMPILER_DIALECT_VMVX_TRANSFORMS_PASSES_H_
