@@ -24,7 +24,6 @@ iree_compiler_cc_library(
         "ConvertExperimentalOps.cpp",
         "ConvertFenceOps.cpp",
         "ConvertHALToVM.cpp",
-        "ConvertSemaphoreOps.cpp",
     ],
     hdrs = [
         "ConvertHALToVM.h",
