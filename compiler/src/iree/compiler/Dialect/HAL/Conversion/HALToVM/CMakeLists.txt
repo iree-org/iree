@@ -25,7 +25,6 @@ iree_cc_library(
     "ConvertExperimentalOps.cpp"
     "ConvertFenceOps.cpp"
     "ConvertHALToVM.cpp"
-    "ConvertSemaphoreOps.cpp"
   DEPS
     LLVMSupport
     MLIRArithmeticDialect
