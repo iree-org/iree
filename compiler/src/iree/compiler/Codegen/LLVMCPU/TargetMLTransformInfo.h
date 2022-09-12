@@ -7,8 +7,9 @@
 #ifndef IREE_COMPILER_CODEGEN_LLVMCPU_TARGETMLTRANSFORMINFO_H_
 #define IREE_COMPILER_CODEGEN_LLVMCPU_TARGETMLTRANSFORMINFO_H_
 
-#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include <limits>
+
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 
 namespace mlir {
 namespace iree_compiler {
