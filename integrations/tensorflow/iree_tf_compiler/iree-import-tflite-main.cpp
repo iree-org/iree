@@ -148,7 +148,7 @@ int main(int argc, char **argv) {
       mlir::writeCodeToFile(module, outputFile->os()) outputFile->keep();
       return success();
     }
-    llvm::errs() << "Unkonwn output format" << outputFormat << "\n";
+    llvm::errs() << "Unknown output format" << outputFormat << "\n";
     return failure();
   };
 
