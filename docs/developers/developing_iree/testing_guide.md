@@ -277,7 +277,7 @@ function.
 Next we use this input constant to exercise the runtime feature under test (in
 this case, just a single floor operation). Finally, we use a check dialect
 operation to make an assertion about the output. There are a few different
-[assertion operations](https://github.com/iree-org/iree/tree/main/iree/compiler/Dialect/Modules/Check).
+[assertion operations](https://github.com/iree-org/iree/tree/main/iree/compiler/Modules/Check).
 Here we use the `expect_almost_eq_const` op: *almost* because we are comparing
 floats and want to allow for floating-point imprecision, and *const* because we
 want to compare it to a constant value. This last part is just syntactic sugar
