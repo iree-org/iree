@@ -188,7 +188,9 @@ class IreeRuleFactory(object):
     target_name = f"iree-module-{target_id}"
 
     # Module path: <iree_artifacts_dir>/<model_id>_<model_name>/<compile_config_id>.vmfb
-    output_path = f"{self._iree_artifacts_dir}/{model_id}_{model_name}/{compile_config.id}.vmfb"
+    output_path = os.path.join(self._iree_artifacts_dir,
+                               f"{model_id}_{model_name},
+                               f"{compile_config.id}.vmfb")
 
     compile_flags = self._generate_iree_compile_flags(
         compile_config=compile_config,
@@ -205,7 +207,7 @@ class IreeRuleFactory(object):
                                                 output_module_path=output_path,
                                                 cmake_rule=cmake_rule)
 
-    # TODO(10155): Dump the compile flags from iree_bytecode_module into a flagfile.
+    # TODO(#10155): Dump the compile flags from iree_bytecode_module into a flagfile.
 
     self._compile_module_rules[target_id] = compile_module_rule
     return compile_module_rule
@@ -224,7 +226,8 @@ class IreeRuleFactory(object):
       self, compile_config: iree_definitions.CompileConfig,
       mlir_dialect_type: str) -> List[str]:
     if len(compile_config.compile_targets) != 1:
-      raise ValueError("Only support one compile target for now.")
+      raise ValueError(f"Only one compile target is supported. Got:"
+                       f" {compile_config.compile_targets}")
 
     compile_target = compile_config.compile_targets[0]
     flags = [
@@ -243,7 +246,7 @@ class IreeRuleFactory(object):
           f"--iree-llvm-target-cpu={arch_info.microarchitecture.lower()}"
       ]
     else:
-      raise ValueError("Unsupported architecture.")
+      raise ValueError(f"Unsupported architecture '{arch_info.architecture}'")
     return flags
 
 
