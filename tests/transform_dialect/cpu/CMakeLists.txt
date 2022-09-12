@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "conv2D.mlir"
     "matmul.mlir"
   TOOLS
     FileCheck
