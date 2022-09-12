@@ -278,7 +278,7 @@ int main(int argc, char **argv) {
     }
 
     if (outputFormat == OutputFormat::mlir_bytecode) {
-      mlir::writeCodeToFile(module, outputFile->os());
+      mlir::writeBytecodeToFile(module, outputFile->os());
       outputFile->keep();
       return success();
     }
