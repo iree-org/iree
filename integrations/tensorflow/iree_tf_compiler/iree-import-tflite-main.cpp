@@ -145,10 +145,11 @@ int main(int argc, char **argv) {
     }
 
     if (outputFormat == OutputFormat::mlir_bytecode) {
-      mlir::writeCodeToFile(module, outputFile->os()) outputFile->keep();
+      mlir::writeCodeToFile(module, outputFile->os());
+      outputFile->keep();
       return success();
     }
-    llvm::errs() << "Unknown output format" << outputFormat << "\n";
+    llvm::errs() << "Unknown output format\n";
     return failure();
   };
 

@@ -19,6 +19,7 @@
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ToolOutputFile.h"
+#include "mlir/Bytecode/BytecodeWriter.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Dialect.h"
@@ -215,10 +216,11 @@ int main(int argc, char **argv) {
     }
 
     if (outputFormat == OutputFormat::mlir_bytecode) {
-      mlir::writeCodeToFile(module, outputFile->os()) outputFile->keep();
+      mlir::writeCodeToFile(module, outputFile->os());
+      outputFile->keep();
       return success();
     }
-    llvm::errs() << "Unknown output format" << outputFormat << "\n";
+    llvm::errs() << "Unknown output format\n";
     return failure();
   };
 
