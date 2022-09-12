@@ -89,14 +89,11 @@ iree_cc_library(
     iree::compiler::Bindings::TFLite::Transforms
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::Interfaces::Interfaces
+    iree::compiler::ConstEval
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::Transforms
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::HAL::Transforms
-    iree::compiler::Dialect::Modules::HAL::Inline::IR::HALInlineDialect
-    iree::compiler::Dialect::Modules::HAL::Inline::Transforms
-    iree::compiler::Dialect::Modules::HAL::Loader::IR::HALLoaderDialect
-    iree::compiler::Dialect::Modules::HAL::Loader::Transforms
     iree::compiler::Dialect::Stream::IR
     iree::compiler::Dialect::Stream::Transforms
     iree::compiler::Dialect::Util::IR
@@ -109,7 +106,10 @@ iree_cc_library(
     iree::compiler::Dialect::VMVX::IR::VMVXDialect
     iree::compiler::Dialect::VMVX::Transforms
     iree::compiler::Dialect::Vulkan::IR
-    iree::compiler::ConstEval
+    iree::compiler::Modules::HAL::Inline::IR::HALInlineDialect
+    iree::compiler::Modules::HAL::Inline::Transforms
+    iree::compiler::Modules::HAL::Loader::IR::HALLoaderDialect
+    iree::compiler::Modules::HAL::Loader::Transforms
     iree::compiler::Pipelines
   PUBLIC
 )
@@ -185,7 +185,7 @@ iree_cc_library(
   HDRS
     "init_compiler_modules.h"
   DEPS
-    iree::compiler::Dialect::Modules::Check::IR::CheckDialect
+    iree::compiler::Modules::Check::IR::CheckDialect
 )
 
 iree_cc_library(

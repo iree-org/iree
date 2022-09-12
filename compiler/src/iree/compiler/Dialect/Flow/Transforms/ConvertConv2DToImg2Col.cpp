@@ -6,12 +6,16 @@
 
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
+#include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/AffineExpr.h"
+#include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -23,6 +27,18 @@ namespace Flow {
 static bool hasAllOneValues(DenseIntElementsAttr attr) {
   return llvm::all_of(
       attr, [](APInt element) { return element.getSExtValue() == 1; });
+}
+
+static Value createAdd(Location loc, Value x, Value y, bool isInt,
+                       OpBuilder &builder) {
+  if (isInt) return builder.create<arith::AddIOp>(loc, x, y);
+  return builder.create<arith::AddFOp>(loc, x, y);
+}
+
+static Value createMul(Location loc, Value x, Value y, bool isInt,
+                       OpBuilder &builder) {
+  if (isInt) return builder.create<arith::MulIOp>(loc, x, y);
+  return builder.create<arith::MulFOp>(loc, x, y);
 }
 
 namespace {
@@ -75,9 +91,6 @@ class ConvertConv2DNhwcHwcf final
       return failure();
     }
 
-    // TODO: Support for batched version.
-    if (inputType.getShape()[0] > 1) return failure();
-
     // TODO: Support dilation.
     if (!hasAllOneValues(convOp.getDilations())) return failure();
 
@@ -116,54 +129,92 @@ class ConvertConv2DNhwcHwcf final
 
     auto nloops = colTensorShape.size();
 
-    SmallVector<StringRef, 3> loopAttributeTypes(nloops,
-                                                 getParallelIteratorTypeName());
+    StringRef parallel = getParallelIteratorTypeName();
+    StringRef reduction = getReductionIteratorTypeName();
+    SmallVector<StringRef, 3> img2colIterators(nloops, parallel);
 
-    SmallVector<AffineMap, 4> indexingMaps = {
+    SmallVector<AffineMap, 4> img2colIndexingMaps = {
         AffineMap::get(nloops, 0, inputExprs, rewriter.getContext()),
         AffineMap::getMultiDimIdentityMap(nloops, rewriter.getContext())};
 
     auto img2ColTensor = rewriter.create<linalg::GenericOp>(
         loc, colTensor.getType(),
-        /*inputs=*/input, /*outputs=*/colTensor, indexingMaps,
-        loopAttributeTypes,
+        /*inputs=*/input, /*outputs=*/colTensor, img2colIndexingMaps,
+        img2colIterators,
         [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
           nestedBuilder.create<linalg::YieldOp>(nestedLoc, args[0]);
         });
 
-    SmallVector<ReassociationIndices> img2ColTensorReassociationIndices = {
-        {0, 1, 2}, {3, 4, 5}};
+    SmallVector<ReassociationIndices> img2ColTensorReassocIndices;
+    SmallVector<ReassociationIndices> outputReassocIndices;
+    RankedTensorType reshapedImg2ColTensorType, reshapedOutputType;
+    if (n == 1) {
+      img2ColTensorReassocIndices = {{0, 1, 2}, {3, 4, 5}};
+      outputReassocIndices = {{0, 1, 2}, {3}};
 
-    SmallVector<ReassociationIndices> filterAndOutputReassociationIndices = {
-        {0, 1, 2}, {3}};
+      reshapedImg2ColTensorType = RankedTensorType::get(
+          {oh * ow, fh * fw * ic}, inputType.getElementType());
+      reshapedOutputType =
+          RankedTensorType::get({oh * ow, oc}, outputType.getElementType());
+    } else {
+      img2ColTensorReassocIndices = {{0}, {1, 2}, {3, 4, 5}};
+      outputReassocIndices = {{0}, {1, 2}, {3}};
 
-    auto reshapedImg2ColTensorType = RankedTensorType::get(
-        {oh * ow, fh * fw * ic}, inputType.getElementType());
+      reshapedImg2ColTensorType = RankedTensorType::get(
+          {n, oh * ow, fh * fw * ic}, inputType.getElementType());
+      reshapedOutputType =
+          RankedTensorType::get({n, oh * ow, oc}, outputType.getElementType());
+    }
 
+    SmallVector<ReassociationIndices> filterReassocIndices = {{0, 1, 2}, {3}};
     auto reshapedFilterType =
         RankedTensorType::get({fh * fw * ic, oc}, inputType.getElementType());
 
-    auto reshapedOutputType =
-        RankedTensorType::get({oh * ow, oc}, outputType.getElementType());
-
     Value reshapedImg2ColTensor = rewriter.create<tensor::CollapseShapeOp>(
         loc, reshapedImg2ColTensorType, img2ColTensor.getResult(0),
-        img2ColTensorReassociationIndices);
+        img2ColTensorReassocIndices);
 
     Value reshapedFilter = rewriter.create<tensor::CollapseShapeOp>(
-        loc, reshapedFilterType, filter, filterAndOutputReassociationIndices);
+        loc, reshapedFilterType, filter, filterReassocIndices);
 
     Value reshapedOutput = rewriter.create<tensor::CollapseShapeOp>(
-        loc, reshapedOutputType, output, filterAndOutputReassociationIndices);
+        loc, reshapedOutputType, output, outputReassocIndices);
 
-    auto matmulResult = rewriter.create<linalg::MatmulOp>(
-        loc, reshapedOutputType,
-        ArrayRef<Value>{reshapedImg2ColTensor, reshapedFilter},
-        ArrayRef<Value>{reshapedOutput});
+    Value result;
+    if (n == 1) {
+      auto matmulOp = rewriter.create<linalg::MatmulOp>(
+          loc, reshapedOutputType,
+          ArrayRef<Value>{reshapedImg2ColTensor, reshapedFilter},
+          ArrayRef<Value>{reshapedOutput});
+      result = matmulOp.getResults().front();
+    } else {
+      // For cases where batch is not 1, we need to keep the batch dimension
+      // separate. However the batch dimension is only used in indexing the
+      // input and output. So we cannot use existing linalg named ops like
+      // linalg.batch_matmul; doing it with a linalg.generic instead.
+      AffineExpr bDim, mDim, nDim, kDim;
+      bindDims(getContext(), bDim, mDim, nDim, kDim);
+      auto lhsMap = AffineMap::get(4, 0, {bDim, mDim, kDim}, getContext());
+      auto rhsMap = AffineMap::get(4, 0, {kDim, nDim}, getContext());
+      auto resultMap = AffineMap::get(4, 0, {bDim, mDim, nDim}, getContext());
+      SmallVector<StringRef> genericIterators = {parallel, parallel, parallel,
+                                                 reduction};
+      bool isInt = outputType.getElementType().isa<IntegerType>();
+      auto genericOp = rewriter.create<linalg::GenericOp>(
+          loc, reshapedOutputType,
+          /*inputs=*/ValueRange{reshapedImg2ColTensor, reshapedFilter},
+          /*outputs=*/ValueRange{reshapedOutput},
+          ArrayRef<AffineMap>{lhsMap, rhsMap, resultMap}, genericIterators,
+          [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
+            Value mul = createMul(loc, args[0], args[1], isInt, nestedBuilder);
+            Value add = createAdd(loc, mul, args[2], isInt, nestedBuilder);
+            nestedBuilder.create<linalg::YieldOp>(nestedLoc, add);
+          });
+      result = genericOp.getResults().front();
+    }
 
     auto reshapedResult = rewriter.create<tensor::ExpandShapeOp>(
-        loc, outputType, matmulResult.getResults()[0],
-        filterAndOutputReassociationIndices);
+        loc, outputType, result, outputReassocIndices);
 
     rewriter.replaceOp(convOp, ArrayRef<Value>{reshapedResult});
 
@@ -282,7 +333,7 @@ class ConvertDepthwiseConv2DNhwcHwc final
           nestedBuilder.create<linalg::YieldOp>(nestedLoc, args[0]);
         });
 
-    SmallVector<ReassociationIndices> img2ColTensorReassociationIndices = {
+    SmallVector<ReassociationIndices> img2ColTensorReassocIndices = {
         {0, 1}, {2, 3}, {4, 5}};
     SmallVector<ReassociationIndices> filterReassociationIndice = {{0}, {1, 2}};
     SmallVector<ReassociationIndices> outputReassociationIndice = {{0, 1},
@@ -297,7 +348,7 @@ class ConvertDepthwiseConv2DNhwcHwc final
 
     Value reshapedImg2ColTensor = rewriter.create<tensor::CollapseShapeOp>(
         loc, reshapedImg2ColTensorType, img2ColTensor.getResult(0),
-        img2ColTensorReassociationIndices);
+        img2ColTensorReassocIndices);
     Value reshapedFilterTensor = rewriter.create<tensor::CollapseShapeOp>(
         loc, reshapedFilterTensorType, filterT, filterReassociationIndice);
     Value reshapedoutputTensor = rewriter.create<tensor::CollapseShapeOp>(

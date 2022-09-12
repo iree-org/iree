@@ -213,6 +213,20 @@ def VectorReduceToGPU :
   let constructor = "mlir::iree_compiler::createConvertVectorReductionToGPUPass()";
 }
 
+def FuseTensorPadWithConsumer :
+    Pass<"iree-codegen-fuse-tensor-pad-with-consumer", "func::FuncOp"> {
+  let summary = "Fuse tensor.pad op into its consumer op's tiled loop nest";
+  let constructor = "mlir::iree_compiler::createFuseTensorPadWithConsumerPass()";
+}
+
+def ConcretizePadResultShape :
+    Pass<"iree-codegen-concretize-pad-result-shape", "func::FuncOp"> {
+  let summary =
+      "Concretizes tensor.pad op's result shape if its source op"
+      "implements OffsetSizeAndStrideOpInterface.";
+  let constructor = "mlir::iree_compiler::createConcretizePadResultShapePass()";
+}
+
 //------------------------------------------------------------------------------
 // LLVMCPU
 //------------------------------------------------------------------------------
@@ -435,12 +449,6 @@ def SPIRVVectorizeLoadStore :
     Pass<"iree-spirv-vectorize-load-store", "ModuleOp"> {
   let summary = "Vectorize load/store of memrefs for better memory access";
   let constructor = "mlir::iree_compiler::createSPIRVVectorizeLoadStore()";
-}
-
-def SPIRVFuseTensorPadWithConsumer :
-    Pass<"iree-spirv-fuse-tensor-pad-with-consumer", "func::FuncOp"> {
-  let summary = "Fuse tensor.pad op into its consumer op's tiled loop nest";
-  let constructor = "mlir::iree_compiler::createSPIRVFuseTensorPadWithConsumerPass()";
 }
 
 def SPIRVCreateFastSlowPath :

@@ -88,10 +88,10 @@ func.func @reduce() -> (tensor<8xf32>) {
   // Note: This will probably happen once the fill is fused into the split op at the linalg level.
   //         CHECK: %[[NEUTRAL_VEC:.*]] = vector.transfer_read %[[SHMEM_ALLOC]][%[[TIDZ]], %[[TIDY]]]{{.*}}vector<1xf32>
 
-  // TODO: Some foldings are missing, no need to be in vector<1xf32>.
-  //         CHECK: %[[NEUTRAL:.*]] = vector.extract %[[NEUTRAL_VEC]][0] : vector<1xf32>
   // Distributed reduction: everyone loads then 5 xor + addf expected
   //         CHECK: vector.transfer_read %{{.*}}[%[[C0]], %[[C0]], %[[TIDX]]]
+  // TODO: Some foldings are missing, no need to be in vector<1xf32>.
+  //         CHECK: %[[NEUTRAL:.*]] = vector.extract %[[NEUTRAL_VEC]][0] : vector<1xf32>
   // CHECK-COUNT-5: gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
 
   //         CHECK: %[[RES:.*]] = arith.addf %{{.*}}, %[[NEUTRAL]]

@@ -1854,16 +1854,16 @@ static void printDispatchResources(OpAsmPrinter &p, Operation *op,
                               .getValue();
     p.printNewline();
     p << "  ";
-    if (bitEnumContains(resourceAccess,
-                        IREE::Stream::ResourceAccessBitfield::Read) &&
-        bitEnumContains(resourceAccess,
-                        IREE::Stream::ResourceAccessBitfield::Write)) {
-      p << "rw";
-    } else if (bitEnumContains(resourceAccess,
-                               IREE::Stream::ResourceAccessBitfield::Read)) {
-      p << "ro";
-    } else if (bitEnumContains(resourceAccess,
+    if (bitEnumContainsAll(resourceAccess,
+                           IREE::Stream::ResourceAccessBitfield::Read |
                                IREE::Stream::ResourceAccessBitfield::Write)) {
+      p << "rw";
+    } else if (bitEnumContainsAll(resourceAccess,
+                                  IREE::Stream::ResourceAccessBitfield::Read)) {
+      p << "ro";
+    } else if (bitEnumContainsAll(
+                   resourceAccess,
+                   IREE::Stream::ResourceAccessBitfield::Write)) {
       p << "wo";
     }
     p << ' ';

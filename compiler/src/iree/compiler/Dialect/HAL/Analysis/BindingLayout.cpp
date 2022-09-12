@@ -96,8 +96,8 @@ static PipelineLayout deriveExportLayout(
               .cast<IREE::Stream::ResourceAccessBitfieldAttr>();
       auto resourceAccess = static_cast<IREE::Stream::ResourceAccessBitfield>(
           resourceAccessAttr.getInt());
-      if (!bitEnumContains(resourceAccess,
-                           IREE::Stream::ResourceAccessBitfield::Write)) {
+      if (!bitEnumContainsAll(resourceAccess,
+                              IREE::Stream::ResourceAccessBitfield::Write)) {
         // Read-only.
         bindingFlags[i] =
             bindingFlags[i] | IREE::HAL::DescriptorFlags::ReadOnly;

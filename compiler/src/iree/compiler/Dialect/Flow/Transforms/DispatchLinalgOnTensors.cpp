@@ -406,7 +406,7 @@ buildOperandLessFlowDispatchWorkgroupOp(PatternRewriter &rewriter, Location loc,
     workloadArgs.push_back(body->addArgument(workload.value().getType(), loc));
   }
   auto numWorkgroupsOp =
-      rewriter.create<DispatchDefaultWorkgroupCountOp>(loc, workloadArgs);
+      rewriter.create<DispatchWorkgroupCountFromDagRootOp>(loc, workloadArgs);
   rewriter.create<ReturnOp>(loc, numWorkgroupsOp.getResults());
 
   LLVM_DEBUG(llvm::dbgs() << "After workgroup_count creation \n"

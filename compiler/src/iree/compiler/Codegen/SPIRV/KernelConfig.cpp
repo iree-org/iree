@@ -50,6 +50,7 @@ namespace detail {
 LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
                               const int64_t subgroupSize,
                               const int64_t bestTilingFactor) {
+  LLVM_DEBUG(llvm::dbgs() << "trying to deduce config as convolution...\n");
   Type inputType = linalgOp.getInputOperand(0)->get().getType();
   ArrayRef<int64_t> inputShape = inputType.cast<ShapedType>().getShape();
   Type outputType = linalgOp.getOutputOperand(0)->get().getType();
@@ -182,6 +183,7 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op, int64_t subgroupSize,
                                 std::array<int64_t, 2> bestWorkgroupSizeXY,
                                 std::array<int64_t, 3> bestThreadTileSizeMNK,
                                 bool useWorkgroupMemory) {
+  LLVM_DEBUG(llvm::dbgs() << "trying to deduce config as matmul...\n");
   OpOperand *lhs = op.getInputOperand(0);
   OpOperand *rhs = op.getInputOperand(1);
 
@@ -219,13 +221,18 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op, int64_t subgroupSize,
     if (inLHS && inRHS) {
       bIndex = i;
     } else if (inLHS) {
+      // For cases where we have two parallel dimensions only accessed by
+      // the LHS, treat the outer one of them as the batch dimension.
+      if (mIndex >= 0 && bIndex < 0) bIndex = mIndex;
       mIndex = i;
     } else if (inRHS) {
+      // For cases where we have two parallel dimensions only accessed by
+      // the RHS, treat the outer one of them as the batch dimension.
+      if (nIndex >= 0 && bIndex < 0) bIndex = nIndex;
       nIndex = i;
     }
     lastParallelDim = i;
   }
-  assert(mIndex >= 0 && nIndex >= 0 && kIndex >= 0);
 
   LLVM_DEBUG({
     llvm::dbgs() << "bIndex = " << bIndex << "\n";
@@ -233,6 +240,7 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op, int64_t subgroupSize,
     llvm::dbgs() << "kIndex = " << kIndex << "\n";
     llvm::dbgs() << "nIndex = " << nIndex << "\n";
   });
+  if (mIndex < 0 || nIndex < 0 || kIndex < 0) return success();
 
   SmallVector<int64_t, 4> loopRanges = op.getStaticLoopRanges();
   const unsigned numLoops = loopRanges.size();
@@ -355,6 +363,7 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op, int64_t subgroupSize,
 
 static LogicalResult setFftOpConfig(spirv::ResourceLimitsAttr limits,
                                     IREE::LinalgExt::FftOp op) {
+  LLVM_DEBUG(llvm::dbgs() << "trying to deduce config as fft...\n");
   const int subgroupSize = limits.getSubgroupSize();
   auto pipeline = IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistribute;
 
@@ -393,6 +402,7 @@ static LogicalResult setFftOpConfig(spirv::ResourceLimitsAttr limits,
 /// Set the configuration for reductions that can be mapped to warp reductions.
 static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
                                         linalg::GenericOp op) {
+  LLVM_DEBUG(llvm::dbgs() << "trying to deduce config as reduction...\n");
   if (op.hasDynamicShape()) return failure();
   // This pipeline eventually generates non-uniform group shuffle ops, which
   // requires special capability.
@@ -455,6 +465,7 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
 static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
                                         Operation *op,
                                         bool allowVectorization = true) {
+  LLVM_DEBUG(llvm::dbgs() << "trying to deduce as default op...\n");
   func::FuncOp funcOp = op->getParentOfType<func::FuncOp>();
   auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
   auto partitionedLoops =

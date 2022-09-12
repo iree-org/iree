@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_DIALECT_MODULES_VMVX_IR_VMVXTYPES_H_
-#define IREE_COMPILER_DIALECT_MODULES_VMVX_IR_VMVXTYPES_H_
+#ifndef IREE_COMPILER_DIALECT_VMVX_IR_VMVXTYPES_H_
+#define IREE_COMPILER_DIALECT_VMVX_IR_VMVXTYPES_H_
 
 #include <cstdint>
 
@@ -26,4 +26,4 @@
 #include "iree/compiler/Dialect/VMVX/IR/VMVXOpInterfaces.h.inc"  // IWYU pragma: export
 // clang-format on
 
-#endif  // IREE_COMPILER_DIALECT_MODULES_VMVX_IR_VMVXTYPES_H_
+#endif  // IREE_COMPILER_DIALECT_VMVX_IR_VMVXTYPES_H_

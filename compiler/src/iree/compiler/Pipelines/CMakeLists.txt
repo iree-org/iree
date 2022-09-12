@@ -48,14 +48,14 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::Transforms
     iree::compiler::Dialect::HAL::Conversion::HALToVM
     iree::compiler::Dialect::HAL::Transforms
-    iree::compiler::Dialect::Modules::HAL::Inline::Transforms
-    iree::compiler::Dialect::Modules::HAL::Loader::Transforms
     iree::compiler::Dialect::Stream::Transforms
     iree::compiler::Dialect::Util::Transforms
     iree::compiler::Dialect::VM::Conversion
     iree::compiler::Dialect::VM::Conversion::StandardToVM
     iree::compiler::Dialect::VM::Target::Bytecode
     iree::compiler::Dialect::VM::Transforms
+    iree::compiler::Modules::HAL::Inline::Transforms
+    iree::compiler::Modules::HAL::Loader::Transforms
     iree::compiler::InputConversion::Common
   PUBLIC
 )

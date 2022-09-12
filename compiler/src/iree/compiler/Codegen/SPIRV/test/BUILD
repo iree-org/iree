@@ -50,7 +50,6 @@ iree_lit_test_suite(
             "vectorize_matmul.mlir",
             "vectorize_load_store.mlir",
             "vectorize_reduction.mlir",
-            "vectorize_tensor_pad.mlir",
         ],
         include = ["*.mlir"],
     ),
