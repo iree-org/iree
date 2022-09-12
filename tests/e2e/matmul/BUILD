@@ -128,6 +128,11 @@ py_binary(
     target_backends_and_drivers = [
         ("vmvx", "local-task"),
     ],
+    target_cpu_features_variants = ["default"] +
+                                   ([
+                                       "aarch64:+dotprod",
+                                       "aarch64:+i8mm",
+                                   ] if lhs_rhs_type == "i8" and strategy == "mmt4d" else []),
     trace_runner = "//tools:iree-e2e-matmul-test",
 ) for strategy in [
     "direct",
