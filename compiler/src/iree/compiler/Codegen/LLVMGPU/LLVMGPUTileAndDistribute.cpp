@@ -186,6 +186,9 @@ static LogicalResult copyToWorkgroupMemory(OpBuilder &b, Value src, Value dst) {
 static SmallVector<int64_t> getTransposedOperands(linalg::GenericOp linalgOp) {
   // Determine which operands to promote:
   SmallVector<int64_t> transposedOperands;
+  if (linalgOp.getNumParallelLoops() < 2) {
+    return transposedOperands;
+  }
   for (auto indexValue : llvm::enumerate(linalgOp.getIndexingMapsArray())) {
     int64_t opIndex = indexValue.index();
     auto indexMap = indexValue.value();
@@ -208,13 +211,7 @@ using PromotionFilterFunction = std::function<LogicalResult(Operation *op)>;
 /// Returns true if op is appropriate transpose for promotion.
 static LogicalResult transposeFilter(Operation *op,
                                      linalg::GenericOp promotedFilterOp) {
-  auto linalgOp = dyn_cast<linalg::GenericOp>(op);
-  if (!linalgOp) return failure();
-
-  if (linalgOp.getNumParallelLoops() < 2) {
-    return failure();
-  }
-  return success(linalgOp == promotedFilterOp);
+  return success(op == promotedFilterOp.getOperation());
 }
 
 /// Returns true if op is appropriate contract for promotion.
@@ -357,12 +354,14 @@ struct LLVMGPUTileAndDistributePass
                 // configuration.
                 SmallVector<int64_t> operandsToPromote =
                     getTransposedOperands(linalgOp);
-                populatePromotionPatterns(
-                    context, promotionPatterns,
-                    [linalgOp](Operation *op) -> LogicalResult {
-                      return transposeFilter(op, linalgOp);
-                    },
-                    operandsToPromote);
+                if (!operandsToPromote.empty()) {
+                  populatePromotionPatterns(
+                      context, promotionPatterns,
+                      [linalgOp](Operation *op) -> LogicalResult {
+                        return transposeFilter(op, linalgOp);
+                      },
+                      operandsToPromote);
+                }
               });
 
           break;
