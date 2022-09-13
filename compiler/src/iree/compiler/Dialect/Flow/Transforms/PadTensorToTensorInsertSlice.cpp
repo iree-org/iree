@@ -52,7 +52,9 @@ struct PadTensorOpConversion : public OpRewritePattern<tensor::PadOp> {
     }
     if (padTensorOp->hasOneUse()) {
       Operation *use = padTensorOp->use_begin()->getOwner();
-      if (isa<linalg::LinalgOp>(use)) {
+      if (isa<linalg::LinalgOp>(use) &&
+          !isa<linalg::Conv2DNhwcHwcfQOp, linalg::DepthwiseConv2DNhwcHwcQOp,
+               linalg::DepthwiseConv2DNhwcHwcmQOp>(use)) {
         return failure();
       }
     }
