@@ -220,14 +220,11 @@ static LogicalResult transposeFilter(
   if (operandsToPromote.size() != filterOperandsToPromote.size()) {
     return failure();
   }
-  for (auto valPair : llvm::zip(operandsToPromote, filterOperandsToPromote)) {
-    if (std::get<0>(valPair) != std::get<1>(valPair)) {
-      return failure();
-    }
+  if (operandsToPromote != filterOperandsToPromote) {
+    return failure();
+  } else {
+    return success();
   }
-  return success(
-      llvm::all_of_zip(operandsToPromote, filterOperandsToPromote,
-                       [](int64_t lhs, int64_t rhs) { return lhs == rhs; }));
 }
 
 /// Returns true if op is appropriate contract for promotion.
@@ -362,8 +359,10 @@ struct LLVMGPUTileAndDistributePass
         case GPUPromoteSharedMemPattern::TransposeOpPattern:
           funcOp.walk(
               [&context, &promotionPatterns](linalg::GenericOp linalgOp) {
-                linalgOp.dump();
-                // For each linalg generic, determine out its operands to
+                // Promotion patterns accept a fixed list of operands to promote
+                // before determine which op is being promoted. To support
+                // multiple linalg generic ops with different promoted operands,
+                // We walk each linalg generic op to determine which operands to
                 // promote, then create a filter that will only apply to it's
                 // configuration.
                 SmallVector<int64_t> operandsToPromote =

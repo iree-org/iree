@@ -581,17 +581,10 @@ static LogicalResult setTransposeConfig(func::FuncOp entryPoint,
 
   // Check alignment with tile size for each transpose.
   if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
-    for (auto operandIndexPair :
-         llvm::zip(genericOp.getOperands(), genericOp.getIndexingMapsArray())) {
-      if (isSharedMemTranspose(std::get<1>(operandIndexPair))) {
-        auto inputShape = std::get<0>(operandIndexPair)
-                              .getType()
-                              .cast<ShapedType>()
-                              .getShape();
-        if (inputShape[inputShape.size() - 1] % tileM != 0 ||
-            inputShape[inputShape.size() - 2] % tileN != 0) {
-          return failure();
-        }
+    auto loopRanges = genericOp.getStaticLoopRanges();
+    for (auto loopRange : loopRanges) {
+      if (loopRange % 32 != 0) {
+        return failure();
       }
     }
   } else {
