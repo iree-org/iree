@@ -357,7 +357,7 @@ class null_crc32_ostream : public llvm::raw_ostream {
 // appendZIPFile implementation used when |os| is a stream without random
 // access (like stdout). This requires us to serialize the file twice in order
 // to compute the total length and CRC32.
-static ZIPFileRef appendZIPFileToStream(
+static Optional<ZIPFileRef> appendZIPFileToStream(
     std::string fileName, uint64_t filePadding, uint64_t fileLength,
     std::function<LogicalResult(llvm::raw_ostream &os)> write,
     llvm::raw_ostream &os) {
@@ -376,7 +376,7 @@ static ZIPFileRef appendZIPFileToStream(
   uint32_t crc32 = 0;
   null_crc32_ostream crcStream(crc32);
   if (failed(write(crcStream))) {
-    return {};
+    return None;
   }
 
   // Write the ZIP header and padding up to the start of the file.
@@ -386,7 +386,7 @@ static ZIPFileRef appendZIPFileToStream(
   // Stream out the file contents to the output stream.
   uint64_t start = os.tell();
   if (failed(write(os))) {
-    return {};
+    return None;
   }
   fileRef.totalLength = os.tell() - start;
   assert(fileRef.totalLength == fileLength && "declared length mismatch");
@@ -416,7 +416,7 @@ class crc32_ostream : public llvm::raw_ostream {
 // appendZIPFile implementation used when |os| is a file with random access.
 // This allows us to write the header and backpatch the CRC computed while while
 // serializing the file contents.
-static ZIPFileRef appendZIPFileToFD(
+static Optional<ZIPFileRef> appendZIPFileToFD(
     std::string fileName, uint64_t filePadding, uint64_t fileLength,
     std::function<LogicalResult(llvm::raw_ostream &os)> write,
     llvm::raw_fd_ostream &os) {
@@ -431,7 +431,7 @@ static ZIPFileRef appendZIPFileToFD(
   {
     crc32_ostream crcStream(os, fileRef.crc32);
     if (failed(write(crcStream))) {
-      return {};
+      return None;
     }
     crcStream.flush();
   }
@@ -450,7 +450,7 @@ static ZIPFileRef appendZIPFileToFD(
 // Appends a file wrapped in a ZIP header and data descriptor.
 // |write| is used to stream the file contents to |os| while also capturing its
 // CRC as required for the central directory.
-static ZIPFileRef appendZIPFile(
+static Optional<ZIPFileRef> appendZIPFile(
     std::string fileName, uint64_t filePadding, uint64_t fileLength,
     std::function<LogicalResult(llvm::raw_ostream &os)> write,
     llvm::raw_ostream &os) {
@@ -627,7 +627,7 @@ LogicalResult ZIPArchiveWriter::flush(FlatbufferBuilder &fbb) {
       sizeof(flatbuffers_uoffset_t));
 
   // Stream out the FlatBuffer contents.
-  fileRefs.push_back(appendZIPFile(
+  auto zipFile = appendZIPFile(
       moduleName, modulePadding, paddedModuleLength,
       [&](llvm::raw_ostream &os) -> LogicalResult {
         os.write(reinterpret_cast<char *>(&paddedModuleLength),
@@ -637,7 +637,11 @@ LogicalResult ZIPArchiveWriter::flush(FlatbufferBuilder &fbb) {
         os.write_zeros(paddedModuleLength - moduleData.size());
         return success();
       },
-      os));
+      os);
+  if (!zipFile.has_value()) {
+    return mlir::emitError(loc) << "failed to serialize flatbuffer module";
+  }
+  fileRefs.push_back(*zipFile);
 
   // Pad out to the start of the external rodata segment.
   // This ensures we begin writing at an aligned offset; all relative offsets
@@ -655,7 +659,7 @@ LogicalResult ZIPArchiveWriter::flush(FlatbufferBuilder &fbb) {
         baseOffset + file.relativeOffset + file.prefixLength - os.tell());
 
     // Write file header and payload.
-    fileRefs.push_back(appendZIPFile(
+    auto zipFile = appendZIPFile(
         file.fileName, filePadding, file.fileLength,
         [this, file](llvm::raw_ostream &os) -> LogicalResult {
           if (failed(file.write(os))) {
@@ -666,7 +670,9 @@ LogicalResult ZIPArchiveWriter::flush(FlatbufferBuilder &fbb) {
           }
           return success();
         },
-        os));
+        os);
+    if (!zipFile.has_value()) return failure();
+    fileRefs.push_back(*zipFile);
   }
 
   // Append the central directory containing an index of all the files.

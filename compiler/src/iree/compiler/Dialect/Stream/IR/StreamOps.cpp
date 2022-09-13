@@ -146,6 +146,7 @@ static LogicalResult verifyAllResourcesCaptured(Region &region) {
       availableResources.insert(result);
     }
     for (auto operand : op.getOperands()) {
+      if (!operand) continue;
       if (!operand.getType().isa<IREE::Stream::ResourceType>()) continue;
       if (!availableResources.contains(operand)) {
         return op.emitOpError() << "used resource not listed in explicit "

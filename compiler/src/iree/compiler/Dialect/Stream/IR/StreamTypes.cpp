@@ -25,7 +25,7 @@ namespace iree_compiler {
 namespace IREE {
 namespace Stream {
 
-static llvm::cl::opt<Favor> partitioningFavor(
+static llvm::cl::opt<Favor> clPartitioningFavor(
     "iree-stream-partitioning-favor",
     llvm::cl::desc("Default stream partitioning favor configuration."),
     llvm::cl::init(Favor::MaxConcurrency),
@@ -264,7 +264,7 @@ PartitioningConfigAttr PartitioningConfigAttr::lookup(Operation *op) {
     op = op->getParentOp();
   }
   // No config found; use defaults.
-  auto favorAttr = FavorAttr::get(attrId.getContext(), partitioningFavor);
+  auto favorAttr = FavorAttr::get(attrId.getContext(), clPartitioningFavor);
   return PartitioningConfigAttr::get(favorAttr);
 }
 
@@ -359,7 +359,11 @@ Value ResourceType::createSubrangeOp(Location loc, Value resource,
 
 void StreamDialect::registerAttributes() {
   // Register command line flags:
-  (void)partitioningFavor;
+  (void)clPartitioningFavor;
+  (void)clResourceMaxAllocationSize;
+  (void)clResourceMinOffsetAlignment;
+  (void)clResourceMaxRange;
+  (void)clResourceIndexBits;
 
   addAttributes<
 #define GET_ATTRDEF_LIST
