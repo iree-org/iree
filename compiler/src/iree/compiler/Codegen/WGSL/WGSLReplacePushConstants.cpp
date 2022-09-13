@@ -23,37 +23,29 @@ namespace {
 #define IREE_HAL_WEBGPU_PARAMS_BIND_GROUP_INDEX 3
 #define IREE_HAL_WEBGPU_PARAMS_BINDING_INDEX 0
 
-static void replaceConstantLoadOp(IREE::HAL::InterfaceConstantLoadOp op) {
+static void replaceConstantLoadOp(IREE::Flow::DispatchTensorLoadOp loadOp,
+                                  IREE::HAL::InterfaceConstantLoadOp op) {
   OpBuilder builder(op);
 
-  // hal.interface.binding.subspan -> !flow.dispatch.tensor<readonly:i32>
-  auto opFlowTensorType = IREE::Flow::DispatchTensorType::get(
-      IREE::Flow::TensorAccess::ReadOnly, {}, op.getType());
-  // Offset by the op's index.
+  // tensor.extract -> i32
   auto offsetValue = builder.createOrFold<arith::ConstantIndexOp>(
       op.getLoc(), op.getIndex().getZExtValue());
-  SmallVector<Value> dynamicDims;
-  // Keep the op's alignment hint.
-  auto alignmentAttr = op.getAlignmentAttr();
-  // Note: we're ignoring the op's potential 'values' hint (if provided) -
-  // InterfaceBindingSubspanOp has no matching concept and we assume that any
-  // analysis using the hint should have been performed by earlier passes.
-  auto subspanOp = builder.create<IREE::HAL::InterfaceBindingSubspanOp>(
-      op.getLoc(), opFlowTensorType,
-      /*set=*/APInt(64, IREE_HAL_WEBGPU_PARAMS_BIND_GROUP_INDEX),
-      /*binding=*/APInt(64, IREE_HAL_WEBGPU_PARAMS_BINDING_INDEX),
-      IREE::HAL::DescriptorType::StorageBuffer, offsetValue, dynamicDims,
-      alignmentAttr);
+  auto extractOp =
+      builder.create<tensor::ExtractOp>(op.getLoc(), loadOp, offsetValue);
 
-  // flow.dispatch.tensor.load -> tensor<i32>
-  auto tensorType = RankedTensorType::get({}, op.getType());
-  auto loadOp = builder.create<IREE::Flow::DispatchTensorLoadOp>(
-      op.getLoc(), tensorType, subspanOp, dynamicDims);
+  // Convert to original type.
+  auto opType = op.getType();
+  if (opType.isIndex()) {
+    auto indexCastOp =
+        builder.create<arith::IndexCastOp>(op.getLoc(), opType, extractOp);
+    op.replaceAllUsesWith(indexCastOp.getResult());
+  } else {
+    // TODO(scotttodd): truncate or zero-extend types with different bitwidths?
+    auto bitcastOp =
+        builder.create<arith::BitcastOp>(op.getLoc(), op.getType(), extractOp);
+    op.replaceAllUsesWith(bitcastOp.getResult());
+  }
 
-  // tensor.extract -> i32
-  auto extractOp = builder.create<tensor::ExtractOp>(op.getLoc(), loadOp);
-
-  op.replaceAllUsesWith(extractOp.getResult());
   op.erase();
 }
 
@@ -67,11 +59,69 @@ class WGSLReplacePushConstantsPass
 
   void runOnOperation() override {
     auto parentOp = getOperation();
+    auto loc = parentOp.getLoc();
     auto constantLoadOps = llvm::to_vector<4>(
         parentOp.getOps<IREE::HAL::InterfaceConstantLoadOp>());
+    if (constantLoadOps.empty()) return;
 
+    OpBuilder builder(parentOp);
+    builder.setInsertionPointToStart(&parentOp.getBlocks().front());
+
+    // Group all push constants into a single `hal.interface.binding.subspan`
+    // and load from it once using `flow.dispatch.tensor.load`, then extract
+    // individual push constants with `tensor.extract`.
+
+    // Find the range of push constant indices (0 to some maximum).
+    uint64_t maxConstantIndex = 0;
+    // Inspect the alignment values. These are just hints, so if all are equal
+    // then use the value, otherwise drop the alignment hint.
+    SmallVector<uint64_t> alignmentValues;
+    bool missingAlignmentValue = false;
     for (auto constantLoadOp : constantLoadOps) {
-      replaceConstantLoadOp(constantLoadOp);
+      maxConstantIndex =
+          std::max(constantLoadOp.getIndex().getZExtValue(), maxConstantIndex);
+
+      auto alignmentAttr = constantLoadOp.getAlignmentAttr();
+      if (alignmentAttr) {
+        uint64_t alignmentValue = alignmentAttr.getValue().getZExtValue();
+        alignmentValues.push_back(alignmentValue);
+      } else {
+        missingAlignmentValue = true;
+      }
+    }
+    auto maxConstantValue =
+        builder.createOrFold<arith::ConstantIndexOp>(loc, maxConstantIndex);
+    mlir::IntegerAttr alignmentAttr = nullptr;
+    // TODO(scotttodd): try llvm::all_equal with attrs directly
+    if (!missingAlignmentValue && llvm::all_equal(alignmentValues)) {
+      alignmentAttr = constantLoadOps[0].getAlignmentAttr();
+    }
+
+    // hal.interface.binding.subspan -> !flow.dispatch.tensor<readonly:i32>
+    //   * Group all push constants into a single tensor<Nxi32>
+    //   * If individual data types differ, they'll be bitcast when extracted
+    auto dispatchTensorType = IREE::Flow::DispatchTensorType::get(
+        IREE::Flow::TensorAccess::ReadOnly, {}, builder.getI32Type());
+    SmallVector<Value> dynamicDims;
+    // Note: we're ignoring all potential 'values' hints (if provided) on ops -
+    // InterfaceBindingSubspanOp has no matching concept and we assume that any
+    // analysis using the hint should have been performed by earlier passes.
+    auto subspanOp = builder.create<IREE::HAL::InterfaceBindingSubspanOp>(
+        loc, dispatchTensorType,
+        /*set=*/APInt(64, IREE_HAL_WEBGPU_PARAMS_BIND_GROUP_INDEX),
+        /*binding=*/APInt(64, IREE_HAL_WEBGPU_PARAMS_BINDING_INDEX),
+        IREE::HAL::DescriptorType::StorageBuffer, maxConstantValue, dynamicDims,
+        alignmentAttr);
+
+    // flow.dispatch.tensor.load -> tensor<Nxi32>
+    auto tensorType = RankedTensorType::get({(int64_t)maxConstantIndex + 1},
+                                            builder.getI32Type());
+    auto loadOp = builder.create<IREE::Flow::DispatchTensorLoadOp>(
+        loc, tensorType, subspanOp, dynamicDims);
+
+    // The grouped subspan and load are complete - now extract each constant.
+    for (auto constantLoadOp : constantLoadOps) {
+      replaceConstantLoadOp(loadOp, constantLoadOp);
     }
   }
 };
