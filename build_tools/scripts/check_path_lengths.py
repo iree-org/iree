@@ -8,6 +8,15 @@
 # This scans the IREE source tree for long path lengths, which are problematic
 # on Windows: https://docs.microsoft.com/en-us/windows/win32/fileio/maximum-file-path-limitation
 #
+# We ultimately care that the build system is happy, but CMake on Windows in
+# particular does not actually give early or easy to understand error messages,
+# and developers/CI using Linux may still want to see warnings. We'll use
+# relative directory path length as a reasonable heuristic for "will the build
+# system be happy?", since CMake tends to create paths like this:
+# `iree/compiler/.../Foo/CMakeFiles/iree_compiler_Foo_Foo.objects.dir/bar.obj`.
+# Note that 'Foo' appears three times in that path, so that's typically the best
+# place to trim characters (and not file names).
+#
 # To check that all relative paths are shorter than the default limit:
 #   python check_path_lengths.py
 #
@@ -18,10 +27,6 @@ import argparse
 import os
 import pathlib
 import sys
-
-
-def repo_relpath(repo_root, path):
-  return os.path.relpath(path, repo_root).replace("\\", "/")
 
 
 def parse_arguments():
@@ -56,11 +61,11 @@ def main(args):
   longest_path_length = -1
   long_paths = []
   short_paths = []
-  for dirpath, _, _ in os.walk(walk_root):
+  for dirpath, dirnames, _ in os.walk(walk_root):
     # Don't descend into test directories, since they typically don't generate
     # object files or binaries that could trip up the build system.
-    if not args.include_tests and "test" in dirpath:
-      continue
+    if not args.include_tests and "test" in dirnames:
+      dirnames.remove("test")
 
     path = pathlib.Path(dirpath).relative_to(repo_root).as_posix()
     if len(path) > args.limit:
