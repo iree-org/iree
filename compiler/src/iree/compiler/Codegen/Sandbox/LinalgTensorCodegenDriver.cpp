@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree-dialects/Dialect/LinalgExt/Transforms/CodegenStrategy.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/Sandbox/PassDetail.h"
 #include "iree/compiler/Codegen/Sandbox/Passes.h"
@@ -13,7 +14,6 @@
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Passes.h"
-#include "mlir/Dialect/Linalg/Transforms/CodegenStrategy.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -27,6 +27,8 @@
 
 using namespace mlir;
 using namespace mlir::linalg;
+
+using mlir::iree_compiler::IREE::LinalgExt::CodegenStrategy;
 
 #define DEBUG_TYPE "iree-linalg-tensor-codegen-driver"
 
