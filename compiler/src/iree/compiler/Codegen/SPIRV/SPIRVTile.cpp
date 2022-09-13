@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
@@ -28,6 +29,8 @@
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
+using mlir::iree_compiler::IREE::LinalgExt::TilingPatterns;
 
 #define DEBUG_TYPE "iree-spirv-tile"
 
@@ -51,10 +54,9 @@ static void populateTilingReductionPatterns(RewritePatternSet &patterns) {
   auto marker = StringAttr::get(context, getTileReductionMarker());
   auto filter = linalg::LinalgTransformationFilter({marker}, llvm::None);
 
-  linalg::TilingPatterns<linalg::BatchMatmulOp, linalg::Conv2DNhwcHwcfOp,
-                         linalg::DepthwiseConv2DNhwcHwcOp, linalg::GenericOp,
-                         linalg::MatmulOp>::insert(patterns, tilingOptions,
-                                                   filter);
+  TilingPatterns<linalg::BatchMatmulOp, linalg::Conv2DNhwcHwcfOp,
+                 linalg::DepthwiseConv2DNhwcHwcOp, linalg::GenericOp,
+                 linalg::MatmulOp>::insert(patterns, tilingOptions, filter);
 }
 
 //===----------------------------------------------------------------------===//

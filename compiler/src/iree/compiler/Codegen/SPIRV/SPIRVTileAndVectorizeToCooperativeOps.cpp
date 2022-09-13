@@ -13,6 +13,7 @@
 
 #include <algorithm>
 
+#include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
@@ -33,6 +34,8 @@
 #include "mlir/Interfaces/VectorInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
+using mlir::iree_compiler::IREE::LinalgExt::TilingPatterns;
 
 #define DEBUG_TYPE "iree-spirv-tile-and-vectorize-to-cooperative-ops"
 
@@ -131,9 +134,8 @@ static void populateTilingToSubgroupPatterns(ArrayRef<int64_t> subgroupCounts,
 
   auto filter = linalg::LinalgTransformationFilter(
       ArrayRef<StringAttr>{}, StringAttr::get(context, getVectorizeMarker()));
-  linalg::TilingPatterns<linalg::FillOp, linalg::MatmulOp,
-                         linalg::GenericOp>::insert(patterns, tilingOptions,
-                                                    filter);
+  TilingPatterns<linalg::FillOp, linalg::MatmulOp, linalg::GenericOp>::insert(
+      patterns, tilingOptions, filter);
 }
 
 //===----------------------------------------------------------------------===//
