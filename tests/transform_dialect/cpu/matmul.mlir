@@ -1,7 +1,7 @@
 
-!A_size = tensor<3x5xf32>
-!B_size = tensor<5x3xf32>
-!C_size = tensor<3x3xf32>
+!A_size = tensor<30x50xf32>
+!B_size = tensor<50x30xf32>
+!C_size = tensor<30x30xf32>
 
 func.func @matmul_static(
     %A : !A_size, %B : !B_size, %C : !C_size) -> !C_size {
@@ -13,7 +13,6 @@ func.func @matmul_static(
 // RUN: iree-opt %s --iree-hal-target-backends=llvm-cpu \
 // RUN:   --iree-abi-transformation-pipeline \
 // RUN:   --iree-flow-transformation-pipeline \
-// RUN:   --iree-flow-dispatch-use-transform-dialect=%p/matmul_dispatch_spec.mlir | \
 // RUN: FileCheck %s --check-prefixes=DISPATCH
 
 // TODO: make this test drop transform dialect usage at the flow level and use:
@@ -34,7 +33,6 @@ func.func @matmul_static(
 // RUN: iree-opt %s --iree-hal-target-backends=llvm-cpu \
 // RUN:   --iree-abi-transformation-pipeline \
 // RUN:   --iree-flow-transformation-pipeline \
-// RUN:   --iree-flow-dispatch-use-transform-dialect=%p/matmul_dispatch_spec.mlir \
 // RUN:   --iree-stream-transformation-pipeline \
 // RUN:    --iree-hal-configuration-pipeline | \
 // RUN: iree-opt --pass-pipeline='hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target))' \
@@ -74,7 +72,6 @@ func.func @matmul_static(
 // CODEGEN:           linalg.matmul ins(%{{.*}}, %{{.*}} : memref<?x5xf32, #map3>, memref<5x3xf32>) outs(%{{.*}} : memref<?x3xf32, #{{.*}}>)
 
 // RUN: iree-compile %s --iree-hal-target-backends=llvm-cpu \
-// RUN:   --iree-flow-dispatch-use-transform-dialect=%p/matmul_dispatch_spec.mlir \
 // RUN:   --iree-codegen-llvmcpu-use-transform-dialect=%p/matmul_codegen_spec.mlir | \
 // RUN: iree-run-module --entry_function=matmul_static \
 // RUN:   --function_input="3x5xf32=1 1 1 1 1 1 1 1 1 1 1 1 1 1 1" \
@@ -85,7 +82,6 @@ func.func @matmul_static(
 // EXEC: 3x3xf32=[5 5 5][5 5 5][5 5 5]
 
 // RUN: iree-compile --iree-hal-target-backends=llvm-cpu \
-// RUN:     --iree-flow-dispatch-use-transform-dialect=%p/matmul_tiled_dispatch_spec.mlir \
 // RUN:     --iree-flow-export-benchmark-funcs %s | \
 // RUN: iree-benchmark-module --device=local-task | \
 // RUN: FileCheck %s --check-prefixes=BENCHMARK-MODULE

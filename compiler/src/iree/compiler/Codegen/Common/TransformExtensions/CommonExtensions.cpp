@@ -14,8 +14,11 @@
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/ADT/StringSet.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arithmetic/Utils/Utils.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/Pass/PassManager.h"
 
@@ -199,36 +202,56 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
   results.set(getOperation()->getOpResult(0), payload.front());
   return DiagnosedSilenceableFailure(failure(res.wasInterrupted()));
 }
-/// Populate the workgroup_count region of `dispatchOp`.
-/// For now, this only supports constant index ops and empty workload operands.
-/// Assumes the HAL::ExecutableExportOp is built with an empty region.
-static LogicalResult populateWorkgroupCountComputingRegion(
+
+/// Lower the ops within the workgroup count region of `exportOp` that
+/// represents the workgroup count calculation, to the actual
+/// computation that returns the number of workgroups. For now
+/// this lowers the `flow.dispatch.workgroup_count_from_dag_root` op
+/// to `ceilDiv(workload, tileSizes)`.
+static LogicalResult lowerWorkgroupCountComputingRegion(
     PatternRewriter &rewriter, scf::ForeachThreadOp foreachThreadOp,
-    HAL::ExecutableExportOp exportOp) {
-  Location loc = foreachThreadOp.getLoc();
-  OpBuilder::InsertionGuard g(rewriter);
+    HAL::ExecutableExportOp exportOp, ArrayRef<OpFoldResult> tileSizes) {
   Region &r = exportOp.getWorkgroupCount();
-  assert(r.empty() && "expected block-less workgroup_count region");
-  Block *block = rewriter.createBlock(&r);
-  // The HAL::DeviceType argument is always the first argument.
-  block->addArgument(HAL::DeviceType::get(rewriter.getContext()), loc);
-  rewriter.setInsertionPointToStart(block);
-
-  SmallVector<Value> results;
-  // For now, this assumes that we only pull in constants.
-  // TODO: Iteratively pull required operations.
-  for (Value v : foreachThreadOp.getNumThreads()) {
-    auto op = dyn_cast_or_null<arith::ConstantIndexOp>(v.getDefiningOp());
-    if (!op) return failure();
-    results.push_back(
-        cast<arith::ConstantIndexOp>(rewriter.clone(*op)).getResult());
+  if (r.hasOneBlock()) {
+    return rewriter.notifyMatchFailure(exportOp,
+                                       "expected export op to have a workgroup "
+                                       "count region with a single block");
   }
-  // Pad to `3` to match assumptions hardcoded in IREE.
-  for (unsigned i = results.size(); i < 3; ++i) {
-    results.push_back(rewriter.create<arith::ConstantIndexOp>(loc, 1));
+  auto workgroupCountOps =
+      r.front().getOps<IREE::Flow::DispatchWorkgroupCountFromDagRootOp>();
+  if (llvm::hasSingleElement(workgroupCountOps)) {
+    return rewriter.notifyMatchFailure(
+        exportOp,
+        "expected region to have a single "
+        "flow.dispatch.workgroup_count_from_dag_root op");
   }
-  rewriter.create<HAL::ReturnOp>(loc, results);
+  auto workgroupCountOp = *workgroupCountOps.begin();
+  auto workload = workgroupCountOp.getOperands();
 
+  if (tileSizes.size() > workload.size()) {
+    return rewriter.notifyMatchFailure(
+        exportOp, "tile sizes more than the workload captured");
+  }
+
+  SmallVector<Value> workgroupCount;
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(workgroupCountOp);
+  Location loc = workgroupCountOp.getLoc();
+  for (auto tileSize : llvm::enumerate(tileSizes)) {
+    if (isConstantIntValue(tileSize.value(), 0)) {
+      workgroupCount.push_back(workload[tileSize.index()]);
+      continue;
+    }
+    AffineExpr s0, s1;
+    bindSymbols(rewriter.getContext(), s0, s1);
+    auto m = AffineMap::get(0, 2, s0.ceilDiv(s1));
+    Value tileSizeVal =
+        getValueOrCreateConstantIndexOp(rewriter, loc, tileSize.value());
+    Value count = rewriter.create<AffineApplyOp>(
+        loc, m, ValueRange{workload[tileSize.index()], tileSizeVal});
+    workgroupCount.push_back(count);
+  }
+  rewriter.replaceOp(workgroupCountOp, workgroupCount);
   return success();
 }
 
@@ -295,7 +318,8 @@ static FailureOr<SmallVector<Value>> getThreadIndices(
 
 LogicalResult rewriteForeachThreadToWorkgroup(
     scf::ForeachThreadOp foreachThreadOp,
-    IREE::HAL::ExecutableExportOp exportOp, PatternRewriter &rewriter) {
+    IREE::HAL::ExecutableExportOp exportOp, ArrayRef<OpFoldResult> tileSizes,
+    PatternRewriter &rewriter) {
   if (foreachThreadOp.getNumResults() > 0)
     return foreachThreadOp->emitError(
         "only bufferized scf.foreach_thread lowers to workgroup");
@@ -303,26 +327,10 @@ LogicalResult rewriteForeachThreadToWorkgroup(
     return foreachThreadOp->emitError(
         "scf.foreach_thread with rank > 3 does not lower to workgroup");
 
-  // Step 0. Outline the compute workload region and set up the workload
-  // operands.
-  auto maybeWorkgroupCounts = getNumThreads(rewriter, foreachThreadOp);
-  if (failed(maybeWorkgroupCounts) ||
-      llvm::any_of(*maybeWorkgroupCounts, [](OpFoldResult ofr) {
-        return !getConstantIntValue(ofr).has_value();
-      }))
-    return foreachThreadOp->emitError(
-        "unsupported dynamic workgroup_count atm --- need to slice out "
-        "workgroup_count computation into ExecutableExport::workgroup_count. "
-        "This region may require arbitrary computations and cannot magically "
-        "match what the `stream.cmd.dispatch` has already imposed on us at a "
-        "distance. For now we must specify the number of values properly when "
-        "applying the topLevel tile_to_foreach_thread_op");
-
-  SmallVector<int64_t> workgroupCounts;
-  for (OpFoldResult ofr : *maybeWorkgroupCounts)
-    workgroupCounts.push_back(getConstantIntValue(ofr).value());
-  if (failed(populateWorkgroupCountComputingRegion(rewriter, foreachThreadOp,
-                                                   exportOp)))
+  // Step 0. Populate the workgroup count region with the actual computation
+  // that returns the workgroup count.
+  if (failed(lowerWorkgroupCountComputingRegion(rewriter, foreachThreadOp,
+                                                exportOp, tileSizes)))
     return foreachThreadOp->emitOpError(
                "failed to populate workload region for dispatchOp: ")
            << exportOp;
@@ -374,6 +382,11 @@ LogicalResult rewriteForeachThreadToWorkgroup(
 // IREE-specific transformations defined outside of iree_linalg_transform.
 //===---------------------------------------------------------------------===//
 
+SmallVector<OpFoldResult>
+transform_dialect::ForeachThreadToWorkgroupOp::getMixedTileSizes() {
+  return getMixedSizes(getStaticTileSizes(), getTileSizes());
+}
+
 DiagnosedSilenceableFailure
 transform_dialect::ForeachThreadToWorkgroupOp::applyToOne(
     func::FuncOp target, SmallVectorImpl<Operation *> &results,
@@ -416,7 +429,7 @@ transform_dialect::ForeachThreadToWorkgroupOp::applyToOne(
 
   SimplePatternRewriter rewriter(topLevelForeachThreadOp);
   if (failed(rewriteForeachThreadToWorkgroup(topLevelForeachThreadOp, exportOp,
-                                             rewriter)))
+                                             getMixedTileSizes(), rewriter)))
     return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
 
   results.assign({target});

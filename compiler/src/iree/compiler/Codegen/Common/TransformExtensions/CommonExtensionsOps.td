@@ -140,16 +140,26 @@ def ForeachThreadToWorkgroupOp : Op<Transform_Dialect,
     properties.
   }];
 
-  let arguments = (ins PDL_Operation:$target);
+  let arguments = (ins PDL_Operation:$target,
+                   Variadic<PDL_Operation>:$tile_sizes,
+                   DefaultValuedAttr<I64ArrayAttr, "{}">:$static_tile_sizes);
   let results = (outs PDL_Operation:$transformed);
 
-  let assemblyFormat = "$target attr-dict";
+  let assemblyFormat = [{
+    $target
+    `tile_sizes` custom<DynamicIndexList>($tile_sizes,
+                                          $static_tile_sizes,
+                                          "ShapedType::kDynamicSize")
+    attr-dict
+  }];
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::func::FuncOp target,
         ::llvm::SmallVectorImpl<::mlir::Operation *> &results,
         ::mlir::transform::TransformState &state);
+
+    ::llvm::SmallVector<OpFoldResult> getMixedTileSizes();
   }];
 }
 
