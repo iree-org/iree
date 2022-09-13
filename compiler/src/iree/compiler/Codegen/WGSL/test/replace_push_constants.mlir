@@ -57,3 +57,28 @@ func.func @constantLoadWithIndexAndAlignment() {
   %1 = arith.index_cast %0 : index to i32
   return
 }
+
+// -----
+
+// CHECK-LABEL: @constantLoadMultiple
+func.func @constantLoadMultiple() {
+  // CHECK: %[[SUBSPAN_0:.+]] = hal.interface.binding.subspan set(3) binding(0) type(storage_buffer) offset(%c0) : !flow.dispatch.tensor<readonly:i32>
+  // CHECK: %[[LOAD_0:.+]] = flow.dispatch.tensor.load %[[SUBSPAN_0]], offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:i32> -> tensor<i32>
+  // CHECK: %[[EXTRACT_0:.+]] = tensor.extract %[[LOAD_0]][] : tensor<i32>
+  %0 = hal.interface.constant.load[0] : i32
+  // CHECK: %[[SUBSPAN_1:.+]] = hal.interface.binding.subspan set(3) binding(0) type(storage_buffer) offset(%c1) : !flow.dispatch.tensor<readonly:i32>
+  // CHECK: %[[LOAD_1:.+]] = flow.dispatch.tensor.load %[[SUBSPAN_1]], offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:i32> -> tensor<i32>
+  // CHECK: %[[EXTRACT_1:.+]] = tensor.extract %[[LOAD_1]][] : tensor<i32>
+  %1 = hal.interface.constant.load[1] : i32
+  // CHECK: %[[SUBSPAN_2:.+]] = hal.interface.binding.subspan set(3) binding(0) type(storage_buffer) offset(%c2) : !flow.dispatch.tensor<readonly:i32>
+  // CHECK: %[[LOAD_2:.+]] = flow.dispatch.tensor.load %[[SUBSPAN_2]], offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:i32> -> tensor<i32>
+  // CHECK: %[[EXTRACT_2:.+]] = tensor.extract %[[LOAD_2]][] : tensor<i32>
+  %2 = hal.interface.constant.load[2] : i32
+  // CHECK: = arith.index_cast %[[EXTRACT_0]] : i32 to index
+  %3 = arith.index_cast %0 : i32 to index
+  // CHECK: = arith.index_cast %[[EXTRACT_1]] : i32 to index
+  %4 = arith.index_cast %1 : i32 to index
+  // CHECK: = arith.index_cast %[[EXTRACT_2]] : i32 to index
+  %5 = arith.index_cast %2 : i32 to index
+  return
+}
