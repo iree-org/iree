@@ -186,15 +186,17 @@ class MobilebertFP32CommandFactory(BenchmarkCommandFactory):
     iree_fp16_model_path = os.path.join(self._base_dir, "models", "iree",
                                         driver, self._model_name + "_fp16.vmfb")
     iree_mobilebert_fp16 = IreeMobilebertFP32(self._iree_benchmark_binary_path,
-                                         self._model_name + "_fp16",
-                                         iree_fp16_model_path,
-                                         driver=driver)
-    iree_padfuse_model_path = os.path.join(self._base_dir, "models", "iree", driver,
-                                        self._model_name + "_padfuse.vmfb")
-    iree_mobilebert_padfuse = IreeMobilebertFP32(self._iree_benchmark_binary_path,
-                                         self._model_name + "_padfuse",
-                                         iree_padfuse_model_path,
-                                         driver=driver)
+                                              self._model_name + "_fp16",
+                                              iree_fp16_model_path,
+                                              driver=driver)
+    iree_padfuse_model_path = os.path.join(self._base_dir, "models", "iree",
+                                           driver,
+                                           self._model_name + "_padfuse.vmfb")
+    iree_mobilebert_padfuse = IreeMobilebertFP32(
+        self._iree_benchmark_binary_path,
+        self._model_name + "_padfuse",
+        iree_padfuse_model_path,
+        driver=driver)
 
     return [
         tflite_mobilebert, tflite_mobilebert_noxnn, tflite_mobilebert_fp16,

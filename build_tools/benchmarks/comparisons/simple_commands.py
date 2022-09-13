@@ -107,13 +107,18 @@ class SimpleCommandFactory(BenchmarkCommandFactory):
     # Generate TFLite benchmarks.
     tflite_model_path = os.path.join(self._base_dir, "models", "tflite",
                                      self._model_name + ".tflite")
-    tflite = TfliteWrapper(self._tflite_benchmark_binary_path, self._model_name,
-                           tflite_model_path, self._input_name, driver="cpu")
+    tflite = TfliteWrapper(self._tflite_benchmark_binary_path,
+                           self._model_name,
+                           tflite_model_path,
+                           self._input_name,
+                           driver="cpu")
     commands.append(tflite)
 
     tflite_noxnn = TfliteWrapper(self._tflite_benchmark_binary_path,
-                                 self._model_name + "_noxnn", tflite_model_path,
-                                 self._input_name, driver="cpu")
+                                 self._model_name + "_noxnn",
+                                 tflite_model_path,
+                                 self._input_name,
+                                 driver="cpu")
     tflite_noxnn.args.append("--use_xnnpack=false")
     commands.append(tflite_noxnn)
 
@@ -123,8 +128,11 @@ class SimpleCommandFactory(BenchmarkCommandFactory):
 
     iree_model_path = os.path.join(self._base_dir, "models", "iree", backend,
                                    self._model_name + ".vmfb")
-    iree = IreeWrapper(self._iree_benchmark_binary_path, self._model_name,
-                       iree_model_path, self._function_input, driver=driver)
+    iree = IreeWrapper(self._iree_benchmark_binary_path,
+                       self._model_name,
+                       iree_model_path,
+                       self._function_input,
+                       driver=driver)
     commands.append(iree)
 
     # Test mmt4d only on mobile.
@@ -133,8 +141,10 @@ class SimpleCommandFactory(BenchmarkCommandFactory):
       iree_mmt4d_model_path = os.path.join(self._base_dir, "models", "iree",
                                            backend, model_mmt4d_name + ".vmfb")
       iree_mmt4d = IreeWrapper(self._iree_benchmark_binary_path,
-                               model_mmt4d_name, iree_mmt4d_model_path,
-                               self._function_input, driver=driver)
+                               model_mmt4d_name,
+                               iree_mmt4d_model_path,
+                               self._function_input,
+                               driver=driver)
       commands.append(iree_mmt4d)
 
       model_im2col_mmt4d_name = self._model_name + "_im2col_mmt4d"
@@ -144,7 +154,8 @@ class SimpleCommandFactory(BenchmarkCommandFactory):
       iree_im2col_mmt4d = IreeWrapper(self._iree_benchmark_binary_path,
                                       model_im2col_mmt4d_name,
                                       iree_im2col_mmt4d_model_path,
-                                      self._function_input, driver=driver)
+                                      self._function_input,
+                                      driver=driver)
       commands.append(iree_im2col_mmt4d)
 
     return commands
@@ -153,43 +164,57 @@ class SimpleCommandFactory(BenchmarkCommandFactory):
     commands = []
     tflite_model_path = os.path.join(self._base_dir, "models", "tflite",
                                      self._model_name + ".tflite")
-    tflite = TfliteWrapper(self._tflite_benchmark_binary_path, self._model_name,
-                           tflite_model_path, self._input_name,
-                           self._input_layer, driver="gpu")
+    tflite = TfliteWrapper(self._tflite_benchmark_binary_path,
+                           self._model_name,
+                           tflite_model_path,
+                           self._input_name,
+                           self._input_layer,
+                           driver="gpu")
     tflite.args.append("--gpu_precision_loss_allowed=false")
     commands.append(tflite)
 
     tflite_noxnn = TfliteWrapper(self._tflite_benchmark_binary_path,
-                                 self._model_name + "_noxnn", tflite_model_path,
-                                 self._input_name, self._input_layer,
+                                 self._model_name + "_noxnn",
+                                 tflite_model_path,
+                                 self._input_name,
+                                 self._input_layer,
                                  driver="gpu")
     tflite.args.append("--use_xnnpack=false")
     commands.append(tflite_noxnn)
 
     tflite_fp16 = TfliteWrapper(self._tflite_benchmark_binary_path,
-                                self._model_name + "_fp16", tflite_model_path,
-                                self._input_name, self._input_layer,
+                                self._model_name + "_fp16",
+                                tflite_model_path,
+                                self._input_name,
+                                self._input_layer,
                                 driver="gpu")
     tflite.args.append("--gpu_precision_loss_allowed=true")
     commands.append(tflite_fp16)
 
     iree_model_path = os.path.join(self._base_dir, "models", "iree", driver,
                                    self._model_name + ".vmfb")
-    iree = IreeWrapper(self._iree_benchmark_binary_path, self._model_name,
-                       iree_model_path, self._function_input, driver=driver)
+    iree = IreeWrapper(self._iree_benchmark_binary_path,
+                       self._model_name,
+                       iree_model_path,
+                       self._function_input,
+                       driver=driver)
     commands.append(iree)
 
     iree_model_path = os.path.join(self._base_dir, "models", "iree", driver,
                                    self._model_name + "_fp16.vmfb")
     iree = IreeWrapper(self._iree_benchmark_binary_path,
-                       self._model_name + "_fp16", iree_model_path,
-                       self._function_input, driver=driver)
+                       self._model_name + "_fp16",
+                       iree_model_path,
+                       self._function_input,
+                       driver=driver)
     commands.append(iree)
 
     iree_model_path = os.path.join(self._base_dir, "models", "iree", driver,
                                    self._model_name + "_padfuse.vmfb")
     iree = IreeWrapper(self._iree_benchmark_binary_path,
-                       self._model_name + "_padfuse", iree_model_path,
-                       self._function_input, driver=driver)
+                       self._model_name + "_padfuse",
+                       iree_model_path,
+                       self._function_input,
+                       driver=driver)
     commands.append(iree)
     return commands
