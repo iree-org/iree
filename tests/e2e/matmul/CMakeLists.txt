@@ -22,9 +22,7 @@ iree_generated_trace_runner_test(
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "llvm-cpu"
-    "vmvx"
   DRIVERS
-    "local-task"
     "local-task"
 )
 
@@ -40,9 +38,7 @@ iree_generated_trace_runner_test(
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "llvm-cpu"
-    "vmvx"
   DRIVERS
-    "local-task"
     "local-task"
 )
 
@@ -176,6 +172,86 @@ iree_generated_trace_runner_test(
 
 iree_generated_trace_runner_test(
   NAME
+    e2e_matmul_direct_i8_small_ukernel
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=i8"
+    "--shapes=small"
+  TRACE_RUNNER
+    iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "vmvx"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-vmvx-enable-microkernels"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_direct_f32_small_ukernel
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--shapes=small"
+  TRACE_RUNNER
+    iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "vmvx"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-vmvx-enable-microkernels"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_mmt4d_i8_small_ukernel
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=i8"
+    "--shapes=small"
+  TRACE_RUNNER
+    iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "vmvx"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-vmvx-enable-microkernels"
+    "--iree-flow-mmt4d-target-options=enable_generic_slow #pass_options_variant#"
+  TARGET_CPU_FEATURES_VARIANTS
+    "default"
+    "aarch64:+dotprod"
+    "aarch64:+i8mm"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_mmt4d_f32_small_ukernel
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--shapes=small"
+  TRACE_RUNNER
+    iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "vmvx"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-vmvx-enable-microkernels"
+    "--iree-flow-mmt4d-target-options=enable_generic_slow #pass_options_variant#"
+  TARGET_CPU_FEATURES_VARIANTS
+    "default"
+)
+
+iree_generated_trace_runner_test(
+  NAME
     e2e_matmul_direct_f32_gpu_large_LLVMGPUMatmulSimt
   GENERATOR
     "generate_e2e_matmul_tests.py"
@@ -250,7 +326,7 @@ iree_generated_trace_runner_test(
 
 iree_generated_trace_runner_test(
   NAME
-    e2e_matmul_direct_f32_gpu_large_valhall-unknown-android11
+    e2e_matmul_direct_f32_gpu_large_valhall-unknown-android31
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -264,7 +340,7 @@ iree_generated_trace_runner_test(
   DRIVERS
     "vulkan"
   COMPILER_FLAGS
-    "--iree-vulkan-target-triple=valhall-unknown-android11"
+    "--iree-vulkan-target-triple=valhall-unknown-android31"
   LABELS
     "requires-gpu-nvidia"
 )

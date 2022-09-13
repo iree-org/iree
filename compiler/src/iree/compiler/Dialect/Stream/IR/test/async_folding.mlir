@@ -184,6 +184,30 @@ func.func @RedundantTransferElision(%arg0: !stream.resource<transient>, %arg1: i
 
 // -----
 
+// CHECK-LABEL: @FoldAsyncLoadBitcast
+func.func @FoldAsyncLoadBitcast(%arg0: !stream.resource<staging>, %arg1: index) -> f32 {
+  %c0 = arith.constant 0 : index
+  // CHECK: %[[F32:.+]] = stream.async.load %arg0[%c0] : !stream.resource<staging>{%arg1} -> f32
+  %0 = stream.async.load %arg0[%c0] : !stream.resource<staging>{%arg1} -> i32
+  // CHECK-NOT: arith.bitcast
+  %1 = arith.bitcast %0 : i32 to f32
+  // CHECK: return %[[F32]]
+  return %1 : f32
+}
+
+// -----
+
+// CHECK-LABEL: @FoldAsyncStoreBitcast
+func.func @FoldAsyncStoreBitcast(%arg0: !stream.resource<staging>, %arg1: index, %arg2: f32) -> !stream.resource<staging> {
+  %c0 = arith.constant 0 : index
+  %0 = arith.bitcast %arg2 : f32 to i32
+  // CHECK: = stream.async.store %arg2, %arg0[%c0] : f32 -> %arg0 as !stream.resource<staging>{%arg1}
+  %1 = stream.async.store %0, %arg0[%c0] : i32 -> %arg0 as !stream.resource<staging>{%arg1}
+  return %1 : !stream.resource<staging>
+}
+
+// -----
+
 // CHECK-LABEL: @ElideImmediateAsyncExecuteWaits
 func.func @ElideImmediateAsyncExecuteWaits(%arg0: !stream.resource<*>, %arg1: index) -> (!stream.resource<*>, !stream.timepoint) {
   %c1 = arith.constant 1 : index

@@ -28,7 +28,6 @@ py_binary(
     ],
     target_backends_and_drivers = [
         ("llvm-cpu", "local-task"),
-        ("vmvx", "local-task"),
     ],
     trace_runner = "//tools:iree-e2e-matmul-test",
 ) for lhs_rhs_type in [
@@ -113,6 +112,52 @@ py_binary(
     "f32",
 ] for size in [
     "small",
+]]
+
+# Test VMVX+ukernel, direct (not mmt4d)
+[iree_generated_trace_runner_test(
+    name = "e2e_matmul_direct_%s_small_ukernel" % lhs_rhs_type,
+    compiler_flags = [
+        "--iree-vmvx-enable-microkernels",
+    ],
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs_rhs_type=%s" % lhs_rhs_type,
+        "--shapes=small",
+    ],
+    target_backends_and_drivers = [
+        ("vmvx", "local-task"),
+    ],
+    trace_runner = "//tools:iree-e2e-matmul-test",
+) for lhs_rhs_type in [
+    "i8",
+    "f32",
+]]
+
+# Test VMVX+ukernel, mmt4d, with target CPU features variants relevant to each
+# lhs_rhs_type.
+[iree_generated_trace_runner_test(
+    name = "e2e_matmul_mmt4d_%s_small_ukernel" % lhs_rhs_type,
+    compiler_flags = [
+        "--iree-vmvx-enable-microkernels",
+        "--iree-flow-mmt4d-target-options=enable_generic_slow #pass_options_variant#",
+    ],
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs_rhs_type=%s" % lhs_rhs_type,
+        "--shapes=small",
+    ],
+    target_backends_and_drivers = [
+        ("vmvx", "local-task"),
+    ],
+    target_cpu_features_variants = ["default"] + ([
+        "aarch64:+dotprod",
+        "aarch64:+i8mm",
+    ] if lhs_rhs_type == "i8" else []),
+    trace_runner = "//tools:iree-e2e-matmul-test",
+) for lhs_rhs_type in [
+    "i8",
+    "f32",
 ]]
 
 [iree_generated_trace_runner_test(
@@ -213,7 +258,7 @@ py_binary(
     ],
     trace_runner = "//tools:iree-e2e-matmul-test",
 ) for vulkan_target in [
-    "valhall-unknown-android11",
+    "valhall-unknown-android31",
     "ampere-unknown-linux",
 ]]
 

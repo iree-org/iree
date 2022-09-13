@@ -22,6 +22,8 @@ include(CMakeParseArguments)
 #     "iree-compile".
 # C_IDENTIFIER: Identifier to use for generate c embed code.
 #     If omitted then no C embed code will be generated.
+# STATIC_LIB_PATH: When added, the module is compiled into a LLVM static
+#     library with the specified library path.
 # FRIENDLY_NAME: Optional. Name to use to display build progress info.
 # PUBLIC: Add this so that this library will be exported under ${PACKAGE}::
 #     Also in IDE, target will appear in ${PACKAGE} folder while non PUBLIC
@@ -39,13 +41,18 @@ function(iree_bytecode_module)
   cmake_parse_arguments(
     _RULE
     "PUBLIC;TESTONLY"
-    "NAME;SRC;MODULE_FILE_NAME;COMPILE_TOOL;C_IDENTIFIER;FRIENDLY_NAME"
+    "NAME;SRC;MODULE_FILE_NAME;COMPILE_TOOL;C_IDENTIFIER;FRIENDLY_NAME;STATIC_LIB_PATH"
     "FLAGS;DEPENDS;DEPS"
     ${ARGN}
   )
 
   if(_RULE_TESTONLY AND NOT IREE_BUILD_TESTS)
     return()
+  endif()
+
+  if(_RULE_STATIC_LIB_PATH AND
+     NOT (IREE_TARGET_BACKEND_LLVM_CPU OR DEFINED IREE_HOST_BINARY_ROOT))
+    message(SEND_ERROR "Static library only supports llvm-cpu backend")
   endif()
 
   # Set default for COMPILE_TOOL.
@@ -90,6 +97,27 @@ function(iree_bytecode_module)
     list(APPEND _ARGS "--iree-llvm-sanitize=thread")
   endif()
 
+  set(_OUTPUT_FILES "${_MODULE_FILE_NAME}")
+  # Check LLVM static library setting. If the static libary output path is set,
+  # retrieve the object path and the corresponding header file path.
+  if(_RULE_STATIC_LIB_PATH)
+    list(APPEND _ARGS "--iree-llvm-link-embedded=false")
+    list(APPEND _ARGS "--iree-llvm-link-static")
+    list(APPEND _ARGS "--iree-llvm-static-library-output-path=${_RULE_STATIC_LIB_PATH}")
+
+    string(REPLACE ".o" ".h" _STATIC_HDR_PATH "${_RULE_STATIC_LIB_PATH}")
+    list(APPEND _OUTPUT_FILES "${_RULE_STATIC_LIB_PATH}" "${_STATIC_HDR_PATH}")
+  endif()
+
+  if(CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv" AND
+    RISCV_CPU STREQUAL "rv64" AND
+    NOT _RULE_FLAGS MATCHES "iree-llvm-target-triple")
+    # RV64 Linux crosscompile toolchain can support iree-compile with
+    # specific CPU flags. Add the llvm flags to support RV64 RVV codegen if
+    # llvm-target-triple is not specified.
+    list(APPEND _RULE_FLAGS ${RISCV64_TEST_DEFAULT_LLVM_FLAGS})
+  endif()
+
   if(_RULE_FRIENDLY_NAME)
     set(_FRIENDLY_NAME "${_RULE_FRIENDLY_NAME}")
   else()
@@ -100,7 +128,7 @@ function(iree_bytecode_module)
   # a target in this CMake invocation when cross-compiling.
   add_custom_command(
     OUTPUT
-      "${_MODULE_FILE_NAME}"
+      ${_OUTPUT_FILES}
     COMMAND
       ${_COMPILE_TOOL_EXECUTABLE}
       ${_ARGS}

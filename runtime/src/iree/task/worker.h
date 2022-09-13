@@ -37,17 +37,15 @@ extern "C" {
 // that for example all states after resuming are > SUSPENDED and all states
 // before exiting are < EXITING.
 typedef enum iree_task_worker_state_e {
-  // Worker has been created in a suspended state and must be resumed to wake.
-  IREE_TASK_WORKER_STATE_SUSPENDED = 0,
   // Worker is idle or actively processing tasks (either its own or others).
-  IREE_TASK_WORKER_STATE_RUNNING = 1,
+  IREE_TASK_WORKER_STATE_RUNNING = 0,
   // Worker should exit (or is exiting) and will soon enter the zombie state.
   // Coordinators can request workers to exit by setting their state to this and
   // then waking.
-  IREE_TASK_WORKER_STATE_EXITING = 2,
+  IREE_TASK_WORKER_STATE_EXITING = 1,
   // Worker has exited and entered a 🧟 state (waiting for join).
   // The thread handle is still valid and must be destroyed.
-  IREE_TASK_WORKER_STATE_ZOMBIE = 3,
+  IREE_TASK_WORKER_STATE_ZOMBIE = 2,
 } iree_task_worker_state_t;
 
 // A worker within the executor pool.

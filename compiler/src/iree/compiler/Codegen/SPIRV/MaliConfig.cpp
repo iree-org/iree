@@ -22,6 +22,19 @@ namespace mlir {
 namespace iree_compiler {
 namespace detail {
 
+static LogicalResult setMaliMatmulConfig(linalg::LinalgOp op,
+                                         int subgroupSize) {
+  const std::array<int64_t, 2> workgroupXY = {subgroupSize / 2, 2};
+  std::array<int64_t, 3> threadMNK;
+  auto inputType = op.inputs()[0].getType().cast<ShapedType>();
+  if (inputType.getElementType().isF16()) {
+    threadMNK = {2, 8, 8};
+  } else {
+    threadMNK = {6, 4, 4};
+  }
+  return setMatmulOpConfig(op, subgroupSize, workgroupXY, threadMNK);
+}
+
 //===----------------------------------------------------------------------===//
 // Entry Point
 //===----------------------------------------------------------------------===//
@@ -29,18 +42,15 @@ namespace detail {
 LogicalResult setMaliCodeGenConfig(const spirv::TargetEnv &targetEnv,
                                    Operation *rootOp) {
   int subgroupSize = targetEnv.getResourceLimits().getSubgroupSize();
+
+  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp)) {
+    if (isMatmulOrBatchMatmul(linalgOp))
+      return setMaliMatmulConfig(linalgOp, subgroupSize);
+  }
+
   return TypeSwitch<Operation *, LogicalResult>(rootOp)
       .Case<linalg::BatchMatmulOp, linalg::MatmulOp>([subgroupSize](auto op) {
-        std::array<int64_t, 2> workgroupXY = {subgroupSize / 2, 2};
-        std::array<int64_t, 3> threadMNK;
-        auto inputType =
-            op.getInputs()[0].getType().template cast<ShapedType>();
-        if (inputType.getElementType().isF16()) {
-          threadMNK = {2, 8, 8};
-        } else {
-          threadMNK = {6, 4, 4};
-        }
-        return setMatmulOpConfig(op, subgroupSize, workgroupXY, threadMNK);
+        return setMaliMatmulConfig(op, subgroupSize);
       })
       .Case<linalg::Conv2DNhwcHwcfOp>([subgroupSize](auto op) {
         bool hasPaddedInput =

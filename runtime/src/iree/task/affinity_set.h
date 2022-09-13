@@ -44,6 +44,8 @@ static inline iree_task_affinity_set_t iree_task_affinity_for_any_worker(void) {
   return UINT64_MAX;
 }
 
+#define iree_task_affinity_set_count_leading_zeros \
+  iree_math_count_leading_zeros_u64
 #define iree_task_affinity_set_count_trailing_zeros \
   iree_math_count_trailing_zeros_u64
 #define iree_task_affinity_set_count_ones iree_math_count_ones_u64

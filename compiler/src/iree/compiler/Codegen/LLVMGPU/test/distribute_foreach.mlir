@@ -8,7 +8,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
          attributes {translation_info = #iree_codegen.translation_info<LLVMGPUVectorize>,
                      workgroup_size = [64 : index, 1 : index, 1 : index]} {
   ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
-    %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
+    %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
     hal.return %x, %y, %z : index, index, index
   }
   builtin.module {
@@ -28,7 +28,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
       %4 = memref.subview %2[%workgroup_id_y, %3] [1, 256] [1, 1] : memref<233x1024xf32> to memref<1x256xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
       %5 = memref.subview %0[%workgroup_id_y, %3] [1, 256] [1, 1] : memref<233x1024xf32> to memref<1x256xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
       %6 = memref.subview %1[%workgroup_id_y, %3] [1, 256] [1, 1] : memref<233x1024xf32> to memref<1x256xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-      scf.foreach_thread (%arg0) in (%c64) -> () {
+      scf.foreach_thread (%arg0) in (%c64) shared_outs() -> () {
         %7 = affine.apply affine_map<(d0) -> (d0 * 4)>(%arg0)
         %8 = memref.subview %4[0, %7] [1, 4] [1, 1] : memref<1x256xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<1x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
         %9 = vector.transfer_read %5[%c0, %7], %cst {in_bounds = [true]} : memref<1x256xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>

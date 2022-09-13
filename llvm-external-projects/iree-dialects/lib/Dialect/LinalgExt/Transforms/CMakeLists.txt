@@ -3,6 +3,7 @@ add_mlir_library(IREELinalgExtTransforms
   ForeachThreadToSequentialFor.cpp
   Fusion.cpp
   Tiling.cpp
+  Transforms.cpp
   Utils.cpp
 
   PARTIAL_SOURCES_INTENDED

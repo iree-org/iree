@@ -215,6 +215,9 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_initialize(
     iree_vm_state_resolver_t state_resolver, iree_allocator_t allocator,
     iree_vm_stack_t** out_stack);
 
+// Resets the stack to its initial state by popping all stack frames.
+IREE_API_EXPORT void iree_vm_stack_reset(iree_vm_stack_t* stack);
+
 // Deinitializes a statically-allocated |stack| previously initialized with
 // iree_vm_stack_initialize.
 IREE_API_EXPORT void iree_vm_stack_deinitialize(iree_vm_stack_t* stack);

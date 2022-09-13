@@ -4,40 +4,23 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "mmt4d.h"
-#include "mmt4d_generic.h"
+#include "iree/builtins/ukernel/mmt4d_arm_64.h"
+
+// TODO: once actual ARM64 code is implemented, we shouldn't need this anymore
+#include "iree/builtins/ukernel/mmt4d_generic.h"
 
 #if defined(IREE_UKERNEL_ARCH_ARM_64)
 
-//===----------------------------------------------------------------------===//
-// Target-specific queries
-//===----------------------------------------------------------------------===//
-// These are substituted with values from the compiler and must not be specified
-// here in C before we generate the IR.
-
-#if defined(IREE_UKERNEL_PLATFORM_EXAMPLE_FLAG)
-// Set by command-line logic:
-static const int iree_microkernels_platform_example_flag =
-    IREE_UKERNEL_PLATFORM_EXAMPLE_FLAG;
-#else
-// Set by IREE AOT compiler:
-extern int iree_microkernels_platform_example_flag;
-#endif  // IREE_UKERNEL_PLATFORM_EXAMPLE_FLAG
-
-//===----------------------------------------------------------------------===//
-// Public API
-//===----------------------------------------------------------------------===//
-
-// This is just an example exporting the reference method.
-// Implementations can do this when they don't otherwise have a code-path that
-// covers a particular case and here we have no code-paths :)
-IREE_UKERNEL_EXPORT int iree_mmt4d_example_matmul_f32(
-    const float* lhs, iree_ukernel_size_t lhs_stride, const float* rhs,
-    iree_ukernel_size_t rhs_stride, float* IREE_RESTRICT out,
-    iree_ukernel_size_t out_stride, int32_t m, int32_t n, int32_t k,
-    float alpha, float beta) {
-  return iree_mmt4d_example_matmul_f32_generic(
-      lhs, lhs_stride, rhs, rhs_stride, out, out_stride, m, n, k, alpha, beta);
+int iree_ukernel_mmt4d_f32f32f32_arm_64(
+    const iree_ukernel_mmt4d_f32f32f32_params_t* params) {
+  // TODO: implement actual arm assembly kernels instead of calling _generic.
+  return iree_ukernel_mmt4d_f32f32f32_generic(params);
 }
 
-#endif  // IREE_MMT4D_ARCH_ARM_64
+int iree_ukernel_mmt4d_i8i8i32_arm_64(
+    const iree_ukernel_mmt4d_i8i8i32_params_t* params) {
+  // TODO: implement actual arm assembly kernels instead of calling _generic.
+  return iree_ukernel_mmt4d_i8i8i32_generic(params);
+}
+
+#endif  // IREE_UKERNEL_ARCH_ARM_64

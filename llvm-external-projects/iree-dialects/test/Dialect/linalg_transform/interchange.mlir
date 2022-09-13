@@ -30,7 +30,7 @@ transform.with_pdl_patterns {
     rewrite %0 with "transform.dialect"
   }
 
-  transform.structured.canonicalized_sequence %root {
+  transform.structured.canonicalized_sequence %root failures(propagate) {
   ^bb0(%arg0: !pdl.operation):
     %0 = pdl_match @pdl_target in %arg0
     transform.structured.interchange %0 {iterator_interchange = [1, 0]}

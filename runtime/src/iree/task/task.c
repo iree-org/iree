@@ -709,7 +709,7 @@ iree_task_dispatch_shard_t* iree_task_dispatch_shard_allocate(
 
 void iree_task_dispatch_shard_execute(
     iree_task_dispatch_shard_t* task, iree_cpu_processor_id_t processor_id,
-    iree_byte_span_t worker_local_memory,
+    uint32_t worker_id, iree_byte_span_t worker_local_memory,
     iree_task_submission_t* pending_submission) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -745,6 +745,7 @@ void iree_task_dispatch_shard_execute(
          sizeof(tile_context.workgroup_count));
   uint32_t workgroup_count_x = tile_context.workgroup_count[0];
   uint32_t workgroup_count_y = tile_context.workgroup_count[1];
+  tile_context.worker_id = worker_id;
   tile_context.local_memory = local_memory;
 
   // We perform all our shard statistics work locally here and only push back to

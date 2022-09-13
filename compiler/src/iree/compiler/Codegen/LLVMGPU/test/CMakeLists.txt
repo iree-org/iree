@@ -25,13 +25,13 @@ iree_lit_test_suite(
     "nvvm_pipeline_test.mlir"
     "reduce_bank_conflicts.mlir"
     "rocdl_pipeline_test.mlir"
+    "tensor_alloc.mlir"
     "tensorcore_vectorization.mlir"
     "tile_on_tensor.mlir"
     "transform_dialect_bufferize.mlir"
     "transform_dialect_vector_distribution.mlir"
+    "transpose_pipeline_test.mlir"
     "vector_to_gpu.mlir"
-    "vectorization.mlir"
-    "warp_reduction.mlir"
   TOOLS
     FileCheck
     iree-opt

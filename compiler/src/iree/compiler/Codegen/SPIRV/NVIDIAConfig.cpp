@@ -109,6 +109,14 @@ static LogicalResult setOpConfig(const spirv::TargetEnv &targetEnv,
       workgroupSize);
 }
 
+static LogicalResult setNVIDIAMatmulConfig(linalg::LinalgOp op,
+                                           int subgroupSize) {
+  const std::array<int64_t, 2> workgroupXY = {subgroupSize, 8};
+  const std::array<int64_t, 3> threadMNK = {4, 4, 32};
+  return setMatmulOpConfig(op, subgroupSize, workgroupXY, threadMNK,
+                           /*useWorkgroupMemory=*/true);
+}
+
 // Volta architecture:
 // https://docs.nvidia.com/cuda/volta-tuning-guide/index.html#sm-occupancy
 //
@@ -149,14 +157,16 @@ LogicalResult setNVIDIACodeGenConfig(const spirv::TargetEnv &targetEnv,
     if (getLoweringConfig(rootOp)) return success();
   }
 
-  if (isa<linalg::BatchMatmulOp, linalg::MatmulOp>(rootOp)) {
-    std::array<int64_t, 2> workgroupXY = {subgroupSize, 8};
-    std::array<int64_t, 3> threadMNK = {4, 4, 32};
-    return setMatmulOpConfig(rootOp, subgroupSize, workgroupXY, threadMNK,
-                             /*useWorkgroupMemory=*/true);
+  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp)) {
+    if (isMatmulOrBatchMatmul(linalgOp))
+      return setNVIDIAMatmulConfig(linalgOp, subgroupSize);
   }
 
-  return success();
+  return TypeSwitch<Operation *, LogicalResult>(rootOp)
+      .Case<linalg::BatchMatmulOp, linalg::MatmulOp>([subgroupSize](auto op) {
+        return setNVIDIAMatmulConfig(op, subgroupSize);
+      })
+      .Default([](Operation *) { return success(); });
 }
 
 }  // namespace detail

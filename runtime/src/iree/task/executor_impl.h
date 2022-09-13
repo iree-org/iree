@@ -34,6 +34,10 @@ struct iree_task_executor_t {
   // TODO(benvanik): make mutable; currently always the same reserved value.
   iree_task_scheduling_mode_t scheduling_mode;
 
+  // Time each worker should spin before parking itself to wait for more work.
+  // IREE_DURATION_ZERO is used to disable spinning.
+  iree_duration_t worker_spin_ns;
+
   // State used by the work-stealing operations performed by donated threads.
   // This is **NOT SYNCHRONIZED** and relies on the fact that we actually don't
   // much care about the precise selection of workers enough to mind any tears
@@ -98,13 +102,6 @@ struct iree_task_executor_t {
   // needs a cheap (single relaxed atomic op) approximation of all N workers'
   // live state without having to perform N expensive atomic ops.
   iree_atomic_task_affinity_set_t worker_live_mask;
-
-  // A bitset indicating which workers may be suspended and need to be resumed
-  // via iree_thread_resume prior to them being able to execute work.
-  //
-  // This mask is just a hint, accessed with memory_order_relaxed. See the
-  // comment on worker_live_mask.
-  iree_atomic_task_affinity_set_t worker_suspend_mask;
 
   // A bitset indicating which workers are currently idle. Used to bias incoming
   // tasks to workers that aren't doing much else. This is a balance of latency

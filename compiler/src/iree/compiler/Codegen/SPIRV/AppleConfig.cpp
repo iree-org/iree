@@ -21,6 +21,13 @@ namespace mlir {
 namespace iree_compiler {
 namespace detail {
 
+static LogicalResult setAppleMatmulConfig(linalg::LinalgOp op,
+                                          int subgroupSize) {
+  const std::array<int64_t, 2> workgroupXY = {256, 1};
+  const std::array<int64_t, 3> threadMNK = {4, 4, 4};
+  return setMatmulOpConfig(op, subgroupSize, workgroupXY, threadMNK);
+}
+
 //===----------------------------------------------------------------------===//
 // Entry Point
 //===----------------------------------------------------------------------===//
@@ -28,11 +35,15 @@ namespace detail {
 LogicalResult setAppleCodeGenConfig(const spirv::TargetEnv &targetEnv,
                                     Operation *rootOp) {
   int subgroupSize = targetEnv.getResourceLimits().getSubgroupSize();
+
+  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp)) {
+    if (isMatmulOrBatchMatmul(linalgOp))
+      return setAppleMatmulConfig(linalgOp, subgroupSize);
+  }
+
   return TypeSwitch<Operation *, LogicalResult>(rootOp)
       .Case<linalg::BatchMatmulOp, linalg::MatmulOp>([subgroupSize](auto op) {
-        std::array<int64_t, 2> workgroupXY = {256, 1};
-        std::array<int64_t, 3> threadMNK = {4, 4, 4};
-        return setMatmulOpConfig(op, subgroupSize, workgroupXY, threadMNK);
+        return setAppleMatmulConfig(op, subgroupSize);
       })
       .Case<linalg::Conv2DNhwcHwcfOp>([subgroupSize](auto op) {
         return setConvOpConfig(op, subgroupSize,

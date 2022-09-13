@@ -10,12 +10,22 @@
 #include "mlir/Dialect/PDL/IR/PDLTypes.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 
+namespace mlir {
+class DialectRegistry;
+
+namespace func {
+class FuncOp;
+}  // namespace func
+
+namespace scf {
+class ForeachThreadOp;
+}  // namespace scf
+}  // namespace mlir
+
 #define GET_OP_CLASSES
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensionsOps.h.inc"
 
 namespace mlir {
-class DialectRegistry;
-
 namespace iree_compiler {
 
 /// Registers common transformations that require IREE-specific information

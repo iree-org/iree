@@ -27,7 +27,7 @@ iree_benchmark_suite(
     "linux-cuda"
 
   MODULES
-    "${MINILM_L12_H384_UNCASED_INT32_MODULE}"
+    "${MINILM_L12_H384_UNCASED_INT32_SEQLEN128_MODULE}"
 
   BENCHMARK_MODES
     "full-inference,default-flags"

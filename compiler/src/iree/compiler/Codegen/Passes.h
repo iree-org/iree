@@ -147,6 +147,27 @@ std::unique_ptr<OperationPass<func::FuncOp>> createPadDynamicAlloc();
 std::unique_ptr<Pass> createTransformDialectInterpreterPass(
     llvm::StringRef transformFileName = llvm::StringRef());
 
+/// Convert Linalg ops to Vector.
+std::unique_ptr<OperationPass<func::FuncOp>> createGPUVectorizationPass(
+    bool generateContract = true);
+
+// Distributes vector ops to all threads/warps in a GPU workgroup.
+// `getWarpSize` is for deciding the warp size to use; it takes the
+// current function containing those vector ops as the argument.
+// If nullptr, warp size 32 will be used.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createConvertVectorReductionToGPUPass(
+    std::function<int(func::FuncOp)> getWarpSize = nullptr);
+
+/// Fuses tensor.pad ops into their consumer ops' tiled loop nests.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createFuseTensorPadWithConsumerPass();
+
+/// Concretizes tensor.pad op's result shape if its source op implements
+/// OffsetSizeAndStrideOpInterface. For example, pad(extract_slice).
+std::unique_ptr<OperationPass<func::FuncOp>>
+createConcretizePadResultShapePass();
+
 //----------------------------------------------------------------------------//
 // Common codegen patterns.
 //----------------------------------------------------------------------------//
@@ -173,6 +194,11 @@ void populateLinalgToVectorVectorizeConvPatterns(MLIRContext *context,
 /// out of bound semantics.
 void populateVectorizePadPatterns(RewritePatternSet &patterns,
                                   PatternBenefit baseBenefit = 1);
+
+/// Populates patterns with patterns to concretize tensor.pad op'ss result
+/// shape.
+void populateConcretizePadResultShapePatterns(MLIRContext *context,
+                                              RewritePatternSet &patterns);
 
 //------------------------------------------------------------------------------
 // LLVMCPU
@@ -312,6 +338,14 @@ LogicalResult verifyGPUMatmulTensorCorePipeline(
 void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
                                         unsigned pipelineDepth);
 
+enum class GPUPromoteSharedMemPattern {
+  ContractionOpPattern = 0,
+  TransposeOpPattern = 1,
+};
+
+/// Lowering transpose using shared memory.
+void addGPUTransposePassPipeline(OpPassManager &pm);
+
 /// Lowering reductions to warp reductions.
 void addGPUWarpReductionPassPipeline(OpPassManager &pm);
 
@@ -336,20 +370,20 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToROCDLPass();
 
 /// Perform tiling and distribution to threads.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTileAndDistribute(
-    bool distributeToWarp = false);
+    bool distributeToWarp = false,
+    GPUPromoteSharedMemPattern promoteSharedMemPattern =
+        GPUPromoteSharedMemPattern::ContractionOpPattern);
 
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTileTensor(
     bool distributeToWarp = false);
 
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUDistribute();
 
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTensorAlloc();
+
 /// Create pass calling the dynamic pipeline for LLVMGPU.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createLLVMGPULowerExecutableTargetPass();
-
-/// Convert Linalg ops to Vector.
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorizationPass(
-    int64_t nativeVector = 4, bool generateContract = true);
 
 /// Convert Linalg ops to Vector and prepare converstion to GPU MMA ops.
 std::unique_ptr<OperationPass<func::FuncOp>>
@@ -363,48 +397,48 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUMultiBuffering(
     unsigned numBuffers = 5);
 
 /// Apply transformation to reduce the number of bank conflicts when accessing
-/// shared memory.
+/// shared memory by padding fastest moving dimension with the specified size.
 std::unique_ptr<OperationPass<func::FuncOp>>
-createLLVMGPUReduceSharedMemoryBankConflicts();
+createLLVMGPUReduceSharedMemoryBankConflicts(int64_t paddingSizeBits = 128);
 
 /// Converts vector ops to gpu dialect.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorToGPU();
-
-// Distribute vector ops.
-std::unique_ptr<OperationPass<func::FuncOp>>
-createConvertVectorReductionToGPUPass();
 
 //------------------------------------------------------------------------------
 // SPIR-V Passes
 //------------------------------------------------------------------------------
 
-/// Pass pipeline to lower IREE HAL executables with workgroup tiled and
-/// distributed Linalg ops to SPIR-V scalar code. Additionally performs
-/// distribution to threads without vectorization.
+/// Pass pipeline to lower IREE HAL executables by tiling and distributing to
+/// workgroups and invocations. Each invocation handles a scalar.
 void addSPIRVTileAndDistributePassPipeline(OpPassManager &pm);
 
-/// Pass pipeline to lower IREE HAL executables with workgroup tiled and
-/// distributed Linalg ops to SPIR-V scalar and vector code. Additionally
-/// performs distribution to threads with vectorization.
+/// Pass pipeline to lower IREE HAL executables by tiling and distributing to
+/// workgroups and invocations and vectorizing. Each invocation handles a
+/// vector.
 void addSPIRVTileAndVectorizePassPipeline(OpPassManager &pm);
 
-/// Pass pipeline to lower IREE HAL executables with workgroup tiled and
-/// distributed Linalg ops to SPIR-V cooperative matrix code. Additionally
-/// performs distribution to threads with vectorization.
+/// Pass pipeline to lower IREE HAL executables by tiling and distributing
+/// to workgroups and subgroups and then vectorizing to SPIR-V cooperative
+/// matrix code.
 void addSPIRVTileAndVectorizeToCooperativeOpsPassPipeline(OpPassManager &pm);
 
-/// Pass pipeline to lower IREE HAL executables with workgroup tiled and
-/// distributed Linalg ops to SPIR-V scalar and vector code. Additionally
-/// performs distribution to threads with vectorization and promotion to use
-/// workgroup memory.
+/// Pass pipeline to lower IREE HAL executables by tiling and distributing to
+/// workgroups, promoting to use workgroup memory, and then tiling and
+/// distributing to invocations and vectorizing. Each invocation handles a
+/// vector.
 void addSPIRVTileAndVectorizeWithWorkgroupMemoryPassPipeline(OpPassManager &pm);
+
+/// Pass pipeline to lower IREE HAL executables by tiling and distributing
+/// reduction to workgroups and then subgroups.
+void addSPIRVSubgroupReducePassPipeline(OpPassManager &pm);
 
 /// Pass to perform the final conversion to SPIR-V dialect.
 ///
 /// This pass converts remaining interface ops into SPIR-V global variables,
 /// GPU processor ID ops into SPIR-V global variables, loop/standard ops into
 /// corresponding SPIR-V ops.
-std::unique_ptr<OperationPass<ModuleOp>> createConvertToSPIRVPass();
+std::unique_ptr<OperationPass<ModuleOp>> createConvertToSPIRVPass(
+    bool enableFastMath = false);
 
 /// Creates a pass to fold processor ID uses where possible.
 std::unique_ptr<OperationPass<func::FuncOp>>
@@ -447,10 +481,6 @@ std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVVectorizePass();
 /// having pointer bitcast.
 std::unique_ptr<OperationPass<ModuleOp>> createSPIRVVectorizeLoadStore();
 
-/// Fuses tensor.pad ops into their consumer ops' tiled loop nests.
-std::unique_ptr<OperationPass<func::FuncOp>>
-createSPIRVFuseTensorPadWithConsumerPass();
-
 // Uses `tensor.pad` ops as anchors to create separate fast and slow paths
 // inside the kernel. The fast path is for inner tiles where we don't need
 // padding, while the slow path is for boundary tiles where we do need padding.
@@ -461,14 +491,10 @@ createSPIRVCreateFastSlowPathPass();
 // SPIRV Codegen Pass Pipelines.
 //----------------------------------------------------------------------------//
 
-/// Populates passes needed to lower a XLA HLO op to SPIR-V dialect via the
-/// structured ops path. The pass manager `pm` in here operate on the module
-/// within the IREE::HAL::ExecutableOp. The `workGroupSize` can be used to
-/// control the work group size used in the code generation and is intended for
-/// testing purposes only. The pass pipeline will set an appropriate workgroup
-/// size.
-/// TODO: Are both of these needed and does this one still work on HLO?
-void buildSPIRVCodegenPassPipeline(OpPassManager &pm);
+/// Populates passes needed to lower linalg/arith/math ops to SPIR-V ops via the
+/// structured ops path. The pass manager `pm` here operate on the module
+/// within the IREE::HAL::ExecutableOp.
+void buildSPIRVCodegenPassPipeline(OpPassManager &pm, bool enableFastMath);
 
 //------------------------------------------------------------------------------
 // VMVX passes

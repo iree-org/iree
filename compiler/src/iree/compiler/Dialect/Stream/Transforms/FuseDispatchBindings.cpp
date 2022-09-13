@@ -96,8 +96,8 @@ static SmallVector<Binding> findCorrelatedBindings(
           std::get<1>(it.value())
               .cast<IREE::Stream::ResourceAccessBitfieldAttr>();
       if (!aliasMutableBindings &&
-          bitEnumContains(resourceAccess.getValue(),
-                          IREE::Stream::ResourceAccessBitfield::Write)) {
+          bitEnumContainsAll(resourceAccess.getValue(),
+                             IREE::Stream::ResourceAccessBitfield::Write)) {
         ec.insert(it.index());
         leaders.insert(std::make_pair(resource, it.index()));
         continue;

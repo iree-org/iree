@@ -36,7 +36,7 @@ class IREELinalgExt_Op<string mnemonic, list<Trait> traits = []> :
   let hasCustomAssemblyFormat = 1;
   code extraLinalgExtOpClassDeclaration = [{
     SmallVector<Value> getDestinationOperands(OpBuilder &b) {
-      SmallVector<Value> dest(outputs().begin(), outputs().end());
+      SmallVector<Value> dest(getOutputs().begin(), getOutputs().end());
       return dest;
     }
 
@@ -180,7 +180,7 @@ def IREELinalgExt_SortOp : IREELinalgExt_Op<"sort",
   }];
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
     Value operand(int index) {
-      return outputs()[index];
+      return getOutputs()[index];
     }
     ShapedType getOperandType(int index) {
       return operand(index).getType().cast<ShapedType>();
@@ -226,9 +226,9 @@ def IREELinalgExt_FftOp : IREELinalgExt_Op<"fft", [
     (`:` type($results)^)?
   }];
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
-    Value getStage() { return inputs()[0]; }
-    Value getReal() { return outputs()[0]; }
-    Value getImag() { return outputs()[1]; }
+    Value getStage() { return getInputs()[0]; }
+    Value getReal() { return getOutputs()[0]; }
+    Value getImag() { return getOutputs()[1]; }
     bool hasCoeff() { return getNumInputs() > 1; }
     void generateScalarImplWithoutCoeffBuf(
         OpBuilder & b, Location loc, ArrayRef<Value> operands, Value wholeSize);
@@ -236,11 +236,11 @@ def IREELinalgExt_FftOp : IREELinalgExt_Op<"fft", [
                                         ArrayRef<Value> operands);
     Value getRealCoeff() {
       if (!hasCoeff()) return Value();
-      return inputs()[1];
+      return getInputs()[1];
     }
     Value getImagCoeff() {
       if (!hasCoeff()) return Value();
-      return inputs()[2];
+      return getInputs()[2];
     }
     ShapedType getOperandType() {
       return getReal().getType().cast<ShapedType>();
@@ -356,7 +356,7 @@ def IREELinalgExt_ReverseOp : IREELinalgExt_Op<"reverse", [
     }
     SmallVector<int64_t> dims() {
       SmallVector<int64_t> ret;
-      for (const APInt& elem : dimensions()) {
+      for (const APInt& elem : getDimensions()) {
         ret.push_back(elem.getLimitedValue());
       }
       return ret;
@@ -434,7 +434,7 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
     }
   }];
 }
- 
+
 //===----------------------------------------------------------------------===//
 // Pure ops
 //===----------------------------------------------------------------------===//

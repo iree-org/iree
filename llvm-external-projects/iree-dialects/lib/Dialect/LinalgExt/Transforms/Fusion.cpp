@@ -37,13 +37,10 @@ FailureOr<FusionResult> LinalgExtFusionPattern::returningMatchAndRewrite(
     if (!producerOp || producerOp->getNumResults() != 1)
       return failure();
 
-    SmallVector<Value> destinationOperands =
-        producerOp.getDestinationOperands(rewriter);
-
     // Tile the producer.
     FailureOr<Value> tiledProducer = producerOp.generateResultTileValue(
-        rewriter, /*resultNumber=*/0, destinationOperands,
-        sliceOp.getMixedOffsets(), sliceOp.getMixedSizes(), true);
+        rewriter, /*resultNumber=*/0, sliceOp.getMixedOffsets(),
+        sliceOp.getMixedSizes());
     if (failed(tiledProducer))
       return failure();
     fusedOps.push_back(cast<TilingInterface>(tiledProducer->getDefiningOp()));

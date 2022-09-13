@@ -11,11 +11,13 @@
 #include <string.h>
 
 #include "iree/base/internal/arena.h"
+#include "iree/base/internal/cpu.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/local_task/task_command_buffer.h"
 #include "iree/hal/drivers/local_task/task_event.h"
 #include "iree/hal/drivers/local_task/task_queue.h"
 #include "iree/hal/drivers/local_task/task_semaphore.h"
+#include "iree/hal/local/executable_environment.h"
 #include "iree/hal/local/local_executable_cache.h"
 #include "iree/hal/local/local_pipeline_layout.h"
 #include "iree/hal/utils/buffer_transfer.h"
@@ -191,26 +193,25 @@ static iree_status_t iree_hal_task_device_query_i64(
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
   *out_value = 0;
 
-  if (iree_string_view_equal(category,
-                             iree_make_cstring_view("hal.executable.format"))) {
+  if (iree_string_view_equal(category, IREE_SV("hal.executable.format"))) {
     *out_value =
         iree_hal_query_any_executable_loader_support(
             device->loader_count, device->loaders, /*caching_mode=*/0, key)
             ? 1
             : 0;
     return iree_ok_status();
-  } else if (iree_string_view_equal(category,
-                                    iree_make_cstring_view("hal.device"))) {
-    if (iree_string_view_equal(key, iree_make_cstring_view("concurrency"))) {
+  } else if (iree_string_view_equal(category, IREE_SV("hal.device"))) {
+    if (iree_string_view_equal(key, IREE_SV("concurrency"))) {
       *out_value = (int64_t)device->queue_count;
       return iree_ok_status();
     }
-  } else if (iree_string_view_equal(category,
-                                    iree_make_cstring_view("hal.dispatch"))) {
-    if (iree_string_view_equal(key, iree_make_cstring_view("concurrency"))) {
+  } else if (iree_string_view_equal(category, IREE_SV("hal.dispatch"))) {
+    if (iree_string_view_equal(key, IREE_SV("concurrency"))) {
       *out_value = (int64_t)iree_task_executor_worker_count(device->executor);
       return iree_ok_status();
     }
+  } else if (iree_string_view_equal(category, IREE_SV("hal.cpu"))) {
+    return iree_cpu_lookup_data_by_key(key, out_value);
   }
 
   return iree_make_status(
@@ -269,7 +270,8 @@ static iree_status_t iree_hal_task_device_create_executable_cache(
     iree_loop_t loop, iree_hal_executable_cache_t** out_executable_cache) {
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
   return iree_hal_local_executable_cache_create(
-      identifier, device->loader_count, device->loaders,
+      identifier, iree_task_executor_worker_count(device->executor),
+      device->loader_count, device->loaders,
       iree_hal_device_host_allocator(base_device), out_executable_cache);
 }
 

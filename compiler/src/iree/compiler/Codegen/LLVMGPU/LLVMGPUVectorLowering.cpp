@@ -53,7 +53,7 @@ struct LLVMGPUVectorLoweringPass
     vectorToSCFOptions.enableFullUnroll();
     populateVectorToSCFConversionPatterns(vectorToLoopsPatterns,
                                           vectorToSCFOptions);
-    memref::populateFoldSubViewOpPatterns(vectorToLoopsPatterns);
+    memref::populateFoldMemRefAliasOpPatterns(vectorToLoopsPatterns);
     vector::populateVectorTransferLoweringPatterns(vectorToLoopsPatterns);
     if (failed(applyPatternsAndFoldGreedily(
             funcOp, std::move(vectorToLoopsPatterns)))) {

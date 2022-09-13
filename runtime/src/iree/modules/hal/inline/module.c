@@ -7,6 +7,7 @@
 #include "iree/modules/hal/inline/module.h"
 
 #include "iree/base/api.h"
+#include "iree/base/internal/cpu.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/utils/buffer_diagnostics.h"
@@ -389,20 +390,37 @@ IREE_VM_ABI_EXPORT(iree_hal_inline_module_buffer_storage,  //
 
 IREE_VM_ABI_EXPORT(iree_hal_inline_module_buffer_view_create,  //
                    iree_hal_inline_module_state_t,             //
-                   riiCID, r) {
+                   rIIiiCID, r) {
   iree_hal_buffer_t* source_buffer = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_check_deref(args->r0, &source_buffer));
-  iree_hal_element_type_t element_type = (iree_hal_element_type_t)args->i1;
-  iree_hal_encoding_type_t encoding_type = (iree_hal_encoding_type_t)args->i2;
+  iree_device_size_t source_offset = iree_hal_cast_device_size(args->i1);
+  iree_device_size_t source_length = iree_hal_cast_device_size(args->i2);
+  iree_hal_element_type_t element_type = (iree_hal_element_type_t)args->i3;
+  iree_hal_encoding_type_t encoding_type = (iree_hal_encoding_type_t)args->i4;
   iree_host_size_t shape_rank = 0;
   iree_hal_dim_t* shape_dims = NULL;
   // TODO(benvanik): avoid the cast/alloca if not required.
-  IREE_VM_ABI_VLA_STACK_CAST(args, a3_count, a3, iree_hal_dim_t, 128,
+  IREE_VM_ABI_VLA_STACK_CAST(args, a5_count, a5, iree_hal_dim_t, 128,
                              &shape_rank, &shape_dims);
+
+  iree_hal_buffer_t* subspan_buffer = NULL;
+  if (source_offset != 0 ||
+      source_length != iree_hal_buffer_byte_length(source_buffer)) {
+    IREE_RETURN_IF_ERROR(
+        iree_hal_buffer_subspan(source_buffer, source_offset, source_length,
+                                &subspan_buffer),
+        "invalid subspan of an existing buffer (source_offset=%" PRIdsz
+        ", length=%" PRIdsz ")",
+        source_offset, source_length);
+  }
+
   iree_hal_buffer_view_t* buffer_view = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create(
-      source_buffer, shape_rank, shape_dims, element_type, encoding_type,
-      state->host_allocator, &buffer_view));
+      subspan_buffer ? subspan_buffer : source_buffer, shape_rank, shape_dims,
+      element_type, encoding_type, state->host_allocator, &buffer_view));
+
+  iree_hal_buffer_release(subspan_buffer);
+
   rets->r0 = iree_hal_buffer_view_move_ref(buffer_view);
   return iree_ok_status();
 }
@@ -499,13 +517,13 @@ IREE_VM_ABI_EXPORT(iree_hal_inline_module_device_query_i64,  //
   // properties or user-provided ones. For now we could at least provide
   // compile-time configuration (like hosting architecture) but nothing dynamic
   // (like cache sizes).
-  // The full HAL asks iree_hal_device_t but we don't have that here:
-  //   iree_hal_device_query_i64(device, category_str, key_str, &value);
-  (void)category_str;
-  (void)key_str;
 
-  int64_t value = 0;
   iree_status_t query_status = iree_status_from_code(IREE_STATUS_NOT_FOUND);
+  int64_t value = 0;
+  if (iree_string_view_equal(category_str, IREE_SV("hal.cpu"))) {
+    query_status = iree_cpu_lookup_data_by_key(key_str, &value);
+  }
+
   rets->i0 = iree_status_consume_code(query_status) == IREE_STATUS_OK ? 1 : 0;
   rets->i1 = value;
   return iree_ok_status();

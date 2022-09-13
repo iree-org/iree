@@ -7,7 +7,7 @@
 #include <numeric>
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree-dialects/Dialect/LinalgExt/Passes/Transforms.h"
+#include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
@@ -18,6 +18,8 @@
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
+using mlir::iree_compiler::IREE::LinalgExt::TilingPatterns;
 
 #define DEBUG_TYPE "iree-llvmgpu-tile-tensor"
 
@@ -51,14 +53,13 @@ static void populateTilingReductionPatterns(RewritePatternSet &patterns) {
   linalg::LinalgTransformationFilter filter(
       ArrayRef<StringAttr>{
           StringAttr::get(context, getWorkgroupMemoryMarker())},
-      StringAttr::get(context, getVectorizeMarker()));
+      StringAttr::get(context, getWorkgroupKTiledMarker()));
   filter.setMatchByDefault();
-  linalg::TilingPatterns<linalg::MatmulOp, linalg::BatchMatmulOp,
-                         linalg::GenericOp>::insert(patterns, tilingOptions,
-                                                    filter);
+  TilingPatterns<linalg::MatmulOp, linalg::BatchMatmulOp,
+                 linalg::GenericOp>::insert(patterns, tilingOptions, filter);
 }
 
-static LogicalResult tileReduction(func::FuncOp funcOp) {
+LogicalResult tileReduction(func::FuncOp funcOp) {
   {
     // Tile again at the workgroup level since redution dimension were
     // ignored. Dimensions already tiled will be ignore since we tile to the
@@ -92,24 +93,22 @@ static LogicalResult tileParallelDims(func::FuncOp funcOp,
   std::array<int64_t, 3> elementPerWorkgroup = {
       distributeToWarp ? workgroupSize[0] / kWarpSize : workgroupSize[0],
       workgroupSize[1], workgroupSize[2]};
-  SmallVector<Operation *> computeOps;
-  SmallVector<LoopTilingAndDistributionInfo> tiledLoops;
-  if (failed(getComputeOps(funcOp, computeOps, tiledLoops))) {
-    return funcOp.emitOpError("failed to get compute ops");
-  }
+  SmallVector<TilingInterface> computeOps;
+  funcOp.walk([&](TilingInterface op) { computeOps.push_back(op); });
 
-  for (Operation *op : computeOps) {
-    auto tilingOp = dyn_cast<TilingInterface>(op);
-    if (!tilingOp) continue;
+  for (TilingInterface tilingOp : computeOps) {
     size_t numLoops = 0;
     for (auto type : tilingOp.getLoopIteratorTypes()) {
       if (type == getParallelIteratorTypeName()) numLoops++;
     }
-    IRRewriter rewriter(op->getContext());
-    rewriter.setInsertionPoint(op);
-    auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
+    IRRewriter rewriter(tilingOp->getContext());
+    rewriter.setInsertionPoint(tilingOp);
+    auto interfaceOp =
+        cast<PartitionableLoopsInterface>(*tilingOp.getOperation());
     auto partitionedLoops =
         interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
+    // If there are no dimensions to tile skip the transformation.
+    if (partitionedLoops.empty()) continue;
     SmallVector<OpFoldResult> numThreads(numLoops, rewriter.getIndexAttr(0));
     int64_t id = 0;
     int64_t threadId = 0;
@@ -126,7 +125,7 @@ static LogicalResult tileParallelDims(func::FuncOp funcOp,
 
     auto tilingResult =
         linalg::tileToForeachThreadOp(rewriter, tilingOp, numThreads, idDims);
-    rewriter.replaceOp(op, tilingResult->tileOp->getResults());
+    rewriter.replaceOp(tilingOp, tilingResult->tileOp->getResults());
   }
   return success();
 }

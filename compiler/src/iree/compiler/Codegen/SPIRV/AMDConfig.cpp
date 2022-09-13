@@ -23,6 +23,13 @@ namespace mlir {
 namespace iree_compiler {
 namespace detail {
 
+static LogicalResult setAMDMatmulConfig(linalg::LinalgOp op, int subgroupSize) {
+  const std::array<int64_t, 2> workgroupXY = {subgroupSize / 2, 8};
+  const std::array<int64_t, 3> threadMNK = {8, 4, 32};
+  return setMatmulOpConfig(op, subgroupSize, workgroupXY, threadMNK,
+                           /*useWorkgroupMemory=*/true);
+}
+
 // RDNA architecture:
 // https://gpuopen.com/wp-content/uploads/2019/08/RDNA_Architecture_public.pdf
 //
@@ -38,13 +45,17 @@ namespace detail {
 LogicalResult setAMDCodeGenConfig(const spirv::TargetEnv &targetEnv,
                                   Operation *rootOp) {
   int subgroupSize = targetEnv.getResourceLimits().getSubgroupSize();
-  if (auto matmulOp = dyn_cast<linalg::MatmulOp>(rootOp)) {
-    std::array<int64_t, 2> workgroupXY = {subgroupSize / 2, 8};
-    std::array<int64_t, 3> threadMNK = {8, 4, 32};
-    return setMatmulOpConfig(matmulOp, subgroupSize, workgroupXY, threadMNK,
-                             /*useWorkgroupMemory=*/true);
+
+  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp)) {
+    if (isMatmulOrBatchMatmul(linalgOp))
+      return setAMDMatmulConfig(linalgOp, subgroupSize);
   }
-  return success();
+
+  return TypeSwitch<Operation *, LogicalResult>(rootOp)
+      .Case<linalg::BatchMatmulOp, linalg::MatmulOp>([subgroupSize](auto op) {
+        return setAMDMatmulConfig(op, subgroupSize);
+      })
+      .Default([](Operation *) { return success(); });
 }
 
 }  // namespace detail

@@ -35,7 +35,7 @@ transform.with_pdl_patterns {
     rewrite %0 with "transform.dialect"
   }
 
-  transform.structured.canonicalized_sequence %arg0 {
+  transform.structured.canonicalized_sequence %arg0 failures(propagate) {
   ^bb1(%arg1: !pdl.operation):
     %0 = pdl_match @pdl_target in %arg1
     %1, %loops1:3 = transform.structured.tile %0 [32, 32, 32] {interchange = [0, 2, 1]}
@@ -52,8 +52,6 @@ transform.with_pdl_patterns {
 func.func @matmul_tensors_pad(
   %arg0: tensor<128x128xf32>, %arg1: tensor<128x128xf32>, %arg2: tensor<128x128xf32> { linalg.inplaceable = true})
     -> tensor<128x128xf32> {
-  //     CHECK:       tensor.pad
-
   //     CHECK:       scf.for
   //     CHECK:         scf.for
   //     CHECK:           scf.for
@@ -79,7 +77,7 @@ transform.with_pdl_patterns {
     rewrite %0 with "transform.dialect"
   }
 
-  transform.structured.canonicalized_sequence %arg0 {
+  transform.structured.canonicalized_sequence %arg0 failures(propagate) {
   ^bb1(%arg1: !pdl.operation):
     %0 = pdl_match @pdl_target in %arg1
     %1, %loops1:3 = transform.structured.tile %0 [32, 32, 32] {interchange = [0, 2, 1]}

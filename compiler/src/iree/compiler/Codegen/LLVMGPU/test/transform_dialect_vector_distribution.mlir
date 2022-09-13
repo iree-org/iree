@@ -33,8 +33,8 @@ hal.executable private @reduce_dispatch_0 {
         // WARP-EXECUTE:     %[[V:.*]] = "some_def"() : () -> vector<128xf32>
         // WARP-EXECUTE:     vector.transfer_write %[[V]], %{{.*}} {in_bounds = [true]} : vector<128xf32>, memref<128xf32>
 
+        // CHECK-DAG: #[[MAP:.*]] = affine_map<()[s0] -> (s0 * 4)>
         // CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
-        // CHECK-DAG: %[[C4:.*]] = arith.constant 4 : index
         // CHECK-DAG: %[[C32:.*]] = arith.constant 32 : index
         // CHECK: %[[TIDX:.*]] = gpu.thread_id  x
         // CHECK: %[[COND32:.*]] = arith.cmpi ult, %[[TIDX]], %[[C32]] : index
@@ -45,9 +45,9 @@ hal.executable private @reduce_dispatch_0 {
         // Single-thread guard runs on thread 0 only.
         // CHECK:   scf.if %[[COND1]] {
         // CHECK:     %[[V:.*]] = "some_def"() : () -> vector<128xf32>
-        // CHECK:     vector.store %[[V]], %{{.*}} : memref<128xf32, 3>, vector<128xf32>
-        // CHECK:   %[[IDX:.*]] = arith.muli %[[TIDX]], %[[C4]] : index
-        // CHECK:   %[[LOADED:.*]] = vector.load %{{.*}}[%[[IDX]]] : memref<128xf32, 3>, vector<4xf32>
+        // CHECK:     vector.transfer_write %[[V]], %{{.*}} : vector<128xf32>, memref<128xf32, 3>
+        // CHECK:   %[[IDX:.*]] = affine.apply #[[MAP]]()[%[[TIDX]]]
+        // CHECK:   %[[LOADED:.*]] = vector.transfer_read %{{.*}}[%[[IDX]]], %{{.*}} {in_bounds = [true]} : memref<128xf32, 3>, vector<4xf32>
         // CHECK:   vector.transfer_write %[[LOADED]], %{{.*}} {in_bounds = [true]} : vector<4xf32>, memref<128xf32>
         scf.if %2 {
           %v = "some_def"() : () -> (vector<128xf32>)

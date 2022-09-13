@@ -78,9 +78,11 @@ class VK_EnumAttr<string name, string description,
 def VK_V_1_0 : I32EnumAttrCase<"V_1_0", 0, "v1.0">;
 def VK_V_1_1 : I32EnumAttrCase<"V_1_1", 1, "v1.1">;
 def VK_V_1_2 : I32EnumAttrCase<"V_1_2", 2, "v1.2">;
+def VK_V_1_3 : I32EnumAttrCase<"V_1_3", 3, "v1.3">;
 
 def VK_VersionAttr : VK_I32EnumAttr<"Version", "valid Vulkan version", [
-    VK_V_1_0, VK_V_1_1, VK_V_1_2]>;
+    VK_V_1_0, VK_V_1_1, VK_V_1_2, VK_V_1_3
+]>;
 
 def VK_KHR_16bit_storage : I32EnumAttrCase<"VK_KHR_16bit_storage", 0>;
 def VK_KHR_8bit_storage : I32EnumAttrCase<"VK_KHR_8bit_storage", 1>;
@@ -141,16 +143,19 @@ def VK_TargetProductAttr : VK_I32EnumAttr<
   ]>;
 
 def VK_TTOS_Unknown   : I32EnumAttrCase<"Unknown", 0, "unknown">;
-def VK_TTOS_Android11 : I32EnumAttrCase<"Android11", 2, "android11">;
-def VK_TTOS_iOS       : I32EnumAttrCase<"iOS", 3, "iOS">;
-def VK_TTOS_Linux     : I32EnumAttrCase<"Linux", 4, "linux">;
-def VK_TTOS_macOS     : I32EnumAttrCase<"macOS", 5, "macos">;
-def VK_TTOS_Windows   : I32EnumAttrCase<"Windows", 6, "windows">;
+def VK_TTOS_Linux     : I32EnumAttrCase<"Linux", 1, "linux">;
+def VK_TTOS_iOS       : I32EnumAttrCase<"iOS", 2, "iOS">;
+def VK_TTOS_macOS     : I32EnumAttrCase<"macOS", 3, "macos">;
+def VK_TTOS_Windows   : I32EnumAttrCase<"Windows", 4, "windows">;
+// API Level 30 => Android 11
+def VK_TTOS_Android30 : I32EnumAttrCase<"Android30", 5, "android30">;
+// API Level 31 => Android 12
+def VK_TTOS_Android31 : I32EnumAttrCase<"Android31", 6, "android31">;
 
 def VK_TargetOSAttr : VK_I32EnumAttr<
   "TargetTripleOS", "recognized target operating system", [
-    VK_TTOS_Unknown, VK_TTOS_Android11, VK_TTOS_iOS, VK_TTOS_Linux,
-    VK_TTOS_macOS, VK_TTOS_Windows,
+    VK_TTOS_Unknown, VK_TTOS_Linux, VK_TTOS_iOS, VK_TTOS_macOS,
+    VK_TTOS_Windows, VK_TTOS_Android30, VK_TTOS_Android31,
   ]>;
 
 //===----------------------------------------------------------------------===//

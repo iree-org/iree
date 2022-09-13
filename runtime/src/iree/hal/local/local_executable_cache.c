@@ -15,6 +15,7 @@ typedef struct iree_hal_local_executable_cache_t {
   iree_hal_resource_t resource;
   iree_allocator_t host_allocator;
   iree_string_view_t identifier;
+  iree_host_size_t worker_capacity;
   iree_host_size_t loader_count;
   iree_hal_executable_loader_t* loaders[];
 } iree_hal_local_executable_cache_t;
@@ -29,8 +30,9 @@ static iree_hal_local_executable_cache_t* iree_hal_local_executable_cache_cast(
 }
 
 iree_status_t iree_hal_local_executable_cache_create(
-    iree_string_view_t identifier, iree_host_size_t loader_count,
-    iree_hal_executable_loader_t** loaders, iree_allocator_t host_allocator,
+    iree_string_view_t identifier, iree_host_size_t worker_capacity,
+    iree_host_size_t loader_count, iree_hal_executable_loader_t** loaders,
+    iree_allocator_t host_allocator,
     iree_hal_executable_cache_t** out_executable_cache) {
   IREE_ASSERT_ARGUMENT(!loader_count || loaders);
   IREE_ASSERT_ARGUMENT(out_executable_cache);
@@ -51,6 +53,7 @@ iree_status_t iree_hal_local_executable_cache_create(
     iree_string_view_append_to_buffer(
         identifier, &executable_cache->identifier,
         (char*)executable_cache + total_size - identifier.size);
+    executable_cache->worker_capacity = worker_capacity;
 
     executable_cache->loader_count = loader_count;
     for (iree_host_size_t i = 0; i < executable_cache->loader_count; ++i) {
@@ -112,7 +115,8 @@ static iree_status_t iree_hal_local_executable_cache_prepare_executable(
     // supported then the try will fail with IREE_STATUS_CANCELLED and we should
     // continue trying other loaders.
     iree_status_t status = iree_hal_executable_loader_try_load(
-        executable_cache->loaders[i], executable_params, out_executable);
+        executable_cache->loaders[i], executable_params,
+        executable_cache->worker_capacity, out_executable);
     if (iree_status_is_ok(status)) {
       // Executable was successfully loaded.
       return status;

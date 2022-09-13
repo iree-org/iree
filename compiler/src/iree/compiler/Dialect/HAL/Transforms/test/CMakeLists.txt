@@ -24,7 +24,6 @@ iree_lit_test_suite(
     "inline_device_switches.mlir"
     "materialize_interfaces.mlir"
     "materialize_resource_caches.mlir"
-    "materialize_timelines.mlir"
     "memoize_device_queries.mlir"
     "replace_push_constants.mlir"
     "resolve_export_ordinals.mlir"

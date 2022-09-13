@@ -34,16 +34,6 @@ cc_library(
 )
 
 cc_library(
-    name = "cpu_features",
-    srcs = ["cpu_features.c"],
-    hdrs = ["cpu_features.h"],
-    deps = [
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/base:target_platform",
-    ],
-)
-
-cc_library(
     name = "device_util",
     srcs = ["device_util.c"],
     hdrs = ["device_util.h"],
@@ -71,6 +61,7 @@ cc_library(
 iree_runtime_cc_test(
     name = "numpy_io_test",
     srcs = ["numpy_io_test.cc"],
+    tags = ["requires-filesystem"],
     deps = [
         ":device_util",
         ":numpy_io",

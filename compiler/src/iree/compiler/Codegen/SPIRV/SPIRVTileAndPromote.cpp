@@ -30,6 +30,8 @@
 
 #define DEBUG_TYPE "iree-spirv-tile-and-promote"
 
+using mlir::iree_compiler::IREE::LinalgExt::TilingPatterns;
+
 namespace mlir {
 namespace iree_compiler {
 
@@ -46,7 +48,7 @@ static void populateTilingReductionPatterns(
   auto tilingOptions = linalg::LinalgTilingOptions()
                            .setLoopType(linalg::LinalgTilingLoopType::Loops)
                            .setTileSizeComputationFunction(getTileSizeFn);
-  linalg::TilingPatterns<linalg::BatchMatmulOp, linalg::MatmulOp>::insert(
+  TilingPatterns<linalg::BatchMatmulOp, linalg::MatmulOp>::insert(
       patterns, tilingOptions, filter);
 }
 
@@ -74,10 +76,8 @@ static void populateTilingToInvocationPatterns(
                            .setTileSizeComputationFunction(getTileSizeFn)
                            .setDistributionOptions(distributionOptions);
 
-  linalg::TilingPatterns<linalg::BatchMatmulOp, linalg::FillOp,
-                         linalg::GenericOp,
-                         linalg::MatmulOp>::insert(patterns, tilingOptions,
-                                                   filter);
+  TilingPatterns<linalg::BatchMatmulOp, linalg::FillOp, linalg::GenericOp,
+                 linalg::MatmulOp>::insert(patterns, tilingOptions, filter);
 }
 
 //===----------------------------------------------------------------------===//

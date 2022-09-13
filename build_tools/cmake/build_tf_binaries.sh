@@ -18,12 +18,15 @@ IREE_USE_WORKSPACE_RC="${IREE_USE_WORKSPACE_RC:-0}"
 IREE_BAZEL_READ_REMOTE_CACHE="${IREE_BAZEL_READ_REMOTE_CACHE:-1}"
 IREE_BAZEL_WRITE_REMOTE_CACHE="${IREE_BAZEL_WRITE_REMOTE_CACHE:-0}"
 IREE_TF_BINARIES_OUTPUT_DIR="${IREE_TF_BINARIES_OUTPUT_DIR:-}"
+INTEGRATIONS_DIR="${ROOT_DIR}/integrations/tensorflow"
 
 if (( ${IREE_BAZEL_WRITE_REMOTE_CACHE} == 1 && ${IREE_BAZEL_READ_REMOTE_CACHE} != 1 )); then
   echo "Can't have 'IREE_BAZEL_WRITE_REMOTE_CACHE' (${IREE_BAZEL_WRITE_REMOTE_CACHE}) set without 'IREE_BAZEL_READ_REMOTE_CACHE' (${IREE_BAZEL_READ_REMOTE_CACHE})"
 fi
 
-cd "${ROOT_DIR}/integrations/tensorflow"
+# We want to get back to wherever we were called from and output to the output
+# directory relative to that.
+pushd "${INTEGRATIONS_DIR}" > /dev/null
 
 BAZEL_BIN=${BAZEL_BIN:-$(which bazel)}
 
@@ -61,12 +64,13 @@ BAZEL_TEST_CMD+=(
    xargs --max-args 1000000 --max-chars 1000000 --exit \
     "${BAZEL_TEST_CMD[@]}"
 
+popd > /dev/null
 
 if [[ "${IREE_TF_BINARIES_OUTPUT_DIR}" != "" ]]; then
   mkdir -p "${IREE_TF_BINARIES_OUTPUT_DIR}"
   cp \
-    bazel-bin/iree_tf_compiler/iree-import-tf \
-    bazel-bin/iree_tf_compiler/iree-import-tflite \
-    bazel-bin/iree_tf_compiler/iree-import-xla \
+    "${INTEGRATIONS_DIR}/bazel-bin/iree_tf_compiler/iree-import-tf" \
+    "${INTEGRATIONS_DIR}/bazel-bin/iree_tf_compiler/iree-import-tflite" \
+    "${INTEGRATIONS_DIR}/bazel-bin/iree_tf_compiler/iree-import-xla" \
     "${IREE_TF_BINARIES_OUTPUT_DIR}"
 fi

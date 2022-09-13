@@ -13,6 +13,7 @@
 
 #include <algorithm>
 
+#include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
@@ -33,6 +34,10 @@
 #include "mlir/Interfaces/VectorInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
+using mlir::iree_compiler::IREE::LinalgExt::LinalgVectorizationPattern;
+using mlir::iree_compiler::IREE::LinalgExt::TilingPatterns;
+using mlir::iree_compiler::IREE::LinalgExt::VectorizationPatterns;
 
 #define DEBUG_TYPE "iree-spirv-tile-and-vectorize-to-cooperative-ops"
 
@@ -131,9 +136,8 @@ static void populateTilingToSubgroupPatterns(ArrayRef<int64_t> subgroupCounts,
 
   auto filter = linalg::LinalgTransformationFilter(
       ArrayRef<StringAttr>{}, StringAttr::get(context, getVectorizeMarker()));
-  linalg::TilingPatterns<linalg::FillOp, linalg::MatmulOp,
-                         linalg::GenericOp>::insert(patterns, tilingOptions,
-                                                    filter);
+  TilingPatterns<linalg::FillOp, linalg::MatmulOp, linalg::GenericOp>::insert(
+      patterns, tilingOptions, filter);
 }
 
 //===----------------------------------------------------------------------===//
@@ -146,9 +150,9 @@ void populateVectorizationPatterns(MLIRContext *context,
   linalg::LinalgVectorizationOptions opt;
   linalg::LinalgTransformationFilter f(
       StringAttr::get(context, getVectorizeMarker()));
-  linalg::VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(
-      patterns, opt, f);
-  patterns.add<linalg::LinalgVectorizationPattern>(
+  VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(patterns,
+                                                                   opt, f);
+  patterns.add<LinalgVectorizationPattern>(
       context, f.addOpFilter<linalg::ContractionOpInterface>(), opt);
   vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
   vector::populateVectorReductionToContractPatterns(patterns);

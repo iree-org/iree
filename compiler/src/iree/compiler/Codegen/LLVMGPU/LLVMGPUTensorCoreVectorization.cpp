@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
@@ -13,6 +14,9 @@
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
+
+using mlir::iree_compiler::IREE::LinalgExt::LinalgVectorizationPattern;
+using mlir::iree_compiler::IREE::LinalgExt::VectorizationPatterns;
 
 namespace mlir {
 namespace iree_compiler {
@@ -28,13 +32,41 @@ static void populateVectorizationPatterns(RewritePatternSet &patterns) {
   linalg::LinalgVectorizationOptions opt;
   linalg::LinalgTransformationFilter f(
       StringAttr::get(patterns.getContext(), getVectorizeMarker()));
-  linalg::VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(
-      patterns, opt, f);
-  patterns.add<linalg::LinalgVectorizationPattern>(
+  VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(patterns,
+                                                                   opt, f);
+  patterns.add<LinalgVectorizationPattern>(
       patterns.getContext(), f.addOpFilter<linalg::ContractionOpInterface>(),
       opt);
   vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
   vector::populateVectorReductionToContractPatterns(patterns);
+}
+
+static Optional<SmallVector<int64_t>> unrollOrder(Operation *op) {
+  auto contract = dyn_cast<vector::ContractionOp>(op);
+  if (!contract) return llvm::None;
+  SmallVector<int64_t> order;
+  // Pick an unrolling order that will allow tensorcore operation to reuse LHS
+  // register. This is needed to get good performance on sm_80 target.
+  // First make reduction the outer dimensions.
+  for (auto iter : llvm::enumerate(contract.getIteratorTypes())) {
+    if (isReductionIterator(iter.value())) order.push_back(iter.index());
+  }
+
+  llvm::SmallDenseSet<int64_t> dims;
+  for (AffineExpr expr : contract.getIndexingMapsArray()[0].getResults()) {
+    dims.insert(expr.cast<AffineDimExpr>().getPosition());
+  }
+  // Then parallel dimensions that are part of Lhs as we want to re-use Lhs.
+  for (auto iter : llvm::enumerate(contract.getIteratorTypes())) {
+    if (isParallelIterator(iter.value()) && dims.count(iter.index()))
+      order.push_back(iter.index());
+  }
+  // Then the remaining parallel loops.
+  for (auto iter : llvm::enumerate(contract.getIteratorTypes())) {
+    if (isParallelIterator(iter.value()) && !dims.count(iter.index()))
+      order.push_back(iter.index());
+  }
+  return order;
 }
 
 // Merge transpose op into the transfer read op. Transpose are not supported on
@@ -120,8 +152,9 @@ static Optional<SmallVector<int64_t, 4>> getGPUTCNativeVectorSize(
 
 static void populateVectorUnrollPatterns(RewritePatternSet &patterns) {
   vector::populateVectorUnrollPatterns(
-      patterns,
-      vector::UnrollVectorOptions().setNativeShapeFn(getGPUTCNativeVectorSize));
+      patterns, vector::UnrollVectorOptions()
+                    .setNativeShapeFn(getGPUTCNativeVectorSize)
+                    .setUnrollTraversalOrderFn(unrollOrder));
 }
 
 namespace {
