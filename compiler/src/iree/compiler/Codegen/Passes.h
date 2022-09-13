@@ -437,7 +437,8 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &pm);
 /// This pass converts remaining interface ops into SPIR-V global variables,
 /// GPU processor ID ops into SPIR-V global variables, loop/standard ops into
 /// corresponding SPIR-V ops.
-std::unique_ptr<OperationPass<ModuleOp>> createConvertToSPIRVPass();
+std::unique_ptr<OperationPass<ModuleOp>> createConvertToSPIRVPass(
+    bool enableFastMath = false);
 
 /// Creates a pass to fold processor ID uses where possible.
 std::unique_ptr<OperationPass<func::FuncOp>>
@@ -490,14 +491,10 @@ createSPIRVCreateFastSlowPathPass();
 // SPIRV Codegen Pass Pipelines.
 //----------------------------------------------------------------------------//
 
-/// Populates passes needed to lower a XLA HLO op to SPIR-V dialect via the
-/// structured ops path. The pass manager `pm` in here operate on the module
-/// within the IREE::HAL::ExecutableOp. The `workGroupSize` can be used to
-/// control the work group size used in the code generation and is intended for
-/// testing purposes only. The pass pipeline will set an appropriate workgroup
-/// size.
-/// TODO: Are both of these needed and does this one still work on HLO?
-void buildSPIRVCodegenPassPipeline(OpPassManager &pm);
+/// Populates passes needed to lower linalg/arith/math ops to SPIR-V ops via the
+/// structured ops path. The pass manager `pm` here operate on the module
+/// within the IREE::HAL::ExecutableOp.
+void buildSPIRVCodegenPassPipeline(OpPassManager &pm, bool enableFastMath);
 
 //------------------------------------------------------------------------------
 // VMVX passes
