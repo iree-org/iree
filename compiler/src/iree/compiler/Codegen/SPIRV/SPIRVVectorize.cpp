@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
@@ -29,6 +30,9 @@
 #include "mlir/Interfaces/VectorInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
+using mlir::iree_compiler::IREE::LinalgExt::LinalgVectorizationPattern;
+using mlir::iree_compiler::IREE::LinalgExt::VectorizationPatterns;
 
 #define DEBUG_TYPE "iree-spirv-vectorize"
 
@@ -116,9 +120,9 @@ Optional<SmallVector<int64_t, 4>> getNativeVectorShape(Operation *op) {
 void populateVectorizationPatterns(RewritePatternSet &patterns) {
   linalg::LinalgVectorizationOptions opt;
   linalg::LinalgTransformationFilter f;
-  linalg::VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(
-      patterns, opt, f);
-  patterns.add<linalg::LinalgVectorizationPattern>(
+  VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(patterns,
+                                                                   opt, f);
+  patterns.add<LinalgVectorizationPattern>(
       patterns.getContext(), f.addOpFilter<linalg::ContractionOpInterface>(),
       opt);
   // Additinally pull in patterns to canonicalize transfer ops and to shuffle

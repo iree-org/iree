@@ -35,7 +35,9 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+using mlir::iree_compiler::IREE::LinalgExt::LinalgVectorizationPattern;
 using mlir::iree_compiler::IREE::LinalgExt::TilingPatterns;
+using mlir::iree_compiler::IREE::LinalgExt::VectorizationPatterns;
 
 #define DEBUG_TYPE "iree-spirv-tile-and-vectorize-to-cooperative-ops"
 
@@ -148,9 +150,9 @@ void populateVectorizationPatterns(MLIRContext *context,
   linalg::LinalgVectorizationOptions opt;
   linalg::LinalgTransformationFilter f(
       StringAttr::get(context, getVectorizeMarker()));
-  linalg::VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(
-      patterns, opt, f);
-  patterns.add<linalg::LinalgVectorizationPattern>(
+  VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(patterns,
+                                                                   opt, f);
+  patterns.add<LinalgVectorizationPattern>(
       context, f.addOpFilter<linalg::ContractionOpInterface>(), opt);
   vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
   vector::populateVectorReductionToContractPatterns(patterns);

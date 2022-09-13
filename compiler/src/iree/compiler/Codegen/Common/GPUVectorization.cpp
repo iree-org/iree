@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
@@ -16,6 +17,9 @@
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
+
+using mlir::iree_compiler::IREE::LinalgExt::LinalgVectorizationPattern;
+using mlir::iree_compiler::IREE::LinalgExt::VectorizationPatterns;
 
 #define DEBUG_TYPE "iree-codegen-gpu-vectorization"
 
@@ -34,10 +38,10 @@ static void populateVectorizationPatterns(RewritePatternSet &patterns) {
        StringAttr::get(ctx, getVectorizeMarker())},
       llvm::None);
   f.setMatchByDefault();
-  linalg::VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(
-      patterns, opt, f);
+  VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(patterns,
+                                                                   opt, f);
   patterns.add<linalg::CopyVectorizationPattern>(ctx);
-  patterns.add<linalg::LinalgVectorizationPattern>(
+  patterns.add<LinalgVectorizationPattern>(
       ctx, f.addOpFilter<linalg::ContractionOpInterface>(), opt);
 }
 

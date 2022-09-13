@@ -56,6 +56,27 @@ LinalgTilingPattern::returningMatchAndRewrite(linalg::LinalgOp op,
   return res;
 }
 
+LinalgVectorizationPattern::LinalgVectorizationPattern(
+    MLIRContext *context, linalg::LinalgTransformationFilter f,
+    linalg::LinalgVectorizationOptions options, PatternBenefit benefit)
+    : OpInterfaceRewritePattern<linalg::LinalgOp>(context, benefit),
+      filter(std::move(f)) {}
+
+LinalgVectorizationPattern::LinalgVectorizationPattern(
+    StringRef opName, MLIRContext *context,
+    linalg::LinalgVectorizationOptions options,
+    linalg::LinalgTransformationFilter f, PatternBenefit benefit)
+    : OpInterfaceRewritePattern<linalg::LinalgOp>(context, benefit),
+      filter(f.addOpNameFilter(opName)) {}
+
+LogicalResult
+LinalgVectorizationPattern::matchAndRewrite(linalg::LinalgOp linalgOp,
+                                            PatternRewriter &rewriter) const {
+  if (failed(filter.checkAndNotify(rewriter, linalgOp)))
+    return failure();
+  return vectorize(rewriter, linalgOp);
+}
+
 } // namespace LinalgExt
 } // namespace IREE
 } // namespace iree_compiler
