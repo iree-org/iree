@@ -42,4 +42,6 @@ iree_cc_test(
     iree::base::internal::file_io
     iree::testing::gtest
     iree::testing::gtest_main
+  LABELS
+    "requires-filesystem"
 )

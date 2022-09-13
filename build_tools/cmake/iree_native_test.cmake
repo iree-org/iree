@@ -115,23 +115,16 @@ function(iree_native_test)
     set_property(TEST ${_TEST_NAME} PROPERTY ENVIRONMENT ${_ENVIRONMENT_VARS})
   elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv" AND RISCV_CPU STREQUAL "rv64")
     # The test target needs to run within the QEMU emulator for RV64 Linux
-    # crosscompile build. A QEMU 64 Linux emulator must be available at the
-    # path specified by the  `QEMU_RV64_BIN` environment variable.
-    if(DEFINED ENV{QEMU_RV64_BIN})
-      add_test(
-        NAME
-          ${_TEST_NAME}
-        COMMAND
-          "$ENV{QEMU_RV64_BIN}"
-          -cpu rv64,x-v=true,x-k=true,vlen=512,elen=64,vext_spec=v1.0
-          -L "${RISCV_TOOLCHAIN_ROOT}/sysroot"
-          "$<TARGET_FILE:${_SRC_TARGET}>"
-          ${_RULE_ARGS}
-      )
-      iree_configure_test(${_TEST_NAME})
-    else()
-      message(SEND_ERROR "QEMU not found.")
-    endif()
+    # crosscompile build or on-device.
+    add_test(
+      NAME
+        ${_TEST_NAME}
+      COMMAND
+        "${IREE_ROOT_DIR}/build_tools/cmake/run_riscv64_test.sh"
+        "$<TARGET_FILE:${_SRC_TARGET}>"
+        ${_RULE_ARGS}
+    )
+    iree_configure_test(${_TEST_NAME})
   else()
     add_test(
       NAME

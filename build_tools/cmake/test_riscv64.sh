@@ -74,9 +74,13 @@ generate_llvm_cpu_vmfb tosa-rvv \
 ${PYTHON_BIN} "${ROOT_DIR}/third_party/llvm-project/llvm/utils/lit/lit.py" \
   -v --path "${LLVM_BIN_DIR}" "${ROOT_DIR}/tests/riscv64"
 
-# Test e2e models. Excluding mobilebert for now.
-ctest --test-dir ${BUILD_RISCV_DIR}/tests/e2e/models -R llvm-cpu_local-task_mobilenet -E bert
-# Test all tosa ops
-ctest --test-dir ${BUILD_RISCV_DIR}/tests/e2e/tosa_ops -R check_llvm-cpu_local-task
-# Test all xla ops except fp16, which is not supported properly
-ctest --test-dir ${BUILD_RISCV_DIR}/tests/e2e/xla_ops -R check_llvm-cpu_local-task -E fp16
+# Test runtime unit tests
+ctest --test-dir ${BUILD_RISCV_DIR}/runtime/ --timeout 900 --output-on-failure \
+  --no-tests=error --label-exclude \
+  '(^nokokoro$|^driver=vulkan$|^driver=cuda$|^vulkan_uses_vk_khr_shader_float16_int8$|^requires-filesystem$|^requires-dtz$)'
+
+# Test e2e models. Excluding mobilebert and fp16 for now.
+ctest --test-dir ${BUILD_RISCV_DIR}/tests/e2e --timeout 900 --output-on-failure \
+  --no-tests=error --label-exclude \
+  '(^nokokoro$|^driver=vulkan$|^driver=cuda$|^vulkan_uses_vk_khr_shader_float16_int8$)' \
+  -E '(bert|fp16)'
