@@ -142,7 +142,7 @@ function create_image() {
   echo "Deleting log file"
   gcloud compute ssh "${INSTANCE_NAME}" --zone="${ZONE}" \
     --no-user-output-enabled \
-    --command="rm /startup.log"
+    --command="sudo rm /startup.log"
 
   echo "Shutting down instance"
   # This actually does things synchronously, so we don't need our own loop to
