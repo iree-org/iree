@@ -16,6 +16,7 @@ iree_cc_library(
   SRCS
     "WGSLReplacePushConstants.cpp"
   DEPS
+    MLIRArithmeticDialect
     MLIRIR
     MLIRPass
     MLIRTensorDialect
