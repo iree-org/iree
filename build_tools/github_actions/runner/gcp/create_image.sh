@@ -146,6 +146,9 @@ function create_image() {
   gcloud compute images create "${IMAGE_NAME}" \
     --source-disk="${INSTANCE_NAME}" \
     --source-disk-zone="${ZONE}"
+
+  echo "Deleting instance"
+  gcloud compute instances delete "${INSTANCE_NAME}" --zone="${ZONE}"
 }
 
 create_image
