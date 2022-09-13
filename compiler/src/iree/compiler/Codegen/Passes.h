@@ -505,6 +505,15 @@ void buildSPIRVCodegenPassPipeline(OpPassManager &pm, bool enableFastMath);
 std::unique_ptr<Pass> createVMVXLowerLinalgMicrokernelsPass();
 
 //------------------------------------------------------------------------------
+// WGSL passes
+//------------------------------------------------------------------------------
+
+// Removes push constants by replacing hal.interface.constant.loads with
+// hal.interface.binding.subspan + flow.dispatch.tensor.load.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createWGSLReplacePushConstantsPass();
+
+//------------------------------------------------------------------------------
 // Test passes
 //------------------------------------------------------------------------------
 

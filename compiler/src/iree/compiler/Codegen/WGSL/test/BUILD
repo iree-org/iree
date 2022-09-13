@@ -1,4 +1,4 @@
-# Copyright 2019 The IREE Authors
+# Copyright 2022 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
@@ -16,19 +16,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
-            "assign_target_devices.mlir",
-            "benchmark_batch_dispatches.mlir",
-            "convert_to_hal.mlir",
-            "dump_executable_benchmarks.mlir",
-            "dump_executable_sources.mlir",
-            "elide_redundant_commands.mlir",
-            "fixup_legacy_sync.mlir",
-            "inline_device_switches.mlir",
-            "materialize_interfaces.mlir",
-            "materialize_resource_caches.mlir",
-            "memoize_device_queries.mlir",
-            "resolve_export_ordinals.mlir",
-            "verify_target_environment.mlir",
+            "replace_push_constants.mlir",
         ],
         include = ["*.mlir"],
     ),

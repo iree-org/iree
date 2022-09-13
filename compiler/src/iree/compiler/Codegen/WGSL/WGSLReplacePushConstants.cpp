@@ -4,10 +4,11 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/PassDetail.h"
+#include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
@@ -16,13 +17,11 @@
 
 namespace mlir {
 namespace iree_compiler {
-namespace IREE {
-namespace HAL {
 namespace {
 
 // These must match what the runtime uses.
-#define IREE_PUSH_CONSTANT_EMULATION_SET 3
-#define IREE_PUSH_CONSTANT_EMULATION_BINDING 0
+#define IREE_HAL_WEBGPU_PARAMS_BIND_GROUP_INDEX 3
+#define IREE_HAL_WEBGPU_PARAMS_BINDING_INDEX 0
 
 static void replaceConstantLoadOp(IREE::HAL::InterfaceConstantLoadOp op) {
   OpBuilder builder(op);
@@ -41,8 +40,8 @@ static void replaceConstantLoadOp(IREE::HAL::InterfaceConstantLoadOp op) {
   // analysis using the hint should have been performed by earlier passes.
   auto subspanOp = builder.create<IREE::HAL::InterfaceBindingSubspanOp>(
       op.getLoc(), opFlowTensorType,
-      /*set=*/APInt(64, IREE_PUSH_CONSTANT_EMULATION_SET),
-      /*binding=*/APInt(64, IREE_PUSH_CONSTANT_EMULATION_BINDING),
+      /*set=*/APInt(64, IREE_HAL_WEBGPU_PARAMS_BIND_GROUP_INDEX),
+      /*binding=*/APInt(64, IREE_HAL_WEBGPU_PARAMS_BINDING_INDEX),
       IREE::HAL::DescriptorType::StorageBuffer, offsetValue, dynamicDims,
       alignmentAttr);
 
@@ -58,25 +57,12 @@ static void replaceConstantLoadOp(IREE::HAL::InterfaceConstantLoadOp op) {
   op.erase();
 }
 
-class ReplacePushConstantsPass
-    : public PassWrapper<ReplacePushConstantsPass,
-                         OperationPass<func::FuncOp>> {
- public:
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(ReplacePushConstantsPass)
-
+class WGSLReplacePushConstantsPass
+    : public WGSLReplacePushConstantsBase<WGSLReplacePushConstantsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::arith::ArithmeticDialect, mlir::func::FuncDialect,
                     mlir::tensor::TensorDialect, IREE::Flow::FlowDialect,
                     IREE::HAL::HALDialect>();
-  }
-
-  StringRef getArgument() const override {
-    return "iree-hal-replace-push-constants";
-  }
-
-  StringRef getDescription() const override {
-    return "Replaces push constant loads with binding loads for when using HAL "
-           "devices that do not support push constants.";
   }
 
   void runOnOperation() override {
@@ -92,13 +78,10 @@ class ReplacePushConstantsPass
 
 }  // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createReplacePushConstantsPass() {
-  return std::make_unique<ReplacePushConstantsPass>();
+std::unique_ptr<OperationPass<func::FuncOp>>
+createWGSLReplacePushConstantsPass() {
+  return std::make_unique<WGSLReplacePushConstantsPass>();
 }
 
-static PassRegistration<ReplacePushConstantsPass> pass;
-
-}  // namespace HAL
-}  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir

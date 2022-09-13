@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-hal-replace-push-constants %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-wgsl-replace-push-constants %s | FileCheck %s
 
 // CHECK-LABEL: @emptyFunctionNoOp
 func.func @emptyFunctionNoOp() {

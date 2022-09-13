@@ -28,7 +28,6 @@ iree_compiler_cc_library(
         "MaterializeResourceCaches.cpp",
         "MemoizeDeviceQueries.cpp",
         "Passes.cpp",
-        "ReplacePushConstants.cpp",
         "ResolveExportOrdinals.cpp",
         "SerializeExecutables.cpp",
         "TranslateExecutables.cpp",
