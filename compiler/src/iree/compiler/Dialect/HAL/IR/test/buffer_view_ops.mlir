@@ -2,17 +2,19 @@
 
 // CHECK-LABEL: @buffer_view_create
 func.func @buffer_view_create(%arg0: !hal.buffer, %arg1: index, %arg2: index) -> !hal.buffer_view {
-  %c1 = arith.constant 1 : i32
-  %c32 = arith.constant 32 : i32
+  %c0 = arith.constant 0 : index
+  %c128 = arith.constant 128 : index
+  %c1_i32 = arith.constant 1 : i32
+  %c32_i32 = arith.constant 32 : i32
   // CHECK: %view = hal.buffer_view.create
-  // CHECK-SAME: buffer(%arg0 : !hal.buffer)
+  // CHECK-SAME: buffer(%arg0 : !hal.buffer)[%c0, %c128]
   // CHECK-SAME: shape([%arg1, %arg2])
   // CHECK-SAME: type(%c32_i32)
   // CHECK-SAME: encoding(%c1_i32) : !hal.buffer_view
-  %view = hal.buffer_view.create buffer(%arg0 : !hal.buffer)
+  %view = hal.buffer_view.create buffer(%arg0 : !hal.buffer)[%c0, %c128]
                                  shape([%arg1, %arg2])
-                                 type(%c32)
-                                 encoding(%c1) : !hal.buffer_view
+                                 type(%c32_i32)
+                                 encoding(%c1_i32) : !hal.buffer_view
   return %view : !hal.buffer_view
 }
 

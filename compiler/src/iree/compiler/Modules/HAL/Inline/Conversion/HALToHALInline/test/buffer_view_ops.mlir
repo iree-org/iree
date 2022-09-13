@@ -5,11 +5,11 @@ func.func @buffer_view_create(%arg0: !hal.buffer, %arg1: index, %arg2: index) ->
   %c1 = arith.constant 1 : i32
   %c32 = arith.constant 32 : i32
   // CHECK: %view = hal_inline.buffer_view.create
-  // CHECK-SAME: buffer(%arg0 : !hal.buffer)
+  // CHECK-SAME: buffer(%arg0 : !hal.buffer)[%arg1, %arg2]
   // CHECK-SAME: shape([%arg1, %arg2])
   // CHECK-SAME: type(%c32_i32)
   // CHECK-SAME: encoding(%c1_i32) : !hal.buffer_view
-  %view = hal.buffer_view.create buffer(%arg0 : !hal.buffer)
+  %view = hal.buffer_view.create buffer(%arg0 : !hal.buffer)[%arg1, %arg2]
                                  shape([%arg1, %arg2])
                                  type(%c32)
                                  encoding(%c1) : !hal.buffer_view

@@ -55,6 +55,44 @@ OpFoldResult TensorExportOp::fold(ArrayRef<Attribute> operands) {
 
 namespace {
 
+/// Folds hal.buffer.subspans into buffer view creation subspans.
+struct FoldBufferViewCreateSubspan
+    : public OpRewritePattern<BufferViewCreateOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(BufferViewCreateOp op,
+                                PatternRewriter &rewriter) const override {
+    auto ip = rewriter.saveInsertionPoint();
+    rewriter.setInsertionPoint(op);
+    bool needsUpdate = false;
+    auto newSourceBuffer = op.getSourceBuffer();
+    auto newSourceOffset = op.getSourceOffset();
+    if (auto subspanOp = dyn_cast_or_null<BufferSubspanOp>(
+            op.getSourceBuffer().getDefiningOp())) {
+      newSourceBuffer = subspanOp.getSourceBuffer();
+      newSourceOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
+          subspanOp.getLoc(), subspanOp.getSourceOffset(),
+          op.getSourceOffset());
+      needsUpdate = true;
+    }
+    rewriter.restoreInsertionPoint(ip);
+    if (!needsUpdate) return failure();
+    rewriter.updateRootInPlace(op, [&]() {
+      op.getSourceBufferMutable().assign(newSourceBuffer);
+      op.getSourceOffsetMutable().assign(newSourceOffset);
+    });
+    return success();
+  }
+};
+
+}  // namespace
+
+void BufferViewCreateOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                     MLIRContext *context) {
+  results.insert<FoldBufferViewCreateSubspan>(context);
+}
+
+namespace {
+
 /// Skips a hal.buffer_view.buffer accessor when the buffer view was created in
 /// the same scope and we know the origin buffer.
 struct SkipBufferViewBufferOp : public OpRewritePattern<BufferViewBufferOp> {
@@ -64,7 +102,7 @@ struct SkipBufferViewBufferOp : public OpRewritePattern<BufferViewBufferOp> {
                                 PatternRewriter &rewriter) const override {
     if (auto createOp = dyn_cast_or_null<BufferViewCreateOp>(
             op.getBufferView().getDefiningOp())) {
-      rewriter.replaceOp(op, createOp.getBuffer());
+      rewriter.replaceOp(op, createOp.getSourceBuffer());
       return success();
     }
     return failure();

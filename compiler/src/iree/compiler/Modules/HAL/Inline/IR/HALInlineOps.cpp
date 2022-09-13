@@ -123,9 +123,10 @@ OpFoldResult BufferStorageOp::fold(ArrayRef<Attribute> operands) {
 //===----------------------------------------------------------------------===//
 
 void BufferViewCreateOp::build(OpBuilder &builder, OperationState &state,
-                               Value buffer, int32_t elementType,
+                               Value sourceBuffer, Value sourceOffset,
+                               Value sourceLength, int32_t elementType,
                                int32_t encodingType, ValueRange shape) {
-  build(builder, state, buffer,
+  build(builder, state, sourceBuffer, sourceOffset, sourceLength,
         builder.createOrFold<arith::ConstantIntOp>(state.location, elementType,
                                                    32),
         builder.createOrFold<arith::ConstantIntOp>(state.location, encodingType,
@@ -134,9 +135,11 @@ void BufferViewCreateOp::build(OpBuilder &builder, OperationState &state,
 }
 
 void BufferViewCreateOp::build(OpBuilder &builder, OperationState &state,
-                               Value buffer, Value elementType,
+                               Value sourceBuffer, Value sourceOffset,
+                               Value sourceLength, Value elementType,
                                Value encodingType, ValueRange shape) {
-  state.addOperands({buffer, elementType, encodingType});
+  state.addOperands(
+      {sourceBuffer, sourceOffset, sourceLength, elementType, encodingType});
   state.addOperands(shape);
   state.addTypes({BufferViewType::get(builder.getContext())});
 }
@@ -144,6 +147,44 @@ void BufferViewCreateOp::build(OpBuilder &builder, OperationState &state,
 void BufferViewCreateOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(getResult(), "view");
+}
+
+namespace {
+
+/// Folds hal_inline.buffer_view.subspans into buffer view creation subspans.
+struct FoldBufferViewCreateSubspan
+    : public OpRewritePattern<BufferViewCreateOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(BufferViewCreateOp op,
+                                PatternRewriter &rewriter) const override {
+    auto ip = rewriter.saveInsertionPoint();
+    rewriter.setInsertionPoint(op);
+    bool needsUpdate = false;
+    auto newSourceBuffer = op.getSourceBuffer();
+    auto newSourceOffset = op.getSourceOffset();
+    if (auto subspanOp = dyn_cast_or_null<BufferSubspanOp>(
+            op.getSourceBuffer().getDefiningOp())) {
+      newSourceBuffer = subspanOp.getSourceBuffer();
+      newSourceOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
+          subspanOp.getLoc(), subspanOp.getSourceOffset(),
+          op.getSourceOffset());
+      needsUpdate = true;
+    }
+    rewriter.restoreInsertionPoint(ip);
+    if (!needsUpdate) return failure();
+    rewriter.updateRootInPlace(op, [&]() {
+      op.getSourceBufferMutable().assign(newSourceBuffer);
+      op.getSourceOffsetMutable().assign(newSourceOffset);
+    });
+    return success();
+  }
+};
+
+}  // namespace
+
+void BufferViewCreateOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                     MLIRContext *context) {
+  results.insert<FoldBufferViewCreateSubspan>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -161,12 +202,11 @@ namespace {
 /// the same scope and we know the origin buffer.
 struct SkipBufferViewBufferOp : public OpRewritePattern<BufferViewBufferOp> {
   using OpRewritePattern<BufferViewBufferOp>::OpRewritePattern;
-
   LogicalResult matchAndRewrite(BufferViewBufferOp op,
                                 PatternRewriter &rewriter) const override {
     if (auto createOp = dyn_cast_or_null<BufferViewCreateOp>(
             op.getBufferView().getDefiningOp())) {
-      rewriter.replaceOp(op, createOp.getBuffer());
+      rewriter.replaceOp(op, createOp.getSourceBuffer());
       return success();
     }
     return failure();

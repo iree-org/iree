@@ -430,7 +430,9 @@ def HAL_BufferViewCreateOp : HAL_PureOp<"buffer_view.create", [
   }];
 
   let arguments = (ins
-    HAL_BufferType:$buffer,
+    HAL_BufferType:$source_buffer,
+    HAL_DeviceSize:$source_offset,
+    HAL_DeviceSize:$source_length,
     HAL_ElementType:$element_type,
     HAL_EncodingType:$encoding_type,
     HAL_Shape:$shape
@@ -440,7 +442,8 @@ def HAL_BufferViewCreateOp : HAL_PureOp<"buffer_view.create", [
   );
 
   let assemblyFormat = [{
-    `buffer` `(` $buffer `:` type($buffer) `)`
+    `buffer` `(` $source_buffer `:` type($source_buffer) `)`
+    `` `[` $source_offset `,` $source_length `]`
     `shape` `(` `[` $shape `]` `)`
     `type` `(` $element_type `)`
     `encoding` `(` $encoding_type `)`
@@ -451,18 +454,24 @@ def HAL_BufferViewCreateOp : HAL_PureOp<"buffer_view.create", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<(ins
-      "Value":$buffer,
+      "Value":$sourceBuffer,
+      "Value":$sourceOffset,
+      "Value":$sourceLength,
       "int32_t":$elementType,
       "int32_t":$encodingType,
       "ValueRange":$shape
     )>,
     OpBuilder<(ins
-      "Value":$buffer,
+      "Value":$sourceBuffer,
+      "Value":$sourceOffset,
+      "Value":$sourceLength,
       "Value":$elementType,
       "Value":$encodingType,
       "ValueRange":$shape
     )>,
   ];
+
+  let hasCanonicalizer = 1;
 }
 
 def HAL_BufferViewAssertOp : HAL_Op<"buffer_view.assert", []> {

@@ -108,6 +108,8 @@ vm.import @buffer.store(
 // Creates a reference to a buffer with a particular shape and element type.
 vm.import @buffer_view.create(
   %buffer : !vm.ref<!hal.buffer>,
+  %source_offset : i64,
+  %source_length : i64,
   %element_type : i32,
   %encoding_type : i32,
   %shape : i64 ...
