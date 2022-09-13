@@ -24,12 +24,13 @@ static iree_status_t iree_mmt4d_example_matmul_f32_benchmark(
   while (iree_benchmark_keep_running(benchmark_state,
                                      /*batch_count=*/FLAG_batch_count)) {
     for (int i = 0; i < FLAG_batch_count; ++i) {
-      iree_ukernel_mmt4d_f32f32f32_params_t params;
+      iree_ukernel_mmt4d_params_t params;
       memset(&params, 0, sizeof params);
-      int ukernel_retcode = iree_ukernel_mmt4d_f32f32f32(&params);
-      if (0 != iree_ukernel_mmt4d_f32f32f32(&params)) {
+      params.type = iree_ukernel_mmt4d_type_f32f32f32;
+      iree_ukernel_mmt4d_status_t status = iree_ukernel_mmt4d(&params);
+      if (status != iree_ukernel_mmt4d_status_ok) {
         fprintf(stderr, "FATAL: iree_ukernel_mmt4d_f32f32f32 failed: %s\n",
-                iree_ukernel_mmt4d_error_message(ukernel_retcode));
+                iree_ukernel_mmt4d_status_message(status));
         abort();
       }
     }

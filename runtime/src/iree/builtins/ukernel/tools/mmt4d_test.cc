@@ -19,7 +19,8 @@
 #include "iree/testing/status_matchers.h"
 
 TEST(MMT4DTest, iree_mmt4d_example_matmul_f32) {
-  iree_ukernel_mmt4d_f32f32f32_params_t params;
+  iree_ukernel_mmt4d_params_t params;
   memset(&params, 0, sizeof params);
-  EXPECT_EQ(0, iree_ukernel_mmt4d_f32f32f32(&params));
+  params.type = iree_ukernel_mmt4d_type_f32f32f32;
+  EXPECT_EQ(0, iree_ukernel_mmt4d(&params));
 }

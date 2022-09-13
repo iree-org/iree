@@ -17,6 +17,7 @@
 
 // Include the ukernel support library so that we can use its implementations
 // as fixed-function components of the runtime.
+#include "iree/base/internal/cpu.h"
 #include "iree/builtins/ukernel/elementwise.h"
 #include "iree/builtins/ukernel/mmt4d.h"
 
@@ -104,54 +105,53 @@ static iree_host_size_t iree_vmvx_cast_host_size(int64_t value,
   return (iree_host_size_t)value;
 }
 
-#define BUFFER_2D_DECLS(name, dtype, offset, stride0, stride1, size0, size1) \
-  uint64_t name##_overflow = 0;                                              \
-  iree_host_size_t name##_size0 =                                            \
-      iree_vmvx_cast_host_size(size0, &name##_overflow);                     \
-  iree_host_size_t name##_size1 =                                            \
-      iree_vmvx_cast_host_size(size1, &name##_overflow);                     \
-  iree_host_size_t name##_stride0 =                                          \
-      iree_vmvx_cast_host_size(stride0, &name##_overflow);                   \
-  iree_host_size_t name##_stride1 =                                          \
-      iree_vmvx_cast_host_size(stride1, &name##_overflow);                   \
-  iree_host_size_t name##_length_bound = iree_vmvx_2d_length_bound(          \
-      sizeof(dtype), name##_size0, name##_size1, name##_stride0,             \
-      name##_stride1, &name##_overflow);                                     \
-  iree_host_size_t name##_offset =                                           \
-      sizeof(dtype) * iree_vmvx_cast_host_size(offset, &name##_overflow);    \
-  if (name##_overflow) {                                                     \
-    IREE_TRACE_ZONE_END(z0);                                                 \
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,                    \
-                            "buffer overflow for " #name);                   \
+#define BUFFER_2D_DECLS(name, dtype_size, offset, stride0, stride1, size0,    \
+                        size1)                                                \
+  uint64_t name##_overflow = 0;                                               \
+  iree_host_size_t name##_size0 =                                             \
+      iree_vmvx_cast_host_size(size0, &name##_overflow);                      \
+  iree_host_size_t name##_size1 =                                             \
+      iree_vmvx_cast_host_size(size1, &name##_overflow);                      \
+  iree_host_size_t name##_stride0 =                                           \
+      iree_vmvx_cast_host_size(stride0, &name##_overflow);                    \
+  iree_host_size_t name##_stride1 =                                           \
+      iree_vmvx_cast_host_size(stride1, &name##_overflow);                    \
+  iree_host_size_t name##_length_bound = iree_vmvx_2d_length_bound(           \
+      dtype_size, name##_size0, name##_size1, name##_stride0, name##_stride1, \
+      &name##_overflow);                                                      \
+  iree_host_size_t name##_offset =                                            \
+      dtype_size * iree_vmvx_cast_host_size(offset, &name##_overflow);        \
+  if (name##_overflow) {                                                      \
+    IREE_TRACE_ZONE_END(z0);                                                  \
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,                     \
+                            "buffer overflow for " #name);                    \
   }
 
-#define MAP_BUFFER_2D_RO(name, dtype, buffer_ref, offset, stride0, stride1, \
-                         size0, size1)                                      \
-  iree_vm_buffer_t* name##_buffer;                                          \
-  iree_const_byte_span_t name##_span;                                       \
-  BUFFER_2D_DECLS(name, dtype, offset, stride0, stride1, size0, size1);     \
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(                                        \
-      z0, iree_vm_buffer_check_deref(buffer_ref, &name##_buffer))           \
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(                                        \
-      z0, iree_vm_buffer_map_ro(name##_buffer,       /*offset=*/            \
-                                name##_offset,       /*length=*/            \
-                                name##_length_bound, /*alignment=*/         \
-                                sizeof(dtype), &name##_span));              \
-  const dtype* name = (dtype*)name##_span.data
+#define MAP_BUFFER_2D_IMPL(mode, ptr_type, span_type, name, dtype_size,        \
+                           buffer_ref, offset, stride0, stride1, size0, size1) \
+  iree_vm_buffer_t* name##_buffer;                                             \
+  span_type name##_span;                                                       \
+  BUFFER_2D_DECLS(name, dtype_size, offset, stride0, stride1, size0, size1);   \
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(                                           \
+      z0, iree_vm_buffer_check_deref(buffer_ref, &name##_buffer))              \
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(                                           \
+      z0, iree_vm_buffer_map_##mode(name##_buffer,       /*offset=*/           \
+                                    name##_offset,       /*length=*/           \
+                                    name##_length_bound, /*alignment=*/        \
+                                    dtype_size, &name##_span));                \
+  ptr_type name = (ptr_type)name##_span.data
 
-#define MAP_BUFFER_2D_RW(name, dtype, buffer_ref, offset, stride0, stride1,  \
-                         size0, size1)                                       \
-  iree_vm_buffer_t* name##_buffer;                                           \
-  iree_byte_span_t name##_span;                                              \
-  BUFFER_2D_DECLS(name, dtype, offset, stride0, stride1, size0, size1);      \
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(                                         \
-      z0, iree_vm_buffer_check_deref(buffer_ref, &name##_buffer));           \
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(                                         \
-      z0, iree_vm_buffer_map_rw(name##_buffer, /*offset=*/                   \
-                                name##_offset, /*length=*/                   \
-                                name##_length_bound,                         \
-                                /*alignment=*/sizeof(dtype), &name##_span)); \
-  dtype* name = (dtype*)name##_span.data
+#define MAP_BUFFER_2D_UNTYPED_RO(name, dtype_size, ...)             \
+  MAP_BUFFER_2D_IMPL(ro, const void*, iree_const_byte_span_t, name, \
+                     dtype_size, __VA_ARGS__)
+#define MAP_BUFFER_2D_UNTYPED_RW(name, dtype_size, ...) \
+  MAP_BUFFER_2D_IMPL(rw, void*, iree_byte_span_t, name, dtype_size, __VA_ARGS__)
+#define MAP_BUFFER_2D_RO(name, dtype, ...)                           \
+  MAP_BUFFER_2D_IMPL(ro, const dtype*, iree_const_byte_span_t, name, \
+                     sizeof(dtype), __VA_ARGS__)
+#define MAP_BUFFER_2D_RW(name, dtype, ...)                              \
+  MAP_BUFFER_2D_IMPL(rw, dtype*, iree_byte_span_t, name, sizeof(dtype), \
+                     __VA_ARGS__)
 
 //===----------------------------------------------------------------------===//
 // Shared argument shims
@@ -636,7 +636,8 @@ IREE_VMVX_ABI_FIXED_STRUCT(mmt4d, rIIrIIrIIIIIiiii, {
 });
 IREE_VMVX_ABI_DEFINE_SHIM(mmt4d, v);
 
-IREE_VMVX_ABI_EXPORT(iree_vmvx_mmt4d_f32f32f32, mmt4d, v) {
+static iree_status_t iree_vmvx_mmt4d(iree_ukernel_mmt4d_type_t type,
+                                     const iree_vm_abi_mmt4d_t* args) {
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_host_size_t M = (iree_host_size_t)args->m;
   iree_host_size_t N = (iree_host_size_t)args->n;
@@ -647,33 +648,39 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_mmt4d_f32f32f32, mmt4d, v) {
   iree_host_size_t lhs_tile_size = M0 * K0;
   iree_host_size_t rhs_tile_size = N0 * K0;
   iree_host_size_t out_tile_size = M0 * N0;
+  int lhs_elem_size = iree_ukernel_mmt4d_lhs_elem_size(type);
+  int rhs_elem_size = iree_ukernel_mmt4d_rhs_elem_size(type);
+  int out_elem_size = iree_ukernel_mmt4d_out_elem_size(type);
   // Here are abusing the 2D-specific macros MAP_BUFFER_2D_* to query 4D arrays.
   // Thanks to the requirement that all dimensions but the outer-most one are
   // contiguous row-major, the outer-most stride is the only nontrivial stride,
   // we can correctly coalesce the inner 3 dimensions without changing the
   // mapped span.
-  MAP_BUFFER_2D_RO(lhs, float,
-                   /*buffer_ref=*/args->lhs_ref,
-                   /*offset=*/args->lhs_offset,
-                   /*stride0=*/args->lhs_row_stride,
-                   /*stride1=*/1,
-                   /*size0=*/M,
-                   /*size1=*/K* lhs_tile_size);
-  MAP_BUFFER_2D_RO(rhs, float,
-                   /*buffer_ref=*/args->rhs_ref,
-                   /*offset=*/args->rhs_offset,
-                   /*stride0=*/args->rhs_row_stride,
-                   /*stride1=*/1,
-                   /*size0=*/N,
-                   /*size1=*/K* rhs_tile_size);
-  MAP_BUFFER_2D_RW(out, float,
-                   /*buffer_ref=*/args->out_ref,
-                   /*offset=*/args->out_offset,
-                   /*stride0=*/args->out_row_stride,
-                   /*stride1=*/1,
-                   /*size0=*/M,
-                   /*size1=*/N* out_tile_size);
-  iree_ukernel_mmt4d_f32f32f32_params_t ukernel_params = {
+  MAP_BUFFER_2D_UNTYPED_RO(lhs,
+                           /*dtype_size=*/lhs_elem_size,
+                           /*buffer_ref=*/args->lhs_ref,
+                           /*offset=*/args->lhs_offset,
+                           /*stride0=*/args->lhs_row_stride,
+                           /*stride1=*/1,
+                           /*size0=*/M,
+                           /*size1=*/K * lhs_tile_size);
+  MAP_BUFFER_2D_UNTYPED_RO(rhs, /*dtype_size=*/rhs_elem_size,
+                           /*buffer_ref=*/args->rhs_ref,
+                           /*offset=*/args->rhs_offset,
+                           /*stride0=*/args->rhs_row_stride,
+                           /*stride1=*/1,
+                           /*size0=*/N,
+                           /*size1=*/K * rhs_tile_size);
+  MAP_BUFFER_2D_UNTYPED_RW(out, /*dtype_size=*/out_elem_size,
+                           /*buffer_ref=*/args->out_ref,
+                           /*offset=*/args->out_offset,
+                           /*stride0=*/args->out_row_stride,
+                           /*stride1=*/1,
+                           /*size0=*/M,
+                           /*size1=*/N * out_tile_size);
+  iree_ukernel_mmt4d_params_t ukernel_params = {
+      .type = type,
+      .flags = args->flags,
       .lhs_buffer = lhs,
       .rhs_buffer = rhs,
       .out_buffer = out,
@@ -686,76 +693,23 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_mmt4d_f32f32f32, mmt4d, v) {
       .M0 = M0,
       .N0 = N0,
       .K0 = K0,
-      .flags = args->flags,
+      .cpu_data_field_0 = iree_cpu_data_field(0),
   };
-  int ukernel_retcode = iree_ukernel_mmt4d_f32f32f32(&ukernel_params);
+  iree_ukernel_mmt4d_status_t status = iree_ukernel_mmt4d(&ukernel_params);
   IREE_TRACE_ZONE_END(z0);
-  if (ukernel_retcode) {
+  if (status != iree_ukernel_mmt4d_status_ok) {
     return iree_make_status(IREE_STATUS_INTERNAL,
-                            iree_ukernel_mmt4d_error_message(ukernel_retcode));
+                            iree_ukernel_mmt4d_status_message(status));
   }
   return iree_ok_status();
 }
 
+IREE_VMVX_ABI_EXPORT(iree_vmvx_mmt4d_f32f32f32, mmt4d, v) {
+  return iree_vmvx_mmt4d(iree_ukernel_mmt4d_type_f32f32f32, args);
+}
+
 IREE_VMVX_ABI_EXPORT(iree_vmvx_mmt4d_i8i8i32, mmt4d, v) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-  iree_host_size_t M = (iree_host_size_t)args->m;
-  iree_host_size_t N = (iree_host_size_t)args->n;
-  iree_host_size_t K = (iree_host_size_t)args->k;
-  iree_host_size_t M0 = (iree_host_size_t)args->m0;
-  iree_host_size_t N0 = (iree_host_size_t)args->n0;
-  iree_host_size_t K0 = (iree_host_size_t)args->k0;
-  iree_host_size_t lhs_tile_size = M0 * K0;
-  iree_host_size_t rhs_tile_size = N0 * K0;
-  iree_host_size_t out_tile_size = M0 * N0;
-  // Here are abusing the 2D-specific macros MAP_BUFFER_2D_* to query 4D arrays.
-  // Thanks to the requirement that all dimensions but the outer-most one are
-  // contiguous row-major, the outer-most stride is the only nontrivial stride,
-  // we can correctly coalesce the inner 3 dimensions without changing the
-  // mapped span.
-  MAP_BUFFER_2D_RO(lhs, int8_t,
-                   /*buffer_ref=*/args->lhs_ref,
-                   /*offset=*/args->lhs_offset,
-                   /*stride0=*/args->lhs_row_stride,
-                   /*stride1=*/1,
-                   /*size0=*/M,
-                   /*size1=*/K * lhs_tile_size);
-  MAP_BUFFER_2D_RO(rhs, int8_t,
-                   /*buffer_ref=*/args->rhs_ref,
-                   /*offset=*/args->rhs_offset,
-                   /*stride0=*/args->rhs_row_stride,
-                   /*stride1=*/1,
-                   /*size0=*/N,
-                   /*size1=*/K * rhs_tile_size);
-  MAP_BUFFER_2D_RW(out, int32_t,
-                   /*buffer_ref=*/args->out_ref,
-                   /*offset=*/args->out_offset,
-                   /*stride0=*/args->out_row_stride,
-                   /*stride1=*/1,
-                   /*size0=*/M,
-                   /*size1=*/N * out_tile_size);
-  iree_ukernel_mmt4d_i8i8i32_params_t ukernel_params = {
-      .lhs_buffer = lhs,
-      .rhs_buffer = rhs,
-      .out_buffer = out,
-      .lhs_stride = lhs_stride0,
-      .rhs_stride = rhs_stride0,
-      .out_stride = out_stride0,
-      .M = M,
-      .N = N,
-      .K = K,
-      .M0 = M0,
-      .N0 = N0,
-      .K0 = K0,
-      .flags = args->flags,
-  };
-  int ukernel_retcode = iree_ukernel_mmt4d_i8i8i32(&ukernel_params);
-  IREE_TRACE_ZONE_END(z0);
-  if (ukernel_retcode) {
-    return iree_make_status(IREE_STATUS_INTERNAL,
-                            iree_ukernel_mmt4d_error_message(ukernel_retcode));
-  }
-  return iree_ok_status();
+  return iree_vmvx_mmt4d(iree_ukernel_mmt4d_type_i8i8i32, args);
 }
 
 //===----------------------------------------------------------------------===//
