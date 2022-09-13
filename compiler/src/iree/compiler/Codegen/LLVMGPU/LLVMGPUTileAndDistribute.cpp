@@ -29,6 +29,8 @@
 #include "mlir/Transforms/Passes.h"
 #include "mlir/Transforms/SideEffectUtils.h"
 
+using mlir::iree_compiler::IREE::LinalgExt::TilingPatterns;
+
 #define DEBUG_TYPE "iree-llvmgpu-tile-and-distribute"
 
 namespace mlir {
@@ -66,9 +68,8 @@ static void populateTilingReductionPatterns(RewritePatternSet &patterns) {
           StringAttr::get(context, getWorkgroupMemoryMarker())},
       StringAttr::get(context, getWorkgroupKTiledMarker()));
   filter.setMatchByDefault();
-  linalg::TilingPatterns<linalg::MatmulOp, linalg::BatchMatmulOp,
-                         linalg::GenericOp>::insert(patterns, tilingOptions,
-                                                    filter);
+  TilingPatterns<linalg::MatmulOp, linalg::BatchMatmulOp,
+                 linalg::GenericOp>::insert(patterns, tilingOptions, filter);
 }
 
 /// Return the tile size associated to one thread or warp based on the number of
@@ -134,10 +135,8 @@ static void populateTilingToWarpPatterns(
        StringAttr::get(context, getWorkgroupMemoryMarker())},
       StringAttr::get(context, getVectorizeMarker()));
   filter.setMatchByDefault();
-  linalg::TilingPatterns<linalg::MatmulOp, linalg::FillOp,
-                         linalg::BatchMatmulOp,
-                         linalg::GenericOp>::insert(patterns, tilingOptions,
-                                                    filter);
+  TilingPatterns<linalg::MatmulOp, linalg::FillOp, linalg::BatchMatmulOp,
+                 linalg::GenericOp>::insert(patterns, tilingOptions, filter);
 }
 
 /// Patterns for thread level tiling.

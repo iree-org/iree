@@ -7,7 +7,7 @@
 #include <numeric>
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree-dialects/Dialect/LinalgExt/Passes/Transforms.h"
+#include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
@@ -18,6 +18,8 @@
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
+using mlir::iree_compiler::IREE::LinalgExt::TilingPatterns;
 
 #define DEBUG_TYPE "iree-llvmgpu-tile-tensor"
 
@@ -53,9 +55,8 @@ static void populateTilingReductionPatterns(RewritePatternSet &patterns) {
           StringAttr::get(context, getWorkgroupMemoryMarker())},
       StringAttr::get(context, getWorkgroupKTiledMarker()));
   filter.setMatchByDefault();
-  linalg::TilingPatterns<linalg::MatmulOp, linalg::BatchMatmulOp,
-                         linalg::GenericOp>::insert(patterns, tilingOptions,
-                                                    filter);
+  TilingPatterns<linalg::MatmulOp, linalg::BatchMatmulOp,
+                 linalg::GenericOp>::insert(patterns, tilingOptions, filter);
 }
 
 LogicalResult tileReduction(func::FuncOp funcOp) {

@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
@@ -13,6 +14,9 @@
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
+
+using mlir::iree_compiler::IREE::LinalgExt::LinalgVectorizationPattern;
+using mlir::iree_compiler::IREE::LinalgExt::VectorizationPatterns;
 
 namespace mlir {
 namespace iree_compiler {
@@ -28,9 +32,9 @@ static void populateVectorizationPatterns(RewritePatternSet &patterns) {
   linalg::LinalgVectorizationOptions opt;
   linalg::LinalgTransformationFilter f(
       StringAttr::get(patterns.getContext(), getVectorizeMarker()));
-  linalg::VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(
-      patterns, opt, f);
-  patterns.add<linalg::LinalgVectorizationPattern>(
+  VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(patterns,
+                                                                   opt, f);
+  patterns.add<LinalgVectorizationPattern>(
       patterns.getContext(), f.addOpFilter<linalg::ContractionOpInterface>(),
       opt);
   vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
@@ -42,8 +46,8 @@ static Optional<SmallVector<int64_t>> unrollOrder(Operation *op) {
   if (!contract) return llvm::None;
   SmallVector<int64_t> order;
   // Pick an unrolling order that will allow tensorcore operation to reuse LHS
-  // register. THis is needed to get good performance on sm_80 target.
-  // First make reduction the outter dimensions.
+  // register. This is needed to get good performance on sm_80 target.
+  // First make reduction the outer dimensions.
   for (auto iter : llvm::enumerate(contract.getIteratorTypes())) {
     if (isReductionIterator(iter.value())) order.push_back(iter.index());
   }

@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <numeric>
 
+#include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
@@ -22,6 +23,9 @@
 #include "mlir/Support/MathExtras.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
+
+using mlir::iree_compiler::IREE::LinalgExt::LinalgVectorizationPattern;
+using mlir::iree_compiler::IREE::LinalgExt::VectorizationPatterns;
 
 //====---------------------------------------------------------------------===//
 // Pass to lower workgroup memory copy to distibuted
@@ -86,7 +90,7 @@ static void populateTilingCopyToWorkgroupMemPatterns(
 }
 
 static void populateVectorizationPatterns(RewritePatternSet &patterns) {
-  linalg::VectorizationPatterns<linalg::GenericOp>::insert(
+  VectorizationPatterns<linalg::GenericOp>::insert(
       patterns, linalg::LinalgVectorizationOptions(),
       linalg::LinalgTransformationFilter(StringAttr::get(
           patterns.getContext(), getCopyToWorkgroupMemoryMarker())));
