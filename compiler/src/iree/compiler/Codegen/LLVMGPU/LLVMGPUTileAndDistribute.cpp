@@ -206,25 +206,15 @@ static SmallVector<int64_t> getTransposedOperands(linalg::GenericOp linalgOp) {
 using PromotionFilterFunction = std::function<LogicalResult(Operation *op)>;
 
 /// Returns true if op is appropriate transpose for promotion.
-static LogicalResult transposeFilter(
-    Operation *op, ArrayRef<int64_t> filterOperandsToPromote) {
+static LogicalResult transposeFilter(Operation *op,
+                                     linalg::GenericOp promotedFilterOp) {
   auto linalgOp = dyn_cast<linalg::GenericOp>(op);
   if (!linalgOp) return failure();
 
   if (linalgOp.getNumParallelLoops() < 2) {
     return failure();
   }
-
-  // Ensure the operands to promote matches this filter.
-  SmallVector<int64_t> operandsToPromote = getTransposedOperands(linalgOp);
-  if (operandsToPromote.size() != filterOperandsToPromote.size()) {
-    return failure();
-  }
-  if (operandsToPromote != filterOperandsToPromote) {
-    return failure();
-  } else {
-    return success();
-  }
+  return success(linalgOp == promotedFilterOp);
 }
 
 /// Returns true if op is appropriate contract for promotion.
@@ -369,8 +359,8 @@ struct LLVMGPUTileAndDistributePass
                     getTransposedOperands(linalgOp);
                 populatePromotionPatterns(
                     context, promotionPatterns,
-                    [operandsToPromote](Operation *op) -> LogicalResult {
-                      return transposeFilter(op, operandsToPromote);
+                    [linalgOp](Operation *op) -> LogicalResult {
+                      return transposeFilter(op, linalgOp);
                     },
                     operandsToPromote);
               });
