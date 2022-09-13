@@ -193,10 +193,10 @@ class IreeRuleFactory(object):
     # Module target: <package_name>_iree-module-<model_id>-<compile_config_id>
     target_name = f"iree-module-{target_id}"
 
-    # Module path: <iree_artifacts_dir>/<model_id>_<model_name>/<compile_config_id>.vmfb
+    # Module path: <iree_artifacts_dir>/<model_id>_<model_name>/compile_<compile_config_id>/module.vmfb
     output_path = os.path.join(self._iree_artifacts_dir,
                                f"{model_id}_{model_name}",
-                               f"{compile_config.id}.vmfb")
+                               f"compile_{compile_config.id}", "module.vmfb")
 
     compile_flags = self._generate_iree_compile_flags(
         compile_config=compile_config,

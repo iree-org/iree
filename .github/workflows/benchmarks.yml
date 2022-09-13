@@ -61,6 +61,7 @@ jobs:
       TF_BINARIES_DIR: ${{ inputs.tf-binaries-dir }}
       TF_BINARIES_ARCHIVE: ${{ inputs.tf-binaries-archive }}
       TF_BINARIES_GCS_ARTIFACT: ${{ inputs.tf-binaries-gcs-artifact }}
+      BUILD_SUITES_DIR: "build-benchmarks-suites"
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
@@ -75,12 +76,29 @@ jobs:
       - name: "Extracting TF binaries archive"
         run: tar -xf "${TF_BINARIES_ARCHIVE}"
       - name: "Building benchmarks"
+        id: build
         run: |
           build_tools/github_actions/docker_run.sh \
             --env "IREE_TF_BINARIES_DIR=${TF_BINARIES_DIR}" \
             --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
+            --env "BUILD_BENCHMARKS_DIR=${BUILD_SUITES_DIR}" \
             gcr.io/iree-oss/base@sha256:5d43683c6b50aebe1fca6c85f2012f3b0fa153bf4dd268e8767b619b1891423a \
             build_tools/cmake/build_benchmarks.sh
+          echo "::set-output name=benchmark-suites-dir::${BUILD_SUITES_DIR}/benchmark_suites"
+      - name: "Archive artifacts"
+        env:
+          BENCHMARK_SUITES_DIR: ${{ steps.build.outputs.benchmark-suites-dir }}
+        run: |
+          find "${BENCHMARK_SUITES_DIR}/iree" -type d -name "compile_*" | xargs -i \
+            tar -zcvf "{}.tar.gz" "{}"
+      - name: "Upload artifacts"
+        env:
+          BENCHMARK_SUITES_GCS_ARTIFACT_DIR: ${{ inputs.gcs-dir }}/benchmark-suites
+        # Switch to the benchmark suites directory so we can get the relative path.
+        working-directory: ${{ steps.build.outputs.benchmark-suites-dir }}
+        run: |
+          find "iree" -type f -name "compile_*.tar.gz" | xargs -i \
+            gcloud alpha storage cp "{}" "${BENCHMARK_SUITES_GCS_ARTIFACT_DIR}/{}"
 
   build_tools:
     runs-on:

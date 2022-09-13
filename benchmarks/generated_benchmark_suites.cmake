@@ -40,12 +40,12 @@ iree_import_tflite_model(
 # Mark dependency so users can import models without compiling them.
 add_dependencies(iree-benchmark-import-models "${_PACKAGE_NAME}_iree-import-model-7d45f8e5-bb5e-48d0-928d-8f125104578f")
 
-# Compile the module "${_IREE_ARTIFACTS_DIR}/7d45f8e5-bb5e-48d0-928d-8f125104578f_mobilenet_v2/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9.vmfb"
+# Compile the module "${_IREE_ARTIFACTS_DIR}/7d45f8e5-bb5e-48d0-928d-8f125104578f_mobilenet_v2/compile_e7e18b0f-c72d-4f1c-89b1-5afee70df6e9/module.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
   MODULE_FILE_NAME
-    "${_IREE_ARTIFACTS_DIR}/7d45f8e5-bb5e-48d0-928d-8f125104578f_mobilenet_v2/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9.vmfb"
+    "${_IREE_ARTIFACTS_DIR}/7d45f8e5-bb5e-48d0-928d-8f125104578f_mobilenet_v2/compile_e7e18b0f-c72d-4f1c-89b1-5afee70df6e9/module.vmfb"
   SRC
     "${_IREE_ARTIFACTS_DIR}/7d45f8e5-bb5e-48d0-928d-8f125104578f_mobilenet_v2/mobilenet_v2.mlir"
   FLAGS
