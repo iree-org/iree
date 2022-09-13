@@ -6,6 +6,11 @@
 
 include(CMakeParseArguments)
 
+set(IREE_TARGET_BACKENDS_SUPPORTING_TARGET_CPU_FEATURES
+  llvm-cpu
+  vmvx
+)
+
 # Helper for iree_check_test and iree_trace_runner_test.
 # Just a thin wrapper around iree_bytecode_module, passing it some
 # common flags, including the appropriate --iree-llvm-target-triple in the
@@ -48,11 +53,10 @@ function(iree_bytecode_module_for_iree_check_test_and_friends)
   endif()
 
   if(_RULE_TARGET_CPU_FEATURES)
-    if(NOT _RULE_TARGET_BACKEND STREQUAL "llvm-cpu")
+    if(NOT _RULE_TARGET_BACKEND IN_LIST IREE_TARGET_BACKENDS_SUPPORTING_TARGET_CPU_FEATURES)
       message(SEND_ERROR "TARGET_CPU_FEATURES should be empty when \
-TARGET_BACKEND is not llvm-cpu. Actual values: \
-TARGET_CPU_FEATURES=${_RULE_TARGET_CPU_FEATURES}, \
-TARGET_BACKEND=${_RULE_TARGET_BACKEND}.")
+TARGET_BACKEND is not in the list (${IREE_TARGET_BACKENDS_SUPPORTING_TARGET_CPU_FEATURES}). Actual values: \
+TARGET_CPU_FEATURES=${_RULE_TARGET_CPU_FEATURES}, TARGET_BACKEND=${_RULE_TARGET_BACKEND}.")
     endif()
     list(APPEND _RULE_FLAGS "--iree-llvm-target-cpu-features=${_RULE_TARGET_CPU_FEATURES}")
   endif()
