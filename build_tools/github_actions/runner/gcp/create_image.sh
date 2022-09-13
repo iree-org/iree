@@ -137,7 +137,14 @@ function create_image() {
     exit 1
   fi
 
-  echo "Startup finished successfully. Shutting down instance"
+  echo "Startup finished successfully."
+
+  echo "Deleting log file"
+  gcloud compute ssh "${INSTANCE_NAME}" --zone="${ZONE}" \
+    --no-user-output-enabled \
+    --command="rm /startup.log"
+
+  echo "Shutting down instance"
   # This actually does things synchronously, so we don't need our own loop to
   # wait.
   gcloud compute instances stop "${INSTANCE_NAME}" --zone="${ZONE}"
