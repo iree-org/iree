@@ -861,15 +861,12 @@ static bool canInsOperandTieWithOutsOperand(OpOperand *insOperand) {
   if (!linalgOp) return false;
 
   AffineMap insOperandIndexingMap = linalgOp.getTiedIndexingMap(insOperand);
-  if (insOperandIndexingMap.isProjectedPermutation() &&
-      !insOperandIndexingMap.isIdentity()) {
-    // If the operand is a projected permutation a small stack might be fine.
-    // So return true.
-    return true;
-  }
 
   auto canTieWithOutsOperand = [&](OpOperand *outsOperand) {
-    if (linalgOp.getTiedIndexingMap(outsOperand) != insOperandIndexingMap) {
+    // If the operand is a projected permutation a small stack might be fine.
+    // So return true.
+    if ((linalgOp.getTiedIndexingMap(outsOperand) != insOperandIndexingMap) &&
+        !insOperandIndexingMap.isProjectedPermutation()) {
       return false;
     }
     // TODO(#8411): Until ops are vectorized (always), we need
