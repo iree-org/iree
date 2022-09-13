@@ -387,7 +387,16 @@ static Operation *findSingleDefiningOp(Operation *replacedOp,
       .Case<scf::ForOp>([&](scf::ForOp) -> Operation * {
         return findSingleForOpDefiningAll(range);
       })
-      .Default([](Operation *) -> Operation * { return nullptr; });
+      .Default([&](Operation *) -> Operation * {
+        Operation *definingOp = range[0].getDefiningOp();
+        if (llvm::all_of(range, [&](Value v) {
+              return v.getDefiningOp() == definingOp;
+            }))
+          return definingOp;
+        // TODO: The op was replaced with values from different ops and/or
+        // block arguments. This case is not supported yet.
+        return nullptr;
+      });
 }
 
 void mlir::TrackingListener::notifyOperationReplaced(Operation *op,
