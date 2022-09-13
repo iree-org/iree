@@ -120,6 +120,8 @@ static flatbuffers_uint8_vec_ref_t serializeEmbeddedData(
           llvm::support::endianness::little,
           ArrayRef<char>(reinterpret_cast<char *>(bytePtr),
                          static_cast<size_t>(totalSize))))) {
+    mlir::emitError(loc) << "constant attribute failed to serialize: "
+                            "unsupported format or encoding";
     return {};
   }
 
@@ -420,23 +422,25 @@ static LogicalResult buildFlatBufferModule(
   // layout planning by preserving the order in the IR is useful.
   SmallVector<iree_vm_RodataSegmentDef_ref_t, 8> rodataSegmentRefs;
   for (auto &rodataRef : llvm::reverse(rodataRefs)) {
-    flatbuffers_uint8_vec_ref_t embedded_ref = 0;
-    if (!rodataRef.archiveFile.has_value()) {
-      embedded_ref = serializeEmbeddedData(
-          rodataRef.rodataOp.getLoc(), rodataRef.rodataOp.getValue(),
-          rodataRef.alignment, rodataRef.totalSize, fbb);
-    }
-    iree_vm_RodataSegmentDef_start(fbb);
     if (rodataRef.archiveFile.has_value()) {
+      // Data is already in the file at a calculated offset.
+      iree_vm_RodataSegmentDef_start(fbb);
       iree_vm_RodataSegmentDef_external_data_offset_add(
           fbb, rodataRef.archiveFile->relativeOffset +
                    rodataRef.archiveFile->prefixLength);
       iree_vm_RodataSegmentDef_external_data_length_add(
           fbb, rodataRef.archiveFile->fileLength);
+      rodataSegmentRefs.push_back(iree_vm_RodataSegmentDef_end(fbb));
     } else {
-      iree_vm_RodataSegmentDef_embedded_data_add(fbb, embedded_ref);
+      // Serialize the embedded data first so that we can reference it.
+      flatbuffers_uint8_vec_ref_t embeddedRef = serializeEmbeddedData(
+          rodataRef.rodataOp.getLoc(), rodataRef.rodataOp.getValue(),
+          rodataRef.alignment, rodataRef.totalSize, fbb);
+      if (!embeddedRef) return failure();
+      iree_vm_RodataSegmentDef_start(fbb);
+      iree_vm_RodataSegmentDef_embedded_data_add(fbb, embeddedRef);
+      rodataSegmentRefs.push_back(iree_vm_RodataSegmentDef_end(fbb));
     }
-    rodataSegmentRefs.push_back(iree_vm_RodataSegmentDef_end(fbb));
   }
   std::reverse(rodataSegmentRefs.begin(), rodataSegmentRefs.end());
 
