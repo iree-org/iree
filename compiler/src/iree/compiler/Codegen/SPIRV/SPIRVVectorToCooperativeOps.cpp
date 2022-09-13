@@ -125,9 +125,9 @@ struct ConvertVectorContractOp final
 
     // Check that this is a matmul operation.
     auto iterators = contractOp.getIteratorTypes().getValue();
-    if (iterators.size() != 3 || !isParallelIterator(iterators[0]) ||
-        !isParallelIterator(iterators[1]) ||
-        !isReductionIterator(iterators[2])) {
+    if (iterators.size() != 3 || !vector::isParallelIterator(iterators[0]) ||
+        !vector::isParallelIterator(iterators[1]) ||
+        !vector::isReductionIterator(iterators[2])) {
       return failure();
     }
     if (contractOp.getKind() != vector::CombiningKind::ADD) return failure();
