@@ -2807,15 +2807,8 @@ class ConstZeroOpConversion : public OpConversionPattern<ConstZeroOpTy> {
       ConstZeroOpTy constZeroOp, Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const final {
     auto type = constZeroOp.getType();
-    Attribute value;
 
-    if (type.template isa<IntegerType>()) {
-      value = rewriter.getIntegerAttr(type, 0);
-    } else if (type.template isa<FloatType>()) {
-      value = rewriter.getFloatAttr(type, 0.0);
-    } else {
-      return failure();
-    }
+    Attribute value = rewriter.getZeroAttr(type);
 
     rewriter.replaceOpWithNewOp<emitc::ConstantOp>(constZeroOp, type, value);
     return success();
