@@ -32,7 +32,7 @@ function startup() {
   systemctl disable apt-daily-upgrade.service
 
   # Don't install documentation (except copyrights) since this is a CI system.
-  cat > /etc/dpkg/dpkg.cfg.d/99-github-actions <<EOF
+  cat > /etc/dpkg/dpkg.cfg.d/github-actions <<EOF
 force-all
 no-pager
 # don't install docs
@@ -46,7 +46,7 @@ EOF
 
   # Provide default apt options like --assume-yes and --quiet since this is
   # designed to run on CI.
-  cat > /etc/apt/apt.conf.d/99-github-actions <<EOF
+  cat > /etc/apt/apt.conf.d/github-actions <<EOF
 APT {
   Install-Recommends "false";
   HideAutoRemove "true";
@@ -101,7 +101,7 @@ EOF
   groups runner # Print out the groups of runner to verify this worked
 
   echo "enabling passwordless sudo for runner user"
-  echo "github ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/2001-runner
+  echo "runner ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/runner
 
 
 
