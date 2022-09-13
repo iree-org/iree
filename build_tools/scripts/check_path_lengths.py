@@ -16,6 +16,7 @@
 
 import argparse
 import os
+import pathlib
 import sys
 
 
@@ -25,12 +26,20 @@ def repo_relpath(repo_root, path):
 
 def parse_arguments():
   parser = argparse.ArgumentParser(description="Path length checker")
+  # The default limit was selected based on repository state when this script
+  # was added. If the max path length decreases, consider lowering this too.
   parser.add_argument("--limit",
                       help="Path length limit (inclusive)",
                       type=int,
                       default=75)
-  parser.add_argument("--include_tests",
-                      help="Includes /test directories",
+  parser.add_argument(
+      "--include_tests",
+      help=
+      "Includes /test directories. False by default as these don't usually generate problematic files during the build",
+      action="store_true",
+      default=False)
+  parser.add_argument("--verbose",
+                      help="Outputs detailed information about path lengths",
                       action="store_true",
                       default=False)
   args = parser.parse_args()
@@ -38,53 +47,47 @@ def parse_arguments():
 
 
 def main(args):
-  repo_root = os.path.dirname(
-      os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-  # Just look at the compiler directory for now.
-  compiler_dir = os.path.join(repo_root, "compiler")
+  repo_root = pathlib.Path(__file__).parent.parent.parent
 
-  directories = [repo_relpath(repo_root, x[0]) for x in os.walk(compiler_dir)]
-  if not args.include_tests:
-    directories = [dir for dir in directories if not dir.endswith("test")]
-  sorted_directories = sorted(directories, key=len)
+  # Just look at the compiler directory for now, since it has historically had
+  # by far the longest paths.
+  walk_root = os.path.join(repo_root, "compiler")
 
-  if not sorted_directories:
-    print("Did not find any directories")
-    return
+  longest_path_length = -1
+  long_paths = []
+  short_paths = []
+  for dirpath, _, _ in os.walk(walk_root):
+    # Don't descend into test directories, since they typically don't generate
+    # object files or binaries that could trip up the build system.
+    if not args.include_tests and "test" in dirpath:
+      continue
 
-  print("*** Path length, relative path (sorted by path length) ***")
-
-  print("Below the limit of {}:".format(args.limit))
-  passed_limit = False
-  number_above_limit = 0
-  number_below_limit = 0
-
-  for dir in sorted_directories:
-    dir_length = len(dir)
-    if dir_length > args.limit and not passed_limit:
-      print("Above the limit of {}:".format(args.limit))
-      passed_limit = True
-
-    if dir_length <= args.limit:
-      number_below_limit += 1
+    path = pathlib.Path(dirpath).relative_to(repo_root).as_posix()
+    if len(path) > args.limit:
+      long_paths.append(path)
     else:
-      number_above_limit += 1
+      short_paths.append(path)
+    longest_path_length = max(longest_path_length, len(path))
+  long_paths.sort(key=len)
+  short_paths.sort(key=len)
 
-    print("{:3d}, {}".format(dir_length, dir))
+  if args.verbose and short_paths:
+    print(f"These paths are shorter than the limit of {args.limit} characters:")
+    for path in short_paths:
+      print("{:3d}, {}".format(len(path), path))
 
-  # TODO(scotttodd): also scan/check file name lengths?
-
-  print("*** Summary ***")
-  print("{:3d} paths above the {} character limit".format(
-      number_above_limit, args.limit))
-  print("{:3d} paths below the {} character limit".format(
-      number_below_limit, args.limit))
-
-  if number_above_limit > 0:
-    print("Error: some source paths are too long")
-    print("  Long paths can be problematic when building on Windows")
-    print("  Please look at the output above and trim the longest paths")
+  if long_paths:
+    print(f"These paths are longer than the limit of {args.limit} characters:")
+    for path in long_paths:
+      print("{:3d}, {}".format(len(path), path))
+    print(
+        f"Error: {len(long_paths)} source paths are longer than {args.limit} characters."
+    )
+    print("  Long paths can be problematic when building on Windows.")
+    print("  Please look at the output above and trim the paths.")
     sys.exit(1)
+  else:
+    print(f"All path lengths are under the limit of {args.limit} characters.")
 
 
 if __name__ == "__main__":
