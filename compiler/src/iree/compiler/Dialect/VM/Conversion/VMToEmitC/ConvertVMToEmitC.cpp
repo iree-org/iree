@@ -2692,12 +2692,10 @@ class CompareRefOpConversion : public OpConversionPattern<CmpOpTy> {
       return cmpOp.emitError() << "parent func op not found in cache.";
     }
 
-    bool moveLhs = vmAnalysis.value().get().isLastValueUse(
-                       cmpOp.getLhs(), cmpOp.getOperation()) &&
-                   false;
-    bool moveRhs = vmAnalysis.value().get().isLastValueUse(
-                       cmpOp.getRhs(), cmpOp.getOperation()) &&
-                   false;
+    bool moveLhs =
+        vmAnalysis.value().get().isMove(cmpOp.getLhs(), cmpOp.getOperation());
+    bool moveRhs =
+        vmAnalysis.value().get().isMove(cmpOp.getRhs(), cmpOp.getOperation());
 
     Optional<Value> refLhs = typeConverter->materializeRef(cmpOp.getLhs());
 
@@ -2756,9 +2754,8 @@ class CompareRefNotZeroOpConversion
       return cmpOp.emitError() << "parent func op not found in cache.";
     }
 
-    bool move = vmAnalysis.value().get().isLastValueUse(cmpOp.getOperand(),
-                                                        cmpOp.getOperation()) &&
-                false;
+    bool move = vmAnalysis.value().get().isMove(cmpOp.getOperand(),
+                                                cmpOp.getOperation());
 
     Optional<Value> ref = typeConverter->materializeRef(cmpOp.getOperand());
 
@@ -3485,8 +3482,7 @@ class GlobalLoadStoreRefOpConversion
     Value srcRef = isLoad ? stateRef : localRef.value();
     Value destRef = isLoad ? localRef.value() : stateRef;
 
-    bool move =
-        vmAnalysis.value().get().isLastValueUse(localValue, op) && false;
+    bool move = vmAnalysis.value().get().isMove(localValue, op);
 
     returnIfError(
         /*rewriter=*/rewriter,
@@ -4084,9 +4080,8 @@ class ListSetRefOpConversion
     if (failed(vmAnalysis)) {
       return setOp.emitError() << "parent func op not found in cache.";
     }
-    bool move = vmAnalysis.value().get().isLastValueUse(setOp.value(),
-                                                        setOp.getOperation()) &&
-                false;
+    bool move =
+        vmAnalysis.value().get().isMove(setOp.value(), setOp.getOperation());
 
     StringRef callee =
         move ? "iree_vm_list_set_ref_move" : "iree_vm_list_set_ref_retain";
