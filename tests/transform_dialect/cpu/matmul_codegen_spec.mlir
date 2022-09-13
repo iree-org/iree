@@ -16,6 +16,6 @@ transform.with_pdl_patterns {
     transform.print {name = "after bufferize"}
 
     %func = transform.structured.match ops{["func.func"]} in %1
-    transform.iree.foreach_thread_to_workgroup %func
+    transform.iree.foreach_thread_to_workgroup %func tile_sizes [4]
   }
 }
