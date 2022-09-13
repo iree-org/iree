@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_CODEGEN_LLVMCPU_LINALGOPINFO_H_
-#define IREE_COMPILER_CODEGEN_LLVMCPU_LINALGOPINFO_H_
+#ifndef IREE_COMPILER_CODEGEN_COMMON_LINALGOPINFO_H_
+#define IREE_COMPILER_CODEGEN_COMMON_LINALGOPINFO_H_
 
 namespace mlir {
 
@@ -32,4 +32,4 @@ class LinalgOpInfo {
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_LLVMCPU_LINALGOPINFO_H_
+#endif  // IREE_COMPILER_CODEGEN_COMMON_LINALGOPINFO_H_

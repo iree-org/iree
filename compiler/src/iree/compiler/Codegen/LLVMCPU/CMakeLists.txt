@@ -15,7 +15,6 @@ iree_cc_library(
     LLVMCPU
   HDRS
     "KernelDispatch.h"
-    "LinalgOpInfo.h"
     "TargetMLTransformInfo.h"
   SRCS
     "ConvertToLLVM.cpp"
@@ -26,7 +25,6 @@ iree_cc_library(
     "LLVMCPULowerExecutableTarget.cpp"
     "LLVMCPUSynchronizeSymbolVisibility.cpp"
     "LLVMCPUUnfuseFMAOps.cpp"
-    "LinalgOpInfo.cpp"
     "Passes.cpp"
     "TargetMLTransformInfo.cpp"
     "VectorContractCustomKernels.cpp"

@@ -23,7 +23,6 @@ iree_compiler_cc_library(
         "LLVMCPULowerExecutableTarget.cpp",
         "LLVMCPUSynchronizeSymbolVisibility.cpp",
         "LLVMCPUUnfuseFMAOps.cpp",
-        "LinalgOpInfo.cpp",
         "Passes.cpp",
         "TargetMLTransformInfo.cpp",
         "VectorContractCustomKernels.cpp",
@@ -31,7 +30,6 @@ iree_compiler_cc_library(
     ],
     hdrs = [
         "KernelDispatch.h",
-        "LinalgOpInfo.h",
         "TargetMLTransformInfo.h",
     ],
     deps = [
