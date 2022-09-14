@@ -36,17 +36,6 @@ function get_latest_green() {
     local query_string="$(IFS="&" ; echo "${query_params[*]}")"
 
     local all_passing="true"
-    for workflow in "${REQUIRED_WORKFLOWS[@]}"; do
-      local successful_run_count="$(\
-        gh api --jq '.total_count' \
-        "/repos/openxla/iree/actions/workflows/${workflow}/runs?${query_string}" \
-      )"
-      # Any successful run of the workflow (including reruns) is OK.
-      if (( successful_run_count==0 )); then
-        all_passing="false"
-        break
-      fi
-    done
     if [[ "${all_passing}" == true ]]; then
       echo "${commit}"
       return 0
