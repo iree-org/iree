@@ -9,14 +9,13 @@ The rules will build required artifacts to run benchmarks.
 """
 
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Sequence
 import os
 import pathlib
 import string
 import urllib.parse
 
-from .definitions import common_definitions, iree_definitions
-from . import iree_benchmarks
+from e2e_test_framework.definitions import common_definitions, iree_definitions
 
 TEMPLATE_DIR = pathlib.Path(__file__).parent
 
@@ -259,10 +258,10 @@ class IreeRuleFactory(object):
     return flags
 
 
-def _generate_iree_benchmark_rules(common_rule_factory: CommonRuleFactory,
-                                   iree_artifacts_dir: str) -> List[str]:
+def _generate_iree_rules(
+    common_rule_factory: CommonRuleFactory, iree_artifacts_dir: str,
+    compile_specs: Sequence[iree_definitions.CompileSpec]) -> List[str]:
   iree_rule_factory = IreeRuleFactory(iree_artifacts_dir)
-  compile_specs, _ = iree_benchmarks.Linux_x86_64_Benchmarks.generate()
   for compile_spec in compile_specs:
     model = compile_spec.model
     compile_config = compile_spec.compile_config
@@ -280,8 +279,9 @@ def _generate_iree_benchmark_rules(common_rule_factory: CommonRuleFactory,
   return iree_rule_factory.generate_cmake_rules()
 
 
-def generate_benchmark_rules(model_artifacts_dir: str,
-                             iree_artifacts_dir: str) -> List[str]:
+def generate_rules(
+    model_artifacts_dir: str, iree_artifacts_dir: str,
+    iree_compile_specs: Sequence[iree_definitions.CompileSpec]) -> List[str]:
   """Generates cmake rules to build benchmarks.
   
   Args:
@@ -289,12 +289,13 @@ def generate_benchmark_rules(model_artifacts_dir: str,
       variable syntax in the path.
     iree_artifacts_dir: root directory to store generated IREE artifacts. Can
       contain CMake variable syntax in the path.
+    iree_compile_specs: compile specs for IREE targets.
   Returns:
     List of CMake rules.
   """
   common_rule_factory = CommonRuleFactory(model_artifacts_dir)
-  iree_rules = _generate_iree_benchmark_rules(common_rule_factory,
-                                              iree_artifacts_dir)
+  iree_rules = _generate_iree_rules(common_rule_factory, iree_artifacts_dir,
+                                    iree_compile_specs)
   # Currently the rules are simple so the common rules can be always put at the
   # top. Need a topological sort once the dependency gets complicated.
   return common_rule_factory.generate_cmake_rules() + iree_rules

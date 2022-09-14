@@ -8,10 +8,10 @@
 import itertools
 from typing import List, Tuple
 
-from .device_specs import linux_x86_64_specs
-from .models import model_groups
-from .definitions import common_definitions, iree_definitions
-from . import unique_ids
+from e2e_test_framework.device_specs import linux_x86_64_specs
+from e2e_test_framework.models import model_groups
+from e2e_test_framework.definitions import common_definitions, iree_definitions
+from e2e_test_framework import unique_ids
 
 MODULE_BENCHMARK_TOOL = "iree-benchmark-module"
 
@@ -33,15 +33,15 @@ class Linux_x86_64_Benchmarks(object):
   @classmethod
   def generate(
       cls
-  ) -> Tuple[List[iree_definitions.BenchmarkCompileSpec],
-             List[iree_definitions.BenchmarkRunSpec]]:
+  ) -> Tuple[List[iree_definitions.CompileSpec],
+             List[iree_definitions.RunSpec]]:
     """Generates IREE compile and run specs."""
 
     default_run_configs = cls._generate_default_run_configs()
 
     # Generate compile specs for mobile models.
     mobile_model_compile_specs = [
-        iree_definitions.BenchmarkCompileSpec(
+        iree_definitions.CompileSpec(
             compile_config=cls.CASCADELAKE_COMPILE_CONFIG, model=model)
         for model in model_groups.MOBILE
     ]
@@ -51,7 +51,7 @@ class Linux_x86_64_Benchmarks(object):
     for compile_spec, run_config in itertools.product(
         mobile_model_compile_specs, default_run_configs):
       mobile_model_run_specs.append(
-          iree_definitions.BenchmarkRunSpec(
+          iree_definitions.RunSpec(
               compile_spec=compile_spec,
               run_config=run_config,
               target_device_spec=linux_x86_64_specs.GCP_C2_STANDARD_16,
@@ -68,7 +68,7 @@ class Linux_x86_64_Benchmarks(object):
             tags=["full-inference", "default-flags"],
             loader=iree_definitions.RuntimeLoader.EMBEDDED_ELF,
             driver=iree_definitions.RuntimeDriver.LOCAL_SYNC,
-            benchmark_tool=MODULE_BENCHMARK_TOOL)
+            tool=MODULE_BENCHMARK_TOOL)
     ]
     for thread_num in [1, 4, 8]:
       run_configs.append(
@@ -77,6 +77,6 @@ class Linux_x86_64_Benchmarks(object):
               tags=[f"{thread_num}-thread", "full-inference", "default-flags"],
               loader=iree_definitions.RuntimeLoader.EMBEDDED_ELF,
               driver=iree_definitions.RuntimeDriver.LOCAL_TASK,
-              benchmark_tool=MODULE_BENCHMARK_TOOL,
+              tool=MODULE_BENCHMARK_TOOL,
               extra_flags=[f"--task_topology_group_count={thread_num}"]))
     return run_configs
