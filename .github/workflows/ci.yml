@@ -497,9 +497,10 @@ jobs:
     if: needs.setup.outputs.should-run == 'true'
     uses: ./.github/workflows/benchmarks.yml
     with:
+      # env.GCS_DIR is also duplicated in this workflow. See the note there on
+      # why this is.
       runner-group: ${{ needs.setup.outputs.runner-group }}
       runner-env: ${{ needs.setup.outputs.runner-env }}
-      gcs-dir: ${{ env.GCS_DIR }}
       build-dir: ${{ needs.build_all.outputs.build-dir }}
       build-dir-archive: ${{ needs.build_all.outputs.build-dir-archive }}
       build-dir-gcs-artifact: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
