@@ -623,9 +623,9 @@ jobs:
   # Depends on all the other jobs to provide a single anchor that indicates the
   # final status. Status reporting will become more sophisticated in the future.
   summary:
-    # Even if you have an explicit if condition, you still need to override
-    # GitHub's default behavior of not running if any dependencies failed.
-    if: always()
+    # Run even if dependent jobs failed, but *don't* run if the workflow is
+    # cancelled, which is what always() does.
+    if: failure() || success()
     runs-on: ubuntu-20.04
     needs:
       # Basic
