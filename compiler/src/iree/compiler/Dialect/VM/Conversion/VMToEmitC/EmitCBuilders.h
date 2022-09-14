@@ -71,6 +71,9 @@ Value sizeOf(OpBuilder builder, Location location, Attribute attr);
 
 Value sizeOf(OpBuilder builder, Location location, Value value);
 
+void memset(OpBuilder builder, Location location, Value dest, int ch,
+            Value count);
+
 Value arrayElementAddress(OpBuilder builder, Location location, Type type,
                           IntegerAttr index, Value operand);
 

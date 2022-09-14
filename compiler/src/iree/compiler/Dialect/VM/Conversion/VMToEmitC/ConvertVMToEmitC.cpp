@@ -58,7 +58,6 @@ void attachAttribute(Operation *op, StringRef name, Attribute value) {
 
 /// Create a call to memset to clear a struct
 LogicalResult clearStruct(OpBuilder builder, Value structValue) {
-  auto ctx = structValue.getContext();
   auto loc = structValue.getLoc();
 
   Value structPointerValue;
@@ -73,17 +72,7 @@ LogicalResult clearStruct(OpBuilder builder, Value structValue) {
     sizeValue = emitc_builders::sizeOf(builder, loc, structValue);
   }
 
-  builder.create<emitc::CallOp>(
-      /*location=*/loc,
-      /*type=*/TypeRange{},
-      /*callee=*/StringAttr::get(ctx, "memset"),
-      /*args=*/
-      ArrayAttr::get(ctx,
-                     {builder.getIndexAttr(0), builder.getUI32IntegerAttr(0),
-                      builder.getIndexAttr(1)}),
-      /*templateArgs=*/ArrayAttr{},
-      /*operands=*/
-      ArrayRef<Value>{structPointerValue, sizeValue});
+  emitc_builders::memset(builder, loc, structPointerValue, 0, sizeValue);
 
   return success();
 }
@@ -763,17 +752,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
                   {}, {allocatorArg, stateSize, voidPtr.getResult()},
                   /*typeConverter=*/typeConverter);
 
-    builder.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/TypeRange{},
-        /*callee=*/StringAttr::get(ctx, "memset"),
-        /*args=*/
-        ArrayAttr::get(ctx,
-                       {builder.getIndexAttr(0), builder.getUI32IntegerAttr(0),
-                        builder.getIndexAttr(1)}),
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/
-        ArrayRef<Value>{stateOp.getResult(), stateSize});
+    emitc_builders::memset(builder, loc, stateOp.getResult(), 0, stateSize);
 
     emitc_builders::structPtrMemberAssign(builder, loc,
                                           /*memberName=*/"allocator",
@@ -1147,17 +1126,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
                   {}, {allocatorArg, moduleSize, voidPtr.getResult()},
                   /*typeConverter=*/typeConverter);
 
-    builder.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/TypeRange{},
-        /*callee=*/StringAttr::get(ctx, "memset"),
-        /*args=*/
-        ArrayAttr::get(ctx,
-                       {builder.getIndexAttr(0), builder.getUI32IntegerAttr(0),
-                        builder.getIndexAttr(1)}),
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/
-        ArrayRef<Value>{module.getResult(), moduleSize});
+    emitc_builders::memset(builder, loc, module.getResult(), 0, moduleSize);
 
     emitc_builders::structPtrMemberAssign(builder, loc,
                                           /*memberName=*/"allocator",
@@ -2131,16 +2100,7 @@ class ImportOpConverter {
                                           /*value=*/byteSpanData);
 
     // memset(byteSpanData, 0, SIZE);
-    builder.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/TypeRange{},
-        /*callee=*/StringAttr::get(ctx, "memset"),
-        /*args=*/
-        ArrayAttr::get(ctx,
-                       {builder.getIndexAttr(0), builder.getI32IntegerAttr(0),
-                        builder.getIndexAttr(1)}),
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{byteSpanData, size});
+    emitc_builders::memset(builder, loc, byteSpanData, 0, size);
 
     return byteSpan;
   }

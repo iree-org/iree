@@ -159,6 +159,22 @@ Value sizeOf(OpBuilder builder, Location loc, Attribute attr) {
       .getResult(0);
 }
 
+void memset(OpBuilder builder, Location location, Value dest, int ch,
+            Value count) {
+  auto ctx = builder.getContext();
+  builder.create<emitc::CallOp>(
+      /*location=*/location,
+      /*type=*/TypeRange{},
+      /*callee=*/StringAttr::get(ctx, "memset"),
+      /*args=*/
+      ArrayAttr::get(ctx,
+                     {builder.getIndexAttr(0), builder.getUI32IntegerAttr(ch),
+                      builder.getIndexAttr(1)}),
+      /*templateArgs=*/ArrayAttr{},
+      /*operands=*/
+      ArrayRef<Value>{dest, count});
+}
+
 Value arrayElementAddress(OpBuilder builder, Location location, Type type,
                           IntegerAttr index, Value operand) {
   auto ctx = builder.getContext();

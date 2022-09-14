@@ -335,7 +335,7 @@ vm.module @my_module {
   // CHECK-NEXT: %[[ARGBYTESPANDATA:.+]] = emitc.cast %[[ARGBYTESPANDATAVOID]] : !emitc.ptr<!emitc.opaque<"void">> to !emitc.ptr<ui8>
   // CHECK-NEXT: emitc.call "EMITC_STRUCT_PTR_MEMBER_ASSIGN"(%[[ARGBYTESPAN]], %[[ARGSIZE]]) {args = [0 : index, #emitc.opaque<"data_length">, 1 : index]}
   // CHECK-NEXT: emitc.call "EMITC_STRUCT_PTR_MEMBER_ASSIGN"(%[[ARGBYTESPAN]], %[[ARGBYTESPANDATA]]) {args = [0 : index, #emitc.opaque<"data">, 1 : index]}
-  // CHECK-NEXT: emitc.call "memset"(%[[ARGBYTESPANDATA]], %[[ARGSIZE]]) {args = [0 : index, 0 : i32, 1 : index]}
+  // CHECK-NEXT: emitc.call "memset"(%[[ARGBYTESPANDATA]], %[[ARGSIZE]]) {args = [0 : index, 0 : ui32, 1 : index]}
 
   // Allocate space for the result.
   // CHECK-NEXT: %[[RESBYTESPAN:.+]] = emitc.call "EMITC_STRUCT_MEMBER_ADDRESS"(%[[ARGSTRUCT]]) {args = [0 : index, #emitc.opaque<"results">]}
@@ -344,7 +344,7 @@ vm.module @my_module {
   // CHECK-NEXT: %[[RESBYTESPANDATA:.+]] = emitc.cast %[[RESBYTESPANDATAVOID]] : !emitc.ptr<!emitc.opaque<"void">> to !emitc.ptr<ui8>
   // CHECK-NEXT: emitc.call "EMITC_STRUCT_PTR_MEMBER_ASSIGN"(%[[RESBYTESPAN]], %[[RESULTSIZE]]) {args = [0 : index, #emitc.opaque<"data_length">, 1 : index]}
   // CHECK-NEXT: emitc.call "EMITC_STRUCT_PTR_MEMBER_ASSIGN"(%[[RESBYTESPAN]], %[[RESBYTESPANDATA]]) {args = [0 : index, #emitc.opaque<"data">, 1 : index]}
-  // CHECK-NEXT: emitc.call "memset"(%[[RESBYTESPANDATA]], %[[RESULTSIZE]]) {args = [0 : index, 0 : i32, 1 : index]}
+  // CHECK-NEXT: emitc.call "memset"(%[[RESBYTESPANDATA]], %[[RESULTSIZE]]) {args = [0 : index, 0 : ui32, 1 : index]}
 
   // Check that we don't pack anything into the argument struct.
   // CHECK-NOT: emitc.call "EMITC_STRUCT_MEMBER"(%[[ARGSTRUCT]]) {args = [0 : index, #emitc.opaque<"arguments">]}
@@ -409,7 +409,7 @@ vm.module @my_module {
   // CHECK-NEXT: %[[ARGBYTESPANDATA:.+]] = emitc.cast %[[ARGBYTESPANDATAVOID]] : !emitc.ptr<!emitc.opaque<"void">> to !emitc.ptr<ui8>
   // CHECK-NEXT: emitc.call "EMITC_STRUCT_PTR_MEMBER_ASSIGN"(%[[ARGBYTESPAN]], %[[ARGSIZE]]) {args = [0 : index, #emitc.opaque<"data_length">, 1 : index]}
   // CHECK-NEXT: emitc.call "EMITC_STRUCT_PTR_MEMBER_ASSIGN"(%[[ARGBYTESPAN]], %[[ARGBYTESPANDATA]]) {args = [0 : index, #emitc.opaque<"data">, 1 : index]}
-  // CHECK-NEXT: emitc.call "memset"(%[[ARGBYTESPANDATA]], %[[ARGSIZE]]) {args = [0 : index, 0 : i32, 1 : index]}
+  // CHECK-NEXT: emitc.call "memset"(%[[ARGBYTESPANDATA]], %[[ARGSIZE]]) {args = [0 : index, 0 : ui32, 1 : index]}
 
   // Allocate space for the result.
   // CHECK-NEXT: %[[RESBYTESPAN:.+]] = emitc.call "EMITC_STRUCT_MEMBER_ADDRESS"(%[[ARGSTRUCT]]) {args = [0 : index, #emitc.opaque<"results">]}
@@ -419,7 +419,7 @@ vm.module @my_module {
   // CHECK-NEXT: %[[RESBYTESPANDATA:.+]] = emitc.cast %[[RESBYTESPANDATAVOID]] : !emitc.ptr<!emitc.opaque<"void">> to !emitc.ptr<ui8>
   // CHECK-NEXT: emitc.call "EMITC_STRUCT_PTR_MEMBER_ASSIGN"(%[[RESBYTESPAN]], %[[RESULTSIZE]]) {args = [0 : index, #emitc.opaque<"data_length">, 1 : index]}
   // CHECK-NEXT: emitc.call "EMITC_STRUCT_PTR_MEMBER_ASSIGN"(%[[RESBYTESPAN]], %[[RESBYTESPANDATA]]) {args = [0 : index, #emitc.opaque<"data">, 1 : index]}
-  // CHECK-NEXT: emitc.call "memset"(%[[RESBYTESPANDATA]], %[[RESULTSIZE]]) {args = [0 : index, 0 : i32, 1 : index]}
+  // CHECK-NEXT: emitc.call "memset"(%[[RESBYTESPANDATA]], %[[RESULTSIZE]]) {args = [0 : index, 0 : ui32, 1 : index]}
 
   // Pack the arguments into the struct.
   // Here we also create pointers for non-pointer types.
@@ -508,7 +508,7 @@ vm.module @my_module {
   // CHECK-NEXT: %[[ARGBYTESPANDATA:.+]] = emitc.cast %[[ARGBYTESPANDATAVOID]] : !emitc.ptr<!emitc.opaque<"void">> to !emitc.ptr<ui8>
   // CHECK-NEXT: emitc.call "EMITC_STRUCT_PTR_MEMBER_ASSIGN"(%[[ARGBYTESPAN]], %[[ARGSIZE]]) {args = [0 : index, #emitc.opaque<"data_length">, 1 : index]}
   // CHECK-NEXT: emitc.call "EMITC_STRUCT_PTR_MEMBER_ASSIGN"(%[[ARGBYTESPAN]], %[[ARGBYTESPANDATA]]) {args = [0 : index, #emitc.opaque<"data">, 1 : index]}
-  // CHECK-NEXT: emitc.call "memset"(%[[ARGBYTESPANDATA]], %[[ARGSIZE]]) {args = [0 : index, 0 : i32, 1 : index]}
+  // CHECK-NEXT: emitc.call "memset"(%[[ARGBYTESPANDATA]], %[[ARGSIZE]]) {args = [0 : index, 0 : ui32, 1 : index]}
 
   // Allocate space for the result.
   // CHECK-NEXT: %[[RESBYTESPAN:.+]] = emitc.call "EMITC_STRUCT_MEMBER_ADDRESS"(%[[ARGSTRUCT]]) {args = [0 : index, #emitc.opaque<"results">]}
@@ -518,7 +518,7 @@ vm.module @my_module {
   // CHECK-NEXT: %[[RESBYTESPANDATA:.+]] = emitc.cast %[[RESBYTESPANDATAVOID]] : !emitc.ptr<!emitc.opaque<"void">> to !emitc.ptr<ui8>
   // CHECK-NEXT: emitc.call "EMITC_STRUCT_PTR_MEMBER_ASSIGN"(%[[RESBYTESPAN]], %[[RESULTSIZE]]) {args = [0 : index, #emitc.opaque<"data_length">, 1 : index]}
   // CHECK-NEXT: emitc.call "EMITC_STRUCT_PTR_MEMBER_ASSIGN"(%[[RESBYTESPAN]], %[[RESBYTESPANDATA]]) {args = [0 : index, #emitc.opaque<"data">, 1 : index]}
-  // CHECK-NEXT: emitc.call "memset"(%[[RESBYTESPANDATA]], %[[RESULTSIZE]]) {args = [0 : index, 0 : i32, 1 : index]}
+  // CHECK-NEXT: emitc.call "memset"(%[[RESBYTESPANDATA]], %[[RESULTSIZE]]) {args = [0 : index, 0 : ui32, 1 : index]}
 
   // Pack the arguments into the struct.
   // Here we also create pointers for non-pointer types.
@@ -592,7 +592,7 @@ vm.module @my_module {
   // CHECK-NEXT: %[[ARGBYTESPANDATA:.+]] = emitc.cast %[[ARGBYTESPANDATAVOID]] : !emitc.ptr<!emitc.opaque<"void">> to !emitc.ptr<ui8>
   // CHECK-NEXT: emitc.call "EMITC_STRUCT_PTR_MEMBER_ASSIGN"(%[[ARGBYTESPAN]], %[[ARGSIZE]]) {args = [0 : index, #emitc.opaque<"data_length">, 1 : index]}
   // CHECK-NEXT: emitc.call "EMITC_STRUCT_PTR_MEMBER_ASSIGN"(%[[ARGBYTESPAN]], %[[ARGBYTESPANDATA]]) {args = [0 : index, #emitc.opaque<"data">, 1 : index]}
-  // CHECK-NEXT: emitc.call "memset"(%[[ARGBYTESPANDATA]], %[[ARGSIZE]]) {args = [0 : index, 0 : i32, 1 : index]}
+  // CHECK-NEXT: emitc.call "memset"(%[[ARGBYTESPANDATA]], %[[ARGSIZE]]) {args = [0 : index, 0 : ui32, 1 : index]}
 
   // Allocate space for the result.
   // CHECK-NEXT: %[[RESBYTESPAN:.+]] = emitc.call "EMITC_STRUCT_MEMBER_ADDRESS"(%[[ARGSTRUCT]]) {args = [0 : index, #emitc.opaque<"results">]}
@@ -601,7 +601,7 @@ vm.module @my_module {
   // CHECK-NEXT: %[[RESBYTESPANDATA:.+]] = emitc.cast %[[RESBYTESPANDATAVOID]] : !emitc.ptr<!emitc.opaque<"void">> to !emitc.ptr<ui8>
   // CHECK-NEXT: emitc.call "EMITC_STRUCT_PTR_MEMBER_ASSIGN"(%[[RESBYTESPAN]], %[[RESULTSIZE]]) {args = [0 : index, #emitc.opaque<"data_length">, 1 : index]}
   // CHECK-NEXT: emitc.call "EMITC_STRUCT_PTR_MEMBER_ASSIGN"(%[[RESBYTESPAN]], %[[RESBYTESPANDATA]]) {args = [0 : index, #emitc.opaque<"data">, 1 : index]}
-  // CHECK-NEXT: emitc.call "memset"(%[[RESBYTESPANDATA]], %[[RESULTSIZE]]) {args = [0 : index, 0 : i32, 1 : index]}
+  // CHECK-NEXT: emitc.call "memset"(%[[RESBYTESPANDATA]], %[[RESULTSIZE]]) {args = [0 : index, 0 : ui32, 1 : index]}
 
   // Pack the argument into the struct.
   // CHECK-NEXT: %[[ARGS:.+]] = emitc.call "EMITC_STRUCT_MEMBER"(%[[ARGSTRUCT]]) {args = [0 : index, #emitc.opaque<"arguments">]}
