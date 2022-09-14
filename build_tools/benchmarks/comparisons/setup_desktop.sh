@@ -53,6 +53,8 @@ IREE_MODEL_DIR="${ROOT_DIR}/models/iree"
 mkdir -p "${IREE_MODEL_DIR}/cuda"
 mkdir -p "${IREE_MODEL_DIR}/llvm-cpu"
 
+# Runs `iree-compile` on all TFLite files in directory. If compilation fails, we
+# keep going.
 for i in $(ls ${ROOT_DIR}/models/tflite/); do
   MODEL_NAME=$(basename $i .tflite)
   echo "Processing ${MODEL_NAME} ..."
