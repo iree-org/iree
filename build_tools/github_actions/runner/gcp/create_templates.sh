@@ -117,7 +117,7 @@ function create_template() {
     args+=(
       --machine-type=n1-standard-96
       --maintenance-policy=MIGRATE
-      --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${CPU_IMAGE},mode=rw,size=1000,type=pd-balanced"
+      --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${CPU_IMAGE},mode=rw,size=10,type=pd-balanced"
     )
   else
     echo "Got unrecognized type '${type}'" >2
