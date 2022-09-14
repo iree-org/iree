@@ -158,6 +158,8 @@ cc_binary(
         "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/hal",
+        "//runtime/src/iree/modules/hal:types",
+        "//runtime/src/iree/tooling:comparison",
         "//runtime/src/iree/tooling:context_util",
         "//runtime/src/iree/tooling:vm_util",
         "//runtime/src/iree/vm",

@@ -23,42 +23,44 @@
 
 // TODO(benvanik): drop use of stdio and make an iree_io_stream_t.
 #if defined(IREE_PLATFORM_WINDOWS)
-static uint64_t GetFileLength(FILE* file) {
+static uint64_t iree_file_query_length(FILE* file) {
   _fseeki64(file, 0, SEEK_END);
   uint64_t file_length = _ftelli64(file);
   _fseeki64(file, 0, SEEK_SET);
   return file_length;
 }
-static bool IsEOF(FILE* file, uint64_t file_length) {
+static bool iree_file_is_eof(FILE* file, uint64_t file_length) {
   return _ftelli64(file) == file_length;
 }
 #else
-static uint64_t GetFileLength(FILE* file) {
+static uint64_t iree_file_query_length(FILE* file) {
   fseeko(file, 0, SEEK_END);
   uint64_t file_length = ftello(file);
   fseeko(file, 0, SEEK_SET);
   return file_length;
 }
-static bool IsEOF(FILE* file, uint64_t file_length) {
+static bool iree_file_is_eof(FILE* file, uint64_t file_length) {
   return ftello(file) == file_length;
 }
 #endif  // IREE_PLATFORM_*
 
+using namespace iree;
+
 namespace iree {
 
-static iree_status_t LoadNdarraysFromFile(
+static iree_status_t iree_tooling_load_ndarrays_from_file(
     iree_string_view_t file_path, iree_hal_allocator_t* device_allocator,
     iree_vm_list_t* variant_list) {
   // Open the file for reading.
   std::string file_path_str(file_path.data, file_path.size);
-  FILE* file = std::fopen(file_path_str.c_str(), "rb");
+  FILE* file = fopen(file_path_str.c_str(), "rb");
   if (!file) {
     return iree_make_status(iree_status_code_from_errno(errno),
                             "failed to open file '%.*s'", (int)file_path.size,
                             file_path.data);
   }
 
-  uint64_t file_length = GetFileLength(file);
+  uint64_t file_length = iree_file_query_length(file);
 
   iree_hal_buffer_params_t buffer_params = {};
   buffer_params.usage = IREE_HAL_BUFFER_USAGE_DEFAULT;
@@ -66,7 +68,7 @@ static iree_status_t LoadNdarraysFromFile(
   buffer_params.type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
 
   iree_status_t status = iree_ok_status();
-  while (iree_status_is_ok(status) && !IsEOF(file, file_length)) {
+  while (iree_status_is_ok(status) && !iree_file_is_eof(file, file_length)) {
     iree_hal_buffer_view_t* buffer_view = NULL;
     status = iree_numpy_npy_load_ndarray(
         file, IREE_NUMPY_NPY_LOAD_OPTION_DEFAULT, buffer_params,
@@ -78,7 +80,7 @@ static iree_status_t LoadNdarraysFromFile(
     iree_hal_buffer_view_release(buffer_view);
   }
 
-  std::fclose(file);
+  fclose(file);
   return status;
 }
 
@@ -117,7 +119,7 @@ static iree_status_t CreateBufferViewFromFile(
 
   // Open the file for reading.
   std::string file_path_str(file_path.data, file_path.size);
-  FILE* file = std::fopen(file_path_str.c_str(), "rb");
+  FILE* file = fopen(file_path_str.c_str(), "rb");
   if (!file) {
     return iree_make_status(iree_status_code_from_errno(errno),
                             "failed to open file '%.*s'", (int)file_path.size,
@@ -138,8 +140,8 @@ static iree_status_t CreateBufferViewFromFile(
       +[](iree_hal_buffer_mapping_t* mapping, void* user_data) {
         auto* read_params = reinterpret_cast<read_params_t*>(user_data);
         size_t bytes_read =
-            std::fread(mapping->contents.data, 1, mapping->contents.data_length,
-                       read_params->file);
+            fread(mapping->contents.data, 1, mapping->contents.data_length,
+                  read_params->file);
         if (bytes_read != mapping->contents.data_length) {
           return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                                   "file contents truncated; expected %zu bytes "
@@ -150,7 +152,7 @@ static iree_status_t CreateBufferViewFromFile(
       },
       &read_params, out_buffer_view);
 
-  std::fclose(file);
+  fclose(file);
 
   return status;
 }
@@ -159,6 +161,8 @@ Status ParseToVariantList(iree_hal_allocator_t* device_allocator,
                           iree::span<const std::string> input_strings,
                           iree_allocator_t host_allocator,
                           iree_vm_list_t** out_list) {
+  IREE_TRACE_SCOPE();
+
   *out_list = NULL;
   vm::ref<iree_vm_list_t> variant_list;
   IREE_RETURN_IF_ERROR(iree_vm_list_create(
@@ -168,10 +172,11 @@ Status ParseToVariantList(iree_hal_allocator_t* device_allocator,
     iree_string_view_t input_view = iree_string_view_trim(iree_make_string_view(
         input_strings[i].data(), input_strings[i].size()));
     if (iree_string_view_consume_prefix(&input_view, IREE_SV("@"))) {
-      IREE_RETURN_IF_ERROR(LoadNdarraysFromFile(input_view, device_allocator,
-                                                variant_list.get()));
+      IREE_RETURN_IF_ERROR(iree_tooling_load_ndarrays_from_file(
+          input_view, device_allocator, variant_list.get()));
       continue;
-    } else if (iree_string_view_equal(input_view, IREE_SV("(null)"))) {
+    } else if (iree_string_view_equal(input_view, IREE_SV("(null)")) ||
+               iree_string_view_equal(input_view, IREE_SV("(ignored)"))) {
       iree_vm_ref_t null_ref = iree_vm_ref_null();
       IREE_RETURN_IF_ERROR(
           iree_vm_list_push_ref_retain(variant_list.get(), &null_ref));
@@ -245,66 +250,80 @@ Status ParseToVariantList(iree_hal_allocator_t* device_allocator,
   return OkStatus();
 }
 
+// Prints a buffer view with contents without a trailing newline.
+static iree_status_t PrintBufferView(iree_hal_buffer_view_t* buffer_view,
+                                     iree_host_size_t max_element_count,
+                                     std::ostream* os) {
+  std::string result_str(4096, '\0');
+  iree_status_t status;
+  do {
+    iree_host_size_t actual_length = 0;
+    status = iree_hal_buffer_view_format(buffer_view, max_element_count,
+                                         result_str.size() + 1, &result_str[0],
+                                         &actual_length);
+    result_str.resize(actual_length);
+  } while (iree_status_is_out_of_range(status));
+  IREE_RETURN_IF_ERROR(status);
+  *os << result_str;
+  return iree_ok_status();
+}
+
+// Prints variant description including a trailing newline.
+static Status PrintVariant(iree_vm_variant_t variant, size_t max_element_count,
+                           std::ostream* os) {
+  if (iree_vm_variant_is_empty(variant)) {
+    *os << "(null)\n";
+  } else if (iree_vm_variant_is_value(variant)) {
+    switch (variant.type.value_type) {
+      case IREE_VM_VALUE_TYPE_I8:
+        *os << "i8=" << variant.i8 << "\n";
+        break;
+      case IREE_VM_VALUE_TYPE_I16:
+        *os << "i16=" << variant.i16 << "\n";
+        break;
+      case IREE_VM_VALUE_TYPE_I32:
+        *os << "i32=" << variant.i32 << "\n";
+        break;
+      case IREE_VM_VALUE_TYPE_I64:
+        *os << "i64=" << variant.i64 << "\n";
+        break;
+      case IREE_VM_VALUE_TYPE_F32:
+        *os << "f32=" << variant.f32 << "\n";
+        break;
+      case IREE_VM_VALUE_TYPE_F64:
+        *os << "f64=" << variant.f64 << "\n";
+        break;
+      default:
+        *os << "?\n";
+        break;
+    }
+  } else if (iree_vm_variant_is_ref(variant)) {
+    iree_string_view_t type_name = iree_vm_ref_type_name(variant.type.ref_type);
+    *os << std::string(type_name.data, type_name.size) << "\n";
+    if (iree_hal_buffer_view_isa(variant.ref)) {
+      auto* buffer_view = iree_hal_buffer_view_deref(variant.ref);
+      IREE_RETURN_IF_ERROR(PrintBufferView(buffer_view, max_element_count, os));
+      *os << "\n";
+    } else {
+      // TODO(benvanik): a way for ref types to describe themselves.
+      *os << "(no printer)\n";
+    }
+  } else {
+    *os << "(null)\n";
+  }
+  return OkStatus();
+}
+
 Status PrintVariantList(iree_vm_list_t* variant_list, size_t max_element_count,
                         std::ostream* os) {
+  IREE_TRACE_SCOPE();
   for (iree_host_size_t i = 0; i < iree_vm_list_size(variant_list); ++i) {
     iree_vm_variant_t variant = iree_vm_variant_empty();
     IREE_RETURN_IF_ERROR(iree_vm_list_get_variant(variant_list, i, &variant),
                          "variant %zu not present", i);
-
     *os << "result[" << i << "]: ";
-    if (iree_vm_variant_is_empty(variant)) {
-      *os << "(null)\n";
-    } else if (iree_vm_variant_is_value(variant)) {
-      switch (variant.type.value_type) {
-        case IREE_VM_VALUE_TYPE_I8:
-          *os << "i8=" << variant.i8 << "\n";
-          break;
-        case IREE_VM_VALUE_TYPE_I16:
-          *os << "i16=" << variant.i16 << "\n";
-          break;
-        case IREE_VM_VALUE_TYPE_I32:
-          *os << "i32=" << variant.i32 << "\n";
-          break;
-        case IREE_VM_VALUE_TYPE_I64:
-          *os << "i64=" << variant.i64 << "\n";
-          break;
-        case IREE_VM_VALUE_TYPE_F32:
-          *os << "f32=" << variant.f32 << "\n";
-          break;
-        case IREE_VM_VALUE_TYPE_F64:
-          *os << "f64=" << variant.f64 << "\n";
-          break;
-        default:
-          *os << "?\n";
-          break;
-      }
-    } else if (iree_vm_variant_is_ref(variant)) {
-      iree_string_view_t type_name =
-          iree_vm_ref_type_name(variant.type.ref_type);
-      *os << std::string(type_name.data, type_name.size) << "\n";
-      if (iree_hal_buffer_view_isa(variant.ref)) {
-        auto* buffer_view = iree_hal_buffer_view_deref(variant.ref);
-        std::string result_str(4096, '\0');
-        iree_status_t status;
-        do {
-          iree_host_size_t actual_length = 0;
-          status = iree_hal_buffer_view_format(buffer_view, max_element_count,
-                                               result_str.size() + 1,
-                                               &result_str[0], &actual_length);
-          result_str.resize(actual_length);
-        } while (iree_status_is_out_of_range(status));
-        IREE_RETURN_IF_ERROR(status);
-        *os << result_str << "\n";
-      } else {
-        // TODO(benvanik): a way for ref types to describe themselves.
-        *os << "(no printer)\n";
-      }
-    } else {
-      *os << "(null)\n";
-    }
+    IREE_RETURN_IF_ERROR(PrintVariant(variant, max_element_count, os));
   }
-
   return OkStatus();
 }
 

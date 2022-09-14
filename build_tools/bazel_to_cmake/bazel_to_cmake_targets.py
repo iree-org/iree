@@ -39,6 +39,7 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//llvm:IPO": ["LLVMipo"],
     "@llvm-project//lld": ["${IREE_LLD_TARGET}"],
     "@llvm-project//llvm:FileCheck": ["FileCheck"],
+    "@llvm-project//llvm:not": ["not"],
     # MLIR
     "@llvm-project//mlir:AllPassesAndDialects": ["MLIRAllDialects"],
     "@llvm-project//mlir:DialectUtils": [""],
