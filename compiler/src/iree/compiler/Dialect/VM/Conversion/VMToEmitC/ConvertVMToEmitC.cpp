@@ -2159,13 +2159,7 @@ class ImportOpConverter {
 
         // memcpy(uint8Ptr, &arg, size);
         Value argPtr = emitc_builders::addressOf(builder, loc, arg);
-        builder.create<emitc::CallOp>(
-            /*location=*/loc,
-            /*type=*/TypeRange{},
-            /*callee=*/StringAttr::get(ctx, "memcpy"),
-            /*args=*/ArrayAttr{},
-            /*templateArgs=*/ArrayAttr{},
-            /*operands=*/ArrayRef<Value>{uint8Ptr, argPtr, size});
+        emitc_builders::memcpy(builder, loc, uint8Ptr, argPtr, size);
       }
 
       // Skip the addition in the last iteration.
@@ -2235,13 +2229,7 @@ class ImportOpConverter {
             emitc_builders::sizeOf(builder, loc, TypeAttr::get(valueType));
 
         // memcpy(arg, uint8Ptr, size);
-        builder.create<emitc::CallOp>(
-            /*location=*/loc,
-            /*type=*/TypeRange{},
-            /*callee=*/StringAttr::get(ctx, "memcpy"),
-            /*args=*/ArrayAttr{},
-            /*templateArgs=*/ArrayAttr{},
-            /*operands=*/ArrayRef<Value>{arg, uint8Ptr, size});
+        emitc_builders::memcpy(builder, loc, arg, uint8Ptr, size);
       }
 
       // Skip the addition in the last iteration.

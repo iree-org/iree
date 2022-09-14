@@ -71,6 +71,9 @@ Value sizeOf(OpBuilder builder, Location location, Attribute attr);
 
 Value sizeOf(OpBuilder builder, Location location, Value value);
 
+void memcpy(OpBuilder builder, Location location, Value dest, Value src,
+            Value count);
+
 void memset(OpBuilder builder, Location location, Value dest, int ch,
             Value count);
 

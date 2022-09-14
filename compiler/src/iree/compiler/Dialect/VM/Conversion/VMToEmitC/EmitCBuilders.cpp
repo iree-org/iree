@@ -159,6 +159,18 @@ Value sizeOf(OpBuilder builder, Location loc, Attribute attr) {
       .getResult(0);
 }
 
+void memcpy(OpBuilder builder, Location location, Value dest, Value src,
+            Value count) {
+  auto ctx = builder.getContext();
+  builder.create<emitc::CallOp>(
+      /*location=*/location,
+      /*type=*/TypeRange{},
+      /*callee=*/StringAttr::get(ctx, "memcpy"),
+      /*args=*/ArrayAttr{},
+      /*templateArgs=*/ArrayAttr{},
+      /*operands=*/ArrayRef<Value>{dest, src, count});
+}
+
 void memset(OpBuilder builder, Location location, Value dest, int ch,
             Value count) {
   auto ctx = builder.getContext();
