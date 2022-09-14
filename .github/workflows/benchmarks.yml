@@ -94,7 +94,7 @@ jobs:
       - name: "Upload artifacts"
         env:
           BENCHMARK_SUITES_GCS_ARTIFACT_DIR: ${{ inputs.gcs-dir }}/benchmark-suites
-        # Switch to the benchmark suites directory so we can get the relative path.
+        # Switch to the benchmark suites directory so we can get the relative path for GCS.
         working-directory: ${{ steps.build.outputs.benchmark-suites-dir }}
         run: |
           find "iree" -type f -name "compile_*.tar.gz" | xargs -i \
