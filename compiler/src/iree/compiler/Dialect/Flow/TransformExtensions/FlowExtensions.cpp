@@ -603,11 +603,7 @@ static bool isAfterRegion(Operation *op, Flow::DispatchRegionOp regionOp) {
 // All uses of the target inside of the dispatch region are replaced with the
 // results of the cloned op.
 //
-// If `updateUsesOutsideOfRegion` is set, all uses of the target op after the
-// dispatch region, are also updated: The target op's results are returned from
-// the dispatch region an used in those places.
-//
-// Example when `updateUsesOutsideOfRegion` is unset:
+// Example:
 //
 // %0 = "some_op"() : () -> (tensor<?xf32>)
 // %r = flow.dispatch.region -> (tensor<?xf32>{%d0}) {
@@ -615,9 +611,41 @@ static bool isAfterRegion(Operation *op, Flow::DispatchRegionOp regionOp) {
 //   flow.return %1 : tensor<?xf32>
 // }
 // %2 = "yet_another_use"(%0) : (tensor<?xf32>) -> (tensor<?xf32>)
+static LogicalResult clonePrecedingOpIntoDispatchRegion(
+    RewriterBase &rewriter, Operation *target,
+    Flow::DispatchRegionOp regionOp) {
+  Block &body = regionOp.getBody().front();
+
+  // Gather all uses of `target`.
+  SmallVector<OpOperand *> usesInsideOfRegion;
+  for (OpOperand &use : target->getUses()) {
+    if (regionOp->isProperAncestor(use.getOwner()))
+      usesInsideOfRegion.push_back(&use);
+  }
+
+  // Clone op into dispatch region.
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPointToStart(&body);
+  Operation *newTargetOp = rewriter.clone(*target);
+
+  // Replace all uses in the dispatch region.
+  for (OpOperand *use : usesInsideOfRegion) {
+    rewriter.updateRootInPlace(use->getOwner(), [&]() {
+      use->set(newTargetOp->getResult(
+          use->get().cast<OpResult>().getResultNumber()));
+    });
+  }
+
+  return success();
+}
+
+// Move a `target` op that is preceding the given dispatch region op into the
+// dispatch region.
 //
-// In this example, "some_op" will be cloned into the dispatch region and the
-// OpOperand of "another_op" will be replaced:
+// All uses of the target outside of the dispatch region are replaced with the
+// results of the cloned op.
+//
+// Example:
 //
 // %0 = "some_op"() : () -> (tensor<?xf32>)
 // %r = flow.dispatch.region -> (tensor<?xf32>{%d0}) {
@@ -626,72 +654,44 @@ static bool isAfterRegion(Operation *op, Flow::DispatchRegionOp regionOp) {
 //   flow.return %1 : tensor<?xf32>
 // }
 // %2 = "yet_another_use"(%0) : (tensor<?xf32>) -> (tensor<?xf32>)
-static FailureOr<Flow::DispatchRegionOp> clonePrecedingOpIntoDispatchRegion(
-    RewriterBase &rewriter, Operation *target, Flow::DispatchRegionOp regionOp,
-    bool updateUsesOutsideOfRegion) {
-  assert(target->isBeforeInBlock(regionOp) &&
-         "expected that target comes first");
+static FailureOr<Flow::DispatchRegionOp> movePrecedingOpIntoDispatchRegion(
+    RewriterBase &rewriter, Operation *target,
+    Flow::DispatchRegionOp regionOp) {
+#ifndef NDEBUG
+  PostDominanceInfo domInfo;
+  for (OpOperand &use : target->getUses()) {
+    if (regionOp->isProperAncestor(use.getOwner())) continue;
+    assert(domInfo.postDominates(use.getOwner(), regionOp) &&
+           "found use that does not post-dominate target");
+  }
+#endif  // NDEBUG
+
   Block &body = regionOp.getBody().front();
 
   // Gather all uses of `target`.
-  SmallVector<OpOperand *> usesInsideOfRegion, usesAfterRegion;
-  bool hasUsesBeforeRegion = false;
-  for (OpOperand &use : target->getUses()) {
-    if (regionOp->isProperAncestor(use.getOwner())) {
-      usesInsideOfRegion.push_back(&use);
-    } else {
-      // Collect only uses that post-dominate the region.
-      if (isAfterRegion(use.getOwner(), regionOp)) {
-        usesAfterRegion.push_back(&use);
-      } else {
-        hasUsesBeforeRegion = true;
-      }
-    }
-  }
+  SmallVector<OpOperand *> usesOutsideOfRegion;
+  for (OpOperand &use : target->getUses())
+    if (!regionOp->isProperAncestor(use.getOwner()))
+      usesOutsideOfRegion.push_back(&use);
 
-  // Clone op into dispatch region.
-  Operation *newTargetOp;
-  if (usesAfterRegion.empty() && !hasUsesBeforeRegion) {
-    // Optimization: If there are not uses outside of the region, we can simply
-    // move the target instead of cloning it.
-    target->moveBefore(&body.front());
-    newTargetOp = target;
-  } else {
-    OpBuilder::InsertionGuard guard(rewriter);
-    rewriter.setInsertionPointToStart(&body);
-    newTargetOp = rewriter.clone(*target);
-
-    // Replace all uses in the dispatch region.
-    for (OpOperand *use : usesInsideOfRegion) {
-      rewriter.updateRootInPlace(use->getOwner(), [&]() {
-        use->set(newTargetOp->getResult(
-            use->get().cast<OpResult>().getResultNumber()));
-      });
-    }
-  }
+  // Move op into dispatch region.
+  target->moveBefore(&body.front());
 
   // Replace all uses outside of the dispatch region.
-  if (updateUsesOutsideOfRegion && !usesAfterRegion.empty()) {
-    // Fail if there are uses before the dispatch region. In that case it does
-    // usually not make sense to update uses after the region; we can just keep
-    // using the original op result.
-    if (hasUsesBeforeRegion) return failure();
-
+  if (!usesOutsideOfRegion.empty()) {
     unsigned previousNumResults = regionOp->getNumResults();
 
     // Note: Appending results one-by-one here so that this can be extended to
     // specific results in the future. Many ops have just one result, so this
     // should not be a large overhead.
-    for (Value v : newTargetOp->getResults()) {
+    for (Value v : target->getResults()) {
       auto newRegionOp = appendDispatchRegionResult(rewriter, regionOp, v);
       if (failed(newRegionOp)) return failure();
       regionOp = *newRegionOp;
     }
 
     // Replace uses of `target` after the dispatch region.
-    for (OpOperand *use : usesAfterRegion) {
-      assert(DominanceInfo().properlyDominates(regionOp, use->getOwner()) &&
-             "all target uses must be inside or after regionOp");
+    for (OpOperand *use : usesOutsideOfRegion) {
       rewriter.updateRootInPlace(use->getOwner(), [&]() {
         use->set(
             regionOp->getResult(previousNumResults +
@@ -700,24 +700,7 @@ static FailureOr<Flow::DispatchRegionOp> clonePrecedingOpIntoDispatchRegion(
     }
   }
 
-  // Remove the original target if it no longer has any uses.
-  if (target->use_empty()) rewriter.eraseOp(target);
-
   return regionOp;
-}
-
-// Move a `target` op that is preceding the given dispatch region op into the
-// dispatch region. All uses of the target must be inside the region.
-static FailureOr<Flow::DispatchRegionOp> movePrecedingOpIntoDispatchRegion(
-    RewriterBase &rewriter, Operation *target,
-    Flow::DispatchRegionOp regionOp) {
-  assert(llvm::all_of(target->getUses(),
-                      [&](OpOperand &use) {
-                        return regionOp->isProperAncestor(use.getOwner());
-                      }) &&
-         "cannot move target into region");
-  return clonePrecedingOpIntoDispatchRegion(
-      rewriter, target, regionOp, /*updateUsesOutsideOfRegion=*/false);
 }
 
 DiagnosedSilenceableFailure
@@ -753,9 +736,51 @@ transform_dialect::ClonePrecedingOpIntoDispatchRegionOp::apply(
   SmallVector<Operation *> orderedTargets =
       llvm::to_vector(llvm::reverse(targetOps));
   IRRewriter rewriter(regionOp->getContext());
+  for (Operation *target : orderedTargets)
+    if (failed(clonePrecedingOpIntoDispatchRegion(rewriter, target, regionOp)))
+      return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+
+  transformResults.set(getTransformed().cast<OpResult>(),
+                       regionOp.getOperation());
+  return DiagnosedSilenceableFailure(success());
+}
+
+DiagnosedSilenceableFailure
+transform_dialect::MovePrecedingOpIntoDispatchRegionOp::apply(
+    transform::TransformResults &transformResults,
+    transform::TransformState &state) {
+  ArrayRef<Operation *> targetOps = state.getPayloadOps(getTarget());
+  ArrayRef<Operation *> dispatchRegion =
+      state.getPayloadOps(getDispatchRegion());
+
+  if (targetOps.empty() && dispatchRegion.empty()) {
+    transformResults.set(getResult().cast<OpResult>(),
+                         SmallVector<mlir::Operation *>{});
+    return DiagnosedSilenceableFailure::success();
+  }
+
+  if (dispatchRegion.size() != 1)
+    return DiagnosedSilenceableFailure(this->emitOpError(
+        "requires exactly one target/dispatch region handle"));
+
+  auto regionOp = dyn_cast<Flow::DispatchRegionOp>(dispatchRegion.front());
+  if (!regionOp)
+    return DiagnosedSilenceableFailure(
+        this->emitOpError("expected 'dispatch.region' operand"));
+
+  // We are cloning ops one-by-one, so the order must be inversed (as opposed
+  // to cloning all ops in one go).
+  SmallVector<Operation *> targetOpsList(targetOps.begin(), targetOps.end());
+  bool sortResult = computeTopologicalSorting(
+      dispatchRegion.front()->getBlock(), targetOpsList);
+  (void)sortResult;
+  assert(sortResult && "unable to sort topologically");
+  SmallVector<Operation *> orderedTargets =
+      llvm::to_vector(llvm::reverse(targetOps));
+  IRRewriter rewriter(regionOp->getContext());
   for (Operation *target : orderedTargets) {
-    auto newRegionOp = clonePrecedingOpIntoDispatchRegion(
-        rewriter, target, regionOp, getUpdateUsesOutsideOfRegion());
+    auto newRegionOp =
+        movePrecedingOpIntoDispatchRegion(rewriter, target, regionOp);
     if (failed(newRegionOp))
       return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
     regionOp = *newRegionOp;
@@ -915,8 +940,8 @@ transform_dialect::WrapInDispatchRegionOp::applyToOne(
       makeEmptyDispatchRegion(rewriter, target->getLoc());
 
   // Move the target into the dispatch region.
-  auto newRegionOp = clonePrecedingOpIntoDispatchRegion(
-      rewriter, target, regionOp, /*updateUsesOutsideOfRegion=*/true);
+  auto newRegionOp =
+      movePrecedingOpIntoDispatchRegion(rewriter, target, regionOp);
   if (failed(newRegionOp))
     return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
 

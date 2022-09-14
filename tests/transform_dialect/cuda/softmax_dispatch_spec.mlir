@@ -14,8 +14,8 @@ transform.with_pdl_patterns {
     // TODO: this could be replaced by a C++ only version.
     // Atm the IR produced is not the same so all pieces do not connect.
     %region_op = transform.iree.wrap_in_dispatch_region %root
-    %region_op_2 = transform.iree.clone_preceding_op_into_dispatch_region %red into %region_op
-    %region_op_3 = transform.iree.clone_preceding_op_into_dispatch_region %fill into %region_op_2
+    %region_op_2 = transform.iree.move_preceding_op_into_dispatch_region %red into %region_op
+    %region_op_3 = transform.iree.move_preceding_op_into_dispatch_region %fill into %region_op_2
     transform.iree.region_to_workgroups %region_op_3
   }
 }
