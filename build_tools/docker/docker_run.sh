@@ -22,7 +22,7 @@ function docker_run() {
     # Make the source repository available and launch containers in that
     # directory.
     DOCKER_RUN_ARGS=(
-      --volume="${DOCKER_HOST_WORKDIR}:${DOCKER_CONTAINER_WORKDIR}"
+      --mount="type=bind,source=${DOCKER_HOST_WORKDIR},dst=${DOCKER_CONTAINER_WORKDIR}"
       --workdir="${DOCKER_CONTAINER_WORKDIR}"
     )
 
@@ -53,17 +53,17 @@ function docker_run() {
     # want these scripts to be runnable locally for debugging.
     # Instead we dump the results of `getent` to some fake files.
     local fake_etc_dir="${DOCKER_HOST_TMPDIR}/fake_etc"
-    mkdir -p "${fake_etc_dir?}"
+    mkdir -p "${fake_etc_dir}"
 
-    local fake_group="${fake_etc_dir?}/group"
-    local fake_passwd="${fake_etc_dir?}/passwd"
+    local fake_group="${fake_etc_dir}/group"
+    local fake_passwd="${fake_etc_dir}/passwd"
 
-    getent group > "${fake_group?}"
-    getent passwd > "${fake_passwd?}"
+    getent group > "${fake_group}"
+    getent passwd > "${fake_passwd}"
 
     DOCKER_RUN_ARGS+=(
-      --volume="${fake_group?}:/etc/group:ro"
-      --volume="${fake_passwd?}:/etc/passwd:ro"
+      --mount="type=bind,src=${fake_group},dst=/etc/group,readonly"
+      --mount="type=bind,src=${fake_passwd},dst=/etc/passwd,readonly"
     )
 
 
@@ -84,19 +84,22 @@ function docker_run() {
     mkdir -p "${fake_home_dir}"
 
     DOCKER_RUN_ARGS+=(
-      --volume="${fake_home_dir?}:${HOME?}"
+      --mount="type=bind,src=${fake_home_dir},dst=${HOME}"
     )
 
-    # Make gcloud credentials available. This isn't necessary when running in
-    # GCE but enables using this script locally with remote caching.
-    DOCKER_RUN_ARGS+=(
-      --volume="${HOME?}/.config/gcloud:${HOME?}/.config/gcloud:ro"
-    )
+    # Make gcloud credentials available if they are present. This isn't
+    # necessary when running in GCE but enables using this script locally with
+    # remote caching.
+    if [[ -d "${HOME}/.config/gcloud" ]]; then
+      DOCKER_RUN_ARGS+=(
+        --mount="type=bind,src=${HOME}/.config/gcloud,dst=${HOME}/.config/gcloud,readonly"
+      )
+    fi
 
     # Give the container a ramdisk and set the Bazel sandbox base to point to
     # it. This helps a lot with Bazel getting IO bound.
     DOCKER_RUN_ARGS+=(
-      --tmpfs /dev/shm
+      --mount="type=tmpfs,dst=/dev/shm"
       --env SANDBOX_BASE=/dev/shm
     )
 
