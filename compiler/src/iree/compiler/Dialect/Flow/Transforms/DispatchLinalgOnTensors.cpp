@@ -198,14 +198,14 @@ bool isClonableIntoDispatchOp(Operation *op) {
 /// For a given operation returns the loop ranges needed to compute the op.
 template <typename T>
 static SmallVector<Range> getLoopRanges(T operation, Location loc,
-                                        PatternRewriter &rewriter);
+                                        OpBuilder &builder);
 
 template <>
 SmallVector<Range> getLoopRanges<TilingInterface>(TilingInterface tilableOp,
                                                   Location loc,
-                                                  PatternRewriter &rewriter) {
-  SmallVector<Range> loopRanges = tilableOp.getIterationDomain(rewriter);
-  Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+                                                  OpBuilder &builder) {
+  SmallVector<Range> loopRanges = tilableOp.getIterationDomain(builder);
+  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
   for (auto iteratorType : llvm::enumerate(tilableOp.getLoopIteratorTypes())) {
     if (iteratorType.value() == getReductionIteratorTypeName()) {
       loopRanges[iteratorType.index()].size = one;
@@ -216,27 +216,26 @@ SmallVector<Range> getLoopRanges<TilingInterface>(TilingInterface tilableOp,
 
 template <>
 SmallVector<Range> getLoopRanges<tensor::InsertSliceOp>(
-    tensor::InsertSliceOp insertSliceOp, Location loc,
-    PatternRewriter &rewriter) {
-  OpFoldResult zero = rewriter.getIndexAttr(0);
-  OpFoldResult one = rewriter.getIndexAttr(1);
+    tensor::InsertSliceOp insertSliceOp, Location loc, OpBuilder &builder) {
+  OpFoldResult zero = builder.getIndexAttr(0);
+  OpFoldResult one = builder.getIndexAttr(1);
   Value source = insertSliceOp.getSource();
   SmallVector<Range> loopRanges(insertSliceOp.getSourceType().getRank(),
                                 Range{zero, one, one});
   for (auto dim : llvm::seq<unsigned>(0, loopRanges.size())) {
     loopRanges[dim].size =
-        rewriter.create<tensor::DimOp>(loc, source, dim).getResult();
+        builder.create<tensor::DimOp>(loc, source, dim).getResult();
   }
   return loopRanges;
 }
 
 template <>
 SmallVector<Range> getLoopRanges<tensor::ExtractSliceOp>(
-    tensor::ExtractSliceOp sliceOp, Location loc, PatternRewriter &rewriter) {
-  Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-  Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+    tensor::ExtractSliceOp sliceOp, Location loc, OpBuilder &builder) {
+  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
+  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
   ReifiedRankedShapedTypeDims resultDims;
-  (void)sliceOp.reifyResultShapes(rewriter, resultDims);
+  (void)sliceOp.reifyResultShapes(builder, resultDims);
   return llvm::to_vector(llvm::map_range(resultDims[0], [&](Value v) {
     return Range{zero, v, one};
   }));
@@ -244,21 +243,21 @@ SmallVector<Range> getLoopRanges<tensor::ExtractSliceOp>(
 
 /// Compute the workload to use for the workgroup based on the root op.
 template <typename OpTy>
-static SmallVector<Value> getWorkloadForRootOp(PatternRewriter &rewriter,
+static SmallVector<Value> getWorkloadForRootOp(OpBuilder &builder,
                                                OpTy rootOp) {
   // Compute workgroup count to use for the dispatch op. These are the ranges
   // of the outermost parallel loops that can be distributed.
   Location loc = rootOp->getLoc();
-  SmallVector<Range> loopRanges = getLoopRanges(rootOp, loc, rewriter);
+  SmallVector<Range> loopRanges = getLoopRanges(rootOp, loc, builder);
   AffineExpr s0, s1, s2;
-  bindSymbols(rewriter.getContext(), s0, s1, s2);
+  bindSymbols(builder.getContext(), s0, s1, s2);
   AffineMap workload = AffineMap::get(0, 3, (s1 - s0).ceilDiv(s2));
   return llvm::to_vector(llvm::map_range(loopRanges, [&](Range r) -> Value {
-    Value offset = getValueOrCreateConstantIndexOp(rewriter, loc, r.offset);
-    Value size = getValueOrCreateConstantIndexOp(rewriter, loc, r.size);
-    Value stride = getValueOrCreateConstantIndexOp(rewriter, loc, r.stride);
-    return rewriter.create<AffineApplyOp>(rootOp.getLoc(), workload,
-                                          ValueRange{offset, size, stride});
+    Value offset = getValueOrCreateConstantIndexOp(builder, loc, r.offset);
+    Value size = getValueOrCreateConstantIndexOp(builder, loc, r.size);
+    Value stride = getValueOrCreateConstantIndexOp(builder, loc, r.stride);
+    return builder.create<AffineApplyOp>(rootOp.getLoc(), workload,
+                                         ValueRange{offset, size, stride});
   }));
 }
 
