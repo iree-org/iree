@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/ConvertRegionToWorkgroups.h"
 #include "iree/compiler/Dialect/Flow/Transforms/DispatchLinalgOnTensors.h"
+#include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -482,227 +483,6 @@ DiagnosedSilenceableFailure transform_dialect::RegionToWorkgroupsOp::applyToOne(
   return DiagnosedSilenceableFailure(success());
 }
 
-/// Return `true` if the given type is a ShapedType and has at least one
-/// dynamic dimension.
-static bool hasDynamicShape(Type t) {
-  auto shapedType = t.dyn_cast<ShapedType>();
-  if (!shapedType) return false;
-  return !shapedType.hasStaticShape();
-}
-
-/// Reify the dynamic dimensions of the given value.
-static LogicalResult reifyDynamicResultDims(OpBuilder b, Value value,
-                                            SmallVector<Value> &dynamicDims) {
-  OpBuilder::InsertionGuard guard(b);
-
-  // Case 1: No dynamic result dims.
-  if (!hasDynamicShape(value.getType())) return success();
-
-  // There is at least one dynamic dimension, continue...
-  ShapedType shapedType = value.getType().cast<ShapedType>();
-
-  // Case 2: Value is a block argument.
-  if (auto bbArg = value.dyn_cast<BlockArgument>()) {
-    b.setInsertionPointToStart(bbArg.getOwner());
-    for (int64_t i = 0; i < shapedType.getRank(); ++i) {
-      if (shapedType.isDynamicDim(i)) {
-        Value dim = b.create<tensor::DimOp>(bbArg.getLoc(), bbArg, i);
-        dynamicDims.push_back(dim);
-      }
-    }
-    return success();
-  }
-
-  // Value is an OpResult.
-  Operation *op = value.getDefiningOp();
-  OpResult opResult = value.cast<OpResult>();
-  b.setInsertionPoint(op);
-
-  // Case 3: Value is tied. Reify the dimensions of the tied operand.
-  auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(op);
-  if (tiedOp) {
-    Value tiedOperand = tiedOp.getTiedResultOperand(value);
-    if (tiedOperand) {
-#ifndef NDEBUG
-      ShapedType tiedOperandType = tiedOperand.getType().cast<ShapedType>();
-      assert(tiedOperandType == shapedType && "expected same type");
-#endif  // NDEBUG
-      return reifyDynamicResultDims(b, tiedOperand, dynamicDims);
-    }
-  }
-
-  // Case 4: Query ShapeAwareOpInterface.
-  auto shapeAwareOp = dyn_cast<IREE::Util::ShapeAwareOpInterface>(op);
-  if (shapeAwareOp) {
-    ValueRange dims =
-        shapeAwareOp.getResultDynamicDims(opResult.getResultNumber());
-    dynamicDims.append(dims.begin(), dims.end());
-    return success();
-  }
-
-  // Case 5: Query ReifyRankedShapedTypeOpInterface.
-  auto reifyShapeOp = dyn_cast<ReifyRankedShapedTypeOpInterface>(op);
-  if (reifyShapeOp) {
-    ReifiedRankedShapedTypeDims dims;
-    if (failed(reifyShapeOp.reifyResultShapes(b, dims))) return failure();
-    for (int64_t i = 0; i < shapedType.getRank(); ++i)
-      if (shapedType.isDynamicDim(i))
-        dynamicDims.push_back(dims[opResult.getResultNumber()][i]);
-    return success();
-  }
-
-  return failure();
-}
-
-// Append a result to the given DispatchRegionOp. The newly created
-// DispatchRegionOp is returned.
-static FailureOr<Flow::DispatchRegionOp> appendDispatchRegionResult(
-    RewriterBase &rewriter, Flow::DispatchRegionOp regionOp, Value result) {
-  OpBuilder::InsertionGuard guard(rewriter);
-
-  // Determine dynamic result dims.
-  rewriter.setInsertionPoint(regionOp);
-  SmallVector<Value> dynamicDims(regionOp.getResultDims().begin(),
-                                 regionOp.getResultDims().end());
-  if (failed(reifyDynamicResultDims(rewriter, result, dynamicDims)))
-    return failure();
-
-  // Determine result types of new RegionOp.
-  SmallVector<Type> resultTypes(regionOp.getResultTypes().begin(),
-                                regionOp.getResultTypes().end());
-  resultTypes.push_back(result.getType());
-
-  // Create new DispatchRegionOp and move over the body.
-  auto newRegionOp = rewriter.create<Flow::DispatchRegionOp>(
-      regionOp->getLoc(), resultTypes, dynamicDims);
-  newRegionOp.getBody().takeBody(regionOp.getBody());
-  rewriter.replaceOp(
-      regionOp, newRegionOp.getResults().take_front(regionOp->getNumResults()));
-
-  // Update terminator.
-  Flow::ReturnOp returnOp =
-      cast<Flow::ReturnOp>(newRegionOp.getBody().front().getTerminator());
-  SmallVector<Value> returnedValues(returnOp.getOperands().begin(),
-                                    returnOp.getOperands().end());
-  returnedValues.push_back(result);
-  returnOp.operandsMutable().assign(returnedValues);
-
-  return newRegionOp;
-}
-
-/// Return `true` if the given op post-dominates the dispatch region.
-static bool isAfterRegion(Operation *op, Flow::DispatchRegionOp regionOp) {
-  Operation *ancestor = regionOp->getBlock()->findAncestorOpInBlock(*op);
-  assert(ancestor && "expected that op and regionOp are in the same block");
-  return regionOp->isBeforeInBlock(ancestor);
-}
-
-// Clone a `target` op that is preceding the given dispatch region op into the
-// dispatch region.
-//
-// All uses of the target inside of the dispatch region are replaced with the
-// results of the cloned op.
-//
-// Example:
-//
-// %0 = "some_op"() : () -> (tensor<?xf32>)
-// %r = flow.dispatch.region -> (tensor<?xf32>{%d0}) {
-//   %1 = "another_op"(%0) : (tensor<?xf32>) -> (tensor<?xf32>)
-//   flow.return %1 : tensor<?xf32>
-// }
-// %2 = "yet_another_use"(%0) : (tensor<?xf32>) -> (tensor<?xf32>)
-static LogicalResult clonePrecedingOpIntoDispatchRegion(
-    RewriterBase &rewriter, Operation *target,
-    Flow::DispatchRegionOp regionOp) {
-  Block &body = regionOp.getBody().front();
-
-  // Gather all uses of `target`.
-  SmallVector<OpOperand *> usesInsideOfRegion;
-  for (OpOperand &use : target->getUses()) {
-    if (regionOp->isProperAncestor(use.getOwner()))
-      usesInsideOfRegion.push_back(&use);
-  }
-
-  // Clone op into dispatch region.
-  OpBuilder::InsertionGuard guard(rewriter);
-  rewriter.setInsertionPointToStart(&body);
-  Operation *newTargetOp = rewriter.clone(*target);
-
-  // Replace all uses in the dispatch region.
-  for (OpOperand *use : usesInsideOfRegion) {
-    rewriter.updateRootInPlace(use->getOwner(), [&]() {
-      use->set(newTargetOp->getResult(
-          use->get().cast<OpResult>().getResultNumber()));
-    });
-  }
-
-  return success();
-}
-
-// Move a `target` op that is preceding the given dispatch region op into the
-// dispatch region.
-//
-// All uses of the target outside of the dispatch region are replaced with the
-// results of the cloned op.
-//
-// Example:
-//
-// %0 = "some_op"() : () -> (tensor<?xf32>)
-// %r = flow.dispatch.region -> (tensor<?xf32>{%d0}) {
-//   %0_clone = "some_op"() : () -> (tensor<?xf32>)
-//   %1 = "another_op"(%0_clone) : (tensor<?xf32>) -> (tensor<?xf32>)
-//   flow.return %1 : tensor<?xf32>
-// }
-// %2 = "yet_another_use"(%0) : (tensor<?xf32>) -> (tensor<?xf32>)
-static FailureOr<Flow::DispatchRegionOp> movePrecedingOpIntoDispatchRegion(
-    RewriterBase &rewriter, Operation *target,
-    Flow::DispatchRegionOp regionOp) {
-#ifndef NDEBUG
-  PostDominanceInfo domInfo;
-  for (OpOperand &use : target->getUses()) {
-    if (regionOp->isProperAncestor(use.getOwner())) continue;
-    assert(domInfo.postDominates(use.getOwner(), regionOp) &&
-           "found use that does not post-dominate target");
-  }
-#endif  // NDEBUG
-
-  Block &body = regionOp.getBody().front();
-
-  // Gather all uses of `target`.
-  SmallVector<OpOperand *> usesOutsideOfRegion;
-  for (OpOperand &use : target->getUses())
-    if (!regionOp->isProperAncestor(use.getOwner()))
-      usesOutsideOfRegion.push_back(&use);
-
-  // Move op into dispatch region.
-  target->moveBefore(&body.front());
-
-  // Replace all uses outside of the dispatch region.
-  if (!usesOutsideOfRegion.empty()) {
-    unsigned previousNumResults = regionOp->getNumResults();
-
-    // Note: Appending results one-by-one here so that this can be extended to
-    // specific results in the future. Many ops have just one result, so this
-    // should not be a large overhead.
-    for (Value v : target->getResults()) {
-      auto newRegionOp = appendDispatchRegionResult(rewriter, regionOp, v);
-      if (failed(newRegionOp)) return failure();
-      regionOp = *newRegionOp;
-    }
-
-    // Replace uses of `target` after the dispatch region.
-    for (OpOperand *use : usesOutsideOfRegion) {
-      rewriter.updateRootInPlace(use->getOwner(), [&]() {
-        use->set(
-            regionOp->getResult(previousNumResults +
-                                use->get().cast<OpResult>().getResultNumber()));
-      });
-    }
-  }
-
-  return regionOp;
-}
-
 DiagnosedSilenceableFailure
 transform_dialect::ClonePrecedingOpIntoDispatchRegionOp::apply(
     transform::TransformResults &transformResults,
@@ -933,19 +713,11 @@ transform_dialect::WrapInDispatchRegionOp::applyToOne(
     Operation *target, SmallVectorImpl<Operation *> &results,
     transform::TransformState &state) {
   IRRewriter rewriter(target->getContext());
-
-  // Make an empty dispatch region right before the target.
-  rewriter.setInsertionPointAfter(target);
-  Flow::DispatchRegionOp regionOp =
-      makeEmptyDispatchRegion(rewriter, target->getLoc());
-
-  // Move the target into the dispatch region.
-  auto newRegionOp =
-      movePrecedingOpIntoDispatchRegion(rewriter, target, regionOp);
-  if (failed(newRegionOp))
+  auto regionOp = Flow::wrapOpInDispatchRegion(rewriter, target);
+  if (failed(regionOp))
     return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
 
-  results.push_back(*newRegionOp);
+  results.push_back(*regionOp);
   return DiagnosedSilenceableFailure(success());
 }
 
