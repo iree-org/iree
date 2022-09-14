@@ -54,6 +54,10 @@ env:
   # See note above regarding lack of proper variables. Also see note about
   # pseudo-ternary hack.
   _CI_STAGE: ${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+  # This needs to be in env instead of the outputs of setup because it contains
+  # the run attempt and we want that to be the current attempt, not whatever
+  # attempt the setup step last ran in.
+  GCS_DIR: gs://iree-github-actions-${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}-artifacts/${{ github.run_id }}/${{ github.run_attempt }}
 
 # Jobs are organized into groups and topologically sorted by dependencies
 jobs:
@@ -68,7 +72,6 @@ jobs:
       should-run: ${{ steps.should-run.outputs.should-run }}
       # Variables for dependent jobs. See comment at top.
       runner-env: prod
-      gcs-dir: gs://iree-github-actions-${{ env._CI_STAGE }}-artifacts/${{ github.run_id }}/${{ github.run_attempt }}
       runner-group: ${{ env._CI_STAGE }}
       # Note that we can't flip the condition here because 0 is falsey. See
       # comment at top.
@@ -151,7 +154,7 @@ jobs:
         id: upload
         env:
           BUILD_DIR_ARCHIVE: ${{ steps.archive.outputs.build-dir-archive }}
-          BUILD_DIR_GCS_ARTIFACT: ${{ needs.setup.outputs.gcs-dir }}/${{ steps.archive.outputs.build-dir-archive }}
+          BUILD_DIR_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.build-dir-archive }}
         run: |
           gcloud alpha storage cp "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR_GCS_ARTIFACT}"
           echo "::set-output name=build-dir-gcs-artifact::${BUILD_DIR_GCS_ARTIFACT}"
@@ -358,7 +361,7 @@ jobs:
         id: upload
         env:
           BINARIES_ARCHIVE: ${{ steps.archive.outputs.binaries-archive }}
-          BINARIES_GCS_ARTIFACT: ${{ needs.setup.outputs.gcs-dir }}/${{ steps.archive.outputs.binaries-archive }}
+          BINARIES_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.binaries-archive }}
         run: |
           gcloud alpha storage cp "${BINARIES_ARCHIVE}" "${BINARIES_GCS_ARTIFACT}"
           echo "::set-output name=binaries-gcs-artifact::${BINARIES_GCS_ARTIFACT}"
@@ -494,9 +497,10 @@ jobs:
     if: needs.setup.outputs.should-run == 'true'
     uses: ./.github/workflows/benchmarks.yml
     with:
+      # env.GCS_DIR is also duplicated in this workflow. See the note there on
+      # why this is.
       runner-group: ${{ needs.setup.outputs.runner-group }}
       runner-env: ${{ needs.setup.outputs.runner-env }}
-      gcs-dir: ${{ needs.setup.outputs.gcs-dir }}
       build-dir: ${{ needs.build_all.outputs.build-dir }}
       build-dir-archive: ${{ needs.build_all.outputs.build-dir-archive }}
       build-dir-gcs-artifact: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
