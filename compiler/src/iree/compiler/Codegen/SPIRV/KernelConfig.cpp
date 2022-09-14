@@ -663,8 +663,10 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
     for (const auto &it : llvm::enumerate(linalgOp.getIteratorTypes())) {
       auto i = it.index();
       if (loopBounds[i] % 4 != 0) continue;
-      if (linalg::isReductionIterator(it.value()) || workgroupTileSizes[i] == 0)
+      if (linalg::isReductionIterator(it.value()) ||
+          workgroupTileSizes[i] == 0) {
         loopTileSizes[it.index()] = 4;
+      }
     }
     if (llvm::any_of(loopTileSizes, [](int64_t s) { return s != 0; })) {
       tileSizes.push_back(loopTileSizes);

@@ -233,19 +233,19 @@ struct SPIRVVectorToCooperativeOpsPass final
     // a result of performing cooperative matrix conversions earlier (it needs
     // to be done before FlattenMemRefSubspanPass because we need 2-D MemRefs)
     // and conversions spreading across upstream and IREE repos..
-    typeConverter.addConversion(
-        [&typeConverter](MemRefType type) -> Optional<Type> {
-          if (!type.hasStaticShape()) return llvm::None;
-          // In IREE all MemRefs are originated from subspan ops, which should
-          // have identity layout.
-          if (!type.getLayout().isIdentity()) return llvm::None;
-          auto storage = spirv::mapMemorySpaceToVulkanStorageClass(
-              type.getMemorySpaceAsInt());
-          auto flattenedType = MemRefType::get(
-              ShapedType::kDynamicSize, type.getElementType(), AffineMap(),
-              spirv::StorageClassAttr::get(type.getContext(), *storage));
-          return typeConverter.convertType(flattenedType);
-        });
+    typeConverter.addConversion([&typeConverter](
+                                    MemRefType type) -> Optional<Type> {
+      if (!type.hasStaticShape()) return llvm::None;
+      // In IREE all MemRefs are originated from subspan ops, which should
+      // have identity layout.
+      if (!type.getLayout().isIdentity()) return llvm::None;
+      auto storage =
+          spirv::mapMemorySpaceToVulkanStorageClass(type.getMemorySpaceAsInt());
+      auto flattenedType = MemRefType::get(
+          ShapedType::kDynamicSize, type.getElementType(), AffineMap(),
+          spirv::StorageClassAttr::get(type.getContext(), *storage));
+      return typeConverter.convertType(flattenedType);
+    });
 
     // Add unrealized conversion cast ops to bridge type conversions: we are
     // only converting the cooperative matrix subset; the rest needs to be done
