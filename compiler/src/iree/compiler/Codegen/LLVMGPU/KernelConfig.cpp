@@ -529,11 +529,26 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   return success();
 }
 
+/// Returns true if the index map represents a transpose that benefits from
+/// shared mem. Currently supports 2D transposes.
+static bool isSharedMemTranspose(AffineMap indexMap) {
+  if (!indexMap.isEmpty() && indexMap.isPermutation() &&
+      indexMap.getNumInputs() == 2) {
+    // Ensure that the fasted moving dimension (the last one) is permuted,
+    // Otherwise shared memory promotion will not benefit the operation.
+    if (indexMap.getDimPosition(indexMap.getNumDims() - 1) !=
+        indexMap.getNumDims() - 1) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /// Returns true if the operation is a GenericOp implementing a 2D transpose.
 static bool isTransposeOp(linalg::LinalgOp linalgOp) {
   if (!isa<linalg::GenericOp>(linalgOp)) return false;
-  // Check that the op has 2 parallel loops.
-  if (linalgOp.getNumParallelLoops() != 2) {
+  // Check that the op has at least 2 parallel loops.
+  if (linalgOp.getNumParallelLoops() < 2) {
     return false;
   }
 
@@ -542,31 +557,19 @@ static bool isTransposeOp(linalg::LinalgOp linalgOp) {
     return false;
   }
 
-  // Check that the op has only one input and one output.
-  if ((linalgOp.getNumInputs() != 1) || (linalgOp.getNumOutputs() != 1)) {
-    return false;
-  }
-  // Check for 2D operations
-  auto inputShape =
-      linalgOp.inputs()[0].getType().cast<ShapedType>().getShape();
-  auto outputShape =
-      linalgOp.outputs()[0].getType().cast<ShapedType>().getShape();
-  if (inputShape.size() != 2 || outputShape.size() != 2) {
-    return false;
-  }
-
   // Only transpose static shapes
   if (linalgOp.hasDynamicShape()) {
     return false;
   }
 
-  // Check that the two indexing maps are a permutation of each other.
-  auto indexing_maps = linalgOp.getIndexingMapsArray();
-  return !indexing_maps[0].isEmpty() && !indexing_maps[1].isEmpty() &&
-         ((indexing_maps[0].isIdentity() && !indexing_maps[1].isIdentity() &&
-           indexing_maps[1].isPermutation()) ||
-          (!indexing_maps[0].isIdentity() && indexing_maps[0].isPermutation() &&
-           indexing_maps[1].isIdentity()));
+  // Check that at least one input operands is transposed.
+  bool hasPermutation = false;
+  for (auto indexMap : linalgOp.getIndexingMapsArray()) {
+    if (isSharedMemTranspose(indexMap)) {
+      hasPermutation = true;
+    }
+  }
+  return hasPermutation;
 }
 
 static LogicalResult setTransposeConfig(func::FuncOp entryPoint,
@@ -576,12 +579,13 @@ static LogicalResult setTransposeConfig(func::FuncOp entryPoint,
   TileSizesListType tileSizes;
   tileSizes.push_back({tileM, tileN});
 
-  // Check alignment with tile size
+  // Check alignment with tile size for each transpose.
   if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
-    auto inputShape =
-        genericOp.inputs()[0].getType().cast<ShapedType>().getShape();
-    if (inputShape[0] % tileM != 0 || inputShape[1] % tileN != 0) {
-      return failure();
+    auto loopRanges = genericOp.getStaticLoopRanges();
+    for (auto loopRange : loopRanges) {
+      if (loopRange % 32 != 0) {
+        return failure();
+      }
     }
   } else {
     return failure();

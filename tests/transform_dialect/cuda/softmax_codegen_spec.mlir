@@ -16,7 +16,7 @@ transform.with_pdl_patterns {
     %foreach_thread, %tiled_generic =
       transform.structured.tile_to_foreach_thread_op %root tile_sizes [1, 4]
     transform.structured.fuse_into_containing_op %not_root into %foreach_thread
-
+    
     // Second level of tiling + fusion parallelizes to threads.
     // Leaving the reduction untiled on threadIdx.x makes it sequential on
     // threadIdx.x. After distribution, predication by if (threadIdx.x == 0) is
@@ -54,7 +54,8 @@ transform.with_pdl_patterns {
     // That is still not good enough because we need to predicate this in order
     // to enable the parallel reduction on warps.
     %func = transform.structured.match ops{["func.func"]} in %variant_op
-    %func_2 = transform.structured.vectorize %func
+    %funcx = transform.iree.apply_patterns %func { rank_reducing }
+    transform.structured.vectorize %funcx
 
     // Bufferization is necessary for:
     //   1. lowering scf.foreach_thread to workgroup (block level parallelism)
@@ -63,9 +64,9 @@ transform.with_pdl_patterns {
     //      warp_execute_on_lane_0 and later vector distribution.
     %variant_op_2 = transform.iree.bufferize { target_gpu } %variant_op
 
-    %func_3 = transform.structured.match ops{["func.func"]} in %variant_op_2
-    %func_4 = transform.iree.foreach_thread_to_workgroup %func_3
-    transform.iree.foreach_thread_to_gpu_and_translation_info %func_4
+    %func_2 = transform.structured.match ops{["func.func"]} in %variant_op_2
+    %func_3 = transform.iree.foreach_thread_to_workgroup %func_2
+    transform.iree.foreach_thread_to_gpu_and_translation_info %func_3
       { workgroup_size = [32, 4, 1] }
 
     %end_func = transform.structured.match ops{["func.func"]} in %variant_op_2

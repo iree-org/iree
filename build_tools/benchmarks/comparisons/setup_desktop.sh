@@ -9,7 +9,7 @@
 set -euo pipefail
 
 # Install Bazel. From https://www.tensorflow.org/install/source
-npm install -g @bazel/bazelisk
+#npm install -g @bazel/bazelisk
 
 # Create root dir.
 ROOT_DIR=/tmp/mobilebert_benchmarks
@@ -40,9 +40,10 @@ cmake --build ../iree-build/
 
 export CC=clang
 export CXX=clang++
-python configure_bazel.py
+python3 configure_bazel.py
 
 cd integrations/tensorflow
+./symlink_binaries.sh
 bazel build -c opt iree_tf_compiler:iree-import-tflite
 
 IREE_COMPILE_PATH="${SOURCE_DIR}/iree-build/tools/iree-compile"
@@ -52,30 +53,37 @@ IREE_MODEL_DIR="${ROOT_DIR}/models/iree"
 mkdir -p "${IREE_MODEL_DIR}/cuda"
 mkdir -p "${IREE_MODEL_DIR}/llvm-cpu"
 
-MODEL_NAME="mobilebert_float_384_gpu"
-bazel-bin/iree_tf_compiler/iree-import-tflite "${TFLITE_MODEL_DIR}/${MODEL_NAME}.tflite" -o "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir"
-# Build for CUDA.
-echo "Compiling ${MODEL_NAME}.vmfb for cuda..."
-"${IREE_COMPILE_PATH}" \
-  --iree-input-type=tosa \
-  --iree-hal-target-backends=cuda \
-  --iree-hal-cuda-llvm-target-arch=sm_80 \
-  --iree-llvm-debug-symbols=false \
-  --iree-vm-bytecode-module-strip-source-map=true \
-  --iree-vm-emit-polyglot-zip=false \
-  "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
-  --o "${IREE_MODEL_DIR}/cuda/${MODEL_NAME}.vmfb"
-# Build for x86.
-echo "Compiling ${MODEL_NAME}.vmfb for llvm-cpu..."
-"${IREE_COMPILE_PATH}" \
-  --iree-input-type=tosa \
-  --iree-llvm-target-cpu-features=host \
-  --iree-hal-target-backends=llvm-cpu \
-  --iree-llvm-debug-symbols=false \
-  --iree-vm-bytecode-module-strip-source-map=true \
-  --iree-vm-emit-polyglot-zip=false \
-  "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
-  --o "${IREE_MODEL_DIR}/llvm-cpu/${MODEL_NAME}.vmfb"
+# Runs `iree-compile` on all TFLite files in directory. If compilation fails, we
+# keep going.
+for i in $(ls ${ROOT_DIR}/models/tflite/); do
+  MODEL_NAME=$(basename $i .tflite)
+  echo "Processing ${MODEL_NAME} ..."
+
+  ${IREE_IMPORT_TFLITE_PATH} "${TFLITE_MODEL_DIR}/${MODEL_NAME}.tflite" -o "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir"
+  # Build for CUDA.
+  echo "Compiling ${MODEL_NAME}.vmfb for cuda..."
+  "${IREE_COMPILE_PATH}" \
+    --iree-input-type=tosa \
+    --iree-hal-target-backends=cuda \
+    --iree-hal-cuda-llvm-target-arch=sm_80 \
+    --iree-llvm-debug-symbols=false \
+    --iree-vm-bytecode-module-strip-source-map=true \
+    --iree-vm-emit-polyglot-zip=false \
+   "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
+    --o "${IREE_MODEL_DIR}/cuda/${MODEL_NAME}.vmfb" || true
+  # Build for x86.
+  echo "Compiling ${MODEL_NAME}.vmfb for llvm-cpu..."
+  "${IREE_COMPILE_PATH}" \
+    --iree-input-type=tosa \
+    --iree-llvm-target-cpu-features=host \
+    --iree-hal-target-backends=llvm-cpu \
+    --iree-llvm-debug-symbols=false \
+    --iree-vm-bytecode-module-strip-source-map=true \
+    --iree-vm-emit-polyglot-zip=false \
+    "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
+    --o "${IREE_MODEL_DIR}/llvm-cpu/${MODEL_NAME}.vmfb" || true
+ done
+
 
 cp "${SOURCE_DIR}/iree-build/tools/iree-benchmark-module" "${ROOT_DIR}/"
 
@@ -89,7 +97,7 @@ cd "${SOURCE_DIR}"
 git clone https://github.com/tensorflow/tensorflow.git
 cd tensorflow
 # Select defaults and answer No to all questions.
-python configure.py
+python3 configure.py
 
 bazel build -c opt --copt=-DCL_DELEGATE_NO_GL \
   --copt=-DMESA_EGL_NO_X11_HEADERS=1 \

@@ -181,13 +181,57 @@ static LogicalResult copyToWorkgroupMemory(OpBuilder &b, Value src, Value dst) {
   return success();
 }
 
+/// Returns the indices of the transposed operands in a linalg generic.
+static SmallVector<int64_t> getTransposedOperands(linalg::GenericOp linalgOp) {
+  // Determine which operands to promote:
+  SmallVector<int64_t> transposedOperands;
+  if (linalgOp.getNumParallelLoops() < 2) {
+    return transposedOperands;
+  }
+  for (auto indexValue : llvm::enumerate(linalgOp.getIndexingMapsArray())) {
+    int64_t opIndex = indexValue.index();
+    auto indexMap = indexValue.value();
+    if (!indexMap.isEmpty() && indexMap.isPermutation()) {
+      // Ensure that the fasted moving dimension (the last one) is permuted
+      // otherwise data isn't moved.
+      if (indexMap.getDimPosition(indexMap.getNumDims() - 1) !=
+          indexMap.getNumDims() - 1) {
+        // Add operand to promote to list and mark the linalg for this
+        // promotion.
+        transposedOperands.push_back(opIndex);
+      }
+    }
+  }
+  return transposedOperands;
+}
+
+using PromotionFilterFunction = std::function<LogicalResult(Operation *op)>;
+
+/// Returns true if op is appropriate transpose for promotion.
+static LogicalResult transposeFilter(Operation *op,
+                                     linalg::GenericOp promotedFilterOp) {
+  return success(op == promotedFilterOp.getOperation());
+}
+
+/// Returns true if op is appropriate contract for promotion.
+static LogicalResult contractOpFilter(Operation *op) {
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+  if (!linalgOp) return failure();
+  // Limit promotion to matmul and batch matmul, there may be generic
+  // ops with more batch dimensions we didn't distribute and therefore
+  // cannot find a higher bound.
+  return success(linalg::isaContractionOpInterface(op) &&
+                 linalgOp.getNumParallelLoops() >= 2 &&
+                 linalgOp.getNumParallelLoops() <= 3);
+}
+
 template <typename T>
 using LinalgPromotionPattern =
     mlir::iree_compiler::IREE::LinalgExt::LinalgPromotionPattern<T>;
-static void populatePromotionPatterns(
-    MLIRContext *context, RewritePatternSet &patterns,
-    GPUPromoteSharedMemPattern promoteSharedMemPattern,
-    ArrayRef<int64_t> operandsToPromote) {
+static void populatePromotionPatterns(MLIRContext *context,
+                                      RewritePatternSet &patterns,
+                                      PromotionFilterFunction filterFunction,
+                                      ArrayRef<int64_t> operandsToPromote) {
   patterns.insert<LinalgPromotionPattern<linalg::MatmulOp>,
                   LinalgPromotionPattern<linalg::BatchMatmulOp>,
                   LinalgPromotionPattern<linalg::GenericOp>>(
@@ -202,20 +246,7 @@ static void populatePromotionPatterns(
           {StringAttr::get(context, getWorkgroupKTiledMarker())},
           StringAttr::get(context, getWorkgroupMemoryMarker()))
           .setMatchByDefault()
-          .addFilter([promoteSharedMemPattern](Operation *op) {
-            auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-            if (!linalgOp) return failure();
-            if (promoteSharedMemPattern ==
-                GPUPromoteSharedMemPattern::TransposeOpPattern) {
-              return success(linalgOp.getNumParallelLoops() == 2);
-            }
-            // Limit promotion to matmul and batch matmul, there may be generic
-            // ops with more batch dimensions we didn't distribute and therefore
-            // cannot find a higher bound.
-            return success(linalg::isaContractionOpInterface(op) &&
-                           linalgOp.getNumParallelLoops() >= 2 &&
-                           linalgOp.getNumParallelLoops() <= 3);
-          }));
+          .addFilter(filterFunction));
 }
 
 /// Transformation to propagate FillOp + CopyOp to temp allocation.
@@ -274,8 +305,8 @@ struct LLVMGPUTileAndDistributePass
     // allocation. This needs to be done before reduction tiling.
     if (llvmgpuUseMMASync) {
       RewritePatternSet promotionPatterns(&getContext());
-      populatePromotionPatterns(context, promotionPatterns,
-                                promoteSharedMemPattern, {2});
+      populatePromotionPatterns(context, promotionPatterns, contractOpFilter,
+                                {2});
       if (failed(applyPatternsAndFoldGreedily(funcOp,
                                               std::move(promotionPatterns)))) {
         return signalPassFailure();
@@ -308,12 +339,29 @@ struct LLVMGPUTileAndDistributePass
       switch (promoteSharedMemPattern) {
         case GPUPromoteSharedMemPattern::ContractionOpPattern:
           populatePromotionPatterns(context, promotionPatterns,
-                                    promoteSharedMemPattern, {0, 1});
+                                    contractOpFilter, {0, 1});
 
           break;
         case GPUPromoteSharedMemPattern::TransposeOpPattern:
-          populatePromotionPatterns(context, promotionPatterns,
-                                    promoteSharedMemPattern, {0});
+          funcOp.walk(
+              [&context, &promotionPatterns](linalg::GenericOp linalgOp) {
+                // Promotion patterns accept a fixed list of operands to promote
+                // before determine which op is being promoted. To support
+                // multiple linalg generic ops with different promoted operands,
+                // We walk each linalg generic op to determine which operands to
+                // promote, then create a filter that will only apply to it's
+                // configuration.
+                SmallVector<int64_t> operandsToPromote =
+                    getTransposedOperands(linalgOp);
+                if (!operandsToPromote.empty()) {
+                  populatePromotionPatterns(
+                      context, promotionPatterns,
+                      [linalgOp](Operation *op) -> LogicalResult {
+                        return transposeFilter(op, linalgOp);
+                      },
+                      operandsToPromote);
+                }
+              });
 
           break;
       }
