@@ -7,10 +7,10 @@
 #ifndef IREE_DIALECTS_DIALECT_LINALGEXT_TRANSFORMS_CODEGENSTRATEGY_H_
 #define IREE_DIALECTS_DIALECT_LINALGEXT_TRANSFORMS_CODEGENSTRATEGY_H_
 
-#include <utility>
-
-#include "mlir/Dialect/Linalg/Passes.h"
+#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "mlir/Pass/PassManager.h"
+
+#include <utility>
 
 //===----------------------------------------------------------------------===//
 // Strategies moved from upstream MLIR as IREE still heavily relies on patterns

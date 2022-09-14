@@ -1,14 +1,14 @@
-// Copyright 2021 The IREE Authors
+// Copyright 2022 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree-dialects/Dialect/LinalgExt/Transforms/CodegenStrategy.h"
+#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "mlir/Pass/PassManager.h"
 
 using namespace mlir;
-using namespace mlir::linalg;
 
 #define DEBUG_TYPE "linalg-codegen-strategy"
 

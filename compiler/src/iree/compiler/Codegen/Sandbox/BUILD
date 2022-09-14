@@ -55,6 +55,8 @@ iree_compiler_cc_library(
         ":PassesIncGen",
         "//compiler/src/iree/compiler/Codegen/Dialect:IREECodegenDialect",
         "//compiler/src/iree/compiler/Codegen/Utils",
+        "//llvm-external-projects/iree-dialects:IREELinalgExtPasses",
+        "//llvm-external-projects/iree-dialects:IREELinalgExtTransforms",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:ArithmeticDialect",
