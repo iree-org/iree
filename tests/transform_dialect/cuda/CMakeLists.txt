@@ -29,6 +29,7 @@ iree_lit_test_suite(
     reduction_dispatch_spec.mlir
     softmax_codegen_spec.mlir
     softmax_dispatch_spec.mlir
+    softmax_fused_codegen_spec.mlir
   LABELS
     "noasan"
     "nomsan"
