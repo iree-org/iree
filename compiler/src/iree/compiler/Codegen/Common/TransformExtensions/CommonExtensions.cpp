@@ -322,17 +322,17 @@ LogicalResult rewriteForeachThreadToWorkgroup(
   for (OpFoldResult ofr : *maybeWorkgroupCounts)
     workgroupCounts.push_back(getConstantIntValue(ofr).value());
   if (failed(populateWorkgroupCountComputingRegion(rewriter, foreachThreadOp,
-                                                   exportOp)))
+                                                   exportOp))) {
     return foreachThreadOp->emitOpError(
                "failed to populate workload region for dispatchOp: ")
            << exportOp;
+  }
 
   // Step 1. Create the workgroup id and count ops.
   Location loc = foreachThreadOp.getLoc();
   BlockAndValueMapping bvm;
   SmallVector<Value, 8> workgroupIdOps, workgroupCountOps;
-  for (int64_t rank :
-       llvm::seq<int64_t>(0, foreachThreadOp.getThreadIndices().size())) {
+  for (int64_t rank : llvm::seq<int64_t>(0, 3)) {
     workgroupIdOps.push_back(
         rewriter.create<HAL::InterfaceWorkgroupIDOp>(loc, rank));
     workgroupCountOps.push_back(
@@ -357,9 +357,15 @@ LogicalResult rewriteForeachThreadToWorkgroup(
   // Step 4. RAUW thread indices to thread ops.
   SmallVector<Value> threadIndices =
       *getThreadIndices(rewriter, foreachThreadOp);
+  assert(workgroupIdOps.size() == 3 && "3 workgroup id ops are required");
+  assert(threadIndices.size() == 3 && "3 thread id dimensions are required");
   for (auto it : llvm::zip(threadIndices, workgroupIdOps)) {
-    if (!std::get<0>(it)) continue;
-    std::get<0>(it).replaceAllUsesWith(std::get<1>(it));
+    Value val = std::get<0>(it);
+    if (!val) continue;
+    for (Operation *user : llvm::make_early_inc_range(val.getUsers())) {
+      rewriter.updateRootInPlace(
+          user, [&]() { user->replaceUsesOfWith(val, std::get<1>(it)); });
+    }
   }
 
   // Step 5. Barriers omitted given unique topLevel scf::ForeachThreadOp.
