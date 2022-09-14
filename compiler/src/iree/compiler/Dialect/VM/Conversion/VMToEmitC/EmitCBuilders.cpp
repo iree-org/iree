@@ -133,6 +133,32 @@ Value contentsOf(OpBuilder builder, Location location, Value operand) {
       .getResult();
 }
 
+Value sizeOf(OpBuilder builder, Location loc, Value value) {
+  auto ctx = builder.getContext();
+  return builder
+      .create<emitc::CallOp>(
+          /*location=*/loc,
+          /*type=*/emitc::OpaqueType::get(ctx, "iree_host_size_t"),
+          /*callee=*/StringAttr::get(ctx, "sizeof"),
+          /*args=*/ArrayAttr{},
+          /*templateArgs=*/ArrayAttr{},
+          /*operands=*/ArrayRef<Value>{value})
+      .getResult(0);
+}
+
+Value sizeOf(OpBuilder builder, Location loc, Attribute attr) {
+  auto ctx = builder.getContext();
+  return builder
+      .create<emitc::CallOp>(
+          /*location=*/loc,
+          /*type=*/emitc::OpaqueType::get(ctx, "iree_host_size_t"),
+          /*callee=*/StringAttr::get(ctx, "sizeof"),
+          /*args=*/ArrayAttr::get(ctx, {attr}),
+          /*templateArgs=*/ArrayAttr{},
+          /*operands=*/ArrayRef<Value>{})
+      .getResult(0);
+}
+
 Value arrayElementAddress(OpBuilder builder, Location location, Type type,
                           IntegerAttr index, Value operand) {
   auto ctx = builder.getContext();

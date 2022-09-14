@@ -67,6 +67,10 @@ Value addressOf(OpBuilder builder, Location location, Value operand);
 
 Value contentsOf(OpBuilder builder, Location location, Value operand);
 
+Value sizeOf(OpBuilder builder, Location location, Attribute attr);
+
+Value sizeOf(OpBuilder builder, Location location, Value value);
+
 Value arrayElementAddress(OpBuilder builder, Location location, Type type,
                           IntegerAttr index, Value operand);
 

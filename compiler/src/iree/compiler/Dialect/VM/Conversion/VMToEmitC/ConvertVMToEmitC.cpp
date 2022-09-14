@@ -56,34 +56,6 @@ void attachAttribute(Operation *op, StringRef name, Attribute value) {
   op->setAttr(name, value);
 }
 
-/// Create a call to the sizeof operator with `value` as operand.
-Value callSizeof(OpBuilder builder, Location loc, Value value) {
-  auto ctx = builder.getContext();
-  return builder
-      .create<emitc::CallOp>(
-          /*location=*/loc,
-          /*type=*/emitc::OpaqueType::get(ctx, "iree_host_size_t"),
-          /*callee=*/StringAttr::get(ctx, "sizeof"),
-          /*args=*/ArrayAttr{},
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{value})
-      .getResult(0);
-}
-
-/// Create a call to the sizeof operator with `attr` as operand.
-Value callSizeof(OpBuilder builder, Location loc, Attribute attr) {
-  auto ctx = builder.getContext();
-  return builder
-      .create<emitc::CallOp>(
-          /*location=*/loc,
-          /*type=*/emitc::OpaqueType::get(ctx, "iree_host_size_t"),
-          /*callee=*/StringAttr::get(ctx, "sizeof"),
-          /*args=*/ArrayAttr::get(ctx, {attr}),
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{})
-      .getResult(0);
-}
-
 /// Create a call to memset to clear a struct
 LogicalResult clearStruct(OpBuilder builder, Value structValue) {
   auto ctx = structValue.getContext();
@@ -94,10 +66,11 @@ LogicalResult clearStruct(OpBuilder builder, Value structValue) {
 
   if (auto ptrType = structValue.getType().dyn_cast<emitc::PointerType>()) {
     structPointerValue = structValue;
-    sizeValue = callSizeof(builder, loc, TypeAttr::get(ptrType.getPointee()));
+    sizeValue = emitc_builders::sizeOf(builder, loc,
+                                       TypeAttr::get(ptrType.getPointee()));
   } else {
     structPointerValue = emitc_builders::addressOf(builder, loc, structValue);
-    sizeValue = callSizeof(builder, loc, structValue);
+    sizeValue = emitc_builders::sizeOf(builder, loc, structValue);
   }
 
   builder.create<emitc::CallOp>(
@@ -773,7 +746,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
             emitc::OpaqueType::get(ctx, moduleStateTypeName)),
         /*value=*/emitc::OpaqueAttr::get(ctx, "NULL"));
 
-    Value stateSize = callSizeof(
+    Value stateSize = emitc_builders::sizeOf(
         builder, loc, emitc::OpaqueAttr::get(ctx, moduleStateTypeName));
 
     Value statePtr =
@@ -824,8 +797,8 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
           /*type=*/emitc::PointerType::get(emitc::OpaqueType::get(ctx, "void")),
           /*operand=*/rodataPointer.getResult());
 
-      Value bufferSize =
-          callSizeof(builder, loc, emitc::OpaqueAttr::get(ctx, bufferName));
+      Value bufferSize = emitc_builders::sizeOf(
+          builder, loc, emitc::OpaqueAttr::get(ctx, bufferName));
 
       auto byteSpan = builder.create<emitc::CallOp>(
           /*location=*/loc,
@@ -1157,8 +1130,8 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         emitc::PointerType::get(emitc::OpaqueType::get(ctx, moduleTypeName)),
         /*value=*/emitc::OpaqueAttr::get(ctx, "NULL"));
 
-    Value moduleSize =
-        callSizeof(builder, loc, emitc::OpaqueAttr::get(ctx, moduleTypeName));
+    Value moduleSize = emitc_builders::sizeOf(
+        builder, loc, emitc::OpaqueAttr::get(ctx, moduleTypeName));
 
     Value modulePtr =
         emitc_builders::addressOf(builder, loc, module.getResult());
@@ -2061,7 +2034,8 @@ class ImportOpConverter {
 
     for (Type type : types) {
       Type valueType = typeConverter.convertTypeAsNonPointer(type);
-      Value size = callSizeof(builder, loc, TypeAttr::get(valueType));
+      Value size =
+          emitc_builders::sizeOf(builder, loc, TypeAttr::get(valueType));
 
       result = emitc_builders::binaryOperator(
           builder, loc, emitc_builders::BinaryOperator::ADDITION, result, size,
@@ -2220,7 +2194,8 @@ class ImportOpConverter {
             /*operands=*/ArrayRef<Value>{arg, refPtr});
       } else {
         assert(!argType.isa<emitc::PointerType>());
-        Value size = callSizeof(builder, loc, TypeAttr::get(argType));
+        Value size =
+            emitc_builders::sizeOf(builder, loc, TypeAttr::get(argType));
 
         // memcpy(uint8Ptr, &arg, size);
         Value argPtr = emitc_builders::addressOf(builder, loc, arg);
@@ -2236,7 +2211,8 @@ class ImportOpConverter {
       // Skip the addition in the last iteration.
       if (i < inputTypes.size() - 1) {
         Type valueType = typeConverter.convertTypeAsNonPointer(argType);
-        Value size = callSizeof(builder, loc, TypeAttr::get(valueType));
+        Value size =
+            emitc_builders::sizeOf(builder, loc, TypeAttr::get(valueType));
         uint8Ptr = emitc_builders::binaryOperator(
             builder, loc, emitc_builders::BinaryOperator::ADDITION, uint8Ptr,
             size, bytePtrType);
@@ -2295,7 +2271,8 @@ class ImportOpConverter {
             /*operands=*/ArrayRef<Value>{refPtr, arg});
       } else {
         Type valueType = argType.cast<emitc::PointerType>().getPointee();
-        Value size = callSizeof(builder, loc, TypeAttr::get(valueType));
+        Value size =
+            emitc_builders::sizeOf(builder, loc, TypeAttr::get(valueType));
 
         // memcpy(arg, uint8Ptr, size);
         builder.create<emitc::CallOp>(
@@ -2310,7 +2287,8 @@ class ImportOpConverter {
       // Skip the addition in the last iteration.
       if (i < resultTypes.size() - 1) {
         Type valueType = argType.cast<emitc::PointerType>().getPointee();
-        Value size = callSizeof(builder, loc, TypeAttr::get(valueType));
+        Value size =
+            emitc_builders::sizeOf(builder, loc, TypeAttr::get(valueType));
         uint8Ptr = emitc_builders::binaryOperator(
             builder, loc, emitc_builders::BinaryOperator::ADDITION, uint8Ptr,
             size, bytePtrType);
