@@ -19,7 +19,7 @@ TEMPLATE_BASE_NAME="${TEMPLATE_BASE_NAME:-github-runner}"
 TEMPLATE_CONFIG_REPO="${TEMPLATE_CONFIG_REPO:-iree-org/iree}"
 TEMPLATE_CONFIG_REF="${TEMPLATE_CONFIG_REF:-$(git rev-parse HEAD)}"
 GPU_IMAGE="github-runner-gpu-2022-08-15-1660603500"
-CPU_IMAGE="github-runner-2022-07-28-1659048799"
+CPU_IMAGE="github-runner-cpu-2022-09-13-1663118788"
 
 if (( TESTING==0 )); then
   if [[ "${TEMPLATE_CONFIG_REPO}" != iree-org/iree ]]; then
