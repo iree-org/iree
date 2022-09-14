@@ -621,7 +621,8 @@ jobs:
   ##############################################################################
 
   # Depends on all the other jobs to provide a single anchor that indicates the
-  # final status. Status reporting will become more sophisticated in the future.
+  # final status. Status reporting will become more sophisticated in the future
+  # and we can hopefully avoid the need to explicitly list every single job...
   summary:
     # Even if you have an explicit if condition, you still need to override
     # GitHub's default behavior of not running if any dependencies failed.
@@ -639,6 +640,7 @@ jobs:
       - test_runtime
 
       # Tensorflow
+      - build_tf_integrations
       - test_tf_integrations
       - test_tf_integrations_gpu
 
