@@ -5,3 +5,5 @@ iree_import_tf_model(
   ENTRY_FUNCTION "$__ENTRY_FUNCTION"
   OUTPUT_MLIR_FILE "$__OUTPUT_PATH"
 )
+# Mark dependency so users can import models without compiling them.
+add_dependencies(iree-benchmark-import-models "$${_PACKAGE_NAME}_$__TARGET_NAME")
