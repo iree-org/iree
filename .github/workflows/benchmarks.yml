@@ -19,9 +19,6 @@ on:
       runner-env:
         required: true
         type: string
-      gcs-dir:
-        required: true
-        type: string
       build-dir:
         required: true
         type: string
