@@ -35,35 +35,25 @@ jobs:
       matrix:
         include:
           # Ubuntu packages.
-          - runs-on: [managed-releaser, os-family=Linux, runner-group=releaser]
+          - runs-on: ubuntu-latest
             build-family: linux
             build-package: main-dist-linux
             experimental: false
-          - runs-on: [managed-releaser, os-family=Linux, runner-group=releaser]
+          - runs-on: ubuntu-latest
             build-family: linux
             build-package: py-compiler-pkg
             experimental: false
-          - runs-on: [managed-releaser, os-family=Linux, runner-group=releaser]
+          - runs-on: ubuntu-latest
             build-family: linux
             build-package: py-runtime-pkg
             experimental: false
-          - runs-on: [managed-releaser, os-family=Linux, runner-group=releaser]
-            build-family: linux
-            build-package: py-tf-compiler-tools-pkg
-            experimental: false
 
-          # MacOS packages.
-          - runs-on:
-              - ${{ github.repository == 'openxla/iree' && 'self-hosted' || 'macos-11' }}
-              - os-family=macOS
-              - runner-group=postsubmit
+          # Macos packages.
+          - runs-on: MacStudio
             build-family: macos
             build-package: py-compiler-pkg
             experimental: true
-          - runs-on:
-              - ${{ github.repository == 'openxla/iree' && 'self-hosted' || 'macos-11' }}
-              - os-family=macOS
-              - runner-group=postsubmit
+          - runs-on: MacStudio
             build-family: macos
             build-package: py-runtime-pkg
             experimental: true
@@ -83,9 +73,13 @@ jobs:
           path: "c"
           submodules: true
           ref: ${{ github.event.inputs.commit }}
+      - uses: actions/setup-python@v4
+        if: "matrix.build-family != 'macos'"
+        with:
+          python-version: '3.11'
 
       ##########################################################################
-      # OS specific setup
+      # OS specific setup (Windows)
       ##########################################################################
       - name: Install Windows VS Deps
         if: "matrix.build-family == 'windows'"
@@ -170,6 +164,7 @@ jobs:
           output_dir: "${{ github.workspace }}/bindist"
           override_python_versions: "3.11"
         run: |
+          [ -e ./bindist/* ] && rm ./bindist/*
           ./c/build_tools/python_deploy/build_macos_packages.sh
 
       ##########################################################################
@@ -196,6 +191,7 @@ jobs:
           output_dir: "${{ github.workspace }}/bindist"
           override_python_versions: "3.11"
         run: |
+          [ -e ./bindist/* ] && rm ./bindist/*
           ./c/build_tools/python_deploy/build_macos_packages.sh
 
       ##########################################################################
