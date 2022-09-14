@@ -15,26 +15,44 @@ namespace iree_compiler {
 
 LinalgOpInfo::LinalgOpInfo(linalg::LinalgOp linalgOp) { computeInfo(linalgOp); }
 
-/// Returns true if `map` is a tranposition.
+/// Returns true if `map` is a tranpose. A transpose map is a projected
+/// permutation with or without zeros in results where there exist at least two
+/// dimensions di and dj such that di < dj and result_pos(di) > result_pos(dj).
+/// Examples:
+///
+///  (d0, d1, d2) -> (d0, d2) is not a transpose map.
+///  (d0, d1, d2) -> (d2, d0) is a transpose map.
+///  (d0, d1, d2) -> (d1, d2) is not a transpose map.
+///  (d0, d1, d2) -> (d0, 0, d1) is not a transpose map.
+///  (d0, d1, d2) -> (d2, 0, d1) is a transpose map.
+///  (d0, d1, d2) -> (d1, 0) is not a transpose map.
+///
 // TODO(dcaballe): Discern between "memcopy" transposes and "shuffle"
 // transposes.
-// TODO(dcaballe): Shouldn't there be a utility for this somewhere in Affine?
+// TODO(dcaballe): Move to Affine utils?
 static bool isTransposeMap(AffineMap map) {
+  // A transpose map must be a projected permutation with or without
+  // broadcasted/reduction dimensions.
+  if (!map.isProjectedPermutation(/*allowZeroInResults=*/true)) {
+    return false;
+  }
+
+  // Check that the projected permutation has at least two result dimensions
+  // that are actually transposed by comparing its input position.
   unsigned prevDim = 0;
   for (AffineExpr expr : map.getResults()) {
-    if (expr.isa<AffineConstantExpr>()) {
-      continue;
-    }
-
-    if (auto dimExpr = expr.dyn_cast<AffineDimExpr>()) {
+    if (auto constExpr = expr.dyn_cast<AffineConstantExpr>()) {
+      if (constExpr.getValue() != 0) {
+        return false;
+      }
+    } else if (auto dimExpr = expr.dyn_cast<AffineDimExpr>()) {
       if (prevDim > dimExpr.getPosition()) {
         return true;
       }
       prevDim = dimExpr.getPosition();
-      continue;
+    } else {
+      return false;
     }
-
-    llvm_unreachable("Unexpected AffineExpr");
   }
 
   return false;
