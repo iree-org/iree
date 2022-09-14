@@ -16,8 +16,8 @@
 namespace mlir {
 namespace iree_compiler {
 
-/// Filter to decide which ops need allocations.
-static bool filter(Operation *op) {
+/// Filter to decide which contract ops need allocations.
+static bool contractOpFilter(Operation *op) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
   if (!linalgOp) return false;
   // Can't promote dynamic shapes.
@@ -27,9 +27,57 @@ static bool filter(Operation *op) {
          linalgOp.getNumParallelLoops() <= 3;
 }
 
+/// Filter to decide which transpose ops need allocations.
+static bool transposeOpFilter(Operation *op) {
+  auto genericOp = dyn_cast<linalg::GenericOp>(op);
+  if (!genericOp) return false;
+  // Can't promote dynamic shapes.
+  if (genericOp.hasDynamicShape()) return false;
+  return genericOp.getNumParallelLoops() >= 2 &&
+         genericOp.getNumParallelLoops() <= 3;
+}
+
+/// Returns true if the index map represents a transpose that benefits from
+/// shared mem.
+static bool isSharedMemTranspose(AffineMap indexMap) {
+  if (!indexMap.isEmpty() && indexMap.isPermutation()) {
+    // Ensure that the fasted moving dimension (the last one) is permuted,
+    // Otherwise shared memory promotion will not benefit the operation.
+    if (indexMap.getDimPosition(indexMap.getNumDims() - 1) !=
+        indexMap.getNumDims() - 1) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/// Returns the indices of the transposed operands in a linalg generic.
+static SmallVector<int64_t> getTransposedOperands(linalg::GenericOp genericOp) {
+  // Determine which operands to promote:
+  SmallVector<int64_t> transposedOperands;
+  if (genericOp.getNumParallelLoops() < 2) {
+    return transposedOperands;
+  }
+  for (auto indexValue : llvm::enumerate(genericOp.getIndexingMapsArray())) {
+    int64_t opIndex = indexValue.index();
+    auto indexMap = indexValue.value();
+    if (isSharedMemTranspose(indexMap)) {
+      transposedOperands.push_back(opIndex);
+    }
+  }
+  return transposedOperands;
+}
+
 namespace {
 struct LLVMGPUTensorAllocPass
     : public LLVMGPUTensorAllocBase<LLVMGPUTensorAllocPass> {
+ private:
+  GPUPromoteSharedMemPattern promoteSharedMemPattern =
+      GPUPromoteSharedMemPattern::ContractionOpPattern;
+
+ public:
+  LLVMGPUTensorAllocPass(GPUPromoteSharedMemPattern promoteSharedMemPattern)
+      : promoteSharedMemPattern(promoteSharedMemPattern) {}
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<bufferization::BufferizationDialect>();
   }
@@ -43,7 +91,14 @@ struct LLVMGPUTensorAllocPass
 
     SmallVector<Operation *> opsToPromote;
     funcOp.walk([&](Operation *op) {
-      if (filter(op)) opsToPromote.push_back(op);
+      switch (promoteSharedMemPattern) {
+        case GPUPromoteSharedMemPattern::ContractionOpPattern:
+          if (contractOpFilter(op)) opsToPromote.push_back(op);
+          break;
+        case GPUPromoteSharedMemPattern::TransposeOpPattern:
+          if (transposeOpFilter(op)) opsToPromote.push_back(op);
+          break;
+      }
     });
     for (Operation *op : opsToPromote) {
       OpBuilder builder(op);
@@ -51,6 +106,12 @@ struct LLVMGPUTensorAllocPass
       bufferization::BufferizationOptions options;
       // Promote all the input operands.
       for (auto operand : linalgOp.getInputOperands()) {
+        if (promoteSharedMemPattern ==
+            GPUPromoteSharedMemPattern::TransposeOpPattern) {
+          if (!isSharedMemTranspose(linalgOp.getTiedIndexingMap(operand))) {
+            continue;
+          }
+        }
         FailureOr<Value> ret = bufferization::allocateTensorForShapedValue(
             builder, op->getLoc(), operand->get(), false, options, true);
         if (failed(ret)) {
@@ -64,8 +125,9 @@ struct LLVMGPUTensorAllocPass
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTensorAlloc() {
-  return std::make_unique<LLVMGPUTensorAllocPass>();
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTensorAlloc(
+    GPUPromoteSharedMemPattern promoteSharedMemPattern) {
+  return std::make_unique<LLVMGPUTensorAllocPass>(promoteSharedMemPattern);
 }
 
 }  // namespace iree_compiler

@@ -379,7 +379,9 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTileTensor(
 
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUDistribute();
 
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTensorAlloc();
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTensorAlloc(
+    GPUPromoteSharedMemPattern promoteSharedMemPattern =
+        GPUPromoteSharedMemPattern::ContractionOpPattern);
 
 /// Create pass calling the dynamic pipeline for LLVMGPU.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
