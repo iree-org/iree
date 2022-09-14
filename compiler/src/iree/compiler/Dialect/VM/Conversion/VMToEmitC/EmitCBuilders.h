@@ -80,6 +80,9 @@ void memset(OpBuilder builder, Location location, Value dest, int ch,
 Value arrayElementAddress(OpBuilder builder, Location location, Type type,
                           IntegerAttr index, Value operand);
 
+Value arrayElementAddress(OpBuilder builder, Location location, Type type,
+                          Value index, Value operand);
+
 void structDefinition(OpBuilder builder, Location location,
                       StringRef structName, ArrayRef<StructField> fields);
 

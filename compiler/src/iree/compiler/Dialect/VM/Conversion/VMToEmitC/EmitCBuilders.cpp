@@ -202,6 +202,22 @@ Value arrayElementAddress(OpBuilder builder, Location location, Type type,
       .getResult(0);
 }
 
+Value arrayElementAddress(OpBuilder builder, Location location, Type type,
+                          Value index, Value operand) {
+  auto ctx = builder.getContext();
+  return builder
+      .create<emitc::CallOp>(
+          /*location=*/location,
+          /*type=*/type,
+          /*callee=*/StringAttr::get(ctx, "EMITC_ARRAY_ELEMENT_ADDRESS"),
+          /*args=*/
+          ArrayAttr::get(ctx,
+                         {builder.getIndexAttr(0), builder.getIndexAttr(1)}),
+          /*templateArgs=*/ArrayAttr{},
+          /*operands=*/ArrayRef<Value>{operand, index})
+      .getResult(0);
+}
+
 void structDefinition(OpBuilder builder, Location location,
                       StringRef structName, ArrayRef<StructField> fields) {
   std::string structBody;

@@ -1028,16 +1028,11 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         /*memberName=*/"imports",
         /*operand=*/stateOp.getResult());
 
-    auto import = builder.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/
+    auto import = emitc_builders::arrayElementAddress(
+        builder, loc, /*type=*/
         emitc::PointerType::get(
             emitc::OpaqueType::get(ctx, "iree_vm_function_t")),
-        /*callee=*/StringAttr::get(ctx, "EMITC_ARRAY_ELEMENT_ADDRESS"),
-        /*args=*/ArrayAttr{},
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/
-        ArrayRef<Value>{imports, ordinalArg});
+        /*index=*/ordinalArg, /*operand=*/imports);
 
     builder.create<emitc::CallOp>(
         /*location=*/loc,
@@ -1046,7 +1041,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/
-        ArrayRef<Value>{import.getResult(0), functionArg});
+        ArrayRef<Value>{import, functionArg});
 
     auto status = emitc_builders::ireeOkStatus(builder, loc);
 
