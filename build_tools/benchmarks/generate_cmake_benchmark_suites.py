@@ -8,13 +8,12 @@
 
 import argparse
 import pathlib
-import string
 import suites.cmake_rule_generator
 
 TEMPLATE_DIR = pathlib.Path(__file__).parent
-GENERATED_BENCHMARK_SUITES_CMAKE_TEMPLATE = string.Template(
-    open(TEMPLATE_DIR / "iree_generated_benchmark_suites_template.cmake",
-         "r").read())
+
+GENERATED_BENCHMARK_SUITES_CMAKE_TEMPLATE = suites.cmake_rule_generator.read_template_from_file(
+    TEMPLATE_DIR, "iree_generated_benchmark_suites_template.cmake")
 
 
 def parse_arguments():
