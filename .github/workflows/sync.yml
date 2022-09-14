@@ -1,0 +1,69 @@
+name: 'Sync Upstream'
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 * * * *'
+
+jobs:
+  sync_upstream:
+    name: 'Sync Upstream'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checking out repository
+        uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.CI_WRITE_TOKEN }}
+          repository: nod-ai/shark-runtime
+          ref: main
+          fetch-depth: 0
+
+      - name: Setup git
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "SHARK bot"
+
+      - name: Update main upstream
+        run: |
+          set -ex
+          git remote add upstream https://github.com/iree-org/iree
+          git pull --ff-only upstream main
+
+      - name: Pushing changes
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.CI_WRITE_TOKEN }}
+          branch: main
+          repository: nod-ai/shark-runtime
+
+  rebase_shark:
+    name: 'Rebase SHARK'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checking out repository
+        uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.CI_WRITE_TOKEN }}
+          repository: nod-ai/shark-runtime
+          ref: shark
+          fetch-depth: 0
+
+      - name: Setup git
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "SHARK bot"
+
+      - name: Update shark upstream
+        run: |
+          set -ex
+          git remote add upstream https://github.com/iree-org/iree
+          git fetch upstream
+          git rebase upstream/main
+
+      - name: Pushing changes
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.CI_WRITE_TOKEN }}
+          branch: shark
+          repository: nod-ai/shark-runtime
+          force: true
