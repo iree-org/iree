@@ -88,7 +88,7 @@ struct DetachElementwisePattern
     for (int i = 0, e = outputMap.getNumResults(); i < e; ++i) {
       int pos = outputMap.getResult(i).cast<AffineDimExpr>().getPosition();
       auto attr = linalgOp.getIteratorTypes()[pos].cast<StringAttr>();
-      if (!isParallelIterator(attr)) return failure();
+      if (!linalg::isParallelIterator(attr)) return failure();
       iterators.push_back(attr.getValue());
     }
 

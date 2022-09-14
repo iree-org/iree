@@ -86,7 +86,7 @@ Optional<SmallVector<int64_t, 4>> getNativeVectorShape(Operation *op) {
   } else if (auto contractOp = dyn_cast<vector::ContractionOp>(op)) {
     unsigned lastParallelDim = 0;
     for (const auto &it : llvm::enumerate(contractOp.getIteratorTypes())) {
-      if (isParallelIterator(it.value())) lastParallelDim = it.index();
+      if (vector::isParallelIterator(it.value())) lastParallelDim = it.index();
     }
     SmallVector<int64_t, 4> nativeSize(contractOp.getIteratorTypes().size(), 1);
     SmallVector<int64_t, 4> bounds;

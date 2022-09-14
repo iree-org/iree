@@ -211,7 +211,7 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op, int64_t subgroupSize,
   int bIndex = -1, mIndex = -1, nIndex = -1, kIndex = -1;
   int lastParallelDim = -1;
   for (unsigned i = 0; i < op.getNumLoops(); ++i) {
-    if (isReductionIterator(op.getIteratorTypes()[i])) {
+    if (linalg::isReductionIterator(op.getIteratorTypes()[i])) {
       kIndex = i;
       continue;
     }
@@ -663,8 +663,10 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
     for (const auto &it : llvm::enumerate(linalgOp.getIteratorTypes())) {
       auto i = it.index();
       if (loopBounds[i] % 4 != 0) continue;
-      if (isReductionIterator(it.value()) || workgroupTileSizes[i] == 0)
+      if (linalg::isReductionIterator(it.value()) ||
+          workgroupTileSizes[i] == 0) {
         loopTileSizes[it.index()] = 4;
+      }
     }
     if (llvm::any_of(loopTileSizes, [](int64_t s) { return s != 0; })) {
       tileSizes.push_back(loopTileSizes);
