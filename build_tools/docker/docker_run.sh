@@ -6,17 +6,24 @@
 
 set -euo pipefail
 
+# It's convenient to have the paths inside the container match the paths
+# outside. This creates an issue, however, because we pass around CMake build
+# directories, which use absolute paths, so it's important that the paths match
+# between runners. Doing things this way allows runners to change their working
+# directory and enables local reproduction of issues.
+DOCKER_CONTAINER_WORKDIR="${DOCKER_CONTAINER_WORKDIR:-/work}"
+
 # Sets up files and environment to enable running scripts in docker.
 # In particular, does some shenanigans to enable running with the current user.
 # Some of this setup is only strictly necessary for Bazel, but it doesn't hurt
 # for anything else.
-# Requires that DOCKER_WORKDIR and DOCKER_TMPDIR have been set
+# Requires that DOCKER_HOST_WORKDIR and DOCKER_HOST_TMPDIR have been set
 function docker_run() {
     # Make the source repository available and launch containers in that
     # directory.
     DOCKER_RUN_ARGS=(
-      --volume="${DOCKER_WORKDIR}:${DOCKER_WORKDIR}"
-      --workdir="${DOCKER_WORKDIR}"
+      --mount="type=bind,source=${DOCKER_HOST_WORKDIR},dst=${DOCKER_CONTAINER_WORKDIR}"
+      --workdir="${DOCKER_CONTAINER_WORKDIR}"
     )
 
     # Delete the container after the run is complete.
@@ -45,18 +52,18 @@ function docker_run() {
     # such that they don't contain the information about normal users and we
     # want these scripts to be runnable locally for debugging.
     # Instead we dump the results of `getent` to some fake files.
-    local fake_etc_dir="${DOCKER_TMPDIR}/fake_etc"
-    mkdir -p "${fake_etc_dir?}"
+    local fake_etc_dir="${DOCKER_HOST_TMPDIR}/fake_etc"
+    mkdir -p "${fake_etc_dir}"
 
-    local fake_group="${fake_etc_dir?}/group"
-    local fake_passwd="${fake_etc_dir?}/passwd"
+    local fake_group="${fake_etc_dir}/group"
+    local fake_passwd="${fake_etc_dir}/passwd"
 
-    getent group > "${fake_group?}"
-    getent passwd > "${fake_passwd?}"
+    getent group > "${fake_group}"
+    getent passwd > "${fake_passwd}"
 
     DOCKER_RUN_ARGS+=(
-      --volume="${fake_group?}:/etc/group:ro"
-      --volume="${fake_passwd?}:/etc/passwd:ro"
+      --mount="type=bind,src=${fake_group},dst=/etc/group,readonly"
+      --mount="type=bind,src=${fake_passwd},dst=/etc/passwd,readonly"
     )
 
 
@@ -73,23 +80,26 @@ function docker_run() {
     #      the difference between a persistent SSD and a local scratch SSD can
     #      be huge. In particular, Kokoro has the home directory on the former
     #      and the work directory on the latter.
-    local fake_home_dir="${DOCKER_TMPDIR}/fake_home"
+    local fake_home_dir="${DOCKER_HOST_TMPDIR}/fake_home"
     mkdir -p "${fake_home_dir}"
 
     DOCKER_RUN_ARGS+=(
-      --volume="${fake_home_dir?}:${HOME?}"
+      --mount="type=bind,src=${fake_home_dir},dst=${HOME}"
     )
 
-    # Make gcloud credentials available. This isn't necessary when running in
-    # GCE but enables using this script locally with remote caching.
-    DOCKER_RUN_ARGS+=(
-      --volume="${HOME?}/.config/gcloud:${HOME?}/.config/gcloud:ro"
-    )
+    # Make gcloud credentials available if they are present. This isn't
+    # necessary when running in GCE but enables using this script locally with
+    # remote caching.
+    if [[ -d "${HOME}/.config/gcloud" ]]; then
+      DOCKER_RUN_ARGS+=(
+        --mount="type=bind,src=${HOME}/.config/gcloud,dst=${HOME}/.config/gcloud,readonly"
+      )
+    fi
 
     # Give the container a ramdisk and set the Bazel sandbox base to point to
     # it. This helps a lot with Bazel getting IO bound.
     DOCKER_RUN_ARGS+=(
-      --tmpfs /dev/shm
+      --mount="type=tmpfs,dst=/dev/shm"
       --env SANDBOX_BASE=/dev/shm
     )
 

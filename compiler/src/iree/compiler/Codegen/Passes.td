@@ -196,6 +196,37 @@ def TransformDialectInterpreter :
   ];
 }
 
+def GPUVectorization :
+    Pass<"iree-codegen-gpu-vectorization", "func::FuncOp"> {
+  let summary = "Pass to convert linalg into Vector.";
+  let constructor = "mlir::iree_compiler::createGPUVectorizationPass()";
+  let options = [
+    Option<"generateContract", "generate-contract", "bool",
+            /*default=*/"true",
+           "Try to convert reduction to vector.contract.">,
+  ];
+}
+
+def VectorReduceToGPU :
+    Pass<"iree-codegen-reduction-to-gpu", "func::FuncOp"> {
+  let summary = "Convert vector reduction to gpu ops.";
+  let constructor = "mlir::iree_compiler::createConvertVectorReductionToGPUPass()";
+}
+
+def FuseTensorPadWithConsumer :
+    Pass<"iree-codegen-fuse-tensor-pad-with-consumer", "func::FuncOp"> {
+  let summary = "Fuse tensor.pad op into its consumer op's tiled loop nest";
+  let constructor = "mlir::iree_compiler::createFuseTensorPadWithConsumerPass()";
+}
+
+def ConcretizePadResultShape :
+    Pass<"iree-codegen-concretize-pad-result-shape", "func::FuncOp"> {
+  let summary =
+      "Concretizes tensor.pad op's result shape if its source op"
+      "implements OffsetSizeAndStrideOpInterface.";
+  let constructor = "mlir::iree_compiler::createConcretizePadResultShapePass()";
+}
+
 //------------------------------------------------------------------------------
 // LLVMCPU
 //------------------------------------------------------------------------------
@@ -322,17 +353,6 @@ def LLVMGPUTensorAlloc :
   let constructor = "mlir::iree_compiler::createLLVMGPUTensorAlloc()";
 }
 
-def LLVMGPUVectorization :
-    Pass<"iree-llvmgpu-vectorization", "func::FuncOp"> {
-  let summary = "Pass to convert linalg into Vector.";
-  let constructor = "mlir::iree_compiler::createLLVMGPUVectorizationPass()";
-  let options = [
-    Option<"generateContract", "generate-contract", "bool",
-            /*default=*/"true",
-           "Try to convert reduction to vector.contract.">,
-  ];
-}
-
 def LLVMGPUTensorCoreVectorization :
     Pass<"iree-llvmgpu-tensorcore-vectorization", "func::FuncOp"> {
   let summary = "Pass to convert linalg into Vector and transform it to a form that can be lowered to GPU MMA ops";
@@ -361,12 +381,6 @@ def LLVMGPUVectorToGPU :
     Pass<"iree-llvmgpu-vector-to-gpu", "func::FuncOp"> {
   let summary = "Pass to convert vector to gpu.";
   let constructor = "mlir::iree_compiler::createLLVMGPUVectorToGPU()";
-}
-
-def LLVMGPUReduceToGPU :
-    Pass<"iree-llvmgpu-reduction-to-gpu", "func::FuncOp"> {
-  let summary = "Convert vector reduction to gpu ops.";
-  let constructor = "mlir::iree_compiler::createConvertVectorReductionToGPUPass()";
 }
 
 //------------------------------------------------------------------------------
@@ -435,12 +449,6 @@ def SPIRVVectorizeLoadStore :
     Pass<"iree-spirv-vectorize-load-store", "ModuleOp"> {
   let summary = "Vectorize load/store of memrefs for better memory access";
   let constructor = "mlir::iree_compiler::createSPIRVVectorizeLoadStore()";
-}
-
-def SPIRVFuseTensorPadWithConsumer :
-    Pass<"iree-spirv-fuse-tensor-pad-with-consumer", "func::FuncOp"> {
-  let summary = "Fuse tensor.pad op into its consumer op's tiled loop nest";
-  let constructor = "mlir::iree_compiler::createSPIRVFuseTensorPadWithConsumerPass()";
 }
 
 def SPIRVCreateFastSlowPath :

@@ -4,50 +4,55 @@
 // Subsequent tests focus on individual components.
 
 // Constants get packed into composite attributes.
-//      CHECK: #composite_of_128b = #util.composite<128xi8, [
+//      CHECK: #composite_of_192b = #util.composite<192xi8, [
 // CHECK-NEXT:   dense<100> : tensor<1xi32>,
 // CHECK-NEXT:   dense<0> : vector<60xi8>,
 // CHECK-NEXT:   dense<[101, 102]> : tensor<2xi32>,
 // CHECK-NEXT:   dense<0> : vector<56xi8>,
+// CHECK-NEXT:   dense_resource<__elided__> : tensor<3x4xf32>,
+// CHECK-NEXT:   dense<0> : vector<16xi8>,
 // CHECK-NEXT: ]>
 
 // CHECK-LABEL: @resourceConstants
-func.func @resourceConstants() -> (!stream.resource<constant>, !stream.resource<constant>, !stream.timepoint) {
+func.func @resourceConstants() -> (!stream.resource<constant>, !stream.resource<constant>, !stream.resource<constant>, !stream.timepoint) {
   %c4 = arith.constant 4 : index
   %c8 = arith.constant 8 : index
+  %c48 = arith.constant 48 : index
 
   // Fetch the read-only host data containing the constants.
-  // CHECK: %[[RODATA:.+]] = util.buffer.constant {alignment = 64 : index} : !util.buffer = #composite_of_128b
-  %0:3 = stream.resource.constants :
+  // CHECK: %[[RODATA:.+]] = util.buffer.constant {alignment = 64 : index} : !util.buffer = #composite_of_192b
+  %0:4 = stream.resource.constants :
     !stream.resource<constant>{%c4} = dense<100> : tensor<1xi32>,
-    !stream.resource<constant>{%c8} = dense<[101, 102]> : tensor<2xi32>
+    !stream.resource<constant>{%c8} = dense<[101, 102]> : tensor<2xi32>,
+    !stream.resource<constant>{%c48} = dense_resource<__elided__> : tensor<3x4xf32>
     => !stream.timepoint
 
   // Try first to map the memory directly into a usable resource. If this
   // succeeds we are done and can avoid allocation/complete immediately.
   // CHECK: %[[DID_MAP:.+]], %[[TRY_MAP:.+]] = stream.resource.try_map %[[RODATA]][%c0] :
-  // CHECK-SAME: !util.buffer -> i1, !stream.resource<constant>{%c128}
+  // CHECK-SAME: !util.buffer -> i1, !stream.resource<constant>{%c192}
   //      CHECK: %[[IF:.+]]:2 = scf.if %[[DID_MAP]] -> (!stream.resource<constant>, !stream.timepoint) {
   // CHECK-NEXT:   %[[IMMEDIATE:.+]] = stream.timepoint.immediate => !stream.timepoint
   // CHECK-NEXT:   scf.yield %[[TRY_MAP]], %[[IMMEDIATE]]
   // CHECK-NEXT: } else {
 
   // If the mapping fails we need to perform an upload via a staging buffer.
-  // CHECK: %[[STAGING:.+]] = stream.resource.map %[[RODATA]][%c0] : !util.buffer -> !stream.resource<staging>{%c128}
-  // CHECK: %[[ALLOC:.+]] = stream.resource.alloc uninitialized : !stream.resource<constant>{%c128}
+  // CHECK: %[[STAGING:.+]] = stream.resource.map %[[RODATA]][%c0] : !util.buffer -> !stream.resource<staging>{%c192}
+  // CHECK: %[[ALLOC:.+]] = stream.resource.alloc uninitialized : !stream.resource<constant>{%c192}
   // CHECK: %[[EXEC_TIMEPOINT:.+]] = stream.cmd.execute
-  // CHECK-SAME: with(%[[STAGING]] as %[[STAGING_CAPTURE:.+]]: !stream.resource<staging>{%c128},
-  // CHECK-SAME:      %[[ALLOC]] as %[[ALLOC_CAPTURE:.+]]: !stream.resource<constant>{%c128}) {
-  // CHECK:   stream.cmd.copy %[[STAGING_CAPTURE]][%c0], %[[ALLOC_CAPTURE]][%c0], %c128 : !stream.resource<staging>{%c128} -> !stream.resource<constant>{%c128}
+  // CHECK-SAME: with(%[[STAGING]] as %[[STAGING_CAPTURE:.+]]: !stream.resource<staging>{%c192},
+  // CHECK-SAME:      %[[ALLOC]] as %[[ALLOC_CAPTURE:.+]]: !stream.resource<constant>{%c192}) {
+  // CHECK:   stream.cmd.copy %[[STAGING_CAPTURE]][%c0], %[[ALLOC_CAPTURE]][%c0], %c192 : !stream.resource<staging>{%c192} -> !stream.resource<constant>{%c192}
   // CHECK: } => !stream.timepoint
   // CHECK: scf.yield %[[ALLOC]], %[[EXEC_TIMEPOINT]]
 
   // Get subviews pointing to the subresources within the packed resource.
-  // CHECK: %[[RES0:.+]] = stream.resource.subview %[[IF]]#0[%c0] : !stream.resource<constant>{%c128} -> !stream.resource<constant>{%c4}
-  // CHECK: %[[RES1:.+]] = stream.resource.subview %[[IF]]#0[%c64] : !stream.resource<constant>{%c128} -> !stream.resource<constant>{%c8}
+  // CHECK: %[[RES0:.+]] = stream.resource.subview %[[IF]]#0[%c0] : !stream.resource<constant>{%c192} -> !stream.resource<constant>{%c4}
+  // CHECK: %[[RES1:.+]] = stream.resource.subview %[[IF]]#0[%c64] : !stream.resource<constant>{%c192} -> !stream.resource<constant>{%c8}
+  // CHECK: %[[RES2:.+]] = stream.resource.subview %[[IF]]#0[%c128] : !stream.resource<constant>{%c192} -> !stream.resource<constant>{%c48}
 
-  // CHECK: return %[[RES0]], %[[RES1]], %[[IF]]#1
-  return %0#0, %0#1, %0#2 : !stream.resource<constant>, !stream.resource<constant>, !stream.timepoint
+  // CHECK: return %[[RES0]], %[[RES1]], %[[RES2]], %[[IF]]#1
+  return %0#0, %0#1, %0#2, %0#3 : !stream.resource<constant>, !stream.resource<constant>, !stream.resource<constant>, !stream.timepoint
 }
 
 // -----

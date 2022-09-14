@@ -61,6 +61,7 @@ cc_library(
 iree_runtime_cc_test(
     name = "numpy_io_test",
     srcs = ["numpy_io_test.cc"],
+    tags = ["requires-filesystem"],
     deps = [
         ":device_util",
         ":numpy_io",

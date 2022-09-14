@@ -342,7 +342,7 @@ jobs:
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "IREE_BAZEL_WRITE_REMOTE_CACHE=${IREE_BAZEL_WRITE_REMOTE_CACHE}" \
-            --env "IREE_TF_BINARIES_OUTPUT_DIR=$(realpath "${IREE_TF_BINARIES_OUTPUT_DIR}")" \
+            --env "IREE_TF_BINARIES_OUTPUT_DIR=${IREE_TF_BINARIES_OUTPUT_DIR}" \
             gcr.io/iree-oss/frontends-swiftshader@sha256:3090418a8d8a64c356d35eff285af32570a72f41127aa123209c1562f57abb01 \
             build_tools/cmake/build_tf_binaries.sh
           echo "::set-output name=binaries-dir::${IREE_TF_BINARIES_OUTPUT_DIR}"
@@ -387,10 +387,10 @@ jobs:
       - name: "Downloading TF binaries archive"
         run: gcloud alpha storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
       - name: "Extracting TF binaries archive"
-        run: tar -xf "${TF_BINARIES_ARCHIVE}"
+        run: tar -xvf "${TF_BINARIES_ARCHIVE}"
       - name: "Symlinking TF binaries"
         run: |
-          ./integrations/tensorflow/symlink_binaries.sh "$(realpath "${TF_BINARIES_DIR}")"
+          ./integrations/tensorflow/symlink_binaries.sh "${TF_BINARIES_DIR}"
       - name: "Downloading build dir archive"
         run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting build dir archive"
@@ -426,10 +426,10 @@ jobs:
       - name: "Downloading TF binaries archive"
         run: gcloud alpha storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
       - name: "Extracting TF binaries archive"
-        run: tar -xf "${TF_BINARIES_ARCHIVE}"
+        run: tar -xvf "${TF_BINARIES_ARCHIVE}"
       - name: "Symlinking TF binaries"
         run: |
-          ./integrations/tensorflow/symlink_binaries.sh "$(realpath "${TF_BINARIES_DIR}")"
+          ./integrations/tensorflow/symlink_binaries.sh "${TF_BINARIES_DIR}"
       - name: "Downloading build dir archive"
         run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting build dir archive"
@@ -489,43 +489,20 @@ jobs:
             gcr.io/iree-oss/base@sha256:5d43683c6b50aebe1fca6c85f2012f3b0fa153bf4dd268e8767b619b1891423a \
             ./build_tools/cmake/build_and_test_tsan.sh
 
-  build_benchmarks:
+  benchmarks:
     needs: [setup, build_all, build_tf_integrations]
     if: needs.setup.outputs.should-run == 'true'
-    runs-on:
-      # Hacks, and order matters. See the comment at the top of the file.
-      - self-hosted
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - cpu
-      - os-family=Linux
-    env:
-      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
-      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
-      TF_BINARIES_DIR: ${{ needs.build_tf_integrations.outputs.binaries-dir }}
-      TF_BINARIES_ARCHIVE: ${{ needs.build_tf_integrations.outputs.binaries-archive }}
-      TF_BINARIES_GCS_ARTIFACT: ${{ needs.build_tf_integrations.outputs.binaries-gcs-artifact }}
-    steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
-        with:
-          submodules: true
-      - name: "Downloading build dir archive"
-        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
-      - name: "Extracting install from build dir archive"
-        run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
-      - name: "Downloading TF binaries archive"
-        run: gcloud alpha storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
-      - name: "Extracting TF binaries archive"
-        run: tar -xf "${TF_BINARIES_ARCHIVE}"
-      - name: "Building benchmarks"
-        run: |
-          build_tools/github_actions/docker_run.sh \
-            --env "IREE_TF_BINARIES_DIR=${TF_BINARIES_DIR}" \
-            --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
-            gcr.io/iree-oss/base@sha256:5d43683c6b50aebe1fca6c85f2012f3b0fa153bf4dd268e8767b619b1891423a \
-            build_tools/cmake/build_benchmarks.sh
+    uses: ./.github/workflows/benchmarks.yml
+    with:
+      runner-group: ${{ needs.setup.outputs.runner-group }}
+      runner-env: ${{ needs.setup.outputs.runner-env }}
+      gcs-dir: ${{ needs.setup.outputs.gcs-dir }}
+      build-dir: ${{ needs.build_all.outputs.build-dir }}
+      build-dir-archive: ${{ needs.build_all.outputs.build-dir-archive }}
+      build-dir-gcs-artifact: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+      tf-binaries-dir: ${{ needs.build_tf_integrations.outputs.binaries-dir }}
+      tf-binaries-archive: ${{ needs.build_tf_integrations.outputs.binaries-archive }}
+      tf-binaries-gcs-artifact: ${{ needs.build_tf_integrations.outputs.binaries-gcs-artifact }}
 
   ############################## Crosscompilation ##############################
   # Jobs that cross-compile IREE for other platforms
@@ -639,7 +616,7 @@ jobs:
             --env "LLVM_BIN_DIR=${BUILD_DIR}/third_party/llvm-project/llvm/bin" \
             gcr.io/iree-oss/riscv@sha256:720bc0215d8462ea14352edc22710a6ce4c0c1daff581d179dd173885f1d8a35 \
             bash -euo pipefail -c \
-              "./build_tools/cmake/build_riscv.sh && ./tests/riscv64/smoke.sh"
+              "./build_tools/cmake/build_riscv.sh && ./build_tools/cmake/test_riscv64.sh"
 
   emscripten:
     needs: [setup, build_all]
@@ -671,81 +648,11 @@ jobs:
             gcr.io/iree-oss/emscripten@sha256:8ccc1c8de11919faf23aeaa585b13e5c5050952db76c101d6f61367280a3546f \
             build_tools/cmake/build_runtime_emscripten.sh
 
-  build_benchmark_tools:
-    needs: [setup, build_all]
-    if: needs.setup.outputs.should-run == 'true'
-    runs-on:
-      - self-hosted  # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - cpu
-      - os-family=Linux
-    strategy:
-      matrix:
-        target:
-          - platform: "riscv"
-            architecture: "rv64"
-            docker_image: "gcr.io/iree-oss/riscv@sha256:720bc0215d8462ea14352edc22710a6ce4c0c1daff581d179dd173885f1d8a35"
-    outputs:
-      benchmark-tools-gcs-artifacts: ${{ toJSON(steps.upload.outputs) }}
-    env:
-      PLATFORM: ${{ matrix.target.platform }}
-      ARCHITECTURE: ${{ matrix.target.architecture }}
-      DOCKER_IMAGE: ${{ matrix.target.docker_image }}
-      BUILD_TOOLS_DIR: ${{ matrix.target.platform }}-${{ matrix.target.architecture }}-benchmark-tools-dir
-      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
-      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
-    steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
-        with:
-          submodules: true
-      - name: "Downloading build dir archive"
-        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
-      - name: "Extracting host binaries"
-        run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
-      - name: "Compiling the benchmark tools"
-        id: build
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            --env "${PLATFORM^^}_ARCH=${ARCHITECTURE}" \
-            --env "BUILD_${PLATFORM^^}_DIR=${BUILD_TOOLS_DIR}/build" \
-            --env "BUILD_PRESET=benchmark" \
-            --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
-            "${DOCKER_IMAGE}" \
-            bash -euo pipefail -c "./build_tools/cmake/build_${PLATFORM}.sh"
-      - name: "Compiling the benchmark tools with tracing"
-        id: build-with-tracing
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            --env "${PLATFORM^^}_ARCH=${ARCHITECTURE}" \
-            --env "BUILD_${PLATFORM^^}_DIR=${BUILD_TOOLS_DIR}/build-traced" \
-            --env "BUILD_PRESET=benchmark-with-tracing" \
-            --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
-            "${DOCKER_IMAGE}" \
-            bash -euo pipefail -c "./build_tools/cmake/build_${PLATFORM}.sh"
-      - name: "Creating the benchmark tools archive"
-        id: archive
-        env:
-          BENCHMARK_TOOLS_ARCHIVE: ${{ matrix.target.platform }}-${{ matrix.target.architecture }}-benchmarks-tools.tar
-        run: |
-          tar -cf ${BENCHMARK_TOOLS_ARCHIVE} \
-            ${BUILD_TOOLS_DIR}/*/tools/iree-benchmark-module
-          echo "::set-output name=benchmark-tools-archive::${BENCHMARK_TOOLS_ARCHIVE}"
-      - name: "Uploading the benchmark tools archive"
-        id: upload
-        env:
-          BENCHMARK_TOOLS_ARCHIVE: ${{ steps.archive.outputs.benchmark-tools-archive }}
-          BENCHMARK_TOOLS_GCS_ARTIFACT: ${{ needs.setup.outputs.gcs-dir }}/${{ steps.archive.outputs.benchmark-tools-archive }}
-        run: |
-          gcloud alpha storage cp "${BENCHMARK_TOOLS_ARCHIVE}" "${BENCHMARK_TOOLS_GCS_ARTIFACT}"
-          echo "::set-output name=${PLATFORM}-${ARCHITECTURE}-benchmark-tools-gcs-artifact::${BENCHMARK_TOOLS_GCS_ARTIFACT}"
-
   ##############################################################################
 
   # Depends on all the other jobs to provide a single anchor that indicates the
-  # final status. Status reporting will become more sophisticated in the future.
+  # final status. Status reporting will become more sophisticated in the future
+  # and we can hopefully avoid the need to explicitly list every single job...
   summary:
     # Even if you have an explicit if condition, you still need to override
     # GitHub's default behavior of not running if any dependencies failed.
@@ -763,13 +670,13 @@ jobs:
       - test_runtime
 
       # Tensorflow
+      - build_tf_integrations
       - test_tf_integrations
       - test_tf_integrations_gpu
 
       # Configurations
       - asan
       - tsan
-      - build_benchmarks
 
       # Crosscompilation
       - android_arm64
@@ -777,8 +684,8 @@ jobs:
       - riscv64
       - emscripten
 
-      # Benchmark tools
-      - build_benchmark_tools
+      # Benchmark pipeline
+      - benchmarks
     steps:
       - name: Getting combined job status
         run: |

@@ -35,7 +35,7 @@ class TMTensor_Op<string mnemonic, list<Trait> traits = []> :
   let hasCustomAssemblyFormat = 1;
   code extraTMTensorOpClassDeclaration = [{
     SmallVector<Value> getDestinationOperands(OpBuilder &b) {
-      SmallVector<Value> dest(outputs().begin(), outputs().end());
+      SmallVector<Value> dest(getOutputs().begin(), getOutputs().end());
       return dest;
     }
   }];

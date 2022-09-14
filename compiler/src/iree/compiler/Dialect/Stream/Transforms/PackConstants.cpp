@@ -47,8 +47,11 @@ struct ConstantSlice {
 
   // Returns the length, in bytes, of the constant value prior to alignment or
   // padding.
-  uint64_t getRawLength() const {
-    if (auto denseAttr = value.dyn_cast<DenseElementsAttr>()) {
+  uint64_t getStorageSize() const {
+    if (auto serializableAttr =
+            value.dyn_cast<IREE::Util::SerializableAttrInterface>()) {
+      return serializableAttr.getStorageSize();
+    } else if (auto denseAttr = value.dyn_cast<DenseElementsAttr>()) {
       return denseAttr.getRawData().size();
     } else {
       assert(false && "invalid constant attr type");
@@ -92,7 +95,7 @@ static SmallVector<StorageResource, 8> bucketValuesIntoStorageResources(
   for (auto slice : slices) {
     uint64_t offset = IREE::Util::align(
         currentBuffer->totalSize, resourceConfig.getMinBufferOffsetAlignment());
-    uint64_t unpaddedLength = slice.getRawLength();
+    uint64_t unpaddedLength = slice.getStorageSize();
     uint64_t paddedLength = IREE::Util::align(
         unpaddedLength, resourceConfig.getMinBufferRangeAlignment());
     if (offset + unpaddedLength > resourceConfig.getMaxAllocationSize()) {

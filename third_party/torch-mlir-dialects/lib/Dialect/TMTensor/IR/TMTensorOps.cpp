@@ -112,7 +112,7 @@ LogicalResult ScanOp::verify() {
   }
   SmallVector<int64_t> expectedAccumulatorShape;
   for (size_t i = 0; i < (size_t)inputType.getRank(); i++) {
-    if (i != dimension())
+    if (i != getDimension())
       expectedAccumulatorShape.push_back(inputShapes[i]);
   }
   if (llvm::any_of(llvm::zip(expectedAccumulatorShape, accumulatorShape),
@@ -158,7 +158,7 @@ SmallVector<Range> ScanOp::getIterationDomain(OpBuilder &builder) {
 SmallVector<StringRef> ScanOp::getLoopIteratorTypes() {
   SmallVector<StringRef> iteratorTypes(getOperandRank(),
                                        getParallelIteratorTypeName());
-  iteratorTypes[dimension()] = getReductionIteratorTypeName();
+  iteratorTypes[getDimension()] = getReductionIteratorTypeName();
   return iteratorTypes;
 }
 
@@ -177,10 +177,10 @@ LogicalResult ScanOp::generateScalarImplementation(OpBuilder &b, Location loc,
   indices.append(ivs.begin(), ivs.end());
   Value zero = b.create<arith::ConstantIndexOp>(loc, 0);
   Value one = b.create<arith::ConstantIndexOp>(loc, 1);
-  uint64_t scanDim = dimension();
+  uint64_t scanDim = getDimension();
   Value cond = b.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq,
                                        indices[scanDim], zero);
-  bool isInclusive = inclusive();
+  bool isInclusive = getInclusive();
   SmallVector<Value> accIndices;
   for (size_t i = 0; i < indices.size(); i++) {
     if (i != scanDim)
@@ -214,7 +214,7 @@ LogicalResult ScanOp::generateScalarImplementation(OpBuilder &b, Location loc,
         scanBlkArgs.push_back(i0);
       });
 
-  auto &srcBlock = region().front();
+  auto &srcBlock = getRegion().front();
   Region &region = scfIf.getElseRegion();
   BlockAndValueMapping bvm;
   {
@@ -259,10 +259,10 @@ LogicalResult ScanOp::fold(ArrayRef<Attribute>,
 // ScatterOp
 //===----------------------------------------------------------------------===//
 LogicalResult ScatterOp::verify() {
-  if (inputs().size() != 2) {
+  if (getInputs().size() != 2) {
     return emitOpError("expected two input operands");
   }
-  if (outputs().size() != 1) {
+  if (getOutputs().size() != 1) {
     return emitOpError("expected one output operand");
   }
   auto checkDimensionsMatch = [&](ShapedType t1, ShapedType t2, unsigned dim) {
@@ -334,7 +334,7 @@ LogicalResult ScatterOp::verify() {
     }
   }
 
-  Region &region = this->region();
+  Region &region = this->getRegion();
   Block *body = &region.front();
   if (body->getNumArguments() != 2) {
     return emitOpError("expected region to have two arguments");
@@ -374,7 +374,7 @@ LogicalResult ScatterOp::verify() {
 SmallVector<StringRef> ScatterOp::getLoopIteratorTypes() {
   SmallVector<StringRef> iteratorTypes(getUpdateType().getRank(),
                                        getParallelIteratorTypeName());
-  if (!unique_indices()) {
+  if (!getUniqueIndices()) {
     iteratorTypes[0] = getReductionIteratorTypeName();
   }
   return iteratorTypes;
@@ -424,7 +424,7 @@ LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
   Value init = b.create<memref::LoadOp>(loc, original(), starts);
 
   BlockAndValueMapping bvm;
-  Block &block = region().front();
+  Block &block = getRegion().front();
   bvm.map(block.getArgument(0), update);
   bvm.map(block.getArgument(1), init);
   for (auto &blockOp : block.without_terminator()) {

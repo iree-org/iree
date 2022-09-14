@@ -38,7 +38,7 @@ static void expandStrategyOps(ModuleOp module, ModuleOp expansions) {
     SimplePatternRewriter rewriter(expertOp);
     if (failed(applicator.matchAndRewrite(expertOp, rewriter))) {
       LLVM_DEBUG(DBGS() << "failed to rewrite strategy \""
-                        << expertOp.expertName() << "\"\n");
+                        << expertOp.getExpertName() << "\"\n");
     }
   });
 }

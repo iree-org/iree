@@ -22,6 +22,7 @@ iree_lit_test_suite(
     "config_default_matmul.mlir"
     "config_mali_conv.mlir"
     "config_mali_matmul.mlir"
+    "config_mali_reduction.mlir"
     "config_nvidia_matmul.mlir"
     "config_nvidia_matmul_cooperative_ops.mlir"
     "convert_to_spirv.mlir"
@@ -30,6 +31,7 @@ iree_lit_test_suite(
     "pipeline_matmul_cooperative_ops.mlir"
     "pipeline_matmul_promotion.mlir"
     "pipeline_matmul_vectorization.mlir"
+    "pipeline_reduction_subgroup.mlir"
     "tile_and_distribute.mlir"
     "tile_and_distribute_scatter.mlir"
     "tile_and_distribute_sort.mlir"
@@ -44,7 +46,6 @@ iree_lit_test_suite(
     "vectorize_load_store.mlir"
     "vectorize_matmul.mlir"
     "vectorize_reduction.mlir"
-    "vectorize_tensor_pad.mlir"
   TOOLS
     FileCheck
     iree-opt

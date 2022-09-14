@@ -34,9 +34,8 @@ iree_lit_test_suite(
             "tile_on_tensor.mlir",
             "transform_dialect_vector_distribution.mlir",
             "transform_dialect_bufferize.mlir",
+            "transpose_pipeline_test.mlir",
             "vector_to_gpu.mlir",
-            "vectorization.mlir",
-            "warp_reduction.mlir",
         ],
         include = ["*.mlir"],
         # tensor_dialect_*_spec is a an MLIR file that specifies a

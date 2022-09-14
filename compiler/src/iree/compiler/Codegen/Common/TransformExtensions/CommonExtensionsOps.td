@@ -66,10 +66,11 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
 
 def IREEBufferizeOp : Op<Transform_Dialect, "iree.bufferize",
     [FunctionalStyleTransformOpTrait, 
-     MemoryEffectsOpInterface,
+     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      DeclareOpInterfaceMethods<TransformOpInterface>]> {
   let description = [{
-    Call upstream comprehensive bufferize with extra IREE hooks.
+    Target the whole hal.executable_variant op and call upstream comprehensive
+    bufferize with extra IREE hooks.
 
     By default, CPU allocations are emitted. This behavior can be modified by 
     using the following attributes:
@@ -89,10 +90,11 @@ def IREEBufferizeOp : Op<Transform_Dialect, "iree.bufferize",
     No handles are consumed or produced.
   }];
 
-  let arguments = (ins UnitAttr:$target_gpu);
-  let results = (outs);
+  let arguments = (ins PDL_Operation:$target,
+                       UnitAttr:$target_gpu);
+  let results = (outs PDL_Operation:$result);
 
-  let assemblyFormat = "attr-dict";
+  let assemblyFormat = "attr-dict $target";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 }
 

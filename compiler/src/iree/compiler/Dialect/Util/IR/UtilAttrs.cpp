@@ -7,11 +7,14 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/BitVector.h"
+#include "llvm/Support/CommandLine.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/DialectImplementation.h"
+#include "mlir/IR/DialectResourceBlobManager.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/TypeSupport.h"
@@ -27,6 +30,11 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace Util {
+
+static llvm::cl::opt<bool> clZeroFillElidedAttrs(
+    "iree-util-zero-fill-elided-attrs",
+    llvm::cl::desc("Fills elided attributes with zeros when serializing."),
+    llvm::cl::init(false));
 
 //===----------------------------------------------------------------------===//
 // ostream utilities
@@ -470,8 +478,8 @@ struct SerializableDenseElementsAttrModel
           SerializableDenseElementsAttrModel, DenseIntOrFPElementsAttr> {
   int64_t getStorageSize(Attribute baseAttr) const {
     auto attr = baseAttr.cast<ElementsAttr>();
-    int32_t bitwidth = attr.getType().getElementTypeBitWidth();
-    return attr.getNumElements() * (bitwidth / 8);
+    return attr.getNumElements() * IREE::Util::getRoundedElementByteWidth(
+                                       attr.getType().getElementType());
   }
 
   LogicalResult serializeToVector(Attribute baseAttr,
@@ -511,6 +519,59 @@ struct SerializableDenseElementsAttrModel
       // Slow-path that performs expensive conversion.
       return serializeGenericElementData(elementsAttr, endian, os);
     }
+  }
+};
+
+// External interface applied to ElementsAttrs so that we can serialize them to
+// byte buffers.
+struct SerializableDenseResourceElementsAttrModel
+    : public SerializableAttrInterface::ExternalModel<
+          SerializableDenseResourceElementsAttrModel,
+          DenseResourceElementsAttr> {
+  int64_t getStorageSize(Attribute baseAttr) const {
+    auto attr = baseAttr.cast<DenseResourceElementsAttr>();
+    return attr.getNumElements() * IREE::Util::getRoundedElementByteWidth(
+                                       attr.getType().getElementType());
+  }
+
+  LogicalResult serializeToVector(Attribute baseAttr,
+                                  llvm::support::endianness endian,
+                                  SmallVectorImpl<char> &buffer) const {
+    buffer.resize(getStorageSize(baseAttr));
+    return serializeToBuffer(baseAttr, endian, buffer);
+  }
+
+  LogicalResult serializeToBuffer(Attribute baseAttr,
+                                  llvm::support::endianness endian,
+                                  ArrayRef<char> buffer) const {
+    raw_inplace_ostream os(buffer);
+    return serializeToStream(baseAttr, endian, os);
+  }
+
+  LogicalResult serializeToStream(Attribute baseAttr,
+                                  llvm::support::endianness endian,
+                                  llvm::raw_ostream &os) const {
+    auto attr = baseAttr.cast<DenseResourceElementsAttr>();
+    auto handle = attr.getRawHandle();
+
+    // Special testing path for elided attributes. We want this to be an
+    // error in normal circumstances as the output will produce garbage
+    // results if executed but it can be useful when building reproducers.
+    if (handle.getKey() == "__elided__") {
+      if (!clZeroFillElidedAttrs) {
+        return mlir::emitError(UnknownLoc::get(baseAttr.getContext()))
+               << "elided attributes cannot be serialized; provide non-elided "
+                  "values or pass --iree-util-zero-fill-elided-attrs for "
+                  "testing and expect invalid execution results";
+      }
+      os.write_zeros(attr.getNumElements() *
+                     IREE::Util::getRoundedElementByteWidth(
+                         attr.getType().getElementType()));
+      return success();
+    }
+
+    return mlir::emitError(UnknownLoc::get(baseAttr.getContext()))
+           << "DenseResourceElementsAttr not yet supported for serialization";
   }
 };
 
@@ -558,6 +619,9 @@ struct SerializableStringAttrModel
 #include "iree/compiler/Dialect/Util/IR/UtilAttrInterfaces.cpp.inc"
 
 void UtilDialect::registerAttributes() {
+  // Register command line flags:
+  (void)clZeroFillElidedAttrs;
+
   addAttributes<
 #define GET_ATTRDEF_LIST
 #include "iree/compiler/Dialect/Util/IR/UtilAttrs.cpp.inc"  // IWYU pragma: keep
@@ -567,11 +631,14 @@ void UtilDialect::registerAttributes() {
   // serialization mechanism and may be something we want to handle much higher
   // up in the stack - things that end up here are generally already in a target
   // encoding.
+  auto &context = *getContext();
   DenseIntElementsAttr::attachInterface<SerializableDenseElementsAttrModel>(
-      *getContext());
+      context);
   DenseFPElementsAttr::attachInterface<SerializableDenseElementsAttrModel>(
-      *getContext());
-  StringAttr::attachInterface<SerializableStringAttrModel>(*getContext());
+      context);
+  DenseResourceElementsAttr::attachInterface<
+      SerializableDenseResourceElementsAttrModel>(context);
+  StringAttr::attachInterface<SerializableStringAttrModel>(context);
 }
 
 }  // namespace Util

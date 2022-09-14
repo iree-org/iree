@@ -60,10 +60,6 @@ extern void populateHALFenceToVMPatterns(MLIRContext *context,
                                          SymbolTable &importSymbols,
                                          TypeConverter &typeConverter,
                                          RewritePatternSet &patterns);
-extern void populateHALSemaphoreToVMPatterns(MLIRContext *context,
-                                             SymbolTable &importSymbols,
-                                             TypeConverter &typeConverter,
-                                             RewritePatternSet &patterns);
 
 void populateHALToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
                              RewritePatternSet &patterns,
@@ -83,8 +79,6 @@ void populateHALToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
   populateHALExperimentalToVMPatterns(context, importSymbols, typeConverter,
                                       patterns);
   populateHALFenceToVMPatterns(context, importSymbols, typeConverter, patterns);
-  populateHALSemaphoreToVMPatterns(context, importSymbols, typeConverter,
-                                   patterns);
 }
 
 namespace {

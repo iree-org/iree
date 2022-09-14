@@ -71,6 +71,7 @@ def Util_GlobalRefAttr : ConfinedAttr<FlatSymbolRefAttr, [
 
 def Util_AnySerializableAttr : Attr<Or<[
   CPred<"$_self.isa<mlir::DenseElementsAttr>()">,
+  CPred<"$_self.isa<mlir::DenseResourceElementsAttr>()">,
   CPred<"$_self.isa<IREE::Util::SerializableAttrInterface>()">,
 ]>, "buffer-like constant attribute values"> {
   let storageType = [{ ::mlir::Attribute }];

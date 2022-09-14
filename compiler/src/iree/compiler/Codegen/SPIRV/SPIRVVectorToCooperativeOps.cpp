@@ -90,7 +90,7 @@ struct ConvertVectorTransferOp final
       Value bufferPtr = spirv::getElementPtr(
           *getTypeConverter<SPIRVTypeConverter>(), memrefType,
           adaptor.getSource(), adaptor.getIndices(), loc, rewriter);
-      rewriter.replaceOpWithNewOp<spirv::CooperativeMatrixLoadNVOp>(
+      rewriter.replaceOpWithNewOp<spirv::NVCooperativeMatrixLoadOp>(
           op, matType, bufferPtr, strideValue, coloumnMajor,
           spirv::MemoryAccessAttr());
       return success();
@@ -102,7 +102,7 @@ struct ConvertVectorTransferOp final
       Value bufferPtr = spirv::getElementPtr(
           *getTypeConverter<SPIRVTypeConverter>(), memrefType,
           adaptor.getSource(), adaptor.getIndices(), loc, rewriter);
-      rewriter.create<spirv::CooperativeMatrixStoreNVOp>(
+      rewriter.create<spirv::NVCooperativeMatrixStoreOp>(
           loc, bufferPtr, adaptor.getVector(), strideValue, coloumnMajor,
           spirv::MemoryAccessAttr());
       rewriter.eraseOp(op);
@@ -136,7 +136,7 @@ struct ConvertVectorContractOp final
     // by this point. Transpose can be handled by load/store operations.
     if (!isRowMajorMatmul(contractOp.getIndexingMapsAttr())) return failure();
 
-    rewriter.replaceOpWithNewOp<spirv::CooperativeMatrixMulAddNVOp>(
+    rewriter.replaceOpWithNewOp<spirv::NVCooperativeMatrixMulAddOp>(
         contractOp, operands.getAcc().getType(), operands.getLhs(),
         operands.getRhs(), operands.getAcc());
     return success();

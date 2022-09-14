@@ -77,7 +77,7 @@ LogicalResult runLLVMIRPasses(const LLVMTargetOptions &options,
             llvm::AddressSanitizerOptions Opts;
             bool moduleUseAfterScope = false;
             bool useOdrIndicator = false;
-            modulePassManager.addPass(llvm::ModuleAddressSanitizerPass(
+            modulePassManager.addPass(llvm::AddressSanitizerPass(
                 Opts, moduleUseAfterScope, useOdrIndicator));
           });
     } break;

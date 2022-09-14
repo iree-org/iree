@@ -26,7 +26,8 @@ namespace HAL {
 // invalid.
 static void makeAllowInlineExecution(IREE::HAL::CommandBufferCreateOp op) {
   auto modes = op.getModes();
-  if (bitEnumContains(modes, IREE::HAL::CommandBufferModeBitfield::OneShot)) {
+  if (bitEnumContainsAll(modes,
+                         IREE::HAL::CommandBufferModeBitfield::OneShot)) {
     op.setModesAttr(IREE::HAL::CommandBufferModeBitfieldAttr::get(
         op.getContext(),
         modes | IREE::HAL::CommandBufferModeBitfield::AllowInlineExecution));

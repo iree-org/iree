@@ -31,7 +31,7 @@ hal.executable @matmul_1024x2048x512 {
         %10 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [512, 2048], strides = [1, 1] : !flow.dispatch.tensor<readonly:512x2048xf32> -> tensor<512x2048xf32>
         %15 = linalg.init_tensor [1024, 2048] : tensor<1024x2048xf32>
         %16 = linalg.fill ins(%cst : f32) outs(%15 : tensor<1024x2048xf32>) -> tensor<1024x2048xf32>
-        %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup"}
+        %17 = linalg.matmul
             ins(%8, %10 : tensor<1024x512xf32>, tensor<512x2048xf32>) outs(%16 : tensor<1024x2048xf32>) -> tensor<1024x2048xf32>
         flow.dispatch.tensor.store %17, %2, offsets = [0, 0], sizes = [1024, 2048], strides = [1, 1]
             : tensor<1024x2048xf32> -> !flow.dispatch.tensor<writeonly:1024x2048xf32>
@@ -83,7 +83,7 @@ hal.executable @matmul_3136x24x96 {
         %10 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [96, 24], strides = [1, 1] : !flow.dispatch.tensor<readonly:96x24xf32> -> tensor<96x24xf32>
         %15 = linalg.init_tensor [3136, 24] : tensor<3136x24xf32>
         %16 = linalg.fill ins(%cst : f32) outs(%15 : tensor<3136x24xf32>) -> tensor<3136x24xf32>
-        %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup"}
+        %17 = linalg.matmul
             ins(%8, %10 : tensor<3136x96xf32>, tensor<96x24xf32>)
             outs(%16 : tensor<3136x24xf32>) -> tensor<3136x24xf32>
         flow.dispatch.tensor.store %17, %2, offsets = [0, 0], sizes = [3136, 24], strides = [1, 1]
@@ -138,7 +138,7 @@ hal.executable @matmul_196x64x192 {
             : !flow.dispatch.tensor<readonly:192x64xf32> -> tensor<192x64xf32>
         %15 = linalg.init_tensor [196, 64] : tensor<196x64xf32>
         %16 = linalg.fill ins(%cst : f32) outs(%15 : tensor<196x64xf32>) -> tensor<196x64xf32>
-        %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup"}
+        %17 = linalg.matmul
             ins(%8, %10 : tensor<196x192xf32>, tensor<192x64xf32>) outs(%16 : tensor<196x64xf32>) -> tensor<196x64xf32>
         flow.dispatch.tensor.store %17, %2, offsets = [0, 0], sizes = [196, 64], strides = [1, 1]
             : tensor<196x64xf32> -> !flow.dispatch.tensor<writeonly:196x64xf32>
@@ -187,7 +187,7 @@ hal.executable @matmul_12544x96x16 {
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x96xf32>
         %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<12544x96xf32>
         linalg.fill ins(%cst : f32) outs(%2 : memref<12544x96xf32>)
-        linalg.matmul {__internal_linalg_transform__ = "workgroup"}
+        linalg.matmul
             ins(%0, %1 : memref<12544x16xf32>, memref<16x96xf32>) outs(%2 : memref<12544x96xf32>)
         return
       }
@@ -239,7 +239,7 @@ hal.executable @matmul_49x160x576 {
             : !flow.dispatch.tensor<readonly:576x160xf32> -> tensor<576x160xf32>
         %15 = linalg.init_tensor [49, 160] : tensor<49x160xf32>
         %16 = linalg.fill ins(%cst : f32) outs(%15 : tensor<49x160xf32>) -> tensor<49x160xf32>
-        %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup"}
+        %17 = linalg.matmul
             ins(%8, %10 : tensor<49x576xf32>, tensor<576x160xf32>) outs(%16 : tensor<49x160xf32>) -> tensor<49x160xf32>
         flow.dispatch.tensor.store %17, %2, offsets = [0, 0], sizes = [49, 160], strides = [1, 1]
             : tensor<49x160xf32> -> !flow.dispatch.tensor<writeonly:49x160xf32>
@@ -350,7 +350,7 @@ hal.executable @batch_matmul_4x384x384 {
             : !flow.dispatch.tensor<readonly:4x32x384xf32> -> tensor<4x32x384xf32>
         %21 = linalg.init_tensor [4, 384, 384] : tensor<4x384x384xf32>
         %22 = linalg.fill ins(%cst : f32) outs(%21 : tensor<4x384x384xf32>) -> tensor<4x384x384xf32>
-        %23 = linalg.batch_matmul {__internal_linalg_transform__ = "workgroup"}
+        %23 = linalg.batch_matmul
             ins(%11, %14 : tensor<4x384x32xf32>, tensor<4x32x384xf32>)
             outs(%22 : tensor<4x384x384xf32>) -> tensor<4x384x384xf32>
         flow.dispatch.tensor.store %23, %2, offsets = [0, 0, 0], sizes = [4, 384, 384], strides = [1, 1, 1]
@@ -406,7 +406,7 @@ hal.executable @batch_matmul_4x2x8 {
             : !flow.dispatch.tensor<readonly:4x32x8xf32> -> tensor<4x32x8xf32>
         %21 = linalg.init_tensor [4, 2, 8] : tensor<4x2x8xf32>
         %22 = linalg.fill ins(%cst : f32) outs(%21 : tensor<4x2x8xf32>) -> tensor<4x2x8xf32>
-        %23 = linalg.batch_matmul {__internal_linalg_transform__ = "workgroup"}
+        %23 = linalg.batch_matmul
             ins(%11, %14 : tensor<4x2x32xf32>, tensor<4x32x8xf32>) outs(%22 : tensor<4x2x8xf32>) -> tensor<4x2x8xf32>
         flow.dispatch.tensor.store %23, %2, offsets = [0, 0, 0], sizes = [4, 2, 8], strides = [1, 1, 1]
             : tensor<4x2x8xf32> -> !flow.dispatch.tensor<writeonly:4x2x8xf32>
@@ -423,4 +423,134 @@ hal.executable @batch_matmul_4x2x8 {
 // CHECK-SAME:   workgroup_size = [2 : index, 2 : index, 1 : index]
 //      CHECK: func.func @batch_matmul_4x2x8()
 //      CHECK:   linalg.batch_matmul
+// CHECK-SAME:     lowering_config = #[[CONFIG]]
+
+// -----
+
+// Linalg.generic that is a batch matmul.
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable @generic_batch_matmul_32x2x512 {
+  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
+      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, #spv.resource_limits<
+        max_compute_shared_memory_size = 32768,
+        max_compute_workgroup_invocations = 512,
+        max_compute_workgroup_size = [512, 512, 512],
+       subgroup_size = 16>>
+    }> {
+    hal.executable.export @generic_batch_matmul_32x2x512 layout(#pipeline_layout)
+    builtin.module {
+      func.func @generic_batch_matmul_32x2x512() {
+        %c0 = arith.constant 0 : index
+        %cst = arith.constant 0.000000e+00 : f32
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:8x32x64xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:32x64x512xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:32x8x512xf32>
+        %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [2, 32, 64], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:8x32x64xf32> -> tensor<8x32x64xf32>
+        %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [32, 64, 512], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:32x64x512xf32> -> tensor<32x64x512xf32>
+        %5 = linalg.init_tensor [32, 8, 512] : tensor<32x8x512xf32>
+        %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<32x8x512xf32>) -> tensor<32x8x512xf32>
+        %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d1, d0, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel", "reduction"]} ins(%3, %4 : tensor<8x32x64xf32>, tensor<32x64x512xf32>) outs(%6 : tensor<32x8x512xf32>) attrs =  {linalg.memoized_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>]} {
+        ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):
+          %8 = arith.mulf %arg0, %arg1 : f32
+          %9 = arith.addf %arg2, %8 : f32
+          linalg.yield %9 : f32
+        } -> tensor<32x8x512xf32>
+        flow.dispatch.tensor.store %7, %2, offsets = [0, 0, 0], sizes = [32, 2, 512], strides = [1, 1, 1] : tensor<32x8x512xf32> -> !flow.dispatch.tensor<writeonly:32x8x512xf32>
+        return
+      }
+    }
+  }
+}
+
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 8, 32], [1, 4, 4], [0, 0, 0, 4]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorize>
+//      CHECK: hal.executable.export public @generic_batch_matmul_32x2x512
+// CHECK-SAME:   translation_info = #[[TRANSLATION]]
+// CHECK-SAME:   workgroup_size = [8 : index, 2 : index, 1 : index]
+//      CHECK: func.func @generic_batch_matmul_32x2x512()
+//      CHECK:   linalg.generic
+// CHECK-SAME:     lowering_config = #[[CONFIG]]
+
+// -----
+
+// Linalg.generic that is a batch matmul.
+
+#map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
+#map3 = affine_map<(d0, d1, d2, d3) -> (d3, d2)>
+#map4 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+#map5 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+
+hal.executable @generic_batch_matmul_8x2500x512x4608 {
+  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
+      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, #spv.resource_limits<
+        max_compute_shared_memory_size = 32768,
+        max_compute_workgroup_invocations = 512,
+        max_compute_workgroup_size = [512, 512, 512],
+       subgroup_size = 16>>
+    }> {
+    hal.executable.export @generic_batch_matmul_8x2500x512x4608 layout(#pipeline_layout)
+    builtin.module {
+      func.func @generic_batch_matmul_8x2500x512x4608() {
+        %c168607744 = arith.constant 168607744 : index
+        %c537247744 = arith.constant 537247744 : index
+        %c0 = arith.constant 0 : index
+        %cst = arith.constant 0.000000e+00 : f32
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c168607744) alignment(64) : !flow.dispatch.tensor<readonly:8x2500x4608xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:4608x512xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c537247744) alignment(64) : !flow.dispatch.tensor<readonly:8x2500x512xf32>
+        %3 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:8x2500x512xf32>
+        %4 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:8x2500x512xf32>
+        %5 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [8, 2500, 4608], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:8x2500x4608xf32> -> tensor<8x2500x4608xf32>
+        %6 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [4608, 512], strides = [1, 1] : !flow.dispatch.tensor<readonly:4608x512xf32> -> tensor<4608x512xf32>
+        %7 = flow.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [8, 2500, 512], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:8x2500x512xf32> -> tensor<8x2500x512xf32>
+        %8 = flow.dispatch.tensor.load %3, offsets = [0, 0, 0], sizes = [8, 2500, 512], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:8x2500x512xf32> -> tensor<8x2500x512xf32>
+        %9 = linalg.init_tensor [8, 2500, 512] : tensor<8x2500x512xf32>
+        %10 = linalg.fill ins(%cst : f32) outs(%9 : tensor<8x2500x512xf32>) -> tensor<8x2500x512xf32>
+        %11 = linalg.generic {
+          indexing_maps = [#map2, #map3, #map4],
+          iterator_types = ["parallel", "parallel", "parallel", "reduction"]
+        } ins(%5, %6 : tensor<8x2500x4608xf32>, tensor<4608x512xf32>) outs(%10 : tensor<8x2500x512xf32>) {
+        ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):
+          %13 = arith.mulf %arg0, %arg1 : f32
+          %14 = arith.addf %13, %arg2 : f32
+          linalg.yield %14 : f32
+        } -> tensor<8x2500x512xf32>
+        %12 = linalg.generic {
+          indexing_maps = [#map5, #map5, #map5, #map5],
+          iterator_types = ["parallel", "parallel", "parallel"]
+        } ins(%11, %7, %8 : tensor<8x2500x512xf32>, tensor<8x2500x512xf32>, tensor<8x2500x512xf32>) outs(%9 : tensor<8x2500x512xf32>) {
+        ^bb0(%arg0: f32, %arg1: f32, %arg2: f32, %arg3: f32):
+          %13 = arith.addf %arg0, %arg1 : f32
+          %14 = arith.subf %13, %arg2 : f32
+          linalg.yield %14 : f32
+        } -> tensor<8x2500x512xf32>
+        flow.dispatch.tensor.store %12, %4, offsets = [0, 0, 0], sizes = [8, 2500, 512], strides = [1, 1, 1] : tensor<8x2500x512xf32> -> !flow.dispatch.tensor<writeonly:8x2500x512xf32>
+        return
+      }
+    }
+  }
+}
+
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 10, 32], [1, 5, 4], [0, 0, 0, 4]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorize>
+//      CHECK: hal.executable.export public @generic_batch_matmul_8x2500x512x4608
+// CHECK-SAME:   translation_info = #[[TRANSLATION]]
+// CHECK-SAME:   workgroup_size = [8 : index, 2 : index, 1 : index]
+//      CHECK: func.func @generic_batch_matmul_8x2500x512x4608()
+//      CHECK:   linalg.generic
 // CHECK-SAME:     lowering_config = #[[CONFIG]]

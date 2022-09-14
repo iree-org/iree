@@ -16,6 +16,7 @@
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRV.h"
@@ -100,7 +101,7 @@ static void addTileAndDistributeToWorkgroupsPasses(
   auto &nestedModulePM = passManager.nest<ModuleOp>();
   if (useFuseTensorPadWithConsumerPass) {
     nestedModulePM.addNestedPass<func::FuncOp>(
-        createSPIRVFuseTensorPadWithConsumerPass());
+        createFuseTensorPadWithConsumerPass());
   }
   nestedModulePM.addNestedPass<func::FuncOp>(
       createConvertToDestinationPassingStylePass());
@@ -176,7 +177,7 @@ static void addMemRefLoweringPasses(OpPassManager &pm) {
 }
 
 /// Adds passes to perform the final SPIR-V conversion.
-static void addSPIRVLoweringPasses(OpPassManager &pm) {
+static void addSPIRVLoweringPasses(OpPassManager &pm, bool enableFastMath) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -185,13 +186,14 @@ static void addSPIRVLoweringPasses(OpPassManager &pm) {
   pm.addPass(createCSEPass());
 
   pm.addPass(createMapMemRefStorageClassPass());
-  pm.addPass(createConvertToSPIRVPass());
+  pm.addPass(createConvertToSPIRVPass(enableFastMath));
 
   OpPassManager &spirvPM = pm.nest<spirv::ModuleOp>();
   spirvPM.addPass(spirv::createUnifyAliasedResourcePass());
   spirvPM.addPass(spirv::createLowerABIAttributesPass());
   spirvPM.addPass(createCanonicalizerPass());
   spirvPM.addPass(createCSEPass());
+  spirvPM.addPass(spirv::createRewriteInsertsPass());
   spirvPM.addPass(spirv::createCanonicalizeGLPass());
   spirvPM.addPass(spirv::createUpdateVersionCapabilityExtensionPass());
 }
@@ -312,17 +314,57 @@ void addSPIRVTileAndDistributePassPipeline(OpPassManager &pm) {
   addLoopMaterializationPasses(nestedModulePM);
 }
 
+void addSPIRVSubgroupReducePassPipeline(OpPassManager &pm) {
+  addTileAndDistributeToWorkgroupsPasses(
+      pm, /*useFuseTensorPadWithConsumerPass=*/true);
+
+  auto &nestedModulePM = pm.nest<ModuleOp>();
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createRemoveSingleIterationLoopPass());
+  // Performs mechanical vectorization. This does not perform unrolling or
+  // lowering, which is done later.
+  nestedModulePM.addNestedPass<func::FuncOp>(createGPUVectorizationPass(
+      /*generateContract=*/false));
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLoopInvariantCodeMotionPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+
+  // Bufferize and distribute.
+  addSPIRVBufferizePasses(nestedModulePM, gpuAllocateFunctionMemoryFn);
+
+  // Perform various vector-level cross-op optimizations like load-store
+  // forwarding, shape casting and casting op cancelling.
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createOptimizeVectorTransferPass());
+
+  auto getWarpSize = [](func::FuncOp func) {
+    auto moduleOp = func->getParentOfType<ModuleOp>();
+    spirv::TargetEnvAttr target = getSPIRVTargetEnvAttr(moduleOp);
+    return target.getResourceLimits().getSubgroupSize();
+  };
+
+  // Handle vector reduction operations specifically.
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createConvertVectorReductionToGPUPass(getWarpSize));
+  // Perform normal vector unrolling and lowering transformations. This breaks
+  // vectors down to native machine size.
+  nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorizePass());
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+}
+
 //===----------------------------------------------------------------------===//
 // Entry Point
 //===----------------------------------------------------------------------===//
 
-void buildSPIRVCodegenPassPipeline(OpPassManager &pm) {
+void buildSPIRVCodegenPassPipeline(OpPassManager &pm, bool enableFastMath) {
   pm.nest<ModuleOp>().nest<func::FuncOp>().addPass(createTypePropagationPass());
   pm.nest<ModuleOp>().addPass(createBufferizeCopyOnlyDispatchesPass());
   pm.addPass(createSPIRVLowerExecutableTargetPass());
 
   addMemRefLoweringPasses(pm.nest<ModuleOp>());
-  addSPIRVLoweringPasses(pm.nest<ModuleOp>());
+  addSPIRVLoweringPasses(pm.nest<ModuleOp>(), enableFastMath);
 
   LLVM_DEBUG({
     llvm::dbgs() << "Using SPIR-V pass pipeline:\n";

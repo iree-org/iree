@@ -58,6 +58,7 @@ iree_compiler_cc_library(
         "PadTensorToTensorInsertSlice.cpp",
         "PassDetail.h",
         "Passes.cpp",
+        "RegionOpUtils.cpp",
         "SplitReduction.cpp",
         "StripAndSplatConstantVariables.cpp",
         "StripSignedness.cpp",
@@ -69,6 +70,7 @@ iree_compiler_cc_library(
         "FusionUtils.h",
         "Passes.h",
         "Passes.h.inc",
+        "RegionOpUtils.h",
     ],
     deps = [
         ":PassesIncGen",

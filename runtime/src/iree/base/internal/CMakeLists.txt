@@ -150,6 +150,8 @@ iree_cc_test(
     iree::base::core_headers
     iree::testing::gtest
     iree::testing::gtest_main
+  LABELS
+    "requires-filesystem"
 )
 
 iree_cc_library(
@@ -225,6 +227,8 @@ iree_cc_test(
     ::fpu_state
     iree::testing::gtest
     iree::testing::gtest_main
+  LABELS
+    "requires-dtz"
 )
 
 iree_cc_library(

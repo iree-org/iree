@@ -1604,6 +1604,29 @@ void AsyncTransferOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // stream.async.load
 //===----------------------------------------------------------------------===//
 
+namespace {
+
+// Folds subsequent bitcasts into the load op. The bit width will be the same
+// and it avoids additional conversion.
+struct FoldAsyncLoadBitcast : public OpRewritePattern<AsyncLoadOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(AsyncLoadOp loadOp,
+                                PatternRewriter &rewriter) const override {
+    auto loadedValue = loadOp.getResult();
+    if (!loadedValue.hasOneUse()) return failure();
+    auto bitcastOp =
+        dyn_cast<arith::BitcastOp>(*loadedValue.getUsers().begin());
+    if (!bitcastOp) return failure();
+    rewriter.updateRootInPlace(
+        loadOp, [&]() { loadedValue.setType(bitcastOp.getType()); });
+    bitcastOp.getResult().replaceAllUsesWith(loadedValue);
+    rewriter.eraseOp(bitcastOp);
+    return success();
+  }
+};
+
+}  // namespace
+
 void AsyncLoadOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {
   // TODO(benvanik): splat + load -> splat value.
@@ -1611,16 +1634,40 @@ void AsyncLoadOp::getCanonicalizationPatterns(RewritePatternSet &results,
   // TODO(benvanik): slice + ex load -> slice (ranged) + load.
   // TODO(benvanik): value->transfer->load -> value->slice->transfer->load?
   // TODO(benvanik): combine multiple loads from the same target if contiguous.
+  results.insert<FoldAsyncLoadBitcast>(context);
 }
 
 //===----------------------------------------------------------------------===//
 // stream.async.store
 //===----------------------------------------------------------------------===//
 
+namespace {
+
+// Folds preceding bitcasts into the store op. The bit width will be the same
+// and it avoids additional conversion.
+struct FoldAsyncStoreBitcast : public OpRewritePattern<AsyncStoreOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(AsyncStoreOp storeOp,
+                                PatternRewriter &rewriter) const override {
+    auto storedValue = storeOp.getValue();
+    if (auto bitcastOp =
+            dyn_cast_or_null<arith::BitcastOp>(storedValue.getDefiningOp())) {
+      rewriter.updateRootInPlace(storeOp, [&]() {
+        storeOp.getValueMutable().assign(bitcastOp.getOperand());
+      });
+      return success();
+    }
+    return failure();
+  }
+};
+
+}  // namespace
+
 void AsyncStoreOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                MLIRContext *context) {
   // TODO(benvanik): if value is a constant splat then turn into fill.
   // TODO(benvanik): combine multiple stores to the same target if contiguous.
+  results.insert<FoldAsyncStoreBitcast>(context);
 }
 
 //===----------------------------------------------------------------------===//

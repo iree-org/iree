@@ -31,7 +31,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
         translation_info = #iree_codegen.translation_info<CPUDefault workload_per_wg = [4]>
       } {
       ^bb0(%device: !hal.device, %arg0: index):
-        %x, %y, %z = flow.dispatch.default_workgroup_count %arg0
+        %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg0
         hal.return %x, %y, %z : index, index, index
       }
       builtin.module {

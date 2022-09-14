@@ -255,8 +255,9 @@ struct ResourceAllocaOpPattern
     // Gather wait/signal fence, which are optional.
     Value waitFence =
         getOrCreateWaitFence(loc, adaptor.getAwaitTimepoint(), rewriter);
-    Value signalFence = rewriter.create<IREE::HAL::TimelineAdvanceOp>(
-        loc, rewriter.getType<IREE::HAL::FenceType>());
+    Value signalFence = rewriter.create<IREE::HAL::FenceCreateOp>(
+        loc, rewriter.getType<IREE::HAL::FenceType>(), device,
+        IREE::HAL::FenceFlagBitfield::None);
 
     // Queue allocation.
     auto queueAffinity = rewriter.create<arith::ConstantIntOp>(loc, -1, 64);
@@ -282,8 +283,9 @@ struct ResourceDeallocaOpPattern
     // Gather wait/signal fence, which are optional.
     Value waitFence =
         getOrCreateWaitFence(loc, adaptor.getAwaitTimepoint(), rewriter);
-    Value signalFence = rewriter.create<IREE::HAL::TimelineAdvanceOp>(
-        loc, rewriter.getType<IREE::HAL::FenceType>());
+    Value signalFence = rewriter.create<IREE::HAL::FenceCreateOp>(
+        loc, rewriter.getType<IREE::HAL::FenceType>(), device,
+        IREE::HAL::FenceFlagBitfield::None);
 
     // Queue allocation.
     auto queueAffinity = rewriter.create<arith::ConstantIntOp>(loc, -1, 64);
@@ -569,8 +571,10 @@ struct TensorExportBufferViewOpPattern
     }
 
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferViewCreateOp>(
-        exportOp, adaptor.getSource(), elementType.value(),
-        encodingType.value(), dims);
+        exportOp, adaptor.getSource(),
+        rewriter.create<arith::ConstantIndexOp>(loc, 0),
+        adaptor.getSourceSize(), elementType.value(), encodingType.value(),
+        dims);
     return success();
   }
 };
@@ -855,8 +859,9 @@ struct CmdExecuteOpPattern
     // Gather wait/signal fence, which are optional.
     Value waitFence =
         getOrCreateWaitFence(loc, adaptor.getAwaitTimepoint(), rewriter);
-    Value signalFence = rewriter.create<IREE::HAL::TimelineAdvanceOp>(
-        loc, rewriter.getType<IREE::HAL::FenceType>());
+    Value signalFence = rewriter.create<IREE::HAL::FenceCreateOp>(
+        loc, rewriter.getType<IREE::HAL::FenceType>(), device,
+        IREE::HAL::FenceFlagBitfield::None);
 
     // Queue execution.
     auto queueAffinity = rewriter.create<arith::ConstantIntOp>(loc, -1, 64);
@@ -928,17 +933,9 @@ struct TimepointImportOpPattern
         operands[0].getType().isa<IREE::HAL::FenceType>()) {
       rewriter.replaceOp(importOp, operands[0]);
       return success();
-    } else if (operands.size() == 2 &&
-               operands[0].getType().isa<IREE::HAL::SemaphoreType>() &&
-               operands[1].getType().isIntOrIndex()) {
-      rewriter.replaceOpWithNewOp<IREE::HAL::FenceCreateOp>(
-          importOp, rewriter.getType<IREE::HAL::FenceType>(),
-          ValueRange{operands[0]}, ValueRange{operands[1]});
-      return success();
     } else {
-      return rewriter.notifyMatchFailure(importOp,
-                                         "only imports from HAL semaphore + "
-                                         "sequence value tuples are supported");
+      return rewriter.notifyMatchFailure(
+          importOp, "only imports from HAL fences are supported");
     }
   }
 };

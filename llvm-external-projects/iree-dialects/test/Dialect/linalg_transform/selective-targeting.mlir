@@ -79,7 +79,7 @@ transform.with_pdl_patterns {
     rewrite %0 with "transform.dialect"
   }
 
-  transform.structured.canonicalized_sequence %arg0 {
+  transform.structured.canonicalized_sequence %arg0 failures(propagate) {
   ^bb1(%arg1: !pdl.operation):
     %0 = pdl_match @pdl_target_attrA in %arg1
     transform.structured.tile %0 [4, 4, 4]
@@ -126,7 +126,7 @@ transform.with_pdl_patterns {
     rewrite %0 with "transform.dialect"
   }
 
-  transform.structured.canonicalized_sequence %arg0 {
+  transform.structured.canonicalized_sequence %arg0 failures(propagate) {
   ^bb1(%arg1: !pdl.operation):
     %0 = pdl_match @pdl_target in %arg1
     %1 = get_closest_isolated_parent %0
@@ -153,7 +153,7 @@ func.func @vectorize_all(
   return %1 : tensor<128x128xf32>
 }
 
-transform.structured.canonicalized_sequence {
+transform.structured.canonicalized_sequence failures(propagate) {
 ^bb0(%arg0: !pdl.operation):
   transform.structured.vectorize %arg0
 }

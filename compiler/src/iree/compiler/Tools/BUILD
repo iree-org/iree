@@ -51,10 +51,6 @@ cc_library(
         "//compiler/src/iree/compiler/Dialect/Flow/Transforms",
         "//compiler/src/iree/compiler/Dialect/HAL/IR:HALDialect",
         "//compiler/src/iree/compiler/Dialect/HAL/Transforms",
-        "//compiler/src/iree/compiler/Dialect/Modules/HAL/Inline/IR:HALInlineDialect",
-        "//compiler/src/iree/compiler/Dialect/Modules/HAL/Inline/Transforms",
-        "//compiler/src/iree/compiler/Dialect/Modules/HAL/Loader/IR:HALLoaderDialect",
-        "//compiler/src/iree/compiler/Dialect/Modules/HAL/Loader/Transforms",
         "//compiler/src/iree/compiler/Dialect/Stream/IR",
         "//compiler/src/iree/compiler/Dialect/Stream/Transforms",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
@@ -67,6 +63,10 @@ cc_library(
         "//compiler/src/iree/compiler/Dialect/VMVX/IR:VMVXDialect",
         "//compiler/src/iree/compiler/Dialect/VMVX/Transforms",
         "//compiler/src/iree/compiler/Dialect/Vulkan/IR",
+        "//compiler/src/iree/compiler/Modules/HAL/Inline/IR:HALInlineDialect",
+        "//compiler/src/iree/compiler/Modules/HAL/Inline/Transforms",
+        "//compiler/src/iree/compiler/Modules/HAL/Loader/IR:HALLoaderDialect",
+        "//compiler/src/iree/compiler/Modules/HAL/Loader/Transforms",
         "//compiler/src/iree/compiler/Pipelines",
         "//llvm-external-projects/iree-dialects:IREEInputDialect",
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
@@ -140,7 +140,7 @@ cc_library(
     name = "init_compiler_modules",
     hdrs = ["init_compiler_modules.h"],
     deps = [
-        "//compiler/src/iree/compiler/Dialect/Modules/Check/IR:CheckDialect",
+        "//compiler/src/iree/compiler/Modules/Check/IR:CheckDialect",
     ],
 )
 

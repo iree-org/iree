@@ -1,4 +1,4 @@
-// RUN: iree-import-tflite %S/multi_add.tflite | FileCheck %s
+// RUN: iree-import-tflite --output-format=mlir-ir %S/multi_add.tflite | FileCheck %s
 
 //      CHECK: module {
 // CHECK-NEXT:   func.func @main(%arg0: tensor<1x8x8x3xf32> {iree.identifier = "a"}, %arg1: tensor<1x8x8x3xf32> {iree.identifier = "b"}, %arg2: tensor<1x8x8x3xf32> {iree.identifier = "c"}, %arg3: tensor<1x8x8x3xf32> {iree.identifier = "d"}) -> (tensor<1x8x8x3xf32> {iree.identifier = "x"}, tensor<1x8x8x3xf32> {iree.identifier = "y"}) {

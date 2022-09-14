@@ -68,9 +68,10 @@ static FailureOr<unsigned> getNumWorkloadValues(
   return tilingRoot.getNumLoops();
 }
 
-/// Fallback lowering of `flow.dispatch.default_workgroup_count` to {1, 1, 1}.
+/// Fallback lowering of `flow.dispatch.workgroup_count_from_dag_root` to {1, 1,
+/// 1}.
 static LogicalResult lowerToUnitWorkgroupCount(
-    IREE::Flow::DispatchDefaultWorkgroupCountOp workgroupCountOp) {
+    IREE::Flow::DispatchWorkgroupCountFromDagRootOp workgroupCountOp) {
   OpBuilder builder(workgroupCountOp.getContext());
   builder.setInsertionPoint(workgroupCountOp);
   Value one =
@@ -81,10 +82,10 @@ static LogicalResult lowerToUnitWorkgroupCount(
   return success();
 }
 
-/// Method to lower the `flow.dispatch.default_workgroup_count` op into the
-/// actual computation that returns the number of workgroups.
-static LogicalResult lowerDispatchDefaultWorkgroupCountOp(
-    IREE::Flow::DispatchDefaultWorkgroupCountOp workgroupCountOp,
+/// Method to lower the `flow.dispatch.workgroup_count_from_dag_root` op into
+/// the actual computation that returns the number of workgroups.
+static LogicalResult lowerDispatchWorkgroupCountFromDagRootOp(
+    IREE::Flow::DispatchWorkgroupCountFromDagRootOp workgroupCountOp,
     ArrayRef<Operation *> computeOps, SmallVectorImpl<int64_t> &tileSizes,
     SmallVector<int64_t> &interchange,
     SmallVectorImpl<int64_t> &workloadPerWorkgroup) {
@@ -256,7 +257,7 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
       continue;
     }
 
-    // Find the `flow.dispatch.default_workgroup_count` operation in the
+    // Find the `flow.dispatch.workgroup_count_from_dag_root` operation in the
     // `workgroup_count` region of `hal.executable.export`. Lower this to the
     // actual computation that returns the `workgroup_count`.
     // TODO(ravishankarm): Ideally this should be done using a pattern, but the
@@ -270,17 +271,17 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
     }
     Block &workgroupCountBody = workgroupCountRegion.front();
     auto ops = workgroupCountBody
-                   .getOps<IREE::Flow::DispatchDefaultWorkgroupCountOp>();
+                   .getOps<IREE::Flow::DispatchWorkgroupCountFromDagRootOp>();
     if (!llvm::hasSingleElement(ops)) {
       // Do not modify the region since the default path expects only a single
-      // `flow.dispatch.default_workgroup_count` op.
+      // `flow.dispatch.workgroup_count_from_dag_root` op.
       continue;
     }
-    IREE::Flow::DispatchDefaultWorkgroupCountOp defaultWorkgroupCountOp =
+    IREE::Flow::DispatchWorkgroupCountFromDagRootOp defaultWorkgroupCountOp =
         *(ops.begin());
 
     SmallVector<int64_t> tileSizes, interchange, workloadPerWorkgroup;
-    if (failed(lowerDispatchDefaultWorkgroupCountOp(
+    if (failed(lowerDispatchWorkgroupCountFromDagRootOp(
             defaultWorkgroupCountOp, computeOps, tileSizes, interchange,
             workloadPerWorkgroup))) {
       defaultWorkgroupCountOp.emitOpError(

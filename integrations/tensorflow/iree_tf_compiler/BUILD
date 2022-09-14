@@ -78,6 +78,7 @@ cc_binary(
         "//iree_tf_compiler/MHLO",
         "//iree_tf_compiler/TF",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:BytecodeWriter",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Support",
@@ -96,6 +97,7 @@ cc_binary(
     deps = [
         "//iree_tf_compiler/TFL",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:BytecodeWriter",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:Pass",
@@ -116,6 +118,7 @@ cc_binary(
         "//iree_tf_compiler/MHLO",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithmeticDialect",
+        "@llvm-project//mlir:BytecodeWriter",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:MathDialect",

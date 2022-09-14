@@ -43,7 +43,7 @@ namespace {
 ///   - Ci must be < 4.
 /// - For filter:
 ///   - Hf must be 1.
-///   - Hf must be 1.
+///   - Wf must be 1.
 /// - No dilation.
 /// - No padding.
 ///
@@ -231,7 +231,7 @@ struct VectorizeLinalgConv : OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
 ///   - C must be a multiple of 4.
 /// - For filter:
 ///   - Hf must be 1.
-///   - Hf must be 1.
+///   - Wf must be 1.
 /// - No dilation.
 /// - No padding.
 ///

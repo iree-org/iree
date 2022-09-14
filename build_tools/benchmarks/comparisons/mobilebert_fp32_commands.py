@@ -118,7 +118,8 @@ class MobilebertFP32CommandFactory(BenchmarkCommandFactory):
 
     # Generate IREE benchmarks.
     driver = "local-task"
-    iree_model_path = os.path.join(self._base_dir, "models", "iree", driver,
+    backend = "llvm-cpu"
+    iree_model_path = os.path.join(self._base_dir, "models", "iree", backend,
                                    self._model_name + ".vmfb")
     iree_mobilebert = IreeMobilebertFP32(self._iree_benchmark_binary_path,
                                          self._model_name,
@@ -130,13 +131,24 @@ class MobilebertFP32CommandFactory(BenchmarkCommandFactory):
     if device == "mobile":
       model_mmt4d_name = self._model_name + "_mmt4d"
       iree_mmt4d_model_path = os.path.join(self._base_dir, "models", "iree",
-                                           driver, model_mmt4d_name + ".vmfb")
+                                           backend, model_mmt4d_name + ".vmfb")
       iree_mmt4d_mobilebert = IreeMobilebertFP32(
           self._iree_benchmark_binary_path,
           model_mmt4d_name,
           iree_mmt4d_model_path,
           driver=driver)
       commands.append(iree_mmt4d_mobilebert)
+
+      model_im2col_mmt4d_name = self._model_name + "_im2col_mmt4d"
+      iree_im2col_mmt4d_model_path = os.path.join(
+          self._base_dir, "models", "iree", backend,
+          model_im2col_mmt4d_name + ".vmfb")
+      iree_im2col_mmt4d_mobilebert = IreeMobilebertFP32(
+          self._iree_benchmark_binary_path,
+          model_im2col_mmt4d_name,
+          iree_im2col_mmt4d_model_path,
+          driver=driver)
+      commands.append(iree_im2col_mmt4d_mobilebert)
 
     return commands
 
@@ -171,7 +183,22 @@ class MobilebertFP32CommandFactory(BenchmarkCommandFactory):
                                          self._model_name,
                                          iree_model_path,
                                          driver=driver)
+    iree_fp16_model_path = os.path.join(self._base_dir, "models", "iree",
+                                        driver, self._model_name + "_fp16.vmfb")
+    iree_mobilebert_fp16 = IreeMobilebertFP32(self._iree_benchmark_binary_path,
+                                              self._model_name + "_fp16",
+                                              iree_fp16_model_path,
+                                              driver=driver)
+    iree_padfuse_model_path = os.path.join(self._base_dir, "models", "iree",
+                                           driver,
+                                           self._model_name + "_padfuse.vmfb")
+    iree_mobilebert_padfuse = IreeMobilebertFP32(
+        self._iree_benchmark_binary_path,
+        self._model_name + "_padfuse",
+        iree_padfuse_model_path,
+        driver=driver)
+
     return [
         tflite_mobilebert, tflite_mobilebert_noxnn, tflite_mobilebert_fp16,
-        iree_mobilebert
+        iree_mobilebert, iree_mobilebert_fp16, iree_mobilebert_padfuse
     ]

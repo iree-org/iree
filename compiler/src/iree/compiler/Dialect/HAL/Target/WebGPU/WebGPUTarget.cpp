@@ -84,7 +84,18 @@ class WebGPUTargetBackend : public TargetBackend {
   }
 
   void buildTranslationPassPipeline(OpPassManager &passManager) override {
-    buildSPIRVCodegenPassPipeline(passManager);
+    // From WGSL spec, "Floating Point Evaluation"
+    // (https://www.w3.org/TR/WGSL/#floating-point-evaluation):
+    // - Implementations may assume that NaNs and infinities are not present at
+    //   runtime.
+    //   - In such an implementation, when an evaluation would produce an
+    //     infinity or a NaN, an undefined value of the target type is produced
+    //     instead.
+    // So WebGPU effectively assumes fast math mode. We also don't have reliable
+    // ways to check whether a floating point number is NaN or infinity.
+    // Therefore, just let the SPIR-V CodeGen to avoid generating guards w.r.t.
+    // NaN and infinity.
+    buildSPIRVCodegenPassPipeline(passManager, /*enableFastMath=*/true);
     // TODO(scotttodd): additional passes for WebGPU/WGSL
     //                  (here or during serialization?)
   }

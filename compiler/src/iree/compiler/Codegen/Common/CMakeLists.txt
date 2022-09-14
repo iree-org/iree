@@ -77,16 +77,19 @@ iree_cc_library(
     "BufferizationAnalysis.cpp"
     "BufferizeCopyOnlyDispatchesPass.cpp"
     "CleanupBufferAllocViewPass.cpp"
+    "ConcretizePadResultShape.cpp"
     "ConvertToDestinationPassingStylePass.cpp"
     "FlattenMemRefSubspanPass.cpp"
     "FoldTensorExtractOpPass.cpp"
     "ForOpCanonicalizationPass.cpp"
+    "FuseTensorPadWithConsumer.cpp"
     "IREEComprehensiveBufferizePass.cpp"
     "OptimizeVectorTransferPass.cpp"
     "PolynomialApproximationPass.cpp"
     "TestPartitionableLoopsInterface.cpp"
     "TileAndDistributeToWorkgroupsPass.cpp"
     "TypePropagationPass.cpp"
+    "VectorizePad.cpp"
   DEPS
     IREELinalgExtDialect
     IREELinalgExtPasses
@@ -147,12 +150,14 @@ iree_cc_library(
     "FoldAffineMinInDistributedLoops.cpp"
     "GPUDistributeSharedMemoryCopy.cpp"
     "GPUPipelining.cpp"
+    "GPUVectorization.cpp"
     "MemrefCopyToLinalg.cpp"
     "PadDynamicAlloc.cpp"
     "RemoveTrivialLoops.cpp"
     "TestPartitionableLoopsInterface.cpp"
     "TileAndDistributeToWorkgroupsPass.cpp"
     "TileDispatchUsingInterface.cpp"
+    "VectorReductionToGPU.cpp"
     "VectorizeConv.cpp"
     "WorkGroupSwizzle.cpp"
   DEPS
@@ -194,6 +199,7 @@ iree_cc_library(
     MLIRTilingInterface
     MLIRTransforms
     MLIRVectorDialect
+    MLIRVectorToSCF
     MLIRVectorTransforms
     MLIRViewLikeInterface
     iree::compiler::Codegen::Common::FoldTensorExtractOpIncGen
