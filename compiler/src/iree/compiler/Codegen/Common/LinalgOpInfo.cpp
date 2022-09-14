@@ -42,9 +42,8 @@ static bool isTransposeMap(AffineMap map) {
   unsigned prevDim = 0;
   for (AffineExpr expr : map.getResults()) {
     if (auto constExpr = expr.dyn_cast<AffineConstantExpr>()) {
-      if (constExpr.getValue() != 0) {
-        return false;
-      }
+      // Constant zero expression, guaranteed by 'allowZeroInResults' above.
+      continue;
     } else if (auto dimExpr = expr.dyn_cast<AffineDimExpr>()) {
       if (prevDim > dimExpr.getPosition()) {
         return true;
