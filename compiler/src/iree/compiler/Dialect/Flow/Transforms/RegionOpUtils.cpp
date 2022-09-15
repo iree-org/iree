@@ -85,8 +85,8 @@ static bool hasDynamicShape(Type t) {
 }
 
 /// Reify the dynamic dimensions of the given value.
-static LogicalResult reifyDynamicResultDims(OpBuilder &b, Value value,
-                                            SmallVector<Value> &dynamicDims) {
+LogicalResult Flow::reifyDynamicResultDims(OpBuilder &b, Value value,
+                                           SmallVector<Value> &dynamicDims) {
   OpBuilder::InsertionGuard guard(b);
 
   // Case 1: No dynamic result dims.

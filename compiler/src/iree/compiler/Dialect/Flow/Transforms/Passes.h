@@ -142,6 +142,12 @@ std::unique_ptr<Pass> createVerifyInputLegalityPass();
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createDispatchLinalgOnTensorsPass();
 
+// Pass to perform dispatch of Linalg on tensor ops by tiling and distribution.
+// A dispatch region is created for each tiled loop nest. (First create
+// DispatchRegionOps, then DispatchWorkgroupsOps.)
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createDispatchLinalgOnTensorsViaRegionOpsPass();
+
 // Pass to perform dispatch of Linalg on tensor ops by using the transform
 // dialect. Dispatch regions are created as specified by the transform module
 // that is parsed from `transformFileName`.

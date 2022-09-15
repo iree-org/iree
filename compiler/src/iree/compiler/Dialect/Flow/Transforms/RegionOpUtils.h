@@ -26,6 +26,10 @@ class DispatchRegionOp;
 SmallVector<Range> getLoopRanges(Operation *op, Location loc,
                                  OpBuilder &builder);
 
+/// Reify the dynamic dimensions of the given value.
+LogicalResult reifyDynamicResultDims(OpBuilder &b, Value value,
+                                     SmallVector<Value> &dynamicDims);
+
 /// Append a result to the given DispatchRegionOp. The newly created
 /// DispatchRegionOp is returned.
 FailureOr<Flow::DispatchRegionOp> appendDispatchRegionResult(

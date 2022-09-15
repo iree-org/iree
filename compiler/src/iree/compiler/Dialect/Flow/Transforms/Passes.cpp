@@ -110,6 +110,11 @@ static llvm::cl::opt<std::string> clDispatchTransformFileName(
                    "the transformations to apply to form dispatch regions."),
     llvm::cl::init(""));
 
+static llvm::cl::opt<bool> clDispatchViaRegionOps(
+    "iree-flow-dispatch-via-region-ops",
+    llvm::cl::desc("Create dispatches via DispatchRegionOps"),
+    llvm::cl::init(false));
+
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
@@ -252,8 +257,15 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
                                clDispatchTransformFileName);
                          })
       // Only want use the transform dialect for some dispatch regions and let
-      // the DispatchLinalgOnTensorsPass unconditionally handle the rest.
-      .addPass(createDispatchLinalgOnTensorsPass)
+      // the DispatchLinalgOnTensorsPass handle the rest.
+      .addPredicatedPass(!clDispatchViaRegionOps,
+                         createDispatchLinalgOnTensorsPass)
+      // DispatchLinalgOnTensorsViaRegionsPass is a variant of
+      // DispatchLinalgOnTensorsPass that lowers via DispatchRegionOps. This is
+      // on an opt-in basis until the pass is stable enough to replace
+      // DispatchLinalgOnTensorsPass.
+      .addPredicatedPass(clDispatchViaRegionOps,
+                         createDispatchLinalgOnTensorsViaRegionOpsPass)
       ////////////////////////////////////////////////////////////////////////
       .addPass(createCaptureDispatchDynamicDimsPass)
       .addPass(mlir::createCanonicalizerPass)
