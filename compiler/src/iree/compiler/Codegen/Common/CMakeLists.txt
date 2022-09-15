@@ -160,6 +160,7 @@ iree_cc_library(
     "TestPartitionableLoopsInterface.cpp"
     "TileAndDistributeToWorkgroupsPass.cpp"
     "TileDispatchUsingInterface.cpp"
+    "UserConfig.cpp"
     "VectorReductionToGPU.cpp"
     "VectorizeConv.cpp"
     "WorkGroupSwizzle.cpp"

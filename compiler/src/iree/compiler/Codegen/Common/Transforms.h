@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 
@@ -18,6 +19,10 @@ void populateTileAndDistributeToWorkgroupsPatterns(
 /// Populate patterns that fold tensor.expand/collapse_shape into the source
 /// hal.interface.binding.subspan.
 void populateReshapeToInterfaceTensorPatterns(RewritePatternSet &patterns);
+
+/// Sets compilation configuration annotated in the incoming IR.
+LogicalResult setUserConfig(func::FuncOp entryPointFn, Operation *computeOp,
+                            IREE::Codegen::CompilationInfoAttr compilationInfo);
 
 }  // namespace iree_compiler
 }  // namespace mlir
