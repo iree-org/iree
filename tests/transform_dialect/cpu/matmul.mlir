@@ -49,15 +49,6 @@ func.func @matmul_static(
 
 // CODEGEN: hal.executable private @matmul_static_dispatch_0 {
 // CODEGEN:   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-//
-// The signature of the hal.executable.export region is subject to conventions
-// at the flow level. These conventions are materialized in IR e.g. into
-// stream.cmd.dispatch before codegen gets invoked.
-// As a consequence, the tile_size/num_threads/workgroup_count passed to
-// transform.tile_to_foreach_thread needs to be aware of this convention.
-// For now we use our own convention that sizes are static and no other bbArg
-// than !hal.device is present.
-//
 // CODEGEN:     hal.executable.export public @matmul_static_dispatch_0_matmul_3x3x5 ordinal(0) layout(#{{.*}}) attributes {translation_info = #translation} {
 // CODEGEN:       ^bb0(%{{.*}}: !hal.device):
 // CODEGEN:         arith.constant 2 : index
@@ -78,6 +69,22 @@ func.func @matmul_static(
 // CODEGEN:           memref.subview %{{.*}}[%{{.*}}, 0] [%{{.*}}, 5] [1, 1] : memref<3x5xf32> to memref<?x5xf32, strided<[5, 1], offset: ?>>
 // CODEGEN:           memref.subview %{{.*}}[%{{.*}}, 0] [%{{.*}}, 3] [1, 1] : memref<3x3xf32> to memref<?x3xf32, strided<[3, 1], offset: ?>>
 // CODEGEN:           linalg.matmul ins(%{{.*}}, %{{.*}} : memref<?x5xf32, strided<[5, 1], offset: ?>>, memref<5x3xf32>) outs(%{{.*}} : memref<?x3xf32, strided<[3, 1], offset: ?>>)
+
+// RUN: iree-opt %s --iree-hal-target-backends=llvm-cpu \
+// RUN:   --iree-abi-transformation-pipeline \
+// RUN:   --iree-flow-transformation-pipeline \
+// RUN:   --iree-stream-transformation-pipeline \
+// RUN:    --iree-hal-configuration-pipeline | \
+// RUN: iree-opt --pass-pipeline='hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target))' \
+// RUN:   --iree-codegen-llvmcpu-use-transform-dialect=%p/matmul_codegen_default_spec.mlir | \
+// RUN: FileCheck %s --check-prefixes=CODEGEN-DEFAULT
+
+// CODEGEN-DEFAULT: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 2)>
+// CODEGEN-DEFAULT:     hal.executable.export public @matmul_static_dispatch_0_matmul_3x3x5
+// CODEGEN-DEFAULT:       ^bb0(%[[DEVICE:[a-zA-Z0-9]+]]: !hal.device, %[[ARG0:[a-zA-Z0-9]+]]: index,
+// CODEGEN-DEFAULT:         %[[C1:.+]] = arith.constant 1 : index
+// CODEGEN-DEFAULT:         %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]]
+// CODEGEN-DEFAULT:         hal.return %[[D0]], %[[C1]], %[[C1]]
 
 // RUN: iree-compile %s --iree-hal-target-backends=llvm-cpu \
 // RUN:   --iree-flow-dispatch-use-transform-dialect=%p/matmul_dispatch_spec.mlir \
