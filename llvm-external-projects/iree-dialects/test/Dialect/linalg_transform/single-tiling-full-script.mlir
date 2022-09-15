@@ -18,7 +18,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   %0 = transform.structured.match ops{["linalg.matmul"]} in %module_op
   %1, %loops:3 = transform.structured.tile %0 [4, 4, 4]
   %2 = get_closest_isolated_parent %1
-  transform.structured.vectorize %2 {vectorize_padding = true}
+  transform.structured.vectorize %2 { vectorize_padding }
   bufferize
   lower_vectors { multireduction_lowering = "innerreduce"}
   lower_to_llvm
