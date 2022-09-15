@@ -18,6 +18,7 @@
     .text
     .p2align 4
     .global \name
+    .hidden \name
     .type \name, %function
     \name:
   .endm
