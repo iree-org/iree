@@ -17,6 +17,7 @@
 #include "iree/compiler/Dialect/Flow/Transforms/FusionUtils.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
@@ -448,88 +449,6 @@ static SmallVector<Operation *> getOperationsToMoveIntoDispatch(
 //===---------------------------------------------------------------------===//
 // Methods to legalize a dispatch region op, i.e. make it isolated from above.
 //===---------------------------------------------------------------------===//
-
-/// Reorders the operations in `ops` such that they could be inlined into the
-/// dispatch region in that order to satisfy dependencies.
-static SmallVector<Operation *> orderOperations(ArrayRef<Operation *> ops) {
-  LLVM_DEBUG({
-    llvm::dbgs() << "Ops to be inlined :\n";
-    for (auto op : ops) {
-      llvm::dbgs() << "\t";
-      op->print(llvm::dbgs());
-      llvm::dbgs() << "\n";
-    }
-  });
-
-  llvm::SmallMapVector<Operation *, SmallVector<Operation *>, 16>
-      insertAfterMap;
-  llvm::SetVector<Operation *> opSet(ops.begin(), ops.end());
-  llvm::SetVector<Operation *> leafOps(ops.begin(), ops.end());
-  // For each operation compute the list of operations in `ops` that use its
-  // results. Also compute the operations that form the leafs of the DAG of
-  // operations in `ops`.
-  for (auto op : ops) {
-    for (auto operand : op->getOperands()) {
-      auto definingOp = operand.getDefiningOp();
-      if (!definingOp || !opSet.count(definingOp)) continue;
-      insertAfterMap[definingOp].push_back(op);
-      if (leafOps.count(op)) leafOps.remove(op);
-    }
-  }
-
-  // The leaves are at the head of the ordered list.
-  SmallVector<Operation *> orderedOps(leafOps.begin(), leafOps.end());
-  orderedOps.reserve(ops.size());
-  llvm::SmallPtrSet<Operation *, 16> processed;
-  processed.insert(leafOps.begin(), leafOps.end());
-
-  // `readyOps` contains the list of operations that have been just added to the
-  // `orderedOps` list. With these marked ready, they might make further
-  // operations in `ops` ready as well.
-  // The complexity of the algorithm is driven by these
-  // - Each operations is added to `readyOps` list at most once, and is removed
-  //   after being processed
-  // - For every operation in `readyOps` every use of its results (within `ops`)
-  //   is looked at once.
-  // - For every use, the operands of the user are processed.
-  // Assuming operands is O(1), i.e. constant order, the complexity is O(sum of
-  // number of uses of each operation). Given that the size of `ops` is at max
-  // O(10), and not O(100), this is assumed to be reasonable.
-  ArrayRef<Operation *> readyOps(orderedOps);
-  size_t startPos = 0;
-  while (!readyOps.empty()) {
-    auto op = readyOps.front();
-    startPos++;
-    // Check all uses of `op` within `ops`. If all of the operations that define
-    // the operands of the user have been added to `orderedOps`, then the user
-    // is ready to be scheduled.
-    for (auto insertAfterOp : insertAfterMap[op]) {
-      if (processed.count(insertAfterOp)) continue;
-      if (llvm::all_of(insertAfterOp->getOperands(), [&](Value operand) {
-            Operation *operandDefiningOp = operand.getDefiningOp();
-            return !operandDefiningOp || !opSet.count(operandDefiningOp) ||
-                   processed.count(operandDefiningOp);
-          })) {
-        // readyOps.push_back(insertAfterOp);
-        orderedOps.push_back(insertAfterOp);
-        processed.insert(insertAfterOp);
-      }
-    }
-    readyOps = ArrayRef<Operation *>(orderedOps).drop_front(startPos);
-  }
-
-  LLVM_DEBUG({
-    llvm::dbgs() << "Ops to be inlined (sorted) : \n";
-    for (auto op : orderedOps) {
-      llvm::dbgs() << "\t";
-      op->print(llvm::dbgs());
-      llvm::dbgs() << "\n";
-    }
-  });
-  assert(orderedOps.size() == ops.size() &&
-         "ordering of inlined operations failed");
-  return orderedOps;
-}
 
 /// Checks if the `Value` has a use within the dispatch that is unfusable.
 static bool hasUnfusableUseInDispatch(

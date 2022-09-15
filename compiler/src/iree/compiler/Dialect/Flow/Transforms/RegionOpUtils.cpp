@@ -11,10 +11,11 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dominance.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+using namespace mlir;
+using namespace mlir::iree_compiler;
+using namespace mlir::iree_compiler::IREE;
+
+#define DEBUG_TYPE "iree-flow-region-op-utils"
 
 /// Return `true` if the given type is a ShapedType and has at least one
 /// dynamic dimension.
@@ -85,7 +86,7 @@ static LogicalResult reifyDynamicResultDims(OpBuilder &b, Value value,
 
 // Append a result to the given DispatchRegionOp. The newly created
 // DispatchRegionOp is returned.
-FailureOr<Flow::DispatchRegionOp> appendDispatchRegionResult(
+FailureOr<Flow::DispatchRegionOp> Flow::appendDispatchRegionResult(
     RewriterBase &rewriter, Flow::DispatchRegionOp regionOp, Value result) {
   OpBuilder::InsertionGuard guard(rewriter);
 
@@ -119,8 +120,8 @@ FailureOr<Flow::DispatchRegionOp> appendDispatchRegionResult(
   return newRegionOp;
 }
 
-Flow::DispatchRegionOp makeEmptyDispatchRegion(OpBuilder &builder,
-                                               Location loc) {
+Flow::DispatchRegionOp Flow::makeEmptyDispatchRegion(OpBuilder &builder,
+                                                     Location loc) {
   OpBuilder::InsertionGuard guard(builder);
 
   // Create RegionOp.
@@ -135,7 +136,7 @@ Flow::DispatchRegionOp makeEmptyDispatchRegion(OpBuilder &builder,
 
 // Clone a `target` op that is preceding the given dispatch region op into the
 // dispatch region.
-LogicalResult clonePrecedingOpIntoDispatchRegion(
+LogicalResult Flow::clonePrecedingOpIntoDispatchRegion(
     RewriterBase &rewriter, Operation *target,
     Flow::DispatchRegionOp regionOp) {
   Block &body = regionOp.getBody().front();
@@ -165,7 +166,7 @@ LogicalResult clonePrecedingOpIntoDispatchRegion(
 
 // Move a `target` op that is preceding the given dispatch region op into the
 // dispatch region.
-FailureOr<Flow::DispatchRegionOp> movePrecedingOpIntoDispatchRegion(
+FailureOr<Flow::DispatchRegionOp> Flow::movePrecedingOpIntoDispatchRegion(
     RewriterBase &rewriter, Operation *target,
     Flow::DispatchRegionOp regionOp) {
 #ifndef NDEBUG
@@ -214,8 +215,8 @@ FailureOr<Flow::DispatchRegionOp> movePrecedingOpIntoDispatchRegion(
   return regionOp;
 }
 
-FailureOr<Flow::DispatchRegionOp> wrapOpInDispatchRegion(RewriterBase &rewriter,
-                                                         Operation *op) {
+FailureOr<Flow::DispatchRegionOp> Flow::wrapOpInDispatchRegion(
+    RewriterBase &rewriter, Operation *op) {
   // Make an empty dispatch region right before the op.
   rewriter.setInsertionPointAfter(op);
   Flow::DispatchRegionOp regionOp =
@@ -226,7 +227,84 @@ FailureOr<Flow::DispatchRegionOp> wrapOpInDispatchRegion(RewriterBase &rewriter,
   return newRegionOp;
 }
 
-}  // namespace Flow
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+/// Reorders the operations in `ops` such that they could be inlined into the
+/// dispatch region in that order to satisfy dependencies.
+SmallVector<Operation *> Flow::orderOperations(ArrayRef<Operation *> ops) {
+  LLVM_DEBUG({
+    llvm::dbgs() << "Ops to be inlined :\n";
+    for (auto op : ops) {
+      llvm::dbgs() << "\t";
+      op->print(llvm::dbgs());
+      llvm::dbgs() << "\n";
+    }
+  });
+
+  llvm::SmallMapVector<Operation *, SmallVector<Operation *>, 16>
+      insertAfterMap;
+  llvm::SetVector<Operation *> opSet(ops.begin(), ops.end());
+  llvm::SetVector<Operation *> leafOps(ops.begin(), ops.end());
+  // For each operation compute the list of operations in `ops` that use its
+  // results. Also compute the operations that form the leafs of the DAG of
+  // operations in `ops`.
+  for (auto op : ops) {
+    for (auto operand : op->getOperands()) {
+      auto definingOp = operand.getDefiningOp();
+      if (!definingOp || !opSet.count(definingOp)) continue;
+      insertAfterMap[definingOp].push_back(op);
+      if (leafOps.count(op)) leafOps.remove(op);
+    }
+  }
+
+  // The leaves are at the head of the ordered list.
+  SmallVector<Operation *> orderedOps(leafOps.begin(), leafOps.end());
+  orderedOps.reserve(ops.size());
+  llvm::SmallPtrSet<Operation *, 16> processed;
+  processed.insert(leafOps.begin(), leafOps.end());
+
+  // `readyOps` contains the list of operations that have been just added to the
+  // `orderedOps` list. With these marked ready, they might make further
+  // operations in `ops` ready as well.
+  // The complexity of the algorithm is driven by these
+  // - Each operations is added to `readyOps` list at most once, and is removed
+  //   after being processed
+  // - For every operation in `readyOps` every use of its results (within `ops`)
+  //   is looked at once.
+  // - For every use, the operands of the user are processed.
+  // Assuming operands is O(1), i.e. constant order, the complexity is O(sum of
+  // number of uses of each operation). Given that the size of `ops` is at max
+  // O(10), and not O(100), this is assumed to be reasonable.
+  ArrayRef<Operation *> readyOps(orderedOps);
+  size_t startPos = 0;
+  while (!readyOps.empty()) {
+    auto op = readyOps.front();
+    startPos++;
+    // Check all uses of `op` within `ops`. If all of the operations that define
+    // the operands of the user have been added to `orderedOps`, then the user
+    // is ready to be scheduled.
+    for (auto insertAfterOp : insertAfterMap[op]) {
+      if (processed.count(insertAfterOp)) continue;
+      if (llvm::all_of(insertAfterOp->getOperands(), [&](Value operand) {
+            Operation *operandDefiningOp = operand.getDefiningOp();
+            return !operandDefiningOp || !opSet.count(operandDefiningOp) ||
+                   processed.count(operandDefiningOp);
+          })) {
+        // readyOps.push_back(insertAfterOp);
+        orderedOps.push_back(insertAfterOp);
+        processed.insert(insertAfterOp);
+      }
+    }
+    readyOps = ArrayRef<Operation *>(orderedOps).drop_front(startPos);
+  }
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "Ops to be inlined (sorted) : \n";
+    for (auto op : orderedOps) {
+      llvm::dbgs() << "\t";
+      op->print(llvm::dbgs());
+      llvm::dbgs() << "\n";
+    }
+  });
+  assert(orderedOps.size() == ops.size() &&
+         "ordering of inlined operations failed");
+  return orderedOps;
+}
