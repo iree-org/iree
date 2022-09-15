@@ -48,7 +48,7 @@ func.func @matmul_static(
 // RUN: FileCheck %s --check-prefixes=CODEGEN
 
 // CODEGEN: hal.executable private @matmul_static_dispatch_0 {
-// CODEGEN:   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
+// CODEGEN:   hal.executable.variant public @embedded_elf_{{.*}}, target = #executable_target_embedded_elf_{{.*}} {
 //
 // The signature of the hal.executable.export region is subject to conventions
 // at the flow level. These conventions are materialized in IR e.g. into
