@@ -115,6 +115,12 @@ static llvm::cl::opt<bool> clDispatchViaRegionOps(
     llvm::cl::desc("Create dispatches via DispatchRegionOps"),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clDispatchViaRegionOpsGenerateWorkloadRegion(
+    "iree-flow-dispatch-via-region-ops-generate-workload-region",
+    llvm::cl::desc("Generate the workload region when running with "
+                   "iree-flow-dispatch-via-region-ops"),
+    llvm::cl::init(true));
+
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
@@ -192,8 +198,9 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPass(IREE::Flow::createConvertConv2D1x1ToMatmulPass)
       .addPredicatedPass(clEnableConvToImg2Col,
                          IREE::Flow::createConvertConv2DToImg2ColPass)
-      .addPredicatedPass(clDispatchTransformFileName.empty(),
-                         IREE::Flow::createDetachElementwiseFromNamedOpsPass)
+      .addPredicatedPass(
+          clDispatchTransformFileName.empty() && !clDispatchViaRegionOps,
+          IREE::Flow::createDetachElementwiseFromNamedOpsPass)
       // Input should now be legal.
       .addPass(IREE::Flow::createVerifyInputLegalityPass)
       // Catch matmul ops before we do anything else with them.
@@ -265,7 +272,10 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       // on an opt-in basis until the pass is stable enough to replace
       // DispatchLinalgOnTensorsPass.
       .addPredicatedPass(clDispatchViaRegionOps,
-                         createDispatchLinalgOnTensorsViaRegionOpsPass)
+                         [&]() {
+                           return createDispatchLinalgOnTensorsViaRegionOpsPass(
+                               clDispatchViaRegionOpsGenerateWorkloadRegion);
+                         })
       ////////////////////////////////////////////////////////////////////////
       .addPass(createCaptureDispatchDynamicDimsPass)
       .addPass(mlir::createCanonicalizerPass)

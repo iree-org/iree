@@ -146,7 +146,8 @@ createDispatchLinalgOnTensorsPass();
 // A dispatch region is created for each tiled loop nest. (First create
 // DispatchRegionOps, then DispatchWorkgroupsOps.)
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createDispatchLinalgOnTensorsViaRegionOpsPass();
+createDispatchLinalgOnTensorsViaRegionOpsPass(
+    bool generateWorkloadRegion = true);
 
 // Pass to perform dispatch of Linalg on tensor ops by using the transform
 // dialect. Dispatch regions are created as specified by the transform module
