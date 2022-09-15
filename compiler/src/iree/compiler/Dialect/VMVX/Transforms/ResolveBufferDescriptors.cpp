@@ -33,6 +33,7 @@ struct FromMemRefSubView : public OpRewritePattern<GetBufferDescriptorOp> {
     auto sourceType = source.getType().cast<MemRefType>();
     int sourceRank = sourceType.getRank();
     int subRank = subType.getRank();
+    (void)subRank;
 
     // Create a descriptor for the source.
     IndexType indexType = rewriter.getIndexType();
@@ -44,20 +45,28 @@ struct FromMemRefSubView : public OpRewritePattern<GetBufferDescriptorOp> {
         loc, op.getBaseBuffer().getType(), indexType, sizeStrideTypes,
         sizeStrideTypes, subview.getSource());
 
-    // For sizes, we just use the new ones, discarding the source.
+    // For sizes, we just use the new ones.
+    llvm::SmallBitVector droppedDims = subview.getDroppedDims();
+    unsigned insertedDims = 0;
     SmallVector<Value> newSizes;
-    for (int i = 0; i < subRank; ++i) {
+    for (int i = 0; i < sourceRank; ++i) {
+      // Skip the sizes that don't show up in the final type.
+      if (droppedDims.test(i)) continue;
+
       if (subview.isDynamicSize(i)) {
         newSizes.push_back(subview.getDynamicSize(i));
       } else {
         newSizes.push_back(indexSet.get(subview.getStaticSize(i)));
       }
-      op.getSizes()[i].replaceAllUsesWith(newSizes.back());
+      op.getSizes()[insertedDims++].replaceAllUsesWith(newSizes.back());
     }
+    assert(insertedDims == subRank &&
+           "Should have populated all the non-reduced sizes");
 
     // Apply stride multipliers.
     SmallVector<Value> strides;
-    for (int i = 0; i < subRank; ++i) {
+    insertedDims = 0;
+    for (int i = 0; i < sourceRank; ++i) {
       Value currentStride;
       if (subview.isDynamicStride(i)) {
         currentStride = subview.getDynamicStride(i);
@@ -67,12 +76,20 @@ struct FromMemRefSubView : public OpRewritePattern<GetBufferDescriptorOp> {
       currentStride = rewriter.createOrFold<arith::MulIOp>(
           loc, sourceDesc.getStrides()[i], currentStride);
       strides.push_back(currentStride);
-      op.getStrides()[i].replaceAllUsesWith(currentStride);
+
+      // Don't replace the value of dropped dimensions.
+      // Although the new stride will be used in the computation of the final
+      // offset, there's no value to replace.
+      if (droppedDims.test(i)) continue;
+
+      op.getStrides()[insertedDims++].replaceAllUsesWith(currentStride);
     }
+    assert(insertedDims == subRank &&
+           "Should have populated all the non-reduced strides");
 
     // Offsets.
     Value offset = sourceDesc.getOffset();
-    for (int i = 0; i < subRank; ++i) {
+    for (int i = 0; i < sourceRank; ++i) {
       Value logicalOffset;
       if (subview.isDynamicOffset(i)) {
         logicalOffset = subview.getDynamicOffset(i);
