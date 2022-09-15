@@ -334,7 +334,7 @@ static int64_t getMaxTileSize(int64_t lb, int64_t ub, int64_t maxSize,
     return maxSize;
   }
   int64_t dim = ub - lb;
-  if (dim < vectorSizeVal) return dim;
+  if (dim <= maxSize && dim < vectorSizeVal) return dim;
 
   int64_t scaledUB = std::min(maxSize, dim) / vectorSizeVal * vectorSizeVal;
   for (int64_t i = scaledUB; i > 0; i -= vectorSizeVal) {
@@ -1277,7 +1277,7 @@ static SmallVector<int64_t> getConvWorkgroupSizes(func::FuncOp entryPointFn,
         .Case<linalg::Conv2DNhwcHwcfOp>(
             [&](auto op) { tileSizes = {1, 1, 8, vectorSize * 2, 1, 1, 8}; })
         .Case<linalg::DepthwiseConv2DNhwcHwcOp>(
-            [&](auto op) { tileSizes = {1, 1, 8, vectorSize * 2, 1, 3}; })
+            [&](auto op) { tileSizes = {1, 1, 8, vectorSize, 1, 3}; })
         .Default([&](Operation *op) { llvm_unreachable("qq"); });
   }
 
