@@ -951,28 +951,6 @@ struct DispatchLinalgOnTensorsPass
   Statistic numDispatches{this, "number of dispatches",
                           "Number of Flow dispatches created"};
 };
-
-// Pass to test conversion to flow patterns.
-struct ConvertToFlowPass : public ConvertToFlowBase<ConvertToFlowPass> {
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<AffineDialect, IREE::Flow::FlowDialect, linalg::LinalgDialect,
-                scf::SCFDialect, tensor::TensorDialect>();
-  }
-
-  void runOnOperation() override {
-    MLIRContext *context = &getContext();
-    RewritePatternSet convertToFlowPatterns(context);
-    populateTensorToFlowConversionPatterns(context, convertToFlowPatterns);
-    memref::populateResolveRankedShapeTypeResultDimsPatterns(
-        convertToFlowPatterns);
-    if (failed(applyPatternsAndFoldGreedily(
-            getOperation(), std::move(convertToFlowPatterns)))) {
-      return signalPassFailure();
-    }
-  }
-};
-
 }  // namespace
 
 /// For all ops within `funcOp` tagged as root ops, create dispatch regions.
@@ -1134,10 +1112,6 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createDispatchLinalgOnTensorsPass() {
   return std::make_unique<DispatchLinalgOnTensorsPass>();
-}
-
-std::unique_ptr<Pass> createConvertToFlowPass() {
-  return std::make_unique<ConvertToFlowPass>();
 }
 
 }  // namespace Flow
