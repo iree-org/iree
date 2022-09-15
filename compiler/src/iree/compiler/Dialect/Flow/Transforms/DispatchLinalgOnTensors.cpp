@@ -196,56 +196,9 @@ bool isClonableIntoDispatchOp(Operation *op) {
 // Methods for getting the workload information for dispatch region creation.
 //===----------------------------------------------------------------------===//
 
-/// For a given operation returns the loop ranges needed to compute the op.
-template <typename T>
-static SmallVector<Range> getLoopRanges(T operation, Location loc,
-                                        OpBuilder &builder);
-
-template <>
-SmallVector<Range> getLoopRanges<TilingInterface>(TilingInterface tilableOp,
-                                                  Location loc,
-                                                  OpBuilder &builder) {
-  SmallVector<Range> loopRanges = tilableOp.getIterationDomain(builder);
-  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
-  for (auto iteratorType : llvm::enumerate(tilableOp.getLoopIteratorTypes())) {
-    if (iteratorType.value() == getReductionIteratorTypeName()) {
-      loopRanges[iteratorType.index()].size = one;
-    }
-  }
-  return loopRanges;
-}
-
-template <>
-SmallVector<Range> getLoopRanges<tensor::InsertSliceOp>(
-    tensor::InsertSliceOp insertSliceOp, Location loc, OpBuilder &builder) {
-  OpFoldResult zero = builder.getIndexAttr(0);
-  OpFoldResult one = builder.getIndexAttr(1);
-  Value source = insertSliceOp.getSource();
-  SmallVector<Range> loopRanges(insertSliceOp.getSourceType().getRank(),
-                                Range{zero, one, one});
-  for (auto dim : llvm::seq<unsigned>(0, loopRanges.size())) {
-    loopRanges[dim].size =
-        builder.create<tensor::DimOp>(loc, source, dim).getResult();
-  }
-  return loopRanges;
-}
-
-template <>
-SmallVector<Range> getLoopRanges<tensor::ExtractSliceOp>(
-    tensor::ExtractSliceOp sliceOp, Location loc, OpBuilder &builder) {
-  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
-  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
-  ReifiedRankedShapedTypeDims resultDims;
-  (void)sliceOp.reifyResultShapes(builder, resultDims);
-  return llvm::to_vector(llvm::map_range(resultDims[0], [&](Value v) {
-    return Range{zero, v, one};
-  }));
-}
-
 /// Compute the workload to use for the workgroup based on the root op.
-template <typename OpTy>
 static SmallVector<Value> getWorkloadForRootOp(OpBuilder &builder,
-                                               OpTy rootOp) {
+                                               Operation *rootOp) {
   // Compute workgroup count to use for the dispatch op. These are the ranges
   // of the outermost parallel loops that can be distributed.
   Location loc = rootOp->getLoc();
@@ -257,7 +210,7 @@ static SmallVector<Value> getWorkloadForRootOp(OpBuilder &builder,
     Value offset = getValueOrCreateConstantIndexOp(builder, loc, r.offset);
     Value size = getValueOrCreateConstantIndexOp(builder, loc, r.size);
     Value stride = getValueOrCreateConstantIndexOp(builder, loc, r.stride);
-    return builder.create<AffineApplyOp>(rootOp.getLoc(), workload,
+    return builder.create<AffineApplyOp>(rootOp->getLoc(), workload,
                                          ValueRange{offset, size, stride});
   }));
 }
@@ -738,7 +691,7 @@ struct CreateDispatchRegionOp : Base<OpType> {
 
     // Get the workload to use for the dispatch.
     FailureOr<SmallVector<Value>> workload =
-        getWorkloadForRootOp(rewriter, rootOp);
+        getWorkloadForRootOp(rewriter, rootOp.getOperation());
     if (failed(workload)) {
       return failure();
     }
