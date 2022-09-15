@@ -172,6 +172,23 @@ static int64_t getVectorSize(func::FuncOp entryPointFn, ShapedType shapedType) {
   return getVectorSize(entryPointFn, byteWidth);
 }
 
+static bool isMajorIdentityMap(AffineMap map) {
+  if (map.getNumInputs() <= map.getNumResults())
+    return false;
+
+  for (auto &en : llvm::enumerate(map.getResults())) {
+    AffineExpr expr = en.value();
+    if (!expr.isa<AffineDimExpr>())
+      return false;
+
+    AffineDimExpr dimExpr = expr.cast<AffineDimExpr>();
+    if (dimExpr.getPosition() != en.index())
+      return false;
+  }
+
+  return true;
+}
+
 /// Returns minimum tiling sizes for each dimension. One dimension is possible
 /// to access at different element types. It determines the tiling sizes by
 /// looking into all the operands.
@@ -203,6 +220,11 @@ static SmallVector<int64_t> getMinTilingSizesForEachDim(
     // the tile size for this case to 'maxUnrollFactor'.
     if (linalgOpInfo.isReduction() &&
         op.isOutputTensor(inputOutputOpOperands[map.index()])) {
+      tileSize = std::min<int64_t>(
+          tileSize, targetMLTransInfo.defaultMaxReductionUnrollFactor);
+    }
+
+    if (isMajorIdentityMap(map.value())) {
       tileSize = std::min<int64_t>(
           tileSize, targetMLTransInfo.defaultMaxReductionUnrollFactor);
     }
