@@ -77,8 +77,11 @@ static bool isTransposeLinalgOp(linalg::LinalgOp linalgOp) {
       linalgOp.getTiedIndexingMap(linalgOp.getOutputOperand(0)));
   SmallVector<AffineMap> inputInversedMaps;
   for (OpOperand *linalgOperand : linalgOp.getInputOperands()) {
-    inputInversedMaps.push_back(inverseAndBroadcastProjectedPermutation(
-        linalgOp.getTiedIndexingMap(linalgOperand)));
+    auto map = linalgOp.getTiedIndexingMap(linalgOperand);
+    if (!map.isProjectedPermutation(/*allowZeroInResults=*/true)) {
+      return false;
+    }
+    inputInversedMaps.push_back(inverseAndBroadcastProjectedPermutation(map));
   }
 
   bool isInputTransposed = llvm::any_of(
