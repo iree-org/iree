@@ -180,6 +180,7 @@ iree_compiler_cc_library(
         "GPUDistributeSharedMemoryCopy.cpp",
         "GPUPipelining.cpp",
         "GPUVectorization.cpp",
+        "LinalgOpInfo.cpp",
         "MemrefCopyToLinalg.cpp",
         "PadDynamicAlloc.cpp",
         "RemoveTrivialLoops.cpp",
@@ -189,6 +190,9 @@ iree_compiler_cc_library(
         "VectorReductionToGPU.cpp",
         "VectorizeConv.cpp",
         "WorkGroupSwizzle.cpp",
+    ],
+    hdrs = [
+        "LinalgOpInfo.h",
     ],
     deps = [
         ":CommonPasses",

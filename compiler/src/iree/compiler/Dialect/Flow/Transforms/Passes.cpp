@@ -110,6 +110,17 @@ static llvm::cl::opt<std::string> clDispatchTransformFileName(
                    "the transformations to apply to form dispatch regions."),
     llvm::cl::init(""));
 
+static llvm::cl::opt<bool> clDispatchViaRegionOps(
+    "iree-flow-dispatch-via-region-ops",
+    llvm::cl::desc("Create dispatches via DispatchRegionOps"),
+    llvm::cl::init(false));
+
+static llvm::cl::opt<bool> clDispatchViaRegionOpsGenerateWorkloadRegion(
+    "iree-flow-dispatch-via-region-ops-generate-workload-region",
+    llvm::cl::desc("Generate the workload region when running with "
+                   "iree-flow-dispatch-via-region-ops"),
+    llvm::cl::init(true));
+
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
@@ -187,8 +198,9 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPass(IREE::Flow::createConvertConv2D1x1ToMatmulPass)
       .addPredicatedPass(clEnableConvToImg2Col,
                          IREE::Flow::createConvertConv2DToImg2ColPass)
-      .addPredicatedPass(clDispatchTransformFileName.empty(),
-                         IREE::Flow::createDetachElementwiseFromNamedOpsPass)
+      .addPredicatedPass(
+          clDispatchTransformFileName.empty() && !clDispatchViaRegionOps,
+          IREE::Flow::createDetachElementwiseFromNamedOpsPass)
       // Input should now be legal.
       .addPass(IREE::Flow::createVerifyInputLegalityPass)
       // Catch matmul ops before we do anything else with them.
@@ -252,8 +264,18 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
                                clDispatchTransformFileName);
                          })
       // Only want use the transform dialect for some dispatch regions and let
-      // the DispatchLinalgOnTensorsPass unconditionally handle the rest.
-      .addPass(createDispatchLinalgOnTensorsPass)
+      // the DispatchLinalgOnTensorsPass handle the rest.
+      .addPredicatedPass(!clDispatchViaRegionOps,
+                         createDispatchLinalgOnTensorsPass)
+      // DispatchLinalgOnTensorsViaRegionsPass is a variant of
+      // DispatchLinalgOnTensorsPass that lowers via DispatchRegionOps. This is
+      // on an opt-in basis until the pass is stable enough to replace
+      // DispatchLinalgOnTensorsPass.
+      .addPredicatedPass(clDispatchViaRegionOps,
+                         [&]() {
+                           return createDispatchLinalgOnTensorsViaRegionOpsPass(
+                               clDispatchViaRegionOpsGenerateWorkloadRegion);
+                         })
       ////////////////////////////////////////////////////////////////////////
       .addPass(createCaptureDispatchDynamicDimsPass)
       .addPass(mlir::createCanonicalizerPass)

@@ -38,7 +38,6 @@
 // These two headers are clean and do not include any other headers:
 #include "iree/base/attributes.h"
 #include "iree/base/target_platform.h"
-#include "iree/schemas/cpu_data.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -116,7 +115,7 @@ typedef unsigned long long uint64_t;
 
 #endif  // !INT8_MIN
 
-// Use iree_mmt4d_size_t for all sizes that may need pointer width.
+// Use iree_ukernel_size_t for all sizes that may need pointer width.
 // For any argument that is known to fit in a specific size prefer that to
 // ensure this code operates well on systems with small/weird widths (x32/ilp32,
 // etc).

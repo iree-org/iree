@@ -17,6 +17,7 @@
 #include "iree/compiler/Dialect/Flow/Transforms/FusionUtils.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
@@ -195,56 +196,9 @@ bool isClonableIntoDispatchOp(Operation *op) {
 // Methods for getting the workload information for dispatch region creation.
 //===----------------------------------------------------------------------===//
 
-/// For a given operation returns the loop ranges needed to compute the op.
-template <typename T>
-static SmallVector<Range> getLoopRanges(T operation, Location loc,
-                                        OpBuilder &builder);
-
-template <>
-SmallVector<Range> getLoopRanges<TilingInterface>(TilingInterface tilableOp,
-                                                  Location loc,
-                                                  OpBuilder &builder) {
-  SmallVector<Range> loopRanges = tilableOp.getIterationDomain(builder);
-  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
-  for (auto iteratorType : llvm::enumerate(tilableOp.getLoopIteratorTypes())) {
-    if (iteratorType.value() == getReductionIteratorTypeName()) {
-      loopRanges[iteratorType.index()].size = one;
-    }
-  }
-  return loopRanges;
-}
-
-template <>
-SmallVector<Range> getLoopRanges<tensor::InsertSliceOp>(
-    tensor::InsertSliceOp insertSliceOp, Location loc, OpBuilder &builder) {
-  OpFoldResult zero = builder.getIndexAttr(0);
-  OpFoldResult one = builder.getIndexAttr(1);
-  Value source = insertSliceOp.getSource();
-  SmallVector<Range> loopRanges(insertSliceOp.getSourceType().getRank(),
-                                Range{zero, one, one});
-  for (auto dim : llvm::seq<unsigned>(0, loopRanges.size())) {
-    loopRanges[dim].size =
-        builder.create<tensor::DimOp>(loc, source, dim).getResult();
-  }
-  return loopRanges;
-}
-
-template <>
-SmallVector<Range> getLoopRanges<tensor::ExtractSliceOp>(
-    tensor::ExtractSliceOp sliceOp, Location loc, OpBuilder &builder) {
-  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
-  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
-  ReifiedRankedShapedTypeDims resultDims;
-  (void)sliceOp.reifyResultShapes(builder, resultDims);
-  return llvm::to_vector(llvm::map_range(resultDims[0], [&](Value v) {
-    return Range{zero, v, one};
-  }));
-}
-
 /// Compute the workload to use for the workgroup based on the root op.
-template <typename OpTy>
 static SmallVector<Value> getWorkloadForRootOp(OpBuilder &builder,
-                                               OpTy rootOp) {
+                                               Operation *rootOp) {
   // Compute workgroup count to use for the dispatch op. These are the ranges
   // of the outermost parallel loops that can be distributed.
   Location loc = rootOp->getLoc();
@@ -256,7 +210,7 @@ static SmallVector<Value> getWorkloadForRootOp(OpBuilder &builder,
     Value offset = getValueOrCreateConstantIndexOp(builder, loc, r.offset);
     Value size = getValueOrCreateConstantIndexOp(builder, loc, r.size);
     Value stride = getValueOrCreateConstantIndexOp(builder, loc, r.stride);
-    return builder.create<AffineApplyOp>(rootOp.getLoc(), workload,
+    return builder.create<AffineApplyOp>(rootOp->getLoc(), workload,
                                          ValueRange{offset, size, stride});
   }));
 }
@@ -448,88 +402,6 @@ static SmallVector<Operation *> getOperationsToMoveIntoDispatch(
 //===---------------------------------------------------------------------===//
 // Methods to legalize a dispatch region op, i.e. make it isolated from above.
 //===---------------------------------------------------------------------===//
-
-/// Reorders the operations in `ops` such that they could be inlined into the
-/// dispatch region in that order to satisfy dependencies.
-static SmallVector<Operation *> orderOperations(ArrayRef<Operation *> ops) {
-  LLVM_DEBUG({
-    llvm::dbgs() << "Ops to be inlined :\n";
-    for (auto op : ops) {
-      llvm::dbgs() << "\t";
-      op->print(llvm::dbgs());
-      llvm::dbgs() << "\n";
-    }
-  });
-
-  llvm::SmallMapVector<Operation *, SmallVector<Operation *>, 16>
-      insertAfterMap;
-  llvm::SetVector<Operation *> opSet(ops.begin(), ops.end());
-  llvm::SetVector<Operation *> leafOps(ops.begin(), ops.end());
-  // For each operation compute the list of operations in `ops` that use its
-  // results. Also compute the operations that form the leafs of the DAG of
-  // operations in `ops`.
-  for (auto op : ops) {
-    for (auto operand : op->getOperands()) {
-      auto definingOp = operand.getDefiningOp();
-      if (!definingOp || !opSet.count(definingOp)) continue;
-      insertAfterMap[definingOp].push_back(op);
-      if (leafOps.count(op)) leafOps.remove(op);
-    }
-  }
-
-  // The leaves are at the head of the ordered list.
-  SmallVector<Operation *> orderedOps(leafOps.begin(), leafOps.end());
-  orderedOps.reserve(ops.size());
-  llvm::SmallPtrSet<Operation *, 16> processed;
-  processed.insert(leafOps.begin(), leafOps.end());
-
-  // `readyOps` contains the list of operations that have been just added to the
-  // `orderedOps` list. With these marked ready, they might make further
-  // operations in `ops` ready as well.
-  // The complexity of the algorithm is driven by these
-  // - Each operations is added to `readyOps` list at most once, and is removed
-  //   after being processed
-  // - For every operation in `readyOps` every use of its results (within `ops`)
-  //   is looked at once.
-  // - For every use, the operands of the user are processed.
-  // Assuming operands is O(1), i.e. constant order, the complexity is O(sum of
-  // number of uses of each operation). Given that the size of `ops` is at max
-  // O(10), and not O(100), this is assumed to be reasonable.
-  ArrayRef<Operation *> readyOps(orderedOps);
-  size_t startPos = 0;
-  while (!readyOps.empty()) {
-    auto op = readyOps.front();
-    startPos++;
-    // Check all uses of `op` within `ops`. If all of the operations that define
-    // the operands of the user have been added to `orderedOps`, then the user
-    // is ready to be scheduled.
-    for (auto insertAfterOp : insertAfterMap[op]) {
-      if (processed.count(insertAfterOp)) continue;
-      if (llvm::all_of(insertAfterOp->getOperands(), [&](Value operand) {
-            Operation *operandDefiningOp = operand.getDefiningOp();
-            return !operandDefiningOp || !opSet.count(operandDefiningOp) ||
-                   processed.count(operandDefiningOp);
-          })) {
-        // readyOps.push_back(insertAfterOp);
-        orderedOps.push_back(insertAfterOp);
-        processed.insert(insertAfterOp);
-      }
-    }
-    readyOps = ArrayRef<Operation *>(orderedOps).drop_front(startPos);
-  }
-
-  LLVM_DEBUG({
-    llvm::dbgs() << "Ops to be inlined (sorted) : \n";
-    for (auto op : orderedOps) {
-      llvm::dbgs() << "\t";
-      op->print(llvm::dbgs());
-      llvm::dbgs() << "\n";
-    }
-  });
-  assert(orderedOps.size() == ops.size() &&
-         "ordering of inlined operations failed");
-  return orderedOps;
-}
 
 /// Checks if the `Value` has a use within the dispatch that is unfusable.
 static bool hasUnfusableUseInDispatch(
@@ -819,7 +691,7 @@ struct CreateDispatchRegionOp : Base<OpType> {
 
     // Get the workload to use for the dispatch.
     FailureOr<SmallVector<Value>> workload =
-        getWorkloadForRootOp(rewriter, rootOp);
+        getWorkloadForRootOp(rewriter, rootOp.getOperation());
     if (failed(workload)) {
       return failure();
     }
@@ -1032,28 +904,6 @@ struct DispatchLinalgOnTensorsPass
   Statistic numDispatches{this, "number of dispatches",
                           "Number of Flow dispatches created"};
 };
-
-// Pass to test conversion to flow patterns.
-struct ConvertToFlowPass : public ConvertToFlowBase<ConvertToFlowPass> {
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<AffineDialect, IREE::Flow::FlowDialect, linalg::LinalgDialect,
-                scf::SCFDialect, tensor::TensorDialect>();
-  }
-
-  void runOnOperation() override {
-    MLIRContext *context = &getContext();
-    RewritePatternSet convertToFlowPatterns(context);
-    populateTensorToFlowConversionPatterns(context, convertToFlowPatterns);
-    memref::populateResolveRankedShapeTypeResultDimsPatterns(
-        convertToFlowPatterns);
-    if (failed(applyPatternsAndFoldGreedily(
-            getOperation(), std::move(convertToFlowPatterns)))) {
-      return signalPassFailure();
-    }
-  }
-};
-
 }  // namespace
 
 /// For all ops within `funcOp` tagged as root ops, create dispatch regions.
@@ -1215,10 +1065,6 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createDispatchLinalgOnTensorsPass() {
   return std::make_unique<DispatchLinalgOnTensorsPass>();
-}
-
-std::unique_ptr<Pass> createConvertToFlowPass() {
-  return std::make_unique<ConvertToFlowPass>();
 }
 
 }  // namespace Flow

@@ -12,26 +12,53 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    ukernel
-  COPTS
-    "-DIREE_UKERNEL_PLATFORM_EXAMPLE_FLAG=1"
+    types
   HDRS
     "common.h"
+    "mmt4d_types.h"
+  DEPS
+    iree::base::core_headers
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    generic
+  HDRS
+    "mmt4d_tile_generic.h"
+  SRCS
+    "mmt4d_tile_generic.c"
+  DEPS
+    ::types
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    elementwise
+  HDRS
     "elementwise.h"
-    "mmt4d.h"
-    "mmt4d_arm_64.h"
-    "mmt4d_generic.h"
   SRCS
     "elementwise_generic.c"
     "elementwise_impl.c.inc"
-    "mmt4d.c"
-    "mmt4d_arm_64.c"
-    "mmt4d_generic.c"
   DEPS
-    iree::base::core_headers
-    iree::schemas::cpu_data
-  DEFINES
-    "IREE_HAVE_UKERNEL_BUILTINS=1"
+    ::types
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    ukernel
+  HDRS
+    "elementwise.h"
+    "mmt4d.h"
+  SRCS
+    "mmt4d.c"
+  DEPS
+    ::elementwise
+    ::generic
+    ::types
+    iree::builtins::ukernel::arm_64::mmt4d_tile_arm_64
   PUBLIC
 )
 

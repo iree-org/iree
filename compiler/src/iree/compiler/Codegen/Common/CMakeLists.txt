@@ -145,12 +145,15 @@ iree_cc_library(
 iree_cc_library(
   NAME
     Common
+  HDRS
+    "LinalgOpInfo.h"
   SRCS
     "DecomposeLinalgGeneric.cpp"
     "FoldAffineMinInDistributedLoops.cpp"
     "GPUDistributeSharedMemoryCopy.cpp"
     "GPUPipelining.cpp"
     "GPUVectorization.cpp"
+    "LinalgOpInfo.cpp"
     "MemrefCopyToLinalg.cpp"
     "PadDynamicAlloc.cpp"
     "RemoveTrivialLoops.cpp"

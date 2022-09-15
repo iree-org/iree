@@ -68,6 +68,12 @@ def DispatchLinalgOnTensors :
   let constructor = "mlir::iree_compiler::IREE::Flow::createDispatchLinalgOnTensorsPass()";
 }
 
+def DispatchLinalgOnTensorsViaRegionOps :
+    InterfacePass<"iree-flow-dispatch-linalg-on-tensors-via-regionops-pass", "mlir::FunctionOpInterface"> {
+  let summary = "Dispatch Linalg operations on tensors by using tile and distribute (via DispatchRegionOps)";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createDispatchLinalgOnTensorsViaRegionOpsPass()";
+}
+
 def DispatchWithTransformDialect :
     InterfacePass<"iree-flow-dispatch-with-transform-dialect", "mlir::FunctionOpInterface"> {
   let summary = "Dispatch Linalg operations on tensors by using the transform dialect interpreter";
