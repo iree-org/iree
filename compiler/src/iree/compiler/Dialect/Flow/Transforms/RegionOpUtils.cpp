@@ -7,7 +7,9 @@
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dominance.h"
 
@@ -16,6 +18,63 @@ using namespace mlir::iree_compiler;
 using namespace mlir::iree_compiler::IREE;
 
 #define DEBUG_TYPE "iree-flow-region-op-utils"
+
+static SmallVector<Range> getLoopRangesImpl(TilingInterface tilableOp,
+                                            Location loc, OpBuilder &builder) {
+  SmallVector<Range> loopRanges = tilableOp.getIterationDomain(builder);
+  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+  for (auto iteratorType : llvm::enumerate(tilableOp.getLoopIteratorTypes())) {
+    if (iteratorType.value() == getReductionIteratorTypeName()) {
+      loopRanges[iteratorType.index()].size = one;
+    }
+  }
+  return loopRanges;
+}
+
+static SmallVector<Range> getLoopRangesImpl(tensor::InsertSliceOp insertSliceOp,
+                                            Location loc, OpBuilder &builder) {
+  OpFoldResult zero = builder.getIndexAttr(0);
+  OpFoldResult one = builder.getIndexAttr(1);
+  Value source = insertSliceOp.getSource();
+  SmallVector<Range> loopRanges(insertSliceOp.getSourceType().getRank(),
+                                Range{zero, one, one});
+  for (auto dim : llvm::seq<unsigned>(0, loopRanges.size())) {
+    loopRanges[dim].size =
+        builder.create<tensor::DimOp>(loc, source, dim).getResult();
+  }
+  return loopRanges;
+}
+
+static SmallVector<Range> getLoopRangesImpl(tensor::ExtractSliceOp sliceOp,
+                                            Location loc, OpBuilder &builder) {
+  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
+  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+  ReifiedRankedShapedTypeDims resultDims;
+  LogicalResult status = sliceOp.reifyResultShapes(builder, resultDims);
+  (void)status;
+  assert(succeeded(status) && "reifyResultShapes failed");
+  return llvm::to_vector(llvm::map_range(resultDims[0], [&](Value v) {
+    return Range{zero, v, one};
+  }));
+}
+
+/// For a given operation returns the loop ranges needed to compute the op.
+SmallVector<Range> Flow::getLoopRanges(Operation *op, Location loc,
+                                       OpBuilder &builder) {
+  return llvm::TypeSwitch<Operation *, SmallVector<Range>>(op)
+      .Case([&](TilingInterface op) {
+        return getLoopRangesImpl(op, loc, builder);
+      })
+      .Case([&](tensor::InsertSliceOp op) {
+        return getLoopRangesImpl(op, loc, builder);
+      })
+      .Case([&](tensor::ExtractSliceOp op) {
+        return getLoopRangesImpl(op, loc, builder);
+      })
+      .Default([](Operation *op) -> SmallVector<Range> {
+        llvm_unreachable("op not supported");
+      });
+}
 
 /// Return `true` if the given type is a ShapedType and has at least one
 /// dynamic dimension.

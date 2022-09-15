@@ -7,6 +7,7 @@
 #define IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_REGIONOPUTILS_H_
 
 #include "llvm/ADT/SmallVector.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Support/LogicalResult.h"
 
 namespace mlir {
@@ -20,6 +21,10 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 class DispatchRegionOp;
+
+/// For a given operation returns the loop ranges needed to compute the op.
+SmallVector<Range> getLoopRanges(Operation *op, Location loc,
+                                 OpBuilder &builder);
 
 /// Append a result to the given DispatchRegionOp. The newly created
 /// DispatchRegionOp is returned.
