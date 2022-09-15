@@ -26,7 +26,8 @@ class BenchmarkConfigTest(unittest.TestCase):
     self.traced_tool_dir = os.path.join(self.build_dir_name, "traced_tool")
     os.mkdir(self.traced_tool_dir)
     self.trace_capture_tool = tempfile.NamedTemporaryFile()
-    self.trace_capture_tool_name = os.path.realpath(self.trace_capture_tool.name)
+    self.trace_capture_tool_name = os.path.realpath(
+        self.trace_capture_tool.name)
     os.chmod(self.trace_capture_tool.name, stat.S_IEXEC)
 
   def tearDown(self):
@@ -53,7 +54,8 @@ class BenchmarkConfigTest(unittest.TestCase):
         capture_tarball=os.path.realpath("capture.tar"),
         capture_tmp_dir=os.path.join(per_commit_tmp_dir, "captures"))
     print(config)
-    print(BenchmarkConfig(root_benchmark_dir=os.path.join(self.build_dir_name,
+    print(
+        BenchmarkConfig(root_benchmark_dir=os.path.join(self.build_dir_name,
                                                         "benchmark_suites"),
                         benchmark_results_dir=os.path.join(
                             per_commit_tmp_dir, "benchmark-results"),
