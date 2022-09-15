@@ -183,7 +183,7 @@ jobs:
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "IREE_BAZEL_WRITE_REMOTE_CACHE=${IREE_BAZEL_WRITE_REMOTE_CACHE}" \
-            gcr.io/iree-oss/frontends-swiftshader@sha256:41e516b8c1b432e3c02896c4bf4b7f06df6a67371aa167b88767b8d4d2018ea6 \
+            gcr.io/iree-oss/frontends-swiftshader@sha256:3d5b879672d7f302124ab3d1aa533a6949bd0adfc176884177844ac6767e23e9 \
             ./build_tools/bazel/build_core.sh
 
   test_all:
@@ -346,7 +346,7 @@ jobs:
           ./build_tools/github_actions/docker_run.sh \
             --env "IREE_BAZEL_WRITE_REMOTE_CACHE=${IREE_BAZEL_WRITE_REMOTE_CACHE}" \
             --env "IREE_TF_BINARIES_OUTPUT_DIR=${IREE_TF_BINARIES_OUTPUT_DIR}" \
-            gcr.io/iree-oss/frontends-swiftshader@sha256:3090418a8d8a64c356d35eff285af32570a72f41127aa123209c1562f57abb01 \
+            gcr.io/iree-oss/frontends-swiftshader@sha256:3d5b879672d7f302124ab3d1aa533a6949bd0adfc176884177844ac6767e23e9 \
             build_tools/cmake/build_tf_binaries.sh
           echo "::set-output name=binaries-dir::${IREE_TF_BINARIES_OUTPUT_DIR}"
       - name: "Creating archive of binaries"
@@ -401,7 +401,7 @@ jobs:
       - name: "Running TF integrations tests"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/frontends-swiftshader@sha256:3090418a8d8a64c356d35eff285af32570a72f41127aa123209c1562f57abb01 \
+            gcr.io/iree-oss/frontends-swiftshader@sha256:3d5b879672d7f302124ab3d1aa533a6949bd0adfc176884177844ac6767e23e9 \
             build_tools/cmake/run_tf_tests.sh \
             "${BUILD_DIR}"
 
@@ -443,7 +443,7 @@ jobs:
             --env IREE_LLVM_CPU_DISABLE=1 \
             --gpus all \
             --env NVIDIA_DRIVER_CAPABILITIES=all \
-            gcr.io/iree-oss/frontends-nvidia@sha256:e934ed09e9e60c28ebe11a02f37a993dd975db40118d410c4279d0fa2d4e6b9a \
+            gcr.io/iree-oss/frontends-nvidia@sha256:28cd43f36b1ca0633bbd915911abe6d22b4aa16093f074e87016305322a0eba1 \
             bash -euo pipefail -c \
               "./build_tools/scripts/check_cuda.sh
               ./build_tools/scripts/check_vulkan.sh
@@ -540,7 +540,7 @@ jobs:
           build_tools/github_actions/docker_run.sh \
             --env "ANDROID_ABI=${ANDROID_ABI}" \
             --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
-            gcr.io/iree-oss/android@sha256:9bc723fc707a18bd0c1be9c12e01ea5bb7c7d77f607427879e10ffcffd7d2bb5 \
+            gcr.io/iree-oss/android@sha256:76c2a52dcd6d07601227b965ac87d021c1d2d5e2d01f46ad58da28c89267f2ab \
             build_tools/cmake/build_android.sh
 
   riscv32:
