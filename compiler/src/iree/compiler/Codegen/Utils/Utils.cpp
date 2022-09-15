@@ -641,7 +641,7 @@ linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions() {
                   builder, dim),
               buildHALWorkgroupInfoOp<IREE::HAL::InterfaceWorkgroupCountOp>(
                   builder, dim),
-              linalg::DistributionMethod::Cyclic};
+              linalg::DistributionMethod::CyclicNumProcsEqNumIters};
         }
         return procInfo;
       }};
