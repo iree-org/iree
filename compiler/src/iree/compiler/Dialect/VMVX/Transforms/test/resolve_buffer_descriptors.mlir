@@ -28,10 +28,43 @@ func.func @resolve_subview_rankreducing(%arg0: memref<384x128xf32>, %arg1 : inde
   // CHECK-DAG: %[[C64:.*]] = arith.constant 64 : index
   // CHECK-DAG: %[[I0:.*]] = arith.muli %arg1, %[[BASE_STRIDES]]#0 : index
   // CHECK:     %[[I1:.*]] = arith.addi %[[BASE_OFFSET]], %[[I0]] : index
-  // CHECK:     return %[[BASE_BUFFER]], %[[I1]], %[[C64]], %[[BASE_STRIDES]]#0
+  // CHECK:     %[[I2:.*]] = arith.muli %arg2, %[[BASE_STRIDES]]#1 : index
+  // CHECK:     %[[I3:.*]] = arith.addi %[[I1]], %[[I2]] : index
+  // CHECK:     return %[[BASE_BUFFER]], %[[I3]], %[[C64]], %[[BASE_STRIDES]]#0
   %0 = memref.subview %arg0[%arg1, %arg2] [64, 1] [1, 1] : memref<384x128xf32> to memref<64xf32, #map0>
   %base_buffer, %offset, %size, %stride = vmvx.get_buffer_descriptor %0 : memref<64xf32, #map0> -> !util.buffer, index, index, index
   return %base_buffer, %offset, %size, %stride : !util.buffer, index, index, index
+}
+
+// -----
+
+// Check that we properly resolve subview with rankreducing when the dropped
+// rank is not the last one.
+// Orig strides: [%strides#0, %strides#1, %strides#2]
+// Sub strides: [1, 1, 1]
+// => New strides: [%strides#0, %strides#1, %strides#2]
+// Final strides == filterOutReducedDim(new strides, 0) == [%strides#1 , %strides#2]
+//
+// Orig offset: %offset
+// Sub offsets: [%arg1, %arg2, 0]
+// => Final offset: %arg1 * %strides#0 + %arg2 * %strides#1 + 0 * %strides#2 + %offset
+//
+// Final sizes == filterOutReducedDim(subview sizes, 0) == [6, 3]
+//
+// CHECK-LABEL: @resolve_subview_rankreducing_not_at_the_end
+func.func @resolve_subview_rankreducing_not_at_the_end(%arg0: memref<8x16x4xf32>, %arg1 : index, %arg2 : index) -> (!util.buffer, index, index, index, index, index) {
+  // CHECK-DAG: %[[BASE_BUFFER:.*]], %[[BASE_OFFSET:.*]], %[[BASE_SIZES:.*]]:3, %[[BASE_STRIDES:.*]]:3 = vmvx.get_buffer_descriptor %arg0
+  // CHECK-DAG: %[[C6:.*]] = arith.constant 6 : index
+  // CHECK-DAG: %[[C3:.*]] = arith.constant 3 : index
+  // CHECK-DAG: %[[I0:.*]] = arith.muli %arg1, %[[BASE_STRIDES]]#0 : index
+  // CHECK:     %[[I1:.*]] = arith.addi %[[BASE_OFFSET]], %[[I0]] : index
+  // CHECK:     %[[I2:.*]] = arith.muli %arg2, %[[BASE_STRIDES]]#1 : index
+  // CHECK:     %[[I3:.*]] = arith.addi %[[I1]], %[[I2]] : index
+  // CHECK:     return %[[BASE_BUFFER]], %[[I3]], %[[C6]], %[[C3]], %[[BASE_STRIDES]]#1, %[[BASE_STRIDES]]#2
+
+  %0 = memref.subview %arg0[%arg1, %arg2, 0] [1, 6, 3] [1, 1, 1] : memref<8x16x4xf32> to memref<6x3xf32, strided<[4,1], offset : ?>>
+  %base_buffer, %offset, %sizes:2, %strides:2 = vmvx.get_buffer_descriptor %0 : memref<6x3xf32, strided<[4,1], offset : ?>> -> !util.buffer, index, index, index, index, index
+  return %base_buffer, %offset, %sizes#0, %sizes#1, %strides#0, %strides#1 : !util.buffer, index, index, index, index, index
 }
 
 // -----
