@@ -4,11 +4,11 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-set(BENCHMARKS_TOOL_PYTHON_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+set(BUILD_TOOLS_PYTHON_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 
-# benchmark_tool_py_test()
+# build_tools_py_module_test()
 #
-# CMake function to test benchmark python tools.
+# CMake function to test build_tools python modules.
 #
 # Parameters:
 # NAME: name of test
@@ -16,7 +16,7 @@ set(BENCHMARKS_TOOL_PYTHON_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 # ARGS: Command line arguments to the Python source file.
 # LABELS: Additional labels to apply to the test. The package path is added
 #     automatically.
-function(benchmark_tool_py_test)
+function(build_tools_py_module_test)
   cmake_parse_arguments(
     _RULE
     ""
@@ -35,15 +35,8 @@ function(benchmark_tool_py_test)
     LABELS
       ${_RULE_LABELS}
     PACKAGE_DIRS
-      ${BENCHMARKS_TOOL_PYTHON_DIR}
+      ${BUILD_TOOLS_PYTHON_DIR}
   )
 endfunction()
 
-add_subdirectory(common)
-
-benchmark_tool_py_test(
-  NAME
-    collect_compilation_statistics_test
-  SRC
-    "collect_compilation_statistics_test.py"
-)
+add_subdirectory(e2e_test_framework)
