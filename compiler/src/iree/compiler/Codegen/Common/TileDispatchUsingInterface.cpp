@@ -244,6 +244,9 @@ static LogicalResult replaceAllStoresWithTiledVersion(
     RewriterBase &rewriter, TilingInterface untiledOp,
     ArrayRef<OpFoldResult> offsets, ArrayRef<OpFoldResult> sizes,
     Operation *tiledOp) {
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(tiledOp->getBlock()->getTerminator());
+
   for (auto result : llvm::enumerate(untiledOp->getResults())) {
     SmallVector<OpFoldResult> resultOffsets, resultSizes;
     if (failed(untiledOp.getResultTilePosition(rewriter, result.index(),
@@ -252,8 +255,6 @@ static LogicalResult replaceAllStoresWithTiledVersion(
       return rewriter.notifyMatchFailure(
           untiledOp, "failed to rewrite destructive update");
     }
-    OpBuilder::InsertionGuard g(rewriter);
-    rewriter.setInsertionPoint(tiledOp->getBlock()->getTerminator());
     if (failed(replaceStoreWithTiledVersion(
             rewriter, result.value().cast<OpResult>(),
             tiledOp->getResult(result.index()).cast<OpResult>(), resultOffsets,
