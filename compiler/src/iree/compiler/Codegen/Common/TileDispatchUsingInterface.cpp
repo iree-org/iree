@@ -150,6 +150,14 @@ static SmallVector<scf::ForOp> generateTileLoopNest(
     if (isConstantIntValue(getAsOpFoldResult(tileSize), 1)) {
       return builder.getIndexAttr(1);
     }
+
+    // When the size is a multiple of the tile size, return the tile size.
+    APSInt tileInt, sizeInt;
+    if (matchPattern(tileSize, m_ConstantInt(&tileInt)) &&
+        matchPattern(size, m_ConstantInt(&sizeInt))) {
+      if (sizeInt % tileInt == 0) return tileSize;
+    }
+
     return makeComposedFoldedAffineMin(
         builder, loc, minMap, ArrayRef<OpFoldResult>{iv, tileSize, size});
   };
