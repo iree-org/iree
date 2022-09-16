@@ -118,7 +118,7 @@ struct FuseElementwiseOpsWithMultipleUses
     OpOperand *fusedOperand = fusedOperandIt;
     assert(linalg::areElementwiseOpsFusable(fusedOperand.getValue()) &&
            "expected producer and consumer to be fusable");
-    Operation *producerOp = fusedOperand->getDefiningOp();
+    Operation *producerOp = fusedOperand->get().getDefiningOp();
     FailureOr<Operation *> fusedOperation =
         linalg::fuseElementwiseOps(rewriter, fusedOperand);
     if (failed(fusedOperation)) {
