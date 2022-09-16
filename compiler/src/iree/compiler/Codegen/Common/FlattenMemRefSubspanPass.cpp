@@ -254,7 +254,11 @@ static Value linearizeIndices(Value sourceValue, ValueRange indices,
   // First try to get the strides from the MemRef type itself. This applies to
   // cases where we have static shapes and only the leading dimension is
   // dynamic.
-  if (AffineMap linearLayoutMap = getStridedLinearLayoutMap(sourceType)) {
+  SmallVector<int64_t> strides;
+  int64_t offset;
+  if (succeeded(getStridesAndOffset(sourceType, strides, offset))) {
+    AffineMap linearLayoutMap =
+        makeStridedLinearLayoutMap(strides, offset, builder.getContext());
     // Dynamic strides/offset will create symbols. There should be none for the
     // static case.
     if (linearLayoutMap.getNumSymbols() == 0) {
