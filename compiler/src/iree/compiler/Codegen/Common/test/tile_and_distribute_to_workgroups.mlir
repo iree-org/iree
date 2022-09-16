@@ -51,8 +51,8 @@ hal.executable private @matmul_tensors {
   }
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
-//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 64)>
-//  CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 64)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0, s1] -> (64, s0 - s1 * 64)>
+//  CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0] -> (s0 * 64)>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [64, 64]>
 //      CHECK: hal.executable.export public @matmul_tensors
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
@@ -73,25 +73,19 @@ hal.executable private @matmul_tensors {
 //  CHECK-DAG:   %[[INIT_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(2)
 //  CHECK-DAG:   %[[OUT_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(3)
 //  CHECK-DAG:   %[[WG_ID_X:.+]] = hal.interface.workgroup.id[0]
-//  CHECK-DAG:   %[[WG_COUNT_X:.+]] = hal.interface.workgroup.count[0]
 //  CHECK-DAG:   %[[WG_ID_Y:.+]] = hal.interface.workgroup.id[1]
-//  CHECK-DAG:   %[[WG_COUNT_Y:.+]] = hal.interface.workgroup.count[1]
-//  CHECK-DAG:   %[[LB_Y:.+]] = affine.apply #[[MAP1]]()[%[[WG_ID_Y]]]
-//  CHECK-DAG:   %[[STEP_Y:.+]] = affine.apply #[[MAP1]]()[%[[WG_COUNT_Y]]]
-//      CHECK:   scf.for %[[IV0:.+]] = %[[LB_Y]] to %[[M]] step %[[STEP_Y]]
-//  CHECK-DAG:     %[[TILESIZE_M:.+]] = affine.min #[[MAP2]](%[[IV0]])[%[[M]]]
-//  CHECK-DAG:     %[[LB_X:.+]] = affine.apply #[[MAP1]]()[%[[WG_ID_X]]]
-//  CHECK-DAG:     %[[STEP_X:.+]] = affine.apply #[[MAP1]]()[%[[WG_COUNT_X]]]
-//      CHECK:     scf.for %[[IV1:.+]] = %[[LB_X]] to %[[N]] step %[[STEP_X]]
-//  CHECK-DAG:       %[[TILESIZE_N:.+]] = affine.min #[[MAP2]](%[[IV1]])[%[[N]]]
-//  CHECK-DAG:       %[[LHS:.+]] = flow.dispatch.tensor.load %[[LHS_BINDING]], offsets = [%[[IV0]], 0], sizes = [%[[TILESIZE_M]], %[[K]]]
-//  CHECK-DAG:       %[[RHS:.+]] = flow.dispatch.tensor.load %[[RHS_BINDING]], offsets = [0, %[[IV1]]], sizes = [%[[K]], %[[TILESIZE_N]]]
-//  CHECK-DAG:       %[[INIT:.+]] = flow.dispatch.tensor.load %[[INIT_BINDING]], offsets = [%[[IV0]], %[[IV1]]], sizes = [%[[TILESIZE_M]], %[[TILESIZE_N]]]
-//      CHECK:       %[[GEMM:.+]] = linalg.matmul
-// CHECK-SAME:           ins(%[[LHS]], %[[RHS]] :
-// CHECK-SAME:           outs(%[[INIT]] :
-//      CHECK:       flow.dispatch.tensor.store %[[GEMM]], %[[OUT_BINDING]]
-// CHECK-SAME:           offsets = [%[[IV0]], %[[IV1]]], sizes = [%[[TILESIZE_M]], %[[TILESIZE_N]]]
+//  CHECK-DAG:   %[[TILESIZE_M:.+]] = affine.min #[[MAP1]]()[%[[M]], %[[WG_ID_Y]]]
+//  CHECK-DAG:   %[[TILESIZE_N:.+]] = affine.min #[[MAP1]]()[%[[N]], %[[WG_ID_X]]]
+//  CHECK-DAG:   %[[LB_Y:.+]] = affine.apply #[[MAP2]]()[%[[WG_ID_Y]]]
+//  CHECK-DAG:   %[[LB_X:.+]] = affine.apply #[[MAP2]]()[%[[WG_ID_X]]]
+//  CHECK-DAG:   %[[LHS:.+]] = flow.dispatch.tensor.load %[[LHS_BINDING]], offsets = [%[[LB_Y]], 0], sizes = [%[[TILESIZE_M]], %[[K]]]
+//  CHECK-DAG:   %[[RHS:.+]] = flow.dispatch.tensor.load %[[RHS_BINDING]], offsets = [0, %[[LB_X]]], sizes = [%[[K]], %[[TILESIZE_N]]]
+//  CHECK-DAG:   %[[INIT:.+]] = flow.dispatch.tensor.load %[[INIT_BINDING]], offsets = [%[[LB_Y]], %[[LB_X]]], sizes = [%[[TILESIZE_M]], %[[TILESIZE_N]]]
+//      CHECK:   %[[GEMM:.+]] = linalg.matmul
+// CHECK-SAME:     ins(%[[LHS]], %[[RHS]] :
+// CHECK-SAME:     outs(%[[INIT]] :
+//      CHECK:   flow.dispatch.tensor.store %[[GEMM]], %[[OUT_BINDING]]
+// CHECK-SAME:           offsets = [%[[LB_Y]], %[[LB_X]]], sizes = [%[[TILESIZE_M]], %[[TILESIZE_N]]]
 
 // -----
 
@@ -148,7 +142,9 @@ hal.executable private @add {
     }
   }
 }
-//  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0, s1] -> (64, s0 - s1 * 64)>
+//  CHECK-DAG  #[[MAP2:.+]] = affine_map<()[s0] -> (s0 * 64)>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [64, 64]>
 //      CHECK: hal.executable private @add
 //      CHECK: hal.executable.export public @add
@@ -157,15 +153,20 @@ hal.executable private @add {
 // CHECK-SAME:    %[[WORKLOAD_0:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[WORKLOAD_1:[a-zA-Z0-9_]+]]: index)
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP]]()[%[[WORKLOAD_0]]]
-//  CHECK-DAG:   %[[D1:.+]] = affine.apply #[[MAP]]()[%[[WORKLOAD_1]]]
+//  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_0]]]
+//  CHECK-DAG:   %[[D1:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_1]]]
 //      CHECK:   hal.return %[[D1]], %[[D0]], %[[C1]] : index, index, index
 //      CHECK: func.func @add()
-//      CHECK:   scf.for %[[IV0:.+]] =
-//      CHECK:     scf.for %[[IV1:.+]] =
-//      CHECK:       %[[RESULT:.+]] = linalg.generic
-//      CHECK:       flow.dispatch.tensor.store %[[RESULT]], %{{.+}}, offsets = [%[[IV0]], %[[IV1]]]
-
+//  CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load[0] : index
+//  CHECK-DAG:   %[[N:.+]] = hal.interface.constant.load[1] : index
+//  CHECK-DAG:   %[[ID_X:.+]] = hal.interface.workgroup.id[0] : index
+//  CHECK-DAG:   %[[ID_Y:.+]] = hal.interface.workgroup.id[1] : index
+//  CHECK-DAG:   %[[TILESIZE_M:.+]] = affine.min #[[MAP1]]()[%[[M]], %[[ID_Y]]]
+//  CHECK-DAG:   %[[TILESIZE_N:.+]] = affine.min #[[MAP1]]()[%[[N]], %[[ID_X]]]
+//  CHECK-DAG:   %[[LB_M:.+]] = affine.apply #[[MAP2]]()[%[[ID_Y]]]
+//  CHECK-DAG:   %[[LB_N:.+]] = affine.apply #[[MAP2]]()[%[[ID_X]]]
+//  CHECK-DAG:   %[[RESULT:.+]] = linalg.generic
+//  CHECK-DAG:   flow.dispatch.tensor.store %[[RESULT]], %{{.+}}, offsets = [%[[LB_M]], %[[LB_N]]], sizes = [%[[TILESIZE_M]], %[[TILESIZE_N]]]
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 64, 64, 64], [1, 1, 1, 4], [0, 0, 0, 0]]>
@@ -221,7 +222,9 @@ hal.executable private @add4D {
     }
   }
 }
-//  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0, s1] -> (64, s0 - s1 * 64)>
+//  CHECK-DAG  #[[MAP2:.+]] = affine_map<()[s0] -> (s0 * 64)>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [64, 64, 64]>
 //      CHECK: hal.executable.export public @add4D
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
@@ -230,17 +233,25 @@ hal.executable private @add4D {
 // CHECK-SAME:    %[[WORKLOAD_1:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[WORKLOAD_2:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[WORKLOAD_3:[a-zA-Z0-9_]+]]: index)
-//  CHECK-DAG:    %[[D0:.+]] = affine.apply #[[MAP]]()[%[[WORKLOAD_1]]
-//  CHECK-DAG:    %[[D1:.+]] = affine.apply #[[MAP]]()[%[[WORKLOAD_2]]]
-//  CHECK-DAG:    %[[D2:.+]] = affine.apply #[[MAP]]()[%[[WORKLOAD_3]]]
+//  CHECK-DAG:    %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_1]]
+//  CHECK-DAG:    %[[D1:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_2]]]
+//  CHECK-DAG:    %[[D2:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_3]]]
 //      CHECK:    hal.return %[[D2]], %[[D1]], %[[D0]] : index, index, index
 //      CHECK: func.func @add4D()
-//      CHECK:   scf.for %[[IV0:.+]] =
-//      CHECK:     scf.for %[[IV1:.+]] =
-//      CHECK:       scf.for %[[IV2:.+]] =
-//  CHECK-NOT:         scf.for
-//      CHECK:         %[[GENERIC:.+]] = linalg.generic
-//      CHECK:         flow.dispatch.tensor.store %[[GENERIC]], %{{.+}}, offsets = [0, %[[IV0]], %[[IV1]], %[[IV2]]]
+//  CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load[1] : index
+//  CHECK-DAG:   %[[N:.+]] = hal.interface.constant.load[2] : index
+//  CHECK-DAG:   %[[K:.+]] = hal.interface.constant.load[3] : index
+//  CHECK-DAG:   %[[ID_X:.+]] = hal.interface.workgroup.id[0] : index
+//  CHECK-DAG:   %[[ID_Y:.+]] = hal.interface.workgroup.id[1] : index
+//  CHECK-DAG:   %[[ID_Z:.+]] = hal.interface.workgroup.id[2] : index
+//  CHECK-DAG:   %[[TILESIZE_M:.+]] = affine.min #[[MAP1]]()[%[[M]], %[[ID_Z]]]
+//  CHECK-DAG:   %[[TILESIZE_N:.+]] = affine.min #[[MAP1]]()[%[[N]], %[[ID_Y]]]
+//  CHECK-DAG:   %[[TILESIZE_N:.+]] = affine.min #[[MAP1]]()[%[[K]], %[[ID_X]]]
+//  CHECK-DAG:   %[[LB_M:.+]] = affine.apply #[[MAP2]]()[%[[ID_Z]]]
+//  CHECK-DAG:   %[[LB_N:.+]] = affine.apply #[[MAP2]]()[%[[ID_Y]]]
+//  CHECK-DAG:   %[[LB_K:.+]] = affine.apply #[[MAP2]]()[%[[ID_X]]]
+//  CHECK-DAG:   %[[RESULT:.+]] = linalg.generic
+//  CHECK-DAG:   flow.dispatch.tensor.store %[[RESULT]], %{{.+}}, offsets = [0, %[[LB_M]], %[[LB_N]], %[[LB_K]]]
 
 // -----
 
