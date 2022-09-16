@@ -198,36 +198,34 @@ static SmallVector<int64_t> getMinTilingSizesForEachDim(
     auto operandType =
         inputOutputOpOperands[map.index()]->get().getType().cast<ShapedType>();
     int64_t tileSize = getVectorSize(entryPointFn, operandType);
-    // Vectorization of reductions is driven by input tensors and considering
-    // the output's fastest varying dim leads to large unroll factors. We limit
-    // the tile size for this case to 'maxUnrollFactor'.
-    if (linalgOpInfo.isReduction() &&
-        op.isOutputTensor(inputOutputOpOperands[map.index()])) {
-      tileSize = std::min<int64_t>(
-          tileSize, targetMLTransInfo.defaultMaxReductionUnrollFactor);
-    }
 
     minTileSizes[fastestVaryingDim] =
         std::max<int64_t>(minTileSizes[fastestVaryingDim], tileSize);
   }
 
-  // Limit unrolling on transpose operations. For know, we assume the rightmost
-  // non-one tiled dimension is for vectorization and any other non-one
-  // dimension is for unrolling.
-  // TODO(dcaballe): Consider input and output transposes.
-  if (linalgOpInfo.isTranspose()) {
+  // Limit unroll factor. For now, we assume the rightmost non-one tiled
+  // dimension is for vectorization and any other non-one dimension is for
+  // unrolling.
+  auto limitUnrollFactor = [&](int64_t maxUnrollFactor) {
     int vecDim;
     for (vecDim = minTileSizes.size() - 1; vecDim >= 0; --vecDim) {
       if (minTileSizes[vecDim] > 1) {
         break;
       }
     }
-
     for (int unrollDim = vecDim - 1; unrollDim >= 0; --unrollDim) {
       minTileSizes[unrollDim] =
-          std::min<int64_t>(minTileSizes[unrollDim],
-                            targetMLTransInfo.defaultMaxTransposeUnrollFactor);
+          std::min<int64_t>(minTileSizes[unrollDim], maxUnrollFactor);
     }
+  };
+
+  if (linalgOpInfo.isTranspose()) {
+    // Limit unrolling on transpose operations.
+    // TODO(dcaballe): Consider input and output transposes.
+    limitUnrollFactor(targetMLTransInfo.defaultMaxTransposeUnrollFactor);
+  } else {
+    // Limit unrolling to the default target maximum.
+    limitUnrollFactor(targetMLTransInfo.defaultMaxUnrollFactor);
   }
 
   return minTileSizes;
