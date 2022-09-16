@@ -1239,14 +1239,13 @@ static LogicalResult setRootConfig(
   return success();
 }
 
-/// Sets the lowering configuration for linalg.conv_2d_nhwc_hwcf and
-/// linalg.depthwise_conv_2d_nhwc_hwc operations.
+/// Sets lowering configuration for conv ops. See below for supported conv ops.
 static LogicalResult setConvRootConfig(func::FuncOp entryPointFn,
                                        linalg::LinalgOp convOp,
                                        ArrayRef<int64_t> targetTileSizes,
                                        int64_t vectorSize) {
-  if (!isa<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp>(
-          convOp.getOperation())) {
+  if (!isa<linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNchwFchwOp,
+           linalg::DepthwiseConv2DNhwcHwcOp>(convOp.getOperation())) {
     return failure();
   }
 
@@ -1298,11 +1297,10 @@ static LogicalResult setConvRootConfig(func::FuncOp entryPointFn,
 static SmallVector<int64_t> getConvWorkgroupSizes(func::FuncOp entryPointFn,
                                                   linalg::LinalgOp op,
                                                   int64_t vectorSize) {
-  bool isSupported =
-      isa<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp>(
-          op.getOperation());
+  bool isSupported = isa<linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNchwFchwOp,
+                         linalg::DepthwiseConv2DNhwcHwcOp>(op.getOperation());
   (void)isSupported;
-  assert(isSupported && "expected conv with nhwc input and hwcf kernel/filter");
+  assert(isSupported && "conv op is not supported");
 
   SmallVector<int64_t> tileSizes;
   auto variantOp = getExecutableVariantOp(entryPointFn);
@@ -1350,6 +1348,16 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
       getVectorSize(entryPointFn, convOp.getResult(0).getType());
   SmallVector<int64_t> targetTileSizes =
       getConvWorkgroupSizes(entryPointFn, convOp, vectorSize);
+  return setConvRootConfig(entryPointFn, convOp, targetTileSizes, vectorSize);
+}
+
+/// Sets the lowering configuration for linalg.conv_2d_nchw_fchw
+/// operations.
+static LogicalResult setRootConfig(func::FuncOp entryPointFn,
+                                   linalg::Conv2DNchwFchwOp convOp) {
+  int64_t vectorSize =
+      getVectorSize(entryPointFn, convOp.getResult(0).getType());
+  SmallVector<int64_t> targetTileSizes = {1, vectorSize * 2, 1, 8, 8, 1, 1};
   return setConvRootConfig(entryPointFn, convOp, targetTileSizes, vectorSize);
 }
 
@@ -1427,7 +1435,7 @@ static LogicalResult setRootConfigImpl(
                                targetMLTransInfo);
         })
         .Case<IREE::LinalgExt::FftOp, linalg::Mmt4DOp, linalg::Conv2DNhwcHwcfOp,
-              linalg::DepthwiseConv2DNhwcHwcOp>(
+              linalg::Conv2DNchwFchwOp, linalg::DepthwiseConv2DNhwcHwcOp>(
             [&](auto op) { return setRootConfig(entryPointFn, op); })
         .Case<linalg::ContractionOpInterface>(
             [&](auto op) { return setRootConfig(entryPointFn, op); })
