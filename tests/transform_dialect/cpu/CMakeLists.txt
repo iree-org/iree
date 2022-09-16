@@ -22,6 +22,7 @@ iree_lit_test_suite(
     iree-opt
     iree-run-module
   DATA
+    matmul_codegen_default_spec.mlir
     matmul_codegen_spec.mlir
     matmul_dispatch_spec.mlir
     matmul_tiled_dispatch_spec.mlir
