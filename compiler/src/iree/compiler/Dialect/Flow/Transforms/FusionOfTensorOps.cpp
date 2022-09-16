@@ -116,7 +116,7 @@ struct FuseElementwiseOpsWithMultipleUses
       return rewriter.notifyMatchFailure(consumerOp, "failed to get producer");
     }
     OpOperand *fusedOperand = fusedOperandIt;
-    assert(linalg::areElementwiseOpsFusable(fusedOperand.getValue()) &&
+    assert(linalg::areElementwiseOpsFusable(fusedOperand) &&
            "expected producer and consumer to be fusable");
     Operation *producerOp = fusedOperand->get().getDefiningOp();
     FailureOr<Operation *> fusedOperation =
