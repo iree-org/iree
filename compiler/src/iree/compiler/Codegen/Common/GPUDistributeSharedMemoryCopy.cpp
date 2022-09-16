@@ -241,7 +241,8 @@ static void populateVectorizationPatterns(RewritePatternSet &patterns) {
       linalg::LinalgTransformationFilter(
           {StringAttr::get(patterns.getContext(),
                            getCopyToWorkgroupMemoryMarker()),
-           StringAttr::get(patterns.getContext(), kCopyDistributed)}));
+           StringAttr::get(patterns.getContext(), kCopyDistributed)},
+          llvm::None));
 }
 
 /// Return a flattened Id Value by combining the 3D gpu thread IDs.
