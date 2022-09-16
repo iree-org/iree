@@ -194,6 +194,7 @@ iree_compiler_cc_library(
     ],
     hdrs = [
         "LinalgOpInfo.h",
+        "UserConfig.h",
     ],
     deps = [
         ":CommonPasses",

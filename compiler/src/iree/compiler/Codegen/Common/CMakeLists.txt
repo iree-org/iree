@@ -147,6 +147,7 @@ iree_cc_library(
     Common
   HDRS
     "LinalgOpInfo.h"
+    "UserConfig.h"
   SRCS
     "DecomposeLinalgGeneric.cpp"
     "FoldAffineMinInDistributedLoops.cpp"
