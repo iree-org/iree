@@ -203,7 +203,7 @@ static SmallVector<int64_t> getMinTilingSizesForEachDim(
         std::max<int64_t>(minTileSizes[fastestVaryingDim], tileSize);
   }
 
-  // Limit unroll factor. For know, we assume the rightmost non-one tiled
+  // Limit unroll factor. For now, we assume the rightmost non-one tiled
   // dimension is for vectorization and any other non-one dimension is for
   // unrolling.
   auto limitUnrollFactor = [&](int64_t maxUnrollFactor) {
