@@ -7,10 +7,10 @@
 #include "iree/builtins/ukernel/mmt4d.h"
 
 #if defined(IREE_UKERNEL_ARCH_ARM_64)
-#include "iree/builtins/ukernel/arm_64/mmt4d_tile_arm_64.h"
+#include "iree/builtins/ukernel/arm_64/mmt4d_select_tile_arm_64.h"
 #endif
 
-#include "iree/builtins/ukernel/mmt4d_tile_generic.h"
+#include "iree/builtins/ukernel/mmt4d_select_tile_generic.h"
 
 #define OUTSIDE_UINT_RANGE(value, bits) (((value) < 0) || ((value) >> (bits)))
 
@@ -33,7 +33,7 @@ static iree_ukernel_mmt4d_status_t iree_ukernel_mmt4d_validate(
   // enforce a narrower range here, as we can always relax that later as needed.
   if (OUTSIDE_UINT_RANGE(params->M, 31) || OUTSIDE_UINT_RANGE(params->M, 31) ||
       OUTSIDE_UINT_RANGE(params->K, 31) || OUTSIDE_UINT_RANGE(params->M0, 15) ||
-      OUTSIDE_UINT_RANGE(params->M0, 15) ||
+      OUTSIDE_UINT_RANGE(params->N0, 15) ||
       OUTSIDE_UINT_RANGE(params->K0, 15)) {
     return iree_ukernel_mmt4d_status_unsupported_huge_or_negative_dimension;
   }

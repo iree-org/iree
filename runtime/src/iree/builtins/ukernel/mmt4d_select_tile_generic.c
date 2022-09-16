@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/builtins/ukernel/mmt4d_tile_generic.h"
+#include "iree/builtins/ukernel/mmt4d_select_tile_generic.h"
 
 // In order to be helpful as a reference for future architecture-specific
 // kernels, the generic kernels here are structured like an actual optimized
@@ -14,15 +14,15 @@
 // the accumulator tile, but for now all known cases are comfortably far below
 // where trouble would happen. For reference:
 // - On ARM NEON, the entire register space is 512 bytes, so the accumulator
-//   tile is less than that.
-// - On ARM SME, we will be working with an accumulator tile as large as 2048
+//   tile is less than that, typically 256 to 384 bytes.
+// - On ARM SME, we will be working with an accumulator tile as large as 4096
 //   bytes (IIUC).
 // - The smallest stack frame size limit that we know we may have to deal with
 //   on certain targets is 16 kilobytes.
 // The size or architecture-specific tiles is relevant here because this
 // generic code is what will be run as a fallback if the device is found not to
 // support the CPU feature that the tile sizes were picked to target.
-enum { iree_ukernel_mmt4d_tile_generic_max_bytes = 2048 };
+enum { iree_ukernel_mmt4d_tile_generic_max_bytes = 4096 };
 
 // Generic implementation of matmul tile, i8*i8->i32 case.
 static void iree_ukernel_mmt4d_tile_i8i8i32_generic(

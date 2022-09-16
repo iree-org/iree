@@ -13,8 +13,8 @@ package(
 )
 
 iree_runtime_cc_library(
-    name = "mmt4d_tile_arm_64",
+    name = "mmt4d_select_tile_arm_64",
     hdrs = [
-        "mmt4d_tile_arm_64.h",
+        "mmt4d_select_tile_arm_64.h",
     ],
 )
