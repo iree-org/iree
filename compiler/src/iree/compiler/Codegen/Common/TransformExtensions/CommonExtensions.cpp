@@ -467,10 +467,11 @@ static LogicalResult lowerWorkgroupCountComputingRegion(
 
   if (tileSizes.size() > workload.size()) {
     return rewriter.notifyMatchFailure(
-        exportOp, "tile sizes more than the workload captured");
+        exportOp,
+        "number of tile sizes overflow the dimension from the workload");
   }
 
-  SmallVector<Value> workgroupCount;
+  SmallVector<OpFoldResult> workgroupCount;
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(workgroupCountOp);
   Location loc = workgroupCountOp.getLoc();
@@ -482,15 +483,15 @@ static LogicalResult lowerWorkgroupCountComputingRegion(
     AffineExpr s0, s1;
     bindSymbols(rewriter.getContext(), s0, s1);
     auto m = AffineMap::get(0, 2, s0.ceilDiv(s1));
-    Value tileSizeVal =
-        getValueOrCreateConstantIndexOp(rewriter, loc, tileSize.value());
-    Value count = rewriter.create<AffineApplyOp>(
-        loc, m, ValueRange{workload[tileSize.index()], tileSizeVal});
+    OpFoldResult count = makeComposedFoldedAffineApply(
+        rewriter, loc, m,
+        ArrayRef<OpFoldResult>{workload[tileSize.index()], tileSize.value()});
     workgroupCount.push_back(count);
   }
   workgroupCount = llvm::to_vector(llvm::reverse(workgroupCount));
-  workgroupCount.resize(3, rewriter.create<arith::ConstantIndexOp>(loc, 1));
-  rewriter.replaceOp(workgroupCountOp, workgroupCount);
+  workgroupCount.resize(3, rewriter.getIndexAttr(1));
+  rewriter.replaceOp(workgroupCountOp, getValueOrCreateConstantIndexOp(
+                                           rewriter, loc, workgroupCount));
   return success();
 }
 
@@ -538,6 +539,8 @@ DiagnosedSilenceableFailure transform_dialect::TileToWorkgroupsOp::apply(
         reportUnknownTransformError(exportOp.value()));
   }
 
+  /// Lower the workgroup count region in keeping with the way dispatch regions
+  /// are created by default in IREEs compilation flow.
   IRRewriter rewriter(getContext());
   if (failed(lowerWorkgroupCountComputingRegion(rewriter, exportOp.value(),
                                                 mixedTileSizes))) {
@@ -546,102 +549,18 @@ DiagnosedSilenceableFailure transform_dialect::TileToWorkgroupsOp::apply(
         reportUnknownTransformError(exportOp.value()));
   }
 
-  /// Everything from here is copied over from TileToForeachThreadOp::apply
-
   ArrayRef<Operation *> targets = state.getPayloadOps(getTarget());
-  // If there the target payload ops are empty, there is nothing to do.
-  if (targets.empty()) {
-    transformResults.set(getForeachThreadOp().cast<OpResult>(), {});
-    transformResults.set(getTiledOp().cast<OpResult>(), {});
-    return DiagnosedSilenceableFailure(success());
-  }
 
   // Result payload ops.
   SmallVector<Operation *> tileOps;
   SmallVector<Operation *> tiledOps;
 
-  // Given a list of OpFoldResults that are either index attrs or op handles,
-  // return a list of OpFoldResults where all op handles are replaced with the
-  // first (and only) OpResult of that payload op. (There must be exactly one
-  // mapped payload op and it must have exactly one index result.)
-  auto getOpResultsOrIndexAttrs =
-      [&](SmallVector<OpFoldResult> &result,
-          ArrayRef<OpFoldResult> opHandlesOrIndexAttrs) {
-        for (OpFoldResult ofr : opHandlesOrIndexAttrs) {
-          if (ofr.is<Attribute>()) {
-            result.push_back(ofr);
-            continue;
-          }
-          ArrayRef<Operation *> dynamicNumThreads =
-              state.getPayloadOps(ofr.get<Value>());
-          if (dynamicNumThreads.size() != 1) {
-            DiagnosedSilenceableFailure diag =
-                emitSilenceableError()
-                << "handle must be mapped to exactly 1 payload op";
-            diag.attachNote(ofr.get<Value>().getLoc())
-                << "mapped to " << dynamicNumThreads.size() << " ops";
-            return diag;
-          }
-          Operation *op = dynamicNumThreads[0];
-          if (op->getNumResults() != 1 ||
-              !op->getResult(0).getType().isIndex()) {
-            DiagnosedSilenceableFailure diag =
-                emitSilenceableError()
-                << "payload op must have exactly 1 index result";
-            diag.attachNote(op->getLoc())
-                << "has " << op->getNumResults() << " results";
-            return diag;
-          }
-          result.push_back(op->getResult(0));
-        }
+  DiagnosedSilenceableFailure diag = transform::tileToForeachThreadOpImpl(
+      rewriter, state, cast<transform::TransformOpInterface>(getOperation()),
+      targets, getMixedNumThreads(), getMixedTileSizes(), getThreadDimMapping(),
+      tileOps, tiledOps);
 
-        return DiagnosedSilenceableFailure(success());
-      };
-
-  // getMixedNumThreads are OpFoldResults[index attributes or PDL operation].
-  // Convert to OpFoldResults[index attributes or payload op].
-  SmallVector<OpFoldResult> numThreads;
-  DiagnosedSilenceableFailure status =
-      getOpResultsOrIndexAttrs(numThreads, getMixedNumThreads());
-  if (!status.succeeded()) return status;
-
-  // getMixedTileSizes are OpFoldResults[index attributes or PDL operation].
-  // Convert to OpFoldResults[index attributes or payload op].
-  SmallVector<OpFoldResult> tileSizes;
-  status = getOpResultsOrIndexAttrs(tileSizes, getMixedTileSizes());
-  if (!status.succeeded()) return status;
-
-  // Transform all targets one by one.
-  for (Operation *target : targets) {
-    auto tilableOp = dyn_cast<TilingInterface>(target);
-    if (!tilableOp) {
-      DiagnosedSilenceableFailure diag =
-          emitSilenceableError() << "only TilingInterface ops are supported";
-      diag.attachNote(target->getLoc()) << "target op";
-      return diag;
-    }
-    rewriter.setInsertionPoint(tilableOp);
-    auto maybeThreadDimMappingAttr = getThreadDimMapping();
-    auto dimMapping = llvm::to_vector(
-        maybeThreadDimMappingAttr
-            ? extractFromI64ArrayAttr(*maybeThreadDimMappingAttr)
-            : ArrayRef<int64_t>{});
-
-    FailureOr<linalg::ForeachThreadTilingResult> tilingResult = failure();
-    if (!getMixedNumThreads().empty()) {
-      tilingResult = linalg::tileToForeachThreadOp(rewriter, tilableOp,
-                                                   numThreads, dimMapping);
-    } else {
-      tilingResult = linalg::tileToForeachThreadOpUsingTileSizes(
-          rewriter, tilableOp, tileSizes, dimMapping);
-    }
-
-    if (failed(tilingResult)) return emitDefaultSilenceableFailure(tilableOp);
-    rewriter.replaceOp(tilableOp, tilingResult->tileOp->getResults());
-
-    tileOps.push_back(tilingResult->tileOp);
-    tiledOps.push_back(tilingResult->tiledOp);
-  }
+  if (!diag.succeeded()) return diag;
 
   transformResults.set(getForeachThreadOp().cast<OpResult>(), tileOps);
   transformResults.set(getTiledOp().cast<OpResult>(), tiledOps);

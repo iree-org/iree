@@ -34,14 +34,19 @@ iree_cc_library(
     IREEDialectsTransforms
     IREELinalgTransformDialect
     LLVMSupport
+    MLIRAffineDialect
     MLIRArithmeticDialect
+    MLIRArithmeticUtils
     MLIRBufferizationDialect
     MLIRBufferizationTransforms
+    MLIRLinalgTransforms
     MLIRPass
     MLIRTransformDialect
     iree::compiler::Codegen::Common::CommonPasses
     iree::compiler::Codegen::Interfaces::BufferizationInterfaces
     iree::compiler::Codegen::PassHeaders
+    iree::compiler::Codegen::Utils
+    iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
   PUBLIC
 )

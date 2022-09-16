@@ -164,6 +164,8 @@ def TileToWorkgroupsOp :
     In addition to tile and distribute using `scf.foreach_thread`, lowers the
     the `workgroup_count` region of the export op corresponding to the
     `func.func` to return the number of workgroups.
+    Please see the doc of `structured.tile_to_foreach_thread_op` for full
+    description of op semantics. 
   }];
 
   let arguments = (ins PDL_Operation:$target,
