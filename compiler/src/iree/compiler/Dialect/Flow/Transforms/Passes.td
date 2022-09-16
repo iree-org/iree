@@ -103,7 +103,9 @@ def FusionOfTensorOps :
   let constructor = "mlir::iree_compiler::IREE::Flow::createFusionOfTensorOpsPass()";
   let options = [
     Option<"fuseMultiUseOption", "fuse-multi-use", "bool",
-           /*default=*/"false", "Fuse ops with multiuse">
+           /*default=*/"false", "Fuse ops with multiuse">,
+    Option<"multiUseFusionIterationOption", "multi-use-fusion-iteration", "unsigned",
+           /*default=*/"2", "Number of iterations to fuse multiuse ops">
   ];
 }
 

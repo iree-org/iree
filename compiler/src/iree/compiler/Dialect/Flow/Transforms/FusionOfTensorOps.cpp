@@ -191,13 +191,18 @@ class FusionOfTensorOpsPass
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<AffineDialect, linalg::LinalgDialect, math::MathDialect>();
   }
-  FusionOfTensorOpsPass(bool fuseMultiUse) : fuseMultiUse(fuseMultiUse) {}
+  FusionOfTensorOpsPass(bool fuseMultiUse, unsigned multiUseFusionIteration)
+      : fuseMultiUse(fuseMultiUse),
+        multiUseFusionIteration(multiUseFusionIteration) {}
   FusionOfTensorOpsPass(const FusionOfTensorOpsPass &pass)
-      : fuseMultiUse(pass.fuseMultiUse) {}
+      : fuseMultiUse(pass.fuseMultiUse),
+        multiUseFusionIteration(pass.multiUseFusionIteration) {}
 
   LogicalResult initializeOptions(StringRef options) override {
     if (failed(Pass::initializeOptions(options))) return failure();
+    // Initialize fusion options from the pass options.
     fuseMultiUse = fuseMultiUseOption;
+    multiUseFusionIteration = multiUseFusionIterationOption;
     return success();
   }
 
@@ -323,9 +328,9 @@ class FusionOfTensorOpsPass
 
     if (fuseMultiUse) {
       // Run fusion of producer with consumer when producer has multiple uses.
-      // For now run this sequence twice. Ideally we would run it till no
-      // candidates exist.
-      for (auto i : llvm::seq<unsigned>(0, 2)) {
+      // For now run this sequence a fixed times (2 by default). Ideally we
+      // would run it till no candidates exist.
+      for (auto i : llvm::seq<unsigned>(0, multiUseFusionIteration)) {
         (void)i;
         auto &dominanceInfo = getAnalysis<DominanceInfo>();
         FailureOr<unsigned> numOfFusableCandidates =
@@ -338,13 +343,16 @@ class FusionOfTensorOpsPass
 
  private:
   bool fuseMultiUse;
+  unsigned multiUseFusionIteration;
 };
 
 }  // namespace
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createFusionOfTensorOpsPass(bool fuseMultiUse) {
-  return std::make_unique<FusionOfTensorOpsPass>(fuseMultiUse);
+createFusionOfTensorOpsPass(bool fuseMultiUse,
+                            unsigned multiUseFusionIteration) {
+  return std::make_unique<FusionOfTensorOpsPass>(fuseMultiUse,
+                                                 multiUseFusionIteration);
 }
 
 }  // namespace Flow
