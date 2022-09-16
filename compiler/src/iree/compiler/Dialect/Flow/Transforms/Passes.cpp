@@ -246,7 +246,8 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPass(mlir::createCSEPass);
 
   // Elementwise fusion.
-  passManager.addNestedPass<func::FuncOp>(createFusionOfTensorOpsPass());
+  passManager.addNestedPass<func::FuncOp>(
+      createFusionOfTensorOpsPass(clEnableFusionOnMultiUseAndReduction));
 
   FunctionLikeNest(passManager)
       .addPredicatedPass(clEnableLinalgDetensorize,

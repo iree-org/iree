@@ -195,6 +195,12 @@ class FusionOfTensorOpsPass
   FusionOfTensorOpsPass(const FusionOfTensorOpsPass &pass)
       : fuseMultiUse(pass.fuseMultiUse) {}
 
+  LogicalResult initializeOptions(StringRef options) override {
+    if (failed(Pass::initializeOptions(options))) return failure();
+    fuseMultiUse = fuseMultiUseOption;
+    return success();
+  }
+
   void runOnOperation() override {
     Operation *funcOp = getOperation();
     MLIRContext *context = funcOp->getContext();
@@ -331,7 +337,6 @@ class FusionOfTensorOpsPass
   }
 
  private:
-  // Fuse ops with multiuse.
   bool fuseMultiUse;
 };
 

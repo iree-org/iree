@@ -101,6 +101,10 @@ def FusionOfTensorOps :
     InterfacePass<"iree-flow-fusion-of-tensor-ops", "mlir::FunctionOpInterface"> {
   let summary = "Fuse operations on tensors";
   let constructor = "mlir::iree_compiler::IREE::Flow::createFusionOfTensorOpsPass()";
+  let options = [
+    Option<"fuseMultiUseOption", "fuse-multi-use", "bool",
+           /*default=*/"false", "Fuse ops with multiuse">
+  ];
 }
 
 def InferNumericNarrowing :

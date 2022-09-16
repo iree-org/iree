@@ -30,6 +30,7 @@ iree_lit_test_suite(
             "dispatch_linalg_transform_dialect.mlir",
             "expand_tensor_shapes.mlir",
             "export_benchmark_funcs.mlir",
+            "fusion_of_tensor_ops.mlir",
             "infer_numeric_narrowing.mlir",
             "initialize_empty_tensor.mlir",
             "inject_dispatch_tracing.mlir",
