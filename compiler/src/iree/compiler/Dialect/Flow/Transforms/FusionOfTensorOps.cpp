@@ -50,13 +50,9 @@ static Optional<OpOperand *> getFusableUse(Operation *op,
       // This can be generalized if needed
       unsigned numUsesOfOp = 0;
       for (OpOperand &operand : sourceOp->getOpOperands()) {
-        if (operand.get().getDefiningOp() == op) {
-          numUsesOfOp++;
-        }
+        if (operand.get().getDefiningOp() == op) numUsesOfOp++;
       }
-      if (numUsesOfOp != 1) {
-        return llvm::None;
-      }
+      if (numUsesOfOp != 1) return llvm::None;
       return &source;
     }
   }
@@ -105,38 +101,37 @@ struct FuseElementwiseOpsWithMultipleUses
                                 PatternRewriter &rewriter) const override {
     auto consumerMarker =
         consumerOp->getAttrOfType<IntegerAttr>(getConsumerAttributeName());
-    if (!consumerMarker) {
-      return failure();
-    }
-    Optional<OpOperand *> fusedOperand = llvm::None;
-    for (OpOperand &operand : consumerOp->getOpOperands()) {
-      Operation *operandProducer = operand.get().getDefiningOp();
-      if (!operandProducer) continue;
-      auto producerMarker = operandProducer->getAttrOfType<IntegerAttr>(
-          getProducerAttributeName());
-      if (!producerMarker) continue;
-      fusedOperand = &operand;
-    }
-    if (!fusedOperand) {
+    if (!consumerMarker) return failure();
+
+    auto fusedOperandIt =
+        llvm::find_if(consumerOp->getOpOperands(), [](OpOperand &operand) {
+          Operation *operandProducer = operand.get().getDefiningOp();
+          if (!operandProducer) return false;
+          auto producerMarker = operandProducer->getAttrOfType<IntegerAttr>(
+              getProducerAttributeName());
+          if (!producerMarker) return false;
+          return true;
+        });
+    if (fusedOperandIt == consumerOp->getOpOperands().end()) {
       return rewriter.notifyMatchFailure(consumerOp, "failed to get producer");
     }
+    OpOperand *fusedOperand = fusedOperandIt;
     assert(linalg::areElementwiseOpsFusable(fusedOperand.getValue()) &&
            "expected producer and consumer to be fusable");
-    Operation *producerOp = fusedOperand.getValue()->get().getDefiningOp();
+    Operation *producerOp = fusedOperand->getDefiningOp();
     FailureOr<Operation *> fusedOperation =
-        linalg::fuseElementwiseOps(rewriter, fusedOperand.getValue());
+        linalg::fuseElementwiseOps(rewriter, fusedOperand);
     if (failed(fusedOperation)) {
       return rewriter.notifyMatchFailure(consumerOp,
                                          "failed to fuse with producer");
     }
     assert(fusedOperation.getValue()->getNumResults() ==
            producerOp->getNumResults() + consumerOp->getNumResults());
+    auto fusedResults = fusedOperation.getValue()->getResults();
     rewriter.replaceOp(producerOp,
-                       fusedOperation.getValue()->getResults().take_front(
-                           producerOp->getNumResults()));
+                       fusedResults.take_front(producerOp->getNumResults()));
     rewriter.replaceOp(consumerOp,
-                       fusedOperation.getValue()->getResults().take_back(
-                           consumerOp->getNumResults()));
+                       fusedResults.take_back(consumerOp->getNumResults()));
     return success();
   }
 };
@@ -160,13 +155,11 @@ static FailureOr<unsigned> fuseMultiUseProducers(Operation *funcOp,
         genericOp->hasAttr(producerAttrName)) {
       return;
     }
+
     Optional<OpOperand *> fusableUse = getFusableUse(genericOp, dominanceInfo);
-    if (!fusableUse) {
-      return;
-    }
-    if (!linalg::areElementwiseOpsFusable(fusableUse.getValue())) {
-      return;
-    }
+    if (!fusableUse) return;
+    if (!linalg::areElementwiseOpsFusable(fusableUse.getValue())) return;
+
     Operation *consumer = fusableUse.getValue()->getOwner();
     genericOp->setAttr(producerAttrName,
                        builder.getI64IntegerAttr(numCandidates));
@@ -176,7 +169,8 @@ static FailureOr<unsigned> fuseMultiUseProducers(Operation *funcOp,
     return;
   });
   LLVM_DEBUG({
-    llvm::dbgs() << "Num Candidates : " << numCandidates << "\n";
+    llvm::dbgs() << "Num of multiuse fusable candidates : " << numCandidates
+                 << "\n";
     funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
   });
   RewritePatternSet fusionPatterns(context);
@@ -326,14 +320,10 @@ struct FusionOfTensorOpsPass
       for (auto i : llvm::seq<unsigned>(0, 2)) {
         (void)i;
         auto &dominanceInfo = getAnalysis<DominanceInfo>();
-        FailureOr<unsigned> fusionInfo =
+        FailureOr<unsigned> numOfFusableCandidates =
             fuseMultiUseProducers(funcOp, context, dominanceInfo);
-        if (failed(fusionInfo)) {
-          return signalPassFailure();
-        }
-        if (fusionInfo.getValue() == 0) {
-          break;
-        }
+        if (failed(numOfFusableCandidates)) return signalPassFailure();
+        if (numOfFusableCandidates.getValue() == 0) break;
       }
     }
   }
