@@ -35,6 +35,7 @@ iree_lit_test_suite(
         "//tools:iree-compile",
         "//tools:iree-opt",
         "//tools:iree-run-module",
+        "@llvm-project//lld",
         "@llvm-project//llvm:FileCheck",
     ],
 )
