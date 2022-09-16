@@ -22,6 +22,7 @@ iree_runtime_cc_library(
     ],
     deps = [
         "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/builtins/ukernel/arch:config",
     ],
 )
 
@@ -70,6 +71,6 @@ iree_runtime_cc_library(
         ":elementwise",
         ":generic",
         ":types",
-        "//runtime/src/iree/builtins/ukernel/arm_64:mmt4d_select_tile_arm_64",
+        "//runtime/src/iree/builtins/ukernel/arch:ukernel_arch",
     ],
 )

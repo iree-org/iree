@@ -6,10 +6,7 @@
 
 #include "iree/builtins/ukernel/mmt4d.h"
 
-#if defined(IREE_UKERNEL_ARCH_ARM_64)
-#include "iree/builtins/ukernel/arm_64/mmt4d_select_tile_arm_64.h"
-#endif
-
+#include "iree/builtins/ukernel/arch/mmt4d_select_tile_arch.h"
 #include "iree/builtins/ukernel/mmt4d_select_tile_generic.h"
 
 #define OUTSIDE_UINT_RANGE(value, bits) (((value) < 0) || ((value) >> (bits)))
@@ -45,10 +42,8 @@ static iree_ukernel_mmt4d_status_t iree_ukernel_mmt4d_validate(
 static iree_ukernel_mmt4d_status_t iree_ukernel_mmt4d_select_tile_func(
     const iree_ukernel_mmt4d_params_t* params,
     iree_ukernel_mmt4d_tile_func_t* out_tile_func) {
-  iree_ukernel_mmt4d_tile_func_t arch_tile_func = 0;
-#if defined(IREE_UKERNEL_ARCH_ARM_64)
-  arch_tile_func = iree_ukernel_mmt4d_select_tile_func_arm_64(params);
-#endif
+  iree_ukernel_mmt4d_tile_func_t arch_tile_func =
+      iree_ukernel_mmt4d_select_tile_func_arch(params);
   if (arch_tile_func) {
     *out_tile_func = arch_tile_func;
     return iree_ukernel_mmt4d_status_ok;
