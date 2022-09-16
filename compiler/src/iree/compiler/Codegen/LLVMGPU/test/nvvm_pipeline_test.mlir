@@ -522,8 +522,10 @@ hal.executable @mma_fused {
 //  MMASYNC-COUNT-4:   nvvm.ldmatrix{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32)
 //  MMASYNC-COUNT-8:   nvvm.mma.sync
 //  MMASYNC-COUNT-4:   llvm.store {{.*}} : !llvm.ptr<vector<2xf32>, 3>
-//  MMASYNC-COUNT-2:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
-//  MMASYNC-COUNT-2:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
+//    MMASYNC-COUNT:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//    MMASYNC-COUNT:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
+//    MMASYNC-COUNT:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//    MMASYNC-COUNT:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
 
 // C matrix promotion prevent efficient fusion with matmul consumer, this needs
 // to be fixed to get good performance.
