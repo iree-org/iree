@@ -1,4 +1,4 @@
-if (CMAKE_SYSTEM_PROCESSOR STREQUAL aarch64)
+if ((CMAKE_SYSTEM_PROCESSOR STREQUAL aarch64) OR (CMAKE_SYSTEM_PROCESSOR STREQUAL arm64))
 
 check_cxx_compiler_flag("-march=armv8.2-a+dotprod" HAVE_FLAG_MARCH_ARMV8_2_A_DOTPROD)
 if(HAVE_FLAG_MARCH_ARMV8_2_A_DOTPROD)
@@ -43,7 +43,7 @@ iree_cc_library(
   PUBLIC
 )
 
-else()  # Not CMAKE_SYSTEM_PROCESSOR STREQUAL aarch64
+else()  # Not CMAKE_SYSTEM_PROCESSOR STREQUAL aarch64 / arm64
 
 iree_cc_library(
   NAME
