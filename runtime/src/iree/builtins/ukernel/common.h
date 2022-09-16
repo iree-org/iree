@@ -56,7 +56,7 @@ extern "C" {
 #define IREE_UKERNEL_SIZE_TYPE int32_t
 #elif defined(IREE_UKERNEL_ARCH_GENERIC_64)
 #define IREE_UKERNEL_SIZE_TYPE int64_t
-#elif defined(IREE_ARCH_ARM_64)
+#elif defined(IREE_ARCH_ARM_64) && !defined(__APPLE__)
 #define IREE_UKERNEL_ARCH_ARM_64 1
 #define IREE_UKERNEL_SIZE_TYPE int64_t
 #else
