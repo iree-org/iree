@@ -185,13 +185,15 @@ static FailureOr<unsigned> fuseMultiUseProducers(Operation *funcOp,
 
 /// Pass to fuse linalg on tensor operations as well as fusion of hal.interface*
 /// operations with linalg.tensor_reshape operation.
-struct FusionOfTensorOpsPass
+class FusionOfTensorOpsPass
     : public FusionOfTensorOpsBase<FusionOfTensorOpsPass> {
+ public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<AffineDialect, linalg::LinalgDialect, math::MathDialect>();
   }
-  FusionOfTensorOpsPass() = default;
-  FusionOfTensorOpsPass(const FusionOfTensorOpsPass &pass) {}
+  FusionOfTensorOpsPass(bool fuseMultiUse) : fuseMultiUse(fuseMultiUse) {}
+  FusionOfTensorOpsPass(const FusionOfTensorOpsPass &pass)
+      : fuseMultiUse(pass.fuseMultiUse) {}
 
   void runOnOperation() override {
     Operation *funcOp = getOperation();
@@ -313,7 +315,7 @@ struct FusionOfTensorOpsPass
       });
     }
 
-    {
+    if (fuseMultiUse) {
       // Run fusion of producer with consumer when producer has multiple uses.
       // For now run this sequence twice. Ideally we would run it till no
       // candidates exist.
@@ -327,13 +329,17 @@ struct FusionOfTensorOpsPass
       }
     }
   }
+
+ private:
+  // Fuse ops with multiuse.
+  bool fuseMultiUse;
 };
 
 }  // namespace
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createFusionOfTensorOpsPass() {
-  return std::make_unique<FusionOfTensorOpsPass>();
+createFusionOfTensorOpsPass(bool fuseMultiUse) {
+  return std::make_unique<FusionOfTensorOpsPass>(fuseMultiUse);
 }
 
 }  // namespace Flow
