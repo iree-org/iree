@@ -67,7 +67,6 @@ std::string mapBinaryOperator(BinaryOperator op) {
       return ">=";
   }
 }
-
 }  // namespace
 
 Value unaryOperator(OpBuilder builder, Location location, UnaryOperator op,
@@ -104,6 +103,17 @@ Value binaryOperator(OpBuilder builder, Location location, BinaryOperator op,
           /*templateArgs=*/ArrayAttr{},
           /*operands=*/ArrayRef<Value>{lhs, rhs})
       .getResult(0);
+}
+
+Value allocateVariable(OpBuilder builder, Location location, Type type,
+                       Optional<StringRef> initializer) {
+  auto ctx = builder.getContext();
+  return builder
+      .create<emitc::VariableOp>(
+          /*location=*/location,
+          /*resultType=*/type,
+          /*value=*/emitc::OpaqueAttr::get(ctx, initializer.value_or("")))
+      .getResult();
 }
 
 Value addressOf(OpBuilder builder, Location location, Value operand) {

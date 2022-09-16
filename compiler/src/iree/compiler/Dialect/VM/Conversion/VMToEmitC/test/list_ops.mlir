@@ -3,8 +3,8 @@
 vm.module @my_module {
   // CHECK-LABEL: @my_module_list_alloc
   vm.func @list_alloc(%arg0: i32) -> !vm.list<i32> {
-    // CHECK: emitc.call "EMITC_STRUCT_MEMBER_ASSIGN"
     // CHECK: %[[A:.+]] = emitc.apply "&"(%{{.+}}) : (!emitc.opaque<"iree_vm_type_def_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_type_def_t">>
+    // CHECK: emitc.call "EMITC_STRUCT_MEMBER_ASSIGN"
     // CHECK: %[[B:.+]] = "emitc.variable"() {value = #emitc.opaque<"NULL">} : () -> !emitc.ptr<!emitc.opaque<"iree_vm_list_t">>
     // CHECK: %[[C:.+]] = emitc.apply "&"(%[[B]]) : (!emitc.ptr<!emitc.opaque<"iree_vm_list_t">>) -> !emitc.ptr<!emitc.ptr<!emitc.opaque<"iree_vm_list_t">>>
     // CHECK: %[[D:.+]] = emitc.call "EMITC_STRUCT_PTR_MEMBER"(%arg2) {args = [0 : index, #emitc.opaque<"allocator">]} : (!emitc.ptr<!emitc.opaque<"my_module_state_t">>) -> !emitc.opaque<"iree_allocator_t">

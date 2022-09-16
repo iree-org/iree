@@ -7,6 +7,8 @@
 #ifndef IREE_COMPILER_DIALECT_VM_CONVERSION_VMTOEMITC_EMITCBUILDERS_H_
 #define IREE_COMPILER_DIALECT_VM_CONVERSION_VMTOEMITC_EMITCBUILDERS_H_
 
+#include <optional>
+
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 #include "mlir/IR/Builders.h"
@@ -62,6 +64,9 @@ Value unaryOperator(OpBuilder builder, Location location, UnaryOperator op,
 
 Value binaryOperator(OpBuilder builder, Location location, BinaryOperator op,
                      Value lhs, Value rhs, Type resultType);
+
+Value allocateVariable(OpBuilder builder, Location location, Type type,
+                       Optional<StringRef> initializer = std::nullopt);
 
 Value addressOf(OpBuilder builder, Location location, Value operand);
 
