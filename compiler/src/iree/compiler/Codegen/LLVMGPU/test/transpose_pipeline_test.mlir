@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target-pass))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target-pass))' %s --fold-memref-alias-ops -canonicalize -cse | FileCheck %s
 
 #device_target_cuda = #hal.device.target<"cuda", {executable_targets = [#hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>], legacy_sync}>
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
@@ -34,20 +34,17 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 //       CHECK:  hal.executable.variant public @cuda
 //   CHECK-DAG:  %[[C0:.+]] = arith.constant 0
 //   CHECK-DAG:  %[[CST:.+]] = arith.constant 0
-//       CHECK:  %[[D3:.+]] = memref.alloc() : memref<32x33xf32, 3>
-//       CHECK:  %[[D4:.+]] = memref.subview %[[D3]][0, 0] [32, 32] [1, 1] : memref<32x33xf32, 3> to memref<32x32xf32, #{{.*}}, 3>
-//       CHECK:  %[[D9:.+]] = memref.subview %[[D6:.+]][%{{.*}}, %{{.*}}] [32, 32] [1, 1] : memref<4096x4096xf32> to memref<32x32xf32, #{{.*}}>
-//       CHECK:  %[[D10:.+]] = memref.subview %[[D5:.+]][%{{.*}}, %{{.*}}] [32, 32] [1, 1] : memref<4096x4096xf32> to memref<32x32xf32, #{{.*}}>
+//   CHECK-DAG:  %[[IN:.+]] = hal.interface.binding.subspan set(0) binding(0)
+//   CHECK-DAG:  %[[OUT:.+]] = hal.interface.binding.subspan set(0) binding(1)
+//   CHECK-DAG:  %[[ALLOC:.+]] = memref.alloc() : memref<32x33xf32, 3>
 //       CHECK:  gpu.barrier
-//       CHECK:  %[[D13:.+]] = vector.transfer_read %[[D10]][%{{.*}}, %{{.*}}], %[[CST]] {in_bounds = [true]} : memref<32x32xf32, #{{.*}}>, vector<4xf32>
-//       CHECK:  vector.transfer_write %[[D13]], %[[D4]][%{{.*}}, %{{.*}}] {in_bounds = [true]} : vector<4xf32>, memref<32x32xf32, #{{.*}}, 3>
+//       CHECK:  %[[R0:.+]] = vector.transfer_read %[[IN]][%{{.*}}, %{{.*}}], %[[CST]] {in_bounds = [true]} : memref<4096x4096xf32>, vector<4xf32>
+//       CHECK:  vector.transfer_write %[[R0]], %[[ALLOC]][%{{.*}}, %{{.*}}] {in_bounds = [true]} : vector<4xf32>, memref<32x33xf32, 3>
 //       CHECK:  gpu.barrier
-//       CHECK:  %[[D15:.+]] = memref.subview %[[D4]][%{{.*}}, %{{.*}}] [4, 1] [1, 1] : memref<32x32xf32, #{{.*}}, 3> to memref<4x1xf32, #{{.*}}, 3>
-//       CHECK:  %[[D16:.+]] = memref.subview %[[D9]][%{{.*}}, %{{.*}}] [1, 4] [1, 1] : memref<32x32xf32, #{{.*}}> to memref<1x4xf32, #{{.*}}>
-//       CHECK:  %[[D17:.+]] = vector.transfer_read %[[D15]][%{{.*}}, %{{.*}}], %[[CST]] {in_bounds = [true, true]} : memref<4x1xf32, #{{.*}}, 3>, vector<4x1xf32>
-//       CHECK:  %[[D18:.+]] = vector.shape_cast %[[D17]] : vector<4x1xf32> to vector<1x4xf32>
-//       CHECK:  %[[D19:.+]] = vector.extract %[[D18]][0] : vector<1x4xf32>
-//       CHECK:  vector.transfer_write %[[D19]], %[[D16]][%{{.*}}, %{{.*}}] {in_bounds = [true]} : vector<4xf32>, memref<1x4xf32, #{{.*}}>
+//       CHECK:  %[[R1:.+]] = vector.transfer_read %[[ALLOC]][%{{.*}}, %{{.*}}], %[[CST]] {in_bounds = [true, true]} : memref<32x33xf32, 3>, vector<4x1xf32>
+//       CHECK:  %[[R2:.+]] = vector.shape_cast %[[R1]] : vector<4x1xf32> to vector<1x4xf32>
+//       CHECK:  %[[R3:.+]] = vector.extract %[[R2]][0] : vector<1x4xf32>
+//       CHECK:  vector.transfer_write %[[R3]], %[[OUT]][%{{.*}}, %{{.*}}] {in_bounds = [true]} : vector<4xf32>, memref<4096x4096xf32>
 
 // -----
 
@@ -88,20 +85,17 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 //       CHECK:  hal.executable.variant public @cuda
 //   CHECK-DAG:  %[[C0:.+]] = arith.constant 0
 //   CHECK-DAG:  %[[CST:.+]] = arith.constant 0
-//       CHECK:  %[[D3:.+]] = memref.alloc() : memref<32x33xf32, 3>
-//       CHECK:  %[[D4:.+]] = memref.subview %[[D3]][0, 0] [32, 32] [1, 1] : memref<32x33xf32, 3> to memref<32x32xf32, #{{.*}}, 3>
-//       CHECK:  %[[D5:.+]] = hal.interface.binding.subspan
-//       CHECK:  %[[D11:.+]] = memref.subview %[[D5:.+]][%{{.*}}, %{{.*}}] [32, 32] [1, 1] : memref<2048x768xf32> to memref<32x32xf32, #{{.*}}>
+//   CHECK-DAG:  %[[ALLOC:.+]] = memref.alloc() : memref<32x33xf32, 3>
+//   CHECK-DAG:  %[[IN0:.+]] = hal.interface.binding.subspan set(0) binding(0)
+//   CHECK-DAG:  %[[IN1:.+]] = hal.interface.binding.subspan set(0) binding(1)
+//   CHECK-DAG:  %[[OUT:.+]] = hal.interface.binding.subspan set(0) binding(2)
 //       CHECK:  gpu.barrier
-//       CHECK:  %[[D15:.+]] = vector.transfer_read %[[D11]][%{{.*}}, %{{.*}}], %[[CST]] {in_bounds = [true]} : memref<32x32xf32, #{{.*}}>, vector<4xf32>
-//       CHECK:  vector.transfer_write %[[D15]], %[[D4]][%{{.*}}, %{{.*}}] {in_bounds = [true]} : vector<4xf32>, memref<32x32xf32, #{{.*}}, 3>
+//       CHECK:  %[[R0:.+]] = vector.transfer_read %[[IN0]][%{{.*}}, %{{.*}}], %[[CST]] {in_bounds = [true]} : memref<2048x768xf32>, vector<4xf32>
+//       CHECK:  vector.transfer_write %[[R0]], %[[ALLOC]][%{{.*}}, %{{.*}}] {in_bounds = [true]} : vector<4xf32>, memref<32x33xf32, 3>
 //       CHECK:  gpu.barrier
-//       CHECK:  %[[D17:.+]] = memref.subview %[[D4]][%{{.*}}, %{{.*}}] [4, 1] [1, 1] : memref<32x32xf32, #{{.*}}, 3> to memref<4x1xf32, #{{.*}}, 3>
-//       CHECK:  %[[D18:.+]] = memref.subview %{{.*}}[%{{.*}}, %{{.*}}] [1, 4] [1, 1] : memref<32x32xf32, #{{.*}}> to memref<1x4xf32, #{{.*}}>
-//       CHECK:  %[[D19:.+]] = memref.subview %{{.*}}[%{{.*}}, %{{.*}}] [1, 4] [1, 1] : memref<32x32xf32, #{{.*}}> to memref<1x4xf32, #{{.*}}>
-//       CHECK:  %[[D20:.+]] = vector.transfer_read %[[D17]][%{{.*}}, %{{.*}}], %[[CST]] {in_bounds = [true, true]} : memref<4x1xf32, #{{.*}}, 3>, vector<4x1xf32>
-//       CHECK:  %[[D21:.+]] = vector.shape_cast %[[D20]] : vector<4x1xf32> to vector<1x4xf32>
-//       CHECK:  %[[D22:.+]] = vector.transfer_read %[[D18]][%{{.*}}, %{{.*}}], %[[CST]] {in_bounds = [true]} : memref<1x4xf32, #{{.*}}>, vector<4xf32>
-//       CHECK:  %[[D23:.+]] = vector.extract %[[D21]][0] : vector<1x4xf32>
-//       CHECK:  %[[D24:.+]] = arith.addf %[[D23]], %[[D22]] : vector<4xf32>
-//       CHECK:  vector.transfer_write %[[D24]], %[[D19]][%{{.*}}, %{{.*}}] {in_bounds = [true]} : vector<4xf32>, memref<1x4xf32, #{{.*}}>
+//       CHECK:  %[[R1:.+]] = vector.transfer_read %[[ALLOC]][%{{.*}}, %{{.*}}], %[[CST]] {in_bounds = [true, true]} : memref<32x33xf32, 3>, vector<4x1xf32>
+//       CHECK:  %[[R2:.+]] = vector.shape_cast %[[R1]] : vector<4x1xf32> to vector<1x4xf32>
+//       CHECK:  %[[R3:.+]] = vector.transfer_read %[[IN1]][%{{.*}}, %{{.*}}], %[[CST]] {in_bounds = [true]} : memref<768x2048xf32>, vector<4xf32>
+//       CHECK:  %[[R4:.+]] = vector.extract %[[R2]][0] : vector<1x4xf32>
+//       CHECK:  %[[R5:.+]] = arith.addf %[[R4]], %[[R3]] : vector<4xf32>
+//       CHECK:  vector.transfer_write %[[R5]], %[[OUT]][%{{.*}}, %{{.*}}] {in_bounds = [true]} : vector<4xf32>, memref<768x2048xf32>

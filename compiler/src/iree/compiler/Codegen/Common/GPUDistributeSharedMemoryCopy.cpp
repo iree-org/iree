@@ -17,6 +17,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/MLIRContext.h"
@@ -31,6 +32,10 @@ using mlir::iree_compiler::IREE::LinalgExt::VectorizationPatterns;
 // Pass to lower workgroup memory copy to distibuted
 // transfer_read/transfer_write ops.
 //====---------------------------------------------------------------------===//
+
+// Markers for intermediate transformations.
+static const llvm::StringRef kCopyToDistribute = "copy_to_distribute";
+static const llvm::StringRef kCopyDistributed = "copy_distributed";
 
 namespace mlir {
 namespace iree_compiler {
@@ -89,26 +94,17 @@ static void populateTilingCopyToWorkgroupMemPatterns(
           StringAttr::get(patterns.getContext(), getVectorizeMarker())));
 }
 
-static void populateVectorizationPatterns(RewritePatternSet &patterns) {
-  VectorizationPatterns<linalg::GenericOp>::insert(
-      patterns, linalg::LinalgVectorizationOptions(),
-      linalg::LinalgTransformationFilter(StringAttr::get(
-          patterns.getContext(), getCopyToWorkgroupMemoryMarker())));
-}
-
-/// Compute a vector size so that the numer of elements is equal to the flat
+/// Compute a tile size so that the numer of iteraton is equal to the flat
 /// workgroup size.
-static Optional<SmallVector<int64_t, 4>> getGPUNativeVectorSize(
-    Operation *op, int64_t flatWorkgroupSize,
-    const llvm::SmallDenseSet<VectorTransferOpInterface> &opsToIgnore) {
-  auto vt = dyn_cast<VectorTransferOpInterface>(op);
-  if (!vt) return llvm::None;
-  if (opsToIgnore.count(vt)) return llvm::None;
-  if (!vt.permutation_map().isMinorIdentity()) return llvm::None;
-  ArrayRef<int64_t> shape = vt.getVectorType().getShape();
-  int targetVectorSize =
-      copyVectorNumBits / vt.getVectorType().getElementTypeBitWidth();
-  SmallVector<int64_t, 4> unroll;
+static Optional<SmallVector<int64_t>> getTileToDistributableSize(
+    linalg::GenericOp copyOp, int64_t flatWorkgroupSize) {
+  SmallVector<int64_t, 4> shape = copyOp.getStaticLoopRanges();
+  unsigned bitWidth = copyOp->getOperand(0)
+                          .getType()
+                          .cast<MemRefType>()
+                          .getElementTypeBitWidth();
+  int targetVectorSize = copyVectorNumBits / bitWidth;
+  SmallVector<int64_t> unroll;
   assert(shape.back() % targetVectorSize == 0);
   int64_t threadsAvailable = flatWorkgroupSize;
   for (auto &dim : llvm::enumerate(llvm::reverse(shape))) {
@@ -123,18 +119,129 @@ static Optional<SmallVector<int64_t, 4>> getGPUNativeVectorSize(
   assert(threadsAvailable == 1);
   unroll.resize(shape.size(), 1);
   std::reverse(unroll.begin(), unroll.end());
-  if (unroll == shape) return llvm::None;
   return unroll;
 }
 
-static void populateVectorUnrollPatterns(
-    RewritePatternSet &patterns, int64_t flatWorkgroupSize,
-    const llvm::SmallDenseSet<VectorTransferOpInterface> &opsToIgnore) {
-  auto getShape = [flatWorkgroupSize, &opsToIgnore](Operation *op) {
-    return getGPUNativeVectorSize(op, flatWorkgroupSize, opsToIgnore);
+/// Pattern to tile copies using serial loops into a shape that can be
+/// distributed onto thread.
+static void populateTileToUnroll(RewritePatternSet &patterns,
+                                 int64_t flatWorkgroupSize) {
+  linalg::TileSizeComputationFunction wgCopyTileSizeFn =
+      [flatWorkgroupSize](OpBuilder &builder, Operation *operation) {
+        SmallVector<Value, 4> tileSizesVal;
+        auto copyOp = dyn_cast<linalg::GenericOp>(operation);
+        if (!copyOp) return tileSizesVal;
+        Optional<SmallVector<int64_t>> staticSize =
+            getTileToDistributableSize(copyOp, flatWorkgroupSize);
+        for (int64_t dim : *staticSize) {
+          tileSizesVal.push_back(
+              builder.create<arith::ConstantIndexOp>(operation->getLoc(), dim));
+        }
+        return tileSizesVal;
+      };
+
+  auto tilingOptions = linalg::LinalgTilingOptions()
+                           .setLoopType(linalg::LinalgTilingLoopType::Loops)
+                           .setTileSizeComputationFunction(wgCopyTileSizeFn);
+  patterns.insert<linalg::LinalgTilingPattern>(
+      linalg::GenericOp::getOperationName(), patterns.getContext(),
+      tilingOptions,
+      linalg::LinalgTransformationFilter(
+          {StringAttr::get(patterns.getContext(),
+                           getCopyToWorkgroupMemoryMarker())},
+          StringAttr::get(patterns.getContext(), kCopyToDistribute)));
+}
+
+/// Break up the flat id onto the static loop ranges.
+SmallVector<linalg::ProcInfo> getIds(OpBuilder &b, Location loc,
+                                     ArrayRef<Range> parallelLoopRanges,
+                                     Value flatThreadId) {
+  SmallVector<linalg::ProcInfo> infos;
+  Value id = flatThreadId;
+  AffineExpr d0 = getAffineDimExpr(0, b.getContext());
+  for (Range r : llvm::reverse(parallelLoopRanges)) {
+    linalg::ProcInfo info;
+    auto offset = r.offset.dyn_cast<Attribute>();
+    auto stride = r.stride.dyn_cast<Attribute>();
+    auto size = r.size.dyn_cast<Attribute>();
+    assert(offset && stride && size);
+    int64_t numThreadsDim = (size.cast<IntegerAttr>().getInt() -
+                             offset.cast<IntegerAttr>().getInt()) /
+                            stride.cast<IntegerAttr>().getInt();
+    Value dimId = id;
+    if (infos.size() != parallelLoopRanges.size() - 1)
+      dimId = makeComposedAffineApply(b, loc, d0 % numThreadsDim, {dimId});
+    info.procId = dimId;
+    info.nprocs = b.create<arith::ConstantIndexOp>(loc, numThreadsDim);
+    info.distributionMethod =
+        linalg::DistributionMethod::CyclicNumProcsEqNumIters;
+    infos.push_back(info);
+    id = makeComposedAffineApply(b, loc, d0.floorDiv(numThreadsDim), {id});
+  }
+  std::reverse(infos.begin(), infos.end());
+  return infos;
+}
+
+/// Return the shape of copy op that can be vectorized to a
+/// transfer_read/transfer_write of size `targetVectorSize`.
+SmallVector<int64_t> getNativeDstShape(linalg::GenericOp copyOp) {
+  unsigned bitWidth = copyOp->getOperand(0)
+                          .getType()
+                          .cast<MemRefType>()
+                          .getElementTypeBitWidth();
+  int targetVectorSize = copyVectorNumBits / bitWidth;
+  SmallVector<int64_t> dstShape;
+  for (int64_t dim : copyOp.getStaticLoopRanges()) {
+    // Skip tiling of dimension of size 1 to simplify distribution.
+    dstShape.push_back(dim == 1 ? 0 : 1);
+  }
+  dstShape.back() = targetVectorSize;
+  return dstShape;
+}
+
+/// Distribute linalg copy onto threads based on the flat id.
+static void populateTilingAndDistribute(RewritePatternSet &patterns,
+                                        Value flatThreadId) {
+  linalg::TileSizeComputationFunction wgCopyTileSizeFn =
+      [](OpBuilder &builder, Operation *operation) {
+        SmallVector<Value, 4> tileSizesVal;
+        auto copyOp = dyn_cast<linalg::GenericOp>(operation);
+        if (!copyOp) return tileSizesVal;
+        SmallVector<int64_t> staticSize = getNativeDstShape(copyOp);
+        for (int64_t dim : staticSize) {
+          tileSizesVal.push_back(
+              builder.create<arith::ConstantIndexOp>(operation->getLoc(), dim));
+        }
+        return tileSizesVal;
+      };
+  auto getCopyThreadProcInfoFn = [flatThreadId](
+                                     OpBuilder &builder, Location loc,
+                                     ArrayRef<Range> parallelLoopRanges) {
+    return getIds(builder, loc, parallelLoopRanges, flatThreadId);
   };
-  vector::populateVectorUnrollPatterns(
-      patterns, vector::UnrollVectorOptions().setNativeShapeFn(getShape));
+  linalg::LinalgLoopDistributionOptions copyInvocationDistributionOptions;
+  copyInvocationDistributionOptions.procInfo = getCopyThreadProcInfoFn;
+
+  auto tilingOptions =
+      linalg::LinalgTilingOptions()
+          .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
+          .setTileSizeComputationFunction(wgCopyTileSizeFn)
+          .setDistributionOptions(copyInvocationDistributionOptions);
+  patterns.insert<linalg::LinalgTilingPattern>(
+      linalg::GenericOp::getOperationName(), patterns.getContext(),
+      tilingOptions,
+      linalg::LinalgTransformationFilter(
+          {StringAttr::get(patterns.getContext(), kCopyToDistribute)},
+          StringAttr::get(patterns.getContext(), kCopyDistributed)));
+}
+
+static void populateVectorizationPatterns(RewritePatternSet &patterns) {
+  VectorizationPatterns<linalg::GenericOp>::insert(
+      patterns, linalg::LinalgVectorizationOptions(),
+      linalg::LinalgTransformationFilter(
+          {StringAttr::get(patterns.getContext(),
+                           getCopyToWorkgroupMemoryMarker()),
+           StringAttr::get(patterns.getContext(), kCopyDistributed)}));
 }
 
 /// Return a flattened Id Value by combining the 3D gpu thread IDs.
@@ -156,58 +263,6 @@ static Value createFlatId(func::FuncOp funcOp,
       d0 + workgroupSize[0] * d1 + (workgroupSize[0] * workgroupSize[1]) * d2,
       {threadX, threadY, threadZ});
   return flatThreadId;
-}
-
-/// Distribute a transfer read operations on the given thread ids.
-static void distributeTransferRead(
-    func::FuncOp funcOp, Value flatThreadId, int64_t flatWorkgroupSize,
-    const llvm::SmallDenseSet<VectorTransferOpInterface> &opsToIgnore) {
-  funcOp.walk([&](vector::TransferReadOp readOp) {
-    if (opsToIgnore.count(
-            cast<VectorTransferOpInterface>(readOp.getOperation())))
-      return WalkResult::advance();
-    OpBuilder b(readOp);
-    Value id = flatThreadId;
-    SmallVector<int64_t, 2> multiplier;
-    auto shape = readOp.getVectorType().getShape();
-    int targetVectorSize =
-        copyVectorNumBits / readOp.getVectorType().getElementTypeBitWidth();
-    SmallVector<Value> ids;
-    SmallVector<AffineExpr> exprs;
-    AffineExpr d0 = getAffineDimExpr(0, b.getContext());
-    int64_t numThreads = flatWorkgroupSize;
-    for (auto &dim : llvm::enumerate(llvm::reverse(shape))) {
-      int64_t threads =
-          dim.index() == 0 ? (dim.value() / targetVectorSize) : dim.value();
-      // If we don't need to distribute the dimension, skip it.
-      if (threads == 1) continue;
-      exprs.push_back(getAffineDimExpr(shape.size() - dim.index() - 1,
-                                       funcOp->getContext()));
-      multiplier.push_back(threads);
-      Value dimId = id;
-      assert(numThreads % threads == 0);
-      if (numThreads / threads > 1) {
-        dimId =
-            makeComposedAffineApply(b, funcOp.getLoc(), d0 % threads, {dimId});
-      }
-      ids.push_back(dimId);
-      numThreads = numThreads / threads;
-      id = makeComposedAffineApply(b, funcOp.getLoc(), d0.floorDiv(threads),
-                                   {id});
-      if (numThreads <= 1) break;
-    }
-    std::reverse(ids.begin(), ids.end());
-    Optional<mlir::vector::DistributeOps> ops =
-        vector::distributPointwiseVectorOp(
-            b, readOp, ids, multiplier,
-            AffineMap::get(shape.size(), 0, exprs, funcOp.getContext()));
-    if (ops.has_value()) {
-      SmallPtrSet<Operation *, 1> extractOp({ops->extract, ops->insert});
-      readOp.getResult().replaceAllUsesExcept(ops->insert.getResult(),
-                                              extractOp);
-    }
-    return WalkResult::advance();
-  });
 }
 
 /// Hoist allocations to the top of the loop if they have no dependencies.
@@ -241,6 +296,31 @@ static void removeRedundantBarriers(func::FuncOp funcOp) {
       }
     }
   });
+}
+
+/// Return the number of iteration if it is static, otherwise returns 0.
+static int64_t numIteration(scf::ForOp forOp) {
+  auto lbCstOp = forOp.getLowerBound().getDefiningOp<arith::ConstantIndexOp>();
+  auto ubCstOp = forOp.getUpperBound().getDefiningOp<arith::ConstantIndexOp>();
+  auto stepCstOp = forOp.getStep().getDefiningOp<arith::ConstantIndexOp>();
+  if (!lbCstOp || !ubCstOp || !stepCstOp || lbCstOp.value() < 0 ||
+      ubCstOp.value() < 0 || stepCstOp.value() < 0)
+    return 0;
+  int64_t tripCount =
+      mlir::ceilDiv(ubCstOp.value() - lbCstOp.value(), stepCstOp.value());
+  return tripCount;
+}
+
+/// Fully unroll all the static loops unless they are part of the ignore map.
+static void UnrollSharedMemoryLoops(
+    func::FuncOp funcOp, const llvm::SmallDenseSet<scf::ForOp> &loopsToIgnore) {
+  SmallVector<scf::ForOp> forOpsToUnroll;
+  funcOp.walk([&](scf::ForOp forOp) {
+    if (!loopsToIgnore.count(forOp)) forOpsToUnroll.push_back(forOp);
+  });
+  for (scf::ForOp forOp : llvm::reverse(forOpsToUnroll)) {
+    (void)loopUnrollByFactor(forOp, numIteration(forOp));
+  }
 }
 
 namespace {
@@ -282,12 +362,30 @@ class GPUDistributeSharedMemoryCopyPass
                                                        targetVectorSize);
         });
     if (isAligned) {
-      // Ignore all the exisiting vector transfer ops.
-      llvm::SmallDenseSet<VectorTransferOpInterface> opsToIgnore;
-      funcOp.walk([&](VectorTransferOpInterface transferOp) {
-        opsToIgnore.insert(transferOp);
-      });
-      // Step 1. Vectorize the shared memory copy.
+      // Ignore all the exisiting loop
+      llvm::SmallDenseSet<scf::ForOp> loopsToIgnore;
+      funcOp.walk([&](scf::ForOp loop) { loopsToIgnore.insert(loop); });
+
+      // Step 1. tile copies to get to a shape that can be distributed to
+      // 128bits per lane copies.
+      RewritePatternSet serialTilingPatterns(context);
+      populateTileToUnroll(serialTilingPatterns, flatWorkgroupSize);
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(serialTilingPatterns)))) {
+        return signalPassFailure();
+      }
+
+      // Calculate a flat id that will then be broken down during distribution.
+      Value flatId = createFlatId(funcOp, workgroupSize);
+      // Step 2. Distribute the linalg op onto threads.
+      RewritePatternSet tileAndDistributePatterns(context);
+      populateTilingAndDistribute(tileAndDistributePatterns, flatId);
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(tileAndDistributePatterns)))) {
+        return signalPassFailure();
+      }
+
+      // Step 3. Vectorize the distributed copies.
       RewritePatternSet vectorizationPatterns(context);
       populateVectorizationPatterns(vectorizationPatterns);
       if (failed(applyPatternsAndFoldGreedily(
@@ -295,27 +393,8 @@ class GPUDistributeSharedMemoryCopyPass
         return signalPassFailure();
       }
 
-      // Step 2. Unroll transfer_read/transfer_write to a vector with the number
-      // of element equal to `targetVectorSize * targetVectorSize`. The.
-      // transfer op generated can. then be distributed to a single op of target
-      // size.
-      RewritePatternSet vectorUnrollPatterns(context);
-      populateVectorUnrollPatterns(vectorUnrollPatterns, flatWorkgroupSize,
-                                   opsToIgnore);
-      if (failed(applyPatternsAndFoldGreedily(
-              funcOp, std::move(vectorUnrollPatterns)))) {
-        return signalPassFailure();
-      }
-      // Step 3. Distribute the transfer ops onto the flat ids.
-      Value flatId = createFlatId(funcOp, workgroupSize);
-      distributeTransferRead(funcOp, flatId, flatWorkgroupSize, opsToIgnore);
-      // Propagate vector distribution to the chain of ops.
-      RewritePatternSet distributePatterns(context);
-      vector::populatePropagateVectorDistributionPatterns(distributePatterns);
-      if (failed(applyPatternsAndFoldGreedily(funcOp,
-                                              std::move(distributePatterns)))) {
-        return signalPassFailure();
-      }
+      // Step4. Finally unroll all the loop created
+      UnrollSharedMemoryLoops(funcOp, loopsToIgnore);
     } else {
       // Fall back to basic tiling for cases where workgroup memory size is not
       // well aligned on the number of threads.
