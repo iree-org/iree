@@ -371,8 +371,7 @@ func.func @fft_1D(%real: memref<16xf32>, %imag: memref<16xf32>) {
     outs(%real, %imag: memref<16xf32>, memref<16xf32>)
   return
 }
-// CHECK-DAG:   #[[MAP0:.+]] = affine_map<(d0)[s0] -> (d0 + s0)>
-// CHECK-DAG:   #[[MAP1:.+]] = affine_map<(d0) -> (d0)>
+// CHECK:   #[[MAP1:.+]] = affine_map<(d0) -> (d0)>
 // CHECK:       func.func @fft_1D
 // CHECK-SAME:    %[[REAL:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[IMAG:[a-zA-Z0-9]+]]
@@ -429,8 +428,7 @@ func.func @fft_2D(%real: memref<?x16xf32>, %imag: memref<?x16xf32>) {
     outs(%real, %imag: memref<?x16xf32>, memref<?x16xf32>)
   return
 }
-// CHECK-DAG:   #[[MAP0:.+]] = affine_map<(d0, d1)[s0] -> (d0 * 16 + s0 + d1)>
-// CHECK-DAG:   #[[MAP1:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK:   #[[MAP1:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 // CHECK:       func.func @fft_2D(
 // CHECK-SAME:    %[[REAL:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[IMAG:[a-zA-Z0-9]+]]
@@ -464,7 +462,6 @@ func.func @fft_2D_coef_buf(%real: memref<?x16xf32>, %imag: memref<?x16xf32>,
     outs(%real, %imag: memref<?x16xf32>, memref<?x16xf32>)
   return
 }
-// CHECK-DAG:   #[[MAP0:.+]] = affine_map<(d0, d1)[s0] -> (d0 * 16 + s0 + d1)>
 // CHECK-DAG:   #[[MAP1:.+]] = affine_map<(d0, d1) -> (d1)>
 // CHECK-DAG:   #[[MAP2:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 // CHECK:       func.func @fft_2D_coef_buf
