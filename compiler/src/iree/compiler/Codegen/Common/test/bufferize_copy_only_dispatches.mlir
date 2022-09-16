@@ -64,8 +64,8 @@ builtin.module {
 //   CHECK-DAG:   %[[SOURCE_SUBVIEW:.+]] = memref.subview %[[SOURCE]][0, 0, 0] [2, 1, 3]
 //   CHECK-DAG:   %[[DEST_SUBVIEW:.+]] = memref.subview %[[DEST]][0, 0, 0] [2, 1, 3]
 //       CHECK:   linalg.generic
-//  CHECK-SAME:       ins(%[[SOURCE_SUBVIEW]] : memref<2x3xf32, #{{[a-zA-Z0-9]+}}>)
-//  CHECK-SAME:       outs(%[[DEST_SUBVIEW]] : memref<2x3xf32, #{{[a-zA-Z0-9]+}}>)
+//  CHECK-SAME:       ins(%[[SOURCE_SUBVIEW]] : memref<2x3xf32, strided<[24, 1]>>)
+//  CHECK-SAME:       outs(%[[DEST_SUBVIEW]] : memref<2x3xf32, strided<[48, 1]>>)
 
 // -----
 
