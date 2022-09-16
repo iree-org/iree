@@ -60,21 +60,15 @@ void attachAttribute(Operation *op, StringRef name, Attribute value) {
 LogicalResult clearStruct(OpBuilder builder, Value structValue) {
   auto loc = structValue.getLoc();
 
-  Value structPointerValue;
-  Value sizeValue;
-
   if (auto ptrType = structValue.getType().dyn_cast<emitc::PointerType>()) {
-    structPointerValue = structValue;
-    sizeValue = emitc_builders::sizeOf(builder, loc,
-                                       TypeAttr::get(ptrType.getPointee()));
-  } else {
-    structPointerValue = emitc_builders::addressOf(builder, loc, structValue);
-    sizeValue = emitc_builders::sizeOf(builder, loc, structValue);
+    Value sizeValue = emitc_builders::sizeOf(
+        builder, loc, TypeAttr::get(ptrType.getPointee()));
+    emitc_builders::memset(builder, loc, structValue, 0, sizeValue);
+
+    return success();
   }
 
-  emitc_builders::memset(builder, loc, structPointerValue, 0, sizeValue);
-
-  return success();
+  return emitError(loc, "expected pointer type");
 }
 
 LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
@@ -304,7 +298,10 @@ Optional<emitc::ApplyOp> createVmTypeDefPtr(ConversionPatternRewriter &rewriter,
       /*resultType=*/emitc::OpaqueType::get(ctx, "iree_vm_type_def_t"),
       /*value=*/emitc::OpaqueAttr::get(ctx, ""));
 
-  if (failed(clearStruct(rewriter, elementTypeOp.getResult()))) {
+  Value elementTypePtr =
+      emitc_builders::addressOf(rewriter, loc, elementTypeOp.getResult());
+
+  if (failed(clearStruct(rewriter, elementTypePtr))) {
     return std::nullopt;
   }
 
@@ -368,9 +365,6 @@ Optional<emitc::ApplyOp> createVmTypeDefPtr(ConversionPatternRewriter &rewriter,
                                        /*operand=*/elementTypeOp.getResult(),
                                        /*value=*/typeDescriptorType);
   }
-
-  Value elementTypePtr =
-      emitc_builders::addressOf(rewriter, loc, elementTypeOp.getResult());
 
   return cast<emitc::ApplyOp>(elementTypePtr.getDefiningOp());
 }
