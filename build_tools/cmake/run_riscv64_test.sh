@@ -15,9 +15,9 @@ set -e
 
 # A QEMU 64 Linux emulator must be available at the path specified by the
 # `QEMU_RV64_BIN` environment variable to run the artifacts under the emulator.
-if [[ -z "${QEMU_RV64_BIN}" ]]; then
-  "${QEMU_RV64_BIN}" "-cpu rv64,x-v=true,x-k=true,vlen=512,elen=64,vext_spec=v1.0 \
-  -L ${RISCV_RV64_LINUX_TOOLCHAIN_ROOT}/sysroot $*"
+if [[ ! -z "${QEMU_RV64_BIN}" ]]; then
+  "${QEMU_RV64_BIN}" "-cpu" "rv64,x-v=true,x-k=true,vlen=512,elen=64,vext_spec=v1.0" \
+  "-L" "${RISCV_RV64_LINUX_TOOLCHAIN_ROOT}/sysroot" $*
 fi
 
 # TODO(dcaballe): Add on-device run commands.
