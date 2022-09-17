@@ -146,3 +146,103 @@ iree_static_linker_test(
     "--iree-vm-target-index-bits=32"
   EMITC
 )
+
+if((IREE_TARGET_BACKEND_LLVM_CPU OR DEFINED IREE_HOST_BINARY_ROOT) AND
+   IREE_HAL_DRIVER_LOCAL_SYNC)
+  iree_bytecode_module(
+    NAME
+      iree_run_module_bytecode_module_llvm_cpu
+    SRC
+      "${IREE_ROOT_DIR}/tools/test/iree-run-module.mlir"
+    MODULE_FILE_NAME
+      "iree_run_module_bytecode_module_llvm_cpu.vmfb"
+    C_IDENTIFIER
+      "iree_tests_e2e_models_iree_run_module_bytecode_module_llvm_cpu"
+    FLAGS
+      "--iree-hal-target-backends=llvm-cpu"
+  )
+
+  iree_run_module_test(
+    NAME
+      iree_run_module_correctness_test
+    MODULE_SRC
+      "${CMAKE_CURRENT_BINARY_DIR}/iree_run_module_bytecode_module_llvm_cpu.vmfb"
+    DRIVER
+      "local-sync"
+    RUNNER_ARGS
+      "--entry_function=abs"
+      "--function_input=f32=-10"
+    EXPECTED_OUTPUT
+      "f32=10"
+    DEPS
+      ::iree_run_module_bytecode_module_llvm_cpu_c
+  )
+endif()
+
+iree_benchmark_suite_module_test(
+  NAME
+    mobilenet_v1_fp32_correctness_test
+  BENCHMARK_MODULE_SRC
+    "TFLite/MobileNetV1-fp32,imagenet"
+  DRIVER
+    "local-sync"
+  RUNNER_ARGS
+    "--entry_function=main"
+    "--function_input=1x224x224x3xf32=0"
+  EXPECTED_OUTPUT
+    "mobilenet_v1_fp32_expected_output.txt"
+  UNSUPPORTED_PLATFORMS
+    "android-arm64-v8a"
+    "riscv32-Linux"
+)
+
+iree_benchmark_suite_module_test(
+  NAME
+    efficientnet_int8_correctness_test
+  BENCHMARK_MODULE_SRC
+    "TFLite/EfficientNet-int8"
+  DRIVER
+    "local-sync"
+  RUNNER_ARGS
+    "--entry_function=main"
+    "--function_input=1x224x224x3xui8=0"
+  EXPECTED_OUTPUT
+    "efficientnet_int8_expected_output.txt"
+  UNSUPPORTED_PLATFORMS
+    "android-arm64-v8a"
+)
+
+# Need to download deeplab_v3_fp32_input_0_expected_output.npy from GCS
+# iree-model-artifacts.
+iree_benchmark_suite_module_test(
+  NAME
+    deeplab_v3_fp32_correctness_test
+  BENCHMARK_MODULE_SRC
+    "TFLite/DeepLabV3-fp32"
+  DRIVER
+    "local-sync"
+  RUNNER_ARGS
+    "--entry_function=main"
+    "--function_input=1x257x257x3xf32=0"
+    "--expected_f32_threshold=0.001"
+  EXPECTED_OUTPUT
+    "deeplab_v3_fp32_input_0_expected_output.npy"
+  UNSUPPORTED_PLATFORMS
+    "riscv32-Linux"
+)
+
+iree_benchmark_suite_module_test(
+  NAME
+    person_detect_int8_correctness_test
+  BENCHMARK_MODULE_SRC
+    "TFLite/PersonDetect-int8"
+  DRIVER
+    "local-sync"
+  RUNNER_ARGS
+    "--entry_function=main"
+    "--function_input=1x96x96x1xi8=0"
+  EXPECTED_OUTPUT
+    "1x2xi8=[72 -72]"
+  UNSUPPORTED_PLATFORMS
+    "android-arm64-v8a"
+)
