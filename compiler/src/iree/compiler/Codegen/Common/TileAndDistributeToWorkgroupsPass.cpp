@@ -148,25 +148,47 @@ static LogicalResult lowerDispatchWorkgroupCountFromDagRootOp(
   llvm::DenseSet<unsigned> partitionableLoopsSet;
   partitionableLoopsSet.insert(partitionableLoops.begin(),
                                partitionableLoops.end());
+
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(*rootOp);
+
   for (auto workload : llvm::enumerate(workloadValues)) {
     if (!partitionableLoopsSet.count(workload.index())) {
       tileSizes[workload.index()] = 0;
     }
-    if (tileSizes[workload.index()] == 0) {
+    int64_t tileSize = tileSizes[workload.index()];
+
+    if (tileSize == 0) {
       numTiles.push_back(one);
       continue;
     }
-    if (tileSizes[workload.index()] == 1) {
-      numTiles.push_back(workload.value());
-      continue;
+
+    // When the loop range is knwon to be static, let's directly use it.
+    int64_t loopRange = ShapedType::kDynamicSize;
+    if (linalgOp) {
+      loopRange = linalgOp.getStaticLoopRanges()[workload.index()];
     }
-    AffineExpr s0;
-    bindSymbols(workgroupCountOp.getContext(), s0);
-    AffineMap numTilesMap =
-        AffineMap::get(0, 1, s0.ceilDiv(tileSizes[workload.index()]));
-    Value nTiles =
-        builder.create<AffineApplyOp>(loc, numTilesMap, workload.value());
-    numTiles.push_back(nTiles);
+
+    if (loopRange != ShapedType::kDynamicSize) {
+      if (tileSize == 1) {
+        Value workload = builder.create<arith::ConstantIndexOp>(loc, loopRange);
+        numTiles.push_back(workload);
+        continue;
+      }
+      int64_t nTileI64 = (loopRange + tileSize - 1) / tileSize;
+      Value nTiles = builder.create<arith::ConstantIndexOp>(loc, nTileI64);
+      numTiles.push_back(nTiles);
+    } else {
+      if (tileSize == 1) {
+        numTiles.push_back(workload.value());
+        continue;
+      }
+      AffineExpr s0;
+      bindSymbols(workgroupCountOp.getContext(), s0);
+      AffineMap numTilesMap = AffineMap::get(0, 1, s0.ceilDiv(tileSize));
+      Value nTiles =
+          builder.create<AffineApplyOp>(loc, numTilesMap, workload.value());
+      numTiles.push_back(nTiles);
+    }
   }
 
   // If there is interchange, first apply interchange on the number of tiles.
