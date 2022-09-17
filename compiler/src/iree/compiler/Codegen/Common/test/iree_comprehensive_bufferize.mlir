@@ -35,7 +35,6 @@ func.func @matmul() {
 
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0)[s0, s1] -> (-d0 + s1, s0)>
-//  CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>
 //      CHECK: func.func @matmul()
 //  CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load[0]
 //  CHECK-DAG:   %[[N:.+]] = hal.interface.constant.load[1]
@@ -1837,9 +1836,9 @@ module {
 //   CHECK-DAG:   %[[OFFSET_X:.+]] = hal.interface.constant.load[1]
 //       CHECK:   scf.for %[[IV0:.+]] =
 //       CHECK:     %[[SRC_VIEW:.+]] = memref.subview %[[SRC]][%[[IV0]]]
-//  CHECK-SAME:         : memref<?xi32> to memref<?xi32, #{{.+}}>
-//       CHECK:     %[[DST_VIEW:.+]] = memref.subview %[[DST]][0, %{{.+}}] [1, %{{.+}}]
-//  CHECK-SAME:         : memref<?x?xi32> to memref<?xi32, #{{.+}}>
+//  CHECK-SAME:         : memref<?xi32> to memref<?xi32, strided<[1], offset: ?>>
+//       CHECK:     %[[DST_VIEW:.+]] = memref.subview %[[DST]][0, %{{[a-zA-Z0-9]+}}] [1, %{{[a-zA-Z0-9]+}}]
+//  CHECK-SAME:         : memref<?x?xi32> to memref<?xi32, strided<[1], offset: ?>>
 //       CHECK:     linalg.generic {{.*}} ins(%[[SRC_VIEW]] {{.*}} outs(%[[DST_VIEW]]
 
 // -----

@@ -468,12 +468,12 @@ hal.executable @matvec {
 //       CHECK:     scf.for %[[IV:.+]] = %[[IDX]] to %[[UB]] step %[[DIMX]]
 //       CHECK:       %[[OUTPUT:.+]] = memref.subview %[[CVIEW]][%[[IV]]] [1] [1]
 //       CHECK:       linalg.fill
-//  CHECK-SAME:         outs(%[[OUTPUT]] : memref<1xf32, #map3>)
+//  CHECK-SAME:         outs(%[[OUTPUT]] : memref<1xf32, strided<[1], offset: ?>>)
 //       CHECK:     %[[IDX:.+]] = gpu.thread_id  x
 //       CHECK:     %[[DIMX:.+]] = gpu.block_dim  x
 //       CHECK:     scf.for %[[IV:.+]] = %[[IDX]] to %[[UB]] step %[[DIMX]]
 //       CHECK:       %[[INPUT:.+]] = memref.subview %[[AVIEW]][%[[IV]], 0] [1, 1024] [1, 1]
 //       CHECK:       %[[OUTPUT:.+]] = memref.subview %[[CVIEW]][%[[IV]]] [1] [1]
 //       CHECK:       linalg.matvec
-//  CHECK-SAME:         ins(%[[INPUT]], %[[B]] : memref<1x1024xf32, #map2>, memref<1024xf32>
-//  CHECK-SAME:         outs(%[[OUTPUT]] : memref<1xf32, #map3>)
+//  CHECK-SAME:         ins(%[[INPUT]], %[[B]] : memref<1x1024xf32, strided<[1024, 1], offset: ?>>, memref<1024xf32>
+//  CHECK-SAME:         outs(%[[OUTPUT]] : memref<1xf32, strided<[1], offset: ?>>)
