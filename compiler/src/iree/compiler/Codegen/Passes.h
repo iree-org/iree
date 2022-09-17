@@ -97,10 +97,6 @@ createRemoveSingleIterationLoopPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createConvertToDestinationPassingStylePass();
 
-/// Creates a pass to vectorize a very specific form of linalg.conv ops.
-std::unique_ptr<OperationPass<func::FuncOp>>
-createLinalgToVectorVectorizeConvPass();
-
 /// Creates a pass to vectorize a very specific form of tensor.pad ops with
 /// control flows.
 std::unique_ptr<OperationPass<func::FuncOp>> createVectorizePadPass();

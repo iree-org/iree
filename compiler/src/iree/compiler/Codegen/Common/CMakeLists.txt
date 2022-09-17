@@ -163,7 +163,6 @@ iree_cc_library(
     "TileDispatchUsingInterface.cpp"
     "UserConfig.cpp"
     "VectorReductionToGPU.cpp"
-    "VectorizeConv.cpp"
     "WorkGroupSwizzle.cpp"
   DEPS
     ::CommonPasses
