@@ -189,11 +189,16 @@ class StridedBufferAnalysis {
       sizeStrideTypes.push_back(indexType);
     }
 
-    auto op = builder.create<IREE::VMVX::GetBufferDescriptorOp>(
-        loc, builder.getType<IREE::Util::BufferType>(), builder.getIndexType(),
-        sizeStrideTypes, sizeStrideTypes, buffer);
+    auto op = builder.create<memref::ExtractStridedMetadataOp>(
+        // TODO: What should we do with the layout and memory space.
+        loc, MemRefType::get({}, getType().getElementType()),
+        builder.getIndexType(), sizeStrideTypes, sizeStrideTypes, buffer);
 
-    desc->baseBuffer = op.getBaseBuffer();
+    desc->baseBuffer = builder
+                           .create<IREE::VMVX::GetBufferPointerOp>(
+                               loc, builder.getType<IREE::Util::BufferType>(),
+                               op.getBaseBuffer())
+                           .getResult();
     desc->offset = op.getOffset();
     desc->sizes = op.getSizes();
     desc->strides = op.getStrides();

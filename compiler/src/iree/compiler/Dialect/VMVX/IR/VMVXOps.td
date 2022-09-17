@@ -49,6 +49,21 @@ def VMVX_GetBufferDescriptorOp : VMVX_PureOp<"get_buffer_descriptor", [
   }];
 }
 
+def VMX_GetBufferPointerOp : VMVX_PureOp<"get_buffer_point"> {
+  let summary = "Wrap a memref into a !util.buffer";
+  let description = [{
+    The main purpose of this op is to convert a memref type into a
+    !util.buffer.
+  }];
+
+  let arguments = (ins AnyMemRef:$source);
+  let results = (outs Util_BufferType:$base_buffer);
+
+  let assemblyFormat = [{
+    $source `:` type($source) `->` type(results) attr-dict
+  }];
+}
+
 def VMVX_GetRawInterfaceBindingBufferOp : VMVX_PureOp<
     "get_raw_interface_binding_buffer"> {
   let summary = "Gets the raw buffer associated with a binding";

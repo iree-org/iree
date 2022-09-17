@@ -10,6 +10,7 @@
 #include "iree/compiler/Utils/IndexSet.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -18,6 +19,7 @@ namespace mlir::iree_compiler::IREE::VMVX {
 
 namespace {
 
+// Can be deleted.
 struct FromMemRefSubView : public OpRewritePattern<GetBufferDescriptorOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(GetBufferDescriptorOp op,
@@ -116,14 +118,25 @@ struct FromMemRefSubView : public OpRewritePattern<GetBufferDescriptorOp> {
 };
 
 struct FromHalInterfaceBindingSubspan
-    : public OpRewritePattern<GetBufferDescriptorOp> {
+    : public OpRewritePattern<GetBufferPointerOp> {
   using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(GetBufferDescriptorOp op,
+  LogicalResult matchAndRewrite(GetBufferPointerOp op,
                                 PatternRewriter &rewriter) const override {
-    auto binding =
-        op.getSource().getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
+    auto extractStridedMetadata =
+        op.getSource().getDefiningOp<memref::ExtractStridedMetadataOp>();
+    if (!extractStridedMetadata) return failure();
+
+    auto binding = extractStridedMetadata.getSource()
+                       .getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
     if (!binding) return failure();
 
+    IRRewriter::InsertPoint savedInsertionPoint = rewriter.saveInsertionPoint();
+    // When replacing the offset, strides, and sizes, we need to make sure that
+    // the insertion point is before the extractStridedMetadata operation.
+    // Otherwise, since this pattern is anchored in get_buffer_point, this may
+    // be further down the code and we could end up with definitions not
+    // dominating their uses.
+    rewriter.setInsertionPoint(extractStridedMetadata);
     auto loc = op.getLoc();
     IndexSet indexSet(loc, rewriter);
 
@@ -148,7 +161,7 @@ struct FromHalInterfaceBindingSubspan
       }
 
       // Replace as we go.
-      op.getSizes()[i].replaceAllUsesWith(sizes.back());
+      extractStridedMetadata.getSizes()[i].replaceAllUsesWith(sizes.back());
     }
 
     // Strides.
@@ -161,18 +174,19 @@ struct FromHalInterfaceBindingSubspan
                                                           sizes[i + 1]);
       }
       for (int i = 0; i < rank; ++i) {
-        op.getStrides()[i].replaceAllUsesWith(strides[i]);
+        extractStridedMetadata.getStrides()[i].replaceAllUsesWith(strides[i]);
       }
     }
 
     // Offset.
     auto elementSize =
         rewriter.create<IREE::Util::SizeOfOp>(loc, memRefType.getElementType());
-    op.getOffset().replaceAllUsesWith(rewriter.createOrFold<arith::DivUIOp>(
-        loc, binding.getByteOffset(), elementSize));
+    extractStridedMetadata.getOffset().replaceAllUsesWith(
+        rewriter.createOrFold<arith::DivUIOp>(loc, binding.getByteOffset(),
+                                              elementSize));
 
     // Base buffer.
-    op.getBaseBuffer().replaceAllUsesWith(
+    op.getResult().replaceAllUsesWith(
         rewriter
             .create<IREE::VMVX::GetRawInterfaceBindingBufferOp>(
                 loc, op.getBaseBuffer().getType(), binding.getSetAttr(),
@@ -180,10 +194,16 @@ struct FromHalInterfaceBindingSubspan
             .getResult());
 
     rewriter.eraseOp(op);
+    // Hack this should be handled somewhere globally.
+    if (extractStridedMetadata.getBaseBuffer().use_empty())
+      rewriter.eraseOp(extractStridedMetadata);
+
+    rewriter.restoreInsertionPoint(savedInsertionPoint);
     return success();
   }
 };
 
+// Still missing in MLIR core.
 // Allocations (and anything else the returns a non-offset identity memref)
 // are matched by this pattern.
 struct FromAllocation : public OpRewritePattern<GetBufferDescriptorOp> {
@@ -266,6 +286,10 @@ class ResolveBufferDescriptorsPass
     patterns.insert<FromAllocation, FromHalInterfaceBindingSubspan,
                     FromMemRefSubView>(&getContext());
 
+    // Kind of gross, but go with it for now.
+    // Longer term, we may want to add that to:
+    // compiler/src/iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.cpp
+    memref::populateSimplifyExtractStridedMetadataOpPatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       return signalPassFailure();
