@@ -649,6 +649,122 @@ struct ScatterOpCollapseBatch : public OpRewritePattern<mhlo::ScatterOp> {
   }
 };
 
+struct ScatterMaterializeInsertedDim
+    : public OpRewritePattern<mhlo::ScatterOp> {
+  using OpRewritePattern<mhlo::ScatterOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mhlo::ScatterOp op,
+                                PatternRewriter &rewriter) const final {
+    auto indices = op.scatter_indices();
+    auto operand = op.operands().front();
+    auto indicesTy = indices.getType().cast<ShapedType>();
+    auto operandTy = operand.getType().cast<ShapedType>();
+    if (!operandTy.hasRank() || !indicesTy.getRank()) {
+      return rewriter.notifyMatchFailure(op, "operand/indices have no rank");
+    }
+
+    auto dimNumbers = op.scatter_dimension_numbers();
+    auto updateDims = dimNumbers.getUpdateWindowDims();
+
+    if (indicesTy.getRank() != 2 || dimNumbers.getIndexVectorDim() != 1) {
+      return rewriter.notifyMatchFailure(
+          op, "indices is not of shape [batch, indices]");
+    }
+
+    if (!updateDims.empty() && updateDims.front() == 0) {
+      return rewriter.notifyMatchFailure(
+          op, "updates is not of shape [batch, ...]");
+    }
+
+    /*
+        for (auto it :
+       llvm::enumerate(dimNumbers.getScatterDimsToOperandDims())) { if
+       (it.index() != it.value()) { return rewriter.notifyMatchFailure( op, "non
+       canonical scatter to operand dims");
+          }
+        }
+        */
+
+    auto scatterDimsToOperandDims = dimNumbers.getScatterDimsToOperandDims();
+    llvm::SmallVector<bool> isIndexDim(operandTy.getRank(), false);
+    for (auto val : scatterDimsToOperandDims) {
+      isIndexDim[val] = true;
+    }
+
+    int64_t firstNonIndex = 0;
+    for (int64_t s = scatterDimsToOperandDims.size(); firstNonIndex < s;
+         firstNonIndex++) {
+      if (!isIndexDim[firstNonIndex]) break;
+    }
+
+    llvm::SmallVector<bool> isInsertDims(operandTy.getRank(), false);
+    for (auto val : dimNumbers.getInsertedWindowDims()) {
+      isInsertDims[val] = true;
+    }
+
+    int64_t frontInsertedDims = 0;
+    for (; frontInsertedDims < firstNonIndex; frontInsertedDims++) {
+      if (!isInsertDims[frontInsertedDims]) {
+        break;
+      }
+    }
+
+    llvm::ArrayRef<bool> toInsertDims =
+        llvm::ArrayRef<bool>(isInsertDims).drop_front(frontInsertedDims);
+    if (!llvm::any_of(toInsertDims, [](auto d) { return d; })) {
+      return rewriter.notifyMatchFailure(op, "no dimensions to insert");
+    }
+
+    // Create a reassociation map that starts with the batch dims.
+    SmallVector<ReassociationExprs, 4> reassociationMap;
+    reassociationMap.push_back({rewriter.getAffineDimExpr(0)});
+
+    for (auto it : llvm::enumerate(llvm::ArrayRef<bool>(toInsertDims))) {
+      if (!it.value()) reassociationMap.push_back({});
+      reassociationMap.back().push_back(
+          rewriter.getAffineDimExpr(it.index() + 1));
+    }
+
+    llvm::SmallVector<Value> expandedUpdates;
+    for (auto update : op.updates()) {
+      auto updatesTy = update.getType().cast<ShapedType>();
+
+      llvm::SmallVector<int64_t> newShape;
+      for (int i = 0, s = reassociationMap.size(); i < s; i++) {
+        newShape.push_back(updatesTy.getDimSize(i));
+        for (int j = 1, s = reassociationMap[i].size(); j < s; j++) {
+          newShape.push_back(1);
+        }
+      }
+
+      Value expandUpdate = rewriter.create<tensor::ExpandShapeOp>(
+          op.getLoc(),
+          RankedTensorType::get(newShape, updatesTy.getElementType()), update,
+          reassociationMap);
+      expandedUpdates.push_back(expandUpdate);
+    }
+
+    llvm::SmallVector<int64_t> newUpdatedWindowDims(toInsertDims.size());
+    llvm::SmallVector<int64_t> newInsertedWindowDims(frontInsertedDims);
+    std::iota(newUpdatedWindowDims.begin(), newUpdatedWindowDims.end(), 1);
+    std::iota(newInsertedWindowDims.begin(), newInsertedWindowDims.end(), 0);
+
+    auto newDimNumbers = mhlo::ScatterDimensionNumbersAttr::get(
+        op.getContext(), newUpdatedWindowDims, newInsertedWindowDims,
+        dimNumbers.getScatterDimsToOperandDims(),
+        /*indexVectorDim=*/1);
+
+    auto newScatter = rewriter.create<mhlo::ScatterOp>(
+        op.getLoc(), op.getResultTypes(), op.operands(), op.scatter_indices(),
+        expandedUpdates, newDimNumbers, op.indices_are_sorted(),
+        op.unique_indices());
+    Region &region = newScatter.update_computation();
+    rewriter.cloneRegionBefore(op.update_computation(), region, region.end());
+    rewriter.replaceOp(op, newScatter.getResults());
+    return success();
+  }
+};
+
 // Traverse upward past common operations to see if the value came from a
 // boolean tensor.
 bool isFromBool(Value val) {
@@ -1162,7 +1278,8 @@ struct MHLOToMHLOPreprocessingPass
 
     // scatter canonicalization patterns
     patterns.insert<ScatterOpImplicitIndex, ScatterOpImplicitBatch,
-                    ScatterOpCollapseBatch>(context);
+                    ScatterMaterializeInsertedDim, ScatterOpCollapseBatch>(
+        context);
 
     // dot_general canoncalization patterns.
     mhlo::populateGeneralDotOpLoweringPatterns(&patterns, context);

@@ -21,6 +21,7 @@ iree_lit_test_suite(
     "dynamic_shape.mlir"
     "fft.mlir"
     "flatten_tuples_in_cfg.mlir"
+    "mhlo_scatter.mlir"
     "mhlo_to_linalg.mlir"
     "mhlo_to_mhlo_preprocessing.mlir"
     "mhlo_to_mhlo_preprocessing_canonicalize_dot_general.mlir"
