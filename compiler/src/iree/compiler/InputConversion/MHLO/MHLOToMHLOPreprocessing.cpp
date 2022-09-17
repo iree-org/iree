@@ -676,15 +676,6 @@ struct ScatterMaterializeInsertedDim
           op, "updates is not of shape [batch, ...]");
     }
 
-    /*
-        for (auto it :
-       llvm::enumerate(dimNumbers.getScatterDimsToOperandDims())) { if
-       (it.index() != it.value()) { return rewriter.notifyMatchFailure( op, "non
-       canonical scatter to operand dims");
-          }
-        }
-        */
-
     auto scatterDimsToOperandDims = dimNumbers.getScatterDimsToOperandDims();
     llvm::SmallVector<bool> isIndexDim(operandTy.getRank(), false);
     for (auto val : scatterDimsToOperandDims) {
