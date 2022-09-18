@@ -34,4 +34,7 @@ set(MINILM_L12_H384_UNCASED_INT32_SEQLEN128_MODULE
 # Add benchmarks for all platforms.                                            #
 ################################################################################
 include(linux-x86_64.cmake)
-include(linux-cuda.cmake)
+
+if(IREE_TARGET_BACKEND_CUDA)
+  include(linux-cuda.cmake)
+endif()
