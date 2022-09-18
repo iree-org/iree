@@ -49,7 +49,10 @@ if(RISCV_CPU STREQUAL "rv64")
   set(CMAKE_SYSTEM_PROCESSOR riscv64)
   set(CMAKE_SYSTEM_NAME Linux)
   set(CMAKE_SYSTEM_LIBRARY_PATH "${RISCV_TOOLCHAIN_ROOT}/sysroot/usr/lib")
-  set(RISCV_COMPILER_FLAGS "${RISCV_COMPILER_FLAGS} -march=rv64gc -mabi=lp64d")
+  # Specify ISP spec for march=rv64gc. This is to resolve the mismatch between
+  # llvm and binutil ISA version.
+  set(RISCV_COMPILER_FLAGS "${RISCV_COMPILER_FLAGS} \
+      -march=rv64i2p0ma2p0f2p0d2p0c2p0 -mabi=lp64d")
   set(RISCV_LINKER_FLAGS "${RISCV_LINKER_FLAGS} -lstdc++ -lpthread -lm -ldl")
   set(RISCV64_TEST_DEFAULT_LLVM_FLAGS
     "--iree-llvm-target-triple=riscv64"
@@ -74,7 +77,10 @@ elseif(RISCV_CPU STREQUAL "rv32-baremetal")
   set(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE ON CACHE BOOL "" FORCE)
   set(CMAKE_SYSTEM_LIBRARY_PATH "${RISCV_TOOLCHAIN_ROOT}/riscv32-unknown-elf/lib")
   set(IREE_ENABLE_THREADING OFF CACHE BOOL "" FORCE)
-  set(RISCV_COMPILER_FLAGS "${RISCV_COMPILER_FLAGS} -march=rv32imf -mabi=ilp32 -DIREE_PLATFORM_GENERIC=1 -DIREE_SYNCHRONIZATION_DISABLE_UNSAFE=1 \
+  # Specify ISP spec for march=rv64gc. This is to resolve the mismatch between
+  # llvm and binutil ISA version.
+  set(RISCV_COMPILER_FLAGS "${RISCV_COMPILER_FLAGS} \
+      -march=rv32i2p0mf2p0 -mabi=ilp32 -DIREE_PLATFORM_GENERIC=1 -DIREE_SYNCHRONIZATION_DISABLE_UNSAFE=1 \
       -DIREE_FILE_IO_ENABLE=0 -DIREE_TIME_NOW_FN=\"\{ return 0; \}\" -DIREE_DEVICE_SIZE_T=uint32_t -DPRIdsz=PRIu32")
   set(RISCV_LINKER_FLAGS "${RISCV_LINKER_FLAGS} -lm")
 endif()
