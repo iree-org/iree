@@ -26,7 +26,7 @@ endif()
 iree_lit_test_suite(
     name = "lit",
     srcs = [
-        # "reduction.mlir", // see #10398
+        "reduction.mlir",
         "softmax.mlir",
     ],
     cfg = "//tests:lit.cfg.py",
