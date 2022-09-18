@@ -115,7 +115,7 @@ function(iree_bytecode_module)
     # RV64 Linux crosscompile toolchain can support iree-compile with
     # specific CPU flags. Add the llvm flags to support RV64 RVV codegen if
     # llvm-target-triple is not specified.
-    list(APPEND _RULE_FLAGS ${RISCV64_TEST_DEFAULT_LLVM_FLAGS})
+    list(APPEND _ARGS ${RISCV64_TEST_DEFAULT_LLVM_FLAGS})
   endif()
 
   if(_RULE_FRIENDLY_NAME)
