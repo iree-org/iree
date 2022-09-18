@@ -289,12 +289,17 @@ MMT4D_TEST(i8i8i32, 9, 6, 3, generic, 0)
 // ARM_64 tests.
 #if defined(IREE_UKERNEL_ARCH_ARM_64)
 
-#define MMT4D_ARM_64_TEST(type, M0, N0, K0, FEATURE) \
-  MMT4D_TEST(type, M0, N0, K0, arm_64_##FEATURE,     \
+#define MMT4D_ARM_64_TEST(type, M0, N0, K0) \
+  MMT4D_TEST(type, M0, N0, K0, arm_64, 0)
+
+#define MMT4D_ARM_64_TEST_WITH_CPU_FEATURE(type, M0, N0, K0, FEATURE) \
+  MMT4D_TEST(type, M0, N0, K0, arm_64_##FEATURE,                      \
              IREE_CPU_DATA_FIELD_0_AARCH64_HAVE_##FEATURE)
 
-MMT4D_ARM_64_TEST(i8i8i32, 8, 8, 4, DOTPROD)
-MMT4D_ARM_64_TEST(i8i8i32, 8, 8, 8, I8MM)
+MMT4D_ARM_64_TEST(f32f32f32, 8, 8, 1)
+MMT4D_ARM_64_TEST(i8i8i32, 8, 8, 1)
+MMT4D_ARM_64_TEST_WITH_CPU_FEATURE(i8i8i32, 8, 8, 4, DOTPROD)
+MMT4D_ARM_64_TEST_WITH_CPU_FEATURE(i8i8i32, 8, 8, 8, I8MM)
 #endif  // defined(IREE_UKERNEL_ARCH_ARM_64)
 
 int main(int argc, char** argv) {

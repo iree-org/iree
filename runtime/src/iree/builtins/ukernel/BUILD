@@ -29,10 +29,10 @@ iree_runtime_cc_library(
 iree_runtime_cc_library(
     name = "generic",
     srcs = [
-        "mmt4d_tile_generic.c",
+        "mmt4d_select_tile_generic.c",
     ],
     hdrs = [
-        "mmt4d_tile_generic.h",
+        "mmt4d_select_tile_generic.h",
     ],
     deps = [
         ":types",
@@ -70,6 +70,6 @@ iree_runtime_cc_library(
         ":elementwise",
         ":generic",
         ":types",
-        "//runtime/src/iree/builtins/ukernel/arm_64:mmt4d_tile_arm_64",
+        "//runtime/src/iree/builtins/ukernel/arm_64:mmt4d_select_tile_arm_64",
     ],
 )

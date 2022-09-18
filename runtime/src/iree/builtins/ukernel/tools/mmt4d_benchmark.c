@@ -116,8 +116,7 @@ static void iree_mmt4d_benchmark_register(
     if ((iree_cpu_data_field(0) & user_data->cpu_data_field_0) !=
         user_data->cpu_data_field_0) {
       // The CPU does not meet this benchmark's requirements. The builtin
-      // would fall back on generic code. We don't need more generic benchmark
-      // results.
+      // would crash.
       return;
     }
   }
@@ -134,29 +133,32 @@ static void iree_mmt4d_benchmark_register(
   iree_benchmark_register(IREE_SV(name), &benchmark_def);
 }
 
-#define IREE_MMT4D_BENCHMARK_REGISTER(_type, _m0, _n0, _k0, _cpu_data_field_0, \
-                                      _label)                                  \
-  do {                                                                         \
-    static const iree_mmt4d_benchmark_user_data_t user_data = {                \
-        .type = iree_ukernel_mmt4d_type_##_type,                               \
-        .M0 = _m0,                                                             \
-        .N0 = _n0,                                                             \
-        .K0 = _k0,                                                             \
-        .cpu_data_field_0 = _cpu_data_field_0,                                 \
-    };                                                                         \
-    iree_mmt4d_benchmark_register(&user_data,                                  \
-                                  "iree_ukernel_mmt4d_" #_type "_" #_m0        \
-                                  "x" #_n0 "x" #_k0 "_" #_label);              \
+#define MMT4D_BENCHMARK_REGISTER(_type, _m0, _n0, _k0, _cpu_data_field_0, \
+                                 _label)                                  \
+  do {                                                                    \
+    static const iree_mmt4d_benchmark_user_data_t user_data = {           \
+        .type = iree_ukernel_mmt4d_type_##_type,                          \
+        .M0 = _m0,                                                        \
+        .N0 = _n0,                                                        \
+        .K0 = _k0,                                                        \
+        .cpu_data_field_0 = _cpu_data_field_0,                            \
+    };                                                                    \
+    iree_mmt4d_benchmark_register(&user_data,                             \
+                                  "iree_ukernel_mmt4d_" #_type "_" #_m0   \
+                                  "x" #_n0 "x" #_k0 "_" #_label);         \
   } while (0)
 
-#define IREE_MMT4D_BENCHMARK_REGISTER_GENERIC(_type, _m0, _n0, _k0) \
-  IREE_MMT4D_BENCHMARK_REGISTER(_type, _m0, _n0, _k0, 0, GENERIC)
+#define MMT4D_BENCHMARK_REGISTER_GENERIC(_type, _m0, _n0, _k0) \
+  MMT4D_BENCHMARK_REGISTER(_type, _m0, _n0, _k0, 0, GENERIC)
 
-#define IREE_MMT4D_BENCHMARK_REGISTER_ARM_64(_type, _m0, _n0, _k0,             \
-                                             _cpu_feature)                     \
-  IREE_MMT4D_BENCHMARK_REGISTER(                                               \
-      _type, _m0, _n0, _k0, IREE_CPU_DATA_FIELD_0_AARCH64_HAVE_##_cpu_feature, \
-      arm_64_##_cpu_feature)
+#define MMT4D_BENCHMARK_REGISTER_ARM_64(_type, _m0, _n0, _k0) \
+  MMT4D_BENCHMARK_REGISTER(_type, _m0, _n0, _k0, 0, arm_64)
+
+#define MMT4D_BENCHMARK_REGISTER_ARM_64_WITH_CPU_FEATURE(_type, _m0, _n0, _k0, \
+                                                         _cpu_feature)         \
+  MMT4D_BENCHMARK_REGISTER(_type, _m0, _n0, _k0,                               \
+                           IREE_CPU_DATA_FIELD_0_AARCH64_HAVE_##_cpu_feature,  \
+                           arm_64_##_cpu_feature)
 
 int main(int argc, char** argv) {
   iree_flags_set_usage(
@@ -171,14 +173,16 @@ int main(int argc, char** argv) {
   // Generic code paths, not actually used, but interesting to get a sense
   // of how slow generic code goes vs decent SIMD kernels. Interesting also to
   // compare generic float vs int arithmetic.
-  IREE_MMT4D_BENCHMARK_REGISTER_GENERIC(f32f32f32, 4, 4, 1);
-  IREE_MMT4D_BENCHMARK_REGISTER_GENERIC(i8i8i32, 4, 4, 1);
+  MMT4D_BENCHMARK_REGISTER_GENERIC(f32f32f32, 4, 4, 1);
+  MMT4D_BENCHMARK_REGISTER_GENERIC(i8i8i32, 4, 4, 1);
 
 // ARM_64 benchmarks.
 #if defined(IREE_UKERNEL_ARCH_ARM_64)
 
-  IREE_MMT4D_BENCHMARK_REGISTER_ARM_64(i8i8i32, 8, 8, 4, DOTPROD);
-  IREE_MMT4D_BENCHMARK_REGISTER_ARM_64(i8i8i32, 8, 8, 8, I8MM);
+  MMT4D_BENCHMARK_REGISTER_ARM_64(f32f32f32, 8, 8, 1);
+  MMT4D_BENCHMARK_REGISTER_ARM_64(i8i8i32, 8, 8, 1);
+  MMT4D_BENCHMARK_REGISTER_ARM_64_WITH_CPU_FEATURE(i8i8i32, 8, 8, 4, DOTPROD);
+  MMT4D_BENCHMARK_REGISTER_ARM_64_WITH_CPU_FEATURE(i8i8i32, 8, 8, 8, I8MM);
 
 #endif  // defined(IREE_UKERNEL_ARCH_ARM_64)
 

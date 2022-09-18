@@ -1,5 +1,13 @@
 if ((CMAKE_SYSTEM_PROCESSOR STREQUAL aarch64) OR (CMAKE_SYSTEM_PROCESSOR STREQUAL arm64))
 
+iree_cc_library(
+  NAME
+    mmt4d_tile_arm_64
+  SRCS
+    "mmt4d_tile_arm_64.S"
+)
+list(APPEND MMT4D_ARM_64_VARIANT_DEPS "iree::builtins::ukernel::arm_64::mmt4d_tile_arm_64")
+
 check_cxx_compiler_flag("-march=armv8.2-a+dotprod" HAVE_FLAG_MARCH_ARMV8_2_A_DOTPROD)
 if(HAVE_FLAG_MARCH_ARMV8_2_A_DOTPROD)
   iree_cc_library(
@@ -30,11 +38,11 @@ configure_file(config.h.in config.h)
 
 iree_cc_library(
   NAME
-    mmt4d_tile_arm_64
+    mmt4d_select_tile_arm_64
   HDRS
-    "mmt4d_tile_arm_64.h"
+    "mmt4d_select_tile_arm_64.h"
   SRCS
-    "mmt4d_tile_arm_64.c"
+    "mmt4d_select_tile_arm_64.c"
   DEPS
     iree::base::core_headers
     iree::schemas::cpu_data
@@ -47,9 +55,9 @@ else()  # Not CMAKE_SYSTEM_PROCESSOR STREQUAL aarch64 / arm64
 
 iree_cc_library(
   NAME
-    mmt4d_tile_arm_64
+    mmt4d_select_tile_arm_64
   HDRS
-    "mmt4d_tile_arm_64.h"
+    "mmt4d_select_tile_arm_64.h"
 )
 
 endif()

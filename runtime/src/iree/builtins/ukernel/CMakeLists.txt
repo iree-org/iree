@@ -25,9 +25,9 @@ iree_cc_library(
   NAME
     generic
   HDRS
-    "mmt4d_tile_generic.h"
+    "mmt4d_select_tile_generic.h"
   SRCS
-    "mmt4d_tile_generic.c"
+    "mmt4d_select_tile_generic.c"
   DEPS
     ::types
   PUBLIC
@@ -58,7 +58,7 @@ iree_cc_library(
     ::elementwise
     ::generic
     ::types
-    iree::builtins::ukernel::arm_64::mmt4d_tile_arm_64
+    iree::builtins::ukernel::arm_64::mmt4d_select_tile_arm_64
   PUBLIC
 )
 
