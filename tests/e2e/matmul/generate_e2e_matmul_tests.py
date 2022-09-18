@@ -14,6 +14,7 @@ import re
 import enum
 import dataclasses
 import typing
+import itertools
 
 
 # Data type of matrix entries. The string values must match MLIR data types.
@@ -42,7 +43,8 @@ class CompilationInfoId(enum.Enum):
   NONE = ""
   LLVMGPUMatmulSimt = "LLVMGPUMatmulSimt"
   LLVMGPUMatmulTensorCore = "LLVMGPUMatmulTensorCore"
-  SPIRVVectorize = "SPIRVVectorize"
+  SPIRVVectorizeAndroid = "SPIRVVectorizeAndroid"
+  SPIRVVectorizeNVIDIA = "SPIRVVectorizeNVIDIA"
 
 
 # Enumerates ways to construct MLIR tensor types.
@@ -73,7 +75,7 @@ class TestShape:
 @dataclasses.dataclass
 class CompilationInfo:
   # Lowering Config
-  tile_sizes: typing.List[int]
+  tile_sizes: typing.Union[typing.List[int], typing.List[typing.List[int]]]
   # Translation Info
   dispatch_lowering_pass_pipeline: str
   workload_per_wg: typing.List[int]
@@ -155,7 +157,7 @@ def get_dynamicities(shapes_id: ShapesId):
 
 @dataclasses.dataclass
 class TileWorkgroupSizePair:
-  tile_size: typing.List[int]
+  tile_size: typing.Union[typing.List[int], typing.List[typing.List[int]]]
   workgroup_size: typing.List[int]
 
 
@@ -165,8 +167,7 @@ def get_test_compilation_infos(
 ) -> typing.List[typing.Optional[CompilationInfo]]:
   if compilation_info_id == CompilationInfoId.NONE:
     return [None]
-  if (compilation_info_id == CompilationInfoId.LLVMGPUMatmulSimt or
-      compilation_info_id == CompilationInfoId.SPIRVVectorize):
+  if compilation_info_id == CompilationInfoId.LLVMGPUMatmulSimt:
     tile_workgroup_size_pairs = [
         TileWorkgroupSizePair([32, 128, 32], [32, 8, 1]),
         TileWorkgroupSizePair([128, 64, 8], [16, 8, 1]),
@@ -175,6 +176,26 @@ def get_test_compilation_infos(
         TileWorkgroupSizePair([8, 128, 4], [32, 1, 1]),
         TileWorkgroupSizePair([16, 64, 4], [16, 2, 1]),
         TileWorkgroupSizePair([1, 128, 8], [32, 1, 1]),
+    ]
+  elif compilation_info_id == CompilationInfoId.SPIRVVectorizeNVIDIA:
+    tile_workgroup_size_pairs = [
+        TileWorkgroupSizePair([[32, 128], [4, 4], [0, 0, 32]], [32, 8, 1]),
+        TileWorkgroupSizePair([[32, 128], [4, 4], [0, 0, 32]], [16, 8, 1]),
+        TileWorkgroupSizePair([[32, 128], [4, 4], [0, 0, 32]], [64, 2, 1]),
+        TileWorkgroupSizePair([[32, 128], [4, 4], [0, 0, 32]], [8, 8, 1]),
+        TileWorkgroupSizePair([[32, 128], [4, 4], [0, 0, 32]], [32, 1, 1]),
+        TileWorkgroupSizePair([[32, 128], [4, 4], [0, 0, 32]], [16, 2, 1]),
+        TileWorkgroupSizePair([[32, 128], [4, 4], [0, 0, 32]], [32, 1, 1]),
+    ]
+  elif compilation_info_id == CompilationInfoId.SPIRVVectorizeAndroid:
+    tile_workgroup_size_pairs = [
+        TileWorkgroupSizePair([[8, 32], [4, 4], [0, 0, 4]], [32, 8, 1]),
+        TileWorkgroupSizePair([[8, 32], [4, 4], [0, 0, 4]], [16, 8, 1]),
+        TileWorkgroupSizePair([[8, 32], [4, 4], [0, 0, 4]], [64, 2, 1]),
+        TileWorkgroupSizePair([[8, 32], [4, 4], [0, 0, 4]], [8, 8, 1]),
+        TileWorkgroupSizePair([[8, 32], [4, 4], [0, 0, 4]], [32, 1, 1]),
+        TileWorkgroupSizePair([[8, 32], [4, 4], [0, 0, 4]], [16, 2, 1]),
+        TileWorkgroupSizePair([[8, 32], [4, 4], [0, 0, 4]], [32, 1, 1]),
     ]
   elif compilation_info_id == CompilationInfoId.LLVMGPUMatmulTensorCore:
     tile_workgroup_size_pairs = [
@@ -295,6 +316,11 @@ def generate_shapes(shape: TestShape, dynamicity: Dynamicity):
   return shapes
 
 
+# Helper to see if tile sizes are specified as list of lists
+def is_list_of_lists(tile_sizes):
+  return all(isinstance(size, list) for size in tile_sizes)
+
+
 # Helper for generate_function.
 # Generates a name for a test function in the generated MLIR code.
 def generate_function_name(
@@ -313,8 +339,11 @@ def generate_function_name(
 
   info = ""
   if compilation_info:
+    tile_sizes = compilation_info.tile_sizes
+    if is_list_of_lists(compilation_info.tile_sizes):
+      tile_sizes = list(itertools.chain(*compilation_info.tile_sizes))
     tile_workgroup_key = "_".join([
-        str(a) for a in compilation_info.tile_sizes
+        str(a) for a in tile_sizes
     ]) + "_" + "_".join([str(a) for a in compilation_info.workgroup_size])
     info = f"_for_{compilation_info.dispatch_lowering_pass_pipeline}_{tile_workgroup_key}"
 
@@ -354,10 +383,16 @@ def generate_function(
   func_definition = ""
   compilation_info_attr = ""
   if compilation_info:
+    tile_sizes_str = f"{compilation_info.tile_sizes}"
+    if not is_list_of_lists(compilation_info.tile_sizes):
+      tile_sizes_str = f"[{compilation_info.tile_sizes}]"
+    dispatch_lowering_pass_pipeline = compilation_info.dispatch_lowering_pass_pipeline
+    if "SPIRV" in compilation_info.dispatch_lowering_pass_pipeline:
+      dispatch_lowering_pass_pipeline = "SPIRVVectorize"
     compilation_info_string = (
         f"#compilation{generate_function.compilation_index} = #iree_codegen.compilation_info<\n"
-        f"  lowering_config = <tile_sizes = [{compilation_info.tile_sizes}]>,\n"
-        f"  translation_info = <{compilation_info.dispatch_lowering_pass_pipeline}\n"
+        f"  lowering_config = <tile_sizes = {tile_sizes_str}>,\n"
+        f"  translation_info = <{dispatch_lowering_pass_pipeline}\n"
         f"  pipeline_depth = {compilation_info.software_pipeline_depth}>,\n"
         f"  workgroup_size = {compilation_info.workgroup_size_str()}>\n")
     compilation_info_attr = f"{{compilation_info = #compilation{generate_function.compilation_index}}} "
@@ -375,7 +410,7 @@ def generate_function(
   )
 
 
-# Counter for producing unique complation info attrs
+# Counter for producing unique compilation info attrs
 generate_function.compilation_index = 0
 
 # Intentionally fixed seed! We want full reproducibility here, both across runs
