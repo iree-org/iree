@@ -1,4 +1,4 @@
-// RUN: iree-opt %s -iree-llvmgpu-alloc | FileCheck %s
+// RUN: iree-opt %s --split-input-file -iree-llvmgpu-alloc | FileCheck %s
 
 func.func @matmul_2048x512x1024() {
   %c0 = arith.constant 0 : index
@@ -27,3 +27,26 @@ func.func @matmul_2048x512x1024() {
 //         CHECK:      %[[PB:.*]] = bufferization.alloc_tensor() copy(%[[B]]) {bufferization.escape = [false]} : tensor<32x128xf32>
 //         CHECK:      %[[M:.*]] = linalg.matmul {{.*}} ins(%[[PA]], %[[PB]] : tensor<32x32xf32>, tensor<32x128xf32>) outs(%{{.*}} : tensor<32x128xf32>) -> tensor<32x128xf32>
 //         CHECK:      scf.yield %[[M]] : tensor<32x128xf32>
+
+// -----
+
+func.func @matmul_1x384x384() {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:1x384xf32>
+  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:384x384xf32>
+  %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:1x384xf32>
+  %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1, 384], strides = [1, 1] : !flow.dispatch.tensor<readonly:1x384xf32> -> tensor<1x384xf32>
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %4 = affine.apply affine_map<()[s0] -> (s0 * 128)>()[%workgroup_id_x]
+  %5 = flow.dispatch.tensor.load %2, offsets = [0, %4], sizes = [1, 128], strides = [1, 1] : !flow.dispatch.tensor<writeonly:1x384xf32> -> tensor<1x128xf32>
+  %6 = flow.dispatch.tensor.load %1, offsets = [0, %4], sizes = [384, 128], strides = [1, 1] : !flow.dispatch.tensor<readonly:384x384xf32> -> tensor<384x128xf32>
+  %7 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0, 128, 8]]>} ins(%cst : f32) outs(%5 : tensor<1x128xf32>) -> tensor<1x128xf32>
+  %8 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0, 128, 8]]>} ins(%3, %6 : tensor<1x384xf32>, tensor<384x128xf32>) outs(%7 : tensor<1x128xf32>) -> tensor<1x128xf32>
+  flow.dispatch.tensor.store %8, %2, offsets = [0, %4], sizes = [1, 128], strides = [1, 1] : tensor<1x128xf32> -> !flow.dispatch.tensor<writeonly:1x384xf32>
+  return
+}
+
+//    CHECK-LABEL: func.func @matmul_1x384x384
+//      CHECK-NOT:   bufferization.alloc_tensor()
+//          CHECK: return

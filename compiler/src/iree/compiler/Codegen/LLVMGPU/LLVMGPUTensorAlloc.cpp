@@ -22,7 +22,17 @@ static bool filter(Operation *op) {
   if (!linalgOp) return false;
   // Can't promote dynamic shapes.
   if (linalgOp.hasDynamicShape()) return false;
-  return linalg::isaContractionOpInterface(op) &&
+  SmallVector<unsigned> dims;
+  linalgOp.getParallelDims(dims);
+  SmallVector<int64_t, 4> shapes = linalgOp.getStaticLoopRanges();
+  // Don't promote vector*matrix kind of case.
+  int numNonUnitParallelLoop = 0;
+  for (unsigned parallelDim : dims) {
+    if (shapes[parallelDim] != 1) {
+      numNonUnitParallelLoop++;
+    }
+  }
+  return numNonUnitParallelLoop > 1 && linalg::isaContractionOpInterface(op) &&
          linalgOp.getNumParallelLoops() >= 2 &&
          linalgOp.getNumParallelLoops() <= 3;
 }
