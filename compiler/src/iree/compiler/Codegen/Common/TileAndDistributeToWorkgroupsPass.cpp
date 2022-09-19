@@ -148,8 +148,6 @@ static LogicalResult lowerDispatchWorkgroupCountFromDagRootOp(
   partitionableLoopsSet.insert(partitionableLoops.begin(),
                                partitionableLoops.end());
 
-  auto linalgOp = dyn_cast<linalg::LinalgOp>(*rootOp);
-
   for (auto workload : llvm::enumerate(workloadValues)) {
     if (!partitionableLoopsSet.count(workload.index())) {
       tileSizes[workload.index()] = 0;
@@ -161,9 +159,10 @@ static LogicalResult lowerDispatchWorkgroupCountFromDagRootOp(
       continue;
     }
 
-    // When the loop range is knwon to be static, let's directly use it.
+    // When the loop range is known to be static, let's directly use it.
     int64_t loopRange = ShapedType::kDynamicSize;
-    if (linalgOp) {
+
+    if (auto linalgOp = dyn_cast<linalg::LinalgOp>(*rootOp)) {
       loopRange = linalgOp.getStaticLoopRanges()[workload.index()];
     }
 
