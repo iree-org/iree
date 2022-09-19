@@ -574,7 +574,7 @@ jobs:
             --env "BUILD_RISCV_DIR=${BUILD_RISCV_DIR}" \
             --env "BUILD_PRESET=test" \
             --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
-            gcr.io/iree-oss/riscv@sha256:720bc0215d8462ea14352edc22710a6ce4c0c1daff581d179dd173885f1d8a35 \
+            gcr.io/iree-oss/riscv@sha256:d6f0e293a50faf5abbd564c1d1bb9dc6456d7ce93d07b131c381fa64c1daed62 \
             bash -euo pipefail -c \
             "./build_tools/cmake/build_riscv.sh && tests/riscv32/smoke.sh"
 
@@ -618,7 +618,7 @@ jobs:
             --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
             --env "IREE_IMPORT_TFLITE_BIN=${TF_BINARIES_DIR}/iree-import-tflite" \
             --env "LLVM_BIN_DIR=${BUILD_DIR}/third_party/llvm-project/llvm/bin" \
-            gcr.io/iree-oss/riscv@sha256:720bc0215d8462ea14352edc22710a6ce4c0c1daff581d179dd173885f1d8a35 \
+            gcr.io/iree-oss/riscv@sha256:d6f0e293a50faf5abbd564c1d1bb9dc6456d7ce93d07b131c381fa64c1daed62 \
             bash -euo pipefail -c \
               "./build_tools/cmake/build_riscv.sh && ./build_tools/cmake/test_riscv64.sh"
 
