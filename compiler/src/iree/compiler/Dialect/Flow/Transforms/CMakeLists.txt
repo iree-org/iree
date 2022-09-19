@@ -25,6 +25,7 @@ iree_cc_library(
   HDRS
     "ConvertRegionToWorkgroups.h"
     "DispatchLinalgOnTensors.h"
+    "FusionUtils.h"
     "Passes.h"
     "Passes.h.inc"
     "RegionOpUtils.h"
@@ -46,6 +47,7 @@ iree_cc_library(
     "ExpandTensorShapes.cpp"
     "ExportBenchmarkFuncs.cpp"
     "FusionOfTensorOps.cpp"
+    "FusionUtils.cpp"
     "InferNumericNarrowing.cpp"
     "InitializeEmptyTensors.cpp"
     "InjectDispatchTracing.cpp"
