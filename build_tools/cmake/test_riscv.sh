@@ -14,8 +14,13 @@ set -xeuo pipefail
 export PS4='[$(date -u "+%T %Z")] '
 
 ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
-IREE_IMPORT_TFLITE_BIN="${IREE_IMPORT_TFLITE_BIN:-iree-import-tflite}"
-LLVM_BIN_DIR="${LLVM_BIN_DIR}"
+
+RISCV_ARCH="${RISCV_ARCH:-rv64}"
+
+if [[ "${RISCV_ARCH}" == "rv64" ]]; then
+  IREE_IMPORT_TFLITE_BIN="${IREE_IMPORT_TFLITE_BIN:-iree-import-tflite}"
+  LLVM_BIN_DIR="${LLVM_BIN_DIR}"
+fi
 
 # Environment variable used by the emulator and iree-compile for the
 # llvm-cpu bytecode codegen.
@@ -57,32 +62,44 @@ function generate_llvm_cpu_vmfb {
   "${IREE_HOST_BINARY_ROOT}/bin/iree-compile" "${compile_args[@]}" "$@"
 }
 
-generate_llvm_cpu_vmfb mhlo \
-  "${ROOT_DIR}/tools/test/iree-run-module.mlir" \
-  -o "${BUILD_RISCV_DIR}/iree-run-module-llvm_cpu.vmfb"
+if [[ "${RISCV_ARCH}" == "rv64" ]]; then
+  generate_llvm_cpu_vmfb mhlo \
+    "${ROOT_DIR}/tools/test/iree-run-module.mlir" \
+    -o "${BUILD_RISCV_DIR}/iree-run-module-llvm_cpu.vmfb"
 
-wget -P "${BUILD_RISCV_DIR}/" "https://storage.googleapis.com/iree-model-artifacts/person_detect.tflite"
+  wget -P "${BUILD_RISCV_DIR}/" "https://storage.googleapis.com/iree-model-artifacts/person_detect.tflite"
 
-generate_llvm_cpu_vmfb tosa \
-  "${BUILD_RISCV_DIR}/person_detect.tflite" \
-  -o "${BUILD_RISCV_DIR}/person_detect.vmfb"
+  generate_llvm_cpu_vmfb tosa \
+    "${BUILD_RISCV_DIR}/person_detect.tflite" \
+    -o "${BUILD_RISCV_DIR}/person_detect.vmfb"
 
-generate_llvm_cpu_vmfb tosa-rvv \
-  "${BUILD_RISCV_DIR}/person_detect.tflite" \
-  -o "${BUILD_RISCV_DIR}/person_detect_rvv.vmfb"
+  generate_llvm_cpu_vmfb tosa-rvv \
+    "${BUILD_RISCV_DIR}/person_detect.tflite" \
+    -o "${BUILD_RISCV_DIR}/person_detect_rvv.vmfb"
 
-${PYTHON_BIN} "${ROOT_DIR}/third_party/llvm-project/llvm/utils/lit/lit.py" \
-  -v --path "${LLVM_BIN_DIR}" "${ROOT_DIR}/tests/riscv64"
-
+  ${PYTHON_BIN} "${ROOT_DIR}/third_party/llvm-project/llvm/utils/lit/lit.py" \
+    -v --path "${LLVM_BIN_DIR}" "${ROOT_DIR}/tests/riscv64"
+fi
 # Test runtime unit tests
 ctest --test-dir ${BUILD_RISCV_DIR}/runtime/ --timeout 900 --output-on-failure \
   --no-tests=error --label-exclude \
   '(^nokokoro$|^driver=vulkan$|^driver=cuda$|^vulkan_uses_vk_khr_shader_float16_int8$|^requires-filesystem$|^requires-dtz$)'
 
-# Test e2e models. Excluding mobilebert, fp16, and lowering_config regression
-# tests for now.
-# TODO(#10462): Investigate the lowering_config test issue.
-ctest --test-dir ${BUILD_RISCV_DIR}/tests/e2e --timeout 900 --output-on-failure \
-  --no-tests=error --label-exclude \
-  '(^nokokoro$|^driver=vulkan$|^driver=cuda$|^vulkan_uses_vk_khr_shader_float16_int8$)' \
-  -E '(bert|fp16|regression_llvm-cpu_lowering_config)'
+if [[ "${RISCV_ARCH}" == "rv64" ]]; then
+  # Test e2e models. Excluding mobilebert, fp16, and lowering_config regression
+  # tests for now.
+  # TODO(#10462): Investigate the lowering_config test issue.
+  ctest --test-dir ${BUILD_RISCV_DIR}/tests/e2e --timeout 900 --output-on-failure \
+    --no-tests=error --label-exclude \
+    '(^nokokoro$|^driver=vulkan$|^driver=cuda$|^vulkan_uses_vk_khr_shader_float16_int8$)' \
+    -E '(bert|fp16|regression_llvm-cpu_lowering_config)'
+elif [[ "${RISCV_ARCH}" == "rv32-linux" ]]; then
+  # Test e2e models. Excluding mobilebert, fp16 and lowering_config
+  # regression tests for now.
+  # mhlo.power is also disabled because musl math library is not compiled for
+  # 32-bit.
+  ctest --test-dir ${BUILD_RISCV_DIR}/tests/e2e --timeout 900 --output-on-failure \
+    --no-tests=error --label-exclude \
+    '(^nokokoro$|^driver=vulkan$|^driver=cuda$|^vulkan_uses_vk_khr_shader_float16_int8$)' \
+    -E '(bert|fp16|regression_llvm-cpu_lowering_config|xla.*llvm-cpu.*pow)'
+fi

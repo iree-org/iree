@@ -173,6 +173,19 @@ function(iree_cc_test)
         ${_RULE_ARGS}
     )
     iree_configure_test(${_NAME_PATH})
+  elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv32" AND
+         CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    # The test target needs to run within the QEMU emulator for RV32 Linux
+    # crosscompile build or on-device.
+    add_test(
+      NAME
+        ${_NAME_PATH}
+      COMMAND
+       "${IREE_ROOT_DIR}/build_tools/cmake/run_riscv32_test.sh"
+        "$<TARGET_FILE:${_NAME}>"
+        ${_RULE_ARGS}
+    )
+    iree_configure_test(${_NAME_PATH})
   else(ANDROID)
     add_test(
       NAME
