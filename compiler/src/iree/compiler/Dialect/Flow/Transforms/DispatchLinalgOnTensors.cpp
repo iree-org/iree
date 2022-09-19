@@ -376,17 +376,17 @@ static SmallVector<Operation *> getOperationsToMoveIntoDispatch(
   int64_t groupNum = getRootNumber(rootOp);
   std::deque<Operation *> worklist;
   worklist.push_back(rootOp);
-  llvm::SmallDenseSet<Operation *, 2> movedOps;
-  movedOps.insert(rootOp);
+  llvm::SmallDenseSet<Operation *, 2> visitedOps;
+  visitedOps.insert(rootOp);
 
   while (!worklist.empty()) {
     Operation *currRoot = worklist.front();
     worklist.pop_front();
     for (auto operand : currRoot->getOperands()) {
       auto producer = operand.getDefiningOp();
-      if (movedOps.count(producer)) continue;
-      if (!producer || !isInFusionGroup(producer, groupNum)) continue;
-      movedOps.insert(producer);
+      if (!producer || visitedOps.count(producer)) continue;
+      visitedOps.insert(producer);
+      if (!isInFusionGroup(producer, groupNum)) continue;
       worklist.push_back(producer);
       dispatchOps.push_back(producer);
     }
