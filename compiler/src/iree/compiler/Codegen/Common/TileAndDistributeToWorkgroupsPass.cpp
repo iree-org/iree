@@ -310,10 +310,6 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
           "failed to lower default number of workgroups");
       return signalPassFailure();
     }
-    if (failed(updateTranslationInfoAttr(exportOp, workloadPerWorkgroup))) {
-      exportOp.emitOpError("failed to update translation info");
-      return signalPassFailure();
-    }
 
     // If there are no compute ops, nothing more to do.
     if (computeOps.empty()) continue;

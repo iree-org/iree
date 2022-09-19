@@ -53,7 +53,7 @@ hal.executable private @matmul_tensors {
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 64)>
 //  CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 64)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [64, 64]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.export public @matmul_tensors
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-NEXT:   (%[[DEVICE:.+]]: !hal.device,
@@ -149,7 +149,7 @@ hal.executable private @add {
   }
 }
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [64, 64]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable private @add
 //      CHECK: hal.executable.export public @add
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
@@ -222,7 +222,7 @@ hal.executable private @add4D {
   }
 }
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [64, 64, 64]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.export public @add4D
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-NEXT:   (%[[DEVICE:.+]]: !hal.device,
@@ -293,7 +293,7 @@ hal.executable private @batch_matmul_tensors {
   }
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [64, 64, 1]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.export public @batch_matmul_tensors
 // CHECK-NEXT:   (%[[DEVICE:.+]]: !hal.device,
 // CHECK-SAME:    %[[WORKLOAD_0:[a-zA-Z0-9_]+]]: index
@@ -357,7 +357,7 @@ hal.executable private @preset_config_matmul_tensors {
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 32)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 16)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [16, 32]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.export public @preset_config
 // CHECK-NEXT:   (%[[DEVICE:.+]]: !hal.device,
 // CHECK-SAME:    %[[WORKLOAD_0:[a-zA-Z0-9_]+]]: index
@@ -431,7 +431,7 @@ hal.executable public @copy_op {
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 64)>
 //  CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 64)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUBufferOpsTileAndVectorize workload_per_wg = [64, 64]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUBufferOpsTileAndVectorize>
 //      CHECK: hal.executable.export public @copy_op
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 // CHECK-NEXT:   (%[[DEVICE:.+]]: !hal.device,
@@ -517,7 +517,7 @@ hal.executable private @static_1d_fft_stage2 {
   }
 }
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault workload_per_wg = [64]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
 //      CHECK: hal.executable private @static_1d_fft_stage2
 //      CHECK: hal.executable.export public @static_1d_fft_stage2
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
@@ -567,7 +567,7 @@ hal.executable private @static_3d_fft_stage3 {
   }
 }
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault workload_per_wg = [64, 64, 64]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
 //      CHECK: hal.executable private @static_3d_fft_stage3
 //      CHECK: hal.executable.export public @static_3d_fft_stage3
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
@@ -650,7 +650,7 @@ hal.executable private @outs_fusion {
   }
 }
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [64, 64]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable private @outs_fusion
 //      CHECK: hal.executable.export public @outs_fusion_fn
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
@@ -727,7 +727,7 @@ hal.executable private @conv {
   }
 }
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault workload_per_wg = [64, 64, 64]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
 //      CHECK: hal.executable private @conv
 //      CHECK: hal.executable.export public @conv
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
@@ -802,7 +802,7 @@ hal.executable private @conv_static {
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 20)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 40)>
 //  CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0] -> (s0 * 48)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault workload_per_wg = [48, 40, 20]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
 //      CHECK: hal.executable private @conv_static
 //      CHECK: hal.executable.export public @conv_static
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
@@ -874,7 +874,7 @@ hal.executable private @generic_static {
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 16)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 32)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [32, 16]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable private @generic_static
 //      CHECK: hal.executable.export public @generic_static
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
@@ -938,7 +938,7 @@ hal.executable private @matmul_static {
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 28)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 8)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [8, 28]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable private @matmul_static
 //      CHECK: hal.executable.export public @matmul_static
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
@@ -999,7 +999,7 @@ hal.executable private @restrict_num_workgroups {
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 7)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 64)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault workload_per_wg = [64, 7, 1]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
 //      CHECK: hal.executable private @restrict_num_workgroups
 //      CHECK: hal.executable.export public @restrict_num_workgroups
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
@@ -1071,7 +1071,7 @@ hal.executable private @reduction {
   }
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 4)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [4]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable private @reduction
 //      CHECK: hal.executable.export public @reduction
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
@@ -1139,7 +1139,7 @@ hal.executable private @gemm_unit_N {
   }
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [64]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable private @gemm_unit_N
 //      CHECK: hal.executable.export public @gemm_unit_N
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
@@ -1274,7 +1274,7 @@ hal.executable private @generic_unit_dims {
   }
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [64, 64, 64]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable private @generic_unit_dims
 //      CHECK: hal.executable.export public @generic_unit_dims
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
@@ -1464,7 +1464,7 @@ hal.executable private @rank_reduced_slice {
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 2)>
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 + 10)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [2]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.export public @rank_reduced_slice
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 // CHECK-NEXT:   %[[WORKLOAD:[a-zA-Z0-9]+]]: index
@@ -1536,7 +1536,7 @@ hal.executable private @matmul_interchange {
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [64, 32]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.export public @matmul_interchange
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-NEXT:   (%[[DEVICE:.+]]: !hal.device,

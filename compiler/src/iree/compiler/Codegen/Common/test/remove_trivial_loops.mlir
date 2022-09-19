@@ -58,7 +58,7 @@ hal.executable private @dispatch_0  {
 ]>
 
 // CHECK-LABEL: func.func @workgroup_tile_loop()
-#translation = #iree_codegen.translation_info<LLVMGPUDistribute workload_per_wg = [32]>
+#translation = #iree_codegen.translation_info<LLVMGPUDistribute>
 hal.executable private @workgroup_tile_loop  {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
     hal.executable.export @workgroup_tile_loop layout(#pipeline_layout) attributes {
@@ -97,7 +97,7 @@ hal.executable private @workgroup_tile_loop  {
 ]>
 
 // CHECK-LABEL: func.func @workgroup_tile_loop_negative()
-#translation = #iree_codegen.translation_info<LLVMGPUDistribute workload_per_wg = [16]>
+#translation = #iree_codegen.translation_info<LLVMGPUDistribute>
 hal.executable private @workgroup_tile_loop_negative  {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
     hal.executable.export @workgroup_tile_loop_negative layout(#pipeline_layout) attributes {
@@ -138,7 +138,7 @@ hal.executable private @workgroup_tile_loop_negative  {
 // CHECK-LABEL: func.func @both_workgroup_and_workitem()
 //   CHECK-NOT:   scf.for
 //       CHECK:   gpu.barrier
-#translation = #iree_codegen.translation_info<LLVMGPUDistribute workload_per_wg = [32, 8, 1]>
+#translation = #iree_codegen.translation_info<LLVMGPUDistribute>
 hal.executable private @both_workgroup_and_workitem  {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
     hal.executable.export @both_workgroup_and_workitem layout(#pipeline_layout) attributes {
@@ -201,7 +201,7 @@ hal.executable private @both_workgroup_and_workitem  {
 #device_target_cpu = #hal.device.target<"llvm-cpu", {executable_targets = [#hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-unknown-unknown-eabi-elf"}>]}>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>, #hal.descriptor_set.binding<1, storage_buffer>, #hal.descriptor_set.binding<2, storage_buffer>]>]>
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-unknown-unknown-eabi-elf"}>
-#translation = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [4]>
+#translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 #map0 = affine_map<()[s0] -> (s0 ceildiv 4)>
 #map1 = affine_map<()[s0] -> (s0 * 4)>
 #map2 = affine_map<()[s0, s1] -> (-((s0 * -4 + 4) mod (s1 * 4)) + 4)>

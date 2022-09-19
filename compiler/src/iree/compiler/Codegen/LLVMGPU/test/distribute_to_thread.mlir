@@ -1,7 +1,7 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(builtin.module(func.func(iree-llvmgpu-tile-and-distribute))))' %s | FileCheck %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[2, 256, 4]]>
-#translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt workload_per_wg = [256, 2]>
+#translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt>
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -85,7 +85,7 @@ hal.executable private @dot_dispatch_0  {
 
 // -----
 
-#translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt workload_per_wg = [32, 8, 1]>
+#translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt>
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -160,7 +160,7 @@ builtin.module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[2, 32, 4]]>
-#translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt workload_per_wg = [32, 2]>
+#translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt>
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -294,7 +294,7 @@ hal.executable @reduction_dispatch {
 
 // -----
 
-#translation = #iree_codegen.translation_info<LLVMGPUVectorize workload_per_wg = [256, 1, 1]>
+#translation = #iree_codegen.translation_info<LLVMGPUVectorize>
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -365,7 +365,7 @@ hal.executable private @conv_dispatch  {
 // Check contract-4d, we currently emit suboptimal code as we don't distribute
 // more than 3 dimensions but make sure we emit correct code.
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 1, 2, 256, 4]]>
-#translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt workload_per_wg = [256, 2]>
+#translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt>
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
