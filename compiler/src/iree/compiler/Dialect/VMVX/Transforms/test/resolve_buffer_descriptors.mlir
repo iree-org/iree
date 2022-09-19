@@ -111,3 +111,49 @@ func.func @resolve_binding_subspan_dyn_dims(%arg0 : index, %arg1 : index) -> (!u
   %base_buffer, %offset, %sizes:2, %strides:2 = vmvx.get_buffer_descriptor %0 : memref<?x?xindex> -> !util.buffer, index, index, index, index, index
   return %base_buffer, %offset, %sizes#0, %sizes#1, %strides#0, %strides#1 : !util.buffer, index, index, index, index, index
 }
+
+// -----
+
+// CHECK-LABEL: @resolve_alloca_static
+func.func @resolve_alloca_static() -> (!util.buffer, index, index, index, index, index) {
+  // CHECK-DAG: %[[C512:.*]] = arith.constant 512 : index
+  // CHECK-DAG: %[[C384:.*]] = arith.constant 384 : index
+  // CHECK-DAG: %[[C1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
+  //     CHECK: %[[CAST:.*]] = builtin.unrealized_conversion_cast
+  //     CHECK: return %[[CAST]], %[[C0]], %[[C512]], %[[C384]], %[[C384]], %[[C1]]
+  %0 = memref.alloca() : memref<512x384xf32>
+  %base_buffer, %offset, %sizes:2, %strides:2 = vmvx.get_buffer_descriptor %0 : memref<512x384xf32> -> !util.buffer, index, index, index, index, index
+  return %base_buffer, %offset, %sizes#0, %sizes#1, %strides#0, %strides#1 : !util.buffer, index, index, index, index, index
+}
+
+// -----
+
+// CHECK-LABEL: @resolve_alloca_dynamic
+func.func @resolve_alloca_dynamic(%arg0 : index) -> (!util.buffer, index, index, index, index, index) {
+  // CHECK-DAG: %[[C384:.*]] = arith.constant 384 : index
+  // CHECK-DAG: %[[C1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
+  //     CHECK: %[[CAST:.*]] = builtin.unrealized_conversion_cast
+  //     CHECK: return %[[CAST]], %[[C0]], %arg0, %[[C384]], %[[C384]], %[[C1]]
+  %0 = memref.alloca(%arg0) : memref<?x384xf32>
+  %base_buffer, %offset, %sizes:2, %strides:2 = vmvx.get_buffer_descriptor %0 : memref<?x384xf32> -> !util.buffer, index, index, index, index, index
+  return %base_buffer, %offset, %sizes#0, %sizes#1, %strides#0, %strides#1 : !util.buffer, index, index, index, index, index
+}
+
+// -----
+
+// CHECK-LABEL: @resolve_global
+memref.global "private" constant @__constant_2xi32 : memref<512x384xf32> = dense<0.0>
+
+func.func @resolve_global() -> (!util.buffer, index, index, index, index, index) {
+  // CHECK-DAG: %[[C512:.*]] = arith.constant 512 : index
+  // CHECK-DAG: %[[C384:.*]] = arith.constant 384 : index
+  // CHECK-DAG: %[[C1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
+  //     CHECK: %[[CAST:.*]] = builtin.unrealized_conversion_cast
+  //     CHECK: return %[[CAST]], %[[C0]], %[[C512]], %[[C384]], %[[C384]], %[[C1]]
+  %0 = memref.get_global @__constant_2xi32 : memref<512x384xf32>
+  %base_buffer, %offset, %sizes:2, %strides:2 = vmvx.get_buffer_descriptor %0 : memref<512x384xf32> -> !util.buffer, index, index, index, index, index
+  return %base_buffer, %offset, %sizes#0, %sizes#1, %strides#0, %strides#1 : !util.buffer, index, index, index, index, index
+}
