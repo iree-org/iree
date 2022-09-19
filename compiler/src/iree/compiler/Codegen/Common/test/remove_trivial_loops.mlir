@@ -66,8 +66,8 @@ hal.executable private @workgroup_tile_loop  {
     } {
     ^bb0(%arg0 : !hal.device, %arg1 : index):
       %c1 = arith.constant 1 : index
-      %0 = affine.apply affine_map<(d0) -> (d0 ceildiv 32)>(%arg1)
-      hal.return %0, %c1, %c1 : index, index, index
+      %c64 = arith.constant 64 : index
+      hal.return %c64, %c1, %c1 : index, index, index
     }
     builtin.module {
       func.func @workgroup_tile_loop() {
@@ -146,9 +146,10 @@ hal.executable private @both_workgroup_and_workitem  {
       workgroup_size = [8: index, 2: index, 1: index]
     } {
     ^bb0(%arg0 : !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
-      %0 = affine.apply affine_map<(d0) -> (d0 ceildiv 8)>(%arg2)
-      %1 = affine.apply affine_map<(d0) -> (d0 ceildiv 32)>(%arg3)
-      hal.return %1, %0, %arg1 : index, index, index
+      %c1 = arith.constant 1 : index
+      %c14 = arith.constant 14 : index
+      %c112 = arith.constant 112: index
+      hal.return %c1, %c14, %c112 : index, index, index
     }
     builtin.module {
       func.func @both_workgroup_and_workitem() {
