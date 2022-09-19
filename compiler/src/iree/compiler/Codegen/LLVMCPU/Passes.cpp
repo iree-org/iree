@@ -151,17 +151,6 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
                                 CPUDoubleTilingPadExpert);
   }
 
-  // Verify that the workload per workgroup is not set.
-  // TODO(ravishankarm): Remove workload_per_wg eventually.
-  SmallVector<int64_t> workloadPerWorkgroup =
-      translationInfo.getWorkloadPerWorkgroupVals();
-  if (!workloadPerWorkgroup.empty()) {
-    return op->emitOpError(
-               "workload_per_wg expected to be empty since its internal "
-               "compiler implementation detail")
-           << kNumMaxParallelDims;
-  }
-
   if (loweringConfig.getTileSizes().size() !=
       static_cast<unsigned>(StrategyTilingLevel::NumStrategyTileLevels)) {
     return op->emitOpError("expected three tiling sizes, got ")

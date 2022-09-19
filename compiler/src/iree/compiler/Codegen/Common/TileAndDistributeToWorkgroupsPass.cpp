@@ -87,8 +87,7 @@ static LogicalResult lowerToUnitWorkgroupCount(
 static LogicalResult lowerDispatchWorkgroupCountFromDagRootOp(
     IREE::Flow::DispatchWorkgroupCountFromDagRootOp workgroupCountOp,
     ArrayRef<Operation *> computeOps, SmallVectorImpl<int64_t> &tileSizes,
-    SmallVector<int64_t> &interchange,
-    SmallVectorImpl<int64_t> &workloadPerWorkgroup) {
+    SmallVector<int64_t> &interchange) {
   auto workloadValues = workgroupCountOp.operands();
 
   // Find the lowering configuration of the root operation.
@@ -209,33 +208,10 @@ static LogicalResult lowerDispatchWorkgroupCountFromDagRootOp(
     // If the loop isnt tiled, skip it.
     if (tileSizes[partitionedLoop] == 0) continue;
     numWorkgroups.push_back(numTiles[partitionedLoop]);
-    workloadPerWorkgroup.push_back(tileSizes[partitionedLoop]);
   }
   numWorkgroups.resize(kNumMaxParallelDims, one);
   workgroupCountOp->replaceAllUsesWith(numWorkgroups);
   workgroupCountOp.erase();
-  return success();
-}
-
-/// Update the workload_per_wg value on the TranslationInfoAttr.
-// TODO(ravishankarm): The workload_per_wg field should be deprecated. This
-// is just transition before all dependencies on it can be removed.
-static LogicalResult updateTranslationInfoAttr(
-    IREE::HAL::ExecutableExportOp exportOp,
-    ArrayRef<int64_t> workloadPerWorkgroup) {
-  IREE::Codegen::DispatchLoweringPassPipeline passPipeline =
-      IREE::Codegen::DispatchLoweringPassPipeline::CPUDefault;
-  if (auto translationInfo = getTranslationInfo(exportOp)) {
-    // Expect the `workload_per_wg` to be empty.
-    if (!translationInfo.getWorkloadPerWorkgroupVals().empty()) {
-      return exportOp.emitOpError(
-          "expected workload_per_wg to be empty at this stage");
-    }
-    passPipeline = translationInfo.getDispatchLoweringPassPipeline();
-  }
-  auto newTranslationInfoAttr = IREE::Codegen::TranslationInfoAttr::get(
-      exportOp.getContext(), passPipeline, workloadPerWorkgroup);
-  setTranslationInfo(exportOp, newTranslationInfoAttr);
   return success();
 }
 
@@ -302,10 +278,9 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
     IREE::Flow::DispatchWorkgroupCountFromDagRootOp defaultWorkgroupCountOp =
         *(ops.begin());
 
-    SmallVector<int64_t> tileSizes, interchange, workloadPerWorkgroup;
+    SmallVector<int64_t> tileSizes, interchange;
     if (failed(lowerDispatchWorkgroupCountFromDagRootOp(
-            defaultWorkgroupCountOp, computeOps, tileSizes, interchange,
-            workloadPerWorkgroup))) {
+            defaultWorkgroupCountOp, computeOps, tileSizes, interchange))) {
       defaultWorkgroupCountOp.emitOpError(
           "failed to lower default number of workgroups");
       return signalPassFailure();
