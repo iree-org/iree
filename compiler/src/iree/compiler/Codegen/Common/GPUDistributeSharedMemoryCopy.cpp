@@ -31,6 +31,15 @@
 using mlir::iree_compiler::IREE::LinalgExt::LinalgVectorizationPattern;
 using mlir::iree_compiler::IREE::LinalgExt::VectorizationPatterns;
 
+/// Prints the given `funcOp` after a leading `step` comment header.
+void debugPrint(mlir::func::FuncOp funcOp, const char *step) {
+  LLVM_DEBUG({
+    llvm::dbgs() << "//--- " << step << " ---//\n";
+    funcOp.print(llvm::dbgs(), mlir::OpPrintingFlags().useLocalScope());
+    llvm::dbgs() << "\n\n";
+  });
+}
+
 //====---------------------------------------------------------------------===//
 // Pass to lower workgroup memory copy to distibuted
 // transfer_read/transfer_write ops.
@@ -365,12 +374,7 @@ class GPUDistributeSharedMemoryCopyPass
           return canPerformVectorAccessUsingAllThreads(shape, flatWorkgroupSize,
                                                        targetVectorSize);
         });
-
-    LLVM_DEBUG({
-      llvm::dbgs() << "//--- After initial IR cleanup  ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
+    debugPrint(funcOp, "After initial IR cleanup");
 
     if (isAligned) {
       // Ignore all the exisiting loop
@@ -385,11 +389,7 @@ class GPUDistributeSharedMemoryCopyPass
               funcOp, std::move(serialTilingPatterns)))) {
         return signalPassFailure();
       }
-      LLVM_DEBUG({
-        llvm::dbgs() << "//--- After step 1: tiling  ---\n";
-        funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-        llvm::dbgs() << "\n\n";
-      });
+      debugPrint(funcOp, "After step 1: tiling");
 
       // Calculate a flat id that will then be broken down during distribution.
       Value flatId = createFlatId(funcOp, workgroupSize);
@@ -400,11 +400,7 @@ class GPUDistributeSharedMemoryCopyPass
               funcOp, std::move(tileAndDistributePatterns)))) {
         return signalPassFailure();
       }
-      LLVM_DEBUG({
-        llvm::dbgs() << "//--- After step 2: thread distribution  ---\n";
-        funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-        llvm::dbgs() << "\n\n";
-      });
+      debugPrint(funcOp, "After step 2: thread distribution");
 
       // Step 3. Vectorize the distributed copies.
       RewritePatternSet vectorizationPatterns(context);
@@ -413,19 +409,11 @@ class GPUDistributeSharedMemoryCopyPass
               funcOp, std::move(vectorizationPatterns)))) {
         return signalPassFailure();
       }
-      LLVM_DEBUG({
-        llvm::dbgs() << "//--- After step 3: vectorization  ---\n";
-        funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-        llvm::dbgs() << "\n\n";
-      });
+      debugPrint(funcOp, "After step 3: vectorization");
 
       // Step4. Finally unroll all the loop created
       UnrollSharedMemoryLoops(funcOp, loopsToIgnore);
-      LLVM_DEBUG({
-        llvm::dbgs() << "//--- After step 4: unrolling  ---\n";
-        funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-        llvm::dbgs() << "\n\n";
-      });
+      debugPrint(funcOp, "After step 4: unrolling");
     } else {
       // Fall back to basic tiling for cases where workgroup memory size is not
       // well aligned on the number of threads.
@@ -438,11 +426,8 @@ class GPUDistributeSharedMemoryCopyPass
               funcOp, std::move(threadLevelTilingPatterns)))) {
         return signalPassFailure();
       }
-      LLVM_DEBUG({
-        llvm::dbgs() << "//--- After tiling for unaligned case ---\n";
-        funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-        llvm::dbgs() << "\n\n";
-      });
+      debugPrint(funcOp, "After tiling for unaligned case");
+
       // Apply canonicalization patterns.
       RewritePatternSet threadTilingCanonicalizationPatterns =
           linalg::getLinalgTilingCanonicalizationPatterns(context);
