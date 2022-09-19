@@ -249,6 +249,8 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   // Elementwise fusion.
   passManager.addNestedPass<func::FuncOp>(
       createFusionOfTensorOpsPass(clEnableAggressiveFusion));
+  passManager.addNestedPass<IREE::Util::InitializerOp>(
+      createFusionOfTensorOpsPass(clEnableAggressiveFusion));
 
   FunctionLikeNest(passManager)
       .addPredicatedPass(clEnableLinalgDetensorize,
