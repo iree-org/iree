@@ -53,27 +53,6 @@ extern "C" {
 #endif  // __cplusplus
 
 //===----------------------------------------------------------------------===//
-// Target architecture selection
-//===----------------------------------------------------------------------===//
-// The "generic" target is used if no other target is specified. All platforms
-// should support the generic path and then optionally provide their own
-// specializations as needed. The generic path can be forced by passing
-// -DIREE_MMT4D_ARCH_GENERIC_32=1 or -DIREE_MMT4D_ARCH_GENERIC_64=1 to the
-// compiler in addition to -DIREE_PLATFORM_GENERIC=1.
-
-#if defined(IREE_UKERNEL_ARCH_GENERIC_32)
-#define IREE_UKERNEL_SIZE_TYPE int32_t
-#elif defined(IREE_UKERNEL_ARCH_GENERIC_64)
-#define IREE_UKERNEL_SIZE_TYPE int64_t
-#elif defined(IREE_ARCH_ARM_64) && !defined(__APPLE__)
-#define IREE_UKERNEL_ARCH_ARM_64 1
-#define IREE_UKERNEL_SIZE_TYPE int64_t
-#else
-#define IREE_UKERNEL_ARCH_GENERIC_64 1
-#define IREE_UKERNEL_SIZE_TYPE int64_t
-#endif  // IREE_ARCH_*
-
-//===----------------------------------------------------------------------===//
 // Attributes and metadata
 //===----------------------------------------------------------------------===//
 
