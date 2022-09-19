@@ -185,25 +185,17 @@ static FailureOr<unsigned> fuseMultiUseProducers(Operation *funcOp,
 
 /// Pass to fuse linalg on tensor operations as well as fusion of hal.interface*
 /// operations with linalg.tensor_reshape operation.
-class FusionOfTensorOpsPass
+struct FusionOfTensorOpsPass
     : public FusionOfTensorOpsBase<FusionOfTensorOpsPass> {
- public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<AffineDialect, linalg::LinalgDialect, math::MathDialect>();
   }
-  FusionOfTensorOpsPass(bool fuseMultiUse, unsigned multiUseFusionIteration)
-      : fuseMultiUse(fuseMultiUse),
-        multiUseFusionIteration(multiUseFusionIteration) {}
+  FusionOfTensorOpsPass(bool fuseMultiUse, unsigned multiUseFusionIteration) {
+    this->fuseMultiUse = fuseMultiUse;
+    this->multiUseFusionIteration = multiUseFusionIteration;
+  }
   FusionOfTensorOpsPass(const FusionOfTensorOpsPass &pass)
-      : fuseMultiUse(pass.fuseMultiUse),
-        multiUseFusionIteration(pass.multiUseFusionIteration) {}
-
-  LogicalResult initializeOptions(StringRef options) override {
-    if (failed(Pass::initializeOptions(options))) return failure();
-    // Initialize fusion options from the pass options.
-    fuseMultiUse = fuseMultiUseOption;
-    multiUseFusionIteration = multiUseFusionIterationOption;
-    return success();
+      : FusionOfTensorOpsPass(pass.fuseMultiUse, pass.multiUseFusionIteration) {
   }
 
   void runOnOperation() override {
@@ -340,10 +332,6 @@ class FusionOfTensorOpsPass
       }
     }
   }
-
- private:
-  bool fuseMultiUse;
-  unsigned multiUseFusionIteration;
 };
 
 }  // namespace
