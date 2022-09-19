@@ -38,15 +38,16 @@ BEGIN_FUNCTION iree_ukernel_mmt4d_i8i8i32_tile_8x8x8_arm_64_i8mm
   
     1:
         // Accumulate case. Load the 8x8 accumulator tile from row-major
-        // out_tile, into temporary registers v0--v15.
+        // out_tile and swizzle it into 2x2 tiled layout. To avoid having to
+        // save the callee-saved registers v8--v15 (their bottom 64bit halves),
+        // we process 4 rows at a time so we only need temporary registers
+        // v0--v7.
+        //
+        // Load rows 0--3.
         ldp q0, q1, [x0, 0]
         ldp q2, q3, [x0, 32]
         ldp q4, q5, [x0, 64]
         ldp q6, q7, [x0, 96]
-        ldp q8, q9, [x0, 128]
-        ldp q10, q11, [x0, 160]
-        ldp q12, q13, [x0, 192]
-        ldp q14, q15, [x0, 224]
         // Swizzle in 2x2 tiles for smmla, rows 0--1.
         zip1 v16.2d, v0.2d, v2.2d
         zip2 v17.2d, v0.2d, v2.2d
@@ -57,16 +58,22 @@ BEGIN_FUNCTION iree_ukernel_mmt4d_i8i8i32_tile_8x8x8_arm_64_i8mm
         zip2 v21.2d, v4.2d, v6.2d
         zip1 v22.2d, v5.2d, v7.2d
         zip2 v23.2d, v5.2d, v7.2d
+        //
+        // Load rows 4--7.
+        ldp q0, q1, [x0, 128]
+        ldp q2, q3, [x0, 160]
+        ldp q4, q5, [x0, 192]
+        ldp q6, q7, [x0, 224]
         // Swizzle in 2x2 tiles for smmla, rows 4--5.
-        zip1 v24.2d, v8.2d, v10.2d
-        zip2 v25.2d, v8.2d, v10.2d
-        zip1 v26.2d, v9.2d, v11.2d
-        zip2 v27.2d, v9.2d, v11.2d
+        zip1 v24.2d, v0.2d, v2.2d
+        zip2 v25.2d, v0.2d, v2.2d
+        zip1 v26.2d, v1.2d, v3.2d
+        zip2 v27.2d, v1.2d, v3.2d
         // Swizzle in 2x2 tiles for smmla, rows 6--7.
-        zip1 v28.2d, v12.2d, v14.2d
-        zip2 v29.2d, v12.2d, v14.2d
-        zip1 v30.2d, v13.2d, v15.2d
-        zip2 v31.2d, v13.2d, v15.2d
+        zip1 v28.2d, v4.2d, v6.2d
+        zip2 v29.2d, v4.2d, v6.2d
+        zip1 v30.2d, v5.2d, v7.2d
+        zip2 v31.2d, v5.2d, v7.2d
         
     2:
         // Loop body. Decrement the loop counter K.
@@ -103,6 +110,11 @@ BEGIN_FUNCTION iree_ukernel_mmt4d_i8i8i32_tile_8x8x8_arm_64_i8mm
         b.ne 2b
 
     3:
+        // Swizzle back to row-major and store to destination. To avoid having
+        // to save the callee-saved registers v8--v15 (their bottom 64bit
+        // halves), we process 4 rows at a time so we only need temporary
+        // registers v0--v7.
+        //
         // Swizzle back to row-major, rows 0--1.
         uzp1 v0.2d, v16.2d, v17.2d
         uzp1 v1.2d, v18.2d, v19.2d
@@ -113,25 +125,26 @@ BEGIN_FUNCTION iree_ukernel_mmt4d_i8i8i32_tile_8x8x8_arm_64_i8mm
         uzp1 v5.2d, v22.2d, v23.2d
         uzp2 v6.2d, v20.2d, v21.2d
         uzp2 v7.2d, v22.2d, v23.2d
-        // Swizzle back to row-major, rows 4--5.
-        uzp1 v8.2d, v24.2d, v25.2d
-        uzp1 v9.2d, v26.2d, v27.2d
-        uzp2 v10.2d, v24.2d, v25.2d
-        uzp2 v11.2d, v26.2d, v27.2d
-        // Swizzle back to row-major, rows 6--7.
-        uzp1 v12.2d, v28.2d, v29.2d
-        uzp1 v13.2d, v30.2d, v31.2d
-        uzp2 v14.2d, v28.2d, v29.2d
-        uzp2 v15.2d, v30.2d, v31.2d
-        // Store the accumulator tile to the destination.
+        // Store rows 0--3 to destination.
         stp q0, q1, [x0, 0]
         stp q2, q3, [x0, 32]
         stp q4, q5, [x0, 64]
         stp q6, q7, [x0, 96]
-        stp q8, q9, [x0, 128]
-        stp q10, q11, [x0, 160]
-        stp q12, q13, [x0, 192]
-        stp q14, q15, [x0, 224]
+        // Swizzle back to row-major, rows 4--5.
+        uzp1 v0.2d, v24.2d, v25.2d
+        uzp1 v1.2d, v26.2d, v27.2d
+        uzp2 v2.2d, v24.2d, v25.2d
+        uzp2 v3.2d, v26.2d, v27.2d
+        // Swizzle back to row-major, rows 6--7.
+        uzp1 v4.2d, v28.2d, v29.2d
+        uzp1 v5.2d, v30.2d, v31.2d
+        uzp2 v6.2d, v28.2d, v29.2d
+        uzp2 v7.2d, v30.2d, v31.2d
+        // Store the accumulator tile to the destination.
+        stp q0, q1, [x0, 128]
+        stp q2, q3, [x0, 160]
+        stp q4, q5, [x0, 192]
+        stp q7, q7, [x0, 224]
         ret
 
 END_FUNCTION iree_ukernel_mmt4d_i8i8i32_tile_8x8x8_arm_64_i8mm
