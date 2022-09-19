@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline='hal.executable(hal.executable.variant(builtin.module(func.func(iree-gpu-distribute-shared-memory-copy))))' --fold-memref-alias-ops --canonicalize --cse %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(builtin.module(func.func(iree-gpu-distribute-shared-memory-copy))))' --fold-memref-alias-ops --canonicalize --cse %s | FileCheck %s
 
 // CHECK-DAG: #[[$MAP0:.*]] = affine_map<()[s0, s1, s2] -> (s1 * 8 + s2 * 32 + s0 floordiv 4)>
 // CHECK-DAG: #[[$MAP1:.*]] = affine_map<()[s0] -> (s0 * 4 - (s0 floordiv 4) * 16)>
@@ -95,6 +95,64 @@ hal.executable private @shared_mem_cpy  {
             linalg.yield %arg4 : f32
         }
         gpu.barrier
+        return
+      }
+    }
+  }
+}
+
+// -----
+
+// CHECK-DAG: #[[$OFFSET_MAP:.+]] = affine_map<()[s0] -> (s0 * 4)>
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>]>
+]>
+
+hal.executable private @unaligned_shared_memory_copy  {
+  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+    hal.executable.export @unaligned_shared_memory_copy layout(#pipeline_layout) attributes {
+      workgroup_size = [32: index, 8: index, 1:index]
+    } {
+    ^bb0(%arg0: !hal.device, %arg1 : index, %arg2 : index):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+
+      // CHECK-LABEL: func.func @unaligned_shared_memory_copy
+      //  CHECK-SAME: (%[[GLOBAL_MEM:.+]]: memref<56x32xf32, {{.+}}>, %[[SHARED_MEM:.+]]: memref<56x32xf32, 3>)
+      func.func @unaligned_shared_memory_copy(
+        %global : memref<56x32xf32, strided<[128, 1], offset: ?>>, %shared : memref<56x32xf32, 3>) {
+
+        //  CHECK-DAG:   %[[C8:.+]] = arith.constant 8 : index
+        //  CHECK-DAG:   %[[C32:.+]] = arith.constant 32 : index
+        //  CHECK-DAG:   %[[C56:.+]] = arith.constant 56 : index
+        //  CHECK-DAG:   %[[C128:.+]] = arith.constant 128 : index
+
+        //  CHECK-DAG:   %[[TID_X:.+]] = gpu.thread_id  x
+        //  CHECK-DAG:   %[[TID_Y:.+]] = gpu.thread_id  y
+
+        //      CHECK:   scf.for %[[IV_Y:.+]] = %[[TID_Y]] to %[[C56]] step %[[C8]] {
+        //      CHECK:     %[[OFFSET_X:.+]] = affine.apply #[[$OFFSET_MAP]]()[%[[TID_X]]]
+        //      CHECK:     scf.for %[[IV_X:.+]] = %[[OFFSET_X]] to %[[C32]] step %[[C128]] {
+        //      CHECK:       %[[GLOBAL_SUBVIEW:.+]] = memref.subview %[[GLOBAL_MEM]][%[[IV_Y]], %[[IV_X]]] [1, 4] [1, 1]
+        // CHECK-SAME:         : memref<56x32xf32, {{.+}}> to memref<1x4xf32, {{.+}}>
+        //      CHECK:       %[[SHARED_SUBVIEW:.+]] = memref.subview %[[SHARED_MEM]][%[[IV_Y]], %[[IV_X]]] [1, 4] [1, 1]
+        // CHECK-SAME:         : memref<56x32xf32, 3> to memref<1x4xf32, strided<[32, 1], offset: ?>, 3>
+        //      CHECK:       linalg.generic
+        // CHECK-SAME:         ins(%[[GLOBAL_SUBVIEW]]
+        // CHECK-SAME:         outs(%[[SHARED_SUBVIEW]]
+        linalg.generic {
+          indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
+          iterator_types = ["parallel", "parallel"]
+        }
+          ins(%global : memref<56x32xf32, strided<[128, 1], offset: ?>>)
+          outs(%shared : memref<56x32xf32, 3>)
+          attrs =  {__internal_linalg_transform__ = "copy_to_workgroup_memory"} {
+        ^bb0(%arg0: f32, %arg1: f32):
+          linalg.yield %arg0 : f32
+        }
         return
       }
     }
