@@ -1520,7 +1520,8 @@ static LogicalResult setTranslationInfoAndRootConfig(
   for (auto computeOp : computeOps) {
     if (IREE::Codegen::CompilationInfoAttr compilationInfo =
             getCompilationInfo(computeOp)) {
-      (void)setUserConfig(entryPointFn, computeOp, compilationInfo);
+      if (failed(setUserConfig(entryPointFn, computeOp, compilationInfo)))
+        return failure();
     }
   }
 

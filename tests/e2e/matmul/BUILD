@@ -258,7 +258,7 @@ py_binary(
     ],
     trace_runner = "//tools:iree-e2e-matmul-test",
 ) for vulkan_target_and_pipeline in [
-    ("valhall-unknown-android31", "SPIRVVectorizeAndroid"),
+    ("valhall-unknown-android31", "SPIRVVectorizeMali"),
     ("ampere-unknown-linux", "SPIRVVectorizeNVIDIA"),
 ]]
 

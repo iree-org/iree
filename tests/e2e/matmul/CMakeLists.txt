@@ -332,7 +332,7 @@ iree_generated_trace_runner_test(
   GENERATOR_ARGS
     "--lhs_rhs_type=f32"
     "--shapes=gpu_large"
-    "--compilation_info=SPIRVVectorizeAndroid"
+    "--compilation_info=SPIRVVectorizeMali"
   TRACE_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS

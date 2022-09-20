@@ -689,8 +689,8 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
                                       Operation *rootOp) {
   if (IREE::Codegen::CompilationInfoAttr compilationInfo =
           getCompilationInfo(rootOp)) {
-    // If the op already has a lowering config coming from the IR use this and
-    // bypass the heuristic.
+    // If the op already has a lowering configuration specified from the
+    // original source by the user, then use it directly.
     return setUserConfig(entryPointFn, rootOp, compilationInfo);
   }
 
