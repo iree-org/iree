@@ -62,11 +62,11 @@ static iree_status_t iree_mmt4d_benchmark(
   params.lhs_stride = params.K * params.M0 * params.K0;
   params.rhs_stride = params.K * params.N0 * params.K0;
   params.out_stride = params.N * params.M0 * params.N0;
-  iree_ukernel_size_t lhs_buffer_size =
+  iree_ukernel_ssize_t lhs_buffer_size =
       iree_ukernel_mmt4d_lhs_buffer_size(&params);
-  iree_ukernel_size_t rhs_buffer_size =
+  iree_ukernel_ssize_t rhs_buffer_size =
       iree_ukernel_mmt4d_rhs_buffer_size(&params);
-  iree_ukernel_size_t out_buffer_size =
+  iree_ukernel_ssize_t out_buffer_size =
       iree_ukernel_mmt4d_out_buffer_size(&params);
   void* lhs_buffer = malloc(lhs_buffer_size);
   void* rhs_buffer = malloc(lhs_buffer_size);

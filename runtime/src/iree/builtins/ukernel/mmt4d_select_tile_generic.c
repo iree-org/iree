@@ -43,10 +43,10 @@ static void iree_ukernel_mmt4d_tile_i8i8i32_generic(
     for (int i = 0; i < M0 * N0; ++i) acc[i] = 0;
   }
   // Accumulation loop.
-  for (iree_ukernel_size_t k = 0; k < K; ++k) {
-    for (iree_ukernel_size_t i0 = 0; i0 < M0; ++i0) {
-      for (iree_ukernel_size_t j0 = 0; j0 < N0; ++j0) {
-        for (iree_ukernel_size_t k0 = 0; k0 < K0; ++k0) {
+  for (iree_ukernel_ssize_t k = 0; k < K; ++k) {
+    for (iree_ukernel_ssize_t i0 = 0; i0 < M0; ++i0) {
+      for (iree_ukernel_ssize_t j0 = 0; j0 < N0; ++j0) {
+        for (iree_ukernel_ssize_t k0 = 0; k0 < K0; ++k0) {
           int32_t lhs_val_int32 = lhs_panel[i0 * K0 + k0];
           int32_t rhs_val_int32 = rhs_panel[j0 * K0 + k0];
           acc[i0 * N0 + j0] += lhs_val_int32 * rhs_val_int32;
@@ -79,10 +79,10 @@ static void iree_ukernel_mmt4d_tile_f32f32f32_generic(
     for (int i = 0; i < M0 * N0; ++i) acc[i] = 0;
   }
   // Accumulation loop.
-  for (iree_ukernel_size_t k = 0; k < K; ++k) {
-    for (iree_ukernel_size_t i0 = 0; i0 < M0; ++i0) {
-      for (iree_ukernel_size_t j0 = 0; j0 < N0; ++j0) {
-        for (iree_ukernel_size_t k0 = 0; k0 < K0; ++k0) {
+  for (iree_ukernel_ssize_t k = 0; k < K; ++k) {
+    for (iree_ukernel_ssize_t i0 = 0; i0 < M0; ++i0) {
+      for (iree_ukernel_ssize_t j0 = 0; j0 < N0; ++j0) {
+        for (iree_ukernel_ssize_t k0 = 0; k0 < K0; ++k0) {
           float lhs_val = lhs_panel[i0 * K0 + k0];
           float rhs_val = rhs_panel[j0 * K0 + k0];
           acc[i0 * N0 + j0] += lhs_val * rhs_val;

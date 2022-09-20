@@ -103,15 +103,14 @@ typedef unsigned long long uint64_t;
 
 #endif  // !INT8_MIN
 
-// Use iree_ukernel_size_t for all sizes that may need pointer width.
+// Use iree_ukernel_ssize_t for all sizes that may need pointer width.
 // For any argument that is known to fit in a specific size prefer that to
 // ensure this code operates well on systems with small/weird widths (x32/ilp32,
 // etc).
-// TODO: it's probably too surprising that a type named *_size_t is signed.
 #if IREE_UKERNEL_POINTER_SIZE == 4
-typedef int32_t iree_ukernel_size_t;
+typedef int32_t iree_ukernel_ssize_t;
 #elif IREE_UKERNEL_POINTER_SIZE == 8
-typedef int64_t iree_ukernel_size_t;
+typedef int64_t iree_ukernel_ssize_t;
 #else
 #error Unexpected pointer size
 #endif
