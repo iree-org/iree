@@ -75,13 +75,10 @@ namespace Codegen {
 
 TranslationInfoAttr TranslationInfoAttr::get(
     MLIRContext *context, DispatchLoweringPassPipeline passPipeline,
-    ArrayRef<int64_t> workloadPerWorkgroup, unsigned softwarePipelineDepth) {
+    unsigned softwarePipelineDepth) {
   auto pipelineAttr =
       DispatchLoweringPassPipelineAttr::get(context, passPipeline);
-  ArrayAttr workloadPerWorkgroupAttr =
-      getI64IntegerArrayAttr(context, workloadPerWorkgroup);
-  return get(context, pipelineAttr, workloadPerWorkgroupAttr,
-             softwarePipelineDepth);
+  return get(context, pipelineAttr, softwarePipelineDepth);
 }
 
 DispatchLoweringPassPipeline
@@ -89,14 +86,10 @@ TranslationInfoAttr::getDispatchLoweringPassPipeline() {
   return getPassPipeline().getValue();
 }
 
-SmallVector<int64_t> TranslationInfoAttr::getWorkloadPerWorkgroupVals() {
-  return getIntegerVals(getWorkloadPerWorkgroup());
-}
-
 LogicalResult TranslationInfoAttr::verify(
     function_ref<InFlightDiagnostic()> emitError,
     IREE::Codegen::DispatchLoweringPassPipelineAttr passPipeline,
-    ArrayAttr workloadPerWorkgroup, unsigned softwarePipelineDepth) {
+    unsigned softwarePipelineDepth) {
   if (!passPipeline) {
     return emitError() << "missing pass pipeline specification";
   }
@@ -219,7 +212,6 @@ LogicalResult CompilationInfoAttr::verify(
   }
   if (failed(TranslationInfoAttr::verify(
           emitError, translationInfo.getPassPipeline(),
-          translationInfo.getWorkloadPerWorkgroup(),
           translationInfo.getSoftwarePipelineDepth()))) {
     return failure();
   }

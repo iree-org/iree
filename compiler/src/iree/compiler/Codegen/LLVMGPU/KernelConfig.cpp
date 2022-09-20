@@ -672,8 +672,6 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
       return funcOp.emitOpError("failed to get compute ops");
     }
 
-    // If using sandbox passes, currently set the workload_per_wg to be
-    // empty for single-threaded execution.
     if (clGPUCodegenTransformDialectFileName.size() > 0) {
       auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
           moduleOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
@@ -712,7 +710,7 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
       // setTranslationInfo(
       //    funcOp,
       //    IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute,
-      //    /*workloadPerWorkgroup=*/{}, {1, 1, 1});
+      //    {1, 1, 1});
       // continue;
       return funcOp.emitOpError("unable to find root operation");
     }

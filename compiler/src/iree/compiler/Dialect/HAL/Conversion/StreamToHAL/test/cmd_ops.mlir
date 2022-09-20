@@ -117,7 +117,7 @@ func.func @cmdExecute(%arg0: !stream.resource<transient>, %arg1: index, %arg2: !
 hal.executable private @ex {
   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) attributes {
-      translation_info = #iree_codegen.translation_info<CPUDefault workload_per_wg = [4]>
+      translation_info = #iree_codegen.translation_info<CPUDefault>
     } {
     ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):  // no predecessors
       %c1 = arith.constant 1 : index

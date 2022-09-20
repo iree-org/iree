@@ -1504,7 +1504,6 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
   if (!getTranslationInfo(entryPointFn)) {
     // Fall back, just set the translation to CPUDefault.
     setTranslationInfo(entryPointFn, DispatchLoweringPassPipeline::CPUDefault,
-                       /*workloadPerWorkgroup=*/ArrayRef<int64_t>{},
                        /*workgroupSize=*/ArrayRef<int64_t>{});
   }
 

@@ -28,7 +28,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
   hal.executable private @ex0 {
     hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
       hal.executable.export public @dispatch0 ordinal(0) layout(#pipeline_layout_0) attributes {
-        translation_info = #iree_codegen.translation_info<CPUDefault workload_per_wg = [4]>
+        translation_info = #iree_codegen.translation_info<CPUDefault>
       } {
       ^bb0(%device: !hal.device, %arg0: index):
         %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg0
@@ -41,7 +41,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
       }
 
       hal.executable.export public @dispatch1 ordinal(1) layout(#pipeline_layout_1) attributes {
-        translation_info = #iree_codegen.translation_info<CPUDefault workload_per_wg = [4]>
+        translation_info = #iree_codegen.translation_info<CPUDefault>
       } {
       ^bb0(%device: !hal.device, %arg0: index, %arg1: index):
         %c1 = arith.constant 1 : index
