@@ -6,11 +6,8 @@
 
 #include "iree/builtins/ukernel/mmt4d.h"
 
-#if defined(IREE_UKERNEL_ARCH_ARM_64)
-#include "iree/builtins/ukernel/arm_64/mmt4d_tile_arm_64.h"
-#endif
-
-#include "iree/builtins/ukernel/mmt4d_tile_generic.h"
+#include "iree/builtins/ukernel/arch/mmt4d_select_tile_arch.h"
+#include "iree/builtins/ukernel/mmt4d_select_tile_generic.h"
 
 #define OUTSIDE_UINT_RANGE(value, bits) (((value) < 0) || ((value) >> (bits)))
 
@@ -33,7 +30,7 @@ static iree_ukernel_mmt4d_status_t iree_ukernel_mmt4d_validate(
   // enforce a narrower range here, as we can always relax that later as needed.
   if (OUTSIDE_UINT_RANGE(params->M, 31) || OUTSIDE_UINT_RANGE(params->M, 31) ||
       OUTSIDE_UINT_RANGE(params->K, 31) || OUTSIDE_UINT_RANGE(params->M0, 15) ||
-      OUTSIDE_UINT_RANGE(params->M0, 15) ||
+      OUTSIDE_UINT_RANGE(params->N0, 15) ||
       OUTSIDE_UINT_RANGE(params->K0, 15)) {
     return iree_ukernel_mmt4d_status_unsupported_huge_or_negative_dimension;
   }
@@ -45,10 +42,8 @@ static iree_ukernel_mmt4d_status_t iree_ukernel_mmt4d_validate(
 static iree_ukernel_mmt4d_status_t iree_ukernel_mmt4d_select_tile_func(
     const iree_ukernel_mmt4d_params_t* params,
     iree_ukernel_mmt4d_tile_func_t* out_tile_func) {
-  iree_ukernel_mmt4d_tile_func_t arch_tile_func = 0;
-#if defined(IREE_UKERNEL_ARCH_ARM_64)
-  arch_tile_func = iree_ukernel_mmt4d_select_tile_func_arm_64(params);
-#endif
+  iree_ukernel_mmt4d_tile_func_t arch_tile_func =
+      iree_ukernel_mmt4d_select_tile_func_arch(params);
   if (arch_tile_func) {
     *out_tile_func = arch_tile_func;
     return iree_ukernel_mmt4d_status_ok;
@@ -78,11 +73,11 @@ static void iree_ukernel_mmt4d_using_tile_func(
   char* out_tile_row = params->out_buffer;
   const char* lhs_panel = params->lhs_buffer;
   int32_t out_tile_size = (M0 * N0) << out_elem_size_log2;
-  iree_ukernel_size_t lhs_panel_stride = params->lhs_stride
-                                         << lhs_elem_size_log2;
-  iree_ukernel_size_t rhs_panel_stride = params->rhs_stride
-                                         << rhs_elem_size_log2;
-  iree_ukernel_size_t out_stride = params->out_stride << out_elem_size_log2;
+  iree_ukernel_ssize_t lhs_panel_stride = params->lhs_stride
+                                          << lhs_elem_size_log2;
+  iree_ukernel_ssize_t rhs_panel_stride = params->rhs_stride
+                                          << rhs_elem_size_log2;
+  iree_ukernel_ssize_t out_stride = params->out_stride << out_elem_size_log2;
   for (int32_t i = 0; i < M; ++i) {
     char* out_tile = out_tile_row;
     const char* rhs_panel = params->rhs_buffer;

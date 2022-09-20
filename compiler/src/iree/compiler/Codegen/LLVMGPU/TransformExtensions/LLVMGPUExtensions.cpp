@@ -173,9 +173,15 @@ mlir::iree_compiler::rewriteForeachThreadToGpu(
   // Step 4. RAUW thread indices to thread ops.
   SmallVector<Value> threadIndices =
       *getThreadIndices(rewriter, foreachThreadOp);
+  assert(threadOps.size() == 3 && "3 thread id ops are required");
+  assert(threadIndices.size() == 3 && "3 thread id dimensions are required");
   for (auto it : llvm::zip(threadIndices, threadOps)) {
-    if (!std::get<0>(it)) continue;
-    std::get<0>(it).replaceAllUsesWith(std::get<1>(it));
+    Value val = std::get<0>(it);
+    if (!val) continue;
+    for (Operation *user : llvm::make_early_inc_range(val.getUsers())) {
+      rewriter.updateRootInPlace(
+          user, [&]() { user->replaceUsesOfWith(val, std::get<1>(it)); });
+    }
   }
 
   // Step 5. syncthreads.

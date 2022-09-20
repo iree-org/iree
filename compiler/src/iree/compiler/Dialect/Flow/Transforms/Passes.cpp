@@ -84,6 +84,13 @@ static llvm::cl::opt<bool> clEnableLinalgDetensorize(
     llvm::cl::desc("Enable detensorizing linalg ops to operate on primitives"),
     llvm::cl::init(true));
 
+static llvm::cl::opt<bool> clEnableAggressiveFusion(
+    "iree-flow-enable-aggressive-fusion",
+    llvm::cl::desc(
+        "Enable the aggressive fusion heuristic to fuse multiuse ops and ops "
+        "with reduction loops"),
+    llvm::cl::init(false));
+
 static llvm::cl::opt<std::string> clMmt4dTargetOptions(
     "iree-flow-mmt4d-target-options",
     llvm::cl::desc("Convert linalg.matmul ops to MMT4D ops targetting the "
@@ -238,9 +245,10 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPass(memref::createResolveShapedTypeResultDimsPass)
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)
-
       // Elementwise fusion.
-      .addPass(createFusionOfTensorOpsPass)
+      .addPass([]() {
+        return createFusionOfTensorOpsPass(clEnableAggressiveFusion);
+      })
       .addPredicatedPass(clEnableLinalgDetensorize,
                          mlir::createLinalgDetensorizePass)
       .addPass(mlir::createCanonicalizerPass)

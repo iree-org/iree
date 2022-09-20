@@ -111,13 +111,13 @@ static inline int iree_ukernel_count_leading_zeros_u32(const uint32_t n) {
 // Corresponds to the header macro DECLARE_UKERNEL_BINARY_2D.
 #define DISPATCH_UKERNEL_BINARY_2D(opcode, opcode_t, dtype, category)         \
   IREE_UKERNEL_EXPORT int iree_ukernel_##category##_##opcode##_2d(            \
-      const dtype* lhs, iree_ukernel_size_t lhs_offset,                       \
-      iree_ukernel_size_t lhs_stride0, iree_ukernel_size_t lhs_stride1,       \
-      const dtype* rhs, iree_ukernel_size_t rhs_offset,                       \
-      iree_ukernel_size_t rhs_stride0, iree_ukernel_size_t rhs_stride1,       \
-      dtype* IREE_RESTRICT out, iree_ukernel_size_t out_offset,               \
-      iree_ukernel_size_t out_stride0, iree_ukernel_size_t out_stride1,       \
-      iree_ukernel_size_t size0, iree_ukernel_size_t size1) {                 \
+      const dtype* lhs, iree_ukernel_ssize_t lhs_offset,                       \
+      iree_ukernel_ssize_t lhs_stride0, iree_ukernel_ssize_t lhs_stride1,       \
+      const dtype* rhs, iree_ukernel_ssize_t rhs_offset,                       \
+      iree_ukernel_ssize_t rhs_stride0, iree_ukernel_ssize_t rhs_stride1,       \
+      dtype* IREE_RESTRICT out, iree_ukernel_ssize_t out_offset,               \
+      iree_ukernel_ssize_t out_stride0, iree_ukernel_ssize_t out_stride1,       \
+      iree_ukernel_ssize_t size0, iree_ukernel_ssize_t size1) {                 \
     return iree_ukernel_generic_##category##_2d(                              \
         opcode_t, lhs, lhs_offset, lhs_stride0, lhs_stride1, rhs, rhs_offset, \
         rhs_stride0, rhs_stride1, out, out_offset, out_stride0, out_stride1,  \
@@ -129,11 +129,11 @@ static inline int iree_ukernel_count_leading_zeros_u32(const uint32_t n) {
 // Corresponds to the header macro DECLARE_UKERNEL_BINARY_2D.
 #define DISPATCH_UKERNEL_UNARY_2D(opcode, opcode_t, dtype, category)      \
   IREE_UKERNEL_EXPORT int iree_ukernel_##category##_##opcode##_2d(        \
-      const dtype* in, iree_ukernel_size_t in_offset,                     \
-      iree_ukernel_size_t in_stride0, iree_ukernel_size_t in_stride1,     \
-      dtype* IREE_RESTRICT out, iree_ukernel_size_t out_offset,           \
-      iree_ukernel_size_t out_stride0, iree_ukernel_size_t out_stride1,   \
-      iree_ukernel_size_t size0, iree_ukernel_size_t size1) {             \
+      const dtype* in, iree_ukernel_ssize_t in_offset,                     \
+      iree_ukernel_ssize_t in_stride0, iree_ukernel_ssize_t in_stride1,     \
+      dtype* IREE_RESTRICT out, iree_ukernel_ssize_t out_offset,           \
+      iree_ukernel_ssize_t out_stride0, iree_ukernel_ssize_t out_stride1,   \
+      iree_ukernel_ssize_t size0, iree_ukernel_ssize_t size1) {             \
     return iree_ukernel_generic_##category##_2d(                          \
         opcode_t, in, in_offset, in_stride0, in_stride1, out, out_offset, \
         out_stride0, out_stride1, size0, size1);                          \
@@ -242,20 +242,20 @@ static void iree_ukernel_generic_x32u_op(iree_ukernel_x32u_opcode_t opcode,
 static int iree_ukernel_generic_x32b_2d(
     iree_ukernel_x32b_opcode_t opcode,
     // LHS.
-    const uint32_t* lhs, iree_ukernel_size_t lhs_offset,
-    iree_ukernel_size_t lhs_stride0, iree_ukernel_size_t lhs_stride1,
+    const uint32_t* lhs, iree_ukernel_ssize_t lhs_offset,
+    iree_ukernel_ssize_t lhs_stride0, iree_ukernel_ssize_t lhs_stride1,
     // RHS
-    const uint32_t* rhs, iree_ukernel_size_t rhs_offset,
-    iree_ukernel_size_t rhs_stride0, iree_ukernel_size_t rhs_stride1,
+    const uint32_t* rhs, iree_ukernel_ssize_t rhs_offset,
+    iree_ukernel_ssize_t rhs_stride0, iree_ukernel_ssize_t rhs_stride1,
     // OUT.
-    uint32_t* IREE_RESTRICT out, iree_ukernel_size_t out_offset,
-    iree_ukernel_size_t out_stride0, iree_ukernel_size_t out_stride1,
+    uint32_t* IREE_RESTRICT out, iree_ukernel_ssize_t out_offset,
+    iree_ukernel_ssize_t out_stride0, iree_ukernel_ssize_t out_stride1,
     // Sizes.
-    iree_ukernel_size_t size0, iree_ukernel_size_t size1) {
+    iree_ukernel_ssize_t size0, iree_ukernel_ssize_t size1) {
   int result_code = 0;
   // TODO: Manually unroll to x4 to trigger vectorization.
-  for (iree_ukernel_size_t i = 0; i < size0; ++i) {
-    for (iree_ukernel_size_t j = 0; j < size1; ++j) {
+  for (iree_ukernel_ssize_t i = 0; i < size0; ++i) {
+    for (iree_ukernel_ssize_t j = 0; j < size1; ++j) {
       iree_ukernel_generic_x32b_op(opcode, &result_code,
                                    &lhs[i * lhs_stride0 + j * lhs_stride1],
                                    &rhs[i * rhs_stride0 + j * rhs_stride1],
@@ -269,17 +269,17 @@ static int iree_ukernel_generic_x32b_2d(
 static int iree_ukernel_generic_x32u_2d(
     iree_ukernel_x32u_opcode_t opcode,
     // IN.
-    const uint32_t* in, iree_ukernel_size_t in_offset,
-    iree_ukernel_size_t in_stride0, iree_ukernel_size_t in_stride1,
+    const uint32_t* in, iree_ukernel_ssize_t in_offset,
+    iree_ukernel_ssize_t in_stride0, iree_ukernel_ssize_t in_stride1,
     // OUT.
-    uint32_t* IREE_RESTRICT out, iree_ukernel_size_t out_offset,
-    iree_ukernel_size_t out_stride0, iree_ukernel_size_t out_stride1,
+    uint32_t* IREE_RESTRICT out, iree_ukernel_ssize_t out_offset,
+    iree_ukernel_ssize_t out_stride0, iree_ukernel_ssize_t out_stride1,
     // Sizes.
-    iree_ukernel_size_t size0, iree_ukernel_size_t size1) {
+    iree_ukernel_ssize_t size0, iree_ukernel_ssize_t size1) {
   int result_code = 0;
   // TODO: Manually unroll to x4 to trigger vectorization.
-  for (iree_ukernel_size_t i = 0; i < size0; ++i) {
-    for (iree_ukernel_size_t j = 0; j < size1; ++j) {
+  for (iree_ukernel_ssize_t i = 0; i < size0; ++i) {
+    for (iree_ukernel_ssize_t j = 0; j < size1; ++j) {
       iree_ukernel_generic_x32u_op(opcode, &result_code,
                                    &in[i * in_stride0 + j * in_stride1],
                                    &out[i * out_stride0 + j * out_stride1]);

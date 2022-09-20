@@ -1,7 +1,7 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(builtin.module(func.func(iree-spirv-tile-and-distribute))))' %s | FileCheck %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 16], [1, 1]]>
-#translation = #iree_codegen.translation_info<SPIRVDistribute workload_per_wg = [16, 1]>
+#translation = #iree_codegen.translation_info<SPIRVDistribute>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -66,10 +66,11 @@ hal.executable private @static_scatter_update_slice  {
 //       CHECK:       scf.for %[[IV_X:.+]] = %[[TID_X]] to %{{.+}} step %[[DIM_X]]
 //       CHECK:         %[[T_UPDATE:.+]] = memref.subview %[[WG_UPDATE]][%[[IV_Y]], %[[IV_X]]] [1, 1] [1, 1]
 //       CHECK:         %[[T_UPDATE_CAST:.+]] = memref.cast %[[T_UPDATE]]
-//       CHECK:         %[[T_INDEX:.+]] = memref.cast %[[WG_INDEX]]
+//       CHECK:         %[[T_INDEX:.+]] = memref.subview %[[WG_INDEX]][%[[IV_Y]], 0] [1, 1] [1, 1]
+//       CHECK:         %[[T_INDEX_CAST:.+]] = memref.cast %[[T_INDEX]]
 //       CHECK:         %[[T_TARGET:.+]] = memref.subview %[[WG_TARGET]][0, %[[IV_X]]] [100, 1] [1, 1]
 //       CHECK:         %[[T_TARGET_CAST:.+]] = memref.cast %[[T_TARGET]]
 //       CHECK:         iree_linalg_ext.scatter
 //  CHECK-SAME:           unique_indices(true)
-//  CHECK-SAME:           ins(%[[T_UPDATE_CAST]], %[[T_INDEX]]
+//  CHECK-SAME:           ins(%[[T_UPDATE_CAST]], %[[T_INDEX_CAST]]
 //  CHECK-SAME:           outs(%[[T_TARGET_CAST]]

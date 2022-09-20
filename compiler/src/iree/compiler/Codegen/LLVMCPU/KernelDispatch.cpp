@@ -10,6 +10,7 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Common/LinalgOpInfo.h"
+#include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/LLVMCPU/TargetMLTransformInfo.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -358,7 +359,7 @@ static int64_t getMaxTileSize(int64_t lb, int64_t ub, int64_t maxSize,
     return maxSize;
   }
   int64_t dim = ub - lb;
-  if (dim < vectorSizeVal) return dim;
+  if (dim <= maxSize && dim < vectorSizeVal) return dim;
 
   int64_t scaledUB = std::min(maxSize, dim) / vectorSizeVal * vectorSizeVal;
   for (int64_t i = scaledUB; i > 0; i -= vectorSizeVal) {
@@ -1524,7 +1525,6 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
   if (!getTranslationInfo(entryPointFn)) {
     // Fall back, just set the translation to CPUDefault.
     setTranslationInfo(entryPointFn, DispatchLoweringPassPipeline::CPUDefault,
-                       /*workloadPerWorkgroup=*/ArrayRef<int64_t>{},
                        /*workgroupSize=*/ArrayRef<int64_t>{});
   }
 
@@ -1538,19 +1538,8 @@ static LogicalResult setTranslationInfoAndRootConfig(
   for (auto computeOp : computeOps) {
     if (IREE::Codegen::CompilationInfoAttr compilationInfo =
             getCompilationInfo(computeOp)) {
-      // If the function already has a translation, error out.
-      if (auto translationInfo = getTranslationInfo(entryPointFn)) {
-        return computeOp->emitOpError(
-            "multiple ops within dispatch trying to set the translation "
-            "info");
-      }
-
-      SmallVector<int64_t> workgroupSize =
-          compilationInfo.getWorkgroupSizeVals();
-      setTranslationInfo(entryPointFn, compilationInfo.getTranslationInfo(),
-                         workgroupSize);
-      setLoweringConfig(computeOp, compilationInfo.getLoweringConfig());
-      eraseCompilationInfo(computeOp);
+      if (failed(setUserConfig(entryPointFn, computeOp, compilationInfo)))
+        return failure();
     }
   }
 

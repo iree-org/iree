@@ -75,9 +75,9 @@ func.func @matmul_static(
 // CODEGEN:           memref.assume_alignment %{{.*}}, 64 : memref<3x3xf32>
 // CODEGEN:           %[[workgroup_id_x:.*]] = hal.interface.workgroup.id[0] : index
 // CODEGEN:           affine.apply {{.*}}()[%workgroup_id_x]
-// CODEGEN:           memref.subview %{{.*}}[%{{.*}}, 0] [%{{.*}}, 5] [1, 1] : memref<3x5xf32> to memref<?x5xf32, #{{.*}}>
-// CODEGEN:           memref.subview %{{.*}}[%{{.*}}, 0] [%{{.*}}, 3] [1, 1] : memref<3x3xf32> to memref<?x3xf32, #{{.*}}>
-// CODEGEN:           linalg.matmul ins(%{{.*}}, %{{.*}} : memref<?x5xf32, #map3>, memref<5x3xf32>) outs(%{{.*}} : memref<?x3xf32, #{{.*}}>)
+// CODEGEN:           memref.subview %{{.*}}[%{{.*}}, 0] [%{{.*}}, 5] [1, 1] : memref<3x5xf32> to memref<?x5xf32, strided<[5, 1], offset: ?>>
+// CODEGEN:           memref.subview %{{.*}}[%{{.*}}, 0] [%{{.*}}, 3] [1, 1] : memref<3x3xf32> to memref<?x3xf32, strided<[3, 1], offset: ?>>
+// CODEGEN:           linalg.matmul ins(%{{.*}}, %{{.*}} : memref<?x5xf32, strided<[5, 1], offset: ?>>, memref<5x3xf32>) outs(%{{.*}} : memref<?x3xf32, strided<[3, 1], offset: ?>>)
 
 // RUN: iree-compile %s --iree-hal-target-backends=llvm-cpu \
 // RUN:   --iree-flow-dispatch-use-transform-dialect=%p/matmul_dispatch_spec.mlir \

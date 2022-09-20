@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/builtins/ukernel/mmt4d_tile_generic.h"
+#include "iree/builtins/ukernel/mmt4d_select_tile_generic.h"
 
 // In order to be helpful as a reference for future architecture-specific
 // kernels, the generic kernels here are structured like an actual optimized
@@ -14,15 +14,15 @@
 // the accumulator tile, but for now all known cases are comfortably far below
 // where trouble would happen. For reference:
 // - On ARM NEON, the entire register space is 512 bytes, so the accumulator
-//   tile is less than that.
-// - On ARM SME, we will be working with an accumulator tile as large as 2048
+//   tile is less than that, typically 256 to 384 bytes.
+// - On ARM SME, we will be working with an accumulator tile as large as 4096
 //   bytes (IIUC).
 // - The smallest stack frame size limit that we know we may have to deal with
 //   on certain targets is 16 kilobytes.
 // The size or architecture-specific tiles is relevant here because this
 // generic code is what will be run as a fallback if the device is found not to
 // support the CPU feature that the tile sizes were picked to target.
-enum { iree_ukernel_mmt4d_tile_generic_max_bytes = 2048 };
+enum { iree_ukernel_mmt4d_tile_generic_max_bytes = 4096 };
 
 // Generic implementation of matmul tile, i8*i8->i32 case.
 static void iree_ukernel_mmt4d_tile_i8i8i32_generic(
@@ -43,10 +43,10 @@ static void iree_ukernel_mmt4d_tile_i8i8i32_generic(
     for (int i = 0; i < M0 * N0; ++i) acc[i] = 0;
   }
   // Accumulation loop.
-  for (iree_ukernel_size_t k = 0; k < K; ++k) {
-    for (iree_ukernel_size_t i0 = 0; i0 < M0; ++i0) {
-      for (iree_ukernel_size_t j0 = 0; j0 < N0; ++j0) {
-        for (iree_ukernel_size_t k0 = 0; k0 < K0; ++k0) {
+  for (iree_ukernel_ssize_t k = 0; k < K; ++k) {
+    for (iree_ukernel_ssize_t i0 = 0; i0 < M0; ++i0) {
+      for (iree_ukernel_ssize_t j0 = 0; j0 < N0; ++j0) {
+        for (iree_ukernel_ssize_t k0 = 0; k0 < K0; ++k0) {
           int32_t lhs_val_int32 = lhs_panel[i0 * K0 + k0];
           int32_t rhs_val_int32 = rhs_panel[j0 * K0 + k0];
           acc[i0 * N0 + j0] += lhs_val_int32 * rhs_val_int32;
@@ -79,10 +79,10 @@ static void iree_ukernel_mmt4d_tile_f32f32f32_generic(
     for (int i = 0; i < M0 * N0; ++i) acc[i] = 0;
   }
   // Accumulation loop.
-  for (iree_ukernel_size_t k = 0; k < K; ++k) {
-    for (iree_ukernel_size_t i0 = 0; i0 < M0; ++i0) {
-      for (iree_ukernel_size_t j0 = 0; j0 < N0; ++j0) {
-        for (iree_ukernel_size_t k0 = 0; k0 < K0; ++k0) {
+  for (iree_ukernel_ssize_t k = 0; k < K; ++k) {
+    for (iree_ukernel_ssize_t i0 = 0; i0 < M0; ++i0) {
+      for (iree_ukernel_ssize_t j0 = 0; j0 < N0; ++j0) {
+        for (iree_ukernel_ssize_t k0 = 0; k0 < K0; ++k0) {
           float lhs_val = lhs_panel[i0 * K0 + k0];
           float rhs_val = rhs_panel[j0 * K0 + k0];
           acc[i0 * N0 + j0] += lhs_val * rhs_val;

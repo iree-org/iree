@@ -14,6 +14,7 @@
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -25,8 +26,19 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 
+#define DEBUG_TYPE "iree-gpu-distribute-shared-memory-copy"
+
 using mlir::iree_compiler::IREE::LinalgExt::LinalgVectorizationPattern;
 using mlir::iree_compiler::IREE::LinalgExt::VectorizationPatterns;
+
+/// Prints the given `funcOp` after a leading `step` comment header.
+void debugPrint(mlir::func::FuncOp funcOp, const char *step) {
+  LLVM_DEBUG({
+    llvm::dbgs() << "//--- " << step << " ---//\n";
+    funcOp.print(llvm::dbgs(), mlir::OpPrintingFlags().useLocalScope());
+    llvm::dbgs() << "\n\n";
+  });
+}
 
 //====---------------------------------------------------------------------===//
 // Pass to lower workgroup memory copy to distibuted
@@ -158,7 +170,7 @@ SmallVector<linalg::ProcInfo> getIds(OpBuilder &b, Location loc,
                                      Value flatThreadId) {
   SmallVector<linalg::ProcInfo> infos;
   Value id = flatThreadId;
-  AffineExpr d0 = getAffineDimExpr(0, b.getContext());
+  AffineExpr d0 = b.getAffineDimExpr(0);
   for (Range r : llvm::reverse(parallelLoopRanges)) {
     linalg::ProcInfo info;
     auto offset = r.offset.dyn_cast<Attribute>();
@@ -330,7 +342,7 @@ class GPUDistributeSharedMemoryCopyPass
     : public GPUDistributeSharedMemoryCopyBase<
           GPUDistributeSharedMemoryCopyPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<vector::VectorDialect, scf::SCFDialect>();
+    registry.insert<gpu::GPUDialect, vector::VectorDialect, scf::SCFDialect>();
   }
   void runOnOperation() override {
     func::FuncOp funcOp = getOperation();
@@ -362,6 +374,8 @@ class GPUDistributeSharedMemoryCopyPass
           return canPerformVectorAccessUsingAllThreads(shape, flatWorkgroupSize,
                                                        targetVectorSize);
         });
+    debugPrint(funcOp, "After initial IR cleanup");
+
     if (isAligned) {
       // Ignore all the exisiting loop
       llvm::SmallDenseSet<scf::ForOp> loopsToIgnore;
@@ -375,6 +389,7 @@ class GPUDistributeSharedMemoryCopyPass
               funcOp, std::move(serialTilingPatterns)))) {
         return signalPassFailure();
       }
+      debugPrint(funcOp, "After step 1: tiling");
 
       // Calculate a flat id that will then be broken down during distribution.
       Value flatId = createFlatId(funcOp, workgroupSize);
@@ -385,6 +400,7 @@ class GPUDistributeSharedMemoryCopyPass
               funcOp, std::move(tileAndDistributePatterns)))) {
         return signalPassFailure();
       }
+      debugPrint(funcOp, "After step 2: thread distribution");
 
       // Step 3. Vectorize the distributed copies.
       RewritePatternSet vectorizationPatterns(context);
@@ -393,9 +409,11 @@ class GPUDistributeSharedMemoryCopyPass
               funcOp, std::move(vectorizationPatterns)))) {
         return signalPassFailure();
       }
+      debugPrint(funcOp, "After step 3: vectorization");
 
       // Step4. Finally unroll all the loop created
       UnrollSharedMemoryLoops(funcOp, loopsToIgnore);
+      debugPrint(funcOp, "After step 4: unrolling");
     } else {
       // Fall back to basic tiling for cases where workgroup memory size is not
       // well aligned on the number of threads.
@@ -408,6 +426,8 @@ class GPUDistributeSharedMemoryCopyPass
               funcOp, std::move(threadLevelTilingPatterns)))) {
         return signalPassFailure();
       }
+      debugPrint(funcOp, "After tiling for unaligned case");
+
       // Apply canonicalization patterns.
       RewritePatternSet threadTilingCanonicalizationPatterns =
           linalg::getLinalgTilingCanonicalizationPatterns(context);
