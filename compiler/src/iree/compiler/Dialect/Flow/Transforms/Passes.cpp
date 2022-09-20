@@ -233,7 +233,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
 
   // Pad tensors.
   passManager.addPass(IREE::Flow::createPadTensorToTensorInsertSlicePass(
-      /*skipOneLinalgUseCase=*/clEnableFusePaddingIntoLinalgConsumerOps));
+      /*skipSingleLinalgOpUses=*/clEnableFusePaddingIntoLinalgConsumerOps));
 
   FunctionLikeNest(passManager)
       // Preprocess the input to a form more amenable for fusion

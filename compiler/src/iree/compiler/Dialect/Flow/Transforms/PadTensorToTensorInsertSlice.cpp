@@ -36,9 +36,9 @@ namespace {
 /// consumers.
 struct PadTensorOpConversion : public OpRewritePattern<tensor::PadOp> {
   using OpRewritePattern<tensor::PadOp>::OpRewritePattern;
-  PadTensorOpConversion(MLIRContext *context, bool skipOneLinalgUseCase)
-      : OpRewritePattern<tensor::PadOp>(context, skipOneLinalgUseCase),
-        skipOneLinalgUseCase(skipOneLinalgUseCase) {}
+  PadTensorOpConversion(MLIRContext *context, bool skipSingleLinalgOpUses)
+      : OpRewritePattern<tensor::PadOp>(context, skipSingleLinalgOpUses),
+        skipSingleLinalgOpUses(skipSingleLinalgOpUses) {}
 
   LogicalResult matchAndRewrite(tensor::PadOp padTensorOp,
                                 PatternRewriter &rewriter) const override {
@@ -54,7 +54,7 @@ struct PadTensorOpConversion : public OpRewritePattern<tensor::PadOp> {
       return failure();
     }
 
-    if (skipOneLinalgUseCase && padTensorOp->hasOneUse()) {
+    if (skipSingleLinalgOpUses && padTensorOp->hasOneUse()) {
       Operation *use = padTensorOp->use_begin()->getOwner();
       // TODO(#10312): Relax the condition to not check quantized ops. They
       // are going to be deprecated. We don't expect them being IREE's input.
@@ -119,14 +119,14 @@ struct PadTensorOpConversion : public OpRewritePattern<tensor::PadOp> {
  private:
   // Option to skip the pattern when tensor.pad op has one use and is used by
   // a Linalg op.
-  bool skipOneLinalgUseCase = false;
+  bool skipSingleLinalgOpUses = false;
 };
 
 struct PadTensorToTensorInsertSlicePass
     : public PadTensorToTensorInsertSliceBase<
           PadTensorToTensorInsertSlicePass> {
-  PadTensorToTensorInsertSlicePass(bool skipOneLinalgUseCase)
-      : skipOneLinalgUseCase(skipOneLinalgUseCase) {}
+  PadTensorToTensorInsertSlicePass(bool skipSingleLinalgOpUses)
+      : skipSingleLinalgOpUses(skipSingleLinalgOpUses) {}
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
         .insert<linalg::LinalgDialect, memref::MemRefDialect, func::FuncDialect,
@@ -137,17 +137,17 @@ struct PadTensorToTensorInsertSlicePass
     if (failed(Pass::initializeOptions(options))) {
       return failure();
     }
-    // `skipOneLinalgUseCase` may have been set to `true` in the constructor
+    // `skipSingleLinalgOpUses` may have been set to `true` in the constructor
     // already. The |= is so we preserve that rather than overwrite it with the
-    // default value `false` of `optionSkipOneLinalgUseCase`.
-    skipOneLinalgUseCase |= optionSkipOneLinalgUseCase;
+    // default value `false` of `optionSkipSingleLinalgOpUses`.
+    skipSingleLinalgOpUses |= optionSkipSingleLinalgOpUses;
     return success();
   }
 
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
-    patterns.insert<PadTensorOpConversion>(context, skipOneLinalgUseCase);
+    patterns.insert<PadTensorOpConversion>(context, skipSingleLinalgOpUses);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       return signalPassFailure();
@@ -155,15 +155,15 @@ struct PadTensorToTensorInsertSlicePass
   }
 
  private:
-  bool skipOneLinalgUseCase;
+  bool skipSingleLinalgOpUses;
 };
 
 }  // namespace
 
 std::unique_ptr<Pass> createPadTensorToTensorInsertSlicePass(
-    bool skipOneLinalgUseCase) {
+    bool skipSingleLinalgOpUses) {
   return std::make_unique<PadTensorToTensorInsertSlicePass>(
-      skipOneLinalgUseCase);
+      skipSingleLinalgOpUses);
 }
 
 }  // namespace Flow

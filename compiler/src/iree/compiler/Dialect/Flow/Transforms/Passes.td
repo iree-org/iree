@@ -178,7 +178,7 @@ def PadTensorToTensorInsertSlice :
   let summary = "Convert linalg.pad_tensor into linalg.fill + tensor.insert_slice";
   let constructor = "mlir::iree_compiler::IREE::Flow::createPadTensorToTensorInsertSlicePass()";
   let options = [
-    Option<"optionSkipOneLinalgUseCase", "skip-one-linalg-use-case", "bool",
+    Option<"optionSkipSingleLinalgOpUses", "skip-one-linalg-use-case", "bool",
            /*default=*/"false",
            "Skip the op that has only one use which is used"
            "by a Linalg op">,
