@@ -95,37 +95,27 @@ def IREECodegen_TranslationInfoAttr :
 
     The fields are
     - `passPipeline` : The pass pipeline to use.
-    - `workloadPerWorkgroup` : Specifies how much of the original
-      `workload` is handled by a workgroup along `x`, `y` and `z`.  If
-      left empty it implies that that there is a single workgroup that
-      does the entire `workload`.
 
   }];
 
   let assemblyFormat = [{
-    `<` `` $passPipeline (`workload_per_wg` `=` $workloadPerWorkgroup^)?
+    `<` `` $passPipeline
     (`pipeline_depth` `=` $softwarePipelineDepth^)? `>`
   }];
 
   let parameters = (ins
     AttrParameter<"IREE::Codegen::DispatchLoweringPassPipelineAttr",
         "Name of the pipeline to be invoked on the translation unit.">:$passPipeline,
-    DefaultValuedParameter<"ArrayAttr", "ArrayAttr::get($_ctxt, {})",
-        "The workload mapped to a single workgroup">:$workloadPerWorkgroup,
     DefaultValuedParameter<"unsigned", "1",
         "The software pipeline depth to be used">:$softwarePipelineDepth
   );
   let builders = [
     AttrBuilder<(ins "DispatchLoweringPassPipeline":$passPipeline,
-        CArg<"ArrayRef<int64_t>", "{}">:$workloadPerWorkgroup,
         CArg<"unsigned", "0">:$softwarePipelineDepth)>
   ];
   let extraClassDeclaration = [{
     // Returns the lowering pass pipeline set.
     DispatchLoweringPassPipeline getDispatchLoweringPassPipeline();
-
-    // Returns values of the workloadPerWorkgroup field if set.
-    SmallVector<int64_t> getWorkloadPerWorkgroupVals();
   }];
   let genVerifyDecl = 1;
 }
@@ -201,10 +191,9 @@ def IREECodegen_CompilationInfoAttr :
     specifies the behaviour of the compilation path chosen with
     `TranslationInfoAttr`. This could be added in the future.  Note:
     Typically the values used for the first-level tiling in
-    `LoweringConfigAttr` and `workload_per_wg` value in the
-    `TranslationInfoAttr` are the same since the first-level of tile +
-    distribute is already done at the `Flow` level. This verification
-    is also a TODO.
+    `LoweringConfigAttr` value in the `TranslationInfoAttr` are the
+    same since the first-level of tile + distribute is already done
+    at the `Flow` level. This verification is also a TODO.
   }];
   let parameters = (ins
     AttrParameter<"LoweringConfigAttr", "">:$loweringConfig,
@@ -222,7 +211,7 @@ def IREECodegen_CompilationInfoAttr :
   let builders = [
     AttrBuilder<(ins "LoweringConfigAttr":$configAttr,
       "TranslationInfoAttr":$translationInfo,
-      "ArrayRef<int64_t>":$workloadPerWorkgroup)>,
+      "ArrayRef<int64_t>":$workgroupSize)>,
   ];
   let extraClassDeclaration = [{
     SmallVector<int64_t> getWorkgroupSizeVals();

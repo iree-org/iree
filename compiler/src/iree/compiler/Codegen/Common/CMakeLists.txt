@@ -147,6 +147,7 @@ iree_cc_library(
     Common
   HDRS
     "LinalgOpInfo.h"
+    "UserConfig.h"
   SRCS
     "DecomposeLinalgGeneric.cpp"
     "FoldAffineMinInDistributedLoops.cpp"
@@ -160,6 +161,7 @@ iree_cc_library(
     "TestPartitionableLoopsInterface.cpp"
     "TileAndDistributeToWorkgroupsPass.cpp"
     "TileDispatchUsingInterface.cpp"
+    "UserConfig.cpp"
     "VectorReductionToGPU.cpp"
     "VectorizeConv.cpp"
     "WorkGroupSwizzle.cpp"

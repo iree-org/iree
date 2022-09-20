@@ -597,8 +597,7 @@ func.func @fft_1d_stage_5_memref(%arg0: memref<1024xf32>, %arg1: memref<1024xf32
     outs(%arg0, %arg1: memref<1024xf32>, memref<1024xf32>)
   return
 }
-// CHECK-DAG:  #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (32, -d0 + s1)>
-// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0)[s0] -> (d0 + s0)>
+// CHECK:  #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (32, -d0 + s1)>
 // CHECK:      func.func @fft_1d_stage_5_memref(
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]
@@ -610,12 +609,12 @@ func.func @fft_1d_stage_5_memref(%arg0: memref<1024xf32>, %arg1: memref<1024xf32
 // CHECK-DAG:    %[[C1024:.+]] = arith.constant 1024 : index
 // CHECK:        scf.for %[[I:.+]] = %[[C0]] to %[[C1024]] step %[[C32]] {
 // CHECK:          %[[SZ:.+]] = affine.min #[[MAP0]](%[[I]])[%[[C32]], %[[C1024]]]
-// CHECK:          %[[SUB1:.+]] = memref.subview %[[ARG0]][%[[I]]] [%[[SZ]]] [1] : memref<1024xf32> to memref<?xf32, #[[MAP1]]>
-// CHECK:          %[[SUB2:.+]] = memref.subview %[[ARG1]][%[[I]]] [%[[SZ]]] [1] : memref<1024xf32> to memref<?xf32, #[[MAP1]]>
+// CHECK:          %[[SUB1:.+]] = memref.subview %[[ARG0]][%[[I]]] [%[[SZ]]] [1] : memref<1024xf32> to memref<?xf32, strided<[1], offset: ?>>
+// CHECK:          %[[SUB2:.+]] = memref.subview %[[ARG1]][%[[I]]] [%[[SZ]]] [1] : memref<1024xf32> to memref<?xf32, strided<[1], offset: ?>>
 // CHECK:          iree_linalg_ext.fft
 // CHECK-SAME:       {__internal_linalg_transform__ = "tiling_1d_stage5_fft_output"}
 // CHECK-SAME:       ins(%[[C5]], %[[COEF_REAL]], %[[COEF_IMAG]] : index, memref<16xf32>, memref<16xf32>)
-// CHECK-SAME:       outs(%[[SUB1]], %[[SUB2]] : memref<?xf32, #[[MAP1]]>, memref<?xf32, #[[MAP1]]>)
+// CHECK-SAME:       outs(%[[SUB1]], %[[SUB2]] : memref<?xf32, strided<[1], offset: ?>>, memref<?xf32, strided<[1], offset: ?>>)
 
 // -----
 
@@ -628,7 +627,6 @@ func.func @reverse_memref(%arg0: memref<?xi32>, %arg1: memref<?xi32>) {
   return
 }
 // CHECK-DAG:  #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (10, -d0 + s1)>
-// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0)[s0] -> (d0 + s0)>
 // CHECK-DAG:  #[[MAP2:.+]] = affine_map<()[s0, s1, s2] -> (s0 - s1 - s2)>
 // CHECK:      func.func @reverse_memref(
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]
@@ -778,8 +776,7 @@ func.func @scan_2d_memref(%0: memref<16x32xi32>, %1: memref<16x32xi32>) {
   }
   return
 }
-//  CHECK-DAG:  #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (20, -d0 + s1)>
-//  CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1)[s0] -> (d0 * 32 + s0 + d1)>
+//      CHECK:  #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (20, -d0 + s1)>
 //      CHECK:  func.func @scan_2d_memref(
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]+]]
 // CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]+]]
@@ -858,9 +855,7 @@ func.func @topk_tile_memref(%input_values: memref<?x?xf32>, %input_indices: memr
   return
 }
 
-// CHECK-DAG:  #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (10, -d0 + s1)>
-// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>
-// CHECK-DAG:  #[[MAP2:.+]] = affine_map<(d0, d1)[s0] -> (d0 * 3 + s0 + d1)>
+// CHECK:       #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (10, -d0 + s1)>
 // CHECK-LABEL: func.func @topk_tile_memref
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]

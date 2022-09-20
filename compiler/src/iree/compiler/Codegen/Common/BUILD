@@ -187,12 +187,14 @@ iree_compiler_cc_library(
         "TestPartitionableLoopsInterface.cpp",
         "TileAndDistributeToWorkgroupsPass.cpp",
         "TileDispatchUsingInterface.cpp",
+        "UserConfig.cpp",
         "VectorReductionToGPU.cpp",
         "VectorizeConv.cpp",
         "WorkGroupSwizzle.cpp",
     ],
     hdrs = [
         "LinalgOpInfo.h",
+        "UserConfig.h",
     ],
     deps = [
         ":CommonPasses",

@@ -222,7 +222,7 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
 
   // Pipeline memory operations.
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createGPUPipeliningPass(pipelineDepth));
+      createGPUPipeliningPass(/*epiloguePeeling=*/false, pipelineDepth));
 }
 
 void addGPUTransposePassPipeline(OpPassManager &pm) {

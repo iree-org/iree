@@ -43,19 +43,19 @@ iree_mmt4d_scalar_type_t iree_ukernel_mmt4d_out_type(
   }
 }
 
-iree_ukernel_size_t iree_ukernel_mmt4d_lhs_buffer_size(
+iree_ukernel_ssize_t iree_ukernel_mmt4d_lhs_buffer_size(
     const iree_ukernel_mmt4d_params_t* params) {
   return params->M * params->lhs_stride *
          iree_ukernel_mmt4d_lhs_elem_size(params->type);
 }
 
-iree_ukernel_size_t iree_ukernel_mmt4d_rhs_buffer_size(
+iree_ukernel_ssize_t iree_ukernel_mmt4d_rhs_buffer_size(
     const iree_ukernel_mmt4d_params_t* params) {
   return params->N * params->rhs_stride *
          iree_ukernel_mmt4d_rhs_elem_size(params->type);
 }
 
-iree_ukernel_size_t iree_ukernel_mmt4d_out_buffer_size(
+iree_ukernel_ssize_t iree_ukernel_mmt4d_out_buffer_size(
     const iree_ukernel_mmt4d_params_t* params) {
   return params->M * params->out_stride *
          iree_ukernel_mmt4d_out_elem_size(params->type);
@@ -94,11 +94,11 @@ int iree_mmt4d_test_random_engine_get_between_minus16_and_plus15(
 }
 
 template <typename T>
-static void write_random_buffer(T* buffer, iree_ukernel_size_t size_in_bytes,
+static void write_random_buffer(T* buffer, iree_ukernel_ssize_t size_in_bytes,
                                 iree_mmt4d_test_random_engine_t* engine) {
-  iree_ukernel_size_t size_in_elems = size_in_bytes / sizeof(T);
+  iree_ukernel_ssize_t size_in_elems = size_in_bytes / sizeof(T);
   assert(size_in_elems * sizeof(T) == size_in_bytes && "bad size");
-  for (iree_ukernel_size_t i = 0; i < size_in_elems; ++i) {
+  for (iree_ukernel_ssize_t i = 0; i < size_in_elems; ++i) {
     // Small integers, should work for now for all the types we currently have
     // and enable exact float arithmetic, allowing to keep tests simpler for
     // now. Watch out for when we'll do float16!
@@ -108,7 +108,7 @@ static void write_random_buffer(T* buffer, iree_ukernel_size_t size_in_bytes,
   }
 }
 
-void write_random_buffer(void* buffer, iree_ukernel_size_t size_in_bytes,
+void write_random_buffer(void* buffer, iree_ukernel_ssize_t size_in_bytes,
                          iree_mmt4d_scalar_type_t type,
                          iree_mmt4d_test_random_engine_t* engine) {
   switch (type) {

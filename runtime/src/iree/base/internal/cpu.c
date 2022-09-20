@@ -60,6 +60,30 @@ static void iree_cpu_initialize_from_platform(iree_allocator_t temp_allocator,
   iree_cpu_query_data_arch_hwcaps(hwcap, hwcap2, out_fields);
 }
 
+#elif defined(IREE_PLATFORM_MACOS) || defined(IREE_PLATFORM_IOS)
+
+#include <sys/sysctl.h>
+#include <sys/types.h>
+
+#define IREE_QUERY_SYSCTL(key, field_value, field_bit)            \
+  do {                                                            \
+    int64_t result = 0;                                           \
+    size_t result_size = sizeof result;                           \
+    if (0 == sysctlbyname(key, &result, &result_size, NULL, 0)) { \
+      if (result) field_value |= field_bit;                       \
+    }                                                             \
+  } while (0)
+
+static void iree_cpu_initialize_from_platform(iree_allocator_t temp_allocator,
+                                              uint64_t* out_fields) {
+#if defined(IREE_ARCH_ARM_64)
+  IREE_QUERY_SYSCTL("hw.optional.arm.FEAT_DotProd", out_fields[0],
+                    IREE_CPU_DATA_FIELD_0_AARCH64_HAVE_DOTPROD);
+  IREE_QUERY_SYSCTL("hw.optional.arm.FEAT_I8MM", out_fields[0],
+                    IREE_CPU_DATA_FIELD_0_AARCH64_HAVE_I8MM);
+#endif
+}
+
 #else
 
 static void iree_cpu_initialize_from_platform(iree_allocator_t temp_allocator,

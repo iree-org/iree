@@ -53,14 +53,12 @@ func.func @matmul_2x128x4() {
 //   CHECK-DAG:   %[[C128:.+]] = arith.constant 128 : index
 
 //       CHECK:   scf.for %[[IV_Y:.+]] = %[[C0]] to %[[C2]] step %[[C1]]
-//       CHECK:     %[[LHS_TILE:.+]] = tensor.extract_slice %{{.+}}[%[[IV_Y]], 0] [1, 4]
-//       CHECK:     %[[LHS_VECTOR:.+]] = vector.transfer_read %[[LHS_TILE]][%[[C0]], %[[C0]]], %[[PAD]]
+//       CHECK:     %[[LHS_VECTOR:.+]] = vector.transfer_read %{{.+}}[%[[IV_Y]], %[[C0]]], %[[PAD]]
 //       CHECK:     scf.for %[[IV_X:.+]] = %[[C0]] to %[[C128]] step %[[C4]] iter_args(%[[ACC_TILE:.+]] =
-//       CHECK:       %[[RHS_TILE:.+]] = tensor.extract_slice %{{.+}}[0, %[[IV_X]]] [4, 4]
-//       CHECK:       %[[RHS_0_VECTOR:.+]] = vector.transfer_read %[[RHS_TILE]][%[[C0]], %[[C0]]], %[[PAD]]
-//       CHECK:       %[[RHS_1_VECTOR:.+]] = vector.transfer_read %[[RHS_TILE]][%[[C1]], %[[C0]]], %[[PAD]]
-//       CHECK:       %[[RHS_2_VECTOR:.+]] = vector.transfer_read %[[RHS_TILE]][%[[C2]], %[[C0]]], %[[PAD]]
-//       CHECK:       %[[RHS_3_VECTOR:.+]] = vector.transfer_read %[[RHS_TILE]][%[[C3]], %[[C0]]], %[[PAD]]
+//       CHECK:       %[[RHS_0_VECTOR:.+]] = vector.transfer_read %{{.+}}[%[[C0]], %[[IV_X]]], %[[PAD]]
+//       CHECK:       %[[RHS_1_VECTOR:.+]] = vector.transfer_read %{{.+}}[%[[C1]], %[[IV_X]]], %[[PAD]]
+//       CHECK:       %[[RHS_2_VECTOR:.+]] = vector.transfer_read %{{.+}}[%[[C2]], %[[IV_X]]], %[[PAD]]
+//       CHECK:       %[[RHS_3_VECTOR:.+]] = vector.transfer_read %{{.+}}[%[[C3]], %[[IV_X]]], %[[PAD]]
 //       CHECK:       %[[LHS_0_SCALAR:.+]] = vector.extract %[[LHS_VECTOR]][0]
 //       CHECK:       %[[LHS_0_VECTOR:.+]] = vector.splat %[[LHS_0_SCALAR]] : vector<4xf32>
 //       CHECK:       %[[FMA_0:.+]] = vector.fma %[[LHS_0_VECTOR]], %[[RHS_0_VECTOR]], %[[ZERO]] : vector<4xf32>
@@ -200,8 +198,8 @@ func.func @matmul_2x8x128_fp16(%a: tensor<2x128xf16>, %b: tensor<128x8xf16>, %x:
 //     CHECK-SAME: (%{{.+}}: tensor<2x128xf16>, %{{.+}}: tensor<128x8xf16>, %[[X:.+]]: tensor<2x8xf16>, %[[Y:.+]]: tensor<2x8xf16>)
 //          CHECK:   %[[ZERO:.+]] = arith.constant dense<0.000000e+00> : vector<8xf16>
 //          CHECK:   %[[FOR:.+]]:2 = scf.for %arg4 = %{{.+}} to %{{.+}} step %{{.+}} iter_args(%arg5 = %[[ZERO]], %arg6 = %[[ZERO]])
-//  CHECK-COUNT-2:     vector.transfer_read {{.+}} : tensor<2x8xf16>, vector<8xf16>
-//  CHECK-COUNT-8:     vector.transfer_read {{.+}} : tensor<8x8xf16>, vector<8xf16>
+//  CHECK-COUNT-2:     vector.transfer_read {{.+}} : tensor<2x128xf16>, vector<8xf16>
+//  CHECK-COUNT-8:     vector.transfer_read {{.+}} : tensor<128x8xf16>, vector<8xf16>
 // CHECK-COUNT-32:     vector.fma {{.+}} : vector<4xf16>
 //          CHECK:     %[[ISS0:.+]] = vector.insert_strided_slice %{{.+}}, %[[ZERO]] {offsets = [0], strides = [1]} : vector<4xf16> into vector<8xf16>
 //          CHECK:     %[[ISS1:.+]] = vector.insert_strided_slice %{{.+}}, %[[ISS0]] {offsets = [4], strides = [1]} : vector<4xf16> into vector<8xf16>

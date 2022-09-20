@@ -15,7 +15,7 @@ namespace {
 
 struct RISCVTargetMLTransformInfo : TargetMLTransformInfo {
   RISCVTargetMLTransformInfo() {
-    defaultMaxReductionUnrollFactor = 8;
+    defaultMaxUnrollFactor = 8;
     defaultMaxTransposeUnrollFactor = 1;
   }
 };

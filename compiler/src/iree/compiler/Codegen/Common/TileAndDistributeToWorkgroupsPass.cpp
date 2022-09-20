@@ -87,8 +87,7 @@ static LogicalResult lowerToUnitWorkgroupCount(
 static LogicalResult lowerDispatchWorkgroupCountFromDagRootOp(
     IREE::Flow::DispatchWorkgroupCountFromDagRootOp workgroupCountOp,
     ArrayRef<Operation *> computeOps, SmallVectorImpl<int64_t> &tileSizes,
-    SmallVector<int64_t> &interchange,
-    SmallVectorImpl<int64_t> &workloadPerWorkgroup) {
+    SmallVector<int64_t> &interchange) {
   auto workloadValues = workgroupCountOp.operands();
 
   // Find the lowering configuration of the root operation.
@@ -148,25 +147,46 @@ static LogicalResult lowerDispatchWorkgroupCountFromDagRootOp(
   llvm::DenseSet<unsigned> partitionableLoopsSet;
   partitionableLoopsSet.insert(partitionableLoops.begin(),
                                partitionableLoops.end());
+
   for (auto workload : llvm::enumerate(workloadValues)) {
     if (!partitionableLoopsSet.count(workload.index())) {
       tileSizes[workload.index()] = 0;
     }
-    if (tileSizes[workload.index()] == 0) {
+    int64_t tileSize = tileSizes[workload.index()];
+
+    if (tileSize == 0) {
       numTiles.push_back(one);
       continue;
     }
-    if (tileSizes[workload.index()] == 1) {
-      numTiles.push_back(workload.value());
-      continue;
+
+    // When the loop range is known to be static, let's directly use it.
+    int64_t loopRange = ShapedType::kDynamicSize;
+
+    if (auto linalgOp = dyn_cast<linalg::LinalgOp>(*rootOp)) {
+      loopRange = linalgOp.getStaticLoopRanges()[workload.index()];
     }
-    AffineExpr s0;
-    bindSymbols(workgroupCountOp.getContext(), s0);
-    AffineMap numTilesMap =
-        AffineMap::get(0, 1, s0.ceilDiv(tileSizes[workload.index()]));
-    Value nTiles =
-        builder.create<AffineApplyOp>(loc, numTilesMap, workload.value());
-    numTiles.push_back(nTiles);
+
+    if (loopRange != ShapedType::kDynamicSize) {
+      if (tileSize == 1) {
+        Value workload = builder.create<arith::ConstantIndexOp>(loc, loopRange);
+        numTiles.push_back(workload);
+        continue;
+      }
+      int64_t nTileI64 = (loopRange + tileSize - 1) / tileSize;
+      Value nTiles = builder.create<arith::ConstantIndexOp>(loc, nTileI64);
+      numTiles.push_back(nTiles);
+    } else {
+      if (tileSize == 1) {
+        numTiles.push_back(workload.value());
+        continue;
+      }
+      AffineExpr s0;
+      bindSymbols(workgroupCountOp.getContext(), s0);
+      AffineMap numTilesMap = AffineMap::get(0, 1, s0.ceilDiv(tileSize));
+      Value nTiles =
+          builder.create<AffineApplyOp>(loc, numTilesMap, workload.value());
+      numTiles.push_back(nTiles);
+    }
   }
 
   // If there is interchange, first apply interchange on the number of tiles.
@@ -187,33 +207,10 @@ static LogicalResult lowerDispatchWorkgroupCountFromDagRootOp(
     // If the loop isnt tiled, skip it.
     if (tileSizes[partitionedLoop] == 0) continue;
     numWorkgroups.push_back(numTiles[partitionedLoop]);
-    workloadPerWorkgroup.push_back(tileSizes[partitionedLoop]);
   }
   numWorkgroups.resize(kNumMaxParallelDims, one);
   workgroupCountOp->replaceAllUsesWith(numWorkgroups);
   workgroupCountOp.erase();
-  return success();
-}
-
-/// Update the workload_per_wg value on the TranslationInfoAttr.
-// TODO(ravishankarm): The workload_per_wg field should be deprecated. This
-// is just transition before all dependencies on it can be removed.
-static LogicalResult updateTranslationInfoAttr(
-    IREE::HAL::ExecutableExportOp exportOp,
-    ArrayRef<int64_t> workloadPerWorkgroup) {
-  IREE::Codegen::DispatchLoweringPassPipeline passPipeline =
-      IREE::Codegen::DispatchLoweringPassPipeline::CPUDefault;
-  if (auto translationInfo = getTranslationInfo(exportOp)) {
-    // Expect the `workload_per_wg` to be empty.
-    if (!translationInfo.getWorkloadPerWorkgroupVals().empty()) {
-      return exportOp.emitOpError(
-          "expected workload_per_wg to be empty at this stage");
-    }
-    passPipeline = translationInfo.getDispatchLoweringPassPipeline();
-  }
-  auto newTranslationInfoAttr = IREE::Codegen::TranslationInfoAttr::get(
-      exportOp.getContext(), passPipeline, workloadPerWorkgroup);
-  setTranslationInfo(exportOp, newTranslationInfoAttr);
   return success();
 }
 
@@ -280,16 +277,11 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
     IREE::Flow::DispatchWorkgroupCountFromDagRootOp defaultWorkgroupCountOp =
         *(ops.begin());
 
-    SmallVector<int64_t> tileSizes, interchange, workloadPerWorkgroup;
+    SmallVector<int64_t> tileSizes, interchange;
     if (failed(lowerDispatchWorkgroupCountFromDagRootOp(
-            defaultWorkgroupCountOp, computeOps, tileSizes, interchange,
-            workloadPerWorkgroup))) {
+            defaultWorkgroupCountOp, computeOps, tileSizes, interchange))) {
       defaultWorkgroupCountOp.emitOpError(
           "failed to lower default number of workgroups");
-      return signalPassFailure();
-    }
-    if (failed(updateTranslationInfoAttr(exportOp, workloadPerWorkgroup))) {
-      exportOp.emitOpError("failed to update translation info");
       return signalPassFailure();
     }
 

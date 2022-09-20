@@ -10,6 +10,7 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Common/LinalgOpInfo.h"
+#include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/LLVMCPU/TargetMLTransformInfo.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -198,36 +199,34 @@ static SmallVector<int64_t> getMinTilingSizesForEachDim(
     auto operandType =
         inputOutputOpOperands[map.index()]->get().getType().cast<ShapedType>();
     int64_t tileSize = getVectorSize(entryPointFn, operandType);
-    // Vectorization of reductions is driven by input tensors and considering
-    // the output's fastest varying dim leads to large unroll factors. We limit
-    // the tile size for this case to 'maxUnrollFactor'.
-    if (linalgOpInfo.isReduction() &&
-        op.isOutputTensor(inputOutputOpOperands[map.index()])) {
-      tileSize = std::min<int64_t>(
-          tileSize, targetMLTransInfo.defaultMaxReductionUnrollFactor);
-    }
 
     minTileSizes[fastestVaryingDim] =
         std::max<int64_t>(minTileSizes[fastestVaryingDim], tileSize);
   }
 
-  // Limit unrolling on transpose operations. For know, we assume the rightmost
-  // non-one tiled dimension is for vectorization and any other non-one
-  // dimension is for unrolling.
-  // TODO(dcaballe): Consider input and output transposes.
-  if (linalgOpInfo.isTranspose()) {
+  // Limit unroll factor. For now, we assume the rightmost non-one tiled
+  // dimension is for vectorization and any other non-one dimension is for
+  // unrolling.
+  auto limitUnrollFactor = [&](int64_t maxUnrollFactor) {
     int vecDim;
     for (vecDim = minTileSizes.size() - 1; vecDim >= 0; --vecDim) {
       if (minTileSizes[vecDim] > 1) {
         break;
       }
     }
-
     for (int unrollDim = vecDim - 1; unrollDim >= 0; --unrollDim) {
       minTileSizes[unrollDim] =
-          std::min<int64_t>(minTileSizes[unrollDim],
-                            targetMLTransInfo.defaultMaxTransposeUnrollFactor);
+          std::min<int64_t>(minTileSizes[unrollDim], maxUnrollFactor);
     }
+  };
+
+  if (linalgOpInfo.isTranspose()) {
+    // Limit unrolling on transpose operations.
+    // TODO(dcaballe): Consider input and output transposes.
+    limitUnrollFactor(targetMLTransInfo.defaultMaxTransposeUnrollFactor);
+  } else {
+    // Limit unrolling to the default target maximum.
+    limitUnrollFactor(targetMLTransInfo.defaultMaxUnrollFactor);
   }
 
   return minTileSizes;
@@ -360,7 +359,7 @@ static int64_t getMaxTileSize(int64_t lb, int64_t ub, int64_t maxSize,
     return maxSize;
   }
   int64_t dim = ub - lb;
-  if (dim < vectorSizeVal) return dim;
+  if (dim <= maxSize && dim < vectorSizeVal) return dim;
 
   int64_t scaledUB = std::min(maxSize, dim) / vectorSizeVal * vectorSizeVal;
   for (int64_t i = scaledUB; i > 0; i -= vectorSizeVal) {
@@ -1505,7 +1504,6 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
   if (!getTranslationInfo(entryPointFn)) {
     // Fall back, just set the translation to CPUDefault.
     setTranslationInfo(entryPointFn, DispatchLoweringPassPipeline::CPUDefault,
-                       /*workloadPerWorkgroup=*/ArrayRef<int64_t>{},
                        /*workgroupSize=*/ArrayRef<int64_t>{});
   }
 
@@ -1519,19 +1517,8 @@ static LogicalResult setTranslationInfoAndRootConfig(
   for (auto computeOp : computeOps) {
     if (IREE::Codegen::CompilationInfoAttr compilationInfo =
             getCompilationInfo(computeOp)) {
-      // If the function already has a translation, error out.
-      if (auto translationInfo = getTranslationInfo(entryPointFn)) {
-        return computeOp->emitOpError(
-            "multiple ops within dispatch trying to set the translation "
-            "info");
-      }
-
-      SmallVector<int64_t> workgroupSize =
-          compilationInfo.getWorkgroupSizeVals();
-      setTranslationInfo(entryPointFn, compilationInfo.getTranslationInfo(),
-                         workgroupSize);
-      setLoweringConfig(computeOp, compilationInfo.getLoweringConfig());
-      eraseCompilationInfo(computeOp);
+      if (failed(setUserConfig(entryPointFn, computeOp, compilationInfo)))
+        return failure();
     }
   }
 
