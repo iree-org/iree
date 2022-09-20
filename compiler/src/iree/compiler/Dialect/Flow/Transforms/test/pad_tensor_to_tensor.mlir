@@ -1,4 +1,5 @@
 // RUN: iree-opt --split-input-file --iree-flow-pad-tensor-to-tensor-insert-slice --canonicalize %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-flow-pad-tensor-to-tensor-insert-slice=skip-one-linalg-use-case --canonicalize %s | FileCheck %s --check-prefix=SKIP
 
 module  {
   func.func @pad_tensor(%arg0 : tensor<?x?xf32>, %arg1 : tensor<f32>, %arg2 : index, %arg3 : index) -> tensor<?x?xf32> {
@@ -60,3 +61,20 @@ module  {
 //  CHECK-SAME:       outs(%[[INIT]] :
 //       CHECK:   %[[RESULT:.+]] = tensor.insert_slice %[[ARG0]] into %[[FILL]][4, 5] [12, 4] [1, 1]
 //       CHECK:   return %[[RESULT]]
+
+// -----
+
+func.func @_main(%arg0: tensor<1x33x33x480xf32>, %arg1: tensor<3x3x480x1xf32>) -> tensor<1x33x33x480xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = tensor.pad %arg0 low[0, 4, 4, 0] high[0, 4, 4, 0] {
+  ^bb0(%arg2: index, %arg3: index, %arg4: index, %arg5: index):
+    tensor.yield %cst : f32
+  } : tensor<1x33x33x480xf32> to tensor<1x41x41x480xf32>
+  %1 = linalg.init_tensor [1, 33, 33, 480] : tensor<1x33x33x480xf32>
+  %2 = tensor.collapse_shape %arg1 [[0], [1], [2, 3]] : tensor<3x3x480x1xf32> into tensor<3x3x480xf32>
+  %3 = linalg.fill ins(%cst : f32) outs(%1 : tensor<1x33x33x480xf32>) -> tensor<1x33x33x480xf32>
+  %4 = linalg.depthwise_conv_2d_nhwc_hwc {dilations = dense<4> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%0, %2 : tensor<1x41x41x480xf32>, tensor<3x3x480xf32>) outs(%3 : tensor<1x33x33x480xf32>) -> tensor<1x33x33x480xf32>
+  return %4 : tensor<1x33x33x480xf32>
+}
+// CHECK-NOT: tensor.pad
+// SKIP: tensor.pad

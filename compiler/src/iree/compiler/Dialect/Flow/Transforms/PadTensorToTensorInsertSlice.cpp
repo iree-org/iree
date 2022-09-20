@@ -36,6 +36,9 @@ namespace {
 /// consumers.
 struct PadTensorOpConversion : public OpRewritePattern<tensor::PadOp> {
   using OpRewritePattern<tensor::PadOp>::OpRewritePattern;
+  PadTensorOpConversion(MLIRContext *context, bool skipSingleLinalgOpUses)
+      : OpRewritePattern<tensor::PadOp>(context, skipSingleLinalgOpUses),
+        skipSingleLinalgOpUses(skipSingleLinalgOpUses) {}
 
   LogicalResult matchAndRewrite(tensor::PadOp padTensorOp,
                                 PatternRewriter &rewriter) const override {
@@ -49,6 +52,17 @@ struct PadTensorOpConversion : public OpRewritePattern<tensor::PadOp> {
     if (llvm::any_of(block.getArguments(),
                      [&](Value v) { return v == yieldVal; })) {
       return failure();
+    }
+
+    if (skipSingleLinalgOpUses && padTensorOp->hasOneUse()) {
+      Operation *use = padTensorOp->use_begin()->getOwner();
+      // TODO(#10312): Relax the condition to not check quantized ops. They
+      // are going to be deprecated. We don't expect them being IREE's input.
+      if (isa<linalg::LinalgOp>(use) &&
+          !isa<linalg::Conv2DNhwcHwcfQOp, linalg::DepthwiseConv2DNhwcHwcQOp,
+               linalg::DepthwiseConv2DNhwcHwcmQOp>(use)) {
+        return failure();
+      }
     }
 
     OpBuilder::InsertionGuard g(rewriter);
@@ -101,32 +115,55 @@ struct PadTensorOpConversion : public OpRewritePattern<tensor::PadOp> {
         padTensorOp, source, fill, lowPad, sourceShape, strides);
     return success();
   }
+
+ private:
+  // Option to skip the pattern when tensor.pad op has one use and is used by
+  // a Linalg op.
+  bool skipSingleLinalgOpUses = false;
 };
 
 struct PadTensorToTensorInsertSlicePass
     : public PadTensorToTensorInsertSliceBase<
           PadTensorToTensorInsertSlicePass> {
+  PadTensorToTensorInsertSlicePass(bool skipSingleLinalgOpUses)
+      : skipSingleLinalgOpUses(skipSingleLinalgOpUses) {}
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
         .insert<linalg::LinalgDialect, memref::MemRefDialect, func::FuncDialect,
                 mlir::math::MathDialect, mlir::arith::ArithmeticDialect>();
   }
 
+  LogicalResult initializeOptions(StringRef options) override {
+    if (failed(Pass::initializeOptions(options))) {
+      return failure();
+    }
+    // `skipSingleLinalgOpUses` may have been set to `true` in the constructor
+    // already. The |= is so we preserve that rather than overwrite it with the
+    // default value `false` of `optionSkipSingleLinalgOpUses`.
+    skipSingleLinalgOpUses |= optionSkipSingleLinalgOpUses;
+    return success();
+  }
+
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
-    patterns.insert<PadTensorOpConversion>(context);
+    patterns.insert<PadTensorOpConversion>(context, skipSingleLinalgOpUses);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       return signalPassFailure();
     }
   }
+
+ private:
+  bool skipSingleLinalgOpUses;
 };
 
 }  // namespace
 
-std::unique_ptr<Pass> createPadTensorToTensorInsertSlicePass() {
-  return std::make_unique<PadTensorToTensorInsertSlicePass>();
+std::unique_ptr<Pass> createPadTensorToTensorInsertSlicePass(
+    bool skipSingleLinalgOpUses) {
+  return std::make_unique<PadTensorToTensorInsertSlicePass>(
+      skipSingleLinalgOpUses);
 }
 
 }  // namespace Flow

@@ -66,9 +66,9 @@ static llvm::cl::opt<bool> clEnablePaddingLinalgOps(
                    "flow-padding-size"),
     llvm::cl::init(false));
 
-static llvm::cl::opt<bool> clEnableFusePaddingIntoConsumerOps(
-    "iree-flow-enable-fuse-padding-into-consumer-ops",
-    llvm::cl::desc("Enable fusing linalg pad_tensor ops into consumer ops"),
+static llvm::cl::opt<bool> clEnableFusePaddingIntoLinalgConsumerOps(
+    "iree-flow-enable-fuse-padding-into-linalg-consumer-ops",
+    llvm::cl::desc("Enable fusing tensor.pad ops into Linalg consumer ops"),
     llvm::cl::init(false));
 
 static llvm::cl::opt<int> clLinalgOpsPaddingSize(
@@ -231,11 +231,11 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   passManager.addPass(IREE::Flow::createExpandTensorShapesPass());
   buildGlobalOptimizationPassPipeline(passManager, transformOptions);
 
-  FunctionLikeNest(passManager)
-      // Pad tensors.
-      .addPredicatedPass((!clEnableFusePaddingIntoConsumerOps),
-                         IREE::Flow::createPadTensorToTensorInsertSlicePass)
+  // Pad tensors.
+  passManager.addPass(IREE::Flow::createPadTensorToTensorInsertSlicePass(
+      /*skipSingleLinalgOpUses=*/clEnableFusePaddingIntoLinalgConsumerOps));
 
+  FunctionLikeNest(passManager)
       // Preprocess the input to a form more amenable for fusion
       // - Convert all elementwise ops to Linalg
       // - Remove unit-extent dimensions.
