@@ -34,35 +34,23 @@
 // that can be substituted by the IREE compiler when producing the final
 // target-specific module.
 
+// Include the build-system-generated configured header and use it as the only
+// source of information about the target we're compiling against, as opposed to
+// including iree/base/target_platform.h.
+//
+// For example, using IREE_UKERNEL_ARCH_ARM_64 (from arch/config.h) rather than
+// IREE_ARCH_ARM_64 (from target_platform.h) means that we can control from a
+// single place in the build system whether we enable ARM_64-specific code paths
+// or stick to generic code.
+#include "iree/builtins/ukernel/arch/config.h"
+
 // We require that this header compile on bare-metal targets with no stdlib.
-// These two headers are clean and do not include any other headers:
+// These headers are clean:
 #include "iree/base/attributes.h"
-#include "iree/base/target_platform.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
-
-//===----------------------------------------------------------------------===//
-// Target architecture selection
-//===----------------------------------------------------------------------===//
-// The "generic" target is used if no other target is specified. All platforms
-// should support the generic path and then optionally provide their own
-// specializations as needed. The generic path can be forced by passing
-// -DIREE_MMT4D_ARCH_GENERIC_32=1 or -DIREE_MMT4D_ARCH_GENERIC_64=1 to the
-// compiler in addition to -DIREE_PLATFORM_GENERIC=1.
-
-#if defined(IREE_UKERNEL_ARCH_GENERIC_32)
-#define IREE_UKERNEL_SIZE_TYPE int32_t
-#elif defined(IREE_UKERNEL_ARCH_GENERIC_64)
-#define IREE_UKERNEL_SIZE_TYPE int64_t
-#elif defined(IREE_ARCH_ARM_64) && !defined(__APPLE__)
-#define IREE_UKERNEL_ARCH_ARM_64 1
-#define IREE_UKERNEL_SIZE_TYPE int64_t
-#else
-#define IREE_UKERNEL_ARCH_GENERIC_64 1
-#define IREE_UKERNEL_SIZE_TYPE int64_t
-#endif  // IREE_ARCH_*
 
 //===----------------------------------------------------------------------===//
 // Attributes and metadata
@@ -119,7 +107,14 @@ typedef unsigned long long uint64_t;
 // For any argument that is known to fit in a specific size prefer that to
 // ensure this code operates well on systems with small/weird widths (x32/ilp32,
 // etc).
-typedef IREE_UKERNEL_SIZE_TYPE iree_ukernel_size_t;
+// TODO: it's probably too surprising that a type named *_size_t is signed.
+#if IREE_UKERNEL_POINTER_SIZE == 4
+typedef int32_t iree_ukernel_size_t;
+#elif IREE_UKERNEL_POINTER_SIZE == 8
+typedef int64_t iree_ukernel_size_t;
+#else
+#error Unexpected pointer size
+#endif
 
 #ifdef __cplusplus
 }  // extern "C"
