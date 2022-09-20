@@ -40,7 +40,7 @@ iree_lit_test_suite(
             "optimize_numerics.mlir",
             "outline_dispatch_regions.mlir",
             "pad_linalg_ops.mlir",
-            "pad_tensor_to_tensor.mlir",
+            "tensor_pad_to_tensor_insert_slice.mlir",
             "region_to_workgroups.mlir",
             "strip_and_splat_constant_variables.mlir",
             "strip_signedness.mlir",

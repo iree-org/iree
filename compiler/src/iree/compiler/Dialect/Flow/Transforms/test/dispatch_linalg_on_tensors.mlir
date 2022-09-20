@@ -1066,7 +1066,7 @@ func.func @extract_slice(%arg0 : tensor<?x?xf32>, %arg1 : index, %arg2 : index,
 // -----
 
 // TODO(ravishankarm): Enable after upstream pad op tiling issues are addressed.
-// func.func @pad_tensor(%arg0 : tensor<?x?xf32>, %arg1 : index, %arg2 : index,
+// func.func @tensor.pad(%arg0 : tensor<?x?xf32>, %arg1 : index, %arg2 : index,
 //     %arg3 : index, %arg4 : index, %arg5 : f32) -> tensor<?x?xf32> {
 //   %0 = tensor.pad %arg0 low[%arg1, %arg2] high[%arg3, %arg4] {
 //     ^bb0(%arg6 : index, %arg7 : index):

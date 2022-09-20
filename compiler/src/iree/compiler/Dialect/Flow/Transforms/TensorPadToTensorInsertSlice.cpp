@@ -4,11 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-//===- PadTensorToInsertSlice.cpp ----- Pass to legalize linalg.pad_tensor-===//
+//===- TensorPadToInsertSlice.cpp ----- Pass to legalize tensor.pad -------===//
 //
-// Pass to convert linalg.pad_tensor to linalg.fill + tensor.insert_slice
-// operations which is the only way Vulkan backend can lower it to a single
-// kernel.
+// Pass to convert tensor.pad to linalg.fill + tensor.insert_slice.
 //
 //===----------------------------------------------------------------------===//
 
@@ -31,12 +29,12 @@ namespace IREE {
 namespace Flow {
 
 namespace {
-/// Pattern to convert a linalg.pad_tensor operation into a fill + tensor
-/// insert_slice. This is needed till pad_tensor op can be fused with its
+/// Pattern to convert a tensor.tensor operation into a fill +
+/// tensor.insert_slice. This is needed till tensor.pad op can be fused with its
 /// consumers.
-struct PadTensorOpConversion : public OpRewritePattern<tensor::PadOp> {
+struct TensorPadOpConversion : public OpRewritePattern<tensor::PadOp> {
   using OpRewritePattern<tensor::PadOp>::OpRewritePattern;
-  PadTensorOpConversion(MLIRContext *context, bool skipSingleLinalgOpUses)
+  TensorPadOpConversion(MLIRContext *context, bool skipSingleLinalgOpUses)
       : OpRewritePattern<tensor::PadOp>(context, skipSingleLinalgOpUses),
         skipSingleLinalgOpUses(skipSingleLinalgOpUses) {}
 
@@ -122,10 +120,10 @@ struct PadTensorOpConversion : public OpRewritePattern<tensor::PadOp> {
   bool skipSingleLinalgOpUses = false;
 };
 
-struct PadTensorToTensorInsertSlicePass
-    : public PadTensorToTensorInsertSliceBase<
-          PadTensorToTensorInsertSlicePass> {
-  PadTensorToTensorInsertSlicePass(bool skipSingleLinalgOpUses)
+struct TensorPadToTensorInsertSlicePass
+    : public TensorPadToTensorInsertSliceBase<
+          TensorPadToTensorInsertSlicePass> {
+  TensorPadToTensorInsertSlicePass(bool skipSingleLinalgOpUses)
       : skipSingleLinalgOpUses(skipSingleLinalgOpUses) {}
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
@@ -147,7 +145,7 @@ struct PadTensorToTensorInsertSlicePass
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
-    patterns.insert<PadTensorOpConversion>(context, skipSingleLinalgOpUses);
+    patterns.insert<TensorPadOpConversion>(context, skipSingleLinalgOpUses);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       return signalPassFailure();
@@ -160,9 +158,9 @@ struct PadTensorToTensorInsertSlicePass
 
 }  // namespace
 
-std::unique_ptr<Pass> createPadTensorToTensorInsertSlicePass(
+std::unique_ptr<Pass> createTensorPadToTensorInsertSlicePass(
     bool skipSingleLinalgOpUses) {
-  return std::make_unique<PadTensorToTensorInsertSlicePass>(
+  return std::make_unique<TensorPadToTensorInsertSlicePass>(
       skipSingleLinalgOpUses);
 }
 
