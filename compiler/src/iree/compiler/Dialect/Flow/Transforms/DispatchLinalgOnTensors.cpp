@@ -816,6 +816,7 @@ static Optional<OpOperand *> getFusableUse(Operation *op,
 /// consumer.
 static bool isFusableWithConsumer(OpOperand &fusedOperand,
                                   bool aggressiveFusion) {
+  // Use the original fusion heuristics if aggressive fusion isn't enabled.
   if (!aggressiveFusion)
     return areLinalgOpsFusableUsingTileAndFuse(fusedOperand);
 

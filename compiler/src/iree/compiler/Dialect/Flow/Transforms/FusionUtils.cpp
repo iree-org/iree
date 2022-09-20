@@ -52,10 +52,8 @@ bool isInsOperandBufferizable(OpOperand *insOperand) {
 
     // If the operand is a projected permutation a small stack might be fine.
     // So return true.
-
     if ((outsOperandIndexingMap != insOperandIndexingMap) &&
-        !(insOperandIndexingMap.isProjectedPermutation() &&
-          outsOperandIndexingMap.isIdentity())) {
+        !insOperandIndexingMap.isProjectedPermutation()) {
       return false;
     }
     // TODO(#8411): Until ops are vectorized (always), we need
