@@ -769,6 +769,9 @@ static bool hasCompatibleOuterParallelLoops(
       getOuterParallelLoops(cast<TilingInterface>(consumer.getOperation()));
 
   if (allowConsumerParallelismPessimization) {
+    // #9802: Vulkan codegen with dynamic shape is not supported yet.
+    if (producer.hasDynamicShape() || consumer.hasDynamicShape()) return false;
+
     if (producerParallelLoops.count() > consumerParallelLoops.count())
       return false;
   } else if (producerParallelLoops.count() != consumerParallelLoops.count()) {
