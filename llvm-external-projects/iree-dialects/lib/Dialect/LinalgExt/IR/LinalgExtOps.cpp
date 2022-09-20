@@ -1447,6 +1447,66 @@ LogicalResult TopkOp::getResultTilePosition(
   return success();
 }
 
+//===----------------------------------------------------------------------===//
+// PackOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult PackOp::verify() { return success(); }
+
+SmallVector<StringRef> PackOp::getLoopIteratorTypes() {
+  SmallVector<StringRef> iteratorTypes(getOutputRank(),
+                                       getParallelIteratorTypeName());
+  return iteratorTypes;
+}
+
+SmallVector<Range> PackOp::getIterationDomain(OpBuilder &builder) {
+  int64_t outputRank = getOutputRank();
+  SmallVector<Range> loopBounds(outputRank);
+  Location loc = getLoc();
+  // lower bound.
+  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
+  // step.
+  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+  // upper bound (size of the output tensor).
+  Value output = getOutput();
+  for (auto dim : llvm::seq<int64_t>(0, outputRank)) {
+    loopBounds[dim].offset = zero;
+    loopBounds[dim].stride = one;
+    loopBounds[dim].size = getDimValue(builder, loc, output, dim);
+  }
+  return loopBounds;
+}
+
+LogicalResult PackOp::generateScalarImplementation(OpBuilder &b, Location loc,
+                                                   ValueRange ivs) {
+  assert(ivs.size() == getOutputRank());
+  AffineMap packMap = getPackMap();
+  assert(packMap.getNumDims() == getOutputRank() &&
+         "num dims must match rank output tensor");
+  assert(packMap.getNumResults() == getInputRank() &&
+         "num results must match rank input tensor");
+
+  SmallVector<Value> indices;
+  size_t domSize = packMap.getNumDims();
+  size_t posInResults = 0;
+  for (AffineExpr result : packMap.getResults()) {
+    // Collect ivs involved.
+    SmallVector<Value> accessMapIvs;
+    for (size_t pos = 0; pos < domSize; pos++) {
+      if (result.isFunctionOfDim(pos))
+        accessMapIvs.push_back(ivs[pos]);
+    }
+    // Build an affine.apply for each accessMap.
+    AffineMap subMap = compressUnusedDims(packMap.getSubMap(posInResults++));
+    Value accessMap = b.create<AffineApplyOp>(loc, subMap, accessMapIvs);
+    indices.push_back(accessMap);
+  }
+  assert(indices.size() == getInputRank());
+  Value scalar = b.create<memref::LoadOp>(loc, getInput(), indices);
+  b.create<memref::StoreOp>(loc, scalar, getOutput(), ivs);
+  return success();
+}
+
 #define DEFINE_OP_GET_EFFECTS(OP_NAME)                                         \
   void OP_NAME::getEffects(                                                    \
       SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>      \
@@ -1463,7 +1523,7 @@ DEFINE_OP_GET_EFFECTS(FftOp)
 DEFINE_OP_GET_EFFECTS(ReverseOp)
 DEFINE_OP_GET_EFFECTS(ScanOp)
 DEFINE_OP_GET_EFFECTS(TopkOp)
-
+DEFINE_OP_GET_EFFECTS(PackOp)
 namespace {
 /// This is derived from mlir/lib/Dialect/Linalg/IR/LinalgOps.cpp without any
 /// changes.
