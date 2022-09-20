@@ -6,6 +6,8 @@
 
 #ifndef IREE_COMPILER_CODEGEN_COMMON_LINALGOPINFO_H_
 #define IREE_COMPILER_CODEGEN_COMMON_LINALGOPINFO_H_
+#include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/Types.h"
 
 namespace mlir {
 
@@ -21,12 +23,19 @@ class LinalgOpInfo {
 
   bool isTranspose() const { return transposeTrait; }
   bool isReduction() const { return reductionTrait; }
+  bool isSharedMemTranspose() const {
+    return !sharedMemTransposeOperands.empty();
+  }
+  ArrayRef<OpOperand *> getSharedMemTransposeOperands() const {
+    return sharedMemTransposeOperands;
+  }
 
  private:
   void computeInfo(linalg::LinalgOp);
 
   bool transposeTrait;
   bool reductionTrait;
+  SmallVector<OpOperand *> sharedMemTransposeOperands;
 };
 
 }  // namespace iree_compiler

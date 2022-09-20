@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/LinalgOpInfo.h"
 
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 
 using namespace mlir::linalg;
@@ -91,6 +92,40 @@ static bool isTransposeLinalgOp(linalg::LinalgOp linalgOp) {
   return isInputTransposed || isOutputTransposed;
 }
 
+/// Returns true if the index map represents a transpose that benefits from
+/// shared mem.
+static bool isSharedMemTranspose(AffineMap indexMap) {
+  if (!indexMap.isEmpty() && indexMap.isPermutation()) {
+    // Ensure that the fasted moving dimension (the last one) is permuted,
+    // Otherwise shared memory promotion will not benefit the operation.
+    if (indexMap.getDimPosition(indexMap.getNumDims() - 1) !=
+        indexMap.getNumDims() - 1) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/// Checks preconditions for shared mem transpose.
+static bool checkTransposePreconditions(LinalgOp linalgOp) {
+  // Check that the op has at least 2 to 3 parallel loops.
+  if (linalgOp.getNumParallelLoops() < 2 ||
+      linalgOp.getNumParallelLoops() > 3) {
+    return false;
+  }
+
+  // Check that all the iterators are parallel.
+  if (linalgOp.getNumParallelLoops() != linalgOp.getNumLoops()) {
+    return false;
+  }
+
+  // Only transpose static shapes
+  if (linalgOp.hasDynamicShape()) {
+    return false;
+  }
+  return true;
+}
+
 static bool computeTransposeInfo(LinalgOp linalgOp) {
   return isTransposeLinalgOp(linalgOp);
 }
@@ -99,9 +134,40 @@ static bool computeReductionInfo(LinalgOp linalgOp) {
   return linalgOp.getNumReductionLoops() > 1;
 }
 
+static SmallVector<OpOperand *> computeSharedMemTransposeInfo(
+    LinalgOp LinalgOp) {
+  SmallVector<OpOperand *> sharedMemTransposeOperands;
+
+  if (!isa<linalg::GenericOp>(LinalgOp)) {
+    return sharedMemTransposeOperands;
+  }
+
+  if (!checkTransposePreconditions(LinalgOp)) {
+    return sharedMemTransposeOperands;
+  }
+
+  // To simplify logic, we only consider linalg ops with transposes who's
+  // outputs maps are identities
+  for (OpOperand *opOperand : LinalgOp.getOutputOperands()) {
+    if (!LinalgOp.getTiedIndexingMap(opOperand).isIdentity()) {
+      return sharedMemTransposeOperands;
+    }
+  }
+
+  // Determine which operands are transposed.
+  for (OpOperand *opOperand : LinalgOp.getInputOperands()) {
+    if (isSharedMemTranspose(LinalgOp.getTiedIndexingMap(opOperand))) {
+      sharedMemTransposeOperands.push_back(opOperand);
+    }
+  }
+
+  return sharedMemTransposeOperands;
+}
+
 void LinalgOpInfo::computeInfo(LinalgOp linalgOp) {
   transposeTrait = computeTransposeInfo(linalgOp);
   reductionTrait = computeReductionInfo(linalgOp);
+  sharedMemTransposeOperands = computeSharedMemTransposeInfo(linalgOp);
 }
 
 }  // namespace iree_compiler
