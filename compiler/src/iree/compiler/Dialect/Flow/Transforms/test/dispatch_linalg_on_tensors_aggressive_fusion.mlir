@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="func.func(iree-flow-dispatch-linalg-on-tensors-pass)" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="func.func(iree-flow-dispatch-linalg-on-tensors-pass{aggressive-fusion=true})" %s | FileCheck %s
 
 #map0 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>

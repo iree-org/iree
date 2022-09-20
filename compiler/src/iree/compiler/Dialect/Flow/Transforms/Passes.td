@@ -67,8 +67,8 @@ def DispatchLinalgOnTensors :
   let summary = "Dispatch Linalg operations on tensors by using tile and distribute";
   let constructor = "mlir::iree_compiler::IREE::Flow::createDispatchLinalgOnTensorsPass()";
   let options = [
-    Option<"fuseProducerOnIns", "fuse-producer-on-ins", "bool",
-           /*default=*/"false", "Fuse producer on input operands">,
+    Option<"aggressiveFusion", "aggressive-fusion", "bool",
+           /*default=*/"false", "Fuse with aggressive heuristics">,
   ];
 }
 

@@ -757,9 +757,11 @@ static bool hasCompatibleOuterParallelLoops(
     OpOperand &operand, bool allowConsumerParallelismPessimization) {
   auto producer = operand.get().getDefiningOp<linalg::LinalgOp>();
   auto consumer = dyn_cast<linalg::LinalgOp>(operand.getOwner());
-  if (!producer || !consumer) {
-    return false;
-  }
+  if (!producer || !consumer) return false;
+
+  // Backend currently can't handle the case when there are more loops on the
+  // elementwise consumer.
+  if (producer.getNumLoops() < consumer.getNumLoops()) return false;
 
   llvm::SmallBitVector producerParallelLoops =
       getOuterParallelLoops(cast<TilingInterface>(producer.getOperation()));
@@ -799,14 +801,10 @@ static bool hasCompatibleOuterParallelLoops(
 
 /// For all uses of an operation, finds the use that dominates all other uses.
 static Optional<OpOperand *> getFusableUse(Operation *op,
-                                           DominanceInfo const &dominanceInfo) {
-  if (true) {
-    if (op->hasOneUse()) {
-      OpOperand &use = *(op->use_begin());
-      return &use;
-    }
-    return llvm::None;
-  }
+                                           DominanceInfo const &dominanceInfo,
+                                           bool fuseMultiUse) {
+  if (!fuseMultiUse && !op->hasOneUse()) return llvm::None;
+
   for (auto &use : op->getUses()) {
     Operation *user = use.getOwner();
     if (llvm::all_of(op->getUsers(), [&](Operation *c) {
@@ -845,7 +843,7 @@ static bool isFusableWithConsumer(OpOperand &fusedOperand) {
   // even if the consumer parallelism is pessimized.
   if (llvm::all_of(allUses, [](OpOperand *use) {
         return !hasCompatibleOuterParallelLoops(
-            *use, /*allowConsumerParallelismPessimization=*/false);
+            *use, /*allowConsumerParallelismPessimization=*/true);
       })) {
     return false;
   }
@@ -858,7 +856,8 @@ static bool isFusableWithConsumer(OpOperand &fusedOperand) {
 /// no more tagged as a root to aid with the dispatch region formation.
 static void fuseRootsWithConsumers(MLIRContext *context,
                                    ArrayRef<Operation *> roots,
-                                   DominanceInfo const &dominanceInfo) {
+                                   DominanceInfo const &dominanceInfo,
+                                   bool aggressiveFusion) {
   SmallVector<Operation *> workList(roots.begin(), roots.end());
   // Fuse with consumers where possible.
   while (!workList.empty()) {
@@ -875,7 +874,8 @@ static void fuseRootsWithConsumers(MLIRContext *context,
       appendToFusionGroup(currRoot, rootNumber);
     };
 
-    Optional<OpOperand *> fusableUse = getFusableUse(currRoot, dominanceInfo);
+    Optional<OpOperand *> fusableUse = getFusableUse(
+        currRoot, dominanceInfo, /*fuseMultiUse=*/aggressiveFusion);
     if (!fusableUse) continue;
 
     // Analyse the use to see if it is fusable.
@@ -893,7 +893,7 @@ static void fuseRootsWithConsumers(MLIRContext *context,
 }
 
 /// Method to check if the consumer of a use can be fused with its producer.
-static bool isFusableWithProducer(OpOperand &operand, bool fuseProducerOnIns) {
+static bool isFusableWithProducer(OpOperand &operand, bool fuseOnInsOps) {
   Operation *producer = operand.get().getDefiningOp();
   Operation *consumer = operand.getOwner();
 
@@ -909,7 +909,7 @@ static bool isFusableWithProducer(OpOperand &operand, bool fuseProducerOnIns) {
   }
 
   // Only fuse on inputs if both are generic ops.
-  if (fuseProducerOnIns && consumerLinalgOp.isInputTensor(&operand) &&
+  if (fuseOnInsOps && consumerLinalgOp.isInputTensor(&operand) &&
       isa<linalg::GenericOp>(consumer) && isa<linalg::GenericOp>(producer)) {
     // Collect all uses from the producer to the consumer.
     SmallVector<OpOperand *> allUses;
@@ -934,7 +934,7 @@ static bool isFusableWithProducer(OpOperand &operand, bool fuseProducerOnIns) {
 static void fuseRootsWithProducers(MLIRContext *context, Operation *root,
                                    unsigned groupNum,
                                    DominanceInfo const &dominanceInfo,
-                                   bool fuseProducerOnIns) {
+                                   bool aggressiveFusion) {
   SmallVector<Operation *> worklist;
   worklist.push_back(root);
 
@@ -947,10 +947,12 @@ static void fuseRootsWithProducers(MLIRContext *context, Operation *root,
         continue;
       }
 
-      Optional<OpOperand *> fusableUse = getFusableUse(producer, dominanceInfo);
+      Optional<OpOperand *> fusableUse = getFusableUse(
+          producer, dominanceInfo, /*fuseMultiUse=*/aggressiveFusion);
       if (!fusableUse || fusableUse.value()->getOwner() != candidate) continue;
 
-      if (!isFusableWithProducer(operand, fuseProducerOnIns)) continue;
+      if (!isFusableWithProducer(operand, /*fuseOnInsOps=*/aggressiveFusion))
+        continue;
 
       appendToFusionGroup(producer, groupNum);
       worklist.push_back(producer);
@@ -968,7 +970,7 @@ static void fuseRootsWithProducers(MLIRContext *context, Operation *root,
 /// enough to capture any heuristic.
 static unsigned decideFusableLinalgOps(FunctionOpInterface funcOp,
                                        DominanceInfo const &dominanceInfo,
-                                       bool fuseProducerOnIns) {
+                                       bool aggressiveFusion) {
   unsigned numRootOps = 0;
   MLIRContext *context = funcOp->getContext();
   OpBuilder builder(context);
@@ -986,11 +988,11 @@ static unsigned decideFusableLinalgOps(FunctionOpInterface funcOp,
       setRootAttribute(context, &op, newGroup);
 
       fuseRootsWithProducers(context, &op, newGroup, dominanceInfo,
-                             fuseProducerOnIns);
+                             aggressiveFusion);
       roots.push_back(&op);
     }
     roots = llvm::to_vector(llvm::reverse(roots));
-    fuseRootsWithConsumers(context, roots, dominanceInfo);
+    fuseRootsWithConsumers(context, roots, dominanceInfo, aggressiveFusion);
   }
 
   // Once all root linalg ops have been tagged, put all remaining generic ops
@@ -1010,7 +1012,7 @@ static unsigned decideFusableLinalgOps(FunctionOpInterface funcOp,
       roots.push_back(&op);
     }
     roots = llvm::to_vector(llvm::reverse(roots));
-    fuseRootsWithConsumers(context, roots, dominanceInfo);
+    fuseRootsWithConsumers(context, roots, dominanceInfo, aggressiveFusion);
   }
 
   return numRootOps;
@@ -1025,8 +1027,11 @@ struct DispatchLinalgOnTensorsPass
         .insert<AffineDialect, IREE::Flow::FlowDialect, linalg::LinalgDialect,
                 scf::SCFDialect, tensor::TensorDialect>();
   }
-  DispatchLinalgOnTensorsPass() = default;
-  DispatchLinalgOnTensorsPass(const DispatchLinalgOnTensorsPass &pass) {}
+  DispatchLinalgOnTensorsPass(bool aggressiveFusion) {
+    this->aggressiveFusion = aggressiveFusion;
+  }
+  DispatchLinalgOnTensorsPass(const DispatchLinalgOnTensorsPass &pass)
+      : DispatchLinalgOnTensorsPass(pass.aggressiveFusion) {}
   void runOnOperation() override;
 
  private:
@@ -1109,7 +1114,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
   auto funcOp = getOperation();
   MLIRContext *context = &getContext();
   DominanceInfo const &dominanceInfo = getAnalysis<DominanceInfo>();
-  decideFusableLinalgOps(funcOp, dominanceInfo, fuseProducerOnIns);
+  decideFusableLinalgOps(funcOp, dominanceInfo, aggressiveFusion);
 
   LLVM_DEBUG({
     llvm::dbgs() << "\n--- After annotating linalg op fusion scheme ---\n";
@@ -1192,8 +1197,8 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
 }
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createDispatchLinalgOnTensorsPass() {
-  return std::make_unique<DispatchLinalgOnTensorsPass>();
+createDispatchLinalgOnTensorsPass(bool aggressiveFusion) {
+  return std::make_unique<DispatchLinalgOnTensorsPass>(aggressiveFusion);
 }
 
 }  // namespace Flow
