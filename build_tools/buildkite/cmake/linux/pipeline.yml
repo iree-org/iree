@@ -115,7 +115,7 @@ steps:
       - "queue=build"
     artifact_paths:
       - "compile-stats-results-*.json"
-    timeout_in_minutes: "10"
+    timeout_in_minutes: "20"
 
   - wait
 
