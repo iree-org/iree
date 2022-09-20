@@ -244,15 +244,11 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPass(createInterchangeGenericOpsPass)
       .addPass(memref::createResolveShapedTypeResultDimsPass)
       .addPass(mlir::createCanonicalizerPass)
-      .addPass(mlir::createCSEPass);
-
-  // Elementwise fusion.
-  passManager.addNestedPass<func::FuncOp>(
-      createFusionOfTensorOpsPass(clEnableAggressiveFusion));
-  passManager.addNestedPass<IREE::Util::InitializerOp>(
-      createFusionOfTensorOpsPass(clEnableAggressiveFusion));
-
-  FunctionLikeNest(passManager)
+      .addPass(mlir::createCSEPass)
+      // Elementwise fusion.
+      .addPass([]() {
+        return createFusionOfTensorOpsPass(clEnableAggressiveFusion);
+      })
       .addPredicatedPass(clEnableLinalgDetensorize,
                          mlir::createLinalgDetensorizePass)
       .addPass(mlir::createCanonicalizerPass)
