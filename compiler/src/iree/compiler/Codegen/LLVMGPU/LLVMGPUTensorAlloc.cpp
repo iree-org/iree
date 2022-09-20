@@ -87,7 +87,8 @@ struct LLVMGPUTensorAllocPass
       OpBuilder builder(op);
       auto linalgOp = cast<linalg::LinalgOp>(op);
       bufferization::BufferizationOptions options;
-      // Promote all the input operands.
+      // Promote all the input operands for contract op or transpose operands
+      // for shared mem transpose.
       for (auto operand : linalgOp.getInputOperands()) {
         if (promoteSharedMemPattern ==
             GPUPromoteSharedMemPattern::TransposeOpPattern) {

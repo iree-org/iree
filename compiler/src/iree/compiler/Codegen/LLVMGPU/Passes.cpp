@@ -226,13 +226,8 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
 }
 
 void addGPUTransposePassPipeline(OpPassManager &pm) {
-  //   tileAndBufferize(pm);
   tileAndDistributeToWorkgroup(pm);
-
   auto &nestedModulePM = pm.nest<ModuleOp>();
-  // Distribute linalg onto threads within the workgroup.
-  //   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUTileAndDistribute(
-  //       false, GPUPromoteSharedMemPattern::TransposeOpPattern));
 
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
