@@ -35,7 +35,7 @@ static iree_ukernel_mmt4d_tile_func_t
 iree_ukernel_mmt4d_select_tile_func_arm_64_i8i8i32_8x8x8(
     const iree_ukernel_mmt4d_params_t* params) {
 #ifdef IREE_UKERNEL_BUILD_ARM_64_I8MM
-  if (params->cpu_data_field_0 & IREE_CPU_DATA_FIELD_0_AARCH64_HAVE_I8MM) {
+  if (params->cpu_data[0] & IREE_CPU_DATA_FIELD_0_AARCH64_HAVE_I8MM) {
     return iree_ukernel_mmt4d_i8i8i32_tile_8x8x8_arm_64_i8mm;
   }
 #else
@@ -48,7 +48,7 @@ static iree_ukernel_mmt4d_tile_func_t
 iree_ukernel_mmt4d_select_tile_func_arm_64_i8i8i32_8x8x4(
     const iree_ukernel_mmt4d_params_t* params) {
 #ifdef IREE_UKERNEL_BUILD_ARM_64_DOTPROD
-  if (params->cpu_data_field_0 & IREE_CPU_DATA_FIELD_0_AARCH64_HAVE_DOTPROD) {
+  if (params->cpu_data[0] & IREE_CPU_DATA_FIELD_0_AARCH64_HAVE_DOTPROD) {
     return iree_ukernel_mmt4d_i8i8i32_tile_8x8x4_arm_64_dotprod;
   }
 #else

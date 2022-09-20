@@ -38,7 +38,7 @@ struct iree_mmt4d_benchmark_user_data_t {
   int M0;
   int N0;
   int K0;
-  uint64_t cpu_data_field_0;
+  const uint64_t* cpu_data;
 };
 
 typedef struct iree_mmt4d_benchmark_user_data_t
@@ -58,7 +58,7 @@ static iree_status_t iree_mmt4d_benchmark(
   params.M0 = user_data->M0;
   params.N0 = user_data->N0;
   params.K0 = user_data->K0;
-  params.cpu_data_field_0 = user_data->cpu_data_field_0;
+  params.cpu_data = user_data->cpu_data;
   params.lhs_stride = params.K * params.M0 * params.K0;
   params.rhs_stride = params.K * params.N0 * params.K0;
   params.out_stride = params.N * params.M0 * params.N0;
@@ -112,9 +112,9 @@ static iree_status_t iree_mmt4d_benchmark(
 static void iree_mmt4d_benchmark_register(
     const iree_mmt4d_benchmark_user_data_t* user_data, const char* name) {
   // Does this benchmark require an optional CPU feature?
-  if (user_data->cpu_data_field_0) {
-    if ((iree_cpu_data_field(0) & user_data->cpu_data_field_0) !=
-        user_data->cpu_data_field_0) {
+  if (user_data->cpu_data[0]) {
+    if ((iree_cpu_data_field(0) & user_data->cpu_data[0]) !=
+        user_data->cpu_data[0]) {
       // The CPU does not meet this benchmark's requirements. The builtin
       // would crash.
       return;
@@ -136,12 +136,14 @@ static void iree_mmt4d_benchmark_register(
 #define MMT4D_BENCHMARK_REGISTER(_type, _m0, _n0, _k0, _cpu_data_field_0, \
                                  _label)                                  \
   do {                                                                    \
+    static const uint64_t local_cpu_data[IREE_CPU_DATA_FIELD_COUNT] = {   \
+        _cpu_data_field_0};                                               \
     static const iree_mmt4d_benchmark_user_data_t user_data = {           \
         .type = iree_ukernel_mmt4d_type_##_type,                          \
         .M0 = _m0,                                                        \
         .N0 = _n0,                                                        \
         .K0 = _k0,                                                        \
-        .cpu_data_field_0 = _cpu_data_field_0,                            \
+        .cpu_data = local_cpu_data,                                       \
     };                                                                    \
     iree_mmt4d_benchmark_register(&user_data,                             \
                                   "iree_ukernel_mmt4d_" #_type "_" #_m0   \
