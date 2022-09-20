@@ -33,11 +33,11 @@ iree_mmt4d_scalar_type_t iree_ukernel_mmt4d_rhs_type(
 iree_mmt4d_scalar_type_t iree_ukernel_mmt4d_out_type(
     const iree_ukernel_mmt4d_params_t* params);
 
-iree_ukernel_size_t iree_ukernel_mmt4d_lhs_buffer_size(
+iree_ukernel_ssize_t iree_ukernel_mmt4d_lhs_buffer_size(
     const iree_ukernel_mmt4d_params_t* params);
-iree_ukernel_size_t iree_ukernel_mmt4d_rhs_buffer_size(
+iree_ukernel_ssize_t iree_ukernel_mmt4d_rhs_buffer_size(
     const iree_ukernel_mmt4d_params_t* params);
-iree_ukernel_size_t iree_ukernel_mmt4d_out_buffer_size(
+iree_ukernel_ssize_t iree_ukernel_mmt4d_out_buffer_size(
     const iree_ukernel_mmt4d_params_t* params);
 
 struct iree_mmt4d_test_random_engine_t;
@@ -49,7 +49,7 @@ int iree_mmt4d_test_random_engine_get_0_or_1(
 int iree_mmt4d_test_random_engine_get_between_minus16_and_plus15(
     iree_mmt4d_test_random_engine_t* e);
 
-void write_random_buffer(void* buffer, iree_ukernel_size_t size_in_bytes,
+void write_random_buffer(void* buffer, iree_ukernel_ssize_t size_in_bytes,
                          iree_mmt4d_scalar_type_t type,
                          iree_mmt4d_test_random_engine_t* engine);
 

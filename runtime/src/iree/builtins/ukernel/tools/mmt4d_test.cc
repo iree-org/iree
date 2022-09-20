@@ -60,25 +60,25 @@
 template <typename lhs_t, typename rhs_t, typename out_t>
 static void iree_mmt4d_reference(const iree_ukernel_mmt4d_params_t& params) {
   bool accumulate = params.flags & IREE_VMVX_MATMUL_FLAG_ACCUMULATE;
-  iree_ukernel_size_t lhs_tile_size = params.M0 * params.K0;
-  iree_ukernel_size_t rhs_tile_size = params.N0 * params.K0;
-  iree_ukernel_size_t out_tile_size = params.M0 * params.N0;
-  for (iree_ukernel_size_t i = 0; i < params.M; ++i) {
-    for (iree_ukernel_size_t j = 0; j < params.N; ++j) {
+  iree_ukernel_ssize_t lhs_tile_size = params.M0 * params.K0;
+  iree_ukernel_ssize_t rhs_tile_size = params.N0 * params.K0;
+  iree_ukernel_ssize_t out_tile_size = params.M0 * params.N0;
+  for (iree_ukernel_ssize_t i = 0; i < params.M; ++i) {
+    for (iree_ukernel_ssize_t j = 0; j < params.N; ++j) {
       out_t* out_tile_ptr = ((out_t*)params.out_buffer) +
                             i * params.out_stride + j * out_tile_size;
       const lhs_t* lhs_panel_ptr =
           ((const lhs_t*)params.lhs_buffer) + i * params.lhs_stride;
       const rhs_t* rhs_panel_ptr =
           ((const rhs_t*)params.rhs_buffer) + j * params.rhs_stride;
-      for (iree_ukernel_size_t i0 = 0; i0 < params.M0; ++i0) {
-        for (iree_ukernel_size_t j0 = 0; j0 < params.N0; ++j0) {
+      for (iree_ukernel_ssize_t i0 = 0; i0 < params.M0; ++i0) {
+        for (iree_ukernel_ssize_t j0 = 0; j0 < params.N0; ++j0) {
           const lhs_t* lhs_tile_ptr = lhs_panel_ptr;
           const rhs_t* rhs_tile_ptr = rhs_panel_ptr;
           out_t* out_ptr = out_tile_ptr + i0 * params.N0 + j0;
           out_t acc = accumulate ? *out_ptr : 0.f;
-          for (iree_ukernel_size_t k = 0; k < params.K; ++k) {
-            for (iree_ukernel_size_t k0 = 0; k0 < params.K0; ++k0) {
+          for (iree_ukernel_ssize_t k = 0; k < params.K; ++k) {
+            for (iree_ukernel_ssize_t k0 = 0; k0 < params.K0; ++k0) {
               out_t lhs_val = lhs_tile_ptr[i0 * params.K0 + k0];
               out_t rhs_val = rhs_tile_ptr[j0 * params.K0 + k0];
               acc += lhs_val * rhs_val;
@@ -113,7 +113,7 @@ static void test_one_matmul_using_given_lhs_rhs(
 
   iree_ukernel_mmt4d_params_t reference_params;
   memcpy(&reference_params, &shared_params, sizeof shared_params);
-  iree_ukernel_size_t out_buffer_size =
+  iree_ukernel_ssize_t out_buffer_size =
       iree_ukernel_mmt4d_out_buffer_size(&shared_params);
   reference_params.out_buffer = malloc(out_buffer_size);
   iree_mmt4d_scalar_type_t out_type =
@@ -190,9 +190,9 @@ static void test_one_matmul_creating_lhs_rhs_for_given_shape(
                       iree_mmt4d_test_random_engine_get_0_or_1(engine);
   params.out_stride = params.N * params.M0 * params.N0 +
                       iree_mmt4d_test_random_engine_get_0_or_1(engine);
-  iree_ukernel_size_t lhs_buffer_size =
+  iree_ukernel_ssize_t lhs_buffer_size =
       iree_ukernel_mmt4d_lhs_buffer_size(&params);
-  iree_ukernel_size_t rhs_buffer_size =
+  iree_ukernel_ssize_t rhs_buffer_size =
       iree_ukernel_mmt4d_rhs_buffer_size(&params);
   iree_mmt4d_scalar_type_t lhs_type = iree_ukernel_mmt4d_lhs_type(&params);
   iree_mmt4d_scalar_type_t rhs_type = iree_ukernel_mmt4d_rhs_type(&params);

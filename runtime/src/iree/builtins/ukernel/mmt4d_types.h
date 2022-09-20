@@ -25,12 +25,12 @@ struct iree_ukernel_mmt4d_params_t {
   const void* lhs_buffer;
   const void* rhs_buffer;
   void* out_buffer;
-  iree_ukernel_size_t lhs_stride;
-  iree_ukernel_size_t rhs_stride;
-  iree_ukernel_size_t out_stride;
-  iree_ukernel_size_t M;
-  iree_ukernel_size_t N;
-  iree_ukernel_size_t K;
+  iree_ukernel_ssize_t lhs_stride;
+  iree_ukernel_ssize_t rhs_stride;
+  iree_ukernel_ssize_t out_stride;
+  iree_ukernel_ssize_t M;
+  iree_ukernel_ssize_t N;
+  iree_ukernel_ssize_t K;
   int32_t M0;
   int32_t N0;
   int32_t K0;
