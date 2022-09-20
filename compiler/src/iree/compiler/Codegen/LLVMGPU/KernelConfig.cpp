@@ -9,6 +9,7 @@
 #include <numeric>
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/Support/CommandLine.h"
@@ -437,25 +438,6 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
   tileSizes.emplace_back(std::move(workgroupTileSizes));  // Workgroup level
   return setOpConfigAndEntryPointFnTranslation(entryPoint, op, tileSizes,
                                                passPipeline, workgroupSize);
-}
-
-/// Propagate the configuration annotated in the incoming IR.
-static LogicalResult setUserConfig(
-    func::FuncOp entryPointFn, Operation *computeOp,
-    IREE::Codegen::CompilationInfoAttr compilationInfo) {
-  if (auto translationInfo = getTranslationInfo(entryPointFn)) {
-    return computeOp->emitOpError(
-        "multiple ops within dispatch trying to set the translation "
-        "info");
-  }
-
-  SmallVector<int64_t> workgroupSize = compilationInfo.getWorkgroupSizeVals();
-  setTranslationInfo(entryPointFn, compilationInfo.getTranslationInfo(),
-                     workgroupSize);
-
-  setLoweringConfig(computeOp, compilationInfo.getLoweringConfig());
-  eraseCompilationInfo(computeOp);
-  return success();
 }
 
 /// Return the size of the given dimension in the linalg op.

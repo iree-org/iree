@@ -10,6 +10,7 @@
 #include <numeric>
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
@@ -684,7 +685,15 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
 /// Sets the CodeGen configuration as attributes to the given `rootOp` if it's a
 /// known Linalg matmul/convolution op with good configurations.
 static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
+                                      func::FuncOp entryPointFn,
                                       Operation *rootOp) {
+  if (IREE::Codegen::CompilationInfoAttr compilationInfo =
+          getCompilationInfo(rootOp)) {
+    // If the op already has a lowering configuration specified from the
+    // original source by the user, then use it directly.
+    return setUserConfig(entryPointFn, rootOp, compilationInfo);
+  }
+
   LogicalResult result = success();
   // First try to find a proper CodeGen configuration to tile and vectorize for
   // the current target architecture.
@@ -798,7 +807,8 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
     // Try to find a configuration according to a matmul/convolution op and use
     // it as the root op.
     for (Operation *computeOp : computeOps) {
-      if (failed(setSPIRVOpConfig(targetEnv, computeOp))) return failure();
+      if (failed(setSPIRVOpConfig(targetEnv, funcOp, computeOp)))
+        return failure();
 
       // Check if the op configuration was set.
       if (!getLoweringConfig(computeOp)) continue;

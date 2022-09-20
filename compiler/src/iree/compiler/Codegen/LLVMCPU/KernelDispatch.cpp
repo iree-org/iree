@@ -10,6 +10,7 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Common/LinalgOpInfo.h"
+#include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/LLVMCPU/TargetMLTransformInfo.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -1517,19 +1518,8 @@ static LogicalResult setTranslationInfoAndRootConfig(
   for (auto computeOp : computeOps) {
     if (IREE::Codegen::CompilationInfoAttr compilationInfo =
             getCompilationInfo(computeOp)) {
-      // If the function already has a translation, error out.
-      if (auto translationInfo = getTranslationInfo(entryPointFn)) {
-        return computeOp->emitOpError(
-            "multiple ops within dispatch trying to set the translation "
-            "info");
-      }
-
-      SmallVector<int64_t> workgroupSize =
-          compilationInfo.getWorkgroupSizeVals();
-      setTranslationInfo(entryPointFn, compilationInfo.getTranslationInfo(),
-                         workgroupSize);
-      setLoweringConfig(computeOp, compilationInfo.getLoweringConfig());
-      eraseCompilationInfo(computeOp);
+      if (failed(setUserConfig(entryPointFn, computeOp, compilationInfo)))
+        return failure();
     }
   }
 
