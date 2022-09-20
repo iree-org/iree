@@ -18,7 +18,8 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
-/// Returns true if the `ins` operand can be properly bufferized after the fusion.
+/// Returns true if the `ins` operand can be properly bufferized after the
+/// fusion.
 bool isInsOperandBufferizable(OpOperand *insOperand);
 
 /// Returns true if the `use` is from a producer linalg op that can be fused
