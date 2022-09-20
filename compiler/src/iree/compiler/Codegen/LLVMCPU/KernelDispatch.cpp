@@ -1308,17 +1308,37 @@ static SmallVector<int64_t> getConvWorkgroupSizes(func::FuncOp entryPointFn,
   auto variantOp = getExecutableVariantOp(entryPointFn);
   assert(succeeded(variantOp) && "ExecutableVariantOp not found");
 
-  if (isX86(*variantOp) || isRISCV(*variantOp)) {
-    tileSizes = {1, 1, 8, vectorSize * 2, 1, 1, 8};
-  }
-
-  if (isAArch64(*variantOp)) {
-    tileSizes = {1, 1, 32, 64, 1, 1, 16};
-  }
-
-  // Get default hard-coded tile sizes if we couldn't compute anything better.
-  if (tileSizes.empty()) {
-    tileSizes = {1, 1, vectorSize, vectorSize, 1, 1, vectorSize};
+  if (isX86(*variantOp)) {
+    TypeSwitch<Operation *>(op.getOperation())
+        .Case<linalg::Conv2DNhwcHwcfOp>(
+            [&](auto op) { tileSizes = {1, 1, 8, vectorSize * 2, 1, 1, 8}; })
+        .Case<linalg::DepthwiseConv2DNhwcHwcOp>(
+            [&](auto op) { tileSizes = {1, 1, 8, vectorSize * 2, 1, 3}; })
+        .Default([&](Operation *op) { llvm_unreachable("unsupported conv"); });
+  } else if (isRISCV(*variantOp)) {
+    TypeSwitch<Operation *>(op.getOperation())
+        .Case<linalg::Conv2DNhwcHwcfOp>(
+            [&](auto op) { tileSizes = {1, 1, 8, vectorSize * 2, 1, 1, 8}; })
+        .Case<linalg::DepthwiseConv2DNhwcHwcOp>(
+            [&](auto op) { tileSizes = {1, 1, 8, vectorSize, 1, 3}; })
+        .Default([&](Operation *op) { llvm_unreachable("unsupported conv"); });
+  } else if (isAArch64(*variantOp)) {
+    TypeSwitch<Operation *>(op.getOperation())
+        .Case<linalg::Conv2DNhwcHwcfOp>(
+            [&](auto op) { tileSizes = {1, 1, 32, 64, 1, 1, 16}; })
+        .Case<linalg::DepthwiseConv2DNhwcHwcOp>(
+            [&](auto op) { tileSizes = {1, 1, 4, 4, 1, 4}; })
+        .Default([&](Operation *op) { llvm_unreachable("unsupported conv"); });
+  } else {
+    // Get default hard-coded tile sizes if we couldn't compute anything better.
+    TypeSwitch<Operation *>(op.getOperation())
+        .Case<linalg::Conv2DNhwcHwcfOp>([&](auto op) {
+          tileSizes = {1, 1, vectorSize, vectorSize, 1, 1, vectorSize};
+        })
+        .Case<linalg::DepthwiseConv2DNhwcHwcOp>([&](auto op) {
+          tileSizes = {1, 1, vectorSize, vectorSize, 1, vectorSize};
+        })
+        .Default([&](Operation *op) { llvm_unreachable("unsupported conv"); });
   }
 
   return tileSizes;
@@ -1339,7 +1359,8 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                    linalg::DepthwiseConv2DNhwcHwcOp convOp) {
   int64_t vectorSize =
       getVectorSize(entryPointFn, convOp.getResult(0).getType());
-  SmallVector<int64_t> targetTileSizes = {1, 1, 8, vectorSize * 2, 1, 3};
+  SmallVector<int64_t> targetTileSizes =
+      getConvWorkgroupSizes(entryPointFn, convOp, vectorSize);
   return setConvRootConfig(entryPointFn, convOp, targetTileSizes, vectorSize);
 }
 
