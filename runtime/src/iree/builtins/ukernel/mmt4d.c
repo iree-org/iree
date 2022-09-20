@@ -74,9 +74,9 @@ static void iree_ukernel_mmt4d_using_tile_func(
   const char* lhs_panel = params->lhs_buffer;
   int32_t out_tile_size = (M0 * N0) << out_elem_size_log2;
   iree_ukernel_ssize_t lhs_panel_stride = params->lhs_stride
-                                         << lhs_elem_size_log2;
+                                          << lhs_elem_size_log2;
   iree_ukernel_ssize_t rhs_panel_stride = params->rhs_stride
-                                         << rhs_elem_size_log2;
+                                          << rhs_elem_size_log2;
   iree_ukernel_ssize_t out_stride = params->out_stride << out_elem_size_log2;
   for (int32_t i = 0; i < M; ++i) {
     char* out_tile = out_tile_row;

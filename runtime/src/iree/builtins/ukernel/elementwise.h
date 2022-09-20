@@ -32,13 +32,13 @@ typedef int (*iree_ukernel_x32b_2d_func_t)(
 // Declares a binary 2d microkernel with the following signature:
 //   int iree_ukernel_{category}_{opcode}_2d(...)
 // of function type iree_ukernel_{category}_2d_func_t.
-#define DECLARE_UKERNEL_BINARY_2D(opcode, dtype, category)              \
-  IREE_UKERNEL_EXPORT int iree_ukernel_##category##_##opcode##_2d(      \
-      const dtype* lhs, iree_ukernel_ssize_t lhs_offset,                 \
+#define DECLARE_UKERNEL_BINARY_2D(opcode, dtype, category)                \
+  IREE_UKERNEL_EXPORT int iree_ukernel_##category##_##opcode##_2d(        \
+      const dtype* lhs, iree_ukernel_ssize_t lhs_offset,                  \
       iree_ukernel_ssize_t lhs_stride0, iree_ukernel_ssize_t lhs_stride1, \
-      const dtype* rhs, iree_ukernel_ssize_t rhs_offset,                 \
+      const dtype* rhs, iree_ukernel_ssize_t rhs_offset,                  \
       iree_ukernel_ssize_t rhs_stride0, iree_ukernel_ssize_t rhs_stride1, \
-      dtype* IREE_RESTRICT out, iree_ukernel_ssize_t out_offset,         \
+      dtype* IREE_RESTRICT out, iree_ukernel_ssize_t out_offset,          \
       iree_ukernel_ssize_t out_stride0, iree_ukernel_ssize_t out_stride1, \
       iree_ukernel_ssize_t size0, iree_ukernel_ssize_t size1)
 
@@ -76,11 +76,11 @@ typedef int (*iree_ukernel_x32u_2d_func_t)(
 //   int iree_ukernel_{category}_{opcode}_2d(...)
 // It takes lhs, rhs, out buffers and size, returning 0 on success and !0 on
 // error.
-#define DECLARE_UKERNEL_UNARY_2D(opcode, dtype, category)               \
-  IREE_UKERNEL_EXPORT int iree_ukernel_##category##_##opcode##_2d(      \
-      const dtype* in, iree_ukernel_ssize_t in_offset,                   \
+#define DECLARE_UKERNEL_UNARY_2D(opcode, dtype, category)                 \
+  IREE_UKERNEL_EXPORT int iree_ukernel_##category##_##opcode##_2d(        \
+      const dtype* in, iree_ukernel_ssize_t in_offset,                    \
       iree_ukernel_ssize_t in_stride0, iree_ukernel_ssize_t in_stride1,   \
-      dtype* IREE_RESTRICT out, iree_ukernel_ssize_t out_offset,         \
+      dtype* IREE_RESTRICT out, iree_ukernel_ssize_t out_offset,          \
       iree_ukernel_ssize_t out_stride0, iree_ukernel_ssize_t out_stride1, \
       iree_ukernel_ssize_t size0, iree_ukernel_ssize_t size1)
 
