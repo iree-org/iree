@@ -1189,6 +1189,9 @@ static LogicalResult allocateExecutionRegion(
   auto resultAllocation = reserveResultAllocation(resultReservations);
   for (auto &reservationSet : resultAllocation.reservationSets) {
     // Allocate and tie an operand to the result.
+    // TODO(benvanik): change this to an alloca. We may need a higher-level
+    // analysis to decide when to deallocate, or just leave it to be deallocated
+    // as part of garbage collection.
     auto allocOp = externalBuilder.create<IREE::Stream::ResourceAllocOp>(
         externalBuilder.getFusedLoc(reservationSet.reservationLocs),
         reservationSet.reservationTypes, reservationSet.reservationSizes,
