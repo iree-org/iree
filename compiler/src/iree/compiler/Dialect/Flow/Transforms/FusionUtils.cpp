@@ -50,8 +50,8 @@ bool isInsOperandBufferizable(OpOperand *insOperand) {
   auto canTieWithOutsOperand = [&](OpOperand *outsOperand) {
     // If the operand is a projected permutation a small stack might be fine.
     // So return true.
-    if ((linalgOp.getTiedIndexingMap(outsOperand) != insOperandIndexingMap) &&
-        !insOperandIndexingMap.isProjectedPermutation()) {
+    if ((linalgOp.getTiedIndexingMap(outsOperand) != insOperandIndexingMap) /*&&
+        !insOperandIndexingMap.isProjectedPermutation()*/) {
       return false;
     }
     // TODO(#8411): Until ops are vectorized (always), we need

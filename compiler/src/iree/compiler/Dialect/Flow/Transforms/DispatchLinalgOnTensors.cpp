@@ -800,6 +800,13 @@ static bool hasCompatibleOuterParallelLoops(
 /// For all uses of an operation, finds the use that dominates all other uses.
 static Optional<OpOperand *> getFusableUse(Operation *op,
                                            DominanceInfo const &dominanceInfo) {
+  if (true) {
+    if (op->hasOneUse()) {
+      OpOperand &use = *(op->use_begin());
+      return &use;
+    }
+    return llvm::None;
+  }
   for (auto &use : op->getUses()) {
     Operation *user = use.getOwner();
     if (llvm::all_of(op->getUsers(), [&](Operation *c) {
@@ -838,7 +845,7 @@ static bool isFusableWithConsumer(OpOperand &fusedOperand) {
   // even if the consumer parallelism is pessimized.
   if (llvm::all_of(allUses, [](OpOperand *use) {
         return !hasCompatibleOuterParallelLoops(
-            *use, /*allowConsumerParallelismPessimization=*/true);
+            *use, /*allowConsumerParallelismPessimization=*/false);
       })) {
     return false;
   }
@@ -859,24 +866,29 @@ static void fuseRootsWithConsumers(MLIRContext *context,
     assert(hasRootOpAttribute(currRoot) &&
            "unexpected non-root op in worklist");
 
+    // Helper function to make the consumer the root instead of the producer
+    // when they are to be fused.
+    auto updateRootTo = [&context, &currRoot](Operation *newRoot) {
+      int64_t rootNumber = getRootNumber(currRoot);
+      setRootAttribute(context, newRoot, rootNumber);
+      removeRootOpAttribute(currRoot);
+      appendToFusionGroup(currRoot, rootNumber);
+    };
+
     Optional<OpOperand *> fusableUse = getFusableUse(currRoot, dominanceInfo);
     if (!fusableUse) continue;
 
     // Analyse the use to see if it is fusable.
     Operation *consumerOp = fusableUse.value()->getOwner();
-    if (hasRootOpAttribute(consumerOp) || hasFusionGroupsAttribute(consumerOp))
+    if (hasRootOpAttribute(consumerOp) ||
+        hasFusionGroupsAttribute(consumerOp)) {
       continue;
+    }
 
-    if (!isFusableWithConsumer(*(fusableUse.value()))) continue;
-
-    // Make the consumer the root instead of the producer when they are to be
-    // fused.
-    int64_t rootNumber = getRootNumber(currRoot);
-    setRootAttribute(context, consumerOp, rootNumber);
-    removeRootOpAttribute(currRoot);
-    appendToFusionGroup(currRoot, rootNumber);
-
-    workList.push_back(consumerOp);
+    if (isFusableWithConsumer(*(fusableUse.value()))) {
+      updateRootTo(consumerOp);
+      workList.push_back(consumerOp);
+    }
   }
 }
 
@@ -1137,7 +1149,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
         convertToFlowPatterns, context);
     if (failed(applyPatternsAndFoldGreedily(
             funcOp, std::move(convertToFlowPatterns)))) {
-          return signalPassFailure();
+      return signalPassFailure();
     }
   }
 
