@@ -51,23 +51,6 @@ static bool isSharedMemTranspose(AffineMap indexMap) {
   return false;
 }
 
-/// Returns the indices of the transposed operands in a linalg generic.
-static SmallVector<int64_t> getTransposedOperands(linalg::GenericOp genericOp) {
-  // Determine which operands to promote:
-  SmallVector<int64_t> transposedOperands;
-  if (genericOp.getNumParallelLoops() < 2) {
-    return transposedOperands;
-  }
-  for (auto indexValue : llvm::enumerate(genericOp.getIndexingMapsArray())) {
-    int64_t opIndex = indexValue.index();
-    auto indexMap = indexValue.value();
-    if (isSharedMemTranspose(indexMap)) {
-      transposedOperands.push_back(opIndex);
-    }
-  }
-  return transposedOperands;
-}
-
 namespace {
 struct LLVMGPUTensorAllocPass
     : public LLVMGPUTensorAllocBase<LLVMGPUTensorAllocPass> {
