@@ -759,19 +759,12 @@ static bool hasCompatibleOuterParallelLoops(
   auto consumer = dyn_cast<linalg::LinalgOp>(operand.getOwner());
   if (!producer || !consumer) return false;
 
-  // Backend currently can't handle the case when there are more loops on the
-  // elementwise consumer.
-  if (producer.getNumLoops() < consumer.getNumLoops()) return false;
-
   llvm::SmallBitVector producerParallelLoops =
       getOuterParallelLoops(cast<TilingInterface>(producer.getOperation()));
   llvm::SmallBitVector consumerParallelLoops =
       getOuterParallelLoops(cast<TilingInterface>(consumer.getOperation()));
 
   if (allowConsumerParallelismPessimization) {
-    // #9802: Vulkan codegen with dynamic shape is not supported yet.
-    if (producer.hasDynamicShape() || consumer.hasDynamicShape()) return false;
-
     if (producerParallelLoops.count() > consumerParallelLoops.count())
       return false;
   } else if (producerParallelLoops.count() != consumerParallelLoops.count()) {
@@ -821,7 +814,11 @@ static Optional<OpOperand *> getFusableUse(Operation *op,
 
 /// Returns true if this is a fusable use, while fusing a root with its
 /// consumer.
-static bool isFusableWithConsumer(OpOperand &fusedOperand) {
+static bool isFusableWithConsumer(OpOperand &fusedOperand,
+                                  bool aggressiveFusion) {
+  if (!aggressiveFusion)
+    return areLinalgOpsFusableUsingTileAndFuse(fusedOperand);
+
   Operation *producer = fusedOperand.get().getDefiningOp();
   Operation *consumer = fusedOperand.getOwner();
 
@@ -888,7 +885,7 @@ static void fuseRootsWithConsumers(MLIRContext *context,
       continue;
     }
 
-    if (isFusableWithConsumer(*(fusableUse.value()))) {
+    if (isFusableWithConsumer(*(fusableUse.value()), aggressiveFusion)) {
       updateRootTo(consumerOp);
       workList.push_back(consumerOp);
     }
