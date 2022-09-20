@@ -435,6 +435,55 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
   }];
 }
 
+// TODO: is pack the right name? After all we are re-arranging the tensor.
+def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack",[
+  DeclareOpInterfaceMethods<LinalgExtInterface>,
+  DeclareOpInterfaceMethods<TilingInterface,
+    ["getIterationDomain",
+     "getLoopIteratorTypes",
+     "generateScalarImplementation"]>,
+  DeclareOpInterfaceMethods<MemoryEffectsOpInterface>, 
+  SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::LinalgExt::YieldOp">,
+]>{
+  let summary = "pack operation";
+  let description = [{
+    Expand the input tensor based on the access pattern provided by the affine
+    map.
+  }];
+  
+  let arguments = (ins Variadic<AnyShaped>:$inputs,
+                       Variadic<AnyShaped>:$outputs,
+                       AffineMapAttr:$packMap);
+
+  let results = (outs Variadic<AnyRankedTensor>:$results);
+  let assemblyFormat = [{
+    attr-dict
+    `ins` `(` $inputs `:` type($inputs) `)`
+    `outs` `(` $outputs `:` type($outputs) `)` $packMap
+     (`->` type($results)^)?
+  }];
+
+  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
+    
+    Value getOutput() {
+      return getOutputOperand(0)->get();
+    }
+    
+    Value getInput() {
+      return getInputOperand(0)->get();
+    }
+    
+    int64_t getOutputRank() {
+      return  getOutput().getType().cast<ShapedType>().getRank();
+    }
+  
+    int64_t getInputRank() {
+      return getInput().getType().cast<ShapedType>().getRank();
+    }
+ 
+  }];
+}
+
 //===----------------------------------------------------------------------===//
 // Pure ops
 //===----------------------------------------------------------------------===//

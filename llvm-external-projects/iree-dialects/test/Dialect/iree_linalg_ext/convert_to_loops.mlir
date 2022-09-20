@@ -760,3 +760,61 @@ func.func @topk_memref_optional(%input_values: memref<2x10xf32>, %out_values: me
 // CHECK:               %[[D13:.+]] = arith.select %[[D5]], %[[D3]], %[[ARG6]] : f32
 // CHECK:               %[[D14:.+]] = arith.select %[[D10]], %[[D4]], %[[ARG7]] : i32
 // CHECK:               scf.yield %[[D13]], %[[D14]] : f32, i32
+
+// -----
+
+#mapPack = affine_map<(d0, d1, d2, d3) -> (d0 * 32 + d2, d1 * 32 + d3)>
+
+func.func @NC_to_NCNC(%arg0: memref<128x256xf32>, %arg1: memref<4x8x32x32xf32>) {  
+  iree_linalg_ext.pack ins(%arg0: memref<128x256xf32>) 
+                      outs(%arg1: memref<4x8x32x32xf32>) #mapPack
+  return
+}
+// CHECK: #[[MAP:.*]] = affine_map<(d0, d1) -> (d0 * 32 + d1)>
+// CHECK-LABEL: func.func @NC_to_NCNC(
+// CHECK-DAG: %[[lb:.*]] = arith.constant 0 : index
+// CHECK-DAG: %[[ubN:.*]] = arith.constant 4 : index
+// CHECK-DAG: %[[step:.*]] = arith.constant 1 : index
+// CHECK-DAG: %[[ubC:.*]] = arith.constant 8 : index
+// CHECK-DAG: %[[block:.*]] = arith.constant 32 : index
+// CHECK: scf.for %[[N:.*]] = %[[lb]] to %[[ubN]] step %[[step]] {
+// CHECK:   scf.for %[[C:.*]] = %[[lb]] to %[[ubC]] step %[[step]] {
+// CHECK:     scf.for %[[n:.*]] = %[[lb]] to %[[block]] step %[[step]] {
+// CHECK:       scf.for %[[c:.*]] = %[[lb]] to %[[block]] step %[[step]] {
+// CHECK:         %[[applyMapI:.*]] = affine.apply #[[MAP]](%[[N]], %[[n]])
+// CHECK:         %[[applyMapJ:.*]] = affine.apply #[[MAP]](%[[C]], %[[c]])
+// CHECK:         %[[scalar:.*]] = memref.load %arg0[%[[applyMapI]], %[[applyMapJ]]] : memref<128x256xf32>
+// CHECK:         memref.store %[[scalar]], %arg1[%[[N]], %[[C]], %[[n]], %[[c]]] : memref<4x8x32x32xf32>
+// CHECK:       }
+// CHECK:     }
+// CHECK:   }
+// CHECK: }
+
+// -----
+
+#mapPack = affine_map<(d0, d1, d2, d3) -> (d1 * 32 + d2, d0 * 32 + d3)>
+
+func.func @KC_to_KCck(%arg0: memref<128x256xf32>, %arg1: memref<8x4x32x32xf32>) {
+  iree_linalg_ext.pack ins(%arg0: memref<128x256xf32>)
+                      outs(%arg1: memref<8x4x32x32xf32>) #mapPack
+  return
+}
+
+// CHECK-LABEL: func.func @KC_to_KCck(
+// CHECK-DAG: %[[lb:.*]] = arith.constant 0 : index
+// CHECK-DAG: %[[ubK:.*]] = arith.constant 8 : index
+// CHECK-DAG: %[[step:.*]] = arith.constant 1 : index
+// CHECK-DAG: %[[ubC:.*]] = arith.constant 4 : index
+// CHECK-DAG: %[[block:.*]] = arith.constant 32 : index
+// CHECK: scf.for %[[K:.*]] = %[[lb]] to %[[ubK]] step %[[step]] {
+// CHECK:   scf.for %[[C:.*]] = %[[lb]] to %[[ubC]] step %[[step]] {
+// CHECK:     scf.for %[[c:.*]] = %[[lb]] to %[[block]] step %[[step]] {
+// CHECK:       scf.for %[[k:.*]] = %[[lb]] to %[[block]] step %[[step]] {
+// CHECK:         %[[applyMapI:.*]] = affine.apply #[[MAP]](%[[C]], %[[c]])
+// CHECK:         %[[applyMapJ:.*]] = affine.apply #[[MAP]](%[[K]], %[[k]])
+// CHECK:         %[[scalar]] = memref.load %arg0[%[[applyMapI]], %[[applyMapJ]]] : memref<128x256xf32>
+// CHECK:         memref.store %[[scalar]], %arg1[%[[K]], %[[C]], %[[c]], %[[k]]] : memref<8x4x32x32xf32>          
+// CHECK:       }
+// CHECK:     }
+// CHECK:   }
+// CHECK: }
