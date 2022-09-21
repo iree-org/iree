@@ -67,7 +67,7 @@ struct LLVMGPUTensorAllocPass
           return signalPassFailure();
         }
         Value v = ret.getValue();
-        operand->get().replaceAllUsesExcept(v, v.getDefiningOp());
+        operand->set(v);
       }
     }
   }

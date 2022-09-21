@@ -61,7 +61,8 @@ struct LLVMGPUReduceBankConflictsPass
     // Collect all the alloc operations.
     funcOp.walk([&](memref::AllocOp allocOp) {
       if (allocOp.getType().getMemorySpaceAsInt() ==
-          gpu::GPUDialect::getWorkgroupAddressSpace()) {
+              gpu::GPUDialect::getWorkgroupAddressSpace() &&
+          allocOp.getType().hasStaticShape()) {
         sharedMemAllocs.push_back(allocOp);
       }
     });
