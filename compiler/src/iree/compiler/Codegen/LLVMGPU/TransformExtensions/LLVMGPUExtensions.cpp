@@ -43,7 +43,7 @@ void mlir::iree_compiler::registerTransformDialectLLVMGPUExtension(
 // reuse most of the code and not require a static number of threads.
 // TODO: synchronizations for imperfectly nested stuff.
 DiagnosedSilenceableFailure
-transform_dialect::ForeachThreadToGpuAndTranslationInfo::applyToOne(
+transform_dialect::MapNestedForeachThreadToGpuThreads::applyToOne(
     func::FuncOp target, SmallVectorImpl<Operation *> &results,
     transform::TransformState &state) {
   if (!isa<HAL::ExecutableOp, HAL::ExecutableVariantOp>(state.getTopLevel())) {
