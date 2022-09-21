@@ -4,7 +4,7 @@
 //   https://reviews.llvm.org/D117021
 // Once it lands, this pattern can be replaced.
 
-func.func @pad_tensor(%source: tensor<1x?x?x3xf32>, %low1: index, %low2: index, %high1: index, %high2: index) -> tensor<1x2x2x3xf32> {
+func.func @tensor_pad(%source: tensor<1x?x?x3xf32>, %low1: index, %low2: index, %high1: index, %high2: index) -> tensor<1x2x2x3xf32> {
   %cst = arith.constant 0.0 : f32
   %pad = tensor.pad %source low[0, %low1, %low2, 0] high[0, %high1, %high2, 0]  {
   ^bb0(%arg0: index, %arg1: index, %arg2: index, %arg3: index):
@@ -13,7 +13,7 @@ func.func @pad_tensor(%source: tensor<1x?x?x3xf32>, %low1: index, %low2: index, 
   return %pad: tensor<1x2x2x3xf32>
 }
 
-// CHECK-LABEL: func.func @pad_tensor
+// CHECK-LABEL: func.func @tensor_pad
 //  CHECK-SAME: (%[[SOURCE:.+]]: tensor<1x?x?x3xf32>, %[[LOW1:.+]]: index, %[[LOW2:.+]]: index, %{{.+}}: index, %{{.+}}: index)
 
 // CHECK-DAG:   %[[I0:.+]] = arith.constant 0 : index

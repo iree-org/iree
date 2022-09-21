@@ -1,8 +1,8 @@
-// RUN: iree-opt --split-input-file --iree-flow-pad-tensor-to-tensor-insert-slice --canonicalize %s | FileCheck %s
-// RUN: iree-opt --split-input-file --iree-flow-pad-tensor-to-tensor-insert-slice=skip-one-linalg-use-case --canonicalize %s | FileCheck %s --check-prefix=SKIP
+// RUN: iree-opt --split-input-file --iree-flow-tensor-pad-to-tensor-insert-slice --canonicalize %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-flow-tensor-pad-to-tensor-insert-slice=skip-one-linalg-use-case --canonicalize %s | FileCheck %s --check-prefix=SKIP
 
 module  {
-  func.func @pad_tensor(%arg0 : tensor<?x?xf32>, %arg1 : tensor<f32>, %arg2 : index, %arg3 : index) -> tensor<?x?xf32> {
+  func.func @tensor_pad(%arg0 : tensor<?x?xf32>, %arg1 : tensor<f32>, %arg2 : index, %arg3 : index) -> tensor<?x?xf32> {
     %c0 = arith.constant 0 : index
     %c4 = arith.constant 4 : index
     %c3 = arith.constant 3 : index
@@ -16,7 +16,7 @@ module  {
 }
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1] -> (s0 + s1 + 4)>
 //   CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0, s1] -> (s0 + s1 + 3)>
-//       CHECK: func.func @pad_tensor
+//       CHECK: func.func @tensor_pad
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 //  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<f32>
 //  CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: index
@@ -38,7 +38,7 @@ module  {
 // -----
 
 module  {
-  func.func @pad_tensor_static(%arg0: tensor<12x4xf32>, %arg1: tensor<f32>) -> tensor<18x12xf32> {
+  func.func @tensor_pad_static(%arg0: tensor<12x4xf32>, %arg1: tensor<f32>) -> tensor<18x12xf32> {
     %c4 = arith.constant 4 : index
     %c2 = arith.constant 2 : index
     %c5 = arith.constant 5 : index
@@ -51,7 +51,7 @@ module  {
     return %1 : tensor<18x12xf32>
   }
 }
-// CHECK-LABEL: func.func @pad_tensor_static
+// CHECK-LABEL: func.func @tensor_pad_static
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<12x4xf32>
 //  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<f32>
 //   CHECK-DAG:   %[[VAL:.+]] = tensor.extract %[[ARG1]]

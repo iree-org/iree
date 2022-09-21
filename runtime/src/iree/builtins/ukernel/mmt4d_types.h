@@ -34,7 +34,7 @@ struct iree_ukernel_mmt4d_params_t {
   int32_t M0;
   int32_t N0;
   int32_t K0;
-  uint64_t cpu_data_field_0;
+  const uint64_t* cpu_data;
 };
 
 typedef struct iree_ukernel_mmt4d_params_t iree_ukernel_mmt4d_params_t;

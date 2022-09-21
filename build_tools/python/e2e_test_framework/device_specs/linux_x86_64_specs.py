@@ -5,8 +5,8 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Defines x86_64 linux devices."""
 
-from .. import unique_ids
-from ..definitions import common_definitions
+from e2e_test_framework import unique_ids
+from e2e_test_framework.definitions import common_definitions
 
 GCP_C2_STANDARD_16 = common_definitions.DeviceSpec(
     id=unique_ids.DEVICE_SPEC_GCP_C2_STANDARD_16,

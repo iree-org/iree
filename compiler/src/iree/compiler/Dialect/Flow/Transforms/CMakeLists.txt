@@ -56,13 +56,13 @@ iree_cc_library(
     "OptimizeNumerics.cpp"
     "OutlineDispatchRegions.cpp"
     "PadLinalgOps.cpp"
-    "PadTensorToTensorInsertSlice.cpp"
     "PassDetail.h"
     "Passes.cpp"
     "RegionOpUtils.cpp"
     "SplitReduction.cpp"
     "StripAndSplatConstantVariables.cpp"
     "StripSignedness.cpp"
+    "TensorPadToTensorInsertSlice.cpp"
     "VerifyInputLegality.cpp"
   DEPS
     ::PassesIncGen

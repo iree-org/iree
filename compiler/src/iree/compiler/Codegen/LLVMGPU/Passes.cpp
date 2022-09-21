@@ -226,12 +226,29 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
 }
 
 void addGPUTransposePassPipeline(OpPassManager &pm) {
-  tileAndBufferize(pm);
-
+  tileAndDistributeToWorkgroup(pm);
   auto &nestedModulePM = pm.nest<ModuleOp>();
-  // Distribute linalg onto threads within the workgroup.
-  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUTileAndDistribute(
-      false, GPUPromoteSharedMemPattern::TransposeOpPattern));
+
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createRemoveSingleIterationLoopPass());
+
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLLVMGPUTensorAlloc(GPUPromoteSharedMemPattern::TransposeOpPattern));
+  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUTileTensor(false));
+
+  // Linalg -> vector
+  nestedModulePM.addNestedPass<func::FuncOp>(createGPUVectorizationPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createOptimizeVectorTransferPass());
+
+  // tensor to memref
+  addBufferizePasses(nestedModulePM);
+
+  // distribute foreach threads
+  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUDistribute());
+
   nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createGPUDistributeSharedMemoryCopy());
@@ -245,13 +262,6 @@ void addGPUTransposePassPipeline(OpPassManager &pm) {
       createRemoveSingleIterationLoopPass());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
-
-  // Linalg -> vector
-  nestedModulePM.addNestedPass<func::FuncOp>(createGPUVectorizationPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createOptimizeVectorTransferPass());
 }
 
 void addGPUWarpReductionPassPipeline(OpPassManager &pm) {
