@@ -6,14 +6,19 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Generates a CMake file to build the benchmark suites."""
 
-import argparse
+import sys
 import pathlib
-import suites.cmake_rule_generator
+import argparse
+
+# Add build_tools python dir to the search path.
+sys.path.insert(0, str(pathlib.Path(__file__).parent / ".." / "python"))
+
+import benchmarks.iree.definitions
+from e2e_test_framework import cmake_rule_generator
 
 TEMPLATE_DIR = pathlib.Path(__file__).parent
-
-GENERATED_BENCHMARK_SUITES_CMAKE_TEMPLATE = suites.cmake_rule_generator.read_template_from_file(
-    TEMPLATE_DIR, "iree_generated_benchmark_suites_template.cmake")
+GENERATED_BENCHMARK_SUITES_CMAKE_TEMPLATE = cmake_rule_generator.read_template_from_file(
+    TEMPLATE_DIR / "iree_generated_benchmark_suites_template.cmake")
 
 
 def parse_arguments():
@@ -28,9 +33,11 @@ def parse_arguments():
 
 
 def main(args: argparse.Namespace):
-  benchmark_rules = suites.cmake_rule_generator.generate_benchmark_rules(
+  compile_specs, _ = benchmarks.iree.definitions.generate()
+  benchmark_rules = cmake_rule_generator.generate_rules(
       model_artifacts_dir="${_MODEL_ARTIFACTS_DIR}",
-      iree_artifacts_dir="${_IREE_ARTIFACTS_DIR}")
+      iree_artifacts_dir="${_IREE_ARTIFACTS_DIR}",
+      iree_compile_specs=compile_specs)
   cmake_file = GENERATED_BENCHMARK_SUITES_CMAKE_TEMPLATE.substitute(
       __BENCHMARK_RULES='\n'.join(benchmark_rules))
   with open(args.output, "w") as output_file:

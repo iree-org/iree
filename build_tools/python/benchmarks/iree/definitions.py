@@ -80,3 +80,9 @@ class Linux_x86_64_Benchmarks(object):
               tool=MODULE_BENCHMARK_TOOL,
               extra_flags=[f"--task_topology_group_count={thread_num}"]))
     return run_configs
+
+
+def generate(
+) -> Tuple[List[iree_definitions.CompileSpec], List[iree_definitions.RunSpec]]:
+  """Generates all compile and run specs for IREE benchmarks."""
+  return Linux_x86_64_Benchmarks.generate()
