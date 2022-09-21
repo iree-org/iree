@@ -145,15 +145,15 @@ const char* get_cpu_features_str(const iree_ukernel_mmt4d_params_t* params) {
   // code path relies on the combination of two features.
   // For now, asserting only one bit set, and taking advantage of that to work
   // with plain string literals.
-  assert(0 == (params->cpu_data_field_0 & (params->cpu_data_field_0 - 1)));
-  if (params->cpu_data_field_0 == 0) {
+  assert(0 == (params->cpu_data[0] & (params->cpu_data[0] - 1)));
+  if (params->cpu_data[0] == 0) {
     return "(none)";
   }
 #if defined(IREE_UKERNEL_ARCH_ARM_64)
-  if (params->cpu_data_field_0 & IREE_CPU_DATA_FIELD_0_AARCH64_HAVE_I8MM) {
+  if (params->cpu_data[0] & IREE_CPU_DATA_FIELD_0_AARCH64_HAVE_I8MM) {
     return "i8mm";
   }
-  if (params->cpu_data_field_0 & IREE_CPU_DATA_FIELD_0_AARCH64_HAVE_DOTPROD) {
+  if (params->cpu_data[0] & IREE_CPU_DATA_FIELD_0_AARCH64_HAVE_DOTPROD) {
     return "dotprod";
   }
 #endif  // defined(IREE_UKERNEL_ARCH_ARM_64)
