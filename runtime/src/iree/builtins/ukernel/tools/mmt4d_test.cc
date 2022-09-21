@@ -253,25 +253,27 @@ static void mmt4d_test(iree_ukernel_mmt4d_type_t type, int M0, int N0, int K0,
   params.M0 = M0;
   params.N0 = N0;
   params.K0 = K0;
-  const uint64_t local_cpu_data[IREE_CPU_DATA_FIELD_COUNT] = {
-      cpu_data_field_0_bit};
-  params.cpu_data = local_cpu_data;
+  const uint64_t local_cpu_data_default[IREE_CPU_DATA_FIELD_COUNT] = {0};
+  params.cpu_data = local_cpu_data_default;
   // First try without any optional CPU feature. This matters even when the
   // feature is supported by the CPU because we want to test the fallback to
   // architecture-default or generic code.
   test_matmuls_for_various_MNK_shapes_and_flags(params, engine);
   // If this is nonzero, we are asked to test again with this CPU feature.
   if (cpu_data_field_0_bit) {
+    const uint64_t local_cpu_data_with_bit[IREE_CPU_DATA_FIELD_COUNT] = {
+        cpu_data_field_0_bit};
+    params.cpu_data = local_cpu_data_with_bit;
     // Check if the CPU supports the feature (otherwise, we crash).
     bool supported = iree_cpu_data_field(0) & params.cpu_data[0];
     if (supported) {
       // Run with the optional CPU feature.
-      fprintf(stderr, "Device supports CPU feature: %s\n",
-              get_cpu_features_str(&params));
+      printf("Device supports CPU feature: %s\n",
+             get_cpu_features_str(&params));
       test_matmuls_for_various_MNK_shapes_and_flags(params, engine);
     } else {
-      fprintf(stderr, "Skipped: device does not support CPU feature: %s\n",
-              get_cpu_features_str(&params));
+      printf("Skipped: device does not support CPU feature: %s\n",
+             get_cpu_features_str(&params));
     }
   }
   iree_mmt4d_test_random_engine_destroy(engine);
