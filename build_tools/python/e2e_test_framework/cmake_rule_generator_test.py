@@ -5,8 +5,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-from suites.definitions import common_definitions, iree_definitions
-from suites import cmake_rule_generator
+from e2e_test_framework.definitions import common_definitions, iree_definitions
+from e2e_test_framework import cmake_rule_generator
 import unittest
 
 

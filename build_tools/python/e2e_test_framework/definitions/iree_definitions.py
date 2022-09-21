@@ -3,14 +3,14 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-"""Classes for IREE benchmark definitions."""
+"""Classes for IREE compilation and run definitions."""
 
 import dataclasses
 from dataclasses import dataclass
 from enum import Enum
 from typing import List
 
-from . import common_definitions
+from e2e_test_framework.definitions import common_definitions
 
 
 class TargetBackend(Enum):
@@ -62,21 +62,21 @@ class RunConfig(object):
   tags: List[str]
   loader: RuntimeLoader
   driver: RuntimeDriver
-  benchmark_tool: str
+  tool: str
   extra_flags: List[str] = dataclasses.field(default_factory=list)
 
 
 @dataclass(frozen=True)
-class BenchmarkCompileSpec(object):
+class CompileSpec(object):
   """Describes a compile target to generate the module."""
   compile_config: CompileConfig
   model: common_definitions.Model
 
 
 @dataclass(frozen=True)
-class BenchmarkRunSpec(object):
-  """Describes a run target to be benchmarked."""
-  compile_spec: BenchmarkCompileSpec
+class RunSpec(object):
+  """Describes a run target."""
+  compile_spec: CompileSpec
   run_config: RunConfig
   target_device_spec: common_definitions.DeviceSpec
   input_data: common_definitions.ModelInputData

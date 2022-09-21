@@ -5,8 +5,8 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Defines TFLite models."""
 
-from .. import unique_ids
-from ..definitions import common_definitions
+from e2e_test_framework import unique_ids
+from e2e_test_framework.definitions import common_definitions
 
 MOBILENET_V2 = common_definitions.Model(
     id=unique_ids.MODEL_MOBILENET_V2,
