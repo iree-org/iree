@@ -93,21 +93,4 @@ python3 build_tools/docker/manage_images.py --image all
 4. Commit the changes and send a PR for review. The CI will use the updated
    digest references to test the new images.
 
-5. Merge your PR after is approved and all CI tests pass. **Please remember to
-   complete the step below**.
-
-### Part 3. Updating the `:prod` tag
-
-Kokoro builds preload images tagged with `prod` on VM creation, so after
-changing the images used, you should also update the images tagged as `prod`
-in GCR. This also makes development significantly easier for others who need to
-modify the `docker` images.
-
-6. We use `build_tools/docker/prod_digests.txt` as a source of truth for which
-   versions of the images on GCR should have the `:prod` tag. The following
-   command will ensure that you are at upstream HEAD on the `main` branch before
-   it updates the tags.
-
-    ```shell
-    python3 build_tools/docker/manage_prod.py
-    ```
+5. Merge your PR after is approved and all CI tests pass.
