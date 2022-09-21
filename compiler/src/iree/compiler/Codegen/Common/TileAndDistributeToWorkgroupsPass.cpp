@@ -327,6 +327,13 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
       }
     }
 
+    // If tiling didn't happen because there are no tile sizes we are
+    // potentially left with a marker that will confuse the following passes so
+    // we remove the intermediate markers.
+    funcOp->walk([&](Operation *op) {
+      op->removeAttr(linalg::LinalgTransforms::kLinalgTransformMarker);
+    });
+
     LLVM_DEBUG({
       llvm::dbgs() << "--- After Tile + Distribute ---\n";
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
