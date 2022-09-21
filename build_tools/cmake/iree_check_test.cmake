@@ -42,8 +42,8 @@ function(iree_bytecode_module_for_iree_check_test_and_friends)
     list(APPEND _RULE_FLAGS "--iree-llvm-target-triple=${_TARGET_TRIPLE}")
   endif()
 
-  if(CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv" AND
-     RISCV_CPU STREQUAL "rv64" AND
+  if(CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv64" AND
+     CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
      _RULE_TARGET_BACKEND STREQUAL "llvm-cpu" AND
      NOT _RULE_FLAGS MATCHES "iree-llvm-target-triple")
     # RV64 Linux crosscompile toolchain can support iree_check_test with
