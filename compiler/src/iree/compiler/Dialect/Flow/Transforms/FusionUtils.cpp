@@ -38,7 +38,7 @@ static llvm::cl::opt<bool> clFuseReductionBroadcastElementwise(
 /// indexing map.
 // TODO: This restriction can go away if we can vectorize always, but that has
 // a long tail of tasks.
-bool isInsOperandBufferizable(OpOperand *insOperand) {
+bool isInsOperandBufferizable(OpOperand *insOperand, bool aggressiveFusion) {
   // Ignore the check if in-place bufferization is not required.
   if (!clEnsureInplaceableConsumer) return true;
 
@@ -50,12 +50,13 @@ bool isInsOperandBufferizable(OpOperand *insOperand) {
   auto canTieWithOutsOperand = [&](OpOperand *outsOperand) {
     AffineMap outsOperandIndexingMap = linalgOp.getTiedIndexingMap(outsOperand);
 
-    // If the operand is a projected permutation a small stack might be fine.
-    // So return true.
-    if ((outsOperandIndexingMap != insOperandIndexingMap) &&
-        !insOperandIndexingMap.isProjectedPermutation()) {
-      return false;
+    if (outsOperandIndexingMap != insOperandIndexingMap) {
+      if (!aggressiveFusion) return false;
+      // If the operand is a projected permutation a small stack might be
+      // fine.
+      if (!insOperandIndexingMap.isProjectedPermutation()) return false;
     }
+
     // TODO(#8411): Until ops are vectorized (always), we need
     // to check that the elementtype matches for the operands to be tied.
     // For now just doing this check for convolution ops since we expect
@@ -227,7 +228,7 @@ bool areLinalgOpsFusableUsingTileAndFuse(OpOperand &use) {
 
   // 4. In-place bufferization requirements (for now) require that the use in
   // the consumer can re-use the buffer for a result.
-  return isInsOperandBufferizable(&use);
+  return isInsOperandBufferizable(&use, /*aggressiveFusion=*/false);
 }
 
 }  // namespace Flow
