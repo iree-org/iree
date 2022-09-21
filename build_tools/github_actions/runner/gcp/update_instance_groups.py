@@ -274,6 +274,7 @@ def parse_args():
           " https://cloud.google.com/compute/docs/instance-groups/updating-migs."
       ))
   subparser_base.add_argument("--env",
+                              "--environment",
                               default="testing",
                               help="The environment for the MIGs.",
                               choices=["prod", "testing"])
