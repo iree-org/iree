@@ -467,27 +467,32 @@ iree_benchmark_suite(
     "--task_topology_group_count=4"
 )
 
-# CPU, VMVX, 4-thread, big-core, full-inference
-# VMVX is slow and we're not optimizing perf yet. Leaving in a single max-thread
-# benchmark because it's useful to keep an eye on and helps disambiguate where a
-# performance change may be coming from (e.g. if it's in vmvx as well, it's
-# probably not a codegen issue).
+# VMVX benchmarks with ukernels for various ARM64 ISA variants.
+# Single-thread only while we have enough single-thread performance problems
+# to work on before bringing multi-threading into the picture.
+# Big-core only and only one model (MobileBert) while the latency is still
+# very high due to unoptimized VMVX (most of it is not yet going through
+# ukernels, latency is still often > 1 minute).
+
+set(VMVX_UKERNEL_COMPILATION_FLAGS
+  "--iree-input-type=tosa"
+  "--iree-vmvx-enable-microkernels"
+)
+
 iree_benchmark_suite(
   GROUP_NAME
     "android-arm64-v8a"
-
   MODULES
-    "${MOBILENET_V2_MODULE}"
-    "${MOBILENET_V3SMALL_MODULE}"
-
+    "${MOBILEBERT_INT8_MODULE}"
   BENCHMARK_MODES
-    "4-thread,big-core,full-inference,experimental-flags"
+    "1-thread,big-core,full-inference,mmt4d,arm64"
   TARGET_BACKEND
     "vmvx"
   TARGET_ARCHITECTURE
     "CPU-ARM64-v8A"
   COMPILATION_FLAGS
-    "--iree-input-type=tosa"
+    ${VMVX_UKERNEL_COMPILATION_FLAGS}
+    "--iree-flow-mmt4d-target-options=arch=aarch64"
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
@@ -495,7 +500,55 @@ iree_benchmark_suite(
   DRIVER
     "local-task"
   RUNTIME_FLAGS
-    "--task_topology_group_count=4"
+    "--task_topology_group_count=1"
+)
+
+iree_benchmark_suite(
+  GROUP_NAME
+    "android-arm64-v8a"
+  MODULES
+    "${MOBILEBERT_INT8_MODULE}"
+  BENCHMARK_MODES
+    "1-thread,big-core,full-inference,mmt4d,arm64,dotprod"
+  TARGET_BACKEND
+    "vmvx"
+  TARGET_ARCHITECTURE
+    "CPU-ARM64-v8A"
+  COMPILATION_FLAGS
+    ${VMVX_UKERNEL_COMPILATION_FLAGS}
+    "--iree-flow-mmt4d-target-options=arch=aarch64 features=+dotprod"
+  BENCHMARK_TOOL
+    iree-benchmark-module
+  CONFIG
+    "iree-vmvx"
+  DRIVER
+    "local-task"
+  RUNTIME_FLAGS
+    "--task_topology_group_count=1"
+)
+
+iree_benchmark_suite(
+  GROUP_NAME
+    "android-arm64-v8a"
+  MODULES
+    "${MOBILEBERT_INT8_MODULE}"
+  BENCHMARK_MODES
+    "1-thread,big-core,full-inference,mmt4d,arm64,i8mm"
+  TARGET_BACKEND
+    "vmvx"
+  TARGET_ARCHITECTURE
+    "CPU-ARM64-v8A"
+  COMPILATION_FLAGS
+    ${VMVX_UKERNEL_COMPILATION_FLAGS}
+    "--iree-flow-mmt4d-target-options=arch=aarch64 features=+i8mm"
+  BENCHMARK_TOOL
+    iree-benchmark-module
+  CONFIG
+    "iree-vmvx"
+  DRIVER
+    "local-task"
+  RUNTIME_FLAGS
+    "--task_topology_group_count=1"
 )
 
 ################################################################################
