@@ -238,7 +238,6 @@ static void iree_hal_task_semaphore_wait_cmd_cleanup(
                                         &cmd->timepoint.base);
   }
   iree_event_pool_release(cmd->semaphore->event_pool, 1, &cmd->timepoint.event);
-  iree_hal_semaphore_release((iree_hal_semaphore_t*)cmd->semaphore);
 }
 
 iree_status_t iree_hal_task_semaphore_enqueue_timepoint(
@@ -272,7 +271,6 @@ iree_status_t iree_hal_task_semaphore_enqueue_timepoint(
                                iree_hal_task_semaphore_wait_cmd_cleanup);
       iree_task_set_completion_task(&cmd->task.header, issue_task);
       cmd->semaphore = semaphore;
-      iree_hal_semaphore_retain(base_semaphore);
       iree_task_submission_enqueue(submission, &cmd->task.header);
     }
   }

@@ -218,6 +218,34 @@ def HAL_TensorBarrierOp : HAL_Op<"tensor.barrier", [
   let hasCanonicalizer = 1;
 }
 
+// NOTE: this has side-effects as it is mutating the global timeline.
+// Eventually we'll probably want a dedicated hal.timeline type instead.
+def HAL_TimelineAdvanceOp : HAL_Op<"timeline.advance"> {
+  let summary = [{advances a program timeline by one step}];
+  let description = [{
+    Returns a fence indicating when the timeline has been advanced one step.
+    This fence can be used to wait until the timeline reaches or exceeds the
+    timepoint or used to signal the that it has.
+
+    This is a pseudo-op that is expanded into a semaphore and target value
+    pair during timeline materialization. The op represents when the advancement
+    should occur in program order but not what the actual live timepoint would
+    be.
+  }];
+
+  // TODO(benvanik): discriminator when multiple devices or timelines are
+  // present. Today we only have a single timeline.
+  let arguments = (ins);
+  let results = (outs
+    HAL_Fence:$fence
+  );
+
+  let assemblyFormat = [{
+    `:` type($fence)
+    attr-dict-with-keyword
+  }];
+}
+
 //===----------------------------------------------------------------------===//
 // !hal.allocator / iree_hal_allocator_t
 //===----------------------------------------------------------------------===//
@@ -2197,28 +2225,24 @@ def HAL_PipelineLayoutLookupOp : HAL_PureOp<"pipeline_layout.lookup", [
 
 def HAL_FenceCreateOp : HAL_Op<"fence.create", [
     DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-    MemoryEffects<[MemAlloc]>,
+    SameVariadicOperandSize,
   ]> {
-  let summary = [{creates an unsignaled fence}];
+  let summary = [{creates a fence from the given timepoints}];
   let description = [{
-    Returns a fence that defines a point in time. By default fences will remain
-    unsignaled unless they are explicitly signaled with `hal.fence.signal` or
-    asynchronously signaled by the device by passing them as an operand to
-    queue submission ops.
+    Returns a fence that defines a point in time across one or more timelines.
   }];
 
   let arguments = (ins
-    HAL_Device:$device,
-    HAL_FenceFlagBitfieldAttr:$flags
+    Variadic<HAL_Semaphore>:$semaphores,
+    Variadic<HAL_TimelineValue>:$min_values
   );
   let results = (outs
     HAL_Fence:$result
   );
 
   let assemblyFormat = [{
-    `device` `(` $device `:` type($device) `)`
-    `flags` `(` $flags `)`
-    `:` type($result)
+    custom<TimepointList>($semaphores, type($semaphores), $min_values)
+    `->` type($result)
     attr-dict-with-keyword
   }];
 
@@ -2247,28 +2271,6 @@ def HAL_FenceJoinOp : HAL_Op<"fence.join", [
   }];
 
   let hasCanonicalizer = 1;
-}
-
-def HAL_FenceQueryOp : HAL_Op<"fence.query"> {
-  let summary = [{fence query operation}];
-  let description = [{
-    Queries whether the fence has been reached and its status.
-    Returns OK if the fence has been signaled successfully, DEFERRED if it is
-    unsignaled, and otherwise an error indicating the failure.
-  }];
-
-  let arguments = (ins
-    HAL_Fence:$fence
-  );
-  let results = (outs
-    Util_Status:$status
-  );
-
-  let assemblyFormat = [{
-    `<` $fence `:` type($fence) `>`
-    `:` type($status)
-    attr-dict-with-keyword
-  }];
 }
 
 def HAL_FenceSignalOp : HAL_Op<"fence.signal"> {
@@ -2334,6 +2336,127 @@ def HAL_FenceAwaitOp : HAL_Op<"fence.await", [
   }];
 
   let hasCanonicalizer = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// !hal.semaphore / iree_hal_semaphore_t
+//===----------------------------------------------------------------------===//
+
+def HAL_SemaphoreCreateOp : HAL_Op<"semaphore.create", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+  ]> {
+  let summary = [{semaphore allocation operation}];
+  let description = [{
+    Returns a semaphore from the device pool with the given initial value.
+  }];
+
+  let arguments = (ins
+    HAL_Device:$device,
+    HAL_TimelineValue:$initial_value
+  );
+  let results = (outs
+    HAL_Semaphore:$result
+  );
+
+  let assemblyFormat = [{
+    `device` `(` $device `:` type($device) `)`
+    `initial` `(` $initial_value `)`
+    `:` type($result)
+    attr-dict-with-keyword
+  }];
+}
+
+def HAL_SemaphoreQueryOp : HAL_Op<"semaphore.query", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+  ]> {
+  let summary = [{semaphore payload value query}];
+  let description = [{
+    Queries the current payload and returns a tuple of `(status, value)`.
+    As the payload is monotonically increasing it is guaranteed that
+    the value is at least equal to the previous result of a
+    `hal.semaphore.signal` call and coherent with any waits for a
+    specified value via `hal.semaphore.await`.
+  }];
+
+  let arguments = (ins
+    HAL_Semaphore:$semaphore
+  );
+  let results = (outs
+    Util_Status:$status,
+    HAL_TimelineValue:$value
+  );
+
+  let assemblyFormat = [{
+    `<` $semaphore `:` type($semaphore) `>`
+    `:` type($status) `,` type($value)
+    attr-dict-with-keyword
+  }];
+}
+
+def HAL_SemaphoreSignalOp : HAL_Op<"semaphore.signal"> {
+  let summary = [{semaphore payload value signal operation}];
+  let description = [{
+    Signals the semaphore to the given payload value.
+    The call is ignored if the current payload value exceeds `new_value`.
+  }];
+
+  let arguments = (ins
+    HAL_Semaphore:$semaphore,
+    HAL_TimelineValue:$new_value
+  );
+
+  let assemblyFormat = [{
+    `<` $semaphore `:` type($semaphore) `>`
+    `value` `(` $new_value `)`
+    attr-dict-with-keyword
+  }];
+}
+
+def HAL_SemaphoreFailOp : HAL_Op<"semaphore.fail"> {
+  let summary = [{semaphore asynchronous failure operation}];
+  let description = [{
+    Signals the semaphore with a failure. The `status` will be returned from
+    `hal.semaphore.query` and `hal.semaphore.signal` for the lifetime
+    of the semaphore.
+  }];
+
+  let arguments = (ins
+    HAL_Semaphore:$semaphore,
+    Util_Status:$status
+  );
+
+  let assemblyFormat = [{
+    `<` $semaphore `:` type($semaphore) `>`
+    `status` `(` $status `)`
+    attr-dict-with-keyword
+  }];
+}
+
+def HAL_SemaphoreAwaitOp : HAL_Op<"semaphore.await", [
+    Util_YieldPoint,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+  ]> {
+  let summary = [{asynchronous semaphore wait operation}];
+  let description = [{
+    Yields the caller until the semaphore reaches or exceeds the specified
+    payload `min_value`. Returns the `status` of the semaphore after the wait,
+    with a non-zero value indicating failure.
+  }];
+
+  let arguments = (ins
+    HAL_Semaphore:$semaphore,
+    HAL_TimelineValue:$min_value
+  );
+  let results = (outs
+    Util_Status:$status
+  );
+
+  let assemblyFormat = [{
+    `<` $semaphore `:` type($semaphore) `>`
+    `until` `(` $min_value `)`
+    `:` type($status)
+    attr-dict-with-keyword
+  }];
 }
 
 #endif  // IREE_DIALECT_HAL_OPS

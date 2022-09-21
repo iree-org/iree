@@ -24,6 +24,7 @@ iree_compiler_cc_library(
         "ConvertExperimentalOps.cpp",
         "ConvertFenceOps.cpp",
         "Patterns.cpp",
+        "ConvertSemaphoreOps.cpp",
     ],
     hdrs = [
         "Patterns.h",

@@ -90,7 +90,7 @@ func.func @cmdExecute(%arg0: !stream.resource<transient>, %arg1: index, %arg2: !
     }
   } => !stream.timepoint
   // CHECK-NEXT: hal.command_buffer.finalize<%[[CMD]]
-  // CHECK: %[[SIGNAL_FENCE:.+]] = hal.fence.create
+  // CHECK: %[[SIGNAL_FENCE:.+]] = hal.timeline.advance
   // CHECK: hal.device.queue.execute
   // CHECK-SAME: affinity(%c-1
   // CHECK-SAME: wait(%arg4)

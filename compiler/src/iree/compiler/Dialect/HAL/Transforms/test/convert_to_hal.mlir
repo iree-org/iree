@@ -116,7 +116,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
     } => !stream.timepoint
 
     // CHECK: %[[WAIT_FENCE:.+]] = util.null : !hal.fence
-    // CHECK: %[[SIGNAL_FENCE:.+]] = hal.fence.create
+    // CHECK: %[[SIGNAL_FENCE:.+]] = hal.timeline.advance
     // CHECK: hal.device.queue.execute<%[[DEVICE]]
     // CHECK-SAME: wait(%[[WAIT_FENCE]])
     // CHECK-SAME: signal(%[[SIGNAL_FENCE]])

@@ -4,11 +4,60 @@
 // This avoids the allocation and lets the null propagate through the rest of
 // the program to simplify submissions.
 
-// CHECK-LABEL: @fence_create_unused
-func.func @fence_create_unused(%device: !hal.device) {
-  // CHECK-NOT: hal.fence.create
-  %fence = hal.fence.create device(%device : !hal.device) flags("None") : !hal.fence
-  return
+// CHECK-LABEL: @fence_create_empty
+func.func @fence_create_empty() -> !hal.fence {
+  // CHECK: %[[FENCE:.+]] = util.null : !hal.fence
+  %fence = hal.fence.create -> !hal.fence
+  // CHECK: return %[[FENCE]]
+  return %fence : !hal.fence
+}
+
+// -----
+
+// Tests that a fence with multiple timepoints sharing the same semaphore are
+// deduplicated to the max of the timepoints.
+
+// CHECK-LABEL: @fence_create_duplicate_semaphores
+// CHECK-SAME: %[[SEMAPHORE0:.+]]: !hal.semaphore, %[[TIME0:.+]]: i64, %[[SEMAPHORE1:.+]]: !hal.semaphore, %[[TIME1:.+]]: i64, %[[TIME2:.+]]: i64
+func.func @fence_create_duplicate_semaphores(
+    %semaphore0: !hal.semaphore, %time0: i64,
+    %semaphore1: !hal.semaphore, %time1: i64, %time2: i64) -> !hal.fence {
+  // CHECK: %[[TIMEMAX:.+]] = arith.maxui %[[TIME1]], %[[TIME2]] : i64
+  // CHECK: %[[FENCE:.+]] = hal.fence.create
+  // CHECK-SAME: at<%[[SEMAPHORE0]] : !hal.semaphore>(%[[TIME0]])
+  // CHECK-SAME: at<%[[SEMAPHORE1]] : !hal.semaphore>(%[[TIMEMAX]])
+  %fence = hal.fence.create
+      at<%semaphore0 : !hal.semaphore>(%time0)
+      at<%semaphore1 : !hal.semaphore>(%time1)
+      at<%semaphore1 : !hal.semaphore>(%time2)
+      -> !hal.fence
+  // CHECK: return %[[FENCE]]
+  return %fence : !hal.fence
+}
+
+// -----
+
+// Tests that timepoints with the same values are deduplicated.
+// This would be handled by util.range.max canonicalizations as above but this
+// avoids emitting additional IR and is effectively free.
+
+// CHECK-LABEL: @fence_create_duplicate_values
+// CHECK-SAME: %[[SEMAPHORE0:.+]]: !hal.semaphore, %[[TIME0:.+]]: i64, %[[SEMAPHORE1:.+]]: !hal.semaphore, %[[TIME1:.+]]: i64
+func.func @fence_create_duplicate_values(
+    %semaphore0: !hal.semaphore, %time0: i64,
+    %semaphore1: !hal.semaphore, %time1: i64) -> !hal.fence {
+  // CHECK: %[[FENCE:.+]] = hal.fence.create
+  %fence = hal.fence.create
+      // CHECK-SAME: at<%[[SEMAPHORE0]] : !hal.semaphore>(%[[TIME0]])
+      at<%semaphore0 : !hal.semaphore>(%time0)
+      at<%semaphore0 : !hal.semaphore>(%time0)
+      at<%semaphore0 : !hal.semaphore>(%time0)
+      // CHECK-SAME: at<%[[SEMAPHORE1]] : !hal.semaphore>(%[[TIME1]])
+      at<%semaphore1 : !hal.semaphore>(%time1)
+      at<%semaphore1 : !hal.semaphore>(%time1)
+      -> !hal.fence
+  // CHECK: return %[[FENCE]]
+  return %fence : !hal.fence
 }
 
 // -----

@@ -323,9 +323,8 @@ static void appendDispatchBenchmark(IREE::HAL::ExecutableOp executableOp,
   // TODO(benvanik): add fences to ABI so the benchmark tool can pipeline.
   Value waitFence = funcBuilder.create<IREE::Util::NullOp>(
       loc, funcBuilder.getType<IREE::HAL::FenceType>());
-  Value signalFence = funcBuilder.create<IREE::HAL::FenceCreateOp>(
-      loc, funcBuilder.getType<IREE::HAL::FenceType>(), device,
-      IREE::HAL::FenceFlagBitfield::None);
+  Value signalFence = funcBuilder.create<IREE::HAL::TimelineAdvanceOp>(
+      loc, funcBuilder.getType<IREE::HAL::FenceType>());
 
   // Queue execution.
   auto queueAffinity = funcBuilder.create<arith::ConstantIntOp>(loc, -1, 64);

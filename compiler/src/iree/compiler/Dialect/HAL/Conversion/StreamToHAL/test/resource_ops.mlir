@@ -21,7 +21,7 @@ func.func @resourceAlloc(%arg0: index, %arg1: index) -> (!stream.resource<transi
 // CHECK-SAME: (%[[SIZE:.+]]: index)
 func.func @resourceAlloca(%size: index) -> (!stream.resource<staging>, !stream.timepoint) {
   // CHECK: %[[WAIT_FENCE:.+]] = util.null : !hal.fence
-  // CHECK: %[[SIGNAL_FENCE:.+]] = hal.fence.create
+  // CHECK: %[[SIGNAL_FENCE:.+]] = hal.timeline.advance
   // CHECK: %[[RET0:.+]] = hal.device.queue.alloca
   // CHECK-SAME: affinity(%c-1
   // CHECK-SAME: wait(%[[WAIT_FENCE]])
@@ -40,7 +40,7 @@ func.func @resourceAlloca(%size: index) -> (!stream.resource<staging>, !stream.t
 // CHECK-LABEL: @resourceAllocaAwait
 // CHECK-SAME: (%[[SIZE:.+]]: index, %[[WAIT_FENCE:.+]]: !hal.fence)
 func.func @resourceAllocaAwait(%size: index, %await_timepoint: !stream.timepoint) -> (!stream.resource<staging>, !stream.timepoint) {
-  // CHECK: %[[SIGNAL_FENCE:.+]] = hal.fence.create
+  // CHECK: %[[SIGNAL_FENCE:.+]] = hal.timeline.advance
   // CHECK: %[[RET0:.+]] = hal.device.queue.alloca
   // CHECK-SAME: affinity(%c-1
   // CHECK-SAME: wait(%[[WAIT_FENCE]])
@@ -60,7 +60,7 @@ func.func @resourceAllocaAwait(%size: index, %await_timepoint: !stream.timepoint
 // CHECK-SAME: (%[[SIZE:.+]]: index, %[[RESOURCE:.+]]: !hal.buffer)
 func.func @resourceDealloca(%size: index, %resource: !stream.resource<staging>) -> !stream.timepoint {
   // CHECK: %[[WAIT_FENCE:.+]] = util.null : !hal.fence
-  // CHECK: %[[SIGNAL_FENCE:.+]] = hal.fence.create
+  // CHECK: %[[SIGNAL_FENCE:.+]] = hal.timeline.advance
   // CHECK: hal.device.queue.dealloca
   // CHECK-SAME: affinity(%c-1
   // CHECK-SAME: wait(%[[WAIT_FENCE]])
@@ -78,7 +78,7 @@ func.func @resourceDealloca(%size: index, %resource: !stream.resource<staging>) 
 // CHECK-LABEL: @resourceDeallocaAwait
 // CHECK-SAME: (%[[SIZE:.+]]: index, %[[RESOURCE:.+]]: !hal.buffer, %[[WAIT_FENCE:.+]]: !hal.fence)
 func.func @resourceDeallocaAwait(%size: index, %resource: !stream.resource<staging>, %await_timepoint: !stream.timepoint) -> !stream.timepoint {
-  // CHECK: %[[SIGNAL_FENCE:.+]] = hal.fence.create
+  // CHECK: %[[SIGNAL_FENCE:.+]] = hal.timeline.advance
   // CHECK: hal.device.queue.dealloca
   // CHECK-SAME: affinity(%c-1
   // CHECK-SAME: wait(%[[WAIT_FENCE]])
