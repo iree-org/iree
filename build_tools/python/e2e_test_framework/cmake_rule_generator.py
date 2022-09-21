@@ -17,22 +17,20 @@ import urllib.parse
 
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 
+
+def read_template_from_file(template_path: pathlib.Path) -> string.Template:
+  return string.Template(template_path.read_text())
+
+
 TEMPLATE_DIR = pathlib.Path(__file__).parent
-
-
-def read_template_from_file(template_name: str) -> string.Template:
-  with open(TEMPLATE_DIR / template_name, "r") as f:
-    return string.Template(f.read())
-
-
 DOWNLOAD_ARTIFACT_CMAKE_TEMPLATE = read_template_from_file(
-    "iree_download_artifact_template.cmake")
+    TEMPLATE_DIR / "iree_download_artifact_template.cmake")
 TFLITE_IMPORT_CMAKE_TEMPLATE = read_template_from_file(
-    "iree_tflite_import_template.cmake")
+    TEMPLATE_DIR / "iree_tflite_import_template.cmake")
 TF_IMPORT_CMAKE_TEMPLATE = read_template_from_file(
-    "iree_tf_import_template.cmake")
+    TEMPLATE_DIR / "iree_tf_import_template.cmake")
 IREE_BYTECODE_MODULE_CMAKE_TEMPLATE = read_template_from_file(
-    "iree_bytecode_module_template.cmake")
+    TEMPLATE_DIR / "iree_bytecode_module_template.cmake")
 
 
 @dataclass
