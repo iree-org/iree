@@ -71,7 +71,7 @@ jobs:
     outputs:
       should-run: ${{ steps.should-run.outputs.should-run }}
       # Variables for dependent jobs. See comment at top.
-      runner-env: prod
+      runner-env: testing
       runner-group: ${{ env._CI_STAGE }}
       # Note that we can't flip the condition here because 0 is falsey. See
       # comment at top.
