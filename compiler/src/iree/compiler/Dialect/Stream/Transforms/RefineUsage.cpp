@@ -161,6 +161,7 @@ struct UsageRefinementPattern : public OpRewritePattern<OpT> {
       return true;
     } else {
       // Directly overwrite the existing lifetime.
+      assert(result.getType() != newType);
       result.setType(newType);
       return true;
     }
@@ -275,6 +276,7 @@ struct ApplyGenericOp : public UsageRefinementPattern<Op> {
                                 PatternRewriter &rewriter) const override {
     bool didChange = this->applyRegionTransitions(op, rewriter);
     rewriter.startRootUpdate(op);
+    rewriter.setInsertionPointAfter(op);
     for (unsigned i = 0; i < op->getNumResults(); ++i) {
       auto result = op->getResult(i);
       if (result.getType().template isa<IREE::Stream::ResourceType>()) {
@@ -304,9 +306,10 @@ struct ApplyStreamableOp : public UsageRefinementPattern<Op> {
     auto affinityAttr = getOpAffinity(op);
 
     rewriter.startRootUpdate(op);
+    rewriter.setInsertionPointAfter(op);
 
     auto sizeAwareOp =
-        dyn_cast<IREE::Util::SizeAwareOpInterface>(op.getOperation());
+        cast<IREE::Util::SizeAwareOpInterface>(op.getOperation());
     for (unsigned i = 0; i < op->getNumResults(); ++i) {
       auto result = op->getResult(i);
       if (!result.getType().template isa<IREE::Stream::ResourceType>()) {
@@ -331,6 +334,7 @@ struct ApplyStreamableOp : public UsageRefinementPattern<Op> {
 static void insertUsageRefinementPatterns(MLIRContext *context,
                                           ResourceUsageAnalysis &analysis,
                                           RewritePatternSet &patterns) {
+  // NOTE: only ops that return values or contain regions need to be handled.
   patterns.insert<ApplyInitializerOp, ApplyFuncOp>(context, analysis);
   patterns.insert<ApplyGenericOp<IREE::Util::DoNotOptimizeOp>,
                   ApplyGenericOp<mlir::arith::SelectOp>,
@@ -386,7 +390,10 @@ class RefineUsagePass : public RefineUsageBase<RefineUsagePass> {
     RewritePatternSet patterns(&getContext());
     insertUsageRefinementPatterns(&getContext(), analysis, patterns);
     FrozenRewritePatternSet frozenPatterns(std::move(patterns));
-    if (failed(applyPatternsAndFoldGreedily(moduleOp, frozenPatterns))) {
+    GreedyRewriteConfig rewriteConfig;
+    rewriteConfig.useTopDownTraversal = true;
+    if (failed(applyPatternsAndFoldGreedily(moduleOp, frozenPatterns,
+                                            rewriteConfig))) {
       return signalPassFailure();
     }
   }

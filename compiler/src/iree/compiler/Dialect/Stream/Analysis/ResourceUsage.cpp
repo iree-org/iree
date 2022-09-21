@@ -86,7 +86,7 @@ class AbstractResourceUsage
   static_assert(BEST_STATE == BaseType::getBestState(),
                 "unexpected BEST_STATE value");
 
-  static bool isValidState(uint16_t bits) {
+  static bool isValidStateBits(uint16_t bits) {
     // bool isIndirect = (bits & NOT_INDIRECT) != NOT_INDIRECT;
     // bool isExternal = (bits & NOT_EXTERNAL) != NOT_EXTERNAL;
     bool isMutated = (bits & NOT_MUTATED) != NOT_MUTATED;
@@ -117,6 +117,11 @@ class AbstractResourceUsage
     return true;
   }
 
+  bool isValidState() const override {
+    return this->getAssumed() != DFX::BooleanState::getWorstState() &&
+           isValidStateBits(this->getAssumed());
+  }
+
   ResourceUsageBitfield convertBitsToResourceUsage(uint16_t bits) const {
     return static_cast<ResourceUsageBitfield>(~bits & BEST_STATE);
   }
@@ -131,6 +136,7 @@ class AbstractResourceUsage
 
   const std::string getAsStr(AsmState &asmState) const override {
     std::string str;
+    if (!isValidState()) return "*";
     auto append = [&](const char *part) {
       if (!str.empty()) str += '|';
       str += part;
@@ -363,13 +369,24 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
           if (kFavorTransients && isSourceExternal && isTargetInternal) {
             LLVM_DEBUG({
               llvm::dbgs() << "[ValueResourceUsage] skipping forward prop of "
-                              "external into internal:";
+                              "external into internal: ";
               op.print(llvm::dbgs(), solver.getAsmState());
               llvm::dbgs() << "\n";
             });
             return;
           }
-          getState() ^= sourceUsage.getState();
+          auto newState = getState();
+          newState ^= sourceUsage.getState();
+          if (!newState.isValidState()) {
+            LLVM_DEBUG({
+              llvm::dbgs() << "[ValueResourceUsage] skipping update from "
+                              "producer as it would create an invalid state: ";
+              op.print(llvm::dbgs(), solver.getAsmState());
+              llvm::dbgs() << "\n";
+            });
+            return;
+          }
+          getState() = newState;
         })
         .Case([&](IREE::Stream::AsyncStoreOp op) {
           removeAssumedBits(NOT_STAGING_WRITE);
@@ -531,14 +548,26 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
           bool isTargetExternal = !resultUsage.isAssumed(NOT_EXTERNAL);
           if (kFavorTransients && isSourceInternal && isTargetExternal) {
             LLVM_DEBUG({
-              llvm::dbgs() << "[ValueResourceUsage] skipping back prop of "
-                              "external into internal due to kFavorTransients:";
+              llvm::dbgs()
+                  << "[ValueResourceUsage] skipping back prop of external into "
+                     "internal due to kFavorTransients: ";
               op.print(llvm::dbgs(), solver.getAsmState());
               llvm::dbgs() << "\n";
             });
             return;
           }
-          getState() ^= resultUsage.getState();
+          auto newState = getState();
+          newState ^= resultUsage.getState();
+          if (!newState.isValidState()) {
+            LLVM_DEBUG({
+              llvm::dbgs() << "[ValueResourceUsage] skipping update from use "
+                              "as it would create an invalid state: ";
+              op.print(llvm::dbgs(), solver.getAsmState());
+              llvm::dbgs() << "\n";
+            });
+            return;
+          }
+          getState() = newState;
         })
         .Case([&](IREE::Stream::AsyncLoadOp op) {
           removeAssumedBits(NOT_STAGING_READ);
@@ -587,12 +616,6 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
 
     if (traversalResult == TraversalResult::INCOMPLETE) {
       removeAssumedBits(NOT_EXTERNAL);
-    }
-
-    // Filter out impossible states by marking the state invalid.
-    // The fixpoint framework will try again.
-    if (!isValidState(assumedBits)) {
-      return indicatePessimisticFixpoint();
     }
 
     return assumedBits == getAssumed() ? ChangeStatus::UNCHANGED
