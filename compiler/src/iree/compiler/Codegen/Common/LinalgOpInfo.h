@@ -8,6 +8,7 @@
 #define IREE_COMPILER_CODEGEN_COMMON_LINALGOPINFO_H_
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Types.h"
+#include "mlir/IR/Value.h"
 
 namespace mlir {
 
@@ -17,25 +18,36 @@ class LinalgOp;
 
 namespace iree_compiler {
 
+/// Returns true if a map represents the appropriate transpose. Pass this into
+/// the LinalgOpInfo for additional transpose granularity.
+using TransposeMapFilter = std::function<bool(AffineMap map)>;
+
 class LinalgOpInfo {
  public:
   LinalgOpInfo(linalg::LinalgOp linalgOp);
+  LinalgOpInfo(linalg::LinalgOp linalgOp,
+               TransposeMapFilter transposeMapFilter);
 
-  bool isTranspose() const { return transposeTrait; }
+  bool isTranspose() const { return !transposeOperands.empty(); }
   bool isReduction() const { return reductionTrait; }
-  bool isSharedMemTranspose() const {
-    return !sharedMemTransposeOperands.empty();
-  }
-  ArrayRef<OpOperand *> getSharedMemTransposeOperands() const {
-    return sharedMemTransposeOperands;
+  bool isDynamic() const { return dynamicTrait; }
+  bool isGeneric() const { return genericTrait; }
+  bool isTwoThreeLoops() const { return twoOrThreeLoopsTrait; }
+
+  ArrayRef<OpOperand *> getTransposeOperands() const {
+    return transposeOperands;
   }
 
  private:
   void computeInfo(linalg::LinalgOp);
 
+  TransposeMapFilter transposeMapFilter;
   bool transposeTrait;
   bool reductionTrait;
-  SmallVector<OpOperand *> sharedMemTransposeOperands;
+  bool dynamicTrait;
+  bool genericTrait;
+  bool twoOrThreeLoopsTrait;
+  SmallVector<OpOperand *> transposeOperands;
 };
 
 }  // namespace iree_compiler

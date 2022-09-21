@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/LinalgOpInfo.h"
 #include "iree/compiler/Codegen/LLVMGPU/TilingUtils.h"
+#include "iree/compiler/Codegen/LLVMGPU/TransposeUtils.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
@@ -42,8 +43,8 @@ static bool contractOpFilter(Operation *op) {
 static bool transposeOpFilter(Operation *op) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
   if (!linalgOp) return false;
-  LinalgOpInfo opInfo(linalgOp);
-  return opInfo.isSharedMemTranspose();
+  LinalgOpInfo opInfo(linalgOp, sharedMemTransposeFilter);
+  return opInfo.isTranspose();
 }
 
 /// Returns true if the index map represents a transpose that benefits from
@@ -111,9 +112,9 @@ struct LLVMGPUTensorAllocPass
           break;
 
         case GPUPromoteSharedMemPattern::TransposeOpPattern:
-          LinalgOpInfo opInfo(linalgOp);
+          LinalgOpInfo opInfo(linalgOp, sharedMemTransposeFilter);
 
-          for (auto operand : opInfo.getSharedMemTransposeOperands()) {
+          for (auto operand : opInfo.getTransposeOperands()) {
             FailureOr<Value> ret = bufferization::allocateTensorForShapedValue(
                 builder, op->getLoc(), operand->get(), false, options, true);
             if (failed(ret)) {

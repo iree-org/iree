@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/Common/LinalgOpInfo.h"
 #include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
+#include "iree/compiler/Codegen/LLVMGPU/TransposeUtils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -514,14 +515,15 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
 
 static LogicalResult setTransposeConfig(func::FuncOp entryPoint,
                                         linalg::LinalgOp linalgOp) {
-  LinalgOpInfo opInfo(linalgOp);
+  LinalgOpInfo opInfo(linalgOp, sharedMemTransposeFilter);
 
-  if (!opInfo.isSharedMemTranspose()) {
+  // Checks preconditions for shared mem transpose.
+  if (!opInfo.isTranspose() || opInfo.isDynamic() || opInfo.isReduction() ||
+      !opInfo.isTwoThreeLoops()) {
     return failure();
   }
 
-  ArrayRef<OpOperand *> transposedOperands =
-      opInfo.getSharedMemTransposeOperands();
+  ArrayRef<OpOperand *> transposedOperands = opInfo.getTransposeOperands();
 
   // Determine the fastest moving dimensions for the source/destination indices
   // of each transpose. These inform the tile sizes.

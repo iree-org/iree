@@ -14,8 +14,6 @@ using namespace mlir::linalg;
 namespace mlir {
 namespace iree_compiler {
 
-LinalgOpInfo::LinalgOpInfo(linalg::LinalgOp linalgOp) { computeInfo(linalgOp); }
-
 /// Returns true if `map` is a tranpose. A transpose map is a projected
 /// permutation with or without zeros in results where there exist at least two
 /// dimensions di and dj such that di < dj and result_pos(di) > result_pos(dj).
@@ -58,116 +56,84 @@ static bool isTransposeMap(AffineMap map) {
   return false;
 }
 
+/// The default filter passes all op operands.
+static bool defaultTransposeMapFilter(AffineMap map) { return true; }
+
+LinalgOpInfo::LinalgOpInfo(linalg::LinalgOp linalgOp)
+    : transposeMapFilter(defaultTransposeMapFilter) {
+  computeInfo(linalgOp);
+}
+LinalgOpInfo::LinalgOpInfo(linalg::LinalgOp linalgOp,
+                           TransposeMapFilter transposeMapFilter)
+    : transposeMapFilter(transposeMapFilter) {
+  computeInfo(linalgOp);
+}
+
 /// Returns true if a LinalgOp implements a transpose.
 // TODO(dcaballe):
 //   * Consider transpose + reductions.
 //   * Consider input and output transposes.
-static bool isTransposeLinalgOp(linalg::LinalgOp linalgOp) {
+static SmallVector<OpOperand *> computeTransposeInfo(
+    LinalgOp linalgOp, TransposeMapFilter transposeMapFilter) {
+  SmallVector<OpOperand *> transposeOperands;
+
   // Reductions are not supported.
   if (linalgOp.getNumReductionLoops() > 0) {
-    return false;
+    return transposeOperands;
   }
 
   // Multiple outputs are not supported yet.
   if (linalgOp.getNumOutputs() != 1) {
-    return false;
+    return transposeOperands;
   }
 
   // Inverse map to use transfer op permutation logic.
   AffineMap outputInversedMap = inversePermutation(
       linalgOp.getTiedIndexingMap(linalgOp.getOutputOperand(0)));
+
   SmallVector<AffineMap> inputInversedMaps;
   for (OpOperand *linalgOperand : linalgOp.getInputOperands()) {
     auto map = linalgOp.getTiedIndexingMap(linalgOperand);
     if (!map.isProjectedPermutation(/*allowZeroInResults=*/true)) {
-      return false;
+      return transposeOperands;
     }
-    inputInversedMaps.push_back(inverseAndBroadcastProjectedPermutation(map));
-  }
-
-  bool isInputTransposed = llvm::any_of(
-      inputInversedMaps, [](AffineMap map) { return isTransposeMap(map); });
-  bool isOutputTransposed = isTransposeMap(outputInversedMap);
-
-  return isInputTransposed || isOutputTransposed;
-}
-
-/// Returns true if the index map represents a transpose that benefits from
-/// shared mem.
-static bool isSharedMemTranspose(AffineMap indexMap) {
-  if (!indexMap.isEmpty() && indexMap.isPermutation()) {
-    // Ensure that the fasted moving dimension (the last one) is permuted,
-    // Otherwise shared memory promotion will not benefit the operation.
-    if (indexMap.getDimPosition(indexMap.getNumDims() - 1) !=
-        indexMap.getNumDims() - 1) {
-      return true;
+    AffineMap inverseMap = inverseAndBroadcastProjectedPermutation(map);
+    if (isTransposeMap(inverseMap) && transposeMapFilter(inverseMap)) {
+      transposeOperands.push_back(linalgOperand);
     }
   }
-  return false;
-}
 
-/// Checks preconditions for shared mem transpose.
-static bool checkTransposePreconditions(LinalgOp linalgOp) {
-  // Check that the op has at least 2 to 3 parallel loops.
-  if (linalgOp.getNumParallelLoops() < 2 ||
-      linalgOp.getNumParallelLoops() > 3) {
-    return false;
+  if (isTransposeMap(outputInversedMap) &&
+      transposeMapFilter(outputInversedMap)) {
+    transposeOperands.push_back(linalgOp.getOutputOperand(0));
   }
 
-  // Check that all the iterators are parallel.
-  if (linalgOp.getNumParallelLoops() != linalgOp.getNumLoops()) {
-    return false;
-  }
-
-  // Only transpose static shapes
-  if (linalgOp.hasDynamicShape()) {
-    return false;
-  }
-  return true;
-}
-
-static bool computeTransposeInfo(LinalgOp linalgOp) {
-  return isTransposeLinalgOp(linalgOp);
+  return transposeOperands;
 }
 
 static bool computeReductionInfo(LinalgOp linalgOp) {
   return linalgOp.getNumReductionLoops() > 1;
 }
 
-static SmallVector<OpOperand *> computeSharedMemTransposeInfo(
-    LinalgOp LinalgOp) {
-  SmallVector<OpOperand *> sharedMemTransposeOperands;
+static bool computeDynamicInfo(LinalgOp linalgOp) {
+  return linalgOp.hasDynamicShape();
+}
 
-  if (!isa<linalg::GenericOp>(LinalgOp)) {
-    return sharedMemTransposeOperands;
-  }
+static bool computeTwoOrThreeLoopsInfo(LinalgOp linalgOp) {
+  return linalgOp.getNumParallelLoops() >= 2 &&
+         linalgOp.getNumParallelLoops() <= 3;
+}
 
-  if (!checkTransposePreconditions(LinalgOp)) {
-    return sharedMemTransposeOperands;
-  }
-
-  // To simplify logic, we only consider linalg ops with transposes who's
-  // outputs maps are identities
-  for (OpOperand *opOperand : LinalgOp.getOutputOperands()) {
-    if (!LinalgOp.getTiedIndexingMap(opOperand).isIdentity()) {
-      return sharedMemTransposeOperands;
-    }
-  }
-
-  // Determine which operands are transposed.
-  for (OpOperand *opOperand : LinalgOp.getInputOperands()) {
-    if (isSharedMemTranspose(LinalgOp.getTiedIndexingMap(opOperand))) {
-      sharedMemTransposeOperands.push_back(opOperand);
-    }
-  }
-
-  return sharedMemTransposeOperands;
+static bool computeGenericInfo(LinalgOp linalgOp) {
+  return isa<GenericOp>(linalgOp);
 }
 
 void LinalgOpInfo::computeInfo(LinalgOp linalgOp) {
-  transposeTrait = computeTransposeInfo(linalgOp);
+  transposeOperands = computeTransposeInfo(linalgOp, transposeMapFilter);
   reductionTrait = computeReductionInfo(linalgOp);
-  sharedMemTransposeOperands = computeSharedMemTransposeInfo(linalgOp);
+  dynamicTrait = computeDynamicInfo(linalgOp);
+  genericTrait = computeGenericInfo(linalgOp);
+  twoOrThreeLoopsTrait = computeTwoOrThreeLoopsInfo(linalgOp);
 }
 
 }  // namespace iree_compiler
