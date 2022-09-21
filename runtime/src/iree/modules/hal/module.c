@@ -1079,27 +1079,28 @@ IREE_VM_ABI_EXPORT(iree_hal_module_executable_create,  //
 
 IREE_VM_ABI_EXPORT(iree_hal_module_fence_create,  //
                    iree_hal_module_state_t,       //
-                   ri, r) {
-  iree_hal_device_t* device = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
-  uint32_t fence_flags = args->i1;
-  (void)fence_flags;
-
-  // TODO(benvanik): hide semaphores from the API.
-  // This should be reworked to just create the fence.
-
-  iree_hal_semaphore_t* semaphore = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_semaphore_create(device, 0ull, &semaphore));
-
-  // Create fence with room for our single semaphore.
+                   CrID, r) {
+  // Create fence with enough capacity to store all the timepoints.
+  // The count may end up lower if some are deduplicated.
   iree_hal_fence_t* fence = NULL;
-  iree_status_t status =
-      iree_hal_fence_create(1, state->host_allocator, &fence);
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_fence_insert(fence, semaphore, 1ull);
+  IREE_RETURN_IF_ERROR(
+      iree_hal_fence_create(args->a0_count, state->host_allocator, &fence));
+
+  // Insert each timepoint into the fence.
+  // This will deduplicate the semaphores and max their values.
+  // The compiler already does this but we want to ensure that invariant is met
+  // and don't trust the user code - at the point we'd have to verify
+  // correctness it's easier just to use the same code path as insertion.
+  iree_status_t status = iree_ok_status();
+  for (iree_host_size_t i = 0; i < args->a0_count; ++i) {
+    iree_hal_semaphore_t* semaphore = NULL;
+    status = iree_hal_semaphore_check_deref(args->a0[i].r0, &semaphore);
+    if (!iree_status_is_ok(status)) break;
+    uint64_t min_value = args->a0[i].i1;
+    status = iree_hal_fence_insert(fence, semaphore, min_value);
+    if (!iree_status_is_ok(status)) break;
   }
 
-  iree_hal_semaphore_release(semaphore);
   if (iree_status_is_ok(status)) {
     rets->r0 = iree_hal_fence_move_ref(fence);
   } else {
@@ -1121,19 +1122,6 @@ IREE_VM_ABI_EXPORT(iree_hal_module_fence_join,  //
       iree_hal_fence_join(fence_count, fences, state->host_allocator, &fence));
 
   rets->r0 = iree_hal_fence_move_ref(fence);
-  return iree_ok_status();
-}
-
-IREE_VM_ABI_EXPORT(iree_hal_module_fence_query,  //
-                   iree_hal_module_state_t,      //
-                   r, i) {
-  iree_hal_fence_t* fence = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_fence_check_deref(args->r0, &fence));
-
-  iree_status_t query_status = iree_hal_fence_query(fence);
-  rets->i0 = iree_status_consume_code(query_status);
-  iree_status_ignore(query_status);
-
   return iree_ok_status();
 }
 
@@ -1376,6 +1364,152 @@ IREE_VM_ABI_EXPORT(iree_hal_module_pipeline_layout_create,  //
       device, push_constants, set_layout_count, set_layouts, &pipeline_layout));
   rets->r0 = iree_hal_pipeline_layout_move_ref(pipeline_layout);
   return iree_ok_status();
+}
+
+//===----------------------------------------------------------------------===//
+// iree_hal_semaphore_t
+//===----------------------------------------------------------------------===//
+
+IREE_VM_ABI_EXPORT(iree_hal_module_semaphore_create,  //
+                   iree_hal_module_state_t,           //
+                   rI, r) {
+  iree_hal_device_t* device = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
+  uint64_t initial_value = (uint64_t)args->i1;
+  iree_hal_semaphore_t* semaphore = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_semaphore_create(device, initial_value, &semaphore));
+  rets->r0 = iree_hal_semaphore_move_ref(semaphore);
+  return iree_ok_status();
+}
+
+IREE_VM_ABI_EXPORT(iree_hal_module_semaphore_query,  //
+                   iree_hal_module_state_t,          //
+                   r, iI) {
+  iree_hal_semaphore_t* semaphore = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_semaphore_check_deref(args->r0, &semaphore));
+  uint64_t current_value = 0;
+  iree_status_t query_status =
+      iree_hal_semaphore_query(semaphore, &current_value);
+  rets->i0 = iree_status_consume_code(query_status);
+  rets->i1 = current_value;
+  iree_status_ignore(query_status);
+  return iree_ok_status();
+}
+
+IREE_VM_ABI_EXPORT(iree_hal_module_semaphore_signal,  //
+                   iree_hal_module_state_t,           //
+                   rI, v) {
+  iree_hal_semaphore_t* semaphore = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_semaphore_check_deref(args->r0, &semaphore));
+  uint64_t new_value = (uint64_t)args->i1;
+  return iree_hal_semaphore_signal(semaphore, new_value);
+}
+
+IREE_VM_ABI_EXPORT(iree_hal_module_semaphore_fail,  //
+                   iree_hal_module_state_t,         //
+                   ri, v) {
+  iree_hal_semaphore_t* semaphore = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_semaphore_check_deref(args->r0, &semaphore));
+  iree_status_code_t status_code =
+      (iree_status_code_t)(args->i1 & IREE_STATUS_CODE_MASK);
+  iree_hal_semaphore_fail(semaphore, iree_make_status(status_code));
+  return iree_ok_status();
+}
+
+// PC for iree_hal_module_semaphore_await.
+enum iree_hal_module_semaphore_await_pc_e {
+  // Initial entry point that will try to either wait inline or yield to the
+  // scheduler with a wait-all operation.
+  IREE_HAL_MODULE_SEMAPHORE_AWAIT_PC_BEGIN = 0,
+  // Resume entry point after the scheduler wait has resolved (successfully or
+  // otherwise).
+  IREE_HAL_MODULE_SEMAPHORE_AWAIT_PC_RESUME,
+};
+
+IREE_VM_ABI_EXPORT(iree_hal_module_semaphore_await,  //
+                   iree_hal_module_state_t,          //
+                   rI, i) {
+  // On entry we either perform the wait or begin a coroutine yield operation.
+  // After resuming we check to see if the timepoint has been reached and
+  // propagate the result.
+  iree_vm_stack_frame_t* current_frame = iree_vm_stack_top(stack);
+  iree_zone_id_t zone_id = 0;
+  iree_status_t wait_status = iree_ok_status();
+  if (current_frame->pc == IREE_HAL_MODULE_SEMAPHORE_AWAIT_PC_BEGIN) {
+    iree_hal_semaphore_t* semaphore = NULL;
+    IREE_RETURN_IF_ERROR(iree_hal_semaphore_check_deref(args->r0, &semaphore));
+    uint64_t new_value = (uint64_t)args->i1;
+
+    IREE_TRACE_ZONE_BEGIN(z0);
+    zone_id = z0;
+
+    // TODO(benvanik): take timeout as an argument.
+    // Capture absolute timeout so that regardless of how long it takes us to
+    // wait the user-perceived wait time remains the same.
+    iree_timeout_t timeout = iree_infinite_timeout();
+    iree_convert_timeout_to_absolute(&timeout);
+
+    if (iree_all_bits_set(state->flags, IREE_HAL_MODULE_FLAG_SYNCHRONOUS)) {
+      // Block the native thread until the fence is reached or the deadline is
+      // exceeded.
+      wait_status = iree_hal_semaphore_wait(semaphore, new_value, timeout);
+    } else {
+      // Quick check inline before yielding to the scheduler. This avoids a
+      // round-trip through the scheduling stack for cases where we complete
+      // synchronously.
+      //
+      // The query may fail to indicate that the semaphore is in a failure
+      // state and we propagate the failure status to the waiter.
+      //
+      // It's possible to race here if we get back an older value and then
+      // before we wait the target is reached but that's ok: the wait will
+      // always be correctly ordered.
+      uint64_t current_value = 0ull;
+      wait_status = iree_hal_semaphore_query(semaphore, &current_value);
+      if (iree_status_is_ok(wait_status) && current_value < new_value) {
+        // Enter a wait frame and yield execution back to the scheduler.
+        // When the wait handle resolves we'll resume at the RESUME PC.
+        iree_vm_wait_frame_t* wait_frame = NULL;
+        IREE_RETURN_AND_END_ZONE_IF_ERROR(
+            zone_id, iree_vm_stack_wait_enter(stack, IREE_VM_WAIT_ALL, 1,
+                                              timeout, zone_id, &wait_frame));
+        wait_frame->wait_sources[0] =
+            iree_hal_semaphore_await(semaphore, new_value);
+        current_frame->pc = IREE_HAL_MODULE_SEMAPHORE_AWAIT_PC_RESUME;
+        wait_status = iree_status_from_code(IREE_STATUS_DEFERRED);
+        zone_id = 0;  // ownership transferred to wait frame
+      }
+    }
+  } else {
+    // Resume by leaving the wait frame and storing the result.
+    iree_vm_wait_result_t wait_result;
+    IREE_RETURN_IF_ERROR(iree_vm_stack_wait_leave(stack, &wait_result));
+    wait_status = wait_result.status;
+    IREE_TRACE(zone_id = wait_result.trace_zone);
+  }
+
+  iree_status_t status = iree_ok_status();
+  if (iree_status_is_ok(wait_status)) {
+    // Successful wait.
+    rets->i0 = 0;
+  } else if (iree_status_is_deferred(wait_status)) {
+    // Yielding; resume required.
+    // NOTE: zone not ended as it's reserved on the stack.
+    status = wait_status;
+  } else if (iree_status_is_deadline_exceeded(wait_status)) {
+    // Propagate deadline exceeded back to the VM.
+    rets->i0 = (int32_t)iree_status_consume_code(wait_status);
+    iree_status_ignore(wait_status);
+  } else {
+    // Fail the invocation.
+    status = wait_status;
+  }
+
+  IREE_TRACE({
+    if (zone_id) IREE_TRACE_ZONE_END(zone_id);
+  });
+  return status;
 }
 
 //===----------------------------------------------------------------------===//

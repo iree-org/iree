@@ -1,11 +1,17 @@
 // RUN: iree-opt --split-input-file --iree-convert-hal-to-vm %s | FileCheck %s
 
 // CHECK-LABEL: @fence_create
-// CHECK-SAME: (%[[DEVICE:.+]]: !vm.ref<!hal.device>)
-func.func @fence_create(%device: !hal.device) -> !hal.fence {
-  // CHECK: %[[FLAGS:.+]] = vm.const.i32.zero
-  // CHECK: %[[FENCE:.+]] = vm.call @hal.fence.create(%[[DEVICE]], %[[FLAGS]])
-  %fence = hal.fence.create device(%device : !hal.device) flags("None") : !hal.fence
+// CHECK-SAME: (%[[SEMAPHORE0:.+]]: !vm.ref<!hal.semaphore>, %[[TIME0:.+]]: i64,
+// CHECK-SAME:  %[[SEMAPHORE1:.+]]: !vm.ref<!hal.semaphore>, %[[TIME1:.+]]: i64)
+func.func @fence_create(
+    %semaphore0: !hal.semaphore, %time0: i64,
+    %semaphore1: !hal.semaphore, %time1: i64) -> !hal.fence {
+  // CHECK: %[[FENCE:.+]] = vm.call.variadic @hal.fence.create
+  // CHECK-SAME: ([(%[[SEMAPHORE0]], %[[TIME0]]), (%[[SEMAPHORE1]], %[[TIME1]])])
+  %fence = hal.fence.create
+      at<%semaphore0 : !hal.semaphore>(%time0)
+      at<%semaphore1 : !hal.semaphore>(%time1)
+      -> !hal.fence
   // CHECK: vm.return %[[FENCE]]
   return %fence : !hal.fence
 }
@@ -20,17 +26,6 @@ func.func @fence_join(%fence0: !hal.fence, %fence1: !hal.fence) -> !hal.fence {
   %fence = hal.fence.join at([%fence0, %fence1]) -> !hal.fence
   // CHECK: vm.return %[[JOIN]]
   return %fence : !hal.fence
-}
-
-// -----
-
-// CHECK-LABEL: @fence_query
-// CHECK-SAME: (%[[FENCE:.+]]: !vm.ref<!hal.fence>)
-func.func @fence_query(%fence: !hal.fence) -> i32 {
-  // CHECK: %[[STATUS:.+]] = vm.call @hal.fence.query(%[[FENCE]])
-  %status = hal.fence.query<%fence : !hal.fence> : i32
-  // CHECK: vm.return %[[STATUS]]
-  return %status : i32
 }
 
 // -----

@@ -396,11 +396,12 @@ attributes {nosideeffects}
 // iree_hal_fence_t
 //===----------------------------------------------------------------------===//
 
-// Returns an unsignaled fence that defines a point in time.
+// Returns a fence that defines a point in time across one or more timelines.
 vm.import @fence.create(
-  %device : !vm.ref<!hal.device>,
-  %flags : i32
+  // <semaphore, min_value>
+  %timepoints : tuple<!vm.ref<!hal.fence>, i64>...
 ) -> !vm.ref<!hal.fence>
+attributes {nosideeffects}
 
 // Returns a fence that joins the input fences as a wait-all operation.
 vm.import @fence.join(
@@ -408,20 +409,13 @@ vm.import @fence.join(
 ) -> !vm.ref<!hal.fence>
 attributes {nosideeffects}
 
-// Queries whether the fence has been reached and returns its status.
-// Returns OK if the fence has been signaled successfully, DEFERRED if it is
-// unsignaled, and otherwise an error indicating the failure.
-vm.import @fence.query(
-  %fence : !vm.ref<!hal.fence>
-) -> i32
-
 // Signals the fence.
 vm.import @fence.signal(
   %fence : !vm.ref<!hal.fence>
 )
 
-// Signals the fence with a failure. The |status| will be returned from
-// `hal.fence.query` and `hal.fence.await`.
+// Signals the fence with a failure. The |status| will be returned from the
+// `hal.semaphore.query` and `hal.semaphore.signal` of each timepoint semaphore.
 vm.import @fence.fail(
   %fence : !vm.ref<!hal.fence>,
   %status : i32
@@ -446,5 +440,51 @@ vm.import @pipeline_layout.create(
   %set_layouts : !vm.ref<!hal.descriptor_set_layout>...
 ) -> !vm.ref<!hal.pipeline_layout>
 attributes {nosideeffects}
+
+//===----------------------------------------------------------------------===//
+// iree_hal_semaphore_t
+//===----------------------------------------------------------------------===//
+
+// Returns a semaphore from the device pool with the given initial value.
+vm.import @semaphore.create(
+  %device : !vm.ref<!hal.device>,
+  %initial_value : i64
+) -> !vm.ref<!hal.semaphore>
+attributes {nosideeffects}
+
+// Queries the current payload and returns a tuple of `(status, value)`.
+// As the payload is monotonically increasing it is guaranteed that
+// the value is at least equal to the previous result of a
+// `hal.semaphore.signal` call and coherent with any waits for a
+// specified value via `hal.semaphore.await`.
+vm.import @semaphore.query(
+  %semaphore : !vm.ref<!hal.semaphore>
+) -> (i32, i64)
+
+// Signals the semaphore to the given payload value.
+// The call is ignored if the current payload value exceeds |new_value|.
+vm.import @semaphore.signal(
+  %semaphore : !vm.ref<!hal.semaphore>,
+  %new_value : i64
+)
+
+// Signals the semaphore with a failure. The |status| will be returned from
+// `hal.semaphore.query` and `hal.semaphore.signal` for the lifetime
+// of the semaphore.
+vm.import @semaphore.fail(
+  %semaphore : !vm.ref<!hal.semaphore>,
+  %status : i32
+)
+
+// Yields the caller until the semaphore reaches or exceeds the specified
+// payload |value|.
+//
+// Returns the status of the semaphore after the wait, with a non-zero value
+// indicating failure.
+vm.import @semaphore.await(
+  %semaphore : !vm.ref<!hal.semaphore>,
+  %min_value : i64
+) -> i32
+attributes {vm.yield}
 
 }  // module

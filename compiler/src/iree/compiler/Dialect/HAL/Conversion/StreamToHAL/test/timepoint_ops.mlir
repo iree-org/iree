@@ -33,6 +33,16 @@ func.func @timepointImportFence(%arg0: !hal.fence) -> !stream.timepoint {
 
 // -----
 
+// CHECK-LABEL: @timepointImportSemaphore
+func.func @timepointImportSemaphore(%arg0: !hal.semaphore, %arg1: i64) -> !stream.timepoint {
+  // CHECK: %[[FENCE:.+]] = hal.fence.create at<%arg0 : !hal.semaphore>(%arg1) -> !hal.fence
+  %0 = stream.timepoint.import %arg0, %arg1 : (!hal.semaphore, i64) => !stream.timepoint
+  // CHECK: return %[[FENCE]]
+  return %0 : !stream.timepoint
+}
+
+// -----
+
 // CHECK-LABEL: @timepointExportFence
 func.func @timepointExportFence(%arg0: !stream.timepoint) -> !hal.fence {
   %0 = stream.timepoint.export %arg0 => (!hal.fence)

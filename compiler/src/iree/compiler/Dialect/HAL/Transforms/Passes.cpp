@@ -149,6 +149,9 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // Convert supported input dialects (std, stream, etc) into the HAL dialect.
   passManager.addPass(createConvertToHALPass());
 
+  // Materialize timelines for device queues.
+  passManager.addPass(createMaterializeTimelinesPass());
+
   // If any devices require the legacy synchronous execution behavior then
   // make all async operations blocking.
   passManager.addPass(createFixupLegacySyncPass());

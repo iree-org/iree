@@ -116,6 +116,54 @@ static void printDescriptorSetBindings(OpAsmPrinter &p, Operation *op,
 }
 
 //===----------------------------------------------------------------------===//
+// custom<TimepointList>($semaphores, $values)
+//===----------------------------------------------------------------------===//
+// at<%semaphore : !hal.semaphore>(%value) ...
+
+static ParseResult parseTimepointList(
+    OpAsmParser &parser,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &semaphores,
+    SmallVectorImpl<Type> &semaphoreTypes,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &values) {
+  while (succeeded(parser.parseOptionalKeyword("at"))) {
+    OpAsmParser::UnresolvedOperand semaphore;
+    Type semaphoreType;
+    OpAsmParser::UnresolvedOperand value;
+    if (failed(parser.parseLess()) || failed(parser.parseOperand(semaphore)) ||
+        failed(parser.parseColonType(semaphoreType)) ||
+        failed(parser.parseGreater()) || failed(parser.parseLParen()) ||
+        failed(parser.parseOperand(value)) || failed(parser.parseRParen())) {
+      return failure();
+    }
+    semaphores.push_back(semaphore);
+    semaphoreTypes.push_back(semaphoreType);
+    values.push_back(value);
+  }
+  return success();
+}
+
+static void printTimepointList(OpAsmPrinter &p, Operation *op,
+                               ValueRange semaphores, TypeRange semaphoreTypes,
+                               ValueRange values) {
+  if (semaphores.empty()) return;
+  llvm::interleave(
+      llvm::zip(semaphores, semaphoreTypes, values), p,
+      [&](std::tuple<Value, Type, Value> it) {
+        auto semaphore = std::get<0>(it);
+        auto semaphoreType = std::get<1>(it);
+        auto value = std::get<2>(it);
+        p << "at<";
+        p.printOperand(semaphore);
+        p << " : ";
+        p.printType(semaphoreType);
+        p << ">(";
+        p.printOperand(value);
+        p << ")";
+      },
+      " ");
+}
+
+//===----------------------------------------------------------------------===//
 // hal.ex.shared_device
 //===----------------------------------------------------------------------===//
 
@@ -1197,6 +1245,25 @@ void FenceJoinOp::getAsmResultNames(
 }
 
 void FenceAwaitOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getStatus(), "status");
+}
+
+//===----------------------------------------------------------------------===//
+// hal.semaphore.*
+//===----------------------------------------------------------------------===//
+
+void SemaphoreCreateOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), "semaphore");
+}
+
+void SemaphoreQueryOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getStatus(), "status");
+}
+
+void SemaphoreAwaitOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(getStatus(), "status");
 }

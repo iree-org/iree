@@ -427,6 +427,31 @@ def HAL_Fence : DialectType<
   let builderCall = "$_builder.getType<IREE::HAL::FenceType>()";
 }
 
+def HAL_RingBuffer : DialectType<
+    HAL_Dialect,
+    CPred<"$_self.isa<IREE::HAL::RingBufferType>()">,
+    "ring_buffer"> {
+  let description = [{
+    Ringbuffer used for transient buffer allocation.
+  }];
+  let builderCall = "$_builder.getType<IREE::HAL::RingBufferType>()";
+}
+
+def HAL_Semaphore : DialectType<
+    HAL_Dialect,
+    CPred<"$_self.isa<IREE::HAL::SemaphoreType>()">,
+    "semaphore"> {
+  let description = [{
+    Synchronization mechanism for host->device, device->host, host->host,
+    and device->device notification. Semaphores behave like Vulkan timeline
+    semaphores (or D3D12 fences) and contain a monotonically increasing
+    uint64_t payload. They may be waited on any number of times even if they
+    have already been signaled for a particular value. They may also be waited
+    on for a particular value prior to the signal for that value.
+  }];
+  let builderCall = "$_builder.getType<IREE::HAL::SemaphoreType>()";
+}
+
 def HAL_ObjectType : AnyTypeOf<[
   HAL_Allocator,
   HAL_Buffer,
@@ -436,8 +461,9 @@ def HAL_ObjectType : AnyTypeOf<[
   HAL_Device,
   HAL_Event,
   HAL_Executable,
-  HAL_Fence,
   HAL_PipelineLayout,
+  HAL_RingBuffer,
+  HAL_Semaphore,
 ]>;
 
 def HAL_BufferType : AnyTypeOf<[

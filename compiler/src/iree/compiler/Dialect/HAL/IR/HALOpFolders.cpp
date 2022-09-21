@@ -733,16 +733,64 @@ void ExecutableConstantBlockOp::getCanonicalizationPatterns(
 namespace {
 
 /// Replaces a fence with no timepoints with a null value.
-struct ElideUnusedFenceCreate : public OpRewritePattern<FenceCreateOp> {
+struct ElideEmptyFenceCreate : public OpRewritePattern<FenceCreateOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(FenceCreateOp op,
                                 PatternRewriter &rewriter) const override {
-    if (op.use_empty()) {
-      rewriter.eraseOp(op);
-      return success();
-    } else {
-      return failure();
+    if (op.getNumOperands() != 0) return failure();
+    rewriter.replaceOpWithNewOp<IREE::Util::NullOp>(op,
+                                                    op.getResult().getType());
+    return success();
+  }
+};
+
+/// Deduplicates timepoints by taking the maximum payload value of any that
+/// share the same semaphore.
+struct DeduplicateFenceCreateTimepoints
+    : public OpRewritePattern<FenceCreateOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(FenceCreateOp op,
+                                PatternRewriter &rewriter) const override {
+    // Check to see if the fence is over a single (semaphore, value) timepoint.
+    if (op.getSemaphores().size() <= 1) {
+      return failure();  // just 0 or 1 timepoint
     }
+
+    // Build a map of all timepoints keyed on semaphore.
+    // This will implicitly deduplicate the semaphores and the values for each.
+    llvm::MapVector<Value, SetVector<Value>> timepoints;
+    for (auto it : llvm::zip(op.getSemaphores(), op.getMinValues())) {
+      auto semaphore = std::get<0>(it);
+      auto minValue = std::get<1>(it);
+      timepoints[semaphore].insert(minValue);
+    }
+
+    // Check for no-op when we don't deduplicate anything.
+    if (timepoints.size() == op.getSemaphores().size()) return failure();
+
+    // Build the timepoints.
+    // A single semaphore may have multiple values and we need to take the max.
+    SmallVector<Value> semaphores;
+    SmallVector<Value> minValues;
+    semaphores.reserve(timepoints.size());
+    minValues.reserve(timepoints.size());
+    for (auto it : timepoints) {
+      semaphores.push_back(it.first);
+      if (it.second.size() == 1) {
+        // Single timepoint.
+        minValues.push_back(it.second.front());
+      } else {
+        // Join timepoints. This will fold if constant.
+        minValues.push_back(rewriter.createOrFold<IREE::Util::RangeMaxOp>(
+            op.getLoc(), it.second.takeVector()));
+      }
+    }
+
+    // Build new op. The map/set vectors we used will ensure the relative order
+    // of the timepoints matches the original.
+    rewriter.replaceOpWithNewOp<FenceCreateOp>(op, op.getResult().getType(),
+                                               semaphores, minValues);
+    return success();
   }
 };
 
@@ -750,7 +798,8 @@ struct ElideUnusedFenceCreate : public OpRewritePattern<FenceCreateOp> {
 
 void FenceCreateOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                 MLIRContext *context) {
-  results.insert<ElideUnusedFenceCreate>(context);
+  results.insert<ElideEmptyFenceCreate>(context);
+  results.insert<DeduplicateFenceCreateTimepoints>(context);
 }
 
 //===----------------------------------------------------------------------===//

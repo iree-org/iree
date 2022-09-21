@@ -114,25 +114,25 @@ static Value consumeBoundFence(Value timepoint,
 // Returns the a new fence for |timepoint| or an existing fence if one was
 // associated with an external fence. Returns util.null if no one observes the
 // fence.
-static Value getOrCreateSignalFence(Location loc, Value device, Value timepoint,
-                                    ConversionPatternRewriter &rewriter) {
-  // Check to see if anyone is consuming the timepoint - if not then we don't
-  // need create a fence.
-  if (timepoint.use_empty()) {
-    return rewriter.create<IREE::Util::NullOp>(
-        loc, rewriter.getType<IREE::HAL::FenceType>());
-  }
+// static Value getOrCreateSignalFence(Location loc, Value device, Value timepoint,
+//                                     ConversionPatternRewriter &rewriter) {
+//   // Check to see if anyone is consuming the timepoint - if not then we don't
+//   // need create a fence.
+//   if (timepoint.use_empty()) {
+//     return rewriter.create<IREE::Util::NullOp>(
+//         loc, rewriter.getType<IREE::HAL::FenceType>());
+//   }
 
-  // Check to see if the timepoint is associated with a fence. In common cases
-  // when along ABI boundaries we can usually find an association.
-  auto fence = consumeBoundFence(timepoint, rewriter);
-  if (fence) return fence;
+//   // Check to see if the timepoint is associated with a fence. In common cases
+//   // when along ABI boundaries we can usually find an association.
+//   auto fence = consumeBoundFence(timepoint, rewriter);
+//   if (fence) return fence;
 
-  // Create a new fence.
-  return rewriter.create<IREE::HAL::FenceCreateOp>(
-      loc, rewriter.getType<IREE::HAL::FenceType>(), device,
-      IREE::HAL::FenceFlagBitfield::None);
-}
+//   // Create a new fence.
+//   return rewriter.create<IREE::HAL::FenceCreateOp>(
+//       loc, rewriter.getType<IREE::HAL::FenceType>(), device,
+//       IREE::HAL::FenceFlagBitfield::None);
+// }
 
 // Scans all of the stream.cmd.* ops in the region to derive a command category.
 static IREE::HAL::CommandCategoryBitfield deriveCommandCategories(
@@ -346,8 +346,8 @@ struct ResourceAllocaOpPattern
     // Gather wait/signal fence, which are optional.
     Value waitFence =
         getOrCreateWaitFence(loc, adaptor.getAwaitTimepoint(), rewriter);
-    Value signalFence = getOrCreateSignalFence(
-        loc, device, allocaOp.getResultTimepoint(), rewriter);
+    Value signalFence = rewriter.create<IREE::HAL::TimelineAdvanceOp>(
+        loc, rewriter.getType<IREE::HAL::FenceType>());
 
     // Queue allocation.
     auto pool = rewriter.create<arith::ConstantIntOp>(loc, 0, 64);
@@ -373,8 +373,8 @@ struct ResourceDeallocaOpPattern
     // Gather wait/signal fence, which are optional.
     Value waitFence =
         getOrCreateWaitFence(loc, adaptor.getAwaitTimepoint(), rewriter);
-    Value signalFence = getOrCreateSignalFence(
-        loc, device, deallocaOp.getResultTimepoint(), rewriter);
+    Value signalFence = rewriter.create<IREE::HAL::TimelineAdvanceOp>(
+        loc, rewriter.getType<IREE::HAL::FenceType>());
 
     // Queue allocation.
     rewriter.create<IREE::HAL::DeviceQueueDeallocaOp>(
@@ -1011,8 +1011,8 @@ struct CmdExecuteOpPattern
     // Gather wait/signal fence, which are optional.
     Value waitFence =
         getOrCreateWaitFence(loc, adaptor.getAwaitTimepoint(), rewriter);
-    Value signalFence = getOrCreateSignalFence(
-        loc, device, executeOp.getResultTimepoint(), rewriter);
+    Value signalFence = rewriter.create<IREE::HAL::TimelineAdvanceOp>(
+        loc, rewriter.getType<IREE::HAL::FenceType>());
 
     // Queue execution.
     rewriter.create<IREE::HAL::DeviceQueueExecuteOp>(loc, device, queueAffinity,
@@ -1083,9 +1083,17 @@ struct TimepointImportOpPattern
         operands[0].getType().isa<IREE::HAL::FenceType>()) {
       rewriter.replaceOp(importOp, operands[0]);
       return success();
+    } else if (operands.size() == 2 &&
+               operands[0].getType().isa<IREE::HAL::SemaphoreType>() &&
+               operands[1].getType().isIntOrIndex()) {
+      rewriter.replaceOpWithNewOp<IREE::HAL::FenceCreateOp>(
+          importOp, rewriter.getType<IREE::HAL::FenceType>(),
+          ValueRange{operands[0]}, ValueRange{operands[1]});
+      return success();
     } else {
-      return rewriter.notifyMatchFailure(
-          importOp, "only imports from HAL fences are supported");
+      return rewriter.notifyMatchFailure(importOp,
+                                         "only imports from HAL semaphore + "
+                                         "sequence value tuples are supported");
     }
   }
 };
