@@ -232,7 +232,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   buildGlobalOptimizationPassPipeline(passManager, transformOptions);
 
   // Pad tensors.
-  passManager.addPass(IREE::Flow::createPadTensorToTensorInsertSlicePass(
+  passManager.addPass(IREE::Flow::createTensorPadToTensorInsertSlicePass(
       /*skipSingleLinalgOpUses=*/clEnableFusePaddingIntoLinalgConsumerOps));
 
   FunctionLikeNest(passManager)
