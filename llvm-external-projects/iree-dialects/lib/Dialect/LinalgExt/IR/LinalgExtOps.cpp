@@ -1452,27 +1452,69 @@ LogicalResult TopkOp::getResultTilePosition(
 //===----------------------------------------------------------------------===//
 
 LogicalResult PackOp::verify() {
-  Operation *op = getOperation();
-  if (getNumInputs() != 1)
-    return op->emitOpError("expects only 1 input operand");
-  if (getNumOutputs() != 1)
-    return op->emitOpError("expects only 1 output operand");
-  AffineMap packMap = getPackMap();
-  if (packMap.getNumDims() != getOutputRank())
-    return op->emitOpError("pack map dimension must match output rank");
-  if (packMap.getNumResults() != getInputRank())
-    return op->emitError("pack map results must match input rank");
+  // input rank = r
+  // output rank = 2 * r (input rank + tile rank).
+  // inner tiles = r
   return success();
 }
 
+SmallVector<OpFoldResult> PackOp::getMixedInnerTiles() {
+  SmallVector<OpFoldResult> mixedInnerTiles;
+  mixedInnerTiles.reserve(getInputRank());
+  unsigned dynamicValIndex = 0;
+  for (Attribute attr : getStaticInnerTiles()) {
+    auto tileAttr = attr.cast<IntegerAttr>();
+    if (!ShapedType::isDynamic(tileAttr.getInt()))
+      mixedInnerTiles.push_back(tileAttr);
+    else
+      mixedInnerTiles.push_back(getInnerTiles()[dynamicValIndex++]);
+  }
+  return mixedInnerTiles;
+}
+
 SmallVector<StringRef> PackOp::getLoopIteratorTypes() {
-  SmallVector<StringRef> iteratorTypes(getOutputRank(),
+  SmallVector<StringRef> iteratorTypes(getInputRank() * 2,
                                        getParallelIteratorTypeName());
   return iteratorTypes;
 }
 
+// copied from:
+// https://mlir.llvm.org/doxygen/TensorInferTypeOpInterfaceImpl_8cpp_source.html
+/// Helper function to convert a vector of `OpFoldResult`s into a vector of
+/// `Value`s.
+static SmallVector<Value> getAsValues(OpBuilder &b, Location loc,
+                                      ArrayRef<OpFoldResult> valueOrAttrVec) {
+  return llvm::to_vector<4>(
+      llvm::map_range(valueOrAttrVec, [&](OpFoldResult value) -> Value {
+        return getValueOrCreateConstantIndexOp(b, loc, value);
+      }));
+}
+
+// TODO: what if we don't have a full tile?
+// TODO: dynamic support.
+static OpFoldResult getBlockedOutputDimFromInputShape(
+    OpBuilder &builder, Location loc, int64_t dimIdx, Value input,
+    ArrayRef<int64_t> destShape, ArrayRef<OpFoldResult> mixedInnerTiles) {
+  unsigned inputRank = input.getType().cast<ShapedType>().getRank();
+  if (!ShapedType::isDynamic(destShape[dimIdx]))
+    return builder.getI64IntegerAttr(destShape[dimIdx]);
+  assert(0 && "dynamic support not yet implemented");
+  return nullptr;
+}
+
+static SmallVector<OpFoldResult>
+getOutputShapeFromInputShape(OpBuilder &builder, Location loc, Value input,
+                             ArrayRef<int64_t> destShape,
+                             ArrayRef<OpFoldResult> mixedInnerTiles) {
+  return llvm::to_vector(llvm::map_range(
+      llvm::seq<int64_t>(0, destShape.size()), [&](int64_t dimIdx) {
+        return getBlockedOutputDimFromInputShape(builder, loc, dimIdx, input,
+                                                 destShape, mixedInnerTiles);
+      }));
+}
+
 SmallVector<Range> PackOp::getIterationDomain(OpBuilder &builder) {
-  int64_t outputRank = getOutputRank();
+  int64_t outputRank = getInputRank() * 2;
   SmallVector<Range> loopBounds(outputRank);
   Location loc = getLoc();
   // lower bound.
@@ -1480,38 +1522,40 @@ SmallVector<Range> PackOp::getIterationDomain(OpBuilder &builder) {
   // step.
   Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
   // upper bound (size of the output tensor).
-  Value output = getOutput();
+  SmallVector<Value> upperBounds = getAsValues(
+      builder, loc,
+      getOutputShapeFromInputShape(
+          builder, loc, getInput(),
+          getOutputType().cast<ShapedType>().getShape(), getMixedInnerTiles()));
   for (auto dim : llvm::seq<int64_t>(0, outputRank)) {
     loopBounds[dim].offset = zero;
     loopBounds[dim].stride = one;
-    loopBounds[dim].size = getDimValue(builder, loc, output, dim);
+    loopBounds[dim].size = upperBounds[dim];
   }
   return loopBounds;
 }
 
-LogicalResult PackOp::generateScalarImplementation(OpBuilder &b, Location loc,
+LogicalResult PackOp::generateScalarImplementation(OpBuilder &builder,
+                                                   Location loc,
                                                    ValueRange ivs) {
-  assert(ivs.size() == getOutputRank() && "ivs size must match output rank");
-  AffineMap packMap = getPackMap();
-
-  SmallVector<Value> indices;
-  size_t domSize = packMap.getNumDims();
-  size_t posInResults = 0;
-  for (AffineExpr result : packMap.getResults()) {
-    // Collect ivs involved.
-    SmallVector<Value> accessMapIvs;
-    for (size_t pos = 0; pos < domSize; pos++) {
-      if (result.isFunctionOfDim(pos))
-        accessMapIvs.push_back(ivs[pos]);
-    }
-    // Build an affine.apply for each accessMap.
-    AffineMap subMap = compressUnusedDims(packMap.getSubMap(posInResults++));
-    Value accessMap = b.create<AffineApplyOp>(loc, subMap, accessMapIvs);
-    indices.push_back(accessMap);
+  SmallVector<OpFoldResult> innerTiles = getMixedInnerTiles();
+  SmallVector<OpFoldResult> sourceIndices;
+  for (auto dim : llvm::seq<int64_t>(0, getInputRank())) {
+    AffineExpr i, j, t;
+    // i dim0
+    // j dim1
+    // t tile_size
+    bindDims(builder.getContext(), i, j);
+    bindSymbols(builder.getContext(), t);
+    OpFoldResult sourceIndex = makeComposedFoldedAffineApply(
+        builder, loc, i * t + j,
+        ArrayRef<OpFoldResult>{ivs[dim], ivs[dim + getInputRank()],
+                               innerTiles[dim]});
+    sourceIndices.push_back(sourceIndex);
   }
-  assert(indices.size() == getInputRank() && "rank must match indices");
-  Value scalar = b.create<memref::LoadOp>(loc, getInput(), indices);
-  b.create<memref::StoreOp>(loc, scalar, getOutput(), ivs);
+  Value scalar = builder.create<memref::LoadOp>(
+      loc, getInput(), getAsValues(builder, loc, sourceIndices));
+  builder.create<memref::StoreOp>(loc, scalar, getOutput(), ivs);
   return success();
 }
 

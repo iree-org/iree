@@ -436,51 +436,57 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
 }
 
 // TODO: is pack the right name? After all we are re-arranging the tensor.
+// TODO: destination passing style.
 def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack",[
   DeclareOpInterfaceMethods<LinalgExtInterface>,
   DeclareOpInterfaceMethods<TilingInterface,
     ["getIterationDomain",
      "getLoopIteratorTypes",
      "generateScalarImplementation"]>,
-  DeclareOpInterfaceMethods<MemoryEffectsOpInterface>, 
-  SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::LinalgExt::YieldOp">,
+  DeclareOpInterfaceMethods<MemoryEffectsOpInterface>
 ]>{
-  let summary = "pack operation";
-  let description = [{
-    Expand the input tensor based on the access pattern provided by the affine
-    map.
-  }];
-  
+  let summary = "pack operation"; 
+
   let arguments = (ins Variadic<AnyShaped>:$inputs,
                        Variadic<AnyShaped>:$outputs,
-                       AffineMapAttr:$packMap);
+                       Variadic<Index>:$inner_tiles,
+                       I64ArrayAttr:$static_inner_tiles);
 
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let assemblyFormat = [{
     attr-dict
     `ins` `(` $inputs `:` type($inputs) `)`
-    `outs` `(` $outputs `:` type($outputs) `)` $packMap
+    `outs` `(` $outputs `:` type($outputs) `)` 
+    `inner_tiles`
+    custom<DynamicIndexList>($inner_tiles, $static_inner_tiles,
+                             "ShapedType::kDynamicStrideOrOffset")
      (`->` type($results)^)?
   }];
 
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
-    
+
     Value getOutput() {
       return getOutputOperand(0)->get();
     }
-    
+
     Value getInput() {
       return getInputOperand(0)->get();
     }
-    
+
     int64_t getOutputRank() {
       return  getOutput().getType().cast<ShapedType>().getRank();
     }
-  
+
+    ShapedType getOutputType() {
+      return getOutput().getType();
+    }
+
     int64_t getInputRank() {
       return getInput().getType().cast<ShapedType>().getRank();
     }
- 
+
+    SmallVector<OpFoldResult> getMixedInnerTiles();
+
   }];
 }
 

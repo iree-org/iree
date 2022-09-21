@@ -646,13 +646,9 @@ func.func @topk_tensor_optional(%input_values: tensor<20x10x8x4xf32>) -> (tensor
 
 // -----
 
-#mapI = affine_map<(d0, d1) -> (d0, d1)>
-
 // CHECK: func.func @relayout(
 func.func @relayout(%arg0: tensor<3x3xf32>, %arg1: tensor<3x3xf32>) -> tensor<3x3xf32> {
   // CHECK: iree_linalg_ext.pack
-  %1 = iree_linalg_ext.pack ins(%arg0: tensor<3x3xf32>)
-                            outs(%arg1: tensor<3x3xf32>) #mapI
-    -> tensor<3x3xf32>
+  %1 = iree_linalg_ext.pack ins(%arg0: tensor<3x3xf32>) outs(%arg1: tensor<3x3xf32>) inner_tiles [0, 0] -> tensor<3x3xf32>
   return %1 : tensor<3x3xf32>
 }
