@@ -16,8 +16,8 @@
 namespace mlir {
 namespace iree_compiler {
 
-/// Filter to decide which ops need allocations.
-static bool filter(Operation *op) {
+/// Filter to decide which contract ops need allocations.
+static bool contractOpFilter(Operation *op) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
   if (!linalgOp) return false;
   // Can't promote dynamic shapes.
@@ -37,9 +37,40 @@ static bool filter(Operation *op) {
          linalgOp.getNumParallelLoops() <= 3;
 }
 
+/// Filter to decide which transpose ops need allocations.
+static bool transposeOpFilter(Operation *op) {
+  auto genericOp = dyn_cast<linalg::GenericOp>(op);
+  if (!genericOp) return false;
+  // Can't promote dynamic shapes.
+  if (genericOp.hasDynamicShape()) return false;
+  return genericOp.getNumParallelLoops() >= 2 &&
+         genericOp.getNumParallelLoops() <= 3;
+}
+
+/// Returns true if the index map represents a transpose that benefits from
+/// shared mem.
+static bool isSharedMemTranspose(AffineMap indexMap) {
+  if (!indexMap.isEmpty() && indexMap.isPermutation()) {
+    // Ensure that the fasted moving dimension (the last one) is permuted,
+    // Otherwise shared memory promotion will not benefit the operation.
+    if (indexMap.getDimPosition(indexMap.getNumDims() - 1) !=
+        indexMap.getNumDims() - 1) {
+      return true;
+    }
+  }
+  return false;
+}
+
 namespace {
 struct LLVMGPUTensorAllocPass
     : public LLVMGPUTensorAllocBase<LLVMGPUTensorAllocPass> {
+ private:
+  GPUPromoteSharedMemPattern promoteSharedMemPattern =
+      GPUPromoteSharedMemPattern::ContractionOpPattern;
+
+ public:
+  LLVMGPUTensorAllocPass(GPUPromoteSharedMemPattern promoteSharedMemPattern)
+      : promoteSharedMemPattern(promoteSharedMemPattern) {}
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<bufferization::BufferizationDialect>();
   }
@@ -53,14 +84,28 @@ struct LLVMGPUTensorAllocPass
 
     SmallVector<Operation *> opsToPromote;
     funcOp.walk([&](Operation *op) {
-      if (filter(op)) opsToPromote.push_back(op);
+      switch (promoteSharedMemPattern) {
+        case GPUPromoteSharedMemPattern::ContractionOpPattern:
+          if (contractOpFilter(op)) opsToPromote.push_back(op);
+          break;
+        case GPUPromoteSharedMemPattern::TransposeOpPattern:
+          if (transposeOpFilter(op)) opsToPromote.push_back(op);
+          break;
+      }
     });
     for (Operation *op : opsToPromote) {
       OpBuilder builder(op);
       auto linalgOp = cast<linalg::LinalgOp>(op);
       bufferization::BufferizationOptions options;
-      // Promote all the input operands.
+      // Promote all the input operands for contract op or transpose operands
+      // for shared mem transpose.
       for (auto operand : linalgOp.getInputOperands()) {
+        if (promoteSharedMemPattern ==
+            GPUPromoteSharedMemPattern::TransposeOpPattern) {
+          if (!isSharedMemTranspose(linalgOp.getTiedIndexingMap(operand))) {
+            continue;
+          }
+        }
         FailureOr<Value> ret = bufferization::allocateTensorForShapedValue(
             builder, op->getLoc(), operand->get(), false, options, true);
         if (failed(ret)) {
@@ -74,8 +119,9 @@ struct LLVMGPUTensorAllocPass
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTensorAlloc() {
-  return std::make_unique<LLVMGPUTensorAllocPass>();
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTensorAlloc(
+    GPUPromoteSharedMemPattern promoteSharedMemPattern) {
+  return std::make_unique<LLVMGPUTensorAllocPass>(promoteSharedMemPattern);
 }
 
 }  // namespace iree_compiler
