@@ -17,8 +17,55 @@ set -o pipefail  # return error if any part of a pipe errors
 set -o nounset   # error if an undefined variable is used
 
 
+GCLOUD_VERSION=402.0.0
+GCLOUD_ARCHIVE_DIGEST=a9902b57d4cba2ebb76d7354570813d3d8199c36b95a1111a1b7fea013beaaf9
+
+
+function save_exit_code() {
+  local exit_code="$?"
+  echo "${exit_code}" > /startup-exit.txt
+  trap - EXIT
+  exit "${exit_code}"
+}
+
+trap save_exit_code EXIT INT TERM
+
+function apt_maybe_purge() {
+  # Remove and purge packages if they are installed and don't error if they're
+  # not or if they're not findable in the ppa.
+  local -a to_remove=()
+  for pkg in "$@"; do
+    ret=0
+    if dpkg --status $pkg &> /dev/null; then
+      to_remove+=("${pkg}")
+    fi
+  done
+  if (( "${#to_remove[@]}" != 0 )); then
+    apt-get remove --purge --autoremove "${to_remove[@]}"
+  fi
+}
+
 function startup() {
-  #################################### APT #####################################
+  # Shut down in 5 hours. Makes sure this instance doesn't hang around forever
+  # if setup fails. Someone can cancel the shutdown with `shutdown -c`.
+  nohup shutdown -h +300 &
+  cd /
+
+  ########################### Create the runner user ###########################
+
+  # GCE "helpfully" creates users for apparently any account that has ever
+  # logged in on any VM. Delete it if it's there.
+  userdel --force --remove runner || true
+  adduser --system --group "runner"
+  groupadd docker
+  usermod --append --groups docker runner
+  usermod --append --groups sudo runner
+  groups runner # Print out the groups of runner to verify this worked
+
+  echo "enabling passwordless sudo for runner user"
+  echo "runner ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/99-runner
+
+  #################################### Apt #####################################
   # Disable apt prompts
   export DEBIAN_FRONTEND="noninteractive"
 
@@ -32,7 +79,7 @@ function startup() {
   systemctl disable apt-daily-upgrade.service
 
   # Don't install documentation (except copyrights) since this is a CI system.
-  cat > /etc/dpkg/dpkg.cfg.d/github-actions <<EOF
+  cat > /etc/dpkg/dpkg.cfg.d/99-github-actions <<EOF
 force-all
 no-pager
 # don't install docs
@@ -46,7 +93,7 @@ EOF
 
   # Provide default apt options like --assume-yes and --quiet since this is
   # designed to run on CI.
-  cat > /etc/apt/apt.conf.d/github-actions <<EOF
+  cat > /etc/apt/apt.conf.d/99-github-actions <<EOF
 APT {
   Install-Recommends "false";
   HideAutoRemove "true";
@@ -89,32 +136,48 @@ EOF
     lsb-release \
     software-properties-common
 
-  ########################### Create the runner user ###########################
+  ############################## Fix gcloud Installation Snap ###############################
 
-  # GCE "helpfully" creates users for apparently any account that has ever
-  # logged in on any VM. Delete it if it's there.
-  userdel --force --remove runner || true
-  adduser --system --group "runner"
-  groupadd docker
-  usermod --append --groups docker runner
-  usermod --append --groups sudo runner
-  groups runner # Print out the groups of runner to verify this worked
+  # Snap literally won't let you disable automatic updates. The only thing
+  # that's installed through snap here is the gcloud CLI, which we definitely
+  # don't want automatically updating (beyond our general desire to not
+  # automatically update on ephemeral machines). So we just delete snap entirely
+  # and install the CLI via apt (above)
+  systemctl stop snapd
+  apt_maybe_purge snapd gnome-software-plugin-snap
+  rm -rf /home/*/snap
+  rm -rf /root/snap
 
-  echo "enabling passwordless sudo for runner user"
-  echo "runner ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/runner
+  curl --silent --fail --show-error --location \
+      https://packages.cloud.google.com/apt/doc/apt-key.gpg \
+      | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg
+  echo \
+      "deb [arch=amd64 signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" \
+      > /etc/apt/sources.list.d/google-cloud-sdk.list
+  apt-get update && apt-get install google-cloud-cli
 
-
+  # This setting is now enabled by default. It sounds great, but unfortunately
+  # doing such an upload requires *delete* permissions on the bucket, which we
+  # deliberately do not give runners. For the life of me, I could not figure out
+  # how to use `gcloud config set` (the "proper" way to set properties) to work
+  # on the global properties.
+  cat <<EOF >> /usr/lib/google-cloud-sdk/properties
+[storage]
+parallel_composite_upload_enabled = False
+EOF
 
   ############################### Install Docker ###############################
 
-  # Remove Docker stuff that may already be installed, proceeding if they're not.
-  apt-get remove containerd docker docker-engine docker.io moby-engine moby-cli runc || true
+  # Remove Docker stuff that may already be installed by all its various names
+  apt_maybe_purge containerd docker docker-engine docker.io moby-engine moby-cli runc
 
   # Install the latest Docker
-  curl -sfSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+  curl --silent --fail --show-error --location \
+    https://download.docker.com/linux/ubuntu/gpg \
+    | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
   echo \
-    "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu \
-    $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list
+    "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
+    > /etc/apt/sources.list.d/docker.list
   apt-get update
   apt-get install docker-ce docker-ce-cli containerd.io
 
@@ -134,7 +197,7 @@ EOF
   # Make sure the runner user can use docker
   runuser --user runner -- docker ps
 
-  ################################### Cleanup ####################################
+  ################################### Cleanup ##################################
 
   apt-get clean
   rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
@@ -150,7 +213,9 @@ EOF
   # And clear others
   find /var/log/ -type f -exec truncate -s 0 {} \;
 
-  # This specific log line is load bearing, as it's referenced in create_image.sh
+  echo "Disk usage after setup"
+  df -h /
+
   echo "Setup complete"
 }
 
