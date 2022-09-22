@@ -31,8 +31,6 @@ class LinalgOpInfo {
   bool isTranspose() const { return !transposeOperands.empty(); }
   bool isReduction() const { return reductionTrait; }
   bool isDynamic() const { return dynamicTrait; }
-  bool isGeneric() const { return genericTrait; }
-  bool isTwoThreeLoops() const { return twoOrThreeLoopsTrait; }
 
   ArrayRef<OpOperand *> getTransposeOperands() const {
     return transposeOperands;
@@ -45,8 +43,6 @@ class LinalgOpInfo {
   bool transposeTrait;
   bool reductionTrait;
   bool dynamicTrait;
-  bool genericTrait;
-  bool twoOrThreeLoopsTrait;
   SmallVector<OpOperand *> transposeOperands;
 };
 

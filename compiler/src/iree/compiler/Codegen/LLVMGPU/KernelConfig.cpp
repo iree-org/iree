@@ -513,13 +513,18 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   return success();
 }
 
+static bool hasTwoOrThreeLoopsInfo(linalg::LinalgOp linalgOp) {
+  return linalgOp.getNumParallelLoops() >= 2 &&
+         linalgOp.getNumParallelLoops() <= 3;
+}
+
 static LogicalResult setTransposeConfig(func::FuncOp entryPoint,
                                         linalg::LinalgOp linalgOp) {
   LinalgOpInfo opInfo(linalgOp, sharedMemTransposeFilter);
 
   // Checks preconditions for shared mem transpose.
   if (!opInfo.isTranspose() || opInfo.isDynamic() || opInfo.isReduction() ||
-      !opInfo.isTwoThreeLoops()) {
+      !isa<linalg::GenericOp>(linalgOp) || !hasTwoOrThreeLoopsInfo(linalgOp)) {
     return failure();
   }
 

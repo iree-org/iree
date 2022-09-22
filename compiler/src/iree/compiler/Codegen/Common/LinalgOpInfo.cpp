@@ -82,11 +82,6 @@ static SmallVector<OpOperand *> computeTransposeInfo(
     return transposeOperands;
   }
 
-  // Multiple outputs are not supported yet.
-  if (linalgOp.getNumOutputs() != 1) {
-    return transposeOperands;
-  }
-
   // Inverse map to use transfer op permutation logic.
   AffineMap outputInversedMap = inversePermutation(
       linalgOp.getTiedIndexingMap(linalgOp.getOutputOperand(0)));
@@ -101,6 +96,11 @@ static SmallVector<OpOperand *> computeTransposeInfo(
     if (isTransposeMap(inverseMap) && transposeMapFilter(inverseMap)) {
       transposeOperands.push_back(linalgOperand);
     }
+  }
+
+  // Multiple outputs are not supported yet.
+  if (linalgOp.getNumOutputs() != 1) {
+    return transposeOperands;
   }
 
   if (isTransposeMap(outputInversedMap) &&
@@ -119,21 +119,10 @@ static bool computeDynamicInfo(LinalgOp linalgOp) {
   return linalgOp.hasDynamicShape();
 }
 
-static bool computeTwoOrThreeLoopsInfo(LinalgOp linalgOp) {
-  return linalgOp.getNumParallelLoops() >= 2 &&
-         linalgOp.getNumParallelLoops() <= 3;
-}
-
-static bool computeGenericInfo(LinalgOp linalgOp) {
-  return isa<GenericOp>(linalgOp);
-}
-
 void LinalgOpInfo::computeInfo(LinalgOp linalgOp) {
   transposeOperands = computeTransposeInfo(linalgOp, transposeMapFilter);
   reductionTrait = computeReductionInfo(linalgOp);
   dynamicTrait = computeDynamicInfo(linalgOp);
-  genericTrait = computeGenericInfo(linalgOp);
-  twoOrThreeLoopsTrait = computeTwoOrThreeLoopsInfo(linalgOp);
 }
 
 }  // namespace iree_compiler
