@@ -9,8 +9,10 @@
 #include <numeric>
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Codegen/Common/LinalgOpInfo.h"
 #include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
+#include "iree/compiler/Codegen/LLVMGPU/TransposeUtils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -511,77 +513,32 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   return success();
 }
 
-/// Returns true if the index map represents a transpose that benefits from
-/// shared mem.
-static bool isSharedMemTranspose(AffineMap indexMap) {
-  if (!indexMap.isEmpty() && indexMap.isPermutation()) {
-    // Ensure that the fasted moving dimension (the last one) is permuted,
-    // Otherwise shared memory promotion will not benefit the operation.
-    if (indexMap.getDimPosition(indexMap.getNumDims() - 1) !=
-        indexMap.getNumDims() - 1) {
-      return true;
-    }
-  }
-  return false;
-}
-
-/// Returns true if the operation is a GenericOp implementing a 2D transpose.
-static bool checkTransposePreconditions(linalg::GenericOp linalgOp) {
-  // Check that the op has at least 2 to 3 parallel loops.
-  if (linalgOp.getNumParallelLoops() < 2 ||
-      linalgOp.getNumParallelLoops() > 3) {
-    return false;
-  }
-
-  // Check that all the iterators are parallel.
-  if (linalgOp.getNumParallelLoops() != linalgOp.getNumLoops()) {
-    return false;
-  }
-
-  // Only transpose static shapes
-  if (linalgOp.hasDynamicShape()) {
-    return false;
-  }
-  return true;
+static bool hasTwoOrThreeLoopsInfo(linalg::LinalgOp linalgOp) {
+  return linalgOp.getNumParallelLoops() >= 2 &&
+         linalgOp.getNumParallelLoops() <= 3;
 }
 
 static LogicalResult setTransposeConfig(func::FuncOp entryPoint,
-                                        linalg::GenericOp linalgOp) {
-  if (!checkTransposePreconditions(linalgOp)) {
+                                        linalg::LinalgOp linalgOp) {
+  LinalgOpInfo opInfo(linalgOp, sharedMemTransposeFilter);
+
+  // Checks preconditions for shared mem transpose.
+  if (!opInfo.isTranspose() || opInfo.isDynamic() || opInfo.isReduction() ||
+      !isa<linalg::GenericOp>(linalgOp) || !hasTwoOrThreeLoopsInfo(linalgOp)) {
     return failure();
   }
 
-  // To simplify logic, we only consider linalg ops with transposes who's
-  // outputs maps are identities
-  for (OpOperand *opOperand : linalgOp.getOutputOperands()) {
-    if (!linalgOp.getTiedIndexingMap(opOperand).isIdentity()) {
-      return failure();
-    }
-  }
-
-  // Determine which operands are transposed.
-  SmallVector<int64_t, 4> transposedOperandIndices;
-  for (auto indexMapPair : llvm::enumerate(linalgOp.getIndexingMapsArray())) {
-    if (isSharedMemTranspose(indexMapPair.value())) {
-      transposedOperandIndices.push_back(indexMapPair.index());
-    }
-  }
-
-  if (transposedOperandIndices.empty()) {
-    return failure();  // No shared mem transposes.
-  }
+  ArrayRef<OpOperand *> transposedOperands = opInfo.getTransposeOperands();
 
   // Determine the fastest moving dimensions for the source/destination indices
   // of each transpose. These inform the tile sizes.
   int64_t outputFastestDim = linalgOp.getNumLoops() - 1;
-  int64_t inputFastestDim =
-      linalgOp.getIndexingMapsArray()[transposedOperandIndices[0]]
-          .getDimPosition(outputFastestDim);
+  int64_t inputFastestDim = linalgOp.getTiedIndexingMap(transposedOperands[0])
+                                .getDimPosition(outputFastestDim);
   // Ensure the other transposed operands match
-  for (int i = 1; i < transposedOperandIndices.size(); ++i) {
-    if (inputFastestDim !=
-        linalgOp.getIndexingMapsArray()[transposedOperandIndices[i]]
-            .getDimPosition(outputFastestDim)) {
+  for (int i = 1; i < transposedOperands.size(); ++i) {
+    if (inputFastestDim != linalgOp.getTiedIndexingMap(transposedOperands[i])
+                               .getDimPosition(outputFastestDim)) {
       return failure();
     }
   }

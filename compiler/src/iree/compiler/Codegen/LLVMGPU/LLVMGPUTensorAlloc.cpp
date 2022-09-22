@@ -4,7 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Common/LinalgOpInfo.h"
 #include "iree/compiler/Codegen/LLVMGPU/TilingUtils.h"
+#include "iree/compiler/Codegen/LLVMGPU/TransposeUtils.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
@@ -39,12 +41,10 @@ static bool contractOpFilter(Operation *op) {
 
 /// Filter to decide which transpose ops need allocations.
 static bool transposeOpFilter(Operation *op) {
-  auto genericOp = dyn_cast<linalg::GenericOp>(op);
-  if (!genericOp) return false;
-  // Can't promote dynamic shapes.
-  if (genericOp.hasDynamicShape()) return false;
-  return genericOp.getNumParallelLoops() >= 2 &&
-         genericOp.getNumParallelLoops() <= 3;
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+  if (!linalgOp) return false;
+  LinalgOpInfo opInfo(linalgOp, sharedMemTransposeFilter);
+  return opInfo.isTranspose();
 }
 
 /// Returns true if the index map represents a transpose that benefits from
@@ -97,22 +97,33 @@ struct LLVMGPUTensorAllocPass
       OpBuilder builder(op);
       auto linalgOp = cast<linalg::LinalgOp>(op);
       bufferization::BufferizationOptions options;
-      // Promote all the input operands for contract op or transpose operands
-      // for shared mem transpose.
-      for (auto operand : linalgOp.getInputOperands()) {
-        if (promoteSharedMemPattern ==
-            GPUPromoteSharedMemPattern::TransposeOpPattern) {
-          if (!isSharedMemTranspose(linalgOp.getTiedIndexingMap(operand))) {
-            continue;
+      switch (promoteSharedMemPattern) {
+        case GPUPromoteSharedMemPattern::ContractionOpPattern:
+          // Promote all the input operands
+          for (auto operand : linalgOp.getInputOperands()) {
+            FailureOr<Value> ret = bufferization::allocateTensorForShapedValue(
+                builder, op->getLoc(), operand->get(), false, options, true);
+            if (failed(ret)) {
+              return signalPassFailure();
+            }
+            Value v = ret.value();
+            operand->set(v);
           }
-        }
-        FailureOr<Value> ret = bufferization::allocateTensorForShapedValue(
-            builder, op->getLoc(), operand->get(), false, options, true);
-        if (failed(ret)) {
-          return signalPassFailure();
-        }
-        Value v = ret.value();
-        operand->set(v);
+          break;
+
+        case GPUPromoteSharedMemPattern::TransposeOpPattern:
+          LinalgOpInfo opInfo(linalgOp, sharedMemTransposeFilter);
+
+          for (auto operand : opInfo.getTransposeOperands()) {
+            FailureOr<Value> ret = bufferization::allocateTensorForShapedValue(
+                builder, op->getLoc(), operand->get(), false, options, true);
+            if (failed(ret)) {
+              return signalPassFailure();
+            }
+            Value v = ret.value();
+            operand->set(v);
+          }
+          break;
       }
     }
   }

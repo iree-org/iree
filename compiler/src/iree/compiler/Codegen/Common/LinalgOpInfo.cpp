@@ -6,14 +6,13 @@
 
 #include "iree/compiler/Codegen/Common/LinalgOpInfo.h"
 
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 
 using namespace mlir::linalg;
 
 namespace mlir {
 namespace iree_compiler {
-
-LinalgOpInfo::LinalgOpInfo(linalg::LinalgOp linalgOp) { computeInfo(linalgOp); }
 
 /// Returns true if `map` is a tranpose. A transpose map is a projected
 /// permutation with or without zeros in results where there exist at least two
@@ -57,51 +56,73 @@ static bool isTransposeMap(AffineMap map) {
   return false;
 }
 
+/// The default filter passes all op operands.
+static bool defaultTransposeMapFilter(AffineMap map) { return true; }
+
+LinalgOpInfo::LinalgOpInfo(linalg::LinalgOp linalgOp)
+    : transposeMapFilter(defaultTransposeMapFilter) {
+  computeInfo(linalgOp);
+}
+LinalgOpInfo::LinalgOpInfo(linalg::LinalgOp linalgOp,
+                           TransposeMapFilter transposeMapFilter)
+    : transposeMapFilter(transposeMapFilter) {
+  computeInfo(linalgOp);
+}
+
 /// Returns true if a LinalgOp implements a transpose.
 // TODO(dcaballe):
 //   * Consider transpose + reductions.
 //   * Consider input and output transposes.
-static bool isTransposeLinalgOp(linalg::LinalgOp linalgOp) {
+static SmallVector<OpOperand *> computeTransposeInfo(
+    LinalgOp linalgOp, TransposeMapFilter transposeMapFilter) {
+  SmallVector<OpOperand *> transposeOperands;
+
   // Reductions are not supported.
   if (linalgOp.getNumReductionLoops() > 0) {
-    return false;
-  }
-
-  // Multiple outputs are not supported yet.
-  if (linalgOp.getNumOutputs() != 1) {
-    return false;
+    return transposeOperands;
   }
 
   // Inverse map to use transfer op permutation logic.
   AffineMap outputInversedMap = inversePermutation(
       linalgOp.getTiedIndexingMap(linalgOp.getOutputOperand(0)));
+
   SmallVector<AffineMap> inputInversedMaps;
   for (OpOperand *linalgOperand : linalgOp.getInputOperands()) {
     auto map = linalgOp.getTiedIndexingMap(linalgOperand);
     if (!map.isProjectedPermutation(/*allowZeroInResults=*/true)) {
-      return false;
+      return transposeOperands;
     }
-    inputInversedMaps.push_back(inverseAndBroadcastProjectedPermutation(map));
+    AffineMap inverseMap = inverseAndBroadcastProjectedPermutation(map);
+    if (isTransposeMap(inverseMap) && transposeMapFilter(inverseMap)) {
+      transposeOperands.push_back(linalgOperand);
+    }
   }
 
-  bool isInputTransposed = llvm::any_of(
-      inputInversedMaps, [](AffineMap map) { return isTransposeMap(map); });
-  bool isOutputTransposed = isTransposeMap(outputInversedMap);
+  // Multiple outputs are not supported yet.
+  if (linalgOp.getNumOutputs() != 1) {
+    return transposeOperands;
+  }
 
-  return isInputTransposed || isOutputTransposed;
-}
+  if (isTransposeMap(outputInversedMap) &&
+      transposeMapFilter(outputInversedMap)) {
+    transposeOperands.push_back(linalgOp.getOutputOperand(0));
+  }
 
-static bool computeTransposeInfo(LinalgOp linalgOp) {
-  return isTransposeLinalgOp(linalgOp);
+  return transposeOperands;
 }
 
 static bool computeReductionInfo(LinalgOp linalgOp) {
   return linalgOp.getNumReductionLoops() > 1;
 }
 
+static bool computeDynamicInfo(LinalgOp linalgOp) {
+  return linalgOp.hasDynamicShape();
+}
+
 void LinalgOpInfo::computeInfo(LinalgOp linalgOp) {
-  transposeTrait = computeTransposeInfo(linalgOp);
+  transposeOperands = computeTransposeInfo(linalgOp, transposeMapFilter);
   reductionTrait = computeReductionInfo(linalgOp);
+  dynamicTrait = computeDynamicInfo(linalgOp);
 }
 
 }  // namespace iree_compiler

@@ -17,6 +17,7 @@ iree_cc_library(
     "ConvertToLLVM.h"
     "KernelConfig.h"
     "TilingUtils.h"
+    "TransposeUtils.h"
   SRCS
     "ConvertToLLVM.cpp"
     "ConvertToNVVM.cpp"
