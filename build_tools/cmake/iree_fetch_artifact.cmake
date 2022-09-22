@@ -35,6 +35,9 @@ function(iree_fetch_artifact)
     list(APPEND _ARGS "--unpack")
   endif()
 
+  # TODO: CMake built-in file command can replace the python script. But python
+  # script also provides streaming unpack (doesn't use double space when
+  # unpacking). Need to evaluate if we want to replace.
   add_custom_command(
     OUTPUT "${_RULE_OUTPUT}"
     COMMAND
