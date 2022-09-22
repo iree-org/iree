@@ -34,6 +34,8 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       registered dialects and ops.
       - rank_reducing: adds patterns that results in rank-reducing behavior on
       subset-based operations.
+      - simplify_memref_metadata: adds patterns that simplify the uses of
+      memref.extract_strided_metadata and fold to the underlying indices.
 
     Return modes:
     =============
@@ -50,7 +52,8 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
 
   let arguments = (ins PDL_Operation:$target,
                        UnitAttr:$canonicalization,
-                       UnitAttr:$rank_reducing);
+                       UnitAttr:$rank_reducing,
+                       UnitAttr:$simplify_memref_metadata);
   let results = (outs PDL_Operation:$result);
 
   let assemblyFormat = "$target attr-dict";
