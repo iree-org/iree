@@ -560,22 +560,18 @@ static LogicalResult setTransposeConfig(func::FuncOp entryPoint,
 static LogicalResult setConvolutionConfig(linalg::LinalgOp linalgOp,
                                           const int64_t subgroupSize,
                                           const int64_t bestTilingFactor) {
+  if (!isa<linalg::Conv2DNhwcHwcfOp>(linalgOp)) {
+    return failure();
+  }
   Type inputType = linalgOp.getInputOperand(0)->get().getType();
   ArrayRef<int64_t> inputShape = inputType.cast<ShapedType>().getShape();
   Type outputType = linalgOp.getOutputOperand(0)->get().getType();
   ArrayRef<int64_t> outputShape = outputType.cast<ShapedType>().getShape();
-  if (!isa<linalg::Conv2DNhwcHwcfOp>(*linalgOp) ||
-      ShapedType::isDynamic(inputShape[3])) {
+  if (ShapedType::isDynamic(inputShape[3]) ||
+      llvm::any_of(outputShape.drop_front(), ShapedType::isDynamic)) {
     return failure();
   }
-  if (llvm::any_of(outputShape.drop_front(), ShapedType::isDynamic)) {
-    return failure();
-  }
-  int64_t ic = inputShape[3];
   int64_t oh = outputShape[1], ow = outputShape[2], oc = outputShape[3];
-  // The conversion pipeline requires the input channel dimension to be some
-  // multipler of four, or less than four.
-  if (!(ic % 4 == 0 || ic < 4)) return failure();
   // The core idea is to distribute the convolution OH/OW/OC dimension to the
   // workgroup Z/Y/X dimension, with each thread in a workgroup handling
   // multiple vector elements. We try to 1) utilize all threads in a subgroup,
