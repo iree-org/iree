@@ -214,11 +214,10 @@ struct HALInterfaceLoadConstantToAccessChainLoadConverter final
     uint64_t elementCount = layoutAttr.getPushConstants();
     unsigned index = loadOp.getIndex().getZExtValue();
 
-    // The following function generates SPIR-V ops with i32 types. So it does
-    // type "conversion" (index -> i32) implicitly.
-    auto i32Type = rewriter.getIntegerType(32);
+    auto &typeConverter = *getTypeConverter<SPIRVTypeConverter>();
+    auto indexType = typeConverter.getIndexType();
     auto value = spirv::getPushConstantValue(loadOp, elementCount, index,
-                                             i32Type, rewriter);
+                                             indexType, rewriter);
 
     rewriter.replaceOp(loadOp, value);
     return success();
@@ -259,11 +258,12 @@ struct HALInterfaceWorkgroupIdAndCountConverter final
       InterfaceOpTy op, typename InterfaceOpTy::Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     int32_t index = static_cast<int32_t>(op.getDimension().getSExtValue());
-    auto i32Type = rewriter.getIntegerType(32);
+    auto *typeConverter = this->template getTypeConverter<SPIRVTypeConverter>();
+    auto indexType = typeConverter->getIndexType();
     Value spirvBuiltin =
-        spirv::getBuiltinVariableValue(op, builtin, i32Type, rewriter);
+        spirv::getBuiltinVariableValue(op, builtin, indexType, rewriter);
     rewriter.replaceOpWithNewOp<spirv::CompositeExtractOp>(
-        op, i32Type, spirvBuiltin, rewriter.getI32ArrayAttr({index}));
+        op, indexType, spirvBuiltin, rewriter.getI32ArrayAttr({index}));
     return success();
   }
 };
@@ -530,13 +530,14 @@ class ConvertToSPIRVPass : public ConvertToSPIRVBase<ConvertToSPIRVPass> {
     registry.insert<spirv::SPIRVDialect>();
   }
 
-  explicit ConvertToSPIRVPass(bool enableFastMath)
-      : enableFastMath(enableFastMath) {}
+  explicit ConvertToSPIRVPass(bool enableFastMath, bool use64bitIndex)
+      : enableFastMath(enableFastMath), use64bitIndex(use64bitIndex) {}
 
   void runOnOperation() override;
 
  private:
   bool enableFastMath;
+  bool use64bitIndex;
 };
 }  // namespace
 
@@ -584,6 +585,7 @@ void ConvertToSPIRVPass::runOnOperation() {
 
   SPIRVConversionOptions options = {};
   options.enableFastMathMode = this->enableFastMath;
+  options.use64bitIndex = this->use64bitIndex;
   SPIRVTypeConverter typeConverter(targetAttr, options);
   // Additionally pull in conversion rules for GPU subgroup MMA ops.
   typeConverter.addConversion([&](gpu::MMAMatrixType type) -> Type {
@@ -593,8 +595,8 @@ void ConvertToSPIRVPass::runOnOperation() {
   ScfToSPIRVContext scfToSPIRVContext;
 
   bool hasKernelCapabilty = false;
-  for (auto capabiltiy : targetAttr.getCapabilities()) {
-    if (capabiltiy == spirv::Capability::Kernel) {
+  for (auto capability : targetAttr.getCapabilities()) {
+    if (capability == spirv::Capability::Kernel) {
       hasKernelCapabilty = true;
     }
   }
@@ -691,7 +693,11 @@ void ConvertToSPIRVPass::runOnOperation() {
   spirv::AddressingModel addressingModel = spirv::AddressingModel::Logical;
   spirv::MemoryModel memoryModel = spirv::MemoryModel::GLSL450;
   if (hasKernelCapabilty) {
-    addressingModel = spirv::AddressingModel::Physical32;
+    if (this->use64bitIndex) {
+      addressingModel = spirv::AddressingModel::Physical64;
+    } else {
+      addressingModel = spirv::AddressingModel::Physical32;
+    }
     memoryModel = spirv::MemoryModel::OpenCL;
   }
   auto builder = OpBuilder::atBlockBegin(moduleOp.getBody());
@@ -711,8 +717,8 @@ void ConvertToSPIRVPass::runOnOperation() {
 //===----------------------------------------------------------------------===//
 
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToSPIRVPass(
-    bool enableFastMath) {
-  return std::make_unique<ConvertToSPIRVPass>(enableFastMath);
+    bool enableFastMath, bool use64bitIndex) {
+  return std::make_unique<ConvertToSPIRVPass>(enableFastMath, use64bitIndex);
 }
 
 }  // namespace iree_compiler

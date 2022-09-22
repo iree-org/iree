@@ -19,6 +19,7 @@ namespace HAL {
 struct OpenCLSPIRVTargetOptions {
   // OpenCL target triple.
   std::string openCLTargetTriple;
+  bool openCLUsePhysical32;
 };
 
 // Returns a OpenCLSPIRVTargetOptions struct initialized with OpenCL/SPIR-V
