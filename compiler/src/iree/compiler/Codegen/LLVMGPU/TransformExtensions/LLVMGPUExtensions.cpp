@@ -11,6 +11,7 @@
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -34,165 +35,6 @@ void mlir::iree_compiler::registerTransformDialectLLVMGPUExtension(
   registry.addExtensions<transform_dialect::LLVMGPUExtensions>();
 }
 
-// TODO: Maybe we need both a transform.iree.cpu.bufferize and a
-// transform.iree.gpu.bufferize rather than a single common bufferize op?
-
-/// Apply the permutation `perm` to `vals; i.e. vals[i] is stored into
-/// res[perm[i]] Return failure if perm is not a permutation.
-// TODO: upstream as extraClassDeclaration once stabilized.
-template <typename T>
-static FailureOr<SmallVector<T>> permute(const SmallVector<T> &vals,
-                                         ArrayRef<int64_t> perm) {
-  if (vals.size() != perm.size()) return failure();
-  SmallVector<T> result(vals.size());
-  SmallVector<bool> seen(vals.size());
-  for (auto [idx, val] : llvm::zip(perm, vals)) {
-    // Already seen, invalid thread_dim_mapping.
-    if (seen[idx]) return failure();
-    result[idx] = val;
-    seen[idx] = true;
-  }
-  // Some not seen, invalid thread_dim_mapping.
-  if (!llvm::all_of(seen, [](bool b) { return b; })) return failure();
-  return result;
-}
-
-/// Helper to get apply the `thread_dim_mapping` permutation of a
-/// `foreachThreadOp` to `values`.
-// TODO: upstream as extraClassDeclaration once stabilized.
-template <typename T>
-static FailureOr<SmallVector<T>> getValuesPermutedByThreadMapping(
-    scf::ForeachThreadOp foreachThreadOp, const SmallVector<T> &values) {
-  // Apply mapping permutation if specified.
-  auto mapping = foreachThreadOp.getThreadDimMapping();
-  if (mapping && !mapping.empty()) {
-    auto maybePermuted = permute(values, extractFromI64ArrayAttr(mapping));
-    if (failed(maybePermuted))
-      return foreachThreadOp->emitError("invalid permutation");
-    return *maybePermuted;
-  }
-  return values;
-}
-
-/// Helper to get the `num_threads` of a `foreachThreadOp` after applying the
-/// `thread_dim_mapping` permutation.
-// TODO: upstream as extraClassDeclaration once stabilized.
-static FailureOr<SmallVector<OpFoldResult>> getNumThreads(
-    OpBuilder &b, scf::ForeachThreadOp foreachThreadOp) {
-  SmallVector<OpFoldResult> threadCount = foreachThreadOp.getNumThreads();
-  threadCount.resize(3, b.getIndexAttr(1));
-  return getValuesPermutedByThreadMapping(foreachThreadOp, threadCount);
-}
-
-/// Helper to get the thread indices of a `foreachThreadOp` after applying the
-/// `thread_dim_mapping` permutation.
-// TODO: upstream as extraClassDeclaration once stabilized.
-static FailureOr<SmallVector<Value>> getThreadIndices(
-    OpBuilder &b, scf::ForeachThreadOp foreachThreadOp) {
-  SmallVector<Value> threadCount = foreachThreadOp.getThreadIndices();
-  threadCount.resize(3, Value());
-  return getValuesPermutedByThreadMapping(foreachThreadOp, threadCount);
-}
-
-//===---------------------------------------------------------------------===//
-// Patterns for ForeachThreadToGpu rewrite.
-//===---------------------------------------------------------------------===//
-
-FailureOr<SmallVector<OpFoldResult>>
-mlir::iree_compiler::rewriteForeachThreadToGpu(
-    scf::ForeachThreadOp foreachThreadOp,
-    const SmallVector<int64_t> &globalWorkgroupSizes, RewriterBase &rewriter,
-    bool syncAfterDistribute) {
-  if (foreachThreadOp.getNumResults() > 0)
-    return foreachThreadOp->emitError(
-        "only bufferized scf.foreach_thread lowers to gpu.thread");
-  if (foreachThreadOp.getNumThreads().size() > 3)
-    return foreachThreadOp->emitError(
-        "scf.foreach_thread with rank > 3 does not lower to gpu.thread");
-
-  auto maybeWorkgroupSizes = getNumThreads(rewriter, foreachThreadOp);
-  if (failed(maybeWorkgroupSizes) ||
-      llvm::any_of(*maybeWorkgroupSizes, [](OpFoldResult ofr) {
-        return !getConstantIntValue(ofr).has_value();
-      }))
-    return foreachThreadOp->emitError("unsupported dynamic workgroup size");
-
-  SmallVector<int64_t> workgroupSizes = llvm::to_vector(llvm::map_range(
-      *maybeWorkgroupSizes,
-      [](OpFoldResult ofr) { return getConstantIntValue(ofr).value(); }));
-
-  // Step 1. Create the gpu.thread ops
-  Location loc = foreachThreadOp.getLoc();
-  IndexType indexType = rewriter.getIndexType();
-
-  SmallVector<gpu::Dimension, 3> gpuDims{gpu::Dimension::x, gpu::Dimension::y,
-                                         gpu::Dimension::z};
-  SmallVector<Value, 3> threadOps;
-  for (int64_t idx : llvm::seq<int64_t>(0, workgroupSizes.size())) {
-    threadOps.push_back(
-        rewriter.create<gpu::ThreadIdOp>(loc, indexType, gpuDims[idx]));
-  }
-
-  // Step 2. Maybe create conditionals to predicate the region.
-  Value predicate;
-  for (auto [threadId, workgroupSize, globalWorkgroupSize] :
-       llvm::zip(threadOps, workgroupSizes, globalWorkgroupSizes)) {
-    if (workgroupSize > globalWorkgroupSize) {
-      return foreachThreadOp.emitOpError("workgroup size overflow: ")
-             << workgroupSize << " > " << globalWorkgroupSize;
-    }
-    if (workgroupSize == globalWorkgroupSize) continue;
-    Value tmpPredicate = rewriter.create<arith::CmpIOp>(
-        loc, arith::CmpIPredicate::ult, threadId,
-        rewriter.create<arith::ConstantIndexOp>(loc, workgroupSize));
-    predicate =
-        predicate ? rewriter.create<arith::AndIOp>(loc, predicate, tmpPredicate)
-                  : tmpPredicate;
-  }
-
-  // Step 3. Move the body of foreachThreadOp.
-  // Erase the terminator first, it will not be used.
-  rewriter.eraseOp(foreachThreadOp.getTerminator());
-  Block *targetBlock;
-  Block::iterator insertionPoint;
-  if (predicate) {
-    // Step 3.a. If predicated, move at the beginning.
-    auto ifOp =
-        rewriter.create<scf::IfOp>(loc, predicate, /*withElseRegion=*/false);
-    targetBlock = ifOp.thenBlock();
-    insertionPoint = ifOp.thenBlock()->begin();
-  } else {
-    // Step 3.a. Otherwise, move inline just before foreachThreadOp.
-    targetBlock = foreachThreadOp->getBlock();
-    insertionPoint = Block::iterator(foreachThreadOp);
-  }
-  Block &sourceBlock = foreachThreadOp.getRegion().front();
-  targetBlock->getOperations().splice(insertionPoint,
-                                      sourceBlock.getOperations());
-
-  // Step 4. RAUW thread indices to thread ops.
-  SmallVector<Value> threadIndices =
-      *getThreadIndices(rewriter, foreachThreadOp);
-  assert(threadOps.size() == 3 && "3 thread id ops are required");
-  assert(threadIndices.size() == 3 && "3 thread id dimensions are required");
-  for (auto it : llvm::zip(threadIndices, threadOps)) {
-    Value val = std::get<0>(it);
-    if (!val) continue;
-    for (Operation *user : llvm::make_early_inc_range(val.getUsers())) {
-      rewriter.updateRootInPlace(
-          user, [&]() { user->replaceUsesOfWith(val, std::get<1>(it)); });
-    }
-  }
-
-  // Step 5. syncthreads.
-  if (syncAfterDistribute) rewriter.create<gpu::BarrierOp>(loc);
-
-  // Step 6. Erase old op.
-  rewriter.eraseOp(foreachThreadOp);
-
-  return *maybeWorkgroupSizes;
-}
-
 //===---------------------------------------------------------------------===//
 // IREE-specific LLVMGPU transformations.
 //===---------------------------------------------------------------------===//
@@ -201,7 +43,7 @@ mlir::iree_compiler::rewriteForeachThreadToGpu(
 // reuse most of the code and not require a static number of threads.
 // TODO: synchronizations for imperfectly nested stuff.
 DiagnosedSilenceableFailure
-transform_dialect::ForeachThreadToGpuAndTranslationInfo::applyToOne(
+transform_dialect::MapNestedForeachThreadToGpuThreads::applyToOne(
     func::FuncOp target, SmallVectorImpl<Operation *> &results,
     transform::TransformState &state) {
   if (!isa<HAL::ExecutableOp, HAL::ExecutableVariantOp>(state.getTopLevel())) {
@@ -225,13 +67,8 @@ transform_dialect::ForeachThreadToGpuAndTranslationInfo::applyToOne(
   // TODO: no magic constant but IREE uses this extensively.
   workgroupSize.resize(/*size=*/3, /*value=*/1);
   SimplePatternRewriter rewriter(target);
-  auto walkResult = target->walk([&](scf::ForeachThreadOp foreachThreadOp) {
-    rewriter.setInsertionPoint(foreachThreadOp);
-    if (failed(rewriteForeachThreadToGpu(foreachThreadOp, workgroupSize,
-                                         rewriter)))
-      return WalkResult::interrupt();
-    return WalkResult::advance();
-  });
+  auto walkResult = mlir::linalg::rewriteMapNestedForeachThreadToGpuThreads(
+      rewriter, target, workgroupSize, true);
 
   if (walkResult.wasInterrupted())
     return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
