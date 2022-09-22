@@ -99,7 +99,6 @@ struct FuseElementwiseOpsWithMultipleUses
 
   LogicalResult matchAndRewrite(linalg::GenericOp consumerOp,
                                 PatternRewriter &rewriter) const override {
-    // Check and cleanup the consumer marker.
     auto consumerMarker =
         consumerOp->getAttrOfType<IntegerAttr>(getConsumerAttributeName());
     if (!consumerMarker) return failure();
