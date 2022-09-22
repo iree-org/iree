@@ -661,3 +661,12 @@ func.func @relayout(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) {
   iree_linalg_ext.pack %arg0 inner_tiles [1, 1] into %arg1 : (memref<3x3xf32> memref<3x3xf32>)
   return 
 }
+
+// -----
+
+// CHECK: func.func @relayout(
+func.func @relayout(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) {
+  // CHECK: iree_linalg_ext.pack
+  iree_linalg_ext.pack %arg0 inner_tiles [1, 1] interchange = [1, 2, 3, 4] into %arg1 : (memref<3x3xf32> memref<3x3xf32>)
+  return 
+}
