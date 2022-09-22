@@ -90,7 +90,6 @@ struct TilingInterfaceLowerToLoopsPattern : public RewritePattern {
     //      tilableOp, "lower to loops needs to have tensor semantics");
     //}
     if (failed(lowerToLoops(rewriter, tilableOp))) {
-      llvm::errs() << "failed to lower to loops\n";
       return failure();
     }
     rewriter.eraseOp(op);
