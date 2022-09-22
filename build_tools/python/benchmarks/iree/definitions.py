@@ -19,15 +19,18 @@ MODULE_BENCHMARK_TOOL = "iree-benchmark-module"
 def _generate_run_specs(
     compile_specs: Sequence[iree_definitions.CompileSpec],
     run_configs: Sequence[iree_definitions.RunConfig],
-    device_spec: common_definitions.DeviceSpec
+    device_spec: common_definitions.DeviceSpec,
+    input_data: common_definitions.ModelInputData = common_definitions.
+    RANDOM_MODEL_INPUT_DATA,
 ) -> List[iree_definitions.RunSpec]:
+  """Generates the run specs from the product of compile specs and run configs.
+  """
   return [
-      iree_definitions.RunSpec(
-          compile_spec=compile_spec,
-          run_config=run_config,
-          target_device_spec=device_spec,
-          input_data=common_definitions.RANDOM_MODEL_INPUT_DATA) for
-      compile_spec, run_config in itertools.product(compile_specs, run_configs)
+      iree_definitions.RunSpec(compile_spec=compile_spec,
+                               run_config=run_config,
+                               target_device_spec=device_spec,
+                               input_data=input_data) for compile_spec,
+      run_config in itertools.product(compile_specs, run_configs)
   ]
 
 

@@ -88,7 +88,7 @@ iree_fetch_artifact(
   SOURCE_URL
     "https://storage.googleapis.com/iree-model-artifacts/mobilenet_v1_224_1.0_float.tflite"
   OUTPUT
-    "${_MODEL_ARTIFACTS_DIR}/78eab9e5-9ff1-4769-9b55-933c81cc9a0f_MobileNetV1_fp32.tflite"
+    "${_MODEL_ARTIFACTS_DIR}/78eab9e5-9ff1-4769-9b55-933c81cc9a0f_MobileNetV1_fp32.0_float.tflite"
   UNPACK
 )
 
@@ -99,7 +99,7 @@ iree_fetch_artifact(
   SOURCE_URL
     "https://storage.googleapis.com/iree-model-artifacts/mobilenet_v2_1.0_224.tflite"
   OUTPUT
-    "${_MODEL_ARTIFACTS_DIR}/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32.tflite"
+    "${_MODEL_ARTIFACTS_DIR}/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32.0_224.tflite"
   UNPACK
 )
 
@@ -143,7 +143,7 @@ iree_fetch_artifact(
   SOURCE_URL
     "https://storage.googleapis.com/iree-model-artifacts/minilm-l12-h384-uncased-seqlen128-tf-model.tar.gz"
   OUTPUT
-    "${_MODEL_ARTIFACTS_DIR}/ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased.gz"
+    "${_MODEL_ARTIFACTS_DIR}/ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased"
   UNPACK
 )
 
@@ -201,19 +201,19 @@ iree_import_tflite_model(
 # Mark dependency so users can import models without compiling them.
 add_dependencies(iree-benchmark-import-models "${_PACKAGE_NAME}_iree-import-model-73a0402e-271b-4aa8-a6a5-ac05839ca569")
 
-# Import the TFLite model "${_MODEL_ARTIFACTS_DIR}/78eab9e5-9ff1-4769-9b55-933c81cc9a0f_MobileNetV1_fp32.tflite"
+# Import the TFLite model "${_MODEL_ARTIFACTS_DIR}/78eab9e5-9ff1-4769-9b55-933c81cc9a0f_MobileNetV1_fp32.0_float.tflite"
 iree_import_tflite_model(
   TARGET_NAME "${_PACKAGE_NAME}_iree-import-model-78eab9e5-9ff1-4769-9b55-933c81cc9a0f"
-  SOURCE "${_MODEL_ARTIFACTS_DIR}/78eab9e5-9ff1-4769-9b55-933c81cc9a0f_MobileNetV1_fp32.tflite"
+  SOURCE "${_MODEL_ARTIFACTS_DIR}/78eab9e5-9ff1-4769-9b55-933c81cc9a0f_MobileNetV1_fp32.0_float.tflite"
   OUTPUT_MLIR_FILE "${_IREE_ARTIFACTS_DIR}/78eab9e5-9ff1-4769-9b55-933c81cc9a0f_MobileNetV1_fp32/MobileNetV1_fp32.mlir"
 )
 # Mark dependency so users can import models without compiling them.
 add_dependencies(iree-benchmark-import-models "${_PACKAGE_NAME}_iree-import-model-78eab9e5-9ff1-4769-9b55-933c81cc9a0f")
 
-# Import the TFLite model "${_MODEL_ARTIFACTS_DIR}/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32.tflite"
+# Import the TFLite model "${_MODEL_ARTIFACTS_DIR}/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32.0_224.tflite"
 iree_import_tflite_model(
   TARGET_NAME "${_PACKAGE_NAME}_iree-import-model-7d45f8e5-bb5e-48d0-928d-8f125104578f"
-  SOURCE "${_MODEL_ARTIFACTS_DIR}/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32.tflite"
+  SOURCE "${_MODEL_ARTIFACTS_DIR}/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32.0_224.tflite"
   OUTPUT_MLIR_FILE "${_IREE_ARTIFACTS_DIR}/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32/MobileNetV2_fp32.mlir"
 )
 # Mark dependency so users can import models without compiling them.
@@ -246,10 +246,10 @@ iree_import_tflite_model(
 # Mark dependency so users can import models without compiling them.
 add_dependencies(iree-benchmark-import-models "${_PACKAGE_NAME}_iree-import-model-4a6f545e-1b4e-41a5-9236-792aa578184b")
 
-# Import the Tensorflow model "${_MODEL_ARTIFACTS_DIR}/ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased.gz"
+# Import the Tensorflow model "${_MODEL_ARTIFACTS_DIR}/ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased"
 iree_import_tf_model(
   TARGET_NAME "${_PACKAGE_NAME}_iree-import-model-ecf5c970-ee97-49f0-a4ed-df1f34e9d493"
-  SOURCE "${_MODEL_ARTIFACTS_DIR}/ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased.gz"
+  SOURCE "${_MODEL_ARTIFACTS_DIR}/ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased"
   ENTRY_FUNCTION "predict"
   OUTPUT_MLIR_FILE "${_IREE_ARTIFACTS_DIR}/ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased/MiniLML12H384Uncased.mlir"
 )
