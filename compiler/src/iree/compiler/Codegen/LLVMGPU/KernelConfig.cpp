@@ -676,7 +676,7 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
     if (succeeded(setWarpReductionConfig(entryPointFn, linalgOp))) {
       return success();
     }
-    if (succeeded(setConvolutionConfig(linalgOp, 32, 32))) {
+    if (succeeded(setConvolutionConfig(linalgOp, 32, 16))) {
       return success();
     }
     auto genericOp = dyn_cast<linalg::GenericOp>(computeOp);
