@@ -727,8 +727,8 @@ void MulI64Op::getCanonicalizationPatterns(RewritePatternSet &results,
       context);
 }
 
-template <typename T>
-static OpFoldResult foldDivSOp(T op, ArrayRef<Attribute> operands) {
+template <typename DivOpT, typename MulOpT>
+static OpFoldResult foldDivSOp(DivOpT op, ArrayRef<Attribute> operands) {
   if (matchPattern(op.getRhs(), m_Zero())) {
     // x / 0 = death
     op.emitOpError() << "is a divide by constant zero";
@@ -739,21 +739,31 @@ static OpFoldResult foldDivSOp(T op, ArrayRef<Attribute> operands) {
   } else if (matchPattern(op.getRhs(), m_One())) {
     // x / 1 = x
     return op.getLhs();
+  } else if (auto mulOp =
+                 dyn_cast_or_null<MulOpT>(op.getLhs().getDefiningOp())) {
+    // Only applies to signed divides (matches LLVM behavior).
+    if (mulOp.getRhs() == op.getRhs()) {
+      // c = mul a, b
+      // d = div c, b
+      // ->
+      // d = a
+      return mulOp.getLhs();
+    }
   }
   return constFoldBinaryOp<IntegerAttr>(
       operands, [](const APInt &a, const APInt &b) { return a.sdiv(b); });
 }
 
 OpFoldResult DivI32SOp::fold(ArrayRef<Attribute> operands) {
-  return foldDivSOp(*this, operands);
+  return foldDivSOp<DivI32SOp, MulI32Op>(*this, operands);
 }
 
 OpFoldResult DivI64SOp::fold(ArrayRef<Attribute> operands) {
-  return foldDivSOp(*this, operands);
+  return foldDivSOp<DivI64SOp, MulI64Op>(*this, operands);
 }
 
-template <typename T>
-static OpFoldResult foldDivUOp(T op, ArrayRef<Attribute> operands) {
+template <typename DivOpT>
+static OpFoldResult foldDivUOp(DivOpT op, ArrayRef<Attribute> operands) {
   if (matchPattern(op.getRhs(), m_Zero())) {
     // x / 0 = death
     op.emitOpError() << "is a divide by constant zero";

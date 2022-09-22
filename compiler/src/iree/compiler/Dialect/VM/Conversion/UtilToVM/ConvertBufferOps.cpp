@@ -200,6 +200,14 @@ struct BufferFillOpConversion
   }
 };
 
+static Value unscaleOffset(Location loc, Value offset, int64_t scale,
+                           OpBuilder &builder) {
+  if (scale == 1) return offset;
+  return builder.createOrFold<IREE::VM::DivI64SOp>(
+      loc, offset.getType(), offset,
+      builder.create<IREE::VM::ConstI64Op>(loc, scale));
+}
+
 struct BufferLoadOpConversion
     : public OpConversionPattern<IREE::Util::BufferLoadOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -224,27 +232,33 @@ struct BufferLoadOpConversion
       } else if (integerType.isInteger(16)) {
         if (integerType.isSigned() || integerType.isSignless()) {
           rewriter.replaceOpWithNewOp<IREE::VM::BufferLoadI16SOp>(
-              loadOp, newType, adaptor.getSource(), byteOffset);
+              loadOp, newType, adaptor.getSource(),
+              unscaleOffset(loadOp.getLoc(), byteOffset, 2, rewriter));
         } else {
           rewriter.replaceOpWithNewOp<IREE::VM::BufferLoadI16UOp>(
-              loadOp, newType, adaptor.getSource(), byteOffset);
+              loadOp, newType, adaptor.getSource(),
+              unscaleOffset(loadOp.getLoc(), byteOffset, 2, rewriter));
         }
       } else if (integerType.isInteger(32)) {
         rewriter.replaceOpWithNewOp<IREE::VM::BufferLoadI32Op>(
-            loadOp, newType, adaptor.getSource(), byteOffset);
+            loadOp, newType, adaptor.getSource(),
+            unscaleOffset(loadOp.getLoc(), byteOffset, 4, rewriter));
       } else if (integerType.isInteger(64)) {
         rewriter.replaceOpWithNewOp<IREE::VM::BufferLoadI64Op>(
-            loadOp, newType, adaptor.getSource(), byteOffset);
+            loadOp, newType, adaptor.getSource(),
+            unscaleOffset(loadOp.getLoc(), byteOffset, 8, rewriter));
       } else {
         return rewriter.notifyMatchFailure(
             loadOp, "invalid integer buffer element type");
       }
     } else if (oldType.isF32()) {
       rewriter.replaceOpWithNewOp<IREE::VM::BufferLoadF32Op>(
-          loadOp, newType, adaptor.getSource(), byteOffset);
+          loadOp, newType, adaptor.getSource(),
+          unscaleOffset(loadOp.getLoc(), byteOffset, 4, rewriter));
     } else if (oldType.isF64()) {
       rewriter.replaceOpWithNewOp<IREE::VM::BufferLoadF64Op>(
-          loadOp, newType, adaptor.getSource(), byteOffset);
+          loadOp, newType, adaptor.getSource(),
+          unscaleOffset(loadOp.getLoc(), byteOffset, 8, rewriter));
     } else {
       return rewriter.notifyMatchFailure(loadOp,
                                          "invalid float buffer element type");
@@ -270,19 +284,29 @@ struct BufferStoreOpConversion
           storeOp, adaptor.getTarget(), byteOffset, adaptor.getSource());
     } else if (oldType.isInteger(16)) {
       rewriter.replaceOpWithNewOp<IREE::VM::BufferStoreI16Op>(
-          storeOp, adaptor.getTarget(), byteOffset, adaptor.getSource());
+          storeOp, adaptor.getTarget(),
+          unscaleOffset(storeOp.getLoc(), byteOffset, 2, rewriter),
+          adaptor.getSource());
     } else if (oldType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::BufferStoreI32Op>(
-          storeOp, adaptor.getTarget(), byteOffset, adaptor.getSource());
+          storeOp, adaptor.getTarget(),
+          unscaleOffset(storeOp.getLoc(), byteOffset, 4, rewriter),
+          adaptor.getSource());
     } else if (oldType.isInteger(64)) {
       rewriter.replaceOpWithNewOp<IREE::VM::BufferStoreI64Op>(
-          storeOp, adaptor.getTarget(), byteOffset, adaptor.getSource());
+          storeOp, adaptor.getTarget(),
+          unscaleOffset(storeOp.getLoc(), byteOffset, 8, rewriter),
+          adaptor.getSource());
     } else if (oldType.isF32()) {
       rewriter.replaceOpWithNewOp<IREE::VM::BufferStoreF32Op>(
-          storeOp, adaptor.getTarget(), byteOffset, adaptor.getSource());
+          storeOp, adaptor.getTarget(),
+          unscaleOffset(storeOp.getLoc(), byteOffset, 4, rewriter),
+          adaptor.getSource());
     } else if (oldType.isF64()) {
       rewriter.replaceOpWithNewOp<IREE::VM::BufferStoreF64Op>(
-          storeOp, adaptor.getTarget(), byteOffset, adaptor.getSource());
+          storeOp, adaptor.getTarget(),
+          unscaleOffset(storeOp.getLoc(), byteOffset, 8, rewriter),
+          adaptor.getSource());
     } else {
       return rewriter.notifyMatchFailure(storeOp,
                                          "invalid buffer element type");
