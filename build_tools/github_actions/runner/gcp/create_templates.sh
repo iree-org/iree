@@ -24,6 +24,7 @@ GPU_IMAGE="github-runner-gpu-2022-08-15-1660603500"
 # TODO(gcmn): Shrink the image and disk size.
 GPU_DISK_SIZE_GB=1000
 CPU_IMAGE="github-runner-cpu-2022-09-22-1663865258"
+# The image is only 10GB, but we need some space for Docker images and such.
 CPU_DISK_SIZE_GB=100
 
 if (( TESTING==0 )); then
