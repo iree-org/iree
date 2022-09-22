@@ -141,7 +141,8 @@ static iree_status_t iree_hal_executable_library_run(
   // Register the loader used to load (or find) the executable.
   iree_hal_executable_loader_t* executable_loader = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_create_executable_loader_by_name(
-      iree_make_cstring_view(FLAG_executable_format), host_allocator,
+      iree_make_cstring_view(FLAG_executable_format),
+      iree_hal_executable_import_provider_default(), host_allocator,
       &executable_loader));
 
   // Setup the specification used to perform the executable load.
