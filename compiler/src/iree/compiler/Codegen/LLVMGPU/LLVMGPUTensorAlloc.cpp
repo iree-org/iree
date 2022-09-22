@@ -111,7 +111,7 @@ struct LLVMGPUTensorAllocPass
         if (failed(ret)) {
           return signalPassFailure();
         }
-        Value v = ret.getValue();
+        Value v = ret.value();
         operand->set(v);
       }
     }

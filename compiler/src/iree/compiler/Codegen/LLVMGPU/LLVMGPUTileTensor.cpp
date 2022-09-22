@@ -148,7 +148,7 @@ struct LLVMGPUTileTensorPass
     if (!isEntryPoint(funcOp)) return;
 
     auto workgroupSize = llvm::to_vector<4>(llvm::map_range(
-        getEntryPoint(funcOp)->getWorkgroupSize().getValue(),
+        getEntryPoint(funcOp)->getWorkgroupSize().value(),
         [&](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
     if (failed(tileParallelDims(funcOp, workgroupSize, distributeToWarp))) {
       return signalPassFailure();

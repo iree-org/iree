@@ -121,7 +121,7 @@ struct ConvertVectorContractOp final
   LogicalResult matchAndRewrite(
       vector::ContractionOp contractOp, OpAdaptor operands,
       ConversionPatternRewriter &rewriter) const override {
-    if (!llvm::empty(contractOp.getMasks())) return failure();
+    if (!contractOp.getMasks().empty()) return failure();
 
     // Check that this is a matmul operation.
     auto iterators = contractOp.getIteratorTypes().getValue();
