@@ -34,6 +34,10 @@ def parse_arguments():
                       required=True,
                       metavar="<output-file>",
                       help="Output file path")
+  parser.add_argument("--unpack",
+                      action='store_true',
+                      default=False,
+                      help="Unpack the downloaded file if it's an archive.")
   return parser.parse_args()
 
 
@@ -50,24 +54,26 @@ def main(args):
           f"Failed to download file with status {response.status} {response.msg}"
       )
 
-    if args.source_url.endswith(".tar.gz"):
-      # Open tar.gz in the streaming mode.
-      with tarfile.open(fileobj=response, mode="r|*") as tar_file:
-        if os.path.exists(args.output):
-          shutil.rmtree(args.output)
-        os.makedirs(args.output)
-        tar_file.extractall(args.output)
+    if args.unpack:
+      if args.source_url.endswith(".tar.gz"):
+        # Open tar.gz in the streaming mode.
+        with tarfile.open(fileobj=response, mode="r|*") as tar_file:
+          if os.path.exists(args.output):
+            shutil.rmtree(args.output)
+          os.makedirs(args.output)
+          tar_file.extractall(args.output)
+        return
+      elif args.source_url.endswith(".gz"):
+        # Open gzip from a file-like object, which will be in the streaming mode.
+        with gzip.open(filename=response, mode="rb") as input_file:
+          with open(args.output, "wb") as output_file:
+            shutil.copyfileobj(input_file, output_file)
+        return
 
-    elif args.source_url.endswith(".gz"):
-      # Open gzip from a file-like object, which will be in the streaming mode.
-      with gzip.open(filename=response, mode="rb") as input_file:
-        with open(args.output, "wb") as output_file:
-          shutil.copyfileobj(input_file, output_file)
-
-    else:
-      with open(args.output, "wb") as output_file:
-        # Streaming copy.
-        shutil.copyfileobj(response, output_file)
+    # Fallback to download the file only.
+    with open(args.output, "wb") as output_file:
+      # Streaming copy.
+      shutil.copyfileobj(response, output_file)
 
 
 if __name__ == "__main__":
