@@ -370,9 +370,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToROCDLPass();
 
 /// Perform tiling and distribution to threads.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTileAndDistribute(
-    bool distributeToWarp = false,
-    GPUPromoteSharedMemPattern promoteSharedMemPattern =
-        GPUPromoteSharedMemPattern::ContractionOpPattern);
+    bool distributeToWarp = false);
 
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTileTensor(
     bool distributeToWarp = false);
