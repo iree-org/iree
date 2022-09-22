@@ -455,11 +455,11 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack",[
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let assemblyFormat = [{
     attr-dict
-    `ins` `(` $inputs `:` type($inputs) `)`
-    `outs` `(` $outputs `:` type($outputs) `)` 
+    $inputs 
     `inner_tiles`
     custom<DynamicIndexList>($inner_tiles, $static_inner_tiles,
                              "ShapedType::kDynamicStrideOrOffset")
+    `into` $outputs `:` `(` type($inputs) type($outputs) `)`
      (`->` type($results)^)?
   }];
 
