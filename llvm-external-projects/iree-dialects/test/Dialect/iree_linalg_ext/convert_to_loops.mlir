@@ -778,8 +778,8 @@ func.func @NC_to_NCnc(%arg0: memref<128x256xf32>, %arg1: memref<4x8x32x32xf32>) 
 // CHECK:   scf.for %[[C:.*]] = %[[lb]] to %[[ubC]] step %[[step]] {
 // CHECK:     scf.for %[[n:.*]] = %[[lb]] to %[[block]] step %[[step]] {
 // CHECK:       scf.for %[[c:.*]] = %[[lb]] to %[[block]] step %[[step]] {
-// CHECK:         %[[applyMapI:.*]] = affine.apply #[[MAP]](%[[N]], %[[n]])
-// CHECK:         %[[applyMapJ:.*]] = affine.apply #[[MAP]](%[[C]], %[[c]])
+// CHECK-DAG:         %[[applyMapI:.*]] = affine.apply #[[MAP]](%[[N]], %[[n]])
+// CHECK-DAG:         %[[applyMapJ:.*]] = affine.apply #[[MAP]](%[[C]], %[[c]])
 // CHECK:         %[[scalar:.*]] = memref.load %arg0[%[[applyMapI]], %[[applyMapJ]]] : memref<128x256xf32>
 // CHECK:         memref.store %[[scalar]], %arg1[%[[N]], %[[C]], %[[n]], %[[c]]] : memref<4x8x32x32xf32>
 // CHECK:       }
@@ -789,27 +789,27 @@ func.func @NC_to_NCnc(%arg0: memref<128x256xf32>, %arg1: memref<4x8x32x32xf32>) 
 
 // -----
 
-// TODO: not too convinced. Memref op should not have results IMO.
-//func.func @KC_to_KCck(%arg0: memref<128x256xf32>, %arg1: memref<8x4x32x32xf32>) -> memref<8x4x32x32xf32> {
-//  %0 = iree_linalg_ext.pack %arg0 inner_tiles [32, 32] : memref<128x256xf32> to memref<8x4x32x32xf32>
-//  return %0 : memref<8x4x32x32xf32>
-//}
+func.func @KC_to_KCck(%arg0: memref<128x256xf32>, %arg1: memref<8x4x32x32xf32>) -> memref<8x4x32x32xf32> {
+  iree_linalg_ext.pack %arg0 inner_tiles [32, 32] interchange = [0, 1, 3, 2] into %arg1 : (memref<128x256xf32> memref<8x4x32x32xf32>)
+  return %arg1 : memref<8x4x32x32xf32>
+}
 
-// TODO-LABEL: func.func @KC_to_KCck(
-// TODO-DAG: %[[lb:.*]] = arith.constant 0 : index
-// TODO-DAG: %[[ubK:.*]] = arith.constant 8 : index
-// TODO-DAG: %[[step:.*]] = arith.constant 1 : index
-// TODO-DAG: %[[ubC:.*]] = arith.constant 4 : index
-// TODO-DAG: %[[block:.*]] = arith.constant 32 : index
-// TODO: scf.for %[[K:.*]] = %[[lb]] to %[[ubK]] step %[[step]] {
-// TODO:   scf.for %[[C:.*]] = %[[lb]] to %[[ubC]] step %[[step]] {
-// TODO:     scf.for %[[c:.*]] = %[[lb]] to %[[block]] step %[[step]] {
-// TODO:       scf.for %[[k:.*]] = %[[lb]] to %[[block]] step %[[step]] {
-// TODO:         %[[applyMapI:.*]] = affine.apply #[[MAP]](%[[C]], %[[c]])
-// TODO:         %[[applyMapJ:.*]] = affine.apply #[[MAP]](%[[K]], %[[k]])
-// TODO:         %[[scalar]] = memref.load %arg0[%[[applyMapI]], %[[applyMapJ]]] : memref<128x256xf32>
-// TODO:         memref.store %[[scalar]], %arg1[%[[K]], %[[C]], %[[c]], %[[k]]] : memref<8x4x32x32xf32>          
-// TODO:       }
-// TODO:     }
-// TODO:   }
-// TODO: }
+// CHECK: #[[MAP:.*]] = affine_map<(d0, d1) -> (d0 * 32 + d1)>
+// CHECK-LABEL: func.func @KC_to_KCck(
+// CHECK-DAG: %[[lb:.*]] = arith.constant 0 : index
+// CHECK-DAG: %[[ubK:.*]] = arith.constant 8 : index
+// CHECK-DAG: %[[step:.*]] = arith.constant 1 : index
+// CHECK-DAG: %[[ubC:.*]] = arith.constant 4 : index
+// CHECK-DAG: %[[block:.*]] = arith.constant 32 : index
+// CHECK: scf.for %[[K:.*]] = %[[lb]] to %[[ubK]] step %[[step]] {
+// CHECK:   scf.for %[[C:.*]] = %[[lb]] to %[[ubC]] step %[[step]] {
+// CHECK:     scf.for %[[c:.*]] = %[[lb]] to %[[block]] step %[[step]] {
+// CHECK:       scf.for %[[k:.*]] = %[[lb]] to %[[block]] step %[[step]] {
+// CHECK-DAG:         %[[applyMapC:.*]] = affine.apply #[[MAP]](%[[C]], %[[c]])
+// CHECK-DAG:         %[[applyMapK:.*]] = affine.apply #[[MAP]](%[[K]], %[[k]])
+// CHECK:         %[[scalar]] = memref.load %arg0[%[[applyMapK]], %[[applyMapC]]] : memref<128x256xf32>
+// CHECK:         memref.store %[[scalar]], %arg1[%[[K]], %[[C]], %[[c]], %[[k]]] : memref<8x4x32x32xf32>          
+// CHECK:       }
+// CHECK:     }
+// CHECK:   }
+// CHECK: }

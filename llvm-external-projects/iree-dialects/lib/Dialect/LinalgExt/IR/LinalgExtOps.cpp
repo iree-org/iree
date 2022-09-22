@@ -1511,6 +1511,30 @@ SmallVector<OpFoldResult> PackOp::buildOutputShape(OpBuilder &builder) {
       [&](size_t dimIdx) { return buildOutputDim(builder, dimIdx); }));
 }
 
+// TODO: copy and pasted from LinalgTransformOps.cpp
+/// Extracts a vector of unsigned from an array attribute. Asserts if the
+/// attribute contains values other than intergers. May truncate.
+static SmallVector<unsigned> extractUIntArray(ArrayAttr attr) {
+  SmallVector<unsigned> result;
+  result.reserve(attr.size());
+  for (APInt value : attr.getAsValueRange<IntegerAttr>())
+    result.push_back(value.getZExtValue());
+  return result;
+}
+
+template <typename T>
+SmallVector<T> interchangeLoops(ArrayRef<T> loops,
+                                ArrayRef<unsigned> interchangeVector) {
+  SmallVector<T> rearrangedLoops = llvm::to_vector(loops);
+  if (interchangeVector.empty())
+    return rearrangedLoops;
+  assert(rearrangedLoops.size() == interchangeVector.size() &&
+         "number of loops must equal number of permutations");
+  for (int idx = 0, end = interchangeVector.size(); idx < end; idx++)
+    rearrangedLoops[interchangeVector[idx]] = loops[idx];
+  return rearrangedLoops;
+}
+
 // Implements `getIterationDomain` from the tiling interface.
 SmallVector<Range> PackOp::getIterationDomain(OpBuilder &builder) {
   int64_t outputRank = getInputRank() * 2;
@@ -1528,13 +1552,24 @@ SmallVector<Range> PackOp::getIterationDomain(OpBuilder &builder) {
     loopBounds[dim].stride = one;
     loopBounds[dim].size = upperBounds[dim];
   }
-  return loopBounds;
+  auto interchangeVector = getIteratorInterchange();
+  if (!interchangeVector)
+    return loopBounds;
+  return interchangeLoops<Range>(loopBounds,
+                                 extractUIntArray(*interchangeVector));
 }
 
 // Implements `getIterationDomain` from the tiling interface.
 LogicalResult PackOp::generateScalarImplementation(OpBuilder &builder,
                                                    Location loc,
                                                    ValueRange ivs) {
+  SmallVector<Value> interchangedIvs = ivs;
+  auto interchangeVector = getIteratorInterchange();
+  if (interchangeVector) {
+    interchangedIvs = interchangeLoops<Value>(
+        interchangedIvs, extractUIntArray(*interchangeVector));
+  }
+
   SmallVector<OpFoldResult> innerTiles = getMixedInnerTiles();
   SmallVector<OpFoldResult> sourceIndices;
   for (auto dim : llvm::seq<int64_t>(0, getInputRank())) {
@@ -1546,7 +1581,8 @@ LogicalResult PackOp::generateScalarImplementation(OpBuilder &builder,
     bindSymbols(builder.getContext(), t);
     OpFoldResult sourceIndex = makeComposedFoldedAffineApply(
         builder, loc, i * t + j,
-        ArrayRef<OpFoldResult>{ivs[dim], ivs[dim + getInputRank()],
+        ArrayRef<OpFoldResult>{interchangedIvs[dim],
+                               interchangedIvs[dim + getInputRank()],
                                innerTiles[dim]});
     sourceIndices.push_back(sourceIndex);
   }
