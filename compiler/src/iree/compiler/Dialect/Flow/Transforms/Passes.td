@@ -66,6 +66,10 @@ def DispatchLinalgOnTensors :
     InterfacePass<"iree-flow-dispatch-linalg-on-tensors-pass", "mlir::FunctionOpInterface"> {
   let summary = "Dispatch Linalg operations on tensors by using tile and distribute";
   let constructor = "mlir::iree_compiler::IREE::Flow::createDispatchLinalgOnTensorsPass()";
+  let options = [
+    Option<"aggressiveFusion", "aggressive-fusion", "bool",
+           /*default=*/"false", "Fuse with aggressive heuristics">,
+  ];
 }
 
 def DispatchLinalgOnTensorsViaRegionOps :

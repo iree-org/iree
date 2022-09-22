@@ -273,8 +273,11 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
                          })
       // Only want use the transform dialect for some dispatch regions and let
       // the DispatchLinalgOnTensorsPass handle the rest.
-      .addPredicatedPass(!clDispatchViaRegionOps,
-                         createDispatchLinalgOnTensorsPass)
+      .addPredicatedPass(
+          !clDispatchViaRegionOps,
+          []() {
+            return createDispatchLinalgOnTensorsPass(clEnableAggressiveFusion);
+          })
       // DispatchLinalgOnTensorsViaRegionsPass is a variant of
       // DispatchLinalgOnTensorsPass that lowers via DispatchRegionOps. This is
       // on an opt-in basis until the pass is stable enough to replace
