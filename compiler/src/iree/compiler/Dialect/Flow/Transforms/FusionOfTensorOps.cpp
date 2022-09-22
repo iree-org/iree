@@ -104,21 +104,25 @@ struct FuseElementwiseOpsWithMultipleUses
     if (!consumerMarker) return failure();
 
     auto fusedOperandIt =
-        llvm::find_if(consumerOp->getOpOperands(), [](OpOperand &operand) {
+        llvm::find_if(consumerOp->getOpOperands(), [&](OpOperand &operand) {
           Operation *operandProducer = operand.get().getDefiningOp();
           if (!operandProducer) return false;
           auto producerMarker = operandProducer->getAttrOfType<IntegerAttr>(
               getProducerAttributeName());
           if (!producerMarker) return false;
-          return true;
+          return consumerMarker.getValue() == producerMarker.getValue();
         });
-    if (fusedOperandIt == consumerOp->getOpOperands().end()) {
-      return rewriter.notifyMatchFailure(consumerOp, "failed to get producer");
-    }
+    assert(fusedOperandIt != consumerOp->getOpOperands().end() &&
+           "expected to find the fusable producer");
     OpOperand *fusedOperand = fusedOperandIt;
     assert(linalg::areElementwiseOpsFusable(fusedOperand) &&
            "expected producer and consumer to be fusable");
     Operation *producerOp = fusedOperand->get().getDefiningOp();
+
+    // Cleanup the markers.
+    consumerOp->removeAttr(getConsumerAttributeName());
+    producerOp->removeAttr(getProducerAttributeName());
+
     FailureOr<Operation *> fusedOperation =
         linalg::fuseElementwiseOps(rewriter, fusedOperand);
     if (failed(fusedOperation)) {

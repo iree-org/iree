@@ -121,3 +121,42 @@ func.func @batchnorm_training(%10 : tensor<12xf32>, %11 : tensor<12x12x12x12x12x
 //  CHECK-SAME:       ins(%[[ARG0]], %[[GENERIC0]] :
 //  CHECK-SAME:       outs(%[[INIT]], %[[INIT]], %[[INIT]] :
 //       CHECK:   return %[[GENERIC1]]#0, %[[GENERIC1]]#1, %[[GENERIC1]]#2
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+module {
+  func.func @fuse_only_with_same_marker(%arg0: tensor<5x5xf32>, %arg1: tensor<5x5xf32>) -> (tensor<5x5xf32>, tensor<5x5xf32>, tensor<5x5xf32>, tensor<5x5xf32>) {
+    %cst = arith.constant 1.000000e+00 : f32
+    %cst_0 = arith.constant 2.000000e+00 : f32
+    %cst_1 = arith.constant 3.000000e+00 : f32
+    %0 = linalg.init_tensor [5, 5] : tensor<5x5xf32>
+    %1 = linalg.init_tensor [5, 5] : tensor<5x5xf32>
+    %2 = linalg.init_tensor [5, 5] : tensor<5x5xf32>
+    %3 = linalg.init_tensor [5, 5] : tensor<5x5xf32>
+    %4 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%arg0 : tensor<5x5xf32>) outs(%0 : tensor<5x5xf32>) {
+    ^bb0(%arg2: f32, %arg3: f32):
+      %8 = arith.addf %arg2, %cst : f32
+      linalg.yield %8 : f32
+    } -> tensor<5x5xf32>
+    %5 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%arg1 : tensor<5x5xf32>) outs(%1 : tensor<5x5xf32>) {
+    ^bb0(%arg2: f32, %arg3: f32):
+      %8 = arith.subf %arg2, %cst_0 : f32
+      linalg.yield %8 : f32
+    } -> tensor<5x5xf32>
+    %6 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%4 : tensor<5x5xf32>) outs(%2 : tensor<5x5xf32>) {
+    ^bb0(%arg2: f32, %arg3: f32):
+      %8 = arith.addf %arg2, %cst_1 : f32
+      linalg.yield %8 : f32
+    } -> tensor<5x5xf32>
+    %7 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel", "parallel"]} ins(%4, %5 : tensor<5x5xf32>, tensor<5x5xf32>) outs(%3 : tensor<5x5xf32>) {
+    ^bb0(%arg2: f32, %arg3: f32, %arg4: f32):
+      %8 = arith.subf %arg2, %arg3 : f32
+      linalg.yield %8 : f32
+    } -> tensor<5x5xf32>
+    return %4, %5, %6, %7 : tensor<5x5xf32>, tensor<5x5xf32>, tensor<5x5xf32>, tensor<5x5xf32>
+  }
+}
+// CHECK-LABEL: func.func @fuse_only_with_same_marke
+// CHECK:         linalg.generic
+// CHECK-NOT:     linalg.generic
