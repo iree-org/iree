@@ -9,7 +9,6 @@ The rules will build required artifacts to run benchmarks.
 """
 
 from dataclasses import dataclass
-import itertools
 from typing import List, Optional, Sequence
 import os
 import pathlib
