@@ -19,6 +19,8 @@ namespace HAL {
 struct VulkanSPIRVTargetOptions {
   // Vulkan target environment as #vk.target_env attribute assembly.
   std::string vulkanTargetEnv;
+  // Vulkan indexing bits.
+  int vulkanIndexingBits;
   // Vulkan target triple.
   std::string vulkanTargetTriple;
 };

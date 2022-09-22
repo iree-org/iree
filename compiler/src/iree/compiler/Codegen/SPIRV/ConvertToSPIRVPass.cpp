@@ -184,11 +184,17 @@ struct HALInterfaceLoadConstantConverter final
     uint64_t elementCount = layoutAttr.getPushConstants();
     unsigned index = loadOp.getIndex().getZExtValue();
 
-    // The following function generates SPIR-V ops with i32 types. So it does
-    // type "conversion" (index -> i32) implicitly.
     auto i32Type = rewriter.getIntegerType(32);
     auto value = spirv::getPushConstantValue(loadOp, elementCount, index,
                                              i32Type, rewriter);
+
+    // Casting if Indexing type not i32.
+    auto &typeConverter = *getTypeConverter<SPIRVTypeConverter>();
+    auto indexType = typeConverter.getIndexType();
+    if (indexType != i32Type) {
+      value =
+          rewriter.create<spirv::UConvertOp>(value.getLoc(), indexType, value);
+    }
 
     rewriter.replaceOp(loadOp, value);
     return success();
@@ -209,8 +215,19 @@ struct HALInterfaceWorkgroupIdAndCountConverter final
     auto i32Type = rewriter.getIntegerType(32);
     Value spirvBuiltin =
         spirv::getBuiltinVariableValue(op, builtin, i32Type, rewriter);
-    rewriter.replaceOpWithNewOp<spirv::CompositeExtractOp>(
-        op, i32Type, spirvBuiltin, rewriter.getI32ArrayAttr({index}));
+    Value spirvId = rewriter.create<spirv::CompositeExtractOp>(
+        spirvBuiltin.getLoc(), i32Type, spirvBuiltin,
+        rewriter.getI32ArrayAttr({index}));
+
+    // Casting if Indexing type not i32.
+    auto &typeConverter =
+        *this->template getTypeConverter<SPIRVTypeConverter>();
+    auto indexType = typeConverter.getIndexType();
+    if (indexType != i32Type) {
+      spirvId = rewriter.create<spirv::UConvertOp>(spirvId.getLoc(), indexType,
+                                                   spirvId);
+    }
+    rewriter.replaceOp(op, spirvId);
     return success();
   }
 };
@@ -324,13 +341,25 @@ class ConvertToSPIRVPass : public ConvertToSPIRVBase<ConvertToSPIRVPass> {
     registry.insert<spirv::SPIRVDialect>();
   }
 
-  explicit ConvertToSPIRVPass(bool enableFastMath)
-      : enableFastMath(enableFastMath) {}
+  explicit ConvertToSPIRVPass(bool enableFastMath, bool use64bitIndex)
+      : enableFastMath(enableFastMath), use64bitIndex(use64bitIndex) {}
+
+  LogicalResult initializeOptions(StringRef options) override {
+    if (failed(Pass::initializeOptions(options))) return failure();
+    // Use pass option if present.
+    enableFastMath |= enableFastMathOption;
+    use64bitIndex |= use64bitIndexOption;
+    return success();
+  }
 
   void runOnOperation() override;
 
  private:
+  // Enable fast math when doing type conversion by assuming no NaN or infinite
+  // values.
   bool enableFastMath;
+  // Use 64 bits for index widths.
+  bool use64bitIndex;
 };
 }  // namespace
 
@@ -378,6 +407,10 @@ void ConvertToSPIRVPass::runOnOperation() {
 
   SPIRVConversionOptions options = {};
   options.enableFastMathMode = this->enableFastMath;
+  spirv::TargetEnv targetEnv(targetAttr);
+  options.use64bitIndex =
+      this->use64bitIndex && targetEnv.allows(spirv::Capability::Int64);
+
   SPIRVTypeConverter typeConverter(targetAttr, options);
   // Additionally pull in conversion rules for GPU subgroup MMA ops.
   typeConverter.addConversion([&](gpu::MMAMatrixType type) -> Type {
@@ -481,8 +514,8 @@ void ConvertToSPIRVPass::runOnOperation() {
 //===----------------------------------------------------------------------===//
 
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToSPIRVPass(
-    bool enableFastMath) {
-  return std::make_unique<ConvertToSPIRVPass>(enableFastMath);
+    bool enableFastMath, bool use64bitIndex) {
+  return std::make_unique<ConvertToSPIRVPass>(enableFastMath, use64bitIndex);
 }
 
 }  // namespace iree_compiler

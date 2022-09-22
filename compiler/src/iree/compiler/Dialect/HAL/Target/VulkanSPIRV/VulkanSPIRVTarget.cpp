@@ -48,6 +48,11 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
       "iree-vulkan-target-triple", llvm::cl::desc("Vulkan target triple"),
       llvm::cl::init("unknown-unknown-unknown"));
 
+  static llvm::cl::opt<int> clVulkanIndexingBits(
+      "iree-vulkan-index-bits",
+      llvm::cl::desc("Set the bit width of indices in Vulkan."),
+      llvm::cl::init(32));
+
   static llvm::cl::opt<std::string> clVulkanTargetEnv(
       "iree-vulkan-target-env",
       llvm::cl::desc(
@@ -56,6 +61,7 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
 
   VulkanSPIRVTargetOptions targetOptions;
   targetOptions.vulkanTargetEnv = clVulkanTargetEnv;
+  targetOptions.vulkanIndexingBits = clVulkanIndexingBits;
   targetOptions.vulkanTargetTriple = clVulkanTargetTriple;
 
   return targetOptions;
@@ -120,7 +126,13 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     // files we could use spirv-link or import them into MLIR and merge here).
     if (variantOp.isExternal()) return;
 
-    buildSPIRVCodegenPassPipeline(passManager, /*enableFastMath=*/false);
+    // We cannot do translation for index widths other than 32 and 64.
+    if (options_.vulkanIndexingBits != 32 && options_.vulkanIndexingBits != 64)
+      return;
+
+    buildSPIRVCodegenPassPipeline(
+        passManager, /*enableFastMath=*/false,
+        /*use64bitIndex=*/options_.vulkanIndexingBits == 64);
   }
 
   LogicalResult serializeExecutable(const SerializationOptions &options,

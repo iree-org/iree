@@ -1,4 +1,5 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-convert-to-spirv))))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-convert-to-spirv{use-64bit-index=true}))))' %s | FileCheck %s --check-prefix=INDEX64
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 5, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -8,7 +9,7 @@
 ]>
 hal.executable private @push_constant {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
-      spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Shader], []>, #spirv.resource_limits<>>}> {
+      spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Int64, Shader], []>, #spirv.resource_limits<>>}> {
     hal.executable.export @push_constant layout(#pipeline_layout) attributes {
       workgroup_size = [32: index, 1: index, 1: index]
     }
@@ -22,6 +23,12 @@ hal.executable private @push_constant {
         // CHECK: %[[ADDR:.+]] = spirv.mlir.addressof @__push_constant_var__ : !spirv.ptr<!spirv.struct<(!spirv.array<5 x i32, stride=4> [0])>, PushConstant>
         // CHECK: %[[AC:.+]] = spirv.AccessChain %[[ADDR]][%[[INDEX_0]], %[[INDEX_1]]] : !spirv.ptr<!spirv.struct<(!spirv.array<5 x i32, stride=4> [0])>, PushConstant>
         // CHECK: spirv.Load "PushConstant" %[[AC]] : i32
+        // INDEX64-DAG: %[[INDEX_0:.+]] = spirv.Constant 0 : i32
+        // INDEX64-DAG: %[[INDEX_1:.+]] = spirv.Constant 2 : i32
+        // INDEX64: %[[ADDR:.+]] = spirv.mlir.addressof @__push_constant_var__ : !spirv.ptr<!spirv.struct<(!spirv.array<5 x i32, stride=4> [0])>, PushConstant>
+        // INDEX64: %[[AC:.+]] = spirv.AccessChain %[[ADDR]][%[[INDEX_0]], %[[INDEX_1]]] : !spirv.ptr<!spirv.struct<(!spirv.array<5 x i32, stride=4> [0])>, PushConstant>
+        // INDEX64: %[[LOAD:.+]] = spirv.Load "PushConstant" %[[AC]] : i32
+        // INDEX64: spirv.UConvert %[[LOAD]] : i32 to i64
         %0 = hal.interface.constant.load[2] : index
         return %0 : index
       }
@@ -246,7 +253,7 @@ hal.executable private @interface_wg_id {
 ]>
 hal.executable private @interface_wg_count {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
-      spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Shader], []>, #spirv.resource_limits<>>}> {
+      spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Int64, Shader], []>, #spirv.resource_limits<>>}> {
     hal.executable.export @interface_wg_count layout(#pipeline_layout) attributes {
       workgroup_size = [32: index, 1: index, 1: index]
     }
@@ -269,3 +276,13 @@ hal.executable private @interface_wg_count {
 //       CHECK:     %[[ADDR2:.+]] = spirv.mlir.addressof @[[WGCOUNT]]
 //       CHECK:     %[[VAL2:.+]] = spirv.Load "Input" %[[ADDR2]]
 //       CHECK:     %[[WGIDY:.+]] = spirv.CompositeExtract %[[VAL2]][1 : i32]
+//   INDEX64-DAG:   spirv.GlobalVariable @[[WGCOUNT:.+]] built_in("NumWorkgroups")
+//       INDEX64:   spirv.func
+//       INDEX64:     %[[ADDR1:.+]] = spirv.mlir.addressof @[[WGCOUNT]]
+//       INDEX64:     %[[VAL1:.+]] = spirv.Load "Input" %[[ADDR1]]
+//       INDEX64:     %[[WGIDX:.+]] = spirv.CompositeExtract %[[VAL1]][0 : i32]
+//       INDEX64:     %[[WGXEXT:.+]] = spirv.UConvert %[[WGIDX]] : i32 to i64
+//       INDEX64:     %[[ADDR2:.+]] = spirv.mlir.addressof @[[WGCOUNT]]
+//       INDEX64:     %[[VAL2:.+]] = spirv.Load "Input" %[[ADDR2]]
+//       INDEX64:     %[[WGIDY:.+]] = spirv.CompositeExtract %[[VAL2]][1 : i32]
+//       INDEX64:     %[[WGYEXT:.+]] = spirv.UConvert %[[WGIDY]] : i32 to i64

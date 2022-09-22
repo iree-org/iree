@@ -499,6 +499,12 @@ def LLVMGPUTensorPad :
 def ConvertToSPIRV : Pass<"iree-convert-to-spirv", "ModuleOp"> {
   let summary = "Perform the final conversion to SPIR-V dialect";
   let constructor = "mlir::iree_compiler::createConvertToSPIRVPass()";
+  let options = [
+    Option<"enableFastMathOption", "enable-fast-math", "bool", /*default=*/"false",
+          "Enable fast math mode during type conversion (i.e. assume no NaN/infinity)">,
+    Option<"use64bitIndexOption", "use-64bit-index", "bool", /*default=*/"false",
+          "Set the bit width of indices to 64 bits">,
+  ];
 }
 
 def SPIRVVectorToGPUSubgroupMMA :
