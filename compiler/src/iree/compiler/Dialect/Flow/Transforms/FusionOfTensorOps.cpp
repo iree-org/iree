@@ -101,7 +101,7 @@ struct FuseElementwiseOpsWithMultipleUses
                                 PatternRewriter &rewriter) const override {
     // Check and cleanup the consumer marker.
     auto consumerMarker =
-        consumerOp->removeAttr(getConsumerAttributeName()).cast<IntegerAttr>();
+        consumerOp->getAttrOfType<IntegerAttr>(getConsumerAttributeName());
     if (!consumerMarker) return failure();
 
     auto fusedOperandIt =
@@ -120,7 +120,8 @@ struct FuseElementwiseOpsWithMultipleUses
            "expected producer and consumer to be fusable");
     Operation *producerOp = fusedOperand->get().getDefiningOp();
 
-    // Cleanup the producer marker.
+    // Cleanup the markers.
+    consumerOp->removeAttr(getConsumerAttributeName());
     producerOp->removeAttr(getProducerAttributeName());
 
     FailureOr<Operation *> fusedOperation =
