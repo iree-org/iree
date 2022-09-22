@@ -465,27 +465,44 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack",[
 
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
 
+    // Return the output operand `destination`.
     Value getOutput() {
       return getOutputOperand(0)->get();
     }
 
+    // Return the input operand `source`.
     Value getInput() {
       return getInputOperand(0)->get();
     }
 
+    // Return the output rank.
     int64_t getOutputRank() {
       return  getOutput().getType().cast<ShapedType>().getRank();
     }
 
+    // Return the output type.
     ShapedType getOutputType() {
       return getOutput().getType();
     }
 
+    // Return the output shape.
+    ArrayRef<int64_t> getOutputShape() {
+      return getOutputType().cast<ShapedType>().getShape();
+    }
+
+    // Return the rank of the input operand.
     int64_t getInputRank() {
       return getInput().getType().cast<ShapedType>().getRank();
     }
 
+    // Return the tile sizes ad OpFoldResults.
     SmallVector<OpFoldResult> getMixedInnerTiles();
+
+    // Infer and return the shape of the output.
+    SmallVector<OpFoldResult> buildOutputShape(OpBuilder &builder);
+
+    // Build the output position at pos `dimIdx`.
+    OpFoldResult buildOutputDim(OpBuilder &builder, size_t dimIdx);
 
   }];
 }

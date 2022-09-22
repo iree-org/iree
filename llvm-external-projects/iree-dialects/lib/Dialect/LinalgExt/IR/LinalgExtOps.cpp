@@ -1482,6 +1482,7 @@ SmallVector<StringRef> PackOp::getLoopIteratorTypes() {
 // https://mlir.llvm.org/doxygen/TensorInferTypeOpInterfaceImpl_8cpp_source.html
 /// Helper function to convert a vector of `OpFoldResult`s into a vector of
 /// `Value`s.
+// TODO: upstream change: move it to StaticValueUtils.h
 static SmallVector<Value> getAsValues(OpBuilder &b, Location loc,
                                       ArrayRef<OpFoldResult> valueOrAttrVec) {
   return llvm::to_vector<4>(
@@ -1492,27 +1493,25 @@ static SmallVector<Value> getAsValues(OpBuilder &b, Location loc,
 
 // TODO: what if we don't have a full tile?
 // TODO: dynamic support.
-static OpFoldResult getBlockedOutputDimFromInputShape(
-    OpBuilder &builder, Location loc, int64_t dimIdx, Value input,
-    ArrayRef<int64_t> destShape, ArrayRef<OpFoldResult> mixedInnerTiles) {
-  unsigned inputRank = input.getType().cast<ShapedType>().getRank();
-  if (!ShapedType::isDynamic(destShape[dimIdx]))
-    return builder.getI64IntegerAttr(destShape[dimIdx]);
+// Build the output dimension at pos `dimIdx`.
+OpFoldResult PackOp::buildOutputDim(OpBuilder &builder, size_t dimIdx) {
+  unsigned inputRank = getInputRank();
+  ArrayRef<int64_t> outputShape = getOutputShape();
+  if (!ShapedType::isDynamic(outputShape[dimIdx]))
+    return builder.getI64IntegerAttr(outputShape[dimIdx]);
   assert(0 && "dynamic support not yet implemented");
   return nullptr;
 }
 
-static SmallVector<OpFoldResult>
-getOutputShapeFromInputShape(OpBuilder &builder, Location loc, Value input,
-                             ArrayRef<int64_t> destShape,
-                             ArrayRef<OpFoldResult> mixedInnerTiles) {
+// Infer and return the shape of the output as OpFoldResult.
+SmallVector<OpFoldResult> PackOp::buildOutputShape(OpBuilder &builder) {
+  ArrayRef<int64_t> outputShape = getOutputShape();
   return llvm::to_vector(llvm::map_range(
-      llvm::seq<int64_t>(0, destShape.size()), [&](int64_t dimIdx) {
-        return getBlockedOutputDimFromInputShape(builder, loc, dimIdx, input,
-                                                 destShape, mixedInnerTiles);
-      }));
+      llvm::seq<size_t>(0, outputShape.size()),
+      [&](size_t dimIdx) { return buildOutputDim(builder, dimIdx); }));
 }
 
+// Implements `getIterationDomain` from the tiling interface.
 SmallVector<Range> PackOp::getIterationDomain(OpBuilder &builder) {
   int64_t outputRank = getInputRank() * 2;
   SmallVector<Range> loopBounds(outputRank);
@@ -1522,11 +1521,8 @@ SmallVector<Range> PackOp::getIterationDomain(OpBuilder &builder) {
   // step.
   Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
   // upper bound (size of the output tensor).
-  SmallVector<Value> upperBounds = getAsValues(
-      builder, loc,
-      getOutputShapeFromInputShape(
-          builder, loc, getInput(),
-          getOutputType().cast<ShapedType>().getShape(), getMixedInnerTiles()));
+  SmallVector<Value> upperBounds =
+      getAsValues(builder, loc, buildOutputShape(builder));
   for (auto dim : llvm::seq<int64_t>(0, outputRank)) {
     loopBounds[dim].offset = zero;
     loopBounds[dim].stride = one;
@@ -1535,6 +1531,7 @@ SmallVector<Range> PackOp::getIterationDomain(OpBuilder &builder) {
   return loopBounds;
 }
 
+// Implements `getIterationDomain` from the tiling interface.
 LogicalResult PackOp::generateScalarImplementation(OpBuilder &builder,
                                                    Location loc,
                                                    ValueRange ivs) {
