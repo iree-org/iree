@@ -47,7 +47,8 @@ void registerCodegenPasses() {
       "iree-codegen-linalg-to-spirv-pipeline",
       "Runs the progressive lowering pipeline from linalg to SPIR-V",
       [](OpPassManager &passManager) {
-        buildSPIRVCodegenPassPipeline(passManager, /*enableFastMath=*/false);
+        buildSPIRVCodegenPassPipeline(passManager, /*enableFastMath=*/false,
+                                      /*use64bitIndex=*/false);
       });
 
   static PassPipelineRegistration<> LLVMCPULinkingPipeline(
