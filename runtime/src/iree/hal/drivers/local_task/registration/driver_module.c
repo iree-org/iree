@@ -44,7 +44,8 @@ static iree_status_t iree_hal_local_task_driver_factory_try_create(
   iree_hal_executable_loader_t* loaders[8] = {NULL};
   iree_host_size_t loader_count = 0;
   iree_status_t status = iree_hal_create_all_available_executable_loaders(
-      IREE_ARRAYSIZE(loaders), &loader_count, loaders, host_allocator);
+      iree_hal_executable_import_provider_default(), IREE_ARRAYSIZE(loaders),
+      &loader_count, loaders, host_allocator);
 
   iree_task_executor_t* executor = NULL;
   if (iree_status_is_ok(status)) {

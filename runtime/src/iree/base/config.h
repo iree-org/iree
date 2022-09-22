@@ -164,6 +164,13 @@ typedef IREE_DEVICE_SIZE_T iree_device_size_t;
 // Enables optional HAL features. Each of these may add several KB to the final
 // binary when linked dynamically.
 
+// To use an import provider in the built-in CPU drivers define a function like:
+//   iree_hal_executable_import_provider_t my_provider(void) { ... }
+// And define it:
+//   -DIREE_HAL_EXECUTABLE_IMPORT_PROVIDER_DEFAULT_FN=my_provider
+// This will only work for default drivers and otherwise users can explicitly
+// specify the provider when creating the executable loaders themselves.
+
 #if !defined(IREE_HAL_HEAP_BUFFER_ALIGNMENT)
 // Power of two byte alignment required on all host heap buffers.
 // Executables are compiled with alignment expectations and the runtime
