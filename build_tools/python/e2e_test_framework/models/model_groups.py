@@ -7,8 +7,8 @@
 
 from e2e_test_framework.models import tf_models, tflite_models
 
-# Small models on mobile devices.
-MOBILE = [
+# Small models that require less computational resources.
+SMALL = [
     tflite_models.DEEPLABV3_FP32,
     tflite_models.MOBILESSD_FP32,
     tflite_models.POSENET_FP32,
@@ -22,7 +22,7 @@ MOBILE = [
     tflite_models.EFFICIENTNET_INT8,
 ]
 
-# Large models for workstations.
-WORKSTATION = [
+# Large models that require more computational resources.
+LARGE = [
     tf_models.MINILM_L12_H384_UNCASED_INT32_SEQLEN128,
 ]

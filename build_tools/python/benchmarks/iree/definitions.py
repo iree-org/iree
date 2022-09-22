@@ -57,22 +57,11 @@ class Linux_x86_64_Benchmarks(object):
 
     default_run_configs = cls._generate_default_run_configs()
 
-    # Generate compile specs for mobile models.
-    mobile_model_compile_specs = [
+    compile_specs = [
         iree_definitions.CompileSpec(
             compile_config=cls.CASCADELAKE_COMPILE_CONFIG, model=model)
-        for model in model_groups.MOBILE
+        for model in model_groups.SMALL + model_groups.LARGE
     ]
-    # Generate compile specs for workstation models.
-    workstation_model_compile_specs = [
-        iree_definitions.CompileSpec(
-            compile_config=cls.CASCADELAKE_COMPILE_CONFIG, model=model)
-        for model in model_groups.WORKSTATION
-    ]
-
-    # Generate run specs for all models.
-    compile_specs = (mobile_model_compile_specs +
-                     workstation_model_compile_specs)
     run_specs = _generate_run_specs(
         compile_specs=compile_specs,
         run_configs=default_run_configs,
