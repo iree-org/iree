@@ -90,11 +90,7 @@ function(iree_hal_cts_test_suite)
     endif()
 
     if(CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv64" AND
-       CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
-       NOT  _TRANSLATE_FLAGS MATCHES "iree-llvm-target-triple")
-      # RV64 Linux crosscompile toolchain can support iree-compile with
-      # specific CPU flags. Add the llvm flags to support RV64 RVV codegen if
-      # llvm-target-triple is not specified.
+       CMAKE_SYSTEM_NAME STREQUAL "Linux")
       list(APPEND  _TRANSLATE_FLAGS ${RISCV64_TEST_DEFAULT_LLVM_FLAGS})
     endif()
 
