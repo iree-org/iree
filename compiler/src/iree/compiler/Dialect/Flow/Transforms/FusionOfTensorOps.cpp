@@ -125,9 +125,9 @@ struct FuseElementwiseOpsWithMultipleUses
       return rewriter.notifyMatchFailure(consumerOp,
                                          "failed to fuse with producer");
     }
-    assert(fusedOperation.getValue()->getNumResults() ==
+    assert(fusedOperation.value()->getNumResults() ==
            producerOp->getNumResults() + consumerOp->getNumResults());
-    auto fusedResults = fusedOperation.getValue()->getResults();
+    auto fusedResults = fusedOperation.value()->getResults();
     rewriter.replaceOp(producerOp,
                        fusedResults.take_front(producerOp->getNumResults()));
     rewriter.replaceOp(consumerOp,
@@ -158,9 +158,9 @@ static FailureOr<unsigned> fuseMultiUseProducers(Operation *funcOp,
 
     Optional<OpOperand *> fusableUse = getFusableUse(genericOp, dominanceInfo);
     if (!fusableUse) return;
-    if (!linalg::areElementwiseOpsFusable(fusableUse.getValue())) return;
+    if (!linalg::areElementwiseOpsFusable(fusableUse.value())) return;
 
-    Operation *consumer = fusableUse.getValue()->getOwner();
+    Operation *consumer = fusableUse.value()->getOwner();
     genericOp->setAttr(producerAttrName,
                        builder.getI64IntegerAttr(numCandidates));
     consumer->setAttr(consumerAttrName,
@@ -328,7 +328,7 @@ struct FusionOfTensorOpsPass
         FailureOr<unsigned> numOfFusableCandidates =
             fuseMultiUseProducers(funcOp, context, dominanceInfo);
         if (failed(numOfFusableCandidates)) return signalPassFailure();
-        if (numOfFusableCandidates.getValue() == 0) break;
+        if (numOfFusableCandidates.value() == 0) break;
       }
     }
   }

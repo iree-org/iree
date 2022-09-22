@@ -57,7 +57,7 @@ struct CreateFastSlowPath final : public OpRewritePattern<scf::ForOp> {
   LogicalResult matchAndRewrite(scf::ForOp forOp,
                                 PatternRewriter &rewriter) const override {
     // Flow tiled and distributed loops do not carry values.
-    if (!llvm::empty(forOp.getIterOpOperands())) return failure();
+    if (!forOp.getIterOpOperands().empty()) return failure();
     Block *forBody = forOp.getBody(0);
 
     // Find the anchor tensor.pad op, from which we get the conditions for

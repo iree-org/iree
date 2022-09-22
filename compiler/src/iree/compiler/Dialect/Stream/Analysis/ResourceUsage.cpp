@@ -118,7 +118,7 @@ class AbstractResourceUsage
   }
 
   bool isValidState() const override {
-    return this->getAssumed() != DFX::BooleanState::getWorstState() &&
+    return this->getAssumed() != BaseType::getWorstState() &&
            isValidStateBits(this->getAssumed());
   }
 

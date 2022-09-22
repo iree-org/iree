@@ -36,7 +36,7 @@ struct LLVMGPUDistributePass
     if (!isEntryPoint(funcOp)) return;
 
     auto workgroupSize = llvm::to_vector(llvm::map_range(
-        getEntryPoint(funcOp)->getWorkgroupSize().getValue(),
+        getEntryPoint(funcOp)->getWorkgroupSize().value(),
         [&](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
 
     IRRewriter rewriter(funcOp->getContext());

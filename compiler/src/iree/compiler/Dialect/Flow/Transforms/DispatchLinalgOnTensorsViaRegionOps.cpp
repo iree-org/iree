@@ -91,7 +91,7 @@ static LogicalResult simplifyDimOps(RewriterBase &rewriter,
   for (tensor::DimOp dimOp : dimOps) {
     // Only DimOps with static indices are supported.
     Optional<int64_t> idx = dimOp.getConstantIndex();
-    if (!idx.hasValue()) continue;
+    if (!idx.has_value()) continue;
     // Only DimOps with ranked tensors are supported.
     auto tensorType = dimOp.getSource().getType().dyn_cast<RankedTensorType>();
     if (!tensorType) continue;
