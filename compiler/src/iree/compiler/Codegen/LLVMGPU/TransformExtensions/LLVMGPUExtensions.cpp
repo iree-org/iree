@@ -468,7 +468,8 @@ static void warpSyncronizationFn(Location loc, OpBuilder &builder,
 
 static void populateWarpExecuteOnLane0ToScf(
     Operation *target, RewritePatternSet &patterns,
-    vector::WarpExecuteOnLane0LoweringOptions options, PatternBenefit benefit) {
+    const vector::WarpExecuteOnLane0LoweringOptions &options,
+    PatternBenefit benefit) {
   assert(target->hasTrait<OpTrait::IsIsolatedFromAbove>());
   vector::populateWarpExecuteOnLane0OpToScfForPattern(patterns, options,
                                                       benefit);
