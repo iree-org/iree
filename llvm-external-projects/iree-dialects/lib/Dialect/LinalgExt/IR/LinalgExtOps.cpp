@@ -1522,17 +1522,19 @@ static SmallVector<unsigned> extractUIntArray(ArrayAttr attr) {
   return result;
 }
 
+// Interchange elements in `loopOrIvs` (Range or Value) based
+// on the indexes in `interchangeVector`.
 template <typename T>
-SmallVector<T> interchangeLoops(ArrayRef<T> loops,
-                                ArrayRef<unsigned> interchangeVector) {
-  SmallVector<T> rearrangedLoops = llvm::to_vector(loops);
+SmallVector<T> interchange(ArrayRef<T> loopsOrIvs,
+                           ArrayRef<unsigned> interchangeVector) {
+  SmallVector<T> rearrangedLoopsOrIvs = llvm::to_vector(loopsOrIvs);
   if (interchangeVector.empty())
-    return rearrangedLoops;
-  assert(rearrangedLoops.size() == interchangeVector.size() &&
-         "number of loops must equal number of permutations");
+    return rearrangedLoopsOrIvs;
+  assert(rearrangedLoopsOrIvs.size() == interchangeVector.size() &&
+         "number of loops ivs must equal number of permutations");
   for (int idx = 0, end = interchangeVector.size(); idx < end; idx++)
-    rearrangedLoops[interchangeVector[idx]] = loops[idx];
-  return rearrangedLoops;
+    rearrangedLoopsOrIvs[interchangeVector[idx]] = loopsOrIvs[idx];
+  return rearrangedLoopsOrIvs;
 }
 
 // Implements `getIterationDomain` from the tiling interface.
@@ -1555,8 +1557,7 @@ SmallVector<Range> PackOp::getIterationDomain(OpBuilder &builder) {
   auto interchangeVector = getIteratorInterchange();
   if (!interchangeVector)
     return loopBounds;
-  return interchangeLoops<Range>(loopBounds,
-                                 extractUIntArray(*interchangeVector));
+  return interchange<Range>(loopBounds, extractUIntArray(*interchangeVector));
 }
 
 // Implements `getIterationDomain` from the tiling interface.
@@ -1566,8 +1567,8 @@ LogicalResult PackOp::generateScalarImplementation(OpBuilder &builder,
   SmallVector<Value> interchangedIvs = ivs;
   auto interchangeVector = getIteratorInterchange();
   if (interchangeVector) {
-    interchangedIvs = interchangeLoops<Value>(
-        interchangedIvs, extractUIntArray(*interchangeVector));
+    interchangedIvs = interchange<Value>(interchangedIvs,
+                                         extractUIntArray(*interchangeVector));
   }
 
   SmallVector<OpFoldResult> innerTiles = getMixedInnerTiles();
