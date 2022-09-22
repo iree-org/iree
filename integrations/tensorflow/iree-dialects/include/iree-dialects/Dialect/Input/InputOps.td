@@ -88,7 +88,7 @@ def IREEInput_GlobalOp : IREEInput_Op<"global", [
     (`mutable` $is_mutable^)?
     $sym_name
     attr-dict
-    (`initializer` `(` $initializer^ `)`):(``)?
+    (`initializer` `(` $initializer^ `)`)?
     custom<TypeOrAttr>($type, $initial_value)
   }];
 
