@@ -18,12 +18,6 @@ To explore an image interactively, use `docker run`, e.g.
 docker run --interactive --tty --rm base
 ```
 
-Production versions of the images can be downloaded from GCR:
-
-```shell
-docker pull gcr.io/iree-oss/base:prod
-```
-
 You can find more information in the
 [official Docker docs](https://docs.docker.com/get-started/overview/).
 
