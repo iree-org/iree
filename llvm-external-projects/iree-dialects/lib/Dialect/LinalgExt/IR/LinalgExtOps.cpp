@@ -1534,26 +1534,33 @@ LogicalResult PackOp::verify() {
   // blocking factors.
   if (interchangeVector && !interchangeVector->empty() &&
       interchangeVector->size() != numberOfBlockingFactors)
-    op->emitError("Interchange vector must equal blocking factors");
+    return op->emitError("interchange vector must equal blocking factors");
 
-  // Blocking factors must be less or equal than the input rank.
+  // Blocking factors must be less or equal than the input rank, and must
+  // match the number of `dims_pos`.
   if (numberOfBlockingFactors > getInputRank())
-    op->emitError("blocking factors must be less or equal than the input rank");
+    return op->emitError(
+        "blocking factors must be less or equal than the input rank");
+  if (numberOfBlockingFactors != getDimsPos().size())
+    return op->emitError(
+        "blocking factors must equal the number of dimensions to block");
 
   // The number of `dim_pos` that carries the index of the dimensions to block
   // must be less or equal than the input rank.
   if (getDimsPos().size() > getInputRank())
-    op->emitError("indices of blocked dimensions must be less or equal than "
-                  "the input rank");
+    return op->emitError(
+        "indices of blocked dimensions must be less or equal than "
+        "the input rank");
 
   // Require output rank to match input rank + number of blocking factors.
   if ((getInputRank() + numberOfBlockingFactors) != getOutputRank())
-    op->emitError("Output rank must equal input rank + blocking factors");
+    return op->emitError(
+        "output rank must equal input rank + blocking factors");
 
   // Require `dim_pos` to be in-bound. `dim_pos` carries the index of the
   // dimensions to block.
   if (!isInBound(extractFromI64ArrayAttr(getDimsPos()), getOutputRank()))
-    op->emitError("Out-of-bound position");
+    return op->emitError("out-of-bound position");
 
   // Require interchangeVector to be in-bound. The interchange index is in bound
   // if it is smaller than the input rank, as most `input rank - 1` dimensions
@@ -1561,12 +1568,15 @@ LogicalResult PackOp::verify() {
   // TODO: use `extractUIntArray` if we decide to expose in `StaticValueUtils.h`
   if (interchangeVector &&
       !isInBound(extractFromI64ArrayAttr(*interchangeVector), getInputRank()))
-    op->emitError("Out of bound position in interchange vector");
+    return op->emitError("out of bound position in interchange vector");
 
   // Verify result type against inferred type.
   ShapedType expectedType = PackOp::inferResultType();
-  if (expectedType != getOutputType())
-    op->emitError("inferred type do not match provied output type");
+  if (expectedType != getOutputType()) {
+    llvm::errs() << expectedType << "\n";
+    llvm::errs() << getOutputType() << "\n";
+    return op->emitError("inferred type do not match provied output type");
+  }
 
   return success();
 }
