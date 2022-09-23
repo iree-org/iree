@@ -92,6 +92,12 @@ Vulkan::Version getVersion(const TargetTriple &triple) {
     return Version::V_1_1;
   }
 
+  // For unknown architecture, be conservative and use a reasonable lowest
+  // denominator.
+  if (triple.getArch() == TargetTripleArch::Unknown) {
+    return Version::V_1_1;
+  }
+
   return Version::V_1_3;
 }
 
@@ -156,6 +162,18 @@ void getExtensions(const TargetTriple &triple,
     return;
   }
 
+  // For unknown architecture, be conservative and use a reasonable lowest
+  // denominator.
+  if (triple.getArch() == TargetTripleArch::Unknown) {
+    // The following extensions have 90%+ device coverage from
+    // https://vulkan.gpuinfo.org/listextensions.php.
+    const std::array<Extension, 2> list = {
+        Extension::VK_KHR_storage_buffer_storage_class,
+        Extension::VK_KHR_variable_pointers,
+    };
+    return extensions.append(list.begin(), list.end());
+  }
+
   // Desktop GPUs typically support all extensions we care.
   const std::array<Extension, 6> desktop = {
       Extension::VK_KHR_16bit_storage,
@@ -204,8 +222,6 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
   Builder builder(context);
 
   switch (triple.getArch()) {
-    case TargetTripleArch::Unknown:
-      break;
     case TargetTripleArch::AMD_RDNAv1:
     case TargetTripleArch::AMD_RDNAv2:
       // Example: https://vulkan.gpuinfo.org/displayreport.php?id=10906
@@ -357,6 +373,14 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
       }
 
       variablePointers = variablePointersStorageBuffer = true;
+      break;
+    case TargetTripleArch::Unknown:
+      // Use the largest subgroup size we can find across various vendors.
+      subgroupSize = 64;
+      // The following capabilities have 90%+ device coverage (Vulkan 1.1+)
+      // from https://vulkan.gpuinfo.org/listfeaturesextensions.php.
+      variablePointers = variablePointersStorageBuffer = false;
+      // Use Vulkan default for others.
       break;
   }
 
