@@ -18,13 +18,7 @@ set(RISCV_TOOLCHAIN_INCLUDED true)
 
 set(CMAKE_SYSTEM_PROCESSOR riscv)
 
-if(CMAKE_HOST_SYSTEM_NAME STREQUAL Linux)
-  set(RISCV_HOST_TAG linux)
-elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL Darwin)
-  set(RISCV_HOST_TAG darwin)
-endif()
-
-set(RISCV_TOOLCHAIN_NAME clang)
+set(RISCV_HOST_TAG linux)
 
 set(RISCV_TOOL_PATH "$ENV{HOME}/riscv" CACHE PATH "RISC-V tool path")
 
