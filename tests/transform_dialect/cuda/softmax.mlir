@@ -1,8 +1,6 @@
 
 // RUN: iree-opt %s --iree-hal-target-backends=cuda \
 // RUN:     --iree-abi-transformation-pipeline \
-// RUN:     --iree-flow-transformation-pipeline  \
-// RUN:     --iree-flow-dispatch-use-transform-dialect=%p/softmax_dispatch_spec.mlir \
 // RUN:     --iree-stream-transformation-pipeline \
 // RUN:     --iree-hal-configuration-pipeline | \
 // RUN: iree-opt --pass-pipeline='hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target-pass))' \
@@ -10,7 +8,6 @@
 // RUN: FileCheck %s --check-prefix=CHECK-SHUFFLE
 
 // RUN: iree-compile %s --iree-hal-target-backends=cuda \
-// RUN:     --iree-flow-dispatch-use-transform-dialect=%p/softmax_dispatch_spec.mlir \
 // RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/softmax_codegen_spec.mlir | \
 // RUN: iree-run-module --entry_function=max_sub_exp --device=cuda | \
 // RUN: FileCheck %s
@@ -18,7 +15,6 @@
 // RUN: iree-opt %s --iree-hal-target-backends=cuda \
 // RUN:     --iree-abi-transformation-pipeline \
 // RUN:     --iree-flow-transformation-pipeline  \
-// RUN:     --iree-flow-dispatch-use-transform-dialect=%p/softmax_dispatch_spec.mlir \
 // RUN:     --iree-stream-transformation-pipeline \
 // RUN:     --iree-hal-configuration-pipeline | \
 // RUN: iree-opt --pass-pipeline='hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target-pass))' \
@@ -26,7 +22,6 @@
 // RUN: FileCheck %s --check-prefix=CHECK-SHUFFLE
 
 // RUN: iree-compile %s --iree-hal-target-backends=cuda \
-// RUN:     --iree-flow-dispatch-use-transform-dialect=%p/softmax_dispatch_spec.mlir \
 // RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/softmax_fused_codegen_spec.mlir | \
 // RUN: iree-run-module --entry_function=max_sub_exp --device=cuda | \
 // RUN: FileCheck %s

@@ -4,6 +4,8 @@
 transform.structured.canonicalized_sequence failures(propagate) {
 // transform.sequence %arg0 failures(propagate) {
 ^bb1(%variant_op: !pdl.operation):
+  %func = transform.structured.match ops{["func.func"]} in %variant_op
+    
   // First level of tiling + fusion parallelizes to blocks.
   // The mapping  to block ids can only happen after bufferization atm 
   %root = transform.structured.match interface{LinalgOp} 
@@ -13,7 +15,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
     attributes{iterator_types = ["parallel", "parallel", "reduction"]} in %variant_op
   %not_root = merge_handles %fill, %red
   %foreach_thread, %tiled_generic = 
-    transform.structured.tile_to_foreach_thread_op %root tile_sizes [1, 1]
+    transform.structured.tile_to_foreach_thread_and_workgroup_count_region %root %func tile_sizes [1, 1]
       (mapped to dims [0, 1, 2])
   transform.structured.fuse_into_containing_op %not_root into %foreach_thread
   
@@ -44,9 +46,9 @@ transform.structured.canonicalized_sequence failures(propagate) {
   //   3. introducing predication (due to 1. + 2.) which enables rewriting to
   //      warp_execute_on_lane_0 and later vector distribution.
   %variant_op_2 = transform.iree.bufferize { target_gpu } %variant_op
-  %func = transform.structured.match ops{["func.func"]} in %variant_op_2
-  %func_2 = transform.iree.foreach_thread_to_workgroup %func
-  transform.iree.map_nested_foreach_thread_to_gpu_threads %func_2
+  %func_2 = transform.structured.match ops{["func.func"]} in %variant_op_2
+  %func_3 = transform.iree.foreach_thread_to_workgroup %func_2
+  transform.iree.map_nested_foreach_thread_to_gpu_threads %func_3
     { workgroup_size = [32, 1, 1] }
   
   // Vector distribution needs to happen on buffers.

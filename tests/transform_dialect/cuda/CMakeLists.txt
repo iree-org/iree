@@ -28,7 +28,6 @@ iree_lit_test_suite(
   DATA
     reduction_codegen_spec.mlir
     softmax_codegen_spec.mlir
-    softmax_dispatch_spec.mlir
     softmax_fused_codegen_spec.mlir
   LABELS
     "noasan"
