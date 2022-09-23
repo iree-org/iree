@@ -32,6 +32,9 @@ TF_IMPORT_CMAKE_TEMPLATE = read_template_from_file(
 IREE_BYTECODE_MODULE_CMAKE_TEMPLATE = read_template_from_file(
     TEMPLATE_DIR / "iree_bytecode_module_template.cmake")
 
+# Archive extensions used to pack models.
+ARCHIVE_FILE_EXTENSIONS = [".tar", ".gz"]
+
 
 @dataclass
 class ModelRule(object):
@@ -79,9 +82,15 @@ class CommonRuleFactory(object):
     target_name = f"model-{model.id}"
 
     model_url = urllib.parse.urlparse(model.source_url)
-    _, file_ext = os.path.splitext(model_url.path)
-    # Model path: <model_artifacts_dir>/<model_id>_<model_name>.<file ext>
-    model_path = f"{self._model_artifacts_dir}/{model.id}_{model.name}{file_ext}"
+
+    # Drop the archive extensions.
+    file_exts = pathlib.PurePath(model_url.path).suffixes
+    while len(file_exts) > 0 and file_exts[-1] in ARCHIVE_FILE_EXTENSIONS:
+      file_exts.pop()
+    model_ext = "".join(file_exts)
+
+    # Model path: <model_artifacts_dir>/<model_id>_<model_name><model_ext>
+    model_path = f"{self._model_artifacts_dir}/{model.id}_{model.name}{model_ext}"
 
     if model_url.scheme == "https":
       cmake_rule = DOWNLOAD_ARTIFACT_CMAKE_TEMPLATE.substitute(

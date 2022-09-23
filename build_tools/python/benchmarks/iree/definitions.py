@@ -6,7 +6,7 @@
 """Defines IREE benchmarks."""
 
 import itertools
-from typing import List, Tuple
+from typing import List, Sequence, Tuple
 
 from e2e_test_framework.device_specs import linux_x86_64_specs
 from e2e_test_framework.models import model_groups
@@ -14,6 +14,24 @@ from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework import unique_ids
 
 MODULE_BENCHMARK_TOOL = "iree-benchmark-module"
+
+
+def _generate_run_specs(
+    compile_specs: Sequence[iree_definitions.CompileSpec],
+    run_configs: Sequence[iree_definitions.RunConfig],
+    device_spec: common_definitions.DeviceSpec,
+    input_data: common_definitions.ModelInputData = common_definitions.
+    RANDOM_MODEL_INPUT_DATA,
+) -> List[iree_definitions.RunSpec]:
+  """Generates the run specs from the product of compile specs and run configs.
+  """
+  return [
+      iree_definitions.RunSpec(compile_spec=compile_spec,
+                               run_config=run_config,
+                               target_device_spec=device_spec,
+                               input_data=input_data) for compile_spec,
+      run_config in itertools.product(compile_specs, run_configs)
+  ]
 
 
 class Linux_x86_64_Benchmarks(object):
@@ -39,25 +57,17 @@ class Linux_x86_64_Benchmarks(object):
 
     default_run_configs = cls._generate_default_run_configs()
 
-    # Generate compile specs for mobile models.
-    mobile_model_compile_specs = [
+    compile_specs = [
         iree_definitions.CompileSpec(
             compile_config=cls.CASCADELAKE_COMPILE_CONFIG, model=model)
-        for model in model_groups.MOBILE
+        for model in model_groups.SMALL + model_groups.LARGE
     ]
+    run_specs = _generate_run_specs(
+        compile_specs=compile_specs,
+        run_configs=default_run_configs,
+        device_spec=linux_x86_64_specs.GCP_C2_STANDARD_16)
 
-    # Generate run specs for mobile models.
-    mobile_model_run_specs = []
-    for compile_spec, run_config in itertools.product(
-        mobile_model_compile_specs, default_run_configs):
-      mobile_model_run_specs.append(
-          iree_definitions.RunSpec(
-              compile_spec=compile_spec,
-              run_config=run_config,
-              target_device_spec=linux_x86_64_specs.GCP_C2_STANDARD_16,
-              input_data=common_definitions.RANDOM_MODEL_INPUT_DATA))
-
-    return (mobile_model_compile_specs, mobile_model_run_specs)
+    return (compile_specs, run_specs)
 
   @staticmethod
   def _generate_default_run_configs() -> List[iree_definitions.RunConfig]:
