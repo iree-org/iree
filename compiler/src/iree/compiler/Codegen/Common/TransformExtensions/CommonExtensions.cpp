@@ -311,8 +311,9 @@ LogicalResult rewriteForeachThreadToWorkgroup(
 
   // Step 0. Outline the compute workload region and set up the workload
   // operands, if this has not been done already.
-  // Using `transform.iree.tile_to_workgroups_op` is the preferred way to set
-  // up tiling and workgroup_count region **at the same time**.
+  // Using `transform.iree.tile_to_foreach_thread_and_workgroup_count_region` is
+  // the preferred way to set up tiling and workgroup_count region **at the same
+  // time**.
   //
   // The block of code below will be retired once there is enough confidence we
   // can do everything without it. This includes in particular providing custom
@@ -443,7 +444,7 @@ transform_dialect::ForeachThreadToWorkgroupOp::applyToOne(
 }
 
 //===---------------------------------------------------------------------===//
-// TileToWorkgroupsOp
+// TileToForeachThreadAndWorkgroupCountRegion
 //===---------------------------------------------------------------------===//
 
 /// Lower the ops within the workgroup count region of `exportOp` that
@@ -501,23 +502,24 @@ static LogicalResult lowerWorkgroupCountComputingRegion(
   return success();
 }
 
-SmallVector<OpFoldResult>
-transform_dialect::TileToWorkgroupsOp::getMixedNumThreads() {
+SmallVector<OpFoldResult> transform_dialect::
+    TileToForeachThreadAndWorkgroupCountRegion::getMixedNumThreads() {
   return getMixedSizes(getStaticNumThreads(), getNumThreads());
 }
 
-SmallVector<OpFoldResult>
-transform_dialect::TileToWorkgroupsOp::getMixedTileSizes() {
+SmallVector<OpFoldResult> transform_dialect::
+    TileToForeachThreadAndWorkgroupCountRegion::getMixedTileSizes() {
   return getMixedSizes(getStaticTileSizes(), getTileSizes());
 }
 
-LogicalResult transform_dialect::TileToWorkgroupsOp::verify() {
+LogicalResult
+transform_dialect::TileToForeachThreadAndWorkgroupCountRegion::verify() {
   if (getMixedNumThreads().empty() == getMixedTileSizes().empty())
     return emitOpError("either num_threads or tile_sizes must be specified");
   return success();
 }
 
-void transform_dialect::TileToWorkgroupsOp::getEffects(
+void transform_dialect::TileToForeachThreadAndWorkgroupCountRegion::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::consumesHandle(getTarget(), effects);
   transform::consumesHandle(getFunc(), effects);
@@ -526,7 +528,8 @@ void transform_dialect::TileToWorkgroupsOp::getEffects(
   transform::producesHandle(getResults(), effects);
 }
 
-DiagnosedSilenceableFailure transform_dialect::TileToWorkgroupsOp::apply(
+DiagnosedSilenceableFailure
+transform_dialect::TileToForeachThreadAndWorkgroupCountRegion::apply(
     transform::TransformResults &transformResults,
     transform::TransformState &state) {
   ArrayRef<Operation *> funcOps = state.getPayloadOps(getFunc());

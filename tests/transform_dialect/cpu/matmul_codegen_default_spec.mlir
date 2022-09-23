@@ -6,7 +6,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   %matmul = transform.structured.match ops{["linalg.matmul"]} in %variant_op
 
   %foreach_thread, %tiled_generic =
-    transform.iree.tile_to_workgroups_op %matmul %func tile_sizes [2]
+    transform.iree.tile_to_foreach_thread_and_workgroup_count_region %matmul %func tile_sizes [2]
 
   %variant_op_2 = transform.iree.bufferize %variant_op
 

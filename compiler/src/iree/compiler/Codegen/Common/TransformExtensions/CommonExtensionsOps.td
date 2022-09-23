@@ -153,8 +153,8 @@ def ForeachThreadToWorkgroupOp : Op<Transform_Dialect,
   }];
 }
 
-def TileToWorkgroupsOp :
-    Op<Transform_Dialect, "iree.tile_to_workgroups_op",
+def TileToForeachThreadAndWorkgroupCountRegion :
+    Op<Transform_Dialect, "iree.tile_to_foreach_thread_and_workgroup_count_region",
       [AttrSizedOperandSegments,
        DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
        TransformOpInterface]> {
