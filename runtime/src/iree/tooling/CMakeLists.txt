@@ -12,6 +12,75 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
+    buffer_view_matchers
+  HDRS
+    "buffer_view_matchers.h"
+  SRCS
+    "buffer_view_matchers.c"
+  DEPS
+    iree::base
+    iree::base::internal
+    iree::base::tracing
+    iree::hal
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    buffer_view_matchers_test
+  SRCS
+    "buffer_view_matchers_test.cc"
+  DEPS
+    ::buffer_view_matchers
+    iree::base
+    iree::base::internal
+    iree::base::internal::span
+    iree::hal
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
+    comparison
+  HDRS
+    "comparison.h"
+  SRCS
+    "comparison.cc"
+  DEPS
+    ::buffer_view_matchers
+    ::vm_util
+    iree::base
+    iree::base::cc
+    iree::base::internal::flags
+    iree::base::internal::span
+    iree::base::tracing
+    iree::hal
+    iree::modules::hal
+    iree::vm
+    iree::vm::cc
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    comparison_test
+  SRCS
+    "comparison_test.cc"
+  DEPS
+    ::comparison
+    ::vm_util
+    iree::base
+    iree::hal
+    iree::modules::hal
+    iree::testing::gtest
+    iree::testing::gtest_main
+    iree::vm
+    iree::vm::cc
+)
+
+iree_cc_library(
+  NAME
     context_util
   HDRS
     "context_util.h"

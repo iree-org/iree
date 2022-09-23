@@ -33,6 +33,11 @@ IREE_API_EXPORT void iree_string_builder_deinitialize(
   memset(builder, 0, sizeof(*builder));
 }
 
+static bool iree_string_builder_is_calculating_size(
+    const iree_string_builder_t* builder) {
+  return iree_allocator_is_null(builder->allocator) && builder->buffer == NULL;
+}
+
 IREE_API_EXPORT const char* iree_string_builder_buffer(
     const iree_string_builder_t* builder) {
   return builder->buffer;
@@ -74,13 +79,23 @@ IREE_API_EXPORT char* iree_string_builder_take_storage(
 
 IREE_API_EXPORT iree_status_t iree_string_builder_reserve(
     iree_string_builder_t* builder, iree_host_size_t minimum_capacity) {
-  if (iree_allocator_is_null(builder->allocator)) return iree_ok_status();
   iree_host_size_t new_capacity = builder->capacity;
   if (builder->capacity < minimum_capacity) {
     new_capacity =
         iree_host_align(minimum_capacity, IREE_STRING_BUILDER_ALIGNMENT);
   }
-  if (builder->capacity >= new_capacity) return iree_ok_status();
+  if (builder->capacity >= new_capacity) {
+    // Already at/above the requested minimum capacity.
+    return iree_ok_status();
+  } else if (iree_allocator_is_null(builder->allocator)) {
+    // No allocator provided and the builder cannot grow.
+    return iree_make_status(
+        IREE_STATUS_RESOURCE_EXHAUSTED,
+        "non-growable builder capacity exceeded (capacity=%" PRIhsz
+        "; requested=%" PRIhsz ", adjusted=%" PRIhsz ")",
+        builder->capacity, minimum_capacity, new_capacity);
+  }
+
   IREE_RETURN_IF_ERROR(iree_allocator_realloc(builder->allocator, new_capacity,
                                               (void**)&builder->buffer));
   builder->buffer[builder->size] = 0;
@@ -88,12 +103,24 @@ IREE_API_EXPORT iree_status_t iree_string_builder_reserve(
   return iree_ok_status();
 }
 
+IREE_API_EXPORT iree_status_t iree_string_builder_append_inline(
+    iree_string_builder_t* builder, iree_host_size_t count, char** out_head) {
+  *out_head = NULL;
+  if (!iree_string_builder_is_calculating_size(builder)) {
+    IREE_RETURN_IF_ERROR(iree_string_builder_reserve(
+        builder, builder->size + count + /*NUL=*/1));
+    *out_head = &builder->buffer[builder->size];
+  }
+  builder->size += count;
+  return iree_ok_status();
+}
+
 IREE_API_EXPORT iree_status_t iree_string_builder_append_string(
     iree_string_builder_t* builder, iree_string_view_t value) {
   // Ensure capacity for the value + NUL terminator.
-  IREE_RETURN_IF_ERROR(
-      iree_string_builder_reserve(builder, builder->size + value.size + 1));
-  if (builder->buffer != NULL) {
+  if (!iree_string_builder_is_calculating_size(builder)) {
+    IREE_RETURN_IF_ERROR(
+        iree_string_builder_reserve(builder, builder->size + value.size + 1));
     // Only copy the bytes if we are not doing a size calculation.
     memcpy(builder->buffer + builder->size, value.data, value.size);
     builder->buffer[builder->size + value.size] = 0;  // NUL
@@ -125,14 +152,17 @@ static iree_status_t iree_string_builder_append_format_impl(
     return iree_ok_status();
   }
 
-  // Reserve new minimum capacity.
-  IREE_RETURN_IF_ERROR(iree_string_builder_reserve(
-      builder, iree_string_builder_size(builder) + n + /*NUL*/ 1));
+  if (!iree_string_builder_is_calculating_size(builder)) {
+    // Reserve new minimum capacity.
+    IREE_RETURN_IF_ERROR(iree_string_builder_reserve(
+        builder, iree_string_builder_size(builder) + n + /*NUL*/ 1));
 
-  // Try printing again.
-  vsnprintf(builder->buffer ? builder->buffer + builder->size : NULL,
-            builder->buffer ? builder->capacity - builder->size : 0, format,
-            varargs_1);
+    // Try printing again.
+    vsnprintf(builder->buffer ? builder->buffer + builder->size : NULL,
+              builder->buffer ? builder->capacity - builder->size : 0, format,
+              varargs_1);
+  }
+
   builder->size += n;
   return iree_ok_status();
 }

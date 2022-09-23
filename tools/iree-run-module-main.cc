@@ -18,6 +18,8 @@
 #include "iree/base/status_cc.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
+#include "iree/modules/hal/types.h"
+#include "iree/tooling/comparison.h"
 #include "iree/tooling/context_util.h"
 #include "iree/tooling/vm_util.h"
 #include "iree/vm/api.h"
@@ -35,15 +37,15 @@ IREE_FLAG(bool, print_statistics, false,
           "Prints runtime statistics to stderr on exit.");
 
 // TODO(benvanik): move --function_input= flag into a util.
-static iree_status_t parse_function_input(iree_string_view_t flag_name,
-                                          void* storage,
-                                          iree_string_view_t value) {
+static iree_status_t parse_function_io(iree_string_view_t flag_name,
+                                       void* storage,
+                                       iree_string_view_t value) {
   auto* list = (std::vector<std::string>*)storage;
   list->push_back(std::string(value.data, value.size));
   return iree_ok_status();
 }
-static void print_function_input(iree_string_view_t flag_name, void* storage,
-                                 FILE* file) {
+static void print_function_io(iree_string_view_t flag_name, void* storage,
+                              FILE* file) {
   auto* list = (std::vector<std::string>*)storage;
   if (list->empty()) {
     fprintf(file, "# --%.*s=\n", (int)flag_name.size, flag_name.data);
@@ -56,8 +58,7 @@ static void print_function_input(iree_string_view_t flag_name, void* storage,
 }
 static std::vector<std::string> FLAG_function_inputs;
 IREE_FLAG_CALLBACK(
-    parse_function_input, print_function_input, &FLAG_function_inputs,
-    function_input,
+    parse_function_io, print_function_io, &FLAG_function_inputs, function_input,
     "An input (a) value or (b) buffer of the format:\n"
     "  (a) scalar value\n"
     "     value\n"
@@ -74,10 +75,19 @@ IREE_FLAG_CALLBACK(
     "Each occurrence of the flag indicates an input in the order they were\n"
     "specified on the command line.");
 
+static std::vector<std::string> FLAG_expected_outputs;
+IREE_FLAG_CALLBACK(parse_function_io, print_function_io, &FLAG_expected_outputs,
+                   expected_output,
+                   "An expected function output following the same format as "
+                   "--function_input. When present the results of the "
+                   "invocation will be compared against these values and the "
+                   "tool will return non-zero if any differ. If the value of a "
+                   "particular output is not of interest provide `(ignored)`.");
+
 namespace iree {
 namespace {
 
-iree_status_t Run() {
+iree_status_t Run(int* out_exit_code) {
   IREE_TRACE_SCOPE0("iree-run-module");
 
   iree_allocator_t host_allocator = iree_allocator_system();
@@ -129,9 +139,30 @@ iree_status_t Run() {
                      host_allocator),
       "invoking function '%s'", function_name.c_str());
 
-  IREE_RETURN_IF_ERROR(
-      PrintVariantList(outputs.get(), (size_t)FLAG_print_max_element_count),
-      "printing results");
+  if (FLAG_expected_outputs.empty()) {
+    IREE_RETURN_IF_ERROR(
+        PrintVariantList(outputs.get(), (size_t)FLAG_print_max_element_count),
+        "printing results");
+  } else {
+    // Parse expected list into host-local memory that we can easily access.
+    // Note that we return a status here as this can fail on user inputs.
+    vm::ref<iree_hal_allocator_t> heap_allocator;
+    IREE_RETURN_IF_ERROR(iree_hal_allocator_create_heap(
+        IREE_SV("heap"), host_allocator, host_allocator, &heap_allocator));
+    vm::ref<iree_vm_list_t> expected_list;
+    IREE_RETURN_IF_ERROR(ParseToVariantList(heap_allocator.get(),
+                                            FLAG_expected_outputs,
+                                            host_allocator, &expected_list));
+
+    // Compare expected vs actual lists and output diffs.
+    bool did_match = iree_tooling_compare_variant_lists(
+        expected_list.get(), outputs.get(), host_allocator, &std::cout);
+    if (did_match) {
+      std::cout
+          << "[SUCCESS] all function outputs matched their expected values.\n";
+    }
+    *out_exit_code = did_match ? EXIT_SUCCESS : EXIT_FAILURE;
+  }
 
   // Release resources before gathering statistics.
   inputs.reset();
@@ -157,20 +188,21 @@ extern "C" int main(int argc, char** argv) {
   if (argc > 1) {
     // Avoid iree-run-module spinning endlessly on stdin if the user uses single
     // dashes for flags.
-    std::cout << "Error: unexpected positional argument (expected none)."
+    std::cout << "[ERROR] unexpected positional argument (expected none)."
                  " Did you use pass a flag with a single dash ('-')?"
                  " Use '--' instead.\n";
     return 1;
   }
 
-  iree_status_t status = Run();
+  int exit_code = EXIT_SUCCESS;
+  iree_status_t status = Run(&exit_code);
   if (!iree_status_is_ok(status)) {
     iree_status_fprint(stderr, status);
     iree_status_free(status);
     return EXIT_FAILURE;
   }
 
-  return EXIT_SUCCESS;
+  return exit_code;
 }
 
 }  // namespace iree

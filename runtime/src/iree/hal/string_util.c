@@ -106,6 +106,17 @@ iree_hal_format_shape(iree_host_size_t shape_rank, const iree_hal_dim_t* shape,
                 : iree_status_from_code(IREE_STATUS_OUT_OF_RANGE);
 }
 
+IREE_API_EXPORT iree_status_t iree_hal_append_shape_string(
+    iree_host_size_t shape_rank, const iree_hal_dim_t* shape,
+    iree_string_builder_t* string_builder) {
+  for (iree_host_size_t i = 0; i < shape_rank; ++i) {
+    IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+        string_builder, (i < shape_rank - 1) ? "%" PRIdim "x" : "%" PRIdim,
+        shape[i]));
+  }
+  return iree_ok_status();
+}
+
 IREE_API_EXPORT iree_status_t iree_hal_parse_element_type(
     iree_string_view_t value, iree_hal_element_type_t* out_element_type) {
   IREE_ASSERT_ARGUMENT(out_element_type);
@@ -196,6 +207,17 @@ IREE_API_EXPORT iree_status_t iree_hal_format_element_type(
                               : iree_ok_status();
 }
 
+IREE_API_EXPORT iree_status_t
+iree_hal_append_element_type_string(iree_hal_element_type_t element_type,
+                                    iree_string_builder_t* string_builder) {
+  char temp[8];
+  iree_host_size_t length = 0;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_format_element_type(element_type, sizeof(temp), temp, &length));
+  return iree_string_builder_append_string(string_builder,
+                                           iree_make_string_view(temp, length));
+}
+
 IREE_API_EXPORT iree_status_t iree_hal_parse_shape_and_element_type(
     iree_string_view_t value, iree_host_size_t shape_capacity,
     iree_host_size_t* out_shape_rank, iree_hal_dim_t* out_shape,
@@ -242,6 +264,19 @@ IREE_API_EXPORT iree_status_t iree_hal_parse_shape_and_element_type(
   IREE_RETURN_IF_ERROR(iree_hal_parse_element_type(type_str, out_element_type));
 
   return iree_ok_status();
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_append_shape_and_element_type_string(
+    iree_host_size_t shape_rank, const iree_hal_dim_t* shape,
+    iree_hal_element_type_t element_type,
+    iree_string_builder_t* string_builder) {
+  if (shape_rank > 0) {
+    IREE_RETURN_IF_ERROR(
+        iree_hal_append_shape_string(shape_rank, shape, string_builder));
+    IREE_RETURN_IF_ERROR(
+        iree_string_builder_append_string(string_builder, IREE_SV("x")));
+  }
+  return iree_hal_append_element_type_string(element_type, string_builder);
 }
 
 // Parses a string of two character pairs representing hex numbers into bytes.

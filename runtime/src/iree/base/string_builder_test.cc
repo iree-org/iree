@@ -12,6 +12,10 @@
 
 namespace {
 
+using iree::Status;
+using iree::StatusCode;
+using iree::testing::status::StatusIs;
+
 struct StringBuilder {
   static StringBuilder MakeSystem() {
     iree_string_builder_t builder;
@@ -37,6 +41,18 @@ struct StringBuilder {
   }
 
   iree_string_builder_t builder;
+
+ protected:
+  StringBuilder() = default;
+};
+
+template <size_t Capacity>
+struct InlineStringBuilder : public StringBuilder {
+  InlineStringBuilder() {
+    iree_string_builder_initialize_with_storage(storage, sizeof(storage),
+                                                &builder);
+  }
+  char storage[Capacity] = {0};
 };
 
 TEST(StringBuilderTest, QueryEmpty) {
@@ -159,6 +175,46 @@ TEST(StringBuilderTest, Format) {
   EXPECT_EQ(strlen(builder.builder.buffer), 6 + 1024);  // NUL check
   EXPECT_EQ(builder.ToString(),
             std::string("abcabc") + std::string(1023, ' ') + std::string("x"));
+}
+
+TEST(StringBuilderTest, InlineStorage) {
+  InlineStringBuilder<8> builder;
+  EXPECT_EQ(iree_string_builder_size(builder), 0);
+  EXPECT_GE(iree_string_builder_capacity(builder), 8);
+  EXPECT_TRUE(iree_string_view_is_empty(iree_string_builder_view(builder)));
+
+  // Should be able to reserve up to capacity.
+  IREE_EXPECT_OK(iree_string_builder_reserve(builder, 4));
+  IREE_EXPECT_OK(iree_string_builder_reserve(builder, 8));
+
+  // Should fail to reserve more than storage size.
+  EXPECT_THAT(Status(iree_string_builder_reserve(builder, 9)),
+              StatusIs(StatusCode::kResourceExhausted));
+}
+
+TEST(StringBuilderTest, SizeCalculation) {
+  auto builder = StringBuilder::MakeEmpty();
+  EXPECT_EQ(iree_string_builder_size(builder), 0);
+  EXPECT_GE(iree_string_builder_capacity(builder), 0);
+  EXPECT_TRUE(iree_string_view_is_empty(iree_string_builder_view(builder)));
+
+  IREE_EXPECT_OK(iree_string_builder_append_cstring(builder, "abc"));
+  EXPECT_EQ(iree_string_builder_size(builder), 3);
+  EXPECT_GE(iree_string_builder_capacity(builder), 0);
+
+  IREE_EXPECT_OK(iree_string_builder_append_format(builder, "def"));
+  EXPECT_EQ(iree_string_builder_size(builder), 6);
+  EXPECT_GE(iree_string_builder_capacity(builder), 0);
+
+  char* head = NULL;
+  IREE_EXPECT_OK(iree_string_builder_append_inline(builder, 3, &head));
+  EXPECT_TRUE(head == NULL);
+  EXPECT_EQ(iree_string_builder_size(builder), 9);
+  EXPECT_GE(iree_string_builder_capacity(builder), 0);
+
+  // Reservation should fail because there's no allocator.
+  EXPECT_THAT(Status(iree_string_builder_reserve(builder, 4)),
+              StatusIs(StatusCode::kResourceExhausted));
 }
 
 }  // namespace
