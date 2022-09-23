@@ -13,27 +13,8 @@ func.func @matmul_static(
 // RUN: iree-opt %s --iree-hal-target-backends=llvm-cpu \
 // RUN:   --iree-abi-transformation-pipeline \
 // RUN:   --iree-flow-transformation-pipeline \
-// RUN:   --iree-flow-dispatch-use-transform-dialect=%p/matmul_dispatch_spec.mlir | \
-// RUN: FileCheck %s --check-prefixes=DISPATCH
-
-// TODO: make this test drop transform dialect usage at the flow level and use:
-//   --iree-flow-transformation-pipeline --iree-flow-convert-region-to-workgroups
-// Atm the 3rd flow.dispatch.tensor.load shows as readonly instead of readwrite.
-
-// DISPATCH: flow.executable private @matmul_static_dispatch_0 {
-// DISPATCH:   flow.executable.export public @matmul_static_dispatch_0_matmul_3x3x5
-// DISPATCH:     builtin.module {
-// DISPATCH:       func.func @matmul_static_dispatch_0_matmul_3x3x5
-// DISPATCH:         flow.dispatch.tensor.load {{.*}}, offsets = [0, 0], sizes = [3, 5], strides = [1, 1] : !flow.dispatch.tensor<readonly:3x5xf32> -> tensor<3x5xf32>
-// DISPATCH:         flow.dispatch.tensor.load {{.*}}, offsets = [0, 0], sizes = [5, 3], strides = [1, 1] : !flow.dispatch.tensor<readonly:5x3xf32> -> tensor<5x3xf32>
-// DISPATCH:         flow.dispatch.tensor.load {{.*}}, offsets = [0, 0], sizes = [3, 3], strides = [1, 1] : !flow.dispatch.tensor<readwrite:3x3xf32> -> tensor<3x3xf32>
-// DISPATCH:         linalg.matmul ins({{.*}} : tensor<3x5xf32>, tensor<5x3xf32>) outs({{.*}} : tensor<3x3xf32>) -> tensor<3x3xf32>
-// DISPATCH:         flow.dispatch.tensor.store {{.*}} offsets = [0, 0], sizes = [3, 3], strides = [1, 1] : tensor<3x3xf32> -> !flow.dispatch.tensor<readwrite:3x3xf32>
-// DISPATCH:         return
-
-// RUN: iree-opt %s --iree-hal-target-backends=llvm-cpu \
-// RUN:   --iree-abi-transformation-pipeline --iree-flow-transformation-pipeline  --iree-flow-dispatch-use-transform-dialect=%p/matmul_dispatch_spec.mlir \
-// RUN:   --iree-stream-transformation-pipeline --iree-hal-configuration-pipeline | \
+// RUN:   --iree-stream-transformation-pipeline \
+// RUN:   --iree-hal-configuration-pipeline | \
 // RUN: iree-opt --pass-pipeline='hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target))' \
 // RUN:   --iree-codegen-llvmcpu-use-transform-dialect=%p/matmul_codegen_spec.mlir | \
 // RUN: FileCheck %s --check-prefixes=CODEGEN
@@ -41,8 +22,10 @@ func.func @matmul_static(
 // Run with C++ dispatch region formation but transform dialect codegen
 // RUN: iree-opt %s --iree-hal-target-backends=llvm-cpu \
 // RUN:   --iree-abi-transformation-pipeline --iree-flow-transformation-pipeline \
-// RUN:   --iree-flow-dispatch-via-region-ops --iree-flow-dispatch-via-region-ops-generate-workload-region=false \
-// RUN:   --iree-stream-transformation-pipeline --iree-hal-configuration-pipeline | \
+// RUN:   --iree-flow-dispatch-via-region-ops \
+// RUN:   --iree-flow-dispatch-via-region-ops-generate-workload-region=false \
+// RUN:   --iree-stream-transformation-pipeline \
+// RUN:   --iree-hal-configuration-pipeline | \
 // RUN: iree-opt --pass-pipeline='hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target))' \
 // RUN:   --iree-codegen-llvmcpu-use-transform-dialect=%p/matmul_codegen_spec.mlir | \
 // RUN: FileCheck %s --check-prefixes=CODEGEN
@@ -74,7 +57,7 @@ func.func @matmul_static(
 // RUN:   --iree-abi-transformation-pipeline \
 // RUN:   --iree-flow-transformation-pipeline \
 // RUN:   --iree-stream-transformation-pipeline \
-// RUN:    --iree-hal-configuration-pipeline | \
+// RUN:   --iree-hal-configuration-pipeline | \
 // RUN: iree-opt --pass-pipeline='hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target))' \
 // RUN:   --iree-codegen-llvmcpu-use-transform-dialect=%p/matmul_codegen_default_spec.mlir | \
 // RUN: FileCheck %s --check-prefixes=CODEGEN-DEFAULT
@@ -87,7 +70,6 @@ func.func @matmul_static(
 // CODEGEN-DEFAULT:         hal.return %[[D0]], %[[C1]], %[[C1]]
 
 // RUN: iree-compile %s --iree-hal-target-backends=llvm-cpu \
-// RUN:   --iree-flow-dispatch-use-transform-dialect=%p/matmul_dispatch_spec.mlir \
 // RUN:   --iree-codegen-llvmcpu-use-transform-dialect=%p/matmul_codegen_spec.mlir | \
 // RUN: iree-run-module --entry_function=matmul_static \
 // RUN:   --function_input="3x5xf32=1 1 1 1 1 1 1 1 1 1 1 1 1 1 1" \

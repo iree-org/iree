@@ -22,8 +22,6 @@ iree_lit_test_suite(
     data = [
         "matmul_codegen_default_spec.mlir",
         "matmul_codegen_spec.mlir",
-        "matmul_dispatch_spec.mlir",
-        "matmul_tiled_dispatch_spec.mlir",
     ],
     tags = [
         "noasan",

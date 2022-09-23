@@ -310,28 +310,27 @@ LogicalResult rewriteForeachThreadToWorkgroup(
         "scf.foreach_thread with rank > 3 does not lower to workgroup");
 
   // Step 0. Outline the compute workload region and set up the workload
-  // operands.
+  // operands, if this has not been done already.
+  // Using `transform.iree.tile_to_workgroups_op` is the preferred way to set
+  // up tiling and workgroup_count region at the same time.
+  //
+  // The block of code below will be retired once there is enough confidence we
+  // can do everything without it. This includes in particular providing custom
+  // fusion heuristics at the flow level: at this time, the only way to fully
+  // control fusion of more advanced cases is to use the transform dialect at
+  // the flow level and explicitly match the ops we want to fuse.
+  // Once fusion is customizable enough in perpetuity, we can retire this.
   auto maybeWorkgroupCounts = getNumThreads(rewriter, foreachThreadOp);
-  if (failed(maybeWorkgroupCounts) ||
-      llvm::any_of(*maybeWorkgroupCounts, [](OpFoldResult ofr) {
-        return !getConstantIntValue(ofr).has_value();
-      }))
-    return foreachThreadOp->emitError(
-        "unsupported dynamic workgroup_count atm --- need to slice out "
-        "workgroup_count computation into ExecutableExport::workgroup_count. "
-        "This region may require arbitrary computations and cannot magically "
-        "match what the `stream.cmd.dispatch` has already imposed on us at a "
-        "distance. For now we must specify the number of values properly when "
-        "applying the topLevel tile_to_foreach_thread_op");
-
-  SmallVector<int64_t> workgroupCounts;
-  for (OpFoldResult ofr : *maybeWorkgroupCounts)
-    workgroupCounts.push_back(getConstantIntValue(ofr).value());
-  if (failed(populateWorkgroupCountComputingRegion(rewriter, foreachThreadOp,
-                                                   exportOp))) {
-    return foreachThreadOp->emitOpError(
-               "failed to populate workload region for dispatchOp: ")
-           << exportOp;
+  if (failed(maybeWorkgroupCounts)) {
+    SmallVector<int64_t> workgroupCounts;
+    for (OpFoldResult ofr : *maybeWorkgroupCounts)
+      workgroupCounts.push_back(getConstantIntValue(ofr).value());
+    if (failed(populateWorkgroupCountComputingRegion(rewriter, foreachThreadOp,
+                                                     exportOp))) {
+      return foreachThreadOp->emitOpError(
+                 "failed to populate workload region for dispatchOp: ")
+             << exportOp;
+    }
   }
 
   // Step 1. Create the workgroup id and count ops.
@@ -406,10 +405,6 @@ transform_dialect::ForeachThreadToWorkgroupOp::applyToOne(
     state.getTopLevel()->emitOpError("no IREE::HAL::ExecutableExportOp found");
     return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
   }
-  if (!exportOp.getWorkgroupCount().empty())
-    return emitDefaultSilenceableFailure(target)
-           << "export op must have an empty workgroup count region that "
-              "the transform fills --- the transform is not applied";
 
   scf::ForeachThreadOp topLevelForeachThreadOp;
   auto walkResult = target->walk([&](scf::ForeachThreadOp foreachThreadOp) {
