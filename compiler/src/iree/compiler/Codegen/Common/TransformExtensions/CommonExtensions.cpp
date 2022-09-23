@@ -312,7 +312,7 @@ LogicalResult rewriteForeachThreadToWorkgroup(
   // Step 0. Outline the compute workload region and set up the workload
   // operands, if this has not been done already.
   // Using `transform.iree.tile_to_workgroups_op` is the preferred way to set
-  // up tiling and workgroup_count region at the same time.
+  // up tiling and workgroup_count region **at the same time**.
   //
   // The block of code below will be retired once there is enough confidence we
   // can do everything without it. This includes in particular providing custom
@@ -320,8 +320,19 @@ LogicalResult rewriteForeachThreadToWorkgroup(
   // control fusion of more advanced cases is to use the transform dialect at
   // the flow level and explicitly match the ops we want to fuse.
   // Once fusion is customizable enough in perpetuity, we can retire this.
-  auto maybeWorkgroupCounts = getNumThreads(rewriter, foreachThreadOp);
-  if (failed(maybeWorkgroupCounts)) {
+  if (exportOp.getWorkgroupCount().empty()) {
+    auto maybeWorkgroupCounts = getNumThreads(rewriter, foreachThreadOp);
+    if (failed(maybeWorkgroupCounts) ||
+        llvm::any_of(*maybeWorkgroupCounts, [](OpFoldResult ofr) {
+          return !getConstantIntValue(ofr).has_value();
+        }))
+      return foreachThreadOp->emitError(
+          "unsupported dynamic workgroup_count atm --- need to slice out "
+          "workgroup_count computation into ExecutableExport::workgroup_count. "
+          "This region may require arbitrary computations and cannot magically "
+          "match what the `stream.cmd.dispatch` has already imposed on us at a "
+          "distance. For now we must specify the number of values properly "
+          "when applying the topLevel tile_to_foreach_thread_op");
     SmallVector<int64_t> workgroupCounts;
     for (OpFoldResult ofr : *maybeWorkgroupCounts)
       workgroupCounts.push_back(getConstantIntValue(ofr).value());
@@ -534,8 +545,8 @@ DiagnosedSilenceableFailure transform_dialect::TileToWorkgroupsOp::apply(
         reportUnknownTransformError(exportOp.value()));
   }
 
-  /// Lower the workgroup count region in keeping with the way dispatch regions
-  /// are created by default in IREEs compilation flow.
+  /// Lower the workgroup count region in keeping with the way dispatch
+  /// regions are created by default in IREEs compilation flow.
   IRRewriter rewriter(getContext());
   if (failed(lowerWorkgroupCountComputingRegion(rewriter, exportOp.value(),
                                                 mixedTileSizes))) {

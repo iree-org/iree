@@ -21,7 +21,7 @@ iree_lit_test_suite(
     # they need to be included as data.
     data = [
         "matmul_codegen_default_spec.mlir",
-        "matmul_codegen_spec.mlir",
+        "matmul_codegen_custom_dispatch_formation_spec.mlir",
     ],
     tags = [
         "noasan",
