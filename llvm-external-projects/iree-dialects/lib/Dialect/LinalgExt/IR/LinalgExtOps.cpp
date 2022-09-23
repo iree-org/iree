@@ -1481,26 +1481,30 @@ ShapedType PackOp::inferResultType() {
                              ShapedType::kDynamicSize);
   SmallVector<int64_t> indicesOfBlockedDims =
       extractFromI64ArrayAttr(getDimsPos());
-  DenseSet<int64_t> blockedDimsAsSet(indicesOfBlockedDims.begin(),
-                                     indicesOfBlockedDims.end());
+
+  assert(staticTiles.size() == indicesOfBlockedDims.size());
+
+  // bind the dimension to tile with the tile factor.
+  DenseMap<int64_t, int64_t> tileAndPosMapping;
+  for (auto i : llvm::seq<int64_t>(0, indicesOfBlockedDims.size()))
+    tileAndPosMapping[indicesOfBlockedDims[i]] = staticTiles[i];
+
   SmallVector<int64_t> inferredShape;
   inferredShape.reserve(getOutputRank());
   ShapedType inputType = getInputType();
   int64_t rank = getInputRank();
-  size_t posInTiles = 0;
 
   // tile loop.
   for (auto i : llvm::seq<int64_t>(0, rank)) {
-    if (blockedDimsAsSet.count(i)) {
+    if (tileAndPosMapping.count(i)) {
       if (inputType.isDynamicDim(i) ||
-          staticTiles[posInTiles] == ShapedType::kDynamicSize)
+          tileAndPosMapping[i] == ShapedType::kDynamicSize)
         inferredShape.push_back(ShapedType::kDynamicSize);
       else {
         int64_t sizeDim =
-            std::ceil(inputType.getDimSize(i) / staticTiles[posInTiles]);
+            std::ceil(inputType.getDimSize(i) / tileAndPosMapping[i]);
         inferredShape.push_back(sizeDim);
       }
-      ++posInTiles;
     } else
       inferredShape.push_back(inputType.getShape()[i]);
   }
@@ -1668,22 +1672,28 @@ LogicalResult PackOp::generateScalarImplementation(OpBuilder &builder,
   }
 
   SmallVector<int64_t> dimsToBlock = extractFromI64ArrayAttr(getDimsPos());
-  DenseSet<int64_t> dimsSet(dimsToBlock.begin(), dimsToBlock.end());
-
   SmallVector<OpFoldResult> innerTiles = getMixedTiles();
+  assert(innerTiles.size() == dimsToBlock.size());
+  // bind the dimension to tile with the tile factor.
+  DenseMap<int64_t, OpFoldResult> tileAndPosMapping;
+  for (auto i : llvm::seq<int64_t>(0, dimsToBlock.size()))
+    tileAndPosMapping[dimsToBlock[i]] = innerTiles[i];
+
   SmallVector<OpFoldResult> sourceIndices;
-  size_t posInTiles = 0;
+  size_t pointLoopsOffset = 0;
   for (auto dim : llvm::seq<int64_t>(0, getInputRank())) {
-    if (dimsSet.count(dim)) {
+    if (tileAndPosMapping.count(dim)) {
       AffineExpr i, j, tile;
       bindDims(builder.getContext(), i, j);
       bindSymbols(builder.getContext(), tile);
       OpFoldResult sourceIndex = makeComposedFoldedAffineApply(
           builder, loc, i * tile + j,
-          ArrayRef<OpFoldResult>{interchangedIvs[dim],
-                                 interchangedIvs[posInTiles + getInputRank()],
-                                 innerTiles[posInTiles++]});
+          ArrayRef<OpFoldResult>{
+              interchangedIvs[dim],
+              interchangedIvs[pointLoopsOffset + getInputRank()],
+              tileAndPosMapping[dim]});
       sourceIndices.push_back(sourceIndex);
+      ++pointLoopsOffset;
     } else
       sourceIndices.push_back(interchangedIvs[dim]);
   }
