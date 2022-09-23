@@ -34,7 +34,6 @@ iree_lit_test_suite(
     # they need to be included as data.
     data = [
         "reduction_codegen_spec.mlir",
-        "reduction_dispatch_spec.mlir",
         "softmax_codegen_spec.mlir",
         "softmax_dispatch_spec.mlir",
         "softmax_fused_codegen_spec.mlir",
