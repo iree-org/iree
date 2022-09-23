@@ -14,8 +14,14 @@
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/ADT/StringSet.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arithmetic/Utils/Utils.h"
+#include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/Pass/PassManager.h"
 
@@ -426,6 +432,138 @@ transform_dialect::ForeachThreadToWorkgroupOp::applyToOne(
     return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
 
   results.assign({target});
+
+  return DiagnosedSilenceableFailure(success());
+}
+
+//===---------------------------------------------------------------------===//
+// TileToWorkgroupsOp
+//===---------------------------------------------------------------------===//
+
+/// Lower the ops within the workgroup count region of `exportOp` that
+/// represents the workgroup count calculation, to the actual
+/// computation that returns the number of workgroups. For now
+/// this lowers the `flow.dispatch.workgroup_count_from_dag_root` op
+/// to `ceilDiv(workload, tileSizes)`.
+static LogicalResult lowerWorkgroupCountComputingRegion(
+    RewriterBase &rewriter, HAL::ExecutableExportOp exportOp,
+    ArrayRef<OpFoldResult> tileSizes) {
+  Region &r = exportOp.getWorkgroupCount();
+  if (!r.hasOneBlock()) {
+    return rewriter.notifyMatchFailure(exportOp,
+                                       "expected export op to have a workgroup "
+                                       "count region with a single block");
+  }
+  auto workgroupCountOps =
+      r.front().getOps<IREE::Flow::DispatchWorkgroupCountFromDagRootOp>();
+  if (!llvm::hasSingleElement(workgroupCountOps)) {
+    return rewriter.notifyMatchFailure(
+        exportOp,
+        "expected region to have a single "
+        "flow.dispatch.workgroup_count_from_dag_root op");
+  }
+  auto workgroupCountOp = *workgroupCountOps.begin();
+  auto workload = workgroupCountOp.getOperands();
+
+  if (tileSizes.size() > workload.size()) {
+    return rewriter.notifyMatchFailure(
+        exportOp,
+        "number of tile sizes overflow the dimension from the workload");
+  }
+
+  SmallVector<OpFoldResult> workgroupCount;
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(workgroupCountOp);
+  Location loc = workgroupCountOp.getLoc();
+  for (auto tileSize : llvm::enumerate(tileSizes)) {
+    if (isConstantIntValue(tileSize.value(), 0)) {
+      workgroupCount.push_back(workload[tileSize.index()]);
+      continue;
+    }
+    AffineExpr s0, s1;
+    bindSymbols(rewriter.getContext(), s0, s1);
+    auto m = AffineMap::get(0, 2, s0.ceilDiv(s1));
+    OpFoldResult count = makeComposedFoldedAffineApply(
+        rewriter, loc, m,
+        ArrayRef<OpFoldResult>{workload[tileSize.index()], tileSize.value()});
+    workgroupCount.push_back(count);
+  }
+  workgroupCount = llvm::to_vector(llvm::reverse(workgroupCount));
+  workgroupCount.resize(3, rewriter.getIndexAttr(1));
+  rewriter.replaceOp(workgroupCountOp, getValueOrCreateConstantIndexOp(
+                                           rewriter, loc, workgroupCount));
+  return success();
+}
+
+SmallVector<OpFoldResult>
+transform_dialect::TileToWorkgroupsOp::getMixedNumThreads() {
+  return getMixedSizes(getStaticNumThreads(), getNumThreads());
+}
+
+SmallVector<OpFoldResult>
+transform_dialect::TileToWorkgroupsOp::getMixedTileSizes() {
+  return getMixedSizes(getStaticTileSizes(), getTileSizes());
+}
+
+LogicalResult transform_dialect::TileToWorkgroupsOp::verify() {
+  if (getMixedNumThreads().empty() == getMixedTileSizes().empty())
+    return emitOpError("either num_threads or tile_sizes must be specified");
+  return success();
+}
+
+void transform_dialect::TileToWorkgroupsOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::consumesHandle(getTarget(), effects);
+  transform::consumesHandle(getFunc(), effects);
+  transform::onlyReadsHandle(getTileSizes(), effects);
+  transform::onlyReadsHandle(getNumThreads(), effects);
+  transform::producesHandle(getResults(), effects);
+}
+
+DiagnosedSilenceableFailure transform_dialect::TileToWorkgroupsOp::apply(
+    transform::TransformResults &transformResults,
+    transform::TransformState &state) {
+  ArrayRef<Operation *> funcOps = state.getPayloadOps(getFunc());
+  assert(funcOps.size() == 1 && "expected single func op in payload");
+  FailureOr<IREE::HAL::ExecutableExportOp> exportOp =
+      getEntryPoint(cast<func::FuncOp>(funcOps[0]));
+  if (failed(exportOp)) {
+    state.getTopLevel()->emitOpError("couldn't find export op for func");
+    return DiagnosedSilenceableFailure(reportUnknownTransformError(funcOps[0]));
+  }
+
+  SmallVector<OpFoldResult> mixedTileSizes = getMixedTileSizes();
+  if (mixedTileSizes.empty()) {
+    exportOp.value()->emitOpError("require tile sizes to be specified");
+    return DiagnosedSilenceableFailure(
+        reportUnknownTransformError(exportOp.value()));
+  }
+
+  /// Lower the workgroup count region in keeping with the way dispatch regions
+  /// are created by default in IREEs compilation flow.
+  IRRewriter rewriter(getContext());
+  if (failed(lowerWorkgroupCountComputingRegion(rewriter, exportOp.value(),
+                                                mixedTileSizes))) {
+    exportOp.value()->emitOpError("failed to lower workgroup count region");
+    return DiagnosedSilenceableFailure(
+        reportUnknownTransformError(exportOp.value()));
+  }
+
+  ArrayRef<Operation *> targets = state.getPayloadOps(getTarget());
+
+  // Result payload ops.
+  SmallVector<Operation *> tileOps;
+  SmallVector<Operation *> tiledOps;
+
+  DiagnosedSilenceableFailure diag = transform::tileToForeachThreadOpImpl(
+      rewriter, state, cast<transform::TransformOpInterface>(getOperation()),
+      targets, getMixedNumThreads(), getMixedTileSizes(), getThreadDimMapping(),
+      tileOps, tiledOps);
+
+  if (!diag.succeeded()) return diag;
+
+  transformResults.set(getForeachThreadOp().cast<OpResult>(), tileOps);
+  transformResults.set(getTiledOp().cast<OpResult>(), tiledOps);
 
   return DiagnosedSilenceableFailure(success());
 }
