@@ -790,7 +790,7 @@ func.func @NC_to_NCnc(%arg0: memref<128x256xf32>, %arg1: memref<4x8x32x32xf32>) 
 // -----
 
 func.func @KC_to_KCck(%arg0: memref<128x256xf32>, %arg1: memref<8x4x32x32xf32>) {
-  iree_linalg_ext.pack %arg0 inner_tiles [32, 32] interchange = [0, 1, 3, 2] into %arg1 : (memref<128x256xf32> memref<8x4x32x32xf32>)
+  iree_linalg_ext.pack %arg0 inner_tiles [32, 32] interchange = [1, 0] into %arg1 : (memref<128x256xf32> memref<8x4x32x32xf32>)
   return
 }
 // CHECK: #[[MAP:.*]] = affine_map<(d0, d1) -> (d0 * 32 + d1)>

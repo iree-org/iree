@@ -647,26 +647,17 @@ func.func @topk_tensor_optional(%input_values: tensor<20x10x8x4xf32>) -> (tensor
 // -----
 
 // CHECK: func.func @relayout(
-func.func @relayout(%arg0: tensor<3x3xf32>, %arg1: tensor<3x3xf32>) -> tensor<3x3xf32> {
+func.func @relayout(%arg0: tensor<3x3xf32>, %arg1: tensor<3x3x1x1xf32>) -> tensor<3x3x1x1xf32> {
   // CHECK: iree_linalg_ext.pack
-  %1 = iree_linalg_ext.pack %arg0 inner_tiles [1, 1] into %arg1 : (tensor<3x3xf32> tensor<3x3xf32>) -> tensor<3x3xf32>
-  return %1 : tensor<3x3xf32>
+  %1 = iree_linalg_ext.pack %arg0 inner_tiles [1, 1] into %arg1 : (tensor<3x3xf32> tensor<3x3x1x1xf32>) -> tensor<3x3x1x1xf32>
+  return %1 : tensor<3x3x1x1xf32>
 }
 
 // -----
 
 // CHECK: func.func @relayout(
-func.func @relayout(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) {
+func.func @relayout(%arg0: memref<3x3xf32>, %arg1: memref<3x3x1x1xf32>) {
   // CHECK: iree_linalg_ext.pack
-  iree_linalg_ext.pack %arg0 inner_tiles [1, 1] into %arg1 : (memref<3x3xf32> memref<3x3xf32>)
-  return 
-}
-
-// -----
-
-// CHECK: func.func @relayout(
-func.func @relayout(%arg0: memref<3x3xf32>, %arg1: memref<3x3xf32>) {
-  // CHECK: iree_linalg_ext.pack
-  iree_linalg_ext.pack %arg0 inner_tiles [1, 1] interchange = [0, 1, 2, 3] into %arg1 : (memref<3x3xf32> memref<3x3xf32>)
+  iree_linalg_ext.pack %arg0 inner_tiles [1, 1] into %arg1 : (memref<3x3xf32> memref<3x3x1x1xf32>)
   return 
 }

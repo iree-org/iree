@@ -1451,10 +1451,18 @@ LogicalResult TopkOp::getResultTilePosition(
 // PackOp
 //===----------------------------------------------------------------------===//
 
+// TODO: implement me. For now only basic checks.
 LogicalResult PackOp::verify() {
-  // input rank = r
-  // output rank = 2 * r (input rank + tile rank).
-  // inner tiles = r
+  Operation *op = getOperation();
+  // If the interchange vector is given, it must equal the blocking factors.
+  auto interchangeVector = getIteratorInterchange();
+  size_t numberOfBlockingFactors = getMixedInnerTiles().size();
+  if (interchangeVector && !interchangeVector->empty() &&
+      interchangeVector->size() != numberOfBlockingFactors)
+    op->emitError("Interchange vector must equal blocking factors");
+  if ((getInputRank() + numberOfBlockingFactors) != getOutputRank())
+    op->emitError("output rank must be input rank + blocking factors");
+
   return success();
 }
 
@@ -1473,7 +1481,7 @@ SmallVector<OpFoldResult> PackOp::getMixedInnerTiles() {
 }
 
 SmallVector<StringRef> PackOp::getLoopIteratorTypes() {
-  SmallVector<StringRef> iteratorTypes(getInputRank() * 2,
+  SmallVector<StringRef> iteratorTypes(getOutputRank(),
                                        getParallelIteratorTypeName());
   return iteratorTypes;
 }
@@ -1525,21 +1533,24 @@ static SmallVector<unsigned> extractUIntArray(ArrayAttr attr) {
 // Interchange elements in `loopOrIvs` (Range or Value) based
 // on the indexes in `interchangeVector`.
 template <typename T>
-SmallVector<T> interchange(ArrayRef<T> loopsOrIvs,
-                           ArrayRef<unsigned> interchangeVector) {
+static SmallVector<T> interchange(ArrayRef<T> loopsOrIvs,
+                                  ArrayRef<unsigned> interchangeVector,
+                                  int64_t inputRank) {
   SmallVector<T> rearrangedLoopsOrIvs = llvm::to_vector(loopsOrIvs);
   if (interchangeVector.empty())
     return rearrangedLoopsOrIvs;
-  assert(rearrangedLoopsOrIvs.size() == interchangeVector.size() &&
-         "number of loops ivs must equal number of permutations");
-  for (int idx = 0, end = interchangeVector.size(); idx < end; idx++)
-    rearrangedLoopsOrIvs[interchangeVector[idx]] = loopsOrIvs[idx];
+  assert((rearrangedLoopsOrIvs.size() - inputRank) ==
+             interchangeVector.size() &&
+         "number of blocked loops ivs must equal number of permutations");
+  for (int64_t idx = 0, end = interchangeVector.size(); idx < end; idx++)
+    rearrangedLoopsOrIvs[interchangeVector[idx] + inputRank] =
+        loopsOrIvs[idx + inputRank];
   return rearrangedLoopsOrIvs;
 }
 
 // Implements `getIterationDomain` from the tiling interface.
 SmallVector<Range> PackOp::getIterationDomain(OpBuilder &builder) {
-  int64_t outputRank = getInputRank() * 2;
+  int64_t outputRank = getOutputRank();
   SmallVector<Range> loopBounds(outputRank);
   Location loc = getLoc();
   // lower bound.
@@ -1555,9 +1566,12 @@ SmallVector<Range> PackOp::getIterationDomain(OpBuilder &builder) {
     loopBounds[dim].size = upperBounds[dim];
   }
   auto interchangeVector = getIteratorInterchange();
-  if (!interchangeVector)
+  if (!interchangeVector || (*interchangeVector).empty())
     return loopBounds;
-  return interchange<Range>(loopBounds, extractUIntArray(*interchangeVector));
+  assert((*interchangeVector).size() == getMixedInnerTiles().size() &&
+         "interchange vector must equal blocking factors");
+  return interchange<Range>(loopBounds, extractUIntArray(*interchangeVector),
+                            getInputRank());
 }
 
 // Implements `getIterationDomain` from the tiling interface.
@@ -1567,8 +1581,8 @@ LogicalResult PackOp::generateScalarImplementation(OpBuilder &builder,
   SmallVector<Value> interchangedIvs = ivs;
   auto interchangeVector = getIteratorInterchange();
   if (interchangeVector) {
-    interchangedIvs = interchange<Value>(interchangedIvs,
-                                         extractUIntArray(*interchangeVector));
+    interchangedIvs = interchange<Value>(
+        interchangedIvs, extractUIntArray(*interchangeVector), getInputRank());
   }
 
   SmallVector<OpFoldResult> innerTiles = getMixedInnerTiles();
