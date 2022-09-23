@@ -806,7 +806,7 @@ class ZeroExtendIOpConversion : public OpConversionPattern<arith::ExtUIOp> {
                                                          adaptor.getIn());
     } else if (srcType.isInteger(8) && dstType.isInteger(64)) {
       rewriter.replaceOpWithNewOp<IREE::VM::ExtI8I64UOp>(srcOp, dstType,
-                                                          adaptor.getIn());
+                                                         adaptor.getIn());
     } else if (srcType.isInteger(16) && dstType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::ExtI16I32UOp>(srcOp, dstType,
                                                           adaptor.getIn());
