@@ -1607,7 +1607,6 @@ SmallVector<StringRef> PackOp::getLoopIteratorTypes() {
 // https://mlir.llvm.org/doxygen/TensorInferTypeOpInterfaceImpl_8cpp_source.html
 /// Helper function to convert a vector of `OpFoldResult`s into a vector of
 /// `Value`s.
-// TODO: https://reviews.llvm.org/D134451
 static SmallVector<Value> getAsValues(OpBuilder &b, Location loc,
                                       ArrayRef<OpFoldResult> valueOrAttrVec) {
   return llvm::to_vector<4>(
@@ -1628,6 +1627,7 @@ OpFoldResult PackOp::buildOutputDim(OpBuilder &builder, size_t dimIdx) {
   return nullptr;
 }
 
+// TODO: ReifyRankedShapedTypeOpInterface
 // Infer and return the shape of the output as OpFoldResult.
 SmallVector<OpFoldResult> PackOp::buildOutputShape(OpBuilder &builder) {
   ArrayRef<int64_t> outputShape = getOutputShape();
