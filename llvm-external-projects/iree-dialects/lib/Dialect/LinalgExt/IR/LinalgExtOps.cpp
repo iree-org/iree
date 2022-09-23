@@ -1652,13 +1652,7 @@ SmallVector<Range> PackOp::getIterationDomain(OpBuilder &builder) {
     loopBounds[dim].stride = one;
     loopBounds[dim].size = upperBounds[dim];
   }
-  auto interchangeVector = getIteratorInterchange();
-  if (!interchangeVector || (*interchangeVector).empty())
-    return loopBounds;
-  assert((*interchangeVector).size() == getMixedTiles().size() &&
-         "interchange vector must equal blocking factors");
-  return interchange<Range>(
-      loopBounds, extractFromI64ArrayAttr(*interchangeVector), getInputRank());
+  return loopBounds;
 }
 
 // Implements `getIterationDomain` from the tiling interface.
