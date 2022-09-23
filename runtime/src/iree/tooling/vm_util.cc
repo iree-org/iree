@@ -9,7 +9,6 @@
 #include <cerrno>
 #include <cstdint>
 #include <cstdio>
-#include <ostream>
 #include <type_traits>
 #include <vector>
 
@@ -253,7 +252,7 @@ Status ParseToVariantList(iree_hal_allocator_t* device_allocator,
 // Prints a buffer view with contents without a trailing newline.
 static iree_status_t PrintBufferView(iree_hal_buffer_view_t* buffer_view,
                                      iree_host_size_t max_element_count,
-                                     std::ostream* os) {
+                                     iree_string_builder_t* builder) {
   std::string result_str(4096, '\0');
   iree_status_t status;
   do {
@@ -264,67 +263,96 @@ static iree_status_t PrintBufferView(iree_hal_buffer_view_t* buffer_view,
     result_str.resize(actual_length);
   } while (iree_status_is_out_of_range(status));
   IREE_RETURN_IF_ERROR(status);
-  *os << result_str;
+  iree_string_builder_append_string(
+      builder, iree_make_string_view(result_str.data(), result_str.size()));
   return iree_ok_status();
 }
 
+#define IREE_PRINTVARIANT_CASE_I(SIZE, B, V, STATUS)     \
+  case IREE_VM_VALUE_TYPE_I##SIZE:                       \
+    STATUS = iree_string_builder_append_format(          \
+        B, "i" #SIZE "=%" PRIi##SIZE "\n", (V).i##SIZE); \
+    break;
+
+#define IREE_PRINTVARIANT_CASE_F(SIZE, B, V, STATUS)                          \
+  case IREE_VM_VALUE_TYPE_F##SIZE:                                            \
+    STATUS =                                                                  \
+        iree_string_builder_append_format(B, "f" #SIZE "=%g\n", (V).f##SIZE); \
+    break;
+
 // Prints variant description including a trailing newline.
 static Status PrintVariant(iree_vm_variant_t variant, size_t max_element_count,
-                           std::ostream* os) {
+                           iree_string_builder_t* builder) {
   if (iree_vm_variant_is_empty(variant)) {
-    *os << "(null)\n";
+    iree_string_builder_append_string(builder, IREE_SVL("(null)\n"));
   } else if (iree_vm_variant_is_value(variant)) {
+    iree_status_t status = iree_ok_status();
     switch (variant.type.value_type) {
-      case IREE_VM_VALUE_TYPE_I8:
-        *os << "i8=" << variant.i8 << "\n";
-        break;
-      case IREE_VM_VALUE_TYPE_I16:
-        *os << "i16=" << variant.i16 << "\n";
-        break;
-      case IREE_VM_VALUE_TYPE_I32:
-        *os << "i32=" << variant.i32 << "\n";
-        break;
-      case IREE_VM_VALUE_TYPE_I64:
-        *os << "i64=" << variant.i64 << "\n";
-        break;
-      case IREE_VM_VALUE_TYPE_F32:
-        *os << "f32=" << variant.f32 << "\n";
-        break;
-      case IREE_VM_VALUE_TYPE_F64:
-        *os << "f64=" << variant.f64 << "\n";
-        break;
+      IREE_PRINTVARIANT_CASE_I(8, builder, variant, status)
+      IREE_PRINTVARIANT_CASE_I(16, builder, variant, status)
+      IREE_PRINTVARIANT_CASE_I(32, builder, variant, status)
+      IREE_PRINTVARIANT_CASE_I(64, builder, variant, status)
+      IREE_PRINTVARIANT_CASE_F(32, builder, variant, status)
+      IREE_PRINTVARIANT_CASE_F(64, builder, variant, status)
       default:
-        *os << "?\n";
+        status = iree_string_builder_append_string(builder, IREE_SVL("?\n"));
         break;
     }
+    IREE_RETURN_IF_ERROR(status);
   } else if (iree_vm_variant_is_ref(variant)) {
     iree_string_view_t type_name = iree_vm_ref_type_name(variant.type.ref_type);
-    *os << std::string(type_name.data, type_name.size) << "\n";
+    iree_string_builder_append_string(builder, type_name);
+    iree_string_builder_append_string(builder, IREE_SVL("\n"));
     if (iree_hal_buffer_view_isa(variant.ref)) {
       auto* buffer_view = iree_hal_buffer_view_deref(variant.ref);
-      IREE_RETURN_IF_ERROR(PrintBufferView(buffer_view, max_element_count, os));
-      *os << "\n";
+      IREE_RETURN_IF_ERROR(
+          PrintBufferView(buffer_view, max_element_count, builder));
+      iree_string_builder_append_string(builder, IREE_SVL("\n"));
     } else {
       // TODO(benvanik): a way for ref types to describe themselves.
-      *os << "(no printer)\n";
+      iree_string_builder_append_string(builder, IREE_SVL("(no printer)\n"));
     }
   } else {
-    *os << "(null)\n";
+    iree_string_builder_append_string(builder, IREE_SVL("(null)\n"));
   }
   return OkStatus();
 }
 
 Status PrintVariantList(iree_vm_list_t* variant_list, size_t max_element_count,
-                        std::ostream* os) {
+                        iree_string_builder_t* builder) {
   IREE_TRACE_SCOPE();
   for (iree_host_size_t i = 0; i < iree_vm_list_size(variant_list); ++i) {
     iree_vm_variant_t variant = iree_vm_variant_empty();
     IREE_RETURN_IF_ERROR(iree_vm_list_get_variant(variant_list, i, &variant),
                          "variant %zu not present", i);
-    *os << "result[" << i << "]: ";
-    IREE_RETURN_IF_ERROR(PrintVariant(variant, max_element_count, os));
+    iree_string_builder_append_format(builder, "result[%zu]: ", i);
+    IREE_RETURN_IF_ERROR(PrintVariant(variant, max_element_count, builder));
   }
   return OkStatus();
+}
+
+Status PrintVariantList(iree_vm_list_t* variant_list, size_t max_element_count,
+                        std::string* out_string) {
+  iree_string_builder_t builder;
+  iree_string_builder_initialize(iree_allocator_system(), &builder);
+  IREE_RETURN_IF_ERROR(
+      PrintVariantList(variant_list, max_element_count, &builder));
+  out_string->assign(iree_string_builder_buffer(&builder),
+                     iree_string_builder_size(&builder));
+  iree_string_builder_deinitialize(&builder);
+  return iree_ok_status();
+}
+
+Status PrintVariantList(iree_vm_list_t* variant_list,
+                        size_t max_element_count) {
+  iree_string_builder_t builder;
+  iree_string_builder_initialize(iree_allocator_system(), &builder);
+  IREE_RETURN_IF_ERROR(
+      PrintVariantList(variant_list, max_element_count, &builder));
+  printf("%.*s", (int)iree_string_builder_size(&builder),
+         iree_string_builder_buffer(&builder));
+  iree_string_builder_deinitialize(&builder);
+  return iree_ok_status();
 }
 
 }  // namespace iree

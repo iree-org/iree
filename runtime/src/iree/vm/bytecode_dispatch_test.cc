@@ -129,7 +129,7 @@ TEST_P(VMBytecodeDispatchTest, Check) {
       GTEST_SUCCEED();
     } else {
       GTEST_FAIL() << "Function expected success but failed with error: "
-                   << iree::Status(std::move(status));
+                   << iree::Status(std::move(status)).ToString();
     }
   }
 }
