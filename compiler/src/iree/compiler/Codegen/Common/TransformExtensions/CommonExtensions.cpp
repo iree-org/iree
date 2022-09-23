@@ -443,6 +443,12 @@ transform_dialect::ForeachThreadToWorkgroupOp::applyToOne(
   return DiagnosedSilenceableFailure(success());
 }
 
+void transform_dialect::ForeachThreadToWorkgroupOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::consumesHandle(getTarget(), effects);
+  transform::producesHandle(getTransformed(), effects);
+}
+
 //===---------------------------------------------------------------------===//
 // TileToForeachThreadAndWorkgroupCountRegion
 //===---------------------------------------------------------------------===//
@@ -522,7 +528,6 @@ transform_dialect::TileToForeachThreadAndWorkgroupCountRegion::verify() {
 void transform_dialect::TileToForeachThreadAndWorkgroupCountRegion::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::consumesHandle(getTarget(), effects);
-  transform::onlyReadsHandle(getFunc(), effects);
   transform::onlyReadsHandle(getTileSizes(), effects);
   transform::onlyReadsHandle(getNumThreads(), effects);
   transform::producesHandle(getResults(), effects);
@@ -532,13 +537,13 @@ DiagnosedSilenceableFailure
 transform_dialect::TileToForeachThreadAndWorkgroupCountRegion::apply(
     transform::TransformResults &transformResults,
     transform::TransformState &state) {
-  ArrayRef<Operation *> funcOps = state.getPayloadOps(getFunc());
-  assert(funcOps.size() == 1 && "expected single func op in payload");
-  FailureOr<IREE::HAL::ExecutableExportOp> exportOp =
-      getEntryPoint(cast<func::FuncOp>(funcOps[0]));
+  ArrayRef<Operation *> targetOps = state.getPayloadOps(getTarget());
+  assert(targetOps.size() == 1 && "expected single target op in payload");
+  auto funcOp = targetOps.front()->getParentOfType<func::FuncOp>();
+  FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
   if (failed(exportOp)) {
     state.getTopLevel()->emitOpError("couldn't find export op for func");
-    return DiagnosedSilenceableFailure(reportUnknownTransformError(funcOps[0]));
+    return DiagnosedSilenceableFailure(reportUnknownTransformError(funcOp));
   }
 
   SmallVector<OpFoldResult> mixedTileSizes = getMixedTileSizes();
