@@ -101,7 +101,7 @@ def IREEBufferizeOp : Op<Transform_Dialect, "iree.bufferize",
 def ForeachThreadToWorkgroupOp : Op<Transform_Dialect, 
     "iree.foreach_thread_to_workgroup",
     [FunctionalStyleTransformOpTrait,
-     MemoryEffectsOpInterface,
+     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      TransformOpInterface,
      TransformEachOpTrait]> {
   let description = [{
@@ -153,8 +153,8 @@ def ForeachThreadToWorkgroupOp : Op<Transform_Dialect,
   }];
 }
 
-def TileToWorkgroupsOp :
-    Op<Transform_Dialect, "iree.tile_to_workgroups_op",
+def TileToForeachThreadAndWorkgroupCountRegion :
+    Op<Transform_Dialect, "iree.tile_to_foreach_thread_and_workgroup_count_region",
       [AttrSizedOperandSegments,
        DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
        TransformOpInterface]> {
@@ -162,14 +162,13 @@ def TileToWorkgroupsOp :
     Wrapper around `structured.tile_to_foreach_thread_op` for use within IREE.
 
     In addition to tile and distribute using `scf.foreach_thread`, lowers the
-    the `workgroup_count` region of the export op corresponding to the
-    `func.func` to return the number of workgroups.
+    the `workgroup_count` region of the export op corresponding to the parent
+    `func.func` of the target to return the number of workgroups.
     Please see the doc of `structured.tile_to_foreach_thread_op` for full
     description of op semantics. 
   }];
 
   let arguments = (ins PDL_Operation:$target,
-                   PDL_Operation:$func,
                    Variadic<PDL_Operation>:$num_threads,
                    Variadic<PDL_Operation>:$tile_sizes,
                    DefaultValuedAttr<I64ArrayAttr, "{}">:$static_num_threads,
@@ -178,7 +177,7 @@ def TileToWorkgroupsOp :
   let results = (outs PDL_Operation:$foreach_thread_op,
                       PDL_Operation:$tiled_op);
   let assemblyFormat = [{
-    $target $func oilist(
+    $target oilist(
         `num_threads` custom<DynamicIndexList>($num_threads,
                                                $static_num_threads,
                                                "ShapedType::kDynamicSize") |

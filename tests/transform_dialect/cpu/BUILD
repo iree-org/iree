@@ -20,10 +20,8 @@ iree_lit_test_suite(
     # transform dialect spec files are MLIR files that specify a transformation,
     # they need to be included as data.
     data = [
+        "matmul_codegen_custom_dispatch_formation_spec.mlir",
         "matmul_codegen_default_spec.mlir",
-        "matmul_codegen_spec.mlir",
-        "matmul_dispatch_spec.mlir",
-        "matmul_tiled_dispatch_spec.mlir",
     ],
     tags = [
         "noasan",
