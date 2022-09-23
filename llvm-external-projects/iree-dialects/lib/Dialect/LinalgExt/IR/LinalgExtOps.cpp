@@ -1456,11 +1456,80 @@ static bool isInBound(ArrayRef<int64_t> dimsPos, int64_t rank) {
       dimsPos, [rank](int64_t dimPos) { return dimPos >= 0 && dimPos < rank; });
 }
 
-// For now only basic checks.
+// Interchange `elements` based on the indexes in `interchangeVector`.
+template <typename T>
+static SmallVector<T> interchange(ArrayRef<T> elements,
+                                  ArrayRef<int64_t> interchangeVector,
+                                  int64_t offset) {
+  SmallVector<T> rearrangedElements = llvm::to_vector(elements);
+  if (interchangeVector.empty())
+    return rearrangedElements;
+  assert((rearrangedElements.size() - offset) == interchangeVector.size() &&
+         "number of elements must equal number of permutations");
+  for (int64_t idx = 0, end = interchangeVector.size(); idx < end; idx++)
+    rearrangedElements[interchangeVector[idx] + offset] =
+        elements[idx + offset];
+  return rearrangedElements;
+}
+
+// Infer result/output type given the input and the tile sizes. Take
+// into account the optional interchange.
+ShapedType PackOp::inferResultType() {
+  SmallVector<Value> dynamicTiles;
+  SmallVector<int64_t> staticTiles;
+  dispatchIndexOpFoldResults(getMixedTiles(), dynamicTiles, staticTiles,
+                             ShapedType::kDynamicSize);
+  SmallVector<int64_t> indicesOfBlockedDims =
+      extractFromI64ArrayAttr(getDimsPos());
+  DenseSet<int64_t> blockedDimsAsSet(indicesOfBlockedDims.begin(),
+                                     indicesOfBlockedDims.end());
+  SmallVector<int64_t> inferredShape;
+  inferredShape.reserve(getOutputRank());
+  ShapedType inputType = getInputType();
+  int64_t rank = getInputRank();
+  size_t posInTiles = 0;
+
+  // tile loop.
+  for (auto i : llvm::seq<int64_t>(0, rank)) {
+    if (blockedDimsAsSet.count(i)) {
+      if (inputType.isDynamicDim(i) ||
+          staticTiles[posInTiles] == ShapedType::kDynamicSize)
+        inferredShape.push_back(ShapedType::kDynamicSize);
+      else {
+        int64_t sizeDim =
+            std::ceil(inputType.getDimSize(i) / staticTiles[posInTiles]);
+        inferredShape.push_back(sizeDim);
+      }
+      ++posInTiles;
+    } else
+      inferredShape.push_back(inputType.getShape()[i]);
+  }
+
+  // point loop.
+  auto interchangeVector = getIteratorInterchange();
+  if (interchangeVector)
+    staticTiles = interchange<int64_t>(
+        staticTiles, extractFromI64ArrayAttr(*interchangeVector), /*offset=*/0);
+  inferredShape.append(staticTiles.begin(), staticTiles.end());
+
+  return TypeSwitch<Type, ShapedType>(inputType)
+      .Case<RankedTensorType>([&](RankedTensorType t) -> ShapedType {
+        return RankedTensorType::get(inferredShape, inputType.getElementType());
+      })
+      .Case<MemRefType>([&](MemRefType t) -> ShapedType {
+        return MemRefType::get(inferredShape, inputType.getElementType());
+      })
+      .Default([&](Type t) {
+        llvm_unreachable("unexpected type");
+        return nullptr;
+      });
+}
+
+// verifier for the pack operation.
 LogicalResult PackOp::verify() {
   Operation *op = getOperation();
   auto interchangeVector = getIteratorInterchange();
-  size_t numberOfBlockingFactors = getMixedInnerTiles().size();
+  size_t numberOfBlockingFactors = getMixedTiles().size();
   // If the interchange vector is given and non empty, it must equal the
   // blocking factors.
   if (interchangeVector && !interchangeVector->empty() &&
@@ -1494,10 +1563,15 @@ LogicalResult PackOp::verify() {
       !isInBound(extractFromI64ArrayAttr(*interchangeVector), getInputRank()))
     op->emitError("Out of bound position in interchange vector");
 
+  // Verify result type against inferred type.
+  ShapedType expectedType = PackOp::inferResultType();
+  if (expectedType != getOutputType())
+    op->emitError("inferred type do not match provied output type");
+
   return success();
 }
 
-SmallVector<OpFoldResult> PackOp::getMixedInnerTiles() {
+SmallVector<OpFoldResult> PackOp::getMixedTiles() {
   SmallVector<OpFoldResult> mixedInnerTiles;
   mixedInnerTiles.reserve(getInputRank());
   unsigned dynamicValIndex = 0;
@@ -1552,24 +1626,6 @@ SmallVector<OpFoldResult> PackOp::buildOutputShape(OpBuilder &builder) {
       [&](size_t dimIdx) { return buildOutputDim(builder, dimIdx); }));
 }
 
-// Interchange elements in `loopOrIvs` (Range or Value) based
-// on the indexes in `interchangeVector`.
-template <typename T>
-static SmallVector<T> interchange(ArrayRef<T> loopsOrIvs,
-                                  ArrayRef<int64_t> interchangeVector,
-                                  int64_t inputRank) {
-  SmallVector<T> rearrangedLoopsOrIvs = llvm::to_vector(loopsOrIvs);
-  if (interchangeVector.empty())
-    return rearrangedLoopsOrIvs;
-  assert((rearrangedLoopsOrIvs.size() - inputRank) ==
-             interchangeVector.size() &&
-         "number of blocked loops ivs must equal number of permutations");
-  for (int64_t idx = 0, end = interchangeVector.size(); idx < end; idx++)
-    rearrangedLoopsOrIvs[interchangeVector[idx] + inputRank] =
-        loopsOrIvs[idx + inputRank];
-  return rearrangedLoopsOrIvs;
-}
-
 // Implements `getIterationDomain` from the tiling interface. In each
 // loop the lower bound is zero and the step is one. For upper bound
 // is inferred from the output tensor.
@@ -1589,7 +1645,7 @@ SmallVector<Range> PackOp::getIterationDomain(OpBuilder &builder) {
   auto interchangeVector = getIteratorInterchange();
   if (!interchangeVector || (*interchangeVector).empty())
     return loopBounds;
-  assert((*interchangeVector).size() == getMixedInnerTiles().size() &&
+  assert((*interchangeVector).size() == getMixedTiles().size() &&
          "interchange vector must equal blocking factors");
   return interchange<Range>(
       loopBounds, extractFromI64ArrayAttr(*interchangeVector), getInputRank());
@@ -1610,7 +1666,7 @@ LogicalResult PackOp::generateScalarImplementation(OpBuilder &builder,
   SmallVector<int64_t> dimsToBlock = extractFromI64ArrayAttr(getDimsPos());
   DenseSet<int64_t> dimsSet(dimsToBlock.begin(), dimsToBlock.end());
 
-  SmallVector<OpFoldResult> innerTiles = getMixedInnerTiles();
+  SmallVector<OpFoldResult> innerTiles = getMixedTiles();
   SmallVector<OpFoldResult> sourceIndices;
   size_t posInTiles = 0;
   for (auto dim : llvm::seq<int64_t>(0, getInputRank())) {

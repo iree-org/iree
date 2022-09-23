@@ -468,12 +468,12 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack",[
 
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
 
-    // Return the output operand `destination`.
+    // Return the output operand.
     Value getOutput() {
       return getOutputOperand(0)->get();
     }
 
-    // Return the input operand `source`.
+    // Return the input operand.
     Value getInput() {
       return getInputOperand(0)->get();
     }
@@ -485,7 +485,12 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack",[
 
     // Return the output type.
     ShapedType getOutputType() {
-      return getOutput().getType();
+      return getOutput().getType().cast<ShapedType>();
+    }
+
+    // Return the input type.
+    ShapedType getInputType() {
+      return getInput().getType().cast<ShapedType>();
     }
 
     // Return the output shape.
@@ -499,13 +504,16 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack",[
     }
 
     // Return the tile sizes ad OpFoldResults.
-    SmallVector<OpFoldResult> getMixedInnerTiles();
+    SmallVector<OpFoldResult> getMixedTiles();
 
-    // Infer and return the shape of the output.
+    // Return the shape of the output.
     SmallVector<OpFoldResult> buildOutputShape(OpBuilder &builder);
 
     // Build the output position at pos `dimIdx`.
     OpFoldResult buildOutputDim(OpBuilder &builder, size_t dimIdx);
+
+    // Infer the output type.
+    ShapedType inferResultType();
 
   }];
 }

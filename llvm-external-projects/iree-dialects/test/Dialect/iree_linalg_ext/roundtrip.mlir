@@ -646,18 +646,25 @@ func.func @topk_tensor_optional(%input_values: tensor<20x10x8x4xf32>) -> (tensor
 
 // -----
 
-// CHECK: func.func @relayout(
 func.func @relayout(%arg0: tensor<3x3xf32>, %arg1: tensor<3x3x1x1xf32>) -> tensor<3x3x1x1xf32> {
-  // CHECK: iree_linalg_ext.pack
   %1 = iree_linalg_ext.pack %arg0 dims_pos = [0, 1] inner_tiles = [1, 1] into %arg1 : (tensor<3x3xf32> tensor<3x3x1x1xf32>) -> tensor<3x3x1x1xf32>
   return %1 : tensor<3x3x1x1xf32>
 }
 
+// CHECK: func.func @relayout(
+// CHECK-SAME: %[[ARG0:[a-zA-Z0-9]+]]: tensor<3x3xf32>,
+// CHECK-SAME: %[[ARG1:[a-zA-Z0-9]+]]: tensor<3x3x1x1xf32>) -> tensor<3x3x1x1xf32>
+// CHECK: %[[RES:.*]] = iree_linalg_ext.pack %[[ARG0]] dims_pos = [0, 1] inner_tiles = [1, 1] into %[[ARG1]] : (tensor<3x3xf32> tensor<3x3x1x1xf32>) -> tensor<3x3x1x1xf32>
+// CHECK: return %[[RES]] : tensor<3x3x1x1xf32>
+
 // -----
 
-// CHECK: func.func @relayout(
 func.func @relayout(%arg0: memref<3x3xf32>, %arg1: memref<3x3x1x1xf32>) {
-  // CHECK: iree_linalg_ext.pack
   iree_linalg_ext.pack %arg0 dims_pos = [0, 1] inner_tiles = [1, 1] into %arg1 : (memref<3x3xf32> memref<3x3x1x1xf32>)
   return 
 }
+
+// CHECK: func.func @relayout(
+// CHECK-SAME: %[[ARG0:[a-zA-Z0-9]+]]: memref<3x3xf32>,
+// CHECK-SAME: %[[ARG1:[a-zA-Z0-9]+]]: memref<3x3x1x1xf32>) {
+// CHECK: iree_linalg_ext.pack %[[ARG0]] dims_pos = [0, 1] inner_tiles = [1, 1] into %[[ARG1]] : (memref<3x3xf32> memref<3x3x1x1xf32>)
