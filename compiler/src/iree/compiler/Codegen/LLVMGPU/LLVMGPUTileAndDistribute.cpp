@@ -181,37 +181,7 @@ static LogicalResult copyToWorkgroupMemory(OpBuilder &b, Value src, Value dst) {
   return success();
 }
 
-/// Returns the indices of the transposed operands in a linalg generic.
-static SmallVector<int64_t> getTransposedOperands(linalg::GenericOp linalgOp) {
-  // Determine which operands to promote:
-  SmallVector<int64_t> transposedOperands;
-  if (linalgOp.getNumParallelLoops() < 2) {
-    return transposedOperands;
-  }
-  for (auto indexValue : llvm::enumerate(linalgOp.getIndexingMapsArray())) {
-    int64_t opIndex = indexValue.index();
-    auto indexMap = indexValue.value();
-    if (!indexMap.isEmpty() && indexMap.isPermutation()) {
-      // Ensure that the fasted moving dimension (the last one) is permuted
-      // otherwise data isn't moved.
-      if (indexMap.getDimPosition(indexMap.getNumDims() - 1) !=
-          indexMap.getNumDims() - 1) {
-        // Add operand to promote to list and mark the linalg for this
-        // promotion.
-        transposedOperands.push_back(opIndex);
-      }
-    }
-  }
-  return transposedOperands;
-}
-
 using PromotionFilterFunction = std::function<LogicalResult(Operation *op)>;
-
-/// Returns true if op is appropriate transpose for promotion.
-static LogicalResult transposeFilter(Operation *op,
-                                     linalg::GenericOp promotedFilterOp) {
-  return success(op == promotedFilterOp.getOperation());
-}
 
 /// Returns true if op is appropriate contract for promotion.
 static LogicalResult contractOpFilter(Operation *op) {
@@ -285,14 +255,10 @@ struct LLVMGPUTileAndDistributePass
  private:
   // Distribute the workloads to warp if true otherwise distribute to threads.
   bool distributeToWarp = false;
-  GPUPromoteSharedMemPattern promoteSharedMemPattern =
-      GPUPromoteSharedMemPattern::ContractionOpPattern;
 
  public:
-  LLVMGPUTileAndDistributePass(
-      bool distributeToWarp, GPUPromoteSharedMemPattern promoteSharedMemPattern)
-      : distributeToWarp(distributeToWarp),
-        promoteSharedMemPattern(promoteSharedMemPattern) {}
+  LLVMGPUTileAndDistributePass(bool distributeToWarp)
+      : distributeToWarp(distributeToWarp) {}
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<AffineDialect, gpu::GPUDialect>();
   }
@@ -336,35 +302,9 @@ struct LLVMGPUTileAndDistributePass
     if (flatWorkgroupSize > kWarpSize) {
       RewritePatternSet promotionPatterns(&getContext());
 
-      switch (promoteSharedMemPattern) {
-        case GPUPromoteSharedMemPattern::ContractionOpPattern:
           populatePromotionPatterns(context, promotionPatterns,
                                     contractOpFilter, {0, 1});
 
-          break;
-        case GPUPromoteSharedMemPattern::TransposeOpPattern:
-          funcOp.walk(
-              [&context, &promotionPatterns](linalg::GenericOp linalgOp) {
-                // Promotion patterns accept a fixed list of operands to promote
-                // before determine which op is being promoted. To support
-                // multiple linalg generic ops with different promoted operands,
-                // We walk each linalg generic op to determine which operands to
-                // promote, then create a filter that will only apply to it's
-                // configuration.
-                SmallVector<int64_t> operandsToPromote =
-                    getTransposedOperands(linalgOp);
-                if (!operandsToPromote.empty()) {
-                  populatePromotionPatterns(
-                      context, promotionPatterns,
-                      [linalgOp](Operation *op) -> LogicalResult {
-                        return transposeFilter(op, linalgOp);
-                      },
-                      operandsToPromote);
-                }
-              });
-
-          break;
-      }
       if (failed(applyPatternsAndFoldGreedily(funcOp,
                                               std::move(promotionPatterns)))) {
         return signalPassFailure();
@@ -442,9 +382,8 @@ struct LLVMGPUTileAndDistributePass
 }  // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTileAndDistribute(
-    bool distributeToWarp, GPUPromoteSharedMemPattern promoteSharedMemPattern) {
-  return std::make_unique<LLVMGPUTileAndDistributePass>(
-      distributeToWarp, promoteSharedMemPattern);
+    bool distributeToWarp) {
+  return std::make_unique<LLVMGPUTileAndDistributePass>(distributeToWarp);
 }
 
 }  // namespace iree_compiler

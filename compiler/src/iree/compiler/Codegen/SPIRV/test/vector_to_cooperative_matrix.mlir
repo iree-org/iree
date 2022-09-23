@@ -53,8 +53,8 @@ hal.executable private @matmul_contract  {
 hal.executable private @matmul_contract_licm  {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.0,
-          [Shader, CooperativeMatrixNV, Int8, Float16, StorageUniform16, StorageBuffer8BitAccess, Float16Buffer],
-          [SPV_KHR_storage_buffer_storage_class, SPV_NV_cooperative_matrix, SPV_KHR_8bit_storage, SPV_KHR_16bit_storage]>,
+          [Shader, CooperativeMatrixNV, Int8, StorageBuffer8BitAccess],
+          [SPV_KHR_storage_buffer_storage_class, SPV_NV_cooperative_matrix, SPV_KHR_8bit_storage]>,
           #spv.resource_limits<max_compute_workgroup_invocations = 128, max_compute_workgroup_size = [128, 128, 64]>>}> {
     builtin.module {
       // CHECK-LABEL: func.func @matmul_contract_licm
@@ -99,8 +99,8 @@ hal.executable private @matmul_contract_licm  {
 hal.executable private @matmul_contract_vector_memref  {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.0,
-        [Shader, CooperativeMatrixNV, Int8, Float16, StorageUniform16, StorageBuffer8BitAccess, Float16Buffer],
-        [SPV_KHR_storage_buffer_storage_class, SPV_NV_cooperative_matrix, SPV_KHR_8bit_storage, SPV_KHR_16bit_storage]>,
+        [Shader, CooperativeMatrixNV, Int8, StorageBuffer8BitAccess],
+        [SPV_KHR_storage_buffer_storage_class, SPV_NV_cooperative_matrix, SPV_KHR_8bit_storage]>,
         #spv.resource_limits<max_compute_workgroup_invocations = 128, max_compute_workgroup_size = [128, 128, 64]>>}> {
     builtin.module {
       // CHECK-LABEL: func.func @matmul_contract_vector_memref
@@ -134,8 +134,8 @@ hal.executable private @matmul_contract_vector_memref  {
 hal.executable private @const_elementwise_ops  {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
     spv.target_env = #spv.target_env<#spv.vce<v1.0,
-        [Shader, CooperativeMatrixNV, Int8, Float16, StorageBuffer8BitAccess],
-        [SPV_KHR_storage_buffer_storage_class, SPV_NV_cooperative_matrix, SPV_KHR_8bit_storage]>,
+        [Shader, CooperativeMatrixNV, Float16],
+        [SPV_KHR_storage_buffer_storage_class, SPV_NV_cooperative_matrix]>,
         #spv.resource_limits<max_compute_workgroup_invocations = 128, max_compute_workgroup_size = [128, 128, 64]>>}> {
     builtin.module {
       // CHECK-LABEL: func.func @const_elementwise_ops

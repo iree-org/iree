@@ -83,6 +83,14 @@ LAYERS_TO_MUTUALLY_EXCLUSIVE_KWARGS = {
     "ConvLSTM2D": ["strides", "dilation_rate"],
 }
 
+# Some layers cannot operate on a fully dynamic shape, only dynamic batch size.
+LAYERS_WITH_BATCH_ONLY_DYNAMIC_SHAPE = [
+    "AveragePooling1D",  # uses tf.nn.avg_pool2d with reshape, which is illegal
+    "BatchNormalization",  # failed to materialize conversion
+    "Conv3D",  # tf.Conv3D op illegal
+    "MaxPool1D",  # uses tf.nn.max_pool2d with reshape, which is illegal
+]
+
 
 def get_default_kwargs_values(layer: str) -> Dict[str, Any]:
   """Gets the default kwargs for a tf.keras.layers layer."""
@@ -501,8 +509,16 @@ def create_layer_unit_test(
 
   dynamic_signature = static_signature
   if FLAGS.dynamic_dims:
-    dynamic_signature = tf_utils.apply_function(dynamic_signature,
-                                                tf_utils.make_dims_dynamic)
+
+    def make_batch_size_dynamic(tensor_spec: tf.TensorSpec) -> tf.TensorSpec:
+      return tf.TensorSpec([None] + tensor_spec.shape[1:], tensor_spec.dtype)
+
+    if FLAGS.layer in LAYERS_WITH_BATCH_ONLY_DYNAMIC_SHAPE:
+      dynamic_signature = tf_utils.apply_function(dynamic_signature,
+                                                  make_batch_size_dynamic)
+    else:
+      dynamic_signature = tf_utils.apply_function(dynamic_signature,
+                                                  tf_utils.make_dims_dynamic)
 
   if len(static_signature) > 1:
     static_signature = [static_signature]

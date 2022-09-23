@@ -144,7 +144,7 @@ BEGIN_FUNCTION iree_ukernel_mmt4d_i8i8i32_tile_8x8x8_arm_64_i8mm
         stp q0, q1, [x0, 128]
         stp q2, q3, [x0, 160]
         stp q4, q5, [x0, 192]
-        stp q7, q7, [x0, 224]
+        stp q6, q7, [x0, 224]
         ret
 
 END_FUNCTION iree_ukernel_mmt4d_i8i8i32_tile_8x8x8_arm_64_i8mm

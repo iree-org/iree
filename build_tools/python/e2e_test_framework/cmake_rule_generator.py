@@ -17,22 +17,23 @@ import urllib.parse
 
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 
+
+def read_template_from_file(template_path: pathlib.Path) -> string.Template:
+  return string.Template(template_path.read_text())
+
+
 TEMPLATE_DIR = pathlib.Path(__file__).parent
-
-
-def read_template_from_file(template_name: str) -> string.Template:
-  with open(TEMPLATE_DIR / template_name, "r") as f:
-    return string.Template(f.read())
-
-
 DOWNLOAD_ARTIFACT_CMAKE_TEMPLATE = read_template_from_file(
-    "iree_download_artifact_template.cmake")
+    TEMPLATE_DIR / "iree_download_artifact_template.cmake")
 TFLITE_IMPORT_CMAKE_TEMPLATE = read_template_from_file(
-    "iree_tflite_import_template.cmake")
+    TEMPLATE_DIR / "iree_tflite_import_template.cmake")
 TF_IMPORT_CMAKE_TEMPLATE = read_template_from_file(
-    "iree_tf_import_template.cmake")
+    TEMPLATE_DIR / "iree_tf_import_template.cmake")
 IREE_BYTECODE_MODULE_CMAKE_TEMPLATE = read_template_from_file(
-    "iree_bytecode_module_template.cmake")
+    TEMPLATE_DIR / "iree_bytecode_module_template.cmake")
+
+# Archive extensions used to pack models.
+ARCHIVE_FILE_EXTENSIONS = [".tar", ".gz"]
 
 
 @dataclass
@@ -81,9 +82,15 @@ class CommonRuleFactory(object):
     target_name = f"model-{model.id}"
 
     model_url = urllib.parse.urlparse(model.source_url)
-    _, file_ext = os.path.splitext(model_url.path)
-    # Model path: <model_artifacts_dir>/<model_id>_<model_name>.<file ext>
-    model_path = f"{self._model_artifacts_dir}/{model.id}_{model.name}{file_ext}"
+
+    # Drop the archive extensions.
+    file_exts = pathlib.PurePath(model_url.path).suffixes
+    while len(file_exts) > 0 and file_exts[-1] in ARCHIVE_FILE_EXTENSIONS:
+      file_exts.pop()
+    model_ext = "".join(file_exts)
+
+    # Model path: <model_artifacts_dir>/<model_id>_<model_name><model_ext>
+    model_path = f"{self._model_artifacts_dir}/{model.id}_{model.name}{model_ext}"
 
     if model_url.scheme == "https":
       cmake_rule = DOWNLOAD_ARTIFACT_CMAKE_TEMPLATE.substitute(
