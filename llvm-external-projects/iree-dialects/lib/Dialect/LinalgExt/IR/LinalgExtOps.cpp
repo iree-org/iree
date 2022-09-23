@@ -1451,17 +1451,58 @@ LogicalResult TopkOp::getResultTilePosition(
 // PackOp
 //===----------------------------------------------------------------------===//
 
-// TODO: implement me. For now only basic checks.
+// TODO: copy and pasted from LinalgTransformOps.cpp
+/// Extracts a vector of unsigned from an array attribute. Asserts if the
+/// attribute contains values other than intergers. May truncate.
+static SmallVector<unsigned> extractUIntArray(ArrayAttr attr) {
+  SmallVector<unsigned> result;
+  result.reserve(attr.size());
+  for (APInt value : attr.getAsValueRange<IntegerAttr>())
+    result.push_back(value.getZExtValue());
+  return result;
+}
+
+static bool isInBound(ArrayRef<unsigned> dimsPos, int64_t rank) {
+  return llvm::all_of(dimsPos,
+                      [rank](unsigned dimPos) { return dimPos < rank; });
+}
+
+// For now only basic checks.
 LogicalResult PackOp::verify() {
   Operation *op = getOperation();
-  // If the interchange vector is given, it must equal the blocking factors.
   auto interchangeVector = getIteratorInterchange();
   size_t numberOfBlockingFactors = getMixedInnerTiles().size();
+  // If the interchange vector is given and non empty, it must equal the
+  // blocking factors.
   if (interchangeVector && !interchangeVector->empty() &&
       interchangeVector->size() != numberOfBlockingFactors)
     op->emitError("Interchange vector must equal blocking factors");
+
+  // Blocking factors must be less or equal than the input rank.
+  if (numberOfBlockingFactors > getInputRank())
+    op->emitError("blocking factors must be less or equal than the input rank");
+
+  // The number of `dim_pos` that carries the index of the dimensions to block
+  // must be less or equal than the input rank.
+  if (getDimsPos().size() > getInputRank())
+    op->emitError("indices of blocked dimensions must be less or equal than "
+                  "the input rank");
+
+  // Require output rank to match input rank + number of blocking factors.
   if ((getInputRank() + numberOfBlockingFactors) != getOutputRank())
-    op->emitError("output rank must be input rank + blocking factors");
+    op->emitError("Output rank must equal input rank + blocking factors");
+
+  // Require `dim_pos` to be in-bound. `dim_pos` carries the index of the
+  // dimensions to block.
+  if (!isInBound(extractUIntArray(getDimsPos()), getOutputRank()))
+    op->emitError("Out-of-bound position");
+
+  // Require interchangeVector to be in-bound. The interchange index is in bound
+  // if it is smaller than the input rank, as most `input rank - 1` dimensions
+  // can be blocked.
+  if (interchangeVector &&
+      !isInBound(extractUIntArray(*interchangeVector), getInputRank()))
+    op->emitError("Out of bound position in interchange vector");
 
   return success();
 }
@@ -1480,6 +1521,8 @@ SmallVector<OpFoldResult> PackOp::getMixedInnerTiles() {
   return mixedInnerTiles;
 }
 
+// Implement the tiling interface. The number of loops equals
+// the rank of the output tensors. All the loops are parallel.
 SmallVector<StringRef> PackOp::getLoopIteratorTypes() {
   SmallVector<StringRef> iteratorTypes(getOutputRank(),
                                        getParallelIteratorTypeName());
@@ -1490,7 +1533,7 @@ SmallVector<StringRef> PackOp::getLoopIteratorTypes() {
 // https://mlir.llvm.org/doxygen/TensorInferTypeOpInterfaceImpl_8cpp_source.html
 /// Helper function to convert a vector of `OpFoldResult`s into a vector of
 /// `Value`s.
-// TODO: upstream change: move it to StaticValueUtils.h
+// TODO: https://reviews.llvm.org/D134451
 static SmallVector<Value> getAsValues(OpBuilder &b, Location loc,
                                       ArrayRef<OpFoldResult> valueOrAttrVec) {
   return llvm::to_vector<4>(
@@ -1519,17 +1562,6 @@ SmallVector<OpFoldResult> PackOp::buildOutputShape(OpBuilder &builder) {
       [&](size_t dimIdx) { return buildOutputDim(builder, dimIdx); }));
 }
 
-// TODO: copy and pasted from LinalgTransformOps.cpp
-/// Extracts a vector of unsigned from an array attribute. Asserts if the
-/// attribute contains values other than intergers. May truncate.
-static SmallVector<unsigned> extractUIntArray(ArrayAttr attr) {
-  SmallVector<unsigned> result;
-  result.reserve(attr.size());
-  for (APInt value : attr.getAsValueRange<IntegerAttr>())
-    result.push_back(value.getZExtValue());
-  return result;
-}
-
 // Interchange elements in `loopOrIvs` (Range or Value) based
 // on the indexes in `interchangeVector`.
 template <typename T>
@@ -1548,16 +1580,15 @@ static SmallVector<T> interchange(ArrayRef<T> loopsOrIvs,
   return rearrangedLoopsOrIvs;
 }
 
-// Implements `getIterationDomain` from the tiling interface.
+// Implements `getIterationDomain` from the tiling interface. In each
+// loop the lower bound is zero and the step is one. For upper bound
+// is inferred from the output tensor.
 SmallVector<Range> PackOp::getIterationDomain(OpBuilder &builder) {
   int64_t outputRank = getOutputRank();
   SmallVector<Range> loopBounds(outputRank);
   Location loc = getLoc();
-  // lower bound.
   Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
-  // step.
   Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
-  // upper bound (size of the output tensor).
   SmallVector<Value> upperBounds =
       getAsValues(builder, loc, buildOutputShape(builder));
   for (auto dim : llvm::seq<int64_t>(0, outputRank)) {
@@ -1585,21 +1616,25 @@ LogicalResult PackOp::generateScalarImplementation(OpBuilder &builder,
         interchangedIvs, extractUIntArray(*interchangeVector), getInputRank());
   }
 
+  SmallVector<unsigned> dimsToBlock = extractUIntArray(getDimsPos());
+  DenseSet<unsigned> dimsSet(dimsToBlock.begin(), dimsToBlock.end());
+
   SmallVector<OpFoldResult> innerTiles = getMixedInnerTiles();
   SmallVector<OpFoldResult> sourceIndices;
+  size_t posInTiles = 0;
   for (auto dim : llvm::seq<int64_t>(0, getInputRank())) {
-    AffineExpr i, j, t;
-    // i dim0
-    // j dim1
-    // t tile_size
-    bindDims(builder.getContext(), i, j);
-    bindSymbols(builder.getContext(), t);
-    OpFoldResult sourceIndex = makeComposedFoldedAffineApply(
-        builder, loc, i * t + j,
-        ArrayRef<OpFoldResult>{interchangedIvs[dim],
-                               interchangedIvs[dim + getInputRank()],
-                               innerTiles[dim]});
-    sourceIndices.push_back(sourceIndex);
+    if (dimsSet.count(dim)) {
+      AffineExpr i, j, tile;
+      bindDims(builder.getContext(), i, j);
+      bindSymbols(builder.getContext(), tile);
+      OpFoldResult sourceIndex = makeComposedFoldedAffineApply(
+          builder, loc, i * tile + j,
+          ArrayRef<OpFoldResult>{interchangedIvs[dim],
+                                 interchangedIvs[posInTiles + getInputRank()],
+                                 innerTiles[posInTiles++]});
+      sourceIndices.push_back(sourceIndex);
+    } else
+      sourceIndices.push_back(interchangedIvs[dim]);
   }
   Value scalar = builder.create<memref::LoadOp>(
       loc, getInput(), getAsValues(builder, loc, sourceIndices));

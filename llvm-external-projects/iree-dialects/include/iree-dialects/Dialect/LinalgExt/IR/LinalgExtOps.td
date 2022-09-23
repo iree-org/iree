@@ -435,7 +435,6 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
   }];
 }
 
-// TODO: is pack the right name? After all we are re-arranging the tensor.
 // TODO: destination passing style.
 def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack",[
   DeclareOpInterfaceMethods<LinalgExtInterface>,
@@ -448,16 +447,18 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack",[
   let summary = "pack operation"; 
 
   let arguments = (ins Variadic<AnyShaped>:$inputs,
-                       Variadic<AnyShaped>:$outputs,
-                       OptionalAttr<DefaultValuedAttr<I64ArrayAttr, "{}">>:$iterator_interchange,
-                       Variadic<Index>:$inner_tiles,
-                       I64ArrayAttr:$static_inner_tiles);
+    Variadic<AnyShaped>:$outputs,
+    OptionalAttr<DefaultValuedAttr<I64ArrayAttr, "{}">>:$iterator_interchange,
+    DefaultValuedAttr<I64ArrayAttr, "{}">:$dims_pos,
+    Variadic<Index>:$inner_tiles,
+    I64ArrayAttr:$static_inner_tiles);
 
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let assemblyFormat = [{
     attr-dict
     $inputs 
-    `inner_tiles`
+    `dims_pos` `=` $dims_pos
+    `inner_tiles` `=`
     custom<DynamicIndexList>($inner_tiles, $static_inner_tiles,
                              "ShapedType::kDynamicStrideOrOffset")
     (`interchange` `=` $iterator_interchange^)?

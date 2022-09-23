@@ -82,13 +82,11 @@ struct TilingInterfaceLowerToLoopsPattern : public RewritePattern {
     if (isa<linalg::LinalgOp>(op)) {
       return rewriter.notifyMatchFailure(op, "ignoring LinalgOps");
     }
-    // Tensor semantics?
-    // if (llvm::any_of(tilableOp->getResults(),
-    //                 [&](Value v) { return v.getType().isa<ShapedType>(); }))
-    //                 {
-    //  return rewriter.notifyMatchFailure(
-    //      tilableOp, "lower to loops needs to have tensor semantics");
-    //}
+    if (llvm::any_of(tilableOp->getResults(),
+                     [&](Value v) { return v.getType().isa<ShapedType>(); })) {
+      return rewriter.notifyMatchFailure(
+          tilableOp, "lower to loops needs to have tensor semantics");
+    }
     if (failed(lowerToLoops(rewriter, tilableOp))) {
       return failure();
     }
