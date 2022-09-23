@@ -1451,20 +1451,9 @@ LogicalResult TopkOp::getResultTilePosition(
 // PackOp
 //===----------------------------------------------------------------------===//
 
-// TODO: copy and pasted from LinalgTransformOps.cpp
-/// Extracts a vector of unsigned from an array attribute. Asserts if the
-/// attribute contains values other than intergers. May truncate.
-static SmallVector<unsigned> extractUIntArray(ArrayAttr attr) {
-  SmallVector<unsigned> result;
-  result.reserve(attr.size());
-  for (APInt value : attr.getAsValueRange<IntegerAttr>())
-    result.push_back(value.getZExtValue());
-  return result;
-}
-
-static bool isInBound(ArrayRef<unsigned> dimsPos, int64_t rank) {
-  return llvm::all_of(dimsPos,
-                      [rank](unsigned dimPos) { return dimPos < rank; });
+static bool isInBound(ArrayRef<int64_t> dimsPos, int64_t rank) {
+  return llvm::all_of(
+      dimsPos, [rank](int64_t dimPos) { return dimPos >= 0 && dimPos < rank; });
 }
 
 // For now only basic checks.
@@ -1494,14 +1483,15 @@ LogicalResult PackOp::verify() {
 
   // Require `dim_pos` to be in-bound. `dim_pos` carries the index of the
   // dimensions to block.
-  if (!isInBound(extractUIntArray(getDimsPos()), getOutputRank()))
+  if (!isInBound(extractFromI64ArrayAttr(getDimsPos()), getOutputRank()))
     op->emitError("Out-of-bound position");
 
   // Require interchangeVector to be in-bound. The interchange index is in bound
   // if it is smaller than the input rank, as most `input rank - 1` dimensions
   // can be blocked.
+  // TODO: use `extractUIntArray` if we decide to expose in `StaticValueUtils.h`
   if (interchangeVector &&
-      !isInBound(extractUIntArray(*interchangeVector), getInputRank()))
+      !isInBound(extractFromI64ArrayAttr(*interchangeVector), getInputRank()))
     op->emitError("Out of bound position in interchange vector");
 
   return success();
@@ -1566,7 +1556,7 @@ SmallVector<OpFoldResult> PackOp::buildOutputShape(OpBuilder &builder) {
 // on the indexes in `interchangeVector`.
 template <typename T>
 static SmallVector<T> interchange(ArrayRef<T> loopsOrIvs,
-                                  ArrayRef<unsigned> interchangeVector,
+                                  ArrayRef<int64_t> interchangeVector,
                                   int64_t inputRank) {
   SmallVector<T> rearrangedLoopsOrIvs = llvm::to_vector(loopsOrIvs);
   if (interchangeVector.empty())
@@ -1601,8 +1591,8 @@ SmallVector<Range> PackOp::getIterationDomain(OpBuilder &builder) {
     return loopBounds;
   assert((*interchangeVector).size() == getMixedInnerTiles().size() &&
          "interchange vector must equal blocking factors");
-  return interchange<Range>(loopBounds, extractUIntArray(*interchangeVector),
-                            getInputRank());
+  return interchange<Range>(
+      loopBounds, extractFromI64ArrayAttr(*interchangeVector), getInputRank());
 }
 
 // Implements `getIterationDomain` from the tiling interface.
@@ -1613,11 +1603,12 @@ LogicalResult PackOp::generateScalarImplementation(OpBuilder &builder,
   auto interchangeVector = getIteratorInterchange();
   if (interchangeVector) {
     interchangedIvs = interchange<Value>(
-        interchangedIvs, extractUIntArray(*interchangeVector), getInputRank());
+        interchangedIvs, extractFromI64ArrayAttr(*interchangeVector),
+        getInputRank());
   }
 
-  SmallVector<unsigned> dimsToBlock = extractUIntArray(getDimsPos());
-  DenseSet<unsigned> dimsSet(dimsToBlock.begin(), dimsToBlock.end());
+  SmallVector<int64_t> dimsToBlock = extractFromI64ArrayAttr(getDimsPos());
+  DenseSet<int64_t> dimsSet(dimsToBlock.begin(), dimsToBlock.end());
 
   SmallVector<OpFoldResult> innerTiles = getMixedInnerTiles();
   SmallVector<OpFoldResult> sourceIndices;
