@@ -522,7 +522,7 @@ transform_dialect::TileToForeachThreadAndWorkgroupCountRegion::verify() {
 void transform_dialect::TileToForeachThreadAndWorkgroupCountRegion::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::consumesHandle(getTarget(), effects);
-  transform::consumesHandle(getFunc(), effects);
+  transform::onlyReadsHandle(getFunc(), effects);
   transform::onlyReadsHandle(getTileSizes(), effects);
   transform::onlyReadsHandle(getNumThreads(), effects);
   transform::producesHandle(getResults(), effects);

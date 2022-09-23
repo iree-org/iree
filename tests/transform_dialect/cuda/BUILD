@@ -35,6 +35,9 @@ iree_lit_test_suite(
     data = [
         "reduction_codegen_spec.mlir",
         "softmax_codegen_spec.mlir",
+        # FIXME: This cannot be retired yet as there is some writeonly vs readwrite
+        # issue and we even end up emitting out of bounds accesses.
+        "softmax_dispatch_spec.mlir",
         "softmax_fused_codegen_spec.mlir",
     ],
     tags = [

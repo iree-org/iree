@@ -1,7 +1,7 @@
 // RUN: iree-opt %s
 
 // Codegen
-transform.structured.canonicalized_sequence %arg0 failures(propagate) {
+transform.structured.canonicalized_sequence failures(propagate) {
 ^bb1(%variant_op: !pdl.operation):
   %func = transform.structured.match ops{["func.func"]} in %variant_op
 
@@ -14,7 +14,7 @@ transform.structured.canonicalized_sequence %arg0 failures(propagate) {
     attributes{iterator_types = ["parallel", "parallel", "reduction"]} in %variant_op
   %not_root = merge_handles %fill, %red
   %foreach_thread, %tiled_generic =
-    transform.structured.tile_to_foreach_thread_and_workgroup_count_region %root %func tile_sizes [1, 4]
+    transform.iree.tile_to_foreach_thread_and_workgroup_count_region %root %func tile_sizes [1, 4]
   transform.structured.fuse_into_containing_op %not_root into %foreach_thread
   
   // Second level of tiling + fusion parallelizes to threads.
@@ -53,9 +53,8 @@ transform.structured.canonicalized_sequence %arg0 failures(propagate) {
   //
   // That is still not good enough because we need to predicate this in order
   // to enable the parallel reduction on warps.
-  %funcx = transform.structured.match ops{["func.func"]} in %variant_op
-  %funcy = transform.iree.apply_patterns %funcx { rank_reducing }
-  transform.structured.vectorize %funcy
+  %funcx = transform.iree.apply_patterns %func { rank_reducing }
+  transform.structured.vectorize %funcx
 
   // Bufferization is necessary for:
   //   1. lowering scf.foreach_thread to workgroup (block level parallelism)
