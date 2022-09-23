@@ -74,6 +74,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:BufferizationTransforms",
         "@llvm-project//mlir:LinalgTransforms",
+        "@llvm-project//mlir:LinalgTransformOps",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:TransformDialect",
     ],

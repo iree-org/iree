@@ -39,6 +39,7 @@ iree_cc_library(
     MLIRArithmeticUtils
     MLIRBufferizationDialect
     MLIRBufferizationTransforms
+    MLIRLinalgTransformOps
     MLIRLinalgTransforms
     MLIRPass
     MLIRTransformDialect
