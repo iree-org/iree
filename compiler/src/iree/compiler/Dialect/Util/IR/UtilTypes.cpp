@@ -159,11 +159,12 @@ LogicalResult detail::verifyGlobalAddressOp(
     GlobalAddressOpInterface addressOp, SymbolTableCollection &symbolTable) {
   if (!isa_and_nonnull<IREE::Util::GlobalOpInterface>(
           symbolTable.lookupNearestSymbolFrom(addressOp.getOperation(),
-                                              addressOp.getGlobalAttr())))
+                                              addressOp.getGlobalAttr()))) {
     return addressOp->emitOpError(
         "attribute 'global' failed to satisfy constraint: flat symbol "
         "reference attribute referencing to a 'IREE::Util::GlobalOpInterface' "
         "symbol");
+  }
   auto globalOp =
       lookupGlobalOp(addressOp, addressOp.getGlobalAttr(), symbolTable);
   if (!globalOp) {
