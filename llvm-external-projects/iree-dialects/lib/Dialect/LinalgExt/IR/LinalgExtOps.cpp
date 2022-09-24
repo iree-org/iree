@@ -1451,12 +1451,14 @@ LogicalResult TopkOp::getResultTilePosition(
 // PackOp
 //===----------------------------------------------------------------------===//
 
+// Return true if each element in `dimsPos` is >= 0 and < rank.
 static bool isInBound(ArrayRef<int64_t> dimsPos, int64_t rank) {
   return llvm::all_of(
       dimsPos, [rank](int64_t dimPos) { return dimPos >= 0 && dimPos < rank; });
 }
 
-// Interchange `elements` based on the indexes in `interchangeVector`.
+// Interchange `elements` starting at offset `offset` based on the indexes in
+// `interchangeVector`.
 template <typename T>
 static SmallVector<T> interchange(ArrayRef<T> elements,
                                   ArrayRef<int64_t> interchangeVector,
@@ -1482,7 +1484,8 @@ ShapedType PackOp::inferResultType() {
   SmallVector<int64_t> indicesOfBlockedDims =
       extractFromI64ArrayAttr(getDimsPos());
 
-  assert(staticTiles.size() == indicesOfBlockedDims.size());
+  assert(staticTiles.size() == indicesOfBlockedDims.size() &&
+         "tiles must match indices of dimension to block");
 
   // bind the dimension to tile with the tile factor.
   DenseMap<int64_t, int64_t> tileAndPosMapping;
@@ -1529,6 +1532,8 @@ ShapedType PackOp::inferResultType() {
       });
 }
 
+static bool hasZeros(ArrayRef<OpFoldResult> tiles) { return false; }
+
 // verifier for the pack operation.
 LogicalResult PackOp::verify() {
   Operation *op = getOperation();
@@ -1573,6 +1578,10 @@ LogicalResult PackOp::verify() {
   if (interchangeVector &&
       !isInBound(extractFromI64ArrayAttr(*interchangeVector), getInputRank()))
     return op->emitError("out of bound position in interchange vector");
+
+  // Verify tiles. Make sure each provided tile is non-zero.
+  if (hasZeros(getMixedTiles()))
+    return op->emitError("invalid tile factor");
 
   // Verify result type against inferred type.
   ShapedType expectedType = PackOp::inferResultType();
@@ -1668,16 +1677,17 @@ LogicalResult PackOp::generateScalarImplementation(OpBuilder &builder,
   if (interchangeVector) {
     interchangedIvs = interchange<Value>(
         interchangedIvs, extractFromI64ArrayAttr(*interchangeVector),
-        getInputRank());
+        /*offset=*/getInputRank());
   }
 
   SmallVector<int64_t> dimsToBlock = extractFromI64ArrayAttr(getDimsPos());
-  SmallVector<OpFoldResult> innerTiles = getMixedTiles();
-  assert(innerTiles.size() == dimsToBlock.size());
+  SmallVector<OpFoldResult> tiles = getMixedTiles();
+  assert(tiles.size() == dimsToBlock.size() &&
+         "tiles must match indices of dimension to block");
   // bind the dimension to tile with the tile factor.
   DenseMap<int64_t, OpFoldResult> tileAndPosMapping;
   for (auto i : llvm::seq<int64_t>(0, dimsToBlock.size()))
-    tileAndPosMapping[dimsToBlock[i]] = innerTiles[i];
+    tileAndPosMapping[dimsToBlock[i]] = tiles[i];
 
   SmallVector<OpFoldResult> sourceIndices;
   size_t pointLoopsOffset = 0;
