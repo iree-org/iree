@@ -448,7 +448,6 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack",[
 
   let arguments = (ins Variadic<AnyShaped>:$inputs,
     Variadic<AnyShaped>:$outputs,
-    OptionalAttr<DefaultValuedAttr<I64ArrayAttr, "{}">>:$iterator_interchange,
     DefaultValuedAttr<I64ArrayAttr, "{}">:$dims_pos,
     Variadic<Index>:$inner_tiles,
     I64ArrayAttr:$static_inner_tiles);
@@ -461,7 +460,6 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack",[
     `inner_tiles` `=`
     custom<DynamicIndexList>($inner_tiles, $static_inner_tiles,
                              "ShapedType::kDynamicStrideOrOffset")
-    (`interchange` `=` $iterator_interchange^)?
     `into` $outputs `:` `(` type($inputs) type($outputs) `)`
      (`->` type($results)^)?
   }];

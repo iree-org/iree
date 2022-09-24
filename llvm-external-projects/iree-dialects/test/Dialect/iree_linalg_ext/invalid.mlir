@@ -513,14 +513,6 @@ func.func @topk_invalid(%input_values: tensor<3x10xf32>, %input_indices: tensor<
 
 func.func @pack_invalid(%input: tensor<256x128xf32>, %output: tensor<8x8x32x16xf32>) -> tensor<8x8x32x16xf32> {
   // expected-error@+1 {{inferred type do not match provied output type}}
-  %0 = iree_linalg_ext.pack %input dims_pos = [0, 1] inner_tiles = [32, 16] interchange = [1, 0] into %output : (tensor<256x128xf32> tensor<8x8x32x16xf32>) -> tensor<8x8x32x16xf32>
-  return %0 : tensor<8x8x32x16xf32>
-}
-
-// -----
-
-func.func @pack_invalid(%input: tensor<256x128xf32>, %output: tensor<8x8x32x16xf32>) -> tensor<8x8x32x16xf32> {
-  // expected-error@+1 {{interchange vector must equal blocking factors}}
-  %0 = iree_linalg_ext.pack %input dims_pos = [0, 1] inner_tiles = [32] interchange = [1, 0] into %output : (tensor<256x128xf32> tensor<8x8x32x16xf32>) -> tensor<8x8x32x16xf32>
+  %0 = iree_linalg_ext.pack %input dims_pos = [1, 0] inner_tiles = [16, 32] into %output : (tensor<256x128xf32> tensor<8x8x32x16xf32>) -> tensor<8x8x32x16xf32>
   return %0 : tensor<8x8x32x16xf32>
 }

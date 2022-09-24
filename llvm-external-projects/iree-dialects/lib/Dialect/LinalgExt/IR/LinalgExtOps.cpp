@@ -1513,10 +1513,6 @@ ShapedType PackOp::inferResultType() {
   }
 
   // point loop.
-  auto interchangeVector = getIteratorInterchange();
-  if (interchangeVector)
-    staticTiles = interchange<int64_t>(
-        staticTiles, extractFromI64ArrayAttr(*interchangeVector), /*offset=*/0);
   inferredShape.append(staticTiles.begin(), staticTiles.end());
 
   return TypeSwitch<Type, ShapedType>(inputType)
@@ -1533,51 +1529,39 @@ ShapedType PackOp::inferResultType() {
 }
 
 static bool hasZeros(ArrayRef<OpFoldResult> tiles) { return false; }
+static bool isInvalid(ArrayRef<int64_t> dimsPos) { return false; }
 
 // verifier for the pack operation.
 LogicalResult PackOp::verify() {
   Operation *op = getOperation();
-  auto interchangeVector = getIteratorInterchange();
   size_t numberOfBlockingFactors = getMixedTiles().size();
-  // If the interchange vector is given and non empty, it must equal the
-  // blocking factors.
-  if (interchangeVector && !interchangeVector->empty() &&
-      interchangeVector->size() != numberOfBlockingFactors)
-    return op->emitError("interchange vector must equal blocking factors");
-
+  SmallVector<int64_t> dimsPos = extractFromI64ArrayAttr(getDimsPos());
   // Blocking factors must be less or equal than the input rank, and must
   // match the number of `dims_pos`.
   if (numberOfBlockingFactors > getInputRank())
     return op->emitError(
         "blocking factors must be less or equal than the input rank");
-  if (numberOfBlockingFactors != getDimsPos().size())
+  if (numberOfBlockingFactors != dimsPos.size())
     return op->emitError(
         "blocking factors must equal the number of dimensions to block");
 
   // The number of `dim_pos` that carries the index of the dimensions to block
   // must be less or equal than the input rank.
-  if (getDimsPos().size() > getInputRank())
+  if (dimsPos.size() > getInputRank())
     return op->emitError(
         "indices of blocked dimensions must be less or equal than "
         "the input rank");
+  if (isInvalid(dimsPos))
+    return op->emitError("invalid dims_pos vector");
+  // Require `dim_pos` to be in-bound. `dim_pos` carries the index of the
+  // dimensions to block.
+  if (!isInBound(dimsPos, getOutputRank()))
+    return op->emitError("out-of-bound position");
 
   // Require output rank to match input rank + number of blocking factors.
   if ((getInputRank() + numberOfBlockingFactors) != getOutputRank())
     return op->emitError(
         "output rank must equal input rank + blocking factors");
-
-  // Require `dim_pos` to be in-bound. `dim_pos` carries the index of the
-  // dimensions to block.
-  if (!isInBound(extractFromI64ArrayAttr(getDimsPos()), getOutputRank()))
-    return op->emitError("out-of-bound position");
-
-  // Require interchangeVector to be in-bound. The interchange index is in bound
-  // if it is smaller than the input rank, as most `input rank - 1` dimensions
-  // can be blocked.
-  // TODO: use `extractUIntArray` if we decide to expose in `StaticValueUtils.h`
-  if (interchangeVector &&
-      !isInBound(extractFromI64ArrayAttr(*interchangeVector), getInputRank()))
-    return op->emitError("out of bound position in interchange vector");
 
   // Verify tiles. Make sure each provided tile is non-zero.
   if (hasZeros(getMixedTiles()))
