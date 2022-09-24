@@ -1528,8 +1528,32 @@ ShapedType PackOp::inferResultType() {
       });
 }
 
-static bool hasZeros(ArrayRef<OpFoldResult> tiles) { return false; }
-static bool isInvalid(ArrayRef<int64_t> dimsPos) { return false; }
+// Return true if at least one element in `tiles` is zero.
+static bool hasZeros(ArrayRef<OpFoldResult> tiles) {
+
+  // Check if `tile` is an integer zero attribute or
+  // comes from a zero constantIndexOp.
+  auto isZero = [](OpFoldResult tile) -> bool {
+    if (Attribute attr = tile.dyn_cast<Attribute>()) {
+      IntegerAttr intAttr = attr.dyn_cast<IntegerAttr>();
+      return intAttr && intAttr.getValue().isZero();
+    } else if (auto cst =
+                   tile.get<Value>().getDefiningOp<arith::ConstantIndexOp>())
+      return cst.value() == 0;
+    return false;
+  };
+
+  return llvm::any_of(tiles, [&](OpFoldResult tile) { return isZero(tile); });
+}
+
+// Return true if `dimsPos` is invalid. It is invalid when: a) it contains
+// duplicate.
+static bool isInvalid(ArrayRef<int64_t> dimsPos) {
+  DenseSet<int64_t> uniqued;
+  for (int64_t dim : dimsPos)
+    uniqued.insert(dim);
+  return dimsPos.size() != uniqued.size();
+}
 
 // verifier for the pack operation.
 LogicalResult PackOp::verify() {
