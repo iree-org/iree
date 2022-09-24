@@ -28,6 +28,7 @@
 #include "mlir/IR/Value.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
+#include "mlir/Support/MathExtras.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -1505,7 +1506,7 @@ ShapedType PackOp::inferResultType() {
         inferredShape.push_back(ShapedType::kDynamicSize);
       else {
         int64_t sizeDim =
-            std::ceil(inputType.getDimSize(i) / tileAndPosMapping[i]);
+            ceilDiv(inputType.getDimSize(i), tileAndPosMapping[i]);
         inferredShape.push_back(sizeDim);
       }
     } else
@@ -1655,7 +1656,7 @@ OpFoldResult PackOp::buildOutputDim(OpBuilder &builder, size_t dimIdx) {
   if (!ShapedType::isDynamic(outputShape[dimIdx]))
     return builder.getI64IntegerAttr(outputShape[dimIdx]);
 
-  // handle dynamic.
+  // Handle dynamic.
   DenseMap<int64_t, OpFoldResult> dimAndTileMapping = getDimAndTileMapping();
   AffineExpr dim = builder.getAffineSymbolExpr(0);
   AffineExpr tile = builder.getAffineSymbolExpr(1);
@@ -1664,14 +1665,19 @@ OpFoldResult PackOp::buildOutputDim(OpBuilder &builder, size_t dimIdx) {
     return makeComposedFoldedAffineApply(builder, getOperation()->getLoc(),
                                          expr, values);
   };
+  // If we are dealing with a tiled dimension compose the map otherwise
+  // return the dimension extracted with `memref.dim`.
   OpFoldResult dimBound =
       getDim(builder, getOperation()->getLoc(), getOutput(), dimIdx);
-  return apply(dim.floorDiv(tile),
-               ArrayRef<OpFoldResult>{dimBound, dimAndTileMapping[dimIdx]});
+  return (dimAndTileMapping.count(dimIdx))
+             ? apply(
+                   dim.ceilDiv(tile),
+                   ArrayRef<OpFoldResult>{dimBound, dimAndTileMapping[dimIdx]})
+             : dimBound;
 }
 
 // TODO: ReifyRankedShapedTypeOpInterface
-// Infer and return the shape of the output as OpFoldResult.
+// Return the shape of the output as OpFoldResult.
 SmallVector<OpFoldResult> PackOp::buildOutputShape(OpBuilder &builder) {
   ArrayRef<int64_t> outputShape = getOutputShape();
   return llvm::to_vector(llvm::map_range(

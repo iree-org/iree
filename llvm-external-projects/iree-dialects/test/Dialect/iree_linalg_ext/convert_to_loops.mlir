@@ -934,3 +934,71 @@ func.func @shuffled_dim_pos_and_tiles(%arg0: memref<128x256x2x1000xf32>, %arg1: 
   iree_linalg_ext.pack %arg0 dims_pos = [2, 0] inner_tiles = [2, 32] into %arg1 : (memref<128x256x2x1000xf32> memref<4x256x1x1000x2x32xf32>)
   return
 }
+
+// CHECK-DAG: #[[MAP0:.*]] = affine_map<(d0, d1) -> (d0 * 32 + d1)>
+// CHECK-DAG: #[[MAP1:.*]] = affine_map<(d0, d1) -> (d0 * 2 + d1)>
+// CHECK-LABEL: func.func @shuffled_dim_pos_and_tiles(
+// CHECK-DAG: %[[lb:.*]] = arith.constant 0 : index
+// CHECK-DAG: %[[step:.*]] = arith.constant 1 : index
+// CHECK-DAG: %[[ubDimZero:.*]] = arith.constant 4 : index
+// CHECK-DAG: %[[ubDimOne:.*]] = arith.constant 256 : index
+// CHECK-DAG: %[[ubDimThree:.*]] = arith.constant 1000 : index
+// CHECK-DAG: %[[ubDimFour:.*]] = arith.constant 2 : index
+// CHECK-DAG: %[[ubDimFive:.*]] = arith.constant 32 : index
+// CHECK: scf.for %[[i:.*]] = %[[lb]] to %[[ubDimZero]] step %[[step]] {
+// CHECK:   scf.for %[[j:.*]] = %[[lb]] to %[[ubDimOne]] step %[[step]] {
+// CHECK:     scf.for %[[k:.*]] = %[[lb]] to %[[step]] step %[[step]] {
+// CHECK:       scf.for %[[l:.*]] = %[[lb]] to %[[ubDimThree]] step %[[step]] {
+// CHECK:         scf.for %[[m:.*]] = %[[lb]] to %[[ubDimFour]] step %[[step]] {
+// CHECK:           scf.for %[[n:.*]] = %[[lb]] to %[[ubDimFive]] step %[[step]] {
+// CHECK-DAG:         %[[affineApplyZero:.*]] = affine.apply #[[MAP0]](%[[i]], %[[n]])
+// CHECK-DAG:         %[[affineApplyOne:.*]] = affine.apply #[[MAP1]](%[[k]], %[[m]])
+// CHECK:             %[[scalar:.*]] = memref.load %arg0[%[[affineApplyZero]], %[[j]], %[[affineApplyOne]], %[[l]]] : memref<128x256x2x1000xf32>
+// CHECK:             memref.store %[[scalar]], %arg1[%[[i]], %[[j]], %[[k]], %[[l]], %[[m]], %[[n]]] : memref<4x256x1x1000x2x32xf32>
+// CHECK:           }
+// CHECK:         }
+// CHECK:       }
+// CHECK:     }
+// CHECK:   }
+// CHECK: }
+
+// -----
+
+func.func @KCRS_to_KCRSsr(%arg0: memref<?x?x?x?xf32>, %arg1: memref<?x?x?x?x8x32xf32>) {
+  iree_linalg_ext.pack %arg0 dims_pos = [3, 2] inner_tiles = [8, 32] into %arg1 : (memref<?x?x?x?xf32> memref<?x?x?x?x8x32xf32>)
+  return
+}
+
+// CHECK-DAG: #[[MAP0:.*]] = affine_map<()[s0] -> (s0 ceildiv 32)>
+// CHECK-DAG: #[[MAP1:.*]] = affine_map<()[s0] -> (s0 ceildiv 8)>
+// CHECK-DAG: #[[MAP2:.*]] = affine_map<(d0, d1) -> (d0 * 32 + d1)>
+// CHECK-DAG: #[[MAP3:.*]] = affine_map<(d0, d1) -> (d0 * 8 + d1)>
+// CHECK-LABEL: func.func @KCRS_to_KCRSsr(
+// CHECK-DAG: %[[zero:.*]] = arith.constant 0 : index
+// CHECK-DAG: %[[one:.*]] = arith.constant 1 : index
+// CHECK-DAG: %[[eight:.*]] = arith.constant 8 : index
+// CHECK-DAG: %[[thirtytwo:.*]] = arith.constant 32 : index
+// CHECK-DAG: %[[two:.*]] = arith.constant 2 : index
+// CHECK-DAG: %[[three:.*]] = arith.constant 3 : index
+// CHECK-DAG: %[[dimZero:.*]] = memref.dim %arg1, %[[zero]] : memref<?x?x?x?x8x32xf32>
+// CHECK-DAG: %[[dimOne:.*]] = memref.dim %arg1, %[[one]] : memref<?x?x?x?x8x32xf32>
+// CHECK-DAG: %[[dimTwo:.*]] = memref.dim %arg1, %[[two]] : memref<?x?x?x?x8x32xf32>
+// CHECK-DAG: %[[dimThree:.*]] = memref.dim %arg1, %[[three]] : memref<?x?x?x?x8x32xf32>
+// CHECK-DAG: %[[mapOnDimTwo:.*]] = affine.apply #[[MAP0]]()[%[[dimTwo]]]
+// CHECK-DAG: %[[mapOnDimThree:.*]] = affine.apply #[[MAP1]]()[%[[dimThree]]]
+// CHECK: scf.for %[[K:.*]] = %[[zero]] to %[[dimZero]] step %[[one]] {
+// CHECK:   scf.for %[[C:.*]] = %[[zero]] to %[[dimOne]] step %[[one]] {
+// CHECK:     scf.for %[[R:.*]] = %[[zero]] to %[[mapOnDimTwo]] step %[[one]] {
+// CHECK:       scf.for %[[S:.*]] = %[[zero]] to %[[mapOnDimThree]] step %[[one]] {
+// CHECK:         scf.for %[[s:.*]] = %[[zero]] to %[[eight]] step %[[step]] {
+// CHECK:           scf.for %[[r:.*]] = %[[zero]] to %[[thirtytwo]] step %[[step]] {
+// CHECK-DAG:         %[[affineMapR:.*]] = affine.apply #[[MAP2]](%[[R]], %[[r]])
+// CHECK-DAG:         %[[affineMapS:.*]] = affine.apply #[[MAP3]](%[[S]], %[[s]])
+// CHECK:             %[[scalar:.*]] = memref.load %arg0[%[[K]], %[[C]], %[[affineMapR]], %[[affineMapS]]] : memref<?x?x?x?xf32>
+// CHECK:             memref.store %[[scalar]], %arg1[%[[K]], %[[C]], %[[R]], %[[S]], %[[s]], %[[r]]] : memref<?x?x?x?x8x32xf32>
+// CHECK:           }
+// CHECK:         }
+// CHECK:       }
+// CHECK:     }
+// CHECK:   }
+// CHECK: }
