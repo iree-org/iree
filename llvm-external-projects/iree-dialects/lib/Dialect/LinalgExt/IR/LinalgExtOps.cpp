@@ -1635,16 +1635,39 @@ static SmallVector<Value> getAsValues(OpBuilder &b, Location loc,
       }));
 }
 
-// TODO: what if we don't have a full tile?
-// TODO: dynamic support.
+// Return a mapping from positions `dims_pos` to their tile factors.
+DenseMap<int64_t, OpFoldResult> PackOp::getDimAndTileMapping() {
+  DenseMap<int64_t, OpFoldResult> dimAndTileMapping;
+  SmallVector<int64_t> dimsToBlock = extractFromI64ArrayAttr(getDimsPos());
+  SmallVector<OpFoldResult> tiles = getMixedTiles();
+  assert(tiles.size() == dimsToBlock.size() &&
+         "tiles must match indices of dimension to block");
+  // bind the dimension to tile with the tile factor.
+  for (auto i : llvm::seq<int64_t>(0, dimsToBlock.size()))
+    dimAndTileMapping[dimsToBlock[i]] = tiles[i];
+  return dimAndTileMapping;
+}
+
 // Build the output dimension at pos `dimIdx`.
 OpFoldResult PackOp::buildOutputDim(OpBuilder &builder, size_t dimIdx) {
   unsigned inputRank = getInputRank();
   ArrayRef<int64_t> outputShape = getOutputShape();
   if (!ShapedType::isDynamic(outputShape[dimIdx]))
     return builder.getI64IntegerAttr(outputShape[dimIdx]);
-  assert(0 && "dynamic support not yet implemented");
-  return nullptr;
+
+  // handle dynamic.
+  DenseMap<int64_t, OpFoldResult> dimAndTileMapping = getDimAndTileMapping();
+  AffineExpr dim = builder.getAffineSymbolExpr(0);
+  AffineExpr tile = builder.getAffineSymbolExpr(1);
+  auto apply = [&](AffineExpr expr,
+                   ArrayRef<OpFoldResult> values) -> OpFoldResult {
+    return makeComposedFoldedAffineApply(builder, getOperation()->getLoc(),
+                                         expr, values);
+  };
+  OpFoldResult dimBound =
+      getDim(builder, getOperation()->getLoc(), getOutput(), dimIdx);
+  return apply(dim.floorDiv(tile),
+               ArrayRef<OpFoldResult>{dimBound, dimAndTileMapping[dimIdx]});
 }
 
 // TODO: ReifyRankedShapedTypeOpInterface
@@ -1718,17 +1741,11 @@ LogicalResult PackOp::generateScalarImplementation(OpBuilder &builder,
                                        /*offset=*/getInputRank());
 
   SmallVector<OpFoldResult> tiles = getMixedTiles();
-  assert(tiles.size() == dimsToBlock.size() &&
-         "tiles must match indices of dimension to block");
-  // bind the dimension to tile with the tile factor.
-  DenseMap<int64_t, OpFoldResult> tileAndPosMapping;
-  for (auto i : llvm::seq<int64_t>(0, dimsToBlock.size()))
-    tileAndPosMapping[dimsToBlock[i]] = tiles[i];
-
+  DenseMap<int64_t, OpFoldResult> dimAndTileMapping = getDimAndTileMapping();
   SmallVector<OpFoldResult> sourceIndices;
   size_t pointLoopsOffset = 0;
   for (auto dim : llvm::seq<int64_t>(0, getInputRank())) {
-    if (tileAndPosMapping.count(dim)) {
+    if (dimAndTileMapping.count(dim)) {
       AffineExpr i, j, tile;
       bindDims(builder.getContext(), i, j);
       bindSymbols(builder.getContext(), tile);
@@ -1737,7 +1754,7 @@ LogicalResult PackOp::generateScalarImplementation(OpBuilder &builder,
           ArrayRef<OpFoldResult>{
               interchangedIvs[dim],
               interchangedIvs[pointLoopsOffset + getInputRank()],
-              tileAndPosMapping[dim]});
+              dimAndTileMapping[dim]});
       sourceIndices.push_back(sourceIndex);
       ++pointLoopsOffset;
     } else

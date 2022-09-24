@@ -513,6 +513,9 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack",[
     // Infer the output type.
     ShapedType inferResultType();
 
+    // Return a mapping from positions `dims_pos` to their tile factors.
+    DenseMap<int64_t, OpFoldResult> getDimAndTileMapping();
+
   }];
 }
 
