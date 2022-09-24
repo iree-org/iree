@@ -34,12 +34,12 @@ iree_lit_test_suite(
     "swizzle_workgroup.mlir"
     "test_partitionable_loops_interface.mlir"
     "tile_and_distribute_to_workgroups.mlir"
-    "tile_and_distribute_to_workgroups_with_specialization.mlir"
     "transform_dialect_apply_pattern_op.mlir"
     "transpose_canonicalization.mlir"
     "type_propagation.mlir"
     "vectorize_tensor_pad.mlir"
     "warp_reduction.mlir"
+    "workgroup_specialization.mlir"
   TOOLS
     FileCheck
     iree-opt

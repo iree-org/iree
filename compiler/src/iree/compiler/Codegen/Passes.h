@@ -113,6 +113,10 @@ createTestPartitionableLoopsInterfacePass();
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createTileAndDistributeToWorkgroupsPass();
 
+/// Pass to specialize workgroup distribution loops
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
+createWorkgroupSpecializationPass();
+
 /// Pass to propagate type to avoid generating load/stores of illegal types.
 std::unique_ptr<OperationPass<func::FuncOp>> createTypePropagationPass();
 

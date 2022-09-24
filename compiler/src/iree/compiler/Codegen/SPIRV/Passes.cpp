@@ -98,6 +98,7 @@ static void addBufferizePasses(OpPassManager &passManager,
 static void addTileAndDistributeToWorkgroupsPasses(
     OpPassManager &passManager, bool useFuseTensorPadWithConsumerPass = false) {
   passManager.addPass(createTileAndDistributeToWorkgroupsPass());
+  passManager.addPass(createWorkgroupSpecializationPass());
   auto &nestedModulePM = passManager.nest<ModuleOp>();
   if (useFuseTensorPadWithConsumerPass) {
     nestedModulePM.addNestedPass<func::FuncOp>(
