@@ -502,7 +502,7 @@ Optional<LoopTilingAndDistributionInfo> isTiledAndDistributedLoop(
   auto stepApplyOp = forOp.getStep().getDefiningOp<AffineApplyOp>();
 
   if (!lbApplyOp || !stepApplyOp) {
-    // Try to see if this s a specical case where we have:
+    // Try to see if this is a specical case where we have:
     //   scf.for %iv = %id to %ub step %count
     Optional<unsigned> idDim;
     if (auto ifx = dyn_cast_or_null<ProcessorIDInterface>(
