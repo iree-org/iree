@@ -115,6 +115,12 @@ def TileAndDistributeToWorkgroups :
   ];
 }
 
+def WorkgroupSpecialization :
+    Pass<"iree-codegen-workgroup-specialization", "func::FuncOp"> {
+  let summary = "Specialize workgroup distribution loops";
+  let constructor = "mlir::iree_compiler::createWorkgroupSpecializationPass()";
+}
+
 def TypePropagation :
     Pass<"iree-codegen-type-propagation", "func::FuncOp"> {
   let summary = "Propogate the type of tensor to avoid load/stores of illegal bit widths";

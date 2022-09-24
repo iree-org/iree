@@ -90,6 +90,7 @@ iree_cc_library(
     "TileAndDistributeToWorkgroupsPass.cpp"
     "TypePropagationPass.cpp"
     "VectorizePad.cpp"
+    "WorkgroupSpecializationPass.cpp"
   DEPS
     IREELinalgExtDialect
     IREELinalgExtPasses
