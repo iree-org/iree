@@ -1585,11 +1585,10 @@ LogicalResult PackOp::verify() {
 
   // Verify result type against inferred type.
   ShapedType expectedType = PackOp::inferResultType();
-  if (expectedType != getOutputType()) {
-    llvm::errs() << expectedType << "\n";
-    llvm::errs() << getOutputType() << "\n";
-    return op->emitError("inferred type do not match provied output type");
-  }
+  if (expectedType != getOutputType())
+    return op->emitError(
+               "inferred type do not match provied output type. Expected ")
+           << expectedType << " but got: " << getOutputType();
 
   return success();
 }
@@ -1668,19 +1667,48 @@ SmallVector<Range> PackOp::getIterationDomain(OpBuilder &builder) {
   return loopBounds;
 }
 
+// Return the `interchangeVector` based on `dims_pos`.
+SmallVector<int64_t> computeInterchangeFromDimPos(ArrayRef<int64_t> dimsPos,
+                                                  int64_t inputRank) {
+  SmallVector<int64_t> interchangeVector;
+  interchangeVector.reserve(dimsPos.size());
+  // First map dims and their position. For example, dims_pos = [2, 0] will map
+  // to:
+  // [
+  //  [ key: 2, value: 0]
+  //  [ key: 0, value: 1]
+  // ]
+  // where key is the idx in dims_pos while value its position in dims_pos.
+  DenseMap<int64_t, int64_t> dimsAndPosMapping;
+  for (int64_t dimsIdx = 0, end = dimsPos.size(); dimsIdx < end; dimsIdx++)
+    dimsAndPosMapping[dimsPos[dimsIdx]] = dimsIdx;
+
+  // Scan the position in order and insert the value in the map
+  // to compute the interchange vector.
+  for (int64_t dimsIdx = 0; dimsIdx < inputRank; dimsIdx++) {
+    if (dimsAndPosMapping.count(dimsIdx))
+      interchangeVector.push_back(dimsAndPosMapping[dimsIdx]);
+  }
+  return interchangeVector;
+}
+
 // Implements `getIterationDomain` from the tiling interface.
 LogicalResult PackOp::generateScalarImplementation(OpBuilder &builder,
                                                    Location loc,
                                                    ValueRange ivs) {
-  SmallVector<Value> interchangedIvs = ivs;
-  auto interchangeVector = getIteratorInterchange();
-  if (interchangeVector) {
-    interchangedIvs = interchange<Value>(
-        interchangedIvs, extractFromI64ArrayAttr(*interchangeVector),
-        /*offset=*/getInputRank());
-  }
-
+  // Note: `ivs` are already in the correct order, possibly interchanged based
+  // on `dims_pos`. However, connecting the loops with the access patterns is
+  // difficult - What is the relation between the position of the tile loop and
+  // the point loop? However, if we interchange `ivs` once more to go to the
+  // canonical blocking format: ABCabc, this connection becomes trivial: Each
+  // point loop is pointLoopsOffset + inputRank away from the tiled loop.
   SmallVector<int64_t> dimsToBlock = extractFromI64ArrayAttr(getDimsPos());
+  SmallVector<int64_t> testInterchangeVector =
+      computeInterchangeFromDimPos(dimsToBlock, getInputRank());
+  SmallVector<Value> interchangedIvs = ivs;
+  interchangedIvs = interchange<Value>(interchangedIvs, testInterchangeVector,
+                                       /*offset=*/getInputRank());
+
   SmallVector<OpFoldResult> tiles = getMixedTiles();
   assert(tiles.size() == dimsToBlock.size() &&
          "tiles must match indices of dimension to block");
