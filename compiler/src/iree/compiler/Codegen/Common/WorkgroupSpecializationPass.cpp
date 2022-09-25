@@ -33,12 +33,11 @@
 #define DEBUG_TYPE "iree-codegen-workgroup-specialization"
 
 namespace mlir {
-namespace iree_compiler {        
+namespace iree_compiler {
 
 namespace {
 struct WorkgroupSpecializationPass
-    : public WorkgroupSpecializationBase<
-          WorkgroupSpecializationPass> {
+    : public WorkgroupSpecializationBase<WorkgroupSpecializationPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<AffineDialect, IREE::Flow::FlowDialect,
                     IREE::HAL::HALDialect, linalg::LinalgDialect,
@@ -51,7 +50,7 @@ struct WorkgroupSpecializationPass
 
 void WorkgroupSpecializationPass::runOnOperation() {
   auto funcOp = getOperation();
-  
+
   SmallVector<Operation *> computeOps;
   SmallVector<LoopTilingAndDistributionInfo> tiledLoops;
   if (failed(getComputeOps(funcOp, computeOps, tiledLoops))) {
@@ -60,7 +59,6 @@ void WorkgroupSpecializationPass::runOnOperation() {
   }
   if (!tiledLoops.empty()) {
     // The entry point already has distribution to workgroups. Do nothing.
-
   }
 }
 
