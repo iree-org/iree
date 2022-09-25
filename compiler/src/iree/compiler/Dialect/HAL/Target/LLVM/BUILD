@@ -42,6 +42,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Codegen/Utils",
         "//compiler/src/iree/compiler/Dialect/HAL/Target",
         "//compiler/src/iree/compiler/Dialect/HAL/Target/LLVM/Builtins",
+        "//compiler/src/iree/compiler/Utils",
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
         "@llvm-project//llvm:AArch64AsmParser",
@@ -113,6 +114,7 @@ iree_compiler_cc_library(
     srcs = ["LinkerTool.cpp"],
     hdrs = ["LinkerTool.h"],
     deps = platform_trampoline_deps("LinkerTools", "compiler/src/iree/compiler/Dialect/HAL/Target/LLVM") + [
+        "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Support",
     ],
 )

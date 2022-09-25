@@ -12,6 +12,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
+#include "iree/compiler/Utils/StringUtils.h"
 #include "llvm/ADT/DenseMap.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
@@ -75,9 +76,8 @@ IREE::VM::RodataOp createExecutableBinaryRodata(
   auto insertPoint = builder.saveInsertionPoint();
   builder.setInsertionPoint(builder.getInsertionBlock()->getParentOp());
 
-  std::string rodataName =
-      (executableOp.getName() + "_" + binaryOp.getName()).str();
-  std::replace(rodataName.begin(), rodataName.end(), '-', '_');
+  std::string rodataName = sanitizeSymbolName(
+      (executableOp.getName() + "_" + binaryOp.getName()).str());
   auto rodataOp = builder.create<IREE::VM::RodataOp>(
       binaryOp.getLoc(), rodataName, binaryOp.getData());
   rodataOp.setPrivate();

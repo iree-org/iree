@@ -6,6 +6,7 @@
 
 #include "iree/compiler/InputConversion/Common/PassDetail.h"
 #include "iree/compiler/InputConversion/Common/Passes.h"
+#include "iree/compiler/Utils/StringUtils.h"
 #include "mlir/IR/BuiltinDialect.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
@@ -29,11 +30,8 @@ struct SanitizeModuleNamesPass
     auto optionalName = moduleOp.getName();
     if (!optionalName.has_value()) return;
     auto name = optionalName.value();
-    if (!name.contains('.')) return;
 
-    std::string sanitizedName(name);
-    std::replace(sanitizedName.begin(), sanitizedName.end(), '.', '_');
-    moduleOp.setName(sanitizedName);
+    moduleOp.setName(sanitizeSymbolName(name));
   }
 };
 
