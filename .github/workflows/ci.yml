@@ -451,6 +451,7 @@ jobs:
 
   test_shark_model_suite:
     needs: [build_tf_integrations, build_all]
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
       # Pseudo-ternary hack and order matters. See comment at top of file.
       - self-hosted
