@@ -29,8 +29,7 @@ class IREELinalgExt_Op<string mnemonic, list<Trait> traits = []> :
         [AttrSizedOperandSegments,
          DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
          LinalgExtInterface,
-         SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::LinalgExt::YieldOp">,
-         ReifyRankedShapedTypeOpInterface
+         SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::LinalgExt::YieldOp">
   ])> {
   let hasVerifier = 1;
   let hasCustomAssemblyFormat = 1;
@@ -38,12 +37,6 @@ class IREELinalgExt_Op<string mnemonic, list<Trait> traits = []> :
     SmallVector<Value> getDestinationOperands(OpBuilder &b) {
       SmallVector<Value> dest(getOutputs().begin(), getOutputs().end());
       return dest;
-    }
-
-    LogicalResult reifyResultShapes(OpBuilder &b,
-        mlir::ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
-      return llvm::cast<LinalgExtOp>(getOperation()).reifyResultShapes(b,
-          reifiedReturnShapes);
     }
   }];
 }
@@ -53,7 +46,8 @@ class IREELinalgExt_Op<string mnemonic, list<Trait> traits = []> :
 //===----------------------------------------------------------------------===//
 
 def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
-    [DeclareOpInterfaceMethods<TilingInterface,
+    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+     DeclareOpInterfaceMethods<TilingInterface,
         ["generateScalarImplementation",
          "getIterationDomain",
          "getLoopIteratorTypes",
@@ -151,7 +145,8 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
 }
 
 def IREELinalgExt_SortOp : IREELinalgExt_Op<"sort",
-    [DeclareOpInterfaceMethods<TilingInterface,
+    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+     DeclareOpInterfaceMethods<TilingInterface,
         ["generateScalarImplementation",
          "getIterationDomain",
          "getLoopIteratorTypes",
@@ -195,6 +190,7 @@ def IREELinalgExt_SortOp : IREELinalgExt_Op<"sort",
 }
 
 def IREELinalgExt_FftOp : IREELinalgExt_Op<"fft", [
+  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
   DeclareOpInterfaceMethods<TilingInterface,
       ["generateScalarImplementation",
        "getIterationDomain",
@@ -258,7 +254,8 @@ def IREELinalgExt_FftOp : IREELinalgExt_Op<"fft", [
 }
 
 def IREELinalgExt_ScanOp : IREELinalgExt_Op<"scan",
-    [DeclareOpInterfaceMethods<TilingInterface,
+    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+     DeclareOpInterfaceMethods<TilingInterface,
       ["generateScalarImplementation",
        "getIterationDomain",
        "getLoopIteratorTypes",
@@ -312,6 +309,7 @@ def IREELinalgExt_ScanOp : IREELinalgExt_Op<"scan",
 }
 
 def IREELinalgExt_ReverseOp : IREELinalgExt_Op<"reverse", [
+  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
   DeclareOpInterfaceMethods<
       TilingInterface,
       ["generateScalarImplementation",
@@ -365,14 +363,14 @@ def IREELinalgExt_ReverseOp : IREELinalgExt_Op<"reverse", [
 }
 
 def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
+  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
   DeclareOpInterfaceMethods<LinalgExtInterface>,
   DeclareOpInterfaceMethods<TilingInterface,
     ["generateScalarImplementation",
      "getIterationDomain",
      "getLoopIteratorTypes",
      "getResultTilePosition",
-     "getTiledImplementation"]>,
-  SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::LinalgExt::YieldOp">,
+     "getTiledImplementation"]>
 ]>{
   let summary = "Top-K operator";
   let description = [{
@@ -435,8 +433,8 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
   }];
 }
 
-// TODO: destination passing style.
-def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack",[
+def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
+  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
   DeclareOpInterfaceMethods<LinalgExtInterface>,
   DeclareOpInterfaceMethods<TilingInterface,
     ["getIterationDomain",
@@ -503,12 +501,6 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack",[
 
     // Return the tile sizes ad OpFoldResults.
     SmallVector<OpFoldResult> getMixedTiles();
-
-    // Return the shape of the output.
-    SmallVector<OpFoldResult> buildOutputShape(OpBuilder &builder);
-
-    // Build the output position at pos `dimIdx`.
-    OpFoldResult buildOutputDim(OpBuilder &builder, size_t dimIdx);
 
     // Infer the output type.
     ShapedType inferResultType();

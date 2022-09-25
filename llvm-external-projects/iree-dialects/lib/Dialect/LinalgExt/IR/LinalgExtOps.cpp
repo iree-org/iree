@@ -111,6 +111,7 @@ OpFoldResult IREE::LinalgExt::getDim(OpBuilder &builder, Location loc, Value v,
 //===----------------------------------------------------------------------===//
 // ScatterOp
 //===----------------------------------------------------------------------===//
+
 LogicalResult ScatterOp::verify() {
   Operation *op = getOperation();
   if (getInputs().size() != 2) {
@@ -370,6 +371,13 @@ LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
   return success();
 }
 
+LogicalResult
+ScatterOp::reifyResultShapes(OpBuilder &b,
+                             ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  return cast<LinalgExtOp>(getOperation())
+      .reifyResultShapes(b, reifiedReturnShapes);
+}
+
 //===----------------------------------------------------------------------===//
 // SortOp
 //===----------------------------------------------------------------------===//
@@ -563,6 +571,13 @@ LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
       });
   b.create<scf::YieldOp>(loc);
   return success();
+}
+
+LogicalResult
+SortOp::reifyResultShapes(OpBuilder &b,
+                          ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  return cast<LinalgExtOp>(getOperation())
+      .reifyResultShapes(b, reifiedReturnShapes);
 }
 
 //===----------------------------------------------------------------------===//
@@ -805,6 +820,13 @@ LogicalResult FftOp::getResultTilePosition(
   return success();
 }
 
+LogicalResult
+FftOp::reifyResultShapes(OpBuilder &b,
+                         ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  return cast<LinalgExtOp>(getOperation())
+      .reifyResultShapes(b, reifiedReturnShapes);
+}
+
 //===----------------------------------------------------------------------===//
 // ScanOp
 //===----------------------------------------------------------------------===//
@@ -1045,6 +1067,13 @@ LogicalResult ScanOp::fold(ArrayRef<Attribute>,
   return foldMemRefCast(*this);
 }
 
+LogicalResult
+ScanOp::reifyResultShapes(OpBuilder &b,
+                          ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  return cast<LinalgExtOp>(getOperation())
+      .reifyResultShapes(b, reifiedReturnShapes);
+}
+
 //===----------------------------------------------------------------------===//
 // ReverseOp
 //===----------------------------------------------------------------------===//
@@ -1181,6 +1210,13 @@ LogicalResult ReverseOp::getResultTilePosition(
   }
   resultSizes.assign(sizes.begin(), sizes.end());
   return success();
+}
+
+LogicalResult
+ReverseOp::reifyResultShapes(OpBuilder &b,
+                             ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  return cast<LinalgExtOp>(getOperation())
+      .reifyResultShapes(b, reifiedReturnShapes);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1448,6 +1484,13 @@ LogicalResult TopkOp::getResultTilePosition(
   return success();
 }
 
+LogicalResult
+TopkOp::reifyResultShapes(OpBuilder &b,
+                          ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  return cast<LinalgExtOp>(getOperation())
+      .reifyResultShapes(b, reifiedReturnShapes);
+}
+
 //===----------------------------------------------------------------------===//
 // PackOp
 //===----------------------------------------------------------------------===//
@@ -1649,42 +1692,6 @@ DenseMap<int64_t, OpFoldResult> PackOp::getDimAndTileMapping() {
   return dimAndTileMapping;
 }
 
-// Build the output dimension at pos `dimIdx`.
-OpFoldResult PackOp::buildOutputDim(OpBuilder &builder, size_t dimIdx) {
-  unsigned inputRank = getInputRank();
-  ArrayRef<int64_t> outputShape = getOutputShape();
-  if (!ShapedType::isDynamic(outputShape[dimIdx]))
-    return builder.getI64IntegerAttr(outputShape[dimIdx]);
-
-  // Handle dynamic.
-  DenseMap<int64_t, OpFoldResult> dimAndTileMapping = getDimAndTileMapping();
-  AffineExpr dim = builder.getAffineSymbolExpr(0);
-  AffineExpr tile = builder.getAffineSymbolExpr(1);
-  auto apply = [&](AffineExpr expr,
-                   ArrayRef<OpFoldResult> values) -> OpFoldResult {
-    return makeComposedFoldedAffineApply(builder, getOperation()->getLoc(),
-                                         expr, values);
-  };
-  // If we are dealing with a tiled dimension compose the map otherwise
-  // return the dimension extracted with `memref.dim`.
-  OpFoldResult dimBound =
-      getDim(builder, getOperation()->getLoc(), getOutput(), dimIdx);
-  return (dimAndTileMapping.count(dimIdx))
-             ? apply(
-                   dim.ceilDiv(tile),
-                   ArrayRef<OpFoldResult>{dimBound, dimAndTileMapping[dimIdx]})
-             : dimBound;
-}
-
-// TODO: ReifyRankedShapedTypeOpInterface
-// Return the shape of the output as OpFoldResult.
-SmallVector<OpFoldResult> PackOp::buildOutputShape(OpBuilder &builder) {
-  ArrayRef<int64_t> outputShape = getOutputShape();
-  return llvm::to_vector(llvm::map_range(
-      llvm::seq<size_t>(0, outputShape.size()),
-      [&](size_t dimIdx) { return buildOutputDim(builder, dimIdx); }));
-}
-
 // Implements `getIterationDomain` from the tiling interface. In each
 // loop the lower bound is zero and the step is one. For upper bound
 // is inferred from the output tensor.
@@ -1694,12 +1701,12 @@ SmallVector<Range> PackOp::getIterationDomain(OpBuilder &builder) {
   Location loc = getLoc();
   Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
   Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
-  SmallVector<Value> upperBounds =
-      getAsValues(builder, loc, buildOutputShape(builder));
+  ReifiedRankedShapedTypeDims resultShape;
+  (void)reifyResultShapes(builder, resultShape);
   for (auto dim : llvm::seq<int64_t>(0, outputRank)) {
     loopBounds[dim].offset = zero;
     loopBounds[dim].stride = one;
-    loopBounds[dim].size = upperBounds[dim];
+    loopBounds[dim].size = resultShape[0][dim];
   }
   return loopBounds;
 }
@@ -1769,6 +1776,47 @@ LogicalResult PackOp::generateScalarImplementation(OpBuilder &builder,
   Value scalar = builder.create<memref::LoadOp>(
       loc, getInput(), getAsValues(builder, loc, sourceIndices));
   builder.create<memref::StoreOp>(loc, scalar, getOutput(), ivs);
+  return success();
+}
+
+LogicalResult
+PackOp::reifyResultShapes(OpBuilder &builder,
+                          ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+
+  // Build the output dimension at pos `dimIdx`.
+  auto buildOutputDim = [&](OpBuilder &builder, size_t dimIdx) -> OpFoldResult {
+    unsigned inputRank = getInputRank();
+    ArrayRef<int64_t> outputShape = getOutputShape();
+    if (!ShapedType::isDynamic(outputShape[dimIdx]))
+      return builder.getI64IntegerAttr(outputShape[dimIdx]);
+
+    // Handle dynamic.
+    DenseMap<int64_t, OpFoldResult> dimAndTileMapping = getDimAndTileMapping();
+    AffineExpr dim = builder.getAffineSymbolExpr(0);
+    AffineExpr tile = builder.getAffineSymbolExpr(1);
+    auto apply = [&](AffineExpr expr,
+                     ArrayRef<OpFoldResult> values) -> OpFoldResult {
+      return makeComposedFoldedAffineApply(builder, getOperation()->getLoc(),
+                                           expr, values);
+    };
+    // If we are dealing with a tiled dimension compose the map otherwise
+    // return the dimension extracted with `memref.dim`.
+    OpFoldResult dimBound =
+        getDim(builder, getOperation()->getLoc(), getOutput(), dimIdx);
+    return (dimAndTileMapping.count(dimIdx))
+               ? apply(dim.ceilDiv(tile),
+                       ArrayRef<OpFoldResult>{dimBound,
+                                              dimAndTileMapping[dimIdx]})
+               : dimBound;
+  };
+
+  reifiedReturnShapes.resize(1);
+  reifiedReturnShapes[0].reserve(getOutputRank());
+  for (auto dimIdx : llvm::seq<int64_t>(0, getOutputRank())) {
+    reifiedReturnShapes[0].push_back(getAsValues(
+        builder, getOperation()->getLoc(),
+        ArrayRef<OpFoldResult>{buildOutputDim(builder, dimIdx)})[0]);
+  }
   return success();
 }
 
