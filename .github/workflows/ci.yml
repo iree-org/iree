@@ -456,7 +456,7 @@ jobs:
       - self-hosted
       - runner-group=${{ needs.setup.outputs.runner-group }}
       - environment=${{ needs.setup.outputs.runner-env }}
-      - gpu 
+      - gpu
       - os-family=Linux
     env:
       BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
@@ -477,6 +477,7 @@ jobs:
       - name: "Symlinking TF binaries"
         run: |
           ./integrations/tensorflow/symlink_binaries.sh "$(realpath "${TF_BINARIES_DIR}")"
+      - name: "Downloading build archive"
         run: gcloud alpha storage cp "${GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting archive"
         run: tar -xf "${BUILD_DIR_ARCHIVE}"
