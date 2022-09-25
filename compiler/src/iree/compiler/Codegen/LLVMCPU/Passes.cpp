@@ -648,5 +648,11 @@ void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager) {
   });
 }
 
+// NOTE: this runs on the top-level program module containing all
+// hal.executable ops.
+void buildLLVMCPULinkingPassPipeline(OpPassManager &passManager) {
+  passManager.addPass(createLLVMCPULinkExecutablesPass());
+}
+
 }  // namespace iree_compiler
 }  // namespace mlir

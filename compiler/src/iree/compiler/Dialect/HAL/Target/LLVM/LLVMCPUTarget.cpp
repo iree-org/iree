@@ -26,7 +26,6 @@
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Linker/Linker.h"
-#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/TargetSelect.h"
 #include "mlir/Dialect/ArmNeon/ArmNeonDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -158,39 +157,8 @@ class LLVMCPUTargetBackend final : public TargetBackend {
     buildLLVMCPUCodegenPassPipeline(passManager);
   }
 
-  LogicalResult linkExecutables(mlir::ModuleOp moduleOp) override {
-    OpBuilder builder = OpBuilder::atBlockBegin(moduleOp.getBody());
-
-    auto sourceExecutableOps =
-        llvm::to_vector<8>(moduleOp.getOps<IREE::HAL::ExecutableOp>());
-    if (sourceExecutableOps.size() <= 1) return success();
-
-    // TODO(benvanik): rework linking to support multiple formats.
-    auto sharedTargetAttr = getExecutableTarget(builder.getContext());
-
-    // Guess a module name, if needed, to make the output files readable.
-    auto moduleName = guessModuleName(moduleOp, "llvm_module");
-
-    // Create our new "linked" hal.executable.
-    std::string linkedExecutableName =
-        llvm::formatv("{0}_linked_{1}", moduleName, "llvm_cpu");
-    auto linkedExecutableOp = builder.create<IREE::HAL::ExecutableOp>(
-        moduleOp.getLoc(), linkedExecutableName);
-    linkedExecutableOp.setVisibility(
-        sourceExecutableOps.front().getVisibility());
-
-    // Add our hal.executable.variant with an empty module.
-    builder.setInsertionPointToStart(&linkedExecutableOp.getBlock());
-    auto linkedTargetOp = builder.create<IREE::HAL::ExecutableVariantOp>(
-        moduleOp.getLoc(), sharedTargetAttr.getSymbolNameFragment(),
-        sharedTargetAttr);
-    builder.setInsertionPoint(&linkedTargetOp.getBlock().back());
-    builder.create<ModuleOp>(moduleOp.getLoc());
-
-    // Try linking together all executables in moduleOp.
-    return linkExecutablesInto(
-        moduleOp, sourceExecutableOps, linkedExecutableOp, linkedTargetOp,
-        [](mlir::ModuleOp moduleOp) { return moduleOp; }, builder);
+  void buildLinkingPassPipeline(OpPassManager &passManager) override {
+    buildLLVMCPULinkingPassPipeline(passManager);
   }
 
   LogicalResult serializeExecutable(const SerializationOptions &options,
