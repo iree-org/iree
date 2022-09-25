@@ -19,7 +19,7 @@
 // behavior and no additional checking was inserted as part of lowering.
 // Avoiding UB is expected to happen above this level.
 // Note: Setting this variable merely doesn't disable UBSAN.
-#if !IREE_VMVX_UBSAN_CHECKABLE_ENABLE
+#if !IREE_VM_UBSAN_CHECKABLE_ENABLE
 #pragma clang attribute push(__attribute__((no_sanitize("undefined"))), \
                              apply_to = function)
 #endif
@@ -382,7 +382,7 @@ static inline int32_t vm_cmp_nan_f32(float operand) {
   return isnan(operand) ? 1 : 0;
 }
 
-#if !IREE_VMVX_UBSAN_CHECKABLE_ENABLE
+#if !IREE_VM_UBSAN_CHECKABLE_ENABLE
 #pragma clang attribute pop
 #endif
 
