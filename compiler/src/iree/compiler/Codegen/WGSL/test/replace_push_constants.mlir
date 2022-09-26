@@ -27,10 +27,23 @@ func.func @constantLoadI32() {
   // CHECK: %[[SUBSPAN:.+]] = hal.interface.binding.subspan set(3) binding(0) type(storage_buffer) offset(%c0) : !flow.dispatch.tensor<readonly:1xi32>
   // CHECK: %[[LOAD:.+]] = flow.dispatch.tensor.load %[[SUBSPAN]], offsets = [0], sizes = [1], strides = [1] : !flow.dispatch.tensor<readonly:1xi32> -> tensor<1xi32>
   // CHECK: %[[EXTRACT:.+]] = tensor.extract %[[LOAD]][%c0_0] : tensor<1xi32>
-  // CHECK: %[[CAST:.+]] = arith.bitcast %[[EXTRACT]] : i32 to i32
   %0 = hal.interface.constant.load[0] : i32
-  // CHECK: = math.absi %[[CAST]] : i32
+  // CHECK: = math.absi %[[EXTRACT]] : i32
   %1 = math.absi %0 : i32
+  return
+}
+
+// -----
+
+// CHECK-LABEL: @constantLoadI16
+func.func @constantLoadI16() {
+  // CHECK: %[[SUBSPAN:.+]] = hal.interface.binding.subspan set(3) binding(0) type(storage_buffer) offset(%c0) : !flow.dispatch.tensor<readonly:1xi32>
+  // CHECK: %[[LOAD:.+]] = flow.dispatch.tensor.load %[[SUBSPAN]], offsets = [0], sizes = [1], strides = [1] : !flow.dispatch.tensor<readonly:1xi32> -> tensor<1xi32>
+  // CHECK: %[[EXTRACT:.+]] = tensor.extract %[[LOAD]][%c0_0] : tensor<1xi32>
+  // CHECK: %[[TRUNC:.+]] = arith.trunci %[[EXTRACT]] : i32 to i16
+  %0 = hal.interface.constant.load[0] : i16
+  // CHECK: = math.absi %[[TRUNC]] : i16
+  %1 = math.absi %0 : i16
   return
 }
 
@@ -70,20 +83,17 @@ func.func @constantLoadMultiple() {
   // CHECK: %[[LOAD:.+]] = flow.dispatch.tensor.load %[[SUBSPAN]], offsets = [0], sizes = [3], strides = [1] : !flow.dispatch.tensor<readonly:3xi32> -> tensor<3xi32>
 
   // CHECK: %[[EXTRACT_0:.+]] = tensor.extract %[[LOAD]][%c0] : tensor<3xi32>
-  // CHECK: %[[CAST_0:.+]] = arith.bitcast %[[EXTRACT_0]] : i32 to i32
   %0 = hal.interface.constant.load[0] : i32
   // CHECK: %[[EXTRACT_1:.+]] = tensor.extract %[[LOAD]][%c1] : tensor<3xi32>
-  // CHECK: %[[CAST_1:.+]] = arith.bitcast %[[EXTRACT_1]] : i32 to i32
   %1 = hal.interface.constant.load[1] : i32
   // CHECK: %[[EXTRACT_2:.+]] = tensor.extract %[[LOAD]][%c2_0] : tensor<3xi32>
-  // CHECK: %[[CAST_2:.+]] = arith.bitcast %[[EXTRACT_2]] : i32 to i32
   %2 = hal.interface.constant.load[2] : i32
 
-  // CHECK: = math.absi %[[CAST_0]] : i32
+  // CHECK: = math.absi %[[EXTRACT_0]] : i32
   %3 = math.absi %0 : i32
-  // CHECK: = math.absi %[[CAST_1]] : i32
+  // CHECK: = math.absi %[[EXTRACT_1]] : i32
   %4 = math.absi %1 : i32
-  // CHECK: = math.absi %[[CAST_2]] : i32
+  // CHECK: = math.absi %[[EXTRACT_2]] : i32
   %5 = math.absi %2 : i32
   return
 }

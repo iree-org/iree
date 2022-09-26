@@ -23,6 +23,42 @@ namespace {
 #define IREE_HAL_WEBGPU_PARAMS_BIND_GROUP_INDEX 3
 #define IREE_HAL_WEBGPU_PARAMS_BINDING_INDEX 0
 
+static Value convertOpTypeFromI32(IREE::HAL::InterfaceConstantLoadOp loadOp,
+                                  tensor::ExtractOp extractOp) {
+  OpBuilder builder(loadOp);
+
+  auto loc = loadOp.getLoc();
+  auto opType = loadOp.getType();
+
+  // Index
+  if (opType.isIndex()) {
+    return builder.create<arith::IndexCastOp>(loc, opType, extractOp);
+  }
+
+  unsigned sourceBitWidth = 32;
+  unsigned destBitWidth = opType.getIntOrFloatBitWidth();
+
+  // AnySignlessInteger
+  if (opType.isa<IntegerType>()) {
+    if (sourceBitWidth > destBitWidth) {
+      return builder.create<arith::TruncIOp>(loc, opType, extractOp);
+    } else if (sourceBitWidth < destBitWidth) {
+      return builder.create<arith::ExtUIOp>(loc, opType, extractOp);
+    } else {
+      return extractOp.getResult();
+    }
+  }
+
+  // AnyFloat
+  Value resizedValue = extractOp.getResult();
+  if (sourceBitWidth > destBitWidth) {
+    return builder.create<arith::TruncFOp>(loc, opType, extractOp);
+  } else if (sourceBitWidth < destBitWidth) {
+    return builder.create<arith::ExtFOp>(loc, opType, extractOp);
+  }
+  return builder.create<arith::BitcastOp>(loc, opType, resizedValue);
+}
+
 static void replaceConstantLoadOp(IREE::Flow::DispatchTensorLoadOp loadOp,
                                   IREE::HAL::InterfaceConstantLoadOp op) {
   OpBuilder builder(op);
@@ -33,18 +69,9 @@ static void replaceConstantLoadOp(IREE::Flow::DispatchTensorLoadOp loadOp,
   auto extractOp =
       builder.create<tensor::ExtractOp>(op.getLoc(), loadOp, offsetValue);
 
-  // Convert to original type.
-  auto opType = op.getType();
-  if (opType.isIndex()) {
-    auto indexCastOp =
-        builder.create<arith::IndexCastOp>(op.getLoc(), opType, extractOp);
-    op.replaceAllUsesWith(indexCastOp.getResult());
-  } else {
-    // TODO(scotttodd): truncate or zero-extend types with different bitwidths?
-    auto bitcastOp =
-        builder.create<arith::BitcastOp>(op.getLoc(), op.getType(), extractOp);
-    op.replaceAllUsesWith(bitcastOp.getResult());
-  }
+  // i32 -> original type
+  auto convertedTypeResult = convertOpTypeFromI32(op, extractOp);
+  op.replaceAllUsesWith(convertedTypeResult);
 
   op.erase();
 }
