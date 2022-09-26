@@ -10,6 +10,10 @@
 
 hal.executable private @dispatch_0 {
   hal.executable.variant @vmvx, target = #vmvx_target {
+    hal.executable.constant.block(%device: !hal.device) -> i32 as "foo" {
+      %c1 = arith.constant 1 : i32
+      hal.return %c1 : i32
+    }
     hal.executable.export @dispatch_0 ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device) :
       %c1 = arith.constant 1 : index
@@ -27,6 +31,10 @@ hal.executable private @dispatch_0 {
 }
 hal.executable private @dispatch_1 {
   hal.executable.variant @vmvx, target = #vmvx_target {
+    hal.executable.constant.block(%device: !hal.device) -> i32 as "baz" {
+      %c2 = arith.constant 2 : i32
+      hal.return %c2 : i32
+    }
     hal.executable.export @dispatch_1 ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device) :
       %c1 = arith.constant 1 : index
@@ -93,10 +101,14 @@ util.initializer {
 // CHECK-NOT: hal.executable private @dispatch_2
 // CHECK:       hal.executable private @link_executables_linked_vmvx {
 // CHECK-NEXT:    hal.executable.variant public @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
-// CHECK-NEXT:      hal.executable.export public @dispatch_0 ordinal(0)
-// CHECK-NEXT:      hal.executable.export public @dispatch_1 ordinal(1)
-// CHECK-NEXT:      hal.executable.export public @dispatch_2 ordinal(2)
-// CHECK-NEXT:      module {
+// CHECK-NEXT:      hal.executable.constant.block(%arg0: !hal.device) -> i32 as "foo"
+// CHECK-NEXT:        = arith.constant 1
+//      CHECK:      hal.executable.export public @dispatch_0 ordinal(0)
+// CHECK-NEXT:      hal.executable.constant.block(%arg0: !hal.device) -> i32 as "baz"
+// CHECK-NEXT:        = arith.constant 2
+//      CHECK:      hal.executable.export public @dispatch_1 ordinal(1)
+//      CHECK:      hal.executable.export public @dispatch_2 ordinal(2)
+//      CHECK:      module {
 // CHECK-NEXT:        vm.module public @linked_module {
 // CHECK-NEXT:          vm.func @dispatch_0() {
 // CHECK-NEXT:            vm.return

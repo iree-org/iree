@@ -505,14 +505,35 @@ class HALDispatchABI {
     return dataValue;
   }
 
-  // Loads an executable constant at |index| and casts it to |resultType|.
-  Value loadExecutableConstant(Location loc, int64_t index, Type resultType,
+  // Loads an executable constant with |key| and casts it to |resultType|.
+  // A placeholder global will be added for the ordinal.
+  Value loadExecutableConstant(Location loc, StringRef key, Type resultType,
                                OpBuilder &builder) {
+    // Create top-level global placeholder.
+    // The magic attribute is used by future assignment passes.
+    std::string globalName = ("__constant_ordinal_" + key).str();
+    auto moduleOp =
+        builder.getInsertionPoint()->getParentOfType<mlir::ModuleOp>();
+    LLVM::GlobalOp globalOp;
+    if (!(globalOp = moduleOp.lookupSymbol<LLVM::GlobalOp>(globalName))) {
+      auto moduleBuilder = OpBuilder::atBlockBegin(moduleOp.getBody());
+      globalOp = moduleBuilder.create<LLVM::GlobalOp>(loc, builder.getI32Type(),
+                                                      /*isConstant=*/false,
+                                                      LLVM::Linkage::Internal,
+                                                      globalName, Attribute{});
+      globalOp->setAttr(IREE::HAL::ExecutableConstantBlockOp::getKeyAttrName(),
+                        builder.getStringAttr(key));
+    }
+
+    // Load the placeholder global ordinal.
+    Value globalPtr = builder.create<LLVM::AddressOfOp>(loc, globalOp);
+    Value ordinalValue = builder.create<LLVM::LoadOp>(loc, globalPtr);
+
+    // Load constant from the executable constants struct.
     auto constantsPtrValue =
         loadFieldValue(loc, EnvironmentField::constants, builder);
-    auto indexValue = getIndexValue(loc, index, builder);
     Value constantPtrValue = builder.create<LLVM::GEPOp>(
-        loc, constantsPtrValue.getType(), constantsPtrValue, indexValue);
+        loc, constantsPtrValue.getType(), constantsPtrValue, ordinalValue);
     Value constantValue = builder.create<LLVM::LoadOp>(loc, constantPtrValue);
     return castValueToType(loc, constantValue, resultType, builder);
   }
@@ -739,6 +760,33 @@ class ConvertHALEntryPointFuncOp : public ConvertToLLVMPattern {
   }
 };
 
+/// Rewrites hal.interface.constant.load to ops loading from the ABI structs.
+/// Because ordinals are not yet available we emit a placeholder global that
+/// later gets updated with the value after linking.
+///
+/// The parent LLVMFuncOp must be compatible with HALDispatchABI.
+class ConvertHALExecutableConstantLoadOp : public ConvertToLLVMPattern {
+ public:
+  explicit ConvertHALExecutableConstantLoadOp(MLIRContext *context,
+                                              LLVMTypeConverter &converter)
+      : ConvertToLLVMPattern(
+            IREE::HAL::ExecutableConstantLoadOp::getOperationName(), context,
+            converter) {}
+  LogicalResult matchAndRewrite(
+      Operation *op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto llvmFuncOp = op->getParentOfType<LLVM::LLVMFuncOp>();
+    if (!llvmFuncOp) return failure();
+    HALDispatchABI abi(llvmFuncOp, getTypeConverter());
+    auto loadOp = cast<IREE::HAL::ExecutableConstantLoadOp>(op);
+    auto resultType = typeConverter->convertType(op->getResult(0).getType());
+    rewriter.replaceOp(op,
+                       abi.loadExecutableConstant(op->getLoc(), loadOp.getKey(),
+                                                  resultType, rewriter));
+    return success();
+  }
+};
+
 /// Rewrites hal.interface.workgroup.id to ops loading from the ABI structs.
 ///
 /// The parent LLVMFuncOp must be compatible with HALDispatchABI.
@@ -823,10 +871,10 @@ class ConvertHALInterfaceWorkgroupCountOp : public ConvertToLLVMPattern {
 /// Rewrites hal.interface.constant.load to ops loading from the ABI structs.
 ///
 /// The parent LLVMFuncOp must be compatible with HALDispatchABI.
-class ConvertHALInterfaceLoadConstant : public ConvertToLLVMPattern {
+class ConvertHALInterfaceConstantLoadOp : public ConvertToLLVMPattern {
  public:
-  explicit ConvertHALInterfaceLoadConstant(MLIRContext *context,
-                                           LLVMTypeConverter &converter)
+  explicit ConvertHALInterfaceConstantLoadOp(MLIRContext *context,
+                                             LLVMTypeConverter &converter)
       : ConvertToLLVMPattern(
             IREE::HAL::InterfaceConstantLoadOp::getOperationName(), context,
             converter) {}
@@ -1005,10 +1053,11 @@ void ConvertToLLVMPass::runOnOperation() {
   // clang-format off
   patterns.insert<
     ConvertHALEntryPointFuncOp,
+    ConvertHALExecutableConstantLoadOp,
     ConvertHALInterfaceWorkgroupIDOp,
     ConvertHALInterfaceWorkgroupSizeOp,
     ConvertHALInterfaceWorkgroupCountOp,
-    ConvertHALInterfaceLoadConstant,
+    ConvertHALInterfaceConstantLoadOp,
     ConvertHALInterfaceBindingSubspanOp
   >(&getContext(), converter);
   // clang-format on

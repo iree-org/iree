@@ -40,6 +40,7 @@ iree_cc_library(
     "Passes.h"
   SRCS
     "Conversion.cpp"
+    "MaterializeConstants.cpp"
     "Passes.cpp"
     "ResolveBufferDescriptors.cpp"
   DEPS
@@ -73,6 +74,7 @@ iree_cc_library(
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::LLVMCPU
     iree::compiler::Codegen::PassHeaders
+    iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::HAL::Transforms
     iree::compiler::Dialect::Util::Conversion::MemRefToUtil

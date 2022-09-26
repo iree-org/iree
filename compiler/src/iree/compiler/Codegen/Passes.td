@@ -311,6 +311,12 @@ def LLVMCPULinkExecutables :
   let constructor = "mlir::iree_compiler::createLLVMCPULinkExecutablesPass()";
 }
 
+def LLVMCPUAssignConstantOrdinals :
+    Pass<"iree-llvmcpu-assign-constant-ordinals", "IREE::HAL::ExecutableVariantOp"> {
+  let summary = "Assigns executable constant ordinals across all LLVMCPU variants.";
+  let constructor = "mlir::iree_compiler::createLLVMCPUAssignConstantOrdinalsPass()";
+}
+
 //------------------------------------------------------------------------------
 // LLVMGPU
 //------------------------------------------------------------------------------
@@ -486,6 +492,12 @@ def VMVXLinkExecutables :
     Pass<"iree-vmvx-link-executables", "mlir::ModuleOp"> {
   let summary = "Links VMVX HAL executables within the top-level program module.";
   let constructor = "mlir::iree_compiler::createVMVXLinkExecutablesPass()";
+}
+
+def VMVXAssignConstantOrdinals :
+    Pass<"iree-vmvx-assign-constant-ordinals", "IREE::HAL::ExecutableVariantOp"> {
+  let summary = "Assigns executable constant ordinals across all VMVX variants.";
+  let constructor = "mlir::iree_compiler::createVMVXAssignConstantOrdinalsPass()";
 }
 
 //------------------------------------------------------------------------------

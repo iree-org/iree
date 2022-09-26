@@ -681,7 +681,17 @@ void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager) {
 // NOTE: this runs on the top-level program module containing all
 // hal.executable ops.
 void buildLLVMCPULinkingPassPipeline(OpPassManager &passManager) {
+  // Link together executables. This may produce some IR duplication.
   passManager.addPass(createLLVMCPULinkExecutablesPass());
+
+  // Cleanup IR duplication.
+  passManager.addNestedPass<IREE::HAL::ExecutableOp>(
+      mlir::createCanonicalizerPass());
+
+  // Assign final executable constant ordinals.
+  passManager.nest<IREE::HAL::ExecutableOp>()
+      .addNestedPass<IREE::HAL::ExecutableVariantOp>(
+          createLLVMCPUAssignConstantOrdinalsPass());
 }
 
 }  // namespace iree_compiler

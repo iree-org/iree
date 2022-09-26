@@ -105,6 +105,7 @@ void buildVMVXTransformPassPipeline(OpPassManager &passManager) {
   // Standard/Vector/HAL/etc -> VMVX conversion
   // ---------------------------------------------------------------------------
 
+  passManager.addNestedPass<mlir::ModuleOp>(createMaterializeConstantsPass());
   passManager.addNestedPass<mlir::ModuleOp>(createConversionPass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());

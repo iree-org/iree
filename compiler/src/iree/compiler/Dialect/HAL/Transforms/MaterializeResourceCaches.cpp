@@ -7,10 +7,14 @@
 #include <memory>
 #include <utility>
 
+#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/Utils/DeviceSwitchBuilder.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -36,6 +40,12 @@ class MaterializeResourceCachesPass
 
   StringRef getDescription() const override {
     return "Materializes hal.executable resource caches and rewrites lookups.";
+  }
+
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<mlir::arith::ArithDialect>();
+    registry.insert<mlir::cf::ControlFlowDialect>();
+    registry.insert<IREE::HAL::HALDialect>();
   }
 
   void runOnOperation() override {
@@ -218,8 +228,14 @@ class MaterializeResourceCachesPass
       // Inline constant initializer from the variant.
       // We want these to all happen inside of this device switch case; they'll
       // get deduplicated/hoisted if possible in future canonicalization passes.
-      // TODO(benvanik): define how constants are exposed on variants.
       SmallVector<Value> constantValues;
+      for (auto blockOp : llvm::make_early_inc_range(
+               executableVariantOp
+                   .getOps<IREE::HAL::ExecutableConstantBlockOp>())) {
+        constantValues.append(inlineConstantBlockOp(blockOp, moduleBuilder,
+                                                    caseBuilder, deviceValue));
+        blockOp.erase();
+      }
 
       auto executableValue = caseBuilder.createOrFold<ExecutableCreateOp>(
           loc, ExecutableType::get(loc.getContext()), deviceValue,
@@ -245,6 +261,41 @@ class MaterializeResourceCachesPass
     blockBuilder.create<IREE::Util::InitializerReturnOp>(loc);
 
     return globalOp;
+  }
+
+  // Inlines a constant block as a function in |moduleBuilder| and then inserts
+  // a call to it in |callerBuilder|.
+  SmallVector<Value> inlineConstantBlockOp(ExecutableConstantBlockOp blockOp,
+                                           OpBuilder &moduleBuilder,
+                                           OpBuilder &callerBuilder,
+                                           Value deviceValue) {
+    // Create the function with the region contents of the constant block.
+    auto funcName = (StringRef("__constant_block_") +
+                     std::to_string(nextUniqueConstantBlockId++))
+                        .str();
+    auto funcOp = moduleBuilder.create<func::FuncOp>(blockOp.getLoc(), funcName,
+                                                     blockOp.getFunctionType());
+    funcOp.setPrivate();
+    funcOp.getRegion().takeBody(blockOp.getRegion());
+
+    // Replace the hal.return with a func.return.
+    for (auto returnOp :
+         llvm::make_early_inc_range(funcOp.getOps<IREE::HAL::ReturnOp>())) {
+      OpBuilder(returnOp).create<func::ReturnOp>(returnOp.getLoc(),
+                                                 returnOp.getOperands());
+      returnOp.erase();
+    }
+
+    // Create the call passing in the device if needed.
+    SmallVector<Value> callOperands;
+    if (funcOp.getNumArguments() > 0) {
+      callOperands.push_back(deviceValue);
+    }
+    auto callOp = callerBuilder.create<func::CallOp>(blockOp.getLoc(), funcOp,
+                                                     callOperands);
+
+    return llvm::to_vector(llvm::map_range(
+        callOp.getResults(), [](OpResult result) -> Value { return result; }));
   }
 
   void replaceDescriptorSetLayoutLookupOp(
@@ -290,6 +341,7 @@ class MaterializeResourceCachesPass
   DenseMap<Attribute, IREE::Util::GlobalOp> pipelineLayoutCache_;
   DenseMap<StringRef, IREE::Util::GlobalOp> executableCache_;
 
+  int nextUniqueConstantBlockId = 0;
   int nextUniquePipelineLayoutId = 0;
   int nextUniqueDescriptorSetLayoutId = 0;
 };
