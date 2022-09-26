@@ -57,6 +57,24 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
   Type outputType = linalgOp.getOutputOperand(0)->get().getType();
   ArrayRef<int64_t> outputShape = outputType.cast<ShapedType>().getShape();
 
+  int64_t icIndex, ohIndex, owIndex, ocIndex;
+  if (isa<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp>(
+          *linalgOp)) {
+    // n, h,w ,c, h, w,f
+    icIndex = 3;
+    ohIndex = 1;
+    owIndex = 2;
+    ocIndex = 3;
+  } else if (isa<linalg::Conv2DNchwFchwOp>(*linalgOp)) {
+    // n, c, h, w, f, h, w
+    icIndex = 1;
+    ohIndex = 2;
+    owIndex = 3;
+    ocIndex = 1;
+  } else {
+    return success();
+  }
+
   if (isa<linalg::Conv2DNhwcHwcfOp>(*linalgOp) &&
       ShapedType::isDynamic(inputShape[3])) {
     return success();
@@ -65,8 +83,9 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
     return success();
   }
 
-  int64_t ic = inputShape[3];
-  int64_t oh = outputShape[1], ow = outputShape[2], oc = outputShape[3];
+  int64_t ic = inputShape[icIndex];
+  int64_t oh = outputShape[ohIndex], ow = outputShape[owIndex],
+          oc = outputShape[ocIndex];
 
   // The conversion pipeline requires the input channel dimension to be some
   // multipler of four, or less than four.
@@ -81,7 +100,8 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
   int64_t residualTilingFactor = bestTilingFactor;
 
   SmallVector<int64_t, 3> workgroupSize(3, 1);     // (X, Y, Z)
-  SmallVector<int64_t> workgroupTileSizes(4, 0);   // (N, OH, OW, OC)
+  SmallVector<int64_t> workgroupTileSizes(
+      4, 0);  // (N, OH, OW, OC) or (N, OC, OH, OW)
   SmallVector<int64_t> invocationTileSizes(4, 0);  // (N, OH, OW, OC)
 
   // Deduce the configuration for the OC dimension.
@@ -91,14 +111,14 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
     int64_t chosenTileSize = 4;
     if (oc % (x * chosenTileSize) == 0) {
       workgroupSize[0] = x;
-      workgroupTileSizes[3] = x * chosenTileSize;
-      invocationTileSizes[3] = chosenTileSize;
+      workgroupTileSizes[ocIndex] = x * chosenTileSize;
+      invocationTileSizes[ocIndex] = chosenTileSize;
       residualThreads /= x;
       residualTilingFactor /= chosenTileSize;
       break;
     }
   }
-  if (workgroupTileSizes[3] == 0) return success();
+  if (workgroupTileSizes[ocIndex] == 0) return success();
 
   // Deduce the configruation for the OW and OH dimension. Try to make them even
   // if possible given we typically have images with the same height and width.
@@ -114,8 +134,10 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
 
     if (chosenTileSize != 0) {
       workgroupSize[1] = workgroupSize[2] = yz;
-      workgroupTileSizes[2] = workgroupTileSizes[1] = yz * chosenTileSize;
-      invocationTileSizes[2] = invocationTileSizes[1] = chosenTileSize;
+      workgroupTileSizes[owIndex] = workgroupTileSizes[ohIndex] =
+          yz * chosenTileSize;
+      invocationTileSizes[owIndex] = invocationTileSizes[ohIndex] =
+          chosenTileSize;
       tileToSquare = true;
     }
   }
@@ -146,10 +168,10 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
       return false;
     };
 
-    if (!decideOneDim(ow, workgroupSize[1], workgroupTileSizes[2],
-                      invocationTileSizes[2]) ||
-        !decideOneDim(oh, workgroupSize[2], workgroupTileSizes[1],
-                      invocationTileSizes[1])) {
+    if (!decideOneDim(ow, workgroupSize[1], workgroupTileSizes[owIndex],
+                      invocationTileSizes[owIndex]) ||
+        !decideOneDim(oh, workgroupSize[2], workgroupTileSizes[ohIndex],
+                      invocationTileSizes[ohIndex])) {
       return success();
     }
   }
@@ -165,6 +187,9 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
   } else if (isa<linalg::DepthwiseConv2DNhwcHwcOp>(linalgOp)) {
     tileSizes.push_back({0, 0, 0, 0, 1, 1});  // (N, OH, OW, C, FH, FW)
     tileSizes.push_back({0, 1, 0, 0});
+  } else if (isa<linalg::Conv2DNchwFchwOp>(linalgOp)) {
+    tileSizes.push_back({0, 0, 0, 0, 4, 1, 1});  // (N, OC, OH, OW, IC, FH, FW)
+    tileSizes.push_back({0, 0, 1, 0});           // (N, OC, OH, OW)
   } else {
     return success();
   }
@@ -740,18 +765,18 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
         // If unsuccessful, try to tile and distribute.
         return setDefaultOpConfig(limits, op);
       })
-      .Case<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp>(
-          [limits](auto op) {
-            // Try to tile and vectorize first. It's common to see 32 threads
-            // per subgroup for GPUs.
-            auto result = detail::setConvOpConfig(op, /*subgroupSize=*/32,
-                                                  /*bestTilingFactor=*/32);
-            if (failed(result)) return result;
-            if (getLoweringConfig(op)) return result;
+      .Case<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp,
+            linalg::Conv2DNchwFchwOp>([limits](auto op) {
+        // Try to tile and vectorize first. It's common to see 32 threads
+        // per subgroup for GPUs.
+        auto result = detail::setConvOpConfig(op, /*subgroupSize=*/32,
+                                              /*bestTilingFactor=*/32);
+        if (failed(result)) return result;
+        if (getLoweringConfig(op)) return result;
 
-            // If unsuccessful, try to tile and distribute.
-            return setDefaultOpConfig(limits, op);
-          })
+        // If unsuccessful, try to tile and distribute.
+        return setDefaultOpConfig(limits, op);
+      })
       .Case<linalg::ConvolutionOpInterface>([limits](auto op) {
         // Other convolution/pooling op vectorization is not wired up.
         return setDefaultOpConfig(limits, op, /*allowVectorization=*/false);

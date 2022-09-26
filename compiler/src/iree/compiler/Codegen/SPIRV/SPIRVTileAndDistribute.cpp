@@ -101,7 +101,7 @@ static void populateTilingReductionPatterns(RewritePatternSet &patterns) {
                            .setTileSizeComputationFunction(getTileSizeFn);
 
   TilingPatterns<linalg::BatchMatmulOp, linalg::Conv2DNhwcHwcfOp,
-                 linalg::DepthwiseConv2DNhwcHwcOp,
+                 linalg::DepthwiseConv2DNhwcHwcOp, linalg::Conv2DNchwFchwOp,
                  linalg::MatmulOp>::insert(patterns, tilingOptions, filter);
 }
 

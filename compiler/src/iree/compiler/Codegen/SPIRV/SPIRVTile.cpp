@@ -57,8 +57,10 @@ static void populateTilingReductionPatterns(RewritePatternSet &patterns) {
   auto filter = linalg::LinalgTransformationFilter({marker}, llvm::None);
 
   TilingPatterns<linalg::BatchMatmulOp, linalg::Conv2DNhwcHwcfOp,
-                 linalg::DepthwiseConv2DNhwcHwcOp, linalg::GenericOp,
-                 linalg::MatmulOp>::insert(patterns, tilingOptions, filter);
+                 linalg::Conv2DNchwFchwOp, linalg::DepthwiseConv2DNhwcHwcOp,
+                 linalg::GenericOp, linalg::MatmulOp>::insert(patterns,
+                                                              tilingOptions,
+                                                              filter);
 }
 
 //===----------------------------------------------------------------------===//
