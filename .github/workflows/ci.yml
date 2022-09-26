@@ -462,10 +462,10 @@ jobs:
     env:
       BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
       BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.gcs-artifact }}
+      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
       TF_BINARIES_DIR: ${{ needs.build_tf_integrations.outputs.binaries-dir }}
       TF_BINARIES_ARCHIVE: ${{ needs.build_tf_integrations.outputs.binaries-archive }}
-      TF_BINARIES_GCS_ARTIFACT: ${{ needs.build_tf_integrations.outputs.gcs-artifact }}
+      TF_BINARIES_GCS_ARTIFACT: ${{ needs.build_tf_integrations.outputs.binaries-gcs-artifact }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
@@ -478,9 +478,9 @@ jobs:
       - name: "Symlinking TF binaries"
         run: |
           ./integrations/tensorflow/symlink_binaries.sh "$(realpath "${TF_BINARIES_DIR}")"
-      - name: "Downloading build archive"
-        run: gcloud alpha storage cp "${GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
-      - name: "Extracting archive"
+      - name: "Downloading build dir archive"
+        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+      - name: "Extracting build dir archive"
         run: tar -xf "${BUILD_DIR_ARCHIVE}"
       - name: "Downloading SHARK"
         id: download_shark
