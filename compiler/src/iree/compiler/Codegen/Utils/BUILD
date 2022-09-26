@@ -18,11 +18,13 @@ iree_compiler_cc_library(
     name = "Utils",
     srcs = [
         "GPUUtils.cpp",
+        "LinkingUtils.cpp",
         "MarkerUtils.cpp",
         "Utils.cpp",
     ],
     hdrs = [
         "GPUUtils.h",
+        "LinkingUtils.h",
         "MarkerUtils.h",
         "Utils.h",
     ],

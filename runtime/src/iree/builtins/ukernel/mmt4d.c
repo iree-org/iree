@@ -104,6 +104,26 @@ void iree_ukernel_memset_zero(void* buf, iree_ukernel_ssize_t n) {
   for (iree_ukernel_ssize_t i = 0; i < n; ++i) ((char*)buf)[i] = 0;
 }
 
+// Helper for early-return path when K==0 and we just need to clear the output.
+static void iree_ukernel_mmt4d_zero_out(
+    const iree_ukernel_mmt4d_params_t* params) {
+  iree_ukernel_ssize_t contiguous_size =
+      params->N * params->M0 * params->N0
+      << iree_ukernel_mmt4d_out_elem_size_log2(params->type);
+  iree_ukernel_ssize_t stride =
+      params->out_stride << iree_ukernel_mmt4d_out_elem_size_log2(params->type);
+  char* out_ptr = params->out_buffer;
+  for (iree_ukernel_ssize_t i = 0; i < params->M; ++i) {
+    iree_ukernel_memset_zero(out_ptr, contiguous_size);
+    out_ptr += stride;
+  }
+}
+
+// Early-return code paths, including trivial or near-trivial cases (when one
+// of the dimensions is 0) and in the future, hardware ports that specialize
+// the entire loop nest.
+// The value |true| is written to the out-param |*done| if an early-return path
+// was taken and the mmt4d work is already done.
 static iree_ukernel_mmt4d_status_t iree_ukernel_mmt4d_early(
     const iree_ukernel_mmt4d_params_t* params, bool* done) {
   // Trivial cases
@@ -115,18 +135,7 @@ static iree_ukernel_mmt4d_status_t iree_ukernel_mmt4d_early(
     if (params->flags & IREE_VMVX_MATMUL_FLAG_ACCUMULATE) {
       // Nothing to do!
     } else {
-      // No accumulate flag, so we must still clear the output buffer.
-      iree_ukernel_ssize_t contiguous_size =
-          params->N * params->M0 * params->N0
-          << iree_ukernel_mmt4d_out_elem_size_log2(params->type);
-      iree_ukernel_ssize_t stride =
-          params->out_stride
-          << iree_ukernel_mmt4d_out_elem_size_log2(params->type);
-      char* out_ptr = params->out_buffer;
-      for (iree_ukernel_ssize_t i = 0; i < params->M; ++i) {
-        iree_ukernel_memset_zero(out_ptr, contiguous_size);
-        out_ptr += stride;
-      }
+      iree_ukernel_mmt4d_zero_out(params);
     }
     *done = true;
     return iree_ukernel_mmt4d_status_ok;

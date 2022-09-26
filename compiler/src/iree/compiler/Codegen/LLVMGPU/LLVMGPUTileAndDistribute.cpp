@@ -36,9 +36,6 @@ using mlir::iree_compiler::IREE::LinalgExt::TilingPatterns;
 namespace mlir {
 namespace iree_compiler {
 
-/// Flag defined in Passes.cpp.
-extern llvm::cl::opt<bool> llvmgpuUseMMASync;
-
 /// Patterns for workgroup level tiling. Workgroup tiling is done at the flow
 /// level but we may have extra tiling for the reduction dimension. Therefore we
 /// tile again without distributing.
@@ -219,31 +216,88 @@ static void populatePromotionPatterns(MLIRContext *context,
           .addFilter(filterFunction));
 }
 
+static bool propagateCopyDestIntoProducerFill(memref::CopyOp copyOp) {
+  // Look for a fill Op writing into the copyOp source.
+  Operation *prevOp = copyOp->getPrevNode();
+  while (prevOp) {
+    if (isSideEffectFree(prevOp)) {
+      prevOp = prevOp->getPrevNode();
+      continue;
+    }
+
+    auto fillOp = dyn_cast<linalg::FillOp>(prevOp);
+    if (!fillOp) break;
+    if (fillOp.output() != copyOp.getSource()) break;
+    // Move the fillOp and change the destination to the copy destination.
+    fillOp->moveBefore(copyOp);
+    fillOp.getOutputsMutable().assign(copyOp.getTarget());
+    return true;
+  }
+  return false;
+}
+
+// Split input/output operand from copy from shared memory into a separate
+// input.
+static void insertInputValueIntoGeneric(Value source, linalg::GenericOp op) {
+  SmallVector<Value> newOperands;
+  SmallVector<AffineMap> maps;
+  for (OpOperand *in : op.getInputOperands()) {
+    newOperands.push_back(in->get());
+    maps.push_back(op.getTiedIndexingMap(in));
+  }
+  newOperands.push_back(source);
+  assert(op.getNumOutputs() == 1);
+  OpOperand *outOperand = op.getOutputOperand(0);
+  maps.push_back(op.getTiedIndexingMap(outOperand));
+  maps.push_back(op.getTiedIndexingMap(outOperand));
+  Location loc = op.getLoc();
+  SmallVector<StringRef> iterTypes(op.getNumLoops(),
+                                   getParallelIteratorTypeName());
+  OpBuilder builder(op);
+  auto newOp = builder.create<linalg::GenericOp>(
+      loc, newOperands, outOperand->get(), maps, iterTypes);
+  newOp.getRegion().getBlocks().splice(newOp.getRegion().begin(),
+                                       op.getRegion().getBlocks());
+
+  Block &payload = newOp.getRegion().front();
+  payload.addArgument(payload.getArguments().back().getType(), loc);
+  setMarker(newOp, getCopyToWorkgroupMemoryMarker());
+}
+
+/// Propagate the shared memory copy into the consumer op if it's a fully
+/// parallel linalg.generic.
+static bool propagateCopySourceIntoConsumerGeneric(
+    memref::CopyOp copyOp, SmallVector<Operation *> &toDelete) {
+  // Look for a generic Op reading the copyOp target.
+  Operation *nextOp = copyOp->getNextNode();
+  while (nextOp) {
+    if (isSideEffectFree(nextOp)) {
+      nextOp = nextOp->getNextNode();
+      continue;
+    }
+    auto consumer = dyn_cast<linalg::GenericOp>(nextOp);
+    if (!consumer || consumer.getNumOutputs() != 1 ||
+        !consumer.getTiedIndexingMap(consumer.getOutputOperand(0)).isIdentity())
+      break;
+    if (*consumer.outputs().begin() != copyOp.getTarget()) break;
+    insertInputValueIntoGeneric(copyOp.getSource(), consumer);
+    toDelete.push_back(consumer);
+    return true;
+  }
+  return false;
+}
+
 /// Transformation to propagate FillOp + CopyOp to temp allocation.
 /// This is needed because we are doing promotion to shared memory on buffers.
 /// This is a fragile and temporary solution until we move to be able to do this
 /// kind of transformations on tensors.
-static void propagateFillIntoPromotionAlloc(func::FuncOp funcOp) {
+static void propagateSharedMemCopy(func::FuncOp funcOp) {
   SmallVector<Operation *> toDelete;
   funcOp.walk([&toDelete](memref::CopyOp copyOp) {
     if (hasMarker(copyOp, getCopyToWorkgroupMemoryMarker())) {
-      // Look for a fill Op writing into the copyOp source.
-      Operation *prevOp = copyOp->getPrevNode();
-      while (prevOp) {
-        if (isSideEffectFree(prevOp)) {
-          prevOp = prevOp->getPrevNode();
-          continue;
-        }
-
-        auto fillOp = dyn_cast<linalg::FillOp>(prevOp);
-        if (!fillOp) break;
-        if (fillOp.output() != copyOp.getSource()) break;
-        // Move the fillOp and change the destination to the copy destination.
-        fillOp->moveBefore(copyOp);
-        fillOp.getOutputsMutable().assign(copyOp.getTarget());
+      if (propagateCopyDestIntoProducerFill(copyOp) ||
+          propagateCopySourceIntoConsumerGeneric(copyOp, toDelete))
         toDelete.push_back(copyOp.getOperation());
-        break;
-      }
     }
   });
   for (Operation *op : toDelete) op->erase();
@@ -269,7 +323,7 @@ struct LLVMGPUTileAndDistributePass
 
     // Promote C matrix and propagate the potential  fill producer into the temp
     // allocation. This needs to be done before reduction tiling.
-    if (llvmgpuUseMMASync) {
+    {
       RewritePatternSet promotionPatterns(&getContext());
       populatePromotionPatterns(context, promotionPatterns, contractOpFilter,
                                 {2});
@@ -277,7 +331,7 @@ struct LLVMGPUTileAndDistributePass
                                               std::move(promotionPatterns)))) {
         return signalPassFailure();
       }
-      propagateFillIntoPromotionAlloc(funcOp);
+      propagateSharedMemCopy(funcOp);
     }
 
     // Tile again at the workgroup level since reduction dimension were
@@ -312,17 +366,17 @@ struct LLVMGPUTileAndDistributePass
       // Insert barriers before and after copies to workgroup memory and skip
       // insert barriers between back to back copy to workgroup memory.
       OpBuilder builder(&getContext());
-      funcOp.walk([&builder](memref::CopyOp copyOp) {
+      funcOp.walk([&builder](Operation *copyOp) {
         if (hasMarker(copyOp, getCopyToWorkgroupMemoryMarker())) {
           Operation *prevOp = copyOp->getPrevNode();
           if (!prevOp || !hasMarker(prevOp, getCopyToWorkgroupMemoryMarker())) {
             builder.setInsertionPoint(copyOp);
-            builder.create<gpu::BarrierOp>(copyOp.getLoc());
+            builder.create<gpu::BarrierOp>(copyOp->getLoc());
           }
           Operation *nextOp = copyOp->getNextNode();
           if (!nextOp || !hasMarker(nextOp, getCopyToWorkgroupMemoryMarker())) {
             builder.setInsertionPointAfter(copyOp);
-            builder.create<gpu::BarrierOp>(copyOp.getLoc());
+            builder.create<gpu::BarrierOp>(copyOp->getLoc());
           }
         }
       });

@@ -476,8 +476,14 @@ hal.executable @mma_fused {
 //           CHECK:   nvvm.cp.async.commit.group
 //           CHECK:   llvm.br
 //       CHECK-NOT:   nvvm.wmma.mma
-//   CHECK-COUNT-8:   llvm.fadd
-//   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f32>, f32, f32, f32, f32, f32, f32, f32, f32
+//   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f32, 3>, f32, f32, f32, f32, f32, f32, f32, f32
+//           CHECK:   vvm.barrier0
+//           CHECK:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//           CHECK:   llvm.fadd {{.*}} : vector<4xf32>
+//           CHECK:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
+//           CHECK:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//           CHECK:   llvm.fadd {{.*}} : vector<4xf32>
+//           CHECK:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
 
 // mma.sync case:
 //    MMASYNC-LABEL: hal.executable public @mma_fused
@@ -504,12 +510,13 @@ hal.executable @mma_fused {
 //    MMASYNC-COUNT:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
 //    MMASYNC-COUNT:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
 //    MMASYNC-COUNT:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
-
-// C matrix promotion prevent efficient fusion with matmul consumer, this needs
-// to be fixed to get good performance.
-// MMASYNC-COUNT-32:   llvm.load {{.*}} : !llvm.ptr<vector<8xf32>>
-// MMASYNC-COUNT-32:   llvm.fadd {{.*}} : vector<8xf32>
-// MMASYNC-COUNT-32:   llvm.store {{.*}} : !llvm.ptr<vector<8xf32>>
+//    MMASYNC-COUNT:   nvvm.barrier0
+//    MMASYNC-COUNT:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//    MMASYNC-COUNT:   llvm.fadd {{.*}} : vector<4xf32>
+//    MMASYNC-COUNT:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
+//    MMASYNC-COUNT:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//    MMASYNC-COUNT:   llvm.fadd {{.*}} : vector<4xf32>
+//    MMASYNC-COUNT:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
 
 
 
@@ -585,7 +592,12 @@ hal.executable @mma_fused_fp16 {
 //           CHECK:   nvvm.cp.async.commit.group
 //           CHECK:   llvm.br
 //       CHECK-NOT:   nvvm.wmma.mma
-//   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>
+//   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f16, 3>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>
+//           CHECK:   vvm.barrier0
+//           CHECK:   llvm.load {{.*}} : !llvm.ptr<vector<8xf16>, 3>
+//           CHECK:   llvm.fadd {{.*}} : vector<8xf16>
+//           CHECK:   llvm.store {{.*}} : !llvm.ptr<vector<8xf16>>
+//           CHECK:   vvm.barrier0
 
 // mma.sync case:
 //    MMASYNC-LABEL: hal.executable public @mma_fused_fp16
@@ -684,7 +696,12 @@ hal.executable @mma_fused_fp16 {
 //           CHECK:   nvvm.cp.async.commit.group
 //           CHECK:   llvm.br
 //       CHECK-NOT:   nvvm.wmma.mma
-//   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f32>, f32, f32, f32, f32, f32, f32, f32, f32
+//   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f32, 3>, f32, f32, f32, f32, f32, f32, f32, f32
+//           CHECK:   vvm.barrier0
+//           CHECK:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//           CHECK:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
+//           CHECK:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//           CHECK:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
 
 // -----
 
@@ -749,7 +766,12 @@ hal.executable @mma_fused_fp16 {
 //           CHECK:   nvvm.cp.async.commit.group
 //           CHECK:   llvm.br
 //       CHECK-NOT:   nvvm.wmma.mma
-//   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f32>, f32, f32, f32, f32, f32, f32, f32, f32
+//   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f32, 3>, f32, f32, f32, f32, f32, f32, f32, f32
+//           CHECK:   vvm.barrier0
+//           CHECK:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//           CHECK:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
+//           CHECK:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//           CHECK:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
 
 // -----
 
@@ -1004,5 +1026,3 @@ hal.executable private @shared_mem_transpose  {
 //         CHECK:     llvm.load %{{.*}} {alignment = 4 : i64} : !llvm.ptr<vector<4xf32>>
 //         CHECK:     llvm.store %{{.*}}, %{{.*}} {alignment = 4 : i64} : !llvm.ptr<vector<4xf32>, 3>
 //         CHECK:     nvvm.barrier0
-
-// -----
