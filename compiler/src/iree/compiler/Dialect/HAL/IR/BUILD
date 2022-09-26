@@ -72,6 +72,7 @@ iree_compiler_cc_library(
         ":HALOpsGen",
         ":HALTypesGen",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
+        "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:FuncDialect",

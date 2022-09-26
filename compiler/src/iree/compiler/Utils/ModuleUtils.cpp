@@ -6,7 +6,9 @@
 
 #include "iree/compiler/Utils/ModuleUtils.h"
 
+#include "iree/compiler/Utils/StringUtils.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/Path.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/Parser/Parser.h"
@@ -14,6 +16,30 @@
 
 namespace mlir {
 namespace iree_compiler {
+
+static llvm::Optional<FileLineColLoc> findFirstFileLoc(Location baseLoc) {
+  if (auto loc = baseLoc.dyn_cast<FusedLoc>()) {
+    for (auto &childLoc : loc.getLocations()) {
+      auto childResult = findFirstFileLoc(childLoc);
+      if (childResult) return childResult;
+    }
+  } else if (auto loc = baseLoc.dyn_cast<FileLineColLoc>()) {
+    return loc;
+  }
+  return llvm::None;
+}
+
+std::string guessModuleName(mlir::ModuleOp moduleOp, StringRef defaultName) {
+  std::string moduleName = moduleOp.getName().value_or("").str();
+  if (!moduleName.empty()) return moduleName;
+  auto loc = findFirstFileLoc(moduleOp.getLoc());
+  if (loc.has_value()) {
+    return sanitizeSymbolName(
+        llvm::sys::path::stem(loc.value().getFilename()).str());
+  } else {
+    return defaultName.str();
+  }
+}
 
 // Renames |op| within |moduleOp| with a new name that is unique within both
 // |moduleOp| and |symbolTable|.

@@ -12,6 +12,7 @@
 #include "iree/compiler/Dialect/HAL/Target/CUDA/cuda_libdevice.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
+#include "iree/compiler/Utils/StringUtils.h"
 #include "iree/schemas/cuda_executable_def_builder.h"
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/IR/Constants.h"
@@ -144,14 +145,6 @@ static void linkAndOptimize(llvm::Module &module,
   MPM.run(module);
 }
 
-/// Sanitize the function name as CUDA driver doesn't allow function names with
-/// '.' character.
-static std::string sanitizeNameForCuda(llvm::StringRef name) {
-  std::string sanitizedName(name);
-  std::replace(sanitizedName.begin(), sanitizedName.end(), '.', '_');
-  return sanitizedName;
-}
-
 class CUDATargetBackend final : public TargetBackend {
  public:
   CUDATargetBackend() = default;
@@ -231,7 +224,7 @@ class CUDATargetBackend final : public TargetBackend {
       auto *llvmFunc = llvmModule->getFunction(func.getName());
       if (llvmFunc->isDeclaration()) continue;
       // setName will make sure the function name is unique.
-      llvmFunc->setName(sanitizeNameForCuda(func.getName()));
+      llvmFunc->setName(sanitizeSymbolName(func.getName()));
       entryPointNames.emplace_back(llvmFunc->getName());
       std::array<int32_t, 3> workgroupSize;
       uint32_t workgroupLocalMemory = 0;

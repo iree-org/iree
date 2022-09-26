@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "iree/compiler/Utils/StringUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringExtras.h"
 #include "mlir/IR/Attributes.h"
@@ -1297,8 +1298,7 @@ void CondFailOp::print(OpAsmPrinter &p) {
 }
 
 void ImportResolvedOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
-  std::string name = ("has_" + getImport()).str();
-  std::replace(name.begin(), name.end(), '.', '_');
+  std::string name = sanitizeSymbolName(("has_" + getImport()).str());
   setResultName(setNameFn, getResult(), name);
 }
 
