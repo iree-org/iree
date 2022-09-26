@@ -8,16 +8,10 @@
 
 #include <cstddef>
 #include <cstdlib>
-#include <ostream>
 
 #include "iree/base/attributes.h"
 
 namespace iree {
-
-std::ostream& operator<<(std::ostream& os, const StatusCode& x) {
-  os << StatusCodeToString(x);
-  return os;
-}
 
 // static
 IREE_MUST_USE_RESULT std::string Status::ToString(iree_status_t status) {
@@ -36,11 +30,6 @@ IREE_MUST_USE_RESULT std::string Status::ToString(iree_status_t status) {
     return "<!>";
   }
   return result;
-}
-
-std::ostream& operator<<(std::ostream& os, const Status& x) {
-  os << x.ToString();
-  return os;
 }
 
 namespace status_impl {

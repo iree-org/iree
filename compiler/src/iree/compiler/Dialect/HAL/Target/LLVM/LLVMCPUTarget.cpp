@@ -19,6 +19,7 @@
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LinkerTool.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/StaticLibraryGenerator.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
+#include "iree/compiler/Utils/ModuleUtils.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
@@ -44,29 +45,6 @@ namespace HAL {
 
 static constexpr char kQueryFunctionName[] =
     "iree_hal_executable_library_query";
-
-static llvm::Optional<FileLineColLoc> findFirstFileLoc(Location baseLoc) {
-  if (auto loc = baseLoc.dyn_cast<FusedLoc>()) {
-    for (auto &childLoc : loc.getLocations()) {
-      auto childResult = findFirstFileLoc(childLoc);
-      if (childResult) return childResult;
-    }
-  } else if (auto loc = baseLoc.dyn_cast<FileLineColLoc>()) {
-    return loc;
-  }
-  return llvm::None;
-}
-
-static std::string guessModuleName(mlir::ModuleOp moduleOp) {
-  std::string moduleName = moduleOp.getName().value_or("").str();
-  if (!moduleName.empty()) return moduleName;
-  auto loc = findFirstFileLoc(moduleOp.getLoc());
-  if (loc.has_value()) {
-    return llvm::sys::path::stem(loc.value().getFilename()).str();
-  } else {
-    return "llvm_module";
-  }
-}
 
 // Appends the |debugDatabase| to the end of |baseFile| and writes the footer
 // so the runtime can find it.
@@ -191,7 +169,7 @@ class LLVMCPUTargetBackend final : public TargetBackend {
     auto sharedTargetAttr = getExecutableTarget(builder.getContext());
 
     // Guess a module name, if needed, to make the output files readable.
-    auto moduleName = guessModuleName(moduleOp);
+    auto moduleName = guessModuleName(moduleOp, "llvm_module");
 
     // Create our new "linked" hal.executable.
     std::string linkedExecutableName =

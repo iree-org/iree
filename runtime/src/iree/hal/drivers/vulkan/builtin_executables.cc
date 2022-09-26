@@ -54,17 +54,23 @@ iree_status_t BuiltinExecutables::InitializeExecutables() {
   IREE_TRACE_SCOPE();
 
   // Create descriptor set layouts for our compute pipeline.
-  // Even though we're just using one set, we still need to create layout
-  // bindings for those preceding it.
+  // Even though we're just using one set, we still need to create dummy set
+  // layout (without any bindings) for those preceding this set.
   for (size_t i = 0; i < IREE_HAL_VULKAN_BUILTIN_DESCRIPTOR_SET_COUNT; ++i) {
     iree_hal_descriptor_set_layout_t* layout = NULL;
-    iree_hal_descriptor_set_layout_binding_t layout_binding;
-    layout_binding.binding = 0;
-    layout_binding.type = IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    layout_binding.flags = IREE_HAL_DESCRIPTOR_FLAG_NONE;
-    IREE_RETURN_IF_ERROR(iree_hal_vulkan_native_descriptor_set_layout_create(
-        logical_device_, IREE_HAL_DESCRIPTOR_SET_LAYOUT_FLAG_NONE,
-        /*binding_count=*/1, &layout_binding, &layout));
+    if (i == IREE_HAL_VULKAN_BUILTIN_DESCRIPTOR_SET) {
+      iree_hal_descriptor_set_layout_binding_t layout_binding;
+      layout_binding.binding = 0;
+      layout_binding.type = IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+      layout_binding.flags = IREE_HAL_DESCRIPTOR_FLAG_NONE;
+      IREE_RETURN_IF_ERROR(iree_hal_vulkan_native_descriptor_set_layout_create(
+          logical_device_, IREE_HAL_DESCRIPTOR_SET_LAYOUT_FLAG_NONE,
+          /*binding_count=*/1, &layout_binding, &layout));
+    } else {
+      IREE_RETURN_IF_ERROR(iree_hal_vulkan_native_descriptor_set_layout_create(
+          logical_device_, IREE_HAL_DESCRIPTOR_SET_LAYOUT_FLAG_NONE,
+          /*binding_count=*/0, /*bindings=*/nullptr, &layout));
+    }
     descriptor_set_layouts_[i] = layout;
   }
 

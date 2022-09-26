@@ -10,13 +10,29 @@
 
 iree_add_all_subdirs()
 
+iree_cc_library(
+  NAME
+    mmt4d_test_utils
+  HDRS
+    "mmt4d_test_utils.h"
+  SRCS
+    "mmt4d_test_utils.cc"
+  DEPS
+    iree::base
+    iree::builtins::ukernel::types
+    iree::schemas::cpu_data
+  PUBLIC
+)
+
 iree_cc_binary_benchmark(
   NAME
     mmt4d_benchmark
   SRCS
     "mmt4d_benchmark.c"
   DEPS
+    ::mmt4d_test_utils
     iree::base
+    iree::base::internal::cpu
     iree::base::internal::flags
     iree::builtins::ukernel
     iree::testing::benchmark
@@ -29,11 +45,12 @@ iree_cc_test(
   SRCS
     "mmt4d_test.cc"
   DEPS
+    ::mmt4d_test_utils
     iree::base
+    iree::base::internal::cpu
     iree::base::internal::flags
     iree::builtins::ukernel
     iree::testing::gtest
-    iree::testing::gtest_main
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

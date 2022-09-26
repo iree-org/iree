@@ -15,8 +15,8 @@ builtin.module @u_n_d_e_r_s_c_o_r_e_s {}
 
 // -----
 
-// CHECK-LABEL: module @dollar$$signs$$are$$okay
-builtin.module @dollar$$signs$$are$$okay {}
+// CHECK-LABEL: module @dollar__signs
+builtin.module @dollar$$signs {}
 
 // -----
 

@@ -1,7 +1,7 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(builtin.module(func.func(iree-spirv-create-fast-slow-path,iree-spirv-tile,iree-spirv-vectorize))))' %s | FileCheck %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 4, 4, 16], [0, 4, 1, 4], [0, 0, 0, 0, 1, 1, 4]]>
-#translation = #iree_codegen.translation_info<SPIRVVectorize workload_per_wg = [16, 4, 4]>
+#translation = #iree_codegen.translation_info<SPIRVVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -89,7 +89,7 @@ hal.executable private @conv_static_shape_f32 {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 4, 4, 16], [0, 1, 1, 4], [0, 0, 0, 0, 1, 1]]>
-#translation = #iree_codegen.translation_info<SPIRVVectorize workload_per_wg = [16, 4, 4]>
+#translation = #iree_codegen.translation_info<SPIRVVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -175,7 +175,7 @@ hal.executable private @depthwise_conv_static_shape_f32 {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 1, 4, 32], [0, 1, 2, 4], [0, 0, 0, 0, 1, 1, 4]]>
-#translation = #iree_codegen.translation_info<SPIRVVectorize workload_per_wg = [32, 4, 1]>
+#translation = #iree_codegen.translation_info<SPIRVVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -279,15 +279,15 @@ hal.executable private @low_padded_conv {
 // Loop nest for thread tiling and reduction tiling
 // CHECK-COUNT-4: scf.for
 //         CHECK: scf.if
-//    CHECK-NEXT:   vector.transfer_read
+//         CHECK:   vector.transfer_read
 //         CHECK: scf.if
-//    CHECK-NEXT:   vector.transfer_read
+//         CHECK:   vector.transfer_read
 // CHECK-COUNT-6: vector.fma
 
 // -----
 
 #config =  #iree_codegen.lowering_config<tile_sizes = [[0, 1, 4, 32], [0, 1, 2, 4], [0, 0, 0, 0, 1, 1]]>
-#translation = #iree_codegen.translation_info<SPIRVVectorize workload_per_wg = [32, 4, 1]>
+#translation = #iree_codegen.translation_info<SPIRVVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -403,8 +403,8 @@ hal.executable private @low_high_padded_depthwise_conv {
 // Loop nest for thread tiling and reduction tiling
 // CHECK-COUNT-4: scf.for
 //         CHECK: scf.if
-//    CHECK-NEXT:   vector.transfer_read
+//         CHECK:   vector.transfer_read
 //         CHECK: scf.if
-//    CHECK-NEXT:   vector.transfer_read
+//         CHECK:   vector.transfer_read
 //         CHECK: vector.transfer_read
 // CHECK-COUNT-2: vector.fma

@@ -54,7 +54,6 @@
 
 #include <array>
 #include <cstdio>
-#include <iostream>
 #include <iterator>
 #include <string>
 #include <type_traits>
@@ -432,7 +431,7 @@ int main(int argc, char** argv) {
   iree_status_t status = iree_benchmark.Register();
   if (!iree_status_is_ok(status)) {
     int ret = static_cast<int>(iree_status_code(status));
-    std::cout << iree::Status(std::move(status)) << std::endl;
+    printf("%s\n", iree::Status(std::move(status)).ToString().c_str());
     return ret;
   }
   ::benchmark::RunSpecifiedBenchmarks();

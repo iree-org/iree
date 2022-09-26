@@ -73,6 +73,7 @@ iree_compiler_cc_library(
         ":VMOpInterfacesGen",
         ":VMOpsGen",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
+        "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AsmParser",
         "@llvm-project//mlir:ControlFlowInterfaces",

@@ -111,27 +111,57 @@ def ClonePrecedingOpIntoDispatchRegionOp : Op<
     handle must be mapped to exactly one payload op.
 
     All uses of the target inside of the dispatch region are replaced with the
-    results of the cloned op.
-
-    If `update_uses_outside_of_region` is set (default value: `false`), all
-    uses outside of the dispatch region are also replaced: The results of the
-    cloned target op are yielded from the dispatch region and used in all uses
-    outside of the dispatch region. The transform fails if there are uses that
-    appear before the dispatch region.
+    results of the cloned op. Uses of the target outside of the dispatch region
+    remain unchanged.
 
     #### Return modes
 
-    This transform consumes both the `target` handle and the `dispatch_region`
+    This transform reads the `target` handle and consumes the `dispatch_region`
     handle. It produces a new handle to the extended dispatch region.
   }];
 
   let arguments = (ins Arg<PDL_Operation, "",
-                           [TransformMappingRead,
-                            TransformMappingFree]>:$target,
+                           [TransformMappingRead]>:$target,
                        Arg<PDL_Operation, "",
                            [TransformMappingRead,
-                            TransformMappingFree]>:$dispatch_region,
-                       DefaultValuedAttr<BoolAttr, "false">:$update_uses_outside_of_region);
+                            TransformMappingFree]>:$dispatch_region);
+  let results = (outs Res<PDL_Operation, "",
+                           [TransformMappingAlloc,
+                            TransformMappingWrite]>:$transformed);
+  let assemblyFormat = "$target `into` $dispatch_region attr-dict";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure apply(
+        ::mlir::transform::TransformResults &transformResults,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
+def MovePrecedingOpIntoDispatchRegionOp : Op<
+    Transform_Dialect, "iree.move_preceding_op_into_dispatch_region",
+    [TransformOpInterface]> {
+  let description = [{
+    Move the `target` op into the given dispatch region op. The dispatch region
+    handle must be mapped to exactly one payload op.
+
+    An extra result is added to the dispatch region for every result of the
+    target op. All uses of the target op are replaced with the newly added
+    results of the dispatch region.
+
+    Note: This transform generates invalid IR if there are uses of the target op
+    that appear before (i.e., dominate) the dispatch region.
+
+    #### Return modes
+
+    This transform reads the `target` handle and consumes the `dispatch_region`
+    handle. It produces a new handle to the extended dispatch region.
+  }];
+
+  let arguments = (ins Arg<PDL_Operation, "",
+                           [TransformMappingRead]>:$target,
+                       Arg<PDL_Operation, "",
+                           [TransformMappingRead,
+                            TransformMappingFree]>:$dispatch_region);
   let results = (outs Res<PDL_Operation, "",
                            [TransformMappingAlloc,
                             TransformMappingWrite]>:$transformed);
@@ -152,7 +182,7 @@ def CloneSucceedingOpIntoDispatchRegionOp : Op<
     handle must be mapped to exactly one payload op.
 
     All operands of the target are replaced with values that are defined inside
-    of the dispatch region when possible. 
+    of the dispatch region when possible.
 
     If `update_uses_outside_of_region` is set (default value: `true`), all uses
     of the original target op are replaced: The results of the cloned target op

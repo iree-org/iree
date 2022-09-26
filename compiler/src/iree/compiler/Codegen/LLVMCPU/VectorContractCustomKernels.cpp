@@ -47,9 +47,9 @@ static bool isMatrixTimesMatrixTransposed(vector::ContractionOp contractionOp) {
   SmallVector<int, 3> parallelIterators;
   SmallVector<int, 3> reductionIterators;
   for (int i = 0; i < 3; i++) {
-    if (isParallelIterator(iteratorTypes[i])) {
+    if (vector::isParallelIterator(iteratorTypes[i])) {
       parallelIterators.push_back(i);
-    } else if (isReductionIterator(iteratorTypes[i])) {
+    } else if (vector::isReductionIterator(iteratorTypes[i])) {
       reductionIterators.push_back(i);
     } else {
       return false;

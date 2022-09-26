@@ -24,11 +24,13 @@ iree_compiler_cc_library(
         "LLVMCPUSynchronizeSymbolVisibility.cpp",
         "LLVMCPUUnfuseFMAOps.cpp",
         "Passes.cpp",
+        "TargetMLTransformInfo.cpp",
         "VectorContractCustomKernels.cpp",
         "VerifyLinalgTransformLegality.cpp",
     ],
     hdrs = [
         "KernelDispatch.h",
+        "TargetMLTransformInfo.h",
     ],
     deps = [
         "//compiler/src/iree/compiler/Codegen:PassHeaders",

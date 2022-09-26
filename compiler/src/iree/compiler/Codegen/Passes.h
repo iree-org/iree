@@ -133,7 +133,7 @@ createGPUDistributeSharedMemoryCopy();
 
 /// Apply software pipelining.
 std::unique_ptr<OperationPass<func::FuncOp>> createGPUPipeliningPass(
-    unsigned depth = 1);
+    bool epiloguePeeling = true, unsigned depth = 1);
 
 /// Converts vector ops to gpu dialect.
 std::unique_ptr<OperationPass<func::FuncOp>> createWorkGroupSwizzle(
@@ -370,16 +370,16 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToROCDLPass();
 
 /// Perform tiling and distribution to threads.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTileAndDistribute(
-    bool distributeToWarp = false,
-    GPUPromoteSharedMemPattern promoteSharedMemPattern =
-        GPUPromoteSharedMemPattern::ContractionOpPattern);
+    bool distributeToWarp = false);
 
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTileTensor(
     bool distributeToWarp = false);
 
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUDistribute();
 
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTensorAlloc();
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTensorAlloc(
+    GPUPromoteSharedMemPattern promoteSharedMemPattern =
+        GPUPromoteSharedMemPattern::ContractionOpPattern);
 
 /// Create pass calling the dynamic pipeline for LLVMGPU.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>

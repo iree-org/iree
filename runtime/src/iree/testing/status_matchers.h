@@ -358,7 +358,7 @@ inline internal::IsOkMatcherGenerator IsOk() {
 template <typename T>
 void PrintTo(const StatusOr<T> &statusor, std::ostream *os) {
   if (!statusor.ok()) {
-    *os << statusor.status();
+    *os << statusor.status().ToString();
   } else {
     *os << "OK: " << ::testing::PrintToString(statusor.value());
   }

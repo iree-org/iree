@@ -24,6 +24,7 @@ iree_cc_library(
     iree::base
     iree::base::tracing
     iree::builtins::ukernel
+    iree::base::internal::cpu
     iree::vm
     ${_VMVX_OPTIONAL_DEPS}
   PUBLIC

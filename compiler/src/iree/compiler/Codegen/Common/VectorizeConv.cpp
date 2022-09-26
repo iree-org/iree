@@ -153,9 +153,14 @@ struct VectorizeLinalgConv : OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
         rewriter.getAffineMapArrayAttr({map02, map21, map01});
 
     // Also build iterator types for the vector contraction op.
-    ArrayAttr iterators = rewriter.getStrArrayAttr(
-        {getParallelIteratorTypeName(), getParallelIteratorTypeName(),
-         getReductionIteratorTypeName()});
+    auto parallelIteratorTypeAttr = vector::IteratorTypeAttr::get(
+        rewriter.getContext(), vector::IteratorType::parallel);
+    auto reductionIteratorTypeAttr = vector::IteratorTypeAttr::get(
+        rewriter.getContext(), vector::IteratorType::reduction);
+    SmallVector<Attribute> iteratorsList = {parallelIteratorTypeAttr,
+                                            parallelIteratorTypeAttr,
+                                            reductionIteratorTypeAttr};
+    ArrayAttr iterators = rewriter.getArrayAttr(iteratorsList);
 
     // Compute the (numOutputHeights * numOutputWidths * numOutputChannels)
     // batch. We only contribute numInputChannels accumulation along the

@@ -120,6 +120,9 @@ else
   echo "'yamllint' not found. Skipping check"
 fi
 
+echo "***** Path Lengths *****"
+./build_tools/scripts/check_path_lengths.py
+
 if (( "${FINAL_RET}" != 0 )); then
   echo "Encountered failures. Check error messages and changes to the working" \
        "directory and git index (which may contain fixes) and try again."

@@ -28,9 +28,9 @@
 // used to separate the compiler flags from the runtime flags, such as:
 //   iree-run-mlir --iree-hal-target-backends=vulkan-spirv -- --logtostderr
 
+#include <cstdio>
 #include <cstring>
 #include <functional>
-#include <iostream>
 #include <memory>
 #include <string>
 #include <tuple>
@@ -238,7 +238,7 @@ Status PrepareModule(std::string target_backend,
   }
 
   // Translate from MLIR to IREE bytecode.
-  std::cout << "Compiling for target backend '" << target_backend << "'...\n";
+  printf("Compiling for target backend '%s'...\n", target_backend.c_str());
   mlir::PassManager pass_manager(mlir_module->getContext());
   pass_manager.enableVerifier(verify_passes_flag);
   mlir::applyPassManagerCLOptions(pass_manager);
@@ -281,7 +281,7 @@ Status PrepareModule(std::string target_backend,
                               "serialization to annotated MLIR (text) failed");
     }
     text_output.flush();
-    std::cerr << text_contents << std::endl;
+    fprintf(stderr, "%s\n", text_contents.c_str());
   }
   if (print_flatbuffer_flag) {
     bytecode_options.outputFormat =
@@ -295,7 +295,7 @@ Status PrepareModule(std::string target_backend,
           "serialization to flatbuffer bytecode (text) failed");
     }
     text_output.flush();
-    std::cerr << text_contents << std::endl;
+    fprintf(stderr, "%s\n", text_contents.c_str());
   }
   if (!output_file_flag.empty()) {
     if (llvm::writeToOutput(
@@ -320,8 +320,7 @@ Status EvaluateFunction(iree_vm_context_t* context,
                         iree_string_view_t function_name) {
   IREE_TRACE_SCOPE();
 
-  std::cout << "EXEC @" << std::string(function_name.data, function_name.size)
-            << std::endl;
+  printf("EXEC @%.*s\n", (int)function_name.size, function_name.data);
 
   // Parse input values from the flags.
   vm::ref<iree_vm_list_t> inputs;
@@ -499,8 +498,8 @@ Status RunFile(const std::string& mlir_filename,
                                llvm::Twine(split_line));
     auto sub_failure = EvaluateFile(std::move(sub_buffer), registry);
     if (!sub_failure.ok()) {
-      std::cerr << "Failure for split at line #" << split_line << ": "
-                << sub_failure << "\n";
+      fprintf(stderr, "Failure for split at line #%u: %s\n", split_line,
+              sub_failure.ToString().c_str());
       if (any_failure.ok()) {
         any_failure = std::move(sub_failure);
       }
@@ -558,8 +557,8 @@ extern "C" int main(int argc_llvm, char** argv_llvm) {
 
   auto status = RunFile(input_file_flag, registry);
   if (!status.ok()) {
-    std::cerr << "ERROR running file (" << input_file_flag << "):\n"
-              << status << "\n";
+    fprintf(stderr, "ERROR running file (%s):\n%s\n", input_file_flag.c_str(),
+            status.ToString().c_str());
     return 1;
   }
   return 0;

@@ -185,6 +185,19 @@ function(iree_benchmark_suite)
     "BENCHMARK_MODES;BENCHMARK_TOOL;MODULES"
   )
 
+  # Try to check if the compiler supports the TARGET_BACKEND. If
+  # IREE_HOST_BINARY_ROOT is defined, we are using a compiler binary, in which
+  # case we can't check it's supported backend just by looking at this build
+  # dir's cmake variables --- we would have to implement a configure-check
+  # executing that compiler.
+  if (NOT DEFINED IREE_HOST_BINARY_ROOT)
+    string(TOUPPER ${_RULE_TARGET_BACKEND} _UPPERCASE_TARGET_BACKEND)
+    string(REPLACE "-" "_" _NORMALIZED_TARGET_BACKEND ${_UPPERCASE_TARGET_BACKEND})
+    if(NOT IREE_TARGET_BACKEND_${_NORMALIZED_TARGET_BACKEND})
+      return()
+    endif()
+  endif()
+
   iree_package_name(_PACKAGE_NAME)
 
   # Add the benchmark suite target.
@@ -223,26 +236,23 @@ function(iree_benchmark_suite)
       # Update the source file to the downloaded-to place.
       string(REPLACE "/" ";" _SOURCE_URL_SEGMENTS "${_SOURCE_URL}")
       list(POP_BACK _SOURCE_URL_SEGMENTS _LAST_URL_SEGMENT)
-      set(_DOWNLOAD_TARGET "${_PACKAGE_NAME}_iree-download-benchmark-source-${_LAST_URL_SEGMENT}")
+      set(_DOWNLOAD_TARGET_NAME "iree-download-benchmark-source-${_LAST_URL_SEGMENT}")
 
       # Strip off gzip/tar suffix if present (downloader unpacks if necessary)
       string(REGEX REPLACE "(\.gz)|(\.tar\.gz)$" "" _SOURCE_FILE_BASENAME "${_LAST_URL_SEGMENT}")
       set(_MODULE_SOURCE "${_ROOT_ARTIFACTS_DIR}/${_SOURCE_FILE_BASENAME}")
-      if(NOT TARGET "${_DOWNLOAD_TARGET}")
-        add_custom_command(
-          OUTPUT "${_MODULE_SOURCE}"
-          COMMAND
-            "${Python3_EXECUTABLE}" "${IREE_ROOT_DIR}/build_tools/scripts/download_file.py"
-            "${_SOURCE_URL}" -o "${_MODULE_SOURCE}"
-          DEPENDS
-            "${IREE_ROOT_DIR}/build_tools/scripts/download_file.py"
-          COMMENT "Downloading ${_SOURCE_URL}"
-        )
-        add_custom_target("${_DOWNLOAD_TARGET}"
-          DEPENDS "${_MODULE_SOURCE}"
+      if(NOT TARGET "${_PACKAGE_NAME}_${_DOWNLOAD_TARGET_NAME}")
+        iree_fetch_artifact(
+          NAME
+            "${_DOWNLOAD_TARGET_NAME}"
+          SOURCE_URL
+            "${_SOURCE_URL}"
+          OUTPUT
+            "${_MODULE_SOURCE}"
+          UNPACK
         )
       endif()
-      set(_MODULE_SOURCE_TARGET "${_DOWNLOAD_TARGET}")
+      set(_MODULE_SOURCE_TARGET "${_PACKAGE_NAME}_${_DOWNLOAD_TARGET_NAME}")
     endif()
 
     # If the source is a TFLite file, import it.

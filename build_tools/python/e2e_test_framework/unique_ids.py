@@ -1,0 +1,31 @@
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+"""List of unique random IDs in the benchmark suites.
+
+Each ID should be generated from uuid.uuid4().
+"""
+
+# Models
+MODEL_DEEPLABV3_FP32 = "c36c63b0-220a-4d78-8ade-c45ce47d89d3"
+MODEL_MOBILESSD_FP32 = "0e466f69-91d6-4e50-b62b-a82b6213a231"
+MODEL_POSENET_FP32 = "5afc3014-d29d-4e88-a840-fbaf678acf2b"
+MODEL_MOBILEBERT_FP32 = "cc69d69f-6d1f-4a1a-a31e-e021888d0d28"
+MODEL_MOBILEBERT_INT8 = "e3997104-a3d2-46b4-9fbf-39069906d123"
+MODEL_MOBILEBERT_FP16 = "73a0402e-271b-4aa8-a6a5-ac05839ca569"
+MODEL_MOBILENET_V1 = "78eab9e5-9ff1-4769-9b55-933c81cc9a0f"
+MODEL_MOBILENET_V2 = "7d45f8e5-bb5e-48d0-928d-8f125104578f"
+MODEL_MOBILENET_V3SMALL = "58855e40-eba9-4a71-b878-6b35e3460244"
+MODEL_PERSON_DETECT_INT8 = "bc1338be-e3df-44fd-82e4-40ba9560a073"
+MODEL_EFFICIENTNET_INT8 = "4a6f545e-1b4e-41a5-9236-792aa578184b"
+MODEL_MINILM_L12_H384_UNCASED_INT32_SEQLEN128 = "ecf5c970-ee97-49f0-a4ed-df1f34e9d493"
+
+# Devices
+DEVICE_SPEC_GCP_C2_STANDARD_16 = "9a4804f1-b1b9-46cd-b251-7f16a655f782"
+
+# IREE benchmarks
+IREE_COMPILE_CONFIG_LINUX_CASCADELAKE = "e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
+IREE_RUN_CONFIG_LOCAL_SYNC = "13fc65a9-e5dc-4cbb-9c09-25b0b08f4c03"
+IREE_RUN_CONFIG_LOCAL_TASK_BASE = "c7c4a15e-b20c-4898-bb4a-864f34ff34b2"

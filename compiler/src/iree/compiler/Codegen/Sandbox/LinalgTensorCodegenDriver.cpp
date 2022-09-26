@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
+#include "iree-dialects/Dialect/LinalgExt/Transforms/CodegenStrategy.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/Sandbox/PassDetail.h"
 #include "iree/compiler/Codegen/Sandbox/Passes.h"
@@ -12,8 +14,6 @@
 #include "mlir/AsmParser/AsmParser.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/Passes.h"
-#include "mlir/Dialect/Linalg/Transforms/CodegenStrategy.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -26,7 +26,9 @@
 #include "mlir/Transforms/Passes.h"
 
 using namespace mlir;
-using namespace mlir::linalg;
+// using namespace mlir::linalg;
+
+using mlir::iree_compiler::IREE::LinalgExt::CodegenStrategy;
 
 #define DEBUG_TYPE "iree-linalg-tensor-codegen-driver"
 
@@ -53,8 +55,9 @@ static FailureOr<Operation *> getRootOp(func::FuncOp funcOp) {
 /// Default method to initialize the tiling options in IREE. These could be
 /// overriden by the command line options if specified. For now the sentinel
 /// -1 is used for avoiding querying the lowering config.
-static bool getTilingOptionsFromConfig(func::FuncOp funcOp, int64_t tilingLevel,
-                                       LinalgTilingOptions &tilingOptions) {
+static bool getTilingOptionsFromConfig(
+    func::FuncOp funcOp, int64_t tilingLevel,
+    linalg::LinalgTilingOptions &tilingOptions) {
   if (tilingLevel != -1) {
     FailureOr<Operation *> rootOp = getRootOp(funcOp);
     if (failed(rootOp)) {
@@ -115,10 +118,10 @@ static LogicalResult getPaddingDims(func::FuncOp funcOp,
 
 /// Default method to initialize the tiling options for fusion in IREE. These
 /// could be ovveridden by the command line options if specified.
-static FailureOr<LinalgTilingAndFusionOptions> getTileAndFuseOptionsFromConfig(
-    func::FuncOp funcOp, int64_t tilingLevel) {
+static FailureOr<linalg::LinalgTilingAndFusionOptions>
+getTileAndFuseOptionsFromConfig(func::FuncOp funcOp, int64_t tilingLevel) {
   if (tilingLevel == -1) {
-    return LinalgTilingAndFusionOptions();
+    return linalg::LinalgTilingAndFusionOptions();
   }
 
   FailureOr<Operation *> rootOp = getRootOp(funcOp);
@@ -127,7 +130,7 @@ static FailureOr<LinalgTilingAndFusionOptions> getTileAndFuseOptionsFromConfig(
   iree_compiler::IREE::Codegen::LoweringConfigAttr loweringConfig =
       iree_compiler::getLoweringConfig(rootOp.value());
 
-  LinalgTilingAndFusionOptions options;
+  linalg::LinalgTilingAndFusionOptions options;
   options.tileSizes.assign(loweringConfig.getTileSizeVals(tilingLevel));
   options.tileInterchange.assign(
       loweringConfig.getTileInterchangeVals(tilingLevel));
@@ -260,12 +263,13 @@ void LinalgFusePass::runOnOperation() {
   func::FuncOp funcOp = getOperation();
 
   // Set up tiling and vectorization options.
-  FailureOr<LinalgTilingAndFusionOptions> defaultTilingOptions =
+  FailureOr<linalg::LinalgTilingAndFusionOptions> defaultTilingOptions =
       getTileAndFuseOptionsFromConfig(funcOp, tilingLevel);
   if (failed(defaultTilingOptions)) {
     return signalPassFailure();
   }
-  LinalgTilingAndFusionOptions tilingOptions = defaultTilingOptions.value();
+  linalg::LinalgTilingAndFusionOptions tilingOptions =
+      defaultTilingOptions.value();
   bool doTiling = !tilingOptions.tileSizes.empty();
   if (!tileSizes.empty()) {
     doTiling = true;
@@ -336,7 +340,7 @@ void LinalgFusePass::runOnOperation() {
     transposePaddingVectors.push_back(transposeVector);
   }
 
-  LinalgPaddingOptions paddingOptions;
+  linalg::LinalgPaddingOptions paddingOptions;
   paddingOptions.setPaddingValues(paddingValueAttributes);
   paddingOptions.setPaddingDimensions(
       SmallVector<int64_t>{paddingDimensions.begin(), paddingDimensions.end()});
@@ -354,6 +358,8 @@ void LinalgFusePass::runOnOperation() {
   // Created a nested OpPassManager and run.
   OpPassManager dynamicPM(func::FuncOp::getOperationName());
   strategy.configurePassPipeline(dynamicPM, funcOp.getContext());
+  dynamicPM.addPass(
+      iree_compiler::IREE::LinalgExt::createLinalgStrategyEnablePass());
 
   if (failed(runPipeline(dynamicPM, funcOp))) {
     return signalPassFailure();
@@ -364,7 +370,7 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
   func::FuncOp funcOp = getOperation();
 
   // Set up tiling and vectorization options.
-  LinalgTilingOptions tilingOptions;
+  linalg::LinalgTilingOptions tilingOptions;
   bool doTiling =
       getTilingOptionsFromConfig(funcOp, tilingLevel, tilingOptions);
   if (!tileSizes.empty()) {
@@ -399,7 +405,7 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
     transposePaddingVectors.push_back(transposeVector);
   }
 
-  LinalgPaddingOptions paddingOptions;
+  linalg::LinalgPaddingOptions paddingOptions;
   paddingOptions.setPaddingValues(paddingValueAttributes);
   paddingOptions.setPackPaddings(
       SmallVector<bool>{packPaddings.begin(), packPaddings.end()});
@@ -409,7 +415,7 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
 
   // Gather tiled loops that aren't distribution loops from previous tiling
   // stages.
-  LinalgPeelOptions peelingOptions;
+  linalg::LinalgPeelOptions peelingOptions;
   peelingOptions.loopsToPeelComputationFunction =
       [](OpBuilder &builder, Operation *op,
          SmallVectorImpl<scf::ForOp> &loopsToPeel) {
@@ -432,7 +438,7 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
       };
 
   CodegenStrategy strategy;
-  StringRef genericOpName = GenericOp::getOperationName();
+  StringRef genericOpName = linalg::GenericOp::getOperationName();
   strategy.tileIf(doTiling, anchorOpName, tilingOptions)
       .padIf(pad, anchorOpName, paddingOptions)
       .decomposeIf(decomposeToLowerDimOp)
@@ -443,6 +449,8 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
   // Created a nested OpPassManager and run.
   OpPassManager dynamicPM(func::FuncOp::getOperationName());
   strategy.configurePassPipeline(dynamicPM, funcOp.getContext());
+  dynamicPM.addPass(
+      iree_compiler::IREE::LinalgExt::createLinalgStrategyEnablePass());
   if (failed(runPipeline(dynamicPM, funcOp))) {
     return signalPassFailure();
   }
@@ -490,8 +498,8 @@ void LinalgVectorLoweringPass::runOnOperation() {
           .enableFullUnroll(unrollVectorTransfers)
           .enableLowerPermutationMaps();
 
-  LinalgVectorLoweringOptions vectorLoweringOptions =
-      LinalgVectorLoweringOptions()
+  linalg::LinalgVectorLoweringOptions vectorLoweringOptions =
+      linalg::LinalgVectorLoweringOptions()
           // Lowering of vector contractions.
           .enableContractionLowering(vectorLoweringStage >= 0)
           // Lowering of vector multi_reduction.
@@ -526,6 +534,8 @@ void LinalgVectorLoweringPass::runOnOperation() {
   OpPassManager dynamicPM(func::FuncOp::getOperationName());
   func::FuncOp funcOp = getOperation();
   strategy.configurePassPipeline(dynamicPM, funcOp.getContext());
+  dynamicPM.addPass(
+      iree_compiler::IREE::LinalgExt::createLinalgStrategyEnablePass());
   if (failed(runPipeline(dynamicPM, funcOp))) {
     return signalPassFailure();
   }

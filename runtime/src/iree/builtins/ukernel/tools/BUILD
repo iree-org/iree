@@ -13,11 +13,24 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+cc_library(
+    name = "mmt4d_test_utils",
+    srcs = ["mmt4d_test_utils.cc"],
+    hdrs = ["mmt4d_test_utils.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/builtins/ukernel:types",
+        "//runtime/src/iree/schemas:cpu_data",
+    ],
+)
+
 cc_binary_benchmark(
     name = "mmt4d_benchmark",
     srcs = ["mmt4d_benchmark.c"],
     deps = [
+        ":mmt4d_test_utils",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:cpu",
         "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/builtins/ukernel",
         "//runtime/src/iree/testing:benchmark",
@@ -28,10 +41,11 @@ iree_runtime_cc_test(
     name = "mmt4d_test",
     srcs = ["mmt4d_test.cc"],
     deps = [
+        ":mmt4d_test_utils",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:cpu",
         "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/builtins/ukernel",
         "//runtime/src/iree/testing:gtest",
-        "//runtime/src/iree/testing:gtest_main",
     ],
 )

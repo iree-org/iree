@@ -41,10 +41,20 @@ typedef struct iree_hal_executable_import_provider_t {
 } iree_hal_executable_import_provider_t;
 
 static inline iree_hal_executable_import_provider_t
-iree_hal_executable_import_provider_null() {
+iree_hal_executable_import_provider_null(void) {
   iree_hal_executable_import_provider_t provider = {NULL, NULL};
   return provider;
 }
+
+// Returns the import provider specified by
+// IREE_HAL_EXECUTABLE_IMPORT_PROVIDER_DEFAULT_FN or null.
+//
+// To use define a function like:
+//   iree_hal_executable_import_provider_t my_provider(void) { ... }
+// And define it:
+//   -DIREE_HAL_EXECUTABLE_IMPORT_PROVIDER_DEFAULT_FN=my_provider
+iree_hal_executable_import_provider_t
+iree_hal_executable_import_provider_default(void);
 
 // Resolves an import symbol with the given |symbol_name| and stores a pointer
 // to the function (or its context) in |out_fn_ptr|.

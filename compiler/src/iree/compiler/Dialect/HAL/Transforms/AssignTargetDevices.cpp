@@ -12,6 +12,8 @@
 #include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/raw_ostream.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -74,8 +76,16 @@ class AssignTargetDevicesPass
     for (const auto &targetName : targets) {
       auto targetBackend = getTargetBackend(targetName);
       if (!targetBackend) {
+        std::string backends;
+        llvm::raw_string_ostream os(backends);
+        llvm::interleaveComma(
+            getTargetBackends(getRegisteredTargetBackends()), os,
+            [&os](const std::shared_ptr<
+                  mlir::iree_compiler::IREE::HAL::TargetBackend>
+                      b) { os << b->name(); });
         moduleOp.emitError()
-            << "target backend '" << targetName << "' not registered";
+            << "target backend '" << targetName
+            << "' not registered; registered backends: " << os.str();
         signalPassFailure();
         return;
       }

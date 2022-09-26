@@ -11,6 +11,7 @@
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -34,161 +35,6 @@ void mlir::iree_compiler::registerTransformDialectLLVMGPUExtension(
   registry.addExtensions<transform_dialect::LLVMGPUExtensions>();
 }
 
-// TODO: Maybe we need both a transform.iree.cpu.bufferize and a
-// transform.iree.gpu.bufferize rather than a single common bufferize op?
-
-/// Apply the permutation `perm` to `vals; i.e. vals[i] is stored into
-/// res[perm[i]] Return failure if perm is not a permutation.
-// TODO: upstream as extraClassDeclaration once stabilized.
-template <typename T>
-static FailureOr<SmallVector<T>> permute(const SmallVector<T> &vals,
-                                         ArrayRef<int64_t> perm) {
-  if (vals.size() != perm.size()) return failure();
-  SmallVector<T> result(vals.size());
-  SmallVector<bool> seen(vals.size());
-  for (auto [idx, val] : llvm::zip(perm, vals)) {
-    // Already seen, invalid thread_dim_mapping.
-    if (seen[idx]) return failure();
-    result[idx] = val;
-    seen[idx] = true;
-  }
-  // Some not seen, invalid thread_dim_mapping.
-  if (!llvm::all_of(seen, [](bool b) { return b; })) return failure();
-  return result;
-}
-
-/// Helper to get apply the `thread_dim_mapping` permutation of a
-/// `foreachThreadOp` to `values`.
-// TODO: upstream as extraClassDeclaration once stabilized.
-template <typename T>
-static FailureOr<SmallVector<T>> getValuesPermutedByThreadMapping(
-    scf::ForeachThreadOp foreachThreadOp, const SmallVector<T> &values) {
-  // Apply mapping permutation if specified.
-  auto mapping = foreachThreadOp.getThreadDimMapping();
-  if (mapping && !mapping.empty()) {
-    auto maybePermuted = permute(values, extractFromI64ArrayAttr(mapping));
-    if (failed(maybePermuted))
-      return foreachThreadOp->emitError("invalid permutation");
-    return *maybePermuted;
-  }
-  return values;
-}
-
-/// Helper to get the `num_threads` of a `foreachThreadOp` after applying the
-/// `thread_dim_mapping` permutation.
-// TODO: upstream as extraClassDeclaration once stabilized.
-static FailureOr<SmallVector<OpFoldResult>> getNumThreads(
-    OpBuilder &b, scf::ForeachThreadOp foreachThreadOp) {
-  SmallVector<OpFoldResult> threadCount = foreachThreadOp.getNumThreads();
-  threadCount.resize(3, b.getIndexAttr(1));
-  return getValuesPermutedByThreadMapping(foreachThreadOp, threadCount);
-}
-
-/// Helper to get the thread indices of a `foreachThreadOp` after applying the
-/// `thread_dim_mapping` permutation.
-// TODO: upstream as extraClassDeclaration once stabilized.
-static FailureOr<SmallVector<Value>> getThreadIndices(
-    OpBuilder &b, scf::ForeachThreadOp foreachThreadOp) {
-  SmallVector<Value> threadCount = foreachThreadOp.getThreadIndices();
-  threadCount.resize(3, Value());
-  return getValuesPermutedByThreadMapping(foreachThreadOp, threadCount);
-}
-
-//===---------------------------------------------------------------------===//
-// Patterns for ForeachThreadToGpu rewrite.
-//===---------------------------------------------------------------------===//
-
-FailureOr<SmallVector<OpFoldResult>>
-mlir::iree_compiler::rewriteForeachThreadToGpu(
-    scf::ForeachThreadOp foreachThreadOp,
-    const SmallVector<int64_t> &globalWorkgroupSizes, RewriterBase &rewriter,
-    bool syncAfterDistribute) {
-  if (foreachThreadOp.getNumResults() > 0)
-    return foreachThreadOp->emitError(
-        "only bufferized scf.foreach_thread lowers to gpu.thread");
-  if (foreachThreadOp.getNumThreads().size() > 3)
-    return foreachThreadOp->emitError(
-        "scf.foreach_thread with rank > 3 does not lower to gpu.thread");
-
-  auto maybeWorkgroupSizes = getNumThreads(rewriter, foreachThreadOp);
-  if (failed(maybeWorkgroupSizes) ||
-      llvm::any_of(*maybeWorkgroupSizes, [](OpFoldResult ofr) {
-        return !getConstantIntValue(ofr).has_value();
-      }))
-    return foreachThreadOp->emitError("unsupported dynamic workgroup size");
-
-  SmallVector<int64_t> workgroupSizes = llvm::to_vector(llvm::map_range(
-      *maybeWorkgroupSizes,
-      [](OpFoldResult ofr) { return getConstantIntValue(ofr).value(); }));
-
-  // Step 1. Create the gpu.thread ops
-  Location loc = foreachThreadOp.getLoc();
-  IndexType indexType = rewriter.getIndexType();
-
-  SmallVector<gpu::Dimension, 3> gpuDims{gpu::Dimension::x, gpu::Dimension::y,
-                                         gpu::Dimension::z};
-  SmallVector<Value, 3> threadOps;
-  for (int64_t idx : llvm::seq<int64_t>(0, workgroupSizes.size())) {
-    threadOps.push_back(
-        rewriter.create<gpu::ThreadIdOp>(loc, indexType, gpuDims[idx]));
-  }
-
-  // Step 2. Maybe create conditionals to predicate the region.
-  Value predicate;
-  for (auto [threadId, workgroupSize, globalWorkgroupSize] :
-       llvm::zip(threadOps, workgroupSizes, globalWorkgroupSizes)) {
-    if (workgroupSize > globalWorkgroupSize) {
-      return foreachThreadOp.emitOpError("workgroup size overflow: ")
-             << workgroupSize << " > " << globalWorkgroupSize;
-    }
-    if (workgroupSize == globalWorkgroupSize) continue;
-    Value tmpPredicate = rewriter.create<arith::CmpIOp>(
-        loc, arith::CmpIPredicate::ult, threadId,
-        rewriter.create<arith::ConstantIndexOp>(loc, workgroupSize));
-    predicate =
-        predicate ? rewriter.create<arith::AndIOp>(loc, predicate, tmpPredicate)
-                  : tmpPredicate;
-  }
-
-  // Step 3. Move the body of foreachThreadOp.
-  // Erase the terminator first, it will not be used.
-  rewriter.eraseOp(foreachThreadOp.getTerminator());
-  Block *targetBlock;
-  Block::iterator insertionPoint;
-  if (predicate) {
-    // Step 3.a. If predicated, move at the beginning.
-    auto ifOp =
-        rewriter.create<scf::IfOp>(loc, predicate, /*withElseRegion=*/false);
-    targetBlock = ifOp.thenBlock();
-    insertionPoint = ifOp.thenBlock()->begin();
-  } else {
-    // Step 3.a. Otherwise, move inline just before foreachThreadOp.
-    targetBlock = foreachThreadOp->getBlock();
-    insertionPoint = Block::iterator(foreachThreadOp);
-  }
-  Block &sourceBlock = foreachThreadOp.getRegion().front();
-  targetBlock->getOperations().splice(insertionPoint,
-                                      sourceBlock.getOperations());
-
-  // Step 4. RAUW thread indices to thread ops.
-  SmallVector<Value> threadIndices =
-      *getThreadIndices(rewriter, foreachThreadOp);
-  for (auto it : llvm::zip(threadIndices, threadOps)) {
-    if (!std::get<0>(it)) continue;
-    std::get<0>(it).replaceAllUsesWith(std::get<1>(it));
-  }
-
-  // Step 5. syncthreads.
-  if (syncAfterDistribute) {
-    rewriter.create<gpu::BarrierOp>(loc);
-  }
-
-  // Step 6. Erase old op.
-  rewriter.eraseOp(foreachThreadOp);
-
-  return *maybeWorkgroupSizes;
-}
-
 //===---------------------------------------------------------------------===//
 // IREE-specific LLVMGPU transformations.
 //===---------------------------------------------------------------------===//
@@ -197,7 +43,7 @@ mlir::iree_compiler::rewriteForeachThreadToGpu(
 // reuse most of the code and not require a static number of threads.
 // TODO: synchronizations for imperfectly nested stuff.
 DiagnosedSilenceableFailure
-transform_dialect::ForeachThreadToGpuAndTranslationInfo::applyToOne(
+transform_dialect::MapNestedForeachThreadToGpuThreads::applyToOne(
     func::FuncOp target, SmallVectorImpl<Operation *> &results,
     transform::TransformState &state) {
   if (!isa<HAL::ExecutableOp, HAL::ExecutableVariantOp>(state.getTopLevel())) {
@@ -221,13 +67,8 @@ transform_dialect::ForeachThreadToGpuAndTranslationInfo::applyToOne(
   // TODO: no magic constant but IREE uses this extensively.
   workgroupSize.resize(/*size=*/3, /*value=*/1);
   SimplePatternRewriter rewriter(target);
-  auto walkResult = target->walk([&](scf::ForeachThreadOp foreachThreadOp) {
-    rewriter.setInsertionPoint(foreachThreadOp);
-    if (failed(rewriteForeachThreadToGpu(foreachThreadOp, workgroupSize,
-                                         rewriter)))
-      return WalkResult::interrupt();
-    return WalkResult::advance();
-  });
+  auto walkResult = mlir::linalg::rewriteMapNestedForeachThreadToGpuThreads(
+      rewriter, target, workgroupSize, true);
 
   if (walkResult.wasInterrupted())
     return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
@@ -483,10 +324,27 @@ static Value warpReduction(Location loc, OpBuilder &builder, Value input,
                          .create<gpu::ShuffleOp>(loc, laneVal, i,
                                                  /*width=*/size,
                                                  /*mode=*/gpu::ShuffleMode::XOR)
-                         .result();
+                         .getShuffleResult();
     laneVal = makeArithReduction(builder, loc, kind, laneVal, shuffled);
   }
   return laneVal;
+}
+
+/// Return a value yielded by `warpOp` which statifies the filter lamdba
+/// condition and is not dead.
+static OpOperand *getWarpResult(vector::WarpExecuteOnLane0Op warpOp,
+                                function_ref<bool(Operation *)> fn) {
+  auto yield = cast<vector::YieldOp>(
+      warpOp.getBodyRegion().getBlocks().begin()->getTerminator());
+  for (OpOperand &yieldOperand : yield->getOpOperands()) {
+    Value yieldValues = yieldOperand.get();
+    Operation *definedOp = yieldValues.getDefiningOp();
+    if (definedOp && fn(definedOp)) {
+      if (!warpOp.getResult(yieldOperand.getOperandNumber()).use_empty())
+        return &yieldOperand;
+    }
+  }
+  return {};
 }
 
 namespace {
@@ -507,60 +365,114 @@ class InsertElementToBroadcast final
   }
 };
 
+/// Sink out load op feeding into a warp op yield.
+/// ```
+/// %0 = vector.warp_execute_on_lane_0(%arg0) -> (f32) {
+///   ...
+//    %2 = memref.load %src[%c0] : memref<1024xf32>
+///   vector.yield %2 : f32
+/// }
+/// ```
+/// To
+/// ```
+/// %dead = vector.warp_execute_on_lane_0(%arg0) -> (f32) {
+///   ...
+//    %2 = memref.load %src[%c0] : memref<1024xf32>
+///   vector.yield %2 : f32
+/// }
+/// gpu.synchronize
+/// %0 = memref.load %src[%c0] : memref<1024xf32>
+struct WarpOpLoad : public OpRewritePattern<vector::WarpExecuteOnLane0Op> {
+  using OpRewritePattern<vector::WarpExecuteOnLane0Op>::OpRewritePattern;
+  LogicalResult matchAndRewrite(vector::WarpExecuteOnLane0Op warpOp,
+                                PatternRewriter &rewriter) const override {
+    OpOperand *operand = getWarpResult(
+        warpOp, [](Operation *op) { return isa<memref::LoadOp>(op); });
+    if (!operand) return failure();
+    auto load = operand->get().getDefiningOp<memref::LoadOp>();
+    unsigned operandIndex = operand->getOperandNumber();
+    Value distributedVal = warpOp.getResult(operandIndex);
+
+    SmallVector<Value, 4> indices(load.getIndices().begin(),
+                                  load.getIndices().end());
+    if (!indices.empty()) return failure();
+
+    OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPointAfter(warpOp);
+    // TODO: generalize this.
+    // options.warpSyncronizationFn currently must take a WarpExecuteOnLane0Op
+    // which we don't have here.
+    rewriter.create<gpu::BarrierOp>(load.getLoc());
+    Value newRead = rewriter.create<memref::LoadOp>(
+        load.getLoc(), distributedVal.getType(), load.getMemref(), indices);
+
+    // The result type of WarpExecuteOnLane0Op may or may not match the yielded
+    // type depending on whether the op has "broadcast" behavior (see the doc
+    // of WarpExecuteOnLane0Op).
+    for (OpOperand &use : distributedVal.getUses()) {
+      rewriter.startRootUpdate(use.getOwner());
+      Value replacement = newRead;
+      if (use.get().getType() != newRead.getType()) {
+        replacement = rewriter.create<vector::BroadcastOp>(
+            load.getLoc(), use.get().getType(), newRead);
+      }
+      use.getOwner()->setOperand(use.getOperandNumber(), replacement);
+      rewriter.finalizeRootUpdate(use.getOwner());
+    }
+    return success();
+  }
+};
 }  // namespace
 
-static LogicalResult applyMultiReductionLoweringPatterns(Operation *target) {
+static void populateMultiReductionLoweringPatterns(Operation *target,
+                                                   RewritePatternSet &patterns,
+                                                   PatternBenefit benefit) {
   assert(target->hasTrait<OpTrait::IsIsolatedFromAbove>());
-
-  MLIRContext *ctx = target->getContext();
-  RewritePatternSet patterns(ctx);
 
   vector::populateVectorMultiReductionLoweringPatterns(
-      patterns, vector::VectorMultiReductionLowering::InnerReduction);
-  patterns.add<InsertElementToBroadcast>(ctx);
-  return applyPatternsAndFoldGreedily(target, std::move(patterns));
+      patterns, vector::VectorMultiReductionLowering::InnerReduction, benefit);
+  patterns.add<InsertElementToBroadcast>(target->getContext(), benefit);
 }
 
-static LogicalResult applyVectorTransferWriteDistribution(Operation *target) {
-  assert(target->hasTrait<OpTrait::IsIsolatedFromAbove>());
-
-  auto distributionFn = [](vector::TransferWriteOp writeOp) {
-    // Create a map (d0, d1) -> (d1) to distribute along the inner
-    // dimension. Once we support n-d distribution we can add more
-    // complex cases.
-    int64_t vecRank = writeOp.getVectorType().getRank();
-    OpBuilder builder(writeOp.getContext());
-    auto map =
-        AffineMap::get(vecRank, 0, builder.getAffineDimExpr(vecRank - 1));
-    return map;
-  };
-  MLIRContext *ctx = target->getContext();
-  RewritePatternSet patterns(ctx);
-  vector::populateDistributeTransferWriteOpPatterns(patterns, distributionFn);
-  return applyPatternsAndFoldGreedily(target, std::move(patterns));
+static AffineMap simpleDistributionFunction(vector::TransferWriteOp writeOp) {
+  // Create a map (d0, d1) -> (d1) to distribute along the inner
+  // dimension. Once we support n-d distribution we can add more
+  // complex cases.
+  int64_t vecRank = writeOp.getVectorType().getRank();
+  OpBuilder builder(writeOp.getContext());
+  auto map = AffineMap::get(vecRank, 0, builder.getAffineDimExpr(vecRank - 1));
+  return map;
 }
 
-static LogicalResult applyPropagateVectorDistribution(Operation *target) {
+static void populateVectorTransferWriteDistribution(Operation *target,
+                                                    RewritePatternSet &patterns,
+                                                    PatternBenefit benefit) {
   assert(target->hasTrait<OpTrait::IsIsolatedFromAbove>());
-
-  MLIRContext *ctx = target->getContext();
-  RewritePatternSet patterns(ctx);
-  vector::populatePropagateWarpVectorDistributionPatterns(patterns);
-  vector::populateDistributeReduction(patterns, warpReduction);
-  return applyPatternsAndFoldGreedily(target, std::move(patterns));
+  vector::populateDistributeTransferWriteOpPatterns(
+      patterns, simpleDistributionFunction, benefit);
 }
 
-static LogicalResult applyWarpExecuteOnLane0ToScf(Operation *target) {
+static void populatePropagateVectorDistribution(Operation *target,
+                                                RewritePatternSet &patterns,
+                                                PatternBenefit benefit) {
   assert(target->hasTrait<OpTrait::IsIsolatedFromAbove>());
+  vector::populatePropagateWarpVectorDistributionPatterns(patterns, benefit);
+  vector::populateDistributeReduction(patterns, warpReduction, benefit);
+  patterns.add<WarpOpLoad>(target->getContext(), benefit);
+}
 
-  MLIRContext *ctx = target->getContext();
-  RewritePatternSet patterns(ctx);
-  vector::WarpExecuteOnLane0LoweringOptions options;
-  options.warpAllocationFn = allocateGlobalSharedMemory;
-  options.warpSyncronizationFn = [](Location loc, OpBuilder &builder,
-                                    vector::WarpExecuteOnLane0Op warpOp) {};
-  vector::populateWarpExecuteOnLane0OpToScfForPattern(patterns, options);
-  return applyPatternsAndFoldGreedily(target, std::move(patterns));
+static void warpSyncronizationFn(Location loc, OpBuilder &builder,
+                                 vector::WarpExecuteOnLane0Op warpOp) {
+  builder.create<gpu::BarrierOp>(loc);
+};
+
+static void populateWarpExecuteOnLane0ToScf(
+    Operation *target, RewritePatternSet &patterns,
+    const vector::WarpExecuteOnLane0LoweringOptions &options,
+    PatternBenefit benefit) {
+  assert(target->hasTrait<OpTrait::IsIsolatedFromAbove>());
+  vector::populateWarpExecuteOnLane0OpToScfForPattern(patterns, options,
+                                                      benefit);
 }
 
 DiagnosedSilenceableFailure
@@ -577,22 +489,24 @@ transform_dialect::VectorWarpDistributionOp::applyToOne(
   // TODO: Hook up into the ApplyPatternOp in CommonExtensions.cpp to
   // automatically get listening capabilities.
 
+  MLIRContext *ctx = target->getContext();
+  RewritePatternSet patterns(ctx);
   // MultiReduction lowering is necessary until we have explicit support for
   // distributing that op.
-  if (failed(applyMultiReductionLoweringPatterns(target))) {
-    target->emitOpError("multi-reduction lowering patterns failed to apply");
+  populateMultiReductionLoweringPatterns(target, patterns, /*benefit=*/3);
+  populateVectorTransferWriteDistribution(target, patterns, /*benefit=*/2);
+  populatePropagateVectorDistribution(target, patterns, /*benefit=*/1);
+  if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns)))) {
+    target->emitOpError("warp distribution patterns failed to apply");
     return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
   }
-  if (failed(applyVectorTransferWriteDistribution(target))) {
-    target->emitOpError("transfer write distribution patterns failed to apply");
-    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
-  }
-  if (failed(applyPropagateVectorDistribution(target))) {
-    target->emitOpError(
-        "propagate vector distribution patterns failed to apply");
-    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
-  }
-  if (failed(applyWarpExecuteOnLane0ToScf(target))) {
+
+  RewritePatternSet endPatterns(ctx);
+  vector::WarpExecuteOnLane0LoweringOptions options;
+  options.warpAllocationFn = allocateGlobalSharedMemory;
+  options.warpSyncronizationFn = warpSyncronizationFn;
+  populateWarpExecuteOnLane0ToScf(target, endPatterns, options, /*benefit=*/0);
+  if (failed(applyPatternsAndFoldGreedily(target, std::move(endPatterns)))) {
     target->emitOpError(
         "warp execute on lane 0 to scf patterns failed to apply");
     return DiagnosedSilenceableFailure(reportUnknownTransformError(target));

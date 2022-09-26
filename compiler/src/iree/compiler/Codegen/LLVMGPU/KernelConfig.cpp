@@ -9,7 +9,10 @@
 #include <numeric>
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Codegen/Common/LinalgOpInfo.h"
+#include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
+#include "iree/compiler/Codegen/LLVMGPU/TransposeUtils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -439,25 +442,6 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
                                                passPipeline, workgroupSize);
 }
 
-/// Propagate the configuration annotated in the incoming IR.
-static LogicalResult setUserConfig(
-    func::FuncOp entryPointFn, Operation *computeOp,
-    IREE::Codegen::CompilationInfoAttr compilationInfo) {
-  if (auto translationInfo = getTranslationInfo(entryPointFn)) {
-    return computeOp->emitOpError(
-        "multiple ops within dispatch trying to set the translation "
-        "info");
-  }
-
-  SmallVector<int64_t> workgroupSize = compilationInfo.getWorkgroupSizeVals();
-  setTranslationInfo(entryPointFn, compilationInfo.getTranslationInfo(),
-                     workgroupSize);
-
-  setLoweringConfig(computeOp, compilationInfo.getLoweringConfig());
-  eraseCompilationInfo(computeOp);
-  return success();
-}
-
 /// Return the size of the given dimension in the linalg op.
 // TODO: this should be part of LinalgOp interface, the equivalent member
 // function currently only support the case where all the dimensions are static
@@ -529,61 +513,50 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   return success();
 }
 
-/// Returns true if the operation is a GenericOp implementing a 2D transpose.
-static bool isTransposeOp(linalg::LinalgOp linalgOp) {
-  if (!isa<linalg::GenericOp>(linalgOp)) return false;
-  // Check that the op has 2 parallel loops.
-  if (linalgOp.getNumParallelLoops() != 2) {
-    return false;
-  }
-
-  // Check that all the iterators are parallel.
-  if (linalgOp.getNumParallelLoops() != linalgOp.getNumLoops()) {
-    return false;
-  }
-
-  // Check that the op has only one input and one output.
-  if ((linalgOp.getNumInputs() != 1) || (linalgOp.getNumOutputs() != 1)) {
-    return false;
-  }
-  // Check for 2D operations
-  auto inputShape =
-      linalgOp.inputs()[0].getType().cast<ShapedType>().getShape();
-  auto outputShape =
-      linalgOp.outputs()[0].getType().cast<ShapedType>().getShape();
-  if (inputShape.size() != 2 || outputShape.size() != 2) {
-    return false;
-  }
-
-  // Only transpose static shapes
-  if (linalgOp.hasDynamicShape()) {
-    return false;
-  }
-
-  // Check that the two indexing maps are a permutation of each other.
-  auto indexing_maps = linalgOp.getIndexingMapsArray();
-  return !indexing_maps[0].isEmpty() && !indexing_maps[1].isEmpty() &&
-         ((indexing_maps[0].isIdentity() && !indexing_maps[1].isIdentity() &&
-           indexing_maps[1].isPermutation()) ||
-          (!indexing_maps[0].isIdentity() && indexing_maps[0].isPermutation() &&
-           indexing_maps[1].isIdentity()));
+static bool hasTwoOrThreeLoopsInfo(linalg::LinalgOp linalgOp) {
+  return linalgOp.getNumParallelLoops() >= 2 &&
+         linalgOp.getNumParallelLoops() <= 3;
 }
 
 static LogicalResult setTransposeConfig(func::FuncOp entryPoint,
-                                        Operation *op) {
+                                        linalg::LinalgOp linalgOp) {
+  LinalgOpInfo opInfo(linalgOp, sharedMemTransposeFilter);
+
+  // Checks preconditions for shared mem transpose.
+  if (!opInfo.isTranspose() || opInfo.isDynamic() || opInfo.isReduction() ||
+      !isa<linalg::GenericOp>(linalgOp) || !hasTwoOrThreeLoopsInfo(linalgOp)) {
+    return failure();
+  }
+
+  ArrayRef<OpOperand *> transposedOperands = opInfo.getTransposeOperands();
+
+  // Determine the fastest moving dimensions for the source/destination indices
+  // of each transpose. These inform the tile sizes.
+  int64_t outputFastestDim = linalgOp.getNumLoops() - 1;
+  int64_t inputFastestDim = linalgOp.getTiedIndexingMap(transposedOperands[0])
+                                .getDimPosition(outputFastestDim);
+  // Ensure the other transposed operands match
+  for (int i = 1; i < transposedOperands.size(); ++i) {
+    if (inputFastestDim != linalgOp.getTiedIndexingMap(transposedOperands[i])
+                               .getDimPosition(outputFastestDim)) {
+      return failure();
+    }
+  }
+
   int32_t tileM = 32;
   int32_t tileN = 32;
   TileSizesListType tileSizes;
-  tileSizes.push_back({tileM, tileN});
+  // Set all tile sizes to 1 except for fastest moving dimensions.
+  SmallVector<int64_t> tileSizesTemp(linalgOp.getNumLoops(), 1);
+  tileSizesTemp[outputFastestDim] = 32;
+  tileSizesTemp[inputFastestDim] = 32;
+  tileSizes.push_back(tileSizesTemp);
 
-  // Check alignment with tile size
-  if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
-    auto inputShape =
-        genericOp.inputs()[0].getType().cast<ShapedType>().getShape();
-    if (inputShape[0] % tileM != 0 || inputShape[1] % tileN != 0) {
-      return failure();
-    }
-  } else {
+  // Check alignment with tile size for each transpose. Only the fastest moving
+  // dims need to match the transpose tile.
+  auto loopRanges = linalgOp.getStaticLoopRanges();
+  if (loopRanges[outputFastestDim] % tileM != 0 ||
+      loopRanges[inputFastestDim] % tileN != 0) {
     return failure();
   }
 
@@ -593,7 +566,7 @@ static LogicalResult setTransposeConfig(func::FuncOp entryPoint,
   std::array<int64_t, 3> workgroupSize = {8, 32, 1};
 
   return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, op, tileSizes,
+      entryPoint, linalgOp, tileSizes,
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTransposeSharedMem,
       workgroupSize);
 }
@@ -625,8 +598,8 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
     if (succeeded(setWarpReductionConfig(entryPointFn, linalgOp))) {
       return success();
     }
-    if (isTransposeOp(linalgOp) &&
-        succeeded(setTransposeConfig(entryPointFn, linalgOp))) {
+    auto genericOp = dyn_cast<linalg::GenericOp>(computeOp);
+    if (genericOp && succeeded(setTransposeConfig(entryPointFn, genericOp))) {
       return success();
     }
   }
@@ -656,8 +629,6 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
       return funcOp.emitOpError("failed to get compute ops");
     }
 
-    // If using sandbox passes, currently set the workload_per_wg to be
-    // empty for single-threaded execution.
     if (clGPUCodegenTransformDialectFileName.size() > 0) {
       auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
           moduleOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
@@ -696,7 +667,7 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
       // setTranslationInfo(
       //    funcOp,
       //    IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute,
-      //    /*workloadPerWorkgroup=*/{}, {1, 1, 1});
+      //    {1, 1, 1});
       // continue;
       return funcOp.emitOpError("unable to find root operation");
     }

@@ -1,7 +1,7 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(builtin.module(func.func(iree-llvmgpu-tile-and-distribute))))' %s | FileCheck %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[2, 256, 4]]>
-#translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt workload_per_wg = [256, 2]>
+#translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt>
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -70,22 +70,22 @@ hal.executable private @dot_dispatch_0  {
 //     CHECK-DAG:  %[[BUFFER1:.+]] = memref.alloc() : memref<2x4xf32, 3>
 //         CHECK:  scf.for %[[K:.+]] = %[[C0]] to %[[C1024]] step %[[C4]] {
 //         CHECK:    gpu.barrier
-//         CHECK:    memref.copy {{.*}}, {{.*}} {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<2x4xf32, #{{.*}}> to memref<2x4xf32, 3>
+//         CHECK:    memref.copy {{.*}}, {{.*}} {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<2x4xf32, strided<[1024, 1], offset: ?>> to memref<2x4xf32, 3>
 //     CHECK-NOT:    gpu.barrier
-//         CHECK:    memref.copy {{.*}}, {{.*}} {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<4x256xf32, #{{.*}}> to memref<4x256xf32, 3>
+//         CHECK:    memref.copy {{.*}}, {{.*}} {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<4x256xf32, strided<[1024, 1], offset: ?>> to memref<4x256xf32, 3>
 //         CHECK:    gpu.barrier
 //         CHECK:    scf.for %[[IND0:.+]] = %{{.*}} to %[[C2]] step %[[C2]] {
 //         CHECK:      scf.for %[[IND1:.+]] = %{{.*}} to %[[C256]] step %[[C256]] {
-//     CHECK-DAG:        %[[A:.+]] = memref.subview %[[BUFFER1]][%[[IND0]], 0] [2, 4] [1, 1] : memref<2x4xf32, 3> to memref<2x4xf32, #{{.*}}, 3>
-//     CHECK-DAG:        %[[B:.+]] = memref.subview %[[BUFFER0]][0, %[[IND1]]] [4, 4] [1, 1] : memref<4x256xf32, 3> to memref<4x4xf32, #{{.*}}, 3>
-//     CHECK-DAG:        %[[C:.+]] = memref.subview %{{.*}}[%[[IND0]], %[[IND1]]] [2, 4] [1, 1] : memref<2x256xf32, #{{.*}}> to memref<2x4xf32, #{{.*}}>
-//         CHECK:        linalg.matmul {__internal_linalg_transform__ = "vectorize", {{.*}}} ins(%[[A]], %[[B]] : memref<2x4xf32, #{{.*}}, 3>, memref<4x4xf32, #{{.*}}, 3>) outs(%[[C]] : memref<2x4xf32, #{{.*}}>)
+//     CHECK-DAG:        %[[A:.+]] = memref.subview %[[BUFFER1]][%[[IND0]], 0] [2, 4] [1, 1] : memref<2x4xf32, 3> to memref<2x4xf32, strided<[4, 1], offset: ?>, 3>
+//     CHECK-DAG:        %[[B:.+]] = memref.subview %[[BUFFER0]][0, %[[IND1]]] [4, 4] [1, 1] : memref<4x256xf32, 3> to memref<4x4xf32, strided<[256, 1], offset: ?>, 3>
+//     CHECK-DAG:        %[[C:.+]] = memref.subview %{{.*}}[%[[IND0]], %[[IND1]]] [2, 4] [1, 1] : memref<2x256xf32, #{{.*}}> to memref<2x4xf32, strided<[1024, 1], offset: ?>>
+//         CHECK:        linalg.matmul {__internal_linalg_transform__ = "vectorize", {{.*}}} ins(%[[A]], %[[B]] : memref<2x4xf32, strided<[4, 1], offset: ?>, 3>, memref<4x4xf32, strided<[256, 1], offset: ?>, 3>) outs(%[[C]] : memref<2x4xf32, strided<[1024, 1], offset: ?>>)
 //         CHECK:    }
 //         CHECK:  }
 
 // -----
 
-#translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt workload_per_wg = [32, 8, 1]>
+#translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt>
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -153,14 +153,14 @@ builtin.module {
 //     CHECK-DAG:       memref.subview
 //     CHECK-DAG:       memref.subview
 //     CHECK-DAG:       memref.subview
-//         CHECK:       linalg.batch_matmul {__internal_linalg_transform__ = "vectorize", {{.*}}} ins(%{{.*}}, %{{.*}} : memref<1x1x32xf32, #{{.*}}, 3>, memref<1x32x4xf32, #{{.*}}, 3>) outs(%{{.*}} : memref<1x1x4xf32, #{{.*}}>)
+//         CHECK:       linalg.batch_matmul {__internal_linalg_transform__ = "vectorize", {{.*}}} ins(%{{.*}}, %{{.*}} : memref<1x1x32xf32, strided<[256, 32, 1], offset: ?>, 3>, memref<1x32x4xf32, strided<[1024, 32, 1], offset: ?>, 3>) outs(%{{.*}} : memref<1x1x4xf32, strided<[2048, 64, 1], offset: ?>>)
 //         CHECK:    }
 //         CHECK:  }
 
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[2, 32, 4]]>
-#translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt workload_per_wg = [32, 2]>
+#translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt>
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -231,16 +231,16 @@ hal.executable private @dot_dispatch_0  {
 //     CHECK-DAG:  %[[BUFFER1:.+]] = memref.alloc() : memref<2x4xf32, 3>
 //         CHECK:  scf.for %[[K:.+]] = %[[C0]] to %[[C1024]] step %[[C4]] {
 //         CHECK:    gpu.barrier
-//         CHECK:    memref.copy {{.*}}, {{.*}} {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<2x4xf32, #{{.*}}> to memref<2x4xf32, 3>
+//         CHECK:    memref.copy {{.*}}, {{.*}} {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<2x4xf32, strided<[1024, 1], offset: ?>> to memref<2x4xf32, 3>
 //     CHECK-NOT:    gpu.barrier
-//         CHECK:    memref.copy {{.*}}, {{.*}} {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<4x32xf32, #{{.*}}> to memref<4x32xf32, 3>
+//         CHECK:    memref.copy {{.*}}, {{.*}} {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<4x32xf32, strided<[1024, 1], offset: ?>> to memref<4x32xf32, 3>
 //         CHECK:    gpu.barrier
 //         CHECK:    scf.for %[[IND0:.+]] = %{{.*}} to %[[C2]] step %[[C8]] {
 //         CHECK:      scf.for %[[IND1:.+]] = %{{.*}} to %[[C32]] step %[[C64]] {
-//     CHECK-DAG:        %[[A:.+]] = memref.subview %[[BUFFER1]][%[[IND0]], 0] [1, 4] [1, 1] : memref<2x4xf32, 3> to memref<1x4xf32, #{{.*}}, 3>
-//     CHECK-DAG:        %[[B:.+]] = memref.subview %[[BUFFER0]][0, %[[IND1]]] [4, 1] [1, 1] : memref<4x32xf32, 3> to memref<4x1xf32, #{{.*}}, 3>
-//     CHECK-DAG:        %[[C:.+]] = memref.subview %{{.*}}[%[[IND0]], %[[IND1]]] [1, 1] [1, 1] : memref<2x32xf32, #{{.*}}> to memref<1x1xf32, #{{.*}}>
-//         CHECK:        linalg.matmul {__internal_linalg_transform__ = "vectorize", {{.*}}} ins(%[[A]], %[[B]] : memref<1x4xf32, #{{.*}}, 3>, memref<4x1xf32, #{{.*}}, 3>) outs(%[[C]] : memref<1x1xf32, #{{.*}}>)
+//     CHECK-DAG:        %[[A:.+]] = memref.subview %[[BUFFER1]][%[[IND0]], 0] [1, 4] [1, 1] : memref<2x4xf32, 3> to memref<1x4xf32, strided<[4, 1], offset: ?>, 3>
+//     CHECK-DAG:        %[[B:.+]] = memref.subview %[[BUFFER0]][0, %[[IND1]]] [4, 1] [1, 1] : memref<4x32xf32, 3> to memref<4x1xf32, strided<[32, 1], offset: ?>, 3>
+//     CHECK-DAG:        %[[C:.+]] = memref.subview %{{.*}}[%[[IND0]], %[[IND1]]] [1, 1] [1, 1] : memref<2x32xf32, #{{.*}}> to memref<1x1xf32, strided<[1024, 1], offset: ?>>
+//         CHECK:        linalg.matmul {__internal_linalg_transform__ = "vectorize", {{.*}}} ins(%[[A]], %[[B]] : memref<1x4xf32, strided<[4, 1], offset: ?>, 3>, memref<4x1xf32, strided<[32, 1], offset: ?>, 3>) outs(%[[C]] : memref<1x1xf32, strided<[1024, 1], offset: ?>>)
 //         CHECK:    }
 //         CHECK:  }
 
@@ -294,7 +294,7 @@ hal.executable @reduction_dispatch {
 
 // -----
 
-#translation = #iree_codegen.translation_info<LLVMGPUVectorize workload_per_wg = [256, 1, 1]>
+#translation = #iree_codegen.translation_info<LLVMGPUVectorize>
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -365,7 +365,7 @@ hal.executable private @conv_dispatch  {
 // Check contract-4d, we currently emit suboptimal code as we don't distribute
 // more than 3 dimensions but make sure we emit correct code.
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 1, 2, 256, 4]]>
-#translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt workload_per_wg = [256, 2]>
+#translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt>
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
