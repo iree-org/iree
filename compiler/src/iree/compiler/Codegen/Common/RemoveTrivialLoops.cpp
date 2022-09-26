@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/MLIRContext.h"
@@ -97,48 +98,27 @@ static bool isWorkgroupLoop(const LoopTilingAndDistributionInfo &info) {
          });
 }
 
-/// Infer the number of workgroups by looking at the tiled loop and the number
-/// of element per workgroups.
+/// Infer the number of workgroups from exportOp.
 static SmallVector<int64_t> getNumWorkgroup(
     func::FuncOp funcOp, IREE::HAL::ExecutableExportOp exportOp) {
-  auto allLoops = getTiledAndDistributedLoopInfo(funcOp);
-  auto wgLoops =
-      llvm::to_vector<3>(llvm::make_filter_range(allLoops, isWorkgroupLoop));
-  SmallVector<int64_t> workloadSize(wgLoops.size());
-  for (LoopTilingAndDistributionInfo &tileInfo : wgLoops) {
-    if (tileInfo.processorDistributionDim >= workloadSize.size()) return {};
-    if (!tileInfo.untiledLowerBound.is<Attribute>() ||
-        !tileInfo.untiledUpperBound.is<Attribute>() ||
-        !tileInfo.untiledStep.is<Attribute>()) {
-      continue;
-    }
-    int64_t lb = tileInfo.untiledLowerBound.get<Attribute>()
-                     .cast<IntegerAttr>()
-                     .getInt();
-    int64_t ub = tileInfo.untiledUpperBound.get<Attribute>()
-                     .cast<IntegerAttr>()
-                     .getInt();
-    int64_t step =
-        tileInfo.untiledStep.get<Attribute>().cast<IntegerAttr>().getInt();
-    if (step == 0) return SmallVector<int64_t>();
-    workloadSize[tileInfo.processorDistributionDim] = (ub - lb) / step;
-  }
-  auto translationInfo = getTranslationInfo(exportOp);
-  if (!translationInfo) return SmallVector<int64_t>();
+  SmallVector<int64_t> result;
 
-  SmallVector<int64_t> workloadPerWorkgroup =
-      translationInfo.getWorkloadPerWorkgroupVals();
-  if (workloadSize.size() != workloadPerWorkgroup.size()) {
-    return SmallVector<int64_t>();
+  Block *body = exportOp.getWorkgroupCountBody();
+  if (!body) return result;
+
+  auto returnOp = cast<IREE::HAL::ReturnOp>(body->getTerminator());
+  assert(returnOp.getNumOperands() == 3);
+
+  for (unsigned i = 0; i < 3; ++i) {
+    Operation *defOp = returnOp.getOperand(i).getDefiningOp();
+    if (auto indexOp = dyn_cast_or_null<arith::ConstantIndexOp>(defOp)) {
+      result.push_back(indexOp.value());
+    } else {
+      return SmallVector<int64_t>();
+    }
   }
-  SmallVector<int64_t> numWorkgroups;
-  for (auto pair : llvm::zip(workloadSize, workloadPerWorkgroup)) {
-    auto workload = std::get<0>(pair);
-    auto size = std::get<1>(pair);
-    numWorkgroups.push_back(llvm::divideCeil(workload, size));
-  }
-  numWorkgroups.resize(kNumMaxParallelDims, 1);
-  return numWorkgroups;
+
+  return result;
 }
 
 static LogicalResult removeOneTripTiledLoops(func::FuncOp funcOp,

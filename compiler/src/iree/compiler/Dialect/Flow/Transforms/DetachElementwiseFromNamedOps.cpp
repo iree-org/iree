@@ -49,8 +49,12 @@ struct DetachElementwisePattern
     // we see multiple output ops.
     if (outputOperands.size() != 1) return failure();
     Value outputOperand = outputOperands.front()->get();
-    if (outputOperand.getDefiningOp<linalg::FillOp>()) return failure();
 
+    auto outsDefiningOp = outputOperand.getDefiningOp<linalg::LinalgOp>();
+    if (!outsDefiningOp || isa<linalg::FillOp>(outsDefiningOp.getOperation())) {
+      // If not linalg op, or is a fill op, do nothing.
+      return failure();
+    }
     auto outputType = outputOperand.getType().cast<RankedTensorType>();
     if (!outputType.getElementType().isIntOrFloat()) return failure();
     auto elementType = outputType.getElementType();
@@ -88,7 +92,7 @@ struct DetachElementwisePattern
     for (int i = 0, e = outputMap.getNumResults(); i < e; ++i) {
       int pos = outputMap.getResult(i).cast<AffineDimExpr>().getPosition();
       auto attr = linalgOp.getIteratorTypes()[pos].cast<StringAttr>();
-      if (!isParallelIterator(attr)) return failure();
+      if (!linalg::isParallelIterator(attr)) return failure();
       iterators.push_back(attr.getValue());
     }
 

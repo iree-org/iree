@@ -49,7 +49,9 @@ static Optional<SmallVector<int64_t>> unrollOrder(Operation *op) {
   // register. This is needed to get good performance on sm_80 target.
   // First make reduction the outer dimensions.
   for (auto iter : llvm::enumerate(contract.getIteratorTypes())) {
-    if (isReductionIterator(iter.value())) order.push_back(iter.index());
+    if (vector::isReductionIterator(iter.value())) {
+      order.push_back(iter.index());
+    }
   }
 
   llvm::SmallDenseSet<int64_t> dims;
@@ -58,13 +60,15 @@ static Optional<SmallVector<int64_t>> unrollOrder(Operation *op) {
   }
   // Then parallel dimensions that are part of Lhs as we want to re-use Lhs.
   for (auto iter : llvm::enumerate(contract.getIteratorTypes())) {
-    if (isParallelIterator(iter.value()) && dims.count(iter.index()))
+    if (vector::isParallelIterator(iter.value()) && dims.count(iter.index())) {
       order.push_back(iter.index());
+    }
   }
   // Then the remaining parallel loops.
   for (auto iter : llvm::enumerate(contract.getIteratorTypes())) {
-    if (isParallelIterator(iter.value()) && !dims.count(iter.index()))
+    if (vector::isParallelIterator(iter.value()) && !dims.count(iter.index())) {
       order.push_back(iter.index());
+    }
   }
   return order;
 }

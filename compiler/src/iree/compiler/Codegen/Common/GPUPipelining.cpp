@@ -7,11 +7,13 @@
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/SideEffectUtils.h"
 
 //====---------------------------------------------------------------------===//
 // Pass to pipeline copy to shared memory for matmul op.
@@ -22,6 +24,63 @@ namespace iree_compiler {
 
 static const StringLiteral kPipeliningLoopMarker = "__pipelining_K_loop__";
 static const StringLiteral kPipeliningGlobalLoad = "__pipelining_global_load__";
+
+// Returns a new predicated operation to support unpeeled epilogue. Unpeeled
+// epilogue needs to handle the last iterations within the mainloop which
+// requires predicating operations, for e.g., OOB global memory access. This
+// helper function predicates operations (where predication is avialable),
+// checks if unpredicated operations are side-effect free and acceptable to
+// execute speculatively.
+static Operation* replaceOpWithPredicatedOp(Operation* op, Value pred,
+                                            PatternRewriter& rewriter) {
+  // Predication is only supported for AsyncCopyOp. Thus, for operations which
+  // are *not* AsyncCopyOp additional checks are requrired in order to be issued
+  // speculatively.
+  if (!isa<nvgpu::DeviceAsyncCopyOp>(op)) {
+    // Return/execute the op if it is a side effect free.
+    if (mlir::isSideEffectFree(op)) return op;
+    // Return/execute the op if it is barrier, commit group, or ldmatrix op.
+    if (isa<gpu::BarrierOp, nvgpu::DeviceAsyncCreateGroupOp, nvgpu::LdMatrixOp>(
+            op))
+      return op;
+    // Return/execute the op if it is a shared memory load.
+    if (auto loadOp = dyn_cast<vector::LoadOp>(op)) {
+      unsigned loadAddrSpace =
+          loadOp.getBase().getType().cast<MemRefType>().getMemorySpaceAsInt();
+      if (loadAddrSpace == gpu::GPUDialect::getWorkgroupAddressSpace())
+        return op;
+    }
+    // If we are here that means the operation does not have predication support
+    // and cannot be speculatively executed. Thus, unpeeled epilogue is not
+    // supported.
+    assert(false &&
+           "Unpeeled epilogue not supported with a side-effect instruction "
+           "with no predication.");
+  }
+
+  // Replace mainloop AsyncCopy with AsyncCopy(zfill) inline asm.
+  auto asyncCopyOp = dyn_cast<nvgpu::DeviceAsyncCopyOp>(op);
+  auto loc = asyncCopyOp->getLoc();
+
+  // Create srcElement Value based on the pred.
+  // The next few lins generate the below code:
+  // srcElement = (pred) ?  dstElements : 0;
+  Value dstElements =
+      rewriter.create<arith::ConstantOp>(loc, asyncCopyOp.getDstElementsAttr());
+  Value c0Index = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+  auto srcElements =
+      rewriter.create<arith::SelectOp>(loc, pred, dstElements, c0Index);
+  auto asyncCopyZfillOp = rewriter.create<nvgpu::DeviceAsyncCopyOp>(
+      loc, nvgpu::DeviceAsyncTokenType::get(asyncCopyOp.getContext()),
+      asyncCopyOp.getDst(), asyncCopyOp.getDstIndices(), asyncCopyOp.getSrc(),
+      asyncCopyOp.getSrcIndices(), asyncCopyOp.getDstElements(), srcElements,
+      UnitAttr());
+
+  rewriter.eraseOp(asyncCopyOp);
+
+  // Return the newly create predicated AsyncCopyZfillOp.
+  return asyncCopyZfillOp;
+}
 
 /// Helper to recursively add operation dependencies within `block` to `dep`
 /// set.
@@ -84,7 +143,9 @@ static void setAsyncAnnotations(Operation* op,
 
 namespace {
 struct GPUPipeliningPass : public GPUPipeliningBase<GPUPipeliningPass> {
-  GPUPipeliningPass(unsigned depth) : depth(depth) {}
+  GPUPipeliningPass(bool epiloguePeeling, unsigned depth) : depth(depth) {
+    this->epiloguePeeling = epiloguePeeling;
+  }
   void runOnOperation() override {
     auto funcOp = getOperation();
     MLIRContext* context = &getContext();
@@ -142,6 +203,17 @@ struct GPUPipeliningPass : public GPUPipeliningBase<GPUPipeliningPass> {
     };
     options.getScheduleFn = getSchedule;
     options.annotateFn = setAnnotation;
+
+    // Use un-peeled epilogue (i.e. epiloguePeeling=flase) only when predication
+    // is avialable a.k.a. AsyncCopyOp.
+    if (!epiloguePeeling) {
+      options.peelEpilogue = false;
+      options.predicateFn = [](Operation* op, Value pred,
+                               PatternRewriter& rewriter) {
+        return replaceOpWithPredicatedOp(op, pred, rewriter);
+      };
+    }
+
     RewritePatternSet pipeliningPatterns(context);
     scf::populateSCFLoopPipeliningPatterns(pipeliningPatterns, options);
     if (failed(applyPatternsAndFoldGreedily(funcOp,
@@ -155,9 +227,14 @@ struct GPUPipeliningPass : public GPUPipeliningBase<GPUPipeliningPass> {
 };
 }  // namespace
 
+/// Pass options
+/// epiloguePeeling - try enable/disable epilogue peeling.
+/// true  : Peel epilogue (no additional checks required)
+/// false : Try and use unpeeled epilogue (check if predication is supported is
+/// avialable)
 std::unique_ptr<OperationPass<func::FuncOp>> createGPUPipeliningPass(
-    unsigned depth) {
-  return std::make_unique<GPUPipeliningPass>(depth);
+    bool epiloguePeeling, unsigned depth) {
+  return std::make_unique<GPUPipeliningPass>(epiloguePeeling, depth);
 }
 
 }  // namespace iree_compiler

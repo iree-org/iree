@@ -84,13 +84,12 @@ inline void setTranslationInfo(
 inline void setTranslationInfo(
     func::FuncOp entryPointFn,
     IREE::Codegen::DispatchLoweringPassPipeline passPipeline,
-    ArrayRef<int64_t> workloadPerWorkgroup, ArrayRef<int64_t> workgroupSize,
-    unsigned softwarePipelineDepth = 0) {
+    ArrayRef<int64_t> workgroupSize, unsigned softwarePipelineDepth = 0) {
   FailureOr<IREE::HAL::ExecutableExportOp> exportOp =
       getEntryPoint(entryPointFn);
   MLIRContext *context = entryPointFn.getContext();
-  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-      context, passPipeline, workloadPerWorkgroup);
+  auto translationInfo =
+      IREE::Codegen::TranslationInfoAttr::get(context, passPipeline);
   setTranslationInfo(*exportOp, translationInfo, workgroupSize);
 }
 
@@ -124,7 +123,7 @@ inline LogicalResult setOpConfigAndEntryPointFnTranslation(
   auto config = IREE::Codegen::LoweringConfigAttr::get(context, tileSizes);
   setLoweringConfig(op, config);
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-      entryPointFn->getContext(), passPipeline, {}, softwarePipelineDepth);
+      entryPointFn->getContext(), passPipeline, softwarePipelineDepth);
   setTranslationInfo(entryPointFn, translationInfo, workgroupSize);
   return success();
 }

@@ -66,9 +66,9 @@ static llvm::cl::opt<bool> clEnablePaddingLinalgOps(
                    "flow-padding-size"),
     llvm::cl::init(false));
 
-static llvm::cl::opt<bool> clEnableFusePaddingIntoConsumerOps(
-    "iree-flow-enable-fuse-padding-into-consumer-ops",
-    llvm::cl::desc("Enable fusing linalg pad_tensor ops into consumer ops"),
+static llvm::cl::opt<bool> clEnableFusePaddingIntoLinalgConsumerOps(
+    "iree-flow-enable-fuse-padding-into-linalg-consumer-ops",
+    llvm::cl::desc("Enable fusing tensor.pad ops into Linalg consumer ops"),
     llvm::cl::init(false));
 
 static llvm::cl::opt<int> clLinalgOpsPaddingSize(
@@ -83,6 +83,13 @@ static llvm::cl::opt<bool> clEnableLinalgDetensorize(
     "iree-flow-enable-linalg-detensorize",
     llvm::cl::desc("Enable detensorizing linalg ops to operate on primitives"),
     llvm::cl::init(true));
+
+static llvm::cl::opt<bool> clEnableAggressiveFusion(
+    "iree-flow-enable-aggressive-fusion",
+    llvm::cl::desc(
+        "Enable the aggressive fusion heuristic to fuse multiuse ops and ops "
+        "with reduction loops"),
+    llvm::cl::init(false));
 
 static llvm::cl::opt<std::string> clMmt4dTargetOptions(
     "iree-flow-mmt4d-target-options",
@@ -109,6 +116,17 @@ static llvm::cl::opt<std::string> clDispatchTransformFileName(
     llvm::cl::desc("mlir file containing a top-level module that specifies "
                    "the transformations to apply to form dispatch regions."),
     llvm::cl::init(""));
+
+static llvm::cl::opt<bool> clDispatchViaRegionOps(
+    "iree-flow-dispatch-via-region-ops",
+    llvm::cl::desc("Create dispatches via DispatchRegionOps"),
+    llvm::cl::init(false));
+
+static llvm::cl::opt<bool> clDispatchViaRegionOpsGenerateWorkloadRegion(
+    "iree-flow-dispatch-via-region-ops-generate-workload-region",
+    llvm::cl::desc("Generate the workload region when running with "
+                   "iree-flow-dispatch-via-region-ops"),
+    llvm::cl::init(true));
 
 namespace mlir {
 namespace iree_compiler {
@@ -187,8 +205,9 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPass(IREE::Flow::createConvertConv2D1x1ToMatmulPass)
       .addPredicatedPass(clEnableConvToImg2Col,
                          IREE::Flow::createConvertConv2DToImg2ColPass)
-      .addPredicatedPass(clDispatchTransformFileName.empty(),
-                         IREE::Flow::createDetachElementwiseFromNamedOpsPass)
+      .addPredicatedPass(
+          clDispatchTransformFileName.empty() && !clDispatchViaRegionOps,
+          IREE::Flow::createDetachElementwiseFromNamedOpsPass)
       // Input should now be legal.
       .addPass(IREE::Flow::createVerifyInputLegalityPass)
       // Catch matmul ops before we do anything else with them.
@@ -212,11 +231,11 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   passManager.addPass(IREE::Flow::createExpandTensorShapesPass());
   buildGlobalOptimizationPassPipeline(passManager, transformOptions);
 
-  FunctionLikeNest(passManager)
-      // Pad tensors.
-      .addPredicatedPass((!clEnableFusePaddingIntoConsumerOps),
-                         IREE::Flow::createPadTensorToTensorInsertSlicePass)
+  // Pad tensors.
+  passManager.addPass(IREE::Flow::createTensorPadToTensorInsertSlicePass(
+      /*skipSingleLinalgOpUses=*/clEnableFusePaddingIntoLinalgConsumerOps));
 
+  FunctionLikeNest(passManager)
       // Preprocess the input to a form more amenable for fusion
       // - Convert all elementwise ops to Linalg
       // - Remove unit-extent dimensions.
@@ -226,9 +245,10 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPass(memref::createResolveShapedTypeResultDimsPass)
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)
-
       // Elementwise fusion.
-      .addPass(createFusionOfTensorOpsPass)
+      .addPass([]() {
+        return createFusionOfTensorOpsPass(clEnableAggressiveFusion);
+      })
       .addPredicatedPass(clEnableLinalgDetensorize,
                          mlir::createLinalgDetensorizePass)
       .addPass(mlir::createCanonicalizerPass)
@@ -252,8 +272,21 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
                                clDispatchTransformFileName);
                          })
       // Only want use the transform dialect for some dispatch regions and let
-      // the DispatchLinalgOnTensorsPass unconditionally handle the rest.
-      .addPass(createDispatchLinalgOnTensorsPass)
+      // the DispatchLinalgOnTensorsPass handle the rest.
+      .addPredicatedPass(
+          !clDispatchViaRegionOps,
+          []() {
+            return createDispatchLinalgOnTensorsPass(clEnableAggressiveFusion);
+          })
+      // DispatchLinalgOnTensorsViaRegionsPass is a variant of
+      // DispatchLinalgOnTensorsPass that lowers via DispatchRegionOps. This is
+      // on an opt-in basis until the pass is stable enough to replace
+      // DispatchLinalgOnTensorsPass.
+      .addPredicatedPass(clDispatchViaRegionOps,
+                         [&]() {
+                           return createDispatchLinalgOnTensorsViaRegionOpsPass(
+                               clDispatchViaRegionOpsGenerateWorkloadRegion);
+                         })
       ////////////////////////////////////////////////////////////////////////
       .addPass(createCaptureDispatchDynamicDimsPass)
       .addPass(mlir::createCanonicalizerPass)

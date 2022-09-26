@@ -6,6 +6,8 @@
 
 #include "iree/compiler/Utils/StringUtils.h"
 
+#include "llvm/ADT/StringRef.h"
+
 namespace mlir {
 namespace iree_compiler {
 
@@ -23,6 +25,34 @@ std::string replaceAllSubstrs(const std::string &str, const std::string &match,
   std::string copy(str);
   replaceAllSubstrsInPlace(copy, match, substitute);
   return copy;
+}
+
+std::string sanitizeSymbolName(StringRef name) {
+  std::string result;
+  result.reserve(name.size());
+  for (size_t i = 0; i < name.size(); ++i) {
+    char c = name[i];
+    if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+          (c >= '0' && c <= '9') || c == '_')) {
+      c = '_';
+    }
+    result.push_back(c);
+  }
+  return result;
+}
+
+std::string sanitizeFileName(StringRef name) {
+  std::string result;
+  result.reserve(name.size());
+  for (size_t i = 0; i < name.size(); ++i) {
+    char c = name[i];
+    if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+          (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.')) {
+      c = '_';
+    }
+    result.push_back(c);
+  }
+  return result;
 }
 
 }  // namespace iree_compiler

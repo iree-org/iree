@@ -6,6 +6,24 @@
 
 #include "iree/hal/local/executable_loader.h"
 
+#if defined(IREE_HAL_EXECUTABLE_IMPORT_PROVIDER_DEFAULT_FN)
+
+// Defined by the user and linked in to the binary:
+extern iree_hal_executable_import_provider_t
+IREE_HAL_EXECUTABLE_IMPORT_PROVIDER_DEFAULT_FN(void);
+
+iree_hal_executable_import_provider_t
+iree_hal_executable_import_provider_default(void) {
+  return IREE_HAL_EXECUTABLE_IMPORT_PROVIDER_DEFAULT_FN();
+}
+
+#else
+iree_hal_executable_import_provider_t
+iree_hal_executable_import_provider_default(void) {
+  return iree_hal_executable_import_provider_null();
+}
+#endif  // IREE_HAL_EXECUTABLE_IMPORT_PROVIDER_DEFAULT_FN
+
 iree_status_t iree_hal_executable_import_provider_resolve(
     const iree_hal_executable_import_provider_t import_provider,
     iree_string_view_t symbol_name, void** out_fn_ptr) {

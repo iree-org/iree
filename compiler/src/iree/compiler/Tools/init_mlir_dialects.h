@@ -23,6 +23,7 @@
 #include "mlir/Dialect/MLProgram/IR/MLProgram.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
 #include "mlir/Dialect/PDL/IR/PDL.h"
 #include "mlir/Dialect/PDLInterp/IR/PDLInterp.h"
 #include "mlir/Dialect/Quant/QuantOps.h"
@@ -48,6 +49,7 @@ inline void registerMlirDialects(DialectRegistry &registry) {
                   cf::ControlFlowDialect,
                   bufferization::BufferizationDialect,
                   gpu::GPUDialect,
+                  nvgpu::NVGPUDialect,
                   LLVM::LLVMDialect,
                   linalg::LinalgDialect,
                   math::MathDialect,

@@ -79,8 +79,10 @@ ctest --test-dir ${BUILD_RISCV_DIR}/runtime/ --timeout 900 --output-on-failure \
   --no-tests=error --label-exclude \
   '(^nokokoro$|^driver=vulkan$|^driver=cuda$|^vulkan_uses_vk_khr_shader_float16_int8$|^requires-filesystem$|^requires-dtz$)'
 
-# Test e2e models. Excluding mobilebert and fp16 for now.
+# Test e2e models. Excluding mobilebert, fp16, and lowering_config regression
+# tests for now.
+# TODO(#10462): Investigate the lowering_config test issue.
 ctest --test-dir ${BUILD_RISCV_DIR}/tests/e2e --timeout 900 --output-on-failure \
   --no-tests=error --label-exclude \
   '(^nokokoro$|^driver=vulkan$|^driver=cuda$|^vulkan_uses_vk_khr_shader_float16_int8$)' \
-  -E '(bert|fp16)'
+  -E '(bert|fp16|regression_llvm-cpu_lowering_config)'

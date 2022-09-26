@@ -10,6 +10,7 @@
 #include <numeric>
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
@@ -159,9 +160,11 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
   tileSizes.push_back(invocationTileSizes);
   // Tiling along reduction dimensions
   if (isa<linalg::Conv2DNhwcHwcfOp>(linalgOp)) {
-    tileSizes.push_back({0, 0, 0, 0, 1, 1, 4});
+    tileSizes.push_back({0, 0, 0, 0, 1, 1, 4});  // (N, OH, OW, OC, FH, FW, IC)
+    tileSizes.push_back({0, 1, 0, 0});
   } else if (isa<linalg::DepthwiseConv2DNhwcHwcOp>(linalgOp)) {
-    tileSizes.push_back({0, 0, 0, 0, 1, 1});
+    tileSizes.push_back({0, 0, 0, 0, 1, 1});  // (N, OH, OW, C, FH, FW)
+    tileSizes.push_back({0, 1, 0, 0});
   } else {
     return success();
   }
@@ -211,7 +214,7 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op, int64_t subgroupSize,
   int bIndex = -1, mIndex = -1, nIndex = -1, kIndex = -1;
   int lastParallelDim = -1;
   for (unsigned i = 0; i < op.getNumLoops(); ++i) {
-    if (isReductionIterator(op.getIteratorTypes()[i])) {
+    if (linalg::isReductionIterator(op.getIteratorTypes()[i])) {
       kIndex = i;
       continue;
     }
@@ -663,8 +666,10 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
     for (const auto &it : llvm::enumerate(linalgOp.getIteratorTypes())) {
       auto i = it.index();
       if (loopBounds[i] % 4 != 0) continue;
-      if (isReductionIterator(it.value()) || workgroupTileSizes[i] == 0)
+      if (linalg::isReductionIterator(it.value()) ||
+          workgroupTileSizes[i] == 0) {
         loopTileSizes[it.index()] = 4;
+      }
     }
     if (llvm::any_of(loopTileSizes, [](int64_t s) { return s != 0; })) {
       tileSizes.push_back(loopTileSizes);
@@ -682,7 +687,15 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
 /// Sets the CodeGen configuration as attributes to the given `rootOp` if it's a
 /// known Linalg matmul/convolution op with good configurations.
 static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
+                                      func::FuncOp entryPointFn,
                                       Operation *rootOp) {
+  if (IREE::Codegen::CompilationInfoAttr compilationInfo =
+          getCompilationInfo(rootOp)) {
+    // If the op already has a lowering configuration specified from the
+    // original source by the user, then use it directly.
+    return setUserConfig(entryPointFn, rootOp, compilationInfo);
+  }
+
   LogicalResult result = success();
   // First try to find a proper CodeGen configuration to tile and vectorize for
   // the current target architecture.
@@ -796,7 +809,8 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
     // Try to find a configuration according to a matmul/convolution op and use
     // it as the root op.
     for (Operation *computeOp : computeOps) {
-      if (failed(setSPIRVOpConfig(targetEnv, computeOp))) return failure();
+      if (failed(setSPIRVOpConfig(targetEnv, funcOp, computeOp)))
+        return failure();
 
       // Check if the op configuration was set.
       if (!getLoweringConfig(computeOp)) continue;

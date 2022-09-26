@@ -151,17 +151,6 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
                                 CPUDoubleTilingPadExpert);
   }
 
-  // Verify that the workload per workgroup is not set.
-  // TODO(ravishankarm): Remove workload_per_wg eventually.
-  SmallVector<int64_t> workloadPerWorkgroup =
-      translationInfo.getWorkloadPerWorkgroupVals();
-  if (!workloadPerWorkgroup.empty()) {
-    return op->emitOpError(
-               "workload_per_wg expected to be empty since its internal "
-               "compiler implementation detail")
-           << kNumMaxParallelDims;
-  }
-
   if (loweringConfig.getTileSizes().size() !=
       static_cast<unsigned>(StrategyTilingLevel::NumStrategyTileLevels)) {
     return op->emitOpError("expected three tiling sizes, got ")
@@ -262,6 +251,14 @@ LogicalResult verifyConvTileAndDecomposeExpertConfig(
                 owSize = shape[2];
                 return success();
               })
+          .Case<linalg::Conv2DNchwFchwOp>([&](auto) {
+            // Shape: N, OC, OH, OW, (IC), KH, KW
+            khSize = shape[5];
+            kwSize = shape[6];
+            ohSize = shape[2];
+            owSize = shape[3];
+            return success();
+          })
           .Default([&](auto) { return failure(); });
   if (failed(isSizeExtracted)) {
     return op->emitOpError("unsupported conv types");
@@ -649,6 +646,12 @@ void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager) {
     passManager.printAsTextualPipeline(llvm::dbgs());
     llvm::dbgs() << "\n";
   });
+}
+
+// NOTE: this runs on the top-level program module containing all
+// hal.executable ops.
+void buildLLVMCPULinkingPassPipeline(OpPassManager &passManager) {
+  passManager.addPass(createLLVMCPULinkExecutablesPass());
 }
 
 }  // namespace iree_compiler

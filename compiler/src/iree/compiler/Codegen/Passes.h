@@ -97,10 +97,6 @@ createRemoveSingleIterationLoopPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createConvertToDestinationPassingStylePass();
 
-/// Creates a pass to vectorize a very specific form of linalg.conv ops.
-std::unique_ptr<OperationPass<func::FuncOp>>
-createLinalgToVectorVectorizeConvPass();
-
 /// Creates a pass to vectorize a very specific form of tensor.pad ops with
 /// control flows.
 std::unique_ptr<OperationPass<func::FuncOp>> createVectorizePadPass();
@@ -133,7 +129,7 @@ createGPUDistributeSharedMemoryCopy();
 
 /// Apply software pipelining.
 std::unique_ptr<OperationPass<func::FuncOp>> createGPUPipeliningPass(
-    unsigned depth = 1);
+    bool epiloguePeeling = true, unsigned depth = 1);
 
 /// Converts vector ops to gpu dialect.
 std::unique_ptr<OperationPass<func::FuncOp>> createWorkGroupSwizzle(
@@ -315,6 +311,17 @@ void addCPUAArchDoubleTilingExpertPassPipeline(OpPassManager &passManager);
 /// module within the IREE::HAL::ExecutableOp.
 void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager);
 
+//----------------------------------------------------------------------------//
+// LLVMCPU Linking Passes and Pipelines
+//----------------------------------------------------------------------------//
+
+/// Links LLVMCPU HAL executables within the top-level program module.
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createLLVMCPULinkExecutablesPass();
+
+/// Populates passes needed to link HAL executables across LLVMCPU targets.
+void buildLLVMCPULinkingPassPipeline(OpPassManager &passManager);
+
 //------------------------------------------------------------------------------
 // LLVMGPU
 //------------------------------------------------------------------------------
@@ -370,16 +377,16 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToROCDLPass();
 
 /// Perform tiling and distribution to threads.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTileAndDistribute(
-    bool distributeToWarp = false,
-    GPUPromoteSharedMemPattern promoteSharedMemPattern =
-        GPUPromoteSharedMemPattern::ContractionOpPattern);
+    bool distributeToWarp = false);
 
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTileTensor(
     bool distributeToWarp = false);
 
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUDistribute();
 
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTensorAlloc();
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTensorAlloc(
+    GPUPromoteSharedMemPattern promoteSharedMemPattern =
+        GPUPromoteSharedMemPattern::ContractionOpPattern);
 
 /// Create pass calling the dynamic pipeline for LLVMGPU.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
@@ -503,6 +510,16 @@ void buildSPIRVCodegenPassPipeline(OpPassManager &pm, bool enableFastMath);
 // Lowers high level library calls from named ops and generics. This operates
 // at the bufferized linalg level.
 std::unique_ptr<Pass> createVMVXLowerLinalgMicrokernelsPass();
+
+//----------------------------------------------------------------------------//
+// VMVX Linking Passes and Pipelines
+//----------------------------------------------------------------------------//
+
+/// Links VMVX HAL executables within the top-level program module.
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createVMVXLinkExecutablesPass();
+
+/// Populates passes needed to link HAL executables across VMVX targets.
+void buildVMVXLinkingPassPipeline(OpPassManager &passManager);
 
 //------------------------------------------------------------------------------
 // Test passes

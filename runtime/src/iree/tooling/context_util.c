@@ -210,7 +210,8 @@ static iree_status_t iree_tooling_load_hal_loader_module(
   iree_host_size_t loader_count = 0;
   iree_hal_executable_loader_t* loaders[16];
   iree_status_t status = iree_hal_create_all_available_executable_loaders(
-      IREE_ARRAYSIZE(loaders), &loader_count, loaders, host_allocator);
+      iree_hal_executable_import_provider_default(), IREE_ARRAYSIZE(loaders),
+      &loader_count, loaders, host_allocator);
 
   // Create the module; it retains the loaders for its lifetime.
   iree_vm_module_t* module = NULL;

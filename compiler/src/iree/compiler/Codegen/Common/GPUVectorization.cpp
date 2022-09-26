@@ -38,8 +38,8 @@ static void populateVectorizationPatterns(RewritePatternSet &patterns) {
        StringAttr::get(ctx, getVectorizeMarker())},
       llvm::None);
   f.setMatchByDefault();
-  VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(patterns,
-                                                                   opt, f);
+  VectorizationPatterns<linalg::FillOp, linalg::GenericOp,
+                        linalg::Conv1DNwcWcfOp>::insert(patterns, opt, f);
   patterns.add<linalg::CopyVectorizationPattern>(ctx);
   patterns.add<LinalgVectorizationPattern>(
       ctx, f.addOpFilter<linalg::ContractionOpInterface>(), opt);
@@ -57,6 +57,18 @@ struct GPUVectorizationPass
   void runOnOperation() override {
     auto funcOp = getOperation();
     MLIRContext *context = &getContext();
+
+    // Pre-process convolution ops.
+    RewritePatternSet decompositionPattern(funcOp.getContext());
+    linalg::LinalgTransformationFilter f(
+        {StringAttr::get(context, getWorkgroupKTiledMarker())},
+        StringAttr::get(context, getVectorizeMarker()));
+    f.setMatchByDefault();
+    linalg::populateDecomposeConvolutionPatterns(decompositionPattern, f);
+    if (failed(applyPatternsAndFoldGreedily(funcOp,
+                                            std::move(decompositionPattern))))
+      return signalPassFailure();
+
     RewritePatternSet vectorizationPatterns(context);
     populateVectorizationPatterns(vectorizationPatterns);
     if (generateContract) {

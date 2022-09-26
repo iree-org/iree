@@ -82,9 +82,10 @@ std::unique_ptr<Pass> createConvertConv2DToImg2ColPass();
 // Creates a pass to convert dispatch.region ops to dispatch.workgroups ops.
 std::unique_ptr<Pass> createConvertRegionToWorkgroupsPass();
 
-// Pass to convert a linalg.pad_tensor operation into a linalg.fill +
-// subtensor_insert. This allows lowering the operation into a single kernel.
-std::unique_ptr<Pass> createPadTensorToTensorInsertSlicePass();
+// Pass to convert a tensor.pad operation into a linalg.fill +
+// tensor.insert_slice.
+std::unique_ptr<Pass> createTensorPadToTensorInsertSlicePass(
+    bool skipSingleLinalgOpUses = false);
 
 // Pass to convert a linalg.matmul into linalg.mmt4d given some target ISA
 // information currently passed as pass options.
@@ -97,7 +98,9 @@ std::unique_ptr<Pass> createConvertLinalgMatmulToMmt4DPass(StringRef options);
 std::unique_ptr<Pass> createDetachElementwiseFromNamedOpsPass();
 
 // Creates a pass to fuse Linalg operations on tensors.
-std::unique_ptr<Pass> createFusionOfTensorOpsPass();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createFusionOfTensorOpsPass(bool fuseMultiUse = false,
+                            unsigned multiUseFusionIteration = 2);
 
 // Infers and inserts util.numeric.optional_narrow ops at points that may be
 // beneficial.
@@ -140,7 +143,14 @@ std::unique_ptr<Pass> createVerifyInputLegalityPass();
 // Pass to perform dispatch of Linalg on tensor ops by tiling and distribution.
 // A dispatch region is created for each tiled loop nest.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createDispatchLinalgOnTensorsPass();
+createDispatchLinalgOnTensorsPass(bool aggressiveFusion = false);
+
+// Pass to perform dispatch of Linalg on tensor ops by tiling and distribution.
+// A dispatch region is created for each tiled loop nest. (First create
+// DispatchRegionOps, then DispatchWorkgroupsOps.)
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createDispatchLinalgOnTensorsViaRegionOpsPass(
+    bool generateWorkloadRegion = true);
 
 // Pass to perform dispatch of Linalg on tensor ops by using the transform
 // dialect. Dispatch regions are created as specified by the transform module

@@ -36,21 +36,15 @@ struct LLVMGPUDistributePass
     if (!isEntryPoint(funcOp)) return;
 
     auto workgroupSize = llvm::to_vector(llvm::map_range(
-        getEntryPoint(funcOp)->getWorkgroupSize().getValue(),
+        getEntryPoint(funcOp)->getWorkgroupSize().value(),
         [&](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
-    SmallVector<scf::ForeachThreadOp> foreachOps;
-    funcOp.walk([&](scf::ForeachThreadOp foreachOp) {
-      foreachOps.push_back(foreachOp);
-    });
-    for (scf::ForeachThreadOp op : foreachOps) {
-      IRRewriter rewriter(op->getContext());
-      rewriter.setInsertionPoint(op);
-      if (failed(
-              rewriteForeachThreadToGpu(op, workgroupSize, rewriter,
-                                        /*syncAfterDistributefalse=*/false))) {
-        return signalPassFailure();
-      }
-    }
+
+    IRRewriter rewriter(funcOp->getContext());
+    rewriter.setInsertionPoint(funcOp);
+    auto walkResult = mlir::linalg::rewriteMapNestedForeachThreadToGpuThreads(
+        rewriter, funcOp, workgroupSize, false);
+
+    if (walkResult.wasInterrupted()) return signalPassFailure();
   }
 };
 }  // namespace

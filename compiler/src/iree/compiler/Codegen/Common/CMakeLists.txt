@@ -145,20 +145,24 @@ iree_cc_library(
 iree_cc_library(
   NAME
     Common
+  HDRS
+    "LinalgOpInfo.h"
+    "UserConfig.h"
   SRCS
     "DecomposeLinalgGeneric.cpp"
     "FoldAffineMinInDistributedLoops.cpp"
     "GPUDistributeSharedMemoryCopy.cpp"
     "GPUPipelining.cpp"
     "GPUVectorization.cpp"
+    "LinalgOpInfo.cpp"
     "MemrefCopyToLinalg.cpp"
     "PadDynamicAlloc.cpp"
     "RemoveTrivialLoops.cpp"
     "TestPartitionableLoopsInterface.cpp"
     "TileAndDistributeToWorkgroupsPass.cpp"
     "TileDispatchUsingInterface.cpp"
+    "UserConfig.cpp"
     "VectorReductionToGPU.cpp"
-    "VectorizeConv.cpp"
     "WorkGroupSwizzle.cpp"
   DEPS
     ::CommonPasses

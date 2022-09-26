@@ -17,6 +17,11 @@
 namespace iree {
 namespace {
 
+std::ostream& operator<<(std::ostream& os, const Status& x) {
+  os << x.ToString();
+  return os;
+}
+
 using ::iree::testing::status::StatusIs;
 using ::testing::HasSubstr;
 

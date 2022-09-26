@@ -18,6 +18,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "link_executables.mlir",
             "lower_linalg_microkernels.mlir",
         ],
         include = ["*.mlir"],

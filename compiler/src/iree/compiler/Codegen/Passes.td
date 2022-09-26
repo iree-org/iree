@@ -124,14 +124,6 @@ def RemoveSingleIterationLoop :
   let constructor = "mlir::iree_compiler::createRemoveSingleIterationLoopPass()";
 }
 
-// TODO: Rename argument to be fully qualified.
-def LinalgToVectorVectorizeConv :
-    Pass<"iree-codegen-vectorize-linalg-conv", "func::FuncOp"> {
-  let summary = "Vectorize a very specific form of linalg.conv";
-  let constructor =
-      "mlir::iree_compiler::createLinalgToVectorVectorizeConvPass()";
-}
-
 def TensorToVectorVectorizePad :
     Pass<"iree-codegen-vectorize-tensor-pad", "func::FuncOp"> {
   let summary = "Vectorize a very specific form of tensor.pad with "
@@ -163,6 +155,11 @@ def GPUDistributeSharedMemoryCopy :
 def GPUPipelining : Pass<"iree-gpu-pipelining", "func::FuncOp"> {
   let summary = "Pass to do software pipelining.";
   let constructor = "mlir::iree_compiler::createGPUPipeliningPass()";
+  let options = [
+    Option<"epiloguePeeling", "epilogue-peeling", "bool",
+            /*default=*/"true",
+           "Try to use un-peeling epilogue when false, peeled epilouge o.w.">,
+  ];
 }
 
 def WorkGroupSwizzle :
@@ -300,6 +297,12 @@ def VectorContractCustomKernels :
             /*default=*/"false",
            "Use intrinsics over inline assembly where applicable">,
   ];
+}
+
+def LLVMCPULinkExecutables :
+    Pass<"iree-llvmcpu-link-executables", "mlir::ModuleOp"> {
+  let summary = "Links LLVMCPU HAL executables within the top-level program module.";
+  let constructor = "mlir::iree_compiler::createLLVMCPULinkExecutablesPass()";
 }
 
 //------------------------------------------------------------------------------
@@ -471,6 +474,12 @@ def VMVXLowerLinalgMicrokernels :
            /*default=*/"false",
            "Warns on any unconverted linalg ops which remain live">
   ];
+}
+
+def VMVXLinkExecutables :
+    Pass<"iree-vmvx-link-executables", "mlir::ModuleOp"> {
+  let summary = "Links VMVX HAL executables within the top-level program module.";
+  let constructor = "mlir::iree_compiler::createVMVXLinkExecutablesPass()";
 }
 
 //------------------------------------------------------------------------------

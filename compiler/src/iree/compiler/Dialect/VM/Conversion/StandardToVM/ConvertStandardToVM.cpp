@@ -804,6 +804,9 @@ class ZeroExtendIOpConversion : public OpConversionPattern<arith::ExtUIOp> {
     } else if (srcType.isInteger(8) && dstType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::ExtI8I32UOp>(srcOp, dstType,
                                                          adaptor.getIn());
+    } else if (srcType.isInteger(8) && dstType.isInteger(64)) {
+      rewriter.replaceOpWithNewOp<IREE::VM::ExtI8I64UOp>(srcOp, dstType,
+                                                         adaptor.getIn());
     } else if (srcType.isInteger(16) && dstType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::ExtI16I32UOp>(srcOp, dstType,
                                                           adaptor.getIn());
@@ -811,8 +814,6 @@ class ZeroExtendIOpConversion : public OpConversionPattern<arith::ExtUIOp> {
       rewriter.replaceOpWithNewOp<IREE::VM::ExtI32I64UOp>(srcOp, dstType,
                                                           adaptor.getIn());
     } else {
-      // TODO(benvanik): we should be building a sequence of extensions for
-      // things like i8 -> i64.
       return rewriter.notifyMatchFailure(srcOp, "unsupported zero extension");
     }
     return success();

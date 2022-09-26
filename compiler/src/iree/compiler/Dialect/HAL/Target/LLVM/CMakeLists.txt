@@ -51,6 +51,7 @@ iree_cc_library(
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::HAL::Target::LLVM::Builtins
+    iree::compiler::Utils
   PUBLIC
 )
 
@@ -99,6 +100,7 @@ iree_cc_library(
   DEPS
     LLVMSupport
     iree::compiler::Dialect::HAL::Target::LLVM::internal::LinkerTools_internal
+    iree::compiler::Utils
   PUBLIC
 )
 

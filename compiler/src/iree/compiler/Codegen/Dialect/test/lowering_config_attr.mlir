@@ -2,16 +2,6 @@
 
 module {
   func.func @test() attributes {
-      lowring_config = #iree_codegen.translation_info<CPUDefault workload_per_wg = [32, 42]>} {
-    return
-  }
-}
-// CHECK: #translation = #iree_codegen.translation_info<CPUDefault workload_per_wg = [32, 42]>
-
-// -----
-
-module {
-  func.func @test() attributes {
       translation_info = #iree_codegen.translation_info<CPUDefault>} {
     return
   }

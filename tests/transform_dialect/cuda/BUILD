@@ -26,7 +26,7 @@ endif()
 iree_lit_test_suite(
     name = "lit",
     srcs = [
-        # "reduction.mlir", // see #10398
+        "reduction.mlir",
         "softmax.mlir",
     ],
     cfg = "//tests:lit.cfg.py",
@@ -34,8 +34,9 @@ iree_lit_test_suite(
     # they need to be included as data.
     data = [
         "reduction_codegen_spec.mlir",
-        "reduction_dispatch_spec.mlir",
         "softmax_codegen_spec.mlir",
+        # FIXME: This cannot be retired yet as there is some writeonly vs readwrite
+        # issue and we even end up emitting out of bounds accesses.
         "softmax_dispatch_spec.mlir",
         "softmax_fused_codegen_spec.mlir",
     ],

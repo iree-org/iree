@@ -26,6 +26,8 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
+#include "mlir/Dialect/SCF/Utils/Utils.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -186,7 +188,7 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
     }
 
     {  // Tile reduction dimensions.
-      RewritePatternSet tilingPatterns(&getContext());
+      RewritePatternSet tilingPatterns(context);
       populateTilingReductionPatterns(tilingPatterns);
       if (failed(applyPatternsAndFoldGreedily(funcOp,
                                               std::move(tilingPatterns)))) {
@@ -214,6 +216,53 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
       });
     }
 
+    {  // Tile convolution output window dimension by 1 to prepare downsizing.
+      SmallVector<linalg::ConvolutionOpInterface, 1> convOps;
+      funcOp.walk([&convOps](linalg::ConvolutionOpInterface convOp) {
+        convOps.push_back(convOp);
+      });
+      for (linalg::ConvolutionOpInterface convOp : convOps) {
+        auto consumerOp = cast<linalg::LinalgOp>(*convOp);
+        OpBuilder builder(context);
+        SmallVector<int64_t> tileSizes = getTileSizes(consumerOp, 3);
+        auto identityLoopOrder =
+            llvm::to_vector<4>(llvm::seq<int64_t>(0, tileSizes.size()));
+
+        FailureOr<linalg::TileLoopNest> loopNest =
+            linalg::tileConsumerAndFuseProducers(builder, consumerOp, tileSizes,
+                                                 identityLoopOrder, llvm::None);
+        if (failed(loopNest)) {
+          consumerOp.emitOpError("failed tiling and fusing producers");
+          return signalPassFailure();
+        }
+
+        consumerOp->replaceAllUsesWith(loopNest->getRootOpReplacementResults());
+
+        // Fully unroll the generated loop. This allows us to remove the loop
+        // for parallel output window dimension, so it helps future vector
+        // transformations.
+        if (!loopNest->getLoopOps().empty()) {
+          assert(loopNest->getLoopOps().size() == 1);
+          scf::ForOp loopOp = loopNest->getLoopOps().front();
+          IntegerAttr ub;
+          if (!matchPattern(loopOp.getUpperBound(), m_Constant(&ub))) {
+            loopOp.emitOpError("upper bound should be a constant");
+            return signalPassFailure();
+          }
+          if (failed(mlir::loopUnrollByFactor(loopOp, ub.getInt()))) {
+            loopOp.emitOpError("failed unrolling by factor 1");
+            return signalPassFailure();
+          }
+        }
+
+        LLVM_DEBUG({
+          llvm::dbgs() << "--- After tiling convolution output window ---\n";
+          funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+          llvm::dbgs() << "\n\n";
+        });
+      }
+    }
+
     {
       RewritePatternSet patterns(context);
       populateConcretizePadResultShapePatterns(context, patterns);
@@ -221,6 +270,26 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
 
       LLVM_DEBUG({
         llvm::dbgs() << "--- After tiling canonicalization ---\n";
+        funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+        llvm::dbgs() << "\n\n";
+      });
+    }
+
+    {  // Downsize n-D (n > 1) convolutions to 1-D.
+      RewritePatternSet patterns(context);
+      linalg::populateDecomposeConvolutionPatterns(patterns);
+      // Downsizing creates consecutive extract/insert slice ops. Merge them.
+      tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
+      // Pull in patterns to fold constant insert/extract slice op parameters.
+      tensor::InsertSliceOp::getCanonicalizationPatterns(patterns, context);
+      tensor::ExtractSliceOp::getCanonicalizationPatterns(patterns, context);
+      // Pull in scf.for op canonicalization patterns to help hoisting across
+      // multiple loops and remove loop carried values unused in the body.
+      scf::ForOp::getCanonicalizationPatterns(patterns, context);
+      (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+
+      LLVM_DEBUG({
+        llvm::dbgs() << "--- After Downsizing N-D convolution to 1-D  ---\n";
         funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
         llvm::dbgs() << "\n\n";
       });

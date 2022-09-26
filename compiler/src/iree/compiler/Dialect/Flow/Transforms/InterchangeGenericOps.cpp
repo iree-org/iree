@@ -35,7 +35,7 @@ struct GenericOpInterchangePattern
     unsigned numParallelLoop = genericOp.getNumParallelLoops();
     if (numParallelLoop == 0) return failure();
     for (auto iter : llvm::enumerate(genericOp.iterator_types())) {
-      if (isParallelIterator(iter.value())) {
+      if (linalg::isParallelIterator(iter.value())) {
         interchange.push_back(iter.index());
         if (iter.index() >= numParallelLoop) needInterchange = true;
       }
@@ -43,7 +43,7 @@ struct GenericOpInterchangePattern
     // If all the parallel loops are outter loops skip the pattern.
     if (!needInterchange) return failure();
     for (auto iter : llvm::enumerate(genericOp.iterator_types())) {
-      if (isReductionIterator(iter.value())) {
+      if (linalg::isReductionIterator(iter.value())) {
         interchange.push_back(iter.index());
       }
     }
