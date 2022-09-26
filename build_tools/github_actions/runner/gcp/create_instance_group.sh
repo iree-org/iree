@@ -15,7 +15,7 @@
 set -euo pipefail
 
 # For now, just change these parameters
-VERSION=deadbeef12-2022-08-23-1661292386
+VERSION=7138511883-62g-testing
 REGION=us-west1
 ZONES=us-west1-a,us-west1-b,us-west1-c
 AUTOSCALING=1
@@ -23,8 +23,8 @@ GROUP=presubmit
 TYPE=cpu
 # For GPU groups, these should both be set to the target group size, as
 # autoscaling currently does not work for these.
-MIN_SIZE=1
-MAX_SIZE=10
+MIN_SIZE=3
+MAX_SIZE=3
 # Whether this is a testing MIG (i.e. not prod)
 TESTING=1
 
@@ -48,6 +48,7 @@ function create_mig() {
     --zones="${ZONES}"
     --region="${REGION}"
     --target-distribution-shape=EVEN
+    --health-check=http-8080-ok
   )
 
   (set -x; gcloud beta compute instance-groups managed create "${create_args[@]}")
