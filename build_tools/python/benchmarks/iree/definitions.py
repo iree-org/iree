@@ -56,7 +56,7 @@ class Linux_x86_64_Benchmarks(object):
              List[iree_definitions.E2EModelRunConfig]]:
     """Generates IREE compile and run configs."""
 
-    default_run_configs = cls._generate_default_run_configs()
+    default_execution_configs = cls._generate_default_execution_configs()
 
     model_compile_configs = [
         iree_definitions.ModelCompileConfig(
@@ -65,18 +65,17 @@ class Linux_x86_64_Benchmarks(object):
     ]
     e2e_model_run_configs = _generate_e2e_model_run_configs(
         model_compile_configs=model_compile_configs,
-        vmfb_execution_configs=default_run_configs,
+        vmfb_execution_configs=default_execution_configs,
         device_spec=linux_x86_64_specs.GCP_C2_STANDARD_16)
 
     return (model_compile_configs, e2e_model_run_configs)
 
   @staticmethod
-  def _generate_default_run_configs(
+  def _generate_default_execution_configs(
   ) -> List[iree_definitions.VMFBExecutionConfig]:
     vmfb_execution_configs = [
-        # Local-sync run config.
         iree_definitions.VMFBExecutionConfig(
-            id=unique_ids.IREE_RUN_CONFIG_LOCAL_SYNC,
+            id=unique_ids.IREE_VMFB_EXECUTION_CONFIG_LOCAL_SYNC,
             tags=["full-inference", "default-flags"],
             loader=iree_definitions.RuntimeLoader.EMBEDDED_ELF,
             driver=iree_definitions.RuntimeDriver.LOCAL_SYNC,
@@ -85,7 +84,8 @@ class Linux_x86_64_Benchmarks(object):
     for thread_num in [1, 4, 8]:
       vmfb_execution_configs.append(
           iree_definitions.VMFBExecutionConfig(
-              id=f"{unique_ids.IREE_RUN_CONFIG_LOCAL_TASK_BASE}_{thread_num}",
+              id=
+              f"{unique_ids.IREE_VMFB_EXECUTION_CONFIG_LOCAL_TASK_BASE}_{thread_num}",
               tags=[f"{thread_num}-thread", "full-inference", "default-flags"],
               loader=iree_definitions.RuntimeLoader.EMBEDDED_ELF,
               driver=iree_definitions.RuntimeDriver.LOCAL_TASK,
