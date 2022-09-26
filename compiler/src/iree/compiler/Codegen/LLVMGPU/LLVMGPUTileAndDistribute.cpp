@@ -216,7 +216,7 @@ static void populatePromotionPatterns(MLIRContext *context,
           .addFilter(filterFunction));
 }
 
-static bool propagateIntoProducer(memref::CopyOp copyOp) {
+static bool propagateCopyDestIntoProducerFill(memref::CopyOp copyOp) {
   // Look for a fill Op writing into the copyOp source.
   Operation *prevOp = copyOp->getPrevNode();
   while (prevOp) {
@@ -238,23 +238,24 @@ static bool propagateIntoProducer(memref::CopyOp copyOp) {
 
 // Split input/output operand from copy from shared memory into a separate
 // input.
-static void mergeCopySourceIntoGeneric(Value source, linalg::GenericOp op) {
+static void insertInputValueIntoGeneric(Value source, linalg::GenericOp op) {
   SmallVector<Value> newOperands;
   SmallVector<AffineMap> maps;
-  for (auto in : op.getInputOperands()) {
+  for (OpOperand *in : op.getInputOperands()) {
     newOperands.push_back(in->get());
     maps.push_back(op.getTiedIndexingMap(in));
   }
   newOperands.push_back(source);
-  maps.push_back(op.getTiedIndexingMap(*op.getOutputOperands().begin()));
-  maps.push_back(op.getTiedIndexingMap(*op.getOutputOperands().begin()));
+  assert(op.getNumOutputs() == 1);
+  OpOperand *outOperand = op.getOutputOperand(0);
+  maps.push_back(op.getTiedIndexingMap(outOperand));
+  maps.push_back(op.getTiedIndexingMap(outOperand));
   Location loc = op.getLoc();
   SmallVector<StringRef> iterTypes(op.getNumLoops(),
                                    getParallelIteratorTypeName());
   OpBuilder builder(op);
   auto newOp = builder.create<linalg::GenericOp>(
-      loc, newOperands, (*op.getOutputOperands().begin())->get(), maps,
-      iterTypes);
+      loc, newOperands, outOperand->get(), maps, iterTypes);
   newOp.getRegion().getBlocks().splice(newOp.getRegion().begin(),
                                        op.getRegion().getBlocks());
 
@@ -263,9 +264,10 @@ static void mergeCopySourceIntoGeneric(Value source, linalg::GenericOp op) {
   setMarker(newOp, getCopyToWorkgroupMemoryMarker());
 }
 
-/// Propagate the shared memory copy into the consumer.
-static bool propagateIntoConsumer(memref::CopyOp copyOp,
-                                  SmallVector<Operation *> &toDelete) {
+/// Propagate the shared memory copy into the consumer op if it's a fully
+/// parallel linalg.generic.
+static bool propagateCopySourceIntoConsumerGeneric(
+    memref::CopyOp copyOp, SmallVector<Operation *> &toDelete) {
   // Look for a generic Op reading the copyOp target.
   Operation *nextOp = copyOp->getNextNode();
   while (nextOp) {
@@ -274,11 +276,11 @@ static bool propagateIntoConsumer(memref::CopyOp copyOp,
       continue;
     }
     auto consumer = dyn_cast<linalg::GenericOp>(nextOp);
-    if (!consumer || consumer.outputs().size() != 1 ||
-        consumer.getNumLoops() != consumer.getNumParallelLoops())
+    if (!consumer || consumer.getNumOutputs() != 1 ||
+        !consumer.getTiedIndexingMap(consumer.getOutputOperand(0)).isIdentity())
       break;
     if (*consumer.outputs().begin() != copyOp.getTarget()) break;
-    mergeCopySourceIntoGeneric(copyOp.getSource(), consumer);
+    insertInputValueIntoGeneric(copyOp.getSource(), consumer);
     toDelete.push_back(consumer);
     return true;
   }
@@ -293,8 +295,8 @@ static void propagateSharedMemCopy(func::FuncOp funcOp) {
   SmallVector<Operation *> toDelete;
   funcOp.walk([&toDelete](memref::CopyOp copyOp) {
     if (hasMarker(copyOp, getCopyToWorkgroupMemoryMarker())) {
-      if (propagateIntoProducer(copyOp) ||
-          propagateIntoConsumer(copyOp, toDelete))
+      if (propagateCopyDestIntoProducerFill(copyOp) ||
+          propagateCopySourceIntoConsumerGeneric(copyOp, toDelete))
         toDelete.push_back(copyOp.getOperation());
     }
   });
