@@ -449,6 +449,9 @@ jobs:
               ./build_tools/scripts/check_vulkan.sh
               build_tools/cmake/run_tf_tests.sh ${BUILD_DIR}"
 
+  ############################# Model Coverage #################################
+  # Jobs that test IREE performance on a set of models.
+  ##############################################################################
   test_shark_model_suite:
     needs: [setup, build_all, build_tf_integrations]
     if: needs.setup.outputs.should-run == 'true'
@@ -701,6 +704,9 @@ jobs:
       - build_tf_integrations
       - test_tf_integrations
       - test_tf_integrations_gpu
+
+      # Model Coverage
+      - test_shark_model_suite
 
       # Configurations
       - asan
