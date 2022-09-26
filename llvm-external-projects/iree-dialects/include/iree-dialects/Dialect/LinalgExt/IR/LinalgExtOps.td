@@ -444,12 +444,12 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
 ]>{
   let summary = "pack operation"; 
   let description = [{
-    The pack operation takes as input an array of dimensions to tile. Each
-    element in the array indexes a specific dimension that will be tiled
-    accordingly to the tile factor provided. A tile factor can either be a constant
-    or an index type. We handle only full tiles now; it is UB  if the tile does not
-    perfectly divide the dimension. We will relax this constraint in the future
-    when we add pad semantics to the operation.
+    The pack operation takes a shaped type as input, tiles, and transposes it
+    based on `dims_pos` and `inner_tiles`. The former carries the indices of the
+    dimension to tile, while the latter the tiling factor. A tile factor can
+    either be a constant or an index type. We handle only full tiles now; it is UB
+    if the tile does not perfectly divide the dimension. We will relax this
+    constraint in the future when we add pad semantics to the operation.
   }];
 
   let arguments = (ins Variadic<AnyShaped>:$inputs,

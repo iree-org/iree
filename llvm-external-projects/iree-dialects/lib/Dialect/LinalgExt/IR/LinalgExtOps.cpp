@@ -1518,13 +1518,9 @@ static SmallVector<T> interchange(ArrayRef<T> elements,
   return rearrangedElements;
 }
 
-// Infer result/output type given the input and the tile sizes. Take
-// into account the optional interchange.
+// Infer result/output type given the input and the tile sizes.
 ShapedType PackOp::inferResultType() {
-
-  // bind the dimension to tile with the tile factor.
   DenseMap<int64_t, int64_t> tileAndPosMapping = getDimAndStaticTileMapping();
-
   SmallVector<int64_t> inferredShape;
   inferredShape.reserve(getOutputRank());
   ShapedType inputType = getInputType();
@@ -1717,7 +1713,7 @@ DenseMap<int64_t, OpFoldResult> PackOp::getDimAndTileMapping() {
   SmallVector<OpFoldResult> tiles = getMixedTiles();
   assert(tiles.size() == dimsToBlock.size() &&
          "tiles must match indices of dimension to block");
-  // bind the dimension to tile with the tile factor.
+  // bind the dimension with the tile factor.
   for (auto i : llvm::seq<int64_t>(0, dimsToBlock.size()))
     dimAndTileMapping[dimsToBlock[i]] = tiles[i];
   return dimAndTileMapping;
@@ -1735,7 +1731,7 @@ DenseMap<int64_t, int64_t> PackOp::getDimAndStaticTileMapping() {
 
   assert(staticTiles.size() == indicesOfBlockedDims.size() &&
          "tiles must match indices of dimension to block");
-  // bind the dimension to tile with the tile factor.
+  // bind the dimension with the tile factor.
   DenseMap<int64_t, int64_t> tileAndPosMapping;
   for (auto i : llvm::seq<int64_t>(0, indicesOfBlockedDims.size()))
     tileAndPosMapping[indicesOfBlockedDims[i]] = staticTiles[i];
