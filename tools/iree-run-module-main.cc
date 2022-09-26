@@ -7,7 +7,6 @@
 #include <array>
 #include <cstdio>
 #include <cstdlib>
-#include <iostream>
 #include <iterator>
 #include <string>
 #include <utility>
@@ -132,7 +131,7 @@ iree_status_t Run(int* out_exit_code) {
   IREE_RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr, 16,
                                            host_allocator, &outputs));
 
-  std::cout << "EXEC @" << function_name << "\n";
+  printf("EXEC @%s\n", function_name.c_str());
   IREE_RETURN_IF_ERROR(
       iree_vm_invoke(context, function, IREE_VM_INVOCATION_FLAG_NONE,
                      /*policy=*/nullptr, inputs.get(), outputs.get(),
@@ -156,10 +155,9 @@ iree_status_t Run(int* out_exit_code) {
 
     // Compare expected vs actual lists and output diffs.
     bool did_match = iree_tooling_compare_variant_lists(
-        expected_list.get(), outputs.get(), host_allocator, &std::cout);
+        expected_list.get(), outputs.get(), host_allocator, stdout);
     if (did_match) {
-      std::cout
-          << "[SUCCESS] all function outputs matched their expected values.\n";
+      printf("[SUCCESS] all function outputs matched their expected values.\n");
     }
     *out_exit_code = did_match ? EXIT_SUCCESS : EXIT_FAILURE;
   }
@@ -188,9 +186,10 @@ extern "C" int main(int argc, char** argv) {
   if (argc > 1) {
     // Avoid iree-run-module spinning endlessly on stdin if the user uses single
     // dashes for flags.
-    std::cout << "[ERROR] unexpected positional argument (expected none)."
-                 " Did you use pass a flag with a single dash ('-')?"
-                 " Use '--' instead.\n";
+    printf(
+        "[ERROR] unexpected positional argument (expected none)."
+        " Did you use pass a flag with a single dash ('-')?"
+        " Use '--' instead.\n");
     return 1;
   }
 

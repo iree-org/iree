@@ -251,31 +251,15 @@ static bool iree_tooling_compare_variants(int result_index,
   return false;
 }
 
-static bool iree_tooling_compare_variants_to_stream(
-    int result_index, iree_vm_variant_t expected_variant,
-    iree_vm_variant_t actual_variant, iree_allocator_t host_allocator,
-    iree_host_size_t max_element_count, std::ostream* os) {
-  iree_string_builder_t builder;
-  iree_string_builder_initialize(host_allocator, &builder);
-  bool did_match = iree_tooling_compare_variants(result_index, expected_variant,
-                                                 actual_variant, host_allocator,
-                                                 max_element_count, &builder);
-  os->write(iree_string_builder_buffer(&builder),
-            iree_string_builder_size(&builder));
-  iree_string_builder_deinitialize(&builder);
-  return did_match;
-}
-
-bool iree_tooling_compare_variant_lists(iree_vm_list_t* expected_list,
-                                        iree_vm_list_t* actual_list,
-                                        iree_allocator_t host_allocator,
-                                        std::ostream* os) {
+bool iree_tooling_compare_variant_lists_and_append(
+    iree_vm_list_t* expected_list, iree_vm_list_t* actual_list,
+    iree_allocator_t host_allocator, iree_string_builder_t* builder) {
   IREE_TRACE_SCOPE();
 
   if (iree_vm_list_size(expected_list) != iree_vm_list_size(actual_list)) {
-    *os << "[FAILED] expected " << iree_vm_list_size(expected_list)
-        << " list elements but " << iree_vm_list_size(actual_list)
-        << " provided\n";
+    IREE_CHECK_OK(iree_string_builder_append_format(
+        builder, "[FAILED] expected %zu list elements but %zu provided\n",
+        iree_vm_list_size(expected_list), iree_vm_list_size(actual_list)));
     return false;
   }
 
@@ -286,11 +270,25 @@ bool iree_tooling_compare_variant_lists(iree_vm_list_t* expected_list,
         iree_vm_list_get_variant(expected_list, i, &expected_variant));
     iree_vm_variant_t actual_variant = iree_vm_variant_empty();
     IREE_CHECK_OK(iree_vm_list_get_variant(actual_list, i, &actual_variant));
-    bool did_match = iree_tooling_compare_variants_to_stream(
+    bool did_match = iree_tooling_compare_variants(
         (int)i, expected_variant, actual_variant, host_allocator,
-        /*max_element_count=*/1024, os);
+        /*max_element_count=*/1024, builder);
     if (!did_match) all_match = false;
   }
 
+  return all_match;
+}
+
+bool iree_tooling_compare_variant_lists(iree_vm_list_t* expected_list,
+                                        iree_vm_list_t* actual_list,
+                                        iree_allocator_t host_allocator,
+                                        FILE* file) {
+  iree_string_builder_t builder;
+  iree_string_builder_initialize(host_allocator, &builder);
+  bool all_match = iree_tooling_compare_variant_lists_and_append(
+      expected_list, actual_list, host_allocator, &builder);
+  fwrite(iree_string_builder_buffer(&builder), 1,
+         iree_string_builder_size(&builder), file);
+  iree_string_builder_deinitialize(&builder);
   return all_match;
 }
