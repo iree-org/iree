@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='iree-hal-transformation-pipeline{serialize-executables=false},canonicalize' --mlir-print-local-scope --iree-vm-target-index-bits=32 %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='iree-hal-transformation-pipeline{serialize-executables=false},canonicalize' --iree-vm-target-index-bits=64 --mlir-print-local-scope %s | FileCheck %s
 
 module attributes {
   hal.device.targets = [
@@ -50,27 +50,27 @@ stream.executable public @add_dispatch_0 {
 //  CHECK-NEXT:         vm.func private @add_dispatch_0(
 //  CHECK-SAME:             %[[SCRATCHPAD:.+]]: !vm.buffer, %[[CONSTANTS:.+]]: !vm.buffer,
 //  CHECK-SAME:             %[[BINDINGS:.+]]: !vm.list<!vm.buffer>
-//   CHECK-DAG:           %zero = vm.const.i32.zero
-//   CHECK-DAG:           %c1 = vm.const.i32 1
-//   CHECK-DAG:           %c2 = vm.const.i32 2
-//   CHECK-DAG:           %c4 = vm.const.i32 4
-//  CHECK-NEXT:           %[[LHS_BUF:.+]] = vm.list.get.ref %[[BINDINGS]], %zero : (!vm.list<!vm.buffer>, i32) -> !vm.buffer
-//  CHECK-NEXT:           %[[RHS_BUF:.+]] = vm.list.get.ref %[[BINDINGS]], %c1 : (!vm.list<!vm.buffer>, i32) -> !vm.buffer
-//  CHECK-NEXT:           %[[RET_BUF:.+]] = vm.list.get.ref %[[BINDINGS]], %c2 : (!vm.list<!vm.buffer>, i32) -> !vm.buffer
-//       CHECK:           vm.br ^bb1(%zero : i32)
-//  CHECK-NEXT:         ^bb1(%[[IDX:.+]]: i32):  // 2 preds: ^bb0, ^bb2
-//  CHECK-NEXT:           %slt = vm.cmp.lt.i32.s %[[IDX]], %{{.+}} : i32
+//   CHECK-DAG:           %[[C0_I32:.+]] = vm.const.i32.zero
+//   CHECK-DAG:           %[[C0_I64:.+]] = vm.const.i64.zero
+//   CHECK-DAG:           %[[C1_I32:.+]] = vm.const.i32 1
+//   CHECK-DAG:           %[[C1_I64:.+]] = vm.const.i64 1
+//   CHECK-DAG:           %[[C2_I32:.+]] = vm.const.i32 2
+//  CHECK-NEXT:           %[[LHS_BUF:.+]] = vm.list.get.ref %[[BINDINGS]], %[[C0_I32]] : (!vm.list<!vm.buffer>, i32) -> !vm.buffer
+//  CHECK-NEXT:           %[[RHS_BUF:.+]] = vm.list.get.ref %[[BINDINGS]], %[[C1_I32]] : (!vm.list<!vm.buffer>, i32) -> !vm.buffer
+//  CHECK-NEXT:           %[[RET_BUF:.+]] = vm.list.get.ref %[[BINDINGS]], %[[C2_I32]] : (!vm.list<!vm.buffer>, i32) -> !vm.buffer
+//       CHECK:           vm.br ^bb1(%[[C0_I64]] : i64)
+//  CHECK-NEXT:         ^bb1(%[[IDX:.+]]: i64):
+//  CHECK-NEXT:           %slt = vm.cmp.lt.i64.s %[[IDX]], %{{.+}} : i64
 //  CHECK-NEXT:           vm.cond_br %slt, ^bb2, ^bb3
-//  CHECK-NEXT:         ^bb2:  // pred: ^bb1
-//       CHECK:           %[[BYTE_OFFSET_32:.+]] = vm.mul.i32 %{{.+}}, %c4 : i32
-//  CHECK-NEXT:           %[[BYTE_OFFSET:.+]] = vm.ext.i32.i64.u %[[BYTE_OFFSET_32]]
-//  CHECK-NEXT:           %[[LHS:.+]] = vm.buffer.load.f32 %[[LHS_BUF]][%[[BYTE_OFFSET]]] : !vm.buffer -> f32
-//  CHECK-NEXT:           %[[RHS:.+]] = vm.buffer.load.f32 %[[RHS_BUF]][%[[BYTE_OFFSET]]] : !vm.buffer -> f32
+//  CHECK-NEXT:         ^bb2:
+//  CHECK-NEXT:           %[[ELEMENT_OFFSET:.+]] = vm.add.i64 %[[IDX]], %{{.+}}
+//  CHECK-NEXT:           %[[LHS:.+]] = vm.buffer.load.f32 %[[LHS_BUF]][%[[ELEMENT_OFFSET]]] : !vm.buffer -> f32
+//  CHECK-NEXT:           %[[RHS:.+]] = vm.buffer.load.f32 %[[RHS_BUF]][%[[ELEMENT_OFFSET]]] : !vm.buffer -> f32
 //  CHECK-NEXT:           %[[RET:.+]] = vm.add.f32 %[[LHS]], %[[RHS]] : f32
-//  CHECK-NEXT:           vm.buffer.store.f32 %[[RET]], %[[RET_BUF]][%[[BYTE_OFFSET]]] : f32 -> !vm.buffer
-//  CHECK-NEXT:           %[[NEXT_IDX:.+]] = vm.add.i32 %[[IDX]], %c1 : i32
-//  CHECK-NEXT:           vm.br ^bb1(%[[NEXT_IDX]] : i32)
-//  CHECK-NEXT:         ^bb3:  // pred: ^bb1
+//  CHECK-NEXT:           vm.buffer.store.f32 %[[RET]], %[[RET_BUF]][%[[ELEMENT_OFFSET]]] : f32 -> !vm.buffer
+//  CHECK-NEXT:           %[[NEXT_IDX:.+]] = vm.add.i64 %[[IDX]], %[[C1_I64]] : i64
+//  CHECK-NEXT:           vm.br ^bb1(%[[NEXT_IDX]] : i64)
+//  CHECK-NEXT:         ^bb3:
 //  CHECK-NEXT:           vm.return
 //  CHECK-NEXT:         }
 //  CHECK-NEXT:         vm.export @add_dispatch_0

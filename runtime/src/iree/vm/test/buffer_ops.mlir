@@ -417,24 +417,24 @@ vm.module @buffer_ops {
   vm.export @test_load_i16u attributes {emitc.exclude}
   vm.func private @test_load_i16u() {
     %c0 = vm.const.i64 0
+    %c1 = vm.const.i64 1
     %c2 = vm.const.i64 2
+    %c3 = vm.const.i64 3
     %c4 = vm.const.i64 4
-    %c6 = vm.const.i64 6
-    %c8 = vm.const.i64 8
     %rodata = vm.const.ref.rodata @test_load_i16_data : !vm.buffer
     %v0 = vm.buffer.load.i16.u %rodata[%c0] : !vm.buffer -> i32
     %e0 = vm.const.i32 0
     vm.check.eq %v0, %e0, "0" : i32
-    %v1 = vm.buffer.load.i16.u %rodata[%c2] : !vm.buffer -> i32
+    %v1 = vm.buffer.load.i16.u %rodata[%c1] : !vm.buffer -> i32
     %e1 = vm.const.i32 1
     vm.check.eq %v1, %e1, "1" : i32
-    %v2 = vm.buffer.load.i16.u %rodata[%c4] : !vm.buffer -> i32
+    %v2 = vm.buffer.load.i16.u %rodata[%c2] : !vm.buffer -> i32
     %e2 = vm.const.i32 0x7FFF
     vm.check.eq %v2, %e2, "0x7FFF" : i32
-    %v3 = vm.buffer.load.i16.u %rodata[%c6] : !vm.buffer -> i32
+    %v3 = vm.buffer.load.i16.u %rodata[%c3] : !vm.buffer -> i32
     %e3 = vm.const.i32 0x8000
     vm.check.eq %v3, %e3, "0x8000" : i32
-    %v4 = vm.buffer.load.i16.u %rodata[%c8] : !vm.buffer -> i32
+    %v4 = vm.buffer.load.i16.u %rodata[%c4] : !vm.buffer -> i32
     %e4 = vm.const.i32 0xFFFF
     vm.check.eq %v4, %e4, "0xFFFF" : i32
     vm.return
@@ -443,24 +443,24 @@ vm.module @buffer_ops {
   vm.export @test_load_i16s attributes {emitc.exclude}
   vm.func private @test_load_i16s() {
     %c0 = vm.const.i64 0
+    %c1 = vm.const.i64 1
     %c2 = vm.const.i64 2
+    %c3 = vm.const.i64 3
     %c4 = vm.const.i64 4
-    %c6 = vm.const.i64 6
-    %c8 = vm.const.i64 8
     %rodata = vm.const.ref.rodata @test_load_i16_data : !vm.buffer
     %v0 = vm.buffer.load.i16.s %rodata[%c0] : !vm.buffer -> i32
     %e0 = vm.const.i32 0
     vm.check.eq %v0, %e0, "0" : i32
-    %v1 = vm.buffer.load.i16.s %rodata[%c2] : !vm.buffer -> i32
+    %v1 = vm.buffer.load.i16.s %rodata[%c1] : !vm.buffer -> i32
     %e1 = vm.const.i32 1
     vm.check.eq %v1, %e1, "1" : i32
-    %v2 = vm.buffer.load.i16.s %rodata[%c4] : !vm.buffer -> i32
+    %v2 = vm.buffer.load.i16.s %rodata[%c2] : !vm.buffer -> i32
     %e2 = vm.const.i32 0x7FFF
     vm.check.eq %v2, %e2, "0x7FFF" : i32
-    %v3 = vm.buffer.load.i16.s %rodata[%c6] : !vm.buffer -> i32
+    %v3 = vm.buffer.load.i16.s %rodata[%c3] : !vm.buffer -> i32
     %e3 = vm.const.i32 -32768
     vm.check.eq %v3, %e3, "-32768" : i32
-    %v4 = vm.buffer.load.i16.s %rodata[%c8] : !vm.buffer -> i32
+    %v4 = vm.buffer.load.i16.s %rodata[%c4] : !vm.buffer -> i32
     %e4 = vm.const.i32 -1
     vm.check.eq %v4, %e4, "-1" : i32
     vm.return
@@ -471,42 +471,26 @@ vm.module @buffer_ops {
   vm.export @test_load_i32 attributes {emitc.exclude}
   vm.func private @test_load_i32() {
     %c0 = vm.const.i64 0
+    %c1 = vm.const.i64 1
+    %c2 = vm.const.i64 2
+    %c3 = vm.const.i64 3
     %c4 = vm.const.i64 4
-    %c8 = vm.const.i64 8
-    %c12 = vm.const.i64 12
-    %c16 = vm.const.i64 16
     %rodata = vm.const.ref.rodata @test_load_i32_data : !vm.buffer
     %v0 = vm.buffer.load.i32 %rodata[%c0] : !vm.buffer -> i32
     %e0 = vm.const.i32 0
     vm.check.eq %v0, %e0, "0" : i32
-    %v1 = vm.buffer.load.i32 %rodata[%c4] : !vm.buffer -> i32
+    %v1 = vm.buffer.load.i32 %rodata[%c1] : !vm.buffer -> i32
     %e1 = vm.const.i32 1
     vm.check.eq %v1, %e1, "1" : i32
-    %v2 = vm.buffer.load.i32 %rodata[%c8] : !vm.buffer -> i32
+    %v2 = vm.buffer.load.i32 %rodata[%c2] : !vm.buffer -> i32
     %e2 = vm.const.i32 0x7FFFFFFF
     vm.check.eq %v2, %e2, "0x7FFFFFFF" : i32
-    %v3 = vm.buffer.load.i32 %rodata[%c12] : !vm.buffer -> i32
+    %v3 = vm.buffer.load.i32 %rodata[%c3] : !vm.buffer -> i32
     %e3 = vm.const.i32 0x80000000
     vm.check.eq %v3, %e3, "0x80000000" : i32
-    %v4 = vm.buffer.load.i32 %rodata[%c16] : !vm.buffer -> i32
+    %v4 = vm.buffer.load.i32 %rodata[%c4] : !vm.buffer -> i32
     %e4 = vm.const.i32 0xFFFFFFFF
     vm.check.eq %v4, %e4, "0xFFFFFFFF" : i32
-    vm.return
-  }
-
-  vm.rodata private @test_load_i32_unaligned_data dense<[0x00112233, 0x44556677, 0x8899AABB, 0xCCDDEEFF]> : tensor<4xui32>
-
-  // Unaligned loads are not supported and offsets will be rounded down.
-  vm.export @test_load_i32_unaligned attributes {emitc.exclude}
-  vm.func private @test_load_i32_unaligned() {
-    %rodata = vm.const.ref.rodata @test_load_i32_unaligned_data : !vm.buffer
-
-    // Byte offset 5 rounded to byte offset 4 (element 1).
-    %c5 = vm.const.i64 5
-    %v1 = vm.buffer.load.i32 %rodata[%c5] : !vm.buffer -> i32
-    %e1 = vm.const.i32 0x44556677
-    vm.check.eq %v1, %e1, "0x44556677" : i32
-
     vm.return
   }
 
@@ -561,18 +545,18 @@ vm.module @buffer_ops {
     %c0 = vm.const.i64 0
     %e0 = vm.const.i32 0
     vm.buffer.store.i16 %e0, %buf_dno[%c0] : i32 -> !vm.buffer
-    %c2 = vm.const.i64 2
+    %c1 = vm.const.i64 1
     %e1 = vm.const.i32 1
-    vm.buffer.store.i16 %e1, %buf_dno[%c2] : i32 -> !vm.buffer
-    %c4 = vm.const.i64 4
+    vm.buffer.store.i16 %e1, %buf_dno[%c1] : i32 -> !vm.buffer
+    %c2 = vm.const.i64 2
     %e2 = vm.const.i32 0x7FFF
-    vm.buffer.store.i16 %e2, %buf_dno[%c4] : i32 -> !vm.buffer
-    %c6 = vm.const.i64 6
+    vm.buffer.store.i16 %e2, %buf_dno[%c2] : i32 -> !vm.buffer
+    %c3 = vm.const.i64 3
     %e3 = vm.const.i32 0x8000
-    vm.buffer.store.i16 %e3, %buf_dno[%c6] : i32 -> !vm.buffer
-    %c8 = vm.const.i64 8
+    vm.buffer.store.i16 %e3, %buf_dno[%c3] : i32 -> !vm.buffer
+    %c4 = vm.const.i64 4
     %e4 = vm.const.i32 0xFFFF
-    vm.buffer.store.i16 %e4, %buf_dno[%c8] : i32 -> !vm.buffer
+    vm.buffer.store.i16 %e4, %buf_dno[%c4] : i32 -> !vm.buffer
 
     %cmp = vm.buffer.compare %ref_dno, %c0, %buf_dno, %c0, %ref_length : !vm.buffer, !vm.buffer
     vm.check.nz %cmp, "source and target match" : i32
@@ -594,41 +578,21 @@ vm.module @buffer_ops {
     %c0 = vm.const.i64 0
     %e0 = vm.const.i32 0
     vm.buffer.store.i32 %e0, %buf_dno[%c0] : i32 -> !vm.buffer
-    %c4 = vm.const.i64 4
+    %c1 = vm.const.i64 1
     %e1 = vm.const.i32 1
-    vm.buffer.store.i32 %e1, %buf_dno[%c4] : i32 -> !vm.buffer
-    %c8 = vm.const.i64 8
+    vm.buffer.store.i32 %e1, %buf_dno[%c1] : i32 -> !vm.buffer
+    %c2 = vm.const.i64 2
     %e2 = vm.const.i32 0x7FFFFFFF
-    vm.buffer.store.i32 %e2, %buf_dno[%c8] : i32 -> !vm.buffer
-    %c12 = vm.const.i64 12
+    vm.buffer.store.i32 %e2, %buf_dno[%c2] : i32 -> !vm.buffer
+    %c3 = vm.const.i64 3
     %e3 = vm.const.i32 0x80000000
-    vm.buffer.store.i32 %e3, %buf_dno[%c12] : i32 -> !vm.buffer
-    %c16 = vm.const.i64 16
+    vm.buffer.store.i32 %e3, %buf_dno[%c3] : i32 -> !vm.buffer
+    %c4 = vm.const.i64 4
     %e4 = vm.const.i32 0xFFFFFFFF
-    vm.buffer.store.i32 %e4, %buf_dno[%c16] : i32 -> !vm.buffer
+    vm.buffer.store.i32 %e4, %buf_dno[%c4] : i32 -> !vm.buffer
 
     %cmp = vm.buffer.compare %ref_dno, %c0, %buf_dno, %c0, %ref_length : !vm.buffer, !vm.buffer
     vm.check.nz %cmp, "source and target match" : i32
-
-    vm.return
-  }
-
-  // Unaligned stores are not supported and offsets will be rounded down.
-  vm.export @test_store_i32_unaligned attributes {emitc.exclude}
-  vm.func private @test_store_i32_unaligned() {
-    %c12 = vm.const.i64 12
-    %buf = vm.buffer.alloc %c12 : !vm.buffer
-    %buf_dno = util.do_not_optimize(%buf) : !vm.buffer
-
-    // Byte offset 5 rounded to byte offset 4 (element 1).
-    %c5 = vm.const.i64 5
-    %e1 = vm.const.i32 0x44556677
-    vm.buffer.store.i32 %e1, %buf_dno[%c5] : i32 -> !vm.buffer
-
-    // Read back at offset 4 (where the data should be).
-    %c4 = vm.const.i64 4
-    %a1 = vm.buffer.load.i32 %buf_dno[%c4] : !vm.buffer -> i32
-    vm.check.eq %a1, %e1, "0x44556677" : i32
 
     vm.return
   }
