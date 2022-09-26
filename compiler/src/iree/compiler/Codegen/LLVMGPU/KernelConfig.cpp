@@ -557,6 +557,98 @@ static LogicalResult setTransposeConfig(func::FuncOp entryPoint,
       workgroupSize);
 }
 
+static LogicalResult setConvolutionConfig(linalg::LinalgOp linalgOp,
+                                          const int64_t subgroupSize,
+                                          const int64_t bestTilingFactor) {
+  if (!isa<linalg::Conv2DNhwcHwcfOp>(linalgOp)) {
+    return failure();
+  }
+  Type inputType = linalgOp.getInputOperand(0)->get().getType();
+  ArrayRef<int64_t> inputShape = inputType.cast<ShapedType>().getShape();
+  Type outputType = linalgOp.getOutputOperand(0)->get().getType();
+  ArrayRef<int64_t> outputShape = outputType.cast<ShapedType>().getShape();
+  if (ShapedType::isDynamic(inputShape[3]) ||
+      llvm::any_of(outputShape.drop_front(), ShapedType::isDynamic)) {
+    return failure();
+  }
+  int64_t oh = outputShape[1], ow = outputShape[2], oc = outputShape[3];
+  // The core idea is to distribute the convolution OH/OW/OC dimension to the
+  // workgroup Z/Y/X dimension, with each thread in a workgroup handling
+  // multiple vector elements. We try to 1) utilize all threads in a subgroup,
+  // and 2) handle an optimal tile size along each dimension.
+  int64_t residualThreads = subgroupSize;
+  int64_t residualTilingFactor = bestTilingFactor;
+  SmallVector<int64_t, 3> workgroupSize(3, 1);    // (X, Y, Z)
+  SmallVector<int64_t> workgroupTileSizes(4, 0);  // (N, OH, OW, OC)
+  // Deduce the configuration for the OC dimension.
+  for (int64_t x = residualThreads; x >= 2; x >>= 1) {
+    // Handle 4 elements per thread for the innermost dimension. We need this
+    // for vectorized load.
+    int64_t chosenTileSize = 4;
+    if (oc % (x * chosenTileSize) == 0) {
+      workgroupSize[0] = x;
+      workgroupTileSizes[3] = x * chosenTileSize;
+      residualThreads /= x;
+      residualTilingFactor /= chosenTileSize;
+      break;
+    }
+  }
+  if (workgroupTileSizes[3] == 0) return failure();
+  // Deduce the configruation for the OW and OH dimension. Try to make them even
+  // if possible given we typically have images with the same height and width.
+  bool tileToSquare = false;
+  unsigned log2Threads = llvm::Log2_64(residualThreads);
+  if (ow == oh && residualThreads != 1 && log2Threads % 2 == 0) {
+    int64_t yz = 1ll << (log2Threads / 2);
+    int64_t chosenTileSize = 1ll << (llvm::Log2_64(residualTilingFactor) / 2);
+    while (chosenTileSize >= 1 && ow % (yz * chosenTileSize) != 0) {
+      chosenTileSize >>= 1;
+    }
+    if (chosenTileSize != 0) {
+      workgroupSize[1] = workgroupSize[2] = yz;
+      workgroupTileSizes[2] = workgroupTileSizes[1] = yz * chosenTileSize;
+      tileToSquare = true;
+    }
+  }
+  // Otherwise treat OW and OH separately to allow them to have different number
+  // of threads and tiling size.
+  if (!tileToSquare) {
+    // Decide the tiling and distribution parameters for one dimension.
+    auto decideOneDim = [&](int64_t inputDim, int64_t &wgDimSize,
+                            int64_t &wgTileSize) {
+      for (int64_t dim = residualThreads; dim >= 1; dim >>= 1) {
+        int64_t chosenTileSize = 0;
+        for (int64_t t = residualTilingFactor; t >= 1; t >>= 1) {
+          if (inputDim % (dim * t) == 0) {
+            chosenTileSize = t;
+            break;
+          }
+        }
+        if (chosenTileSize) {
+          wgDimSize = dim;
+          wgTileSize = dim * chosenTileSize;
+          residualThreads /= dim;
+          residualTilingFactor /= chosenTileSize;
+          return true;
+        }
+      }
+      return false;
+    };
+    if (!decideOneDim(ow, workgroupSize[1], workgroupTileSizes[2]) ||
+        !decideOneDim(oh, workgroupSize[2], workgroupTileSizes[1])) {
+      return failure();
+    }
+  }
+  auto pipeline = IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorize;
+  TileSizesListType tileSizes;
+  // Add reduction tile sizes.
+  workgroupTileSizes.append({1, 1, 4});
+  tileSizes.push_back(workgroupTileSizes);
+  auto funcOp = linalgOp->getParentOfType<func::FuncOp>();
+  return setOpConfigAndEntryPointFnTranslation(funcOp, linalgOp, tileSizes,
+                                               pipeline, workgroupSize);
+}
+
 static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                    Operation *computeOp) {
   if (!clGPUCodegenTransformDialectTileSizes.empty()) {
@@ -582,6 +674,9 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
       return setContractConfig(entryPointFn, linalgOp);
     }
     if (succeeded(setWarpReductionConfig(entryPointFn, linalgOp))) {
+      return success();
+    }
+    if (succeeded(setConvolutionConfig(linalgOp, 32, 16))) {
       return success();
     }
     auto genericOp = dyn_cast<linalg::GenericOp>(computeOp);

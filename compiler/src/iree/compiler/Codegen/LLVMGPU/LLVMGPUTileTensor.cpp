@@ -17,6 +17,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 using mlir::iree_compiler::IREE::LinalgExt::TilingPatterns;
@@ -55,8 +56,9 @@ static void populateTilingReductionPatterns(RewritePatternSet &patterns) {
           StringAttr::get(context, getWorkgroupMemoryMarker())},
       StringAttr::get(context, getWorkgroupKTiledMarker()));
   filter.setMatchByDefault();
-  TilingPatterns<linalg::MatmulOp, linalg::BatchMatmulOp,
-                 linalg::GenericOp>::insert(patterns, tilingOptions, filter);
+  TilingPatterns<linalg::MatmulOp, linalg::BatchMatmulOp, linalg::GenericOp,
+                 linalg::Conv2DNhwcHwcfOp>::insert(patterns, tilingOptions,
+                                                   filter);
 }
 
 LogicalResult tileReduction(func::FuncOp funcOp) {
@@ -76,6 +78,8 @@ LogicalResult tileReduction(func::FuncOp funcOp) {
     RewritePatternSet wgTilingCanonicalizationPatterns =
         linalg::getLinalgTilingCanonicalizationPatterns(funcOp.getContext());
     populateAffineMinSCFCanonicalizationPattern(
+        wgTilingCanonicalizationPatterns);
+    scf::populateSCFForLoopCanonicalizationPatterns(
         wgTilingCanonicalizationPatterns);
     if (failed(applyPatternsAndFoldGreedily(
             funcOp, std::move(wgTilingCanonicalizationPatterns)))) {
@@ -147,6 +151,15 @@ struct LLVMGPUTileTensorPass
     auto funcOp = getOperation();
     if (!isEntryPoint(funcOp)) return;
 
+    if (failed(tileReduction(funcOp))) {
+      return signalPassFailure();
+    }
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "--- After tile reductions:";
+      funcOp.dump();
+    });
+
     auto workgroupSize = llvm::to_vector<4>(llvm::map_range(
         getEntryPoint(funcOp)->getWorkgroupSize().value(),
         [&](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
@@ -156,15 +169,6 @@ struct LLVMGPUTileTensorPass
 
     LLVM_DEBUG({
       llvm::dbgs() << "--- After second level of tiling";
-      funcOp.dump();
-    });
-
-    if (failed(tileReduction(funcOp))) {
-      return signalPassFailure();
-    }
-
-    LLVM_DEBUG({
-      llvm::dbgs() << "--- After tile reductions:";
       funcOp.dump();
     });
   }
