@@ -502,20 +502,26 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
       return getOutputType().cast<ShapedType>().getShape();
     }
 
+    // Return the input shape.
+    ArrayRef<int64_t> getInputShape() {
+      return getInputType().cast<ShapedType>().getShape();
+    }
+
     // Return the rank of the input operand.
     int64_t getInputRank() {
       return getInput().getType().cast<ShapedType>().getRank();
     }
 
-    // Return the tile sizes ad OpFoldResults.
+    // Return the tile sizes.
     SmallVector<OpFoldResult> getMixedTiles();
+    SmallVector<int64_t> getStaticTiles();
 
     // Infer the output type.
     ShapedType inferResultType();
 
     // Return a mapping from positions `dims_pos` to their tile factors.
     DenseMap<int64_t, OpFoldResult> getDimAndTileMapping();
-
+    DenseMap<int64_t, int64_t> getDimAndStaticTileMapping();
   }];
 }
 
