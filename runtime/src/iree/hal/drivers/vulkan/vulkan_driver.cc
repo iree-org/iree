@@ -549,6 +549,7 @@ static iree_status_t iree_hal_vulkan_driver_find_device_by_index(
 
   *found_physical_device = physical_device;
 
+  (void)visible_physical_devices;  // unused var if IREE_STATUS_MODE=0
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
