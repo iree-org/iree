@@ -58,14 +58,14 @@ class WGSLReplacePushConstantsPass
   }
 
   void runOnOperation() override {
-    auto parentOp = getOperation();
-    auto loc = parentOp.getLoc();
-    auto constantLoadOps = llvm::to_vector<4>(
-        parentOp.getOps<IREE::HAL::InterfaceConstantLoadOp>());
+    auto funcOp = getOperation();
+    auto loc = funcOp.getLoc();
+    auto constantLoadOps =
+        llvm::to_vector<4>(funcOp.getOps<IREE::HAL::InterfaceConstantLoadOp>());
     if (constantLoadOps.empty()) return;
 
-    OpBuilder builder(parentOp);
-    builder.setInsertionPointToStart(&parentOp.getBlocks().front());
+    OpBuilder builder(funcOp);
+    builder.setInsertionPointToStart(&funcOp.getBlocks().front());
 
     // Group all push constants into a single `hal.interface.binding.subspan`
     // and load from it once using `flow.dispatch.tensor.load`, then extract
@@ -90,7 +90,7 @@ class WGSLReplacePushConstantsPass
       }
     }
     auto maxConstantValue =
-        builder.createOrFold<arith::ConstantIndexOp>(loc, maxConstantIndex);
+        builder.create<arith::ConstantIndexOp>(loc, maxConstantIndex);
     mlir::IntegerAttr alignmentAttr = nullptr;
     // TODO(scotttodd): try llvm::all_equal with attrs directly
     if (!missingAlignmentValue && llvm::all_equal(alignmentValues)) {
