@@ -97,11 +97,12 @@ class WGSLReplacePushConstantsPass
       alignmentAttr = constantLoadOps[0].getAlignmentAttr();
     }
 
-    // hal.interface.binding.subspan -> !flow.dispatch.tensor<readonly:i32>
+    // hal.interface.binding.subspan -> !flow.dispatch.tensor<readonly:Nxi32>
     //   * Group all push constants into a single tensor<Nxi32>
     //   * If individual data types differ, they'll be bitcast when extracted
     auto dispatchTensorType = IREE::Flow::DispatchTensorType::get(
-        IREE::Flow::TensorAccess::ReadOnly, {}, builder.getI32Type());
+        IREE::Flow::TensorAccess::ReadOnly,
+        {static_cast<int64_t>(maxConstantIndex + 1)}, builder.getI32Type());
     SmallVector<Value> dynamicDims;
     // Note: we're ignoring all potential 'values' hints (if provided) on ops -
     // InterfaceBindingSubspanOp has no matching concept and we assume that any
