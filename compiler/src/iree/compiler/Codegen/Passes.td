@@ -116,7 +116,7 @@ def TileAndDistributeToWorkgroups :
 }
 
 def WorkgroupSpecialization :
-    Pass<"iree-codegen-workgroup-specialization", "func::FuncOp"> {
+    Pass<"iree-codegen-workgroup-specialization", "IREE::HAL::ExecutableVariantOp"> {
   let summary = "Specialize workgroup distribution loops";
   let constructor = "mlir::iree_compiler::createWorkgroupSpecializationPass()";
 }
