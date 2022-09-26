@@ -457,7 +457,7 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
     `dims_pos` `=` $dims_pos
     `inner_tiles` `=`
     custom<DynamicIndexList>($inner_tiles, $static_inner_tiles,
-                             "ShapedType::kDynamicStrideOrOffset")
+                             "ShapedType::kDynamicSize")
     `into` $outputs `:` `(` type($inputs) type($outputs) `)`
      (`->` type($results)^)?
   }];
