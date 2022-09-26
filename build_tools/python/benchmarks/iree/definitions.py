@@ -23,8 +23,7 @@ def _generate_e2e_model_run_configs(
     input_data: common_definitions.ModelInputData = common_definitions.
     RANDOM_MODEL_INPUT_DATA,
 ) -> List[iree_definitions.E2EModelRunConfig]:
-  """Generates the run specs from the product of compile specs and run configs.
-  """
+  """Generates the run configs from the product of compile configs and execution configs."""
   return [
       iree_definitions.E2EModelRunConfig(
           model_compile_config=model_compile_config,
@@ -55,7 +54,7 @@ class Linux_x86_64_Benchmarks(object):
       cls
   ) -> Tuple[List[iree_definitions.ModelCompileConfig],
              List[iree_definitions.E2EModelRunConfig]]:
-    """Generates IREE compile and run specs."""
+    """Generates IREE compile and run configs."""
 
     default_run_configs = cls._generate_default_run_configs()
 
@@ -97,5 +96,5 @@ class Linux_x86_64_Benchmarks(object):
 
 def generate() -> Tuple[List[iree_definitions.ModelCompileConfig],
                         List[iree_definitions.E2EModelRunConfig]]:
-  """Generates all compile and run specs for IREE benchmarks."""
+  """Generates all compile and run configs for IREE benchmarks."""
   return Linux_x86_64_Benchmarks.generate()

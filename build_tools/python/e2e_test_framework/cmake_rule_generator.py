@@ -298,7 +298,7 @@ def generate_rules(
       variable syntax in the path.
     iree_artifacts_dir: root directory to store generated IREE artifacts. Can
       contain CMake variable syntax in the path.
-    iree_model_compile_configs: compile specs for IREE targets.
+    iree_model_compile_configs: compile configs for IREE targets.
   Returns:
     List of CMake rules.
   """
