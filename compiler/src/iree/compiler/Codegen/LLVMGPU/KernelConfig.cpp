@@ -136,20 +136,6 @@ static bool supportsTensorCore(func::FuncOp entryPoint, linalg::LinalgOp op) {
       if (outputMap.getResult(i) != b.getAffineDimExpr(i)) return false;
     }
   }
-  // Check that we support converting any fused operation. When using the
-  // tensorcore pipeline we need to be sure we can generate MMA ops otherwise
-  // the code will be highly inneficent.
-  bool fusedOpSupported = true;
-  entryPoint.walk([&fusedOpSupported](linalg::GenericOp linalgOp) {
-    for (Operation &fusedOp : linalgOp.getOps()) {
-      if (!isa<arith::AddFOp, arith::MulFOp, arith::MaxFOp, arith::MinFOp,
-               linalg::YieldOp, arith::DivFOp>(fusedOp)) {
-        fusedOpSupported = false;
-        break;
-      }
-    }
-  });
-  if (!fusedOpSupported) return false;
   return true;
 }
 
