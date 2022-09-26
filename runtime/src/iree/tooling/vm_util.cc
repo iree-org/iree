@@ -263,57 +263,52 @@ static iree_status_t PrintBufferView(iree_hal_buffer_view_t* buffer_view,
     result_str.resize(actual_length);
   } while (iree_status_is_out_of_range(status));
   IREE_RETURN_IF_ERROR(status);
-  iree_string_builder_append_string(
+  return iree_string_builder_append_string(
       builder, iree_make_string_view(result_str.data(), result_str.size()));
-  return iree_ok_status();
 }
 
-#define IREE_PRINTVARIANT_CASE_I(SIZE, B, V, STATUS)     \
-  case IREE_VM_VALUE_TYPE_I##SIZE:                       \
-    STATUS = iree_string_builder_append_format(          \
-        B, "i" #SIZE "=%" PRIi##SIZE "\n", (V).i##SIZE); \
-    break;
+#define IREE_PRINTVARIANT_CASE_I(SIZE, B, V)  \
+  case IREE_VM_VALUE_TYPE_I##SIZE:            \
+    return iree_string_builder_append_format( \
+        B, "i" #SIZE "=%" PRIi##SIZE "\n", (V).i##SIZE);
 
-#define IREE_PRINTVARIANT_CASE_F(SIZE, B, V, STATUS)                          \
-  case IREE_VM_VALUE_TYPE_F##SIZE:                                            \
-    STATUS =                                                                  \
-        iree_string_builder_append_format(B, "f" #SIZE "=%g\n", (V).f##SIZE); \
-    break;
+#define IREE_PRINTVARIANT_CASE_F(SIZE, B, V) \
+  case IREE_VM_VALUE_TYPE_F##SIZE:           \
+    return iree_string_builder_append_format(B, "f" #SIZE "=%g\n", (V).f##SIZE);
 
 // Prints variant description including a trailing newline.
 static Status PrintVariant(iree_vm_variant_t variant, size_t max_element_count,
                            iree_string_builder_t* builder) {
   if (iree_vm_variant_is_empty(variant)) {
-    iree_string_builder_append_string(builder, IREE_SV("(null)\n"));
+    return iree_string_builder_append_string(builder, IREE_SV("(null)\n"));
   } else if (iree_vm_variant_is_value(variant)) {
-    iree_status_t status = iree_ok_status();
     switch (variant.type.value_type) {
-      IREE_PRINTVARIANT_CASE_I(8, builder, variant, status)
-      IREE_PRINTVARIANT_CASE_I(16, builder, variant, status)
-      IREE_PRINTVARIANT_CASE_I(32, builder, variant, status)
-      IREE_PRINTVARIANT_CASE_I(64, builder, variant, status)
-      IREE_PRINTVARIANT_CASE_F(32, builder, variant, status)
-      IREE_PRINTVARIANT_CASE_F(64, builder, variant, status)
+      IREE_PRINTVARIANT_CASE_I(8, builder, variant)
+      IREE_PRINTVARIANT_CASE_I(16, builder, variant)
+      IREE_PRINTVARIANT_CASE_I(32, builder, variant)
+      IREE_PRINTVARIANT_CASE_I(64, builder, variant)
+      IREE_PRINTVARIANT_CASE_F(32, builder, variant)
+      IREE_PRINTVARIANT_CASE_F(64, builder, variant)
       default:
-        status = iree_string_builder_append_string(builder, IREE_SV("?\n"));
-        break;
+        return iree_string_builder_append_string(builder, IREE_SV("?\n"));
     }
-    IREE_RETURN_IF_ERROR(status);
   } else if (iree_vm_variant_is_ref(variant)) {
     iree_string_view_t type_name = iree_vm_ref_type_name(variant.type.ref_type);
-    iree_string_builder_append_string(builder, type_name);
-    iree_string_builder_append_string(builder, IREE_SV("\n"));
+    IREE_RETURN_IF_ERROR(iree_string_builder_append_string(builder, type_name));
+    IREE_RETURN_IF_ERROR(
+        iree_string_builder_append_string(builder, IREE_SV("\n")));
     if (iree_hal_buffer_view_isa(variant.ref)) {
       auto* buffer_view = iree_hal_buffer_view_deref(variant.ref);
       IREE_RETURN_IF_ERROR(
           PrintBufferView(buffer_view, max_element_count, builder));
-      iree_string_builder_append_string(builder, IREE_SV("\n"));
+      return iree_string_builder_append_string(builder, IREE_SV("\n"));
     } else {
       // TODO(benvanik): a way for ref types to describe themselves.
-      iree_string_builder_append_string(builder, IREE_SV("(no printer)\n"));
+      return iree_string_builder_append_string(builder,
+                                               IREE_SV("(no printer)\n"));
     }
   } else {
-    iree_string_builder_append_string(builder, IREE_SV("(null)\n"));
+    return iree_string_builder_append_string(builder, IREE_SV("(null)\n"));
   }
   return OkStatus();
 }
