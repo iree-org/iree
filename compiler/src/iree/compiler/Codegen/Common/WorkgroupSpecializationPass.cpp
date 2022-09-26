@@ -51,8 +51,7 @@ namespace iree_compiler {
 
 static llvm::cl::opt<bool> clEnableWorkgroupSpecialization(
     "iree-codegen-enable-workgroup-specialization",
-    llvm::cl::desc("Enable workgroup specialization."),
-    llvm::cl::init(false));
+    llvm::cl::desc("Enable workgroup specialization."), llvm::cl::init(false));
 
 static bool isBoundedTileSizeOp(Operation *op, int64_t tileSize) {
   if (!isa<AffineMinOp>(op)) return false;
