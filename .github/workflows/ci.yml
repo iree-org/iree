@@ -499,9 +499,9 @@ jobs:
           export SHARK_SKIP_TESTS="--ignore=shark/tests/test_shark_importer.py \
             --ignore=benchmarks/tests/test_hf_benchmark.py \
             --ignore=benchmarks/tests/test_benchmark.py"
-          pytest -k 'cpu' $SHARK_SKIP_TESTS
-          pytest -k 'vulkan' $SHARK_SKIP_TESTS
-          pytest -k "cuda" $SHARK_SKIP_TESTS
+          pytest tank/test_models.py -k 'cpu' $SHARK_SKIP_TESTS
+          pytest tank/test_models.py -k 'vulkan' $SHARK_SKIP_TESTS
+          pytest tank/test_models.py -k "cuda" $SHARK_SKIP_TESTS
 
   ############################### Configurations ###############################
   # Jobs that build IREE in some non-default configuration
