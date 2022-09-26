@@ -26,11 +26,13 @@ def _generate_run_module_configs(
   """Generates the run specs from the product of compile specs and run configs.
   """
   return [
-      iree_definitions.ModuleRunConfig(model_compile_config=model_compile_config,
-                               run_config=run_config,
-                               target_device_spec=device_spec,
-                               input_data=input_data) for model_compile_config,
-      run_config in itertools.product(model_compile_configs, run_configs)
+      iree_definitions.ModuleRunConfig(
+          model_compile_config=model_compile_config,
+          run_config=run_config,
+          target_device_spec=device_spec,
+          input_data=input_data)
+      for model_compile_config, run_config in itertools.product(
+          model_compile_configs, run_configs)
   ]
 
 
@@ -92,7 +94,7 @@ class Linux_x86_64_Benchmarks(object):
     return run_configs
 
 
-def generate(
-) -> Tuple[List[iree_definitions.ModelCompileConfig], List[iree_definitions.ModuleRunConfig]]:
+def generate() -> Tuple[List[iree_definitions.ModelCompileConfig],
+                        List[iree_definitions.ModuleRunConfig]]:
   """Generates all compile and run specs for IREE benchmarks."""
   return Linux_x86_64_Benchmarks.generate()

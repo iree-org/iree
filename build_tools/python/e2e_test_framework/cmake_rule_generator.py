@@ -267,7 +267,8 @@ class IreeRuleFactory(object):
 
 def _generate_iree_rules(
     common_rule_factory: CommonRuleFactory, iree_artifacts_dir: str,
-    model_compile_configs: Sequence[iree_definitions.ModelCompileConfig]) -> List[str]:
+    model_compile_configs: Sequence[iree_definitions.ModelCompileConfig]
+) -> List[str]:
   iree_rule_factory = IreeRuleFactory(iree_artifacts_dir)
   for model_compile_config in model_compile_configs:
     model = model_compile_config.model
@@ -288,7 +289,8 @@ def _generate_iree_rules(
 
 def generate_rules(
     model_artifacts_dir: str, iree_artifacts_dir: str,
-    iree_model_compile_configs: Sequence[iree_definitions.ModelCompileConfig]) -> List[str]:
+    iree_model_compile_configs: Sequence[iree_definitions.ModelCompileConfig]
+) -> List[str]:
   """Generates cmake rules to build benchmarks.
   
   Args:
