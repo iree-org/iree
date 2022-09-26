@@ -7,7 +7,7 @@
 //   x0: int32_t* out_tile
 //   x1: const int8_t* lhs_panel
 //   x2: const int8_t* rhs_panel
-//   w3: int32_t K
+//   w3: int32_t K. Note: K>=1, as the K==0 case was handled as an early-return.
 //   w4: uint32_t flags
 //   x5: (UNUSED) params - relevant params K and flags already passed above.
 
