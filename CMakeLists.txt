@@ -98,6 +98,13 @@ option(IREE_BUILD_EXPERIMENTAL_PYTHON_GENERATED_BENCHMARKS "Builds IREE benchmar
 # information on how to declare external drivers.
 set(IREE_EXTERNAL_HAL_DRIVERS "" CACHE STRING "")
 
+# Additional executable loader deps to add dependent libraries to any target
+# using the default executable loader registration utilities.
+# TODO(benvanik): extend the deps to encompass the built-in loaders too so that
+# we have one flag. We could also support a list of deps and automatically
+# generate the registration from that via a configure file.
+set(IREE_HAL_EXECUTABLE_LOADER_EXTRA_DEPS "" CACHE STRING "")
+
 option(IREE_HAL_DRIVER_DEFAULTS "Sets the default value for all runtime HAL drivers" ON)
 # CUDA support must be explicitly enabled.
 set(IREE_HAL_DRIVER_CUDA_DEFAULT OFF)
