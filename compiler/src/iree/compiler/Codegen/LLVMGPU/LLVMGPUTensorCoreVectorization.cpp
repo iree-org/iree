@@ -16,6 +16,9 @@
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
+#include <iostream>
+
+#define DEBUG_LEVEL 0
 
 using mlir::iree_compiler::IREE::LinalgExt::LinalgVectorizationPattern;
 using mlir::iree_compiler::IREE::LinalgExt::VectorizationPatterns;
@@ -75,17 +78,16 @@ static Optional<SmallVector<int64_t>> unrollOrder(Operation *op) {
   return order;
 }
 
-static Optional<SmallVector<int64_t>> getGPUTCNativeVectorSize(Operation *op) {
+
+// Helper function to return native size for WMMA-based operations.
+static Optional<SmallVector<int64_t, 4>> getWmmaNativeVectorSize(    
+  Operation *op) {
   // Currently hardcode the size of wmma operation. When more cases are
   // supported this should be picked based on what the backend supports.
   int64_t m = 16;
-  int64_t n = llvmgpuUseMMASync ? 8 : 16;
+  int64_t n = 16;
   if (auto contract = dyn_cast<vector::ContractionOp>(op)) {
-    int64_t k;
-    if (llvmgpuUseMMASync)
-      k = contract.getLhsType().getElementType().isF16() ? 8 : 4;
-    else
-      k = contract.getLhsType().getElementType().isF16() ? 16 : 8;
+    int64_t k = contract.getLhsType().getElementType().isF16() ? 16 : 8;
     SmallVector<int64_t> nativeSize(contract.getIteratorTypes().size() - 3, 1);
     nativeSize.append({m, n, k});
     return nativeSize;
@@ -119,10 +121,91 @@ static Optional<SmallVector<int64_t>> getGPUTCNativeVectorSize(Operation *op) {
   return std::nullopt;
 }
 
+// Helper function to return native size for MMA.SYNC-based operations.
+static Optional<SmallVector<int64_t>> getMmaNativeVectorSize(
+    Operation *op) {
+  
+  // Shape of native Tensor Core GPU mma.sync instruction
+  int64_t mmaShapeM = 16;
+  int64_t mmaShapeN = 8;
+  int64_t mmaShapeK;
+
+  // Shape the matrix-multiply-accumulate operations.
+  if (auto contract = dyn_cast<vector::ContractionOp>(op)) {
+    auto sourceType = contract.getLhsType().getElementType();
+
+    // Set mmaShapeK based on sourceType.
+    if (sourceType.isInteger(4))
+      mmaShapeK = 64;  
+    else if (sourceType.isInteger(8))
+      mmaShapeK = 32;   
+    else if (sourceType.isF16() || sourceType.isBF16())
+       mmaShapeK = 16;  
+    else if (sourceType.isF32())
+      mmaShapeK = 8;   
+    else
+      return std::nullopt;
+
+    // Initialize/set the starting dims of the ranked shape, such as batch, to 1. 
+    SmallVector<int64_t> mmaShape(contract.getIteratorTypes().size() - 3,
+                                       1);
+    mmaShape.append({mmaShapeM, mmaShapeN, mmaShapeK});
+    return mmaShape;
+  }
+
+  // Shape of warp-level vector write operation.
+  if (auto writeOp = dyn_cast<vector::TransferWriteOp>(op)) {
+    SmallVector<int64_t> outputShape(writeOp.getVectorType().getRank() - 2,
+                                       1);
+    outputShape.append({mmaShapeM, mmaShapeN});
+    return outputShape;
+  }
+
+  // Shape of warp-level vector read (load) operation.
+  if (auto readOp = dyn_cast<vector::TransferReadOp>(op)) {
+    auto resultVectorType = readOp.getVector().getType().cast<VectorType>();
+    auto resultElementType = resultVectorType.getElementType();
+
+    // F16 reads/writes
+    if (resultElementType.isF16() || resultElementType.isBF16()) {
+      // MmaSyncOp input operands: matrixA and matrixB. 
+      // LDSMx1, x2, x4:
+      // - LDSMx1 loads a 1 tile  of 8x8.
+      // - LDSMx2 loads a 2 tiles of 8x8.
+      // - LDSMx4 loads a 4 tiles of 8x8. (in use)
+      // IREE uses the largest tiled load, i.e., LDSMx4. 
+
+      // MmaSyncOp source operand: matrixC.
+      // matrixC is also read/written in tiled block of 16x16. In the pass OptimizeVectorTransfer 
+      // matrixC reads will lifted above the mainloop and writes will moved below the mainloop. 
+      // Thus, mma.sync read/write accumulator inplace. 
+
+      SmallVector<int64_t> readShape;
+      readShape.append({16, 16});
+      return readShape;
+    }
+    
+
+    // F32 reads/writes
+    if (resultElementType.isF32()) {
+    
+    }
+  }
+  return std::nullopt;
+}
+
+static Optional<SmallVector<int64_t>> getGPUTensorCoreNativeVectorSize(
+    Operation *op) {
+  if (llvmgpuUseMMASync)
+    return getMmaNativeVectorSize(op);
+  
+  return getWmmaNativeVectorSize(op);
+}
+
 static void populateVectorUnrollPatterns(RewritePatternSet &patterns) {
   vector::populateVectorUnrollPatterns(
       patterns, vector::UnrollVectorOptions()
-                    .setNativeShapeFn(getGPUTCNativeVectorSize)
+                    .setNativeShapeFn(getGPUTensorCoreNativeVectorSize)
                     .setUnrollTraversalOrderFn(unrollOrder));
 }
 
@@ -137,7 +220,14 @@ struct LLVMGPUTensorCoreVectorizationPass
     auto funcOp = getOperation();
     MLIRContext *context = &getContext();
     {
-      // Step 1. Vectorize
+
+#if DEBUG_LEVEL
+      std::cout << "// ---- Before  LLVMGPUTensorCoreVectorization" << std::endl;
+      funcOp->dump();
+      std::endl;
+#endif
+
+      // Step 1. Vectorize.
       RewritePatternSet vectorizationPatterns(context);
       populateVectorizationPatterns(vectorizationPatterns);
       if (failed(applyPatternsAndFoldGreedily(
@@ -145,7 +235,13 @@ struct LLVMGPUTensorCoreVectorizationPass
         return signalPassFailure();
       }
 
-      // Fold consumer add ops into the contraction op itself.
+#if DEBUG_LEVEL
+      std::cout << "// ---- LLVMGPUTensorCoreVectorization (Vectorize)" << std::endl;
+      funcOp->dump();
+      std::endl;
+#endif
+
+      // Step 2. Fold consumer add ops into the contraction op itself.
       RewritePatternSet canonicalizationPatterns(context);
       vector::ContractionOp::getCanonicalizationPatterns(
           canonicalizationPatterns, context);
@@ -156,12 +252,25 @@ struct LLVMGPUTensorCoreVectorizationPass
         return signalPassFailure();
       }
 
+#if DEBUG_LEVEL
+      std::cout << "// ---- LLVMGPUTensorCoreVectorization (Fold consumer add ops)" << std::endl;
+      funcOp->dump();
+      std::endl;
+#endif
+
+      // Step 3. Break and unroll warp tile size to native math and load sizes.
       RewritePatternSet vectorUnrollPatterns(context);
       populateVectorUnrollPatterns(vectorUnrollPatterns);
       if (failed(applyPatternsAndFoldGreedily(
               funcOp, std::move(vectorUnrollPatterns)))) {
         return signalPassFailure();
       }
+
+#if DEBUG_LEVEL
+      std::cout << "// ---- After LLVMGPUTensorCoreVectorization " << std::endl;
+      funcOp->dump();
+      std::endl;
+#endif
     }
   }
 };
