@@ -484,7 +484,7 @@ jobs:
         run: tar -xf "${BUILD_DIR_ARCHIVE}"
       - name: "Downloading SHARK"
         id: download_shark
-        uses: actions/checkout@64424877aca820469cfb91591c29fdf7be764084  # v2
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
         with:
           repository: nod-ai/SHARK
           path: ${{ github.workspace }}/SHARK
