@@ -37,6 +37,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
@@ -47,6 +48,11 @@
 
 namespace mlir {
 namespace iree_compiler {
+
+static llvm::cl::opt<bool> clEnableWorkgroupSpecialization(
+    "iree-codegen-enable-workgroup-specialization",
+    llvm::cl::desc("Enable workgroup specialization."),
+    llvm::cl::init(false));
 
 static bool isBoundedTileSizeOp(Operation *op, int64_t tileSize) {
   if (!isa<AffineMinOp>(op)) return false;
@@ -227,6 +233,8 @@ struct WorkgroupSpecializationPass
   }
 
   void runOnOperation() override {
+    if (!clEnableWorkgroupSpecialization) return;
+
     IREE::HAL::ExecutableVariantOp variantOp = getOperation();
     ModuleOp innerModule = variantOp.getInnerModule();
     llvm::StringMap<IREE::HAL::ExecutableExportOp> entryPoints =

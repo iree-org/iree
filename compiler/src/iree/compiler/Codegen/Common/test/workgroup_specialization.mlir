@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline='hal.executable(hal.executable.variant(iree-codegen-tile-and-distribute-to-workgroups,iree-codegen-workgroup-specialization)), canonicalize, cse' --split-input-file %s | FileCheck %s
+// RUN: iree-opt --iree-codegen-enable-workgroup-specialization --pass-pipeline='hal.executable(hal.executable.variant(iree-codegen-tile-and-distribute-to-workgroups,iree-codegen-workgroup-specialization)), canonicalize, cse' --split-input-file %s | FileCheck %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0], [16, 4, 0], [0, 0, 64]]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
