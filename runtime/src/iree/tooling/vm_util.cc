@@ -284,7 +284,7 @@ static iree_status_t PrintBufferView(iree_hal_buffer_view_t* buffer_view,
 static Status PrintVariant(iree_vm_variant_t variant, size_t max_element_count,
                            iree_string_builder_t* builder) {
   if (iree_vm_variant_is_empty(variant)) {
-    iree_string_builder_append_string(builder, IREE_SVL("(null)\n"));
+    iree_string_builder_append_string(builder, IREE_SV("(null)\n"));
   } else if (iree_vm_variant_is_value(variant)) {
     iree_status_t status = iree_ok_status();
     switch (variant.type.value_type) {
@@ -295,25 +295,25 @@ static Status PrintVariant(iree_vm_variant_t variant, size_t max_element_count,
       IREE_PRINTVARIANT_CASE_F(32, builder, variant, status)
       IREE_PRINTVARIANT_CASE_F(64, builder, variant, status)
       default:
-        status = iree_string_builder_append_string(builder, IREE_SVL("?\n"));
+        status = iree_string_builder_append_string(builder, IREE_SV("?\n"));
         break;
     }
     IREE_RETURN_IF_ERROR(status);
   } else if (iree_vm_variant_is_ref(variant)) {
     iree_string_view_t type_name = iree_vm_ref_type_name(variant.type.ref_type);
     iree_string_builder_append_string(builder, type_name);
-    iree_string_builder_append_string(builder, IREE_SVL("\n"));
+    iree_string_builder_append_string(builder, IREE_SV("\n"));
     if (iree_hal_buffer_view_isa(variant.ref)) {
       auto* buffer_view = iree_hal_buffer_view_deref(variant.ref);
       IREE_RETURN_IF_ERROR(
           PrintBufferView(buffer_view, max_element_count, builder));
-      iree_string_builder_append_string(builder, IREE_SVL("\n"));
+      iree_string_builder_append_string(builder, IREE_SV("\n"));
     } else {
       // TODO(benvanik): a way for ref types to describe themselves.
-      iree_string_builder_append_string(builder, IREE_SVL("(no printer)\n"));
+      iree_string_builder_append_string(builder, IREE_SV("(no printer)\n"));
     }
   } else {
-    iree_string_builder_append_string(builder, IREE_SVL("(null)\n"));
+    iree_string_builder_append_string(builder, IREE_SV("(null)\n"));
   }
   return OkStatus();
 }
