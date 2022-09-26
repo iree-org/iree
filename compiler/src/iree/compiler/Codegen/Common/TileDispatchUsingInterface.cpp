@@ -27,6 +27,7 @@
 
 namespace mlir {
 namespace iree_compiler {
+
 /// Method to check if a value is zero
 static bool isZero(Value val) {
   OpFoldResult ofr = getAsOpFoldResult(val);
@@ -582,12 +583,10 @@ TileAndFuseDispatchUsingSCFForOp::returningMatchAndRewrite(
   if (failed(tilingResult)) {
     return failure();
   }
-
   // If there is no tiling then there is nothing to do for fusion.
   if (!tilingResult->tiledLoops.any()) {
     return tileAndFuseResult;
   }
-
   tileAndFuseResult.tiledAndFusedOps.push_back(tilingResult->tiledOp);
   tileAndFuseResult.loops.append(tilingResult->loops);
 
