@@ -501,7 +501,7 @@ jobs:
             --ignore=benchmarks/tests/test_benchmark.py"
           pytest -k 'cpu' $SHARK_SKIP_TESTS
           pytest -k 'vulkan' $SHARK_SKIP_TESTS
-          pytest -k "gpu" $SHARK_SKIP_TESTS
+          pytest -k "cuda" $SHARK_SKIP_TESTS
 
   ############################### Configurations ###############################
   # Jobs that build IREE in some non-default configuration
