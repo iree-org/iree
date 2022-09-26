@@ -16,21 +16,21 @@ from e2e_test_framework import unique_ids
 MODULE_BENCHMARK_TOOL = "iree-benchmark-module"
 
 
-def _generate_run_specs(
-    compile_specs: Sequence[iree_definitions.CompileSpec],
+def _generate_run_module_configs(
+    model_compile_configs: Sequence[iree_definitions.ModelCompileConfig],
     run_configs: Sequence[iree_definitions.RunConfig],
     device_spec: common_definitions.DeviceSpec,
     input_data: common_definitions.ModelInputData = common_definitions.
     RANDOM_MODEL_INPUT_DATA,
-) -> List[iree_definitions.RunSpec]:
+) -> List[iree_definitions.ModuleRunConfig]:
   """Generates the run specs from the product of compile specs and run configs.
   """
   return [
-      iree_definitions.RunSpec(compile_spec=compile_spec,
+      iree_definitions.ModuleRunConfig(model_compile_config=model_compile_config,
                                run_config=run_config,
                                target_device_spec=device_spec,
-                               input_data=input_data) for compile_spec,
-      run_config in itertools.product(compile_specs, run_configs)
+                               input_data=input_data) for model_compile_config,
+      run_config in itertools.product(model_compile_configs, run_configs)
   ]
 
 
@@ -51,23 +51,23 @@ class Linux_x86_64_Benchmarks(object):
   @classmethod
   def generate(
       cls
-  ) -> Tuple[List[iree_definitions.CompileSpec],
-             List[iree_definitions.RunSpec]]:
+  ) -> Tuple[List[iree_definitions.ModelCompileConfig],
+             List[iree_definitions.ModuleRunConfig]]:
     """Generates IREE compile and run specs."""
 
     default_run_configs = cls._generate_default_run_configs()
 
-    compile_specs = [
-        iree_definitions.CompileSpec(
+    model_compile_configs = [
+        iree_definitions.ModelCompileConfig(
             compile_config=cls.CASCADELAKE_COMPILE_CONFIG, model=model)
         for model in model_groups.SMALL + model_groups.LARGE
     ]
-    run_specs = _generate_run_specs(
-        compile_specs=compile_specs,
+    run_module_configs = _generate_run_module_configs(
+        model_compile_configs=model_compile_configs,
         run_configs=default_run_configs,
         device_spec=linux_x86_64_specs.GCP_C2_STANDARD_16)
 
-    return (compile_specs, run_specs)
+    return (model_compile_configs, run_module_configs)
 
   @staticmethod
   def _generate_default_run_configs() -> List[iree_definitions.RunConfig]:
@@ -93,6 +93,6 @@ class Linux_x86_64_Benchmarks(object):
 
 
 def generate(
-) -> Tuple[List[iree_definitions.CompileSpec], List[iree_definitions.RunSpec]]:
+) -> Tuple[List[iree_definitions.ModelCompileConfig], List[iree_definitions.ModuleRunConfig]]:
   """Generates all compile and run specs for IREE benchmarks."""
   return Linux_x86_64_Benchmarks.generate()

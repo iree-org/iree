@@ -67,16 +67,16 @@ class RunConfig(object):
 
 
 @dataclass(frozen=True)
-class CompileSpec(object):
+class ModelCompileConfig(object):
   """Describes a compile target to generate the module."""
   compile_config: CompileConfig
   model: common_definitions.Model
 
 
 @dataclass(frozen=True)
-class RunSpec(object):
-  """Describes a run target."""
-  compile_spec: CompileSpec
+class ModuleRunConfig(object):
+  """Describes a run target to run the module."""
+  model_compile_config: ModelCompileConfig
   run_config: RunConfig
   target_device_spec: common_definitions.DeviceSpec
   input_data: common_definitions.ModelInputData
