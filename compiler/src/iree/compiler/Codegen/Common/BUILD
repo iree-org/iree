@@ -189,7 +189,6 @@ iree_compiler_cc_library(
         "TileDispatchUsingInterface.cpp",
         "UserConfig.cpp",
         "VectorReductionToGPU.cpp",
-        "VectorizeConv.cpp",
         "WorkGroupSwizzle.cpp",
     ],
     hdrs = [

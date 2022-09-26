@@ -124,14 +124,6 @@ def RemoveSingleIterationLoop :
   let constructor = "mlir::iree_compiler::createRemoveSingleIterationLoopPass()";
 }
 
-// TODO: Rename argument to be fully qualified.
-def LinalgToVectorVectorizeConv :
-    Pass<"iree-codegen-vectorize-linalg-conv", "func::FuncOp"> {
-  let summary = "Vectorize a very specific form of linalg.conv";
-  let constructor =
-      "mlir::iree_compiler::createLinalgToVectorVectorizeConvPass()";
-}
-
 def TensorToVectorVectorizePad :
     Pass<"iree-codegen-vectorize-tensor-pad", "func::FuncOp"> {
   let summary = "Vectorize a very specific form of tensor.pad with "
