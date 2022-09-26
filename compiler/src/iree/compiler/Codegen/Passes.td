@@ -307,6 +307,12 @@ def VectorContractCustomKernels :
   ];
 }
 
+def LLVMCPULinkExecutables :
+    Pass<"iree-llvmcpu-link-executables", "mlir::ModuleOp"> {
+  let summary = "Links LLVMCPU HAL executables within the top-level program module.";
+  let constructor = "mlir::iree_compiler::createLLVMCPULinkExecutablesPass()";
+}
+
 //------------------------------------------------------------------------------
 // LLVMGPU
 //------------------------------------------------------------------------------
@@ -476,6 +482,12 @@ def VMVXLowerLinalgMicrokernels :
            /*default=*/"false",
            "Warns on any unconverted linalg ops which remain live">
   ];
+}
+
+def VMVXLinkExecutables :
+    Pass<"iree-vmvx-link-executables", "mlir::ModuleOp"> {
+  let summary = "Links VMVX HAL executables within the top-level program module.";
+  let constructor = "mlir::iree_compiler::createVMVXLinkExecutablesPass()";
 }
 
 //------------------------------------------------------------------------------

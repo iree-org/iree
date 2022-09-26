@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/HAL/Target/VMVX/VMVXTarget.h"
 
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionTarget.h"
@@ -17,7 +18,6 @@
 #include "iree/compiler/Dialect/VMVX/Transforms/Passes.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Support/FormatVariadic.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/OperationSupport.h"
@@ -69,42 +69,8 @@ class VMVXTargetBackend final : public TargetBackend {
     IREE::VM::buildVMTransformPassPipeline(nestedModulePM, vmOptions);
   }
 
-  LogicalResult linkExecutables(mlir::ModuleOp moduleOp) override {
-    OpBuilder builder = OpBuilder::atBlockBegin(moduleOp.getBody());
-
-    auto sourceExecutableOps =
-        llvm::to_vector<8>(moduleOp.getOps<IREE::HAL::ExecutableOp>());
-    if (sourceExecutableOps.size() <= 1) return success();
-
-    // TODO(benvanik): rework linking to support multiple formats.
-    auto sharedTargetAttr = getExecutableTarget(builder.getContext());
-
-    // Create our new "linked" hal.executable.
-    std::string linkedExecutableName = llvm::formatv("{0}_linked", name());
-    auto linkedExecutableOp = builder.create<IREE::HAL::ExecutableOp>(
-        moduleOp.getLoc(), linkedExecutableName);
-    linkedExecutableOp.setVisibility(
-        sourceExecutableOps.front().getVisibility());
-
-    // Add our VMVX hal.executable.variant with an empty module.
-    builder.setInsertionPointToStart(&linkedExecutableOp.getBlock());
-    auto linkedTargetOp = builder.create<IREE::HAL::ExecutableVariantOp>(
-        moduleOp.getLoc(), sharedTargetAttr.getSymbolNameFragment(),
-        sharedTargetAttr);
-    builder.setInsertionPoint(&linkedTargetOp.getBlock().back());
-    auto linkedModuleOp = builder.create<ModuleOp>(moduleOp.getLoc());
-
-    // Add an empty vm.module to that module (as our vm.funcs must live in it).
-    builder.setInsertionPointToStart(linkedModuleOp.getBody());
-    builder.create<IREE::VM::ModuleOp>(moduleOp.getLoc(), "linked_module");
-
-    // Try linking together all executables in moduleOp.
-    return linkExecutablesInto(
-        moduleOp, sourceExecutableOps, linkedExecutableOp, linkedTargetOp,
-        [](mlir::ModuleOp moduleOp) {
-          return *moduleOp.getOps<IREE::VM::ModuleOp>().begin();
-        },
-        builder);
+  void buildLinkingPassPipeline(OpPassManager &passManager) override {
+    buildVMVXLinkingPassPipeline(passManager);
   }
 
   LogicalResult serializeExecutable(const SerializationOptions &options,
