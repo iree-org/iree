@@ -1631,9 +1631,10 @@ LogicalResult PackOp::verify() {
   // dynamic tile factors or dimensions, having a partial tile is undefined
   // behavior. We will relax this constraint when we introduce padding
   // semantics.
-  if (areNotFullTiles(getInputShape(), getDimAndTileMapping())) {
+  if (!getPad() && areNotFullTiles(getInputShape(), getDimAndTileMapping())) {
     return op->emitError(
-        "invalid tile factor provided. Only full tiles are supported");
+        "invalid tile factor provided. Only full tiles are "
+        "supported when pad=false");
   }
 
   // Verify result type against inferred type.
@@ -1750,9 +1751,11 @@ SmallVector<int64_t> computeInterchangeFromDimPos(ArrayRef<int64_t> dimsPos,
 }
 
 // Implements `getIterationDomain` from the tiling interface.
+// TODO(hanchung): Add support for pad=true.
 LogicalResult PackOp::generateScalarImplementation(OpBuilder &builder,
                                                    Location loc,
                                                    ValueRange ivs) {
+  if (getPad()) return failure();
   // Note: `ivs` are already in the correct order, possibly interchanged based
   // on `dims_pos`. However, connecting the loops with the access patterns is
   // difficult - What is the relation between the position of the tile loop and
