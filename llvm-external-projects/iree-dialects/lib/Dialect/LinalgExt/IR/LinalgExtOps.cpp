@@ -1799,7 +1799,6 @@ PackOp::reifyResultShapes(OpBuilder &builder,
 
   // Build the output dimension at pos `dimIdx`.
   auto buildOutputDim = [&](OpBuilder &builder, size_t dimIdx) -> OpFoldResult {
-    unsigned inputRank = getInputRank();
     ArrayRef<int64_t> outputShape = getOutputShape();
     if (!ShapedType::isDynamic(outputShape[dimIdx]))
       return builder.getI64IntegerAttr(outputShape[dimIdx]);
