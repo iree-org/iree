@@ -70,6 +70,7 @@ jobs:
       PR_DESCRIPTION: ${{ github.event.pull_request.body }}
     outputs:
       should-run: ${{ steps.should-run.outputs.should-run }}
+      ci-stage: ${{ env._CI_STAGE }}
       # Variables for dependent jobs. See comment at top.
       runner-env: prod
       runner-group: ${{ env._CI_STAGE }}
@@ -624,7 +625,7 @@ jobs:
 
   emscripten:
     needs: [setup, build_all]
-    if: needs.setup.outputs.should-run == 'true'
+    if: needs.setup.outputs.should-run == 'true' && needs.setup.outputs.ci-stage == 'postsubmit'
     runs-on:
       # Hacks, and order matters. See the comment at the top of the file.
       - self-hosted
