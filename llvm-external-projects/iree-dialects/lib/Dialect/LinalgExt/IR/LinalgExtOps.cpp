@@ -1532,18 +1532,19 @@ ShapedType PackOp::inferResultType() {
     if (tileAndPosMapping.count(i)) {
       Optional<int64_t> tileSize =
           getConstantIntValue(tileAndPosMapping.lookup(i));
-      if (inputType.isDynamicDim(i) || !tileSize)
+      if (inputType.isDynamicDim(i) || !tileSize) {
         inferredShape.push_back(ShapedType::kDynamicSize);
-      else {
+      } else {
         int64_t sizeTiledDim = ceilDiv(inputType.getDimSize(i), *tileSize);
         inferredShape.push_back(sizeTiledDim);
       }
-    } else
+    } else {
       inferredShape.push_back(inputType.getShape()[i]);
+    }
   }
 
   // point loop.
-  SmallVector staticTiles = getStaticTiles();
+  auto staticTiles = getStaticTiles();
   inferredShape.append(staticTiles.begin(), staticTiles.end());
 
   return TypeSwitch<Type, ShapedType>(inputType)
@@ -1782,8 +1783,9 @@ LogicalResult PackOp::generateScalarImplementation(OpBuilder &builder,
               dimAndTileMapping[dim]});
       sourceIndices.push_back(sourceIndex);
       ++pointLoopsOffset;
-    } else
+    } else {
       sourceIndices.push_back(interchangedIvs[dim]);
+    }
   }
   Value scalar = builder.create<memref::LoadOp>(
       loc, getInput(), getAsValues(builder, loc, sourceIndices));
