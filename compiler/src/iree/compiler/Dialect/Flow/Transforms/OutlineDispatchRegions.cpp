@@ -35,7 +35,7 @@ static int64_t estimateLinalgOpCost(linalg::LinalgOp op) {
   if (op.hasDynamicShape()) {
     // Note: bounded dynamic shapes would be interesting, if the compiler used
     // them. For now just treat dynamic shapes as arbitrarily large.
-    return INT_MAX;
+    return INT64_MAX;
   }
 
   int64_t cost = 1;
@@ -95,7 +95,7 @@ static std::string summarizeDispatchWorkgroupsOp(
   regionOp.getBodyRegion().walk([&](Operation *op) {
     TypeSwitch<Operation *>(op)
         .Case<linalg::LinalgOp>([&](auto op) {
-          int estimatedCost = estimateLinalgOpCost(op);
+          int64_t estimatedCost = estimateLinalgOpCost(op);
           if (estimatedCost < bestEstimatedCost) return;
           bestEstimatedCost = estimatedCost;
           bestOp = op;
