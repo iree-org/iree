@@ -6,6 +6,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
@@ -436,5 +437,7 @@ const char* call_function(iree_program_state_t* program_state,
   }
 
   // Note: this leaks the buffer. It's up to the caller to free it after use.
-  return iree_string_builder_buffer(&outputs_builder);
+  char* outputs = strdup(iree_string_builder_buffer(&outputs_builder));
+  iree_string_builder_deinitialize(&outputs_builder);
+  return outputs;
 }
