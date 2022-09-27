@@ -11,7 +11,7 @@
 #include "iree/modules/hal/module.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
-#include "iree/tooling/vm_util.h"
+#include "iree/tooling/vm_util_cc.h"
 #include "iree/vm/api.h"
 #include "iree/vm/ref_cc.h"
 
