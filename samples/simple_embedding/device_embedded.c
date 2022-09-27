@@ -17,9 +17,9 @@
 
 // Compiled module embedded here to avoid file IO:
 #include "samples/simple_embedding/simple_embedding_test_bytecode_module_cpu_arm_64_c.h"
+#include "samples/simple_embedding/simple_embedding_test_bytecode_module_cpu_riscv_32_c.h"
 #include "samples/simple_embedding/simple_embedding_test_bytecode_module_cpu_riscv_64_c.h"
 #include "samples/simple_embedding/simple_embedding_test_bytecode_module_cpu_x86_64_c.h"
-
 iree_status_t create_sample_device(iree_allocator_t host_allocator,
                                    iree_hal_device_t** out_device) {
   // Set parameters for the device created in the next step.
@@ -61,6 +61,9 @@ const iree_const_byte_span_t load_bytecode_module_data() {
 #if IREE_ARCH_X86_64
   const struct iree_file_toc_t* module_file_toc =
       iree_samples_simple_embedding_test_module_cpu_x86_64_create();
+#elif IREE_ARCH_RISCV_32
+  const struct iree_file_toc_t* module_file_toc =
+      iree_samples_simple_embedding_test_module_cpu_riscv_32_create();
 #elif IREE_ARCH_RISCV_64
   const struct iree_file_toc_t* module_file_toc =
       iree_samples_simple_embedding_test_module_cpu_riscv_64_create();

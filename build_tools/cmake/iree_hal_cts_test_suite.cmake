@@ -92,6 +92,9 @@ function(iree_hal_cts_test_suite)
     if(CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv64" AND
        CMAKE_SYSTEM_NAME STREQUAL "Linux")
       list(APPEND  _TRANSLATE_FLAGS ${RISCV64_TEST_DEFAULT_LLVM_FLAGS})
+    elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv32" AND
+           CMAKE_SYSTEM_NAME STREQUAL "Linux")
+      list(APPEND _TRANSLATE_FLAGS ${RISCV32_TEST_DEFAULT_LLVM_FLAGS})
     endif()
 
     # Skip if already created (multiple suites using the same compiler setting).

@@ -601,7 +601,7 @@ jobs:
             gcr.io/iree-oss/android@sha256:76c2a52dcd6d07601227b965ac87d021c1d2d5e2d01f46ad58da28c89267f2ab \
             build_tools/cmake/build_android.sh
 
-  riscv32:
+  baremetal_riscv32:
     needs: [setup, build_all]
     if: needs.setup.outputs.should-run == 'true'
     runs-on:
@@ -625,7 +625,7 @@ jobs:
         run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting install from build dir archive"
         run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
-      - name: "Cross-compiling and testing riscv32"
+      - name: "Cross-compiling and testing riscv32 baremetal"
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "RISCV_ARCH=${BUILD_ARCH}" \
@@ -636,7 +636,7 @@ jobs:
             bash -euo pipefail -c \
             "./build_tools/cmake/build_riscv.sh && tests/riscv32/smoke.sh"
 
-  riscv64:
+  linux_riscv:
     needs: [setup, build_all, build_tf_integrations]
     if: needs.setup.outputs.should-run == 'true'
     runs-on:
@@ -645,9 +645,12 @@ jobs:
       - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
+    strategy:
+      matrix:
+        architecture: [rv64, rv32-linux]
     env:
-      BUILD_RISCV_DIR: "build-riscv64"
-      BUILD_ARCH: "rv64"
+      BUILD_RISCV_DIR: build-${{ matrix.architecture }}
+      BUILD_ARCH: ${{ matrix.architecture }}
       BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
       BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
       BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
@@ -667,7 +670,7 @@ jobs:
         run: gcloud alpha storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
       - name: "Extracting TF binaries archive"
         run: tar -xf "${TF_BINARIES_ARCHIVE}"
-      - name: "Cross-compiling and testing riscv64"
+      - name: "Cross-compiling and testing RISC-V Linux"
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "RISCV_ARCH=${BUILD_ARCH}" \
@@ -678,7 +681,7 @@ jobs:
             --env "LLVM_BIN_DIR=${BUILD_DIR}/third_party/llvm-project/llvm/bin" \
             gcr.io/iree-oss/riscv@sha256:d6f0e293a50faf5abbd564c1d1bb9dc6456d7ce93d07b131c381fa64c1daed62 \
             bash -euo pipefail -c \
-              "./build_tools/cmake/build_riscv.sh && ./build_tools/cmake/test_riscv64.sh"
+              "./build_tools/cmake/build_riscv.sh && ./build_tools/cmake/test_riscv.sh"
 
   ##############################################################################
 
@@ -715,8 +718,8 @@ jobs:
 
       # Crosscompilation
       - android_arm64
-      - riscv32
-      - riscv64
+      - baremetal_riscv32
+      - linux_riscv
 
       # Benchmark pipeline
       - benchmarks
