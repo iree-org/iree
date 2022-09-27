@@ -7,10 +7,7 @@
 #ifndef IREE_TOOLING_VM_UTIL_H_
 #define IREE_TOOLING_VM_UTIL_H_
 
-#include "iree/base/internal/span.h"
-#include "iree/base/status.h"
-#include "iree/base/string_builder.h"
-#include "iree/base/string_view.h"
+#include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/vm/api.h"
 
