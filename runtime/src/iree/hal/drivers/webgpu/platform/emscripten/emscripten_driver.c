@@ -149,9 +149,15 @@ iree_status_t iree_hal_webgpu_emscripten_driver_create(
 
   // Request an adapter from the implementation. We only get one of these and it
   // may expose multiple devices so it's effectively what we consider a driver.
-  // HACKS: sync via Asyncify, assume success
+  // HACKS: sync via Asyncify
   WGPUAdapter adapter = wgpuInstanceRequestAdapterSync();
-  IREE_ASSERT_NE(adapter, NULL);
+  if (!adapter) {
+    iree_hal_driver_release((iree_hal_driver_t*)driver);
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(
+        IREE_STATUS_UNAVAILABLE,
+        "WebGPU requestAdapter() failed to return a WGPUAdapter");
+  }
   driver->adapter = adapter;
 
   WGPUAdapterProperties adapter_props;
@@ -214,8 +220,13 @@ static iree_status_t iree_hal_webgpu_emscripten_driver_create_device_by_id(
   iree_hal_webgpu_emscripten_driver_t* driver =
       iree_hal_webgpu_emscripten_driver_cast(base_driver);
 
-  // HACKS: sync via Asyncify, assume success
+  // HACKS: sync via Asyncify
   WGPUDevice device = wgpuAdapterRequestDeviceSync(driver->adapter);
+  if (!device) {
+    return iree_make_status(
+        IREE_STATUS_UNAVAILABLE,
+        "WebGPU requestDevice() failed to return a WGPUDevice");
+  }
 
   return iree_hal_webgpu_wrap_device(driver->identifier,
                                      &driver->default_options, device,
