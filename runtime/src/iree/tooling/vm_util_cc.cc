@@ -21,9 +21,9 @@ Status ParseToVariantList(iree_hal_allocator_t* device_allocator,
     input_string_views[i].data = input_strings[i].data();
     input_string_views[i].size = input_strings[i].size();
   }
-  return iree_parse_to_variant_list(device_allocator, input_string_views.data(),
-                                    input_string_views.size(), host_allocator,
-                                    out_list);
+  return iree_create_and_parse_to_variant_list(
+      device_allocator, input_string_views.data(), input_string_views.size(),
+      host_allocator, out_list);
 }
 
 Status PrintVariantList(iree_vm_list_t* variant_list, size_t max_element_count,

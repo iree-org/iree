@@ -26,11 +26,10 @@ extern "C" {
 // described in iree/hal/api.h
 // Uses |device_allocator| to allocate the buffers.
 // The returned variant list must be freed by the caller.
-iree_status_t iree_parse_to_variant_list(iree_hal_allocator_t* device_allocator,
-                                         iree_string_view_t* input_strings,
-                                         iree_host_size_t input_strings_count,
-                                         iree_allocator_t host_allocator,
-                                         iree_vm_list_t** out_list);
+iree_status_t iree_create_and_parse_to_variant_list(
+    iree_hal_allocator_t* device_allocator, iree_string_view_t* input_strings,
+    iree_host_size_t input_strings_count, iree_allocator_t host_allocator,
+    iree_vm_list_t** out_list);
 
 // Appends a variant list of VM scalars and buffers to |builder|.
 // Prints scalars in the format:
