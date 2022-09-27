@@ -1512,15 +1512,16 @@ static SmallVector<T> interchange(ArrayRef<T> elements,
     return rearrangedElements;
   assert((rearrangedElements.size() - offset) == interchangeVector.size() &&
          "number of elements must equal number of permutations");
-  for (int64_t idx = 0, end = interchangeVector.size(); idx < end; idx++)
+  for (int64_t idx = 0, end = interchangeVector.size(); idx < end; idx++) {
     rearrangedElements[interchangeVector[idx] + offset] =
         elements[idx + offset];
+  }
   return rearrangedElements;
 }
 
 // Infer result/output type given the input and the tile sizes.
 ShapedType PackOp::inferResultType() {
-  DenseMap<int64_t, int64_t> tileAndPosMapping = getDimAndStaticTileMapping();
+  DenseMap<int64_t, OpFoldResult> tileAndPosMapping = getDimAndTileMapping();
   SmallVector<int64_t> inferredShape;
   inferredShape.reserve(getOutputRank());
   ShapedType inputType = getInputType();
@@ -1529,13 +1530,13 @@ ShapedType PackOp::inferResultType() {
   // tile loop.
   for (auto i : llvm::seq<int64_t>(0, rank)) {
     if (tileAndPosMapping.count(i)) {
-      if (inputType.isDynamicDim(i) ||
-          tileAndPosMapping[i] == ShapedType::kDynamicSize)
+      Optional<int64_t> tileSize =
+          getConstantIntValue(tileAndPosMapping.lookup(i));
+      if (inputType.isDynamicDim(i) || !tileSize)
         inferredShape.push_back(ShapedType::kDynamicSize);
       else {
-        int64_t sizeDim =
-            ceilDiv(inputType.getDimSize(i), tileAndPosMapping[i]);
-        inferredShape.push_back(sizeDim);
+        int64_t sizeTiledDim = ceilDiv(inputType.getDimSize(i), *tileSize);
+        inferredShape.push_back(sizeTiledDim);
       }
     } else
       inferredShape.push_back(inputType.getShape()[i]);
@@ -1560,20 +1561,8 @@ ShapedType PackOp::inferResultType() {
 
 // Return true if at least one element in `tiles` is zero.
 static bool hasZeros(ArrayRef<OpFoldResult> tiles) {
-
-  // Check if `tile` is an integer zero attribute or
-  // comes from a zero constantIndexOp.
-  auto isZero = [](OpFoldResult tile) -> bool {
-    if (Attribute attr = tile.dyn_cast<Attribute>()) {
-      IntegerAttr intAttr = attr.dyn_cast<IntegerAttr>();
-      return intAttr && intAttr.getValue().isZero();
-    } else if (auto cst =
-                   tile.get<Value>().getDefiningOp<arith::ConstantIndexOp>())
-      return cst.value() == 0;
-    return false;
-  };
-
-  return llvm::any_of(tiles, [&](OpFoldResult tile) { return isZero(tile); });
+  return llvm::any_of(
+      tiles, [&](OpFoldResult tile) { return isConstantIntValue(tile, 0); });
 }
 
 // Return true if `dimsPos` is invalid. It is invalid when: a) it contains
@@ -1588,20 +1577,19 @@ static bool isInvalid(ArrayRef<int64_t> dimsPos) {
 // Check if we have enough static information to catch undefined behavior when
 // the tile size does not divide perfectly the dimension of the input tensor.
 static bool areNotFullTiles(ArrayRef<int64_t> inputShape,
-                            DenseMap<int64_t, int64_t> dimAndTileMapping) {
+                            DenseMap<int64_t, OpFoldResult> dimAndTileMapping) {
   int64_t rank = inputShape.size();
   for (int64_t dim = 0; dim < rank; dim++) {
-    // dynamic dimension.
     if (inputShape[dim] == ShapedType::kDynamicSize)
       continue;
-    // static dimension but dynamic tile factor.
-    if (dimAndTileMapping.count(dim) &&
-        dimAndTileMapping[dim] == ShapedType::kDynamicSize)
-      continue;
-    // static tile and dimension, check.
-    if (dimAndTileMapping.count(dim) &&
-        inputShape[dim] % dimAndTileMapping[dim] != 0)
-      return true;
+    if (dimAndTileMapping.count(dim)) {
+      Optional<int64_t> constantTile =
+          getConstantIntValue(dimAndTileMapping[dim]);
+      if (!constantTile)
+        continue;
+      if (inputShape[dim] % (*constantTile) != 0)
+        return true;
+    }
   }
   return false;
 }
@@ -1613,19 +1601,14 @@ LogicalResult PackOp::verify() {
   SmallVector<int64_t> dimsPos = extractFromI64ArrayAttr(getDimsPos());
   // Blocking factors must be less or equal than the input rank, and must
   // match the number of `dims_pos`.
-  if (numberOfBlockingFactors > getInputRank())
+  if (numberOfBlockingFactors > getInputRank()) {
     return op->emitError(
         "blocking factors must be less or equal than the input rank");
-  if (numberOfBlockingFactors != dimsPos.size())
+  }
+  if (numberOfBlockingFactors != dimsPos.size()) {
     return op->emitError(
         "blocking factors must equal the number of dimensions to block");
-
-  // The number of `dim_pos` that carries the index of the dimensions to block
-  // must be less or equal than the input rank.
-  if (dimsPos.size() > getInputRank())
-    return op->emitError(
-        "indices of blocked dimensions must be less or equal than "
-        "the input rank");
+  }
   if (isInvalid(dimsPos))
     return op->emitError("invalid dims_pos vector");
   // Require `dim_pos` to be in-bound. `dim_pos` carries the index of the
@@ -1634,9 +1617,10 @@ LogicalResult PackOp::verify() {
     return op->emitError("out-of-bound position");
 
   // Require output rank to match input rank + number of blocking factors.
-  if ((getInputRank() + numberOfBlockingFactors) != getOutputRank())
+  if ((getInputRank() + numberOfBlockingFactors) != getOutputRank()) {
     return op->emitError(
         "output rank must equal input rank + blocking factors");
+  }
 
   // Verify tiles. Make sure each provided tile is non-zero.
   if (hasZeros(getMixedTiles()))
@@ -1646,17 +1630,18 @@ LogicalResult PackOp::verify() {
   // dynamic tile factors or dimensions, having a partial tile is undefined
   // behavior. We will relax this constraint when we introduce padding
   // semantics.
-  if (areNotFullTiles(getInputShape(), getDimAndStaticTileMapping()))
+  if (areNotFullTiles(getInputShape(), getDimAndTileMapping())) {
     return op->emitError(
         "invalid tile factor provided. Only full tiles are supported");
+  }
 
   // Verify result type against inferred type.
-  ShapedType expectedType = PackOp::inferResultType();
-  if (expectedType != getOutputType())
+  ShapedType expectedType = inferResultType();
+  if (expectedType != getOutputType()) {
     return op->emitError(
                "inferred type do not match provied output type. Expected ")
            << expectedType << " but got: " << getOutputType();
-
+  }
   return success();
 }
 
@@ -1717,25 +1702,6 @@ DenseMap<int64_t, OpFoldResult> PackOp::getDimAndTileMapping() {
   for (auto i : llvm::seq<int64_t>(0, dimsToBlock.size()))
     dimAndTileMapping[dimsToBlock[i]] = tiles[i];
   return dimAndTileMapping;
-}
-
-// Return a mapping from positions `dims_pos` to their `int64_t` tile factors.
-// If the tile factor is dynamic a sentinel is inserted in the map.
-DenseMap<int64_t, int64_t> PackOp::getDimAndStaticTileMapping() {
-  SmallVector<Value> dynamicTiles;
-  SmallVector<int64_t> staticTiles;
-  dispatchIndexOpFoldResults(getMixedTiles(), dynamicTiles, staticTiles,
-                             ShapedType::kDynamicSize);
-  SmallVector<int64_t> indicesOfBlockedDims =
-      extractFromI64ArrayAttr(getDimsPos());
-
-  assert(staticTiles.size() == indicesOfBlockedDims.size() &&
-         "tiles must match indices of dimension to block");
-  // bind the dimension with the tile factor.
-  DenseMap<int64_t, int64_t> tileAndPosMapping;
-  for (auto i : llvm::seq<int64_t>(0, indicesOfBlockedDims.size()))
-    tileAndPosMapping[indicesOfBlockedDims[i]] = staticTiles[i];
-  return tileAndPosMapping;
 }
 
 // Implements `getIterationDomain` from the tiling interface. In each

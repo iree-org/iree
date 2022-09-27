@@ -444,12 +444,32 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
 ]>{
   let summary = "pack operation"; 
   let description = [{
-    The pack operation takes a shaped type as input, tiles, and transposes it
-    based on `dims_pos` and `inner_tiles`. The former carries the indices of the
-    dimension to tile, while the latter the tiling factor. A tile factor can
-    either be a constant or an index type. We handle only full tiles now; it is UB
-    if the tile does not perfectly divide the dimension. We will relax this
-    constraint in the future when we add pad semantics to the operation.
+    The pack operation converts an `input` into a tiled and packed layout. The
+    dimensions to be tiled are obtained from `dims_pos` and the size of the tile is
+    obtained from `inner_tiles`. The dimensions listed in `dims_pos` do not need to
+    be contiguous in which case the tile will get transposed.  We handle only full
+    tiles now; it is UB if the tile does not perfectly divide the dimension. We
+    will relax this constraint in the future when we add pad semantics to the
+    operation.
+
+    Example KC_to_KCck:
+    
+    ```mlir
+    iree_linalg_ext.pack %arg0 dims_pos = [1, 0] 
+      inner_tiles = [32, 8] into %arg1 : (memref<128x256xf32> memref<16x8x32x8xf32>)
+    ```
+    
+    Example NC_to_NCnc:
+    
+    ```mlir
+    iree_linalg_ext.pack %arg0 dims_pos = [0, 1] 
+      inner_tiles = [8, 32] into %arg1 : (memref<128x256xf32> memref<16x8x8x32xf32>)
+    ``` 
+    
+    In both cases, dimension at position 0 in the input memref (128) is tiled
+    with a factor of 8, while dimension at position 1 (256) is tiled with a factor
+    of 32. In the KC_to_KCck example, the point loops are interchanged. 
+
   }];
 
   let arguments = (ins Variadic<AnyShaped>:$inputs,
@@ -484,32 +504,32 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
 
     // Return the output rank.
     int64_t getOutputRank() {
-      return  getOutput().getType().cast<ShapedType>().getRank();
+      return  getOutputType().getRank();
     }
 
     // Return the output type.
     ShapedType getOutputType() {
-      return getOutput().getType().cast<ShapedType>();
+      return getOutput().getType();
     }
 
     // Return the input type.
     ShapedType getInputType() {
-      return getInput().getType().cast<ShapedType>();
+      return getInput().getType();
     }
 
     // Return the output shape.
     ArrayRef<int64_t> getOutputShape() {
-      return getOutputType().cast<ShapedType>().getShape();
+      return getOutputType().getShape();
     }
 
     // Return the input shape.
     ArrayRef<int64_t> getInputShape() {
-      return getInputType().cast<ShapedType>().getShape();
+      return getInputType().getShape();
     }
 
     // Return the rank of the input operand.
     int64_t getInputRank() {
-      return getInput().getType().cast<ShapedType>().getRank();
+      return getInputType().getRank();
     }
 
     // Return the tile sizes.
@@ -521,7 +541,6 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
 
     // Return a mapping from positions `dims_pos` to their tile factors.
     DenseMap<int64_t, OpFoldResult> getDimAndTileMapping();
-    DenseMap<int64_t, int64_t> getDimAndStaticTileMapping();
   }];
 }
 
