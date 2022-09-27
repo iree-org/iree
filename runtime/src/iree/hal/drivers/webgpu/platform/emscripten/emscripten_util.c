@@ -27,9 +27,7 @@ void iree_wgpuBindGroupLayoutDrop(WGPUBindGroupLayout bindGroupLayout) {
   // Not implemented on the web / Emscripten.
 }
 
-void iree_wgpuBufferDrop(WGPUBuffer buffer) {
-  // Not implemented on the web / Emscripten.
-}
+void iree_wgpuBufferDrop(WGPUBuffer buffer) { wgpuBufferDestroy(buffer); }
 
 void iree_wgpuCommandBufferDrop(WGPUCommandBuffer commandBuffer) {
   // Not implemented on the web / Emscripten.
@@ -48,7 +46,7 @@ void iree_wgpuPipelineLayoutDrop(WGPUPipelineLayout pipelineLayout) {
 }
 
 void iree_wgpuQuerySetDrop(WGPUQuerySet querySet) {
-  // Not implemented on the web / Emscripten.
+  wgpuQuerySetDestroy(querySet);
 }
 
 void iree_wgpuShaderModuleDrop(WGPUShaderModule shaderModule) {
