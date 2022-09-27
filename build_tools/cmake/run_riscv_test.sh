@@ -21,11 +21,11 @@ RISCV_ARCH="${RISCV_ARCH:-rv64}"
 # under the emulator.
 if [[ "${RISCV_ARCH}" == "rv64" ]] && [[ ! -z "${QEMU_RV64_BIN}" ]]; then
   "${QEMU_RV64_BIN}" "-cpu" "rv64,x-v=true,x-k=true,vlen=512,elen=64,vext_spec=v1.0" \
-  "-L" "${RISCV_RV64_LINUX_TOOLCHAIN_ROOT}/sysroot" $*
+  "-L" "${RISCV_RV64_LINUX_TOOLCHAIN_ROOT}/sysroot" "$@"
 elif [[ "${RISCV_ARCH}" == "rv32-linux" ]] && [[ ! -z "${QEMU_RV32_BIN}" ]]; then
   "${QEMU_RV32_BIN}" "-cpu" "rv32,x-v=true,x-k=true,vlen=512,elen=32,vext_spec=v1.0" \
-  "-L" "${RISCV_RV64_LINUX_TOOLCHAIN_ROOT}/sysroot" $*
+  "-L" "${RISCV_RV64_LINUX_TOOLCHAIN_ROOT}/sysroot" "$@"
 else
 # TODO(dcaballe): Add on-device run commands.
-  $*
+  "$@"
 fi

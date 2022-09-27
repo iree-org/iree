@@ -60,17 +60,19 @@ download_file() {
         return
       ;;
       * )
-        rm -rf $2
+        rm -rf "$2"
       ;;
     esac
   fi
 
   echo "Download ${file_name} ..."
   mkdir -p $install_path
-  wget --progress=bar:force:noscroll -P "${BOOTSTRAP_WORK_DIR}" "${IREE_ARTIFACT_URL}/${file_name}" && \
+  wget --progress=bar:force:noscroll --directory-prefix="${BOOTSTRAP_WORK_DIR}" \
+    "${IREE_ARTIFACT_URL}/${file_name}" && \
     echo "${file_sha} ${BOOTSTRAP_WORK_DIR}/${file_name}" | sha256sum -c -
   echo "Extract ${file_name} ..."
-  tar -C "${install_path}" -xf "${BOOTSTRAP_WORK_DIR}/${file_name}" --no-same-owner --strip-components=1
+  tar -C "${install_path}" -xf "${BOOTSTRAP_WORK_DIR}/${file_name}" --no-same-owner \
+    --strip-components=1
 }
 
 mkdir -p "${BOOTSTRAP_WORK_DIR}"
