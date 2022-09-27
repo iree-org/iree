@@ -18,7 +18,7 @@ iree_hal_cts_test_suite(
   COMPILER_TARGET_BACKEND
     "webgpu"
   EXECUTABLE_FORMAT
-    "\"WGSL\""
+    "\"webgpu-wgsl-fb\""
   DEPS
     iree::hal::drivers::webgpu::registration
 )
