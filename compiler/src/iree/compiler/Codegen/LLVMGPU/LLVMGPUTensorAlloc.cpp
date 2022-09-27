@@ -22,8 +22,6 @@ namespace iree_compiler {
 static bool contractOpFilter(Operation *op) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
   if (!linalgOp) return false;
-  // Can't promote dynamic shapes.
-  if (linalgOp.hasDynamicShape()) return false;
   SmallVector<unsigned> dims;
   linalgOp.getParallelDims(dims);
   SmallVector<int64_t, 4> shapes = linalgOp.getStaticLoopRanges();

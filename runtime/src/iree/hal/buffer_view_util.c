@@ -572,3 +572,24 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_fprint(
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
+
+IREE_API_EXPORT iree_status_t iree_hal_buffer_view_append_to_builder(
+    iree_hal_buffer_view_t* buffer_view, iree_host_size_t max_element_count,
+    iree_string_builder_t* builder) {
+  // NOTE: we could see how many bytes are available in the builder (capacity -
+  // size) and then pass those in to the initial format - if there's enough
+  // space it'll fill what it needs. We'd need to adjust the string builder
+  // afterward somehow.
+  iree_host_size_t required_length = 0;
+  iree_status_t status = iree_hal_buffer_view_format(
+      buffer_view, max_element_count, /*buffer_capacity=*/0, /*buffer=*/NULL,
+      &required_length);
+  if (!iree_status_is_out_of_range(status)) return status;
+  char* buffer = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_string_builder_append_inline(builder, required_length, &buffer));
+  if (!buffer) return iree_ok_status();
+  return iree_hal_buffer_view_format(buffer_view, max_element_count,
+                                     required_length + /*NUL=*/1, buffer,
+                                     &required_length);
+}

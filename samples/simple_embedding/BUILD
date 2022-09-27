@@ -185,6 +185,7 @@ cc_binary(
     ],
     deps = [
         ":simple_embedding_test_bytecode_module_cpu_arm_64_c",
+        ":simple_embedding_test_bytecode_module_cpu_riscv_32_c",
         ":simple_embedding_test_bytecode_module_cpu_riscv_64_c",
         ":simple_embedding_test_bytecode_module_cpu_x86_64_c",
         "//runtime/src/iree/base",

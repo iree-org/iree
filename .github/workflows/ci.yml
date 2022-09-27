@@ -450,6 +450,64 @@ jobs:
               ./build_tools/scripts/check_vulkan.sh
               build_tools/cmake/run_tf_tests.sh ${BUILD_DIR}"
 
+  ############################# Model Coverage #################################
+  # Jobs that test IREE performance on a set of models.
+  ##############################################################################
+  test_shark_model_suite:
+    needs: [setup, build_all, build_tf_integrations]
+    if: needs.setup.outputs.should-run == 'true'
+    runs-on:
+      # Pseudo-ternary hack and order matters. See comment at top of file.
+      - self-hosted
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - gpu
+      - os-family=Linux
+    env:
+      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
+      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
+      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+      TF_BINARIES_DIR: ${{ needs.build_tf_integrations.outputs.binaries-dir }}
+      TF_BINARIES_ARCHIVE: ${{ needs.build_tf_integrations.outputs.binaries-archive }}
+      TF_BINARIES_GCS_ARTIFACT: ${{ needs.build_tf_integrations.outputs.binaries-gcs-artifact }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
+        with:
+          submodules: true
+      - name: "Downloading TF binaries archive"
+        run: gcloud alpha storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
+      - name: "Extracting TF binaries archive"
+        run: tar -xf "${TF_BINARIES_ARCHIVE}"
+      - name: "Symlinking TF binaries"
+        run: |
+          ./integrations/tensorflow/symlink_binaries.sh "$(realpath "${TF_BINARIES_DIR}")"
+      - name: "Downloading build dir archive"
+        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+      - name: "Extracting build dir archive"
+        run: tar -xf "${BUILD_DIR_ARCHIVE}"
+      - name: "Downloading SHARK"
+        id: download_shark
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e  # v2
+        with:
+          repository: nod-ai/SHARK
+          path: ${{ github.workspace }}/SHARK
+      - name: "Testing Shark Model Suite"
+        run: |
+          cd "${GITHUB_WORKSPACE}/SHARK"
+          NO_BACKEND=1 ./setup_venv.sh
+          source shark.venv/bin/activate
+          export TFPYBASE="${GITHUB_WORKSPACE}/integrations/tensorflow/python_projects"
+          export PYTHONPATH="${PYTHONPATH}:${BUILD_DIR}/compiler/bindings/python:${BUILD_DIR}/runtime/bindings/python"
+          export PYTHONPATH="${PYTHONPATH}:$TFPYBASE/iree_tf:$TFPYBASE/iree_tflite"
+          export SHARK_SKIP_TESTS="--ignore=shark/tests/test_shark_importer.py \
+            --ignore=benchmarks/tests/test_hf_benchmark.py \
+            --ignore=benchmarks/tests/test_benchmark.py"
+          export MODEL_LIST="bert_base_cased or mobilebert_uncased or MiniLM_L12_H384_uncased or module_resnet50 or mobilenet_v3 or squeezenet1_0 or vit_base_patch16_224"
+          pytest tank/test_models.py -k "cpu and ($MODEL_LIST)" $SHARK_SKIP_TESTS
+          pytest tank/test_models.py -k "vulkan and ($MODEL_LIST)" $SHARK_SKIP_TESTS
+          pytest tank/test_models.py -k "cuda and ($MODEL_LIST)" $SHARK_SKIP_TESTS
+
   ############################### Configurations ###############################
   # Jobs that build IREE in some non-default configuration
   ##############################################################################
@@ -544,7 +602,7 @@ jobs:
             gcr.io/iree-oss/android@sha256:76c2a52dcd6d07601227b965ac87d021c1d2d5e2d01f46ad58da28c89267f2ab \
             build_tools/cmake/build_android.sh
 
-  riscv32:
+  baremetal_riscv32:
     needs: [setup, build_all]
     if: needs.setup.outputs.should-run == 'true'
     runs-on:
@@ -568,7 +626,7 @@ jobs:
         run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting install from build dir archive"
         run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
-      - name: "Cross-compiling and testing riscv32"
+      - name: "Cross-compiling and testing riscv32 baremetal"
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "RISCV_ARCH=${BUILD_ARCH}" \
@@ -579,7 +637,7 @@ jobs:
             bash -euo pipefail -c \
             "./build_tools/cmake/build_riscv.sh && tests/riscv32/smoke.sh"
 
-  riscv64:
+  linux_riscv:
     needs: [setup, build_all, build_tf_integrations]
     if: needs.setup.outputs.should-run == 'true'
     runs-on:
@@ -588,9 +646,12 @@ jobs:
       - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
+    strategy:
+      matrix:
+        architecture: [rv64, rv32-linux]
     env:
-      BUILD_RISCV_DIR: "build-riscv64"
-      BUILD_ARCH: "rv64"
+      BUILD_RISCV_DIR: build-${{ matrix.architecture }}
+      BUILD_ARCH: ${{ matrix.architecture }}
       BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
       BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
       BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
@@ -610,7 +671,7 @@ jobs:
         run: gcloud alpha storage cp "${TF_BINARIES_GCS_ARTIFACT}" "${TF_BINARIES_ARCHIVE}"
       - name: "Extracting TF binaries archive"
         run: tar -xf "${TF_BINARIES_ARCHIVE}"
-      - name: "Cross-compiling and testing riscv64"
+      - name: "Cross-compiling and testing RISC-V Linux"
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "RISCV_ARCH=${BUILD_ARCH}" \
@@ -621,7 +682,7 @@ jobs:
             --env "LLVM_BIN_DIR=${BUILD_DIR}/third_party/llvm-project/llvm/bin" \
             gcr.io/iree-oss/riscv@sha256:d6f0e293a50faf5abbd564c1d1bb9dc6456d7ce93d07b131c381fa64c1daed62 \
             bash -euo pipefail -c \
-              "./build_tools/cmake/build_riscv.sh && ./build_tools/cmake/test_riscv64.sh"
+              "./build_tools/cmake/build_riscv.sh && ./build_tools/cmake/test_riscv.sh"
 
   emscripten:
     needs: [setup, build_all]
@@ -679,14 +740,17 @@ jobs:
       - test_tf_integrations
       - test_tf_integrations_gpu
 
+      # Model Coverage
+      - test_shark_model_suite
+
       # Configurations
       - asan
       - tsan
 
       # Crosscompilation
       - android_arm64
-      - riscv32
-      - riscv64
+      - baremetal_riscv32
+      - linux_riscv
       - emscripten
 
       # Benchmark pipeline

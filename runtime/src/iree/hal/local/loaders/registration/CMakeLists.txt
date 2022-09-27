@@ -25,6 +25,7 @@ iree_cc_library(
   DEPS
     iree::base
     iree::hal::local
+    ${IREE_HAL_EXECUTABLE_LOADER_EXTRA_DEPS}
     ${IREE_HAL_EXECUTABLE_LOADER_MODULES}
   PUBLIC
 )

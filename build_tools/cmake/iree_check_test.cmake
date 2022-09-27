@@ -50,6 +50,13 @@ function(iree_bytecode_module_for_iree_check_test_and_friends)
     # specific CPU flags. Add the llvm flags to support RV64 RVV codegen if
     # llvm-target-triple is not specified.
     list(APPEND _RULE_FLAGS ${RISCV64_TEST_DEFAULT_LLVM_FLAGS})
+  elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv32" AND
+         CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
+         NOT _RULE_FLAGS MATCHES "iree-llvm-target-triple")
+    # RV32 Linux crosscompile toolchain can support iree-compile with
+    # specific CPU flags. Add the llvm flags to support RV32 RVV codegen if
+    # llvm-target-triple is not specified.
+    list(APPEND _RULE_FLAGS ${RISCV32_TEST_DEFAULT_LLVM_FLAGS})
   endif()
 
   if(_RULE_TARGET_CPU_FEATURES)

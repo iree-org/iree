@@ -483,6 +483,18 @@ def VMVXLinkExecutables :
 }
 
 //------------------------------------------------------------------------------
+// WGSL Passes
+//------------------------------------------------------------------------------
+
+def WGSLReplacePushConstants :
+    Pass<"iree-wgsl-replace-push-constants", "func::FuncOp"> {
+  let summary =
+      "Replaces push constant loads with binding loads for when using "
+      "WGSL without push constant support";
+  let constructor = "mlir::iree_compiler::createWGSLReplacePushConstantsPass()";
+}
+
+//------------------------------------------------------------------------------
 // Test Passes
 //------------------------------------------------------------------------------
 
