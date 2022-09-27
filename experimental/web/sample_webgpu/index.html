@@ -166,6 +166,9 @@ SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
     const initializePromise = ireeInitialize();
     initializePromise.then(() => {
       console.log("IREE initialized, ready to load programs.");
+    }).catch((error) => {
+      console.error("Failed to initialize IREE, error:");
+      console.error(error);
     });
 
     let loadedProgram = null;

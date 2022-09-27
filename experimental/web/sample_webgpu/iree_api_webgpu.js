@@ -113,6 +113,9 @@ async function _ireeInitialize() {
   // adapter and device itself, but that would jump through layers of Emscripten
   // binding code and C/JS callbacks. This is much more concise.
   // const instance = -1; // No wgpuCreateInstance function in JS (yet?).
+  if (navigator['gpu'] === undefined) {
+    throw 'No \'gpu\' property on navigator, can\'t initialize WebGPU (missing #enable-unsafe-webgpu or an origin trial?)';
+  }
   const adapter = await navigator['gpu']['requestAdapter']();
   const deviceDescriptor = {
     'label': 'IREE WebGPU device',

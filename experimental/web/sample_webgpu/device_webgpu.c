@@ -15,7 +15,11 @@
 iree_status_t create_device(iree_allocator_t host_allocator,
                             iree_hal_device_t** out_device) {
   WGPUDevice wgpu_device = emscripten_webgpu_get_device();
-  // TODO(scotttodd): error handling here
+  if (!wgpu_device) {
+    return iree_make_status(
+        IREE_STATUS_UNAVAILABLE,
+        "emscripten_webgpu_get_device() failed to return a WGPUDevice");
+  }
 
   iree_hal_webgpu_device_options_t default_options;
   iree_hal_webgpu_device_options_initialize(&default_options);
