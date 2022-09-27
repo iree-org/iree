@@ -40,12 +40,14 @@ iree_cc_library(
     MLIRLinalgTransforms
     MLIRLinalgUtils
     MLIRMemRefDialect
+    MLIRNVGPUDialect
     MLIRPDLDialect
     MLIRPass
     MLIRSCFDialect
     MLIRTransformDialect
     MLIRTransforms
     MLIRVectorDialect
+    MLIRVectorToGPU
     MLIRVectorTransforms
     iree::compiler::Dialect::HAL::IR
   PUBLIC

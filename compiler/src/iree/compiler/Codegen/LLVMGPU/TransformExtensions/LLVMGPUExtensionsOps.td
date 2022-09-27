@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMEXTENSIONS_LLVMGPUEXTENSIONS
 #define IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMEXTENSIONS_LLVMGPUEXTENSIONS
 
+include "mlir/IR/EnumAttr.td"
 include "mlir/Dialect/PDL/IR/PDLTypes.td"
 include "mlir/Dialect/Transform/IR/TransformDialect.td"
 include "mlir/Dialect/Transform/IR/TransformInterfaces.td"
@@ -297,6 +298,45 @@ def VectorWarpDistributionOp : Op<Transform_Dialect, "iree.vector.warp_distribut
 
   let assemblyFormat = "$target attr-dict";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::Operation *target,
+        ::llvm::SmallVectorImpl<::mlir::Operation *> &results, 
+        ::mlir::transform::TransformState &state);
+  }];
+}
+def TargetVectorOp : 
+  Op<Transform_Dialect, "iree.target_vector_to",
+    [FunctionalStyleTransformOpTrait, 
+     MemoryEffectsOpInterface,
+     TransformEachOpTrait,
+     TransformOpInterface]> {
+  let description = [{
+    Specifies that the `target` operation has ops in vector dialect and 
+    lowers it to the target specific dialect. The transformation
+     only handles vector ops, otherwise it is no-op. Internally, it applies a 
+     set of rewrite patterns.
+    
+    This transformation supports the following target dialects:
+      - `gpu`: Lower the operations from the vector dialect into the 
+      general GPU dialect
+      - `nvgpu`: Lower the operations from the vector dialect into the 
+      Nvidia specific GPU dialect
+
+    #### Return modes:
+    
+    This operation produces `definiteFailure` if vectorization fails for any
+    reason.
+    The operation always returns the handle to the target op that is expected 
+    to be isolated from above.
+  }];
+
+  let arguments = (ins PDL_Operation:$target, StrAttr:$target_dialect);
+  let results = (outs PDL_Operation:$transformed);
+
+  let assemblyFormat = "$target_dialect $target attr-dict";
+  let cppNamespace =  "mlir::iree_compiler::IREE::transform_dialect";
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(

@@ -8,11 +8,13 @@
 
 #include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/VectorDistribution.h"
@@ -293,6 +295,43 @@ transform_dialect::VectorToWarpExecuteOnLane0Op::applyToOne(
   return DiagnosedSilenceableFailure(success());
 }
 
+//===----------------------------------------------------------------------===//
+// TargetVectorOp
+//===----------------------------------------------------------------------===//
+DiagnosedSilenceableFailure transform_dialect::TargetVectorOp::applyToOne(
+    Operation *target, SmallVectorImpl<Operation *> &results,
+    transform::TransformState &state) {
+  if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
+    auto diag = this->emitOpError("requires isolated-from-above targets");
+    diag.attachNote(target->getLoc()) << "non-isolated target";
+    return DiagnosedSilenceableFailure::definiteFailure();
+  }
+  MLIRContext *ctx = getContext();
+  RewritePatternSet patterns(ctx);
+  StringRef targetDialect = getTargetDialect();
+
+  bool targetGPU = targetDialect.compare_insensitive("gpu") == 0;
+  bool targetNVGPU = targetDialect.compare_insensitive("nvgpu") == 0;
+
+  if (!targetGPU && !targetNVGPU) {
+    state.getTopLevel()->emitOpError(
+        "Requested target dialect is not valid or supported yet. Supported "
+        "dialects are gpu, nvgpu.");
+    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+  }
+  if (targetGPU || targetNVGPU)
+    populatePrepareVectorToMMAPatterns(patterns, targetNVGPU);
+
+  if (failed(applyPatternsAndFoldGreedily(target, std::move(patterns))))
+    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+
+  if (targetGPU) (void)convertVectorToMMAOps(target);
+  if (targetNVGPU) (void)convertVectorToNVVMCompatibleMMASync(target);
+
+  results.push_back(target);
+  return DiagnosedSilenceableFailure(success());
+}
+
 //===---------------------------------------------------------------------===//
 // VectorWarpDistributionOp.
 //===---------------------------------------------------------------------===//
@@ -406,9 +445,9 @@ struct WarpOpLoad : public OpRewritePattern<vector::WarpExecuteOnLane0Op> {
     Value newRead = rewriter.create<memref::LoadOp>(
         load.getLoc(), distributedVal.getType(), load.getMemref(), indices);
 
-    // The result type of WarpExecuteOnLane0Op may or may not match the yielded
-    // type depending on whether the op has "broadcast" behavior (see the doc
-    // of WarpExecuteOnLane0Op).
+    // The result type of WarpExecuteOnLane0Op may or may not match the
+    // yielded type depending on whether the op has "broadcast" behavior (see
+    // the doc of WarpExecuteOnLane0Op).
     for (OpOperand &use : distributedVal.getUses()) {
       rewriter.startRootUpdate(use.getOwner());
       Value replacement = newRead;
@@ -481,7 +520,8 @@ transform_dialect::VectorWarpDistributionOp::applyToOne(
     transform::TransformState &state) {
   if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
     target->emitOpError(
-        "applies only to isolated-from-above targets because it needs to apply "
+        "applies only to isolated-from-above targets because it needs to "
+        "apply "
         "patterns greedily");
     return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
   }
@@ -505,7 +545,8 @@ transform_dialect::VectorWarpDistributionOp::applyToOne(
   vector::WarpExecuteOnLane0LoweringOptions options;
   options.warpAllocationFn = allocateGlobalSharedMemory;
   options.warpSyncronizationFn = warpSyncronizationFn;
-  populateWarpExecuteOnLane0ToScf(target, endPatterns, options, /*benefit=*/0);
+  populateWarpExecuteOnLane0ToScf(target, endPatterns, options,
+                                  /*benefit=*/0);
   if (failed(applyPatternsAndFoldGreedily(target, std::move(endPatterns)))) {
     target->emitOpError(
         "warp execute on lane 0 to scf patterns failed to apply");

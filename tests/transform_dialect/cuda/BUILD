@@ -28,6 +28,7 @@ iree_lit_test_suite(
     srcs = [
         "reduction.mlir",
         "softmax.mlir",
+        "matmul.mlir",
     ],
     cfg = "//tests:lit.cfg.py",
     # transform dialect spec files are MLIR files that specify a transformation,
@@ -35,6 +36,7 @@ iree_lit_test_suite(
     data = [
         "reduction_codegen_spec.mlir",
         "softmax_codegen_spec.mlir",
+        "matmul_codegen_spec.mlir",
         # FIXME: This cannot be retired yet as there is some writeonly vs readwrite
         # issue and we even end up emitting out of bounds accesses.
         "softmax_dispatch_spec.mlir",

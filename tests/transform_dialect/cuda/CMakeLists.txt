@@ -18,6 +18,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "matmul.mlir"
     "reduction.mlir"
     "softmax.mlir"
   TOOLS
@@ -26,6 +27,7 @@ iree_lit_test_suite(
     iree-opt
     iree-run-module
   DATA
+    matmul_codegen_spec.mlir
     reduction_codegen_spec.mlir
     softmax_codegen_spec.mlir
     softmax_dispatch_spec.mlir
