@@ -502,9 +502,10 @@ jobs:
           export SHARK_SKIP_TESTS="--ignore=shark/tests/test_shark_importer.py \
             --ignore=benchmarks/tests/test_hf_benchmark.py \
             --ignore=benchmarks/tests/test_benchmark.py"
-          pytest tank/test_models.py -k 'cpu' $SHARK_SKIP_TESTS
-          pytest tank/test_models.py -k 'vulkan' $SHARK_SKIP_TESTS
-          pytest tank/test_models.py -k "cuda" $SHARK_SKIP_TESTS
+          export MODEL_LIST="bert_base_cased or mobilebert_uncased or MiniLM_L12_H384_uncased or module_resnet50 or mobilenet_v3 or squeezenet1_0 or vit_base_patch16_224"
+          pytest tank/test_models.py -k "cpu and ($MODEL_LIST)" $SHARK_SKIP_TESTS
+          pytest tank/test_models.py -k "vulkan and ($MODEL_LIST)" $SHARK_SKIP_TESTS
+          pytest tank/test_models.py -k "cuda and ($MODEL_LIST)" $SHARK_SKIP_TESTS
 
   ############################### Configurations ###############################
   # Jobs that build IREE in some non-default configuration
