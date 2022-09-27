@@ -752,7 +752,7 @@ func.func @unpack_static(%input: tensor<8x8x32x16xf32>, %output: tensor<256x128x
 // CHECK-SAME:     into %[[OUTPUT]]
 // CHECK:        return %[[UNPACK]]
 
-// ----
+// -----
 
 func.func @unpack_undo_padding(%input: tensor<2x8x8x2xf32>, %output: tensor<13x15xf32>) -> tensor<13x15xf32> {
   %0 = iree_linalg_ext.unpack %input inner_dims_pos = [0, 1] inner_tiles = [8, 2] into %output : (tensor<2x8x8x2xf32> tensor<13x15xf32>) -> tensor<13x15xf32>
@@ -827,3 +827,69 @@ func.func @unpack(%arg0: memref<128x256xf32>, %arg1: memref<32x4x32x8xf32>) {
 // CHECK-SAME: %[[ARG0:[a-zA-Z0-9]+]]: memref<128x256xf32>,
 // CHECK-SAME: %[[ARG1:[a-zA-Z0-9]+]]: memref<32x4x32x8xf32>) {
 // CHECK: iree_linalg_ext.unpack %[[ARG1]] outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 8] into %[[ARG0]] : (memref<32x4x32x8xf32> memref<128x256xf32>)
+
+// -----
+
+// CHECK: @set_encoding_ops(%[[ARG0:.+]]: tensor<?x?xf32>)
+func.func @set_encoding_ops(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>> {
+  // CHECK: iree_linalg_ext.set_encoding %[[ARG0]] : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>
+  %0 = iree_linalg_ext.set_encoding %arg0 : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>
+  return %0 : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>
+}
+
+// -----
+
+// CHECK: @set_encoding_ops_mixed_dynamic_static(%[[ARG0:.+]]: tensor<?x10xf32>)
+func.func @set_encoding_ops_mixed_dynamic_static(%arg0: tensor<?x10xf32>) -> tensor<20x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>> {
+  // CHECK: iree_linalg_ext.set_encoding %[[ARG0]] : tensor<?x10xf32> -> tensor<20x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>
+  %0 = iree_linalg_ext.set_encoding %arg0 : tensor<?x10xf32> -> tensor<20x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>
+  return %0 : tensor<20x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>
+}
+
+// -----
+
+// CHECK: @unset_encoding_ops(%[[ARG0:.+]]: tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RHS>>)
+func.func @unset_encoding_ops(%arg0: tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RHS>>) -> tensor<?x?xf32> {
+  // CHECK: iree_linalg_ext.unset_encoding %[[ARG0]] : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RHS>> -> tensor<?x?xf32>
+  %0 = iree_linalg_ext.unset_encoding %arg0 : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RHS>> -> tensor<?x?xf32>
+  return %0 : tensor<?x?xf32>
+}
+
+// -----
+
+// CHECK: @unset_encoding_ops_mixed_dynamic_static(%[[ARG0:.+]]: tensor<10x?xf32, #iree_linalg_ext.encoding<GEMM_RHS>>)
+func.func @unset_encoding_ops_mixed_dynamic_static(%arg0: tensor<10x?xf32, #iree_linalg_ext.encoding<GEMM_RHS>>) -> tensor<?x20xf32> {
+  // CHECK: iree_linalg_ext.unset_encoding %[[ARG0]] : tensor<10x?xf32, #iree_linalg_ext.encoding<GEMM_RHS>>
+  %0 = iree_linalg_ext.unset_encoding %arg0 : tensor<10x?xf32, #iree_linalg_ext.encoding<GEMM_RHS>> -> tensor<?x20xf32>
+  return %0 : tensor<?x20xf32>
+}
+
+// -----
+
+func.func @encoding_tensors_with_ops(%arg0 : tensor<?x?xf32>,
+    %arg1 : tensor<?x?xf32>, %arg2 : tensor<?x?xf32>) -> tensor<?x?xf32> {
+  %0 = iree_linalg_ext.set_encoding %arg0 : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>
+  %1 = iree_linalg_ext.set_encoding %arg1 : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RHS>>
+  %2 = iree_linalg_ext.set_encoding %arg2 : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RESULT>>
+  %3 = linalg.matmul
+      ins(%0, %1 : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>, tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RHS>>)
+      outs(%2 : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RESULT>>)
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RESULT>>
+  %4 = iree_linalg_ext.unset_encoding %3 : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RESULT>> -> tensor<?x?xf32>
+  return %4 : tensor<?x?xf32>
+}
+// CHECK-LABEL: func.func @encoding_tensors_with_ops
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
+//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?xf32>
+//  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<?x?xf32>
+//       CHECK:   %[[LHS:.+]] = iree_linalg_ext.set_encoding %[[ARG0]]
+//  CHECK-SAME:       tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>
+//       CHECK:   %[[RHS:.+]] = iree_linalg_ext.set_encoding %[[ARG1]]
+//  CHECK-SAME:       tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RHS>>
+//       CHECK:   %[[OUT:.+]] = iree_linalg_ext.set_encoding %[[ARG2]]
+//  CHECK-SAME:       tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RESULT>>
+//       CHECK:   %[[GEMM:.+]] = linalg.matmul
+//  CHECK-SAME:       ins(%[[LHS]], %[[RHS]] :
+//  CHECK-SAME:       outs(%[[OUT]] :
+//       CHECK:   %[[RESULT:.+]] = iree_linalg_ext.unset_encoding %[[GEMM]]
+//       CHECK:   return %[[RESULT]]

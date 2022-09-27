@@ -20,6 +20,7 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/FunctionImplementation.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpImplementation.h"
@@ -82,10 +83,20 @@ static Value getSlice(OpBuilder &b, Location loc, Value source,
       .Default([&](Type t) { return nullptr; });
 }
 
-/// Returns true if the dimensions of ShapedType aren't dynamic or aren't equal.
-static bool isShapedTypeDimEqual(int64_t lhs, int64_t rhs) {
-  return lhs != ShapedType::kDynamicSize && rhs != ShapedType::kDynamicSize &&
-         lhs != rhs;
+/// Returns true if the dimensions of ShapedType are compatible.
+static bool isShapedTypeDimCompatible(int64_t lhs, int64_t rhs) {
+  return lhs == ShapedType::kDynamicSize || rhs == ShapedType::kDynamicSize ||
+         lhs == rhs;
+}
+
+/// Returns true if the dimensions of ShapedType are compatible.
+static bool areShapesCompatible(ArrayRef<int64_t> lhs, ArrayRef<int64_t> rhs) {
+  if (lhs.size() != rhs.size()) {
+    return false;
+  }
+  return llvm::all_of(llvm::zip(lhs, rhs), [](std::tuple<int64_t, int64_t> it) {
+    return isShapedTypeDimCompatible(std::get<0>(it), std::get<1>(it));
+  });
 }
 
 Value IREE::LinalgExt::getDimValue(OpBuilder &builder, Location loc, Value v,
@@ -1278,34 +1289,26 @@ LogicalResult TopkOp::verify() {
   // Input indicies and values must have the same shape.
   if (auto inputIndices = indices()) {
     auto inputIndicesType = inputIndices->getType().cast<ShapedType>();
-    if (llvm::any_of(
-            llvm::zip(inputValuesType.getShape(), inputIndicesType.getShape()),
-            [](std::tuple<int64_t, int64_t> s) {
-              return isShapedTypeDimEqual(std::get<0>(s), std::get<1>(s));
-            })) {
+    if (!areShapesCompatible(inputValuesType.getShape(),
+                             inputIndicesType.getShape()))
       return op->emitOpError("input indices/values shape must match");
-    }
   }
   // Output indicies and values must have the same shape.
-  if (llvm::any_of(
-          llvm::zip(outputValuesType.getShape(), outputIndicesType.getShape()),
-          [](std::tuple<int64_t, int64_t> s) {
-            return isShapedTypeDimEqual(std::get<0>(s), std::get<1>(s));
-          })) {
+  if (!areShapesCompatible(outputValuesType.getShape(),
+                           outputIndicesType.getShape()))
     return op->emitOpError("output indices/values shape must match");
-  }
   // Input shape must match the output shape except for the dimension()
   uint64_t dim = getDimension();
-  if (llvm::any_of(llvm::enumerate(llvm::zip(inputValuesType.getShape(),
-                                             outputValuesType.getShape())),
-                   [dim](auto e) {
-                     if (e.index() == dim) {
-                       return false;
-                     }
-                     std::tuple<int64_t, int64_t> s = e.value();
-                     return isShapedTypeDimEqual(std::get<0>(s),
-                                                 std::get<1>(s));
-                   })) {
+  if (!llvm::all_of(llvm::enumerate(llvm::zip(inputValuesType.getShape(),
+                                              outputValuesType.getShape())),
+                    [dim](auto e) {
+                      if (e.index() == dim) {
+                        return true;
+                      }
+                      std::tuple<int64_t, int64_t> s = e.value();
+                      return isShapedTypeDimCompatible(std::get<0>(s),
+                                                       std::get<1>(s));
+                    })) {
     return op->emitOpError("incompatible input/output shapes");
   }
   // Check region compatibility
@@ -2316,6 +2319,79 @@ DEFINE_OP_GET_EFFECTS(ScanOp)
 DEFINE_OP_GET_EFFECTS(TopkOp)
 DEFINE_OP_GET_EFFECTS(PackOp)
 DEFINE_OP_GET_EFFECTS(UnPackOp)
+
+//===----------------------------------------------------------------------===//
+// iree_linalg_ext.set_encoding
+//===----------------------------------------------------------------------===//
+
+void SetEncodingOp::build(OpBuilder &builder, OperationState &state,
+                          Value source, TensorEncoding encoding) {
+  auto encodingAttr = EncodingAttr::get(builder.getContext(), encoding);
+  auto sourceType = source.getType().cast<RankedTensorType>();
+  RankedTensorType encodingType = RankedTensorType::get(
+      sourceType.getShape(), sourceType.getElementType(), encodingAttr);
+  build(builder, state, encodingType, source);
+}
+
+LogicalResult SetEncodingOp::verify() {
+  // Source and the result have the same rank.
+  if (getSourceType().getEncoding()) {
+    return emitOpError(
+        "source of set_encoding op cannot have a tensor encoding");
+  }
+  if (!getResultType().getEncoding().isa_and_nonnull<EncodingAttr>()) {
+    return emitOpError(
+        "result of set_encoding op expected to have a valid tensor encoding");
+  }
+  // The source and result must have the same rank.
+  if (getResultType().getRank() != getSourceType().getRank())
+    return emitOpError("cannot change the rank of the tensor");
+  if (!areShapesCompatible(getResultType().getShape(),
+                           getSourceType().getShape()))
+    return emitOpError("expected to preserve the logical shape of the tensor");
+  return success();
+}
+
+LogicalResult SetEncodingOp::reifyResultShapes(
+    OpBuilder &builder, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  OpBuilder::InsertionGuard g(builder);
+  builder.setInsertionPoint(getOperation());
+  reifiedReturnShapes.resize(1);
+  reifiedReturnShapes[0] = getValueOrCreateConstantIndexOp(
+      builder, getLoc(), getDims(builder, getLoc(), getSource()));
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// iree_linalg_ext.unset_encoding
+//===----------------------------------------------------------------------===//
+
+void UnsetEncodingOp::build(OpBuilder &builder, OperationState &state,
+                            Value source) {
+  auto sourceType = source.getType().cast<RankedTensorType>();
+  auto resultType =
+      RankedTensorType::get(sourceType.getShape(), sourceType.getElementType());
+  return build(builder, state, resultType, source);
+}
+
+LogicalResult UnsetEncodingOp::verify() {
+  if (getResultType().getEncoding()) {
+    return emitOpError(
+        "result of unset_encoding op cannot have a tensor encoding");
+  }
+  if (!getSourceType().getEncoding().isa_and_nonnull<EncodingAttr>()) {
+    return emitOpError(
+        "source of unset_encoding op expected to have a valid tensor encoding");
+  }
+  // The source and result must have the same rank.
+  if (getResultType().getRank() != getSourceType().getRank())
+    return emitOpError("cannot change the rank of the tensor");
+  if (!areShapesCompatible(getResultType().getShape(),
+                           getSourceType().getShape()))
+    return emitOpError("expected to preserve the logical shape of the tensor");
+  return success();
+}
+
 namespace {
 /// This is derived from mlir/lib/Dialect/Linalg/IR/LinalgOps.cpp without any
 /// changes.
@@ -2392,5 +2468,7 @@ void IREELinalgExtDialect::getCanonicalizationPatterns(
   results.add<FoldTensorCastOp>(getContext());
 }
 
+// clang-format off
 #define GET_OP_CLASSES
-#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.cpp.inc"
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.cpp.inc" // IWYU pragma: keep
+// clang-format: on
