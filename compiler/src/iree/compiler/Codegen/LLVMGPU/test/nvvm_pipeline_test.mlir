@@ -15,7 +15,7 @@ hal.executable @simpleMath_ex_dispatch_0 {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
   hal.executable.export @add_dispatch_0 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
@@ -59,7 +59,7 @@ hal.executable @dot_dispatch_0 {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
     hal.executable.export @dot_dispatch_0 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -130,7 +130,7 @@ hal.executable @dot_dispatch_0 {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
     hal.executable.export @dot_dispatch_0 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -183,7 +183,7 @@ hal.executable @conv2d_dispatch_0 {
 hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
   hal.executable.export @conv2d_dispatch_0 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 : index, %arg5 : index, %arg6 : index, %arg7 : index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3, %arg4, %arg5, %arg6, %arg7
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4, %arg5, %arg6, %arg7
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
@@ -231,7 +231,7 @@ hal.executable @simpleMath_ex_dispatch_0 {
 hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
   hal.executable.export @add_dispatch_0 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
@@ -271,7 +271,7 @@ hal.executable @reduction_dispatch {
 hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
   hal.executable.export @reduction layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
@@ -318,7 +318,7 @@ hal.executable @vector_add_dispatch {
 hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
   hal.executable.export @vector_add_dispatch layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
@@ -371,7 +371,7 @@ hal.executable @vector_reduction_dispatch {
 hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
   hal.executable.export @vector_reduction_dispatch layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
@@ -417,7 +417,7 @@ hal.executable @mma_fused {
   hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
   hal.executable.export public @_large_aligned_dispatch_0 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>, #hal.descriptor_set.binding<1, storage_buffer>, #hal.descriptor_set.binding<2, storage_buffer>]>]>) {
   ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
-    %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
+    %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
     hal.return %x, %y, %z : index, index, index
   }
   builtin.module {
@@ -472,23 +472,18 @@ hal.executable @mma_fused {
 //           CHECK:   nvvm.cp.async.wait.group 3
 //   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
 //   CHECK-COUNT-2:   nvvm.wmma.mma
-//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//   CHECK-COUNT-2:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<i8, 3>, !llvm.ptr<i8, 1>, i32, i32) -> !llvm.void
 //           CHECK:   nvvm.cp.async.commit.group
 //           CHECK:   llvm.br
-//           CHECK:   nvvm.cp.async.wait.group 3
-//   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
-//   CHECK-COUNT-2:   nvvm.wmma.mma
-//           CHECK:   nvvm.cp.async.wait.group 2
-//   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
-//   CHECK-COUNT-2:   nvvm.wmma.mma
-//           CHECK:   nvvm.cp.async.wait.group 1
-//   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
-//   CHECK-COUNT-2:   nvvm.wmma.mma
-//           CHECK:   nvvm.cp.async.wait.group 0
-//   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
-//   CHECK-COUNT-2:   nvvm.wmma.mma
-//   CHECK-COUNT-8:   llvm.fadd
-//   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f32>, f32, f32, f32, f32, f32, f32, f32, f32
+//       CHECK-NOT:   nvvm.wmma.mma
+//   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f32, 3>, f32, f32, f32, f32, f32, f32, f32, f32
+//           CHECK:   vvm.barrier0
+//           CHECK:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//           CHECK:   llvm.fadd {{.*}} : vector<4xf32>
+//           CHECK:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
+//           CHECK:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//           CHECK:   llvm.fadd {{.*}} : vector<4xf32>
+//           CHECK:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
 
 // mma.sync case:
 //    MMASYNC-LABEL: hal.executable public @mma_fused
@@ -506,30 +501,22 @@ hal.executable @mma_fused {
 //          MMASYNC:   nvvm.cp.async.wait.group 3
 //  MMASYNC-COUNT-4:   nvvm.ldmatrix{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32)
 //  MMASYNC-COUNT-8:   nvvm.mma.sync
-//  MMASYNC-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//  MMASYNC-COUNT-2:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<i8, 3>, !llvm.ptr<i8, 1>, i32, i32) -> !llvm.void
 //          MMASYNC:   nvvm.cp.async.commit.group
 //          MMASYNC:   llvm.br
-//          MMASYNC:   nvvm.cp.async.wait.group 3
-//  MMASYNC-COUNT-4:   nvvm.ldmatrix{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32)
-//  MMASYNC-COUNT-8:   nvvm.mma.sync
-//          MMASYNC:   nvvm.cp.async.wait.group 2
-//  MMASYNC-COUNT-4:   nvvm.ldmatrix{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32)
-//  MMASYNC-COUNT-8:   nvvm.mma.sync
-//          MMASYNC:   nvvm.cp.async.wait.group 1
-//  MMASYNC-COUNT-4:   nvvm.ldmatrix{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32)
-//  MMASYNC-COUNT-8:   nvvm.mma.sync
-//          MMASYNC:   nvvm.cp.async.wait.group 0
-//  MMASYNC-COUNT-4:   nvvm.ldmatrix{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32)
-//  MMASYNC-COUNT-8:   nvvm.mma.sync
+//      MMASYNC-NOT:   nvvm.mma.sync
 //  MMASYNC-COUNT-4:   llvm.store {{.*}} : !llvm.ptr<vector<2xf32>, 3>
-//  MMASYNC-COUNT-2:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
-//  MMASYNC-COUNT-2:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
-
-// C matrix promotion prevent efficient fusion with matmul consumer, this needs
-// to be fixed to get good performance.
-// MMASYNC-COUNT-32:   llvm.load {{.*}} : !llvm.ptr<vector<8xf32>>
-// MMASYNC-COUNT-32:   llvm.fadd {{.*}} : vector<8xf32>
-// MMASYNC-COUNT-32:   llvm.store {{.*}} : !llvm.ptr<vector<8xf32>>
+//    MMASYNC-COUNT:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//    MMASYNC-COUNT:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
+//    MMASYNC-COUNT:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//    MMASYNC-COUNT:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
+//    MMASYNC-COUNT:   nvvm.barrier0
+//    MMASYNC-COUNT:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//    MMASYNC-COUNT:   llvm.fadd {{.*}} : vector<4xf32>
+//    MMASYNC-COUNT:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
+//    MMASYNC-COUNT:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//    MMASYNC-COUNT:   llvm.fadd {{.*}} : vector<4xf32>
+//    MMASYNC-COUNT:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
 
 
 
@@ -546,7 +533,7 @@ hal.executable @mma_fused_fp16 {
   hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
   hal.executable.export public @_large_aligned_dispatch_0 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>, #hal.descriptor_set.binding<1, storage_buffer>, #hal.descriptor_set.binding<2, storage_buffer>]>]>) {
   ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
-    %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
+    %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
     hal.return %x, %y, %z : index, index, index
   }
   builtin.module {
@@ -601,23 +588,16 @@ hal.executable @mma_fused_fp16 {
 //           CHECK:   nvvm.cp.async.wait.group 3
 //   CHECK-COUNT-2:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f16, 3>) -> !llvm.struct<(vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>)
 //   CHECK-COUNT-1:   nvvm.wmma.mma
-//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//   CHECK-COUNT-2:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<i8, 3>, !llvm.ptr<i8, 1>, i32, i32) -> !llvm.void
 //           CHECK:   nvvm.cp.async.commit.group
 //           CHECK:   llvm.br
-//           CHECK:   nvvm.cp.async.wait.group 3
-//   CHECK-COUNT-2:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f16, 3>) -> !llvm.struct<(vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>)
-//   CHECK-COUNT-1:   nvvm.wmma.mma
-//           CHECK:   nvvm.cp.async.wait.group 2
-//   CHECK-COUNT-2:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f16, 3>) -> !llvm.struct<(vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>)
-//   CHECK-COUNT-1:   nvvm.wmma.mma
-//           CHECK:   nvvm.cp.async.wait.group 1
-//   CHECK-COUNT-2:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f16, 3>) -> !llvm.struct<(vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>)
-//   CHECK-COUNT-1:   nvvm.wmma.mma
-//           CHECK:   nvvm.cp.async.wait.group 0
-//   CHECK-COUNT-2:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f16, 3>) -> !llvm.struct<(vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>)
-//   CHECK-COUNT-1:   nvvm.wmma.mma
-//   CHECK-COUNT-4:   llvm.fadd
-//   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>
+//       CHECK-NOT:   nvvm.wmma.mma
+//   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f16, 3>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>
+//           CHECK:   vvm.barrier0
+//           CHECK:   llvm.load {{.*}} : !llvm.ptr<vector<8xf16>, 3>
+//           CHECK:   llvm.fadd {{.*}} : vector<8xf16>
+//           CHECK:   llvm.store {{.*}} : !llvm.ptr<vector<8xf16>>
+//           CHECK:   vvm.barrier0
 
 // mma.sync case:
 //    MMASYNC-LABEL: hal.executable public @mma_fused_fp16
@@ -635,21 +615,10 @@ hal.executable @mma_fused_fp16 {
 //          MMASYNC:   nvvm.cp.async.wait.group 3
 //  MMASYNC-COUNT-4:   nvvm.ldmatrix {{.*}} : (!llvm.ptr<f16, 3>) -> !llvm.struct<(i32, i32)>
 //  MMASYNC-COUNT-8:   nvvm.mma.sync
-//  MMASYNC-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//  MMASYNC-COUNT-2:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<i8, 3>, !llvm.ptr<i8, 1>, i32, i32) -> !llvm.void
 //          MMASYNC:   nvvm.cp.async.commit.group
 //          MMASYNC:   llvm.br
-//          MMASYNC:   nvvm.cp.async.wait.group 3
-//  MMASYNC-COUNT-4:   nvvm.ldmatrix {{.*}} : (!llvm.ptr<f16, 3>) -> !llvm.struct<(i32, i32)>
-//  MMASYNC-COUNT-8:   nvvm.mma.sync
-//          MMASYNC:   nvvm.cp.async.wait.group 2
-//  MMASYNC-COUNT-4:   nvvm.ldmatrix {{.*}} : (!llvm.ptr<f16, 3>) -> !llvm.struct<(i32, i32)>
-//  MMASYNC-COUNT-8:   nvvm.mma.sync
-//          MMASYNC:   nvvm.cp.async.wait.group 1
-//  MMASYNC-COUNT-4:   nvvm.ldmatrix {{.*}} : (!llvm.ptr<f16, 3>) -> !llvm.struct<(i32, i32)>
-//  MMASYNC-COUNT-8:   nvvm.mma.sync
-//          MMASYNC:   nvvm.cp.async.wait.group 0
-//  MMASYNC-COUNT-4:   nvvm.ldmatrix {{.*}} : (!llvm.ptr<f16, 3>) -> !llvm.struct<(i32, i32)>
-//  MMASYNC-COUNT-8:   nvvm.mma.sync
+//      MMASYNC-NOT:   nvvm.mma.sync
 //  MMASYNC-COUNT-4:   llvm.store {{.*}} : !llvm.ptr<vector<2xf16>, 3>
 //          MMASYNC:   llvm.load {{.*}} : !llvm.ptr<vector<8xf16>, 3>
 //          MMASYNC:   llvm.store {{.*}} : !llvm.ptr<vector<8xf16>>
@@ -675,7 +644,7 @@ hal.executable @mma_fused_fp16 {
     hal.executable.variant public @cuda, target = #executable_target_cuda_nvptx_fb {
       hal.executable.export @large_dot_general_dispatch_0 layout(#pipeline_layout) {
       ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 :index):
-        %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3, %arg4
+        %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4
         hal.return %x, %y, %z : index, index, index
       }
       builtin.module {
@@ -723,22 +692,16 @@ hal.executable @mma_fused_fp16 {
 //           CHECK:   nvvm.cp.async.wait.group 3
 //   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
 //   CHECK-COUNT-2:   nvvm.wmma.mma
-//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//   CHECK-COUNT-2:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<i8, 3>, !llvm.ptr<i8, 1>, i32, i32) -> !llvm.void
 //           CHECK:   nvvm.cp.async.commit.group
 //           CHECK:   llvm.br
-//           CHECK:   nvvm.cp.async.wait.group 3
-//   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
-//   CHECK-COUNT-2:   nvvm.wmma.mma
-//           CHECK:   nvvm.cp.async.wait.group 2
-//   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
-//   CHECK-COUNT-2:   nvvm.wmma.mma
-//           CHECK:   nvvm.cp.async.wait.group 1
-//   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
-//   CHECK-COUNT-2:   nvvm.wmma.mma
-//           CHECK:   nvvm.cp.async.wait.group 0
-//   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
-//   CHECK-COUNT-2:   nvvm.wmma.mma
-//   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f32>, f32, f32, f32, f32, f32, f32, f32, f32
+//       CHECK-NOT:   nvvm.wmma.mma
+//   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f32, 3>, f32, f32, f32, f32, f32, f32, f32, f32
+//           CHECK:   vvm.barrier0
+//           CHECK:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//           CHECK:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
+//           CHECK:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//           CHECK:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
 
 // -----
 
@@ -761,7 +724,7 @@ hal.executable @mma_fused_fp16 {
     hal.executable.variant public @cuda_nvptx_fb, target = #executable_target_cuda_nvptx_fb {
       hal.executable.export public @split_k_gemm ordinal(0) layout(#pipeline_layout) {
       ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 : index):
-        %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3, %arg4
+        %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4
         hal.return %x, %y, %z : index, index, index
       }
       builtin.module {
@@ -799,16 +762,16 @@ hal.executable @mma_fused_fp16 {
 //           CHECK:   nvvm.cp.async.wait.group 3
 //   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
 //   CHECK-COUNT-2:   nvvm.wmma.mma
-//           CHECK:   nvvm.cp.async.wait.group 2
-//   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
-//   CHECK-COUNT-2:   nvvm.wmma.mma
-//           CHECK:   nvvm.cp.async.wait.group 1
-//   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
-//   CHECK-COUNT-2:   nvvm.wmma.mma
-//           CHECK:   nvvm.cp.async.wait.group 0
-//   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
-//   CHECK-COUNT-2:   nvvm.wmma.mma
-//   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f32>, f32, f32, f32, f32, f32, f32, f32, f32
+//           CHECK:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<i8, 3>, !llvm.ptr<i8, 1>, i32, i32) -> !llvm.void
+//           CHECK:   nvvm.cp.async.commit.group
+//           CHECK:   llvm.br
+//       CHECK-NOT:   nvvm.wmma.mma
+//   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f32, 3>, f32, f32, f32, f32, f32, f32, f32, f32
+//           CHECK:   vvm.barrier0
+//           CHECK:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//           CHECK:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
+//           CHECK:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//           CHECK:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>>
 
 // -----
 
@@ -824,7 +787,7 @@ hal.executable @mma_fused_fp16 {
     hal.executable.variant public @cuda_nvptx_fb, target = #executable_target_cuda_nvptx_fb {
       hal.executable.export public @pooling_dynamic ordinal(0) layout(#pipeline_layout) {
       ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 :index, %arg4 : index, %arg5 : index, %arg6 : index):
-        %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3, %arg4, %arg5, %arg6
+        %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4, %arg5, %arg6
         hal.return %x, %y, %z : index, index, index
       }
       builtin.module {
@@ -869,7 +832,7 @@ hal.executable @warp_reduction_dispatch {
 hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
   hal.executable.export @warp_reduction_dispatch layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
@@ -922,7 +885,7 @@ hal.executable @warp_reduction_broadcast_dispatch {
 hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
   hal.executable.export @warp_reduction_broadcast_dispatch layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
@@ -983,7 +946,7 @@ hal.executable private @shared_mem_alloc {
   hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_35"}> {
     hal.executable.export public @shared_mem_alloc ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer>, <1, storage_buffer>]>]>) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index, %arg5: index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3, %arg4, %arg5
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4, %arg5
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1034,7 +997,7 @@ hal.executable private @shared_mem_transpose  {
   hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
     hal.executable.export @shared_mem_transpose layout(#pipeline_layout) {
       ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
-        %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
+        %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
         hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1063,5 +1026,3 @@ hal.executable private @shared_mem_transpose  {
 //         CHECK:     llvm.load %{{.*}} {alignment = 4 : i64} : !llvm.ptr<vector<4xf32>>
 //         CHECK:     llvm.store %{{.*}}, %{{.*}} {alignment = 4 : i64} : !llvm.ptr<vector<4xf32>, 3>
 //         CHECK:     nvvm.barrier0
-
-// -----

@@ -51,9 +51,10 @@ struct VMAnalysis {
     return registerAllocation.mapToRegister(ref).ordinal();
   }
 
-  bool isLastValueUse(Value ref, Operation *op) {
+  bool isMove(Value ref, Operation *op) {
     assert(ref.getType().isa<IREE::VM::RefType>());
-    return valueLiveness.isLastValueUse(ref, op);
+    bool lastUse = valueLiveness.isLastValueUse(ref, op);
+    return lastUse && false;
   }
 
   void cacheLocalRef(int64_t ordinal, emitc::ApplyOp &applyOp) {

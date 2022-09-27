@@ -19,7 +19,13 @@ TEMPLATE_BASE_NAME="${TEMPLATE_BASE_NAME:-github-runner}"
 TEMPLATE_CONFIG_REPO="${TEMPLATE_CONFIG_REPO:-iree-org/iree}"
 TEMPLATE_CONFIG_REF="${TEMPLATE_CONFIG_REF:-$(git rev-parse HEAD)}"
 GPU_IMAGE="github-runner-gpu-2022-08-15-1660603500"
-CPU_IMAGE="github-runner-2022-07-28-1659048799"
+# Due to an early misconfiguration, this boot image is really large (1TB), so we
+# need a 1TB boot disk.
+# TODO(gcmn): Shrink the image and disk size.
+GPU_DISK_SIZE_GB=1000
+CPU_IMAGE="github-runner-cpu-2022-09-22-1663865258"
+# The image is only 10GB, but we need some space for Docker images and such.
+CPU_DISK_SIZE_GB=100
 
 if (( TESTING==0 )); then
   if [[ "${TEMPLATE_CONFIG_REPO}" != iree-org/iree ]]; then
@@ -41,8 +47,8 @@ SHORT_REF="${TEMPLATE_CONFIG_REF:0:10}"
 VERSION="${SHORT_REF}-${TIME_STRING}"
 STARTUP_SCRIPT_PATH="/tmp/startup_script.${SHORT_REF}.sh"
 GITHUB_RUNNER_SCOPE=iree-org
-GITHUB_RUNNER_VERSION="2.294.0"
-GITHUB_RUNNER_ARCHIVE_DIGEST="a19a09f4eda5716e5d48ba86b6b78fc014880c5619b9dba4a059eaf65e131780"
+GITHUB_RUNNER_VERSION="2.296.2"
+GITHUB_RUNNER_ARCHIVE_DIGEST="34a8f34956cdacd2156d4c658cce8dd54c5aef316a16bbbc95eb3ca4fd76429a"
 GITHUB_TOKEN_PROXY_URL="https://ght-proxy-zbhz5clunq-ue.a.run.app"
 
 declare -a METADATA=(
@@ -106,20 +112,18 @@ function create_template() {
     --metadata="${metadata_string}"
   )
 
-  local disk_name="${TEMPLATE_BASE_NAME}-${group}-${type}-${VERSION}"
-
   if [[ "${type}" == gpu ]]; then
     args+=(
       --machine-type=a2-highgpu-1g
       --maintenance-policy=TERMINATE
       --accelerator=count=1,type=nvidia-tesla-a100
-      --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${GPU_IMAGE},mode=rw,size=1000,type=pd-balanced"
+      --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${GPU_IMAGE},mode=rw,size=${GPU_DISK_SIZE_GB},type=pd-balanced"
     )
   elif [[ "${type}" == cpu ]]; then
     args+=(
       --machine-type=n1-standard-96
       --maintenance-policy=MIGRATE
-      --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${CPU_IMAGE},mode=rw,size=1000,type=pd-balanced"
+      --create-disk="auto-delete=yes,boot=yes,image=projects/iree-oss/global/images/${CPU_IMAGE},mode=rw,size=${CPU_DISK_SIZE_GB},type=pd-balanced"
     )
   else
     echo "Got unrecognized type '${type}'" >2

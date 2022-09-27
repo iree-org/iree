@@ -22,7 +22,7 @@ def LinalgExtInterface : OpInterface<"LinalgExtOp"> {
         Return the input shape operands.
       }],
       /*retTy=*/"ValueRange",
-      /*methodName=*/"inputs",
+      /*methodName=*/"getInputs",
       /*args=*/(ins)
     >,
     // These special methods rely on `inputs` and `outputs` being defined by
@@ -36,7 +36,7 @@ def LinalgExtInterface : OpInterface<"LinalgExtOp"> {
       /*args=*/(ins),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
-        return $_op.inputs().size();
+        return $_op.getInputs().size();
       }]
     >,
     // `outputs` must be defined by each op that wants to implement the
@@ -46,7 +46,7 @@ def LinalgExtInterface : OpInterface<"LinalgExtOp"> {
         Return the output shape operands.
       }],
       /*retTy=*/"ValueRange",
-      /*methodName=*/"outputs",
+      /*methodName=*/"getOutputs",
       /*args=*/(ins)
     >,
     InterfaceMethod<
@@ -58,7 +58,7 @@ def LinalgExtInterface : OpInterface<"LinalgExtOp"> {
       /*args=*/(ins),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
-        return $_op.outputs().size();
+        return $_op.getOutputs().size();
       }]
     >,
     InterfaceMethod<

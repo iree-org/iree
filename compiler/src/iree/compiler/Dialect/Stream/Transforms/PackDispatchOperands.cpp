@@ -340,7 +340,9 @@ class PackDispatchOperandsPass
       auto exportOp =
           symbolTable.lookupNearestSymbolFrom<IREE::Stream::ExecutableExportOp>(
               dispatchOp, dispatchOp.getEntryPoint());
-      updateDispatchOp(dispatchOp, exportOp);
+      if (exportOp) {
+        updateDispatchOp(dispatchOp, exportOp);
+      }
       return WalkResult::advance();
     });
   }

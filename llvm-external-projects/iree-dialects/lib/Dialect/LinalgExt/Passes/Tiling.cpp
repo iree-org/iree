@@ -99,8 +99,8 @@ tileInterfaceOpImpl(OpBuilder &builder, TilingInterface tilableOp,
   // the op by invoking the TiledOpInterface methods.
   if (loopDepth == tileSizes.size()) {
     TiledOp ret;
-    SmallVector<Operation *> tiledOps = tilableOp.getTiledImplementation(
-        builder, outputs, offsets, tileSizes, /*tileDestOperands=*/true);
+    SmallVector<Operation *> tiledOps =
+        tilableOp.getTiledImplementation(builder, offsets, tileSizes);
     if (tiledOps.empty()) {
       return static_cast<LogicalResult>(
           tilableOp.emitOpError("failed to get tiled implementation"));

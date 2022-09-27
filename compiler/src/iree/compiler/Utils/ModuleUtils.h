@@ -9,11 +9,17 @@
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/SymbolTable.h"
 
 namespace mlir {
 namespace iree_compiler {
+
+// Guesses the name of the module from the source locations attached unless a
+// name is already specified. If no source locations are found then
+// |defaultName| is returned.
+std::string guessModuleName(mlir::ModuleOp moduleOp, StringRef defaultName);
 
 // Destructively merges |sourceOp| into |targetOp| using |targetBuilder|.
 //

@@ -15,16 +15,19 @@ iree_cc_library(
     LLVMCPU
   HDRS
     "KernelDispatch.h"
+    "TargetMLTransformInfo.h"
   SRCS
     "ConvertToLLVM.cpp"
     "KernelDispatch.cpp"
     "LLVMCPUAArch64VectorLowering.cpp"
     "LLVMCPUCheckIRBeforeLLVMConversion.cpp"
     "LLVMCPUEmitVectorizationRemarks.cpp"
+    "LLVMCPULinkExecutables.cpp"
     "LLVMCPULowerExecutableTarget.cpp"
     "LLVMCPUSynchronizeSymbolVisibility.cpp"
     "LLVMCPUUnfuseFMAOps.cpp"
     "Passes.cpp"
+    "TargetMLTransformInfo.cpp"
     "VectorContractCustomKernels.cpp"
     "VerifyLinalgTransformLegality.cpp"
   DEPS

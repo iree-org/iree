@@ -230,13 +230,24 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_initialize(
   return iree_ok_status();
 }
 
-IREE_API_EXPORT void iree_vm_stack_deinitialize(iree_vm_stack_t* stack) {
+IREE_API_EXPORT void iree_vm_stack_reset(iree_vm_stack_t* stack) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  // Pop each frame of the stack in reverse.
   while (stack->top) {
     iree_status_ignore(iree_vm_stack_function_leave(stack));
   }
 
+  IREE_TRACE_ZONE_END(z0);
+}
+
+IREE_API_EXPORT void iree_vm_stack_deinitialize(iree_vm_stack_t* stack) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // Release stack frame resources.
+  iree_vm_stack_reset(stack);
+
+  // Drop allocated frame storage.
   if (stack->owns_frame_storage) {
     iree_allocator_free(stack->allocator, stack->frame_storage);
   }

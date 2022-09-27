@@ -31,9 +31,14 @@ touch "${ROOT_DIR}/output/results.csv"
 
 wget https://storage.googleapis.com/iree-model-artifacts/tflite_squad_test_data.zip -O /tmp/tflite_squad_test_data.zip
 unzip /tmp/tflite_squad_test_data.zip -d "${ROOT_DIR}/test_data/"
+wget https://storage.googleapis.com/iree-model-artifacts/mobilebert-baseline-tf2-quant.tflite -P "${ROOT_DIR}/models/tflite/"
 wget https://storage.googleapis.com/iree-model-artifacts/mobilebert_float_384_gpu.tflite -P "${ROOT_DIR}/models/tflite/"
 wget https://storage.googleapis.com/iree-model-artifacts/mobilenet_v2_224_1.0_uint8.tflite -P "${ROOT_DIR}/models/tflite/"
 wget https://storage.googleapis.com/iree-model-artifacts/mobilenet_v2_1.0_224.tflite -P "${ROOT_DIR}/models/tflite/"
+wget https://storage.googleapis.com/iree-model-artifacts/deeplabv3.tflite -P "${ROOT_DIR}/models/tflite/"
+wget https://storage.googleapis.com/iree-model-artifacts/person_detect.tflite -P "${ROOT_DIR}/models/tflite/"
+wget https://storage.googleapis.com/iree-model-artifacts/ssd_mobilenet_v2_static_1.0_int8.tflite -P "${ROOT_DIR}/models/tflite/"
+wget https://storage.googleapis.com/iree-model-artifacts/resnet_v2_101_1_default_1.tflite -P "${ROOT_DIR}/models/tflite/"
 
 # Build IREE source.
 SOURCE_DIR=/tmp/github
@@ -57,11 +62,13 @@ export CXX=clang++
 python configure_bazel.py
 
 cd integrations/tensorflow
+./symlink_binaries.sh
 bazel build -c opt iree_tf_compiler:iree-import-tflite
 
 echo "Done building iree-import-tflite"
 echo
 
+IREE_IMPORT_TFLITE_PATH=${SOURCE_DIR}/iree/integrations/tensorflow/bazel-bin/iree_tf_compiler/iree-import-tflite
 IREE_COMPILE_PATH="${SOURCE_DIR}/iree-build/tools/iree-compile"
 
 TFLITE_MODEL_DIR="${ROOT_DIR}/models/tflite"
@@ -69,11 +76,13 @@ IREE_MODEL_DIR="${ROOT_DIR}/models/iree"
 mkdir -p "${IREE_MODEL_DIR}/vulkan"
 mkdir -p "${IREE_MODEL_DIR}/llvm-cpu"
 
+# Runs `iree-compile` on all TFLite files in directory. If compilation fails, we
+# keep going.
 for i in $(ls ${ROOT_DIR}/models/tflite/); do
   MODEL_NAME=$(basename $i .tflite)
 
   echo "Processing ${MODEL_NAME} ..."
-  bazel-bin/iree_tf_compiler/iree-import-tflite "${TFLITE_MODEL_DIR}/${MODEL_NAME}.tflite" -o "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir"
+  ${IREE_IMPORT_TFLITE_PATH} "${TFLITE_MODEL_DIR}/${MODEL_NAME}.tflite" -o "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir"
   echo -e "\tCompiling ${MODEL_NAME}.vmfb for aarch64..."
   "${IREE_COMPILE_PATH}" \
     --iree-input-type=tosa \
@@ -83,7 +92,7 @@ for i in $(ls ${ROOT_DIR}/models/tflite/); do
     --iree-vm-bytecode-module-strip-source-map=true \
     --iree-vm-emit-polyglot-zip=false \
     "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
-    --o "${IREE_MODEL_DIR}/llvm-cpu/${MODEL_NAME}.vmfb"
+    --o "${IREE_MODEL_DIR}/llvm-cpu/${MODEL_NAME}.vmfb" || true
 
   echo -e "\tCompiling ${MODEL_NAME}_mmt4d.vmfb for aarch64..."
   "${IREE_COMPILE_PATH}" \
@@ -96,30 +105,67 @@ for i in $(ls ${ROOT_DIR}/models/tflite/); do
     --iree-vm-bytecode-module-strip-source-map=true \
     --iree-vm-emit-polyglot-zip=false \
     "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
-    --o "${IREE_MODEL_DIR}/llvm-cpu/${MODEL_NAME}_mmt4d.vmfb"
+    --o "${IREE_MODEL_DIR}/llvm-cpu/${MODEL_NAME}_mmt4d.vmfb" || true
+
+  echo -e "\tCompiling ${MODEL_NAME}_im2col_mmt4d.vmfb for aarch64..."
+  "${IREE_COMPILE_PATH}" \
+    --iree-input-type=tosa \
+    --iree-hal-target-backends=llvm-cpu \
+    --iree-llvm-target-triple=aarch64-none-linux-android29 \
+    "--iree-flow-mmt4d-target-options=arch=aarch64 features=+dotprod" \
+    --iree-llvm-target-cpu-features=+dotprod \
+    --iree-flow-enable-conv-img2col-transform \
+    --iree-llvm-debug-symbols=false \
+    --iree-vm-bytecode-module-strip-source-map=true \
+    --iree-vm-emit-polyglot-zip=false \
+    "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
+    --o "${IREE_MODEL_DIR}/llvm-cpu/${MODEL_NAME}_im2col_mmt4d.vmfb" || true
+
 
   if [[ "${GPU_TYPE}" = "mali" ]]; then
     echo -e "\tCompiling ${MODEL_NAME}.vmfb for vulkan mali..."
     "${IREE_COMPILE_PATH}" \
       --iree-input-type=tosa \
       --iree-hal-target-backends=vulkan-spirv \
-      --iree-vulkan-target-triple=valhall-unknown-android11 \
+      --iree-vulkan-target-triple=valhall-unknown-android31 \
       --iree-llvm-debug-symbols=false \
       --iree-vm-bytecode-module-strip-source-map=true \
       --iree-vm-emit-polyglot-zip=false \
       "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
-      --o "${IREE_MODEL_DIR}/vulkan/${MODEL_NAME}.vmfb"
+      --o "${IREE_MODEL_DIR}/vulkan/${MODEL_NAME}.vmfb" || true
+     echo -e "\tCompiling ${MODEL_NAME}_fp16.vmfb for vulkan mali..."
+    "${IREE_COMPILE_PATH}" \
+      --iree-input-type=tosa \
+      --iree-hal-target-backends=vulkan-spirv \
+      --iree-vulkan-target-triple=valhall-unknown-android31 \
+      --iree-flow-demote-f32-to-f16 \
+      --iree-llvm-debug-symbols=false \
+      --iree-vm-bytecode-module-strip-source-map=true \
+      --iree-vm-emit-polyglot-zip=false \
+      "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
+      --o "${IREE_MODEL_DIR}/vulkan/${MODEL_NAME}_fp16.vmfb" || true
+    echo -e "\tCompiling ${MODEL_NAME}_padfuse.vmfb for vulkan mali..."
+    "${IREE_COMPILE_PATH}" \
+      --iree-input-type=tosa \
+      --iree-hal-target-backends=vulkan-spirv \
+      --iree-vulkan-target-triple=valhall-unknown-android31 \
+      --iree-flow-enable-fuse-padding-into-linalg-consumer-ops \
+      --iree-llvm-debug-symbols=false \
+      --iree-vm-bytecode-module-strip-source-map=true \
+      --iree-vm-emit-polyglot-zip=false \
+      "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
+      --o "${IREE_MODEL_DIR}/vulkan/${MODEL_NAME}_padfuse.vmfb" || true
   else
     echo -e "\tCompiling ${MODEL_NAME}.vmfb for vulkan adreno..."
     "${IREE_COMPILE_PATH}" \
       --iree-input-type=tosa \
       --iree-hal-target-backends=vulkan-spirv \
-      --iree-vulkan-target-triple=adreno-unknown-android11 \
+      --iree-vulkan-target-triple=adreno-unknown-android31 \
       --iree-llvm-debug-symbols=false \
       --iree-vm-bytecode-module-strip-source-map=true \
       --iree-vm-emit-polyglot-zip=false \
       "${IREE_MODEL_DIR}/${MODEL_NAME}.mlir" \
-      --o "${IREE_MODEL_DIR}/vulkan/${MODEL_NAME}.vmfb"
+      --o "${IREE_MODEL_DIR}/vulkan/${MODEL_NAME}.vmfb" || true
   fi
 done
 

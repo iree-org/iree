@@ -394,11 +394,11 @@ hal.executable @copy_op_dynamic {
         %o1 = hal.interface.constant.load[5] : index
         %source = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<?x?xi32>{%d0, %d1}
         %dest = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<?x?xi32>{%d2, %d3}
-        %dest_view = memref.subview %dest[%o0, %o1] [%d0, %d1] [1, 1] : memref<?x?xi32> to memref<?x?xi32, offset : ?, strides : [?, ?]>
+        %dest_view = memref.subview %dest[%o0, %o1] [%d0, %d1] [1, 1] : memref<?x?xi32> to memref<?x?xi32,  strided<[?, ?], offset : ?>>
         linalg.generic {
             indexing_maps = [affine_map<(d0, d1) -> (d0, d1)> , affine_map<(d0, d1) -> (d0, d1)>],
             iterator_types = ["parallel", "parallel"]}
-            ins(%source : memref<?x?xi32>) outs(%dest_view : memref<?x?xi32, offset : ?, strides : [?, ?]>) {
+            ins(%source : memref<?x?xi32>) outs(%dest_view : memref<?x?xi32, strided<[?, ?], offset : ?>>) {
           ^bb0(%arg0 : i32, %arg1 : i32):
             linalg.yield %arg0 : i32
           }
@@ -655,6 +655,44 @@ hal.executable private @conv_static {
 
 // -----
 
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-unknown-unknown-eabi-elf"}>
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable private @conv_nchw_static {
+  hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
+    hal.executable.export public @conv_nchw_static ordinal(0) layout(#pipeline_layout)
+    builtin.module {
+      func.func @conv_nchw_static() {
+        %c0 = arith.constant 0 : index
+        %cst = arith.constant 0.000000e+00 : f32
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:1x128x30x30xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:128x128x3x3xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:1x128x28x28xf32>
+        %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [1, 128, 30, 30], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:1x128x30x30xf32> -> tensor<1x128x30x30xf32>
+        %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [128, 128, 3, 3], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:128x128x3x3xf32> -> tensor<128x128x3x3xf32>
+        %5 = linalg.init_tensor [1, 128, 28, 28] : tensor<1x128x28x28xf32>
+        %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<1x128x28x28xf32>) -> tensor<1x128x28x28xf32>
+        %7 = linalg.conv_2d_nchw_fchw {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>} ins(%3, %4 : tensor<1x128x30x30xf32>, tensor<128x128x3x3xf32>) outs(%6 : tensor<1x128x28x28xf32>) -> tensor<1x128x28x28xf32>
+        flow.dispatch.tensor.store %7, %2, offsets = [0, 0, 0, 0], sizes = [1, 128, 28, 28], strides = [1, 1, 1, 1] : tensor<1x128x28x28xf32> -> !flow.dispatch.tensor<writeonly:1x128x28x28xf32>
+        return
+      }
+    }
+  }
+}
+
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 64, 28, 4, 0, 0, 0], [1, 8, 1, 4, 0, 0, 0], [0, 0, 0, 0, 8, 1, 1]]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUConvTileAndDecomposeExpert>
+//      CHECK: hal.executable.export public @conv_nchw_static
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//      CHECK:     linalg.conv_2d_nchw_fchw
+
+// -----
+
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -705,6 +743,55 @@ hal.executable private @depthwise_conv_static {
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable private @thin_depthwise_conv_static {
+  hal.executable.variant public @system_elf_x86_64, target = <"llvm-cpu", "system-elf-x86_64", {
+    data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+    native_vector_size = 64 : index,
+    target_triple = "x86_64-unknown-linux-gnu"
+  }> {
+    hal.executable.export public @thin_depthwise_conv_static layout(#pipeline_layout)
+    builtin.module {
+      func.func @thin_depthwise_conv_static() {
+        %cst = arith.constant 0.0 : f32
+        %input_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
+            : !flow.dispatch.tensor<readonly:1x57x57x72xf32>
+        %filter_binding = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
+            : !flow.dispatch.tensor<readonly:3x3x72xf32>
+        %result_binding = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
+            : !flow.dispatch.tensor<writeonly:1x28x28x72xf32>
+        %input = flow.dispatch.tensor.load %input_binding, offsets = [0, 0, 0, 0], sizes = [1, 161, 161, 240], strides = [1, 1, 1, 1]
+            : !flow.dispatch.tensor<readonly:1x57x57x72xf32> -> tensor<1x57x57x72xf32>
+        %filter = flow.dispatch.tensor.load %filter_binding, offsets = [0, 0, 0], sizes = [3, 3, 240], strides = [1, 1, 1]
+            : !flow.dispatch.tensor<readonly:3x3x72xf32> -> tensor<3x3x72xf32>
+        %init = linalg.init_tensor [1, 28, 28, 72] : tensor<1x28x28x72xf32>
+        %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<1x28x28x72xf32>) -> tensor<1x28x28x72xf32>
+        %conv = linalg.depthwise_conv_2d_nhwc_hwc {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>}
+          ins(%input, %filter : tensor<1x57x57x72xf32>, tensor<3x3x72xf32>)
+          outs(%fill : tensor<1x28x28x72xf32>) -> tensor<1x28x28x72xf32>
+
+        flow.dispatch.tensor.store %conv, %result_binding, offsets = [0, 0, 0, 0], sizes = [1, 28, 28, 72], strides = [1, 1, 1, 1]
+            : tensor<1x28x28x72xf32> -> !flow.dispatch.tensor<writeonly:1x28x28x72xf32>
+        return
+      }
+    }
+  }
+}
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 7, 14, 36, 0, 0], [1, 1, 7, 18, 0, 0], [0, 0, 0, 0, 1, 3]]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUConvTileAndDecomposeExpert>
+//      CHECK: hal.executable.export public @thin_depthwise_conv_static
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//      CHECK:     linalg.depthwise_conv_2d_nhwc_hwc
+// CHECK-SAME:       lowering_config  = #[[CONFIG]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
   ]>
 ]>
@@ -738,7 +825,7 @@ hal.executable private @generic_static {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[16, 96], [16, 8], [0, 0]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[16, 96], [16, 16], [0, 0]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
 //      CHECK: hal.executable.export public @generic_static
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -1282,7 +1369,7 @@ hal.executable private @multi_root {
             push_constants = 0, 
             sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {

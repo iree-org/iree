@@ -2,7 +2,7 @@
 
 llvm.func @sink(i64)
 
-// CHECK-LABEL: llvm.func internal @workgroup_id
+// CHECK-LABEL: llvm.func @workgroup_id
 func.func @workgroup_id() {
   // CHECK: %[[STATE:.+]] = llvm.load %arg2 : !llvm.ptr<struct<"iree_hal_executable_workgroup_state_v0_t"
   // CHECK: %[[Z16:.+]] = llvm.extractvalue %[[STATE]][2]
@@ -18,7 +18,7 @@ func.func @workgroup_id() {
 
 llvm.func @sink(i64)
 
-// CHECK-LABEL: llvm.func internal @workgroup_size
+// CHECK-LABEL: llvm.func @workgroup_size
 func.func @workgroup_size() {
   // CHECK: %[[STATE:.+]] = llvm.load %arg1 : !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t"
   // CHECK: %[[Z16:.+]] = llvm.extractvalue %[[STATE]][2]
@@ -34,7 +34,7 @@ func.func @workgroup_size() {
 
 llvm.func @sink(i64)
 
-// CHECK-LABEL: llvm.func internal @workgroup_count
+// CHECK-LABEL: llvm.func @workgroup_count
 func.func @workgroup_count() {
   // CHECK: %[[STATE:.+]] = llvm.load %arg1 : !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t"
   // CHECK: %[[Z16:.+]] = llvm.extractvalue %[[STATE]][6]

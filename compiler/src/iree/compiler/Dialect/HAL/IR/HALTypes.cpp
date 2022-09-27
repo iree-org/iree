@@ -9,6 +9,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/Utils/StringUtils.h"
 #include "llvm/ADT/StringExtras.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -198,9 +199,7 @@ void DeviceTargetAttr::print(AsmPrinter &p) const {
 }
 
 std::string DeviceTargetAttr::getSymbolNameFragment() {
-  auto deviceName = getDeviceID().getValue().lower();
-  std::replace(deviceName.begin(), deviceName.end(), '-', '_');
-  return deviceName;
+  return sanitizeSymbolName(getDeviceID().getValue().lower());
 }
 
 Attribute DeviceTargetAttr::getMatchExpression() {
@@ -307,9 +306,7 @@ void ExecutableTargetAttr::print(AsmPrinter &p) const {
 }
 
 std::string ExecutableTargetAttr::getSymbolNameFragment() {
-  auto format = getFormat().getValue().lower();
-  std::replace(format.begin(), format.end(), '-', '_');
-  return format;
+  return sanitizeSymbolName(getFormat().getValue().lower());
 }
 
 Attribute ExecutableTargetAttr::getMatchExpression() {

@@ -12,28 +12,65 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+# :types is the type declarations used by both the entry points and the
+# internal implementation functions.
 iree_runtime_cc_library(
-    name = "ukernel",
-    srcs = [
-        "elementwise_generic.c",
-        "elementwise_impl.c.inc",
-        "mmt4d_arm_64.c",
-        "mmt4d_generic.c",
-    ],
+    name = "types",
     hdrs = [
         "common.h",
-        "elementwise.h",
-        "mmt4d.h",
-        "mmt4d_generic.h",
-    ],
-    copts = [
-        # Placeholder for a real flag.
-        "-DIREE_UKERNEL_PLATFORM_EXAMPLE_FLAG=1",
-    ],
-    defines = [
-        "IREE_HAVE_UKERNEL_BUILTINS=1",
+        "mmt4d_types.h",
     ],
     deps = [
         "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/builtins/ukernel/arch:config",
+    ],
+)
+
+# :generic contains non-architecture-specific implementations.
+iree_runtime_cc_library(
+    name = "generic",
+    srcs = [
+        "mmt4d_select_tile_generic.c",
+    ],
+    hdrs = [
+        "mmt4d_select_tile_generic.h",
+    ],
+    deps = [
+        ":types",
+    ],
+)
+
+# elementwise code is structured differently from other kernels. In fact it's
+# profoundly different: it carries its own custom shims. For now, we keep it
+# separate from the rest.
+iree_runtime_cc_library(
+    name = "elementwise",
+    srcs = [
+        "elementwise_generic.c",
+        "elementwise_impl.c.inc",
+    ],
+    hdrs = [
+        "elementwise.h",
+    ],
+    deps = [
+        ":types",
+    ],
+)
+
+# Entry points.
+iree_runtime_cc_library(
+    name = "ukernel",
+    srcs = [
+        "mmt4d.c",
+    ],
+    hdrs = [
+        "elementwise.h",
+        "mmt4d.h",
+    ],
+    deps = [
+        ":elementwise",
+        ":generic",
+        ":types",
+        "//runtime/src/iree/builtins/ukernel/arch:ukernel_arch",
     ],
 )

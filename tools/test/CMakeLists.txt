@@ -17,6 +17,7 @@ iree_lit_test_suite(
     "executable_benchmarks.mlir"
     "iree-benchmark-module.mlir"
     "iree-run-mlir.mlir"
+    "iree-run-module-expected.mlir"
     "iree-run-module.mlir"
     "multiple_args.mlir"
     "multiple_exported_functions.mlir"
@@ -30,6 +31,7 @@ iree_lit_test_suite(
     iree-compile
     iree-run-mlir
     iree-run-module
+    not
   LABELS
     "hostonly"
 )

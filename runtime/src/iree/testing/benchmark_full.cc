@@ -135,7 +135,7 @@ void iree_benchmark_register(iree_string_view_t name,
   }
 
   if (benchmark_def->minimum_duration_ns != 0) {
-    instance->MinTime((double)benchmark_def->minimum_duration_ns / 1e-9);
+    instance->MinTime((double)benchmark_def->minimum_duration_ns * 1e-9);
   } else if (benchmark_def->iteration_count != 0) {
     instance->Iterations(benchmark_def->iteration_count);
   }

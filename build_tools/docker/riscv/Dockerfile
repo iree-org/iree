@@ -8,11 +8,11 @@
 
 FROM gcr.io/iree-oss/base@sha256:5d43683c6b50aebe1fca6c85f2012f3b0fa153bf4dd268e8767b619b1891423a AS install-riscv
 WORKDIR /install-riscv
-RUN wget "https://storage.googleapis.com/iree-shared-files/toolchain_iree_rvv-intrinsic.tar.gz"
-RUN tar -xf "toolchain_iree_rvv-intrinsic.tar.gz" -C /usr/src/
-RUN wget "https://storage.googleapis.com/iree-shared-files/toolchain_iree_rv32.tar.gz"
-RUN tar -xf "toolchain_iree_rv32.tar.gz" -C /usr/src/
-RUN wget "https://storage.googleapis.com/iree-shared-files/qemu-riscv.tar.gz"
+RUN wget --no-verbose "https://storage.googleapis.com/iree-shared-files/toolchain_iree_20220918.tar.gz"
+RUN tar -xf "toolchain_iree_20220918.tar.gz" -C /usr/src/
+RUN wget --no-verbose "https://storage.googleapis.com/iree-shared-files/toolchain_iree_rv32_20220918.tar.gz"
+RUN tar -xf "toolchain_iree_rv32_20220918.tar.gz" -C /usr/src/
+RUN wget --no-verbose "https://storage.googleapis.com/iree-shared-files/qemu-riscv.tar.gz"
 RUN tar -xf "qemu-riscv.tar.gz" -C /usr/src/
 
 FROM gcr.io/iree-oss/base@sha256:5d43683c6b50aebe1fca6c85f2012f3b0fa153bf4dd268e8767b619b1891423a AS final

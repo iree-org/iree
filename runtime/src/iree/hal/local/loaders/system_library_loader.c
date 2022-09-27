@@ -366,7 +366,8 @@ static void iree_hal_system_executable_destroy(
 static iree_status_t iree_hal_system_executable_issue_call(
     iree_hal_local_executable_t* base_executable, iree_host_size_t ordinal,
     const iree_hal_executable_dispatch_state_v0_t* dispatch_state,
-    const iree_hal_executable_workgroup_state_v0_t* workgroup_state) {
+    const iree_hal_executable_workgroup_state_v0_t* workgroup_state,
+    uint32_t worker_id) {
   iree_hal_system_executable_t* executable =
       (iree_hal_system_executable_t*)base_executable;
   const iree_hal_executable_library_v0_t* library = executable->library.v0;
@@ -499,7 +500,7 @@ static bool iree_hal_system_library_loader_query_support(
 static iree_status_t iree_hal_system_library_loader_try_load(
     iree_hal_executable_loader_t* base_executable_loader,
     const iree_hal_executable_params_t* executable_params,
-    iree_hal_executable_t** out_executable) {
+    iree_host_size_t worker_capacity, iree_hal_executable_t** out_executable) {
   iree_hal_system_library_loader_t* executable_loader =
       (iree_hal_system_library_loader_t*)base_executable_loader;
   IREE_TRACE_ZONE_BEGIN(z0);

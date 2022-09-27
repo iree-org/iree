@@ -21,25 +21,24 @@ namespace {
 /// Gets the corresponding SPIR-V version for the ggiven Vulkan target
 /// environment.
 spirv::Version convertVersion(Vulkan::TargetEnvAttr vkTargetEnv) {
-  // Vulkan 1.2 supports up to SPIR-V 1.5 by default.
-  if (vkTargetEnv.getVersion() == Version::V_1_2) return spirv::Version::V_1_5;
-
   // Special extension to enable SPIR-V 1.4.
-  if (llvm::is_contained(vkTargetEnv.getExtensions(),
-                         Extension::VK_KHR_spirv_1_4))
-    return spirv::Version::V_1_4;
+  const bool has14Ext = (llvm::is_contained(vkTargetEnv.getExtensions(),
+                                            Extension::VK_KHR_spirv_1_4));
 
   switch (vkTargetEnv.getVersion()) {
     case Version::V_1_0:
       // Vulkan 1.0 only supports SPIR-V 1.0 by default.
-      return spirv::Version::V_1_0;
+      return has14Ext ? spirv::Version::V_1_4 : spirv::Version::V_1_0;
     case Version::V_1_1:
       // Vulkan 1.1 supports up to SPIR-V 1.3 by default.
-      return spirv::Version::V_1_3;
-    default:
-      break;
+      return has14Ext ? spirv::Version::V_1_4 : spirv::Version::V_1_3;
+    case Version::V_1_2:
+      // Vulkan 1.1 supports up to SPIR-V 1.5 by default.
+      return spirv::Version::V_1_5;
+    case Version::V_1_3:
+      // Vulkan 1.1 supports up to SPIR-V 1.6 by default.
+      return spirv::Version::V_1_6;
   }
-  assert(false && "unhandled Vulkan version!");
   return spirv::Version::V_1_0;
 }
 

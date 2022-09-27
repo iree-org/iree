@@ -7,9 +7,13 @@
 #ifndef IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_CONVERTREGIONTOWORKGROUPS_H_
 #define IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_CONVERTREGIONTOWORKGROUPS_H_
 
+#include "mlir/IR/ValueRange.h"
 #include "mlir/Support/LogicalResult.h"
 
 namespace mlir {
+class BlockArgument;
+class Location;
+class OpBuilder;
 class RewriterBase;
 
 namespace iree_compiler {
@@ -18,13 +22,18 @@ namespace Flow {
 class DispatchRegionOp;
 class DispatchWorkgroupsOp;
 
+/// A function that builds the workload body of a DispatchWorkgroupsOp.
+using WorkloadBuilderFn =
+    std::function<void(OpBuilder &, Location, ArrayRef<BlockArgument>)>;
+
 /// Rewrite the DispatchRegionOp into a DispatchWorkgroupsOp. The
 /// DispatchRegionOp is not isolated from above and may capture any SSA value
 /// that is in scope. The generated DispatchWorkgroupsOp captures all SSA values
 /// explicitly and makes them available inside the region via block arguments.
 FailureOr<DispatchWorkgroupsOp>
-rewriteFlowDispatchRegionToFlowDispatchWorkgroups(DispatchRegionOp regionOp,
-                                                  RewriterBase &rewriter);
+rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
+    DispatchRegionOp regionOp, RewriterBase &rewriter, ValueRange workload = {},
+    WorkloadBuilderFn workloadRegionBuilder = nullptr);
 
 }  // namespace Flow
 }  // namespace IREE

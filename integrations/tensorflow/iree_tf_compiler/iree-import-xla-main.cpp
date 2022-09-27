@@ -16,6 +16,7 @@
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "mlir-hlo/Dialect/mhlo/IR/register.h"
+#include "mlir/Bytecode/BytecodeWriter.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
@@ -43,6 +44,12 @@ enum XlaFormat {
   text_proto,
   hlo_text,
   mlir_text,
+};
+
+enum class OutputFormat {
+  none,
+  mlir_ir,
+  mlir_bytecode,
 };
 
 // Error collector that prints errors.
@@ -118,6 +125,15 @@ int main(int argc, char **argv) {
           clEnumVal(text_proto, "Parse a text protocol buffer"),
           clEnumVal(hlo_text, "Parse an HLO module in its native text format"),
           clEnumVal(mlir_text, "Parse MLIR text containing MHLO ops")));
+
+  // The output format flag is the master control for what we do with the
+  // in-memory compiled form.
+  llvm::cl::opt<OutputFormat> outputFormat(
+      "output-format", llvm::cl::desc("Format of imported output"),
+      llvm::cl::values(clEnumValN(OutputFormat::mlir_bytecode, "mlir-bytecode",
+                                  "MLIR Bytecode (default)"),
+                       clEnumValN(OutputFormat::mlir_ir, "mlir-ir", "MLIR IR")),
+      llvm::cl::init(OutputFormat::mlir_bytecode));
 
   // Register any command line options.
   registerAsmPrinterCLOptions();
@@ -252,11 +268,22 @@ int main(int argc, char **argv) {
       llvm::errs() << "Could not open output file: " << savePath << "\n";
       return failure();
     }
-    OpPrintingFlags printFlags;
-    module->print(outputFile->os(), printFlags);
-    outputFile->os() << "\n";
-    outputFile->keep();
-    return success();
+
+    if (outputFormat == OutputFormat::mlir_ir) {
+      OpPrintingFlags printFlags;
+      module->print(outputFile->os(), printFlags);
+      outputFile->os() << "\n";
+      outputFile->keep();
+      return success();
+    }
+
+    if (outputFormat == OutputFormat::mlir_bytecode) {
+      mlir::writeBytecodeToFile(*module, outputFile->os());
+      outputFile->keep();
+      return success();
+    }
+    llvm::errs() << "Unknown output format\n";
+    return failure();
   };
 
   // Save temp output.

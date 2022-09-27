@@ -46,7 +46,7 @@ cc_binary(
         "@org_tensorflow//tensorflow/compiler/mlir/tosa:tfl_passes",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_tf",
         "@org_tensorflow//tensorflow/compiler/xla/mlir_hlo",
-        "@org_tensorflow//tensorflow/compiler/xla/mlir_hlo/stablehlo:chlo_ops",
+        "@stablehlo//:chlo_ops",
     ],
 )
 
@@ -78,6 +78,7 @@ cc_binary(
         "//iree_tf_compiler/MHLO",
         "//iree_tf_compiler/TF",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:BytecodeWriter",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Support",
@@ -96,6 +97,7 @@ cc_binary(
     deps = [
         "//iree_tf_compiler/TFL",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:BytecodeWriter",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:Pass",
@@ -116,6 +118,7 @@ cc_binary(
         "//iree_tf_compiler/MHLO",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithmeticDialect",
+        "@llvm-project//mlir:BytecodeWriter",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:MathDialect",

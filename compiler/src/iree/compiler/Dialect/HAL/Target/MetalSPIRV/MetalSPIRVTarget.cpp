@@ -67,7 +67,7 @@ class MetalSPIRVTargetBackend : public TargetBackend {
   }
 
   void buildTranslationPassPipeline(OpPassManager &passManager) override {
-    buildSPIRVCodegenPassPipeline(passManager);
+    buildSPIRVCodegenPassPipeline(passManager, /*enableFastMath=*/false);
   }
 
   LogicalResult serializeExecutable(const SerializationOptions &options,

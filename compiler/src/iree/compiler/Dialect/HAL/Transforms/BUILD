@@ -26,7 +26,6 @@ iree_compiler_cc_library(
         "LinkExecutables.cpp",
         "MaterializeInterfaces.cpp",
         "MaterializeResourceCaches.cpp",
-        "MaterializeTimelines.cpp",
         "MemoizeDeviceQueries.cpp",
         "Passes.cpp",
         "ResolveExportOrdinals.cpp",
@@ -66,6 +65,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:SCFToControlFlow",
         "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:Transforms",
     ],
 )

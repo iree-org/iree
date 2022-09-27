@@ -17,17 +17,12 @@
 
 // Include the ukernel support library so that we can use its implementations
 // as fixed-function components of the runtime.
+#include "iree/base/internal/cpu.h"
 #include "iree/builtins/ukernel/elementwise.h"
-
-#if 0  // TODO: implement mmt4d ukernel
 #include "iree/builtins/ukernel/mmt4d.h"
-#endif
 
 #define IREE_VMVX_MODULE_VERSION_0_0 0x00000000u
 #define IREE_VMVX_MODULE_VERSION_LATEST IREE_VMVX_MODULE_VERSION_0_0
-
-// TODO: move these flags to a header file shared with compiler/.
-#define IREE_VMVX_MATMUL_FLAG_ACCUMULATE 1
 
 //===----------------------------------------------------------------------===//
 // Module type definitions
@@ -43,6 +38,11 @@ typedef struct iree_vmvx_module_t {
 
 typedef struct iree_vmvx_module_state_t {
   iree_allocator_t host_allocator;
+
+  // Logical processor identifier used to index into processor info fields.
+  // Depending on the implementation this may be an ordinal, a bitfield, or an
+  // opaque unique identifier.
+  uint32_t processor_id;
 
   // If we have any external libraries we want to interact with that are
   // stateful we could store their state here. Note that VMVX invocations may
@@ -105,54 +105,53 @@ static iree_host_size_t iree_vmvx_cast_host_size(int64_t value,
   return (iree_host_size_t)value;
 }
 
-#define BUFFER_2D_DECLS(name, dtype, offset, stride0, stride1, size0, size1) \
-  uint64_t name##_overflow = 0;                                              \
-  iree_host_size_t name##_size0 =                                            \
-      iree_vmvx_cast_host_size(size0, &name##_overflow);                     \
-  iree_host_size_t name##_size1 =                                            \
-      iree_vmvx_cast_host_size(size1, &name##_overflow);                     \
-  iree_host_size_t name##_stride0 =                                          \
-      iree_vmvx_cast_host_size(stride0, &name##_overflow);                   \
-  iree_host_size_t name##_stride1 =                                          \
-      iree_vmvx_cast_host_size(stride1, &name##_overflow);                   \
-  iree_host_size_t name##_length_bound = iree_vmvx_2d_length_bound(          \
-      sizeof(dtype), name##_size0, name##_size1, name##_stride0,             \
-      name##_stride1, &name##_overflow);                                     \
-  iree_host_size_t name##_offset =                                           \
-      sizeof(dtype) * iree_vmvx_cast_host_size(offset, &name##_overflow);    \
-  if (name##_overflow) {                                                     \
-    IREE_TRACE_ZONE_END(z0);                                                 \
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,                    \
-                            "buffer overflow for " #name);                   \
+#define BUFFER_2D_DECLS(name, dtype_size, offset, stride0, stride1, size0,    \
+                        size1)                                                \
+  uint64_t name##_overflow = 0;                                               \
+  iree_host_size_t name##_size0 =                                             \
+      iree_vmvx_cast_host_size(size0, &name##_overflow);                      \
+  iree_host_size_t name##_size1 =                                             \
+      iree_vmvx_cast_host_size(size1, &name##_overflow);                      \
+  iree_host_size_t name##_stride0 =                                           \
+      iree_vmvx_cast_host_size(stride0, &name##_overflow);                    \
+  iree_host_size_t name##_stride1 =                                           \
+      iree_vmvx_cast_host_size(stride1, &name##_overflow);                    \
+  iree_host_size_t name##_length_bound = iree_vmvx_2d_length_bound(           \
+      dtype_size, name##_size0, name##_size1, name##_stride0, name##_stride1, \
+      &name##_overflow);                                                      \
+  iree_host_size_t name##_offset =                                            \
+      dtype_size * iree_vmvx_cast_host_size(offset, &name##_overflow);        \
+  if (name##_overflow) {                                                      \
+    IREE_TRACE_ZONE_END(z0);                                                  \
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,                     \
+                            "buffer overflow for " #name);                    \
   }
 
-#define MAP_BUFFER_2D_RO(name, dtype, buffer_ref, offset, stride0, stride1, \
-                         size0, size1)                                      \
-  iree_vm_buffer_t* name##_buffer;                                          \
-  iree_const_byte_span_t name##_span;                                       \
-  BUFFER_2D_DECLS(name, dtype, offset, stride0, stride1, size0, size1);     \
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(                                        \
-      z0, iree_vm_buffer_check_deref(buffer_ref, &name##_buffer))           \
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(                                        \
-      z0, iree_vm_buffer_map_ro(name##_buffer,       /*offset=*/            \
-                                name##_offset,       /*length=*/            \
-                                name##_length_bound, /*alignment=*/         \
-                                sizeof(dtype), &name##_span));              \
-  const dtype* name = (dtype*)name##_span.data
+#define MAP_BUFFER_2D_IMPL(mode, ptr_type, span_type, name, dtype_size,        \
+                           buffer_ref, offset, stride0, stride1, size0, size1) \
+  iree_vm_buffer_t* name##_buffer;                                             \
+  span_type name##_span;                                                       \
+  BUFFER_2D_DECLS(name, dtype_size, offset, stride0, stride1, size0, size1);   \
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(                                           \
+      z0, iree_vm_buffer_check_deref(buffer_ref, &name##_buffer))              \
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(                                           \
+      z0, iree_vm_buffer_map_##mode(name##_buffer,       /*offset=*/           \
+                                    name##_offset,       /*length=*/           \
+                                    name##_length_bound, /*alignment=*/        \
+                                    dtype_size, &name##_span));                \
+  ptr_type name = (ptr_type)name##_span.data
 
-#define MAP_BUFFER_2D_RW(name, dtype, buffer_ref, offset, stride0, stride1,  \
-                         size0, size1)                                       \
-  iree_vm_buffer_t* name##_buffer;                                           \
-  iree_byte_span_t name##_span;                                              \
-  BUFFER_2D_DECLS(name, dtype, offset, stride0, stride1, size0, size1);      \
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(                                         \
-      z0, iree_vm_buffer_check_deref(buffer_ref, &name##_buffer));           \
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(                                         \
-      z0, iree_vm_buffer_map_rw(name##_buffer, /*offset=*/                   \
-                                name##_offset, /*length=*/                   \
-                                name##_length_bound,                         \
-                                /*alignment=*/sizeof(dtype), &name##_span)); \
-  dtype* name = (dtype*)name##_span.data
+#define MAP_BUFFER_2D_UNTYPED_RO(name, dtype_size, ...)             \
+  MAP_BUFFER_2D_IMPL(ro, const void*, iree_const_byte_span_t, name, \
+                     dtype_size, __VA_ARGS__)
+#define MAP_BUFFER_2D_UNTYPED_RW(name, dtype_size, ...) \
+  MAP_BUFFER_2D_IMPL(rw, void*, iree_byte_span_t, name, dtype_size, __VA_ARGS__)
+#define MAP_BUFFER_2D_RO(name, dtype, ...)                           \
+  MAP_BUFFER_2D_IMPL(ro, const dtype*, iree_const_byte_span_t, name, \
+                     sizeof(dtype), __VA_ARGS__)
+#define MAP_BUFFER_2D_RW(name, dtype, ...)                              \
+  MAP_BUFFER_2D_IMPL(rw, dtype*, iree_byte_span_t, name, sizeof(dtype), \
+                     __VA_ARGS__)
 
 //===----------------------------------------------------------------------===//
 // Shared argument shims
@@ -633,11 +632,12 @@ IREE_VMVX_ABI_FIXED_STRUCT(mmt4d, rIIrIIrIIIIIiiii, {
   int32_t m0;
   int32_t n0;
   int32_t k0;
-  int32_t flags;
+  uint32_t flags;
 });
 IREE_VMVX_ABI_DEFINE_SHIM(mmt4d, v);
 
-IREE_VMVX_ABI_EXPORT(iree_vmvx_mmt4d_f32f32f32, mmt4d, v) {
+static iree_status_t iree_vmvx_mmt4d(iree_ukernel_mmt4d_type_t type,
+                                     const iree_vm_abi_mmt4d_t* args) {
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_host_size_t M = (iree_host_size_t)args->m;
   iree_host_size_t N = (iree_host_size_t)args->n;
@@ -648,148 +648,68 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_mmt4d_f32f32f32, mmt4d, v) {
   iree_host_size_t lhs_tile_size = M0 * K0;
   iree_host_size_t rhs_tile_size = N0 * K0;
   iree_host_size_t out_tile_size = M0 * N0;
-
+  int lhs_elem_size = iree_ukernel_mmt4d_lhs_elem_size(type);
+  int rhs_elem_size = iree_ukernel_mmt4d_rhs_elem_size(type);
+  int out_elem_size = iree_ukernel_mmt4d_out_elem_size(type);
   // Here are abusing the 2D-specific macros MAP_BUFFER_2D_* to query 4D arrays.
   // Thanks to the requirement that all dimensions but the outer-most one are
   // contiguous row-major, the outer-most stride is the only nontrivial stride,
   // we can correctly coalesce the inner 3 dimensions without changing the
   // mapped span.
-  MAP_BUFFER_2D_RO(lhs, float,
-                   /*buffer_ref=*/args->lhs_ref,
-                   /*offset=*/args->lhs_offset,
-                   /*stride0=*/args->lhs_row_stride,
-                   /*stride1=*/1,
-                   /*size0=*/M,
-                   /*size1=*/K* lhs_tile_size);
-  MAP_BUFFER_2D_RO(rhs, float,
-                   /*buffer_ref=*/args->rhs_ref,
-                   /*offset=*/args->rhs_offset,
-                   /*stride0=*/args->rhs_row_stride,
-                   /*stride1=*/1,
-                   /*size0=*/N,
-                   /*size1=*/K* rhs_tile_size);
-  MAP_BUFFER_2D_RW(out, float,
-                   /*buffer_ref=*/args->out_ref,
-                   /*offset=*/args->out_offset,
-                   /*stride0=*/args->out_row_stride,
-                   /*stride1=*/1,
-                   /*size0=*/M,
-                   /*size1=*/N* out_tile_size);
-
-  unsigned accumulate_flag = args->flags & IREE_VMVX_MATMUL_FLAG_ACCUMULATE;
-  unsigned unhandled_flags = args->flags ^ accumulate_flag;
-  if (unhandled_flags) {
-    IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "unsupported mmt4d flags: 0x%x", unhandled_flags);
-  }
-
-  for (iree_host_size_t i = 0; i < M; ++i) {
-    for (iree_host_size_t j = 0; j < N; ++j) {
-      float* out_tile_ptr = out + i * out_stride0 + j * out_tile_size;
-      const float* lhs_panel_ptr = lhs + i * lhs_stride0;
-      const float* rhs_panel_ptr = rhs + j * rhs_stride0;
-      for (iree_host_size_t i0 = 0; i0 < M0; ++i0) {
-        for (iree_host_size_t j0 = 0; j0 < N0; ++j0) {
-          const float* lhs_tile_ptr = lhs_panel_ptr;
-          const float* rhs_tile_ptr = rhs_panel_ptr;
-          float* out_ptr = out_tile_ptr + i0 * N0 + j0;
-          float acc = accumulate_flag ? *out_ptr : 0.f;
-          for (iree_host_size_t k = 0; k < K; ++k) {
-            for (iree_host_size_t k0 = 0; k0 < K0; ++k0) {
-              float lhs_val = lhs_tile_ptr[i0 * K0 + k0];
-              float rhs_val = rhs_tile_ptr[j0 * K0 + k0];
-              acc += lhs_val * rhs_val;
-            }
-            lhs_tile_ptr += lhs_tile_size;
-            rhs_tile_ptr += rhs_tile_size;
-          }
-          *out_ptr = acc;
-        }
-      }
-    }
-  }
-
+  MAP_BUFFER_2D_UNTYPED_RO(lhs,
+                           /*dtype_size=*/lhs_elem_size,
+                           /*buffer_ref=*/args->lhs_ref,
+                           /*offset=*/args->lhs_offset,
+                           /*stride0=*/args->lhs_row_stride,
+                           /*stride1=*/1,
+                           /*size0=*/M,
+                           /*size1=*/K * lhs_tile_size);
+  MAP_BUFFER_2D_UNTYPED_RO(rhs, /*dtype_size=*/rhs_elem_size,
+                           /*buffer_ref=*/args->rhs_ref,
+                           /*offset=*/args->rhs_offset,
+                           /*stride0=*/args->rhs_row_stride,
+                           /*stride1=*/1,
+                           /*size0=*/N,
+                           /*size1=*/K * rhs_tile_size);
+  MAP_BUFFER_2D_UNTYPED_RW(out, /*dtype_size=*/out_elem_size,
+                           /*buffer_ref=*/args->out_ref,
+                           /*offset=*/args->out_offset,
+                           /*stride0=*/args->out_row_stride,
+                           /*stride1=*/1,
+                           /*size0=*/M,
+                           /*size1=*/N * out_tile_size);
+  iree_ukernel_mmt4d_params_t ukernel_params = {
+      .type = type,
+      .flags = args->flags,
+      .lhs_buffer = lhs,
+      .rhs_buffer = rhs,
+      .out_buffer = out,
+      .lhs_stride = lhs_stride0,
+      .rhs_stride = rhs_stride0,
+      .out_stride = out_stride0,
+      .M = M,
+      .N = N,
+      .K = K,
+      .M0 = M0,
+      .N0 = N0,
+      .K0 = K0,
+      .cpu_data = iree_cpu_data_fields(),
+  };
+  iree_ukernel_mmt4d_status_t status = iree_ukernel_mmt4d(&ukernel_params);
   IREE_TRACE_ZONE_END(z0);
+  if (status != iree_ukernel_mmt4d_status_ok) {
+    return iree_make_status(IREE_STATUS_INTERNAL,
+                            iree_ukernel_mmt4d_status_message(status));
+  }
   return iree_ok_status();
 }
 
+IREE_VMVX_ABI_EXPORT(iree_vmvx_mmt4d_f32f32f32, mmt4d, v) {
+  return iree_vmvx_mmt4d(iree_ukernel_mmt4d_type_f32f32f32, args);
+}
+
 IREE_VMVX_ABI_EXPORT(iree_vmvx_mmt4d_i8i8i32, mmt4d, v) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-  iree_host_size_t M = (iree_host_size_t)args->m;
-  iree_host_size_t N = (iree_host_size_t)args->n;
-  iree_host_size_t K = (iree_host_size_t)args->k;
-  iree_host_size_t M0 = (iree_host_size_t)args->m0;
-  iree_host_size_t N0 = (iree_host_size_t)args->n0;
-  iree_host_size_t K0 = (iree_host_size_t)args->k0;
-  iree_host_size_t lhs_tile_size = M0 * K0;
-  iree_host_size_t rhs_tile_size = N0 * K0;
-  iree_host_size_t out_tile_size = M0 * N0;
-
-  // Here are abusing the 2D-specific macros MAP_BUFFER_2D_* to query 4D arrays.
-  // Thanks to the requirement that all dimensions but the outer-most one are
-  // contiguous row-major, the outer-most stride is the only nontrivial stride,
-  // we can correctly coalesce the inner 3 dimensions without changing the
-  // mapped span.
-  MAP_BUFFER_2D_RO(lhs, int8_t,
-                   /*buffer_ref=*/args->lhs_ref,
-                   /*offset=*/args->lhs_offset,
-                   /*stride0=*/args->lhs_row_stride,
-                   /*stride1=*/1,
-                   /*size0=*/M,
-                   /*size1=*/K * lhs_tile_size);
-  MAP_BUFFER_2D_RO(rhs, int8_t,
-                   /*buffer_ref=*/args->rhs_ref,
-                   /*offset=*/args->rhs_offset,
-                   /*stride0=*/args->rhs_row_stride,
-                   /*stride1=*/1,
-                   /*size0=*/N,
-                   /*size1=*/K * rhs_tile_size);
-  MAP_BUFFER_2D_RW(out, int32_t,
-                   /*buffer_ref=*/args->out_ref,
-                   /*offset=*/args->out_offset,
-                   /*stride0=*/args->out_row_stride,
-                   /*stride1=*/1,
-                   /*size0=*/M,
-                   /*size1=*/N * out_tile_size);
-
-  unsigned accumulate_flag = args->flags & IREE_VMVX_MATMUL_FLAG_ACCUMULATE;
-  unsigned unhandled_flags = args->flags ^ accumulate_flag;
-  if (unhandled_flags) {
-    IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "unsupported mmt4d flags: 0x%x", unhandled_flags);
-  }
-
-  for (iree_host_size_t i = 0; i < M; ++i) {
-    for (iree_host_size_t j = 0; j < N; ++j) {
-      int32_t* out_tile_ptr = out + i * out_stride0 + j * out_tile_size;
-      const int8_t* lhs_panel_ptr = lhs + i * lhs_stride0;
-      const int8_t* rhs_panel_ptr = rhs + j * rhs_stride0;
-      for (iree_host_size_t i0 = 0; i0 < M0; ++i0) {
-        for (iree_host_size_t j0 = 0; j0 < N0; ++j0) {
-          const int8_t* lhs_tile_ptr = lhs_panel_ptr;
-          const int8_t* rhs_tile_ptr = rhs_panel_ptr;
-          int32_t* out_ptr = out_tile_ptr + i0 * N0 + j0;
-          int32_t acc = accumulate_flag ? *out_ptr : 0.f;
-          for (iree_host_size_t k = 0; k < K; ++k) {
-            for (iree_host_size_t k0 = 0; k0 < K0; ++k0) {
-              // C's implicit promotion to int saves skin, but let's be explicit
-              int32_t lhs_val_int32 = lhs_tile_ptr[i0 * K0 + k0];
-              int32_t rhs_val_int32 = rhs_tile_ptr[j0 * K0 + k0];
-              acc += lhs_val_int32 * rhs_val_int32;
-            }
-            lhs_tile_ptr += lhs_tile_size;
-            rhs_tile_ptr += rhs_tile_size;
-          }
-          *out_ptr = acc;
-        }
-      }
-    }
-  }
-
-  IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return iree_vmvx_mmt4d(iree_ukernel_mmt4d_type_i8i8i32, args);
 }
 
 //===----------------------------------------------------------------------===//
@@ -877,4 +797,10 @@ IREE_API_EXPORT iree_status_t iree_vmvx_module_create(
 
   *out_module = base_module;
   return iree_ok_status();
+}
+
+IREE_API_EXPORT void iree_vmvx_module_state_update_workgroup_state(
+    iree_vm_module_state_t* module_state, uint32_t processor_id) {
+  iree_vmvx_module_state_t* state = (iree_vmvx_module_state_t*)module_state;
+  state->processor_id = processor_id;
 }

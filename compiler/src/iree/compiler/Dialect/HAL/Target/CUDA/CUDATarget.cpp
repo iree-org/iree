@@ -9,9 +9,10 @@
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/CUDA/LLVMPasses.h"
-#include "iree/compiler/Dialect/HAL/Target/CUDA/libdevice.h"
+#include "iree/compiler/Dialect/HAL/Target/CUDA/cuda_libdevice.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
+#include "iree/compiler/Utils/StringUtils.h"
 #include "iree/schemas/cuda_executable_def_builder.h"
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/IR/Constants.h"
@@ -37,11 +38,13 @@ static llvm::cl::opt<bool> dumpPtx(
     "iree-hal-cuda-dump-ptx", llvm::cl::init(false),
     llvm::cl::desc("Dump ptx to the debug stream."));
 
+// TODO: remove this workaround altogether once we decide not to support
+// CUDA 11.3
 static llvm::cl::opt<bool> clDisableLoopNounrollWa(
     "iree-hal-cuda-disable-loop-nounroll-wa",
     llvm::cl::desc("Disable the workaround for bug in ptxas for CUDA version "
                    "before 11.4."),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 static llvm::cl::opt<std::string> clTargetChip(
     "iree-hal-cuda-llvm-target-arch", llvm::cl::desc("LLVM target chip."),
@@ -142,14 +145,6 @@ static void linkAndOptimize(llvm::Module &module,
   MPM.run(module);
 }
 
-/// Sanitize the function name as CUDA driver doesn't allow function names with
-/// '.' character.
-static std::string sanitizeNameForCuda(llvm::StringRef name) {
-  std::string sanitizedName(name);
-  std::replace(sanitizedName.begin(), sanitizedName.end(), '.', '_');
-  return sanitizedName;
-}
-
 class CUDATargetBackend final : public TargetBackend {
  public:
   CUDATargetBackend() = default;
@@ -229,7 +224,7 @@ class CUDATargetBackend final : public TargetBackend {
       auto *llvmFunc = llvmModule->getFunction(func.getName());
       if (llvmFunc->isDeclaration()) continue;
       // setName will make sure the function name is unique.
-      llvmFunc->setName(sanitizeNameForCuda(func.getName()));
+      llvmFunc->setName(sanitizeSymbolName(func.getName()));
       entryPointNames.emplace_back(llvmFunc->getName());
       std::array<int32_t, 3> workgroupSize;
       uint32_t workgroupLocalMemory = 0;

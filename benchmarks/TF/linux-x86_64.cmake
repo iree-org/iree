@@ -28,7 +28,7 @@ iree_benchmark_suite(
     "linux-x86_64"
 
   MODULES
-    "${MINILM_L12_H384_UNCASED_INT32_MODULE}"
+    "${MINILM_L12_H384_UNCASED_INT32_SEQLEN128_MODULE}"
 
   BENCHMARK_MODES
     "full-inference,default-flags"
@@ -52,7 +52,7 @@ iree_benchmark_suite(
     "linux-x86_64"
 
   MODULES
-    "${MINILM_L12_H384_UNCASED_INT32_MODULE}"
+    "${MINILM_L12_H384_UNCASED_INT32_SEQLEN128_MODULE}"
 
   BENCHMARK_MODES
     "1-thread,full-inference,default-flags"
@@ -78,7 +78,7 @@ iree_benchmark_suite(
     "linux-x86_64"
 
   MODULES
-    "${MINILM_L12_H384_UNCASED_INT32_MODULE}"
+    "${MINILM_L12_H384_UNCASED_INT32_SEQLEN128_MODULE}"
 
   BENCHMARK_MODES
     "4-thread,full-inference,default-flags"
@@ -104,7 +104,7 @@ iree_benchmark_suite(
     "linux-x86_64"
 
   MODULES
-    "${MINILM_L12_H384_UNCASED_INT32_MODULE}"
+    "${MINILM_L12_H384_UNCASED_INT32_SEQLEN128_MODULE}"
 
   BENCHMARK_MODES
     "8-thread,full-inference,default-flags"

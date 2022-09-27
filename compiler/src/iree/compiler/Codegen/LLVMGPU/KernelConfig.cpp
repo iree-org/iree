@@ -9,7 +9,10 @@
 #include <numeric>
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Codegen/Common/LinalgOpInfo.h"
+#include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
+#include "iree/compiler/Codegen/LLVMGPU/TransposeUtils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -32,7 +35,13 @@ llvm::cl::opt<std::string> clGPUCodegenTransformDialectFileName(
     llvm::cl::desc(
         "MLIR file containing a transform dialect specification to apply"),
     llvm::cl::init(""));
-}
+
+llvm::cl::list<int64_t> clGPUCodegenTransformDialectTileSizes(
+    "iree-codegen-llvmgpu-workgroup-tile-sizes",
+    llvm::cl::desc("Fixed tile sizes when using the transform dialect starting "
+                   "from IR already workgroup distributed"),
+    llvm::cl::CommaSeparated);
+}  // namespace iree_compiler
 }  // namespace mlir
 
 namespace {
@@ -127,20 +136,6 @@ static bool supportsTensorCore(func::FuncOp entryPoint, linalg::LinalgOp op) {
       if (outputMap.getResult(i) != b.getAffineDimExpr(i)) return false;
     }
   }
-  // Check that we support converting any fused operation. When using the
-  // tensorcore pipeline we need to be sure we can generate MMA ops otherwise
-  // the code will be highly inneficent.
-  bool fusedOpSupported = true;
-  entryPoint.walk([&fusedOpSupported](linalg::GenericOp linalgOp) {
-    for (Operation &fusedOp : linalgOp.getOps()) {
-      if (!isa<arith::AddFOp, arith::MulFOp, arith::MaxFOp, arith::MinFOp,
-               linalg::YieldOp, arith::DivFOp>(fusedOp)) {
-        fusedOpSupported = false;
-        break;
-      }
-    }
-  });
-  if (!fusedOpSupported) return false;
   return true;
 }
 
@@ -402,9 +397,11 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
 
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
   // Pick a vectorSize of 1 for op that we know won't get vectorizedd.
+  // Also skip vectorization for linalg on memref (no result) as the pipeline
+  // relies on tensor level tiling.
   // TODO(thomasraoux): This could be improved by checking if the linalg op
   // would fail vectorization.
-  if (!linalgOp || op->getNumResults() > 1 ||
+  if (!linalgOp || op->getNumResults() != 1 ||
       llvm::any_of(linalgOp.getInputAndOutputOperands(), [&](OpOperand *input) {
         return !linalgOp.getTiedIndexingMap(input).isProjectedPermutation();
       })) {
@@ -429,25 +426,6 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
   tileSizes.emplace_back(std::move(workgroupTileSizes));  // Workgroup level
   return setOpConfigAndEntryPointFnTranslation(entryPoint, op, tileSizes,
                                                passPipeline, workgroupSize);
-}
-
-/// Propagate the configuration annotated in the incoming IR.
-static LogicalResult setUserConfig(
-    func::FuncOp entryPointFn, Operation *computeOp,
-    IREE::Codegen::CompilationInfoAttr compilationInfo) {
-  if (auto translationInfo = getTranslationInfo(entryPointFn)) {
-    return computeOp->emitOpError(
-        "multiple ops within dispatch trying to set the translation "
-        "info");
-  }
-
-  SmallVector<int64_t> workgroupSize = compilationInfo.getWorkgroupSizeVals();
-  setTranslationInfo(entryPointFn, compilationInfo.getTranslationInfo(),
-                     workgroupSize);
-
-  setLoweringConfig(computeOp, compilationInfo.getLoweringConfig());
-  eraseCompilationInfo(computeOp);
-  return success();
 }
 
 /// Return the size of the given dimension in the linalg op.
@@ -521,61 +499,50 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   return success();
 }
 
-/// Returns true if the operation is a GenericOp implementing a 2D transpose.
-static bool isTransposeOp(linalg::LinalgOp linalgOp) {
-  if (!isa<linalg::GenericOp>(linalgOp)) return false;
-  // Check that the op has 2 parallel loops.
-  if (linalgOp.getNumParallelLoops() != 2) {
-    return false;
-  }
-
-  // Check that all the iterators are parallel.
-  if (linalgOp.getNumParallelLoops() != linalgOp.getNumLoops()) {
-    return false;
-  }
-
-  // Check that the op has only one input and one output.
-  if ((linalgOp.getNumInputs() != 1) || (linalgOp.getNumOutputs() != 1)) {
-    return false;
-  }
-  // Check for 2D operations
-  auto inputShape =
-      linalgOp.inputs()[0].getType().cast<ShapedType>().getShape();
-  auto outputShape =
-      linalgOp.outputs()[0].getType().cast<ShapedType>().getShape();
-  if (inputShape.size() != 2 || outputShape.size() != 2) {
-    return false;
-  }
-
-  // Only transpose static shapes
-  if (linalgOp.hasDynamicShape()) {
-    return false;
-  }
-
-  // Check that the two indexing maps are a permutation of each other.
-  auto indexing_maps = linalgOp.getIndexingMapsArray();
-  return !indexing_maps[0].isEmpty() && !indexing_maps[1].isEmpty() &&
-         ((indexing_maps[0].isIdentity() && !indexing_maps[1].isIdentity() &&
-           indexing_maps[1].isPermutation()) ||
-          (!indexing_maps[0].isIdentity() && indexing_maps[0].isPermutation() &&
-           indexing_maps[1].isIdentity()));
+static bool hasTwoOrThreeLoopsInfo(linalg::LinalgOp linalgOp) {
+  return linalgOp.getNumParallelLoops() >= 2 &&
+         linalgOp.getNumParallelLoops() <= 3;
 }
 
 static LogicalResult setTransposeConfig(func::FuncOp entryPoint,
-                                        Operation *op) {
+                                        linalg::LinalgOp linalgOp) {
+  LinalgOpInfo opInfo(linalgOp, sharedMemTransposeFilter);
+
+  // Checks preconditions for shared mem transpose.
+  if (!opInfo.isTranspose() || opInfo.isDynamic() || opInfo.isReduction() ||
+      !isa<linalg::GenericOp>(linalgOp) || !hasTwoOrThreeLoopsInfo(linalgOp)) {
+    return failure();
+  }
+
+  ArrayRef<OpOperand *> transposedOperands = opInfo.getTransposeOperands();
+
+  // Determine the fastest moving dimensions for the source/destination indices
+  // of each transpose. These inform the tile sizes.
+  int64_t outputFastestDim = linalgOp.getNumLoops() - 1;
+  int64_t inputFastestDim = linalgOp.getTiedIndexingMap(transposedOperands[0])
+                                .getDimPosition(outputFastestDim);
+  // Ensure the other transposed operands match
+  for (int i = 1; i < transposedOperands.size(); ++i) {
+    if (inputFastestDim != linalgOp.getTiedIndexingMap(transposedOperands[i])
+                               .getDimPosition(outputFastestDim)) {
+      return failure();
+    }
+  }
+
   int32_t tileM = 32;
   int32_t tileN = 32;
   TileSizesListType tileSizes;
-  tileSizes.push_back({tileM, tileN});
+  // Set all tile sizes to 1 except for fastest moving dimensions.
+  SmallVector<int64_t> tileSizesTemp(linalgOp.getNumLoops(), 1);
+  tileSizesTemp[outputFastestDim] = 32;
+  tileSizesTemp[inputFastestDim] = 32;
+  tileSizes.push_back(tileSizesTemp);
 
-  // Check alignment with tile size
-  if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
-    auto inputShape =
-        genericOp.inputs()[0].getType().cast<ShapedType>().getShape();
-    if (inputShape[0] % tileM != 0 || inputShape[1] % tileN != 0) {
-      return failure();
-    }
-  } else {
+  // Check alignment with tile size for each transpose. Only the fastest moving
+  // dims need to match the transpose tile.
+  auto loopRanges = linalgOp.getStaticLoopRanges();
+  if (loopRanges[outputFastestDim] % tileM != 0 ||
+      loopRanges[inputFastestDim] % tileN != 0) {
     return failure();
   }
 
@@ -585,13 +552,116 @@ static LogicalResult setTransposeConfig(func::FuncOp entryPoint,
   std::array<int64_t, 3> workgroupSize = {8, 32, 1};
 
   return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, op, tileSizes,
+      entryPoint, linalgOp, tileSizes,
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTransposeSharedMem,
       workgroupSize);
 }
 
+static LogicalResult setConvolutionConfig(linalg::LinalgOp linalgOp,
+                                          const int64_t subgroupSize,
+                                          const int64_t bestTilingFactor) {
+  if (!isa<linalg::Conv2DNhwcHwcfOp>(linalgOp)) {
+    return failure();
+  }
+  Type inputType = linalgOp.getInputOperand(0)->get().getType();
+  ArrayRef<int64_t> inputShape = inputType.cast<ShapedType>().getShape();
+  Type outputType = linalgOp.getOutputOperand(0)->get().getType();
+  ArrayRef<int64_t> outputShape = outputType.cast<ShapedType>().getShape();
+  if (ShapedType::isDynamic(inputShape[3]) ||
+      llvm::any_of(outputShape.drop_front(), ShapedType::isDynamic)) {
+    return failure();
+  }
+  int64_t oh = outputShape[1], ow = outputShape[2], oc = outputShape[3];
+  // The core idea is to distribute the convolution OH/OW/OC dimension to the
+  // workgroup Z/Y/X dimension, with each thread in a workgroup handling
+  // multiple vector elements. We try to 1) utilize all threads in a subgroup,
+  // and 2) handle an optimal tile size along each dimension.
+  int64_t residualThreads = subgroupSize;
+  int64_t residualTilingFactor = bestTilingFactor;
+  SmallVector<int64_t, 3> workgroupSize(3, 1);    // (X, Y, Z)
+  SmallVector<int64_t> workgroupTileSizes(4, 0);  // (N, OH, OW, OC)
+  // Deduce the configuration for the OC dimension.
+  for (int64_t x = residualThreads; x >= 2; x >>= 1) {
+    // Handle 4 elements per thread for the innermost dimension. We need this
+    // for vectorized load.
+    int64_t chosenTileSize = 4;
+    if (oc % (x * chosenTileSize) == 0) {
+      workgroupSize[0] = x;
+      workgroupTileSizes[3] = x * chosenTileSize;
+      residualThreads /= x;
+      residualTilingFactor /= chosenTileSize;
+      break;
+    }
+  }
+  if (workgroupTileSizes[3] == 0) return failure();
+  // Deduce the configruation for the OW and OH dimension. Try to make them even
+  // if possible given we typically have images with the same height and width.
+  bool tileToSquare = false;
+  unsigned log2Threads = llvm::Log2_64(residualThreads);
+  if (ow == oh && residualThreads != 1 && log2Threads % 2 == 0) {
+    int64_t yz = 1ll << (log2Threads / 2);
+    int64_t chosenTileSize = 1ll << (llvm::Log2_64(residualTilingFactor) / 2);
+    while (chosenTileSize >= 1 && ow % (yz * chosenTileSize) != 0) {
+      chosenTileSize >>= 1;
+    }
+    if (chosenTileSize != 0) {
+      workgroupSize[1] = workgroupSize[2] = yz;
+      workgroupTileSizes[2] = workgroupTileSizes[1] = yz * chosenTileSize;
+      tileToSquare = true;
+    }
+  }
+  // Otherwise treat OW and OH separately to allow them to have different number
+  // of threads and tiling size.
+  if (!tileToSquare) {
+    // Decide the tiling and distribution parameters for one dimension.
+    auto decideOneDim = [&](int64_t inputDim, int64_t &wgDimSize,
+                            int64_t &wgTileSize) {
+      for (int64_t dim = residualThreads; dim >= 1; dim >>= 1) {
+        int64_t chosenTileSize = 0;
+        for (int64_t t = residualTilingFactor; t >= 1; t >>= 1) {
+          if (inputDim % (dim * t) == 0) {
+            chosenTileSize = t;
+            break;
+          }
+        }
+        if (chosenTileSize) {
+          wgDimSize = dim;
+          wgTileSize = dim * chosenTileSize;
+          residualThreads /= dim;
+          residualTilingFactor /= chosenTileSize;
+          return true;
+        }
+      }
+      return false;
+    };
+    if (!decideOneDim(ow, workgroupSize[1], workgroupTileSizes[2]) ||
+        !decideOneDim(oh, workgroupSize[2], workgroupTileSizes[1])) {
+      return failure();
+    }
+  }
+  auto pipeline = IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorize;
+  TileSizesListType tileSizes;
+  // Add reduction tile sizes.
+  workgroupTileSizes.append({1, 1, 4});
+  tileSizes.push_back(workgroupTileSizes);
+  auto funcOp = linalgOp->getParentOfType<func::FuncOp>();
+  return setOpConfigAndEntryPointFnTranslation(funcOp, linalgOp, tileSizes,
+                                               pipeline, workgroupSize);
+}
+
 static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                    Operation *computeOp) {
+  if (!clGPUCodegenTransformDialectTileSizes.empty()) {
+    SmallVector<int64_t, 4> workgroupTileSizes(
+        clGPUCodegenTransformDialectTileSizes.begin(),
+        clGPUCodegenTransformDialectTileSizes.end());
+    TileSizesListType tileSizes;
+    tileSizes.emplace_back(std::move(workgroupTileSizes));
+    auto config = IREE::Codegen::LoweringConfigAttr::get(
+        computeOp->getContext(), tileSizes);
+    setLoweringConfig(computeOp, config);
+    return success();
+  }
   if (IREE::Codegen::CompilationInfoAttr compilationInfo =
           getCompilationInfo(computeOp)) {
     // If the op already has a lowering config coming from the IR use this and
@@ -606,8 +676,11 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
     if (succeeded(setWarpReductionConfig(entryPointFn, linalgOp))) {
       return success();
     }
-    if (isTransposeOp(linalgOp) &&
-        succeeded(setTransposeConfig(entryPointFn, linalgOp))) {
+    if (succeeded(setConvolutionConfig(linalgOp, 32, 16))) {
+      return success();
+    }
+    auto genericOp = dyn_cast<linalg::GenericOp>(computeOp);
+    if (genericOp && succeeded(setTransposeConfig(entryPointFn, genericOp))) {
       return success();
     }
   }
@@ -637,14 +710,12 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
       return funcOp.emitOpError("failed to get compute ops");
     }
 
-    // If using sandbox passes, currently set the workload_per_wg to be
-    // empty for single-threaded execution.
     if (clGPUCodegenTransformDialectFileName.size() > 0) {
       auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
           moduleOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
                                      TransformDialectInterpreterCodegen);
       setTranslationInfo(funcOp, translationInfo);
-      continue;
+      if (clGPUCodegenTransformDialectTileSizes.empty()) continue;
     }
 
     Operation *rootOperation = nullptr;
@@ -677,7 +748,7 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
       // setTranslationInfo(
       //    funcOp,
       //    IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute,
-      //    /*workloadPerWorkgroup=*/{}, {1, 1, 1});
+      //    {1, 1, 1});
       // continue;
       return funcOp.emitOpError("unable to find root operation");
     }

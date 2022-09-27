@@ -31,8 +31,8 @@ namespace Vulkan {
 /// For example:
 ///   ampere-rtx3080-windows
 ///   rdna1-5700xt-linux
-///   adreno-a650-android11
-///   valhall-unknown-android11
+///   adreno-a650-android30
+///   valhall-unknown-android30
 ///   cpu-swiftshader-unknown
 ///
 /// Vendor and architecture are combined together because:

@@ -2009,7 +2009,7 @@ iree_status_t iree_vm_bytecode_disasm_op(
       uint16_t result_reg = VM_ParseResultRegI32("result");
       EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
-          iree_string_builder_append_cstring(b, " = vm.bitcast.f32.if32 "));
+          iree_string_builder_append_cstring(b, " = vm.bitcast.f32.i32 "));
       EMIT_F32_REG_NAME(operand_reg);
       EMIT_OPTIONAL_VALUE_F32(regs->i32[operand_reg]);
       break;

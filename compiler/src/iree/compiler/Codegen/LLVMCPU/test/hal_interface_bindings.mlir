@@ -2,7 +2,7 @@
 
 llvm.func @sink(f32)
 
-// CHECK-LABEL: llvm.func internal @binding_ptrs
+// CHECK-LABEL: llvm.func @binding_ptrs
 func.func @binding_ptrs() {
   // CHECK-DAG: %[[C72:.+]] = llvm.mlir.constant(72 : index) : i64
   %c72 = arith.constant 72 : index

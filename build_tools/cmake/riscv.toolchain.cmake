@@ -46,11 +46,21 @@ set(RISCV_LINKER_FLAGS)
 set(RISCV_LINKER_FLAGS_EXE)
 
 if(RISCV_CPU STREQUAL "rv64")
+  set(CMAKE_SYSTEM_PROCESSOR riscv64)
   set(CMAKE_SYSTEM_NAME Linux)
   set(CMAKE_SYSTEM_LIBRARY_PATH "${RISCV_TOOLCHAIN_ROOT}/sysroot/usr/lib")
   set(RISCV_COMPILER_FLAGS "${RISCV_COMPILER_FLAGS} -march=rv64gc -mabi=lp64d")
   set(RISCV_LINKER_FLAGS "${RISCV_LINKER_FLAGS} -lstdc++ -lpthread -lm -ldl")
+  set(RISCV64_TEST_DEFAULT_LLVM_FLAGS
+    "--iree-llvm-target-triple=riscv64"
+    "--iree-llvm-target-cpu=generic-rv64"
+    "--iree-llvm-target-abi=lp64d"
+    "--iree-llvm-target-cpu-features=+m,+a,+f,+d,+c,+v"
+    "--riscv-v-fixed-length-vector-lmul-max=8"
+    "--riscv-v-vector-bits-min=512"
+    CACHE INTERNAL "Default llvm codegen flags for testing purposes")
 elseif(RISCV_CPU STREQUAL "rv32-baremetal")
+  set(CMAKE_SYSTEM_PROCESSOR riscv32)
   set(CMAKE_SYSTEM_NAME Generic)
   set(CMAKE_CROSSCOMPILING ON CACHE BOOL "")
   set(CMAKE_C_STANDARD 11)

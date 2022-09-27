@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "conv_pipeline_test.mlir"
     "convert_to_nvvm.mlir"
     "convert_to_rocdl.mlir"
     "distribute_foreach.mlir"
@@ -30,9 +31,8 @@ iree_lit_test_suite(
     "tile_on_tensor.mlir"
     "transform_dialect_bufferize.mlir"
     "transform_dialect_vector_distribution.mlir"
+    "transpose_pipeline_test.mlir"
     "vector_to_gpu.mlir"
-    "vectorization.mlir"
-    "warp_reduction.mlir"
   TOOLS
     FileCheck
     iree-opt

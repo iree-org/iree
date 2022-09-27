@@ -68,9 +68,10 @@ static FailureOr<unsigned> getNumWorkloadValues(
   return tilingRoot.getNumLoops();
 }
 
-/// Fallback lowering of `flow.dispatch.default_workgroup_count` to {1, 1, 1}.
+/// Fallback lowering of `flow.dispatch.workgroup_count_from_dag_root` to {1, 1,
+/// 1}.
 static LogicalResult lowerToUnitWorkgroupCount(
-    IREE::Flow::DispatchDefaultWorkgroupCountOp workgroupCountOp) {
+    IREE::Flow::DispatchWorkgroupCountFromDagRootOp workgroupCountOp) {
   OpBuilder builder(workgroupCountOp.getContext());
   builder.setInsertionPoint(workgroupCountOp);
   Value one =
@@ -81,13 +82,12 @@ static LogicalResult lowerToUnitWorkgroupCount(
   return success();
 }
 
-/// Method to lower the `flow.dispatch.default_workgroup_count` op into the
-/// actual computation that returns the number of workgroups.
-static LogicalResult lowerDispatchDefaultWorkgroupCountOp(
-    IREE::Flow::DispatchDefaultWorkgroupCountOp workgroupCountOp,
+/// Method to lower the `flow.dispatch.workgroup_count_from_dag_root` op into
+/// the actual computation that returns the number of workgroups.
+static LogicalResult lowerDispatchWorkgroupCountFromDagRootOp(
+    IREE::Flow::DispatchWorkgroupCountFromDagRootOp workgroupCountOp,
     ArrayRef<Operation *> computeOps, SmallVectorImpl<int64_t> &tileSizes,
-    SmallVector<int64_t> &interchange,
-    SmallVectorImpl<int64_t> &workloadPerWorkgroup) {
+    SmallVector<int64_t> &interchange) {
   auto workloadValues = workgroupCountOp.operands();
 
   // Find the lowering configuration of the root operation.
@@ -147,25 +147,46 @@ static LogicalResult lowerDispatchDefaultWorkgroupCountOp(
   llvm::DenseSet<unsigned> partitionableLoopsSet;
   partitionableLoopsSet.insert(partitionableLoops.begin(),
                                partitionableLoops.end());
+
   for (auto workload : llvm::enumerate(workloadValues)) {
     if (!partitionableLoopsSet.count(workload.index())) {
       tileSizes[workload.index()] = 0;
     }
-    if (tileSizes[workload.index()] == 0) {
+    int64_t tileSize = tileSizes[workload.index()];
+
+    if (tileSize == 0) {
       numTiles.push_back(one);
       continue;
     }
-    if (tileSizes[workload.index()] == 1) {
-      numTiles.push_back(workload.value());
-      continue;
+
+    // When the loop range is known to be static, let's directly use it.
+    int64_t loopRange = ShapedType::kDynamicSize;
+
+    if (auto linalgOp = dyn_cast<linalg::LinalgOp>(*rootOp)) {
+      loopRange = linalgOp.getStaticLoopRanges()[workload.index()];
     }
-    AffineExpr s0;
-    bindSymbols(workgroupCountOp.getContext(), s0);
-    AffineMap numTilesMap =
-        AffineMap::get(0, 1, s0.ceilDiv(tileSizes[workload.index()]));
-    Value nTiles =
-        builder.create<AffineApplyOp>(loc, numTilesMap, workload.value());
-    numTiles.push_back(nTiles);
+
+    if (loopRange != ShapedType::kDynamicSize) {
+      if (tileSize == 1) {
+        Value workload = builder.create<arith::ConstantIndexOp>(loc, loopRange);
+        numTiles.push_back(workload);
+        continue;
+      }
+      int64_t nTileI64 = (loopRange + tileSize - 1) / tileSize;
+      Value nTiles = builder.create<arith::ConstantIndexOp>(loc, nTileI64);
+      numTiles.push_back(nTiles);
+    } else {
+      if (tileSize == 1) {
+        numTiles.push_back(workload.value());
+        continue;
+      }
+      AffineExpr s0;
+      bindSymbols(workgroupCountOp.getContext(), s0);
+      AffineMap numTilesMap = AffineMap::get(0, 1, s0.ceilDiv(tileSize));
+      Value nTiles =
+          builder.create<AffineApplyOp>(loc, numTilesMap, workload.value());
+      numTiles.push_back(nTiles);
+    }
   }
 
   // If there is interchange, first apply interchange on the number of tiles.
@@ -186,33 +207,10 @@ static LogicalResult lowerDispatchDefaultWorkgroupCountOp(
     // If the loop isnt tiled, skip it.
     if (tileSizes[partitionedLoop] == 0) continue;
     numWorkgroups.push_back(numTiles[partitionedLoop]);
-    workloadPerWorkgroup.push_back(tileSizes[partitionedLoop]);
   }
   numWorkgroups.resize(kNumMaxParallelDims, one);
   workgroupCountOp->replaceAllUsesWith(numWorkgroups);
   workgroupCountOp.erase();
-  return success();
-}
-
-/// Update the workload_per_wg value on the TranslationInfoAttr.
-// TODO(ravishankarm): The workload_per_wg field should be deprecated. This
-// is just transition before all dependencies on it can be removed.
-static LogicalResult updateTranslationInfoAttr(
-    IREE::HAL::ExecutableExportOp exportOp,
-    ArrayRef<int64_t> workloadPerWorkgroup) {
-  IREE::Codegen::DispatchLoweringPassPipeline passPipeline =
-      IREE::Codegen::DispatchLoweringPassPipeline::CPUDefault;
-  if (auto translationInfo = getTranslationInfo(exportOp)) {
-    // Expect the `workload_per_wg` to be empty.
-    if (!translationInfo.getWorkloadPerWorkgroupVals().empty()) {
-      return exportOp.emitOpError(
-          "expected workload_per_wg to be empty at this stage");
-    }
-    passPipeline = translationInfo.getDispatchLoweringPassPipeline();
-  }
-  auto newTranslationInfoAttr = IREE::Codegen::TranslationInfoAttr::get(
-      exportOp.getContext(), passPipeline, workloadPerWorkgroup);
-  setTranslationInfo(exportOp, newTranslationInfoAttr);
   return success();
 }
 
@@ -256,7 +254,7 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
       continue;
     }
 
-    // Find the `flow.dispatch.default_workgroup_count` operation in the
+    // Find the `flow.dispatch.workgroup_count_from_dag_root` operation in the
     // `workgroup_count` region of `hal.executable.export`. Lower this to the
     // actual computation that returns the `workgroup_count`.
     // TODO(ravishankarm): Ideally this should be done using a pattern, but the
@@ -270,25 +268,20 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
     }
     Block &workgroupCountBody = workgroupCountRegion.front();
     auto ops = workgroupCountBody
-                   .getOps<IREE::Flow::DispatchDefaultWorkgroupCountOp>();
+                   .getOps<IREE::Flow::DispatchWorkgroupCountFromDagRootOp>();
     if (!llvm::hasSingleElement(ops)) {
       // Do not modify the region since the default path expects only a single
-      // `flow.dispatch.default_workgroup_count` op.
+      // `flow.dispatch.workgroup_count_from_dag_root` op.
       continue;
     }
-    IREE::Flow::DispatchDefaultWorkgroupCountOp defaultWorkgroupCountOp =
+    IREE::Flow::DispatchWorkgroupCountFromDagRootOp defaultWorkgroupCountOp =
         *(ops.begin());
 
-    SmallVector<int64_t> tileSizes, interchange, workloadPerWorkgroup;
-    if (failed(lowerDispatchDefaultWorkgroupCountOp(
-            defaultWorkgroupCountOp, computeOps, tileSizes, interchange,
-            workloadPerWorkgroup))) {
+    SmallVector<int64_t> tileSizes, interchange;
+    if (failed(lowerDispatchWorkgroupCountFromDagRootOp(
+            defaultWorkgroupCountOp, computeOps, tileSizes, interchange))) {
       defaultWorkgroupCountOp.emitOpError(
           "failed to lower default number of workgroups");
-      return signalPassFailure();
-    }
-    if (failed(updateTranslationInfoAttr(exportOp, workloadPerWorkgroup))) {
-      exportOp.emitOpError("failed to update translation info");
       return signalPassFailure();
     }
 
@@ -333,6 +326,13 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
         return signalPassFailure();
       }
     }
+
+    // If tiling didn't happen because there are no tile sizes we are
+    // potentially left with a marker that will confuse the following passes so
+    // we remove the intermediate markers.
+    funcOp->walk([&](Operation *op) {
+      op->removeAttr(linalg::LinalgTransforms::kLinalgTransformMarker);
+    });
 
     LLVM_DEBUG({
       llvm::dbgs() << "--- After Tile + Distribute ---\n";

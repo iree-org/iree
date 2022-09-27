@@ -27,6 +27,7 @@ import os
 from common.benchmark_runner import *
 from common.utils import *
 from mobilebert_fp32_commands import *
+from mobilebert_int8_commands import *
 from simple_commands import *
 
 
@@ -109,12 +110,23 @@ def main(args):
   # Create factories for all models to be benchmarked.
   command_factory = []
   command_factory.append(MobilebertFP32CommandFactory(args.base_dir))
+  command_factory.append(MobilebertInt8CommandFactory(args.base_dir))
   command_factory.append(
       SimpleCommandFactory(args.base_dir, "mobilenet_v2_1.0_224",
                            "1x224x224x3xf32"))
   command_factory.append(
       SimpleCommandFactory(args.base_dir, "mobilenet_v2_224_1.0_uint8",
                            "1x224x224x3xui8", "input", "1,224,224,3"))
+  command_factory.append(
+      SimpleCommandFactory(args.base_dir, "deeplabv3", "1x257x257x3xf32"))
+  command_factory.append(
+      SimpleCommandFactory(args.base_dir, "person_detect", "1x96x96x1xi8"))
+  command_factory.append(
+      SimpleCommandFactory(args.base_dir, "ssd_mobilenet_v2_static_1.0_int8",
+                           "1x320x320x3xi8"))
+  command_factory.append(
+      SimpleCommandFactory(args.base_dir, "resnet_v2_101_1_default_1",
+                           "1x299x299x3xf32"))
 
   if args.mode == "desktop":
     results_path = os.path.join(args.output_dir, "results.csv")

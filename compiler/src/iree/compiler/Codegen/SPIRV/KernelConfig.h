@@ -63,6 +63,9 @@ LogicalResult setNVIDIACodeGenConfig(const spirv::TargetEnv &targetEnv,
 
 }  // namespace detail
 
+/// Returns true if the given `linalgOp` is a (batch) matmul op.
+bool isMatmulOrBatchMatmul(linalg::LinalgOp linalgOp);
+
 /// Attaches the `translation_info` attribute to entry points in `moduleOp` and
 /// `lowering_config` attributes to all root ops in `moduleOp`'s region.
 /// These attributes are used to drive the CodeGen pipeline.

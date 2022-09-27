@@ -52,16 +52,20 @@ static iree_status_t iree_hal_vulkan_create_descriptor_set_layout(
   create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
   create_info.pNext = NULL;
   create_info.flags = 0;
-  if (logical_device->enabled_extensions().push_descriptors) {
-    // Note that we can *only* use push descriptor sets if we set this create
-    // flag. If push descriptors aren't supported we emulate them with normal
-    // descriptors so it's fine to have kPushOnly without support.
-    create_info.flags |=
-        VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR;
-  }
 
   VkDescriptorSetLayoutBinding* native_bindings = NULL;
   if (binding_count > 0) {
+    if (logical_device->enabled_extensions().push_descriptors) {
+      // Note that we can *only* use push descriptor sets if we set this create
+      // flag. If push descriptors aren't supported we emulate them with normal
+      // descriptors so it's fine to have kPushOnly without support.
+      // Also we only enable this when there are at least one binding in it.
+      // (We can have dummy descriptor sets without any bindings for builtin
+      // executables.)
+      create_info.flags |=
+          VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR;
+    }
+
     // TODO(benvanik): avoid this allocation if possible (inline_array).
     IREE_RETURN_IF_ERROR(iree_allocator_malloc(
         logical_device->host_allocator(),

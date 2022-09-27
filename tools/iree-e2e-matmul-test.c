@@ -11,12 +11,12 @@
 #include <string.h>
 
 #include "iree/base/api.h"
+#include "iree/base/internal/cpu.h"
 #include "iree/base/internal/flags.h"
 #include "iree/base/internal/path.h"
 #include "iree/base/target_platform.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/module.h"
-#include "iree/tooling/cpu_features.h"
 #include "iree/tooling/device_util.h"
 #include "iree/tooling/trace_replay.h"
 #include "iree/tooling/yaml_util.h"
@@ -1056,17 +1056,16 @@ static iree_status_t replay_event_call_matmul(iree_trace_replay_t* replay,
  *****************************************************************************/
 
 // Helper for |replay_event_requirements|.
-static iree_status_t iree_cpu_features_have_all_target_features(
-    iree_cpu_features_t* cpu_features, yaml_document_t* document,
-    yaml_node_t* target_features_node) {
+static iree_status_t iree_cpu_has_required_target_features(
+    yaml_document_t* document, yaml_node_t* target_features_node) {
   for (yaml_node_item_t* item = target_features_node->data.sequence.items.start;
        item != target_features_node->data.sequence.items.top; ++item) {
     yaml_node_t* item_node = yaml_document_get_node(document, *item);
     iree_string_view_t required_feature = iree_yaml_node_as_string(item_node);
     if (iree_string_view_is_empty(required_feature)) continue;
-    bool feature_is_supported = false;
-    IREE_RETURN_IF_ERROR(iree_cpu_features_query(cpu_features, required_feature,
-                                                 &feature_is_supported));
+    int64_t feature_is_supported = 0;
+    IREE_RETURN_IF_ERROR(
+        iree_cpu_lookup_data_by_key(required_feature, &feature_is_supported));
     if (!feature_is_supported) {
       return iree_make_status(
           // The error status matters. We distinguish "feature not supported",
@@ -1087,21 +1086,7 @@ static iree_status_t replay_event_requirements(iree_trace_replay_t* replay,
   IREE_RETURN_IF_ERROR(iree_yaml_mapping_find(
       document, event_node, iree_make_cstring_view("target_features"),
       &target_features_node));
-  // Creating/destroying CPU features here everytime makes this function
-  // expensive beyond just the allocator churn, as it amounts to clearing a
-  // cache, so the subsequent feature checks are potentially expensive, e.g.
-  // on Linux/Aarch64, retriggering the trapped reads of privileged CPU features
-  // registers.
-  //
-  // But that's fine because this function is only called once per requirements
-  // node, and there's only one such node at the start of the entire trace.
-  iree_cpu_features_t* cpu_features;
-  IREE_RETURN_IF_ERROR(
-      iree_cpu_features_allocate(replay->host_allocator, &cpu_features));
-  iree_status_t status = iree_cpu_features_have_all_target_features(
-      cpu_features, document, target_features_node);
-  iree_cpu_features_free(replay->host_allocator, cpu_features);
-  return status;
+  return iree_cpu_has_required_target_features(document, target_features_node);
 }
 
 static iree_status_t iree_e2e_matmul_test_trace_replay_event(

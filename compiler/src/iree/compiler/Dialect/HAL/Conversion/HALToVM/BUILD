@@ -24,7 +24,6 @@ iree_compiler_cc_library(
         "ConvertExperimentalOps.cpp",
         "ConvertFenceOps.cpp",
         "ConvertHALToVM.cpp",
-        "ConvertSemaphoreOps.cpp",
     ],
     hdrs = [
         "ConvertHALToVM.h",
@@ -38,6 +37,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/VM/Conversion/StandardToVM",
         "//compiler/src/iree/compiler/Dialect/VM/Conversion/UtilToVM",
         "//compiler/src/iree/compiler/Dialect/VM/IR",
+        "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:FuncDialect",

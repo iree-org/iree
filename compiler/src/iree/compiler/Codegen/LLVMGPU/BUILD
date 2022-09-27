@@ -29,15 +29,14 @@ iree_compiler_cc_library(
         "LLVMGPUTileTensor.cpp",
         "LLVMGPUVectorLowering.cpp",
         "LLVMGPUVectorToGPU.cpp",
-        "LLVMGPUVectorization.cpp",
         "Passes.cpp",
-        "VectorReductionToGPU.cpp",
         "Verifiers.cpp",
     ],
     hdrs = [
         "ConvertToLLVM.h",
         "KernelConfig.h",
         "TilingUtils.h",
+        "TransposeUtils.h",
     ],
     deps = [
         "//compiler/src/iree/compiler/Codegen:PassHeaders",

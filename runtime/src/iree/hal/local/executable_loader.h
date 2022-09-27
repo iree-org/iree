@@ -41,10 +41,20 @@ typedef struct iree_hal_executable_import_provider_t {
 } iree_hal_executable_import_provider_t;
 
 static inline iree_hal_executable_import_provider_t
-iree_hal_executable_import_provider_null() {
+iree_hal_executable_import_provider_null(void) {
   iree_hal_executable_import_provider_t provider = {NULL, NULL};
   return provider;
 }
+
+// Returns the import provider specified by
+// IREE_HAL_EXECUTABLE_IMPORT_PROVIDER_DEFAULT_FN or null.
+//
+// To use define a function like:
+//   iree_hal_executable_import_provider_t my_provider(void) { ... }
+// And define it:
+//   -DIREE_HAL_EXECUTABLE_IMPORT_PROVIDER_DEFAULT_FN=my_provider
+iree_hal_executable_import_provider_t
+iree_hal_executable_import_provider_default(void);
 
 // Resolves an import symbol with the given |symbol_name| and stores a pointer
 // to the function (or its context) in |out_fn_ptr|.
@@ -122,7 +132,7 @@ bool iree_hal_query_any_executable_loader_support(
 iree_status_t iree_hal_executable_loader_try_load(
     iree_hal_executable_loader_t* executable_loader,
     const iree_hal_executable_params_t* executable_params,
-    iree_hal_executable_t** out_executable);
+    iree_host_size_t worker_capacity, iree_hal_executable_t** out_executable);
 
 //===----------------------------------------------------------------------===//
 // iree_hal_executable_loader_t implementation details
@@ -139,7 +149,7 @@ typedef struct iree_hal_executable_loader_vtable_t {
   iree_status_t(IREE_API_PTR* try_load)(
       iree_hal_executable_loader_t* executable_loader,
       const iree_hal_executable_params_t* executable_params,
-      iree_hal_executable_t** out_executable);
+      iree_host_size_t worker_capacity, iree_hal_executable_t** out_executable);
 } iree_hal_executable_loader_vtable_t;
 
 #ifdef __cplusplus

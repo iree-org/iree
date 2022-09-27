@@ -18,7 +18,7 @@
 
 set(ANDROID_ADRENO_GPU_COMPILATION_FLAGS
   "--iree-input-type=tosa"
-  "--iree-vulkan-target-triple=adreno-unknown-android11"
+  "--iree-vulkan-target-triple=adreno-unknown-android31"
 )
 
 # GPU, Vulkan, Adreno, full-inference
@@ -87,7 +87,7 @@ iree_benchmark_suite(
     "GPU-Adreno"
   COMPILATION_FLAGS
     ${ANDROID_ADRENO_GPU_COMPILATION_FLAGS}
-    "--iree-flow-enable-fuse-padding-into-consumer-ops"
+    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
@@ -129,7 +129,7 @@ iree_benchmark_suite(
     "GPU-Adreno"
   COMPILATION_FLAGS
     ${ANDROID_ADRENO_GPU_COMPILATION_FLAGS}
-    "--iree-flow-enable-fuse-padding-into-consumer-ops"
+    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=16"
   BENCHMARK_TOOL
     iree-benchmark-module

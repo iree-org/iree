@@ -17,6 +17,7 @@ iree_cc_library(
     "ConvertToLLVM.h"
     "KernelConfig.h"
     "TilingUtils.h"
+    "TransposeUtils.h"
   SRCS
     "ConvertToLLVM.cpp"
     "ConvertToNVVM.cpp"
@@ -32,9 +33,7 @@ iree_cc_library(
     "LLVMGPUTileTensor.cpp"
     "LLVMGPUVectorLowering.cpp"
     "LLVMGPUVectorToGPU.cpp"
-    "LLVMGPUVectorization.cpp"
     "Passes.cpp"
-    "VectorReductionToGPU.cpp"
     "Verifiers.cpp"
   DEPS
     IREELinalgExtDialect

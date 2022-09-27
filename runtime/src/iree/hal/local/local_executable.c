@@ -50,13 +50,15 @@ iree_hal_local_executable_t* iree_hal_local_executable_cast(
 iree_status_t iree_hal_local_executable_issue_call(
     iree_hal_local_executable_t* executable, iree_host_size_t ordinal,
     const iree_hal_executable_dispatch_state_v0_t* dispatch_state,
-    const iree_hal_executable_workgroup_state_v0_t* workgroup_state) {
+    const iree_hal_executable_workgroup_state_v0_t* workgroup_state,
+    uint32_t worker_id) {
   IREE_ASSERT_ARGUMENT(executable);
   IREE_ASSERT_ARGUMENT(dispatch_state);
   IREE_ASSERT_ARGUMENT(workgroup_state);
   return ((const iree_hal_local_executable_vtable_t*)
               executable->resource.vtable)
-      ->issue_call(executable, ordinal, dispatch_state, workgroup_state);
+      ->issue_call(executable, ordinal, dispatch_state, workgroup_state,
+                   worker_id);
 }
 
 iree_status_t iree_hal_local_executable_issue_dispatch_inline(
@@ -95,7 +97,8 @@ iree_status_t iree_hal_local_executable_issue_dispatch_inline(
       for (uint32_t x = 0; x < workgroup_count_x; ++x) {
         workgroup_state.workgroup_id_x = x;
         status = iree_hal_local_executable_issue_call(
-            executable, ordinal, dispatch_state, &workgroup_state);
+            executable, ordinal, dispatch_state, &workgroup_state,
+            /*worker_id=*/0);
         if (!iree_status_is_ok(status)) break;
       }
     }

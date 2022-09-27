@@ -77,7 +77,7 @@ void linalg::transform::ScopeOp::getSuccessorRegions(
   if (index)
     regions.emplace_back(getResults());
   else
-    regions.emplace_back(&body());
+    regions.emplace_back(&getBody());
 }
 
 #define GET_OP_CLASSES

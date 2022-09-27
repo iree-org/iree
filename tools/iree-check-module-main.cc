@@ -6,7 +6,6 @@
 
 #include <array>
 #include <cstdio>
-#include <iostream>
 #include <iterator>
 #include <string>
 #include <type_traits>
@@ -90,7 +89,7 @@ iree_status_t Run(std::string module_file_path, iree_allocator_t host_allocator,
   // iree_tooling_load_module_from_flags.
   iree_file_contents_t* flatbuffer_contents = NULL;
   if (module_file_path == "-") {
-    std::cout << "Reading module contents from stdin...\n";
+    printf("Reading module contents from stdin...\n");
     IREE_RETURN_IF_ERROR(
         iree_stdin_read_contents(host_allocator, &flatbuffer_contents));
   } else {
@@ -173,8 +172,8 @@ extern "C" int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
 
   if (argc < 2) {
-    std::cerr
-        << "A binary module file path to run (or - for stdin) must be passed";
+    fprintf(stderr,
+            "A binary module file path to run (or - for stdin) must be passed");
     return -1;
   }
   auto module_file_path = std::string(argv[1]);
@@ -185,16 +184,15 @@ extern "C" int main(int argc, char** argv) {
   int ret = iree_status_is_ok(status) ? exit_code : 1;
   if (FLAG_expect_failure) {
     if (ret == 0) {
-      std::cout << "Test passed but expected failure\n";
+      printf("Test passed but expected failure\n");
       return 1;
     }
-    std::cout << "Test failed as expected\n";
+    printf("Test failed as expected\n");
     return 0;
   }
 
   if (ret != 0) {
-    std::cout << "Test failed\n";
-    std::cout << Status(std::move(status));
+    printf("Test failed\n%s\n", Status(std::move(status)).ToString().c_str());
   }
 
   return ret;

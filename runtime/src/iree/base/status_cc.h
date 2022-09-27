@@ -94,9 +94,6 @@ static inline const char* StatusCodeToString(StatusCode code) {
   return iree_status_code_string(static_cast<iree_status_code_t>(code));
 }
 
-// Prints a human-readable representation of `x` to `os`.
-std::ostream& operator<<(std::ostream& os, const StatusCode& x);
-
 //===----------------------------------------------------------------------===//
 // Status
 //===----------------------------------------------------------------------===//
@@ -229,9 +226,6 @@ class Status final {
 
 // Returns an OK status, equivalent to a default constructed instance.
 IREE_MUST_USE_RESULT static inline Status OkStatus() { return Status(); }
-
-// Prints a human-readable representation of `x` to `os`.
-std::ostream& operator<<(std::ostream& os, const Status& x);
 
 IREE_MUST_USE_RESULT static inline bool IsOk(const Status& status) {
   return status.code() == StatusCode::kOk;

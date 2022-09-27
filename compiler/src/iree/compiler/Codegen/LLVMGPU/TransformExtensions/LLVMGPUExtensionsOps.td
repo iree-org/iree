@@ -13,8 +13,8 @@ include "mlir/Dialect/Transform/IR/TransformInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpBase.td"
 
-def ForeachThreadToGpuAndTranslationInfo : 
-  Op<Transform_Dialect, "iree.foreach_thread_to_gpu_and_translation_info",
+def MapNestedForeachThreadToGpuThreads : 
+  Op<Transform_Dialect, "iree.map_nested_foreach_thread_to_gpu_threads",
     [FunctionalStyleTransformOpTrait, 
      MemoryEffectsOpInterface,
      TransformEachOpTrait,
@@ -99,7 +99,7 @@ def ForeachThreadToGpuAndTranslationInfo :
   }];
 }
 
-def VectorWarpExecuteOnLane0Op : Op<Transform_Dialect, "iree.vector.warp_execute_on_lane_0",
+def VectorToWarpExecuteOnLane0Op : Op<Transform_Dialect, "iree.vector.to_warp_execute_on_lane_0",
     [FunctionalStyleTransformOpTrait, 
      MemoryEffectsOpInterface,
      TransformEachOpTrait, 

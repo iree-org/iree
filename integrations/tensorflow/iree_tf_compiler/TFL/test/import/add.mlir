@@ -1,4 +1,4 @@
-// RUN: iree-import-tflite %S/add.tflite | FileCheck %s
+// RUN: iree-import-tflite --output-format=mlir-ir %S/add.tflite | FileCheck %s
 
 //      CHECK: module {
 // CHECK-NEXT:   func.func @main(%arg0: tensor<1x8x8x3xf32> {iree.identifier = "input"}) -> (tensor<1x8x8x3xf32> {iree.identifier = "output"}) {

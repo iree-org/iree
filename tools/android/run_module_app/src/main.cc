@@ -153,11 +153,11 @@ Status RunModule(const IreeModuleInvocation& invocation) {
                      iree_allocator_system()),
       "invoking function '%s'", function_name.c_str());
 
-  std::ostringstream oss;
-  IREE_RETURN_IF_ERROR(PrintVariantList(outputs.get(), &oss),
+  std::string result;
+  IREE_RETURN_IF_ERROR(PrintVariantList(outputs.get(), &result),
                        "printing results");
   LOGI("Execution Result:");
-  LOGI("%s", oss.str().c_str());
+  LOGI("%s", result.c_str());
 
   inputs.reset();
   outputs.reset();

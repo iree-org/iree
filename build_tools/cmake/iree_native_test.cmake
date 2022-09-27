@@ -113,6 +113,19 @@ function(iree_native_test)
         "TEST_TMPDIR=${_ANDROID_ABS_DIR}/test_tmpdir"
     )
     set_property(TEST ${_TEST_NAME} PROPERTY ENVIRONMENT ${_ENVIRONMENT_VARS})
+  elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv64" AND
+         CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    # The test target needs to run within the QEMU emulator for RV64 Linux
+    # crosscompile build or on-device.
+    add_test(
+      NAME
+        ${_TEST_NAME}
+      COMMAND
+        "${IREE_ROOT_DIR}/build_tools/cmake/run_riscv64_test.sh"
+        "$<TARGET_FILE:${_SRC_TARGET}>"
+        ${_RULE_ARGS}
+    )
+    iree_configure_test(${_TEST_NAME})
   else()
     add_test(
       NAME
@@ -131,5 +144,5 @@ function(iree_native_test)
   list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
   set_property(TEST ${_TEST_NAME} PROPERTY LABELS "${_RULE_LABELS}")
   set_property(TEST "${_TEST_NAME}" PROPERTY REQUIRED_FILES "${_RULE_DATA}")
-  set_property(TEST ${_TEST_NAME} PROPERTY TIMEOUT ${_RULE_ARGS})
+  set_property(TEST ${_TEST_NAME} PROPERTY TIMEOUT ${_RULE_TIMEOUT})
 endfunction()

@@ -98,14 +98,14 @@ static void processOp(IREE::HAL::CommandBufferExecutionBarrierOp op,
 
   // See if this is a full barrier. These are all we emit today so this simple
   // analysis can remain simple by pattern matching.
-  if (bitEnumContains(op.getSourceStageMask(),
-                      IREE::HAL::ExecutionStageBitfield::CommandRetire |
-                          IREE::HAL::ExecutionStageBitfield::Transfer |
-                          IREE::HAL::ExecutionStageBitfield::Dispatch) &&
-      bitEnumContains(op.getTargetStageMask(),
-                      IREE::HAL::ExecutionStageBitfield::CommandRetire |
-                          IREE::HAL::ExecutionStageBitfield::Transfer |
-                          IREE::HAL::ExecutionStageBitfield::Dispatch)) {
+  if (bitEnumContainsAny(op.getSourceStageMask(),
+                         IREE::HAL::ExecutionStageBitfield::CommandRetire |
+                             IREE::HAL::ExecutionStageBitfield::Transfer |
+                             IREE::HAL::ExecutionStageBitfield::Dispatch) &&
+      bitEnumContainsAny(op.getTargetStageMask(),
+                         IREE::HAL::ExecutionStageBitfield::CommandRetire |
+                             IREE::HAL::ExecutionStageBitfield::Transfer |
+                             IREE::HAL::ExecutionStageBitfield::Dispatch)) {
     state.previousFullBarrier = op;
   } else {
     state.previousFullBarrier = {};

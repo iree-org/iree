@@ -18,6 +18,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "conv_pipeline_test.mlir",
             "convert_to_nvvm.mlir",
             "convert_to_rocdl.mlir",
             "distribute_to_thread.mlir",
@@ -34,9 +35,8 @@ iree_lit_test_suite(
             "tile_on_tensor.mlir",
             "transform_dialect_vector_distribution.mlir",
             "transform_dialect_bufferize.mlir",
+            "transpose_pipeline_test.mlir",
             "vector_to_gpu.mlir",
-            "vectorization.mlir",
-            "warp_reduction.mlir",
         ],
         include = ["*.mlir"],
         # tensor_dialect_*_spec is a an MLIR file that specifies a

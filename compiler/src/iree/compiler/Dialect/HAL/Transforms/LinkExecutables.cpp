@@ -17,6 +17,7 @@
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Transforms/Passes.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -31,20 +32,20 @@ class LinkTargetExecutablesPass
   LinkTargetExecutablesPass(const LinkTargetExecutablesPass &pass) {}
   LinkTargetExecutablesPass(StringRef target) { this->target = target.str(); }
 
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::HAL::HALDialect>();
-    auto targetBackend = getTargetBackend(target);
-    if (targetBackend) {
-      targetBackend->getDependentDialects(registry);
-    }
-  }
-
   StringRef getArgument() const override {
     return "iree-hal-link-target-executables";
   }
 
   StringRef getDescription() const override {
     return "Links together hal.executables for the specified target.";
+  }
+
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<IREE::HAL::HALDialect>();
+    auto targetBackend = getTargetBackend(target);
+    if (targetBackend) {
+      targetBackend->getDependentDialects(registry);
+    }
   }
 
   void runOnOperation() override {
@@ -55,22 +56,13 @@ class LinkTargetExecutablesPass
       return signalPassFailure();
     }
 
-    // Ask the target backend to link all executables it wants.
-    if (failed(targetBackend->linkExecutables(moduleOp))) {
-      moduleOp.emitError() << "failed to link executables for target backend "
-                           << target;
+    OpPassManager passManager(moduleOp.getOperationName());
+    targetBackend->buildLinkingPassPipeline(passManager);
+    if (failed(runPipeline(passManager, moduleOp))) {
+      moduleOp.emitError()
+          << "failed to run linking of executable variants for backend "
+          << target;
       return signalPassFailure();
-    }
-
-    // Backends may move target ops from executables into linked executables.
-    // If an executable ends up with no targets, remove it.
-    auto executableOps =
-        llvm::to_vector<4>(moduleOp.getOps<IREE::HAL::ExecutableOp>());
-    for (auto executableOp : executableOps) {
-      auto targetOps = executableOp.getOps<IREE::HAL::ExecutableVariantOp>();
-      if (targetOps.empty()) {
-        executableOp.erase();
-      }
     }
   }
 
@@ -103,10 +95,19 @@ class LinkExecutablesPass
 
   void runOnOperation() override {
     auto moduleOp = getOperation();
+
+    // Add pipelines for each target backend used in the module.
+    // These will create/rearrange executables.
     OpPassManager passManager(moduleOp.getOperationName());
     for (const auto &targetName : gatherExecutableTargetNames(moduleOp)) {
       passManager.addPass(createLinkTargetExecutablesPass(targetName));
     }
+
+    // Cleanup any remaining empty executables after each pipeline has run.
+    // We do this to aid debugging as then the pipelines can (mostly) be run in
+    // any order and not radically change the IR.
+    passManager.addPass(mlir::createSymbolDCEPass());
+
     if (failed(runPipeline(passManager, moduleOp))) {
       moduleOp.emitError() << "failed to link executables";
       return signalPassFailure();

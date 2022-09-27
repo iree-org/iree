@@ -33,6 +33,7 @@ struct FromMemRefSubView : public OpRewritePattern<GetBufferDescriptorOp> {
     auto sourceType = source.getType().cast<MemRefType>();
     int sourceRank = sourceType.getRank();
     int subRank = subType.getRank();
+    (void)subRank;
 
     // Create a descriptor for the source.
     IndexType indexType = rewriter.getIndexType();
@@ -44,20 +45,28 @@ struct FromMemRefSubView : public OpRewritePattern<GetBufferDescriptorOp> {
         loc, op.getBaseBuffer().getType(), indexType, sizeStrideTypes,
         sizeStrideTypes, subview.getSource());
 
-    // For sizes, we just use the new ones, discarding the source.
+    // For sizes, we just use the new ones.
+    llvm::SmallBitVector droppedDims = subview.getDroppedDims();
+    unsigned insertedDims = 0;
     SmallVector<Value> newSizes;
-    for (int i = 0; i < subRank; ++i) {
+    for (int i = 0; i < sourceRank; ++i) {
+      // Skip the sizes that don't show up in the final type.
+      if (droppedDims.test(i)) continue;
+
       if (subview.isDynamicSize(i)) {
         newSizes.push_back(subview.getDynamicSize(i));
       } else {
         newSizes.push_back(indexSet.get(subview.getStaticSize(i)));
       }
-      op.getSizes()[i].replaceAllUsesWith(newSizes.back());
+      op.getSizes()[insertedDims++].replaceAllUsesWith(newSizes.back());
     }
+    assert(insertedDims == subRank &&
+           "Should have populated all the non-reduced sizes");
 
     // Apply stride multipliers.
     SmallVector<Value> strides;
-    for (int i = 0; i < subRank; ++i) {
+    insertedDims = 0;
+    for (int i = 0; i < sourceRank; ++i) {
       Value currentStride;
       if (subview.isDynamicStride(i)) {
         currentStride = subview.getDynamicStride(i);
@@ -67,12 +76,20 @@ struct FromMemRefSubView : public OpRewritePattern<GetBufferDescriptorOp> {
       currentStride = rewriter.createOrFold<arith::MulIOp>(
           loc, sourceDesc.getStrides()[i], currentStride);
       strides.push_back(currentStride);
-      op.getStrides()[i].replaceAllUsesWith(currentStride);
+
+      // Don't replace the value of dropped dimensions.
+      // Although the new stride will be used in the computation of the final
+      // offset, there's no value to replace.
+      if (droppedDims.test(i)) continue;
+
+      op.getStrides()[insertedDims++].replaceAllUsesWith(currentStride);
     }
+    assert(insertedDims == subRank &&
+           "Should have populated all the non-reduced strides");
 
     // Offsets.
     Value offset = sourceDesc.getOffset();
-    for (int i = 0; i < subRank; ++i) {
+    for (int i = 0; i < sourceRank; ++i) {
       Value logicalOffset;
       if (subview.isDynamicOffset(i)) {
         logicalOffset = subview.getDynamicOffset(i);
@@ -167,8 +184,8 @@ struct FromHalInterfaceBindingSubspan
   }
 };
 
-// Allocations (and anything else the returns a non-offset identity memref)
-// are matched by this pattern.
+// Allocations always return a non-offset memref and are matched by this
+// pattern.
 struct FromAllocation : public OpRewritePattern<GetBufferDescriptorOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(GetBufferDescriptorOp op,
@@ -235,6 +252,70 @@ struct FromAllocation : public OpRewritePattern<GetBufferDescriptorOp> {
   }
 };
 
+// MemRef globals are always static shaped and reference a non-offset
+// buffer.
+struct FromGlobal : public OpRewritePattern<GetBufferDescriptorOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(GetBufferDescriptorOp op,
+                                PatternRewriter &rewriter) const override {
+    auto global = op.getSource().getDefiningOp<memref::GetGlobalOp>();
+    if (!global) return failure();
+    auto memRefType = global.getResult().getType().cast<MemRefType>();
+    if (!memRefType.getLayout().isIdentity()) {
+      return rewriter.notifyMatchFailure(op, "not identity allocation");
+    }
+
+    auto loc = op.getLoc();
+    IndexSet indexSet(loc, rewriter);
+
+    // Replace the op with values:
+    //   base_buffer: The subspan result
+    //   offset: byte offset from subspan divided by element type size
+    //   sizes: static and dynamic sizes from the subspan
+    //   strides: identity strides
+    int rank = memRefType.getRank();
+
+    // Compute sizes.
+    SmallVector<Value> sizes;
+    for (int i = 0; i < rank; ++i) {
+      assert(!memRefType.isDynamicDim(i) &&
+             "memref.get_global does not support dynamic dims");
+      sizes.push_back(rewriter.create<arith::ConstantIndexOp>(
+          loc, memRefType.getDimSize(i)));
+
+      // Replace as we go.
+      op.getSizes()[i].replaceAllUsesWith(sizes.back());
+    }
+
+    // Strides (just creates identity strides).
+    if (rank > 0) {
+      SmallVector<Value> strides;
+      strides.resize(rank);
+      strides[rank - 1] = indexSet.get(1);
+      for (int i = rank - 2; i >= 0; --i) {
+        strides[i] = rewriter.createOrFold<arith::MulIOp>(loc, strides[i + 1],
+                                                          sizes[i + 1]);
+      }
+      for (int i = 0; i < rank; ++i) {
+        op.getStrides()[i].replaceAllUsesWith(strides[i]);
+      }
+    }
+
+    // Offset.
+    op.getOffset().replaceAllUsesWith(indexSet.get(0));
+
+    // Base buffer.
+    op.getBaseBuffer().replaceAllUsesWith(
+        rewriter
+            .create<UnrealizedConversionCastOp>(
+                loc, op.getBaseBuffer().getType(), global.getResult())
+            .getResult(0));
+
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
 class ResolveBufferDescriptorsPass
     : public ResolveBufferDescriptorsBase<ResolveBufferDescriptorsPass> {
  public:
@@ -246,7 +327,7 @@ class ResolveBufferDescriptorsPass
 
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
-    patterns.insert<FromAllocation, FromHalInterfaceBindingSubspan,
+    patterns.insert<FromAllocation, FromGlobal, FromHalInterfaceBindingSubspan,
                     FromMemRefSubView>(&getContext());
 
     if (failed(applyPatternsAndFoldGreedily(getOperation(),

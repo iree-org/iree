@@ -65,12 +65,11 @@ def Util_TiedOpStorageAttr :
   let constBuilderCall = "$_builder.getI64ArrayAttr($0)";
 }
 
-def Util_GlobalRefAttr : ConfinedAttr<FlatSymbolRefAttr, [
-  ReferToOp<"IREE::Util::GlobalOpInterface">,
-]>;
+defvar Util_GlobalRefAttr = FlatSymbolRefAttr;
 
 def Util_AnySerializableAttr : Attr<Or<[
   CPred<"$_self.isa<mlir::DenseElementsAttr>()">,
+  CPred<"$_self.isa<mlir::DenseResourceElementsAttr>()">,
   CPred<"$_self.isa<IREE::Util::SerializableAttrInterface>()">,
 ]>, "buffer-like constant attribute values"> {
   let storageType = [{ ::mlir::Attribute }];

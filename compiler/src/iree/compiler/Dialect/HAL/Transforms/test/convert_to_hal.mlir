@@ -21,7 +21,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
   hal.executable private @ex {
     hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
       hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) attributes {
-        translation_info = #iree_codegen.translation_info<CPUDefault workload_per_wg = [4]>
+        translation_info = #iree_codegen.translation_info<CPUDefault>
       } {
       ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):  // no predecessors
         %c1 = arith.constant 1 : index
@@ -116,7 +116,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
     } => !stream.timepoint
 
     // CHECK: %[[WAIT_FENCE:.+]] = util.null : !hal.fence
-    // CHECK: %[[SIGNAL_FENCE:.+]] = hal.timeline.advance
+    // CHECK: %[[SIGNAL_FENCE:.+]] = hal.fence.create
     // CHECK: hal.device.queue.execute<%[[DEVICE]]
     // CHECK-SAME: wait(%[[WAIT_FENCE]])
     // CHECK-SAME: signal(%[[SIGNAL_FENCE]])

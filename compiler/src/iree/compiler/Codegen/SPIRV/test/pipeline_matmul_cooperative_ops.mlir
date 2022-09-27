@@ -35,7 +35,7 @@ hal.executable public @matmul_256x1024x128_div_sub {
        >}> {
     hal.executable.export public @matmul_256x1024x128_div_sub layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module  {
@@ -78,11 +78,11 @@ hal.executable public @matmul_256x1024x128_div_sub {
 //      CHECK-DAG:   %[[COL_MAJOR:.+]] = spv.Constant false
 //      CHECK-DAG:   %[[C128:.+]] = spv.Constant 128 : i32
 //      CHECK-DAG:   %[[C1024:.+]] = spv.Constant 1024 : i32
-//  CHECK-COUNT-8:   spv.CooperativeMatrixLoadNV %{{.+}}, %[[C128]], %[[COL_MAJOR]]
-//  CHECK-COUNT-8:   spv.CooperativeMatrixLoadNV %{{.+}}, %[[C1024]], %[[COL_MAJOR]]
-//  CHECK-COUNT-8:   spv.CooperativeMatrixMulAddNV
-//          CHECK:   %[[ELEMENTWISE1:.+]] = spv.CooperativeMatrixLoadNV %{{.+}}, %[[C1024]], %[[COL_MAJOR]]
-//          CHECK:   %[[ELEMENTWISE2:.+]] = spv.CooperativeMatrixLoadNV %{{.+}}, %[[C1024]], %[[COL_MAJOR]]
+//  CHECK-COUNT-8:   spv.NV.CooperativeMatrixLoad %{{.+}}, %[[C128]], %[[COL_MAJOR]]
+//  CHECK-COUNT-8:   spv.NV.CooperativeMatrixLoad %{{.+}}, %[[C1024]], %[[COL_MAJOR]]
+//  CHECK-COUNT-8:   spv.NV.CooperativeMatrixMulAdd
+//          CHECK:   %[[ELEMENTWISE1:.+]] = spv.NV.CooperativeMatrixLoad %{{.+}}, %[[C1024]], %[[COL_MAJOR]]
+//          CHECK:   %[[ELEMENTWISE2:.+]] = spv.NV.CooperativeMatrixLoad %{{.+}}, %[[C1024]], %[[COL_MAJOR]]
 //          CHECK:   %[[DIV:.+]] = spv.FDiv %{{.+}}, %[[ELEMENTWISE1]] : !spv.coopmatrix<16x16xf16, Subgroup>
 //          CHECK:   %[[SUB:.+]] = spv.FSub %[[DIV]], %[[ELEMENTWISE2]] : !spv.coopmatrix<16x16xf16, Subgroup>
-//          CHECK:   spv.CooperativeMatrixStoreNV %{{.+}}, %[[SUB]], %[[C1024]], %[[COL_MAJOR]]
+//          CHECK:   spv.NV.CooperativeMatrixStore %{{.+}}, %[[SUB]], %[[C1024]], %[[COL_MAJOR]]

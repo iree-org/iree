@@ -34,6 +34,8 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
       registered dialects and ops.
       - rank_reducing: adds patterns that results in rank-reducing behavior on
       subset-based operations.
+      - simplify_memref_metadata: adds patterns that simplify the uses of
+      memref.extract_strided_metadata and fold to the underlying indices.
 
     Return modes:
     =============
@@ -50,7 +52,8 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
 
   let arguments = (ins PDL_Operation:$target,
                        UnitAttr:$canonicalization,
-                       UnitAttr:$rank_reducing);
+                       UnitAttr:$rank_reducing,
+                       UnitAttr:$simplify_memref_metadata);
   let results = (outs PDL_Operation:$result);
 
   let assemblyFormat = "$target attr-dict";
@@ -66,10 +69,11 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
 
 def IREEBufferizeOp : Op<Transform_Dialect, "iree.bufferize",
     [FunctionalStyleTransformOpTrait, 
-     MemoryEffectsOpInterface,
+     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      DeclareOpInterfaceMethods<TransformOpInterface>]> {
   let description = [{
-    Call upstream comprehensive bufferize with extra IREE hooks.
+    Target the whole hal.executable_variant op and call upstream comprehensive
+    bufferize with extra IREE hooks.
 
     By default, CPU allocations are emitted. This behavior can be modified by 
     using the following attributes:
@@ -89,17 +93,18 @@ def IREEBufferizeOp : Op<Transform_Dialect, "iree.bufferize",
     No handles are consumed or produced.
   }];
 
-  let arguments = (ins UnitAttr:$target_gpu);
-  let results = (outs);
+  let arguments = (ins PDL_Operation:$target,
+                       UnitAttr:$target_gpu);
+  let results = (outs PDL_Operation:$result);
 
-  let assemblyFormat = "attr-dict";
+  let assemblyFormat = "attr-dict $target";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 }
 
 def ForeachThreadToWorkgroupOp : Op<Transform_Dialect, 
     "iree.foreach_thread_to_workgroup",
     [FunctionalStyleTransformOpTrait,
-     MemoryEffectsOpInterface,
+     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      TransformOpInterface,
      TransformEachOpTrait]> {
   let description = [{
@@ -150,5 +155,52 @@ def ForeachThreadToWorkgroupOp : Op<Transform_Dialect,
         ::mlir::transform::TransformState &state);
   }];
 }
+
+def TileToForeachThreadAndWorkgroupCountRegion :
+    Op<Transform_Dialect, "iree.tile_to_foreach_thread_and_workgroup_count_region",
+      [AttrSizedOperandSegments,
+       DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+       TransformOpInterface]> {
+  let description = [{
+    Wrapper around `structured.tile_to_foreach_thread_op` for use within IREE.
+
+    In addition to tile and distribute using `scf.foreach_thread`, lowers the
+    the `workgroup_count` region of the export op corresponding to the parent
+    `func.func` of the target to return the number of workgroups.
+    Please see the doc of `structured.tile_to_foreach_thread_op` for full
+    description of op semantics. 
+  }];
+
+  let arguments = (ins PDL_Operation:$target,
+                   Variadic<PDL_Operation>:$num_threads,
+                   Variadic<PDL_Operation>:$tile_sizes,
+                   DefaultValuedAttr<I64ArrayAttr, "{}">:$static_num_threads,
+                   DefaultValuedAttr<I64ArrayAttr, "{}">:$static_tile_sizes,
+                   OptionalAttr<I64ArrayAttr>:$thread_dim_mapping);
+  let results = (outs PDL_Operation:$foreach_thread_op,
+                      PDL_Operation:$tiled_op);
+  let assemblyFormat = [{
+    $target oilist(
+        `num_threads` custom<DynamicIndexList>($num_threads,
+                                               $static_num_threads,
+                                               "ShapedType::kDynamicSize") |
+         `tile_sizes` custom<DynamicIndexList>($tile_sizes,
+                                               $static_tile_sizes,
+                                               "ShapedType::kDynamicSize"))
+    (`(` `mapped` `to` `dims` $thread_dim_mapping^ `)`)? attr-dict
+  }];
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+  let hasVerifier = 1;
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure apply(
+        ::mlir::transform::TransformResults &transformResults,
+        ::mlir::transform::TransformState &state);
+
+    ::llvm::SmallVector<::mlir::OpFoldResult> getMixedNumThreads();
+    ::llvm::SmallVector<::mlir::OpFoldResult> getMixedTileSizes();
+  }];
+}
+
 
 #endif // IREE_COMPILER_CODEGEN_COMMON_TRANSFORMEXTENSIONS_COMMONEXTENSIONS

@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
@@ -29,6 +30,9 @@
 #include "mlir/Interfaces/VectorInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
+using mlir::iree_compiler::IREE::LinalgExt::LinalgVectorizationPattern;
+using mlir::iree_compiler::IREE::LinalgExt::VectorizationPatterns;
 
 #define DEBUG_TYPE "iree-spirv-vectorize"
 
@@ -82,7 +86,7 @@ Optional<SmallVector<int64_t, 4>> getNativeVectorShape(Operation *op) {
   } else if (auto contractOp = dyn_cast<vector::ContractionOp>(op)) {
     unsigned lastParallelDim = 0;
     for (const auto &it : llvm::enumerate(contractOp.getIteratorTypes())) {
-      if (isParallelIterator(it.value())) lastParallelDim = it.index();
+      if (vector::isParallelIterator(it.value())) lastParallelDim = it.index();
     }
     SmallVector<int64_t, 4> nativeSize(contractOp.getIteratorTypes().size(), 1);
     SmallVector<int64_t, 4> bounds;
@@ -98,6 +102,11 @@ Optional<SmallVector<int64_t, 4>> getNativeVectorShape(Operation *op) {
       nativeSize[dimAttr.getZExtValue()] = 1;
     }
     return nativeSize;
+  } else if (auto reductionOp = dyn_cast<vector::ReductionOp>(op)) {
+    auto srcVectorType = reductionOp.getVectorType();
+    assert(srcVectorType.getRank() == 1);  // Guaranteed by semantics
+    int64_t vectorSize = getComputeVectorSize(srcVectorType.getDimSize(0));
+    return SmallVector<int64_t, 4>{vectorSize};
   } else if (auto transposeOp = dyn_cast<vector::TransposeOp>(op)) {
     auto vectorType = transposeOp.getResultType();
     SmallVector<int64_t, 4> nativeSize(vectorType.getRank(), 1);
@@ -111,9 +120,10 @@ Optional<SmallVector<int64_t, 4>> getNativeVectorShape(Operation *op) {
 void populateVectorizationPatterns(RewritePatternSet &patterns) {
   linalg::LinalgVectorizationOptions opt;
   linalg::LinalgTransformationFilter f;
-  linalg::VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(
-      patterns, opt, f);
-  patterns.add<linalg::LinalgVectorizationPattern>(
+  VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(patterns,
+                                                                   opt, f);
+  linalg::populateConvolutionVectorizationPatterns(patterns);
+  patterns.add<LinalgVectorizationPattern>(
       patterns.getContext(), f.addOpFilter<linalg::ContractionOpInterface>(),
       opt);
   // Additinally pull in patterns to canonicalize transfer ops and to shuffle
@@ -151,7 +161,6 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       RewritePatternSet patterns(context);
       populateVectorizationPatterns(patterns);
       // Pull in additional vectorization patterns in IREE.
-      populateLinalgToVectorVectorizeConvPatterns(context, patterns);
       populateVectorizePadPatterns(patterns);
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
@@ -183,6 +192,25 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       llvm::dbgs() << "\n\n";
     });
 
+    // Fold tensor.extract_slice/insert_slice ops into transfer ops. This helps
+    // to remove those tensor slice ops so that we can enable further vector op
+    // transformations.
+    {
+      RewritePatternSet patterns(context);
+      vector::TransferReadOp::getCanonicalizationPatterns(patterns, context);
+      vector::TransferWriteOp::getCanonicalizationPatterns(patterns, context);
+
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
+      }
+    }
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "--- After folding tensor extract/insert slice ops ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
+
     // Lower vector.multi_dimension early if any operand is a transpose op.
     // The lowering itself generates transpose ops. This helps to cancel
     // transpose ops. vector.multi_reduction is arguably a higher level op and
@@ -200,8 +228,7 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       RewritePatternSet patterns(context);
       vector::populateVectorMultiReductionLoweringPatterns(
           patterns, vector::VectorMultiReductionLowering::InnerParallel);
-      FrozenRewritePatternSet frozenSet(std::move(patterns));
-      applyOpPatternsAndFold(reductionOps, frozenSet,
+      applyOpPatternsAndFold(reductionOps, std::move(patterns),
                              /*strict=*/false);
     }
 

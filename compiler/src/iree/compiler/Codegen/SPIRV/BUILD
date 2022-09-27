@@ -25,7 +25,6 @@ iree_compiler_cc_library(
         "Passes.cpp",
         "SPIRVCreateFastSlowPath.cpp",
         "SPIRVDistribute.cpp",
-        "SPIRVFuseTensorPadWithConsumer.cpp",
         "SPIRVLowerExecutableTargetPass.cpp",
         "SPIRVTile.cpp",
         "SPIRVTileAndDistribute.cpp",
@@ -34,7 +33,6 @@ iree_compiler_cc_library(
         "SPIRVVectorToCooperativeOps.cpp",
         "SPIRVVectorize.cpp",
         "SPIRVVectorizeLoadStore.cpp",
-        "SPIRVVectorizePad.cpp",
         "Utils.cpp",
     ],
     hdrs = [

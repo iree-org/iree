@@ -88,6 +88,7 @@ static void createAsyncGroups(func::FuncOp funcOp) {
           writeOp.getSource(), writeOp.getIndices(), readOp.getSource(),
           readOp.getIndices(),
           builder.getIndexAttr(readOp.getVectorType().getNumElements()),
+          Value(),
           /*bypassL1=*/llvmgpuUseMMASync ? builder.getUnitAttr() : UnitAttr());
       tokens.push_back(token);
     }
@@ -99,6 +100,23 @@ static void createAsyncGroups(func::FuncOp funcOp) {
                                              nullptr);
     // Clean up old stores.
     for (vector::TransferWriteOp writeOp : group) writeOp.erase();
+  }
+}
+
+static void swizzleSharedMemory(func::FuncOp funcOp) {
+  SmallVector<memref::AllocOp> shmAllocOps;
+  funcOp->walk([&](memref::AllocOp allocOp) {
+    auto memrefType = allocOp.getMemref().getType().cast<MemRefType>();
+    // Only apply it to shared memory of input operands.
+    if (memrefType.getMemorySpaceAsInt() !=
+            gpu::GPUDialect::getWorkgroupAddressSpace() ||
+        memrefType.getRank() < 3)
+      return;
+    shmAllocOps.push_back(allocOp);
+  });
+  for (auto allocOp : shmAllocOps) {
+    (void)nvgpu::optimizeSharedMemoryReadsAndWrites(funcOp,
+                                                    allocOp.getMemref());
   }
 }
 
@@ -239,6 +257,7 @@ struct LLVMGPUVectorToGPUPass
       return signalPassFailure();
     }
     RewritePatternSet patterns(funcOp.getContext());
+    mlir::vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
     populatePrepareVectorToMMAPatterns(patterns, llvmgpuUseMMASync);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
@@ -261,6 +280,10 @@ struct LLVMGPUVectorToGPUPass
       convertVectorToMMAOps(funcOp);
     }
     createAsyncGroups(funcOp);
+
+    if (llvmgpuUseMMASync) {
+      swizzleSharedMemory(funcOp);
+    }
   }
 };
 }  // namespace

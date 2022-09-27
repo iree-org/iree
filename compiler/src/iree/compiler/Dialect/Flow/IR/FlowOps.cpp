@@ -1069,7 +1069,10 @@ DispatchWorkgroupsOp::cloneReplacementExcludingOperandsAndResults(
     eraseArgUseTree(arg, rewriter);
     erasedArguments.push_back(i);
   }
-  newBody.front().eraseArguments(erasedArguments);
+  auto &block = newBody.front();
+  BitVector eraseIndices(block.getNumArguments());
+  for (auto i : erasedArguments) eraseIndices.set(i);
+  block.eraseArguments(eraseIndices);
 
   return newOp;
 }

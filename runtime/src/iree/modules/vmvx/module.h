@@ -21,6 +21,10 @@ IREE_API_EXPORT iree_status_t iree_vmvx_module_create(
     iree_vm_instance_t* instance, iree_allocator_t host_allocator,
     iree_vm_module_t** out_module);
 
+// Updates the context-local state of the module.
+IREE_API_EXPORT void iree_vmvx_module_state_update_workgroup_state(
+    iree_vm_module_state_t* module_state, uint32_t processor_id);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

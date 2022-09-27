@@ -50,7 +50,8 @@ function(iree_bytecode_module)
     return()
   endif()
 
-  if(_RULE_STATIC_LIB_PATH AND NOT IREE_TARGET_BACKEND_LLVM_CPU)
+  if(_RULE_STATIC_LIB_PATH AND
+     NOT (IREE_TARGET_BACKEND_LLVM_CPU OR DEFINED IREE_HOST_BINARY_ROOT))
     message(SEND_ERROR "Static library only supports llvm-cpu backend")
   endif()
 
@@ -96,12 +97,6 @@ function(iree_bytecode_module)
     list(APPEND _ARGS "--iree-llvm-sanitize=thread")
   endif()
 
-  if(_RULE_FRIENDLY_NAME)
-    set(_FRIENDLY_NAME "${_RULE_FRIENDLY_NAME}")
-  else()
-    get_filename_component(_FRIENDLY_NAME "${_RULE_SRC}" NAME)
-  endif()
-
   set(_OUTPUT_FILES "${_MODULE_FILE_NAME}")
   # Check LLVM static library setting. If the static libary output path is set,
   # retrieve the object path and the corresponding header file path.
@@ -112,6 +107,21 @@ function(iree_bytecode_module)
 
     string(REPLACE ".o" ".h" _STATIC_HDR_PATH "${_RULE_STATIC_LIB_PATH}")
     list(APPEND _OUTPUT_FILES "${_RULE_STATIC_LIB_PATH}" "${_STATIC_HDR_PATH}")
+  endif()
+
+  if(CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv64" AND
+     CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
+     NOT _RULE_FLAGS MATCHES "iree-llvm-target-triple")
+    # RV64 Linux crosscompile toolchain can support iree-compile with
+    # specific CPU flags. Add the llvm flags to support RV64 RVV codegen if
+    # llvm-target-triple is not specified.
+    list(APPEND _ARGS ${RISCV64_TEST_DEFAULT_LLVM_FLAGS})
+  endif()
+
+  if(_RULE_FRIENDLY_NAME)
+    set(_FRIENDLY_NAME "${_RULE_FRIENDLY_NAME}")
+  else()
+    get_filename_component(_FRIENDLY_NAME "${_RULE_SRC}" NAME)
   endif()
 
   # Depending on the binary instead of the target here given we might not have

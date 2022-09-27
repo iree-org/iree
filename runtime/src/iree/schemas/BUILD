@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_build_test")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_build_test", "iree_runtime_cc_library")
 load("//build_tools/bazel:iree_flatcc.bzl", "iree_flatbuffer_c_library")
 
 package(
@@ -63,5 +63,12 @@ iree_build_test(
         ":metal_executable_def_c_fbs",
         ":spirv_executable_def_c_fbs",
         ":wgsl_executable_def_c_fbs",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "cpu_data",
+    hdrs = [
+        "cpu_data.h",
     ],
 )

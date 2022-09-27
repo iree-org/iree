@@ -18,7 +18,7 @@
 
 set(ANDROID_MALI_GPU_COMPILATION_FLAGS
   "--iree-input-type=tosa"
-  "--iree-vulkan-target-triple=valhall-unknown-android11"
+  "--iree-vulkan-target-triple=valhall-unknown-android31"
 )
 
 # GPU, Vulkan, Mali, full-inference
@@ -114,7 +114,7 @@ iree_benchmark_suite(
     "GPU-Mali-Valhall"
   COMPILATION_FLAGS
     ${ANDROID_MALI_GPU_COMPILATION_FLAGS}
-    "--iree-flow-enable-fuse-padding-into-consumer-ops"
+    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
@@ -139,8 +139,8 @@ iree_benchmark_suite(
   COMPILATION_FLAGS
     "--iree-input-type=tosa"
     "--iree-flow-demote-f32-to-f16"
-    "--iree-vulkan-target-triple=valhall-unknown-android11"
-    "--iree-flow-enable-fuse-padding-into-consumer-ops"
+    "--iree-vulkan-target-triple=valhall-unknown-android31"
+    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
@@ -180,7 +180,7 @@ iree_benchmark_suite(
     "GPU-Mali-Valhall"
   COMPILATION_FLAGS
     ${ANDROID_MALI_GPU_COMPILATION_FLAGS}
-    "--iree-flow-enable-fuse-padding-into-consumer-ops"
+    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=32"
   BENCHMARK_TOOL
     iree-benchmark-module
@@ -208,8 +208,8 @@ iree_benchmark_suite(
   COMPILATION_FLAGS
     "--iree-input-type=tosa"
     "--iree-flow-demote-f32-to-f16"
-    "--iree-vulkan-target-triple=valhall-unknown-android11"
-    "--iree-flow-enable-fuse-padding-into-consumer-ops"
+    "--iree-vulkan-target-triple=valhall-unknown-android31"
+    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=32"
   BENCHMARK_TOOL
     iree-benchmark-module

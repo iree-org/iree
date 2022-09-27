@@ -19,7 +19,7 @@ hal.executable private @matmul_tensors {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_arm_64_ {
     hal.executable.export public @matmul_tensors layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -53,7 +53,7 @@ hal.executable private @matmul_tensors {
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 64)>
 //  CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 64)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [64, 64]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.export public @matmul_tensors
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-NEXT:   (%[[DEVICE:.+]]: !hal.device,
@@ -115,7 +115,7 @@ hal.executable private @add {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.export public @add layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -149,7 +149,7 @@ hal.executable private @add {
   }
 }
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [64, 64]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable private @add
 //      CHECK: hal.executable.export public @add
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
@@ -187,7 +187,7 @@ hal.executable private @add4D {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.export public @add4D layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 :index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3, %arg4
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -222,7 +222,7 @@ hal.executable private @add4D {
   }
 }
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [64, 64, 64]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.export public @add4D
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-NEXT:   (%[[DEVICE:.+]]: !hal.device,
@@ -261,7 +261,7 @@ hal.executable private @batch_matmul_tensors {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_arm_64_ {
     hal.executable.export public @batch_matmul_tensors layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 : index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3, %arg4
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -293,7 +293,7 @@ hal.executable private @batch_matmul_tensors {
   }
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [64, 64, 1]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.export public @batch_matmul_tensors
 // CHECK-NEXT:   (%[[DEVICE:.+]]: !hal.device,
 // CHECK-SAME:    %[[WORKLOAD_0:[a-zA-Z0-9_]+]]: index
@@ -328,7 +328,7 @@ hal.executable private @preset_config_matmul_tensors {
   hal.executable.variant public @system_elf_x86_64, target = #executable_target_system_elf_x86_64_ {
     hal.executable.export public @preset_config layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -355,18 +355,18 @@ hal.executable private @preset_config_matmul_tensors {
     }
   }
 }
-//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
-//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 16)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [16, 32]>
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 32)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 16)>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.export public @preset_config
 // CHECK-NEXT:   (%[[DEVICE:.+]]: !hal.device,
 // CHECK-SAME:    %[[WORKLOAD_0:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[WORKLOAD_1:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[WORKLOAD_2:[a-zA-Z0-9_]+]]: index)
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_0]]]
-//  CHECK-DAG:   %[[D1:.+]] = affine.apply #[[MAP1]]()[%[[WORKLOAD_1]]]
-//      CHECK:   hal.return %[[D1]], %[[D0]], %[[C1]]
+//  CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
+//  CHECK-DAG:   %[[C32:.+]] = arith.constant 32 : index
+//      CHECK:   hal.return %[[C32]], %[[C4]], %[[C1]]
 //      CHECK: func.func @preset_config()
 //      CHECK:   scf.for %[[IV0:.+]] =
 //      CHECK:     scf.for %[[IV1:.+]] =
@@ -395,7 +395,7 @@ hal.executable public @copy_op {
   hal.executable.variant public @system_elf_x86_64, target = #executable_target_system_elf_x86_64_ {
     hal.executable.export public @copy_op layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -412,13 +412,13 @@ hal.executable public @copy_op {
         %slice_size_x = hal.interface.constant.load[9] : index
         %source = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<?x?xi32>{%source_size_y, %source_size_x}
         %dest = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<?x?xi32>{%dest_size_y, %dest_size_x}
-        %source_subview = memref.subview %source[%source_offset_y, %source_offset_x] [%slice_size_y, %slice_size_x] [1, 1] : memref<?x?xi32> to memref<?x?xi32, offset : ?, strides : [?, ?]>
-        %dest_subview = memref.subview %dest[%dest_offset_y, %dest_offset_x] [%slice_size_y, %slice_size_x] [1, 1] : memref<?x?xi32> to memref<?x?xi32, offset : ?, strides : [?, ?]>
+        %source_subview = memref.subview %source[%source_offset_y, %source_offset_x] [%slice_size_y, %slice_size_x] [1, 1] : memref<?x?xi32> to memref<?x?xi32, strided<[?, ?], offset : ?>>
+        %dest_subview = memref.subview %dest[%dest_offset_y, %dest_offset_x] [%slice_size_y, %slice_size_x] [1, 1] : memref<?x?xi32> to memref<?x?xi32, strided<[?, ?], offset : ?>>
         linalg.generic {
             indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
             iterator_types = ["parallel", "parallel"]}
-            ins(%source_subview : memref<?x?xi32, offset : ?, strides : [?, ?]>)
-            outs(%dest_subview : memref<?x?xi32, offset : ?, strides : [?, ?]>)
+            ins(%source_subview : memref<?x?xi32, strided<[?, ?], offset : ?>>)
+            outs(%dest_subview : memref<?x?xi32, strided<[?, ?], offset : ?>>)
             attrs = {lowering_config = #config} {
           ^bb0(%arg0: i32, %arg1: i32):
             linalg.yield %arg0 : i32
@@ -431,7 +431,7 @@ hal.executable public @copy_op {
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 64)>
 //  CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 64)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUBufferOpsTileAndVectorize workload_per_wg = [64, 64]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUBufferOpsTileAndVectorize>
 //      CHECK: hal.executable.export public @copy_op
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 // CHECK-NEXT:   (%[[DEVICE:.+]]: !hal.device,
@@ -489,7 +489,7 @@ hal.executable private @static_1d_fft_stage2 {
   hal.executable.variant public @system_elf_x86_64, target = #executable_target_system_elf_x86_64_ {
     hal.executable.export public @static_1d_fft_stage2 layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -517,7 +517,7 @@ hal.executable private @static_1d_fft_stage2 {
   }
 }
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault workload_per_wg = [64]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
 //      CHECK: hal.executable private @static_1d_fft_stage2
 //      CHECK: hal.executable.export public @static_1d_fft_stage2
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
@@ -547,7 +547,7 @@ hal.executable private @static_3d_fft_stage3 {
   hal.executable.variant public @system_elf_x86_64, target = #executable_target_system_elf_x86_64_ {
     hal.executable.export public @static_3d_fft_stage3 layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -567,7 +567,7 @@ hal.executable private @static_3d_fft_stage3 {
   }
 }
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault workload_per_wg = [64, 64, 64]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
 //      CHECK: hal.executable private @static_3d_fft_stage3
 //      CHECK: hal.executable.export public @static_3d_fft_stage3
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
@@ -610,7 +610,7 @@ hal.executable private @outs_fusion {
   hal.executable.variant public @system_elf_x86_64, target = #executable_target_system_elf_x86_64_ {
     hal.executable.export public @outs_fusion_fn layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -650,7 +650,7 @@ hal.executable private @outs_fusion {
   }
 }
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [64, 64]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable private @outs_fusion
 //      CHECK: hal.executable.export public @outs_fusion_fn
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
@@ -691,7 +691,7 @@ hal.executable private @conv {
   hal.executable.variant public @system_elf_x86_64, target = #executable_target_system_elf_x86_64_ {
     hal.executable.export public @conv layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 : index, %arg5 : index, %arg6 : index, %arg7 : index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3, %arg4, %arg5, %arg6, %arg7
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4, %arg5, %arg6, %arg7
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -727,7 +727,7 @@ hal.executable private @conv {
   }
 }
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault workload_per_wg = [64, 64, 64]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
 //      CHECK: hal.executable private @conv
 //      CHECK: hal.executable.export public @conv
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
@@ -772,7 +772,7 @@ hal.executable private @conv_static {
   hal.executable.variant public @system_elf_x86_64, target = #executable_target_system_elf_x86_64_ {
     hal.executable.export public @conv_static layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 : index, %arg5 : index, %arg6 : index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3, %arg4, %arg5, %arg6
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4, %arg5, %arg6
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -799,10 +799,10 @@ hal.executable private @conv_static {
     }
   }
 }
-//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 20)>
-//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 40)>
-//  CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0] -> (s0 ceildiv 48)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault workload_per_wg = [48, 40, 20]>
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 20)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 40)>
+//  CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0] -> (s0 * 48)>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
 //      CHECK: hal.executable private @conv_static
 //      CHECK: hal.executable.export public @conv_static
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
@@ -813,10 +813,9 @@ hal.executable private @conv_static {
 // CHECK-SAME:    %[[WORKLOAD_3:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[WORKLOAD_4:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[WORKLOAD_5:[a-zA-Z0-9_]+]]: index)
-//  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_1]]]
-//  CHECK-DAG:   %[[D1:.+]] = affine.apply #[[MAP1]]()[%[[WORKLOAD_2]]]
-//  CHECK-DAG:   %[[D2:.+]] = affine.apply #[[MAP2]]()[%[[WORKLOAD_3]]]
-//      CHECK:   hal.return %[[D2]], %[[D1]], %[[D0]] : index, index, index
+//  CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
+//  CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
+//      CHECK:   hal.return %[[C2]], %[[C2]], %[[C4]] : index, index, index
 //      CHECK: func.func @conv_static()
 //      CHECK:   scf.for %[[IV0:.+]] =
 //      CHECK:     scf.for %[[IV1:.+]] =
@@ -848,7 +847,7 @@ hal.executable private @generic_static {
   hal.executable.variant public @system_elf_x86_64, target = #executable_target_system_elf_x86_64_ {
     hal.executable.export public @generic_static layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -873,9 +872,9 @@ hal.executable private @generic_static {
     }
   }
 }
-//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 16)>
-//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [32, 16]>
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 16)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 32)>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable private @generic_static
 //      CHECK: hal.executable.export public @generic_static
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
@@ -883,9 +882,8 @@ hal.executable private @generic_static {
 // CHECK-SAME:    %[[WORKLOAD_0:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[WORKLOAD_1:[a-zA-Z0-9_]+]]: index)
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_0]]]
-//  CHECK-DAG:   %[[D1:.+]] = affine.apply #[[MAP1]]()[%[[WORKLOAD_1]]]
-//      CHECK:   hal.return %[[D1]], %[[D0]], %[[C1]] : index, index, index
+//  CHECK-DAG:   %[[C3:.+]] = arith.constant 3 : index
+//      CHECK:   hal.return %[[C3]], %[[C1]], %[[C1]] : index, index, index
 //      CHECK: func.func @generic_static()
 //      CHECK:   scf.for %[[IV0:.+]] =
 //      CHECK:     scf.for %[[IV1:.+]] =
@@ -911,7 +909,7 @@ hal.executable private @matmul_static {
   hal.executable.variant public @system_elf_arm_64, target = #executable_target_system_elf_arm_64_ {
     hal.executable.export public @matmul_static layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -938,9 +936,9 @@ hal.executable private @matmul_static {
     }
   }
 }
-//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 28)>
-//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [8, 28]>
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 28)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 8)>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable private @matmul_static
 //      CHECK: hal.executable.export public @matmul_static
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
@@ -949,9 +947,9 @@ hal.executable private @matmul_static {
 // CHECK-SAME:    %[[WORKLOAD_1:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[WORKLOAD_2:[a-zA-Z0-9_]+]]: index)
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_0]]]
-//  CHECK-DAG:   %[[D1:.+]] = affine.apply #[[MAP1]]()[%[[WORKLOAD_1]]]
-//      CHECK:   hal.return %[[D1]], %[[D0]], %[[C1]] : index, index, index
+//  CHECK-DAG:   %[[C7:.+]] = arith.constant 7 : index
+//  CHECK-DAG:   %[[C5:.+]] = arith.constant 5 : index
+//      CHECK:   hal.return %[[C5]], %[[C7]], %[[C1]] : index, index, index
 
 // -----
 
@@ -972,7 +970,7 @@ hal.executable private @restrict_num_workgroups {
   hal.executable.variant public @system_elf_arm_64, target = #executable_target_system_elf_arm_64_ {
     hal.executable.export public @restrict_num_workgroups layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 :index, %arg4 : index, %arg5 : index, %arg6 : index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3, %arg4, %arg5, %arg6
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4, %arg5, %arg6
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -999,9 +997,9 @@ hal.executable private @restrict_num_workgroups {
     }
   }
 }
-//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 7)>
-//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault workload_per_wg = [64, 7, 1]>
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 7)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 64)>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
 //      CHECK: hal.executable private @restrict_num_workgroups
 //      CHECK: hal.executable.export public @restrict_num_workgroups
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
@@ -1012,9 +1010,10 @@ hal.executable private @restrict_num_workgroups {
 // CHECK-SAME:    %[[WORKLOAD_3:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[WORKLOAD_4:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[WORKLOAD_5:[a-zA-Z0-9_]+]]: index)
-//  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD_2]]]
-//  CHECK-DAG:   %[[D1:.+]] = affine.apply #[[MAP1]]()[%[[WORKLOAD_3]]]
-//      CHECK:   hal.return %[[D1]], %[[D0]], %[[WORKLOAD_1]] : index, index, index
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//  CHECK-DAG:   %[[C7:.+]] = arith.constant 7 : index
+//  CHECK-DAG:   %[[C9:.+]] = arith.constant 9 : index
+//      CHECK:   hal.return %[[C9]], %[[C1]], %[[C7]] : index, index, index
 
 // -----
 
@@ -1038,7 +1037,7 @@ hal.executable private @reduction {
   hal.executable.variant public @reduction, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.export public @reduction ordinal(0) layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1071,16 +1070,16 @@ hal.executable private @reduction {
     }
   }
 }
-//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 4)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [4]>
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 4)>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable private @reduction
 //      CHECK: hal.executable.export public @reduction
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
 // CHECK-NEXT:   (%[[DEVICE:.+]]: !hal.device,
 // CHECK-SAME:    %[[WORKLOAD:[a-zA-Z0-9_]+]]: index)
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD]]]
-//      CHECK:   hal.return %[[D0]], %[[C1]], %[[C1]] : index, index, index
+//  CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
+//      CHECK:   hal.return %[[C2]], %[[C1]], %[[C1]] : index, index, index
 //      CHECK: func.func @reduction
 //      CHECK:   scf.for %[[IV0:.+]] =
 //      CHECK:     %[[INIT:.+]] = linalg.init_tensor
@@ -1110,7 +1109,7 @@ hal.executable private @gemm_unit_N {
   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.export public @gemm_unit_N ordinal(0) layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1140,7 +1139,7 @@ hal.executable private @gemm_unit_N {
   }
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [64]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable private @gemm_unit_N
 //      CHECK: hal.executable.export public @gemm_unit_N
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
@@ -1181,7 +1180,7 @@ hal.executable private @gemm_unit_M_unit_N {
   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.export public @gemm_unit_M_unit_N ordinal(0) layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1244,7 +1243,7 @@ hal.executable private @generic_unit_dims {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.export public @generic_unit_dims layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index, %arg4 : index, %arg5 : index, %arg6 : index, %arg7 : index, %arg8 : index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3, %arg4, %arg5, %arg6, %arg7, %arg8
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4, %arg5, %arg6, %arg7, %arg8
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1275,7 +1274,7 @@ hal.executable private @generic_unit_dims {
   }
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [64, 64, 64]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable private @generic_unit_dims
 //      CHECK: hal.executable.export public @generic_unit_dims
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
@@ -1320,7 +1319,7 @@ hal.executable private @reduce_to_scalar {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.export public @reduce_to_scalar layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1379,7 +1378,7 @@ hal.executable private @scalar {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.export public @scalar layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device):
-      %x, %y, %z = flow.dispatch.default_workgroup_count
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1436,7 +1435,7 @@ hal.executable private @rank_reduced_slice {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_arm_64_ {
     hal.executable.export public @rank_reduced_slice layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1463,15 +1462,15 @@ hal.executable private @rank_reduced_slice {
     }
   }
 }
-//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 2)>
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 2)>
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 + 10)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [2]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.export public @rank_reduced_slice
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 // CHECK-NEXT:   %[[WORKLOAD:[a-zA-Z0-9]+]]: index
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1
-//  CHECK-DAG:   %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[WORKLOAD]]]
-//      CHECK:   hal.return %[[D0]], %[[C1]], %[[C1]]
+//  CHECK-DAG:   %[[C5:.+]] = arith.constant 5
+//      CHECK:   hal.return %[[C5]], %[[C1]], %[[C1]]
 //      CHECK: func.func @rank_reduced_slice()
 //  CHECK-DAG:   %[[SRC_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(0)
 // CHECK-SAME:       : !flow.dispatch.tensor<readonly:5x40xf32>
@@ -1504,7 +1503,7 @@ hal.executable private @matmul_interchange {
   hal.executable.variant public @llvm, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.export public @matmul_interchange layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1537,7 +1536,7 @@ hal.executable private @matmul_interchange {
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert workload_per_wg = [64, 32]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.export public @matmul_interchange
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-NEXT:   (%[[DEVICE:.+]]: !hal.device,
@@ -1560,7 +1559,7 @@ hal.executable private @no_compute {
   hal.executable.variant public @embedded_elf_x86_64, target = <"llvm-cpu", "embedded-elf-x86_64", {}> {
     hal.executable.export public @no_compute ordinal(0) layout(#hal.pipeline.layout<push_constants = 5, sets = [<0, bindings = [<0, storage_buffer>, <1, storage_buffer>]>]>) attributes {translation_info = #iree_codegen.translation_info<CPUDefault>} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1599,7 +1598,7 @@ hal.executable private @tile_multiuse_producer {
           <0, storage_buffer, ReadOnly>, <1, storage_buffer>, <2, storage_buffer>, <3, storage_buffer>]>]>)
       attributes {translation_info = #iree_codegen.translation_info<CPUDoubleTilingExpert>} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1, %arg2, %arg3
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
@@ -1697,7 +1696,7 @@ hal.executable private @no_tile {
         push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>, <3, storage_buffer>]>]>)
         attributes {translation_info = #iree_codegen.translation_info<CPUDefault>} {
     ^bb0(%arg0: !hal.device, %arg1: index):
-      %x, %y, %z = flow.dispatch.default_workgroup_count %arg1
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {

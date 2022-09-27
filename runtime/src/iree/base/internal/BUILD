@@ -109,6 +109,8 @@ iree_runtime_cc_library(
     deps = [
         "//runtime/src/iree/base",
         "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/schemas:cpu_data",
     ],
 )
 
@@ -144,6 +146,7 @@ iree_runtime_cc_library(
 iree_runtime_cc_test(
     name = "file_io_test",
     srcs = ["file_io_test.cc"],
+    tags = ["requires-filesystem"],
     deps = [
         ":file_io",
         "//runtime/src/iree/base:cc",
@@ -210,6 +213,7 @@ cc_binary_benchmark(
 iree_runtime_cc_test(
     name = "fpu_state_test",
     srcs = ["fpu_state_test.cc"],
+    tags = ["requires-dtz"],
     deps = [
         ":fpu_state",
         "//runtime/src/iree/testing:gtest",

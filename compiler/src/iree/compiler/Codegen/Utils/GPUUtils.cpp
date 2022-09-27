@@ -84,7 +84,13 @@ bool canPerformVectorAccessUsingAllThreads(ArrayRef<int64_t> shape,
     int64_t numElementPerThread = dim.index() == 0 ? vectorSize : 1;
     int64_t numThreads = dim.value() / numElementPerThread;
     if (numThreads == 0) return false;
-    numThreads = std::min(numThreads, threadsAvailable);
+    if (numThreads > threadsAvailable) {
+      // If there are no enough remaining threads to distribute the current
+      // dimension, try to use all remaining threads. But we still need to make
+      // sure all work can be distributed to these threads evenly.
+      if (numThreads % threadsAvailable != 0) return false;
+      numThreads = threadsAvailable;
+    }
     if (threadsAvailable % numThreads != 0) return false;
     threadsAvailable = threadsAvailable / numThreads;
     if (threadsAvailable == 1) break;
