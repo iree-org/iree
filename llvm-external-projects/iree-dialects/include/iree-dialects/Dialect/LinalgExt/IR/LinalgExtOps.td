@@ -456,14 +456,14 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
     Example KC_to_KCck:
 
     ```mlir
-    iree_linalg_ext.pack %arg0 dims_pos = [1, 0]
+    iree_linalg_ext.pack pad(false) %arg0 dims_pos = [1, 0]
       inner_tiles = [32, 8] into %arg1 : (memref<128x256xf32> memref<16x8x32x8xf32>)
     ```
 
     Example NC_to_NCnc:
 
     ```mlir
-    iree_linalg_ext.pack %arg0 dims_pos = [0, 1]
+    iree_linalg_ext.pack pad(false) %arg0 dims_pos = [0, 1]
       inner_tiles = [8, 32] into %arg1 : (memref<128x256xf32> memref<16x8x8x32xf32>)
     ```
 
@@ -471,6 +471,12 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
     with a factor of 8, while dimension at position 1 (256) is tiled with a factor
     of 32. In the KC_to_KCck example, the point loops are interchanged.
 
+    Example NC_to_NCnc with padding:
+
+    ```mlir
+    iree_linalg_ext.pack pad(true) %arg dims_pos = [0, 1]
+      inner_tiles = [8, 2] into %arg1 : (memref<13x15xf32> memref<2x8x8x2xf32>)
+    ```
 
   }];
 
