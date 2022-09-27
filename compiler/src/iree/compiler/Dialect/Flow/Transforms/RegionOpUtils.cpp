@@ -24,7 +24,7 @@ static SmallVector<Range> getLoopRangesImpl(TilingInterface tilableOp,
   SmallVector<Range> loopRanges = tilableOp.getIterationDomain(builder);
   Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
   for (auto iteratorType : llvm::enumerate(tilableOp.getLoopIteratorTypes())) {
-    if (iteratorType.value() == getReductionIteratorTypeName()) {
+    if (iteratorType.value() == utils::IteratorType::reduction) {
       loopRanges[iteratorType.index()].size = one;
     }
   }

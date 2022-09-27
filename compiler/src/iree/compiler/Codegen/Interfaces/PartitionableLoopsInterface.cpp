@@ -48,10 +48,11 @@ llvm::SmallVector<unsigned> getPartitionableLoopsImpl(
   return parallelLoops;
 }
 
-static llvm::SmallVector<llvm::StringRef> getIteratorTypesFromAttr(
+static llvm::SmallVector<utils::IteratorType> getIteratorTypesFromAttr(
     ArrayAttr iteratorTypesAttr) {
   return llvm::to_vector(llvm::map_range(iteratorTypesAttr, [](Attribute attr) {
-    return attr.cast<StringAttr>().getValue();
+    return utils::symbolizeIteratorType(attr.cast<StringAttr>().getValue())
+        .getValue();
   }));
 }
 
@@ -71,7 +72,7 @@ struct LinalgOpPartitionableLoops
     return getPartitionableLoopsImpl(linalgOp, maxNumPartitionedLoops);
   }
 
-  llvm::SmallVector<llvm::StringRef> getIteratorTypes(Operation *op) const {
+  llvm::SmallVector<utils::IteratorType> getIteratorTypes(Operation *op) const {
     return getIteratorTypesFromAttr(
         cast<linalg::LinalgOp>(op).iterator_types());
   }
@@ -91,7 +92,7 @@ struct Mmt4DOpPartitionableLoops
     return {0, 1};
   }
 
-  llvm::SmallVector<StringRef> getIteratorTypes(Operation *op) const {
+  llvm::SmallVector<utils::IteratorType> getIteratorTypes(Operation *op) const {
     return getIteratorTypesFromAttr(
         cast<linalg::LinalgOp>(op).iterator_types());
   }
@@ -118,7 +119,7 @@ struct OuterParallelAsPartitionableLoops
     auto interfaceOp = cast<OpTy>(op);
     for (auto iteratorType :
          llvm::enumerate(interfaceOp.getLoopIteratorTypes())) {
-      if (iteratorType.value() != getParallelIteratorTypeName()) {
+      if (iteratorType.value() != utils::IteratorType::parallel) {
         break;
       }
       partitionableLoops.push_back(iteratorType.index());
@@ -132,7 +133,7 @@ struct OuterParallelAsPartitionableLoops
     return partitionableLoops;
   }
 
-  llvm::SmallVector<StringRef> getIteratorTypes(Operation *op) const {
+  llvm::SmallVector<utils::IteratorType> getIteratorTypes(Operation *op) const {
     auto tiledOp = cast<OpTy>(op);
     return tiledOp.getLoopIteratorTypes();
   }
@@ -165,7 +166,7 @@ struct FftOpPartitionableLoops
     return partitionableLoops;
   }
 
-  llvm::SmallVector<StringRef> getIteratorTypes(Operation *op) const {
+  llvm::SmallVector<utils::IteratorType> getIteratorTypes(Operation *op) const {
     auto fftOp = cast<IREE::LinalgExt::FftOp>(op);
     return fftOp.getLoopIteratorTypes();
   }
@@ -188,7 +189,7 @@ struct AllParallelAsPartitionableLoops
     auto interfaceOp = cast<OpTy>(op);
     for (auto iteratorType :
          llvm::enumerate(interfaceOp.getLoopIteratorTypes())) {
-      if (iteratorType.value() != getParallelIteratorTypeName()) {
+      if (iteratorType.value() != utils::IteratorType::parallel) {
         continue;
       }
       partitionableLoops.push_back(iteratorType.index());
@@ -202,7 +203,7 @@ struct AllParallelAsPartitionableLoops
     return partitionableLoops;
   }
 
-  llvm::SmallVector<StringRef> getIteratorTypes(Operation *op) const {
+  llvm::SmallVector<utils::IteratorType> getIteratorTypes(Operation *op) const {
     auto tiledOp = cast<OpTy>(op);
     return tiledOp.getLoopIteratorTypes();
   }
