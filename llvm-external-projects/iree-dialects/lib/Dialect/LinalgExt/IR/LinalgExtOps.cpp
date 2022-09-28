@@ -1772,9 +1772,9 @@ static void generatePackOpScalarImplementationBody(PackOp packOp,
   SmallVector<int64_t> dimsToBlock =
       extractFromI64ArrayAttr(packOp.getDimsPos());
   SmallVector<Value> interchangedIvs = ivs;
-  SmallVector<int64_t> testInterchangeVector =
+  SmallVector<int64_t> interchangeVector =
       computeInterchangeFromDimPos(dimsToBlock, packOp.getInputRank());
-  interchangedIvs = interchange<Value>(interchangedIvs, testInterchangeVector,
+  interchangedIvs = interchange<Value>(interchangedIvs, interchangeVector,
                                        /*offset=*/packOp.getInputRank());
 
   SmallVector<OpFoldResult> tiles = packOp.getMixedTiles();
@@ -1830,8 +1830,7 @@ LogicalResult PackOp::generateScalarImplementation(OpBuilder &builder,
   for (auto dataTileDim :
        llvm::seq<unsigned>(getInputRank(), getOutputRank() - 1)) {
     Value ub = outputShape[0][dataTileDim];
-    scf::ForOp loop =
-        builder.create<scf::ForOp>(loc, zero, ub, one, ValueRange{});
+    scf::ForOp loop = builder.create<scf::ForOp>(loc, zero, ub, one);
     builder.setInsertionPointToStart(loop.getBody());
     ivVec.push_back(loop.getInductionVar());
   }
