@@ -20,22 +20,25 @@ import requests
 
 def parse_arguments():
   parser = argparse.ArgumentParser()
-  parser.add_argument("--owner", default="iree-org")
-  parser.add_argument("--repo", default="iree")
-  parser.add_argument("--output", default="-")
+  parser.add_argument("--repo",
+                      default="iree-org/iree",
+                      help="The GitHub repository to fetch releases from.")
+  parser.add_argument(
+      "--output",
+      default="-",
+      help="The file to write the HTML to or '-' for stdout (the default)")
   return parser.parse_args()
 
 
 class ReleaseFetcher:
 
-  def __init__(self, owner, repo, per_page=100):
+  def __init__(self, repo, per_page=100):
     self._session = requests.Session()
-    self._owner = owner
     self._repo = repo
     self._per_page = per_page
 
   def get_all(self):
-    url = f"https://api.github.com/repos/{self._owner}/{self._repo}/releases"
+    url = f"https://api.github.com/repos/{self._repo}/releases"
     page = 1
 
     while True:
@@ -52,7 +55,7 @@ class ReleaseFetcher:
 
 
 def main(args):
-  fetcher = ReleaseFetcher(owner=args.owner, repo=args.repo)
+  fetcher = ReleaseFetcher(repo=args.repo)
   with (sys.stdout if args.output == "-" else open(args.output, "w")) as f:
     f.write(
         textwrap.dedent("""\
