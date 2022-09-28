@@ -44,7 +44,7 @@ jobs:
         run: |
           build_tools/scripts/generate_release_index.py \
             --owner="${GITHUB_REPOSITORY}" \
-            --output=docs/website/overrides/pip-release-links.html
+            --output=docs/website/docs/pip-release-links.html
       - name: Setting git config
         run: |
           git config --local user.email "iree-github-actions-bot@google.com"
