@@ -457,14 +457,14 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
     Example KC_to_KCck:
 
     ```mlir
-    iree_linalg_ext.pack pad(false) %arg0 dims_pos = [1, 0]
+    iree_linalg_ext.pack %arg0 dims_pos = [1, 0]
       inner_tiles = [32, 8] into %arg1 : (memref<128x256xf32> memref<16x8x32x8xf32>)
     ```
 
     Example NC_to_NCnc:
 
     ```mlir
-    iree_linalg_ext.pack pad(false) %arg0 dims_pos = [0, 1]
+    iree_linalg_ext.pack %arg0 dims_pos = [0, 1]
       inner_tiles = [8, 32] into %arg1 : (memref<128x256xf32> memref<16x8x8x32xf32>)
     ```
 
