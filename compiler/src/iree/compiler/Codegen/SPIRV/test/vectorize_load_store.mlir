@@ -279,3 +279,30 @@ func.func @scalarize_0d_transfer_write(%val: vector<f32>, %memory: memref<4xf32>
 
 // CHECK: %[[S:.+]] = vector.extractelement %[[V]][] : vector<f32>
 // CHECK: memref.store %[[S]], %[[MEM]][%[[I]]] : memref<4xf32>
+
+// -----
+
+// CHECK-LABEL: func.func @scalarize_indivisible_vector_transfer_read_op
+func.func @scalarize_indivisible_vector_transfer_read_op(%i: index) -> vector<4xf32> {
+  %f0 = arith.constant 0.0 : f32
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<10xf32>
+  %1 = vector.transfer_read %0[%i], %f0 : memref<10xf32>, vector<4xf32>
+  return %1: vector<4xf32>
+}
+
+// CHECK:         %[[SUBSPAN:.+]] = hal.interface.binding.subspan
+// CHECK-COUNT-4: memref.load %[[SUBSPAN]]
+
+
+// -----
+
+// CHECK-LABEL: func.func @scalarize_indivisible_vector_transfer_write_op
+func.func @scalarize_indivisible_vector_transfer_write_op(%value: vector<4xf32>, %i: index) {
+  %f0 = arith.constant 0.0 : f32
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<10xf32>
+  vector.transfer_write %value, %0[%i] : vector<4xf32>, memref<10xf32>
+  return
+}
+
+// CHECK:         %[[SUBSPAN:.+]] = hal.interface.binding.subspan
+// CHECK-COUNT-4: memref.store %{{.+}}, %[[SUBSPAN]]
