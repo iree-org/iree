@@ -675,6 +675,16 @@ func.func @pad_and_pack_static(%input: tensor<13x15xf32>, %output: tensor<2x8x8x
   %0 = iree_linalg_ext.pack %input padding_value(%pad : f32) dims_pos = [0, 1] inner_tiles = [8, 2] into %output : (tensor<13x15xf32> tensor<2x8x8x2xf32>) -> tensor<2x8x8x2xf32>
   return %0 : tensor<2x8x8x2xf32>
 }
+// CHECK:      func.func @pad_and_pack_static
+// CHECK-SAME:   %[[INPUT:[a-zA-Z0-9_]+]]: tensor<13x15xf32>
+// CHECK-SAME:   %[[OUTPUT:[a-zA-Z0-9_]+]]: tensor<2x8x8x2xf32>
+// CHECK-SAME:   %[[PAD:[a-zA-Z0-9_]+]]: f32
+// CHECK:        %[[RES:.+]] = iree_linalg_ext.pack %[[INPUT]]
+// CHECK-SAME:     padding_value(%[[PAD]] : f32)
+// CHECK-SAME:     dims_pos = [0, 1]
+// CHECK-SAME:     inner_tiles = [8, 2]
+// CHECK-SAME:     into %[[OUTPUT]]
+// CHECK:        return %[[RES]]
 
 // -----
 
@@ -682,6 +692,16 @@ func.func @pad_and_pack_partially_dynamic(%input: tensor<?x?xf32>, %output: tens
   %0 = iree_linalg_ext.pack %input padding_value(%pad : f32) dims_pos = [0, 1] inner_tiles = [8, 2] into %output : (tensor<?x?xf32> tensor<?x?x8x2xf32>) -> tensor<?x?x8x2xf32>
   return %0 : tensor<?x?x8x2xf32>
 }
+// CHECK:      func.func @pad_and_pack_partially_dynamic
+// CHECK-SAME:   %[[INPUT:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
+// CHECK-SAME:   %[[OUTPUT:[a-zA-Z0-9_]+]]: tensor<?x?x8x2xf32>
+// CHECK-SAME:   %[[PAD:[a-zA-Z0-9_]+]]: f32
+// CHECK:        %[[RES:.+]] = iree_linalg_ext.pack %[[INPUT]]
+// CHECK-SAME:     padding_value(%[[PAD]] : f32)
+// CHECK-SAME:     dims_pos = [0, 1]
+// CHECK-SAME:     inner_tiles = [8, 2]
+// CHECK-SAME:     into %[[OUTPUT]]
+// CHECK:        return %[[RES]]
 
 // -----
 
@@ -690,3 +710,15 @@ func.func @pad_and_pack_fully_dynamic(%input: tensor<?x?xf32>, %output: tensor<?
     dims_pos = [0, 1] inner_tiles = [%tile_n, %tile_m] into %output : (tensor<?x?xf32> tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32>
   return %0 : tensor<?x?x?x?xf32>
 }
+// CHECK:      func.func @pad_and_pack_fully_dynamic
+// CHECK-SAME:   %[[INPUT:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
+// CHECK-SAME:   %[[OUTPUT:[a-zA-Z0-9_]+]]: tensor<?x?x?x?xf32>
+// CHECK-SAME:   %[[PAD:[a-zA-Z0-9_]+]]: f32
+// CHECK-SAME:   %[[TILE_N:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:   %[[TILE_M:[a-zA-Z0-9_]+]]: index
+// CHECK:        %[[RES:.+]] = iree_linalg_ext.pack %[[INPUT]]
+// CHECK-SAME:     padding_value(%[[PAD]] : f32)
+// CHECK-SAME:     dims_pos = [0, 1]
+// CHECK-SAME:     inner_tiles = [%[[TILE_N]], %[[TILE_M]]]
+// CHECK-SAME:     into %[[OUTPUT]]
+// CHECK:        return %[[RES]]

@@ -1641,7 +1641,7 @@ LogicalResult PackOp::verify() {
   if (!getPaddingValue() &&
       areNotFullTiles(getInputShape(), getDimAndTileMapping())) {
     return op->emitError("invalid tile factor provided. Only full tiles are "
-                         "supported when pad=false");
+                         "supported when padding_value is not set");
   }
 
   // Verify result type against inferred type.
