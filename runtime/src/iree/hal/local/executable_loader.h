@@ -37,7 +37,8 @@ typedef struct iree_hal_executable_import_provider_t {
   // to the function (or its context) in |out_fn_ptr|.
   iree_status_t(IREE_API_PTR* resolve)(void* self,
                                        iree_string_view_t symbol_name,
-                                       void** out_fn_ptr);
+                                       void** out_fn_ptr,
+                                       void** out_fn_context);
 } iree_hal_executable_import_provider_t;
 
 static inline iree_hal_executable_import_provider_t
@@ -63,7 +64,7 @@ iree_hal_executable_import_provider_default(void);
 // allowed to be resolved to NULL. Such cases will always return OK.
 iree_status_t iree_hal_executable_import_provider_resolve(
     const iree_hal_executable_import_provider_t import_provider,
-    iree_string_view_t symbol_name, void** out_fn_ptr);
+    iree_string_view_t symbol_name, void** out_fn_ptr, void** out_fn_context);
 
 //===----------------------------------------------------------------------===//
 // iree_hal_executable_loader_t
