@@ -42,7 +42,7 @@ jobs:
             requests
       - name: Generating release index
         run: |
-          build_tools/scripts/generate_release_index.py \
+          ./build_tools/scripts/generate_release_index.py \
             --repo="${GITHUB_REPOSITORY}" \
             --output=docs/website/docs/pip-release-links.html
       - name: Setting git config
