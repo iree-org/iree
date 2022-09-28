@@ -13,7 +13,6 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Support/Mutex.h"
-#include "llvm/Support/raw_ostream.h"
 #include "mlir/Analysis/DataLayoutAnalysis.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/ArithmeticToLLVM/ArithmeticToLLVM.h"
@@ -864,6 +863,42 @@ class ConvertHALInterfaceBindingSubspanOp : public ConvertToLLVMPattern {
   }
 };
 
+/// Convert memref.extract_aligned_pointer_as_index to the pointer recovered
+/// from a HAL::InterfaceBindingSubspanOp.
+class ConvertExtractAlignedPointerAsIndex : public ConvertToLLVMPattern {
+ public:
+  explicit ConvertExtractAlignedPointerAsIndex(MLIRContext *context,
+                                               LLVMTypeConverter &converter)
+      : ConvertToLLVMPattern(
+            memref::ExtractAlignedPointerAsIndexOp::getOperationName(), context,
+            converter) {}
+
+  LogicalResult matchAndRewrite(
+      Operation *op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto llvmFuncOp = op->getParentOfType<LLVM::LLVMFuncOp>();
+    if (!llvmFuncOp) {
+      return rewriter.notifyMatchFailure(op, "no parent LLVM func");
+    }
+
+    auto extractOp = cast<memref::ExtractAlignedPointerAsIndexOp>(op);
+    auto bindingOp = extractOp.getSource()
+                         .getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
+    if (!bindingOp) {
+      return rewriter.notifyMatchFailure(op, [&](Diagnostic &diag) {
+        diag << "not an InterfaceBindingSubspanOp source: "
+             << extractOp.getSource();
+      });
+    }
+    HALDispatchABI abi(llvmFuncOp, getTypeConverter());
+    Value baseMemrefPtr = abi.loadBindingPtr(
+        op->getLoc(), bindingOp.getBinding().getSExtValue(), rewriter);
+    rewriter.replaceOpWithNewOp<LLVM::PtrToIntOp>(
+        op, getTypeConverter()->getIndexType(), baseMemrefPtr);
+
+    return success();
+  }
+};
 class ConvertToLLVMPass : public ConvertToLLVMBase<ConvertToLLVMPass> {
  public:
   ConvertToLLVMPass() = default;
@@ -988,6 +1023,7 @@ void ConvertToLLVMPass::runOnOperation() {
 
   // clang-format off
   patterns.insert<
+    ConvertExtractAlignedPointerAsIndex,
     ConvertHALEntryPointFuncOp,
     ConvertHALInterfaceWorkgroupIDOp,
     ConvertHALInterfaceWorkgroupSizeOp,
