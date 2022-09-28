@@ -139,6 +139,27 @@ struct OuterParallelAsPartitionableLoops
   }
 };
 
+/// External model implementation for operations that are to be executed
+/// sequentially.
+template <typename OpTy>
+struct NoPartitionableLoops : public PartitionableLoopsInterface::ExternalModel<
+                                  NoPartitionableLoops<OpTy>, OpTy> {
+  unsigned getNumLoops(Operation *op) const {
+    auto tiledOp = cast<OpTy>(op);
+    return tiledOp.getLoopIteratorTypes().size();
+  }
+
+  llvm::SmallVector<unsigned> getPartitionableLoops(
+      Operation *op, unsigned maxNumPartitionedLoops) const {
+    return {};
+  }
+
+  llvm::SmallVector<utils::IteratorType> getIteratorTypes(Operation *op) const {
+    auto tiledOp = cast<OpTy>(op);
+    return tiledOp.getLoopIteratorTypes();
+  }
+};
+
 /// External model implementation for specifying partitionable loops of FftOp.
 struct FftOpPartitionableLoops
     : public PartitionableLoopsInterface::ExternalModel<
@@ -246,16 +267,18 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
   registry.addExtension(+[](MLIRContext *ctx,
                             IREE::LinalgExt::IREELinalgExtDialect *dialect) {
     IREE::LinalgExt::FftOp::attachInterface<FftOpPartitionableLoops>(*ctx);
+    IREE::LinalgExt::PackOp::attachInterface<
+        NoPartitionableLoops<IREE::LinalgExt::PackOp>>(*ctx);
     IREE::LinalgExt::ScanOp::attachInterface<
         AllParallelAsPartitionableLoops<IREE::LinalgExt::ScanOp>>(*ctx);
-    IREE::LinalgExt::SortOp::attachInterface<
-        AllParallelAsPartitionableLoops<IREE::LinalgExt::SortOp>>(*ctx);
-    IREE::LinalgExt::TopkOp::attachInterface<
-        AllParallelAsPartitionableLoops<IREE::LinalgExt::TopkOp>>(*ctx);
-    IREE::LinalgExt::ReverseOp::attachInterface<
-        OuterParallelAsPartitionableLoops<IREE::LinalgExt::ReverseOp>>(*ctx);
     IREE::LinalgExt::ScatterOp::attachInterface<
         OuterParallelAsPartitionableLoops<IREE::LinalgExt::ScatterOp>>(*ctx);
+    IREE::LinalgExt::SortOp::attachInterface<
+        AllParallelAsPartitionableLoops<IREE::LinalgExt::SortOp>>(*ctx);
+    IREE::LinalgExt::ReverseOp::attachInterface<
+        OuterParallelAsPartitionableLoops<IREE::LinalgExt::ReverseOp>>(*ctx);
+    IREE::LinalgExt::TopkOp::attachInterface<
+        AllParallelAsPartitionableLoops<IREE::LinalgExt::TopkOp>>(*ctx);
   });
 }
 
