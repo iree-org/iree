@@ -1824,7 +1824,6 @@ LogicalResult PackOp::generateScalarImplementation(OpBuilder &builder,
   // Generate the loops that iterate over the data tile.
   Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
   Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
-  Value output = getOutput();
 
   // All loops except the innermost are simple loops that just iterate
   // over the tile dimensions.
@@ -1837,15 +1836,15 @@ LogicalResult PackOp::generateScalarImplementation(OpBuilder &builder,
     ivVec.push_back(loop.getInductionVar());
   }
   // The body of the innermost loops does the actual data movement.
-  scf::ForOp innerMostLoop = builder.create<scf::ForOp>(
-      loc, zero, outputShape[0].back(), one, ValueRange{},
-      [&](OpBuilder &bodyBuilder, Location bodyLoc, Value iv,
-          ValueRange regionIterArgs) {
-        ivVec.push_back(iv);
-        generatePackOpScalarImplementationBody(*this, bodyBuilder, bodyLoc,
-                                               ivVec);
-        bodyBuilder.create<scf::YieldOp>(bodyLoc);
-      });
+  builder.create<scf::ForOp>(loc, zero, outputShape[0].back(), one,
+                             ValueRange{},
+                             [&](OpBuilder &bodyBuilder, Location bodyLoc,
+                                 Value iv, ValueRange regionIterArgs) {
+                               ivVec.push_back(iv);
+                               generatePackOpScalarImplementationBody(
+                                   *this, bodyBuilder, bodyLoc, ivVec);
+                               bodyBuilder.create<scf::YieldOp>(bodyLoc);
+                             });
   return success();
 }
 
