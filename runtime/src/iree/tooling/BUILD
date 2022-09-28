@@ -62,7 +62,7 @@ cc_test(
     srcs = ["comparison_test.cc"],
     deps = [
         ":comparison",
-        ":vm_util",
+        ":vm_util_cc",
         "//runtime/src/iree/base",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/modules/hal",
@@ -136,18 +136,29 @@ iree_runtime_cc_test(
 # TODO(benvanik): fold these into iree/runtime and use that instead.
 cc_library(
     name = "vm_util",
-    srcs = ["vm_util.cc"],
+    srcs = ["vm_util.c"],
     hdrs = ["vm_util.h"],
     deps = [
         ":numpy_io",
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:cc",
         "//runtime/src/iree/base:tracing",
-        "//runtime/src/iree/base/internal:span",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/modules/hal",
         "//runtime/src/iree/vm",
         "//runtime/src/iree/vm:bytecode_module",
+    ],
+)
+
+cc_library(
+    name = "vm_util_cc",
+    srcs = ["vm_util_cc.cc"],
+    hdrs = ["vm_util_cc.h"],
+    deps = [
+        ":vm_util",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:cc",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/base/internal:span",
         "//runtime/src/iree/vm:cc",
     ],
 )
@@ -157,7 +168,7 @@ cc_test(
     srcs = ["vm_util_test.cc"],
     deps = [
         ":device_util",
-        ":vm_util",
+        ":vm_util_cc",
         "//runtime/src/iree/base",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/modules/hal",

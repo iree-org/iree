@@ -160,7 +160,8 @@ function(iree_cc_test)
         TEST_TMPDIR=${_ANDROID_ABS_DIR}/test_tmpdir
     )
     set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT ${_ENVIRONMENT_VARS})
-  elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv64" AND
+  elseif((CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv64" OR
+          CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv32") AND
          CMAKE_SYSTEM_NAME STREQUAL "Linux")
     # The test target needs to run within the QEMU emulator for RV64 Linux
     # crosscompile build or on-device.
@@ -168,7 +169,7 @@ function(iree_cc_test)
       NAME
         ${_NAME_PATH}
       COMMAND
-       "${IREE_ROOT_DIR}/build_tools/cmake/run_riscv64_test.sh"
+       "${IREE_ROOT_DIR}/build_tools/cmake/run_riscv_test.sh"
         "$<TARGET_FILE:${_NAME}>"
         ${_RULE_ARGS}
     )

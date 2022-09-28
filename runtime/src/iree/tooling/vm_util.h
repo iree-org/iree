@@ -7,17 +7,13 @@
 #ifndef IREE_TOOLING_VM_UTIL_H_
 #define IREE_TOOLING_VM_UTIL_H_
 
-#include <string>
-#include <vector>
-
-#include "iree/base/internal/span.h"
-#include "iree/base/status_cc.h"
-#include "iree/base/string_builder.h"
+#include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/vm/api.h"
-#include "iree/vm/ref_cc.h"
 
-namespace iree {
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 // NOTE: this file is not best-practice and needs to be rewritten; consider this
 // appropriate only for test code.
@@ -30,10 +26,10 @@ namespace iree {
 // described in iree/hal/api.h
 // Uses |device_allocator| to allocate the buffers.
 // The returned variant list must be freed by the caller.
-Status ParseToVariantList(iree_hal_allocator_t* device_allocator,
-                          iree::span<const std::string> input_strings,
-                          iree_allocator_t host_allocator,
-                          iree_vm_list_t** out_list);
+iree_status_t iree_create_and_parse_to_variant_list(
+    iree_hal_allocator_t* device_allocator, iree_string_view_t* input_strings,
+    iree_host_size_t input_strings_count, iree_allocator_t host_allocator,
+    iree_vm_list_t** out_list);
 
 // Appends a variant list of VM scalars and buffers to |builder|.
 // Prints scalars in the format:
@@ -42,25 +38,16 @@ Status ParseToVariantList(iree_hal_allocator_t* device_allocator,
 //   [shape]xtype=[value]
 // described in
 // https://github.com/iree-org/iree/tree/main/iree/hal/api.h
-Status AppendVariantList(iree_vm_list_t* variant_list, size_t max_element_count,
-                         iree_string_builder_t* builder);
-inline Status AppendVariantList(iree_vm_list_t* variant_list,
-                                iree_string_builder_t* builder) {
-  return AppendVariantList(variant_list, 1024, builder);
-}
-Status PrintVariantList(iree_vm_list_t* variant_list, size_t max_element_count,
-                        std::string* out_string);
+iree_status_t iree_append_variant_list(iree_vm_list_t* variant_list,
+                                       size_t max_element_count,
+                                       iree_string_builder_t* builder);
 
-// Prints a variant list to |out_string|.
-inline Status PrintVariantList(iree_vm_list_t* variant_list,
-                               std::string* out_string) {
-  return PrintVariantList(variant_list, 1024, out_string);
-}
+// Prints a variant list to a file.
+iree_status_t iree_print_variant_list(iree_vm_list_t* variant_list,
+                                      size_t max_element_count, FILE* file);
 
-// Prints a variant list to stdout.
-Status PrintVariantList(iree_vm_list_t* variant_list,
-                        size_t max_element_count = 1024);
-
-}  // namespace iree
+#ifdef __cplusplus
+}  // extern "C"
+#endif
 
 #endif  // IREE_TOOLING_VM_UTIL_H_

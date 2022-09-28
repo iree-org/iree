@@ -37,28 +37,6 @@ static iree_hal_buffer_equality_t iree_tooling_equality_from_flags(void) {
   return equality;
 }
 
-// Prints a buffer view with contents without a trailing newline.
-static iree_status_t iree_tooling_append_buffer_view_string(
-    iree_hal_buffer_view_t* buffer_view, iree_host_size_t max_element_count,
-    iree_string_builder_t* builder) {
-  // NOTE: we could see how many bytes are available in the builder (capacity -
-  // size) and then pass those in to the initial format - if there's enough
-  // space it'll fill what it needs. We'd need to adjust the string builder
-  // afterward somehow.
-  iree_host_size_t required_length = 0;
-  iree_status_t status = iree_hal_buffer_view_format(
-      buffer_view, max_element_count, /*buffer_capacity=*/0, /*buffer=*/NULL,
-      &required_length);
-  if (!iree_status_is_out_of_range(status)) return status;
-  char* buffer = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_string_builder_append_inline(builder, required_length, &buffer));
-  if (!buffer) return iree_ok_status();
-  return iree_hal_buffer_view_format(buffer_view, max_element_count,
-                                     required_length + /*NUL=*/1, buffer,
-                                     &required_length);
-}
-
 static iree_status_t iree_vm_append_variant_type_string(
     iree_vm_variant_t variant, iree_string_builder_t* builder) {
   if (iree_vm_variant_is_empty(variant)) {
@@ -197,11 +175,11 @@ static bool iree_tooling_compare_buffer_views(
 
   IREE_CHECK_OK(
       iree_string_builder_append_string(builder, IREE_SV("\n  expected:\n")));
-  IREE_CHECK_OK(iree_tooling_append_buffer_view_string(
+  IREE_CHECK_OK(iree_hal_buffer_view_append_to_builder(
       expected_view, max_element_count, builder));
   IREE_CHECK_OK(
       iree_string_builder_append_string(builder, IREE_SV("\n  actual:\n")));
-  IREE_CHECK_OK(iree_tooling_append_buffer_view_string(
+  IREE_CHECK_OK(iree_hal_buffer_view_append_to_builder(
       actual_view, max_element_count, builder));
   IREE_CHECK_OK(iree_string_builder_append_string(builder, IREE_SV("\n")));
 

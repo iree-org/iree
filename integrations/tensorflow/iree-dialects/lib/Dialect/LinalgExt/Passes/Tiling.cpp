@@ -47,15 +47,6 @@ verifySupportedTilingOptions(PatternRewriter &rewriter, Operation *op,
     return rewriter.notifyMatchFailure(op,
                                        "only tiling with scf.for is supported");
   }
-  if (options.distribution) {
-    if (llvm::any_of(options.distribution->distributionMethod,
-                     [](linalg::DistributionMethod method) {
-                       return method != linalg::DistributionMethod::Cyclic;
-                     })) {
-      return rewriter.notifyMatchFailure(op,
-                                         "only cyclic distibution is allowed");
-    }
-  }
   return success();
 }
 
@@ -108,8 +99,8 @@ tileInterfaceOpImpl(OpBuilder &builder, TilingInterface tilableOp,
   // the op by invoking the TiledOpInterface methods.
   if (loopDepth == tileSizes.size()) {
     TiledOp ret;
-    SmallVector<Operation *> tiledOps = tilableOp.getTiledImplementation(
-        builder, outputs, offsets, tileSizes, /*tileDestOperands=*/true);
+    SmallVector<Operation *> tiledOps =
+        tilableOp.getTiledImplementation(builder, offsets, tileSizes);
     if (tiledOps.empty()) {
       return static_cast<LogicalResult>(
           tilableOp.emitOpError("failed to get tiled implementation"));
@@ -374,11 +365,7 @@ void TilingInterfaceTilingPass::runOnOperation() {
                   builder, dim)};
         }
         return procInfo;
-      },
-      {linalg::DistributionMethod::Cyclic, linalg::DistributionMethod::Cyclic,
-       linalg::DistributionMethod::Cyclic},
-      DenseMap<StringRef,
-               std::function<linalg::ProcInfo(OpBuilder &, Location)>>()};
+      }};
 
   patterns.add<TilingInterfaceTilingPattern>(
       context,

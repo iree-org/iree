@@ -20,7 +20,7 @@
 #include "iree/modules/hal/types.h"
 #include "iree/tooling/comparison.h"
 #include "iree/tooling/context_util.h"
-#include "iree/tooling/vm_util.h"
+#include "iree/tooling/vm_util_cc.h"
 #include "iree/vm/api.h"
 #include "iree/vm/ref_cc.h"
 

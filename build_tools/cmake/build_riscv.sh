@@ -52,7 +52,7 @@ args=(
   -DIREE_ENABLE_CPUINFO=OFF
 )
 
-if [[ "${RISCV_ARCH}" == "rv64" ]]; then
+if [[ "${RISCV_ARCH}" == "rv64" || "${RISCV_ARCH}" == "rv32-linux" ]]; then
   args+=(
     -DRISCV_TOOLCHAIN_ROOT="${RISCV_RV64_LINUX_TOOLCHAIN_ROOT}"
   )
@@ -98,7 +98,7 @@ esac
 "${CMAKE_BIN}" "${args[@]}" "${ROOT_DIR}"
 "${CMAKE_BIN}" --build "${BUILD_RISCV_DIR}" -- -k 0
 
-if [[ "${RISCV_ARCH}" == "rv64" ]]; then
+if [[ "${RISCV_ARCH}" == "rv64" || "${RISCV_ARCH}" == "rv32-linux" ]]; then
   echo "Building test deps for RISC-V"
   echo "-----------------------------"
   "${CMAKE_BIN}" --build "${BUILD_RISCV_DIR}" --target iree-test-deps -- -k 0
