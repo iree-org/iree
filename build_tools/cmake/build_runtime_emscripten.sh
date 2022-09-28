@@ -13,8 +13,7 @@
 # ./build-host/install. Emscripten binaries (e.g. .wasm and .js files) will be
 # built in ./build-emscripten/.
 
-set -x
-set -e
+set -xeuo pipefail
 
 if ! command -v emcmake &> /dev/null
 then
@@ -22,12 +21,11 @@ then
     exit 1
 fi
 
-CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
-"${CMAKE_BIN?}" --version
-ninja --version
-
 ROOT_DIR=$(git rev-parse --show-toplevel)
 cd ${ROOT_DIR?}
+
+CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
+IREE_HOST_BINARY_ROOT="$(realpath ${IREE_HOST_BINARY_ROOT})"
 
 if [ -d "build-emscripten" ]
 then
@@ -40,13 +38,11 @@ cd build-emscripten
 
 # Configure using Emscripten's CMake wrapper, then build.
 emcmake "${CMAKE_BIN?}" -G Ninja .. \
-  -DIREE_HOST_BINARY_ROOT=$PWD/../build-host/install \
+  -DIREE_HOST_BINARY_ROOT="${IREE_HOST_BINARY_ROOT}" \
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_HAL_DRIVER_DEFAULTS=OFF \
   -DIREE_HAL_DRIVER_LOCAL_SYNC=ON \
   -DIREE_HAL_DRIVER_LOCAL_TASK=ON \
-  -DIREE_HAL_EXECUTABLE_LOADER_DEFAULTS=OFF \
-  -DIREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE=ON \
   -DIREE_ENABLE_CPUINFO=OFF \
   -DIREE_BUILD_TESTS=ON \
   -DIREE_BUILD_SAMPLES=ON

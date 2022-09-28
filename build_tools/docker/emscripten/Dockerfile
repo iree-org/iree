@@ -12,8 +12,8 @@ FROM gcr.io/iree-oss/base@sha256:5d43683c6b50aebe1fca6c85f2012f3b0fa153bf4dd268e
 #   * https://github.com/emscripten-core/emsdk/blob/main/docker/Dockerfile
 #   * https://hub.docker.com/r/emscripten/emsdk
 
-ARG EMSDK_COMMIT=62d817b66dad481b150fd49cdc1e803725d23813
-ARG SDK_VERSION=3.1.12
+ARG EMSDK_COMMIT=21611d2a507fad73385120d89e05a794666070ae
+ARG SDK_VERSION=3.1.20
 
 WORKDIR /
 
@@ -43,4 +43,4 @@ RUN mkdir -p "${EM_CACHE?}" && chmod -R 777 "${EM_CACHE?}"
 # Normally we'd run `source emsdk_env.sh`, but that doesn't integrate with
 # Docker's environment properties model. Instead, we directly extend the path
 # to include the directories suggested by `emsdk activate`.
-ENV PATH="${EMSDK?}:${EMSDK?}/node/14.15.5_64bit/bin:${EMSDK?}/upstream/emscripten:$PATH"
+ENV PATH="${EMSDK?}:${EMSDK?}/node/14.18.2_64bit/bin:${EMSDK?}/upstream/emscripten:$PATH"

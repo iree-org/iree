@@ -573,8 +573,7 @@ jobs:
     needs: [setup, build_all]
     if: needs.setup.outputs.should-run == 'true'
     runs-on:
-      # Hacks, and order matters. See the comment at the top of the file.
-      - self-hosted
+      - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
       - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
@@ -683,6 +682,35 @@ jobs:
             bash -euo pipefail -c \
               "./build_tools/cmake/build_riscv.sh && ./build_tools/cmake/test_riscv.sh"
 
+  emscripten:
+    needs: [setup, build_all]
+    if: needs.setup.outputs.should-run == 'true' && needs.setup.outputs.ci-stage == 'postsubmit'
+    runs-on:
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - cpu
+      - os-family=Linux
+    env:
+      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
+      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
+      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
+        with:
+          submodules: true
+      - name: "Downloading build dir archive"
+        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+      - name: "Extracting install from build dir archive"
+        run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
+      - name: "Building the runtime for the web using Emscripten"
+        run: |
+          build_tools/github_actions/docker_run.sh \
+            --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
+            gcr.io/iree-oss/emscripten@sha256:8ccc1c8de11919faf23aeaa585b13e5c5050952db76c101d6f61367280a3546f \
+            build_tools/cmake/build_runtime_emscripten.sh
+
   ##############################################################################
 
   # Depends on all the other jobs to provide a single anchor that indicates the
@@ -720,6 +748,7 @@ jobs:
       - android_arm64
       - baremetal_riscv32
       - linux_riscv
+      - emscripten
 
       # Benchmark pipeline
       - benchmarks
