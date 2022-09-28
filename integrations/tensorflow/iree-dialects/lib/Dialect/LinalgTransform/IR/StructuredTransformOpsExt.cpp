@@ -838,7 +838,7 @@ transform_ext::LowerToLLVMOp::apply(mlir::transform::TransformResults &result,
         .enableX86Vector(getEnableX86vector())));
   // clang-format on
   pm.addNestedPass<func::FuncOp>(createConvertMathToLLVMPass());
-  pm.addPass(createMemRefToLLVMPass());
+  pm.addPass(createMemRefToLLVMConversionPass());
   if (getEnableAsync())
     pm.addPass(createConvertAsyncToLLVMPass());
   pm.addPass(createConvertFuncToLLVMPass());

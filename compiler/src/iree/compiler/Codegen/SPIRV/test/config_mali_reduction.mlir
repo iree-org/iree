@@ -8,7 +8,7 @@
 ]>
 hal.executable private @subgroup_reduce {
   hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
-      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader, GroupNonUniformShuffle], []>, ARM:IntegratedGPU, #spv.resource_limits<
+      spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader, GroupNonUniformShuffle], []>, ARM:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 512,
         max_compute_workgroup_size = [512, 512, 512],

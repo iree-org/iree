@@ -8,6 +8,7 @@
 #define IREE_COMPILER_CODEGEN_INTERFACES_PARTITIONABLE_LOOPS_INTERFACE_H_
 
 #include "llvm/ADT/SmallVector.h"
+#include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/Support/LLVM.h"
 

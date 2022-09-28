@@ -403,13 +403,14 @@ static LogicalResult setFftOpConfig(spirv::ResourceLimitsAttr limits,
 
   std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
 
-  SmallVector<StringRef> loopIteratorTypes = op.getLoopIteratorTypes();
+  SmallVector<utils::IteratorType> loopIteratorTypes =
+      op.getLoopIteratorTypes();
   unsigned loopDepth = loopIteratorTypes.size();
   SmallVector<int64_t> workgroupTileSize(loopDepth, 0);
 
   // Tiling along partitioned loops with size 1.
   for (auto iteratorType : llvm::enumerate(loopIteratorTypes)) {
-    if (iteratorType.value() == getParallelIteratorTypeName()) {
+    if (iteratorType.value() == utils::IteratorType::parallel) {
       workgroupTileSize[iteratorType.index()] = 1;
     }
   }

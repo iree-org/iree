@@ -161,7 +161,7 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
   if (interfaceOp) {
     llvm::SmallDenseSet<unsigned> pLoopsSet;
     for (auto iteratorType : llvm::enumerate(interfaceOp.getIteratorTypes())) {
-      if (iteratorType.value() == getParallelIteratorTypeName()) {
+      if (iteratorType.value() == utils::IteratorType::parallel) {
         pLoopsSet.insert(iteratorType.index());
       }
     }

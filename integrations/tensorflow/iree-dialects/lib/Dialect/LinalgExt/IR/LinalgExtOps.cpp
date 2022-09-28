@@ -227,11 +227,11 @@ LogicalResult ScatterOp::verify() {
   return success();
 }
 
-SmallVector<StringRef> ScatterOp::getLoopIteratorTypes() {
-  SmallVector<StringRef> iteratorTypes(getUpdateType().getRank(),
-                                       getParallelIteratorTypeName());
+SmallVector<utils::IteratorType> ScatterOp::getLoopIteratorTypes() {
+  SmallVector<utils::IteratorType> iteratorTypes(getUpdateType().getRank(),
+                                                 utils::IteratorType::parallel);
   if (!getUniqueIndices()) {
-    iteratorTypes[0] = getReductionIteratorTypeName();
+    iteratorTypes[0] = utils::IteratorType::reduction;
   }
   return iteratorTypes;
 }
@@ -439,11 +439,11 @@ LogicalResult SortOp::verify() {
   return success();
 }
 
-SmallVector<StringRef> SortOp::getLoopIteratorTypes() {
+SmallVector<utils::IteratorType> SortOp::getLoopIteratorTypes() {
   // All loops except the dimension to sort along are parallel.
-  SmallVector<StringRef> iteratorTypes(getOperandRank(),
-                                       getParallelIteratorTypeName());
-  iteratorTypes[getDimension()] = getReductionIteratorTypeName();
+  SmallVector<utils::IteratorType> iteratorTypes(getOperandRank(),
+                                                 utils::IteratorType::parallel);
+  iteratorTypes[getDimension()] = utils::IteratorType::reduction;
   return iteratorTypes;
 }
 
@@ -611,12 +611,12 @@ LogicalResult FftOp::verify() {
   return success();
 }
 
-SmallVector<StringRef> FftOp::getLoopIteratorTypes() {
+SmallVector<utils::IteratorType> FftOp::getLoopIteratorTypes() {
   // There are `rank-1` outer loops. The fft itselfs has one loop for each
   // stage, which handles the merge step -- taking two half size tensors and
   // merge them into one tensor.
-  SmallVector<StringRef> iteratorTypes(getOperandRank(),
-                                       getParallelIteratorTypeName());
+  SmallVector<utils::IteratorType> iteratorTypes(getOperandRank(),
+                                                 utils::IteratorType::parallel);
   return iteratorTypes;
 }
 
@@ -659,8 +659,12 @@ void FftOp::generateScalarImplWithoutCoeffBuf(OpBuilder &b, Location loc,
       loc, llvm::APFloat(static_cast<float>(-2 * acos(-1))), f32Type);
   coeff = b.create<arith::DivFOp>(loc, coeff, indexToF32(b, loc, wholeSize));
 
+  SmallVector<StringRef> iteratorTypes = llvm::to_vector(
+      llvm::map_range(getLoopIteratorTypes(), [](utils::IteratorType it) {
+        return utils::stringifyIteratorType(it);
+      }));
   b.create<linalg::GenericOp>(
-      loc, TypeRange{}, ValueRange{}, operands, maps, getLoopIteratorTypes(),
+      loc, TypeRange{}, ValueRange{}, operands, maps, iteratorTypes,
       [&](OpBuilder &b, Location loc, ValueRange args) {
         Value lhsReal = args[0];
         Value lhsImag = args[1];
@@ -704,10 +708,13 @@ void FftOp::generateScalarImplWithCoeffBuf(OpBuilder &b, Location loc,
       2, AffineMap::get(rank, 0, b.getAffineDimExpr(rank - 1), b.getContext()));
   maps.append(operands.size(), b.getMultiDimIdentityMap(rank));
 
+  SmallVector<StringRef> iteratorTypes = llvm::to_vector(
+      llvm::map_range(getLoopIteratorTypes(), [](utils::IteratorType it) {
+        return utils::stringifyIteratorType(it);
+      }));
   b.create<linalg::GenericOp>(
       loc, TypeRange{}, ValueRange{getRealCoeff(), getImagCoeff()}, operands,
-      maps, getLoopIteratorTypes(),
-      [&](OpBuilder &b, Location loc, ValueRange args) {
+      maps, iteratorTypes, [&](OpBuilder &b, Location loc, ValueRange args) {
         Value wReal = args[0];
         Value wImag = args[1];
         Value lhsReal = args[2];
@@ -903,10 +910,10 @@ SmallVector<Range> ScanOp::getIterationDomain(OpBuilder &builder) {
   return loopBounds;
 }
 
-SmallVector<StringRef> ScanOp::getLoopIteratorTypes() {
-  SmallVector<StringRef> iteratorTypes(getOperandRank(),
-                                       getParallelIteratorTypeName());
-  iteratorTypes[getDimension()] = getReductionIteratorTypeName();
+SmallVector<utils::IteratorType> ScanOp::getLoopIteratorTypes() {
+  SmallVector<utils::IteratorType> iteratorTypes(getOperandRank(),
+                                                 utils::IteratorType::parallel);
+  iteratorTypes[getDimension()] = utils::IteratorType::reduction;
   return iteratorTypes;
 }
 
@@ -1122,9 +1129,9 @@ LogicalResult ReverseOp::verify() {
   return success();
 }
 
-SmallVector<StringRef> ReverseOp::getLoopIteratorTypes() {
-  SmallVector<StringRef> iteratorTypes(getOperandRank(),
-                                       getParallelIteratorTypeName());
+SmallVector<utils::IteratorType> ReverseOp::getLoopIteratorTypes() {
+  SmallVector<utils::IteratorType> iteratorTypes(getOperandRank(),
+                                                 utils::IteratorType::parallel);
   return iteratorTypes;
 }
 
@@ -1325,10 +1332,10 @@ SmallVector<Range> TopkOp::getIterationDomain(OpBuilder &builder) {
   return loopBounds;
 }
 
-SmallVector<StringRef> TopkOp::getLoopIteratorTypes() {
-  SmallVector<StringRef> iteratorTypes(getInputRank(),
-                                       getParallelIteratorTypeName());
-  iteratorTypes[getDimension()] = getReductionIteratorTypeName();
+SmallVector<utils::IteratorType> TopkOp::getLoopIteratorTypes() {
+  SmallVector<utils::IteratorType> iteratorTypes(getInputRank(),
+                                                 utils::IteratorType::parallel);
+  iteratorTypes[getDimension()] = utils::IteratorType::reduction;
   return iteratorTypes;
 }
 
@@ -1673,9 +1680,9 @@ SmallVector<int64_t> PackOp::getStaticTiles() {
 
 // Implement the tiling interface. The number of loops equals
 // the rank of the output tensors. All the loops are parallel.
-SmallVector<StringRef> PackOp::getLoopIteratorTypes() {
-  SmallVector<StringRef> iteratorTypes(getOutputRank(),
-                                       getParallelIteratorTypeName());
+SmallVector<utils::IteratorType> PackOp::getLoopIteratorTypes() {
+  SmallVector<utils::IteratorType> iteratorTypes(getOutputRank(),
+                                                 utils::IteratorType::parallel);
   return iteratorTypes;
 }
 

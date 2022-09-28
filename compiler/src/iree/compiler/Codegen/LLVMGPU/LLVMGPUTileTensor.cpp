@@ -103,7 +103,7 @@ static LogicalResult tileParallelDims(func::FuncOp funcOp,
   for (TilingInterface tilingOp : computeOps) {
     size_t numLoops = 0;
     for (auto type : tilingOp.getLoopIteratorTypes()) {
-      if (type == getParallelIteratorTypeName()) numLoops++;
+      if (type == utils::IteratorType::parallel) numLoops++;
     }
     IRRewriter rewriter(tilingOp->getContext());
     rewriter.setInsertionPoint(tilingOp);
