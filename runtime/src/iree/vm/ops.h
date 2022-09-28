@@ -14,6 +14,16 @@
 #include "iree/base/internal/math.h"
 #include "iree/vm/value.h"
 
+// The kernels below has undefined behavior in cases where the corresponding
+// higher-level ops that map to them have undefined/implementation defined
+// behavior and no additional checking was inserted as part of lowering.
+// Avoiding UB is expected to happen above this level.
+// Note: Setting this variable merely doesn't disable UBSAN.
+#if !IREE_VM_UBSAN_CHECKABLE_ENABLE
+#pragma clang attribute push(__attribute__((no_sanitize("undefined"))), \
+                             apply_to = function)
+#endif
+
 //===------------------------------------------------------------------===//
 // Globals
 //===------------------------------------------------------------------===//
@@ -371,5 +381,9 @@ static inline int32_t vm_cmp_lte_f32u(float lhs, float rhs) {
 static inline int32_t vm_cmp_nan_f32(float operand) {
   return isnan(operand) ? 1 : 0;
 }
+
+#if !IREE_VM_UBSAN_CHECKABLE_ENABLE
+#pragma clang attribute pop
+#endif
 
 #endif  // IREE_VM_OPS_H_
