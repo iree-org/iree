@@ -21,6 +21,7 @@ import requests
 def parse_arguments():
   parser = argparse.ArgumentParser()
   parser.add_argument("--repo",
+                      "--repository",
                       default="iree-org/iree",
                       help="The GitHub repository to fetch releases from.")
   parser.add_argument(
