@@ -70,6 +70,7 @@ jobs:
       PR_DESCRIPTION: ${{ github.event.pull_request.body }}
     outputs:
       should-run: ${{ steps.should-run.outputs.should-run }}
+      ci-stage: ${{ env._CI_STAGE }}
       # Variables for dependent jobs. See comment at top.
       runner-env: prod
       runner-group: ${{ env._CI_STAGE }}
@@ -449,15 +450,14 @@ jobs:
               ./build_tools/scripts/check_vulkan.sh
               build_tools/cmake/run_tf_tests.sh ${BUILD_DIR}"
 
-  ############################# Model Coverage #################################
-  # Jobs that test IREE performance on a set of models.
+  ######################## Community Model Coverage ############################
+  # Jobs that test IREE behavior on a set of models.
   ##############################################################################
   test_shark_model_suite:
     needs: [setup, build_all, build_tf_integrations]
-    if: needs.setup.outputs.should-run == 'true'
+    if: needs.setup.outputs.should-run == 'true' && needs.setup.outputs.ci-stage == 'postsubmit'
     runs-on:
-      # Pseudo-ternary hack and order matters. See comment at top of file.
-      - self-hosted
+      - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
       - environment=${{ needs.setup.outputs.runner-env }}
       - gpu
