@@ -101,7 +101,8 @@ class HALDispatchABI {
   enum class EnvironmentField {
     constants,
     import_thunk,
-    imports,
+    import_funcs,
+    import_contexts,
     processor,
   };
 
@@ -124,13 +125,16 @@ class HALDispatchABI {
     fieldTypes.push_back(uint32PtrType);
 
     // iree_hal_executable_import_thunk_v0_t import_thunk;
-    // const iree_hal_executable_import_v0_t* imports;
-    auto importType = LLVM::LLVMFunctionType::get(uint32Type, int8PtrType);
+    // const iree_hal_executable_import_v0_t* import_funcs;
+    // const void** import_contexts;
+    auto importType = LLVM::LLVMFunctionType::get(
+        uint32Type, {int8PtrType, int8PtrType, int8PtrType});
     auto importPtrType = LLVM::LLVMPointerType::get(importType);
-    auto importThunkType =
-        LLVM::LLVMFunctionType::get(uint32Type, {importPtrType, int8PtrType});
+    auto importThunkType = LLVM::LLVMFunctionType::get(
+        uint32Type, {importPtrType, int8PtrType, int8PtrType, int8PtrType});
     fieldTypes.push_back(LLVM::LLVMPointerType::get(importThunkType));
     fieldTypes.push_back(LLVM::LLVMPointerType::get(importPtrType));
+    fieldTypes.push_back(LLVM::LLVMPointerType::get(int8PtrType));
 
     // iree_hal_processor_v0_t processor;
     fieldTypes.push_back(processorType);
@@ -515,27 +519,35 @@ class HALDispatchABI {
 
   // Loads the import function pointer of the import |ordinal|.
   // Equivalent to:
-  //   iree_hal_executable_import_v0_t func_ptr = state->imports[ordinal];
-  Value loadImportFuncPtr(Location loc, int64_t ordinal, OpBuilder &builder) {
-    auto importsPtrValue =
-        loadFieldValue(loc, EnvironmentField::imports, builder);
+  //   iree_hal_executable_import_v0_t fn_ptr = state->import_funcs[ordinal];
+  //   void* context = state->import_contexts[ordinal];
+  std::pair<Value, Value> loadImportFunc(Location loc, int64_t ordinal,
+                                         OpBuilder &builder) {
     auto ordinalValue = getIndexValue(loc, ordinal, builder);
-    auto elementPtrValue = builder.createOrFold<LLVM::GEPOp>(
-        loc, importsPtrValue.getType(), importsPtrValue, ordinalValue);
-    return builder.createOrFold<LLVM::LoadOp>(loc, elementPtrValue);
+    auto funcPtrsValue =
+        loadFieldValue(loc, EnvironmentField::import_funcs, builder);
+    auto funcPtrValue = builder.createOrFold<LLVM::GEPOp>(
+        loc, funcPtrsValue.getType(), funcPtrsValue, ordinalValue);
+    auto contextPtrsValue =
+        loadFieldValue(loc, EnvironmentField::import_contexts, builder);
+    auto contextPtrValue = builder.createOrFold<LLVM::GEPOp>(
+        loc, contextPtrsValue.getType(), contextPtrsValue, ordinalValue);
+    return std::make_pair(
+        builder.createOrFold<LLVM::LoadOp>(loc, funcPtrValue),
+        builder.createOrFold<LLVM::LoadOp>(loc, contextPtrValue));
   }
 
   // Returns an i1 indicating whether the optional import with |ordinal| is
   // defined. Equivalent to:
-  //   state->imports[ordinal] != NULL
+  //   state->import_funcs[ordinal] != NULL
   Value isImportFuncAvailable(Location loc, int64_t ordinal,
                               OpBuilder &builder) {
-    auto importPtrValue = loadImportFuncPtr(loc, ordinal, builder);
-    auto nullPtrValue =
-        builder.create<LLVM::NullOp>(loc, importPtrValue.getType()).getResult();
+    auto importFunc = loadImportFunc(loc, ordinal, builder);
+    Value nullPtrValue =
+        builder.create<LLVM::NullOp>(loc, importFunc.first.getType());
     return builder.create<LLVM::ICmpOp>(loc, builder.getI1Type(),
-                                        LLVM::ICmpPredicate::ne, importPtrValue,
-                                        nullPtrValue);
+                                        LLVM::ICmpPredicate::ne,
+                                        importFunc.first, nullPtrValue);
   }
 
   // Emits a call to the import with the given |importOrdinal|.
@@ -546,13 +558,17 @@ class HALDispatchABI {
                    OpBuilder &builder) {
     auto thunkPtrValue =
         loadFieldValue(loc, EnvironmentField::import_thunk, builder);
-    auto importPtrValue = loadImportFuncPtr(loc, importOrdinal, builder);
+    auto importFunc = loadImportFunc(loc, importOrdinal, builder);
+    Value nullPtrValue = builder.create<LLVM::NullOp>(
+        loc, LLVM::LLVMPointerType::get(builder.getI8Type()));
     auto callOp =
         builder.create<LLVM::CallOp>(loc, TypeRange{builder.getI32Type()},
                                      ValueRange{
                                          /*thunk_func_ptr=*/thunkPtrValue,
-                                         /*import_func_ptr=*/importPtrValue,
-                                         /*import_params=*/params,
+                                         /*import_func_ptr=*/importFunc.first,
+                                         /*context=*/importFunc.second,
+                                         /*params=*/params,
+                                         /*reserved=*/nullPtrValue,
                                      });
     return callOp.getResult();
   }

@@ -206,8 +206,9 @@ static iree_status_t iree_hal_system_executable_query_library(
 }
 
 static int iree_hal_system_executable_import_thunk_v0(
-    iree_hal_executable_import_v0_t fn_ptr, void* import_params) {
-  return fn_ptr(import_params);
+    iree_hal_executable_import_v0_t fn_ptr, void* context, void* params,
+    void* reserved) {
+  return fn_ptr(context, params, reserved);
 }
 
 // Resolves all of the imports declared by the executable using the given
@@ -225,12 +226,19 @@ static iree_status_t iree_hal_system_executable_resolve_imports(
       iree_hal_system_executable_import_thunk_v0;
 
   // Allocate storage for the imports.
+  // TODO(benvanik): allocate both as one block.
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0,
-      iree_allocator_malloc(
-          executable->base.host_allocator,
-          import_table->count * sizeof(*executable->base.environment.imports),
-          (void**)&executable->base.environment.imports));
+      z0, iree_allocator_malloc(
+              executable->base.host_allocator,
+              import_table->count *
+                  sizeof(*executable->base.environment.import_funcs),
+              (void**)&executable->base.environment.import_funcs));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(
+              executable->base.host_allocator,
+              import_table->count *
+                  sizeof(*executable->base.environment.import_contexts),
+              (void**)&executable->base.environment.import_contexts));
 
   // Try to resolve each import.
   // NOTE: imports are sorted alphabetically and if we cared we could use this
@@ -241,7 +249,8 @@ static iree_status_t iree_hal_system_executable_resolve_imports(
         z0,
         iree_hal_executable_import_provider_resolve(
             import_provider, iree_make_cstring_view(import_table->symbols[i]),
-            (void**)&executable->base.environment.imports[i]));
+            (void**)&executable->base.environment.import_funcs[i],
+            (void**)&executable->base.environment.import_contexts[i]));
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -351,9 +360,13 @@ static void iree_hal_system_executable_destroy(
 
   iree_dynamic_library_release(executable->handle);
 
-  if (executable->base.environment.imports != NULL) {
+  if (executable->base.environment.import_funcs != NULL) {
     iree_allocator_free(host_allocator,
-                        (void*)executable->base.environment.imports);
+                        (void*)executable->base.environment.import_funcs);
+  }
+  if (executable->base.environment.import_contexts != NULL) {
+    iree_allocator_free(host_allocator,
+                        (void*)executable->base.environment.import_contexts);
   }
 
   iree_hal_local_executable_deinitialize(
