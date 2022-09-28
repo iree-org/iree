@@ -30,7 +30,7 @@ iree_linalg_transform.sequence {
   // EXPAND-NOT: expert apply
   // EXPAND: %[[OP:.*]] = match @pdl_target
   // EXPAND: %[[HANDLE:.*]], %{{.*}}:3 = tile %[[OP]] {sizes = [4, 4, 4]}
-  // EXPAND: %[[HANDLE2:.*]] = vectorize %[[HANDLE]] {vectorize_padding = true}
+  // EXPAND: %[[HANDLE2:.*]] = vectorize %[[HANDLE]] vectorize_padding
   // EXPAND: bufferize
   // EXPAND: lower_vectors {multireduction_lowering = "innerreduce"}
   // EXPAND: lower_to_llvm
@@ -114,7 +114,8 @@ iree_linalg_transform.sequence {
   // EXPAND: %[[OP:.*]] = match @pdl_target2
   // EXPAND: %[[HANDLE:.*]], %{{.*}}:3 = tile %[[OP]] {sizes = [32, 8, 8]}
   // EXPAND: %[[HANDLE2:.*]], %{{.*}}:3 = tile %[[HANDLE]] {sizes = [4, 4, 4]}
-  // EXPAND: %[[HANDLE3:.*]] = vectorize %[[HANDLE2]] {vectorize_padding = false}
+  // EXPAND: %[[HANDLE3:.*]] = vectorize %[[HANDLE2]]
+  // EXPAND-NOT: vectorize_padding
   // EXPAND: bufferize
   // EXPAND: lower_vectors {multireduction_lowering = "innerparallel"}
   // EXPAND: lower_to_llvm

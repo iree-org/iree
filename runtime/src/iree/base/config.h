@@ -253,4 +253,9 @@ typedef IREE_DEVICE_SIZE_T iree_device_size_t;
 #define IREE_VM_EXT_F64_ENABLE 0
 #endif  // !IREE_VM_EXT_F64_ENABLE
 
+#if !defined(IREE_VM_UBSAN_CHECKABLE_ENABLE)
+// Exposes VMVX kernels to UBSAN checking, else disable UBSAN checking.
+#define IREE_VM_UBSAN_CHECKABLE_ENABLE 0
+#endif  // IREE_VM_UBSAN_CHECKABLE_ENABLE
+
 #endif  // IREE_BASE_CONFIG_H_

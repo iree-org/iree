@@ -8,7 +8,7 @@
 ]>
 hal.executable private @subgroup_reduce {
   hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
-      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader, GroupNonUniformShuffle], []>, ARM:IntegratedGPU, #spv.resource_limits<
+      spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader, GroupNonUniformShuffle], []>, ARM:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 512,
         max_compute_workgroup_size = [512, 512, 512],
@@ -43,55 +43,55 @@ hal.executable private @subgroup_reduce {
   }
 }
 
-// CHECK-LABEL: spv.func @subgroup_reduce()
+// CHECK-LABEL: spirv.func @subgroup_reduce()
 
-// CHECK-DAG:   %[[C0:.+]] = spv.Constant 0 : i32
-// CHECK-DAG:   %[[C1:.+]] = spv.Constant 1 : i32
-// CHECK-DAG:   %[[C2:.+]] = spv.Constant 2 : i32
-// CHECK-DAG:   %[[C4:.+]] = spv.Constant 4 : i32
-// CHECK-DAG:   %[[C8:.+]] = spv.Constant 8 : i32
-// CHECK-DAG:   %[[F0:.+]] = spv.Constant 0.000000e+00 : f32
+// CHECK-DAG:   %[[C0:.+]] = spirv.Constant 0 : i32
+// CHECK-DAG:   %[[C1:.+]] = spirv.Constant 1 : i32
+// CHECK-DAG:   %[[C2:.+]] = spirv.Constant 2 : i32
+// CHECK-DAG:   %[[C4:.+]] = spirv.Constant 4 : i32
+// CHECK-DAG:   %[[C8:.+]] = spirv.Constant 8 : i32
+// CHECK-DAG:   %[[F0:.+]] = spirv.Constant 0.000000e+00 : f32
 
-// CHECK:   %[[LD:.+]] = spv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
+// CHECK:   %[[LD:.+]] = spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
 
-// CHECK:   %[[E0:.+]] = spv.CompositeExtract %[[LD]][0 : i32] : vector<4xf32>
-// CHECK:   %[[E1:.+]] = spv.CompositeExtract %[[LD]][1 : i32] : vector<4xf32>
-// CHECK:   %[[E2:.+]] = spv.CompositeExtract %[[LD]][2 : i32] : vector<4xf32>
-// CHECK:   %[[E3:.+]] = spv.CompositeExtract %[[LD]][3 : i32] : vector<4xf32>
+// CHECK:   %[[E0:.+]] = spirv.CompositeExtract %[[LD]][0 : i32] : vector<4xf32>
+// CHECK:   %[[E1:.+]] = spirv.CompositeExtract %[[LD]][1 : i32] : vector<4xf32>
+// CHECK:   %[[E2:.+]] = spirv.CompositeExtract %[[LD]][2 : i32] : vector<4xf32>
+// CHECK:   %[[E3:.+]] = spirv.CompositeExtract %[[LD]][3 : i32] : vector<4xf32>
 
-// CHECK:   %[[ADD0:.+]] = spv.FAdd %[[E0]], %[[E1]] : f32
-// CHECK:   %[[ADD1:.+]] = spv.FAdd %[[ADD0]], %[[E2]] : f32
-// CHECK:   %[[ADD2:.+]] = spv.FAdd %[[ADD1]], %[[E3]] : f32
+// CHECK:   %[[ADD0:.+]] = spirv.FAdd %[[E0]], %[[E1]] : f32
+// CHECK:   %[[ADD1:.+]] = spirv.FAdd %[[ADD0]], %[[E2]] : f32
+// CHECK:   %[[ADD2:.+]] = spirv.FAdd %[[ADD1]], %[[E3]] : f32
 
-// CHECK:   %[[S0:.+]] = spv.GroupNonUniformShuffleXor <Subgroup> %[[ADD2]], %[[C1]] : f32, i32
-// CHECK:   %[[ADD3:.+]] = spv.FAdd %[[ADD2]], %[[S0]] : f32
-// CHECK:   %[[S1:.+]] = spv.GroupNonUniformShuffleXor <Subgroup> %[[ADD3]], %[[C2]] : f32, i32
-// CHECK:   %[[ADD4:.+]] = spv.FAdd %[[ADD3]], %[[S1]] : f32
-// CHECK:   %[[S2:.+]] = spv.GroupNonUniformShuffleXor <Subgroup> %[[ADD4]], %[[C4]] : f32, i32
-// CHECK:   %[[ADD5:.+]] = spv.FAdd %[[ADD4]], %[[S2]] : f32
-// CHECK:   %[[S3:.+]] = spv.GroupNonUniformShuffleXor <Subgroup> %[[ADD5]], %[[C8]] : f32, i32
-// CHECK:   %[[ADD6:.+]] = spv.FAdd %[[ADD5]], %[[S3]] : f32
+// CHECK:   %[[S0:.+]] = spirv.GroupNonUniformShuffleXor <Subgroup> %[[ADD2]], %[[C1]] : f32, i32
+// CHECK:   %[[ADD3:.+]] = spirv.FAdd %[[ADD2]], %[[S0]] : f32
+// CHECK:   %[[S1:.+]] = spirv.GroupNonUniformShuffleXor <Subgroup> %[[ADD3]], %[[C2]] : f32, i32
+// CHECK:   %[[ADD4:.+]] = spirv.FAdd %[[ADD3]], %[[S1]] : f32
+// CHECK:   %[[S2:.+]] = spirv.GroupNonUniformShuffleXor <Subgroup> %[[ADD4]], %[[C4]] : f32, i32
+// CHECK:   %[[ADD5:.+]] = spirv.FAdd %[[ADD4]], %[[S2]] : f32
+// CHECK:   %[[S3:.+]] = spirv.GroupNonUniformShuffleXor <Subgroup> %[[ADD5]], %[[C8]] : f32, i32
+// CHECK:   %[[ADD6:.+]] = spirv.FAdd %[[ADD5]], %[[S3]] : f32
 
-// CHECK:   spv.Store "Workgroup" %{{.+}}, %[[ADD6]] : f32
+// CHECK:   spirv.Store "Workgroup" %{{.+}}, %[[ADD6]] : f32
 
-// CHECK:   spv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
+// CHECK:   spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
 
-// CHECK-COUNT-8:   spv.Load "Workgroup" %{{.+}} : f32
-// CHECK-COUNT-7:   spv.FAdd %{{.+}}, %{{.+}} : f32
-//         CHECK:   spv.FAdd %{{.+}}, %[[F0]] : f32
+// CHECK-COUNT-8:   spirv.Load "Workgroup" %{{.+}} : f32
+// CHECK-COUNT-7:   spirv.FAdd %{{.+}}, %{{.+}} : f32
+//         CHECK:   spirv.FAdd %{{.+}}, %[[F0]] : f32
 
-// CHECK:   %[[EQ:.+]] = spv.IEqual %{{.+}}, %[[C0]] : i32
-// CHECK:   spv.mlir.selection {
-// CHECK:     spv.BranchConditional %[[EQ]], ^bb1, ^bb2
+// CHECK:   %[[EQ:.+]] = spirv.IEqual %{{.+}}, %[[C0]] : i32
+// CHECK:   spirv.mlir.selection {
+// CHECK:     spirv.BranchConditional %[[EQ]], ^bb1, ^bb2
 // CHECK:   ^bb1:
-// CHECK:     spv.Store "StorageBuffer" %{{.+}}, %{{.+}} : f32
-// CHECK:     spv.Branch ^bb2
+// CHECK:     spirv.Store "StorageBuffer" %{{.+}}, %{{.+}} : f32
+// CHECK:     spirv.Branch ^bb2
 // CHECK:   ^bb2:
-// CHECK:     spv.mlir.merge
+// CHECK:     spirv.mlir.merge
 // CHECK:   }
-// CHECK:   spv.Return
+// CHECK:   spirv.Return
 
-// CHECK: spv.ExecutionMode @{{.+}} "LocalSize", 128, 1, 1
+// CHECK: spirv.ExecutionMode @{{.+}} "LocalSize", 128, 1, 1
 
 // -----
 
@@ -105,7 +105,7 @@ hal.executable private @subgroup_reduce {
 ]>
 hal.executable private @subgroup_reduce {
   hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
-      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, #spv.resource_limits<
+      spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 512,
         max_compute_workgroup_size = [512, 512, 512],
@@ -140,4 +140,4 @@ hal.executable private @subgroup_reduce {
   }
 }
 
-// CHECK-NOT: spv.GroupNonUniformShuffleXor
+// CHECK-NOT: spirv.GroupNonUniformShuffleXor

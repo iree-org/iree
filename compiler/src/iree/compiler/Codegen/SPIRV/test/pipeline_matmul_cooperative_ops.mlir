@@ -12,19 +12,19 @@
 
 hal.executable public @matmul_256x1024x128_div_sub {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
-    spv.target_env = #spv.target_env<
-      #spv.vce<v1.5,
+    spirv.target_env = #spirv.target_env<
+      #spirv.vce<v1.5,
       [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixNV],
       [SPV_KHR_variable_pointers, SPV_NV_cooperative_matrix]>, NVIDIA:DiscreteGPU,
-      #spv.resource_limits<
+      #spirv.resource_limits<
         cooperative_matrix_properties_nv = [
-          #spv.coop_matrix_props<
+          #spirv.coop_matrix_props<
             a_type = i8, b_type = i8, c_type = i32, k_size = 32,
             m_size = 8, n_size = 8, result_type = i32, scope = <Subgroup>>,
-          #spv.coop_matrix_props<
+          #spirv.coop_matrix_props<
             a_type = f16, b_type = f16, c_type = f16, k_size = 16,
             m_size = 16, n_size = 16, result_type = f16, scope = <Subgroup>>,
-          #spv.coop_matrix_props<
+          #spirv.coop_matrix_props<
             a_type = f16, b_type = f16, c_type = f32, k_size = 16,
             m_size = 16, n_size = 16, result_type = f32, scope = <Subgroup>>
         ],
@@ -74,15 +74,15 @@ hal.executable public @matmul_256x1024x128_div_sub {
   }
 }
 
-//    CHECK-LABEL: spv.func @matmul_256x1024x128_div_sub
-//      CHECK-DAG:   %[[COL_MAJOR:.+]] = spv.Constant false
-//      CHECK-DAG:   %[[C128:.+]] = spv.Constant 128 : i32
-//      CHECK-DAG:   %[[C1024:.+]] = spv.Constant 1024 : i32
-//  CHECK-COUNT-8:   spv.NV.CooperativeMatrixLoad %{{.+}}, %[[C128]], %[[COL_MAJOR]]
-//  CHECK-COUNT-8:   spv.NV.CooperativeMatrixLoad %{{.+}}, %[[C1024]], %[[COL_MAJOR]]
-//  CHECK-COUNT-8:   spv.NV.CooperativeMatrixMulAdd
-//          CHECK:   %[[ELEMENTWISE1:.+]] = spv.NV.CooperativeMatrixLoad %{{.+}}, %[[C1024]], %[[COL_MAJOR]]
-//          CHECK:   %[[ELEMENTWISE2:.+]] = spv.NV.CooperativeMatrixLoad %{{.+}}, %[[C1024]], %[[COL_MAJOR]]
-//          CHECK:   %[[DIV:.+]] = spv.FDiv %{{.+}}, %[[ELEMENTWISE1]] : !spv.coopmatrix<16x16xf16, Subgroup>
-//          CHECK:   %[[SUB:.+]] = spv.FSub %[[DIV]], %[[ELEMENTWISE2]] : !spv.coopmatrix<16x16xf16, Subgroup>
-//          CHECK:   spv.NV.CooperativeMatrixStore %{{.+}}, %[[SUB]], %[[C1024]], %[[COL_MAJOR]]
+//    CHECK-LABEL: spirv.func @matmul_256x1024x128_div_sub
+//      CHECK-DAG:   %[[COL_MAJOR:.+]] = spirv.Constant false
+//      CHECK-DAG:   %[[C128:.+]] = spirv.Constant 128 : i32
+//      CHECK-DAG:   %[[C1024:.+]] = spirv.Constant 1024 : i32
+//  CHECK-COUNT-8:   spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C128]], %[[COL_MAJOR]]
+//  CHECK-COUNT-8:   spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C1024]], %[[COL_MAJOR]]
+//  CHECK-COUNT-8:   spirv.NV.CooperativeMatrixMulAdd
+//          CHECK:   %[[ELEMENTWISE1:.+]] = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C1024]], %[[COL_MAJOR]]
+//          CHECK:   %[[ELEMENTWISE2:.+]] = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C1024]], %[[COL_MAJOR]]
+//          CHECK:   %[[DIV:.+]] = spirv.FDiv %{{.+}}, %[[ELEMENTWISE1]] : !spirv.coopmatrix<16x16xf16, Subgroup>
+//          CHECK:   %[[SUB:.+]] = spirv.FSub %[[DIV]], %[[ELEMENTWISE2]] : !spirv.coopmatrix<16x16xf16, Subgroup>
+//          CHECK:   spirv.NV.CooperativeMatrixStore %{{.+}}, %[[SUB]], %[[C1024]], %[[COL_MAJOR]]

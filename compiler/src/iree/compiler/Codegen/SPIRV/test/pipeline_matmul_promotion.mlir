@@ -12,7 +12,7 @@
 
 hal.executable @matmul_128x256x64 {
   hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
-    spv.target_env = #spv.target_env<#spv.vce<v1.5, [Shader], []>, NVIDIA:DiscreteGPU, #spv.resource_limits<
+    spirv.target_env = #spirv.target_env<#spirv.vce<v1.5, [Shader], []>, NVIDIA:DiscreteGPU, #spirv.resource_limits<
       max_compute_shared_memory_size = 49152,
       max_compute_workgroup_invocations = 1024,
       max_compute_workgroup_size = [65535, 65535, 65535],
@@ -49,29 +49,29 @@ hal.executable @matmul_128x256x64 {
   }
 }
 
-// CHECK-DAG: spv.GlobalVariable @{{.+}} : !spv.ptr<!spv.struct<(!spv.array<256 x vector<4xf32>>)>, Workgroup>
-// CHECK-DAG: spv.GlobalVariable @{{.+}} : !spv.ptr<!spv.struct<(!spv.array<1024 x vector<4xf32>>)>, Workgroup>
+// CHECK-DAG: spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<256 x vector<4xf32>>)>, Workgroup>
+// CHECK-DAG: spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<1024 x vector<4xf32>>)>, Workgroup>
 
-// CHECK-LABEL: spv.func @matmul_128x256x64
+// CHECK-LABEL: spirv.func @matmul_128x256x64
 
-//   CHECK-COUNT-5: spv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
+//   CHECK-COUNT-5: spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
 
-//           CHECK: spv.mlir.loop
-//           CHECK:   spv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
-//   CHECK-COUNT-5:   spv.Store "Workgroup" %{{.+}}, %{{.+}} : vector<4xf32>
-//           CHECK:   spv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
+//           CHECK: spirv.mlir.loop
+//           CHECK:   spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
+//   CHECK-COUNT-5:   spirv.Store "Workgroup" %{{.+}}, %{{.+}} : vector<4xf32>
+//           CHECK:   spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
 
-//  CHECK-COUNT-64:   spv.Load "Workgroup" %{{.+}} : vector<4xf32>
-// CHECK-COUNT-128:   spv.GL.Fma %{{.+}}, %{{.+}}, %{{.+}} : vector<4xf32>
-//   CHECK-COUNT-5:   spv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
-//           CHECK:   spv.mlir.merge
+//  CHECK-COUNT-64:   spirv.Load "Workgroup" %{{.+}} : vector<4xf32>
+// CHECK-COUNT-128:   spirv.GL.Fma %{{.+}}, %{{.+}}, %{{.+}} : vector<4xf32>
+//   CHECK-COUNT-5:   spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
+//           CHECK:   spirv.mlir.merge
 
-//           CHECK: spv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
-//   CHECK-COUNT-5: spv.Store "Workgroup" %{{.+}}, %{{.+}} : vector<4xf32>
-//           CHECK: spv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
+//           CHECK: spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
+//   CHECK-COUNT-5: spirv.Store "Workgroup" %{{.+}}, %{{.+}} : vector<4xf32>
+//           CHECK: spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
 
-//  CHECK-COUNT-64: spv.Load "Workgroup" %{{.+}} : vector<4xf32>
-// CHECK-COUNT-128: spv.GL.Fma %{{.+}}, %{{.+}}, %{{.+}} : vector<4xf32>
-//   CHECK-COUNT-4: spv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
-//   CHECK-COUNT-4: spv.FDiv %{{.+}}, %{{.+}} : vector<4xf32>
-//   CHECK-COUNT-4: spv.Store "StorageBuffer" %{{.+}}, %{{.+}} : vector<4xf32>
+//  CHECK-COUNT-64: spirv.Load "Workgroup" %{{.+}} : vector<4xf32>
+// CHECK-COUNT-128: spirv.GL.Fma %{{.+}}, %{{.+}}, %{{.+}} : vector<4xf32>
+//   CHECK-COUNT-4: spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
+//   CHECK-COUNT-4: spirv.FDiv %{{.+}}, %{{.+}} : vector<4xf32>
+//   CHECK-COUNT-4: spirv.Store "StorageBuffer" %{{.+}}, %{{.+}} : vector<4xf32>

@@ -34,7 +34,7 @@ def PartitionableLoopsInterface : OpInterface<"PartitionableLoopsInterface"> {
         The size of the vector returned is always lesser than
         `maxNumPartitionedLoops`.
       }],
-      /*retTy=*/"llvm::SmallVector<unsigned>",
+      /*retTy=*/"::llvm::SmallVector<unsigned>",
       /*methodName=*/"getPartitionableLoops",
       /*args=*/(ins "unsigned":$maxNumPartitionedLoops)
     >,
@@ -42,7 +42,7 @@ def PartitionableLoopsInterface : OpInterface<"PartitionableLoopsInterface"> {
       /*desc=*/[{
         Returns the iterator types for all the loops of the op.
       }],
-      /*retTy=*/"llvm::SmallVector<llvm::StringRef>",
+      /*retTy=*/"::llvm::SmallVector<::mlir::utils::IteratorType>",
       /*methodName=*/"getIteratorTypes"
     >
   ];

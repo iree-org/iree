@@ -46,6 +46,8 @@ static bool getUsesIfAllTransferOp(Value value,
     // Only vectorize memref used by vector transfer ops.
     if (!isa<vector::TransferReadOp, vector::TransferWriteOp>(userOp)) {
       uses.clear();
+      LLVM_DEBUG(llvm::dbgs()
+                 << "failed: non-transfer user: " << *userOp << "\n");
       return false;
     }
     uses.push_back(userOp);
@@ -88,25 +90,48 @@ static unsigned isMemRefVectorizable(Value value,
   auto memrefType = value.getType().dyn_cast<MemRefType>();
 
   // Require scalar element type
-  if (!memrefType || memrefType.getElementType().isa<VectorType>()) return 0;
+  if (!memrefType || memrefType.getElementType().isa<VectorType>()) {
+    LLVM_DEBUG(llvm::dbgs() << "failed: not (scalar) memref\n");
+    return 0;
+  }
 
   // Require static innermost dimension.
   if (memrefType.getRank() == 0 ||
-      ShapedType::isDynamic(memrefType.getShape().back()))
+      ShapedType::isDynamic(memrefType.getShape().back())) {
+    LLVM_DEBUG(llvm::dbgs() << "failed: 0 rank or dynamic shape\n");
     return 0;
+  }
+  const int64_t lastDimSize = memrefType.getShape().back();
+  LLVM_DEBUG(llvm::dbgs() << "lastDimSize=" << lastDimSize << "\n");
 
   // If we have an odd number of elements, it will require padding in the
   // buffer.
-  if (memrefType.getShape().back() % 2 != 0) return 0;
+  if (lastDimSize % 2 != 0) {
+    LLVM_DEBUG(llvm::dbgs() << "failed: innermost dim not divisible by 2\n");
+    return 0;
+  }
 
   unsigned elementNumBits = memrefType.getElementTypeBitWidth();
-  if (kMaxVectorNumBits % elementNumBits != 0) return 0;
+  if (kMaxVectorNumBits % elementNumBits != 0) {
+    LLVM_DEBUG(llvm::dbgs() << "failed: element not fitting in vector4\n");
+    return 0;
+  }
 
   if (getUsesIfAllTransferOp(value, uses)) {
     unsigned vectorBits = calculateMemRefVectorNumBits(uses);
     unsigned vectorSize = vectorBits / elementNumBits;
+    LLVM_DEBUG(llvm::dbgs() << "vectorBits=" << vectorBits << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "elementNumBits=" << elementNumBits << "\n");
     // Again make sure we don't have vectors of odd numbers.
-    if (vectorSize % 2 != 0) return 0;
+    if (vectorSize % 2 != 0) {
+      LLVM_DEBUG(llvm::dbgs() << "failed: odd element count after grouping\n");
+      return 0;
+    }
+    if ((lastDimSize * elementNumBits) % vectorBits != 0) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "failed: innermost dim not divisible by vector size\n");
+      return 0;
+    }
     return vectorBits;
   }
 
@@ -163,6 +188,7 @@ MemRefUsageAnalysis::MemRefUsageAnalysis(mlir::Operation *op) {
 
 void MemRefUsageAnalysis::analyzeMemRefValue(Value value) {
   SmallVector<Operation *, 4> vectorUses;
+  LLVM_DEBUG(llvm::dbgs() << "analyzing value: " << value << "\n");
   if (unsigned vectorSize = isMemRefVectorizable(value, vectorUses)) {
     valueToVectorBitsMap.insert(std::make_pair(value, vectorSize));
     transferOps.insert(vectorUses.begin(), vectorUses.end());

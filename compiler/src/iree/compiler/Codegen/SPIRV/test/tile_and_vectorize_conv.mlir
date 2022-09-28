@@ -9,14 +9,14 @@
     #hal.descriptor_set.binding<2, storage_buffer>
   ]>
 ]>
-hal.executable private @conv_static_shape_f32 {
+hal.executable private @nhwc_conv_static_shape_f32 {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
-    hal.executable.export @conv_static_shape_f32 layout(#pipeline_layout) attributes {
+    hal.executable.export @nhwc_conv_static_shape_f32 layout(#pipeline_layout) attributes {
       workgroup_size = [4: index, 4: index, 1: index],
       translation_info = #translation
     }
     builtin.module  {
-      func.func @conv_static_shape_f32() {
+      func.func @nhwc_conv_static_shape_f32() {
         %c112 = arith.constant 112 : index
         %c16 = arith.constant 16 : index
         %c0 = arith.constant 0 : index
@@ -58,9 +58,9 @@ hal.executable private @conv_static_shape_f32 {
   }
 }
 
-// CHECK-LABEL: func.func @conv_static_shape_f32()
+// CHECK-LABEL: func.func @nhwc_conv_static_shape_f32()
 
-// No vector transfer write ops generated for the linalg.fill op: it's cancelled with read ops.
+// No vector transfer write ops generated for the linalg.fill op: initial values are forwarded to loops.
 // CHECK-NOT: vector.transfer
 
 // Check tiling loop along filter height/width and input channel
@@ -89,14 +89,14 @@ hal.executable private @conv_static_shape_f32 {
     #hal.descriptor_set.binding<2, storage_buffer>
   ]>
 ]>
-hal.executable private @depthwise_conv_static_shape_f32 {
+hal.executable private @nhwc_nhwc_depthwise_conv_static_shape_f32 {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
-    hal.executable.export @depthwise_conv_static_shape_f32 layout(#pipeline_layout) attributes {
+    hal.executable.export @nhwc_nhwc_depthwise_conv_static_shape_f32 layout(#pipeline_layout) attributes {
       workgroup_size = [4: index, 4: index, 4: index],
       translation_info = #translation
     }
     builtin.module  {
-      func.func @depthwise_conv_static_shape_f32() {
+      func.func @nhwc_nhwc_depthwise_conv_static_shape_f32() {
         %c56 = arith.constant 56 : index
         %c96 = arith.constant 96 : index
         %c0 = arith.constant 0 : index
@@ -135,9 +135,9 @@ hal.executable private @depthwise_conv_static_shape_f32 {
   }
 }
 
-// CHECK-LABEL: func.func @depthwise_conv_static_shape_f32()
+// CHECK-LABEL: func.func @nhwc_nhwc_depthwise_conv_static_shape_f32()
 
-// No vector transfer write ops generated for the linalg.fill op: it's cancelled with read ops.
+// No vector transfer write ops generated for the linalg.fill op: initial values are forwarded to loops.
 // CHECK-NOT: vector.transfer
 
 // check tiling loop along filter height/width and input channel
@@ -287,14 +287,14 @@ hal.executable private @low_padded_conv {
   ]>
 ]>
 
-hal.executable private @low_high_padded_depthwise_conv {
+hal.executable private @low_high_padded_nhwc_depthwise_conv {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
-    hal.executable.export @low_high_padded_depthwise_conv layout(#pipeline_layout) attributes {
+    hal.executable.export @low_high_padded_nhwc_depthwise_conv layout(#pipeline_layout) attributes {
       workgroup_size = [8: index, 2: index, 1: index],
       translation_info = #translation
     }
     builtin.module {
-      func.func @low_high_padded_depthwise_conv() {
+      func.func @low_high_padded_nhwc_depthwise_conv() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
         %c112 = arith.constant 112 : index
@@ -370,7 +370,7 @@ hal.executable private @low_high_padded_depthwise_conv {
   }
 }
 
-// CHECK-LABEL: func.func @low_high_padded_depthwise_conv()
+// CHECK-LABEL: func.func @low_high_padded_nhwc_depthwise_conv()
 
 // Loop nest for workgroup tiling and distribution
 // CHECK-COUNT-3: scf.for
@@ -396,3 +396,89 @@ hal.executable private @low_high_padded_depthwise_conv {
 //         CHECK:   vector.transfer_read
 //         CHECK: vector.transfer_read
 // CHECK-COUNT-2: vector.fma
+
+// -----
+
+#config = #iree_codegen.lowering_config<tile_sizes = [[0, 16, 8, 8], [0, 8, 1, 4], [0, 0, 0, 0, 4, 1, 1], [0, 0, 1, 0]]>
+#translation = #iree_codegen.translation_info<SPIRVVectorize>
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+
+hal.executable private @nchw_conv_static_shape_f32 {
+  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
+    hal.executable.export @nchw_conv_static_shape_f32 layout(#pipeline_layout) attributes {
+      workgroup_size = [4: index, 4: index, 1: index],
+      translation_info = #translation
+    }
+    builtin.module  {
+      func.func @nchw_conv_static_shape_f32() {
+        %c1280 = arith.constant 1280 : index
+        %c8 = arith.constant 8 : index
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:2x1280x10x10xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:1280x1280x3x3xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readwrite:2x1280x8x8xf32>
+        %workgroup_id_x = hal.interface.workgroup.id[0] : index
+        %workgroup_count_x = hal.interface.workgroup.count[0] : index
+        %workgroup_id_y = hal.interface.workgroup.id[1] : index
+        %workgroup_count_y = hal.interface.workgroup.count[1] : index
+        %workgroup_id_z = hal.interface.workgroup.id[2] : index
+        %workgroup_count_z = hal.interface.workgroup.count[2] : index
+        %3 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%workgroup_id_z]
+        %4 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%workgroup_count_z]
+        scf.for %arg0 = %3 to %c1280 step %4 {
+          %5 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%workgroup_id_y]
+          %6 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%workgroup_count_y]
+          scf.for %arg1 = %5 to %c8 step %6 {
+            %7 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%workgroup_id_x]
+            %8 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%workgroup_count_x]
+            scf.for %arg2 = %7 to %c8 step %8 {
+              %9 = flow.dispatch.tensor.load %0, offsets = [0, 0, %arg1, %arg2], sizes = [2, 1280, 10, 10], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:2x1280x10x10xf32> -> tensor<2x1280x10x10xf32>
+              %10 = flow.dispatch.tensor.load %1, offsets = [%arg0, 0, 0, 0], sizes = [16, 1280, 3, 3], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:1280x1280x3x3xf32> -> tensor<16x1280x3x3xf32>
+              %11 = flow.dispatch.tensor.load %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [2, 16, 8, 8], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readwrite:2x1280x8x8xf32> -> tensor<2x16x8x8xf32>
+              %12 = linalg.conv_2d_nchw_fchw
+                      {dilations = dense<1> : vector<2xi64>, lowering_config = #config, strides = dense<1> : vector<2xi64>}
+                      ins(%9, %10 : tensor<2x1280x10x10xf32>, tensor<16x1280x3x3xf32>)
+                      outs(%11 : tensor<2x16x8x8xf32>) -> tensor<2x16x8x8xf32>
+              flow.dispatch.tensor.store %12, %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [2, 16, 8, 8], strides = [1, 1, 1, 1] : tensor<2x16x8x8xf32> -> !flow.dispatch.tensor<readwrite:2x1280x8x8xf32>
+            }
+          }
+        }
+        return
+      }
+    }
+  }
+}
+
+// CHECK-LABEL: func.func @nchw_conv_static_shape_f32()
+
+// No vector transfer write ops generated for the linalg.fill op: initial values are forwarded to loops.
+// CHECK-NOT: vector.transfer
+
+// Check tiling loop along input channel and filter height/width
+// TODO: enable vector hoisting
+//      CHECK: scf.for %{{.*}} = %c0 to %c1280 step %c4
+// CHECK-SAME:     -> (tensor<2x8x1x4xf32>)
+//      CHECK:   scf.for %{{.*}} = %c0 to %c3 step %c1
+// CHECK-SAME:       -> (tensor<2x8x1x4xf32>)
+//      CHECK:     scf.for %{{.*}} = %c0 to %c3 step %c1
+// CHECK-SAME:         -> (tensor<2x8x1x4xf32>)
+
+// TODO: remove these vector.extract & vector.insert pairs due to vector.transpose
+// CHECK-COUNT-96: vector.insert %{{.+}}
+
+// CHECK-COUNT-64: vector.fma
+
+// TODO: remove these vector.extract & vector.insert pairs due to vector.transpose
+// CHECK-COUNT-64: vector.insert %{{.+}}
+
+// For linalg.conv_2d_nchw_fchw
+// CHECK-COUNT-16: vector.transfer_write
+
+//  CHECK-COUNT-3: scf.yield %{{.+}} : tensor<2x8x1x4xf32>

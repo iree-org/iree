@@ -98,7 +98,7 @@ static LogicalResult getPaddingAttrs(func::FuncOp funcOp,
 }
 
 static LogicalResult getPaddingDims(func::FuncOp funcOp,
-                                    StringRef targetIterType,
+                                    utils::IteratorType targetIterType,
                                     SmallVectorImpl<int64_t> &paddingDims) {
   FailureOr<Operation *> rootOp = getRootOp(funcOp);
   if (failed(rootOp)) return failure();
@@ -108,7 +108,8 @@ static LogicalResult getPaddingDims(func::FuncOp funcOp,
 
   linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(rootOp.value());
   for (auto en : llvm::enumerate(linalgOp.getIteratorTypes())) {
-    if (en.value().cast<StringAttr>().getValue() == targetIterType) {
+    if (en.value().cast<StringAttr>().getValue() ==
+        utils::stringifyIteratorType(targetIterType)) {
       paddingDims.push_back(en.index());
     }
   }
@@ -297,7 +298,7 @@ void LinalgFusePass::runOnOperation() {
   if (padParallelDims) {
     SmallVector<int64_t> dims;
     assert(paddingDimensions.empty());
-    if (failed(getPaddingDims(funcOp, getParallelIteratorTypeName(), dims))) {
+    if (failed(getPaddingDims(funcOp, utils::IteratorType::parallel, dims))) {
       return signalPassFailure();
     }
     paddingDimensions = dims;
@@ -305,7 +306,7 @@ void LinalgFusePass::runOnOperation() {
   if (padReductionDims) {
     SmallVector<int64_t> dims;
     assert(paddingDimensions.empty());
-    if (failed(getPaddingDims(funcOp, getReductionIteratorTypeName(), dims))) {
+    if (failed(getPaddingDims(funcOp, utils::IteratorType::reduction, dims))) {
       return signalPassFailure();
     }
     paddingDimensions = dims;

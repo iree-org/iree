@@ -508,3 +508,19 @@ func.func @topk_invalid(%input_values: tensor<3x10xf32>, %input_indices: tensor<
         } -> tensor<2x3xf32>, tensor<2x3xi32>
   return %0#0, %0#1 : tensor<2x3xf32>, tensor<2x3xi32>
 }
+
+// -----
+
+func.func @pack_invalid(%input: tensor<256x128xf32>, %output: tensor<8x8x32x16xf32>) -> tensor<8x8x32x16xf32> {
+  // expected-error@+1 {{inferred type do not match provied output type}}
+  %0 = iree_linalg_ext.pack %input dims_pos = [1, 0] inner_tiles = [16, 32] into %output : (tensor<256x128xf32> tensor<8x8x32x16xf32>) -> tensor<8x8x32x16xf32>
+  return %0 : tensor<8x8x32x16xf32>
+}
+
+// -----
+
+func.func @pack_invalid(%input: tensor<256x128xf32>, %output: tensor<8x8x32x16xf32>) -> tensor<8x8x32x16xf32> {
+  // expected-error@+1 {{invalid tile factor provided. Only full tiles are supported}}
+  %0 = iree_linalg_ext.pack %input dims_pos = [1, 0] inner_tiles = [16, 5] into %output : (tensor<256x128xf32> tensor<8x8x32x16xf32>) -> tensor<8x8x32x16xf32>
+  return %0 : tensor<8x8x32x16xf32>
+}

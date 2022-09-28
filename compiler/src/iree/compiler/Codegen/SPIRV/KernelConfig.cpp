@@ -15,6 +15,7 @@
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
@@ -46,6 +47,79 @@ bool isMatmulOrBatchMatmul(linalg::LinalgOp linalgOp) {
 // Convolution Default Configuration
 //===----------------------------------------------------------------------===//
 
+/// Decides the tiling and distribution parameters for one convolution
+/// dimension. Returns true if we can succesfully deduce.
+///
+/// - `inputDim` is the size of the dimension to be distributed.
+/// - `residualThreads` is the remaining threads we can distribute.
+/// - `residualTilingFactor` indicates the remaining tiling scale factor.
+/// - `wgDimSize` will be updated with the decided workgroup dimension size.
+/// - `wgTileSize` will be updated with the decided workgroup tile size.
+/// - `invoTileSize` will be updated with the decided invocation tile size.
+static bool distributeToOneDim(const int64_t inputDim,
+                               const bool isInnerMostDim,
+                               int64_t &residualThreads,
+                               int64_t &residualTilingFactor,
+                               int64_t &wgDimSize, int64_t &wgTileSize,
+                               int64_t &invoTileSize) {
+  const int64_t lb = isInnerMostDim ? 2 : 1;
+  for (int64_t dim = residualThreads; dim >= lb; dim >>= 1) {
+    int64_t chosenTileSize = 0;
+    if (isInnerMostDim) {
+      // Handle 4 elements per thread for the innermost dimension. We need
+      // this for vectorized load.
+      chosenTileSize = 4;
+      if (inputDim % (dim * chosenTileSize) != 0) continue;
+    } else {
+      for (int64_t t = residualTilingFactor; t >= 1; t >>= 1)
+        if (inputDim % (dim * t) == 0) {
+          chosenTileSize = t;
+          break;
+        }
+    }
+    if (chosenTileSize) {
+      wgDimSize = dim;
+      wgTileSize = dim * chosenTileSize;
+      invoTileSize = chosenTileSize;
+      residualThreads /= dim;
+      residualTilingFactor /= chosenTileSize;
+      return true;
+    }
+  }
+  return false;
+};
+
+/// Decides the tiling and distribution parameters for two convolution window
+/// dimensions to two workgroup dimensions as a square. Returns true if we can
+/// succesfully deduce.
+static bool distributeToSquare(const int64_t oh, const int64_t ow,
+                               int64_t &residualThreads,
+                               int64_t &residualTilingFactor,
+                               MutableArrayRef<int64_t> wgDimSizes,
+                               MutableArrayRef<int64_t> wgTileSizes,
+                               MutableArrayRef<int64_t> invoTileSizes) {
+  assert(wgDimSizes.size() == 2 && wgTileSizes.size() == 2 &&
+         invoTileSizes.size() == 2);
+
+  const unsigned log2Threads = llvm::Log2_64(residualThreads);
+  if (oh == ow && residualThreads != 1 && log2Threads % 2 == 0) {
+    const int64_t yz = 1ll << (log2Threads / 2);
+
+    int64_t chosenTileSize = 1ll << (llvm::Log2_64(residualTilingFactor) / 2);
+    while (chosenTileSize >= 1 && ow % (yz * chosenTileSize) != 0) {
+      chosenTileSize >>= 1;
+    }
+
+    if (chosenTileSize != 0) {
+      wgDimSizes.front() = wgDimSizes.back() = yz;
+      wgTileSizes.front() = wgTileSizes.back() = yz * chosenTileSize;
+      invoTileSizes.front() = invoTileSizes.back() = chosenTileSize;
+      return true;
+    }
+  }
+  return false;
+}
+
 namespace detail {
 
 LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
@@ -57,117 +131,101 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
   Type outputType = linalgOp.getOutputOperand(0)->get().getType();
   ArrayRef<int64_t> outputShape = outputType.cast<ShapedType>().getShape();
 
-  if (isa<linalg::Conv2DNhwcHwcfOp>(*linalgOp) &&
-      ShapedType::isDynamic(inputShape[3])) {
-    return success();
-  }
-  if (llvm::any_of(outputShape.drop_front(), ShapedType::isDynamic)) {
+  const bool isNCHW = isa<linalg::Conv2DNchwFchwOp>(*linalgOp);
+  const bool isNHWC = isa<linalg::Conv2DNhwcHwcfOp>(*linalgOp) ||
+                      isa<linalg::DepthwiseConv2DNhwcHwcOp>(*linalgOp);
+  if (!isNCHW & !isNHWC) return success();
+
+  const int icIndex = isNHWC ? 3 : 1;
+  const int ohIndex = isNHWC ? 1 : 2;
+  const int owIndex = isNHWC ? 2 : 3;
+  const int ocIndex = isNHWC ? 3 : 1;
+
+  if (ShapedType::isDynamic(inputShape[icIndex]) ||
+      llvm::any_of(outputShape.drop_front(), ShapedType::isDynamic)) {
     return success();
   }
 
-  int64_t ic = inputShape[3];
-  int64_t oh = outputShape[1], ow = outputShape[2], oc = outputShape[3];
+  const int64_t ic = inputShape[icIndex], oc = outputShape[ocIndex];
+  const int64_t oh = outputShape[ohIndex], ow = outputShape[owIndex];
 
   // The conversion pipeline requires the input channel dimension to be some
   // multipler of four, or less than four.
   if (!(ic % 4 == 0 || ic < 4)) return success();
 
-  // The core idea is to distribute the convolution OH/OW/OC dimension to the
-  // workgroup Z/Y/X dimension, with each thread in a workgroup handling
-  // multiple vector elements. We try to 1) utilize all threads in a subgroup,
-  // and 2) handle an optimal tile size along each dimension.
+  // The core idea is to distribute the convolution dimensions to the workgroup
+  // Z/Y/X dimensions, with each thread in a workgroup handling multiple vector
+  // elements. We try to 1) utilize all threads in a subgroup, and 2) handle an
+  // optimal tile size along each dimension.
 
   int64_t residualThreads = subgroupSize;
   int64_t residualTilingFactor = bestTilingFactor;
 
-  SmallVector<int64_t, 3> workgroupSize(3, 1);     // (X, Y, Z)
-  SmallVector<int64_t> workgroupTileSizes(4, 0);   // (N, OH, OW, OC)
-  SmallVector<int64_t> invocationTileSizes(4, 0);  // (N, OH, OW, OC)
+  SmallVector<int64_t, 3> workgroupSize(3, 1);  // (X, Y, Z)
+  SmallVector<int64_t> workgroupTileSizes(4, 0);
+  SmallVector<int64_t> threadTileSizes(4, 0);
 
-  // Deduce the configuration for the OC dimension.
-  for (int64_t x = residualThreads; x >= 2; x >>= 1) {
-    // Handle 4 elements per thread for the innermost dimension. We need this
-    // for vectorized load.
-    int64_t chosenTileSize = 4;
-    if (oc % (x * chosenTileSize) == 0) {
-      workgroupSize[0] = x;
-      workgroupTileSizes[3] = x * chosenTileSize;
-      invocationTileSizes[3] = chosenTileSize;
-      residualThreads /= x;
-      residualTilingFactor /= chosenTileSize;
-      break;
-    }
-  }
-  if (workgroupTileSizes[3] == 0) return success();
-
-  // Deduce the configruation for the OW and OH dimension. Try to make them even
-  // if possible given we typically have images with the same height and width.
-  bool tileToSquare = false;
-  unsigned log2Threads = llvm::Log2_64(residualThreads);
-  if (ow == oh && residualThreads != 1 && log2Threads % 2 == 0) {
-    int64_t yz = 1ll << (log2Threads / 2);
-
-    int64_t chosenTileSize = 1ll << (llvm::Log2_64(residualTilingFactor) / 2);
-    while (chosenTileSize >= 1 && ow % (yz * chosenTileSize) != 0) {
-      chosenTileSize >>= 1;
-    }
-
-    if (chosenTileSize != 0) {
-      workgroupSize[1] = workgroupSize[2] = yz;
-      workgroupTileSizes[2] = workgroupTileSizes[1] = yz * chosenTileSize;
-      invocationTileSizes[2] = invocationTileSizes[1] = chosenTileSize;
-      tileToSquare = true;
-    }
-  }
-
-  // Otherwise treat OW and OH separately to allow them to have different number
-  // of threads and tiling size.
-  if (!tileToSquare) {
-    // Decide the tiling and distribution parameters for one dimension.
-    auto decideOneDim = [&](int64_t inputDim, int64_t &wgDimSize,
-                            int64_t &wgTileSize, int64_t &invoTileSize) {
-      for (int64_t dim = residualThreads; dim >= 1; dim >>= 1) {
-        int64_t chosenTileSize = 0;
-        for (int64_t t = residualTilingFactor; t >= 1; t >>= 1) {
-          if (inputDim % (dim * t) == 0) {
-            chosenTileSize = t;
-            break;
-          }
-        }
-        if (chosenTileSize) {
-          wgDimSize = dim;
-          wgTileSize = dim * chosenTileSize;
-          invoTileSize = chosenTileSize;
-          residualThreads /= dim;
-          residualTilingFactor /= chosenTileSize;
-          return true;
-        }
-      }
-      return false;
-    };
-
-    if (!decideOneDim(ow, workgroupSize[1], workgroupTileSizes[2],
-                      invocationTileSizes[2]) ||
-        !decideOneDim(oh, workgroupSize[2], workgroupTileSizes[1],
-                      invocationTileSizes[1])) {
+  if (isNCHW) {
+    // OW -> x, OH -> y, OC -> z
+    if (!distributeToOneDim(ow, /*isInnerMostDim=*/true, residualThreads,
+                            residualTilingFactor, workgroupSize[0],
+                            workgroupTileSizes[3], threadTileSizes[3]) ||
+        !distributeToOneDim(oh, /*isInnerMostDim=*/false, residualThreads,
+                            residualTilingFactor, workgroupSize[1],
+                            workgroupTileSizes[2], threadTileSizes[2]) ||
+        !distributeToOneDim(oc, /*isInnerMostDim=*/false, residualThreads,
+                            residualTilingFactor, workgroupSize[2],
+                            workgroupTileSizes[1], threadTileSizes[1])) {
       return success();
+    }
+  } else {
+    // OC -> x
+    if (!distributeToOneDim(oc, /*isInnerMostDim=*/true, residualThreads,
+                            residualTilingFactor, workgroupSize[0],
+                            workgroupTileSizes[3], threadTileSizes[3]))
+      return success();
+
+    // Deduce the configruation for the OW and OH dimension. Try to make them
+    // even if possible given we typically have images with the same height
+    // and width.
+    const bool tileToSquare = distributeToSquare(
+        oh, ow, residualThreads, residualTilingFactor,
+        llvm::makeMutableArrayRef(workgroupSize).drop_front(),
+        llvm::makeMutableArrayRef(workgroupTileSizes).drop_front().drop_back(),
+        llvm::makeMutableArrayRef(threadTileSizes).drop_front().drop_back());
+
+    // Otherwise treat OW and OH separately to allow them to have different
+    // number of threads and tiling size.
+    if (!tileToSquare) {
+      if (!distributeToOneDim(ow, /*isInnerMostDim=*/false, residualThreads,
+                              residualTilingFactor, workgroupSize[1],
+                              workgroupTileSizes[2], threadTileSizes[2]) ||
+          !distributeToOneDim(oh, /*isInnerMostDim=*/false, residualThreads,
+                              residualTilingFactor, workgroupSize[2],
+                              workgroupTileSizes[1], threadTileSizes[1])) {
+        return success();
+      }
     }
   }
 
   auto pipeline = IREE::Codegen::DispatchLoweringPassPipeline::SPIRVVectorize;
   TileSizesListType tileSizes;
   tileSizes.push_back(workgroupTileSizes);
-  tileSizes.push_back(invocationTileSizes);
+  tileSizes.push_back(threadTileSizes);
   // Tiling along reduction dimensions
-  if (isa<linalg::Conv2DNhwcHwcfOp>(linalgOp)) {
+  if (isa<linalg::Conv2DNchwFchwOp>(linalgOp)) {
+    tileSizes.push_back({0, 0, 0, 0, 4, 1, 1});  // (N, OC, OH, OW, IC, FH, FW)
+  } else if (isa<linalg::Conv2DNhwcHwcfOp>(linalgOp)) {
     tileSizes.push_back({0, 0, 0, 0, 1, 1, 4});  // (N, OH, OW, OC, FH, FW, IC)
-    tileSizes.push_back({0, 1, 0, 0});
   } else if (isa<linalg::DepthwiseConv2DNhwcHwcOp>(linalgOp)) {
     tileSizes.push_back({0, 0, 0, 0, 1, 1});  // (N, OH, OW, C, FH, FW)
-    tileSizes.push_back({0, 1, 0, 0});
   } else {
     return success();
   }
+  // Tile along OH by size 1 to enable downsizing 2-D convolution to 1-D.
+  SmallVector<int64_t> windowTileSizes(4, 0);
+  windowTileSizes[ohIndex] = 1;
+  tileSizes.push_back(windowTileSizes);
 
   auto funcOp = linalgOp->getParentOfType<func::FuncOp>();
   return setOpConfigAndEntryPointFnTranslation(funcOp, linalgOp, tileSizes,
@@ -277,10 +335,10 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op, int64_t subgroupSize,
 
   SmallVector<int64_t, 3> workgroupSize(3, 1);  // (X, Y, Z)
   SmallVector<int64_t> workgroupTileSizes(numLoops, 0);
-  SmallVector<int64_t> invocationTileSizes(numLoops, 0);
+  SmallVector<int64_t> threadTileSizes(numLoops, 0);
   SmallVector<int64_t> reductionTileSizes(numLoops, 0);
 
-  if (isBM) workgroupTileSizes[bIndex] = invocationTileSizes[bIndex] = 1;
+  if (isBM) workgroupTileSizes[bIndex] = threadTileSizes[bIndex] = 1;
 
   // Deduce the configuration for the N dimension. Start with the best workgroup
   // X size, and reduce by a factor of two each time.
@@ -291,7 +349,7 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op, int64_t subgroupSize,
     if (dimN % (x * chosenTileSize) == 0) {
       workgroupSize[0] = x;
       workgroupTileSizes[nIndex] = x * chosenTileSize;
-      invocationTileSizes[nIndex] = chosenTileSize;
+      threadTileSizes[nIndex] = chosenTileSize;
       residualThreads /= x;
       assert(residualTilingFactor % chosenTileSize == 0);
       residualTilingFactor /= chosenTileSize;
@@ -319,7 +377,7 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op, int64_t subgroupSize,
     if (chosenTileSize) {
       workgroupSize[1] = y;
       workgroupTileSizes[mIndex] = y * chosenTileSize;
-      invocationTileSizes[mIndex] = chosenTileSize;
+      threadTileSizes[mIndex] = chosenTileSize;
       assert(residualTilingFactor > chosenTileSize);
       residualTilingFactor -= chosenTileSize;
       break;
@@ -348,9 +406,9 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op, int64_t subgroupSize,
 
   TileSizesListType tileSizes;
   workgroupTileSizes.resize(lastParallelDim + 1);
-  invocationTileSizes.resize(lastParallelDim + 1);
+  threadTileSizes.resize(lastParallelDim + 1);
   tileSizes.push_back(workgroupTileSizes);
-  tileSizes.push_back(invocationTileSizes);
+  tileSizes.push_back(threadTileSizes);
   tileSizes.push_back(reductionTileSizes);
 
   return setOpConfigAndEntryPointFnTranslation(
@@ -372,13 +430,14 @@ static LogicalResult setFftOpConfig(spirv::ResourceLimitsAttr limits,
 
   std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
 
-  SmallVector<StringRef> loopIteratorTypes = op.getLoopIteratorTypes();
+  SmallVector<utils::IteratorType> loopIteratorTypes =
+      op.getLoopIteratorTypes();
   unsigned loopDepth = loopIteratorTypes.size();
   SmallVector<int64_t> workgroupTileSize(loopDepth, 0);
 
   // Tiling along partitioned loops with size 1.
   for (auto iteratorType : llvm::enumerate(loopIteratorTypes)) {
-    if (iteratorType.value() == getParallelIteratorTypeName()) {
+    if (iteratorType.value() == utils::IteratorType::parallel) {
       workgroupTileSize[iteratorType.index()] = 1;
     }
   }
@@ -740,18 +799,18 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
         // If unsuccessful, try to tile and distribute.
         return setDefaultOpConfig(limits, op);
       })
-      .Case<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp>(
-          [limits](auto op) {
-            // Try to tile and vectorize first. It's common to see 32 threads
-            // per subgroup for GPUs.
-            auto result = detail::setConvOpConfig(op, /*subgroupSize=*/32,
-                                                  /*bestTilingFactor=*/32);
-            if (failed(result)) return result;
-            if (getLoweringConfig(op)) return result;
+      .Case<linalg::Conv2DNchwFchwOp, linalg::Conv2DNhwcHwcfOp,
+            linalg::DepthwiseConv2DNhwcHwcOp>([limits](auto op) {
+        // Try to tile and vectorize first. It's common to see 32 threads
+        // per subgroup for GPUs.
+        auto result = detail::setConvOpConfig(op, /*subgroupSize=*/32,
+                                              /*bestTilingFactor=*/32);
+        if (failed(result)) return result;
+        if (getLoweringConfig(op)) return result;
 
-            // If unsuccessful, try to tile and distribute.
-            return setDefaultOpConfig(limits, op);
-          })
+        // If unsuccessful, try to tile and distribute.
+        return setDefaultOpConfig(limits, op);
+      })
       .Case<linalg::ConvolutionOpInterface>([limits](auto op) {
         // Other convolution/pooling op vectorization is not wired up.
         return setDefaultOpConfig(limits, op, /*allowVectorization=*/false);
