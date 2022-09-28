@@ -61,6 +61,8 @@ def main(args):
               <body>
             """))
     for release in fetcher.get_all():
+      if release["draft"]:
+        continue
       for asset in release["assets"]:
         url = html.escape(asset['browser_download_url'])
         name = html.escape(asset['name'])
