@@ -257,6 +257,7 @@ struct LLVMGPUVectorToGPUPass
       return signalPassFailure();
     }
     RewritePatternSet patterns(funcOp.getContext());
+    mlir::vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
     populatePrepareVectorToMMAPatterns(patterns, llvmgpuUseMMASync);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {

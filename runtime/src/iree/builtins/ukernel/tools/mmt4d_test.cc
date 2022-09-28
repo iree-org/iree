@@ -220,8 +220,25 @@ static void test_matmuls_for_various_MNK_shapes_and_flags(
     int m, n, k;
   };
   std::vector<shape_mnk_t> shapes{
-      {1, 1, 1}, {1, 1, 2}, {1, 1, 10}, {1, 1, 1000},
-      {2, 1, 1}, {1, 2, 1}, {2, 2, 2},  {5, 7, 13},
+      // Degenerate case M==0. Vacuous.
+      {0, 1, 1},
+      {0, 5, 7},
+      // Degenerate case N==0. Vacuous.
+      {1, 0, 1},
+      {5, 0, 7},
+      // Degenerate case K==0. Vacuous if flags have ACCUMULATE. Zeroing the
+      // output buffer otherwise.
+      {1, 1, 0},
+      {5, 7, 0},
+      // Non-degenerate cases.
+      {1, 1, 1},
+      {1, 1, 2},
+      {1, 1, 10},
+      {1, 1, 1000},
+      {2, 1, 1},
+      {1, 2, 1},
+      {2, 2, 2},
+      {5, 7, 13},
   };
   for (shape_mnk_t shape : shapes) {
     params.M = shape.m;

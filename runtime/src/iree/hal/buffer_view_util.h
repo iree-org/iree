@@ -141,6 +141,11 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_fprint(
     FILE* file, const iree_hal_buffer_view_t* buffer_view,
     iree_host_size_t max_element_count, iree_allocator_t host_allocator);
 
+// Appends to |builder| a buffer view with contents without a trailing newline.
+IREE_API_EXPORT iree_status_t iree_hal_buffer_view_append_to_builder(
+    iree_hal_buffer_view_t* buffer_view, iree_host_size_t max_element_count,
+    iree_string_builder_t* builder);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

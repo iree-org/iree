@@ -30,10 +30,22 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
 
     The following additive attributes can be set, they add patterns in an 
     unspecified order:
-      - canonicalization: adds all the canonicalization pattenrs of all 
+      - additional_iree_patterns: fancy patterns we shortcut into the system, will
+      need to be sliced out better in the future.
+      - canonicalization: adds all the canonicalization patterns of all
       registered dialects and ops.
       - rank_reducing: adds patterns that results in rank-reducing behavior on
       subset-based operations.
+      - simplify_memref_metadata: adds patterns that simplify the uses of
+      memref.extract_strided_metadata and fold to the underlying indices.
+      - swapping_patterns: adds patterns that swap operations for a better outcome.
+      This is a catch all that can be refined further if/when needed.
+      - swap_padding_elide_conditional: refines the tensor.pad +
+      tensor.extract_slice swapping pattern. This injects static information
+      that guarantees padding is smaller than the window size which guarantees
+      we never see a tile comprised of padding-only.
+      This allows dropping the generation or an annoying internal scf.if but may
+      yield incorrect code in pathological cases.
 
     Return modes:
     =============
@@ -49,8 +61,12 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
   }];
 
   let arguments = (ins PDL_Operation:$target,
+                       UnitAttr:$additional_iree_patterns,
                        UnitAttr:$canonicalization,
-                       UnitAttr:$rank_reducing);
+                       UnitAttr:$rank_reducing,
+                       UnitAttr:$simplify_memref_metadata,
+                       UnitAttr:$swap_padding_elide_conditional,
+                       UnitAttr:$swapping_patterns);
   let results = (outs PDL_Operation:$result);
 
   let assemblyFormat = "$target attr-dict";

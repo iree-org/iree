@@ -11,7 +11,7 @@
 ]>
 hal.executable @matmul_1024x2048x512 {
   hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
-      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, Qualcomm:IntegratedGPU, #spv.resource_limits<
+      spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Qualcomm:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [1024, 1024, 64],
@@ -65,7 +65,7 @@ hal.executable @matmul_1024x2048x512 {
 ]>
 hal.executable @matmul_3136x24x96 {
   hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
-      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, Qualcomm:IntegratedGPU, #spv.resource_limits<
+      spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Qualcomm:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [1024, 1024, 64],
@@ -119,7 +119,7 @@ hal.executable @matmul_3136x24x96 {
 ]>
 hal.executable @matmul_196x64x192 {
   hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
-      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, Qualcomm:IntegratedGPU, #spv.resource_limits<
+      spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Qualcomm:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [1024, 1024, 64],
@@ -173,7 +173,7 @@ hal.executable @matmul_196x64x192 {
 ]>
 hal.executable @matmul_12544x96x16 {
   hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
-      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, Qualcomm:IntegratedGPU, #spv.resource_limits<
+      spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Qualcomm:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [1024, 1024, 64],
@@ -219,7 +219,7 @@ hal.executable @matmul_12544x96x16 {
 ]>
 hal.executable @matmul_49x160x576 {
   hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
-      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, Qualcomm:IntegratedGPU, #spv.resource_limits<
+      spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Qualcomm:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [1024, 1024, 64],
@@ -271,7 +271,7 @@ hal.executable @matmul_49x160x576 {
 ]>
 hal.executable @batch_matmul_4x384x384 {
   hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
-      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, Qualcomm:IntegratedGPU, #spv.resource_limits<
+      spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Qualcomm:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [1024, 1024, 64],
@@ -325,7 +325,7 @@ hal.executable @batch_matmul_4x384x384 {
 ]>
 hal.executable @batch_matmul_4x8x8 {
   hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
-      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, Qualcomm:IntegratedGPU, #spv.resource_limits<
+      spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Qualcomm:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 1024,
         max_compute_workgroup_size = [1024, 1024, 64],

@@ -42,30 +42,6 @@ steps:
     agents:
       - "queue=build"
 
-  - label: ":linux: Build host install"
-    key: "build-host-install"
-    commands:
-      - "git submodule sync && git submodule update --init --jobs 8 --depth 1"
-      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/base@sha256:5d43683c6b50aebe1fca6c85f2012f3b0fa153bf4dd268e8767b619b1891423a ./build_tools/cmake/build_host_tools.sh"
-      - "tar -czvf build-artifacts.tgz build-host/install"
-    artifact_paths: "build-artifacts.tgz"
-    env:
-      IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
-    agents:
-      - "queue=build"
-
-  - label: ":webassembly: Build WebAssembly runtime with Emscripten"
-    depends_on: "build-host-install"
-    commands:
-      - "buildkite-agent artifact download --step build-host-install build-artifacts.tgz ./"
-      - "tar xzf build-artifacts.tgz"
-      - "git submodule update --init --jobs 8 --depth 1"
-      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/emscripten@sha256:afa6aab07d753631c37a935695e69165d8f7598dec249b31d459b046593ccd56 ./build_tools/cmake/build_runtime_emscripten.sh"
-    env:
-      IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
-    agents:
-      - "queue=build"
-
 # Notify rotation on postsubmit failures.
 notify:
   - email: "bdi-build-cop+buildkite@grotations.appspotmail.com"

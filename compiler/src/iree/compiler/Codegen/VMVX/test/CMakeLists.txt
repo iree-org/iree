@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "link_executables.mlir"
     "lower_linalg_microkernels.mlir"
   TOOLS
     FileCheck

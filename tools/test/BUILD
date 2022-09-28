@@ -22,6 +22,7 @@ iree_lit_test_suite(
             "iree-benchmark-module.mlir",
             "iree-run-mlir.mlir",
             "iree-run-module.mlir",
+            "iree-run-module-expected.mlir",
             "multiple_args.mlir",
             "multiple_exported_functions.mlir",
             "null_values.mlir",
@@ -41,6 +42,7 @@ iree_lit_test_suite(
         "//tools:iree-run-module",
         "@llvm-project//lld",
         "@llvm-project//llvm:FileCheck",
+        "@llvm-project//llvm:not",
     ],
 )
 

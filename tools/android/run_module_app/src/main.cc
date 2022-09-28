@@ -16,9 +16,10 @@
 #include "iree/base/status_cc.h"
 #include "iree/modules/hal/module.h"
 #include "iree/tooling/device_util.h"
-#include "iree/tooling/vm_util.h"
+#include "iree/tooling/vm_util_cc.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
+#include "iree/vm/ref_cc.h"
 
 namespace iree {
 namespace {
@@ -153,11 +154,11 @@ Status RunModule(const IreeModuleInvocation& invocation) {
                      iree_allocator_system()),
       "invoking function '%s'", function_name.c_str());
 
-  std::ostringstream oss;
-  IREE_RETURN_IF_ERROR(PrintVariantList(outputs.get(), &oss),
+  std::string result;
+  IREE_RETURN_IF_ERROR(PrintVariantList(outputs.get(), &result),
                        "printing results");
   LOGI("Execution Result:");
-  LOGI("%s", oss.str().c_str());
+  LOGI("%s", result.c_str());
 
   inputs.reset();
   outputs.reset();

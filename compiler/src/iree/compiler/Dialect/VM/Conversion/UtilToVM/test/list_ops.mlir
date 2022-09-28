@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-vm-conversion %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-vm-conversion --iree-vm-target-index-bits=32 %s | FileCheck %s
 
 // CHECK-LABEL: @list_ops
 module @list_ops { module {

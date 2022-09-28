@@ -4,14 +4,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/tooling/vm_util.h"
-
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/module.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 #include "iree/tooling/device_util.h"
+#include "iree/tooling/vm_util_cc.h"
 #include "iree/vm/api.h"
 #include "iree/vm/ref_cc.h"
 
@@ -52,10 +51,9 @@ TEST_F(VmUtilTest, ParsePrintBuffer) {
   IREE_ASSERT_OK(
       ParseToVariantList(allocator_, std::vector<std::string>{buf_string},
                          iree_vm_instance_allocator(instance_), &variant_list));
-  std::stringstream os;
-  IREE_ASSERT_OK(PrintVariantList(variant_list.get(), &os));
-  // TODO(benvanik): add a !hal.buffer printer.
-  EXPECT_EQ(os.str(),
+  std::string result;
+  IREE_ASSERT_OK(PrintVariantList(variant_list.get(), &result));
+  EXPECT_EQ(result,
             std::string("result[0]: hal.buffer\n") + "(no printer)" + "\n");
 }
 
@@ -65,9 +63,9 @@ TEST_F(VmUtilTest, ParsePrintBufferView) {
   IREE_ASSERT_OK(
       ParseToVariantList(allocator_, std::vector<std::string>{buf_string},
                          iree_vm_instance_allocator(instance_), &variant_list));
-  std::stringstream os;
-  IREE_ASSERT_OK(PrintVariantList(variant_list.get(), &os));
-  EXPECT_EQ(os.str(),
+  std::string result;
+  IREE_ASSERT_OK(PrintVariantList(variant_list.get(), &result));
+  EXPECT_EQ(result,
             std::string("result[0]: hal.buffer_view\n") + buf_string + "\n");
 }
 
@@ -77,9 +75,9 @@ TEST_F(VmUtilTest, ParsePrintScalar) {
   IREE_ASSERT_OK(
       ParseToVariantList(allocator_, std::vector<std::string>{input_string},
                          iree_vm_instance_allocator(instance_), &variant_list));
-  std::stringstream os;
-  IREE_ASSERT_OK(PrintVariantList(variant_list.get(), &os));
-  EXPECT_EQ(os.str(), std::string("result[0]: i32=") + input_string + "\n");
+  std::string result;
+  IREE_ASSERT_OK(PrintVariantList(variant_list.get(), &result));
+  EXPECT_EQ(result, std::string("result[0]: i32=") + input_string + "\n");
 }
 
 TEST_F(VmUtilTest, ParsePrintRank0BufferView) {
@@ -88,9 +86,9 @@ TEST_F(VmUtilTest, ParsePrintRank0BufferView) {
   IREE_ASSERT_OK(
       ParseToVariantList(allocator_, std::vector<std::string>{buf_string},
                          iree_vm_instance_allocator(instance_), &variant_list));
-  std::stringstream os;
-  IREE_ASSERT_OK(PrintVariantList(variant_list.get(), &os));
-  EXPECT_EQ(os.str(),
+  std::string result;
+  IREE_ASSERT_OK(PrintVariantList(variant_list.get(), &result));
+  EXPECT_EQ(result,
             std::string("result[0]: hal.buffer_view\n") + buf_string + "\n");
 }
 
@@ -101,11 +99,10 @@ TEST_F(VmUtilTest, ParsePrintMultipleBufferViews) {
   IREE_ASSERT_OK(ParseToVariantList(
       allocator_, std::vector<std::string>{buf_string1, buf_string2},
       iree_vm_instance_allocator(instance_), &variant_list));
-  std::stringstream os;
-  IREE_ASSERT_OK(PrintVariantList(variant_list.get(), &os));
-  EXPECT_EQ(os.str(), std::string("result[0]: hal.buffer_view\n") +
-                          buf_string1 + "\nresult[1]: hal.buffer_view\n" +
-                          buf_string2 + "\n");
+  std::string result;
+  IREE_ASSERT_OK(PrintVariantList(variant_list.get(), &result));
+  EXPECT_EQ(result, std::string("result[0]: hal.buffer_view\n") + buf_string1 +
+                        "\nresult[1]: hal.buffer_view\n" + buf_string2 + "\n");
 }
 
 }  // namespace

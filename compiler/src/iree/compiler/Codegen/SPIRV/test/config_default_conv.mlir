@@ -18,17 +18,17 @@
     #hal.descriptor_set.binding<3, storage_buffer>
   ]>
 ]>
-hal.executable private @conv_pointwise_112x112x32 {
+hal.executable private @nhwc_conv_pointwise_112x112x32 {
   hal.executable.variant public @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
-      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, #spv.resource_limits<
+      spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 16384,
         max_compute_workgroup_invocations = 128,
         max_compute_workgroup_size = [128, 128, 64],
         subgroup_size = 32>>
     }> {
-    hal.executable.export public @conv_pointwise_112x112x32 layout(#pipeline_layout)
+    hal.executable.export public @nhwc_conv_pointwise_112x112x32 layout(#pipeline_layout)
     builtin.module {
-      func.func @conv_pointwise_112x112x32() {
+      func.func @nhwc_conv_pointwise_112x112x32() {
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f32
         %c112 = arith.constant 112 : index
@@ -62,11 +62,56 @@ hal.executable private @conv_pointwise_112x112x32 {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 4, 4, 32], [0, 2, 2, 4], [0, 0, 0, 0, 1, 1, 4]{{\]}}>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 4, 4, 32], [0, 2, 2, 4], [0, 0, 0, 0, 1, 1, 4], [0, 1, 0, 0]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorize>
-//      CHECK: hal.executable.export public @conv_pointwise_112x112x32
+//      CHECK: hal.executable.export public @nhwc_conv_pointwise_112x112x32
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [8 : index, 2 : index, 2 : index]
-//      CHECK: func.func @conv_pointwise_112x112x32()
+//      CHECK: func.func @nhwc_conv_pointwise_112x112x32()
 //      CHECK:   linalg.conv_2d_nhwc_hwcf
+// CHECK-SAME:     lowering_config = #[[CONFIG]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+
+hal.executable private @nchw_conv_2x1280x8x8 {
+  hal.executable.variant public @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+      spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, #spirv.resource_limits<
+        max_compute_shared_memory_size = 16384,
+        max_compute_workgroup_invocations = 128,
+        max_compute_workgroup_size = [128, 128, 64],
+        subgroup_size = 32>>
+    }> {
+    hal.executable.export public @nchw_conv_2x1280x8x8 layout(#pipeline_layout)
+    builtin.module {
+      func.func @nchw_conv_2x1280x8x8() {
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:2x1280x10x10xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:1280x1280x3x3xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readwrite:2x1280x8x8xf32>
+        %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [2, 1280, 10, 10], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:2x1280x10x10xf32> -> tensor<2x1280x10x10xf32>
+        %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [1280, 1280, 3, 3], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:1280x1280x3x3xf32> -> tensor<1280x1280x3x3xf32>
+        %5 = flow.dispatch.tensor.load %2, offsets = [0, 0, 0, 0], sizes = [2, 1280, 8, 8], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readwrite:2x1280x8x8xf32> -> tensor<2x1280x8x8xf32>
+        %6 = linalg.conv_2d_nchw_fchw {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>} ins(%3, %4 : tensor<2x1280x10x10xf32>, tensor<1280x1280x3x3xf32>) outs(%5 : tensor<2x1280x8x8xf32>) -> tensor<2x1280x8x8xf32>
+        flow.dispatch.tensor.store %6, %2, offsets = [0, 0, 0, 0], sizes = [2, 1280, 8, 8], strides = [1, 1, 1, 1] : tensor<2x1280x8x8xf32> -> !flow.dispatch.tensor<readwrite:2x1280x8x8xf32>
+        return
+      }
+    }
+  }
+}
+
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 16, 8, 8], [0, 8, 1, 4], [0, 0, 0, 0, 4, 1, 1], [0, 0, 1, 0]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorize>
+//      CHECK: hal.executable.export public @nchw_conv_2x1280x8x8
+// CHECK-SAME:   translation_info = #[[TRANSLATION]]
+// CHECK-SAME:   workgroup_size = [2 : index, 8 : index, 2 : index]
+//      CHECK: func.func @nchw_conv_2x1280x8x8()
+//      CHECK:   linalg.conv_2d_nchw_fchw
 // CHECK-SAME:     lowering_config = #[[CONFIG]]

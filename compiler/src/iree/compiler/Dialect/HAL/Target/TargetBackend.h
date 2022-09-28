@@ -168,47 +168,55 @@ class TargetBackend {
   //   }
   virtual void buildTranslationPassPipeline(OpPassManager &passManager) = 0;
 
-  // Links compatible executables within the provided |moduleOp| together into
-  // zero or more new linked executables. Implementations should move
-  // executable contents (including interfaces, entry points, and functions)
-  // into new executables and update any relevant references as they do so.
+  // Inserts passes used to link `hal.executable.variant` ops together.
+  // The pass manager will be nested on the parent module of `hal.executable`
+  // ops and the pipeline will need to find relevant variant ops itself.
   //
-  // Which executables to link together and how many new executables to produce
-  // are left to implementations to determine. For example, an implementation
-  // may choose to link all executables (even with different interfaces) into
-  // a single combined executable, or it could choose to limit the number linked
-  // together in order to shard binary size across multiple executables.
+  // Implementations should clone executable contents (including interfaces,
+  // entry points, and functions) into new executables and update any relevant
+  // references as they do so.
   //
-  // The input |moduleOp| may contain executables containing multiple targets,
-  // so implementations should check target backend filters against their own
-  // `name()` prior to modifying them.
+  // Which executable variants to link together and how many new executables to
+  // produce are left to implementations to determine. For example, an
+  // implementation may choose to link all executables (even with different
+  // interfaces) into a single combined executable, or it could choose to limit
+  // the number linked together in order to shard binary size across multiple
+  // executables.
   //
-  // Sample output structure:
-  //   hal.executable @linked_executable {
-  //     hal.interface @io_0 { ... }
-  //     hal.interface @io_1 { ... }
-  //     hal.executable.variant @target, target="target-backend" {
-  //       hal.executable.export @main_dispatch_0 attributes { ... }
-  //       hal.executable.export @main_dispatch_1 attributes { ... }
-  //       hal.executable.export @main_dispatch_2 attributes { ... }
-  //       module {
-  //         func.func @main_0(...) { ... }
-  //         func.func @main_1(...) { ... }
-  //         func.func @main_2(...) { ... }
-  //       }
-  //     }
-  //   }
-  //   // Other targets within executables are not modified
-  //   hal.executable @main_dispatch_0 {
-  //     hal.interface @io { ... }
-  //     hal.executable.variant @other, target="other" {
-  //       hal.executable.export @main_dispatch_0 attributes { ... }
+  // For example, as input:
+  //   hal.executable @some_executable_0 {
+  //     hal.interface...
+  //     hal.executable.variant @target_a, target="target-backend" {
   //       module { ... }
   //     }
   //   }
-  virtual LogicalResult linkExecutables(mlir::ModuleOp moduleOp) {
-    return success();
-  }
+  //   hal.executable @some_executable_1 {
+  //     hal.interface...
+  //     hal.executable.variant @target_b, target="target-backend" {
+  //       module { ... }
+  //     }
+  //     hal.executable.variant @target_c, target="other-backend" {
+  //       module { ... }
+  //     }
+  //   }
+  //
+  // As output:
+  //   hal.executable @some_executable_1 {  // untouched, not relevant
+  //     hal.interface...
+  //     hal.executable.variant @target_c, target="other-backend" {
+  //       module { ... }
+  //     }
+  //   }
+  //   hal.executable @some_executable_linked {
+  //     hal.interface...
+  //     hal.executable.variant @target_a, target="target-backend" {
+  //       module { ... }
+  //     }
+  //     hal.executable.variant @target_b, target="target-backend" {
+  //       module { ... }
+  //     }
+  //   }
+  virtual void buildLinkingPassPipeline(OpPassManager &passManager) {}
 
   struct SerializationOptions {
     // Debug level for serialization (0-3).
@@ -236,17 +244,6 @@ class TargetBackend {
     assert(false && "unimplemented serializeExecutable");
     return failure();
   }
-
- protected:
-  // Links all executables for the current target found in |moduleOp| into
-  // |linkedExecutableOp|. Functions will be cloned into |linkedModuleOp|.
-  LogicalResult linkExecutablesInto(
-      mlir::ModuleOp moduleOp,
-      ArrayRef<IREE::HAL::ExecutableOp> sourceExecutableOps,
-      IREE::HAL::ExecutableOp linkedExecutableOp,
-      IREE::HAL::ExecutableVariantOp linkedTargetOp,
-      std::function<Operation *(mlir::ModuleOp moduleOp)> getInnerModuleFn,
-      OpBuilder &builder);
 };
 
 // Dumps binary data to a file formed by joining the given path components:

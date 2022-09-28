@@ -45,10 +45,11 @@ LogicalResult setAdrenoCodeGenConfig(const spirv::TargetEnv &targetEnv,
       .Case<linalg::BatchMatmulOp, linalg::MatmulOp>([subgroupSize](auto op) {
         return setAdrenoMatmulConfig(op, subgroupSize);
       })
-      .Case<linalg::Conv2DNhwcHwcfOp>([subgroupSize](auto op) {
-        return setConvOpConfig(op, subgroupSize,
-                               /*bestTilingFactor=*/32);
-      })
+      .Case<linalg::Conv2DNchwFchwOp, linalg::Conv2DNhwcHwcfOp>(
+          [subgroupSize](auto op) {
+            return setConvOpConfig(op, subgroupSize,
+                                   /*bestTilingFactor=*/32);
+          })
       .Case<linalg::DepthwiseConv2DNhwcHwcOp>([subgroupSize](auto op) {
         return setConvOpConfig(op, subgroupSize,
                                /*bestTilingFactor=*/16);

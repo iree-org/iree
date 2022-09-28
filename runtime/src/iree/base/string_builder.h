@@ -106,6 +106,15 @@ IREE_API_EXPORT IREE_MUST_USE_RESULT char* iree_string_builder_take_storage(
 IREE_API_EXPORT iree_status_t iree_string_builder_reserve(
     iree_string_builder_t* builder, iree_host_size_t minimum_capacity);
 
+// Reserves storage for |count| characters (including NUL) and returns a mutable
+// pointer in |out_head| for the caller to write the characters.
+// The pointer is only valid so long as the string builder is initialized and
+// unmodified. No NUL terminator is added by this call.
+// |out_head| will be NULL if the string builder is operating in size
+// calculation mode.
+IREE_API_EXPORT iree_status_t iree_string_builder_append_inline(
+    iree_string_builder_t* builder, iree_host_size_t count, char** out_head);
+
 // Appends a string to the builder.
 IREE_API_EXPORT iree_status_t iree_string_builder_append_string(
     iree_string_builder_t* builder, iree_string_view_t value);

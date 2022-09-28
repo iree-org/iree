@@ -166,7 +166,7 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
   if (interfaceOp) {
     llvm::SmallDenseSet<unsigned> pLoopsSet;
     for (auto iteratorType : llvm::enumerate(interfaceOp.getIteratorTypes())) {
-      if (iteratorType.value() == getParallelIteratorTypeName()) {
+      if (iteratorType.value() == utils::IteratorType::parallel) {
         pLoopsSet.insert(iteratorType.index());
       }
     }
@@ -682,6 +682,12 @@ void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager) {
     passManager.printAsTextualPipeline(llvm::dbgs());
     llvm::dbgs() << "\n";
   });
+}
+
+// NOTE: this runs on the top-level program module containing all
+// hal.executable ops.
+void buildLLVMCPULinkingPassPipeline(OpPassManager &passManager) {
+  passManager.addPass(createLLVMCPULinkExecutablesPass());
 }
 
 }  // namespace iree_compiler

@@ -117,12 +117,20 @@ void addGPUVectorizationPassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUVectorizationPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createOptimizeVectorTransferPass());
 
   // tensor to memref
   addBufferizePasses(nestedModulePM);
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUDistribute());
+
+  // Post bufferization optimizations.
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLoopInvariantCodeMotionPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      memref::createFoldMemRefAliasOpsPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createOptimizeVectorTransferPass());
 }
 
 void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
@@ -188,16 +196,9 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
   if (pipelineDepth > 1)
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMGPUMultiBuffering(pipelineDepth));
-  nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createGPUDistributeSharedMemoryCopy());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
-  if (!llvmgpuUseMMASync) {
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createLLVMGPUReduceSharedMemoryBankConflicts());
-  }
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -212,6 +213,17 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());
+
+  // Distribute shared memory copies.
+  nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createGPUDistributeSharedMemoryCopy());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+  if (!llvmgpuUseMMASync) {
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLLVMGPUReduceSharedMemoryBankConflicts());
+  }
 
   // Vector -> MMA ops
   nestedModulePM.addNestedPass<func::FuncOp>(

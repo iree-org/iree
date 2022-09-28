@@ -124,14 +124,6 @@ def RemoveSingleIterationLoop :
   let constructor = "mlir::iree_compiler::createRemoveSingleIterationLoopPass()";
 }
 
-// TODO: Rename argument to be fully qualified.
-def LinalgToVectorVectorizeConv :
-    Pass<"iree-codegen-vectorize-linalg-conv", "func::FuncOp"> {
-  let summary = "Vectorize a very specific form of linalg.conv";
-  let constructor =
-      "mlir::iree_compiler::createLinalgToVectorVectorizeConvPass()";
-}
-
 def TensorToVectorVectorizePad :
     Pass<"iree-codegen-vectorize-tensor-pad", "func::FuncOp"> {
   let summary = "Vectorize a very specific form of tensor.pad with "
@@ -307,6 +299,12 @@ def VectorContractCustomKernels :
   ];
 }
 
+def LLVMCPULinkExecutables :
+    Pass<"iree-llvmcpu-link-executables", "mlir::ModuleOp"> {
+  let summary = "Links LLVMCPU HAL executables within the top-level program module.";
+  let constructor = "mlir::iree_compiler::createLLVMCPULinkExecutablesPass()";
+}
+
 //------------------------------------------------------------------------------
 // LLVMGPU
 //------------------------------------------------------------------------------
@@ -476,6 +474,24 @@ def VMVXLowerLinalgMicrokernels :
            /*default=*/"false",
            "Warns on any unconverted linalg ops which remain live">
   ];
+}
+
+def VMVXLinkExecutables :
+    Pass<"iree-vmvx-link-executables", "mlir::ModuleOp"> {
+  let summary = "Links VMVX HAL executables within the top-level program module.";
+  let constructor = "mlir::iree_compiler::createVMVXLinkExecutablesPass()";
+}
+
+//------------------------------------------------------------------------------
+// WGSL Passes
+//------------------------------------------------------------------------------
+
+def WGSLReplacePushConstants :
+    Pass<"iree-wgsl-replace-push-constants", "func::FuncOp"> {
+  let summary =
+      "Replaces push constant loads with binding loads for when using "
+      "WGSL without push constant support";
+  let constructor = "mlir::iree_compiler::createWGSLReplacePushConstantsPass()";
 }
 
 //------------------------------------------------------------------------------

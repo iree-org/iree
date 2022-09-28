@@ -22,7 +22,7 @@ void registerCodegenPasses() {
   registerPasses();
   registerSandboxPasses();
 
-  static PassPipelineRegistration<> LinalgLLVMVPipeline(
+  static PassPipelineRegistration<> LinalgLLVMPipeline(
       "iree-codegen-linalg-to-llvm-pipeline",
       "Runs the progressive lowering pipeline from Linalg to LLVM",
       [](OpPassManager &passManager) {
@@ -48,6 +48,20 @@ void registerCodegenPasses() {
       "Runs the progressive lowering pipeline from linalg to SPIR-V",
       [](OpPassManager &passManager) {
         buildSPIRVCodegenPassPipeline(passManager, /*enableFastMath=*/false);
+      });
+
+  static PassPipelineRegistration<> LLVMCPULinkingPipeline(
+      "iree-codegen-llvmcpu-linking-pipeline",
+      "Runs the LLVMCPU HAL executable linking pipeline",
+      [](OpPassManager &passManager) {
+        buildLLVMCPULinkingPassPipeline(passManager);
+      });
+
+  static PassPipelineRegistration<> VMVXLinkingPipeline(
+      "iree-codegen-vmvx-linking-pipeline",
+      "Runs the VMVX HAL executable linking pipeline",
+      [](OpPassManager &passManager) {
+        buildVMVXLinkingPassPipeline(passManager);
       });
 }
 

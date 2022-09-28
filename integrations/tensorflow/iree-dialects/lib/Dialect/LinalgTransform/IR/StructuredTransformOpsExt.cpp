@@ -347,6 +347,7 @@ static linalg::LinalgOp findSingleLinalgOpDefiningAll(ValueRange range) {
           DBGS() << "different source linalg ops for replacing one op: \n"
                  << sourceOp << "\n"
                  << currentSourceOp << "\n");
+      return nullptr;
     }
     LLVM_DEBUG(DBGS() << "replacing linalg op with unknown non-linalg op:\n"
                       << *value.getDefiningOp() << "\n");
@@ -366,6 +367,7 @@ static scf::ForOp findSingleForOpDefiningAll(ValueRange range) {
       }
       LLVM_DEBUG(
           DBGS() << "different source scf.for ops when replacing one op\n");
+      return nullptr;
     }
 
     LLVM_DEBUG(
@@ -374,6 +376,26 @@ static scf::ForOp findSingleForOpDefiningAll(ValueRange range) {
     return nullptr;
   }
   return forOp;
+}
+
+/// Find the op that defines all values in the range.
+static Operation *findSingleOpDefiningAll(ValueRange range) {
+  Operation *op = nullptr;
+  for (Value value : range) {
+    if (auto currentSourceOp = value.getDefiningOp()) {
+      if (!op || op == currentSourceOp) {
+        op = currentSourceOp;
+        continue;
+      }
+      LLVM_DEBUG(DBGS() << "different source op when replacing one op\n");
+      return nullptr;
+    }
+
+    LLVM_DEBUG(
+        DBGS() << "could not find a source op when replacing another op\n");
+    return nullptr;
+  }
+  return op;
 }
 
 // Find a single op that defines all values in the range, optionally
@@ -387,7 +409,9 @@ static Operation *findSingleDefiningOp(Operation *replacedOp,
       .Case<scf::ForOp>([&](scf::ForOp) -> Operation * {
         return findSingleForOpDefiningAll(range);
       })
-      .Default([](Operation *) -> Operation * { return nullptr; });
+      .Default([&](Operation *) -> Operation * {
+        return findSingleOpDefiningAll(range);
+      });
 }
 
 void mlir::TrackingListener::notifyOperationReplaced(Operation *op,
@@ -551,9 +575,16 @@ DiagnosedSilenceableFailure transform_ext::CanonicalizedSequenceOp::apply(
   for (Operation &transform : getBodyBlock()->without_terminator()) {
     DiagnosedSilenceableFailure result =
         state.applyTransform(cast<transform::TransformOpInterface>(transform));
-    if (!result.succeeded()) {
+    if (result.isDefiniteFailure()) {
       LLVM_DEBUG(DBGS() << "failed: " << transform << "\n");
       return result;
+    }
+    if (result.isSilenceableFailure()) {
+      LLVM_DEBUG(DBGS() << "failed silently: " << transform << "\n");
+      if (getFailurePropagationMode() ==
+          transform::FailurePropagationMode::Propagate)
+        return result;
+      (void)result.silence();
     }
     LLVM_DEBUG(DBGS() << "successfully performed: " << transform << "\n");
 
@@ -807,7 +838,7 @@ transform_ext::LowerToLLVMOp::apply(mlir::transform::TransformResults &result,
         .enableX86Vector(getEnableX86vector())));
   // clang-format on
   pm.addNestedPass<func::FuncOp>(createConvertMathToLLVMPass());
-  pm.addPass(createMemRefToLLVMPass());
+  pm.addPass(createMemRefToLLVMConversionPass());
   if (getEnableAsync())
     pm.addPass(createConvertAsyncToLLVMPass());
   pm.addPass(createConvertFuncToLLVMPass());

@@ -6,6 +6,8 @@
 
 #include "iree/builtins/ukernel/mmt4d.h"
 
+#include <stdbool.h>
+
 #include "iree/builtins/ukernel/arch/mmt4d_select_tile_arch.h"
 #include "iree/builtins/ukernel/mmt4d_select_tile_generic.h"
 
@@ -91,9 +93,73 @@ static void iree_ukernel_mmt4d_using_tile_func(
   }
 }
 
+// A memset implementation that we can use here, as we can't #include <string.h>
+// as that brings in <stdint.h>. Special-cased for byte value 0.
+void iree_ukernel_memset_zero(void* buf, iree_ukernel_ssize_t n) {
+  // No need for memset builtins: this naive loop is already transformed into a
+  // memset by both clang and gcc on ARM64. As __builtin_memset_inline requires
+  // a compile-time-constant size, it would require writing more complex code,
+  // which could actually prevent the optimization matching it as a single
+  // memset!
+  for (iree_ukernel_ssize_t i = 0; i < n; ++i) ((char*)buf)[i] = 0;
+}
+
+// Helper for early-return path when K==0 and we just need to clear the output.
+static void iree_ukernel_mmt4d_zero_out(
+    const iree_ukernel_mmt4d_params_t* params) {
+  iree_ukernel_ssize_t contiguous_size =
+      params->N * params->M0 * params->N0
+      << iree_ukernel_mmt4d_out_elem_size_log2(params->type);
+  iree_ukernel_ssize_t stride =
+      params->out_stride << iree_ukernel_mmt4d_out_elem_size_log2(params->type);
+  char* out_ptr = params->out_buffer;
+  for (iree_ukernel_ssize_t i = 0; i < params->M; ++i) {
+    iree_ukernel_memset_zero(out_ptr, contiguous_size);
+    out_ptr += stride;
+  }
+}
+
+// Early-return code paths, including trivial or near-trivial cases (when one
+// of the dimensions is 0) and in the future, hardware ports that specialize
+// the entire loop nest.
+// The value |true| is written to the out-param |*done| if an early-return path
+// was taken and the mmt4d work is already done.
+static iree_ukernel_mmt4d_status_t iree_ukernel_mmt4d_early(
+    const iree_ukernel_mmt4d_params_t* params, bool* done) {
+  // Trivial cases
+  if (params->M == 0 || params->N == 0) {
+    *done = true;
+    return iree_ukernel_mmt4d_status_ok;
+  }
+  if (params->K == 0) {
+    if (params->flags & IREE_VMVX_MATMUL_FLAG_ACCUMULATE) {
+      // Nothing to do!
+    } else {
+      iree_ukernel_mmt4d_zero_out(params);
+    }
+    *done = true;
+    return iree_ukernel_mmt4d_status_ok;
+  }
+
+  // Targets that want to specialize the entire loop nest can do so here.
+
+  return iree_ukernel_mmt4d_status_ok;
+}
+
 IREE_UKERNEL_EXPORT iree_ukernel_mmt4d_status_t
 iree_ukernel_mmt4d(const iree_ukernel_mmt4d_params_t* params) {
+  // Validate params.
   IREE_UKERNEL_MMT4D_RETURN_IF_ERROR(iree_ukernel_mmt4d_validate(params));
+
+  // Maybe handle this mmt4d "early", without needing to select a tile_func.
+  // Typical cases include trivial cases (e.g. when params->K == 0) and hardware
+  // targets that want to handle the entire loop nest in target-specific code.
+  bool done = false;
+  IREE_UKERNEL_MMT4D_RETURN_IF_ERROR(iree_ukernel_mmt4d_early(params, &done));
+  if (done) return iree_ukernel_mmt4d_status_ok;
+
+  // Select a target-specific tile_func (inner loop on K, computing one M0xN0
+  // tile) and use that with generic outer loops.
   iree_ukernel_mmt4d_tile_func_t tile_func;
   IREE_UKERNEL_MMT4D_RETURN_IF_ERROR(
       iree_ukernel_mmt4d_select_tile_func(params, &tile_func));

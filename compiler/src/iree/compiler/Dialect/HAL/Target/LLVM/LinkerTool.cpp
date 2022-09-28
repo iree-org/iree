@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LinkerTool.h"
 
+#include "iree/compiler/Utils/StringUtils.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Process.h"
 
@@ -16,30 +17,14 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-// Sanitizes potentially user provided portions of a file name by replacing
-// all but a small set of alpha numeric and safe punctuation characters with
-// '_'. This is intended for components of temporary files that are uniqued
-// independently, where the input is meant to aid debugability but does not
-// need to be retained verbatim.
-static void sanitizeFilePart(llvm::SmallVectorImpl<char> &part) {
-  for (char &c : part) {
-    if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-        (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.')
-      continue;
-    c = '_';
-  }
-}
-
 // static
 Artifact Artifact::createTemporary(StringRef prefix, StringRef suffix) {
-  llvm::SmallString<8> prefixCopy(prefix);
-  llvm::SmallString<8> suffixCopy(suffix);
-  sanitizeFilePart(prefixCopy);
-  sanitizeFilePart(suffixCopy);
+  auto sanitizedPrefix = sanitizeFileName(prefix);
+  auto sanitizedSuffix = sanitizeFileName(suffix);
 
   llvm::SmallString<32> filePath;
   if (std::error_code error = llvm::sys::fs::createTemporaryFile(
-          prefixCopy, suffixCopy, filePath)) {
+          sanitizedPrefix, sanitizedSuffix, filePath)) {
     llvm::errs() << "failed to generate temporary file: " << error.message();
     return {};
   }

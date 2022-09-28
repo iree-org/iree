@@ -13,6 +13,67 @@ package(
 )
 
 cc_library(
+    name = "buffer_view_matchers",
+    srcs = ["buffer_view_matchers.c"],
+    hdrs = ["buffer_view_matchers.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "buffer_view_matchers_test",
+    srcs = ["buffer_view_matchers_test.cc"],
+    deps = [
+        ":buffer_view_matchers",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/base/internal:span",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "comparison",
+    srcs = ["comparison.cc"],
+    hdrs = ["comparison.h"],
+    deps = [
+        ":buffer_view_matchers",
+        ":vm_util",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:cc",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/base/internal:flags",
+        "//runtime/src/iree/base/internal:span",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/modules/hal",
+        "//runtime/src/iree/vm",
+        "//runtime/src/iree/vm:cc",
+    ],
+)
+
+cc_test(
+    name = "comparison_test",
+    srcs = ["comparison_test.cc"],
+    deps = [
+        ":comparison",
+        ":vm_util_cc",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/modules/hal",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+        "//runtime/src/iree/vm",
+        "//runtime/src/iree/vm:cc",
+    ],
+)
+
+cc_library(
     name = "context_util",
     srcs = ["context_util.c"],
     hdrs = ["context_util.h"],
@@ -75,18 +136,29 @@ iree_runtime_cc_test(
 # TODO(benvanik): fold these into iree/runtime and use that instead.
 cc_library(
     name = "vm_util",
-    srcs = ["vm_util.cc"],
+    srcs = ["vm_util.c"],
     hdrs = ["vm_util.h"],
     deps = [
         ":numpy_io",
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:cc",
         "//runtime/src/iree/base:tracing",
-        "//runtime/src/iree/base/internal:span",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/modules/hal",
         "//runtime/src/iree/vm",
         "//runtime/src/iree/vm:bytecode_module",
+    ],
+)
+
+cc_library(
+    name = "vm_util_cc",
+    srcs = ["vm_util_cc.cc"],
+    hdrs = ["vm_util_cc.h"],
+    deps = [
+        ":vm_util",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base:cc",
+        "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/base/internal:span",
         "//runtime/src/iree/vm:cc",
     ],
 )
@@ -96,7 +168,7 @@ cc_test(
     srcs = ["vm_util_test.cc"],
     deps = [
         ":device_util",
-        ":vm_util",
+        ":vm_util_cc",
         "//runtime/src/iree/base",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/modules/hal",

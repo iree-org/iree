@@ -52,7 +52,8 @@ LogicalResult setMaliCodeGenConfig(const spirv::TargetEnv &targetEnv,
       .Case<linalg::BatchMatmulOp, linalg::MatmulOp>([subgroupSize](auto op) {
         return setMaliMatmulConfig(op, subgroupSize);
       })
-      .Case<linalg::Conv2DNhwcHwcfOp>([subgroupSize](auto op) {
+      .Case<linalg::Conv2DNchwFchwOp, linalg::Conv2DNhwcHwcfOp>([subgroupSize](
+                                                                    auto op) {
         bool hasPaddedInput =
             op.image().template getDefiningOp<tensor::PadOp>();
         int bestTilingFactor = hasPaddedInput ? 8 : 16;

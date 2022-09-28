@@ -295,7 +295,7 @@ struct ScatterUpdateConversion : public OpConversionPattern<mhlo::ScatterOp> {
         /*outputs=*/adaptor.operands()[0], indexingMaps,
         mhlo::getNParallelLoopsAttrs(nloops),
         [](OpBuilder &b, Location loc, ValueRange args) {},
-        mhlo::pruneAttributeList(op));
+        linalg::getPrunedAttributeList(op));
 
     // Transform the scatter update computation region
     //   update = a bunch of computation

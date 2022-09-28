@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-hal-link-executables %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-vmvx-link-executables %s | FileCheck %s
 
 #vmvx_target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb">
 #pipeline_layout = #hal.pipeline.layout<push_constants = 1, sets = [
@@ -91,7 +91,7 @@ util.initializer {
 // CHECK-NOT: hal.executable private @dispatch_0
 // CHECK-NOT: hal.executable private @dispatch_1
 // CHECK-NOT: hal.executable private @dispatch_2
-// CHECK:       hal.executable private @vmvx_linked {
+// CHECK:       hal.executable private @link_executables_linked_vmvx {
 // CHECK-NEXT:    hal.executable.variant public @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
 // CHECK-NEXT:      hal.executable.export public @dispatch_0 ordinal(0)
 // CHECK-NEXT:      hal.executable.export public @dispatch_1 ordinal(1)
@@ -116,20 +116,20 @@ util.initializer {
 // CHECK-NEXT:  }
 //
 // CHECK:       func.func @basic_linking()
-// CHECK:           testing.func.a = @vmvx_linked
-// CHECK-SAME:      testing.func.b = @vmvx_linked::@vmvx_bytecode_fb
-// CHECK-SAME:      testing.func.c = @vmvx_linked::@vmvx_bytecode_fb::@dispatch_0
-// CHECK:           testing.op.a = @vmvx_linked
-// CHECK-SAME:      testing.op.b = @vmvx_linked::@vmvx_bytecode_fb
-// CHECK-SAME:      testing.op.c = @vmvx_linked::@vmvx_bytecode_fb::@dispatch_0
-// CHECK:         hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@vmvx_linked::@vmvx_bytecode_fb::@dispatch_0) workgroups([%c1, %c1, %c1])
-// CHECK-NEXT:    hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@vmvx_linked::@vmvx_bytecode_fb::@dispatch_1) workgroups([%c1, %c1, %c1])
-// CHECK-NEXT:    hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@vmvx_linked::@vmvx_bytecode_fb::@dispatch_2) workgroups([%c1, %c1, %c1])
+// CHECK:           testing.func.a = @link_executables_linked_vmvx
+// CHECK-SAME:      testing.func.b = @link_executables_linked_vmvx::@vmvx_bytecode_fb
+// CHECK-SAME:      testing.func.c = @link_executables_linked_vmvx::@vmvx_bytecode_fb::@dispatch_0
+// CHECK:           testing.op.a = @link_executables_linked_vmvx
+// CHECK-SAME:      testing.op.b = @link_executables_linked_vmvx::@vmvx_bytecode_fb
+// CHECK-SAME:      testing.op.c = @link_executables_linked_vmvx::@vmvx_bytecode_fb::@dispatch_0
+// CHECK:         hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@link_executables_linked_vmvx::@vmvx_bytecode_fb::@dispatch_0) workgroups([%c1, %c1, %c1])
+// CHECK-NEXT:    hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@link_executables_linked_vmvx::@vmvx_bytecode_fb::@dispatch_1) workgroups([%c1, %c1, %c1])
+// CHECK-NEXT:    hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@link_executables_linked_vmvx::@vmvx_bytecode_fb::@dispatch_2) workgroups([%c1, %c1, %c1])
 //
 // CHECK:       util.initializer
-// CHECK:         hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@vmvx_linked::@vmvx_bytecode_fb::@dispatch_0) workgroups([%c1, %c1, %c1])
-// CHECK-NEXT:    hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@vmvx_linked::@vmvx_bytecode_fb::@dispatch_1) workgroups([%c1, %c1, %c1])
-// CHECK-NEXT:    hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@vmvx_linked::@vmvx_bytecode_fb::@dispatch_2) workgroups([%c1, %c1, %c1])
+// CHECK:         hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@link_executables_linked_vmvx::@vmvx_bytecode_fb::@dispatch_0) workgroups([%c1, %c1, %c1])
+// CHECK-NEXT:    hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@link_executables_linked_vmvx::@vmvx_bytecode_fb::@dispatch_1) workgroups([%c1, %c1, %c1])
+// CHECK-NEXT:    hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@link_executables_linked_vmvx::@vmvx_bytecode_fb::@dispatch_2) workgroups([%c1, %c1, %c1])
 
 // -----
 
@@ -207,7 +207,7 @@ hal.executable private @dispatch_1 {
 //
 // CHECK-NOT: hal.executable private @dispatch_0
 // CHECK-NOT: hal.executable private @dispatch_1
-// CHECK:       hal.executable private @vmvx_linked {
+// CHECK:       hal.executable private @link_executables_linked_vmvx {
 // CHECK:       hal.executable.variant public @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
 // CHECK:           module {
 // CHECK-NEXT:        vm.module public @linked_module {

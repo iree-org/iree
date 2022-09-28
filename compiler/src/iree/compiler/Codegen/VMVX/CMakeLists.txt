@@ -15,6 +15,8 @@ iree_cc_library(
     VMVX
   SRCS
     "LowerLinalgMicrokernels.cpp"
+    "Passes.cpp"
+    "VMVXLinkExecutables.cpp"
   DEPS
     LLVMSupport
     MLIRArithmeticDialect
@@ -27,9 +29,12 @@ iree_cc_library(
     MLIRTransforms
     iree::builtins::ukernel
     iree::compiler::Codegen::PassHeaders
+    iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Util::IR
+    iree::compiler::Dialect::VM::IR
     iree::compiler::Dialect::VMVX::IR
     iree::compiler::Dialect::VMVX::IR::VMVXDialect
+    iree::compiler::Utils
   PUBLIC
 )
 

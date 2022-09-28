@@ -29,8 +29,10 @@ struct LLVMGPUMultiBufferingPass
     // Collect all the alloc operations.
     funcOp.walk([&](memref::AllocOp allocOp) {
       // Skip allocations not used in a loop.
-      auto loop = allocOp->getUsers().begin()->getParentOfType<scf::ForOp>();
-      if (!loop) return WalkResult::advance();
+      for (Operation* user : allocOp->getUsers()) {
+        auto loop = user->getParentOfType<scf::ForOp>();
+        if (!loop) return WalkResult::advance();
+      }
       allocs.push_back(allocOp);
       return WalkResult::advance();
     });

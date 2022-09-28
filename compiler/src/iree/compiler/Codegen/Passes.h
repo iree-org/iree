@@ -97,10 +97,6 @@ createRemoveSingleIterationLoopPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createConvertToDestinationPassingStylePass();
 
-/// Creates a pass to vectorize a very specific form of linalg.conv ops.
-std::unique_ptr<OperationPass<func::FuncOp>>
-createLinalgToVectorVectorizeConvPass();
-
 /// Creates a pass to vectorize a very specific form of tensor.pad ops with
 /// control flows.
 std::unique_ptr<OperationPass<func::FuncOp>> createVectorizePadPass();
@@ -315,6 +311,17 @@ void addCPUAArchDoubleTilingExpertPassPipeline(OpPassManager &passManager);
 /// module within the IREE::HAL::ExecutableOp.
 void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager);
 
+//----------------------------------------------------------------------------//
+// LLVMCPU Linking Passes and Pipelines
+//----------------------------------------------------------------------------//
+
+/// Links LLVMCPU HAL executables within the top-level program module.
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createLLVMCPULinkExecutablesPass();
+
+/// Populates passes needed to link HAL executables across LLVMCPU targets.
+void buildLLVMCPULinkingPassPipeline(OpPassManager &passManager);
+
 //------------------------------------------------------------------------------
 // LLVMGPU
 //------------------------------------------------------------------------------
@@ -503,6 +510,25 @@ void buildSPIRVCodegenPassPipeline(OpPassManager &pm, bool enableFastMath);
 // Lowers high level library calls from named ops and generics. This operates
 // at the bufferized linalg level.
 std::unique_ptr<Pass> createVMVXLowerLinalgMicrokernelsPass();
+
+//----------------------------------------------------------------------------//
+// VMVX Linking Passes and Pipelines
+//----------------------------------------------------------------------------//
+
+/// Links VMVX HAL executables within the top-level program module.
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createVMVXLinkExecutablesPass();
+
+/// Populates passes needed to link HAL executables across VMVX targets.
+void buildVMVXLinkingPassPipeline(OpPassManager &passManager);
+
+//------------------------------------------------------------------------------
+// WGSL passes
+//------------------------------------------------------------------------------
+
+// Removes push constants by replacing hal.interface.constant.loads with
+// hal.interface.binding.subspan + flow.dispatch.tensor.load.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createWGSLReplacePushConstantsPass();
 
 //------------------------------------------------------------------------------
 // Test passes

@@ -56,12 +56,13 @@ LogicalResult setAMDCodeGenConfig(const spirv::TargetEnv &targetEnv,
       .Case<linalg::BatchMatmulOp, linalg::MatmulOp>([subgroupSize](auto op) {
         return setAMDMatmulConfig(op, subgroupSize);
       })
-      .Case<linalg::Conv2DNhwcHwcfOp>([subgroupSize](auto op) {
-        bool hasPaddedInput =
-            op.image().template getDefiningOp<tensor::PadOp>();
-        int bestTilingFactor = hasPaddedInput ? 16 : 32;
-        return setConvOpConfig(op, subgroupSize, bestTilingFactor);
-      })
+      .Case<linalg::Conv2DNchwFchwOp, linalg::Conv2DNhwcHwcfOp>(
+          [subgroupSize](auto op) {
+            bool hasPaddedInput =
+                op.image().template getDefiningOp<tensor::PadOp>();
+            int bestTilingFactor = hasPaddedInput ? 16 : 32;
+            return setConvOpConfig(op, subgroupSize, bestTilingFactor);
+          })
       .Case<linalg::DepthwiseConv2DNhwcHwcOp>([subgroupSize](auto op) {
         bool hasPaddedInput =
             op.image().template getDefiningOp<tensor::PadOp>();

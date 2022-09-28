@@ -19,13 +19,13 @@
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LinkerTool.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/StaticLibraryGenerator.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
+#include "iree/compiler/Utils/ModuleUtils.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Linker/Linker.h"
-#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/TargetSelect.h"
 #include "mlir/Dialect/ArmNeon/ArmNeonDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -44,29 +44,6 @@ namespace HAL {
 
 static constexpr char kQueryFunctionName[] =
     "iree_hal_executable_library_query";
-
-static llvm::Optional<FileLineColLoc> findFirstFileLoc(Location baseLoc) {
-  if (auto loc = baseLoc.dyn_cast<FusedLoc>()) {
-    for (auto &childLoc : loc.getLocations()) {
-      auto childResult = findFirstFileLoc(childLoc);
-      if (childResult) return childResult;
-    }
-  } else if (auto loc = baseLoc.dyn_cast<FileLineColLoc>()) {
-    return loc;
-  }
-  return llvm::None;
-}
-
-static std::string guessModuleName(mlir::ModuleOp moduleOp) {
-  std::string moduleName = moduleOp.getName().value_or("").str();
-  if (!moduleName.empty()) return moduleName;
-  auto loc = findFirstFileLoc(moduleOp.getLoc());
-  if (loc.has_value()) {
-    return llvm::sys::path::stem(loc.value().getFilename()).str();
-  } else {
-    return "llvm_module";
-  }
-}
 
 // Appends the |debugDatabase| to the end of |baseFile| and writes the footer
 // so the runtime can find it.
@@ -180,39 +157,8 @@ class LLVMCPUTargetBackend final : public TargetBackend {
     buildLLVMCPUCodegenPassPipeline(passManager);
   }
 
-  LogicalResult linkExecutables(mlir::ModuleOp moduleOp) override {
-    OpBuilder builder = OpBuilder::atBlockBegin(moduleOp.getBody());
-
-    auto sourceExecutableOps =
-        llvm::to_vector<8>(moduleOp.getOps<IREE::HAL::ExecutableOp>());
-    if (sourceExecutableOps.size() <= 1) return success();
-
-    // TODO(benvanik): rework linking to support multiple formats.
-    auto sharedTargetAttr = getExecutableTarget(builder.getContext());
-
-    // Guess a module name, if needed, to make the output files readable.
-    auto moduleName = guessModuleName(moduleOp);
-
-    // Create our new "linked" hal.executable.
-    std::string linkedExecutableName =
-        llvm::formatv("{0}_linked_{1}", moduleName, "llvm_cpu");
-    auto linkedExecutableOp = builder.create<IREE::HAL::ExecutableOp>(
-        moduleOp.getLoc(), linkedExecutableName);
-    linkedExecutableOp.setVisibility(
-        sourceExecutableOps.front().getVisibility());
-
-    // Add our hal.executable.variant with an empty module.
-    builder.setInsertionPointToStart(&linkedExecutableOp.getBlock());
-    auto linkedTargetOp = builder.create<IREE::HAL::ExecutableVariantOp>(
-        moduleOp.getLoc(), sharedTargetAttr.getSymbolNameFragment(),
-        sharedTargetAttr);
-    builder.setInsertionPoint(&linkedTargetOp.getBlock().back());
-    builder.create<ModuleOp>(moduleOp.getLoc());
-
-    // Try linking together all executables in moduleOp.
-    return linkExecutablesInto(
-        moduleOp, sourceExecutableOps, linkedExecutableOp, linkedTargetOp,
-        [](mlir::ModuleOp moduleOp) { return moduleOp; }, builder);
+  void buildLinkingPassPipeline(OpPassManager &passManager) override {
+    buildLLVMCPULinkingPassPipeline(passManager);
   }
 
   LogicalResult serializeExecutable(const SerializationOptions &options,

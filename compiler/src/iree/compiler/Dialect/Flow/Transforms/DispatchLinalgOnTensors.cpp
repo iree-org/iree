@@ -719,10 +719,11 @@ struct CreateDispatchRegionOp : Base<OpType> {
 /// Returns a bit vector of size number of loops of the `interfaceOp` with
 /// the bits corresponding to outer parallel loops set to `true`.
 static llvm::SmallBitVector getOuterParallelLoops(TilingInterface interfaceOp) {
-  SmallVector<StringRef> loopIteratorTypes = interfaceOp.getLoopIteratorTypes();
+  SmallVector<utils::IteratorType> loopIteratorTypes =
+      interfaceOp.getLoopIteratorTypes();
   llvm::SmallBitVector parallelLoops(loopIteratorTypes.size());
   for (auto iteratorType : llvm::enumerate(loopIteratorTypes)) {
-    if (iteratorType.value() != getParallelIteratorTypeName()) break;
+    if (iteratorType.value() != utils::IteratorType::parallel) break;
     parallelLoops.set(iteratorType.index());
   }
   return parallelLoops;

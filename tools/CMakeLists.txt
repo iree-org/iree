@@ -53,7 +53,7 @@ iree_cc_binary(
     iree::hal
     iree::tooling::context_util
     iree::tooling::device_util
-    iree::tooling::vm_util
+    iree::tooling::vm_util_cc
     iree::vm
     iree::vm::cc
 )
@@ -95,7 +95,7 @@ iree_cc_binary(
     iree::modules::check
     iree::testing::gtest
     iree::tooling::context_util
-    iree::tooling::vm_util
+    iree::tooling::vm_util_cc
     iree::vm
     iree::vm::bytecode_module
   TESTONLY
@@ -126,8 +126,10 @@ iree_cc_binary(
     iree::base::internal::flags
     iree::base::tracing
     iree::hal
+    iree::modules::hal::types
+    iree::tooling::comparison
     iree::tooling::context_util
-    iree::tooling::vm_util
+    iree::tooling::vm_util_cc
     iree::vm
     iree::vm::cc
 )
@@ -257,7 +259,7 @@ if(IREE_BUILD_COMPILER)
       iree::hal
       iree::tooling::context_util
       iree::tooling::device_util
-      iree::tooling::vm_util
+      iree::tooling::vm_util_cc
       iree::vm
       iree::vm::bytecode_module
       iree::vm::cc
@@ -266,16 +268,23 @@ if(IREE_BUILD_COMPILER)
     HOSTONLY
   )
 
-  # Ensure FileCheck gets built. Tests don't have dependencies in CMake because
-  # they aren't targets. So until we fix that, we just force this to get built.
+  # Ensure FileCheck and associated binaries get built. Tests don't have
+  # dependencies in CMake because they aren't targets. So until we fix that, we
+  # just force this to get built.
   # Limiting this to when IREE_BUILD_TESTS is set prevents the installation
   # below, which we use for cross-platform testing.
   set_target_properties(FileCheck PROPERTIES EXCLUDE_FROM_ALL OFF)
+  set_target_properties(not PROPERTIES EXCLUDE_FROM_ALL OFF)
 
-  # Bundle the FileCheck binary from LLVM into our tests/bin directory so
-  # installed FileCheck tests are hermetic.
+  # Bundle the FileCheck and associated binaries from LLVM into our tests/bin
+  # directory so installed FileCheck tests are hermetic.
   install(
     TARGETS FileCheck
+    DESTINATION "tests/bin"
+    COMPONENT Tests
+  )
+  install(
+    TARGETS not
     DESTINATION "tests/bin"
     COMPONENT Tests
   )
