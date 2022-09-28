@@ -123,51 +123,6 @@ void LinalgExt::FuseProducersOp::print(OpAsmPrinter &p) {
 }
 
 DiagnosedSilenceableFailure
-LinalgExt::TileToForeachOp::applyToOne(linalg::LinalgOp target,
-                                       SmallVectorImpl<Operation *> &results,
-                                       transform::TransformState &state) {
-  linalg::LinalgTilingOptions tilingOptions;
-  SmallVector<int64_t> numThreads = extractI64Array(getNumThreads());
-
-  // TODO: Pass options object when the number of parameters increases.
-  LinalgExt::ForeachThreadTilingPattern pattern(
-      this->getContext(), numThreads,
-      extractFromI64ArrayAttr(getThreadDimMapping()));
-  // Apply the pattern.
-  SimplePatternRewriter rewriter(target);
-  FailureOr<iree_compiler::IREE::LinalgExt::TilingResult> result =
-      pattern.returningMatchAndRewrite(
-          cast<TilingInterface>(target.getOperation()), rewriter);
-  if (failed(result))
-    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
-  results.assign({result->tileOp, result->tiledOp});
-  return DiagnosedSilenceableFailure(success());
-}
-
-DiagnosedSilenceableFailure
-LinalgExt::FuseIntoContainingOp::apply(transform::TransformResults &results,
-                                       transform::TransformState &state) {
-  ArrayRef<Operation *> producerOps = state.getPayloadOps(getProducerOp());
-  ArrayRef<Operation *> containingOps = state.getPayloadOps(getContainingOp());
-  for (auto it : llvm::zip(producerOps, containingOps)) {
-    auto producerOp = dyn_cast<TilingInterface>(std::get<0>(it));
-    Operation *containingOp = std::get<1>(it);
-    if (!producerOp) {
-      std::get<0>(it)->emitError("Cannot fuse op: Not a tileable op");
-      return DiagnosedSilenceableFailure::definiteFailure();
-    }
-    LinalgExt::LinalgExtFusionInContainingOpPattern pattern(this->getContext(),
-                                                            containingOp);
-
-    // Apply the pattern.
-    SimplePatternRewriter rewriter(producerOp);
-    if (failed(pattern.returningMatchAndRewrite(producerOp, rewriter)))
-      return DiagnosedSilenceableFailure::definiteFailure();
-  }
-  return DiagnosedSilenceableFailure::success();
-}
-
-DiagnosedSilenceableFailure
 LinalgExt::RewriteForeachThreadToAsyncOp::applyToOne(
     scf::ForeachThreadOp target, SmallVectorImpl<Operation *> &results,
     transform::TransformState &state) {

@@ -237,7 +237,7 @@ struct HALInterfaceBindingSubspanConverter final
 
     auto varOp = interfaceToResourceVars.lookup(subspanOp);
     // Fix up the variable's type.
-    varOp.typeAttr(TypeAttr::get(convertedType));
+    varOp.setTypeAttr(TypeAttr::get(convertedType));
 
     rewriter.replaceOpWithNewOp<spirv::AddressOfOp>(subspanOp, varOp);
 

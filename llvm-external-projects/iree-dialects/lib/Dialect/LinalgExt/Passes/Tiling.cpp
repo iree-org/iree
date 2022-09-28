@@ -90,7 +90,7 @@ static bool isUntiledLoop(OpFoldResult valueOrAttr) {
 static FailureOr<TiledOp>
 tileInterfaceOpImpl(OpBuilder &builder, TilingInterface tilableOp,
                     ValueRange outputs, MutableArrayRef<OpFoldResult> tileSizes,
-                    ArrayRef<StringRef> iteratorTypes,
+                    ArrayRef<utils::IteratorType> iteratorTypes,
                     ArrayRef<Range> loopBounds, unsigned loopDepth,
                     SmallVectorImpl<OpFoldResult> &offsets,
                     ArrayRef<linalg::ProcInfo> distributionInfo) {
@@ -154,7 +154,7 @@ tileInterfaceOpImpl(OpBuilder &builder, TilingInterface tilableOp,
 
   // Update lb, ub and step for cyclic distribution.
   if (!distributionInfo.empty() &&
-      iteratorTypes[loopDepth] == getParallelIteratorTypeName()) {
+      iteratorTypes[loopDepth] == utils::IteratorType::parallel) {
     linalg::updateBoundsForCyclicDistribution(
         builder, loc, distributionInfo.front().procId,
         distributionInfo.front().nprocs, lb, ub, step);
@@ -203,7 +203,8 @@ FailureOr<TiledOp> tileInterfaceOp(OpBuilder &b, TilingInterface tilableOp,
         "cannot tile operation without destination operands"));
   }
 
-  SmallVector<StringRef> iteratorTypes = tilableOp.getLoopIteratorTypes();
+  SmallVector<utils::IteratorType> iteratorTypes =
+      tilableOp.getLoopIteratorTypes();
   SmallVector<Value, 4> tileSizesVals =
       options.tileSizeComputationFunction(b, tilableOp);
   auto zeroAttr = b.getI64IntegerAttr(0);
@@ -214,7 +215,7 @@ FailureOr<TiledOp> tileInterfaceOp(OpBuilder &b, TilingInterface tilableOp,
   auto tileSizes = getAsOpFoldResult(tileSizesVals);
   tileSizes.resize(iteratorTypes.size(), zeroAttr);
   for (auto en : llvm::enumerate(iteratorTypes)) {
-    if (en.value() == getParallelIteratorTypeName())
+    if (en.value() == utils::IteratorType::parallel)
       continue;
     if (!isUntiledLoop(tileSizes[en.index()])) {
       return static_cast<LogicalResult>(tilableOp.emitOpError(
@@ -239,7 +240,7 @@ FailureOr<TiledOp> tileInterfaceOp(OpBuilder &b, TilingInterface tilableOp,
     for (auto i : llvm::seq<unsigned>(0, tileSizes.size())) {
       if (isUntiledLoop(tileSizes[i]))
         continue;
-      if (iteratorTypes[i] != getParallelIteratorTypeName())
+      if (iteratorTypes[i] != utils::IteratorType::parallel)
         continue;
       distributedLoopRange.push_back(loopBounds[i]);
     }

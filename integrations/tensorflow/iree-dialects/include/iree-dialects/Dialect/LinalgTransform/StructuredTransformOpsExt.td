@@ -8,6 +8,7 @@
 #define STRUCTURED_TRANSFORM_OPS_EXT
 
 include "mlir/Dialect/PDL/IR/PDLTypes.td"
+include "mlir/Dialect/Transform/IR/TransformAttrs.td"
 include "mlir/Dialect/Transform/IR/TransformDialect.td"
 include "mlir/Dialect/Transform/IR/TransformInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
@@ -31,12 +32,13 @@ def CanonicalizedSequenceOp
     after each step in the sequence.
   }];
 
-  let arguments = (ins Optional<PDL_Operation>:$root);
+  let arguments = (ins FailurePropagationMode:$failure_propagation_mode,
+                       Optional<PDL_Operation>:$root);
   let results = (outs Variadic<AnyType>:$results);
   let regions = (region SizedRegion<1>:$body);
 
   let assemblyFormat =
-    "($root^)? attr-dict-with-keyword regions (`:` type($results)^)?";
+    "($root^)? `failures` `(` $failure_propagation_mode `)` attr-dict-with-keyword regions (`:` type($results)^)?";
 
   let extraClassDeclaration = [{
     /// Allow the dialect prefix to be omitted.
@@ -50,7 +52,7 @@ def CanonicalizedSequenceOp
 //===----------------------------------------------------------------------===//
 
 def BufferizeOp : Op<Transform_Dialect, "bufferize",
-    [DeclareOpInterfaceMethods<TransformOpInterface>, 
+    [DeclareOpInterfaceMethods<TransformOpInterface>,
      FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,
      TransformOpInterface]> {
@@ -60,7 +62,7 @@ def BufferizeOp : Op<Transform_Dialect, "bufferize",
 }
 
 def LowerVectorsOp : Op<Transform_Dialect, "lower_vectors",
-    [DeclareOpInterfaceMethods<TransformOpInterface>, 
+    [DeclareOpInterfaceMethods<TransformOpInterface>,
      FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface]> {
   let description = [{Indicates that the vector operations in the entire

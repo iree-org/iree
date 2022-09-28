@@ -41,8 +41,10 @@ iree_cc_library(
     MLIRBufferizationTransforms
     MLIRLinalgTransformOps
     MLIRLinalgTransforms
+    MLIRMemRefDialect
     MLIRMemRefTransforms
     MLIRPass
+    MLIRTensorDialect
     MLIRTransformDialect
     iree::compiler::Codegen::Common::CommonPasses
     iree::compiler::Codegen::Interfaces::BufferizationInterfaces
