@@ -43,7 +43,7 @@ jobs:
       - name: Generating release index
         run: |
           build_tools/scripts/generate_release_index.py \
-            --owner="${GITHUB_REPOSITORY}" \
+            --repo="${GITHUB_REPOSITORY}" \
             --output=docs/website/docs/pip-release-links.html
       - name: Setting git config
         run: |
