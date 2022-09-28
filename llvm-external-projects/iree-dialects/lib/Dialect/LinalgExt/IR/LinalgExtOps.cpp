@@ -1680,9 +1680,9 @@ SmallVector<int64_t> PackOp::getStaticTiles() {
 
 // Implement the tiling interface. The number of loops equals
 // the rank of the output tensors. All the loops are parallel.
-SmallVector<StringRef> PackOp::getLoopIteratorTypes() {
-  SmallVector<StringRef> iteratorTypes(getOutputRank(),
-                                       getParallelIteratorTypeName());
+SmallVector<utils::IteratorType> PackOp::getLoopIteratorTypes() {
+  SmallVector<utils::IteratorType> iteratorTypes(getOutputRank(),
+                                                 utils::IteratorType::parallel);
   return iteratorTypes;
 }
 
