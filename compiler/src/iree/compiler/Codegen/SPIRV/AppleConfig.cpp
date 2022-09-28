@@ -45,7 +45,8 @@ LogicalResult setAppleCodeGenConfig(const spirv::TargetEnv &targetEnv,
       .Case<linalg::BatchMatmulOp, linalg::MatmulOp>([subgroupSize](auto op) {
         return setAppleMatmulConfig(op, subgroupSize);
       })
-      .Case<linalg::Conv2DNhwcHwcfOp>([subgroupSize](auto op) {
+      .Case<linalg::Conv2DNchwFchwOp, linalg::Conv2DNhwcHwcfOp>([subgroupSize](
+                                                                    auto op) {
         return setConvOpConfig(op, subgroupSize,
                                /*bestTilingFactor=*/16);
       })
