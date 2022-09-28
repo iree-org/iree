@@ -448,10 +448,11 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
     dimensions to be tiled are obtained from `dims_pos` and the size of the tile is
     obtained from `inner_tiles`. The dimensions listed in `dims_pos` do not need to
     be contiguous in which case the tile will get transposed.  We handle only full
-    tiles if pad=false; it is UB if the tile does not perfectly divide the dimension..
-    If pad=true, it will pad along high dimensions, i.e., it pads at the bottom
-    and on the right if the input has rank 2, and the result type shape, will be
-    dynamic in any dimension if and only if the input shape is.
+    tiles if `padding_value` is not set; it is UB if the tile does not perfectly
+    divide the dimension. If `padding_value` is set, it will pad along high
+    dimensions, i.e., it pads at the bottom and on the right if the input has
+    rank 2, and the result type shape, will be dynamic in any dimension if and
+    only if the input shape is.
 
     Example KC_to_KCck:
 
@@ -474,7 +475,7 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
     Example NC_to_NCnc with padding:
 
     ```mlir
-    iree_linalg_ext.pack pad(true) %arg dims_pos = [0, 1]
+    iree_linalg_ext.pack %arg padding_value(%pad : f32) dims_pos = [0, 1]
       inner_tiles = [8, 2] into %arg1 : (memref<13x15xf32> memref<2x8x8x2xf32>)
     ```
 
@@ -485,12 +486,13 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
     DefaultValuedAttr<I64ArrayAttr, "{}">:$dims_pos,
     Variadic<Index>:$inner_tiles,
     I64ArrayAttr:$static_inner_tiles,
-    DefaultValuedAttr<BoolAttr, "false">:$pad);
+    Optional<AnyType>:$padding_value);
 
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let assemblyFormat = [{
-    attr-dict `pad` `(` $pad `)`
+    attr-dict
     $inputs
+    (`padding_value` `(` $padding_value^ `:` type($padding_value) `)`)?
     `dims_pos` `=` $dims_pos
     `inner_tiles` `=`
     custom<DynamicIndexList>($inner_tiles, $static_inner_tiles,
@@ -534,6 +536,11 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
     // Return the input shape.
     ArrayRef<int64_t> getInputShape() {
       return getInputType().getShape();
+    }
+
+    // Return the element type.
+    Type getElementType() {
+      return getInputType().getElementType();
     }
 
     // Return the rank of the input operand.
