@@ -97,3 +97,10 @@ jobs:
           github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           branch: latest-snapshot
           force: true
+
+      # Publish an updated release index page to the website
+      - name: Invoke workflow to publish website
+        uses: benc-uk/workflow-dispatch@4c044c1613fabbe5250deadc65452d54c4ad4fc7 # v1
+        with:
+          workflow: Publish Website
+          token: ${{ secrets.WRITE_ACCESS_TOKEN }}
