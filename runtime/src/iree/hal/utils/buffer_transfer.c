@@ -30,7 +30,7 @@
 // |wait_value|. Behavior is undefined if no semaphore is provided and there are
 // in-flight operations concurrently using the buffer ranges.
 // Returns only after all transfers have completed and been flushed.
-static iree_status_t iree_hal_device_transfer_and_wait(
+IREE_API_EXPORT iree_status_t iree_hal_device_transfer_and_wait(
     iree_hal_device_t* device, iree_hal_semaphore_t* wait_semaphore,
     uint64_t wait_value, iree_host_size_t transfer_count,
     const iree_hal_transfer_command_t* transfer_commands,
