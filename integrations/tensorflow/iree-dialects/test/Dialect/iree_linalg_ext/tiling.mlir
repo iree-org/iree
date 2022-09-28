@@ -37,7 +37,7 @@ func.func @scatter_tiling(
 //       CHECK:       %[[INDEX_SLICE:.+]] = tensor.extract_slice %[[INDICES]][%[[IV0]], 0]
 //  CHECK-SAME:           [%[[USED_TILESIZEY]], 1]
 //       CHECK:       %[[SCATTER_DIM:.+]] = tensor.dim %[[ORIGINAL]], %[[C0]]
-//       CHECK:       %[[ORIGINAL_SLICE:.+]] = tensor.extract_slice %[[INITX]][0, %[[IV1]]]
+//       CHECK:       %[[ORIGINAL_SLICE:.+]] = tensor.extract_slice %[[ORIGINAL]][0, %[[IV1]]]
 //  CHECK-SAME:           [%[[SCATTER_DIM]], %[[USED_TILESIZEX]]]
 //       CHECK:       %[[SCATTER_TILE:.+]] = iree_linalg_ext.scatter
 //  CHECK-SAME:           __internal_linalg_transform__ = "tiling_output"
@@ -134,7 +134,7 @@ func.func @scatter_tiling_distribution(
 //       CHECK:     %[[INDEX_SLICE:.+]] = tensor.extract_slice %[[INDICES]][%[[IV]], 0]
 //  CHECK-SAME:         [%[[USED_TILESIZE]], 1]
 //       CHECK:     %[[D2:.+]] = tensor.dim %[[ORIGINAL]], %[[C0]]
-//       CHECK:     %[[ORIGINAL_SLICE:.+]] = tensor.extract_slice %[[INIT]][0, 0]
+//       CHECK:     %[[ORIGINAL_SLICE:.+]] = tensor.extract_slice %[[ORIGINAL]][0, 0]
 //  CHECK-SAME:         [%[[D2]], %[[D1]]]
 //       CHECK:     %[[SCATTER_TILE:.+]] = iree_linalg_ext.scatter
 //  CHECK-SAME:        __internal_linalg_transform__ = "distribute_output"
@@ -208,7 +208,7 @@ func.func @scatter_repeated_indices_tiling(
 //  CHECK-SAME:         %[[INDICES]][0, 0] [%[[D0]], 1] [1, 1]
 //       CHECK:       %[[ORIGINAL_D0:.+]] = tensor.dim %[[ORIGINAL]], %[[C0]]
 //       CHECK:       %[[ORIGINAL_TILE:.+]] = tensor.extract_slice
-//  CHECK-SAME:         %[[ITER]][0, %[[I]]] [%[[ORIGINAL_D0]], %[[SZ]]] [1, 1]
+//  CHECK-SAME:         %[[ORIGINAL]][0, %[[I]]] [%[[ORIGINAL_D0]], %[[SZ]]] [1, 1]
 //       CHECK:       %[[SCATTER:.+]] = iree_linalg_ext.scatter
 //  CHECK-SAME:         __internal_linalg_transform__ = "tiling_repeated_indices_scatter_output"
 //  CHECK-SAME:         unique_indices(false)
@@ -281,7 +281,7 @@ func.func @sort_2d(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
 //       CHECK:   %[[RESULT:.+]] = scf.for %[[IV:.+]] = %[[C0]] to %[[D0]] step %[[TILESIZE]]
 //  CHECK-SAME:       iter_args(%[[INIT:.+]] = %[[OPERAND]])
 //   CHECK-DAG:     %[[USED_TILESIZE:.+]] = affine.min #[[MAP]](%[[IV]])[%[[TILESIZE]], %[[D0]]]
-//       CHECK:     %[[OPERAND_SLICE:.+]] = tensor.extract_slice %[[INIT]][%[[IV]], 0]
+//       CHECK:     %[[OPERAND_SLICE:.+]] = tensor.extract_slice %[[OPERAND]][%[[IV]], 0]
 //  CHECK-SAME:         [%[[USED_TILESIZE]], %[[D1]]]
 //       CHECK:     %[[SORT_TILE:.+]] = iree_linalg_ext.sort
 //  CHECK-SAME:         __internal_linalg_transform__ = "inner_reduce_output"
@@ -315,7 +315,7 @@ func.func @sort_2d_inner_parallel(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
 //       CHECK:   %[[RESULT:.+]] = scf.for %[[IV:.+]] = %[[C0]] to %[[D1]] step %[[TILESIZE]]
 //  CHECK-SAME:       iter_args(%[[INIT:.+]] = %[[OPERAND]])
 //   CHECK-DAG:     %[[USED_TILESIZE:.+]] = affine.min #[[MAP]](%[[IV]])[%[[TILESIZE]], %[[D1]]]
-//       CHECK:     %[[OPERAND_SLICE:.+]] = tensor.extract_slice %[[INIT]][0, %[[IV]]]
+//       CHECK:     %[[OPERAND_SLICE:.+]] = tensor.extract_slice %[[OPERAND]][0, %[[IV]]]
 //  CHECK-SAME:         [%[[D0]], %[[USED_TILESIZE]]]
 //       CHECK:     %[[SORT_TILE:.+]] = iree_linalg_ext.sort
 //  CHECK-SAME:         __internal_linalg_transform__ = "outer_reduce_output"
@@ -352,9 +352,9 @@ func.func @sort_2d_multi_result(
 //       CHECK:   %[[RESULT:.+]]:2 = scf.for %[[IV:.+]] = %[[C0]] to %[[D0]] step %[[TILESIZE]]
 //  CHECK-SAME:       iter_args(%[[INIT1:.+]] = %[[OPERAND1]], %[[INIT2:.+]] = %[[OPERAND2]])
 //   CHECK-DAG:     %[[USED_TILESIZE:.+]] = affine.min #[[MAP]](%[[IV]])[%[[TILESIZE]], %[[D0]]]
-//       CHECK:     %[[OPERAND1_SLICE:.+]] = tensor.extract_slice %[[INIT1]][%[[IV]], 0]
+//       CHECK:     %[[OPERAND1_SLICE:.+]] = tensor.extract_slice %[[OPERAND1]][%[[IV]], 0]
 //  CHECK-SAME:         [%[[USED_TILESIZE]], %[[D1]]]
-//       CHECK:     %[[OPERAND2_SLICE:.+]] = tensor.extract_slice %[[INIT2]][%[[IV]], 0]
+//       CHECK:     %[[OPERAND2_SLICE:.+]] = tensor.extract_slice %[[OPERAND2]][%[[IV]], 0]
 //  CHECK-SAME:         [%[[USED_TILESIZE]], %[[D1]]]
 //       CHECK:     %[[SORT_TILE:.+]]:2 = iree_linalg_ext.sort
 //  CHECK-SAME:         __internal_linalg_transform__ = "inner_reduce_output"
@@ -443,9 +443,9 @@ func.func @sort_3d_multi_result_distribute(
 //       CHECK:     %[[RESULT_INNER:.+]]:2 = scf.for %[[IV1:.+]] = %[[OFFSETX]] to %[[D2]] step %[[STEPX]]
 //  CHECK-SAME:         iter_args(%[[INIT3:.+]] = %[[INIT1]], %[[INIT4:.+]] = %[[INIT2]])
 //   CHECK-DAG:       %[[USED_TILESIZE2:.+]] = affine.min #[[MAP3]](%[[IV1]])[%[[TILESIZE2]], %[[D2]]]
-//       CHECK:       %[[OPERAND1_SLICE:.+]] = tensor.extract_slice %[[INIT3]][%[[IV0]], 0, %[[IV1]]]
+//       CHECK:       %[[OPERAND1_SLICE:.+]] = tensor.extract_slice %[[OPERAND1]][%[[IV0]], 0, %[[IV1]]]
 //  CHECK-SAME:           [%[[USED_TILESIZE1]], %[[D1]], %[[USED_TILESIZE2]]]
-//       CHECK:       %[[OPERAND2_SLICE:.+]] = tensor.extract_slice %[[INIT4]][%[[IV0]], 0, %[[IV1]]]
+//       CHECK:       %[[OPERAND2_SLICE:.+]] = tensor.extract_slice %[[OPERAND2]][%[[IV0]], 0, %[[IV1]]]
 //  CHECK-SAME:           [%[[USED_TILESIZE1]], %[[D1]], %[[USED_TILESIZE2]]]
 //       CHECK:       %[[SORT_SLICE:.+]]:2 = iree_linalg_ext.sort
 //  CHECK-SAME:           __internal_linalg_transform__ = "distribute_output"
@@ -533,8 +533,8 @@ func.func @fft_1d_stage_5(%arg0: tensor<1024xf32>, %arg1: tensor<1024xf32>,
 // CHECK-SAME:       iter_args(%[[ARG5:.+]] = %[[ARG0]], %[[ARG6:.+]] = %[[ARG1]])
 // CHECK-SAME:       -> (tensor<1024xf32>, tensor<1024xf32>) {
 // CHECK:          %[[SIZE:.+]] = affine.min #[[MAP0]](%[[I]])[%[[C32]], %[[C1024]]]
-// CHECK:          %[[SLICE1:.+]] = tensor.extract_slice %[[ARG5]][%[[I]]] [%[[SIZE]]] [1] : tensor<1024xf32> to tensor<?xf32>
-// CHECK:          %[[SLICE2:.+]] = tensor.extract_slice %[[ARG6]][%[[I]]] [%[[SIZE]]] [1] : tensor<1024xf32> to tensor<?xf32>
+// CHECK:          %[[SLICE1:.+]] = tensor.extract_slice %[[ARG0]][%[[I]]] [%[[SIZE]]] [1] : tensor<1024xf32> to tensor<?xf32>
+// CHECK:          %[[SLICE2:.+]] = tensor.extract_slice %[[ARG1]][%[[I]]] [%[[SIZE]]] [1] : tensor<1024xf32> to tensor<?xf32>
 // CHECK:          %[[FFT:.+]]:2 = iree_linalg_ext.fft
 // CHECK-SAME:       {__internal_linalg_transform__ = "tiling_1d_stage5_fft_output"}
 // CHECK-SAME:       ins(%[[C5]], %[[COEF_REAL]], %[[COEF_IMAG]] : index, tensor<16xf32>, tensor<16xf32>)
@@ -576,8 +576,8 @@ func.func @fft_2d_stage_5(%arg0: tensor<3x1024xf32>, %arg1: tensor<3x1024xf32>,
 // CHECK:          %{{.+}} = scf.for %[[J:.+]] = %[[C0]] to %[[C1024]] step %[[C32]]
 // CHECK-SAME:         iter_args(%[[ARG8:.+]] = %[[ARG5]], %[[ARG9:.+]] = %[[ARG6]]) -> (tensor<3x1024xf32>, tensor<3x1024xf32>) {
 // CHECK:            %[[SZ2:.+]] = affine.min #[[MAP1]](%[[J]])[%[[C32]], %[[C1024]]]
-// CHECK:            %[[SLICE1:.+]] = tensor.extract_slice %[[ARG8]][%[[I]], %[[J]]] [%[[SZ1]], %[[SZ2]]] [1, 1]
-// CHECK:            %[[SLICE2:.+]] = tensor.extract_slice %[[ARG9]][%[[I]], %[[J]]] [%[[SZ1]], %[[SZ2]]] [1, 1]
+// CHECK:            %[[SLICE1:.+]] = tensor.extract_slice %[[ARG0]][%[[I]], %[[J]]] [%[[SZ1]], %[[SZ2]]] [1, 1]
+// CHECK:            %[[SLICE2:.+]] = tensor.extract_slice %[[ARG1]][%[[I]], %[[J]]] [%[[SZ1]], %[[SZ2]]] [1, 1]
 // CHECK:          %[[FFT:.+]]:2 = iree_linalg_ext.fft
 // CHECK-SAME:       {__internal_linalg_transform__ = "tiling_2d_stage5_fft_output"}
 // CHECK-SAME:       ins(%[[C5]], %[[COEF_REAL]], %[[COEF_IMAG]] : index, tensor<16xf32>, tensor<16xf32>)
@@ -597,8 +597,7 @@ func.func @fft_1d_stage_5_memref(%arg0: memref<1024xf32>, %arg1: memref<1024xf32
     outs(%arg0, %arg1: memref<1024xf32>, memref<1024xf32>)
   return
 }
-// CHECK-DAG:  #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (32, -d0 + s1)>
-// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0)[s0] -> (d0 + s0)>
+// CHECK:  #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (32, -d0 + s1)>
 // CHECK:      func.func @fft_1d_stage_5_memref(
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]
@@ -610,12 +609,12 @@ func.func @fft_1d_stage_5_memref(%arg0: memref<1024xf32>, %arg1: memref<1024xf32
 // CHECK-DAG:    %[[C1024:.+]] = arith.constant 1024 : index
 // CHECK:        scf.for %[[I:.+]] = %[[C0]] to %[[C1024]] step %[[C32]] {
 // CHECK:          %[[SZ:.+]] = affine.min #[[MAP0]](%[[I]])[%[[C32]], %[[C1024]]]
-// CHECK:          %[[SUB1:.+]] = memref.subview %[[ARG0]][%[[I]]] [%[[SZ]]] [1] : memref<1024xf32> to memref<?xf32, #[[MAP1]]>
-// CHECK:          %[[SUB2:.+]] = memref.subview %[[ARG1]][%[[I]]] [%[[SZ]]] [1] : memref<1024xf32> to memref<?xf32, #[[MAP1]]>
+// CHECK:          %[[SUB1:.+]] = memref.subview %[[ARG0]][%[[I]]] [%[[SZ]]] [1] : memref<1024xf32> to memref<?xf32, strided<[1], offset: ?>>
+// CHECK:          %[[SUB2:.+]] = memref.subview %[[ARG1]][%[[I]]] [%[[SZ]]] [1] : memref<1024xf32> to memref<?xf32, strided<[1], offset: ?>>
 // CHECK:          iree_linalg_ext.fft
 // CHECK-SAME:       {__internal_linalg_transform__ = "tiling_1d_stage5_fft_output"}
 // CHECK-SAME:       ins(%[[C5]], %[[COEF_REAL]], %[[COEF_IMAG]] : index, memref<16xf32>, memref<16xf32>)
-// CHECK-SAME:       outs(%[[SUB1]], %[[SUB2]] : memref<?xf32, #[[MAP1]]>, memref<?xf32, #[[MAP1]]>)
+// CHECK-SAME:       outs(%[[SUB1]], %[[SUB2]] : memref<?xf32, strided<[1], offset: ?>>, memref<?xf32, strided<[1], offset: ?>>)
 
 // -----
 
@@ -628,7 +627,6 @@ func.func @reverse_memref(%arg0: memref<?xi32>, %arg1: memref<?xi32>) {
   return
 }
 // CHECK-DAG:  #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (10, -d0 + s1)>
-// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0)[s0] -> (d0 + s0)>
 // CHECK-DAG:  #[[MAP2:.+]] = affine_map<()[s0, s1, s2] -> (s0 - s1 - s2)>
 // CHECK:      func.func @reverse_memref(
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]
@@ -750,8 +748,8 @@ func.func @scan_2d(%0: tensor<16x32xi32>) -> tensor<16x32xi32> {
 // CHECK-SAME:      iter_args(%[[ARG2:.+]] = %[[OUTPUT]], %[[ARG3:.+]] = %[[ACC]])
 //      CHECK:      %[[SIZE:.+]] = affine.min #[[MAP0]](%[[I]])[%[[C20]], %[[C32]]]
 //      CHECK:      %[[UPDATE_SLICE_IN:.+]] = tensor.extract_slice %[[ARG0]][0, %[[I]]] [%[[C16]], %[[SIZE]]]
-//      CHECK:      %[[UPDATE_SLICE_OUT:.+]] = tensor.extract_slice %[[ARG2]][0, %[[I]]] [%[[C16]], %[[SIZE]]]
-//      CHECK:      %[[UPDATE_SLICE_ACC:.+]] = tensor.extract_slice %[[ARG3]][%[[I]]] [%[[SIZE]]]
+//      CHECK:      %[[UPDATE_SLICE_OUT:.+]] = tensor.extract_slice %[[OUTPUT]][0, %[[I]]] [%[[C16]], %[[SIZE]]]
+//      CHECK:      %[[UPDATE_SLICE_ACC:.+]] = tensor.extract_slice %[[ACC]][%[[I]]] [%[[SIZE]]]
 //      CHECK:      %[[SCAN_TILE:.+]]:2 = iree_linalg_ext.scan
 // CHECK-SAME:       {__internal_linalg_transform__ = "outer_reduce_output"}
 // CHECK-SAME:       dimension(0) inclusive(true)
@@ -778,8 +776,7 @@ func.func @scan_2d_memref(%0: memref<16x32xi32>, %1: memref<16x32xi32>) {
   }
   return
 }
-//  CHECK-DAG:  #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (20, -d0 + s1)>
-//  CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1)[s0] -> (d0 * 32 + s0 + d1)>
+//      CHECK:  #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (20, -d0 + s1)>
 //      CHECK:  func.func @scan_2d_memref(
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]+]]
 // CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]+]]
@@ -831,8 +828,8 @@ func.func @topk_tile_tensor(%input_values: tensor<?x?xf32>, %input_indices: tens
 // CHECK:           %[[D3:.+]] = affine.min #[[MAP0]](%[[ARG4]])[%[[C10]], %[[D0]]]
 // CHECK:           %[[D4:.+]] = tensor.extract_slice %[[ARG0]][%[[ARG4]], 0] [%[[D3]], %[[D1]]] [1, 1]
 // CHECK:           %[[D5:.+]] = tensor.extract_slice %[[ARG1]][%[[ARG4]], 0] [%[[D3]], %[[D1]]] [1, 1]
-// CHECK:           %[[D6:.+]] = tensor.extract_slice %[[ARG5]][%[[ARG4]], 0] [%[[D3]], %[[C3]]] [1, 1]
-// CHECK:           %[[D7:.+]] = tensor.extract_slice %[[ARG6]][%[[ARG4]], 0] [%[[D3]], %[[C3]]] [1, 1]
+// CHECK:           %[[D6:.+]] = tensor.extract_slice %[[ARG2]][%[[ARG4]], 0] [%[[D3]], %[[C3]]] [1, 1]
+// CHECK:           %[[D7:.+]] = tensor.extract_slice %[[ARG3]][%[[ARG4]], 0] [%[[D3]], %[[C3]]] [1, 1]
 // CHECK:           %[[D8:.+]]:2 = iree_linalg_ext.topk {__internal_linalg_transform__ = "inner_reduce_output"}
 // CHECK-SAME:      dimension(1)
 // CHECK-SAME:      ins(%[[D4]], %[[D5]]
@@ -858,9 +855,7 @@ func.func @topk_tile_memref(%input_values: memref<?x?xf32>, %input_indices: memr
   return
 }
 
-// CHECK-DAG:  #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (10, -d0 + s1)>
-// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>
-// CHECK-DAG:  #[[MAP2:.+]] = affine_map<(d0, d1)[s0] -> (d0 * 3 + s0 + d1)>
+// CHECK:       #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (10, -d0 + s1)>
 // CHECK-LABEL: func.func @topk_tile_memref
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
@@ -911,8 +906,8 @@ func.func @topk_tile_tensor_optional(%input_values: tensor<20x10xf32>, %out_valu
 // CHECK:         %[[RESULT:.+]]:2 = scf.for %[[ARG3:.+]] = %[[C0]] to %[[C20]] step %[[C10]] iter_args(%[[ARG4:.+]] = %[[ARG1]], %[[ARG5:.+]] = %[[ARG2]])
 // CHECK:           %[[D1:.+]] = affine.min #[[MAP0]](%[[ARG3]])[%[[C10]], %[[C20]]]
 // CHECK:           %[[D2:.+]] = tensor.extract_slice %[[ARG0]][%[[ARG3]], 0] [%[[D1]], %[[C10]]] [1, 1]
-// CHECK:           %[[D3:.+]] = tensor.extract_slice %[[ARG4]][%[[ARG3]], 0] [%[[D1]], %[[C3]]] [1, 1]
-// CHECK:           %[[D4:.+]] = tensor.extract_slice %[[ARG5]][%[[ARG3]], 0] [%[[D1]], %[[C3]]] [1, 1]
+// CHECK:           %[[D3:.+]] = tensor.extract_slice %[[ARG1]][%[[ARG3]], 0] [%[[D1]], %[[C3]]] [1, 1]
+// CHECK:           %[[D4:.+]] = tensor.extract_slice %[[ARG2]][%[[ARG3]], 0] [%[[D1]], %[[C3]]] [1, 1]
 // CHECK:           %[[D5:.+]]:2 = iree_linalg_ext.topk {__internal_linalg_transform__ = "inner_reduce_output"}
 // CHECK-SAME:      dimension(1)
 // CHECK-SAME:      ins(%[[D2]]

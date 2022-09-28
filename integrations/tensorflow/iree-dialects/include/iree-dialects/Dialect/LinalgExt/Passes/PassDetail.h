@@ -8,6 +8,8 @@
 #define IREE_DIALECTS_DIALECT_LINALGEXT_TRANSFORMS_PASS_DETAIL_H_
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
@@ -16,6 +18,7 @@ namespace IREE {
 namespace LinalgExt {
 
 #define GEN_PASS_CLASSES
+
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h.inc" // IWYU pragma: keep
 
 } // namespace LinalgExt
