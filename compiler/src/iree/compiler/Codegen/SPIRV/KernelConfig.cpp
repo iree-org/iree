@@ -62,7 +62,8 @@ static bool distributeToOneDim(const int64_t inputDim,
                                int64_t &residualTilingFactor,
                                int64_t &wgDimSize, int64_t &wgTileSize,
                                int64_t &invoTileSize) {
-  for (int64_t dim = residualThreads; dim >= 1; dim >>= 1) {
+  const int64_t lb = isInnerMostDim ? 2 : 1;
+  for (int64_t dim = residualThreads; dim >= lb; dim >>= 1) {
     int64_t chosenTileSize = 0;
     if (isInnerMostDim) {
       // Handle 4 elements per thread for the innermost dimension. We need
