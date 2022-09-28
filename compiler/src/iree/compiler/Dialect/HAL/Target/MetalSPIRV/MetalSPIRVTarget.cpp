@@ -81,7 +81,7 @@ class MetalSPIRVTargetBackend : public TargetBackend {
     // point names.
     SmallVector<StringRef, 8> entryPointNames;
     spvModuleOp.walk([&](spirv::EntryPointOp exportOp) {
-      entryPointNames.push_back(exportOp.fn());
+      entryPointNames.push_back(exportOp.getFn());
     });
 
     // 1. Serialize the spirv::ModuleOp into binary format.

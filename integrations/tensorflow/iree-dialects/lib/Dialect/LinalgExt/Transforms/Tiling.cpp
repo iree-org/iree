@@ -167,7 +167,7 @@ struct OpTilingPattern : public OpInterfaceRewritePattern<TilingInterface> {
 
     /// Currently only handle operations with all parallel iterator types.
     for (auto iteratorType : enumerate(iteratorTypes)) {
-      if (iteratorType.value() != getParallelIteratorTypeName() &&
+      if (iteratorType.value() != utils::IteratorType::parallel &&
           !isZero(tileSizes[iteratorType.index()])) {
         return rewriter.notifyMatchFailure(
             op, "unhandled tiling of non-parallel iterator");

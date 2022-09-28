@@ -9,7 +9,7 @@
 ]>
 hal.executable private @fuse_and_vectorize_fill_matmul {
   hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
-      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, #spv.resource_limits<
+      spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 512,
         max_compute_workgroup_size = [512, 512, 512],
@@ -40,13 +40,13 @@ hal.executable private @fuse_and_vectorize_fill_matmul {
   }
 }
 
-//    CHECK-LABEL: spv.func @fuse_and_vectorize_fill_matmul
-//      CHECK-NOT:   spv.Store "StorageBuffer"
-//      CHECK-NOT:   spv.Load "StorageBuffer"
-//          CHECK:   spv.mlir.loop
-//  CHECK-COUNT-8:   spv.Load "StorageBuffer" %{{.*}} : vector<4xf32>
-// CHECK-COUNT-16:   spv.GL.Fma %{{.*}}, %{{.*}} : vector<4xf32>
-//  CHECK-COUNT-4:   spv.Store "StorageBuffer" %{{.*}}, %{{.*}} : vector<4xf32>
+//    CHECK-LABEL: spirv.func @fuse_and_vectorize_fill_matmul
+//      CHECK-NOT:   spirv.Store "StorageBuffer"
+//      CHECK-NOT:   spirv.Load "StorageBuffer"
+//          CHECK:   spirv.mlir.loop
+//  CHECK-COUNT-8:   spirv.Load "StorageBuffer" %{{.*}} : vector<4xf32>
+// CHECK-COUNT-16:   spirv.GL.Fma %{{.*}}, %{{.*}} : vector<4xf32>
+//  CHECK-COUNT-4:   spirv.Store "StorageBuffer" %{{.*}}, %{{.*}} : vector<4xf32>
 
 // -----
 
@@ -60,7 +60,7 @@ hal.executable private @fuse_and_vectorize_fill_matmul {
 ]>
 hal.executable private @fuse_and_vectorize_matmul_add {
   hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
-      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, #spv.resource_limits<
+      spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 512,
         max_compute_workgroup_size = [512, 512, 512],
@@ -100,15 +100,15 @@ hal.executable private @fuse_and_vectorize_matmul_add {
   }
 }
 
-//    CHECK-LABEL: spv.func @fuse_and_vectorize_matmul_add
-//      CHECK-NOT:   spv.Store "StorageBuffer"
-//      CHECK-NOT:   spv.Load "StorageBuffer"
-//          CHECK:   spv.mlir.loop
-//  CHECK-COUNT-8:     spv.Load "StorageBuffer" %{{.*}} : vector<4xf32>
-// CHECK-COUNT-16:     spv.GL.Fma %{{.*}}, %{{.*}} : vector<4xf32>
-//          CHECK:   spv.mlir.merge
-//  CHECK-COUNT-4:   spv.Load "StorageBuffer" %{{.*}} : vector<4xf32>
-//      CHECK-NOT:   spv.Load "StorageBuffer"
-//      CHECK-NOT:   spv.Store "StorageBuffer"
-//  CHECK-COUNT-4:   spv.FAdd %{{.*}}, %{{.*}} : vector<4xf32>
-//  CHECK-COUNT-4:   spv.Store "StorageBuffer" %{{.*}}, %{{.*}} : vector<4xf32>
+//    CHECK-LABEL: spirv.func @fuse_and_vectorize_matmul_add
+//      CHECK-NOT:   spirv.Store "StorageBuffer"
+//      CHECK-NOT:   spirv.Load "StorageBuffer"
+//          CHECK:   spirv.mlir.loop
+//  CHECK-COUNT-8:     spirv.Load "StorageBuffer" %{{.*}} : vector<4xf32>
+// CHECK-COUNT-16:     spirv.GL.Fma %{{.*}}, %{{.*}} : vector<4xf32>
+//          CHECK:   spirv.mlir.merge
+//  CHECK-COUNT-4:   spirv.Load "StorageBuffer" %{{.*}} : vector<4xf32>
+//      CHECK-NOT:   spirv.Load "StorageBuffer"
+//      CHECK-NOT:   spirv.Store "StorageBuffer"
+//  CHECK-COUNT-4:   spirv.FAdd %{{.*}}, %{{.*}} : vector<4xf32>
+//  CHECK-COUNT-4:   spirv.Store "StorageBuffer" %{{.*}}, %{{.*}} : vector<4xf32>

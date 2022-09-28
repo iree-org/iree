@@ -402,13 +402,14 @@ FailureOr<TilingResult> TileDispatchUsingSCFForOp::returningMatchAndRewrite(
         iterationDomain.size(), linalg::DistributionMethod::None);
     SmallVector<linalg::ProcInfo> procInfo;
     if (options.distribution) {
-      SmallVector<StringRef> iteratorTypes = op.getLoopIteratorTypes();
+      SmallVector<utils::IteratorType> iteratorTypes =
+          op.getLoopIteratorTypes();
 
       // The parallel loops that are tiled are partitionable loops.
       SmallVector<Range> parallelLoopRanges;
       SmallVector<unsigned> partitionedLoopIds;
       for (auto iteratorType : llvm::enumerate(iteratorTypes)) {
-        if (iteratorType.value() == getParallelIteratorTypeName() &&
+        if (iteratorType.value() == utils::IteratorType::parallel &&
             !isZero(tileSizeVector[iteratorType.index()])) {
           parallelLoopRanges.push_back(
               iterationDomainOfr[iteratorType.index()]);

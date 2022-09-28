@@ -23,6 +23,7 @@
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/Pass/PassManager.h"
 
@@ -45,11 +46,46 @@ void mlir::iree_compiler::registerTransformDialectCommonExtension(
 //===---------------------------------------------------------------------===//
 // ApplyPatternsOp
 //===---------------------------------------------------------------------===//
+namespace {
+/// Rewrite a tensor.generate as an arith.constant when possible.
+struct GenerateToConstant : public OpRewritePattern<tensor::GenerateOp> {
+  using OpRewritePattern<tensor::GenerateOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::GenerateOp generateOp,
+                                PatternRewriter &rewriter) const final {
+    auto tensorType = generateOp.getResult().getType().cast<RankedTensorType>();
+    if (!tensorType.hasStaticShape()) return failure();
+    auto terminatorOp =
+        cast<tensor::YieldOp>(generateOp.getBody().front().getTerminator());
+    if (terminatorOp->getNumOperands() > 1) return failure();
+    auto constantOp =
+        terminatorOp->getOperand(0).getDefiningOp<arith::ConstantOp>();
+    if (!constantOp) return failure();
+    rewriter.replaceOpWithNewOp<arith::ConstantOp>(
+        generateOp, tensorType,
+        DenseElementsAttr::get(tensorType, constantOp.getValueAttr()));
+    return success();
+  }
+};
+}  // namespace
 
 static void addRankReducingPatterns(RewritePatternSet &patterns) {
   populateReshapeToInterfaceTensorPatterns(patterns);
   vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
   linalg::populateFoldUnitExtentDimsPatterns(patterns);
+}
+
+static void addSwappingPatterns(RewritePatternSet &patterns,
+                                bool swapPaddingElideCornerCase) {
+  patterns.add<linalg::ExtractSliceOfPadTensorSwapPattern>(
+      patterns.getContext(),
+      [&](tensor::ExtractSliceOp) -> llvm::Optional<bool> {
+        return !swapPaddingElideCornerCase;
+      });
+}
+
+static void addAdditionalIreePatterns(RewritePatternSet &patterns) {
+  patterns.add<GenerateToConstant>(patterns.getContext());
 }
 
 static void addAllRegisteredCanonicalizationPatterns(
@@ -76,6 +112,9 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
   if (getRankReducing()) addRankReducingPatterns(patterns);
   if (getSimplifyMemrefMetadata())
     memref::populateSimplifyExtractStridedMetadataOpPatterns(patterns);
+  if (getSwappingPatterns())
+    addSwappingPatterns(patterns, getSwapPaddingElideConditional());
+  if (getAdditionalIreePatterns()) addAdditionalIreePatterns(patterns);
 
   TrackingListener listener(state);
   GreedyRewriteConfig config;
