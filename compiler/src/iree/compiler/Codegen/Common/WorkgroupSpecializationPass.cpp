@@ -126,11 +126,16 @@ static void specializeDistributionLoops(
     tileSizes.push_back(tileSize);
     SmallVector<AffineMinOp> boundedTileSizesOps =
         getBoundedTileSizeOps(forOp, tileSize);
-    // Supposed to see only one affine min for the bounded size.
-    if (boundedTileSizesOps.size() != 1) {
+    if (boundedTileSizesOps.empty()) {
+      // When there is no bounded tile size op, it means that the tensor
+      // size is already a multiple of tile size.
+      minSizeOps.push_back(AffineMinOp());
+    } else if (boundedTileSizesOps.size() != 1) {
+      // Supposed to see only one op for the bounded tile size if any.
       return;
+    } else {
+      minSizeOps.push_back(boundedTileSizesOps[0]);
     }
-    minSizeOps.push_back(boundedTileSizesOps[0]);
   }
 
   // Check the eligilbility. Unsupported cases are:
@@ -176,6 +181,13 @@ static void specializeDistributionLoops(
 
     // clone the minSize op in the loop and place it before scf.if
     AffineMinOp minOp = minSizeOps[i];
+    if (!minOp) {
+      // add a dummy value to indicate that this loop does not have an
+      // op for the bounded tile size.
+      constantOps.push_back(Value());
+      continue;
+    }
+
     scf::ForOp distLoop = distLoops[i];
     // clone the lower bound and put before the nested loops.
     BlockAndValueMapping mapperForLB;
@@ -208,7 +220,6 @@ static void specializeDistributionLoops(
   for (int i = 0, e = distLoops.size(); i != e; ++i) {
     AffineMinOp minOp = minSizeOps[i];
     if (!minOp) {
-      assert(tileSizes[i] == 0 || tileSizes[i] == 1);
       continue;
     }
     LLVM_DEBUG({
