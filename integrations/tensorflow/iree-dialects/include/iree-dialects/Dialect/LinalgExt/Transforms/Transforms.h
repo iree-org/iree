@@ -24,33 +24,6 @@ namespace iree_compiler {
 namespace IREE {
 namespace LinalgExt {
 
-struct TilingResult {
-  Operation *tileOp;
-  Operation *tiledOp;
-};
-
-/// Pattern to tile a TilingInterface op using a scf::ForeachThreadOp.
-struct ForeachThreadTilingPattern
-    : public OpInterfaceRewritePattern<TilingInterface> {
-  ForeachThreadTilingPattern(MLIRContext *context, ArrayRef<int64_t> tileSizes,
-                             ArrayRef<int64_t> threadDimMapping)
-      : OpInterfaceRewritePattern<TilingInterface>(context),
-        tileSizes(tileSizes.begin(), tileSizes.end()),
-        threadDimMapping(threadDimMapping.begin(), threadDimMapping.end()) {}
-
-  FailureOr<TilingResult>
-  returningMatchAndRewrite(TilingInterface op, PatternRewriter &rewriter) const;
-
-  LogicalResult matchAndRewrite(TilingInterface op,
-                                PatternRewriter &rewriter) const override {
-    return returningMatchAndRewrite(op, rewriter);
-  }
-
-private:
-  SmallVector<int64_t> tileSizes;
-  SmallVector<int64_t> threadDimMapping;
-};
-
 /// Pattern to swap a `TilingInterface` op -> `tensor::ExtractSliceOp`.
 struct SwapTilingInterfaceOp : public OpRewritePattern<tensor::ExtractSliceOp> {
   using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
@@ -95,27 +68,6 @@ struct ForeachThreadOpToScfForRewriter
   }
 };
 
-/// Pattern to fuse a tileable op into a containing op.
-struct LinalgExtFusionInContainingOpPattern
-    : public OpInterfaceRewritePattern<TilingInterface> {
-  LinalgExtFusionInContainingOpPattern(MLIRContext *context,
-                                       Operation *containingOp)
-      : OpInterfaceRewritePattern<TilingInterface>(context),
-        containingOp(containingOp) {}
-
-  FailureOr<SmallVector<TilingInterface>>
-  returningMatchAndRewrite(TilingInterface producerOp,
-                           PatternRewriter &rewriter) const;
-
-  LogicalResult matchAndRewrite(TilingInterface producerOp,
-                                PatternRewriter &rewriter) const override {
-    return returningMatchAndRewrite(producerOp, rewriter);
-  }
-
-private:
-  Operation *containingOp;
-};
-
 struct FusionResult {
   TilingInterface consumerOp;
   SmallVector<TilingInterface> fusedOps;
@@ -144,8 +96,125 @@ private:
 //===----------------------------------------------------------------------===//
 // Transformations exposed as patterns, moved from upstream MLIR as IREE still
 // heavily relies on patterns that compose through filters.
-// TODO: Deprecate this.
+// TODO: Deprecate all the patterns below.
 //===----------------------------------------------------------------------===//
+///
+/// Linalg tiling pattern.
+///
+/// Apply the `tiling` transformation as a pattern.
+/// `filter` controls LinalgTransformMarker matching and update when specified.
+/// See `tiling` for more details.
+// TODO: TiledOpInterface
+struct LinalgTilingPattern
+    : public OpInterfaceRewritePattern<linalg::LinalgOp> {
+  /// Construct a generic pattern applied to all LinalgOp that verify `filter`.
+  LinalgTilingPattern(MLIRContext *context, linalg::LinalgTilingOptions options,
+                      linalg::LinalgTransformationFilter f =
+                          linalg::LinalgTransformationFilter(),
+                      PatternBenefit benefit = 1);
+
+  /// Construct a pattern specifically applied to `opName`.
+  LinalgTilingPattern(StringRef opName, MLIRContext *context,
+                      linalg::LinalgTilingOptions options,
+                      linalg::LinalgTransformationFilter f =
+                          linalg::LinalgTransformationFilter(),
+                      PatternBenefit benefit = 1);
+
+  /// `matchAndRewrite` implementation that returns the significant transformed
+  /// pieces of IR.
+  FailureOr<linalg::TiledLinalgOp>
+  returningMatchAndRewrite(linalg::LinalgOp op,
+                           PatternRewriter &rewriter) const;
+
+  LogicalResult matchAndRewrite(linalg::LinalgOp op,
+                                PatternRewriter &rewriter) const override {
+    return returningMatchAndRewrite(op, rewriter);
+  }
+
+private:
+  /// LinalgTransformMarker handles special attribute manipulations.
+  linalg::LinalgTransformationFilter filter;
+  /// Options to control tiling;
+  linalg::LinalgTilingOptions options;
+};
+
+template <typename... OpTypes>
+class TilingPatterns;
+
+template <>
+class TilingPatterns<> {
+public:
+  static void insert(RewritePatternSet &patterns,
+                     const linalg::LinalgTilingOptions &options,
+                     const linalg::LinalgTransformationFilter &f) {}
+};
+
+template <typename OpTy, typename... OpTypes>
+class TilingPatterns<OpTy, OpTypes...> {
+public:
+  static void insert(RewritePatternSet &patterns,
+                     const linalg::LinalgTilingOptions &options,
+                     const linalg::LinalgTransformationFilter &f) {
+    patterns.add<LinalgTilingPattern>(OpTy::getOperationName(),
+                                      patterns.getContext(), options, f);
+    TilingPatterns<OpTypes...>::insert(patterns, options, f);
+  }
+};
+
+///
+/// Linalg vectorization patterns.
+///
+/// `filter` controls LinalgTransformMarker matching and update when specified.
+/// See `vectorizeLinalgOp` for more details.
+struct LinalgVectorizationPattern
+    : public OpInterfaceRewritePattern<linalg::LinalgOp> {
+  /// Construct a generic pattern applied to all LinalgOp that verify `filter`.
+  LinalgVectorizationPattern(MLIRContext *context,
+                             linalg::LinalgTransformationFilter f =
+                                 linalg::LinalgTransformationFilter(),
+                             linalg::LinalgVectorizationOptions options =
+                                 linalg::LinalgVectorizationOptions(),
+                             PatternBenefit benefit = 1);
+
+  /// Construct a pattern specifically applied to `opName`.
+  LinalgVectorizationPattern(StringRef opName, MLIRContext *context,
+                             linalg::LinalgVectorizationOptions options =
+                                 linalg::LinalgVectorizationOptions(),
+                             linalg::LinalgTransformationFilter f =
+                                 linalg::LinalgTransformationFilter(),
+                             PatternBenefit benefit = 1);
+
+  LogicalResult matchAndRewrite(linalg::LinalgOp linalgOp,
+                                PatternRewriter &rewriter) const override;
+
+private:
+  /// LinalgTransformMarker handles special attribute manipulations.
+  linalg::LinalgTransformationFilter filter;
+};
+
+template <typename... OpTypes>
+class VectorizationPatterns;
+
+template <>
+class VectorizationPatterns<> {
+public:
+  static void insert(RewritePatternSet &patterns,
+                     const linalg::LinalgVectorizationOptions &options,
+                     const linalg::LinalgTransformationFilter &f) {}
+};
+
+template <typename OpTy, typename... OpTypes>
+class VectorizationPatterns<OpTy, OpTypes...> {
+public:
+  static void insert(RewritePatternSet &patterns,
+                     const linalg::LinalgVectorizationOptions &options,
+                     const linalg::LinalgTransformationFilter &f) {
+    patterns.add<LinalgVectorizationPattern>(OpTy::getOperationName(),
+                                             patterns.getContext(), options, f);
+    VectorizationPatterns<OpTypes...>::insert(patterns, options, f);
+  }
+};
+
 ///
 /// Linalg promotion patterns.
 ///
@@ -153,8 +222,9 @@ private:
 /// `filter` controls LinalgTransformMarker matching and update when specified.
 /// See `promoteSubViews` for more details.
 struct LinalgBasePromotionPattern : public RewritePattern {
-  /// Entry point to match any LinalgOp OpInterface.
-  /// MatchAnyOpTag-based constructor with a mandatory `filter`.
+  /// Entry point to match any LinalgOp
+  /// OpInterface. MatchAnyOpTag-based constructor
+  /// with a mandatory `filter`.
   LinalgBasePromotionPattern(
       MLIRContext *context, linalg::LinalgTransformationFilter f,
       linalg::LinalgPromotionOptions options = linalg::LinalgPromotionOptions(),
@@ -177,10 +247,13 @@ struct LinalgBasePromotionPattern : public RewritePattern {
     if (failed(promoteSubviewsPrecondition(op, options)))
       return failure();
 
-    // TODO: We cannot use root update here. This pattern is creating other ops,
-    // so if the promotion fails, those need to be cleaned up, which doesnt seem
-    // to be happening here. So to fail properly, we should be cloning the op
-    // and deleting the previous op. This needs more investigation.
+    // TODO: We cannot use root update here. This
+    // pattern is creating other ops, so if the
+    // promotion fails, those need to be cleaned
+    // up, which doesnt seem to be happening here.
+    // So to fail properly, we should be cloning
+    // the op and deleting the previous op. This
+    // needs more investigation.
     rewriter.startRootUpdate(op);
     Optional<linalg::LinalgOp> promotedOp =
         promoteSubViews(rewriter, op, options);
@@ -194,7 +267,8 @@ struct LinalgBasePromotionPattern : public RewritePattern {
   }
 
 private:
-  /// LinalgTransformMarker handles special attribute manipulations.
+  /// LinalgTransformMarker handles special
+  /// attribute manipulations.
   linalg::LinalgTransformationFilter filter;
   /// Promotion options.
   linalg::LinalgPromotionOptions options;
@@ -202,8 +276,9 @@ private:
 
 template <typename OpTy>
 struct LinalgPromotionPattern : public LinalgBasePromotionPattern {
-  /// SFINAE: This constructor can only trigger for concrete ops that have a
-  /// static `getOperationName` method.
+  /// SFINAE: This constructor can only trigger for
+  /// concrete ops that have a static
+  /// `getOperationName` method.
   template <typename ConcreateOpTy = OpTy>
   LinalgPromotionPattern(MLIRContext *context,
                          linalg::LinalgPromotionOptions options,

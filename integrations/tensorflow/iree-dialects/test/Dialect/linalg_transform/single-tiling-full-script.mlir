@@ -13,27 +13,13 @@ func.func @matmul_tensors(
   return %0 : tensor<128x128xf32>
 }
 
-
-transform.with_pdl_patterns {
-^bb0(%arg0: !pdl.operation):
-  pdl.pattern @pdl_target : benefit(1) {
-    %args = operands
-    %results = types
-    %0 = pdl.operation "linalg.matmul"(%args : !pdl.range<value>) -> (%results : !pdl.range<type>)
-    %1 = pdl.attribute = @matmul_tensors
-    apply_native_constraint "nestedInFunc"(%0, %1 : !pdl.operation, !pdl.attribute)
-    // TODO: we don't want this, but it is the required terminator for pdl.pattern
-    rewrite %0 with "transform.dialect"
-  }
-
-  transform.structured.canonicalized_sequence %arg0 {
-  ^bb1(%arg1: !pdl.operation):
-    %0 = pdl_match @pdl_target in %arg1
-    %1, %loops:3 = transform.structured.tile %0 [4, 4, 4]
-    %2 = get_closest_isolated_parent %1
-    transform.structured.vectorize %2 {vectorize_padding = true}
-    bufferize
-    lower_vectors { multireduction_lowering = "innerreduce"}
-    lower_to_llvm
-  }
+transform.structured.canonicalized_sequence failures(propagate) {
+^bb1(%module_op: !pdl.operation):
+  %0 = transform.structured.match ops{["linalg.matmul"]} in %module_op
+  %1, %loops:3 = transform.structured.tile %0 [4, 4, 4]
+  %2 = get_closest_isolated_parent %1
+  transform.structured.vectorize %2 { vectorize_padding }
+  bufferize
+  lower_vectors { multireduction_lowering = "innerreduce"}
+  lower_to_llvm
 }
