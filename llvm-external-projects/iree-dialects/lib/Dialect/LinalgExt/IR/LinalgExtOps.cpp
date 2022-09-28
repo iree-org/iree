@@ -1752,6 +1752,11 @@ SmallVector<int64_t> computeInterchangeFromDimPos(ArrayRef<int64_t> dimsPos,
 
 // Implements `getIterationDomain` from the tiling interface.
 // TODO(hanchung): Add support for pad=true.
+// We might want to revisit the implementation. Taking a 2D input tensor as an
+// example, we might want loops ([0, ceilDiv(N, n), 1], [0, ceilDiv(M, m), 1]).
+// The scalar implementation generates two scf.for loops ([0, n, 1], (0, m, 1]).
+// For padding, we shoulc check if it's in bound. If so, load from the source.
+// If not, yield zero instead.
 LogicalResult PackOp::generateScalarImplementation(OpBuilder &builder,
                                                    Location loc,
                                                    ValueRange ivs) {
