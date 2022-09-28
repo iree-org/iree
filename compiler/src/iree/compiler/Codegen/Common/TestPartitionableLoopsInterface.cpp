@@ -34,15 +34,11 @@ struct TestPartitionableLoopsInterfacePattern
     if (!interfaceOp->hasAttr(kAttributeName)) {
       return failure();
     }
-    unsigned numLoops = interfaceOp.getNumLoops();
     SmallVector<unsigned> partitionableLoops =
         interfaceOp.getPartitionableLoops(3);
-    SmallVector<int64_t> loopInfo(numLoops, 0);
-    for (auto partitionableLoop : partitionableLoops) {
-      loopInfo[partitionableLoop] = 1;
-    }
-    auto type = RankedTensorType::get(numLoops, rewriter.getIndexType());
-    auto constantAttr = DenseIntElementsAttr::get(type, loopInfo);
+    auto type =
+        RankedTensorType::get(partitionableLoops.size(), rewriter.getI32Type());
+    auto constantAttr = DenseIntElementsAttr::get(type, partitionableLoops);
     rewriter.create<IREE::Util::UnfoldableConstantOp>(interfaceOp.getLoc(),
                                                       constantAttr);
     rewriter.updateRootInPlace(
