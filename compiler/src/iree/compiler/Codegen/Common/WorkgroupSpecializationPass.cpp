@@ -251,6 +251,9 @@ struct WorkgroupSpecializationPass
         getAllEntryPoints(innerModule);
 
     for (auto funcOp : innerModule.getOps<func::FuncOp>()) {
+      auto exportOp = entryPoints.lookup(funcOp.getName());
+      if (!exportOp) continue;
+
       SmallVector<LoopTilingAndDistributionInfo> infoVec =
           getTiledAndDistributedLoopInfo(funcOp);
 
