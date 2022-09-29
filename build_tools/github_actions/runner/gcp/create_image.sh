@@ -206,7 +206,7 @@ function create_image() {
   gcloud compute ssh "${INSTANCE_NAME}" --zone="${ZONE}" \
       --no-user-output-enabled --ssh-flag="-t" \
       --command="tail --follow=name --retry --lines=+1 --pid=${startup_pid} /startup.log"
-      # | tee "${log_file}"
+      | tee "${log_file}"
 
   echo "*******************"
   echo ""
