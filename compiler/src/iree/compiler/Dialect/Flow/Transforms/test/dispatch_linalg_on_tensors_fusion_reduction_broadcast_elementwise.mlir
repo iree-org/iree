@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-flow-fuse-reduction-broadcast-elementwise --split-input-file --pass-pipeline="func.func(iree-flow-dispatch-linalg-on-tensors-pass)" --canonicalize -cse %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="func.func(iree-flow-dispatch-linalg-on-tensors-pass)" --canonicalize -cse %s | FileCheck %s
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 
@@ -163,4 +163,6 @@ func.func @reduction_broadcast_elementwise_dynamic(%a: tensor<12x16x?xf32>, %b: 
 
 // CHECK-LABEL: func.func @reduction_broadcast_elementwise_dynamic
 //      CHECK: flow.dispatch.workgroups
-//      CHECK: flow.dispatch.workgroups
+//      CHECK: linalg.generic
+//      CHECK: linalg.generic
+//  CHECK-NOT: flow.dispatch.workgroups
