@@ -25,7 +25,8 @@ class RulesTest(unittest.TestCase):
         c_identifier="abcd.c",
         static_lib_path="libx.a",
         deps=["iree_libx", "iree_liby"],
-        testonly=True)
+        testonly=True,
+        public=False)
 
     self.assertEqual(rule, ('iree_bytecode_module(\n'
                             '  NAME\n'
@@ -47,7 +48,6 @@ class RulesTest(unittest.TestCase):
                             '    "iree_libx"\n'
                             '    "iree_liby"\n'
                             '  TESTONLY\n'
-                            '  PUBLIC\n'
                             ')\n'))
 
   def test_build_iree_bytecode_module_with_defaults(self):

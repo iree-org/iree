@@ -61,6 +61,8 @@ def _convert_block_to_string(block: List[str]) -> str:
 
 
 def get_target_path(target_name: str):
+  """Returns the full target path by combining the variable _PACKAGE_NAME and
+  the target name."""
   return f"${{_PACKAGE_NAME}}_{target_name}"
 
 
@@ -72,7 +74,8 @@ def build_iree_bytecode_module(target_name: str,
                                c_identifier: Optional[str] = None,
                                static_lib_path: Optional[str] = None,
                                deps: List[str] = [],
-                               testonly: bool = False) -> str:
+                               testonly: bool = False,
+                               public: bool = True) -> str:
   name_block = _get_string_arg_block("NAME", target_name)
   src_block = _get_string_arg_block("SRC", src)
   module_name_block = _get_string_arg_block("MODULE_FILE_NAME", module_name)
@@ -83,13 +86,14 @@ def build_iree_bytecode_module(target_name: str,
   flags_block = _get_string_list_arg_block("FLAGS", flags)
   deps_block = _get_string_list_arg_block("DEPS", deps)
   testonly_block = _get_option_arg_block("TESTONLY", testonly)
+  public_block = _get_option_arg_block("PUBLIC", public)
   return _convert_block_to_string(
       _build_call_rule(rule_name="iree_bytecode_module",
                        parameter_blocks=[
                            name_block, src_block, module_name_block,
                            c_identifier_block, compile_tool_target_block,
                            static_lib_block, flags_block, deps_block,
-                           testonly_block, ["PUBLIC"]
+                           testonly_block, public_block
                        ]))
 
 
