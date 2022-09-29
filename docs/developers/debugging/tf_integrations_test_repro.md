@@ -13,7 +13,7 @@ source iree.venv/bin/activate
 2. Install latest IREE release binaries. The importers are not expected to change much, so using the release binaries should work for most cases
 
 ```
-python -m pip install iree-compiler iree-runtime iree-tools-tf iree-tools-tflite -f https://github.com/iree-org/iree/releases/latest
+python -m pip install iree-compiler iree-runtime iree-tools-tf iree-tools-tflite --find-links https://iree-org.github.io/iree/pip-release-links.html
 ```
 
 3. Install TF nightly
