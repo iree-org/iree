@@ -10,5 +10,12 @@
 
 set -xeuo pipefail
 
-dpkg -l | grep nvidia
-nvidia-smi
+if ! dpkg -l | grep nvidia; then
+  echo "Cannot find installed nvidia package"
+  exit 1
+fi
+if ! nvidia-smi; then
+  ret=$?
+  echo "nvidia-smi failed"
+  exit "${ret}"
+fi
