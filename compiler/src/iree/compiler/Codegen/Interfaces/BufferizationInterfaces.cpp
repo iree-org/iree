@@ -416,16 +416,18 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
       });
   registry.addExtension(
       +[](MLIRContext *ctx, IREE::LinalgExt::IREELinalgExtDialect *dialect) {
-        IREE::LinalgExt::ReverseOp::attachInterface<
-            LinalgExtOpInterface<IREE::LinalgExt::ReverseOp>>(*ctx);
         IREE::LinalgExt::FftOp::attachInterface<
             LinalgExtOpInterface<IREE::LinalgExt::FftOp>>(*ctx);
-        IREE::LinalgExt::SortOp::attachInterface<
-            LinalgExtOpInterface<IREE::LinalgExt::SortOp>>(*ctx);
-        IREE::LinalgExt::ScatterOp::attachInterface<
-            LinalgExtOpInterface<IREE::LinalgExt::ScatterOp>>(*ctx);
+        IREE::LinalgExt::PackOp::attachInterface<
+            LinalgExtOpInterface<IREE::LinalgExt::PackOp>>(*ctx);
+        IREE::LinalgExt::ReverseOp::attachInterface<
+            LinalgExtOpInterface<IREE::LinalgExt::ReverseOp>>(*ctx);
         IREE::LinalgExt::ScanOp::attachInterface<
             LinalgExtOpInterface<IREE::LinalgExt::ScanOp>>(*ctx);
+        IREE::LinalgExt::ScatterOp::attachInterface<
+            LinalgExtOpInterface<IREE::LinalgExt::ScatterOp>>(*ctx);
+        IREE::LinalgExt::SortOp::attachInterface<
+            LinalgExtOpInterface<IREE::LinalgExt::SortOp>>(*ctx);
         IREE::LinalgExt::TopkOp::attachInterface<
             LinalgExtOpInterface<IREE::LinalgExt::TopkOp>>(*ctx);
       });
