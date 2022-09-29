@@ -780,7 +780,7 @@ static bool isInsOperandBufferizable(OpOperand *insOperand,
       // If the operand is a projected permutation a small stack might be
       // fine.
       if (!(insOperandIndexingMap.isProjectedPermutation() &&
-            !insOperandIndexingMap.isIdentity())) {
+            !insOperandIndexingMap.isPermutation())) {
         return false;
       }
     }
