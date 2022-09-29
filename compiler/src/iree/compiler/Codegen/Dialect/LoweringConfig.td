@@ -106,7 +106,7 @@ def IREECodegen_TranslationInfoAttr :
   let parameters = (ins
     AttrParameter<"IREE::Codegen::DispatchLoweringPassPipelineAttr",
         "Name of the pipeline to be invoked on the translation unit.">:$passPipeline,
-    OptionalParameter<"unsigned",
+    DefaultValuedParameter<"unsigned", "1",
         "The software pipeline depth to be used">:$softwarePipelineDepth
   );
   let builders = [
