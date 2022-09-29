@@ -17,9 +17,26 @@ set -o pipefail  # return error if any part of a pipe errors
 set -o nounset   # error if an undefined variable is used
 
 
+# Copied from build_tools/github_actions/runner/config/functions.sh
+get_metadata() {
+  local url="http://metadata.google.internal/computeMetadata/v1/${1}"
+  ret=0
+  curl "${url}" \
+    --silent --fail --show-error \
+    --header "Metadata-Flavor: Google" || ret=$?
+  if [[ "${ret}" != 0 ]]; then
+    echo "Failed fetching ${url}" >&2
+    return "${ret}"
+  fi
+}
+
+get_attribute() {
+  get_metadata "instance/attributes/${1}"
+}
+
+RUNNER_TYPE="$(get_attribute github-runner-type)"
 GCLOUD_VERSION=402.0.0
 GCLOUD_ARCHIVE_DIGEST=a9902b57d4cba2ebb76d7354570813d3d8199c36b95a1111a1b7fea013beaaf9
-
 
 function save_exit_code() {
   local exit_code="$?"
@@ -216,57 +233,56 @@ EOF
 
   #################################### GPU #####################################
 
-  # DO NOT SUBMIT: Make conditional on there being a GPU
+  if [[ "${RUNNER_TYPE^^}" == GPU ]]; then
+    local script_dir="$(mktemp --directory --tmpdir scripts.XXX)"
 
-  local script_dir="$(mktemp --directory --tmpdir scripts.XXX)"
+    nice_curl \
+      --remote-name-all \
+      --output-dir "${script_dir}" \
+      https://raw.githubusercontent.com/iree-org/iree/main/build_tools/scripts/check_vulkan.sh \
+      https://raw.githubusercontent.com/iree-org/iree/main/build_tools/scripts/check_cuda.sh
 
-  nice_curl \
-    --remote-name-all \
-    --output-dir "${script_dir}" \
-    https://raw.githubusercontent.com/iree-org/iree/main/build_tools/scripts/check_vulkan.sh \
-    https://raw.githubusercontent.com/iree-org/iree/main/build_tools/scripts/check_cuda.sh
+    chmod +x "${script_dir}/check_vulkan.sh" "${script_dir}/check_cuda.sh"
 
-  chmod +x "${script_dir}/check_vulkan.sh" "${script_dir}/check_cuda.sh"
-
-  # Doing these all in one command fails, probably because there's a dependency
-  # between them and apt-fast makes it happen in parallel. Also, it turns out
-  # that the Vulkan ICD is in libnvidia-gl for some reason.
-  apt-get install nvidia-headless-515
-  apt-get install libnvidia-gl-515-server nvidia-utils-515-server vulkan-tools
-  "${script_dir}/check_cuda.sh"
-  "${script_dir}/check_vulkan.sh"
+    # Doing these all in one command fails, probably because there's a dependency
+    # between them and apt-fast makes it happen in parallel. Also, it turns out
+    # that the Vulkan ICD is in libnvidia-gl for some reason.
+    apt-get install nvidia-headless-515
+    apt-get install libnvidia-gl-515-server nvidia-utils-515-server vulkan-tools
+    "${script_dir}/check_cuda.sh"
+    "${script_dir}/check_vulkan.sh"
 
 
-  # Nvidia container toolkit: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/overview.html
-  local distribution="$(source /etc/os-release; echo "${ID}${VERSION_ID}")"
-  nice_curl \
-      https://nvidia.github.io/libnvidia-container/gpgkey \
-      | gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
-  nice_curl \
-      "https://nvidia.github.io/libnvidia-container/${distribution}/libnvidia-container.list" | \
-      sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' \
-      > /etc/apt/sources.list.d/nvidia-container-toolkit.list
+    # Nvidia container toolkit: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/overview.html
+    local distribution="$(source /etc/os-release; echo "${ID}${VERSION_ID}")"
+    nice_curl \
+        https://nvidia.github.io/libnvidia-container/gpgkey \
+        | gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+    nice_curl \
+        "https://nvidia.github.io/libnvidia-container/${distribution}/libnvidia-container.list" | \
+        sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' \
+        > /etc/apt/sources.list.d/nvidia-container-toolkit.list
 
-  apt-get update
-  apt-get install nvidia-docker2
-  systemctl restart docker
+    apt-get update
+    apt-get install nvidia-docker2
+    systemctl restart docker
 
-  # Check GPU usage with Vulkan and Cuda work
-  function check_docker() {
-    local image="$1"
-    docker run --rm --gpus all --env NVIDIA_DRIVER_CAPABILITIES=all \
-        --mount="type=bind,source=${script_dir},dst=${script_dir},readonly" \
-        "${image}" \
-        bash -c "${script_dir}/check_cuda.sh && ${script_dir}/check_vulkan.sh"
-  }
+    # Check GPU usage with Vulkan and Cuda work
+    function check_docker() {
+      local image="$1"
+      docker run --rm --gpus all --env NVIDIA_DRIVER_CAPABILITIES=all \
+          --mount="type=bind,source=${script_dir},dst=${script_dir},readonly" \
+          "${image}" \
+          bash -c "${script_dir}/check_cuda.sh && ${script_dir}/check_vulkan.sh"
+    }
 
-  # And also our own Nvidia images
-  check_docker gcr.io/iree-oss/nvidia@sha256:7c2f56db65e656c15e6c96b5812a8275dd53c82bf41221192f9ba8a451aad870
-  check_docker gcr.io/iree-oss/frontends-nvidia@sha256:28cd43f36b1ca0633bbd915911abe6d22b4aa16093f074e87016305322a0eba1
+    check_docker gcr.io/iree-oss/nvidia@sha256:7c2f56db65e656c15e6c96b5812a8275dd53c82bf41221192f9ba8a451aad870
+    check_docker gcr.io/iree-oss/frontends-nvidia@sha256:28cd43f36b1ca0633bbd915911abe6d22b4aa16093f074e87016305322a0eba1
 
-  # Remove the docker images we've fetched. We might want to pre-fetch Docker
-  # images into the VM image, but that should be a separate decision.
-  docker system prune --force --all
+    # Remove the docker images we've fetched. We might want to pre-fetch Docker
+    # images into the VM image, but that should be a separate decision.
+    docker system prune --force --all
+  fi
 
   ################################### Cleanup ##################################
 

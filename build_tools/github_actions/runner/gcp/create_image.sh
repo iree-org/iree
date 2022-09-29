@@ -16,15 +16,8 @@ set -o nounset   # error if an undefined variable is used
 SUCCESS_DELETE_INSTANCE=1
 FAILURE_DELETE_INSTANCE=0
 
-# TODO: make these configurable
-MACHINE_TYPE="a2-highgpu-1g"
-MAINTENANCE_POLICY="TERMINATE"
-RUNNER_TYPE="gpu"
-# The Ubuntu base image is 10GB
-# We need enough space to fetch Docker images and such.
-# TODO(gcmn): See if we can make the image smaller, e.g. by resizing after setup
-IMAGE_SIZE_GB=50
-
+RUNNER_TYPE="${RUNNER_TYPE:-cpu}"
+RUNNER_TYPE="${RUNNER_TYPE,,}"
 
 TIME_STRING="$(date +%Y-%m-%d-%s)"
 INSTANCE_NAME="${INSTANCE_NAME:-github-runner-template-${RUNNER_TYPE}-${TIME_STRING}}"
@@ -32,6 +25,14 @@ IMAGE_NAME="${INSTANCE_NAME/-template/}"
 ZONE="${ZONE:-us-central1-a}"
 PROJECT=iree-oss
 BASE_IMAGE="${BASE_IMAGE:-projects/ubuntu-os-cloud/global/images/ubuntu-2204-jammy-v20220902}"
+
+GPU_MACHINE_TYPE="a2-highgpu-1g"
+CPU_MACHINE_TYPE="e2-medium"
+CPU_IMAGE_SIZE_GB=10
+# We need enough space to fetch Docker images that we test with
+# TODO(gcmn): See if we can make the image smaller, e.g. by resizing after setup
+GPU_IMAGE_SIZE_GB=50
+
 # It takes a little bit to bring up ssh on the instance. I haven't found a
 # better way to wait for this than just polling.
 MAX_IP_ATTEMPTS=5
@@ -82,32 +83,6 @@ function failure_exit() {
 trap failure_exit INT ERR EXIT
 
 SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")";
-
-CREATE_INSTANCE_CMD=(
-  gcloud
-  compute
-  instances
-  create
-  "${INSTANCE_NAME}"
-  --project=iree-oss
-  --zone="${ZONE}"
-  --machine-type="${MACHINE_TYPE}"
-  # `address=''` indicates an ephemeral IP. This *shouldn't* be necessary here,
-  # as the gcloud docs say that this is the default, but in fact if you leave it
-  # off the VM gets no external IP and is impossible to SSH into. This knowledge
-  # was hard won.
-  --network-interface=network=default,address='',network-tier=PREMIUM
-  --maintenance-policy="${MAINTENANCE_POLICY}"
-  --provisioning-model=STANDARD
-  --no-service-account
-  --no-scopes
-  --create-disk="boot=yes,device-name=${INSTANCE_NAME},image=${BASE_IMAGE},mode=rw,size=${IMAGE_SIZE_GB},type=projects/${PROJECT}/zones/${ZONE}/diskTypes/pd-balanced,auto-delete=yes"
-  --no-shielded-secure-boot
-  --shielded-vtpm
-  --shielded-integrity-monitoring
-  --reservation-affinity=any
-  --metadata-from-file=startup-script="${SCRIPT_DIR}/image_setup.sh"
-)
 
 function get_ip() {
   gcloud compute instances describe \
@@ -164,12 +139,55 @@ function create_image() {
     echo "Using existing instance '${INSTANCE_NAME}'"
   else
     echo "Creating instance '${INSTANCE_NAME}' for boot disk"
-    (set -x; "${CREATE_INSTANCE_CMD[@]}")
+    case "${RUNNER_TYPE}" in
+      cpu)
+        local machine_type="${CPU_MACHINE_TYPE}"
+        local image_size_gb="${CPU_IMAGE_SIZE_GB}"
+        local maintenance_policy=MIGRATE
+        ;;
+      gpu)
+        local machine_type="${GPU_MACHINE_TYPE}"
+        local image_size_gb="${GPU_IMAGE_SIZE_GB}"
+        local maintenance_policy=TERMINATE
+        ;;
+      *)
+        echo "Unrecognized RUNNER_TYPE=${RUNNER_TYPE}"
+        exit 1
+        ;;
+    esac
+
+    local -a create_instance_cmd=(
+      gcloud
+      compute
+      instances
+      create
+      "${INSTANCE_NAME}"
+      --project=iree-oss
+      --zone="${ZONE}"
+      # `address=''` indicates an ephemeral IP. This *shouldn't* be necessary here,
+      # as the gcloud docs say that this is the default, but in fact if you leave it
+      # off the VM gets no external IP and is impossible to SSH into. This knowledge
+      # was hard won.
+      --network-interface=network=default,address='',network-tier=PREMIUM
+      --provisioning-model=STANDARD
+      --no-service-account
+      --no-scopes
+      --no-shielded-secure-boot
+      --shielded-vtpm
+      --shielded-integrity-monitoring
+      --reservation-affinity=any
+      --metadata-from-file=startup-script="${SCRIPT_DIR}/image_setup.sh"
+      --maintenance-policy="${maintenance_policy}"
+      --metadata="github-runner-type=${RUNNER_TYPE}"
+      --machine-type="${machine_type}"
+      --create-disk="boot=yes,device-name=${INSTANCE_NAME},image=${BASE_IMAGE},mode=rw,size=${image_size_gb},type=projects/${PROJECT}/zones/${ZONE}/diskTypes/pd-balanced,auto-delete=yes"
+    )
+    (set -x; "${create_instance_cmd[@]}")
   fi
 
+  echo "Waiting for instance to start up"
   # We could only use the ssh check below, but it's much nicer to know why an
   # an instance isn't responsive and this is something we can check first.
-  echo "Waiting for instance to start up"
   wait_for_ip "${MAX_IP_ATTEMPTS}"
   wait_for_ssh "${MAX_SSH_ATTEMPTS}"
 
