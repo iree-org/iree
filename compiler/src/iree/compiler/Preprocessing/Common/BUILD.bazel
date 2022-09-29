@@ -31,6 +31,7 @@ iree_compiler_cc_library(
     name = "Transforms",
     srcs = [
         "ConvertConv2DToImg2Col.cpp",
+        "ConvertConvNchwToNhwc.cpp",
         "PadLinalgOps.cpp",
         "PassDetail.h",
         "Passes.cpp",
