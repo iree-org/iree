@@ -3,21 +3,21 @@
 Like the IREE project in general, IREE tests are divided into a few different
 components and use different tooling depending on the needs of that component.
 
-| Test type       | Test                  | Build system  | Supported platforms              |
-|:--------------  | :-----------------    | ------------- | -------------                    |
-| Compiler tests  | iree_lit_test         | Bazel/CMake   | Host                             |
-|                 | iree_lit_test_suite   | Bazel/CMake   | Host                             |
-| Runtime tests   | iree_cc_test          | Bazel/CMake   | x86_64/arm64-v8a/riscv32/riscv64 |
-|                 | iree_native_test      | Bazel/CMake   | x86_64/arm64-v8a/riscv32/riscv64 |
-|                 | iree_hal_cts_test_suite| CMake        | x86_64/arm64-v8a/riscv32/riscv64 |
-| Core E2E tests  | iree_check_test       | Bazel/CMake   | x86_64/arm64-v8a/riscv32/riscv64 |
-|                 | iree_check_test_suite | Bazel/CMake   | x86_64/arm64-v8a/riscv32/riscv64 |
-|                 | iree_check_single_backend_test_suite | Bazel/CMake | x86_64/arm64-v8a/riscv32/riscv64 |
-|                 | iree_trace_runner_test| Bazel/CMake   | x86_64/arm64-v8a/riscv32/riscv64 |
-|                 | iree_single_backend_generated_trace_runner_test | Bazel/CMake | x86_64/arm64-v8a/riscv32/riscv64 |
-|                 | iree_generated_trace_runner_test      | Bazel/CMake | x86_64/arm64-v8a/riscv32/riscv64 |
-|                 | iree_run_module_test    | CMake       | x86_64/arm64-v8a/riscv32/riscv64 |
-|                 | iree_static_linker_test | CMake       | x86_64/arm64-v8a/riscv32/riscv64 |
+| Test type       | Test                                            | Build system | Supported platforms              |
+|:--------------  | :-----------------                              | -----------  | -------------                    |
+| Compiler tests  | iree_lit_test                                   | Bazel/CMake  | Host                             |
+|                 | iree_lit_test_suite                             | Bazel/CMake  | Host                             |
+| Runtime tests   | iree_cc_test                                    | Bazel/CMake  | x86_64/arm64-v8a/riscv32/riscv64 |
+|                 | iree_native_test                                | Bazel/CMake  | x86_64/arm64-v8a/riscv32/riscv64 |
+|                 | iree_hal_cts_test_suite                         | CMake        | x86_64/arm64-v8a/riscv32/riscv64 |
+| Core E2E tests  | iree_check_test                                 | Bazel/CMake  | x86_64/arm64-v8a/riscv32/riscv64 |
+|                 | iree_check_test_suite                           | Bazel/CMake  | x86_64/arm64-v8a/riscv32/riscv64 |
+|                 | iree_check_single_backend_test_suite            | Bazel/CMake  | x86_64/arm64-v8a/riscv32/riscv64 |
+|                 | iree_trace_runner_test                          | Bazel/CMake  | x86_64/arm64-v8a/riscv32/riscv64 |
+|                 | iree_single_backend_generated_trace_runner_test | Bazel/CMake  | x86_64/arm64-v8a/riscv32/riscv64 |
+|                 | iree_generated_trace_runner_test                | Bazel/CMake  | x86_64/arm64-v8a/riscv32/riscv64 |
+|                 | iree_run_module_test                            | CMake        | x86_64/arm64-v8a/riscv32/riscv64 |
+|                 | iree_static_linker_test                         | CMake        | x86_64/arm64-v8a/riscv32/riscv64 |
 
 ## Compiler Tests
 
