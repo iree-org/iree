@@ -79,6 +79,10 @@ std::unique_ptr<Pass> createConvert1X1FilterConv2DToMatmulPass();
 // using im2col tranformation.
 std::unique_ptr<Pass> createConvertConv2DToImg2ColPass();
 
+/// Creates a pass to convert linalg NCHW Convolutions to NHWC.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createConvertConvNchwToNhwcPass();
+
 // Creates a pass to convert dispatch.region ops to dispatch.workgroups ops.
 std::unique_ptr<Pass> createConvertRegionToWorkgroupsPass();
 

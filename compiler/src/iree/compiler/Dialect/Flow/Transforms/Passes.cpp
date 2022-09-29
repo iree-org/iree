@@ -60,6 +60,11 @@ static llvm::cl::opt<bool> clEnableConvToImg2Col(
     llvm::cl::desc("Enable converting convolution ops to img2col form."),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clEnableConvNchwToNhwc(
+    "iree-flow-enable-conv-nchw-to-nhwc-transform",
+    llvm::cl::desc("Enable converting convolution ops in nchw format."),
+    llvm::cl::init(false));
+
 static llvm::cl::opt<bool> clEnablePaddingLinalgOps(
     "iree-flow-enable-padding-linalg-ops",
     llvm::cl::desc("Enable padding linalg ops to an integer multiple of "
@@ -213,6 +218,8 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
 
   // Special case peephole optimizations.
   FunctionLikeNest(passManager)
+      .addPredicatedPass(clEnableConvNchwToNhwc,
+                         IREE::Flow::createConvertConvNchwToNhwcPass)
       .addPass(IREE::Flow::createConvert1X1FilterConv2DToMatmulPass)
       .addPredicatedPass(clEnableConvToImg2Col,
                          IREE::Flow::createConvertConv2DToImg2ColPass)
