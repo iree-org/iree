@@ -58,14 +58,13 @@ static FailureOr<Operation *> getRootOp(ArrayRef<Operation *> computeOps) {
 static FailureOr<unsigned> getNumWorkloadValues(
     ArrayRef<Operation *> computeOps) {
   if (computeOps.empty()) return failure();
-  PartitionableLoopsInterface tilingRoot =
-      dyn_cast<PartitionableLoopsInterface>(computeOps.back());
+  TilingInterface tilingRoot = dyn_cast<TilingInterface>(computeOps.back());
   if (!tilingRoot) {
     return tilingRoot->emitOpError(
         "expected the root of tile and fuse operations to implement the "
-        "`PartitionableLoopsInterface`");
+        "`TilingInterface`");
   }
-  return tilingRoot.getNumLoops();
+  return tilingRoot.getLoopIteratorTypes().size();
 }
 
 /// Fallback lowering of `flow.dispatch.workgroup_count_from_dag_root` to {1, 1,

@@ -76,14 +76,15 @@ static SmallVector<Value, 4> calculateDistributedTileSize(
   SmallVector<int64_t> blockTileSize = getTileSizes(operation, 0);
   SmallVector<Value, 4> tileSizesVal;
   // Use partitionedLoop to know what loop needs to be distributed.
-  auto interfaceOp = cast<PartitionableLoopsInterface>(*operation);
+  auto interfaceOp = cast<PartitionableLoopsInterface>(operation);
   auto partitionedLoops =
       interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
   if (partitionedLoops.empty()) {
     return tileSizesVal;
   }
   auto zero = builder.create<arith::ConstantIndexOp>(operation->getLoc(), 0);
-  tileSizesVal.resize(interfaceOp.getNumLoops(), zero);
+  tileSizesVal.resize(
+      cast<TilingInterface>(operation).getLoopIteratorTypes().size(), zero);
 
   // partitionedLoops contains the dimensions we want to distribute.
   // We are distributing them in order onto the different workgroup
@@ -356,8 +357,8 @@ struct LLVMGPUTileAndDistributePass
     if (flatWorkgroupSize > kWarpSize) {
       RewritePatternSet promotionPatterns(&getContext());
 
-          populatePromotionPatterns(context, promotionPatterns,
-                                    contractOpFilter, {0, 1});
+      populatePromotionPatterns(context, promotionPatterns, contractOpFilter,
+                                {0, 1});
 
       if (failed(applyPatternsAndFoldGreedily(funcOp,
                                               std::move(promotionPatterns)))) {

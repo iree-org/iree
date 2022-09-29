@@ -157,10 +157,11 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
            << loweringConfig.getTileSizes().size();
   }
 
-  auto interfaceOp = dyn_cast_or_null<PartitionableLoopsInterface>(op);
+  auto interfaceOp = dyn_cast_or_null<TilingInterface>(op);
   if (interfaceOp) {
     llvm::SmallDenseSet<unsigned> pLoopsSet;
-    for (auto iteratorType : llvm::enumerate(interfaceOp.getIteratorTypes())) {
+    for (auto iteratorType :
+         llvm::enumerate(interfaceOp.getLoopIteratorTypes())) {
       if (iteratorType.value() == utils::IteratorType::parallel) {
         pLoopsSet.insert(iteratorType.index());
       }
