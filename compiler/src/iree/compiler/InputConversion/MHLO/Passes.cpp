@@ -52,6 +52,7 @@ void registerMHLOConversionPassPipeline() {
 
 // Prepare HLO for use as an input to the Flow dialect.
 void buildMHLOInputConversionPassPipeline(OpPassManager &passManager) {
+  passManager.addPass(mlir::mhlo::createStablehloLegalizeToHloPass());
   passManager.addNestedPass<func::FuncOp>(
       mhlo::createLegalizeControlFlowPass());
 
