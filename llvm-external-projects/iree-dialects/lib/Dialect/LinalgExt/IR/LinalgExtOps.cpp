@@ -1886,6 +1886,119 @@ LogicalResult PackOp::generateScalarImplementation(OpBuilder &builder,
   return success();
 }
 
+SmallVector<Operation *>
+PackOp::getTiledImplementation(OpBuilder &builder,
+                               ArrayRef<OpFoldResult> offsets,
+                               ArrayRef<OpFoldResult> sizes) {
+  Location loc = getLoc();
+  auto ctx = builder.getContext();
+
+  // Take the minimum of two integers.
+  auto idMap = AffineMap::getMultiDimIdentityMap(2, ctx);
+  auto min = [&](OpFoldResult v1, OpFoldResult v2) {
+    return builder.createOrFold<AffineMinOp>(
+        loc, idMap,
+        ValueRange{getValueOrCreateConstantIndexOp(builder, loc, v1),
+                   getValueOrCreateConstantIndexOp(builder, loc, v2)});
+  };
+  // Subtract two integers.
+  AffineExpr dim0, dim1;
+  bindDims(ctx, dim0, dim1);
+  auto subMap = AffineMap::get(2, 0, {dim0 - dim1});
+  auto sub = [&](OpFoldResult v1, OpFoldResult v2) {
+    return builder.createOrFold<AffineApplyOp>(
+        loc, subMap,
+        ValueRange{getValueOrCreateConstantIndexOp(builder, loc, v1),
+                   getValueOrCreateConstantIndexOp(builder, loc, v2)});
+  };
+
+  int64_t inputRank = getInputRank();
+  DenseMap<int64_t, OpFoldResult> dimAndTileMapping = getDimAndTileMapping();
+  SmallVector<OpFoldResult> sourceIndices, sourceSizes;
+  for (auto dim : llvm::seq<int64_t>(0, inputRank)) {
+    if (dimAndTileMapping.count(dim)) {
+      AffineExpr i, tile;
+      bindDims(ctx, i);
+      bindSymbols(ctx, tile);
+      OpFoldResult sourceIndex = makeComposedFoldedAffineApply(
+          builder, loc, i * tile,
+          ArrayRef<OpFoldResult>{offsets[dim], dimAndTileMapping[dim]});
+      sourceIndices.push_back(sourceIndex);
+
+      OpFoldResult sourceSize = makeComposedFoldedAffineApply(
+          builder, loc, i * tile,
+          ArrayRef<OpFoldResult>{sizes[dim], dimAndTileMapping[dim]});
+
+      sourceSizes.push_back(sourceSize);
+    } else {
+      sourceIndices.push_back(offsets[dim]);
+      sourceSizes.push_back(sizes[dim]);
+    }
+    OpFoldResult dimSize = getDim(builder, loc, getInput(), dim);
+    sourceSizes.back() =
+        min(sourceSizes.back(), sub(dimSize, sourceIndices.back()));
+  }
+
+  auto oneAttr = builder.getI64IntegerAttr(1);
+  SmallVector<OpFoldResult> strides(inputRank, oneAttr);
+
+  SmallVector<Value> tiledOperands;
+  tiledOperands.push_back(
+      getSlice(builder, loc, getInput(), sourceIndices, sourceSizes, strides));
+
+  SmallVector<OpFoldResult> outputOffsets, outputSizes;
+  if (failed(getResultTilePosition(builder, 0, offsets, sizes, outputOffsets,
+                                   outputSizes))) {
+    return {};
+  }
+  strides.append(inputRank, oneAttr);
+  tiledOperands.push_back(
+      getSlice(builder, loc, getOutput(), outputOffsets, outputSizes, strides));
+
+  for (auto tile : getInnerTiles()) tiledOperands.push_back(tile);
+  if (auto val = getPaddingValue()) tiledOperands.push_back(val);
+
+  // There are exactly one input and one output, the output is the second operand.
+  SmallVector<Type, 4> tiledResultTypes;
+  if (hasTensorSemantics()) {
+    tiledResultTypes.push_back(tiledOperands[1].getType());
+  }
+
+  Operation *tiledPackOp =
+      cast<LinalgExtOp>(getOperation())
+          .clone(builder, loc, tiledResultTypes, tiledOperands);
+
+  return {tiledPackOp};
+}
+
+LogicalResult PackOp::getResultTilePosition(
+    OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
+    SmallVector<OpFoldResult> &resultSizes) {
+  auto zeroAttr = builder.getI64IntegerAttr(0);
+  resultOffsets.assign(offsets.begin(), offsets.end());
+  resultOffsets.append(getInputRank(), zeroAttr);
+  resultSizes.assign(sizes.begin(), sizes.end());
+
+  ReifiedRankedShapedTypeDims outputShape;
+  if (failed(reifyResultShapes(builder, outputShape)))
+    return getOperation()->emitOpError("failed to reify result shape");
+  if (outputShape.size() != 1 || outputShape[0].size() != getOutputRank()) {
+    return getOperation()->emitOpError(
+               "expected shape of one result value of rank")
+           << getOutputRank();
+  }
+
+  // All loops except the innermost are simple loops that just iterate
+  // over the tile dimensions.
+  for (auto dataTileDim :
+       llvm::seq<unsigned>(getInputRank(), getOutputRank())) {
+    resultSizes.push_back(getAsOpFoldResult(outputShape[0][dataTileDim]));
+  }
+
+  return success();
+}
+
 LogicalResult
 PackOp::reifyResultShapes(OpBuilder &builder,
                           ReifiedRankedShapedTypeDims &reifiedReturnShapes) {

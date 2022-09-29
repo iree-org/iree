@@ -916,3 +916,198 @@ func.func @topk_tile_tensor_optional(%input_values: tensor<20x10xf32>, %out_valu
 // CHECK:           %[[D7:.+]] = tensor.insert_slice %[[D5]]#1 into %[[ARG5]][%[[ARG3]], 0] [%[[D1]], %[[C3]]] [1, 1]
 // CHECK:           scf.yield %[[D6]], %[[D7]]
 // CHECK:           return %[[RESULT]]#0, %[[RESULT]]#1
+
+// -----
+
+func.func @NC_to_NCnc(%arg0: tensor<128x256xf32>, %arg1: tensor<4x8x32x32xf32>) -> tensor<4x8x32x32xf32> {
+  %0 = iree_linalg_ext.pack {__internal_linalg_transform__ = "tiling_pack_input"} %arg0 dims_pos = [0, 1] inner_tiles = [32, 32] into %arg1 : (tensor<128x256xf32> tensor<4x8x32x32xf32>) -> tensor<4x8x32x32xf32>
+  return %0 : tensor<4x8x32x32xf32>
+}
+// CHECK:         #map0 = affine_map<(d0)[s0, s1] -> (2, -d0 + s1)>
+// CHECK:         #map1 = affine_map<(d0)[s0, s1] -> (4, -d0 + s1)>
+// CHECK:         #map2 = affine_map<(d0) -> (d0 * 32)>
+// CHECK:         #map3 = affine_map<(d0, d1) -> (d0 - d1)>
+// CHECK:         #map4 = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK-LABEL:   func.func @NC_to_NCnc(
+// CHECK-SAME:                          %[[VAL_0:.*]]: tensor<128x256xf32>,
+// CHECK-SAME:                          %[[VAL_1:.*]]: tensor<4x8x32x32xf32>) -> tensor<4x8x32x32xf32> {
+// CHECK:           %[[VAL_2:.*]] = arith.constant 0 : index
+// CHECK:           %[[VAL_3:.*]] = arith.constant 4 : index
+// CHECK:           %[[VAL_4:.*]] = arith.constant 8 : index
+// CHECK:           %[[VAL_5:.*]] = arith.constant 2 : index
+// CHECK:           %[[VAL_6:.*]] = arith.constant 128 : index
+// CHECK:           %[[VAL_7:.*]] = arith.constant 256 : index
+// CHECK:           %[[VAL_8:.*]] = scf.for %[[VAL_9:.*]] = %[[VAL_2]] to %[[VAL_3]] step %[[VAL_5]] iter_args(%[[VAL_10:.*]] = %[[VAL_1]]) -> (tensor<4x8x32x32xf32>) {
+// CHECK:             %[[VAL_11:.*]] = affine.min #map0(%[[VAL_9]]){{\[}}%[[VAL_5]], %[[VAL_3]]]
+// CHECK:             %[[VAL_12:.*]] = scf.for %[[VAL_13:.*]] = %[[VAL_2]] to %[[VAL_4]] step %[[VAL_3]] iter_args(%[[VAL_14:.*]] = %[[VAL_10]]) -> (tensor<4x8x32x32xf32>) {
+// CHECK:               %[[VAL_15:.*]] = affine.min #map1(%[[VAL_13]]){{\[}}%[[VAL_3]], %[[VAL_4]]]
+// CHECK:               %[[VAL_16:.*]] = affine.apply #map2(%[[VAL_9]])
+// CHECK:               %[[VAL_17:.*]] = affine.apply #map2(%[[VAL_11]])
+// CHECK:               %[[VAL_18:.*]] = affine.apply #map3(%[[VAL_6]], %[[VAL_16]])
+// CHECK:               %[[VAL_19:.*]] = affine.min #map4(%[[VAL_17]], %[[VAL_18]])
+// CHECK:               %[[VAL_20:.*]] = affine.apply #map2(%[[VAL_13]])
+// CHECK:               %[[VAL_21:.*]] = affine.apply #map2(%[[VAL_15]])
+// CHECK:               %[[VAL_22:.*]] = affine.apply #map3(%[[VAL_7]], %[[VAL_20]])
+// CHECK:               %[[VAL_23:.*]] = affine.min #map4(%[[VAL_21]], %[[VAL_22]])
+// CHECK:               %[[VAL_24:.*]] = tensor.extract_slice %[[VAL_0]]{{\[}}%[[VAL_16]], %[[VAL_20]]] {{\[}}%[[VAL_19]], %[[VAL_23]]] [1, 1] : tensor<128x256xf32> to tensor<?x?xf32>
+// CHECK:               %[[VAL_25:.*]] = tensor.extract_slice %[[VAL_1]]{{\[}}%[[VAL_9]], %[[VAL_13]], 0, 0] {{\[}}%[[VAL_11]], %[[VAL_15]], 32, 32] [1, 1, 1, 1] : tensor<4x8x32x32xf32> to tensor<?x?x32x32xf32>
+// CHECK:               %[[VAL_26:.*]] = iree_linalg_ext.pack {__internal_linalg_transform__ = "tiling_pack_output"} %[[VAL_24]] dims_pos = [0, 1] inner_tiles = [32, 32] into %[[VAL_25]] : (tensor<?x?xf32> tensor<?x?x32x32xf32>) -> tensor<?x?x32x32xf32>
+// CHECK:               %[[VAL_27:.*]] = tensor.insert_slice %[[VAL_26]] into %[[VAL_14]]{{\[}}%[[VAL_9]], %[[VAL_13]], 0, 0] {{\[}}%[[VAL_11]], %[[VAL_15]], 32, 32] [1, 1, 1, 1] : tensor<?x?x32x32xf32> into tensor<4x8x32x32xf32>
+// CHECK:               scf.yield %[[VAL_27]] : tensor<4x8x32x32xf32>
+// CHECK:             }
+// CHECK:             scf.yield %[[VAL_28:.*]] : tensor<4x8x32x32xf32>
+// CHECK:           }
+// CHECK:           return %[[VAL_29:.*]] : tensor<4x8x32x32xf32>
+// CHECK:         }
+
+// -----
+
+func.func @pad_and_pack_static(%input: tensor<13x15xf32>, %output: tensor<2x8x8x2xf32>, %pad: f32) -> tensor<2x8x8x2xf32> {
+  %0 = iree_linalg_ext.pack {__internal_linalg_transform__ = "tiling_pack_input"} %input padding_value(%pad : f32) dims_pos = [0, 1] inner_tiles = [8, 2] into %output : (tensor<13x15xf32> tensor<2x8x8x2xf32>) -> tensor<2x8x8x2xf32>
+  return %0 : tensor<2x8x8x2xf32>
+}
+// CHECK:         #map0 = affine_map<(d0)[s0, s1] -> (2, -d0 + s1)>
+// CHECK:         #map1 = affine_map<(d0)[s0, s1] -> (4, -d0 + s1)>
+// CHECK:         #map2 = affine_map<(d0) -> (d0 * 8)>
+// CHECK:         #map3 = affine_map<(d0, d1) -> (d0 - d1)>
+// CHECK:         #map4 = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK:         #map5 = affine_map<(d0) -> (d0 * 2)>
+// CHECK-LABEL:   func.func @pad_and_pack_static(
+// CHECK-SAME:                                   %[[VAL_0:.*]]: tensor<13x15xf32>,
+// CHECK-SAME:                                   %[[VAL_1:.*]]: tensor<2x8x8x2xf32>,
+// CHECK-SAME:                                   %[[VAL_2:.*]]: f32) -> tensor<2x8x8x2xf32> {
+// CHECK:           %[[VAL_3:.*]] = arith.constant 0 : index
+// CHECK:           %[[VAL_4:.*]] = arith.constant 2 : index
+// CHECK:           %[[VAL_5:.*]] = arith.constant 8 : index
+// CHECK:           %[[VAL_6:.*]] = arith.constant 4 : index
+// CHECK:           %[[VAL_7:.*]] = arith.constant 13 : index
+// CHECK:           %[[VAL_8:.*]] = arith.constant 15 : index
+// CHECK:           %[[VAL_9:.*]] = scf.for %[[VAL_10:.*]] = %[[VAL_3]] to %[[VAL_4]] step %[[VAL_4]] iter_args(%[[VAL_11:.*]] = %[[VAL_1]]) -> (tensor<2x8x8x2xf32>) {
+// CHECK:             %[[VAL_12:.*]] = affine.min #map0(%[[VAL_10]]){{\[}}%[[VAL_4]], %[[VAL_4]]]
+// CHECK:             %[[VAL_13:.*]] = scf.for %[[VAL_14:.*]] = %[[VAL_3]] to %[[VAL_5]] step %[[VAL_6]] iter_args(%[[VAL_15:.*]] = %[[VAL_11]]) -> (tensor<2x8x8x2xf32>) {
+// CHECK:               %[[VAL_16:.*]] = affine.min #map1(%[[VAL_14]]){{\[}}%[[VAL_6]], %[[VAL_5]]]
+// CHECK:               %[[VAL_17:.*]] = affine.apply #map2(%[[VAL_10]])
+// CHECK:               %[[VAL_18:.*]] = affine.apply #map2(%[[VAL_12]])
+// CHECK:               %[[VAL_19:.*]] = affine.apply #map3(%[[VAL_7]], %[[VAL_17]])
+// CHECK:               %[[VAL_20:.*]] = affine.min #map4(%[[VAL_18]], %[[VAL_19]])
+// CHECK:               %[[VAL_21:.*]] = affine.apply #map5(%[[VAL_14]])
+// CHECK:               %[[VAL_22:.*]] = affine.apply #map5(%[[VAL_16]])
+// CHECK:               %[[VAL_23:.*]] = affine.apply #map3(%[[VAL_8]], %[[VAL_21]])
+// CHECK:               %[[VAL_24:.*]] = affine.min #map4(%[[VAL_22]], %[[VAL_23]])
+// CHECK:               %[[VAL_25:.*]] = tensor.extract_slice %[[VAL_0]]{{\[}}%[[VAL_17]], %[[VAL_21]]] {{\[}}%[[VAL_20]], %[[VAL_24]]] [1, 1] : tensor<13x15xf32> to tensor<?x?xf32>
+// CHECK:               %[[VAL_26:.*]] = tensor.extract_slice %[[VAL_1]]{{\[}}%[[VAL_10]], %[[VAL_14]], 0, 0] {{\[}}%[[VAL_12]], %[[VAL_16]], 8, 2] [1, 1, 1, 1] : tensor<2x8x8x2xf32> to tensor<?x?x8x2xf32>
+// CHECK:               %[[VAL_27:.*]] = iree_linalg_ext.pack {__internal_linalg_transform__ = "tiling_pack_output"} %[[VAL_25]] padding_value(%[[VAL_2]] : f32) dims_pos = [0, 1] inner_tiles = [8, 2] into %[[VAL_26]] : (tensor<?x?xf32> tensor<?x?x8x2xf32>) -> tensor<?x?x8x2xf32>
+// CHECK:               %[[VAL_28:.*]] = tensor.insert_slice %[[VAL_27]] into %[[VAL_15]]{{\[}}%[[VAL_10]], %[[VAL_14]], 0, 0] {{\[}}%[[VAL_12]], %[[VAL_16]], 8, 2] [1, 1, 1, 1] : tensor<?x?x8x2xf32> into tensor<2x8x8x2xf32>
+// CHECK:               scf.yield %[[VAL_28]] : tensor<2x8x8x2xf32>
+// CHECK:             }
+// CHECK:             scf.yield %[[VAL_29:.*]] : tensor<2x8x8x2xf32>
+// CHECK:           }
+// CHECK:           return %[[VAL_30:.*]] : tensor<2x8x8x2xf32>
+// CHECK:         }
+
+// -----
+
+func.func @pad_and_pack_partially_dynamic(%input: tensor<?x?xf32>, %output: tensor<?x?x8x2xf32>, %pad: f32) -> tensor<?x?x8x2xf32> {
+  %0 = iree_linalg_ext.pack {__internal_linalg_transform__ = "tiling_pack_input"} %input padding_value(%pad : f32) dims_pos = [0, 1] inner_tiles = [8, 2] into %output : (tensor<?x?xf32> tensor<?x?x8x2xf32>) -> tensor<?x?x8x2xf32>
+  return %0 : tensor<?x?x8x2xf32>
+}
+// CHECK:         #map0 = affine_map<()[s0] -> (s0 ceildiv 8)>
+// CHECK:         #map1 = affine_map<()[s0] -> (s0 ceildiv 2)>
+// CHECK:         #map2 = affine_map<(d0)[s0, s1] -> (2, -d0 + s1)>
+// CHECK:         #map3 = affine_map<(d0)[s0, s1] -> (4, -d0 + s1)>
+// CHECK:         #map4 = affine_map<(d0) -> (d0 * 8)>
+// CHECK:         #map5 = affine_map<(d0, d1) -> (d0 - d1)>
+// CHECK:         #map6 = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK:         #map7 = affine_map<(d0) -> (d0 * 2)>
+// CHECK-LABEL:   func.func @pad_and_pack_partially_dynamic(
+// CHECK-SAME:                                              %[[VAL_0:.*]]: tensor<?x?xf32>,
+// CHECK-SAME:                                              %[[VAL_1:.*]]: tensor<?x?x8x2xf32>,
+// CHECK-SAME:                                              %[[VAL_2:.*]]: f32) -> tensor<?x?x8x2xf32> {
+// CHECK:           %[[VAL_3:.*]] = arith.constant 0 : index
+// CHECK:           %[[VAL_4:.*]] = arith.constant 1 : index
+// CHECK:           %[[VAL_5:.*]] = arith.constant 2 : index
+// CHECK:           %[[VAL_6:.*]] = arith.constant 4 : index
+// CHECK:           %[[VAL_7:.*]] = tensor.dim %[[VAL_1]], %[[VAL_3]] : tensor<?x?x8x2xf32>
+// CHECK:           %[[VAL_8:.*]] = affine.apply #map0(){{\[}}%[[VAL_7]]]
+// CHECK:           %[[VAL_9:.*]] = tensor.dim %[[VAL_1]], %[[VAL_4]] : tensor<?x?x8x2xf32>
+// CHECK:           %[[VAL_10:.*]] = affine.apply #map1(){{\[}}%[[VAL_9]]]
+// CHECK:           %[[VAL_11:.*]] = scf.for %[[VAL_12:.*]] = %[[VAL_3]] to %[[VAL_8]] step %[[VAL_5]] iter_args(%[[VAL_13:.*]] = %[[VAL_1]]) -> (tensor<?x?x8x2xf32>) {
+// CHECK:             %[[VAL_14:.*]] = affine.min #map2(%[[VAL_12]]){{\[}}%[[VAL_5]], %[[VAL_8]]]
+// CHECK:             %[[VAL_15:.*]] = scf.for %[[VAL_16:.*]] = %[[VAL_3]] to %[[VAL_10]] step %[[VAL_6]] iter_args(%[[VAL_17:.*]] = %[[VAL_13]]) -> (tensor<?x?x8x2xf32>) {
+// CHECK:               %[[VAL_18:.*]] = affine.min #map3(%[[VAL_16]]){{\[}}%[[VAL_6]], %[[VAL_10]]]
+// CHECK:               %[[VAL_19:.*]] = affine.apply #map4(%[[VAL_12]])
+// CHECK:               %[[VAL_20:.*]] = affine.apply #map4(%[[VAL_14]])
+// CHECK:               %[[VAL_21:.*]] = tensor.dim %[[VAL_0]], %[[VAL_3]] : tensor<?x?xf32>
+// CHECK:               %[[VAL_22:.*]] = affine.apply #map5(%[[VAL_21]], %[[VAL_19]])
+// CHECK:               %[[VAL_23:.*]] = affine.min #map6(%[[VAL_20]], %[[VAL_22]])
+// CHECK:               %[[VAL_24:.*]] = affine.apply #map7(%[[VAL_16]])
+// CHECK:               %[[VAL_25:.*]] = affine.apply #map7(%[[VAL_18]])
+// CHECK:               %[[VAL_26:.*]] = tensor.dim %[[VAL_0]], %[[VAL_4]] : tensor<?x?xf32>
+// CHECK:               %[[VAL_27:.*]] = affine.apply #map5(%[[VAL_26]], %[[VAL_24]])
+// CHECK:               %[[VAL_28:.*]] = affine.min #map6(%[[VAL_25]], %[[VAL_27]])
+// CHECK:               %[[VAL_29:.*]] = tensor.extract_slice %[[VAL_0]]{{\[}}%[[VAL_19]], %[[VAL_24]]] {{\[}}%[[VAL_23]], %[[VAL_28]]] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
+// CHECK:               %[[VAL_30:.*]] = tensor.extract_slice %[[VAL_1]]{{\[}}%[[VAL_12]], %[[VAL_16]], 0, 0] {{\[}}%[[VAL_14]], %[[VAL_18]], 8, 2] [1, 1, 1, 1] : tensor<?x?x8x2xf32> to tensor<?x?x8x2xf32>
+// CHECK:               %[[VAL_31:.*]] = iree_linalg_ext.pack {__internal_linalg_transform__ = "tiling_pack_output"} %[[VAL_29]] padding_value(%[[VAL_2]] : f32) dims_pos = [0, 1] inner_tiles = [8, 2] into %[[VAL_30]] : (tensor<?x?xf32> tensor<?x?x8x2xf32>) -> tensor<?x?x8x2xf32>
+// CHECK:               %[[VAL_32:.*]] = tensor.insert_slice %[[VAL_31]] into %[[VAL_17]]{{\[}}%[[VAL_12]], %[[VAL_16]], 0, 0] {{\[}}%[[VAL_14]], %[[VAL_18]], 8, 2] [1, 1, 1, 1] : tensor<?x?x8x2xf32> into tensor<?x?x8x2xf32>
+// CHECK:               scf.yield %[[VAL_32]] : tensor<?x?x8x2xf32>
+// CHECK:             }
+// CHECK:             scf.yield %[[VAL_33:.*]] : tensor<?x?x8x2xf32>
+// CHECK:           }
+// CHECK:           return %[[VAL_34:.*]] : tensor<?x?x8x2xf32>
+// CHECK:         }
+
+// -----
+
+func.func @pad_and_pack_fully_dynamic(%input: tensor<?x?xf32>, %output: tensor<?x?x?x?xf32>, %pad: f32, %tile_n : index, %tile_m : index) -> tensor<?x?x?x?xf32> {
+  %0 = iree_linalg_ext.pack {__internal_linalg_transform__ = "tiling_pack_input"} %input padding_value(%pad : f32)
+    dims_pos = [0, 1] inner_tiles = [%tile_n, %tile_m] into %output : (tensor<?x?xf32> tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32>
+  return %0 : tensor<?x?x?x?xf32>
+}
+// CHECK:         #map0 = affine_map<()[s0, s1] -> (s0 ceildiv s1)>
+// CHECK:         #map1 = affine_map<(d0)[s0, s1] -> (2, -d0 + s1)>
+// CHECK:         #map2 = affine_map<(d0)[s0, s1] -> (4, -d0 + s1)>
+// CHECK:         #map3 = affine_map<(d0)[s0] -> (d0 * s0)>
+// CHECK:         #map4 = affine_map<(d0, d1) -> (d0 - d1)>
+// CHECK:         #map5 = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK-LABEL:   func.func @pad_and_pack_fully_dynamic(
+// CHECK-SAME:                                          %[[VAL_0:.*]]: tensor<?x?xf32>,
+// CHECK-SAME:                                          %[[VAL_1:.*]]: tensor<?x?x?x?xf32>,
+// CHECK-SAME:                                          %[[VAL_2:.*]]: f32,
+// CHECK-SAME:                                          %[[VAL_3:.*]]: index,
+// CHECK-SAME:                                          %[[VAL_4:.*]]: index) -> tensor<?x?x?x?xf32> {
+// CHECK:           %[[VAL_5:.*]] = arith.constant 0 : index
+// CHECK:           %[[VAL_6:.*]] = arith.constant 1 : index
+// CHECK:           %[[VAL_7:.*]] = arith.constant 2 : index
+// CHECK:           %[[VAL_8:.*]] = arith.constant 4 : index
+// CHECK:           %[[VAL_9:.*]] = arith.constant 3 : index
+// CHECK:           %[[VAL_10:.*]] = tensor.dim %[[VAL_1]], %[[VAL_5]] : tensor<?x?x?x?xf32>
+// CHECK:           %[[VAL_11:.*]] = affine.apply #map0(){{\[}}%[[VAL_10]], %[[VAL_3]]]
+// CHECK:           %[[VAL_12:.*]] = tensor.dim %[[VAL_1]], %[[VAL_6]] : tensor<?x?x?x?xf32>
+// CHECK:           %[[VAL_13:.*]] = affine.apply #map0(){{\[}}%[[VAL_12]], %[[VAL_4]]]
+// CHECK:           %[[VAL_14:.*]] = tensor.dim %[[VAL_1]], %[[VAL_7]] : tensor<?x?x?x?xf32>
+// CHECK:           %[[VAL_15:.*]] = tensor.dim %[[VAL_1]], %[[VAL_9]] : tensor<?x?x?x?xf32>
+// CHECK:           %[[VAL_16:.*]] = scf.for %[[VAL_17:.*]] = %[[VAL_5]] to %[[VAL_11]] step %[[VAL_7]] iter_args(%[[VAL_18:.*]] = %[[VAL_1]]) -> (tensor<?x?x?x?xf32>) {
+// CHECK:             %[[VAL_19:.*]] = affine.min #map1(%[[VAL_17]]){{\[}}%[[VAL_7]], %[[VAL_11]]]
+// CHECK:             %[[VAL_20:.*]] = scf.for %[[VAL_21:.*]] = %[[VAL_5]] to %[[VAL_13]] step %[[VAL_8]] iter_args(%[[VAL_22:.*]] = %[[VAL_18]]) -> (tensor<?x?x?x?xf32>) {
+// CHECK:               %[[VAL_23:.*]] = affine.min #map2(%[[VAL_21]]){{\[}}%[[VAL_8]], %[[VAL_13]]]
+// CHECK:               %[[VAL_24:.*]] = affine.apply #map3(%[[VAL_17]]){{\[}}%[[VAL_3]]]
+// CHECK:               %[[VAL_25:.*]] = affine.apply #map3(%[[VAL_19]]){{\[}}%[[VAL_3]]]
+// CHECK:               %[[VAL_26:.*]] = tensor.dim %[[VAL_0]], %[[VAL_5]] : tensor<?x?xf32>
+// CHECK:               %[[VAL_27:.*]] = affine.apply #map4(%[[VAL_26]], %[[VAL_24]])
+// CHECK:               %[[VAL_28:.*]] = affine.min #map5(%[[VAL_25]], %[[VAL_27]])
+// CHECK:               %[[VAL_29:.*]] = affine.apply #map3(%[[VAL_21]]){{\[}}%[[VAL_4]]]
+// CHECK:               %[[VAL_30:.*]] = affine.apply #map3(%[[VAL_23]]){{\[}}%[[VAL_4]]]
+// CHECK:               %[[VAL_31:.*]] = tensor.dim %[[VAL_0]], %[[VAL_6]] : tensor<?x?xf32>
+// CHECK:               %[[VAL_32:.*]] = affine.apply #map4(%[[VAL_31]], %[[VAL_29]])
+// CHECK:               %[[VAL_33:.*]] = affine.min #map5(%[[VAL_30]], %[[VAL_32]])
+// CHECK:               %[[VAL_34:.*]] = tensor.extract_slice %[[VAL_0]]{{\[}}%[[VAL_24]], %[[VAL_29]]] {{\[}}%[[VAL_28]], %[[VAL_33]]] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
+// CHECK:               %[[VAL_35:.*]] = tensor.extract_slice %[[VAL_1]]{{\[}}%[[VAL_17]], %[[VAL_21]], 0, 0] {{\[}}%[[VAL_19]], %[[VAL_23]], %[[VAL_14]], %[[VAL_15]]] [1, 1, 1, 1] : tensor<?x?x?x?xf32> to tensor<?x?x?x?xf32>
+// CHECK:               %[[VAL_36:.*]] = iree_linalg_ext.pack {__internal_linalg_transform__ = "tiling_pack_output"} %[[VAL_34]] padding_value(%[[VAL_2]] : f32) dims_pos = [0, 1] inner_tiles = {{\[}}%[[VAL_3]], %[[VAL_4]]] into %[[VAL_35]] : (tensor<?x?xf32> tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32>
+// CHECK:               %[[VAL_37:.*]] = tensor.insert_slice %[[VAL_36]] into %[[VAL_22]]{{\[}}%[[VAL_17]], %[[VAL_21]], 0, 0] {{\[}}%[[VAL_19]], %[[VAL_23]], %[[VAL_14]], %[[VAL_15]]] [1, 1, 1, 1] : tensor<?x?x?x?xf32> into tensor<?x?x?x?xf32>
+// CHECK:               scf.yield %[[VAL_37]] : tensor<?x?x?x?xf32>
+// CHECK:             }
+// CHECK:             scf.yield %[[VAL_38:.*]] : tensor<?x?x?x?xf32>
+// CHECK:           }
+// CHECK:           return %[[VAL_39:.*]] : tensor<?x?x?x?xf32>
+// CHECK:         }
+

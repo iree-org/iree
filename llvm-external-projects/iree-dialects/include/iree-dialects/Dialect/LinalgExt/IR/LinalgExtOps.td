@@ -439,7 +439,9 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
   DeclareOpInterfaceMethods<TilingInterface,
     ["getIterationDomain",
      "getLoopIteratorTypes",
-     "generateScalarImplementation"]>,
+     "generateScalarImplementation",
+     "getResultTilePosition",
+     "getTiledImplementation"]>,
   DeclareOpInterfaceMethods<MemoryEffectsOpInterface>
 ]>{
   let summary = "pack operation";
