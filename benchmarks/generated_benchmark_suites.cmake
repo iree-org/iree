@@ -149,303 +149,352 @@ iree_fetch_artifact(
 
 # Import the TFLite model "${_MODEL_ARTIFACTS_DIR}/c36c63b0-220a-4d78-8ade-c45ce47d89d3_DeepLabV3_fp32.tflite"
 iree_import_tflite_model(
-  TARGET_NAME "${_PACKAGE_NAME}_iree-import-model-c36c63b0-220a-4d78-8ade-c45ce47d89d3"
-  SOURCE "${_MODEL_ARTIFACTS_DIR}/c36c63b0-220a-4d78-8ade-c45ce47d89d3_DeepLabV3_fp32.tflite"
-  OUTPUT_MLIR_FILE "${_IREE_ARTIFACTS_DIR}/c36c63b0-220a-4d78-8ade-c45ce47d89d3_DeepLabV3_fp32/DeepLabV3_fp32.mlir"
+  TARGET_NAME
+    "${_PACKAGE_NAME}_iree-import-model-c36c63b0-220a-4d78-8ade-c45ce47d89d3"
+  SOURCE
+    "${_MODEL_ARTIFACTS_DIR}/c36c63b0-220a-4d78-8ade-c45ce47d89d3_DeepLabV3_fp32.tflite"
+  OUTPUT_MLIR_FILE
+    "${_IREE_ARTIFACTS_DIR}/c36c63b0-220a-4d78-8ade-c45ce47d89d3_DeepLabV3_fp32/DeepLabV3_fp32.mlir"
 )
-# Mark dependency so users can import models without compiling them.
-add_dependencies(iree-benchmark-import-models "${_PACKAGE_NAME}_iree-import-model-c36c63b0-220a-4d78-8ade-c45ce47d89d3")
 
 # Import the TFLite model "${_MODEL_ARTIFACTS_DIR}/0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32.tflite"
 iree_import_tflite_model(
-  TARGET_NAME "${_PACKAGE_NAME}_iree-import-model-0e466f69-91d6-4e50-b62b-a82b6213a231"
-  SOURCE "${_MODEL_ARTIFACTS_DIR}/0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32.tflite"
-  OUTPUT_MLIR_FILE "${_IREE_ARTIFACTS_DIR}/0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32/MobileSSD_fp32.mlir"
+  TARGET_NAME
+    "${_PACKAGE_NAME}_iree-import-model-0e466f69-91d6-4e50-b62b-a82b6213a231"
+  SOURCE
+    "${_MODEL_ARTIFACTS_DIR}/0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32.tflite"
+  OUTPUT_MLIR_FILE
+    "${_IREE_ARTIFACTS_DIR}/0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32/MobileSSD_fp32.mlir"
 )
-# Mark dependency so users can import models without compiling them.
-add_dependencies(iree-benchmark-import-models "${_PACKAGE_NAME}_iree-import-model-0e466f69-91d6-4e50-b62b-a82b6213a231")
 
 # Import the TFLite model "${_MODEL_ARTIFACTS_DIR}/5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32.tflite"
 iree_import_tflite_model(
-  TARGET_NAME "${_PACKAGE_NAME}_iree-import-model-5afc3014-d29d-4e88-a840-fbaf678acf2b"
-  SOURCE "${_MODEL_ARTIFACTS_DIR}/5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32.tflite"
-  OUTPUT_MLIR_FILE "${_IREE_ARTIFACTS_DIR}/5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32/PoseNet_fp32.mlir"
+  TARGET_NAME
+    "${_PACKAGE_NAME}_iree-import-model-5afc3014-d29d-4e88-a840-fbaf678acf2b"
+  SOURCE
+    "${_MODEL_ARTIFACTS_DIR}/5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32.tflite"
+  OUTPUT_MLIR_FILE
+    "${_IREE_ARTIFACTS_DIR}/5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32/PoseNet_fp32.mlir"
 )
-# Mark dependency so users can import models without compiling them.
-add_dependencies(iree-benchmark-import-models "${_PACKAGE_NAME}_iree-import-model-5afc3014-d29d-4e88-a840-fbaf678acf2b")
 
 # Import the TFLite model "${_MODEL_ARTIFACTS_DIR}/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32.tflite"
 iree_import_tflite_model(
-  TARGET_NAME "${_PACKAGE_NAME}_iree-import-model-cc69d69f-6d1f-4a1a-a31e-e021888d0d28"
-  SOURCE "${_MODEL_ARTIFACTS_DIR}/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32.tflite"
-  OUTPUT_MLIR_FILE "${_IREE_ARTIFACTS_DIR}/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/MobileBertSquad_fp32.mlir"
+  TARGET_NAME
+    "${_PACKAGE_NAME}_iree-import-model-cc69d69f-6d1f-4a1a-a31e-e021888d0d28"
+  SOURCE
+    "${_MODEL_ARTIFACTS_DIR}/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32.tflite"
+  OUTPUT_MLIR_FILE
+    "${_IREE_ARTIFACTS_DIR}/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/MobileBertSquad_fp32.mlir"
 )
-# Mark dependency so users can import models without compiling them.
-add_dependencies(iree-benchmark-import-models "${_PACKAGE_NAME}_iree-import-model-cc69d69f-6d1f-4a1a-a31e-e021888d0d28")
 
 # Import the TFLite model "${_MODEL_ARTIFACTS_DIR}/e3997104-a3d2-46b4-9fbf-39069906d123_MobileBertSquad_int8.tflite"
 iree_import_tflite_model(
-  TARGET_NAME "${_PACKAGE_NAME}_iree-import-model-e3997104-a3d2-46b4-9fbf-39069906d123"
-  SOURCE "${_MODEL_ARTIFACTS_DIR}/e3997104-a3d2-46b4-9fbf-39069906d123_MobileBertSquad_int8.tflite"
-  OUTPUT_MLIR_FILE "${_IREE_ARTIFACTS_DIR}/e3997104-a3d2-46b4-9fbf-39069906d123_MobileBertSquad_int8/MobileBertSquad_int8.mlir"
+  TARGET_NAME
+    "${_PACKAGE_NAME}_iree-import-model-e3997104-a3d2-46b4-9fbf-39069906d123"
+  SOURCE
+    "${_MODEL_ARTIFACTS_DIR}/e3997104-a3d2-46b4-9fbf-39069906d123_MobileBertSquad_int8.tflite"
+  OUTPUT_MLIR_FILE
+    "${_IREE_ARTIFACTS_DIR}/e3997104-a3d2-46b4-9fbf-39069906d123_MobileBertSquad_int8/MobileBertSquad_int8.mlir"
 )
-# Mark dependency so users can import models without compiling them.
-add_dependencies(iree-benchmark-import-models "${_PACKAGE_NAME}_iree-import-model-e3997104-a3d2-46b4-9fbf-39069906d123")
 
 # Import the TFLite model "${_MODEL_ARTIFACTS_DIR}/73a0402e-271b-4aa8-a6a5-ac05839ca569_MobileBertSquad_fp16.tflite"
 iree_import_tflite_model(
-  TARGET_NAME "${_PACKAGE_NAME}_iree-import-model-73a0402e-271b-4aa8-a6a5-ac05839ca569"
-  SOURCE "${_MODEL_ARTIFACTS_DIR}/73a0402e-271b-4aa8-a6a5-ac05839ca569_MobileBertSquad_fp16.tflite"
-  OUTPUT_MLIR_FILE "${_IREE_ARTIFACTS_DIR}/73a0402e-271b-4aa8-a6a5-ac05839ca569_MobileBertSquad_fp16/MobileBertSquad_fp16.mlir"
+  TARGET_NAME
+    "${_PACKAGE_NAME}_iree-import-model-73a0402e-271b-4aa8-a6a5-ac05839ca569"
+  SOURCE
+    "${_MODEL_ARTIFACTS_DIR}/73a0402e-271b-4aa8-a6a5-ac05839ca569_MobileBertSquad_fp16.tflite"
+  OUTPUT_MLIR_FILE
+    "${_IREE_ARTIFACTS_DIR}/73a0402e-271b-4aa8-a6a5-ac05839ca569_MobileBertSquad_fp16/MobileBertSquad_fp16.mlir"
 )
-# Mark dependency so users can import models without compiling them.
-add_dependencies(iree-benchmark-import-models "${_PACKAGE_NAME}_iree-import-model-73a0402e-271b-4aa8-a6a5-ac05839ca569")
 
 # Import the TFLite model "${_MODEL_ARTIFACTS_DIR}/78eab9e5-9ff1-4769-9b55-933c81cc9a0f_MobileNetV1_fp32.0_float.tflite"
 iree_import_tflite_model(
-  TARGET_NAME "${_PACKAGE_NAME}_iree-import-model-78eab9e5-9ff1-4769-9b55-933c81cc9a0f"
-  SOURCE "${_MODEL_ARTIFACTS_DIR}/78eab9e5-9ff1-4769-9b55-933c81cc9a0f_MobileNetV1_fp32.0_float.tflite"
-  OUTPUT_MLIR_FILE "${_IREE_ARTIFACTS_DIR}/78eab9e5-9ff1-4769-9b55-933c81cc9a0f_MobileNetV1_fp32/MobileNetV1_fp32.mlir"
+  TARGET_NAME
+    "${_PACKAGE_NAME}_iree-import-model-78eab9e5-9ff1-4769-9b55-933c81cc9a0f"
+  SOURCE
+    "${_MODEL_ARTIFACTS_DIR}/78eab9e5-9ff1-4769-9b55-933c81cc9a0f_MobileNetV1_fp32.0_float.tflite"
+  OUTPUT_MLIR_FILE
+    "${_IREE_ARTIFACTS_DIR}/78eab9e5-9ff1-4769-9b55-933c81cc9a0f_MobileNetV1_fp32/MobileNetV1_fp32.mlir"
 )
-# Mark dependency so users can import models without compiling them.
-add_dependencies(iree-benchmark-import-models "${_PACKAGE_NAME}_iree-import-model-78eab9e5-9ff1-4769-9b55-933c81cc9a0f")
 
 # Import the TFLite model "${_MODEL_ARTIFACTS_DIR}/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32.0_224.tflite"
 iree_import_tflite_model(
-  TARGET_NAME "${_PACKAGE_NAME}_iree-import-model-7d45f8e5-bb5e-48d0-928d-8f125104578f"
-  SOURCE "${_MODEL_ARTIFACTS_DIR}/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32.0_224.tflite"
-  OUTPUT_MLIR_FILE "${_IREE_ARTIFACTS_DIR}/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32/MobileNetV2_fp32.mlir"
+  TARGET_NAME
+    "${_PACKAGE_NAME}_iree-import-model-7d45f8e5-bb5e-48d0-928d-8f125104578f"
+  SOURCE
+    "${_MODEL_ARTIFACTS_DIR}/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32.0_224.tflite"
+  OUTPUT_MLIR_FILE
+    "${_IREE_ARTIFACTS_DIR}/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32/MobileNetV2_fp32.mlir"
 )
-# Mark dependency so users can import models without compiling them.
-add_dependencies(iree-benchmark-import-models "${_PACKAGE_NAME}_iree-import-model-7d45f8e5-bb5e-48d0-928d-8f125104578f")
 
 # Import the TFLite model "${_MODEL_ARTIFACTS_DIR}/58855e40-eba9-4a71-b878-6b35e3460244_MobileNetV3Small_fp32.tflite"
 iree_import_tflite_model(
-  TARGET_NAME "${_PACKAGE_NAME}_iree-import-model-58855e40-eba9-4a71-b878-6b35e3460244"
-  SOURCE "${_MODEL_ARTIFACTS_DIR}/58855e40-eba9-4a71-b878-6b35e3460244_MobileNetV3Small_fp32.tflite"
-  OUTPUT_MLIR_FILE "${_IREE_ARTIFACTS_DIR}/58855e40-eba9-4a71-b878-6b35e3460244_MobileNetV3Small_fp32/MobileNetV3Small_fp32.mlir"
+  TARGET_NAME
+    "${_PACKAGE_NAME}_iree-import-model-58855e40-eba9-4a71-b878-6b35e3460244"
+  SOURCE
+    "${_MODEL_ARTIFACTS_DIR}/58855e40-eba9-4a71-b878-6b35e3460244_MobileNetV3Small_fp32.tflite"
+  OUTPUT_MLIR_FILE
+    "${_IREE_ARTIFACTS_DIR}/58855e40-eba9-4a71-b878-6b35e3460244_MobileNetV3Small_fp32/MobileNetV3Small_fp32.mlir"
 )
-# Mark dependency so users can import models without compiling them.
-add_dependencies(iree-benchmark-import-models "${_PACKAGE_NAME}_iree-import-model-58855e40-eba9-4a71-b878-6b35e3460244")
 
 # Import the TFLite model "${_MODEL_ARTIFACTS_DIR}/bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8.tflite"
 iree_import_tflite_model(
-  TARGET_NAME "${_PACKAGE_NAME}_iree-import-model-bc1338be-e3df-44fd-82e4-40ba9560a073"
-  SOURCE "${_MODEL_ARTIFACTS_DIR}/bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8.tflite"
-  OUTPUT_MLIR_FILE "${_IREE_ARTIFACTS_DIR}/bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8/PersonDetect_int8.mlir"
+  TARGET_NAME
+    "${_PACKAGE_NAME}_iree-import-model-bc1338be-e3df-44fd-82e4-40ba9560a073"
+  SOURCE
+    "${_MODEL_ARTIFACTS_DIR}/bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8.tflite"
+  OUTPUT_MLIR_FILE
+    "${_IREE_ARTIFACTS_DIR}/bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8/PersonDetect_int8.mlir"
 )
-# Mark dependency so users can import models without compiling them.
-add_dependencies(iree-benchmark-import-models "${_PACKAGE_NAME}_iree-import-model-bc1338be-e3df-44fd-82e4-40ba9560a073")
 
 # Import the TFLite model "${_MODEL_ARTIFACTS_DIR}/4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8.tflite"
 iree_import_tflite_model(
-  TARGET_NAME "${_PACKAGE_NAME}_iree-import-model-4a6f545e-1b4e-41a5-9236-792aa578184b"
-  SOURCE "${_MODEL_ARTIFACTS_DIR}/4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8.tflite"
-  OUTPUT_MLIR_FILE "${_IREE_ARTIFACTS_DIR}/4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8/EfficientNet_int8.mlir"
+  TARGET_NAME
+    "${_PACKAGE_NAME}_iree-import-model-4a6f545e-1b4e-41a5-9236-792aa578184b"
+  SOURCE
+    "${_MODEL_ARTIFACTS_DIR}/4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8.tflite"
+  OUTPUT_MLIR_FILE
+    "${_IREE_ARTIFACTS_DIR}/4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8/EfficientNet_int8.mlir"
 )
-# Mark dependency so users can import models without compiling them.
-add_dependencies(iree-benchmark-import-models "${_PACKAGE_NAME}_iree-import-model-4a6f545e-1b4e-41a5-9236-792aa578184b")
 
 # Import the Tensorflow model "${_MODEL_ARTIFACTS_DIR}/ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased"
 iree_import_tf_model(
-  TARGET_NAME "${_PACKAGE_NAME}_iree-import-model-ecf5c970-ee97-49f0-a4ed-df1f34e9d493"
-  SOURCE "${_MODEL_ARTIFACTS_DIR}/ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased"
-  ENTRY_FUNCTION "predict"
-  OUTPUT_MLIR_FILE "${_IREE_ARTIFACTS_DIR}/ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased/MiniLML12H384Uncased.mlir"
+  TARGET_NAME
+    "${_PACKAGE_NAME}_iree-import-model-ecf5c970-ee97-49f0-a4ed-df1f34e9d493"
+  SOURCE
+    "${_MODEL_ARTIFACTS_DIR}/ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased"
+  ENTRY_FUNCTION
+    "predict"
+  OUTPUT_MLIR_FILE
+    "${_IREE_ARTIFACTS_DIR}/ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased/MiniLML12H384Uncased.mlir"
 )
-# Mark dependency so users can import models without compiling them.
-add_dependencies(iree-benchmark-import-models "${_PACKAGE_NAME}_iree-import-model-ecf5c970-ee97-49f0-a4ed-df1f34e9d493")
 
 # Compile the module "${_IREE_ARTIFACTS_DIR}/c36c63b0-220a-4d78-8ade-c45ce47d89d3_DeepLabV3_fp32/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-c36c63b0-220a-4d78-8ade-c45ce47d89d3-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
-  MODULE_FILE_NAME
-    "${_IREE_ARTIFACTS_DIR}/c36c63b0-220a-4d78-8ade-c45ce47d89d3_DeepLabV3_fp32/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9.vmfb"
   SRC
     "${_IREE_ARTIFACTS_DIR}/c36c63b0-220a-4d78-8ade-c45ce47d89d3_DeepLabV3_fp32/DeepLabV3_fp32.mlir"
+  MODULE_FILE_NAME
+    "${_IREE_ARTIFACTS_DIR}/c36c63b0-220a-4d78-8ade-c45ce47d89d3_DeepLabV3_fp32/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9.vmfb"
   FLAGS
-    --iree-hal-target-backends=llvm-cpu;--iree-input-type=tosa;--iree-llvm-target-triple=x86_64-unknown-linux-gnu;--iree-llvm-target-cpu=cascadelake
-  DEPENDS
-    "${_PACKAGE_NAME}_iree-import-model-c36c63b0-220a-4d78-8ade-c45ce47d89d3"
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=tosa"
+    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvm-target-cpu=cascadelake"
+  PUBLIC
 )
-# Mark dependency so that we have one target to drive them all.
-add_dependencies(iree-benchmark-suites "${_PACKAGE_NAME}_iree-module-c36c63b0-220a-4d78-8ade-c45ce47d89d3-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9")
+add_dependencies(iree-benchmark-suites
+  ${_PACKAGE_NAME}_iree-module-c36c63b0-220a-4d78-8ade-c45ce47d89d3-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
+)
 
 # Compile the module "${_IREE_ARTIFACTS_DIR}/0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
-  MODULE_FILE_NAME
-    "${_IREE_ARTIFACTS_DIR}/0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9.vmfb"
   SRC
     "${_IREE_ARTIFACTS_DIR}/0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32/MobileSSD_fp32.mlir"
+  MODULE_FILE_NAME
+    "${_IREE_ARTIFACTS_DIR}/0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9.vmfb"
   FLAGS
-    --iree-hal-target-backends=llvm-cpu;--iree-input-type=tosa;--iree-llvm-target-triple=x86_64-unknown-linux-gnu;--iree-llvm-target-cpu=cascadelake
-  DEPENDS
-    "${_PACKAGE_NAME}_iree-import-model-0e466f69-91d6-4e50-b62b-a82b6213a231"
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=tosa"
+    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvm-target-cpu=cascadelake"
+  PUBLIC
 )
-# Mark dependency so that we have one target to drive them all.
-add_dependencies(iree-benchmark-suites "${_PACKAGE_NAME}_iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9")
+add_dependencies(iree-benchmark-suites
+  ${_PACKAGE_NAME}_iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
+)
 
 # Compile the module "${_IREE_ARTIFACTS_DIR}/5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
-  MODULE_FILE_NAME
-    "${_IREE_ARTIFACTS_DIR}/5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9.vmfb"
   SRC
     "${_IREE_ARTIFACTS_DIR}/5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32/PoseNet_fp32.mlir"
+  MODULE_FILE_NAME
+    "${_IREE_ARTIFACTS_DIR}/5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9.vmfb"
   FLAGS
-    --iree-hal-target-backends=llvm-cpu;--iree-input-type=tosa;--iree-llvm-target-triple=x86_64-unknown-linux-gnu;--iree-llvm-target-cpu=cascadelake
-  DEPENDS
-    "${_PACKAGE_NAME}_iree-import-model-5afc3014-d29d-4e88-a840-fbaf678acf2b"
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=tosa"
+    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvm-target-cpu=cascadelake"
+  PUBLIC
 )
-# Mark dependency so that we have one target to drive them all.
-add_dependencies(iree-benchmark-suites "${_PACKAGE_NAME}_iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9")
+add_dependencies(iree-benchmark-suites
+  ${_PACKAGE_NAME}_iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
+)
 
 # Compile the module "${_IREE_ARTIFACTS_DIR}/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
-  MODULE_FILE_NAME
-    "${_IREE_ARTIFACTS_DIR}/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9.vmfb"
   SRC
     "${_IREE_ARTIFACTS_DIR}/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/MobileBertSquad_fp32.mlir"
+  MODULE_FILE_NAME
+    "${_IREE_ARTIFACTS_DIR}/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9.vmfb"
   FLAGS
-    --iree-hal-target-backends=llvm-cpu;--iree-input-type=tosa;--iree-llvm-target-triple=x86_64-unknown-linux-gnu;--iree-llvm-target-cpu=cascadelake
-  DEPENDS
-    "${_PACKAGE_NAME}_iree-import-model-cc69d69f-6d1f-4a1a-a31e-e021888d0d28"
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=tosa"
+    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvm-target-cpu=cascadelake"
+  PUBLIC
 )
-# Mark dependency so that we have one target to drive them all.
-add_dependencies(iree-benchmark-suites "${_PACKAGE_NAME}_iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9")
+add_dependencies(iree-benchmark-suites
+  ${_PACKAGE_NAME}_iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
+)
 
 # Compile the module "${_IREE_ARTIFACTS_DIR}/e3997104-a3d2-46b4-9fbf-39069906d123_MobileBertSquad_int8/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-e3997104-a3d2-46b4-9fbf-39069906d123-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
-  MODULE_FILE_NAME
-    "${_IREE_ARTIFACTS_DIR}/e3997104-a3d2-46b4-9fbf-39069906d123_MobileBertSquad_int8/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9.vmfb"
   SRC
     "${_IREE_ARTIFACTS_DIR}/e3997104-a3d2-46b4-9fbf-39069906d123_MobileBertSquad_int8/MobileBertSquad_int8.mlir"
+  MODULE_FILE_NAME
+    "${_IREE_ARTIFACTS_DIR}/e3997104-a3d2-46b4-9fbf-39069906d123_MobileBertSquad_int8/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9.vmfb"
   FLAGS
-    --iree-hal-target-backends=llvm-cpu;--iree-input-type=tosa;--iree-llvm-target-triple=x86_64-unknown-linux-gnu;--iree-llvm-target-cpu=cascadelake
-  DEPENDS
-    "${_PACKAGE_NAME}_iree-import-model-e3997104-a3d2-46b4-9fbf-39069906d123"
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=tosa"
+    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvm-target-cpu=cascadelake"
+  PUBLIC
 )
-# Mark dependency so that we have one target to drive them all.
-add_dependencies(iree-benchmark-suites "${_PACKAGE_NAME}_iree-module-e3997104-a3d2-46b4-9fbf-39069906d123-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9")
+add_dependencies(iree-benchmark-suites
+  ${_PACKAGE_NAME}_iree-module-e3997104-a3d2-46b4-9fbf-39069906d123-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
+)
 
 # Compile the module "${_IREE_ARTIFACTS_DIR}/73a0402e-271b-4aa8-a6a5-ac05839ca569_MobileBertSquad_fp16/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-73a0402e-271b-4aa8-a6a5-ac05839ca569-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
-  MODULE_FILE_NAME
-    "${_IREE_ARTIFACTS_DIR}/73a0402e-271b-4aa8-a6a5-ac05839ca569_MobileBertSquad_fp16/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9.vmfb"
   SRC
     "${_IREE_ARTIFACTS_DIR}/73a0402e-271b-4aa8-a6a5-ac05839ca569_MobileBertSquad_fp16/MobileBertSquad_fp16.mlir"
+  MODULE_FILE_NAME
+    "${_IREE_ARTIFACTS_DIR}/73a0402e-271b-4aa8-a6a5-ac05839ca569_MobileBertSquad_fp16/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9.vmfb"
   FLAGS
-    --iree-hal-target-backends=llvm-cpu;--iree-input-type=tosa;--iree-llvm-target-triple=x86_64-unknown-linux-gnu;--iree-llvm-target-cpu=cascadelake
-  DEPENDS
-    "${_PACKAGE_NAME}_iree-import-model-73a0402e-271b-4aa8-a6a5-ac05839ca569"
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=tosa"
+    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvm-target-cpu=cascadelake"
+  PUBLIC
 )
-# Mark dependency so that we have one target to drive them all.
-add_dependencies(iree-benchmark-suites "${_PACKAGE_NAME}_iree-module-73a0402e-271b-4aa8-a6a5-ac05839ca569-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9")
+add_dependencies(iree-benchmark-suites
+  ${_PACKAGE_NAME}_iree-module-73a0402e-271b-4aa8-a6a5-ac05839ca569-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
+)
 
 # Compile the module "${_IREE_ARTIFACTS_DIR}/78eab9e5-9ff1-4769-9b55-933c81cc9a0f_MobileNetV1_fp32/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-78eab9e5-9ff1-4769-9b55-933c81cc9a0f-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
-  MODULE_FILE_NAME
-    "${_IREE_ARTIFACTS_DIR}/78eab9e5-9ff1-4769-9b55-933c81cc9a0f_MobileNetV1_fp32/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9.vmfb"
   SRC
     "${_IREE_ARTIFACTS_DIR}/78eab9e5-9ff1-4769-9b55-933c81cc9a0f_MobileNetV1_fp32/MobileNetV1_fp32.mlir"
+  MODULE_FILE_NAME
+    "${_IREE_ARTIFACTS_DIR}/78eab9e5-9ff1-4769-9b55-933c81cc9a0f_MobileNetV1_fp32/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9.vmfb"
   FLAGS
-    --iree-hal-target-backends=llvm-cpu;--iree-input-type=tosa;--iree-llvm-target-triple=x86_64-unknown-linux-gnu;--iree-llvm-target-cpu=cascadelake
-  DEPENDS
-    "${_PACKAGE_NAME}_iree-import-model-78eab9e5-9ff1-4769-9b55-933c81cc9a0f"
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=tosa"
+    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvm-target-cpu=cascadelake"
+  PUBLIC
 )
-# Mark dependency so that we have one target to drive them all.
-add_dependencies(iree-benchmark-suites "${_PACKAGE_NAME}_iree-module-78eab9e5-9ff1-4769-9b55-933c81cc9a0f-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9")
+add_dependencies(iree-benchmark-suites
+  ${_PACKAGE_NAME}_iree-module-78eab9e5-9ff1-4769-9b55-933c81cc9a0f-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
+)
 
 # Compile the module "${_IREE_ARTIFACTS_DIR}/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
-  MODULE_FILE_NAME
-    "${_IREE_ARTIFACTS_DIR}/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9.vmfb"
   SRC
     "${_IREE_ARTIFACTS_DIR}/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32/MobileNetV2_fp32.mlir"
+  MODULE_FILE_NAME
+    "${_IREE_ARTIFACTS_DIR}/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9.vmfb"
   FLAGS
-    --iree-hal-target-backends=llvm-cpu;--iree-input-type=tosa;--iree-llvm-target-triple=x86_64-unknown-linux-gnu;--iree-llvm-target-cpu=cascadelake
-  DEPENDS
-    "${_PACKAGE_NAME}_iree-import-model-7d45f8e5-bb5e-48d0-928d-8f125104578f"
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=tosa"
+    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvm-target-cpu=cascadelake"
+  PUBLIC
 )
-# Mark dependency so that we have one target to drive them all.
-add_dependencies(iree-benchmark-suites "${_PACKAGE_NAME}_iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9")
+add_dependencies(iree-benchmark-suites
+  ${_PACKAGE_NAME}_iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
+)
 
 # Compile the module "${_IREE_ARTIFACTS_DIR}/58855e40-eba9-4a71-b878-6b35e3460244_MobileNetV3Small_fp32/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-58855e40-eba9-4a71-b878-6b35e3460244-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
-  MODULE_FILE_NAME
-    "${_IREE_ARTIFACTS_DIR}/58855e40-eba9-4a71-b878-6b35e3460244_MobileNetV3Small_fp32/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9.vmfb"
   SRC
     "${_IREE_ARTIFACTS_DIR}/58855e40-eba9-4a71-b878-6b35e3460244_MobileNetV3Small_fp32/MobileNetV3Small_fp32.mlir"
+  MODULE_FILE_NAME
+    "${_IREE_ARTIFACTS_DIR}/58855e40-eba9-4a71-b878-6b35e3460244_MobileNetV3Small_fp32/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9.vmfb"
   FLAGS
-    --iree-hal-target-backends=llvm-cpu;--iree-input-type=tosa;--iree-llvm-target-triple=x86_64-unknown-linux-gnu;--iree-llvm-target-cpu=cascadelake
-  DEPENDS
-    "${_PACKAGE_NAME}_iree-import-model-58855e40-eba9-4a71-b878-6b35e3460244"
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=tosa"
+    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvm-target-cpu=cascadelake"
+  PUBLIC
 )
-# Mark dependency so that we have one target to drive them all.
-add_dependencies(iree-benchmark-suites "${_PACKAGE_NAME}_iree-module-58855e40-eba9-4a71-b878-6b35e3460244-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9")
+add_dependencies(iree-benchmark-suites
+  ${_PACKAGE_NAME}_iree-module-58855e40-eba9-4a71-b878-6b35e3460244-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
+)
 
 # Compile the module "${_IREE_ARTIFACTS_DIR}/bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-bc1338be-e3df-44fd-82e4-40ba9560a073-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
-  MODULE_FILE_NAME
-    "${_IREE_ARTIFACTS_DIR}/bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9.vmfb"
   SRC
     "${_IREE_ARTIFACTS_DIR}/bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8/PersonDetect_int8.mlir"
+  MODULE_FILE_NAME
+    "${_IREE_ARTIFACTS_DIR}/bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9.vmfb"
   FLAGS
-    --iree-hal-target-backends=llvm-cpu;--iree-input-type=tosa;--iree-llvm-target-triple=x86_64-unknown-linux-gnu;--iree-llvm-target-cpu=cascadelake
-  DEPENDS
-    "${_PACKAGE_NAME}_iree-import-model-bc1338be-e3df-44fd-82e4-40ba9560a073"
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=tosa"
+    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvm-target-cpu=cascadelake"
+  PUBLIC
 )
-# Mark dependency so that we have one target to drive them all.
-add_dependencies(iree-benchmark-suites "${_PACKAGE_NAME}_iree-module-bc1338be-e3df-44fd-82e4-40ba9560a073-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9")
+add_dependencies(iree-benchmark-suites
+  ${_PACKAGE_NAME}_iree-module-bc1338be-e3df-44fd-82e4-40ba9560a073-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
+)
 
 # Compile the module "${_IREE_ARTIFACTS_DIR}/4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-4a6f545e-1b4e-41a5-9236-792aa578184b-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
-  MODULE_FILE_NAME
-    "${_IREE_ARTIFACTS_DIR}/4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9.vmfb"
   SRC
     "${_IREE_ARTIFACTS_DIR}/4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8/EfficientNet_int8.mlir"
+  MODULE_FILE_NAME
+    "${_IREE_ARTIFACTS_DIR}/4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9.vmfb"
   FLAGS
-    --iree-hal-target-backends=llvm-cpu;--iree-input-type=tosa;--iree-llvm-target-triple=x86_64-unknown-linux-gnu;--iree-llvm-target-cpu=cascadelake
-  DEPENDS
-    "${_PACKAGE_NAME}_iree-import-model-4a6f545e-1b4e-41a5-9236-792aa578184b"
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=tosa"
+    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvm-target-cpu=cascadelake"
+  PUBLIC
 )
-# Mark dependency so that we have one target to drive them all.
-add_dependencies(iree-benchmark-suites "${_PACKAGE_NAME}_iree-module-4a6f545e-1b4e-41a5-9236-792aa578184b-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9")
+add_dependencies(iree-benchmark-suites
+  ${_PACKAGE_NAME}_iree-module-4a6f545e-1b4e-41a5-9236-792aa578184b-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
+)
 
 # Compile the module "${_IREE_ARTIFACTS_DIR}/ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9.vmfb"
 iree_bytecode_module(
   NAME
     "iree-module-ecf5c970-ee97-49f0-a4ed-df1f34e9d493-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
-  MODULE_FILE_NAME
-    "${_IREE_ARTIFACTS_DIR}/ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9.vmfb"
   SRC
     "${_IREE_ARTIFACTS_DIR}/ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased/MiniLML12H384Uncased.mlir"
+  MODULE_FILE_NAME
+    "${_IREE_ARTIFACTS_DIR}/ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9.vmfb"
   FLAGS
-    --iree-hal-target-backends=llvm-cpu;--iree-input-type=mhlo;--iree-llvm-target-triple=x86_64-unknown-linux-gnu;--iree-llvm-target-cpu=cascadelake
-  DEPENDS
-    "${_PACKAGE_NAME}_iree-import-model-ecf5c970-ee97-49f0-a4ed-df1f34e9d493"
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=mhlo"
+    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvm-target-cpu=cascadelake"
+  PUBLIC
 )
-# Mark dependency so that we have one target to drive them all.
-add_dependencies(iree-benchmark-suites "${_PACKAGE_NAME}_iree-module-ecf5c970-ee97-49f0-a4ed-df1f34e9d493-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9")
+add_dependencies(iree-benchmark-suites
+  ${_PACKAGE_NAME}_iree-module-ecf5c970-ee97-49f0-a4ed-df1f34e9d493-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
+)
 
 ################################################################################
