@@ -49,6 +49,13 @@ def ConvertConv2DToImg2Col :
   ];
 }
 
+def ConvertConvNchwToNhwc :
+    InterfacePass<"iree-flow-convert-conv-nchw-to-nhwc", "mlir::FunctionOpInterface"> {
+  let summary = "Convert linalg NCHW Convolutions to NHWC";
+  let constructor =
+      "mlir::iree_compiler::IREE::Flow::createConvertConvNchwToNhwcPass()";
+}
+
 def ConvertRegionToWorkgroups :
     Pass<"iree-flow-convert-region-to-workgroups", ""> {
   let summary = "Convert DispatchRegion ops to Workgroups ops.";

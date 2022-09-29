@@ -21,6 +21,7 @@ iree_lit_test_suite(
             "cleanup_tensor_shapes.mlir",
             "collapse_reduction.mlir",
             "conv1x1_to_matmul.mlir",
+            "conv2d_nchw_to_nhwc.mlir",
             "conv2d_to_img2col.mlir",
             "convert_region_to_workgroups.mlir",
             "deduplicate_executables.mlir",

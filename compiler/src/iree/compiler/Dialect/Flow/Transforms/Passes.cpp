@@ -71,6 +71,11 @@ static llvm::cl::opt<bool> clImg2ColBatchMatmul(
         "Enable broadcasting the filter when converting to img2col form."),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clEnableConvNchwToNhwc(
+    "iree-flow-enable-conv-nchw-to-nhwc-transform",
+    llvm::cl::desc("Enable converting convolution ops in nchw format."),
+    llvm::cl::init(false));
+
 static llvm::cl::opt<bool> clEnablePaddingLinalgOps(
     "iree-flow-enable-padding-linalg-ops",
     llvm::cl::desc("Enable padding linalg ops to an integer multiple of "
@@ -240,6 +245,8 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
 
   // Preprocessing passes to get the program into a canonical state.
   FunctionLikeNest(passManager)
+      .addPredicatedPass(clEnableConvNchwToNhwc,
+                         IREE::Flow::createConvertConvNchwToNhwcPass)
       .addPass(IREE::Flow::createConvert1X1FilterConv2DToMatmulPass)
       .addPass(IREE::Flow::createDetachElementwiseFromNamedOpsPass)
       .addPass(mlir::createLinalgNamedOpConversionPass);
