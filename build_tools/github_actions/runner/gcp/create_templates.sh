@@ -18,13 +18,9 @@ TESTING="${TEMPLATE_TESTING:-0}"
 TEMPLATE_BASE_NAME="${TEMPLATE_BASE_NAME:-github-runner}"
 TEMPLATE_CONFIG_REPO="${TEMPLATE_CONFIG_REPO:-iree-org/iree}"
 TEMPLATE_CONFIG_REF="${TEMPLATE_CONFIG_REF:-$(git rev-parse HEAD)}"
-GPU_IMAGE="github-runner-gpu-2022-08-15-1660603500"
-# Due to an early misconfiguration, this boot image is really large (1TB), so we
-# need a 1TB boot disk.
-# TODO(gcmn): Shrink the image and disk size.
-GPU_DISK_SIZE_GB=1000
-CPU_IMAGE="github-runner-cpu-2022-09-22-1663865258"
-# The image is only 10GB, but we need some space for Docker images and such.
+GPU_IMAGE="github-runner-gpu-2022-09-29-1664451806"
+GPU_DISK_SIZE_GB=100
+CPU_IMAGE="github-runner-cpu-2022-09-29-1664451255"
 CPU_DISK_SIZE_GB=100
 
 if (( TESTING==0 )); then
