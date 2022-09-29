@@ -34,17 +34,8 @@ jobs:
         uses: actions/setup-python@7f80679172b057fc5e90d70d197929d454754a5a # v2
         with:
           python-version: 3.x
-          cache: 'pip'
-      - name: Installing dependencies
-        run: |
-          pip install \
-            mkdocs-material \
-            requests
-      - name: Generating release index
-        run: |
-          ./build_tools/scripts/generate_release_index.py \
-            --repo="${GITHUB_REPOSITORY}" \
-            --output=docs/website/docs/pip-release-links.html
+      - name: Installing Material for MkDocs
+        run: pip install mkdocs-material
       - name: Setting git config
         run: |
           git config --local user.email "iree-github-actions-bot@google.com"
