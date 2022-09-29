@@ -12,6 +12,7 @@ on:
       - main
     paths:
       - "docs/website/**"
+      - "build_tools/scripts/generate_release_index.py"
   # Regenerate the release pip index when a regular or pre-release is created or
   # deleted.
   release:
