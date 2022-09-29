@@ -16,6 +16,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "conv2d_nchw_to_nhwc.mlir",
             "conv2d_to_img2col.mlir",
             "pad_linalg_ops.mlir",
         ],

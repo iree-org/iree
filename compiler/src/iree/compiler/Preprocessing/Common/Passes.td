@@ -15,6 +15,13 @@ def ConvertConv2DToImg2Col :
   let constructor = "mlir::iree_compiler::IREE::createConvertConv2DToImg2ColPass()";
 }
 
+def ConvertConvNchwToNhwc :
+    InterfacePass<"iree-flow-convert-conv-nchw-to-nhwc", "mlir::FunctionOpInterface"> {
+  let summary = "Convert linalg NCHW Convolutions to NHWC";
+  let constructor =
+      "mlir::iree_compiler::IREE::createConvertConvNchwToNhwcPass()";
+}
+
 def PadLinalgOps :
     Pass<"iree-preprocessing-pad-linalg-ops", ""> {
   let summary = "Pad linalg ops to the next integer multiple of paddingSize.";
