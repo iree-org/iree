@@ -896,10 +896,9 @@ static bool isFusableWithConsumer(OpOperand &fusedOperand,
   Operation *producer = fusedOperand.get().getDefiningOp();
   Operation *consumer = fusedOperand.getOwner();
 
-  if (!isa<linalg::LinalgOp>(producer) || !isa<linalg::LinalgOp>(consumer))
-    return false;
-
-  auto consumerLinalgOp = cast<linalg::LinalgOp>(consumer);
+  auto producerLinalgOp = dyn_cast<linalg::LinalgOp>(producer);
+  auto consumerLinalgOp = dyn_cast<linalg::LinalgOp>(consumer);
+  if (!producerLinalgOp || !consumerLinalgOp) return false;
 
   // Check that the consumer is all parallel.
   if (consumerLinalgOp.getNumLoops() !=
@@ -907,9 +906,22 @@ static bool isFusableWithConsumer(OpOperand &fusedOperand,
     return false;
   }
 
-  return areOpsAggresiveFusable(producer, consumer,
-                                /*allowConsumerParallelismPessimization=*/true,
-                                aggressiveFusion);
+  if (!areOpsAggresiveFusable(producer, consumer,
+                              /*allowConsumerParallelismPessimization=*/true,
+                              aggressiveFusion)) {
+    return false;
+  }
+
+  // Check if the iteration spaces of the producer and consumer are same.
+  // TODO: This is unnecessary requirement, but needed to pass tests right now
+  if (!aggressiveFusion) {
+    auto producerIterationSpace = producerLinalgOp.getStaticLoopRanges();
+    auto consumerIterationSpace = consumerLinalgOp.getStaticLoopRanges();
+    if (producerIterationSpace.size() < consumerIterationSpace.size()) {
+      return false;
+    }
+  }
+  return true;
 }
 
 /// Fuses roots with its consumers. If a root is fused with its consumer, it is
