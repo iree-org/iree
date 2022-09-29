@@ -3,21 +3,20 @@
 Like the IREE project in general, IREE tests are divided into a few different
 components and use different tooling depending on the needs of that component.
 
-| Test type       | Test                                            | Build system | Supported platforms              |
-|:--------------  | :-----------------                              | -----------  | -------------                    |
-| Compiler tests  | iree_lit_test                                   | Bazel/CMake  | Host                             |
-|                 | iree_lit_test_suite                             | Bazel/CMake  | Host                             |
-| Runtime tests   | iree_cc_test                                    | Bazel/CMake  | x86_64/arm64-v8a/riscv32/riscv64 |
-|                 | iree_native_test                                | Bazel/CMake  | x86_64/arm64-v8a/riscv32/riscv64 |
-|                 | iree_hal_cts_test_suite                         | CMake        | x86_64/arm64-v8a/riscv32/riscv64 |
-| Core E2E tests  | iree_check_test                                 | Bazel/CMake  | x86_64/arm64-v8a/riscv32/riscv64 |
-|                 | iree_check_test_suite                           | Bazel/CMake  | x86_64/arm64-v8a/riscv32/riscv64 |
-|                 | iree_check_single_backend_test_suite            | Bazel/CMake  | x86_64/arm64-v8a/riscv32/riscv64 |
-|                 | iree_trace_runner_test                          | Bazel/CMake  | x86_64/arm64-v8a/riscv32/riscv64 |
-|                 | iree_single_backend_generated_trace_runner_test | Bazel/CMake  | x86_64/arm64-v8a/riscv32/riscv64 |
-|                 | iree_generated_trace_runner_test                | Bazel/CMake  | x86_64/arm64-v8a/riscv32/riscv64 |
-|                 | iree_run_module_test                            | CMake        | x86_64/arm64-v8a/riscv32/riscv64 |
-|                 | iree_static_linker_test                         | CMake        | x86_64/arm64-v8a/riscv32/riscv64 |
+| Test type       | Test                                            | Build system | Supported platforms |
+|:--------------  | :-----------------                              | -----------  | -------------       |
+| Compiler tests  | iree_lit_test                                   | Bazel/CMake  | Host                |
+| Runtime tests   | iree_cc_test                                    | Bazel/CMake  | Host/Device         |
+|                 | iree_native_test                                | Bazel/CMake  | Host/Device         |
+|                 | iree_hal_cts_test_suite                         | CMake        | Host/Device         |
+| Core E2E tests  | iree_check_test                                 | Bazel/CMake  | Host/Device         |
+|                 | iree_trace_runner_test                          | Bazel/CMake  | Host/Device         |
+|                 | iree_single_backend_generated_trace_runner_test | Bazel/CMake  | Host/Device         |
+|                 | iree_generated_trace_runner_test                | Bazel/CMake  | Host/Device         |
+|                 | iree_static_linker_test                         | CMake        | Host                |
+
+There are also more `*_test_suite` targets that groups test targets with the
+same configuration together.
 
 ## Compiler Tests
 
@@ -397,9 +396,8 @@ our `CMakeLists.txt` file by
 [bazel_to_cmake](https://github.com/iree-org/iree/tree/main/build_tools/bazel_to_cmake/bazel_to_cmake.py).
 
 There are other test targets that generate tests based on template configuraton
-and platform detection, such as `iree_run_module_test` and
-`iree_static_linker_test`. Those targets are not supported by Bazel rules at
-this point.
+and platform detection, such as `iree_static_linker_test`. Those targets are
+not supported by Bazel rules at this point.
 
 ## Binding Tests
 
