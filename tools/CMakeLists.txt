@@ -136,6 +136,21 @@ iree_cc_binary(
 
 iree_cc_binary(
   NAME
+    iree-minimal-invoke-module
+  SRCS
+    "iree-minimal-invoke-module-main.c"
+  DEPS
+    iree::base
+    iree::base::internal::file_io
+    iree::hal
+    iree::modules::hal::types
+    iree::tooling::context_util
+    iree::vm
+    iree::vm::bytecode_module
+)
+
+iree_cc_binary(
+  NAME
     iree-run-trace
   SRCS
     "iree-run-trace-main.c"

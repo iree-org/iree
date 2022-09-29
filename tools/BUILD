@@ -168,6 +168,19 @@ cc_binary(
 )
 
 cc_binary(
+    name = "iree-minimal-invoke-module",
+    srcs = ["iree-minimal-invoke-module-main.c"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:file_io",
+        "//runtime/src/iree/modules/hal:types",
+        "//runtime/src/iree/tooling:context_util",
+        "//runtime/src/iree/vm",
+        "//runtime/src/iree/vm:bytecode_module",
+    ],
+)
+
+cc_binary(
     name = "iree-run-trace",
     srcs = ["iree-run-trace-main.c"],
     deps = [
