@@ -1638,9 +1638,10 @@ LogicalResult PackOp::verify() {
   // dynamic tile factors or dimensions, having a partial tile is undefined
   // behavior. We will relax this constraint when we introduce padding
   // semantics.
-  if (areNotFullTiles(getInputShape(), getDimAndTileMapping())) {
-    return op->emitError(
-        "invalid tile factor provided. Only full tiles are supported");
+  if (!getPaddingValue() &&
+      areNotFullTiles(getInputShape(), getDimAndTileMapping())) {
+    return op->emitError("invalid tile factor provided. Only full tiles are "
+                         "supported when padding_value is not set");
   }
 
   // Verify result type against inferred type.
@@ -1649,6 +1650,14 @@ LogicalResult PackOp::verify() {
     return op->emitError(
                "inferred type do not match provied output type. Expected ")
            << expectedType << " but got: " << getOutputType();
+  }
+
+  if (auto paddingValue = getPaddingValue()) {
+    if (paddingValue.getType() != expectedType.getElementType()) {
+      return op->emitError("expected padding_value has ")
+             << expectedType.getElementType()
+             << " but got: " << paddingValue.getType();
+    }
   }
   return success();
 }
@@ -1782,7 +1791,8 @@ static void generatePackOpScalarImplementationBody(PackOp packOp,
       packOp.getDimAndTileMapping();
   SmallVector<OpFoldResult> sourceIndices;
   size_t pointLoopsOffset = 0;
-  for (auto dim : llvm::seq<int64_t>(0, packOp.getInputRank())) {
+  int64_t inputRank = packOp.getInputRank();
+  for (auto dim : llvm::seq<int64_t>(0, inputRank)) {
     if (dimAndTileMapping.count(dim)) {
       AffineExpr i, j, tile;
       bindDims(builder.getContext(), i, j);
@@ -1799,8 +1809,37 @@ static void generatePackOpScalarImplementationBody(PackOp packOp,
       sourceIndices.push_back(interchangedIvs[dim]);
     }
   }
-  Value scalar = builder.create<memref::LoadOp>(
-      loc, packOp.getInput(), getAsValues(builder, loc, sourceIndices));
+
+  auto createLoad = [&]() -> Value {
+    return builder.create<memref::LoadOp>(
+        loc, packOp.getInput(), getAsValues(builder, loc, sourceIndices));
+  };
+  Value scalar;
+  if (auto paddingValue = packOp.getPaddingValue()) {
+    ArithBuilder arithBuilder(builder, loc);
+    Value isInBounds;
+    for (auto dim : llvm::seq<int64_t>(0, inputRank)) {
+      Value idx =
+          getValueOrCreateConstantIndexOp(builder, loc, sourceIndices[dim]);
+      Value cond = arithBuilder.slt(
+          idx, getDimValue(builder, loc, packOp.getInput(), dim));
+      isInBounds = dim == 0 ? cond : arithBuilder._and(isInBounds, cond);
+    }
+    scalar = builder
+                 .create<scf::IfOp>(
+                     loc, packOp.getElementType(), isInBounds, /*thenBuilder=*/
+                     [&](OpBuilder &b, Location l) {
+                       b.create<scf::YieldOp>(l, createLoad());
+                     },
+                     /*elseBuilder=*/
+                     [&](OpBuilder &b, Location l) {
+                       b.create<scf::YieldOp>(l, paddingValue);
+                     })
+                 .getResult(0);
+  } else {
+    scalar = createLoad();
+  }
+
   builder.create<memref::StoreOp>(loc, scalar, packOp.getOutput(), ivs);
 }
 
