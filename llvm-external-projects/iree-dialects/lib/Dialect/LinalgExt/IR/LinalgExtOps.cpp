@@ -2050,6 +2050,30 @@ PackOp::reifyResultShapes(OpBuilder &builder,
   return success();
 }
 
+//===----------------------------------------------------------------------===//
+// UnPackOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult UnPackOp::generateScalarImplementation(OpBuilder &builder,
+                                                     Location loc,
+                                                     ValueRange ivs) {
+  return failure();
+}
+
+LogicalResult
+UnPackOp::reifyResultShapes(OpBuilder &builder,
+                            ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  return failure();
+}
+
+SmallVector<Range> UnPackOp::getIterationDomain(OpBuilder &builder) {
+  return {};
+}
+
+LogicalResult UnPackOp::verify() { return success(); }
+
+SmallVector<utils::IteratorType> UnPackOp::getLoopIteratorTypes() { return {}; }
+
 #define DEFINE_OP_GET_EFFECTS(OP_NAME)                                         \
   void OP_NAME::getEffects(                                                    \
       SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>      \
@@ -2067,6 +2091,7 @@ DEFINE_OP_GET_EFFECTS(ReverseOp)
 DEFINE_OP_GET_EFFECTS(ScanOp)
 DEFINE_OP_GET_EFFECTS(TopkOp)
 DEFINE_OP_GET_EFFECTS(PackOp)
+DEFINE_OP_GET_EFFECTS(UnPackOp)
 namespace {
 /// This is derived from mlir/lib/Dialect/Linalg/IR/LinalgOps.cpp without any
 /// changes.
