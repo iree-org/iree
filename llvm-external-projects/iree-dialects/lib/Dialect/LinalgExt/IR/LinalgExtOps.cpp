@@ -2144,9 +2144,12 @@ DenseMap<int64_t, OpFoldResult> UnPackOp::getDimAndTileMapping() {
   return ::getDimAndTileMapping(*this);
 }
 
+// Implement the tiling interface. Generate the scalar implementation for the
+// `unpack` operation.
 LogicalResult UnPackOp::generateScalarImplementation(OpBuilder &builder,
                                                      Location loc,
                                                      ValueRange ivs) {
+  OpBuilder::InsertionGuard g(builder);
   generatePackOpOrUnPackScalarImplementationBody(*this, builder, loc, ivs);
   return success();
 }
