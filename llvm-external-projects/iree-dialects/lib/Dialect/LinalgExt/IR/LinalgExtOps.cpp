@@ -1726,18 +1726,18 @@ ShapedType PackOp::inferResultType() {
   int64_t rank = getInputRank();
 
   // tile loop.
-  for (auto i : llvm::seq<int64_t>(0, rank)) {
-    if (tileAndPosMapping.count(i)) {
+  for (auto dim : llvm::seq<int64_t>(0, rank)) {
+    if (tileAndPosMapping.count(dim)) {
       Optional<int64_t> tileSize =
-          getConstantIntValue(tileAndPosMapping.lookup(i));
-      if (inputType.isDynamicDim(i) || !tileSize) {
+          getConstantIntValue(tileAndPosMapping.lookup(dim));
+      if (inputType.isDynamicDim(dim) || !tileSize) {
         inferredShape.push_back(ShapedType::kDynamicSize);
       } else {
-        int64_t sizeTiledDim = ceilDiv(inputType.getDimSize(i), *tileSize);
+        int64_t sizeTiledDim = ceilDiv(inputType.getDimSize(dim), *tileSize);
         inferredShape.push_back(sizeTiledDim);
       }
     } else {
-      inferredShape.push_back(inputType.getShape()[i]);
+      inferredShape.push_back(inputType.getShape()[dim]);
     }
   }
 
