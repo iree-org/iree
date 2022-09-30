@@ -318,9 +318,16 @@ class ConvertIREEBindingSubspanOp : public ConvertToLLVMPattern {
                                        .getAddressSpace()),
         llvmBufferArg);
     if (adaptor.getByteOffset()) {
+      // Workaround, we trunc the offset to 32bits as we know it should be a
+      // 32bits unsigned value. This works around the incorrect cast to 64bits
+      // signed value happening at the HAL level. In order to support offsets
+      // greater than 4G we will need to remove this.
+      Value offset32bits = rewriter.create<LLVM::TruncOp>(
+          loc, rewriter.getI32Type(), adaptor.getByteOffset());
+      Value offset = rewriter.create<LLVM::ZExtOp>(
+          loc, adaptor.getByteOffset().getType(), offset32bits);
       llvmBufferBasei8Ptr = rewriter.create<LLVM::GEPOp>(
-          loc, llvmBufferBasei8Ptr.getType(), llvmBufferBasei8Ptr,
-          adaptor.getByteOffset());
+          loc, llvmBufferBasei8Ptr.getType(), llvmBufferBasei8Ptr, offset);
     }
     auto llvmPtrType = LLVM::LLVMPointerType::get(
         memrefType.getElementType(), memrefType.getMemorySpaceAsInt());
