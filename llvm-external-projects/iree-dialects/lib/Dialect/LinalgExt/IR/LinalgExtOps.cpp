@@ -1895,7 +1895,7 @@ PackOp::getTiledImplementation(OpBuilder &builder,
 
   // Take the minimum of two integers.
   auto idMap = AffineMap::getMultiDimIdentityMap(2, ctx);
-  auto min = [&](OpFoldResult v1, OpFoldResult v2) {
+  auto min = [&](OpFoldResult v1, OpFoldResult v2) -> OpFoldResult {
     return builder.createOrFold<AffineMinOp>(
         loc, idMap,
         ValueRange{getValueOrCreateConstantIndexOp(builder, loc, v1),
@@ -1905,7 +1905,7 @@ PackOp::getTiledImplementation(OpBuilder &builder,
   AffineExpr dim0, dim1;
   bindDims(ctx, dim0, dim1);
   auto subMap = AffineMap::get(2, 0, {dim0 - dim1});
-  auto sub = [&](OpFoldResult v1, OpFoldResult v2) {
+  auto sub = [&](OpFoldResult v1, OpFoldResult v2) -> OpFoldResult {
     return builder.createOrFold<AffineApplyOp>(
         loc, subMap,
         ValueRange{getValueOrCreateConstantIndexOp(builder, loc, v1),
@@ -1914,29 +1914,32 @@ PackOp::getTiledImplementation(OpBuilder &builder,
 
   int64_t inputRank = getInputRank();
   DenseMap<int64_t, OpFoldResult> dimAndTileMapping = getDimAndTileMapping();
-  SmallVector<OpFoldResult> sourceIndices, sourceSizes;
+  SmallVector<OpFoldResult> inputIndices, inputSizes;
   for (auto dim : llvm::seq<int64_t>(0, inputRank)) {
     if (dimAndTileMapping.count(dim)) {
+      // If the dimension is tiled, the i-th index is the product of offset_i
+      // and tile_i, and the i-th size is the product of sizes_i and tile_i.
       AffineExpr i, tile;
       bindDims(ctx, i);
       bindSymbols(ctx, tile);
-      OpFoldResult sourceIndex = makeComposedFoldedAffineApply(
+      OpFoldResult inputIndex = makeComposedFoldedAffineApply(
           builder, loc, i * tile,
           ArrayRef<OpFoldResult>{offsets[dim], dimAndTileMapping[dim]});
-      sourceIndices.push_back(sourceIndex);
+      inputIndices.push_back(inputIndex);
 
-      OpFoldResult sourceSize = makeComposedFoldedAffineApply(
+      OpFoldResult inputSize = makeComposedFoldedAffineApply(
           builder, loc, i * tile,
           ArrayRef<OpFoldResult>{sizes[dim], dimAndTileMapping[dim]});
-
-      sourceSizes.push_back(sourceSize);
+      inputSizes.push_back(inputSize);
     } else {
-      sourceIndices.push_back(offsets[dim]);
-      sourceSizes.push_back(sizes[dim]);
+      inputIndices.push_back(offsets[dim]);
+      inputSizes.push_back(sizes[dim]);
     }
+
+    // Limit the size of the input operand for incomplet tiles.
     OpFoldResult dimSize = getDim(builder, loc, getInput(), dim);
-    sourceSizes.back() =
-        min(sourceSizes.back(), sub(dimSize, sourceIndices.back()));
+    inputSizes.back() =
+        min(inputSizes.back(), sub(dimSize, inputIndices.back()));
   }
 
   auto oneAttr = builder.getI64IntegerAttr(1);
@@ -1944,19 +1947,23 @@ PackOp::getTiledImplementation(OpBuilder &builder,
 
   SmallVector<Value> tiledOperands;
   tiledOperands.push_back(
-      getSlice(builder, loc, getInput(), sourceIndices, sourceSizes, strides));
+      getSlice(builder, loc, getInput(), inputIndices, inputSizes, strides));
 
   SmallVector<OpFoldResult> outputOffsets, outputSizes;
   if (failed(getResultTilePosition(builder, 0, offsets, sizes, outputOffsets,
                                    outputSizes))) {
     return {};
   }
-  strides.append(inputRank, oneAttr);
+  strides.append(getOutputRank() - inputRank, oneAttr);
   tiledOperands.push_back(
       getSlice(builder, loc, getOutput(), outputOffsets, outputSizes, strides));
 
-  for (auto tile : getInnerTiles()) tiledOperands.push_back(tile);
-  if (auto val = getPaddingValue()) tiledOperands.push_back(val);
+  for (auto tile : getInnerTiles()) {
+    tiledOperands.push_back(tile);
+  }
+  if (auto val = getPaddingValue()) {
+    tiledOperands.push_back(val);
+  }
 
   // There are exactly one input and one output, the output is the second operand.
   SmallVector<Type, 4> tiledResultTypes;
@@ -1975,10 +1982,12 @@ LogicalResult PackOp::getResultTilePosition(
     OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
     ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
     SmallVector<OpFoldResult> &resultSizes) {
+  // The tiling is applied on outer dimensions. In this context, the outer
+  // dimenensions of result tile position is the same. The inner offsets are
+  // zeros becuase tiling is not applied to them.
   auto zeroAttr = builder.getI64IntegerAttr(0);
   resultOffsets.assign(offsets.begin(), offsets.end());
-  resultOffsets.append(getInputRank(), zeroAttr);
-  resultSizes.assign(sizes.begin(), sizes.end());
+  resultOffsets.append(getOutputRank() - getInputRank(), zeroAttr);
 
   ReifiedRankedShapedTypeDims outputShape;
   if (failed(reifyResultShapes(builder, outputShape)))
@@ -1989,8 +1998,10 @@ LogicalResult PackOp::getResultTilePosition(
            << getOutputRank();
   }
 
-  // All loops except the innermost are simple loops that just iterate
-  // over the tile dimensions.
+  // The outer sizes are the same because the iteration space is over outer
+  // dimensions. The inner sizes are whole sizes because tiling is not applied
+  // on them.
+  resultSizes.assign(sizes.begin(), sizes.end());
   for (auto dataTileDim :
        llvm::seq<unsigned>(getInputRank(), getOutputRank())) {
     resultSizes.push_back(getAsOpFoldResult(outputShape[0][dataTileDim]));
@@ -2021,8 +2032,12 @@ PackOp::reifyResultShapes(OpBuilder &builder,
     };
     // If we are dealing with a tiled dimension compose the map otherwise
     // return the dimension extracted with `memref.dim`.
+    // TODO(hanchung): Should bind inner size to inner_tiles if they are
+    // dynamic.
     OpFoldResult dimBound =
-        getDim(builder, getOperation()->getLoc(), getOutput(), dimIdx);
+        dimIdx < getInputRank()
+            ? getDim(builder, getOperation()->getLoc(), getInput(), dimIdx)
+            : getDim(builder, getOperation()->getLoc(), getOutput(), dimIdx);
     return (dimAndTileMapping.count(dimIdx))
                ? apply(dim.ceilDiv(tile),
                        ArrayRef<OpFoldResult>{dimBound,
