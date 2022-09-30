@@ -78,9 +78,11 @@ static void addBufferizePasses(OpPassManager &passManager) {
   passManager.addPass(createCSEPass());
 }
 
-static void tileAndDistributeToWorkgroup(OpPassManager &pm) {
+static void tileAndDistributeToWorkgroup(OpPassManager &pm,
+                                         bool specializeWorkgroup) {
   pm.addPass(createTileAndDistributeToWorkgroupsPass());
-  pm.addPass(createWorkgroupSpecializationPass());
+  if (specializeWorkgroup)
+    pm.addPass(createWorkgroupSpecializationPass());
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -90,7 +92,7 @@ static void tileAndDistributeToWorkgroup(OpPassManager &pm) {
 }
 
 static void tileAndBufferize(OpPassManager &pm) {
-  tileAndDistributeToWorkgroup(pm);
+  tileAndDistributeToWorkgroup(pm, /*speciailzeWorkgroup=*/false);
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
   addBufferizePasses(nestedModulePM);
@@ -101,7 +103,7 @@ static void tileAndBufferize(OpPassManager &pm) {
 //===---------------------------------------------------------------------===//
 
 void addGPUVectorizationPassPipeline(OpPassManager &pm) {
-  tileAndDistributeToWorkgroup(pm);
+  tileAndDistributeToWorkgroup(pm, /*specializeWorkgroup=*/true);
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -135,7 +137,7 @@ void addGPUVectorizationPassPipeline(OpPassManager &pm) {
 }
 
 void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
-  tileAndDistributeToWorkgroup(pm);
+  tileAndDistributeToWorkgroup(pm, /*specializeWorkgroup=*/true);
   auto &nestedModulePM = pm.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
@@ -239,7 +241,7 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
 }
 
 void addGPUTransposePassPipeline(OpPassManager &pm) {
-  tileAndDistributeToWorkgroup(pm);
+  tileAndDistributeToWorkgroup(pm, /*specializeWorkgroup=*/true);
   auto &nestedModulePM = pm.nest<ModuleOp>();
 
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -278,7 +280,7 @@ void addGPUTransposePassPipeline(OpPassManager &pm) {
 }
 
 void addGPUWarpReductionPassPipeline(OpPassManager &pm) {
-  tileAndDistributeToWorkgroup(pm);
+  tileAndDistributeToWorkgroup(pm, /*specializeWorkgroup=*/false);
   auto &nestedModulePM = pm.nest<ModuleOp>();
 
   nestedModulePM.addNestedPass<func::FuncOp>(

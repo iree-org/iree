@@ -246,16 +246,6 @@ struct WorkgroupSpecializationPass
       auto exportOp = entryPoints.lookup(funcOp.getName());
       if (!exportOp) continue;
 
-      // Do not specialize when there is a scatter op since it
-      // may trigger share memory promotion for the output buffer
-      // of the scatter op, and this causes a race condition because
-      // the output buffer of scatter op is not tiled.
-      bool hasScatter = false;
-      funcOp.walk([&](Operation *op) {
-        if (isa<IREE::LinalgExt::ScatterOp>(op)) hasScatter = true;
-      });
-      if (hasScatter) continue;
-
       SmallVector<LoopTilingAndDistributionInfo> infoVec =
           getTiledAndDistributedLoopInfo(funcOp);
 
