@@ -146,6 +146,11 @@ LogicalResult getFilteredOps(
 LogicalResult getComputeOps(
     func::FuncOp funcOp, SmallVectorImpl<Operation *> &computeOps,
     SmallVectorImpl<LoopTilingAndDistributionInfo> &tiledLoops);
+inline LogicalResult getComputeOps(func::FuncOp funcOp,
+                                   SmallVectorImpl<Operation *> &computeOps) {
+  SmallVector<LoopTilingAndDistributionInfo> tiledLoops;
+  return getComputeOps(funcOp, computeOps, tiledLoops);
+}
 
 /// If the given `forOp` is a tiled and distributed loop, returns its tiling and
 /// distribution information.

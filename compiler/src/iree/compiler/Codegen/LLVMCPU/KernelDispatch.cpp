@@ -1573,10 +1573,9 @@ LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
     }
 
     SmallVector<Operation *> computeOps;
-    SmallVector<LoopTilingAndDistributionInfo> tiledLoops;
 
     // If there are no linalg ops, not using Linalg based lowering.
-    if (failed(getComputeOps(funcOp, computeOps, tiledLoops))) {
+    if (failed(getComputeOps(funcOp, computeOps))) {
       return failure();
     }
 
