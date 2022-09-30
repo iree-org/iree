@@ -1756,7 +1756,7 @@ LogicalResult PackOp::verify() {
     return op->emitError("invalid dims_pos vector");
   // Require `dim_pos` to be in-bound. `dim_pos` carries the index of the
   // dimensions to block.
-  if (!isInBound(dimsPos, getOutputRank()))
+  if (!isInBound(dimsPos, getInputRank()))
     return op->emitError("out-of-bound position");
 
   // Require output rank to match input rank + number of blocking factors.
