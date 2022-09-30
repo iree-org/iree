@@ -103,7 +103,8 @@ void addGPUVectorizationPassPipeline(OpPassManager &pm) {
   tileAndDistributeToWorkgroup(pm);
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
-  nestedModulePM.addPass(createWorkgroupSpecializationPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createWorkgroupSpecializationPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
   // Distribute linalg onto threads within the workgroup.
@@ -137,7 +138,8 @@ void addGPUVectorizationPassPipeline(OpPassManager &pm) {
 void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
   tileAndDistributeToWorkgroup(pm);
   auto &nestedModulePM = pm.nest<ModuleOp>();
-  nestedModulePM.addPass(createWorkgroupSpecializationPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createWorkgroupSpecializationPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
 
@@ -243,7 +245,8 @@ void addGPUTransposePassPipeline(OpPassManager &pm) {
   tileAndDistributeToWorkgroup(pm);
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
-  nestedModulePM.addPass(createWorkgroupSpecializationPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createWorkgroupSpecializationPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
 
@@ -385,7 +388,6 @@ void addGPUTransformDialectInterpreterPasses(OpPassManager &passManager) {
     // First do the tile and distribution to workgroups and remove the
     // distributions loops. Then apply the transform dialect.
     passManager.addPass(createTileAndDistributeToWorkgroupsPass());
-    passManager.addPass(createWorkgroupSpecializationPass());
 
     auto &nestedModulePM = passManager.nest<ModuleOp>();
     nestedModulePM.addNestedPass<func::FuncOp>(

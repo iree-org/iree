@@ -37,8 +37,6 @@
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
-#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -230,34 +228,25 @@ namespace {
 struct WorkgroupSpecializationPass
     : public WorkgroupSpecializationBase<WorkgroupSpecializationPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<AffineDialect, IREE::HAL::HALDialect, linalg::LinalgDialect,
-                    scf::SCFDialect, tensor::TensorDialect>();
+    registry.insert<AffineDialect, linalg::LinalgDialect, scf::SCFDialect,
+                    tensor::TensorDialect>();
   }
 
   void runOnOperation() override {
     if (!clEnableWorkgroupSpecialization) return;
 
-    IREE::HAL::ExecutableVariantOp variantOp = getOperation();
-    ModuleOp innerModule = variantOp.getInnerModule();
-    llvm::StringMap<IREE::HAL::ExecutableExportOp> entryPoints =
-        getAllEntryPoints(innerModule);
+    func::FuncOp funcOp = getOperation();
+    SmallVector<LoopTilingAndDistributionInfo> infoVec =
+        getTiledAndDistributedLoopInfo(funcOp);
 
-    for (auto funcOp : innerModule.getOps<func::FuncOp>()) {
-      auto exportOp = entryPoints.lookup(funcOp.getName());
-      if (!exportOp) continue;
+    if (infoVec.empty()) return;
 
-      SmallVector<LoopTilingAndDistributionInfo> infoVec =
-          getTiledAndDistributedLoopInfo(funcOp);
-
-      if (infoVec.empty()) return;
-
-      specializeDistributionLoops(infoVec);
-    }
+    specializeDistributionLoops(infoVec);
   }
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
+std::unique_ptr<OperationPass<func::FuncOp>>
 createWorkgroupSpecializationPass() {
   return std::make_unique<WorkgroupSpecializationPass>();
 }
