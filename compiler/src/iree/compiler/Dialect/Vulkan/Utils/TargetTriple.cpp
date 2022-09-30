@@ -215,7 +215,7 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
 
       subgroupSize = 64;
       subgroupFeatures = SubgroupFeature::Basic | SubgroupFeature::Vote |
-                         SubgroupFeature::Arith | SubgroupFeature::Ballot |
+                         SubgroupFeature::Arithmetic | SubgroupFeature::Ballot |
                          SubgroupFeature::Shuffle |
                          SubgroupFeature::ShuffleRelative |
                          SubgroupFeature::Clustered | SubgroupFeature::Quad;
@@ -238,7 +238,7 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
 
       subgroupSize = 32;
       subgroupFeatures = SubgroupFeature::Basic | SubgroupFeature::Vote |
-                         SubgroupFeature::Arith | SubgroupFeature::Ballot |
+                         SubgroupFeature::Arithmetic | SubgroupFeature::Ballot |
                          SubgroupFeature::Shuffle |
                          SubgroupFeature::ShuffleRelative |
                          SubgroupFeature::Quad;
@@ -263,7 +263,7 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
 
       subgroupSize = 16;
       subgroupFeatures = SubgroupFeature::Basic | SubgroupFeature::Vote |
-                         SubgroupFeature::Arith | SubgroupFeature::Ballot |
+                         SubgroupFeature::Arithmetic | SubgroupFeature::Ballot |
                          SubgroupFeature::Clustered | SubgroupFeature::Quad;
 
       if (triple.getOS() == TargetTripleOS::Android31) {
@@ -287,7 +287,7 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
 
         subgroupSize = 4;
         subgroupFeatures = SubgroupFeature::Basic | SubgroupFeature::Vote |
-                           SubgroupFeature::Arith |
+                           SubgroupFeature::Arithmetic |
                            SubgroupFeature::Ballot | SubgroupFeature::Shuffle |
                            SubgroupFeature::ShuffleRelative;
       }
@@ -301,7 +301,7 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
 
       subgroupSize = 32;
       subgroupFeatures = SubgroupFeature::Basic | SubgroupFeature::Vote |
-                         SubgroupFeature::Arith | SubgroupFeature::Ballot |
+                         SubgroupFeature::Arithmetic | SubgroupFeature::Ballot |
                          SubgroupFeature::Shuffle |
                          SubgroupFeature::ShuffleRelative |
                          SubgroupFeature::Clustered | SubgroupFeature::Quad;
@@ -344,7 +344,7 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
 
       subgroupSize = 64;
       subgroupFeatures = SubgroupFeature::Basic | SubgroupFeature::Vote |
-                         SubgroupFeature::Arith | SubgroupFeature::Ballot |
+                         SubgroupFeature::Arithmetic | SubgroupFeature::Ballot |
                          SubgroupFeature::Shuffle |
                          SubgroupFeature::ShuffleRelative |
                          SubgroupFeature::Quad;

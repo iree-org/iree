@@ -123,7 +123,7 @@ void convertCapabilities(Vulkan::TargetEnvAttr vkTargetEnv,
     capabilities.push_back(spirv::Capability::GroupNonUniform);
   }
   MAP_SUBGROUP_FEATURE(Vote);
-  MAP_SUBGROUP_FEATURE(Arith);
+  MAP_SUBGROUP_FEATURE(Arithmetic);
   MAP_SUBGROUP_FEATURE(Ballot);
   MAP_SUBGROUP_FEATURE(Shuffle);
   MAP_SUBGROUP_FEATURE(ShuffleRelative);

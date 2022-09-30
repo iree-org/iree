@@ -164,7 +164,7 @@ def VK_TargetOSAttr : VK_I32EnumAttr<
 
 def VK_SF_Basic           : I32BitEnumAttrCase<"Basic", 0x001>;
 def VK_SF_Vote            : I32BitEnumAttrCase<"Vote", 0x002>;
-def VK_SF_Arith      : I32BitEnumAttrCase<"Arith", 0x004>;
+def VK_SF_Arithmetic      : I32BitEnumAttrCase<"Arithmetic", 0x004>;
 def VK_SF_Ballot          : I32BitEnumAttrCase<"Ballot", 0x008>;
 def VK_SF_Shuffle         : I32BitEnumAttrCase<"Shuffle", 0x010>;
 def VK_SF_ShuffleRelative : I32BitEnumAttrCase<"ShuffleRelative", 0x020>;
@@ -174,7 +174,7 @@ def VK_SF_PartitionedNV   : I32BitEnumAttrCase<"PartitionedNV", 0x100>;
 
 def VK_SubgroupFeatureAttr : VK_BitEnumAttr<
   "SubgroupFeature", "supported Vulkan subgroup feature", [
-    VK_SF_Basic, VK_SF_Vote, VK_SF_Arith, VK_SF_Ballot, VK_SF_Shuffle,
+    VK_SF_Basic, VK_SF_Vote, VK_SF_Arithmetic, VK_SF_Ballot, VK_SF_Shuffle,
     VK_SF_ShuffleRelative, VK_SF_Clustered, VK_SF_Quad, VK_SF_PartitionedNV
   ]>;
 
