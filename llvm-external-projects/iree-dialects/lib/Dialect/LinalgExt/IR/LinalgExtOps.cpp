@@ -1757,6 +1757,8 @@ SmallVector<int64_t> PackOp::getStaticTiles() {
 
 // Implement the tiling interface. The number of loops equals
 // the rank of the output tensors. All the loops are parallel.
+// Note that here that we consider only the tiled loops, the other loops are
+// materialized when building the body of the operation.
 SmallVector<utils::IteratorType> PackOp::getLoopIteratorTypes() {
   SmallVector<utils::IteratorType> iteratorTypes(getInputRank(),
                                                  utils::IteratorType::parallel);
@@ -2073,10 +2075,53 @@ PackOp::reifyResultShapes(OpBuilder &builder,
 // UnPackOp
 //===----------------------------------------------------------------------===//
 
+// Get the tile sizes as `OpFoldResult`.
+SmallVector<OpFoldResult> UnPackOp::getMixedTiles() {
+  return ::getMixedTiles(*this);
+}
+
+// Return a mapping from positions `dims_pos` to their `OpFoldResult` tile
+// factors.
+DenseMap<int64_t, OpFoldResult> UnPackOp::getDimAndTileMapping() {
+  return ::getDimAndTileMapping(*this);
+}
+
 LogicalResult UnPackOp::generateScalarImplementation(OpBuilder &builder,
                                                      Location loc,
                                                      ValueRange ivs) {
-  return failure();
+  // Similar to PackOp, we interchange the `ivs` to go back to a canonical form
+  // between the tile and poit loops.
+  SmallVector<int64_t> dimsToBlock = extractFromI64ArrayAttr(getDimsPos());
+  SmallVector<int64_t> interchangeVector =
+      computeInterchangeFromDimPos(dimsToBlock, getOutputRank());
+  SmallVector<Value> interchangedIvs = ivs;
+  interchangedIvs = interchange<Value>(interchangedIvs, interchangeVector,
+                                       /*offset=*/getOutputRank());
+  SmallVector<OpFoldResult> tiles = getMixedTiles();
+  DenseMap<int64_t, OpFoldResult> dimAndTileMapping = getDimAndTileMapping();
+  SmallVector<OpFoldResult> destIndices;
+  size_t pointLoopsOffset = 0;
+  for (auto dim : llvm::seq<int64_t>(0, getOutputRank())) {
+    if (dimAndTileMapping.count(dim)) {
+      AffineExpr i, j, tile;
+      bindDims(builder.getContext(), i, j);
+      bindSymbols(builder.getContext(), tile);
+      OpFoldResult destIndex = makeComposedFoldedAffineApply(
+          builder, loc, i * tile + j,
+          ArrayRef<OpFoldResult>{
+              interchangedIvs[dim],
+              interchangedIvs[pointLoopsOffset + getOutputRank()],
+              dimAndTileMapping[dim]});
+      destIndices.push_back(destIndex);
+      ++pointLoopsOffset;
+    } else {
+      destIndices.push_back(interchangedIvs[dim]);
+    }
+  }
+  Value scalar = builder.create<memref::LoadOp>(loc, getInput(), ivs);
+  builder.create<memref::StoreOp>(loc, scalar, getOutput(),
+                                  getAsValues(builder, loc, destIndices));
+  return success();
 }
 
 LogicalResult
@@ -2085,13 +2130,33 @@ UnPackOp::reifyResultShapes(OpBuilder &builder,
   return failure();
 }
 
+// Implement the tiling interface. The iteration domain is fully specified by
+// input. Lower bound is zero, step is one, while the upper bound it the
+// dimension of the input tensor.
 SmallVector<Range> UnPackOp::getIterationDomain(OpBuilder &builder) {
-  return {};
+  OpBuilder::InsertionGuard g(builder);
+  int64_t inputRank = getInputRank();
+  SmallVector<Range> loopBounds(inputRank);
+  Location loc = getLoc();
+  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
+  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+  for (auto dim : llvm::seq<int64_t>(0, inputRank)) {
+    loopBounds[dim].offset = zero;
+    loopBounds[dim].stride = one;
+    loopBounds[dim].size = getDim(builder, loc, getInput(), dim);
+  }
+  return loopBounds;
 }
 
 LogicalResult UnPackOp::verify() { return success(); }
 
-SmallVector<utils::IteratorType> UnPackOp::getLoopIteratorTypes() { return {}; }
+// Implement the tiling interface. The number of loops equals the rank of the
+// input. All the loops are parallel.
+SmallVector<utils::IteratorType> UnPackOp::getLoopIteratorTypes() {
+  SmallVector<utils::IteratorType> iteratorTypes(getInputRank(),
+                                                 utils::IteratorType::parallel);
+  return iteratorTypes;
+}
 
 #define DEFINE_OP_GET_EFFECTS(OP_NAME)                                         \
   void OP_NAME::getEffects(                                                    \
