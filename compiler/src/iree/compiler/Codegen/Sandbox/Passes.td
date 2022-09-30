@@ -60,7 +60,7 @@ def LinalgFuse : Pass<"linalg-fuse", "func::FuncOp"> {
       "Apply IREE distribution during tiling">,
   ];
   let dependentDialects = [
-    "::mlir::arith::ArithmeticDialect", "::mlir::AffineDialect",
+    "::mlir::arith::ArithDialect", "::mlir::AffineDialect",
     "::mlir::linalg::LinalgDialect", "::mlir::scf::SCFDialect",
     "::mlir::cf::ControlFlowDialect", "::mlir::tensor::TensorDialect",
     "::mlir::vector::VectorDialect"
@@ -133,7 +133,7 @@ def LinalgSingleTilingExpert
       "Use default tiling level used to retrieve the configuration from lowering_config">
   ];
   let dependentDialects = [
-    "::mlir::arith::ArithmeticDialect", "::mlir::AffineDialect",
+    "::mlir::arith::ArithDialect", "::mlir::AffineDialect",
     "::mlir::linalg::LinalgDialect", "::mlir::scf::SCFDialect",
     "::mlir::cf::ControlFlowDialect", "::mlir::tensor::TensorDialect",
     "::mlir::vector::VectorDialect"
@@ -188,7 +188,7 @@ def LinalgVectorLowering : Pass<"linalg-vector-lowering", "func::FuncOp"> {
       "Set the maximum vector load/store rank.">
   ];
   let dependentDialects = [
-    "::mlir::arith::ArithmeticDialect", "::mlir::AffineDialect",
+    "::mlir::arith::ArithDialect", "::mlir::AffineDialect",
     "::mlir::linalg::LinalgDialect", "::mlir::memref::MemRefDialect",
     "::mlir::scf::SCFDialect", "::mlir::cf::ControlFlowDialect",
     "::mlir::vector::VectorDialect"
@@ -211,7 +211,7 @@ def UnrollOneVectorOp : Pass<"unroll-one-vector-op", "func::FuncOp"> {
                "llvm::cl::ZeroOrMore">,
   ];
   let dependentDialects = [
-    "::mlir::arith::ArithmeticDialect", "::mlir::AffineDialect",
+    "::mlir::arith::ArithDialect", "::mlir::AffineDialect",
     "::mlir::linalg::LinalgDialect", "::mlir::scf::SCFDialect",
     "::mlir::cf::ControlFlowDialect", "::mlir::tensor::TensorDialect",
     "::mlir::vector::VectorDialect"
@@ -234,7 +234,7 @@ def UnrollOneParentLoop : Pass<"unroll-one-parent-loop", "func::FuncOp"> {
       "Unroll factor.">,
   ];
   let dependentDialects = [
-    "::mlir::arith::ArithmeticDialect", "::mlir::AffineDialect",
+    "::mlir::arith::ArithDialect", "::mlir::AffineDialect",
     "::mlir::linalg::LinalgDialect", "::mlir::scf::SCFDialect",
     "::mlir::cf::ControlFlowDialect", "::mlir::tensor::TensorDialect",
     "::mlir::vector::VectorDialect"
@@ -257,7 +257,7 @@ def OutlineOneParentLoop : Pass<"outline-one-parent-loop", "func::FuncOp"> {
       "Name of the func op produced by outlining.">,
   ];
   let dependentDialects = [
-    "::mlir::arith::ArithmeticDialect", "::mlir::AffineDialect",
+    "::mlir::arith::ArithDialect", "::mlir::AffineDialect",
     "::mlir::linalg::LinalgDialect", "::mlir::scf::SCFDialect",
     "::mlir::cf::ControlFlowDialect", "::mlir::tensor::TensorDialect",
     "::mlir::vector::VectorDialect"

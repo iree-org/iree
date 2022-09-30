@@ -25,7 +25,7 @@ namespace iree_compiler {
 namespace {
 
 template <typename SrcOpTy, typename Dst32OpTy, typename Dst64OpTy>
-class UnaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
+class UnaryArithOpConversion : public OpConversionPattern<SrcOpTy> {
   using OpConversionPattern<SrcOpTy>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
@@ -52,7 +52,7 @@ class UnaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
 };
 
 template <typename SrcOpTy, typename Dst32OpTy, typename Dst64OpTy>
-class BinaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
+class BinaryArithOpConversion : public OpConversionPattern<SrcOpTy> {
   using OpConversionPattern<SrcOpTy>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
@@ -86,47 +86,47 @@ void populateMathToVMPatterns(MLIRContext *context,
                               TypeConverter &typeConverter,
                               RewritePatternSet &patterns) {
   patterns.insert<
-      UnaryArithmeticOpConversion<math::AbsFOp, IREE::VM::AbsF32Op,
+      UnaryArithOpConversion<math::AbsFOp, IREE::VM::AbsF32Op,
                                   IREE::VM::AbsF64Op>,
-      UnaryArithmeticOpConversion<math::CeilOp, IREE::VM::CeilF32Op,
+      UnaryArithOpConversion<math::CeilOp, IREE::VM::CeilF32Op,
                                   IREE::VM::CeilF64Op>,
-      UnaryArithmeticOpConversion<math::FloorOp, IREE::VM::FloorF32Op,
+      UnaryArithOpConversion<math::FloorOp, IREE::VM::FloorF32Op,
                                   IREE::VM::FloorF64Op>,
-      UnaryArithmeticOpConversion<math::RoundOp, IREE::VM::RoundF32Op,
+      UnaryArithOpConversion<math::RoundOp, IREE::VM::RoundF32Op,
                                   IREE::VM::RoundF64Op>,
-      UnaryArithmeticOpConversion<math::AtanOp, IREE::VM::AtanF32Op,
+      UnaryArithOpConversion<math::AtanOp, IREE::VM::AtanF32Op,
                                   IREE::VM::AtanF64Op>,
-      BinaryArithmeticOpConversion<math::Atan2Op, IREE::VM::Atan2F32Op,
+      BinaryArithOpConversion<math::Atan2Op, IREE::VM::Atan2F32Op,
                                    IREE::VM::Atan2F64Op>,
-      UnaryArithmeticOpConversion<math::CosOp, IREE::VM::CosF32Op,
+      UnaryArithOpConversion<math::CosOp, IREE::VM::CosF32Op,
                                   IREE::VM::CosF64Op>,
-      UnaryArithmeticOpConversion<math::SinOp, IREE::VM::SinF32Op,
+      UnaryArithOpConversion<math::SinOp, IREE::VM::SinF32Op,
                                   IREE::VM::SinF64Op>,
-      UnaryArithmeticOpConversion<math::ExpOp, IREE::VM::ExpF32Op,
+      UnaryArithOpConversion<math::ExpOp, IREE::VM::ExpF32Op,
                                   IREE::VM::ExpF64Op>,
-      UnaryArithmeticOpConversion<math::Exp2Op, IREE::VM::Exp2F32Op,
+      UnaryArithOpConversion<math::Exp2Op, IREE::VM::Exp2F32Op,
                                   IREE::VM::Exp2F64Op>,
-      UnaryArithmeticOpConversion<math::ExpM1Op, IREE::VM::ExpM1F32Op,
+      UnaryArithOpConversion<math::ExpM1Op, IREE::VM::ExpM1F32Op,
                                   IREE::VM::ExpM1F64Op>,
-      UnaryArithmeticOpConversion<math::LogOp, IREE::VM::LogF32Op,
+      UnaryArithOpConversion<math::LogOp, IREE::VM::LogF32Op,
                                   IREE::VM::LogF64Op>,
-      UnaryArithmeticOpConversion<math::Log10Op, IREE::VM::Log10F32Op,
+      UnaryArithOpConversion<math::Log10Op, IREE::VM::Log10F32Op,
                                   IREE::VM::Log10F64Op>,
-      UnaryArithmeticOpConversion<math::Log1pOp, IREE::VM::Log1pF32Op,
+      UnaryArithOpConversion<math::Log1pOp, IREE::VM::Log1pF32Op,
                                   IREE::VM::Log1pF64Op>,
-      UnaryArithmeticOpConversion<math::Log2Op, IREE::VM::Log2F32Op,
+      UnaryArithOpConversion<math::Log2Op, IREE::VM::Log2F32Op,
                                   IREE::VM::Log2F64Op>,
-      BinaryArithmeticOpConversion<math::PowFOp, IREE::VM::PowF32Op,
+      BinaryArithOpConversion<math::PowFOp, IREE::VM::PowF32Op,
                                    IREE::VM::PowF64Op>,
-      UnaryArithmeticOpConversion<math::RsqrtOp, IREE::VM::RsqrtF32Op,
+      UnaryArithOpConversion<math::RsqrtOp, IREE::VM::RsqrtF32Op,
                                   IREE::VM::RsqrtF64Op>,
-      UnaryArithmeticOpConversion<math::SqrtOp, IREE::VM::SqrtF32Op,
+      UnaryArithOpConversion<math::SqrtOp, IREE::VM::SqrtF32Op,
                                   IREE::VM::SqrtF64Op>,
-      UnaryArithmeticOpConversion<math::TanhOp, IREE::VM::TanhF32Op,
+      UnaryArithOpConversion<math::TanhOp, IREE::VM::TanhF32Op,
                                   IREE::VM::TanhF64Op>,
-      UnaryArithmeticOpConversion<math::ErfOp, IREE::VM::ErfF32Op,
+      UnaryArithOpConversion<math::ErfOp, IREE::VM::ErfF32Op,
                                   IREE::VM::ErfF64Op>,
-      UnaryArithmeticOpConversion<math::CountLeadingZerosOp,
+      UnaryArithOpConversion<math::CountLeadingZerosOp,
                                   IREE::VM::CtlzI32Op, IREE::VM::CtlzI64Op>>(
       typeConverter, context);
 }

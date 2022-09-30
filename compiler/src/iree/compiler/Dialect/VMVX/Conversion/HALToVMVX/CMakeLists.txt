@@ -18,7 +18,7 @@ iree_cc_library(
   SRCS
     "ConvertHALToVMVX.cpp"
   DEPS
-    MLIRArithmeticDialect
+    MLIRArithDialect
     MLIRFuncDialect
     MLIRIR
     MLIRMemRefDialect

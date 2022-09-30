@@ -68,7 +68,7 @@ class PromoteTensorLoadsPass
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
-        .insert<FlowDialect, func::FuncDialect, mlir::arith::ArithmeticDialect,
+        .insert<FlowDialect, func::FuncDialect, mlir::arith::ArithDialect,
                 mlir::math::MathDialect, tensor::TensorDialect>();
   }
 
@@ -79,7 +79,7 @@ class PromoteTensorLoadsPass
 
     conversionTarget.addLegalDialect<IREE::Flow::FlowDialect>();
     conversionTarget
-        .addLegalDialect<func::FuncDialect, mlir::arith::ArithmeticDialect,
+        .addLegalDialect<func::FuncDialect, mlir::arith::ArithDialect,
                          mlir::math::MathDialect>();
     setupStandardToFlowTensorLoadLegality(context, conversionTarget);
     populateStandardToFlowTensorLoadPatterns(context, conversionPatterns);

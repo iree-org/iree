@@ -18,7 +18,7 @@ iree_cc_library(
   SRCS
     "ConvertFlowToStream.cpp"
   DEPS
-    MLIRArithmeticDialect
+    MLIRArithDialect
     MLIRFuncDialect
     MLIRIR
     MLIRTensorDialect

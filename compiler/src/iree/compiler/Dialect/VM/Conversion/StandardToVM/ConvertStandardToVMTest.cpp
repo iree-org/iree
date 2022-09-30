@@ -8,7 +8,7 @@
 #include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"
 #include "iree/compiler/Dialect/VM/IR/VMTypes.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -42,7 +42,7 @@ class ConvertStandardToVMTestPass
     ConversionTarget target(getContext());
     target.addLegalDialect<IREE::VM::VMDialect>();
     target
-        .addIllegalDialect<func::FuncDialect, mlir::arith::ArithmeticDialect>();
+        .addIllegalDialect<func::FuncDialect, mlir::arith::ArithDialect>();
 
     IREE::VM::TypeConverter typeConverter(
         IREE::VM::TargetOptions::FromFlags::get());

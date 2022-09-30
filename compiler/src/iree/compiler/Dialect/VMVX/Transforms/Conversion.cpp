@@ -65,7 +65,7 @@ class ConversionPass : public ConversionBase<ConversionPass> {
     conversionTarget.addLegalDialect<IREE::VMVX::VMVXDialect>();
     conversionTarget
         .addLegalDialect<mlir::func::FuncDialect, mlir::scf::SCFDialect,
-                         mlir::arith::ArithmeticDialect>();
+                         mlir::arith::ArithDialect>();
     conversionTarget.addLegalDialect<mlir::AffineDialect>();
     conversionTarget.addLegalDialect<memref::MemRefDialect>();
     conversionTarget.addIllegalOp<mlir::UnrealizedConversionCastOp>();

@@ -601,7 +601,7 @@ class PropagateSubrangesPass
     : public PropagateSubrangesBase<PropagateSubrangesPass> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::arith::ArithmeticDialect>();
+    registry.insert<mlir::arith::ArithDialect>();
     registry.insert<mlir::func::FuncDialect>();
     registry.insert<mlir::scf::SCFDialect>();
     registry.insert<IREE::Util::UtilDialect>();

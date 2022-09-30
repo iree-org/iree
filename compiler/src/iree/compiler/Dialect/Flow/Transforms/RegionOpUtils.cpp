@@ -7,7 +7,7 @@
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/BuiltinTypes.h"

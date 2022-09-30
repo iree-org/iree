@@ -12,7 +12,7 @@
 #include "iree/compiler/Dialect/VM/Conversion/TargetOptions.h"
 #include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
@@ -681,7 +681,7 @@ struct CmpF32OpConversion : public OpConversionPattern<arith::CmpFOp> {
 };
 
 template <typename SrcOpTy, typename Dst32OpTy, typename Dst64OpTy>
-class UnaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
+class UnaryArithOpConversion : public OpConversionPattern<SrcOpTy> {
   using OpConversionPattern<SrcOpTy>::OpConversionPattern;
   LogicalResult matchAndRewrite(
       SrcOpTy srcOp, typename SrcOpTy::Adaptor adaptor,
@@ -703,7 +703,7 @@ class UnaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
 };
 
 template <typename SrcOpTy, typename Dst32OpTy, typename Dst64OpTy>
-class BinaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
+class BinaryArithOpConversion : public OpConversionPattern<SrcOpTy> {
   using OpConversionPattern<SrcOpTy>::OpConversionPattern;
   LogicalResult matchAndRewrite(
       SrcOpTy srcOp, typename SrcOpTy::Adaptor adaptor,
@@ -727,7 +727,7 @@ class BinaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
 };
 
 template <typename SrcOpTy, typename Dst32OpTy, typename Dst64OpTy>
-class ShiftArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
+class ShiftArithOpConversion : public OpConversionPattern<SrcOpTy> {
   using OpConversionPattern<SrcOpTy>::OpConversionPattern;
   LogicalResult matchAndRewrite(
       SrcOpTy srcOp, typename SrcOpTy::Adaptor adaptor,
@@ -1091,47 +1091,47 @@ void populateStandardToVMPatterns(MLIRContext *context,
 
   // Integer arithmetic ops.
   patterns
-      .insert<BinaryArithmeticOpConversion<arith::AddIOp, IREE::VM::AddI32Op,
+      .insert<BinaryArithOpConversion<arith::AddIOp, IREE::VM::AddI32Op,
                                            IREE::VM::AddI64Op>,
-              BinaryArithmeticOpConversion<arith::DivSIOp, IREE::VM::DivI32SOp,
+              BinaryArithOpConversion<arith::DivSIOp, IREE::VM::DivI32SOp,
                                            IREE::VM::DivI64SOp>,
-              BinaryArithmeticOpConversion<arith::DivUIOp, IREE::VM::DivI32UOp,
+              BinaryArithOpConversion<arith::DivUIOp, IREE::VM::DivI32UOp,
                                            IREE::VM::DivI64UOp>,
-              BinaryArithmeticOpConversion<arith::MulIOp, IREE::VM::MulI32Op,
+              BinaryArithOpConversion<arith::MulIOp, IREE::VM::MulI32Op,
                                            IREE::VM::MulI64Op>,
-              BinaryArithmeticOpConversion<arith::RemSIOp, IREE::VM::RemI32SOp,
+              BinaryArithOpConversion<arith::RemSIOp, IREE::VM::RemI32SOp,
                                            IREE::VM::RemI64SOp>,
-              BinaryArithmeticOpConversion<arith::RemUIOp, IREE::VM::RemI32UOp,
+              BinaryArithOpConversion<arith::RemUIOp, IREE::VM::RemI32UOp,
                                            IREE::VM::RemI64UOp>,
-              BinaryArithmeticOpConversion<arith::SubIOp, IREE::VM::SubI32Op,
+              BinaryArithOpConversion<arith::SubIOp, IREE::VM::SubI32Op,
                                            IREE::VM::SubI64Op>,
-              BinaryArithmeticOpConversion<arith::AndIOp, IREE::VM::AndI32Op,
+              BinaryArithOpConversion<arith::AndIOp, IREE::VM::AndI32Op,
                                            IREE::VM::AndI64Op>,
-              BinaryArithmeticOpConversion<arith::OrIOp, IREE::VM::OrI32Op,
+              BinaryArithOpConversion<arith::OrIOp, IREE::VM::OrI32Op,
                                            IREE::VM::OrI64Op>,
-              BinaryArithmeticOpConversion<arith::XOrIOp, IREE::VM::XorI32Op,
+              BinaryArithOpConversion<arith::XOrIOp, IREE::VM::XorI32Op,
                                            IREE::VM::XorI64Op>>(typeConverter,
                                                                 context);
 
   // Floating-point arithmetic ops.
   patterns
-      .insert<UnaryArithmeticOpConversion<math::AbsFOp, IREE::VM::AbsF32Op,
+      .insert<UnaryArithOpConversion<math::AbsFOp, IREE::VM::AbsF32Op,
                                           IREE::VM::AbsF64Op>,
-              BinaryArithmeticOpConversion<arith::AddFOp, IREE::VM::AddF32Op,
+              BinaryArithOpConversion<arith::AddFOp, IREE::VM::AddF32Op,
                                            IREE::VM::AddF64Op>,
-              UnaryArithmeticOpConversion<math::CeilOp, IREE::VM::CeilF32Op,
+              UnaryArithOpConversion<math::CeilOp, IREE::VM::CeilF32Op,
                                           IREE::VM::CeilF64Op>,
-              UnaryArithmeticOpConversion<math::FloorOp, IREE::VM::FloorF32Op,
+              UnaryArithOpConversion<math::FloorOp, IREE::VM::FloorF32Op,
                                           IREE::VM::FloorF64Op>,
-              BinaryArithmeticOpConversion<arith::DivFOp, IREE::VM::DivF32Op,
+              BinaryArithOpConversion<arith::DivFOp, IREE::VM::DivF32Op,
                                            IREE::VM::DivF64Op>,
-              BinaryArithmeticOpConversion<arith::MulFOp, IREE::VM::MulF32Op,
+              BinaryArithOpConversion<arith::MulFOp, IREE::VM::MulF32Op,
                                            IREE::VM::MulF64Op>,
-              UnaryArithmeticOpConversion<arith::NegFOp, IREE::VM::NegF32Op,
+              UnaryArithOpConversion<arith::NegFOp, IREE::VM::NegF32Op,
                                           IREE::VM::NegF64Op>,
-              BinaryArithmeticOpConversion<arith::RemFOp, IREE::VM::RemF32Op,
+              BinaryArithOpConversion<arith::RemFOp, IREE::VM::RemF32Op,
                                            IREE::VM::RemF64Op>,
-              BinaryArithmeticOpConversion<arith::SubFOp, IREE::VM::SubF32Op,
+              BinaryArithOpConversion<arith::SubFOp, IREE::VM::SubF32Op,
                                            IREE::VM::SubF64Op>>(typeConverter,
                                                                 context);
 
@@ -1142,11 +1142,11 @@ void populateStandardToVMPatterns(MLIRContext *context,
 
   // Shift ops.
   patterns
-      .insert<ShiftArithmeticOpConversion<arith::ShLIOp, IREE::VM::ShlI32Op,
+      .insert<ShiftArithOpConversion<arith::ShLIOp, IREE::VM::ShlI32Op,
                                           IREE::VM::ShlI64Op>,
-              ShiftArithmeticOpConversion<arith::ShRSIOp, IREE::VM::ShrI32SOp,
+              ShiftArithOpConversion<arith::ShRSIOp, IREE::VM::ShrI32SOp,
                                           IREE::VM::ShrI64SOp>,
-              ShiftArithmeticOpConversion<arith::ShRUIOp, IREE::VM::ShrI32UOp,
+              ShiftArithOpConversion<arith::ShRUIOp, IREE::VM::ShrI32UOp,
                                           IREE::VM::ShrI64UOp>>(typeConverter,
                                                                 context);
 }

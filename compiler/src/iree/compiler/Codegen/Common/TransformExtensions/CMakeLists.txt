@@ -35,8 +35,8 @@ iree_cc_library(
     IREELinalgTransformDialect
     LLVMSupport
     MLIRAffineDialect
-    MLIRArithmeticDialect
-    MLIRArithmeticUtils
+    MLIRArithDialect
+    MLIRArithUtils
     MLIRBufferizationDialect
     MLIRBufferizationTransforms
     MLIRLinalgTransformOps

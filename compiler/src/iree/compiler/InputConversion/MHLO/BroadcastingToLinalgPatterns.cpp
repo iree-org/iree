@@ -13,7 +13,7 @@
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/map_chlo_to_hlo_op.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/rewriters.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -787,8 +787,8 @@ void mlir::iree_compiler::MHLO::populateMHLOBroadcastingToLinalgPatterns(
   POPULATE_SIMPLE_BCAST(chlo::BroadcastPowOp, mhlo::PowOp);
   POPULATE_SIMPLE_BCAST(chlo::BroadcastRemOp, mhlo::RemOp);
   POPULATE_SIMPLE_BCAST(chlo::BroadcastShiftLeftOp, mhlo::ShiftLeftOp);
-  POPULATE_SIMPLE_BCAST(chlo::BroadcastShiftRightArithmeticOp,
-                        mhlo::ShiftRightArithmeticOp);
+  POPULATE_SIMPLE_BCAST(chlo::BroadcastShiftRightArithOp,
+                        mhlo::ShiftRightArithOp);
   POPULATE_SIMPLE_BCAST(chlo::BroadcastShiftRightLogicalOp,
                         mhlo::ShiftRightLogicalOp);
   POPULATE_SIMPLE_BCAST(chlo::BroadcastSubOp, mhlo::SubtractOp);

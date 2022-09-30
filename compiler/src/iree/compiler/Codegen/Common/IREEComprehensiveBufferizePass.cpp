@@ -30,7 +30,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Bufferization/Transforms/AllocTensorElimination.h"
 #include "mlir/Dialect/Bufferization/Transforms/BufferUtils.h"
@@ -82,7 +82,7 @@ class IREEComprehensiveBufferizePass
     // clang-format off
     registry
         .insert<AffineDialect,
-                arith::ArithmeticDialect,
+                arith::ArithDialect,
                 bufferization::BufferizationDialect,
                 func::FuncDialect,
                 IREE::Flow::FlowDialect,

@@ -530,7 +530,7 @@ struct ConvertMHLOToLinalgExtPass
     registry
         .insert<IREE::LinalgExt::IREELinalgExtDialect, linalg::LinalgDialect,
                 IREE::Flow::FlowDialect, mlir::cf::ControlFlowDialect,
-                mlir::math::MathDialect, mlir::arith::ArithmeticDialect,
+                mlir::math::MathDialect, mlir::arith::ArithDialect,
                 complex::ComplexDialect, tensor::TensorDialect>();
   }
 
@@ -580,7 +580,7 @@ struct ConvertMHLOToLinalgExtPass
                 LinalgExtRegionHLOOpConversion<mhlo::RsqrtOp>,
                 LinalgExtRegionHLOOpConversion<mhlo::SelectOp>,
                 LinalgExtRegionHLOOpConversion<mhlo::ShiftLeftOp>,
-                LinalgExtRegionHLOOpConversion<mhlo::ShiftRightArithmeticOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::ShiftRightArithOp>,
                 LinalgExtRegionHLOOpConversion<mhlo::ShiftRightLogicalOp>,
                 LinalgExtRegionHLOOpConversion<mhlo::SignOp>,
                 LinalgExtRegionHLOOpConversion<mhlo::SineOp>,
@@ -594,7 +594,7 @@ struct ConvertMHLOToLinalgExtPass
     target.addLegalDialect<
         IREE::LinalgExt::IREELinalgExtDialect, linalg::LinalgDialect,
         IREE::Flow::FlowDialect, mlir::cf::ControlFlowDialect,
-        mlir::math::MathDialect, mlir::arith::ArithmeticDialect,
+        mlir::math::MathDialect, mlir::arith::ArithDialect,
         tensor::TensorDialect, complex::ComplexDialect>();
     // TODO: Scatter is not marked as illegal to allow falling back to the
     // generic LinAlg lowering, the generic lowering is not always performant

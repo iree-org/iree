@@ -236,7 +236,7 @@ def Util_RangeExtentsOp : Util_PureOp<"range.extents", [
 }
 
 //===----------------------------------------------------------------------===//
-// Address/offset Arithmetic
+// Address/offset Arith
 //===----------------------------------------------------------------------===//
 
 def Util_AlignOp : Util_PureOp<"align", [

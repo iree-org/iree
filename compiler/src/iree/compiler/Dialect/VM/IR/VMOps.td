@@ -1986,10 +1986,10 @@ def VM_SwitchRefOp : VM_PureOp<"switch.ref", [
 }
 
 //===----------------------------------------------------------------------===//
-// Arithmetic helpers
+// Arith helpers
 //===----------------------------------------------------------------------===//
 
-class VM_UnaryArithmeticOp<Type type, string mnemonic, VM_OPC opcode,
+class VM_UnaryArithOp<Type type, string mnemonic, VM_OPC opcode,
                            list<Trait> traits = []> :
     VM_PureOp<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
@@ -2013,7 +2013,7 @@ class VM_UnaryArithmeticOp<Type type, string mnemonic, VM_OPC opcode,
   ];
 }
 
-class VM_BinaryArithmeticOp<Type type, string mnemonic, VM_OPC opcode,
+class VM_BinaryArithOp<Type type, string mnemonic, VM_OPC opcode,
                             list<Trait> traits = []> :
     VM_PureOp<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
@@ -2039,7 +2039,7 @@ class VM_BinaryArithmeticOp<Type type, string mnemonic, VM_OPC opcode,
   ];
 }
 
-class VM_TernaryArithmeticOp<Type type, string mnemonic, VM_OPC opcode,
+class VM_TernaryArithOp<Type type, string mnemonic, VM_OPC opcode,
                              list<Trait> traits = []> :
     VM_PureOp<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
@@ -2072,113 +2072,113 @@ class VM_TernaryArithmeticOp<Type type, string mnemonic, VM_OPC opcode,
 //===----------------------------------------------------------------------===//
 
 def VM_AddI32Op :
-    VM_BinaryArithmeticOp<I32, "add.i32", VM_OPC_AddI32, [Commutative]> {
+    VM_BinaryArithOp<I32, "add.i32", VM_OPC_AddI32, [Commutative]> {
   let summary = [{integer add operation}];
   let hasFolder = 1;
 }
 
 def VM_AddI64Op :
-    VM_BinaryArithmeticOp<I64, "add.i64", VM_OPC_AddI64, [Commutative]> {
+    VM_BinaryArithOp<I64, "add.i64", VM_OPC_AddI64, [Commutative]> {
   let summary = [{integer add operation}];
   let hasFolder = 1;
 }
 
 def VM_SubI32Op :
-    VM_BinaryArithmeticOp<I32, "sub.i32", VM_OPC_SubI32> {
+    VM_BinaryArithOp<I32, "sub.i32", VM_OPC_SubI32> {
   let summary = [{integer subtract operation}];
   let hasFolder = 1;
 }
 
 def VM_SubI64Op :
-    VM_BinaryArithmeticOp<I64, "sub.i64", VM_OPC_SubI64> {
+    VM_BinaryArithOp<I64, "sub.i64", VM_OPC_SubI64> {
   let summary = [{integer subtract operation}];
   let hasFolder = 1;
 }
 
 def VM_MulI32Op :
-    VM_BinaryArithmeticOp<I32, "mul.i32", VM_OPC_MulI32, [Commutative]> {
+    VM_BinaryArithOp<I32, "mul.i32", VM_OPC_MulI32, [Commutative]> {
   let summary = [{integer multiplication operation}];
   let hasFolder = 1;
   let hasCanonicalizer = 1;
 }
 
 def VM_MulI64Op :
-    VM_BinaryArithmeticOp<I64, "mul.i64", VM_OPC_MulI64, [Commutative]> {
+    VM_BinaryArithOp<I64, "mul.i64", VM_OPC_MulI64, [Commutative]> {
   let summary = [{integer multiplication operation}];
   let hasFolder = 1;
   let hasCanonicalizer = 1;
 }
 
 def VM_DivI32SOp :
-    VM_BinaryArithmeticOp<I32, "div.i32.s", VM_OPC_DivI32S> {
+    VM_BinaryArithOp<I32, "div.i32.s", VM_OPC_DivI32S> {
   let summary = [{signed integer division operation}];
   let hasFolder = 1;
 }
 
 def VM_DivI64SOp :
-    VM_BinaryArithmeticOp<I64, "div.i64.s", VM_OPC_DivI64S> {
+    VM_BinaryArithOp<I64, "div.i64.s", VM_OPC_DivI64S> {
   let summary = [{signed integer division operation}];
   let hasFolder = 1;
 }
 
 def VM_DivI32UOp :
-    VM_BinaryArithmeticOp<I32, "div.i32.u", VM_OPC_DivI32U> {
+    VM_BinaryArithOp<I32, "div.i32.u", VM_OPC_DivI32U> {
   let summary = [{unsigned integer division operation}];
   let hasFolder = 1;
 }
 
 def VM_DivI64UOp :
-    VM_BinaryArithmeticOp<I64, "div.i64.u", VM_OPC_DivI64U> {
+    VM_BinaryArithOp<I64, "div.i64.u", VM_OPC_DivI64U> {
   let summary = [{unsigned integer division operation}];
   let hasFolder = 1;
 }
 
 def VM_RemI32SOp :
-    VM_BinaryArithmeticOp<I32, "rem.i32.s", VM_OPC_RemI32S> {
+    VM_BinaryArithOp<I32, "rem.i32.s", VM_OPC_RemI32S> {
   let summary = [{signed integer division remainder operation}];
   let hasFolder = 1;
 }
 
 def VM_RemI64SOp :
-    VM_BinaryArithmeticOp<I64, "rem.i64.s", VM_OPC_RemI64S> {
+    VM_BinaryArithOp<I64, "rem.i64.s", VM_OPC_RemI64S> {
   let summary = [{signed integer division remainder operation}];
   let hasFolder = 1;
 }
 
 def VM_RemI32UOp :
-    VM_BinaryArithmeticOp<I32, "rem.i32.u", VM_OPC_RemI32U> {
+    VM_BinaryArithOp<I32, "rem.i32.u", VM_OPC_RemI32U> {
   let summary = [{unsigned integer division remainder operation}];
   let hasFolder = 1;
 }
 
 def VM_RemI64UOp :
-    VM_BinaryArithmeticOp<I64, "rem.i64.u", VM_OPC_RemI64U> {
+    VM_BinaryArithOp<I64, "rem.i64.u", VM_OPC_RemI64U> {
   let summary = [{unsigned integer division remainder operation}];
   let hasFolder = 1;
 }
 
 def VM_FMAI32Op :
-    VM_TernaryArithmeticOp<I32, "fma.i32", VM_OPC_FMAI32> {
+    VM_TernaryArithOp<I32, "fma.i32", VM_OPC_FMAI32> {
   let summary = [{integer fused-multiply add operation (a*b+c)}];
   let hasFolder = 1;
   let hasCanonicalizer = 1;
 }
 
 def VM_FMAI64Op :
-    VM_TernaryArithmeticOp<I64, "fma.i64", VM_OPC_FMAI64> {
+    VM_TernaryArithOp<I64, "fma.i64", VM_OPC_FMAI64> {
   let summary = [{integer fused-multiply add operation (a*b+c)}];
   let hasFolder = 1;
   let hasCanonicalizer = 1;
 }
 
 def VM_AbsI32Op :
-    VM_UnaryArithmeticOp<I32, "abs.i32", VM_OPC_AbsI32> {
+    VM_UnaryArithOp<I32, "abs.i32", VM_OPC_AbsI32> {
   let summary = [{integer absolute-value operation}];
   let hasFolder = 1;
 }
 
 def VM_AbsI64Op :
-    VM_UnaryArithmeticOp<I64, "abs.i64", VM_OPC_AbsI64> {
+    VM_UnaryArithOp<I64, "abs.i64", VM_OPC_AbsI64> {
   let summary = [{integer absolute-value operation}];
   let hasFolder = 1;
 }
@@ -2188,35 +2188,35 @@ def VM_AbsI64Op :
 //===----------------------------------------------------------------------===//
 
 def VM_AddF32Op :
-    VM_BinaryArithmeticOp<F32, "add.f32", VM_OPC_AddF32,
+    VM_BinaryArithOp<F32, "add.f32", VM_OPC_AddF32,
                           [VM_ExtF32, Commutative]> {
   let summary = [{floating-point add operation}];
   let hasFolder = 1;
 }
 
 def VM_AddF64Op :
-    VM_BinaryArithmeticOp<F64, "add.f64", VM_OPC_AddF64,
+    VM_BinaryArithOp<F64, "add.f64", VM_OPC_AddF64,
                           [VM_ExtF64, Commutative]> {
   let summary = [{floating-point add operation}];
   let hasFolder = 1;
 }
 
 def VM_SubF32Op :
-    VM_BinaryArithmeticOp<F32, "sub.f32", VM_OPC_SubF32,
+    VM_BinaryArithOp<F32, "sub.f32", VM_OPC_SubF32,
                           [VM_ExtF32]> {
   let summary = [{floating point subtraction operation}];
   let hasFolder = 1;
 }
 
 def VM_SubF64Op :
-    VM_BinaryArithmeticOp<F64, "sub.f64", VM_OPC_SubF64,
+    VM_BinaryArithOp<F64, "sub.f64", VM_OPC_SubF64,
                           [VM_ExtF64]> {
   let summary = [{floating point subtraction operation}];
   let hasFolder = 1;
 }
 
 def VM_MulF32Op :
-    VM_BinaryArithmeticOp<F32, "mul.f32", VM_OPC_MulF32,
+    VM_BinaryArithOp<F32, "mul.f32", VM_OPC_MulF32,
                           [VM_ExtF32, Commutative]> {
   let summary = [{floating point multiplication operation}];
   let hasFolder = 1;
@@ -2224,7 +2224,7 @@ def VM_MulF32Op :
 }
 
 def VM_MulF64Op :
-    VM_BinaryArithmeticOp<F64, "mul.f64", VM_OPC_MulF64,
+    VM_BinaryArithOp<F64, "mul.f64", VM_OPC_MulF64,
                           [VM_ExtF64, Commutative]> {
   let summary = [{floating point multiplication operation}];
   let hasFolder = 1;
@@ -2232,107 +2232,107 @@ def VM_MulF64Op :
 }
 
 def VM_DivF32Op :
-    VM_BinaryArithmeticOp<F32, "div.f32", VM_OPC_DivF32,
+    VM_BinaryArithOp<F32, "div.f32", VM_OPC_DivF32,
                           [VM_ExtF32]> {
   let summary = [{floating point division operation}];
   let hasFolder = 1;
 }
 
 def VM_DivF64Op :
-    VM_BinaryArithmeticOp<F64, "div.f64", VM_OPC_DivF64,
+    VM_BinaryArithOp<F64, "div.f64", VM_OPC_DivF64,
                           [VM_ExtF64]> {
   let summary = [{floating point division operation}];
   let hasFolder = 1;
 }
 
 def VM_RemF32Op :
-    VM_BinaryArithmeticOp<F32, "rem.f32", VM_OPC_RemF32,
+    VM_BinaryArithOp<F32, "rem.f32", VM_OPC_RemF32,
                           [VM_ExtF32]> {
   let summary = [{floating point remainder operation}];
   let hasFolder = 1;
 }
 
 def VM_RemF64Op :
-    VM_BinaryArithmeticOp<F64, "rem.f64", VM_OPC_RemF64,
+    VM_BinaryArithOp<F64, "rem.f64", VM_OPC_RemF64,
                           [VM_ExtF64]> {
   let summary = [{floating point remainder operation}];
   let hasFolder = 1;
 }
 
 def VM_FMAF32Op :
-    VM_TernaryArithmeticOp<F32, "fma.f32", VM_OPC_FMAF32, [VM_ExtF32]> {
+    VM_TernaryArithOp<F32, "fma.f32", VM_OPC_FMAF32, [VM_ExtF32]> {
   let summary = [{floating point fused multiply-add operation (a*b+c)}];
   let hasFolder = 1;
   let hasCanonicalizer = 1;
 }
 
 def VM_FMAF64Op :
-    VM_TernaryArithmeticOp<F64, "fma.f64", VM_OPC_FMAF64, [VM_ExtF64]> {
+    VM_TernaryArithOp<F64, "fma.f64", VM_OPC_FMAF64, [VM_ExtF64]> {
   let summary = [{floating point fused multiply-add operation (a*b+c)}];
   let hasFolder = 1;
   let hasCanonicalizer = 1;
 }
 
 def VM_AbsF32Op :
-    VM_UnaryArithmeticOp<F32, "abs.f32", VM_OPC_AbsF32,
+    VM_UnaryArithOp<F32, "abs.f32", VM_OPC_AbsF32,
                          [VM_ExtF32]> {
   let summary = [{floating point absolute-value operation}];
   let hasFolder = 1;
 }
 
 def VM_AbsF64Op :
-    VM_UnaryArithmeticOp<F64, "abs.f64", VM_OPC_AbsF64,
+    VM_UnaryArithOp<F64, "abs.f64", VM_OPC_AbsF64,
                          [VM_ExtF64]> {
   let summary = [{floating point absolute-value operation}];
   let hasFolder = 1;
 }
 
 def VM_NegF32Op :
-    VM_UnaryArithmeticOp<F32, "neg.f32", VM_OPC_NegF32,
+    VM_UnaryArithOp<F32, "neg.f32", VM_OPC_NegF32,
                          [VM_ExtF32]> {
   let summary = [{floating point negation operation}];
   let hasFolder = 1;
 }
 
 def VM_NegF64Op :
-    VM_UnaryArithmeticOp<F64, "neg.f64", VM_OPC_NegF64,
+    VM_UnaryArithOp<F64, "neg.f64", VM_OPC_NegF64,
                          [VM_ExtF64]> {
   let summary = [{floating point negation operation}];
   let hasFolder = 1;
 }
 
 def VM_CeilF32Op :
-    VM_UnaryArithmeticOp<F32, "ceil.f32", VM_OPC_CeilF32,
+    VM_UnaryArithOp<F32, "ceil.f32", VM_OPC_CeilF32,
                          [VM_ExtF32]> {
   let summary = [{floating point ceiling operation}];
   let hasFolder = 1;
 }
 
 def VM_CeilF64Op :
-    VM_UnaryArithmeticOp<F64, "ceil.f64", VM_OPC_CeilF64,
+    VM_UnaryArithOp<F64, "ceil.f64", VM_OPC_CeilF64,
                          [VM_ExtF64]> {
   let summary = [{floating point ceiling operation}];
   let hasFolder = 1;
 }
 
 def VM_FloorF32Op :
-    VM_UnaryArithmeticOp<F32, "floor.f32", VM_OPC_FloorF32,
+    VM_UnaryArithOp<F32, "floor.f32", VM_OPC_FloorF32,
                          [VM_ExtF32]> {
   let summary = [{floating point floor operation}];
   let hasFolder = 1;
 }
 
 def VM_FloorF64Op :
-    VM_UnaryArithmeticOp<F64, "floor.f64", VM_OPC_FloorF64,
+    VM_UnaryArithOp<F64, "floor.f64", VM_OPC_FloorF64,
                          [VM_ExtF64]> {
   let summary = [{floating point floor operation}];
   let hasFolder = 1;
 }
 
-def VM_RoundF32Op : VM_UnaryArithmeticOp<F32, "round.f32", VM_OPC_RoundF32, [VM_ExtF32]> {
+def VM_RoundF32Op : VM_UnaryArithOp<F32, "round.f32", VM_OPC_RoundF32, [VM_ExtF32]> {
   let summary = [{rounds the value to the nearest integer away from zero}];
 }
-def VM_RoundF64Op : VM_UnaryArithmeticOp<F64, "round.f64", VM_OPC_RoundF64, [VM_ExtF64]> {
+def VM_RoundF64Op : VM_UnaryArithOp<F64, "round.f64", VM_OPC_RoundF64, [VM_ExtF64]> {
   let summary = [{rounds the value to the nearest integer away from zero}];
 }
 
@@ -2341,117 +2341,117 @@ def VM_RoundF64Op : VM_UnaryArithmeticOp<F64, "round.f64", VM_OPC_RoundF64, [VM_
 //===----------------------------------------------------------------------===//
 // These map directly to the `math` dialect.
 
-def VM_AtanF32Op : VM_UnaryArithmeticOp<F32, "atan.f32", VM_OPC_AtanF32, [VM_ExtF32]> {
+def VM_AtanF32Op : VM_UnaryArithOp<F32, "atan.f32", VM_OPC_AtanF32, [VM_ExtF32]> {
   let summary = [{arcus tangent of the given value}];
 }
-def VM_AtanF64Op : VM_UnaryArithmeticOp<F64, "atan.f64", VM_OPC_AtanF64, [VM_ExtF64]> {
+def VM_AtanF64Op : VM_UnaryArithOp<F64, "atan.f64", VM_OPC_AtanF64, [VM_ExtF64]> {
   let summary = [{arcus tangent of the given value}];
 }
 
-def VM_Atan2F32Op : VM_BinaryArithmeticOp<F32, "atan2.f32", VM_OPC_Atan2F32, [VM_ExtF32]> {
+def VM_Atan2F32Op : VM_BinaryArithOp<F32, "atan2.f32", VM_OPC_Atan2F32, [VM_ExtF32]> {
   let summary = [{2-argument arcus tangent of the given values}];
 }
-def VM_Atan2F64Op : VM_BinaryArithmeticOp<F64, "atan2.f64", VM_OPC_Atan2F64, [VM_ExtF64]> {
+def VM_Atan2F64Op : VM_BinaryArithOp<F64, "atan2.f64", VM_OPC_Atan2F64, [VM_ExtF64]> {
   let summary = [{2-argument arcus tangent of the given values}];
 }
 
-def VM_CosF32Op : VM_UnaryArithmeticOp<F32, "cos.f32", VM_OPC_CosF32, [VM_ExtF32]> {
+def VM_CosF32Op : VM_UnaryArithOp<F32, "cos.f32", VM_OPC_CosF32, [VM_ExtF32]> {
   let summary = [{cosine of the specified value}];
 }
-def VM_CosF64Op : VM_UnaryArithmeticOp<F64, "cos.f64", VM_OPC_CosF64, [VM_ExtF64]> {
+def VM_CosF64Op : VM_UnaryArithOp<F64, "cos.f64", VM_OPC_CosF64, [VM_ExtF64]> {
   let summary = [{cosine of the specified value}];
 }
 
-def VM_SinF32Op : VM_UnaryArithmeticOp<F32, "sin.f32", VM_OPC_SinF32, [VM_ExtF32]> {
+def VM_SinF32Op : VM_UnaryArithOp<F32, "sin.f32", VM_OPC_SinF32, [VM_ExtF32]> {
   let summary = [{sine of the specified value}];
 }
-def VM_SinF64Op : VM_UnaryArithmeticOp<F64, "sin.f64", VM_OPC_SinF64, [VM_ExtF64]> {
+def VM_SinF64Op : VM_UnaryArithOp<F64, "sin.f64", VM_OPC_SinF64, [VM_ExtF64]> {
   let summary = [{sine of the specified value}];
 }
 
-def VM_ExpF32Op : VM_UnaryArithmeticOp<F32, "exp.f32", VM_OPC_ExpF32, [VM_ExtF32]> {
+def VM_ExpF32Op : VM_UnaryArithOp<F32, "exp.f32", VM_OPC_ExpF32, [VM_ExtF32]> {
   let summary = [{base-e exponential of the specified value}];
 }
-def VM_ExpF64Op : VM_UnaryArithmeticOp<F64, "exp.f64", VM_OPC_ExpF64, [VM_ExtF64]> {
+def VM_ExpF64Op : VM_UnaryArithOp<F64, "exp.f64", VM_OPC_ExpF64, [VM_ExtF64]> {
   let summary = [{base-e exponential of the specified value}];
 }
 
-def VM_Exp2F32Op : VM_UnaryArithmeticOp<F32, "exp2.f32", VM_OPC_Exp2F32, [VM_ExtF32]> {
+def VM_Exp2F32Op : VM_UnaryArithOp<F32, "exp2.f32", VM_OPC_Exp2F32, [VM_ExtF32]> {
   let summary = [{base-2 exponential of the specified value}];
 }
-def VM_Exp2F64Op : VM_UnaryArithmeticOp<F64, "exp2.f64", VM_OPC_Exp2F64, [VM_ExtF64]> {
+def VM_Exp2F64Op : VM_UnaryArithOp<F64, "exp2.f64", VM_OPC_Exp2F64, [VM_ExtF64]> {
   let summary = [{base-2 exponential of the specified value}];
 }
 
-def VM_ExpM1F32Op : VM_UnaryArithmeticOp<F32, "expm1.f32", VM_OPC_ExpM1F32, [VM_ExtF32]> {
+def VM_ExpM1F32Op : VM_UnaryArithOp<F32, "expm1.f32", VM_OPC_ExpM1F32, [VM_ExtF32]> {
   let summary = [{base-e exponential of the specified value minus 1}];
 }
-def VM_ExpM1F64Op : VM_UnaryArithmeticOp<F64, "expm1.f64", VM_OPC_ExpM1F64, [VM_ExtF64]> {
+def VM_ExpM1F64Op : VM_UnaryArithOp<F64, "expm1.f64", VM_OPC_ExpM1F64, [VM_ExtF64]> {
   let summary = [{base-e exponential of the specified value minus 1}];
 }
 
-def VM_LogF32Op : VM_UnaryArithmeticOp<F32, "log.f32", VM_OPC_LogF32, [VM_ExtF32]> {
+def VM_LogF32Op : VM_UnaryArithOp<F32, "log.f32", VM_OPC_LogF32, [VM_ExtF32]> {
   let summary = [{base-e logarithm of the specified value}];
 }
-def VM_LogF64Op : VM_UnaryArithmeticOp<F64, "log.f64", VM_OPC_LogF64, [VM_ExtF64]> {
+def VM_LogF64Op : VM_UnaryArithOp<F64, "log.f64", VM_OPC_LogF64, [VM_ExtF64]> {
   let summary = [{base-e logarithm of the specified value}];
 }
 
-def VM_Log10F32Op : VM_UnaryArithmeticOp<F32, "log10.f32", VM_OPC_Log10F32, [VM_ExtF32]> {
+def VM_Log10F32Op : VM_UnaryArithOp<F32, "log10.f32", VM_OPC_Log10F32, [VM_ExtF32]> {
   let summary = [{base-10 logarithm of the specified value}];
 }
-def VM_Log10F64Op : VM_UnaryArithmeticOp<F64, "log10.f64", VM_OPC_Log10F64, [VM_ExtF64]> {
+def VM_Log10F64Op : VM_UnaryArithOp<F64, "log10.f64", VM_OPC_Log10F64, [VM_ExtF64]> {
   let summary = [{base-10 logarithm of the specified value}];
 }
 
-def VM_Log1pF32Op : VM_UnaryArithmeticOp<F32, "log1p.f32", VM_OPC_Log1pF32, [VM_ExtF32]> {
+def VM_Log1pF32Op : VM_UnaryArithOp<F32, "log1p.f32", VM_OPC_Log1pF32, [VM_ExtF32]> {
   let summary = [{natural logarithm of one plus the given value}];
 }
-def VM_Log1pF64Op : VM_UnaryArithmeticOp<F64, "log1p.f64", VM_OPC_Log1pF64, [VM_ExtF64]> {
+def VM_Log1pF64Op : VM_UnaryArithOp<F64, "log1p.f64", VM_OPC_Log1pF64, [VM_ExtF64]> {
   let summary = [{natural logarithm of one plus the given value}];
 }
 
-def VM_Log2F32Op : VM_UnaryArithmeticOp<F32, "log2.f32", VM_OPC_Log2F32, [VM_ExtF32]> {
+def VM_Log2F32Op : VM_UnaryArithOp<F32, "log2.f32", VM_OPC_Log2F32, [VM_ExtF32]> {
   let summary = [{base-2 logarithm of the specified value}];
 }
-def VM_Log2F64Op : VM_UnaryArithmeticOp<F64, "log2.f64", VM_OPC_Log2F64, [VM_ExtF64]> {
+def VM_Log2F64Op : VM_UnaryArithOp<F64, "log2.f64", VM_OPC_Log2F64, [VM_ExtF64]> {
   let summary = [{base-2 logarithm of the specified value}];
 }
 
-def VM_PowF32Op : VM_BinaryArithmeticOp<F32, "pow.f32", VM_OPC_PowF32, [VM_ExtF32]> {
+def VM_PowF32Op : VM_BinaryArithOp<F32, "pow.f32", VM_OPC_PowF32, [VM_ExtF32]> {
   let summary = [{floating point raised to the power of operation}];
 }
-def VM_PowF64Op : VM_BinaryArithmeticOp<F64, "pow.f64", VM_OPC_PowF64, [VM_ExtF64]> {
+def VM_PowF64Op : VM_BinaryArithOp<F64, "pow.f64", VM_OPC_PowF64, [VM_ExtF64]> {
   let summary = [{floating point raised to the power of operation}];
 }
 
-def VM_RsqrtF32Op : VM_UnaryArithmeticOp<F32, "rsqrt.f32", VM_OPC_RsqrtF32, [VM_ExtF32]> {
+def VM_RsqrtF32Op : VM_UnaryArithOp<F32, "rsqrt.f32", VM_OPC_RsqrtF32, [VM_ExtF32]> {
   let summary = [{reciprocal of sqrt (1 / sqrt of the specified value)}];
 }
-def VM_RsqrtF64Op : VM_UnaryArithmeticOp<F64, "rsqrt.f64", VM_OPC_RsqrtF64, [VM_ExtF64]> {
+def VM_RsqrtF64Op : VM_UnaryArithOp<F64, "rsqrt.f64", VM_OPC_RsqrtF64, [VM_ExtF64]> {
   let summary = [{reciprocal of sqrt (1 / sqrt of the specified value)}];
 }
 
-def VM_SqrtF32Op : VM_UnaryArithmeticOp<F32, "sqrt.f32", VM_OPC_SqrtF32, [VM_ExtF32]> {
+def VM_SqrtF32Op : VM_UnaryArithOp<F32, "sqrt.f32", VM_OPC_SqrtF32, [VM_ExtF32]> {
   let summary = [{sqrt of the specified value}];
   let hasFolder = 1;
 }
-def VM_SqrtF64Op : VM_UnaryArithmeticOp<F64, "sqrt.f64", VM_OPC_SqrtF64, [VM_ExtF64]> {
+def VM_SqrtF64Op : VM_UnaryArithOp<F64, "sqrt.f64", VM_OPC_SqrtF64, [VM_ExtF64]> {
   let summary = [{sqrt of the specified value}];
   let hasFolder = 1;
 }
 
-def VM_TanhF32Op : VM_UnaryArithmeticOp<F32, "tanh.f32", VM_OPC_TanhF32, [VM_ExtF32]> {
+def VM_TanhF32Op : VM_UnaryArithOp<F32, "tanh.f32", VM_OPC_TanhF32, [VM_ExtF32]> {
   let summary = [{hyperbolic tangent of the specified value}];
 }
-def VM_TanhF64Op : VM_UnaryArithmeticOp<F64, "tanh.f64", VM_OPC_TanhF64, [VM_ExtF64]> {
+def VM_TanhF64Op : VM_UnaryArithOp<F64, "tanh.f64", VM_OPC_TanhF64, [VM_ExtF64]> {
   let summary = [{hyperbolic tangent of the specified value}];
 }
 
-def VM_ErfF32Op : VM_UnaryArithmeticOp<F32, "erf.f32", VM_OPC_ErfF32, [VM_ExtF32]> {
+def VM_ErfF32Op : VM_UnaryArithOp<F32, "erf.f32", VM_OPC_ErfF32, [VM_ExtF32]> {
   let summary = [{computes the error function of the specified value}];
 }
-def VM_ErfF64Op : VM_UnaryArithmeticOp<F64, "erf.f64", VM_OPC_ErfF64, [VM_ExtF64]> {
+def VM_ErfF64Op : VM_UnaryArithOp<F64, "erf.f64", VM_OPC_ErfF64, [VM_ExtF64]> {
   let summary = [{computes the error function of the specified value}];
 }
 
@@ -2460,61 +2460,61 @@ def VM_ErfF64Op : VM_UnaryArithmeticOp<F64, "erf.f64", VM_OPC_ErfF64, [VM_ExtF64
 //===----------------------------------------------------------------------===//
 
 def VM_NotI32Op :
-    VM_UnaryArithmeticOp<I32, "not.i32", VM_OPC_NotI32> {
+    VM_UnaryArithOp<I32, "not.i32", VM_OPC_NotI32> {
   let summary = [{integer binary not operation}];
   let hasFolder = 1;
 }
 
 def VM_NotI64Op :
-    VM_UnaryArithmeticOp<I64, "not.i64", VM_OPC_NotI64> {
+    VM_UnaryArithOp<I64, "not.i64", VM_OPC_NotI64> {
   let summary = [{integer binary not operation}];
   let hasFolder = 1;
 }
 
 def VM_AndI32Op :
-    VM_BinaryArithmeticOp<I32, "and.i32", VM_OPC_AndI32, [Commutative]> {
+    VM_BinaryArithOp<I32, "and.i32", VM_OPC_AndI32, [Commutative]> {
   let summary = [{integer binary and operation}];
   let hasFolder = 1;
 }
 
 def VM_AndI64Op :
-    VM_BinaryArithmeticOp<I64, "and.i64", VM_OPC_AndI64, [Commutative]> {
+    VM_BinaryArithOp<I64, "and.i64", VM_OPC_AndI64, [Commutative]> {
   let summary = [{integer binary and operation}];
   let hasFolder = 1;
 }
 
 def VM_OrI32Op :
-    VM_BinaryArithmeticOp<I32, "or.i32", VM_OPC_OrI32, [Commutative]> {
+    VM_BinaryArithOp<I32, "or.i32", VM_OPC_OrI32, [Commutative]> {
   let summary = [{integer binary or operation}];
   let hasFolder = 1;
 }
 
 def VM_OrI64Op :
-    VM_BinaryArithmeticOp<I64, "or.i64", VM_OPC_OrI64, [Commutative]> {
+    VM_BinaryArithOp<I64, "or.i64", VM_OPC_OrI64, [Commutative]> {
   let summary = [{integer binary or operation}];
   let hasFolder = 1;
 }
 
 def VM_XorI32Op :
-    VM_BinaryArithmeticOp<I32, "xor.i32", VM_OPC_XorI32, [Commutative]> {
+    VM_BinaryArithOp<I32, "xor.i32", VM_OPC_XorI32, [Commutative]> {
   let summary = [{integer binary exclusive-or operation}];
   let hasFolder = 1;
 }
 
 def VM_XorI64Op :
-    VM_BinaryArithmeticOp<I64, "xor.i64", VM_OPC_XorI64, [Commutative]> {
+    VM_BinaryArithOp<I64, "xor.i64", VM_OPC_XorI64, [Commutative]> {
   let summary = [{integer binary exclusive-or operation}];
   let hasFolder = 1;
 }
 
 def VM_CtlzI32Op :
-    VM_UnaryArithmeticOp<I32, "ctlz.i32", VM_OPC_CtlzI32> {
+    VM_UnaryArithOp<I32, "ctlz.i32", VM_OPC_CtlzI32> {
   let summary = [{counts the leading zeros in an integer value}];
   let hasFolder = 1;
 }
 
 def VM_CtlzI64Op :
-    VM_UnaryArithmeticOp<I64, "ctlz.i64", VM_OPC_CtlzI64> {
+    VM_UnaryArithOp<I64, "ctlz.i64", VM_OPC_CtlzI64> {
   let summary = [{counts the leading zeros in an integer value}];
   let hasFolder = 1;
 }
@@ -2523,7 +2523,7 @@ def VM_CtlzI64Op :
 // Bitwise shifts and rotates
 //===----------------------------------------------------------------------===//
 
-class VM_ShiftArithmeticOp<I type, string mnemonic, VM_OPC opcode,
+class VM_ShiftArithOp<I type, string mnemonic, VM_OPC opcode,
                            list<Trait> traits = []> :
     VM_PureOp<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
@@ -2553,32 +2553,32 @@ class VM_ShiftArithmeticOp<I type, string mnemonic, VM_OPC opcode,
   ];
 }
 
-def VM_ShlI32Op : VM_ShiftArithmeticOp<I32, "shl.i32", VM_OPC_ShlI32> {
+def VM_ShlI32Op : VM_ShiftArithOp<I32, "shl.i32", VM_OPC_ShlI32> {
   let summary = [{integer shift left operation}];
   let hasFolder = 1;
 }
 
-def VM_ShlI64Op : VM_ShiftArithmeticOp<I64, "shl.i64", VM_OPC_ShlI64> {
+def VM_ShlI64Op : VM_ShiftArithOp<I64, "shl.i64", VM_OPC_ShlI64> {
   let summary = [{integer shift left operation}];
   let hasFolder = 1;
 }
 
-def VM_ShrI32SOp : VM_ShiftArithmeticOp<I32, "shr.i32.s", VM_OPC_ShrI32S> {
+def VM_ShrI32SOp : VM_ShiftArithOp<I32, "shr.i32.s", VM_OPC_ShrI32S> {
   let summary = [{signed integer (arithmetic) shift right operation}];
   let hasFolder = 1;
 }
 
-def VM_ShrI64SOp : VM_ShiftArithmeticOp<I64, "shr.i64.s", VM_OPC_ShrI64S> {
+def VM_ShrI64SOp : VM_ShiftArithOp<I64, "shr.i64.s", VM_OPC_ShrI64S> {
   let summary = [{signed integer (arithmetic) shift right operation}];
   let hasFolder = 1;
 }
 
-def VM_ShrI32UOp : VM_ShiftArithmeticOp<I32, "shr.i32.u", VM_OPC_ShrI32U> {
+def VM_ShrI32UOp : VM_ShiftArithOp<I32, "shr.i32.u", VM_OPC_ShrI32U> {
   let summary = [{unsigned integer (logical) shift right operation}];
   let hasFolder = 1;
 }
 
-def VM_ShrI64UOp : VM_ShiftArithmeticOp<I64, "shr.i64.u", VM_OPC_ShrI64U> {
+def VM_ShrI64UOp : VM_ShiftArithOp<I64, "shr.i64.u", VM_OPC_ShrI64U> {
   let summary = [{unsigned integer (logical) shift right operation}];
   let hasFolder = 1;
 }

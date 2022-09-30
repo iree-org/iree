@@ -39,8 +39,8 @@ iree_cc_library(
     LLVMSupport
     MLIRAffineDialect
     MLIRAnalysis
-    MLIRArithmeticDialect
-    MLIRArithmeticTransforms
+    MLIRArithDialect
+    MLIRArithTransforms
     MLIRControlFlowDialect
     MLIRFuncDialect
     MLIRIR

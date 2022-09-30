@@ -19,7 +19,7 @@ iree_cc_library(
     "VMVXLinkExecutables.cpp"
   DEPS
     LLVMSupport
-    MLIRArithmeticDialect
+    MLIRArithDialect
     MLIRBufferizationDialect
     MLIRIR
     MLIRLinalgDialect
