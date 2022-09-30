@@ -2165,6 +2165,8 @@ LogicalResult UnPackOp::generateScalarImplementation(OpBuilder &builder,
   return success();
 }
 
+// TODO: implement `reifyResultShapes`. Should we also derive `inferResultType`
+// from this method?
 LogicalResult
 UnPackOp::reifyResultShapes(OpBuilder &builder,
                             ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
