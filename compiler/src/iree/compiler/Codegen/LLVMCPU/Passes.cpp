@@ -617,8 +617,7 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
   passManager.addNestedPass<func::FuncOp>(createCSEPass());
 
   // (HAL, IREE, Linalg, CF) -> LLVM
-  passManager.addNestedPass<func::FuncOp>(
-      arith::createArithExpandOpsPass());
+  passManager.addNestedPass<func::FuncOp>(arith::createArithExpandOpsPass());
   passManager.addNestedPass<func::FuncOp>(memref::createExpandOpsPass());
   passManager.addPass(createConvertToLLVMPass());
   passManager.addPass(createReconcileUnrealizedCastsPass());

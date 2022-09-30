@@ -113,8 +113,7 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
       populateMemRefToLLVMConversionPatterns(converter, llvmPatterns);
       populateFuncToLLVMConversionPatterns(converter, llvmPatterns);
       cf::populateControlFlowToLLVMConversionPatterns(converter, llvmPatterns);
-      arith::populateArithToLLVMConversionPatterns(converter,
-                                                        llvmPatterns);
+      arith::populateArithToLLVMConversionPatterns(converter, llvmPatterns);
       populateVectorToLLVMConversionPatterns(converter, llvmPatterns);
       populateGpuToNVVMConversionPatterns(converter, llvmPatterns);
       populateNVGPUToNVVMConversionPatterns(converter, llvmPatterns);

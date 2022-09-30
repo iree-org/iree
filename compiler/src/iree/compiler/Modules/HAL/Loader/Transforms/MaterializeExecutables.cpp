@@ -134,8 +134,8 @@ class MaterializeExecutablesPass
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Util::UtilDialect, IREE::HAL::HALDialect,
-                    IREE::HAL::Loader::HALLoaderDialect,
-                    arith::ArithDialect, cf::ControlFlowDialect>();
+                    IREE::HAL::Loader::HALLoaderDialect, arith::ArithDialect,
+                    cf::ControlFlowDialect>();
   }
 
   void runOnOperation() override {

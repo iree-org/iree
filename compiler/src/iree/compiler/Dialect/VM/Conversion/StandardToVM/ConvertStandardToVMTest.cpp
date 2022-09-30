@@ -41,8 +41,7 @@ class ConvertStandardToVMTestPass
   void runOnOperation() override {
     ConversionTarget target(getContext());
     target.addLegalDialect<IREE::VM::VMDialect>();
-    target
-        .addIllegalDialect<func::FuncDialect, mlir::arith::ArithDialect>();
+    target.addIllegalDialect<func::FuncDialect, mlir::arith::ArithDialect>();
 
     IREE::VM::TypeConverter typeConverter(
         IREE::VM::TargetOptions::FromFlags::get());

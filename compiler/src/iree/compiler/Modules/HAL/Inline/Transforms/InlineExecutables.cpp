@@ -32,10 +32,9 @@ class InlineExecutablesPass
     : public InlineExecutablesBase<InlineExecutablesPass> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<IREE::Util::UtilDialect, IREE::HAL::HALDialect,
-                IREE::HAL::Inline::HALInlineDialect, arith::ArithDialect,
-                func::FuncDialect, scf::SCFDialect>();
+    registry.insert<IREE::Util::UtilDialect, IREE::HAL::HALDialect,
+                    IREE::HAL::Inline::HALInlineDialect, arith::ArithDialect,
+                    func::FuncDialect, scf::SCFDialect>();
   }
 
   void runOnOperation() override {

@@ -67,9 +67,8 @@ class PromoteTensorLoadsPass
     : public PromoteTensorLoadsBase<PromoteTensorLoadsPass> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<FlowDialect, func::FuncDialect, mlir::arith::ArithDialect,
-                mlir::math::MathDialect, tensor::TensorDialect>();
+    registry.insert<FlowDialect, func::FuncDialect, mlir::arith::ArithDialect,
+                    mlir::math::MathDialect, tensor::TensorDialect>();
   }
 
   void runOnOperation() override {

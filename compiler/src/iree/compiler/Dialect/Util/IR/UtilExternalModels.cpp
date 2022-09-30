@@ -103,8 +103,7 @@ void registerUtilExternalModels(DialectRegistry &registry) {
   registry.insert<arith::ArithDialect, linalg::LinalgDialect,
                   tensor::TensorDialect>();
 
-  registry.addExtension(+[](MLIRContext *ctx,
-                            arith::ArithDialect *dialect) {
+  registry.addExtension(+[](MLIRContext *ctx, arith::ArithDialect *dialect) {
     GenericNumericCastExternalModel::add<
         arith::BitcastOp, arith::ExtFOp, arith::ExtUIOp, arith::ExtSIOp,
         arith::FPToSIOp, arith::FPToUIOp, arith::IndexCastOp, arith::TruncFOp,

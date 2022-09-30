@@ -75,9 +75,9 @@ class ConversionPass
   }
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Util::UtilDialect, IREE::VM::VMDialect,
-                    func::FuncDialect, mlir::arith::ArithDialect,
-                    math::MathDialect, AffineDialect>();
+    registry
+        .insert<IREE::Util::UtilDialect, IREE::VM::VMDialect, func::FuncDialect,
+                mlir::arith::ArithDialect, math::MathDialect, AffineDialect>();
   }
 
   void runOnOperation() override {

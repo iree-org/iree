@@ -1136,8 +1136,8 @@ struct MHLOToMHLOPreprocessingPass
     // chlo::PopulateLegalizeChloToHloPatterns(context, &conversionPatterns);
     conversionTarget.addLegalDialect<
         shape::ShapeDialect, chlo::ChloDialect, mhlo::MhloDialect,
-        math::MathDialect, mlir::func::FuncDialect,
-        mlir::arith::ArithDialect, mlir::tensor::TensorDialect>();
+        math::MathDialect, mlir::func::FuncDialect, mlir::arith::ArithDialect,
+        mlir::tensor::TensorDialect>();
     // conversionTarget.addIllegalDialect<chlo::ChloDialect>();
     if (failed(applyPartialConversion(getOperation(), conversionTarget,
                                       std::move(conversionPatterns)))) {
