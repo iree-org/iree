@@ -1695,18 +1695,6 @@ SmallVector<utils::IteratorType> PackOp::getLoopIteratorTypes() {
   return iteratorTypes;
 }
 
-// copied from:
-// https://mlir.llvm.org/doxygen/TensorInferTypeOpInterfaceImpl_8cpp_source.html
-/// Helper function to convert a vector of `OpFoldResult`s into a vector of
-/// `Value`s.
-static SmallVector<Value> getAsValues(OpBuilder &b, Location loc,
-                                      ArrayRef<OpFoldResult> valueOrAttrVec) {
-  return llvm::to_vector<4>(
-      llvm::map_range(valueOrAttrVec, [&](OpFoldResult value) -> Value {
-        return getValueOrCreateConstantIndexOp(b, loc, value);
-      }));
-}
-
 // Return a mapping from positions `dims_pos` to their `OpFoldResult` tile
 // factors.
 DenseMap<int64_t, OpFoldResult> PackOp::getDimAndTileMapping() {
