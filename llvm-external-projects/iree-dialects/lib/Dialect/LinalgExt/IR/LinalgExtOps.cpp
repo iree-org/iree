@@ -1706,6 +1706,10 @@ static LogicalResult commonVerifierPackAndUnPackOp(OpTy packOrUnPack) {
   // Reject `dims_pos` if it contains duplicate.
   if (isInvalid(dimsPos))
     return op->emitError("invalid dims_pos vector");
+  if (packOrUnPack.getMixedTiles().size() != dimsPos.size()) {
+    return op->emitError(
+        "blocking factors must equal the number of dimensions to block");
+  }
   return success();
 }
 
@@ -1767,10 +1771,6 @@ LogicalResult PackOp::verify() {
   if (numberOfBlockingFactors > getInputRank()) {
     return op->emitError(
         "blocking factors must be less or equal than the input rank");
-  }
-  if (numberOfBlockingFactors != dimsPos.size()) {
-    return op->emitError(
-        "blocking factors must equal the number of dimensions to block");
   }
   // Require `dim_pos` to be in-bound. `dim_pos` carries the index of the
   // dimensions to block.
@@ -2189,7 +2189,83 @@ SmallVector<Range> UnPackOp::getIterationDomain(OpBuilder &builder) {
   return loopBounds;
 }
 
-LogicalResult UnPackOp::verify() { return success(); }
+// Infer result/output type given the input and the tile sizes.
+ShapedType UnPackOp::inferResultType() {
+  DenseMap<int64_t, OpFoldResult> tileAndPosMapping = getDimAndTileMapping();
+  SmallVector<int64_t> inferredShape;
+  inferredShape.reserve(getOutputRank());
+  ShapedType inputType = getInputType();
+  int64_t rank = getOutputRank();
+
+  for (auto dim : llvm::seq<int64_t>(0, rank)) {
+    if (tileAndPosMapping.count(dim)) {
+      Optional<int64_t> maybeConstantTileSize =
+          getConstantIntValue(tileAndPosMapping.lookup(dim));
+      if (inputType.isDynamicDim(dim) || !maybeConstantTileSize) {
+        inferredShape.push_back(ShapedType::kDynamicSize);
+      } else {
+        int64_t tile = *maybeConstantTileSize;
+        int64_t sizeDim = inputType.getDimSize(dim) * tile;
+        inferredShape.push_back(sizeDim);
+      }
+    } else {
+      inferredShape.push_back(inputType.getShape()[dim]);
+    }
+  }
+  assert(inferredShape.size() == getOutputRank() &&
+         "expect inferredShape to match output rank");
+  return TypeSwitch<Type, ShapedType>(inputType)
+      .Case<RankedTensorType>([&](RankedTensorType t) -> ShapedType {
+        return RankedTensorType::get(inferredShape, inputType.getElementType());
+      })
+      .Case<MemRefType>([&](MemRefType t) -> ShapedType {
+        return MemRefType::get(inferredShape, inputType.getElementType());
+      })
+      .Default([&](Type t) {
+        llvm_unreachable("unexpected type");
+        return nullptr;
+      });
+}
+
+LogicalResult UnPackOp::verify() {
+  Operation *op = getOperation();
+  size_t numberOfBlockingFactors = getMixedTiles().size();
+  SmallVector<int64_t> dimsPos = extractFromI64ArrayAttr(getDimsPos());
+  if (failed(commonVerifierPackAndUnPackOp(*this))) {
+    return failure();
+  }
+  // Blocking factors must be less or equal than the input rank, and must
+  // match the number of `dims_pos`.
+  if (numberOfBlockingFactors > getOutputRank()) {
+    return op->emitError(
+        "blocking factors must be less or equal than the output rank");
+  }
+  // Require `dim_pos` to be in-bound. `dim_pos` carries the index of the
+  // dimensions to block.
+  if (!isInBound(dimsPos, getOutputRank()))
+    return op->emitError("out-of-bound position");
+  // Require input rank to match output rank + number of blocking factors.
+  if ((getOutputRank() + numberOfBlockingFactors) != getInputRank()) {
+    return op->emitError(
+        "input rank must equal output rank + blocking factors");
+  }
+  // Bail out if the tile does not divide the dimension fully. In the case of
+  // dynamic tile factors or dimensions, having a partial tile is undefined
+  // behavior. We will relax this constraint when we introduce padding
+  // semantics.
+  if (areNotFullTiles(getOutputShape(), getDimAndTileMapping())) {
+    return op->emitError(
+        "invalid tile factor provided. Only full tiles are supported");
+  }
+  // Verify result type against inferred type.
+  ShapedType expectedType = inferResultType();
+  if (expectedType != getOutputType()) {
+    return op->emitError(
+               "inferred type do not match provied output type. Expected ")
+           << expectedType << " but got: " << getOutputType();
+  }
+  return success();
+}
 
 // Implement the tiling interface. The number of loops equals the rank of the
 // input. All the loops are parallel.
