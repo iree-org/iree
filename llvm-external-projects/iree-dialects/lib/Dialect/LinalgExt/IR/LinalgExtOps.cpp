@@ -1692,6 +1692,23 @@ generatePackOpOrUnPackScalarImplementationBody(OpTy op, OpBuilder &builder,
   }
 }
 
+/// Common verifier for `PackOp` and `UnPackOp`.
+template <typename OpTy>
+static LogicalResult commonVerifierPackAndUnPackOp(OpTy packOrUnPack) {
+  static_assert(llvm::is_one_of<OpTy, PackOp, UnPackOp>::value,
+                "applies to only pack or unpack operations");
+  Operation *op = packOrUnPack.getOperation();
+  SmallVector<int64_t> dimsPos =
+      extractFromI64ArrayAttr(packOrUnPack.getDimsPos());
+  // Verify tiles. Make sure each provided tile is non-zero.
+  if (hasZeros(packOrUnPack.getMixedTiles()))
+    return op->emitError("invalid tile factor");
+  // Reject `dims_pos` if it contains duplicate.
+  if (isInvalid(dimsPos))
+    return op->emitError("invalid dims_pos vector");
+  return success();
+}
+
 //===----------------------------------------------------------------------===//
 // PackOp
 //===----------------------------------------------------------------------===//
@@ -1742,6 +1759,9 @@ LogicalResult PackOp::verify() {
   Operation *op = getOperation();
   size_t numberOfBlockingFactors = getMixedTiles().size();
   SmallVector<int64_t> dimsPos = extractFromI64ArrayAttr(getDimsPos());
+  if (failed(commonVerifierPackAndUnPackOp(*this))) {
+    return failure();
+  }
   // Blocking factors must be less or equal than the input rank, and must
   // match the number of `dims_pos`.
   if (numberOfBlockingFactors > getInputRank()) {
@@ -1752,23 +1772,15 @@ LogicalResult PackOp::verify() {
     return op->emitError(
         "blocking factors must equal the number of dimensions to block");
   }
-  if (isInvalid(dimsPos))
-    return op->emitError("invalid dims_pos vector");
   // Require `dim_pos` to be in-bound. `dim_pos` carries the index of the
   // dimensions to block.
   if (!isInBound(dimsPos, getInputRank()))
     return op->emitError("out-of-bound position");
-
   // Require output rank to match input rank + number of blocking factors.
   if ((getInputRank() + numberOfBlockingFactors) != getOutputRank()) {
     return op->emitError(
         "output rank must equal input rank + blocking factors");
   }
-
-  // Verify tiles. Make sure each provided tile is non-zero.
-  if (hasZeros(getMixedTiles()))
-    return op->emitError("invalid tile factor");
-
   // Bail out if the tile does not divide the dimension fully. In the case of
   // dynamic tile factors or dimensions, having a partial tile is undefined
   // behavior. We will relax this constraint when we introduce padding
@@ -1778,7 +1790,6 @@ LogicalResult PackOp::verify() {
     return op->emitError("invalid tile factor provided. Only full tiles are "
                          "supported when padding_value is not set");
   }
-
   // Verify result type against inferred type.
   ShapedType expectedType = inferResultType();
   if (!isCompatible(expectedType, getOutputType())) {
