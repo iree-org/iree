@@ -81,8 +81,7 @@ static void addBufferizePasses(OpPassManager &passManager) {
 static void tileAndDistributeToWorkgroup(OpPassManager &pm,
                                          bool specializeWorkgroup) {
   pm.addPass(createTileAndDistributeToWorkgroupsPass());
-  if (specializeWorkgroup)
-    pm.addPass(createWorkgroupSpecializationPass());
+  if (specializeWorkgroup) pm.addPass(createWorkgroupSpecializationPass());
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(
