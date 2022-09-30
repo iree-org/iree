@@ -1502,6 +1502,57 @@ TopkOp::reifyResultShapes(OpBuilder &b,
 // PackOp and UnPackOp utils
 //===----------------------------------------------------------------------===//
 
+/// Return true if at least one element in `tiles` is zero.
+static bool hasZeros(ArrayRef<OpFoldResult> tiles) {
+  return llvm::any_of(
+      tiles, [&](OpFoldResult tile) { return isConstantIntValue(tile, 0); });
+}
+
+/// Return true if `dimsPos` is invalid. It is invalid when: a) it contains
+/// duplicate.
+static bool isInvalid(ArrayRef<int64_t> dimsPos) {
+  DenseSet<int64_t> uniqued;
+  for (int64_t dim : dimsPos)
+    uniqued.insert(dim);
+  return dimsPos.size() != uniqued.size();
+}
+
+/// Check if we have enough static information to catch undefined behavior when
+/// the tile size does not divide perfectly the dimension of the input tensor.
+static bool areNotFullTiles(ArrayRef<int64_t> inputShape,
+                            DenseMap<int64_t, OpFoldResult> dimAndTileMapping) {
+  int64_t rank = inputShape.size();
+  for (int64_t dim = 0; dim < rank; dim++) {
+    if (inputShape[dim] == ShapedType::kDynamicSize)
+      continue;
+    if (dimAndTileMapping.count(dim)) {
+      Optional<int64_t> constantTile =
+          getConstantIntValue(dimAndTileMapping[dim]);
+      if (!constantTile)
+        continue;
+      if (inputShape[dim] % (*constantTile) != 0)
+        return true;
+    }
+  }
+  return false;
+}
+
+/// Check if two `RankedShapedTypes` are compatible. The shapes are compatible
+/// if there are no statically known shapes that mismatch. Shapes are still
+/// compatible if one is static and other is dynamic.
+static bool isCompatible(ShapedType a, ShapedType b) {
+  if (a.getRank() != b.getRank())
+    return false;
+  for (auto it : llvm::zip(a.getShape(), b.getShape())) {
+    auto aDim = std::get<0>(it);
+    auto bDim = std::get<1>(it);
+    if (!ShapedType::isDynamic(aDim) && !ShapedType::isDynamic(bDim) &&
+        aDim != bDim)
+      return false;
+  }
+  return true;
+}
+
 /// Return true if each element in `dimsPos` is >= 0 and < rank.
 static bool isInBound(ArrayRef<int64_t> dimsPos, int64_t rank) {
   return llvm::all_of(
@@ -1684,57 +1735,6 @@ ShapedType PackOp::inferResultType() {
         llvm_unreachable("unexpected type");
         return nullptr;
       });
-}
-
-/// Return true if at least one element in `tiles` is zero.
-static bool hasZeros(ArrayRef<OpFoldResult> tiles) {
-  return llvm::any_of(
-      tiles, [&](OpFoldResult tile) { return isConstantIntValue(tile, 0); });
-}
-
-/// Return true if `dimsPos` is invalid. It is invalid when: a) it contains
-/// duplicate.
-static bool isInvalid(ArrayRef<int64_t> dimsPos) {
-  DenseSet<int64_t> uniqued;
-  for (int64_t dim : dimsPos)
-    uniqued.insert(dim);
-  return dimsPos.size() != uniqued.size();
-}
-
-/// Check if we have enough static information to catch undefined behavior when
-/// the tile size does not divide perfectly the dimension of the input tensor.
-static bool areNotFullTiles(ArrayRef<int64_t> inputShape,
-                            DenseMap<int64_t, OpFoldResult> dimAndTileMapping) {
-  int64_t rank = inputShape.size();
-  for (int64_t dim = 0; dim < rank; dim++) {
-    if (inputShape[dim] == ShapedType::kDynamicSize)
-      continue;
-    if (dimAndTileMapping.count(dim)) {
-      Optional<int64_t> constantTile =
-          getConstantIntValue(dimAndTileMapping[dim]);
-      if (!constantTile)
-        continue;
-      if (inputShape[dim] % (*constantTile) != 0)
-        return true;
-    }
-  }
-  return false;
-}
-
-/// Check if two `RankedShapedTypes` are compatible. The shapes are compatible
-/// if there are no statically known shapes that mismatch. Shapes are still
-/// compatible if one is static and other is dynamic.
-static bool isCompatible(ShapedType a, ShapedType b) {
-  if (a.getRank() != b.getRank())
-    return false;
-  for (auto it : llvm::zip(a.getShape(), b.getShape())) {
-    auto aDim = std::get<0>(it);
-    auto bDim = std::get<1>(it);
-    if (!ShapedType::isDynamic(aDim) && !ShapedType::isDynamic(bDim) &&
-        aDim != bDim)
-      return false;
-  }
-  return true;
 }
 
 /// verifier for the pack operation.
