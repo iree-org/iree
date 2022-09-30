@@ -22,7 +22,7 @@ if not iree.compiler.tools.tf.is_available():
 import tensorflow as tf
 
 
-class SimpleArithModule(tf.Module):
+class SimpleArithmeticModule(tf.Module):
 
   @tf.function(input_signature=[
       tf.TensorSpec([4], tf.float32),
@@ -65,7 +65,7 @@ class TfCompilerTest(tf.test.TestCase):
 
   @classmethod
   def setUpClass(cls):
-    cls.m = SimpleArithModule()
+    cls.m = SimpleArithmeticModule()
     cls.tempdir = tempfile.TemporaryDirectory()
     cls.smdir = os.path.join(cls.tempdir.name, "arith.sm")
     tf.saved_model.save(
