@@ -27,7 +27,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/VM/Conversion/StandardToVM",
         "//compiler/src/iree/compiler/Dialect/VM/IR",
         "//compiler/src/iree/compiler/Modules/HAL/Loader/IR",
-        "@llvm-project//mlir:ArithmeticDialect",
+        "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",

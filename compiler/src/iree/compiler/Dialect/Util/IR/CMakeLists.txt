@@ -20,7 +20,7 @@ iree_cc_library(
   DEPS
     ::IR
     IREELinalgExtDialect
-    MLIRArithmeticDialect
+    MLIRArithDialect
     MLIRLinalgDialect
     MLIRLinalgStructuredOpsIncGenLib
     MLIRTensorDialect
@@ -62,7 +62,7 @@ iree_cc_library(
     ::UtilOpsGen
     ::UtilTypesGen
     LLVMSupport
-    MLIRArithmeticDialect
+    MLIRArithDialect
     MLIRControlFlowDialect
     MLIRControlFlowInterfaces
     MLIRFuncDialect

@@ -39,8 +39,8 @@ iree_cc_library(
     ::StreamOpsGen
     ::StreamTypesGen
     LLVMSupport
-    MLIRArithmeticDialect
-    MLIRArithmeticUtils
+    MLIRArithDialect
+    MLIRArithUtils
     MLIRFuncDialect
     MLIRIR
     MLIRInferTypeOpInterface

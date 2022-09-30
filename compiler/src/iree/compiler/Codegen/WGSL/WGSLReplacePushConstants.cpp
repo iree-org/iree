@@ -9,7 +9,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -79,7 +79,7 @@ static void replaceConstantLoadOp(IREE::Flow::DispatchTensorLoadOp loadOp,
 class WGSLReplacePushConstantsPass
     : public WGSLReplacePushConstantsBase<WGSLReplacePushConstantsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::arith::ArithmeticDialect, mlir::func::FuncDialect,
+    registry.insert<mlir::arith::ArithDialect, mlir::func::FuncDialect,
                     mlir::tensor::TensorDialect, IREE::Flow::FlowDialect,
                     IREE::HAL::HALDialect>();
   }

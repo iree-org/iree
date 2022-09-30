@@ -8,7 +8,7 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Dialect/Arithmetic/Utils/Utils.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Math/IR/Math.h"
@@ -1693,18 +1693,6 @@ SmallVector<utils::IteratorType> PackOp::getLoopIteratorTypes() {
   SmallVector<utils::IteratorType> iteratorTypes(getInputRank(),
                                                  utils::IteratorType::parallel);
   return iteratorTypes;
-}
-
-// copied from:
-// https://mlir.llvm.org/doxygen/TensorInferTypeOpInterfaceImpl_8cpp_source.html
-/// Helper function to convert a vector of `OpFoldResult`s into a vector of
-/// `Value`s.
-static SmallVector<Value> getAsValues(OpBuilder &b, Location loc,
-                                      ArrayRef<OpFoldResult> valueOrAttrVec) {
-  return llvm::to_vector<4>(
-      llvm::map_range(valueOrAttrVec, [&](OpFoldResult value) -> Value {
-        return getValueOrCreateConstantIndexOp(b, loc, value);
-      }));
 }
 
 // Return a mapping from positions `dims_pos` to their `OpFoldResult` tile

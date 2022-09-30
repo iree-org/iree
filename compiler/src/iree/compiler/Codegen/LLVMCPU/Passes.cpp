@@ -17,7 +17,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
-#include "mlir/Dialect/Arithmetic/Transforms/Passes.h"
+#include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Func/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
@@ -617,8 +617,7 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
   passManager.addNestedPass<func::FuncOp>(createCSEPass());
 
   // (HAL, IREE, Linalg, CF) -> LLVM
-  passManager.addNestedPass<func::FuncOp>(
-      arith::createArithmeticExpandOpsPass());
+  passManager.addNestedPass<func::FuncOp>(arith::createArithExpandOpsPass());
   passManager.addNestedPass<func::FuncOp>(memref::createExpandOpsPass());
   passManager.addPass(createConvertToLLVMPass());
   passManager.addPass(createReconcileUnrealizedCastsPass());

@@ -9,7 +9,7 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 
@@ -100,11 +100,10 @@ struct LinalgOpTiedOpInterfaceHelper {
 
 void registerUtilExternalModels(DialectRegistry &registry) {
   // Must ensure that any dependent dialects are registered.
-  registry.insert<arith::ArithmeticDialect, linalg::LinalgDialect,
+  registry.insert<arith::ArithDialect, linalg::LinalgDialect,
                   tensor::TensorDialect>();
 
-  registry.addExtension(+[](MLIRContext *ctx,
-                            arith::ArithmeticDialect *dialect) {
+  registry.addExtension(+[](MLIRContext *ctx, arith::ArithDialect *dialect) {
     GenericNumericCastExternalModel::add<
         arith::BitcastOp, arith::ExtFOp, arith::ExtUIOp, arith::ExtSIOp,
         arith::FPToSIOp, arith::FPToUIOp, arith::IndexCastOp, arith::TruncFOp,

@@ -420,7 +420,7 @@ class DumpExecutableBenchmarksPass
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::HAL::HALDialect>();
-    registry.insert<arith::ArithmeticDialect>();
+    registry.insert<arith::ArithDialect>();
     registry.insert<scf::SCFDialect>();
   }
 

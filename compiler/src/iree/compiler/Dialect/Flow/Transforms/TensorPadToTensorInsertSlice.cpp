@@ -13,7 +13,7 @@
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Math/IR/Math.h"
@@ -128,7 +128,7 @@ struct TensorPadToTensorInsertSlicePass
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
         .insert<linalg::LinalgDialect, memref::MemRefDialect, func::FuncDialect,
-                mlir::math::MathDialect, mlir::arith::ArithmeticDialect>();
+                mlir::math::MathDialect, mlir::arith::ArithDialect>();
   }
 
   LogicalResult initializeOptions(StringRef options) override {

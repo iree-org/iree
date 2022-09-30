@@ -31,9 +31,9 @@ iree_cc_library(
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineUtils
-    MLIRArithmeticDialect
-    MLIRArithmeticTransforms
-    MLIRArithmeticUtils
+    MLIRArithDialect
+    MLIRArithTransforms
+    MLIRArithUtils
     MLIRAsyncDialect
     MLIRBufferizationDialect
     MLIRBufferizationTransforms
@@ -98,9 +98,9 @@ iree_cc_library(
     MLIRAffineDialect
     MLIRAffineUtils
     MLIRAnalysis
-    MLIRArithmeticDialect
-    MLIRArithmeticTransforms
-    MLIRArithmeticUtils
+    MLIRArithDialect
+    MLIRArithTransforms
+    MLIRArithUtils
     MLIRBufferizationDialect
     MLIRBufferizationTransforms
     MLIRFuncDialect
@@ -174,9 +174,9 @@ iree_cc_library(
     MLIRAffineDialect
     MLIRAffineUtils
     MLIRAnalysis
-    MLIRArithmeticDialect
-    MLIRArithmeticTransforms
-    MLIRArithmeticUtils
+    MLIRArithDialect
+    MLIRArithTransforms
+    MLIRArithUtils
     MLIRBufferizationDialect
     MLIRBufferizationTransforms
     MLIRFuncDialect

@@ -10,7 +10,7 @@
 #include "iree/compiler/Dialect/Util/Analysis/Explorer.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/Support/Debug.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 
 #define DEBUG_TYPE "iree-const-expr-analysis"
 

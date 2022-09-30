@@ -13,7 +13,7 @@
 #include "llvm/Support/Casting.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/rewriters.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Shape/IR/Shape.h"
@@ -1143,8 +1143,8 @@ struct MHLOToMHLOPreprocessingPass
     // chlo::PopulateLegalizeChloToHloPatterns(context, &conversionPatterns);
     conversionTarget.addLegalDialect<
         shape::ShapeDialect, chlo::ChloDialect, mhlo::MhloDialect,
-        math::MathDialect, mlir::func::FuncDialect,
-        mlir::arith::ArithmeticDialect, mlir::tensor::TensorDialect>();
+        math::MathDialect, mlir::func::FuncDialect, mlir::arith::ArithDialect,
+        mlir::tensor::TensorDialect>();
     // conversionTarget.addIllegalDialect<chlo::ChloDialect>();
     if (failed(applyPartialConversion(getOperation(), conversionTarget,
                                       std::move(conversionPatterns)))) {

@@ -22,7 +22,7 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRAnalysis
-    MLIRArithmeticDialect
+    MLIRArithDialect
     MLIRIR
     MLIRLinalgDialect
     MLIRMathDialect

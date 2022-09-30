@@ -53,7 +53,7 @@ iree_compiler_cc_library(
     deps = [
         ":IR",
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
-        "@llvm-project//mlir:ArithmeticDialect",
+        "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:LinalgStructuredOpsIncGen",
         "@llvm-project//mlir:TensorDialect",
@@ -97,7 +97,7 @@ iree_compiler_cc_library(
         ":UtilOpsGen",
         ":UtilTypesGen",
         "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:ArithmeticDialect",
+        "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:ControlFlowDialect",
         "@llvm-project//mlir:ControlFlowInterfaces",
         "@llvm-project//mlir:FuncDialect",

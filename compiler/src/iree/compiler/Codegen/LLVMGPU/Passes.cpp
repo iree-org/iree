@@ -14,7 +14,7 @@
 #include "mlir/Conversion/GPUToNVVM/GPUToNVVMPass.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
-#include "mlir/Dialect/Arithmetic/Transforms/Passes.h"
+#include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Func/Transforms/Passes.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/Passes.h"
@@ -358,7 +358,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   // math dialect elementry functions -> polynomial form.
   pm.addNestedPass<func::FuncOp>(createPolynomialApproximationPass());
 
-  pm.addNestedPass<func::FuncOp>(arith::createArithmeticExpandOpsPass());
+  pm.addNestedPass<func::FuncOp>(arith::createArithExpandOpsPass());
   pm.addNestedPass<func::FuncOp>(memref::createExpandOpsPass());
   pm.addPass(createLowerAffinePass());
 

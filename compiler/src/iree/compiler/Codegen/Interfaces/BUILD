@@ -68,7 +68,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/Flow/IR",
         "//compiler/src/iree/compiler/Dialect/HAL/IR",
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
-        "@llvm-project//mlir:ArithmeticTransforms",
+        "@llvm-project//mlir:ArithTransforms",
         "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:BufferizationTransforms",
         "@llvm-project//mlir:DialectUtils",

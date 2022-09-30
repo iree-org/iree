@@ -23,7 +23,7 @@ iree_compiler_cc_library(
     deps = [
         "//compiler/src/iree/compiler/Dialect/Util/IR",
         "@llvm-project//mlir:AffineDialect",
-        "@llvm-project//mlir:ArithmeticDialect",
+        "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",

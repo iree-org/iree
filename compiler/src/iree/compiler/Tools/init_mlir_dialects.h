@@ -62,7 +62,7 @@ inline void registerMlirDialects(DialectRegistry &registry) {
                   spirv::SPIRVDialect,
                   arm_neon::ArmNeonDialect,
                   func::FuncDialect,
-                  mlir::arith::ArithmeticDialect,
+                  mlir::arith::ArithDialect,
                   vector::VectorDialect,
                   tensor::TensorDialect,
                   transform::TransformDialect,

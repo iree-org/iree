@@ -13,7 +13,7 @@
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/EquivalenceClasses.h"
 #include "llvm/Support/Debug.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Attributes.h"
@@ -256,7 +256,7 @@ class FoldUniformOperandsPass
   FoldUniformOperandsPass() = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::arith::ArithmeticDialect>();
+    registry.insert<mlir::arith::ArithDialect>();
     registry.insert<IREE::Stream::StreamDialect>();
   }
 

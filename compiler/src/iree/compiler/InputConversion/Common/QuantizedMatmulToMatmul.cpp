@@ -6,7 +6,7 @@
 
 #include "iree/compiler/InputConversion/Common/PassDetail.h"
 #include "iree/compiler/InputConversion/Common/Passes.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"

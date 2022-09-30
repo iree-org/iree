@@ -12,7 +12,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/AsmParser/AsmParser.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
