@@ -316,6 +316,13 @@ class TransposeReshapeGenericDotGeneral
     auto resultType = op.getResult().getType().dyn_cast<RankedTensorType>();
     if (!lhsShapeType || !rhsShapeType || !resultType) return failure();
 
+    // TODO(jpienaar): This pattern is not safe for dynamic shapes and seems to
+    // be (now) redundant with later pass that does handle them. To decouple
+    // fixing and verifying redundant, this just limits to static shapes and
+    // then will remove this in follow up.
+    if (!lhsShapeType.hasStaticShape() || !rhsShapeType.hasStaticShape())
+      return failure();
+
     SmallVector<int64_t> lhsTargetOrder, rhsTargetOrder;
     mhlo::DotDimensionNumbersAttr dimNumbers = op.dot_dimension_numbers();
     auto lhsBatchingDims = dimNumbers.getLhsBatchingDimensions();
@@ -1158,6 +1165,8 @@ struct MHLOToMHLOPreprocessingPass
 
     // dot_general canoncalization patterns.
     mhlo::populateGeneralDotOpLoweringPatterns(&patterns, context);
+    // TODO(jpienaar): This may be redundant with lower_general_dot. Remove if
+    // so.
     patterns.insert<TransposeReshapeGenericDotGeneral>(context,
                                                        /*benefit=*/200);
     patterns.insert<DotGeneralIsMul>(context, /*benefit=*/300);
