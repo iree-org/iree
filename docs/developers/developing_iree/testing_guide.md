@@ -13,7 +13,7 @@ components and use different tooling depending on the needs of that component.
 |                 | iree_trace_runner_test                          | Bazel/CMake  | Host/Device         |
 |                 | iree_single_backend_generated_trace_runner_test | Bazel/CMake  | Host/Device         |
 |                 | iree_generated_trace_runner_test                | Bazel/CMake  | Host/Device         |
-|                 | iree_static_linker_test                         | CMake        | Host                |
+|                 | iree_static_linker_test                         | CMake        | Host/Device         |
 
 There are also more `*_test_suite` targets that groups test targets with the
 same configuration together.
