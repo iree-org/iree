@@ -1965,7 +1965,8 @@ PackOp::getTiledImplementation(OpBuilder &builder,
     tiledOperands.push_back(val);
   }
 
-  // There are exactly one input and one output, the output is the second operand.
+  // There are exactly one input and one output, the output is the second
+  // operand.
   SmallVector<Type, 4> tiledResultTypes;
   if (hasTensorSemantics()) {
     tiledResultTypes.push_back(tiledOperands[1].getType());
