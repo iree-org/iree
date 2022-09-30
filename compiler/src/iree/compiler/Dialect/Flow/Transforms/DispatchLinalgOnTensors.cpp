@@ -54,11 +54,6 @@
 // NOTE: These flags are added for experimental purposes only
 // for developer control. These should be treated as internal
 // compiler implementation details.
-static llvm::cl::opt<bool> clEnsureInplaceableConsumer(
-    "iree-flow-ensure-inplaceable-consumer",
-    llvm::cl::desc("Ensure the consumer is inplaceable for fusion."),
-    llvm::cl::init(true));
-
 static llvm::cl::opt<int> clInlineConstantByteLength(
     "iree-flow-inline-constants-max-byte-length",
     llvm::cl::desc("Maximum byte-length of constant that can be inlined into a "
@@ -766,7 +761,7 @@ static bool isIdentityMapWithZeros(AffineMap map) {
 static bool isInsOperandBufferizable(OpOperand *insOperand,
                                      bool aggressiveFusion) {
   // Ignore the check if in-place bufferization is not required.
-  if (!clEnsureInplaceableConsumer) return true;
+  if (aggressiveFusion) return true;
 
   auto linalgOp = dyn_cast<linalg::LinalgOp>(insOperand->getOwner());
   if (!linalgOp) return false;
