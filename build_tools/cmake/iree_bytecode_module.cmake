@@ -109,9 +109,20 @@ function(iree_bytecode_module)
     list(APPEND _OUTPUT_FILES "${_RULE_STATIC_LIB_PATH}" "${_STATIC_HDR_PATH}")
   endif()
 
-  iree_compile_flags_for_platform(_PLATFORM_FLAGS "${_RULE_FLAGS}")
-  if(_PLATFORM_FLAGS)
-    list(APPEND _ARGS ${_PLATFORM_FLAGS})
+  if(CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv64" AND
+     CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
+     NOT _RULE_FLAGS MATCHES "iree-llvm-target-triple")
+    # RV64 Linux crosscompile toolchain can support iree-compile with
+    # specific CPU flags. Add the llvm flags to support RV64 RVV codegen if
+    # llvm-target-triple is not specified.
+    list(APPEND _ARGS ${RISCV64_TEST_DEFAULT_LLVM_FLAGS})
+  elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv32" AND
+         CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
+         NOT _RULE_FLAGS MATCHES "iree-llvm-target-triple")
+    # RV32 Linux crosscompile toolchain can support iree-compile with
+    # specific CPU flags. Add the llvm flags to support RV32 RVV codegen if
+    # llvm-target-triple is not specified.
+    list(APPEND _ARGS ${RISCV32_TEST_DEFAULT_LLVM_FLAGS})
   endif()
 
   if(_RULE_FRIENDLY_NAME)
