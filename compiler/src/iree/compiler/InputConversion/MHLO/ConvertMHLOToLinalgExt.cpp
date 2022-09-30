@@ -580,7 +580,7 @@ struct ConvertMHLOToLinalgExtPass
                 LinalgExtRegionHLOOpConversion<mhlo::RsqrtOp>,
                 LinalgExtRegionHLOOpConversion<mhlo::SelectOp>,
                 LinalgExtRegionHLOOpConversion<mhlo::ShiftLeftOp>,
-                LinalgExtRegionHLOOpConversion<mhlo::ShiftRightArithOp>,
+                LinalgExtRegionHLOOpConversion<mhlo::ShiftRightArithmeticOp>,
                 LinalgExtRegionHLOOpConversion<mhlo::ShiftRightLogicalOp>,
                 LinalgExtRegionHLOOpConversion<mhlo::SignOp>,
                 LinalgExtRegionHLOOpConversion<mhlo::SineOp>,
