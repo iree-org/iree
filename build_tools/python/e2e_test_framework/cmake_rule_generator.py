@@ -267,11 +267,12 @@ class IreeRuleFactory(object):
 
 def _generate_iree_rules(
     common_rule_factory: CommonRuleFactory, iree_artifacts_dir: str,
-    compile_specs: Sequence[iree_definitions.CompileSpec]) -> List[str]:
+    model_compile_configs: Sequence[iree_definitions.ModelCompileConfig]
+) -> List[str]:
   iree_rule_factory = IreeRuleFactory(iree_artifacts_dir)
-  for compile_spec in compile_specs:
-    model = compile_spec.model
-    compile_config = compile_spec.compile_config
+  for model_compile_config in model_compile_configs:
+    model = model_compile_config.model
+    compile_config = model_compile_config.compile_config
 
     source_model_rule = common_rule_factory.add_model_rule(model)
     import_rule = iree_rule_factory.add_import_model_rule(
@@ -288,7 +289,8 @@ def _generate_iree_rules(
 
 def generate_rules(
     model_artifacts_dir: str, iree_artifacts_dir: str,
-    iree_compile_specs: Sequence[iree_definitions.CompileSpec]) -> List[str]:
+    iree_model_compile_configs: Sequence[iree_definitions.ModelCompileConfig]
+) -> List[str]:
   """Generates cmake rules to build benchmarks.
   
   Args:
@@ -296,13 +298,13 @@ def generate_rules(
       variable syntax in the path.
     iree_artifacts_dir: root directory to store generated IREE artifacts. Can
       contain CMake variable syntax in the path.
-    iree_compile_specs: compile specs for IREE targets.
+    iree_model_compile_configs: compile configs for IREE targets.
   Returns:
     List of CMake rules.
   """
   common_rule_factory = CommonRuleFactory(model_artifacts_dir)
   iree_rules = _generate_iree_rules(common_rule_factory, iree_artifacts_dir,
-                                    iree_compile_specs)
+                                    iree_model_compile_configs)
   # Currently the rules are simple so the common rules can be always put at the
   # top. Need a topological sort once the dependency gets complicated.
   return common_rule_factory.generate_cmake_rules() + iree_rules

@@ -15,7 +15,7 @@
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Dialect/Affine/Passes.h"
-#include "mlir/Dialect/Arithmetic/Transforms/Passes.h"
+#include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"
@@ -82,7 +82,7 @@ void buildVMTransformPassPipeline(OpPassManager &passManager,
       .addPass(mlir::createLoopInvariantCodeMotionPass)
       .addPass(mlir::createConvertSCFToCFPass)
       .addPass(mlir::createLowerAffinePass)
-      .addPass(mlir::arith::createArithmeticUnsignedWhenEquivalentPass);
+      .addPass(mlir::arith::createArithUnsignedWhenEquivalentPass);
 
   // Propagate buffer subranges throughout the program - this should remove any
   // remaining subspans and give us a smaller surface area during conversion.

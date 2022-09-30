@@ -49,8 +49,8 @@ iree_cc_library(
     MLIRAffineDialect
     MLIRAffineToStandard
     MLIRAffineTransforms
-    MLIRArithmeticDialect
-    MLIRArithmeticTransforms
+    MLIRArithDialect
+    MLIRArithTransforms
     MLIRBufferizationDialect
     MLIRFuncDialect
     MLIRFuncTransforms

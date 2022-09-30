@@ -8,7 +8,7 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
@@ -68,22 +68,6 @@ static bool isOffsetSizeAndStrideMappableToFlow(ArrayRef<OpFoldResult> offsets,
     }
   }
   return true;
-}
-
-/// Returns the `Value`s for a list of `OpFoldResult` by generating std.constant
-/// ops for the static values.
-static SmallVector<Value, 4> getAsValues(
-    OpBuilder &b, Location loc, ArrayRef<OpFoldResult> valueOrAttrList) {
-  SmallVector<Value, 4> values;
-  for (auto valueOrAttr : valueOrAttrList) {
-    if (auto attr = valueOrAttr.dyn_cast<Attribute>()) {
-      values.push_back(b.create<arith::ConstantIndexOp>(
-          loc, attr.cast<IntegerAttr>().getInt()));
-    } else {
-      values.push_back(valueOrAttr.get<Value>());
-    }
-  }
-  return values;
 }
 
 /// Gets the list of non-static values from a list of `OpFoldResult`.

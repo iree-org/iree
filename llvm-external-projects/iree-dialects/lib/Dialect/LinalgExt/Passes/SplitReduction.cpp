@@ -9,7 +9,7 @@
 #include "iree-dialects/Dialect/LinalgExt/Passes/PassDetail.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -376,7 +376,7 @@ struct TopkSplitReductionPass
     : public TopkSplitReductionBase<TopkSplitReductionPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, func::FuncDialect,
-                    mlir::arith::ArithmeticDialect, math::MathDialect,
+                    mlir::arith::ArithDialect, math::MathDialect,
                     memref::MemRefDialect, scf::SCFDialect>();
   }
 

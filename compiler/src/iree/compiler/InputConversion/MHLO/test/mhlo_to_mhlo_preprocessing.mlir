@@ -426,3 +426,13 @@ func.func @convolution(%arg0: tensor<16x32x256xbf16>, %arg1: tensor<1x256x256xbf
   // CHECK: return %[[CONV]]
   func.return %0 : tensor<16x32x256xf32>
 }
+
+// -----
+
+// CHECK-LABEL: @dynamic_dot_general
+// This verifies non-crashing, the lowering to linalg happens elsewhere.
+func.func @dynamic_dot_general(%arg1: tensor<?x1024x16x64xf32>, %arg2: tensor<?x1024x16x64xf32>) -> tensor<?x16x1024x1024xf32> {
+  %2 = "mhlo.dot_general"(%arg2, %arg1) {dot_dimension_numbers = #mhlo.dot<lhs_batching_dimensions = [0, 2], rhs_batching_dimensions = [0, 2], lhs_contracting_dimensions = [3], rhs_contracting_dimensions = [3]>, precision_config = [#mhlo<precision DEFAULT>, #mhlo<precision DEFAULT>]} : (tensor<?x1024x16x64xf32>, tensor<?x1024x16x64xf32>) -> tensor<?x16x1024x1024xf32>
+  return %2 : tensor<?x16x1024x1024xf32>
+}
+

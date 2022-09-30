@@ -15,14 +15,13 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/ConvertRegionToWorkgroups.h"
-#include "iree/compiler/Dialect/Flow/Transforms/FusionUtils.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
-#include "mlir/Dialect/Arithmetic/Utils/Utils.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
@@ -326,9 +325,33 @@ static SmallVector<Operation *> getCloneableOps(
   return result;
 }
 
+static bool areLinalgOpsFusableUsingTileAndFuse(OpOperand &use) {
+  auto producer = use.get().getDefiningOp<linalg::LinalgOp>();
+  auto consumer = dyn_cast<linalg::LinalgOp>(use.getOwner());
+  if (!producer || !consumer) return false;
+
+  // 1. Producer has a single result.
+  if (producer->getNumResults() != 1) return false;
+
+  // 2. Consumer is elementwise parallel.
+  if (consumer.getNumLoops() != consumer.getNumParallelLoops()) return false;
+
+  // 3. Check if a reduction result is used in the following elementwise
+  // operation with broadcast. If so, we can fuse the reduction into the
+  // elementwise op. The elementwise op on the reduced dimension will be
+  // serialized to match the workgroup counts of the fused operations.
+  // Otherwise, check if the result of producer is accessed using identity
+  // indexing.
+  AffineMap consumerIndexingMap = consumer.getTiedIndexingMap(&use);
+  if (!consumerIndexingMap.isIdentity()) {
+    return false;
+  }
+  return true;
+}
+
 /// Checks if the producer and consumer LinalgOps can be fused.
 static bool areFusableLinalgOps(OpOperand &use) {
-  return Flow::areLinalgOpsFusableUsingTileAndFuse(use);
+  return areLinalgOpsFusableUsingTileAndFuse(use);
 }
 
 /// Returns true if this is a fusable use.

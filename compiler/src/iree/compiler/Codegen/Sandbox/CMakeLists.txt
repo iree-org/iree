@@ -49,7 +49,7 @@ iree_cc_library(
     IREELinalgExtTransforms
     LLVMSupport
     MLIRAffineDialect
-    MLIRArithmeticDialect
+    MLIRArithDialect
     MLIRAsmParser
     MLIRControlFlowDialect
     MLIRLinalgDialect

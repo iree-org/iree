@@ -8,7 +8,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "mlir/Dialect/Arithmetic/Utils/Utils.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -65,7 +65,7 @@ struct RewriteInitTensorToSplat
 struct InitializeEmptyTensorsPass
     : public InitializeEmptyTensorsBase<InitializeEmptyTensorsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<arith::ArithmeticDialect, IREE::Flow::FlowDialect,
+    registry.insert<arith::ArithDialect, IREE::Flow::FlowDialect,
                     linalg::LinalgDialect>();
   }
   InitializeEmptyTensorsPass() = default;

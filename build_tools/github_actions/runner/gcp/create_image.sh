@@ -11,18 +11,28 @@ set -o errtrace  # make ERR trap inherit
 set -o pipefail  # return error if any part of a pipe errors
 set -o nounset   # error if an undefined variable is used
 
-TIME_STRING="$(date +%Y-%m-%d-%s)"
+
 
 SUCCESS_DELETE_INSTANCE=1
 FAILURE_DELETE_INSTANCE=0
 
-INSTANCE_NAME="${INSTANCE_NAME:-github-runner-template-cpu-${TIME_STRING}}"
-IMAGE_NAME="${IMAGE_NAME:-github-runner-cpu-${TIME_STRING}}"
+RUNNER_TYPE="${RUNNER_TYPE:-cpu}"
+RUNNER_TYPE="${RUNNER_TYPE,,}"
+
+TIME_STRING="$(date +%Y-%m-%d-%s)"
+INSTANCE_NAME="${INSTANCE_NAME:-github-runner-template-${RUNNER_TYPE}-${TIME_STRING}}"
+IMAGE_NAME="${INSTANCE_NAME/-template/}"
 ZONE="${ZONE:-us-central1-a}"
 PROJECT=iree-oss
 BASE_IMAGE="${BASE_IMAGE:-projects/ubuntu-os-cloud/global/images/ubuntu-2204-jammy-v20220902}"
-# The size of the base image
-IMAGE_SIZE_GB=10
+
+GPU_MACHINE_TYPE="a2-highgpu-1g"
+CPU_MACHINE_TYPE="e2-medium"
+CPU_IMAGE_SIZE_GB=10
+# We need enough space to fetch Docker images that we test with
+# TODO(gcmn): See if we can make the image smaller, e.g. by resizing after setup
+GPU_IMAGE_SIZE_GB=50
+
 # It takes a little bit to bring up ssh on the instance. I haven't found a
 # better way to wait for this than just polling.
 MAX_IP_ATTEMPTS=5
@@ -38,7 +48,18 @@ DELETE_INSTANCE_CMD=(
   --zone="${ZONE}"
 )
 
+SSH_CMD=(
+  gcloud
+  compute
+  ssh
+  "${INSTANCE_NAME}"
+  --zone="${ZONE}"
+  --no-user-output-enabled
+)
+
 function cleanup_reminder() {
+  echo "You can ssh in to debug with the following command:"
+  echo "${SSH_CMD[@]}"
   echo "Make sure to delete ${INSTANCE_NAME} when you're done debugging:"
   echo "${DELETE_INSTANCE_CMD[@]}"
 }
@@ -63,32 +84,6 @@ trap failure_exit INT ERR EXIT
 
 SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")";
 
-CREATE_INSTANCE_CMD=(
-  gcloud
-  compute
-  instances
-  create
-  "${INSTANCE_NAME}"
-  --project=iree-oss
-  --zone="${ZONE}"
-  --machine-type=e2-medium
-  # `address=''` indicates an ephemeral IP. This *shouldn't* be necessary here,
-  # as the gcloud docs say that this is the default, but in fact if you leave it
-  # off the VM gets no external IP and is impossible to SSH into. This knowledge
-  # was hard won.
-  --network-interface=network=default,address='',network-tier=PREMIUM
-  --maintenance-policy=MIGRATE
-  --provisioning-model=STANDARD
-  --no-service-account
-  --no-scopes
-  --create-disk="boot=yes,device-name=${INSTANCE_NAME},image=${BASE_IMAGE},mode=rw,size=${IMAGE_SIZE_GB},type=projects/${PROJECT}/zones/${ZONE}/diskTypes/pd-balanced,auto-delete=yes"
-  --no-shielded-secure-boot
-  --shielded-vtpm
-  --shielded-integrity-monitoring
-  --reservation-affinity=any
-  --metadata-from-file=startup-script="${SCRIPT_DIR}/image_setup.sh"
-)
-
 function get_ip() {
   gcloud compute instances describe \
     "${INSTANCE_NAME}" \
@@ -96,11 +91,17 @@ function get_ip() {
     --format='value(networkInterfaces[0].accessConfigs[0].ip)'
 }
 
-function ssh_ping() {
-  gcloud compute ssh "${INSTANCE_NAME}" \
-        --zone="${ZONE}" \
-        --command=":"
+function instance_ssh() {
+  gcloud compute ssh "${INSTANCE_NAME}" --zone="${ZONE}" \
+      --no-user-output-enabled \
+      "$@"
 }
+
+function ssh_ping() {
+  # ssh with a no-op command
+  instance_ssh --command=":"
+}
+
 
 function wait_for_ip() {
   local -i max_attempts="$1"
@@ -134,12 +135,59 @@ function wait_for_ssh() {
 }
 
 function create_image() {
-  echo "Creating instance for boot disk"
-  (set -x; "${CREATE_INSTANCE_CMD[@]}")
+  if gcloud compute instances describe "${INSTANCE_NAME}" --zone="${ZONE}" > /dev/null 2>&1; then
+    echo "Using existing instance '${INSTANCE_NAME}'"
+  else
+    echo "Creating instance '${INSTANCE_NAME}' for boot disk"
+    case "${RUNNER_TYPE}" in
+      cpu)
+        local machine_type="${CPU_MACHINE_TYPE}"
+        local image_size_gb="${CPU_IMAGE_SIZE_GB}"
+        local maintenance_policy=MIGRATE
+        ;;
+      gpu)
+        local machine_type="${GPU_MACHINE_TYPE}"
+        local image_size_gb="${GPU_IMAGE_SIZE_GB}"
+        local maintenance_policy=TERMINATE
+        ;;
+      *)
+        echo "Unrecognized RUNNER_TYPE=${RUNNER_TYPE}"
+        exit 1
+        ;;
+    esac
 
+    local -a create_instance_cmd=(
+      gcloud
+      compute
+      instances
+      create
+      "${INSTANCE_NAME}"
+      --project=iree-oss
+      --zone="${ZONE}"
+      # `address=''` indicates an ephemeral IP. This *shouldn't* be necessary here,
+      # as the gcloud docs say that this is the default, but in fact if you leave it
+      # off the VM gets no external IP and is impossible to SSH into. This knowledge
+      # was hard won.
+      --network-interface=network=default,address='',network-tier=PREMIUM
+      --provisioning-model=STANDARD
+      --no-service-account
+      --no-scopes
+      --no-shielded-secure-boot
+      --shielded-vtpm
+      --shielded-integrity-monitoring
+      --reservation-affinity=any
+      --metadata-from-file=startup-script="${SCRIPT_DIR}/image_setup.sh"
+      --maintenance-policy="${maintenance_policy}"
+      --metadata="github-runner-type=${RUNNER_TYPE}"
+      --machine-type="${machine_type}"
+      --create-disk="boot=yes,device-name=${INSTANCE_NAME},image=${BASE_IMAGE},mode=rw,size=${image_size_gb},type=projects/${PROJECT}/zones/${ZONE}/diskTypes/pd-balanced,auto-delete=yes"
+    )
+    (set -x; "${create_instance_cmd[@]}")
+  fi
+
+  echo "Waiting for instance to start up"
   # We could only use the ssh check below, but it's much nicer to know why an
   # an instance isn't responsive and this is something we can check first.
-  echo "Waiting for instance to start up"
   wait_for_ip "${MAX_IP_ATTEMPTS}"
   wait_for_ssh "${MAX_SSH_ATTEMPTS}"
 
@@ -149,24 +197,21 @@ function create_image() {
   echo "Streaming startup logs from instance to stdout and ${log_file}"
 
   # Get the PID of the startup script
-  local startup_pid="$(gcloud compute ssh "${INSTANCE_NAME}" --zone="${ZONE}" \
-      --no-user-output-enabled \
-      --command='systemctl show --property=ExecMainPID --value google-startup-scripts')"
+  local startup_pid="$(instance_ssh --command='systemctl show --property=ExecMainPID --value google-startup-scripts')"
 
   echo ""
   echo "*******************"
 
   # -t forces a pseudo-tty which allows us to run tail with a follow
   gcloud compute ssh "${INSTANCE_NAME}" --zone="${ZONE}" \
-      --no-user-output-enabled \
-      --ssh-flag="-t" \
-      --command="tail --follow=name --retry --pid=${startup_pid} /startup.log" \
+      --no-user-output-enabled --ssh-flag="-t" \
+      --command="tail --follow=name --retry --lines=+1 --pid=${startup_pid} /startup.log"
       | tee "${log_file}"
 
   echo "*******************"
   echo ""
 
-  local exit_code="$(gcloud compute ssh "${INSTANCE_NAME}" --command="cat /startup-exit.txt")"
+  local exit_code="$(instance_ssh --command="cat /startup-exit.txt")"
 
   if [[ "${exit_code}" != +([0-9]) ]]; then
     echo "Failed to retrieve exit code from startup script (got '${exit_code}')."
@@ -181,9 +226,7 @@ function create_image() {
   echo "Startup finished successfully."
 
   echo "Deleting remote log file"
-  gcloud compute ssh "${INSTANCE_NAME}" --zone="${ZONE}" \
-    --no-user-output-enabled \
-    --command="sudo rm /startup.log"
+  instance_ssh --command="sudo rm /startup.log"
 
   echo "Shutting down instance"
   # This actually does things synchronously, so we don't need our own loop to

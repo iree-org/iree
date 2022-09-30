@@ -18,7 +18,7 @@ iree_cc_library(
   SRCS
     "ConvertTensorToFlow.cpp"
   DEPS
-    MLIRArithmeticDialect
+    MLIRArithDialect
     MLIRFuncDialect
     MLIRIR
     MLIRLinalgDialect

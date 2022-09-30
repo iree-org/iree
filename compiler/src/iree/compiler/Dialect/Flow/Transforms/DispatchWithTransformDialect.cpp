@@ -13,7 +13,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/SourceMgr.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/PDL/IR/PDL.h"
 #include "mlir/Dialect/PDLInterp/IR/PDLInterp.h"
@@ -43,7 +43,7 @@ struct DispatchWithTransformDialect
     registry.insert<mlir::iree_compiler::IREE::LinalgExt::IREELinalgExtDialect,
                     IREE::Flow::FlowDialect,
                     AffineDialect,
-                    arith::ArithmeticDialect,
+                    arith::ArithDialect,
                     linalg::LinalgDialect,
                     pdl::PDLDialect,
                     pdl_interp::PDLInterpDialect,

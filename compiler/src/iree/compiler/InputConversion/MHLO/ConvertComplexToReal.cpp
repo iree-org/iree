@@ -8,7 +8,7 @@
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
 #include "iree/compiler/InputConversion/MHLO/Rewriters.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "stablehlo/dialect/ChloOps.h"
@@ -483,7 +483,7 @@ struct TestMHLOConvertComplexToRealPass
 
     target.addLegalDialect<mhlo::MhloDialect>();
     target.addLegalDialect<chlo::ChloDialect>();
-    target.addLegalDialect<func::FuncDialect, mlir::arith::ArithmeticDialect>();
+    target.addLegalDialect<func::FuncDialect, mlir::arith::ArithDialect>();
 
     // For the test, require that casts fully convert.
     target.addIllegalOp<mhlo::ComplexOp>();

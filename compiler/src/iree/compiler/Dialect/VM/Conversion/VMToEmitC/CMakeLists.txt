@@ -30,7 +30,7 @@ iree_cc_library(
     "EmitCTypeConverter.cpp"
   DEPS
     LLVMSupport
-    MLIRArithmeticDialect
+    MLIRArithDialect
     MLIRControlFlowDialect
     MLIREmitCDialect
     MLIRFuncDialect

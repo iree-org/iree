@@ -21,7 +21,7 @@ iree_cc_library(
     "OpOracle.cpp"
   DEPS
     LLVMSupport
-    MLIRArithmeticDialect
+    MLIRArithDialect
     MLIRFuncDialect
     MLIRIR
     MLIRLinalgDialect

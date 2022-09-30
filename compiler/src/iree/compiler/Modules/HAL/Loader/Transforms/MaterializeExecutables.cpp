@@ -9,7 +9,7 @@
 #include "iree/compiler/Modules/HAL/Loader/IR/HALLoaderDialect.h"
 #include "iree/compiler/Modules/HAL/Loader/Transforms/PassDetail.h"
 #include "iree/compiler/Modules/HAL/Loader/Transforms/Passes.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -134,8 +134,8 @@ class MaterializeExecutablesPass
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Util::UtilDialect, IREE::HAL::HALDialect,
-                    IREE::HAL::Loader::HALLoaderDialect,
-                    arith::ArithmeticDialect, cf::ControlFlowDialect>();
+                    IREE::HAL::Loader::HALLoaderDialect, arith::ArithDialect,
+                    cf::ControlFlowDialect>();
   }
 
   void runOnOperation() override {

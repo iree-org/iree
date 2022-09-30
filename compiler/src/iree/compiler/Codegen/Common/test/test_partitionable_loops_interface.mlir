@@ -19,7 +19,7 @@ func.func @generic_dynamic(%arg0 : tensor<?x?x?xf32>) -> tensor<?x?xf32> {
   return %0 : tensor<?x?xf32>
 }
 // CHECK-LABEL: func.func @generic_dynamic(
-//       CHECK:   util.unfoldable_constant dense<[1, 0, 1]> : tensor<3xindex>
+//       CHECK:   util.unfoldable_constant dense<[0, 2]> : tensor<2xi32>
 
 // -----
 
@@ -40,7 +40,7 @@ func.func @generic_unit_dim(%arg0 : tensor<1x?x?xf32>) -> tensor<1x?xf32> {
   return %0 : tensor<1x?xf32>
 }
 // CHECK-LABEL: func.func @generic_unit_dim(
-//       CHECK:   util.unfoldable_constant dense<[0, 0, 1]> : tensor<3xindex>
+//       CHECK:   util.unfoldable_constant dense<2> : tensor<1xi32>
 
 // -----
 
@@ -66,7 +66,7 @@ func.func @generic_4D(%arg0: tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32> {
   return %0 : tensor<?x?x?x?xf32>
 }
 // CHECK-LABEL: func.func @generic_4D(
-//       CHECK:   util.unfoldable_constant dense<[0, 1, 1, 1]> : tensor<4xindex>
+//       CHECK:   util.unfoldable_constant dense<[1, 2, 3]> : tensor<3xi32>
 
 // -----
 
@@ -90,7 +90,7 @@ func.func @generic_4D_unit_dim(%arg0: tensor<?x?x1x?xf32>) -> tensor<?x?x1x?xf32
   return %0 : tensor<?x?x1x?xf32>
 }
 // CHECK-LABEL: func.func @generic_4D_unit_dim(
-//       CHECK:   util.unfoldable_constant dense<[1, 1, 0, 1]> : tensor<4xindex>
+//       CHECK:   util.unfoldable_constant dense<[0, 1, 3]> : tensor<3xi32>
 
 // -----
 
@@ -102,7 +102,7 @@ func.func @named_op(%lhs : tensor<?x?xf32>, %rhs : tensor<?x?xf32>,
   return %0 : tensor<?x?xf32>
 }
 // CHECK-LABEL: func.func @named_op(
-//       CHECK:   util.unfoldable_constant dense<[1, 1, 0]> : tensor<3xindex>
+//       CHECK:   util.unfoldable_constant dense<[0, 1]> : tensor<2xi32>
 
 // -----
 
@@ -116,7 +116,7 @@ func.func @named_op_unit_dim(%lhs : tensor<1x?xf32>, %rhs : tensor<?x?xf32>,
 
 
 // CHECK-LABEL: func.func @named_op_unit_dim(
-//       CHECK:   util.unfoldable_constant dense<[0, 1, 0]> : tensor<3xindex>
+//       CHECK:   util.unfoldable_constant dense<1> : tensor<1xi32>
 
 // -----
 
@@ -128,7 +128,7 @@ func.func @mmt4d(%lhs : tensor<?x?x?x?xf32>, %rhs : tensor<?x?x?x?xf32>,
   return %0 : tensor<?x?x?x?xf32>
 }
 // CHECK-LABEL: func.func @mmt4d(
-//       CHECK:   util.unfoldable_constant dense<[1, 1, 0, 0, 0, 0]> : tensor<6xindex>
+//       CHECK:   util.unfoldable_constant dense<[0, 1]> : tensor<2xi32>
 
 // -----
 
@@ -140,7 +140,7 @@ func.func @mmt4d_unit_dim(%lhs : tensor<1x?x?x?xf32>, %rhs : tensor<?x?x?x?xf32>
   return %0 : tensor<1x?x?x?xf32>
 }
 // CHECK-LABEL: func.func @mmt4d_unit_dim(
-//       CHECK:   util.unfoldable_constant dense<[1, 1, 0, 0, 0, 0]> : tensor<6xindex>
+//       CHECK:   util.unfoldable_constant dense<[0, 1]> : tensor<2xi32>
 
 // -----
 
@@ -156,7 +156,7 @@ func.func @sort(%arg0 : tensor<?x?xf32>) -> tensor<?x?xf32> {
   return %0 : tensor<?x?xf32>
 }
 // CHECK-LABEL: func.func @sort(
-//       CHECK:   util.unfoldable_constant dense<[0, 1]> : tensor<2xindex>
+//       CHECK:   util.unfoldable_constant dense<1> : tensor<1xi32>
 
 // -----
 
@@ -172,4 +172,4 @@ func.func @sort_unit_dim(%arg0 : tensor<?x1xf32>) -> tensor<?x1xf32> {
   return %0 : tensor<?x1xf32>
 }
 // CHECK-LABEL: func.func @sort_unit_dim(
-//       CHECK:   util.unfoldable_constant dense<[0, 1]> : tensor<2xindex>
+//       CHECK:   util.unfoldable_constant dense<1> : tensor<1xi32>

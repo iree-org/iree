@@ -17,7 +17,7 @@
 #include "llvm/Support/ToolOutputFile.h"
 #include "mlir-hlo/Dialect/mhlo/IR/register.h"
 #include "mlir/Bytecode/BytecodeWriter.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/IR/AsmState.h"
@@ -162,7 +162,7 @@ int main(int argc, char **argv) {
 
   DialectRegistry registry;
   mlir::mhlo::registerAllMhloDialects(registry);
-  registry.insert<mlir::func::FuncDialect, mlir::arith::ArithmeticDialect,
+  registry.insert<mlir::func::FuncDialect, mlir::arith::ArithDialect,
                   mlir::math::MathDialect>();
   MLIRContext context;
   OwningOpRef<mlir::ModuleOp> module =

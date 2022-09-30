@@ -12,7 +12,7 @@
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Async/IR/Async.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -56,7 +56,7 @@ int main(int argc, char **argv) {
       mlir::linalg::transform::LinalgTransformDialect,
       // Upstream dialects
       mlir::async::AsyncDialect,
-      mlir::arith::ArithmeticDialect,
+      mlir::arith::ArithDialect,
       mlir::AffineDialect,
       mlir::cf::ControlFlowDialect,
       mlir::func::FuncDialect,

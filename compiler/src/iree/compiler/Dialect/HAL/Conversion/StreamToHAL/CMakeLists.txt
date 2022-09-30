@@ -19,7 +19,7 @@ iree_cc_library(
     "ConvertStreamToHAL.cpp"
   DEPS
     LLVMSupport
-    MLIRArithmeticDialect
+    MLIRArithDialect
     MLIRFuncDialect
     MLIRIR
     MLIRPass
