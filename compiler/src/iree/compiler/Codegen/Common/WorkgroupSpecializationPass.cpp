@@ -11,22 +11,24 @@
 // For example, it converts
 //
 // scf.for ...
-//   %boundedTileSizeY = affine.min ...
+//   %tileSizeY = affine.min ...
 //   scf.for ...
-//     %boundedTileSizeX = affine.min ...
-//     the_op with bounded sizes (The tensor is of dynamic shape.)
+//     %tileSizeX = affine.min ...
+//     the_op with bounded tile sizes (The tensor is of dynamic shape.)
 //
 // into
 //
-// %cmp0 = arith.cmpi %worksizeY, %tilesizeY
-// %cmp1 = arith.cmpi %worksizeX, %tilesizeX
-// %cond = arith.and %cmp0, %cmp1
-// scf.if %cond
+// scf.for
+//   %tileSizeY = affine.min ...
 //   scf.for
-//     scf.for
+//     %tileSizeX = affine.min ...
+//     %cmp0 = arith.cmpi %worksizeY, %tilesizeY
+//     %cmp1 = arith.cmpi %worksizeX, %tilesizeX
+//     %cond = arith.and %cmp0, %cmp1
+//     scf.if %cond
 //       operation with the static shape with the main tile sizes
-// else
-//   original nested loops with dynamic shaped op
+//     else
+//       original nested loops with dynamic shaped op
 //
 //===---------------------------------------------------------------------===//
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
@@ -102,10 +104,9 @@ static SmallVector<AffineMinOp> getBoundedTileSizeOps(scf::ForOp forOp,
 // Steps:
 //   1. bail out if the loop bounds are already a multiple of the tile size.
 //   2. create a condition for scf.if
-//   3. clone the nested loops in the else block.
-//   4. update the bounded size ops of the original loop nest with the constant
-//      tile size.
-//   5. clone the updated loop nest in the then block.
+//   3. clone the body of the innermost loop in the else block.
+//   4. clone the body of the else block into the then block and update the
+//      bounded size ops with the constant tile size during the cloning.
 static void specializeDistributionLoops(
     SmallVector<LoopTilingAndDistributionInfo> &infoVec) {
   // get the scf for loop nests and their tile size.
