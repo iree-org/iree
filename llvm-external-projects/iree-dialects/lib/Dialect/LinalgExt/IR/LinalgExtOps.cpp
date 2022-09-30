@@ -1499,7 +1499,7 @@ TopkOp::reifyResultShapes(OpBuilder &b,
 }
 
 //===----------------------------------------------------------------------===//
-// PackOp
+// PackOp and UnPackOp utils
 //===----------------------------------------------------------------------===//
 
 /// Return true if each element in `dimsPos` is >= 0 and < rank.
@@ -1525,6 +1525,68 @@ static SmallVector<T> interchange(ArrayRef<T> elements,
   }
   return rearrangedElements;
 }
+
+/// Return the `interchangeVector` based on `dims_pos`.
+static SmallVector<int64_t>
+computeInterchangeFromDimPos(ArrayRef<int64_t> dimsPos, int64_t inputRank) {
+  SmallVector<int64_t> interchangeVector;
+  interchangeVector.reserve(dimsPos.size());
+  // First map dims and their position. For example, dims_pos = [2, 0] will map
+  // to:
+  // [
+  //  [ key: 2, value: 0]
+  //  [ key: 0, value: 1]
+  // ]
+  // where key is the idx in dims_pos while value its position in dims_pos.
+  DenseMap<int64_t, int64_t> dimsAndPosMapping;
+  for (int64_t dimsIdx = 0, end = dimsPos.size(); dimsIdx < end; dimsIdx++)
+    dimsAndPosMapping[dimsPos[dimsIdx]] = dimsIdx;
+
+  // Scan the position in order and insert the value in the map
+  // to compute the interchange vector.
+  for (int64_t dimsIdx = 0; dimsIdx < inputRank; dimsIdx++) {
+    if (dimsAndPosMapping.count(dimsIdx))
+      interchangeVector.push_back(dimsAndPosMapping[dimsIdx]);
+  }
+  return interchangeVector;
+}
+
+// Utility function shared between Pack and UnPack to get the tile sizes as
+// OpFoldResults.
+// TODO: interface?
+template <typename OpTy>
+static SmallVector<OpFoldResult> getMixedTiles(OpTy op) {
+  SmallVector<OpFoldResult> mixedInnerTiles;
+  unsigned dynamicValIndex = 0;
+  for (Attribute attr : op.getStaticInnerTiles()) {
+    auto tileAttr = attr.cast<IntegerAttr>();
+    if (!ShapedType::isDynamic(tileAttr.getInt()))
+      mixedInnerTiles.push_back(tileAttr);
+    else
+      mixedInnerTiles.push_back(op.getInnerTiles()[dynamicValIndex++]);
+  }
+  return mixedInnerTiles;
+}
+
+// Utility function shared between Pack and UnPack to get a map between
+// `dim_pos` and `inner_tiles`.
+// TODO: interface
+template <typename OpTy>
+static DenseMap<int64_t, OpFoldResult> getDimAndTileMapping(OpTy op) {
+  DenseMap<int64_t, OpFoldResult> dimAndTileMapping;
+  SmallVector<int64_t> dimsToBlock = extractFromI64ArrayAttr(op.getDimsPos());
+  SmallVector<OpFoldResult> tiles = op.getMixedTiles();
+  assert(tiles.size() == dimsToBlock.size() &&
+         "tiles must match indices of dimension to block");
+  // bind the dimension with the tile factor.
+  for (auto i : llvm::seq<int64_t>(0, dimsToBlock.size()))
+    dimAndTileMapping[dimsToBlock[i]] = tiles[i];
+  return dimAndTileMapping;
+}
+
+//===----------------------------------------------------------------------===//
+// PackOp
+//===----------------------------------------------------------------------===//
 
 /// Infer result/output type given the input and the tile sizes.
 ShapedType PackOp::inferResultType() {
@@ -1567,14 +1629,14 @@ ShapedType PackOp::inferResultType() {
       });
 }
 
-// Return true if at least one element in `tiles` is zero.
+/// Return true if at least one element in `tiles` is zero.
 static bool hasZeros(ArrayRef<OpFoldResult> tiles) {
   return llvm::any_of(
       tiles, [&](OpFoldResult tile) { return isConstantIntValue(tile, 0); });
 }
 
-// Return true if `dimsPos` is invalid. It is invalid when: a) it contains
-// duplicate.
+/// Return true if `dimsPos` is invalid. It is invalid when: a) it contains
+/// duplicate.
 static bool isInvalid(ArrayRef<int64_t> dimsPos) {
   DenseSet<int64_t> uniqued;
   for (int64_t dim : dimsPos)
@@ -1680,17 +1742,7 @@ LogicalResult PackOp::verify() {
 
 /// Get the tile sizes as `OpFoldResult`.
 SmallVector<OpFoldResult> PackOp::getMixedTiles() {
-  SmallVector<OpFoldResult> mixedInnerTiles;
-  mixedInnerTiles.reserve(getInputRank());
-  unsigned dynamicValIndex = 0;
-  for (Attribute attr : getStaticInnerTiles()) {
-    auto tileAttr = attr.cast<IntegerAttr>();
-    if (!ShapedType::isDynamic(tileAttr.getInt()))
-      mixedInnerTiles.push_back(tileAttr);
-    else
-      mixedInnerTiles.push_back(getInnerTiles()[dynamicValIndex++]);
-  }
-  return mixedInnerTiles;
+  return ::getMixedTiles(*this);
 }
 
 /// Return the tile sizes as `int64_t`. If a tile size is dynamic a sentinel
@@ -1714,15 +1766,7 @@ SmallVector<utils::IteratorType> PackOp::getLoopIteratorTypes() {
 /// Return a mapping from positions `dims_pos` to their `OpFoldResult` tile
 /// factors.
 DenseMap<int64_t, OpFoldResult> PackOp::getDimAndTileMapping() {
-  DenseMap<int64_t, OpFoldResult> dimAndTileMapping;
-  SmallVector<int64_t> dimsToBlock = extractFromI64ArrayAttr(getDimsPos());
-  SmallVector<OpFoldResult> tiles = getMixedTiles();
-  assert(tiles.size() == dimsToBlock.size() &&
-         "tiles must match indices of dimension to block");
-  // bind the dimension with the tile factor.
-  for (auto i : llvm::seq<int64_t>(0, dimsToBlock.size()))
-    dimAndTileMapping[dimsToBlock[i]] = tiles[i];
-  return dimAndTileMapping;
+  return ::getDimAndTileMapping(*this);
 }
 
 /// Implements `getIterationDomain` from the tiling interface. In each
@@ -1743,31 +1787,6 @@ SmallVector<Range> PackOp::getIterationDomain(OpBuilder &builder) {
     loopBounds[dim].size = resultShape[0][dim];
   }
   return loopBounds;
-}
-
-/// Return the `interchangeVector` based on `dims_pos`.
-SmallVector<int64_t> computeInterchangeFromDimPos(ArrayRef<int64_t> dimsPos,
-                                                  int64_t inputRank) {
-  SmallVector<int64_t> interchangeVector;
-  interchangeVector.reserve(dimsPos.size());
-  // First map dims and their position. For example, dims_pos = [2, 0] will map
-  // to:
-  // [
-  //  [ key: 2, value: 0]
-  //  [ key: 0, value: 1]
-  // ]
-  // where key is the idx in dims_pos while value its position in dims_pos.
-  DenseMap<int64_t, int64_t> dimsAndPosMapping;
-  for (int64_t dimsIdx = 0, end = dimsPos.size(); dimsIdx < end; dimsIdx++)
-    dimsAndPosMapping[dimsPos[dimsIdx]] = dimsIdx;
-
-  // Scan the position in order and insert the value in the map
-  // to compute the interchange vector.
-  for (int64_t dimsIdx = 0; dimsIdx < inputRank; dimsIdx++) {
-    if (dimsAndPosMapping.count(dimsIdx))
-      interchangeVector.push_back(dimsAndPosMapping[dimsIdx]);
-  }
-  return interchangeVector;
 }
 
 /// Generate the body of the innermost loop of the scalar implementation
