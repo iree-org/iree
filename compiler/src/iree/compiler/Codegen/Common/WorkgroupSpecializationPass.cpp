@@ -186,7 +186,6 @@ static void specializeDistributionLoops(
   Value cond;
   SmallVector<Value> constantOps;  // ConstantIndexOps for tile sizes
   for (unsigned i = 0, e = distLoops.size(); i != e; ++i) {
-    // clone the minSize op in the loop and place it before scf.if
     AffineMinOp minOp = minSizeOps[i];
     if (!minOp) {
       // add a dummy value to indicate that this loop does not have an
@@ -214,7 +213,8 @@ static void specializeDistributionLoops(
   Block *elseBlock = ifOp.elseBlock();
   elseBlock->getOperations().splice(elseBlock->begin(), block->getOperations(),
                                     origBodyBegin, origBodyEnd);
-
+  // Clone the else block into the then block. minOps are replaced during the
+  // cloning.
   auto b = ifOp.getThenBodyBuilder();
   BlockAndValueMapping bvm;
   for (unsigned i = 0, e = minSizeOps.size(); i != e; ++i) {
