@@ -37,25 +37,16 @@ using mlir::iree_compiler::IREE::LinalgExt::CodegenStrategy;
 //===----------------------------------------------------------------------===//
 
 /// Returns the op that contains lowering config. Returns failure if there are
-/// multiple op having a different lowering config. Otherwise, return the first
-/// root op we found.
+/// multiple op having lowering config.
 static FailureOr<Operation *> getRootOp(func::FuncOp funcOp) {
   Operation *rootOp = nullptr;
   auto result = funcOp.walk([&](Operation *op) -> WalkResult {
     if (!iree_compiler::getLoweringConfig(op)) return WalkResult::advance();
     if (rootOp) {
-      // We can have multiple operations with a duplicated lowering config
-      // due to the distribution specialization. (See
-      // --iree-codegen-specialize-distribution.)
-      if (iree_compiler::getLoweringConfig(rootOp) !=
-          iree_compiler::getLoweringConfig(op))
-        return WalkResult::interrupt();
-      else
-        return WalkResult::advance();
-    } else {
-      rootOp = op;
-      return WalkResult::advance();
+      return WalkResult::interrupt();
     }
+    rootOp = op;
+    return WalkResult::advance();
   });
   if (!rootOp || result.wasInterrupted()) return failure();
   return rootOp;
