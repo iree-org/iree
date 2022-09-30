@@ -70,22 +70,6 @@ static bool isOffsetSizeAndStrideMappableToFlow(ArrayRef<OpFoldResult> offsets,
   return true;
 }
 
-/// Returns the `Value`s for a list of `OpFoldResult` by generating std.constant
-/// ops for the static values.
-static SmallVector<Value, 4> getAsValues(
-    OpBuilder &b, Location loc, ArrayRef<OpFoldResult> valueOrAttrList) {
-  SmallVector<Value, 4> values;
-  for (auto valueOrAttr : valueOrAttrList) {
-    if (auto attr = valueOrAttr.dyn_cast<Attribute>()) {
-      values.push_back(b.create<arith::ConstantIndexOp>(
-          loc, attr.cast<IntegerAttr>().getInt()));
-    } else {
-      values.push_back(valueOrAttr.get<Value>());
-    }
-  }
-  return values;
-}
-
 /// Gets the list of non-static values from a list of `OpFoldResult`.
 static SmallVector<Value, 4> getDynamicValues(
     ArrayRef<OpFoldResult> valueOrAttrList) {
