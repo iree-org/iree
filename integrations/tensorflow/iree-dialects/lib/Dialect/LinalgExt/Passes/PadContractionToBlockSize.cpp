@@ -8,7 +8,7 @@
 #include "iree-dialects/Dialect/Input/InputOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/PassDetail.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
