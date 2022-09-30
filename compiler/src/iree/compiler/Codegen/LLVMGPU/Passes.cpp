@@ -243,7 +243,6 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
 
 void addGPUTransposePassPipeline(OpPassManager &pm) {
   tileAndDistributeToWorkgroup(pm);
-
   auto &nestedModulePM = pm.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(
       createWorkgroupSpecializationPass());
@@ -388,7 +387,6 @@ void addGPUTransformDialectInterpreterPasses(OpPassManager &passManager) {
     // First do the tile and distribution to workgroups and remove the
     // distributions loops. Then apply the transform dialect.
     passManager.addPass(createTileAndDistributeToWorkgroupsPass());
-
     auto &nestedModulePM = passManager.nest<ModuleOp>();
     nestedModulePM.addNestedPass<func::FuncOp>(
         createConvertToDestinationPassingStylePass());
