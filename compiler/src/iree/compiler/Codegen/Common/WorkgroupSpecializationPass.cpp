@@ -113,10 +113,8 @@ static void specializeDistributionLoops(
   SmallVector<int64_t> tileSizes;
   SmallVector<AffineMinOp> minSizeOps;
 
-  // Distribution info vector has the innermost loop at index 0. Let's reverse
-  // it to make the outermost loop positioned at index 0, and collect forOps,
-  // tile sizes, and the bounded tile size ops.
-  for (auto &info : reverse(infoVec)) {
+  // Distribution info vector has the innermost loop at index 0.
+  for (auto &info : infoVec) {
     auto forOp = cast<scf::ForOp>(info.loop);
     distLoops.push_back(forOp);
     if (!info.tileSize) {
@@ -163,22 +161,30 @@ static void specializeDistributionLoops(
 
   if (isAlreadyMultiple) return;
 
-  scf::ForOp outermostLoop = distLoops[0];
-  auto loc = outermostLoop.getLoc();
-  OpBuilder builder(outermostLoop->getContext());
+  scf::ForOp innermostLoop = distLoops[0];
+  auto loc = innermostLoop.getLoc();
+  Block *block = innermostLoop.getBody();
+
+  OpBuilder builder(innermostLoop->getContext());
   PatternRewriter::InsertionGuard guard(builder);
-  builder.setInsertionPoint(outermostLoop);
+
+  AffineMinOp minOp0 = minSizeOps[0];
+  if (minOp0) {
+    // Make sure the affine.min in the innermost loop is the first
+    // instruction in the body.
+    auto minOp = llvm::dyn_cast_or_null<AffineMinOp>(block->front());
+    if (!minOp || minOp != minOp0) {
+      minOp0->moveBefore(&block->front());
+    }
+    builder.setInsertionPointAfter(&block->front());
+  } else {
+    builder.setInsertionPoint(&block->front());
+  }
 
   // create a condition for scf.if
   Value cond;
   SmallVector<Value> constantOps;  // ConstantIndexOps for tile sizes
   for (unsigned i = 0, e = distLoops.size(); i != e; ++i) {
-    int64_t tileSize = tileSizes[i];
-    if (tileSize == 0 || tileSize == 1) {
-      constantOps.push_back(Value());
-      continue;
-    }
-
     // clone the minSize op in the loop and place it before scf.if
     AffineMinOp minOp = minSizeOps[i];
     if (!minOp) {
@@ -188,49 +194,34 @@ static void specializeDistributionLoops(
       continue;
     }
 
-    scf::ForOp distLoop = distLoops[i];
-    // clone the lower bound and put before the nested loops.
-    BlockAndValueMapping mapperForLB;
-    Operation *lb =
-        builder.clone(*distLoop.getLowerBound().getDefiningOp(), mapperForLB);
-
-    // Clone the affine min op for the dynamic size in the current loop and
-    // place it before the nested loops. The induction variable is replaced by
-    // the cloned lower-bound above.
-    BlockAndValueMapping mapperForIV;
-    Value iv = distLoop.getInductionVar();
-    mapperForIV.map(iv, lb->getResult(0));
-    Value size =
-        builder.clone(*minOp.getOperation(), mapperForIV)->getResult(0);
-
     // Generate a compare op that checks the dynamic size is equal to the
     // constant main tile size.
-    Value constant = builder.create<arith::ConstantIndexOp>(loc, tileSize);
+    Value constant = builder.create<arith::ConstantIndexOp>(loc, tileSizes[i]);
     constantOps.push_back(constant);
     Value cmp = builder.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq,
-                                              size, constant);
+                                              minOp, constant);
     cond = cond ? builder.create<arith::AndIOp>(loc, cond, cmp) : cmp;
   }
 
-  // generate scf.if %cond then { scf.for ... } else { scf.for ... }
+  // generate scf.if %cond
   auto ifOp = builder.create<scf::IfOp>(loc, cond, /*withElseRegion=*/true);
-  ifOp.getElseBodyBuilder().clone(*outermostLoop.getOperation());
 
-  // Specialize the size operations (affine min) in each for loop.
-  for (int i = 0, e = distLoops.size(); i != e; ++i) {
-    AffineMinOp minOp = minSizeOps[i];
-    if (!minOp) {
-      continue;
-    }
-    LLVM_DEBUG({
-      llvm::errs() << "Replacing ";
-      minOp.dump();
-      llvm::errs() << "with ";
-      constantOps[i].dump();
-    });
-    minOp.replaceAllUsesWith(constantOps[i]);
+  // Transfer the original body to the scf.else body.
+  auto origBodyBegin = ++Block::iterator(ifOp);
+  auto origBodyEnd = --block->end();  // yield
+
+  Block *elseBlock = ifOp.elseBlock();
+  elseBlock->getOperations().splice(elseBlock->begin(), block->getOperations(),
+                                    origBodyBegin, origBodyEnd);
+
+  auto b = ifOp.getThenBodyBuilder();
+  BlockAndValueMapping bvm;
+  for (unsigned i = 0, e = minSizeOps.size(); i != e; ++i) {
+    bvm.map(minSizeOps[i], constantOps[i]);
   }
-  outermostLoop->moveBefore(&ifOp.getThenRegion().front().front());
+  for (auto &blockOp : elseBlock->without_terminator()) {
+    b.clone(blockOp, bvm);
+  }
   return;
 }
 

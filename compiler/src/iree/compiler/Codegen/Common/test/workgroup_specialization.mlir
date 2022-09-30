@@ -53,19 +53,17 @@ module {
 }
 
 // CHECK: func.func @matmul_tensors()
-// CHECK: %[[CMP0:.+]] = arith.cmpi eq, %{{.+}}, %c64 : index
-// CHECK: %[[CMP1:.+]] = arith.cmpi eq, %{{.+}}, %c64 : index
-// CHECK: %[[COND:.+]] = arith.andi %[[CMP0]], %[[CMP1]] : i1
-// CHECK: scf.if %[[COND]] {
 // CHECK:   scf.for
 // CHECK:     scf.for
-// CHECK:       linalg.matmul
-// CHECK-SAME:                ins(%{{.+}}, %{{.+}} : tensor<64x456xf32>, tensor<456x64xf32>) outs(%{{.+}} : tensor<64x64xf32>) -> tensor<64x64xf32>
-// CHECK: } else {
-// CHECK:   scf.for
-// CHECK:     scf.for
-// CHECK:       linalg.matmul
-// CHECK-SAME:                ins(%{{.+}}, %{{.+}} : tensor<?x456xf32>, tensor<456x?xf32>) outs(%{{.+}} : tensor<?x?xf32>) -> tensor<?x?xf32>
+// CHECK:       %[[CMP0:.+]] = arith.cmpi eq, %{{.+}}, %c64 : index
+// CHECK:       %[[CMP1:.+]] = arith.cmpi eq, %{{.+}}, %c64 : index
+// CHECK:       %[[COND:.+]] = arith.andi %[[CMP0]], %[[CMP1]] : i1
+// CHECK:       scf.if %[[COND]] {
+// CHECK:         linalg.matmul
+// CHECK-SAME:                  ins(%{{.+}}, %{{.+}} : tensor<64x456xf32>, tensor<456x64xf32>) outs(%{{.+}} : tensor<64x64xf32>) -> tensor<64x64xf32>
+// CHECK:       } else {
+// CHECK:         linalg.matmul
+// CHECK-SAME:                  ins(%{{.+}}, %{{.+}} : tensor<?x456xf32>, tensor<456x?xf32>) outs(%{{.+}} : tensor<?x?xf32>) -> tensor<?x?xf32>
 
 // -----
 
@@ -127,19 +125,17 @@ module {
 }
 
 // CHECK: func.func @add_tensors()
-// CHECK: %[[CMP0:.+]] = arith.cmpi eq, %{{.+}}, %c64 : index
-// CHECK: %[[CMP1:.+]] = arith.cmpi eq, %{{.+}}, %c64 : index
-// CHECK: %[[COND:.+]] = arith.andi %[[CMP0]], %[[CMP1]] : i1
-// CHECK: scf.if %[[COND]] {
 // CHECK:   scf.for
 // CHECK:     scf.for
-// CHECK:       linalg.generic
-// CHECK-SAME:                ins(%{{.+}}, %{{.+}} : tensor<64x64xf32>, tensor<64x64xf32>) outs(%{{.+}} : tensor<64x64xf32>)
-// CHECK: } else {
-// CHECK:   scf.for
-// CHECK:     scf.for
-// CHECK:       linalg.generic
-// CHECK-SAME:                ins(%{{.+}}, %{{.+}} : tensor<?x?xf32>, tensor<?x?xf32>) outs(%{{.+}} : tensor<?x?xf32>)
+// CHECK:       %[[CMP0:.+]] = arith.cmpi eq, %{{.+}}, %c64 : index
+// CHECK:       %[[CMP1:.+]] = arith.cmpi eq, %{{.+}}, %c64 : index
+// CHECK:       %[[COND:.+]] = arith.andi %[[CMP0]], %[[CMP1]] : i1
+// CHECK:       scf.if %[[COND]] {
+// CHECK:         linalg.generic
+// CHECK-SAME:                  ins(%{{.+}}, %{{.+}} : tensor<64x64xf32>, tensor<64x64xf32>) outs(%{{.+}} : tensor<64x64xf32>)
+// CHECK:       } else {
+// CHECK:         linalg.generic
+// CHECK-SAME:                  ins(%{{.+}}, %{{.+}} : tensor<?x?xf32>, tensor<?x?xf32>) outs(%{{.+}} : tensor<?x?xf32>)
 
 // -----
 
@@ -201,6 +197,13 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 }
 
 // CHECK: func.func @unaligned_partial_loop()
-// CHECK: arith.cmpi eq
-// CHECK: scf.if
-// CHECK: } else {
+// CHECK:   scf.for
+// CHECK:     scf.for
+// CHECK:       %[[COND:.+]] = arith.cmpi eq, %{{.+}}, %c256 : index
+// CHECK:       scf.if %[[COND]] {
+// CHECK:         linalg.matmul
+// CHECK-SAME:                  ins(%{{.+}}, %{{.+}} : tensor<2x768xf32>, tensor<768x256xf32>) outs(%{{.+}} : tensor<2x256xf32>)
+// CHECK:       } else {
+// CHECK:         linalg.matmul
+// CHECK-SAME:                  ins(%{{.+}}, %{{.+}} : tensor<2x768xf32>, tensor<768x?xf32>) outs(%{{.+}} : tensor<2x?xf32>)
+
