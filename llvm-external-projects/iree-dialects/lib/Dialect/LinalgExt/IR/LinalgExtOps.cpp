@@ -1584,6 +1584,63 @@ static DenseMap<int64_t, OpFoldResult> getDimAndTileMapping(OpTy op) {
   return dimAndTileMapping;
 }
 
+/// Generate the body of the innermost loop of the scalar implementation
+/// of `pack` or `unpack` operation.
+template <typename OpTy>
+static void
+generatePackOpOrUnPackScalarImplementationBody(OpTy op, OpBuilder &builder,
+                                               Location loc, ValueRange ivs) {
+  static_assert(llvm::is_one_of<OpTy, PackOp, UnPackOp>::value,
+                "applies to only pack or unpack operations");
+  // Note: `ivs` are already in the correct order, possibly interchanged based
+  // on `dims_pos`. However, connecting the loops with the access patterns is
+  // difficult - What is the relation between the position of the tile loop and
+  // the point loop? However, if we interchange `ivs` once more to go to the
+  // canonical blocking format: ABCabc, this connection becomes trivial: Each
+  // point loop is pointLoopsOffset + rank away from the tiled loop. Where rank
+  // is inputRank for the pack operation and outputRank for the unpack
+  // operation.
+  size_t rank = std::is_same<OpTy, PackOp>::value ? op.getInputRank()
+                                                  : op.getOutputRank();
+  SmallVector<int64_t> dimsToBlock = extractFromI64ArrayAttr(op.getDimsPos());
+  SmallVector<Value> interchangedIvs = ivs;
+  SmallVector<int64_t> interchangeVector =
+      computeInterchangeFromDimPos(dimsToBlock, rank);
+  interchangedIvs = interchange<Value>(interchangedIvs, interchangeVector,
+                                       /*offset=*/rank);
+
+  SmallVector<OpFoldResult> tiles = op.getMixedTiles();
+  DenseMap<int64_t, OpFoldResult> dimAndTileMapping = op.getDimAndTileMapping();
+  SmallVector<OpFoldResult> indices;
+  size_t pointLoopsOffset = 0;
+  for (auto dim : llvm::seq<int64_t>(0, rank)) {
+    if (dimAndTileMapping.count(dim)) {
+      AffineExpr i, j, tile;
+      bindDims(builder.getContext(), i, j);
+      bindSymbols(builder.getContext(), tile);
+      OpFoldResult index = makeComposedFoldedAffineApply(
+          builder, loc, i * tile + j,
+          ArrayRef<OpFoldResult>{interchangedIvs[dim],
+                                 interchangedIvs[pointLoopsOffset + rank],
+                                 dimAndTileMapping[dim]});
+      indices.push_back(index);
+      ++pointLoopsOffset;
+    } else {
+      indices.push_back(interchangedIvs[dim]);
+    }
+  }
+
+  if (std::is_same<OpTy, PackOp>::value) {
+    Value scalar = builder.create<memref::LoadOp>(
+        loc, op.getInput(), getAsValues(builder, loc, indices));
+    builder.create<memref::StoreOp>(loc, scalar, op.getOutput(), ivs);
+  } else {
+    Value scalar = builder.create<memref::LoadOp>(loc, op.getInput(), ivs);
+    builder.create<memref::StoreOp>(loc, scalar, op.getOutput(),
+                                    getAsValues(builder, loc, indices));
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // PackOp
 //===----------------------------------------------------------------------===//
@@ -1904,6 +1961,7 @@ LogicalResult PackOp::generateScalarImplementation(OpBuilder &builder,
                              [&](OpBuilder &bodyBuilder, Location bodyLoc,
                                  Value iv, ValueRange regionIterArgs) {
                                ivVec.push_back(iv);
+                               // TODO: (lorenzo) check if we can share more.
                                generatePackOpScalarImplementationBody(
                                    *this, bodyBuilder, bodyLoc, ivVec);
                                bodyBuilder.create<scf::YieldOp>(bodyLoc);
@@ -2089,38 +2147,7 @@ DenseMap<int64_t, OpFoldResult> UnPackOp::getDimAndTileMapping() {
 LogicalResult UnPackOp::generateScalarImplementation(OpBuilder &builder,
                                                      Location loc,
                                                      ValueRange ivs) {
-  // Similar to PackOp, we interchange the `ivs` to go back to a canonical form
-  // between the tile and poit loops.
-  SmallVector<int64_t> dimsToBlock = extractFromI64ArrayAttr(getDimsPos());
-  SmallVector<int64_t> interchangeVector =
-      computeInterchangeFromDimPos(dimsToBlock, getOutputRank());
-  SmallVector<Value> interchangedIvs = ivs;
-  interchangedIvs = interchange<Value>(interchangedIvs, interchangeVector,
-                                       /*offset=*/getOutputRank());
-  SmallVector<OpFoldResult> tiles = getMixedTiles();
-  DenseMap<int64_t, OpFoldResult> dimAndTileMapping = getDimAndTileMapping();
-  SmallVector<OpFoldResult> destIndices;
-  size_t pointLoopsOffset = 0;
-  for (auto dim : llvm::seq<int64_t>(0, getOutputRank())) {
-    if (dimAndTileMapping.count(dim)) {
-      AffineExpr i, j, tile;
-      bindDims(builder.getContext(), i, j);
-      bindSymbols(builder.getContext(), tile);
-      OpFoldResult destIndex = makeComposedFoldedAffineApply(
-          builder, loc, i * tile + j,
-          ArrayRef<OpFoldResult>{
-              interchangedIvs[dim],
-              interchangedIvs[pointLoopsOffset + getOutputRank()],
-              dimAndTileMapping[dim]});
-      destIndices.push_back(destIndex);
-      ++pointLoopsOffset;
-    } else {
-      destIndices.push_back(interchangedIvs[dim]);
-    }
-  }
-  Value scalar = builder.create<memref::LoadOp>(loc, getInput(), ivs);
-  builder.create<memref::StoreOp>(loc, scalar, getOutput(),
-                                  getAsValues(builder, loc, destIndices));
+  generatePackOpOrUnPackScalarImplementationBody(*this, builder, loc, ivs);
   return success();
 }
 
