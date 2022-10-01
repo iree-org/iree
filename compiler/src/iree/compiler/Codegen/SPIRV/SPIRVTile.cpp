@@ -86,8 +86,7 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
     SmallVector<scf::IfOp, 1> ifOps;
     funcOp.walk([&ifOps](scf::IfOp ifOp) { ifOps.push_back(ifOp); });
     if (ifOps.empty()) {
-      SmallVector<LoopTilingAndDistributionInfo> loopInfos;
-      if (failed(getComputeOps(funcOp, computeOps, loopInfos))) {
+      if (failed(getComputeOps(funcOp, computeOps))) {
         funcOp.emitOpError("does not contain compute ops");
         return signalPassFailure();
       }
