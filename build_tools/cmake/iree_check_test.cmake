@@ -28,6 +28,37 @@ function(iree_bytecode_module_for_iree_check_test_and_friends)
     ${ARGN}
   )
 
+  if(ANDROID AND NOT _RULE_FLAGS MATCHES "iree-llvm-target-triple")
+    # Android's CMake toolchain defines some variables that we can use to infer
+    # the appropriate target triple from the configured settings:
+    # https://developer.android.com/ndk/guides/cmake#android_platform
+    #
+    # In typical CMake fashion, the various strings are pretty fuzzy and can
+    # have multiple values like "latest", "android-25"/"25"/"android-N-MR1".
+    #
+    # From looking at the toolchain file, ANDROID_PLATFORM_LEVEL seems like it
+    # should pretty consistently be just a number we can use for target triple.
+    set(_TARGET_TRIPLE "aarch64-none-linux-android${ANDROID_PLATFORM_LEVEL}")
+    list(APPEND _RULE_FLAGS "--iree-llvm-target-triple=${_TARGET_TRIPLE}")
+  endif()
+
+  if(CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv64" AND
+     CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
+     _RULE_TARGET_BACKEND STREQUAL "llvm-cpu" AND
+     NOT _RULE_FLAGS MATCHES "iree-llvm-target-triple")
+    # RV64 Linux crosscompile toolchain can support iree_check_test with
+    # specific CPU flags. Add the llvm flags to support RV64 RVV codegen if
+    # llvm-target-triple is not specified.
+    list(APPEND _RULE_FLAGS ${RISCV64_TEST_DEFAULT_LLVM_FLAGS})
+  elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv32" AND
+         CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
+         NOT _RULE_FLAGS MATCHES "iree-llvm-target-triple")
+    # RV32 Linux crosscompile toolchain can support iree-compile with
+    # specific CPU flags. Add the llvm flags to support RV32 RVV codegen if
+    # llvm-target-triple is not specified.
+    list(APPEND _RULE_FLAGS ${RISCV32_TEST_DEFAULT_LLVM_FLAGS})
+  endif()
+
   if(_RULE_TARGET_CPU_FEATURES)
     if(NOT _RULE_TARGET_BACKEND IN_LIST IREE_TARGET_BACKENDS_SUPPORTING_TARGET_CPU_FEATURES)
       message(SEND_ERROR "TARGET_CPU_FEATURES should be empty when \

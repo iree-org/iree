@@ -84,6 +84,18 @@ function(iree_hal_cts_test_suite)
       "--compile-mode=hal-executable"
       "--iree-hal-target-backends=${_RULE_COMPILER_TARGET_BACKEND}"
     )
+    if(ANDROID)
+      set(_TARGET_TRIPLE "aarch64-none-linux-android${ANDROID_PLATFORM_LEVEL}")
+      list(APPEND _TRANSLATE_FLAGS "--iree-llvm-target-triple=${_TARGET_TRIPLE}")
+    endif()
+
+    if(CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv64" AND
+       CMAKE_SYSTEM_NAME STREQUAL "Linux")
+      list(APPEND  _TRANSLATE_FLAGS ${RISCV64_TEST_DEFAULT_LLVM_FLAGS})
+    elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv32" AND
+           CMAKE_SYSTEM_NAME STREQUAL "Linux")
+      list(APPEND _TRANSLATE_FLAGS ${RISCV32_TEST_DEFAULT_LLVM_FLAGS})
+    endif()
 
     # Skip if already created (multiple suites using the same compiler setting).
     iree_package_name(_PACKAGE_NAME)
