@@ -59,7 +59,10 @@ hal.executable private @check_no_cse {
 //      CHECK: func.func @check_no_cse()
 //  CHECK-NOT:    memref.alloc
 //      CHECK:    %[[FOR:.+]] = scf.for
-//      CHECK:    %[[DIVF:.+]] = arith.divf %[[FOR]]
+//      CHECK:    %[[EXTRACT:.+]] = vector.extract %[[FOR]]
+//      CHECK:    %[[REDUCTION:.+]] = vector.reduction <add>, %[[EXTRACT]]
+//      CHECK:    %[[INS:.+]] = vector.insertelement %[[REDUCTION]]
+//      CHECK:    %[[DIVF:.+]] = arith.divf %[[INS]]
 //      CHECK:    %[[RES:.+]] = vector.extract %[[DIVF]]
 //      CHECK:    memref.store %[[RES]]
 

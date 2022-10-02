@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <optional>
+
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/CodegenStrategy.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
@@ -138,6 +140,40 @@ getTileAndFuseOptionsFromConfig(func::FuncOp funcOp, int64_t tilingLevel) {
   return options;
 }
 
+/// Default method to initialize the split reduction size and unroll factor in
+/// IREE. These could be overriden by the command line options if specified.
+static bool getSplitReductionOptionsFromConfig(func::FuncOp funcOp,
+                                               int64_t &size,
+                                               uint64_t &unrollFactor) {
+  FailureOr<Operation *> rootOp = getRootOp(funcOp);
+  if (failed(rootOp)) {
+    return false;
+  }
+  auto configAttr = mlir::iree_compiler::getLoweringConfig(rootOp.value());
+  if (!configAttr) return false;
+  auto tileSizesAttr = configAttr.getTileSizes();
+  if (!tileSizesAttr || tileSizesAttr.empty()) return false;
+  // The last one is the reduction dimension.
+  auto reductionSizesAttr = tileSizesAttr[tileSizesAttr.size() - 1];
+  if (!reductionSizesAttr) return false;
+  auto reductionSizes = reductionSizesAttr.cast<ArrayAttr>();
+  if (!reductionSizes || reductionSizes.empty()) return false;
+  size = reductionSizes[reductionSizes.size() - 1].cast<IntegerAttr>().getInt();
+  // The penultimate one's product excluding the zeros is the unrollFactor.
+  if (tileSizesAttr.size() == 1) return false;
+  auto parallelSizesAttr = tileSizesAttr[tileSizesAttr.size() - 2];
+  if (!parallelSizesAttr) return false;
+  auto parallelSizes = parallelSizesAttr.cast<ArrayAttr>();
+  if (!parallelSizes || parallelSizes.empty()) return false;
+  unrollFactor = 1;
+  for (auto p : parallelSizes) {
+    uint64_t val = p.cast<IntegerAttr>().getInt();
+    if (val != 0) unrollFactor *= val;
+  }
+
+  return true;
+}
+
 //===----------------------------------------------------------------------===//
 // From Sandbox
 //===----------------------------------------------------------------------===//
@@ -180,6 +216,15 @@ struct LinalgFusePass : public LinalgFuseBase<LinalgFusePass> {
     this->vectorizePadding = options.vectorizePadding;
     this->tilingLevel = options.tilingLevel;
     this->doIREEDistribution = options.doIREEDistribution;
+  }
+  void runOnOperation() override;
+};
+
+struct LinalgSplitReductionPass
+    : public LinalgSplitReductionBase<LinalgSplitReductionPass> {
+  LinalgSplitReductionPass(int64_t size = 0, uint64_t unrollFactor = 1) {
+    this->size.setValue(size);
+    this->unrollFactor.setValue(unrollFactor);
   }
   void runOnOperation() override;
 };
@@ -267,7 +312,7 @@ void LinalgFusePass::runOnOperation() {
   FailureOr<linalg::LinalgTilingAndFusionOptions> defaultTilingOptions =
       getTileAndFuseOptionsFromConfig(funcOp, tilingLevel);
   if (failed(defaultTilingOptions)) {
-    return signalPassFailure();
+    return;
   }
   linalg::LinalgTilingAndFusionOptions tilingOptions =
       defaultTilingOptions.value();
@@ -364,6 +409,125 @@ void LinalgFusePass::runOnOperation() {
 
   if (failed(runPipeline(dynamicPM, funcOp))) {
     return signalPassFailure();
+  }
+}
+namespace {
+/// Pattern to wrap splitReduction transformation. This changes the
+/// lowering_config for the split op and keeps the same lowering_config for the
+/// reduction op.
+struct CodegenSplitReduction
+    : public OpInterfaceRewritePattern<linalg::LinalgOp> {
+  CodegenSplitReduction(MLIRContext *context, int64_t size,
+                        uint64_t unrollFactor,
+                        linalg::LinalgTransformationFilter filter,
+                        PatternBenefit benefit = 1)
+      : OpInterfaceRewritePattern<linalg::LinalgOp>(context, benefit),
+        size(size),
+        unrollFactor(unrollFactor),
+        filter(std::move(filter)) {}
+
+  LogicalResult matchAndRewrite(linalg::LinalgOp op,
+                                PatternRewriter &rewriter) const override {
+    // Make sure that only generic ops are supported, only one input and the
+    // innermost tensor dimension is reduction dimension.  Everything else is
+    // copied from the original SplitReduction Transformation.
+    if (failed(filter.checkAndNotify(rewriter, op)) ||
+        !op.hasTensorSemantics() || op.getNumReductionLoops() != 1 ||
+        op.getNumOutputs() != 1 || !op.hasOnlyProjectedPermutations() ||
+        !isa<linalg::GenericOp>(op) || op.getNumInputs() != 1)
+      return rewriter.notifyMatchFailure(op, "precondition not met");
+    SmallVector<unsigned> dims;
+    op.getReductionDims(dims);
+    AffineMap map = op.getTiedIndexingMap(op.getInputOperand(0));
+    unsigned lastIdx = map.getNumResults() - 1;
+    unsigned lastDim = map.getDimPosition(lastIdx);
+    if (lastDim != dims[0])
+      return rewriter.notifyMatchFailure(op, "precondition not met");
+
+    linalg::ControlSplitReductionFn fn = [this, lastIdx](linalg::LinalgOp op) {
+      return linalg::SplitReductionOptions{size, lastIdx, true};
+    };
+
+    auto opNumLoops = op.getNumLoops();
+
+    // 1) Tile to extract a single vector-length array.
+    SmallVector<int64_t> tileSizesSVFirst(opNumLoops, 1);
+    tileSizesSVFirst[opNumLoops - 1] = 0;
+    ArrayRef<int64_t> tileSizesFirst(tileSizesSVFirst);
+    linalg::LinalgTilingOptions optionsFirst;
+    optionsFirst.setTileSizes(tileSizesFirst);
+    FailureOr<linalg::TiledLinalgOp> tileResFirst =
+        linalg::tileLinalgOp(rewriter, op, optionsFirst);
+    if (failed(tileResFirst)) return failure();
+    rewriter.replaceOp(op, tileResFirst->tensorResults);
+
+    // 2) Apply splitReduction on the single vector-length array. splitReduction
+    // already replaces the op.
+    FailureOr<linalg::SplitReductionResult> splitRes =
+        splitReduction(rewriter, tileResFirst->op, fn);
+    if (failed(splitRes)) return failure();
+
+    // 3) Tile the first op generated by splitReduction with tile size of 1, to
+    // essentially create a reduction loop.
+    SmallVector<int64_t> tileSizesSV(opNumLoops + 1, 0);
+    tileSizesSV[opNumLoops - 1] = 1;
+    ArrayRef<int64_t> tileSizes(tileSizesSV);
+    linalg::LinalgTilingOptions options;
+    options.setTileSizes(tileSizes);
+    FailureOr<linalg::TiledLinalgOp> tileRes =
+        linalg::tileLinalgOp(rewriter, splitRes->splitLinalgOp, options);
+    if (failed(tileRes)) return failure();
+    rewriter.replaceOp(splitRes->splitLinalgOp, tileRes->tensorResults);
+
+    // // 4) Unroll the tiled op (scf.for) by unrollFactor. loopUnrollByFactor
+    // // already replaces the op.
+    // LogicalResult unrolledRes = mlir::loopUnrollByFactor(
+    //     cast<scf::ForOp>(tileRes->loops[0]), unrollFactor);
+    // if (failed(unrolledRes)) return failure();
+
+    filter.replaceLinalgTransformationFilter(rewriter,
+                                             splitRes->resultCombiningLinalgOp);
+    return success();
+  }
+
+ private:
+  int64_t size;
+  uint64_t unrollFactor;
+  linalg::LinalgTransformationFilter filter;
+};
+}  // namespace
+
+void LinalgSplitReductionPass::runOnOperation() {
+  func::FuncOp funcOp = getOperation();
+  int64_t useSize = size.getValue();
+  uint64_t unroll = unrollFactor.getValue();
+  if (unroll == 0) unroll = 1;
+  bool doSplitReduction = true;
+  if (useSize == 0) {
+    doSplitReduction =
+        getSplitReductionOptionsFromConfig(funcOp, useSize, unroll);
+  }
+  if (doSplitReduction) {
+    RewritePatternSet patterns(&getContext());
+    patterns.add<CodegenSplitReduction>(
+        &getContext(), useSize, unroll,
+        linalg::LinalgTransformationFilter(
+            ArrayRef<StringAttr>{},
+            StringAttr::get(&getContext(), "CODEGEN_SPLIT")));
+
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      return signalPassFailure();
+    }
+    // Remove all the markers at the end.
+    auto funcOp = getOperation();
+    funcOp->walk([&](linalg::LinalgOp op) {
+      op->removeAttr(linalg::LinalgTransforms::kLinalgTransformMarker);
+    });
+    funcOp->walk([&](iree_compiler::IREE::LinalgExt::LinalgExtOp op) {
+      op->removeAttr(linalg::LinalgTransforms::kLinalgTransformMarker);
+      op->removeAttr(
+          iree_compiler::IREE::LinalgExt::kSplitReductionDepthMarker);
+    });
   }
 }
 
@@ -631,6 +795,11 @@ std::unique_ptr<OperationPass<func::FuncOp>> mlir::createLinalgFusePass(
   return std::make_unique<LinalgFusePass>(options);
 }
 
+std::unique_ptr<OperationPass<func::FuncOp>>
+mlir::createLinalgSplitReductionPass(const int64_t size,
+                                     const uint64_t unroll) {
+  return std::make_unique<LinalgSplitReductionPass>(size, unroll);
+}
 std::unique_ptr<OperationPass<func::FuncOp>>
 mlir::createLinalgSingleTilingExpertPass() {
   return std::make_unique<LinalgSingleTilingExpertPass>();

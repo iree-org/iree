@@ -168,4 +168,15 @@ iree_check_single_backend_test_suite(
     "-iree-flow-demote-f64-to-f32=false"
 )
 
+iree_check_single_backend_test_suite(
+  NAME
+    split_reduction
+  SRCS
+    "split_reduction.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

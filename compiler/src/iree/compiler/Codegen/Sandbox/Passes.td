@@ -67,6 +67,22 @@ def LinalgFuse : Pass<"linalg-fuse", "func::FuncOp"> {
   ];
 }
 
+def LinalgSplitReduction : Pass<"linalg-split-reduction", "func::FuncOp"> {
+  let summary = "Pass to splitReduce linalg operations.";
+  let constructor = "mlir::createLinalgSplitReductionPass()";
+  let dependentDialects = [
+    "::mlir::linalg::LinalgDialect"
+  ];
+  let options = [
+    // This corresponds to the value in the last level of tiling
+    Option<"size", "size", "int64_t", /*default=*/"0",
+      "Size that splitReduction should use for parallel reduction results.">,
+    // This corresponds to the value in the penultimate level of tiling
+    Option<"unrollFactor", "unrollFactor", "uint64_t", /*default=*/"1",
+      "Loop unroll factor for the generated reduction loop.">,
+  ];
+}
+
 def LinalgSingleTilingExpert
     : Pass<"linalg-single-tiling-expert-driver", "func::FuncOp"> {
   let summary = "Pass to drive transformations on Linalg on tensors.";

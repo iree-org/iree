@@ -300,6 +300,8 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager) {
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
 
+  nestedModulePM.addNestedPass<func::FuncOp>(createLinalgSplitReductionPass());
+
   // Add the vector lowering expert.
   {
     OpPassManager &nestedFuncPassManager = nestedModulePM.nest<func::FuncOp>();
@@ -321,6 +323,10 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager) {
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
+
+  // Run SplitReductionPass before the final reduction Fuse pass, because
+  // SplitReductionPass takes care of banked-tiling.
+  nestedModulePM.addNestedPass<func::FuncOp>(createLinalgSplitReductionPass());
 
   auto pad = [&](std::string anchorOpName, bool setAnchorOpToRootOp = false,
                  ArrayRef<int64_t> packPaddings = {}) {
@@ -435,10 +441,19 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   {
     LinalgFusePassOptions options;
-    for (int64_t i = 1; i < numLevels; ++i) {
+    for (int64_t i = 1; i < numLevels - 1; ++i) {
       options.tilingLevel = i;
       nestedModulePM.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
     }
+  }
+
+  // Run SplitReductionPass before the final reduction Fuse pass, because
+  // SplitReductionPass takes care of banked-tiling.
+  nestedModulePM.addNestedPass<func::FuncOp>(createLinalgSplitReductionPass());
+  {
+    LinalgFusePassOptions options;
+    options.tilingLevel = numLevels - 1;
+    nestedModulePM.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
   }
 
   {
@@ -483,6 +498,10 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
+
+  // Run SplitReductionPass before the final reduction Fuse pass, because
+  // SplitReductionPass takes care of banked-tiling.
+  nestedModulePM.addNestedPass<func::FuncOp>(createLinalgSplitReductionPass());
 
   // Add the sandbox single tiling expert to tile.
   {
@@ -539,6 +558,10 @@ void addCPUAArchDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
         static_cast<int64_t>(StrategyTilingLevel::ParallelTiles);
     nestedModulePM.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
   }
+
+  // Run SplitReductionPass before the final reduction Fuse pass, because
+  // SplitReductionPass takes care of banked-tiling.
+  nestedModulePM.addNestedPass<func::FuncOp>(createLinalgSplitReductionPass());
 
   {
     LinalgSingleTilingExpertPassOptions options;
