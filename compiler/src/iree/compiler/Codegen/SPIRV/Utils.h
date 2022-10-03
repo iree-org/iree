@@ -20,7 +20,7 @@
 namespace mlir {
 namespace iree_compiler {
 
-/// Given an operation, return the `spv.target_env` attribute.
+/// Given an operation, return the `spirv.target_env` attribute.
 spirv::TargetEnvAttr getSPIRVTargetEnvAttr(Operation *op);
 
 /// Returns the attribute name carrying information about distribution.

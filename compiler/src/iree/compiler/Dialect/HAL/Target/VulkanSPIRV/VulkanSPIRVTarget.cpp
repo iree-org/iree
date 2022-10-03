@@ -123,7 +123,7 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     auto spirvModuleOps = innerModuleOp.getOps<spirv::ModuleOp>();
     if (!llvm::hasSingleElement(spirvModuleOps)) {
       return variantOp.emitError()
-             << "should only contain exactly one spv.module op";
+             << "should only contain exactly one spirv.module op";
     }
     auto spvModuleOp = *spirvModuleOps.begin();
 
@@ -134,7 +134,7 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     // final FlatBuffer.
     SmallVector<uint32_t, 256> spvBinary;
     if (failed(spirv::serialize(spvModuleOp, spvBinary)) || spvBinary.empty()) {
-      return variantOp.emitError() << "failed to serialize spv.module";
+      return variantOp.emitError() << "failed to serialize spirv.module";
     }
     if (!options.dumpBinariesPath.empty()) {
       dumpDataToPath<uint32_t>(options.dumpBinariesPath, options.dumpBaseName,
