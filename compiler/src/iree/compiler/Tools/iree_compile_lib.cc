@@ -170,6 +170,11 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
       llvm::cl::desc("Split the input file into pieces and "
                      "process each chunk independently"),
       llvm::cl::init(false));
+  llvm::cl::opt<bool> listHalTargets(
+      "iree-hal-list-target-backends",
+      llvm::cl::desc(
+          "List all registered target backends for executable compilation."),
+      llvm::cl::init(false));
 
 // Optional output formats.
 #ifdef IREE_HAVE_C_OUTPUT_FORMAT
@@ -199,6 +204,16 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
   // Default output format.
   if (outputFormat == OutputFormat::none) {
     outputFormat = OutputFormat::vm_bytecode;
+  }
+
+  // Handle help-style flags before running any compilation-related code.
+  if (listHalTargets) {
+    auto registeredTargetBackends = IREE::HAL::getRegisteredTargetBackends();
+    llvm::outs() << "Registered target backends:\n";
+    for (auto &registeredTargetBackend : registeredTargetBackends) {
+      llvm::outs() << "  " << registeredTargetBackend << "\n";
+    }
+    return 0;
   }
 
   std::string errorMessage;
