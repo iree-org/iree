@@ -12,8 +12,8 @@
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Transforms.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
-#include "mlir/Dialect/Arithmetic/Utils/Utils.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Math/IR/Math.h"
@@ -314,7 +314,7 @@ struct TilingInterfaceTilingPass
     registry.insert<
         AffineDialect, IREE::Input::IREEInputDialect, linalg::LinalgDialect,
         IREE::LinalgExt::IREELinalgExtDialect, memref::MemRefDialect,
-        func::FuncDialect, mlir::arith::ArithmeticDialect, math::MathDialect,
+        func::FuncDialect, mlir::arith::ArithDialect, math::MathDialect,
         tensor::TensorDialect, scf::SCFDialect>();
   }
   void runOnOperation() override;

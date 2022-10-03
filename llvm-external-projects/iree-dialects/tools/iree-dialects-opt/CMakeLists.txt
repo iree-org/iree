@@ -11,7 +11,7 @@ set(LIBS
   IREETransformsTestPasses
   # Core dialects.
   MLIRAffineDialect
-  MLIRArithmeticDialect
+  MLIRArithDialect
   MLIRAsyncDialect
   MLIRControlFlowDialect
   MLIRDialect

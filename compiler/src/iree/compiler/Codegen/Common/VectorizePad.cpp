@@ -8,7 +8,7 @@
 #include "iree/compiler/Codegen/Passes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/AffineMap.h"
@@ -223,9 +223,8 @@ struct VectorizePadWithConditions final
 struct TensorToVectorVectorizePadPass
     : public TensorToVectorVectorizePadBase<TensorToVectorVectorizePadPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<AffineDialect, arith::ArithmeticDialect, linalg::LinalgDialect,
-                scf::SCFDialect, vector::VectorDialect>();
+    registry.insert<AffineDialect, arith::ArithDialect, linalg::LinalgDialect,
+                    scf::SCFDialect, vector::VectorDialect>();
   }
 
   void runOnOperation() override {

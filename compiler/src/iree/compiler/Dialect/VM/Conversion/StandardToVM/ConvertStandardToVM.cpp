@@ -12,7 +12,7 @@
 #include "iree/compiler/Dialect/VM/Conversion/TargetOptions.h"
 #include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
@@ -765,19 +765,20 @@ class CastingOpConversion : public OpConversionPattern<StdOp> {
   }
 };
 
-class IndexCastOpConversion : public OpConversionPattern<arith::IndexCastOp> {
-  using OpConversionPattern::OpConversionPattern;
+template <typename OpTy, typename ExtOpTy>
+class IndexCastOpConversion : public OpConversionPattern<OpTy> {
+  using OpConversionPattern<OpTy>::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      arith::IndexCastOp srcOp, OpAdaptor adaptor,
+      OpTy srcOp, typename OpTy::Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto srcType = adaptor.getIn().getType();
-    auto dstType = getTypeConverter()->convertType(srcOp.getResult().getType());
+    auto dstType =
+        this->getTypeConverter()->convertType(srcOp.getResult().getType());
     if (srcType == dstType) {
       rewriter.replaceOp(srcOp, adaptor.getOperands());
     } else if (srcType.getIntOrFloatBitWidth() <
                dstType.getIntOrFloatBitWidth()) {
-      rewriter.replaceOpWithNewOp<arith::ExtUIOp>(srcOp, dstType,
-                                                  adaptor.getIn());
+      rewriter.replaceOpWithNewOp<ExtOpTy>(srcOp, dstType, adaptor.getIn());
     } else {
       rewriter.replaceOpWithNewOp<arith::TruncIOp>(srcOp, dstType,
                                                    adaptor.getIn());
@@ -1085,9 +1086,10 @@ void populateStandardToVMPatterns(MLIRContext *context,
   patterns.insert<ConstantOpConversion>(context, typeConverter);
 
   patterns.insert<CastingOpConversion<UnrealizedConversionCastOp>,
-                  IndexCastOpConversion, ZeroExtendIOpConversion,
-                  SignExtendIOpConversion, TruncateIOpConversion>(typeConverter,
-                                                                  context);
+                  IndexCastOpConversion<arith::IndexCastOp, arith::ExtSIOp>,
+                  IndexCastOpConversion<arith::IndexCastUIOp, arith::ExtUIOp>,
+                  ZeroExtendIOpConversion, SignExtendIOpConversion,
+                  TruncateIOpConversion>(typeConverter, context);
 
   // Integer arithmetic ops.
   patterns

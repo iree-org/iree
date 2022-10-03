@@ -16,7 +16,7 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -502,7 +502,7 @@ Optional<LoopTilingAndDistributionInfo> isTiledAndDistributedLoop(
   auto stepApplyOp = forOp.getStep().getDefiningOp<AffineApplyOp>();
 
   if (!lbApplyOp || !stepApplyOp) {
-    // Try to see if this s a specical case where we have:
+    // Try to see if this is a specical case where we have:
     //   scf.for %iv = %id to %ub step %count
     Optional<unsigned> idDim;
     if (auto ifx = dyn_cast_or_null<ProcessorIDInterface>(

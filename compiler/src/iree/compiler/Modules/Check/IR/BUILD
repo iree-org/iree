@@ -41,7 +41,7 @@ iree_compiler_cc_library(
     deps = [
         ":check_ops_gen",
         "//compiler/src/iree/compiler/Dialect/HAL/IR",
-        "@llvm-project//mlir:ArithmeticDialect",
+        "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
     ],

@@ -45,9 +45,9 @@ iree_cc_library(
     MLIRAffineDialect
     MLIRAffineToStandard
     MLIRAnalysis
-    MLIRArithmeticDialect
-    MLIRArithmeticToLLVM
-    MLIRArithmeticTransforms
+    MLIRArithDialect
+    MLIRArithToLLVM
+    MLIRArithTransforms
     MLIRBufferizationDialect
     MLIRControlFlowToLLVM
     MLIRFuncDialect

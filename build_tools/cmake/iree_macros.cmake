@@ -359,3 +359,54 @@ function(iree_validate_required_arguments
     endif()
   endforeach()
 endfunction()
+
+# iree_compile_flags_for_patform
+#
+# Helper function to add necessary compile flags based on platform-specific
+# configurations. Note the flags are added for cpu backends only.
+function(iree_compile_flags_for_platform OUT_FLAGS IN_FLAGS)
+  if(NOT (IN_FLAGS MATCHES "iree-hal-target-backends=llvm-cpu" OR
+          IN_FLAGS MATCHES "iree-hal-target-backends=vmvx"))
+    set(${OUT_FLAGS} "" PARENT_SCOPE)
+    return()
+  endif()
+
+  if(ANDROID AND NOT IN_FLAGS MATCHES "iree-llvm-target-triple")
+    # Android's CMake toolchain defines some variables that we can use to infer
+    # the appropriate target triple from the configured settings:
+    # https://developer.android.com/ndk/guides/cmake#android_platform
+    #
+    # In typical CMake fashion, the various strings are pretty fuzzy and can
+    # have multiple values like "latest", "android-25"/"25"/"android-N-MR1".
+    #
+    # From looking at the toolchain file, ANDROID_PLATFORM_LEVEL seems like it
+    # should pretty consistently be just a number we can use for target triple.
+    set(_TARGET_TRIPLE "aarch64-none-linux-android${ANDROID_PLATFORM_LEVEL}")
+    list(APPEND _FLAGS "--iree-llvm-target-triple=${_TARGET_TRIPLE}")
+  endif()
+
+  if(CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv64" AND
+     CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
+     NOT IN_FLAGS MATCHES "iree-llvm-target-triple")
+    # RV64 Linux crosscompile toolchain can support iree-compile with
+    # specific CPU flags. Add the llvm flags to support RV64 RVV codegen if
+    # llvm-target-triple is not specified.
+    list(APPEND _FLAGS ${RISCV64_TEST_DEFAULT_LLVM_FLAGS})
+  elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "riscv32" AND
+         CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
+         NOT IN_FLAGS MATCHES "iree-llvm-target-triple")
+    # RV32 Linux crosscompile toolchain can support iree-compile with
+    # specific CPU flags. Add the llvm flags to support RV32 RVV codegen if
+    # llvm-target-triple is not specified.
+    list(APPEND _FLAGS ${RISCV32_TEST_DEFAULT_LLVM_FLAGS})
+  endif()
+
+  if(EMSCRIPTEN AND NOT IN_FLAGS MATCHES "iree-llvm-target-triple")
+    set(_EMSCRIPTEN_TEST_DEFAULT_FLAGS
+      "--iree-llvm-target-triple=wasm32-unknown-emscripten"
+    )
+    list(APPEND _FLAGS ${_EMSCRIPTEN_TEST_DEFAULT_FLAGS})
+  endif()
+
+  set(${OUT_FLAGS} "${_FLAGS}" PARENT_SCOPE)
+endfunction()

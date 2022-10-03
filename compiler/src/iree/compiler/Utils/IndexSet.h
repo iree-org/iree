@@ -7,7 +7,7 @@
 #ifndef IREE_COMPILER_UTILS_INDEXSET_H_
 #define IREE_COMPILER_UTILS_INDEXSET_H_
 
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Matchers.h"
 

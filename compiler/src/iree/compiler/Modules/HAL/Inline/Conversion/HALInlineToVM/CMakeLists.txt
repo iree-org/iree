@@ -18,7 +18,7 @@ iree_cc_library(
   SRCS
     "ConvertHALInlineToVM.cpp"
   DEPS
-    MLIRArithmeticDialect
+    MLIRArithDialect
     MLIRFuncDialect
     MLIRIR
     MLIRPass

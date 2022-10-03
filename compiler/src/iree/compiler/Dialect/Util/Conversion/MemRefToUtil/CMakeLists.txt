@@ -19,7 +19,7 @@ iree_cc_library(
     "ConvertMemRefToUtil.cpp"
   DEPS
     MLIRAffineDialect
-    MLIRArithmeticDialect
+    MLIRArithDialect
     MLIRBufferizationDialect
     MLIRFuncDialect
     MLIRIR

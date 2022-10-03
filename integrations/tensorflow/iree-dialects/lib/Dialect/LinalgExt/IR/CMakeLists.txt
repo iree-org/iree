@@ -11,7 +11,7 @@ add_mlir_library(IREELinalgExtDialect
 
   LINK_LIBS PUBLIC
   MLIRAffineDialect
-  MLIRArithmeticUtils
+  MLIRArithUtils
   MLIRDialectUtils
   MLIRIR
   MLIRInferTypeOpInterface

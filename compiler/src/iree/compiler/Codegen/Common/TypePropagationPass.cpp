@@ -27,7 +27,7 @@
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -381,7 +381,7 @@ struct LegalizeResultElementType : public ConversionPattern {
 struct TypePropagationPass : public TypePropagationBase<TypePropagationPass> {
   TypePropagationPass() = default;
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<arith::ArithmeticDialect>();
+    registry.insert<arith::ArithDialect>();
   }
   void runOnOperation() override {
     MLIRContext *context = &getContext();

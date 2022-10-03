@@ -43,6 +43,7 @@ iree_lit_test_suite(
             "type_propagation.mlir",
             "vectorize_tensor_pad.mlir",
             "warp_reduction.mlir",
+            "workgroup_specialization.mlir",
         ],
         include = ["*.mlir"],
     ),

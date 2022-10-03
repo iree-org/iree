@@ -14,7 +14,7 @@
 #include "iree/compiler/Utils/IndexSet.h"
 #include "iree/compiler/Utils/ModuleUtils.h"
 #include "llvm/ADT/STLExtras.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -32,10 +32,9 @@ class InlineExecutablesPass
     : public InlineExecutablesBase<InlineExecutablesPass> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<IREE::Util::UtilDialect, IREE::HAL::HALDialect,
-                IREE::HAL::Inline::HALInlineDialect, arith::ArithmeticDialect,
-                func::FuncDialect, scf::SCFDialect>();
+    registry.insert<IREE::Util::UtilDialect, IREE::HAL::HALDialect,
+                    IREE::HAL::Inline::HALInlineDialect, arith::ArithDialect,
+                    func::FuncDialect, scf::SCFDialect>();
   }
 
   void runOnOperation() override {

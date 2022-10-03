@@ -10,7 +10,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRV.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"

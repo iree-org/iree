@@ -26,9 +26,11 @@ iree_hal_executable_import_provider_default(void) {
 
 iree_status_t iree_hal_executable_import_provider_resolve(
     const iree_hal_executable_import_provider_t import_provider,
-    iree_string_view_t symbol_name, void** out_fn_ptr) {
+    iree_string_view_t symbol_name, void** out_fn_ptr, void** out_fn_context) {
   IREE_ASSERT_ARGUMENT(out_fn_ptr);
+  IREE_ASSERT_ARGUMENT(out_fn_context);
   *out_fn_ptr = NULL;
+  *out_fn_context = NULL;
 
   // A `?` suffix indicates the symbol is weakly linked and can be NULL.
   bool is_weak = false;
@@ -47,8 +49,8 @@ iree_status_t iree_hal_executable_import_provider_resolve(
                             (int)symbol_name.size, symbol_name.data);
   }
 
-  iree_status_t status =
-      import_provider.resolve(import_provider.self, symbol_name, out_fn_ptr);
+  iree_status_t status = import_provider.resolve(
+      import_provider.self, symbol_name, out_fn_ptr, out_fn_context);
   if (!iree_status_is_ok(status) && is_weak) {
     status = iree_status_ignore(status);  // ok to fail on weak symbols
   }

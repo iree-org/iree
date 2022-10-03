@@ -9,8 +9,8 @@
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree-dialects/Dialect/LinalgTransform/TransformInterpreterUtils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
-#include "mlir/Dialect/Arithmetic/Transforms/BufferizableOpInterfaceImpl.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Arith/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Bufferization/Transforms/FuncBufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -121,7 +121,7 @@ public:
 
     // clang-format off
     registry.insert<mlir::iree_compiler::IREE::LinalgExt::IREELinalgExtDialect,
-                    arith::ArithmeticDialect,
+                    arith::ArithDialect,
                     AffineDialect,
                     bufferization::BufferizationDialect,
                     func::FuncDialect,

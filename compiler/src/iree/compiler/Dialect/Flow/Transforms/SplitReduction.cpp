@@ -89,14 +89,14 @@ struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
     RewritePatternSet patterns(&getContext());
     patterns.add<LinalgSplitReduction>(
         &getContext(),
-        [&](linalg::LinalgOp op) {
+        [&](linalg::LinalgOp op) -> linalg::SplitReductionOptions {
           // For matmul make the new parallel dimension first so that it looks
           // like a batch_matmul and can follow the same codegen.
           if (isa<linalg::MatmulOp>(op))
-            return std::make_pair(int64_t(splitReductionRatio), 0);
+            return {int64_t(splitReductionRatio), 0, /*innerParallel=*/false};
           // Currently disable spliting reduction for non-matmul op. This will
           // get enabled after once tests are ready.
-          return std::make_pair(int64_t(0), 0);
+          return {int64_t(0), 0, /*innerParallel=*/false};
         },
         linalg::LinalgTransformationFilter(
             ArrayRef<StringAttr>{}, StringAttr::get(&getContext(), "SPLIT")));

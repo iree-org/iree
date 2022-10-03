@@ -332,7 +332,7 @@ class SpecializeDispatchesPass
   SpecializeDispatchesPass() = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::arith::ArithmeticDialect>();
+    registry.insert<mlir::arith::ArithDialect>();
     registry.insert<mlir::tensor::TensorDialect>();
     registry.insert<IREE::Stream::StreamDialect>();
   }

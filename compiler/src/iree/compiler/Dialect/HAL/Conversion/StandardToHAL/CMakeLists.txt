@@ -20,7 +20,7 @@ iree_cc_library(
     "ConvertStandardToHAL.cpp"
   DEPS
     LLVMSupport
-    MLIRArithmeticDialect
+    MLIRArithDialect
     MLIRFuncDialect
     MLIRIR
     MLIRPass

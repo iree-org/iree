@@ -33,7 +33,7 @@ iree_cc_library(
     ::FlowExtensionsOpGen
     IREEDialectsTransforms
     IREELinalgTransformDialect
-    MLIRArithmeticDialect
+    MLIRArithDialect
     MLIRIR
     MLIRSCFDialect
     MLIRTensorDialect

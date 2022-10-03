@@ -13,8 +13,8 @@
 #include "iree/compiler/Utils/GraphUtils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
-#include "mlir/Dialect/Arithmetic/Utils/Utils.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -532,7 +532,7 @@ struct TileAndFuseDispatchUsingSCFForOp
 };
 }  // namespace
 
-/// Find all producers to fuse and return then in sorted order;
+/// Find all producers to fuse and return them in sorted order;
 static std::vector<Operation *> getAllFusableProducers(TilingInterface op) {
   llvm::SetVector<Operation *> producers;
   std::deque<Operation *> worklist;

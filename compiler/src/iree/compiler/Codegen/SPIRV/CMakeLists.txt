@@ -46,10 +46,10 @@ iree_cc_library(
     MLIRAffineToStandard
     MLIRAffineUtils
     MLIRAnalysis
-    MLIRArithmeticDialect
-    MLIRArithmeticToSPIRV
-    MLIRArithmeticTransforms
-    MLIRArithmeticUtils
+    MLIRArithDialect
+    MLIRArithToSPIRV
+    MLIRArithTransforms
+    MLIRArithUtils
     MLIRBufferizationDialect
     MLIRControlFlowToSPIRV
     MLIRFuncDialect

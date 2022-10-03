@@ -516,7 +516,7 @@ class ExpandTensorShapesPass
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::func::FuncDialect>();
-    registry.insert<mlir::arith::ArithmeticDialect>();
+    registry.insert<mlir::arith::ArithDialect>();
     registry.insert<IREE::Flow::FlowDialect>();
     registry.insert<IREE::Util::UtilDialect>();
   }

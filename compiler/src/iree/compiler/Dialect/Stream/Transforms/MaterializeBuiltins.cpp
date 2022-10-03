@@ -15,7 +15,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/TypeSwitch.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -75,7 +75,7 @@ class MaterializeBuiltinsPass
   void getDependentDialects(DialectRegistry &registry) const override {
     // We need to include all dialects that the builtin modules use.
     registry.insert<mlir::func::FuncDialect>();
-    registry.insert<mlir::arith::ArithmeticDialect>();
+    registry.insert<mlir::arith::ArithDialect>();
     registry.insert<mlir::linalg::LinalgDialect>();
     registry.insert<mlir::memref::MemRefDialect>();
     registry.insert<mlir::scf::SCFDialect>();

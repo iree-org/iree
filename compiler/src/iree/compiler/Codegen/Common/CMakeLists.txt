@@ -31,9 +31,9 @@ iree_cc_library(
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineUtils
-    MLIRArithmeticDialect
-    MLIRArithmeticTransforms
-    MLIRArithmeticUtils
+    MLIRArithDialect
+    MLIRArithTransforms
+    MLIRArithUtils
     MLIRAsyncDialect
     MLIRBufferizationDialect
     MLIRBufferizationTransforms
@@ -90,6 +90,7 @@ iree_cc_library(
     "TileAndDistributeToWorkgroupsPass.cpp"
     "TypePropagationPass.cpp"
     "VectorizePad.cpp"
+    "WorkgroupSpecializationPass.cpp"
   DEPS
     IREELinalgExtDialect
     IREELinalgExtPasses
@@ -98,9 +99,9 @@ iree_cc_library(
     MLIRAffineDialect
     MLIRAffineUtils
     MLIRAnalysis
-    MLIRArithmeticDialect
-    MLIRArithmeticTransforms
-    MLIRArithmeticUtils
+    MLIRArithDialect
+    MLIRArithTransforms
+    MLIRArithUtils
     MLIRBufferizationDialect
     MLIRBufferizationTransforms
     MLIRFuncDialect
@@ -174,9 +175,9 @@ iree_cc_library(
     MLIRAffineDialect
     MLIRAffineUtils
     MLIRAnalysis
-    MLIRArithmeticDialect
-    MLIRArithmeticTransforms
-    MLIRArithmeticUtils
+    MLIRArithDialect
+    MLIRArithTransforms
+    MLIRArithUtils
     MLIRBufferizationDialect
     MLIRBufferizationTransforms
     MLIRFuncDialect

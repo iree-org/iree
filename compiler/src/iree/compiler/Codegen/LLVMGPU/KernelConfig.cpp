@@ -17,7 +17,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/SliceAnalysis.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/Types.h"
@@ -705,8 +705,7 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
     if (!exportOp) continue;
     if (getTranslationInfo(exportOp)) continue;
     SmallVector<Operation *> computeOps;
-    SmallVector<LoopTilingAndDistributionInfo> tiledLoops;
-    if (failed(getComputeOps(funcOp, computeOps, tiledLoops))) {
+    if (failed(getComputeOps(funcOp, computeOps))) {
       return funcOp.emitOpError("failed to get compute ops");
     }
 

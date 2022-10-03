@@ -23,7 +23,7 @@ iree_cc_library(
   DEPS
     ::HALInlineOpsGen
     LLVMSupport
-    MLIRArithmeticDialect
+    MLIRArithDialect
     MLIRFuncDialect
     MLIRIR
     MLIRSideEffectInterfaces
