@@ -92,7 +92,7 @@ static void updateDispatchOp(IREE::Stream::CmdDispatchOp dispatchOp,
       // slower to work with on mobile GPUs. In the future we will want to flag
       // this as a global setting as well as have some heuristics for deriving
       // from target devices.
-      operand = builder.createOrFold<arith::IndexCastOp>(
+      operand = builder.createOrFold<arith::IndexCastUIOp>(
           loc, builder.getIntegerType(resourceConfig.getIndexBits()), operand);
     }
 
@@ -206,8 +206,8 @@ static void updateExportFuncOp(mlir::func::FuncOp funcOp) {
 
     // If going to index we need to insert a cast as the type changes.
     if (targetType.isIndex()) {
-      argOp = builder.create<arith::IndexCastOp>(loc, targetType,
-                                                 argOp->getResult(0));
+      argOp = builder.create<arith::IndexCastUIOp>(loc, targetType,
+                                                   argOp->getResult(0));
     }
 
     // Replace all subsequent uses with the new reconstituted value.
@@ -267,7 +267,7 @@ static void updateExportFuncOp(mlir::func::FuncOp funcOp) {
 
     // i32 or i64 -> index
     if (targetType.isIndex()) {
-      auto castOp = builder.create<arith::IndexCastOp>(
+      auto castOp = builder.create<arith::IndexCastUIOp>(
           loc, builder.getIndexType(), value);
       value.replaceAllUsesExcept(castOp.getResult(), castOp);
       value = castOp.getResult();
