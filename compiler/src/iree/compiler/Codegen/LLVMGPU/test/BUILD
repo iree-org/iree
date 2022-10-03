@@ -37,6 +37,7 @@ iree_lit_test_suite(
             "transform_dialect_bufferize.mlir",
             "transpose_pipeline_test.mlir",
             "vector_to_gpu.mlir",
+            "workgroup_specialization_pipeline_test.mlir",
         ],
         include = ["*.mlir"],
         # tensor_dialect_*_spec is a an MLIR file that specifies a

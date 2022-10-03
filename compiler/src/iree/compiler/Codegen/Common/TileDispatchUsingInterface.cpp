@@ -532,7 +532,7 @@ struct TileAndFuseDispatchUsingSCFForOp
 };
 }  // namespace
 
-/// Find all producers to fuse and return then in sorted order;
+/// Find all producers to fuse and return them in sorted order;
 static std::vector<Operation *> getAllFusableProducers(TilingInterface op) {
   llvm::SetVector<Operation *> producers;
   std::deque<Operation *> worklist;

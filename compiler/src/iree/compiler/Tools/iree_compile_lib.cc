@@ -141,7 +141,7 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
           clEnumValN(OutputFormat::vm_c, "vm-c", "C source module"),
 #endif  // IREE_HAVE_C_OUTPUT_FORMAT
           clEnumValN(OutputFormat::vm_asm, "vm-asm", "IREE VM MLIR Assembly")),
-      llvm::cl::init(OutputFormat::none), llvm::cl::cat(mainOptions));
+      llvm::cl::init(OutputFormat::vm_bytecode), llvm::cl::cat(mainOptions));
 
   llvm::cl::opt<CompileMode> compileMode(
       "compile-mode", llvm::cl::desc("IREE compilation mode"),
@@ -154,15 +154,6 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
               "a target-specific binary form (such as an ELF file or a "
               "flatbuffer containing a SPIR-V blob)")),
       llvm::cl::init(CompileMode::std), llvm::cl::cat(mainOptions));
-
-  llvm::cl::opt<bool> legacyTranslateToCModule(
-      "iree-mlir-to-vm-c-module",
-      llvm::cl::desc("Alias for --output-format=c-module (deprecated)"),
-      llvm::cl::init(false));
-  llvm::cl::opt<bool> legacyTranslateToVMBytecodeModule(
-      "iree-mlir-to-vm-bytecode-module",
-      llvm::cl::desc("Alias for --output-format=vm-bytecode (deprecated)"),
-      llvm::cl::init(false));
 
   // Misc options.
   llvm::cl::opt<bool> splitInputFile(
@@ -177,29 +168,6 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
 #endif
 
   llvm::cl::ParseCommandLineOptions(argc, argv, "IREE compilation driver\n");
-
-  // Post-process and select the correct outputFormat.
-  if (legacyTranslateToCModule) {
-    if (outputFormat != OutputFormat::none) {
-      llvm::errs()
-          << "Cannot specify --output-format= and --iree-mlir-to-vm-c-module\n";
-      return 1;
-    }
-    outputFormat = OutputFormat::vm_c;
-  }
-  if (legacyTranslateToVMBytecodeModule) {
-    if (outputFormat != OutputFormat::none) {
-      llvm::errs() << "Cannot specify --output-format= and "
-                      "--iree-mlir-to-vm-bytecode-module\n";
-      return 1;
-    }
-    outputFormat = OutputFormat::vm_bytecode;
-  }
-
-  // Default output format.
-  if (outputFormat == OutputFormat::none) {
-    outputFormat = OutputFormat::vm_bytecode;
-  }
 
   std::string errorMessage;
   auto input = mlir::openInputFile(inputFilename, &errorMessage);
