@@ -81,6 +81,11 @@ function(iree_c_module)
     list(APPEND _OUTPUT_FILES "${_RULE_STATIC_LIB_PATH}" "${_STATIC_HDR_PATH}")
   endif()
 
+  iree_compile_flags_for_platform(_PLATFORM_FLAGS "${_RULE_FLAGS}")
+  if(_PLATFORM_FLAGS)
+    list(APPEND _ARGS "${_PLATFORM_FLAGS}")
+  endif()
+
   add_custom_command(
     OUTPUT ${_OUTPUT_FILES}
     COMMAND ${_COMPILE_TOOL_EXECUTABLE} ${_ARGS}
