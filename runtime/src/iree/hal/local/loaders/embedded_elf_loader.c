@@ -98,15 +98,22 @@ static iree_status_t iree_hal_elf_executable_resolve_imports(
   // All calls from the loaded ELF route through our thunk function so that we
   // can adapt to ABI differences.
   executable->base.environment.import_thunk =
-      (iree_hal_executable_import_thunk_v0_t)iree_elf_thunk_i_p;
+      (iree_hal_executable_import_thunk_v0_t)iree_elf_call_i_ppp;
 
   // Allocate storage for the imports.
+  // TODO(benvanik): allocate both as one block.
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0,
-      iree_allocator_malloc(
-          executable->base.host_allocator,
-          import_table->count * sizeof(*executable->base.environment.imports),
-          (void**)&executable->base.environment.imports));
+      z0, iree_allocator_malloc(
+              executable->base.host_allocator,
+              import_table->count *
+                  sizeof(*executable->base.environment.import_funcs),
+              (void**)&executable->base.environment.import_funcs));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(
+              executable->base.host_allocator,
+              import_table->count *
+                  sizeof(*executable->base.environment.import_contexts),
+              (void**)&executable->base.environment.import_contexts));
 
   // Try to resolve each import.
   // NOTE: imports are sorted alphabetically and if we cared we could use this
@@ -117,7 +124,8 @@ static iree_status_t iree_hal_elf_executable_resolve_imports(
         z0,
         iree_hal_executable_import_provider_resolve(
             import_provider, iree_make_cstring_view(import_table->symbols[i]),
-            (void**)&executable->base.environment.imports[i]));
+            (void**)&executable->base.environment.import_funcs[i],
+            (void**)&executable->base.environment.import_contexts[i]));
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -231,9 +239,13 @@ static void iree_hal_elf_executable_destroy(
 
   iree_elf_module_deinitialize(&executable->module);
 
-  if (executable->base.environment.imports != NULL) {
+  if (executable->base.environment.import_funcs != NULL) {
     iree_allocator_free(host_allocator,
-                        (void*)executable->base.environment.imports);
+                        (void*)executable->base.environment.import_funcs);
+  }
+  if (executable->base.environment.import_contexts != NULL) {
+    iree_allocator_free(host_allocator,
+                        (void*)executable->base.environment.import_contexts);
   }
 
   iree_hal_local_executable_deinitialize(

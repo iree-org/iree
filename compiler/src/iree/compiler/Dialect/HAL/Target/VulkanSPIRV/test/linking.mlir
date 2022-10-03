@@ -28,12 +28,12 @@ hal.executable private @call_dispatch_0  {
       hal.return %c1, %c1, %c1 : index, index, index
     }
     builtin.module {
-      spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
-        spv.func @call_dispatch_0() "None" {
-          spv.Return
+      spirv.module Logical GLSL450 requires #spirv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
+        spirv.func @call_dispatch_0() "None" {
+          spirv.Return
         }
-        spv.EntryPoint "GLCompute" @call_dispatch_0
-        spv.ExecutionMode @call_dispatch_0 "LocalSize", 32, 1, 1
+        spirv.EntryPoint "GLCompute" @call_dispatch_0
+        spirv.ExecutionMode @call_dispatch_0 "LocalSize", 32, 1, 1
       }
     }
   }
@@ -46,12 +46,12 @@ hal.executable private @call_dispatch_1  {
       hal.return %c1, %c1, %c1 : index, index, index
     }
     builtin.module {
-      spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
-        spv.func @call_dispatch_1() "None" {
-          spv.Return
+      spirv.module Logical GLSL450 requires #spirv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
+        spirv.func @call_dispatch_1() "None" {
+          spirv.Return
         }
-        spv.EntryPoint "GLCompute" @call_dispatch_1
-        spv.ExecutionMode @call_dispatch_1 "LocalSize", 4, 4, 1
+        spirv.EntryPoint "GLCompute" @call_dispatch_1
+        spirv.ExecutionMode @call_dispatch_1 "LocalSize", 4, 4, 1
       }
     }
   }
@@ -64,12 +64,12 @@ hal.executable private @call_dispatch_2  {
       hal.return %c1, %c1, %c1 : index, index, index
     }
     builtin.module {
-      spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
-        spv.func @call_dispatch_2() "None" {
-          spv.Return
+      spirv.module Logical GLSL450 requires #spirv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
+        spirv.func @call_dispatch_2() "None" {
+          spirv.Return
         }
-        spv.EntryPoint "GLCompute" @call_dispatch_2
-        spv.ExecutionMode @call_dispatch_2 "LocalSize", 32, 1, 1
+        spirv.EntryPoint "GLCompute" @call_dispatch_2
+        spirv.ExecutionMode @call_dispatch_2 "LocalSize", 32, 1, 1
       }
     }
   }
@@ -82,12 +82,12 @@ hal.executable private @call_dispatch_3  {
       hal.return %c1, %c1, %c1 : index, index, index
     }
     builtin.module {
-      spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
-        spv.func @call_dispatch_3() "None" {
-          spv.Return
+      spirv.module Logical GLSL450 requires #spirv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
+        spirv.func @call_dispatch_3() "None" {
+          spirv.Return
         }
-        spv.EntryPoint "GLCompute" @call_dispatch_3
-        spv.ExecutionMode @call_dispatch_3 "LocalSize", 8, 2, 2
+        spirv.EntryPoint "GLCompute" @call_dispatch_3
+        spirv.ExecutionMode @call_dispatch_3 "LocalSize", 8, 2, 2
       }
     }
   }
@@ -100,12 +100,12 @@ hal.executable private @call_dispatch_4  {
       hal.return %c1, %c1, %c1 : index, index, index
     }
     builtin.module {
-      spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
-        spv.func @call_dispatch_4() "None" {
-          spv.Return
+      spirv.module Logical GLSL450 requires #spirv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
+        spirv.func @call_dispatch_4() "None" {
+          spirv.Return
         }
-        spv.EntryPoint "GLCompute" @call_dispatch_4
-        spv.ExecutionMode @call_dispatch_4 "LocalSize", 2, 8, 1
+        spirv.EntryPoint "GLCompute" @call_dispatch_4
+        spirv.ExecutionMode @call_dispatch_4 "LocalSize", 2, 8, 1
       }
     }
   }
@@ -119,22 +119,22 @@ hal.executable private @call_dispatch_4  {
 // CHECK-NEXT:     hal.executable.export public @call_dispatch_3 ordinal(1) layout(#pipeline_layout_0)
 // CHECK-NEXT:     hal.executable.export public @call_dispatch_4 ordinal(2) layout(#pipeline_layout_0)
 // CHECK-NEXT:     module  {
-// CHECK-NEXT:       spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
-// CHECK-NEXT:         spv.func @call_dispatch_1() "None" {
-// CHECK-NEXT:           spv.Return
+// CHECK-NEXT:       spirv.module Logical GLSL450 requires #spirv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
+// CHECK-NEXT:         spirv.func @call_dispatch_1() "None" {
+// CHECK-NEXT:           spirv.Return
 // CHECK-NEXT:         }
-// CHECK-NEXT:         spv.EntryPoint "GLCompute" @call_dispatch_1
-// CHECK-NEXT:         spv.ExecutionMode @call_dispatch_1 "LocalSize", 4, 4, 1
-// CHECK-NEXT:         spv.func @call_dispatch_3() "None" {
-// CHECK-NEXT:           spv.Return
+// CHECK-NEXT:         spirv.EntryPoint "GLCompute" @call_dispatch_1
+// CHECK-NEXT:         spirv.ExecutionMode @call_dispatch_1 "LocalSize", 4, 4, 1
+// CHECK-NEXT:         spirv.func @call_dispatch_3() "None" {
+// CHECK-NEXT:           spirv.Return
 // CHECK-NEXT:         }
-// CHECK-NEXT:         spv.EntryPoint "GLCompute" @call_dispatch_3
-// CHECK-NEXT:         spv.ExecutionMode @call_dispatch_3 "LocalSize", 8, 2, 2
-// CHECK-NEXT:         spv.func @call_dispatch_4() "None" {
-// CHECK-NEXT:           spv.Return
+// CHECK-NEXT:         spirv.EntryPoint "GLCompute" @call_dispatch_3
+// CHECK-NEXT:         spirv.ExecutionMode @call_dispatch_3 "LocalSize", 8, 2, 2
+// CHECK-NEXT:         spirv.func @call_dispatch_4() "None" {
+// CHECK-NEXT:           spirv.Return
 // CHECK-NEXT:         }
-// CHECK-NEXT:         spv.EntryPoint "GLCompute" @call_dispatch_4
-// CHECK-NEXT:         spv.ExecutionMode @call_dispatch_4 "LocalSize", 2, 8, 1
+// CHECK-NEXT:         spirv.EntryPoint "GLCompute" @call_dispatch_4
+// CHECK-NEXT:         spirv.ExecutionMode @call_dispatch_4 "LocalSize", 2, 8, 1
 // CHECK-NEXT:       }
 // CHECK-NEXT:     }
 // CHECK-NEXT:   }
@@ -145,17 +145,17 @@ hal.executable private @call_dispatch_4  {
 // CHECK-NEXT:     hal.executable.export public @call_dispatch_0 ordinal(0) layout(#pipeline_layout_1)
 // CHECK-NEXT:     hal.executable.export public @call_dispatch_2 ordinal(1) layout(#pipeline_layout_1)
 // CHECK-NEXT:     module  {
-// CHECK-NEXT:       spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
-// CHECK-NEXT:         spv.func @call_dispatch_0() "None" {
-// CHECK-NEXT:           spv.Return
+// CHECK-NEXT:       spirv.module Logical GLSL450 requires #spirv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
+// CHECK-NEXT:         spirv.func @call_dispatch_0() "None" {
+// CHECK-NEXT:           spirv.Return
 // CHECK-NEXT:         }
-// CHECK-NEXT:         spv.EntryPoint "GLCompute" @call_dispatch_0
-// CHECK-NEXT:         spv.ExecutionMode @call_dispatch_0 "LocalSize", 32, 1, 1
-// CHECK-NEXT:         spv.func @call_dispatch_2() "None" {
-// CHECK-NEXT:           spv.Return
+// CHECK-NEXT:         spirv.EntryPoint "GLCompute" @call_dispatch_0
+// CHECK-NEXT:         spirv.ExecutionMode @call_dispatch_0 "LocalSize", 32, 1, 1
+// CHECK-NEXT:         spirv.func @call_dispatch_2() "None" {
+// CHECK-NEXT:           spirv.Return
 // CHECK-NEXT:         }
-// CHECK-NEXT:         spv.EntryPoint "GLCompute" @call_dispatch_2
-// CHECK-NEXT:         spv.ExecutionMode @call_dispatch_2 "LocalSize", 32, 1, 1
+// CHECK-NEXT:         spirv.EntryPoint "GLCompute" @call_dispatch_2
+// CHECK-NEXT:         spirv.ExecutionMode @call_dispatch_2 "LocalSize", 32, 1, 1
 // CHECK-NEXT:       }
 // CHECK-NEXT:     }
 // CHECK-NEXT:   }

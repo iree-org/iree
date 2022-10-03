@@ -7,7 +7,7 @@
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Utils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -27,7 +27,7 @@ namespace {
 SmallVector<Value> getValuesToYield(scf::PerformConcurrentlyOp op) {
   return llvm::to_vector(
       llvm::map_range(op.getYieldingOps(), [](Operation &op) {
-        return cast<tensor::ParallelInsertSliceOp>(&op).getDest();
+        return cast<Value>(cast<tensor::ParallelInsertSliceOp>(&op).getDest());
       }));
 }
 

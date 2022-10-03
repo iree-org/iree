@@ -101,7 +101,7 @@ Stable release packages are published to
     run `pip install` with this extra option:
 
     ```
-    --find-links https://github.com/iree-org/iree/releases
+    --find-links https://iree-org.github.io/iree/pip-release-links.html
     ```
 
 ### Building from source

@@ -59,7 +59,7 @@ iree_compiler_cc_library(
         "//llvm-external-projects/iree-dialects:IREELinalgExtTransforms",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AffineDialect",
-        "@llvm-project//mlir:ArithmeticDialect",
+        "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:AsmParser",
         "@llvm-project//mlir:ControlFlowDialect",
         "@llvm-project//mlir:LinalgDialect",

@@ -22,29 +22,17 @@ def PartitionableLoopsInterface : OpInterface<"PartitionableLoopsInterface"> {
   let methods = [
     InterfaceMethod<
       /*desc=*/[{
-        Returns the total number of loops that the operation represents.
-      }],
-      /*retTy=*/"unsigned",
-      /*methodName=*/"getNumLoops"
-    >,
-    InterfaceMethod<
-      /*desc=*/[{
         Returns the loop IDs (0 being outermost) that are partitionable.
 
         The size of the vector returned is always lesser than
         `maxNumPartitionedLoops`.
       }],
-      /*retTy=*/"llvm::SmallVector<unsigned>",
+      /*retTy=*/"::llvm::SmallVector<unsigned>",
       /*methodName=*/"getPartitionableLoops",
-      /*args=*/(ins "unsigned":$maxNumPartitionedLoops)
+      /*args=*/(ins "unsigned":$maxNumPartitionedLoops),
+      /*methodBody=*/"",
+      /*defaultImplementation*/"return {};"
     >,
-    InterfaceMethod<
-      /*desc=*/[{
-        Returns the iterator types for all the loops of the op.
-      }],
-      /*retTy=*/"llvm::SmallVector<llvm::StringRef>",
-      /*methodName=*/"getIteratorTypes"
-    >
   ];
 }
 

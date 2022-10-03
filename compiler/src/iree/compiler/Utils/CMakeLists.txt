@@ -37,7 +37,7 @@ iree_cc_library(
     "TracingUtils.cpp"
   DEPS
     LLVMSupport
-    MLIRArithmeticDialect
+    MLIRArithDialect
     MLIRFuncDialect
     MLIRIR
     MLIRParser

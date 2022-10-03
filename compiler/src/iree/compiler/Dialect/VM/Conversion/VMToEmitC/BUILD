@@ -42,7 +42,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/VM/IR",
         "//compiler/src/iree/compiler/Dialect/VM/Utils:CallingConvention",
         "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:ArithmeticDialect",
+        "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:ControlFlowDialect",
         "@llvm-project//mlir:EmitCDialect",
         "@llvm-project//mlir:FuncDialect",

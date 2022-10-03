@@ -508,3 +508,35 @@ func.func @topk_invalid(%input_values: tensor<3x10xf32>, %input_indices: tensor<
         } -> tensor<2x3xf32>, tensor<2x3xi32>
   return %0#0, %0#1 : tensor<2x3xf32>, tensor<2x3xi32>
 }
+
+// -----
+
+func.func @pack_invalid(%input: tensor<256x128xf32>, %output: tensor<8x8x32x16xf32>) -> tensor<8x8x32x16xf32> {
+  // expected-error@+1 {{inferred type do not match provied output type}}
+  %0 = iree_linalg_ext.pack %input dims_pos = [1, 0] inner_tiles = [16, 32] into %output : (tensor<256x128xf32> tensor<8x8x32x16xf32>) -> tensor<8x8x32x16xf32>
+  return %0 : tensor<8x8x32x16xf32>
+}
+
+// -----
+
+func.func @pack_invalid(%input: tensor<256x128xf32>, %output: tensor<8x8x32x16xf32>) -> tensor<8x8x32x16xf32> {
+  // expected-error@+1 {{invalid tile factor provided. Only full tiles are supported when padding_value is not set}}
+  %0 = iree_linalg_ext.pack %input dims_pos = [1, 0] inner_tiles = [16, 5] into %output : (tensor<256x128xf32> tensor<8x8x32x16xf32>) -> tensor<8x8x32x16xf32>
+  return %0 : tensor<8x8x32x16xf32>
+}
+
+// -----
+
+func.func @pad_and_pack_invalid_shape(%input: tensor<13x15xf32>, %output: tensor<3x8x8x2xf32>, %pad: f32) -> tensor<3x8x8x2xf32> {
+  // expected-error@+1 {{inferred type do not match provied output type. Expected 'tensor<2x8x8x2xf32>' but got: 'tensor<3x8x8x2xf32>}}
+  %0 = iree_linalg_ext.pack %input padding_value(%pad: f32) dims_pos = [0, 1] inner_tiles = [8, 2] into %output : (tensor<13x15xf32> tensor<3x8x8x2xf32>) -> tensor<3x8x8x2xf32>
+  return %0 : tensor<3x8x8x2xf32>
+}
+
+// -----
+
+func.func @pad_and_pack_invalid_type(%input: tensor<13x15xf32>, %output: tensor<2x8x8x2xf32>, %pad: i32) -> tensor<2x8x8x2xf32> {
+  // expected-error@+1 {{expected padding_value has 'f32' but got: 'i32}}
+  %0 = iree_linalg_ext.pack %input padding_value(%pad: i32) dims_pos = [0, 1] inner_tiles = [8, 2] into %output : (tensor<13x15xf32> tensor<2x8x8x2xf32>) -> tensor<2x8x8x2xf32>
+  return %0 : tensor<2x8x8x2xf32>
+}

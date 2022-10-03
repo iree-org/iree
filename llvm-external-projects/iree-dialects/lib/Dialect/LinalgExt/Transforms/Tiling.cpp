@@ -7,7 +7,7 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Utils.h"
-#include "mlir/Dialect/Arithmetic/Utils/Utils.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -167,7 +167,7 @@ struct OpTilingPattern : public OpInterfaceRewritePattern<TilingInterface> {
 
     /// Currently only handle operations with all parallel iterator types.
     for (auto iteratorType : enumerate(iteratorTypes)) {
-      if (iteratorType.value() != getParallelIteratorTypeName() &&
+      if (iteratorType.value() != utils::IteratorType::parallel &&
           !isZero(tileSizes[iteratorType.index()])) {
         return rewriter.notifyMatchFailure(
             op, "unhandled tiling of non-parallel iterator");

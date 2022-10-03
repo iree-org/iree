@@ -23,7 +23,7 @@ iree_cc_library(
     "ConvertStatusOps.cpp"
     "ConvertUtilToVM.cpp"
   DEPS
-    MLIRArithmeticDialect
+    MLIRArithDialect
     MLIRFuncDialect
     MLIRIR
     MLIRPass

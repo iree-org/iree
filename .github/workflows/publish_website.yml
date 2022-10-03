@@ -12,16 +12,15 @@ on:
       - main
     paths:
       - "docs/website/**"
-
-defaults:
-  run:
-    working-directory: docs/website
+      - "build_tools/scripts/generate_release_index.py"
+  # Regenerate the release pip index when a regular or pre-release is created or
+  # deleted.
+  release:
+    types: [published, unpublished]
 
 jobs:
   publish_website:
-    # Don't run this in everyone's forks.
-    if: github.repository == 'iree-org/iree'
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
       - name: Checkout out repository
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
@@ -34,11 +33,21 @@ jobs:
         uses: actions/setup-python@7f80679172b057fc5e90d70d197929d454754a5a # v2
         with:
           python-version: 3.x
-      - name: Installing Material for MkDocs
-        run: pip install mkdocs-material
+          cache: 'pip'
+      - name: Installing dependencies
+        run: |
+          pip install \
+            mkdocs-material \
+            requests
+      - name: Generating release index
+        run: |
+          ./build_tools/scripts/generate_release_index.py \
+            --repo="${GITHUB_REPOSITORY}" \
+            --output=docs/website/docs/pip-release-links.html
       - name: Setting git config
         run: |
           git config --local user.email "iree-github-actions-bot@google.com"
           git config --local user.name "Website Publish Action"
       - name: Deploying to gh-pages
+        working-directory: docs/website
         run: mkdocs gh-deploy

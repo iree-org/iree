@@ -40,7 +40,7 @@ iree_cc_library(
     ::HALOpsGen
     ::HALTypesGen
     LLVMSupport
-    MLIRArithmeticDialect
+    MLIRArithDialect
     MLIRFuncDialect
     MLIRIR
     MLIRMemRefDialect
@@ -64,7 +64,7 @@ iree_cc_library(
   DEPS
     ::IR
     LLVMSupport
-    MLIRArithmeticDialect
+    MLIRArithDialect
     MLIRFuncDialect
     MLIRIR
     MLIRMemRefDialect

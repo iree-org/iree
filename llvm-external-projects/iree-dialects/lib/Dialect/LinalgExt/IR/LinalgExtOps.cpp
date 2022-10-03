@@ -8,7 +8,7 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Dialect/Arithmetic/Utils/Utils.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Math/IR/Math.h"
@@ -28,6 +28,7 @@
 #include "mlir/IR/Value.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
+#include "mlir/Support/MathExtras.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -110,6 +111,7 @@ OpFoldResult IREE::LinalgExt::getDim(OpBuilder &builder, Location loc, Value v,
 //===----------------------------------------------------------------------===//
 // ScatterOp
 //===----------------------------------------------------------------------===//
+
 LogicalResult ScatterOp::verify() {
   Operation *op = getOperation();
   if (getInputs().size() != 2) {
@@ -225,11 +227,11 @@ LogicalResult ScatterOp::verify() {
   return success();
 }
 
-SmallVector<StringRef> ScatterOp::getLoopIteratorTypes() {
-  SmallVector<StringRef> iteratorTypes(getUpdateType().getRank(),
-                                       getParallelIteratorTypeName());
+SmallVector<utils::IteratorType> ScatterOp::getLoopIteratorTypes() {
+  SmallVector<utils::IteratorType> iteratorTypes(getUpdateType().getRank(),
+                                                 utils::IteratorType::parallel);
   if (!getUniqueIndices()) {
-    iteratorTypes[0] = getReductionIteratorTypeName();
+    iteratorTypes[0] = utils::IteratorType::reduction;
   }
   return iteratorTypes;
 }
@@ -369,6 +371,13 @@ LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
   return success();
 }
 
+LogicalResult
+ScatterOp::reifyResultShapes(OpBuilder &b,
+                             ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  return cast<LinalgExtOp>(getOperation())
+      .reifyResultShapes(b, reifiedReturnShapes);
+}
+
 //===----------------------------------------------------------------------===//
 // SortOp
 //===----------------------------------------------------------------------===//
@@ -430,11 +439,11 @@ LogicalResult SortOp::verify() {
   return success();
 }
 
-SmallVector<StringRef> SortOp::getLoopIteratorTypes() {
+SmallVector<utils::IteratorType> SortOp::getLoopIteratorTypes() {
   // All loops except the dimension to sort along are parallel.
-  SmallVector<StringRef> iteratorTypes(getOperandRank(),
-                                       getParallelIteratorTypeName());
-  iteratorTypes[getDimension()] = getReductionIteratorTypeName();
+  SmallVector<utils::IteratorType> iteratorTypes(getOperandRank(),
+                                                 utils::IteratorType::parallel);
+  iteratorTypes[getDimension()] = utils::IteratorType::reduction;
   return iteratorTypes;
 }
 
@@ -564,6 +573,13 @@ LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
   return success();
 }
 
+LogicalResult
+SortOp::reifyResultShapes(OpBuilder &b,
+                          ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  return cast<LinalgExtOp>(getOperation())
+      .reifyResultShapes(b, reifiedReturnShapes);
+}
+
 //===----------------------------------------------------------------------===//
 // FftOp
 //===----------------------------------------------------------------------===//
@@ -595,12 +611,12 @@ LogicalResult FftOp::verify() {
   return success();
 }
 
-SmallVector<StringRef> FftOp::getLoopIteratorTypes() {
+SmallVector<utils::IteratorType> FftOp::getLoopIteratorTypes() {
   // There are `rank-1` outer loops. The fft itselfs has one loop for each
   // stage, which handles the merge step -- taking two half size tensors and
   // merge them into one tensor.
-  SmallVector<StringRef> iteratorTypes(getOperandRank(),
-                                       getParallelIteratorTypeName());
+  SmallVector<utils::IteratorType> iteratorTypes(getOperandRank(),
+                                                 utils::IteratorType::parallel);
   return iteratorTypes;
 }
 
@@ -643,8 +659,12 @@ void FftOp::generateScalarImplWithoutCoeffBuf(OpBuilder &b, Location loc,
       loc, llvm::APFloat(static_cast<float>(-2 * acos(-1))), f32Type);
   coeff = b.create<arith::DivFOp>(loc, coeff, indexToF32(b, loc, wholeSize));
 
+  SmallVector<StringRef> iteratorTypes = llvm::to_vector(
+      llvm::map_range(getLoopIteratorTypes(), [](utils::IteratorType it) {
+        return utils::stringifyIteratorType(it);
+      }));
   b.create<linalg::GenericOp>(
-      loc, TypeRange{}, ValueRange{}, operands, maps, getLoopIteratorTypes(),
+      loc, TypeRange{}, ValueRange{}, operands, maps, iteratorTypes,
       [&](OpBuilder &b, Location loc, ValueRange args) {
         Value lhsReal = args[0];
         Value lhsImag = args[1];
@@ -688,10 +708,13 @@ void FftOp::generateScalarImplWithCoeffBuf(OpBuilder &b, Location loc,
       2, AffineMap::get(rank, 0, b.getAffineDimExpr(rank - 1), b.getContext()));
   maps.append(operands.size(), b.getMultiDimIdentityMap(rank));
 
+  SmallVector<StringRef> iteratorTypes = llvm::to_vector(
+      llvm::map_range(getLoopIteratorTypes(), [](utils::IteratorType it) {
+        return utils::stringifyIteratorType(it);
+      }));
   b.create<linalg::GenericOp>(
       loc, TypeRange{}, ValueRange{getRealCoeff(), getImagCoeff()}, operands,
-      maps, getLoopIteratorTypes(),
-      [&](OpBuilder &b, Location loc, ValueRange args) {
+      maps, iteratorTypes, [&](OpBuilder &b, Location loc, ValueRange args) {
         Value wReal = args[0];
         Value wImag = args[1];
         Value lhsReal = args[2];
@@ -804,6 +827,13 @@ LogicalResult FftOp::getResultTilePosition(
   return success();
 }
 
+LogicalResult
+FftOp::reifyResultShapes(OpBuilder &b,
+                         ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  return cast<LinalgExtOp>(getOperation())
+      .reifyResultShapes(b, reifiedReturnShapes);
+}
+
 //===----------------------------------------------------------------------===//
 // ScanOp
 //===----------------------------------------------------------------------===//
@@ -880,10 +910,10 @@ SmallVector<Range> ScanOp::getIterationDomain(OpBuilder &builder) {
   return loopBounds;
 }
 
-SmallVector<StringRef> ScanOp::getLoopIteratorTypes() {
-  SmallVector<StringRef> iteratorTypes(getOperandRank(),
-                                       getParallelIteratorTypeName());
-  iteratorTypes[getDimension()] = getReductionIteratorTypeName();
+SmallVector<utils::IteratorType> ScanOp::getLoopIteratorTypes() {
+  SmallVector<utils::IteratorType> iteratorTypes(getOperandRank(),
+                                                 utils::IteratorType::parallel);
+  iteratorTypes[getDimension()] = utils::IteratorType::reduction;
   return iteratorTypes;
 }
 
@@ -1044,6 +1074,13 @@ LogicalResult ScanOp::fold(ArrayRef<Attribute>,
   return foldMemRefCast(*this);
 }
 
+LogicalResult
+ScanOp::reifyResultShapes(OpBuilder &b,
+                          ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  return cast<LinalgExtOp>(getOperation())
+      .reifyResultShapes(b, reifiedReturnShapes);
+}
+
 //===----------------------------------------------------------------------===//
 // ReverseOp
 //===----------------------------------------------------------------------===//
@@ -1092,9 +1129,9 @@ LogicalResult ReverseOp::verify() {
   return success();
 }
 
-SmallVector<StringRef> ReverseOp::getLoopIteratorTypes() {
-  SmallVector<StringRef> iteratorTypes(getOperandRank(),
-                                       getParallelIteratorTypeName());
+SmallVector<utils::IteratorType> ReverseOp::getLoopIteratorTypes() {
+  SmallVector<utils::IteratorType> iteratorTypes(getOperandRank(),
+                                                 utils::IteratorType::parallel);
   return iteratorTypes;
 }
 
@@ -1180,6 +1217,13 @@ LogicalResult ReverseOp::getResultTilePosition(
   }
   resultSizes.assign(sizes.begin(), sizes.end());
   return success();
+}
+
+LogicalResult
+ReverseOp::reifyResultShapes(OpBuilder &b,
+                             ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  return cast<LinalgExtOp>(getOperation())
+      .reifyResultShapes(b, reifiedReturnShapes);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1288,10 +1332,10 @@ SmallVector<Range> TopkOp::getIterationDomain(OpBuilder &builder) {
   return loopBounds;
 }
 
-SmallVector<StringRef> TopkOp::getLoopIteratorTypes() {
-  SmallVector<StringRef> iteratorTypes(getInputRank(),
-                                       getParallelIteratorTypeName());
-  iteratorTypes[getDimension()] = getReductionIteratorTypeName();
+SmallVector<utils::IteratorType> TopkOp::getLoopIteratorTypes() {
+  SmallVector<utils::IteratorType> iteratorTypes(getInputRank(),
+                                                 utils::IteratorType::parallel);
+  iteratorTypes[getDimension()] = utils::IteratorType::reduction;
   return iteratorTypes;
 }
 
@@ -1447,6 +1491,430 @@ LogicalResult TopkOp::getResultTilePosition(
   return success();
 }
 
+LogicalResult
+TopkOp::reifyResultShapes(OpBuilder &b,
+                          ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  return cast<LinalgExtOp>(getOperation())
+      .reifyResultShapes(b, reifiedReturnShapes);
+}
+
+//===----------------------------------------------------------------------===//
+// PackOp
+//===----------------------------------------------------------------------===//
+
+// Return true if each element in `dimsPos` is >= 0 and < rank.
+static bool isInBound(ArrayRef<int64_t> dimsPos, int64_t rank) {
+  return llvm::all_of(
+      dimsPos, [rank](int64_t dimPos) { return dimPos >= 0 && dimPos < rank; });
+}
+
+// Interchange `elements` starting at offset `offset` based on the indexes in
+// `interchangeVector`.
+template <typename T>
+static SmallVector<T> interchange(ArrayRef<T> elements,
+                                  ArrayRef<int64_t> interchangeVector,
+                                  int64_t offset) {
+  SmallVector<T> rearrangedElements = llvm::to_vector(elements);
+  if (interchangeVector.empty())
+    return rearrangedElements;
+  assert((rearrangedElements.size() - offset) == interchangeVector.size() &&
+         "number of elements must equal number of permutations");
+  for (int64_t idx = 0, end = interchangeVector.size(); idx < end; idx++) {
+    rearrangedElements[interchangeVector[idx] + offset] =
+        elements[idx + offset];
+  }
+  return rearrangedElements;
+}
+
+// Infer result/output type given the input and the tile sizes.
+ShapedType PackOp::inferResultType() {
+  DenseMap<int64_t, OpFoldResult> tileAndPosMapping = getDimAndTileMapping();
+  SmallVector<int64_t> inferredShape;
+  inferredShape.reserve(getOutputRank());
+  ShapedType inputType = getInputType();
+  int64_t rank = getInputRank();
+
+  // tile loop.
+  for (auto i : llvm::seq<int64_t>(0, rank)) {
+    if (tileAndPosMapping.count(i)) {
+      Optional<int64_t> tileSize =
+          getConstantIntValue(tileAndPosMapping.lookup(i));
+      if (inputType.isDynamicDim(i) || !tileSize) {
+        inferredShape.push_back(ShapedType::kDynamicSize);
+      } else {
+        int64_t sizeTiledDim = ceilDiv(inputType.getDimSize(i), *tileSize);
+        inferredShape.push_back(sizeTiledDim);
+      }
+    } else {
+      inferredShape.push_back(inputType.getShape()[i]);
+    }
+  }
+
+  // point loop.
+  auto staticTiles = getStaticTiles();
+  inferredShape.append(staticTiles.begin(), staticTiles.end());
+
+  return TypeSwitch<Type, ShapedType>(inputType)
+      .Case<RankedTensorType>([&](RankedTensorType t) -> ShapedType {
+        return RankedTensorType::get(inferredShape, inputType.getElementType());
+      })
+      .Case<MemRefType>([&](MemRefType t) -> ShapedType {
+        return MemRefType::get(inferredShape, inputType.getElementType());
+      })
+      .Default([&](Type t) {
+        llvm_unreachable("unexpected type");
+        return nullptr;
+      });
+}
+
+// Return true if at least one element in `tiles` is zero.
+static bool hasZeros(ArrayRef<OpFoldResult> tiles) {
+  return llvm::any_of(
+      tiles, [&](OpFoldResult tile) { return isConstantIntValue(tile, 0); });
+}
+
+// Return true if `dimsPos` is invalid. It is invalid when: a) it contains
+// duplicate.
+static bool isInvalid(ArrayRef<int64_t> dimsPos) {
+  DenseSet<int64_t> uniqued;
+  for (int64_t dim : dimsPos)
+    uniqued.insert(dim);
+  return dimsPos.size() != uniqued.size();
+}
+
+// Check if we have enough static information to catch undefined behavior when
+// the tile size does not divide perfectly the dimension of the input tensor.
+static bool areNotFullTiles(ArrayRef<int64_t> inputShape,
+                            DenseMap<int64_t, OpFoldResult> dimAndTileMapping) {
+  int64_t rank = inputShape.size();
+  for (int64_t dim = 0; dim < rank; dim++) {
+    if (inputShape[dim] == ShapedType::kDynamicSize)
+      continue;
+    if (dimAndTileMapping.count(dim)) {
+      Optional<int64_t> constantTile =
+          getConstantIntValue(dimAndTileMapping[dim]);
+      if (!constantTile)
+        continue;
+      if (inputShape[dim] % (*constantTile) != 0)
+        return true;
+    }
+  }
+  return false;
+}
+
+// verifier for the pack operation.
+LogicalResult PackOp::verify() {
+  Operation *op = getOperation();
+  size_t numberOfBlockingFactors = getMixedTiles().size();
+  SmallVector<int64_t> dimsPos = extractFromI64ArrayAttr(getDimsPos());
+  // Blocking factors must be less or equal than the input rank, and must
+  // match the number of `dims_pos`.
+  if (numberOfBlockingFactors > getInputRank()) {
+    return op->emitError(
+        "blocking factors must be less or equal than the input rank");
+  }
+  if (numberOfBlockingFactors != dimsPos.size()) {
+    return op->emitError(
+        "blocking factors must equal the number of dimensions to block");
+  }
+  if (isInvalid(dimsPos))
+    return op->emitError("invalid dims_pos vector");
+  // Require `dim_pos` to be in-bound. `dim_pos` carries the index of the
+  // dimensions to block.
+  if (!isInBound(dimsPos, getOutputRank()))
+    return op->emitError("out-of-bound position");
+
+  // Require output rank to match input rank + number of blocking factors.
+  if ((getInputRank() + numberOfBlockingFactors) != getOutputRank()) {
+    return op->emitError(
+        "output rank must equal input rank + blocking factors");
+  }
+
+  // Verify tiles. Make sure each provided tile is non-zero.
+  if (hasZeros(getMixedTiles()))
+    return op->emitError("invalid tile factor");
+
+  // Bail out if the tile does not divide the dimension fully. In the case of
+  // dynamic tile factors or dimensions, having a partial tile is undefined
+  // behavior. We will relax this constraint when we introduce padding
+  // semantics.
+  if (!getPaddingValue() &&
+      areNotFullTiles(getInputShape(), getDimAndTileMapping())) {
+    return op->emitError("invalid tile factor provided. Only full tiles are "
+                         "supported when padding_value is not set");
+  }
+
+  // Verify result type against inferred type.
+  ShapedType expectedType = inferResultType();
+  if (expectedType != getOutputType()) {
+    return op->emitError(
+               "inferred type do not match provied output type. Expected ")
+           << expectedType << " but got: " << getOutputType();
+  }
+
+  if (auto paddingValue = getPaddingValue()) {
+    if (paddingValue.getType() != expectedType.getElementType()) {
+      return op->emitError("expected padding_value has ")
+             << expectedType.getElementType()
+             << " but got: " << paddingValue.getType();
+    }
+  }
+  return success();
+}
+
+// Get the tile sizes as `OpFoldResult`.
+SmallVector<OpFoldResult> PackOp::getMixedTiles() {
+  SmallVector<OpFoldResult> mixedInnerTiles;
+  mixedInnerTiles.reserve(getInputRank());
+  unsigned dynamicValIndex = 0;
+  for (Attribute attr : getStaticInnerTiles()) {
+    auto tileAttr = attr.cast<IntegerAttr>();
+    if (!ShapedType::isDynamic(tileAttr.getInt()))
+      mixedInnerTiles.push_back(tileAttr);
+    else
+      mixedInnerTiles.push_back(getInnerTiles()[dynamicValIndex++]);
+  }
+  return mixedInnerTiles;
+}
+
+// Return the tile sizes as `int64_t`. If a tile size is dynamic a sentinel
+// `kDynamicSize` is introduced at that position in the returned vector.
+SmallVector<int64_t> PackOp::getStaticTiles() {
+  SmallVector<Value> dynamicTiles;
+  SmallVector<int64_t> staticTiles;
+  dispatchIndexOpFoldResults(getMixedTiles(), dynamicTiles, staticTiles,
+                             ShapedType::kDynamicSize);
+  return staticTiles;
+}
+
+// Implement the tiling interface. The number of loops equals
+// the rank of the output tensors. All the loops are parallel.
+SmallVector<utils::IteratorType> PackOp::getLoopIteratorTypes() {
+  SmallVector<utils::IteratorType> iteratorTypes(getInputRank(),
+                                                 utils::IteratorType::parallel);
+  return iteratorTypes;
+}
+
+// Return a mapping from positions `dims_pos` to their `OpFoldResult` tile
+// factors.
+DenseMap<int64_t, OpFoldResult> PackOp::getDimAndTileMapping() {
+  DenseMap<int64_t, OpFoldResult> dimAndTileMapping;
+  SmallVector<int64_t> dimsToBlock = extractFromI64ArrayAttr(getDimsPos());
+  SmallVector<OpFoldResult> tiles = getMixedTiles();
+  assert(tiles.size() == dimsToBlock.size() &&
+         "tiles must match indices of dimension to block");
+  // bind the dimension with the tile factor.
+  for (auto i : llvm::seq<int64_t>(0, dimsToBlock.size()))
+    dimAndTileMapping[dimsToBlock[i]] = tiles[i];
+  return dimAndTileMapping;
+}
+
+// Implements `getIterationDomain` from the tiling interface. In each
+// loop the lower bound is zero and the step is one. For upper bound
+// is inferred from the output tensor for the dimensions that are
+// not part of the data tile created.
+SmallVector<Range> PackOp::getIterationDomain(OpBuilder &builder) {
+  int64_t inputRank = getInputRank();
+  SmallVector<Range> loopBounds(inputRank);
+  Location loc = getLoc();
+  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
+  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+  ReifiedRankedShapedTypeDims resultShape;
+  (void)reifyResultShapes(builder, resultShape);
+  for (auto dim : llvm::seq<int64_t>(0, inputRank)) {
+    loopBounds[dim].offset = zero;
+    loopBounds[dim].stride = one;
+    loopBounds[dim].size = resultShape[0][dim];
+  }
+  return loopBounds;
+}
+
+// Return the `interchangeVector` based on `dims_pos`.
+SmallVector<int64_t> computeInterchangeFromDimPos(ArrayRef<int64_t> dimsPos,
+                                                  int64_t inputRank) {
+  SmallVector<int64_t> interchangeVector;
+  interchangeVector.reserve(dimsPos.size());
+  // First map dims and their position. For example, dims_pos = [2, 0] will map
+  // to:
+  // [
+  //  [ key: 2, value: 0]
+  //  [ key: 0, value: 1]
+  // ]
+  // where key is the idx in dims_pos while value its position in dims_pos.
+  DenseMap<int64_t, int64_t> dimsAndPosMapping;
+  for (int64_t dimsIdx = 0, end = dimsPos.size(); dimsIdx < end; dimsIdx++)
+    dimsAndPosMapping[dimsPos[dimsIdx]] = dimsIdx;
+
+  // Scan the position in order and insert the value in the map
+  // to compute the interchange vector.
+  for (int64_t dimsIdx = 0; dimsIdx < inputRank; dimsIdx++) {
+    if (dimsAndPosMapping.count(dimsIdx))
+      interchangeVector.push_back(dimsAndPosMapping[dimsIdx]);
+  }
+  return interchangeVector;
+}
+
+/// Generate the body of the innermost loop of the scalar implementation
+/// of `pack` operation.
+static void generatePackOpScalarImplementationBody(PackOp packOp,
+                                                   OpBuilder &builder,
+                                                   Location loc,
+                                                   ValueRange ivs) {
+  // Note: `ivs` are already in the correct order, possibly interchanged based
+  // on `dims_pos`. However, connecting the loops with the access patterns is
+  // difficult - What is the relation between the position of the tile loop and
+  // the point loop? However, if we interchange `ivs` once more to go to the
+  // canonical blocking format: ABCabc, this connection becomes trivial: Each
+  // point loop is pointLoopsOffset + inputRank away from the tiled loop.
+  SmallVector<int64_t> dimsToBlock =
+      extractFromI64ArrayAttr(packOp.getDimsPos());
+  SmallVector<Value> interchangedIvs = ivs;
+  SmallVector<int64_t> interchangeVector =
+      computeInterchangeFromDimPos(dimsToBlock, packOp.getInputRank());
+  interchangedIvs = interchange<Value>(interchangedIvs, interchangeVector,
+                                       /*offset=*/packOp.getInputRank());
+
+  SmallVector<OpFoldResult> tiles = packOp.getMixedTiles();
+  DenseMap<int64_t, OpFoldResult> dimAndTileMapping =
+      packOp.getDimAndTileMapping();
+  SmallVector<OpFoldResult> sourceIndices;
+  size_t pointLoopsOffset = 0;
+  int64_t inputRank = packOp.getInputRank();
+  for (auto dim : llvm::seq<int64_t>(0, inputRank)) {
+    if (dimAndTileMapping.count(dim)) {
+      AffineExpr i, j, tile;
+      bindDims(builder.getContext(), i, j);
+      bindSymbols(builder.getContext(), tile);
+      OpFoldResult sourceIndex = makeComposedFoldedAffineApply(
+          builder, loc, i * tile + j,
+          ArrayRef<OpFoldResult>{
+              interchangedIvs[dim],
+              interchangedIvs[pointLoopsOffset + packOp.getInputRank()],
+              dimAndTileMapping[dim]});
+      sourceIndices.push_back(sourceIndex);
+      ++pointLoopsOffset;
+    } else {
+      sourceIndices.push_back(interchangedIvs[dim]);
+    }
+  }
+
+  auto createLoad = [&]() -> Value {
+    return builder.create<memref::LoadOp>(
+        loc, packOp.getInput(), getAsValues(builder, loc, sourceIndices));
+  };
+  Value scalar;
+  if (auto paddingValue = packOp.getPaddingValue()) {
+    ArithBuilder arithBuilder(builder, loc);
+    Value isInBounds;
+    for (auto dim : llvm::seq<int64_t>(0, inputRank)) {
+      Value idx =
+          getValueOrCreateConstantIndexOp(builder, loc, sourceIndices[dim]);
+      Value cond = arithBuilder.slt(
+          idx, getDimValue(builder, loc, packOp.getInput(), dim));
+      isInBounds = dim == 0 ? cond : arithBuilder._and(isInBounds, cond);
+    }
+    scalar = builder
+                 .create<scf::IfOp>(
+                     loc, packOp.getElementType(), isInBounds, /*thenBuilder=*/
+                     [&](OpBuilder &b, Location l) {
+                       b.create<scf::YieldOp>(l, createLoad());
+                     },
+                     /*elseBuilder=*/
+                     [&](OpBuilder &b, Location l) {
+                       b.create<scf::YieldOp>(l, paddingValue);
+                     })
+                 .getResult(0);
+  } else {
+    scalar = createLoad();
+  }
+
+  builder.create<memref::StoreOp>(loc, scalar, packOp.getOutput(), ivs);
+}
+
+// Implements `generateScalarImplementation` from the tiling interface.
+LogicalResult PackOp::generateScalarImplementation(OpBuilder &builder,
+                                                   Location loc,
+                                                   ValueRange ivs) {
+  OpBuilder::InsertionGuard g(builder);
+  // The `ivs` already represent the position into the output tensor for the
+  // non data-tile dimensions.
+  SmallVector<Value> ivVec = llvm::to_vector(ivs);
+  ReifiedRankedShapedTypeDims outputShape;
+  if (failed(reifyResultShapes(builder, outputShape)))
+    return getOperation()->emitOpError("failed to reify result shape");
+  if (outputShape.size() != 1 || outputShape[0].size() != getOutputRank()) {
+    return getOperation()->emitOpError(
+               "expected shape of one result value of rank")
+           << getOutputRank();
+  }
+
+  // Generate the loops that iterate over the data tile.
+  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
+  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+
+  // All loops except the innermost are simple loops that just iterate
+  // over the tile dimensions.
+  for (auto dataTileDim :
+       llvm::seq<unsigned>(getInputRank(), getOutputRank() - 1)) {
+    Value ub = outputShape[0][dataTileDim];
+    scf::ForOp loop = builder.create<scf::ForOp>(loc, zero, ub, one);
+    builder.setInsertionPointToStart(loop.getBody());
+    ivVec.push_back(loop.getInductionVar());
+  }
+  // The body of the innermost loops does the actual data movement.
+  builder.create<scf::ForOp>(loc, zero, outputShape[0].back(), one,
+                             ValueRange{},
+                             [&](OpBuilder &bodyBuilder, Location bodyLoc,
+                                 Value iv, ValueRange regionIterArgs) {
+                               ivVec.push_back(iv);
+                               generatePackOpScalarImplementationBody(
+                                   *this, bodyBuilder, bodyLoc, ivVec);
+                               bodyBuilder.create<scf::YieldOp>(bodyLoc);
+                             });
+  return success();
+}
+
+LogicalResult
+PackOp::reifyResultShapes(OpBuilder &builder,
+                          ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  OpBuilder::InsertionGuard g(builder);
+  builder.setInsertionPoint(getOperation());
+  // Build the output dimension at pos `dimIdx`.
+  auto buildOutputDim = [&](OpBuilder &builder, size_t dimIdx) -> OpFoldResult {
+    ArrayRef<int64_t> outputShape = getOutputShape();
+    if (!ShapedType::isDynamic(outputShape[dimIdx]))
+      return builder.getI64IntegerAttr(outputShape[dimIdx]);
+
+    // Handle dynamic.
+    DenseMap<int64_t, OpFoldResult> dimAndTileMapping = getDimAndTileMapping();
+    AffineExpr dim = builder.getAffineSymbolExpr(0);
+    AffineExpr tile = builder.getAffineSymbolExpr(1);
+    auto apply = [&](AffineExpr expr,
+                     ArrayRef<OpFoldResult> values) -> OpFoldResult {
+      return makeComposedFoldedAffineApply(builder, getOperation()->getLoc(),
+                                           expr, values);
+    };
+    // If we are dealing with a tiled dimension compose the map otherwise
+    // return the dimension extracted with `memref.dim`.
+    OpFoldResult dimBound =
+        getDim(builder, getOperation()->getLoc(), getOutput(), dimIdx);
+    return (dimAndTileMapping.count(dimIdx))
+               ? apply(dim.ceilDiv(tile),
+                       ArrayRef<OpFoldResult>{dimBound,
+                                              dimAndTileMapping[dimIdx]})
+               : dimBound;
+  };
+
+  reifiedReturnShapes.resize(1);
+  reifiedReturnShapes[0].reserve(getOutputRank());
+  for (auto dimIdx : llvm::seq<int64_t>(0, getOutputRank())) {
+    reifiedReturnShapes[0].push_back(getAsValues(
+        builder, getOperation()->getLoc(),
+        ArrayRef<OpFoldResult>{buildOutputDim(builder, dimIdx)})[0]);
+  }
+  return success();
+}
+
 #define DEFINE_OP_GET_EFFECTS(OP_NAME)                                         \
   void OP_NAME::getEffects(                                                    \
       SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>      \
@@ -1463,7 +1931,7 @@ DEFINE_OP_GET_EFFECTS(FftOp)
 DEFINE_OP_GET_EFFECTS(ReverseOp)
 DEFINE_OP_GET_EFFECTS(ScanOp)
 DEFINE_OP_GET_EFFECTS(TopkOp)
-
+DEFINE_OP_GET_EFFECTS(PackOp)
 namespace {
 /// This is derived from mlir/lib/Dialect/Linalg/IR/LinalgOps.cpp without any
 /// changes.

@@ -23,8 +23,8 @@ iree_cc_library(
     ::PassHeaders
     LLVMSupport
     MLIRAffineDialect
-    MLIRArithmeticDialect
-    MLIRArithmeticTransforms
+    MLIRArithDialect
+    MLIRArithTransforms
     MLIRFuncDialect
     MLIRFuncTransforms
     MLIRIR

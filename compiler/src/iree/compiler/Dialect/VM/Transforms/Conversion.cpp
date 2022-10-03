@@ -20,7 +20,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Dialect/Arithmetic/Transforms/Passes.h"
+#include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -75,9 +75,9 @@ class ConversionPass
   }
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Util::UtilDialect, IREE::VM::VMDialect,
-                    func::FuncDialect, mlir::arith::ArithmeticDialect,
-                    math::MathDialect, AffineDialect>();
+    registry
+        .insert<IREE::Util::UtilDialect, IREE::VM::VMDialect, func::FuncDialect,
+                mlir::arith::ArithDialect, math::MathDialect, AffineDialect>();
   }
 
   void runOnOperation() override {
@@ -120,13 +120,13 @@ class ConversionPass
                                    patterns);
     populateUtilToVMPatterns(context, conversionTarget, typeConverter,
                              patterns);
-    arith::populateArithmeticExpandOpsPatterns(patterns);
+    arith::populateArithExpandOpsPatterns(patterns);
     populateStandardToVMPatterns(context, typeConverter, patterns);
     populateMathToVMPatterns(context, typeConverter, patterns);
     populateAffineToStdConversionPatterns(patterns);
 
     conversionTarget
-        .addIllegalDialect<func::FuncDialect, mlir::arith::ArithmeticDialect>();
+        .addIllegalDialect<func::FuncDialect, mlir::arith::ArithDialect>();
     conversionTarget.addIllegalDialect<AffineDialect>();
     conversionTarget.addIllegalDialect<math::MathDialect>();
 

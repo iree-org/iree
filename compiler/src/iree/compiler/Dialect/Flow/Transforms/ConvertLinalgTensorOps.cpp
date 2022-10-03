@@ -128,7 +128,7 @@ struct ConvertLinalgTensorOpsPass
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Flow::FlowDialect, tensor::TensorDialect,
                     linalg::LinalgDialect, mlir::func::FuncDialect,
-                    mlir::arith::ArithmeticDialect, mlir::math::MathDialect>();
+                    mlir::arith::ArithDialect, mlir::math::MathDialect>();
   }
   void runOnOperation() override {
     auto funcOp = getOperation();

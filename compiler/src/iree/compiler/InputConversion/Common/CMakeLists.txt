@@ -49,7 +49,7 @@ iree_cc_library(
     ::PassHeaders
     ::PassesIncGen
     IREEInputDialect
-    MLIRArithmeticDialect
+    MLIRArithDialect
     MLIRFuncDialect
     MLIRIR
     MLIRLinalgDialect

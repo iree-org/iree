@@ -643,3 +643,82 @@ func.func @topk_tensor_optional(%input_values: tensor<20x10x8x4xf32>) -> (tensor
 //  CHECK-SAME:      outs(%[[OUT_VALUES]], %[[OUT_INDICES]]
 //       CHECK:      iree_linalg_ext.yield
 //       CHECK:   return %[[RESULT]]#0, %[[RESULT]]#1
+
+// -----
+
+func.func @relayout(%arg0: tensor<3x3xf32>, %arg1: tensor<3x3x1x1xf32>) -> tensor<3x3x1x1xf32> {
+  %1 = iree_linalg_ext.pack %arg0 dims_pos = [0, 1] inner_tiles = [1, 1] into %arg1 : (tensor<3x3xf32> tensor<3x3x1x1xf32>) -> tensor<3x3x1x1xf32>
+  return %1 : tensor<3x3x1x1xf32>
+}
+
+// CHECK: func.func @relayout(
+// CHECK-SAME: %[[ARG0:[a-zA-Z0-9]+]]: tensor<3x3xf32>,
+// CHECK-SAME: %[[ARG1:[a-zA-Z0-9]+]]: tensor<3x3x1x1xf32>) -> tensor<3x3x1x1xf32>
+// CHECK: %[[RES:.*]] = iree_linalg_ext.pack %[[ARG0]] dims_pos = [0, 1] inner_tiles = [1, 1] into %[[ARG1]] : (tensor<3x3xf32> tensor<3x3x1x1xf32>) -> tensor<3x3x1x1xf32>
+// CHECK: return %[[RES]] : tensor<3x3x1x1xf32>
+
+// -----
+
+func.func @relayout(%arg0: memref<3x3xf32>, %arg1: memref<3x3x1x1xf32>) {
+  iree_linalg_ext.pack %arg0 dims_pos = [0, 1] inner_tiles = [1, 1] into %arg1 : (memref<3x3xf32> memref<3x3x1x1xf32>)
+  return
+}
+
+// CHECK: func.func @relayout(
+// CHECK-SAME: %[[ARG0:[a-zA-Z0-9]+]]: memref<3x3xf32>,
+// CHECK-SAME: %[[ARG1:[a-zA-Z0-9]+]]: memref<3x3x1x1xf32>) {
+// CHECK: iree_linalg_ext.pack %[[ARG0]] dims_pos = [0, 1] inner_tiles = [1, 1] into %[[ARG1]] : (memref<3x3xf32> memref<3x3x1x1xf32>)
+
+// -----
+
+func.func @pad_and_pack_static(%input: tensor<13x15xf32>, %output: tensor<2x8x8x2xf32>, %pad: f32) -> tensor<2x8x8x2xf32> {
+  %0 = iree_linalg_ext.pack %input padding_value(%pad : f32) dims_pos = [0, 1] inner_tiles = [8, 2] into %output : (tensor<13x15xf32> tensor<2x8x8x2xf32>) -> tensor<2x8x8x2xf32>
+  return %0 : tensor<2x8x8x2xf32>
+}
+// CHECK:      func.func @pad_and_pack_static
+// CHECK-SAME:   %[[INPUT:[a-zA-Z0-9_]+]]: tensor<13x15xf32>
+// CHECK-SAME:   %[[OUTPUT:[a-zA-Z0-9_]+]]: tensor<2x8x8x2xf32>
+// CHECK-SAME:   %[[PAD:[a-zA-Z0-9_]+]]: f32
+// CHECK:        %[[RES:.+]] = iree_linalg_ext.pack %[[INPUT]]
+// CHECK-SAME:     padding_value(%[[PAD]] : f32)
+// CHECK-SAME:     dims_pos = [0, 1]
+// CHECK-SAME:     inner_tiles = [8, 2]
+// CHECK-SAME:     into %[[OUTPUT]]
+// CHECK:        return %[[RES]]
+
+// -----
+
+func.func @pad_and_pack_partially_dynamic(%input: tensor<?x?xf32>, %output: tensor<?x?x8x2xf32>, %pad: f32) -> tensor<?x?x8x2xf32> {
+  %0 = iree_linalg_ext.pack %input padding_value(%pad : f32) dims_pos = [0, 1] inner_tiles = [8, 2] into %output : (tensor<?x?xf32> tensor<?x?x8x2xf32>) -> tensor<?x?x8x2xf32>
+  return %0 : tensor<?x?x8x2xf32>
+}
+// CHECK:      func.func @pad_and_pack_partially_dynamic
+// CHECK-SAME:   %[[INPUT:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
+// CHECK-SAME:   %[[OUTPUT:[a-zA-Z0-9_]+]]: tensor<?x?x8x2xf32>
+// CHECK-SAME:   %[[PAD:[a-zA-Z0-9_]+]]: f32
+// CHECK:        %[[RES:.+]] = iree_linalg_ext.pack %[[INPUT]]
+// CHECK-SAME:     padding_value(%[[PAD]] : f32)
+// CHECK-SAME:     dims_pos = [0, 1]
+// CHECK-SAME:     inner_tiles = [8, 2]
+// CHECK-SAME:     into %[[OUTPUT]]
+// CHECK:        return %[[RES]]
+
+// -----
+
+func.func @pad_and_pack_fully_dynamic(%input: tensor<?x?xf32>, %output: tensor<?x?x?x?xf32>, %pad: f32, %tile_n : index, %tile_m : index) -> tensor<?x?x?x?xf32> {
+  %0 = iree_linalg_ext.pack %input padding_value(%pad : f32)
+    dims_pos = [0, 1] inner_tiles = [%tile_n, %tile_m] into %output : (tensor<?x?xf32> tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32>
+  return %0 : tensor<?x?x?x?xf32>
+}
+// CHECK:      func.func @pad_and_pack_fully_dynamic
+// CHECK-SAME:   %[[INPUT:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
+// CHECK-SAME:   %[[OUTPUT:[a-zA-Z0-9_]+]]: tensor<?x?x?x?xf32>
+// CHECK-SAME:   %[[PAD:[a-zA-Z0-9_]+]]: f32
+// CHECK-SAME:   %[[TILE_N:[a-zA-Z0-9_]+]]: index
+// CHECK-SAME:   %[[TILE_M:[a-zA-Z0-9_]+]]: index
+// CHECK:        %[[RES:.+]] = iree_linalg_ext.pack %[[INPUT]]
+// CHECK-SAME:     padding_value(%[[PAD]] : f32)
+// CHECK-SAME:     dims_pos = [0, 1]
+// CHECK-SAME:     inner_tiles = [%[[TILE_N]], %[[TILE_M]]]
+// CHECK-SAME:     into %[[OUTPUT]]
+// CHECK:        return %[[RES]]

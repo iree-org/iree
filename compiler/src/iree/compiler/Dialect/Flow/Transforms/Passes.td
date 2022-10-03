@@ -26,10 +26,10 @@ def CleanupNumericNarrowing :
   let constructor = "mlir::iree_compiler::IREE::Flow::createCleanupNumericNarrowingPass()";
 }
 
-def ConvertConv2D1x1ConvToMatmul :
-    Pass<"iree-flow-convert-conv2d-1x1-to-matmul", ""> {
+def Convert1X1FilterConv2DToMatmul:
+    Pass<"iree-flow-convert-1x1-filter-conv2d-to-matmul", ""> {
   let summary = "Convert linalg convolution ops with 1x1 kernels into linalg matrix multiplication ops.";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createConvertConv2D1x1ToMatmulPass()";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createConvert1X1FilterConv2DToMatmulPass()";
 }
 
 def ConvertConv2DToImg2Col :

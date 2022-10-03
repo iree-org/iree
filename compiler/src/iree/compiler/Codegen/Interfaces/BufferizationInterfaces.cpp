@@ -12,7 +12,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "mlir/Dialect/Arithmetic/Transforms/BufferizableOpInterfaceImpl.h"
+#include "mlir/Dialect/Arith/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Bufferization/Transforms/AllocTensorElimination.h"
@@ -416,16 +416,18 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
       });
   registry.addExtension(
       +[](MLIRContext *ctx, IREE::LinalgExt::IREELinalgExtDialect *dialect) {
-        IREE::LinalgExt::ReverseOp::attachInterface<
-            LinalgExtOpInterface<IREE::LinalgExt::ReverseOp>>(*ctx);
         IREE::LinalgExt::FftOp::attachInterface<
             LinalgExtOpInterface<IREE::LinalgExt::FftOp>>(*ctx);
-        IREE::LinalgExt::SortOp::attachInterface<
-            LinalgExtOpInterface<IREE::LinalgExt::SortOp>>(*ctx);
-        IREE::LinalgExt::ScatterOp::attachInterface<
-            LinalgExtOpInterface<IREE::LinalgExt::ScatterOp>>(*ctx);
+        IREE::LinalgExt::PackOp::attachInterface<
+            LinalgExtOpInterface<IREE::LinalgExt::PackOp>>(*ctx);
+        IREE::LinalgExt::ReverseOp::attachInterface<
+            LinalgExtOpInterface<IREE::LinalgExt::ReverseOp>>(*ctx);
         IREE::LinalgExt::ScanOp::attachInterface<
             LinalgExtOpInterface<IREE::LinalgExt::ScanOp>>(*ctx);
+        IREE::LinalgExt::ScatterOp::attachInterface<
+            LinalgExtOpInterface<IREE::LinalgExt::ScatterOp>>(*ctx);
+        IREE::LinalgExt::SortOp::attachInterface<
+            LinalgExtOpInterface<IREE::LinalgExt::SortOp>>(*ctx);
         IREE::LinalgExt::TopkOp::attachInterface<
             LinalgExtOpInterface<IREE::LinalgExt::TopkOp>>(*ctx);
       });

@@ -14,7 +14,7 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -176,7 +176,7 @@ struct DetachElementwiseFromNamedOpsPass
     : public DetachElementwiseFromNamedOpsBase<
           DetachElementwiseFromNamedOpsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<arith::ArithmeticDialect, linalg::LinalgDialect,
+    registry.insert<arith::ArithDialect, linalg::LinalgDialect,
                     tensor::TensorDialect>();
   }
 

@@ -29,8 +29,7 @@ class IREELinalgExt_Op<string mnemonic, list<Trait> traits = []> :
         [AttrSizedOperandSegments,
          DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
          LinalgExtInterface,
-         SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::LinalgExt::YieldOp">,
-         ReifyRankedShapedTypeOpInterface
+         SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::LinalgExt::YieldOp">
   ])> {
   let hasVerifier = 1;
   let hasCustomAssemblyFormat = 1;
@@ -38,12 +37,6 @@ class IREELinalgExt_Op<string mnemonic, list<Trait> traits = []> :
     SmallVector<Value> getDestinationOperands(OpBuilder &b) {
       SmallVector<Value> dest(getOutputs().begin(), getOutputs().end());
       return dest;
-    }
-
-    LogicalResult reifyResultShapes(OpBuilder &b,
-        mlir::ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
-      return llvm::cast<LinalgExtOp>(getOperation()).reifyResultShapes(b,
-          reifiedReturnShapes);
     }
   }];
 }
@@ -53,7 +46,8 @@ class IREELinalgExt_Op<string mnemonic, list<Trait> traits = []> :
 //===----------------------------------------------------------------------===//
 
 def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
-    [DeclareOpInterfaceMethods<TilingInterface,
+    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+     DeclareOpInterfaceMethods<TilingInterface,
         ["generateScalarImplementation",
          "getIterationDomain",
          "getLoopIteratorTypes",
@@ -151,11 +145,12 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
 }
 
 def IREELinalgExt_SortOp : IREELinalgExt_Op<"sort",
-    [DeclareOpInterfaceMethods<TilingInterface,
+    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+     DeclareOpInterfaceMethods<TilingInterface,
         ["generateScalarImplementation",
          "getIterationDomain",
          "getLoopIteratorTypes",
-         "getResultTilePosition", 
+         "getResultTilePosition",
          "getTiledImplementation"]>]> {
   let summary = "Sort operator";
   let description = [{
@@ -195,6 +190,7 @@ def IREELinalgExt_SortOp : IREELinalgExt_Op<"sort",
 }
 
 def IREELinalgExt_FftOp : IREELinalgExt_Op<"fft", [
+  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
   DeclareOpInterfaceMethods<TilingInterface,
       ["generateScalarImplementation",
        "getIterationDomain",
@@ -258,7 +254,8 @@ def IREELinalgExt_FftOp : IREELinalgExt_Op<"fft", [
 }
 
 def IREELinalgExt_ScanOp : IREELinalgExt_Op<"scan",
-    [DeclareOpInterfaceMethods<TilingInterface,
+    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+     DeclareOpInterfaceMethods<TilingInterface,
       ["generateScalarImplementation",
        "getIterationDomain",
        "getLoopIteratorTypes",
@@ -312,6 +309,7 @@ def IREELinalgExt_ScanOp : IREELinalgExt_Op<"scan",
 }
 
 def IREELinalgExt_ReverseOp : IREELinalgExt_Op<"reverse", [
+  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
   DeclareOpInterfaceMethods<
       TilingInterface,
       ["generateScalarImplementation",
@@ -365,14 +363,14 @@ def IREELinalgExt_ReverseOp : IREELinalgExt_Op<"reverse", [
 }
 
 def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
+  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
   DeclareOpInterfaceMethods<LinalgExtInterface>,
   DeclareOpInterfaceMethods<TilingInterface,
     ["generateScalarImplementation",
      "getIterationDomain",
      "getLoopIteratorTypes",
      "getResultTilePosition",
-     "getTiledImplementation"]>,
-  SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::LinalgExt::YieldOp">,
+     "getTiledImplementation"]>
 ]>{
   let summary = "Top-K operator";
   let description = [{
@@ -432,6 +430,133 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
     int64_t getInputRank() {
       return getInputType().getRank();
     }
+  }];
+}
+
+def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
+  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+  DeclareOpInterfaceMethods<LinalgExtInterface>,
+  DeclareOpInterfaceMethods<TilingInterface,
+    ["getIterationDomain",
+     "getLoopIteratorTypes",
+     "generateScalarImplementation"]>,
+  DeclareOpInterfaceMethods<MemoryEffectsOpInterface>
+]>{
+  let summary = "pack operation";
+  let description = [{
+    The pack operation converts an `input` into a tiled and packed layout. The
+    dimensions to be tiled are obtained from `dims_pos` and the size of the tile is
+    obtained from `inner_tiles`. The dimensions listed in `dims_pos` do not need to
+    be contiguous in which case the tile will get transposed.  We handle only full
+    tiles if `padding_value` is not set; it is UB if the tile does not perfectly
+    divide the dimension. If `padding_value` is set, it will pad along high
+    dimensions, i.e., it pads at the bottom and on the right if the input has
+    rank 2, and the result type shape, will be dynamic in any dimension if and
+    only if the input shape is.
+
+    Example KC_to_KCck:
+
+    ```mlir
+    iree_linalg_ext.pack %arg0 dims_pos = [1, 0]
+      inner_tiles = [32, 8] into %arg1 : (memref<128x256xf32> memref<16x8x32x8xf32>)
+    ```
+
+    Example NC_to_NCnc:
+
+    ```mlir
+    iree_linalg_ext.pack %arg0 dims_pos = [0, 1]
+      inner_tiles = [8, 32] into %arg1 : (memref<128x256xf32> memref<16x8x8x32xf32>)
+    ```
+
+    In both cases, dimension at position 0 in the input memref (128) is tiled
+    with a factor of 8, while dimension at position 1 (256) is tiled with a factor
+    of 32. In the KC_to_KCck example, the point loops are interchanged.
+
+    Example NC_to_NCnc with padding:
+
+    ```mlir
+    iree_linalg_ext.pack %arg padding_value(%pad : f32) dims_pos = [0, 1]
+      inner_tiles = [8, 2] into %arg1 : (memref<13x15xf32> memref<2x8x8x2xf32>)
+    ```
+
+  }];
+
+  let arguments = (ins Variadic<AnyShaped>:$inputs,
+    Variadic<AnyShaped>:$outputs,
+    DefaultValuedAttr<I64ArrayAttr, "{}">:$dims_pos,
+    Variadic<Index>:$inner_tiles,
+    I64ArrayAttr:$static_inner_tiles,
+    Optional<AnyType>:$padding_value);
+
+  let results = (outs Variadic<AnyRankedTensor>:$results);
+  let assemblyFormat = [{
+    attr-dict
+    $inputs
+    (`padding_value` `(` $padding_value^ `:` type($padding_value) `)`)?
+    `dims_pos` `=` $dims_pos
+    `inner_tiles` `=`
+    custom<DynamicIndexList>($inner_tiles, $static_inner_tiles,
+                             "ShapedType::kDynamicSize")
+    `into` $outputs `:` `(` type($inputs) type($outputs) `)`
+     (`->` type($results)^)?
+  }];
+
+  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
+
+    // Return the output operand.
+    Value getOutput() {
+      return getOutputOperand(0)->get();
+    }
+
+    // Return the input operand.
+    Value getInput() {
+      return getInputOperand(0)->get();
+    }
+
+    // Return the output rank.
+    int64_t getOutputRank() {
+      return  getOutputType().getRank();
+    }
+
+    // Return the output type.
+    ShapedType getOutputType() {
+      return getOutput().getType();
+    }
+
+    // Return the input type.
+    ShapedType getInputType() {
+      return getInput().getType();
+    }
+
+    // Return the output shape.
+    ArrayRef<int64_t> getOutputShape() {
+      return getOutputType().getShape();
+    }
+
+    // Return the input shape.
+    ArrayRef<int64_t> getInputShape() {
+      return getInputType().getShape();
+    }
+
+    // Return the element type.
+    Type getElementType() {
+      return getInputType().getElementType();
+    }
+
+    // Return the rank of the input operand.
+    int64_t getInputRank() {
+      return getInputType().getRank();
+    }
+
+    // Return the tile sizes.
+    SmallVector<OpFoldResult> getMixedTiles();
+    SmallVector<int64_t> getStaticTiles();
+
+    // Infer the output type.
+    ShapedType inferResultType();
+
+    // Return a mapping from positions `dims_pos` to their tile factors.
+    DenseMap<int64_t, OpFoldResult> getDimAndTileMapping();
   }];
 }
 

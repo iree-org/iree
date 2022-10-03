@@ -29,7 +29,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Utils",
         "//runtime/src/iree/builtins/ukernel",
         "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:ArithmeticDialect",
+        "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgDialect",

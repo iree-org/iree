@@ -19,7 +19,7 @@ struct LLVMGPUMultiBufferingPass
     : public LLVMGPUMultiBufferingBase<LLVMGPUMultiBufferingPass> {
   LLVMGPUMultiBufferingPass(unsigned numBuffers) : numBuffers(numBuffers) {}
 
-  void getDependentDialects(DialectRegistry &registry) const override {
+  void getDependentDialects(DialectRegistry& registry) const override {
     registry.insert<AffineDialect>();
   }
 

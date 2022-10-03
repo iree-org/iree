@@ -48,10 +48,11 @@ llvm::SmallVector<unsigned> getPartitionableLoopsImpl(
   return parallelLoops;
 }
 
-static llvm::SmallVector<llvm::StringRef> getIteratorTypesFromAttr(
+static llvm::SmallVector<utils::IteratorType> getIteratorTypesFromAttr(
     ArrayAttr iteratorTypesAttr) {
   return llvm::to_vector(llvm::map_range(iteratorTypesAttr, [](Attribute attr) {
-    return attr.cast<StringAttr>().getValue();
+    return utils::symbolizeIteratorType(attr.cast<StringAttr>().getValue())
+        .getValue();
   }));
 }
 
@@ -60,20 +61,10 @@ template <typename OpTy>
 struct LinalgOpPartitionableLoops
     : public PartitionableLoopsInterface::ExternalModel<
           LinalgOpPartitionableLoops<OpTy>, OpTy> {
-  unsigned getNumLoops(Operation *op) const {
-    auto linalgOp = cast<linalg::LinalgOp>(op);
-    return linalgOp.getNumLoops();
-  }
-
   llvm::SmallVector<unsigned> getPartitionableLoops(
       Operation *op, unsigned maxNumPartitionedLoops) const {
     auto linalgOp = cast<linalg::LinalgOp>(op);
     return getPartitionableLoopsImpl(linalgOp, maxNumPartitionedLoops);
-  }
-
-  llvm::SmallVector<llvm::StringRef> getIteratorTypes(Operation *op) const {
-    return getIteratorTypesFromAttr(
-        cast<linalg::LinalgOp>(op).iterator_types());
   }
 };
 
@@ -81,19 +72,9 @@ struct LinalgOpPartitionableLoops
 struct Mmt4DOpPartitionableLoops
     : public PartitionableLoopsInterface::ExternalModel<
           Mmt4DOpPartitionableLoops, linalg::Mmt4DOp> {
-  unsigned getNumLoops(Operation *op) const {
-    auto linalgOp = cast<linalg::LinalgOp>(op);
-    return linalgOp.getNumLoops();
-  }
-
   llvm::SmallVector<unsigned> getPartitionableLoops(
       Operation *op, unsigned maxNumPartitionedLoops) const {
     return {0, 1};
-  }
-
-  llvm::SmallVector<StringRef> getIteratorTypes(Operation *op) const {
-    return getIteratorTypesFromAttr(
-        cast<linalg::LinalgOp>(op).iterator_types());
   }
 };
 
@@ -103,11 +84,6 @@ template <typename OpTy>
 struct OuterParallelAsPartitionableLoops
     : public PartitionableLoopsInterface::ExternalModel<
           OuterParallelAsPartitionableLoops<OpTy>, OpTy> {
-  unsigned getNumLoops(Operation *op) const {
-    auto tiledOp = cast<OpTy>(op);
-    return tiledOp.getLoopIteratorTypes().size();
-  }
-
   llvm::SmallVector<unsigned> getPartitionableLoops(
       Operation *op, unsigned maxNumPartitionedLoops) const {
     // For now just return the loops that are returned by the
@@ -118,7 +94,7 @@ struct OuterParallelAsPartitionableLoops
     auto interfaceOp = cast<OpTy>(op);
     for (auto iteratorType :
          llvm::enumerate(interfaceOp.getLoopIteratorTypes())) {
-      if (iteratorType.value() != getParallelIteratorTypeName()) {
+      if (iteratorType.value() != utils::IteratorType::parallel) {
         break;
       }
       partitionableLoops.push_back(iteratorType.index());
@@ -131,10 +107,16 @@ struct OuterParallelAsPartitionableLoops
     }
     return partitionableLoops;
   }
+};
 
-  llvm::SmallVector<StringRef> getIteratorTypes(Operation *op) const {
-    auto tiledOp = cast<OpTy>(op);
-    return tiledOp.getLoopIteratorTypes();
+/// External model implementation for operations that are to be executed
+/// sequentially.
+template <typename OpTy>
+struct NoPartitionableLoops : public PartitionableLoopsInterface::ExternalModel<
+                                  NoPartitionableLoops<OpTy>, OpTy> {
+  llvm::SmallVector<unsigned> getPartitionableLoops(
+      Operation *op, unsigned maxNumPartitionedLoops) const {
+    return {};
   }
 };
 
@@ -142,11 +124,6 @@ struct OuterParallelAsPartitionableLoops
 struct FftOpPartitionableLoops
     : public PartitionableLoopsInterface::ExternalModel<
           FftOpPartitionableLoops, IREE::LinalgExt::FftOp> {
-  unsigned getNumLoops(Operation *op) const {
-    auto fftOp = cast<IREE::LinalgExt::FftOp>(op);
-    return fftOp.getLoopIteratorTypes().size();
-  }
-
   llvm::SmallVector<unsigned> getPartitionableLoops(
       Operation *op, unsigned maxNumPartitionedLoops) const {
     auto fftOp = cast<IREE::LinalgExt::FftOp>(op);
@@ -164,11 +141,6 @@ struct FftOpPartitionableLoops
     }
     return partitionableLoops;
   }
-
-  llvm::SmallVector<StringRef> getIteratorTypes(Operation *op) const {
-    auto fftOp = cast<IREE::LinalgExt::FftOp>(op);
-    return fftOp.getLoopIteratorTypes();
-  }
 };
 
 /// External model implementation for making all parallel loops as
@@ -177,18 +149,13 @@ template <typename OpTy>
 struct AllParallelAsPartitionableLoops
     : public PartitionableLoopsInterface::ExternalModel<
           AllParallelAsPartitionableLoops<OpTy>, OpTy> {
-  unsigned getNumLoops(Operation *op) const {
-    auto tiledOp = cast<OpTy>(op);
-    return tiledOp.getLoopIteratorTypes().size();
-  }
-
   llvm::SmallVector<unsigned> getPartitionableLoops(
       Operation *op, unsigned maxNumPartitionedLoops) const {
     SmallVector<unsigned> partitionableLoops;
     auto interfaceOp = cast<OpTy>(op);
     for (auto iteratorType :
          llvm::enumerate(interfaceOp.getLoopIteratorTypes())) {
-      if (iteratorType.value() != getParallelIteratorTypeName()) {
+      if (iteratorType.value() != utils::IteratorType::parallel) {
         continue;
       }
       partitionableLoops.push_back(iteratorType.index());
@@ -200,11 +167,6 @@ struct AllParallelAsPartitionableLoops
                     partitionableLoops.size() - maxNumPartitionedLoops));
     }
     return partitionableLoops;
-  }
-
-  llvm::SmallVector<StringRef> getIteratorTypes(Operation *op) const {
-    auto tiledOp = cast<OpTy>(op);
-    return tiledOp.getLoopIteratorTypes();
   }
 };
 
@@ -245,16 +207,18 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
   registry.addExtension(+[](MLIRContext *ctx,
                             IREE::LinalgExt::IREELinalgExtDialect *dialect) {
     IREE::LinalgExt::FftOp::attachInterface<FftOpPartitionableLoops>(*ctx);
+    IREE::LinalgExt::PackOp::attachInterface<
+        NoPartitionableLoops<IREE::LinalgExt::PackOp>>(*ctx);
     IREE::LinalgExt::ScanOp::attachInterface<
         AllParallelAsPartitionableLoops<IREE::LinalgExt::ScanOp>>(*ctx);
-    IREE::LinalgExt::SortOp::attachInterface<
-        AllParallelAsPartitionableLoops<IREE::LinalgExt::SortOp>>(*ctx);
-    IREE::LinalgExt::TopkOp::attachInterface<
-        AllParallelAsPartitionableLoops<IREE::LinalgExt::TopkOp>>(*ctx);
-    IREE::LinalgExt::ReverseOp::attachInterface<
-        OuterParallelAsPartitionableLoops<IREE::LinalgExt::ReverseOp>>(*ctx);
     IREE::LinalgExt::ScatterOp::attachInterface<
         OuterParallelAsPartitionableLoops<IREE::LinalgExt::ScatterOp>>(*ctx);
+    IREE::LinalgExt::SortOp::attachInterface<
+        AllParallelAsPartitionableLoops<IREE::LinalgExt::SortOp>>(*ctx);
+    IREE::LinalgExt::ReverseOp::attachInterface<
+        OuterParallelAsPartitionableLoops<IREE::LinalgExt::ReverseOp>>(*ctx);
+    IREE::LinalgExt::TopkOp::attachInterface<
+        AllParallelAsPartitionableLoops<IREE::LinalgExt::TopkOp>>(*ctx);
   });
 }
 

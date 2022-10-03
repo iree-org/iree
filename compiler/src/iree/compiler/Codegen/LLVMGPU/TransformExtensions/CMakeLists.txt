@@ -33,7 +33,7 @@ iree_cc_library(
     ::LLVMGPUExtensionsOpGen
     IREEDialectsTransforms
     IREELinalgTransformDialect
-    MLIRArithmeticDialect
+    MLIRArithDialect
     MLIRFuncDialect
     MLIRGPUOps
     MLIRIR

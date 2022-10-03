@@ -149,7 +149,7 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     // VkShaderModuleCreateInfo.
     SmallVector<StringRef, 8> entryPointNames;
     spvModuleOp.walk([&](spirv::EntryPointOp exportOp) {
-      entryPointNames.push_back(exportOp.fn());
+      entryPointNames.push_back(exportOp.getFn());
     });
     auto entryPointsRef = builder.createStringVec(entryPointNames);
 

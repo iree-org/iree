@@ -66,7 +66,7 @@ trap "deactivate 2> /dev/null" EXIT
 # specific version when iterating on metrics is useful, and fetching is slow.
 
 python -m pip install --upgrade \
-  --find-links https://github.com/iree-org/iree/releases \
+  --find-links https://iree-org.github.io/iree/pip-release-links.html \
   iree-compiler iree-tools-tflite iree-tools-xla
 
 ###############################################################################

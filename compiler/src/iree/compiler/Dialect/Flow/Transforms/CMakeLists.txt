@@ -25,7 +25,6 @@ iree_cc_library(
   HDRS
     "ConvertRegionToWorkgroups.h"
     "DispatchLinalgOnTensors.h"
-    "FusionUtils.h"
     "Passes.h"
     "Passes.h.inc"
     "RegionOpUtils.h"
@@ -33,7 +32,7 @@ iree_cc_library(
     "CaptureDispatchDynamicDims.cpp"
     "CleanupNumericNarrowing.cpp"
     "CleanupTensorShapes.cpp"
-    "ConvertConv2D1x1ToMatmul.cpp"
+    "Convert1X1FilterConv2DToMatmul.cpp"
     "ConvertConv2DToImg2Col.cpp"
     "ConvertLinalgMatmulToMmt4D.cpp"
     "ConvertRegionToWorkgroups.cpp"
@@ -47,7 +46,6 @@ iree_cc_library(
     "ExpandTensorShapes.cpp"
     "ExportBenchmarkFuncs.cpp"
     "FusionOfTensorOps.cpp"
-    "FusionUtils.cpp"
     "InferNumericNarrowing.cpp"
     "InitializeEmptyTensors.cpp"
     "InjectDispatchTracing.cpp"
@@ -74,8 +72,8 @@ iree_cc_library(
     LLVMSupport
     MLIRAffineDialect
     MLIRAnalysis
-    MLIRArithmeticDialect
-    MLIRArithmeticUtils
+    MLIRArithDialect
+    MLIRArithUtils
     MLIRControlFlowDialect
     MLIRFuncDialect
     MLIRIR

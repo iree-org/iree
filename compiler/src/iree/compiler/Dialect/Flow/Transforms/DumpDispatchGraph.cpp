@@ -19,7 +19,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/GraphWriter.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/AsmState.h"

@@ -33,11 +33,11 @@ def parse_arguments():
 
 
 def main(args: argparse.Namespace):
-  compile_specs, _ = benchmarks.iree.definitions.generate()
+  model_compile_configs, _ = benchmarks.iree.definitions.generate()
   benchmark_rules = cmake_rule_generator.generate_rules(
       model_artifacts_dir="${_MODEL_ARTIFACTS_DIR}",
       iree_artifacts_dir="${_IREE_ARTIFACTS_DIR}",
-      iree_compile_specs=compile_specs)
+      iree_model_compile_configs=model_compile_configs)
   cmake_file = GENERATED_BENCHMARK_SUITES_CMAKE_TEMPLATE.substitute(
       __BENCHMARK_RULES='\n'.join(benchmark_rules))
   with open(args.output, "w") as output_file:

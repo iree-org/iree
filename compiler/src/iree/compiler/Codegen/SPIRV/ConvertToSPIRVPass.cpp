@@ -26,7 +26,7 @@
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/FormatVariadic.h"
-#include "mlir/Conversion/ArithmeticToSPIRV/ArithmeticToSPIRV.h"
+#include "mlir/Conversion/ArithToSPIRV/ArithToSPIRV.h"
 #include "mlir/Conversion/ControlFlowToSPIRV/ControlFlowToSPIRVPass.h"
 #include "mlir/Conversion/FuncToSPIRV/FuncToSPIRV.h"
 #include "mlir/Conversion/GPUToSPIRV/GPUToSPIRV.h"
@@ -237,7 +237,7 @@ struct HALInterfaceBindingSubspanConverter final
 
     auto varOp = interfaceToResourceVars.lookup(subspanOp);
     // Fix up the variable's type.
-    varOp.typeAttr(TypeAttr::get(convertedType));
+    varOp.setTypeAttr(TypeAttr::get(convertedType));
 
     rewriter.replaceOpWithNewOp<spirv::AddressOfOp>(subspanOp, varOp);
 
@@ -357,7 +357,7 @@ void ConvertToSPIRVPass::runOnOperation() {
   populateMemRefToSPIRVPatterns(typeConverter, patterns);
 
   // Pull in standard/math patterns to convert arithmetic ops and others.
-  arith::populateArithmeticToSPIRVPatterns(typeConverter, patterns);
+  arith::populateArithToSPIRVPatterns(typeConverter, patterns);
   populateFuncToSPIRVPatterns(typeConverter, patterns);
   populateMathToSPIRVPatterns(typeConverter, patterns);
 

@@ -11,7 +11,7 @@
 #include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Dialect/Arithmetic/Transforms/Passes.h"
+#include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -30,14 +30,14 @@ class TestConversionPass : public TestConversionBase<TestConversionPass> {
   TestConversionPass(const TestConversionPass &) {}
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Util::UtilDialect, func::FuncDialect,
-                    mlir::arith::ArithmeticDialect, math::MathDialect,
+                    mlir::arith::ArithDialect, math::MathDialect,
                     mlir::AffineDialect, memref::MemRefDialect>();
   }
 
   void runOnOperation() override {
     auto *context = &getContext();
     ConversionTarget conversionTarget(*context);
-    conversionTarget.addLegalDialect<arith::ArithmeticDialect>();
+    conversionTarget.addLegalDialect<arith::ArithDialect>();
     conversionTarget.addLegalDialect<IREE::Util::UtilDialect>();
     conversionTarget.addLegalOp<UnrealizedConversionCastOp>();
 

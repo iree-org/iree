@@ -17,7 +17,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
-#include "mlir/Dialect/Arithmetic/Transforms/Passes.h"
+#include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Func/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
@@ -157,11 +157,12 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
            << loweringConfig.getTileSizes().size();
   }
 
-  auto interfaceOp = dyn_cast_or_null<PartitionableLoopsInterface>(op);
+  auto interfaceOp = dyn_cast_or_null<TilingInterface>(op);
   if (interfaceOp) {
     llvm::SmallDenseSet<unsigned> pLoopsSet;
-    for (auto iteratorType : llvm::enumerate(interfaceOp.getIteratorTypes())) {
-      if (iteratorType.value() == getParallelIteratorTypeName()) {
+    for (auto iteratorType :
+         llvm::enumerate(interfaceOp.getLoopIteratorTypes())) {
+      if (iteratorType.value() == utils::IteratorType::parallel) {
         pLoopsSet.insert(iteratorType.index());
       }
     }
@@ -616,8 +617,7 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
   passManager.addNestedPass<func::FuncOp>(createCSEPass());
 
   // (HAL, IREE, Linalg, CF) -> LLVM
-  passManager.addNestedPass<func::FuncOp>(
-      arith::createArithmeticExpandOpsPass());
+  passManager.addNestedPass<func::FuncOp>(arith::createArithExpandOpsPass());
   passManager.addNestedPass<func::FuncOp>(memref::createExpandOpsPass());
   passManager.addPass(createConvertToLLVMPass());
   passManager.addPass(createReconcileUnrealizedCastsPass());

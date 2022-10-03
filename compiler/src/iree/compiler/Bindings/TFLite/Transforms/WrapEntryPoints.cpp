@@ -49,7 +49,7 @@ class WrapEntryPointsPass
     : public PassWrapper<WrapEntryPointsPass, OperationPass<ModuleOp>> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::func::FuncDialect, mlir::arith::ArithmeticDialect,
+    registry.insert<mlir::func::FuncDialect, mlir::arith::ArithDialect,
                     mlir::tensor::TensorDialect, IREE::HAL::HALDialect,
                     IREE::Util::UtilDialect>();
   }

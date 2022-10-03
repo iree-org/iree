@@ -13,7 +13,7 @@
 #include "llvm/Support/Casting.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/rewriters.h"
-#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Shape/IR/Shape.h"
@@ -315,6 +315,13 @@ class TransposeReshapeGenericDotGeneral
     auto rhsShapeType = op.rhs().getType().dyn_cast<RankedTensorType>();
     auto resultType = op.getResult().getType().dyn_cast<RankedTensorType>();
     if (!lhsShapeType || !rhsShapeType || !resultType) return failure();
+
+    // TODO(jpienaar): This pattern is not safe for dynamic shapes and seems to
+    // be (now) redundant with later pass that does handle them. To decouple
+    // fixing and verifying redundant, this just limits to static shapes and
+    // then will remove this in follow up.
+    if (!lhsShapeType.hasStaticShape() || !rhsShapeType.hasStaticShape())
+      return failure();
 
     SmallVector<int64_t> lhsTargetOrder, rhsTargetOrder;
     mhlo::DotDimensionNumbersAttr dimNumbers = op.dot_dimension_numbers();
@@ -1136,8 +1143,8 @@ struct MHLOToMHLOPreprocessingPass
     // chlo::PopulateLegalizeChloToHloPatterns(context, &conversionPatterns);
     conversionTarget.addLegalDialect<
         shape::ShapeDialect, chlo::ChloDialect, mhlo::MhloDialect,
-        math::MathDialect, mlir::func::FuncDialect,
-        mlir::arith::ArithmeticDialect, mlir::tensor::TensorDialect>();
+        math::MathDialect, mlir::func::FuncDialect, mlir::arith::ArithDialect,
+        mlir::tensor::TensorDialect>();
     // conversionTarget.addIllegalDialect<chlo::ChloDialect>();
     if (failed(applyPartialConversion(getOperation(), conversionTarget,
                                       std::move(conversionPatterns)))) {
@@ -1158,6 +1165,8 @@ struct MHLOToMHLOPreprocessingPass
 
     // dot_general canoncalization patterns.
     mhlo::populateGeneralDotOpLoweringPatterns(&patterns, context);
+    // TODO(jpienaar): This may be redundant with lower_general_dot. Remove if
+    // so.
     patterns.insert<TransposeReshapeGenericDotGeneral>(context,
                                                        /*benefit=*/200);
     patterns.insert<DotGeneralIsMul>(context, /*benefit=*/300);

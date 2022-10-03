@@ -154,14 +154,16 @@ typedef const iree_hal_executable_library_header_t** (
 // a useful failure though the HAL does not mandate that all overflows are
 // caught and only that they are not harmful - clamping byte ranges and never
 // returning a failure is sufficient.
-typedef int (*iree_hal_executable_import_v0_t)(void* import_params);
+typedef int (*iree_hal_executable_import_v0_t)(void* context, void* params,
+                                               void* reserved);
 
 // A thunk function used to call an import.
 // All imports must be called through this function by passing the import
 // function pointer as the first argument followed by the arguments of the
 // import function itself.
 typedef int (*iree_hal_executable_import_thunk_v0_t)(
-    iree_hal_executable_import_v0_t fn_ptr, void* import_params);
+    iree_hal_executable_import_v0_t fn_ptr, void* context, void* params,
+    void* reserved);
 
 // Declares imports available to the executable library at runtime.
 // To enable linker isolation, ABI shimming, and import multi-versioning we use
@@ -251,7 +253,8 @@ typedef struct iree_hal_executable_environment_v0_t {
   // Optional imported functions available for use within the executable.
   // Contains one entry per imported function. If an import was marked as weak
   // then the corresponding entry may be NULL.
-  const iree_hal_executable_import_v0_t* imports;
+  const iree_hal_executable_import_v0_t* import_funcs;
+  const void** import_contexts;
 
   // Optional architecture-specific CPU information.
   // In heterogenous processors this may represent any of the subarchitecture
