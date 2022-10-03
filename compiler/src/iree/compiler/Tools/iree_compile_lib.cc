@@ -155,15 +155,6 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
               "flatbuffer containing a SPIR-V blob)")),
       llvm::cl::init(CompileMode::std), llvm::cl::cat(mainOptions));
 
-  llvm::cl::opt<bool> legacyTranslateToCModule(
-      "iree-mlir-to-vm-c-module",
-      llvm::cl::desc("Alias for --output-format=c-module (deprecated)"),
-      llvm::cl::init(false));
-  llvm::cl::opt<bool> legacyTranslateToVMBytecodeModule(
-      "iree-mlir-to-vm-bytecode-module",
-      llvm::cl::desc("Alias for --output-format=vm-bytecode (deprecated)"),
-      llvm::cl::init(false));
-
   // Misc options.
   llvm::cl::opt<bool> splitInputFile(
       "split-input-file",
@@ -177,24 +168,6 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
 #endif
 
   llvm::cl::ParseCommandLineOptions(argc, argv, "IREE compilation driver\n");
-
-  // Post-process and select the correct outputFormat.
-  if (legacyTranslateToCModule) {
-    if (outputFormat != OutputFormat::none) {
-      llvm::errs()
-          << "Cannot specify --output-format= and --iree-mlir-to-vm-c-module\n";
-      return 1;
-    }
-    outputFormat = OutputFormat::vm_c;
-  }
-  if (legacyTranslateToVMBytecodeModule) {
-    if (outputFormat != OutputFormat::none) {
-      llvm::errs() << "Cannot specify --output-format= and "
-                      "--iree-mlir-to-vm-bytecode-module\n";
-      return 1;
-    }
-    outputFormat = OutputFormat::vm_bytecode;
-  }
 
   // Default output format.
   if (outputFormat == OutputFormat::none) {
