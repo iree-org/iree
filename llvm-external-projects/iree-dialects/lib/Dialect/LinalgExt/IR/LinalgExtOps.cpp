@@ -1884,20 +1884,14 @@ PackOp::getTiledImplementation(OpBuilder &builder,
   // Take the minimum of two integers.
   auto idMap = AffineMap::getMultiDimIdentityMap(2, ctx);
   auto min = [&](OpFoldResult v1, OpFoldResult v2) -> OpFoldResult {
-    return builder.createOrFold<AffineMinOp>(
-        loc, idMap,
-        ValueRange{getValueOrCreateConstantIndexOp(builder, loc, v1),
-                   getValueOrCreateConstantIndexOp(builder, loc, v2)});
+    return makeComposedFoldedAffineMin(builder, loc, idMap, {v1, v2});
   };
   // Subtract two integers.
   AffineExpr dim0, dim1;
   bindDims(ctx, dim0, dim1);
   auto subMap = AffineMap::get(2, 0, {dim0 - dim1});
   auto sub = [&](OpFoldResult v1, OpFoldResult v2) -> OpFoldResult {
-    return builder.createOrFold<AffineApplyOp>(
-        loc, subMap,
-        ValueRange{getValueOrCreateConstantIndexOp(builder, loc, v1),
-                   getValueOrCreateConstantIndexOp(builder, loc, v2)});
+    return makeComposedFoldedAffineApply(builder, loc, subMap, {v1, v2});
   };
 
   int64_t inputRank = getInputRank();
