@@ -402,8 +402,10 @@ function(iree_compile_flags_for_platform OUT_FLAGS IN_FLAGS)
   endif()
 
   if(EMSCRIPTEN AND NOT IN_FLAGS MATCHES "iree-llvm-target-triple")
-    list(APPEND _FLAGS "--iree-llvm-target-triple=wasm32-unknown-emscripten")
-    list(APPEND _FLAGS "--iree-llvm-target-cpu-features=+atomics,+bulk-memory")
+    set(_EMSCRIPTEN_TEST_DEFAULT_FLAGS
+      "--iree-llvm-target-triple=wasm32-unknown-emscripten"
+    )
+    list(APPEND _FLAGS ${_EMSCRIPTEN_TEST_DEFAULT_FLAGS})
   endif()
 
   set(${OUT_FLAGS} "${_FLAGS}" PARENT_SCOPE)
