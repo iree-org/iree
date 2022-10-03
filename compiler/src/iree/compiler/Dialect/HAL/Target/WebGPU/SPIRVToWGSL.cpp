@@ -45,11 +45,11 @@ llvm::Optional<std::string> compileSPIRVToWGSL(
     return llvm::None;
   }
 
-  // TODO(scotttodd): Refine this set of transforms
+  // Run a few transforms to clean up the program. The browser/runtime/driver
+  // will likely run other transforms later.
   tint::transform::Manager transformManager;
   tint::transform::DataMap transformInputs;
-  transformInputs.Add<tint::transform::FirstIndexOffset::BindingPoint>(0, 0);
-  transformManager.Add<tint::transform::FirstIndexOffset>();
+  // Cleans trivial `let`s produced by the SPIR-V reader by inlining them.
   transformManager.Add<tint::transform::FoldTrivialSingleUseLets>();
 
   auto output = transformManager.Run(program.get(), std::move(transformInputs));
