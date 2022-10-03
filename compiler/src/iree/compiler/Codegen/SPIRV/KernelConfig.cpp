@@ -843,7 +843,7 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
   spirv::TargetEnvAttr targetEnvAttr = getSPIRVTargetEnvAttr(module);
   if (!targetEnvAttr) {
     return module.emitOpError(
-        "expected parent hal.executable.variant to have spv.target_env "
+        "expected parent hal.executable.variant to have spirv.target_env "
         "attribute");
   }
   spirv::TargetEnv targetEnv(targetEnvAttr);

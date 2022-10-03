@@ -114,7 +114,7 @@ class WebGPUTargetBackend : public TargetBackend {
     if (!llvm::hasSingleElement(spirvModuleOps)) {
       // TODO(#7824): Implement linking / shader module combining and relax this
       return variantOp.emitError()
-             << "should only contain exactly one spv.module op";
+             << "should only contain exactly one spirv.module op";
     }
     auto spvModuleOp = *spirvModuleOps.begin();
 
@@ -155,7 +155,7 @@ class WebGPUTargetBackend : public TargetBackend {
     if (failed(
             spirv::serialize(spvModuleOp, spvBinary, serializationOptions)) ||
         spvBinary.empty()) {
-      return variantOp.emitError() << "failed to serialize spv.module";
+      return variantOp.emitError() << "failed to serialize spirv.module";
     }
     if (!options.dumpIntermediatesPath.empty()) {
       dumpDataToPath<uint32_t>(options.dumpIntermediatesPath,
