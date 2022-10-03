@@ -510,11 +510,11 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
-  addBufferizePasses(nestedModulePM);
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createOptimizeVectorTransferPass(/*flatten=*/true));
+      createOptimizeVectorTransferPass(/*flatten=*/false));
+  addBufferizePasses(nestedModulePM);
 
   // Run IREE specific passes before vector lowering expert.
   nestedModulePM.addNestedPass<func::FuncOp>(
