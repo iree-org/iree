@@ -1635,6 +1635,47 @@ static DenseMap<int64_t, OpFoldResult> getDimAndTileMapping(OpTy op) {
   return dimAndTileMapping;
 }
 
+/// Helper function for `generatePackOpOrUnPackScalarImplementationBody` to
+/// build the statements in the innermost loop.
+template <typename OpTy>
+static void generatePackOpScalarImplementationBodyImpl(
+    OpTy op, OpBuilder &builder, Location loc, ValueRange ivs,
+    ArrayRef<OpFoldResult> accessIndices) {
+
+  auto createLoad = [&]() -> Value {
+    return builder.create<memref::LoadOp>(
+        loc, op.getInput(), getAsValues(builder, loc, accessIndices));
+  };
+
+  Value scalar;
+  if (auto paddingValue = op.getPaddingValue()) {
+    ArithBuilder arithBuilder(builder, loc);
+    Value isInBounds;
+    for (auto dim : llvm::seq<int64_t>(0, op.getInputRank())) {
+      Value idx =
+          getValueOrCreateConstantIndexOp(builder, loc, accessIndices[dim]);
+      Value cond =
+          arithBuilder.slt(idx, getDimValue(builder, loc, op.getInput(), dim));
+      isInBounds = dim == 0 ? cond : arithBuilder._and(isInBounds, cond);
+    }
+    scalar = builder
+                 .create<scf::IfOp>(
+                     loc, op.getElementType(), isInBounds, /*thenBuilder=*/
+                     [&](OpBuilder &b, Location l) {
+                       b.create<scf::YieldOp>(l, createLoad());
+                     },
+                     /*elseBuilder=*/
+                     [&](OpBuilder &b, Location l) {
+                       b.create<scf::YieldOp>(l, paddingValue);
+                     })
+                 .getResult(0);
+  } else {
+    scalar = createLoad();
+  }
+
+  builder.create<memref::StoreOp>(loc, scalar, op.getOutput(), ivs);
+}
+
 /// Generate the body of the innermost loop of the scalar implementation
 /// of `pack` or `unpack` operation.
 template <typename OpTy>
@@ -1682,10 +1723,9 @@ generatePackOpOrUnPackScalarImplementationBody(OpTy op, OpBuilder &builder,
   }
 
   if (std::is_same<OpTy, PackOp>::value) {
-    Value scalar = builder.create<memref::LoadOp>(
-        loc, op.getInput(), getAsValues(builder, loc, indices));
-    builder.create<memref::StoreOp>(loc, scalar, op.getOutput(), ivs);
+    generatePackOpScalarImplementationBodyImpl(op, builder, loc, ivs, indices);
   } else {
+    assert(!op.getPaddingValue() && "pad semantics not implemented for unpack");
     Value scalar = builder.create<memref::LoadOp>(loc, op.getInput(), ivs);
     builder.create<memref::StoreOp>(loc, scalar, op.getOutput(),
                                     getAsValues(builder, loc, indices));
@@ -1972,8 +2012,7 @@ LogicalResult PackOp::generateScalarImplementation(OpBuilder &builder,
                              [&](OpBuilder &bodyBuilder, Location bodyLoc,
                                  Value iv, ValueRange regionIterArgs) {
                                ivVec.push_back(iv);
-                               // TODO: (lorenzo) check if we can share more.
-                               generatePackOpScalarImplementationBody(
+                               generatePackOpOrUnPackScalarImplementationBody(
                                    *this, bodyBuilder, bodyLoc, ivVec);
                                bodyBuilder.create<scf::YieldOp>(bodyLoc);
                              });

@@ -630,6 +630,11 @@ def IREELinalgExt_UnPackOp : IREELinalgExt_Op<"unpack", [
       return getInputType().getShape();
     }
 
+    // Return the element type.
+    Type getElementType() {
+      return getInputType().getElementType();
+    }
+
     // Return the rank of the input operand.
     int64_t getInputRank() {
       return getInputType().getRank();
