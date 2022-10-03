@@ -173,8 +173,17 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
   llvm::cl::opt<bool> listHalTargets(
       "iree-hal-list-target-backends",
       llvm::cl::desc(
-          "List all registered target backends for executable compilation."),
-      llvm::cl::init(false));
+          "Lists all registered target backends for executable compilation."),
+      llvm::cl::init(false), llvm::cl::ValueDisallowed,
+      llvm::cl::callback([&](const bool &) {
+        auto registeredTargetBackends =
+            IREE::HAL::getRegisteredTargetBackends();
+        llvm::outs() << "Registered target backends:\n";
+        for (auto &registeredTargetBackend : registeredTargetBackends) {
+          llvm::outs() << "  " << registeredTargetBackend << "\n";
+        }
+        exit(0);
+      }));
 
 // Optional output formats.
 #ifdef IREE_HAVE_C_OUTPUT_FORMAT
@@ -204,16 +213,6 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
   // Default output format.
   if (outputFormat == OutputFormat::none) {
     outputFormat = OutputFormat::vm_bytecode;
-  }
-
-  // Handle help-style flags before running any compilation-related code.
-  if (listHalTargets) {
-    auto registeredTargetBackends = IREE::HAL::getRegisteredTargetBackends();
-    llvm::outs() << "Registered target backends:\n";
-    for (auto &registeredTargetBackend : registeredTargetBackends) {
-      llvm::outs() << "  " << registeredTargetBackend << "\n";
-    }
-    return 0;
   }
 
   std::string errorMessage;
