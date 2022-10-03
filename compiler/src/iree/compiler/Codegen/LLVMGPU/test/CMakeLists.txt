@@ -33,6 +33,7 @@ iree_lit_test_suite(
     "transform_dialect_vector_distribution.mlir"
     "transpose_pipeline_test.mlir"
     "vector_to_gpu.mlir"
+    "workgroup_specialization_pipeline_test.mlir"
   TOOLS
     FileCheck
     iree-opt
