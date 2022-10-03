@@ -581,3 +581,11 @@ func.func @unpack_invalid(%output: tensor<256x128xf32>, %input: tensor<8x8x32x16
   %0 = iree_linalg_ext.unpack %input dims_pos = [1, 0] inner_tiles = [4, 32] into %output : (tensor<8x8x32x16xf32> tensor<256x128xf32>) -> tensor<256x128xf32>
   return %0 : tensor<256x128xf32>
 }
+
+// -----
+
+func.func @relayout(%arg0: memref<3x3xf32>, %arg1: memref<3x3x1x1xf32>, %pad: f32) {
+  // expected-error@+1 {{padding semantics not implemented}}
+  iree_linalg_ext.unpack %arg1 padding_value(%pad : f32) dims_pos = [0, 1] inner_tiles = [1, 1] into %arg0 : (memref<3x3x1x1xf32> memref<3x3xf32>)
+  return
+}

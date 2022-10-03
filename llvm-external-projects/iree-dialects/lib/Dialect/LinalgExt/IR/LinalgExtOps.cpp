@@ -2236,6 +2236,10 @@ LogicalResult UnPackOp::verify() {
   if (failed(commonVerifierPackAndUnPackOp(*this))) {
     return failure();
   }
+  // TODO: implement padding semantics. Bail out for now.
+  if (getPaddingValue())
+    return op->emitError("padding semantics not implemented");
+
   // Blocking factors must be less or equal than the input rank, and must
   // match the number of `dims_pos`.
   if (numberOfBlockingFactors > getOutputRank()) {
