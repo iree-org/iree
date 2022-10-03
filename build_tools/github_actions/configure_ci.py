@@ -15,7 +15,7 @@ import fnmatch
 import os
 import subprocess
 import sys
-from typing import Iterable, Mapping
+from typing import Iterable, Mapping, MutableMapping
 
 SKIP_CI_KEY = "skip-ci"
 RUNNER_ENV_KEY = "runner-env"
@@ -125,7 +125,7 @@ def get_ci_stage(event_name):
 
 
 def main():
-  output: Mapping[str, str] = {}
+  output: MutableMapping[str, str] = {}
   trailers = get_trailers()
   event_name = os.environ["GITHUB_EVENT_NAME"]
   if should_run_ci(event_name, trailers):
