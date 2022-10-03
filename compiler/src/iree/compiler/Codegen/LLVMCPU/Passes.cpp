@@ -448,13 +448,11 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
     }
   }
 
-  {
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createFuseTensorPadWithConsumerPass());
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createConcretizePadResultShapePass());
-    nestedModulePM.addNestedPass<func::FuncOp>(createVectorizePadPass());
-  }
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createFuseTensorPadWithConsumerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createConcretizePadResultShapePass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createVectorizePadPass());
 
   {
     LinalgSingleTilingExpertPassOptions options;
@@ -511,13 +509,11 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
-  {
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createFuseTensorPadWithConsumerPass());
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createConcretizePadResultShapePass());
-    nestedModulePM.addNestedPass<func::FuncOp>(createVectorizePadPass());
-  }
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createFuseTensorPadWithConsumerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createConcretizePadResultShapePass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createVectorizePadPass());
 
   // Add the sandbox single tiling expert to vectorize.
   // We can't do the vectorization in the tiling expert above due to an issue in
@@ -571,13 +567,11 @@ void addCPUAArchDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
         createLinalgSingleTilingExpertPass(options));
   }
 
-  {
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createFuseTensorPadWithConsumerPass());
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createConcretizePadResultShapePass());
-    nestedModulePM.addNestedPass<func::FuncOp>(createVectorizePadPass());
-  }
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createFuseTensorPadWithConsumerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createConcretizePadResultShapePass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createVectorizePadPass());
 
   {
     LinalgSingleTilingExpertPassOptions options;
