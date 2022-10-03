@@ -484,11 +484,11 @@ struct CodegenSplitReduction
     rewriter.replaceOp(splitRes->splitLinalgOp, tileRes->tensorResults);
     filter.replaceLinalgTransformationFilter(rewriter, tileRes->loops[0]);
 
-    // // 4) Unroll the tiled op (scf.for) by unrollFactor. loopUnrollByFactor
-    // // already replaces the op.
-    // LogicalResult unrolledRes = mlir::loopUnrollByFactor(
-    //     cast<scf::ForOp>(tileRes->loops[0]), unrollFactor);
-    // if (failed(unrolledRes)) return failure();
+    // 4) Unroll the tiled op (scf.for) by unrollFactor. loopUnrollByFactor
+    // already replaces the op.
+    LogicalResult unrolledRes = mlir::loopUnrollByFactor(
+        cast<scf::ForOp>(tileRes->loops[0]), unrollFactor);
+    if (failed(unrolledRes)) return failure();
 
     return success();
   }
