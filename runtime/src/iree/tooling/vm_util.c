@@ -64,7 +64,7 @@ static iree_status_t iree_tooling_load_ndarrays_from_file(
 
   uint64_t file_length = iree_file_query_length(file);
 
-  iree_hal_buffer_params_t buffer_params = {};
+  iree_hal_buffer_params_t buffer_params = {0};
   buffer_params.usage = IREE_HAL_BUFFER_USAGE_DEFAULT;
   buffer_params.access = IREE_HAL_MEMORY_ACCESS_READ;
   buffer_params.type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;

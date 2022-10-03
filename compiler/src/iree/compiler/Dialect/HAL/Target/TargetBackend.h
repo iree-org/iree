@@ -93,15 +93,15 @@ struct TargetOptions {
 //          hal.executable.export @my_entry_1
 //          hal.executable.export @my_entry_2
 //          hal.executable.export @my_entry_3
-//          module { spv.module { ... } }
+//          module { spirv.module { ... } }
 //      + hal.executable.variant @spirv-v1.1-desktop
 //      filter="spirv-v1.1-desktop*"
 //          hal.executable.export @my_entry
-//          module { spv.module { ... } }
+//          module { spirv.module { ... } }
 //      + hal.executable.variant @spirv-v1.2-desktop
 //      filter="spirv-v1.2-desktop*"
 //          hal.executable.export @my_entry
-//          module { spv.module { ... } }
+//          module { spirv.module { ... } }
 //   [[-iree-hal-link-executables]]
 //   -> TODO(benvanik): linkage rules.
 //   [[-iree-hal-serialize-executables]]
@@ -163,7 +163,7 @@ class TargetBackend {
   //     hal.interface @main_io ...
   //     hal.executable.variant @target, target="target-backend" {
   //       hal.executable.export @main ...
-  //       module { spv.module { ... } }
+  //       module { spirv.module { ... } }
   //     }
   //   }
   virtual void buildTranslationPassPipeline(OpPassManager &passManager) = 0;

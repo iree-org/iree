@@ -705,8 +705,7 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
     if (!exportOp) continue;
     if (getTranslationInfo(exportOp)) continue;
     SmallVector<Operation *> computeOps;
-    SmallVector<LoopTilingAndDistributionInfo> tiledLoops;
-    if (failed(getComputeOps(funcOp, computeOps, tiledLoops))) {
+    if (failed(getComputeOps(funcOp, computeOps))) {
       return funcOp.emitOpError("failed to get compute ops");
     }
 

@@ -113,7 +113,7 @@ stream.executable private @ex3 attributes {stream.resources = #resourceIndex32} 
     // CHECK-SAME: (%[[DEV_I32:.+]]: i32, %{{.+}}: !stream.binding)
     func.func @device_index_32(%arg0: index {stream.alignment = 16 : index, stream.values = [0 : index, 1234 : index]}, %arg1: !stream.binding) {
       // 32-bit device size fits in a push constant:
-      // CHECK: %[[DEV_INDEX:.+]] = arith.index_cast %[[DEV_I32]] {
+      // CHECK: %[[DEV_INDEX:.+]] = arith.index_castui %[[DEV_I32]] {
       // CHECK-SAME:   stream.alignment = 16 : index
       // CHECK-SAME:   stream.values = [0 : index, 1234 : index]
       // CHECK-SAME: } : i32 to index
@@ -130,7 +130,7 @@ func.func @host_index_32(%arg0: index) -> !stream.timepoint {
   %0 = stream.resource.alloc uninitialized : !stream.resource<external>{%c128}
 
   // 32-bit device size fits in a push constant:
-  // CHECK: %[[HOST_I32:.+]] = arith.index_cast %arg0 : index to i32
+  // CHECK: %[[HOST_I32:.+]] = arith.index_castui %arg0 : index to i32
   // CHECK: stream.cmd.dispatch {{.+}}(%[[HOST_I32]] : i32)
 
   %1 = stream.cmd.execute with(%0 as %arg1: !stream.resource<external>{%c128}) {
@@ -162,7 +162,7 @@ stream.executable private @ex4 attributes {stream.resources = #resourceIndex64} 
       // CHECK: %[[DEV_HI64:.+]] = arith.extui %[[DEV_HI32]] : i32 to i64
       // CHECK: %[[DEV_HISHL:.+]] = arith.shli %[[DEV_HI64]], %c32
       // CHECK: %[[DEV_I64:.+]] = arith.ori %[[DEV_LO64]], %[[DEV_HISHL]] : i64
-      // CHECK: %[[DEV_INDEX:.+]] = arith.index_cast %[[DEV_I64]] {
+      // CHECK: %[[DEV_INDEX:.+]] = arith.index_castui %[[DEV_I64]] {
       // CHECK-SAME:   stream.alignment = 16 : index
       // CHECK-SAME:   stream.values = [0 : index, 1234 : index]
       // CHECK-SAME: } : i64 to index
@@ -179,7 +179,7 @@ func.func @host_index_64(%arg0: index) -> !stream.timepoint {
   %0 = stream.resource.alloc uninitialized : !stream.resource<external>{%c128}
 
   // 64-bit device size requires splitting into lo/hi:
-  // CHECK: %[[HOST_I64:.+]] = arith.index_cast %arg0 : index to i64
+  // CHECK: %[[HOST_I64:.+]] = arith.index_castui %arg0 : index to i64
   // CHECK: %[[HOST_LO32:.+]] = arith.trunci %[[HOST_I64]] : i64 to i32
   // CHECK: %[[HOST_HI64:.+]] = arith.shrui %[[HOST_I64]], %c32
   // CHECK: %[[HOST_HI32:.+]] = arith.trunci %[[HOST_HI64]] : i64 to i32

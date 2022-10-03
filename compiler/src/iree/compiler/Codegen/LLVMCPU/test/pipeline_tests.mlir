@@ -277,6 +277,7 @@ hal.executable private @vectorize_fill_conv2d_generic {
 }
 
 // CHECK:      func.func @vectorize_fill_conv2d_generic
+// CHECK-NOT:    memref.alloca
 // CHECK-NOT:    linalg.fill
 // CHECK:        vector.outerproduct %{{.+}}, %{{.+}}, %{{.+}} {kind = #vector.kind<add>}
 // CHECK-NOT:    linalg.generic

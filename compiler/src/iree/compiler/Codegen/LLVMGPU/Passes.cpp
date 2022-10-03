@@ -104,6 +104,11 @@ void addGPUVectorizationPassPipeline(OpPassManager &pm) {
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(
+      createWorkgroupSpecializationPass());
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+
+  nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
   // Distribute linalg onto threads within the workgroup.
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUTileTensor(false));
@@ -136,6 +141,11 @@ void addGPUVectorizationPassPipeline(OpPassManager &pm) {
 void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
   tileAndDistributeToWorkgroup(pm);
   auto &nestedModulePM = pm.nest<ModuleOp>();
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createWorkgroupSpecializationPass());
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
 
@@ -240,6 +250,10 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
 void addGPUTransposePassPipeline(OpPassManager &pm) {
   tileAndDistributeToWorkgroup(pm);
   auto &nestedModulePM = pm.nest<ModuleOp>();
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createWorkgroupSpecializationPass());
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
 
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
