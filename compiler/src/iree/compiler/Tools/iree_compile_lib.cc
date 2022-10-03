@@ -141,7 +141,7 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
           clEnumValN(OutputFormat::vm_c, "vm-c", "C source module"),
 #endif  // IREE_HAVE_C_OUTPUT_FORMAT
           clEnumValN(OutputFormat::vm_asm, "vm-asm", "IREE VM MLIR Assembly")),
-      llvm::cl::init(OutputFormat::none), llvm::cl::cat(mainOptions));
+      llvm::cl::init(OutputFormat::vm_bytecode), llvm::cl::cat(mainOptions));
 
   llvm::cl::opt<CompileMode> compileMode(
       "compile-mode", llvm::cl::desc("IREE compilation mode"),
@@ -168,11 +168,6 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
 #endif
 
   llvm::cl::ParseCommandLineOptions(argc, argv, "IREE compilation driver\n");
-
-  // Default output format.
-  if (outputFormat == OutputFormat::none) {
-    outputFormat = OutputFormat::vm_bytecode;
-  }
 
   std::string errorMessage;
   auto input = mlir::openInputFile(inputFilename, &errorMessage);
