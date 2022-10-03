@@ -182,7 +182,7 @@ static void specializeDistributionLoops(
   Block *block = innermostLoop.getBody();
 
   OpBuilder builder(innermostLoop->getContext());
-  PatternRewriter::InsertionGuard guard(builder);
+  OpBuilder::InsertionGuard guard(builder);
 
   AffineMinOp minOp0 = minSizeOps[0];
   if (minOp0) {
