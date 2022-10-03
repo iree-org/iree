@@ -27,6 +27,12 @@ class CompilerTest(unittest.TestCase):
     if "IREE_SAVE_TEMPS" in os.environ:
       del os.environ["IREE_SAVE_TEMPS"]
 
+  def testQueryTargets(self):
+    target_names = iree.compiler.query_available_targets()
+    logging.info("Targets = %s", target_names)
+    # The VMVX target is always enabled.
+    self.assertIn("vmvx", target_names)
+
   def testNoTargetBackends(self):
     with self.assertRaisesRegex(
         ValueError, "Expected a non-empty list for 'target_backends'"):
