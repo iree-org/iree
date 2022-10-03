@@ -6,7 +6,7 @@ module attributes {
     #hal.device.target<"webgpu", {
       executable_targets = [
         #hal.executable.target<"webgpu-wgsl", "webgpu-wgsl-fb", {
-          spv.target_env = #spv.target_env<#spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]>, #spv.resource_limits<>>
+          spirv.target_env = #spirv.target_env<#spirv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]>, #spirv.resource_limits<>>
         }>
       ]
     }>
@@ -18,7 +18,7 @@ module attributes {
 //   * The computation just reads from a single binding, without using intermediate memory
 stream.executable public @absf_dispatch {
   stream.executable.export @absf_dispatch workgroups(%arg0 : index) -> (index, index, index) {
-    %x, %y, %z = flow.dispatch.default_workgroup_count %arg0
+    %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg0
     stream.return %x, %y, %z : index, index, index
   }
   builtin.module {

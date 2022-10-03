@@ -8,7 +8,6 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "is_nan.mlir"
     "memory_access.mlir"
     "smoketest.mlir"
   TOOLS
