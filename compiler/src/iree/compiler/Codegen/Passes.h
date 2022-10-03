@@ -510,6 +510,9 @@ std::unique_ptr<OperationPass<ModuleOp>> createSPIRVVectorizeLoadStore();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVCreateFastSlowPathPass();
 
+/// Emulates 64-bit integer ops with 32-bit integer ops.
+std::unique_ptr<OperationPass<ModuleOp>> createSPIRVEmulateI64Pass();
+
 //----------------------------------------------------------------------------//
 // SPIRV Codegen Pass Pipelines.
 //----------------------------------------------------------------------------//

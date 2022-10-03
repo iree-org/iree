@@ -489,6 +489,12 @@ def SPIRVCreateFastSlowPath :
   let constructor = "mlir::iree_compiler::createSPIRVCreateFastSlowPathPass()";
 }
 
+def SPIRVEmulateI64 :
+    Pass<"iree-spirv-emulate-i64", "ModuleOp"> {
+  let summary = "Emulate 64-bit integer opts with 32-bit integer ops";
+  let constructor = "mlir::iree_compiler::createSPIRVEmulateI64Pass()";
+}
+
 //------------------------------------------------------------------------------
 // VMVX Passes
 //------------------------------------------------------------------------------
