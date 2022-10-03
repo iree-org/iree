@@ -81,7 +81,24 @@ static SmallVector<AffineMinOp> getBoundedTileSizeOps(scf::ForOp forOp,
 
   for (Operation *user : forOp.getInductionVar().getUsers()) {
     if (isBoundedTileSizeOp(user, tileSize)) {
-      minOps.push_back(cast<AffineMinOp>(user));
+      // check if all operands of the minOp are defined outside. This
+      // guarantees that the bounded tile size op does not depend on
+      // any value in the current loop body.
+      bool definedOutisde =
+          llvm::all_of(user->getOpOperands(), [&](OpOperand &opOperand) {
+            Operation *op = opOperand.get().getDefiningOp();
+            if (op) {
+              return op->getBlock() != forOp.getBody();
+            } else {
+              // It is a block argument, so it is already outside of body.
+              return true;
+            }
+          });
+
+      if (!definedOutisde) continue;
+
+      AffineMinOp minOp = cast<AffineMinOp>(user);
+      minOps.push_back(cast<AffineMinOp>(minOp));
     }
   }
 
