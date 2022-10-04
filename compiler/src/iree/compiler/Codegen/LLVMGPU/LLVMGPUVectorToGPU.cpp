@@ -154,19 +154,12 @@ struct LLVMGPUVectorToGPUPass
                                             std::move(flatternpatterns)))) {
       return signalPassFailure();
     }
-    RewritePatternSet patterns(funcOp.getContext());
-    mlir::vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
-    mlir::populatePrepareVectorToMMAPatterns(patterns, llvmgpuUseMMASync);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
-      return signalPassFailure();
-    }
 
     if (llvmgpuUseMMASync) {
       if (failed(convertVectorToNVVMCompatibleMMASync(funcOp))) {
         return signalPassFailure();
       }
-      // Use TF32 for float32 case for now.
+      // Using TF32 for Float.
       RewritePatternSet f32ToTF32patterns(funcOp.getContext());
       nvgpu::populateMmaSyncF32ToTF32Patterns(f32ToTF32patterns,
                                               nvgpu::MmaSyncF32Lowering::TF32);

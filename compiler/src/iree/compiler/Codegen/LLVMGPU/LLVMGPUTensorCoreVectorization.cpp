@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -257,8 +258,16 @@ struct LLVMGPUTensorCoreVectorizationPass
       funcOp->dump();
       std::endl;
 #endif
+      // Step 3. Prepare vector operations to be lowered to GPU ops.
+      RewritePatternSet vectorContractPatterns(funcOp.getContext());
+      mlir::vector::populateCastAwayVectorLeadingOneDimPatterns(vectorContractPatterns);
+      mlir::populatePrepareVectorToMMAPatterns(vectorContractPatterns, llvmgpuUseMMASync);
+      if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                              std::move(vectorContractPatterns)))) {
+        return signalPassFailure();
+      }
 
-      // Step 3. Break and unroll warp tile size to native math and load sizes.
+      // Step 4. Break and unroll warp tile size to native math and load sizes.
       RewritePatternSet vectorUnrollPatterns(context);
       populateVectorUnrollPatterns(vectorUnrollPatterns);
       if (failed(applyPatternsAndFoldGreedily(
