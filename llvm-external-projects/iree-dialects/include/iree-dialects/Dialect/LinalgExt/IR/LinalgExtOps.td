@@ -577,14 +577,12 @@ def IREELinalgExt_UnPackOp : IREELinalgExt_Op<"unpack", [
     Variadic<AnyShaped>:$outputs,
     DefaultValuedAttr<I64ArrayAttr, "{}">:$dims_pos,
     Variadic<Index>:$inner_tiles,
-    I64ArrayAttr:$static_inner_tiles,
-    Optional<AnyType>:$padding_value);
+    I64ArrayAttr:$static_inner_tiles);
 
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let assemblyFormat = [{
     attr-dict
     $inputs
-    (`padding_value` `(` $padding_value^ `:` type($padding_value) `)`)? 
     `dims_pos` `=` $dims_pos
     `inner_tiles` `=`
     custom<DynamicIndexList>($inner_tiles, $static_inner_tiles,

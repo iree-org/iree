@@ -1635,11 +1635,9 @@ static DenseMap<int64_t, OpFoldResult> getDimAndTileMapping(OpTy op) {
   return dimAndTileMapping;
 }
 
-/// Helper function for `generatePackOpOrUnPackScalarImplementationBody` to
-/// build the statements in the innermost loop.
-template <typename OpTy>
+/// Helper function to generate the inner body for `PackOp`.
 static void generatePackOpScalarImplementationBodyImpl(
-    OpTy op, OpBuilder &builder, Location loc, ValueRange ivs,
+    PackOp op, OpBuilder &builder, Location loc, ValueRange ivs,
     ArrayRef<OpFoldResult> accessIndices) {
 
   auto createLoad = [&]() -> Value {
@@ -1722,9 +1720,9 @@ generatePackOpOrUnPackScalarImplementationBody(OpTy op, OpBuilder &builder,
   }
 
   if (std::is_same<OpTy, PackOp>::value) {
-    generatePackOpScalarImplementationBodyImpl(op, builder, loc, ivs, indices);
+    generatePackOpScalarImplementationBodyImpl(cast<PackOp>(op), builder, loc,
+                                               ivs, indices);
   } else {
-    assert(!op.getPaddingValue() && "pad semantics not implemented for unpack");
     Value scalar = builder.create<memref::LoadOp>(loc, op.getInput(), ivs);
     builder.create<memref::StoreOp>(loc, scalar, op.getOutput(),
                                     getAsValues(builder, loc, indices));
@@ -1822,8 +1820,7 @@ LogicalResult PackOp::verify() {
   }
   // Bail out if the tile does not divide the dimension fully. In the case of
   // dynamic tile factors or dimensions, having a partial tile is undefined
-  // behavior. We will relax this constraint when we introduce padding
-  // semantics.
+  // behavior.
   if (!getPaddingValue() &&
       areNotFullTiles(getInputShape(), getDimAndTileMapping())) {
     return op->emitError("invalid tile factor provided. Only full tiles are "
@@ -2274,10 +2271,6 @@ LogicalResult UnPackOp::verify() {
   if (failed(commonVerifierPackAndUnPackOp(*this))) {
     return failure();
   }
-  // TODO: implement padding semantics. Bail out for now.
-  if (getPaddingValue())
-    return op->emitError("padding semantics not implemented");
-
   // Blocking factors must be less or equal than the input rank, and must
   // match the number of `dims_pos`.
   if (numberOfBlockingFactors > getOutputRank()) {
@@ -2295,8 +2288,9 @@ LogicalResult UnPackOp::verify() {
   }
   // Bail out if the tile does not divide the dimension fully. In the case of
   // dynamic tile factors or dimensions, having a partial tile is undefined
-  // behavior. We will relax this constraint when we introduce padding
-  // semantics.
+  // behavior. We could relax this if we allow to `undo` the padding done in the
+  // pack operation. The product of dim(point_loop) and dim(tile_loop) >=
+  // dim(input).
   if (areNotFullTiles(getOutputShape(), getDimAndTileMapping())) {
     return op->emitError(
         "invalid tile factor provided. Only full tiles are supported");
