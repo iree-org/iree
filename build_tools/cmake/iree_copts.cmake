@@ -355,12 +355,17 @@ iree_select_compiler_opts(IREE_DEFAULT_LINKOPTS
     "-natvis:${IREE_ROOT_DIR}/runtime/iree.natvis"
 )
 
-# Add to LINKOPTS on a binary to configure it for X/Wayland/Windows/etc
-# depending on the target cross-compilation platform.
-if(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
-  set(IREE_TARGET_GUI_LINKOPTS "-SUBSYSTEM:WINDOWS")
-else()
-  set(IREE_TARGET_GUI_LINKOPTS "")
+if(EMSCRIPTEN AND IREE_HAL_DRIVER_WEBGPU)
+  iree_select_compiler_opts(IREE_DEFAULT_LINKOPTS
+    ALL
+      "-sUSE_WEBGPU"
+      # Hack: Used to create sync versions of requestAdapter and requestDevice
+      # TODO(scotttodd): Only set for test binaries, avoid sync code in apps
+      #   this doesn't _break_ apps that don't use the sync functions, but it
+      #   does bloat their binary size (and each Emscripten flag comes with
+      #   some risk of breaking compatibility with other features)
+      "-sASYNCIFY"
+  )
 endif()
 
 #-------------------------------------------------------------------------------

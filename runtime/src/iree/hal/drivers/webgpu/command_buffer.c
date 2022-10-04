@@ -11,6 +11,7 @@
 #include <stdint.h>
 
 #include "iree/base/api.h"
+#include "iree/base/internal/arena.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/drivers/webgpu/buffer.h"
 #include "iree/hal/drivers/webgpu/executable.h"

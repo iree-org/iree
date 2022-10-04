@@ -280,7 +280,10 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_validate_memory_type(
 IREE_API_EXPORT iree_status_t iree_hal_buffer_validate_access(
     iree_hal_memory_access_t allowed_memory_access,
     iree_hal_memory_access_t required_memory_access) {
-  if (iree_all_bits_set(allowed_memory_access, IREE_HAL_MEMORY_ACCESS_ANY)) {
+  // TODO(scotttodd): change to allowed_memory_access when possible
+  //   (at least the web samples aren't setting the required access bits)
+  // if (iree_all_bits_set(allowed_memory_access, IREE_HAL_MEMORY_ACCESS_ANY)) {
+  if (iree_all_bits_set(required_memory_access, IREE_HAL_MEMORY_ACCESS_ANY)) {
     return iree_ok_status();
   }
   if (IREE_UNLIKELY(!iree_any_bit_set(

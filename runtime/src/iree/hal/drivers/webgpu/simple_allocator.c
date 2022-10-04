@@ -39,16 +39,17 @@ iree_status_t iree_hal_webgpu_simple_allocator_create(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_webgpu_simple_allocator_t* allocator = NULL;
-  iree_status_t status = iree_allocator_malloc(
-      host_allocator, sizeof(*allocator), (void**)&allocator);
+  iree_host_size_t struct_size = iree_sizeof_struct(*allocator);
+  iree_host_size_t total_size = struct_size + identifier.size;
+  iree_status_t status =
+      iree_allocator_malloc(host_allocator, total_size, (void**)&allocator);
   if (iree_status_is_ok(status)) {
     iree_hal_resource_initialize(&iree_hal_webgpu_simple_allocator_vtable,
                                  &allocator->resource);
     allocator->host_allocator = host_allocator;
     allocator->device = device;
-    iree_string_view_append_to_buffer(
-        identifier, &allocator->identifier,
-        (char*)allocator + iree_sizeof_struct(*allocator));
+    iree_string_view_append_to_buffer(identifier, &allocator->identifier,
+                                      (char*)allocator + struct_size);
     *out_allocator = (iree_hal_allocator_t*)allocator;
   }
 
