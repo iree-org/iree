@@ -1998,42 +1998,38 @@ PackOp::reifyResultShapes(OpBuilder &builder,
                           ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
   OpBuilder::InsertionGuard g(builder);
   builder.setInsertionPoint(getOperation());
+  Location loc = getLoc();
+  SmallVector<OpFoldResult> mixedTiles = getMixedTiles();
+  DenseMap<int64_t, OpFoldResult> dimAndTileMapping = getDimAndTileMapping();
+
   // Build the output dimension at pos `dimIdx`.
   auto buildOutputDim = [&](OpBuilder &builder, size_t dimIdx) -> OpFoldResult {
     ArrayRef<int64_t> outputShape = getOutputShape();
-    if (!ShapedType::isDynamic(outputShape[dimIdx]))
+    if (!ShapedType::isDynamic(outputShape[dimIdx])) {
       return builder.getI64IntegerAttr(outputShape[dimIdx]);
+    }
 
-    // Handle dynamic.
-    DenseMap<int64_t, OpFoldResult> dimAndTileMapping = getDimAndTileMapping();
-    AffineExpr dim = builder.getAffineSymbolExpr(0);
-    AffineExpr tile = builder.getAffineSymbolExpr(1);
-    auto apply = [&](AffineExpr expr,
-                     ArrayRef<OpFoldResult> values) -> OpFoldResult {
-      return makeComposedFoldedAffineApply(builder, getOperation()->getLoc(),
-                                           expr, values);
-    };
-    // If we are dealing with a tiled dimension compose the map otherwise
-    // return the dimension extracted with `memref.dim`.
-    // TODO(hanchung): Should bind inner size to inner_tiles if they are
-    // dynamic.
-    OpFoldResult dimBound =
-        dimIdx < getInputRank()
-            ? getDim(builder, getOperation()->getLoc(), getInput(), dimIdx)
-            : getDim(builder, getOperation()->getLoc(), getOutput(), dimIdx);
-    return (dimAndTileMapping.count(dimIdx))
-               ? apply(dim.ceilDiv(tile),
-                       ArrayRef<OpFoldResult>{dimBound,
-                                              dimAndTileMapping[dimIdx]})
-               : dimBound;
+    // Inner tile sizes can be derived from inner_tiles.
+    if (dimIdx >= getInputRank()) {
+      return mixedTiles[dimIdx - getInputRank()];
+    }
+
+    OpFoldResult dimBound = getDim(builder, loc, getInput(), dimIdx);
+    if (dimAndTileMapping.count(dimIdx)) {
+      AffineExpr dim = builder.getAffineSymbolExpr(0);
+      AffineExpr tile = builder.getAffineSymbolExpr(1);
+      dimBound = makeComposedFoldedAffineApply(
+          builder, loc, dim.ceilDiv(tile),
+          ArrayRef<OpFoldResult>{dimBound, dimAndTileMapping[dimIdx]});
+    }
+    return dimBound;
   };
 
   reifiedReturnShapes.resize(1);
   reifiedReturnShapes[0].reserve(getOutputRank());
   for (auto dimIdx : llvm::seq<int64_t>(0, getOutputRank())) {
-    reifiedReturnShapes[0].push_back(getAsValues(
-        builder, getOperation()->getLoc(),
-        ArrayRef<OpFoldResult>{buildOutputDim(builder, dimIdx)})[0]);
+    reifiedReturnShapes[0].push_back(getValueOrCreateConstantIndexOp(
+        builder, loc, buildOutputDim(builder, dimIdx)));
   }
   return success();
 }

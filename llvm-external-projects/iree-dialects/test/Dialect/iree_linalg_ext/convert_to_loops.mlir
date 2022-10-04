@@ -1042,34 +1042,35 @@ func.func @KCRS_to_KCRSsr(%arg0: memref<?x?x?x?xf32>, %arg1: memref<?x?x?x?x8x?x
   return
 }
 
-// CHECK-DAG: #[[MAP0:.*]] = affine_map<()[s0, s1] -> (s0 ceildiv s1)>
-// CHECK-DAG: #[[MAP1:.*]] = affine_map<()[s0] -> (s0 ceildiv 8)>
-// CHECK-DAG: #[[MAP2:.*]] = affine_map<(d0, d1)[s0] -> (d0 * s0 + d1)>
-// CHECK-DAG: #[[MAP3:.*]] = affine_map<(d0, d1) -> (d0 * 8 + d1)>
-// CHECK-LABEL: func.func @KCRS_to_KCRSsr(
+// CHECK-DAG:  #[[MAP0:.*]] = affine_map<()[s0, s1] -> (s0 ceildiv s1)>
+// CHECK-DAG:  #[[MAP1:.*]] = affine_map<()[s0] -> (s0 ceildiv 8)>
+// CHECK-DAG:  #[[MAP2:.*]] = affine_map<(d0, d1)[s0] -> (d0 * s0 + d1)>
+// CHECK-DAG:  #[[MAP3:.*]] = affine_map<(d0, d1) -> (d0 * 8 + d1)>
+// CHECK:      func.func @KCRS_to_KCRSsr
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
 // CHECK-DAG: %[[zero:.*]] = arith.constant 0 : index
 // CHECK-DAG: %[[one:.*]] = arith.constant 1 : index
 // CHECK-DAG: %[[eight:.*]] = arith.constant 8 : index
 // CHECK-DAG: %[[two:.*]] = arith.constant 2 : index
 // CHECK-DAG: %[[three:.*]] = arith.constant 3 : index
-// CHECK-DAG: %[[five:.*]] = arith.constant 5 : index
-// CHECK-DAG: %[[dimZero:.*]] = memref.dim %arg0, %[[zero]] : memref<?x?x?x?xf32>
-// CHECK-DAG: %[[dimOne:.*]] = memref.dim %arg0, %[[one]] : memref<?x?x?x?xf32>
-// CHECK-DAG: %[[dimTwo:.*]] = memref.dim %arg0, %[[two]] : memref<?x?x?x?xf32>
-// CHECK-DAG: %[[dimThree:.*]] = memref.dim %arg0, %[[three]] : memref<?x?x?x?xf32>
-// CHECK-DAG: %[[dimFive:.*]] = memref.dim %arg1, %[[five]] : memref<?x?x?x?x8x?xf32>
-// CHECK-DAG: %[[mapOnDimTwo:.*]] = affine.apply #[[MAP0]]()[%[[dimTwo]], %arg2]
+// CHECK-DAG: %[[dimZero:.*]] = memref.dim %[[ARG0]], %[[zero]] : memref<?x?x?x?xf32>
+// CHECK-DAG: %[[dimOne:.*]] = memref.dim %[[ARG0]], %[[one]] : memref<?x?x?x?xf32>
+// CHECK-DAG: %[[dimTwo:.*]] = memref.dim %[[ARG0]], %[[two]] : memref<?x?x?x?xf32>
+// CHECK-DAG: %[[dimThree:.*]] = memref.dim %[[ARG0]], %[[three]] : memref<?x?x?x?xf32>
+// CHECK-DAG: %[[mapOnDimTwo:.*]] = affine.apply #[[MAP0]]()[%[[dimTwo]], %[[ARG2]]]
 // CHECK-DAG: %[[mapOnDimThree:.*]] = affine.apply #[[MAP1]]()[%[[dimThree]]]
 // CHECK: scf.for %[[K:.*]] = %[[zero]] to %[[dimZero]] step %[[one]] {
 // CHECK:   scf.for %[[C:.*]] = %[[zero]] to %[[dimOne]] step %[[one]] {
 // CHECK:     scf.for %[[R:.*]] = %[[zero]] to %[[mapOnDimTwo]] step %[[one]] {
 // CHECK:       scf.for %[[S:.*]] = %[[zero]] to %[[mapOnDimThree]] step %[[one]] {
 // CHECK:         scf.for %[[s:.*]] = %[[zero]] to %[[eight]] step %[[step]] {
-// CHECK:           scf.for %[[r:.*]] = %[[zero]] to %[[dimFive]] step %[[step]] {
+// CHECK:           scf.for %[[r:.*]] = %[[zero]] to %[[ARG2]] step %[[step]] {
 // CHECK-DAG:         %[[affineMapR:.*]] = affine.apply #[[MAP2]](%[[R]], %[[r]])
 // CHECK-DAG:         %[[affineMapS:.*]] = affine.apply #[[MAP3]](%[[S]], %[[s]])
-// CHECK:             %[[scalar:.*]] = memref.load %arg0[%[[K]], %[[C]], %[[affineMapR]], %[[affineMapS]]] : memref<?x?x?x?xf32>
-// CHECK:             memref.store %[[scalar]], %arg1[%[[K]], %[[C]], %[[R]], %[[S]], %[[s]], %[[r]]] : memref<?x?x?x?x8x?xf32>
+// CHECK:             %[[scalar:.*]] = memref.load %[[ARG0]][%[[K]], %[[C]], %[[affineMapR]], %[[affineMapS]]] : memref<?x?x?x?xf32>
+// CHECK:             memref.store %[[scalar]], %[[ARG1]][%[[K]], %[[C]], %[[R]], %[[S]], %[[s]], %[[r]]] : memref<?x?x?x?x8x?xf32>
 // CHECK:           }
 // CHECK:         }
 // CHECK:       }
