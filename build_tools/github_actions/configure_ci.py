@@ -93,7 +93,7 @@ def should_run_ci(event_name, trailers) -> bool:
           f" pull request event (event name is '{event_name}')")
     return True
 
-  for SKIP_CI_KEY in trailers:
+  if SKIP_CI_KEY in trailers:
     print(f"Not running CI because PR description has '{SKIP_CI_KEY}' trailer.")
     return False
 
