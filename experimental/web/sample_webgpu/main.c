@@ -10,6 +10,7 @@
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
+#include "iree/hal/drivers/webgpu/platform/webgpu.h"
 #include "iree/modules/hal/module.h"
 #include "iree/runtime/api.h"
 #include "iree/vm/bytecode_module.h"
@@ -72,8 +73,8 @@ typedef struct iree_program_state_t {
   iree_vm_module_t* module;
 } iree_program_state_t;
 
-extern iree_status_t create_device_with_loaders(iree_allocator_t host_allocator,
-                                                iree_hal_device_t** out_device);
+extern iree_status_t create_device(iree_allocator_t host_allocator,
+                                   iree_hal_device_t** out_device);
 
 iree_sample_state_t* setup_sample() {
   iree_sample_state_t* sample_state = NULL;
@@ -82,7 +83,8 @@ iree_sample_state_t* setup_sample() {
                             sizeof(iree_sample_state_t), (void**)&sample_state);
 
   iree_runtime_instance_options_t instance_options;
-  iree_runtime_instance_options_initialize(&instance_options);
+  iree_runtime_instance_options_initialize(IREE_API_VERSION_LATEST,
+                                           &instance_options);
   // Note: no call to iree_runtime_instance_options_use_all_available_drivers().
 
   if (iree_status_is_ok(status)) {
@@ -91,8 +93,7 @@ iree_sample_state_t* setup_sample() {
   }
 
   if (iree_status_is_ok(status)) {
-    status = create_device_with_loaders(iree_allocator_system(),
-                                        &sample_state->device);
+    status = create_device(iree_allocator_system(), &sample_state->device);
   }
 
   if (!iree_status_is_ok(status)) {

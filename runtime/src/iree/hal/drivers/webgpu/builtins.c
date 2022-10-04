@@ -76,7 +76,7 @@ static iree_status_t iree_hal_webgpu_builtins_initialize_fill_buffer(
               .next = NULL,
               .sType = WGPUSType_ShaderModuleWGSLDescriptor,
           },
-      .code = iree_hal_webgpu_builtins_find_code("fill_buffer.wgsl"),
+      .source = iree_hal_webgpu_builtins_find_code("fill_buffer.wgsl"),
   };
   const WGPUShaderModuleDescriptor module_descriptor = {
       .nextInChain = &wgsl_descriptor.chain,
