@@ -11,16 +11,11 @@
 #include "iree/hal/api.h"
 
 #define WGPU_SKIP_PROCS 1
-#if defined(IREE_HAL_WEBGPU_PLATFORM_WGPU_NATIVE)
-#include <webgpu-headers/webgpu.h>
-#include <wgpu.h>  // wgpu-native implementation only
-#elif defined(IREE_HAL_WEBGPU_PLATFORM_DAWN)
-#include <dawn/webgpu.h>
-#elif defined(__EMSCRIPTEN__)
+#if defined(__EMSCRIPTEN__)
 #include <emscripten/html5_webgpu.h>
 #else
 #include "third_party/webgpu-headers/webgpu.h"  // IWYU pragma: export
-#endif  // IREE_HAL_WEBGPU_PLATFORM_WGPU_NATIVE
+#endif
 
 #ifdef __cplusplus
 extern "C" {
