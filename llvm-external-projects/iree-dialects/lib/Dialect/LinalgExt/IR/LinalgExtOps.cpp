@@ -1604,7 +1604,7 @@ computeInterchangeFromDimPos(ArrayRef<int64_t> dimsPos, int64_t inputRank) {
 
 // Utility function shared between Pack and UnPack to get the tile sizes as
 // OpFoldResults.
-// TODO: interface?
+// TODO: interface or base class in .td
 template <typename OpTy>
 static SmallVector<OpFoldResult> getMixedTiles(OpTy op) {
   SmallVector<OpFoldResult> mixedInnerTiles;
@@ -1621,7 +1621,7 @@ static SmallVector<OpFoldResult> getMixedTiles(OpTy op) {
 
 // Utility function shared between Pack and UnPack to get a map between
 // `dim_pos` and `inner_tiles`.
-// TODO: interface
+// TODO: interface or base class in .td
 template <typename OpTy>
 static DenseMap<int64_t, OpFoldResult> getDimAndTileMapping(OpTy op) {
   DenseMap<int64_t, OpFoldResult> dimAndTileMapping;
@@ -1672,7 +1672,6 @@ static void generatePackOpScalarImplementationBodyImpl(
   } else {
     scalar = createLoad();
   }
-
   builder.create<memref::StoreOp>(loc, scalar, op.getOutput(), ivs);
 }
 
@@ -1865,7 +1864,7 @@ SmallVector<int64_t> PackOp::getStaticTiles() {
 
 // Implement the tiling interface. The number of loops equals
 // the rank of the output tensors. All the loops are parallel.
-// Note that here that we consider only the tiled loops, the other loops are
+// Note that here that we consider only the tiled loops, the point loops are
 // materialized when building the body of the operation.
 SmallVector<utils::IteratorType> PackOp::getLoopIteratorTypes() {
   SmallVector<utils::IteratorType> iteratorTypes(getInputRank(),
