@@ -18,9 +18,11 @@ namespace iree_compiler {
 namespace IREE {
 namespace ABI {
 
-void buildTransformPassPipeline(OpPassManager &passManager) {
+void buildTransformPassPipeline(OpPassManager &passManager,
+                                const InvocationOptions &invocationOptions) {
   // Wraps the entry points in an export function.
-  passManager.addPass(createWrapEntryPointsPass());
+  passManager.addPass(
+      createWrapEntryPointsPass(invocationOptions.invocationModel));
 
   // Cleanup the IR after manipulating it.
   passManager.addPass(createInlinerPass());
@@ -30,11 +32,12 @@ void buildTransformPassPipeline(OpPassManager &passManager) {
 }
 
 void registerTransformPassPipeline() {
-  PassPipelineRegistration<> transformPassPipeline(
+  PassPipelineRegistration<InvocationOptions> transformPassPipeline(
       "iree-abi-transformation-pipeline",
       "Runs the IREE native ABI bindings support pipeline",
-      [](OpPassManager &passManager) {
-        buildTransformPassPipeline(passManager);
+      [](OpPassManager &passManager,
+         const InvocationOptions &invocationOptions) {
+        buildTransformPassPipeline(passManager, invocationOptions);
       });
 }
 

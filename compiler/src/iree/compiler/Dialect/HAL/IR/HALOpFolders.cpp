@@ -52,6 +52,47 @@ OpFoldResult TensorExportOp::fold(ArrayRef<Attribute> operands) {
 }
 
 //===----------------------------------------------------------------------===//
+// hal.tensor.barrier
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+/// Deduplicates hal.tensor.barrier operands.
+struct DeduplicateTensorBarrierSources
+    : public OpRewritePattern<TensorBarrierOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(TensorBarrierOp op,
+                                PatternRewriter &rewriter) const override {
+    DenseMap<Value, unsigned> uniqueSources;  // source -> unique index
+    SmallVector<Value> orderedSources;
+    SmallVector<unsigned> resultMapping;  // old -> new result index
+    for (auto source : op.getSources()) {
+      auto it =
+          uniqueSources.insert(std::make_pair(source, orderedSources.size()));
+      if (it.second) orderedSources.push_back(source);
+      resultMapping.push_back(it.first->second);
+    }
+    if (orderedSources.size() == op.getSources().size()) return failure();
+    auto newOp = rewriter.create<TensorBarrierOp>(op.getLoc(), orderedSources,
+                                                  op.getSignalFence());
+    SmallVector<Value> newResults;
+    newResults.reserve(newOp.getNumResults());
+    for (unsigned newIndex : resultMapping) {
+      newResults.push_back(newOp.getResult(newIndex));
+    }
+    rewriter.replaceOp(op, newResults);
+    return success();
+  }
+};
+
+}  // namespace
+
+void TensorBarrierOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                  MLIRContext *context) {
+  results.insert<DeduplicateTensorBarrierSources>(context);
+}
+
+//===----------------------------------------------------------------------===//
 // hal.buffer_view.*
 //===----------------------------------------------------------------------===//
 

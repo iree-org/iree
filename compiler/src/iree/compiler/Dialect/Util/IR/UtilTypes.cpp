@@ -401,8 +401,8 @@ void excludeTiedOperandAndResultIndices(
 // IREE::Util::SizeAwareTypeInterface
 //===----------------------------------------------------------------------===//
 
-static bool isValueUsableForOp(Value value, Block *block,
-                               Block::iterator insertionPoint) {
+bool isValueUsableForOp(Value value, Block *block,
+                        Block::iterator insertionPoint) {
   if (block == nullptr) {
     // Op is not in a block; can't analyze (maybe?).
     return false;
@@ -426,6 +426,10 @@ static bool isValueUsableForOp(Value value, Block *block,
     return dominanceInfo.dominates(definingBlock, block);
   }
   return false;
+}
+
+bool isValueUsableForOp(Value value, Operation *op) {
+  return isValueUsableForOp(value, op->getBlock(), Block::iterator(op));
 }
 
 // static

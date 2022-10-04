@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "wrap_entry_points.mlir"
+    "wrap_entry_points_coarse_fences.mlir"
   TOOLS
     FileCheck
     iree-opt

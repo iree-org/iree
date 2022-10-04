@@ -2096,6 +2096,36 @@ LogicalResult TimepointJoinOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
+// stream.timepoint.barrier
+//===----------------------------------------------------------------------===//
+
+LogicalResult TimepointBarrierOp::verify() {
+  TimepointBarrierOp op = *this;
+  if (failed(verifyOpValueSizes(op, op.getResource(), op.getResourceSize()))) {
+    return failure();
+  }
+  return success();
+}
+
+Value TimepointBarrierOp::getTiedResult(unsigned resultIndex) {
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getResource());
+}
+
+::llvm::Optional<unsigned> TimepointBarrierOp::getTiedResultOperandIndex(
+    unsigned resultIndex) {
+  return {0};
+}
+
+SmallVector<int64_t, 4> TimepointBarrierOp::getTiedResultOperandIndices() {
+  return {0};
+}
+
+std::pair<unsigned, unsigned>
+TimepointBarrierOp::getTiedResultsIndexAndLength() {
+  return {0, 1};
+}
+
+//===----------------------------------------------------------------------===//
 // stream.timepoint.await
 //===----------------------------------------------------------------------===//
 
