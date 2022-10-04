@@ -50,10 +50,6 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # This is mostly here so we can compute it once and use it in outputs below.
-  # See note above regarding lack of proper variables. Also see note about
-  # pseudo-ternary hack.
-  _CI_STAGE: ${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
   # This needs to be in env instead of the outputs of setup because it contains
   # the run attempt and we want that to be the current attempt, not whatever
   # attempt the setup step last ran in.
@@ -69,22 +65,19 @@ jobs:
       BASE_REF: HEAD^
       PR_DESCRIPTION: ${{ github.event.pull_request.body }}
     outputs:
-      should-run: ${{ steps.should-run.outputs.should-run }}
-      ci-stage: ${{ env._CI_STAGE }}
-      # Variables for dependent jobs. See comment at top.
-      runner-env: prod
-      runner-group: ${{ env._CI_STAGE }}
-      # Note that we can't flip the condition here because 0 is falsey. See
-      # comment at top.
-      write-caches: ${{ github.event_name != 'pull_request' && 1 || 0 }}
+      should-run: ${{ steps.configure.outputs.should-run }}
+      ci-stage: ${{ steps.configure.outputs.ci-stage }}
+      runner-env: ${{ steps.configure.outputs.runner-env }}
+      runner-group: ${{ steps.configure.outputs.runner-group }}
+      write-caches: ${{ steps.configure.outputs.write-caches }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
         with:
           # We need the parent commit to do a diff
           fetch-depth: 2
-      - name: "Computing whether CI should run"
-        id: should-run
+      - name: "Configuring CI options"
+        id: configure
         run: |
           # Just informative logging. There should only be two commits in the
           # history here, but limiting the depth helps when copying from a local
@@ -92,16 +85,7 @@ jobs:
           # https://github.com/nektos/act where there will be more.
           git log --oneline --graph --max-count=3
 
-          ret=0
-          ./build_tools/github_actions/should_ci_run.py || ret=$?
-          if (( ret==0 )); then
-            echo "::set-output name=should-run::true"
-            exit 0
-          elif (( ret==2 )); then
-            echo "::set-output name=should-run::false"
-            exit 0
-          fi
-          exit "${ret}"
+          ./build_tools/github_actions/configure_ci.py
 
 
   ################################### Basic ####################################
