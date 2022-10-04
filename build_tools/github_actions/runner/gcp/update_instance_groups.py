@@ -96,6 +96,11 @@ def main(args):
       project=args.project,
   )
 
+  if "testing" in args.version and args.env != "testing":
+    scary_action = (f"using testing template version '{args.version}' in"
+                    f" environment '{args.env}'")
+    check_scary_action(scary_action, args.skip_confirmation)
+
   # Prod instances just have the bare name
   modifier = None if args.env == "prod" else args.env
   migs = updater.get_migs(region=args.region,
