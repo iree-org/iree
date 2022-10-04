@@ -119,3 +119,73 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //         CHECK:     scf.yield %[[F]] : tensor<64xf32>
 //         CHECK:   }
 //         CHECK:   flow.dispatch.tensor.store %[[T]], %{{.}}, offsets = [%{{.*}}], sizes = [64], strides = [1] : tensor<64xf32> -> !flow.dispatch.tensor<writeonly:128xf32>
+
+// -----
+
+hal.executable private @reduction_broadcast  {
+hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_35"}> {
+  hal.executable.export public @reduction_broadcast ordinal(0)
+  layout(#hal.pipeline.layout<push_constants = 0,
+         sets = [<0, bindings = [<0, storage_buffer>, <1, storage_buffer>, <2, storage_buffer>]>]>)
+         attributes {translation_info = #iree_codegen.translation_info<LLVMGPUVectorize>,
+                     workgroup_size = [64 : index, 1 : index, 1 : index]} {
+  ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
+    %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
+    hal.return %x, %y, %z : index, index, index
+  }
+  builtin.module {
+    func.func @reduction_broadcast() {
+      %c0 = arith.constant 0 : index
+      %cst = arith.constant 0.000000e+00 : f32
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:2x32x10x4096xf32>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:2x32x10x4096xf32>
+      %workgroup_id_x = hal.interface.workgroup.id[0] : index
+      %workgroup_id_y = hal.interface.workgroup.id[1] : index
+      %2 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
+      %3 = flow.dispatch.tensor.load %1, offsets = [%workgroup_id_y, %2, 0, 0], sizes = [1, 32, 10, 4096], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<writeonly:2x32x10x4096xf32> -> tensor<1x32x10x4096xf32>
+      %4 = flow.dispatch.tensor.load %0, offsets = [%workgroup_id_y, %2, 0, 0], sizes = [1, 32, 10, 4096], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:2x32x10x4096xf32> -> tensor<1x32x10x4096xf32>
+      %5 = linalg.init_tensor [1, 32] : tensor<1x32xf32>
+      %6 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 64, 4, 4]]>} ins(%cst : f32) outs(%5 : tensor<1x32xf32>) -> tensor<1x32xf32>
+      %7 = linalg.generic {
+        indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1)>],
+        iterator_types = ["parallel", "parallel", "reduction", "reduction"]}
+        ins(%4 : tensor<1x32x10x4096xf32>) outs(%6 : tensor<1x32xf32>)
+        attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 64, 4, 4]]>} {
+      ^bb0(%arg0: f32, %arg1: f32):
+        %9 = arith.addf %arg0, %arg1 : f32
+        linalg.yield %9 : f32
+      } -> tensor<1x32xf32>
+      %8 = linalg.generic {
+        indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+        iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+        ins(%4, %7 : tensor<1x32x10x4096xf32>, tensor<1x32xf32>) outs(%3 : tensor<1x32x10x4096xf32>)
+        attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 64, 4, 4]]>} {
+      ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):
+        %9 = arith.addf %arg0, %arg1 : f32
+        linalg.yield %9 : f32
+      } -> tensor<1x32x10x4096xf32>
+      flow.dispatch.tensor.store %8, %1, offsets = [%workgroup_id_y, %2, 0, 0], sizes = [1, 32, 10, 4096], strides = [1, 1, 1, 1] : tensor<1x32x10x4096xf32> -> !flow.dispatch.tensor<writeonly:2x32x10x4096xf32>
+      return
+    }
+}
+}
+}
+//   Check that the parallel dimensions that didn't get distributed are being
+//   tiled with a serial loop. This happens because the broadcast has extra
+//   parallel dimension that won't get distributed by tile and distribute to
+//   workgroup.
+//   CHECK-LABEL: func.func @reduction_broadcast
+//     CHECK-DAG:   %[[C0:.*]] = arith.constant 0 : index
+//     CHECK-DAG:   %[[C4:.*]] = arith.constant 4 : index
+//     CHECK-DAG:   %[[C10:.*]] = arith.constant 10 : index
+//     CHECK-DAG:   %[[C4096:.*]] = arith.constant 4096 : index
+//         CHECK:   scf.foreach_thread
+//         CHECK:     linalg.fill
+//         CHECK:   scf.for %{{.*}} = %[[C0]] to %[[C10]] step %[[C4]]
+//         CHECK:     scf.for %{{.*}} = %[[C0]] to %[[C4096]] step %[[C4]]
+//         CHECK:       scf.foreach_thread
+//         CHECK:         linalg.generic
+//         CHECK:   scf.for %{{.*}} = %[[C0]] to %[[C10]] step %[[C4]]
+//         CHECK:     scf.for %{{.*}} = %[[C0]] to %[[C4096]] step %[[C4]]
+//         CHECK:       scf.foreach_thread
+//         CHECK:         linalg.generic

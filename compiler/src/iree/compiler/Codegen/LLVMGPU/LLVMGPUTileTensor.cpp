@@ -30,17 +30,20 @@ namespace iree_compiler {
 /// Patterns for workgroup level tiling. Workgroup tiling is done at the flow
 /// level but we may have extra tiling for the reduction dimension. Therefore we
 /// tile again without distributing.
-static void populateTilingReductionPatterns(RewritePatternSet &patterns) {
-  auto tileSizesFn = [&](OpBuilder &builder,
-                         Operation *op) -> SmallVector<Value, 4> {
+static void populateTilingPatterns(RewritePatternSet &patterns,
+                                   bool onlyReduction) {
+  auto tileSizesFn = [onlyReduction](OpBuilder &builder,
+                                     Operation *op) -> SmallVector<Value, 4> {
     auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
     auto partitionedLoops =
         interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
     SmallVector<Value, 4> tileSizes = getTileSizes(builder, op, 0);
-    auto zero = builder.create<arith::ConstantIndexOp>(op->getLoc(), 0);
-    for (unsigned depth : partitionedLoops) {
-      if (depth < tileSizes.size()) {
-        tileSizes[depth] = zero;
+    if (onlyReduction) {
+      auto zero = builder.create<arith::ConstantIndexOp>(op->getLoc(), 0);
+      for (unsigned depth : partitionedLoops) {
+        if (depth < tileSizes.size()) {
+          tileSizes[depth] = zero;
+        }
       }
     }
     return tileSizes;
@@ -61,13 +64,13 @@ static void populateTilingReductionPatterns(RewritePatternSet &patterns) {
                                                    filter);
 }
 
-LogicalResult tileReduction(func::FuncOp funcOp) {
+LogicalResult tileToSerialLoops(func::FuncOp funcOp, bool onlyReduction) {
   {
     // Tile again at the workgroup level since redution dimension were
     // ignored. Dimensions already tiled will be ignore since we tile to the
     // same size.
     RewritePatternSet wgTilingPatterns(funcOp.getContext());
-    populateTilingReductionPatterns(wgTilingPatterns);
+    populateTilingPatterns(wgTilingPatterns, onlyReduction);
     if (failed(applyPatternsAndFoldGreedily(funcOp,
                                             std::move(wgTilingPatterns)))) {
       return failure();
@@ -151,7 +154,9 @@ struct LLVMGPUTileTensorPass
     auto funcOp = getOperation();
     if (!isEntryPoint(funcOp)) return;
 
-    if (failed(tileReduction(funcOp))) {
+    // Tile to serial loops to the wg tile size to handle reductions and other
+    // dimension that have not been distributed.
+    if (failed(tileToSerialLoops(funcOp, /*onlyReduction=*/false))) {
       return signalPassFailure();
     }
 
