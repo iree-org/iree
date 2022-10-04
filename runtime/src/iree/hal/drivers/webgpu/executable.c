@@ -106,12 +106,18 @@ static iree_status_t iree_hal_webgpu_create_wgsl_shader_module(
   const char* code = iree_WGSLShaderModuleDef_code_get(shader_module_def);
 
   const WGPUShaderModuleWGSLDescriptor descriptor = {
-      .chain =
-          {
-              .next = NULL,
-              .sType = WGPUSType_ShaderModuleWGSLDescriptor,
-          },
-      .source = code,
+    .chain =
+        {
+            .next = NULL,
+            .sType = WGPUSType_ShaderModuleWGSLDescriptor,
+        },
+#if defined(__EMSCRIPTEN__)
+    // Emscripten uses this older name.
+    .source = code,
+#else
+    // Spec uses this name: https://www.w3.org/TR/webgpu/#shader-module-creation
+    .code = code,
+#endif
   };
   const WGPUShaderModuleDescriptor module_descriptor = {
       .nextInChain = &descriptor.chain,

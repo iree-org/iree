@@ -82,10 +82,6 @@ IREEWGPUBufferMapSyncStatus iree_wgpuBufferMapSync(WGPUDevice device,
                                                    WGPUBuffer buffer,
                                                    WGPUMapModeFlags mode,
                                                    size_t offset, size_t size) {
-  IREEWGPUBufferMapSyncStatus status = IREEWGPUBufferMapSyncStatus_Unknown;
-  wgpuBufferMapAsync(buffer, mode, offset, size,
-                     iree_hal_webgpu_buffer_map_sync_callback, &status);
-  // TODO(scotttodd): poll / wait somehow, or implement sync mapping differently
-  // wgpuDevicePoll(device, /*force_wait=*/true);
-  return status;
+  // WebGPU (browser/Emscripten) does not support synchronous buffer mapping.
+  return IREEWGPUBufferMapSyncStatus_Error;
 }

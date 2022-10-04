@@ -391,6 +391,7 @@ endif()
 if(EMSCRIPTEN AND IREE_HAL_DRIVER_WEBGPU)
   iree_select_compiler_opts(IREE_DEFAULT_LINKOPTS
     ALL
+      # TODO(scotttodd): Only add when using WebGPU in a library/binary?
       "-sUSE_WEBGPU"
       # Hack: Used to create sync versions of requestAdapter and requestDevice
       # TODO(scotttodd): Only set for test binaries, avoid sync code in apps

@@ -145,7 +145,6 @@ class TargetConverter:
             "vulkan_memory_allocator"
         ],
         "@webgpu_headers": [],
-        "@wgpu-native//:static": ["wgpu-native-static"],
     })
 
     self._initialize()

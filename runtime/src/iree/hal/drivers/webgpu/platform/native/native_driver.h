@@ -16,6 +16,8 @@
 extern "C" {
 #endif  // __cplusplus
 
+// A stub webgpu driver that builds on native platforms, for testing
+// compilation without Emscripten.
 iree_status_t iree_hal_webgpu_native_driver_create(
     iree_string_view_t identifier,
     const iree_hal_webgpu_driver_options_t* options,
