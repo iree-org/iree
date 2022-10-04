@@ -280,8 +280,8 @@ static iree_status_t iree_hal_webgpu_native_driver_create_device(
   IREE_ASSERT_NE(device_data.handle, NULL);
 
   return iree_hal_webgpu_wrap_device(
-      driver->identifier, &driver->default_options, driver->instance,
-      driver->adapter, device_data.handle, driver->host_allocator, out_device);
+      driver->identifier, &driver->default_options, device_data.handle,
+      driver->host_allocator, out_device);
 }
 
 static const iree_hal_driver_vtable_t iree_hal_webgpu_native_driver_vtable = {

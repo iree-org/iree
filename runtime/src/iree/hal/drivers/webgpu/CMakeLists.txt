@@ -45,6 +45,7 @@ iree_cc_library(
     iree::base
     iree::base::core_headers
     iree::base::internal
+    iree::base::internal::arena
     iree::base::internal::flatcc::parsing
     iree::base::tracing
     iree::hal

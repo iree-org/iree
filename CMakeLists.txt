@@ -883,10 +883,12 @@ endif()
 if(IREE_TARGET_BACKEND_WEBGPU OR
   (IREE_HAL_DRIVER_WEBGPU AND ("${IREE_HAL_WEBGPU_PLATFORM}" STREQUAL "dawn")))
   # NOTE: these all need to be synchronized with Dawn.
-  set(IREE_SPIRV_TOOLS_TAG  "37d2396cabe56b29d37551ea55d0d745d5748ded")
+  # set(IREE_SPIRV_TOOLS_TAG  "37d2396cabe56b29d37551ea55d0d745d5748ded")
+  set(IREE_SPIRV_TOOLS_TAG  "ff07cfd86fa229525659f6b81058b3171a67bef1")  # 2021-12-10
   # https://dawn.googlesource.com/dawn/+/refs/heads/main/DEPS
   # https://chromium.googlesource.com/vulkan-deps/+/main/DEPS
-  set(IREE_TINT_TAG         "5aca651c524caca8ac85962d1dff378238671eba")
+  # set(IREE_TINT_TAG         "5aca651c524caca8ac85962d1dff378238671eba")
+  set(IREE_TINT_TAG         "188b1fb8f5be52299fb7fbc6db17dbb0c07dbb7e")  # 2021-12-16
   set(IREE_DAWN_ABSEIL_TAG  "789af048b388657987c59d4da406859034fe310f")
   set(IREE_DAWN_GLFW_TAG    "62e175ef9fae75335575964c845a302447c012c7")
   set(IREE_DAWN_TAG         "2f1b0dc47d8316f3db6e5b9a55b873cd3079cea5")

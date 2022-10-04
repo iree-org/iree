@@ -283,9 +283,9 @@ static iree_status_t iree_hal_webgpu_native_driver_create_device(
       nullptr);
   device.Release();
 
-  return iree_hal_webgpu_wrap_device(
-      driver->identifier, &driver->default_options, driver->instance,
-      driver->adapter, handle, driver->host_allocator, out_device);
+  return iree_hal_webgpu_wrap_device(driver->identifier,
+                                     &driver->default_options, handle,
+                                     driver->host_allocator, out_device);
 }
 
 static const iree_hal_driver_vtable_t iree_hal_webgpu_native_driver_vtable = {
