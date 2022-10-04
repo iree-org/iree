@@ -12,7 +12,7 @@ INDENT_SPACES = " " * 2
 
 def _get_string_list(values: List[str], quote: bool = True) -> List[str]:
   if quote:
-    values = [f"\"{value}\"" for value in values]
+    values = [f'"{value}"' for value in values]
   return values
 
 
@@ -26,16 +26,16 @@ def _get_string_arg_block(keyword: str,
   if value is None:
     return []
   if quote:
-    value = f"\"{value}\""
+    value = f'"{value}"'
   return [keyword] + _get_block_body([value])
 
 
 def _get_string_list_arg_block(keyword: str,
                                values: List[str],
                                quote: bool = True) -> List[str]:
-  body = _get_string_list(values, quote)
-  if len(body) == 0:
+  if len(values) == 0:
     return []
+  body = _get_string_list(values, quote)
   return [keyword] + _get_block_body(body)
 
 
@@ -57,13 +57,9 @@ def _build_call_rule(rule_name: str,
 
 
 def _convert_block_to_string(block: List[str]) -> str:
-  return "\n".join(block) + "\n"
-
-
-def get_target_path(target_name: str):
-  """Returns the full target path by combining the variable _PACKAGE_NAME and
-  the target name."""
-  return f"${{_PACKAGE_NAME}}_{target_name}"
+  # Hack to append the terminating newline and only copies the list instead of
+  # the whole string.
+  return "\n".join(block + [""])
 
 
 def build_iree_bytecode_module(target_name: str,

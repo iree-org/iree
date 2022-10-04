@@ -19,6 +19,8 @@ import cmake_builder.rules
 
 # Archive extensions used to pack models.
 ARCHIVE_FILE_EXTENSIONS = [".tar", ".gz"]
+# CMake variable name to store IREE package name.
+PACKAGE_NAME_CMAKE_VARIABLE = "_PACKAGE_NAME"
 
 
 @dataclass
@@ -43,6 +45,13 @@ class IreeModuleCompileRule(object):
   target_name: str
   output_module_path: str
   cmake_rule: str
+
+
+def _build_target_path(target_name: str):
+  """Returns the full target path by combining the variable of package name and
+  the target name.
+  """
+  return f"${{{PACKAGE_NAME_CMAKE_VARIABLE}}}_{target_name}"
 
 
 class CommonRuleFactory(object):
@@ -149,7 +158,7 @@ class IreeRuleFactory(object):
       cmake_rule = (
           f'# Import the TFLite model "{source_model_rule.file_path}"\n' +
           cmake_builder.rules.build_iree_import_tflite_model(
-              target_path=cmake_builder.rules.get_target_path(target_name),
+              target_path=_build_target_path(target_name),
               source=source_model_rule.file_path,
               output_mlir_file=output_file_path))
       mlir_dialect_type = "tosa"
@@ -157,7 +166,7 @@ class IreeRuleFactory(object):
       cmake_rule = (
           f'# Import the Tensorflow model "{source_model_rule.file_path}"\n' +
           cmake_builder.rules.build_iree_import_tf_model(
-              target_path=cmake_builder.rules.get_target_path(target_name),
+              target_path=_build_target_path(target_name),
               source=source_model_rule.file_path,
               entry_function=model_entry_function,
               output_mlir_file=output_file_path))
@@ -169,7 +178,7 @@ class IreeRuleFactory(object):
 
     cmake_builder.rules.build_add_dependencies(
         target="iree-benchmark-import-models",
-        deps=[cmake_builder.rules.get_target_path(target_name)])
+        deps=[_build_target_path(target_name)])
 
     import_model_rule = IreeModelImportRule(target_name=target_name,
                                             model_id=model_id,
@@ -214,8 +223,7 @@ class IreeRuleFactory(object):
                       module_name=output_path,
                       flags=compile_flags))
     cmake_rule += cmake_builder.rules.build_add_dependencies(
-        target="iree-benchmark-suites",
-        deps=[cmake_builder.rules.get_target_path(target_name)])
+        target="iree-benchmark-suites", deps=[_build_target_path(target_name)])
     compile_module_rule = IreeModuleCompileRule(target_name=target_name,
                                                 output_module_path=output_path,
                                                 cmake_rule=cmake_rule)

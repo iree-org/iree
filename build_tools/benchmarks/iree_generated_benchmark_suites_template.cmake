@@ -7,7 +7,7 @@
 ################################################################################
 # Defines the required variables                                               #
 ################################################################################
-iree_package_name(_PACKAGE_NAME)
+iree_package_name($__PACKAGE_NAME_VARIABLE)
 set(_ROOT_ARTIFACTS_DIR "$${IREE_BINARY_DIR}/benchmark_suites")
 set(_MODEL_ARTIFACTS_DIR "$${_ROOT_ARTIFACTS_DIR}/models")
 set(_IREE_ARTIFACTS_DIR "$${_ROOT_ARTIFACTS_DIR}/iree")

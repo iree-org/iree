@@ -5,15 +5,12 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+import textwrap
 import unittest
 import cmake_builder.rules
 
 
 class RulesTest(unittest.TestCase):
-
-  def test_get_target_path(self):
-    self.assertEqual(cmake_builder.rules.get_target_path("abcd"),
-                     "${_PACKAGE_NAME}_abcd")
 
   def test_build_iree_bytecode_module(self):
     rule = cmake_builder.rules.build_iree_bytecode_module(
@@ -61,18 +58,22 @@ class RulesTest(unittest.TestCase):
         module_name="abcd.vmfb",
         flags=["--backend=cpu", "--opt=3"])
 
-    self.assertEqual(rule, ('iree_bytecode_module(\n'
-                            '  NAME\n'
-                            '    "abcd"\n'
-                            '  SRC\n'
-                            '    "abcd.mlir"\n'
-                            '  MODULE_FILE_NAME\n'
-                            '    "abcd.vmfb"\n'
-                            '  FLAGS\n'
-                            '    "--backend=cpu"\n'
-                            '    "--opt=3"\n'
-                            '  PUBLIC\n'
-                            ')\n'))
+    self.assertEqual(
+        rule,
+        textwrap.dedent("""\
+        iree_bytecode_module(
+          NAME
+            "abcd"
+          SRC
+            "abcd.mlir"
+          MODULE_FILE_NAME
+            "abcd.vmfb"
+          FLAGS
+            "--backend=cpu"
+            "--opt=3"
+          PUBLIC
+        )
+        """))
 
   def test_build_iree_fetch_artifact(self):
     rule = cmake_builder.rules.build_iree_fetch_artifact(
@@ -81,15 +82,19 @@ class RulesTest(unittest.TestCase):
         output="./abcd.tflite",
         unpack=True)
 
-    self.assertEqual(rule, ('iree_fetch_artifact(\n'
-                            '  NAME\n'
-                            '    "abcd"\n'
-                            '  SOURCE_URL\n'
-                            '    "https://example.com/abcd.tflite"\n'
-                            '  OUTPUT\n'
-                            '    "./abcd.tflite"\n'
-                            '  UNPACK\n'
-                            ')\n'))
+    self.assertEqual(
+        rule,
+        textwrap.dedent("""\
+        iree_fetch_artifact(
+          NAME
+            "abcd"
+          SOURCE_URL
+            "https://example.com/abcd.tflite"
+          OUTPUT
+            "./abcd.tflite"
+          UNPACK
+        )
+        """))
 
   def test_build_iree_import_tf_model(self):
     rule = cmake_builder.rules.build_iree_import_tf_model(
@@ -98,16 +103,20 @@ class RulesTest(unittest.TestCase):
         entry_function="main",
         output_mlir_file="abcd.mlir")
 
-    self.assertEqual(rule, ('iree_import_tf_model(\n'
-                            '  TARGET_NAME\n'
-                            '    "pkg_abcd"\n'
-                            '  SOURCE\n'
-                            '    "abcd/model"\n'
-                            '  ENTRY_FUNCTION\n'
-                            '    "main"\n'
-                            '  OUTPUT_MLIR_FILE\n'
-                            '    "abcd.mlir"\n'
-                            ')\n'))
+    self.assertEqual(
+        rule,
+        textwrap.dedent("""\
+        iree_import_tf_model(
+          TARGET_NAME
+            "pkg_abcd"
+          SOURCE
+            "abcd/model"
+          ENTRY_FUNCTION
+            "main"
+          OUTPUT_MLIR_FILE
+            "abcd.mlir"
+        )
+        """))
 
   def test_build_iree_import_tflite_model(self):
     rule = cmake_builder.rules.build_iree_import_tflite_model(
@@ -115,23 +124,31 @@ class RulesTest(unittest.TestCase):
         source="abcd.tflite",
         output_mlir_file="abcd.mlir")
 
-    self.assertEqual(rule, ('iree_import_tflite_model(\n'
-                            '  TARGET_NAME\n'
-                            '    "pkg_abcd"\n'
-                            '  SOURCE\n'
-                            '    "abcd.tflite"\n'
-                            '  OUTPUT_MLIR_FILE\n'
-                            '    "abcd.mlir"\n'
-                            ')\n'))
+    self.assertEqual(
+        rule,
+        textwrap.dedent("""\
+        iree_import_tflite_model(
+          TARGET_NAME
+            "pkg_abcd"
+          SOURCE
+            "abcd.tflite"
+          OUTPUT_MLIR_FILE
+            "abcd.mlir"
+        )
+        """))
 
   def test_build_add_dependencies(self):
     rule = cmake_builder.rules.build_add_dependencies(
         target="iree_mlir_suites", deps=["pkg_abcd", "pkg_efgh"])
 
-    self.assertEqual(rule, ('add_dependencies(iree_mlir_suites\n'
-                            '  pkg_abcd\n'
-                            '  pkg_efgh\n'
-                            ')\n'))
+    self.assertEqual(
+        rule,
+        textwrap.dedent("""\
+        add_dependencies(iree_mlir_suites
+          pkg_abcd
+          pkg_efgh
+        )
+        """))
 
 
 if __name__ == "__main__":

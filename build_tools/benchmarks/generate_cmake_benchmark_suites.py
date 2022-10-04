@@ -41,6 +41,7 @@ def main(args: argparse.Namespace):
       iree_artifacts_dir="${_IREE_ARTIFACTS_DIR}",
       iree_model_compile_configs=model_compile_configs)
   cmake_file = GENERATED_BENCHMARK_SUITES_CMAKE_TEMPLATE.substitute(
+      __PACKAGE_NAME_VARIABLE=cmake_rule_generator.PACKAGE_NAME_CMAKE_VARIABLE,
       __BENCHMARK_RULES='\n'.join(benchmark_rules))
   with open(args.output, "w") as output_file:
     output_file.write(cmake_file)
