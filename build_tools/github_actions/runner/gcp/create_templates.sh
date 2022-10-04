@@ -95,7 +95,7 @@ function create_template() {
     "${METADATA[@]}"
     "github-runner-group=${group}"
     "github-runner-trust=${trust}"
-    "github-runner-labels=${type}"
+    "github-runner-type=${type}"
   )
 
   # Join on commas
