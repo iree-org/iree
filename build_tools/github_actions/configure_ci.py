@@ -114,9 +114,8 @@ def should_run_ci(event_name, trailers) -> bool:
 def get_runner_env(trailers: Mapping[str, str]) -> str:
   runner_env = trailers.get(RUNNER_ENV_KEY)
   if runner_env is None:
-    print(
-        f"Using '{RUNNER_ENV_DEFAULT}' runners because '{RUNNER_ENV_KEY}' not found in {trailers}"
-    )
+    print(f"Using '{RUNNER_ENV_DEFAULT}' runners because '{RUNNER_ENV_KEY}'"
+          f" not found in {trailers}")
     runner_env = RUNNER_ENV_DEFAULT
   else:
     print(
@@ -136,7 +135,6 @@ def main():
     output["should-run"] = "true"
   else:
     output["should-run"] = "false"
-  runner_env = get_runner_env(trailers)
   output[RUNNER_ENV_KEY] = get_runner_env(trailers)
   ci_stage = get_ci_stage(event_name)
   output["ci-stage"] = ci_stage
