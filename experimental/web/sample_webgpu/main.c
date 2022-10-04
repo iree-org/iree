@@ -10,9 +10,10 @@
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
+#include "iree/hal/drivers/webgpu/platform/webgpu.h"
 #include "iree/modules/hal/module.h"
 #include "iree/runtime/api.h"
-#include "iree/vm/bytecode/module.h"
+#include "iree/vm/bytecode_module.h"
 
 //===----------------------------------------------------------------------===//
 // Public API
@@ -51,7 +52,7 @@ void unload_program(iree_program_state_t* program_state);
 // * |function_name| is the fully qualified function name, like 'module.abs'.
 // * |inputs| is a semicolon delimited list of VM scalars and buffers, as
 //   described in iree/tooling/vm_util and used in IREE's CLI tools.
-//   For example, the CLI `--input=f32=1 --input=f32=2`
+//   For example, the CLI `--function_input=f32=1 --function_input=f32=2`
 //   should be passed here as `f32=1;f32=2`.
 // * |iterations| is the number of times to call the function, for benchmarking
 const char* call_function(iree_program_state_t* program_state,
@@ -72,8 +73,8 @@ typedef struct iree_program_state_t {
   iree_vm_module_t* module;
 } iree_program_state_t;
 
-extern iree_status_t create_device_with_loaders(iree_allocator_t host_allocator,
-                                                iree_hal_device_t** out_device);
+extern iree_status_t create_device(iree_allocator_t host_allocator,
+                                   iree_hal_device_t** out_device);
 
 iree_sample_state_t* setup_sample() {
   iree_sample_state_t* sample_state = NULL;
@@ -82,7 +83,8 @@ iree_sample_state_t* setup_sample() {
                             sizeof(iree_sample_state_t), (void**)&sample_state);
 
   iree_runtime_instance_options_t instance_options;
-  iree_runtime_instance_options_initialize(&instance_options);
+  iree_runtime_instance_options_initialize(IREE_API_VERSION_LATEST,
+                                           &instance_options);
   // Note: no call to iree_runtime_instance_options_use_all_available_drivers().
 
   if (iree_status_is_ok(status)) {
@@ -91,8 +93,7 @@ iree_sample_state_t* setup_sample() {
   }
 
   if (iree_status_is_ok(status)) {
-    status = create_device_with_loaders(iree_allocator_system(),
-                                        &sample_state->device);
+    status = create_device(iree_allocator_system(), &sample_state->device);
   }
 
   if (!iree_status_is_ok(status)) {
@@ -284,12 +285,11 @@ static iree_status_t print_outputs_from_call(
   iree_vm_list_t* variants_list = iree_runtime_call_outputs(call);
   for (iree_host_size_t i = 0; i < iree_vm_list_size(variants_list); ++i) {
     iree_vm_variant_t variant = iree_vm_variant_empty();
-    IREE_RETURN_IF_ERROR(
-        iree_vm_list_get_variant_assign(variants_list, i, &variant),
-        "variant %" PRIhsz " not present", i);
+    IREE_RETURN_IF_ERROR(iree_vm_list_get_variant(variants_list, i, &variant),
+                         "variant %" PRIhsz " not present", i);
 
     if (iree_vm_variant_is_value(variant)) {
-      switch (iree_vm_type_def_as_value(variant.type)) {
+      switch (variant.type.value_type) {
         case IREE_VM_VALUE_TYPE_I8: {
           IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
               outputs_builder, "i8=%" PRIi8, variant.i8));

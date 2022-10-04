@@ -20,7 +20,16 @@ iree_cc_library(
 )
 
 if(${EMSCRIPTEN})
-  # TODO(benvanik): emscripten driver.
+  target_sources(
+    iree_hal_drivers_webgpu_registration_registration
+    PUBLIC
+      "driver_module_emscripten.c"
+  )
+  target_link_libraries(
+    iree_hal_drivers_webgpu_registration_registration
+    INTERFACE
+      iree::hal::drivers::webgpu::platform::emscripten
+  )
 else()
   target_sources(
     iree_hal_drivers_webgpu_registration_registration

@@ -44,8 +44,6 @@ typedef struct iree_hal_webgpu_device_t {
   iree_string_view_t identifier;
 
   bool owns_device_handle;
-  WGPUInstance instance;
-  WGPUAdapter adapter;
   WGPUDevice handle;
   WGPUQueue queue;
 
@@ -79,12 +77,9 @@ static iree_hal_webgpu_device_t* iree_hal_webgpu_device_cast(
 
 IREE_API_EXPORT iree_status_t iree_hal_webgpu_wrap_device(
     iree_string_view_t identifier,
-    const iree_hal_webgpu_device_options_t* options, WGPUInstance instance,
-    WGPUAdapter adapter, WGPUDevice handle, iree_allocator_t host_allocator,
-    iree_hal_device_t** out_device) {
+    const iree_hal_webgpu_device_options_t* options, WGPUDevice handle,
+    iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   IREE_ASSERT_ARGUMENT(options);
-  IREE_ASSERT_ARGUMENT(instance);
-  IREE_ASSERT_ARGUMENT(adapter);
   IREE_ASSERT_ARGUMENT(handle);
   IREE_ASSERT_ARGUMENT(out_device);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -114,8 +109,6 @@ IREE_API_EXPORT iree_status_t iree_hal_webgpu_wrap_device(
       identifier, &device->identifier, (char*)buffer_ptr);
 
   device->owns_device_handle = false;
-  device->instance = instance;
-  device->adapter = adapter;
   device->handle = handle;
   device->queue = wgpuDeviceGetQueue(handle);
 
