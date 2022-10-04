@@ -54,7 +54,7 @@ static FailureOr<Operation *> getRootOp(ArrayRef<Operation *> computeOps) {
 /// Method to return the configuration to use for first-level tile and
 /// distribute. Returns the
 /// - tileSizes to use
-/// - intechange
+/// - interchange
 /// - loops to be partitioned (the tile sizes for the non-partitioned loop are
 ///   set to 0)
 /// - static loop ranges - this is meant to be an optimization hint. It recovers
@@ -62,20 +62,19 @@ static FailureOr<Operation *> getRootOp(ArrayRef<Operation *> computeOps) {
 // TODO: Remove the use of static loop ranges. This is used to set the number of
 // workgroups to a static value. Ideally this should not be done and the static
 // and dyamic cases are handled the same way. When the tile+distribute moves
-// away from using `scf.for` to using a construct that better captured
+// away from using `scf.for` to using a construct that better captures
 // distribution (like `scf.foreach_thread`) this information can be dropped.
 static LogicalResult getTileAndDistributeConfig(
     ArrayRef<Operation *> computeOps, SmallVectorImpl<int64_t> &tileSizes,
     SmallVectorImpl<int64_t> &staticLoopRanges,
     SmallVectorImpl<int64_t> &interchange,
-    SmallVector<unsigned> &partitionableLoops) {
+    SmallVectorImpl<unsigned> &partitionableLoops) {
   // Find the lowering configuration of the root operation.
   FailureOr<Operation *> rootOp = getRootOp(computeOps);
   if (failed(rootOp)) {
     // Just return. All the in-out vectors are empty that should default
     // the number of workgroups to {1, 1, 1}
     return success();
-    ;
   }
 
   auto partitionableLoopInterface =
