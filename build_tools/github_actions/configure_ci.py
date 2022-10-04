@@ -54,6 +54,7 @@ def skip_path(path: str) -> bool:
 
 
 def set_output(d: Mapping[str, str]):
+  print(f"Setting outputs: {d}")
   for k, v in d.items():
     print(f"::set-output name={k}::{v}")
 
@@ -66,7 +67,6 @@ def get_trailers() -> Mapping[str, str]:
                                  check=True,
                                  text=True,
                                  timeout=60).stdout.splitlines()
-  print(trailer_lines)
   return {
       k.lower().strip(): v.strip()
       for k, v in (line.split(":") for line in trailer_lines)
@@ -107,12 +107,16 @@ def should_run_ci(event_name, trailers) -> bool:
     print("Skipping CI because all modified files are marked as excluded.")
     return False
 
+  print("CI should run")
   return True
 
 
 def get_runner_env(trailers: Mapping[str, str]) -> str:
   runner_env = trailers.get(RUNNER_ENV_KEY)
   if runner_env is None:
+    print(
+        f"Using '{RUNNER_ENV_DEFAULT}' runners because '{RUNNER_ENV_KEY}' not found in {trailers}"
+    )
     runner_env = RUNNER_ENV_DEFAULT
   else:
     print(
@@ -129,10 +133,8 @@ def main():
   trailers = get_trailers()
   event_name = os.environ["GITHUB_EVENT_NAME"]
   if should_run_ci(event_name, trailers):
-    print("CI should run")
     output["should-run"] = "true"
   else:
-    print("CI should not run")
     output["should-run"] = "false"
   runner_env = get_runner_env(trailers)
   output[RUNNER_ENV_KEY] = get_runner_env(trailers)

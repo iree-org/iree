@@ -76,7 +76,7 @@ jobs:
         with:
           # We need the parent commit to do a diff
           fetch-depth: 2
-      - name: "Computing whether CI should run"
+      - name: "Configuring CI options"
         id: configure
         run: |
           # Just informative logging. There should only be two commits in the
