@@ -7,6 +7,26 @@ func.func @pack_simple() {
   return
 }
 
+func.func @pack_simple_pad_mode() {
+  %iree_input = util.unfoldable_constant dense<[[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15]]> : tensor<4x4xi32>
+  %pad = arith.constant 0 : i32
+  %init = linalg.init_tensor [2, 2, 3, 3] : tensor<2x2x3x3xi32>
+  %pack = iree_linalg_ext.pack %iree_input padding_value(%pad : i32) dims_pos = [0, 1] inner_tiles = [3, 3] into %init
+      : (tensor<4x4xi32> tensor<2x2x3x3xi32>) -> tensor<2x2x3x3xi32>
+  // After padding, the input is
+  //  0,  1,  2,  3,  0,  0
+  //  4,  5,  6,  7,  0,  0
+  //  8,  9, 10, 11,  0,  0
+  // 12, 13, 14, 15,  0,  0
+  //  0,  0,  0,  0,  0,  0
+  //  0,  0,  0,  0,  0,  0
+  check.expect_eq_const(%pack, dense<[[[[0, 1, 2], [4, 5, 6], [8, 9, 10]],
+                                       [[3, 0, 0], [7, 0, 0], [11, 0, 0]]],
+                                      [[[12, 13, 14], [0, 0, 0], [0, 0, 0]],
+                                       [[15, 0, 0], [0, 0, 0], [0, 0, 0]]]]> : tensor<2x2x3x3xi32>) : tensor<2x2x3x3xi32>
+  return
+}
+
 func.func @pack_large() {
   %init_source = linalg.init_tensor [128, 256] : tensor<128x256xi32>
   %source = linalg.generic {
