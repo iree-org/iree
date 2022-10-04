@@ -68,6 +68,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:GPUToNVVMTransforms",
         "@llvm-project//mlir:GPUToROCDLTransforms",
+        "@llvm-project//mlir:GPUTransformOps",
         "@llvm-project//mlir:GPUTransforms",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LLVMCommonConversion",
