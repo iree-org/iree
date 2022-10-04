@@ -189,12 +189,7 @@ static VectorPreProcStrategy getVectorPreProcStrategy(
   //   * Contractions: Peeling.
   //   * Rest: None.
 
-  if (isRISCV(variantOp) && enableVectorPeeling &&
-      isa<linalg::ContractionOpInterface>(*linalgOp)) {
-    return VectorPreProcStrategy::Peeling;
-  }
-
-  return VectorPreProcStrategy::None;
+  return VectorPreProcStrategy::Peeling;
 }
 
 /// Looks for the `native_vector_size` attribute in the hal.executable.variant
