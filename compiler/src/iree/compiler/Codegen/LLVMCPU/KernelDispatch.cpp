@@ -28,6 +28,10 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#define DEBUG_TYPE "kernel-dispatch"
+#define DBGS() (llvm::dbgs())
+#define KD_DBGS() (DBGS() << '[' << DEBUG_TYPE << "] ")
+
 namespace mlir {
 namespace iree_compiler {
 
@@ -101,6 +105,45 @@ enum class VectorPreProcStrategy {
   None
 };
 
+// TODO(dcaballe): Move operator<< to DebugUtils.h.
+static llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                                     const VectorPreProcStrategy &strategy) {
+  switch (strategy) {
+    case VectorPreProcStrategy::Padding:
+      os << "Padding";
+      break;
+    case VectorPreProcStrategy::Peeling:
+      os << "Peeling";
+      break;
+    case VectorPreProcStrategy::None:
+      os << "None";
+      break;
+  }
+  return os;
+}
+
+template <typename T>
+static llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                                     const llvm::SmallVectorImpl<T> &vector) {
+  for (T element : vector) {
+    os << element << " ";
+  }
+
+  return os;
+}
+
+static llvm::raw_ostream &operator<<(
+    llvm::raw_ostream &os,
+    const mlir::iree_compiler::TileSizesListType &tileSizeList) {
+  os << "[";
+  for (auto &tuple : tileSizeList) {
+    os << "[" << tuple << "]";
+  }
+  os << "]";
+
+  return os;
+}
+
 /// Returns true if all the input and output tensor operands of 'op' are fully
 /// dynamic.
 static bool isFullyDynamicOp(linalg::LinalgOp op) {
@@ -111,8 +154,11 @@ static bool isFullyDynamicOp(linalg::LinalgOp op) {
 
 /// Returns the vectorization pre-processing strategy (padding, peeling) for the
 /// given LinalgOp, depending on the op traits and the target architecture.
-static VectorPreProcStrategy getVectorPreProcStrategy(linalg::LinalgOp op) {
-  if (op.hasBufferSemantics()) {
+static VectorPreProcStrategy getVectorPreProcStrategy(
+    linalg::LinalgOp linalgOp) {
+  // Generic strategies.
+
+  if (linalgOp.hasBufferSemantics()) {
     return VectorPreProcStrategy::None;
   }
 
@@ -122,18 +168,30 @@ static VectorPreProcStrategy getVectorPreProcStrategy(linalg::LinalgOp op) {
     return VectorPreProcStrategy::None;
   }
 
-  if (isFullyDynamicOp(op) && enableVectorPeeling) {
+  if (isFullyDynamicOp(linalgOp) && enableVectorPeeling) {
     // Peeling is only enabled on fully dynamic shape ops for now.
     return VectorPreProcStrategy::Peeling;
   }
 
-  auto variantOp = getExecutableVariantOp(op);
-  assert(succeeded(variantOp) && "ExecutableVariantOp not found");
+  auto maybeVariantOp = getExecutableVariantOp(linalgOp);
+  assert(succeeded(maybeVariantOp) && "ExecutableVariantOp not found");
+  auto variantOp = *maybeVariantOp;
 
-  if (isX86(*variantOp) && enableVectorPadding) {
+  // Default X86 specific strategies:
+
+  if (isX86(variantOp) && enableVectorPadding) {
     // Padding is only enabled on x86. It leads to too much overhead on RISC-V
     // and ARM.
     return VectorPreProcStrategy::Padding;
+  }
+
+  // Default RISC-V specific strategies:
+  //   * Contractions: Peeling.
+  //   * Rest: None.
+
+  if (isRISCV(variantOp) && enableVectorPeeling &&
+      isa<linalg::ContractionOpInterface>(*linalgOp)) {
+    return VectorPreProcStrategy::Peeling;
   }
 
   return VectorPreProcStrategy::None;
@@ -438,6 +496,7 @@ static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
   }
   return distributedTileSizes;
 }
+
 static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
     linalg::LinalgOp linalgOp, ArrayRef<int64_t> minTileSizes,
     ArrayRef<int64_t> maxTileSizes, bool allowIncompleteTile = false,
@@ -484,6 +543,11 @@ static void setAlwaysVectorizeSizes(linalg::LinalgOp op,
       reductionSizes[en.index()] = 1;
     }
   }
+
+  LLVM_DEBUG(KD_DBGS() << "Set always-vectorize parallel sizes: "
+                       << parallelSizes << "\n");
+  LLVM_DEBUG(KD_DBGS() << "Set always-vectorize reduction sizes: "
+                       << reductionSizes << "\n");
 }
 
 static void setVectorSizesForDynamicShapes(
@@ -500,6 +564,7 @@ static void setVectorSizesForDynamicShapes(
   // lowest order parallel dimension for now to avoid peeling higher level
   // dimensions. If no parallel dimension is found to be vectorized, we try to
   // vectorize the lowest order reduction dimension.
+
   if (!isFullyDynamicOp(op) ||
       vecPreProcStrategy != VectorPreProcStrategy::Peeling) {
     return;
@@ -528,6 +593,11 @@ static void setVectorSizesForDynamicShapes(
       break;
     }
   }
+
+  LLVM_DEBUG(KD_DBGS() << "Parallel sizes for dynamic sizes: " << parallelSizes
+                       << "\n");
+  LLVM_DEBUG(KD_DBGS() << "Reduction sizes for dynamic sizes: "
+                       << reductionSizes << "\n");
 
   return;
 }
@@ -639,53 +709,70 @@ static DispatchLoweringPassPipeline getNoPadMultiTilingExpert(
     case (3):
       return DispatchLoweringPassPipeline::CPUTripleTilingExpert;
     default:
-      return DispatchLoweringPassPipeline::CPUDefault;
+      llvm_unreachable("Unexpected number of levels");
   }
 }
 
-static LogicalResult setMatmulNoPadRootConfig(func::FuncOp entryPointFn,
-                                              linalg::ContractionOpInterface op,
-                                              TileSizesListType tileSizes,
-                                              int vectorSize) {
-  auto numLevels = tileSizes.size();
-  SmallVector<int64_t> workgroupTileSizes = tileSizes.pop_back_val();
+static LogicalResult setMatmulNoPadRootConfig(
+    func::FuncOp entryPointFn, linalg::ContractionOpInterface op,
+    const TileSizesListTypeRef inputTileSizes, int vectorSize) {
+  // auto numLevels = tileSizes.size();
+  // SmallVector<int64_t> workgroupTileSizes = tileSizes.pop_back_val();
+
+  // LLVM_DEBUG(KD_DBGS() << "After pop back: " << tileSizes << "\n");
+
+  // auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
+  // SmallVector<int64_t> shape = linalgOp.getStaticLoopRanges();
+  // for (auto sizes : tileSizes) {
+  //   for (auto en : llvm::enumerate(sizes)) {
+  //     // Quantized cases are not fully evaluated yet, so it might go with
+  //     NoPad
+  //     // approach.
+  //     int idx = en.index();
+  //     if (!en.value() || shape[idx] == ShapedType::kDynamicSize) continue;
+  //     assert(shape[idx] % en.value() == 0);
+  //     shape[idx] = en.value();
+  //   }
+  // }
+
+  //// TODO(hanchung): Create an addtional pass to handle such cases.
+  //// The tiling for parallel dims and reduction dims should be separated.
+  // SmallVector<int64_t> parallelTileSizes;
+  // for (auto en : llvm::enumerate(workgroupTileSizes)) {
+  //   int64_t sz = en.value();
+  //   if (sz) {
+  //     sz = getMaxTileSize(0, shape[en.index()], sz, vectorSize);
+  //   }
+  //   parallelTileSizes.push_back(sz);
+  // }
+
+  size_t numTuples = inputTileSizes.size();
+  assert(numTuples >= 2 && "Expected two or more tile size tuples");
 
   auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
-  SmallVector<int64_t> shape = linalgOp.getStaticLoopRanges();
-  for (auto sizes : tileSizes) {
-    for (auto en : llvm::enumerate(sizes)) {
-      // Quantized cases are not fully evaluated yet, so it might go with NoPad
-      // approach.
-      int idx = en.index();
-      if (!en.value() || shape[idx] == ShapedType::kDynamicSize) continue;
-      assert(shape[idx] % en.value() == 0);
-      shape[idx] = en.value();
-    }
-  }
-
-  // TODO(hanchung): Create an addtional pass to handle such cases.
-  // The tiling for parallel dims and reduction dims should be separated.
-  SmallVector<int64_t> parallelTileSizes;
-  for (auto en : llvm::enumerate(workgroupTileSizes)) {
-    int64_t sz = en.value();
-    if (sz) {
-      sz = getMaxTileSize(0, shape[en.index()], sz, vectorSize);
-    }
-    parallelTileSizes.push_back(sz);
-  }
+  SmallVector<int64_t> parallelTileSizes = inputTileSizes.back();
   SmallVector<int64_t> reductionTileSizes;
   splitParallelAndReductionTiles(op.getOperation(), parallelTileSizes,
                                  reductionTileSizes);
+
   auto vecPreProcStrategy = getVectorPreProcStrategy(linalgOp);
   setVectorSizesForDynamicShapes(op.getOperation(), vecPreProcStrategy,
                                  parallelTileSizes, reductionTileSizes);
 
-  tileSizes.push_back(parallelTileSizes);
-  tileSizes.push_back(reductionTileSizes);
+  TileSizesListType newTileSizes;
+  // Copy all the tile size levels except the workgroup one which will be split
+  // into parallel and reduction.
+  std::copy(inputTileSizes.begin(), inputTileSizes.end() - 1,
+            std::back_inserter(newTileSizes));
+  newTileSizes.push_back(parallelTileSizes);
+  newTileSizes.push_back(reductionTileSizes);
+
+  LLVM_DEBUG(KD_DBGS() << "Final tile sizes for no-padding contraction: "
+                       << newTileSizes << "\n");
 
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, op, tileSizes,
-      getNoPadMultiTilingExpert(vecPreProcStrategy, numLevels));
+      entryPointFn, op, newTileSizes,
+      getNoPadMultiTilingExpert(vecPreProcStrategy, numTuples));
 }
 
 static LogicalResult setAArch64RootConfig(func::FuncOp entryPointFn,
@@ -781,6 +868,8 @@ static SmallVector<int64_t> getMatmulWorkgroupSizes(func::FuncOp entryPointFn,
                      matmulTileSizes.end());
   }
 
+  LLVM_DEBUG(KD_DBGS() << "Matmul workgroup sizes: " << tileSizes << "\n");
+
   return tileSizes;
 }
 
@@ -834,8 +923,12 @@ static LogicalResult setRootConfig(
   // works for linalg.matmul cases. We can relax it once we have better
   // scheduling, e.g., transform dialect.
   SmallVector<int64_t> flowTileSizes;
-  bool usePaddingPipeline =
-      getVectorPreProcStrategy(linalgOp) == VectorPreProcStrategy::Padding;
+  auto preProcStrategy = getVectorPreProcStrategy(linalgOp);
+  bool usePaddingPipeline = preProcStrategy == VectorPreProcStrategy::Padding;
+
+  LLVM_DEBUG(KD_DBGS() << "Vector pre-processing strategy: " << preProcStrategy
+                       << "\n");
+
   if (usePaddingPipeline) {
     // It's inspired from Sandbox configuration. Sandbox has
     // [[288, 128, 512], [12, 32, 1]] setup. We scale 288 to 192 because
@@ -851,6 +944,11 @@ static LogicalResult setRootConfig(
     flowTileSizes = getDefaultDistributedLevelTileSizes(
         linalgOp, workgroupTileSizes, maxTileSizes);
   }
+
+  LLVM_DEBUG(KD_DBGS() << "Flow tile sizes: " << flowTileSizes << "\n");
+  LLVM_DEBUG(KD_DBGS() << "Workgroup tile sizes: " << workgroupTileSizes
+                       << "\n");
+  LLVM_DEBUG(KD_DBGS() << "Vector size: " << vectorSize << "\n");
 
   // ARM codgen does not switch to use codegen driver based approach, so we have
   // special logic for it. All the new pipeline is expected to use codegen
