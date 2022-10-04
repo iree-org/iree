@@ -338,7 +338,7 @@ struct LLVMGPUTileAndDistributePass
     // Tile again at the workgroup level since reduction dimension were
     // ignored. Dimensions already tiled will be ignore since we tile to the
     // same size.
-    if (failed(tileReduction(funcOp))) {
+    if (failed(tileToSerialLoops(funcOp))) {
       return signalPassFailure();
     }
 

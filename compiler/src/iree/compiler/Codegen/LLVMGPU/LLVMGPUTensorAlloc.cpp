@@ -76,7 +76,7 @@ struct LLVMGPUTensorAllocPass
     auto funcOp = getOperation();
 
     // Tile the reduction first to reduce the alloc size.
-    if (failed(tileReduction(funcOp))) {
+    if (failed(tileToSerialLoops(funcOp))) {
       return signalPassFailure();
     }
 
