@@ -3,7 +3,32 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-"""Helpers that build CMake rules."""
+"""Helpers that build CMake rules.
+
+Each function takes a list of parameters and returns a string ready to be
+included in a CMakeLists.txt file. Builder functions handle optional arguments,
+lists, formatting, etc.
+
+For example:
+
+build_iree_fetch_artifact(
+    target_name="abcd",
+    source_url="https://example.com/abcd.tflite",
+    output="./abcd.tflite",
+    unpack=True)
+
+Outputs:
+
+iree_fetch_artifact(
+  NAME
+    "abcd"
+  SOURCE_URL
+    "https://example.com/abcd.tflite"
+  OUTPUT
+    "./abcd.tflite"
+  UNPACK
+)
+"""
 
 from typing import List, Optional, Sequence
 
