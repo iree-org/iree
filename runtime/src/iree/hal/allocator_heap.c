@@ -34,7 +34,6 @@ IREE_API_EXPORT iree_status_t iree_hal_allocator_create_heap(
   IREE_ASSERT_ARGUMENT(out_allocator);
   *out_allocator = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
-  *out_allocator = NULL;
 
   iree_hal_heap_allocator_t* allocator = NULL;
   iree_host_size_t total_size =

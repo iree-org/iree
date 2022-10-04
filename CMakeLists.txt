@@ -229,11 +229,9 @@ if(APPLE)
 endif()
 
 # WebGPU is disabled by default as it's experimental.
-# TODO(benvanik): FindPackage the deps or default to on when under emscripten?
+# TODO(benvanik): FindPackage the deps or default to on when under Emscripten?
+#     (also see iree_copts.cmake and anywhere that uses IREE_HAL_DRIVER_WEBGPU)
 set(IREE_HAL_DRIVER_WEBGPU_DEFAULT OFF)
-set(IREE_HAL_WEBGPU_PLATFORM_DEFAULT "dawn")
-set(IREE_HAL_WEBGPU_PLATFORM "${IREE_HAL_WEBGPU_PLATFORM_DEFAULT}"
-    CACHE STRING "Native WebGPU implementation ('dawn' or 'wgpu-native').")
 
 option(IREE_HAL_DRIVER_CUDA "Enables the 'cuda' runtime HAL driver" ${IREE_HAL_DRIVER_CUDA_DEFAULT})
 option(IREE_HAL_DRIVER_LOCAL_SYNC "Enables the 'local-sync' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
@@ -832,7 +830,6 @@ add_subdirectory(build_tools/third_party/libyaml EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/llvm-project EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/tracy_client EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/vulkan_memory_allocator EXCLUDE_FROM_ALL)
-add_subdirectory(build_tools/third_party/wgpu-native EXCLUDE_FROM_ALL)
 
 iree_set_googletest_cmake_options()
 add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
@@ -875,35 +872,27 @@ if(IREE_BUILD_PYTHON_BINDINGS)
 endif()
 
 if(IREE_TARGET_BACKEND_METAL_SPIRV)
-  iree_set_spirv_cross_cmake_options()
   # SPIRV-Cross is needed to cross compile SPIR-V into MSL source code.
+  iree_set_spirv_cross_cmake_options()
   add_subdirectory(third_party/spirv_cross EXCLUDE_FROM_ALL)
 endif()
 
-if(IREE_TARGET_BACKEND_WEBGPU OR
-  (IREE_HAL_DRIVER_WEBGPU AND ("${IREE_HAL_WEBGPU_PLATFORM}" STREQUAL "dawn")))
-  # NOTE: these all need to be synchronized with Dawn.
-  # set(IREE_SPIRV_TOOLS_TAG  "37d2396cabe56b29d37551ea55d0d745d5748ded")
-  set(IREE_SPIRV_TOOLS_TAG  "ff07cfd86fa229525659f6b81058b3171a67bef1")  # 2021-12-10
-  # https://dawn.googlesource.com/dawn/+/refs/heads/main/DEPS
-  # https://chromium.googlesource.com/vulkan-deps/+/main/DEPS
-  # set(IREE_TINT_TAG         "5aca651c524caca8ac85962d1dff378238671eba")
-  set(IREE_TINT_TAG         "188b1fb8f5be52299fb7fbc6db17dbb0c07dbb7e")  # 2021-12-16
-  set(IREE_DAWN_ABSEIL_TAG  "789af048b388657987c59d4da406859034fe310f")
-  set(IREE_DAWN_GLFW_TAG    "62e175ef9fae75335575964c845a302447c012c7")
-  set(IREE_DAWN_TAG         "2f1b0dc47d8316f3db6e5b9a55b873cd3079cea5")
-
+if(IREE_TARGET_BACKEND_WEBGPU)
   # Tint is needed to compile SPIR-V into WGSL source code.
   # Tint also requires SPIRV-Tools, which requires SPIRV-Headers.
-  # Dawn needs Tint (and thus SPIRV-Tools), but only at runtime.
-  # Order matters here, unfortunately.
+
+  # NOTE: these can be synced by referencing one of these repositories:
+  #   * https://dawn.googlesource.com/dawn/
+  #   * https://dawn.googlesource.com/tint/
+  #   * https://chromium.googlesource.com/vulkan-deps/+/refs/heads/main/DEPS
+  # or they can be updated independently
+  set(IREE_TINT_TAG         "200492e32b94f042d9942154fb4fa7f93bb8289a")  # 2022-08-17
+  set(IREE_SPIRV_TOOLS_TAG  "ff07cfd86fa229525659f6b81058b3171a67bef1")  # 2021-12-10
+
   iree_set_spirv_headers_cmake_options()
   add_subdirectory(third_party/spirv_headers EXCLUDE_FROM_ALL)
   add_subdirectory(build_tools/third_party/spirv-tools EXCLUDE_FROM_ALL)
   add_subdirectory(build_tools/third_party/tint EXCLUDE_FROM_ALL)
-  if(IREE_HAL_DRIVER_WEBGPU AND ("${IREE_HAL_WEBGPU_PLATFORM}" STREQUAL "dawn"))
-    add_subdirectory(build_tools/third_party/dawn EXCLUDE_FROM_ALL)
-  endif()
 endif()
 
 #-------------------------------------------------------------------------------

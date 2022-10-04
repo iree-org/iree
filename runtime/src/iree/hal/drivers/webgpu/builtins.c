@@ -70,13 +70,20 @@ static iree_status_t iree_hal_webgpu_builtins_initialize_fill_buffer(
         "failed to create fill_buffer builtin pipeline layout");
   }
 
+  const char* code = iree_hal_webgpu_builtins_find_code("fill_buffer.wgsl");
   const WGPUShaderModuleWGSLDescriptor wgsl_descriptor = {
-      .chain =
-          {
-              .next = NULL,
-              .sType = WGPUSType_ShaderModuleWGSLDescriptor,
-          },
-      .source = iree_hal_webgpu_builtins_find_code("fill_buffer.wgsl"),
+    .chain =
+        {
+            .next = NULL,
+            .sType = WGPUSType_ShaderModuleWGSLDescriptor,
+        },
+#if defined(__EMSCRIPTEN__)
+    // Emscripten uses this older name.
+    .source = code,
+#else
+    // Spec uses this name: https://www.w3.org/TR/webgpu/#shader-module-creation
+    .code = code,
+#endif
   };
   const WGPUShaderModuleDescriptor module_descriptor = {
       .nextInChain = &wgsl_descriptor.chain,
