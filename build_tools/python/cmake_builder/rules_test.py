@@ -28,27 +28,31 @@ class RulesTest(unittest.TestCase):
         testonly=True,
         public=False)
 
-    self.assertEqual(rule, ('iree_bytecode_module(\n'
-                            '  NAME\n'
-                            '    "abcd"\n'
-                            '  SRC\n'
-                            '    "abcd.mlir"\n'
-                            '  MODULE_FILE_NAME\n'
-                            '    "abcd.vmfb"\n'
-                            '  C_IDENTIFIER\n'
-                            '    "abcd.c"\n'
-                            '  COMPILE_TOOL\n'
-                            '    "iree_iree-compile2"\n'
-                            '  STATIC_LIB_PATH\n'
-                            '    "libx.a"\n'
-                            '  FLAGS\n'
-                            '    "--backend=cpu"\n'
-                            '    "--opt=3"\n'
-                            '  DEPS\n'
-                            '    "iree_libx"\n'
-                            '    "iree_liby"\n'
-                            '  TESTONLY\n'
-                            ')\n'))
+    self.assertEqual(
+        rule,
+        textwrap.dedent("""\
+        iree_bytecode_module(
+          NAME
+            "abcd"
+          SRC
+            "abcd.mlir"
+          MODULE_FILE_NAME
+            "abcd.vmfb"
+          C_IDENTIFIER
+            "abcd.c"
+          COMPILE_TOOL
+            "iree_iree-compile2"
+          STATIC_LIB_PATH
+            "libx.a"
+          FLAGS
+            "--backend=cpu"
+            "--opt=3"
+          DEPS
+            "iree_libx"
+            "iree_liby"
+          TESTONLY
+        )
+        """))
 
   def test_build_iree_bytecode_module_with_defaults(self):
     rule = cmake_builder.rules.build_iree_bytecode_module(
