@@ -17,6 +17,7 @@
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/FunctionImplementation.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/PatternMatch.h"
@@ -834,6 +835,138 @@ void ExecutableVariantOp::build(OpBuilder &builder, OperationState &state,
   state.addAttribute(mlir::SymbolTable::getSymbolAttrName(),
                      builder.getStringAttr(symName));
   state.addAttribute("target", target);
+}
+
+DenseMap<Attribute, int> ExecutableVariantOp::gatherConstantOrdinals() {
+  DenseMap<Attribute, int> map;
+  for (auto blockOp : getOps<IREE::HAL::ExecutableConstantBlockOp>()) {
+    int baseCount = map.size();
+    for (auto [i, keyAttr] : llvm::enumerate(blockOp.getKeys())) {
+      map.try_emplace(keyAttr, baseCount + i);
+    }
+  }
+  return map;
+}
+
+//===----------------------------------------------------------------------===//
+// hal.executable.constant.block
+//===----------------------------------------------------------------------===//
+
+ParseResult ExecutableConstantBlockOp::parse(OpAsmParser &parser,
+                                             OperationState &result) {
+  auto &builder = parser.getBuilder();
+
+  // Parse the function signature.
+  SmallVector<OpAsmParser::Argument> entryArgs;
+  bool isVariadic = false;
+  SmallVector<DictionaryAttr> resultAttrs;
+  SmallVector<Type> resultTypes;
+  if (mlir::function_interface_impl::parseFunctionSignature(
+          parser, /*allowVariadic=*/false, entryArgs, isVariadic, resultTypes,
+          resultAttrs)) {
+    return failure();
+  }
+  SmallVector<Type> argTypes;
+  for (auto &arg : entryArgs) argTypes.push_back(arg.type);
+  result.addAttribute("function_type", TypeAttr::get(builder.getFunctionType(
+                                           argTypes, resultTypes)));
+
+  // Parse the keys used for each yielded constant value.
+  // There must be one key per result. Note that we support omitted parens when
+  // only one result is present.
+  SmallVector<Attribute> keyAttrs;
+  if (failed(parser.parseKeyword("as"))) return failure();
+  if (resultTypes.size() == 1) {
+    std::string key;
+    if (failed(parser.parseString(&key))) return failure();
+    keyAttrs.push_back(builder.getStringAttr(key));
+  } else {
+    if (failed(parser.parseCommaSeparatedList(
+            AsmParser::Delimiter::OptionalParen,
+            [&]() {
+              std::string key;
+              if (failed(parser.parseString(&key))) return failure();
+              keyAttrs.push_back(builder.getStringAttr(key));
+              return success();
+            },
+            "containing a 1:1 list of keys per yielded value"))) {
+      return failure();
+    }
+  }
+  result.addAttribute("keys", builder.getArrayAttr(keyAttrs));
+
+  // If function attributes are present, parse them.
+  NamedAttrList parsedAttributes;
+  if (parser.parseOptionalAttrDictWithKeyword(parsedAttributes)) {
+    return failure();
+  }
+  result.attributes.append(parsedAttributes);
+
+  // Add the attributes to the function arguments.
+  assert(resultAttrs.size() == resultTypes.size());
+  mlir::function_interface_impl::addArgAndResultAttrs(builder, result,
+                                                      entryArgs, resultAttrs);
+
+  // Parse the optional function body. The printer will not print the body if
+  // its empty, so disallow parsing of empty body in the parser.
+  auto *body = result.addRegion();
+  SMLoc loc = parser.getCurrentLocation();
+  if (failed(parser.parseRegion(*body, entryArgs,
+                                /*enableNameShadowing=*/false))) {
+    return failure();
+  }
+  // Function body was parsed, make sure its not empty.
+  if (body->empty()) {
+    return parser.emitError(loc, "expected non-empty function body");
+  }
+
+  return success();
+}
+
+void ExecutableConstantBlockOp::print(OpAsmPrinter &p) {
+  Operation *op = getOperation();
+  ArrayRef<Type> argTypes = getArgumentTypes();
+  ArrayRef<Type> resultTypes = getResultTypes();
+  mlir::function_interface_impl::printFunctionSignature(
+      p, op, argTypes, /*isVariadic=*/false, resultTypes);
+  p << " as ";
+  if (resultTypes.size() != 1) p << '(';
+  llvm::interleaveComma(getKeys().getValue(), p,
+                        [&](Attribute attr) { p << attr; });
+  if (resultTypes.size() != 1) p << ')';
+  mlir::function_interface_impl::printFunctionAttributes(
+      p, op, argTypes.size(), resultTypes.size(), {"keys"});
+  p << " ";
+  p.printRegion(getBody(), /*printEntryBlockArgs=*/false,
+                /*printBlockTerminators=*/true);
+}
+
+LogicalResult ExecutableConstantBlockOp::verify() {
+  ExecutableConstantBlockOp op = *this;
+
+  // Verify the function takes either nothing or a device.
+  auto argTypes = op.getArgumentTypes();
+  if (!argTypes.empty() &&
+      (argTypes.size() > 1 || !argTypes[0].isa<IREE::HAL::DeviceType>())) {
+    return op->emitOpError()
+           << "initializer must take a !hal.device or nothing";
+  }
+
+  // Verify the return types are all i32 (today).
+  for (auto resultType : llvm::enumerate(op.getResultTypes())) {
+    if (!resultType.value().isInteger(32)) {
+      return op->emitOpError()
+             << "initializer must return only i32 values (result "
+             << resultType.index() << " is " << resultType.value() << ")";
+    }
+  }
+
+  // Verify there's a key for every result.
+  if (op.getNumResults() != op.getKeys().size()) {
+    return op->emitOpError() << "must have one key for every result";
+  }
+
+  return success();
 }
 
 //===----------------------------------------------------------------------===//

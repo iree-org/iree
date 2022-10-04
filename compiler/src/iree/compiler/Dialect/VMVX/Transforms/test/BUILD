@@ -16,6 +16,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "materialize_constants.mlir",
             "resolve_buffer_descriptors.mlir",
         ],
         include = ["*.mlir"],

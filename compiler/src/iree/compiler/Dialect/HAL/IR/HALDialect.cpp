@@ -15,6 +15,7 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/SourceMgr.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
@@ -114,6 +115,7 @@ class HALToVMConversionInterface : public VMConversionDialectInterface {
 
 HALDialect::HALDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context, TypeID::get<HALDialect>()) {
+  context->loadDialect<mlir::cf::ControlFlowDialect>();
   context->loadDialect<IREE::Util::UtilDialect>();
 
   registerAttributes();

@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "assign_constant_ordinals.mlir"
     "link_executables.mlir"
     "lower_linalg_microkernels.mlir"
   TOOLS

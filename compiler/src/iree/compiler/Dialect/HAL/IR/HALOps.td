@@ -12,8 +12,10 @@ include "iree/compiler/Dialect/HAL/IR/HALInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilAttrs.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 include "mlir/IR/BuiltinAttributeInterfaces.td"
+include "mlir/IR/FunctionInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
+include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
 
@@ -1624,7 +1626,13 @@ def HAL_ExecutableVariantOp : HAL_Op<"executable.variant", [
       assert(!moduleOps.empty() && "source ops need inner modules");
       return *moduleOps.begin();
     }
+
+    // Returns a map of constant key attributes to ordinals across all constant
+    // blocks inside the variant.
+    DenseMap<Attribute, int> gatherConstantOrdinals();
   }];
+
+  let hasCanonicalizer = 1;
 }
 
 def HAL_ExecutableVariantEndOp : HAL_Op<"executable.variant_end", [
@@ -1633,6 +1641,114 @@ def HAL_ExecutableVariantEndOp : HAL_Op<"executable.variant_end", [
   ]> {
   let summary = [{terminator pseudo-op for the executable variant op}];
   let assemblyFormat = "attr-dict";
+}
+
+def HAL_ExecutableConstantBlockOp :
+  HAL_Op<"executable.constant.block", [
+    ParentOneOf<[
+      "IREE::HAL::ExecutableSourceOp",
+      "IREE::HAL::ExecutableVariantOp",
+    ]>,
+    IsolatedFromAbove,
+    CallableOpInterface,
+    FunctionOpInterface,
+  ]> {
+  let summary = [{executable constant block initializer}];
+  let description = [{
+    Initializes one or more constants in the executable constant block by
+    returning one value per identified constant. Each constant block is
+    evaluated on the host prior to instantiating the executable for a given
+    device and allows for the executable to be specialized based on device
+    capabilities and limits.
+
+    The keys specified are unique per variant and will be deduplicated across
+    multiple constant blocks when present. They are only used during lowering
+    and will not survive to runtime so they need only have descriptive enough
+    names to avoid collisions and represent the semantics of the value.
+
+    Constant values can be loaded in the device code with the
+    `hal.executable.constant.load` op:
+
+    ```mlir
+    hal.executable.variant public @target {
+      hal.executable.constant.block(%device: !hal.device) -> (i32, i32) as ("foo", "bar") {
+        %0 = hal.device.query<%device> key("some.device.prop")...
+        %1 = hal.device.query<%device> key("another.device.prop")...
+        hal.return %0, %1 : i32, i32
+      }
+      builtin.module {
+        func @dispatch0() {
+          %0 = hal.executable.constant.load "foo" : i32
+          %1 = hal.executable.constant.load "bar" : i32
+          return
+        }
+      }
+    }
+    ```
+
+    Each target backend will implement the constant initialization and access in
+    a way compatible with its execution model. Examples:
+    - CPU: read-only buffer initialized on load and passed to each dispatch
+    - CUDA: read-only buffer initialized on load and passed to each dispatch
+    - SPIR-V: specialization constants
+    - Metal: function constants
+    - WebGPU: pipeline-overridable constants
+  }];
+
+  let arguments = (ins
+    TypeAttrOf<FunctionType>:$function_type,
+    ArrayAttr:$keys
+  );
+
+  let regions = (region AnyRegion:$body);
+
+  let builders = [
+    OpBuilder<(ins
+      "FunctionType":$type,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs,
+      CArg<"ArrayRef<DictionaryAttr>", "{}">:$argAttrs)>,
+  ];
+
+  let extraClassDeclaration = [{
+    // CallableOpInterface:
+    ::mlir::Region *getCallableRegion() { return &getBody(); }
+    ArrayRef<Type> getCallableResults() { return getFunctionType().getResults(); }
+    // FunctionOpInterface:
+    ArrayRef<Type> getArgumentTypes() { return getFunctionType().getInputs(); }
+    ArrayRef<Type> getResultTypes() { return getFunctionType().getResults(); }
+
+    // Placeholder attribute added to ops that look up constants by key.
+    // Ordinal assignment passes use this to identify and update usage.
+    static StringRef getKeyAttrName() { return "hal.executable.constant.key"; }
+  }];
+
+  let hasCanonicalizer = 1;
+  let hasCustomAssemblyFormat = 1;
+  let hasVerifier = 1;
+}
+
+def HAL_ExecutableConstantLoadOp : HAL_PureOp<"executable.constant.load"> {
+  let summary = [{loads a constant value from the executable constant block}];
+  let description = [{
+    Loads a scalar constant value from the static executable constant block.
+    The value provided by a constant block with the given key will be loaded and
+    bitcast (possibly with truncation or zero-extension) to the result type.
+
+    Note that backends are allowed to implement their own mechanisms for
+    referencing constant block values and this is provided only as a default for
+    those not needing special behavior.
+  }];
+
+  let arguments = (ins
+    StrAttr:$key
+  );
+  let results = (outs
+    HAL_PrimitiveType:$result
+  );
+
+  let assemblyFormat = [{
+    $key attr-dict `:` type($result)
+  }];
 }
 
 def HAL_ExecutableBinaryOp : HAL_Op<"executable.binary", [

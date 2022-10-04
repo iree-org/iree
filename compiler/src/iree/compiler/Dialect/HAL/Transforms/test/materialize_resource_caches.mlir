@@ -131,6 +131,20 @@ hal.executable @exe {
     hal.executable.export @entry1 ordinal(1) layout(#pipeline_layout_1) attributes {
       workgroup_size = [32 : index, 1 : index, 1 : index]
     }
+    hal.executable.constant.block() -> (i32, i32) as ("foo", "bar") {
+      %c123 = arith.constant 123 : i32
+      %c456 = arith.constant 456 : i32
+      hal.return %c123, %c456 : i32, i32
+    }
+    hal.executable.constant.block(%device: !hal.device) -> i32 as "baz" {
+      %ok, %query = hal.device.query<%device : !hal.device> key("sys" :: "baz") : i1, i32
+      cf.cond_br %ok, ^bb_ok, ^bb_fail
+    ^bb_ok:
+      hal.return %query : i32
+    ^bb_fail:
+      %dummy = arith.constant 0 : i32
+      hal.return %dummy : i32
+    }
   }
 }
 
@@ -141,17 +155,27 @@ hal.executable @exe {
 
 // CHECK: util.global private @_executable_exe : !hal.executable
 // CHECK-NEXT: util.initializer {
-// CHECK:   %[[DEV:.+]] = hal.ex.shared_device : !hal.device
-// CHECK:   %[[RET:.+]] = hal.device.switch<%[[DEV]] : !hal.device> -> !hal.executable
+// CHECK:   %[[DEVICE:.+]] = hal.ex.shared_device : !hal.device
+// CHECK:   %[[RET:.+]] = hal.device.switch<%[[DEVICE]] : !hal.device> -> !hal.executable
 // CHECK:   #hal.device.match.executable.format<"vmvx-bytecode-fb"> {
+
+// Dependent layouts:
 // CHECK:     %[[LAYOUT0:.+]] = util.global.load @_pipeline_layout_0 : !hal.pipeline_layout
 // CHECK:     %[[LAYOUT0_2:.+]] = util.global.load @_pipeline_layout_0 : !hal.pipeline_layout
 // CHECK:     %[[LAYOUT1:.+]] = util.global.load @_pipeline_layout_1 : !hal.pipeline_layout
+
+// Constant block initializers:
+// CHECK:     %[[CONST_01:.+]]:2 = func.call @__constant_block_0()
+// CHECK:     %[[CONST_2:.+]] = func.call @__constant_block_1(%[[DEVICE]])
+
+// Executable creation:
 // CHECK:     %[[EXE:.+]] = hal.executable.create
-// CHECK-SAME:  device(%[[DEV]] : !hal.device)
+// CHECK-SAME:  device(%[[DEVICE]] : !hal.device)
 // CHECK-SAME:  target(@exe::@vmvx)
 // CHECK-SAME:  layouts([%[[LAYOUT0]], %[[LAYOUT0_2]], %[[LAYOUT1]]])
+// CHECK-SAME:  constants([%[[CONST_01]]#0, %[[CONST_01]]#1, %[[CONST_2]]])
 // CHECK-SAME:  : !hal.executable
+
 // CHECK:     hal.return %[[EXE]] : !hal.executable
 // CHECK:   },
 // CHECK:   #hal.match.always {
@@ -159,6 +183,20 @@ hal.executable @exe {
 // CHECK:     hal.return %[[NULL]] : !hal.executable
 // CHECK:   }
 // CHECK:   util.global.store %[[RET]], @_executable_exe : !hal.executable
+
+// Inlined constant block functions (here we ensure all blocks are cloned):
+// CHECK: func.func private @__constant_block_0() -> (i32, i32)
+// CHECK-DAG: %[[C0:.+]] = arith.constant 123
+// CHECK-DAG: %[[C1:.+]] = arith.constant 456
+// CHECK: return %[[C0]], %[[C1]]
+// CHECK: func.func private @__constant_block_1(%[[BLOCK_DEVICE:.+]]: !hal.device) -> i32
+// CHECK:   %[[OK:.+]], %[[VALUE:.+]] = hal.device.query<%[[BLOCK_DEVICE]] : !hal.device> key("sys" :: "baz")
+// CHECK:   cf.cond_br %[[OK]], ^bb1, ^bb2
+// CHECK: ^bb1:
+// CHECK:   return %[[VALUE]]
+// CHECK: ^bb2:
+// CHECK:   %[[DUMMY:.+]] = arith.constant 0
+// CHECK:   return %[[DUMMY]]
 
 // CHECK-LABEL: @exeLookup
 func.func @exeLookup(%device : !hal.device) -> !hal.executable {

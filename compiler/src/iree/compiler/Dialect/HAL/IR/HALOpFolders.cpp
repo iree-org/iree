@@ -10,8 +10,10 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpDefinition.h"
@@ -297,6 +299,256 @@ void CommandBufferPushDescriptorSetOp::getCanonicalizationPatterns(
 //===----------------------------------------------------------------------===//
 
 // TODO(benvanik): fold matches that are known true based on device config.
+
+//===----------------------------------------------------------------------===//
+// hal.executable.*
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+// Returns a set of fused locations for each result from all return sites.
+static SmallVector<Location> gatherResultLocations(int numResults,
+                                                   Region &region) {
+  SmallVector<SmallVector<Location>> allLocs;
+  allLocs.resize(numResults);
+  for (auto returnOp : region.getOps<IREE::HAL::ReturnOp>()) {
+    for (auto [i, result] : llvm::enumerate(returnOp.getOperands())) {
+      allLocs[i].push_back(result.getLoc());
+    }
+  }
+  return llvm::to_vector(llvm::map_range(allLocs, [&](auto resultLocs) {
+    return FusedLoc::get(region.getContext(), resultLocs);
+  }));
+}
+
+// Rewrites |region| to have a single hal.return with all prior return sites
+// branching to it. Upon return the exit block may not be the last!
+static void rewriteToOneReturn(int numResults, Region &region,
+                               PatternRewriter &rewriter) {
+  // Get all of the return ops - if there's only one then the requirement is
+  // already satisfied and we can exit early.
+  auto returnOps = llvm::to_vector(region.getOps<IREE::HAL::ReturnOp>());
+  if (returnOps.size() <= 1) return;  // no-op
+  SmallVector<Location> returnLocs;
+  for (auto returnOp : returnOps) returnLocs.push_back(returnOp.getLoc());
+
+  // Create the new exit block with arguments matching 1:1 with results.
+  auto anyReturnOp = returnOps.front();
+  auto resultLocs = gatherResultLocations(anyReturnOp.getNumOperands(), region);
+  auto &exitBlock = region.emplaceBlock();
+  exitBlock.addArguments(anyReturnOp.getOperandTypes(), resultLocs);
+  OpBuilder::atBlockBegin(&exitBlock)
+      .create<IREE::HAL::ReturnOp>(
+          FusedLoc::get(region.getContext(), returnLocs),
+          exitBlock.getArguments());
+
+  // Rewrite all return ops to branch to the exit block.
+  for (auto returnOp : returnOps) {
+    OpBuilder(returnOp).create<cf::BranchOp>(returnOp.getLoc(), &exitBlock,
+                                             returnOp.getOperands());
+    rewriter.eraseOp(returnOp);
+  }
+}
+
+/// Merges hal.executable.constant.block ops together into one.
+/// Duplicate keys are ignored and will be cleaned up by
+/// DeduplicateExecutableConstantBlockKeys.
+struct MergeExecutableConstantBlocks
+    : public OpRewritePattern<ExecutableVariantOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(ExecutableVariantOp variantOp,
+                                PatternRewriter &rewriter) const override {
+    auto blockOps =
+        llvm::to_vector(variantOp.getOps<ExecutableConstantBlockOp>());
+    if (blockOps.size() <= 1) {
+      return rewriter.notifyMatchFailure(variantOp,
+                                         "not enough blocks to merge");
+    }
+
+    rewriter.startRootUpdate(variantOp);
+
+    // Gather all constants initialized by the blocks.
+    SmallVector<Location> blockLocs;
+    bool anyRequireDevice = false;
+    SmallVector<Type> resultTypes;
+    SmallVector<Attribute> resultKeys;
+    SmallVector<Location> resultLocs;
+    for (auto blockOp : blockOps) {
+      blockLocs.push_back(blockOp.getLoc());
+      if (blockOp.getNumArguments() > 0) anyRequireDevice = true;
+      llvm::append_range(resultTypes, blockOp.getResultTypes());
+      llvm::append_range(resultKeys, blockOp.getKeys().getValue());
+      llvm::append_range(
+          resultLocs,
+          gatherResultLocations(blockOp.getNumResults(), blockOp.getRegion()));
+    }
+    SmallVector<Type> inputTypes;
+    if (anyRequireDevice) {
+      inputTypes.push_back(IREE::HAL::DeviceType::get(rewriter.getContext()));
+    }
+
+    // Create the new combined block op at the location of the first block to
+    // keep things in a deterministic order; this makes it look like we are
+    // merging all subsequent blocks into the first but without having to worry
+    // about making that work.
+    rewriter.setInsertionPoint(blockOps.front());
+    auto fusedLoc = rewriter.getFusedLoc(blockLocs);
+    auto newBlockOp = rewriter.create<ExecutableConstantBlockOp>(
+        fusedLoc, rewriter.getFunctionType(inputTypes, resultTypes),
+        rewriter.getArrayAttr(resultKeys));
+
+    // Create the entry block that captures the optional device argument and
+    // the exit block that returns the final flattened set of keys.
+    auto &targetRegion = newBlockOp.getRegion();
+    auto *preBlock = newBlockOp.addEntryBlock();
+    SmallVector<Block *> targetBlocks;
+    for (size_t i = 0; i < blockOps.size(); ++i) {
+      targetBlocks.push_back(&targetRegion.emplaceBlock());
+    }
+    auto *postBlock = &targetRegion.emplaceBlock();
+    OpBuilder::atBlockBegin(preBlock).create<cf::BranchOp>(
+        blockOps.front().getLoc(), targetBlocks.front());
+
+    // Inline all source constant block regions (which may have multiple
+    // Blocks).
+    SmallVector<Value> resultValues;
+    for (unsigned i = 0; i < targetBlocks.size(); ++i) {
+      auto *headerBlock = targetBlocks[i];
+      auto *nextBlock =
+          i < targetBlocks.size() - 1 ? targetBlocks[i + 1] : postBlock;
+      auto blockOp = blockOps[i];
+      auto &sourceRegion = blockOp.getRegion();
+
+      // Ensure there's only one hal.return in the region.
+      // This makes it easier to splice in as we can capture the returned values
+      // for use in our combined return.
+      rewriteToOneReturn(resultTypes.size(), sourceRegion, rewriter);
+
+      // Inline the entire CFG of the constant block into the target.
+      rewriter.cloneRegionBefore(sourceRegion, nextBlock);
+
+      // Branch from the header block into the first block of the region. Note
+      // that it may have a %device argument.
+      Block *firstBlock = headerBlock->getNextNode();
+      SmallVector<Value> firstBranchOperands;
+      if (firstBlock->getNumArguments() > 0) {
+        firstBranchOperands.push_back(newBlockOp.getArgument(0));
+      }
+      OpBuilder::atBlockEnd(headerBlock)
+          .create<cf::BranchOp>(newBlockOp.getLoc(), firstBlock,
+                                firstBranchOperands);
+
+      // Find the single expected return, capture its operands, and rewrite it
+      // to branch to the next block.
+      for (auto returnOp : llvm::make_early_inc_range(
+               targetRegion.getOps<IREE::HAL::ReturnOp>())) {
+        llvm::append_range(resultValues, returnOp.getOperands());
+        OpBuilder(returnOp).create<cf::BranchOp>(returnOp.getLoc(), nextBlock);
+        returnOp.erase();
+      }
+    }
+
+    // Return from the constant block with all operands.
+    OpBuilder::atBlockBegin(postBlock).create<IREE::HAL::ReturnOp>(
+        fusedLoc, resultValues);
+
+    rewriter.finalizeRootUpdate(variantOp);
+
+    // Erase all the old blocks.
+    for (auto blockOp : blockOps) {
+      rewriter.eraseOp(blockOp);
+    }
+
+    return success();
+  }
+};
+
+}  // namespace
+
+void ExecutableVariantOp::getCanonicalizationPatterns(
+    RewritePatternSet &results, MLIRContext *context) {
+  results.insert<MergeExecutableConstantBlocks>(context);
+}
+
+namespace {
+
+static void filterReturnOperands(ExecutableConstantBlockOp blockOp,
+                                 const BitVector &preservedIndices) {
+  for (auto returnOp :
+       llvm::make_early_inc_range(blockOp.getOps<IREE::HAL::ReturnOp>())) {
+    SmallVector<Value> operands;
+    for (auto [i, operand] : llvm::enumerate(returnOp.getOperands())) {
+      if (preservedIndices.test(i)) operands.push_back(operand);
+    }
+    returnOp.operandsMutable().assign(operands);
+  }
+}
+
+/// Drops the %device argument of a constant block region if unused.
+struct DropUnusedExecutableConstantBlockDeviceArg
+    : public OpRewritePattern<ExecutableConstantBlockOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(ExecutableConstantBlockOp blockOp,
+                                PatternRewriter &rewriter) const override {
+    if (blockOp.getNumArguments() == 0) return failure();
+    auto deviceArg = blockOp.getArgument(0);
+    if (!deviceArg.use_empty()) return failure();
+    rewriter.updateRootInPlace(blockOp, [&]() {
+      blockOp.eraseArgument(0);
+      blockOp.setFunctionTypeAttr(TypeAttr::get(
+          rewriter.getFunctionType(/*inputs=*/{}, blockOp.getResultTypes())));
+    });
+    return success();
+  }
+};
+
+/// Deduplicates constant values that have matching keys, choosing the first
+/// one found. There's no verification that the values produced are the same
+/// as users are expected to uniquely name their keys.
+struct DeduplicateExecutableConstantBlockKeys
+    : public OpRewritePattern<ExecutableConstantBlockOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(ExecutableConstantBlockOp blockOp,
+                                PatternRewriter &rewriter) const override {
+    // Build a set of preserved result indices (those with unique keys).
+    BitVector resultIndices(blockOp.getNumResults(), /*t=*/false);
+    SmallVector<Type> resultTypes;
+    SetVector<Attribute> resultKeys;
+    int i = 0;
+    for (auto [resultKey, resultType] :
+         llvm::zip(blockOp.getKeys().getValue(), blockOp.getResultTypes())) {
+      if (resultKeys.insert(resultKey)) {
+        resultIndices.set(i);
+        resultTypes.push_back(resultType);
+      }
+      ++i;
+    }
+
+    // If all results are preserved this is a no-op.
+    if (resultIndices.all()) {
+      return rewriter.notifyMatchFailure(blockOp, "no duplicate keys");
+    }
+
+    // Update function in-place.
+    rewriter.updateRootInPlace(blockOp, [&]() {
+      // Update metadata.
+      blockOp.setFunctionTypeAttr(TypeAttr::get(
+          rewriter.getFunctionType(blockOp.getArgumentTypes(), resultTypes)));
+      blockOp.setKeysAttr(rewriter.getArrayAttr(resultKeys.takeVector()));
+      // Drop all unneeded results from each return.
+      filterReturnOperands(blockOp, resultIndices);
+    });
+    return success();
+  }
+};
+
+}  // namespace
+
+void ExecutableConstantBlockOp::getCanonicalizationPatterns(
+    RewritePatternSet &results, MLIRContext *context) {
+  results.insert<DropUnusedExecutableConstantBlockDeviceArg>(context);
+  results.insert<DeduplicateExecutableConstantBlockKeys>(context);
+}
 
 //===----------------------------------------------------------------------===//
 // hal.fence.create

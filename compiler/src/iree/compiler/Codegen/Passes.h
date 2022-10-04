@@ -324,6 +324,10 @@ void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager);
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createLLVMCPULinkExecutablesPass();
 
+/// Assigns executable constant ordinals across all LLVMCPU variants.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
+createLLVMCPUAssignConstantOrdinalsPass();
+
 /// Populates passes needed to link HAL executables across LLVMCPU targets.
 void buildLLVMCPULinkingPassPipeline(OpPassManager &passManager);
 
@@ -522,6 +526,10 @@ std::unique_ptr<Pass> createVMVXLowerLinalgMicrokernelsPass();
 
 /// Links VMVX HAL executables within the top-level program module.
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createVMVXLinkExecutablesPass();
+
+/// Assigns executable constant ordinals across all VMVX variants.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
+createVMVXAssignConstantOrdinalsPass();
 
 /// Populates passes needed to link HAL executables across VMVX targets.
 void buildVMVXLinkingPassPipeline(OpPassManager &passManager);

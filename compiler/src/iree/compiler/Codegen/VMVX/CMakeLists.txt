@@ -16,6 +16,7 @@ iree_cc_library(
   SRCS
     "LowerLinalgMicrokernels.cpp"
     "Passes.cpp"
+    "VMVXAssignConstantOrdinals.cpp"
     "VMVXLinkExecutables.cpp"
   DEPS
     LLVMSupport

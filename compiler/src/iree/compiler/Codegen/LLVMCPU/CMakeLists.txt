@@ -20,6 +20,7 @@ iree_cc_library(
     "ConvertToLLVM.cpp"
     "KernelDispatch.cpp"
     "LLVMCPUAArch64VectorLowering.cpp"
+    "LLVMCPUAssignConstantOrdinals.cpp"
     "LLVMCPUCheckIRBeforeLLVMConversion.cpp"
     "LLVMCPUEmitVectorizationRemarks.cpp"
     "LLVMCPULinkExecutables.cpp"
