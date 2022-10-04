@@ -177,19 +177,19 @@ static VectorPreProcStrategy getVectorPreProcStrategy(
   assert(succeeded(maybeVariantOp) && "ExecutableVariantOp not found");
   auto variantOp = *maybeVariantOp;
 
-  // Default X86 specific strategies:
-
+  // Default X86 specific strategy.
   if (isX86(variantOp) && enableVectorPadding) {
     // Padding is only enabled on x86. It leads to too much overhead on RISC-V
     // and ARM.
     return VectorPreProcStrategy::Padding;
   }
 
-  // Default RISC-V specific strategies:
-  //   * Contractions: Peeling.
-  //   * Rest: None.
+  // Default RISC-V specific strategies.
+  if (isRISCV(variantOp) && enableVectorPeeling) {
+    return VectorPreProcStrategy::Peeling;
+  }
 
-  return VectorPreProcStrategy::Peeling;
+  return VectorPreProcStrategy::None;
 }
 
 /// Looks for the `native_vector_size` attribute in the hal.executable.variant
@@ -406,36 +406,38 @@ static SmallVector<int64_t> getDefaultDistributedLoopTileSizes(
 /// Adjusts the workload per workgroup to be a multiple of vector size to ensure
 /// that the op vectorizes.
 static int64_t getMaxTileSize(int64_t lb, int64_t ub, int64_t maxSize,
-                              int64_t vectorSizeVal,
+                              int64_t vectorSize,
                               bool allowIncompleteTile = false) {
   if (ub == ShapedType::kDynamicSize || lb == ShapedType::kDynamicSize) {
     return maxSize;
   }
-  int64_t dim = ub - lb;
-  if (dim <= maxSize && dim < vectorSizeVal) return dim;
+  int64_t numIters = ub - lb;
+  if (numIters <= maxSize && numIters < vectorSize) {
+    return numIters;
+  }
 
-  int64_t scaledUB = std::min(maxSize, dim) / vectorSizeVal * vectorSizeVal;
-  for (int64_t i = scaledUB; i > 0; i -= vectorSizeVal) {
-    if (dim % i == 0) {
+  int64_t scaledUB = std::min(maxSize, numIters) / vectorSize * vectorSize;
+  for (int64_t i = scaledUB; i > 0; i -= vectorSize) {
+    if (numIters % i == 0) {
       return i;
     }
   }
   if (allowIncompleteTile) {
     // Set bound to half to avoid too many workgroup.
-    int64_t start = std::min(maxSize, dim);
+    int64_t start = std::min(maxSize, numIters);
     int64_t end = start / 2;
     for (int64_t i = start; i >= end; --i) {
-      if (dim % i == 0) {
+      if (numIters % i == 0) {
         return i;
       }
     }
     return maxSize;
   }
-  // If it can't be a multiple of vectorSizeVal, let's choose a factor of dim
-  // sizes heuristically.
-  int64_t start = std::min(maxSize, dim);
+  // If it can't be a multiple of `vectorSize`, let's choose a factor of
+  // `numIters` sizes heuristically.
+  int64_t start = std::min(maxSize, numIters);
   for (int64_t i = start; i > 0; --i) {
-    if (dim % i == 0) {
+    if (numIters % i == 0) {
       return i;
     }
   }
@@ -710,47 +712,45 @@ static DispatchLoweringPassPipeline getNoPadMultiTilingExpert(
 
 static LogicalResult setMatmulNoPadRootConfig(
     func::FuncOp entryPointFn, linalg::ContractionOpInterface op,
-    const TileSizesListTypeRef inputTileSizes, int vectorSize) {
-  // auto numLevels = tileSizes.size();
-  // SmallVector<int64_t> workgroupTileSizes = tileSizes.pop_back_val();
-
-  // LLVM_DEBUG(KD_DBGS() << "After pop back: " << tileSizes << "\n");
-
-  // auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
-  // SmallVector<int64_t> shape = linalgOp.getStaticLoopRanges();
-  // for (auto sizes : tileSizes) {
-  //   for (auto en : llvm::enumerate(sizes)) {
-  //     // Quantized cases are not fully evaluated yet, so it might go with
-  //     NoPad
-  //     // approach.
-  //     int idx = en.index();
-  //     if (!en.value() || shape[idx] == ShapedType::kDynamicSize) continue;
-  //     assert(shape[idx] % en.value() == 0);
-  //     shape[idx] = en.value();
-  //   }
-  // }
-
-  //// TODO(hanchung): Create an addtional pass to handle such cases.
-  //// The tiling for parallel dims and reduction dims should be separated.
-  // SmallVector<int64_t> parallelTileSizes;
-  // for (auto en : llvm::enumerate(workgroupTileSizes)) {
-  //   int64_t sz = en.value();
-  //   if (sz) {
-  //     sz = getMaxTileSize(0, shape[en.index()], sz, vectorSize);
-  //   }
-  //   parallelTileSizes.push_back(sz);
-  // }
-
+    const TileSizesListTypeRef inputTileSizes, int vectorSize,
+    VectorPreProcStrategy vecPreProcStrategy) {
   size_t numTuples = inputTileSizes.size();
   assert(numTuples >= 2 && "Expected two or more tile size tuples");
 
   auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
-  SmallVector<int64_t> parallelTileSizes = inputTileSizes.back();
+  SmallVector<int64_t> shape = linalgOp.getStaticLoopRanges();
+  // Iterate over the inner tile size tuples to check that their sizes divides
+  // the sizes of the iteration space.
+  for (auto tileSizeTuple :
+       llvm::make_range(inputTileSizes.begin(), inputTileSizes.end() - 1)) {
+    for (auto &en : llvm::enumerate(tileSizeTuple)) {
+      // Quantized cases are not fully evaluated yet, so it might go with NoPad
+      // approach.
+      int idx = en.index();
+      if (en.value() == 0 || shape[idx] == ShapedType::kDynamicSize) continue;
+      assert(shape[idx] % en.value() == 0);
+      shape[idx] = en.value();
+    }
+  }
+
+  // TODO(hanchung): Create an addtional pass to handle such cases.
+  // The tiling for parallel dims and reduction dims should be separated.
+  const SmallVectorImpl<int64_t> &workgroupTileSizes = inputTileSizes.back();
+  SmallVector<int64_t> parallelTileSizes;
+  for (auto en : llvm::enumerate(workgroupTileSizes)) {
+    int64_t sz = en.value();
+    if (sz != 0) {
+      sz = getMaxTileSize(/*lb=*/0, /*ub=*/shape[en.index()],
+                          /*maxTileSize=*/sz, vectorSize,
+                          /*allowIncompleteTile=*/vecPreProcStrategy ==
+                              VectorPreProcStrategy::Peeling);
+    }
+    parallelTileSizes.push_back(sz);
+  }
   SmallVector<int64_t> reductionTileSizes;
   splitParallelAndReductionTiles(op.getOperation(), parallelTileSizes,
                                  reductionTileSizes);
 
-  auto vecPreProcStrategy = getVectorPreProcStrategy(linalgOp);
   setVectorSizesForDynamicShapes(op.getOperation(), vecPreProcStrategy,
                                  parallelTileSizes, reductionTileSizes);
 
@@ -966,11 +966,12 @@ static LogicalResult setRootConfig(
                                          workgroupTileSizes};
     if (isNoPadMultiTilingBeneficial(contractionOp, tripleTileSizes)) {
       return setMatmulNoPadRootConfig(entryPointFn, contractionOp,
-                                      tripleTileSizes, vectorSize);
+                                      tripleTileSizes, vectorSize,
+                                      preProcStrategy);
     }  // else fall back to the default configuration.
   }
   return setMatmulNoPadRootConfig(entryPointFn, contractionOp, tileSizes,
-                                  vectorSize);
+                                  vectorSize, preProcStrategy);
 }
 
 /// Sets the lowering configuration for dispatch region for linalg.mmt4d root
