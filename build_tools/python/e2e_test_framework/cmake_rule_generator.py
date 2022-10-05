@@ -273,12 +273,12 @@ class IreeRuleFactory(object):
 
 def _generate_iree_rules(
     common_rule_factory: CommonRuleFactory, iree_artifacts_dir: str,
-    vmfb_generation_configs: Sequence[iree_definitions.VMFBGenerationConfig]
+    module_generation_configs: Sequence[iree_definitions.ModuleGenerationConfig]
 ) -> List[str]:
   iree_rule_factory = IreeRuleFactory(iree_artifacts_dir)
-  for vmfb_generation_config in vmfb_generation_configs:
-    model = vmfb_generation_config.model
-    compile_config = vmfb_generation_config.compile_config
+  for module_generation_config in module_generation_configs:
+    model = module_generation_config.model
+    compile_config = module_generation_config.compile_config
 
     source_model_rule = common_rule_factory.add_model_rule(model)
     import_rule = iree_rule_factory.add_import_model_rule(
@@ -295,8 +295,8 @@ def _generate_iree_rules(
 
 def generate_rules(
     model_artifacts_dir: str, iree_artifacts_dir: str,
-    iree_vmfb_generation_configs: Sequence[
-        iree_definitions.VMFBGenerationConfig]
+    iree_module_generation_configs: Sequence[
+        iree_definitions.ModuleGenerationConfig]
 ) -> List[str]:
   """Generates cmake rules to build benchmarks.
   
@@ -305,13 +305,13 @@ def generate_rules(
       variable syntax in the path.
     iree_artifacts_dir: root directory to store generated IREE artifacts. Can
       contain CMake variable syntax in the path.
-    iree_vmfb_generation_configs: compile configs for IREE targets.
+    iree_module_generation_configs: compile configs for IREE targets.
   Returns:
     List of CMake rules.
   """
   common_rule_factory = CommonRuleFactory(model_artifacts_dir)
   iree_rules = _generate_iree_rules(common_rule_factory, iree_artifacts_dir,
-                                    iree_vmfb_generation_configs)
+                                    iree_module_generation_configs)
   # Currently the rules are simple so the common rules can be always put at the
   # top. Need a topological sort once the dependency gets complicated.
   return common_rule_factory.generate_cmake_rules() + iree_rules
