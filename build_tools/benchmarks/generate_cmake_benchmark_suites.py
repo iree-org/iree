@@ -14,7 +14,7 @@ import argparse
 # Add build_tools python dir to the search path.
 sys.path.insert(0, str(pathlib.Path(__file__).parent / ".." / "python"))
 
-import benchmarks.iree.definitions
+import benchmark_suites.iree.definitions
 from e2e_test_framework import cmake_rule_generator
 
 TEMPLATE_DIR = pathlib.Path(__file__).parent
@@ -35,7 +35,7 @@ def parse_arguments():
 
 
 def main(args: argparse.Namespace):
-  model_compile_configs, _ = benchmarks.iree.definitions.generate()
+  model_compile_configs, _ = benchmark_suites.iree.definitions.generate()
   benchmark_rules = cmake_rule_generator.generate_rules(
       model_artifacts_dir="${_MODEL_ARTIFACTS_DIR}",
       iree_artifacts_dir="${_IREE_ARTIFACTS_DIR}",
