@@ -127,9 +127,7 @@ function(iree_run_module_test)
     cmake_path(GET _RULE_EXPECTED_OUTPUT EXTENSION LAST_ONLY _OUTPUT_FILE_TYPE)
     if(_OUTPUT_FILE_TYPE AND NOT
        (_OUTPUT_FILE_TYPE STREQUAL ".txt" OR _OUTPUT_FILE_TYPE STREQUAL ".npy"))
-      message(SEND_ERROR
-        "Unsupported expected output file type: ${_RULE_EXPECTED_OUTPUT}"
-      )
+      message(SEND_ERROR "Unsupported expected output file type: ${_RULE_EXPECTED_OUTPUT}")
     elseif(_OUTPUT_FILE_TYPE STREQUAL ".txt")
       file(REAL_PATH "${_RULE_EXPECTED_OUTPUT}" _OUTPUT_FILE_SRC)
       # Process the text input to remove the line breaks.
