@@ -22,6 +22,16 @@ class DeviceCollections(object):
       platform: common_definitions.DevicePlatform,
       device_parameters: Set[str] = set()
   ) -> List[common_definitions.DeviceSpec]:
+    """Query the device specs.
+
+    Args:
+      architecture: device architecture to match.
+      platform: device platform to match.
+      device_parameters: parameters that devices need to have.
+    Returns:
+      List of matched device specs.
+    """
+
     matched_device_specs = []
     for device_spec in self.device_specs:
       if device_spec.architecture != architecture:
