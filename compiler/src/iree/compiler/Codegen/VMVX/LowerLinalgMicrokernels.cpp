@@ -912,6 +912,48 @@ bool isMmt4d(ArrayAttr indexingMaps) {
   return indexingMaps == maps;
 }
 
+int getNumberOfUses(Value v) {
+  auto uses = v.getUses();
+  return std::distance(uses.begin(), uses.end());
+}
+
+template <typename OpType>
+OpType getUserOfType(Value v) {
+  auto uses = v.getUses();
+  for (const auto &u : uses) {
+    if (OpType user = llvm::dyn_cast<OpType>(u.getOwner())) {
+      return user;
+    }
+  }
+  return nullptr;
+}
+
+linalg::FillOp findFillOpSolelyZeroingOutputOf(linalg::LinalgOp op) {
+  Value out = op.getOutputOperand(0)->get();
+  if (getNumberOfUses(out) != 2) {
+    return nullptr;
+  }
+  linalg::FillOp fillOp = getUserOfType<linalg::FillOp>(out);
+  if (!fillOp) {
+    return nullptr;
+  }
+  if (!fillOp->isBeforeInBlock(op)) {
+    return nullptr;
+  }
+  Value fillValue = fillOp.value();
+  if (auto constIntOp = fillValue.getDefiningOp<arith::ConstantIntOp>()) {
+    if (constIntOp.value() == 0) {
+      return fillOp;
+    }
+  }
+  if (auto constFloatOp = fillValue.getDefiningOp<arith::ConstantFloatOp>()) {
+    if (constFloatOp.value().isZero()) {
+      return fillOp;
+    }
+  }
+  return nullptr;
+}
+
 /// Convert supported linalg contraction ops like matmul and mmt4d.
 struct LinalgContractionConversion
     : public OpInterfaceRewritePattern<linalg::ContractionOpInterface> {
@@ -998,17 +1040,22 @@ struct LinalgContractionConversion
 
   LogicalResult handleConformingMatmul2D(OpInfo &info,
                                          PatternRewriter &rewriter) const {
-    auto loc = info.op.getLoc();
+    int flags = 0;
+    if (linalg::FillOp fillOp = findFillOpSolelyZeroingOutputOf(info.op)) {
+      rewriter.eraseOp(fillOp);  // let the matmul overwrite the accumulator.
+    } else {
+      flags |= IREE_VMVX_MATMUL_FLAG_ACCUMULATE;  // accumulate into existing.
+    }
+
     auto &lhsDesc = info.lhsAnal.getDesc(rewriter);
     auto &rhsDesc = info.rhsAnal.getDesc(rewriter);
     auto &outDesc = info.outAnal.getDesc(rewriter);
-
-    int flags = IREE_VMVX_MATMUL_FLAG_ACCUMULATE;
 
     Value m = lhsDesc.sizes[0];
     Value k = rhsDesc.sizes[0];
     Value n = rhsDesc.sizes[1];
 
+    auto loc = info.op.getLoc();
     auto lhsBuffer = lhsDesc.castToLinear(loc, rewriter);
     auto rhsBuffer = rhsDesc.castToLinear(loc, rewriter);
     auto outBuffer = outDesc.castToLinear(loc, rewriter);
@@ -1031,11 +1078,17 @@ struct LinalgContractionConversion
 
   LogicalResult handleConformingMmt4d(OpInfo &info,
                                       PatternRewriter &rewriter) const {
-    auto loc = info.op.getLoc();
+    int flags = 0;
+    if (linalg::FillOp fillOp = findFillOpSolelyZeroingOutputOf(info.op)) {
+      rewriter.eraseOp(fillOp);  // let the matmul overwrite the accumulator.
+    } else {
+      flags |= IREE_VMVX_MATMUL_FLAG_ACCUMULATE;  // accumulate into existing.
+    }
+
     auto &lhsDesc = info.lhsAnal.getDesc(rewriter);
     auto &rhsDesc = info.rhsAnal.getDesc(rewriter);
     auto &outDesc = info.outAnal.getDesc(rewriter);
-    int flags = IREE_VMVX_MATMUL_FLAG_ACCUMULATE;
+
     Value m = lhsDesc.sizes[0];
     Value n = rhsDesc.sizes[0];
     Value k = rhsDesc.sizes[1];
@@ -1043,6 +1096,7 @@ struct LinalgContractionConversion
     Value n0 = rhsDesc.sizes[2];
     Value k0 = rhsDesc.sizes[3];
 
+    auto loc = info.op.getLoc();
     auto lhsBuffer = lhsDesc.castToLinear(loc, rewriter);
     auto rhsBuffer = rhsDesc.castToLinear(loc, rewriter);
     auto outBuffer = outDesc.castToLinear(loc, rewriter);
@@ -1076,14 +1130,32 @@ class VMVXLowerLinalgMicrokernelsPass
   }
 
   void runOnOperation() override {
-    RewritePatternSet patterns(&getContext());
-    patterns.insert<LinalgBinaryGenericConversion, LinalgFillConversion,
-                    LinalgContractionConversion, LinalgTrivialGenericConversion,
-                    LinalgUnaryGenericConversion>(&getContext());
+    // Patterns that need to be applied first to match multiple linalg ops
+    // before they have been lowered.
+    {
+      RewritePatternSet patterns(&getContext());
+      // LinalgContractionConversion needs to match linalg::FillOp to determine
+      // whether to set the 'accumulate' flag or just erase the FillOp.
+      patterns.insert<LinalgContractionConversion>(&getContext());
 
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
-      return signalPassFailure();
+      if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                              std::move(patterns)))) {
+        return signalPassFailure();
+      }
+    }
+
+    // Other lowering patterns
+    {
+      RewritePatternSet patterns(&getContext());
+      patterns
+          .insert<LinalgBinaryGenericConversion, LinalgFillConversion,
+                  LinalgTrivialGenericConversion, LinalgUnaryGenericConversion>(
+              &getContext());
+
+      if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                              std::move(patterns)))) {
+        return signalPassFailure();
+      }
     }
 
     if (warnOnUnconverted) {
