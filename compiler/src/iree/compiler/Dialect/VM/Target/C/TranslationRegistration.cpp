@@ -16,6 +16,7 @@ namespace VM {
 void registerToCTranslation() {
   TranslateFromMLIRRegistration toCModule(
       "iree-vm-ir-to-c-module",
+      "Translates a vm.module to a c module",
       [](mlir::ModuleOp moduleOp, llvm::raw_ostream &output) {
         return translateModuleToC(moduleOp, getCTargetOptionsFromFlags(),
                                   output);
