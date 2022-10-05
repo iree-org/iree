@@ -64,7 +64,7 @@ class Linux_x86_64_Benchmarks(object):
             compile_config=cls.CASCADELAKE_COMPILE_CONFIG, model=model)
         for model in model_groups.SMALL + model_groups.LARGE
     ]
-    cascadelake_devices = device_collections.DEFAULT_DEVICE_COLLECTION.query_device_specs(
+    cascadelake_devices = device_collections.DEFAULT_DEVICE_COLLECTIONS.query_device_specs(
         architecture=common_definitions.DeviceArchitecture.X86_64_CASCADELAKE,
         platform=common_definitions.DevicePlatform.GENERIC_LINUX)
     e2e_model_run_configs = _generate_e2e_model_run_configs(
