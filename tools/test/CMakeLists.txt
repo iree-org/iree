@@ -50,3 +50,35 @@ iree_lit_test_suite(
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+
+if((IREE_TARGET_BACKEND_LLVM_CPU OR DEFINED IREE_HOST_BINARY_ROOT) AND
+   IREE_HAL_DRIVER_LOCAL_SYNC)
+  iree_bytecode_module(
+    NAME
+      iree_run_module_bytecode_module_llvm_cpu
+    SRC
+      "iree-run-module.mlir"
+    MODULE_FILE_NAME
+      "iree_run_module_bytecode_module_llvm_cpu.vmfb"
+    C_IDENTIFIER
+      "iree_tools_test_iree_run_module_bytecode_module_llvm_cpu"
+    FLAGS
+      "--iree-hal-target-backends=llvm-cpu"
+  )
+
+  iree_run_module_test(
+    NAME
+      iree_run_module_correctness_test
+    MODULE_SRC
+      "${CMAKE_CURRENT_BINARY_DIR}/iree_run_module_bytecode_module_llvm_cpu.vmfb"
+    DRIVER
+      "local-sync"
+    RUNNER_ARGS
+      "--entry_function=abs"
+      "--function_input=f32=-10"
+    EXPECTED_OUTPUT
+      "f32=10"
+    DEPS
+      ::iree_run_module_bytecode_module_llvm_cpu_c
+  )
+endif()

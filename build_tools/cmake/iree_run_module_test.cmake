@@ -20,27 +20,26 @@ endfunction()
 #
 # Creates a test using iree-run-module to run an IREE module (vmfb).
 #
-# The function supports cross compile and checks the benchmark suite prefixes
-# based on the cross compile platform settings, so there is no matching bzl rule
-# until there is a bazel --build_config for cross compile targets in place.
+# The function is unimplemented in Bazel because it is not used there.
 #
 # Parameters:
 #   NAME: Name of the target
 #   MODULE_SRC: IREE module (vmfb) file.
-#   DRIVER: Driver to run the module with. If specified, it has to be consistent
-#       with the one provided by the benchmark_suite's flagfile.
+#   DRIVER: Driver to run the module with.
 #   RUNNER_ARGS: additional args to pass to iree-run-module. The driver
 #       and input file are passed automatically.
-#   EXPECTED_OUTPUT: A file of expected output to compare with the output from
-#       iree-run-module
+#   EXPECTED_OUTPUT: A string representing the expected output from executing
+#       the module in the format accepted by `iree-run-module` or a file
+#       containing the same.
 #   LABELS: Additional labels to apply to the test. The package path and
 #       "driver=${DRIVER}" are added automatically.
-#   XFAIL: When set for x86_64|android-arm64-v8a|riscv64-Linux|riscv32-Linux,
-#       the test is expected to fail for the particular platforms/architectures
-#       for various reasons, e.g., upstream llvm backend.
-#   UNSUPPORTED_PLATFORMS: Platforms
-#       (android-arm64-v8a|riscv64-Linux|riscv32-Linux) not supported by the
-#       test target. The target will be skipped during crosscompile.
+#   XFAIL: List of platforms (all, x86_64, android-arm64-v8a, riscv64-Linux,
+#       riscv32-Linux) for which the test is expected to fail e.g. due to
+#       issues with the upstream llvm backend. The target will be run, but its
+#       pass/fail status will be inverted.
+#   UNSUPPORTED_PLATFORMS: List of platforms (x86_64, android-arm64-v8a,
+#       riscv64-Linux, riscv32-Linux) not supported by the test target. The
+#       target will be skipped entirely.
 #   DEPS: (Optional) List of targets to build the test artifacts.
 #   TIMEOUT: (optional) Test timeout.
 #
@@ -106,26 +105,33 @@ function(iree_run_module_test)
     ${ARGN}
   )
 
-  if(CMAKE_CROSSCOMPILING AND "hostonly" IN_LIST _RULE_LABELS)
-    return()
-  endif()
-
   iree_get_platform(_PLATFORM)
   if(_PLATFORM IN_LIST _RULE_UNSUPPORTED_PLATFORMS)
     return()
+  endif()
+
+  if(NOT DEFINED _RULE_DRIVER)
+    message(SEND_ERROR "Need to specify the driver to use.")
   endif()
 
   set(_RUNNER_TARGET "iree-run-module")
   iree_package_name(_PACKAGE_NAME)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
 
-  get_filename_component(_SRC "${_RULE_MODULE_SRC}" REALPATH)
+  file(REAL_PATH "${_RULE_MODULE_SRC}" _SRC)
   list(APPEND _RULE_RUNNER_ARGS "--module_file=${_SRC}")
 
   if(_RULE_EXPECTED_OUTPUT)
-    get_filename_component(_OUTPUT_FILE_TYPE "${_RULE_EXPECTED_OUTPUT}" EXT)
-    if(_OUTPUT_FILE_TYPE STREQUAL ".txt")
-      get_filename_component(_OUTPUT_FILE_SRC "${_RULE_EXPECTED_OUTPUT}" REALPATH)
+    # this may be a file or a literal output. In the latter case, the
+    # extension variable will be empty.
+    cmake_path(GET _RULE_EXPECTED_OUTPUT EXTENSION LAST_ONLY _OUTPUT_FILE_TYPE)
+    if(_OUTPUT_FILE_TYPE AND NOT
+       (_OUTPUT_FILE_TYPE STREQUAL ".txt" OR _OUTPUT_FILE_TYPE STREQUAL ".npy"))
+      message(SEND_ERROR
+        "Unsupported expected output file type: ${_RULE_EXPECTED_OUTPUT}"
+      )
+    elseif(_OUTPUT_FILE_TYPE STREQUAL ".txt")
+      file(REAL_PATH "${_RULE_EXPECTED_OUTPUT}" _OUTPUT_FILE_SRC)
       # Process the text input to remove the line breaks.
       file(STRINGS "${_OUTPUT_FILE_SRC}" _EXPECTED_OUTPUT ENCODING UTF-8)
       string(REPLACE ";" " " _EXPECTED_OUTPUT_STR "${_EXPECTED_OUTPUT}")
@@ -156,7 +162,7 @@ function(iree_run_module_test)
           ${IREE_BENCHMARK_SUITE_DIR}\n\
           Please check if you need to download it first.")
       else()
-        get_filename_component(_OUTPUT_FILE_SRC "${_OUTPUT_FILE_SRC_PATH}" REALPATH)
+        file(REAL_PATH "${_OUTPUT_FILE_SRC_PATH}" _OUTPUT_FILE_SRC)
         list(APPEND _RULE_RUNNER_ARGS "--expected_output=@${_OUTPUT_FILE_SRC}")
         list(APPEND _SRC ${_OUTPUT_FILE_SRC})
       endif()
@@ -165,17 +171,18 @@ function(iree_run_module_test)
     endif()
   endif(_RULE_EXPECTED_OUTPUT)
 
-  if(NOT DEFINED _RULE_DRIVER)
-    return()
-  endif()
-
   # Dump the flags into a flag file to avoid CMake's naive handling of spaces
   # in expected output.
   if(_RULE_RUNNER_ARGS)
     set(_OUTPUT_FLAGFILE "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}_flagfile")
     # Write each argument in a new line.
     string(REPLACE ";" "\n" _OUTPUT_FLAGS "${_RULE_RUNNER_ARGS}")
-    file(WRITE "${_OUTPUT_FLAGFILE}" "${_OUTPUT_FLAGS}")
+    file(CONFIGURE
+      OUTPUT
+        "${_OUTPUT_FLAGFILE}"
+      CONTENT
+        "${_OUTPUT_FLAGS}"
+    )
     list(APPEND _SRC "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}_flagfile")
   endif()
 
@@ -209,14 +216,9 @@ function(iree_run_module_test)
   endif()
 
   # Set expect failure cases.
-  if(_PLATFORM IN_LIST _RULE_XFAIL)
-    set(_XFAIL TRUE)
-  else()
-    set(_XFAIL FALSE)
-  endif()
   iree_package_path(_PACKAGE_PATH)
   set(_TEST_NAME "${_PACKAGE_PATH}/${_RULE_NAME}")
-  if(_XFAIL)
+  if(_PLATFORM IN_LIST _RULE_XFAIL OR _RULE_XFAIL STREQUAL "all")
     set_property(TEST ${_TEST_NAME} PROPERTY WILL_FAIL TRUE)
   endif()
   add_dependencies(iree-test-deps "${_NAME}")
@@ -226,27 +228,27 @@ endfunction()
 #
 # Creates a test using iree-run-module to run a benchmark suite module.
 #
-# The function supports cross compile and checks the benchmark suite prefixes
-# based on the cross compile platform settings, so there is no matching bzl rule
-# until there is a bazel --build_config for cross compile targets in place.
+# The function is unimplemented in Bazel because it is not used there.
 #
 # Parameters:
 #   NAME: Name of the target
-#   BENCHMARK_MODULE_SRC: IREE module from benchmark_suite.
-#   DRIVER: Driver to run the module with. If specified, it has to be consistent
-#       with the one provided by the benchmark_suite's flagfile.
+#   BENCHMARK_MODULE_SRC: IREE module flagfile path built from benchmark_suite.
+#       The flagfile for different compile configurations are stored in the
+#       subdirectories.
+#   DRIVER: Driver to run the module with.
 #   RUNNER_ARGS: additional args to pass to iree-run-module. The driver
 #       and input file are passed automatically.
 #   EXPECTED_OUTPUT: A file of expected output to compare with the output from
 #       iree-run-module
 #   LABELS: Additional labels to apply to the test. The package path and
 #       "driver=${DRIVER}" are added automatically.
-#   XFAIL: When set for x86_64|android-arm64-v8a|riscv64-Linux|riscv32-Linux,
-#       the test is expected to fail for the particular platforms/architectures
-#       for various reasons, e.g., upstream llvm backend.
-#   UNSUPPORTED_PLATFORMS: Platforms
-#       (android-arm64-v8a|riscv64-Linux|riscv32-Linux) not supported by the
-#       test target. The target will be skipped during crosscompile.
+#   XFAIL: List of platforms (all, x86_64, android-arm64-v8a, riscv64-Linux,
+#       riscv32-Linux) for which the test is expected to fail e.g. due to
+#       issues with the upstream llvm backend. The target will be run, but its
+#       pass/fail status will be inverted.
+#   UNSUPPORTED_PLATFORMS: List of platforms (x86_64, android-arm64-v8a,
+#       riscv64-Linux, riscv32-Linux) not supported by the test target. The
+#       target will be skipped entirely.
 #   TIMEOUT: (optional) Test timeout.
 #
 # Examples:
@@ -284,7 +286,7 @@ endfunction()
 #     "riscv32-Linux"
 # )
 function(iree_benchmark_suite_module_test)
-if(NOT IREE_BUILD_TESTS)
+  if(NOT IREE_BUILD_TESTS)
     return()
   endif()
 
@@ -296,18 +298,14 @@ if(NOT IREE_BUILD_TESTS)
     ${ARGN}
   )
 
-  if(CMAKE_CROSSCOMPILING AND "hostonly" IN_LIST _RULE_LABELS)
+  # Benchmark suite needs to be stored at the location of
+  # `IREE_BENCHMARK_SUITE_DIR` or the test target is bypassed.
+  if(NOT DEFINED IREE_BENCHMARK_SUITE_DIR)
     return()
   endif()
 
   iree_get_platform(_PLATFORM)
   if(_PLATFORM IN_LIST _RULE_UNSUPPORTED_PLATFORMS)
-    return()
-  endif()
-
-  # Benchmark suite needs to be stored at the location of
-  # `IREE_BENCHMARK_SUITE_DIR` or the test target is bypassed.
-  if(_RULE_BENCHMARK_MODULE_SRC AND NOT DEFINED IREE_BENCHMARK_SUITE_DIR)
     return()
   endif()
 
@@ -327,24 +325,26 @@ if(NOT IREE_BUILD_TESTS)
       LIST_DIRECTORIES FALSE
       "${_FLAGFILE_HINT_PATH}"
     )
-  if(_FLAGFILE_PATH)
-    list(LENGTH _FLAGFILE_PATH _FLAGFILE_NUM)
-    if(_FLAGFILE GREATER 1)
-      message(SEND_ERROR "Found multiple flagfile with '${_FLAGFILE_HINT_PATH}' for ${_RULE_BENCHMARK_MODULE_SRC}")
-    endif()
-    get_filename_component(_FLAG_FILE_DIR "${_FLAGFILE_PATH}" DIRECTORY)
-    file(STRINGS "${_FLAGFILE_PATH}" _FLAGS ENCODING UTF-8)
-    # Parse the flagfile to find the vmfb location.
-    # TODO(#10391): Update this logic with the new benchmark framework.
-    foreach(_FLAG ${_FLAGS})
-      if(_FLAG MATCHES "--module_file=")
-        string(REPLACE "--module_file=" "" _SRC "${_FLAG}")
-        set(_SRC "${_FLAG_FILE_DIR}/${_SRC}")
-      endif()
-    endforeach(_FLAG)
-  else()
+  if(NOT _FLAGFILE_PATH)
     message(SEND_ERROR "Could not locate flagfile matching '${_FLAGFILE_HINT_PATH}' for ${_RULE_BENCHMARK_MODULE_SRC}")
-  endif(_FLAGFILE_PATH)
+    return()
+  endif()
+
+  list(LENGTH _FLAGFILE_PATH _FLAGFILE_COUNT)
+  if(_FLAGFILE_COUNT GREATER 1)
+    message(SEND_ERROR "Found multiple files matching '${_FLAGFILE_HINT_PATH}' for ${_RULE_BENCHMARK_MODULE_SRC}: ${_FLAGFILE_PATH}")
+  endif()
+
+  cmake_path(GET _FLAGFILE_PATH PARENT_PATH _FLAG_FILE_DIR)
+  file(STRINGS "${_FLAGFILE_PATH}" _FLAGS ENCODING UTF-8)
+  # Parse the flagfile to find the vmfb location.
+  # TODO(#10391): Update this logic with the new benchmark framework.
+  foreach(_FLAG ${_FLAGS})
+    if(_FLAG MATCHES "--module_file=")
+      string(REPLACE "--module_file=" "" _SRC "${_FLAG}")
+      set(_SRC "${_FLAG_FILE_DIR}/${_SRC}")
+    endif()
+  endforeach(_FLAG)
 
   iree_run_module_test(
     NAME
