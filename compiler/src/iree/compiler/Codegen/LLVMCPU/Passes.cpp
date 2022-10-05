@@ -600,6 +600,10 @@ void addCPUDefaultPassPipeline(OpPassManager &passManager) {
 }
 
 void addTransformDialectInterpreterPasses(OpPassManager &passManager) {
+  auto &nestedModulePM = passManager.nest<ModuleOp>();
+  // Unconditionally convert to DPS.
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createConvertToDestinationPassingStylePass());
   // Give control to the transform dialect.
   passManager.addPass(
       mlir::iree_compiler::createTransformDialectInterpreterPass(

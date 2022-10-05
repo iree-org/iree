@@ -1,5 +1,8 @@
 // RUN: iree-opt %s
 
+// This is to be used with:
+//   --iree-flow-dispatch-via-region-ops \
+//   --iree-flow-dispatch-via-region-ops-generate-workload-region=false \
 transform.structured.canonicalized_sequence failures(propagate) {
 ^bb1(%variant_op: !pdl.operation):
   %0 = transform.structured.match ops{["linalg.matmul"]} in %variant_op
