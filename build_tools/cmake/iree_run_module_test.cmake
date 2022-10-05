@@ -189,6 +189,12 @@ function(iree_run_module_test)
   # A target specifically for the test.
   add_custom_target("${_NAME}" ALL)
 
+  # Set expect failure cases.
+  set(_TEST_XFAIL FALSE)
+  if(_PLATFORM IN_LIST _RULE_XFAIL OR _RULE_XFAIL STREQUAL "all")
+    set(_TEST_XFAIL TRUE)
+  endif()
+
   iree_native_test(
     NAME
       "${_RULE_NAME}"
@@ -200,6 +206,8 @@ function(iree_run_module_test)
       "--flagfile=${_OUTPUT_FLAGFILE}"
     DATA
       "${_SRC}"
+    XFAIL
+      ${_TEST_XFAIL}
     LABELS
       ${_RULE_LABELS}
     TIMEOUT
@@ -215,12 +223,6 @@ function(iree_run_module_test)
     )
   endif()
 
-  # Set expect failure cases.
-  iree_package_path(_PACKAGE_PATH)
-  set(_TEST_NAME "${_PACKAGE_PATH}/${_RULE_NAME}")
-  if(_PLATFORM IN_LIST _RULE_XFAIL OR _RULE_XFAIL STREQUAL "all")
-    set_property(TEST ${_TEST_NAME} PROPERTY WILL_FAIL TRUE)
-  endif()
   add_dependencies(iree-test-deps "${_NAME}")
 endfunction()
 
