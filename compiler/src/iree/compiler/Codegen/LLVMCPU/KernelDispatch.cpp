@@ -29,8 +29,7 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "kernel-dispatch"
-#define DBGS() (llvm::dbgs())
-#define KD_DBGS() (DBGS() << '[' << DEBUG_TYPE << "] ")
+#define KD_DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
 
 namespace mlir {
 namespace iree_compiler {
