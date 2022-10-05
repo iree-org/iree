@@ -67,7 +67,7 @@ class VMFBExecutionConfig(object):
 
 
 @dataclass(frozen=True)
-class ModelCompileConfig(object):
+class VMFBGenerationConfig(object):
   """Describes a compile target to generate the module."""
   compile_config: CompileConfig
   model: common_definitions.Model
@@ -76,7 +76,7 @@ class ModelCompileConfig(object):
 @dataclass(frozen=True)
 class E2EModelRunConfig(object):
   """Describes an e2e run."""
-  model_compile_config: ModelCompileConfig
+  vmfb_generation_config: VMFBGenerationConfig
   vmfb_execution_config: VMFBExecutionConfig
   target_device_spec: common_definitions.DeviceSpec
   input_data: common_definitions.ModelInputData

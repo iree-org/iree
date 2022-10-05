@@ -17,7 +17,7 @@ MODULE_BENCHMARK_TOOL = "iree-benchmark-module"
 
 
 def _generate_e2e_model_run_configs(
-    model_compile_configs: Sequence[iree_definitions.ModelCompileConfig],
+    vmfb_generation_configs: Sequence[iree_definitions.VMFBGenerationConfig],
     vmfb_execution_configs: Sequence[iree_definitions.VMFBExecutionConfig],
     device_spec: common_definitions.DeviceSpec,
     input_data: common_definitions.ModelInputData = common_definitions.
@@ -26,12 +26,12 @@ def _generate_e2e_model_run_configs(
   """Generates the run configs from the product of compile configs and execution configs."""
   return [
       iree_definitions.E2EModelRunConfig(
-          model_compile_config=model_compile_config,
+          vmfb_generation_config=vmfb_generation_config,
           vmfb_execution_config=vmfb_execution_config,
           target_device_spec=device_spec,
           input_data=input_data)
-      for model_compile_config, vmfb_execution_config in itertools.product(
-          model_compile_configs, vmfb_execution_configs)
+      for vmfb_generation_config, vmfb_execution_config in itertools.product(
+          vmfb_generation_configs, vmfb_execution_configs)
   ]
 
 
@@ -52,23 +52,23 @@ class Linux_x86_64_Benchmarks(object):
   @classmethod
   def generate(
       cls
-  ) -> Tuple[List[iree_definitions.ModelCompileConfig],
+  ) -> Tuple[List[iree_definitions.VMFBGenerationConfig],
              List[iree_definitions.E2EModelRunConfig]]:
     """Generates IREE compile and run configs."""
 
     default_execution_configs = cls._generate_default_execution_configs()
 
-    model_compile_configs = [
-        iree_definitions.ModelCompileConfig(
+    vmfb_generation_configs = [
+        iree_definitions.VMFBGenerationConfig(
             compile_config=cls.CASCADELAKE_COMPILE_CONFIG, model=model)
         for model in model_groups.SMALL + model_groups.LARGE
     ]
     e2e_model_run_configs = _generate_e2e_model_run_configs(
-        model_compile_configs=model_compile_configs,
+        vmfb_generation_configs=vmfb_generation_configs,
         vmfb_execution_configs=default_execution_configs,
         device_spec=linux_x86_64_specs.GCP_C2_STANDARD_16)
 
-    return (model_compile_configs, e2e_model_run_configs)
+    return (vmfb_generation_configs, e2e_model_run_configs)
 
   @staticmethod
   def _generate_default_execution_configs(
@@ -94,7 +94,7 @@ class Linux_x86_64_Benchmarks(object):
     return vmfb_execution_configs
 
 
-def generate() -> Tuple[List[iree_definitions.ModelCompileConfig],
+def generate() -> Tuple[List[iree_definitions.VMFBGenerationConfig],
                         List[iree_definitions.E2EModelRunConfig]]:
   """Generates all compile and run configs for IREE benchmarks."""
   return Linux_x86_64_Benchmarks.generate()
