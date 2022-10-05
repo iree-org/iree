@@ -111,12 +111,8 @@ function(iree_run_module_test)
   endif()
 
   if(NOT DEFINED _RULE_DRIVER)
-    message(SEND_ERROR "Need to specify the driver to use.")
+    message(SEND_ERROR "The DRIVER argument is required.")
   endif()
-
-  set(_RUNNER_TARGET "iree-run-module")
-  iree_package_name(_PACKAGE_NAME)
-  set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
 
   file(REAL_PATH "${_RULE_MODULE_SRC}" _SRC)
   list(APPEND _RULE_RUNNER_ARGS "--module_file=${_SRC}")
@@ -185,6 +181,9 @@ function(iree_run_module_test)
   endif()
 
   # A target specifically for the test.
+  iree_package_name(_PACKAGE_NAME)
+  set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
+
   add_custom_target("${_NAME}" ALL)
 
   # Set expect failure cases.
@@ -192,6 +191,8 @@ function(iree_run_module_test)
   if(_PLATFORM IN_LIST _RULE_XFAIL OR _RULE_XFAIL STREQUAL "all")
     set(_TEST_XFAIL TRUE)
   endif()
+
+  set(_RUNNER_TARGET "iree-run-module")
 
   iree_native_test(
     NAME
