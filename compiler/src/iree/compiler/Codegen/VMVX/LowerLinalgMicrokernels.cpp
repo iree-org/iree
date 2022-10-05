@@ -561,22 +561,22 @@ struct LinalgBinaryGenericConversion
         // 1:1 matching.
         return BinaryEmitter(
             BinaryEmitter::Descriptor(operand0->get(),
-                                      op.getTiedIndexingMap(operand0)),
+                                      op.getMatchingIndexingMap(operand0)),
             BinaryEmitter::Descriptor(operand1->get(),
-                                      op.getTiedIndexingMap(operand1)),
+                                      op.getMatchingIndexingMap(operand1)),
             BinaryEmitter::Descriptor(result->get(),
-                                      op.getTiedIndexingMap(result)),
+                                      op.getMatchingIndexingMap(result)),
             selection);
       } else if (binaryOp->getOperand(1) == operandScalar0 &&
                  binaryOp->getOperand(0) == operandScalar1) {
         // Inverted operands.
         return BinaryEmitter(
             BinaryEmitter::Descriptor(operand1->get(),
-                                      op.getTiedIndexingMap(operand1)),
+                                      op.getMatchingIndexingMap(operand1)),
             BinaryEmitter::Descriptor(operand0->get(),
-                                      op.getTiedIndexingMap(operand0)),
+                                      op.getMatchingIndexingMap(operand0)),
             BinaryEmitter::Descriptor(result->get(),
-                                      op.getTiedIndexingMap(result)),
+                                      op.getMatchingIndexingMap(result)),
             selection);
       } else {
         return None;
@@ -726,9 +726,9 @@ struct LinalgUnaryGenericConversion
       // ins and detect the order.
       auto selection = UnaryEmitter::OpSelection::genericUnary(opcode);
       return UnaryEmitter(UnaryEmitter::Descriptor(
-                              operand0->get(), op.getTiedIndexingMap(operand0)),
+                              operand0->get(), op.getMatchingIndexingMap(operand0)),
                           UnaryEmitter::Descriptor(
-                              result->get(), op.getTiedIndexingMap(result)),
+                              result->get(), op.getMatchingIndexingMap(result)),
                           selection);
     };
 
@@ -823,9 +823,9 @@ struct LinalgTrivialGenericConversion
         OpOperand *input = op.getInputOperand(inputIndex);
         OpOperand *output = op.getOutputOperand(outputIndex);
         emitter.copies.emplace_back(
-            CopyEmitter::Descriptor{input->get(), op.getTiedIndexingMap(input)},
+            CopyEmitter::Descriptor{input->get(), op.getMatchingIndexingMap(input)},
             CopyEmitter::Descriptor{output->get(),
-                                    op.getTiedIndexingMap(output)});
+                                    op.getMatchingIndexingMap(output)});
       } else {
         return rewriter.notifyMatchFailure(op, "does not yield blockargs");
       }

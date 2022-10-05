@@ -263,10 +263,10 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op, int64_t subgroupSize,
 
   auto lhsLoopIndices = llvm::to_vector(llvm::map_range(
       llvm::seq<int>(0, lhsShape.size()),
-      [&](int i) { return op.getTiedIndexingMap(lhs).getDimPosition(i); }));
+      [&](int i) { return op.getMatchingIndexingMap(lhs).getDimPosition(i); }));
   auto rhsLoopIndices = llvm::to_vector(llvm::map_range(
       llvm::seq<int>(0, rhsShape.size()),
-      [&](int i) { return op.getTiedIndexingMap(rhs).getDimPosition(i); }));
+      [&](int i) { return op.getMatchingIndexingMap(rhs).getDimPosition(i); }));
 
   // Figure out what dimension each loop corresponds to.
   int bIndex = -1, mIndex = -1, nIndex = -1, kIndex = -1;
@@ -480,7 +480,7 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
   // Only support projected permutation for now. This could be extended to
   // projected permutated with broadcast.
   if (llvm::any_of(op.getInputOperands(), [&](OpOperand *input) {
-        return !op.getTiedIndexingMap(input).isProjectedPermutation();
+        return !op.getMatchingIndexingMap(input).isProjectedPermutation();
       })) {
     return failure();
   }

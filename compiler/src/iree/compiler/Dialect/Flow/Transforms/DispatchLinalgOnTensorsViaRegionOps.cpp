@@ -342,7 +342,7 @@ static bool areLinalgOpsFusableUsingTileAndFuse(OpOperand &use) {
   // serialized to match the workgroup counts of the fused operations.
   // Otherwise, check if the result of producer is accessed using identity
   // indexing.
-  AffineMap consumerIndexingMap = consumer.getTiedIndexingMap(&use);
+  AffineMap consumerIndexingMap = consumer.getMatchingIndexingMap(&use);
   if (!consumerIndexingMap.isIdentity()) {
     return false;
   }

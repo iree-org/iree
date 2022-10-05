@@ -454,8 +454,8 @@ static void tieOperandsForOperandFusion(linalg::LinalgOp linalgOp,
                                    .cast<RankedTensorType>()
                                    .getElementType();
       if (input->get().hasOneUse() && (inputElementType == resultElementType) &&
-          linalgOp.getTiedIndexingMap(input) ==
-              linalgOp.getTiedIndexingMap(result.value()) &&
+          linalgOp.getMatchingIndexingMap(input) ==
+              linalgOp.getMatchingIndexingMap(result.value()) &&
           !getEquivalentOpOfType<IREE::HAL::InterfaceBindingSubspanOp>(
               input->get(), plan) &&
           !isFromReadOnlyTensor(input->get(), plan)) {

@@ -766,10 +766,10 @@ static bool isInsOperandBufferizable(OpOperand *insOperand,
   auto linalgOp = dyn_cast<linalg::LinalgOp>(insOperand->getOwner());
   if (!linalgOp) return false;
 
-  AffineMap insOperandIndexingMap = linalgOp.getTiedIndexingMap(insOperand);
+  AffineMap insOperandIndexingMap = linalgOp.getMatchingIndexingMap(insOperand);
 
   auto canTieWithOutsOperand = [&](OpOperand *outsOperand) {
-    AffineMap outsOperandIndexingMap = linalgOp.getTiedIndexingMap(outsOperand);
+    AffineMap outsOperandIndexingMap = linalgOp.getMatchingIndexingMap(outsOperand);
 
     if (outsOperandIndexingMap != insOperandIndexingMap) {
       // if (!aggressiveFusion) return false;
@@ -817,8 +817,8 @@ static bool hasCompatibleOuterParallelLoops(
   }
 
   auto producerIndexingMap =
-      producer.getTiedIndexingMapForResult(operand.get().cast<OpResult>());
-  auto consumerIndexingMap = consumer.getTiedIndexingMap(&operand);
+      producer.getIndexingMapMatchingResult(operand.get().cast<OpResult>());
+  auto consumerIndexingMap = consumer.getMatchingIndexingMap(&operand);
   if (!producerIndexingMap.isProjectedPermutation() ||
       !consumerIndexingMap.isProjectedPermutation()) {
     return false;
