@@ -76,7 +76,7 @@ class Linux_x86_64_Benchmarks(object):
   ) -> List[iree_definitions.ModuleExecutionConfig]:
     module_execution_configs = [
         iree_definitions.ModuleExecutionConfig(
-            id=unique_ids.IREE_VMFB_EXECUTION_CONFIG_LOCAL_SYNC,
+            id=unique_ids.IREE_MODULE_EXECUTION_CONFIG_LOCAL_SYNC,
             tags=["full-inference", "default-flags"],
             loader=iree_definitions.RuntimeLoader.EMBEDDED_ELF,
             driver=iree_definitions.RuntimeDriver.LOCAL_SYNC,
@@ -86,7 +86,7 @@ class Linux_x86_64_Benchmarks(object):
       module_execution_configs.append(
           iree_definitions.ModuleExecutionConfig(
               id=
-              f"{unique_ids.IREE_VMFB_EXECUTION_CONFIG_LOCAL_TASK_BASE}_{thread_num}",
+              f"{unique_ids.IREE_MODULE_EXECUTION_CONFIG_LOCAL_TASK_BASE}_{thread_num}",
               tags=[f"{thread_num}-thread", "full-inference", "default-flags"],
               loader=iree_definitions.RuntimeLoader.EMBEDDED_ELF,
               driver=iree_definitions.RuntimeDriver.LOCAL_TASK,
