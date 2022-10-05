@@ -60,8 +60,6 @@ if((IREE_TARGET_BACKEND_VMVX OR DEFINED IREE_HOST_BINARY_ROOT) AND
       "iree-run-module.mlir"
     MODULE_FILE_NAME
       "iree_run_module_bytecode_module_vmvx.vmfb"
-    C_IDENTIFIER
-      "iree_tools_test_iree_run_module_bytecode_module_vmvx"
     FLAGS
       "--iree-hal-target-backends=vmvx"
   )
@@ -79,6 +77,6 @@ if((IREE_TARGET_BACKEND_VMVX OR DEFINED IREE_HOST_BINARY_ROOT) AND
     EXPECTED_OUTPUT
       "f32=10"
     DEPS
-      ::iree_run_module_bytecode_module_vmvx_c
+      iree_tools_test_iree_run_module_bytecode_module_vmvx
   )
 endif()

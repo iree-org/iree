@@ -212,9 +212,6 @@ function(iree_run_module_test)
       ${_RULE_TIMEOUT}
   )
 
-  # Replace dependencies passed by ::name with iree::package::name
-  iree_package_ns(_PACKAGE_NS)
-  list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
   if(_RULE_DEPS)
     add_dependencies(${_NAME}
       ${_RULE_DEPS}
