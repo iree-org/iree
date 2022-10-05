@@ -8,6 +8,7 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -2195,8 +2196,49 @@ DenseMap<int64_t, OpFoldResult> UnPackOp::getDimAndTileMapping() {
 LogicalResult UnPackOp::generateScalarImplementation(OpBuilder &builder,
                                                      Location loc,
                                                      ValueRange ivs) {
+  assert(ivs.size() == getOutputRank());
   OpBuilder::InsertionGuard g(builder);
-  generatePackOpOrUnPackScalarImplementationBody(*this, builder, loc, ivs);
+  // The `ivs` already represent the position into the output tensor.
+  ReifiedRankedShapedTypeDims outputShape;
+  if (failed(reifyResultShapes(builder, outputShape)))
+    return getOperation()->emitOpError("failed to reify result shape");
+  if (outputShape.size() != 1 || outputShape[0].size() != getOutputRank()) {
+    return getOperation()->emitOpError(
+               "expected shape of one result value of rank")
+           << getOutputRank();
+  }
+
+  DenseMap<int64_t, OpFoldResult> dimAndTileMapping = getDimAndTileMapping();
+  // untiled loops and tile loops.
+  SmallVector<Value> sourceIvs;
+  // point loops.
+  SmallVector<Value> sourceIvsPointLoops;
+  sourceIvs.reserve(getOutputRank());
+  sourceIvsPointLoops.reserve(dimAndTileMapping.size());
+  for (auto dim : llvm::seq<int64_t>(0, getOutputRank())) {
+    if (dimAndTileMapping.count(dim)) {
+      DivModValue divMod =
+          getDivMod(builder, loc, ivs[dim],
+                    getAsValues(builder, loc, dimAndTileMapping[dim])[0]);
+      sourceIvsPointLoops.push_back(divMod.remainder);
+      sourceIvs.push_back(divMod.quotient);
+    } else {
+      sourceIvs.push_back(ivs[dim]);
+    }
+  }
+
+  assert(sourceIvsPointLoops.size() + sourceIvs.size() == getInputRank());
+  // interchange the point loops based on `dim_pos`.
+  SmallVector<int64_t> dimsToBlock = extractFromI64ArrayAttr(getDimsPos());
+  SmallVector<int64_t> interchangeVector =
+      computeInterchangeFromDimPos(dimsToBlock, getOutputRank());
+  SmallVector<Value> interchangedSourceIvsPointLoops = sourceIvsPointLoops;
+  interchangedSourceIvsPointLoops = interchange<Value>(
+      interchangedSourceIvsPointLoops, interchangeVector, /*offset=*/0);
+
+  llvm::append_range(sourceIvs, interchangedSourceIvsPointLoops);
+  Value scalar = builder.create<memref::LoadOp>(loc, getInput(), sourceIvs);
+  builder.create<memref::StoreOp>(loc, scalar, getOutput(), ivs);
   return success();
 }
 
@@ -2205,23 +2247,43 @@ LogicalResult UnPackOp::generateScalarImplementation(OpBuilder &builder,
 LogicalResult
 UnPackOp::reifyResultShapes(OpBuilder &builder,
                             ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
-  return failure();
+  OpBuilder::InsertionGuard g(builder);
+  builder.setInsertionPoint(getOperation());
+  Location loc = getLoc();
+
+  auto buildOutputDim = [&](OpBuilder &builder, size_t dimIdx) -> OpFoldResult {
+    ArrayRef<int64_t> outputShape = getOutputShape();
+    if (!ShapedType::isDynamic(outputShape[dimIdx])) {
+      return builder.getI64IntegerAttr(outputShape[dimIdx]);
+    }
+    return getDim(builder, loc, getOutput(), dimIdx);
+  };
+
+  reifiedReturnShapes.resize(1);
+  reifiedReturnShapes[0].reserve(getOutputRank());
+  for (auto dimIdx : llvm::seq<int64_t>(0, getOutputRank())) {
+    reifiedReturnShapes[0].push_back(getValueOrCreateConstantIndexOp(
+        builder, loc, buildOutputDim(builder, dimIdx)));
+  }
+  return success();
 }
 
 // Implement the tiling interface. The iteration domain is fully specified by
-// input. Lower bound is zero, step is one, while the upper bound it the
+// output. Lower bound is zero, step is one, while the upper bound it the
 // dimension of the input tensor.
 SmallVector<Range> UnPackOp::getIterationDomain(OpBuilder &builder) {
   OpBuilder::InsertionGuard g(builder);
-  int64_t inputRank = getInputRank();
-  SmallVector<Range> loopBounds(inputRank);
+  int64_t outputRank = getOutputRank();
+  SmallVector<Range> loopBounds(outputRank);
   Location loc = getLoc();
   Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
   Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
-  for (auto dim : llvm::seq<int64_t>(0, inputRank)) {
+  ReifiedRankedShapedTypeDims resultShape;
+  (void)reifyResultShapes(builder, resultShape);
+  for (auto dim : llvm::seq<int64_t>(0, outputRank)) {
     loopBounds[dim].offset = zero;
     loopBounds[dim].stride = one;
-    loopBounds[dim].size = getDim(builder, loc, getInput(), dim);
+    loopBounds[dim].size = resultShape[0][dim];
   }
   return loopBounds;
 }
@@ -2243,9 +2305,7 @@ ShapedType UnPackOp::inferResultType() {
       } else {
         int64_t tile = *maybeConstantTileSize;
         // TODO: (lorenzo) We bail out if we don't have full tiles. But we can
-        // also allow an output tensor with smaller dimensions. We need to
-        // compute min(output[dim], inputType.getDimSize(dim) * tile). This
-        // allows us to discard padding values. Example,
+        // also allow an output tensor with smaller dimensions. Example,
         // input: memref<2x8x8x2xf32> and output: memref<13x15xf32> with
         // dims_pos = [0, 1] and inner_tiles = [8, 2]. This is rejected today as
         // 8 and 2 do not fully divide 13 and 15. But this is actually a legit
@@ -2318,7 +2378,7 @@ LogicalResult UnPackOp::verify() {
 // Implement the tiling interface. The number of loops equals the rank of the
 // input. All the loops are parallel.
 SmallVector<utils::IteratorType> UnPackOp::getLoopIteratorTypes() {
-  SmallVector<utils::IteratorType> iteratorTypes(getInputRank(),
+  SmallVector<utils::IteratorType> iteratorTypes(getOutputRank(),
                                                  utils::IteratorType::parallel);
   return iteratorTypes;
 }
