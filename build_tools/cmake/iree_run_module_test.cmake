@@ -61,22 +61,6 @@ endfunction()
 #
 # iree_run_module_test(
 #   NAME
-#     person_detect_int8_correctness_test
-#   MODULE_SRC
-#     "person_detect_int8.vmfb"
-#   DRIVER
-#     "local-sync"
-#   RUNNER_ARGS
-#     "--entry_function=main"
-#     "--function_input=1x96x96x1xi8=0"
-#   EXPECTED_OUTPUT
-#     "1x2xi8=[72 -72]"
-#   UNSUPPORTED_PLATFORMS
-#     "android-arm64-v8a"
-# )
-#
-# iree_run_module_test(
-#   NAME
 #     mobilenet_v1_fp32_correctness_test
 #   MODULE_SRC
 #     "mobilenet_v1_fp32.vmfb"
@@ -249,23 +233,7 @@ endfunction()
 #       target will be skipped entirely.
 #   TIMEOUT: (optional) Test timeout.
 #
-# Examples:
-#
-# iree_benchmark_suite_module_test(
-#   NAME
-#     person_detect_int8_correctness_test
-#   BENCHMARK_MODULE_SRC
-#     "TFLite/PersonDetect-int8"
-#   DRIVER
-#     "local-sync"
-#   RUNNER_ARGS
-#     "--entry_function=main"
-#     "--function_input=1x96x96x1xi8=0"
-#   EXPECTED_OUTPUT
-#     "1x2xi8=[72 -72]"
-#   UNSUPPORTED_PLATFORMS
-#     "android-arm64-v8a"
-# )
+# Example:
 #
 # iree_benchmark_suite_module_test(
 #   NAME
