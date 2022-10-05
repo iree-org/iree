@@ -114,8 +114,8 @@ def IREEBufferizeOp : Op<Transform_Dialect, "iree.bufferize",
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 }
 
-def ForeachThreadToWorkgroupOp : Op<Transform_Dialect, 
-    "iree.foreach_thread_to_workgroup",
+def MapForeachThreadToWorkgroupOp : Op<Transform_Dialect, 
+    "iree.map_foreach_thread_to_workgroups",
     [FunctionalStyleTransformOpTrait,
      DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      TransformOpInterface,

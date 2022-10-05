@@ -63,7 +63,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   %variant_op_2 = transform.iree.bufferize { target_gpu } %variant_op
 
   %func_2 = transform.structured.match ops{["func.func"]} in %variant_op_2
-  %func_3 = transform.iree.foreach_thread_to_workgroup %func_2
+  %func_3 = transform.iree.map_foreach_thread_to_workgroups %func_2
   transform.iree.map_nested_foreach_thread_to_gpu_threads %func_3
     { workgroup_size = [32, 4, 1] }
 

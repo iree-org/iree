@@ -45,7 +45,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   //      warp_execute_on_lane_0 and later vector distribution.
   %variant_op_2 = transform.iree.bufferize { target_gpu } %variant_op
   %func = transform.structured.match ops{["func.func"]} in %variant_op_2
-  %func_2 = transform.iree.foreach_thread_to_workgroup %func
+  %func_2 = transform.iree.map_foreach_thread_to_workgroups %func
   transform.iree.map_nested_foreach_thread_to_gpu_threads %func_2
     { workgroup_size = [32, 1, 1] }
   

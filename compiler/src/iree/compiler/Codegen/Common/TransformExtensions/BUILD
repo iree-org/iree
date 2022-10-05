@@ -77,6 +77,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:MemRefTransforms",
+        "@llvm-project//mlir:GPUTransformOps",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TransformDialect",

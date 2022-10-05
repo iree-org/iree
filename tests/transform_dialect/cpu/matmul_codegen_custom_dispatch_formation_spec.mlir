@@ -10,5 +10,5 @@ transform.structured.canonicalized_sequence failures(propagate) {
   %1 = transform.iree.bufferize %variant_op
 
   %func = transform.structured.match ops{["func.func"]} in %1
-  transform.iree.foreach_thread_to_workgroup %func
+  transform.iree.map_foreach_thread_to_workgroups %func
 }
