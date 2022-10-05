@@ -155,7 +155,7 @@ struct ConvertSharedMemAllocOp : public OpRewritePattern<memref::AllocOp> {
         /*constant=*/false, /*alignment=*/IntegerAttr());
     symbolTable.insert(global);
 
-    rewriter.setInsertionPointToStart(&(*funcOp.getBody().begin()));
+    rewriter.setInsertionPointToStart(&(*funcOp.getFunctionBody().begin()));
     rewriter.replaceOpWithNewOp<memref::GetGlobalOp>(allocOp, global.getType(),
                                                      global.getName());
     return success();
@@ -268,9 +268,10 @@ class ConvertFunc : public ConvertToLLVMPattern {
 
     // Copy all of funcOp's operations into newFuncOp's body and perform region
     // type conversion.
-    rewriter.inlineRegionBefore(funcOp.getBody(), newFuncOp.getBody(),
-                                newFuncOp.end());
-    if (failed(rewriter.convertRegionTypes(&newFuncOp.getBody(), *typeConverter,
+    rewriter.inlineRegionBefore(funcOp.getFunctionBody(),
+                                newFuncOp.getFunctionBody(), newFuncOp.end());
+    if (failed(rewriter.convertRegionTypes(&newFuncOp.getFunctionBody(),
+                                           *typeConverter,
                                            &signatureConverter))) {
       return failure();
     }

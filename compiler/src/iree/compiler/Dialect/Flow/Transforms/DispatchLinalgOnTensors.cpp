@@ -769,7 +769,8 @@ static bool isInsOperandBufferizable(OpOperand *insOperand,
   AffineMap insOperandIndexingMap = linalgOp.getMatchingIndexingMap(insOperand);
 
   auto canTieWithOutsOperand = [&](OpOperand *outsOperand) {
-    AffineMap outsOperandIndexingMap = linalgOp.getMatchingIndexingMap(outsOperand);
+    AffineMap outsOperandIndexingMap =
+        linalgOp.getMatchingIndexingMap(outsOperand);
 
     if (outsOperandIndexingMap != insOperandIndexingMap) {
       // if (!aggressiveFusion) return false;
@@ -1029,7 +1030,7 @@ static unsigned decideFusableLinalgOps(FunctionOpInterface funcOp,
   unsigned numRootOps = 0;
   MLIRContext *context = funcOp->getContext();
   OpBuilder builder(context);
-  for (Block &block : funcOp.getBody()) {
+  for (Block &block : funcOp.getFunctionBody()) {
     // Dispatch region formation works by first cloning the root into
     // the dispatch region and then pulling operations in.
     // So procedure here is to
@@ -1052,7 +1053,7 @@ static unsigned decideFusableLinalgOps(FunctionOpInterface funcOp,
 
   // Once all root linalg ops have been tagged, put all remaining generic ops
   // into their own dispatches.
-  for (Block &block : funcOp.getBody()) {
+  for (Block &block : funcOp.getFunctionBody()) {
     SmallVector<Operation *> roots;
     for (Operation &op : llvm::reverse(block)) {
       // If it is part of a fusion group or root op, ignore it.

@@ -508,7 +508,7 @@ struct ConvertMHLOToLinalgOnTensorsPass
       for (Type type : funcOp.getFunctionType().getResults()) {
         if (isIllegalType(type)) return false;
       }
-      for (Block &block : funcOp.getBody()) {
+      for (Block &block : funcOp.getFunctionBody()) {
         for (Type type : block.getArgumentTypes()) {
           if (isIllegalType(type)) return false;
         }

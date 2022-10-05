@@ -263,7 +263,7 @@ static void populateVectorizationPatterns(RewritePatternSet &patterns) {
 /// Return a flattened Id Value by combining the 3D gpu thread IDs.
 static Value createFlatId(func::FuncOp funcOp,
                           ArrayRef<int64_t> workgroupSize) {
-  OpBuilder b(funcOp.getBody());
+  OpBuilder b(funcOp.getFunctionBody());
   Type indexType = b.getIndexType();
   AffineExpr d0 = getAffineDimExpr(0, b.getContext());
   AffineExpr d1 = getAffineDimExpr(1, b.getContext());

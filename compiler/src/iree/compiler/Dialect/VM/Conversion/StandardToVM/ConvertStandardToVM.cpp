@@ -125,12 +125,13 @@ class FuncOpConversion : public OpConversionPattern<func::FuncOp> {
     // Note that attributes are dropped. Consider preserving some if needed.
     auto newFuncOp = rewriter.create<IREE::VM::FuncOp>(
         srcOp.getLoc(), srcOp.getName(), *newFuncType);
-    rewriter.inlineRegionBefore(srcOp.getBody(), newFuncOp.getBody(),
+    rewriter.inlineRegionBefore(srcOp.getBody(), newFuncOp.getFunctionBody(),
                                 newFuncOp.end());
 
     // Tell the rewriter to convert the region signature.
     TypeConverter &typeConverter = *getTypeConverter();
-    if (failed(rewriter.convertRegionTypes(&newFuncOp.getBody(), typeConverter,
+    if (failed(rewriter.convertRegionTypes(&newFuncOp.getFunctionBody(),
+                                           typeConverter,
                                            &signatureConversion))) {
       return failure();
     }

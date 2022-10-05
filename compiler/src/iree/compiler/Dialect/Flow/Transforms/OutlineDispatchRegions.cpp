@@ -193,7 +193,7 @@ static mlir::func::FuncOp createWorkgroupFunc(Location loc,
   // Clone region into the function body.
   auto funcOp = mlir::func::FuncOp::create(loc, functionName, functionType);
   BlockAndValueMapping mapping;
-  region.cloneInto(&funcOp.getBody(), mapping);
+  region.cloneInto(&funcOp.getFunctionBody(), mapping);
 
   // Replace flow.return with std.return.
   // NOTE: in the dispatch workgroups case the return should have no values.
@@ -273,7 +273,7 @@ class OutlineDispatchRegionsPass
             std::string("_function_like_") + std::to_string(it.index());
       }
 
-      auto &bodyRegion = op.getBody();
+      auto &bodyRegion = op.getFunctionBody();
       // Outline all of the dispatch regions ops in this function.
       auto dispatchWorkgroupsOps =
           llvm::to_vector<8>(bodyRegion.getOps<DispatchWorkgroupsOp>());

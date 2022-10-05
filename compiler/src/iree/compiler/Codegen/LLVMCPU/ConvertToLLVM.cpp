@@ -726,10 +726,11 @@ class ConvertHALEntryPointFuncOp : public ConvertToLLVMPattern {
         stdFuncOp.getLoc(), stdFuncOp.getName(), llvmFuncType,
         LLVM::Linkage::External, /*dso_local=*/false, /*cconv*/ LLVM::CConv::C,
         funcAttrs);
-    rewriter.inlineRegionBefore(stdFuncOp.getBody(), llvmFuncOp.getBody(),
-                                llvmFuncOp.end());
-    if (failed(rewriter.convertRegionTypes(
-            &llvmFuncOp.getBody(), *typeConverter, &signatureConverter))) {
+    rewriter.inlineRegionBefore(stdFuncOp.getFunctionBody(),
+                                llvmFuncOp.getFunctionBody(), llvmFuncOp.end());
+    if (failed(rewriter.convertRegionTypes(&llvmFuncOp.getFunctionBody(),
+                                           *typeConverter,
+                                           &signatureConverter))) {
       return failure();
     }
 
