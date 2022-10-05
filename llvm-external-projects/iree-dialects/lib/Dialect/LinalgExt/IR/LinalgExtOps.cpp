@@ -1502,14 +1502,14 @@ TopkOp::reifyResultShapes(OpBuilder &b,
 // PackOp
 //===----------------------------------------------------------------------===//
 
-// Return true if each element in `dimsPos` is >= 0 and < rank.
+/// Return true if each element in `dimsPos` is >= 0 and < rank.
 static bool isInBound(ArrayRef<int64_t> dimsPos, int64_t rank) {
   return llvm::all_of(
       dimsPos, [rank](int64_t dimPos) { return dimPos >= 0 && dimPos < rank; });
 }
 
-// Interchange `elements` starting at offset `offset` based on the indexes in
-// `interchangeVector`.
+/// Interchange `elements` starting at offset `offset` based on the indexes in
+/// `interchangeVector`.
 template <typename T>
 static SmallVector<T> interchange(ArrayRef<T> elements,
                                   ArrayRef<int64_t> interchangeVector,
@@ -1526,7 +1526,7 @@ static SmallVector<T> interchange(ArrayRef<T> elements,
   return rearrangedElements;
 }
 
-// Infer result/output type given the input and the tile sizes.
+/// Infer result/output type given the input and the tile sizes.
 ShapedType PackOp::inferResultType() {
   DenseMap<int64_t, OpFoldResult> tileAndPosMapping = getDimAndTileMapping();
   SmallVector<int64_t> inferredShape;
@@ -1582,8 +1582,8 @@ static bool isInvalid(ArrayRef<int64_t> dimsPos) {
   return dimsPos.size() != uniqued.size();
 }
 
-// Check if we have enough static information to catch undefined behavior when
-// the tile size does not divide perfectly the dimension of the input tensor.
+/// Check if we have enough static information to catch undefined behavior when
+/// the tile size does not divide perfectly the dimension of the input tensor.
 static bool areNotFullTiles(ArrayRef<int64_t> inputShape,
                             DenseMap<int64_t, OpFoldResult> dimAndTileMapping) {
   int64_t rank = inputShape.size();
@@ -1602,7 +1602,23 @@ static bool areNotFullTiles(ArrayRef<int64_t> inputShape,
   return false;
 }
 
-// verifier for the pack operation.
+/// Check if two `RankedShapedTypes` are compatible. The shapes are compatible
+/// if there are no statically known shapes that mismatch. Shapes are still
+/// compatible if one is static and other is dynamic.
+static bool isCompatible(ShapedType a, ShapedType b) {
+  if (a.getRank() != b.getRank())
+    return false;
+  for (auto it : llvm::zip(a.getShape(), b.getShape())) {
+    auto aDim = std::get<0>(it);
+    auto bDim = std::get<1>(it);
+    if (!ShapedType::isDynamic(aDim) && !ShapedType::isDynamic(bDim) &&
+        aDim != bDim)
+      return false;
+  }
+  return true;
+}
+
+/// verifier for the pack operation.
 LogicalResult PackOp::verify() {
   Operation *op = getOperation();
   size_t numberOfBlockingFactors = getMixedTiles().size();
@@ -1646,9 +1662,9 @@ LogicalResult PackOp::verify() {
 
   // Verify result type against inferred type.
   ShapedType expectedType = inferResultType();
-  if (expectedType != getOutputType()) {
+  if (!isCompatible(expectedType, getOutputType())) {
     return op->emitError(
-               "inferred type do not match provied output type. Expected ")
+               "infered type do not match provided output type. Expected ")
            << expectedType << " but got: " << getOutputType();
   }
 
@@ -1662,7 +1678,7 @@ LogicalResult PackOp::verify() {
   return success();
 }
 
-// Get the tile sizes as `OpFoldResult`.
+/// Get the tile sizes as `OpFoldResult`.
 SmallVector<OpFoldResult> PackOp::getMixedTiles() {
   SmallVector<OpFoldResult> mixedInnerTiles;
   mixedInnerTiles.reserve(getInputRank());
@@ -1677,8 +1693,8 @@ SmallVector<OpFoldResult> PackOp::getMixedTiles() {
   return mixedInnerTiles;
 }
 
-// Return the tile sizes as `int64_t`. If a tile size is dynamic a sentinel
-// `kDynamicSize` is introduced at that position in the returned vector.
+/// Return the tile sizes as `int64_t`. If a tile size is dynamic a sentinel
+/// `kDynamicSize` is introduced at that position in the returned vector.
 SmallVector<int64_t> PackOp::getStaticTiles() {
   SmallVector<Value> dynamicTiles;
   SmallVector<int64_t> staticTiles;
@@ -1695,8 +1711,8 @@ SmallVector<utils::IteratorType> PackOp::getLoopIteratorTypes() {
   return iteratorTypes;
 }
 
-// Return a mapping from positions `dims_pos` to their `OpFoldResult` tile
-// factors.
+/// Return a mapping from positions `dims_pos` to their `OpFoldResult` tile
+/// factors.
 DenseMap<int64_t, OpFoldResult> PackOp::getDimAndTileMapping() {
   DenseMap<int64_t, OpFoldResult> dimAndTileMapping;
   SmallVector<int64_t> dimsToBlock = extractFromI64ArrayAttr(getDimsPos());
@@ -1709,10 +1725,10 @@ DenseMap<int64_t, OpFoldResult> PackOp::getDimAndTileMapping() {
   return dimAndTileMapping;
 }
 
-// Implements `getIterationDomain` from the tiling interface. In each
-// loop the lower bound is zero and the step is one. For upper bound
-// is inferred from the output tensor for the dimensions that are
-// not part of the data tile created.
+/// Implements `getIterationDomain` from the tiling interface. In each
+/// loop the lower bound is zero and the step is one. For upper bound
+/// is inferred from the output tensor for the dimensions that are
+/// not part of the data tile created.
 SmallVector<Range> PackOp::getIterationDomain(OpBuilder &builder) {
   int64_t inputRank = getInputRank();
   SmallVector<Range> loopBounds(inputRank);
@@ -1729,7 +1745,7 @@ SmallVector<Range> PackOp::getIterationDomain(OpBuilder &builder) {
   return loopBounds;
 }
 
-// Return the `interchangeVector` based on `dims_pos`.
+/// Return the `interchangeVector` based on `dims_pos`.
 SmallVector<int64_t> computeInterchangeFromDimPos(ArrayRef<int64_t> dimsPos,
                                                   int64_t inputRank) {
   SmallVector<int64_t> interchangeVector;
@@ -1831,7 +1847,7 @@ static void generatePackOpScalarImplementationBody(PackOp packOp,
   builder.create<memref::StoreOp>(loc, scalar, packOp.getOutput(), ivs);
 }
 
-// Implements `generateScalarImplementation` from the tiling interface.
+/// Implements `generateScalarImplementation` from the tiling interface.
 LogicalResult PackOp::generateScalarImplementation(OpBuilder &builder,
                                                    Location loc,
                                                    ValueRange ivs) {
@@ -2088,6 +2104,13 @@ struct FoldTensorCastOp : public OpInterfaceRewritePattern<LinalgExtOp> {
       newOperands.push_back(fold ? tensorCastOp.getOperand()
                                  : opOperand->get());
       newResultTypes.push_back(newOperands.back().getType());
+    }
+    // Add the other operands.
+    for (OpOperand *opOperand : op.getNonInputOrOutputOperands()) {
+      auto tensorCastOp = opOperand->get().getDefiningOp<tensor::CastOp>();
+      newOperands.push_back(canFoldIntoConsumerOp(tensorCastOp)
+                                ? tensorCastOp.getSource()
+                                : opOperand->get());
     }
     // Clone op.
     Operation *newOp =
