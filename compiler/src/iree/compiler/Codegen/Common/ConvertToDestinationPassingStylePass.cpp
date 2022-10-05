@@ -350,7 +350,8 @@ struct AdaptLinalgInputOperandToOutputOperand
     SmallVector<AffineMap> maps;
     for (auto in : op.getInputOperands()) {
       if (!operand && !isReadOnly(in->get()) &&
-          op.getMatchingIndexingMap(in) == op.getMatchingIndexingMap(outputOperand) &&
+          op.getMatchingIndexingMap(in) ==
+              op.getMatchingIndexingMap(outputOperand) &&
           in->get().getType() == outputOperand->get().getType()) {
         operand = in;
       } else {

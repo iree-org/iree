@@ -519,12 +519,14 @@ static LogicalResult setTransposeConfig(func::FuncOp entryPoint,
   // Determine the fastest moving dimensions for the source/destination indices
   // of each transpose. These inform the tile sizes.
   int64_t outputFastestDim = linalgOp.getNumLoops() - 1;
-  int64_t inputFastestDim = linalgOp.getMatchingIndexingMap(transposedOperands[0])
-                                .getDimPosition(outputFastestDim);
+  int64_t inputFastestDim =
+      linalgOp.getMatchingIndexingMap(transposedOperands[0])
+          .getDimPosition(outputFastestDim);
   // Ensure the other transposed operands match
   for (int i = 1; i < transposedOperands.size(); ++i) {
-    if (inputFastestDim != linalgOp.getMatchingIndexingMap(transposedOperands[i])
-                               .getDimPosition(outputFastestDim)) {
+    if (inputFastestDim !=
+        linalgOp.getMatchingIndexingMap(transposedOperands[i])
+            .getDimPosition(outputFastestDim)) {
       return failure();
     }
   }
