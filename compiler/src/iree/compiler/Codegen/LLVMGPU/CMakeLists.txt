@@ -56,6 +56,7 @@ iree_cc_library(
     MLIRGPUOps
     MLIRGPUToNVVMTransforms
     MLIRGPUToROCDLTransforms
+    MLIRGPUTransformOps
     MLIRGPUTransforms
     MLIRIR
     MLIRLLVMCommonConversion

@@ -9,10 +9,12 @@
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
+#include "llvm/ADT/None.h"
 #include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVM.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/GPU/TransformOps/GPUTransformOps.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Support/MathExtras.h"
@@ -41,10 +43,11 @@ struct LLVMGPUDistributePass
 
     IRRewriter rewriter(funcOp->getContext());
     rewriter.setInsertionPoint(funcOp);
-    auto walkResult = mlir::linalg::rewriteMapNestedForeachThreadToGpuThreads(
-        rewriter, funcOp, workgroupSize, false);
+    DiagnosedSilenceableFailure const result =
+        mlir::transform::gpu::mapNestedForeachToThreadsImpl(
+            rewriter, funcOp, workgroupSize, false, llvm::None);
 
-    if (walkResult.wasInterrupted()) return signalPassFailure();
+    if (!result.succeeded()) return signalPassFailure();
   }
 };
 }  // namespace
