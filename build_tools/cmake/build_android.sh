@@ -98,6 +98,18 @@ NM_TOOL="${TOOLCHAIN_TOOLS_DIR}/llvm-nm"
 STRIP_TOOL="${TOOLCHAIN_TOOLS_DIR}/llvm-strip"
 NM_ARGS="-S --radix=d"
 NM_OUTPUT="$(${NM_TOOL} ${NM_ARGS} ${TARGET_BINARY})"
+
+# If we ever start stripping binaries in the Release build type, that will cause
+# nm to report "no symbols" as a 1-line output but nm doesn't return an error
+# code in that case.
+NM_OUTPUT_LINES="$(wc -l <<< "${NM_OUTPUT}")"
+if (( NM_OUTPUT_LINES < 100 ))
+then
+  echo "FATAL error: unexpectedly short nm output:"
+  echo "${NM_OUTPUT}"
+  exit 1
+fi
+
 NM_OUTPUT_ALL_CXX_SYMBOLS="$(grep '\b_Z' <<< "${NM_OUTPUT}" || true)"
 # The standard C library we're linking against has a snprintf implementation
 # that internally calls a C++ snprintf. As a result we get those C++ snprintf
@@ -127,7 +139,7 @@ fi
 ${STRIP_TOOL} ${TARGET_BINARY}
 
 TARGET_BINARY_SIZE="$(size -A ${TARGET_BINARY} | grep Total | grep -o '[0-9]\+')"
-echo "File size: ${TARGET_BINARY_SIZE} bytes"
+echo "Sections size of ${TARGET_BINARY}: ${TARGET_BINARY_SIZE} bytes"
 
 # As of October 2022, the current size is 397827, so this gives 20% growth room.
 TARGET_BINARY_SIZE_LIMIT=480000
