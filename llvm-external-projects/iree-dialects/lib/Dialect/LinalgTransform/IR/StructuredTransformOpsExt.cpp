@@ -125,8 +125,8 @@ static LogicalResult isEquivalentToOpImpl(PatternRewriter &rewriter,
                                           linalg::LinalgOp linalgOp,
                                           linalg::LinalgOp linalgModelOp) {
   // If basic properties do not match, return failure.
-  if (linalgOp.inputs() != linalgModelOp.inputs() ||
-      linalgOp.outputs() != linalgModelOp.outputs() ||
+  if (linalgOp.getInputs() != linalgModelOp.getInputs() ||
+      linalgOp.getOutputs() != linalgModelOp.getOutputs() ||
       linalgOp.getIndexingMaps() != linalgModelOp.getIndexingMaps() ||
       linalgOp.iterator_types() != linalgModelOp.iterator_types())
     return failure();

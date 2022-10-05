@@ -725,11 +725,12 @@ struct LinalgUnaryGenericConversion
       // Make sure that the binary op has operands that map to the
       // ins and detect the order.
       auto selection = UnaryEmitter::OpSelection::genericUnary(opcode);
-      return UnaryEmitter(UnaryEmitter::Descriptor(
-                              operand0->get(), op.getMatchingIndexingMap(operand0)),
-                          UnaryEmitter::Descriptor(
-                              result->get(), op.getMatchingIndexingMap(result)),
-                          selection);
+      return UnaryEmitter(
+          UnaryEmitter::Descriptor(operand0->get(),
+                                   op.getMatchingIndexingMap(operand0)),
+          UnaryEmitter::Descriptor(result->get(),
+                                   op.getMatchingIndexingMap(result)),
+          selection);
     };
 
     // Select the op to lower to and configure the emitter.
@@ -823,7 +824,8 @@ struct LinalgTrivialGenericConversion
         OpOperand *input = op.getInputOperand(inputIndex);
         OpOperand *output = op.getOutputOperand(outputIndex);
         emitter.copies.emplace_back(
-            CopyEmitter::Descriptor{input->get(), op.getMatchingIndexingMap(input)},
+            CopyEmitter::Descriptor{input->get(),
+                                    op.getMatchingIndexingMap(input)},
             CopyEmitter::Descriptor{output->get(),
                                     op.getMatchingIndexingMap(output)});
       } else {
@@ -975,10 +977,10 @@ struct LinalgContractionConversion
           op(llvm::cast<linalg::LinalgOp>(contract.getOperation())),
           lhsAnal(contract.lhs()),
           rhsAnal(contract.rhs()),
-          outAnal(op.outputs().front()) {
+          outAnal(op.getOutputs().front()) {
       lhs = contract.lhs();
       rhs = contract.rhs();
-      out = op.outputs().front();
+      out = op.getOutputs().front();
     }
   };
 

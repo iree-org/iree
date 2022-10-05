@@ -278,9 +278,10 @@ static bool propagateCopySourceIntoConsumerGeneric(
     }
     auto consumer = dyn_cast<linalg::GenericOp>(nextOp);
     if (!consumer || consumer.getNumOutputs() != 1 ||
-        !consumer.getMatchingIndexingMap(consumer.getOutputOperand(0)).isIdentity())
+        !consumer.getMatchingIndexingMap(consumer.getOutputOperand(0))
+             .isIdentity())
       break;
-    if (*consumer.outputs().begin() != copyOp.getTarget()) break;
+    if (*consumer.getOutputs().begin() != copyOp.getTarget()) break;
     insertInputValueIntoGeneric(copyOp.getSource(), consumer);
     toDelete.push_back(consumer);
     return true;

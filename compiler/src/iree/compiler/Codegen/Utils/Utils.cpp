@@ -474,7 +474,7 @@ class StepExprVisitor
 template <typename OpTy>
 static Optional<unsigned> getInterfaceWorkgroupOpDim(Value value) {
   if (auto op = value.getDefiningOp<OpTy>()) {
-    return op.dimension().getZExtValue();
+    return op.getDimension().getZExtValue();
   }
   return llvm::None;
 }

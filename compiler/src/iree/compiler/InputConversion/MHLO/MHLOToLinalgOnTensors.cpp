@@ -70,7 +70,7 @@ struct ConcatenateOpConversion
     }
 
     Location loc = op.getLoc();
-    int dim = op.dimension();
+    int dim = op.getDimension();
     int rank = resultType.getRank();
     SmallVector<Value, 3> offsets, sizes, strides;
     for (int i = 0; i < rank; ++i) {
