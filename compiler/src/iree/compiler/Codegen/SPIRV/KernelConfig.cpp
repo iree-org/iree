@@ -272,7 +272,7 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op, int64_t subgroupSize,
   int bIndex = -1, mIndex = -1, nIndex = -1, kIndex = -1;
   int lastParallelDim = -1;
   for (unsigned i = 0; i < op.getNumLoops(); ++i) {
-    if (linalg::isReductionIterator(op.getIteratorTypes()[i])) {
+    if (linalg::isReductionIterator(op.getIteratorTypesArray()[i])) {
       kIndex = i;
       continue;
     }
@@ -722,7 +722,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
     // vector later. Similarly, also try to tile other untiled parallel
     // dimensions by 4 to avoid instruction bloat.
     SmallVector<int64_t> loopTileSizes(linalgOp.getNumLoops(), 0);
-    for (const auto &it : llvm::enumerate(linalgOp.getIteratorTypes())) {
+    for (const auto &it : llvm::enumerate(linalgOp.getIteratorTypesArray())) {
       auto i = it.index();
       if (loopBounds[i] % 4 != 0) continue;
       if (linalg::isReductionIterator(it.value()) ||
