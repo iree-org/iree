@@ -1793,7 +1793,7 @@ SmallVector<int64_t> PackOp::getStaticTiles() {
 }
 
 SmallVector<utils::IteratorType> PackOp::getLoopIteratorTypes() {
-  // Note that here that we consider only the tiled loops, the point loops are
+  // Note that here we consider only the tiled loops, the point loops are
   // materialized when building the body of the operation.
   SmallVector<utils::IteratorType> iteratorTypes(getInputRank(),
                                                  utils::IteratorType::parallel);
