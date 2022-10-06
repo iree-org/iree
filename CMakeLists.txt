@@ -377,6 +377,7 @@ include(iree_microbenchmark_suite)
 include(iree_hal_cts_test_suite)
 include(iree_static_linker_test)
 include(iree_fetch_artifact)
+include(iree_run_module_test)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 
