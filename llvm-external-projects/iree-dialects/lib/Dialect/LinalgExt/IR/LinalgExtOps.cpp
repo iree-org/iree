@@ -1603,8 +1603,8 @@ computeInterchangeFromDimPos(ArrayRef<int64_t> dimsPos, int64_t inputRank) {
   return interchangeVector;
 }
 
-// Utility function shared between Pack and UnPack to get the tile sizes as
-// OpFoldResults.
+/// Utility function shared between Pack and UnPack to get the tile sizes as
+/// OpFoldResults.
 // TODO: interface or base class in .td
 template <typename OpTy>
 static SmallVector<OpFoldResult> getMixedTiles(OpTy op) {
@@ -1622,8 +1622,8 @@ static SmallVector<OpFoldResult> getMixedTiles(OpTy op) {
   return mixedInnerTiles;
 }
 
-// Utility function shared between Pack and UnPack to get a map between
-// `dim_pos` and `inner_tiles`.
+/// Utility function shared between Pack and UnPack to get a map between
+/// `dim_pos` and `inner_tiles`.
 // TODO: interface or base class in .td
 template <typename OpTy>
 static DenseMap<int64_t, OpFoldResult> getDimAndTileMapping(OpTy op) {
