@@ -33,10 +33,10 @@ endfunction()
 #       containing the same.
 #   LABELS: Additional labels to apply to the test. The package path and
 #       "driver=${DRIVER}" are added automatically.
-#   XFAIL: List of platforms (all, x86_64, android-arm64-v8a, riscv64-Linux,
-#       riscv32-Linux) for which the test is expected to fail e.g. due to
-#       issues with the upstream llvm backend. The target will be run, but its
-#       pass/fail status will be inverted.
+#   XFAIL_PLATFORMS: List of platforms (all, x86_64, android-arm64-v8a,
+#       riscv64-Linux, riscv32-Linux) for which the test is expected to fail
+#       e.g. due to issues with the upstream llvm backend. The target will be
+#       run, but its pass/fail status will be inverted.
 #   UNSUPPORTED_PLATFORMS: List of platforms (x86_64, android-arm64-v8a,
 #       riscv64-Linux, riscv32-Linux) not supported by the test target. The
 #       target will be skipped entirely.
@@ -85,7 +85,7 @@ function(iree_run_module_test)
     _RULE
     ""
     "NAME;MODULE_SRC;DRIVER;EXPECTED_OUTPUT;TIMEOUT"
-    "RUNNER_ARGS;LABELS;XFAIL;UNSUPPORTED_PLATFORMS;DEPS"
+    "RUNNER_ARGS;LABELS;XFAIL_PLATFORMS;UNSUPPORTED_PLATFORMS;DEPS"
     ${ARGN}
   )
 
@@ -105,9 +105,8 @@ function(iree_run_module_test)
     # this may be a file or a literal output. In the latter case, the
     # extension variable will be empty.
     cmake_path(GET _RULE_EXPECTED_OUTPUT EXTENSION LAST_ONLY _OUTPUT_FILE_TYPE)
-    if(_OUTPUT_FILE_TYPE AND NOT
-       (_OUTPUT_FILE_TYPE STREQUAL ".txt" OR _OUTPUT_FILE_TYPE STREQUAL ".npy"))
-      message(SEND_ERROR "Unsupported expected output file type: ${_RULE_EXPECTED_OUTPUT}")
+    if(NOT _OUTPUT_FILE_TYPE)  # The expected output is listed in the field.
+      list(APPEND _RULE_RUNNER_ARGS "--expected_output=\"${_RULE_EXPECTED_OUTPUT}\"")
     elseif(_OUTPUT_FILE_TYPE STREQUAL ".txt")
       file(REAL_PATH "${_RULE_EXPECTED_OUTPUT}" _OUTPUT_FILE_SRC)
       # Process the text input to remove the line breaks.
@@ -144,9 +143,9 @@ function(iree_run_module_test)
         list(APPEND _RULE_RUNNER_ARGS "--expected_output=@${_OUTPUT_FILE_SRC}")
         list(APPEND _SRC ${_OUTPUT_FILE_SRC})
       endif()
-    else()  # The expected output is listed in the field.
-      list(APPEND _RULE_RUNNER_ARGS "--expected_output=\"${_RULE_EXPECTED_OUTPUT}\"")
-    endif()
+    else()
+      message(SEND_ERROR "Unsupported expected output file type: ${_RULE_EXPECTED_OUTPUT}")
+    endif(NOT _OUTPUT_FILE_TYPE)
   endif(_RULE_EXPECTED_OUTPUT)
 
   # Dump the flags into a flag file to avoid CMake's naive handling of spaces
@@ -172,7 +171,8 @@ function(iree_run_module_test)
 
   # Set expect failure cases.
   set(_TEST_XFAIL FALSE)
-  if(_PLATFORM IN_LIST _RULE_XFAIL OR _RULE_XFAIL STREQUAL "all")
+  if(_PLATFORM IN_LIST _RULE_XFAIL_PLATFORMS OR
+     _RULE_XFAIL_PLATFORMS STREQUAL "all")
     set(_TEST_XFAIL TRUE)
   endif()
 
@@ -189,7 +189,7 @@ function(iree_run_module_test)
       "--flagfile=${_OUTPUT_FLAGFILE}"
     DATA
       "${_SRC}"
-    XFAIL
+    WILL_FAIL
       ${_TEST_XFAIL}
     LABELS
       ${_RULE_LABELS}
@@ -224,10 +224,10 @@ endfunction()
 #       iree-run-module
 #   LABELS: Additional labels to apply to the test. The package path and
 #       "driver=${DRIVER}" are added automatically.
-#   XFAIL: List of platforms (all, x86_64, android-arm64-v8a, riscv64-Linux,
-#       riscv32-Linux) for which the test is expected to fail e.g. due to
-#       issues with the upstream llvm backend. The target will be run, but its
-#       pass/fail status will be inverted.
+#   XFAIL_PLATFORMS: List of platforms (all, x86_64, android-arm64-v8a,
+#       riscv64-Linux, riscv32-Linux) for which the test is expected to fail
+#       e.g. due to issues with the upstream llvm backend. The target will be
+#       run, but its pass/fail status will be inverted.
 #   UNSUPPORTED_PLATFORMS: List of platforms (x86_64, android-arm64-v8a,
 #       riscv64-Linux, riscv32-Linux) not supported by the test target. The
 #       target will be skipped entirely.
@@ -260,7 +260,7 @@ function(iree_benchmark_suite_module_test)
     _RULE
     ""
     "NAME;BENCHMARK_MODULE_SRC;DRIVER;EXPECTED_OUTPUT;TIMEOUT"
-    "RUNNER_ARGS;LABELS;XFAIL;UNSUPPORTED_PLATFORMS"
+    "RUNNER_ARGS;LABELS;XFAIL_PLATFORMS;UNSUPPORTED_PLATFORMS"
     ${ARGN}
   )
 
@@ -323,8 +323,8 @@ function(iree_benchmark_suite_module_test)
       "${_RULE_EXPECTED_OUTPUT}"
     RUNNER_ARGS
       ${_RULE_RUNNER_ARGS}
-    XFAIL
-      ${_RULE_XFAIL}
+    XFAIL_PLATFORMS
+      ${_RULE_XFAIL_PLATFORMS}
     UNSUPPORTED_PLATFORMS
       ${_RULE_UNSUPPORTED_PLATFORMS}
     LABELS
