@@ -53,11 +53,20 @@ class DeviceCollectionTest(unittest.TestCase):
         architecture=common_definitions.DeviceArchitecture.ARMV9_A_GENERIC,
         platform=common_definitions.DevicePlatform.GENERIC_ANDROID,
         device_parameters={"big-cores"})
+    all_arm_devices = devices.query_device_specs(
+        architecture=common_definitions.DeviceArchitecture.ARMV9_A_GENERIC,
+        platform=common_definitions.DevicePlatform.GENERIC_ANDROID)
+    no_matched_device = devices.query_device_specs(
+        architecture=common_definitions.DeviceArchitecture.ARMV9_A_GENERIC,
+        platform=common_definitions.DevicePlatform.GENERIC_LINUX)
 
     self.assertEqual(linux_x86_devices, [linux_x86_device_spec])
     self.assertEqual(android_x86_devices, [android_x86_device_spec])
     self.assertEqual(little_cores_devices, [little_cores_device_spec])
     self.assertEqual(big_cores_devices, [big_cores_device_spec])
+    self.assertEqual(all_arm_devices,
+                     [little_cores_device_spec, big_cores_device_spec])
+    self.assertEqual(no_matched_device, [])
 
 
 if __name__ == "__main__":

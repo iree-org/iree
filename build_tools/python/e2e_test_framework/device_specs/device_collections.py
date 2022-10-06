@@ -1,8 +1,8 @@
-## copyright 2022 the iree authors
+# Copyright 2022 The IREE Authors
 #
-# licensed under the apache license v2.0 with llvm exceptions.
-# see https://llvm.org/license.txt for license information.
-# spdx-license-identifier: apache-2.0 with llvm-exception
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Defines the collections of device specs and provides query methods."""
 
 from typing import List, Sequence, Set
