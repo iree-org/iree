@@ -6,7 +6,6 @@
 """Generates all benchmarks."""
 
 from typing import List, Tuple
-
 from e2e_test_framework.definitions import iree_definitions
 from benchmark_suites.iree import (riscv_benchmarks, x86_64_benchmarks,
                                    adreno_benchmarks, armv8_a_benchmarks,
