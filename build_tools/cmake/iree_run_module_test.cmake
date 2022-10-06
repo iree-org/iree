@@ -98,8 +98,12 @@ function(iree_run_module_test)
     message(SEND_ERROR "The DRIVER argument is required.")
   endif()
 
-  file(REAL_PATH "${_RULE_MODULE_SRC}" _SRC)
-  list(APPEND _RULE_RUNNER_ARGS "--module_file=${_SRC}")
+  # All the file paths referred in the _RULE_RUNNER_ARGS are relative paths to
+  # make it portable, and all the paths in `_RUNNER_DATA` are absolute paths to
+  # make sure it can be checked/copied by the `iree_native_test` flow.
+  file(RELATIVE_PATH _SRC_RELATIVE_PATH
+    "${CMAKE_CURRENT_BINARY_DIR}" "${_RULE_MODULE_SRC}")
+  list(APPEND _RUNNER_DATA ${_RULE_MODULE_SRC})
 
   if(_RULE_EXPECTED_OUTPUT)
     # this may be a file or a literal output. In the latter case, the
@@ -108,18 +112,18 @@ function(iree_run_module_test)
     if(NOT _OUTPUT_FILE_TYPE)  # The expected output is listed in the field.
       list(APPEND _RULE_RUNNER_ARGS "--expected_output=\"${_RULE_EXPECTED_OUTPUT}\"")
     elseif(_OUTPUT_FILE_TYPE STREQUAL ".txt")
-      file(REAL_PATH "${_RULE_EXPECTED_OUTPUT}" _OUTPUT_FILE_SRC)
+      file(REAL_PATH "${_RULE_EXPECTED_OUTPUT}" _OUTPUT_FILE_ABS_PATH)
       # Process the text input to remove the line breaks.
-      file(STRINGS "${_OUTPUT_FILE_SRC}" _EXPECTED_OUTPUT ENCODING UTF-8)
-      string(REPLACE ";" " " _EXPECTED_OUTPUT_STR "${_EXPECTED_OUTPUT}")
+      file(READ "${_OUTPUT_FILE_ABS_PATH}" _EXPECTED_OUTPUT)
+      string(REPLACE "\n" " " _EXPECTED_OUTPUT_STR "${_EXPECTED_OUTPUT}")
       set(_EXPECTED_OUTPUT_STR "--expected_output=\"${_EXPECTED_OUTPUT_STR}\"")
       list(APPEND _RULE_RUNNER_ARGS ${_EXPECTED_OUTPUT_STR})
-      list(APPEND _SRC ${_OUTPUT_FILE_SRC})
+      list(APPEND _RUNNER_DATA ${_OUTPUT_FILE_ABS_PATH})
     elseif(_OUTPUT_FILE_TYPE STREQUAL ".npy")
       # Large npy files are not stored in the codebase. Need to download them
       # from GCS iree-model-artifacts first and store them in the following possible
       # paths.
-      find_file(_OUTPUT_FILE_SRC_PATH
+      find_file(_OUTPUT_FILE_ABS_PATH
         NAME
           "${_RULE_EXPECTED_OUTPUT}"
         PATHS
@@ -132,16 +136,17 @@ function(iree_run_module_test)
       # If the expected output npy file is not found (the large file is not
       # loaded from GCS to `IREE_BENCHMARK_SUITE_DIR` benchmark suite test),
       # report error.
-      if(NOT _OUTPUT_FILE_SRC_PATH)
+      if(NOT _OUTPUT_FILE_ABS_PATH)
         message(SEND_ERROR "${_RULE_EXPECTED_OUTPUT} is not found in\n\
           ${CMAKE_CURRENT_SOURCE_DIR}\n\
           ${CMAKE_CURRENT_BINARY_DIR}\n\
           ${IREE_BENCHMARK_SUITE_DIR}\n\
           Please check if you need to download it first.")
       else()
-        file(REAL_PATH "${_OUTPUT_FILE_SRC_PATH}" _OUTPUT_FILE_SRC)
-        list(APPEND _RULE_RUNNER_ARGS "--expected_output=@${_OUTPUT_FILE_SRC}")
-        list(APPEND _SRC ${_OUTPUT_FILE_SRC})
+        file(RELATIVE_PATH _OUTPUT_FILE_RELATIVE_PATH
+          "${CMAKE_CURRENT_BINARY_DIR}" "${_OUTPUT_FILE_ABS_PATH}")
+        list(APPEND _RULE_RUNNER_ARGS "--expected_output=@${_OUTPUT_FILE_RELATIVE_PATH}")
+        list(APPEND _RUNNER_DATA ${_OUTPUT_FILE_ABS_PATH})
       endif()
     else()
       message(SEND_ERROR "Unsupported expected output file type: ${_RULE_EXPECTED_OUTPUT}")
@@ -149,9 +154,9 @@ function(iree_run_module_test)
   endif(_RULE_EXPECTED_OUTPUT)
 
   # Dump the flags into a flag file to avoid CMake's naive handling of spaces
-  # in expected output.
+  # in expected output. `--module_file` is coded separatedly to make it portable.
   if(_RULE_RUNNER_ARGS)
-    set(_OUTPUT_FLAGFILE "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}_flagfile")
+    set(_OUTPUT_FLAGFILE "${_RULE_NAME}_flagfile")
     # Write each argument in a new line.
     string(REPLACE ";" "\n" _OUTPUT_FLAGS "${_RULE_RUNNER_ARGS}")
     file(CONFIGURE
@@ -160,7 +165,7 @@ function(iree_run_module_test)
       CONTENT
         "${_OUTPUT_FLAGS}"
     )
-    list(APPEND _SRC "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}_flagfile")
+    list(APPEND _RUNNER_DATA "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}_flagfile")
   endif()
 
   # A target specifically for the test.
@@ -186,9 +191,10 @@ function(iree_run_module_test)
     SRC
       "${_RUNNER_TARGET}"
     ARGS
+      "--module_file=${_SRC_RELATIVE_PATH}"
       "--flagfile=${_OUTPUT_FLAGFILE}"
     DATA
-      "${_SRC}"
+      "${_RUNNER_DATA}"
     WILL_FAIL
       ${_TEST_XFAIL}
     LABELS
