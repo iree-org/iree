@@ -474,7 +474,7 @@ class StepExprVisitor
 template <typename OpTy>
 static Optional<unsigned> getInterfaceWorkgroupOpDim(Value value) {
   if (auto op = value.getDefiningOp<OpTy>()) {
-    return op.dimension().getZExtValue();
+    return op.getDimension().getZExtValue();
   }
   return llvm::None;
 }
@@ -546,7 +546,7 @@ LogicalResult getFilteredOps(
     func::FuncOp funcOp, RootOpFilteringFn filteringFn,
     SmallVectorImpl<Operation *> &filteredOps,
     SmallVectorImpl<LoopTilingAndDistributionInfo> &tiledLoops) {
-  Region &region = funcOp.getBody();
+  Region &region = funcOp.getFunctionBody();
   if (!llvm::hasSingleElement(region)) {
     return funcOp.emitError("unable dispatch function with multiple blocks");
   }

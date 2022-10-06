@@ -147,7 +147,7 @@ static void updateDispatchOp(IREE::Stream::CmdDispatchOp dispatchOp,
 // This is a mirror of updateDispatchOp; see that for more information.
 static void updateExportFuncOp(mlir::func::FuncOp funcOp) {
   assert(!funcOp.empty() && "can't have empty exported functions");
-  auto &entryBlock = funcOp.getBody().front();
+  auto &entryBlock = funcOp.getFunctionBody().front();
   auto builder = OpBuilder::atBlockBegin(&entryBlock);
   auto streamAlignmentAttr = builder.getStringAttr("stream.alignment");
   auto streamValuesAttr = builder.getStringAttr("stream.values");

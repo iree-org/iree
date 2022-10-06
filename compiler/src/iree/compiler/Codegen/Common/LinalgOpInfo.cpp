@@ -84,11 +84,11 @@ static SmallVector<OpOperand *> computeTransposeInfo(
 
   // Inverse map to use transfer op permutation logic.
   AffineMap outputInversedMap = inversePermutation(
-      linalgOp.getTiedIndexingMap(linalgOp.getOutputOperand(0)));
+      linalgOp.getMatchingIndexingMap(linalgOp.getOutputOperand(0)));
 
   SmallVector<AffineMap> inputInversedMaps;
   for (OpOperand *linalgOperand : linalgOp.getInputOperands()) {
-    auto map = linalgOp.getTiedIndexingMap(linalgOperand);
+    auto map = linalgOp.getMatchingIndexingMap(linalgOperand);
     if (!map.isProjectedPermutation(/*allowZeroInResults=*/true)) {
       return transposeOperands;
     }

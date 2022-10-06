@@ -46,7 +46,7 @@ static Optional<std::pair<AffineExpr, AffineExpr>> getWorkgroupRange(
     SmallVectorImpl<Value> & /*symbols*/, ArrayRef<int64_t> workgroupCount,
     ArrayRef<int64_t> workgroupSize) {
   if (auto idOp = processorValue.getDefiningOp<gpu::ThreadIdOp>()) {
-    unsigned index = dimToIndex(idOp.dimension());
+    unsigned index = dimToIndex(idOp.getDimension());
     OpBuilder b(processorValue.getContext());
     AffineExpr zero = b.getAffineConstantExpr(0);
     AffineExpr ubExpr = b.getAffineConstantExpr(workgroupSize[index]);
@@ -54,7 +54,7 @@ static Optional<std::pair<AffineExpr, AffineExpr>> getWorkgroupRange(
   }
   if (auto dimOp = processorValue.getDefiningOp<gpu::BlockDimOp>()) {
     OpBuilder builder(processorValue.getContext());
-    unsigned index = dimToIndex(dimOp.dimension());
+    unsigned index = dimToIndex(dimOp.getDimension());
     AffineExpr bound = builder.getAffineConstantExpr(workgroupSize[index]);
     return std::make_pair(bound, bound);
   }

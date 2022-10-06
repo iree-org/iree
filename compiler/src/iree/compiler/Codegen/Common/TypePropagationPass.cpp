@@ -217,7 +217,7 @@ struct GenericOpTypePropagation
         OpOperand *modifiedOpOperand =
             &modifiedOp->getOpOperand(modifiedOperandIndex);
         BlockArgument source =
-            modifiedOp.getTiedBlockArgument(modifiedOpOperand);
+            modifiedOp.getMatchingBlockArgument(modifiedOpOperand);
         Type destType = getElementTypeOrSelf(
             genericOp.getOperand(modifiedOperandIndex).getType());
 
@@ -243,7 +243,7 @@ struct GenericOpTypePropagation
         if (modifiedOp.isOutputTensor(modifiedOpOperand)) {
           modifyYield = true;
           OpOperand *yieldOperand =
-              modifiedOp.getTiedYieldValue(modifiedOpOperand);
+              modifiedOp.getMatchingYieldValue(modifiedOpOperand);
           Optional<Type> legalizedType =
               getLegalizedElementType(yieldOperand->get().getType());
           if (!legalizedType) {

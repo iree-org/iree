@@ -350,16 +350,17 @@ struct AdaptLinalgInputOperandToOutputOperand
     SmallVector<AffineMap> maps;
     for (auto in : op.getInputOperands()) {
       if (!operand && !isReadOnly(in->get()) &&
-          op.getTiedIndexingMap(in) == op.getTiedIndexingMap(outputOperand) &&
+          op.getMatchingIndexingMap(in) ==
+              op.getMatchingIndexingMap(outputOperand) &&
           in->get().getType() == outputOperand->get().getType()) {
         operand = in;
       } else {
         newOperands.push_back(in->get());
-        maps.push_back(op.getTiedIndexingMap(in));
+        maps.push_back(op.getMatchingIndexingMap(in));
       }
     }
     if (!operand) return failure();
-    maps.push_back(op.getTiedIndexingMap(operand));
+    maps.push_back(op.getMatchingIndexingMap(operand));
 
     Location loc = op.getLoc();
     SmallVector<StringRef> iterTypes(op.getNumLoops(),

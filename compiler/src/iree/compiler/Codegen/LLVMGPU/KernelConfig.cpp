@@ -129,7 +129,7 @@ static bool supportsTensorCore(func::FuncOp entryPoint, linalg::LinalgOp op) {
     if (it == body.op_end() || !isa<arith::MulFOp>(*(it++))) return false;
     if (it == body.op_end() || !isa<arith::AddFOp>(*(it++))) return false;
     if (it == body.op_end() || !isa<linalg::YieldOp>(*(it++))) return false;
-    AffineMap outputMap = op.getTiedIndexingMap(op.getOutputOperand(0));
+    AffineMap outputMap = op.getMatchingIndexingMap(op.getOutputOperand(0));
     if (outputMap.getNumResults() != outputMap.getNumDims() - 1) return false;
     OpBuilder b(op);
     for (unsigned i = 0, e = outputMap.getNumResults(); i < e - 1; i++) {
@@ -178,16 +178,16 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
   int64_t sizeM = ShapedType::kDynamicSize;
   int64_t sizeN = ShapedType::kDynamicSize;
   int64_t sizeK = ShapedType::kDynamicSize;
-  auto outputMap = op.getTiedIndexingMap(op.getOutputOperand(0));
+  auto outputMap = op.getMatchingIndexingMap(op.getOutputOperand(0));
   for (unsigned i = 0; i < lhsShape.size(); i++) {
-    if (op.getTiedIndexingMap(op.getInputOperand(0)).getDimPosition(i) ==
+    if (op.getMatchingIndexingMap(op.getInputOperand(0)).getDimPosition(i) ==
         outputMap.getDimPosition(outputMap.getNumResults() - 2)) {
       sizeM = lhsShape[i];
       break;
     }
   }
   for (unsigned i = 0; i < rhsShape.size(); i++) {
-    if (op.getTiedIndexingMap(op.getInputOperand(1)).getDimPosition(i) ==
+    if (op.getMatchingIndexingMap(op.getInputOperand(1)).getDimPosition(i) ==
         outputMap.getDimPosition(outputMap.getNumResults() - 1)) {
       sizeN = rhsShape[i];
       break;
@@ -197,7 +197,7 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
   op.getReductionDims(exprs);
   if (exprs.size() == 1) {
     for (unsigned i = 0; i < lhsShape.size(); i++) {
-      if (op.getTiedIndexingMap(op.getInputOperand(0)).getDimPosition(i) ==
+      if (op.getMatchingIndexingMap(op.getInputOperand(0)).getDimPosition(i) ==
           exprs[0]) {
         sizeK = lhsShape[i];
         break;
@@ -364,7 +364,7 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
 
   if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
     for (auto outputOperand : enumerate(genericOp.getOutputOperands())) {
-      if (!genericOp.getTiedIndexingMap(outputOperand.value())
+      if (!genericOp.getMatchingIndexingMap(outputOperand.value())
                .isProjectedPermutation()) {
         vectorSize = 1;
         break;
@@ -403,7 +403,7 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
   // would fail vectorization.
   if (!linalgOp || op->getNumResults() != 1 ||
       llvm::any_of(linalgOp.getInputAndOutputOperands(), [&](OpOperand *input) {
-        return !linalgOp.getTiedIndexingMap(input).isProjectedPermutation();
+        return !linalgOp.getMatchingIndexingMap(input).isProjectedPermutation();
       })) {
     vectorSize = 1;
   } else {
@@ -462,7 +462,7 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   // Only support projected permutation, this could be extended to projected
   // permutated with broadcast.
   if (llvm::any_of(op.getInputOperands(), [&](OpOperand *input) {
-        return !op.getTiedIndexingMap(input).isProjectedPermutation();
+        return !op.getMatchingIndexingMap(input).isProjectedPermutation();
       }))
     return failure();
 
@@ -519,12 +519,14 @@ static LogicalResult setTransposeConfig(func::FuncOp entryPoint,
   // Determine the fastest moving dimensions for the source/destination indices
   // of each transpose. These inform the tile sizes.
   int64_t outputFastestDim = linalgOp.getNumLoops() - 1;
-  int64_t inputFastestDim = linalgOp.getTiedIndexingMap(transposedOperands[0])
-                                .getDimPosition(outputFastestDim);
+  int64_t inputFastestDim =
+      linalgOp.getMatchingIndexingMap(transposedOperands[0])
+          .getDimPosition(outputFastestDim);
   // Ensure the other transposed operands match
   for (int i = 1; i < transposedOperands.size(); ++i) {
-    if (inputFastestDim != linalgOp.getTiedIndexingMap(transposedOperands[i])
-                               .getDimPosition(outputFastestDim)) {
+    if (inputFastestDim !=
+        linalgOp.getMatchingIndexingMap(transposedOperands[i])
+            .getDimPosition(outputFastestDim)) {
       return failure();
     }
   }

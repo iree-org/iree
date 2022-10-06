@@ -70,7 +70,7 @@ struct ConcatenateOpConversion
     }
 
     Location loc = op.getLoc();
-    int dim = op.dimension();
+    int dim = op.getDimension();
     int rank = resultType.getRank();
     SmallVector<Value, 3> offsets, sizes, strides;
     for (int i = 0; i < rank; ++i) {
@@ -508,7 +508,7 @@ struct ConvertMHLOToLinalgOnTensorsPass
       for (Type type : funcOp.getFunctionType().getResults()) {
         if (isIllegalType(type)) return false;
       }
-      for (Block &block : funcOp.getBody()) {
+      for (Block &block : funcOp.getFunctionBody()) {
         for (Type type : block.getArgumentTypes()) {
           if (isIllegalType(type)) return false;
         }

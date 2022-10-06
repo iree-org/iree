@@ -84,7 +84,7 @@ class MaterializeResourceCachesPass
     for (Operation &funcLikeOp : moduleOp.getOps()) {
       auto funcOp = llvm::dyn_cast<FunctionOpInterface>(funcLikeOp);
       if (!funcOp) continue;
-      for (auto &block : funcOp.getBody()) {
+      for (auto &block : funcOp.getFunctionBody()) {
         block.walk([&](Operation *op) {
           if (auto lookupOp = dyn_cast<DescriptorSetLayoutLookupOp>(op)) {
             replaceDescriptorSetLayoutLookupOp(lookupOp);

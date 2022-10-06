@@ -35,7 +35,7 @@ class InjectDispatchTracingPass
 
   void runOnOperation() override {
     auto funcOp = getOperation();
-    for (auto dispatchOp : funcOp.getBody().getOps<DispatchOp>()) {
+    for (auto dispatchOp : funcOp.getFunctionBody().getOps<DispatchOp>()) {
       std::string entryPointName =
           dispatchOp.getEntryPoint().getRootReference().getValue().str();
       for (FlatSymbolRefAttr nestedRef :

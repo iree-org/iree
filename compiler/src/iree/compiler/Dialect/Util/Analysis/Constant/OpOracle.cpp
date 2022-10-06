@@ -129,7 +129,7 @@ bool isHoistableConstExprLeaf(const ConstExprAnalysis::ConstValueInfo *info) {
     if (genericOp.getNumParallelLoops() == genericOp.getNumLoops() &&
         isa<linalg::YieldOp>(genericOp.getBody()->front())) {
       for (OpOperand *opOperand : genericOp.getInputOperands()) {
-        AffineMap indexingMap = genericOp.getTiedIndexingMap(opOperand);
+        AffineMap indexingMap = genericOp.getMatchingIndexingMap(opOperand);
         if (indexingMap.isProjectedPermutation() &&
             indexingMap.getNumDims() != indexingMap.getNumResults()) {
           return false;

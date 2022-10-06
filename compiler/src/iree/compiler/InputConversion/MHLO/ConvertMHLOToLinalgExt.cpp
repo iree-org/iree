@@ -440,7 +440,7 @@ struct TopkOpConversion : public OpConversionPattern<chlo::TopKOp> {
 
     auto inputValuesType = operand.getType().dyn_cast<ShapedType>();
     auto outputValuesType = op.values().getType().dyn_cast<ShapedType>();
-    auto outputIndicesType = op.indices().getType().dyn_cast<ShapedType>();
+    auto outputIndicesType = op.getIndices().getType().dyn_cast<ShapedType>();
     if (!inputValuesType || !outputValuesType || !outputIndicesType) {
       return rewriter.notifyMatchFailure(
           op, "Input and output must be of ShapedType");

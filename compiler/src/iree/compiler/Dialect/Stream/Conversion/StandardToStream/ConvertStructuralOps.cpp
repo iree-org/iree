@@ -51,12 +51,12 @@ struct FuncOpSignatureConversion
     // Replace function.
     auto newFuncOp = rewriter.cloneWithoutRegions(funcOp);
     newFuncOp.getBlocks().clear();
-    rewriter.inlineRegionBefore(funcOp.getBody(), newFuncOp.getBody(),
-                                newFuncOp.end());
+    rewriter.inlineRegionBefore(funcOp.getFunctionBody(),
+                                newFuncOp.getFunctionBody(), newFuncOp.end());
     newFuncOp.setType(rewriter.getFunctionType(newSignature.getConvertedTypes(),
                                                newResultTypes));
-    if (failed(rewriter.convertRegionTypes(&newFuncOp.getBody(), typeConverter,
-                                           &newSignature))) {
+    if (failed(rewriter.convertRegionTypes(&newFuncOp.getFunctionBody(),
+                                           typeConverter, &newSignature))) {
       return failure();
     }
 
