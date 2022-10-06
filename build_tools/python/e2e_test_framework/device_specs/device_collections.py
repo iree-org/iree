@@ -10,7 +10,7 @@ from e2e_test_framework.definitions import common_definitions
 from e2e_test_framework.device_specs import gcp_specs, pixel_4_specs, pixel_6_pro_specs, moto_edge_x30_specs
 
 
-class DeviceCollections(object):
+class DeviceCollection(object):
   """Class to collect and query device specs."""
 
   def __init__(self, device_specs: Sequence[common_definitions.DeviceSpec]):
@@ -62,4 +62,4 @@ ALL_DEVICE_SPECS = [
     gcp_specs.GCP_C2_STANDARD_16,
     gcp_specs.GCP_A2_HIGHGPU_1G,
 ]
-DEFAULT_DEVICE_COLLECTIONS = DeviceCollections(ALL_DEVICE_SPECS)
+DEFAULT_DEVICE_COLLECTION = DeviceCollection(ALL_DEVICE_SPECS)

@@ -9,7 +9,7 @@ from e2e_test_framework.definitions import common_definitions
 from e2e_test_framework.device_specs import device_collections
 
 
-class DeviceCollectionsTest(unittest.TestCase):
+class DeviceCollectionTest(unittest.TestCase):
 
   def test_query_device_specs(self):
     linux_x86_device_spec = common_definitions.DeviceSpec(
@@ -34,7 +34,7 @@ class DeviceCollectionsTest(unittest.TestCase):
         architecture=common_definitions.DeviceArchitecture.ARMV9_A_GENERIC,
         platform=common_definitions.DevicePlatform.GENERIC_ANDROID,
         device_parameters=["big-cores"])
-    devices = device_collections.DeviceCollections(device_specs=[
+    devices = device_collections.DeviceCollection(device_specs=[
         linux_x86_device_spec, android_x86_device_spec,
         little_cores_device_spec, big_cores_device_spec
     ])
