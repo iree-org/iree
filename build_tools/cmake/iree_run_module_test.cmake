@@ -105,6 +105,8 @@ function(iree_run_module_test)
     "${CMAKE_CURRENT_BINARY_DIR}" "${_RULE_MODULE_SRC}")
   list(APPEND _RUNNER_DATA ${_RULE_MODULE_SRC})
 
+  iree_package_path(_PACKAGE_PATH)
+
   if(_RULE_EXPECTED_OUTPUT)
     # this may be a file or a literal output. In the latter case, the
     # extension variable will be empty.
@@ -145,7 +147,14 @@ function(iree_run_module_test)
       else()
         file(RELATIVE_PATH _OUTPUT_FILE_RELATIVE_PATH
           "${CMAKE_CURRENT_BINARY_DIR}" "${_OUTPUT_FILE_ABS_PATH}")
-        list(APPEND _RULE_RUNNER_ARGS "--expected_output=@${_OUTPUT_FILE_RELATIVE_PATH}")
+        # Android runs on device and pushs the file into a different path.
+        if(ANDROID)
+          cmake_path(GET _OUTPUT_FILE_ABS_PATH FILENAME _OUTPUT_FILE_BASE)
+          list(APPEND
+            _RULE_RUNNER_ARGS "--expected_output=@${_PACKAGE_PATH}/${_RULE_NAME}/${_OUTPUT_FILE_BASE}")
+        else()
+          list(APPEND _RULE_RUNNER_ARGS "--expected_output=@${_OUTPUT_FILE_RELATIVE_PATH}")
+        endif()
         list(APPEND _RUNNER_DATA ${_OUTPUT_FILE_ABS_PATH})
       endif()
     else()
@@ -179,6 +188,13 @@ function(iree_run_module_test)
   if(_PLATFORM IN_LIST _RULE_XFAIL_PLATFORMS OR
      _RULE_XFAIL_PLATFORMS STREQUAL "all")
     set(_TEST_XFAIL TRUE)
+  endif()
+
+  # Android test runs on device and needs to set the file location properly.
+  if(ANDROID)
+    cmake_path(GET _RULE_MODULE_SRC FILENAME _SRC_FILE_BASE)
+    set(_SRC_RELATIVE_PATH "${_PACKAGE_PATH}/${_RULE_NAME}/${_SRC_FILE_BASE}")
+    set(_OUTPUT_FLAGFILE "${_PACKAGE_PATH}/${_RULE_NAME}/${_OUTPUT_FLAGFILE}")
   endif()
 
   set(_RUNNER_TARGET "iree-run-module")
