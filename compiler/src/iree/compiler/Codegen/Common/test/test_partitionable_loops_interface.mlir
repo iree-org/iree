@@ -7,7 +7,7 @@ func.func @generic_dynamic(%arg0 : tensor<?x?x?xf32>) -> tensor<?x?xf32> {
   %c2 = arith.constant 2 : index
   %d0 = tensor.dim %arg0, %c0 : tensor<?x?x?xf32>
   %d2 = tensor.dim %arg0, %c2 : tensor<?x?x?xf32>
-  %init = linalg.init_tensor [%d0, %d2] : tensor<?x?xf32>
+  %init = tensor.empty(%d0, %d2) : tensor<?x?xf32>
   %0 = linalg.generic {
     indexing_maps = [#map1, #map2],
     iterator_types = ["parallel", "reduction", "parallel"]}
@@ -28,7 +28,7 @@ func.func @generic_dynamic(%arg0 : tensor<?x?x?xf32>) -> tensor<?x?xf32> {
 func.func @generic_unit_dim(%arg0 : tensor<1x?x?xf32>) -> tensor<1x?xf32> {
   %c2 = arith.constant 2 : index
   %d2 = tensor.dim %arg0, %c2 : tensor<1x?x?xf32>
-  %init = linalg.init_tensor [1, %d2] : tensor<1x?xf32>
+  %init = tensor.empty(%d2) : tensor<1x?xf32>
   %0 = linalg.generic {
     indexing_maps = [#map1, #map2],
     iterator_types = ["parallel", "reduction", "parallel"]}
@@ -54,7 +54,7 @@ func.func @generic_4D(%arg0: tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32> {
   %d1 = tensor.dim %arg0, %c1 : tensor<?x?x?x?xf32>
   %d2 = tensor.dim %arg0, %c2 : tensor<?x?x?x?xf32>
   %d3 = tensor.dim %arg0, %c3 : tensor<?x?x?x?xf32>
-  %init = linalg.init_tensor [%d0, %d1, %d2, %d3] : tensor<?x?x?x?xf32>
+  %init = tensor.empty(%d0, %d1, %d2, %d3) : tensor<?x?x?x?xf32>
   %0 = linalg.generic {
     indexing_maps = [#map, #map],
     iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
@@ -78,7 +78,7 @@ func.func @generic_4D_unit_dim(%arg0: tensor<?x?x1x?xf32>) -> tensor<?x?x1x?xf32
   %d0 = tensor.dim %arg0, %c0 : tensor<?x?x1x?xf32>
   %d1 = tensor.dim %arg0, %c1 : tensor<?x?x1x?xf32>
   %d3 = tensor.dim %arg0, %c3 : tensor<?x?x1x?xf32>
-  %init = linalg.init_tensor [%d0, %d1, 1, %d3] : tensor<?x?x1x?xf32>
+  %init = tensor.empty(%d0, %d1, %d3) : tensor<?x?x1x?xf32>
   %0 = linalg.generic {
     indexing_maps = [#map, #map],
     iterator_types = ["parallel", "parallel", "parallel", "parallel"]}

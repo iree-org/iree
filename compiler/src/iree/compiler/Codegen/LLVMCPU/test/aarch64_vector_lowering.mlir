@@ -26,7 +26,7 @@ module {
     %4 = affine.apply #map0()[%workgroup_count_y]
     %5 = affine.apply #map0()[%workgroup_id_x]
     %6 = affine.apply #map0()[%workgroup_count_x]
-    %7 = linalg.init_tensor [64, 64] : tensor<64x64xf32>
+    %7 = tensor.empty() : tensor<64x64xf32>
     scf.for %arg0 = %3 to %c384 step %4 {
       %8 = flow.dispatch.tensor.load %0, offsets = [%arg0, 0], sizes = [64, 512], strides = [1, 1] : !flow.dispatch.tensor<readonly:384x512xf32> -> tensor<64x512xf32>
       scf.for %arg1 = %5 to %c128 step %6 {
@@ -65,7 +65,7 @@ module {
 //      CHECK: %[[LHS:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:384x512xf32>
 //      CHECK: %[[RHS:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:512x128xf32>
 //      CHECK: %[[DST:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:384x128xf32>
-//      CHECK: %[[DST_TILE_INIT:.+]] = linalg.init_tensor
+//      CHECK: %[[DST_TILE_INIT:.+]] = tensor.empty()
 //      CHECK: scf.for %[[I_IDX:.+]] = {{.*}} to %[[C384]] step %{{[0-9]*}} {
 //      CHECK:   %[[LHS_TILE:.+]] = flow.dispatch.tensor.load %[[LHS]], {{.*}} -> tensor<64x512xf32>
 //      CHECK:   scf.for %[[J_IDX:.+]] = {{.*}} to %[[C128]] step %{{[0-9]*}} {
@@ -122,8 +122,8 @@ module {
     %8 = affine.apply #map0()[%workgroup_count_y]
     %9 = affine.apply #map0()[%workgroup_id_x]
     %10 = affine.apply #map0()[%workgroup_count_x]
-    %11 = linalg.init_tensor [64, 64] : tensor<64x64xf32>
-    %12 = linalg.init_tensor [32, 32] : tensor<32x32xf32>
+    %11 = tensor.empty() : tensor<64x64xf32>
+    %12 = tensor.empty() : tensor<32x32xf32>
     scf.for %arg0 = %7 to %c384 step %8 {
       %13 = flow.dispatch.tensor.load %0, offsets = [%arg0], sizes = [64], strides = [1] : !flow.dispatch.tensor<readonly:384xi32> -> tensor<64xi32>
       %14 = flow.dispatch.tensor.load %2, offsets = [%arg0, 0], sizes = [64, 384], strides = [1, 1] : !flow.dispatch.tensor<readonly:384x384xf32> -> tensor<64x384xf32>

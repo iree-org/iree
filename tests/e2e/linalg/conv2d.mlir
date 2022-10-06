@@ -16,7 +16,7 @@ func.func @conv2d_nopadding() {
          [6.0, 8.0],
          [10.0, 12.0]]]]> : tensor<1x2x3x2xf32>
   %cst = arith.constant 0.000000e+00 : f32
-  %fill = linalg.init_tensor [1, 1, 2, 3] : tensor<1x1x2x3xf32>
+  %fill = tensor.empty() : tensor<1x1x2x3xf32>
   %out = linalg.fill ins(%cst : f32) outs(%fill : tensor<1x1x2x3xf32>) -> tensor<1x1x2x3xf32>
   %result = linalg.conv_2d_nchw_fchw {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>} ins(%inputs, %weights : tensor<1x2x4x4xf32>, tensor<1x2x3x2xf32>) outs(%out : tensor<1x1x2x3xf32>) -> tensor<1x1x2x3xf32>
   check.expect_almost_eq_const(%result, dense<[[

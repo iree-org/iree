@@ -355,7 +355,7 @@ func.func @rfft_1d(%input: tensor<8xf32>) -> (tensor<5xf32>, tensor<5xf32>) {
 // CHECK:      func.func @rfft_1d
 // CHECK-SAME:   %[[REAL:[a-zA-Z0-9]+]]
 // CHECK-DAG:    %[[INDICES:.+]] = arith.constant dense<[0, 4, 2, 6, 1, 5, 3, 7]> : tensor<8xi32>
-// CHECK-DAG:    %[[INIT_TENSOR:.+]] = linalg.init_tensor [8] : tensor<8xf32>
+// CHECK-DAG:    %[[INIT_TENSOR:.+]] = tensor.empty() : tensor<8xf32>
 // CHECK:        %[[REORDERED:.+]] = linalg.generic
 // CHECK-SAME:     {indexing_maps = [#[[MAP]], #[[MAP]]]
 // CHECK-SAME:     iterator_types = ["parallel"]
@@ -403,7 +403,7 @@ func.func @rfft_2d(%input: tensor<4x8xf32>) -> (tensor<4x5xf32>, tensor<4x5xf32>
 // CHECK:      func.func @rfft_2d
 // CHECK-SAME:   %[[REAL:[a-zA-Z0-9]+]]
 // CHECK-DAG:    %[[INDICES:.+]] = arith.constant dense<[0, 4, 2, 6, 1, 5, 3, 7]> : tensor<8xi32>
-// CHECK-DAG:    %[[INIT_TENSOR:.+]] = linalg.init_tensor [4, 8] : tensor<4x8xf32>
+// CHECK-DAG:    %[[INIT_TENSOR:.+]] = tensor.empty() : tensor<4x8xf32>
 // CHECK:        %[[REORDERED:.+]] = linalg.generic
 // CHECK-SAME:     {indexing_maps = [#[[MAP0]], #[[MAP1]]]
 // CHECK-SAME:     iterator_types = ["parallel", "parallel"]
@@ -447,7 +447,7 @@ func.func @reverse_dim1(%arg0: tensor<3x5xi32>) -> tensor<3x5xi32> {
 }
 // CHECK-LABEL: func.func @reverse_dim1
 // CHECK-SAME:   %[[IN:[a-zA-Z0-9]+]]
-// CHECK:        %[[INIT:.+]] = linalg.init_tensor [3, 5] : tensor<3x5xi32>
+// CHECK:        %[[INIT:.+]] = tensor.empty() : tensor<3x5xi32>
 // CHECK:        %[[REV:.+]] = iree_linalg_ext.reverse
 // CHECK-SAME:     dimensions(dense<1> : tensor<1xi64>)
 // CHECK-SAME:     ins(%[[IN]] : tensor<3x5xi32>)
@@ -468,7 +468,7 @@ func.func @reverse_multi_dim(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
 // CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG:    %[[D0:.+]] = tensor.dim %[[IN]], %[[C0]]
 // CHECK-DAG:    %[[D1:.+]] = tensor.dim %[[IN]], %[[C1]]
-// CHECK:        %[[INIT:.+]] = linalg.init_tensor [%[[D0]], %[[D1]]] : tensor<?x?xi32>
+// CHECK:        %[[INIT:.+]] = tensor.empty(%[[D0]], %[[D1]]) : tensor<?x?xi32>
 // CHECK:        %[[REV:.+]] = iree_linalg_ext.reverse
 // CHECK-SAME:     dimensions(dense<[0, 1]> : tensor<2xi64>)
 // CHECK-SAME:     ins(%[[IN]] : tensor<?x?xi32>)
@@ -484,8 +484,8 @@ func.func @chlo_top_k_int(%arg : tensor<16x16xi32>) -> (tensor<16x8xi32>, tensor
 
 // CHECK:       func.func @chlo_top_k_int
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]
-// CHECK:        %[[D2:.+]] = linalg.init_tensor [16, 8] : tensor<16x8xi32>
-// CHECK:        %[[D3:.+]] = linalg.init_tensor [16, 8] : tensor<16x8xi32>
+// CHECK:        %[[D2:.+]] = tensor.empty() : tensor<16x8xi32>
+// CHECK:        %[[D3:.+]] = tensor.empty() : tensor<16x8xi32>
 // CHECK-DAG:    %[[CNEG:.+]] = arith.constant -2147483648 : i32
 // CHECK-DAG:    %[[CPOS:.+]] = arith.constant 2147483647 : i32
 // CHECK-DAG:    %[[D4:.+]] = linalg.fill ins(%[[CNEG]] : i32) outs(%[[D2]]
@@ -508,8 +508,8 @@ func.func @chlo_top_k_float(%arg : tensor<16x16xf32>) -> (tensor<16x8xf32>, tens
 
 // CHECK:       func.func @chlo_top_k_float
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]
-// CHECK:        %[[D2:.+]] = linalg.init_tensor [16, 8] : tensor<16x8xf32>
-// CHECK:        %[[D3:.+]] = linalg.init_tensor [16, 8] : tensor<16x8xi32>
+// CHECK:        %[[D2:.+]] = tensor.empty() : tensor<16x8xf32>
+// CHECK:        %[[D3:.+]] = tensor.empty() : tensor<16x8xi32>
 // CHECK-DAG:    %[[CNEG:.+]] = arith.constant 0xFF800000 : f32
 // CHECK-DAG:    %[[CPOS:.+]] = arith.constant 2147483647 : i32
 // CHECK-DAG:    %[[D4:.+]] = linalg.fill ins(%[[CNEG]] : f32) outs(%[[D2]]
