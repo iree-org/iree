@@ -99,6 +99,7 @@ function(iree_run_module_test)
   endif()
 
   file(RELATIVE_PATH _SRC "${CMAKE_CURRENT_BINARY_DIR}" "${_RULE_MODULE_SRC}")
+  list(APPEND _RUNNER_DATA ${_RULE_MODULE_SRC})
 
   if(_RULE_EXPECTED_OUTPUT)
     # this may be a file or a literal output. In the latter case, the
@@ -113,6 +114,7 @@ function(iree_run_module_test)
       string(REPLACE "\n" " " _EXPECTED_OUTPUT_STR "${_EXPECTED_OUTPUT}")
       set(_EXPECTED_OUTPUT_STR "--expected_output=\"${_EXPECTED_OUTPUT_STR}\"")
       list(APPEND _RULE_RUNNER_ARGS ${_EXPECTED_OUTPUT_STR})
+      list(APPEND _RUNNER_DATA ${_OUTPUT_FILE_SRC})
     elseif(_OUTPUT_FILE_TYPE STREQUAL ".npy")
       # Large npy files are not stored in the codebase. Need to download them
       # from GCS iree-model-artifacts first and store them in the following possible
@@ -140,6 +142,7 @@ function(iree_run_module_test)
         file(RELATIVE_PATH _OUTPUT_FILE_SRC
           "${CMAKE_CURRENT_BINARY_DIR}" "${_OUTPUT_FILE_SRC_PATH}")
         list(APPEND _RULE_RUNNER_ARGS "--expected_output=@${_OUTPUT_FILE_SRC}")
+        list(APPEND _RUNNER_DATA ${_OUTPUT_FILE_SRC_PATH})
       endif()
     else()
       message(SEND_ERROR "Unsupported expected output file type: ${_RULE_EXPECTED_OUTPUT}")
@@ -158,6 +161,7 @@ function(iree_run_module_test)
       CONTENT
         "${_OUTPUT_FLAGS}"
     )
+    list(APPEND _RUNNER_DATA "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}_flagfile")
   endif()
 
   # A target specifically for the test.
@@ -185,6 +189,8 @@ function(iree_run_module_test)
     ARGS
       "--module_file=${_SRC}"
       "--flagfile=${_OUTPUT_FLAGFILE}"
+    DATA
+      "${_RUNNER_DATA}"
     WILL_FAIL
       ${_TEST_XFAIL}
     LABELS
