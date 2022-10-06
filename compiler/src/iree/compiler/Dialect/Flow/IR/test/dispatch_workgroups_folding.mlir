@@ -91,7 +91,7 @@ func.func @remove_unused_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi32>) ->
     %c-2147483648_i32 = arith.constant -2147483648 : i32
     %0 = flow.dispatch.tensor.load %arg0, offsets=[0], sizes=[9], strides = [1] : !flow.dispatch.tensor<readonly:9xi32> -> tensor<9xi32>
     %1 = flow.dispatch.tensor.load %arg1, offsets=[0], sizes=[9], strides = [1] : !flow.dispatch.tensor<readonly:9xi32> -> tensor<9xi32>
-    %2 = linalg.init_tensor [] : tensor<i32>
+    %2 = tensor.empty() : tensor<i32>
     %3 = linalg.fill ins(%c-2147483648_i32 : i32) outs(%2 : tensor<i32>) -> tensor<i32>
     %4 = linalg.fill ins(%c0_i32 : i32) outs(%2 : tensor<i32>) -> tensor<i32>
     flow.dispatch.tensor.store %3, %arg2, offsets = [], sizes = [], strides = [] : tensor<i32> -> !flow.dispatch.tensor<writeonly:i32>
@@ -115,14 +115,14 @@ func.func @remove_unused_dynamic_result(%dim: index) -> (tensor<i32>) {
       (%dim: index, %ret0: !flow.dispatch.tensor<writeonly:i32>, %ret1: !flow.dispatch.tensor<writeonly:?xi32>) {
     // Used as a result; should remain after canonicalization.
     %c-2147483648_i32 = arith.constant -2147483648 : i32
-    %ret0_init = linalg.init_tensor [] : tensor<i32>
+    %ret0_init = tensor.empty() : tensor<i32>
     %ret0_value = linalg.fill ins(%c-2147483648_i32 : i32) outs(%ret0_init : tensor<i32>) -> tensor<i32>
     flow.dispatch.tensor.store %ret0_value, %ret0, offsets = [], sizes = [], strides = [] : tensor<i32> -> !flow.dispatch.tensor<writeonly:i32>
 
     // Unused as a result; should be stripped entirely.
     %c0_i32 = arith.constant 0 : i32
     %ret1_shaped = flow.dispatch.tie_shape %ret1 : !flow.dispatch.tensor<writeonly:?xi32>{%dim}
-    %ret1_init = linalg.init_tensor [%dim] : tensor<?xi32>
+    %ret1_init = tensor.empty(%dim) : tensor<?xi32>
     %ret1_value = linalg.fill ins(%c0_i32 : i32) outs(%ret1_init : tensor<?xi32>) -> tensor<?xi32>
     flow.dispatch.tensor.store %ret1_value, %ret1_shaped, offsets = [0], sizes = [%dim], strides = [1] : tensor<?xi32> -> !flow.dispatch.tensor<writeonly:?xi32>{%dim}
     flow.return
@@ -145,7 +145,7 @@ func.func @remove_unused_read_write_result(%arg0 : tensor<9xi32>, %arg1 : tensor
     %c-2147483648_i32 = arith.constant -2147483648 : i32
     %0 = flow.dispatch.tensor.load %arg0, offsets=[0], sizes=[9], strides = [1] : !flow.dispatch.tensor<readonly:9xi32> -> tensor<9xi32>
     %1 = flow.dispatch.tensor.load %arg1, offsets=[0], sizes=[9], strides = [1] : !flow.dispatch.tensor<readonly:9xi32> -> tensor<9xi32>
-    %2 = linalg.init_tensor [] : tensor<i32>
+    %2 = tensor.empty() : tensor<i32>
     %3 = linalg.fill ins(%c-2147483648_i32 : i32) outs(%2 : tensor<i32>) -> tensor<i32>
     %4 = linalg.fill ins(%c0_i32 : i32) outs(%2 : tensor<i32>) -> tensor<i32>
     flow.dispatch.tensor.store %3, %arg2, offsets = [], sizes = [], strides = [] : tensor<i32> -> !flow.dispatch.tensor<writeonly:i32>
@@ -168,7 +168,7 @@ func.func @keep_used_read_write_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi
     %0 = flow.dispatch.tensor.load %arg3, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readwrite:i32> -> tensor<i32>
     %val = tensor.extract %0[] : tensor<i32>
     %1 = flow.dispatch.tensor.load %arg1, offsets=[0], sizes=[9], strides = [1] : !flow.dispatch.tensor<readonly:9xi32> -> tensor<9xi32>
-    %2 = linalg.init_tensor [] : tensor<i32>
+    %2 = tensor.empty() : tensor<i32>
     %3 = linalg.fill ins(%c-2147483648_i32 : i32) outs(%2 : tensor<i32>) -> tensor<i32>
     %4 = linalg.fill ins(%val : i32) outs(%2 : tensor<i32>) -> tensor<i32>
     flow.dispatch.tensor.store %3, %arg2, offsets = [], sizes = [], strides = [] : tensor<i32> -> !flow.dispatch.tensor<writeonly:i32>

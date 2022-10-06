@@ -78,7 +78,7 @@ static Value transpose(mlir::Location loc, PatternRewriter &rewriter,
     }
   }
 
-  Value outputTensor = rewriter.create<linalg::InitTensorOp>(
+  Value outputTensor = rewriter.create<tensor::EmptyOp>(
       loc, targetShape, inputType.getElementType());
 
   SmallVector<StringRef, 4> loopAttributeTypes(nloops, "parallel");
@@ -424,7 +424,7 @@ struct FoldFillGenericOpPattern : public OpRewritePattern<linalg::GenericOp> {
     if (!fillOp) return failure();
 
     auto loc = genericOp.getLoc();
-    Value newInitTensor = rewriter.create<linalg::InitTensorOp>(
+    Value newInitTensor = rewriter.create<tensor::EmptyOp>(
         loc, outputType.getShape(), outputType.getElementType());
     rewriter.replaceOpWithNewOp<linalg::FillOp>(genericOp, fillOp.value(),
                                                 newInitTensor);
@@ -464,7 +464,7 @@ class ConvertLinalgMatmulToMmt4DPass final
     {
       RewritePatternSet patterns(&getContext());
       tensor::ExpandShapeOp::getCanonicalizationPatterns(patterns, context);
-      linalg::InitTensorOp::getCanonicalizationPatterns(patterns, context);
+      tensor::EmptyOp::getCanonicalizationPatterns(patterns, context);
       linalg::FillOp::getCanonicalizationPatterns(patterns, context);
       patterns.insert<FoldFillGenericOpPattern>(context);
       if (failed(applyPatternsAndFoldGreedily(getOperation(),
