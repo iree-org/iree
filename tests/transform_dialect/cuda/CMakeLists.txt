@@ -18,7 +18,6 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "reduction.mlir"
     "softmax.mlir"
   TOOLS
     FileCheck
