@@ -45,28 +45,17 @@ func.func @pack_large() {
   %init_pack = linalg.init_tensor [4, 16, 32, 16] : tensor<4x16x32x16xi32>
   %pack = iree_linalg_ext.pack %source dims_pos = [0, 1] inner_tiles = [32, 16] into %init_pack
       : (tensor<128x256xi32> tensor<4x16x32x16xi32>) -> tensor<4x16x32x16xi32>
-  %result = linalg.generic {
-      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+  // Pack without padding is just a reshape followed by a transpose.
+  %reshape = tensor.expand_shape %source [[0, 1], [2, 3]] : tensor<128x256xi32> into tensor<4x32x16x16xi32>
+  %init_transpose = linalg.init_tensor[4, 16, 32, 16] : tensor<4x16x32x16xi32>
+  %transpose = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d2, d1, d3)>],
       iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
-      outs(%init_pack : tensor<4x16x32x16xi32>) {
-    ^bb0(%b0: i32):
-      %0 = linalg.index 0 : index
-      %1 = linalg.index 1 : index
-      %2 = linalg.index 2 : index
-      %3 = linalg.index 3 : index
-      %c32 = arith.constant 32 : index
-      %outer_tile_strided = arith.muli %0, %c32 : index
-      %outer = arith.addi %outer_tile_strided, %2 : index
-      %c16 = arith.constant 16 : index
-      %inner_tile_strided = arith.muli %1, %c16 : index
-      %inner = arith.addi %inner_tile_strided, %3 : index
-      %c256 = arith.constant 256 : index
-      %strided = arith.muli %outer, %c256 : index
-      %linearized = arith.addi %inner, %strided : index
-      %linearized_i32 = arith.index_cast %linearized : index to i32
-      linalg.yield %linearized_i32 : i32
+      ins(%reshape : tensor<4x32x16x16xi32>) outs(%init_transpose : tensor<4x16x32x16xi32>) {
+    ^bb0(%b0 : i32, %b1 : i32):
+      linalg.yield %b0 : i32
     } -> tensor<4x16x32x16xi32>
-  check.expect_eq(%pack, %result) : tensor<4x16x32x16xi32>
+  check.expect_eq(%pack, %transpose) : tensor<4x16x32x16xi32>
   return
 }
 
@@ -88,27 +77,89 @@ func.func @pack_transpose_large() {
   %init_pack = linalg.init_tensor [4, 16, 16, 32] : tensor<4x16x16x32xi32>
   %pack = iree_linalg_ext.pack %source dims_pos = [1, 0] inner_tiles = [16, 32] into %init_pack
       : (tensor<128x256xi32> tensor<4x16x16x32xi32>) -> tensor<4x16x16x32xi32>
-  %result = linalg.generic {
-      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+  %reshape = tensor.expand_shape %source [[0, 1], [2, 3]] : tensor<128x256xi32> into tensor<4x32x16x16xi32>
+  %init_transpose = linalg.init_tensor[4, 16, 16, 32] : tensor<4x16x16x32xi32>
+  %transpose = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d2, d3, d1)>],
       iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
-      outs(%init_pack : tensor<4x16x16x32xi32>) {
-    ^bb0(%b0: i32):
-      %0 = linalg.index 0 : index
-      %1 = linalg.index 1 : index
-      %2 = linalg.index 2 : index
-      %3 = linalg.index 3 : index
-      %c32 = arith.constant 32 : index
-      %outer_tile_strided = arith.muli %0, %c32 : index
-      %outer = arith.addi %outer_tile_strided, %3 : index
-      %c16 = arith.constant 16 : index
-      %inner_tile_strided = arith.muli %1, %c16 : index
-      %inner = arith.addi %inner_tile_strided, %2 : index
-      %c256 = arith.constant 256 : index
-      %strided = arith.muli %outer, %c256 : index
+      ins(%reshape : tensor<4x32x16x16xi32>) outs(%init_transpose : tensor<4x16x16x32xi32>) {
+    ^bb0(%b0 : i32, %b1 : i32):
+      linalg.yield %b0 : i32
+    } -> tensor<4x16x16x32xi32>
+  check.expect_eq(%pack, %transpose) : tensor<4x16x16x32xi32>
+  return
+}
+
+func.func @pack_pad_large() {
+  %init_source = linalg.init_tensor [100, 250] : tensor<100x250xi32>
+  %source = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      outs(%init_source : tensor<100x250xi32>) {
+    ^bb0(%b0 : i32):
+      %outer = linalg.index 0 : index
+      %inner = linalg.index 1 : index
+      %c250 = arith.constant 250 : index
+      %strided = arith.muli %outer, %c250 : index
       %linearized = arith.addi %inner, %strided : index
       %linearized_i32 = arith.index_cast %linearized : index to i32
       linalg.yield %linearized_i32 : i32
+  } -> tensor<100x250xi32>
+  %padding_value = arith.constant 42 : i32
+  %init_pack = linalg.init_tensor [4, 16, 32, 16] : tensor<4x16x32x16xi32>
+  %pack = iree_linalg_ext.pack %source padding_value(%padding_value : i32)
+      dims_pos = [0, 1] inner_tiles = [32, 16] into %init_pack
+      : (tensor<100x250xi32> tensor<4x16x32x16xi32>) -> tensor<4x16x32x16xi32>
+  %pad = tensor.pad %source low[0, 0] high[28, 6] {
+    ^bb0(%b0 : index, %b1 : index):
+      tensor.yield %padding_value : i32
+  } : tensor<100x250xi32> to tensor<128x256xi32>
+  %reshape = tensor.expand_shape %pad [[0, 1], [2, 3]] : tensor<128x256xi32> into tensor<4x32x16x16xi32>
+  %init_transpose = linalg.init_tensor[4, 16, 32, 16] : tensor<4x16x32x16xi32>
+  %transpose = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d2, d1, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%reshape : tensor<4x32x16x16xi32>) outs(%init_transpose : tensor<4x16x32x16xi32>) {
+    ^bb0(%b0 : i32, %b1 : i32):
+      linalg.yield %b0 : i32
+    } -> tensor<4x16x32x16xi32>
+  check.expect_eq(%pack, %transpose) : tensor<4x16x32x16xi32>
+  return
+}
+
+func.func @pack_pad_transpose_large() {
+  %init_source = linalg.init_tensor [100, 250] : tensor<100x250xi32>
+  %source = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      outs(%init_source : tensor<100x250xi32>) {
+    ^bb0(%b0 : i32):
+      %outer = linalg.index 0 : index
+      %inner = linalg.index 1 : index
+      %c250 = arith.constant 250 : index
+      %strided = arith.muli %outer, %c250 : index
+      %linearized = arith.addi %inner, %strided : index
+      %linearized_i32 = arith.index_cast %linearized : index to i32
+      linalg.yield %linearized_i32 : i32
+  } -> tensor<100x250xi32>
+  %padding_value = arith.constant 42 : i32
+  %init_pack = linalg.init_tensor [4, 16, 16, 32] : tensor<4x16x16x32xi32>
+  %pack = iree_linalg_ext.pack %source padding_value(%padding_value : i32)
+      dims_pos = [1, 0] inner_tiles = [16, 32] into %init_pack
+      : (tensor<100x250xi32> tensor<4x16x16x32xi32>) -> tensor<4x16x16x32xi32>
+  %pad = tensor.pad %source low[0, 0] high[28, 6] {
+    ^bb0(%b0 : index, %b1 : index):
+      tensor.yield %padding_value : i32
+  } : tensor<100x250xi32> to tensor<128x256xi32>
+  %reshape = tensor.expand_shape %pad [[0, 1], [2, 3]] : tensor<128x256xi32> into tensor<4x32x16x16xi32>
+  %init_transpose = linalg.init_tensor[4, 16, 16, 32] : tensor<4x16x16x32xi32>
+  %transpose = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d2, d3, d1)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%reshape : tensor<4x32x16x16xi32>) outs(%init_transpose : tensor<4x16x16x32xi32>) {
+    ^bb0(%b0 : i32, %b1 : i32):
+      linalg.yield %b0 : i32
     } -> tensor<4x16x16x32xi32>
-  check.expect_eq(%pack, %result) : tensor<4x16x16x32xi32>
+  check.expect_eq(%pack, %transpose) : tensor<4x16x16x32xi32>
   return
 }
