@@ -8,11 +8,12 @@
 from typing import List, Tuple
 
 from e2e_test_framework.definitions import iree_definitions
-from benchmarks.iree import riscv_benchmarks, x86_64_benchmarks, adreno_benchmarks, armv8_a_benchmarks, cuda_benchmarks, mali_benchmarks, vmvx_benchmarks
+from benchmark_suites.iree import riscv_benchmarks, x86_64_benchmarks, adreno_benchmarks, armv8_a_benchmarks, cuda_benchmarks, mali_benchmarks, vmvx_benchmarks
 
 
-def generate_benchmarks() -> Tuple[List[iree_definitions.ModelCompileConfig],
-                                   List[iree_definitions.E2EModelRunConfig]]:
+def generate_benchmarks(
+) -> Tuple[List[iree_definitions.ModuleGenerationConfig],
+           List[iree_definitions.E2EModelRunConfig]]:
   benchmarks = [
       x86_64_benchmarks.Linux_x86_64_Benchmarks(),
       cuda_benchmarks.Linux_CUDA_Benchmarks(),
@@ -23,11 +24,11 @@ def generate_benchmarks() -> Tuple[List[iree_definitions.ModelCompileConfig],
       mali_benchmarks.Android_Mali_Benchmarks(),
       vmvx_benchmarks.Android_VMVX_Benchmarks()
   ]
-  all_model_compile_configs = []
+  all_module_generation_configs = []
   all_run_configs = []
   for benchmark in benchmarks:
-    model_compile_configs, run_configs = benchmark.generate()
-    all_model_compile_configs += model_compile_configs
+    module_generation_configs, run_configs = benchmark.generate()
+    all_module_generation_configs += module_generation_configs
     all_run_configs += run_configs
 
-  return (all_model_compile_configs, all_run_configs)
+  return (all_module_generation_configs, all_run_configs)

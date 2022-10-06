@@ -11,8 +11,8 @@ from e2e_test_framework.device_specs import device_collections
 from e2e_test_framework.models import model_groups
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework import unique_ids
-from benchmarks.iree import vmfb_execution_configs
-import benchmarks.iree.utils
+from benchmark_suites.iree import module_execution_configs
+import benchmark_suites.iree.utils
 
 
 class Linux_x86_64_Benchmarks(object):
@@ -31,33 +31,33 @@ class Linux_x86_64_Benchmarks(object):
 
   def generate(
       self
-  ) -> Tuple[List[iree_definitions.ModelCompileConfig],
+  ) -> Tuple[List[iree_definitions.ModuleGenerationConfig],
              List[iree_definitions.E2EModelRunConfig]]:
     """Generates IREE compile and run configs."""
 
     gen_configs = [
-        iree_definitions.ModelCompileConfig(
+        iree_definitions.ModuleGenerationConfig(
             compile_config=self.CASCADELAKE_COMPILE_CONFIG, model=model)
         for model in model_groups.SMALL + model_groups.LARGE
     ]
     default_execution_configs = [
-        vmfb_execution_configs.ELF_LOCAL_SYNC_CONFIG
+        module_execution_configs.ELF_LOCAL_SYNC_CONFIG
     ] + [
-        vmfb_execution_configs.get_elf_local_task_config(thread_num)
+        module_execution_configs.get_elf_local_task_config(thread_num)
         for thread_num in [1, 4, 8]
     ]
-    gcp_cascadelake_devices = device_collections.DEFAULT_DEVICE_COLLECTION.query_device_specs(
+    cascadelake_devices = device_collections.DEFAULT_DEVICE_COLLECTION.query_device_specs(
         architecture=common_definitions.DeviceArchitecture.X86_64_CASCADELAKE,
         platform=common_definitions.DevicePlatform.GENERIC_LINUX)
-    run_configs = benchmarks.iree.utils.generate_e2e_model_run_configs(
-        model_compile_configs=gen_configs,
-        vmfb_execution_configs=default_execution_configs,
-        device_specs=gcp_cascadelake_devices)
+    run_configs = benchmark_suites.iree.utils.generate_e2e_model_run_configs(
+        module_generation_configs=gen_configs,
+        module_execution_configs=default_execution_configs,
+        device_specs=cascadelake_devices)
 
     return (gen_configs, run_configs)
 
 
-def generate() -> Tuple[List[iree_definitions.ModelCompileConfig],
+def generate() -> Tuple[List[iree_definitions.ModuleGenerationConfig],
                         List[iree_definitions.E2EModelRunConfig]]:
   """Generates all compile and run configs for IREE benchmarks."""
   return Linux_x86_64_Benchmarks().generate()

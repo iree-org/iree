@@ -6,7 +6,6 @@
 """Defines IREE RISC-V benchmarks."""
 
 from typing import List, Tuple
-from benchmarks import iree
 from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework.models import tflite_models
@@ -34,11 +33,11 @@ class Linux_RV64_Benchmarks(object):
 
   def generate(
       self
-  ) -> Tuple[List[iree_definitions.ModelCompileConfig],
+  ) -> Tuple[List[iree_definitions.ModuleGenerationConfig],
              List[iree_definitions.E2EModelRunConfig]]:
     """Generates IREE compile and run configs."""
     gen_configs = [
-        iree_definitions.ModelCompileConfig(
+        iree_definitions.ModuleGenerationConfig(
             compile_config=self.DEFAULT_COMPILE_CONFIG, model=model)
         for model in self.MODELS
     ]
@@ -63,11 +62,11 @@ class Linux_RV32_Benchmarks(object):
 
   def generate(
       self
-  ) -> Tuple[List[iree_definitions.ModelCompileConfig],
+  ) -> Tuple[List[iree_definitions.ModuleGenerationConfig],
              List[iree_definitions.E2EModelRunConfig]]:
     """Generates IREE compile and run configs."""
     gen_configs = [
-        iree_definitions.ModelCompileConfig(
+        iree_definitions.ModuleGenerationConfig(
             compile_config=self.DEFAULT_COMPILE_CONFIG, model=model)
         for model in self.MODELS
     ]

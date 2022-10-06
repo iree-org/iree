@@ -11,8 +11,8 @@ from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework.models import tflite_models
 from e2e_test_framework.device_specs import device_collections
-from benchmarks.iree import vmfb_execution_configs
-import benchmarks.iree.utils
+from benchmark_suites.iree import module_execution_configs
+import benchmark_suites.iree.utils
 
 
 class Android_Mali_Benchmarks(object):
@@ -60,7 +60,7 @@ class Android_Mali_Benchmarks(object):
 
   def generate(
       self
-  ) -> Tuple[List[iree_definitions.ModelCompileConfig],
+  ) -> Tuple[List[iree_definitions.ModuleGenerationConfig],
              List[iree_definitions.E2EModelRunConfig]]:
     default_gen_configs = self._get_module_generation_configs(
         compile_config=self.DEFAULT_COMPILE_CONFIG,
@@ -78,14 +78,15 @@ class Android_Mali_Benchmarks(object):
     mali_devices = device_collections.DEFAULT_DEVICE_COLLECTION.query_device_specs(
         architecture=common_definitions.DeviceArchitecture.MALI_VALHALL,
         platform=common_definitions.DevicePlatform.GENERIC_ANDROID)
-    run_configs = benchmarks.iree.utils.generate_e2e_model_run_configs(
-        model_compile_configs=default_gen_configs + fuse_padding_gen_configs,
-        vmfb_execution_configs=[vmfb_execution_configs.VULKAN_CONFIG],
+    run_configs = benchmark_suites.iree.utils.generate_e2e_model_run_configs(
+        module_generation_configs=default_gen_configs +
+        fuse_padding_gen_configs,
+        module_execution_configs=[module_execution_configs.VULKAN_CONFIG],
         device_specs=mali_devices)
-    run_configs += benchmarks.iree.utils.generate_e2e_model_run_configs(
-        model_compile_configs=fuse_padding_repeated_kernel_gen_configs,
-        vmfb_execution_configs=[
-            vmfb_execution_configs.VULKAN_BATCH_SIZE_32_CONFIG
+    run_configs += benchmark_suites.iree.utils.generate_e2e_model_run_configs(
+        module_generation_configs=fuse_padding_repeated_kernel_gen_configs,
+        module_execution_configs=[
+            module_execution_configs.VULKAN_BATCH_SIZE_32_CONFIG
         ],
         device_specs=mali_devices)
 
@@ -97,7 +98,7 @@ class Android_Mali_Benchmarks(object):
       self, compile_config: iree_definitions.CompileConfig,
       fp32_models: Sequence[common_definitions.Model],
       fp16_models: Sequence[common_definitions.Model]
-  ) -> List[iree_definitions.ModelCompileConfig]:
+  ) -> List[iree_definitions.ModuleGenerationConfig]:
     demote_compile_config = iree_definitions.CompileConfig(
         id=compile_config.id + "_demote_f32_to_16",
         tags=compile_config.tags + ["demote-f32-to-f16"],
@@ -105,11 +106,11 @@ class Android_Mali_Benchmarks(object):
         extra_flags=compile_config.extra_flags +
         ["--iree-flow-demote-f32-to-f16"])
     return [
-        iree_definitions.ModelCompileConfig(compile_config=compile_config,
-                                            model=model)
+        iree_definitions.ModuleGenerationConfig(compile_config=compile_config,
+                                                model=model)
         for model in fp32_models
     ] + [
-        iree_definitions.ModelCompileConfig(
+        iree_definitions.ModuleGenerationConfig(
             compile_config=demote_compile_config, model=model)
         for model in fp16_models
     ]
