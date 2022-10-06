@@ -26,8 +26,10 @@ include(CMakeParseArguments)
 # ARGS: additional arguments passed to the test binary. TEST_INPUT_FILE_ARG and
 #     --device=DRIVER are automatically added if specified.
 # SRC: binary target to run as the test.
+# WILL_FAIL: The target will run, but its pass/fail status will be inverted.
 # LABELS: Additional labels to apply to the test. The package path is added
 #     automatically.
+# TIMEOUT: Test target timeout in seconds.
 #
 # Note: the DATA argument is not actually adding dependencies because CMake
 # doesn't have a good way to specify a data dependency for a test.
@@ -55,7 +57,7 @@ function(iree_native_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;SRC;DRIVER;TEST_INPUT_FILE_ARG"
+    "NAME;SRC;DRIVER;TEST_INPUT_FILE_ARG;WILL_FAIL"
     "ARGS;LABELS;DATA;TIMEOUT"
     ${ARGN}
   )
@@ -146,4 +148,7 @@ function(iree_native_test)
   set_property(TEST ${_TEST_NAME} PROPERTY LABELS "${_RULE_LABELS}")
   set_property(TEST "${_TEST_NAME}" PROPERTY REQUIRED_FILES "${_RULE_DATA}")
   set_property(TEST ${_TEST_NAME} PROPERTY TIMEOUT ${_RULE_TIMEOUT})
+  if(_RULE_WILL_FAIL)
+    set_property(TEST ${_TEST_NAME} PROPERTY WILL_FAIL ${_RULE_WILL_FAIL})
+  endif()
 endfunction()

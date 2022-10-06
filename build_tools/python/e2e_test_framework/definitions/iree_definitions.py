@@ -56,7 +56,7 @@ class CompileConfig(object):
 
 
 @dataclass(frozen=True)
-class VMFBExecutionConfig(object):
+class ModuleExecutionConfig(object):
   """Describes the options to run a module."""
   id: str
   tags: List[str]
@@ -67,7 +67,7 @@ class VMFBExecutionConfig(object):
 
 
 @dataclass(frozen=True)
-class ModelCompileConfig(object):
+class ModuleGenerationConfig(object):
   """Describes a compile target to generate the module."""
   compile_config: CompileConfig
   model: common_definitions.Model
@@ -76,7 +76,7 @@ class ModelCompileConfig(object):
 @dataclass(frozen=True)
 class E2EModelRunConfig(object):
   """Describes an e2e run."""
-  model_compile_config: ModelCompileConfig
-  vmfb_execution_config: VMFBExecutionConfig
+  module_generation_config: ModuleGenerationConfig
+  module_execution_config: ModuleExecutionConfig
   target_device_spec: common_definitions.DeviceSpec
   input_data: common_definitions.ModelInputData

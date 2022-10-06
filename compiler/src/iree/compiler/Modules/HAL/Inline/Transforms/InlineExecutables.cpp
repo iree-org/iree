@@ -264,13 +264,13 @@ class InlineExecutablesPass
               "unhandled dynamic buffer access; must be static");
         }
       } else if (auto loadOp = dyn_cast<memref::LoadOp>(user)) {
-        if (loadOp.indices().size() != 1) {
+        if (loadOp.getIndices().size() != 1) {
           return loadOp.emitOpError(
               "expected memrefs to have been flattened before inlining "
               "executables");
         }
         APInt index;
-        if (matchPattern(loadOp.indices()[0], m_ConstantInt(&index))) {
+        if (matchPattern(loadOp.getIndices()[0], m_ConstantInt(&index))) {
           loadOp.replaceAllUsesWith(elements[index.getSExtValue()]);
           loadOp.erase();
           continue;

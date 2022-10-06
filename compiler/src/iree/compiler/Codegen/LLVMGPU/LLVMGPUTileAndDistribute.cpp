@@ -244,13 +244,13 @@ static void insertInputValueIntoGeneric(Value source, linalg::GenericOp op) {
   SmallVector<AffineMap> maps;
   for (OpOperand *in : op.getInputOperands()) {
     newOperands.push_back(in->get());
-    maps.push_back(op.getTiedIndexingMap(in));
+    maps.push_back(op.getMatchingIndexingMap(in));
   }
   newOperands.push_back(source);
   assert(op.getNumOutputs() == 1);
   OpOperand *outOperand = op.getOutputOperand(0);
-  maps.push_back(op.getTiedIndexingMap(outOperand));
-  maps.push_back(op.getTiedIndexingMap(outOperand));
+  maps.push_back(op.getMatchingIndexingMap(outOperand));
+  maps.push_back(op.getMatchingIndexingMap(outOperand));
   Location loc = op.getLoc();
   SmallVector<StringRef> iterTypes(op.getNumLoops(),
                                    getParallelIteratorTypeName());
@@ -278,9 +278,10 @@ static bool propagateCopySourceIntoConsumerGeneric(
     }
     auto consumer = dyn_cast<linalg::GenericOp>(nextOp);
     if (!consumer || consumer.getNumOutputs() != 1 ||
-        !consumer.getTiedIndexingMap(consumer.getOutputOperand(0)).isIdentity())
+        !consumer.getMatchingIndexingMap(consumer.getOutputOperand(0))
+             .isIdentity())
       break;
-    if (*consumer.outputs().begin() != copyOp.getTarget()) break;
+    if (*consumer.getOutputs().begin() != copyOp.getTarget()) break;
     insertInputValueIntoGeneric(copyOp.getSource(), consumer);
     toDelete.push_back(consumer);
     return true;

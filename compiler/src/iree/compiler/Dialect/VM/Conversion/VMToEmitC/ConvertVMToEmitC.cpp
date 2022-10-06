@@ -161,8 +161,8 @@ LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
                   StringAttr::get(ctx, callingConvention.value()));
 
   // This call shold be equivalent to rewriter.inlineRegionBefore()
-  newFuncOp.getBody().getBlocks().splice(newFuncOp.end(),
-                                         funcOp.getBody().getBlocks());
+  newFuncOp.getFunctionBody().getBlocks().splice(
+      newFuncOp.end(), funcOp.getFunctionBody().getBlocks());
 
   Block &entryBlock = newFuncOp.getBlocks().front();
 
@@ -1321,7 +1321,8 @@ class FuncOpConversion : public OpConversionPattern<mlir::func::FuncOp> {
       signatureConverter.addInputs(arg.index(), convertedType);
     }
 
-    rewriter.applySignatureConversion(&funcOp.getBody(), signatureConverter);
+    rewriter.applySignatureConversion(&funcOp.getFunctionBody(),
+                                      signatureConverter);
 
     // Creates a new function with the updated signature.
     rewriter.updateRootInPlace(funcOp, [&] {
@@ -1401,8 +1402,8 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
     // Populate newly generated function.
     {
       OpBuilder::InsertionGuard guard(rewriter);
-      Block *block =
-          rewriter.createBlock(&newFuncOp.getBody(), newFuncOp.getBody().end());
+      Block *block = rewriter.createBlock(&newFuncOp.getFunctionBody(),
+                                          newFuncOp.getFunctionBody().end());
 
       // Insert arguments into block.
       block->addArgument(stackType, loc);        // SHIM_ARGUMENT_STACK
@@ -1915,8 +1916,8 @@ class ImportOpConverter {
     // Populate newly generated function.
     {
       OpBuilder::InsertionGuard guard(builder);
-      Block *block =
-          builder.createBlock(&newFuncOp.getBody(), newFuncOp.getBody().end());
+      Block *block = builder.createBlock(&newFuncOp.getFunctionBody(),
+                                         newFuncOp.getFunctionBody().end());
 
       for (Type type : newFuncOp.getFunctionType().getInputs()) {
         block->addArgument(type, loc);

@@ -128,7 +128,7 @@ static FailureOr<gpu::ThreadIdOp> isThreadIdxxZeroPredicate(scf::IfOp ifOp) {
   auto ULT = arith::CmpIPredicate::ult;
   auto ULE = arith::CmpIPredicate::ule;
   if (auto threadIdOp = pred.getLhs().getDefiningOp<gpu::ThreadIdOp>()) {
-    if (threadIdOp.dimension() != gpu::Dimension::x) return failure();
+    if (threadIdOp.getDimension() != gpu::Dimension::x) return failure();
     if (pred.getPredicate() == EQ && isConstantIntValue(pred.getRhs(), 0))
       return threadIdOp;
     if (pred.getPredicate() == SLE && isConstantIntValue(pred.getRhs(), 0))
@@ -145,7 +145,7 @@ static FailureOr<gpu::ThreadIdOp> isThreadIdxxZeroPredicate(scf::IfOp ifOp) {
   auto UGT = arith::CmpIPredicate::ugt;
   auto UGE = arith::CmpIPredicate::uge;
   if (auto threadIdOp = pred.getRhs().getDefiningOp<gpu::ThreadIdOp>()) {
-    if (threadIdOp.dimension() != gpu::Dimension::x) return failure();
+    if (threadIdOp.getDimension() != gpu::Dimension::x) return failure();
     if (pred.getPredicate() == EQ && isConstantIntValue(pred.getLhs(), 0))
       return threadIdOp;
     if (pred.getPredicate() == SGE && isConstantIntValue(pred.getLhs(), 0))

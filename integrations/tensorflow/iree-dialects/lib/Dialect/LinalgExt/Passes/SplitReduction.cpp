@@ -77,7 +77,7 @@ LogicalResult shouldParallelTopk(iree_compiler::IREE::LinalgExt::TopkOp topkOp,
     return rewriter.notifyMatchFailure(topkOp,
                                        "cannot split dynamic dimension");
   }
-  if (topkOp.indices() && splitReductionDepth == 0) {
+  if (topkOp.getIndices() && splitReductionDepth == 0) {
     return rewriter.notifyMatchFailure(
         topkOp, "input indices aren't supported for first split");
   }
@@ -118,7 +118,7 @@ computeParallelTopk(Location loc, PatternRewriter &rewriter,
 
   // Expand input indices shape for parallel processing if they exist
   Optional<Value> indicesExpanded;
-  if (Optional<Value> inputIndices = topkOp.indices()) {
+  if (Optional<Value> inputIndices = topkOp.getIndices()) {
     // Type inputElementType = inputIndices->getType().cast<ShapedType>();
     Type indicesExpandedType =
         RankedTensorType::get(expandedShape, indicesElementType);
@@ -338,7 +338,7 @@ struct TopkOpSplitReduction : public OpRewritePattern<TopkOp> {
     // provided. If input indices were provided, no offsetting is needed as
     // original original indices are already known.
     Value updatedParallelIndices = parallelTopkOp.getResult(1);
-    if (!topkOp.indices()) {
+    if (!topkOp.getIndices()) {
       Value parallelIndices = parallelTopkOp.getResult(1);
       SmallVector<int64_t> expandedShape = getExpandedShape(
           topkOp.values().getType().cast<ShapedType>().getShape(),

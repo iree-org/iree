@@ -83,7 +83,7 @@ mlir::iree_compiler::IREE::LinalgExt::ForeachThreadOpToAsyncRewriter::
   // 3.e. Add to group within the loop.
   rewriter.setInsertionPoint(forOp.getBody()->getTerminator());
   rewriter.create<async::AddToGroupOp>(loc, rewriter.getIndexType(),
-                                       executeOp.token(), asyncGroup);
+                                       executeOp.getToken(), asyncGroup);
 
   // 4. After the iree_compiler::IREE::LinalgExt::ForeachThread, await all async
   // tasks in `asyncGroup`.

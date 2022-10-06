@@ -81,7 +81,7 @@ struct DetachElementwisePattern
                                [&]() { linalgOp.setOutputOperand(0, fill); });
 
     auto outputMap = mlir::compressUnusedDims(
-        linalgOp.getTiedIndexingMap(outputOperands.front()));
+        linalgOp.getMatchingIndexingMap(outputOperands.front()));
     // Only support identity map for output access for now; this is the case for
     // all existing contraction/convolution ops.
     if (!outputMap.isIdentity()) return failure();

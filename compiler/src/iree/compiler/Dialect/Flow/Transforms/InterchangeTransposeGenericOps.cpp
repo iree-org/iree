@@ -44,7 +44,7 @@ struct TransposeGenericOpPattern : public OpRewritePattern<linalg::GenericOp> {
       if (!producer) continue;
 
       // check if the generic op has a non-identity map for the operand.
-      auto indexingMap = genericOp.getTiedIndexingMap(operand);
+      auto indexingMap = genericOp.getMatchingIndexingMap(operand);
       // This is already identity. Nothing to do.
       if (indexingMap.isIdentity()) {
         return rewriter.notifyMatchFailure(genericOp, "already normalized");
