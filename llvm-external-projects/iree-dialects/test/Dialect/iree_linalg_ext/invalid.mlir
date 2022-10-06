@@ -568,16 +568,8 @@ func.func @pack_invalid(%input: tensor<256x128xf32>, %output: tensor<8x8x32x16xf
 
 // -----
 
-func.func @unpack_invalid(%output: tensor<256x128xf32>, %input: tensor<8x8x32x16xf32>) -> tensor<8x8x32x16xf32> {
-  // expected-error@+1 {{invalid tile factor provided. Only full tiles are supported}}
-  %0 = iree_linalg_ext.unpack %input dims_pos = [1, 0] inner_tiles = [16, 5] into %output : (tensor<8x8x32x16xf32> tensor<256x128xf32>) -> tensor<256x128xf32>
-  return %0 : tensor<256x128xf32>
-}
-
-// -----
-
 func.func @unpack_invalid(%output: tensor<256x128xf32>, %input: tensor<8x8x32x16xf32>) -> tensor<256x128xf32> {
-  // expected-error@+1 {{infered type do not match provided output type}}
+  // expected-error@+1 {{infered type do not match provided input type. Expected 'tensor<8x32x4x32xf32>' but got: 'tensor<8x8x32x16xf32>'}}
   %0 = iree_linalg_ext.unpack %input dims_pos = [1, 0] inner_tiles = [4, 32] into %output : (tensor<8x8x32x16xf32> tensor<256x128xf32>) -> tensor<256x128xf32>
   return %0 : tensor<256x128xf32>
 }
