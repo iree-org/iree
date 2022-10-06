@@ -128,6 +128,7 @@ static void specializeDistributionLoops(
   SmallVector<scf::ForOp> distLoops;
   SmallVector<int64_t> tileSizes;
   SmallVector<AffineMinOp> minSizeOps;
+  unsigned numMinSizeOps = 0;
 
   // Distribution info vector has the innermost loop at index 0.
   for (auto &info : infoVec) {
@@ -148,9 +149,12 @@ static void specializeDistributionLoops(
       // Supposed to see only one op for the bounded tile size if any.
       return;
     } else {
+      ++numMinSizeOps;
       minSizeOps.push_back(boundedTileSizesOps[0]);
     }
   }
+
+  if (numMinSizeOps == 0) return;
 
   // Check the eligilbility. Unsupported cases are:
   //   1. Dynamic cases
@@ -221,22 +225,74 @@ static void specializeDistributionLoops(
   // generate scf.if %cond
   auto ifOp = builder.create<scf::IfOp>(loc, cond, /*withElseRegion=*/true);
 
-  // Transfer the original body to the scf.else body.
   auto origBodyBegin = ++Block::iterator(ifOp);
   auto origBodyEnd = --block->end();  // yield
 
-  Block *elseBlock = ifOp.elseBlock();
-  elseBlock->getOperations().splice(elseBlock->begin(), block->getOperations(),
-                                    origBodyBegin, origBodyEnd);
-  // Clone the else block into the then block. minOps are replaced during the
-  // cloning.
-  auto b = ifOp.getThenBodyBuilder();
-  BlockAndValueMapping bvm;
-  for (unsigned i = 0, e = minSizeOps.size(); i != e; ++i) {
-    bvm.map(minSizeOps[i], constantOps[i]);
-  }
-  for (auto &blockOp : elseBlock->without_terminator()) {
-    b.clone(blockOp, bvm);
+  if (numMinSizeOps > 1) {
+    // Transfer the original body to the scf.else body since we can reuse the
+    // operations in the original body directly.
+    Block *elseBlock = ifOp.elseBlock();
+    elseBlock->getOperations().splice(
+        elseBlock->begin(), block->getOperations(), origBodyBegin, origBodyEnd);
+    // Clone the else block into the then block. minOps are replaced during the
+    // cloning.
+    auto b = ifOp.getThenBodyBuilder();
+    BlockAndValueMapping bvm;
+    for (unsigned i = 0, e = minSizeOps.size(); i != e; ++i) {
+      bvm.map(minSizeOps[i], constantOps[i]);
+    }
+    for (auto &blockOp : elseBlock->without_terminator()) {
+      b.clone(blockOp, bvm);
+    }
+  } else {
+    // Clone into the then block.
+    auto b = ifOp.getThenBodyBuilder();
+    BlockAndValueMapping bvm;
+    for (unsigned i = 0, e = minSizeOps.size(); i != e; ++i) {
+      bvm.map(minSizeOps[i], constantOps[i]);
+    }
+    for (auto it = origBodyBegin; it != origBodyEnd; ++it) {
+      b.clone(*it, bvm);
+    }
+
+    // Calculate the static partial tile size.
+    int64_t partialTileSize = 0;
+    AffineMinOp theMinOp;
+
+    for (auto en : llvm::enumerate(minSizeOps)) {
+      AffineMinOp minOp = en.value();
+      if (!minOp) continue;
+
+      const auto &info = infoVec[en.index()];
+      const int64_t lb = *getConstantIntValue(info.untiledLowerBound);
+      const int64_t ub = *getConstantIntValue(info.untiledUpperBound);
+      const int64_t step = *getConstantIntValue(info.untiledStep);
+      partialTileSize = ((ub - lb) / step) % tileSizes[en.index()];
+      theMinOp = minOp;
+      break;
+    }
+    assert(partialTileSize != 0);
+
+    // Create a constant op for the static partial tile size.
+    builder.setInsertionPoint(ifOp);
+    auto partialTileSizeOp =
+        builder.create<arith::ConstantIndexOp>(loc, partialTileSize);
+
+    // Clone the operations into the else block.
+    b = ifOp.getElseBodyBuilder();
+    bvm.clear();
+    bvm.map(theMinOp, partialTileSizeOp);
+    for (auto it = origBodyBegin; it != origBodyEnd; ++it) {
+      b.clone(*it, bvm);
+    }
+
+    // Delete the original operations.
+    for (auto it = origBodyBegin; it != origBodyEnd;) {
+      Operation *op = &(*it);
+      ++it;
+      op->dropAllUses();
+      op->erase();
+    }
   }
   return;
 }
