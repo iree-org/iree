@@ -273,12 +273,12 @@ class IreeRuleFactory(object):
 
 def _generate_iree_rules(
     common_rule_factory: CommonRuleFactory, iree_artifacts_dir: str,
-    model_compile_configs: Sequence[iree_definitions.ModelCompileConfig]
+    module_generation_configs: Sequence[iree_definitions.ModuleGenerationConfig]
 ) -> List[str]:
   iree_rule_factory = IreeRuleFactory(iree_artifacts_dir)
-  for model_compile_config in model_compile_configs:
-    model = model_compile_config.model
-    compile_config = model_compile_config.compile_config
+  for module_generation_config in module_generation_configs:
+    model = module_generation_config.model
+    compile_config = module_generation_config.compile_config
 
     source_model_rule = common_rule_factory.add_model_rule(model)
     import_rule = iree_rule_factory.add_import_model_rule(
@@ -295,7 +295,8 @@ def _generate_iree_rules(
 
 def generate_rules(
     model_artifacts_dir: str, iree_artifacts_dir: str,
-    iree_model_compile_configs: Sequence[iree_definitions.ModelCompileConfig]
+    iree_module_generation_configs: Sequence[
+        iree_definitions.ModuleGenerationConfig]
 ) -> List[str]:
   """Generates cmake rules to build benchmarks.
   
@@ -304,13 +305,13 @@ def generate_rules(
       variable syntax in the path.
     iree_artifacts_dir: root directory to store generated IREE artifacts. Can
       contain CMake variable syntax in the path.
-    iree_model_compile_configs: compile configs for IREE targets.
+    iree_module_generation_configs: compile configs for IREE targets.
   Returns:
     List of CMake rules.
   """
   common_rule_factory = CommonRuleFactory(model_artifacts_dir)
   iree_rules = _generate_iree_rules(common_rule_factory, iree_artifacts_dir,
-                                    iree_model_compile_configs)
+                                    iree_module_generation_configs)
   # Currently the rules are simple so the common rules can be always put at the
   # top. Need a topological sort once the dependency gets complicated.
   return common_rule_factory.generate_cmake_rules() + iree_rules
