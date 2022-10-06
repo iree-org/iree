@@ -22,7 +22,7 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
           %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [250, 500], strides = [1, 1] : !flow.dispatch.tensor<readonly:250x500xf32> -> tensor<250x500xf32>
           %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [500, 1020], strides = [1, 1] : !flow.dispatch.tensor<readonly:500x1020xf32> -> tensor<500x1020xf32>
 
-          %50 = linalg.init_tensor [250, 1020] : tensor<250x1020xf32>
+          %50 = tensor.empty() : tensor<250x1020xf32>
           %cst = arith.constant 0.000000e+00 : f32
           %5 = linalg.fill ins(%cst : f32) outs(%50 : tensor<250x1020xf32>) -> tensor<250x1020xf32>
 

@@ -23,7 +23,7 @@ hal.executable @simpleMath_ex_dispatch_0 {
       %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:16xf32>
       %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:16xf32>
       %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:16xf32>
-      %3 = linalg.init_tensor [16] : tensor<16xf32>
+      %3 = tensor.empty() : tensor<16xf32>
       %4 = flow.dispatch.tensor.load %0, offsets=[0], sizes=[16], strides=[1] : !flow.dispatch.tensor<readonly:16xf32> -> tensor<16xf32>
       %5 = flow.dispatch.tensor.load %1, offsets=[0], sizes=[16], strides=[1] : !flow.dispatch.tensor<readonly:16xf32> -> tensor<16xf32>
       %6 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%4, %5 : tensor<16xf32>, tensor<16xf32>) outs(%3 : tensor<16xf32>) {
@@ -74,7 +74,7 @@ hal.executable @dot_dispatch_0 {
             : !flow.dispatch.tensor<readonly:1024x1024xf32> -> tensor<1024x1024xf32>
         %10 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [1024, 1024], strides = [1, 1]
             : !flow.dispatch.tensor<readonly:1024x1024xf32> -> tensor<1024x1024xf32>
-        %15 = linalg.init_tensor [1024, 1024] : tensor<1024x1024xf32>
+        %15 = tensor.empty() : tensor<1024x1024xf32>
         %16 = linalg.fill ins(%cst : f32) outs(%15 : tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
         %17 = linalg.matmul ins(%8, %10 : tensor<1024x1024xf32>, tensor<1024x1024xf32>)
             outs(%16 : tensor<1024x1024xf32>) -> tensor<1024x1024xf32>

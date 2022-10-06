@@ -80,6 +80,6 @@ func.func @tensor_pad(%source: tensor<1x?x?x3xf32>, %low1: index, %low2: index, 
 // CHECK:   }
 // CHECK:   %[[INSERT3:.+]] = vector.insert_strided_slice %[[IF3]], %[[INSERT2]] {offsets = [1, 1, 0], strides = [1]} : vector<3xf32> into vector<2x2x3xf32>
 
-// CHECK:   %[[INIT:.+]] = linalg.init_tensor [1, 2, 2, 3] : tensor<1x2x2x3xf32>
+// CHECK:   %[[INIT:.+]] = tensor.empty() : tensor<1x2x2x3xf32>
 // CHECK:   %[[WRITE:.+]] = vector.transfer_write %[[INSERT3]], %[[INIT]][%[[I0]], %[[I0]], %[[I0]], %[[I0]]] {in_bounds = [true, true, true]} : vector<2x2x3xf32>, tensor<1x2x2x3xf32>
 // CHECK:   return %[[WRITE]]

@@ -84,12 +84,12 @@ func.func @custom_constant_ui64() -> tensor<1xui64> {
 // CHECK-SAME: (%arg0: tensor<i32>, %arg1: tensor<i32>) -> (i1, tensor<i32>)
 func.func @arith_cmpi_i64(%arg0 : tensor<i64>, %arg1 : tensor<i64>) -> (i1, tensor<i64>) {
   // CHECK-NEXT: %0 = arith.cmpi slt, %arg0, %arg1 : tensor<i32>
-  // CHECK-NEXT: %1 = tensor.extract %0[] : tensor<i1>
-  // CHECK-NEXT: cf.cond_br %1, ^bb1(%1, %arg0 : i1, tensor<i32>), ^bb2(%1, %arg1 : i1, tensor<i32>)
-  // CHECK-NEXT: ^bb1(%2: i1, %3: tensor<i32>): // pred: ^bb0
-  // CHECK-NEXT: return %2, %3 : i1, tensor<i32>
-  // CHECK-NEXT: ^bb2(%4: i1, %5: tensor<i32>): // pred: ^bb0
-  // CHECK-NEXT: return %4, %5 : i1, tensor<i32>
+  // CHECK-NEXT: %[[EXT:.*]] = tensor.extract %0[] : tensor<i1>
+  // CHECK-NEXT: cf.cond_br %[[EXT]], ^bb1(%[[EXT]], %arg0 : i1, tensor<i32>), ^bb2(%[[EXT]], %arg1 : i1, tensor<i32>)
+  // CHECK-NEXT: ^bb1(%[[ARG1:.+]]: i1, %[[ARG2:.+]]: tensor<i32>): // pred: ^bb0
+  // CHECK-NEXT: return %[[ARG1]], %[[ARG2]] : i1, tensor<i32>
+  // CHECK-NEXT: ^bb2(%[[ARG3:.+]]: i1, %[[ARG4:.+]]: tensor<i32>): // pred: ^bb0
+  // CHECK-NEXT: return %[[ARG3]], %[[ARG4]] : i1, tensor<i32>
   %0 = arith.cmpi slt, %arg0, %arg1 : tensor<i64>
   %1 = tensor.extract %0[] : tensor<i1>
   cf.cond_br %1, ^bb1(%1, %arg0 : i1, tensor<i64>), ^bb2(%1, %arg1 : i1, tensor<i64>)
@@ -116,8 +116,8 @@ func.func @linalg_matmul_i64(%arg0: tensor<2x3xi64>, %arg1: tensor<3x4xi64>, %ar
 // CHECK-LABEL: func.func @linalg_generic_i64
 // CHECK-SAME: (%[[ARG:.+]]: tensor<2xi32>) -> tensor<2xi32>
 func.func @linalg_generic_i64(%arg: tensor<2xi64>)  -> tensor<2xi64> {
-  // CHECK: %[[INIT:.+]] = linalg.init_tensor [2] : tensor<2xi32>
-  %init = linalg.init_tensor [2] : tensor<2xi64>
+  // CHECK: %[[INIT:.+]] = tensor.empty() : tensor<2xi32>
+  %init = tensor.empty() : tensor<2xi64>
   // CHECK: %[[T:.+]] = linalg.generic {{.+}} ins(%[[ARG]] : tensor<2xi32>) outs(%[[INIT]] : tensor<2xi32>)
   %generic = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%arg : tensor<2xi64>) outs(%init : tensor<2xi64>) {
   // CHECK-NEXT: ^bb0(%[[A:.+]]: i32, %[[B:.+]]: i32):

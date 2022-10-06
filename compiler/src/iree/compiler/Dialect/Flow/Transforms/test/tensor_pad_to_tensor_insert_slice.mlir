@@ -28,7 +28,7 @@ module  {
 //   CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
 //   CHECK-DAG:   %[[RD0:.+]] = affine.apply #[[MAP0]]()[%[[ARG3]], %[[D0]]]
 //   CHECK-DAG:   %[[RD1:.+]] = affine.apply #[[MAP1]]()[%[[ARG2]], %[[D1]]]
-//       CHECK:   %[[INIT:.+]] = linalg.init_tensor [%[[RD0]], %[[RD1]]]
+//       CHECK:   %[[INIT:.+]] = tensor.empty(%[[RD0]], %[[RD1]])
 //       CHECK:   %[[FILL:.+]] = linalg.fill
 //  CHECK-SAME:       ins(%[[VAL]] :
 //  CHECK-SAME:       outs(%[[INIT]] :
@@ -55,7 +55,7 @@ module  {
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<12x4xf32>
 //  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<f32>
 //   CHECK-DAG:   %[[VAL:.+]] = tensor.extract %[[ARG1]]
-//       CHECK:   %[[INIT:.+]] = linalg.init_tensor [18, 12]
+//       CHECK:   %[[INIT:.+]] = tensor.empty()
 //       CHECK:   %[[FILL:.+]] = linalg.fill
 //  CHECK-SAME:       ins(%[[VAL]] :
 //  CHECK-SAME:       outs(%[[INIT]] :
@@ -70,7 +70,7 @@ func.func @_main(%arg0: tensor<1x33x33x480xf32>, %arg1: tensor<3x3x480x1xf32>) -
   ^bb0(%arg2: index, %arg3: index, %arg4: index, %arg5: index):
     tensor.yield %cst : f32
   } : tensor<1x33x33x480xf32> to tensor<1x41x41x480xf32>
-  %1 = linalg.init_tensor [1, 33, 33, 480] : tensor<1x33x33x480xf32>
+  %1 = tensor.empty() : tensor<1x33x33x480xf32>
   %2 = tensor.collapse_shape %arg1 [[0], [1], [2, 3]] : tensor<3x3x480x1xf32> into tensor<3x3x480xf32>
   %3 = linalg.fill ins(%cst : f32) outs(%1 : tensor<1x33x33x480xf32>) -> tensor<1x33x33x480xf32>
   %4 = linalg.depthwise_conv_2d_nhwc_hwc {dilations = dense<4> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%0, %2 : tensor<1x41x41x480xf32>, tensor<3x3x480xf32>) outs(%3 : tensor<1x33x33x480xf32>) -> tensor<1x33x33x480xf32>

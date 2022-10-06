@@ -35,6 +35,7 @@
 #include "mlir/Dialect/Bufferization/Transforms/AllocTensorElimination.h"
 #include "mlir/Dialect/Bufferization/Transforms/BufferUtils.h"
 #include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
+#include "mlir/Dialect/Bufferization/Transforms/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Passes.h"
@@ -106,7 +107,7 @@ class IREEComprehensiveBufferizePass
 
 static bool isaTensor(Type t) { return t.isa<TensorType>(); };
 
-static LogicalResult initTensorElimination(
+static LogicalResult emptyTensorElimination(
     Operation *op, OneShotBufferizationOptions options) {
   // Analyze IR.
   options.testAnalysisOnly = false;
@@ -170,7 +171,7 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
                                                               memorySpace);
   };
 
-  if (failed(initTensorElimination(moduleOp.getOperation(), options))) {
+  if (failed(emptyTensorElimination(moduleOp.getOperation(), options))) {
     return signalPassFailure();
   }
 
@@ -214,7 +215,7 @@ void addIREEComprehensiveBufferizePasses(
     Optional<BufferizationOptions::AllocationFn> allocationFn,
     Optional<BufferizationOptions::DeallocationFn> deallocationFn,
     Optional<BufferizationOptions::MemCpyFn> memCpyFn) {
-  passManager.addPass(createLinalgInitTensorToAllocTensorPass());
+  passManager.addPass(bufferization::createEmptyTensorToAllocTensorPass());
   passManager.addPass(createIREEComprehensiveBufferizePass(
       allocationFn, deallocationFn, memCpyFn));
   passManager.addPass(memref::createResolveShapedTypeResultDimsPass());

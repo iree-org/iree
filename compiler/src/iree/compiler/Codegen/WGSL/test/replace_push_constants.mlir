@@ -82,11 +82,11 @@ func.func @constantLoadMultiple() {
   // CHECK: %[[SUBSPAN:.+]] = hal.interface.binding.subspan set(3) binding(0) type(storage_buffer) offset(%c2) : !flow.dispatch.tensor<readonly:3xi32>
   // CHECK: %[[LOAD:.+]] = flow.dispatch.tensor.load %[[SUBSPAN]], offsets = [0], sizes = [3], strides = [1] : !flow.dispatch.tensor<readonly:3xi32> -> tensor<3xi32>
 
-  // CHECK: %[[EXTRACT_0:.+]] = tensor.extract %[[LOAD]][%c0] : tensor<3xi32>
+  // CHECK: %[[EXTRACT_0:.+]] = tensor.extract %[[LOAD]][%{{.*}}] : tensor<3xi32>
   %0 = hal.interface.constant.load[0] : i32
-  // CHECK: %[[EXTRACT_1:.+]] = tensor.extract %[[LOAD]][%c1] : tensor<3xi32>
+  // CHECK: %[[EXTRACT_1:.+]] = tensor.extract %[[LOAD]][%{{.*}}] : tensor<3xi32>
   %1 = hal.interface.constant.load[1] : i32
-  // CHECK: %[[EXTRACT_2:.+]] = tensor.extract %[[LOAD]][%c2_0] : tensor<3xi32>
+  // CHECK: %[[EXTRACT_2:.+]] = tensor.extract %[[LOAD]][%{{.*}}] : tensor<3xi32>
   %2 = hal.interface.constant.load[2] : i32
 
   // CHECK: = math.absi %[[EXTRACT_0]] : i32

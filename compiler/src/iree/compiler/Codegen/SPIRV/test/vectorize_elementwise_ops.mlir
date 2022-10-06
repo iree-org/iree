@@ -1,7 +1,7 @@
 // RUN: iree-opt --split-input-file --iree-spirv-vectorize %s | FileCheck %s
 
 func.func @add(%lhs: tensor<2x8xf32>, %rhs: tensor<2x8xf32>) -> tensor<2x8xf32> {
-  %init = linalg.init_tensor [2, 8] : tensor<2x8xf32>
+  %init = tensor.empty() : tensor<2x8xf32>
   %0 = linalg.generic {
     indexing_maps = [affine_map<(i, j) -> (i, j)>,
                      affine_map<(i, j) -> (i, j)>,
@@ -28,7 +28,7 @@ func.func @add(%lhs: tensor<2x8xf32>, %rhs: tensor<2x8xf32>) -> tensor<2x8xf32> 
 // -----
 
 func.func @transpose_leading_one_dim(%input: tensor<4x1x1xf32>) -> tensor<1x1x4xf32> {
-  %init = linalg.init_tensor [1, 1, 4] : tensor<1x1x4xf32>
+  %init = tensor.empty() : tensor<1x1x4xf32>
   %0 = linalg.generic {
     indexing_maps = [affine_map<(d0, d1, d2) -> (d2, d0, d1)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
     iterator_types = ["parallel", "parallel", "parallel"]
@@ -68,7 +68,7 @@ func.func @transpose_leading_one_dim(%input: tensor<4x1x1xf32>) -> tensor<1x1x4x
 // -----
 
 func.func @transpose_add(%lhs: tensor<4x2xf32>, %rhs: tensor<2xf32>) -> tensor<2x4xf32> {
-  %init = linalg.init_tensor [2, 4] : tensor<2x4xf32>
+  %init = tensor.empty() : tensor<2x4xf32>
   %0 = linalg.generic {
     indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>,
                      affine_map<(d0, d1) -> (d0)>,
@@ -128,7 +128,7 @@ func.func @transpose_add(%lhs: tensor<4x2xf32>, %rhs: tensor<2xf32>) -> tensor<2
 // -----
 
 func.func @transpose_nd(%input: tensor<2x4x2x1x1xf32>) -> tensor<2x2x1x1x4xf32> {
-  %init = linalg.init_tensor [2, 2, 1, 1, 4] : tensor<2x2x1x1x4xf32>
+  %init = tensor.empty() : tensor<2x2x1x1x4xf32>
   %0 = linalg.generic {
     indexing_maps = [
       affine_map<(d0, d1, d2, d3, d4) -> (d0, d4, d1, d2, d3)>,

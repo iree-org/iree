@@ -52,7 +52,7 @@ func.func @check_reordering() {
      0.581549, 0.700341, 0.247854, 0.803821, -0.887014, -0.151061, 1.16038, -1.0655,
      2.32756, 1.00794, -1.34373, -0.102644, -0.672338, -1.08293, -1.56172, -0.993132]> : tensor<384xf32>
   %1 = util.unfoldable_constant dense<-0.395125> : tensor<f32>
-  %2 = linalg.init_tensor [] : tensor<f32>
+  %2 = tensor.empty() : tensor<f32>
   %3 = linalg.fill ins(%cst : f32) outs(%2 : tensor<f32>) -> tensor<f32>
   %4 = linalg.generic {indexing_maps = [#map0, #map3, #map3], iterator_types = ["reduction"]}
     ins(%0, %1 : tensor<384xf32>, tensor<f32>) outs(%3 : tensor<f32>){
