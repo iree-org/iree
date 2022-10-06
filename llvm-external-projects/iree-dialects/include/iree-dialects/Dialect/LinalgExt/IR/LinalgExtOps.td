@@ -573,6 +573,26 @@ def IREELinalgExt_UnPackOp : IREELinalgExt_Op<"unpack", [
 ]>{
   let summary = "unpack operation";  
 
+  let description = [{
+    The unpack operation converts a tiled and packed input to an unpacked
+    output. See `pack` for more details on `inner_tiles` and `dims_pos`; it is UB
+    if the tile does not perfectly divide the dimension.
+
+    Example KCck_to_KC:
+
+    ```mlir
+    iree_linalg_ext.pack %arg0 dims_pos = [1, 0]
+      inner_tiles = [32, 8] into %arg1 : (memref<16x8x32x8xf32> memref<128x256xf32>)
+    ```
+
+    Example NCnc_to_NC:
+
+    ```mlir
+    iree_linalg_ext.pack %arg0 dims_pos = [0, 1]
+      inner_tiles = [8, 32] into %arg1 : (memref<16x8x8x32xf32> memref<128x256xf32>)
+    ```
+  }];
+
   let arguments = (ins Variadic<AnyShaped>:$inputs,
     Variadic<AnyShaped>:$outputs,
     DefaultValuedAttr<I64ArrayAttr, "{}">:$dims_pos,
