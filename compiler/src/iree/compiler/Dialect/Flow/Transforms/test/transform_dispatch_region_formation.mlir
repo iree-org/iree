@@ -179,7 +179,7 @@ transform.with_pdl_patterns {
     %0 = transform.structured.match ops{["tensor.extract_slice"]} in %arg1
     %dispatch_op = transform.iree.wrap_in_dispatch_region %0
     %1 = transform.structured.match ops{["tensor.insert_slice"]} in %arg1
-    transform.iree.clone_succeeding_op_into_dispatch_region %1 into %dispatch_op
+    transform.iree.move_succeeding_op_into_dispatch_region %1 into %dispatch_op
   }
 }
 
@@ -215,6 +215,36 @@ transform.with_pdl_patterns {
     %0 = transform.structured.match ops{["test.dummy_op"]} in %arg1
     %dispatch_op = transform.iree.wrap_in_dispatch_region %0
     %1 = transform.structured.match attributes{"__tagged__"} in %arg1
+    transform.iree.move_succeeding_op_into_dispatch_region %1 into %dispatch_op
+  }
+}
+
+// -----
+
+// CHECK-LABEL: func @clone_succeeding(
+//  CHECK-SAME:   %[[arg0:.*]]: tensor<?x?xf32>, %[[arg1:.*]]: tensor<?x?xf32>, %[[s1:.*]]: index, %[[s2:.*]]: index
+func.func @clone_succeeding(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>, %s1: index, %s2: index) -> (tensor<?x?xf32>, tensor<?x?xf32>) {
+  // CHECK: %[[region:.*]] = flow.dispatch.region -> (tensor<?x?xf32>{%[[s1]], %[[s2]]}) {
+  // CHECK:   %[[slice:.*]] = tensor.extract_slice %[[arg0]]
+  // CHECK:   tensor.insert_slice %[[slice]] into %[[arg1]]
+  // CHECK:   flow.return %[[slice]]
+  // CHECK: }
+  // CHECK: %[[insert:.*]] = tensor.insert_slice %[[region]] into %[[arg1]]
+  // CHECK: return %[[insert]], %[[region]]
+  %0 = tensor.extract_slice %arg0 [0, 10] [%s1, %s2] [1, 1]
+      : tensor<?x?xf32> to tensor<?x?xf32>
+  %1 = tensor.insert_slice %0 into %arg1 [5, 16] [%s1, %s2] [1, 1]
+      : tensor<?x?xf32> into tensor<?x?xf32>
+  return %1, %0 : tensor<?x?xf32>, tensor<?x?xf32>
+}
+
+transform.with_pdl_patterns {
+^bb0(%arg0: !pdl.operation):
+  transform.sequence %arg0 : !pdl.operation failures(propagate) {
+  ^bb1(%arg1: !pdl.operation):
+    %0 = transform.structured.match ops{["tensor.extract_slice"]} in %arg1
+    %dispatch_op = transform.iree.wrap_in_dispatch_region %0
+    %1 = transform.structured.match ops{["tensor.insert_slice"]} in %arg1
     transform.iree.clone_succeeding_op_into_dispatch_region %1 into %dispatch_op
   }
 }

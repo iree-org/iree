@@ -201,7 +201,7 @@ Flow::DispatchRegionOp Flow::makeEmptyDispatchRegion(OpBuilder &builder,
 
 // Clone a `target` op that is preceding the given dispatch region op into the
 // dispatch region.
-LogicalResult Flow::clonePrecedingOpIntoDispatchRegion(
+FailureOr<Operation *> Flow::clonePrecedingOpIntoDispatchRegion(
     RewriterBase &rewriter, Operation *target,
     Flow::DispatchRegionOp regionOp) {
   Block &body = regionOp.getBody().front();
@@ -226,7 +226,7 @@ LogicalResult Flow::clonePrecedingOpIntoDispatchRegion(
     });
   }
 
-  return success();
+  return newTargetOp;
 }
 
 // Move a `target` op that is preceding the given dispatch region op into the
