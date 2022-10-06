@@ -1802,95 +1802,12 @@ SmallVector<utils::IteratorType> PackOp::getLoopIteratorTypes() {
   return iteratorTypes;
 }
 
-/// Return a mapping from positions `dims_pos` to their `OpFoldResult` tile
-/// factors.
 DenseMap<int64_t, OpFoldResult> PackOp::getDimAndTileMapping() {
   return ::getDimAndTileMapping(*this);
 }
 
-/// Implements `getIterationDomain` from the tiling interface. In each
-/// loop the lower bound is zero and the step is one. For upper bound
-/// is inferred from the output tensor for the dimensions that are
-/// not part of the data tile created.
 SmallVector<Range> PackOp::getIterationDomain(OpBuilder &builder) {
   return ::getIterationDomain(*this, builder);
-}
-
-/// Generate the body of the innermost loop of the scalar implementation
-/// of `pack` operation.
-static void generatePackOpScalarImplementationBody(PackOp packOp,
-                                                   OpBuilder &builder,
-                                                   Location loc,
-                                                   ValueRange ivs) {
-  // Note: `ivs` are already in the correct order, possibly interchanged based
-  // on `dims_pos`. However, connecting the loops with the access patterns is
-  // difficult - What is the relation between the position of the tile loop and
-  // the point loop? However, if we interchange `ivs` once more to go to the
-  // canonical blocking format: ABCabc, this connection becomes trivial: Each
-  // point loop is pointLoopsOffset + inputRank away from the tiled loop.
-  SmallVector<int64_t> dimsToBlock =
-      extractFromI64ArrayAttr(packOp.getDimsPos());
-  SmallVector<Value> interchangedIvs = ivs;
-  SmallVector<int64_t> interchangeVector =
-      computeInterchangeFromDimPos(dimsToBlock, packOp.getInputRank());
-  interchangedIvs = interchange<Value>(interchangedIvs, interchangeVector,
-                                       /*offset=*/packOp.getInputRank());
-
-  SmallVector<OpFoldResult> tiles = packOp.getMixedTiles();
-  DenseMap<int64_t, OpFoldResult> dimAndTileMapping =
-      packOp.getDimAndTileMapping();
-  SmallVector<OpFoldResult> sourceIndices;
-  size_t pointLoopsOffset = 0;
-  int64_t inputRank = packOp.getInputRank();
-  for (auto dim : llvm::seq<int64_t>(0, inputRank)) {
-    if (dimAndTileMapping.count(dim)) {
-      AffineExpr i, j, tile;
-      bindDims(builder.getContext(), i, j);
-      bindSymbols(builder.getContext(), tile);
-      OpFoldResult sourceIndex = makeComposedFoldedAffineApply(
-          builder, loc, i * tile + j,
-          ArrayRef<OpFoldResult>{
-              interchangedIvs[dim],
-              interchangedIvs[pointLoopsOffset + packOp.getInputRank()],
-              dimAndTileMapping[dim]});
-      sourceIndices.push_back(sourceIndex);
-      ++pointLoopsOffset;
-    } else {
-      sourceIndices.push_back(interchangedIvs[dim]);
-    }
-  }
-
-  auto createLoad = [&]() -> Value {
-    return builder.create<memref::LoadOp>(
-        loc, packOp.getInput(), getAsValues(builder, loc, sourceIndices));
-  };
-  Value scalar;
-  if (auto paddingValue = packOp.getPaddingValue()) {
-    ArithBuilder arithBuilder(builder, loc);
-    Value isInBounds;
-    for (auto dim : llvm::seq<int64_t>(0, inputRank)) {
-      Value idx =
-          getValueOrCreateConstantIndexOp(builder, loc, sourceIndices[dim]);
-      Value cond = arithBuilder.slt(
-          idx, getDimValue(builder, loc, packOp.getInput(), dim));
-      isInBounds = dim == 0 ? cond : arithBuilder._and(isInBounds, cond);
-    }
-    scalar = builder
-                 .create<scf::IfOp>(
-                     loc, packOp.getElementType(), isInBounds, /*thenBuilder=*/
-                     [&](OpBuilder &b, Location l) {
-                       b.create<scf::YieldOp>(l, createLoad());
-                     },
-                     /*elseBuilder=*/
-                     [&](OpBuilder &b, Location l) {
-                       b.create<scf::YieldOp>(l, paddingValue);
-                     })
-                 .getResult(0);
-  } else {
-    scalar = createLoad();
-  }
-
-  builder.create<memref::StoreOp>(loc, scalar, packOp.getOutput(), ivs);
 }
 
 /// Generate the body of the innermost loop of the scalar implementation
@@ -2177,26 +2094,22 @@ PackOp::reifyResultShapes(OpBuilder &builder,
 // UnPackOp
 //===----------------------------------------------------------------------===//
 
-// Get the tile sizes as `OpFoldResult`.
 SmallVector<OpFoldResult> UnPackOp::getMixedTiles() {
   return ::getMixedTiles(*this);
 }
 
-// Return a mapping from positions `dims_pos` to their `OpFoldResult` tile
-// factors.
 DenseMap<int64_t, OpFoldResult> UnPackOp::getDimAndTileMapping() {
   return ::getDimAndTileMapping(*this);
 }
 
-// Implement the tiling interface. Generate the scalar implementation for the
-// `unpack` operation.
+/// Generate the scalar implementation for the
+/// `unpack` operation.
 LogicalResult UnPackOp::generateScalarImplementation(OpBuilder &builder,
                                                      Location loc,
                                                      ValueRange ivs) {
   assert(ivs.size() == getOutputRank() &&
          "number of ivs must match the rank of the output tensor");
   OpBuilder::InsertionGuard g(builder);
-  // The `ivs` already represent the position into the output tensor.
   ReifiedRankedShapedTypeDims outputShape;
   if (failed(reifyResultShapes(builder, outputShape)))
     return getOperation()->emitOpError("failed to reify result shape");
@@ -2208,35 +2121,35 @@ LogicalResult UnPackOp::generateScalarImplementation(OpBuilder &builder,
 
   DenseMap<int64_t, OpFoldResult> dimAndTileMapping = getDimAndTileMapping();
   // untiled loops and tile loops induction variables.
-  SmallVector<Value> sourceIvs;
+  SmallVector<Value> inputIvs;
   // point loops induction variables.
-  SmallVector<Value> sourceIvsPointLoops;
-  sourceIvs.reserve(getOutputRank());
-  sourceIvsPointLoops.reserve(dimAndTileMapping.size());
+  SmallVector<Value> inputIvsPointLoops;
+  inputIvs.reserve(getOutputRank());
+  inputIvsPointLoops.reserve(dimAndTileMapping.size());
   for (auto dim : llvm::seq<int64_t>(0, getOutputRank())) {
     if (dimAndTileMapping.count(dim)) {
-      DivModValue divMod =
-          getDivMod(builder, loc, ivs[dim],
-                    getAsValues(builder, loc, dimAndTileMapping[dim])[0]);
-      sourceIvsPointLoops.push_back(divMod.remainder);
-      sourceIvs.push_back(divMod.quotient);
+      DivModValue divMod = getDivMod(builder, loc, ivs[dim],
+                                     getValueOrCreateConstantIndexOp(
+                                         builder, loc, dimAndTileMapping[dim]));
+      inputIvsPointLoops.push_back(divMod.remainder);
+      inputIvs.push_back(divMod.quotient);
     } else {
-      sourceIvs.push_back(ivs[dim]);
+      inputIvs.push_back(ivs[dim]);
     }
   }
 
-  assert(sourceIvsPointLoops.size() + sourceIvs.size() == getInputRank() &&
+  assert(inputIvsPointLoops.size() + inputIvs.size() == getInputRank() &&
          "expect same number of iduction variables equals to input rank");
   // interchange the point loops induction variables based on `dim_pos`.
   SmallVector<int64_t> dimsToBlock = extractFromI64ArrayAttr(getDimsPos());
   SmallVector<int64_t> interchangeVector =
       computeInterchangeFromDimPos(dimsToBlock, getOutputRank());
-  SmallVector<Value> interchangedSourceIvsPointLoops = sourceIvsPointLoops;
-  interchangedSourceIvsPointLoops = interchange<Value>(
-      interchangedSourceIvsPointLoops, interchangeVector, /*offset=*/0);
+  SmallVector<Value> interchangedInputIvsPointLoops = inputIvsPointLoops;
+  interchangedInputIvsPointLoops = interchange<Value>(
+      interchangedInputIvsPointLoops, interchangeVector, /*offset=*/0);
 
-  llvm::append_range(sourceIvs, interchangedSourceIvsPointLoops);
-  Value scalar = builder.create<memref::LoadOp>(loc, getInput(), sourceIvs);
+  llvm::append_range(inputIvs, interchangedInputIvsPointLoops);
+  Value scalar = builder.create<memref::LoadOp>(loc, getInput(), inputIvs);
   builder.create<memref::StoreOp>(loc, scalar, getOutput(), ivs);
   return success();
 }
@@ -2267,14 +2180,11 @@ UnPackOp::reifyResultShapes(OpBuilder &builder,
   return success();
 }
 
-// Implement the tiling interface. The iteration domain is fully specified by
-// output. Lower bound is zero, step is one, while the upper bound it the
-// dimension of the input tensor.
 SmallVector<Range> UnPackOp::getIterationDomain(OpBuilder &builder) {
   return ::getIterationDomain(*this, builder);
 }
 
-// Infer result/output type given the input and the tile sizes.
+/// Infer result/output type given the input and the tile sizes.
 ShapedType UnPackOp::inferResultType() {
   DenseMap<int64_t, OpFoldResult> tileAndPosMapping = getDimAndTileMapping();
   SmallVector<int64_t> inferredShape;
@@ -2327,7 +2237,7 @@ LogicalResult UnPackOp::verify() {
   if (failed(commonVerifierPackAndUnPackOp(*this))) {
     return failure();
   }
-  // Blocking factors must be less or equal than the input rank, and must
+  // Blocking factors must be less or equal than the output rank, and must
   // match the number of `dims_pos`.
   if (numberOfBlockingFactors > getOutputRank()) {
     return op->emitError(
@@ -2351,18 +2261,17 @@ LogicalResult UnPackOp::verify() {
     return op->emitError(
         "invalid tile factor provided. Only full tiles are supported");
   }
+
   // Verify result type against inferred type.
   ShapedType expectedType = inferResultType();
-  if (expectedType != getOutputType()) {
+  if (!isCompatible(expectedType, getOutputType())) {
     return op->emitError(
-               "inferred type do not match provied output type. Expected ")
+               "infered type do not match provided output type. Expected ")
            << expectedType << " but got: " << getOutputType();
   }
   return success();
 }
 
-// Implement the tiling interface. The number of loops equals the rank of the
-// input. All the loops are parallel.
 SmallVector<utils::IteratorType> UnPackOp::getLoopIteratorTypes() {
   SmallVector<utils::IteratorType> iteratorTypes(getOutputRank(),
                                                  utils::IteratorType::parallel);

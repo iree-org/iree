@@ -723,6 +723,8 @@ func.func @pad_and_pack_fully_dynamic(%input: tensor<?x?xf32>, %output: tensor<?
 // CHECK-SAME:     into %[[OUTPUT]]
 // CHECK:        return %[[RES]]
 
+// -----
+
 func.func @relayout(%arg0: memref<3x3xf32>, %arg1: memref<3x3x1x1xf32>) {
   iree_linalg_ext.unpack %arg1 dims_pos = [0, 1] inner_tiles = [1, 1] into %arg0 : (memref<3x3x1x1xf32> memref<3x3xf32>)
   return
