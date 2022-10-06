@@ -562,6 +562,109 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
   }];
 }
 
+def IREELinalgExt_UnPackOp : IREELinalgExt_Op<"unpack", [
+  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+  DeclareOpInterfaceMethods<LinalgExtInterface>,
+  DeclareOpInterfaceMethods<TilingInterface,
+    ["getIterationDomain",
+     "getLoopIteratorTypes",
+     "generateScalarImplementation"]>,
+  DeclareOpInterfaceMethods<MemoryEffectsOpInterface>
+]>{
+  let summary = "unpack operation";  
+
+  let description = [{
+    The unpack operation converts a tiled and packed input to an unpacked
+    output. See `pack` for more details on `inner_tiles` and `dims_pos`; it is UB
+    if the tile does not perfectly divide the dimension.
+
+    Example KCck_to_KC:
+
+    ```mlir
+    iree_linalg_ext.pack %arg0 dims_pos = [1, 0]
+      inner_tiles = [32, 8] into %arg1 : (memref<16x8x32x8xf32> memref<128x256xf32>)
+    ```
+
+    Example NCnc_to_NC:
+
+    ```mlir
+    iree_linalg_ext.pack %arg0 dims_pos = [0, 1]
+      inner_tiles = [8, 32] into %arg1 : (memref<16x8x8x32xf32> memref<128x256xf32>)
+    ```
+  }];
+
+  let arguments = (ins Variadic<AnyShaped>:$inputs,
+    Variadic<AnyShaped>:$outputs,
+    DefaultValuedAttr<I64ArrayAttr, "{}">:$dims_pos,
+    Variadic<Index>:$inner_tiles,
+    I64ArrayAttr:$static_inner_tiles);
+
+  let results = (outs Variadic<AnyRankedTensor>:$results);
+  let assemblyFormat = [{
+    attr-dict
+    $inputs
+    `dims_pos` `=` $dims_pos
+    `inner_tiles` `=`
+    custom<DynamicIndexList>($inner_tiles, $static_inner_tiles,
+                             "ShapedType::kDynamicSize")
+    `into` $outputs `:` `(` type($inputs) type($outputs) `)`
+     (`->` type($results)^)?
+  }];
+
+  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
+
+    // Return the output operand.
+    Value getOutput() {
+      return getOutputOperand(0)->get();
+    }
+
+    // Return the input operand.
+    Value getInput() {
+      return getInputOperand(0)->get();
+    }
+
+    // Return the output rank.
+    int64_t getOutputRank() {
+      return  getOutputType().getRank();
+    }
+
+    // Return the output type.
+    ShapedType getOutputType() {
+      return getOutput().getType();
+    }
+
+    // Return the input type.
+    ShapedType getInputType() {
+      return getInput().getType();
+    }
+
+    // Return the output shape.
+    ArrayRef<int64_t> getOutputShape() {
+      return getOutputType().getShape();
+    }
+
+    // Return the input shape.
+    ArrayRef<int64_t> getInputShape() {
+      return getInputType().getShape();
+    }
+
+    // Return the rank of the input operand.
+    int64_t getInputRank() {
+      return getInputType().getRank();
+    }
+
+    // Return the tile sizes.
+    SmallVector<OpFoldResult> getMixedTiles();
+    SmallVector<int64_t> getStaticTiles();
+
+    // Infer the output type.
+    ShapedType inferResultType();
+
+    // Return a mapping from positions `dims_pos` to their tile factors.
+    DenseMap<int64_t, OpFoldResult> getDimAndTileMapping();
+  }];
+}
+
 //===----------------------------------------------------------------------===//
 // Pure ops
 //===----------------------------------------------------------------------===//
