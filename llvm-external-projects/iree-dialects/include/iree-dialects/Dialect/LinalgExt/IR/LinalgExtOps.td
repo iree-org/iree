@@ -554,9 +554,6 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
     SmallVector<OpFoldResult> getMixedTiles();
     SmallVector<int64_t> getStaticTiles();
 
-    // Infer the output type.
-    ShapedType inferResultType();
-
     // Return a mapping from positions `dims_pos` to their tile factors.
     DenseMap<int64_t, OpFoldResult> getDimAndTileMapping();
   }];
@@ -571,7 +568,7 @@ def IREELinalgExt_UnPackOp : IREELinalgExt_Op<"unpack", [
      "generateScalarImplementation"]>,
   DeclareOpInterfaceMethods<MemoryEffectsOpInterface>
 ]>{
-  let summary = "unpack operation";  
+  let summary = "unpack operation";
 
   let description = [{
     The unpack operation converts a tiled and packed input to an unpacked
@@ -656,9 +653,6 @@ def IREELinalgExt_UnPackOp : IREELinalgExt_Op<"unpack", [
     // Return the tile sizes.
     SmallVector<OpFoldResult> getMixedTiles();
     SmallVector<int64_t> getStaticTiles();
-
-    // Infer the output type.
-    ShapedType inferResultType();
 
     // Return a mapping from positions `dims_pos` to their tile factors.
     DenseMap<int64_t, OpFoldResult> getDimAndTileMapping();

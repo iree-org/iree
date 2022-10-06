@@ -1302,3 +1302,29 @@ func.func @KCRSsr_to_KCRS(%arg0: memref<?x?x?x?xf32>, %arg1: memref<?x?x?x?x8x?x
 // CHECK: }
 // CHECK: }
 // CHECK: }
+
+// -----
+
+func.func @unpack_undo_padding(%input: memref<2x8x8x2xf32>, %output: memref<13x15xf32>) {
+  iree_linalg_ext.unpack %input dims_pos = [0, 1] inner_tiles = [8, 2] into %output : (memref<2x8x8x2xf32> memref<13x15xf32>)
+  return
+}
+// CHECK-DAG:  #[[MAP_FLOORI:.*]] = affine_map<(d0) -> (d0 floordiv 8)>
+// CHECK-DAG:  #[[MAP_MODI:.*]] = affine_map<(d0) -> (d0 mod 8)>
+// CHECK-DAG:  #[[MAP_FLOORJ:.*]] = affine_map<(d0) -> (d0 floordiv 2)>
+// CHECK-DAG:  #[[MAP_MODJ:.*]] = affine_map<(d0) -> (d0 mod 2)>
+// CHECK:      func.func @unpack_undo_padding
+// CHECK-SAME:   %[[INPUT:[a-zA-Z0-9]+]]
+// CHECK-SAME:   %[[OUTPUT:[a-zA-Z0-9]+]]
+// CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:    %[[C13:.+]] = arith.constant 13 : index
+// CHECK-DAG:    %[[C15:.+]] = arith.constant 15 : index
+// CHECK:        scf.for %[[I:.+]] = %[[C0]] to %[[C13]] step %[[C1]] {
+// CHECK:          scf.for %[[J:.+]] = %[[C0]] to %[[C15]] step %[[C1]] {
+// CHECK-DAG:        %[[OUTER_I:.+]] = affine.apply #[[MAP0]](%[[I]])
+// CHECK-DAG:        %[[INNER_I:.+]] = affine.apply #[[MAP1]](%[[I]])
+// CHECK-DAG:        %[[OUTER_J:.+]] = affine.apply #[[MAP2]](%[[J]])
+// CHECK-DAG:        %[[INNER_J:.+]] = affine.apply #[[MAP3]](%[[J]])
+// CHECK:            %[[VAL:.+]] = memref.load %[[INPUT]][%[[OUTER_I]], %[[OUTER_J]], %[[INNER_I]], %[[INNER_J]]]
+// CHECK:            memref.store %[[VAL]], %[[OUTPUT]][%[[I]], %[[J]]]
