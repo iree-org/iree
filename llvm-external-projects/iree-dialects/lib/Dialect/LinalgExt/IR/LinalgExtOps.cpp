@@ -1885,7 +1885,6 @@ static void generatePackOpScalarImplementationBody(PackOp packOp,
   builder.create<memref::StoreOp>(loc, scalar, packOp.getOutput(), ivs);
 }
 
-/// Implements `generateScalarImplementation` from the tiling interface.
 LogicalResult PackOp::generateScalarImplementation(OpBuilder &builder,
                                                    Location loc,
                                                    ValueRange ivs) {
@@ -2100,8 +2099,6 @@ DenseMap<int64_t, OpFoldResult> UnPackOp::getDimAndTileMapping() {
   return ::getDimAndTileMapping(*this);
 }
 
-/// Generate the scalar implementation for the
-/// `unpack` operation.
 LogicalResult UnPackOp::generateScalarImplementation(OpBuilder &builder,
                                                      Location loc,
                                                      ValueRange ivs) {
