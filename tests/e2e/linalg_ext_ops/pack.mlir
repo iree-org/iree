@@ -91,7 +91,7 @@ func.func @pack_large() {
   %init_pack = linalg.init_tensor [4, 16, 32, 16] : tensor<4x16x32x16xi32>
   %pack = iree_linalg_ext.pack %source dims_pos = [0, 1] inner_tiles = [32, 16] into %init_pack
       : (tensor<128x256xi32> tensor<4x16x32x16xi32>) -> tensor<4x16x32x16xi32>
-  %result = linalg.generic {
+  %golden = linalg.generic {
       indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
       iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
       outs(%init_pack : tensor<4x16x32x16xi32>) {
@@ -112,7 +112,7 @@ func.func @pack_large() {
       %linearized_i32 = arith.index_cast %linearized : index to i32
       linalg.yield %linearized_i32 : i32
     } -> tensor<4x16x32x16xi32>
-  check.expect_eq(%pack, %result) : tensor<4x16x32x16xi32>
+  check.expect_eq(%pack, %golden) : tensor<4x16x32x16xi32>
   return
 }
 
@@ -144,7 +144,7 @@ func.func @dynamic_pack_large() {
   %cast_pack = tensor.cast %pack : tensor<?x?x32x16xi32> to tensor<4x16x32x16xi32>
 
   %static_init_pack = linalg.init_tensor [4, 16, 32, 16] : tensor<4x16x32x16xi32>
-  %result = linalg.generic {
+  %golden = linalg.generic {
       indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
       iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
       outs(%static_init_pack : tensor<4x16x32x16xi32>) {
@@ -165,7 +165,7 @@ func.func @dynamic_pack_large() {
       %linearized_i32 = arith.index_cast %linearized : index to i32
       linalg.yield %linearized_i32 : i32
     } -> tensor<4x16x32x16xi32>
-  check.expect_eq(%cast_pack, %result) : tensor<4x16x32x16xi32>
+  check.expect_eq(%cast_pack, %golden) : tensor<4x16x32x16xi32>
   return
 }
 
@@ -187,7 +187,7 @@ func.func @pack_transpose_large() {
   %init_pack = linalg.init_tensor [4, 16, 16, 32] : tensor<4x16x16x32xi32>
   %pack = iree_linalg_ext.pack %source dims_pos = [1, 0] inner_tiles = [16, 32] into %init_pack
       : (tensor<128x256xi32> tensor<4x16x16x32xi32>) -> tensor<4x16x16x32xi32>
-  %result = linalg.generic {
+  %golden = linalg.generic {
       indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
       iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
       outs(%init_pack : tensor<4x16x16x32xi32>) {
@@ -208,7 +208,7 @@ func.func @pack_transpose_large() {
       %linearized_i32 = arith.index_cast %linearized : index to i32
       linalg.yield %linearized_i32 : i32
     } -> tensor<4x16x16x32xi32>
-  check.expect_eq(%pack, %result) : tensor<4x16x16x32xi32>
+  check.expect_eq(%pack, %golden) : tensor<4x16x16x32xi32>
   return
 }
 
@@ -237,8 +237,9 @@ func.func @dynamic_pack_transpose_large() {
   %pack = iree_linalg_ext.pack %source dims_pos = [1, 0] inner_tiles = [16, 32] into %dyn_init_pack
       : (tensor<?x?xi32> tensor<?x?x16x32xi32>) -> tensor<?x?x16x32xi32>
   %cast_pack = tensor.cast %pack : tensor<?x?x16x32xi32> to tensor<4x16x16x32xi32>
+
   %static_init_pack = linalg.init_tensor [4, 16, 16, 32] : tensor<4x16x16x32xi32>
-  %result = linalg.generic {
+  %golden = linalg.generic {
       indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
       iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
       outs(%static_init_pack : tensor<4x16x16x32xi32>) {
@@ -259,6 +260,6 @@ func.func @dynamic_pack_transpose_large() {
       %linearized_i32 = arith.index_cast %linearized : index to i32
       linalg.yield %linearized_i32 : i32
     } -> tensor<4x16x16x32xi32>
-  check.expect_eq(%cast_pack, %result) : tensor<4x16x16x32xi32>
+  check.expect_eq(%cast_pack, %golden) : tensor<4x16x16x32xi32>
   return
 }
