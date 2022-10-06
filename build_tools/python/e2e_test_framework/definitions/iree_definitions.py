@@ -23,6 +23,13 @@ class TargetBackend(Enum):
   VULKAN_SPIRV = "vulkan-spirv"
 
 
+class TargetABI(Enum):
+  VMVX = "vmvx"
+  LINUX_GNU = "linux-gnu"
+  LINUX_ANDROID29 = "linux-android29"
+  LINUX_ANDROID31 = "linux-android31"
+
+
 class RuntimeLoader(Enum):
   """IREE runtime loader."""
   EMBEDDED_ELF = "embedded-elf"
@@ -41,9 +48,9 @@ class RuntimeDriver(Enum):
 @dataclass(frozen=True)
 class CompileTarget(object):
   """Describes a target device to build for."""
-  target_architecture: common_definitions.DeviceArchitecture
-  target_platform: common_definitions.DevicePlatform
   target_backend: TargetBackend
+  target_architecture: common_definitions.DeviceArchitecture
+  target_abi: TargetABI
 
 
 @dataclass(frozen=True)

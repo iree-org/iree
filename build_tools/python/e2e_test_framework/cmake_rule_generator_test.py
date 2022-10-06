@@ -108,8 +108,8 @@ class IreeRuleFactoryTest(unittest.TestCase):
             iree_definitions.CompileTarget(
                 target_architecture=common_definitions.DeviceArchitecture.
                 X86_64_CASCADELAKE,
-                target_platform=common_definitions.DevicePlatform.LINUX_GNU,
-                target_backend=iree_definitions.TargetBackend.LLVM_CPU)
+                target_backend=iree_definitions.TargetBackend.LLVM_CPU,
+                target_abi=iree_definitions.TargetABI.LINUX_GNU)
         ],
         extra_flags=[])
 
@@ -141,8 +141,8 @@ class IreeRuleFactoryTest(unittest.TestCase):
             iree_definitions.CompileTarget(
                 target_architecture=common_definitions.DeviceArchitecture.
                 X86_64_CASCADELAKE,
-                target_platform=common_definitions.DevicePlatform.LINUX_GNU,
-                target_backend=iree_definitions.TargetBackend.LLVM_CPU)
+                target_backend=iree_definitions.TargetBackend.LLVM_CPU,
+                target_abi=iree_definitions.TargetABI.LINUX_GNU)
         ],
         extra_flags=[])
     compile_rule = self._factory.add_compile_module_rule(

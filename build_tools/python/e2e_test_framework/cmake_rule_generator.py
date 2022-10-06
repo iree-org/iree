@@ -263,7 +263,7 @@ class IreeRuleFactory(object):
     arch_info: common_definitions.ArchitectureInfo = target.target_architecture.value
     if arch_info.architecture == "x86_64":
       flags = [
-          f"--iree-llvm-target-triple=x86_64-unknown-{target.target_platform.value}",
+          f"--iree-llvm-target-triple=x86_64-unknown-{target.target_abi.value}",
           f"--iree-llvm-target-cpu={arch_info.microarchitecture.lower()}"
       ]
     else:

@@ -8,7 +8,7 @@
 import itertools
 from typing import List, Sequence, Tuple
 
-from e2e_test_framework.device_specs import linux_x86_64_specs
+from e2e_test_framework.device_specs import device_collections
 from e2e_test_framework.models import model_groups
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework import unique_ids
@@ -20,7 +20,7 @@ def _generate_e2e_model_run_configs(
     module_generation_configs: Sequence[
         iree_definitions.ModuleGenerationConfig],
     module_execution_configs: Sequence[iree_definitions.ModuleExecutionConfig],
-    device_spec: common_definitions.DeviceSpec,
+    device_specs: Sequence[common_definitions.DeviceSpec],
     input_data: common_definitions.ModelInputData = common_definitions.
     RANDOM_MODEL_INPUT_DATA,
 ) -> List[iree_definitions.E2EModelRunConfig]:
@@ -30,9 +30,9 @@ def _generate_e2e_model_run_configs(
           module_generation_config=module_generation_config,
           module_execution_config=module_execution_config,
           target_device_spec=device_spec,
-          input_data=input_data)
-      for module_generation_config, module_execution_config in
-      itertools.product(module_generation_configs, module_execution_configs)
+          input_data=input_data) for module_generation_config,
+      module_execution_config, device_spec in itertools.product(
+          module_generation_configs, module_execution_configs, device_specs)
   ]
 
 
@@ -42,8 +42,8 @@ class Linux_x86_64_Benchmarks(object):
   CASCADELAKE_CPU_TARGET = iree_definitions.CompileTarget(
       target_architecture=common_definitions.DeviceArchitecture.
       X86_64_CASCADELAKE,
-      target_platform=common_definitions.DevicePlatform.LINUX_GNU,
-      target_backend=iree_definitions.TargetBackend.LLVM_CPU)
+      target_backend=iree_definitions.TargetBackend.LLVM_CPU,
+      target_abi=iree_definitions.TargetABI.LINUX_GNU)
 
   CASCADELAKE_COMPILE_CONFIG = iree_definitions.CompileConfig(
       id=unique_ids.IREE_COMPILE_CONFIG_LINUX_CASCADELAKE,
@@ -64,10 +64,13 @@ class Linux_x86_64_Benchmarks(object):
             compile_config=cls.CASCADELAKE_COMPILE_CONFIG, model=model)
         for model in model_groups.SMALL + model_groups.LARGE
     ]
+    cascadelake_devices = device_collections.DEFAULT_DEVICE_COLLECTION.query_device_specs(
+        architecture=common_definitions.DeviceArchitecture.X86_64_CASCADELAKE,
+        platform=common_definitions.DevicePlatform.GENERIC_LINUX)
     e2e_model_run_configs = _generate_e2e_model_run_configs(
         module_generation_configs=module_generation_configs,
         module_execution_configs=default_execution_configs,
-        device_spec=linux_x86_64_specs.GCP_C2_STANDARD_16)
+        device_specs=cascadelake_devices)
 
     return (module_generation_configs, e2e_model_run_configs)
 
