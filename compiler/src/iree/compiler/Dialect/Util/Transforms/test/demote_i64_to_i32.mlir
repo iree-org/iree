@@ -116,8 +116,8 @@ func.func @linalg_matmul_i64(%arg0: tensor<2x3xi64>, %arg1: tensor<3x4xi64>, %ar
 // CHECK-LABEL: func.func @linalg_generic_i64
 // CHECK-SAME: (%[[ARG:.+]]: tensor<2xi32>) -> tensor<2xi32>
 func.func @linalg_generic_i64(%arg: tensor<2xi64>)  -> tensor<2xi64> {
-  // CHECK: %[[INIT:.+]] = linalg.init_tensor [2] : tensor<2xi32>
-  %init = linalg.init_tensor [2] : tensor<2xi64>
+  // CHECK: %[[INIT:.+]] = tensor.empty(2) : tensor<2xi32>
+  %init = tensor.empty(2) : tensor<2xi64>
   // CHECK: %[[T:.+]] = linalg.generic {{.+}} ins(%[[ARG]] : tensor<2xi32>) outs(%[[INIT]] : tensor<2xi32>)
   %generic = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%arg : tensor<2xi64>) outs(%init : tensor<2xi64>) {
   // CHECK-NEXT: ^bb0(%[[A:.+]]: i32, %[[B:.+]]: i32):

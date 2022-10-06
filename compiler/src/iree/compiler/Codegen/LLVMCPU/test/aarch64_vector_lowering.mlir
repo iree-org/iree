@@ -26,7 +26,7 @@ module {
     %4 = affine.apply #map0()[%workgroup_count_y]
     %5 = affine.apply #map0()[%workgroup_id_x]
     %6 = affine.apply #map0()[%workgroup_count_x]
-    %7 = linalg.init_tensor [64, 64] : tensor<64x64xf32>
+    %7 = tensor.empty(64, 64) : tensor<64x64xf32>
     scf.for %arg0 = %3 to %c384 step %4 {
       %8 = flow.dispatch.tensor.load %0, offsets = [%arg0, 0], sizes = [64, 512], strides = [1, 1] : !flow.dispatch.tensor<readonly:384x512xf32> -> tensor<64x512xf32>
       scf.for %arg1 = %5 to %c128 step %6 {
@@ -122,8 +122,8 @@ module {
     %8 = affine.apply #map0()[%workgroup_count_y]
     %9 = affine.apply #map0()[%workgroup_id_x]
     %10 = affine.apply #map0()[%workgroup_count_x]
-    %11 = linalg.init_tensor [64, 64] : tensor<64x64xf32>
-    %12 = linalg.init_tensor [32, 32] : tensor<32x32xf32>
+    %11 = tensor.empty(64, 64) : tensor<64x64xf32>
+    %12 = tensor.empty(32, 32) : tensor<32x32xf32>
     scf.for %arg0 = %7 to %c384 step %8 {
       %13 = flow.dispatch.tensor.load %0, offsets = [%arg0], sizes = [64], strides = [1] : !flow.dispatch.tensor<readonly:384xi32> -> tensor<64xi32>
       %14 = flow.dispatch.tensor.load %2, offsets = [%arg0, 0], sizes = [64, 384], strides = [1, 1] : !flow.dispatch.tensor<readonly:384x384xf32> -> tensor<64x384xf32>

@@ -198,8 +198,8 @@ static LogicalResult replaceDestinationBuffer(OpResult resultValue,
         linalgOp.setOutputOperand(resultNumber, destinationValue);
         return success();
       })
-      .Case<linalg::InitTensorOp>([&](auto initTensorOp) {
-        initTensorOp.replaceAllUsesWith(destinationValue);
+      .Case<tensor::EmptyOp>([&](auto emptyTensorOp) {
+        emptyTensorOp.replaceAllUsesWith(destinationValue);
         return success();
       })
       .Default([](auto defaultOp) {
@@ -280,8 +280,8 @@ static LogicalResult convertToDestinationPassingStyle(OpBuilder &b,
 
   llvm::DenseSet<Value> processed;
   auto walkResult = funcOp.walk<WalkOrder::PreOrder>(
-      [&](linalg::InitTensorOp initTensorOp) -> WalkResult {
-        for (auto result : initTensorOp->getResults()) {
+      [&](tensor::EmptyOp emptyTensorOp) -> WalkResult {
+        for (auto result : emptyTensorOp->getResults()) {
           if (!result.getType().isa<RankedTensorType>()) continue;
           if (plan.isInStoreSet(result) && !processed.count(result)) {
             return modifyResultToUseStoreBuffer(b, result, plan, processed);
@@ -298,14 +298,14 @@ static LogicalResult convertToDestinationPassingStyle(OpBuilder &b,
 /// undef, these could just be duplicated to have a single use. This removes
 /// unnecessary data-hazards.
 static LogicalResult duplicateInitTensorOps(OpBuilder &b,
-                                            linalg::InitTensorOp initTensorOp) {
+                                            tensor::EmptyOp emptyTensorOp) {
   OpBuilder::InsertionGuard g(b);
-  b.setInsertionPoint(initTensorOp);
+  b.setInsertionPoint(emptyTensorOp);
   SmallVector<OpOperand *> uses = llvm::to_vector(llvm::map_range(
-      initTensorOp->getUses(), [](OpOperand &use) { return &use; }));
+      emptyTensorOp->getUses(), [](OpOperand &use) { return &use; }));
   for (auto use : llvm::make_range(std::next(uses.begin()), uses.end())) {
     auto newOp =
-        cast<linalg::InitTensorOp>(b.clone(*initTensorOp.getOperation()));
+        cast<tensor::EmptyOp>(b.clone(*emptyTensorOp.getOperation()));
     Operation *user = use->getOwner();
     user->setOperand(use->getOperandNumber(), newOp);
   }
@@ -400,11 +400,11 @@ struct RemoveCstOutsDependency
       Attribute scalarAttr = attr.getValues<Attribute>()[0];
 
       modifiedOutput = true;
-      Value initTensor = rewriter.create<linalg::InitTensorOp>(
+      Value emptyTensor = rewriter.create<tensor::EmptyOp>(
           loc, type.getShape(), type.getElementType());
       Value cstOp = rewriter.create<arith::ConstantOp>(loc, scalarAttr);
       Value fillOp =
-          rewriter.create<linalg::FillOp>(loc, cstOp, initTensor).result();
+          rewriter.create<linalg::FillOp>(loc, cstOp, emptyTensor).result();
       op->setOperand(opOperand->getOperandNumber(), fillOp);
     }
     if (!modifiedOutput) {
@@ -431,12 +431,12 @@ void ConvertToDestinationPassingStylePass::runOnOperation() {
   }
 
   OpBuilder b(context);
-  SmallVector<linalg::InitTensorOp> initTensorOps;
-  funcOp.walk([&](linalg::InitTensorOp initTensorOp) {
-    initTensorOps.push_back(initTensorOp);
+  SmallVector<tensor::EmptyOp> emptyTensorOps;
+  funcOp.walk([&](tensor::EmptyOp emptyTensorOp) {
+    emptyTensorOps.push_back(emptyTensorOp);
   });
-  if (llvm::any_of(initTensorOps, [&](linalg::InitTensorOp initTensorOp) {
-        return failed(duplicateInitTensorOps(b, initTensorOp));
+  if (llvm::any_of(emptyTensorOps, [&](tensor::EmptyOp emptyTensorOp) {
+        return failed(duplicateInitTensorOps(b, emptyTensorOp));
       })) {
     return signalPassFailure();
   }
