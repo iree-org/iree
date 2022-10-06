@@ -7,6 +7,27 @@ func.func @pack_simple() {
   return
 }
 
+func.func @dynamic_pack_simple() {
+  %iree_input = flow.tensor.constant dense<[
+    [0, 1, 2, 3],
+    [4, 5, 6, 7],
+    [8, 9, 10, 11],
+    [12, 13, 14, 15]]> : tensor<4x4xi32> -> tensor<?x?xi32>
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %in_d0 = tensor.dim %iree_input, %c0 : tensor<?x?xi32>
+  %in_d1 = tensor.dim %iree_input, %c1 : tensor<?x?xi32>
+  %out_d0 = arith.ceildivui %in_d0, %c2 : index
+  %out_d1 = arith.ceildivui %in_d1, %c2 : index
+  %init = linalg.init_tensor [%out_d0, %out_d1, 2, 2] : tensor<?x?x2x2xi32>
+  %pack = iree_linalg_ext.pack %iree_input dims_pos = [0, 1] inner_tiles = [2, 2] into %init
+      : (tensor<?x?xi32> tensor<?x?x2x2xi32>) -> tensor<?x?x2x2xi32>
+  %cast = tensor.cast %pack : tensor<?x?x2x2xi32> to tensor<2x2x2x2xi32>
+  check.expect_eq_const(%cast, dense<[[[[0, 1], [4, 5]], [[2, 3], [6, 7]]], [[[8, 9], [12, 13]], [[10 ,11], [14, 15]]]]> : tensor<2x2x2x2xi32>) : tensor<2x2x2x2xi32>
+  return
+}
+
 func.func @pack_simple_pad_mode() {
   %iree_input = util.unfoldable_constant dense<[[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15]]> : tensor<4x4xi32>
   %pad = arith.constant 0 : i32
@@ -21,6 +42,31 @@ func.func @pack_simple_pad_mode() {
   //  0,  0,  0,  0,  0,  0
   //  0,  0,  0,  0,  0,  0
   check.expect_eq_const(%pack, dense<[[[[0, 1, 2], [4, 5, 6], [8, 9, 10]],
+                                       [[3, 0, 0], [7, 0, 0], [11, 0, 0]]],
+                                      [[[12, 13, 14], [0, 0, 0], [0, 0, 0]],
+                                       [[15, 0, 0], [0, 0, 0], [0, 0, 0]]]]> : tensor<2x2x3x3xi32>) : tensor<2x2x3x3xi32>
+  return
+}
+
+func.func @dynamic_pack_simple_pad_mode() {
+  %iree_input = flow.tensor.constant dense<[
+    [0, 1, 2, 3],
+    [4, 5, 6, 7],
+    [8, 9, 10, 11],
+    [12, 13, 14, 15]]> : tensor<4x4xi32> -> tensor<?x?xi32>
+  %pad = arith.constant 0 : i32
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c3 = arith.constant 3 : index
+  %in_d0 = tensor.dim %iree_input, %c0 : tensor<?x?xi32>
+  %in_d1 = tensor.dim %iree_input, %c1 : tensor<?x?xi32>
+  %out_d0 = arith.ceildivui %in_d0, %c3 : index
+  %out_d1 = arith.ceildivui %in_d1, %c3 : index
+  %init = linalg.init_tensor [%out_d0, %out_d1, 3, 3] : tensor<?x?x3x3xi32>
+  %pack = iree_linalg_ext.pack %iree_input padding_value(%pad : i32) dims_pos = [0, 1] inner_tiles = [3, 3] into %init
+      : (tensor<?x?xi32> tensor<?x?x3x3xi32>) -> tensor<?x?x3x3xi32>
+  %cast = tensor.cast %pack : tensor<?x?x3x3xi32> to tensor<2x2x3x3xi32>
+  check.expect_eq_const(%cast, dense<[[[[0, 1, 2], [4, 5, 6], [8, 9, 10]],
                                        [[3, 0, 0], [7, 0, 0], [11, 0, 0]]],
                                       [[[12, 13, 14], [0, 0, 0], [0, 0, 0]],
                                        [[15, 0, 0], [0, 0, 0], [0, 0, 0]]]]> : tensor<2x2x3x3xi32>) : tensor<2x2x3x3xi32>
