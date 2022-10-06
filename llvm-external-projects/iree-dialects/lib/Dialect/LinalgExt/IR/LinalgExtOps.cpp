@@ -2195,14 +2195,14 @@ ShapedType UnPackOp::inferResultType() {
         inferredShape.push_back(ShapedType::kDynamicSize);
       } else {
         int64_t tile = *maybeConstantTileSize;
-        // TODO: (lorenzo) We bail out if we don't have full tiles. But we can
-        // also allow an output tensor with smaller dimensions. Example,
-        // input: memref<2x8x8x2xf32> and output: memref<13x15xf32> with
-        // dims_pos = [0, 1] and inner_tiles = [8, 2]. This is rejected today as
-        // 8 and 2 do not fully divide 13 and 15. But this is actually a legit
-        // operation. From the 16x16 we can extract 13x15 discarding previously
-        // introduced padding values. We need to guard the extraction with an
-        // if.
+        // TODO: (hanchung, lorenzo) We bail out if we don't have full tiles.
+        // But we can also allow an output tensor with smaller dimensions.
+        // Example, input: memref<2x8x8x2xf32> and output: memref<13x15xf32>
+        // with dims_pos = [0, 1] and inner_tiles = [8, 2]. This is rejected
+        // today as 8 and 2 do not fully divide 13 and 15. But this is actually
+        // a legit operation. From the 16x16 we can extract 13x15 discarding
+        // previously introduced padding values. We need to guard the extraction
+        // with an if.
         int64_t sizeDim = inputType.getDimSize(dim) * tile;
         inferredShape.push_back(sizeDim);
       }
@@ -2249,9 +2249,9 @@ LogicalResult UnPackOp::verify() {
   }
   // Bail out if the tile does not divide the dimension fully. In the case of
   // dynamic tile factors or dimensions, having a partial tile is undefined
-  // behavior. TODO: (lorenzo): We could relax this if we allow to `undo` the
-  // padding done in the pack operation. The product of dim(point_loop) and
-  // dim(tile_loop) >= dim(input).
+  // behavior. TODO: (lorenzo, hanchung): We could relax this if we allow to
+  // `undo` the padding done in the pack operation. The product of
+  // dim(point_loop) and dim(tile_loop) >= dim(input).
   if (areNotFullTiles(getOutputShape(), getDimAndTileMapping())) {
     return op->emitError(
         "invalid tile factor provided. Only full tiles are supported");
