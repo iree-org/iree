@@ -11,8 +11,8 @@ from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework.device_specs import device_collections
 from e2e_test_framework.models import tflite_models
+from benchmark_suites.iree import module_execution_configs
 import benchmark_suites.iree.utils
-import benchmark_suites.iree.module_execution_configs
 
 
 class Android_ARMv8_A_Benchmarks(object):
@@ -58,11 +58,11 @@ class Android_ARMv8_A_Benchmarks(object):
     """Generates IREE compile and run configs."""
 
     local_sync_execution_configs = [
-        benchmark_suites.iree.module_execution_configs.ELF_LOCAL_SYNC_CONFIG
+        module_execution_configs.ELF_LOCAL_SYNC_CONFIG
     ]
     local_task_execution_configs = [
-        benchmark_suites.iree.module_execution_configs.
-        get_elf_local_task_config(thread_num) for thread_num in [1, 4]
+        module_execution_configs.get_elf_local_task_config(thread_num)
+        for thread_num in [1, 4]
     ]
 
     default_gen_confings = [

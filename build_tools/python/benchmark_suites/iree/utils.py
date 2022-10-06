@@ -4,8 +4,9 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-import itertools
 from typing import List, Sequence
+import itertools
+
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 
 MODULE_BENCHMARK_TOOL = "iree-benchmark-module"

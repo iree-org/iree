@@ -7,7 +7,6 @@
 
 from typing import List, Sequence, Tuple
 from e2e_test_framework import unique_ids
-
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework.models import tflite_models
 from e2e_test_framework.device_specs import device_collections

@@ -5,12 +5,12 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Defines IREE CUDA benchmarks."""
 
+from typing import List, Tuple
 from benchmark_suites.iree import module_execution_configs
 from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework.device_specs import device_collections
 from e2e_test_framework.models import model_groups
-from typing import List, Tuple
 import benchmark_suites.iree.utils
 
 

@@ -6,7 +6,6 @@
 """Defines IREE x86_64 benchmarks."""
 
 from typing import List, Tuple
-
 from e2e_test_framework.device_specs import device_collections
 from e2e_test_framework.models import model_groups
 from e2e_test_framework.definitions import common_definitions, iree_definitions
