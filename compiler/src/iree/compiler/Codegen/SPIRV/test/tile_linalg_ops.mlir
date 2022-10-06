@@ -20,7 +20,7 @@ func.func @innermost_reduction() {
   scf.for %arg0 = %9 to %c128 step %10 {
     %11 = flow.dispatch.tensor.load %6, offsets = [%arg0, 0], sizes = [128, 384], strides = [1, 1] : !flow.dispatch.tensor<readonly:128x384xf32> -> tensor<128x384xf32>
     %12 = flow.dispatch.tensor.load %7, offsets = [%arg0], sizes = [128], strides = [1] : !flow.dispatch.tensor<readonly:128xf32> -> tensor<128xf32>
-    %13 = linalg.init_tensor [128] : tensor<128xf32>
+    %13 = tensor.empty() : tensor<128xf32>
     %14 = linalg.fill ins(%cst : f32) outs(%13 : tensor<128xf32>) -> tensor<128xf32>
     %15 = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0)>],
