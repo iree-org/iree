@@ -278,7 +278,12 @@ struct LinalgStrategyDecomposePass
     if (!anchorFuncName.empty() && funcOp.getName() != anchorFuncName)
       return;
     RewritePatternSet decompositionPattern(funcOp.getContext());
-    populateDecomposeConvolutionPatterns(decompositionPattern, filter);
+    decompositionPattern
+        .add<DownscaleSizeOneWindowed2DConvolution<linalg::Conv2DNhwcHwcfOp,
+                                                   linalg::Conv1DNwcWcfOp>,
+             DownscaleSizeOneWindowed2DConvolution<linalg::Conv2DNchwFchwOp,
+                                                   linalg::Conv1DNcwFcwOp>,
+             DownscaleDepthwiseConv2DNhwcHwcOp>(funcOp.getContext(), filter);
     if (failed(applyPatternsAndFoldGreedily(funcOp,
                                             std::move(decompositionPattern))))
       signalPassFailure();
