@@ -438,7 +438,7 @@ func.func @fft_tensor_coef_stage_5(%arg0: tensor<1024xf32>, %arg1: tensor<1024xf
 // -----
 
 func.func @reverse_tensor(%arg0: tensor<3x5xi32>) -> tensor<3x5xi32> {
-  %init = tensor.empty(3, 5) : tensor<3x5xi32>
+  %init = tensor.empty() : tensor<3x5xi32>
   %0 = iree_linalg_ext.reverse
          dimensions(dense<0> : tensor<1xi64>)
          ins(%arg0 : tensor<3x5xi32>)
@@ -447,7 +447,7 @@ func.func @reverse_tensor(%arg0: tensor<3x5xi32>) -> tensor<3x5xi32> {
 }
 // CHECK-LABEL: func.func @reverse_tensor
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<3x5xi32>
-//       CHECK:   %[[INIT:.+]] = tensor.empty(3, 5)
+//       CHECK:   %[[INIT:.+]] = tensor.empty()
 //       CHECK:   %[[RESULT:.+]] = iree_linalg_ext.reverse
 //  CHECK-SAME:      dimensions(dense<0> : tensor<1xi64>)
 //  CHECK-SAME:      ins(%[[ARG0]]
@@ -525,7 +525,7 @@ func.func @reverse_static_dynamic_tensor(%arg0: tensor<3x5xi32>) -> tensor<?x?xi
 // -----
 
 func.func @reverse_multi_dims(%arg0: tensor<3x5xi32>) -> tensor<3x5xi32> {
-  %init = tensor.empty(3, 5) : tensor<3x5xi32>
+  %init = tensor.empty() : tensor<3x5xi32>
   %0 = iree_linalg_ext.reverse
          dimensions(dense<[0, 1]> : tensor<2xi64>)
          ins(%arg0 : tensor<3x5xi32>)
@@ -534,7 +534,7 @@ func.func @reverse_multi_dims(%arg0: tensor<3x5xi32>) -> tensor<3x5xi32> {
 }
 // CHECK-LABEL: func.func @reverse_multi_dims
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<3x5xi32>
-//       CHECK:   %[[INIT:.+]] = tensor.empty(3, 5)
+//       CHECK:   %[[INIT:.+]] = tensor.empty()
 //       CHECK:   %[[RESULT:.+]] = iree_linalg_ext.reverse
 //  CHECK-SAME:      dimensions(dense<[0, 1]> : tensor<2xi64>)
 //  CHECK-SAME:      ins(%[[ARG0]]
@@ -543,8 +543,8 @@ func.func @reverse_multi_dims(%arg0: tensor<3x5xi32>) -> tensor<3x5xi32> {
 // -----
 
 func.func @topk_tensor(%input_values: tensor<20x10x8x4xf32>, %input_indices: tensor<20x10x8x4xi32>) -> (tensor<20x10x3x4xf32>, tensor<20x10x3x4xi32>) {
-  %out_values = tensor.empty(20, 10, 3, 4) : tensor<20x10x3x4xf32>
-  %out_indices = tensor.empty(20, 10, 3, 4) : tensor<20x10x3x4xi32>
+  %out_values = tensor.empty() : tensor<20x10x3x4xf32>
+  %out_indices = tensor.empty() : tensor<20x10x3x4xi32>
   %0:2 = iree_linalg_ext.topk
         dimension(2)
         ins(%input_values, %input_indices : tensor<20x10x8x4xf32> , tensor<20x10x8x4xi32>)
@@ -559,8 +559,8 @@ func.func @topk_tensor(%input_values: tensor<20x10x8x4xf32>, %input_indices: ten
 // CHECK-LABEL: func.func @topk_tensor
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<20x10x8x4xf32>
 //  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9]+]]: tensor<20x10x8x4xi32>
-//       CHECK:   %[[OUT_VALUES:.+]] = tensor.empty(20, 10, 3, 4)
-//       CHECK:   %[[OUT_INDICES:.+]] = tensor.empty(20, 10, 3, 4)
+//       CHECK:   %[[OUT_VALUES:.+]] = tensor.empty()
+//       CHECK:   %[[OUT_INDICES:.+]] = tensor.empty()
 //       CHECK:   %[[RESULT:.+]]:2 = iree_linalg_ext.topk
 //  CHECK-SAME:      dimension(2)
 //  CHECK-SAME:      ins(%[[ARG0]], %[[ARG1]]
@@ -620,8 +620,8 @@ func.func @topk_dynamic_tensor(%input_values: tensor<?x?xf32>, %input_indices: t
 // -----
 
 func.func @topk_tensor_optional(%input_values: tensor<20x10x8x4xf32>) -> (tensor<20x10x3x4xf32>, tensor<20x10x3x4xi32>) {
-  %out_values = tensor.empty(20, 10, 3, 4) : tensor<20x10x3x4xf32>
-  %out_indices = tensor.empty(20, 10, 3, 4) : tensor<20x10x3x4xi32>
+  %out_values = tensor.empty() : tensor<20x10x3x4xf32>
+  %out_indices = tensor.empty() : tensor<20x10x3x4xi32>
   %0:2 = iree_linalg_ext.topk
         dimension(2)
         ins(%input_values : tensor<20x10x8x4xf32>)
@@ -635,8 +635,8 @@ func.func @topk_tensor_optional(%input_values: tensor<20x10x8x4xf32>) -> (tensor
 
 // CHECK-LABEL: func.func @topk_tensor
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<20x10x8x4xf32>
-//       CHECK:   %[[OUT_VALUES:.+]] = tensor.empty(20, 10, 3, 4)
-//       CHECK:   %[[OUT_INDICES:.+]] = tensor.empty(20, 10, 3, 4)
+//       CHECK:   %[[OUT_VALUES:.+]] = tensor.empty()
+//       CHECK:   %[[OUT_INDICES:.+]] = tensor.empty()
 //       CHECK:   %[[RESULT:.+]]:2 = iree_linalg_ext.topk
 //  CHECK-SAME:      dimension(2)
 //  CHECK-SAME:      ins(%[[ARG0]]

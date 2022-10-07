@@ -390,8 +390,8 @@ LinalgMatmulOpToLinalgMmt4DOpPattern::chooseTileParams(Value lhs, Value rhs,
   return llvm::None;
 }
 
-/// Canonicalizes [linalg.init_tensor -> linalg.fill -> linalg.generic] ->
-/// [linalg.init_tensor -> linalg.fill] where linalg.generic does only copy e.g
+/// Canonicalizes [tensor.empty() -> linalg.fill -> linalg.generic] ->
+/// [tensor.empty() -> linalg.fill] where linalg.generic does only copy e.g
 /// a transpose.
 struct FoldFillGenericOpPattern : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;

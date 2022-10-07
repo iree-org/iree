@@ -12,7 +12,7 @@
 // Equivalent to linalg.quantized_matmul, but not using linalg.quantized_matmul
 func.func private @quantized_matmul_as_matmul_3x4x5(%lhs : tensor<3x4xi8>, %rhs : tensor<4x5xi8>,  %lhs_zp : i32, %rhs_zp : i32) -> tensor<3x5xi32> {
   %c_0 = arith.constant 0 : i32
-  %init_acc_uninitialized =  tensor.empty(3, 5) : tensor<3x5xi32>
+  %init_acc_uninitialized =  tensor.empty() : tensor<3x5xi32>
   %zero_acc = linalg.fill ins(%c_0 : i32) outs(%init_acc_uninitialized : tensor<3x5xi32>) -> tensor<3x5xi32>
 
   // compute the matmul itself, which would be the end result already in the case
@@ -23,7 +23,7 @@ func.func private @quantized_matmul_as_matmul_3x4x5(%lhs : tensor<3x4xi8>, %rhs 
 
   // compute the sums along rows of %lhs.
   %lhs_i32 = arith.extsi %lhs : tensor<3x4xi8> to tensor<3x4xi32>
-  %init_lhs_sums_uninitialized = tensor.empty(3) : tensor<3xi32>
+  %init_lhs_sums_uninitialized = tensor.empty() : tensor<3xi32>
   %zero_lhs_sums = linalg.fill ins(%c_0 : i32) outs(%init_lhs_sums_uninitialized : tensor<3xi32>) -> tensor<3xi32>
   %lhs_sums = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
@@ -38,7 +38,7 @@ func.func private @quantized_matmul_as_matmul_3x4x5(%lhs : tensor<3x4xi8>, %rhs 
 
   // compute the sums along columns of %rhs.
   %rhs_i32 = arith.extsi %rhs : tensor<4x5xi8> to tensor<4x5xi32>
-  %init_rhs_sums_uninitialized = tensor.empty(5) : tensor<5xi32>
+  %init_rhs_sums_uninitialized = tensor.empty() : tensor<5xi32>
   %zero_rhs_sums = linalg.fill ins(%c_0 : i32) outs(%init_rhs_sums_uninitialized : tensor<5xi32>) -> tensor<5xi32>
   %rhs_sums = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
@@ -153,7 +153,7 @@ func.func private @quantized_matmul_as_matmul_dynamic(%lhs : tensor<?x?xi8>, %rh
 // Checks that linalg.quantized_matmul agrees with @quantized_matmul_as_matmul_3x4x5
 func.func private @check_one_quantized_matmul_as_matmul_3x4x5(%lhs : tensor<3x4xi8>, %rhs : tensor<4x5xi8>, %lhs_zp : i32, %rhs_zp : i32) {
     %c_0 = arith.constant 0 : i32
-    %init_acc_uninitialized =  tensor.empty(3, 5) : tensor<3x5xi32>
+    %init_acc_uninitialized =  tensor.empty() : tensor<3x5xi32>
     %zero_acc = linalg.fill ins(%c_0 : i32) outs(%init_acc_uninitialized : tensor<3x5xi32>) -> tensor<3x5xi32>
     %result_of_quantized_matmul = linalg.quantized_matmul ins(%lhs, %rhs, %lhs_zp, %rhs_zp : tensor<3x4xi8>, tensor<4x5xi8>, i32, i32) outs(%zero_acc : tensor<3x5xi32>) -> tensor<3x5xi32>
     %result_of_quantized_matmul_as_matmul = call @quantized_matmul_as_matmul_3x4x5(%lhs, %rhs, %lhs_zp, %rhs_zp) : (tensor<3x4xi8>, tensor<4x5xi8>, i32, i32) -> tensor<3x5xi32>

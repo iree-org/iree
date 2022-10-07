@@ -292,8 +292,8 @@ static LogicalResult convertToDestinationPassingStyle(OpBuilder &b,
   return success(!walkResult.wasInterrupted());
 }
 
-/// Multiple uses of `linalg.init_tensor` results in a copy since upstream
-/// treats `linalg.init_tensor` as an allocation and sees uses as a data-hazard
+/// Multiple uses of `tensor.empty()` results in a copy since upstream
+/// treats `tensor.empty()` as an allocation and sees uses as a data-hazard
 /// creating copies/allocations. Since the `init_tensor` op is a proxy for
 /// undef, these could just be duplicated to have a single use. This removes
 /// unnecessary data-hazards.

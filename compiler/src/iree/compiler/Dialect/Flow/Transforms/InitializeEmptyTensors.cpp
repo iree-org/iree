@@ -33,7 +33,7 @@ static FailureOr<Attribute> getZero(OpBuilder &builder, Location loc,
 
 namespace {
 
-/// Converts an linalg.init_tensor op to `flow.tensor.splat` op.
+/// Converts an tensor.empty() op to `flow.tensor.splat` op.
 struct RewriteInitTensorToSplat
     : public OpRewritePattern<tensor::EmptyOp> {
   using OpRewritePattern<tensor::EmptyOp>::OpRewritePattern;
