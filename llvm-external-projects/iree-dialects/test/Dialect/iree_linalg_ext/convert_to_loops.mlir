@@ -1328,3 +1328,33 @@ func.func @unpack_undo_padding(%input: memref<2x8x8x2xf32>, %output: memref<13x1
 // CHECK-DAG:        %[[INNER_J:.+]] = affine.apply #[[MAP3]](%[[J]])
 // CHECK:            %[[VAL:.+]] = memref.load %[[INPUT]][%[[OUTER_I]], %[[OUTER_J]], %[[INNER_I]], %[[INNER_J]]]
 // CHECK:            memref.store %[[VAL]], %[[OUTPUT]][%[[I]], %[[J]]]
+
+// -----
+
+func.func @KC_to_CKkc(%arg0: memref<128x256xf32>, %arg1: memref<32x4x32x8xf32>) {
+  iree_linalg_ext.pack %arg0 outer_dims_pos = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 8] into %arg1 : (memref<128x256xf32> memref<32x4x32x8xf32>)
+  return
+}
+
+// CHECK: #[[MAP0:.*]] = affine_map<(d0, d1) -> (d0 * 32 + d1)>
+// CHECK: #[[MAP1:.*]] = affine_map<(d0, d1) -> (d0 * 8 + d1)>
+// CHECK: func.func @KC_to_CKkc
+// CHECK-SAME:   %[[INPUT:[a-zA-Z0-9]+]]
+// CHECK-SAME:   %[[OUTPUT:[a-zA-Z0-9]+]]
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
+// CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
+// CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
+// CHECK: scf.for %[[C:.+]] = %[[C0]] to %[[C32]] step %[[C1]] {
+// CHECK: scf.for %[[K:.+]] = %[[C0]] to %[[C4]] step %[[C1]] {
+// CHECK: scf.for %[[k:.+]] = %[[C0]] to %[[C32]] step %[[C1]] {
+// CHECK: scf.for %[[c:.+]] = %[[C0]] to %[[C8]] step %[[C1]] {
+// CHECK: %[[MAPK:.+]] = affine.apply #[[MAP0]](%[[K]], %[[k]])
+// CHECK: %[[MAPC:.+]] = affine.apply #[[MAP1]](%[[C]], %[[c]])
+// CHECK: %[[VAL:.+]] = memref.load %[[ARG0]][%[[MAPK]], %[[MAPC]]] : memref<128x256xf32>
+// CHECK: memref.store %[[VAL]], %[[ARG1]][%[[C]], %[[K]], %[[k]], %[[c]]] : memref<32x4x32x8xf32>
+// CHECK: }
+// CHECK: }
+// CHECK: }
+// CHECK: }
