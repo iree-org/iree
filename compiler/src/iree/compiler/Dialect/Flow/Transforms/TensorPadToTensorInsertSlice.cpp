@@ -106,8 +106,8 @@ struct TensorPadOpConversion : public OpRewritePattern<tensor::PadOp> {
     }
     Value emptyTensor = rewriter.create<tensor::EmptyOp>(
         loc, outputShape, sourceType.getElementType());
-    Value fill =
-        rewriter.create<linalg::FillOp>(loc, yieldVal, emptyTensor).getResult(0);
+    Value fill = rewriter.create<linalg::FillOp>(loc, yieldVal, emptyTensor)
+                     .getResult(0);
     SmallVector<OpFoldResult> strides(rank, rewriter.getI64IntegerAttr(1));
     rewriter.replaceOpWithNewOp<tensor::InsertSliceOp>(
         padTensorOp, source, fill, lowPad, sourceShape, strides);

@@ -146,7 +146,7 @@ Value createLinalgMatmulOnTensors(OpBuilder b, Location loc,
       loc, b.getZeroAttr(resultType.getElementType()));
   Value emptyTensor = b.create<mlir::tensor::EmptyOp>(
       loc, resultType.getShape(), resultType.getElementType(),
-       /*dyn_size=*/ValueRange{});
+      /*dyn_size=*/ValueRange{});
   Value zeroTensor =
       b.create<linalg::FillOp>(loc, zero, emptyTensor).getResult(0);
 

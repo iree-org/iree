@@ -34,8 +34,7 @@ static FailureOr<Attribute> getZero(OpBuilder &builder, Location loc,
 namespace {
 
 /// Converts an tensor.empty() op to `flow.tensor.splat` op.
-struct RewriteInitTensorToSplat
-    : public OpRewritePattern<tensor::EmptyOp> {
+struct RewriteInitTensorToSplat : public OpRewritePattern<tensor::EmptyOp> {
   using OpRewritePattern<tensor::EmptyOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(tensor::EmptyOp emptyTensorOp,

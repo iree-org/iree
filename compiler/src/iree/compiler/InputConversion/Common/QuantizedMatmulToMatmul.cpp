@@ -43,8 +43,8 @@ Value additiveReductionLeaving1ParallelDim(PatternRewriter &rewriter,
   }
   Value initAcc =
       rewriter
-          .create<tensor::EmptyOp>(
-              loc, ArrayRef<int64_t>{dstStaticSize}, accElTy, dstDynSizes)
+          .create<tensor::EmptyOp>(loc, ArrayRef<int64_t>{dstStaticSize},
+                                   accElTy, dstDynSizes)
           .getResult();
   // Zero-fill the accumulator.
   Value zeroInt =
