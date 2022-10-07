@@ -2334,7 +2334,7 @@ func.func @pack() {
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:2x2x3x3xi32>
   %2 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [2, 2, 3, 3], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<writeonly:2x2x3x3xi32> -> tensor<2x2x3x3xi32>
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [4, 4], strides = [1, 1] : !flow.dispatch.tensor<readonly:4x4xi32> -> tensor<4x4xi32>
-  %4 = iree_linalg_ext.pack %3 padding_value(%c0_i32 : i32) dims_pos = [0, 1] inner_tiles = [3, 3] into %2 : (tensor<4x4xi32> tensor<2x2x3x3xi32>) -> tensor<2x2x3x3xi32>
+  %4 = iree_linalg_ext.pack %3 padding_value(%c0_i32 : i32) inner_dims_pos = [0, 1] inner_tiles = [3, 3] into %2 : (tensor<4x4xi32> tensor<2x2x3x3xi32>) -> tensor<2x2x3x3xi32>
   flow.dispatch.tensor.store %4, %1, offsets = [0, 0, 0, 0], sizes = [2, 2, 3, 3], strides = [1, 1, 1, 1] : tensor<2x2x3x3xi32> -> !flow.dispatch.tensor<writeonly:2x2x3x3xi32>
   return
 }
@@ -2344,7 +2344,7 @@ func.func @pack() {
 // CHECK-DAG:  %[[OUT:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : memref<2x2x3x3xi32>
 // CHECK:      iree_linalg_ext.pack %[[IN]]
 // CHECK-SAME:   padding_value(%[[PAD]] : i32)
-// CHECK-SAME:   dims_pos = [0, 1] inner_tiles = [3, 3] into %[[OUT]]
+// CHECK-SAME:   inner_dims_pos = [0, 1] inner_tiles = [3, 3] into %[[OUT]]
 
 // -----
 module {
