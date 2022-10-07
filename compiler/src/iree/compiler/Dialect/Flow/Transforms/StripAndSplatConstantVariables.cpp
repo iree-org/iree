@@ -12,8 +12,10 @@
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
@@ -42,37 +44,51 @@ class StripAndSplatConstantVariablesPass
     // TODO(scotttodd): flags to control numbers used (all 0, all 1, increasing)
     int replaceIndex = 1;
 
-    moduleOp.walk([&](IREE::Util::GlobalOp op) {
-      // Only strip constant variables.
-      if (op.getIsMutable()) {
-        return;
-      }
-
-      // Only strip tensor type constants (to replace with dense<>).
-      if (!op.getType().isa<TensorType>()) {
-        return;
-      }
-
-      auto tensorType = op.getType().cast<TensorType>();
+    auto getSplatAttr = [&](TensorType tensorType) {
       auto elementType = tensorType.getElementType();
-      TypedAttr newValue;
+      TypedAttr newAttr;
       if (elementType.isa<FloatType>()) {
-        newValue = DenseElementsAttr::get(
+        newAttr = DenseElementsAttr::get(
             tensorType, FloatAttr::get(elementType, 1.0 / replaceIndex));
       } else {
-        newValue = DenseElementsAttr::get(
+        assert(elementType.isa<IntegerType>());
+        newAttr = DenseElementsAttr::get(
             tensorType, IntegerAttr::get(elementType, replaceIndex));
       }
 
-      builder.setInsertionPointAfter(op);
-      auto newOp = builder.create<IREE::Util::GlobalOp>(
-          op.getLoc(), op.getSymName(), op.getIsMutable(), op.getType(),
-          newValue);
-      newOp.setVisibility(op.getVisibility());
-      newOp->setAttr("noinline", UnitAttr::get(builder.getContext()));
-      op.erase();
-
       replaceIndex++;
+      return newAttr;
+    };
+
+    moduleOp.walk([&](Operation *op) {
+      if (auto globalOp = dyn_cast<Util::GlobalOp>(op)) {
+        // Only strip constant variables.
+        if (globalOp.getIsMutable()) return;
+
+        // Only strip tensor type constants (to replace with dense<>).
+        if (!globalOp.getType().isa<TensorType>()) return;
+
+        auto tensorType = globalOp.getType().cast<TensorType>();
+        TypedAttr newValue = getSplatAttr(tensorType);
+
+        builder.setInsertionPoint(globalOp);
+        auto newOp = builder.create<IREE::Util::GlobalOp>(
+            globalOp.getLoc(), globalOp.getSymName(), globalOp.getIsMutable(),
+            globalOp.getType(), newValue);
+        newOp.setVisibility(globalOp.getVisibility());
+        newOp->setAttr("noinline", UnitAttr::get(builder.getContext()));
+        globalOp.erase();
+      } else if (auto cstOp = dyn_cast<arith::ConstantOp>(op)) {
+        if (!cstOp.getType().isa<TensorType>()) return;
+
+        auto tensorType = cstOp.getType().cast<TensorType>();
+        TypedAttr newValue = getSplatAttr(tensorType);
+        builder.setInsertionPoint(cstOp);
+        auto newOp =
+            builder.create<arith::ConstantOp>(cstOp.getLoc(), newValue);
+        cstOp->replaceAllUsesWith(newOp);
+        cstOp.erase();
+      }
     });
   }
 };

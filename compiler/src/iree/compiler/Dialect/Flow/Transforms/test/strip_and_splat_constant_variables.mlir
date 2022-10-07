@@ -9,3 +9,15 @@ func.func @fn() -> () {
   util.global private @int_1 = dense<"0x89ABCDEF89ABCDEF89ABCDEF"> : tensor<3xi32>
   return
 }
+
+// -----
+
+func.func @fn() -> (tensor<3xf32>, tensor<3xf32>, tensor<3xi32>) {
+  // CHECK: arith.constant dense<1.000000e+00> : tensor<3xf32>
+  %0 = arith.constant dense<"0x012345670123456701234567"> : tensor<3xf32>
+  // CHECK: arith.constant dense<5.000000e-01> : tensor<3xf32>
+  %1 = arith.constant dense<"0x89ABCDEF89ABCDEF89ABCDEF"> : tensor<3xf32>
+  // CHECK: arith.constant dense<3> : tensor<3xi32>
+  %2 = arith.constant dense<"0x89ABCDEF89ABCDEF89ABCDEF"> : tensor<3xi32>
+  return %0, %1, %2 : tensor<3xf32>, tensor<3xf32>, tensor<3xi32>
+}
