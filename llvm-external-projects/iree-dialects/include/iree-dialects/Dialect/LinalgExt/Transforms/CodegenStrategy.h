@@ -100,11 +100,11 @@ struct Decompose : public Transformation {
 
 /// Represent one application of createLinalgStrategyPeelPass.
 struct Peel : public Transformation {
-  explicit Peel(linalg::LinalgPeelOptions options,
+  explicit Peel(LinalgPeelOptions options,
                 linalg::LinalgTransformationFilter::FilterFunction f = nullptr)
       : Transformation(std::move(f)), options(options) {}
 
-  Peel(StringRef name, linalg::LinalgPeelOptions options,
+  Peel(StringRef name, LinalgPeelOptions options,
        linalg::LinalgTransformationFilter::FilterFunction f = nullptr)
       : Transformation(std::move(f)), opName(name), options(options) {}
 
@@ -115,7 +115,7 @@ struct Peel : public Transformation {
 
 private:
   std::string opName;
-  linalg::LinalgPeelOptions options;
+  LinalgPeelOptions options;
 };
 
 /// Represent one application of createLinalgStrategyVectorizePass.
@@ -225,7 +225,7 @@ struct CodegenStrategy {
   }
   /// Append a pattern to peel 'LinalgOpType'.
   CodegenStrategy &
-  peel(StringRef opName, const linalg::LinalgPeelOptions &options,
+  peel(StringRef opName, const LinalgPeelOptions &options,
        const linalg::LinalgTransformationFilter::FilterFunction &f = nullptr) {
     transformationSequence.emplace_back(
         std::make_unique<Peel>(opName, options, f));
@@ -233,7 +233,7 @@ struct CodegenStrategy {
   }
   /// Conditionally append a pattern to peel 'LinalgOpType'.
   CodegenStrategy &
-  peelIf(bool b, StringRef opName, const linalg::LinalgPeelOptions &options,
+  peelIf(bool b, StringRef opName, const LinalgPeelOptions &options,
          linalg::LinalgTransformationFilter::FilterFunction f = nullptr) {
     return b ? peel(opName, options, std::move(f)) : *this;
   }

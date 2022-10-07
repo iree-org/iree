@@ -29,6 +29,7 @@ using namespace mlir;
 // using namespace mlir::linalg;
 
 using mlir::iree_compiler::IREE::LinalgExt::CodegenStrategy;
+using mlir::iree_compiler::IREE::LinalgExt::LinalgPeelOptions;
 
 #define DEBUG_TYPE "iree-linalg-tensor-codegen-driver"
 
@@ -416,7 +417,7 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
 
   // Gather tiled loops that aren't distribution loops from previous tiling
   // stages.
-  linalg::LinalgPeelOptions peelingOptions;
+  LinalgPeelOptions peelingOptions;
   peelingOptions.loopsToPeelComputationFunction =
       [](OpBuilder &builder, Operation *op,
          SmallVectorImpl<scf::ForOp> &loopsToPeel) {
