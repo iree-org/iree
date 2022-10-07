@@ -59,6 +59,17 @@ def TopkSplitReduction:
   ];
 }
 
+def LinalgExtVectorization:
+    Pass<"iree-linalg-ext-vectorization", "func::FuncOp"> {
+  let summary = "Vectorization pass for LinalgExt ops.";
+  let description = [{
+    Vectorizes LinalgExt ops when they meet the conditions, e.g., having static
+    shapes, etc.
+  }];
+  let constructor = "mlir::iree_compiler::IREE::LinalgExt::"
+                    "createLinalgExtVectorizationPass()";
+}
+
 //===---------------------------------------------------------------------====//
 // Codegen Strategy passes moved into IREE
 // TODO: Deprecate all this.

@@ -4,6 +4,7 @@ add_mlir_library(IREELinalgExtPasses
   Passes.cpp
   SplitReduction.cpp
   Tiling.cpp
+  Vectorization.cpp
 
   DEPENDS
   IREELinalgExtPassesIncGen
