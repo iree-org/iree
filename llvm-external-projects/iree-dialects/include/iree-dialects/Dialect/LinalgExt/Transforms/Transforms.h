@@ -349,6 +349,47 @@ private:
   linalg::LinalgTransformationFilter filter;
 };
 
+/// Wraps upstream Linalg pattern in a filter check + update.
+struct LinalgPaddingPattern
+    : public OpInterfaceRewritePattern<linalg::LinalgOp> {
+  /// Construct a generic pattern applied to all LinalgOp that verify `filter`.
+  LinalgPaddingPattern(
+      MLIRContext *context,
+      linalg::LinalgPaddingOptions options = linalg::LinalgPaddingOptions(),
+      linalg::LinalgTransformationFilter f =
+          linalg::LinalgTransformationFilter())
+      : OpInterfaceRewritePattern<linalg::LinalgOp>(context,
+                                                    /*benefit=*/1),
+        filter(std::move(f)), options(options) {}
+
+  /// Construct a pattern specifically applied to `opName`.
+  LinalgPaddingPattern(
+      StringRef opName, MLIRContext *context,
+      linalg::LinalgPaddingOptions options = linalg::LinalgPaddingOptions(),
+      linalg::LinalgTransformationFilter f =
+          linalg::LinalgTransformationFilter())
+      : OpInterfaceRewritePattern<linalg::LinalgOp>(context, /*benefit=*/1),
+        filter(f.addOpNameFilter(opName)), options(std::move(options)) {}
+
+  LogicalResult matchAndRewrite(linalg::LinalgOp op,
+                                PatternRewriter &rewriter) const override {
+    if (failed(filter.checkAndNotify(rewriter, op)))
+      return failure();
+    linalg::LinalgPaddingPattern p(op.getContext(), options);
+    auto maybeRes = p.returningMatchAndRewrite(op, rewriter);
+    if (failed(maybeRes))
+      return failure();
+    filter.replaceLinalgTransformationFilter(rewriter, *maybeRes);
+    return success();
+  }
+
+private:
+  /// LinalgTransformMarker handles special attribute manipulations.
+  linalg::LinalgTransformationFilter filter;
+  /// Options to control padding and hoisting.
+  linalg::LinalgPaddingOptions options;
+};
+
 } // namespace LinalgExt
 } // namespace IREE
 } // namespace iree_compiler

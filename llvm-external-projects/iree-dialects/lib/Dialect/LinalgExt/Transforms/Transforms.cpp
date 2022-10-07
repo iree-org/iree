@@ -250,11 +250,11 @@ struct LinalgStrategyPadPass
 
     RewritePatternSet paddingPattern(funcOp.getContext());
     if (!anchorOpName.empty()) {
-      paddingPattern.add<linalg::LinalgPaddingPattern>(
+      paddingPattern.add<LinalgPaddingPattern>(
           anchorOpName, funcOp.getContext(), options, filter);
     } else {
-      paddingPattern.add<linalg::LinalgPaddingPattern>(funcOp.getContext(),
-                                                       options, filter);
+      paddingPattern.add<LinalgPaddingPattern>(funcOp.getContext(), options,
+                                               filter);
     }
     (void)applyPatternsAndFoldGreedily(funcOp, std::move(paddingPattern));
   }
