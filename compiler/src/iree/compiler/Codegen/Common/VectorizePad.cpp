@@ -69,7 +69,7 @@ namespace {
 /// %insert01 = <similarly-for-[..][0][1][..]>
 /// %insert10 = <similarly-for-[..][1][0][..]>
 /// %insert11 = <similarly-for-[..][1][1][..]>
-/// %init = tensor.empty(1, 2, 2, 3) : tensor<1x2x2x3xf32>
+/// %init = tensor.empty() : tensor<1x2x2x3xf32>
 /// %pad = vector.transfer_write %insert11, %init
 /// ```
 struct VectorizePadWithConditions final
