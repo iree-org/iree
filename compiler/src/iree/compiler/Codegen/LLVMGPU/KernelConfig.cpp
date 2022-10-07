@@ -473,14 +473,16 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
     return failure();
   Optional<int64_t> dimSize = getLinalgDimSize(op, reductionDims[0]);
   if (!dimSize || *dimSize % cudaWarpSize != 0) return failure();
-  // TODO: Add reduction tiling to handle larger reductions.
-  if (*dimSize > 1024) return failure();
   SmallVector<unsigned> parallelDims;
   op.getParallelDims(parallelDims);
   unsigned vectorSize = 4;
   while ((*dimSize / vectorSize) % cudaWarpSize != 0) vectorSize /= 2;
 
-  std::array<int64_t, 3> workgroupSize = {*dimSize / vectorSize, 1, 1};
+  // TODO: Add reduction tiling to handle larger reductions.
+  const int64_t maxWorkgroupSize = 1024;
+  int64_t groupSize = *dimSize / vectorSize;
+  if (groupSize > maxWorkgroupSize) return failure();
+  std::array<int64_t, 3> workgroupSize = {groupSize, 1, 1};
 
   SmallVector<unsigned> partitionedLoops =
       cast<PartitionableLoopsInterface>(op.getOperation())
