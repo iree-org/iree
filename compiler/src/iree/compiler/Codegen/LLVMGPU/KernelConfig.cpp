@@ -620,22 +620,12 @@ static LogicalResult setTransposeConfig(func::FuncOp entryPoint,
     }
   }
 
-  int32_t tileM = 32;
-  int32_t tileN = 32;
   TileSizesListType tileSizes;
   // Set all tile sizes to 1 except for fastest moving dimensions.
   SmallVector<int64_t> tileSizesTemp(linalgOp.getNumLoops(), 1);
   tileSizesTemp[outputFastestDim] = 32;
   tileSizesTemp[inputFastestDim] = 32;
   tileSizes.push_back(tileSizesTemp);
-
-  // Check alignment with tile size for each transpose. Only the fastest moving
-  // dims need to match the transpose tile.
-  auto loopRanges = linalgOp.getStaticLoopRanges();
-  if (loopRanges[outputFastestDim] % tileM != 0 ||
-      loopRanges[inputFastestDim] % tileN != 0) {
-    return failure();
-  }
 
   // Workgroup size contains 8 warps. Configured with 8 threads on fastest
   // moving dimension so each thread can execute a vectorized copy of 4

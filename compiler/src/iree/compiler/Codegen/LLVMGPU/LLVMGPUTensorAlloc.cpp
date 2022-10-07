@@ -12,6 +12,7 @@
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/Passes.h"
 
 #define DEBUG_TYPE "iree-llvmgpu-alloc"
@@ -118,8 +119,13 @@ struct LLVMGPUTensorAllocPass
 
         case GPUPromoteSharedMemPattern::TransposeOpPattern:
           LinalgOpInfo opInfo(linalgOp, sharedMemTransposeFilter);
-
           for (auto operand : opInfo.getTransposeOperands()) {
+            if (auto tensorLoad = dyn_cast_or_null<tensor::PadOp>(
+                    operand->get().getDefiningOp())) {
+              // Padded tensors are already allocated in shared memory.
+              continue;
+            }
+
             FailureOr<Value> ret = bufferization::allocateTensorForShapedValue(
                 builder, op->getLoc(), operand->get(), false, options, true);
             if (failed(ret)) {

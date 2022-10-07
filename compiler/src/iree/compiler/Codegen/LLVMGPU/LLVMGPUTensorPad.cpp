@@ -125,7 +125,7 @@ struct LLVMGPUTensorPadPass
       // dynamic.
       if (!opInfo.isTranspose() || !opInfo.isDynamic() ||
           !hasTwoOrThreeLoopsInfo(linalgOp)) {
-        funcOp.emitWarning("failed preconditions");
+        // funcOp.emitWarning("failed preconditions");
         return;
       }
 
