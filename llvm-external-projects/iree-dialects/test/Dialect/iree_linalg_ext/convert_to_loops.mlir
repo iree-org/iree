@@ -764,7 +764,7 @@ func.func @topk_memref_optional(%input_values: memref<2x10xf32>, %out_values: me
 // -----
 
 func.func @NC_to_NCnc(%arg0: memref<128x256xf32>, %arg1: memref<4x8x32x32xf32>) {
-  iree_linalg_ext.pack %arg0 dims_pos = [0, 1] inner_tiles = [32, 32] into %arg1 : (memref<128x256xf32> memref<4x8x32x32xf32>)
+  iree_linalg_ext.pack %arg0 inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %arg1 : (memref<128x256xf32> memref<4x8x32x32xf32>)
   return
 }
 // CHECK: #[[MAP:.*]] = affine_map<(d0, d1) -> (d0 * 32 + d1)>
@@ -790,7 +790,7 @@ func.func @NC_to_NCnc(%arg0: memref<128x256xf32>, %arg1: memref<4x8x32x32xf32>) 
 // -----
 
 func.func @NC_to_NCnc_pad_static(%arg0: memref<13x15xf32>, %arg1: memref<2x8x8x2xf32>, %arg2: f32) {
-  iree_linalg_ext.pack %arg0 padding_value(%arg2 : f32) dims_pos = [0, 1] inner_tiles = [8, 2] into %arg1 : (memref<13x15xf32> memref<2x8x8x2xf32>)
+  iree_linalg_ext.pack %arg0 padding_value(%arg2 : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 2] into %arg1 : (memref<13x15xf32> memref<2x8x8x2xf32>)
   return
 }
 // CHECK-DAG:   #[[MAP0:.*]] = affine_map<(d0, d1) -> (d0 * 8 + d1)>
@@ -822,7 +822,7 @@ func.func @NC_to_NCnc_pad_static(%arg0: memref<13x15xf32>, %arg1: memref<2x8x8x2
 // -----
 
 func.func @KC_to_KCck(%arg0: memref<128x256xf32>, %arg1: memref<4x8x32x32xf32>) {
-  iree_linalg_ext.pack %arg0 dims_pos = [1, 0] inner_tiles = [32, 32] into %arg1 : (memref<128x256xf32> memref<4x8x32x32xf32>)
+  iree_linalg_ext.pack %arg0 inner_dims_pos = [1, 0] inner_tiles = [32, 32] into %arg1 : (memref<128x256xf32> memref<4x8x32x32xf32>)
   return
 }
 // CHECK: #[[MAP:.*]] = affine_map<(d0, d1) -> (d0 * 32 + d1)>
@@ -849,7 +849,7 @@ func.func @KC_to_KCck(%arg0: memref<128x256xf32>, %arg1: memref<4x8x32x32xf32>) 
 
 // This should be a simple expand shape.
 func.func @KC_to_KCc(%arg0: memref<128x256xf32>, %arg1: memref<128x8x32xf32>) {
-  iree_linalg_ext.pack %arg0 dims_pos = [1] inner_tiles = [32] into %arg1 : (memref<128x256xf32> memref<128x8x32xf32>)
+  iree_linalg_ext.pack %arg0 inner_dims_pos = [1] inner_tiles = [32] into %arg1 : (memref<128x256xf32> memref<128x8x32xf32>)
   return
 }
 // CHECK: #[[MAP:.*]] = affine_map<(d0, d1) -> (d0 * 32 + d1)>
@@ -872,7 +872,7 @@ func.func @KC_to_KCc(%arg0: memref<128x256xf32>, %arg1: memref<128x8x32xf32>) {
 // -----
 
 func.func @KC_to_KCk(%arg0: memref<128x256xf32>, %arg1: memref<4x256x32xf32>) {
-  iree_linalg_ext.pack %arg0 dims_pos = [0] inner_tiles = [32] into %arg1 : (memref<128x256xf32> memref<4x256x32xf32>)
+  iree_linalg_ext.pack %arg0 inner_dims_pos = [0] inner_tiles = [32] into %arg1 : (memref<128x256xf32> memref<4x256x32xf32>)
   return
 }
 
@@ -896,7 +896,7 @@ func.func @KC_to_KCk(%arg0: memref<128x256xf32>, %arg1: memref<4x256x32xf32>) {
 // -----
 
 func.func @KCRS_to_KCRSck(%arg0: memref<128x64x1x1xf32>, %arg1: memref<4x8x1x1x8x32xf32>) {
-  iree_linalg_ext.pack %arg0 dims_pos = [1, 0] inner_tiles = [8, 32] into %arg1 : (memref<128x64x1x1xf32> memref<4x8x1x1x8x32xf32>)
+  iree_linalg_ext.pack %arg0 inner_dims_pos = [1, 0] inner_tiles = [8, 32] into %arg1 : (memref<128x64x1x1xf32> memref<4x8x1x1x8x32xf32>)
   return
 }
 
@@ -928,7 +928,7 @@ func.func @KCRS_to_KCRSck(%arg0: memref<128x64x1x1xf32>, %arg1: memref<4x8x1x1x8
 // -----
 
 func.func @KCRS_to_KCRSsr(%arg0: memref<1x1x128x64xf32>, %arg1: memref<1x1x4x8x8x32xf32>) {
-  iree_linalg_ext.pack %arg0 dims_pos = [3, 2] inner_tiles = [8, 32] into %arg1 : (memref<1x1x128x64xf32> memref<1x1x4x8x8x32xf32>)
+  iree_linalg_ext.pack %arg0 inner_dims_pos = [3, 2] inner_tiles = [8, 32] into %arg1 : (memref<1x1x128x64xf32> memref<1x1x4x8x8x32xf32>)
   return
 }
 
@@ -959,11 +959,11 @@ func.func @KCRS_to_KCRSsr(%arg0: memref<1x1x128x64xf32>, %arg1: memref<1x1x4x8x8
 
 // -----
 
-// Test to check that we properly handle shuffled `dims_pos` and `tiles.
+// Test to check that we properly handle shuffled `inner_dims_pos` and `tiles.
 // In this example, the dimension at position `0` (aka `128`) is tiled with a factor of `32`.
 // While the dimension at position `2` (aka `2`) is tiled with a factor of `2`.
 func.func @shuffled_dim_pos_and_tiles(%arg0: memref<128x256x2x1000xf32>, %arg1: memref<4x256x1x1000x2x32xf32>) {
-  iree_linalg_ext.pack %arg0 dims_pos = [2, 0] inner_tiles = [2, 32] into %arg1 : (memref<128x256x2x1000xf32> memref<4x256x1x1000x2x32xf32>)
+  iree_linalg_ext.pack %arg0 inner_dims_pos = [2, 0] inner_tiles = [2, 32] into %arg1 : (memref<128x256x2x1000xf32> memref<4x256x1x1000x2x32xf32>)
   return
 }
 
@@ -997,7 +997,7 @@ func.func @shuffled_dim_pos_and_tiles(%arg0: memref<128x256x2x1000xf32>, %arg1: 
 // -----
 
 func.func @KCRS_to_KCRSsr(%arg0: memref<?x?x?x?xf32>, %arg1: memref<?x?x?x?x8x32xf32>) {
-  iree_linalg_ext.pack %arg0 dims_pos = [3, 2] inner_tiles = [8, 32] into %arg1 : (memref<?x?x?x?xf32> memref<?x?x?x?x8x32xf32>)
+  iree_linalg_ext.pack %arg0 inner_dims_pos = [3, 2] inner_tiles = [8, 32] into %arg1 : (memref<?x?x?x?xf32> memref<?x?x?x?x8x32xf32>)
   return
 }
 
@@ -1038,7 +1038,7 @@ func.func @KCRS_to_KCRSsr(%arg0: memref<?x?x?x?xf32>, %arg1: memref<?x?x?x?x8x32
 // -----
 
 func.func @KCRS_to_KCRSsr(%arg0: memref<?x?x?x?xf32>, %arg1: memref<?x?x?x?x8x?xf32>, %block : index) {
-  iree_linalg_ext.pack %arg0 dims_pos = [3, 2] inner_tiles = [8, %block] into %arg1 : (memref<?x?x?x?xf32> memref<?x?x?x?x8x?xf32>)
+  iree_linalg_ext.pack %arg0 inner_dims_pos = [3, 2] inner_tiles = [8, %block] into %arg1 : (memref<?x?x?x?xf32> memref<?x?x?x?x8x?xf32>)
   return
 }
 
@@ -1081,7 +1081,7 @@ func.func @KCRS_to_KCRSsr(%arg0: memref<?x?x?x?xf32>, %arg1: memref<?x?x?x?x8x?x
 // -----
 
 func.func @NCnc_to_NC(%arg0: memref<128x256xf32>, %arg1: memref<4x8x32x32xf32>) {  
-  iree_linalg_ext.unpack %arg1 dims_pos = [0, 1] inner_tiles = [32, 32] into %arg0 : (memref<4x8x32x32xf32> memref<128x256xf32>)
+  iree_linalg_ext.unpack %arg1 inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %arg0 : (memref<4x8x32x32xf32> memref<128x256xf32>)
   return
 }
 
@@ -1108,7 +1108,7 @@ func.func @NCnc_to_NC(%arg0: memref<128x256xf32>, %arg1: memref<4x8x32x32xf32>) 
 // -----
 
 func.func @KCck_to_KC(%arg0: memref<128x256xf32>, %arg1: memref<4x8x32x32xf32>) {
-  iree_linalg_ext.unpack %arg1 dims_pos = [1, 0] inner_tiles = [32, 32] into %arg0 : (memref<4x8x32x32xf32> memref<128x256xf32>)
+  iree_linalg_ext.unpack %arg1 inner_dims_pos = [1, 0] inner_tiles = [32, 32] into %arg0 : (memref<4x8x32x32xf32> memref<128x256xf32>)
   return
 }
 
@@ -1136,7 +1136,7 @@ func.func @KCck_to_KC(%arg0: memref<128x256xf32>, %arg1: memref<4x8x32x32xf32>) 
 
 // This should be a simple collapse shape.
 func.func @KCc_to_KC(%arg0: memref<128x256xf32>, %arg1: memref<128x8x32xf32>) {
-  iree_linalg_ext.unpack %arg1 dims_pos = [1] inner_tiles = [32] into %arg0 : (memref<128x8x32xf32> memref<128x256xf32>)
+  iree_linalg_ext.unpack %arg1 inner_dims_pos = [1] inner_tiles = [32] into %arg0 : (memref<128x8x32xf32> memref<128x256xf32>)
   return
 }
 
@@ -1163,7 +1163,7 @@ func.func @KCc_to_KC(%arg0: memref<128x256xf32>, %arg1: memref<128x8x32xf32>) {
 // -----
 
 func.func @KCRSsr_to_KCRS(%arg0: memref<1x1x128x64xf32>, %arg1: memref<1x1x4x8x8x32xf32>) {
-  iree_linalg_ext.unpack %arg1 dims_pos = [3, 2] inner_tiles = [8, 32] into %arg0 : (memref<1x1x4x8x8x32xf32> memref<1x1x128x64xf32>)
+  iree_linalg_ext.unpack %arg1 inner_dims_pos = [3, 2] inner_tiles = [8, 32] into %arg0 : (memref<1x1x4x8x8x32xf32> memref<1x1x128x64xf32>)
   return
 }
 
@@ -1196,7 +1196,7 @@ func.func @KCRSsr_to_KCRS(%arg0: memref<1x1x128x64xf32>, %arg1: memref<1x1x4x8x8
 // -----
 
 func.func @shuffled_dim_pos_and_tiles(%arg0: memref<128x256x2x1000xf32>, %arg1: memref<4x256x1x1000x2x32xf32>) {
-  iree_linalg_ext.unpack %arg1 dims_pos = [2, 0] inner_tiles = [2, 32] into %arg0 : (memref<4x256x1x1000x2x32xf32> memref<128x256x2x1000xf32>)
+  iree_linalg_ext.unpack %arg1 inner_dims_pos = [2, 0] inner_tiles = [2, 32] into %arg0 : (memref<4x256x1x1000x2x32xf32> memref<128x256x2x1000xf32>)
   return
 }
 
@@ -1231,7 +1231,7 @@ func.func @shuffled_dim_pos_and_tiles(%arg0: memref<128x256x2x1000xf32>, %arg1: 
 // -----
 
 func.func @KCRSsr_to_KCRS(%arg0: memref<?x?x?x?xf32>, %arg1: memref<?x?x?x?x8x32xf32>) {
-  iree_linalg_ext.unpack %arg1 dims_pos = [3, 2] inner_tiles = [8, 32] into %arg0 : (memref<?x?x?x?x8x32xf32> memref<?x?x?x?xf32>)
+  iree_linalg_ext.unpack %arg1 inner_dims_pos = [3, 2] inner_tiles = [8, 32] into %arg0 : (memref<?x?x?x?x8x32xf32> memref<?x?x?x?xf32>)
   return
 }
 
@@ -1268,7 +1268,7 @@ func.func @KCRSsr_to_KCRS(%arg0: memref<?x?x?x?xf32>, %arg1: memref<?x?x?x?x8x32
 // -----
 
 func.func @KCRSsr_to_KCRS(%arg0: memref<?x?x?x?xf32>, %arg1: memref<?x?x?x?x8x?xf32>, %block : index) {
-  iree_linalg_ext.unpack %arg1 dims_pos = [3, 2] inner_tiles = [8, %block] into %arg0 : (memref<?x?x?x?x8x?xf32> memref<?x?x?x?xf32>)
+  iree_linalg_ext.unpack %arg1 inner_dims_pos = [3, 2] inner_tiles = [8, %block] into %arg0 : (memref<?x?x?x?x8x?xf32> memref<?x?x?x?xf32>)
   return
 }
 
@@ -1306,7 +1306,7 @@ func.func @KCRSsr_to_KCRS(%arg0: memref<?x?x?x?xf32>, %arg1: memref<?x?x?x?x8x?x
 // -----
 
 func.func @unpack_undo_padding(%input: memref<2x8x8x2xf32>, %output: memref<13x15xf32>) {
-  iree_linalg_ext.unpack %input dims_pos = [0, 1] inner_tiles = [8, 2] into %output : (memref<2x8x8x2xf32> memref<13x15xf32>)
+  iree_linalg_ext.unpack %input inner_dims_pos = [0, 1] inner_tiles = [8, 2] into %output : (memref<2x8x8x2xf32> memref<13x15xf32>)
   return
 }
 // CHECK-DAG:  #[[MAP_FLOORI:.*]] = affine_map<(d0) -> (d0 floordiv 8)>

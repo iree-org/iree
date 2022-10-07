@@ -920,7 +920,7 @@ func.func @topk_tile_tensor_optional(%input_values: tensor<20x10xf32>, %out_valu
 // -----
 
 func.func @NC_to_NCnc(%arg0: tensor<128x256xf32>, %arg1: tensor<4x8x32x32xf32>) -> tensor<4x8x32x32xf32> {
-  %0 = iree_linalg_ext.pack {__internal_linalg_transform__ = "tiling_pack_input"} %arg0 dims_pos = [0, 1] inner_tiles = [32, 32] into %arg1 : (tensor<128x256xf32> tensor<4x8x32x32xf32>) -> tensor<4x8x32x32xf32>
+  %0 = iree_linalg_ext.pack {__internal_linalg_transform__ = "tiling_pack_input"} %arg0 inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %arg1 : (tensor<128x256xf32> tensor<4x8x32x32xf32>) -> tensor<4x8x32x32xf32>
   return %0 : tensor<4x8x32x32xf32>
 }
 // CHECK-DAG:     #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (2, -d0 + s1)>
@@ -947,7 +947,7 @@ func.func @NC_to_NCnc(%arg0: tensor<128x256xf32>, %arg1: tensor<4x8x32x32xf32>) 
 // CHECK:               %[[SUB_OUT:.*]] = tensor.extract_slice %[[OUT]][%[[I]], %[[J]], 0, 0] [%[[OUT_I_SZ]], %[[OUT_J_SZ]], 32, 32] [1, 1, 1, 1] : tensor<4x8x32x32xf32> to tensor<?x?x32x32xf32>
 // CHECK:               %[[SUB_RES:.*]] = iree_linalg_ext.pack
 // CHECK-SAME:            {__internal_linalg_transform__ = "tiling_pack_output"}
-// CHECK-SAME:            %[[SUB_IN]] dims_pos = [0, 1] inner_tiles = [32, 32] into %[[SUB_OUT]]
+// CHECK-SAME:            %[[SUB_IN]] inner_dims_pos = [0, 1] inner_tiles = [32, 32] into %[[SUB_OUT]]
 // CHECK:               %[[INSERT:.*]] = tensor.insert_slice %[[SUB_RES]] into %[[ITER1]]
 // CHECK:               scf.yield %[[INSERT]] : tensor<4x8x32x32xf32>
 // CHECK:             }
@@ -959,7 +959,7 @@ func.func @NC_to_NCnc(%arg0: tensor<128x256xf32>, %arg1: tensor<4x8x32x32xf32>) 
 // -----
 
 func.func @pad_and_pack_static(%input: tensor<13x15xf32>, %output: tensor<2x8x8x2xf32>, %pad: f32) -> tensor<2x8x8x2xf32> {
-  %0 = iree_linalg_ext.pack {__internal_linalg_transform__ = "tiling_pack_input"} %input padding_value(%pad : f32) dims_pos = [0, 1] inner_tiles = [8, 2] into %output : (tensor<13x15xf32> tensor<2x8x8x2xf32>) -> tensor<2x8x8x2xf32>
+  %0 = iree_linalg_ext.pack {__internal_linalg_transform__ = "tiling_pack_input"} %input padding_value(%pad : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 2] into %output : (tensor<13x15xf32> tensor<2x8x8x2xf32>) -> tensor<2x8x8x2xf32>
   return %0 : tensor<2x8x8x2xf32>
 }
 // CHECK-DAG:     #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (2, -d0 + s1)>
@@ -988,7 +988,7 @@ func.func @pad_and_pack_static(%input: tensor<13x15xf32>, %output: tensor<2x8x8x
 // CHECK:               %[[SUB_OUT:.*]] = tensor.extract_slice %[[OUT]][%[[I]], %[[J]], 0, 0] [%[[OUT_I_SZ]], %[[OUT_J_SZ]], 8, 2] [1, 1, 1, 1] : tensor<2x8x8x2xf32> to tensor<?x?x8x2xf32>
 // CHECK:               %[[SUB_RES:.*]] = iree_linalg_ext.pack
 // CHECK-SAME:            {__internal_linalg_transform__ = "tiling_pack_output"}
-// CHECK-SAME:            %[[SUB_IN]] padding_value(%[[PAD]] : f32) dims_pos = [0, 1] inner_tiles = [8, 2]
+// CHECK-SAME:            %[[SUB_IN]] padding_value(%[[PAD]] : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 2]
 // CHECK-SAME:            into %[[SUB_OUT]]
 // CHECK:               %[[INSERT:.*]] = tensor.insert_slice %[[SUB_RES]] into %[[ITER1]]
 // CHECK:               scf.yield %[[INSERT]] : tensor<2x8x8x2xf32>
@@ -1001,7 +1001,7 @@ func.func @pad_and_pack_static(%input: tensor<13x15xf32>, %output: tensor<2x8x8x
 // -----
 
 func.func @pad_and_pack_partially_dynamic(%input: tensor<?x?xf32>, %output: tensor<?x?x8x2xf32>, %pad: f32) -> tensor<?x?x8x2xf32> {
-  %0 = iree_linalg_ext.pack {__internal_linalg_transform__ = "tiling_pack_input"} %input padding_value(%pad : f32) dims_pos = [0, 1] inner_tiles = [8, 2] into %output : (tensor<?x?xf32> tensor<?x?x8x2xf32>) -> tensor<?x?x8x2xf32>
+  %0 = iree_linalg_ext.pack {__internal_linalg_transform__ = "tiling_pack_input"} %input padding_value(%pad : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 2] into %output : (tensor<?x?xf32> tensor<?x?x8x2xf32>) -> tensor<?x?x8x2xf32>
   return %0 : tensor<?x?x8x2xf32>
 }
 // CHECK-DAG:     #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
@@ -1036,7 +1036,7 @@ func.func @pad_and_pack_partially_dynamic(%input: tensor<?x?xf32>, %output: tens
 // CHECK:               %[[SUB_OUT:.*]] = tensor.extract_slice %[[OUT]][%[[I]], %[[J]], 0, 0] [%[[OUT_I_SZ]], %[[OUT_J_SZ]], 8, 2] [1, 1, 1, 1] : tensor<?x?x8x2xf32> to tensor<?x?x8x2xf32>
 // CHECK:               %[[SUB_RES:.*]] = iree_linalg_ext.pack
 // CHECK-SAME:            {__internal_linalg_transform__ = "tiling_pack_output"}
-// CHECK-SAME:            %[[SUB_IN]] padding_value(%[[PAD]] : f32) dims_pos = [0, 1] inner_tiles = [8, 2]
+// CHECK-SAME:            %[[SUB_IN]] padding_value(%[[PAD]] : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 2]
 // CHECK-SAME:            into %[[SUB_OUT]]
 // CHECK:               %[[INSERT:.*]] = tensor.insert_slice %[[SUB_RES]] into %[[ITER1]]
 
@@ -1051,7 +1051,7 @@ func.func @pad_and_pack_partially_dynamic(%input: tensor<?x?xf32>, %output: tens
 
 func.func @pad_and_pack_fully_dynamic(%input: tensor<?x?xf32>, %output: tensor<?x?x?x?xf32>, %pad: f32, %tile_n : index, %tile_m : index) -> tensor<?x?x?x?xf32> {
   %0 = iree_linalg_ext.pack {__internal_linalg_transform__ = "tiling_pack_input"} %input padding_value(%pad : f32)
-    dims_pos = [0, 1] inner_tiles = [%tile_n, %tile_m] into %output : (tensor<?x?xf32> tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32>
+    inner_dims_pos = [0, 1] inner_tiles = [%tile_n, %tile_m] into %output : (tensor<?x?xf32> tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32>
   return %0 : tensor<?x?x?x?xf32>
 }
 // CHECK-DAG:     #[[MAP0:.+]] = affine_map<()[s0, s1] -> (s0 ceildiv s1)>
@@ -1085,7 +1085,7 @@ func.func @pad_and_pack_fully_dynamic(%input: tensor<?x?xf32>, %output: tensor<?
 // CHECK:               %[[SUB_OUT:.*]] = tensor.extract_slice %[[OUT]][%[[I]], %[[J]], 0, 0] [%[[OUT_I_SZ]], %[[OUT_J_SZ]], %[[TILE_0]], %[[TILE_1]]] [1, 1, 1, 1] : tensor<?x?x?x?xf32> to tensor<?x?x?x?xf32>
 // CHECK:               %[[PACK:.*]] = iree_linalg_ext.pack
 // CHECK-SAME:            {__internal_linalg_transform__ = "tiling_pack_output"}
-// CHECK-SAME:            %[[SUB_IN]] padding_value(%[[PAD]] : f32) dims_pos = [0, 1] inner_tiles = [%[[TILE_0]], %[[TILE_1]]]
+// CHECK-SAME:            %[[SUB_IN]] padding_value(%[[PAD]] : f32) inner_dims_pos = [0, 1] inner_tiles = [%[[TILE_0]], %[[TILE_1]]]
 // CHECK-SAME:            into %[[SUB_OUT]]
 // CHECK:               %[[INSERT:.*]] = tensor.insert_slice %[[PACK]] into %[[ITER1]]
 // CHECK:               scf.yield %[[INSERT]] : tensor<?x?x?x?xf32>

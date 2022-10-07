@@ -27,7 +27,7 @@ func.func @pack_canonicalize(%arg0 : tensor<?x?xi32>,
   %c0_i32 = arith.constant 0 : i32
   %0 = tensor.cast %arg1 : tensor<1x2x3x3xi32> to tensor<1x?x3x3xi32>
   %1 = iree_linalg_ext.pack %arg0 padding_value(%c0_i32 : i32)
-      dims_pos = [0, 1] inner_tiles = [3, 3] into %0
+      inner_dims_pos = [0, 1] inner_tiles = [3, 3] into %0
       : (tensor<?x?xi32> tensor<1x?x3x3xi32>) -> tensor<1x?x3x3xi32>
   return %1 : tensor<1x?x3x3xi32>
 }
