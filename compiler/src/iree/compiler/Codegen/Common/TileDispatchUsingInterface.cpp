@@ -741,8 +741,7 @@ struct SwapExtractSliceWithInitTensor
 
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
-    auto emptyTensorOp =
-        sliceOp.getSource().getDefiningOp<tensor::EmptyOp>();
+    auto emptyTensorOp = sliceOp.getSource().getDefiningOp<tensor::EmptyOp>();
     if (!emptyTensorOp) return failure();
 
     SmallVector<OpFoldResult> mixedSizes = sliceOp.getMixedSizes();

@@ -69,8 +69,8 @@ struct DetachElementwisePattern
         dynamicDims.push_back(
             rewriter.create<tensor::DimOp>(loc, outputOperand, i));
     }
-    auto initOp = rewriter.create<tensor::EmptyOp>(
-        loc, outputType.getShape(), elementType, dynamicDims);
+    auto initOp = rewriter.create<tensor::EmptyOp>(loc, outputType.getShape(),
+                                                   elementType, dynamicDims);
     Value zero = rewriter.create<arith::ConstantOp>(
         loc, rewriter.getZeroAttr(elementType));
     Value fill =
@@ -160,8 +160,8 @@ struct DetachSplatConstantOutsOperands
           rewriter.create<arith::ConstantOp>(loc, elementType, constValue);
 
       Value fillOp = rewriter
-                         .create<linalg::FillOp>(loc, resultType,
-                                                 scalarConstantOp, emptyTensorOp)
+                         .create<linalg::FillOp>(
+                             loc, resultType, scalarConstantOp, emptyTensorOp)
                          .getResult(0);
       rewriter.updateRootInPlace(linalgExtOp, [&]() {
         linalgExtOp->setOperand(outOperand->getOperandNumber(), fillOp);

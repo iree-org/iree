@@ -304,8 +304,7 @@ static LogicalResult duplicateInitTensorOps(OpBuilder &b,
   SmallVector<OpOperand *> uses = llvm::to_vector(llvm::map_range(
       emptyTensorOp->getUses(), [](OpOperand &use) { return &use; }));
   for (auto use : llvm::make_range(std::next(uses.begin()), uses.end())) {
-    auto newOp =
-        cast<tensor::EmptyOp>(b.clone(*emptyTensorOp.getOperation()));
+    auto newOp = cast<tensor::EmptyOp>(b.clone(*emptyTensorOp.getOperation()));
     Operation *user = use->getOwner();
     user->setOperand(use->getOperandNumber(), newOp);
   }
