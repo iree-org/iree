@@ -1592,7 +1592,8 @@ static SmallVector<T> interchange(ArrayRef<T> elements,
 
 /// Return the `interchangeVector` based on `dims_pos`.
 static SmallVector<int64_t>
-computeInterchangeFromDimPos(ArrayRef<int64_t> innerDimsPos, int64_t inputRank) {
+computeInterchangeFromDimPos(ArrayRef<int64_t> innerDimsPos,
+                             int64_t inputRank) {
   SmallVector<int64_t> interchangeVector;
   interchangeVector.reserve(innerDimsPos.size());
   // First map dims and their position. For example, dims_pos = [2, 0] will map
@@ -1655,7 +1656,8 @@ static DenseMap<int64_t, OpFoldResult> getDimAndTileMapping(OpTy op) {
   static_assert(llvm::is_one_of<OpTy, PackOp, UnPackOp>::value,
                 "applies to only pack or unpack operations");
   DenseMap<int64_t, OpFoldResult> dimAndTileMapping;
-  SmallVector<int64_t> dimsToBlock = extractFromI64ArrayAttr(op.getInnerDimsPos());
+  SmallVector<int64_t> dimsToBlock =
+      extractFromI64ArrayAttr(op.getInnerDimsPos());
   SmallVector<OpFoldResult> tiles = op.getMixedTiles();
   assert(tiles.size() == dimsToBlock.size() &&
          "tiles must match indices of dimension to block");
@@ -1724,7 +1726,8 @@ static LogicalResult commonVerifierPackAndUnPackOp(OpTy packOrUnPack) {
 
 static ShapedType
 inferPackedType(ShapedType sourceType, ArrayRef<int64_t> innerTiles,
-                const DenseMap<int64_t, OpFoldResult> &tileAndPosMapping) {
+                const DenseMap<int64_t, OpFoldResult> &tileAndPosMapping,
+                ArrayRef<int64_t> outerDimsPos) {
   SmallVector<int64_t> inferredShape;
   int64_t rank = sourceType.getRank();
 
@@ -1743,6 +1746,10 @@ inferPackedType(ShapedType sourceType, ArrayRef<int64_t> innerTiles,
       inferredShape.push_back(sourceType.getShape()[dim]);
     }
   }
+
+  // swap tile loops if `outer_dims_pos` is available.
+  inferredShape =
+      interchange<int64_t>(inferredShape, outerDimsPos, /*offset=*/0);
 
   // point loop.
   inferredShape.append(innerTiles.begin(), innerTiles.end());
@@ -1769,7 +1776,8 @@ inferPackedType(ShapedType sourceType, ArrayRef<int64_t> innerTiles,
 LogicalResult PackOp::verify() {
   Operation *op = getOperation();
   size_t numberOfBlockingFactors = getMixedTiles().size();
-  SmallVector<int64_t> innerDimsPos = extractFromI64ArrayAttr(getInnerDimsPos());
+  SmallVector<int64_t> innerDimsPos =
+      extractFromI64ArrayAttr(getInnerDimsPos());
   if (failed(commonVerifierPackAndUnPackOp(*this))) {
     return failure();
   }
@@ -1796,9 +1804,11 @@ LogicalResult PackOp::verify() {
                          "supported when padding_value is not set");
   }
   // Verify result type against inferred type.
+  SmallVector<int64_t> outerDimsPos =
+      extractFromI64ArrayAttr(getOuterDimsPos());
   DenseMap<int64_t, OpFoldResult> tileAndPosMapping = getDimAndTileMapping();
-  ShapedType expectedOutputType =
-      inferPackedType(getInputType(), getStaticTiles(), tileAndPosMapping);
+  ShapedType expectedOutputType = inferPackedType(
+      getInputType(), getStaticTiles(), tileAndPosMapping, outerDimsPos);
   if (!isCompatible(expectedOutputType, getOutputType())) {
     return op->emitError(
                "infered type do not match provided output type. Expected ")
@@ -2199,7 +2209,8 @@ SmallVector<Range> UnPackOp::getIterationDomain(OpBuilder &builder) {
 LogicalResult UnPackOp::verify() {
   Operation *op = getOperation();
   size_t numberOfBlockingFactors = getMixedTiles().size();
-  SmallVector<int64_t> innerDimsPos = extractFromI64ArrayAttr(getInnerDimsPos());
+  SmallVector<int64_t> innerDimsPos =
+      extractFromI64ArrayAttr(getInnerDimsPos());
   if (failed(commonVerifierPackAndUnPackOp(*this))) {
     return failure();
   }
@@ -2219,9 +2230,11 @@ LogicalResult UnPackOp::verify() {
 
   // Verify input type against inferred type. The check includes the cases for
   // incompilete tiles. We allow to `undo` the padding done in the pack.
+  SmallVector<int64_t> outerDimsPos =
+      extractFromI64ArrayAttr(getOuterDimsPos());
   DenseMap<int64_t, OpFoldResult> tileAndPosMapping = getDimAndTileMapping();
-  ShapedType expectedInputType =
-      inferPackedType(getOutputType(), getStaticTiles(), tileAndPosMapping);
+  ShapedType expectedInputType = inferPackedType(
+      getOutputType(), getStaticTiles(), tileAndPosMapping, outerDimsPos);
   if (!isCompatible(expectedInputType, getInputType())) {
     return op->emitError(
                "infered type do not match provided input type. Expected ")
