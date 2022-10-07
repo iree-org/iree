@@ -2188,15 +2188,24 @@ LogicalResult UnPackOp::generateScalarImplementation(OpBuilder &builder,
     }
   }
 
+  // TODO: (lorenzo) simplify the logic a bit. There is `ivs`,
+  // `inputIvsPointLoops` and `inputIvs`.
   assert(inputIvsPointLoops.size() + inputIvs.size() == getInputRank() &&
          "expect same number of iduction variables equals to input rank");
-  // interchange the point loops induction variables based on `dim_pos`.
-  SmallVector<int64_t> dimsToBlock = extractFromI64ArrayAttr(getInnerDimsPos());
+  // interchange the point loops induction variables based on `inner_dim_pos`.
+  SmallVector<int64_t> innerDims = extractFromI64ArrayAttr(getInnerDimsPos());
   SmallVector<int64_t> interchangeVector =
-      computeInterchangeFromDimPos(dimsToBlock, getOutputRank());
+      computeInterchangeFromDimPos(innerDims, getOutputRank());
   SmallVector<Value> interchangedInputIvsPointLoops = inputIvsPointLoops;
   interchangedInputIvsPointLoops = interchange<Value>(
       interchangedInputIvsPointLoops, interchangeVector, /*offset=*/0);
+  // interchange the tiled loops induction variables based on `outer_dims_pos`.
+  SmallVector<int64_t> outerDims = extractFromI64ArrayAttr(getOuterDimsPos());
+  if (!outerDims.empty()) {
+    interchangeVector =
+        computeInterchangeFromDimPos(outerDims, getOutputRank());
+    inputIvs = interchange<Value>(inputIvs, interchangeVector, /*offset=*/0);
+  }
 
   llvm::append_range(inputIvs, interchangedInputIvsPointLoops);
   Value scalar = builder.create<memref::LoadOp>(loc, getInput(), inputIvs);
