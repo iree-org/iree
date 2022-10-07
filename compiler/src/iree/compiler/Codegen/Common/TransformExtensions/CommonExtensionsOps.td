@@ -82,7 +82,7 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
 
 def IREEBufferizeOp : Op<Transform_Dialect, "iree.bufferize",
     [FunctionalStyleTransformOpTrait, 
-     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     MemoryEffectsOpInterface,
      DeclareOpInterfaceMethods<TransformOpInterface>]> {
   let description = [{
     Target the whole hal.executable_variant op and call upstream comprehensive
@@ -117,7 +117,7 @@ def IREEBufferizeOp : Op<Transform_Dialect, "iree.bufferize",
 def ForeachThreadToWorkgroupOp : Op<Transform_Dialect, 
     "iree.foreach_thread_to_workgroup",
     [FunctionalStyleTransformOpTrait,
-     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     MemoryEffectsOpInterface,
      TransformOpInterface,
      TransformEachOpTrait]> {
   let description = [{

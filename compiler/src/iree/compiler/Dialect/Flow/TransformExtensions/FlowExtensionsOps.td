@@ -78,8 +78,10 @@ def RegionToWorkgroupsOp : Op<Transform_Dialect, "iree.region_to_workgroups",
 
 def WrapInDispatchRegionOp : Op<
     Transform_Dialect, "iree.wrap_in_dispatch_region",
-    [FunctionalStyleTransformOpTrait, MemoryEffectsOpInterface,
-     TransformOpInterface, TransformEachOpTrait]> {
+    [FunctionalStyleTransformOpTrait,
+     MemoryEffectsOpInterface,
+     TransformOpInterface,
+     TransformEachOpTrait]> {
   let description = [{
     Wrap the `target` op in a new `dispatch.region` op. All uses of target op
     are replaces with the results of the newly generated `dispach.region` op.
@@ -104,8 +106,9 @@ def WrapInDispatchRegionOp : Op<
 }
 
 def ClonePrecedingOpIntoDispatchRegionOp : Op<
-    Transform_Dialect, "iree.clone_preceding_op_into_dispatch_region",
-    [TransformOpInterface]> {
+    Transform_Dialect, "iree.clone_preceding_op_into_dispatch_region", [
+      // TODO: this is missing effects.
+      TransformOpInterface]> {
   let description = [{
     Clone the `target` op into the given dispatch region op. The dispatch region
     handle must be mapped to exactly one payload op.
@@ -138,8 +141,9 @@ def ClonePrecedingOpIntoDispatchRegionOp : Op<
 }
 
 def MovePrecedingOpIntoDispatchRegionOp : Op<
-    Transform_Dialect, "iree.move_preceding_op_into_dispatch_region",
-    [TransformOpInterface]> {
+    Transform_Dialect, "iree.move_preceding_op_into_dispatch_region", [
+      // TODO: this is missing effects.
+      TransformOpInterface]> {
   let description = [{
     Move the `target` op into the given dispatch region op. The dispatch region
     handle must be mapped to exactly one payload op.
@@ -175,8 +179,9 @@ def MovePrecedingOpIntoDispatchRegionOp : Op<
 }
 
 def CloneSucceedingOpIntoDispatchRegionOp : Op<
-    Transform_Dialect, "iree.clone_succeeding_op_into_dispatch_region",
-    [TransformOpInterface]> {
+    Transform_Dialect, "iree.clone_succeeding_op_into_dispatch_region", [
+      // TODO: this is missing effects.
+      TransformOpInterface]> {
   let description = [{
     Clone the `target` op into the given dispatch region op. The dispatch region
     handle must be mapped to exactly one payload op.
