@@ -1686,9 +1686,12 @@ static LogicalResult commonVerifierPackAndUnPackOp(OpTy packOrUnPack) {
   // Verify tiles. Make sure each provided tile is non-zero.
   if (hasZeros(packOrUnPack.getMixedTiles()))
     return op->emitError("invalid tile factor");
-  // Reject `dims_pos` if it contains duplicate.
+  // Reject `inner_dims_pos` if it contains duplicate.
   if (isInvalid(innerDimsPos))
     return op->emitError("invalid inner_dims_pos vector");
+  // Reject `outer_dims_pos` if it contains duplicate.
+  if (isInvalid(extractFromI64ArrayAttr(packOrUnPack.getOuterDimsPos())))
+    return op->emitError("invalid outer_dims_pos vector");
   if (packOrUnPack.getMixedTiles().size() != innerDimsPos.size()) {
     return op->emitError(
         "blocking factors must equal the number of dimensions to block");
