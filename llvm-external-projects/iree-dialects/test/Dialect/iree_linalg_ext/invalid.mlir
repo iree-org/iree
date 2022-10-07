@@ -576,27 +576,27 @@ func.func @unpack_invalid(%output: tensor<256x128xf32>, %input: tensor<8x8x32x16
 
 // -----
 
-// duplicate element in `outer_dims_pos`, fail.
+// duplicate element in `outer_dims_perm`, fail.
 func.func @pack_invalid(%input: tensor<256x128xf32>, %output: tensor<8x8x32x16xf32>) -> tensor<8x8x32x16xf32> {
-  // expected-error@+1 {{invalid outer_dims_pos vector}}
-  %0 = iree_linalg_ext.pack %input outer_dims_pos = [1, 1] inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %output : (tensor<256x128xf32> tensor<8x8x32x16xf32>) -> tensor<8x8x32x16xf32>
+  // expected-error@+1 {{invalid outer_dims_perm vector}}
+  %0 = iree_linalg_ext.pack %input outer_dims_perm = [1, 1] inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %output : (tensor<256x128xf32> tensor<8x8x32x16xf32>) -> tensor<8x8x32x16xf32>
   return %0 : tensor<8x8x32x16xf32>
 }
 
 // -----
 
-// duplicate element in `outer_dims_pos`, fail.
+// duplicate element in `outer_dims_perm`, fail.
 func.func @pack_invalid(%input: tensor<256x128xf32>, %output: tensor<8x8x32x16xf32>) -> tensor<8x8x32x16xf32> {
-  // expected-error@+1 {{invalid outer_dims_pos vector}}
-  %0 = iree_linalg_ext.unpack %output outer_dims_pos = [1, 1] inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %input : (tensor<8x8x32x16xf32> tensor<256x128xf32>) -> tensor<256x128xf32>
+  // expected-error@+1 {{invalid outer_dims_perm vector}}
+  %0 = iree_linalg_ext.unpack %output outer_dims_perm = [1, 1] inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %input : (tensor<8x8x32x16xf32> tensor<256x128xf32>) -> tensor<256x128xf32>
   return %0 : tensor<256x128xf32>
 }
 
 // -----
 
-// `outer_dims_pos` and `inner_dims_pos` do not agree on the dimensions to tile and interchange.
+// `outer_dims_perm` and `inner_dims_pos` do not agree on the dimensions to tile and interchange.
 func.func @pack_invalid(%input: tensor<256x128xf32>, %output: tensor<8x8x32x16xf32>) -> tensor<8x8x32x16xf32> {
-  // expected-error@+1 {{invalid outer_dims_pos vector}}
-  %0 = iree_linalg_ext.unpack %output outer_dims_pos = [2, 1] inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %input : (tensor<8x8x32x16xf32> tensor<256x128xf32>) -> tensor<256x128xf32>
+  // expected-error@+1 {{invalid outer_dims_perm vector}}
+  %0 = iree_linalg_ext.unpack %output outer_dims_perm = [2, 1] inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %input : (tensor<8x8x32x16xf32> tensor<256x128xf32>) -> tensor<256x128xf32>
   return %0 : tensor<256x128xf32>
 }

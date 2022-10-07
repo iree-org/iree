@@ -485,7 +485,7 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
 
   let arguments = (ins Variadic<AnyShaped>:$inputs,
     Variadic<AnyShaped>:$outputs,
-    DefaultValuedOptionalAttr<I64ArrayAttr, "{}">:$outer_dims_pos,
+    DefaultValuedOptionalAttr<I64ArrayAttr, "{}">:$outer_dims_perm,
     DefaultValuedAttr<I64ArrayAttr, "{}">:$inner_dims_pos,
     Variadic<Index>:$inner_tiles,
     I64ArrayAttr:$static_inner_tiles,
@@ -496,7 +496,7 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
     attr-dict
     $inputs
     (`padding_value` `(` $padding_value^ `:` type($padding_value) `)`)?
-    (`outer_dims_pos` `=` $outer_dims_pos^)?
+    (`outer_dims_perm` `=` $outer_dims_perm^)?
     `inner_dims_pos` `=` $inner_dims_pos
     `inner_tiles` `=`
     custom<DynamicIndexList>($inner_tiles, $static_inner_tiles,
@@ -594,7 +594,7 @@ def IREELinalgExt_UnPackOp : IREELinalgExt_Op<"unpack", [
 
   let arguments = (ins Variadic<AnyShaped>:$inputs,
     Variadic<AnyShaped>:$outputs,
-    DefaultValuedOptionalAttr<I64ArrayAttr, "{}">:$outer_dims_pos,
+    DefaultValuedOptionalAttr<I64ArrayAttr, "{}">:$outer_dims_perm,
     DefaultValuedAttr<I64ArrayAttr, "{}">:$inner_dims_pos,
     Variadic<Index>:$inner_tiles,
     I64ArrayAttr:$static_inner_tiles);
@@ -603,7 +603,7 @@ def IREELinalgExt_UnPackOp : IREELinalgExt_Op<"unpack", [
   let assemblyFormat = [{
     attr-dict
     $inputs
-    (`outer_dims_pos` `=` $outer_dims_pos^)?
+    (`outer_dims_perm` `=` $outer_dims_perm^)?
     `inner_dims_pos` `=` $inner_dims_pos
     `inner_tiles` `=`
     custom<DynamicIndexList>($inner_tiles, $static_inner_tiles,

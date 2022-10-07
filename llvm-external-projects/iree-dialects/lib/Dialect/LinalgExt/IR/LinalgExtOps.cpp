@@ -1522,18 +1522,18 @@ static bool isInvalid(ArrayRef<int64_t> dimsPos, int64_t rank) {
       dimsPos, [rank](int64_t dimPos) { return dimPos < 0 || dimPos >= rank; });
 }
 
-/// Return true if `inner_dims_pos` and `outer_dims_pos` are incompatible. They
+/// Return true if `inner_dims_pos` and `outer_dims_perm` are incompatible. They
 /// are incompatible when: a) They have different sizes and b) They have
 /// different elements.
 static bool isInvalid(SmallVectorImpl<int64_t> &innerDimsPos,
-                      SmallVectorImpl<int64_t> &outerDimsPos) {
-  if (outerDimsPos.empty())
+                      SmallVectorImpl<int64_t> &outerDimPerm) {
+  if (outerDimPerm.empty())
     return false;
-  if (innerDimsPos.size() != outerDimsPos.size())
+  if (innerDimsPos.size() != outerDimPerm.size())
     return true;
   llvm::sort(innerDimsPos);
-  llvm::sort(outerDimsPos);
-  return innerDimsPos != outerDimsPos;
+  llvm::sort(outerDimPerm);
+  return innerDimsPos != outerDimPerm;
 }
 
 /// Check if we have enough static information to catch undefined behavior when
@@ -1700,22 +1700,22 @@ static LogicalResult commonVerifierPackAndUnPackOp(OpTy packOrUnPack) {
                      : packOrUnPack.getOutputRank();
   SmallVector<int64_t> innerDimsPos =
       extractFromI64ArrayAttr(packOrUnPack.getInnerDimsPos());
-  SmallVector<int64_t> outerDimsPos =
-      extractFromI64ArrayAttr(packOrUnPack.getOuterDimsPos());
+  SmallVector<int64_t> outerDimPerm =
+      extractFromI64ArrayAttr(packOrUnPack.getOuterDimsPerm());
   // Verify tiles. Make sure each provided tile is non-zero.
   if (hasZeros(packOrUnPack.getMixedTiles()))
     return op->emitError("invalid tile factor");
   // Reject `inner_dims_pos` if it contains duplicate.
   if (isInvalid(innerDimsPos, rank))
     return op->emitError("invalid inner_dims_pos vector");
-  // Reject `outer_dims_pos` if it contains duplicate.
-  if (isInvalid(outerDimsPos, rank))
-    return op->emitError("invalid outer_dims_pos vector");
-  // Reject if `inner_dims_pos` and `outer_dims_pos` contain different
+  // Reject `outer_dims_perm` if it contains duplicate.
+  if (isInvalid(outerDimPerm, rank))
+    return op->emitError("invalid outer_dims_perm vector");
+  // Reject if `inner_dims_pos` and `outer_dims_perm` contain different
   // dimensions.
-  if (isInvalid(innerDimsPos, outerDimsPos)) {
+  if (isInvalid(innerDimsPos, outerDimPerm)) {
     return op->emitError(
-        "inner_dims_pos and outer_dims_pos must have the same elements");
+        "inner_dims_pos and outer_dims_perm must have the same elements");
   }
   if (packOrUnPack.getMixedTiles().size() != innerDimsPos.size()) {
     return op->emitError(
@@ -1727,7 +1727,7 @@ static LogicalResult commonVerifierPackAndUnPackOp(OpTy packOrUnPack) {
 static ShapedType
 inferPackedType(ShapedType sourceType, ArrayRef<int64_t> innerTiles,
                 const DenseMap<int64_t, OpFoldResult> &tileAndPosMapping,
-                ArrayRef<int64_t> outerDimsPos) {
+                ArrayRef<int64_t> outerDimPerm) {
   SmallVector<int64_t> inferredShape;
   int64_t rank = sourceType.getRank();
 
@@ -1747,9 +1747,9 @@ inferPackedType(ShapedType sourceType, ArrayRef<int64_t> innerTiles,
     }
   }
 
-  // swap tile loops if `outer_dims_pos` is available.
+  // swap tile loops if `outer_dims_perm` is available.
   inferredShape =
-      interchange<int64_t>(inferredShape, outerDimsPos, /*offset=*/0);
+      interchange<int64_t>(inferredShape, outerDimPerm, /*offset=*/0);
 
   // point loop.
   inferredShape.append(innerTiles.begin(), innerTiles.end());
@@ -1804,11 +1804,11 @@ LogicalResult PackOp::verify() {
                          "supported when padding_value is not set");
   }
   // Verify result type against inferred type.
-  SmallVector<int64_t> outerDimsPos =
-      extractFromI64ArrayAttr(getOuterDimsPos());
+  SmallVector<int64_t> outerDimPerm =
+      extractFromI64ArrayAttr(getOuterDimsPerm());
   DenseMap<int64_t, OpFoldResult> tileAndPosMapping = getDimAndTileMapping();
   ShapedType expectedOutputType = inferPackedType(
-      getInputType(), getStaticTiles(), tileAndPosMapping, outerDimsPos);
+      getInputType(), getStaticTiles(), tileAndPosMapping, outerDimPerm);
   if (!isCompatible(expectedOutputType, getOutputType())) {
     return op->emitError(
                "infered type do not match provided output type. Expected ")
@@ -1865,7 +1865,7 @@ static void generatePackOpScalarImplementationBody(PackOp packOp,
   SmallVector<int64_t> dimsToInnerBlock =
       extractFromI64ArrayAttr(packOp.getInnerDimsPos());
   SmallVector<int64_t> dimsToOuterBlock =
-      extractFromI64ArrayAttr(packOp.getOuterDimsPos());
+      extractFromI64ArrayAttr(packOp.getOuterDimsPerm());
 
   SmallVector<Value> interchangedIvs = ivs;
   SmallVector<int64_t> interchangeVector =
@@ -2199,8 +2199,8 @@ LogicalResult UnPackOp::generateScalarImplementation(OpBuilder &builder,
   SmallVector<Value> interchangedInputIvsPointLoops = inputIvsPointLoops;
   interchangedInputIvsPointLoops = interchange<Value>(
       interchangedInputIvsPointLoops, interchangeVector, /*offset=*/0);
-  // interchange the tiled loops induction variables based on `outer_dims_pos`.
-  SmallVector<int64_t> outerDims = extractFromI64ArrayAttr(getOuterDimsPos());
+  // interchange the tiled loops induction variables based on `outer_dims_perm`.
+  SmallVector<int64_t> outerDims = extractFromI64ArrayAttr(getOuterDimsPerm());
   if (!outerDims.empty()) {
     interchangeVector =
         computeInterchangeFromDimPos(outerDims, getOutputRank());
@@ -2248,11 +2248,11 @@ LogicalResult UnPackOp::verify() {
 
   // Verify input type against inferred type. The check includes the cases for
   // incompilete tiles. We allow to `undo` the padding done in the pack.
-  SmallVector<int64_t> outerDimsPos =
-      extractFromI64ArrayAttr(getOuterDimsPos());
+  SmallVector<int64_t> outerDimPerm =
+      extractFromI64ArrayAttr(getOuterDimsPerm());
   DenseMap<int64_t, OpFoldResult> tileAndPosMapping = getDimAndTileMapping();
   ShapedType expectedInputType = inferPackedType(
-      getOutputType(), getStaticTiles(), tileAndPosMapping, outerDimsPos);
+      getOutputType(), getStaticTiles(), tileAndPosMapping, outerDimPerm);
   if (!isCompatible(expectedInputType, getInputType())) {
     return op->emitError(
                "infered type do not match provided input type. Expected ")
