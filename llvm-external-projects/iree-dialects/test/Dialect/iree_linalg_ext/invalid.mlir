@@ -591,3 +591,12 @@ func.func @pack_invalid(%input: tensor<256x128xf32>, %output: tensor<8x8x32x16xf
   %0 = iree_linalg_ext.unpack %output outer_dims_pos = [1, 1] inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %input : (tensor<8x8x32x16xf32> tensor<256x128xf32>) -> tensor<256x128xf32>
   return %0 : tensor<256x128xf32>
 }
+
+// -----
+
+// `outer_dims_pos` and `inner_dims_pos` do not agree on the dimensions to tile and interchange.
+func.func @pack_invalid(%input: tensor<256x128xf32>, %output: tensor<8x8x32x16xf32>) -> tensor<8x8x32x16xf32> {
+  // expected-error@+1 {{invalid outer_dims_pos vector}}
+  %0 = iree_linalg_ext.unpack %output outer_dims_pos = [2, 1] inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %input : (tensor<8x8x32x16xf32> tensor<256x128xf32>) -> tensor<256x128xf32>
+  return %0 : tensor<256x128xf32>
+}

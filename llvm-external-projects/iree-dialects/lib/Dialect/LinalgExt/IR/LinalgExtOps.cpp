@@ -1522,6 +1522,20 @@ static bool isInvalid(ArrayRef<int64_t> dimsPos, int64_t rank) {
       dimsPos, [rank](int64_t dimPos) { return dimPos < 0 || dimPos >= rank; });
 }
 
+/// Return true if `inner_dims_pos` and `outer_dims_pos` are incompatible. They
+/// are incompatible when: a) They have different sizes and b) They have
+/// different elements.
+static bool isInvalid(SmallVectorImpl<int64_t> &innerDimsPos,
+                      SmallVectorImpl<int64_t> &outerDimsPos) {
+  if (outerDimsPos.empty())
+    return false;
+  if (innerDimsPos.size() != outerDimsPos.size())
+    return true;
+  llvm::sort(innerDimsPos);
+  llvm::sort(outerDimsPos);
+  return innerDimsPos != outerDimsPos;
+}
+
 /// Check if we have enough static information to catch undefined behavior when
 /// the tile size does not divide perfectly the dimension of the input tensor.
 static bool areNotFullTiles(ArrayRef<int64_t> inputShape,
@@ -1684,6 +1698,8 @@ static LogicalResult commonVerifierPackAndUnPackOp(OpTy packOrUnPack) {
                      : packOrUnPack.getOutputRank();
   SmallVector<int64_t> innerDimsPos =
       extractFromI64ArrayAttr(packOrUnPack.getInnerDimsPos());
+  SmallVector<int64_t> outerDimsPos =
+      extractFromI64ArrayAttr(packOrUnPack.getOuterDimsPos());
   // Verify tiles. Make sure each provided tile is non-zero.
   if (hasZeros(packOrUnPack.getMixedTiles()))
     return op->emitError("invalid tile factor");
@@ -1691,8 +1707,14 @@ static LogicalResult commonVerifierPackAndUnPackOp(OpTy packOrUnPack) {
   if (isInvalid(innerDimsPos, rank))
     return op->emitError("invalid inner_dims_pos vector");
   // Reject `outer_dims_pos` if it contains duplicate.
-  if (isInvalid(extractFromI64ArrayAttr(packOrUnPack.getOuterDimsPos()), rank))
+  if (isInvalid(outerDimsPos, rank))
     return op->emitError("invalid outer_dims_pos vector");
+  // Reject if `inner_dims_pos` and `outer_dims_pos` contain different
+  // dimensions.
+  if (isInvalid(innerDimsPos, outerDimsPos)) {
+    return op->emitError(
+        "inner_dims_pos and outer_dims_pos must have the same elements");
+  }
   if (packOrUnPack.getMixedTiles().size() != innerDimsPos.size()) {
     return op->emitError(
         "blocking factors must equal the number of dimensions to block");

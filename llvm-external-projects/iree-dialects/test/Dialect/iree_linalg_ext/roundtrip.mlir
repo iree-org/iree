@@ -767,3 +767,15 @@ func.func @unpack_undo_padding(%input: tensor<2x8x8x2xf32>, %output: tensor<13x1
 // CHECK-SAME      inner_pos = [32, 16]
 // CHECK-SAME:     into %[[OUTPUT]]
 // CHECK:        return %[[UNPACK]]
+
+// -----
+
+func.func @unpack(%arg0: memref<3x3xf32>, %arg1: memref<3x3x1x1xf32>) {
+  iree_linalg_ext.unpack %arg1 outer_dims_pos = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [1, 1] into %arg0 : (memref<3x3x1x1xf32> memref<3x3xf32>)
+  return
+}
+
+// CHECK: func.func @unpack(
+// CHECK-SAME: %[[ARG0:[a-zA-Z0-9]+]]: memref<3x3xf32>,
+// CHECK-SAME: %[[ARG1:[a-zA-Z0-9]+]]: memref<3x3x1x1xf32>) {
+// CHECK: iree_linalg_ext.unpack %[[ARG1]] outer_dims_pos = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [1, 1] into %[[ARG0]] : (memref<3x3x1x1xf32> memref<3x3xf32>)
