@@ -358,7 +358,7 @@ void ConvertToSPIRVPass::runOnOperation() {
   populateMemRefToSPIRVPatterns(typeConverter, patterns);
 
   // Pull in standard/math patterns to convert arithmetic ops and others.
-  arith::populateCeilFloorDivExpandOpsPatterns(typeConverter, patterns);
+  arith::populateCeilFloorDivExpandOpsPatterns(patterns);
   arith::populateArithToSPIRVPatterns(typeConverter, patterns);
   populateFuncToSPIRVPatterns(typeConverter, patterns);
   populateMathToSPIRVPatterns(typeConverter, patterns);
