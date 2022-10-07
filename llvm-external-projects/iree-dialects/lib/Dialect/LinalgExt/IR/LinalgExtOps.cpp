@@ -1509,13 +1509,17 @@ static bool hasZeros(ArrayRef<OpFoldResult> tiles) {
       tiles, [&](OpFoldResult tile) { return isConstantIntValue(tile, 0); });
 }
 
-/// Return true if `innerDimsPos` is invalid. It is invalid when: a) it contains
-/// duplicate.
-static bool isInvalid(ArrayRef<int64_t> innerDimsPos) {
+/// Return true if `dimsPos` is invalid. It is invalid when: a) it contains
+/// duplicate. b) At least one dimension is out of bound (`dimPos` is >= 0 and <
+/// rank).
+static bool isInvalid(ArrayRef<int64_t> dimsPos, int64_t rank) {
   DenseSet<int64_t> uniqued;
-  for (int64_t dim : innerDimsPos)
+  for (int64_t dim : dimsPos)
     uniqued.insert(dim);
-  return innerDimsPos.size() != uniqued.size();
+  if (dimsPos.size() != uniqued.size())
+    return true;
+  return llvm::any_of(
+      dimsPos, [rank](int64_t dimPos) { return dimPos < 0 || dimPos >= rank; });
 }
 
 /// Check if we have enough static information to catch undefined behavior when
@@ -1552,12 +1556,6 @@ static bool isCompatible(ShapedType a, ShapedType b) {
       return false;
   }
   return true;
-}
-
-/// Return true if each element in `innerDimsPos` is >= 0 and < rank.
-static bool isInBound(ArrayRef<int64_t> innerDimsPos, int64_t rank) {
-  return llvm::all_of(
-      innerDimsPos, [rank](int64_t dimPos) { return dimPos >= 0 && dimPos < rank; });
 }
 
 /// Interchange `elements` starting at offset `offset` based on the indexes in
@@ -1681,16 +1679,19 @@ static LogicalResult commonVerifierPackAndUnPackOp(OpTy packOrUnPack) {
   static_assert(llvm::is_one_of<OpTy, PackOp, UnPackOp>::value,
                 "applies to only pack or unpack operations");
   Operation *op = packOrUnPack.getOperation();
+  int64_t rank = (std::is_same<OpTy, PackOp>::value)
+                     ? packOrUnPack.getInputRank()
+                     : packOrUnPack.getOutputRank();
   SmallVector<int64_t> innerDimsPos =
       extractFromI64ArrayAttr(packOrUnPack.getInnerDimsPos());
   // Verify tiles. Make sure each provided tile is non-zero.
   if (hasZeros(packOrUnPack.getMixedTiles()))
     return op->emitError("invalid tile factor");
   // Reject `inner_dims_pos` if it contains duplicate.
-  if (isInvalid(innerDimsPos))
+  if (isInvalid(innerDimsPos, rank))
     return op->emitError("invalid inner_dims_pos vector");
   // Reject `outer_dims_pos` if it contains duplicate.
-  if (isInvalid(extractFromI64ArrayAttr(packOrUnPack.getOuterDimsPos())))
+  if (isInvalid(extractFromI64ArrayAttr(packOrUnPack.getOuterDimsPos()), rank))
     return op->emitError("invalid outer_dims_pos vector");
   if (packOrUnPack.getMixedTiles().size() != innerDimsPos.size()) {
     return op->emitError(
@@ -1750,21 +1751,20 @@ LogicalResult PackOp::verify() {
   if (failed(commonVerifierPackAndUnPackOp(*this))) {
     return failure();
   }
+
   // Blocking factors must be less or equal than the input rank, and must
   // match the number of `dims_pos`.
   if (numberOfBlockingFactors > getInputRank()) {
     return op->emitError(
         "blocking factors must be less or equal than the input rank");
   }
-  // Require `dim_pos` to be in-bound. `dim_pos` carries the index of the
-  // dimensions to block.
-  if (!isInBound(innerDimsPos, getInputRank()))
-    return op->emitError("out-of-bound position in inner dims");
+
   // Require output rank to match input rank + number of blocking factors.
   if ((getInputRank() + numberOfBlockingFactors) != getOutputRank()) {
     return op->emitError(
         "output rank must equal input rank + blocking factors");
   }
+
   // Bail out if the tile does not divide the dimension fully. In the case of
   // dynamic tile factors or dimensions, having a partial tile is undefined
   // behavior.
@@ -2181,16 +2181,14 @@ LogicalResult UnPackOp::verify() {
   if (failed(commonVerifierPackAndUnPackOp(*this))) {
     return failure();
   }
+
   // Blocking factors must be less or equal than the output rank, and must
   // match the number of `dims_pos`.
   if (numberOfBlockingFactors > getOutputRank()) {
     return op->emitError(
         "blocking factors must be less or equal than the output rank");
   }
-  // Require `dim_pos` to be in-bound. `dim_pos` carries the index of the
-  // dimensions to block.
-  if (!isInBound(innerDimsPos, getOutputRank()))
-    return op->emitError("out-of-bound position in inner dims");
+
   // Require input rank to match output rank + number of blocking factors.
   if ((getOutputRank() + numberOfBlockingFactors) != getInputRank()) {
     return op->emitError(

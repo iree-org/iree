@@ -544,7 +544,7 @@ func.func @pad_and_pack_invalid_type(%input: tensor<13x15xf32>, %output: tensor<
 // -----
 
 func.func @pack_invalid(%input: tensor<256x128xf32>, %output: tensor<8x8x32x16xf32>) -> tensor<8x8x32x16xf32> {
-  // expected-error@+1 {{out-of-bound position}}
+  // expected-error@+1 {{invalid inner_dims_pos vector}}
   %0 = iree_linalg_ext.pack %input inner_dims_pos = [2, 0] inner_tiles = [2, 2] into %output : (tensor<256x128xf32> tensor<8x8x32x16xf32>) -> tensor<8x8x32x16xf32>
   return %0 : tensor<8x8x32x16xf32>
 }
