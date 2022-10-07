@@ -23,36 +23,37 @@ endif()
     inline = True,
 )
 
-# TODO: restore reduction.mlir test
-iree_lit_test_suite(
-    name = "lit",
-    srcs = [
-        "softmax.mlir",
-    ],
-    cfg = "//tests:lit.cfg.py",
-    # transform dialect spec files are MLIR files that specify a transformation,
-    # they need to be included as data.
-    data = [
-        "reduction_codegen_spec.mlir",
-        "softmax_codegen_spec.mlir",
-        # FIXME: This cannot be retired yet as there is some writeonly vs readwrite
-        # issue and we even end up emitting out of bounds accesses.
-        "softmax_dispatch_spec.mlir",
-        "softmax_fused_codegen_spec.mlir",
-    ],
-    tags = [
-        # CUDA cuInit fails with sanitizer on.
-        "noasan",
-        "nomsan",
-        "notsan",
-        "noubsan",
-        "requires-gpu-nvidia",
-        "driver=cuda",
-    ],
-    tools = [
-        "//tools:iree-compile",
-        "//tools:iree-opt",
-        "//tools:iree-run-module",
-        "@llvm-project//llvm:FileCheck",
-    ],
-)
+# TODO: re-enable the tests
+# iree_lit_test_suite(
+#     name = "lit",
+#     srcs = [
+#         "reduction.mlir",
+#         "softmax.mlir",
+#     ],
+#     cfg = "//tests:lit.cfg.py",
+#     # transform dialect spec files are MLIR files that specify a transformation,
+#     # they need to be included as data.
+#     data = [
+#         "reduction_codegen_spec.mlir",
+#         "softmax_codegen_spec.mlir",
+#         # FIXME: This cannot be retired yet as there is some writeonly vs readwrite
+#         # issue and we even end up emitting out of bounds accesses.
+#         "softmax_dispatch_spec.mlir",
+#         "softmax_fused_codegen_spec.mlir",
+#     ],
+#     tags = [
+#         # CUDA cuInit fails with sanitizer on.
+#         "noasan",
+#         "nomsan",
+#         "notsan",
+#         "noubsan",
+#         "requires-gpu-nvidia",
+#         "driver=cuda",
+#     ],
+#     tools = [
+#         "//tools:iree-compile",
+#         "//tools:iree-opt",
+#         "//tools:iree-run-module",
+#         "@llvm-project//llvm:FileCheck",
+#     ],
+# )
