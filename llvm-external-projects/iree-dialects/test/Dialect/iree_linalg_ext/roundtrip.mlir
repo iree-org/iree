@@ -646,33 +646,33 @@ func.func @topk_tensor_optional(%input_values: tensor<20x10x8x4xf32>) -> (tensor
 
 // -----
 
-func.func @relayout(%arg0: tensor<3x3xf32>, %arg1: tensor<3x3x1x1xf32>) -> tensor<3x3x1x1xf32> {
-  %1 = iree_linalg_ext.pack %arg0 dims_pos = [0, 1] inner_tiles = [1, 1] into %arg1 : (tensor<3x3xf32> tensor<3x3x1x1xf32>) -> tensor<3x3x1x1xf32>
+func.func @pack(%arg0: tensor<3x3xf32>, %arg1: tensor<3x3x1x1xf32>) -> tensor<3x3x1x1xf32> {
+  %1 = iree_linalg_ext.pack %arg0 inner_dims_pos = [0, 1] inner_tiles = [1, 1] into %arg1 : (tensor<3x3xf32> tensor<3x3x1x1xf32>) -> tensor<3x3x1x1xf32>
   return %1 : tensor<3x3x1x1xf32>
 }
 
-// CHECK: func.func @relayout(
+// CHECK: func.func @pack(
 // CHECK-SAME: %[[ARG0:[a-zA-Z0-9]+]]: tensor<3x3xf32>,
 // CHECK-SAME: %[[ARG1:[a-zA-Z0-9]+]]: tensor<3x3x1x1xf32>) -> tensor<3x3x1x1xf32>
-// CHECK: %[[RES:.*]] = iree_linalg_ext.pack %[[ARG0]] dims_pos = [0, 1] inner_tiles = [1, 1] into %[[ARG1]] : (tensor<3x3xf32> tensor<3x3x1x1xf32>) -> tensor<3x3x1x1xf32>
+// CHECK: %[[RES:.*]] = iree_linalg_ext.pack %[[ARG0]] inner_dims_pos = [0, 1] inner_tiles = [1, 1] into %[[ARG1]] : (tensor<3x3xf32> tensor<3x3x1x1xf32>) -> tensor<3x3x1x1xf32>
 // CHECK: return %[[RES]] : tensor<3x3x1x1xf32>
 
 // -----
 
-func.func @relayout(%arg0: memref<3x3xf32>, %arg1: memref<3x3x1x1xf32>) {
-  iree_linalg_ext.pack %arg0 dims_pos = [0, 1] inner_tiles = [1, 1] into %arg1 : (memref<3x3xf32> memref<3x3x1x1xf32>)
+func.func @pack(%arg0: memref<3x3xf32>, %arg1: memref<3x3x1x1xf32>) {
+  iree_linalg_ext.pack %arg0 inner_dims_pos = [0, 1] inner_tiles = [1, 1] into %arg1 : (memref<3x3xf32> memref<3x3x1x1xf32>)
   return
 }
 
-// CHECK: func.func @relayout(
+// CHECK: func.func @pack(
 // CHECK-SAME: %[[ARG0:[a-zA-Z0-9]+]]: memref<3x3xf32>,
 // CHECK-SAME: %[[ARG1:[a-zA-Z0-9]+]]: memref<3x3x1x1xf32>) {
-// CHECK: iree_linalg_ext.pack %[[ARG0]] dims_pos = [0, 1] inner_tiles = [1, 1] into %[[ARG1]] : (memref<3x3xf32> memref<3x3x1x1xf32>)
+// CHECK: iree_linalg_ext.pack %[[ARG0]] inner_dims_pos = [0, 1] inner_tiles = [1, 1] into %[[ARG1]] : (memref<3x3xf32> memref<3x3x1x1xf32>)
 
 // -----
 
 func.func @pad_and_pack_static(%input: tensor<13x15xf32>, %output: tensor<2x8x8x2xf32>, %pad: f32) -> tensor<2x8x8x2xf32> {
-  %0 = iree_linalg_ext.pack %input padding_value(%pad : f32) dims_pos = [0, 1] inner_tiles = [8, 2] into %output : (tensor<13x15xf32> tensor<2x8x8x2xf32>) -> tensor<2x8x8x2xf32>
+  %0 = iree_linalg_ext.pack %input padding_value(%pad : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 2] into %output : (tensor<13x15xf32> tensor<2x8x8x2xf32>) -> tensor<2x8x8x2xf32>
   return %0 : tensor<2x8x8x2xf32>
 }
 // CHECK:      func.func @pad_and_pack_static
@@ -681,7 +681,7 @@ func.func @pad_and_pack_static(%input: tensor<13x15xf32>, %output: tensor<2x8x8x
 // CHECK-SAME:   %[[PAD:[a-zA-Z0-9_]+]]: f32
 // CHECK:        %[[RES:.+]] = iree_linalg_ext.pack %[[INPUT]]
 // CHECK-SAME:     padding_value(%[[PAD]] : f32)
-// CHECK-SAME:     dims_pos = [0, 1]
+// CHECK-SAME:     inner_dims_pos = [0, 1]
 // CHECK-SAME:     inner_tiles = [8, 2]
 // CHECK-SAME:     into %[[OUTPUT]]
 // CHECK:        return %[[RES]]
@@ -689,7 +689,7 @@ func.func @pad_and_pack_static(%input: tensor<13x15xf32>, %output: tensor<2x8x8x
 // -----
 
 func.func @pad_and_pack_partially_dynamic(%input: tensor<?x?xf32>, %output: tensor<?x?x8x2xf32>, %pad: f32) -> tensor<?x?x8x2xf32> {
-  %0 = iree_linalg_ext.pack %input padding_value(%pad : f32) dims_pos = [0, 1] inner_tiles = [8, 2] into %output : (tensor<?x?xf32> tensor<?x?x8x2xf32>) -> tensor<?x?x8x2xf32>
+  %0 = iree_linalg_ext.pack %input padding_value(%pad : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 2] into %output : (tensor<?x?xf32> tensor<?x?x8x2xf32>) -> tensor<?x?x8x2xf32>
   return %0 : tensor<?x?x8x2xf32>
 }
 // CHECK:      func.func @pad_and_pack_partially_dynamic
@@ -698,7 +698,7 @@ func.func @pad_and_pack_partially_dynamic(%input: tensor<?x?xf32>, %output: tens
 // CHECK-SAME:   %[[PAD:[a-zA-Z0-9_]+]]: f32
 // CHECK:        %[[RES:.+]] = iree_linalg_ext.pack %[[INPUT]]
 // CHECK-SAME:     padding_value(%[[PAD]] : f32)
-// CHECK-SAME:     dims_pos = [0, 1]
+// CHECK-SAME:     inner_dims_pos = [0, 1]
 // CHECK-SAME:     inner_tiles = [8, 2]
 // CHECK-SAME:     into %[[OUTPUT]]
 // CHECK:        return %[[RES]]
@@ -707,7 +707,7 @@ func.func @pad_and_pack_partially_dynamic(%input: tensor<?x?xf32>, %output: tens
 
 func.func @pad_and_pack_fully_dynamic(%input: tensor<?x?xf32>, %output: tensor<?x?x?x?xf32>, %pad: f32, %tile_n : index, %tile_m : index) -> tensor<?x?x?x?xf32> {
   %0 = iree_linalg_ext.pack %input padding_value(%pad : f32)
-    dims_pos = [0, 1] inner_tiles = [%tile_n, %tile_m] into %output : (tensor<?x?xf32> tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32>
+    inner_dims_pos = [0, 1] inner_tiles = [%tile_n, %tile_m] into %output : (tensor<?x?xf32> tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32>
   return %0 : tensor<?x?x?x?xf32>
 }
 // CHECK:      func.func @pad_and_pack_fully_dynamic
@@ -718,27 +718,27 @@ func.func @pad_and_pack_fully_dynamic(%input: tensor<?x?xf32>, %output: tensor<?
 // CHECK-SAME:   %[[TILE_M:[a-zA-Z0-9_]+]]: index
 // CHECK:        %[[RES:.+]] = iree_linalg_ext.pack %[[INPUT]]
 // CHECK-SAME:     padding_value(%[[PAD]] : f32)
-// CHECK-SAME:     dims_pos = [0, 1]
+// CHECK-SAME:     inner_dims_pos = [0, 1]
 // CHECK-SAME:     inner_tiles = [%[[TILE_N]], %[[TILE_M]]]
 // CHECK-SAME:     into %[[OUTPUT]]
 // CHECK:        return %[[RES]]
 
 // -----
 
-func.func @relayout(%arg0: memref<3x3xf32>, %arg1: memref<3x3x1x1xf32>) {
-  iree_linalg_ext.unpack %arg1 dims_pos = [0, 1] inner_tiles = [1, 1] into %arg0 : (memref<3x3x1x1xf32> memref<3x3xf32>)
+func.func @unpack(%arg0: memref<3x3xf32>, %arg1: memref<3x3x1x1xf32>) {
+  iree_linalg_ext.unpack %arg1 inner_dims_pos = [0, 1] inner_tiles = [1, 1] into %arg0 : (memref<3x3x1x1xf32> memref<3x3xf32>)
   return
 }
 
-// CHECK: func.func @relayout(
+// CHECK: func.func @unpack(
 // CHECK-SAME: %[[ARG0:[a-zA-Z0-9]+]]: memref<3x3xf32>,
 // CHECK-SAME: %[[ARG1:[a-zA-Z0-9]+]]: memref<3x3x1x1xf32>) {
-// CHECK: iree_linalg_ext.unpack %[[ARG1]] dims_pos = [0, 1] inner_tiles = [1, 1] into %[[ARG0]] : (memref<3x3x1x1xf32> memref<3x3xf32>)
+// CHECK: iree_linalg_ext.unpack %[[ARG1]] inner_dims_pos = [0, 1] inner_tiles = [1, 1] into %[[ARG0]] : (memref<3x3x1x1xf32> memref<3x3xf32>)
 
 // -----
 
 func.func @unpack_static(%input: tensor<8x8x32x16xf32>, %output: tensor<256x128xf32>) -> tensor<256x128xf32> {
-  %0 = iree_linalg_ext.unpack %input dims_pos = [0, 1] inner_tiles = [32, 16] into %output : (tensor<8x8x32x16xf32> tensor<256x128xf32>) -> tensor<256x128xf32>
+  %0 = iree_linalg_ext.unpack %input inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %output : (tensor<8x8x32x16xf32> tensor<256x128xf32>) -> tensor<256x128xf32>
   return %0 : tensor<256x128xf32>
 }
 
@@ -755,7 +755,7 @@ func.func @unpack_static(%input: tensor<8x8x32x16xf32>, %output: tensor<256x128x
 // ----
 
 func.func @unpack_undo_padding(%input: tensor<2x8x8x2xf32>, %output: tensor<13x15xf32>) -> tensor<13x15xf32> {
-  %0 = iree_linalg_ext.unpack %input dims_pos = [0, 1] inner_tiles = [8, 2] into %output : (tensor<2x8x8x2xf32> tensor<13x15xf32>) -> tensor<13x15xf32>
+  %0 = iree_linalg_ext.unpack %input inner_dims_pos = [0, 1] inner_tiles = [8, 2] into %output : (tensor<2x8x8x2xf32> tensor<13x15xf32>) -> tensor<13x15xf32>
   return %0 : tensor<13x15xf32>
 }
 // CHECK:      func.func @unpack_undo_padding
@@ -767,3 +767,63 @@ func.func @unpack_undo_padding(%input: tensor<2x8x8x2xf32>, %output: tensor<13x1
 // CHECK-SAME      inner_pos = [32, 16]
 // CHECK-SAME:     into %[[OUTPUT]]
 // CHECK:        return %[[UNPACK]]
+
+// -----
+
+func.func @unpack(%arg0: memref<3x3xf32>, %arg1: memref<3x3x1x1xf32>) {
+  iree_linalg_ext.unpack %arg1 outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [1, 1] into %arg0 : (memref<3x3x1x1xf32> memref<3x3xf32>)
+  return
+}
+
+// CHECK: func.func @unpack(
+// CHECK-SAME: %[[ARG0:[a-zA-Z0-9]+]]: memref<3x3xf32>,
+// CHECK-SAME: %[[ARG1:[a-zA-Z0-9]+]]: memref<3x3x1x1xf32>) {
+// CHECK: iree_linalg_ext.unpack %[[ARG1]] outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [1, 1] into %[[ARG0]] : (memref<3x3x1x1xf32> memref<3x3xf32>)
+
+// -----
+
+func.func @pack(%arg0: memref<128x256xf32>, %arg1: memref<32x4x32x8xf32>) {
+  iree_linalg_ext.pack %arg0 outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 8] into %arg1 : (memref<128x256xf32> memref<32x4x32x8xf32>)
+  return
+}
+
+// CHECK: func.func @pack
+// CHECK-SAME: %[[ARG0:[a-zA-Z0-9]+]]: memref<128x256xf32>,
+// CHECK-SAME: %[[ARG1:[a-zA-Z0-9]+]]: memref<32x4x32x8xf32>) {
+// CHECK: iree_linalg_ext.pack %[[ARG0]] outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 8] into %[[ARG1]] : (memref<128x256xf32> memref<32x4x32x8xf32>)
+
+// -----
+
+func.func @pack(%arg0: memref<128x256xf32>, %arg1: memref<4x32x32x8xf32>) {
+  iree_linalg_ext.pack %arg0 outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [32, 8] into %arg1 : (memref<128x256xf32> memref<4x32x32x8xf32>)
+  return
+}
+
+// CHECK: func.func @pack
+// CHECK-SAME: %[[ARG0:[a-zA-Z0-9]+]]: memref<128x256xf32>,
+// CHECK-SAME: %[[ARG1:[a-zA-Z0-9]+]]: memref<4x32x32x8xf32>) {
+// CHECK: iree_linalg_ext.pack %[[ARG0]] outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [32, 8] into %[[ARG1]] : (memref<128x256xf32> memref<4x32x32x8xf32>)
+
+// -----
+
+func.func @unpack(%arg0: memref<128x256xf32>, %arg1: memref<4x32x32x8xf32>) {
+  iree_linalg_ext.unpack %arg1 outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [32, 8] into %arg0 : (memref<4x32x32x8xf32> memref<128x256xf32>)
+  return
+}
+
+// CHECK: func.func @unpack
+// CHECK-SAME: %[[ARG0:[a-zA-Z0-9]+]]: memref<128x256xf32>,
+// CHECK-SAME: %[[ARG1:[a-zA-Z0-9]+]]: memref<4x32x32x8xf32>) {
+// CHECK: iree_linalg_ext.unpack %[[ARG1]] outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [32, 8] into %[[ARG0]] : (memref<4x32x32x8xf32> memref<128x256xf32>)
+
+// -----
+
+func.func @unpack(%arg0: memref<128x256xf32>, %arg1: memref<32x4x32x8xf32>) {
+  iree_linalg_ext.unpack %arg1 outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 8] into %arg0 : (memref<32x4x32x8xf32> memref<128x256xf32>)
+  return
+}
+
+// CHECK: func.func @unpack
+// CHECK-SAME: %[[ARG0:[a-zA-Z0-9]+]]: memref<128x256xf32>,
+// CHECK-SAME: %[[ARG1:[a-zA-Z0-9]+]]: memref<32x4x32x8xf32>) {
+// CHECK: iree_linalg_ext.unpack %[[ARG1]] outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 8] into %[[ARG0]] : (memref<32x4x32x8xf32> memref<128x256xf32>)

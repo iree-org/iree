@@ -1,7 +1,7 @@
 func.func @pack_simple() {
   %iree_input = util.unfoldable_constant dense<[[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15]]> : tensor<4x4xi32>
   %init = linalg.init_tensor [2, 2, 2, 2] : tensor<2x2x2x2xi32>
-  %pack = iree_linalg_ext.pack %iree_input dims_pos = [0, 1] inner_tiles = [2, 2] into %init
+  %pack = iree_linalg_ext.pack %iree_input inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %init
       : (tensor<4x4xi32> tensor<2x2x2x2xi32>) -> tensor<2x2x2x2xi32>
   check.expect_eq_const(%pack, dense<[[[[0, 1], [4, 5]], [[2, 3], [6, 7]]], [[[8, 9], [12, 13]], [[10 ,11], [14, 15]]]]> : tensor<2x2x2x2xi32>) : tensor<2x2x2x2xi32>
   return
@@ -21,7 +21,7 @@ func.func @dynamic_pack_simple() {
   %out_d0 = arith.ceildivui %in_d0, %c2 : index
   %out_d1 = arith.ceildivui %in_d1, %c2 : index
   %init = linalg.init_tensor [%out_d0, %out_d1, 2, 2] : tensor<?x?x2x2xi32>
-  %pack = iree_linalg_ext.pack %iree_input dims_pos = [0, 1] inner_tiles = [2, 2] into %init
+  %pack = iree_linalg_ext.pack %iree_input inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %init
       : (tensor<?x?xi32> tensor<?x?x2x2xi32>) -> tensor<?x?x2x2xi32>
   %cast = tensor.cast %pack : tensor<?x?x2x2xi32> to tensor<2x2x2x2xi32>
   check.expect_eq_const(%cast, dense<[[[[0, 1], [4, 5]], [[2, 3], [6, 7]]], [[[8, 9], [12, 13]], [[10 ,11], [14, 15]]]]> : tensor<2x2x2x2xi32>) : tensor<2x2x2x2xi32>
@@ -32,7 +32,7 @@ func.func @pack_simple_pad_mode() {
   %iree_input = util.unfoldable_constant dense<[[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15]]> : tensor<4x4xi32>
   %pad = arith.constant 0 : i32
   %init = linalg.init_tensor [2, 2, 3, 3] : tensor<2x2x3x3xi32>
-  %pack = iree_linalg_ext.pack %iree_input padding_value(%pad : i32) dims_pos = [0, 1] inner_tiles = [3, 3] into %init
+  %pack = iree_linalg_ext.pack %iree_input padding_value(%pad : i32) inner_dims_pos = [0, 1] inner_tiles = [3, 3] into %init
       : (tensor<4x4xi32> tensor<2x2x3x3xi32>) -> tensor<2x2x3x3xi32>
   // After padding, the input is
   //  0,  1,  2,  3,  0,  0
@@ -63,7 +63,7 @@ func.func @dynamic_pack_simple_pad_mode() {
   %out_d0 = arith.ceildivui %in_d0, %c3 : index
   %out_d1 = arith.ceildivui %in_d1, %c3 : index
   %init = linalg.init_tensor [%out_d0, %out_d1, 3, 3] : tensor<?x?x3x3xi32>
-  %pack = iree_linalg_ext.pack %iree_input padding_value(%pad : i32) dims_pos = [0, 1] inner_tiles = [3, 3] into %init
+  %pack = iree_linalg_ext.pack %iree_input padding_value(%pad : i32) inner_dims_pos = [0, 1] inner_tiles = [3, 3] into %init
       : (tensor<?x?xi32> tensor<?x?x3x3xi32>) -> tensor<?x?x3x3xi32>
   %cast = tensor.cast %pack : tensor<?x?x3x3xi32> to tensor<2x2x3x3xi32>
   check.expect_eq_const(%cast, dense<[[[[0, 1, 2], [4, 5, 6], [8, 9, 10]],
@@ -89,7 +89,7 @@ func.func @pack_large() {
       linalg.yield %linearized_i32 : i32
   } -> tensor<128x256xi32>
   %init_pack = linalg.init_tensor [4, 16, 32, 16] : tensor<4x16x32x16xi32>
-  %pack = iree_linalg_ext.pack %source dims_pos = [0, 1] inner_tiles = [32, 16] into %init_pack
+  %pack = iree_linalg_ext.pack %source inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %init_pack
       : (tensor<128x256xi32> tensor<4x16x32x16xi32>) -> tensor<4x16x32x16xi32>
   // Pack without padding is just a reshape followed by a transpose.
   %reshape = tensor.expand_shape %source [[0, 1], [2, 3]] : tensor<128x256xi32> into tensor<4x32x16x16xi32>
@@ -128,7 +128,7 @@ func.func @dynamic_pack_large() {
   %tiled_d0 = arith.ceildivui %d0, %c32 : index
   %tiled_d1 = arith.ceildivui %d1, %c16 : index
   %dyn_init_pack = linalg.init_tensor [%tiled_d0, %tiled_d1, 32, 16] : tensor<?x?x32x16xi32>
-  %pack = iree_linalg_ext.pack %source dims_pos = [0, 1] inner_tiles = [32, 16] into %dyn_init_pack
+  %pack = iree_linalg_ext.pack %source inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %dyn_init_pack
       : (tensor<?x?xi32> tensor<?x?x32x16xi32>) -> tensor<?x?x32x16xi32>
   %cast_pack = tensor.cast %pack : tensor<?x?x32x16xi32> to tensor<4x16x32x16xi32>
 
@@ -174,7 +174,7 @@ func.func @pack_transpose_large() {
       linalg.yield %linearized_i32 : i32
   } -> tensor<128x256xi32>
   %init_pack = linalg.init_tensor [4, 16, 16, 32] : tensor<4x16x16x32xi32>
-  %pack = iree_linalg_ext.pack %source dims_pos = [1, 0] inner_tiles = [16, 32] into %init_pack
+  %pack = iree_linalg_ext.pack %source inner_dims_pos = [1, 0] inner_tiles = [16, 32] into %init_pack
       : (tensor<128x256xi32> tensor<4x16x16x32xi32>) -> tensor<4x16x16x32xi32>
   %reshape = tensor.expand_shape %source [[0, 1], [2, 3]] : tensor<128x256xi32> into tensor<4x32x16x16xi32>
   %init_transpose = linalg.init_tensor[4, 16, 16, 32] : tensor<4x16x16x32xi32>
@@ -211,7 +211,7 @@ func.func @dynamic_pack_transpose_large() {
   %tiled_d0 = arith.ceildivui %d0, %c32 : index
   %tiled_d1 = arith.ceildivui %d1, %c16 : index
   %dyn_init_pack = linalg.init_tensor [%tiled_d0, %tiled_d1, 16, 32] : tensor<?x?x16x32xi32>
-  %pack = iree_linalg_ext.pack %source dims_pos = [1, 0] inner_tiles = [16, 32] into %dyn_init_pack
+  %pack = iree_linalg_ext.pack %source inner_dims_pos = [1, 0] inner_tiles = [16, 32] into %dyn_init_pack
       : (tensor<?x?xi32> tensor<?x?x16x32xi32>) -> tensor<?x?x16x32xi32>
   %cast_pack = tensor.cast %pack : tensor<?x?x16x32xi32> to tensor<4x16x16x32xi32>
 
@@ -259,7 +259,7 @@ func.func @pack_pad_large() {
   %padding_value = arith.constant 42 : i32
   %init_pack = linalg.init_tensor [4, 16, 32, 16] : tensor<4x16x32x16xi32>
   %pack = iree_linalg_ext.pack %source padding_value(%padding_value : i32)
-      dims_pos = [0, 1] inner_tiles = [32, 16] into %init_pack
+      inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %init_pack
       : (tensor<100x250xi32> tensor<4x16x32x16xi32>) -> tensor<4x16x32x16xi32>
   %pad = tensor.pad %source low[0, 0] high[28, 6] {
     ^bb0(%b0 : index, %b1 : index):
@@ -302,7 +302,7 @@ func.func @dynamic_pack_pad_large() {
   %tiled_d1 = arith.ceildivui %d1, %c16 : index
   %dyn_init_pack = linalg.init_tensor [%tiled_d0, %tiled_d1, 32, 16] : tensor<?x?x32x16xi32>
   %pack = iree_linalg_ext.pack %source padding_value(%padding_value : i32)
-      dims_pos = [0, 1] inner_tiles = [32, 16] into %dyn_init_pack
+      inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %dyn_init_pack
       : (tensor<?x?xi32> tensor<?x?x32x16xi32>) -> tensor<?x?x32x16xi32>
   %cast_pack = tensor.cast %pack : tensor<?x?x32x16xi32> to tensor<4x16x32x16xi32>
 
@@ -358,7 +358,7 @@ func.func @pack_pad_transpose_large() {
   %padding_value = arith.constant 42 : i32
   %init_pack = linalg.init_tensor [4, 16, 16, 32] : tensor<4x16x16x32xi32>
   %pack = iree_linalg_ext.pack %source padding_value(%padding_value : i32)
-      dims_pos = [1, 0] inner_tiles = [16, 32] into %init_pack
+      inner_dims_pos = [1, 0] inner_tiles = [16, 32] into %init_pack
       : (tensor<100x250xi32> tensor<4x16x16x32xi32>) -> tensor<4x16x16x32xi32>
   %pad = tensor.pad %source low[0, 0] high[28, 6] {
     ^bb0(%b0 : index, %b1 : index):
@@ -401,7 +401,7 @@ func.func @dynamic_pack_pad_transpose_large() {
   %padding_value = arith.constant 42 : i32
   %init_pack = linalg.init_tensor [%tiled_d0, %tiled_d1, 16, 32] : tensor<?x?x16x32xi32>
   %pack = iree_linalg_ext.pack %source padding_value(%padding_value : i32)
-      dims_pos = [1, 0] inner_tiles = [16, 32] into %init_pack
+      inner_dims_pos = [1, 0] inner_tiles = [16, 32] into %init_pack
       : (tensor<?x?xi32> tensor<?x?x16x32xi32>) -> tensor<?x?x16x32xi32>
   %cast_pack = tensor.cast %pack : tensor<?x?x16x32xi32> to tensor<4x16x16x32xi32>
 
