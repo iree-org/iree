@@ -1581,8 +1581,6 @@ static SmallVector<T> interchange(ArrayRef<T> elements,
   SmallVector<T> rearrangedElements = llvm::to_vector(elements);
   if (interchangeVector.empty())
     return rearrangedElements;
-  // assert((rearrangedElements.size() - offset) == interchangeVector.size() &&
-  //        "number of elements must equal number of permutations");
   for (int64_t idx = 0, end = interchangeVector.size(); idx < end; idx++) {
     rearrangedElements[interchangeVector[idx] + offset] =
         elements[idx + offset];
