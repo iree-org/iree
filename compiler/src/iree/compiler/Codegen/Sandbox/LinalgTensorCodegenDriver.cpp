@@ -29,6 +29,8 @@ using namespace mlir;
 // using namespace mlir::linalg;
 
 using mlir::iree_compiler::IREE::LinalgExt::CodegenStrategy;
+using mlir::iree_compiler::IREE::LinalgExt::LinalgPeelOptions;
+using mlir::iree_compiler::IREE::LinalgExt::LinalgVectorLoweringOptions;
 
 #define DEBUG_TYPE "iree-linalg-tensor-codegen-driver"
 
@@ -416,7 +418,7 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
 
   // Gather tiled loops that aren't distribution loops from previous tiling
   // stages.
-  linalg::LinalgPeelOptions peelingOptions;
+  LinalgPeelOptions peelingOptions;
   peelingOptions.loopsToPeelComputationFunction =
       [](OpBuilder &builder, Operation *op,
          SmallVectorImpl<scf::ForOp> &loopsToPeel) {
@@ -499,8 +501,8 @@ void LinalgVectorLoweringPass::runOnOperation() {
           .enableFullUnroll(unrollVectorTransfers)
           .enableLowerPermutationMaps();
 
-  linalg::LinalgVectorLoweringOptions vectorLoweringOptions =
-      linalg::LinalgVectorLoweringOptions()
+  LinalgVectorLoweringOptions vectorLoweringOptions =
+      LinalgVectorLoweringOptions()
           // Lowering of vector contractions.
           .enableContractionLowering(vectorLoweringStage >= 0)
           // Lowering of vector multi_reduction.
