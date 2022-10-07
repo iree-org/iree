@@ -433,7 +433,7 @@ struct LinalgStrategyLowerVectorsPass
     : public LinalgStrategyLowerVectorsPassBase<
           LinalgStrategyLowerVectorsPass> {
 
-  LinalgStrategyLowerVectorsPass(linalg::LinalgVectorLoweringOptions opt,
+  LinalgStrategyLowerVectorsPass(LinalgVectorLoweringOptions opt,
                                  linalg::LinalgTransformationFilter filt)
       : options(opt), filter(std::move(filt)) {}
 
@@ -490,7 +490,7 @@ struct LinalgStrategyLowerVectorsPass
     (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
   }
 
-  linalg::LinalgVectorLoweringOptions options;
+  LinalgVectorLoweringOptions options;
   linalg::LinalgTransformationFilter filter;
 };
 
@@ -567,7 +567,7 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyEnablePass(
 /// Create a LinalgStrategyLowerVectorsPass.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLinalgStrategyLowerVectorsPass(
-    linalg::LinalgVectorLoweringOptions opt,
+    LinalgVectorLoweringOptions opt,
     const linalg::LinalgTransformationFilter &filter) {
   return std::make_unique<LinalgStrategyLowerVectorsPass>(opt, filter);
 }

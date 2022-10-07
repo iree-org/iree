@@ -30,6 +30,7 @@ using namespace mlir;
 
 using mlir::iree_compiler::IREE::LinalgExt::CodegenStrategy;
 using mlir::iree_compiler::IREE::LinalgExt::LinalgPeelOptions;
+using mlir::iree_compiler::IREE::LinalgExt::LinalgVectorLoweringOptions;
 
 #define DEBUG_TYPE "iree-linalg-tensor-codegen-driver"
 
@@ -500,8 +501,8 @@ void LinalgVectorLoweringPass::runOnOperation() {
           .enableFullUnroll(unrollVectorTransfers)
           .enableLowerPermutationMaps();
 
-  linalg::LinalgVectorLoweringOptions vectorLoweringOptions =
-      linalg::LinalgVectorLoweringOptions()
+  LinalgVectorLoweringOptions vectorLoweringOptions =
+      LinalgVectorLoweringOptions()
           // Lowering of vector contractions.
           .enableContractionLowering(vectorLoweringStage >= 0)
           // Lowering of vector multi_reduction.

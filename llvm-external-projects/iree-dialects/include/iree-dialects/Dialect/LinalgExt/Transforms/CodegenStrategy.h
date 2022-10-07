@@ -148,7 +148,7 @@ private:
 /// Represent one application of createLinalgStrategyLowerVectorsPass.
 struct VectorLowering : public Transformation {
   explicit VectorLowering(
-      linalg::LinalgVectorLoweringOptions options,
+      LinalgVectorLoweringOptions options,
       linalg::LinalgTransformationFilter::FilterFunction f = nullptr)
       : Transformation(std::move(f)), options(options) {}
 
@@ -158,7 +158,7 @@ struct VectorLowering : public Transformation {
   }
 
 private:
-  linalg::LinalgVectorLoweringOptions options;
+  LinalgVectorLoweringOptions options;
 };
 
 /// Codegen strategy controls how a Linalg op is progressively lowered.
@@ -255,7 +255,7 @@ struct CodegenStrategy {
     return b ? vectorize(opName, std::move(f), vectorizePadding) : *this;
   }
   /// Append a pattern to lower all vector operations.
-  CodegenStrategy &vectorLowering(linalg::LinalgVectorLoweringOptions options) {
+  CodegenStrategy &vectorLowering(LinalgVectorLoweringOptions options) {
     transformationSequence.emplace_back(
         std::make_unique<VectorLowering>(options));
     return *this;
