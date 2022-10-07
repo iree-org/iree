@@ -847,6 +847,10 @@ static Optional<OpOperand *> getFusableUse(Operation *op,
                                            bool fuseMultiUse) {
   if (!fuseMultiUse && !op->hasOneUse()) return llvm::None;
 
+  // Don't fuse `linalg.fill` if it has multi uses. This might result in a
+  // dispatch with multi results just to return the filled tensors.
+  if (isa<linalg::FillOp>(op) && !op->hasOneUse()) return llvm::None;
+
   for (auto &use : op->getUses()) {
     Operation *user = use.getOwner();
     if (llvm::all_of(op->getUsers(), [&](Operation *c) {
