@@ -8,6 +8,7 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/PassDetail.h"
+#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
@@ -88,6 +89,77 @@ LinalgVectorizationPattern::matchAndRewrite(linalg::LinalgOp linalgOp,
 }
 
 namespace {
+
+///
+/// Linalg peeling patterns.
+///
+
+/// Compute the loops to peel and return them in a SmallVector. Loops will be
+/// peeled in order of appearance in the SmallVector. This order will impact the
+/// output IR. If an inner-to-outer order is provided, the peeled iterations of
+/// the outer loops will also contain the peeled inner loops. If an
+/// outer-to-inner order is provided, the peeled iterations of the outer loops
+/// will not contain any peeled inner loops.
+
+/// `filter` controls LinalgTransformMarker matching and update when specified.
+struct LinalgPeelingPattern
+    : public OpInterfaceRewritePattern<linalg::LinalgOp> {
+  /// Construct a generic pattern applied to all LinalgOp that verify `filter`.
+  LinalgPeelingPattern(MLIRContext *context,
+                       linalg::LinalgTransformationFilter f =
+                           linalg::LinalgTransformationFilter(),
+                       LinalgPeelOptions options = LinalgPeelOptions(),
+                       PatternBenefit benefit = 1);
+
+  /// Construct a pattern specifically applied to `opName`.
+  LinalgPeelingPattern(StringRef opName, MLIRContext *context,
+                       LinalgPeelOptions options = LinalgPeelOptions(),
+                       linalg::LinalgTransformationFilter f =
+                           linalg::LinalgTransformationFilter(),
+                       PatternBenefit benefit = 1);
+
+  LogicalResult matchAndRewrite(linalg::LinalgOp linalgOp,
+                                PatternRewriter &rewriter) const override;
+
+private:
+  /// LinalgTransformMarker handles special attribute manipulations.
+  const linalg::LinalgTransformationFilter filter;
+  /// Peeling options.
+  const LinalgPeelOptions options;
+};
+
+LinalgPeelingPattern::LinalgPeelingPattern(MLIRContext *context,
+                                           linalg::LinalgTransformationFilter f,
+                                           LinalgPeelOptions options,
+                                           PatternBenefit benefit)
+    : OpInterfaceRewritePattern<linalg::LinalgOp>(context, benefit),
+      filter(std::move(f)), options(std::move(options)) {}
+
+LinalgPeelingPattern::LinalgPeelingPattern(StringRef opName,
+                                           MLIRContext *context,
+                                           LinalgPeelOptions options,
+                                           linalg::LinalgTransformationFilter f,
+                                           PatternBenefit benefit)
+    : OpInterfaceRewritePattern<linalg::LinalgOp>(context, benefit),
+      filter(f.addOpNameFilter(opName)), options(std::move(options)) {}
+
+LogicalResult
+LinalgPeelingPattern::matchAndRewrite(linalg::LinalgOp linalgOp,
+                                      PatternRewriter &rewriter) const {
+  if (failed(filter.checkAndNotify(rewriter, linalgOp)))
+    return failure();
+
+  // Increase marker counter even if peeling doesn't happen for this op.
+  filter.replaceLinalgTransformationFilter(rewriter, linalgOp);
+
+  if (!options.loopsToPeelComputationFunction)
+    return failure();
+
+  SmallVector<scf::ForOp, 4> loopsToPeel;
+  options.loopsToPeelComputationFunction(rewriter, linalgOp, loopsToPeel);
+  linalg::peelLoops(rewriter, loopsToPeel);
+  return success();
+}
 
 /// Configurable pass to apply pattern-based tiling and fusion.
 struct LinalgStrategyTileAndFusePass
@@ -221,7 +293,7 @@ struct LinalgStrategyPeelPass
 
   LinalgStrategyPeelPass() = default;
 
-  LinalgStrategyPeelPass(StringRef opName, linalg::LinalgPeelOptions opt,
+  LinalgStrategyPeelPass(StringRef opName, LinalgPeelOptions opt,
                          linalg::LinalgTransformationFilter filt)
       : options(std::move(opt)), filter(std::move(filt)) {
     this->anchorOpName.setValue(opName.str());
@@ -234,18 +306,18 @@ struct LinalgStrategyPeelPass
 
     RewritePatternSet peelingPatterns(funcOp.getContext());
     if (!anchorOpName.empty()) {
-      peelingPatterns.add<linalg::LinalgPeelingPattern>(
+      peelingPatterns.add<LinalgPeelingPattern>(
           anchorOpName, funcOp.getContext(), options, filter);
     } else {
-      peelingPatterns.add<linalg::LinalgPeelingPattern>(funcOp.getContext(),
-                                                        filter, options);
+      peelingPatterns.add<LinalgPeelingPattern>(funcOp.getContext(), filter,
+                                                options);
     }
     if (failed(
             applyPatternsAndFoldGreedily(funcOp, std::move(peelingPatterns))))
       return signalPassFailure();
   }
 
-  linalg::LinalgPeelOptions options;
+  LinalgPeelOptions options;
   linalg::LinalgTransformationFilter filter;
 };
 
@@ -361,7 +433,7 @@ struct LinalgStrategyLowerVectorsPass
     : public LinalgStrategyLowerVectorsPassBase<
           LinalgStrategyLowerVectorsPass> {
 
-  LinalgStrategyLowerVectorsPass(linalg::LinalgVectorLoweringOptions opt,
+  LinalgStrategyLowerVectorsPass(LinalgVectorLoweringOptions opt,
                                  linalg::LinalgTransformationFilter filt)
       : options(opt), filter(std::move(filt)) {}
 
@@ -418,7 +490,7 @@ struct LinalgStrategyLowerVectorsPass
     (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
   }
 
-  linalg::LinalgVectorLoweringOptions options;
+  LinalgVectorLoweringOptions options;
   linalg::LinalgTransformationFilter filter;
 };
 
@@ -472,8 +544,7 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyDecomposePass(
 
 /// Create a LinalgStrategyPeelPass.
 std::unique_ptr<OperationPass<func::FuncOp>>
-createLinalgStrategyPeelPass(StringRef opName,
-                             const linalg::LinalgPeelOptions &opt,
+createLinalgStrategyPeelPass(StringRef opName, const LinalgPeelOptions &opt,
                              const linalg::LinalgTransformationFilter &filter) {
   return std::make_unique<LinalgStrategyPeelPass>(opName, opt, filter);
 }
@@ -496,7 +567,7 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyEnablePass(
 /// Create a LinalgStrategyLowerVectorsPass.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLinalgStrategyLowerVectorsPass(
-    linalg::LinalgVectorLoweringOptions opt,
+    LinalgVectorLoweringOptions opt,
     const linalg::LinalgTransformationFilter &filter) {
   return std::make_unique<LinalgStrategyLowerVectorsPass>(opt, filter);
 }
