@@ -84,10 +84,12 @@ Optional<SmallVector<int64_t, 4>> getNativeVectorShape(Operation *op) {
     }
     return nativeSize;
   } else if (auto contractOp = dyn_cast<vector::ContractionOp>(op)) {
-    unsigned lastParallelDim = 0;
-    for (const auto &it : llvm::enumerate(contractOp.getIteratorTypes())) {
-      if (vector::isParallelIterator(it.value())) lastParallelDim = it.index();
-    }
+    // Find the contract output's innermost dimension. It is guaranteed to be a
+    // parallel dimension due to contract definition. Unroll it with compute
+    // size.
+    AffineMap resultMap = contractOp.getIndexingMapsArray().back();
+    unsigned lastParallelDim =
+        resultMap.getDimPosition(resultMap.getNumResults() - 1);
     SmallVector<int64_t, 4> nativeSize(contractOp.getIteratorTypes().size(), 1);
     SmallVector<int64_t, 4> bounds;
     contractOp.getIterationBounds(bounds);
