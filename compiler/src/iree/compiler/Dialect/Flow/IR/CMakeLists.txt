@@ -39,6 +39,7 @@ iree_cc_library(
     ::FlowTypesGen
     LLVMSupport
     MLIRAffineDialect
+    MLIRAffineUtils
     MLIRAnalysis
     MLIRArithDialect
     MLIRArithUtils
