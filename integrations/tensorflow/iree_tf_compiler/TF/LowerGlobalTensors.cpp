@@ -144,7 +144,7 @@ void LowerGlobalTensors::runOnOperation() {
     auto exportedNames = tf_saved_model::GetExportedNames(globalTensor);
     std::string name;
     if (exportedNames.empty()) {
-      name = globalTensor.sym_name().str();
+      name = globalTensor.getSymName().str();
     } else if (exportedNames.size() == 1) {
       name = exportedNames[0].str();
     } else {
@@ -154,8 +154,8 @@ void LowerGlobalTensors::runOnOperation() {
       return;
     }
     auto global = globalBuilder.create<mlir::ml_program::GlobalOp>(
-        globalTensor.getLoc(), name, globalTensor.value().getType(),
-        globalTensor.is_mutable(), globalTensor.value(), nullptr);
+        globalTensor.getLoc(), name, globalTensor.getValue().getType(),
+        globalTensor.getIsMutable(), globalTensor.getValue(), nullptr);
     global.setPrivate();
     symbolRefMap[globalTensor] = global;
   }
