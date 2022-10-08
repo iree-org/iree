@@ -15,6 +15,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Affine/ViewLikeInterfaceUtils.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -125,47 +126,6 @@ static llvm::SmallBitVector getDroppedDimsImpl(
     droppedDims.set(size.index());
   }
   return droppedDims;
-}
-
-/// Helper function to create `AffineExpr` from `OpFoldResult`. If the
-/// `OpFoldResult` is a `Value`, creates a `AffineSymbolExpr` and appends it to
-/// `symbols`.
-static AffineExpr getAffineExpr(OpFoldResult ofr,
-                                SmallVector<OpFoldResult> &symbols) {
-  if (auto attr = ofr.dyn_cast<Attribute>()) {
-    return getAffineConstantExpr(attr.cast<IntegerAttr>().getInt(),
-                                 attr.getContext());
-  }
-  Value v = ofr.get<Value>();
-  AffineExpr expr = getAffineSymbolExpr(symbols.size(), v.getContext());
-  symbols.push_back(v);
-  return expr;
-}
-/// Converts an `AffineExpr` to `OpFoldResult` by generating an `affine.apply`
-/// operation.
-static OpFoldResult getOpFoldResult(OpBuilder &builder, Location loc,
-                                    AffineExpr expr,
-                                    SmallVector<OpFoldResult> &symbols) {
-  AffineMap m = AffineMap::get(0, symbols.size(), expr);
-  return makeComposedFoldedAffineApply(builder, loc, m, symbols);
-}
-
-/// Methods to build the Affine Expr for arithmetic operations.
-static AffineExpr add(AffineExpr expr, OpFoldResult ofr,
-                      SmallVector<OpFoldResult> &symbols) {
-  return expr + getAffineExpr(ofr, symbols);
-}
-static AffineExpr add(OpFoldResult lhs, OpFoldResult rhs,
-                      SmallVector<OpFoldResult> &symbols) {
-  return getAffineExpr(lhs, symbols) + getAffineExpr(rhs, symbols);
-}
-static AffineExpr mul(AffineExpr expr, OpFoldResult ofr,
-                      SmallVector<OpFoldResult> &symbols) {
-  return expr * getAffineExpr(ofr, symbols);
-}
-static AffineExpr mul(OpFoldResult lhs, OpFoldResult rhs,
-                      SmallVector<OpFoldResult> &symbols) {
-  return getAffineExpr(lhs, symbols) * getAffineExpr(rhs, symbols);
 }
 
 /// Returns the `hal.interface.binding` a value comes from.
@@ -1421,70 +1381,6 @@ SmallVector<int64_t, 4> TensorUpdateOp::getTiedResultOperandIndices() {
 // Public methods
 //===----------------------------------------------------------------------===//
 
-// Returns the offsets, sizes and strides to use when combining two operations
-// that implement the `OffsetSizeAndStrideOpInterface`.
-LogicalResult foldOffsetsSizesAndStrides(
-    OpBuilder &builder, Location loc, ArrayRef<OpFoldResult> producerOffsets,
-    ArrayRef<OpFoldResult> producerSizes,
-    ArrayRef<OpFoldResult> producerStrides,
-    const llvm::SmallBitVector &droppedProducerDims,
-    ArrayRef<OpFoldResult> consumerOffsets,
-    ArrayRef<OpFoldResult> consumerSizes,
-    ArrayRef<OpFoldResult> consumerStrides,
-    SmallVector<OpFoldResult> &combinedOffsets,
-    SmallVector<OpFoldResult> &combinedSizes,
-    SmallVector<OpFoldResult> &combinedStrides) {
-  combinedOffsets.resize(producerOffsets.size());
-  combinedSizes.resize(producerOffsets.size());
-  combinedStrides.resize(producerOffsets.size());
-  unsigned consumerPos = 0;
-  for (auto i : llvm::seq<unsigned>(0, producerOffsets.size())) {
-    if (droppedProducerDims.test(i)) {
-      // For dropped dims, get the values from the producer.
-      combinedOffsets[i] = producerOffsets[i];
-      combinedSizes[i] = producerSizes[i];
-      combinedStrides[i] = producerStrides[i];
-      continue;
-    }
-    SmallVector<OpFoldResult> offsetSymbols, strideSymbols;
-    // The combined offset is computed as
-    //    producer_offset + consumer_offset * producer_strides.
-    combinedOffsets[i] =
-        getOpFoldResult(builder, loc,
-                        add(mul(consumerOffsets[consumerPos],
-                                producerStrides[i], offsetSymbols),
-                            producerOffsets[i], offsetSymbols),
-                        offsetSymbols);
-    combinedSizes[i] = consumerSizes[consumerPos];
-    // The combined stride is computed as
-    //    consumer_stride * producer_stride.
-    combinedStrides[i] = getOpFoldResult(
-        builder, loc,
-        mul(consumerStrides[consumerPos], producerStrides[i], strideSymbols),
-        strideSymbols);
-    consumerPos++;
-  }
-  return success();
-}
-LogicalResult foldOffsetsSizesAndStrides(
-    OpBuilder &builder, Location loc, OffsetSizeAndStrideOpInterface producer,
-    OffsetSizeAndStrideOpInterface consumer,
-    const llvm::SmallBitVector &droppedProducerDims,
-    SmallVector<OpFoldResult> &combinedOffsets,
-    SmallVector<OpFoldResult> &combinedSizes,
-    SmallVector<OpFoldResult> &combinedStrides) {
-  SmallVector<OpFoldResult> consumerOffsets = consumer.getMixedOffsets();
-  SmallVector<OpFoldResult> consumerSizes = consumer.getMixedSizes();
-  SmallVector<OpFoldResult> consumerStrides = consumer.getMixedStrides();
-  SmallVector<OpFoldResult> producerOffsets = producer.getMixedOffsets();
-  SmallVector<OpFoldResult> producerSizes = producer.getMixedSizes();
-  SmallVector<OpFoldResult> producerStrides = producer.getMixedStrides();
-  return foldOffsetsSizesAndStrides(
-      builder, loc, producerOffsets, producerSizes, producerStrides,
-      droppedProducerDims, consumerOffsets, consumerSizes, consumerStrides,
-      combinedOffsets, combinedSizes, combinedStrides);
-}
-
 /// Pattern to fold `flow.dispatch.tensor.load` -> `tensor.extract_slice`.
 // TODO(ravishankarm): Eventually this should go in as a canonicalization at the
 // Flow level.
@@ -1502,7 +1398,7 @@ struct FoldTensorLoadWithExtractSlice
     SmallVector<OpFoldResult> offsets, sizes, strides;
     // `tensor.extract_slice` (i.e. the producer) folds **into**
     // `flow.dispatch.tensor.load1 (i.e. the consumer).
-    if (failed(foldOffsetsSizesAndStrides(
+    if (failed(mergeOffsetsSizesAndStrides(
             rewriter, dispatchTensorLoadOp->getLoc(), dispatchTensorLoadOp,
             extractSliceOp, dispatchTensorLoadOp.getDroppedDims(), offsets,
             sizes, strides))) {
@@ -1546,7 +1442,7 @@ struct FoldInsertSliceWithTensorStoreOp
     SmallVector<OpFoldResult> offsets, sizes, strides;
     // `tensor.insert_slice` (i.e. the producer) folds **into**
     // `flow.dispatch.tensor.store` (i.e. the consumer).
-    if (failed(foldOffsetsSizesAndStrides(
+    if (failed(mergeOffsetsSizesAndStrides(
             rewriter, dispatchTensorStoreOp->getLoc(), dispatchTensorStoreOp,
             insertSliceOp, dispatchTensorStoreOp.getDroppedDims(), offsets,
             sizes, strides))) {

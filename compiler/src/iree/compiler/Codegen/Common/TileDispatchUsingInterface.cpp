@@ -13,6 +13,7 @@
 #include "iree/compiler/Utils/GraphUtils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Affine/ViewLikeInterfaceUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -221,7 +222,7 @@ static LogicalResult replaceStoreWithTiledVersion(
   SmallVector<OpFoldResult> tileStrides(tileOffsets.size(),
                                         rewriter.getIndexAttr(1));
   SmallVector<OpFoldResult> combinedOffsets, combinedSizes, combinedStrides;
-  if (failed(IREE::Flow::foldOffsetsSizesAndStrides(
+  if (failed(mergeOffsetsSizesAndStrides(
           rewriter, storeOp.getLoc(), storeOp.getMixedOffsets(),
           storeOp.getMixedSizes(), storeOp.getMixedStrides(),
           storeOp.getDroppedDims(), tileOffsets, tileSizes, tileStrides,
@@ -716,7 +717,7 @@ struct SwapExtractSliceWithDispatchTensorLoad
     if (!loadOp) return failure();
 
     SmallVector<OpFoldResult> combinedOffsets, combinedSizes, combinedStrides;
-    if (failed(IREE::Flow::foldOffsetsSizesAndStrides(
+    if (failed(mergeOffsetsSizesAndStrides(
             rewriter, loadOp.getLoc(), loadOp, sliceOp, loadOp.getDroppedDims(),
             combinedOffsets, combinedSizes, combinedStrides))) {
       return rewriter.notifyMatchFailure(
