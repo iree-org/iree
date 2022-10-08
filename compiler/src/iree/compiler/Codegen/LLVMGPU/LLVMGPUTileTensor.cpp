@@ -154,8 +154,8 @@ static LogicalResult tileAndUnrollConv(func::FuncOp funcOp) {
         llvm::to_vector<4>(llvm::seq<int64_t>(0, tileSizes.size()));
 
     FailureOr<linalg::TileLoopNest> loopNest =
-        linalg::tileConsumerAndFuseProducers(builder, consumerOp, tileSizes,
-                                             identityLoopOrder, llvm::None);
+        IREE::LinalgExt::tileConsumerAndFuseProducers(
+            builder, consumerOp, tileSizes, identityLoopOrder, llvm::None);
     if (failed(loopNest)) {
       consumerOp.emitOpError("failed tiling and fusing producers");
       return failure();
