@@ -107,6 +107,7 @@ IREE::Codegen::LoweringConfigAttr getLoweringConfig(Operation *op);
 /// `iree_codegen.lowering_config` attribute is set on it.
 SmallVector<int64_t> getTileSizes(Operation *op, unsigned level);
 SmallVector<Value, 4> getTileSizes(OpBuilder &b, Operation *op, unsigned level);
+unsigned getNumTileLevels(Operation *op);
 
 /// Sets the lowering configuration, overwriting existing attribute values.
 void setLoweringConfig(Operation *op, IREE::Codegen::LoweringConfigAttr config);
