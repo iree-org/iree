@@ -92,4 +92,3 @@ hal.executable @batch_matmul_16x4096x40x77 {
 //      CHECK: func.func @batch_matmul_16x4096x40x77()
 //      CHECK:   linalg.batch_matmul
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
-
