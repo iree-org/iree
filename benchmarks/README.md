@@ -5,7 +5,7 @@ benchmarks suite. Benchmark results are posted to https://perf.iree.dev.
 
 The https://buildkite.com/iree/iree-benchmark Buildkite pipeline runs on each
 commit to the `main` branch and posts those results to the dashboard. The
-pipeline also runs on pull requests with the `buildkite:benchmark` label,
+pipeline also runs on pull requests with the `buildkite:benchmark-*` label,
 posting results compared against their base commit as comments.
 
 ## Types of benchmarks
@@ -44,7 +44,7 @@ posting results compared against their base commit as comments.
    your desired benchmark configuration with the `iree_mlir_benchmark_suite`
    function. You can test your change by running the
    https://buildkite.com/iree/iree-benchmark pipeline on a GitHub pull request
-   with the `buildkite:benchmark` label.
+   with the `buildkite:benchmark-*` label.
 
 5. Once your changes are merged to the `main` branch, results will start to
    appear on the benchmarks dashboard at https://perf.iree.dev.
