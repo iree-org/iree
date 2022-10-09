@@ -70,7 +70,7 @@ def _generate_table(df_iree, df_shark, df_baseline, title):
           iree_results = iree_results_per_datatype.loc[
               iree_results_per_datatype.device == device]
           if len(iree_results) != 3:
-            print(f"Warning! Expected number of results to be 3. Got" 
+            print(f"Warning! Expected number of results to be 3. Got"
                   f" {len(iree_results)}")
             print(iree_results)
             continue
@@ -85,9 +85,10 @@ def _generate_table(df_iree, df_shark, df_baseline, title):
             # We use snapshots of latencies for baseline. If it is a new
             # benchmark that is not included in the snapshot yet, emit a
             # warning.
-            print(f"Warning: No baseline results found for {model}, {dialect},"
-                  f" {data_type}, {device}. Using IREE version as baseline. Please"
-                  f" update baseline csv.")
+            print(
+                f"Warning: No baseline results found for {model}, {dialect},"
+                f" {data_type}, {device}. Using IREE version as baseline. Please"
+                f" update baseline csv.")
             engine = iree_results.engine.iloc[0]
             baseline_latency = iree_results.loc[iree_results.engine == engine]
             baseline_latency = baseline_latency.iloc[0]["ms/iter"]
@@ -125,8 +126,8 @@ def _generate_table(df_iree, df_shark, df_baseline, title):
           summary.loc[len(summary)] = [
               model, engine, data_type, dialect, device,
               f"{baseline_latency:.1f}", f"{iree_latency:.1f}",
-              f"{shark_latency:.1f}", iree_vs_baseline,
-              shark_vs_baseline, iree_vs_shark
+              f"{shark_latency:.1f}", iree_vs_baseline, shark_vs_baseline,
+              iree_vs_shark
           ]
 
   summary = summary.round(2)
@@ -213,40 +214,36 @@ def main(args):
   html = html_utils.generate_header_and_legend(verison_html)
 
   # Generate Server CPU Static.
-  html += generate_table(
-      args.cpu_iree_csv,
-      args.cpu_baseline_csv,
-      shark_csv=args.cpu_shark_csv,
-      shape_type="static",
-      device="cpu",
-      title="Server Intel Ice Lake CPU (Static Shapes)")
+  html += generate_table(args.cpu_iree_csv,
+                         args.cpu_baseline_csv,
+                         shark_csv=args.cpu_shark_csv,
+                         shape_type="static",
+                         device="cpu",
+                         title="Server Intel Ice Lake CPU (Static Shapes)")
 
   # Generate Server GPU Static.
-  html += generate_table(
-      args.gpu_iree_csv,
-      args.gpu_baseline_csv,
-      shark_csv=args.gpu_shark_csv,
-      shape_type="static",
-      device="cuda",
-      title="Server NVIDIA Tesla A100 GPU (Static Shapes)")
+  html += generate_table(args.gpu_iree_csv,
+                         args.gpu_baseline_csv,
+                         shark_csv=args.gpu_shark_csv,
+                         shape_type="static",
+                         device="cuda",
+                         title="Server NVIDIA Tesla A100 GPU (Static Shapes)")
 
   # Generate Server CPU Dynamic.
-  html += generate_table(
-      args.cpu_iree_csv,
-      args.cpu_baseline_csv,
-      shark_csv=args.cpu_shark_csv,
-      shape_type="dynamic",
-      device="cpu",
-      title="Server Intel Ice Lake CPU (Dynamic Shapes)")
+  html += generate_table(args.cpu_iree_csv,
+                         args.cpu_baseline_csv,
+                         shark_csv=args.cpu_shark_csv,
+                         shape_type="dynamic",
+                         device="cpu",
+                         title="Server Intel Ice Lake CPU (Dynamic Shapes)")
 
   # Generate Server GPU Dynamic.
-  html += generate_table(
-      args.gpu_iree_csv,
-      args.gpu_baseline_csv,
-      shark_csv=args.gpu_shark_csv,
-      shape_type="dynamic",
-      device="cuda",
-      title="Server NVIDIA Tesla A100 GPU (Dynamic Shapes)")
+  html += generate_table(args.gpu_iree_csv,
+                         args.gpu_baseline_csv,
+                         shark_csv=args.gpu_shark_csv,
+                         shape_type="dynamic",
+                         device="cuda",
+                         title="Server NVIDIA Tesla A100 GPU (Dynamic Shapes)")
 
   args.output_path.write_text(html)
 
@@ -258,8 +255,7 @@ def parse_args():
       type=str,
       default=None,
       help="The path to the csv file with CPU benchmarking results from the "
-           "SHARK runtime."
-  )
+      "SHARK runtime.")
   parser.add_argument(
       "--cpu_iree_csv",
       type=str,
@@ -275,8 +271,7 @@ def parse_args():
       type=str,
       default=None,
       help="The path to the csv file with GPU benchmarking results from the "
-           "SHARK runtime."
-  )
+      "SHARK runtime.")
   parser.add_argument(
       "--gpu_iree_csv",
       type=str,
