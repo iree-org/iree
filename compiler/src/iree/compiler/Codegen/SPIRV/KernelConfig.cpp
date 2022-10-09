@@ -296,10 +296,8 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op, int64_t subgroupSize,
   }
 
   LLVM_DEBUG({
-    llvm::dbgs() << "bIndex = " << bIndex << "\n";
-    llvm::dbgs() << "mIndex = " << mIndex << "\n";
-    llvm::dbgs() << "kIndex = " << kIndex << "\n";
-    llvm::dbgs() << "nIndex = " << nIndex << "\n";
+    llvm::dbgs() << "(B, M, N, K) indices = (" << bIndex << ", " << mIndex
+                 << ", " << nIndex << ", " << kIndex << ")\n";
   });
   if (mIndex < 0 || nIndex < 0 || kIndex < 0) return success();
 
@@ -330,6 +328,13 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op, int64_t subgroupSize,
     bestY = llvm::divideCeil(bestY, factor);
   }
 
+  LLVM_DEBUG({
+    llvm::dbgs() << "best thread tile size (M, N, K) = (" << bestThreadM << ", "
+                 << bestThreadN << ", " << bestThreadK << ")\n";
+    llvm::dbgs() << "best workgroup size (X, Y) = (" << bestX << ", " << bestY
+                 << ")\n";
+  });
+
   int64_t residualThreads = bestX * bestY;
   int64_t residualTilingFactor = (bestThreadM + bestThreadK) * bestThreadN;
 
@@ -357,10 +362,6 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op, int64_t subgroupSize,
     }
   }
   if (workgroupTileSizes[nIndex] == 0) return success();
-
-  // Don't overshoot when using workgroup memory to avoid blowing up workgroup
-  // memory size.
-  if (useWorkgroupMemory) residualThreads = std::min(residualThreads, bestY);
 
   // Deduce the configuration for the M dimension. Start with the best workgroup
   // Y size, and reduce by a factor of two each time.
@@ -398,6 +399,10 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op, int64_t subgroupSize,
   auto totalThreads =
       std::accumulate(workgroupSize.begin(), workgroupSize.end(), 1,
                       std::multiplies<int64_t>());
+  LLVM_DEBUG({
+    llvm::dbgs() << "total thread count = " << totalThreads << "\n";
+    llvm::dbgs() << "subgroup size = " << subgroupSize << "\n";
+  });
   auto pipeline =
       (useWorkgroupMemory && totalThreads > subgroupSize)
           ? IREE::Codegen::DispatchLoweringPassPipeline::
