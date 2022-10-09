@@ -33,7 +33,7 @@ hal.executable @matmul_1024x2048x512 {
             : !flow.dispatch.tensor<readonly:512x2048xf32> -> tensor<512x2048xf32>
         %15 = linalg.init_tensor [1024, 2048] : tensor<1024x2048xf32>
         %16 = linalg.fill ins(%cst : f32) outs(%15 : tensor<1024x2048xf32>) -> tensor<1024x2048xf32>
-        %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup"}
+        %17 = linalg.matmul
             ins(%8, %10 : tensor<1024x512xf32>, tensor<512x2048xf32>) outs(%16 : tensor<1024x2048xf32>) -> tensor<1024x2048xf32>
         flow.dispatch.tensor.store %17, %2, offsets = [0, 0], sizes = [1024, 2048], strides = [1, 1]
             : tensor<1024x2048xf32> -> !flow.dispatch.tensor<writeonly:1024x2048xf32>
@@ -87,7 +87,7 @@ hal.executable @matmul_3136x24x96 {
             : !flow.dispatch.tensor<readonly:96x24xf32> -> tensor<96x24xf32>
         %15 = linalg.init_tensor [3136, 24] : tensor<3136x24xf32>
         %16 = linalg.fill ins(%cst : f32) outs(%15 : tensor<3136x24xf32>) -> tensor<3136x24xf32>
-        %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup"}
+        %17 = linalg.matmul
             ins(%8, %10 : tensor<3136x96xf32>, tensor<96x24xf32>) outs(%16 : tensor<3136x24xf32>) -> tensor<3136x24xf32>
         flow.dispatch.tensor.store %17, %2, offsets = [0, 0], sizes = [3136, 24], strides = [1, 1]
             : tensor<3136x24xf32> -> !flow.dispatch.tensor<writeonly:3136x24xf32>
@@ -141,7 +141,7 @@ hal.executable @matmul_196x64x192 {
             : !flow.dispatch.tensor<readonly:192x64xf32> -> tensor<192x64xf32>
         %15 = linalg.init_tensor [196, 64] : tensor<196x64xf32>
         %16 = linalg.fill ins(%cst : f32) outs(%15 : tensor<196x64xf32>) -> tensor<196x64xf32>
-        %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup"}
+        %17 = linalg.matmul
             ins(%8, %10 : tensor<196x192xf32>, tensor<192x64xf32>) outs(%16 : tensor<196x64xf32>) -> tensor<196x64xf32>
         flow.dispatch.tensor.store %17, %2, offsets = [0, 0], sizes = [196, 64], strides = [1, 1]
             : tensor<196x64xf32> -> !flow.dispatch.tensor<writeonly:196x64xf32>
@@ -190,7 +190,7 @@ hal.executable @matmul_12544x96x16 {
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x96xf32>
         %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<12544x96xf32>
         linalg.fill ins(%cst : f32) outs(%2 : memref<12544x96xf32>)
-        linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%0, %1 : memref<12544x16xf32>, memref<16x96xf32>) outs(%2 : memref<12544x96xf32>)
+        linalg.matmul ins(%0, %1 : memref<12544x16xf32>, memref<16x96xf32>) outs(%2 : memref<12544x96xf32>)
         return
       }
     }
@@ -239,7 +239,7 @@ hal.executable @matmul_49x160x576 {
         %10 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [576, 160], strides = [1, 1] : !flow.dispatch.tensor<readonly:576x160xf32> -> tensor<576x160xf32>
         %15 = linalg.init_tensor [49, 160] : tensor<49x160xf32>
         %16 = linalg.fill ins(%cst : f32) outs(%15 : tensor<49x160xf32>) -> tensor<49x160xf32>
-        %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup"}
+        %17 = linalg.matmul
             ins(%8, %10 : tensor<49x576xf32>, tensor<576x160xf32>) outs(%16 : tensor<49x160xf32>) -> tensor<49x160xf32>
         flow.dispatch.tensor.store %17, %2, offsets = [0, 0], sizes = [49, 160], strides = [1, 1]
             : tensor<49x160xf32> -> !flow.dispatch.tensor<writeonly:49x160xf32>
@@ -249,11 +249,11 @@ hal.executable @matmul_49x160x576 {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[7, 32], [7, 4], [0, 0, 8]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorize>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 64], [1, 1]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVDistribute>
 //      CHECK: hal.executable.export public @matmul_49x160x576
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
-// CHECK-SAME:   workgroup_size = [8 : index, 1 : index, 1 : index]
+// CHECK-SAME:   workgroup_size = [64 : index, 1 : index, 1 : index]
 //      CHECK: func.func @matmul_49x160x576()
 //      CHECK:   linalg.matmul
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
@@ -293,7 +293,7 @@ hal.executable @batch_matmul_4x384x384 {
             : !flow.dispatch.tensor<readonly:4x32x384xf32> -> tensor<4x32x384xf32>
         %21 = linalg.init_tensor [4, 384, 384] : tensor<4x384x384xf32>
         %22 = linalg.fill ins(%cst : f32) outs(%21 : tensor<4x384x384xf32>) -> tensor<4x384x384xf32>
-        %23 = linalg.batch_matmul {__internal_linalg_transform__ = "workgroup"}
+        %23 = linalg.batch_matmul
             ins(%11, %14 : tensor<4x384x32xf32>, tensor<4x32x384xf32>) outs(%22 : tensor<4x384x384xf32>) -> tensor<4x384x384xf32>
         flow.dispatch.tensor.store %23, %2, offsets = [0, 0, 0], sizes = [4, 384, 384], strides = [1, 1, 1]
             : tensor<4x384x384xf32> -> !flow.dispatch.tensor<writeonly:4x384x384xf32>
@@ -347,7 +347,7 @@ hal.executable @batch_matmul_4x8x8 {
             : !flow.dispatch.tensor<readonly:4x32x8xf32> -> tensor<4x32x8xf32>
         %21 = linalg.init_tensor [4, 8, 8] : tensor<4x8x8xf32>
         %22 = linalg.fill ins(%cst : f32) outs(%21 : tensor<4x8x8xf32>) -> tensor<4x8x8xf32>
-        %23 = linalg.batch_matmul {__internal_linalg_transform__ = "workgroup"}
+        %23 = linalg.batch_matmul
             ins(%11, %14 : tensor<4x8x32xf32>, tensor<4x32x8xf32>) outs(%22 : tensor<4x8x8xf32>) -> tensor<4x8x8xf32>
         flow.dispatch.tensor.store %23, %2, offsets = [0, 0, 0], sizes = [4, 8, 8], strides = [1, 1, 1]
             : tensor<4x8x8xf32> -> !flow.dispatch.tensor<writeonly:4x8x8xf32>
@@ -357,11 +357,11 @@ hal.executable @batch_matmul_4x8x8 {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 8, 8], [1, 1, 4], [0, 0, 0, 16]{{\]}}>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[4, 8, 8], [1, 1, 4], [0, 0, 0, 4]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorize>
 //      CHECK: hal.executable.export public @batch_matmul_4x8x8
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
-// CHECK-SAME:   workgroup_size = [2 : index, 8 : index, 1 : index]
+// CHECK-SAME:   workgroup_size = [2 : index, 8 : index, 4 : index]
 //      CHECK: func.func @batch_matmul_4x8x8()
 //      CHECK:   linalg.batch_matmul
 // CHECK-SAME:     lowering_config = #[[CONFIG]]

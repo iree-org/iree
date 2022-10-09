@@ -396,13 +396,15 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op, int64_t subgroupSize,
   }
   if (reductionTileSizes[kIndex] == 0) return success();
 
-  auto totalThreads =
-      std::accumulate(workgroupSize.begin(), workgroupSize.end(), 1,
-                      std::multiplies<int64_t>());
+  int64_t totalThreads = workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
   LLVM_DEBUG({
     llvm::dbgs() << "total thread count = " << totalThreads << "\n";
     llvm::dbgs() << "subgroup size = " << subgroupSize << "\n";
   });
+  // If we cannot keep all the threads in a single subgroup activel, don't go
+  // through this pipeline.
+  if (totalThreads < subgroupSize) return success();
+
   auto pipeline =
       (useWorkgroupMemory && totalThreads > subgroupSize)
           ? IREE::Codegen::DispatchLoweringPassPipeline::
