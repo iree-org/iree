@@ -289,16 +289,41 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
       linalg::populateDecomposeConvolutionPatterns(patterns);
       // Downsizing creates consecutive extract/insert slice ops. Merge them.
       tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
+      // Break the insert slice op chain due to loop unrolling.
+      tensor::populateExtractFromInsertSliceDestOpPatterns(patterns);
       // Pull in patterns to fold constant insert/extract slice op parameters.
       tensor::InsertSliceOp::getCanonicalizationPatterns(patterns, context);
       tensor::ExtractSliceOp::getCanonicalizationPatterns(patterns, context);
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
+      }
+
+      LLVM_DEBUG({
+        llvm::dbgs() << "--- After downsizing N-D convolution to 1-D ---\n";
+        funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+        llvm::dbgs() << "\n\n";
+      });
+    }
+
+    {  // Hoist tensor extract/insert slice ops.
+      RewritePatternSet patterns(context);
+      // Hoist out extract/insert slice op pairs with constant parameters.
+      tensor::populateHoistExtractInsertSliceOpPatterns(patterns);
       // Pull in scf.for op canonicalization patterns to help hoisting across
       // multiple loops and remove loop carried values unused in the body.
       scf::ForOp::getCanonicalizationPatterns(patterns, context);
-      (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+      // If we unrolled a relative large window dimension (e.g., 8) inside
+      // multiple loops, we may need to run patterns more times than the
+      // default (10) to converge. So use a large threshold.
+      GreedyRewriteConfig config = {};
+      config.maxIterations = 256;
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns),
+                                              config))) {
+        return signalPassFailure();
+      }
 
       LLVM_DEBUG({
-        llvm::dbgs() << "--- After Downsizing N-D convolution to 1-D  ---\n";
+        llvm::dbgs() << "--- After hoisting tensor slice ops ---\n";
         funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
         llvm::dbgs() << "\n\n";
       });
