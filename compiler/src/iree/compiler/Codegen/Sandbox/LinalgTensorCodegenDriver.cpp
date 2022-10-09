@@ -503,6 +503,9 @@ struct CodegenSplitReduction
 
     // TODO: 4) Unroll the tiled op (scf.for) by unrollFactor using
     // loopUnrollByFactor which already replaces the op.
+    auto result = loopUnrollByFactor(
+        dyn_cast<scf::ForOp>(tileRes->loops[0]), unrollFactor, rewriter);
+    if (failed(result)) return failure();
 
     return success();
   }

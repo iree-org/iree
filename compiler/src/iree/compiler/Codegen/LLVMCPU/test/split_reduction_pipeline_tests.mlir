@@ -40,12 +40,12 @@ hal.executable private @split_reduction_pass1_dispatch_0 {
 
 // CHECK:     func.func @split_reduction_pass1_dispatch_0_generic_1024x512x256()
 // CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-// CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
 // CHECK-DAG:   %[[C64:.+]] = arith.constant 64 : index
 // CHECK:       scf.for
 // CHECK:         scf.for
 // CHECK:           scf.for
-// CHECK:             scf.for %[[ARG3:.+]] = %[[C0]] to %[[C64]] step %[[C1]]
+// CHECK:             scf.for %[[ARG3:.+]] = %[[C0]] to %[[C64]] step %[[C4]]
 // CHECK:               scf.yield %{{.+}} : vector<1x1x4xi32>
 // CHECK:             vector.reduction <add>, %{{.+}} %{{.+}} : vector<4xi32> into i32
 // CHECK:           arith.addi %{{.+}}, %{{.+}} : vector<1x4xi32>
@@ -129,12 +129,12 @@ hal.executable private @split_reduction_pass3_dispatch_0 {
 
 // CHECK:     func.func @split_reduction_pass3_dispatch_0_generic_1024x513x256()
 // CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-// CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-// CHECK-DAG:   %[[C64:.+]] = arith.constant 64 : index
+// CHECK-DAG:   %[[C3:.+]] = arith.constant 3 : index
+// CHECK-DAG:   %[[C63:.+]] = arith.constant 63 : index
 // CHECK:       scf.for
 // CHECK:         scf.for
 // CHECK:           scf.for
-// CHECK:             scf.for %[[ARG3:.+]] = %[[C0]] to %[[C64]] step %[[C1]]
+// CHECK:             scf.for %[[ARG3:.+]] = %[[C0]] to %[[C63]] step %[[C3]]
 // CHECK:               scf.yield %{{.+}} : vector<1x1x4xi32>
 // CHECK:             vector.reduction <add>, %{{.+}} %{{.+}} : vector<4xi32> into i32
 
