@@ -388,7 +388,7 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op, int64_t subgroupSize,
 
   // Deduce the configuration for the K dimension. We need some power of two
   // here so that we can do vector load.
-  for (int64_t t = llvm::PowerOf2Floor(residualTilingFactor); t >= 2; t >>= 1) {
+  for (int64_t t = llvm::PowerOf2Floor(residualTilingFactor); t >= 1; t >>= 1) {
     if (dimK % t == 0) {
       reductionTileSizes[kIndex] = t;
       break;
