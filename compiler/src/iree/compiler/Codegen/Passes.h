@@ -152,6 +152,9 @@ std::unique_ptr<Pass> createTransformDialectInterpreterPass(
 std::unique_ptr<OperationPass<func::FuncOp>> createGPUVectorizationPass(
     bool generateContract = true);
 
+/// Tile reductions and generate serial loops around reductions.
+std::unique_ptr<OperationPass<func::FuncOp>> createGPUTileReductionPass();
+
 // Distributes vector ops to all threads/warps in a GPU workgroup.
 // `getWarpSize` is for deciding the warp size to use; it takes the
 // current function containing those vector ops as the argument.

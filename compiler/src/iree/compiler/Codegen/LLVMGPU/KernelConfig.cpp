@@ -446,6 +446,20 @@ static Optional<int64_t> getLinalgDimSize(linalg::LinalgOp op, int64_t d) {
   return llvm::None;
 }
 
+// Check if the given function contains an op that may require a broadcast of
+// the reduced result.
+static bool isFusedWithBroadcast(func::FuncOp entryPoint,
+                                 linalg::LinalgOp reduce) {
+  int64_t reducedRank =
+      reduce->getResult(0).getType().cast<ShapedType>().getRank();
+  bool hasBroadcast = false;
+  entryPoint.walk([&](linalg::LinalgOp linalgOp) {
+    if (reduce != linalgOp && linalgOp.getNumLoops() > reducedRank)
+      hasBroadcast = true;
+  });
+  return hasBroadcast;
+}
+
 /// Set the configuration for reductions that can be mapped to warp reductions.
 static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
                                             linalg::LinalgOp op) {
@@ -481,9 +495,17 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   // TODO: Add reduction tiling to handle larger reductions.
   const int64_t maxWorkgroupSize = 1024;
   int64_t groupSize = *dimSize / vectorSize;
-  if (groupSize > maxWorkgroupSize) return failure();
+  if (groupSize > maxWorkgroupSize) {
+    groupSize = llvm::APIntOps::GreatestCommonDivisor(
+                    {64, uint64_t(groupSize)}, {64, uint64_t(maxWorkgroupSize)})
+                    .getZExtValue();
+    // Workaround, the vector distribution doesn't handle cases where we fuse
+    // the reduction with a consumer that needs to be tiled.
+    // TODO(thomasraoux): remove the restriction once vector distribution is
+    // improved.
+    if (isFusedWithBroadcast(entryPoint, op)) return failure();
+  }
   std::array<int64_t, 3> workgroupSize = {groupSize, 1, 1};
-
   SmallVector<unsigned> partitionedLoops =
       cast<PartitionableLoopsInterface>(op.getOperation())
           .getPartitionableLoops(kNumMaxParallelDims);
@@ -492,8 +514,11 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
   // Tile all the parallel dimension to 1.
   SmallVector<int64_t, 4> workgroupTileSizes(numLoops, 1);
+  SmallVector<int64_t, 4> reductionTileSizes(numLoops, 0);
+  reductionTileSizes.push_back(groupSize * vectorSize);
   TileSizesListType tileSizes;
   tileSizes.emplace_back(std::move(workgroupTileSizes));  // Workgroup level
+  tileSizes.emplace_back(std::move(reductionTileSizes));  // reduction level
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, tileSizes,
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWarpReduction,
