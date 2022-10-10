@@ -23,11 +23,11 @@ namespace iree_compiler {
 namespace {
 
 static FailureOr<SmallVector<Value>> rewriteAsPaddedOp(
-    PatternRewriter &rewriter, linalg::LinalgOp linalgOp,
+    IRRewriter &rewriter, linalg::LinalgOp linalgOp,
     linalg::LinalgOp &paddedOp) {
   Location loc = linalgOp.getLoc();
 
-  PatternRewriter::InsertionGuard g(rewriter);
+  IRRewriter::InsertionGuard g(rewriter);
   // Set IP after op because we also take the dims of the original output.
   rewriter.setInsertionPointAfter(linalgOp);
 
@@ -107,45 +107,6 @@ static bool hasTwoOrThreeLoopsInfo(linalg::LinalgOp linalgOp) {
          linalgOp.getNumParallelLoops() <= 3;
 }
 
-struct TransposePadOpPattern : public OpRewritePattern<linalg::GenericOp> {
- public:
-  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
-
-  TransposePadOpPattern(MLIRContext *context,
-                        linalg::LinalgTransformationFilter filt)
-      : OpRewritePattern<linalg::GenericOp>(context), filter(std::move(filt)) {}
-
-  LogicalResult matchAndRewrite(linalg::GenericOp linalgOp,
-                                PatternRewriter &rewriter) const override {
-    if (failed(filter.checkAndNotify(rewriter, linalgOp))) {
-      return rewriter.notifyMatchFailure(linalgOp, "filter check");
-    }
-    LinalgOpInfo opInfo(linalgOp, sharedMemTransposeFilter);
-    // Checks preconditions for shared mem transpose. Only pad if op is dynamic.
-    if (!opInfo.isTranspose() || !opInfo.isDynamic() ||
-        !hasTwoOrThreeLoopsInfo(linalgOp)) {
-      return rewriter.notifyMatchFailure(linalgOp, "failed preconditions");
-    }
-
-    linalg::LinalgOp paddedOp;
-    FailureOr<SmallVector<Value>> newResults =
-        rewriteAsPaddedOp(rewriter, linalgOp, paddedOp);
-    if (failed(newResults)) {
-      return failure();
-    }
-
-    // Replace the original operation to pad.
-    rewriter.replaceOp(linalgOp, *newResults);
-    filter.replaceLinalgTransformationFilter(
-        rewriter, paddedOp);  // Note filter applied to replacement.
-
-    return success();
-  }
-
- private:
-  mlir::linalg::LinalgTransformationFilter filter;
-};
-
 struct LLVMGPUTensorPadPass
     : public LLVMGPUTensorPadBase<LLVMGPUTensorPadPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -154,19 +115,27 @@ struct LLVMGPUTensorPadPass
   void runOnOperation() override {
     auto funcOp = getOperation();
 
-    RewritePatternSet patterns(funcOp.getContext());
-    patterns.add<TransposePadOpPattern>(
-        &getContext(), linalg::LinalgTransformationFilter(
-                           ArrayRef<StringAttr>{},
-                           StringAttr::get(&getContext(), "transpose_pad")));
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
-      return signalPassFailure();
-    }
+    IRRewriter rewriter(funcOp->getContext());
+    rewriter.setInsertionPoint(funcOp);
+    funcOp.walk([&](linalg::GenericOp linalgOp) {
+      LinalgOpInfo opInfo(linalgOp, sharedMemTransposeFilter);
+      // Checks preconditions for shared mem transpose. Only pad if op is
+      // dynamic.
+      if (!opInfo.isTranspose() || !opInfo.isDynamic() ||
+          !hasTwoOrThreeLoopsInfo(linalgOp)) {
+        funcOp.emitWarning("failed preconditions");
+        return;
+      }
 
-    // Remove all the markers at the end.
-    funcOp->walk([&](linalg::LinalgOp op) {
-      op->removeAttr(linalg::LinalgTransforms::kLinalgTransformMarker);
+      linalg::LinalgOp paddedOp;
+      FailureOr<SmallVector<Value>> newResults =
+          rewriteAsPaddedOp(rewriter, linalgOp, paddedOp);
+      if (failed(newResults)) {
+        return;
+      }
+
+      // Replace the original operation to pad.
+      rewriter.replaceOp(linalgOp, *newResults);
     });
   }
 };
