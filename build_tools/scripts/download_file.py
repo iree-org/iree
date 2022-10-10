@@ -20,7 +20,7 @@ import urllib.error
 import logging
 import time
 
-MAX_TRIES = 3
+DEFAULT_MAX_TRIES = 3
 RETRY_COOLDOWN_TIME = 1.0
 
 
@@ -43,7 +43,12 @@ def parse_arguments():
   parser.add_argument("--unpack",
                       action='store_true',
                       default=False,
-                      help="Unpack the downloaded file if it's an archive.")
+                      help="Unpack the downloaded file if it's an archive")
+  parser.add_argument("--max-tries",
+                      metavar="<max-tries>",
+                      type=int,
+                      default=DEFAULT_MAX_TRIES,
+                      help="Number of tries before giving up")
   return parser.parse_args()
 
 
@@ -83,7 +88,7 @@ def main(args):
   if not os.path.isdir(output_dir):
     os.makedirs(output_dir)
 
-  remaining_tries = MAX_TRIES
+  remaining_tries = args.max_tries
   while remaining_tries > 0:
     try:
       download_and_extract(args.source_url, args.output, args.unpack)
