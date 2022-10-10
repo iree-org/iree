@@ -1783,7 +1783,9 @@ void PackOp::build(OpBuilder &builder, OperationState &state, Value source,
                    ArrayRef<OpFoldResult> innerTiles,
                    Optional<Value> paddingValue,
                    ArrayRef<int64_t> outerDimsPerm) {
-  assert(innerDimsPos.size() == innerTiles.size());
+  assert(innerDimsPos.size() == innerTiles.size() &&
+         "number of tile sizes specified must match the specified number of "
+         "original dimensions to be tiled");
   DenseMap<int64_t, OpFoldResult> tileAndPosMapping;
   for (auto it : llvm::zip(innerDimsPos, innerTiles))
     tileAndPosMapping[std::get<0>(it)] = std::get<1>(it);
@@ -1880,21 +1882,17 @@ SmallVector<OpFoldResult> PackOp::getResultShape(
   }
   if (!outerDimsPerm.empty()) {
     resultDims =
-        interchange<OpFoldResult>(resultDims, outerDimsPerm, /*offset = */ 0);
+        interchange<OpFoldResult>(resultDims, outerDimsPerm, /*offset=*/0);
   }
   resultDims.append(innerTileSizes.begin(), innerTileSizes.end());
   return resultDims;
 }
+
 SmallVector<OpFoldResult> PackOp::getResultShape(OpBuilder &builder) {
-  auto getAsIntVector = [](ArrayAttr arrayAttr) {
-    return llvm::to_vector(llvm::map_range(arrayAttr, [](Attribute attr) {
-      return attr.cast<IntegerAttr>().getInt();
-    }));
-  };
   return getResultShape(builder, getLoc(),
                         getDims(builder, getLoc(), getInput()), getMixedTiles(),
-                        getAsIntVector(getInnerDimsPos()),
-                        getAsIntVector(getOuterDimsPerm()));
+                        extractFromI64ArrayAttr(getInnerDimsPos()),
+                        extractFromI64ArrayAttr(getOuterDimsPerm()));
 }
 
 SmallVector<utils::IteratorType> PackOp::getLoopIteratorTypes() {

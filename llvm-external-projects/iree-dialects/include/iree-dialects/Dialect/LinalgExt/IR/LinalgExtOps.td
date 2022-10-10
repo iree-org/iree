@@ -575,11 +575,15 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
     // Return a mapping from positions `dims_pos` to their tile factors.
     DenseMap<int64_t, OpFoldResult> getDimAndTileMapping();
 
-    // Method to get the shape of the result as `SmallVector<OpFoldResult>`
+    // Method to get the shape of the result as `SmallVector<OpFoldResult>`.
+    // This is a static method to allow getting the shape of the destination
+    // expected while creating a `pack` op.
     static SmallVector<OpFoldResult> getResultShape(OpBuilder &builder,
         Location loc, ArrayRef<OpFoldResult> sourceDims,
         ArrayRef<OpFoldResult> innerTileDims, ArrayRef<int64_t> innerDimsPos,
         ArrayRef<int64_t> outerDimsPerm = {});
+
+    // Method to return the shape of the result as `SmallVector<OpFoldResult>`.
     SmallVector<OpFoldResult> getResultShape(OpBuilder &builder);
   }];
 }
