@@ -462,7 +462,7 @@ hal.executable private @nchw_conv_static_shape_f32 {
 // CHECK-NOT: vector.transfer_write
 
 // Reading initial values for the the convolution output tile.
-// CHECK-COUNT-16: vector.transfer_read {{.+}} : tensor<2x8x4xf32>, vector<4xf32>
+// CHECK-COUNT-16: vector.transfer_read {{.+}} : tensor<2x16x8x8xf32>, vector<4xf32>
 
 // Check tiling loop along input channel and filter height/width
 //          CHECK: %{{.+}}:16 = scf.for %{{.*}} = %c0 to %c1280 step %c4
@@ -470,7 +470,7 @@ hal.executable private @nchw_conv_static_shape_f32 {
 //          CHECK:     %{{.+}}:16 = scf.for %{{.*}} = %c0 to %c3 step %c1
 
 // Read in input and filter
-//  CHECK-COUNT-8:       vector.transfer_read {{.+}} : tensor<2x4x4xf32>, vector<4xf32>
+//  CHECK-COUNT-8:       vector.transfer_read {{.+}} : tensor<2x1280x10x10xf32>, vector<4xf32>
 // CHECK-COUNT-32:       vector.transfer_read {{.+}} : tensor<8x4x1xf32>, vector<1xf32>
 
 // CHECK-COUNT-64:       vector.fma
@@ -478,7 +478,7 @@ hal.executable private @nchw_conv_static_shape_f32 {
 //  CHECK-COUNT-3: scf.yield
 
 // For linalg.conv_2d_nchw_fchw
-// CHECK-COUNT-16: vector.transfer_write {{.+}} : vector<4xf32>, tensor<2x8x4xf32>
+// CHECK-COUNT-16: vector.transfer_write {{.+}} : vector<4xf32>, tensor<2x16x8x8xf32>
 
 // -----
 
@@ -540,7 +540,7 @@ hal.executable private @nchw_conv_static_shape_f32 {
 // CHECK-NOT: vector.transfer_write
 
 // Reading initial values for the the convolution output tile.
-// CHECK-COUNT-16: vector.transfer_read {{.+}} : tensor<2x1x4xf32>, vector<4xf32>
+// CHECK-COUNT-16: vector.transfer_read {{.+}} : tensor<2x1x16x64xf32>, vector<4xf32>
 
 // Check tiling loop along input channel and filter height/width
 //          CHECK: %{{.+}}:16 = scf.for %{{.*}} = %c0 to %c320 step %c4
@@ -549,39 +549,39 @@ hal.executable private @nchw_conv_static_shape_f32 {
 
 // Read in input and filter and perform computation.
 // Because we unroll along OH (8 per thread), we have 8 blocks here.
-//  CHECK-COUNT-8:       vector.transfer_read {{.+}} : tensor<2x4x4xf32>, vector<4xf32>
+//  CHECK-COUNT-8:       vector.transfer_read {{.+}} : tensor<2x320x18x66xf32>, vector<4xf32>
 //  CHECK-COUNT-4:       vector.transfer_read {{.+}} : tensor<1x4x1xf32>, vector<1xf32>
 //  CHECK-COUNT-8:       vector.fma
 
-//  CHECK-COUNT-8:       vector.transfer_read {{.+}} : tensor<2x4x4xf32>, vector<4xf32>
+//  CHECK-COUNT-8:       vector.transfer_read {{.+}} : tensor<2x320x18x66xf32>, vector<4xf32>
 //  CHECK-COUNT-4:       vector.transfer_read {{.+}} : tensor<1x4x1xf32>, vector<1xf32>
 //  CHECK-COUNT-8:       vector.fma
 
-//  CHECK-COUNT-8:       vector.transfer_read {{.+}} : tensor<2x4x4xf32>, vector<4xf32>
+//  CHECK-COUNT-8:       vector.transfer_read {{.+}} : tensor<2x320x18x66xf32>, vector<4xf32>
 //  CHECK-COUNT-4:       vector.transfer_read {{.+}} : tensor<1x4x1xf32>, vector<1xf32>
 //  CHECK-COUNT-8:       vector.fma
 
-//  CHECK-COUNT-8:       vector.transfer_read {{.+}} : tensor<2x4x4xf32>, vector<4xf32>
+//  CHECK-COUNT-8:       vector.transfer_read {{.+}} : tensor<2x320x18x66xf32>, vector<4xf32>
 //  CHECK-COUNT-4:       vector.transfer_read {{.+}} : tensor<1x4x1xf32>, vector<1xf32>
 //  CHECK-COUNT-8:       vector.fma
 
-//  CHECK-COUNT-8:       vector.transfer_read {{.+}} : tensor<2x4x4xf32>, vector<4xf32>
+//  CHECK-COUNT-8:       vector.transfer_read {{.+}} : tensor<2x320x18x66xf32>, vector<4xf32>
 //  CHECK-COUNT-4:       vector.transfer_read {{.+}} : tensor<1x4x1xf32>, vector<1xf32>
 //  CHECK-COUNT-8:       vector.fma
 
-//  CHECK-COUNT-8:       vector.transfer_read {{.+}} : tensor<2x4x4xf32>, vector<4xf32>
+//  CHECK-COUNT-8:       vector.transfer_read {{.+}} : tensor<2x320x18x66xf32>, vector<4xf32>
 //  CHECK-COUNT-4:       vector.transfer_read {{.+}} : tensor<1x4x1xf32>, vector<1xf32>
 //  CHECK-COUNT-8:       vector.fma
 
-//  CHECK-COUNT-8:       vector.transfer_read {{.+}} : tensor<2x4x4xf32>, vector<4xf32>
+//  CHECK-COUNT-8:       vector.transfer_read {{.+}} : tensor<2x320x18x66xf32>, vector<4xf32>
 //  CHECK-COUNT-4:       vector.transfer_read {{.+}} : tensor<1x4x1xf32>, vector<1xf32>
 //  CHECK-COUNT-8:       vector.fma
 
-//  CHECK-COUNT-8:       vector.transfer_read {{.+}} : tensor<2x4x4xf32>, vector<4xf32>
+//  CHECK-COUNT-8:       vector.transfer_read {{.+}} : tensor<2x320x18x66xf32>, vector<4xf32>
 //  CHECK-COUNT-4:       vector.transfer_read {{.+}} : tensor<1x4x1xf32>, vector<1xf32>
 //  CHECK-COUNT-8:       vector.fma
 
 //  CHECK-COUNT-3: scf.yield
 
 // For linalg.conv_2d_nchw_fchw
-// CHECK-COUNT-16: vector.transfer_write {{.+}} : vector<4xf32>, tensor<2x1x4xf32>
+// CHECK-COUNT-16: vector.transfer_write {{.+}} : vector<4xf32>, tensor<2x1x16x64xf32>
