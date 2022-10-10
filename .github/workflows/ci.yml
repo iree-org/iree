@@ -137,6 +137,7 @@ jobs:
         env:
           BUILD_DIR_ARCHIVE: ${{ env.BUILD_DIR }}.tar.zst
         run: |
+          df -h ${BUILD_DIR}
           tar --exclude '*.a' --exclude '*.o' \
             -I 'zstd -T0' \
             -cf ${BUILD_DIR_ARCHIVE} ${BUILD_DIR}
