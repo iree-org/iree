@@ -470,13 +470,7 @@ hal.executable private @nchw_conv_static_shape_f32 {
 //      CHECK:     scf.for %{{.*}} = %c0 to %c3 step %c1
 // CHECK-SAME:         -> (tensor<2x8x1x4xf32>)
 
-// TODO: remove these vector.extract & vector.insert pairs due to vector.transpose
-// CHECK-COUNT-96: vector.insert %{{.+}}
-
 // CHECK-COUNT-64: vector.fma
-
-// TODO: remove these vector.extract & vector.insert pairs due to vector.transpose
-// CHECK-COUNT-64: vector.insert %{{.+}}
 
 // For linalg.conv_2d_nchw_fchw
 // CHECK-COUNT-16: vector.transfer_write
