@@ -31,6 +31,7 @@ iree_lit_test_suite(
             "linalg_transform.mlir",
             "legalize.mlir",
             "tensor_alloc.mlir",
+            "tensor_pad.mlir",
             "tensorcore_vectorization.mlir",
             "tile_on_tensor.mlir",
             "transform_dialect_vector_distribution.mlir",

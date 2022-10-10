@@ -27,6 +27,7 @@ iree_lit_test_suite(
     "reduce_bank_conflicts.mlir"
     "rocdl_pipeline_test.mlir"
     "tensor_alloc.mlir"
+    "tensor_pad.mlir"
     "tensorcore_vectorization.mlir"
     "tile_on_tensor.mlir"
     "transform_dialect_bufferize.mlir"
