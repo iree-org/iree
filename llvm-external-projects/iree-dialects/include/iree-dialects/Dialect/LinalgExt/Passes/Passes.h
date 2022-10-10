@@ -13,6 +13,10 @@
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
+
+class ConversionTarget;
+class TypeConverter;
+
 namespace iree_compiler {
 namespace IREE {
 namespace LinalgExt {
@@ -81,6 +85,26 @@ private:
 std::unique_ptr<OperationPass<func::FuncOp>> createTilingInterfaceTilingPass();
 
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgExtToLoopsPass();
+
+/// Method to populate the patterns to convert operations that have operands
+/// with tensor encodings into ops that materialize the layout specified by the
+/// encoding, as well as ops that perform the computation on the materialized
+/// layout. For now these hard-code a fixed way the lowering is encoded, but the
+/// encoding can be made backend specific. Also initializes the
+/// `conversionTarget` and `typeConverter`.
+void populateMaterializeEncodingPatterns(RewritePatternSet &patterns,
+                                         ConversionTarget &conversionTarget,
+                                         TypeConverter &typeConverter);
+
+/// Pass to apply patterns specified by `populateMaterializeEncodingPass`.
+std::unique_ptr<OperationPass<func::FuncOp>> createMaterializeEncodingPass();
+
+/// Patterns to fold operations like `tensor.pad` and `tensor.extract_slice`
+/// into `linalg_ext.pack` and `linalg_ext.unpack` operations respectively.
+void populateFoldIntoPackAndUnpackOpsPatterns(RewritePatternSet &patterns);
+
+/// Pass to apply patterns specified by `populateFoldIntoPackAndUnpackOps`.
+std::unique_ptr<OperationPass<func::FuncOp>> createFoldIntoPackAndUnpackOps();
 
 std::unique_ptr<OperationPass<>> createPadContractionToBlockSizePass();
 
