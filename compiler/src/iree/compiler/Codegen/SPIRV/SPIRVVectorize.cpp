@@ -379,6 +379,7 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
     {
       RewritePatternSet patterns(context);
       vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
+      vector::populateVectorReorderTransferExtractInsertSlicePatterns(patterns);
       vector::InsertOp::getCanonicalizationPatterns(patterns, context);
       vector::ExtractOp::getCanonicalizationPatterns(patterns, context);
       vector::TransferReadOp::getCanonicalizationPatterns(patterns, context);
