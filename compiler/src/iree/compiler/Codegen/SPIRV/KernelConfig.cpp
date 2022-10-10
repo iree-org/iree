@@ -506,6 +506,10 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
   while ((*dimSize / vectorSize) % subgroupSize != 0) vectorSize /= 2;
 
   std::array<int64_t, 3> workgroupSize = {*dimSize / vectorSize, 1, 1};
+  const int64_t maxWorkgroupSize = 1024;
+  if (workgroupSize[0] > maxWorkgroupSize) {
+    return failure();
+  }
 
   // Tile all the parallel dimension to 1.
   SmallVector<unsigned> partitionedLoops =
