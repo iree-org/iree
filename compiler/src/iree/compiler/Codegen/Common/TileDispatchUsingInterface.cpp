@@ -742,9 +742,8 @@ struct SwapExtractSliceWithInitTensor
 
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
-    auto initTensorOp =
-        sliceOp.getSource().getDefiningOp<linalg::InitTensorOp>();
-    if (!initTensorOp) return failure();
+    auto emptyOp = sliceOp.getSource().getDefiningOp<tensor::EmptyOp>();
+    if (!emptyOp) return failure();
 
     SmallVector<OpFoldResult> mixedSizes = sliceOp.getMixedSizes();
     if (mixedSizes.size() != sliceOp.getType().getRank()) {
@@ -757,7 +756,7 @@ struct SwapExtractSliceWithInitTensor
       }
       std::swap(mixedSizes, rankReducedMixedSizes);
     }
-    rewriter.replaceOpWithNewOp<linalg::InitTensorOp>(
+    rewriter.replaceOpWithNewOp<tensor::EmptyOp>(
         sliceOp, mixedSizes, sliceOp.getType().getElementType());
     return success();
   }

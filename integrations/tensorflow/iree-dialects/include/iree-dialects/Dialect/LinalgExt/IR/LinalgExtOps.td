@@ -439,43 +439,53 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
   DeclareOpInterfaceMethods<TilingInterface,
     ["getIterationDomain",
      "getLoopIteratorTypes",
-     "generateScalarImplementation"]>,
+     "generateScalarImplementation",
+     "getResultTilePosition",
+     "getTiledImplementation"]>,
   DeclareOpInterfaceMethods<MemoryEffectsOpInterface>
 ]>{
   let summary = "pack operation";
   let description = [{
     The pack operation converts an `input` into a tiled and packed layout. The
-    dimensions to be tiled are obtained from `dims_pos` and the size of the tile is
-    obtained from `inner_tiles`. The dimensions listed in `dims_pos` do not need to
-    be contiguous in which case the tile will get transposed.  We handle only full
-    tiles if `padding_value` is not set; it is UB if the tile does not perfectly
-    divide the dimension. If `padding_value` is set, it will pad along high
-    dimensions, i.e., it pads at the bottom and on the right if the input has
-    rank 2, and the result type shape, will be dynamic in any dimension if and
-    only if the input shape is.
+    dimensions to be tiled are obtained from `inner_dims_pos` and the size of the
+    tile is obtained from `inner_tiles`. The dimensions listed in `inner_dims_pos`
+    do not need to be contiguous in which case the tile will get transposed.  We
+    handle only full tiles if `padding_value` is not set; it is UB if the tile does
+    not perfectly divide the dimension. If `padding_value` is set, it will pad
+    along high dimensions, i.e., it pads at the bottom and on the right if the
+    input has rank 2, and the result type shape, will be dynamic in any dimension
+    if and only if the input shape is. As optional input, the operation takes
+    `outer_dims_perm` that allows to permute the tiled loops.
 
     Example KC_to_KCck:
 
     ```mlir
-    iree_linalg_ext.pack %arg0 dims_pos = [1, 0]
+    iree_linalg_ext.pack %arg0 inner_dims_pos = [1, 0]
       inner_tiles = [32, 8] into %arg1 : (memref<128x256xf32> memref<16x8x32x8xf32>)
     ```
 
     Example NC_to_NCnc:
 
     ```mlir
-    iree_linalg_ext.pack %arg0 dims_pos = [0, 1]
+    iree_linalg_ext.pack %arg0 inner_dims_pos = [0, 1]
       inner_tiles = [8, 32] into %arg1 : (memref<128x256xf32> memref<16x8x8x32xf32>)
     ```
+    Example KC_to_CKkc
+    
+    ```mlir
+    iree_linalg_ext.pack %arg0 outer_dims_pos = [1, 0] inner_dims_pos = [0, 1] 
+      inner_tiles = [32, 8] into %arg1 : (memref<128x256xf32> memref<32x4x32x8xf32>)
+    ```
 
-    In both cases, dimension at position 0 in the input memref (128) is tiled
+    In all cases, dimension at position 0 in the input memref (128) is tiled
     with a factor of 8, while dimension at position 1 (256) is tiled with a factor
-    of 32. In the KC_to_KCck example, the point loops are interchanged.
+    of 32. In the KC_to_KCck example, the point loops are interchanged, while in the
+    KC_to_CKkc example the tiled loops.
 
     Example NC_to_NCnc with padding:
 
     ```mlir
-    iree_linalg_ext.pack %arg padding_value(%pad : f32) dims_pos = [0, 1]
+    iree_linalg_ext.pack %arg padding_value(%pad : f32) inner_dims_pos = [0, 1]
       inner_tiles = [8, 2] into %arg1 : (memref<13x15xf32> memref<2x8x8x2xf32>)
     ```
 
@@ -483,7 +493,8 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
 
   let arguments = (ins Variadic<AnyShaped>:$inputs,
     Variadic<AnyShaped>:$outputs,
-    DefaultValuedAttr<I64ArrayAttr, "{}">:$dims_pos,
+    DefaultValuedOptionalAttr<I64ArrayAttr, "{}">:$outer_dims_perm,
+    DefaultValuedAttr<I64ArrayAttr, "{}">:$inner_dims_pos,
     Variadic<Index>:$inner_tiles,
     I64ArrayAttr:$static_inner_tiles,
     Optional<AnyType>:$padding_value);
@@ -493,7 +504,8 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
     attr-dict
     $inputs
     (`padding_value` `(` $padding_value^ `:` type($padding_value) `)`)?
-    `dims_pos` `=` $dims_pos
+    (`outer_dims_perm` `=` $outer_dims_perm^)?
+    `inner_dims_pos` `=` $inner_dims_pos
     `inner_tiles` `=`
     custom<DynamicIndexList>($inner_tiles, $static_inner_tiles,
                              "ShapedType::kDynamicSize")
@@ -552,8 +564,115 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
     SmallVector<OpFoldResult> getMixedTiles();
     SmallVector<int64_t> getStaticTiles();
 
-    // Infer the output type.
-    ShapedType inferResultType();
+    // Return a mapping from positions `dims_pos` to their tile factors.
+    DenseMap<int64_t, OpFoldResult> getDimAndTileMapping();
+  }];
+}
+
+def IREELinalgExt_UnPackOp : IREELinalgExt_Op<"unpack", [
+  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+  DeclareOpInterfaceMethods<LinalgExtInterface>,
+  DeclareOpInterfaceMethods<TilingInterface,
+    ["getIterationDomain",
+     "getLoopIteratorTypes",
+     "generateScalarImplementation"]>,
+  DeclareOpInterfaceMethods<MemoryEffectsOpInterface>
+]>{
+  let summary = "unpack operation";
+
+  let description = [{
+    The unpack operation converts a tiled and packed input to an unpacked
+    output. See `pack` for more details on `inner_tiles` and `dims_pos`; it is UB
+    if the tile does not perfectly divide the dimension. Optionally, the operation
+    also supports permuting the tiled loops.
+
+    Example KCck_to_KC:
+
+    ```mlir
+    iree_linalg_ext.pack %arg0 dims_pos = [1, 0]
+      inner_tiles = [32, 8] into %arg1 : (memref<16x8x32x8xf32> memref<128x256xf32>)
+    ```
+
+    Example NCnc_to_NC:
+
+    ```mlir
+    iree_linalg_ext.pack %arg0 dims_pos = [0, 1]
+      inner_tiles = [8, 32] into %arg1 : (memref<16x8x8x32xf32> memref<128x256xf32>)
+    ```
+
+    Example CKkc_to_KC:
+    
+    ```mlir
+    iree_linalg_ext.unpack %arg1 outer_dims_pos = [1, 0] inner_dims_pos = [0, 1] 
+      inner_tiles = [32, 8] into %arg0 : (memref<32x4x32x8xf32> memref<128x256xf32>)
+    ```
+  }];
+
+  let arguments = (ins Variadic<AnyShaped>:$inputs,
+    Variadic<AnyShaped>:$outputs,
+    DefaultValuedOptionalAttr<I64ArrayAttr, "{}">:$outer_dims_perm,
+    DefaultValuedAttr<I64ArrayAttr, "{}">:$inner_dims_pos,
+    Variadic<Index>:$inner_tiles,
+    I64ArrayAttr:$static_inner_tiles);
+
+  let results = (outs Variadic<AnyRankedTensor>:$results);
+  let assemblyFormat = [{
+    attr-dict
+    $inputs
+    (`outer_dims_perm` `=` $outer_dims_perm^)?
+    `inner_dims_pos` `=` $inner_dims_pos
+    `inner_tiles` `=`
+    custom<DynamicIndexList>($inner_tiles, $static_inner_tiles,
+                             "ShapedType::kDynamicSize")
+    `into` $outputs `:` `(` type($inputs) type($outputs) `)`
+     (`->` type($results)^)?
+  }];
+
+  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
+
+    // Return the output operand.
+    Value getOutput() {
+      return getOutputOperand(0)->get();
+    }
+
+    // Return the input operand.
+    Value getInput() {
+      return getInputOperand(0)->get();
+    }
+
+    // Return the output rank.
+    int64_t getOutputRank() {
+      return  getOutputType().getRank();
+    }
+
+    // Return the output type.
+    ShapedType getOutputType() {
+      return getOutput().getType();
+    }
+
+    // Return the input type.
+    ShapedType getInputType() {
+      return getInput().getType();
+    }
+
+    // Return the output shape.
+    ArrayRef<int64_t> getOutputShape() {
+      return getOutputType().getShape();
+    }
+
+    // Return the input shape.
+    ArrayRef<int64_t> getInputShape() {
+      return getInputType().getShape();
+    }
+
+    // Return the rank of the input operand.
+    int64_t getInputRank() {
+      return getInputType().getRank();
+    }
+
+    // Return the tile sizes.
+    SmallVector<OpFoldResult> getMixedTiles();
+    SmallVector<int64_t> getStaticTiles();
 
     // Return a mapping from positions `dims_pos` to their tile factors.
     DenseMap<int64_t, OpFoldResult> getDimAndTileMapping();

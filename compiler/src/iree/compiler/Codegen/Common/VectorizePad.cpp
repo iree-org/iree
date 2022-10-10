@@ -210,8 +210,8 @@ struct VectorizePadWithConditions final
           staticStrides);
     }
 
-    Value fullTensor = rewriter.create<linalg::InitTensorOp>(
-        loc, ValueRange(), paddedTensorShape, elementType);
+    Value fullTensor = rewriter.create<tensor::EmptyOp>(
+        loc, paddedTensorShape, elementType, ValueRange());
     valueIndices.assign(tensorRank, zeroIndex);
     rewriter.replaceOpWithNewOp<vector::TransferWriteOp>(
         padOp, fullVector, fullTensor, valueIndices);

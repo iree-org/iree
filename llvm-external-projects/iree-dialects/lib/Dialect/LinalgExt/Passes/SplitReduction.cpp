@@ -143,10 +143,10 @@ computeParallelTopk(Location loc, PatternRewriter &rewriter,
           rewriter.create<tensor::DimOp>(loc, valuesExpanded, i));
     }
   }
-  Value initTensorOutputValues = rewriter.create<mlir::linalg::InitTensorOp>(
-      loc, dynSizes, outputValuesExpandedType.getShape(), valueElementType);
-  Value initTensorOutputIndices = rewriter.create<mlir::linalg::InitTensorOp>(
-      loc, dynSizes, outputIndicesExpandedType.getShape(), indicesElementType);
+  Value initTensorOutputValues = rewriter.create<mlir::tensor::EmptyOp>(
+      loc, outputValuesExpandedType.getShape(), valueElementType, dynSizes);
+  Value initTensorOutputIndices = rewriter.create<mlir::tensor::EmptyOp>(
+      loc, outputIndicesExpandedType.getShape(), indicesElementType, dynSizes);
 
   // Initialize indices to positive infinity and values to negative infinity
   // for a top (maxk) comparison.

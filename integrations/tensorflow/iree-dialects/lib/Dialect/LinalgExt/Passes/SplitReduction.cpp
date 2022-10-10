@@ -77,7 +77,7 @@ LogicalResult shouldParallelTopk(iree_compiler::IREE::LinalgExt::TopkOp topkOp,
     return rewriter.notifyMatchFailure(topkOp,
                                        "cannot split dynamic dimension");
   }
-  if (topkOp.getIndices() && splitReductionDepth == 0) {
+  if (topkOp.indices() && splitReductionDepth == 0) {
     return rewriter.notifyMatchFailure(
         topkOp, "input indices aren't supported for first split");
   }
@@ -118,7 +118,7 @@ computeParallelTopk(Location loc, PatternRewriter &rewriter,
 
   // Expand input indices shape for parallel processing if they exist
   Optional<Value> indicesExpanded;
-  if (Optional<Value> inputIndices = topkOp.getIndices()) {
+  if (Optional<Value> inputIndices = topkOp.indices()) {
     // Type inputElementType = inputIndices->getType().cast<ShapedType>();
     Type indicesExpandedType =
         RankedTensorType::get(expandedShape, indicesElementType);
@@ -143,10 +143,10 @@ computeParallelTopk(Location loc, PatternRewriter &rewriter,
           rewriter.create<tensor::DimOp>(loc, valuesExpanded, i));
     }
   }
-  Value initTensorOutputValues = rewriter.create<mlir::linalg::InitTensorOp>(
-      loc, dynSizes, outputValuesExpandedType.getShape(), valueElementType);
-  Value initTensorOutputIndices = rewriter.create<mlir::linalg::InitTensorOp>(
-      loc, dynSizes, outputIndicesExpandedType.getShape(), indicesElementType);
+  Value initTensorOutputValues = rewriter.create<mlir::tensor::EmptyOp>(
+      loc, outputValuesExpandedType.getShape(), valueElementType, dynSizes);
+  Value initTensorOutputIndices = rewriter.create<mlir::tensor::EmptyOp>(
+      loc, outputIndicesExpandedType.getShape(), indicesElementType, dynSizes);
 
   // Initialize indices to positive infinity and values to negative infinity
   // for a top (maxk) comparison.
@@ -338,7 +338,7 @@ struct TopkOpSplitReduction : public OpRewritePattern<TopkOp> {
     // provided. If input indices were provided, no offsetting is needed as
     // original original indices are already known.
     Value updatedParallelIndices = parallelTopkOp.getResult(1);
-    if (!topkOp.getIndices()) {
+    if (!topkOp.indices()) {
       Value parallelIndices = parallelTopkOp.getResult(1);
       SmallVector<int64_t> expandedShape = getExpandedShape(
           topkOp.values().getType().cast<ShapedType>().getShape(),
