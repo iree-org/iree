@@ -459,20 +459,129 @@ hal.executable private @nchw_conv_static_shape_f32 {
 // CHECK-LABEL: func.func @nchw_conv_static_shape_f32()
 
 // No vector transfer write ops generated for the linalg.fill op: initial values are forwarded to loops.
-// CHECK-NOT: vector.transfer
+// CHECK-NOT: vector.transfer_write
+
+// Reading initial values for the the convolution output tile.
+// CHECK-COUNT-16: vector.transfer_read {{.+}} : tensor<2x8x4xf32>, vector<4xf32>
 
 // Check tiling loop along input channel and filter height/width
-// TODO: enable vector hoisting
-//      CHECK: scf.for %{{.*}} = %c0 to %c1280 step %c4
-// CHECK-SAME:     -> (tensor<2x8x1x4xf32>)
-//      CHECK:   scf.for %{{.*}} = %c0 to %c3 step %c1
-// CHECK-SAME:       -> (tensor<2x8x1x4xf32>)
-//      CHECK:     scf.for %{{.*}} = %c0 to %c3 step %c1
-// CHECK-SAME:         -> (tensor<2x8x1x4xf32>)
+//          CHECK: %{{.+}}:16 = scf.for %{{.*}} = %c0 to %c1280 step %c4
+//          CHECK:   %{{.+}}:16 = scf.for %{{.*}} = %c0 to %c3 step %c1
+//          CHECK:     %{{.+}}:16 = scf.for %{{.*}} = %c0 to %c3 step %c1
 
-// CHECK-COUNT-64: vector.fma
+// Read in input and filter
+//  CHECK-COUNT-8:       vector.transfer_read {{.+}} : tensor<2x4x4xf32>, vector<4xf32>
+// CHECK-COUNT-32:       vector.transfer_read {{.+}} : tensor<8x4x1xf32>, vector<1xf32>
+
+// CHECK-COUNT-64:       vector.fma
+
+//  CHECK-COUNT-3: scf.yield
 
 // For linalg.conv_2d_nchw_fchw
-// CHECK-COUNT-16: vector.transfer_write
+// CHECK-COUNT-16: vector.transfer_write {{.+}} : vector<4xf32>, tensor<2x8x4xf32>
 
-//  CHECK-COUNT-3: scf.yield %{{.+}} : tensor<2x8x1x4xf32>
+// -----
+
+#config = #iree_codegen.lowering_config<tile_sizes = [[0, 1, 16, 64], [0, 1, 8, 4], [0, 0, 0, 0, 4, 1, 1], [0, 0, 1, 0]]>
+#translation = #iree_codegen.translation_info<SPIRVVectorize>
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+
+hal.executable private @nchw_conv_static_shape_f32 {
+  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
+    hal.executable.export @nchw_conv_static_shape_f32 layout(#pipeline_layout) attributes {
+      workgroup_size = [16: index, 2: index, 1: index],
+      translation_info = #translation
+    }
+    builtin.module  {
+      func.func @nchw_conv_static_shape_f32() {
+      %c320 = arith.constant 320 : index
+      %c64 = arith.constant 64 : index
+      %c0 = arith.constant 0 : index
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:2x320x66x66xf32>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:320x320x3x3xf32>
+      %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readwrite:2x320x64x64xf32>
+      %workgroup_id_x = hal.interface.workgroup.id[0] : index
+      %workgroup_count_x = hal.interface.workgroup.count[0] : index
+      %workgroup_id_y = hal.interface.workgroup.id[1] : index
+      %workgroup_count_y = hal.interface.workgroup.count[1] : index
+      %workgroup_id_z = hal.interface.workgroup.id[2] : index
+      %workgroup_count_z = hal.interface.workgroup.count[2] : index
+      scf.for %arg0 = %workgroup_id_z to %c320 step %workgroup_count_z {
+        %3 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%workgroup_id_y]
+        %4 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%workgroup_count_y]
+        scf.for %arg1 = %3 to %c64 step %4 {
+          %5 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
+          %6 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_count_x]
+          scf.for %arg2 = %5 to %c64 step %6 {
+            %7 = flow.dispatch.tensor.load %0, offsets = [0, 0, %arg1, %arg2], sizes = [2, 320, 18, 66], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:2x320x66x66xf32> -> tensor<2x320x18x66xf32>
+            %8 = flow.dispatch.tensor.load %1, offsets = [%arg0, 0, 0, 0], sizes = [1, 320, 3, 3], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:320x320x3x3xf32> -> tensor<1x320x3x3xf32>
+            %9 = flow.dispatch.tensor.load %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [2, 1, 16, 64], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readwrite:2x320x64x64xf32> -> tensor<2x1x16x64xf32>
+            %10 = linalg.conv_2d_nchw_fchw {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>, lowering_config = #config} ins(%7, %8 : tensor<2x320x18x66xf32>, tensor<1x320x3x3xf32>) outs(%9 : tensor<2x1x16x64xf32>) -> tensor<2x1x16x64xf32>
+            flow.dispatch.tensor.store %10, %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [2, 1, 16, 64], strides = [1, 1, 1, 1] : tensor<2x1x16x64xf32> -> !flow.dispatch.tensor<readwrite:2x320x64x64xf32>
+          }
+        }
+      }
+      return
+      }
+    }
+  }
+}
+
+// CHECK-LABEL: func.func @nchw_conv_static_shape_f32()
+
+// No vector transfer write ops generated for the linalg.fill op: initial values are forwarded to loops.
+// CHECK-NOT: vector.transfer_write
+
+// Reading initial values for the the convolution output tile.
+// CHECK-COUNT-16: vector.transfer_read {{.+}} : tensor<2x1x4xf32>, vector<4xf32>
+
+// Check tiling loop along input channel and filter height/width
+//          CHECK: %{{.+}}:16 = scf.for %{{.*}} = %c0 to %c320 step %c4
+//          CHECK:   %{{.+}}:16 = scf.for %{{.*}} = %c0 to %c3 step %c1
+//          CHECK:     %{{.+}}:16 = scf.for %{{.*}} = %c0 to %c3 step %c1
+
+// Read in input and filter and perform computation.
+// Because we unroll along OH (8 per thread), we have 8 blocks here.
+//  CHECK-COUNT-8:       vector.transfer_read {{.+}} : tensor<2x4x4xf32>, vector<4xf32>
+//  CHECK-COUNT-4:       vector.transfer_read {{.+}} : tensor<1x4x1xf32>, vector<1xf32>
+//  CHECK-COUNT-8:       vector.fma
+
+//  CHECK-COUNT-8:       vector.transfer_read {{.+}} : tensor<2x4x4xf32>, vector<4xf32>
+//  CHECK-COUNT-4:       vector.transfer_read {{.+}} : tensor<1x4x1xf32>, vector<1xf32>
+//  CHECK-COUNT-8:       vector.fma
+
+//  CHECK-COUNT-8:       vector.transfer_read {{.+}} : tensor<2x4x4xf32>, vector<4xf32>
+//  CHECK-COUNT-4:       vector.transfer_read {{.+}} : tensor<1x4x1xf32>, vector<1xf32>
+//  CHECK-COUNT-8:       vector.fma
+
+//  CHECK-COUNT-8:       vector.transfer_read {{.+}} : tensor<2x4x4xf32>, vector<4xf32>
+//  CHECK-COUNT-4:       vector.transfer_read {{.+}} : tensor<1x4x1xf32>, vector<1xf32>
+//  CHECK-COUNT-8:       vector.fma
+
+//  CHECK-COUNT-8:       vector.transfer_read {{.+}} : tensor<2x4x4xf32>, vector<4xf32>
+//  CHECK-COUNT-4:       vector.transfer_read {{.+}} : tensor<1x4x1xf32>, vector<1xf32>
+//  CHECK-COUNT-8:       vector.fma
+
+//  CHECK-COUNT-8:       vector.transfer_read {{.+}} : tensor<2x4x4xf32>, vector<4xf32>
+//  CHECK-COUNT-4:       vector.transfer_read {{.+}} : tensor<1x4x1xf32>, vector<1xf32>
+//  CHECK-COUNT-8:       vector.fma
+
+//  CHECK-COUNT-8:       vector.transfer_read {{.+}} : tensor<2x4x4xf32>, vector<4xf32>
+//  CHECK-COUNT-4:       vector.transfer_read {{.+}} : tensor<1x4x1xf32>, vector<1xf32>
+//  CHECK-COUNT-8:       vector.fma
+
+//  CHECK-COUNT-8:       vector.transfer_read {{.+}} : tensor<2x4x4xf32>, vector<4xf32>
+//  CHECK-COUNT-4:       vector.transfer_read {{.+}} : tensor<1x4x1xf32>, vector<1xf32>
+//  CHECK-COUNT-8:       vector.fma
+
+//  CHECK-COUNT-3: scf.yield
+
+// For linalg.conv_2d_nchw_fchw
+// CHECK-COUNT-16: vector.transfer_write {{.+}} : vector<4xf32>, tensor<2x1x4xf32>
