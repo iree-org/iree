@@ -8,12 +8,22 @@
 #define IREE_BASE_ASSERT_H_
 
 #include <assert.h>
+#include <stdlib.h>
 
+#include "iree/base/attributes.h"
 #include "iree/base/config.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
+
+//===----------------------------------------------------------------------===//
+// abort() wrapper
+//===----------------------------------------------------------------------===//
+// We shim this so that it's easier to set breakpoints on CRTs where `abort` is
+// a define to some internal symbol rather than an actual function.
+
+IREE_ATTRIBUTE_NORETURN static inline void iree_abort(void) { abort(); }
 
 //===----------------------------------------------------------------------===//
 // IREE_ASSERT macros
