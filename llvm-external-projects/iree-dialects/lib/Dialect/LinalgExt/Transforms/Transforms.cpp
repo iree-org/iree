@@ -202,7 +202,8 @@ LinalgTilingPattern::returningMatchAndRewrite(linalg::LinalgOp op,
   if (failed(filter.checkAndNotify(rewriter, op)))
     return failure();
 
-  FailureOr<linalg::TiledLinalgOp> res = tileLinalgOp(rewriter, op, options);
+  FailureOr<linalg::TiledLinalgOp> res =
+      linalg::tileLinalgOp(rewriter, op, options);
   if (failed(res))
     return failure();
 

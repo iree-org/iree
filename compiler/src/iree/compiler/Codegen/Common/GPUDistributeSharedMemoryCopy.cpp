@@ -98,7 +98,7 @@ static void populateTilingCopyToWorkgroupMemPatterns(
           .setLoopType(linalg::LinalgTilingLoopType::Loops)
           .setTileSizeComputationFunction(wgCopyTileSizeFn)
           .setDistributionOptions(copyInvocationDistributionOptions);
-  patterns.insert<linalg::LinalgTilingPattern>(
+  patterns.insert<IREE::LinalgExt::LinalgTilingPattern>(
       linalg::GenericOp::getOperationName(), patterns.getContext(),
       tilingOptions,
       linalg::LinalgTransformationFilter(
@@ -157,7 +157,7 @@ static void populateTileToUnroll(RewritePatternSet &patterns,
   auto tilingOptions = linalg::LinalgTilingOptions()
                            .setLoopType(linalg::LinalgTilingLoopType::Loops)
                            .setTileSizeComputationFunction(wgCopyTileSizeFn);
-  patterns.insert<linalg::LinalgTilingPattern>(
+  patterns.insert<IREE::LinalgExt::LinalgTilingPattern>(
       linalg::GenericOp::getOperationName(), patterns.getContext(),
       tilingOptions,
       linalg::LinalgTransformationFilter(
@@ -242,7 +242,7 @@ static void populateTilingAndDistribute(RewritePatternSet &patterns,
           .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
           .setTileSizeComputationFunction(wgCopyTileSizeFn)
           .setDistributionOptions(copyInvocationDistributionOptions);
-  patterns.insert<linalg::LinalgTilingPattern>(
+  patterns.insert<IREE::LinalgExt::LinalgTilingPattern>(
       linalg::GenericOp::getOperationName(), patterns.getContext(),
       tilingOptions,
       linalg::LinalgTransformationFilter(
