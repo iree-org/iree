@@ -1322,10 +1322,10 @@ func.func @unpack_undo_padding(%input: memref<2x8x8x2xf32>, %output: memref<13x1
 // CHECK-DAG:    %[[C15:.+]] = arith.constant 15 : index
 // CHECK:        scf.for %[[I:.+]] = %[[C0]] to %[[C13]] step %[[C1]] {
 // CHECK:          scf.for %[[J:.+]] = %[[C0]] to %[[C15]] step %[[C1]] {
-// CHECK-DAG:        %[[OUTER_I:.+]] = affine.apply #[[MAP0]](%[[I]])
-// CHECK-DAG:        %[[INNER_I:.+]] = affine.apply #[[MAP1]](%[[I]])
-// CHECK-DAG:        %[[OUTER_J:.+]] = affine.apply #[[MAP2]](%[[J]])
-// CHECK-DAG:        %[[INNER_J:.+]] = affine.apply #[[MAP3]](%[[J]])
+// CHECK-DAG:        %[[OUTER_I:.+]] = affine.apply #[[MAP_FLOORI]](%[[I]])
+// CHECK-DAG:        %[[INNER_I:.+]] = affine.apply #[[MAP_MODI]](%[[I]])
+// CHECK-DAG:        %[[OUTER_J:.+]] = affine.apply #[[MAP_FLOORJ]](%[[J]])
+// CHECK-DAG:        %[[INNER_J:.+]] = affine.apply #[[MAP_MODJ]](%[[J]])
 // CHECK:            %[[VAL:.+]] = memref.load %[[INPUT]][%[[OUTER_I]], %[[OUTER_J]], %[[INNER_I]], %[[INNER_J]]]
 // CHECK:            memref.store %[[VAL]], %[[OUTPUT]][%[[I]], %[[J]]]
 

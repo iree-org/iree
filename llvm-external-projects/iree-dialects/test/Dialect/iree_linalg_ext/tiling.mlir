@@ -1020,10 +1020,10 @@ func.func @pad_and_pack_partially_dynamic(%input: tensor<?x?xf32>, %output: tens
 // CHECK-DAG:       %[[C1:.*]] = arith.constant 1 : index
 // CHECK-DAG:       %[[C2:.*]] = arith.constant 2 : index
 // CHECK-DAG:       %[[C4:.*]] = arith.constant 4 : index
-// CHECK:           %[[IN_D0:.*]] = tensor.dim %[[IN]], %[[C0]] : tensor<?x?xf32>
-// CHECK:           %[[OUT_D0:.*]] = affine.apply #[[MAP0]]()[%[[IN_D0]]]
-// CHECK:           %[[IN_D1:.*]] = tensor.dim %[[IN]], %[[C1]] : tensor<?x?xf32>
-// CHECK:           %[[OUT_D1:.*]] = affine.apply #[[MAP1]]()[%[[IN_D1]]]
+// CHECK-DAG:       %[[IN_D0:.*]] = tensor.dim %[[IN]], %[[C0]] : tensor<?x?xf32>
+// CHECK-DAG:       %[[IN_D1:.*]] = tensor.dim %[[IN]], %[[C1]] : tensor<?x?xf32>
+// CHECK-DAG:       %[[OUT_D0:.*]] = affine.apply #[[MAP0]]()[%[[IN_D0]]]
+// CHECK-DAG:       %[[OUT_D1:.*]] = affine.apply #[[MAP1]]()[%[[IN_D1]]]
 // CHECK:           %[[RES0:.*]] = scf.for %[[I:.*]] = %[[C0]] to %[[OUT_D0]] step %[[C2]] iter_args(%[[ITER0:.*]] = %[[OUT]]) -> (tensor<?x?x8x2xf32>) {
 // CHECK-DAG:         %[[OUT_I_SZ:.*]] = affine.min #[[MAP2]](%[[I]])[%[[C2]], %[[OUT_D0]]]
 // CHECK:             %[[RES1:.*]] = scf.for %[[J:.*]] = %[[C0]] to %[[OUT_D1]] step %[[C4]] iter_args(%[[ITER1:.*]] = %[[ITER0]]) -> (tensor<?x?x8x2xf32>) {
@@ -1069,10 +1069,10 @@ func.func @pad_and_pack_fully_dynamic(%input: tensor<?x?xf32>, %output: tensor<?
 // CHECK-DAG:       %[[C1:.*]] = arith.constant 1 : index
 // CHECK-DAG:       %[[C2:.*]] = arith.constant 2 : index
 // CHECK-DAG:       %[[C4:.*]] = arith.constant 4 : index
-// CHECK:           %[[IN_D0:.*]] = tensor.dim %[[IN]], %[[C0]] : tensor<?x?xf32>
-// CHECK:           %[[OUT_D0:.*]] = affine.apply #[[MAP0]]()[%[[IN_D0]], %[[TILE_0]]]
-// CHECK:           %[[IN_D1:.*]] = tensor.dim %[[IN]], %[[C1]] : tensor<?x?xf32>
-// CHECK:           %[[OUT_D1:.*]] = affine.apply #[[MAP0]]()[%[[IN_D1]], %[[TILE_1]]]
+// CHECK-DAG:       %[[IN_D0:.*]] = tensor.dim %[[IN]], %[[C0]] : tensor<?x?xf32>
+// CHECK-DAG:       %[[IN_D1:.*]] = tensor.dim %[[IN]], %[[C1]] : tensor<?x?xf32>
+// CHECK-DAG:       %[[OUT_D0:.*]] = affine.apply #[[MAP0]]()[%[[IN_D0]], %[[TILE_0]]]
+// CHECK-DAG:       %[[OUT_D1:.*]] = affine.apply #[[MAP0]]()[%[[IN_D1]], %[[TILE_1]]]
 // CHECK:           %[[RES0:.*]] = scf.for %[[I:.*]] = %[[C0]] to %[[OUT_D0]] step %[[C2]] iter_args(%[[ITER0:.*]] = %[[OUT]]) -> (tensor<?x?x?x?xf32>) {
 // CHECK:             %[[OUT_I_SZ:.*]] = affine.min #[[MAP1]](%[[I]])[%[[C2]], %[[OUT_D0]]]
 // CHECK:             %[[RES1:.*]] = scf.for %[[J:.*]] = %[[C0]] to %[[OUT_D1]] step %[[C4]] iter_args(%[[ITER1:.*]] = %[[ITER0]]) -> (tensor<?x?x?x?xf32>) {
