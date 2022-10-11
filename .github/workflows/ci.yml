@@ -121,10 +121,12 @@ jobs:
             "${BUILD_DIR}"
       # The archive step below doesn't include these files. Remove them first to
       # save disk space.
+      # TODO(#10739): This step can be removed once we enlarge the disk sapce.
       - name: "Removing unused files"
         run: |
           find "${BUILD_DIR}" -type f -name "*.a" -o -type f -name "*.o" \
-            -exec rm -v {} +
+            -print \
+            -delete
       # Things get more complicated here than when we're just building the
       # runtime. The build directory is way bigger. We're also using on our own
       # runners on GCE. So uploading to GitHub actions artifact storage hosted
