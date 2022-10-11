@@ -103,21 +103,21 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //         First the scf.foreach for the linalg.fill.
 //         CHECK:   scf.foreach_thread
 //         then the reduction case.
-//         CHECK:   %[[T:.*]] = scf.for %[[IV:.*]] = %[[C0]] to %[[C384]] step %[[C4]] iter_args(%[[ACC:.*]] = %{{.*}}) -> (tensor<64xf32>) {
-//         CHECK:     %[[OUTSLICE:.*]] = tensor.extract_slice %{{.*}}[0, %[[IV]]] [64, 4] [1, 1] : tensor<64x384xf32> to tensor<64x4xf32>
-//         CHECK:     %[[F:.*]] = scf.foreach_thread (%[[ARG:.*]]) in (%[[C64]]) shared_outs(%[[O:.+]] = %[[ACC]]) -> (tensor<64xf32>) {
-//         CHECK:       %[[E:.*]] = tensor.extract_slice %[[OUTSLICE]][%[[ARG]], 0] [1, 4] [1, 1] : tensor<64x4xf32> to tensor<1x4xf32>
-//         CHECK:       %[[A:.*]] = tensor.extract_slice %[[O]][%[[ARG]]] [1] [1] : tensor<64xf32> to tensor<1xf32>
-//         CHECK:       %[[L:.*]] = linalg.generic {{.*}} ins(%[[E]] : tensor<1x4xf32>) outs(%[[A]] : tensor<1xf32>)
-//         CHECK:           arith.addf
-//         CHECK:           linalg.yield %{{.*}} : f32
-//         CHECK:         } -> tensor<1xf32>
-//         CHECK:       scf.foreach_thread.perform_concurrently {
-//         CHECK:         tensor.parallel_insert_slice %[[L]] into %[[O]][%[[ARG]]] [1] [1] : tensor<1xf32> into tensor<64xf32>
-//         CHECK:       }
-//         CHECK:     } {thread_dim_mapping = [0, 1, 2]}
-//         CHECK:     scf.yield %[[F]] : tensor<64xf32>
-//         CHECK:   }
+//         CHECK:   %[[T:.*]] = scf.foreach_thread (%[[ARG:.*]]) in (%[[C64]]) shared_outs(%[[O:.+]] = %{{.+}}) -> (tensor<64xf32>) {
+//         CHECK:     %[[OUTSLICE:.*]] = tensor.extract_slice %{{.*}}[%[[ARG]], 0] [1, 384] [1, 1] : tensor<64x384xf32> to tensor<1x384xf32>
+//         CHECK:     %[[A:.*]] = tensor.extract_slice %[[O]][%[[ARG]]] [1] [1] : tensor<64xf32> to tensor<1xf32>
+//         CHECK:     %[[R:.*]] = scf.for %[[IV:.*]] = %[[C0]] to %[[C384]] step %[[C4]] iter_args(%[[ACC:.*]] = %[[A]]) -> (tensor<1xf32>) {
+//         CHECK:     %[[E:.*]] = tensor.extract_slice %[[OUTSLICE]][0, %[[IV]]] [1, 4] [1, 1] : tensor<1x384xf32> to tensor<1x4xf32>
+//         CHECK:       %[[L:.*]] = linalg.generic {{.*}} ins(%[[E]] : tensor<1x4xf32>) outs(%[[ACC]] : tensor<1xf32>)
+//         CHECK:         arith.addf
+//         CHECK:         linalg.yield %{{.*}} : f32
+//         CHECK:       } -> tensor<1xf32>
+//         CHECK:       scf.yield %[[L]] : tensor<1xf32>
+//         CHECK:     }
+//         CHECK:     scf.foreach_thread.perform_concurrently {
+//         CHECK:       tensor.parallel_insert_slice %[[R]] into %[[O]][%[[ARG]]] [1] [1] : tensor<1xf32> into tensor<64xf32>
+//         CHECK:     }
+//         CHECK:   } {thread_dim_mapping = [0, 1, 2]}
 //         CHECK:   flow.dispatch.tensor.store %[[T]], %{{.}}, offsets = [%{{.*}}], sizes = [64], strides = [1] : tensor<64xf32> -> !flow.dispatch.tensor<writeonly:128xf32>
 
 // -----
@@ -181,11 +181,9 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //     CHECK-DAG:   %[[C4096:.*]] = arith.constant 4096 : index
 //         CHECK:   scf.foreach_thread
 //         CHECK:     linalg.fill
-//         CHECK:   scf.for %{{.*}} = %[[C0]] to %[[C10]] step %[[C4]]
-//         CHECK:     scf.for %{{.*}} = %[[C0]] to %[[C4096]] step %[[C4]]
-//         CHECK:       scf.foreach_thread
+//         CHECK:   scf.foreach_thread
+//         CHECK:     scf.for %{{.*}} = %[[C0]] to %[[C10]] step %[[C4]]
+//         CHECK:       scf.for %{{.*}} = %[[C0]] to %[[C4096]] step %[[C4]]
 //         CHECK:         linalg.generic
-//         CHECK:   scf.for %{{.*}} = %[[C0]] to %[[C10]] step %[[C4]]
-//         CHECK:     scf.for %{{.*}} = %[[C0]] to %[[C4096]] step %[[C4]]
-//         CHECK:       scf.foreach_thread
-//         CHECK:         linalg.generic
+//         CHECK:   scf.foreach_thread
+//         CHECK:     linalg.generic
