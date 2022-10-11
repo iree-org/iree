@@ -237,6 +237,12 @@ void addSPIRVBaseVectorizePassPipeline(OpPassManager &pm) {
       createOptimizeVectorTransferPass());
 }
 
+void addSPIRVConvDirectVectorizePassPipeline(OpPassManager &pm) {
+  // This pipeline is the same as the base vectorization pipeline for now.
+  // Having it separately helps to identify this case for autotuning.
+  addSPIRVBaseDistributePassPipeline(pm);
+}
+
 void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm) {
   addTileAndDistributeToWorkgroupsPasses(pm);
 

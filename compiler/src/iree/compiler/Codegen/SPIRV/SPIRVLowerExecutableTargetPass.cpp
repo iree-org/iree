@@ -103,6 +103,10 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
         addSPIRVBaseVectorizePassPipeline(pipeline);
         break;
       case IREE::Codegen::DispatchLoweringPassPipeline::
+          SPIRVConvDirectVectorize:
+        addSPIRVConvDirectVectorizePassPipeline(pipeline);
+        break;
+      case IREE::Codegen::DispatchLoweringPassPipeline::
           SPIRVCooperativeMatrixVectorize:
         addSPIRVCooperativeMatrixVectorizePassPipeline(pipeline);
         break;

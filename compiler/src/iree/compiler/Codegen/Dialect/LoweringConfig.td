@@ -41,14 +41,17 @@ def SPIRV_BaseDistribute
     : I32EnumAttrCase<"SPIRVBaseDistribute", 15>;
 def SPIRV_BaseVectorize
     : I32EnumAttrCase<"SPIRVBaseVectorize", 16>;
+def SPIRV_ConvDirectVectorize
+    : I32EnumAttrCase<"SPIRVConvDirectVectorize", 17>;
 def SPIRV_MatmulPromoteVectorize
-    : I32EnumAttrCase<"SPIRVMatmulPromoteVectorize", 17>;
+    : I32EnumAttrCase<"SPIRVMatmulPromoteVectorize", 18>;
 def SPIRV_CooperativeMatrixVectorize
-    : I32EnumAttrCase<"SPIRVCooperativeMatrixVectorize", 18>;
+    : I32EnumAttrCase<"SPIRVCooperativeMatrixVectorize", 19>;
 def SPIRV_SubgroupReduce
-    : I32EnumAttrCase<"SPIRVSubgroupReduce", 19>;
+    : I32EnumAttrCase<"SPIRVSubgroupReduce", 20>;
 
-def VMVX_Default : I32EnumAttrCase<"VMVXDefault", 20>;
+def VMVX_Default : I32EnumAttrCase<"VMVXDefault", 21>;
+
 def None : I32EnumAttrCase<"None", 0xff>;
 
 // EnumAttrCase for all known lowerings for ops within dispatch region
@@ -64,6 +67,7 @@ def DispatchLoweringPassPipelineEnum
                     LLVMGPU_Vectorize, LLVMGPU_MatmulSimt, LLVMGPU_MatmulTensorCore,
                     LLVMGPU_TransposeSharedMem, LLVMGPU_WarpReduction,
                     SPIRV_BaseDistribute, SPIRV_BaseVectorize,
+                    SPIRV_ConvDirectVectorize,
                     SPIRV_MatmulPromoteVectorize, SPIRV_CooperativeMatrixVectorize,
                     SPIRV_SubgroupReduce,
                     VMVX_Default, None

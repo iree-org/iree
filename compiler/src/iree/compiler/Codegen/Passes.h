@@ -437,6 +437,11 @@ void addSPIRVBaseDistributePassPipeline(OpPassManager &pm);
 void addSPIRVBaseVectorizePassPipeline(OpPassManager &pm);
 
 /// Pass pipeline to lower IREE HAL executables by tiling and distributing
+/// convolution to workgroups and invocations and vectorizing. Each invocation
+/// handles a vector.
+void addSPIRVConvDirectVectorizePassPipeline(OpPassManager &pm);
+
+/// Pass pipeline to lower IREE HAL executables by tiling and distributing
 /// to workgroups and subgroups and then vectorizing to SPIR-V cooperative
 /// matrix code.
 void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm);

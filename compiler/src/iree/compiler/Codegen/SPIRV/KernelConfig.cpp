@@ -209,7 +209,7 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
   }
 
   auto pipeline =
-      IREE::Codegen::DispatchLoweringPassPipeline::SPIRVBaseVectorize;
+      IREE::Codegen::DispatchLoweringPassPipeline::SPIRVConvDirectVectorize;
   TileSizesListType tileSizes;
   tileSizes.push_back(workgroupTileSizes);
   tileSizes.push_back(threadTileSizes);
