@@ -78,7 +78,8 @@ static void populateTilingToInvocationPatterns(RewritePatternSet &patterns) {
       linalg::LinalgTransformationFilter(ArrayRef<StringAttr>(), marker)
           .setMatchByDefault();
 
-  patterns.add<linalg::LinalgTilingPattern>(context, tilingOptions, filter);
+  patterns.add<IREE::LinalgExt::LinalgTilingPattern>(context, tilingOptions,
+                                                     filter);
   patterns.add<IREE::LinalgExt::TilingInterfaceTilingPattern>(
       context, tilingOptions, filter);
 }
