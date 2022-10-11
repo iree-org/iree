@@ -64,7 +64,6 @@ if((IREE_TARGET_BACKEND_VMVX OR DEFINED IREE_HOST_BINARY_ROOT) AND
       "--iree-hal-target-backends=vmvx"
   )
 
-  # TODO(hcindyl): Fix android iree_native_test flow to find required files
   iree_run_module_test(
     NAME
       iree_run_module_correctness_test
@@ -79,7 +78,5 @@ if((IREE_TARGET_BACKEND_VMVX OR DEFINED IREE_HOST_BINARY_ROOT) AND
       "f32=10"
     DEPS
       iree_tools_test_iree_run_module_bytecode_module_vmvx
-    XFAIL_PLATFORMS
-      "android-arm64-v8a"
   )
 endif()
