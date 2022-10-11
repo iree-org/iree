@@ -9,6 +9,9 @@
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
+#include "llvm/Support/Debug.h"
+
+#define DEBUG_TYPE "iree-spirv-verifier"
 
 namespace mlir {
 namespace iree_compiler {
@@ -33,20 +36,25 @@ LogicalResult verifySPIRVVectorizePassPipeline(
            linalg::DepthwiseConv2DNhwcHwcOp>(op)) {
     return success();
   }
+  LLVM_DEBUG({
+    llvm::dbgs() << "verifying op: " << *op << "\n";
+    llvm::dbgs() << "chosen workgroup size: [";
+    llvm::interleaveComma(workgroupSize, llvm::dbgs());
+    llvm::dbgs() << "]\n";
+  });
 
   // Get spirv.target_env attributes
-  spirv::TargetEnvAttr targetEnvAttr = getSPIRVTargetEnvAttr(op);
-  spirv::TargetEnv targetEnv(targetEnvAttr);
-  auto resourceLimits = targetEnv.getResourceLimits();
-  const int subgroupSize = resourceLimits.getSubgroupSize();
-  const int maxSharedMemory = resourceLimits.getMaxComputeSharedMemorySize();
-  const int maxWorkGroupInvocations =
-      resourceLimits.getMaxComputeWorkgroupInvocations();
-  auto maxWorkGroupSizeAttr = resourceLimits.getMaxComputeWorkgroupSize();
-  SmallVector<int64_t, 3> maxWorkGroupSize;
-  for (auto attr : llvm::enumerate(maxWorkGroupSizeAttr)) {
-    maxWorkGroupSize[attr.index()] = attr.value().cast<IntegerAttr>().getInt();
-  }
+  const spirv::TargetEnvAttr targetEnvAttr = getSPIRVTargetEnvAttr(op);
+  const spirv::TargetEnv targetEnv(targetEnvAttr);
+  const auto limits = targetEnv.getResourceLimits();
+  LLVM_DEBUG(llvm::dbgs() << "target environment: " << targetEnvAttr << "\n");
+
+  const int subgroupSize = limits.getSubgroupSize();
+  const int maxSharedMemory = limits.getMaxComputeSharedMemorySize();
+  const int maxThreads = limits.getMaxComputeWorkgroupInvocations();
+  const auto maxWorkGroupSize = llvm::to_vector<3>(llvm::map_range(
+      limits.getMaxComputeWorkgroupSize().getAsValueRange<IntegerAttr>(),
+      [](const APInt& dim) { return dim.getSExtValue(); }));
 
   // Verify each dimension of workgroupSize should be power of two
   if (!llvm::isPowerOf2_64(workgroupSize[0]) ||
@@ -66,13 +74,13 @@ LogicalResult verifySPIRVVectorizePassPipeline(
            << maxWorkGroupSize[2] << "]";
   }
 
-  // Verify the total workgroup size should not exceed maxWorkGroupInvocations
+  // Verify the total workgroup size should not exceed maxThreads
   int64_t totalWorkgroupSize =
       workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
-  if (totalWorkgroupSize > maxWorkGroupInvocations) {
+  if (totalWorkgroupSize > maxThreads) {
     return op->emitOpError(
                "expected total invocation count in workgroup to be <= ")
-           << maxWorkGroupInvocations << ", got " << totalWorkgroupSize;
+           << maxThreads << ", got " << totalWorkgroupSize;
   }
 
   // Verify the total workgroup size should be multiple of subgroupSize
@@ -89,6 +97,8 @@ LogicalResult verifySPIRVVectorizePassPipeline(
   ArrayRef<int64_t> outputShape =
       op->getOperand(2).getType().cast<ShapedType>().getShape();
 
+  const int numTileSizeLevels = loweringConfig.getTileSizes().size();
+
   SmallVector<int64_t> firstLevelTileSizes =
       loweringConfig.getTileSizeVals(kWorkgroupTileLevel);
   SmallVector<int64_t> secondLevelTileSizes =
@@ -104,8 +114,7 @@ LogicalResult verifySPIRVVectorizePassPipeline(
 
     // For BatchMatmul, the first dimension is the batch dimension.
     // We don't check the batch.
-    if (linalg::BatchMatmulOp batchMatmulOp =
-            dyn_cast<linalg::BatchMatmulOp>(op)) {
+    if (isa<linalg::BatchMatmulOp>(op)) {
       lhsShape = lhsShape.drop_front(1);
       rhsShape = rhsShape.drop_front(1);
       firstLevelTileSizes.erase(firstLevelTileSizes.begin());
@@ -148,15 +157,15 @@ LogicalResult verifySPIRVVectorizePassPipeline(
              << maxSharedMemory << ", got " << totalSharedMemSizeBytes;
     }
     return success();
+  }
 
-  } else if (isa<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp>(
-                 op)) {
-    if (loweringConfig.getTileSizes().size() != 4) {
+  if (isa<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp>(op)) {
+    if (numTileSizeLevels != 4) {
       return op->emitOpError("expected 4 levels of tiling sizes, got ")
-             << loweringConfig.getTileSizes().size();
+             << numTileSizeLevels;
     }
 
-    int64_t oh = outputShape[1], ow = outputShape[2], oc = outputShape[3];
+    const int64_t oh = outputShape[1], ow = outputShape[2], oc = outputShape[3];
 
     // Verify the first level tile size divides the Convolution
     // output size [OH, OW, OC]
