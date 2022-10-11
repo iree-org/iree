@@ -202,7 +202,7 @@ static void addSPIRVLoweringPasses(OpPassManager &pm, bool enableFastMath) {
 // Pass Pipelines
 //===----------------------------------------------------------------------===//
 
-void addSPIRVTileAndVectorizePassPipeline(OpPassManager &pm) {
+void addSPIRVBaseVectorizePassPipeline(OpPassManager &pm) {
   addTileAndDistributeToWorkgroupsPasses(
       pm, /*useFuseTensorPadWithConsumerPass=*/true);
 
@@ -237,7 +237,7 @@ void addSPIRVTileAndVectorizePassPipeline(OpPassManager &pm) {
       createOptimizeVectorTransferPass());
 }
 
-void addSPIRVTileAndVectorizeToCooperativeOpsPassPipeline(OpPassManager &pm) {
+void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm) {
   addTileAndDistributeToWorkgroupsPasses(pm);
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
@@ -266,8 +266,7 @@ void addSPIRVTileAndVectorizeToCooperativeOpsPassPipeline(OpPassManager &pm) {
       createSPIRVVectorToCooperativeOpsPass());
 }
 
-void addSPIRVTileAndVectorizeWithWorkgroupMemoryPassPipeline(
-    OpPassManager &pm) {
+void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm) {
   addTileAndDistributeToWorkgroupsPasses(pm);
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
@@ -295,7 +294,7 @@ void addSPIRVTileAndVectorizeWithWorkgroupMemoryPassPipeline(
   addLoopMaterializationPasses(nestedModulePM);
 }
 
-void addSPIRVTileAndDistributePassPipeline(OpPassManager &pm) {
+void addSPIRVBaseDistributePassPipeline(OpPassManager &pm) {
   addTileAndDistributeToWorkgroupsPasses(pm);
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
