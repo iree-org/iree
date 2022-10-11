@@ -610,6 +610,16 @@ static FailureOr<Flow::DispatchRegionOp> cloneSucceedingOpIntoDispatchRegion(
   SmallVector<OpOperand *> usesOutsideOfRegion;
   for (OpOperand &use : target->getUses()) usesOutsideOfRegion.push_back(&use);
 
+  // Compute dynamic result dims.
+  SmallVector<SmallVector<Value>> dynamicDims;
+  for (Value v : target->getResults()) {
+    OpBuilder::InsertionGuard guard(rewriter);
+    rewriter.setInsertionPoint(target);
+    SmallVector<Value> &dims = dynamicDims.emplace_back();
+    if (failed(Flow::reifyDynamicResultDims(rewriter, v, dims)))
+      return failure();
+  }
+
   // Clone op into dispatch region.
   auto returnOp = cast<Flow::ReturnOp>(body.getTerminator());
   Operation *newTargetOp;
@@ -639,8 +649,9 @@ static FailureOr<Flow::DispatchRegionOp> cloneSucceedingOpIntoDispatchRegion(
     // Note: Appending results one-by-one here so that this can be extended to
     // specific results in the future. Many ops have just one result, so this
     // should not be a large overhead.
-    for (Value v : newTargetOp->getResults()) {
-      auto newRegionOp = appendDispatchRegionResult(rewriter, regionOp, v);
+    for (const auto &it : llvm::enumerate(newTargetOp->getResults())) {
+      auto newRegionOp = appendDispatchRegionResult(
+          rewriter, regionOp, it.value(), dynamicDims[it.index()]);
       if (failed(newRegionOp)) return failure();
       regionOp = *newRegionOp;
     }
