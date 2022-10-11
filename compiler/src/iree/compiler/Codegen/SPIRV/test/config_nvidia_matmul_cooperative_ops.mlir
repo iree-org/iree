@@ -81,7 +81,7 @@ hal.executable public @matmul_256x1024x128_div_sub {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[16, 16, 16], [16, 16, 16]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorizeToCooperativeOps>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize>
 //      CHECK: hal.executable.export public @matmul_256x1024x128_div_sub
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [32 : index, 1 : index, 1 : index]
@@ -152,6 +152,6 @@ hal.executable public @matmul_256x1024x8 {
   }
 }
 
-//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorize
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize>
 //       CHECK: hal.executable.export public @matmul_256x1024x8
 //  CHECK-SAME:   translation_info = #[[TRANSLATION]]

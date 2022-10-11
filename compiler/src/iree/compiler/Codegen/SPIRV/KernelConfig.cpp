@@ -208,7 +208,8 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
     }
   }
 
-  auto pipeline = IREE::Codegen::DispatchLoweringPassPipeline::SPIRVVectorize;
+  auto pipeline =
+      IREE::Codegen::DispatchLoweringPassPipeline::SPIRVBaseVectorize;
   TileSizesListType tileSizes;
   tileSizes.push_back(workgroupTileSizes);
   tileSizes.push_back(threadTileSizes);
@@ -406,8 +407,8 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op, int64_t subgroupSize,
   auto pipeline =
       (useWorkgroupMemory && totalThreads > subgroupSize)
           ? IREE::Codegen::DispatchLoweringPassPipeline::
-                SPIRVVectorizeWithWorkgroupMemory
-          : IREE::Codegen::DispatchLoweringPassPipeline::SPIRVVectorize;
+                SPIRVMatmulPromoteVectorize
+          : IREE::Codegen::DispatchLoweringPassPipeline::SPIRVBaseVectorize;
 
   TileSizesListType tileSizes;
   workgroupTileSizes.resize(lastParallelDim + 1);
@@ -431,7 +432,8 @@ static LogicalResult setFftOpConfig(spirv::ResourceLimitsAttr limits,
                                     IREE::LinalgExt::FftOp op) {
   LLVM_DEBUG(llvm::dbgs() << "trying to deduce config as fft...\n");
   const int subgroupSize = limits.getSubgroupSize();
-  auto pipeline = IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistribute;
+  auto pipeline =
+      IREE::Codegen::DispatchLoweringPassPipeline::SPIRVBaseDistribute;
 
   std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
 
@@ -547,7 +549,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
     // No tiled loops means we cannot tile (and distribute) at all. Use just one
     // single thread to run everything.
     auto pipeline =
-        IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistribute;
+        IREE::Codegen::DispatchLoweringPassPipeline::SPIRVBaseDistribute;
     std::array<int64_t, 3> workgroupSize = {1, 1, 1};
     return setOpConfigAndEntryPointFnTranslation(funcOp, op, {}, pipeline,
                                                  workgroupSize);
@@ -580,7 +582,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
   if (!linalgOp || linalgOp.getNumOutputs() != 1) {
     auto pipeline =
-        IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistribute;
+        IREE::Codegen::DispatchLoweringPassPipeline::SPIRVBaseDistribute;
 
     initConfiguration();
     TileSizesListType tileSizes;
@@ -717,8 +719,8 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
 
   auto pipeline =
       vectorizable
-          ? IREE::Codegen::DispatchLoweringPassPipeline::SPIRVVectorize
-          : IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistribute;
+          ? IREE::Codegen::DispatchLoweringPassPipeline::SPIRVBaseVectorize
+          : IREE::Codegen::DispatchLoweringPassPipeline::SPIRVBaseDistribute;
 
   TileSizesListType tileSizes;
   tileSizes.push_back(workgroupTileSizes);

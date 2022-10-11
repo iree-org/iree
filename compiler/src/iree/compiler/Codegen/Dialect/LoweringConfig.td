@@ -37,12 +37,14 @@ def LLVMGPU_MatmulTensorCore : I32EnumAttrCase<"LLVMGPUMatmulTensorCore", 12>;
 def LLVMGPU_TransposeSharedMem : I32EnumAttrCase<"LLVMGPUTransposeSharedMem", 13>;
 def LLVMGPU_WarpReduction : I32EnumAttrCase<"LLVMGPUWarpReduction", 14>;
 
-def SPIRV_Distribute : I32EnumAttrCase<"SPIRVDistribute", 15>;
-def SPIRV_Vectorize : I32EnumAttrCase<"SPIRVVectorize", 16>;
-def SPIRV_VectorizeToCooperativeOps
-    : I32EnumAttrCase<"SPIRVVectorizeToCooperativeOps", 17>;
-def SPIRV_VectorizeWithWorkgroupMemory
-    : I32EnumAttrCase<"SPIRVVectorizeWithWorkgroupMemory", 18>;
+def SPIRV_BaseDistribute
+    : I32EnumAttrCase<"SPIRVBaseDistribute", 15>;
+def SPIRV_BaseVectorize
+    : I32EnumAttrCase<"SPIRVBaseVectorize", 16>;
+def SPIRV_MatmulPromoteVectorize
+    : I32EnumAttrCase<"SPIRVMatmulPromoteVectorize", 17>;
+def SPIRV_CooperativeMatrixVectorize
+    : I32EnumAttrCase<"SPIRVCooperativeMatrixVectorize", 18>;
 def SPIRV_SubgroupReduce
     : I32EnumAttrCase<"SPIRVSubgroupReduce", 19>;
 
@@ -61,9 +63,9 @@ def DispatchLoweringPassPipelineEnum
                     Linalg_TransformInterpCodegen, LLVMGPU_SimpleDistribute,
                     LLVMGPU_Vectorize, LLVMGPU_MatmulSimt, LLVMGPU_MatmulTensorCore,
                     LLVMGPU_TransposeSharedMem, LLVMGPU_WarpReduction,
-                    SPIRV_Distribute, SPIRV_Vectorize,
-                    SPIRV_VectorizeToCooperativeOps,
-                    SPIRV_VectorizeWithWorkgroupMemory, SPIRV_SubgroupReduce,
+                    SPIRV_BaseDistribute, SPIRV_BaseVectorize,
+                    SPIRV_MatmulPromoteVectorize, SPIRV_CooperativeMatrixVectorize,
+                    SPIRV_SubgroupReduce,
                     VMVX_Default, None
                   ]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
