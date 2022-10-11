@@ -266,8 +266,45 @@ class IreeRuleFactory(object):
           f"--iree-llvm-target-triple=x86_64-unknown-{target.target_abi.value}",
           f"--iree-llvm-target-cpu={arch_info.microarchitecture.lower()}"
       ]
+    elif arch_info.architecture == "rv64":
+      flags = [
+          f"--iree-llvm-target-triple=riscv64-pc-{target.target_abi.value}",
+          "--iree-llvm-target-cpu=generic-rv64", "--iree-llvm-target-abi=lp64d",
+          "--iree-llvm-target-cpu-features=+m,+a,+f,+d,+v",
+          "--riscv-v-vector-bits-min=512",
+          "--riscv-v-fixed-length-vector-lmul-max=8"
+      ]
+    elif arch_info.architecture == "rv32":
+      flags = [
+          f"--iree-llvm-target-triple=riscv32-pc-{target.target_abi.value}",
+          "--iree-llvm-target-cpu=generic-rv32", "--iree-llvm-target-abi=ilp32",
+          "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32x",
+          "--riscv-v-vector-bits-min=512",
+          "--riscv-v-fixed-length-vector-lmul-max=8"
+      ]
+    elif arch_info.architecture == "adreno":
+      flags = [
+          f"--iree-vulkan-target-triple=adreno-unknown-{target.target_abi.value}",
+      ]
+    elif arch_info.architecture == "mali":
+      flags = [
+          f"--iree-vulkan-target-triple=valhall-unknown-{target.target_abi.value}",
+      ]
+    elif arch_info.architecture == "armv8.2-a":
+      flags = [
+          f"--iree-llvm-target-triple=aarch64-none-{target.target_abi.value}",
+      ]
+    elif arch_info.architecture == "cuda":
+      if target.target_abi != iree_definitions.TargetABI.LINUX_GNU:
+        raise ValueError(
+            f"Unsupported target ABI for CUDA backend: `{target.target_abi}`")
+      flags = [
+          f"--iree-hal-cuda-llvm-target-arch=sm_80",
+      ]
+    elif arch_info.architecture == "vmvx":
+      flags = []
     else:
-      raise ValueError(f"Unsupported architecture '{arch_info.architecture}'")
+      raise ValueError(f"Unsupported architecture: '{arch_info.architecture}'")
     return flags
 
 
