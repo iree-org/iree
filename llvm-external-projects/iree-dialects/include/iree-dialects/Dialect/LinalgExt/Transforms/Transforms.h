@@ -390,6 +390,11 @@ private:
   linalg::LinalgPaddingOptions options;
 };
 
+FailureOr<linalg::TileLoopNest> tileConsumerAndFuseProducers(
+    OpBuilder &b, linalg::LinalgOp consumerOp, ArrayRef<int64_t> tileSizes,
+    ArrayRef<int64_t> tileInterchange,
+    const Optional<linalg::LinalgLoopDistributionOptions> &tileDistribution);
+
 } // namespace LinalgExt
 } // namespace IREE
 } // namespace iree_compiler
