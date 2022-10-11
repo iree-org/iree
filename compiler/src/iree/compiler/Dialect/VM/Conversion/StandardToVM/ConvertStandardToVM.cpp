@@ -834,7 +834,7 @@ class SignExtendIOpConversion : public OpConversionPattern<arith::ExtSIOp> {
                                                          adaptor.getIn());
     } else if (srcType.isInteger(8) && dstType.isInteger(64)) {
       rewriter.replaceOpWithNewOp<IREE::VM::ExtI8I64SOp>(srcOp, dstType,
-                                                          adaptor.getIn());
+                                                         adaptor.getIn());
     } else if (srcType.isInteger(16) && dstType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::ExtI16I32SOp>(srcOp, dstType,
                                                           adaptor.getIn());
