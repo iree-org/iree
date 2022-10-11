@@ -96,6 +96,14 @@ struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
           // like a batch_matmul and can follow the same codegen.
           if (isa<linalg::MatmulOp>(op))
             return {ratio, 0, /*innerParallel=*/false};
+	  else if (isa<linalg::GenericOp>(op)){
+            SmallVector<unsigned> reductionDims;
+            op.getReductionDims(reductionDims);
+            if (reductionDims.empty())
+              return {int64_t(0), 0, /*innerParallel=*/false};
+            else
+              return {ratio, 0, /*innerParallel=*/false};
+          }
           // Currently disable spliting reduction for non-matmul op. This will
           // get enabled after once tests are ready.
           return {int64_t(0), 0, /*innerParallel=*/false};
