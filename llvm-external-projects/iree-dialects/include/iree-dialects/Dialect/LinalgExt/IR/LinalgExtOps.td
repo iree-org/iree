@@ -586,8 +586,8 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
     SmallVector<OpFoldResult> getResultShape(OpBuilder &builder);
 
     // Method to get the `ShapedType` of the result. This is a static method
-    // to allow getting the type of the destination operation expected while
-    // creating the `pack` op.
+    // to allow getting the type of the destination while creating the `pack`
+    // op.
     static ShapedType getPackedType(ShapedType sourceType,
         ArrayRef<int64_t> innerTileSizes, ArrayRef<int64_t> innerDimsPos,
         ArrayRef<int64_t> outerDimsPerm = {});

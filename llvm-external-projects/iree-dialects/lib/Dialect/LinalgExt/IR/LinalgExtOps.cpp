@@ -1865,7 +1865,11 @@ ShapedType PackOp::getPackedType(ShapedType sourceType,
     resultShape[tiledDim.value()] = ceilDiv(resultShape[tiledDim.value()],
                                             innerTileSizes[tiledDim.index()]);
   }
+
+  // Swap tile loops if outer_dims_perm is available.
   resultShape = interchange<int64_t>(resultShape, outerDimsPerm, /*offset=*/0);
+
+  // Append the inner tile dimensions.
   resultShape.append(innerTileSizes.begin(), innerTileSizes.end());
   return TypeSwitch<ShapedType, ShapedType>(sourceType)
       .Case<RankedTensorType>([&](auto shapedType) {
@@ -1875,7 +1879,7 @@ ShapedType PackOp::getPackedType(ShapedType sourceType,
         return MemRefType::get(resultShape, shapedType.getElementType());
       })
       .Default([&](Type t) {
-        assert(0 && "unexpected type");
+        assert(false && "unexpected type");
         return nullptr;
       });
 }
