@@ -196,7 +196,9 @@ iree_benchmark_suite_module_test(
   EXPECTED_OUTPUT
     "deeplab_v3_fp32_input_0_expected_output.npy"
   UNSUPPORTED_PLATFORMS
-    "riscv32-Linux"
+    #TODO(#10748): Disabled due to `iree-import-tflite` failure.
+    # "riscv32-Linux"
+    "all"
 )
 
 iree_benchmark_suite_module_test(
