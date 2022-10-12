@@ -37,7 +37,7 @@ static constexpr int64_t kMaxVectorSize = 4096;
 static void populateVectorizationPatterns(RewritePatternSet &patterns) {
   MLIRContext *ctx = patterns.getContext();
   linalg::LinalgVectorizationOptions opt;
-  linalg::LinalgTransformationFilter f(
+  IREE::LinalgExt::LinalgTransformationFilter f(
       {StringAttr::get(ctx, getWorkgroupKTiledMarker()),
        StringAttr::get(ctx, getVectorizeMarker())},
       llvm::None);
@@ -80,7 +80,7 @@ struct GPUVectorizationPass
 
     // Pre-process convolution ops.
     RewritePatternSet decompositionPattern(funcOp.getContext());
-    linalg::LinalgTransformationFilter f(
+    IREE::LinalgExt::LinalgTransformationFilter f(
         {StringAttr::get(context, getWorkgroupKTiledMarker())},
         StringAttr::get(context, getVectorizeMarker()));
     f.setMatchByDefault();

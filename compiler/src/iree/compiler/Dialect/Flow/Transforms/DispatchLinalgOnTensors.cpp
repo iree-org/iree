@@ -665,7 +665,7 @@ namespace {
 template <typename OpType, template <typename> class Base>
 struct CreateDispatchRegionOp : Base<OpType> {
   CreateDispatchRegionOp(MLIRContext *context,
-                         const linalg::LinalgTransformationFilter &filter,
+                         const LinalgExt::LinalgTransformationFilter &filter,
                          PatternBenefit benefit = 1)
       : Base<OpType>(context, benefit), transformationFilter(filter) {}
 
@@ -707,7 +707,7 @@ struct CreateDispatchRegionOp : Base<OpType> {
   }
 
  private:
-  linalg::LinalgTransformationFilter transformationFilter;
+  LinalgExt::LinalgTransformationFilter transformationFilter;
 };
 }  // namespace
 
@@ -1179,7 +1179,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
   });
 
   {
-    linalg::LinalgTransformationFilter filterForComputeOps(
+    LinalgExt::LinalgTransformationFilter filterForComputeOps(
         [](Operation *op) { return success(hasRootOpAttribute(op)); }, {},
         StringAttr::get(context, "indispatch"));
     filterForComputeOps.setMatchByDefault();
@@ -1218,7 +1218,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
 
   // Start with just moving the tensor.insert_slice into its dispatch.
   {
-    linalg::LinalgTransformationFilter filterForInsertSliceOps(
+    LinalgExt::LinalgTransformationFilter filterForInsertSliceOps(
         ArrayRef<StringAttr>{}, StringAttr::get(context, "indispatch"));
     RewritePatternSet insertSliceOpDispatchPatterns(context);
     insertSliceOpDispatchPatterns.insert<
@@ -1232,7 +1232,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
 
   // Now move all remaining ops that need to be cleaned up.
   {
-    linalg::LinalgTransformationFilter filterForCleanupOps(
+    LinalgExt::LinalgTransformationFilter filterForCleanupOps(
         ArrayRef<StringAttr>{}, StringAttr::get(context, "indispatch"));
     RewritePatternSet cleanUpDispatchPatterns(context);
     cleanUpDispatchPatterns.insert<

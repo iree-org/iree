@@ -121,7 +121,7 @@ Optional<SmallVector<int64_t, 4>> getNativeVectorShape(Operation *op) {
 /// Add patterns to vectorize any supported Linalg ops.
 void populateVectorizationPatterns(RewritePatternSet &patterns) {
   linalg::LinalgVectorizationOptions opt;
-  linalg::LinalgTransformationFilter f;
+  IREE::LinalgExt::LinalgTransformationFilter f;
   VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(patterns,
                                                                    opt, f);
   linalg::populateConvolutionVectorizationPatterns(patterns);

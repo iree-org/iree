@@ -120,7 +120,8 @@ static void populateTilingReductionPatterns(RewritePatternSet &patterns) {
                            .setLoopType(linalg::LinalgTilingLoopType::Loops)
                            .setTileSizeComputationFunction(getTileSizeFn);
   auto marker = StringAttr::get(context, getTileReductionMarker());
-  auto filter = linalg::LinalgTransformationFilter({marker}, llvm::None);
+  auto filter =
+      IREE::LinalgExt::LinalgTransformationFilter({marker}, llvm::None);
 
   TilingPatterns<linalg::BatchMatmulOp, linalg::Conv2DNchwFchwOp,
                  linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp,
