@@ -43,9 +43,9 @@ func.func @mhloElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
 // -----
 
 func.func @interleavedDot(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
-  %0 = mhlo.add %arg0, %arg0 : tensor<4x4xf32>
-  %1 = "mhlo.dot"(%0, %arg0) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
-  %2 = mhlo.multiply %1, %arg0 : tensor<4x4xf32>
+  %0 = "stablehlo.add"(%arg0, %arg0) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
+  %1 = "stablehlo.dot"(%0, %arg0) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
+  %2 = "stablehlo.multiply"(%1, %arg0) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
   return %2 : tensor<4x4xf32>
 }
 

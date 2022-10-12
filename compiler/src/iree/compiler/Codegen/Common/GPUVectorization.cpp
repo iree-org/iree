@@ -26,6 +26,10 @@ using mlir::iree_compiler::IREE::LinalgExt::VectorizationPatterns;
 namespace mlir {
 namespace iree_compiler {
 
+// Max vector size we want to create. This could be changed to a pass option
+// based on target.
+static constexpr int64_t kMaxVectorSize = 4096;
+
 //====---------------------------------------------------------------------===//
 // Patterns for vectorization
 //====---------------------------------------------------------------------===//
@@ -38,8 +42,24 @@ static void populateVectorizationPatterns(RewritePatternSet &patterns) {
        StringAttr::get(ctx, getVectorizeMarker())},
       llvm::None);
   f.setMatchByDefault();
+  // When vectorizing if some ops didn't get tiled we may end up with large
+  // vectors being created that will later explode code size. If we have any
+  // vectors larger than what would fit in register skip vectorization.
+  f.addFilter([](Operation *op) {
+    auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+    if (!linalgOp) return success();
+    int64_t maxFlatVecSize = 1;
+    for (OpOperand *operand : linalgOp.getInputAndOutputOperands()) {
+      auto type = operand->get().getType().dyn_cast<ShapedType>();
+      if (!type) continue;
+      if (!type.hasStaticShape()) return failure();
+      maxFlatVecSize = std::max(maxFlatVecSize, type.getNumElements());
+    }
+    return success(maxFlatVecSize <= kMaxVectorSize);
+  });
   VectorizationPatterns<linalg::FillOp, linalg::GenericOp,
-                        linalg::Conv1DNwcWcfOp>::insert(patterns, opt, f);
+                        linalg::Conv1DNwcWcfOp,
+                        linalg::Conv1DNcwFcwOp>::insert(patterns, opt, f);
   patterns.add<linalg::CopyVectorizationPattern>(ctx);
   patterns.add<LinalgVectorizationPattern>(
       ctx, f.addOpFilter<linalg::ContractionOpInterface>(), opt);

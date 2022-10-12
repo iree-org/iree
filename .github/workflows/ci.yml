@@ -119,6 +119,14 @@ jobs:
             gcr.io/iree-oss/base@sha256:5d43683c6b50aebe1fca6c85f2012f3b0fa153bf4dd268e8767b619b1891423a \
             ./build_tools/cmake/build_all.sh \
             "${BUILD_DIR}"
+      # The archive step below doesn't include these files. Remove them first to
+      # save disk space.
+      # TODO(#10739): This step can be removed once we enlarge the disk sapce.
+      - name: "Removing unused files"
+        run: |
+          find "${BUILD_DIR}" -type f -name "*.a" -o -type f -name "*.o" \
+            -print \
+            -delete
       # Things get more complicated here than when we're just building the
       # runtime. The build directory is way bigger. We're also using on our own
       # runners on GCE. So uploading to GitHub actions artifact storage hosted
@@ -131,8 +139,7 @@ jobs:
         env:
           BUILD_DIR_ARCHIVE: ${{ env.BUILD_DIR }}.tar.zst
         run: |
-          tar --exclude '*.a' --exclude '*.o' \
-            -I 'zstd -T0' \
+          tar -I 'zstd -T0' \
             -cf ${BUILD_DIR_ARCHIVE} ${BUILD_DIR}
           echo "::set-output name=build-dir-archive::${BUILD_DIR_ARCHIVE}"
       - name: "Uploading build dir archive"

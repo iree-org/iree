@@ -33,7 +33,8 @@ LogicalResult reifyDynamicResultDims(OpBuilder &b, Value value,
 /// Append a result to the given DispatchRegionOp. The newly created
 /// DispatchRegionOp is returned.
 FailureOr<Flow::DispatchRegionOp> appendDispatchRegionResult(
-    RewriterBase &rewriter, Flow::DispatchRegionOp regionOp, Value result);
+    RewriterBase &rewriter, Flow::DispatchRegionOp regionOp, Value result,
+    const SmallVector<Value> &dynamicDims);
 
 /// Create an empty DispatchRegionOp.
 Flow::DispatchRegionOp makeEmptyDispatchRegion(OpBuilder &builder,
