@@ -95,15 +95,20 @@ LogicalResult Flow::reifyDynamicResultDims(OpBuilder &b, Value value,
   // There is at least one dynamic dimension, continue...
   ShapedType shapedType = value.getType().cast<ShapedType>();
 
-  // Case 2: Value is a block argument.
-  if (auto bbArg = value.dyn_cast<BlockArgument>()) {
-    b.setInsertionPointToStart(bbArg.getOwner());
+  // Helper function that generates tensor.dim ops.
+  auto emitTensorDimOps = [&]() {
     for (int64_t i = 0; i < shapedType.getRank(); ++i) {
       if (shapedType.isDynamicDim(i)) {
-        Value dim = b.create<tensor::DimOp>(bbArg.getLoc(), bbArg, i);
+        Value dim = b.create<tensor::DimOp>(value.getLoc(), value, i);
         dynamicDims.push_back(dim);
       }
     }
+  };
+
+  // Case 2: Value is a block argument.
+  if (auto bbArg = value.dyn_cast<BlockArgument>()) {
+    b.setInsertionPointToStart(bbArg.getOwner());
+    emitTensorDimOps();
     return success();
   }
 
@@ -140,7 +145,10 @@ LogicalResult Flow::reifyDynamicResultDims(OpBuilder &b, Value value,
     return success();
   }
 
-  return failure();
+  // None of the above. Insert tensor.dim ops.
+  b.setInsertionPointAfter(op);
+  emitTensorDimOps();
+  return success();
 }
 
 // Append a result to the given DispatchRegionOp. The newly created
