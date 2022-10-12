@@ -44,8 +44,7 @@ void IREELinalgExtDialect::initialize() {
 // iree_linalg_ext.encoding
 //==----------------------------------------------------------------------===//
 
-EncodingAttr EncodingAttr::get(MLIRContext *context,
-  TensorEncoding encoding) {
+EncodingAttr EncodingAttr::get(MLIRContext *context, TensorEncoding encoding) {
   auto tensorEncodingAttr = TensorEncodingAttr::get(context, encoding);
   return get(context, tensorEncodingAttr);
 }
