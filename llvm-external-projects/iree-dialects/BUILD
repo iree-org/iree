@@ -170,6 +170,22 @@ gentbl_cc_library(
             "include/iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.cpp.inc",
         ),
         (
+            ["--gen-attrdef-decls"],
+            "include/iree-dialects/Dialect/LinalgExt/IR/LinalgExtAttrs.h.inc",
+        ),
+        (
+            ["--gen-attrdef-defs"],
+            "include/iree-dialects/Dialect/LinalgExt/IR/LinalgExtAttrs.cpp.inc",
+        ),
+        (
+            ["--gen-enum-decls"],
+            "include/iree-dialects/Dialect/LinalgExt/IR/LinalgExtEnums.h.inc",
+        ),
+        (
+            ["--gen-enum-defs"],
+            "include/iree-dialects/Dialect/LinalgExt/IR/LinalgExtEnums.cpp.inc",
+        ),
+        (
             ["--gen-op-decls"],
             "include/iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h.inc",
         ),
@@ -645,6 +661,7 @@ cc_binary(
         "@llvm-project//mlir:LinalgTransformOps",
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:MemRefDialect",
+        "@llvm-project//mlir:MemRefTransforms",
         "@llvm-project//mlir:MlirOptLib",
         "@llvm-project//mlir:PDLDialect",
         "@llvm-project//mlir:PDLInterpDialect",

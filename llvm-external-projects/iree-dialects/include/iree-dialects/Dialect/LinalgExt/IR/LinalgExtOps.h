@@ -36,7 +36,16 @@ SmallVector<OpFoldResult> getDims(OpBuilder &builder, Location loc, Value v);
 } // namespace iree_compiler
 } // namespace mlir
 
+// clang-format off
+
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtEnums.h.inc" // IWYU pragma: export
+
+#define GET_ATTRDEF_CLASSES
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtAttrs.h.inc" // IWYU pragma: export
+
 #define GET_OP_CLASSES
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h.inc" // IWYU pragma: export
+
+// clang-format on
 
 #endif // IREE_DIALECTS_DIALECT_LINALGEXT_IR_LINALGEXTOPS_H_

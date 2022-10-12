@@ -39,6 +39,7 @@ td_library(
 iree_compiler_cc_library(
     name = "IR",
     srcs = [
+        "FlowAttrs.cpp.inc",
         "FlowDialect.cpp",
         "FlowEnums.cpp.inc",
         "FlowOpFolders.cpp",
@@ -50,6 +51,7 @@ iree_compiler_cc_library(
         "FlowTypes.cpp.inc",
     ],
     hdrs = [
+        "FlowAttrs.h.inc",
         "FlowDialect.h",
         "FlowEnums.h.inc",
         "FlowOpInterfaces.h.inc",

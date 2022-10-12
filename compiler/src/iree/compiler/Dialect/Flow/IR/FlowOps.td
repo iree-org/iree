@@ -1232,8 +1232,6 @@ def FLOW_TensorTraceOp : FLOW_Op<"tensor.trace", []> {
   let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
 }
 
-#endif  // IREE_DIALECT_FLOW_OPS
-
 //===---------------------------------------------------------------------===//
 // Parameterization Ops
 //===---------------------------------------------------------------------===//
@@ -1262,3 +1260,5 @@ def Flow_DispatchWorkgroupCountFromDagRootOp :
     attr-dict $operands
   }];
 }
+
+#endif  // IREE_DIALECT_FLOW_OPS
