@@ -126,10 +126,10 @@ struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
     // Remove all the markers at the end.
     auto funcOp = getOperation();
     funcOp->walk([&](linalg::LinalgOp op) {
-      op->removeAttr(linalg::LinalgTransforms::kLinalgTransformMarker);
+      op->removeAttr(IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker);
     });
     funcOp->walk([&](LinalgExt::LinalgExtOp op) {
-      op->removeAttr(linalg::LinalgTransforms::kLinalgTransformMarker);
+      op->removeAttr(IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker);
       op->removeAttr(
           mlir::iree_compiler::IREE::LinalgExt::kSplitReductionDepthMarker);
     });

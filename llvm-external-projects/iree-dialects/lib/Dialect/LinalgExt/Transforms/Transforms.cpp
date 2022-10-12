@@ -222,13 +222,12 @@ LinalgTilingPattern::returningMatchAndRewrite(linalg::LinalgOp op,
 
 LinalgVectorizationPattern::LinalgVectorizationPattern(
     MLIRContext *context, LinalgExt::LinalgTransformationFilter f,
-    linalg::LinalgVectorizationOptions options, PatternBenefit benefit)
+    PatternBenefit benefit)
     : OpInterfaceRewritePattern<linalg::LinalgOp>(context, benefit),
       filter(std::move(f)) {}
 
 LinalgVectorizationPattern::LinalgVectorizationPattern(
     StringRef opName, MLIRContext *context,
-    linalg::LinalgVectorizationOptions options,
     LinalgExt::LinalgTransformationFilter f, PatternBenefit benefit)
     : OpInterfaceRewritePattern<linalg::LinalgOp>(context, benefit),
       filter(f.addOpNameFilter(opName)) {}
@@ -539,10 +538,9 @@ struct LinalgStrategyVectorizePass
   LinalgStrategyVectorizePass() = default;
 
   LinalgStrategyVectorizePass(StringRef opName,
-                              linalg::LinalgVectorizationOptions opt,
                               LinalgExt::LinalgTransformationFilter filt,
                               bool padVectorize = false)
-      : options(opt), filter(std::move(filt)) {
+      : filter(std::move(filt)) {
     this->anchorOpName.setValue(opName.str());
     this->vectorizePadding.setValue(padVectorize);
   }
@@ -555,10 +553,10 @@ struct LinalgStrategyVectorizePass
     RewritePatternSet vectorizationPatterns(funcOp.getContext());
     if (!anchorOpName.empty()) {
       vectorizationPatterns.add<LinalgVectorizationPattern>(
-          anchorOpName, funcOp.getContext(), options, filter);
+          anchorOpName, funcOp.getContext(), filter);
     } else {
       vectorizationPatterns.add<LinalgVectorizationPattern>(funcOp.getContext(),
-                                                            filter, options);
+                                                            filter);
     }
     vector::populateVectorTransferPermutationMapLoweringPatterns(
         vectorizationPatterns);
@@ -584,7 +582,6 @@ struct LinalgStrategyVectorizePass
     }
   }
 
-  linalg::LinalgVectorizationOptions options;
   LinalgExt::LinalgTransformationFilter filter;
 };
 
@@ -715,7 +712,7 @@ struct LinalgStrategyRemoveMarkersPass
     if (!anchorFuncName.empty() && funcOp.getName() != anchorFuncName)
       return;
     funcOp.walk([](linalg::LinalgOp op) {
-      op->removeAttr(linalg::LinalgTransforms::kLinalgTransformMarker);
+      op->removeAttr(LinalgTransforms::kLinalgTransformMarker);
     });
   }
 };
@@ -760,9 +757,9 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyPeelPass(
 
 /// Create a LinalgStrategyVectorizePass.
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyVectorizePass(
-    StringRef opName, linalg::LinalgVectorizationOptions opt,
-    const LinalgExt::LinalgTransformationFilter &filter, bool padVectorize) {
-  return std::make_unique<LinalgStrategyVectorizePass>(opName, opt, filter,
+    StringRef opName, const LinalgExt::LinalgTransformationFilter &filter,
+    bool padVectorize) {
+  return std::make_unique<LinalgStrategyVectorizePass>(opName, filter,
                                                        padVectorize);
 }
 

@@ -409,7 +409,7 @@ struct TopkSplitReductionPass
     // Remove all the markers at the end.
     auto funcOp = getOperation();
     funcOp->walk([&](TopkOp op) {
-      op->removeAttr(linalg::LinalgTransforms::kLinalgTransformMarker);
+      op->removeAttr(LinalgTransforms::kLinalgTransformMarker);
       op->removeAttr(kSplitReductionDepthMarker);
     });
   }

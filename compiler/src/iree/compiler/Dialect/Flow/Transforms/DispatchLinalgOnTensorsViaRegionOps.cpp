@@ -11,6 +11,7 @@
 // Note: The heuristic part of the implementation is unchanged and copied from
 // DispatchLinalgOnTensors.cpp.
 
+#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree/compiler/Dialect/Flow/Conversion/TensorToFlow/ConvertTensorToFlow.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
@@ -764,7 +765,7 @@ void DispatchLinalgOnTensorsViaRegionOpsPass::runOnOperation() {
   funcOp.walk([](Operation *op) {
     removeFusionGroupsAttribute(op);
     removeRootOpAttribute(op);
-    op->removeAttr(linalg::LinalgTransforms::kLinalgTransformMarker);
+    op->removeAttr(IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker);
   });
 }
 

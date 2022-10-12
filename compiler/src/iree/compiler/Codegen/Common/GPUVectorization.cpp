@@ -36,7 +36,6 @@ static constexpr int64_t kMaxVectorSize = 4096;
 
 static void populateVectorizationPatterns(RewritePatternSet &patterns) {
   MLIRContext *ctx = patterns.getContext();
-  linalg::LinalgVectorizationOptions opt;
   IREE::LinalgExt::LinalgTransformationFilter f(
       {StringAttr::get(ctx, getWorkgroupKTiledMarker()),
        StringAttr::get(ctx, getVectorizeMarker())},
@@ -59,10 +58,10 @@ static void populateVectorizationPatterns(RewritePatternSet &patterns) {
   });
   VectorizationPatterns<linalg::FillOp, linalg::GenericOp,
                         linalg::Conv1DNwcWcfOp,
-                        linalg::Conv1DNcwFcwOp>::insert(patterns, opt, f);
+                        linalg::Conv1DNcwFcwOp>::insert(patterns, f);
   patterns.add<linalg::CopyVectorizationPattern>(ctx);
   patterns.add<LinalgVectorizationPattern>(
-      ctx, f.addOpFilter<linalg::ContractionOpInterface>(), opt);
+      ctx, f.addOpFilter<linalg::ContractionOpInterface>());
 }
 
 namespace {
