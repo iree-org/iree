@@ -16,6 +16,7 @@
 #                                                                              #
 ################################################################################
 
+# TODO(#10748): Disabled since the iree-import-tflite fails on this model.
 # set(DEEPLABV3_FP32_MODULE
 #   NAME
 #     "DeepLabV3"
