@@ -66,6 +66,32 @@ static iree_vm_ref_type_descriptor_t iree_vm_list_descriptor = {0};
 
 IREE_VM_DEFINE_TYPE_ADAPTERS(iree_vm_list, iree_vm_list_t);
 
+static void iree_vm_list_retain_range(iree_vm_list_t* list,
+                                      iree_host_size_t offset,
+                                      iree_host_size_t length) {
+  switch (list->storage_mode) {
+    case IREE_VM_LIST_STORAGE_MODE_VALUE:
+      // Value types don't need to be retained.
+      break;
+    case IREE_VM_LIST_STORAGE_MODE_REF: {
+      iree_vm_ref_t* ref_storage = (iree_vm_ref_t*)list->storage;
+      for (iree_host_size_t i = offset; i < offset + length; ++i) {
+        iree_vm_ref_retain_inplace(&ref_storage[i]);
+      }
+      break;
+    }
+    case IREE_VM_LIST_STORAGE_MODE_VARIANT: {
+      iree_vm_variant_t* variant_storage = (iree_vm_variant_t*)list->storage;
+      for (iree_host_size_t i = offset; i < offset + length; ++i) {
+        if (iree_vm_type_def_is_ref(&variant_storage[i].type)) {
+          iree_vm_ref_retain_inplace(&variant_storage[i].ref);
+        }
+      }
+      break;
+    }
+  }
+}
+
 static void iree_vm_list_reset_range(iree_vm_list_t* list,
                                      iree_host_size_t offset,
                                      iree_host_size_t length) {
@@ -220,6 +246,31 @@ static void iree_vm_list_destroy(void* ptr) {
   IREE_TRACE_ZONE_END(z0);
 }
 
+IREE_API_EXPORT iree_status_t
+iree_vm_list_clone(iree_vm_list_t* source, iree_allocator_t host_allocator,
+                   iree_vm_list_t** out_target) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_host_size_t count = iree_vm_list_size(source);
+  iree_vm_type_def_t element_type = iree_vm_list_element_type(source);
+  iree_vm_list_t* target = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_vm_list_create(&element_type, count, host_allocator, &target));
+  iree_status_t status = iree_vm_list_resize(target, count);
+  if (iree_status_is_ok(status)) {
+    // Copy storage directly. Note that we need to retain any refs contained.
+    memcpy(target->storage, source->storage,
+           target->count * target->element_size);
+    iree_vm_list_retain_range(target, 0, count);
+  }
+  if (iree_status_is_ok(status)) {
+    *out_target = target;
+  } else {
+    iree_vm_list_release(target);
+  }
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 IREE_API_EXPORT void iree_vm_list_retain(iree_vm_list_t* list) {
   iree_vm_ref_object_retain(list, &iree_vm_list_descriptor);
 }
@@ -228,10 +279,9 @@ IREE_API_EXPORT void iree_vm_list_release(iree_vm_list_t* list) {
   iree_vm_ref_object_release(list, &iree_vm_list_descriptor);
 }
 
-IREE_API_EXPORT iree_status_t iree_vm_list_element_type(
-    const iree_vm_list_t* list, iree_vm_type_def_t* out_element_type) {
-  *out_element_type = list->element_type;
-  return iree_ok_status();
+IREE_API_EXPORT iree_vm_type_def_t
+iree_vm_list_element_type(const iree_vm_list_t* list) {
+  return list->element_type;
 }
 
 IREE_API_EXPORT iree_host_size_t
@@ -273,6 +323,14 @@ IREE_API_EXPORT iree_status_t iree_vm_list_resize(iree_vm_list_t* list,
   }
   list->count = new_size;
   return iree_ok_status();
+}
+
+IREE_API_EXPORT void iree_vm_list_clear(iree_vm_list_t* list) {
+  if (list->count > 0) {
+    // Truncating.
+    iree_vm_list_reset_range(list, 0, list->count);
+  }
+  list->count = 0;
 }
 
 static void iree_vm_list_convert_value_type(
