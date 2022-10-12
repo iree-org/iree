@@ -96,8 +96,7 @@ Value IREE::LinalgExt::getDimValue(OpBuilder &builder, Location loc, Value v,
       })
       .Case<MemRefType>([&](MemRefType t) -> Value {
         return builder.create<memref::DimOp>(loc, v, dim);
-      })
-      .Default([&](Type t) { return Value(); });
+      });
 }
 
 OpFoldResult IREE::LinalgExt::getDim(OpBuilder &builder, Location loc, Value v,
@@ -107,6 +106,14 @@ OpFoldResult IREE::LinalgExt::getDim(OpBuilder &builder, Location loc, Value v,
     return getDimValue(builder, loc, v, dim);
   }
   return builder.getI64IntegerAttr(t.getDimSize(dim));
+}
+SmallVector<OpFoldResult> IREE::LinalgExt::getDims(OpBuilder &builder,
+                                                   Location loc,
+                                                   Value shapedTypeValue) {
+  return llvm::to_vector(llvm::map_range(
+      llvm::seq<int64_t>(
+          0, shapedTypeValue.getType().cast<ShapedType>().getRank()),
+      [&](int64_t dim) { return getDim(builder, loc, shapedTypeValue, dim); }));
 }
 
 //===----------------------------------------------------------------------===//
@@ -1770,6 +1777,33 @@ inferPackedType(ShapedType sourceType, ArrayRef<int64_t> innerTiles,
 // PackOp
 //===----------------------------------------------------------------------===//
 
+/// Custom builder methods for pack ops.
+void PackOp::build(OpBuilder &builder, OperationState &state, Value source,
+                   Value output, ArrayRef<int64_t> innerDimsPos,
+                   ArrayRef<OpFoldResult> innerTiles,
+                   Optional<Value> paddingValue,
+                   ArrayRef<int64_t> outerDimsPerm) {
+  assert(innerDimsPos.size() == innerTiles.size() &&
+         "number of tile sizes specified must match the specified number of "
+         "original dimensions to be tiled");
+  DenseMap<int64_t, OpFoldResult> tileAndPosMapping;
+  for (auto it : llvm::zip(innerDimsPos, innerTiles))
+    tileAndPosMapping[std::get<0>(it)] = std::get<1>(it);
+  SmallVector<int64_t> staticTileSizes;
+  SmallVector<Value> dynamicTileSizes;
+  dispatchIndexOpFoldResults(innerTiles, dynamicTileSizes, staticTileSizes,
+                             ShapedType::kDynamicSize);
+  ShapedType resultType =
+      inferPackedType(source.getType().cast<ShapedType>(), staticTileSizes,
+                      tileAndPosMapping, outerDimsPerm);
+  build(builder, state, resultType, source, output,
+        outerDimsPerm.empty() ? nullptr
+                              : builder.getI64ArrayAttr(outerDimsPerm),
+        builder.getI64ArrayAttr(innerDimsPos), dynamicTileSizes,
+        builder.getI64ArrayAttr(staticTileSizes),
+        (paddingValue ? paddingValue.value() : nullptr));
+}
+
 /// verifier for the pack operation.
 LogicalResult PackOp::verify() {
   Operation *op = getOperation();
@@ -1830,6 +1864,35 @@ SmallVector<OpFoldResult> PackOp::getMixedTiles() {
 
 SmallVector<int64_t> PackOp::getStaticTiles() {
   return ::getStaticTiles(*this);
+}
+
+SmallVector<OpFoldResult> PackOp::getResultShape(
+    OpBuilder &builder, Location loc, ArrayRef<OpFoldResult> sourceDims,
+    ArrayRef<OpFoldResult> innerTileSizes, ArrayRef<int64_t> innerDimsPos,
+    ArrayRef<int64_t> outerDimsPerm) {
+  SmallVector<OpFoldResult> resultDims = llvm::to_vector(sourceDims);
+
+  AffineExpr s0, s1;
+  bindSymbols(builder.getContext(), s0, s1);
+  AffineExpr ceilDivExpr = s0.ceilDiv(s1);
+  for (auto tiledDim : llvm::enumerate(innerDimsPos)) {
+    resultDims[tiledDim.value()] = makeComposedFoldedAffineApply(
+        builder, loc, ceilDivExpr,
+        {resultDims[tiledDim.value()], innerTileSizes[tiledDim.index()]});
+  }
+  if (!outerDimsPerm.empty()) {
+    resultDims =
+        interchange<OpFoldResult>(resultDims, outerDimsPerm, /*offset=*/0);
+  }
+  resultDims.append(innerTileSizes.begin(), innerTileSizes.end());
+  return resultDims;
+}
+
+SmallVector<OpFoldResult> PackOp::getResultShape(OpBuilder &builder) {
+  return getResultShape(builder, getLoc(),
+                        getDims(builder, getLoc(), getInput()), getMixedTiles(),
+                        extractFromI64ArrayAttr(getInnerDimsPos()),
+                        extractFromI64ArrayAttr(getOuterDimsPerm()));
 }
 
 SmallVector<utils::IteratorType> PackOp::getLoopIteratorTypes() {
@@ -2100,39 +2163,9 @@ PackOp::reifyResultShapes(OpBuilder &builder,
                           ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
   OpBuilder::InsertionGuard g(builder);
   builder.setInsertionPoint(getOperation());
-  Location loc = getLoc();
-  SmallVector<OpFoldResult> mixedTiles = getMixedTiles();
-  DenseMap<int64_t, OpFoldResult> dimAndTileMapping = getDimAndTileMapping();
-
-  // Build the output dimension at pos `dimIdx`.
-  auto buildOutputDim = [&](OpBuilder &builder, size_t dimIdx) -> OpFoldResult {
-    ArrayRef<int64_t> outputShape = getOutputShape();
-    if (!ShapedType::isDynamic(outputShape[dimIdx])) {
-      return builder.getI64IntegerAttr(outputShape[dimIdx]);
-    }
-
-    // Inner tile sizes can be derived from inner_tiles.
-    if (dimIdx >= getInputRank()) {
-      return mixedTiles[dimIdx - getInputRank()];
-    }
-
-    OpFoldResult dimBound = getDim(builder, loc, getInput(), dimIdx);
-    if (dimAndTileMapping.count(dimIdx)) {
-      AffineExpr dim = builder.getAffineSymbolExpr(0);
-      AffineExpr tile = builder.getAffineSymbolExpr(1);
-      dimBound = makeComposedFoldedAffineApply(
-          builder, loc, dim.ceilDiv(tile),
-          ArrayRef<OpFoldResult>{dimBound, dimAndTileMapping[dimIdx]});
-    }
-    return dimBound;
-  };
-
   reifiedReturnShapes.resize(1);
-  reifiedReturnShapes[0].reserve(getOutputRank());
-  for (auto dimIdx : llvm::seq<int64_t>(0, getOutputRank())) {
-    reifiedReturnShapes[0].push_back(getValueOrCreateConstantIndexOp(
-        builder, loc, buildOutputDim(builder, dimIdx)));
-  }
+  reifiedReturnShapes[0] = getValueOrCreateConstantIndexOp(
+      builder, getLoc(), getResultShape(builder));
   return success();
 }
 

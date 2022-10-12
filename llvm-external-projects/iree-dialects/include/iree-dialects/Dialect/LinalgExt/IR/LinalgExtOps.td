@@ -494,7 +494,7 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
   let arguments = (ins Variadic<AnyShaped>:$inputs,
     Variadic<AnyShaped>:$outputs,
     DefaultValuedOptionalAttr<I64ArrayAttr, "{}">:$outer_dims_perm,
-    DefaultValuedAttr<I64ArrayAttr, "{}">:$inner_dims_pos,
+    I64ArrayAttr:$inner_dims_pos,
     Variadic<Index>:$inner_tiles,
     I64ArrayAttr:$static_inner_tiles,
     Optional<AnyType>:$padding_value);
@@ -512,6 +512,14 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
     `into` $outputs `:` `(` type($inputs) type($outputs) `)`
      (`->` type($results)^)?
   }];
+
+  let builders = [
+    OpBuilder<(ins "Value":$source, "Value":$output,
+      "ArrayRef<int64_t>":$innerDimsPos,
+      "ArrayRef<OpFoldResult>":$innerTiles, 
+      CArg<"Optional<Value>", "llvm::None">:$paddingValue,
+      CArg<"ArrayRef<int64_t>", "{}">:$outerDimsPerm)>
+  ];
 
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
 
@@ -566,6 +574,17 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
 
     // Return a mapping from positions `dims_pos` to their tile factors.
     DenseMap<int64_t, OpFoldResult> getDimAndTileMapping();
+
+    // Method to get the shape of the result as `SmallVector<OpFoldResult>`.
+    // This is a static method to allow getting the shape of the destination
+    // expected while creating a `pack` op.
+    static SmallVector<OpFoldResult> getResultShape(OpBuilder &builder,
+        Location loc, ArrayRef<OpFoldResult> sourceDims,
+        ArrayRef<OpFoldResult> innerTileDims, ArrayRef<int64_t> innerDimsPos,
+        ArrayRef<int64_t> outerDimsPerm = {});
+
+    // Method to return the shape of the result as `SmallVector<OpFoldResult>`.
+    SmallVector<OpFoldResult> getResultShape(OpBuilder &builder);
   }];
 }
 

@@ -29,6 +29,7 @@ Value getDimValue(OpBuilder &builder, Location loc, Value v, int64_t dim);
 /// Returns a `memref.dim` or `tensor.dim` operation to get the shape of `v` at
 /// `dim`. If the shape is constant, returns the shape as an `IntegerAttr`.
 OpFoldResult getDim(OpBuilder &builder, Location loc, Value v, int64_t dim);
+SmallVector<OpFoldResult> getDims(OpBuilder &builder, Location loc, Value v);
 
 } // namespace LinalgExt
 } // namespace IREE
