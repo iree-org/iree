@@ -533,20 +533,21 @@ static LogicalResult setTransposeConfig(func::FuncOp entryPoint,
     }
   }
 
-  int32_t tileM = 32;
-  int32_t tileN = 32;
+  const int64_t tileM = 32;
+  const int64_t tileN = 32;
   TileSizesListType tileSizes;
   // Set all tile sizes to 1 except for fastest moving dimensions.
   SmallVector<int64_t> tileSizesTemp(linalgOp.getNumLoops(), 1);
-  tileSizesTemp[outputFastestDim] = 32;
-  tileSizesTemp[inputFastestDim] = 32;
+  tileSizesTemp[outputFastestDim] = tileM;
+  tileSizesTemp[inputFastestDim] = tileN;
   tileSizes.push_back(tileSizesTemp);
 
-  // Check alignment with tile size for each transpose. Only the fastest moving
-  // dims need to match the transpose tile.
+  // Check if the input sizes are greater than the tile sizes.  It is okay to
+  // have unaligned input sizes because the workgroup specialization guarantees
+  // the main tile sizes to be the same as the given tile sizes.
   auto loopRanges = linalgOp.getStaticLoopRanges();
-  if (loopRanges[outputFastestDim] % tileM != 0 ||
-      loopRanges[inputFastestDim] % tileN != 0) {
+  if (loopRanges[outputFastestDim] < tileM ||
+      loopRanges[inputFastestDim] < tileN) {
     return failure();
   }
 
