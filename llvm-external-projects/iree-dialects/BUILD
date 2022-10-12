@@ -492,6 +492,7 @@ cc_library(
     deps = [
         ":IREEDialectsTransforms",
         ":IREELinalgExtDialect",
+        ":IREELinalgExtPasses",
         ":IREELinalgExtTransforms",
         ":IREELinalgTransformIncGen",
         ":IREELinalgTransformStructuredIncGen",

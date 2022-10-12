@@ -6,6 +6,7 @@
 
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 
+#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/ScopedTransform.h"
 #include "iree-dialects/Transforms/Listener.h"
@@ -61,13 +62,15 @@
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE << "]: ")
 
 using namespace mlir;
+using mlir::iree_compiler::IREE::LinalgExt::LinalgEnablingOptions;
 
 //===----------------------------------------------------------------------===//
 // Additional constraints for PDLMatchOp.
 //===----------------------------------------------------------------------===//
 
 /// Hook for PDL driver to check if an operation (`values[0]`) is directly
-/// nested in a function with the name provided by an attribute (`values[1]`).
+/// nested in a function with the name provided by an attribute
+/// (`values[1]`).
 /// TODO: PDL needs user-defined "questions".
 static LogicalResult nestedInFunc(PatternRewriter &rewriter,
                                   Operation *operation, Attribute attr) {
@@ -458,7 +461,7 @@ void mlir::TrackingListener::notifyOperationRemoved(Operation *op) {
 /// removal, CSE) on the given function.
 static LogicalResult performEnablerTransformations(
     func::FuncOp func, RewriteListener &listener,
-    linalg::LinalgEnablingOptions options = linalg::LinalgEnablingOptions()) {
+    LinalgEnablingOptions options = LinalgEnablingOptions()) {
   MLIRContext *ctx = func->getContext();
   RewritePatternSet patterns(ctx);
   linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
@@ -492,7 +495,7 @@ static LogicalResult performEnablerTransformations(
 /// operation tracking information.
 static LogicalResult performEnablerTransformations(
     Operation *containerOp, RewriteListener &listener,
-    linalg::LinalgEnablingOptions options = linalg::LinalgEnablingOptions()) {
+    LinalgEnablingOptions options = LinalgEnablingOptions()) {
   auto res = containerOp->walk([&](func::FuncOp func) {
     if (failed(performEnablerTransformations(func, listener, options)))
       return WalkResult::interrupt();
