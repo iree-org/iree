@@ -584,6 +584,13 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
         ArrayRef<int64_t> outerDimsPerm = {});
     // Method to return the shape of the result as `SmallVector<OpFoldResult>`.
     SmallVector<OpFoldResult> getResultShape(OpBuilder &builder);
+
+    // Method to get the `ShapedType` of the result. This is a static method
+    // to allow getting the type of the destination while creating the `pack`
+    // op.
+    static ShapedType getPackedType(ShapedType sourceType,
+        ArrayRef<int64_t> innerTileSizes, ArrayRef<int64_t> innerDimsPos,
+        ArrayRef<int64_t> outerDimsPerm = {});
   }];
 }
 
@@ -607,14 +614,14 @@ def IREELinalgExt_UnPackOp : IREELinalgExt_Op<"unpack", [
     Example KCck_to_KC:
 
     ```mlir
-    iree_linalg_ext.pack %arg0 dims_pos = [1, 0]
+    iree_linalg_ext.unpack %arg0 dims_pos = [1, 0]
       inner_tiles = [32, 8] into %arg1 : (memref<16x8x32x8xf32> memref<128x256xf32>)
     ```
 
     Example NCnc_to_NC:
 
     ```mlir
-    iree_linalg_ext.pack %arg0 dims_pos = [0, 1]
+    iree_linalg_ext.unpack %arg0 dims_pos = [0, 1]
       inner_tiles = [8, 32] into %arg1 : (memref<16x8x8x32xf32> memref<128x256xf32>)
     ```
 
@@ -645,6 +652,13 @@ def IREELinalgExt_UnPackOp : IREELinalgExt_Op<"unpack", [
     `into` $outputs `:` `(` type($inputs) type($outputs) `)`
      (`->` type($results)^)?
   }];
+
+  let builders = [
+    OpBuilder<(ins "Value":$source, "Value":$output,
+    "ArrayRef<int64_t>":$innerDimsPos,
+    "ArrayRef<OpFoldResult>":$innerTiles,
+    CArg<"ArrayRef<int64_t>", "{}">:$outerDimsPerm)>
+  ];
 
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
 
