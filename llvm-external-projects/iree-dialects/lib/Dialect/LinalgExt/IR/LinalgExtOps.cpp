@@ -1521,8 +1521,11 @@ static bool hasZeros(ArrayRef<OpFoldResult> tiles) {
 
 /// Return true if `dimsPos` is invalid. It is invalid when: a) it contains
 /// duplicate. b) At least one dimension is out of bound (`dimPos` is >= 0 and <
-/// rank).
+/// rank). c) the number of elements in `dimsPos` is > than `rank`.
 static bool isInvalid(ArrayRef<int64_t> dimsPos, int64_t rank) {
+  // early exit.
+  if (dimsPos.size() > rank)
+    return true;
   DenseSet<int64_t> uniqued;
   for (int64_t dim : dimsPos)
     uniqued.insert(dim);
@@ -1530,20 +1533,6 @@ static bool isInvalid(ArrayRef<int64_t> dimsPos, int64_t rank) {
     return true;
   return llvm::any_of(
       dimsPos, [rank](int64_t dimPos) { return dimPos < 0 || dimPos >= rank; });
-}
-
-/// Return true if `inner_dims_pos` and `outer_dims_perm` are incompatible. They
-/// are incompatible when: a) They have different sizes and b) They have
-/// different elements.
-static bool isInvalid(SmallVectorImpl<int64_t> &innerDimsPos,
-                      SmallVectorImpl<int64_t> &outerDimPerm) {
-  if (outerDimPerm.empty())
-    return false;
-  if (innerDimsPos.size() != outerDimPerm.size())
-    return true;
-  llvm::sort(innerDimsPos);
-  llvm::sort(outerDimPerm);
-  return innerDimsPos != outerDimPerm;
 }
 
 /// Check if we have enough static information to catch undefined behavior when
@@ -1591,9 +1580,8 @@ static SmallVector<T> interchange(ArrayRef<T> elements,
   SmallVector<T> rearrangedElements = llvm::to_vector(elements);
   if (interchangeVector.empty())
     return rearrangedElements;
-  for (int64_t idx = 0, end = interchangeVector.size(); idx < end; idx++) {
-    rearrangedElements[interchangeVector[idx] + offset] =
-        elements[idx + offset];
+  for (auto en : llvm::enumerate(interchangeVector)) {
+    rearrangedElements[en.index() + offset] = elements[en.value() + offset];
   }
   return rearrangedElements;
 }
@@ -1713,18 +1701,10 @@ static LogicalResult commonVerifierPackAndUnPackOp(OpTy packOrUnPack) {
   // Verify tiles. Make sure each provided tile is non-zero.
   if (hasZeros(packOrUnPack.getMixedTiles()))
     return op->emitError("invalid tile factor");
-  // Reject `inner_dims_pos` if it contains duplicate.
   if (isInvalid(innerDimsPos, rank))
     return op->emitError("invalid inner_dims_pos vector");
-  // Reject `outer_dims_perm` if it contains duplicate.
   if (isInvalid(outerDimPerm, rank))
     return op->emitError("invalid outer_dims_perm vector");
-  // Reject if `inner_dims_pos` and `outer_dims_perm` contain different
-  // dimensions.
-  if (isInvalid(innerDimsPos, outerDimPerm)) {
-    return op->emitError(
-        "inner_dims_pos and outer_dims_perm must have the same elements");
-  }
   if (packOrUnPack.getMixedTiles().size() != innerDimsPos.size()) {
     return op->emitError(
         "blocking factors must equal the number of dimensions to block");
