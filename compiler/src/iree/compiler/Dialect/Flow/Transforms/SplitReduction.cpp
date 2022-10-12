@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
+#include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -60,8 +61,8 @@ struct LinalgSplitReduction
       }
     }
 
-    FailureOr<linalg::LinalgOp> result =
-        splitReduction(rewriter, op, controlSplitReductionFn, filter);
+    FailureOr<linalg::LinalgOp> result = LinalgExt::splitReduction(
+        rewriter, op, controlSplitReductionFn, filter);
     if (failed(result)) return failure();
     // If any attributes needs to be propagated set it.
     for (std::pair<StringAttr, Attribute> &attrib : attributes) {
