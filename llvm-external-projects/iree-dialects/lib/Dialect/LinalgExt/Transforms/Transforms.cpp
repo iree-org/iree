@@ -598,7 +598,7 @@ struct LinalgStrategyVectorizePass
 struct LinalgStrategyEnablePass
     : public LinalgStrategyEnablePassBase<LinalgStrategyEnablePass> {
 
-  LinalgStrategyEnablePass(linalg::LinalgEnablingOptions opt,
+  LinalgStrategyEnablePass(LinalgEnablingOptions opt,
                            linalg::LinalgTransformationFilter filt)
       : options(opt), filter(std::move(filt)) {}
 
@@ -640,7 +640,7 @@ struct LinalgStrategyEnablePass
       return signalPassFailure();
   }
 
-  linalg::LinalgEnablingOptions options;
+  LinalgEnablingOptions options;
   linalg::LinalgTransformationFilter filter;
 };
 
@@ -775,7 +775,7 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyVectorizePass(
 
 /// Create a LinalgStrategyEnablePass.
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyEnablePass(
-    linalg::LinalgEnablingOptions opt,
+    LinalgEnablingOptions opt,
     const linalg::LinalgTransformationFilter &filter) {
   return std::make_unique<LinalgStrategyEnablePass>(opt, filter);
 }

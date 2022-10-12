@@ -262,7 +262,7 @@ struct CodegenStrategy {
   }
   /// Configure the post staged-patterns global enabling passes options.
   CodegenStrategy &
-  setVectorTransferToSCFOptions(linalg::LinalgEnablingOptions options) {
+  setVectorTransferToSCFOptions(LinalgEnablingOptions options) {
     linalgEnablingOptions = options;
     return *this;
   }
@@ -275,7 +275,7 @@ struct CodegenStrategy {
 private:
   LogicalResult postPatternTransforms(Operation *func) const;
 
-  linalg::LinalgEnablingOptions linalgEnablingOptions;
+  LinalgEnablingOptions linalgEnablingOptions;
   SmallVector<std::unique_ptr<Transformation>, 4> transformationSequence;
 };
 

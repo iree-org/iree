@@ -46,6 +46,31 @@ const StringLiteral kSplitReductionDepthMarker = "__split_reduction_depth__";
 //===---------------------------------------------------------------------===//
 // Codegen Strategy passes that are moved into IREE.
 //===---------------------------------------------------------------------===//
+/// Options to control the application of enabling transformations.
+/// Hoisting transformations are always deemed beneficial and must be disabled
+/// explicitly.
+struct LinalgEnablingOptions {
+  /// Enable LICM.
+  bool licm = true;
+  LinalgEnablingOptions &enableLICM(bool val = true) {
+    licm = val;
+    return *this;
+  }
+  /// Enable hoisting of redundant vector transfer ops.
+  bool hoistRedundantVectorTransfers = true;
+  LinalgEnablingOptions &enableHoistRedundantVectorTransfers(bool val = true) {
+    hoistRedundantVectorTransfers = val;
+    return *this;
+  }
+  /// Enable hoisting of redundant vector transfer ops on tensor.
+  bool hoistRedundantVectorTransfersOnTensor = true;
+  LinalgEnablingOptions &
+  enableHoistRedundantVectorTransfersOnTensor(bool val = true) {
+    hoistRedundantVectorTransfersOnTensor = val;
+    return *this;
+  }
+};
+
 /// Create a LinalgStrategyTileAndFusePass.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLinalgStrategyTileAndFusePass(
@@ -97,7 +122,7 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyVectorizePass(
 
 /// Create a LinalgStrategyEnablePass.
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyEnablePass(
-    linalg::LinalgEnablingOptions opt = linalg::LinalgEnablingOptions(),
+    LinalgEnablingOptions opt = LinalgEnablingOptions(),
     const linalg::LinalgTransformationFilter &filter =
         linalg::LinalgTransformationFilter());
 
