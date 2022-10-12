@@ -17,7 +17,7 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
           %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:4096x4096xf32>
           %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:4096x4096xf32>
           %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [4096, 4096], strides = [1, 1] : !flow.dispatch.tensor<readonly:4096x4096xf32> -> tensor<4096x4096xf32>
-          %3 = linalg.init_tensor [4096, 4096] : tensor<4096x4096xf32>
+          %3 = tensor.empty() : tensor<4096x4096xf32>
           %4 = linalg.generic {indexing_maps = [ affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%2 : tensor<4096x4096xf32>) outs(%3 : tensor<4096x4096xf32>) {
           ^bb0(%arg0: f32, %arg1: f32):
             linalg.yield %arg0 : f32
@@ -79,7 +79,7 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
           %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:768x2048xf32>
           %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [2048, 768], strides = [1, 1] : !flow.dispatch.tensor<readonly:2048x768xf32> -> tensor<2048x768xf32>
           %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [768, 2048], strides = [1, 1] : !flow.dispatch.tensor<readonly:768x2048xf32> -> tensor<768x2048xf32>
-          %5 = linalg.init_tensor [768, 2048] : tensor<768x2048xf32>
+          %5 = tensor.empty() : tensor<768x2048xf32>
           %6 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%3, %4 : tensor<2048x768xf32>, tensor<768x2048xf32>) outs(%5 : tensor<768x2048xf32>) {
           ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):
             %7 = arith.addf %arg0, %arg1 : f32
@@ -145,7 +145,7 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
           %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:768x2048x1024xf32>
           %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [2048, 768, 1024], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:2048x768x1024xf32> -> tensor<2048x768x1024xf32>
           %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [768, 2048, 1024], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:768x2048x1024xf32> -> tensor<768x2048x1024xf32>
-          %5 = linalg.init_tensor [768, 2048, 1024] : tensor<768x2048x1024xf32>
+          %5 = tensor.empty() : tensor<768x2048x1024xf32>
           %6 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d1, d0, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%3, %4 : tensor<2048x768x1024xf32>, tensor<768x2048x1024xf32>) outs(%5 : tensor<768x2048x1024xf32>) {
           ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):
             %7 = arith.addf %arg0, %arg1 : f32
@@ -185,7 +185,7 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
           %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:10x768x2048xf32>
           %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [10, 2048, 768], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:10x2048x768xf32> -> tensor<10x2048x768xf32>
           %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [10, 768, 2048], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:10x768x2048xf32> -> tensor<10x768x2048xf32>
-          %5 = linalg.init_tensor [10, 768, 2048] : tensor<10x768x2048xf32>
+          %5 = tensor.empty() : tensor<10x768x2048xf32>
           %6 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%3, %4 : tensor<10x2048x768xf32>, tensor<10x768x2048xf32>) outs(%5 : tensor<10x768x2048xf32>) {
           ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):
             %7 = arith.addf %arg0, %arg1 : f32
@@ -252,7 +252,7 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
           %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:10x2048x768xf32>
           %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [10, 768, 2048], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:10x768x2048xf32> -> tensor<10x768x2048xf32>
           %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [10, 768, 2048], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:10x768x2048xf32> -> tensor<10x768x2048xf32>
-          %5 = linalg.init_tensor [10, 2048, 768] : tensor<10x2048x768xf32>
+          %5 = tensor.empty() : tensor<10x2048x768xf32>
           %6 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%3, %4 : tensor<10x768x2048xf32>, tensor<10x768x2048xf32>) outs(%5 : tensor<10x2048x768xf32>) {
           ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):
             %7 = arith.addf %arg0, %arg1 : f32
@@ -337,7 +337,7 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
             scf.for %arg2 = %3 to %c2048 step %4 {
                 %5 = flow.dispatch.tensor.load %0, offsets = [%arg0, %arg2, %arg1], sizes = [1, %c256, 1], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:10x2048x768xf32> -> tensor<1x?x1xf32>
                 %6 = flow.dispatch.tensor.load %1, offsets = [%arg2, %arg1, %arg0], sizes = [%c256, 1, 1], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:2048x768x10xf32> -> tensor<?x1x1xf32>
-                %7 = linalg.init_tensor [1, 1, 256] : tensor<1x1x256xf32>
+                %7 = tensor.empty() : tensor<1x1x256xf32>
                 %8 = tensor.cast %5 : tensor<1x?x1xf32> to tensor<1x256x1xf32>
                 %9 = tensor.cast %6 : tensor<?x1x1xf32> to tensor<256x1x1xf32>
                 %10 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2, d1)>, affine_map<(d0, d1, d2) -> (d2, d1, d0)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%8, %9 : tensor<1x256x1xf32>, tensor<256x1x1xf32>) outs(%7 : tensor<1x1x256xf32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 1, 256]]>} {

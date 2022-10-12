@@ -652,7 +652,7 @@ func.func @reverse_tensor_multi_dim(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
   %c1 = arith.constant 1 : index
   %d0 = tensor.dim %arg0, %c0 : tensor<?x?xi32>
   %d1 = tensor.dim %arg0, %c1 : tensor<?x?xi32>
-  %init = linalg.init_tensor [%d0, %d1] : tensor<?x?xi32>
+  %init = tensor.empty(%d0, %d1) : tensor<?x?xi32>
   %0 = iree_linalg_ext.reverse
          {__internal_linalg_transform__ = "tiling_input"}
          dimensions(dense<[0, 1]> : tensor<2xi64>)
@@ -671,7 +671,7 @@ func.func @reverse_tensor_multi_dim(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
 // CHECK-DAG:    %[[C20:.+]] = arith.constant 20 : index
 // CHECK-DAG:    %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]] : tensor<?x?xi32>
 // CHECK-DAG:    %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]] : tensor<?x?xi32>
-// CHECK:        %[[INIT:.+]] = linalg.init_tensor [%[[D0]], %[[D1]]] : tensor<?x?xi32>
+// CHECK:        %[[INIT:.+]] = tensor.empty(%[[D0]], %[[D1]]) : tensor<?x?xi32>
 // CHECK:        %[[RES:.+]] = scf.for %[[I:.+]] = %[[C0]] to %[[D0]] step %[[C10]]
 // CHECK-SAME:     iter_args(%[[INIT2:.+]] = %[[INIT]]) -> (tensor<?x?xi32>) {
 // CHECK:          %[[SIZE_I:.+]] = affine.min #[[MAP0]](%[[I]])[%[[C10]], %[[D0]]]
@@ -698,8 +698,8 @@ func.func @reverse_tensor_multi_dim(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
 // -----
 
 func.func @scan_1d(%0: tensor<128xi32>) -> tensor<128xi32> {
-  %c0 = linalg.init_tensor [] : tensor<i32>
-  %1 = linalg.init_tensor [128] : tensor<128xi32>
+  %c0 = tensor.empty() : tensor<i32>
+  %1 = tensor.empty() : tensor<128xi32>
   %2:2 = iree_linalg_ext.scan
     {__internal_linalg_transform__ = "outer_reduce_input"}
     dimension(0) inclusive(true)
@@ -712,8 +712,8 @@ func.func @scan_1d(%0: tensor<128xi32>) -> tensor<128xi32> {
 }
 //      CHECK: func.func @scan_1d(
 // CHECK-SAME:   %[[OPERAND:.+]]: tensor<128xi32>
-//      CHECK:   %[[ACC:.+]] = linalg.init_tensor [] : tensor<i32>
-//      CHECK:   %[[OUTPUT:.+]] = linalg.init_tensor [128] : tensor<128xi32>
+//      CHECK:   %[[ACC:.+]] = tensor.empty() : tensor<i32>
+//      CHECK:   %[[OUTPUT:.+]] = tensor.empty() : tensor<128xi32>
 //      CHECK:   %[[RESULT:.+]]:2 = iree_linalg_ext.scan
 // CHECK-SAME:           __internal_linalg_transform__ = "outer_reduce_output"
 // CHECK-SAME:       ins(%[[OPERAND]] :
@@ -723,8 +723,8 @@ func.func @scan_1d(%0: tensor<128xi32>) -> tensor<128xi32> {
 // -----
 
 func.func @scan_2d(%0: tensor<16x32xi32>) -> tensor<16x32xi32> {
-  %c0 = linalg.init_tensor [32] : tensor<32xi32>
-  %1 = linalg.init_tensor [16, 32] : tensor<16x32xi32>
+  %c0 = tensor.empty() : tensor<32xi32>
+  %1 = tensor.empty() : tensor<16x32xi32>
   %2:2 = iree_linalg_ext.scan
     {__internal_linalg_transform__ = "outer_reduce_input"}
     dimension(0) inclusive(true)
@@ -742,8 +742,8 @@ func.func @scan_2d(%0: tensor<16x32xi32>) -> tensor<16x32xi32> {
 //      CHECK:    %[[C16:.+]] = arith.constant 16 : index
 //      CHECK:    %[[C32:.+]] = arith.constant 32 : index
 //      CHECK:    %[[C20:.+]] = arith.constant 20 : index
-//      CHECK:    %[[ACC:.+]] = linalg.init_tensor [32] : tensor<32xi32>
-//      CHECK:    %[[OUTPUT:.+]] = linalg.init_tensor [16, 32] : tensor<16x32xi32>
+//      CHECK:    %[[ACC:.+]] = tensor.empty() : tensor<32xi32>
+//      CHECK:    %[[OUTPUT:.+]] = tensor.empty() : tensor<16x32xi32>
 //      CHECK:    %[[RESULT:.+]]:2 = scf.for %[[I:.+]] = %[[C0]] to %[[C32]] step %[[C20]]
 // CHECK-SAME:      iter_args(%[[ARG2:.+]] = %[[OUTPUT]], %[[ARG3:.+]] = %[[ACC]])
 //      CHECK:      %[[SIZE:.+]] = affine.min #[[MAP0]](%[[I]])[%[[C20]], %[[C32]]]

@@ -43,8 +43,8 @@ Value additiveReductionLeaving1ParallelDim(PatternRewriter &rewriter,
   }
   Value initAcc =
       rewriter
-          .create<linalg::InitTensorOp>(
-              loc, dstDynSizes, ArrayRef<int64_t>{dstStaticSize}, accElTy)
+          .create<tensor::EmptyOp>(loc, ArrayRef<int64_t>{dstStaticSize},
+                                   accElTy, dstDynSizes)
           .getResult();
   // Zero-fill the accumulator.
   Value zeroInt =
@@ -122,8 +122,8 @@ struct QuantizedMatmulToMatmul
     // Create the result. No need to zero-fill it as we will overwrite it.
     ShapedType accType = acc.getType().cast<ShapedType>();
     auto accDynShape = linalg::getDynOperands(loc, acc, rewriter);
-    Value initResult = rewriter.create<linalg::InitTensorOp>(
-        loc, accDynShape, accType.getShape(), accType.getElementType());
+    Value initResult = rewriter.create<tensor::EmptyOp>(
+        loc, accType.getShape(), accType.getElementType(), accDynShape);
     // Create the indexing maps for the generic.
     MLIRContext *context = rewriter.getContext();
     AffineExpr m, n;

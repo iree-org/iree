@@ -143,10 +143,10 @@ computeParallelTopk(Location loc, PatternRewriter &rewriter,
           rewriter.create<tensor::DimOp>(loc, valuesExpanded, i));
     }
   }
-  Value initTensorOutputValues = rewriter.create<mlir::linalg::InitTensorOp>(
-      loc, dynSizes, outputValuesExpandedType.getShape(), valueElementType);
-  Value initTensorOutputIndices = rewriter.create<mlir::linalg::InitTensorOp>(
-      loc, dynSizes, outputIndicesExpandedType.getShape(), indicesElementType);
+  Value emptyTensorOutputValues = rewriter.create<mlir::tensor::EmptyOp>(
+      loc, outputValuesExpandedType.getShape(), valueElementType, dynSizes);
+  Value emptyTensorOutputIndices = rewriter.create<mlir::tensor::EmptyOp>(
+      loc, outputIndicesExpandedType.getShape(), indicesElementType, dynSizes);
 
   // Initialize indices to positive infinity and values to negative infinity
   // for a top (maxk) comparison.
@@ -165,10 +165,10 @@ computeParallelTopk(Location loc, PatternRewriter &rewriter,
       rewriter.getIntegerAttr(indicesElementType, APInt::getSignedMaxValue(32));
   Value posInf = rewriter.create<arith::ConstantOp>(loc, posInfAttr);
   Value negInfTensor =
-      rewriter.create<linalg::FillOp>(loc, negInf, initTensorOutputValues)
+      rewriter.create<linalg::FillOp>(loc, negInf, emptyTensorOutputValues)
           .result();
   Value posInfTensor =
-      rewriter.create<linalg::FillOp>(loc, posInf, initTensorOutputIndices)
+      rewriter.create<linalg::FillOp>(loc, posInf, emptyTensorOutputIndices)
           .result();
 
   SmallVector<Type> parallelTopkResultTypes = {outputValuesExpandedType,

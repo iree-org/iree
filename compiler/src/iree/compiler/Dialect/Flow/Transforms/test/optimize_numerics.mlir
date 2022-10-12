@@ -69,9 +69,9 @@ func.func @cast_fill(%arg0 : f32, %arg1 : tensor<3xf32>) -> tensor<3xi8> {
 
 // CHECK-LABEL: @cast_init
 func.func @cast_init() -> tensor<5x9xi8> {
-  // CHECK: %[[RESULT:.*]] = linalg.init_tensor [5, 9] : tensor<5x9xi8>
+  // CHECK: %[[RESULT:.*]] = tensor.empty() : tensor<5x9xi8>
   // CHECK: return %[[RESULT]]
-  %0 = linalg.init_tensor [5, 9] : tensor<5x9xf32>
+  %0 = tensor.empty() : tensor<5x9xf32>
   %1 = arith.fptosi %0 : tensor<5x9xf32> to tensor<5x9xi8>
   return %1 : tensor<5x9xi8>
 }

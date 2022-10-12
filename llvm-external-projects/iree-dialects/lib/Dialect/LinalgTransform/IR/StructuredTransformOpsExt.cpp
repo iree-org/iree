@@ -424,8 +424,8 @@ void mlir::TrackingListener::notifyOperationReplaced(Operation *op,
     return;
 
   // Exit early if the op is not tracked.
-  Value handle = getTransformState().getHandleForPayloadOp(op);
-  if (!handle)
+  SmallVector<Value> handles;
+  if (failed(getTransformState().getHandlesForPayloadOp(op, handles)))
     return;
 
   Operation *replacement = findSingleDefiningOp(op, newValues);
@@ -435,7 +435,7 @@ void mlir::TrackingListener::notifyOperationReplaced(Operation *op,
   }
 
   LLVM_DEBUG(DBGS() << "replacing tracked " << *op << " with " << *replacement
-                    << " for " << handle << "\n");
+                    << "\n");
   mayFail(replacePayloadOp(op, replacement));
 }
 
@@ -445,11 +445,11 @@ void mlir::TrackingListener::notifyOperationRemoved(Operation *op) {
     return;
 
   // Exit early if the op is not tracked.
-  Value handle = getTransformState().getHandleForPayloadOp(op);
-  if (!handle)
+  SmallVector<Value> handles;
+  if (failed(getTransformState().getHandlesForPayloadOp(op, handles)))
     return;
 
-  LLVM_DEBUG(DBGS() << "removing tracked " << *op << " for " << handle << "\n");
+  LLVM_DEBUG(DBGS() << "removing tracked " << *op << "\n");
   mayFail(replacePayloadOp(op, nullptr));
 }
 
@@ -520,8 +520,7 @@ DiagnosedSilenceableFailure transform_ext::CanonicalizedSequenceOp::apply(
   auto &listener = state.addExtension<::mlir::TrackingListener>();
   auto detachListener = llvm::make_scope_exit(
       [&] { state.removeExtension<::mlir::TrackingListener>(); });
-  if (failed(mapBlockArguments(state)))
-    return DiagnosedSilenceableFailure::definiteFailure();
+  mapBlockArguments(state);
 
   auto checkedListenerTransform =
       [&](function_ref<LogicalResult(Operation *, RewriteListener &)>

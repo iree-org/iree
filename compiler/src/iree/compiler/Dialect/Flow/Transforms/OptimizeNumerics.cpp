@@ -10,6 +10,7 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -106,13 +107,12 @@ struct LinalgInitTensorCast
 
   LogicalResult matchAndRewrite(IREE::Util::NumericCastOpInterface castOp,
                                 PatternRewriter &rewriter) const override {
-    auto initTensorOp = castOp.getInput().getDefiningOp<linalg::InitTensorOp>();
-    if (!initTensorOp) return failure();
+    auto emptyTensorOp = castOp.getInput().getDefiningOp<tensor::EmptyOp>();
+    if (!emptyTensorOp) return failure();
     Type resultType = castOp.getCasted().getType();
 
-    rewriter.replaceOpWithNewOp<linalg::InitTensorOp>(
-        castOp, resultType, initTensorOp.getSizes(),
-        initTensorOp.getStaticSizes());
+    rewriter.replaceOpWithNewOp<tensor::EmptyOp>(
+        castOp, resultType, emptyTensorOp.getDynamicSizes());
     return success();
   }
 };

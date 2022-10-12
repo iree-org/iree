@@ -20,7 +20,7 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
           %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:1x112x112x64xf32>
           %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [1, 230, 230, 3], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:1x230x230x3xf32> -> tensor<1x230x230x3xf32>
           %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [7, 7, 3, 64], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:7x7x3x64xf32> -> tensor<7x7x3x64xf32>
-          %5 = linalg.init_tensor [1, 112, 112, 64] : tensor<1x112x112x64xf32>
+          %5 = tensor.empty() : tensor<1x112x112x64xf32>
           %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<1x112x112x64xf32>) -> tensor<1x112x112x64xf32>
           %7 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>} ins(%3, %4 : tensor<1x230x230x3xf32>, tensor<7x7x3x64xf32>) outs(%6 : tensor<1x112x112x64xf32>) -> tensor<1x112x112x64xf32>
           flow.dispatch.tensor.store %7, %2, offsets = [0, 0, 0, 0], sizes = [1, 112, 112, 64], strides = [1, 1, 1, 1] : tensor<1x112x112x64xf32> -> !flow.dispatch.tensor<writeonly:1x112x112x64xf32>
@@ -64,7 +64,7 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
           %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:2x320x64x64xf32>
           %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [1, 230, 230, 3], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:2x4x66x66xf32> -> tensor<2x4x66x66xf32>
           %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [7, 7, 3, 64], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:320x4x3x3xf32> -> tensor<320x4x3x3xf32>
-          %5 = linalg.init_tensor [2, 320, 64, 64] : tensor<2x320x64x64xf32>
+          %5 = tensor.empty() : tensor<2x320x64x64xf32>
           %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<2x320x64x64xf32>) -> tensor<2x320x64x64xf32>
           %7 = linalg.conv_2d_nchw_fchw {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>}
             ins(%3, %4 : tensor<2x4x66x66xf32>, tensor<320x4x3x3xf32>)

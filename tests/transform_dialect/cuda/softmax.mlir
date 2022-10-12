@@ -57,7 +57,7 @@ func.func @max_sub_exp() -> !out_tensor_t {
   %cst_1 = arith.constant dense<5.000000e+00> : !out_tensor_t
   %0 = util.do_not_optimize(%cst_1) : !out_tensor_t
 
-  %1 = linalg.init_tensor [16, 128] : !tmp_tensor_t
+  %1 = tensor.empty() : !tmp_tensor_t
   %2 = linalg.fill ins(%cst : f32) outs(%1 : !tmp_tensor_t) -> !tmp_tensor_t
   %3 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, 
                                         affine_map<(d0, d1, d2) -> (d0, d1)>], 
@@ -69,7 +69,7 @@ func.func @max_sub_exp() -> !out_tensor_t {
   } -> !tmp_tensor_t
 
   // This has been fused manually to avoid the fusion on tensors pass and reduce noise atm.
-  %4 = linalg.init_tensor [16, 128, 128] : !out_tensor_t
+  %4 = tensor.empty() : !out_tensor_t
   %5 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
                                         affine_map<(d0, d1, d2) -> (d0, d1)>,
                                         affine_map<(d0, d1, d2) -> (d0, d1, d2)>], 

@@ -39,7 +39,6 @@ iree_lit_test_suite(
         [
             "fill_i64.mlir",
             "globals.mlir",
-            "globals_ml_program.mlir",
             "libm_linking.mlir",
             "scalar.mlir",
             "trace_dispatch_tensors.mlir",
@@ -51,6 +50,7 @@ iree_lit_test_suite(
         exclude = [
             "associative_reordering.mlir",
             "disable_demote_f64_to_f32.mlir",
+            "globals_ml_program.mlir",
             "large_reduction.mlir",
             "layernorm.mlir",
             "linalg_quantized_matmul_vs_linalg_matmul.mlir",

@@ -86,7 +86,7 @@ struct ConcatenateOpConversion
           rewriter.createOrFold<arith::AddIOp>(loc, resultDimSize, size);
     }
     sizes[dim] = resultDimSize;
-    Value result = rewriter.create<linalg::InitTensorOp>(
+    Value result = rewriter.create<tensor::EmptyOp>(
         loc, resultType.getShape(), resultType.getElementType());
 
     auto toOpFoldResult = [](Value v) -> OpFoldResult {
@@ -144,11 +144,11 @@ Value createLinalgMatmulOnTensors(OpBuilder b, Location loc,
                                   Value rhs) {
   Value zero = b.create<arith::ConstantOp>(
       loc, b.getZeroAttr(resultType.getElementType()));
-  Value initTensor = b.create<linalg::InitTensorOp>(
-      loc, /*dyn_size=*/ValueRange{}, resultType.getShape(),
-      resultType.getElementType());
+  Value emptyTensor = b.create<mlir::tensor::EmptyOp>(
+      loc, resultType.getShape(), resultType.getElementType(),
+      /*dyn_size=*/ValueRange{});
   Value zeroTensor =
-      b.create<linalg::FillOp>(loc, zero, initTensor).getResult(0);
+      b.create<linalg::FillOp>(loc, zero, emptyTensor).getResult(0);
 
   switch (lhs.getType().cast<RankedTensorType>().getRank()) {
     case 1:

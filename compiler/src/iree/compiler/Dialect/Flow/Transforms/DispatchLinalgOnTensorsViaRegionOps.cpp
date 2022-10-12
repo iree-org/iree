@@ -213,7 +213,7 @@ bool isClonableIntoDispatchOp(Operation *op) {
   // TODO(#8637): `tensor.collapse_shape` and `tensor.expand_shape` are
   // trivially clonable too, but they cause problems
   // with bufferization. Make them clonable when fixed.
-  if (isa<arith::IndexCastOp, linalg::InitTensorOp, tensor::CastOp,
+  if (isa<arith::IndexCastOp, tensor::EmptyOp, tensor::CastOp,
           tensor::ExtractOp, tensor::ExtractSliceOp, tensor::PadOp>(op)) {
     return true;
   }

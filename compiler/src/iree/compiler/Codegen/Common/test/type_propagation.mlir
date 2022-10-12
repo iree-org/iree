@@ -6,7 +6,7 @@ func.func @generic_op_illegal_operand() {
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:?xi8>{%d}
   %2 = flow.dispatch.tensor.load %0, offsets = [0], sizes=[%d], strides=[1] : !flow.dispatch.tensor<readonly:?xi8>{%d} -> tensor<?xi8>
   %3 = arith.trunci %2 : tensor<?xi8> to tensor<?xi1>
-  %4 = linalg.init_tensor [%d] : tensor<?xi8>
+  %4 = tensor.empty(%d) : tensor<?xi8>
   %5 = linalg.generic {
     indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
     iterator_types = ["parallel"]}
@@ -22,7 +22,7 @@ func.func @generic_op_illegal_operand() {
 //   CHECK-DAG:   %[[IN:.+]] = hal.interface.binding.subspan set(0) binding(0)
 //   CHECK-DAG:   %[[OUT:.+]] = hal.interface.binding.subspan set(0) binding(1)
 //   CHECK-DAG:   %[[INTENSOR:.+]] = flow.dispatch.tensor.load %[[IN]]
-//   CHECK-DAG:   %[[INIT:.+]] = linalg.init_tensor [%{{.+}}] : tensor<?xi8>
+//   CHECK-DAG:   %[[INIT:.+]] = tensor.empty(%{{.+}}) : tensor<?xi8>
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:       ins(%[[INTENSOR]] : tensor<?xi8>)
 //  CHECK-SAME:       outs(%[[INIT]] : tensor<?xi8>)
@@ -40,7 +40,7 @@ func.func @generic_op_illegal_operand_i7() {
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:?xi8>{%d}
   %2 = flow.dispatch.tensor.load %0, offsets = [0], sizes=[%d], strides=[1] : !flow.dispatch.tensor<readonly:?xi8>{%d} -> tensor<?xi8>
   %3 = arith.trunci %2 : tensor<?xi8> to tensor<?xi7>
-  %4 = linalg.init_tensor [%d] : tensor<?xi8>
+  %4 = tensor.empty(%d) : tensor<?xi8>
   %5 = linalg.generic {
     indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
     iterator_types = ["parallel"]}
@@ -56,7 +56,7 @@ func.func @generic_op_illegal_operand_i7() {
 //   CHECK-DAG:   %[[IN:.+]] = hal.interface.binding.subspan set(0) binding(0)
 //   CHECK-DAG:   %[[OUT:.+]] = hal.interface.binding.subspan set(0) binding(1)
 //   CHECK-DAG:   %[[INTENSOR:.+]] = flow.dispatch.tensor.load %[[IN]]
-//   CHECK-DAG:   %[[INIT:.+]] = linalg.init_tensor [%{{.+}}] : tensor<?xi8>
+//   CHECK-DAG:   %[[INIT:.+]] = tensor.empty(%{{.+}}) : tensor<?xi8>
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:       ins(%[[INTENSOR]] : tensor<?xi8>)
 //  CHECK-SAME:       outs(%[[INIT]] : tensor<?xi8>)
@@ -74,7 +74,7 @@ func.func @generic_op_illegal_operand_i33() {
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:?xi64>{%d}
   %2 = flow.dispatch.tensor.load %0, offsets = [0], sizes=[%d], strides=[1] : !flow.dispatch.tensor<readonly:?xi64>{%d} -> tensor<?xi64>
   %3 = arith.trunci %2 : tensor<?xi64> to tensor<?xi33>
-  %4 = linalg.init_tensor [%d] : tensor<?xi64>
+  %4 = tensor.empty(%d) : tensor<?xi64>
   %5 = linalg.generic {
     indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
     iterator_types = ["parallel"]}
@@ -90,7 +90,7 @@ func.func @generic_op_illegal_operand_i33() {
 //   CHECK-DAG:   %[[IN:.+]] = hal.interface.binding.subspan set(0) binding(0)
 //   CHECK-DAG:   %[[OUT:.+]] = hal.interface.binding.subspan set(0) binding(1)
 //   CHECK-DAG:   %[[INTENSOR:.+]] = flow.dispatch.tensor.load %[[IN]]
-//   CHECK-DAG:   %[[INIT:.+]] = linalg.init_tensor [%{{.+}}] : tensor<?xi64>
+//   CHECK-DAG:   %[[INIT:.+]] = tensor.empty(%{{.+}}) : tensor<?xi64>
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:       ins(%[[INTENSOR]] : tensor<?xi64>)
 //  CHECK-SAME:       outs(%[[INIT]] : tensor<?xi64>)
@@ -108,7 +108,7 @@ func.func @generic_op_illegal_result() {
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:?xi8>{%d}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:?xi8>{%d}
   %2 = flow.dispatch.tensor.load %0, offsets = [0], sizes=[%d], strides=[1] : !flow.dispatch.tensor<readonly:?xi8>{%d} -> tensor<?xi8>
-  %3 = linalg.init_tensor [%d] : tensor<?xi1>
+  %3 = tensor.empty(%d) : tensor<?xi1>
   %4 = linalg.generic {
     indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
     iterator_types = ["parallel"]}
@@ -125,7 +125,7 @@ func.func @generic_op_illegal_result() {
 //   CHECK-DAG:   %[[IN:.+]] = hal.interface.binding.subspan set(0) binding(0)
 //   CHECK-DAG:   %[[OUT:.+]] = hal.interface.binding.subspan set(0) binding(1)
 //   CHECK-DAG:   %[[INTENSOR:.+]] = flow.dispatch.tensor.load %[[IN]]
-//   CHECK-DAG:   %[[INIT:.+]] = linalg.init_tensor [%{{.+}}] : tensor<?xi8>
+//   CHECK-DAG:   %[[INIT:.+]] = tensor.empty(%{{.+}}) : tensor<?xi8>
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:       ins(%[[INTENSOR]] : tensor<?xi8>)
 //  CHECK-SAME:       outs(%[[INIT]] : tensor<?xi8>)
@@ -223,7 +223,7 @@ func.func @for_loop() {
 func.func @fill_op() {
   %d = hal.interface.constant.load[0] : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<writeonly:?xi8>{%d}
-  %1 = linalg.init_tensor [%d] : tensor<?xi1>
+  %1 = tensor.empty(%d) : tensor<?xi1>
   %false = arith.constant false
   %2 = linalg.fill ins(%false : i1) outs(%1 : tensor<?xi1>) -> tensor<?xi1>
   %3 = arith.extui %2 : tensor<?xi1> to tensor<?xi8>
@@ -232,7 +232,7 @@ func.func @fill_op() {
 }
 // CHECK-LABEL: func.func @fill_op()
 //   CHECK-DAG:   %[[OUT:.+]] = hal.interface.binding.subspan set(0) binding(0)
-//   CHECK-DAG:   %[[INIT:.+]] = linalg.init_tensor
+//   CHECK-DAG:   %[[INIT:.+]] = tensor.empty
 //   CHECK-DAG:   %[[FALSE:.+]] = arith.constant false
 //   CHECK-DAG:   %[[EXT_SCALAR:.+]] = arith.extui %[[FALSE]]
 //       CHECK:   %[[FILL:.+]] = linalg.fill
@@ -250,7 +250,7 @@ func.func @constant_op() {
   %at = flow.dispatch.tensor.load %a, offsets = [0], sizes = [4], strides = [1] : !flow.dispatch.tensor<readonly:4xi32> -> tensor<4xi32>
   %bt = flow.dispatch.tensor.load %b, offsets = [0], sizes = [4], strides = [1] : !flow.dispatch.tensor<readonly:4xi32> -> tensor<4xi32>
   %select = arith.constant dense<[true, false, true, false]> : tensor<4xi1>
-  %init = linalg.init_tensor [4] : tensor<4xi32>
+  %init = tensor.empty() : tensor<4xi32>
   %result = linalg.generic {
       indexing_maps = [#map, #map, #map, #map],
       iterator_types = ["parallel"]}
@@ -282,7 +282,7 @@ func.func @constant_splat_op() {
   %at = flow.dispatch.tensor.load %a, offsets = [0], sizes = [4], strides = [1] : !flow.dispatch.tensor<readonly:4xi32> -> tensor<4xi32>
   %bt = flow.dispatch.tensor.load %b, offsets = [0], sizes = [4], strides = [1] : !flow.dispatch.tensor<readonly:4xi32> -> tensor<4xi32>
   %select = arith.constant dense<true> : tensor<4xi1>
-  %init = linalg.init_tensor [4] : tensor<4xi32>
+  %init = tensor.empty() : tensor<4xi32>
   %result = linalg.generic {
       indexing_maps = [#map, #map, #map, #map],
       iterator_types = ["parallel"]}
