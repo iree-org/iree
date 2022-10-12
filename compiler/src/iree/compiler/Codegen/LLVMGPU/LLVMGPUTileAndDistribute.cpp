@@ -60,7 +60,7 @@ static void populateTilingReductionPatterns(RewritePatternSet &patterns) {
                            .setTileSizeComputationFunction(tileSizesFn);
   MLIRContext *context = patterns.getContext();
 
-  linalg::LinalgTransformationFilter filter(
+  IREE::LinalgExt::LinalgTransformationFilter filter(
       ArrayRef<StringAttr>{
           StringAttr::get(context, getWorkgroupMemoryMarker())},
       StringAttr::get(context, getWorkgroupKTiledMarker()));
@@ -128,7 +128,7 @@ static void populateTilingToWarpPatterns(
                            .setTileSizeComputationFunction(getInnerTileSizeFn)
                            .setDistributionOptions(warpDistributionOptions);
   MLIRContext *context = patterns.getContext();
-  linalg::LinalgTransformationFilter filter(
+  IREE::LinalgExt::LinalgTransformationFilter filter(
       {StringAttr::get(context, getWorkgroupKTiledMarker()),
        StringAttr::get(context, getWorkgroupMemoryMarker())},
       StringAttr::get(context, getVectorizeMarker()));
@@ -160,7 +160,7 @@ static void populateTilingToInvocationPatterns(
           .setDistributionOptions(invocationDistributionOptions);
 
   MLIRContext *context = patterns.getContext();
-  linalg::LinalgTransformationFilter f(
+  IREE::LinalgExt::LinalgTransformationFilter f(
       {StringAttr::get(context, getWorkgroupKTiledMarker()),
        StringAttr::get(context, getWorkgroupMemoryMarker())},
       StringAttr::get(context, getVectorizeMarker()));
@@ -210,7 +210,7 @@ static void populatePromotionPatterns(MLIRContext *context,
           .setCopyInOutFns(copyToWorkgroupMemory, copyToWorkgroupMemory)
           .setOperandsToPromote(operandsToPromote)
           .setUseFullTileBuffers({false, false}),
-      linalg::LinalgTransformationFilter(
+      IREE::LinalgExt::LinalgTransformationFilter(
           {StringAttr::get(context, getWorkgroupKTiledMarker())},
           StringAttr::get(context, getWorkgroupMemoryMarker()))
           .setMatchByDefault()

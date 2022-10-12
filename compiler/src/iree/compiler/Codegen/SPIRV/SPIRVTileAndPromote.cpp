@@ -40,7 +40,8 @@ namespace iree_compiler {
 //====---------------------------------------------------------------------===//
 
 static void populateTilingReductionPatterns(
-    RewritePatternSet &patterns, linalg::LinalgTransformationFilter filter) {
+    RewritePatternSet &patterns,
+    IREE::LinalgExt::LinalgTransformationFilter filter) {
   auto getTileSizeFn = [&](OpBuilder &builder, Operation *op) {
     return getTileSizes(builder, op, 2);
   };
@@ -57,7 +58,8 @@ static void populateTilingReductionPatterns(
 //===----------------------------------------------------------------------===//
 
 static void populateTilingToInvocationPatterns(
-    RewritePatternSet &patterns, linalg::LinalgTransformationFilter filter) {
+    RewritePatternSet &patterns,
+    IREE::LinalgExt::LinalgTransformationFilter filter) {
   linalg::TileSizeComputationFunction getTileSizeFn = [&](OpBuilder &builder,
                                                           Operation *op) {
     return getTileSizes(builder, op, 1);
@@ -110,11 +112,11 @@ static void populatePromotionPatterns(RewritePatternSet &patterns,
   auto promoteRHSOptions = baseOptions.setOperandsToPromote({1});
   auto promoteBothOptions = baseOptions.setOperandsToPromote({0, 1});
 
-  linalg::LinalgTransformationFilter promoteLHSFilter(
+  IREE::LinalgExt::LinalgTransformationFilter promoteLHSFilter(
       {StringAttr::get(context, promoteLHSMarker)}, replaceMarker);
-  linalg::LinalgTransformationFilter promoteRHSFilter(
+  IREE::LinalgExt::LinalgTransformationFilter promoteRHSFilter(
       {StringAttr::get(context, promoteRHSMarker)}, replaceMarker);
-  linalg::LinalgTransformationFilter promoteBothFilter(
+  IREE::LinalgExt::LinalgTransformationFilter promoteBothFilter(
       {StringAttr::get(context, promoteBothMarker)}, replaceMarker);
 
   patterns.insert<LinalgPromotionPattern<linalg::MatmulOp>,
@@ -153,7 +155,7 @@ void SPIRVTileAndPromotePass::runOnOperation() {
 
   {  // Tile reduction dimensions.
     RewritePatternSet tilingPatterns(context);
-    linalg::LinalgTransformationFilter filter(
+    IREE::LinalgExt::LinalgTransformationFilter filter(
         ArrayRef<StringAttr>(),
         StringAttr::get(context, getWorkgroupKTiledMarker()));
     populateTilingReductionPatterns(tilingPatterns, filter);
@@ -249,7 +251,7 @@ void SPIRVTileAndPromotePass::runOnOperation() {
 
   {  // Tile and distribute to invocations.
     RewritePatternSet tilingPatterns(&getContext());
-    linalg::LinalgTransformationFilter filter(
+    IREE::LinalgExt::LinalgTransformationFilter filter(
         {StringAttr::get(context, getWorkgroupMemoryMarker())}, llvm::None);
     populateTilingToInvocationPatterns(tilingPatterns, filter);
     if (failed(

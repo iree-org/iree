@@ -288,7 +288,7 @@ struct TopkOpSplitReduction : public OpRewritePattern<TopkOp> {
   using OpRewritePattern::OpRewritePattern;
 
   TopkOpSplitReduction(MLIRContext *context, TopkSplitReductionControlFn fn,
-                       linalg::LinalgTransformationFilter filt)
+                       LinalgTransformationFilter filt)
       : OpRewritePattern<TopkOp>(context), splitReductionFn(std::move(fn)),
         filter(std::move(filt)) {}
 
@@ -362,7 +362,7 @@ struct TopkOpSplitReduction : public OpRewritePattern<TopkOp> {
 
 private:
   TopkSplitReductionControlFn splitReductionFn;
-  mlir::linalg::LinalgTransformationFilter filter;
+  LinalgTransformationFilter filter;
 };
 
 } // namespace
@@ -398,7 +398,7 @@ struct TopkSplitReductionPass
 
     patterns.add<TopkOpSplitReduction>(
         patterns.getContext(), splitReductionFn,
-        mlir::linalg::LinalgTransformationFilter(
+        LinalgTransformationFilter(
             ArrayRef<StringAttr>{},
             StringAttr::get(patterns.getContext(), "SPLIT_REDUCTION")));
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
@@ -419,7 +419,7 @@ struct TopkSplitReductionPass
 void mlir::iree_compiler::IREE::LinalgExt::populateTopkSplitReductionPattern(
     RewritePatternSet &patterns,
     const TopkSplitReductionControlFn &splitReductionFn,
-    const linalg::LinalgTransformationFilter &f) {
+    const LinalgTransformationFilter &f) {
   patterns.add<TopkOpSplitReduction>(patterns.getContext(), splitReductionFn,
                                      f);
 }

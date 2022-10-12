@@ -41,7 +41,7 @@ struct LinalgSplitReduction
     : public OpInterfaceRewritePattern<linalg::LinalgOp> {
   LinalgSplitReduction(MLIRContext *context,
                        linalg::ControlSplitReductionFn controlSplitReductionFn,
-                       linalg::LinalgTransformationFilter f,
+                       LinalgExt::LinalgTransformationFilter f,
                        PatternBenefit benefit = 1)
       : OpInterfaceRewritePattern<linalg::LinalgOp>(context, benefit),
         controlSplitReductionFn(controlSplitReductionFn),
@@ -73,7 +73,7 @@ struct LinalgSplitReduction
 
  private:
   linalg::ControlSplitReductionFn controlSplitReductionFn;
-  linalg::LinalgTransformationFilter filter;
+  LinalgExt::LinalgTransformationFilter filter;
 };
 
 struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
@@ -99,7 +99,7 @@ struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
           // get enabled after once tests are ready.
           return {int64_t(0), 0, /*innerParallel=*/false};
         },
-        linalg::LinalgTransformationFilter(
+        LinalgExt::LinalgTransformationFilter(
             ArrayRef<StringAttr>{}, StringAttr::get(&getContext(), "SPLIT")));
 
     LinalgExt::TopkSplitReductionControlFn splitReductionFn =
@@ -114,7 +114,7 @@ struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
     };
     LinalgExt::populateTopkSplitReductionPattern(
         patterns, splitReductionFn,
-        mlir::linalg::LinalgTransformationFilter(
+        LinalgExt::LinalgTransformationFilter(
             ArrayRef<StringAttr>{},
             StringAttr::get(patterns.getContext(), "SPLIT_REDUCTION")));
 

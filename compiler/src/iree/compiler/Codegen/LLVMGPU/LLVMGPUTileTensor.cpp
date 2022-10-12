@@ -55,7 +55,7 @@ static void populateTilingPatterns(RewritePatternSet &patterns,
                            .setTileSizeComputationFunction(tileSizesFn);
   MLIRContext *context = patterns.getContext();
 
-  linalg::LinalgTransformationFilter filter(
+  IREE::LinalgExt::LinalgTransformationFilter filter(
       ArrayRef<StringAttr>{
           StringAttr::get(context, getWorkgroupMemoryMarker())},
       StringAttr::get(context, getWorkgroupKTiledMarker()));

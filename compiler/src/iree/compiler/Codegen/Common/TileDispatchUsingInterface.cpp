@@ -283,7 +283,7 @@ struct TileDispatchUsingSCFForOp
   /// Construct a generic pattern applied to all TilingInterface ops.
   TileDispatchUsingSCFForOp(MLIRContext *context,
                             linalg::LinalgTilingOptions options,
-                            linalg::LinalgTransformationFilter filter,
+                            IREE::LinalgExt::LinalgTransformationFilter filter,
                             PatternBenefit benefit = 1)
       : OpInterfaceRewritePattern<TilingInterface>(context, benefit),
         options(std::move(options)),
@@ -292,7 +292,7 @@ struct TileDispatchUsingSCFForOp
   /// Construct a generic pattern applied to `opName`.
   TileDispatchUsingSCFForOp(StringRef opName, MLIRContext *context,
                             linalg::LinalgTilingOptions options,
-                            linalg::LinalgTransformationFilter filter,
+                            IREE::LinalgExt::LinalgTransformationFilter filter,
                             PatternBenefit benefit = 1)
       : OpInterfaceRewritePattern<TilingInterface>(context, benefit),
         options(std::move(options)),
@@ -313,7 +313,7 @@ struct TileDispatchUsingSCFForOp
   linalg::LinalgTilingOptions options;
 
   /// Filter to control transformation.
-  linalg::LinalgTransformationFilter filter;
+  IREE::LinalgExt::LinalgTransformationFilter filter;
 };
 }  // namespace
 
@@ -505,18 +505,19 @@ struct TileAndFuseResult {
 struct TileAndFuseDispatchUsingSCFForOp
     : public OpInterfaceRewritePattern<TilingInterface> {
   /// Construct a generic pattern applied to all TilingInterface ops.
-  TileAndFuseDispatchUsingSCFForOp(MLIRContext *context,
-                                   linalg::LinalgTilingOptions options,
-                                   linalg::LinalgTransformationFilter filter,
-                                   PatternBenefit benefit = 1)
+  TileAndFuseDispatchUsingSCFForOp(
+      MLIRContext *context, linalg::LinalgTilingOptions options,
+      IREE::LinalgExt::LinalgTransformationFilter filter,
+      PatternBenefit benefit = 1)
       : OpInterfaceRewritePattern<TilingInterface>(context, benefit),
         tilingPattern(context, options, filter) {}
 
   /// Construct a generic pattern applied to `opName`.
-  TileAndFuseDispatchUsingSCFForOp(StringRef opName, MLIRContext *context,
-                                   linalg::LinalgTilingOptions options,
-                                   linalg::LinalgTransformationFilter filter,
-                                   PatternBenefit benefit = 1)
+  TileAndFuseDispatchUsingSCFForOp(
+      StringRef opName, MLIRContext *context,
+      linalg::LinalgTilingOptions options,
+      IREE::LinalgExt::LinalgTransformationFilter filter,
+      PatternBenefit benefit = 1)
       : OpInterfaceRewritePattern<TilingInterface>(context, benefit),
         tilingPattern(context, options, filter) {}
 
@@ -767,7 +768,7 @@ struct SwapExtractSliceWithInitTensor
 
 void populateTileAndDistributeToWorkgroupsPatterns(
     RewritePatternSet &patterns, linalg::LinalgTilingOptions options,
-    linalg::LinalgTransformationFilter filter) {
+    IREE::LinalgExt::LinalgTransformationFilter filter) {
   MLIRContext *context = patterns.getContext();
   patterns.insert<TileAndFuseDispatchUsingSCFForOp>(context, std::move(options),
                                                     std::move(filter));
