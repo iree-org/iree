@@ -727,7 +727,7 @@ jobs:
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "${PLATFORM^^}_ARCH=${ARCHITECTURE}" \
-            --env "BUILD_${PLATFORM^^}_DIR=build-${PLATFORM^^}-${ARCHITECTURE^^}" \
+            --env "BUILD_${PLATFORM^^}_DIR=build-${PLATFORM}-${ARCHITECTURE}" \
             --env "BUILD_PRESET=benchmark-suite-test" \
             --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
             --env "BUILD_BENCHMARK_SUITE_DIR=${BUILD_BENCHMARK_SUITE_DIR}" \
