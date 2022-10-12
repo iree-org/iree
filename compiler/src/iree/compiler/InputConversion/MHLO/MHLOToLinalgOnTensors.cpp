@@ -348,7 +348,8 @@ struct ScatterUpdateConversion : public OpConversionPattern<mhlo::ScatterOp> {
     result = rewriter.create<arith::SelectOp>(loc, args[2].getType(), pred,
                                               args[2], result);
 
-    op.emitWarning("op is lowered to an inefficient way, which is unexpected");
+    emitWarning(loc,
+                "op is lowered to an inefficient way, which is unexpected");
     rewriter.replaceOpWithNewOp<linalg::YieldOp>(terminator, result);
     rewriter.replaceOp(op, linalgOp.getResults());
     return success();
