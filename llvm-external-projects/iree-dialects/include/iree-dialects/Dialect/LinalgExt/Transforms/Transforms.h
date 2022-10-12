@@ -195,15 +195,11 @@ struct LinalgVectorizationPattern
   LinalgVectorizationPattern(
       MLIRContext *context,
       LinalgTransformationFilter f = LinalgTransformationFilter(),
-      linalg::LinalgVectorizationOptions options =
-          linalg::LinalgVectorizationOptions(),
       PatternBenefit benefit = 1);
 
   /// Construct a pattern specifically applied to `opName`.
   LinalgVectorizationPattern(
       StringRef opName, MLIRContext *context,
-      linalg::LinalgVectorizationOptions options =
-          linalg::LinalgVectorizationOptions(),
       LinalgTransformationFilter f = LinalgTransformationFilter(),
       PatternBenefit benefit = 1);
 
@@ -222,7 +218,6 @@ template <>
 class VectorizationPatterns<> {
 public:
   static void insert(RewritePatternSet &patterns,
-                     const linalg::LinalgVectorizationOptions &options,
                      const LinalgTransformationFilter &f) {}
 };
 
@@ -230,11 +225,10 @@ template <typename OpTy, typename... OpTypes>
 class VectorizationPatterns<OpTy, OpTypes...> {
 public:
   static void insert(RewritePatternSet &patterns,
-                     const linalg::LinalgVectorizationOptions &options,
                      const LinalgTransformationFilter &f) {
     patterns.add<LinalgVectorizationPattern>(OpTy::getOperationName(),
-                                             patterns.getContext(), options, f);
-    VectorizationPatterns<OpTypes...>::insert(patterns, options, f);
+                                             patterns.getContext(), f);
+    VectorizationPatterns<OpTypes...>::insert(patterns, f);
   }
 };
 

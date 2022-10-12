@@ -141,7 +141,8 @@ static LogicalResult tileReduction(func::FuncOp funcOp) {
     if (isa<linalg::ContractionOpInterface>(*op) ||
         isa<linalg::ConvolutionOpInterface>(*op) ||
         isa<linalg::GenericOp>(*op)) {
-      op->setAttr(linalg::LinalgTransforms::kLinalgTransformMarker, marker);
+      op->setAttr(IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker,
+                  marker);
     }
   });
 

@@ -201,7 +201,7 @@ struct LLVMGPUTileTensorPass
     if (!isEntryPoint(funcOp)) return;
 
     funcOp->walk([&](linalg::LinalgOp op) {
-      op->removeAttr(linalg::LinalgTransforms::kLinalgTransformMarker);
+      op->removeAttr(IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker);
     });
 
     auto workgroupSize = llvm::to_vector<4>(llvm::map_range(

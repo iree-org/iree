@@ -252,12 +252,11 @@ static void populateTilingAndDistribute(RewritePatternSet &patterns,
 
 static void populateVectorizationPatterns(RewritePatternSet &patterns) {
   VectorizationPatterns<linalg::GenericOp>::insert(
-      patterns, linalg::LinalgVectorizationOptions(),
-      IREE::LinalgExt::LinalgTransformationFilter(
-          {StringAttr::get(patterns.getContext(),
-                           getCopyToWorkgroupMemoryMarker()),
-           StringAttr::get(patterns.getContext(), kCopyDistributed)},
-          llvm::None));
+      patterns, IREE::LinalgExt::LinalgTransformationFilter(
+                    {StringAttr::get(patterns.getContext(),
+                                     getCopyToWorkgroupMemoryMarker()),
+                     StringAttr::get(patterns.getContext(), kCopyDistributed)},
+                    llvm::None));
 }
 
 /// Return a flattened Id Value by combining the 3D gpu thread IDs.

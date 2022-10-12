@@ -283,8 +283,8 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
 
     // Add a marker to the last operation in the list.
     auto marker = StringAttr::get(context, "__workgroup_tiling__");
-    computeOps.back()->setAttr(linalg::LinalgTransforms::kLinalgTransformMarker,
-                               marker);
+    computeOps.back()->setAttr(
+        IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker, marker);
 
     // Configure the linalg options.
     // Tile size selection function.
@@ -324,7 +324,7 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
     // potentially left with a marker that will confuse the following passes so
     // we remove the intermediate markers.
     funcOp->walk([&](Operation *op) {
-      op->removeAttr(linalg::LinalgTransforms::kLinalgTransformMarker);
+      op->removeAttr(IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker);
     });
 
     LLVM_DEBUG({

@@ -190,7 +190,7 @@ void SPIRVTileAndPromotePass::runOnOperation() {
 
   funcOp.walk([&](Operation *op) {
     if (isa<linalg::FillOp, linalg::GenericOp>(op)) {
-      op->setAttr(linalg::LinalgTransforms::kLinalgTransformMarker,
+      op->setAttr(IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker,
                   StringAttr::get(context, getWorkgroupMemoryMarker()));
     } else if (isa<linalg::BatchMatmulOp, linalg::MatmulOp>(op)) {
       auto lhsShape = op->getOperand(0).getType().cast<ShapedType>().getShape();
@@ -208,7 +208,7 @@ void SPIRVTileAndPromotePass::runOnOperation() {
       } else if (canPromoteRHS) {
         promoteMarker = StringAttr::get(context, promoteRHSMarker);
       }
-      op->setAttr(linalg::LinalgTransforms::kLinalgTransformMarker,
+      op->setAttr(IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker,
                   promoteMarker);
     }
     return WalkResult::advance();

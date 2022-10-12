@@ -147,13 +147,11 @@ static void populateTilingToSubgroupPatterns(ArrayRef<int64_t> subgroupCounts,
 /// Adds patterns to vectorize Linalg ops with vectorization markers.
 void populateVectorizationPatterns(MLIRContext *context,
                                    RewritePatternSet &patterns) {
-  linalg::LinalgVectorizationOptions opt;
   IREE::LinalgExt::LinalgTransformationFilter f(
       StringAttr::get(context, getVectorizeMarker()));
-  VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(patterns,
-                                                                   opt, f);
+  VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(patterns, f);
   patterns.add<LinalgVectorizationPattern>(
-      context, f.addOpFilter<linalg::ContractionOpInterface>(), opt);
+      context, f.addOpFilter<linalg::ContractionOpInterface>());
   vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
   vector::populateVectorReductionToContractPatterns(patterns);
 }

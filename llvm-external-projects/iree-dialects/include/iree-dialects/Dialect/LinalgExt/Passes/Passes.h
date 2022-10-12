@@ -174,8 +174,6 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyPeelPass(
 /// Create a LinalgStrategyVectorizePass.
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyVectorizePass(
     StringRef opName = "",
-    linalg::LinalgVectorizationOptions opt =
-        linalg::LinalgVectorizationOptions(),
     const LinalgExt::LinalgTransformationFilter &filter =
         LinalgExt::LinalgTransformationFilter(),
     bool padVectorize = false);
