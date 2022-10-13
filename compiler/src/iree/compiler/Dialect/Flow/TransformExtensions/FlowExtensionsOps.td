@@ -45,7 +45,8 @@ def ForeachThreadToFlowDispatchWorkgroupsOp : Op<Transform_Dialect, "iree.foreac
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::scf::ForeachThreadOp target,
-        ::llvm::SmallVectorImpl<::mlir::Operation *> &results);
+        ::llvm::SmallVectorImpl<::mlir::Operation *> &results,
+        ::mlir::transform::TransformState &state);
   }];
 }
 
@@ -70,7 +71,8 @@ def RegionToWorkgroupsOp : Op<Transform_Dialect, "iree.region_to_workgroups",
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::iree_compiler::IREE::Flow::DispatchRegionOp target,
-        ::llvm::SmallVectorImpl<::mlir::Operation *> &results);
+        ::llvm::SmallVectorImpl<::mlir::Operation *> &results,
+        ::mlir::transform::TransformState &state);
   }];
 }
 
@@ -98,7 +100,8 @@ def WrapInDispatchRegionOp : Op<
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::Operation *target,
-        ::llvm::SmallVectorImpl<::mlir::Operation *> &results);
+        ::llvm::SmallVectorImpl<::mlir::Operation *> &results,
+        ::mlir::transform::TransformState &state);
   }];
 }
 
@@ -132,7 +135,8 @@ def ClonePrecedingOpIntoDispatchRegionOp : Op<
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure apply(
-        ::mlir::transform::TransformResults &transformResults);
+        ::mlir::transform::TransformResults &transformResults,
+        ::mlir::transform::TransformState &state);
   }];
 }
 
@@ -169,7 +173,8 @@ def MovePrecedingOpIntoDispatchRegionOp : Op<
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure apply(
-        ::mlir::transform::TransformResults &transformResults);
+        ::mlir::transform::TransformResults &transformResults,
+        ::mlir::transform::TransformState &state);
   }];
 }
 
@@ -209,7 +214,8 @@ def CloneSucceedingOpIntoDispatchRegionOp : Op<
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure apply(
-        ::mlir::transform::TransformResults &transformResults);
+        ::mlir::transform::TransformResults &transformResults,
+        ::mlir::transform::TransformState &state);
   }];
 }
 
