@@ -380,7 +380,7 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
           %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:5000x5000xf32>
           %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:5000x5000xf32>
           %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [5000, 5000], strides = [1, 1] : !flow.dispatch.tensor<readonly:5000x5000xf32> -> tensor<5000x5000xf32>
-          %3 = linalg.init_tensor [5000, 5000] : tensor<5000x5000xf32>
+          %3 = tensor.empty() : tensor<5000x5000xf32>
           %4 = linalg.generic {indexing_maps = [ affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%2 : tensor<5000x5000xf32>) outs(%3 : tensor<5000x5000xf32>) {
           ^bb0(%arg0: f32, %arg1: f32):
             linalg.yield %arg0 : f32
