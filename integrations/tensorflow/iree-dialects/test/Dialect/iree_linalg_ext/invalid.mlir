@@ -371,7 +371,7 @@ func.func @scatter_original_rank_mismatch(
 // -----
 
 func.func @reverse_diff_element_type(%arg0: tensor<3x5xi32>) -> tensor<3x5xf32> {
-  %init = linalg.init_tensor [3, 5] : tensor<3x5xf32>
+  %init = tensor.empty() : tensor<3x5xf32>
   // expected-error @+1 {{expected input/output element types to be identical}}
   %0 = iree_linalg_ext.reverse
          dimensions(dense<0> : tensor<1xi64>)
@@ -383,7 +383,7 @@ func.func @reverse_diff_element_type(%arg0: tensor<3x5xi32>) -> tensor<3x5xf32> 
 // -----
 
 func.func @reverse_diff_shape(%arg0: tensor<3x5xi32>) -> tensor<3x6xi32> {
-  %init = linalg.init_tensor [3, 6] : tensor<3x6xi32>
+  %init = tensor.empty() : tensor<3x6xi32>
   // expected-error @+1 {{incompatible input/output shapes}}
   %0 = iree_linalg_ext.reverse
          dimensions(dense<0> : tensor<1xi64>)
@@ -395,7 +395,7 @@ func.func @reverse_diff_shape(%arg0: tensor<3x5xi32>) -> tensor<3x6xi32> {
 // -----
 
 func.func @reverse_dup_dims(%arg0: tensor<3x5xi32>) -> tensor<3x5xi32> {
-  %init = linalg.init_tensor [3, 5] : tensor<3x5xi32>
+  %init = tensor.empty() : tensor<3x5xi32>
   // expected-error @+1 {{expected dimensions numbers are all unique}}
   %0 = iree_linalg_ext.reverse
          dimensions(dense<[0, 0]> : tensor<2xi64>)

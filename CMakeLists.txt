@@ -743,6 +743,13 @@ endif()
 # This allows them to be EXCLUDE_FROM_ALL but still invokable.
 add_custom_target(iree-test-deps COMMENT "Building IREE test deps")
 
+# Testing rules that generate test scripts for iree-run-module-test will add
+# dependencies to this target. It is a subset of `iree-test-deps`.
+add_custom_target(iree-run-module-test-deps
+  COMMENT
+    "Building IREE run module test targets"
+)
+
 #-------------------------------------------------------------------------------
 # IREE top-level libraries
 #-------------------------------------------------------------------------------

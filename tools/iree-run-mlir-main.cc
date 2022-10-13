@@ -49,6 +49,7 @@
 #include "iree/compiler/Tools/init_dialects.h"
 #include "iree/compiler/Tools/init_targets.h"
 #include "iree/hal/api.h"
+#include "iree/modules/hal/types.h"
 #include "iree/tooling/context_util.h"
 #include "iree/tooling/device_util.h"
 #include "iree/tooling/vm_util_cc.h"
@@ -314,11 +315,12 @@ Status PrepareModule(std::string target_backend,
 }
 
 // Evaluates a single function in its own fiber, printing the results to stdout.
-Status EvaluateFunction(iree_vm_context_t* context,
+Status EvaluateFunction(iree_vm_context_t* context, iree_hal_device_t* device,
                         iree_hal_allocator_t* device_allocator,
                         iree_vm_function_t function,
                         iree_string_view_t function_name) {
   IREE_TRACE_SCOPE();
+  iree_allocator_t host_allocator = iree_allocator_system();
 
   printf("EXEC @%.*s\n", (int)function_name.size, function_name.data);
 
@@ -328,18 +330,28 @@ Status EvaluateFunction(iree_vm_context_t* context,
       device_allocator,
       iree::span<const std::string>{FLAG_function_inputs.data(),
                                     FLAG_function_inputs.size()},
-      iree_allocator_system(), &inputs));
+      host_allocator, &inputs));
+
+  // If the function is async add fences so we can invoke it synchronously.
+  vm::ref<iree_hal_fence_t> finish_fence;
+  IREE_RETURN_IF_ERROR(iree_tooling_append_async_fence_inputs(
+      inputs.get(), &function, device, /*wait_fence=*/NULL, &finish_fence));
 
   // Prepare outputs list to accept the results from the invocation.
   vm::ref<iree_vm_list_t> outputs;
   IREE_RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr, 16,
-                                           iree_allocator_system(), &outputs));
+                                           host_allocator, &outputs));
 
   // Synchronously invoke the function.
-  IREE_RETURN_IF_ERROR(iree_vm_invoke(context, function,
-                                      IREE_VM_INVOCATION_FLAG_NONE,
-                                      /*policy=*/nullptr, inputs.get(),
-                                      outputs.get(), iree_allocator_system()));
+  IREE_RETURN_IF_ERROR(iree_vm_invoke(
+      context, function, IREE_VM_INVOCATION_FLAG_NONE,
+      /*policy=*/nullptr, inputs.get(), outputs.get(), host_allocator));
+
+  // If the function is async we need to wait for it to complete.
+  if (!!finish_fence) {
+    IREE_RETURN_IF_ERROR(
+        iree_hal_fence_wait(finish_fence.get(), iree_infinite_timeout()));
+  }
 
   // Print outputs.
   IREE_RETURN_IF_ERROR(PrintVariantList(outputs.get()));
@@ -398,9 +410,9 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
         iree_allocator_system(), &context, &device, &device_allocator));
 
     // Invoke the function and print results.
-    IREE_RETURN_IF_ERROR(
-        EvaluateFunction(context, device_allocator, function, function_name),
-        "evaluating export function %d", ordinal);
+    IREE_RETURN_IF_ERROR(EvaluateFunction(context, device, device_allocator,
+                                          function, function_name),
+                         "evaluating export function %d", ordinal);
 
     iree_vm_context_release(context);
     iree_hal_allocator_release(device_allocator);

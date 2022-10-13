@@ -132,7 +132,7 @@ static void test_one_matmul_using_given_lhs_rhs(
   if (status != iree_ukernel_mmt4d_status_ok) {
     fprintf(stderr, "FATAL: iree_ukernel_mmt4d failed: %s\n",
             iree_ukernel_mmt4d_status_message(status));
-    abort();
+    iree_abort();
   }
 
   // For now we use exact comparisons, even for float, even though the reference
@@ -164,7 +164,7 @@ static void test_one_matmul_using_given_lhs_rhs(
     // wants us to do, so they can inspect values while they exist in memory.
     // What's the GTest-sanctioned fatal error? GTEST_FAIL() has a comment that
     // says that it's fatal, but that's a lie at least here on Android.
-    abort();
+    iree_abort();
   }
 
   free(reference_params.out_buffer);

@@ -135,7 +135,7 @@ func.func @matmul_2x8x128_fp16(%a: tensor<2x128xf16>, %b: tensor<128x8xf16>, %x:
   %c128 = arith.constant 128 : index
   %f0 = arith.constant 0.0 : f16
 
-  %init = linalg.init_tensor [2, 8] : tensor<2x8xf16>
+  %init = tensor.empty() : tensor<2x8xf16>
   %fill = linalg.fill ins(%f0 : f16) outs(%init : tensor<2x8xf16>) -> tensor<2x8xf16>
   %matmul = scf.for %iv = %c0 to %c128 step %c8 iter_args(%arg = %fill) -> (tensor<2x8xf16>) {
     %as = tensor.extract_slice %a[0, %iv] [2, 8] [1, 1] : tensor<2x128xf16> to tensor<2x8xf16>

@@ -172,8 +172,7 @@ static iree_status_t copy_device_buffer_view_to_device(
 static iree_status_t copy_device_buffer_views_to_host(
     iree_hal_device_t* device, iree_hal_allocator_t* hal_allocator,
     iree_vm_list_t* src, iree_vm_list_t** dst) {
-  iree_vm_type_def_t elem_type;
-  IREE_RETURN_IF_ERROR(iree_vm_list_element_type(src, &elem_type));
+  iree_vm_type_def_t elem_type = iree_vm_list_element_type(src);
   iree_host_size_t size = iree_vm_list_size(src);
   iree_allocator_t allocator = iree_hal_allocator_host_allocator(hal_allocator);
   IREE_RETURN_IF_ERROR(iree_vm_list_create(&elem_type, size, allocator, dst));
@@ -816,8 +815,7 @@ static iree_status_t mask_and_copy_device_buffer_view_to_device(
 static iree_status_t mask_and_copy_device_buffer_views_to_device(
     iree_hal_device_t* device, iree_hal_allocator_t* hal_allocator,
     iree_vm_list_t* src_list, matrix_mask_t* mask, iree_vm_list_t** dst_list) {
-  iree_vm_type_def_t elem_type;
-  IREE_RETURN_IF_ERROR(iree_vm_list_element_type(src_list, &elem_type));
+  iree_vm_type_def_t elem_type = iree_vm_list_element_type(src_list);
   iree_host_size_t size = iree_vm_list_size(src_list);
   iree_allocator_t allocator = iree_hal_allocator_host_allocator(hal_allocator);
   IREE_RETURN_IF_ERROR(

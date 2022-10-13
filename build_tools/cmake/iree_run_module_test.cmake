@@ -221,6 +221,7 @@ function(iree_run_module_test)
     WILL_FAIL
       ${_TEST_XFAIL}
     LABELS
+      "test-type=run-module-test"
       ${_RULE_LABELS}
     TIMEOUT
       ${_RULE_TIMEOUT}
@@ -233,6 +234,7 @@ function(iree_run_module_test)
   endif()
 
   add_dependencies(iree-test-deps "${_NAME}")
+  add_dependencies(iree-run-module-test-deps "${_NAME}")
 endfunction()
 
 # iree_benchmark_suite_module_test()

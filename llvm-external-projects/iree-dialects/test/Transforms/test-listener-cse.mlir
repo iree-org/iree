@@ -72,12 +72,12 @@ func.func @different_ops() -> (i32, i32) {
 /// types.
 // CHECK-LABEL: @different_results
 func.func @different_results(%arg0: tensor<*xf32>) -> (tensor<?x?xf32>, tensor<4x?xf32>) {
-  // CHECK: %0 = tensor.cast %arg0 : tensor<*xf32> to tensor<?x?xf32>
-  // CHECK-NEXT: %1 = tensor.cast %arg0 : tensor<*xf32> to tensor<4x?xf32>
+  // CHECK: %[[CAST0:.+]] = tensor.cast %arg0 : tensor<*xf32> to tensor<?x?xf32>
+  // CHECK-NEXT: %[[CAST1:.+]] = tensor.cast %arg0 : tensor<*xf32> to tensor<4x?xf32>
   %0 = tensor.cast %arg0 : tensor<*xf32> to tensor<?x?xf32>
   %1 = tensor.cast %arg0 : tensor<*xf32> to tensor<4x?xf32>
 
-  // CHECK-NEXT: return %0, %1 : tensor<?x?xf32>, tensor<4x?xf32>
+  // CHECK-NEXT: return %[[CAST0]], %[[CAST1]] : tensor<?x?xf32>, tensor<4x?xf32>
   return %0, %1 : tensor<?x?xf32>, tensor<4x?xf32>
 }
 
@@ -100,13 +100,13 @@ func.func @different_attributes(index, index) -> (i1, i1, i1) {
 /// Check that operations with side effects are not eliminated.
 // CHECK-LABEL: @side_effect
 func.func @side_effect() -> (memref<2x1xf32>, memref<2x1xf32>) {
-  // CHECK: %0 = memref.alloc() : memref<2x1xf32>
+  // CHECK: %[[ALLOC0:.+]] = memref.alloc() : memref<2x1xf32>
   %0 = memref.alloc() : memref<2x1xf32>
 
-  // CHECK-NEXT: %1 = memref.alloc() : memref<2x1xf32>
+  // CHECK-NEXT: %[[ALLOC1:.+]] = memref.alloc() : memref<2x1xf32>
   %1 = memref.alloc() : memref<2x1xf32>
 
-  // CHECK-NEXT: return %0, %1 : memref<2x1xf32>, memref<2x1xf32>
+  // CHECK-NEXT: return %[[ALLOC0]], %[[ALLOC1]] : memref<2x1xf32>, memref<2x1xf32>
   return %0, %1 : memref<2x1xf32>, memref<2x1xf32>
 }
 

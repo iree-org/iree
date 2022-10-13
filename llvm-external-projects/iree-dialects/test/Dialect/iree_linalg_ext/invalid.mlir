@@ -371,7 +371,7 @@ func.func @scatter_original_rank_mismatch(
 // -----
 
 func.func @reverse_diff_element_type(%arg0: tensor<3x5xi32>) -> tensor<3x5xf32> {
-  %init = linalg.init_tensor [3, 5] : tensor<3x5xf32>
+  %init = tensor.empty() : tensor<3x5xf32>
   // expected-error @+1 {{expected input/output element types to be identical}}
   %0 = iree_linalg_ext.reverse
          dimensions(dense<0> : tensor<1xi64>)
@@ -383,7 +383,7 @@ func.func @reverse_diff_element_type(%arg0: tensor<3x5xi32>) -> tensor<3x5xf32> 
 // -----
 
 func.func @reverse_diff_shape(%arg0: tensor<3x5xi32>) -> tensor<3x6xi32> {
-  %init = linalg.init_tensor [3, 6] : tensor<3x6xi32>
+  %init = tensor.empty() : tensor<3x6xi32>
   // expected-error @+1 {{incompatible input/output shapes}}
   %0 = iree_linalg_ext.reverse
          dimensions(dense<0> : tensor<1xi64>)
@@ -395,7 +395,7 @@ func.func @reverse_diff_shape(%arg0: tensor<3x5xi32>) -> tensor<3x6xi32> {
 // -----
 
 func.func @reverse_dup_dims(%arg0: tensor<3x5xi32>) -> tensor<3x5xi32> {
-  %init = linalg.init_tensor [3, 5] : tensor<3x5xi32>
+  %init = tensor.empty() : tensor<3x5xi32>
   // expected-error @+1 {{expected dimensions numbers are all unique}}
   %0 = iree_linalg_ext.reverse
          dimensions(dense<[0, 0]> : tensor<2xi64>)
@@ -594,9 +594,89 @@ func.func @pack_invalid(%input: tensor<256x128xf32>, %output: tensor<8x8x32x16xf
 
 // -----
 
-// `outer_dims_perm` and `inner_dims_pos` do not agree on the dimensions to tile and interchange.
+// `outer_dims_perm` is out of bound.
 func.func @pack_invalid(%input: tensor<256x128xf32>, %output: tensor<8x8x32x16xf32>) -> tensor<8x8x32x16xf32> {
   // expected-error@+1 {{invalid outer_dims_perm vector}}
   %0 = iree_linalg_ext.unpack %output outer_dims_perm = [2, 1] inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %input : (tensor<8x8x32x16xf32> tensor<256x128xf32>) -> tensor<256x128xf32>
   return %0 : tensor<256x128xf32>
+}
+
+// -----
+
+func.func @illegal_set_encoding_op_with_no_result_encoding(%arg0 : tensor<?x?xf32>) -> tensor<?x?xf32> {
+  // expected-error @+1 {{result of set_encoding op expected to have a valid tensor encoding}}
+  %0 = iree_linalg_ext.set_encoding %arg0: tensor<?x?xf32> -> tensor<?x?xf32>
+  return %0 : tensor<?x?xf32>
+}
+
+// -----
+
+func.func @illegal_set_encoding_op_with_source_encoding(%arg0 : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>) -> tensor<?x?xf32> {
+  // expected-error @+1 {{source of set_encoding op cannot have a tensor encoding}}
+  %0 = iree_linalg_ext.set_encoding %arg0: tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>> -> tensor<?x?xf32>
+  return %0 : tensor<?x?xf32>
+}
+
+// -----
+
+func.func @illegal_set_encoding_op_with_unknown_encoding(%arg0 : tensor<?x?xf32>) -> tensor<?x?xf32, "gemm_lhs"> {
+  // expected-error @+1 {{result of set_encoding op expected to have a valid tensor encoding}}
+  %0 = iree_linalg_ext.set_encoding %arg0: tensor<?x?xf32> -> tensor<?x?xf32, "gemm_lhs">
+  return %0 : tensor<?x?xf32, "gemm_lhs">
+}
+
+// -----
+
+func.func @illegal_set_encoding_op_with_rank_change(%arg0 : tensor<?x?xf32>) -> tensor<?xf32, #iree_linalg_ext.encoding<GEMM_LHS>> {
+  // expected-error @+1 {{cannot change the rank of the tensor}}
+  %0 = iree_linalg_ext.set_encoding %arg0: tensor<?x?xf32> -> tensor<?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>
+  return %0 : tensor<?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>
+}
+
+// -----
+
+func.func @illegal_set_encoding_op_with_shape_change(%arg0 : tensor<10x20xf32>) -> tensor<20x30xf32, #iree_linalg_ext.encoding<GEMM_LHS>> {
+  // expected-error @+1 {{expected to preserve the logical shape of the tensor}}
+  %0 = iree_linalg_ext.set_encoding %arg0: tensor<10x20xf32> -> tensor<20x30xf32, #iree_linalg_ext.encoding<GEMM_LHS>>
+  return %0 : tensor<20x30xf32, #iree_linalg_ext.encoding<GEMM_LHS>>
+}
+
+// -----
+
+func.func @illegal_unset_encoding_op_with_no_source_encoding(%arg0 : tensor<?x?xf32>) -> tensor<?x?xf32> {
+  // expected-error @+1 {{source of unset_encoding op expected to have a valid tensor encoding}}
+  %0 = iree_linalg_ext.unset_encoding %arg0: tensor<?x?xf32> -> tensor<?x?xf32>
+  return %0 : tensor<?x?xf32>
+}
+
+// -----
+
+func.func @illegal_unset_encoding_op_with_result_encoding(%arg0 : tensor<?x?xf32>) -> tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>> {
+  // expected-error @+1 {{result of unset_encoding op cannot have a tensor encoding}}
+  %0 = iree_linalg_ext.unset_encoding %arg0: tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>
+  return %0 : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>
+}
+
+// -----
+
+func.func @illegal_unset_encoding_op_with_unknown_encoding(%arg0 : tensor<?x?xf32, "gemm_lhs">) -> tensor<?x?xf32> {
+  // expected-error @+1 {{source of unset_encoding op expected to have a valid tensor encoding}}
+  %0 = iree_linalg_ext.unset_encoding %arg0: tensor<?x?xf32, "gemm_lhs"> -> tensor<?x?xf32>
+  return %0 : tensor<?x?xf32>
+}
+
+// -----
+
+func.func @illegal_unset_encoding_op_with_rank_change(%arg0 : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>) -> tensor<?xf32> {
+  // expected-error @+1 {{cannot change the rank of the tensor}}
+  %0 = iree_linalg_ext.unset_encoding %arg0: tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>> -> tensor<?xf32>
+  return %0 : tensor<?xf32>
+}
+
+// -----
+
+func.func @illegal_unset_encoding_op_with_shape_change(%arg0 : tensor<20x30xf32, #iree_linalg_ext.encoding<GEMM_LHS>>) -> tensor<10x20xf32> {
+  // expected-error @+1 {{expected to preserve the logical shape of the tensor}}
+  %0 = iree_linalg_ext.unset_encoding %arg0: tensor<20x30xf32, #iree_linalg_ext.encoding<GEMM_LHS>> -> tensor<10x20xf32>
+  return %0 : tensor<10x20xf32>
 }

@@ -228,7 +228,7 @@ class WrapEntryPointsPass
       auto dynamicDims = inputDynamicDims.loadDynamicDims(recalculateBuilder);
       auto castOp = recalculateBuilder.create<IREE::HAL::TensorImportOp>(
           loc, inputValue.getType(), inputPlaceholder, inputValue.getType(),
-          dynamicDims);
+          dynamicDims, /*wait_fence=*/Value{});
       inputValue.replaceAllUsesWith(castOp.getTarget());
     }
     while (entryBlock.getNumArguments() > 0) {
@@ -525,7 +525,8 @@ class WrapEntryPointsPass
       }
       callOperands.push_back(entryBuilder.create<IREE::HAL::TensorImportOp>(
           arg.getLoc(), inputDynamicDims.tensorType, arg,
-          TypeAttr::get(inputDynamicDims.tensorType), dynamicDims));
+          TypeAttr::get(inputDynamicDims.tensorType), dynamicDims,
+          /*wait_fence=*/Value{}));
     }
     auto callOp = entryBuilder.create<mlir::func::CallOp>(
         entryFuncOp.getLoc(), entryFuncOp, callOperands);

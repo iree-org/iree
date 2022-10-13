@@ -156,6 +156,15 @@ IREE_API_EXPORT iree_status_t iree_vm_ref_wrap_retain(void* ptr,
   return iree_ok_status();
 }
 
+IREE_API_EXPORT void iree_vm_ref_retain_inplace(iree_vm_ref_t* ref) {
+  if (ref->ptr) {
+    volatile iree_atomic_ref_count_t* counter =
+        iree_vm_get_ref_counter_ptr(ref);
+    iree_atomic_ref_count_inc(counter);
+    iree_vm_ref_trace("RETAIN", ref);
+  }
+}
+
 IREE_API_EXPORT void iree_vm_ref_retain(iree_vm_ref_t* ref,
                                         iree_vm_ref_t* out_ref) {
   // NOTE: ref and out_ref may alias or be nested so we retain before we

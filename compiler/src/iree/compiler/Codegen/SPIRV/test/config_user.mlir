@@ -33,7 +33,7 @@ hal.executable public @user_config {
             : !flow.dispatch.tensor<readonly:128x256xf32> -> tensor<128x256xf32>
         %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [256, 1024], strides = [1, 1]
             : !flow.dispatch.tensor<readonly:256x1024xf32> -> tensor<256x1024xf32>
-        %15 = linalg.init_tensor [128, 1024] : tensor<128x1024xf32>
+        %15 = tensor.empty() : tensor<128x1024xf32>
         %16 = linalg.fill ins(%cst : f32) outs(%15 : tensor<128x1024xf32>) -> tensor<128x1024xf32>
         %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup", compilation_info = #compilation}
             ins(%3, %4 : tensor<128x256xf32>, tensor<256x1024xf32>) outs(%16 : tensor<128x1024xf32>) -> tensor<128x1024xf32>

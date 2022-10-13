@@ -105,7 +105,7 @@ class BufferViewToTensorPattern
       // will get it).
       rewriter.replaceOpWithNewOp<IREE::HAL::TensorImportOp>(
           srcOp, resultType, adaptor.getSource(), TypeAttr::get(resultType),
-          adaptor.getTargetDims());
+          adaptor.getTargetDims(), /*wait_fence=*/Value{});
     }
     return success();
   }

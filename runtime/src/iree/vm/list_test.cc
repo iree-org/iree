@@ -89,8 +89,7 @@ TEST_F(VMListTest, UsageI32) {
   IREE_ASSERT_OK(iree_vm_list_create(&element_type, initial_capacity,
                                      iree_allocator_system(), &list));
 
-  iree_vm_type_def_t queried_element_type;
-  IREE_ASSERT_OK(iree_vm_list_element_type(list, &queried_element_type));
+  iree_vm_type_def_t queried_element_type = iree_vm_list_element_type(list);
   EXPECT_TRUE(iree_vm_type_def_is_value(&queried_element_type));
   EXPECT_EQ(0,
             memcmp(&element_type, &queried_element_type, sizeof(element_type)));
@@ -126,8 +125,7 @@ TEST_F(VMListTest, UsageRef) {
   IREE_ASSERT_OK(iree_vm_list_create(&element_type, initial_capacity,
                                      iree_allocator_system(), &list));
 
-  iree_vm_type_def_t queried_element_type;
-  IREE_ASSERT_OK(iree_vm_list_element_type(list, &queried_element_type));
+  iree_vm_type_def_t queried_element_type = iree_vm_list_element_type(list);
   EXPECT_TRUE(iree_vm_type_def_is_ref(&queried_element_type));
   EXPECT_EQ(0,
             memcmp(&element_type, &queried_element_type, sizeof(element_type)));
@@ -163,8 +161,7 @@ TEST_F(VMListTest, UsageVariant) {
   IREE_ASSERT_OK(iree_vm_list_create(&element_type, initial_capacity,
                                      iree_allocator_system(), &list));
 
-  iree_vm_type_def_t queried_element_type;
-  IREE_ASSERT_OK(iree_vm_list_element_type(list, &queried_element_type));
+  iree_vm_type_def_t queried_element_type = iree_vm_list_element_type(list);
   EXPECT_TRUE(iree_vm_type_def_is_variant(&queried_element_type));
   EXPECT_LE(initial_capacity, iree_vm_list_capacity(list));
   EXPECT_EQ(0, iree_vm_list_size(list));
@@ -198,6 +195,202 @@ TEST_F(VMListTest, UsageVariant) {
   }
 
   iree_vm_list_release(list);
+}
+
+// Tests cloning lists of value types.
+TEST_F(VMListTest, CloneValuesEmpty) {
+  // Create source list.
+  iree_vm_type_def_t element_type =
+      iree_vm_type_def_make_value_type(IREE_VM_VALUE_TYPE_I32);
+  iree_host_size_t initial_capacity = 123;
+  iree_vm_list_t* source_list = nullptr;
+  IREE_ASSERT_OK(iree_vm_list_create(&element_type, initial_capacity,
+                                     iree_allocator_system(), &source_list));
+
+  // Clone list.
+  iree_vm_list_t* target_list = NULL;
+  IREE_ASSERT_OK(
+      iree_vm_list_clone(source_list, iree_allocator_system(), &target_list));
+
+  // Verify the target list matches source parameters.
+  iree_vm_type_def_t queried_element_type =
+      iree_vm_list_element_type(target_list);
+  EXPECT_TRUE(iree_vm_type_def_is_value(&queried_element_type));
+  EXPECT_EQ(0,
+            memcmp(&element_type, &queried_element_type, sizeof(element_type)));
+  EXPECT_LE(iree_vm_list_capacity(target_list),
+            iree_vm_list_capacity(source_list));
+  EXPECT_EQ(iree_vm_list_size(target_list), iree_vm_list_size(source_list));
+
+  iree_vm_list_release(source_list);
+  iree_vm_list_release(target_list);
+}
+TEST_F(VMListTest, CloneValues) {
+  // Create source list.
+  iree_vm_type_def_t element_type =
+      iree_vm_type_def_make_value_type(IREE_VM_VALUE_TYPE_I32);
+  iree_host_size_t initial_capacity = 123;
+  iree_vm_list_t* source_list = nullptr;
+  IREE_ASSERT_OK(iree_vm_list_create(&element_type, initial_capacity,
+                                     iree_allocator_system(), &source_list));
+  IREE_ASSERT_OK(iree_vm_list_resize(source_list, 5));
+  EXPECT_EQ(5, iree_vm_list_size(source_list));
+  for (iree_host_size_t i = 0; i < 5; ++i) {
+    iree_vm_value_t value = iree_vm_value_make_i32((int32_t)i);
+    IREE_ASSERT_OK(iree_vm_list_set_value(source_list, i, &value));
+  }
+
+  // Clone list.
+  iree_vm_list_t* target_list = NULL;
+  IREE_ASSERT_OK(
+      iree_vm_list_clone(source_list, iree_allocator_system(), &target_list));
+
+  // Verify the contents match.
+  EXPECT_EQ(iree_vm_list_size(target_list), iree_vm_list_size(source_list));
+  for (iree_host_size_t i = 0; i < 5; ++i) {
+    iree_vm_value_t value;
+    IREE_ASSERT_OK(iree_vm_list_get_value_as(target_list, i,
+                                             IREE_VM_VALUE_TYPE_I32, &value));
+    EXPECT_EQ(IREE_VM_VALUE_TYPE_I32, value.type);
+    EXPECT_EQ(i, value.i32);
+  }
+
+  iree_vm_list_release(source_list);
+  iree_vm_list_release(target_list);
+}
+
+// Tests cloning lists of ref types.
+TEST_F(VMListTest, CloneRefsEmpty) {
+  iree_vm_type_def_t element_type =
+      iree_vm_type_def_make_ref_type(test_a_type_id());
+  iree_vm_list_t* source_list = nullptr;
+  IREE_ASSERT_OK(iree_vm_list_create(&element_type, 8, iree_allocator_system(),
+                                     &source_list));
+
+  // Clone list.
+  iree_vm_list_t* target_list = NULL;
+  IREE_ASSERT_OK(
+      iree_vm_list_clone(source_list, iree_allocator_system(), &target_list));
+
+  // Verify the target list matches source parameters.
+  iree_vm_type_def_t queried_element_type =
+      iree_vm_list_element_type(target_list);
+  EXPECT_TRUE(iree_vm_type_def_is_ref(&queried_element_type));
+  EXPECT_EQ(0,
+            memcmp(&element_type, &queried_element_type, sizeof(element_type)));
+  EXPECT_LE(iree_vm_list_capacity(target_list),
+            iree_vm_list_capacity(source_list));
+  EXPECT_EQ(iree_vm_list_size(target_list), iree_vm_list_size(source_list));
+
+  iree_vm_list_release(source_list);
+  iree_vm_list_release(target_list);
+}
+TEST_F(VMListTest, CloneRefs) {
+  iree_vm_type_def_t element_type =
+      iree_vm_type_def_make_ref_type(test_a_type_id());
+  iree_vm_list_t* source_list = nullptr;
+  IREE_ASSERT_OK(iree_vm_list_create(&element_type, 8, iree_allocator_system(),
+                                     &source_list));
+  IREE_ASSERT_OK(iree_vm_list_resize(source_list, 5));
+  EXPECT_EQ(5, iree_vm_list_size(source_list));
+  for (iree_host_size_t i = 0; i < 5; ++i) {
+    iree_vm_ref_t ref_a = MakeRef<A>((float)i);
+    IREE_ASSERT_OK(iree_vm_list_set_ref_move(source_list, i, &ref_a));
+  }
+
+  // Clone list.
+  iree_vm_list_t* target_list = NULL;
+  IREE_ASSERT_OK(
+      iree_vm_list_clone(source_list, iree_allocator_system(), &target_list));
+
+  // Verify the contents match. Since they are refs we compare pointer equality
+  // to ensure they were shallowly cloned.
+  EXPECT_EQ(iree_vm_list_size(target_list), iree_vm_list_size(source_list));
+  for (iree_host_size_t i = 0; i < 5; ++i) {
+    iree_vm_ref_t source_ref_a{0};
+    IREE_ASSERT_OK(iree_vm_list_get_ref_assign(source_list, i, &source_ref_a));
+    EXPECT_TRUE(test_a_isa(source_ref_a));
+    auto* source_a = test_a_deref(source_ref_a);
+    iree_vm_ref_t target_ref_a{0};
+    IREE_ASSERT_OK(iree_vm_list_get_ref_assign(target_list, i, &target_ref_a));
+    EXPECT_TRUE(test_a_isa(target_ref_a));
+    auto* target_a = test_a_deref(target_ref_a);
+    EXPECT_EQ(source_a, target_a);
+  }
+
+  iree_vm_list_release(source_list);
+  iree_vm_list_release(target_list);
+}
+
+// Tests cloning lists of variant types.
+TEST_F(VMListTest, CloneVariantsEmpty) {
+  iree_vm_type_def_t element_type = iree_vm_type_def_make_variant_type();
+  iree_vm_list_t* source_list = nullptr;
+  IREE_ASSERT_OK(iree_vm_list_create(&element_type, 10, iree_allocator_system(),
+                                     &source_list));
+
+  // Clone list.
+  iree_vm_list_t* target_list = NULL;
+  IREE_ASSERT_OK(
+      iree_vm_list_clone(source_list, iree_allocator_system(), &target_list));
+
+  // Verify the target list matches source parameters.
+  iree_vm_type_def_t queried_element_type =
+      iree_vm_list_element_type(target_list);
+  EXPECT_TRUE(iree_vm_type_def_is_variant(&queried_element_type));
+  EXPECT_EQ(0,
+            memcmp(&element_type, &queried_element_type, sizeof(element_type)));
+  EXPECT_LE(iree_vm_list_capacity(target_list),
+            iree_vm_list_capacity(source_list));
+  EXPECT_EQ(iree_vm_list_size(target_list), iree_vm_list_size(source_list));
+
+  iree_vm_list_release(source_list);
+  iree_vm_list_release(target_list);
+}
+TEST_F(VMListTest, CloneVariants) {
+  iree_vm_type_def_t element_type = iree_vm_type_def_make_variant_type();
+  iree_vm_list_t* source_list = nullptr;
+  IREE_ASSERT_OK(iree_vm_list_create(&element_type, 10, iree_allocator_system(),
+                                     &source_list));
+  IREE_ASSERT_OK(iree_vm_list_resize(source_list, 10));
+  EXPECT_EQ(10, iree_vm_list_size(source_list));
+  for (iree_host_size_t i = 0; i < 5; ++i) {
+    iree_vm_value_t value = iree_vm_value_make_i32((int32_t)i);
+    IREE_ASSERT_OK(iree_vm_list_set_value(source_list, i, &value));
+  }
+  for (iree_host_size_t i = 5; i < 10; ++i) {
+    iree_vm_ref_t ref_a = MakeRef<A>(static_cast<float>(i));
+    IREE_ASSERT_OK(iree_vm_list_set_ref_move(source_list, i, &ref_a));
+  }
+
+  // Clone list.
+  iree_vm_list_t* target_list = NULL;
+  IREE_ASSERT_OK(
+      iree_vm_list_clone(source_list, iree_allocator_system(), &target_list));
+
+  // Verify the contents match. Since they are refs we compare pointer equality
+  // to ensure they were shallowly cloned.
+  for (iree_host_size_t i = 0; i < 5; ++i) {
+    iree_vm_value_t value;
+    IREE_ASSERT_OK(iree_vm_list_get_value_as(target_list, i,
+                                             IREE_VM_VALUE_TYPE_I32, &value));
+    EXPECT_EQ(IREE_VM_VALUE_TYPE_I32, value.type);
+    EXPECT_EQ(i, value.i32);
+  }
+  for (iree_host_size_t i = 5; i < 10; ++i) {
+    iree_vm_ref_t source_ref_a{0};
+    IREE_ASSERT_OK(iree_vm_list_get_ref_assign(source_list, i, &source_ref_a));
+    EXPECT_TRUE(test_a_isa(source_ref_a));
+    auto* source_a = test_a_deref(source_ref_a);
+    iree_vm_ref_t target_ref_a{0};
+    IREE_ASSERT_OK(iree_vm_list_get_ref_assign(target_list, i, &target_ref_a));
+    EXPECT_TRUE(test_a_isa(target_ref_a));
+    auto* target_a = test_a_deref(target_ref_a);
+    EXPECT_EQ(source_a, target_a);
+  }
+
+  iree_vm_list_release(source_list);
+  iree_vm_list_release(target_list);
 }
 
 // Tests capacity reservation.

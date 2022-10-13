@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 
+#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Operation.h"
@@ -47,14 +48,14 @@ StringRef getDeleteMarker() { return "delete"; }
 
 StringRef getMarkerOrNull(Operation *op) {
   StringAttr attr = op->getAttrOfType<StringAttr>(
-      linalg::LinalgTransforms::kLinalgTransformMarker);
+      IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker);
   if (!attr) return "";
   return attr.getValue();
 }
 
 bool hasMarker(Operation *op, ArrayRef<StringRef> marker) {
   StringAttr attr = op->getAttrOfType<StringAttr>(
-      linalg::LinalgTransforms::kLinalgTransformMarker);
+      IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker);
   return attr && (marker.empty() ||
                   llvm::any_of(marker, [&attr](StringRef markerValue) {
                     return attr.getValue() == markerValue;
@@ -62,7 +63,7 @@ bool hasMarker(Operation *op, ArrayRef<StringRef> marker) {
 }
 
 void setMarker(Operation *op, StringRef marker) {
-  op->setAttr(linalg::LinalgTransforms::kLinalgTransformMarker,
+  op->setAttr(IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker,
               StringAttr::get(op->getContext(), marker));
 }
 

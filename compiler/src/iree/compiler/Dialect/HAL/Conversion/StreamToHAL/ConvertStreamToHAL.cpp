@@ -16,6 +16,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/IR/Dominance.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
@@ -42,6 +43,62 @@ static Value getOrCreateWaitFence(Location loc, Value timepointFence,
   if (timepointFence) return timepointFence;
   return builder.create<IREE::Util::NullOp>(
       loc, builder.getType<IREE::HAL::FenceType>());
+}
+
+// Finds a !hal.fence bound to |timepoint| via a chain op and returns it if
+// it is usable at the builder insertion point. The chain ops is only used if
+// it is the only consumer of the timepoint and it is removed upon return.
+static Value consumeBoundFence(Value timepoint,
+                               ConversionPatternRewriter &rewriter) {
+  // Must only have one use. We can't consume a fence multiple times.
+  if (!timepoint.hasOneUse()) return nullptr;  // >1 use
+
+  // The use must be an export to a fence.
+  auto chainOp = dyn_cast<IREE::Stream::TimepointChainExternalOp>(
+      *timepoint.getUsers().begin());
+  if (!chainOp) return nullptr;  // non-export use
+  assert(!chainOp.getExternalValues().empty());
+  auto fence = chainOp.getExternalValues().front();
+  if (!fence || !fence.getType().isa<IREE::HAL::FenceType>()) return nullptr;
+
+  // Try really hard to figure out if the fence can be used. A larger analysis
+  // pass running prior to conversion that did some code motion could help
+  // ensure the fence SSA value is usable in the places it is needed - for now
+  // we just do this local check that satisfies most common programs today. IPO
+  // would do something like add the fence as an argument to function calls so
+  // that the functions could consume it but inlining is pretty aggressive now.
+  if (!IREE::Util::isValueUsableForOp(fence, rewriter.getBlock(),
+                                      rewriter.getInsertionPoint())) {
+    return nullptr;  // unusable
+  }
+
+  // Consume the op by erasing it.
+  rewriter.eraseOp(chainOp);
+
+  return fence;  // usable
+}
+
+// Returns the a new fence for |timepoint| or an existing fence if one was
+// associated with an external fence. Returns util.null if no one observes the
+// fence.
+static Value getOrCreateSignalFence(Location loc, Value device, Value timepoint,
+                                    ConversionPatternRewriter &rewriter) {
+  // Check to see if anyone is consuming the timepoint - if not then we don't
+  // need create a fence.
+  if (timepoint.use_empty()) {
+    return rewriter.create<IREE::Util::NullOp>(
+        loc, rewriter.getType<IREE::HAL::FenceType>());
+  }
+
+  // Check to see if the timepoint is associated with a fence. In common cases
+  // when along ABI boundaries we can usually find an association.
+  auto fence = consumeBoundFence(timepoint, rewriter);
+  if (fence) return fence;
+
+  // Create a new fence.
+  return rewriter.create<IREE::HAL::FenceCreateOp>(
+      loc, rewriter.getType<IREE::HAL::FenceType>(), device,
+      IREE::HAL::FenceFlagBitfield::None);
 }
 
 // Scans all of the stream.cmd.* ops in the region to derive a command category.
@@ -255,9 +312,8 @@ struct ResourceAllocaOpPattern
     // Gather wait/signal fence, which are optional.
     Value waitFence =
         getOrCreateWaitFence(loc, adaptor.getAwaitTimepoint(), rewriter);
-    Value signalFence = rewriter.create<IREE::HAL::FenceCreateOp>(
-        loc, rewriter.getType<IREE::HAL::FenceType>(), device,
-        IREE::HAL::FenceFlagBitfield::None);
+    Value signalFence = getOrCreateSignalFence(
+        loc, device, allocaOp.getResultTimepoint(), rewriter);
 
     // Queue allocation.
     auto queueAffinity = rewriter.create<arith::ConstantIntOp>(loc, -1, 64);
@@ -283,9 +339,8 @@ struct ResourceDeallocaOpPattern
     // Gather wait/signal fence, which are optional.
     Value waitFence =
         getOrCreateWaitFence(loc, adaptor.getAwaitTimepoint(), rewriter);
-    Value signalFence = rewriter.create<IREE::HAL::FenceCreateOp>(
-        loc, rewriter.getType<IREE::HAL::FenceType>(), device,
-        IREE::HAL::FenceFlagBitfield::None);
+    Value signalFence = getOrCreateSignalFence(
+        loc, device, deallocaOp.getResultTimepoint(), rewriter);
 
     // Queue allocation.
     auto queueAffinity = rewriter.create<arith::ConstantIntOp>(loc, -1, 64);
@@ -859,9 +914,8 @@ struct CmdExecuteOpPattern
     // Gather wait/signal fence, which are optional.
     Value waitFence =
         getOrCreateWaitFence(loc, adaptor.getAwaitTimepoint(), rewriter);
-    Value signalFence = rewriter.create<IREE::HAL::FenceCreateOp>(
-        loc, rewriter.getType<IREE::HAL::FenceType>(), device,
-        IREE::HAL::FenceFlagBitfield::None);
+    Value signalFence = getOrCreateSignalFence(
+        loc, device, executeOp.getResultTimepoint(), rewriter);
 
     // Queue execution.
     auto queueAffinity = rewriter.create<arith::ConstantIntOp>(loc, -1, 64);
@@ -957,6 +1011,30 @@ struct TimepointExportOpPattern
   }
 };
 
+struct TimepointChainExternalOpPattern
+    : public StreamConversionPattern<IREE::Stream::TimepointChainExternalOp> {
+  using StreamConversionPattern::StreamConversionPattern;
+  LogicalResult matchAndRewrite(
+      IREE::Stream::TimepointChainExternalOp exportOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    // Only handle exports into HAL fences.
+    auto externalValues = exportOp.getExternalValues();
+    if (externalValues.size() != 1 ||
+        !externalValues[0].getType().isa<IREE::HAL::FenceType>()) {
+      return rewriter.notifyMatchFailure(
+          exportOp, "only exports to HAL fences are supported");
+    }
+    auto device = lookupDeviceFor(exportOp, rewriter);
+    auto queueAffinity =
+        rewriter.create<arith::ConstantIntOp>(exportOp.getLoc(), -1, 64);
+    rewriter.replaceOpWithNewOp<IREE::HAL::DeviceQueueExecuteOp>(
+        exportOp, device, queueAffinity,
+        /*wait_fence=*/adaptor.getAwaitTimepoint(),
+        /*signal_fence=*/externalValues[0], /*command_buffers=*/ValueRange{});
+    return success();
+  }
+};
+
 struct TimepointJoinOpPattern
     : public StreamConversionPattern<IREE::Stream::TimepointJoinOp> {
   using StreamConversionPattern::StreamConversionPattern;
@@ -966,6 +1044,23 @@ struct TimepointJoinOpPattern
     rewriter.replaceOpWithNewOp<IREE::HAL::FenceJoinOp>(
         joinOp, rewriter.getType<IREE::HAL::FenceType>(),
         adaptor.getAwaitTimepoints());
+    return success();
+  }
+};
+
+struct TimepointBarrierOpPattern
+    : public StreamConversionPattern<IREE::Stream::TimepointBarrierOp> {
+  using StreamConversionPattern::StreamConversionPattern;
+  LogicalResult matchAndRewrite(
+      IREE::Stream::TimepointBarrierOp barrierOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    // Replace with a signaled fence.
+    // NOTE: this assumes that if this op still exists the input resource is
+    // already available. If it isn't then timepoint propagation should have
+    // replaced the signal op with the producing timepoint.
+    Value nullFence = rewriter.create<IREE::Util::NullOp>(
+        barrierOp.getLoc(), rewriter.getType<IREE::HAL::FenceType>());
+    rewriter.replaceOp(barrierOp, {adaptor.getResource(), nullFence});
     return success();
   }
 };
@@ -1057,7 +1152,8 @@ void populateStreamToHALPatterns(MLIRContext *context,
               CmdExecuteOpPattern, CmdSerialOpPattern, CmdConcurrentOpPattern>(
           mapping, typeConverter, context);
   patterns.insert<TimepointImmediateOpPattern, TimepointImportOpPattern,
-                  TimepointExportOpPattern, TimepointJoinOpPattern,
+                  TimepointExportOpPattern, TimepointChainExternalOpPattern,
+                  TimepointJoinOpPattern, TimepointBarrierOpPattern,
                   TimepointAwaitOpPattern>(mapping, typeConverter, context);
   patterns.insert<ElideYieldOpPattern>(mapping, typeConverter, context);
 }

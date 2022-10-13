@@ -32,6 +32,7 @@ iree_cc_library(
     "CaptureDispatchDynamicDims.cpp"
     "CleanupNumericNarrowing.cpp"
     "CleanupTensorShapes.cpp"
+    "CollapseReductionDims.cpp"
     "Convert1X1FilterConv2DToMatmul.cpp"
     "ConvertConv2DToImg2Col.cpp"
     "ConvertLinalgMatmulToMmt4D.cpp"
@@ -67,6 +68,7 @@ iree_cc_library(
     IREELinalgExtDialect
     IREELinalgExtPasses
     IREELinalgExtTransformOps
+    IREELinalgExtTransforms
     IREELinalgTransformDialect
     IREELinalgTransformDialectPasses
     LLVMSupport

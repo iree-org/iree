@@ -103,10 +103,19 @@ case "${BUILD_PRESET}" in
 esac
 
 "${CMAKE_BIN}" "${args[@]}" "${ROOT_DIR}"
-"${CMAKE_BIN}" --build "${BUILD_RISCV_DIR}" -- -k 0
 
-if [[ "${RISCV_ARCH}" == "rv64" || "${RISCV_ARCH}" == "rv32-linux" ]]; then
-  echo "Building test deps for RISC-V"
-  echo "-----------------------------"
-  "${CMAKE_BIN}" --build "${BUILD_RISCV_DIR}" --target iree-test-deps -- -k 0
+if [[ "${BUILD_PRESET}" == "benchmark-suite-test" ]] && \
+   [[ "${RISCV_ARCH}" == "rv64" || "${RISCV_ARCH}" == "rv32-linux" ]]; then
+  echo "Building iree-run-module and run-module-test deps for RISC-V"
+  echo "------------------------------------------------------------"
+  "${CMAKE_BIN}" --build "${BUILD_RISCV_DIR}" --target iree-run-module \
+    iree-run-module-test-deps -- -k 0
+else
+  "${CMAKE_BIN}" --build "${BUILD_RISCV_DIR}" -- -k 0
+
+  if [[ "${RISCV_ARCH}" == "rv64" || "${RISCV_ARCH}" == "rv32-linux" ]]; then
+    echo "Building test deps for RISC-V"
+    echo "-----------------------------"
+    "${CMAKE_BIN}" --build "${BUILD_RISCV_DIR}" --target iree-test-deps -- -k 0
+  fi
 fi

@@ -627,11 +627,8 @@ jobs:
             bash -euo pipefail -c \
             "./build_tools/cmake/build_riscv.sh && tests/riscv32/smoke.sh"
 
-  # TODO(#10391): Update the benchmark dependency with the new benchmark
-  # framework. The step only requires the compiled benchmark modules, not the
-  # result from the benchmark.
   linux_riscv:
-    needs: [setup, build_all, benchmarks]
+    needs: [setup, build_all]
     if: needs.setup.outputs.should-run == 'true'
     runs-on:
       - self-hosted  # must come first
@@ -648,8 +645,6 @@ jobs:
       BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
       BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
       BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
-      BENCHMARKS_ARCHIVE: ${{ needs.benchmarks.outputs.benchmarks-archive }}
-      BENCHMARKS_GCS_ARTIFACT: ${{ needs.benchmarks.outputs.benchmarks-gcs-artifact }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
@@ -659,21 +654,6 @@ jobs:
         run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting build dir archive"
         run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
-      - name: "Downloading benchmarks archive"
-        id: download_benchmarks
-        run: gcloud alpha storage cp "${BENCHMARKS_GCS_ARTIFACT}" "${BENCHMARKS_ARCHIVE}"
-      - name: "Extracting benchmarks archive"
-        run: tar -xf "${BENCHMARKS_ARCHIVE}"
-      # We may need to use a tar archive later, but for now we only download one npy file.
-      - name: "Download benchmark suite module expected output"
-        id: download_expected_output
-        env:
-          BUILD_BENCHMARK_SUITE_DIR: ${{ needs.benchmarks.outputs.benchmarks-dir }}/benchmark_suites
-          EXPECTED_OUTPUT_GSC_ARTIFACT: gs://iree-model-artifacts/deeplab_v3_fp32_input_0_expected_output.npy
-          EXPECTED_OUTPUT_FILE: deeplab_v3_fp32_input_0_expected_output.npy
-        run: |
-          gcloud alpha storage cp "${EXPECTED_OUTPUT_GSC_ARTIFACT}" "${BUILD_BENCHMARK_SUITE_DIR}/${EXPECTED_OUTPUT_FILE}"
-          echo "::set-output name=benchmark-suite-dir::${BUILD_BENCHMARK_SUITE_DIR}"
       - name: "Cross-compiling and testing RISC-V Linux"
         env:
           BUILD_BENCHMARK_SUITE_DIR: ${{ steps.download_expected_output.outputs.benchmark-suite-dir }}
@@ -681,9 +661,8 @@ jobs:
           ./build_tools/github_actions/docker_run.sh \
             --env "RISCV_ARCH=${BUILD_ARCH}" \
             --env "BUILD_RISCV_DIR=${BUILD_RISCV_DIR}" \
-            --env "BUILD_PRESET=benchmark-suite-test" \
+            --env "BUILD_PRESET=test" \
             --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
-            --env "BUILD_BENCHMARK_SUITE_DIR=${BUILD_BENCHMARK_SUITE_DIR}" \
             gcr.io/iree-oss/riscv@sha256:d6f0e293a50faf5abbd564c1d1bb9dc6456d7ce93d07b131c381fa64c1daed62 \
             bash -euo pipefail -c \
               "./build_tools/cmake/build_riscv.sh && ./build_tools/cmake/test_riscv.sh"
@@ -716,6 +695,81 @@ jobs:
             --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
             gcr.io/iree-oss/emscripten@sha256:8ccc1c8de11919faf23aeaa585b13e5c5050952db76c101d6f61367280a3546f \
             build_tools/cmake/build_runtime_emscripten.sh
+
+  # TODO(#10391): Update the benchmark dependency with the new benchmark
+  # framework. The step only requires the compiled benchmark modules, not the
+  # result from the benchmark.
+  test_benchmark_suites:
+    needs: [setup, build_all, benchmarks]
+    if: needs.setup.outputs.should-run == 'true'
+    runs-on:
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - cpu
+      - os-family=Linux
+    strategy:
+      matrix:
+        target:
+          - platform: riscv
+            architecture: rv64
+            docker_image: "gcr.io/iree-oss/riscv@sha256:d6f0e293a50faf5abbd564c1d1bb9dc6456d7ce93d07b131c381fa64c1daed62"
+            run_scripts: "./build_tools/cmake/build_riscv.sh && ./build_tools/cmake/test_riscv.sh"
+          - platform: riscv
+            architecture: rv32-linux
+            docker_image: "gcr.io/iree-oss/riscv@sha256:d6f0e293a50faf5abbd564c1d1bb9dc6456d7ce93d07b131c381fa64c1daed62"
+            run_scripts: "./build_tools/cmake/build_riscv.sh && ./build_tools/cmake/test_riscv.sh"
+          - platform: host
+            architecture: x86_64
+            docker_image: "gcr.io/iree-oss/base@sha256:5d43683c6b50aebe1fca6c85f2012f3b0fa153bf4dd268e8767b619b1891423a"
+            run_scripts: "./build_tools/cmake/test_benchmark_suites_host.sh"
+    env:
+      PLATFORM: ${{ matrix.target.platform }}
+      ARCHITECTURE: ${{ matrix.target.architecture }}
+      DOCKER_IMAGE: ${{ matrix.target.docker_image }}
+      RUN_SCRIPTS: ${{ matrix.target.run_scripts }}
+      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
+      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
+      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+      BENCHMARKS_ARCHIVE: ${{ needs.benchmarks.outputs.benchmarks-archive }}
+      BENCHMARKS_GCS_ARTIFACT: ${{ needs.benchmarks.outputs.benchmarks-gcs-artifact }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
+        with:
+          submodules: true
+      - name: "Downloading build dir archive"
+        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+      - name: "Extracting build dir archive"
+        run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
+      - name: "Downloading benchmarks archive"
+        id: download_benchmarks
+        run: gcloud alpha storage cp "${BENCHMARKS_GCS_ARTIFACT}" "${BENCHMARKS_ARCHIVE}"
+      - name: "Extracting benchmarks archive"
+        run: tar -xf "${BENCHMARKS_ARCHIVE}"
+      # We may need to use a tar archive later, but for now we only download one npy file.
+      - name: "Download benchmark suite module expected output"
+        id: download_expected_output
+        env:
+          BUILD_BENCHMARK_SUITE_DIR: ${{ needs.benchmarks.outputs.benchmarks-dir }}/benchmark_suites
+          EXPECTED_OUTPUT_GSC_ARTIFACT: gs://iree-model-artifacts/deeplab_v3_fp32_input_0_expected_output.npy
+          EXPECTED_OUTPUT_FILE: deeplab_v3_fp32_input_0_expected_output.npy
+        run: |
+          gcloud alpha storage cp "${EXPECTED_OUTPUT_GSC_ARTIFACT}" "${BUILD_BENCHMARK_SUITE_DIR}/${EXPECTED_OUTPUT_FILE}"
+          echo "::set-output name=benchmark-suite-dir::${BUILD_BENCHMARK_SUITE_DIR}"
+      - name: "Build iree-run-module and test benchmark suite modules"
+        env:
+          BUILD_BENCHMARK_SUITE_DIR: ${{ steps.download_expected_output.outputs.benchmark-suite-dir }}
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "${PLATFORM^^}_ARCH=${ARCHITECTURE}" \
+            --env "BUILD_${PLATFORM^^}_DIR=build-${PLATFORM}-${ARCHITECTURE}" \
+            --env "BUILD_PRESET=benchmark-suite-test" \
+            --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
+            --env "BUILD_BENCHMARK_SUITE_DIR=${BUILD_BENCHMARK_SUITE_DIR}" \
+            "${DOCKER_IMAGE}" \
+            bash -euo pipefail -c \
+              "${RUN_SCRIPTS}"
 
   ##############################################################################
 
@@ -758,6 +812,9 @@ jobs:
 
       # Benchmark pipeline
       - benchmarks
+
+      # Test modules from benchmark pipeline
+      - test_benchmark_suites
     steps:
       - name: Getting combined job status
         run: |

@@ -652,7 +652,7 @@ func.func @reverse_tensor_multi_dim(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
   %c1 = arith.constant 1 : index
   %d0 = tensor.dim %arg0, %c0 : tensor<?x?xi32>
   %d1 = tensor.dim %arg0, %c1 : tensor<?x?xi32>
-  %init = linalg.init_tensor [%d0, %d1] : tensor<?x?xi32>
+  %init = tensor.empty(%d0, %d1) : tensor<?x?xi32>
   %0 = iree_linalg_ext.reverse
          {__internal_linalg_transform__ = "tiling_input"}
          dimensions(dense<[0, 1]> : tensor<2xi64>)
@@ -671,7 +671,7 @@ func.func @reverse_tensor_multi_dim(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
 // CHECK-DAG:    %[[C20:.+]] = arith.constant 20 : index
 // CHECK-DAG:    %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]] : tensor<?x?xi32>
 // CHECK-DAG:    %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]] : tensor<?x?xi32>
-// CHECK:        %[[INIT:.+]] = linalg.init_tensor [%[[D0]], %[[D1]]] : tensor<?x?xi32>
+// CHECK:        %[[INIT:.+]] = tensor.empty(%[[D0]], %[[D1]]) : tensor<?x?xi32>
 // CHECK:        %[[RES:.+]] = scf.for %[[I:.+]] = %[[C0]] to %[[D0]] step %[[C10]]
 // CHECK-SAME:     iter_args(%[[INIT2:.+]] = %[[INIT]]) -> (tensor<?x?xi32>) {
 // CHECK:          %[[SIZE_I:.+]] = affine.min #[[MAP0]](%[[I]])[%[[C10]], %[[D0]]]
@@ -698,8 +698,8 @@ func.func @reverse_tensor_multi_dim(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
 // -----
 
 func.func @scan_1d(%0: tensor<128xi32>) -> tensor<128xi32> {
-  %c0 = linalg.init_tensor [] : tensor<i32>
-  %1 = linalg.init_tensor [128] : tensor<128xi32>
+  %c0 = tensor.empty() : tensor<i32>
+  %1 = tensor.empty() : tensor<128xi32>
   %2:2 = iree_linalg_ext.scan
     {__internal_linalg_transform__ = "outer_reduce_input"}
     dimension(0) inclusive(true)
@@ -712,8 +712,8 @@ func.func @scan_1d(%0: tensor<128xi32>) -> tensor<128xi32> {
 }
 //      CHECK: func.func @scan_1d(
 // CHECK-SAME:   %[[OPERAND:.+]]: tensor<128xi32>
-//      CHECK:   %[[ACC:.+]] = linalg.init_tensor [] : tensor<i32>
-//      CHECK:   %[[OUTPUT:.+]] = linalg.init_tensor [128] : tensor<128xi32>
+//      CHECK:   %[[ACC:.+]] = tensor.empty() : tensor<i32>
+//      CHECK:   %[[OUTPUT:.+]] = tensor.empty() : tensor<128xi32>
 //      CHECK:   %[[RESULT:.+]]:2 = iree_linalg_ext.scan
 // CHECK-SAME:           __internal_linalg_transform__ = "outer_reduce_output"
 // CHECK-SAME:       ins(%[[OPERAND]] :
@@ -723,8 +723,8 @@ func.func @scan_1d(%0: tensor<128xi32>) -> tensor<128xi32> {
 // -----
 
 func.func @scan_2d(%0: tensor<16x32xi32>) -> tensor<16x32xi32> {
-  %c0 = linalg.init_tensor [32] : tensor<32xi32>
-  %1 = linalg.init_tensor [16, 32] : tensor<16x32xi32>
+  %c0 = tensor.empty() : tensor<32xi32>
+  %1 = tensor.empty() : tensor<16x32xi32>
   %2:2 = iree_linalg_ext.scan
     {__internal_linalg_transform__ = "outer_reduce_input"}
     dimension(0) inclusive(true)
@@ -742,8 +742,8 @@ func.func @scan_2d(%0: tensor<16x32xi32>) -> tensor<16x32xi32> {
 //      CHECK:    %[[C16:.+]] = arith.constant 16 : index
 //      CHECK:    %[[C32:.+]] = arith.constant 32 : index
 //      CHECK:    %[[C20:.+]] = arith.constant 20 : index
-//      CHECK:    %[[ACC:.+]] = linalg.init_tensor [32] : tensor<32xi32>
-//      CHECK:    %[[OUTPUT:.+]] = linalg.init_tensor [16, 32] : tensor<16x32xi32>
+//      CHECK:    %[[ACC:.+]] = tensor.empty() : tensor<32xi32>
+//      CHECK:    %[[OUTPUT:.+]] = tensor.empty() : tensor<16x32xi32>
 //      CHECK:    %[[RESULT:.+]]:2 = scf.for %[[I:.+]] = %[[C0]] to %[[C32]] step %[[C20]]
 // CHECK-SAME:      iter_args(%[[ARG2:.+]] = %[[OUTPUT]], %[[ARG3:.+]] = %[[ACC]])
 //      CHECK:      %[[SIZE:.+]] = affine.min #[[MAP0]](%[[I]])[%[[C20]], %[[C32]]]
@@ -1020,10 +1020,10 @@ func.func @pad_and_pack_partially_dynamic(%input: tensor<?x?xf32>, %output: tens
 // CHECK-DAG:       %[[C1:.*]] = arith.constant 1 : index
 // CHECK-DAG:       %[[C2:.*]] = arith.constant 2 : index
 // CHECK-DAG:       %[[C4:.*]] = arith.constant 4 : index
-// CHECK:           %[[IN_D0:.*]] = tensor.dim %[[IN]], %[[C0]] : tensor<?x?xf32>
-// CHECK:           %[[OUT_D0:.*]] = affine.apply #[[MAP0]]()[%[[IN_D0]]]
-// CHECK:           %[[IN_D1:.*]] = tensor.dim %[[IN]], %[[C1]] : tensor<?x?xf32>
-// CHECK:           %[[OUT_D1:.*]] = affine.apply #[[MAP1]]()[%[[IN_D1]]]
+// CHECK-DAG:       %[[IN_D0:.*]] = tensor.dim %[[IN]], %[[C0]] : tensor<?x?xf32>
+// CHECK-DAG:       %[[IN_D1:.*]] = tensor.dim %[[IN]], %[[C1]] : tensor<?x?xf32>
+// CHECK-DAG:       %[[OUT_D0:.*]] = affine.apply #[[MAP0]]()[%[[IN_D0]]]
+// CHECK-DAG:       %[[OUT_D1:.*]] = affine.apply #[[MAP1]]()[%[[IN_D1]]]
 // CHECK:           %[[RES0:.*]] = scf.for %[[I:.*]] = %[[C0]] to %[[OUT_D0]] step %[[C2]] iter_args(%[[ITER0:.*]] = %[[OUT]]) -> (tensor<?x?x8x2xf32>) {
 // CHECK-DAG:         %[[OUT_I_SZ:.*]] = affine.min #[[MAP2]](%[[I]])[%[[C2]], %[[OUT_D0]]]
 // CHECK:             %[[RES1:.*]] = scf.for %[[J:.*]] = %[[C0]] to %[[OUT_D1]] step %[[C4]] iter_args(%[[ITER1:.*]] = %[[ITER0]]) -> (tensor<?x?x8x2xf32>) {
@@ -1069,10 +1069,10 @@ func.func @pad_and_pack_fully_dynamic(%input: tensor<?x?xf32>, %output: tensor<?
 // CHECK-DAG:       %[[C1:.*]] = arith.constant 1 : index
 // CHECK-DAG:       %[[C2:.*]] = arith.constant 2 : index
 // CHECK-DAG:       %[[C4:.*]] = arith.constant 4 : index
-// CHECK:           %[[IN_D0:.*]] = tensor.dim %[[IN]], %[[C0]] : tensor<?x?xf32>
-// CHECK:           %[[OUT_D0:.*]] = affine.apply #[[MAP0]]()[%[[IN_D0]], %[[TILE_0]]]
-// CHECK:           %[[IN_D1:.*]] = tensor.dim %[[IN]], %[[C1]] : tensor<?x?xf32>
-// CHECK:           %[[OUT_D1:.*]] = affine.apply #[[MAP0]]()[%[[IN_D1]], %[[TILE_1]]]
+// CHECK-DAG:       %[[IN_D0:.*]] = tensor.dim %[[IN]], %[[C0]] : tensor<?x?xf32>
+// CHECK-DAG:       %[[IN_D1:.*]] = tensor.dim %[[IN]], %[[C1]] : tensor<?x?xf32>
+// CHECK-DAG:       %[[OUT_D0:.*]] = affine.apply #[[MAP0]]()[%[[IN_D0]], %[[TILE_0]]]
+// CHECK-DAG:       %[[OUT_D1:.*]] = affine.apply #[[MAP0]]()[%[[IN_D1]], %[[TILE_1]]]
 // CHECK:           %[[RES0:.*]] = scf.for %[[I:.*]] = %[[C0]] to %[[OUT_D0]] step %[[C2]] iter_args(%[[ITER0:.*]] = %[[OUT]]) -> (tensor<?x?x?x?xf32>) {
 // CHECK:             %[[OUT_I_SZ:.*]] = affine.min #[[MAP1]](%[[I]])[%[[C2]], %[[OUT_D0]]]
 // CHECK:             %[[RES1:.*]] = scf.for %[[J:.*]] = %[[C0]] to %[[OUT_D1]] step %[[C4]] iter_args(%[[ITER1:.*]] = %[[ITER0]]) -> (tensor<?x?x?x?xf32>) {

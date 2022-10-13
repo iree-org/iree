@@ -17,7 +17,7 @@ func.func @probe_linalg_op(%arg0 : tensor<5x3xf32>) -> tensor<5x1xf32> {
   %rhs = arith.constant dense<
     [[3.900000e+01], [0.000000e+00], [1.270000e+02]]> : tensor<3x1xf32>
   %init_value = arith.constant 0.000000e+00 : f32
-  %0 = linalg.init_tensor [5, 1] : tensor<5x1xf32>
+  %0 = tensor.empty() : tensor<5x1xf32>
   %1 = linalg.fill ins(%init_value : f32) outs(%0 : tensor<5x1xf32>) -> tensor<5x1xf32>
   %2 = linalg.matmul ins(%arg0, %rhs : tensor<5x3xf32>, tensor<3x1xf32>) outs(%1 : tensor<5x1xf32>) -> tensor<5x1xf32>
   return %2 : tensor<5x1xf32>
@@ -29,7 +29,7 @@ func.func @infer_symmetric_signed(%arg0 : tensor<5x3xf32>) -> tensor<5x1xf32> {
   %rhs = arith.constant dense<
     [[-3.900000e+01], [0.000000e+00], [1.270000e+02]]> : tensor<3x1xf32>
   %init_value = arith.constant 0.000000e+00 : f32
-  %0 = linalg.init_tensor [5, 1] : tensor<5x1xf32>
+  %0 = tensor.empty() : tensor<5x1xf32>
   %1 = linalg.fill ins(%init_value : f32) outs(%0 : tensor<5x1xf32>) -> tensor<5x1xf32>
   %2 = linalg.matmul ins(%arg0, %rhs : tensor<5x3xf32>, tensor<3x1xf32>) outs(%1 : tensor<5x1xf32>) -> tensor<5x1xf32>
   return %2 : tensor<5x1xf32>
@@ -42,7 +42,7 @@ func.func @infer_i1_signed(%arg0 : tensor<5x3xf32>) -> tensor<5x1xf32> {
   %rhs = arith.constant dense<
     [[0.000000e+00], [0.000000e+00], [-1.000000e+00]]> : tensor<3x1xf32>
   %init_value = arith.constant 0.000000e+00 : f32
-  %0 = linalg.init_tensor [5, 1] : tensor<5x1xf32>
+  %0 = tensor.empty() : tensor<5x1xf32>
   %1 = linalg.fill ins(%init_value : f32) outs(%0 : tensor<5x1xf32>) -> tensor<5x1xf32>
   %2 = linalg.matmul ins(%arg0, %rhs : tensor<5x3xf32>, tensor<3x1xf32>) outs(%1 : tensor<5x1xf32>) -> tensor<5x1xf32>
   return %2 : tensor<5x1xf32>
@@ -55,7 +55,7 @@ func.func @infer_positive_non_straddling_zero(%arg0 : tensor<5x3xf32>) -> tensor
   %rhs = arith.constant dense<
     [[1.000000e+00], [1.000000e+00], [2.000000e+00]]> : tensor<3x1xf32>
   %init_value = arith.constant 0.000000e+00 : f32
-  %0 = linalg.init_tensor [5, 1] : tensor<5x1xf32>
+  %0 = tensor.empty() : tensor<5x1xf32>
   %1 = linalg.fill ins(%init_value : f32) outs(%0 : tensor<5x1xf32>) -> tensor<5x1xf32>
   %2 = linalg.matmul ins(%arg0, %rhs : tensor<5x3xf32>, tensor<3x1xf32>) outs(%1 : tensor<5x1xf32>) -> tensor<5x1xf32>
   return %2 : tensor<5x1xf32>
@@ -68,7 +68,7 @@ func.func @infer_negative_non_straddling_zero(%arg0 : tensor<5x3xf32>) -> tensor
   %rhs = arith.constant dense<
     [[-1.000000e+00], [-1.000000e+00], [-2.000000e+00]]> : tensor<3x1xf32>
   %init_value = arith.constant 0.000000e+00 : f32
-  %0 = linalg.init_tensor [5, 1] : tensor<5x1xf32>
+  %0 = tensor.empty() : tensor<5x1xf32>
   %1 = linalg.fill ins(%init_value : f32) outs(%0 : tensor<5x1xf32>) -> tensor<5x1xf32>
   %2 = linalg.matmul ins(%arg0, %rhs : tensor<5x3xf32>, tensor<3x1xf32>) outs(%1 : tensor<5x1xf32>) -> tensor<5x1xf32>
   return %2 : tensor<5x1xf32>

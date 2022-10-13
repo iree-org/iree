@@ -54,12 +54,12 @@ hal.executable public @matmul_256x1024x128_div_sub {
             : !flow.dispatch.tensor<readonly:256x1024xf16> -> tensor<256x1024xf16>
         %14 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [256, 1024], strides = [1, 1]
             : !flow.dispatch.tensor<readonly:256x1024xf16> -> tensor<256x1024xf16>
-        %17 = linalg.init_tensor [256, 1024] : tensor<256x1024xf16>
+        %17 = tensor.empty() : tensor<256x1024xf16>
         %19 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [256, 128], strides = [1, 1]
             : !flow.dispatch.tensor<readonly:256x128xf16> -> tensor<256x128xf16>
         %21 = flow.dispatch.tensor.load %3, offsets = [0, 0], sizes = [128, 1024], strides = [1, 1]
             : !flow.dispatch.tensor<readonly:128x1024xf16> -> tensor<128x1024xf16>
-        %24 = linalg.init_tensor [256, 1024] : tensor<256x1024xf16>
+        %24 = tensor.empty() : tensor<256x1024xf16>
         %25 = linalg.fill ins(%cst : f16) outs(%24 : tensor<256x1024xf16>) -> tensor<256x1024xf16>
         %26 = linalg.matmul ins(%19, %21 : tensor<256x128xf16>, tensor<128x1024xf16>) outs(%25 : tensor<256x1024xf16>) -> tensor<256x1024xf16>
         %27 = linalg.generic {
@@ -140,7 +140,7 @@ hal.executable public @matmul_256x1024x8 {
         %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:256x1024xf16>
         %8 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [256, 8], strides = [1, 1] : !flow.dispatch.tensor<readonly:256x8xf16> -> tensor<256x8xf16>
         %10 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [8, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:8x1024xf16> -> tensor<8x1024xf16>
-        %15 = linalg.init_tensor [256, 1024] : tensor<256x1024xf16>
+        %15 = tensor.empty() : tensor<256x1024xf16>
         %16 = linalg.fill ins(%cst : f16) outs(%15 : tensor<256x1024xf16>) -> tensor<256x1024xf16>
         %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup"}
             ins(%8, %10 : tensor<256x8xf16>, tensor<8x1024xf16>) outs(%16 : tensor<256x1024xf16>) -> tensor<256x1024xf16>

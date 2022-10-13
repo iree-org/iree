@@ -118,7 +118,7 @@ func.func @scatter_add_slice_2D() {
 func.func @scatter_1D_large() {
   %original = util.unfoldable_constant dense<1> : tensor<1400xi32>
   %update = util.unfoldable_constant dense<2> : tensor<1400xi32>
-  %init = linalg.init_tensor [1400] : tensor<1400xi32>
+  %init = tensor.empty() : tensor<1400xi32>
   %indices = linalg.generic {
       indexing_maps = [affine_map<(d0) -> (d0)>],
       iterator_types = ["parallel"]}
@@ -149,7 +149,7 @@ func.func @scatter_1D_large() {
 func.func @scatter_2D_large() {
   %original = util.unfoldable_constant dense<1> : tensor<200x300xi32>
   %update = util.unfoldable_constant dense<2> : tensor<200x300xi32>
-  %init = linalg.init_tensor [200] : tensor<200xi32>
+  %init = tensor.empty() : tensor<200xi32>
   %indices = linalg.generic {
       indexing_maps = [affine_map<(d0) -> (d0)>],
       iterator_types = ["parallel"]}

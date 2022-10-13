@@ -164,6 +164,11 @@ LogicalResult ReturnOp::verify() {
 
 void TensorImportOp::build(OpBuilder &builder, OperationState &result,
                            Type resultType, Value source) {
+  build(builder, result, resultType, source, /*waitFence=*/Value{});
+}
+
+void TensorImportOp::build(OpBuilder &builder, OperationState &result,
+                           Type resultType, Value source, Value waitFence) {
   auto shapedType = resultType.cast<ShapedType>();
   assert((source.getType().isa<IREE::HAL::BufferViewType>() ||
           shapedType.hasStaticShape()) &&
@@ -177,7 +182,7 @@ void TensorImportOp::build(OpBuilder &builder, OperationState &result,
         builder.getIndexAttr(i)));
   }
   build(builder, result, resultType, source, TypeAttr::get(shapedType),
-        dynamicDims);
+        dynamicDims, waitFence);
 }
 
 Value TensorImportOp::getTiedResult(unsigned resultIndex) {
@@ -279,6 +284,32 @@ LogicalResult TensorExportOp::verify() {
   }
   return verifyTypeStorageCompatibility(op, op.getSourceEncoding(),
                                         op.getSource().getType());
+}
+
+//===----------------------------------------------------------------------===//
+// hal.tensor.barrier
+//===----------------------------------------------------------------------===//
+
+void TensorBarrierOp::build(OpBuilder &builder, OperationState &result,
+                            ValueRange sources, Value signalFence) {
+  auto resultTypes = llvm::to_vector(
+      llvm::map_range(sources, [](Value source) { return source.getType(); }));
+  build(builder, result, resultTypes, sources, signalFence);
+}
+
+Value TensorBarrierOp::getTiedResult(unsigned resultIndex) {
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(
+      getSources()[resultIndex]);
+}
+
+::llvm::Optional<unsigned> TensorBarrierOp::getTiedResultOperandIndex(
+    unsigned resultIndex) {
+  return {resultIndex};  // sources[i]
+}
+
+SmallVector<int64_t, 4> TensorBarrierOp::getTiedResultOperandIndices() {
+  size_t numSources = getSources().size();
+  return llvm::to_vector<4>(llvm::seq<int64_t>(0, numSources));
 }
 
 //===----------------------------------------------------------------------===//

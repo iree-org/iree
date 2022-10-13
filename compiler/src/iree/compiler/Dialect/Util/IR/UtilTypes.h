@@ -121,6 +121,12 @@ void excludeTiedOperandAndResultIndices(
     ArrayRef<unsigned> excludedResultIndices,
     SmallVector<int64_t, 4> &tiedOperandIndices);
 
+// Returns true if |value| can be used by the operation at the insertion point.
+bool isValueUsableForOp(Value value, Block *block,
+                        Block::iterator insertionPoint);
+// Returns true if |value| can be used by |op|.
+bool isValueUsableForOp(Value value, Operation *op);
+
 //===----------------------------------------------------------------------===//
 // Shape-aware interface utilities
 //===----------------------------------------------------------------------===//

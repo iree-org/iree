@@ -27,6 +27,15 @@ func.func @timepointExport(%arg0: !stream.timepoint) -> (!hal.semaphore, index) 
 
 // -----
 
+// CHECK-LABEL: @timepointChainExternal
+func.func @timepointChainExternal(%arg0: !stream.timepoint, %arg1: !hal.fence) {
+  // CHECK: stream.timepoint.chain_external %arg0 => (%arg1 : !hal.fence)
+  stream.timepoint.chain_external %arg0 => (%arg1 : !hal.fence)
+  return
+}
+
+// -----
+
 // CHECK-LABEL: @timepointJoin
 func.func @timepointJoin(%arg0: !stream.timepoint, %arg1: !stream.timepoint) -> !stream.timepoint {
   // CHECK: = stream.timepoint.join max(%arg0, %arg1) => !stream.timepoint

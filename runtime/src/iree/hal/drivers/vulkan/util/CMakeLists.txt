@@ -18,7 +18,7 @@ iree_cc_library(
   SRCS
     "arena.cc"
   DEPS
-    iree::base::core_headers
+    iree::base
   PUBLIC
 )
 

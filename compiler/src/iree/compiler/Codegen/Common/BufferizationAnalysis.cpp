@@ -556,8 +556,8 @@ LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
             [&](scf::IfOp ifOp) { return analyseScfIfOp(ifOp, plan); })
         .Case<scf::ForOp>(
             [&](scf::ForOp forOp) { return analyseScfForOp(forOp, plan); })
-        .Case<scf::YieldOp, linalg::InitTensorOp, tensor::DimOp,
-              tensor::ExtractOp, tensor::PadOp, bufferization::ToMemrefOp>(
+        .Case<scf::YieldOp, tensor::EmptyOp, tensor::DimOp, tensor::ExtractOp,
+              tensor::PadOp, bufferization::ToMemrefOp>(
             [&](Operation *op) { return success(); })
         .Default([&](Operation *op) -> LogicalResult {
           if (llvm::any_of(op->getOperands(),

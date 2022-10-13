@@ -5,7 +5,7 @@
 func.func @linalg_generic_traversal(%arg0 : tensor<5x6xf32>) -> (tensor<5x6xf32>, tensor<5x6xf32>, tensor<5x6xf32>) {
   %cst_min = arith.constant dense<-1.270000e+02> : tensor<f32>
   %cst_max = arith.constant dense<1.270000e+02> : tensor<f32>
-  %init = linalg.init_tensor [5, 6] : tensor<5x6xf32>
+  %init = tensor.empty() : tensor<5x6xf32>
 
   %broadcast_min = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]} ins(%cst_min : tensor<f32>) outs(%init : tensor<5x6xf32>) {
   ^bb0(%arg1: f32, %arg2: f32):  // no predecessors

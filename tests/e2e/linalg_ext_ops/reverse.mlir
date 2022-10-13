@@ -2,7 +2,7 @@ func.func @reverse_dim0() {
   %input = util.unfoldable_constant dense<[[1.0, 2.0, 3.0],
                                            [4.0, 5.0, 6.0]]> : tensor<2x3xf32>
 
-  %init = linalg.init_tensor [2, 3] : tensor<2x3xf32>
+  %init = tensor.empty() : tensor<2x3xf32>
   %0 = iree_linalg_ext.reverse
          dimensions(dense<0> : tensor<1xi64>)
          ins(%input : tensor<2x3xf32>)
@@ -20,7 +20,7 @@ func.func @reverse_dim1() {
   %input = util.unfoldable_constant dense<[[1, 2, 3],
                                            [4, 5, 6]]> : tensor<2x3xi32>
 
-  %init = linalg.init_tensor [2, 3] : tensor<2x3xi32>
+  %init = tensor.empty() : tensor<2x3xi32>
   %0 = iree_linalg_ext.reverse
          dimensions(dense<1> : tensor<1xi64>)
          ins(%input : tensor<2x3xi32>)
@@ -38,7 +38,7 @@ func.func @reverse_multi_dims() {
   %input = util.unfoldable_constant dense<[[1, 2, 3],
                                            [4, 5, 6]]> : tensor<2x3xi32>
 
-  %init = linalg.init_tensor [2, 3] : tensor<2x3xi32>
+  %init = tensor.empty() : tensor<2x3xi32>
   %0 = iree_linalg_ext.reverse
          dimensions(dense<[0, 1]> : tensor<2xi64>)
          ins(%input : tensor<2x3xi32>)

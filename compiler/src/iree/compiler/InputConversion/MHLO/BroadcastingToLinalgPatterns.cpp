@@ -118,8 +118,8 @@ Value broadcast(OpBuilder &builder, Location loc, Value operand,
   }
 
   int nloops = resultExtents.size();
-  Value init = builder.create<linalg::InitTensorOp>(
-      loc, dynDims, resultShape, operandType.getElementType());
+  Value init = builder.create<tensor::EmptyOp>(
+      loc, resultShape, operandType.getElementType(), dynDims);
   auto generic = builder.create<linalg::GenericOp>(
       loc, TypeRange{init.getType()}, ValueRange{operand},
       /*outputBuffers=*/ValueRange{init},
