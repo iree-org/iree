@@ -18,7 +18,8 @@
 
 set(ANDROID_CPU_COMPILATION_FLAGS
   "--iree-input-type=tosa"
-  "--iree-llvm-target-triple=aarch64-none-linux-android29")
+  "--iree-llvm-target-triple=aarch64-none-linux-android29"
+  "--iree-llvmcpu-reassociate-fp-reductions=true")
 
 # CPU, LLVM, local-sync, big/little-core, full-inference
 iree_benchmark_suite(
