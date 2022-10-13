@@ -148,8 +148,11 @@ static SmallVector<Value> clipAndCreateTileSize(
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
   assert(linalgOp && "can only compute tile size on linalg ops");
 
-  SmallVector<int64_t> clippedTileSizes(
-      tileSizes.begin(), tileSizes.begin() + linalgOp.getNumLoops());
+  SmallVector<int64_t> clippedTileSizes =
+      tileSizes.size() <= linalgOp.getNumLoops()
+          ? tileSizes
+          : SmallVector<int64_t>(tileSizes.begin(),
+                                 tileSizes.begin() + linalgOp.getNumLoops());
 
   OpBuilder::InsertionGuard guard(b);
   b.setInsertionPointToStart(
