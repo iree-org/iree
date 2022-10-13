@@ -245,6 +245,11 @@ def ConvertToLLVM :
   let summary =
       "Perform final conversion from Linalg/HAL/Shape/Vector/Standard to LLVMIR dialect";
   let constructor = "mlir::iree_compiler::createConvertToLLVMPass()";
+  let options = [
+    Option<"reassociateFpReductions", "reassociateFpReductions", "bool",
+            /*default=*/"false",
+           "Specifies if FP add and mult reductions can be reordered">,
+  ];
 }
 
 def LLVMCPUEmitVectorizationRemarks :
