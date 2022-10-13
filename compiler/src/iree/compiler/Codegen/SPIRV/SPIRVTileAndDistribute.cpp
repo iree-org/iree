@@ -74,11 +74,12 @@ static void populateTilingToInvocationPatterns(RewritePatternSet &patterns) {
 
   MLIRContext *context = patterns.getContext();
   auto marker = StringAttr::get(context, getTileReductionMarker());
-  auto filter =
-      linalg::LinalgTransformationFilter(ArrayRef<StringAttr>(), marker)
-          .setMatchByDefault();
+  auto filter = IREE::LinalgExt::LinalgTransformationFilter(
+                    ArrayRef<StringAttr>(), marker)
+                    .setMatchByDefault();
 
-  patterns.add<linalg::LinalgTilingPattern>(context, tilingOptions, filter);
+  patterns.add<IREE::LinalgExt::LinalgTilingPattern>(context, tilingOptions,
+                                                     filter);
   patterns.add<IREE::LinalgExt::TilingInterfaceTilingPattern>(
       context, tilingOptions, filter);
 }
@@ -92,7 +93,7 @@ static void populateTilingReductionPatterns(RewritePatternSet &patterns) {
     return getTileSizes(builder, op, 2);
   };
 
-  auto filter = linalg::LinalgTransformationFilter(
+  auto filter = IREE::LinalgExt::LinalgTransformationFilter(
       StringAttr::get(patterns.getContext(), getTileReductionMarker()),
       llvm::None);
 

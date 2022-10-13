@@ -21,7 +21,7 @@ Status ParseToVariantList(iree_hal_allocator_t* device_allocator,
     input_string_views[i].data = input_strings[i].data();
     input_string_views[i].size = input_strings[i].size();
   }
-  return iree_create_and_parse_to_variant_list(
+  return iree_tooling_parse_to_variant_list(
       device_allocator, input_string_views.data(), input_string_views.size(),
       host_allocator, out_list);
 }
@@ -30,8 +30,8 @@ Status PrintVariantList(iree_vm_list_t* variant_list, size_t max_element_count,
                         std::string* out_string) {
   iree_string_builder_t builder;
   iree_string_builder_initialize(iree_allocator_system(), &builder);
-  IREE_RETURN_IF_ERROR(
-      iree_append_variant_list(variant_list, max_element_count, &builder));
+  IREE_RETURN_IF_ERROR(iree_tooling_append_variant_list_lines(
+      variant_list, max_element_count, &builder));
   out_string->assign(iree_string_builder_buffer(&builder),
                      iree_string_builder_size(&builder));
   iree_string_builder_deinitialize(&builder);

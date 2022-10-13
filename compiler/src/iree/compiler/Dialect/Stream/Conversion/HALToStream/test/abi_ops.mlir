@@ -35,6 +35,25 @@ func.func @importBufferViewBitcasting(%view: !hal.buffer_view) -> tensor<4xbf16>
 
 // -----
 
+// CHECK-LABEL: @importBufferViewAsync
+// CHECK-SAME: (%[[VIEW:.+]]: !hal.buffer_view, %[[FENCE:.+]]: !hal.fence)
+// CHECK-SAME: -> (!stream.resource<*>, index)
+func.func @importBufferViewAsync(%view: !hal.buffer_view, %fence: !hal.fence) -> tensor<4xf32> {
+  //  CHECK-DAG: %[[SIZE:.+]] = stream.tensor.sizeof tensor<4xf32>
+  //      CHECK: %[[ASYNC_RESOURCE:.+]] = stream.tensor.import %[[VIEW]]
+  // CHECK-SAME:     : !hal.buffer_view -> tensor<4xf32> in !stream.resource<external>{%[[SIZE]]}
+  //      CHECK: %[[TIMEPOINT:.+]] = stream.timepoint.import %[[FENCE]]
+  //      CHECK: %[[SYNC_RESOURCE:.+]] = stream.timepoint.await %[[TIMEPOINT]] => %[[ASYNC_RESOURCE]]
+  // CHECK-SAME:     : !stream.resource<external>{%[[SIZE]]}
+  // CHECK-NEXT: %[[RESULT:.+]] = stream.async.transfer %[[SYNC_RESOURCE]]
+  // CHECK-SAME:     : !stream.resource<external>{%[[SIZE]]} -> !stream.resource<*>{%[[SIZE]]}
+  %0 = hal.tensor.import wait(%fence) => %view : !hal.buffer_view -> tensor<4xf32>
+  // CHECK: return %[[RESULT]], %[[SIZE]] : !stream.resource<*>, index
+  return %0 : tensor<4xf32>
+}
+
+// -----
+
 // CHECK-LABEL: @exportBufferView
 // CHECK-SAME: (%[[TENSOR:.+]]: !stream.resource<*>, %[[SIZE:.+]]: index, %[[DIM0:.+]]: index, %[[DIM1:.+]]: index)
 func.func @exportBufferView(%tensor: tensor<?x?x4xf32>, %dim0: index, %dim1: index) -> !hal.buffer_view {

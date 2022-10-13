@@ -296,8 +296,8 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
         dynSizes.push_back(b.create<tensor::DimOp>(real, en.index()));
       }
     }
-    Value initTensor = b.create<linalg::InitTensorOp>(
-        dynSizes, realType.getShape(), realType.getElementType());
+    Value emptyTensor = b.create<tensor::EmptyOp>(
+        realType.getShape(), realType.getElementType(), dynSizes);
 
     SmallVector<AffineMap> maps;
     maps.push_back(
@@ -307,7 +307,7 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
 
     Value indices = getBitReversalBuffer(b, fftLength);
     auto genericOp = b.create<linalg::GenericOp>(
-        TypeRange{realType}, indices, initTensor, maps, iterTypes,
+        TypeRange{realType}, indices, emptyTensor, maps, iterTypes,
         [&](OpBuilder &b, Location loc, ValueRange args) {
           SmallVector<Value> ivs;
           for (auto i : llvm::seq<unsigned>(0, rank - 1)) {
@@ -417,10 +417,10 @@ struct ReverseOpConversion : public OpConversionPattern<mhlo::ReverseOp> {
             loc, adaptor.getOperands()[0], en.index()));
       }
     }
-    Value initTensor = rewriter.create<linalg::InitTensorOp>(
-        loc, dynSizes, ty.getShape(), ty.getElementType());
+    Value emptyTensor = rewriter.create<tensor::EmptyOp>(
+        loc, ty.getShape(), ty.getElementType(), dynSizes);
     rewriter.replaceOpWithNewOp<IREE::LinalgExt::ReverseOp>(
-        op, op->getResultTypes(), adaptor.getOperands(), initTensor,
+        op, op->getResultTypes(), adaptor.getOperands(), emptyTensor,
         op.dimensions());
     return success();
   }
@@ -463,10 +463,10 @@ struct TopkOpConversion : public OpConversionPattern<chlo::TopKOp> {
             rewriter.create<tensor::DimOp>(loc, adaptor.operand(), en.index()));
       }
     }
-    Value initTensorOutputValues = rewriter.create<mlir::linalg::InitTensorOp>(
-        loc, dynSizes, outputValuesType.getShape(), valueElementType);
-    Value initTensorOutputIndices = rewriter.create<mlir::linalg::InitTensorOp>(
-        loc, dynSizes, outputIndicesType.getShape(), indicesElementType);
+    Value emptyTensorOutputValues = rewriter.create<mlir::tensor::EmptyOp>(
+        loc, outputValuesType.getShape(), valueElementType, dynSizes);
+    Value emptyTensorOutputIndices = rewriter.create<mlir::tensor::EmptyOp>(
+        loc, outputIndicesType.getShape(), indicesElementType, dynSizes);
     // Initialize indices to 0 and values to negative infinity
     Attribute negInfAttr;
     if (auto intType = valueElementType.dyn_cast<IntegerType>()) {
@@ -483,10 +483,10 @@ struct TopkOpConversion : public OpConversionPattern<chlo::TopKOp> {
         indicesElementType, APInt::getSignedMaxValue(32));
     Value posInf = rewriter.create<arith::ConstantOp>(loc, posInfAttr);
     Value negInfTensor =
-        rewriter.create<linalg::FillOp>(loc, negInf, initTensorOutputValues)
+        rewriter.create<linalg::FillOp>(loc, negInf, emptyTensorOutputValues)
             .result();
     Value posInfTensor =
-        rewriter.create<linalg::FillOp>(loc, posInf, initTensorOutputIndices)
+        rewriter.create<linalg::FillOp>(loc, posInf, emptyTensorOutputIndices)
             .result();
 
     // Replace the CHLO TopK with LinalgExt TopK

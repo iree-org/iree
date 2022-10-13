@@ -182,22 +182,23 @@ iree_benchmark_suite_module_test(
 
 # Need to download deeplab_v3_fp32_input_0_expected_output.npy from GCS
 # iree-model-artifacts.
-iree_benchmark_suite_module_test(
-  NAME
-    deeplab_v3_fp32_correctness_test
-  BENCHMARK_MODULE_SRC
-    "TFLite/DeepLabV3-fp32"
-  DRIVER
-    "local-sync"
-  RUNNER_ARGS
-    "--entry_function=main"
-    "--function_input=1x257x257x3xf32=0"
-    "--expected_f32_threshold=0.001"
-  EXPECTED_OUTPUT
-    "deeplab_v3_fp32_input_0_expected_output.npy"
-  UNSUPPORTED_PLATFORMS
-    "riscv32-Linux"
-)
+#TODO(#10748): Disabled due to `iree-import-tflite` failure.
+# iree_benchmark_suite_module_test(
+#   NAME
+#     deeplab_v3_fp32_correctness_test
+#   BENCHMARK_MODULE_SRC
+#     "TFLite/DeepLabV3-fp32"
+#   DRIVER
+#     "local-sync"
+#   RUNNER_ARGS
+#     "--entry_function=main"
+#     "--function_input=1x257x257x3xf32=0"
+#     "--expected_f32_threshold=0.001"
+#   EXPECTED_OUTPUT
+#     "deeplab_v3_fp32_input_0_expected_output.npy"
+#   UNSUPPORTED_PLATFORMS
+#     "riscv32-Linux"
+# )
 
 iree_benchmark_suite_module_test(
   NAME

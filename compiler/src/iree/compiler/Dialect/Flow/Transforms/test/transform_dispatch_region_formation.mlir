@@ -91,13 +91,13 @@ transform.with_pdl_patterns {
 // -----
 
 // CHECK-LABEL: func @create_region_and_convert_to_workgroups
-//       CHECK:   linalg.init_tensor
+//       CHECK:   tensor.empty()
 //       CHECK:   flow.dispatch.workgroups
 //       CHECK:     linalg.matmul
 //       CHECK:     flow.return
 func.func @create_region_and_convert_to_workgroups(
     %A: tensor<5x3xf32>, %B: tensor<3x5xf32>) -> tensor<5x5xf32> {
-  %init = linalg.init_tensor [5, 5] : tensor<5x5xf32>
+  %init = tensor.empty() : tensor<5x5xf32>
   %matmul = linalg.matmul
       ins(%A, %B : tensor<5x3xf32>, tensor<3x5xf32>)
       outs(%init : tensor<5x5xf32>) -> tensor<5x5xf32>

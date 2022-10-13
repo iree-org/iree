@@ -17,6 +17,7 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         [
             "wrap_entry_points.mlir",
+            "wrap_entry_points_coarse_fences.mlir",
         ],
         include = ["*.mlir"],
     ),

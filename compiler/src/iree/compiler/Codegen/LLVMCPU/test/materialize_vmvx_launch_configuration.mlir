@@ -20,7 +20,7 @@ hal.executable private @matmul_static  {
             : !flow.dispatch.tensor<readonly:384x512xf32> -> tensor<384x512xf32>
         %rhs = flow.dispatch.tensor.load %rhs_binding, offsets = [0, 0], sizes = [512, 128], strides = [1, 1]
             : !flow.dispatch.tensor<readonly:512x128xf32> -> tensor<512x128xf32>
-        %init = linalg.init_tensor [384, 128] : tensor<384x128xf32>
+        %init = tensor.empty() : tensor<384x128xf32>
         %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<384x128xf32>) -> tensor<384x128xf32>
         %gemm = linalg.matmul ins(%lhs, %rhs : tensor<384x512xf32>, tensor<512x128xf32>)
             outs(%fill : tensor<384x128xf32>) -> tensor<384x128xf32>

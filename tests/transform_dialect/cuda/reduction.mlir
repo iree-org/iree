@@ -7,7 +7,7 @@ func.func @reduce() -> (!out_tensor_t) {
   // Note: arith.constant is good for our purposes here but it may be useful to use
   // util.unfoldable_constant.
   %arg = arith.constant dense<1.0> : !in_tensor_t
-  %0 = linalg.init_tensor [8] : !out_tensor_t
+  %0 = tensor.empty() : !out_tensor_t
   %1 = linalg.fill ins(%cst : f32) outs(%0 : !out_tensor_t) ->   !out_tensor_t
   %2 = linalg.generic {
     indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,

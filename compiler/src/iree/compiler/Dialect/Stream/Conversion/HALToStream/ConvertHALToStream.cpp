@@ -60,14 +60,28 @@ struct ConvertTensorImportOp
         op.getLoc(), rewriter.getIndexType(),
         TypeAttr::get(op.getTarget().getType()), adaptor.getTargetDims(),
         /*affinity=*/nullptr);
-    auto newOp = rewriter.create<IREE::Stream::TensorImportOp>(
+    Value resource = rewriter.create<IREE::Stream::TensorImportOp>(
         op.getLoc(), resultType, adaptor.getSource(), TypeAttr::get(targetType),
         adaptor.getTargetDims(), resultSize,
         /*affinity=*/nullptr);
 
+    // Await the fence, if needed. When not specified the resource is assumed to
+    // be immediately available.
+    if (auto waitFence = op.getWaitFence()) {
+      Value waitTimepoint = rewriter.create<IREE::Stream::TimepointImportOp>(
+          op.getLoc(), rewriter.getType<IREE::Stream::TimepointType>(),
+          ValueRange{waitFence},
+          /*affinity=*/nullptr);
+      resource = rewriter
+                     .create<IREE::Stream::TimepointAwaitOp>(
+                         op.getLoc(), ValueRange{resource},
+                         ValueRange{resultSize}, waitTimepoint)
+                     .getResult(0);
+    }
+
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncTransferOp>(
-        op, unknownType, newOp.getResult(), resultSize, resultSize,
+        op, unknownType, resource, resultSize, resultSize,
         /*source_affinity=*/nullptr,
         /*result_affinity=*/nullptr);
     return success();
@@ -196,6 +210,43 @@ struct ConvertTensorExportOp
   }
 };
 
+// %r0b, %r1b = hal.tensor.barrier join(%r0a : tensor<4xf32>,
+//                                      %r1a : tensor<1xi32>) => %fence
+// ->
+// %r0b, %t0 = stream.timepoint.barrier %r0a :
+//                 tensor<4xf32> in !stream.resource<*> => !stream.timepoint
+// %r1b, %t1 = stream.timepoint.barrier %r1a :
+//                 tensor<1xi32> in !stream.resource<*> => !stream.timepoint
+// %t01 = stream.timepoint.join max(%t0, %t1)
+// stream.timepoint.export %t01 => %fence
+struct ConvertTensorBarrierOp
+    : public OpConversionPattern<IREE::HAL::TensorBarrierOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      IREE::HAL::TensorBarrierOp op, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    auto timepointType = rewriter.getType<IREE::Stream::TimepointType>();
+    SmallVector<Value> signaledResources;
+    SmallVector<Value> signaledTimepoints;
+    for (auto sourceResource : adaptor.getSources()) {
+      auto source = consumeTensorOperand(op.getLoc(), sourceResource, rewriter);
+      auto barrierOp = rewriter.create<IREE::Stream::TimepointBarrierOp>(
+          sourceResource.getLoc(), source.resource.getType(), timepointType,
+          source.resource, source.resourceSize, /*affinity=*/nullptr);
+      signaledResources.push_back(barrierOp.getResult());
+      signaledTimepoints.push_back(barrierOp.getResultTimepoint());
+    }
+    Value joinedTimepoint =
+        rewriter.createOrFold<IREE::Stream::TimepointJoinOp>(
+            op.getLoc(), timepointType, signaledTimepoints);
+    rewriter.create<IREE::Stream::TimepointChainExternalOp>(
+        op.getLoc(), joinedTimepoint, ValueRange{adaptor.getSignalFence()},
+        /*affinity=*/nullptr);
+    rewriter.replaceOp(op, signaledResources);
+    return success();
+  }
+};
+
 }  // namespace
 
 void populateHALToStreamConversionPatterns(MLIRContext *context,
@@ -205,6 +256,7 @@ void populateHALToStreamConversionPatterns(MLIRContext *context,
       [](IREE::HAL::BufferViewType type) { return type; });
   patterns.insert<ConvertTensorImportOp>(typeConverter, context);
   patterns.insert<ConvertTensorExportOp>(typeConverter, context);
+  patterns.insert<ConvertTensorBarrierOp>(typeConverter, context);
 }
 
 void populateHALToStreamConversionPatterns(MLIRContext *context,

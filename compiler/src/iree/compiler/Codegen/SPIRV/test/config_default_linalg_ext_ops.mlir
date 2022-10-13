@@ -34,7 +34,7 @@ hal.executable private @static_1d_sort {
 // Check that the workgroup count and size are (1, 1, 1) for serializing the computation.
 
 //   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = []>
-//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVDistribute>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseDistribute>
 //       CHECK: hal.executable.export public @static_1d_sort
 //  CHECK-SAME:   translation_info = #[[TRANSLATION]]
 //  CHECK-SAME:   workgroup_size = [1 : index, 1 : index, 1 : index]
@@ -83,7 +83,7 @@ hal.executable private @static_3d_sort {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 0, 16], [1, 0, 1]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVDistribute>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseDistribute>
 //      CHECK: hal.executable.export public @static_3d_sort
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [16 : index, 1 : index, 1 : index]
@@ -128,7 +128,7 @@ hal.executable private @static_1d_fft_stage2 {
 }
 
 //   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[4]{{\]}}>
-//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVDistribute>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseDistribute>
 //       CHECK: hal.executable.export public @static_1d_fft_stage2
 //  CHECK-SAME:   translation_info = #[[TRANSLATION]]
 //  CHECK-SAME:   workgroup_size = [16 : index, 1 : index, 1 : index]
@@ -177,7 +177,7 @@ hal.executable private @static_3d_fft_stage3 {
 
 
 //   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1, 8]{{\]}}>
-//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVDistribute>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseDistribute>
 //       CHECK: hal.executable.export public @static_3d_fft_stage3
 //  CHECK-SAME:   translation_info = #[[TRANSLATION]]
 //  CHECK-SAME:   workgroup_size = [16 : index, 1 : index, 1 : index]

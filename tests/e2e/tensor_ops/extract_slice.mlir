@@ -1,5 +1,5 @@
 func.func @extract_slice_strided() {
-  %0 = linalg.init_tensor [500, 750] : tensor<500x750xi32>
+  %0 = tensor.empty() : tensor<500x750xi32>
   %1 = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>],
       iterator_types = ["parallel", "parallel"]}
@@ -16,7 +16,7 @@ func.func @extract_slice_strided() {
       } -> tensor<500x750xi32>
   %2 = tensor.extract_slice %1[20, 30] [50, 75] [2, 3]
       : tensor<500x750xi32> to tensor<50x75xi32>
-  %3 = linalg.init_tensor [50, 75] : tensor<50x75xi32>
+  %3 = tensor.empty() : tensor<50x75xi32>
   %4 = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>],
       iterator_types = ["parallel", "parallel"]}

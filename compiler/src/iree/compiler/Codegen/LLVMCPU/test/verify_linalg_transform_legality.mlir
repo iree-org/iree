@@ -8,7 +8,7 @@ func.func @matmul_123x456xf32_times_456x789xf32_into_123x789xf32_dispatch_0() {
   %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:4x123x789xf32>
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [123, 4, 114], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:123x4x114xf32> -> tensor<123x4x114xf32>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [4, 114, 789], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:4x114x789xf32> -> tensor<4x114x789xf32>
-  %5 = linalg.init_tensor [4, 123, 789] : tensor<4x123x789xf32>
+  %5 = tensor.empty() : tensor<4x123x789xf32>
   %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<4x123x789xf32>) -> tensor<4x123x789xf32>
   // expected-error @+1 {{expected no Linalg transform markers}}
   %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d1, d0, d3)>,

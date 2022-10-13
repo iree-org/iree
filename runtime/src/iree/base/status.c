@@ -585,7 +585,7 @@ IREE_API_EXPORT IREE_ATTRIBUTE_NORETURN void iree_status_abort(
   IREE_ASSERT(!iree_status_is_ok(status),
               "only valid to call with failing status codes");
   iree_status_free(status);
-  abort();
+  iree_abort();
 }
 
 IREE_API_EXPORT iree_status_code_t

@@ -6,9 +6,9 @@
 """Common classes for benchmark definitions."""
 
 from dataclasses import dataclass
-import dataclasses
 from enum import Enum
 from typing import List
+import dataclasses
 
 
 class ArchitectureType(Enum):

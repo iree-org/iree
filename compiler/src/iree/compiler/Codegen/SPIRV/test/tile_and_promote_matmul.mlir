@@ -18,7 +18,7 @@ hal.executable @matmul_256x1024x128 {
       max_compute_workgroup_size = [65535, 65535, 65535],
       subgroup_size = 32>>}> {
     hal.executable.export public @matmul_256x1024x128 ordinal(0) layout(#pipeline_layout) attributes {
-      translation_info = #iree_codegen.translation_info<SPIRVVectorizeWithWorkgroupMemory>,
+      translation_info = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize>,
       workgroup_size = [32 : index, 8 : index, 1 : index]
     }
     builtin.module {

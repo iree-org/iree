@@ -27,7 +27,7 @@ hal.executable private @matmul_riscv  {
             : !flow.dispatch.tensor<readonly:384x512xf32> -> tensor<384x512xf32>
         %rhs = flow.dispatch.tensor.load %rhs_binding, offsets = [0, 0], sizes = [512, 128], strides = [1, 1]
             : !flow.dispatch.tensor<readonly:512x128xf32> -> tensor<512x128xf32>
-        %init = linalg.init_tensor [384, 128] : tensor<384x128xf32>
+        %init = tensor.empty() : tensor<384x128xf32>
         %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<384x128xf32>) -> tensor<384x128xf32>
         %gemm = linalg.matmul ins(%lhs, %rhs : tensor<384x512xf32>, tensor<512x128xf32>)
             outs(%fill : tensor<384x128xf32>) -> tensor<384x128xf32>
@@ -78,7 +78,7 @@ hal.executable private @thin_depthwise_conv_static {
             : !flow.dispatch.tensor<readonly:1x57x57x72xf32> -> tensor<1x57x57x72xf32>
         %filter = flow.dispatch.tensor.load %filter_binding, offsets = [0, 0, 0], sizes = [3, 3, 240], strides = [1, 1, 1]
             : !flow.dispatch.tensor<readonly:3x3x72xf32> -> tensor<3x3x72xf32>
-        %init = linalg.init_tensor [1, 28, 28, 72] : tensor<1x28x28x72xf32>
+        %init = tensor.empty() : tensor<1x28x28x72xf32>
         %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<1x28x28x72xf32>) -> tensor<1x28x28x72xf32>
         %conv = linalg.depthwise_conv_2d_nhwc_hwc {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>}
           ins(%input, %filter : tensor<1x57x57x72xf32>, tensor<3x3x72xf32>)

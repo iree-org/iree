@@ -1,7 +1,7 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(builtin.module(func.func(iree-spirv-tile,iree-spirv-vectorize))))' --cse %s | FileCheck %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 8, 64], [1, 8, 4], [0, 0, 0, 4]]>
-#translation = #iree_codegen.translation_info<SPIRVVectorize>
+#translation = #iree_codegen.translation_info<SPIRVBaseVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -43,7 +43,7 @@ hal.executable private @fused_fill_batch_matmul {
               %13 = flow.dispatch.tensor.load %1, offsets = [%arg0, 0, %arg2], sizes = [1, 1024, %12], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:4x1024x1024xf32> -> tensor<1x1024x?xf32>
               %15 = affine.min affine_map<(d0) -> (-d0 + 1024, 8)>(%arg1)[]
               %16 = affine.min affine_map<(d0) -> (-d0 + 1024, 64)>(%arg2)[]
-              %17 = linalg.init_tensor [1, %15, %16] : tensor<1x?x?xf32>
+              %17 = tensor.empty(%15, %16) : tensor<1x?x?xf32>
               %18 = linalg.fill ins(%cst : f32) outs(%17 : tensor<1x?x?xf32>) -> tensor<1x?x?xf32>
               %19 = linalg.batch_matmul {lowering_config = #config} ins(%11, %13 : tensor<1x?x1024xf32>, tensor<1x1024x?xf32>) outs(%18 : tensor<1x?x?xf32>) -> tensor<1x?x?xf32>
               flow.dispatch.tensor.store %19, %2, offsets = [%arg0, %arg1, %arg2], sizes = [1, %10, %12], strides = [1, 1, 1] : tensor<1x?x?xf32> -> !flow.dispatch.tensor<writeonly:4x1024x1024xf32>

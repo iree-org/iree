@@ -156,7 +156,7 @@ bool isClonableIntoDispatchOp(Operation *op) {
   // TODO(#8637): `tensor.collapse_shape` and `tensor.expand_shape` are
   // trivially clonable too, but they cause problems
   // with bufferization. Make them clonable when fixed.
-  if (isa<arith::IndexCastOp, linalg::InitTensorOp, tensor::CastOp,
+  if (isa<arith::IndexCastOp, tensor::EmptyOp, tensor::CastOp,
           tensor::ExtractOp, tensor::ExtractSliceOp, tensor::PadOp>(op)) {
     return true;
   }
@@ -665,7 +665,7 @@ namespace {
 template <typename OpType, template <typename> class Base>
 struct CreateDispatchRegionOp : Base<OpType> {
   CreateDispatchRegionOp(MLIRContext *context,
-                         const linalg::LinalgTransformationFilter &filter,
+                         const LinalgExt::LinalgTransformationFilter &filter,
                          PatternBenefit benefit = 1)
       : Base<OpType>(context, benefit), transformationFilter(filter) {}
 
@@ -707,7 +707,7 @@ struct CreateDispatchRegionOp : Base<OpType> {
   }
 
  private:
-  linalg::LinalgTransformationFilter transformationFilter;
+  LinalgExt::LinalgTransformationFilter transformationFilter;
 };
 }  // namespace
 
@@ -1179,7 +1179,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
   });
 
   {
-    linalg::LinalgTransformationFilter filterForComputeOps(
+    LinalgExt::LinalgTransformationFilter filterForComputeOps(
         [](Operation *op) { return success(hasRootOpAttribute(op)); }, {},
         StringAttr::get(context, "indispatch"));
     filterForComputeOps.setMatchByDefault();
@@ -1218,7 +1218,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
 
   // Start with just moving the tensor.insert_slice into its dispatch.
   {
-    linalg::LinalgTransformationFilter filterForInsertSliceOps(
+    LinalgExt::LinalgTransformationFilter filterForInsertSliceOps(
         ArrayRef<StringAttr>{}, StringAttr::get(context, "indispatch"));
     RewritePatternSet insertSliceOpDispatchPatterns(context);
     insertSliceOpDispatchPatterns.insert<
@@ -1232,7 +1232,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
 
   // Now move all remaining ops that need to be cleaned up.
   {
-    linalg::LinalgTransformationFilter filterForCleanupOps(
+    LinalgExt::LinalgTransformationFilter filterForCleanupOps(
         ArrayRef<StringAttr>{}, StringAttr::get(context, "indispatch"));
     RewritePatternSet cleanUpDispatchPatterns(context);
     cleanUpDispatchPatterns.insert<
@@ -1248,7 +1248,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
   funcOp.walk([](Operation *op) {
     removeFusionGroupsAttribute(op);
     removeRootOpAttribute(op);
-    op->removeAttr(linalg::LinalgTransforms::kLinalgTransformMarker);
+    op->removeAttr(IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker);
   });
 }
 

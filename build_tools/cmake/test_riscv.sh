@@ -16,6 +16,7 @@ export PS4='[$(date -u "+%T %Z")] '
 ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
 BUILD_RISCV_DIR="${BUILD_RISCV_DIR:-$ROOT_DIR/build-riscv}"
 RISCV_ARCH="${RISCV_ARCH:-rv64}"
+BUILD_PRESET="${BUILD_PRESET:-test}"
 
 # Environment variable used by the emulator.
 export RISCV_TOOLCHAIN_ROOT="${RISCV_RV64_LINUX_TOOLCHAIN_ROOT}"
@@ -45,6 +46,17 @@ declare -a test_exclude_args=(
   "fp16"
   "regression_llvm-cpu_lowering_config"
 )
+
+if [[ "${BUILD_PRESET}" == "benchmark-suite-test" ]]; then
+  declare -a label_args=(
+    "^test-type=run-module-test$"
+  )
+  label_include_regex="($(IFS="|" ; echo "${label_args[*]}"))"
+  echo "******** Running run-module CTest ********"
+  ctest --test-dir ${BUILD_RISCV_DIR} ${ctest_args[@]} \
+    --label-regex ${label_include_regex}
+  exit 0
+fi
 
 # Test runtime unit tests
 runtime_label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]}"))"

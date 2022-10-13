@@ -11,14 +11,14 @@ module @compute_hoisted {
     %cst_0 = arith.constant dense<1.270000e+02> : tensor<f32>
 
     // A non-leaf broadcast.
-    %0 = linalg.init_tensor [5, 6] : tensor<5x6xf32>
+    %0 = tensor.empty() : tensor<5x6xf32>
     %1 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]} ins(%cst_0 : tensor<f32>) outs(%0 : tensor<5x6xf32>) {
     ^bb0(%arg1: f32, %arg2: f32):  // no predecessors
       linalg.yield %arg1 : f32
     } -> tensor<5x6xf32>
 
     // A leaf-compute.
-    %2 = linalg.init_tensor [5, 6] : tensor<5x6xf32>
+    %2 = tensor.empty() : tensor<5x6xf32>
     %3 = linalg.generic {indexing_maps = [#map1, #map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%1, %1 : tensor<5x6xf32>, tensor<5x6xf32>) outs(%2 : tensor<5x6xf32>) {
     ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):  // no predecessors
       %42 = arith.mulf %arg1, %arg2 : f32
@@ -44,8 +44,8 @@ module @broadcast_treated_as_leaf {
   // CHECK: func.func @main
   func.func @main() -> (tensor<5x6xf32>) {
     %cst_0 = arith.constant dense<1.270000e+02> : tensor<f32>
-    // CHECK: linalg.init_tensor
-    %0 = linalg.init_tensor [5, 6] : tensor<5x6xf32>
+    // CHECK: tensor.empty()
+    %0 = tensor.empty() : tensor<5x6xf32>
     // A broadcast.
     // CHECK: linalg.generic
     %1 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]} ins(%cst_0 : tensor<f32>) outs(%0 : tensor<5x6xf32>) {

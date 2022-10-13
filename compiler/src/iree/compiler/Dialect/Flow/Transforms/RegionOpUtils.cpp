@@ -146,15 +146,21 @@ LogicalResult Flow::reifyDynamicResultDims(OpBuilder &b, Value value,
 // Append a result to the given DispatchRegionOp. The newly created
 // DispatchRegionOp is returned.
 FailureOr<Flow::DispatchRegionOp> Flow::appendDispatchRegionResult(
-    RewriterBase &rewriter, Flow::DispatchRegionOp regionOp, Value result) {
+    RewriterBase &rewriter, Flow::DispatchRegionOp regionOp, Value result,
+    const SmallVector<Value> &dynamicDims) {
+#ifndef NDEBUG
+  auto tensorType = result.getType().cast<RankedTensorType>();
+  assert(tensorType.getNumDynamicDims() == dynamicDims.size() &&
+         "incorrect number of dynamicDims provided");
+#endif  // NDEBUG
+
   OpBuilder::InsertionGuard guard(rewriter);
 
   // Determine dynamic result dims.
   rewriter.setInsertionPoint(regionOp);
-  SmallVector<Value> dynamicDims(regionOp.getResultDims().begin(),
-                                 regionOp.getResultDims().end());
-  if (failed(reifyDynamicResultDims(rewriter, result, dynamicDims)))
-    return failure();
+  SmallVector<Value> regionDynamicDims(regionOp.getResultDims().begin(),
+                                       regionOp.getResultDims().end());
+  regionDynamicDims.append(dynamicDims);
 
   // Determine result types of new RegionOp.
   SmallVector<Type> resultTypes(regionOp.getResultTypes().begin(),
@@ -163,7 +169,7 @@ FailureOr<Flow::DispatchRegionOp> Flow::appendDispatchRegionResult(
 
   // Create new DispatchRegionOp and move over the body.
   auto newRegionOp = rewriter.create<Flow::DispatchRegionOp>(
-      regionOp->getLoc(), resultTypes, dynamicDims);
+      regionOp->getLoc(), resultTypes, regionDynamicDims);
   newRegionOp.getBody().takeBody(regionOp.getBody());
   rewriter.replaceOp(
       regionOp, newRegionOp.getResults().take_front(regionOp->getNumResults()));
@@ -245,6 +251,15 @@ FailureOr<Flow::DispatchRegionOp> Flow::movePrecedingOpIntoDispatchRegion(
     if (!regionOp->isProperAncestor(use.getOwner()))
       usesOutsideOfRegion.push_back(&use);
 
+  // Compute dynamic result dims.
+  SmallVector<SmallVector<Value>> dynamicDims;
+  for (Value v : target->getResults()) {
+    OpBuilder::InsertionGuard guard(rewriter);
+    rewriter.setInsertionPoint(target);
+    SmallVector<Value> &dims = dynamicDims.emplace_back();
+    if (failed(reifyDynamicResultDims(rewriter, v, dims))) return failure();
+  }
+
   // Move op into dispatch region.
   target->moveBefore(&body.front());
 
@@ -255,8 +270,9 @@ FailureOr<Flow::DispatchRegionOp> Flow::movePrecedingOpIntoDispatchRegion(
     // Note: Appending results one-by-one here so that this can be extended to
     // specific results in the future. Many ops have just one result, so this
     // should not be a large overhead.
-    for (Value v : target->getResults()) {
-      auto newRegionOp = appendDispatchRegionResult(rewriter, regionOp, v);
+    for (const auto &it : llvm::enumerate(target->getResults())) {
+      auto newRegionOp = appendDispatchRegionResult(
+          rewriter, regionOp, it.value(), dynamicDims[it.index()]);
       if (failed(newRegionOp)) return failure();
       regionOp = *newRegionOp;
     }

@@ -31,6 +31,7 @@ cc_library(
         "@mlir-hlo//:lhlo",
         "@mlir-hlo//:mlir_hlo",
         "@mlir-hlo//stablehlo:chlo_ops",
+        "@mlir-hlo//stablehlo:stablehlo_ops",
         "@torch-mlir-dialects//:TorchMLIRTMTensorDialect",
     ],
 )

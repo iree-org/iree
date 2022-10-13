@@ -167,7 +167,7 @@ static iree_status_t iree_create_buffer_view_from_file(
   return status;
 }
 
-iree_status_t iree_create_and_parse_to_variant_list(
+iree_status_t iree_tooling_parse_to_variant_list(
     iree_hal_allocator_t* device_allocator, iree_string_view_t* input_strings,
     iree_host_size_t input_strings_count, iree_allocator_t host_allocator,
     iree_vm_list_t** out_list) {
@@ -277,6 +277,50 @@ iree_status_t iree_create_and_parse_to_variant_list(
   return status;
 }
 
+iree_status_t iree_tooling_append_async_fence_inputs(
+    iree_vm_list_t* list, const iree_vm_function_t* function,
+    iree_hal_device_t* device, iree_hal_fence_t* wait_fence,
+    iree_hal_fence_t** out_signal_fence) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_string_view_t model =
+      iree_vm_function_lookup_attr_by_name(function, IREE_SV("iree.abi.model"));
+  if (!iree_string_view_equal(model, IREE_SV("coarse-fences"))) {
+    // Ignore unknown models - the user may have provided their own fences.
+    IREE_TRACE_ZONE_END(z0);
+    return iree_ok_status();
+  }
+
+  // Create the signal fence as a 0->1 transition. The caller will wait on that.
+  iree_hal_semaphore_t* semaphore = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_semaphore_create(device, 0ull, &semaphore));
+  iree_hal_fence_t* signal_fence = NULL;
+  iree_status_t status = iree_hal_fence_create_at(
+      semaphore, 1ull, iree_hal_device_host_allocator(device), &signal_fence);
+  iree_hal_semaphore_release(semaphore);
+
+  // Append (wait, signal) fences.
+  if (iree_status_is_ok(status)) {
+    iree_vm_ref_t wait_fence_ref = iree_hal_fence_retain_ref(wait_fence);
+    status = iree_vm_list_push_ref_move(list, &wait_fence_ref);
+    iree_vm_ref_release(&wait_fence_ref);
+  }
+  if (iree_status_is_ok(status)) {
+    iree_vm_ref_t signal_fence_ref = iree_hal_fence_retain_ref(signal_fence);
+    status = iree_vm_list_push_ref_move(list, &signal_fence_ref);
+    iree_vm_ref_release(&signal_fence_ref);
+  }
+
+  if (iree_status_is_ok(status)) {
+    *out_signal_fence = signal_fence;
+  } else {
+    iree_hal_fence_release(signal_fence);
+  }
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 #define IREE_PRINTVARIANT_CASE_I(SIZE, B, V)  \
   case IREE_VM_VALUE_TYPE_I##SIZE:            \
     return iree_string_builder_append_format( \
@@ -325,9 +369,9 @@ static iree_status_t iree_print_variant(iree_vm_variant_t variant,
   return iree_ok_status();
 }
 
-iree_status_t iree_append_variant_list(iree_vm_list_t* variant_list,
-                                       size_t max_element_count,
-                                       iree_string_builder_t* builder) {
+iree_status_t iree_tooling_append_variant_list_lines(
+    iree_vm_list_t* variant_list, size_t max_element_count,
+    iree_string_builder_t* builder) {
   IREE_TRACE_ZONE_BEGIN(z0);
   for (iree_host_size_t i = 0; i < iree_vm_list_size(variant_list); ++i) {
     iree_vm_variant_t variant = iree_vm_variant_empty();
@@ -342,12 +386,13 @@ iree_status_t iree_append_variant_list(iree_vm_list_t* variant_list,
   return iree_ok_status();
 }
 
-iree_status_t iree_print_variant_list(iree_vm_list_t* variant_list,
-                                      size_t max_element_count, FILE* file) {
+iree_status_t iree_tooling_variant_list_fprint(iree_vm_list_t* variant_list,
+                                               size_t max_element_count,
+                                               FILE* file) {
   iree_string_builder_t builder;
   iree_string_builder_initialize(iree_allocator_system(), &builder);
-  iree_status_t status =
-      iree_append_variant_list(variant_list, max_element_count, &builder);
+  iree_status_t status = iree_tooling_append_variant_list_lines(
+      variant_list, max_element_count, &builder);
   if (iree_status_is_ok(status)) {
     size_t written = fwrite(iree_string_builder_buffer(&builder), 1,
                             iree_string_builder_size(&builder), file);

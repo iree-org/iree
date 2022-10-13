@@ -89,8 +89,8 @@ static LogicalResult tileAndDistributeToThreads(linalg::LinalgOp consumerOp) {
       llvm::to_vector<4>(llvm::seq<int64_t>(0, tileSizes.size()));
 
   FailureOr<linalg::TileLoopNest> loopNest =
-      linalg::tileConsumerAndFuseProducers(builder, consumerOp, tileSizes,
-                                           identityLoopOrder, llvm::None);
+      IREE::LinalgExt::tileConsumerAndFuseProducers(
+          builder, consumerOp, tileSizes, identityLoopOrder, llvm::None);
   if (failed(loopNest)) {
     return consumerOp.emitOpError("failed tiling and fusing producers");
   }
@@ -120,7 +120,8 @@ static void populateTilingReductionPatterns(RewritePatternSet &patterns) {
                            .setLoopType(linalg::LinalgTilingLoopType::Loops)
                            .setTileSizeComputationFunction(getTileSizeFn);
   auto marker = StringAttr::get(context, getTileReductionMarker());
-  auto filter = linalg::LinalgTransformationFilter({marker}, llvm::None);
+  auto filter =
+      IREE::LinalgExt::LinalgTransformationFilter({marker}, llvm::None);
 
   TilingPatterns<linalg::BatchMatmulOp, linalg::Conv2DNchwFchwOp,
                  linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp,
@@ -140,7 +141,8 @@ static LogicalResult tileReduction(func::FuncOp funcOp) {
     if (isa<linalg::ContractionOpInterface>(*op) ||
         isa<linalg::ConvolutionOpInterface>(*op) ||
         isa<linalg::GenericOp>(*op)) {
-      op->setAttr(linalg::LinalgTransforms::kLinalgTransformMarker, marker);
+      op->setAttr(IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker,
+                  marker);
     }
   });
 
@@ -204,8 +206,8 @@ static LogicalResult tileAndUnrollConvWindow(func::FuncOp funcOp) {
         llvm::to_vector<4>(llvm::seq<int64_t>(0, tileSizes.size()));
 
     FailureOr<linalg::TileLoopNest> loopNest =
-        linalg::tileConsumerAndFuseProducers(builder, consumerOp, tileSizes,
-                                             identityLoopOrder, llvm::None);
+        IREE::LinalgExt::tileConsumerAndFuseProducers(
+            builder, consumerOp, tileSizes, identityLoopOrder, llvm::None);
     if (failed(loopNest)) {
       return consumerOp.emitOpError("failed tiling and fusing producers");
     }

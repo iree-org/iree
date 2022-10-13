@@ -42,12 +42,35 @@ func.func @timepointExportFence(%arg0: !stream.timepoint) -> !hal.fence {
 
 // -----
 
+// CHECK-LABEL: @timepointChainExternal
+//  CHECK-SAME: (%[[TIMEPOINT:.+]]: !hal.fence, %[[SIGNAL:.+]]: !hal.fence)
+func.func @timepointChainExternal(%timepoint: !stream.timepoint, %signal: !hal.fence) {
+  // CHECK: %[[DEVICE:.+]] = hal.ex.shared_device
+  // CHECK: hal.device.queue.execute<%[[DEVICE]] : !hal.device> affinity(%c-1_i64) wait(%[[TIMEPOINT]]) signal(%[[SIGNAL]])
+  stream.timepoint.chain_external %timepoint => (%signal : !hal.fence)
+  return
+}
+
+// -----
+
 // CHECK-LABEL: @timepointJoin
 func.func @timepointJoin(%arg0: !stream.timepoint, %arg1: !stream.timepoint) -> !stream.timepoint {
   // CHECK: %[[FENCE:.+]] = hal.fence.join at([%arg0, %arg1]) -> !hal.fence
   %0 = stream.timepoint.join max(%arg0, %arg1) => !stream.timepoint
   // CHECK: return %[[FENCE]]
   return %0 : !stream.timepoint
+}
+
+// -----
+
+// CHECK-LABEL: @timepointBarrier
+//  CHECK-SAME: (%[[R0:.+]]: !hal.buffer) -> (!hal.buffer, !hal.fence)
+func.func @timepointBarrier(%r0: !stream.resource<external>) -> (!stream.resource<external>, !stream.timepoint) {
+  %c128 = arith.constant 128 : index
+  // CHECK: %[[R1T:.+]] = util.null : !hal.fence
+  %r1, %r1t = stream.timepoint.barrier %r0 : !stream.resource<external>{%c128} => !stream.timepoint
+  // CHECK: return %[[R0]], %[[R1T]]
+  return %r1, %r1t : !stream.resource<external>, !stream.timepoint
 }
 
 // -----

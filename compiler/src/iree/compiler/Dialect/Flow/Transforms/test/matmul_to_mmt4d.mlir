@@ -28,7 +28,7 @@ func.func @check_mmt4d_f32_static_nopad(%arg0: tensor<24x8xf32>, %arg1: tensor<8
 // CHECK-SAME:   tensor<8x32xf32> into tensor<4x2x8x4xf32>
 //      CHECK: %[[DST4D:.+]] = tensor.expand_shape %[[DST]]
 // CHECK-SAME:   tensor<24x32xf32> into tensor<3x8x8x4xf32>
-//      CHECK: %[[LHS4DT_INIT:.+]] = linalg.init_tensor [3, 4, 8, 2] : tensor<3x4x8x2xf32>
+//      CHECK: %[[LHS4DT_INIT:.+]] = tensor.empty() : tensor<3x4x8x2xf32>
 //      CHECK: %[[LHS4DT:.+]] = linalg.generic
 // CHECK-SAME:   indexing_maps = [#[[MAP0]], #[[MAP1]]]
 // CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "parallel"]
@@ -36,32 +36,32 @@ func.func @check_mmt4d_f32_static_nopad(%arg0: tensor<24x8xf32>, %arg1: tensor<8
 // CHECK-NEXT:     ^bb0(%{{.*}}: f32, %{{.*}}: f32):
 // CHECK-NEXT:       linalg.yield
 // CHECK-NEXT:    } -> tensor<3x4x8x2xf32>
-//      CHECK: %[[RHS4DT_INIT:.+]] = linalg.init_tensor [8, 4, 4, 2] : tensor<8x4x4x2xf32>
+//      CHECK: %[[RHS4DT_INIT:.+]] = tensor.empty() : tensor<8x4x4x2xf32>
 //      CHECK: %[[RHS4DT:.+]] = linalg.generic
 // CHECK-SAME:   indexing_maps = [#[[MAP2]], #[[MAP1]]],
 // CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "parallel"]
 // CHECK-SAME:   ins(%[[RHS4D]] : tensor<4x2x8x4xf32>) outs(%[[RHS4DT_INIT]] : tensor<8x4x4x2xf32>) {
 // CHECK-NEXT:     ^bb0(%{{.*}}: f32, %{{.*}}: f32):
-// CHECK-NEXT:         linalg.yield %arg3 : f32
+// CHECK-NEXT:         linalg.yield %{{.*}} : f32
 // CHECK-NEXT:   } -> tensor<8x4x4x2xf32>
-// CHECK-NEXT: %[[DST4DT_INIT:.+]] = linalg.init_tensor [3, 8, 8, 4] : tensor<3x8x8x4xf32>
+// CHECK-NEXT: %[[DST4DT_INIT:.+]] = tensor.empty() : tensor<3x8x8x4xf32>
 //      CHECK: %[[DST4DT:.+]] = linalg.generic
 // CHECK-SAME: indexing_maps = [#[[MAP0]], #[[MAP1]]]
 // CHECK-SAME: iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
 // CHECK-SAME:    ins(%[[DST4D]] : tensor<3x8x8x4xf32>) outs(%[[DST4DT_INIT]] : tensor<3x8x8x4xf32>) {
 // CHECK-NEXT:    ^bb0(%{{.*}}: f32, %{{.*}}: f32):
-// CHECK-NEXT:          linalg.yield %arg3 : f32
+// CHECK-NEXT:          linalg.yield %{{.*}} : f32
 // CHECK-NEXT:    } -> tensor<3x8x8x4xf32>
 //      CHECK: %[[MMT4D:.+]] = linalg.mmt4d
 // CHECK-SAME:    {comment = "generic tiling parameters, as no known kernel was matched for this matmul and target"}
 // CHECK-SAME:    ins(%[[LHS4DT]], %[[RHS4DT]] : tensor<3x4x8x2xf32>, tensor<8x4x4x2xf32>) outs(%[[DST4DT]] : tensor<3x8x8x4xf32>) -> tensor<3x8x8x4xf32>
-//      CHECK: %[[MMT4DT_INIT:.+]] = linalg.init_tensor [3, 8, 8, 4] : tensor<3x8x8x4xf32>
+//      CHECK: %[[MMT4DT_INIT:.+]] = tensor.empty() : tensor<3x8x8x4xf32>
 //      CHECK: %[[MMT4DT:.+]] = linalg.generic
 // CHECK-SAME:    indexing_maps = [#[[MAP0]], #[[MAP1]]]
 // CHECK-SAME:    iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
 // CHECK-SAME:    ins(%[[MMT4D]] : tensor<3x8x8x4xf32>) outs(%[[MMT4DT_INIT]] : tensor<3x8x8x4xf32>) {
 // CHECK-NEXT:    ^bb0(%{{.*}}: f32, %{{.*}}: f32):
-// CHECK-NEXT:           linalg.yield %arg3 : f32
+// CHECK-NEXT:           linalg.yield %{{.*}} : f32
 // CHECK-NEXT:    } -> tensor<3x8x8x4xf32>
 //      CHECK: %[[RESULT:.+]] = tensor.collapse_shape %[[MMT4DT]]
 // CHECK-SAME:    tensor<3x8x8x4xf32> into tensor<24x32xf32>
@@ -70,7 +70,7 @@ func.func @check_mmt4d_f32_static_nopad(%arg0: tensor<24x8xf32>, %arg1: tensor<8
 // -----
 func.func @check_mmt4d_with_init_tensor_and_fill(%arg0: tensor<24x8xf32>, %arg1: tensor<8x32xf32>) -> tensor<24x32xf32> {
     %c0 = arith.constant 0.0 : f32
-    %0 = linalg.init_tensor [24, 32] : tensor<24x32xf32>
+    %0 = tensor.empty() : tensor<24x32xf32>
     %1 = linalg.fill ins(%c0 : f32) outs(%0 : tensor<24x32xf32>) -> tensor<24x32xf32>
     %2 = linalg.matmul ins(%arg0, %arg1 : tensor<24x8xf32>, tensor<8x32xf32>) outs(%1 : tensor<24x32xf32>) -> tensor<24x32xf32>
     return %2 : tensor<24x32xf32>
@@ -84,7 +84,7 @@ func.func @check_mmt4d_with_init_tensor_and_fill(%arg0: tensor<24x8xf32>, %arg1:
 // CHECK-SAME:   tensor<24x8xf32> into tensor<3x8x4x2xf32>
 //      CHECK: %[[RHS4D:.+]] = tensor.expand_shape %[[RHS]]
 // CHECK-SAME:   tensor<8x32xf32> into tensor<4x2x8x4xf32>
-//      CHECK: %[[DST_INIT:.+]] = linalg.init_tensor [3, 8, 8, 4] : tensor<3x8x8x4xf32>
+//      CHECK: %[[DST_INIT:.+]] = tensor.empty() : tensor<3x8x8x4xf32>
 //      CHECK: [[DST:.+]] linalg.fill
 // CHECK-SAME:   outs(%[[DST_INIT]] :
 

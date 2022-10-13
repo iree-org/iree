@@ -96,19 +96,19 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
 
   if (!testLoweringConfiguration && passPipeline.has_value()) {
     switch (*passPipeline) {
-      case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistribute:
-        addSPIRVTileAndDistributePassPipeline(pipeline);
+      case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVBaseDistribute:
+        addSPIRVBaseDistributePassPipeline(pipeline);
         break;
-      case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVVectorize:
-        addSPIRVTileAndVectorizePassPipeline(pipeline);
-        break;
-      case IREE::Codegen::DispatchLoweringPassPipeline::
-          SPIRVVectorizeToCooperativeOps:
-        addSPIRVTileAndVectorizeToCooperativeOpsPassPipeline(pipeline);
+      case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVBaseVectorize:
+        addSPIRVBaseVectorizePassPipeline(pipeline);
         break;
       case IREE::Codegen::DispatchLoweringPassPipeline::
-          SPIRVVectorizeWithWorkgroupMemory:
-        addSPIRVTileAndVectorizeWithWorkgroupMemoryPassPipeline(pipeline);
+          SPIRVCooperativeMatrixVectorize:
+        addSPIRVCooperativeMatrixVectorizePassPipeline(pipeline);
+        break;
+      case IREE::Codegen::DispatchLoweringPassPipeline::
+          SPIRVMatmulPromoteVectorize:
+        addSPIRVMatmulPromoteVectorizePassPipeline(pipeline);
         break;
       case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVSubgroupReduce:
         addSPIRVSubgroupReducePassPipeline(pipeline);

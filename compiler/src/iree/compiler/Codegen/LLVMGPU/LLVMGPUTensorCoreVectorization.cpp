@@ -29,14 +29,11 @@ extern llvm::cl::opt<bool> llvmgpuUseMMASync;
 //====---------------------------------------------------------------------===//
 
 static void populateVectorizationPatterns(RewritePatternSet &patterns) {
-  linalg::LinalgVectorizationOptions opt;
-  linalg::LinalgTransformationFilter f(
+  IREE::LinalgExt::LinalgTransformationFilter f(
       StringAttr::get(patterns.getContext(), getVectorizeMarker()));
-  VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(patterns,
-                                                                   opt, f);
+  VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(patterns, f);
   patterns.add<LinalgVectorizationPattern>(
-      patterns.getContext(), f.addOpFilter<linalg::ContractionOpInterface>(),
-      opt);
+      patterns.getContext(), f.addOpFilter<linalg::ContractionOpInterface>());
   vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
   vector::populateVectorReductionToContractPatterns(patterns);
 }

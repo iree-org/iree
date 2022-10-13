@@ -24,12 +24,12 @@ module @linalg_tensor_jit {
   // CHECK-NOT: util.initializer
   util.initializer {
     %cst = arith.constant dense<2.0e+02> : tensor<f32>
-    %0 = linalg.init_tensor [5, 6] : tensor<5x6xf32>
+    %0 = tensor.empty() : tensor<5x6xf32>
     %1 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]} ins(%cst : tensor<f32>) outs(%0 : tensor<5x6xf32>) {
     ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
       linalg.yield %arg0 : f32
     } -> tensor<5x6xf32>
-    %2 = linalg.init_tensor [5, 6] : tensor<5x6xf32>
+    %2 = tensor.empty() : tensor<5x6xf32>
     %3 = linalg.generic {indexing_maps = [#map1, #map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%1, %1 : tensor<5x6xf32>, tensor<5x6xf32>) outs(%2 : tensor<5x6xf32>) {
     ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):  // no predecessors
       %4 = arith.mulf %arg0, %arg1 : f32
