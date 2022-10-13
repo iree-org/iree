@@ -55,13 +55,11 @@ bool isMatmulOrBatchMatmul(linalg::LinalgOp linalgOp) {
 /// - `residualTilingFactor` indicates the remaining tiling scale factor.
 /// - `wgDimSize` will be updated with the decided workgroup dimension size.
 /// - `wgTileSize` will be updated with the decided workgroup tile size.
-/// - `invoTileSize` will be updated with the decided invocation tile size.
-static bool distributeToOneDim(const int64_t inputDim,
-                               const bool isInnerMostDim,
-                               int64_t &residualThreads,
-                               int64_t &residualTilingFactor,
-                               int64_t &wgDimSize, int64_t &wgTileSize,
-                               int64_t &invoTileSize) {
+/// - `threadTileSize` will be updated with the decided invocation tile size.
+static bool tileConvOneDim(const int64_t inputDim, const bool isInnerMostDim,
+                           int64_t &residualThreads,
+                           int64_t &residualTilingFactor, int64_t &wgDimSize,
+                           int64_t &wgTileSize, int64_t &threadTileSize) {
   const int64_t lb = isInnerMostDim ? 2 : 1;
   for (int64_t dim = residualThreads; dim >= lb; dim >>= 1) {
     int64_t chosenTileSize = 0;
@@ -80,7 +78,7 @@ static bool distributeToOneDim(const int64_t inputDim,
     if (chosenTileSize) {
       wgDimSize = dim;
       wgTileSize = dim * chosenTileSize;
-      invoTileSize = chosenTileSize;
+      threadTileSize = chosenTileSize;
       residualThreads /= dim;
       residualTilingFactor /= chosenTileSize;
       return true;
@@ -92,12 +90,12 @@ static bool distributeToOneDim(const int64_t inputDim,
 /// Decides the tiling and distribution parameters for two convolution window
 /// dimensions to two workgroup dimensions as a square. Returns true if we can
 /// succesfully deduce.
-static bool distributeToSquare(const int64_t oh, const int64_t ow,
-                               int64_t &residualThreads,
-                               int64_t &residualTilingFactor,
-                               MutableArrayRef<int64_t> wgDimSizes,
-                               MutableArrayRef<int64_t> wgTileSizes,
-                               MutableArrayRef<int64_t> invoTileSizes) {
+static bool tileConvSquare(const int64_t oh, const int64_t ow,
+                           int64_t &residualThreads,
+                           int64_t &residualTilingFactor,
+                           MutableArrayRef<int64_t> wgDimSizes,
+                           MutableArrayRef<int64_t> wgTileSizes,
+                           MutableArrayRef<int64_t> invoTileSizes) {
   assert(wgDimSizes.size() == 2 && wgTileSizes.size() == 2 &&
          invoTileSizes.size() == 2);
 
@@ -167,28 +165,28 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
 
   if (isNCHW) {
     // OW -> x, OH -> y, OC -> z
-    if (!distributeToOneDim(ow, /*isInnerMostDim=*/true, residualThreads,
-                            residualTilingFactor, workgroupSize[0],
-                            workgroupTileSizes[3], threadTileSizes[3]) ||
-        !distributeToOneDim(oh, /*isInnerMostDim=*/false, residualThreads,
-                            residualTilingFactor, workgroupSize[1],
-                            workgroupTileSizes[2], threadTileSizes[2]) ||
-        !distributeToOneDim(oc, /*isInnerMostDim=*/false, residualThreads,
-                            residualTilingFactor, workgroupSize[2],
-                            workgroupTileSizes[1], threadTileSizes[1])) {
+    if (!tileConvOneDim(ow, /*isInnerMostDim=*/true, residualThreads,
+                        residualTilingFactor, workgroupSize[0],
+                        workgroupTileSizes[3], threadTileSizes[3]) ||
+        !tileConvOneDim(oh, /*isInnerMostDim=*/false, residualThreads,
+                        residualTilingFactor, workgroupSize[1],
+                        workgroupTileSizes[2], threadTileSizes[2]) ||
+        !tileConvOneDim(oc, /*isInnerMostDim=*/false, residualThreads,
+                        residualTilingFactor, workgroupSize[2],
+                        workgroupTileSizes[1], threadTileSizes[1])) {
       return success();
     }
   } else {
     // OC -> x
-    if (!distributeToOneDim(oc, /*isInnerMostDim=*/true, residualThreads,
-                            residualTilingFactor, workgroupSize[0],
-                            workgroupTileSizes[3], threadTileSizes[3]))
+    if (!tileConvOneDim(oc, /*isInnerMostDim=*/true, residualThreads,
+                        residualTilingFactor, workgroupSize[0],
+                        workgroupTileSizes[3], threadTileSizes[3]))
       return success();
 
     // Deduce the configruation for the OW and OH dimension. Try to make them
     // even if possible given we typically have images with the same height
     // and width.
-    const bool tileToSquare = distributeToSquare(
+    const bool tileToSquare = tileConvSquare(
         oh, ow, residualThreads, residualTilingFactor,
         llvm::makeMutableArrayRef(workgroupSize).drop_front(),
         llvm::makeMutableArrayRef(workgroupTileSizes).drop_front().drop_back(),
@@ -197,12 +195,12 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
     // Otherwise treat OW and OH separately to allow them to have different
     // number of threads and tiling size.
     if (!tileToSquare) {
-      if (!distributeToOneDim(ow, /*isInnerMostDim=*/false, residualThreads,
-                              residualTilingFactor, workgroupSize[1],
-                              workgroupTileSizes[2], threadTileSizes[2]) ||
-          !distributeToOneDim(oh, /*isInnerMostDim=*/false, residualThreads,
-                              residualTilingFactor, workgroupSize[2],
-                              workgroupTileSizes[1], threadTileSizes[1])) {
+      if (!tileConvOneDim(ow, /*isInnerMostDim=*/false, residualThreads,
+                          residualTilingFactor, workgroupSize[1],
+                          workgroupTileSizes[2], threadTileSizes[2]) ||
+          !tileConvOneDim(oh, /*isInnerMostDim=*/false, residualThreads,
+                          residualTilingFactor, workgroupSize[2],
+                          workgroupTileSizes[1], threadTileSizes[1])) {
         return success();
       }
     }
@@ -239,28 +237,15 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
 // Matmul Default Configuration
 //===----------------------------------------------------------------------===//
 
-namespace detail {
-
-LogicalResult setMatmulOpConfig(linalg::LinalgOp op, int64_t subgroupSize,
-                                std::array<int64_t, 2> bestWorkgroupSizeXY,
-                                std::array<int64_t, 3> bestThreadTileSizeMNK,
-                                bool useWorkgroupMemory) {
-  LLVM_DEBUG(llvm::dbgs() << "trying to deduce config as matmul...\n");
+/// Given the linalg `op` with `lhsShape` and `rhsShape`, tries to treat as a
+/// (batch) matmul like op and deduce the index of the loop corresponding to
+/// B/M/N/K dimension respectively. Returns -1 as the index if unable to deduce.
+static std::tuple<int, int, int, int> getMatmulBMNKIndex(linalg::LinalgOp op,
+                                                         int &lastParallelDim) {
   OpOperand *lhs = op.getInputOperand(0);
   OpOperand *rhs = op.getInputOperand(1);
-
-  auto lhsType = lhs->get().getType().cast<ShapedType>();
-  auto rhsType = rhs->get().getType().cast<ShapedType>();
-  auto elementBits = lhsType.getElementType().getIntOrFloatBitWidth();
-  if (elementBits != 16 && elementBits != 32) return success();
-
-  ArrayRef<int64_t> lhsShape = lhsType.getShape();
-  ArrayRef<int64_t> rhsShape = rhsType.getShape();
-  if (llvm::any_of(lhsShape, ShapedType::isDynamic)) return success();
-  if (llvm::any_of(rhsShape, ShapedType::isDynamic)) return success();
-
-  assert(llvm::is_contained({2u, 3u}, op.getNumParallelLoops()));
-  const bool isBM = op.getNumParallelLoops() == 3;
+  auto lhsShape = lhs->get().getType().cast<ShapedType>().getShape();
+  auto rhsShape = rhs->get().getType().cast<ShapedType>().getShape();
 
   auto lhsLoopIndices = llvm::to_vector(llvm::map_range(
       llvm::seq<int>(0, lhsShape.size()),
@@ -271,7 +256,6 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op, int64_t subgroupSize,
 
   // Figure out what dimension each loop corresponds to.
   int bIndex = -1, mIndex = -1, nIndex = -1, kIndex = -1;
-  int lastParallelDim = -1;
   for (unsigned i = 0; i < op.getNumLoops(); ++i) {
     if (linalg::isReductionIterator(op.getIteratorTypesArray()[i])) {
       kIndex = i;
@@ -300,6 +284,92 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op, int64_t subgroupSize,
     llvm::dbgs() << "(B, M, N, K) indices = (" << bIndex << ", " << mIndex
                  << ", " << nIndex << ", " << kIndex << ")\n";
   });
+  return {bIndex, mIndex, nIndex, kIndex};
+}
+
+/// Decides the tiling and distribution parameters for matmul's N dimension to
+/// workgroup X dimension.
+static bool tileMatmulNToWorkgroupX(
+    const int64_t dimN, const int64_t bestThreadN, int64_t &residualThreads,
+    const int64_t bestX, int64_t &residualTilingFactor, int64_t &wgDimSize,
+    int64_t &wgTileSize, int64_t &threadTileSize) {
+  threadTileSize = 0;
+  // Deduce the configuration for the N dimension. Start with the best workgroup
+  // X size, and reduce by a factor of two each time.
+  for (int64_t x = bestX; x >= 2; x >>= 1) {
+    // Handle 4 elements per thread for the innermost dimension. We need this
+    // for vectorized load.
+    int64_t chosenTileSize = bestThreadN;
+    if (dimN % (x * chosenTileSize) == 0) {
+      wgDimSize = x;
+      wgTileSize = x * chosenTileSize;
+      threadTileSize = chosenTileSize;
+      residualThreads /= x;
+      assert(residualTilingFactor % chosenTileSize == 0);
+      residualTilingFactor /= chosenTileSize;
+      break;
+    }
+  }
+  return threadTileSize != 0;
+}
+
+/// Decides the tiling and distribution parameters for matmul's M dimension to
+/// workgroup Y dimension.
+static bool tileMatmulMToWorkgroupY(
+    const int64_t dimM, const int64_t bestThreadM, int64_t &residualThreads,
+    const int64_t bestY, int64_t &residualTilingFactor, int64_t &wgDimSize,
+    int64_t &wgTileSize, int64_t &threadTileSize) {
+  threadTileSize = 0;
+  // Deduce the configuration for the M dimension. Start with the best workgroup
+  // Y size, and reduce by a factor of two each time.
+  for (int64_t y = residualThreads; y >= 1; y >>= 1) {
+    int64_t chosenTileSize = 0;
+    // Reduce the thread tiling size by one each time. We read one row each
+    // time; so it's fine to not be some power of two here.
+    for (int64_t t = bestThreadM; t >= 1; --t) {
+      if (dimM % (y * t) == 0) {
+        chosenTileSize = t;
+        break;
+      }
+    }
+    if (chosenTileSize) {
+      wgDimSize = y;
+      wgTileSize = y * chosenTileSize;
+      threadTileSize = chosenTileSize;
+      assert(residualTilingFactor > chosenTileSize);
+      residualTilingFactor -= chosenTileSize;
+      break;
+    }
+  }
+  return threadTileSize != 0;
+}
+
+namespace detail {
+
+LogicalResult setMatmulOpConfig(linalg::LinalgOp op, int64_t subgroupSize,
+                                std::array<int64_t, 2> bestWorkgroupSizeXY,
+                                std::array<int64_t, 3> bestThreadTileSizeMNK,
+                                bool useWorkgroupMemory) {
+  LLVM_DEBUG(llvm::dbgs() << "trying to deduce config as matmul...\n");
+  OpOperand *lhs = op.getInputOperand(0);
+  OpOperand *rhs = op.getInputOperand(1);
+
+  auto lhsType = lhs->get().getType().cast<ShapedType>();
+  auto rhsType = rhs->get().getType().cast<ShapedType>();
+  auto elementBits = lhsType.getElementType().getIntOrFloatBitWidth();
+  if (elementBits != 16 && elementBits != 32) return success();
+
+  ArrayRef<int64_t> lhsShape = lhsType.getShape();
+  ArrayRef<int64_t> rhsShape = rhsType.getShape();
+  if (llvm::any_of(lhsShape, ShapedType::isDynamic)) return success();
+  if (llvm::any_of(rhsShape, ShapedType::isDynamic)) return success();
+
+  assert(llvm::is_contained({2u, 3u}, op.getNumParallelLoops()));
+  const bool isBM = op.getNumParallelLoops() == 3;
+
+  int lastParallelDim = -1;
+  auto [bIndex, mIndex, nIndex, kIndex] =
+      getMatmulBMNKIndex(op, lastParallelDim);
   if (mIndex < 0 || nIndex < 0 || kIndex < 0) return success();
 
   SmallVector<int64_t, 4> loopRanges = op.getStaticLoopRanges();
@@ -346,46 +416,16 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op, int64_t subgroupSize,
 
   if (isBM) workgroupTileSizes[bIndex] = threadTileSizes[bIndex] = 1;
 
-  // Deduce the configuration for the N dimension. Start with the best workgroup
-  // X size, and reduce by a factor of two each time.
-  for (int64_t x = bestX; x >= 2; x >>= 1) {
-    // Handle 4 elements per thread for the innermost dimension. We need this
-    // for vectorized load.
-    int64_t chosenTileSize = bestThreadN;
-    if (dimN % (x * chosenTileSize) == 0) {
-      workgroupSize[0] = x;
-      workgroupTileSizes[nIndex] = x * chosenTileSize;
-      threadTileSizes[nIndex] = chosenTileSize;
-      residualThreads /= x;
-      assert(residualTilingFactor % chosenTileSize == 0);
-      residualTilingFactor /= chosenTileSize;
-      break;
-    }
+  if (!tileMatmulNToWorkgroupX(dimN, bestThreadN, residualThreads, bestX,
+                               residualTilingFactor, workgroupSize[0],
+                               workgroupTileSizes[nIndex],
+                               threadTileSizes[nIndex]) ||
+      !tileMatmulMToWorkgroupY(dimM, bestThreadM, residualThreads, bestY,
+                               residualTilingFactor, workgroupSize[1],
+                               workgroupTileSizes[mIndex],
+                               threadTileSizes[mIndex])) {
+    return success();
   }
-  if (workgroupTileSizes[nIndex] == 0) return success();
-
-  // Deduce the configuration for the M dimension. Start with the best workgroup
-  // Y size, and reduce by a factor of two each time.
-  for (int64_t y = residualThreads; y >= 1; y >>= 1) {
-    int64_t chosenTileSize = 0;
-    // Reduce the thread tiling size by one each time. We read one row each
-    // time; so it's fine to not be some power of two here.
-    for (int64_t t = bestThreadM; t >= 1; --t) {
-      if (dimM % (y * t) == 0) {
-        chosenTileSize = t;
-        break;
-      }
-    }
-    if (chosenTileSize) {
-      workgroupSize[1] = y;
-      workgroupTileSizes[mIndex] = y * chosenTileSize;
-      threadTileSizes[mIndex] = chosenTileSize;
-      assert(residualTilingFactor > chosenTileSize);
-      residualTilingFactor -= chosenTileSize;
-      break;
-    }
-  }
-  if (workgroupTileSizes[mIndex] == 0) return success();
 
   // Deduce the configuration for the K dimension. We need some power of two
   // here so that we can do vector load.
@@ -397,9 +437,7 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op, int64_t subgroupSize,
   }
   if (reductionTileSizes[kIndex] == 0) return success();
 
-  auto totalThreads =
-      std::accumulate(workgroupSize.begin(), workgroupSize.end(), 1,
-                      std::multiplies<int64_t>());
+  int64_t totalThreads = workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
   LLVM_DEBUG({
     llvm::dbgs() << "total thread count = " << totalThreads << "\n";
     llvm::dbgs() << "subgroup size = " << subgroupSize << "\n";
