@@ -84,7 +84,7 @@ static LogicalResult setOpConfig(const spirv::TargetEnv &targetEnv,
   if (!coopMatSize) return success();
 
   auto pipeline = IREE::Codegen::DispatchLoweringPassPipeline::
-      SPIRVVectorizeToCooperativeOps;
+      SPIRVCooperativeMatrixVectorize;
 
   // For now only support one subgroup per workgroup because in the above
   // configuration deduction step we only consider whether the input workload is

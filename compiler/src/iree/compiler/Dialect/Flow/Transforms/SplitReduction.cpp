@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
+#include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -40,7 +41,7 @@ struct LinalgSplitReduction
     : public OpInterfaceRewritePattern<linalg::LinalgOp> {
   LinalgSplitReduction(MLIRContext *context,
                        linalg::ControlSplitReductionFn controlSplitReductionFn,
-                       linalg::LinalgTransformationFilter f,
+                       LinalgExt::LinalgTransformationFilter f,
                        PatternBenefit benefit = 1)
       : OpInterfaceRewritePattern<linalg::LinalgOp>(context, benefit),
         controlSplitReductionFn(controlSplitReductionFn),
@@ -60,8 +61,8 @@ struct LinalgSplitReduction
       }
     }
 
-    FailureOr<linalg::LinalgOp> result =
-        splitReduction(rewriter, op, controlSplitReductionFn, filter);
+    FailureOr<linalg::LinalgOp> result = LinalgExt::splitReduction(
+        rewriter, op, controlSplitReductionFn, filter);
     if (failed(result)) return failure();
     // If any attributes needs to be propagated set it.
     for (std::pair<StringAttr, Attribute> &attrib : attributes) {
@@ -72,7 +73,7 @@ struct LinalgSplitReduction
 
  private:
   linalg::ControlSplitReductionFn controlSplitReductionFn;
-  linalg::LinalgTransformationFilter filter;
+  LinalgExt::LinalgTransformationFilter filter;
 };
 
 struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
@@ -98,7 +99,7 @@ struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
           // get enabled after once tests are ready.
           return {int64_t(0), 0, /*innerParallel=*/false};
         },
-        linalg::LinalgTransformationFilter(
+        LinalgExt::LinalgTransformationFilter(
             ArrayRef<StringAttr>{}, StringAttr::get(&getContext(), "SPLIT")));
 
     LinalgExt::TopkSplitReductionControlFn splitReductionFn =
@@ -113,7 +114,7 @@ struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
     };
     LinalgExt::populateTopkSplitReductionPattern(
         patterns, splitReductionFn,
-        mlir::linalg::LinalgTransformationFilter(
+        LinalgExt::LinalgTransformationFilter(
             ArrayRef<StringAttr>{},
             StringAttr::get(patterns.getContext(), "SPLIT_REDUCTION")));
 
@@ -125,10 +126,10 @@ struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
     // Remove all the markers at the end.
     auto funcOp = getOperation();
     funcOp->walk([&](linalg::LinalgOp op) {
-      op->removeAttr(linalg::LinalgTransforms::kLinalgTransformMarker);
+      op->removeAttr(IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker);
     });
     funcOp->walk([&](LinalgExt::LinalgExtOp op) {
-      op->removeAttr(linalg::LinalgTransforms::kLinalgTransformMarker);
+      op->removeAttr(IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker);
       op->removeAttr(
           mlir::iree_compiler::IREE::LinalgExt::kSplitReductionDepthMarker);
     });

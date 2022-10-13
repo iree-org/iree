@@ -69,10 +69,14 @@ void buildIREEVMTransformPassPipeline(
   buildCommonInputConversionPassPipeline(passManager);
 
   // Now that inputs are legalized, generate wrapper for entry functions.
+  IREE::ABI::InvocationOptions invocationOptions;
+  invocationOptions.invocationModel =
+      schedulingOptions.executionModel ==
+              SchedulingOptions::ExecutionModel::AsyncExternal
+          ? IREE::ABI::InvocationModel::CoarseFences
+          : IREE::ABI::InvocationModel::Sync;
   if (bindingOptions.native) {
-    // TODO(benvanik): pass down execution model to the ABI pipeline so that
-    // it can change default function signature behavior
-    IREE::ABI::buildTransformPassPipeline(passManager);
+    IREE::ABI::buildTransformPassPipeline(passManager, invocationOptions);
   }
   if (bindingOptions.tflite) {
     IREE::TFLite::buildTransformPassPipeline(passManager);

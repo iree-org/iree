@@ -34,7 +34,7 @@ hal.executable @batch_matmul_16x4096x40x4096 {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1024, 8], [1, 8, 4], [0, 0, 0, 16]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorizeWithWorkgroupMemory>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize>
 //      CHECK: hal.executable.export public @batch_matmul_16x4096x40x4096
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [2 : index, 128 : index, 1 : index]

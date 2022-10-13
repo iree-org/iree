@@ -37,3 +37,14 @@ func.func @foldTensorExportImport(%arg0: tensor<5xi32>) -> tensor<5xi32> {
   // CHECK: return %arg0 : tensor<5xi32>
   return %1 : tensor<5xi32>
 }
+
+// -----
+
+// CHECK-LABEL: @DeduplicateTensorBarrierSources
+// CHECK-SAME: (%[[ARG0:.+]]: tensor<5xi32>, %[[ARG1:.+]]: tensor<6xi32>, %[[FENCE:.+]]: !hal.fence)
+func.func @DeduplicateTensorBarrierSources(%arg0: tensor<5xi32>, %arg1: tensor<6xi32>, %fence: !hal.fence) -> (tensor<5xi32>, tensor<6xi32>, tensor<5xi32>) {
+  // CHECK: %[[RESULTS:.+]]:2 = hal.tensor.barrier join(%[[ARG0]], %[[ARG1]] : tensor<5xi32>, tensor<6xi32>) => %[[FENCE]] : !hal.fence
+  %0:3 = hal.tensor.barrier join(%arg0, %arg1, %arg0 : tensor<5xi32>, tensor<6xi32>, tensor<5xi32>) => %fence : !hal.fence
+  // CHECK: return %[[RESULTS]]#0, %[[RESULTS]]#1, %[[RESULTS]]#0 : tensor<5xi32>, tensor<6xi32>, tensor<5xi32>
+  return %0#0, %0#1, %0#2 : tensor<5xi32>, tensor<6xi32>, tensor<5xi32>
+}

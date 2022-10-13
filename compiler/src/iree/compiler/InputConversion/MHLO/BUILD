@@ -112,6 +112,7 @@ iree_compiler_cc_library(
         "@mlir-hlo//:materialize_broadcasts",
         "@mlir-hlo//:mhlo_to_mhlo_lowering_patterns",
         "@mlir-hlo//:mlir_hlo",
+        "@mlir-hlo//:stablehlo_legalize_to_hlo_pass",
         "@mlir-hlo//:unfuse_batch_norm",
         "@mlir-hlo//stablehlo:broadcast_utils",
         "@mlir-hlo//stablehlo:chlo_ops",

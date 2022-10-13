@@ -164,7 +164,7 @@ func.func @load_store_alloc_static(%value : f32, %i0: index, %i1 : index, %i2: i
 //      CHECK:   %[[INDEX0:.+]] = affine.apply #[[MAP]]()[%[[I0]], %[[I1]], %[[I2]]]
 //      CHECK:   memref.store %[[VAL]], %[[ALLOC]][%[[INDEX0]]] : memref<24xf32, 3>
 //      CHECK:   %[[INDEX1:.+]] = affine.apply #[[MAP]]()[%[[I0]], %[[I1]], %[[I2]]]
-//      CHECK:   %[[LOAD:.+]] = memref.load %0[%[[INDEX1]]] : memref<24xf32, 3>
+//      CHECK:   %[[LOAD:.+]] = memref.load %[[ALLOC]][%[[INDEX1]]] : memref<24xf32, 3>
 //      CHECK:   return %[[LOAD]]
 
 // -----

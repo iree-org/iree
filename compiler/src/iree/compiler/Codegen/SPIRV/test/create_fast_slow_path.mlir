@@ -23,7 +23,7 @@ func.func @padded_conv() {
       %7 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_count_x]
       scf.for %arg2 = %6 to %c32 step %7 {
         %8 = flow.dispatch.tensor.load %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 1, 4, 32], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:1x112x112x32xf32> -> tensor<1x1x4x32xf32>
-        %9 = linalg.init_tensor [1, 1, 4, 32] : tensor<1x1x4x32xf32>
+        %9 = tensor.empty() : tensor<1x1x4x32xf32>
         %10 = affine.apply affine_map<(d0) -> (d0 * 2)>(%arg0)
         %11 = affine.min affine_map<(d0) -> (d0 * 2 + 3, 224)>(%arg0)
         %12 = affine.apply affine_map<(d0, d1) -> (d0 - d1 * 2)>(%11, %arg0)

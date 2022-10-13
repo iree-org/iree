@@ -17,6 +17,7 @@
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
+#include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRV.h"
@@ -26,6 +27,7 @@
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVEnums.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/Transforms/Passes.h"
 #include "mlir/Dialect/SPIRV/Transforms/SPIRVConversion.h"
@@ -78,7 +80,18 @@ static LogicalResult gpuDeallocationFn(OpBuilder &builder, Location loc,
 
 static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
                                Value to) {
-  createLinalgCopyOp(builder, loc, from, to);
+  Optional<unsigned> workgroupSpace =
+      spirv::mapVulkanStorageClassToMemorySpace(spirv::StorageClass::Workgroup);
+  auto fromType = from.getType().cast<MemRefType>();
+  auto toType = to.getType().cast<MemRefType>();
+  bool isWorkgroupMemory = fromType.getMemorySpaceAsInt() == workgroupSpace ||
+                           toType.getMemorySpaceAsInt() == workgroupSpace;
+  if (isWorkgroupMemory) builder.create<gpu::BarrierOp>(loc);
+  Operation *copy = createLinalgCopyOp(builder, loc, from, to);
+  if (isWorkgroupMemory) {
+    setMarker(copy, getCopyToWorkgroupMemoryMarker());
+    builder.create<gpu::BarrierOp>(loc);
+  }
   return success();
 }
 
@@ -202,7 +215,7 @@ static void addSPIRVLoweringPasses(OpPassManager &pm, bool enableFastMath) {
 // Pass Pipelines
 //===----------------------------------------------------------------------===//
 
-void addSPIRVTileAndVectorizePassPipeline(OpPassManager &pm) {
+void addSPIRVBaseVectorizePassPipeline(OpPassManager &pm) {
   addTileAndDistributeToWorkgroupsPasses(
       pm, /*useFuseTensorPadWithConsumerPass=*/true);
 
@@ -237,7 +250,7 @@ void addSPIRVTileAndVectorizePassPipeline(OpPassManager &pm) {
       createOptimizeVectorTransferPass());
 }
 
-void addSPIRVTileAndVectorizeToCooperativeOpsPassPipeline(OpPassManager &pm) {
+void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm) {
   addTileAndDistributeToWorkgroupsPasses(pm);
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
@@ -266,8 +279,7 @@ void addSPIRVTileAndVectorizeToCooperativeOpsPassPipeline(OpPassManager &pm) {
       createSPIRVVectorToCooperativeOpsPass());
 }
 
-void addSPIRVTileAndVectorizeWithWorkgroupMemoryPassPipeline(
-    OpPassManager &pm) {
+void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm) {
   addTileAndDistributeToWorkgroupsPasses(pm);
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
@@ -295,7 +307,7 @@ void addSPIRVTileAndVectorizeWithWorkgroupMemoryPassPipeline(
   addLoopMaterializationPasses(nestedModulePM);
 }
 
-void addSPIRVTileAndDistributePassPipeline(OpPassManager &pm) {
+void addSPIRVBaseDistributePassPipeline(OpPassManager &pm) {
   addTileAndDistributeToWorkgroupsPasses(pm);
 
   auto &nestedModulePM = pm.nest<ModuleOp>();

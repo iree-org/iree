@@ -141,10 +141,6 @@ class LLVMCPUTargetBackend final : public TargetBackend {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
 
-    // Indicates that the runtime HAL driver operates only in the legacy
-    // synchronous mode.
-    configItems.emplace_back(b.getStringAttr("legacy_sync"), b.getUnitAttr());
-
     configItems.emplace_back(b.getStringAttr("executable_targets"),
                              getExecutableTargets(context));
 
@@ -371,7 +367,7 @@ class LLVMCPUTargetBackend final : public TargetBackend {
     // Fixup visibility from any symbols we may link in - we want to hide all
     // but the query entry point.
     for (auto &func : *llvmModule) {
-      if (&func == queryLibraryFunc) {
+      if (&func == queryLibraryFunc || func.getName() == "iree_dll_main") {
         // Leave our library query function as public/external so that it is
         // exported from shared objects and available for linking in static
         // objects.

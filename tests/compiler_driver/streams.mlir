@@ -40,7 +40,7 @@ stream.executable private @executable_0 {
       %2 = stream.binding.subspan %ret0[%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:4xf32>
       %3 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [4], strides = [1] : !flow.dispatch.tensor<readonly:4xf32> -> tensor<4xf32>
       %4 = flow.dispatch.tensor.load %1, offsets = [0], sizes = [4], strides = [1] : !flow.dispatch.tensor<readonly:4xf32> -> tensor<4xf32>
-      %5 = linalg.init_tensor [4] : tensor<4xf32>
+      %5 = tensor.empty() : tensor<4xf32>
       %6 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%3, %4 : tensor<4xf32>, tensor<4xf32>) outs(%5 : tensor<4xf32>) attrs =  {name = "mul.1"} {
         ^bb0(%arg4: f32, %arg5: f32, %arg6: f32):
           %10 = arith.mulf %arg4, %arg5 : f32
@@ -87,7 +87,7 @@ stream.executable private @executable_1 {
       %1 = stream.binding.subspan %arg1[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:4xf32>
       %3 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [4], strides = [1] : !flow.dispatch.tensor<readwrite:4xf32> -> tensor<4xf32>
       %4 = flow.dispatch.tensor.load %1, offsets = [0], sizes = [4], strides = [1] : !flow.dispatch.tensor<readonly:4xf32> -> tensor<4xf32>
-      %5 = linalg.init_tensor [4] : tensor<4xf32>
+      %5 = tensor.empty() : tensor<4xf32>
       %6 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%3, %4 : tensor<4xf32>, tensor<4xf32>) outs(%5 : tensor<4xf32>) attrs =  {name = "mul.1"} {
         ^bb0(%arg4: f32, %arg5: f32, %arg6: f32):
           %10 = arith.mulf %arg4, %arg5 : f32
@@ -137,7 +137,7 @@ stream.executable private @executable_2 {
       %2 = stream.binding.subspan %ret0[%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:?xf32>{%arg0_dim0}
       %3 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [%arg0_dim0], strides = [1] : !flow.dispatch.tensor<readonly:?xf32>{%arg0_dim0} -> tensor<?xf32>
       %4 = flow.dispatch.tensor.load %1, offsets = [0], sizes = [%arg1_dim0], strides = [1] : !flow.dispatch.tensor<readonly:?xf32>{%arg1_dim0} -> tensor<?xf32>
-      %5 = linalg.init_tensor [%arg0_dim0] : tensor<?xf32>
+      %5 = tensor.empty(%arg0_dim0) : tensor<?xf32>
       %6 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%3, %4 : tensor<?xf32>, tensor<?xf32>) outs(%5 : tensor<?xf32>) attrs =  {name = "mul.1"} {
         ^bb0(%arg6: f32, %arg7: f32, %arg8: f32):
           %10 = arith.mulf %arg6, %arg7 : f32
@@ -183,7 +183,7 @@ stream.executable private @executable_3 {
       %2 = stream.binding.subspan %ret0[%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:4xf32>
       %3 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [4], strides = [1] : !flow.dispatch.tensor<readonly:4xf32> -> tensor<4xf32>
       %4 = flow.dispatch.tensor.load %1, offsets = [0], sizes = [4], strides = [1] : !flow.dispatch.tensor<readonly:4xf32> -> tensor<4xf32>
-      %5 = linalg.init_tensor [4] : tensor<4xf32>
+      %5 = tensor.empty() : tensor<4xf32>
       %6 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%3, %4 : tensor<4xf32>, tensor<4xf32>) outs(%5 : tensor<4xf32>) {
       ^bb0(%lhs: f32, %rhs: f32, %out: f32):
         %7 = arith.mulf %lhs, %rhs : f32

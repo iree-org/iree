@@ -95,7 +95,7 @@ static iree_status_t iree_mmt4d_benchmark(
       if (status != iree_ukernel_mmt4d_status_ok) {
         fprintf(stderr, "FATAL: iree_ukernel_mmt4d failed: %s\n",
                 iree_ukernel_mmt4d_status_message(status));
-        abort();
+        iree_abort();
       }
     }
     total_iterations += FLAG_batch_count;

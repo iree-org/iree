@@ -113,7 +113,7 @@ class ConvertConv2DNhwcHwcf final
 
     SmallVector<int64_t, 4> colTensorShape = {n, oh, ow, fh, fw, ic};
 
-    Value colTensor = rewriter.create<linalg::InitTensorOp>(
+    Value colTensor = rewriter.create<tensor::EmptyOp>(
         loc, colTensorShape, inputType.getElementType());
 
     AffineExpr nDim, ohDim, owDim, khDim, kwDim, icDim;
@@ -260,7 +260,7 @@ class ConvertDepthwiseConv2DNhwcHwc final
           indices,
           [&](int64_t index) -> int64_t { return inputShape[index]; }));
 
-      Value outputTensor = rewriter.create<linalg::InitTensorOp>(
+      Value outputTensor = rewriter.create<tensor::EmptyOp>(
           loc, targetShape, operandTensorType.getElementType());
 
       SmallVector<StringRef> loopAttributeTypes(nloops,
@@ -322,7 +322,7 @@ class ConvertDepthwiseConv2DNhwcHwc final
         AffineMap::get(nloops, 0, inputExprs, rewriter.getContext()),
         AffineMap::getMultiDimIdentityMap(nloops, rewriter.getContext())};
 
-    Value colTensor = rewriter.create<linalg::InitTensorOp>(
+    Value colTensor = rewriter.create<tensor::EmptyOp>(
         loc, colTensorShape, inputType.getElementType());
 
     auto img2ColTensor = rewriter.create<linalg::GenericOp>(

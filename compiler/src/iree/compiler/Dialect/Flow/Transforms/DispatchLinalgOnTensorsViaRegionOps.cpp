@@ -11,6 +11,7 @@
 // Note: The heuristic part of the implementation is unchanged and copied from
 // DispatchLinalgOnTensors.cpp.
 
+#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree/compiler/Dialect/Flow/Conversion/TensorToFlow/ConvertTensorToFlow.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
@@ -213,7 +214,7 @@ bool isClonableIntoDispatchOp(Operation *op) {
   // TODO(#8637): `tensor.collapse_shape` and `tensor.expand_shape` are
   // trivially clonable too, but they cause problems
   // with bufferization. Make them clonable when fixed.
-  if (isa<arith::IndexCastOp, linalg::InitTensorOp, tensor::CastOp,
+  if (isa<arith::IndexCastOp, tensor::EmptyOp, tensor::CastOp,
           tensor::ExtractOp, tensor::ExtractSliceOp, tensor::PadOp>(op)) {
     return true;
   }
@@ -764,7 +765,7 @@ void DispatchLinalgOnTensorsViaRegionOpsPass::runOnOperation() {
   funcOp.walk([](Operation *op) {
     removeFusionGroupsAttribute(op);
     removeRootOpAttribute(op);
-    op->removeAttr(linalg::LinalgTransforms::kLinalgTransformMarker);
+    op->removeAttr(IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker);
   });
 }
 

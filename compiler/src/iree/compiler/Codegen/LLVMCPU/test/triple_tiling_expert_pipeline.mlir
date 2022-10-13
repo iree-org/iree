@@ -30,7 +30,7 @@ hal.executable private @matmul_128_384_1536  {
         %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:128x384xf32>
         %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [128, 1536], strides = [1, 1] : !flow.dispatch.tensor<readonly:128x1536xf32> -> tensor<128x1536xf32>
         %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [1536, 384], strides = [1, 1] : !flow.dispatch.tensor<readonly:1536x384xf32> -> tensor<1536x384xf32>
-        %5 = linalg.init_tensor [128, 384] : tensor<128x384xf32>
+        %5 = tensor.empty() : tensor<128x384xf32>
         %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<128x384xf32>) -> tensor<128x384xf32>
         %7 = linalg.matmul ins(%3, %4 : tensor<128x1536xf32>, tensor<1536x384xf32>) outs(%6 : tensor<128x384xf32>) -> tensor<128x384xf32>
         %8 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%7 : tensor<128x384xf32>) outs(%5 : tensor<128x384xf32>) {

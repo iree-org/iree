@@ -84,7 +84,7 @@ flow.executable private @while_test_dispatch_0 {
       // CHECK: %[[ARG1:.+]] = stream.binding.subspan %[[BINDING1]][%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:i1>
       // CHECK: = flow.dispatch.tensor.load %[[ARG0]], offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:i32> -> tensor<i32>
       %0 = flow.dispatch.tensor.load %arg0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:i32> -> tensor<i32>
-      %1 = linalg.init_tensor [] : tensor<i1>
+      %1 = tensor.empty() : tensor<i1>
       // CHECK: linalg.generic
       %2 = linalg.generic {indexing_maps = [affine_map<() -> ()>, affine_map<() -> ()>], iterator_types = []} ins(%0 : tensor<i32>) outs(%1 : tensor<i1>) {
       ^bb0(%arg2: i32, %arg3: i1):
@@ -105,7 +105,7 @@ flow.executable private @while_test_dispatch_1 {
     func.func @dispatch(%arg0: !flow.dispatch.tensor<readonly:i32>, %arg1: !flow.dispatch.tensor<writeonly:i32>) {
       %c2_i32 = arith.constant 2 : i32
       %0 = flow.dispatch.tensor.load %arg0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:i32> -> tensor<i32>
-      %1 = linalg.init_tensor [] : tensor<i32>
+      %1 = tensor.empty() : tensor<i32>
       %2 = linalg.generic {indexing_maps = [affine_map<() -> ()>, affine_map<() -> ()>], iterator_types = []} ins(%0 : tensor<i32>) outs(%1 : tensor<i32>) {
       ^bb0(%arg2: i32, %arg3: i32):
         %3 = arith.addi %arg2, %c2_i32 : i32

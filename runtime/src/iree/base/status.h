@@ -320,7 +320,7 @@ typedef struct iree_status_handle_t* iree_status_t;
 #undef IREE_STATUS_IMPL_CHECK_OK_
 #define IREE_STATUS_IMPL_CHECK_OK_(var, expr) \
   iree_status_t var = (expr);                 \
-  if (IREE_UNLIKELY(!iree_status_is_ok(var))) abort();
+  if (IREE_UNLIKELY(!iree_status_is_ok(var))) iree_abort();
 #else
 #define IREE_STATUS_IMPL_MAKE_(...) \
   IREE_STATUS_IMPL_MAKE_SWITCH_(__FILE__, __LINE__, __VA_ARGS__)

@@ -185,6 +185,9 @@ static inline iree_status_t iree_vm_ref_check(const iree_vm_ref_t ref,
 }
 
 // Retains the reference-counted pointer |ref|.
+IREE_API_EXPORT void iree_vm_ref_retain_inplace(iree_vm_ref_t* ref);
+
+// Retains the reference-counted pointer |ref|.
 // |out_ref| will be released if it already contains a reference.
 IREE_API_EXPORT void iree_vm_ref_retain(iree_vm_ref_t* ref,
                                         iree_vm_ref_t* out_ref);

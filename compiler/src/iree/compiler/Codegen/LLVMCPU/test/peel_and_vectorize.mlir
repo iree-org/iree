@@ -33,7 +33,7 @@ hal.executable private @preset_config_matmul  {
             : !flow.dispatch.tensor<readonly:128x64xf32> -> tensor<128x64xf32>
         %rhs = flow.dispatch.tensor.load %rhs_binding, offsets = [0, 0], sizes = [64, 512], strides = [1, 1]
             : !flow.dispatch.tensor<readonly:64x512xf32> -> tensor<64x512xf32>
-        %init = linalg.init_tensor [128, 512] : tensor<128x512xf32>
+        %init = tensor.empty() : tensor<128x512xf32>
         %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<128x512xf32>) -> tensor<128x512xf32>
         %gemm = linalg.matmul {compilation_info = #compilation}
             ins(%lhs, %rhs : tensor<128x64xf32>, tensor<64x512xf32>)
@@ -89,7 +89,7 @@ hal.executable private @preset_config_matmul  {
             : !flow.dispatch.tensor<readonly:128x49xf32> -> tensor<128x49xf32>
         %rhs = flow.dispatch.tensor.load %rhs_binding, offsets = [0, 0], sizes = [49, 512], strides = [1, 1]
             : !flow.dispatch.tensor<readonly:49x512xf32> -> tensor<49x512xf32>
-        %init = linalg.init_tensor [128, 512] : tensor<128x512xf32>
+        %init = tensor.empty() : tensor<128x512xf32>
         %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<128x512xf32>) -> tensor<128x512xf32>
         %gemm = linalg.matmul {compilation_info = #compilation}
             ins(%lhs, %rhs : tensor<128x49xf32>, tensor<49x512xf32>)
@@ -163,7 +163,7 @@ hal.executable private @preset_config_matmul  {
             : !flow.dispatch.tensor<readonly:?x?xf32>{%dim1, %dim0} -> tensor<?x?xf32>
         %rhs = flow.dispatch.tensor.load %rhs_binding, offsets = [0, 0], sizes = [%dim0, %dim2], strides = [1, 1]
             : !flow.dispatch.tensor<readonly:?x?xf32>{%dim0, %dim2} -> tensor<?x?xf32>
-        %init = linalg.init_tensor [%dim1, %dim2] : tensor<?x?xf32>
+        %init = tensor.empty(%dim1, %dim2) : tensor<?x?xf32>
         %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<?x?xf32>) -> tensor<?x?xf32>
         %gemm = linalg.matmul {compilation_info = #compilation}
             ins(%lhs, %rhs : tensor<?x?xf32>, tensor<?x?xf32>)

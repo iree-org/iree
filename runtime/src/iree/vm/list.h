@@ -66,6 +66,12 @@ IREE_API_EXPORT iree_status_t iree_vm_list_create(
     const iree_vm_type_def_t* element_type, iree_host_size_t initial_capacity,
     iree_allocator_t allocator, iree_vm_list_t** out_list);
 
+// Shallowly clones |source| into |out_target|.
+// The resulting list will be have its capacity set to the |source| size.
+IREE_API_EXPORT iree_status_t
+iree_vm_list_clone(iree_vm_list_t* source, iree_allocator_t host_allocator,
+                   iree_vm_list_t** out_target);
+
 // Retains the given |list| for the caller.
 IREE_API_EXPORT void iree_vm_list_retain(iree_vm_list_t* list);
 
@@ -73,8 +79,8 @@ IREE_API_EXPORT void iree_vm_list_retain(iree_vm_list_t* list);
 IREE_API_EXPORT void iree_vm_list_release(iree_vm_list_t* list);
 
 // Returns the element type stored in the list.
-IREE_API_EXPORT iree_status_t iree_vm_list_element_type(
-    const iree_vm_list_t* list, iree_vm_type_def_t* out_element_type);
+IREE_API_EXPORT iree_vm_type_def_t
+iree_vm_list_element_type(const iree_vm_list_t* list);
 
 // Returns the capacity of the list in elements.
 IREE_API_EXPORT iree_host_size_t
@@ -94,6 +100,9 @@ IREE_API_EXPORT iree_host_size_t iree_vm_list_size(const iree_vm_list_t* list);
 // empty if variants.
 IREE_API_EXPORT iree_status_t iree_vm_list_resize(iree_vm_list_t* list,
                                                   iree_host_size_t new_size);
+
+// Clears the list contents. Equivalent to resizing to 0.
+IREE_API_EXPORT void iree_vm_list_clear(iree_vm_list_t* list);
 
 // Returns the value of the element at the given index.
 // Note that the value type may vary from element to element in variant lists

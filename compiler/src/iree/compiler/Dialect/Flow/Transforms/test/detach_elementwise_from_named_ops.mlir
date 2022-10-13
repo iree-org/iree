@@ -23,7 +23,7 @@ func.func @matmul(%a: tensor<?x64xf32>, %b: tensor<64x?xf32>, %c: tensor<?x?xf32
 //  CHECK-SAME:     ins(%[[ARG2]] :
 //       CHECK:   %[[DIM0:.+]] = tensor.dim %[[C]], %[[C0]]
 //       CHECK:   %[[DIM1:.+]] = tensor.dim %[[C]], %[[C1]]
-//       CHECK:   %[[INIT:.+]] = linalg.init_tensor [%[[DIM0]], %[[DIM1]]]
+//       CHECK:   %[[INIT:.+]] = tensor.empty(%[[DIM0]], %[[DIM1]])
 //       CHECK:   %[[FILL:.+]] = linalg.fill ins(%[[F0]] : f32) outs(%[[INIT]] : tensor<?x?xf32>)
 //       CHECK:   %[[MM:.+]] = linalg.matmul
 //  CHECK-SAME:     ins(%[[A]], %[[B]] : tensor<?x64xf32>, tensor<64x?xf32>)
@@ -61,7 +61,7 @@ func.func @batch_matmul(%a: tensor<?x8x?xi32>, %b: tensor<?x?x16xi32>, %c: tenso
 //       CHECK:   %[[C:.+]] = linalg.generic
 //  CHECK-SAME:     ins(%[[ARG2]] :
 //       CHECK:   %[[DIM0:.+]] = tensor.dim %[[C]], %[[C0]] : tensor<?x8x16xi32>
-//       CHECK:   %[[INIT:.+]] = linalg.init_tensor [%[[DIM0]], 8, 16] : tensor<?x8x16xi32>
+//       CHECK:   %[[INIT:.+]] = tensor.empty(%[[DIM0]]) : tensor<?x8x16xi32>
 //       CHECK:   %[[FILL:.+]] = linalg.fill ins(%[[I0]] : i32) outs(%[[INIT]] : tensor<?x8x16xi32>) -> tensor<?x8x16xi32>
 //       CHECK:   %[[MM:.+]] = linalg.batch_matmul
 //  CHECK-SAME:     ins(%[[A]], %[[B]] : tensor<?x8x?xi32>, tensor<?x?x16xi32>)
@@ -76,7 +76,7 @@ func.func @batch_matmul(%a: tensor<?x8x?xi32>, %b: tensor<?x?x16xi32>, %c: tenso
 // -----
 
 func.func @conv(%input: tensor<1x225x225x3xf32>, %filter: tensor<3x3x3x32xf32>, %init: tensor<32xf32>) -> tensor<1x112x112x32xf32> {
-  %init0 = linalg.init_tensor [1, 112, 112, 32] : tensor<1x112x112x32xf32>
+  %init0 = tensor.empty() : tensor<1x112x112x32xf32>
   %0 = linalg.generic {
       indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
       iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
@@ -107,7 +107,7 @@ func.func @keep_fill(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>) -> tensor
   %cst = arith.constant 0.0 : f32
   %d0 = tensor.dim %arg0, %c0 : tensor<?x?xf32>
   %d1 = tensor.dim %arg1, %c1 : tensor<?x?xf32>
-  %init = linalg.init_tensor [%d0, %d1] : tensor<?x?xf32>
+  %init = tensor.empty(%d0, %d1) : tensor<?x?xf32>
   %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<?x?xf32>) -> tensor<?x?xf32>
   %gemm = linalg.matmul ins(%arg0, %arg1 : tensor<?x?xf32>, tensor<?x?xf32>)
       outs(%fill : tensor<?x?xf32>) -> tensor<?x?xf32>
@@ -143,7 +143,7 @@ func.func @fft_cst_output(%arg0 : tensor<3x2190x1x512xf32>)
 // CHECK-LABEL: func @fft_cst_output(
 //  CHECK-SAME:     %[[ARG0:.+]]: tensor<3x2190x1x512xf32>
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0.000000e+00 : f32
-//   CHECK-DAG:   %[[INIT:.+]] = linalg.init_tensor [3, 2190, 1, 512]
+//   CHECK-DAG:   %[[INIT:.+]] = tensor.empty()
 //       CHECK:   %[[FILL:.+]] = linalg.fill
 //  CHECK-SAME:       ins(%[[C0]] : f32)
 //  CHECK-SAME:       outs(%[[INIT]] :
