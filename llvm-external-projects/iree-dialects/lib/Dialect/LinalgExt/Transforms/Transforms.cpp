@@ -331,27 +331,21 @@ LinalgTileAndFusePattern::matchAndRewrite(linalg::LinalgOp op,
   if (failed(filter.checkAndNotify(rewriter, op)))
     return failure();
 
-  scf::SCFTilingOptions tilingOptions = options.tilingOptions;
-  auto tileSizes = tilingOptions.tileSizeComputationFunction(rewriter, op);
-
-  // Check `tileSizes` contains a tile size for every `op` loop dimension.
-  if (tileSizes.size() < op.getNumLoops())
-    return rewriter.notifyMatchFailure(op, "expect #tile sizes >= #loops");
-
   // Check `tileInterchange` contains no entries or as many as `tileSizes`.
-  if (!tilingOptions.interchangeVector.empty() &&
-      tilingOptions.interchangeVector.size() != tileSizes.size())
+  if (!options.tilingOptions.interchangeVector.empty() &&
+      options.tilingOptions.interchangeVector.size() >= op.getNumLoops())
     return rewriter.notifyMatchFailure(
-        op, "expect the number of tile sizes and interchange dims to match");
+        op, "expect the number of interchange dims >= num of loops");
 
   // Copy the `tileInterchange` prefixes needed for `op`.
   SmallVector<int64_t> rootInterchange;
-  if (tilingOptions.interchangeVector.empty()) {
+  if (options.tilingOptions.interchangeVector.empty()) {
     rootInterchange =
         llvm::to_vector<6>(llvm::seq<int64_t>(0, op.getNumLoops()));
   } else {
-    for (auto it = tilingOptions.interchangeVector.begin();
-         tilingOptions.interchangeVector.begin() + op.getNumLoops(); ++it) {
+    for (auto it = options.tilingOptions.interchangeVector.begin();
+         options.tilingOptions.interchangeVector.begin() + op.getNumLoops();
+         ++it) {
       rootInterchange.push_back(*it);
     }
   }
@@ -363,10 +357,18 @@ LinalgTileAndFusePattern::matchAndRewrite(linalg::LinalgOp op,
     return rewriter.notifyMatchFailure(
         op, "expect the tile interchange permutes the root loops");
 
+  SmallVector<unsigned> tmpInterchange;
+  for (auto value : rootInterchange) {
+    tmpInterchange.push_back(value);
+  }
+
+  scf::SCFTileAndFuseOptions updatedOptions = options;
+  updatedOptions.tilingOptions.setInterchange(tmpInterchange);
+
   // Tile `op` and fuse its producers.
   FailureOr<scf::SCFTileAndFuseResult> tiledResults =
       tileConsumerAndFuseProducerGreedilyUsingSCFForOp(
-          rewriter, tilingInterfaceOp, options);
+          rewriter, tilingInterfaceOp, updatedOptions);
   if (failed(tiledResults))
     return rewriter.notifyMatchFailure(
         op,

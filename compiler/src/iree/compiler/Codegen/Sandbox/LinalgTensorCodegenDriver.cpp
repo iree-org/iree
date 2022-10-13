@@ -143,6 +143,23 @@ static LogicalResult getPaddingDims(func::FuncOp funcOp,
   return success();
 }
 
+static SmallVector<Value> clipAndCreateTileSize(
+    OpBuilder &b, Operation *op, SmallVector<int64_t> tileSizes) {
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+  assert(linalgOp && "can only compute tile size on linalg ops");
+
+  SmallVector<int64_t> clippedTileSizes(
+      tileSizes.begin(), tileSizes.begin() + linalgOp.getNumLoops());
+
+  OpBuilder::InsertionGuard guard(b);
+  b.setInsertionPointToStart(
+      &op->getParentOfType<func::FuncOp>().getBody().front());
+  return llvm::to_vector<4>(map_range(clippedTileSizes, [&](int64_t s) {
+    Value v = b.create<arith::ConstantIndexOp>(op->getLoc(), s);
+    return v;
+  }));
+}
+
 /// Default method to initialize the tiling options for fusion in IREE. These
 /// could be ovveridden by the command line options if specified.
 static FailureOr<scf::SCFTileAndFuseOptions> getTileAndFuseOptionsFromConfig(
@@ -158,13 +175,19 @@ static FailureOr<scf::SCFTileAndFuseOptions> getTileAndFuseOptionsFromConfig(
       iree_compiler::getLoweringConfig(rootOp.value());
 
   scf::SCFTileAndFuseOptions options;
-  options.tilingOptions.setTileSizes(
-      loweringConfig.getTileSizeVals(tilingLevel));
+
+  SmallVector<int64_t> tileSizes = loweringConfig.getTileSizeVals(tilingLevel);
+  options.tilingOptions.setTileSizeComputationFunction(
+      [tileSizes](OpBuilder &b, Operation *op) {
+        return clipAndCreateTileSize(b, op, tileSizes);
+      });
+
   SmallVector<unsigned> tmpTileInterchange;
   for (auto value : loweringConfig.getTileInterchangeVals(tilingLevel)) {
     tmpTileInterchange.push_back(value);
   }
   options.tilingOptions.setInterchange(tmpTileInterchange);
+
   return options;
 }
 
@@ -335,7 +358,11 @@ void LinalgFusePass::runOnOperation() {
       tileAndFuseOptions.tilingOptions.tileSizeComputationFunction != nullptr;
   if (!tileSizes.empty()) {
     doTiling = true;
-    tileAndFuseOptions.tilingOptions.setTileSizes(tileSizes);
+    SmallVector<int64_t> tmpTileSizes = llvm::to_vector(tileSizes);
+    tileAndFuseOptions.tilingOptions.setTileSizeComputationFunction(
+        [tmpTileSizes](OpBuilder &b, Operation *op) {
+          return clipAndCreateTileSize(b, op, tmpTileSizes);
+        });
   }
   if (!tileInterchange.empty()) {
     SmallVector<unsigned> tmpTileInterchange;
