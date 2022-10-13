@@ -171,9 +171,10 @@ private:
 struct CodegenStrategy {
   /// Append a pattern to tile the Op `opName` and fuse its producers with
   /// tiling and fusion `options`.
-  CodegenStrategy &tileAndFuse(
-      StringRef opName, const scf::SCFTileAndFuseOptions &options,
-      const LinalgExt::LinalgTransformationFilter::FilterFunction &f = nullptr) {
+  CodegenStrategy &
+  tileAndFuse(StringRef opName, const scf::SCFTileAndFuseOptions &options,
+              const LinalgExt::LinalgTransformationFilter::FilterFunction &f =
+                  nullptr) {
     transformationSequence.emplace_back(
         std::make_unique<TileAndFuse>(opName, options, f));
     return *this;
