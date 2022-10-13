@@ -460,8 +460,7 @@ rewriteForeachThreadToFlowDispatchWorkgroups(
 
 DiagnosedSilenceableFailure
 transform_dialect::ForeachThreadToFlowDispatchWorkgroupsOp::applyToOne(
-    scf::ForeachThreadOp target, SmallVectorImpl<Operation *> &results,
-    transform::TransformState &state) {
+    scf::ForeachThreadOp target, SmallVectorImpl<Operation *> &results) {
   SimplePatternRewriter rewriter(target->getContext());
   FailureOr<Flow::DispatchWorkgroupsOp> result =
       rewriteForeachThreadToFlowDispatchWorkgroups(target, rewriter);
@@ -472,8 +471,7 @@ transform_dialect::ForeachThreadToFlowDispatchWorkgroupsOp::applyToOne(
 }
 
 DiagnosedSilenceableFailure transform_dialect::RegionToWorkgroupsOp::applyToOne(
-    Flow::DispatchRegionOp target, SmallVectorImpl<Operation *> &results,
-    transform::TransformState &state) {
+    Flow::DispatchRegionOp target, SmallVectorImpl<Operation *> &results) {
   IRRewriter rewriter(target->getContext());
   FailureOr<Flow::DispatchWorkgroupsOp> result =
       rewriteFlowDispatchRegionToFlowDispatchWorkgroups(target, rewriter);
@@ -485,8 +483,7 @@ DiagnosedSilenceableFailure transform_dialect::RegionToWorkgroupsOp::applyToOne(
 
 DiagnosedSilenceableFailure
 transform_dialect::ClonePrecedingOpIntoDispatchRegionOp::apply(
-    transform::TransformResults &transformResults,
-    transform::TransformState &state) {
+    transform::TransformResults &transformResults) {
   ArrayRef<Operation *> targetOps = state.getPayloadOps(getTarget());
   ArrayRef<Operation *> dispatchRegion =
       state.getPayloadOps(getDispatchRegion());
@@ -527,8 +524,7 @@ transform_dialect::ClonePrecedingOpIntoDispatchRegionOp::apply(
 
 DiagnosedSilenceableFailure
 transform_dialect::MovePrecedingOpIntoDispatchRegionOp::apply(
-    transform::TransformResults &transformResults,
-    transform::TransformState &state) {
+    transform::TransformResults &transformResults) {
   ArrayRef<Operation *> targetOps = state.getPayloadOps(getTarget());
   ArrayRef<Operation *> dispatchRegion =
       state.getPayloadOps(getDispatchRegion());
@@ -671,8 +667,7 @@ static FailureOr<Flow::DispatchRegionOp> cloneSucceedingOpIntoDispatchRegion(
 
 DiagnosedSilenceableFailure
 transform_dialect::CloneSucceedingOpIntoDispatchRegionOp::apply(
-    transform::TransformResults &transformResults,
-    transform::TransformState &state) {
+    transform::TransformResults &transformResults) {
   ArrayRef<Operation *> targetOps = state.getPayloadOps(getTarget());
   ArrayRef<Operation *> dispatchRegion =
       state.getPayloadOps(getDispatchRegion());
@@ -721,8 +716,7 @@ static Flow::DispatchRegionOp makeEmptyDispatchRegion(RewriterBase &rewriter,
 
 DiagnosedSilenceableFailure
 transform_dialect::WrapInDispatchRegionOp::applyToOne(
-    Operation *target, SmallVectorImpl<Operation *> &results,
-    transform::TransformState &state) {
+    Operation *target, SmallVectorImpl<Operation *> &results) {
   IRRewriter rewriter(target->getContext());
   auto regionOp = Flow::wrapOpInDispatchRegion(rewriter, target);
   if (failed(regionOp))

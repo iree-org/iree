@@ -131,7 +131,7 @@ static LogicalResult isEquivalentToOpImpl(PatternRewriter &rewriter,
   if (linalgOp.getInputs() != linalgModelOp.getInputs() ||
       linalgOp.getOutputs() != linalgModelOp.getOutputs() ||
       linalgOp.getIndexingMaps() != linalgModelOp.getIndexingMaps() ||
-      linalgOp.iterator_types() != linalgModelOp.iterator_types())
+      linalgOp.getIteratorTypesArray() != linalgModelOp.getIteratorTypesArray())
     return failure();
 
   // Build the block and go perform a body comparison.

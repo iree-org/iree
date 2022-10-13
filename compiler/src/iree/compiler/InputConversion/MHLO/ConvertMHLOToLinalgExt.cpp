@@ -164,8 +164,8 @@ struct SortOpConversion : public OpConversionPattern<mhlo::SortOp> {
     auto sortOp = rewriter.create<IREE::LinalgExt::SortOp>(
         loc, resultTypes,
         /*inputs=*/ValueRange{}, adaptor.getOperands(),
-        mhloSortOp.dimensionAttr());
-    rewriter.inlineRegionBefore(mhloSortOp.comparator(), sortOp.getRegion(),
+        mhloSortOp.getDimensionAttr());
+    rewriter.inlineRegionBefore(mhloSortOp.getComparator(), sortOp.getRegion(),
                                 sortOp.getRegion().begin());
     Region &region = sortOp.getRegion();
     Block &block = region.front();
@@ -199,8 +199,8 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
   /// * Inserted window dims order: (0, ... , d)
   /// * Update window dims order: (d + 1, ... , m)
   static bool hasCanonicalDimensionNumbers(mhlo::ScatterOp op) {
-    auto dimNumbers = op.scatter_dimension_numbers();
-    auto indicesType = op.scatter_indices().getType().cast<ShapedType>();
+    auto dimNumbers = op.getScatterDimensionNumbers();
+    auto indicesType = op.getScatterIndices().getType().cast<ShapedType>();
     auto indicesRank = indicesType.getRank();
     auto indexVectorDim = dimNumbers.getIndexVectorDim();
     auto indexDepth = indicesType.getShape().back();
@@ -233,20 +233,21 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
     if (!hasCanonicalDimensionNumbers(op)) return failure();
     if (llvm::size(op.operands()) != 1)
       return op.emitError("NYI variadic operands scatter");
-    if (llvm::size(op.updates()) != 1)
+    if (llvm::size(op.getUpdates()) != 1)
       return op.emitError("NYI variadic updates scatter");
 
     ImplicitLocOpBuilder b(op.getLoc(), rewriter);
 
     Value original = adaptor.operands().front();
-    Value indices = adaptor.scatter_indices();
-    Value updates = adaptor.updates().front();
+    Value indices = adaptor.getScatterIndices();
+    Value updates = adaptor.getUpdates().front();
 
     auto scatterOp = rewriter.create<IREE::LinalgExt::ScatterOp>(
         op.getLoc(), op->getResultTypes(), ValueRange{updates, indices},
-        ValueRange{original}, op.unique_indices());
+        ValueRange{original}, op.getUniqueIndices());
 
-    rewriter.inlineRegionBefore(op.update_computation(), scatterOp.getRegion(),
+    rewriter.inlineRegionBefore(op.getUpdateComputation(),
+                                scatterOp.getRegion(),
                                 scatterOp.getRegion().begin());
     Region &region = scatterOp.getRegion();
     TypeConverter::SignatureConversion signatureConverter(2);
@@ -347,11 +348,12 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
       mhlo::FftOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const final {
     // Only handle 2^n fft length.
-    auto operandType = adaptor.operand().getType().dyn_cast<RankedTensorType>();
+    auto operandType =
+        adaptor.getOperand().getType().dyn_cast<RankedTensorType>();
     if (!operandType || !operandType.hasStaticShape()) {
       return failure();
     }
-    int fftLength = op.fft_length().getSplatValue<IntegerAttr>().getInt();
+    int fftLength = op.getFftLength().getSplatValue<IntegerAttr>().getInt();
     if (fftLength & (fftLength - 1)) {
       return rewriter.notifyMatchFailure(
           op, "expected FFT length to be a power of two");
@@ -359,7 +361,7 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
 
     ImplicitLocOpBuilder b(op.getLoc(), rewriter);
     SmallVector<Value> results =
-        getBitReversalOrder(b, adaptor.operand(), fftLength);
+        getBitReversalOrder(b, adaptor.getOperand(), fftLength);
     int lognPlus1 = std::log(fftLength) / std::log(2) + 1;
     for (auto s : llvm::seq<unsigned>(1, lognPlus1)) {
       SmallVector<Value> inputs;
@@ -378,7 +380,7 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
     SmallVector<OpFoldResult> offsets(ty.getRank(), b.getIndexAttr(0));
     SmallVector<OpFoldResult> strides(ty.getRank(), b.getIndexAttr(1));
     SmallVector<OpFoldResult> sizes;
-    Value operand = adaptor.operand();
+    Value operand = adaptor.getOperand();
     for (auto dim : llvm::enumerate(operandType.getShape().drop_back())) {
       if (dim.value() != ShapedType::kDynamicSize) {
         sizes.push_back(b.getIndexAttr(dim.value()));
@@ -421,7 +423,7 @@ struct ReverseOpConversion : public OpConversionPattern<mhlo::ReverseOp> {
         loc, ty.getShape(), ty.getElementType(), dynSizes);
     rewriter.replaceOpWithNewOp<IREE::LinalgExt::ReverseOp>(
         op, op->getResultTypes(), adaptor.getOperands(), emptyTensor,
-        op.dimensions());
+        op.getDimensions());
     return success();
   }
 };
@@ -436,7 +438,7 @@ struct TopkOpConversion : public OpConversionPattern<chlo::TopKOp> {
       chlo::TopKOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const final {
     Location loc = op.getLoc();
-    Value operand = adaptor.operand();
+    Value operand = adaptor.getOperand();
 
     auto inputValuesType = operand.getType().dyn_cast<ShapedType>();
     auto outputValuesType = op.values().getType().dyn_cast<ShapedType>();
@@ -459,8 +461,8 @@ struct TopkOpConversion : public OpConversionPattern<chlo::TopKOp> {
     SmallVector<Value> dynSizes;
     for (auto en : llvm::enumerate(inputValuesType.getShape())) {
       if (en.value() == ShapedType::kDynamicSize) {
-        dynSizes.push_back(
-            rewriter.create<tensor::DimOp>(loc, adaptor.operand(), en.index()));
+        dynSizes.push_back(rewriter.create<tensor::DimOp>(
+            loc, adaptor.getOperand(), en.index()));
       }
     }
     Value emptyTensorOutputValues = rewriter.create<mlir::tensor::EmptyOp>(

@@ -91,9 +91,9 @@ struct DetachElementwisePattern
     iterators.reserve(outputMap.getNumResults());
     for (int i = 0, e = outputMap.getNumResults(); i < e; ++i) {
       int pos = outputMap.getResult(i).cast<AffineDimExpr>().getPosition();
-      auto attr = linalgOp.getIteratorTypes()[pos].cast<StringAttr>();
+      StringRef attr = linalgOp.getIteratorTypesArray()[pos];
       if (!linalg::isParallelIterator(attr)) return failure();
-      iterators.push_back(attr.getValue());
+      iterators.push_back(attr);
     }
 
     // Create a generic op to add back the original output tensor operand.
