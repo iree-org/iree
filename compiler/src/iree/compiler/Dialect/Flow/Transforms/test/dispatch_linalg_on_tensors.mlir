@@ -548,11 +548,11 @@ func.func @inline_dag_1(
 //       CHECK:     %[[LEAF2:.+]] = flow.dispatch.tensor.load %[[ARG5]]
 //       CHECK:     %[[LEAF3:.+]] = flow.dispatch.tensor.load %[[ARG8]]
 //       CHECK:     %[[INIT:.+]] = tensor.empty
-//       CHECK:     %[[OP1:.+]] = tensor.cast %[[LEAF3]]
-//       CHECK:     %[[OP2:.+]] = tensor.cast %[[LEAF2]]
-//       CHECK:     %[[OP3:.+]] = tensor.extract_slice %[[OP1]][0, 0]
-//       CHECK:     %[[OP4:.+]] = tensor.extract_slice %[[OP1]][0, 10]
-//       CHECK:     %[[OP5:.+]] = tensor.extract_slice %[[OP1]][0, 20]
+//   CHECK-DAG:     %[[OP1:.+]] = tensor.cast %[[LEAF3]]
+//   CHECK-DAG:     %[[OP2:.+]] = tensor.cast %[[LEAF2]]
+//   CHECK-DAG:     %[[OP3:.+]] = tensor.extract_slice %[[OP1]][0, 0]
+//   CHECK-DAG:     %[[OP4:.+]] = tensor.extract_slice %[[OP1]][0, 10]
+//   CHECK-DAG:     %[[OP5:.+]] = tensor.extract_slice %[[OP1]][0, 20]
 //       CHECK:     linalg.generic
 //  CHECK-SAME:         ins(%[[LEAF1]], %[[OP5]], %[[OP2]], %[[OP4]], %[[OP3]] :
 //  CHECK-SAME:         outs(%[[INIT]] :
@@ -607,10 +607,10 @@ func.func @inline_dag_2(
 //       CHECK:     %[[LEAF2:.+]] = flow.dispatch.tensor.load %[[ARG5]], {{.*}}
 //       CHECK:     %[[LEAF3:.+]] = flow.dispatch.tensor.load %[[ARG7]], {{.*}}
 //       CHECK:     %[[INIT:.+]] = tensor.empty
-//       CHECK:     %[[OP1:.+]] = tensor.cast %[[LEAF3]]
-//       CHECK:     %[[OP3:.+]] = tensor.extract_slice %[[OP1]][0, 0]
-//       CHECK:     %[[OP4:.+]] = tensor.extract_slice %[[OP1]][0, 10]
-//       CHECK:     %[[OP5:.+]] = tensor.extract_slice %[[OP1]][0, 20]
+//   CHECK-DAG:     %[[OP1:.+]] = tensor.cast %[[LEAF3]]
+//   CHECK-DAG:     %[[OP3:.+]] = tensor.extract_slice %[[OP1]][0, 0]
+//   CHECK-DAG:     %[[OP4:.+]] = tensor.extract_slice %[[OP1]][0, 10]
+//   CHECK-DAG:     %[[OP5:.+]] = tensor.extract_slice %[[OP1]][0, 20]
 //       CHECK:     linalg.generic
 //  CHECK-SAME:         ins(%[[LEAF1]], %[[OP5]], %[[LEAF2]], %[[OP4]], %[[OP3]] :
 //  CHECK-SAME:         outs(%[[INIT]] :
