@@ -311,13 +311,13 @@ LinalgVectorizationPattern::matchAndRewrite(linalg::LinalgOp linalgOp,
 /// Linalg tile and fuse tensor ops pattern.
 LinalgTileAndFusePattern::LinalgTileAndFusePattern(
     MLIRContext *context, scf::SCFTileAndFuseOptions options,
-    linalg::LinalgTransformationFilter f, PatternBenefit benefit)
+    LinalgExt::LinalgTransformationFilter f, PatternBenefit benefit)
     : OpInterfaceRewritePattern<linalg::LinalgOp>(context, benefit),
       filter(std::move(f)), options(std::move(options)) {}
 
 LinalgTileAndFusePattern::LinalgTileAndFusePattern(
     StringRef opName, MLIRContext *context, scf::SCFTileAndFuseOptions options,
-    linalg::LinalgTransformationFilter f, PatternBenefit benefit)
+    LinalgExt::LinalgTransformationFilter f, PatternBenefit benefit)
     : OpInterfaceRewritePattern<linalg::LinalgOp>(context, benefit),
       filter(f.addOpNameFilter(opName)), options(std::move(options)) {}
 
@@ -537,11 +537,11 @@ struct LinalgStrategyTileAndFusePass
 
     RewritePatternSet tilingAndFusionPattern(funcOp.getContext());
     if (!anchorOpName.empty()) {
-      tilingAndFusionPattern.add<linalg::LinalgTileAndFuseTensorOpsPattern>(
+      tilingAndFusionPattern.add<LinalgTileAndFusePattern>(
           anchorOpName, funcOp.getContext(), options, filter);
     } else {
-      tilingAndFusionPattern.add<linalg::LinalgTileAndFuseTensorOpsPattern>(
-          funcOp.getContext(), options, filter);
+      tilingAndFusionPattern.add<LinalgTileAndFusePattern>(funcOp.getContext(),
+                                                           options, filter);
     }
     // Search the root operation using bottom up traversal.
     GreedyRewriteConfig config;

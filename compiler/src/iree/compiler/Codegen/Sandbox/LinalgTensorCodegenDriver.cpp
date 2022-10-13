@@ -160,7 +160,7 @@ static FailureOr<scf::SCFTileAndFuseOptions> getTileAndFuseOptionsFromConfig(
   scf::SCFTileAndFuseOptions options;
   options.tilingOptions.setTileSizes(
       loweringConfig.getTileSizeVals(tilingLevel));
-  SmallVector<unsigned> tmpTileInterchange; 
+  SmallVector<unsigned> tmpTileInterchange;
   for (auto value : loweringConfig.getTileInterchangeVals(tilingLevel)) {
     tmpTileInterchange.push_back(value);
   }
@@ -331,13 +331,14 @@ void LinalgFusePass::runOnOperation() {
   }
   scf::SCFTileAndFuseOptions tileAndFuseOptions =
       defaultTileAndFuseOptionsOptions.value();
-  bool doTiling = true;
+  bool doTiling =
+      tileAndFuseOptions.tilingOptions.tileSizeComputationFunction != nullptr;
   if (!tileSizes.empty()) {
     doTiling = true;
     tileAndFuseOptions.tilingOptions.setTileSizes(tileSizes);
   }
   if (!tileInterchange.empty()) {
-    SmallVector<unsigned> tmpTileInterchange; 
+    SmallVector<unsigned> tmpTileInterchange;
     for (auto value : tileInterchange) {
       tmpTileInterchange.push_back(value);
     }

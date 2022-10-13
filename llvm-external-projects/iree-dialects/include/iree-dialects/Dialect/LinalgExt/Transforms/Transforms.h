@@ -281,16 +281,14 @@ struct LinalgTileAndFusePattern
   LinalgTileAndFusePattern(
       MLIRContext *context,
       scf::SCFTileAndFuseOptions options = scf::SCFTileAndFuseOptions(),
-      linalg::LinalgTransformationFilter f =
-          linalg::LinalgTransformationFilter(),
+      LinalgTransformationFilter f = LinalgTransformationFilter(),
       PatternBenefit benefit = 1);
 
   /// Construct a pattern specifically applied to `opName`.
   LinalgTileAndFusePattern(
       StringRef opName, MLIRContext *context,
       scf::SCFTileAndFuseOptions options = scf::SCFTileAndFuseOptions(),
-      linalg::LinalgTransformationFilter f =
-          linalg::LinalgTransformationFilter(),
+      LinalgTransformationFilter f = LinalgTransformationFilter(),
       PatternBenefit benefit = 1);
 
   LogicalResult matchAndRewrite(linalg::LinalgOp op,
@@ -298,7 +296,7 @@ struct LinalgTileAndFusePattern
 
 private:
   /// LinalgTransformMarker handles special attribute manipulations.
-  linalg::LinalgTransformationFilter filter;
+  LinalgTransformationFilter filter;
 
   scf::SCFTileAndFuseOptions options;
 };
