@@ -98,7 +98,7 @@ Value createTransposeOp(Location loc, OpBuilder &builder, Value input,
     }
   }
 
-  Value outputTensor = builder.create<linalg::InitTensorOp>(
+  Value outputTensor = builder.create<tensor::EmptyOp>(
       loc, targetShape, inputType.getElementType());
 
   SmallVector<StringRef, 4> loopAttributeTypes(nloops,
@@ -203,11 +203,10 @@ struct ExpandShapeVectorizationPattern
         rewriter.create<vector::ShapeCastOp>(loc, destVecType, read);
 
     // TBD: it will be tensor::EmptyOp after an integration.
-    // Value dest = rewriter.create<tensor::EmptyOp>(
-    // loc, resultType.getShape(), resultType.getElementType());
     SmallVector<Value> writeIndices(
-        destShapedType.getRank(), rewriter.create<arith::ConstantIndexOp>(loc, 0));
-    Value dest = rewriter.create<linalg::InitTensorOp>(
+        destShapedType.getRank(),
+        rewriter.create<arith::ConstantIndexOp>(loc, 0));
+    Value dest = rewriter.create<tensor::EmptyOp>(
         loc, destShapedType.getShape(), destShapedType.getElementType());
 
     Value write = rewriter.create<vector::TransferWriteOp>(
