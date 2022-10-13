@@ -37,6 +37,8 @@ SmallVector<int64_t> interchange(ArrayRef<int64_t> elements,
   return vec;
 }
 
+/// Returns a tensor.pad op if padding value is set. Otherwise, returns the
+/// input directly. The method assumes that the `packOp` has static shapes.
 Value getInputOrPaddedInput(OpBuilder &builder, PackOp packOp) {
   Value input = packOp.getInput();
   if (!packOp.getPaddingValue()) {
@@ -63,7 +65,7 @@ Value getInputOrPaddedInput(OpBuilder &builder, PackOp packOp) {
 
     Optional<int64_t> tileSize =
         getConstantIntValue(tileAndPosMapping.lookup(dim));
-    assert(!inputType.isDynamicDim(dim) && tileSize.hasValue() &&
+    assert((!inputType.isDynamicDim(dim) && tileSize.hasValue()) &&
            "something goes really wrong...");
     int64_t sizeWithPad = llvm::alignTo(size, tileSize.getValue());
     highPadding.push_back(builder.getIndexAttr(sizeWithPad - size));
@@ -98,21 +100,17 @@ Value createTransposeOp(Location loc, OpBuilder &builder, Value input,
     }
   }
 
-  Value outputTensor = builder.create<tensor::EmptyOp>(
-      loc, targetShape, inputType.getElementType());
-
+  Value empty = builder.create<tensor::EmptyOp>(loc, targetShape,
+                                                inputType.getElementType());
   SmallVector<StringRef, 4> loopAttributeTypes(nloops,
                                                getParallelIteratorTypeName());
-
   SmallVector<AffineMap, 2> indexingMaps = {
       inversePermutation(
           AffineMap::get(nloops, 0, exprs, builder.getContext())),
       AffineMap::getMultiDimIdentityMap(nloops, builder.getContext())};
 
   auto transposedOp = builder.create<linalg::GenericOp>(
-      loc, outputTensor.getType(),
-      /*inputs=*/input, /*outputs=*/outputTensor, indexingMaps,
-      loopAttributeTypes,
+      loc, empty.getType(), input, empty, indexingMaps, loopAttributeTypes,
       [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
         nestedBuilder.create<linalg::YieldOp>(nestedLoc, args[0]);
       });
@@ -162,6 +160,8 @@ struct GeneralizePackOpPattern : OpRewritePattern<PackOp> {
     }
 
     for (auto dim : extractFromI64ArrayAttr(packOp.getInnerDimsPos())) {
+      assert(innerPosAfterExpansion[dim] != -1 &&
+             "can't find the position of an inner loop after expansion");
       transPerm.push_back(innerPosAfterExpansion[dim]);
     }
     if (auto outerDims = packOp.getOuterDimsPerm()) {
@@ -176,10 +176,13 @@ struct GeneralizePackOpPattern : OpRewritePattern<PackOp> {
     auto trans = createTransposeOp(loc, rewriter, expand, transPerm);
     rewriter.replaceOp(packOp, trans);
     return success();
-
   }
 };
 
+/// Vectorization pattern of tensor.expand_shape op. It reads a vector from the
+/// source, and cast the shape to target vector type. Then a tensor.empty op is
+/// generated and be used as a destination. The consumers are expected to be
+/// vectorized. In this context, the tensor.empty op will be folded away.
 struct ExpandShapeVectorizationPattern
     : OpRewritePattern<tensor::ExpandShapeOp> {
   using OpRewritePattern<tensor::ExpandShapeOp>::OpRewritePattern;
@@ -187,31 +190,34 @@ struct ExpandShapeVectorizationPattern
                                 PatternRewriter &rewriter) const final {
     Location loc = op.getLoc();
     auto srcShapedType = op.getSrc().getType().cast<ShapedType>();
-    auto inputVecType =
-        VectorType::get(srcShapedType.getShape(), srcShapedType.getElementType());
+    Type elemType = srcShapedType.getElementType();
+
+    auto inputVecType = VectorType::get(srcShapedType.getShape(), elemType);
     SmallVector<Value> readIndices(
-        srcShapedType.getRank(), rewriter.create<arith::ConstantIndexOp>(loc, 0));
+        srcShapedType.getRank(),
+        rewriter.create<arith::ConstantIndexOp>(loc, 0));
     SmallVector<bool> readInBounds(srcShapedType.getRank(), true);
     Value read = rewriter.create<vector::TransferReadOp>(
         loc, inputVecType, op.getSrc(), readIndices,
         ArrayRef<bool>{readInBounds});
 
     auto destShapedType = op.getResult().getType().cast<ShapedType>();
-    auto destVecType = VectorType::get(destShapedType.getShape(),
-                                       destShapedType.getElementType());
+    auto destVecType = VectorType::get(destShapedType.getShape(), elemType);
     Value shapeCast =
         rewriter.create<vector::ShapeCastOp>(loc, destVecType, read);
 
-    // TBD: it will be tensor::EmptyOp after an integration.
     SmallVector<Value> writeIndices(
         destShapedType.getRank(),
         rewriter.create<arith::ConstantIndexOp>(loc, 0));
     Value dest = rewriter.create<tensor::EmptyOp>(
-        loc, destShapedType.getShape(), destShapedType.getElementType());
+        loc, destShapedType.getShape(), elemType);
 
-    Value write = rewriter.create<vector::TransferWriteOp>(
-        loc, shapeCast, dest, writeIndices,
-        rewriter.getMultiDimIdentityMap(destShapedType.getRank())).getResult();
+    Value write =
+        rewriter
+            .create<vector::TransferWriteOp>(
+                loc, shapeCast, dest, writeIndices,
+                rewriter.getMultiDimIdentityMap(destShapedType.getRank()))
+            .getResult();
     rewriter.replaceOp(op, write);
 
     return success();
@@ -229,11 +235,9 @@ struct LinalgExtVectorizationPass
   void runOnOperation() override {
     MLIRContext *ctx = &getContext();
     RewritePatternSet patterns(ctx);
-    patterns.add<GeneralizePackOpPattern>(ctx);
-    patterns.add<ExpandShapeVectorizationPattern, LinalgVectorizationPattern>(
-        ctx);
+    patterns.add<GeneralizePackOpPattern, ExpandShapeVectorizationPattern,
+                 LinalgVectorizationPattern>(ctx);
     linalg::populatePadOpVectorizationPatterns(patterns);
-
     vector::TransferReadOp::getCanonicalizationPatterns(patterns, ctx);
     vector::TransferWriteOp::getCanonicalizationPatterns(patterns, ctx);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
