@@ -38,6 +38,10 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLinalgFusePass();
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgFusePass(
     const LinalgFusePassOptions &options);
 
+/// Creates a pass to perform SplitReduction transformations of `LinalgOp`s.
+std::unique_ptr<OperationPass<func::FuncOp>> createLinalgSplitReductionPass(
+    bool enableReassociateFpReductions = false, int64_t size = 0);
+
 /// Struct to control pass options for `LinalgSingleTilingExpert` pass.
 struct LinalgSingleTilingExpertPassOptions {
   std::string anchorFuncOpName = "";
