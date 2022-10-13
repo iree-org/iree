@@ -12,6 +12,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 
@@ -51,14 +52,16 @@ static LogicalResult tileReduction(linalg::GenericOp op) {
   // Then tile the new dimension to 1.
   SmallVector<int64_t> tileSizes(numLoops, 0);
   tileSizes[numLoops - 2] = 1;
-  linalg::LinalgTilingOptions tileOption;
+  scf::SCFTilingOptions tileOption;
   tileOption.setTileSizes(tileSizes);
-  FailureOr<linalg::TiledLinalgOp> tiledOps =
-      linalg::tileLinalgOp(rewriter, result->splitLinalgOp, tileOption);
+  FailureOr<scf::SCFTilingResult> tiledOps = scf::tileUsingSCFForOp(
+      rewriter, cast<TilingInterface>(result->splitLinalgOp.getOperation()),
+      tileOption);
   if (failed(tiledOps)) return failure();
-  rewriter.replaceOp(result->splitLinalgOp, tiledOps->tensorResults);
+  rewriter.replaceOp(result->splitLinalgOp, tiledOps->replacements);
   return success();
 }
+
 struct GPUTileReductionPass
     : public GPUTileReductionBase<GPUTileReductionPass> {
   void runOnOperation() override {
