@@ -14,9 +14,19 @@ set -xeuo pipefail
 SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")";
 source "${SCRIPT_DIR}/functions.sh"
 
+RUNNER_TYPE="$(get_attribute github-runner-type)"
+# The CPU machines have 360GB of RAM
+TMPFS_SIZE=100g
+if [[ "${RUNNER_TYPE}" == gpu ]]; then
+  # The GPU machines have only 85GB of RAM
+  # TODO(gcmn): Switch to using a local ssd. This is probably too much of the
+  # RAM.
+  TMPFS_SIZE=50g
+fi
+
 echo "Creating tmpfs for runner"
 mkdir /runner-root
-mount -t tmpfs -o size=50g tmpfs /runner-root
+mount -t tmpfs -o size="${TMPFS_SIZE}" tmpfs /runner-root
 cp -r "${SCRIPT_DIR}" /runner-root/config
 chown -R runner:runner /runner-root/
 
