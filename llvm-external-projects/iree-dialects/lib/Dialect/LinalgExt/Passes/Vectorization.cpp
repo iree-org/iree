@@ -121,6 +121,12 @@ struct GeneralizePackOpPattern : OpRewritePattern<PackOp> {
     if (!packOp.hasTensorSemantics()) {
       return rewriter.notifyMatchFailure(packOp, "require tensor semantics");
     }
+    int64_t inputRank = packOp.getInputRank();
+    if (llvm::any_of(packOp.getOutputShape().take_front(inputRank),
+                     [](int64_t val) { return val != 1; })) {
+      return rewriter.notifyMatchFailure(
+          packOp, "require the outer dimension of the result are all 1s");
+    }
 
     Value input = getInputOrPaddedInput(rewriter, packOp);
 
@@ -128,7 +134,6 @@ struct GeneralizePackOpPattern : OpRewritePattern<PackOp> {
     SmallVector<int64_t> transPerm, innerPosAfterExpansion;
     SmallVector<int64_t> inputVecCastShape;
     ShapedType paddedInputType = input.getType();
-    int64_t inputRank = packOp.getInputRank();
     SmallVector<bool> readInBounds(inputRank, true);
     DenseMap<int64_t, OpFoldResult> tileAndPosMapping =
         packOp.getDimAndTileMapping();
