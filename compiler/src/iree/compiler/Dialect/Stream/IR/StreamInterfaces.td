@@ -10,6 +10,62 @@
 include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 
 //===----------------------------------------------------------------------===//
+// IREE::Stream::AffinityAttrInterface
+//===----------------------------------------------------------------------===//
+
+def Stream_AffinityAttr : AttrInterface<"AffinityAttr"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Stream";
+
+  let summary = [{defines execution context affinity}];
+  let description = [{
+    WIP; see https://github.com/iree-org/iree/issues/10765.
+
+    TBD. The intent is that this can specify host, device, and queue affinity.
+    Scopes can be annotated with an affinity to ensure execution within happens
+    in a particular location. Arrays of affinities or wildcard specifiers will
+    allow for refinement ("do it on this device but auto select a queue"). It
+    will also allow us to indicate host affinity such that device<->device and
+    host<->device can be identified in the IR structure. Today all affinities
+    are no-op'ed and assumed to be 'current device'.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the resource configuration specified by the placement.
+        If the affinity is a composite of several placements the intersection
+        will be taken. Returns an empty attribute if no resource configuration
+        is specified.
+      }],
+      /*retTy=*/"IREE::Stream::ResourceConfigAttr",
+      /*methodName=*/"getResourceConfigAttr",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return {};
+      }]
+    >,
+  ];
+
+  let extraClassDeclaration = [{
+    // Returns an affinity active for the given operation.
+    // This will recursively walk parent operations until one with the
+    // `stream.affinity` attribute is found.
+    static AffinityAttr lookup(Operation *op);
+
+    // TODO(benvanik): replace with more fine-grained compatibility checks.
+    // "Compatible" can mean a lot of things: are they cache-coherent, are they
+    // a shared address space, are they able to perform collective operations,
+    // etc. May be able to represent it with a bitfield or a dedicated
+    // compatibility struct result.
+    // Returns true if |desiredAffinity| (if any) is compatible with
+    // |requiredAffinity|.
+    static bool areCompatible(AffinityAttr desiredAffinity,
+                              AffinityAttr requiredAffinity);
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // IREE::Stream::AffinityOpInterface
 //===----------------------------------------------------------------------===//
 
