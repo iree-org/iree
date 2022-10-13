@@ -75,7 +75,8 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::Operation *target,
-        ::llvm::SmallVectorImpl<::mlir::Operation *> &results);
+        ::llvm::SmallVectorImpl<::mlir::Operation *> &results,
+        ::mlir::transform::TransformState &state);
   }];
 }
 
@@ -163,7 +164,8 @@ def ForeachThreadToWorkgroupOp : Op<Transform_Dialect,
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::func::FuncOp target,
-        ::llvm::SmallVectorImpl<::mlir::Operation *> &results);
+        ::llvm::SmallVectorImpl<::mlir::Operation *> &results,
+        ::mlir::transform::TransformState &state);
   }];
 }
 
@@ -205,7 +207,8 @@ def TileToForeachThreadAndWorkgroupCountRegion :
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure apply(
-        ::mlir::transform::TransformResults &transformResults);
+        ::mlir::transform::TransformResults &transformResults,
+        ::mlir::transform::TransformState &state);
 
     ::llvm::SmallVector<::mlir::OpFoldResult> getMixedNumThreads();
     ::llvm::SmallVector<::mlir::OpFoldResult> getMixedTileSizes();

@@ -460,7 +460,8 @@ rewriteForeachThreadToFlowDispatchWorkgroups(
 
 DiagnosedSilenceableFailure
 transform_dialect::ForeachThreadToFlowDispatchWorkgroupsOp::applyToOne(
-    scf::ForeachThreadOp target, SmallVectorImpl<Operation *> &results) {
+    scf::ForeachThreadOp target, SmallVectorImpl<Operation *> &results,
+    transform::TransformState &) {
   SimplePatternRewriter rewriter(target->getContext());
   FailureOr<Flow::DispatchWorkgroupsOp> result =
       rewriteForeachThreadToFlowDispatchWorkgroups(target, rewriter);
@@ -471,7 +472,8 @@ transform_dialect::ForeachThreadToFlowDispatchWorkgroupsOp::applyToOne(
 }
 
 DiagnosedSilenceableFailure transform_dialect::RegionToWorkgroupsOp::applyToOne(
-    Flow::DispatchRegionOp target, SmallVectorImpl<Operation *> &results) {
+    Flow::DispatchRegionOp target, SmallVectorImpl<Operation *> &results,
+    transform::TransformState &) {
   IRRewriter rewriter(target->getContext());
   FailureOr<Flow::DispatchWorkgroupsOp> result =
       rewriteFlowDispatchRegionToFlowDispatchWorkgroups(target, rewriter);
@@ -507,8 +509,7 @@ transform_dialect::ClonePrecedingOpIntoDispatchRegionOp::apply(
   // We are cloning ops one-by-one, so the order must be inversed (as opposed
   // to cloning all ops in one go).
   SmallVector<Operation *> targetOpsList(targetOps.begin(), targetOps.end());
-  bool sortResult = computeTopologicalSorting(
-      dispatchRegion.front()->getBlock(), targetOpsList);
+  bool sortResult = computeTopologicalSorting(targetOpsList);
   (void)sortResult;
   assert(sortResult && "unable to sort topologically");
   SmallVector<Operation *> orderedTargets =
@@ -549,8 +550,7 @@ transform_dialect::MovePrecedingOpIntoDispatchRegionOp::apply(
   // We are cloning ops one-by-one, so the order must be inversed (as opposed
   // to cloning all ops in one go).
   SmallVector<Operation *> targetOpsList(targetOps.begin(), targetOps.end());
-  bool sortResult = computeTopologicalSorting(
-      dispatchRegion.front()->getBlock(), targetOpsList);
+  bool sortResult = computeTopologicalSorting(targetOpsList);
   (void)sortResult;
   assert(sortResult && "unable to sort topologically");
   SmallVector<Operation *> orderedTargets =
@@ -685,8 +685,7 @@ transform_dialect::CloneSucceedingOpIntoDispatchRegionOp::apply(
         this->emitOpError("expected 'dispatch.region' operand"));
 
   SmallVector<Operation *> orderedTargets(targetOps.begin(), targetOps.end());
-  bool sortResult = computeTopologicalSorting(
-      dispatchRegion.front()->getBlock(), orderedTargets);
+  bool sortResult = computeTopologicalSorting(orderedTargets);
   (void)sortResult;
   assert(sortResult && "unable to sort topologically");
   IRRewriter rewriter(regionOp->getContext());
