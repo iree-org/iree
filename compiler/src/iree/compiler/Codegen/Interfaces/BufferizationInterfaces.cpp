@@ -425,6 +425,8 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
             LinalgExtOpInterface<IREE::LinalgExt::FftOp>>(*ctx);
         IREE::LinalgExt::PackOp::attachInterface<
             LinalgExtOpInterface<IREE::LinalgExt::PackOp>>(*ctx);
+        IREE::LinalgExt::UnPackOp::attachInterface<
+            LinalgExtOpInterface<IREE::LinalgExt::UnPackOp>>(*ctx);
         IREE::LinalgExt::ReverseOp::attachInterface<
             LinalgExtOpInterface<IREE::LinalgExt::ReverseOp>>(*ctx);
         IREE::LinalgExt::ScanOp::attachInterface<

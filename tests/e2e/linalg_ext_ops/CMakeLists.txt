@@ -77,6 +77,7 @@ iree_check_single_backend_test_suite(
     "scan.mlir"
     "sort.mlir"
     "top-k.mlir"
+    "unpack.mlir"
   TARGET_BACKEND
     "llvm-cpu"
   DRIVER

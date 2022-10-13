@@ -25,6 +25,7 @@ iree_check_single_backend_test_suite(
         include = ["*.mlir"],
         exclude = [
             "pack.mlir",
+            "unpack.mlir",
         ],
     ),
     driver = "cuda",
@@ -85,6 +86,7 @@ iree_check_single_backend_test_suite(
             "scan.mlir",
             "sort.mlir",
             "top-k.mlir",
+            "unpack.mlir",
         ],
         include = ["*.mlir"],
     ),
@@ -105,6 +107,7 @@ iree_check_single_backend_test_suite(
         include = ["*.mlir"],
         exclude = [
             "pack.mlir",
+            "unpack.mlir",
         ],
     ),
     driver = "local-task",
@@ -124,6 +127,7 @@ iree_check_single_backend_test_suite(
         include = ["*.mlir"],
         exclude = [
             "pack.mlir",
+            "unpack.mlir",
             # TODO(antiagainst): scan fails on Adreno GPUs due to driver bug.
             # Re-enable this once we have new devices with up-to-date drivers.
             "top-k.mlir",
