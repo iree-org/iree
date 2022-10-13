@@ -19,6 +19,7 @@ iree_lit_test_suite(
             "capture_dispatch_dynamic_dims.mlir",
             "cleanup_numeric_narrowing.mlir",
             "cleanup_tensor_shapes.mlir",
+            "collapse_reduction.mlir",
             "conv1x1_to_matmul.mlir",
             "conv2d_to_img2col.mlir",
             "deduplicate_executables.mlir",
