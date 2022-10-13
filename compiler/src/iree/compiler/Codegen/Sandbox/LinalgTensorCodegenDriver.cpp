@@ -145,10 +145,10 @@ static LogicalResult getPaddingDims(func::FuncOp funcOp,
 
 /// Default method to initialize the tiling options for fusion in IREE. These
 /// could be ovveridden by the command line options if specified.
-static FailureOr<linalg::LinalgTilingAndFusionOptions>
-getTileAndFuseOptionsFromConfig(func::FuncOp funcOp, int64_t tilingLevel) {
+static FailureOr<scf::SCFTileAndFuseOptions> getTileAndFuseOptionsFromConfig(
+    func::FuncOp funcOp, int64_t tilingLevel) {
   if (tilingLevel == -1) {
-    return linalg::LinalgTilingAndFusionOptions();
+    return scf::SCFTileAndFuseOptions();
   }
 
   FailureOr<Operation *> rootOp = getRootOp(funcOp);
@@ -157,10 +157,14 @@ getTileAndFuseOptionsFromConfig(func::FuncOp funcOp, int64_t tilingLevel) {
   iree_compiler::IREE::Codegen::LoweringConfigAttr loweringConfig =
       iree_compiler::getLoweringConfig(rootOp.value());
 
-  linalg::LinalgTilingAndFusionOptions options;
-  options.tileSizes.assign(loweringConfig.getTileSizeVals(tilingLevel));
-  options.tileInterchange.assign(
-      loweringConfig.getTileInterchangeVals(tilingLevel));
+  scf::SCFTileAndFuseOptions options;
+  options.tilingOptions.setTileSizes(
+      loweringConfig.getTileSizeVals(tilingLevel));
+  SmallVector<unsigned> tmpTileInterchange; 
+  for (auto value : loweringConfig.getTileInterchangeVals(tilingLevel)) {
+    tmpTileInterchange.push_back(value);
+  }
+  options.tilingOptions.setInterchange(tmpTileInterchange);
   return options;
 }
 
@@ -320,26 +324,31 @@ void LinalgFusePass::runOnOperation() {
   func::FuncOp funcOp = getOperation();
 
   // Set up tiling and vectorization options.
-  FailureOr<linalg::LinalgTilingAndFusionOptions> defaultTilingOptions =
+  FailureOr<scf::SCFTileAndFuseOptions> defaultTileAndFuseOptionsOptions =
       getTileAndFuseOptionsFromConfig(funcOp, tilingLevel);
-  if (failed(defaultTilingOptions)) {
+  if (failed(defaultTileAndFuseOptionsOptions)) {
     return;
   }
-  linalg::LinalgTilingAndFusionOptions tilingOptions =
-      defaultTilingOptions.value();
-  bool doTiling = !tilingOptions.tileSizes.empty();
+  scf::SCFTileAndFuseOptions tileAndFuseOptions =
+      defaultTileAndFuseOptionsOptions.value();
+  bool doTiling = true;
   if (!tileSizes.empty()) {
     doTiling = true;
-    tilingOptions.tileSizes = {tileSizes.begin(), tileSizes.end()};
+    tileAndFuseOptions.tilingOptions.setTileSizes(tileSizes);
   }
   if (!tileInterchange.empty()) {
-    tilingOptions.tileInterchange = {tileInterchange.begin(),
-                                     tileInterchange.end()};
+    SmallVector<unsigned> tmpTileInterchange; 
+    for (auto value : tileInterchange) {
+      tmpTileInterchange.push_back(value);
+    }
+    tileAndFuseOptions.tilingOptions.setInterchange(tmpTileInterchange);
   }
+  /*
   if (doIREEDistribution) {
     tilingOptions.setDistributionOptions(
         ::mlir::iree_compiler::getIREELinalgLoopDistributionOptions());
   }
+  */
 
   if (setAnchorOpToRootOp) {
     FailureOr<Operation *> rootOp = getRootOp(funcOp);
@@ -408,7 +417,7 @@ void LinalgFusePass::runOnOperation() {
   paddingOptions.setTransposePaddings(transposePaddingVectors);
 
   CodegenStrategy strategy;
-  strategy.tileAndFuseIf(doTiling, anchorOpName, tilingOptions)
+  strategy.tileAndFuseIf(doTiling, anchorOpName, tileAndFuseOptions)
       .padIf(pad, anchorOpName, paddingOptions)
       .vectorizeIf(vectorize, "", nullptr, vectorizePadding);
 

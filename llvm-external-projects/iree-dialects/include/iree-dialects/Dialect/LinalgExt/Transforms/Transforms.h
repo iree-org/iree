@@ -271,6 +271,39 @@ public:
 };
 
 ///
+/// Linalg tile and fuse patterns.
+///
+/// `filter` controls LinalgTransformMarker matching and update when specified.
+/// See `vectorizeLinalgOp` for more details.
+struct LinalgTileAndFusePattern
+    : public OpInterfaceRewritePattern<linalg::LinalgOp> {
+  /// Construct a generic pattern applied to all LinalgOp that verify `filter`.
+  LinalgTileAndFusePattern(
+      MLIRContext *context,
+      scf::SCFTileAndFuseOptions options = scf::SCFTileAndFuseOptions(),
+      linalg::LinalgTransformationFilter f =
+          linalg::LinalgTransformationFilter(),
+      PatternBenefit benefit = 1);
+
+  /// Construct a pattern specifically applied to `opName`.
+  LinalgTileAndFusePattern(
+      StringRef opName, MLIRContext *context,
+      scf::SCFTileAndFuseOptions options = scf::SCFTileAndFuseOptions(),
+      linalg::LinalgTransformationFilter f =
+          linalg::LinalgTransformationFilter(),
+      PatternBenefit benefit = 1);
+
+  LogicalResult matchAndRewrite(linalg::LinalgOp op,
+                                PatternRewriter &rewriter) const override;
+
+private:
+  /// LinalgTransformMarker handles special attribute manipulations.
+  linalg::LinalgTransformationFilter filter;
+
+  scf::SCFTileAndFuseOptions options;
+};
+
+///
 /// Linalg promotion patterns.
 ///
 /// Apply the `promoteSubViews` transformation as a pattern.

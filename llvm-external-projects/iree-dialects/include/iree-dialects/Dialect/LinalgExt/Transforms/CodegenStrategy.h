@@ -8,6 +8,7 @@
 #define IREE_DIALECTS_DIALECT_LINALGEXT_TRANSFORMS_CODEGENSTRATEGY_H_
 
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
+#include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Pass/PassManager.h"
 
 #include <utility>
@@ -38,7 +39,7 @@ struct Transformation {
 
 /// Represent one application of LinalgStrategyTileAndFusePass.
 struct TileAndFuse : public Transformation {
-  TileAndFuse(StringRef name, linalg::LinalgTilingAndFusionOptions options,
+  TileAndFuse(StringRef name, scf::SCFTileAndFuseOptions options,
               LinalgExt::LinalgTransformationFilter::FilterFunction f = nullptr)
       : Transformation(std::move(f)), opName(name),
         options(std::move(options)) {}
@@ -51,7 +52,7 @@ struct TileAndFuse : public Transformation {
 
 private:
   std::string opName;
-  linalg::LinalgTilingAndFusionOptions options;
+  scf::SCFTileAndFuseOptions options;
 };
 
 /// Represent one application of LinalgStrategyTilePass.
@@ -170,11 +171,9 @@ private:
 struct CodegenStrategy {
   /// Append a pattern to tile the Op `opName` and fuse its producers with
   /// tiling and fusion `options`.
-  CodegenStrategy &
-  tileAndFuse(StringRef opName,
-              const linalg::LinalgTilingAndFusionOptions &options,
-              const LinalgExt::LinalgTransformationFilter::FilterFunction &f =
-                  nullptr) {
+  CodegenStrategy &tileAndFuse(
+      StringRef opName, const scf::SCFTileAndFuseOptions &options,
+      const LinalgExt::LinalgTransformationFilter::FilterFunction &f = nullptr) {
     transformationSequence.emplace_back(
         std::make_unique<TileAndFuse>(opName, options, f));
     return *this;
@@ -182,7 +181,7 @@ struct CodegenStrategy {
   /// Conditionally append a pattern to tile the Op `opName` and fuse its
   /// producers with tiling and fusion `options`.
   CodegenStrategy &tileAndFuseIf(
-      bool b, StringRef opName, linalg::LinalgTilingAndFusionOptions options,
+      bool b, StringRef opName, scf::SCFTileAndFuseOptions options,
       LinalgExt::LinalgTransformationFilter::FilterFunction f = nullptr) {
     return b ? tileAndFuse(opName, std::move(options), std::move(f)) : *this;
   }

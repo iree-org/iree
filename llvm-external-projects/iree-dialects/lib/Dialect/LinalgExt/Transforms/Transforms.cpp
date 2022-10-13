@@ -308,6 +308,89 @@ LinalgVectorizationPattern::matchAndRewrite(linalg::LinalgOp linalgOp,
   return vectorize(rewriter, linalgOp);
 }
 
+/// Linalg tile and fuse tensor ops pattern.
+LinalgTileAndFusePattern::LinalgTileAndFusePattern(
+    MLIRContext *context, scf::SCFTileAndFuseOptions options,
+    linalg::LinalgTransformationFilter f, PatternBenefit benefit)
+    : OpInterfaceRewritePattern<linalg::LinalgOp>(context, benefit),
+      filter(std::move(f)), options(std::move(options)) {}
+
+LinalgTileAndFusePattern::LinalgTileAndFusePattern(
+    StringRef opName, MLIRContext *context, scf::SCFTileAndFuseOptions options,
+    linalg::LinalgTransformationFilter f, PatternBenefit benefit)
+    : OpInterfaceRewritePattern<linalg::LinalgOp>(context, benefit),
+      filter(f.addOpNameFilter(opName)), options(std::move(options)) {}
+
+LogicalResult
+LinalgTileAndFusePattern::matchAndRewrite(linalg::LinalgOp op,
+                                          PatternRewriter &rewriter) const {
+  Operation *top = op;
+  TilingInterface tilingInterfaceOp = dyn_cast<TilingInterface>(top);
+  if (!tilingInterfaceOp)
+    return failure();
+  if (failed(filter.checkAndNotify(rewriter, op)))
+    return failure();
+
+  scf::SCFTilingOptions tilingOptions = options.tilingOptions;
+  auto tileSizes = tilingOptions.tileSizeComputationFunction(rewriter, op);
+
+  // Check `tileSizes` contains a tile size for every `op` loop dimension.
+  if (tileSizes.size() < op.getNumLoops())
+    return rewriter.notifyMatchFailure(op, "expect #tile sizes >= #loops");
+
+  // Check `tileInterchange` contains no entries or as many as `tileSizes`.
+  if (!tilingOptions.interchangeVector.empty() &&
+      tilingOptions.interchangeVector.size() != tileSizes.size())
+    return rewriter.notifyMatchFailure(
+        op, "expect the number of tile sizes and interchange dims to match");
+
+  // Copy the `tileInterchange` prefixes needed for `op`.
+  SmallVector<int64_t> rootInterchange;
+  if (tilingOptions.interchangeVector.empty()) {
+    rootInterchange =
+        llvm::to_vector<6>(llvm::seq<int64_t>(0, op.getNumLoops()));
+  } else {
+    for (auto it = tilingOptions.interchangeVector.begin();
+         tilingOptions.interchangeVector.begin() + op.getNumLoops(); ++it) {
+      rootInterchange.push_back(*it);
+    }
+  }
+
+  // Check `rootInterchange` is a permutation of the `op` loop dimensions.
+  // It has to be a permutation since the tiling cannot tile the same loop
+  // dimension multiple times.
+  if (!linalg::isPermutation(rootInterchange))
+    return rewriter.notifyMatchFailure(
+        op, "expect the tile interchange permutes the root loops");
+
+  // Tile `op` and fuse its producers.
+  FailureOr<scf::SCFTileAndFuseResult> tiledResults =
+      tileConsumerAndFuseProducerGreedilyUsingSCFForOp(
+          rewriter, tilingInterfaceOp, options);
+  if (failed(tiledResults))
+    return rewriter.notifyMatchFailure(
+        op,
+        "tileConsumerAndFuseProducerGreedilyUsingSCFForOp failed unexpectedly");
+
+  // Replace all uses of the tiled loop operation.
+  SmallVector<Value> replacements(op->getNumResults());
+  for (auto result : llvm::enumerate(op->getResults())) {
+    auto it = tiledResults->replacements.find(result.value());
+    if (it == tiledResults->replacements.end()) {
+      replacements[result.index()] = result.value();
+    } else {
+      replacements[result.index()] = it->getSecond();
+    }
+  }
+  rewriter.replaceOp(op, replacements);
+
+  // Apply the filter if specified.
+  for (linalg::LinalgOp linalgOp : tiledResults->tiledAndFusedOps)
+    filter.replaceLinalgTransformationFilter(rewriter, linalgOp);
+
+  return success();
+}
+
 namespace {
 
 ///
@@ -441,9 +524,9 @@ struct LinalgStrategyTileAndFusePass
   LinalgStrategyTileAndFusePass() = default;
 
   LinalgStrategyTileAndFusePass(StringRef opName,
-                                linalg::LinalgTilingAndFusionOptions opt,
+                                scf::SCFTileAndFuseOptions options,
                                 LinalgExt::LinalgTransformationFilter filt)
-      : options(std::move(opt)), filter(std::move(filt)) {
+      : options(std::move(options)), filter(std::move(filt)) {
     this->anchorOpName.setValue(opName.str());
   }
 
@@ -454,10 +537,10 @@ struct LinalgStrategyTileAndFusePass
 
     RewritePatternSet tilingAndFusionPattern(funcOp.getContext());
     if (!anchorOpName.empty()) {
-      tilingAndFusionPattern.add<LinalgTileAndFuseTensorOpsPattern>(
+      tilingAndFusionPattern.add<linalg::LinalgTileAndFuseTensorOpsPattern>(
           anchorOpName, funcOp.getContext(), options, filter);
     } else {
-      tilingAndFusionPattern.add<LinalgTileAndFuseTensorOpsPattern>(
+      tilingAndFusionPattern.add<linalg::LinalgTileAndFuseTensorOpsPattern>(
           funcOp.getContext(), options, filter);
     }
     // Search the root operation using bottom up traversal.
@@ -467,7 +550,7 @@ struct LinalgStrategyTileAndFusePass
         funcOp, std::move(tilingAndFusionPattern), config);
   }
 
-  linalg::LinalgTilingAndFusionOptions options;
+  scf::SCFTileAndFuseOptions options;
   LinalgExt::LinalgTransformationFilter filter;
 };
 
@@ -788,7 +871,7 @@ struct LinalgStrategyRemoveMarkersPass
 /// Create a LinalgStrategyTileAndFusePass.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLinalgStrategyTileAndFusePass(
-    StringRef opName, const linalg::LinalgTilingAndFusionOptions &options,
+    StringRef opName, const scf::SCFTileAndFuseOptions &options,
     const LinalgExt::LinalgTransformationFilter &filter) {
   return std::make_unique<LinalgStrategyTileAndFusePass>(opName, options,
                                                          filter);
