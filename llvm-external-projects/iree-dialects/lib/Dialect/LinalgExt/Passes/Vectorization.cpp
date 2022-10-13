@@ -46,11 +46,8 @@ Value getInputOrPaddedInput(OpBuilder &builder, PackOp packOp) {
   }
 
   Location loc = packOp.getLoc();
-  SmallVector<OpFoldResult> lowPadding, highPadding;
-  auto zeroAttr = builder.getIndexAttr(0);
   ShapedType inputType = packOp.getInputType();
   int64_t inputRank = inputType.getRank();
-  lowPadding.append(inputRank, zeroAttr);
 
   SmallVector<int64_t> paddedShape;
   DenseMap<int64_t, OpFoldResult> tileAndPosMapping =
@@ -59,7 +56,6 @@ Value getInputOrPaddedInput(OpBuilder &builder, PackOp packOp) {
     int64_t size = inputType.getDimSize(dim);
     if (!tileAndPosMapping.count(dim)) {
       paddedShape.push_back(size);
-      highPadding.push_back(zeroAttr);
       continue;
     }
 
@@ -68,14 +64,12 @@ Value getInputOrPaddedInput(OpBuilder &builder, PackOp packOp) {
     assert((!inputType.isDynamicDim(dim) && tileSize.hasValue()) &&
            "something goes really wrong...");
     int64_t sizeWithPad = llvm::alignTo(size, tileSize.getValue());
-    highPadding.push_back(builder.getIndexAttr(sizeWithPad - size));
     paddedShape.push_back(sizeWithPad);
   }
   auto resultType =
       RankedTensorType::get(paddedShape, inputType.getElementType());
-  return tensor::createPadScalarOp(resultType, input, packOp.getPaddingValue(),
-                                   lowPadding, highPadding,
-                                   /*nofold=*/false, loc, builder);
+  return tensor::createPadHighOp(resultType, input, packOp.getPaddingValue(),
+                                 /*nofold=*/false, loc, builder);
 }
 
 // Creates a linalg.generic that transposes input using permutation indices.
