@@ -520,7 +520,8 @@ DiagnosedSilenceableFailure transform_ext::CanonicalizedSequenceOp::apply(
   auto &listener = state.addExtension<::mlir::TrackingListener>();
   auto detachListener = llvm::make_scope_exit(
       [&] { state.removeExtension<::mlir::TrackingListener>(); });
-  mapBlockArguments(state);
+  if (failed(mapBlockArguments(state)))
+    return DiagnosedSilenceableFailure::definiteFailure();
 
   auto checkedListenerTransform =
       [&](function_ref<LogicalResult(Operation *, RewriteListener &)>

@@ -13,7 +13,7 @@ func.func @matmul_tensors(
   return %0 : tensor<128x128xf32>
 }
 
-transform.structured.canonicalized_sequence failures(propagate) {
+transform.structured.canonicalized_sequence : (!pdl.operation) -> !pdl.operation failures(propagate) {
 ^bb1(%module_op: !pdl.operation):
   %0 = transform.structured.match ops{["linalg.matmul"]} in %module_op
   %1, %loops:3 = transform.structured.tile %0 [4, 4, 4]

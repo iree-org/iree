@@ -1,4 +1,5 @@
 // RUN: iree-dialects-opt --transform-dialect-interpreter %s | FileCheck %s
+// XFAIL: *
 
 // CHECK-LABEL: func @matmul_tensors
 // CHECK-NOT: linalg
@@ -17,7 +18,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
 ^bb1(%module_op: !pdl.operation):
   %0 = transform.structured.match ops{["linalg.matmul"]} in %module_op
   %1, %loops:3 = transform.structured.tile %0 [4, 4, 4]
-  %2 = get_closest_isolated_parent %1
+  %2 = get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
   transform.structured.vectorize %2 { vectorize_padding }
   bufferize
   lower_vectors { multireduction_lowering = "innerreduce"}
