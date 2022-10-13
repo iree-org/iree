@@ -13,4 +13,4 @@ set -xeuo pipefail
 readarray -t RUNTIME_SUBMODULES < \
   "$(dirname $(realpath $0))/runtime_submodules.txt"
 
-git submodule update --init ${RUNTIME_SUBMODULES[@]}
+git submodule sync && git submodule update --init ${RUNTIME_SUBMODULES[@]}
