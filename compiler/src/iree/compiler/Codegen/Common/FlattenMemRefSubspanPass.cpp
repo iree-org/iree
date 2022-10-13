@@ -292,7 +292,13 @@ static Value linearizeIndices(Value sourceValue, ValueRange indices,
     } else if (auto allocaOp = dyn_cast<memref::AllocaOp>(sourceOp)) {
       getDimValues(sourceType, allocaOp.getDynamicSizes());
     } else {
-      return nullptr;
+      if (sourceType.hasStaticShape()) {
+        for (int64_t dim : sourceType.getShape()) {
+          dims.push_back(builder.create<arith::ConstantIndexOp>(loc, dim));
+        }
+      } else {
+        return nullptr;
+      }
     }
   }
 
