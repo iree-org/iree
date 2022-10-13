@@ -1,8 +1,7 @@
 // RUN: iree-opt %s 
  
 // Codegen
-transform.structured.canonicalized_sequence failures(propagate) {
-// transform.sequence %arg0 failures(propagate) {
+transform.structured.canonicalized_sequence failures(suppress) {
 ^bb1(%variant_op: !pdl.operation):
   // First level of tiling + fusion parallelizes to blocks.
   // The mapping  to block ids can only happen after bufferization atm 
@@ -11,12 +10,18 @@ transform.structured.canonicalized_sequence failures(propagate) {
   %fill = transform.structured.match ops{["linalg.fill"]} in %variant_op
   %red = transform.structured.match interface{LinalgOp} 
     attributes{iterator_types = ["parallel", "parallel", "reduction"]} in %variant_op
-  %not_root = merge_handles %fill, %red
+  %not_root = merge_handles %fill, %red : !pdl.operation
+  // This must be used with the custom dispatch region formation because IREE's
+  // pulls in tensor.empty by default. This results in threadprivate allocations
+  // and prevents vector distribution down the line.
   %foreach_thread, %tiled_generic = 
     transform.structured.tile_to_foreach_thread_op %root tile_sizes [1, 1]
       (mapped to dims [0, 1, 2])
+  // %foreach_thread, %tiled_generic = 
+    // transform.iree.tile_to_foreach_thread_and_workgroup_count_region %root tile_sizes [1, 1]
+    //   (mapped to dims [0, 1, 2])
   transform.structured.fuse_into_containing_op %not_root into %foreach_thread
-  
+
   // Second level of tiling + fusion parallelizes to threads.
   // Leaving the reduction untiled on threadIdx.x makes it sequential on 
   // threadIdx.x. After distribution, predication by if (threadIdx.x == 0) is
@@ -25,7 +30,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   %fill_linalg = transform.structured.match ops{["linalg.fill"]} in %variant_op
   %reduction_linalg = transform.structured.match ops{["linalg.generic"]} 
     attributes{iterator_types = ["parallel", "parallel", "reduction"]} in %variant_op
-  %not_root_2 = merge_handles %fill_linalg, %reduction_linalg
+  %not_root_2 = merge_handles %fill_linalg, %reduction_linalg : !pdl.operation
   %parallel_linalg = transform.structured.match ops{["linalg.generic"]} 
     attributes{iterator_types = ["parallel", "parallel", "parallel"]} in %variant_op
   %foreach_thread_2, %parallel_linalg_2 = 

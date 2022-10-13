@@ -10,7 +10,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   %fill = transform.structured.match ops{["linalg.fill"]} in %variant_op
   %red = transform.structured.match interface{LinalgOp}
     attributes{iterator_types = ["parallel", "parallel", "reduction"]} in %variant_op
-  %not_root = merge_handles %fill, %red
+  %not_root = merge_handles %fill, %red : !pdl.operation
   %foreach_thread, %tiled_generic =
     transform.iree.tile_to_foreach_thread_and_workgroup_count_region %root tile_sizes [1, 4]
   transform.structured.fuse_into_containing_op %not_root into %foreach_thread

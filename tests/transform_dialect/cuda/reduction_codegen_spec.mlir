@@ -1,6 +1,6 @@
 // RUN: iree-opt %s
 
-transform.structured.canonicalized_sequence failures(propagate) {
+transform.structured.canonicalized_sequence failures(suppress) {
 ^bb1(%variant_op: !pdl.operation):
   %fill = transform.structured.match ops{["linalg.fill"]} in %variant_op
 
@@ -15,7 +15,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   // The mapping to block ids can only happen after bufferization atm.
   %foreach_thread_grid, %grid_combiner_op =
     transform.iree.tile_to_foreach_thread_and_workgroup_count_region %combiner_op tile_sizes [1]
-  %not_combiner = transform.merge_handles %fill, %more_parallel_fill_op, %more_parallel_op
+  %not_combiner = transform.merge_handles %fill, %more_parallel_fill_op, %more_parallel_op : !pdl.operation
   transform.structured.fuse_into_containing_op %not_combiner into %foreach_thread_grid
 
   // Second level of tiling + fusion parallelizes to threads.

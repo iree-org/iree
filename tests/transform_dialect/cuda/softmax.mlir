@@ -13,13 +13,14 @@
 // RUN: iree-run-module --entry_function=max_sub_exp --device=cuda | \
 // RUN: FileCheck %s
 
+///
+/// FIXME: Fused codegen must be used with the custom dispatch region formation
+/// because IREE's pulls in tensor.empty by default. 
+/// This results in threadprivate allocations and prevents vector distribution.
+///
 // RUN: iree-opt %s --iree-hal-target-backends=cuda \
 // RUN:     --iree-abi-transformation-pipeline \
 // RUN:     --iree-flow-transformation-pipeline  \
-///
-/// FIXME: This cannot be retired yet as there is some writeonly vs readwrite
-/// issue and we even end up emitting out of bounds accesses.
-///
 // RUN:     --iree-flow-dispatch-use-transform-dialect=%p/softmax_dispatch_spec.mlir \
 // RUN:     --iree-stream-transformation-pipeline \
 // RUN:     --iree-hal-configuration-pipeline | \
@@ -27,11 +28,12 @@
 // RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/softmax_fused_codegen_spec.mlir | \
 // RUN: FileCheck %s --check-prefix=CHECK-SHUFFLE
 
+///
+/// FIXME: Fused codegen must be used with the custom dispatch region formation
+/// because IREE's pulls in tensor.empty by default. 
+/// This results in threadprivate allocations and prevents vector distribution.
+///
 // RUN: iree-compile %s --iree-hal-target-backends=cuda \
-///
-/// FIXME: This cannot be retired yet as there is some writeonly vs readwrite
-/// issue and we even end up emitting out of bounds accesses.
-///
 // RUN:     --iree-flow-dispatch-use-transform-dialect=%p/softmax_dispatch_spec.mlir \
 // RUN:     --iree-codegen-llvmgpu-use-transform-dialect=%p/softmax_fused_codegen_spec.mlir | \
 // RUN: iree-run-module --entry_function=max_sub_exp --device=cuda | \

@@ -7,7 +7,7 @@
 # Tests for end-to-end IREE support of entire models or their close derivatives.
 
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content")
-#load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
+load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 
 package(
     features = ["layering_check"],
@@ -23,37 +23,39 @@ endif()
     inline = True,
 )
 
-# TODO: re-enable the tests
-# iree_lit_test_suite(
-#     name = "lit",
-#     srcs = [
-#         "reduction.mlir",
-#         "softmax.mlir",
-#     ],
-#     cfg = "//tests:lit.cfg.py",
-#     # transform dialect spec files are MLIR files that specify a transformation,
-#     # they need to be included as data.
-#     data = [
-#         "reduction_codegen_spec.mlir",
-#         "softmax_codegen_spec.mlir",
-#         # FIXME: This cannot be retired yet as there is some writeonly vs readwrite
-#         # issue and we even end up emitting out of bounds accesses.
-#         "softmax_dispatch_spec.mlir",
-#         "softmax_fused_codegen_spec.mlir",
-#     ],
-#     tags = [
-#         # CUDA cuInit fails with sanitizer on.
-#         "noasan",
-#         "nomsan",
-#         "notsan",
-#         "noubsan",
-#         "requires-gpu-nvidia",
-#         "driver=cuda",
-#     ],
-#     tools = [
-#         "//tools:iree-compile",
-#         "//tools:iree-opt",
-#         "//tools:iree-run-module",
-#         "@llvm-project//llvm:FileCheck",
-#     ],
-# )
+iree_lit_test_suite(
+    name = "lit",
+    srcs = [
+        "reduction.mlir",
+        "softmax.mlir",
+    ],
+    cfg = "//tests:lit.cfg.py",
+    # transform dialect spec files are MLIR files that specify a transformation,
+    # they need to be included as data.
+    data = [
+        "reduction_codegen_spec.mlir",
+        "softmax_codegen_spec.mlir",
+        #
+        # FIXME: Fused codegen must be used with the custom dispatch region formation
+        # because IREE's pulls in tensor.empty by default.
+        # This results in threadprivate allocations and prevents vector distribution.
+        #
+        "softmax_dispatch_spec.mlir",
+        "softmax_fused_codegen_spec.mlir",
+    ],
+    tags = [
+        # CUDA cuInit fails with sanitizer on.
+        "noasan",
+        "nomsan",
+        "notsan",
+        "noubsan",
+        "requires-gpu-nvidia",
+        "driver=cuda",
+    ],
+    tools = [
+        "//tools:iree-compile",
+        "//tools:iree-opt",
+        "//tools:iree-run-module",
+        "@llvm-project//llvm:FileCheck",
+    ],
+)

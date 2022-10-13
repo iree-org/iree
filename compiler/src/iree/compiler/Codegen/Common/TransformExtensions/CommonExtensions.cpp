@@ -101,10 +101,10 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
     Operation *target, SmallVectorImpl<Operation *> &results,
     transform::TransformState &state) {
   if (!target->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
-    target->emitOpError(
+    return mlir::emitDefiniteFailure(
+        target,
         "applies only to isolated-from-above targets because it needs to apply "
         "patterns greedily");
-    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
   }
   MLIRContext *ctx = target->getContext();
   RewritePatternSet patterns(ctx);
@@ -121,8 +121,13 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
   LogicalResult result = applyPatternsAndFoldGreedily(
       target, std::move(patterns), config, &listener);
   LogicalResult listenerResult = listener.checkErrorState();
-  if (failed(result) || failed(listenerResult))
-    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+  if (failed(result)) {
+    return mlir::emitDefiniteFailure(target,
+                                     "greedy pattern application failed");
+  }
+  if (failed(listenerResult))
+    return mlir::emitDefiniteFailure(target, "listener tracking failed");
+
   results.assign({target});
   return DiagnosedSilenceableFailure(success());
 }
@@ -207,10 +212,10 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
   if (payload.size() != 1 ||
       !isa<ModuleOp, HAL::ExecutableOp, HAL::ExecutableVariantOp>(
           payload.front())) {
-    state.getTopLevel()->emitOpError(
+    return mlir::emitDefiniteFailure(
+        state.getTopLevel(),
         "requires exactly a single HAL::ExecutableOp or "
         "HAL::ExecutableVariantOp target op.");
-    return DiagnosedSilenceableFailure(failure());
   }
   PassManager pm(getContext());
   // Bufferize the dispatch.
@@ -237,9 +242,14 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
     }
     return WalkResult::advance();
   });
+
+  if (res.wasInterrupted())
+    return DiagnosedSilenceableFailure::definiteFailure();
+
   results.set(getOperation()->getOpResult(0), payload.front());
-  return DiagnosedSilenceableFailure(failure(res.wasInterrupted()));
+  return DiagnosedSilenceableFailure::success();
 }
+
 /// Populate the workgroup_count region of `dispatchOp`.
 /// For now, this only supports constant index ops and empty workload operands.
 /// Assumes the HAL::ExecutableExportOp is built with an empty region.
@@ -437,11 +447,11 @@ transform_dialect::ForeachThreadToWorkgroupOp::applyToOne(
     func::FuncOp target, SmallVectorImpl<Operation *> &results,
     transform::TransformState &state) {
   if (!isa<HAL::ExecutableOp, HAL::ExecutableVariantOp>(state.getTopLevel())) {
-    state.getTopLevel()->emitOpError(
+    return mlir::emitDefiniteFailure(
+        state.getTopLevel(),
         "requires HAL::ExecutableOp or HAL::ExecutableVariantOp toplevel "
         "to attach the workgroup size information to a nested "
         "ExecutableExportOp");
-    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
   }
 
   IREE::HAL::ExecutableExportOp exportOp;
@@ -449,8 +459,9 @@ transform_dialect::ForeachThreadToWorkgroupOp::applyToOne(
     if (op.getSymName() == target.getName()) exportOp = op;
   });
   if (!exportOp) {
-    state.getTopLevel()->emitOpError("no IREE::HAL::ExecutableExportOp found");
-    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+    results.assign(1, nullptr);
+    return mlir::emitSilenceableFailure(
+        target, "no IREE::HAL::ExecutableExportOp found");
   }
 
   scf::ForeachThreadOp topLevelForeachThreadOp;
@@ -463,18 +474,19 @@ transform_dialect::ForeachThreadToWorkgroupOp::applyToOne(
   });
 
   if (walkResult.wasInterrupted()) {
-    state.getTopLevel()->emitOpError(
-        "could not find a unique topLevel scf.foreach_thread");
-    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+    results.assign(1, nullptr);
+    return mlir::emitSilenceableFailure(
+        target, "could not find a unique topLevel scf.foreach_thread");
   }
 
   SimplePatternRewriter rewriter(topLevelForeachThreadOp);
   if (failed(rewriteForeachThreadToWorkgroup(topLevelForeachThreadOp, exportOp,
-                                             rewriter)))
-    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+                                             rewriter))) {
+    return mlir::emitDefiniteFailure(target,
+                                     "rewriteForeachThreadToWorkgroup failed");
+  }
 
   results.assign({target});
-
   return DiagnosedSilenceableFailure(success());
 }
 
@@ -560,10 +572,7 @@ void transform_dialect::TileToForeachThreadAndWorkgroupCountRegion::getEffects(
   transform::onlyReadsHandle(getTileSizes(), effects);
   transform::onlyReadsHandle(getNumThreads(), effects);
   transform::producesHandle(getResults(), effects);
-  effects.emplace_back(MemoryEffects::Read::get(),
-                       transform::PayloadIRResource::get());
-  effects.emplace_back(MemoryEffects::Write::get(),
-                       transform::PayloadIRResource::get());
+  transform::modifiesPayload(effects);
 }
 
 DiagnosedSilenceableFailure
@@ -575,15 +584,14 @@ transform_dialect::TileToForeachThreadAndWorkgroupCountRegion::apply(
   auto funcOp = targetOps.front()->getParentOfType<func::FuncOp>();
   FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
   if (failed(exportOp)) {
-    state.getTopLevel()->emitOpError("couldn't find export op for func");
-    return DiagnosedSilenceableFailure(reportUnknownTransformError(funcOp));
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                     "couldn't find export op for func");
   }
 
   SmallVector<OpFoldResult> mixedTileSizes = getMixedTileSizes();
   if (mixedTileSizes.empty()) {
-    exportOp.value()->emitOpError("require tile sizes to be specified");
-    return DiagnosedSilenceableFailure(
-        reportUnknownTransformError(exportOp.value()));
+    return mlir::emitDefiniteFailure(exportOp.value(),
+                                     "require tile sizes to be specified");
   }
 
   /// Lower the workgroup count region in keeping with the way dispatch
@@ -591,9 +599,8 @@ transform_dialect::TileToForeachThreadAndWorkgroupCountRegion::apply(
   IRRewriter rewriter(getContext());
   if (failed(lowerWorkgroupCountComputingRegion(rewriter, exportOp.value(),
                                                 mixedTileSizes))) {
-    exportOp.value()->emitOpError("failed to lower workgroup count region");
-    return DiagnosedSilenceableFailure(
-        reportUnknownTransformError(exportOp.value()));
+    return mlir::emitDefiniteFailure(exportOp.value(),
+                                     "failed to lower workgroup count region");
   }
 
   ArrayRef<Operation *> targets = state.getPayloadOps(getTarget());
@@ -607,11 +614,16 @@ transform_dialect::TileToForeachThreadAndWorkgroupCountRegion::apply(
       targets, getMixedNumThreads(), getMixedTileSizes(), getThreadDimMapping(),
       tileOps, tiledOps);
 
-  if (!diag.succeeded()) return diag;
+  if (!diag.succeeded()) {
+    transformResults.set(getForeachThreadOp().cast<OpResult>(),
+                         SmallVector<mlir::Operation *>{});
+    transformResults.set(getTiledOp().cast<OpResult>(),
+                         SmallVector<mlir::Operation *>{});
+    return diag;
+  }
 
   transformResults.set(getForeachThreadOp().cast<OpResult>(), tileOps);
   transformResults.set(getTiledOp().cast<OpResult>(), tiledOps);
-
   return DiagnosedSilenceableFailure(success());
 }
 
