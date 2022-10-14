@@ -85,10 +85,16 @@ result = invoker.forward(example_input)
 
 ## Training
 
-Training in PyTorch with IREE should be seamlessly supported.  We are working to provide an example.
+Training with PyTorch in IREE is supported via `functorch`.  The steps for loading the model, once defined, into IREE, is nearly identical to the above example.
+
+You can find a full end-to-end example of defining a basic regression model, training with it, and running inference on it [here](https://github.com/iree-org/iree-torch/blob/main/examples/regression.py).
 
 ## Samples
 
 | Colab notebooks |  |
 | -- | -- |
 Inference on BERT | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iree-org/iree-torch/blob/main/examples/bert.ipynb)
+
+| Example scripts |
+| -- |
+[Basic Inference and Training Example](https://github.com/iree-org/iree-torch/blob/main/examples/regression.py)
