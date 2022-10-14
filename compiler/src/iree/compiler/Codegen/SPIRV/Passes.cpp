@@ -297,6 +297,7 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm) {
       createRemoveSingleIterationLoopPass());
 
   nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorizePass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(

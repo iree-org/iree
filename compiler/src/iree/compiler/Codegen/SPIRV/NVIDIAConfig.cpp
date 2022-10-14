@@ -112,7 +112,13 @@ static LogicalResult setOpConfig(const spirv::TargetEnv &targetEnv,
 static LogicalResult setNVIDIAMatmulConfig(linalg::LinalgOp op,
                                            int subgroupSize) {
   const std::array<int64_t, 2> workgroupXY = {subgroupSize, 8};
-  const std::array<int64_t, 3> threadMNK = {4, 4, 32};
+  std::array<int64_t, 3> threadMNK;
+  auto inputType = op.getInputs()[0].getType().cast<ShapedType>();
+  if (inputType.getElementType().getIntOrFloatBitWidth() == 16) {
+    threadMNK = {8, 8, 32};
+  } else {
+    threadMNK = {4, 4, 32};
+  }
   return setMatmulOpConfig(op, subgroupSize, workgroupXY, threadMNK,
                            /*useWorkgroupMemory=*/true);
 }
