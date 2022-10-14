@@ -154,6 +154,7 @@ iree_cc_library(
     "FoldAffineMinInDistributedLoops.cpp"
     "GPUDistributeSharedMemoryCopy.cpp"
     "GPUPipelining.cpp"
+    "GPUTileReduction.cpp"
     "GPUVectorization.cpp"
     "LinalgOpInfo.cpp"
     "MemrefCopyToLinalg.cpp"

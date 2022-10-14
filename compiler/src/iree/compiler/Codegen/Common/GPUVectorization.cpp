@@ -105,6 +105,8 @@ struct GPUVectorizationPass
             funcOp, std::move(vectorizationPatterns)))) {
       return signalPassFailure();
     }
+
+    linalg::hoistRedundantVectorTransfersOnTensor(funcOp);
   }
 };
 }  // namespace
