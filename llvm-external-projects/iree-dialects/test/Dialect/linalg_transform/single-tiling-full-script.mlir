@@ -1,5 +1,5 @@
 // RUN: iree-dialects-opt --transform-dialect-interpreter %s | FileCheck %s
-// XFAIL: *
+// REQUIRES: dont-run
 // FIXME(#10785): Fix an un-XFAIL this test.
 
 // CHECK-LABEL: func @matmul_tensors
