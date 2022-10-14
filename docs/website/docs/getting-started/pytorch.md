@@ -1,7 +1,7 @@
 # PyTorch Integration
 
 IREE supports compiling and running PyTorch programs represented as
-`nn.Module` [classes](https://pytorch.org/docs/stable/generated/torch.nn.Module.html).
+`nn.Module` [classes](https://pytorch.org/docs/stable/generated/torch.nn.Module.html) as well as models defined using [`functorch`](https://pytorch.org/functorch/).
 
 ## Prerequisites
 
