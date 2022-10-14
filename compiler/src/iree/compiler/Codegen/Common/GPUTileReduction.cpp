@@ -32,13 +32,18 @@ class SimpleRewriter : public PatternRewriter {
 namespace {
 
 static LogicalResult tileReduction(linalg::GenericOp op) {
+  SmallVector<unsigned> dims;
+  op.getReductionDims(dims);
+  SmallVector<int64_t> tileSize = getTileSizes(op, 1);
+  if (tileSize.empty() || dims.size() != 1 ||
+      tileSize.back() == op.getStaticLoopRanges()[dims.back()])
+    return success();
   // First split the reduction.
   SimpleRewriter rewriter(op.getContext());
   rewriter.setInsertionPoint(op);
   auto control = [](linalg::LinalgOp op) {
     linalg::SplitReductionOptions option;
     SmallVector<int64_t> tileSize = getTileSizes(op, 1);
-    if (tileSize.empty()) return option;
     option.ratio = tileSize.back();
     option.innerParallel = true;
     option.index = op.getNumLoops() - 1;
