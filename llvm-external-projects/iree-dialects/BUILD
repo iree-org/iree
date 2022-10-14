@@ -303,6 +303,7 @@ cc_library(
     ],
 )
 
+# TODO(#9827): Remove aliases and/or backref.
 alias(
     name = "IREELinalgExtPasses",
     actual = ":IREELinalgExtPassesAndTransforms",
