@@ -32,7 +32,7 @@ def run():
   submodules = output.readlines()
 
   runtime_submodules = pathlib.Path(__file__).with_name(
-       "runtime_submodules.txt").read_text().split("\n")
+      "runtime_submodules.txt").read_text().split("\n")
 
   for submodule in submodules:
     prefix = submodule.strip()[0]
