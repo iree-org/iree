@@ -11,8 +11,7 @@ Install IREE pip packages, either from pip or by
 ```shell
 pip install \
   iree-compiler \
-  iree-runtime \
-  iree-tools-tf
+  iree-runtime
 ```
 
 Install [`torch-mlir`](https://github.com/llvm/torch-mlir), necessary for compiling PyTorch models to a format IREE is able to execute:
