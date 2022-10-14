@@ -675,7 +675,7 @@ struct ScatterOpCollapseBatch : public OpRewritePattern<mhlo::ScatterOp> {
 //            scatter_dims_to_operand_dims = [0],
 //            index_vector_dim = 1>,
 //     unique_indices = true} :
-//        (tensor<5x4x1xi32>, tensor<1x1xi32>, tensor<1x4x1xi32>) -> tensor<5x4x1xi32>
+//        (tensor<5x4x1xi32>, tensor<1x1xi32>, tensor<1x4x1xi32>)
 //  return %0 : tensor<5x4x1xi32>
 struct ScatterMaterializeInsertedDim
     : public OpRewritePattern<mhlo::ScatterOp> {
