@@ -10,7 +10,8 @@
 
 set -xeuo pipefail
 
-readarray -t RUNTIME_SUBMODULES < \
-  "$(dirname $(realpath $0))/runtime_submodules.txt"
+SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")"
+
+readarray -t RUNTIME_SUBMODULES < "${SCRIPT_DIR}/runtime_submodules.txt"
 
 git submodule sync && git submodule update --init ${RUNTIME_SUBMODULES[@]}

@@ -6,6 +6,7 @@
 
 import argparse
 import os
+import pathlib
 import subprocess
 import sys
 
@@ -30,19 +31,17 @@ def run():
   output = os.popen("git submodule status")
   submodules = output.readlines()
 
-  with open(
-      os.path.dirname(os.path.realpath(__file__)) + "/runtime_submodules.txt",
-      "r") as f:
-    runtime_submodules = f.read().split("\n")
+  runtime_submodules = pathlib.Path(__file__).with_name(
+       "runtime_submodules.txt").read_text().split("\n")
 
   for submodule in submodules:
-    if submodule.strip()[0] == "-":
-      if (args.runtime_only and
-          submodule.split()[1] in runtime_submodules) or not args.runtime_only:
-        print(
-            "The git submodule '%s' is not initialized. Please run `git submodule update --init`"
-            % (submodule.split()[1]))
-        sys.exit(1)
+    prefix = submodule.strip()[0]
+    name = submodule.split()[1]
+    if prefix == "-" and (not args.runtime_only or name in runtime_submodules):
+      print(
+          "The git submodule '%s' is not initialized. Please run `git submodule update --init`"
+          % (name))
+      sys.exit(1)
 
 
 if __name__ == "__main__":
