@@ -24,7 +24,13 @@ namespace detail {
 static LogicalResult setAdrenoMatmulConfig(linalg::LinalgOp op,
                                            int subgroupSize) {
   const std::array<int64_t, 2> workgroupXY = {subgroupSize / 2, 2};
-  const std::array<int64_t, 3> threadMNK = {16, 4, 4};
+  std::array<int64_t, 3> threadMNK;
+  auto inputType = op.getInputs()[0].getType().cast<ShapedType>();
+  if (inputType.getElementType().getIntOrFloatBitWidth() == 16) {
+    threadMNK = {16, 8, 8};
+  } else {
+    threadMNK = {16, 4, 4};
+  }
   return setMatmulOpConfig(op, subgroupSize, workgroupXY, threadMNK);
 }
 

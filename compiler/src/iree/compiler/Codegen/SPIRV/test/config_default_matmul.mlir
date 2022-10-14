@@ -305,7 +305,7 @@ hal.executable private @matmul_pointwise_256x1024 {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[16, 256], [8, 8], [0, 0, 4]{{\]}}>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[16, 256], [8, 8], [0, 0, 8]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseVectorize>
 //      CHECK: hal.executable.export public @matmul_pointwise_256x1024
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]

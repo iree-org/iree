@@ -26,7 +26,13 @@ namespace detail {
 
 static LogicalResult setAMDMatmulConfig(linalg::LinalgOp op, int subgroupSize) {
   const std::array<int64_t, 2> workgroupXY = {subgroupSize / 2, 8};
-  const std::array<int64_t, 3> threadMNK = {8, 4, 16};
+  std::array<int64_t, 3> threadMNK;
+  auto inputType = op.getInputs()[0].getType().cast<ShapedType>();
+  if (inputType.getElementType().getIntOrFloatBitWidth() == 16) {
+    threadMNK = {8, 8, 32};
+  } else {
+    threadMNK = {8, 4, 16};
+  }
   return setMatmulOpConfig(op, subgroupSize, workgroupXY, threadMNK,
                            /*useWorkgroupMemory=*/true);
 }

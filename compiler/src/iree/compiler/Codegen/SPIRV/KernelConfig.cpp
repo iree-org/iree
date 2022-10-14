@@ -839,7 +839,14 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
         // Try to tile and vectorize first. It's common to see 32 threads
         // per subgroup for GPUs.
         std::array<int64_t, 2> workgroupXY = {32, 2};
-        std::array<int64_t, 3> threadMNK = {8, 8, 4};
+        std::array<int64_t, 3> threadMNK;
+        auto inputType =
+            op.getInputs()[0].getType().template cast<ShapedType>();
+        if (inputType.getElementType().getIntOrFloatBitWidth() == 16) {
+          threadMNK = {8, 8, 8};
+        } else {
+          threadMNK = {8, 8, 4};
+        }
         auto result = detail::setMatmulOpConfig(op, /*subgroupSize=*/32,
                                                 workgroupXY, threadMNK);
         if (failed(result)) return result;
