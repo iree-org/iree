@@ -22,6 +22,12 @@ namespace iree_compiler {
 static bool contractOpFilter(Operation *op) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
   if (!linalgOp) return false;
+
+  // The workgroup specialization already makes static shapes available for the
+  // main tile part and makes the partial tile computation small, so promoting
+  // to shared memory for the partial tile actually hurts the performance.
+  if (linalgOp.hasDynamicShape()) return false;
+
   SmallVector<unsigned> dims;
   linalgOp.getParallelDims(dims);
   SmallVector<int64_t, 4> shapes = linalgOp.getStaticLoopRanges();
