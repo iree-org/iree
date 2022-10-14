@@ -102,7 +102,7 @@ function(iree_run_module_test)
 
   # All the file paths referred in the _RUNNER_FILE_ARGS are absolute paths and
   # the portability is handled by `iree_native_test`.
-  list(APPEND _RUNNER_FILE_ARGS "--module_file=${_RULE_MODULE_SRC}")
+  list(APPEND _RUNNER_FILE_ARGS "--module_file={{${_RULE_MODULE_SRC}}}")
 
   if(_RULE_EXPECTED_OUTPUT)
     # this may be a file or a literal output. In the latter case, the
@@ -141,7 +141,8 @@ function(iree_run_module_test)
           ${IREE_BENCHMARK_SUITE_DIR}\n\
           Please check if you need to download it first.")
       else()
-        list(APPEND _RUNNER_FILE_ARGS "--expected_output=@${_OUTPUT_FILE_ABS_PATH}")
+        list(APPEND _RUNNER_FILE_ARGS
+          "--expected_output=@{{${_OUTPUT_FILE_ABS_PATH}}}")
       endif()
     else()
       message(SEND_ERROR "Unsupported expected output file type: ${_RULE_EXPECTED_OUTPUT}")
@@ -159,7 +160,8 @@ function(iree_run_module_test)
       CONTENT
         "${_OUTPUT_FLAGS}"
     )
-    list(APPEND _RUNNER_FILE_ARGS "--flagfile=${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}_flagfile")
+    list(APPEND _RUNNER_FILE_ARGS
+      "--flagfile={{${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}_flagfile}}")
   endif()
 
   # A target specifically for the test.
@@ -184,7 +186,7 @@ function(iree_run_module_test)
       "${_RULE_DRIVER}"
     SRC
       "${_RUNNER_TARGET}"
-    TEST_INPUT_FILE_ARGS
+    ARGS
       ${_RUNNER_FILE_ARGS}
     WILL_FAIL
       ${_TEST_XFAIL}
