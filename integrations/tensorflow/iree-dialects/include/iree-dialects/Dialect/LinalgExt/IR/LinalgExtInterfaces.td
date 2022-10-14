@@ -389,6 +389,33 @@ def LinalgExtInterface : OpInterface<"LinalgExtOp"> {
       }]
     >,
     //===------------------------------------------------------------------===//
+    // Non input and output operands handling
+    //===------------------------------------------------------------------===//
+    InterfaceMethod<
+      /*desc=*/[{
+        Return operands that are neither inputs nor outputs.
+      }],
+      /*retTy=*/"OpOperandVector",
+      /*methodName=*/"getNonInputOrOutputOperands",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        int64_t numInputsAndOutputs = getNumInputsAndOutputs();
+        int64_t numOperands = this->getOperation()->getNumOperands();
+        assert(numInputsAndOutputs <= numOperands);
+        if (numInputsAndOutputs == numOperands)
+          return {};
+        OpOperandVector result;
+        result.reserve(numOperands - numInputsAndOutputs);
+        llvm::transform(
+          this->getOperation()->getOpOperands()
+            .drop_front(numInputsAndOutputs),
+          std::back_inserter(result),
+          [](OpOperand &opOperand) {return &opOperand;});
+        return result;
+      }]
+    >,
+    //===------------------------------------------------------------------===//
     // Other interface methods.
     //===------------------------------------------------------------------===//
     InterfaceMethod<
