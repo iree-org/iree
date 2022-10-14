@@ -4,7 +4,31 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-include(CMakeParseArguments)
+# iree_parse_input_file_arg
+#
+# A helper function to split the flag and the file path from
+# `TEST_INPUT_FILE_ARGS`. it is for `iree_run_module_test` as `iree-run-module`
+# can have multiple input files while are passed through different flags.
+# The file path is then handled in `iree_native_test` for portability.
+function(iree_parse_input_file_arg OUT_FLAG OUT_FILE INPUT_ARG)
+  if(${INPUT_ARG} MATCHES "^--")
+    string(FIND "${INPUT_ARG}" "=" _FLAG_IDX)
+    if(${_FLAG_IDX} GREATER 0)  # Add `=` back to _OUT_FLAG
+      math(EXPR _FLAG_IDX "${_FLAG_IDX} + 1")
+      cmake_path(GET INPUT_ARG EXTENSION LAST_ONLY _FILE_TYPE)
+      if(_FILE_TYPE STREQUAL ".npy")  # Add `@` back to _OUT_FLAG
+        math(EXPR _FLAG_IDX "${_FLAG_IDX} + 1")
+      endif()
+    endif()
+    string(SUBSTRING "${INPUT_ARG}" 0 ${_FLAG_IDX} _OUT_FLAG)
+    string(SUBSTRING "${INPUT_ARG}" ${_FLAG_IDX} -1 _OUT_FILE)
+  else()
+    set(_OUT_FLAG "")
+    set(_OUT_FILE "${INPUT_ARG}")
+  endif()
+  set(${OUT_FLAG} "${_OUT_FLAG}" PARENT_SCOPE)
+  set(${OUT_FILE} "${_OUT_FILE}" PARENT_SCOPE)
+endfunction()
 
 # iree_native_test()
 #
@@ -16,14 +40,14 @@ include(CMakeParseArguments)
 # NAME: name of target
 # DRIVER: If specified, will pass --device=DRIVER to the test binary and adds
 #     a driver label to the test.
-# TEST_INPUT_FILE_ARG: If specified, the input file will be added to DATA and
-#     its device path appended to ARGS. Note that the device path may be
+# TEST_INPUT_FILE_ARGS: If specified, the input files will be added to DATA and
+#     their device paths appended to ARGS. Note that the device path may be
 #     different from the host path, so this parameter should be used to portably
 #     pass file arguments to tests.
 # DATA: Additional input files needed by the test binary. When running tests on
 #     a separate device (e.g. Android), these files will be pushed to the
-#     device. TEST_INPUT_FILE_ARG is automatically added if specified.
-# ARGS: additional arguments passed to the test binary. TEST_INPUT_FILE_ARG and
+#     device. TEST_INPUT_FILE_ARGS is automatically added if specified.
+# ARGS: additional arguments passed to the test binary. TEST_INPUT_FILE_ARGS and
 #     --device=DRIVER are automatically added if specified.
 # SRC: binary target to run as the test.
 # WILL_FAIL: The target will run, but its pass/fail status will be inverted.
@@ -57,8 +81,8 @@ function(iree_native_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;SRC;DRIVER;TEST_INPUT_FILE_ARG;WILL_FAIL"
-    "ARGS;LABELS;DATA;TIMEOUT"
+    "NAME;SRC;DRIVER;WILL_FAIL"
+    "ARGS;TEST_INPUT_FILE_ARGS;LABELS;DATA;TIMEOUT"
     ${ARGN}
   )
 
@@ -79,14 +103,17 @@ function(iree_native_test)
     set(_ANDROID_ABS_DIR "/data/local/tmp/${_PACKAGE_PATH}/${_RULE_NAME}")
   endif()
 
-  if(DEFINED _RULE_TEST_INPUT_FILE_ARG)
-    if(ANDROID)
-      get_filename_component(_TEST_INPUT_FILE_BASENAME "${_RULE_TEST_INPUT_FILE_ARG}" NAME)
-      list(APPEND _RULE_ARGS "${_ANDROID_ABS_DIR}/${_TEST_INPUT_FILE_BASENAME}")
-    else()
-      list(APPEND _RULE_ARGS "${_RULE_TEST_INPUT_FILE_ARG}")
-    endif()
-    list(APPEND _RULE_DATA "${_RULE_TEST_INPUT_FILE_ARG}")
+  if(DEFINED _RULE_TEST_INPUT_FILE_ARGS)
+    foreach(_INPUT_FILE_ARG ${_RULE_TEST_INPUT_FILE_ARGS})
+      iree_parse_input_file_arg(_INPUT_FLAG _INPUT_FILE ${_INPUT_FILE_ARG})
+      if(ANDROID)
+        get_filename_component(_TEST_INPUT_FILE_BASENAME "${_INPUT_FILE}" NAME)
+        list(APPEND _RULE_ARGS "${_INPUT_FLAG}${_ANDROID_ABS_DIR}/${_TEST_INPUT_FILE_BASENAME}")
+      else()
+        list(APPEND _RULE_ARGS "${_INPUT_FLAG}${_INPUT_FILE}")
+      endif()
+      list(APPEND _RULE_DATA "${_INPUT_FILE}")
+    endforeach()
   endif()
 
   # Replace binary passed by relative ::name with iree::package::name
