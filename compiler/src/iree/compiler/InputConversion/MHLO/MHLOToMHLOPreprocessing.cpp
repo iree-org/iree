@@ -649,6 +649,34 @@ struct ScatterOpCollapseBatch : public OpRewritePattern<mhlo::ScatterOp> {
   }
 };
 
+// mhlo.scatter can materialize a unit dimension at both indexed dimensions or
+// at unary dimensions in the destination matrix. linalg_ext.scatter only
+// allows unit dimensions at indexed dimensions. This pattern inserts all
+// unary dimensions that are not index dimensions to be compatible with
+// linalg_ext.scatter.
+//
+// If converts an mhlo.scatter as below:
+//  %result = "mhlo.scatter"(...) ({
+//    indices_are_sorted = true,
+//    scatter_dimension_numbers = #mhlo.scatter<
+//            update_window_dims = [1],
+//            inserted_window_dims = [0, 2],
+//            scatter_dims_to_operand_dims = [0],
+//            index_vector_dim = 1>,
+//    unique_indices = true} :
+//        (tensor<5x4x1xi32>, tensor<1x1xi32>, tensor<1x4xi32>)
+//
+// To:
+//  %result = "mhlo.scatter"(...) ({
+//    indices_are_sorted = true,
+//    scatter_dimension_numbers = #mhlo.scatter<
+//            update_window_dims = [1, 2],
+//            inserted_window_dims = [0],
+//            scatter_dims_to_operand_dims = [0],
+//            index_vector_dim = 1>,
+//     unique_indices = true} :
+//        (tensor<5x4x1xi32>, tensor<1x1xi32>, tensor<1x4x1xi32>) -> tensor<5x4x1xi32>
+//  return %0 : tensor<5x4x1xi32>
 struct ScatterMaterializeInsertedDim
     : public OpRewritePattern<mhlo::ScatterOp> {
   using OpRewritePattern<mhlo::ScatterOp>::OpRewritePattern;
@@ -659,7 +687,7 @@ struct ScatterMaterializeInsertedDim
     auto operand = op.operands().front();
     auto indicesTy = indices.getType().cast<ShapedType>();
     auto operandTy = operand.getType().cast<ShapedType>();
-    if (!operandTy.hasRank() || !indicesTy.getRank()) {
+    if (!operandTy.hasRank() || !indicesTy.hasRank()) {
       return rewriter.notifyMatchFailure(op, "operand/indices have no rank");
     }
 
@@ -684,7 +712,7 @@ struct ScatterMaterializeInsertedDim
 
     int64_t firstNonIndex = 0;
     for (int64_t s = scatterDimsToOperandDims.size(); firstNonIndex < s;
-         firstNonIndex++) {
+         ++firstNonIndex) {
       if (!isIndexDim[firstNonIndex]) break;
     }
 
@@ -694,7 +722,7 @@ struct ScatterMaterializeInsertedDim
     }
 
     int64_t frontInsertedDims = 0;
-    for (; frontInsertedDims < firstNonIndex; frontInsertedDims++) {
+    for (; frontInsertedDims < firstNonIndex; ++frontInsertedDims) {
       if (!isInsertDims[frontInsertedDims]) {
         break;
       }
@@ -721,9 +749,9 @@ struct ScatterMaterializeInsertedDim
       auto updatesTy = update.getType().cast<ShapedType>();
 
       llvm::SmallVector<int64_t> newShape;
-      for (int i = 0, s = reassociationMap.size(); i < s; i++) {
+      for (int i = 0, s = reassociationMap.size(); i < s; ++i) {
         newShape.push_back(updatesTy.getDimSize(i));
-        for (int j = 1, s = reassociationMap[i].size(); j < s; j++) {
+        for (int j = 1, s = reassociationMap[i].size(); j < s; ++j) {
           newShape.push_back(1);
         }
       }
