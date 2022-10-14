@@ -49,6 +49,7 @@ iree_check_single_backend_test_suite(
     "reduction_broadcast_elementwise.mlir"
     "softmax.mlir"
     "strided_slice.mlir"
+    "transpose.mlir"
   TARGET_BACKEND
     "llvm-cpu"
   DRIVER
@@ -88,6 +89,7 @@ iree_check_single_backend_test_suite(
     "reduction_broadcast_elementwise.mlir"
     "softmax.mlir"
     "strided_slice.mlir"
+    "transpose.mlir"
   TARGET_BACKEND
     "vmvx"
   DRIVER
@@ -113,6 +115,7 @@ iree_check_single_backend_test_suite(
     "reduction_broadcast_elementwise.mlir"
     "softmax.mlir"
     "strided_slice.mlir"
+    "transpose.mlir"
   TARGET_BACKEND
     "vulkan-spirv"
   DRIVER
@@ -140,6 +143,7 @@ iree_check_single_backend_test_suite(
     "reduction_broadcast_elementwise.mlir"
     "softmax.mlir"
     "strided_slice.mlir"
+    "transpose.mlir"
   TARGET_BACKEND
     "cuda"
   DRIVER
