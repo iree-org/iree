@@ -62,13 +62,13 @@ iree_backend = "llvm-cpu"
 iree_vmfb = iree_torch.compile_to_vmfb(mlir, iree_backend)
 ```
 
-Here we have a choice of backend we want to target.  See [IREE Deployment Configurations](https://iree-org.github.io/iree/deployment-configurations/) for a full list of targets.
+Here we have a choice of backend we want to target. See [IREE Deployment Configurations](https://iree-org.github.io/iree/deployment-configurations/) for a full list of targets.
 
 The generated flatbuffer can now be serialized and stored for another time or loaded and executed immediately.
 
 ### Load the VM flatbuffer into IREE
 
-Next, we load the flatbuffer into the IREE runtime.  `iree_torch` provides a convenience method for loading this flatbuffer:
+Next, we load the flatbuffer into the IREE runtime. `iree_torch` provides a convenience method for loading this flatbuffer:
 
 ```python
 invoker = iree_torch.load_vmfb(iree_vmfb, iree_backend)
@@ -84,7 +84,7 @@ result = invoker.forward(example_input)
 
 ## Training
 
-Training with PyTorch in IREE is supported via `functorch`.  The steps for loading the model, once defined, into IREE, is nearly identical to the above example.
+Training with PyTorch in IREE is supported via `functorch`. The steps for loading the model, once defined, into IREE, is nearly identical to the above example.
 
 You can find a full end-to-end example of defining a basic regression model, training with it, and running inference on it [here](https://github.com/iree-org/iree-torch/blob/main/examples/regression.py).
 
