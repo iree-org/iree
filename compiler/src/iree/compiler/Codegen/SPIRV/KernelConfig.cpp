@@ -14,6 +14,7 @@
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
@@ -30,6 +31,8 @@
 #include "mlir/IR/Matchers.h"
 
 #define DEBUG_TYPE "iree-spirv-kernel-config"
+
+constexpr int kMaxVectorNumBits = 128;
 
 namespace mlir {
 namespace iree_compiler {
@@ -343,6 +346,115 @@ static bool tileMatmulMToWorkgroupY(const int64_t dimM,
   return false;
 }
 
+/// Decides the tiling parameters for matmul's K dimension.
+static bool tileMatmulK(const int64_t dimK, const int64_t residualTilingFactor,
+                        int64_t &tileSize) {
+  // Deduce the configuration for the K dimension. We need some power of two
+  // here so that we can do vector load.
+  for (int64_t t = llvm::PowerOf2Floor(residualTilingFactor); t >= 2; t >>= 1) {
+    if (dimK % t == 0) {
+      tileSize = t;
+      return true;
+    }
+  }
+  return false;
+}
+
+/// Computes the total number of bytes if promoting both matmul LHS and RHS with
+/// the tiven tile sizes.
+static int64_t getTileBytes(int64_t mTileSize, int64_t nTileSize,
+                            int64_t kTileSize, int64_t elementBits) {
+  const int64_t count = (mTileSize + nTileSize) * kTileSize;
+  return (elementBits / 8) * count;
+}
+
+/// Tries to adjust workgroup and tile sizes to enable vector load for both
+/// matmul LHS and RHS. Returns false only when it's not beneficial to promote.
+static bool adjustToVectorLoad(ArrayRef<int64_t> dimMNKSize, int64_t &mTileSize,
+                               int64_t &nTileSize, int64_t &kTileSize,
+                               SmallVectorImpl<int64_t> &wgSize,
+                               const int64_t subgroupSize, int64_t vectorSize) {
+  const int64_t totalThreads = wgSize[0] * wgSize[1] * wgSize[2];
+  LLVM_DEBUG(llvm::dbgs() << "initial total thread = " << totalThreads << "\n");
+  if (totalThreads <= subgroupSize) return false;
+
+  const bool canVectorLoadLHS = canPerformVectorAccessUsingAllThreads(
+      {mTileSize, kTileSize}, totalThreads, vectorSize);
+  const bool canVectorLoadRHS = canPerformVectorAccessUsingAllThreads(
+      {kTileSize, nTileSize}, totalThreads, vectorSize);
+  LLVM_DEBUG(llvm::dbgs() << "LHS vector load: " << canVectorLoadLHS << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "RHS vector load: " << canVectorLoadRHS << "\n");
+
+  // If we can perform vector load of neither, just don't use shared memory.
+  if (!canVectorLoadLHS && !canVectorLoadRHS) return false;
+
+  // If we can only perform vector load of one operands, adjust the tiling
+  // scheme to see if we can make both work. Increase K to load more data for
+  // the smaller tile; decrease M or N, for the larger tile.
+  if (canVectorLoadLHS && !canVectorLoadRHS) {
+    for (const int scale : {2, 4}) {
+      const int64_t newKTileSize = kTileSize * scale;
+      if (dimMNKSize[2] % newKTileSize != 0) continue;
+      const int64_t newMTileSize = mTileSize / scale;
+      const int64_t newWgMDim = wgSize[1] / scale;
+      if (newMTileSize == 0 || newWgMDim == 0) continue;
+      const int64_t newCount = wgSize[0] * newWgMDim * wgSize[2];
+      if (newCount <= subgroupSize) continue;
+      if (!canPerformVectorAccessUsingAllThreads({newMTileSize, newKTileSize},
+                                                 newCount, vectorSize) ||
+          !canPerformVectorAccessUsingAllThreads({newKTileSize, nTileSize},
+                                                 newCount, vectorSize)) {
+        continue;
+      }
+      LLVM_DEBUG({
+        llvm::dbgs() << "initial [M, N, K] tile size = [" << mTileSize << ", "
+                     << nTileSize << ", " << kTileSize << "]\n";
+        llvm::dbgs() << "revised [M, N, K] tile size = [" << newMTileSize
+                     << ", " << nTileSize << ", " << newKTileSize << "]\n";
+      });
+      mTileSize = newMTileSize;
+      kTileSize = newKTileSize;
+      wgSize[1] = newWgMDim;
+      break;
+    }
+  }
+  // TODO: improve (!canVectorLoadLHS && canVectorLoadRHS)
+
+  return true;
+}
+
+/// Tries to adjust workgorup and tile sizes to promote matmul LHS and RHS and
+/// returns true if it's beneficial to promote.
+static bool adjustToPromote(ArrayRef<int64_t> dimMNKSize, int64_t &mTileSize,
+                            int64_t &nTileSize, int64_t &kTileSize,
+                            SmallVectorImpl<int64_t> &wgSize,
+                            const int subgroupSize, const int maxBytes,
+                            const int elementBits) {
+  LLVM_DEBUG(llvm::dbgs() << "subgroup size = " << subgroupSize << "\n");
+  const int vectorSize = kMaxVectorNumBits / elementBits;
+  if (!adjustToVectorLoad(dimMNKSize, mTileSize, nTileSize, kTileSize, wgSize,
+                          subgroupSize, vectorSize))
+    return false;
+
+  auto usedBytes = getTileBytes(mTileSize, nTileSize, kTileSize, elementBits);
+  LLVM_DEBUG(llvm::dbgs() << "initial tile bytes = " << usedBytes << "\n");
+  if (usedBytes <= maxBytes) return true;
+
+  // Using too much workgorup memory. Try to reduce the tile size for X/Y once
+  // by a factor of two.
+  int64_t &wgDimSize = wgSize[0] > wgSize[1] ? wgSize[0] : wgSize[1];
+  int64_t &tileSize = wgSize[0] > wgSize[1] ? nTileSize : mTileSize;
+  assert(wgDimSize % 2 == 0);
+  wgDimSize /= 2;
+  tileSize /= 2;
+
+  int64_t totalThreads = wgSize[0] * wgSize[1] * wgSize[2];
+  LLVM_DEBUG(llvm::dbgs() << "revised total thread = " << totalThreads << "\n");
+  usedBytes = getTileBytes(mTileSize, nTileSize, kTileSize, elementBits);
+  LLVM_DEBUG(llvm::dbgs() << "revised tile bytes = " << usedBytes << "\n");
+  return totalThreads > subgroupSize && usedBytes <= maxBytes;
+}
+
 namespace detail {
 
 LogicalResult setMatmulOpConfig(spirv::ResourceLimitsAttr limits,
@@ -367,7 +479,7 @@ LogicalResult setMatmulOpConfig(spirv::ResourceLimitsAttr limits,
   assert(llvm::is_contained({2u, 3u}, op.getNumParallelLoops()));
 
   int lastParallelDim = -1;
-  auto [bIndex, mIndex, nIndex, kIndex] =
+  const auto [bIndex, mIndex, nIndex, kIndex] =
       getMatmulBMNKIndex(op, lastParallelDim);
   if (mIndex < 0 || nIndex < 0 || kIndex < 0) return success();
   const bool isBM = bIndex >= 0;
@@ -420,29 +532,33 @@ LogicalResult setMatmulOpConfig(spirv::ResourceLimitsAttr limits,
                                workgroupTileSizes[nIndex]) ||
       !tileMatmulMToWorkgroupY(dimM, bestThreadM, residualThreads, bestY,
                                residualTilingFactor, workgroupSize[1],
-                               workgroupTileSizes[mIndex])) {
+                               workgroupTileSizes[mIndex]) ||
+      !tileMatmulK(dimK, residualTilingFactor, reductionTileSizes[kIndex])) {
     return success();
   }
-
-  // Deduce the configuration for the K dimension. We need some power of two
-  // here so that we can do vector load.
-  for (int64_t t = llvm::PowerOf2Floor(residualTilingFactor); t >= 2; t >>= 1) {
-    if (dimK % t == 0) {
-      reductionTileSizes[kIndex] = t;
-      break;
-    }
-  }
-  if (reductionTileSizes[kIndex] == 0) return success();
+  LLVM_DEBUG({
+    llvm::dbgs() << "workgroup tile size before promotion = (";
+    llvm::interleaveComma(workgroupTileSizes, llvm::dbgs());
+    llvm::dbgs() << ")\n";
+    llvm::dbgs() << "reduction tile size before promotion = (";
+    llvm::interleaveComma(reductionTileSizes, llvm::dbgs());
+    llvm::dbgs() << ")\n";
+    llvm::dbgs() << "workgroup size before promotion = (";
+    llvm::interleaveComma(workgroupSize, llvm::dbgs());
+    llvm::dbgs() << ")\n";
+  });
 
   const int subgroupSize = limits.getSubgroupSize();
-  int64_t totalThreads = workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
-  LLVM_DEBUG({
-    llvm::dbgs() << "total thread count = " << totalThreads << "\n";
-    llvm::dbgs() << "subgroup size = " << subgroupSize << "\n";
-  });
-  auto pipeline = (enablePromotion && totalThreads > subgroupSize)
-                      ? CodeGenPipeline::SPIRVMatmulPromoteVectorize
-                      : CodeGenPipeline::SPIRVBaseVectorize;
+  const int maxBytes = limits.getMaxComputeSharedMemorySize();
+
+  auto pipeline =
+      enablePromotion &&
+              adjustToPromote({dimM, dimN, dimK}, workgroupTileSizes[mIndex],
+                              workgroupTileSizes[nIndex],
+                              reductionTileSizes[kIndex], workgroupSize,
+                              subgroupSize, maxBytes, elementBits)
+          ? CodeGenPipeline::SPIRVMatmulPromoteVectorize
+          : CodeGenPipeline::SPIRVBaseVectorize;
 
   SmallVector<int64_t> threadTileSizes(numLoops, 0);
   if (isBM) {

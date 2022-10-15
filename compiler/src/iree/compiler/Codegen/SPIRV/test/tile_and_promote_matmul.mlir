@@ -213,3 +213,80 @@ hal.executable @batch_matmul_16x1024x1024x80 {
 //      CHECK:       memref.copy %{{.+}}, %[[MEM]]
 // CHECK-SAME:           __internal_linalg_transform__ = "copy_to_workgroup_memory"
 //      CHECK:       gpu.barrier
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[1, 512, 8], [1, 8, 4], [0, 0, 0, 16]]>
+
+hal.executable @batch_matmul_f32_16x4096x40x4096 {
+  hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+    spirv.target_env = #spirv.target_env<#spirv.vce<v1.6, [Shader], []>, AMD:DiscreteGPU, #spirv.resource_limits<
+      max_compute_shared_memory_size = 65536,
+      max_compute_workgroup_invocations = 1024,
+      max_compute_workgroup_size = [1024, 1024, 1024],
+      subgroup_size = 64>>}> {
+    hal.executable.export public @batch_matmul_f32_16x4096x40x4096 ordinal(0) layout(#pipeline_layout) attributes {
+      translation_info = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize>,
+      workgroup_size = [2 : index, 64 : index, 1 : index]
+    }
+    builtin.module {
+      func.func @batch_matmul_f32_16x4096x40x4096() {
+        %c16 = arith.constant 16 : index
+        %c4096 = arith.constant 4096 : index
+        %c40 = arith.constant 40 : index
+        %c0 = arith.constant 0 : index
+        %cst = arith.constant 0.000000e+00 : f32
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : memref<16x4096x4096xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : memref<16x4096x40xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : memref<16x4096x40xf32>
+        %workgroup_id_x = hal.interface.workgroup.id[0] : index
+        %workgroup_count_x = hal.interface.workgroup.count[0] : index
+        %workgroup_id_y = hal.interface.workgroup.id[1] : index
+        %workgroup_count_y = hal.interface.workgroup.count[1] : index
+        %workgroup_id_z = hal.interface.workgroup.id[2] : index
+        %workgroup_count_z = hal.interface.workgroup.count[2] : index
+        scf.for %arg0 = %workgroup_id_z to %c16 step %workgroup_count_z {
+          %3 = affine.apply affine_map<()[s0] -> (s0 * 512)>()[%workgroup_id_y]
+          %4 = affine.apply affine_map<()[s0] -> (s0 * 512)>()[%workgroup_count_y]
+          scf.for %arg1 = %3 to %c4096 step %4 {
+            %5 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%workgroup_id_x]
+            %6 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%workgroup_count_x]
+            scf.for %arg2 = %5 to %c40 step %6 {
+              %subview = memref.subview %2[%arg0, %arg1, %arg2] [1, 512, 8] [1, 1, 1] : memref<16x4096x40xf32> to memref<1x512x8xf32, strided<[163840, 40, 1], offset: ?>>
+              %subview_0 = memref.subview %0[%arg0, %arg1, 0] [1, 512, 4096] [1, 1, 1] : memref<16x4096x4096xf32> to memref<1x512x4096xf32, strided<[16777216, 4096, 1], offset: ?>>
+              %subview_1 = memref.subview %1[%arg0, 0, %arg2] [1, 4096, 8] [1, 1, 1] : memref<16x4096x40xf32> to memref<1x4096x8xf32, strided<[163840, 40, 1], offset: ?>>
+              linalg.fill {lowering_config = #config}
+                ins(%cst : f32) outs(%subview : memref<1x512x8xf32, strided<[163840, 40, 1], offset: ?>>)
+              linalg.batch_matmul {lowering_config = #config}
+                ins(%subview_0, %subview_1 : memref<1x512x4096xf32, strided<[16777216, 4096, 1], offset: ?>>, memref<1x4096x8xf32, strided<[163840, 40, 1], offset: ?>>)
+                outs(%subview : memref<1x512x8xf32, strided<[163840, 40, 1], offset: ?>>)
+            }
+          }
+        }
+        return
+      }
+    }
+  }
+}
+
+// CHECK-LABEL: func.func @batch_matmul_f32_16x4096x40x4096()
+
+// Check that we only have one allocation for LHS---RHS is not well aligned
+// ((16 * 8) % (2 * 64 * 4) != 0) so cannot we cannot perform vector load/store
+// for it.
+
+//   CHECK-NOT: memref.alloc()
+//  CHECK-DAG: %[[MEM_A:.+]] = memref.alloc() : memref<1x512x16xf32, 3>
+//   CHECK-NOT: memref.alloc()
+
+//      CHECK:       gpu.barrier
+//  CHECK-DAG:       memref.copy %{{.+}}, %[[MEM_A]]
+// CHECK-SAME:           __internal_linalg_transform__ = "copy_to_workgroup_memory"
+//      CHECK:       gpu.barrier

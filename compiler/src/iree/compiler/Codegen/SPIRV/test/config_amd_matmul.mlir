@@ -33,11 +33,11 @@ hal.executable @batch_matmul_f32_16x4096x40x4096 {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1024, 8], [1, 8, 4], [0, 0, 0, 16]{{\]}}>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 512, 8], [1, 8, 4], [0, 0, 0, 16]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize>
 //      CHECK: hal.executable.export public @batch_matmul_f32_16x4096x40x4096
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
-// CHECK-SAME:   workgroup_size = [2 : index, 128 : index, 1 : index]
+// CHECK-SAME:   workgroup_size = [2 : index, 64 : index, 1 : index]
 //      CHECK: func.func @batch_matmul_f32_16x4096x40x4096()
 //      CHECK:   linalg.batch_matmul
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
@@ -86,4 +86,50 @@ hal.executable @matmul_f16_64x1280x320 {
 // CHECK-SAME:   workgroup_size = [32 : index, 8 : index, 1 : index]
 //      CHECK: func.func @matmul_f16_64x1280x320()
 //      CHECK:   linalg.matmul
+// CHECK-SAME:     lowering_config = #[[CONFIG]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable @batch_matmul_f32_16x4096x40x4096 {
+  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
+      spirv.target_env = #spirv.target_env<#spirv.vce<v1.6, [Shader], []>, AMD:DiscreteGPU, #spirv.resource_limits<
+        max_compute_shared_memory_size = 65536,
+        max_compute_workgroup_invocations = 1024,
+        max_compute_workgroup_size = [1024, 1024, 1024],
+        subgroup_size = 64>>
+    }> {
+    hal.executable.export @batch_matmul_f32_16x4096x40x4096 layout(#pipeline_layout)
+    builtin.module {
+      func.func @batch_matmul_f32_16x4096x40x4096() {
+        %cst = arith.constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
+        %6 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:16x4096x4096xf32>
+        %7 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:16x4096x48xf32>
+        %8 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:16x4096x48xf32>
+        %9 = flow.dispatch.tensor.load %6, offsets = [0, 0, 0], sizes = [16, 4096, 4096], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:16x4096x4096xf32> -> tensor<16x4096x4096xf32>
+        %10 = flow.dispatch.tensor.load %7, offsets = [0, 0, 0], sizes = [16, 4096, 48], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:16x4096x48xf32> -> tensor<16x4096x48xf32>
+        %11 = tensor.empty() : tensor<16x4096x48xf32>
+        %12 = linalg.fill ins(%cst : f32) outs(%11 : tensor<16x4096x48xf32>) -> tensor<16x4096x48xf32>
+        %13 = linalg.batch_matmul ins(%9, %10 : tensor<16x4096x4096xf32>, tensor<16x4096x48xf32>) outs(%12 : tensor<16x4096x48xf32>) -> tensor<16x4096x48xf32>
+        flow.dispatch.tensor.store %13, %8, offsets = [0, 0, 0], sizes = [16, 4096, 48], strides = [1, 1, 1] : tensor<16x4096x48xf32> -> !flow.dispatch.tensor<writeonly:16x4096x48xf32>
+        return
+      }
+    }
+  }
+}
+
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 256, 16], [1, 8, 4], [0, 0, 0, 32]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize>
+//      CHECK: hal.executable.export public @batch_matmul_f32_16x4096x40x4096
+// CHECK-SAME:   translation_info = #[[TRANSLATION]]
+// CHECK-SAME:   workgroup_size = [4 : index, 32 : index, 1 : index]
+//      CHECK: func.func @batch_matmul_f32_16x4096x40x4096()
+//      CHECK:   linalg.batch_matmul
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
