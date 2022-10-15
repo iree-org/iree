@@ -487,8 +487,13 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
     return failure();
   Optional<int64_t> dimSize = getLinalgDimSize(op, reductionDims[0]);
   if (!dimSize || *dimSize % cudaWarpSize != 0) return failure();
-  SmallVector<unsigned> parallelDims;
-  op.getParallelDims(parallelDims);
+
+  const Type elementType =
+      op.getOutputs()[0].getType().cast<ShapedType>().getElementType();
+  if (!elementType.isIntOrFloat()) return failure();
+  // Reduction distribution only supports 32-bit types now.
+  if (elementType.getIntOrFloatBitWidth() != 32) return failure();
+
   unsigned vectorSize = 4;
   while ((*dimSize / vectorSize) % cudaWarpSize != 0) vectorSize /= 2;
 
@@ -509,8 +514,6 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   SmallVector<unsigned> partitionedLoops =
       cast<PartitionableLoopsInterface>(op.getOperation())
           .getPartitionableLoops(kNumMaxParallelDims);
-  llvm::SmallDenseSet<unsigned, 4> partitionedLoopsSet;
-  partitionedLoopsSet.insert(partitionedLoops.begin(), partitionedLoops.end());
   size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
   // Tile all the parallel dimension to 1.
   SmallVector<int64_t, 4> workgroupTileSizes(numLoops, 1);
