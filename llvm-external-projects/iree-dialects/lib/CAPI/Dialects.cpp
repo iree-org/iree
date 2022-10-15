@@ -57,10 +57,6 @@ void mlirIREELinalgTransformRegisterPasses() {
 // TransformDialect
 //===--------------------------------------------------------------------===//
 
-// TODO: this should go to upstream MLIR eventually.
-MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(Transform, transform,
-                                      mlir::transform::TransformDialect)
-
 void ireeRegisterTransformExtensions(MlirContext context) {
   MLIRContext *ctx = unwrap(context);
   DialectRegistry registry;

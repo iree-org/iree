@@ -96,7 +96,7 @@ static void moveScalarAndBindingUniformCode(
   auto canBeHoisted = [](Operation *op,
                          function_ref<bool(Value)> definedOutside) {
     return llvm::all_of(op->getOperands(), definedOutside) &&
-           (isSideEffectFree(op) ||
+           (isMemoryEffectFree(op) ||
             isa<IREE::HAL::InterfaceBindingSubspanOp,
                 IREE::HAL::InterfaceConstantLoadOp, memref::AssumeAlignmentOp>(
                 op)) &&

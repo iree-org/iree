@@ -19,7 +19,7 @@ include "iree/compiler/Dialect/Util/IR/UtilTypes.td"
 include "iree/compiler/Dialect/VM/IR/VMBase.td"
 
 class VM_PureOp<string mnemonic, list<Trait> traits = []> :
-    VM_Op<mnemonic, !listconcat(traits, [NoSideEffect])>;
+    VM_Op<mnemonic, !listconcat(traits, [Pure])>;
 
 //===----------------------------------------------------------------------===//
 // Structural ops
@@ -3714,7 +3714,7 @@ def VM_CallVariadicOp : VM_CallBaseOp<"call.variadic"> {
 
 def VM_ReturnOp : VM_Op<"return", [
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
-    NoSideEffect,
+    Pure,
     ReturnLike,
     Terminator,
   ]> {

@@ -32,6 +32,8 @@ using namespace mlir;
 
 using mlir::iree_compiler::IREE::LinalgExt::CodegenStrategy;
 using mlir::iree_compiler::IREE::LinalgExt::LinalgPeelOptions;
+using mlir::iree_compiler::IREE::LinalgExt::LinalgTransformationFilter;
+using mlir::iree_compiler::IREE::LinalgExt::LinalgTransforms;
 using mlir::iree_compiler::IREE::LinalgExt::LinalgVectorLoweringOptions;
 
 #define DEBUG_TYPE "iree-linalg-tensor-codegen-driver"
@@ -111,10 +113,10 @@ static LogicalResult getPaddingDims(func::FuncOp funcOp,
   if (!rootOp.value()) return success();
 
   linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(rootOp.value());
-  for (auto en : llvm::enumerate(linalgOp.getIteratorTypes())) {
-    if (en.value().cast<StringAttr>().getValue() ==
-        utils::stringifyIteratorType(targetIterType)) {
-      paddingDims.push_back(en.index());
+  for (auto [index, iterType] :
+       llvm::enumerate(linalgOp.getIteratorTypesArray())) {
+    if (iterType == utils::stringifyIteratorType(targetIterType)) {
+      paddingDims.push_back(index);
     }
   }
 
@@ -407,7 +409,7 @@ namespace {
 struct CodegenSplitReduction
     : public OpInterfaceRewritePattern<linalg::LinalgOp> {
   CodegenSplitReduction(MLIRContext *context, bool fpReductionReordering,
-                        int64_t size, linalg::LinalgTransformationFilter filter,
+                        int64_t size, LinalgTransformationFilter filter,
                         PatternBenefit benefit = 1)
       : OpInterfaceRewritePattern<linalg::LinalgOp>(context, benefit),
         fpReductionReordering(fpReductionReordering),
@@ -517,7 +519,7 @@ struct CodegenSplitReduction
  private:
   bool fpReductionReordering;
   int64_t size;
-  linalg::LinalgTransformationFilter filter;
+  LinalgTransformationFilter filter;
 };
 }  // namespace
 
@@ -534,7 +536,7 @@ void LinalgSplitReductionPass::runOnOperation() {
   RewritePatternSet patterns(&getContext());
   patterns.add<CodegenSplitReduction>(
       &getContext(), fpReductionReordering, useSize,
-      linalg::LinalgTransformationFilter(
+      LinalgTransformationFilter(
           ArrayRef<StringAttr>{},
           StringAttr::get(&getContext(), "CODEGEN_SPLIT")));
 
@@ -543,7 +545,7 @@ void LinalgSplitReductionPass::runOnOperation() {
   }
   // Remove all the markers at the end.
   funcOp->walk([&](linalg::LinalgOp op) {
-    op->removeAttr(linalg::LinalgTransforms::kLinalgTransformMarker);
+    op->removeAttr(LinalgTransforms::kLinalgTransformMarker);
   });
 }
 

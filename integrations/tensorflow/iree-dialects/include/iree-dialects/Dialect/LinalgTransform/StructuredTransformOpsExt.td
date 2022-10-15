@@ -18,12 +18,13 @@ include "mlir/IR/OpBase.td"
 
 def CanonicalizedSequenceOp
     : TransformDialectOp<"structured.canonicalized_sequence",
-      [DeclareOpInterfaceMethods<RegionBranchOpInterface,
+      [OpAsmOpInterface,
+       PossibleTopLevelTransformOpTrait,
+       DeclareOpInterfaceMethods<RegionBranchOpInterface,
           ["getSuccessorEntryOperands", "getSuccessorRegions",
            "getRegionInvocationBounds"]>,
        DeclareOpInterfaceMethods<TransformOpInterface>,
        DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-       OpAsmOpInterface, PossibleTopLevelTransformOpTrait,
        SingleBlockImplicitTerminator<"::mlir::transform::YieldOp">]> {
 
   let summary = "A transformation sequence interspersed with canonicalizations";
@@ -52,19 +53,18 @@ def CanonicalizedSequenceOp
 //===----------------------------------------------------------------------===//
 
 def BufferizeOp : Op<Transform_Dialect, "bufferize",
-    [DeclareOpInterfaceMethods<TransformOpInterface>,
-     FunctionalStyleTransformOpTrait,
+    [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,
-     TransformOpInterface]> {
+     DeclareOpInterfaceMethods<TransformOpInterface>]> {
   let description = [{Indicates that the entire module should be bufferized.}];
   let assemblyFormat = "attr-dict";
   let cppNamespace = "transform_ext";
 }
 
 def LowerVectorsOp : Op<Transform_Dialect, "lower_vectors",
-    [DeclareOpInterfaceMethods<TransformOpInterface>,
-     FunctionalStyleTransformOpTrait,
-     MemoryEffectsOpInterface]> {
+    [FunctionalStyleTransformOpTrait,
+     MemoryEffectsOpInterface,
+     DeclareOpInterfaceMethods<TransformOpInterface>]> {
   let description = [{Indicates that the vector operations in the entire
   module should be lowered to simpler primitives (multiple stages of lowering
   be executed at once).}];
@@ -84,9 +84,9 @@ def LowerVectorsOp : Op<Transform_Dialect, "lower_vectors",
 }
 
 def LowerToLLVMOp : Op<Transform_Dialect, "lower_to_llvm",
-    [DeclareOpInterfaceMethods<TransformOpInterface>,
-     FunctionalStyleTransformOpTrait,
-     MemoryEffectsOpInterface]> {
+    [FunctionalStyleTransformOpTrait,
+     MemoryEffectsOpInterface,
+     DeclareOpInterfaceMethods<TransformOpInterface>]> {
   let description = [{Indicates that the entire module should be converted
   to the LLVM dialect. This is expected to be the last transformation in
   a sequence.}];

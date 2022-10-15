@@ -72,15 +72,18 @@ LogicalResult mlir::transform::applyTransformsInRegion(Region &transformRegion,
   for (transform::TransformOpInterface transform : transforms) {
     // TransformState::applyTransform requires that the parent region is a
     // proper ancestor of the transform op to perform SSA liveness assertions.
-    // In multithreaded state hwever, we cannot clone into `transformRegion` so
+    // In multithreaded state however, we cannot clone into `transformRegion` so
     // we build a new single-block region and clone the transform op into it.
     Region r;
     OpBuilder b(target->getContext());
     b.createBlock(&r);
-    transform::TransformState state(r, target);
+    TransformOptions options;
+#ifndef NDEBUG
+    options = options.enableExpensiveChecks();
+#endif
     auto xform = cast<transform::TransformOpInterface>(b.clone(*transform));
     auto g = llvm::make_scope_exit([&]() { xform->erase(); });
-    if (failed(state.applyTransform(xform).checkAndReport()))
+    if (failed(transform::applyTransforms(target, xform, options)))
       return failure();
   }
   return success();

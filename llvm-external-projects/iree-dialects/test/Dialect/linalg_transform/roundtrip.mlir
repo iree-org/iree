@@ -4,7 +4,7 @@
 transform.structured.canonicalized_sequence failures(propagate) {
 ^bb0(%arg0: !pdl.operation):
   // CHECK: %[[OPS:.*]] = pdl_match @match1 in %{{.*}}
-  %0 = pdl_match @match1 in %arg0
+  %0 = pdl_match @match1 in %arg0 : (!pdl.operation) -> !pdl.operation
   // CHECK: %[[TILED:.*]], %{{.*}}:3 = transform.structured.tile %[[OPS]][4, 4, 4]
   %1, %loops1:3 = transform.structured.tile %0 [4, 4, 4]
   // CHECK: %[[TILED2:.*]], %{{.*}}:3 = transform.structured.tile %[[TILED]]
@@ -14,7 +14,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   // CHECK: %{{.*}} = transform.structured.vectorize %[[PADDED]] {vectorize_padding}
   %4 = transform.structured.vectorize %3 { vectorize_padding }
   // CHECK: %[[OPS2:.*]] = pdl_match @{{.*}}
-  %5 = pdl_match @match2 in %arg0
+  %5 = pdl_match @match2 in %arg0 : (!pdl.operation) -> !pdl.operation
   // CHECK: transform.structured.vectorize %[[OPS2]]
   transform.structured.vectorize %5
   // CHECK: bufferize

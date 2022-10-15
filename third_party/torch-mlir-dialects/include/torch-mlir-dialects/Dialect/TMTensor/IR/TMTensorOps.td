@@ -193,7 +193,7 @@ def TMTensor_ScatterOp : TMTensor_Op<"scatter",
 // Pure ops
 //===----------------------------------------------------------------------===//
 
-def TMTensor_YieldOp : TMTensor_PureOp<"yield", [NoSideEffect, ReturnLike, Terminator]> {
+def TMTensor_YieldOp : TMTensor_PureOp<"yield", [Pure, ReturnLike, Terminator]> {
   let summary = "TMTensor yield op";
   let description = [{
     `tm_tensor.yield` is a special terminator operation for blocks inside

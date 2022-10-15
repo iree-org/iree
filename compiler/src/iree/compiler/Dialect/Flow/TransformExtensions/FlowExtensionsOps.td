@@ -17,8 +17,8 @@ include "mlir/IR/OpBase.td"
 def ForeachThreadToFlowDispatchWorkgroupsOp : Op<Transform_Dialect, "iree.foreach_thread_to_flow",
     [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,
-     TransformOpInterface,
-     TransformEachOpTrait]> {
+     TransformEachOpTrait,
+     TransformOpInterface]> {
   let description = [{
     Rewrite an scf.foreach_thread to Flow::DispatchWorkgroups.
 

@@ -61,7 +61,7 @@ cc_library(
         "@org_tensorflow//tensorflow/compiler/xla/mlir_hlo",
         "@org_tensorflow//tensorflow/compiler/xla/mlir_hlo:all_passes",
         "@org_tensorflow//tensorflow/compiler/xla/mlir_hlo:chlo_legalize_to_hlo",
-        "@org_tensorflow//tensorflow/compiler/xla/mlir_hlo:mhlo_to_mhlo_lowering_patterns",
+        "@org_tensorflow//tensorflow/compiler/xla/mlir_hlo:mhlo_passes",
         "@stablehlo//:chlo_ops",
     ],
 )
