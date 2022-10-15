@@ -110,7 +110,7 @@ class ConvertToMHLOPass
     // condition in legalize_to_linalg.cc for this op.
     target.addDynamicallyLegalOp<mhlo::DynamicBroadcastInDimOp>(
         [](mhlo::DynamicBroadcastInDimOp op) {
-          if (auto t = op.operand()
+          if (auto t = op.getOperand()
                            .getType()
                            .template dyn_cast<RankedTensorType>()) {
             if (t.hasStaticShape()) {
