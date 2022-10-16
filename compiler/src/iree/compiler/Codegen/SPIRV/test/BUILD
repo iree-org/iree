@@ -38,6 +38,7 @@ iree_lit_test_suite(
             "pipeline_matmul_promotion.mlir",
             "pipeline_matmul_vectorization.mlir",
             "pipeline_reduction_subgroup.mlir",
+            "reduction_lowering.mlir",
             "tile_and_distribute.mlir",
             "tile_and_distribute_scatter.mlir",
             "tile_and_distribute_sort.mlir",

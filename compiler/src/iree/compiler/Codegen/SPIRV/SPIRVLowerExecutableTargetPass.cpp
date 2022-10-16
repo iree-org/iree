@@ -14,6 +14,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
@@ -43,7 +44,8 @@ class SPIRVLowerExecutableTargetPass
         .insert<IREE::Codegen::IREECodegenDialect, AffineDialect,
                 gpu::GPUDialect, IREE::HAL::HALDialect, linalg::LinalgDialect,
                 IREE::LinalgExt::IREELinalgExtDialect, memref::MemRefDialect,
-                scf::SCFDialect, spirv::SPIRVDialect, vector::VectorDialect>();
+                bufferization::BufferizationDialect, scf::SCFDialect,
+                spirv::SPIRVDialect, vector::VectorDialect>();
   }
 
   void runOnOperation() override;

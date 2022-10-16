@@ -508,6 +508,23 @@ static LogicalResult setFftOpConfig(spirv::ResourceLimitsAttr limits,
 // Reduction Default Configuration
 //===----------------------------------------------------------------------===//
 
+// Check if the given function contains an op that may require a broadcast of
+// the reduced result.
+static bool isFusedWithBroadcast(linalg::LinalgOp reduce) {
+  func::FuncOp entryPoint = reduce->getParentOfType<func::FuncOp>();
+  int64_t reducedRank =
+      reduce->getResult(0).getType().cast<ShapedType>().getRank();
+  bool hasBroadcast = false;
+  entryPoint.walk([&](linalg::LinalgOp linalgOp) {
+    if (reduce != linalgOp && linalgOp.getNumLoops() > reducedRank) {
+      hasBroadcast = true;
+      return WalkResult::interrupt();
+    }
+    return WalkResult::advance();
+  });
+  return hasBroadcast;
+}
+
 /// Set the configuration for reductions that can be mapped to warp reductions.
 static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
                                         linalg::GenericOp op) {
@@ -553,12 +570,21 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
   unsigned vectorSize = 4;
   while ((*dimSize / vectorSize) % subgroupSize != 0) vectorSize /= 2;
 
-  std::array<int64_t, 3> workgroupSize = {*dimSize / vectorSize, 1, 1};
-  if (workgroupSize[0] >
-      targetEnv.getResourceLimits().getMaxComputeWorkgroupInvocations()) {
-    return failure();
+  // TODO: Add reduction tiling to handle larger reductions.
+  const int64_t maxWorkgroupSize =
+      targetEnv.getResourceLimits().getMaxComputeWorkgroupInvocations();
+  int64_t groupSize = *dimSize / vectorSize;
+  if (groupSize > maxWorkgroupSize) {
+    groupSize = llvm::APIntOps::GreatestCommonDivisor(
+                    {64, uint64_t(groupSize)}, {64, uint64_t(maxWorkgroupSize)})
+                    .getZExtValue();
+    // Workaround, the vector distribution doesn't handle cases where we fuse
+    // the reduction with a consumer that needs to be tiled.
+    // TODO(thomasraoux): remove the restriction once vector distribution is
+    // improved.
+    if (isFusedWithBroadcast(op)) return failure();
   }
-
+  std::array<int64_t, 3> workgroupSize = {groupSize, 1, 1};
   // Tile all the parallel dimension to 1.
   SmallVector<unsigned> partitionedLoops =
       cast<PartitionableLoopsInterface>(op.getOperation())
@@ -567,9 +593,12 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
   partitionedLoopsSet.insert(partitionedLoops.begin(), partitionedLoops.end());
   size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
   SmallVector<int64_t, 4> workgroupTileSizes(numLoops, 1);
+  SmallVector<int64_t, 4> reductionTileSizes(numLoops, 0);
+  reductionTileSizes.push_back(groupSize * vectorSize);
 
   TileSizesListType tileSizes;
   tileSizes.emplace_back(std::move(workgroupTileSizes));  // Workgroup level
+  tileSizes.emplace_back(std::move(reductionTileSizes));  // reduction level
 
   return setOpConfigAndEntryPointFnTranslation(
       op->getParentOfType<func::FuncOp>(), op, tileSizes,
