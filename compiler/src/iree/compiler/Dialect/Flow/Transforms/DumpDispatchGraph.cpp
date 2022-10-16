@@ -17,6 +17,7 @@
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/GraphWriter.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -323,7 +324,9 @@ class DumpDispatchGraphPass
   template <typename T>
   void printLinalgInsOuts(raw_ostream &os, T op, AsmState &state) {
     printResultsAndName(os, op.getOperation(), state);
-    os << " " << op.iterator_types() << "(";
+    os << "[";
+    llvm::interleaveComma(op.getIteratorTypesArray(), os);
+    os << "] (";
     printOperands(os, op.getInputs(), state);
     os << ") -> (";
     printOperands(os, op.getOutputs(), state);

@@ -176,12 +176,13 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
   LogicalResult matchAndRewrite(
       mhlo::FftOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (op.fft_type() != mhlo::FftType::RFFT) {
+    if (op.getFftType() != mhlo::FftType::RFFT) {
       return rewriter.notifyMatchFailure(op,
                                          "non RFFT types are supported yet");
     }
 
-    auto inputType = adaptor.operand().getType().dyn_cast<RankedTensorType>();
+    auto inputType =
+        adaptor.getOperand().getType().dyn_cast<RankedTensorType>();
     if (!inputType || !inputType.hasStaticShape() || inputType.getRank() > 2) {
       return rewriter.notifyMatchFailure(op, "only static 1D or 2D dft ops");
     }
@@ -189,7 +190,7 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
     int rank = inputType.getRank();
     int n = inputType.getDimSize(rank - 1);
     int fftLength =
-        op.fft_length().getSplatValue<IntegerAttr>().getInt() / 2 + 1;
+        op.getFftLength().getSplatValue<IntegerAttr>().getInt() / 2 + 1;
 
     Location loc = op.getLoc();
     auto matrixType =
@@ -201,12 +202,12 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
     auto realMatrix =
         getDFTMatmulCoeff(rewriter, loc, matrixType, /*isRealPart=*/true);
     auto real = createLinalgMatmulOnTensors(rewriter, loc, resultType,
-                                            adaptor.operand(), realMatrix);
+                                            adaptor.getOperand(), realMatrix);
 
     auto imagMatrix =
         getDFTMatmulCoeff(rewriter, loc, matrixType, /*isRealPart=*/false);
     auto imag = createLinalgMatmulOnTensors(rewriter, loc, resultType,
-                                            adaptor.operand(), imagMatrix);
+                                            adaptor.getOperand(), imagMatrix);
 
     // Pack the results back to mhlo::ComplexOp.
     rewriter.replaceOpWithNewOp<mhlo::ComplexOp>(op, op.getType(), real, imag);
@@ -223,7 +224,8 @@ struct ScatterUpdateConversion : public OpConversionPattern<mhlo::ScatterOp> {
       mhlo::ScatterOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const final {
     // Variadic Scatter support not yet implemented
-    if (op.operands().size() != 1 || op.updates().size() != 1) return failure();
+    if (op.operands().size() != 1 || op.getUpdates().size() != 1)
+      return failure();
 
     // Check if it is a tensor_scatter_nd_update-like op.
     if (op.getRegion().front().getNumArguments() != 2) return failure();
@@ -231,7 +233,7 @@ struct ScatterUpdateConversion : public OpConversionPattern<mhlo::ScatterOp> {
     auto operandTy =
         adaptor.operands()[0].getType().dyn_cast<RankedTensorType>();
     auto indicesTy =
-        adaptor.scatter_indices().getType().dyn_cast<RankedTensorType>();
+        adaptor.getScatterIndices().getType().dyn_cast<RankedTensorType>();
     if (!operandTy || !indicesTy) return failure();
 
     // Linalg operations put all the computation to the innermost loop. Since we
@@ -241,7 +243,7 @@ struct ScatterUpdateConversion : public OpConversionPattern<mhlo::ScatterOp> {
     // comparison state. E.g., if the index_depth is 2, like indices = [[0, 1]],
     // we should use the update value only if (i == 0 and j == 1). However, we
     // can not get both indices in one iteration unless we pack them together.
-    auto indexVectorDim = op.scatter_dimension_numbers().getIndexVectorDim();
+    auto indexVectorDim = op.getScatterDimensionNumbers().getIndexVectorDim();
     if (indicesTy.getDimSize(indexVectorDim) != 1)
       return rewriter.notifyMatchFailure(op, "require index depth to be 1");
     if (indexVectorDim != indicesTy.getRank() - 1) {
@@ -270,7 +272,7 @@ struct ScatterUpdateConversion : public OpConversionPattern<mhlo::ScatterOp> {
 
       exprs.pop_back();
       auto updateWindowDims =
-          op.scatter_dimension_numbers().getUpdateWindowDims();
+          op.getScatterDimensionNumbers().getUpdateWindowDims();
       for (auto d : updateWindowDims)
         exprs.push_back(rewriter.getAffineDimExpr(d));
       indexingMaps.push_back(AffineMap::get(nloops, /*symbolCount=*/0, exprs,
@@ -282,7 +284,7 @@ struct ScatterUpdateConversion : public OpConversionPattern<mhlo::ScatterOp> {
         this->typeConverter->convertType(op.getResults()[0].getType())
             .cast<ShapedType>();
     auto scatterDimsToOperandDims =
-        op.scatter_dimension_numbers().getScatterDimsToOperandDims();
+        op.getScatterDimensionNumbers().getScatterDimsToOperandDims();
     assert(scatterDimsToOperandDims.size() == 1);
     // Do not need init_tensor because we'd like to initialize the output as
     // operand.
@@ -290,8 +292,8 @@ struct ScatterUpdateConversion : public OpConversionPattern<mhlo::ScatterOp> {
     auto linalgOp = rewriter.create<linalg::GenericOp>(
         loc, /*resultTensors=*/ArrayRef<Type>{resultTy},
         /*inputs=*/
-        ValueRange{adaptor.operands()[0], adaptor.scatter_indices(),
-                   adaptor.updates()[0]},
+        ValueRange{adaptor.operands()[0], adaptor.getScatterIndices(),
+                   adaptor.getUpdates()[0]},
         /*outputs=*/adaptor.operands()[0], indexingMaps,
         mhlo::getNParallelLoopsAttrs(nloops),
         [](OpBuilder &b, Location loc, ValueRange args) {},

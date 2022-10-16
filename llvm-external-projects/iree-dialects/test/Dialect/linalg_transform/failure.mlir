@@ -15,9 +15,9 @@ transform.with_pdl_patterns {
 
   transform.structured.canonicalized_sequence %arg0 failures(propagate) {
   ^bb1(%arg1: !pdl.operation):
-    %0 = pdl_match @some_operation in %arg1
+    %0 = pdl_match @some_operation in %arg1 : (!pdl.operation) -> !pdl.operation
     // Make sure we don't crash on wrong operation type.
     // expected-error@below {{failed to outline}}
-    transform.loop.outline %0 {func_name = "outlined"}
+    transform.loop.outline %0 {func_name = "outlined"} : (!pdl.operation) -> !pdl.operation
   }
 }

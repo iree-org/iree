@@ -81,10 +81,9 @@ LogicalResult mlir::transform::applyTransformsInRegion(Region &transformRegion,
 #ifndef NDEBUG
     options = options.enableExpensiveChecks();
 #endif
-    transform::TransformState state(r, target, options);
     auto xform = cast<transform::TransformOpInterface>(b.clone(*transform));
     auto g = llvm::make_scope_exit([&]() { xform->erase(); });
-    if (failed(state.applyTransform(xform).checkAndReport()))
+    if (failed(transform::applyTransforms(target, xform, options)))
       return failure();
   }
   return success();

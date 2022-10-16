@@ -95,6 +95,7 @@ formats:
 * [TensorFlow](getting-started/tensorflow.md)
 * [TensorFlow Lite](getting-started/tflite.md)
 * [JAX](getting-started/jax.md)
+* [PyTorch](getting-started/pytorch.md)
 
 ### Selecting deployment configurations
 

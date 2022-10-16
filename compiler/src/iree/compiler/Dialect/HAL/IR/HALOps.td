@@ -20,7 +20,7 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
 
 class HAL_PureOp<string mnemonic, list<Trait> traits = []> :
-    HAL_Op<mnemonic, !listconcat(traits, [NoSideEffect])>;
+    HAL_Op<mnemonic, !listconcat(traits, [Pure])>;
 
 class HAL_MakeTupleOp<string mnemonic, list<Trait> traits = []> :
     HAL_PureOp<mnemonic, traits>;
@@ -1172,7 +1172,7 @@ def HAL_DeviceAllocatorOp : HAL_PureOp<"device.allocator", [
 
 def HAL_DeviceSwitchOp : HAL_Op<"device.switch", [
     NoRegionArguments,
-    RecursiveSideEffects,
+    RecursiveMemoryEffects,
   ]> {
   let summary = [{runtime device switch pseudo op}];
   let description = [{

@@ -29,9 +29,9 @@ void CodegenStrategy::configurePassPipeline(OpPassManager &pm,
     std::string nextStr = std::to_string(stepCount + 1);
     auto nextState = StringAttr::get(context, nextStr);
     auto filter = (currentState.str() == std::to_string(0))
-                      ? linalg::LinalgTransformationFilter(
+                      ? LinalgExt::LinalgTransformationFilter(
                             t->filter, ArrayRef<StringAttr>{}, nextState)
-                      : linalg::LinalgTransformationFilter(
+                      : LinalgExt::LinalgTransformationFilter(
                             t->filter, currentState, nextState);
     t->addToPassPipeline(pm, filter);
     if (addEnablePass)

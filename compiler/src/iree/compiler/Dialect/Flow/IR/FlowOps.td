@@ -18,7 +18,7 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
 
 class FLOW_PureOp<string mnemonic, list<Trait> traits = []> :
-    FLOW_Op<mnemonic, !listconcat(traits, [NoSideEffect])>;
+    FLOW_Op<mnemonic, !listconcat(traits, [Pure])>;
 
 //===----------------------------------------------------------------------===//
 // Partitioned regions
@@ -574,7 +574,7 @@ def FLOW_DispatchTensorStoreOp : FLOW_Op<"dispatch.tensor.store", [
   let hasCanonicalizer = 1;
 }
 
-def FLOW_ReturnOp : FLOW_Op<"return", [NoSideEffect, ReturnLike, Terminator]> {
+def FLOW_ReturnOp : FLOW_Op<"return", [Pure, ReturnLike, Terminator]> {
   let summary = [{return from a flow.dispatch_region}];
   let description = [{
     Returns the given values from the region and back to the host code.

@@ -210,6 +210,12 @@ def GPUVectorization :
   ];
 }
 
+def GPUTileReduction :
+    Pass<"iree-codegen-gpu-tile-reduction", "func::FuncOp"> {
+  let summary = "Pass to tile linalg reduction dimensions.";
+  let constructor = "mlir::iree_compiler::createGPUTileReductionPass()";
+}
+
 def VectorReduceToGPU :
     Pass<"iree-codegen-reduction-to-gpu", "func::FuncOp"> {
   let summary = "Convert vector reduction to gpu ops.";

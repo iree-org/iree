@@ -296,6 +296,7 @@ void addGPUWarpReductionPassPipeline(OpPassManager &pm) {
 
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createGPUTileReductionPass());
 
   // Linalg -> vector
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUVectorizationPass(
@@ -316,6 +317,8 @@ void addGPUWarpReductionPassPipeline(OpPassManager &pm) {
       createLoopInvariantCodeMotionPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
 
   // vector -> simt gpu + vector
   nestedModulePM.addNestedPass<func::FuncOp>(

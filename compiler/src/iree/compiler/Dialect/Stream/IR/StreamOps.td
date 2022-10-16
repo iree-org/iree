@@ -18,7 +18,7 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
 
 class Stream_PureOp<string mnemonic, list<Trait> traits = []> :
-    Stream_Op<mnemonic, !listconcat(traits, [NoSideEffect])>;
+    Stream_Op<mnemonic, !listconcat(traits, [Pure])>;
 
 //===----------------------------------------------------------------------===//
 // Generic resource ops
@@ -1906,7 +1906,7 @@ def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
 
 def Stream_AsyncExecuteOp : Stream_Op<"async.execute", [
   AttrSizedOperandSegments,
-  RecursiveSideEffects,
+  RecursiveMemoryEffects,
   DeclareOpInterfaceMethods<RegionBranchOpInterface, [
     "getSuccessorEntryOperands",
   ]>,
@@ -1998,7 +1998,7 @@ def Stream_AsyncConcurrentOp : Stream_Op<"async.concurrent", [
     "IREE::Stream::AsyncConcurrentOp",
   ]>,
   AttrSizedOperandSegments,
-  RecursiveSideEffects,
+  RecursiveMemoryEffects,
   DeclareOpInterfaceMethods<RegionBranchOpInterface, [
     "getSuccessorEntryOperands",
   ]>,
@@ -2363,7 +2363,7 @@ def Stream_CmdDispatchOp : Stream_Op<"cmd.dispatch", [
 
 def Stream_CmdExecuteOp : Stream_Op<"cmd.execute", [
   AttrSizedOperandSegments,
-  RecursiveSideEffects,
+  RecursiveMemoryEffects,
   DeclareOpInterfaceMethods<RegionBranchOpInterface, [
     "getSuccessorEntryOperands",
   ]>,
@@ -2444,7 +2444,7 @@ def Stream_CmdSerialOp : Stream_Op<"cmd.serial", [
     "IREE::Stream::CmdSerialOp",
     "IREE::Stream::CmdConcurrentOp",
   ]>,
-  RecursiveSideEffects,
+  RecursiveMemoryEffects,
   DeclareOpInterfaceMethods<RegionBranchOpInterface>,
   SingleBlockImplicitTerminator<"IREE::Stream::YieldOp">,
   Stream_CmdPhaseOp,
@@ -2510,7 +2510,7 @@ def Stream_CmdConcurrentOp : Stream_Op<"cmd.concurrent", [
     "IREE::Stream::CmdSerialOp",
     "IREE::Stream::CmdConcurrentOp",
   ]>,
-  RecursiveSideEffects,
+  RecursiveMemoryEffects,
   DeclareOpInterfaceMethods<RegionBranchOpInterface>,
   SingleBlockImplicitTerminator<"IREE::Stream::YieldOp">,
   Stream_CmdPhaseOp,
@@ -2977,7 +2977,7 @@ def Stream_ReturnOp : Stream_Op<"return", [
   ParentOneOf<[
     "IREE::Stream::ExecutableExportOp",
   ]>,
-  NoSideEffect,
+  Pure,
   DeclareOpInterfaceMethods<RegionBranchTerminatorOpInterface, [
     "getMutableSuccessorOperands",
   ]>,
@@ -3007,7 +3007,7 @@ def Stream_YieldOp : Stream_Op<"yield", [
     "IREE::Stream::CmdSerialOp",
     "IREE::Stream::CmdConcurrentOp",
   ]>,
-  NoSideEffect,
+  Pure,
   DeclareOpInterfaceMethods<RegionBranchTerminatorOpInterface, [
     "getMutableSuccessorOperands",
   ]>,
