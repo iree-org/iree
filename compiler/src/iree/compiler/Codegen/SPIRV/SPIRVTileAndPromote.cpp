@@ -32,6 +32,8 @@
 
 using mlir::iree_compiler::IREE::LinalgExt::TilingPatterns;
 
+constexpr int kMaxVectorNumBits = 128;
+
 namespace mlir {
 namespace iree_compiler {
 
@@ -183,8 +185,7 @@ void SPIRVTileAndPromotePass::runOnOperation() {
   auto workgroupSize = llvm::to_vector<4>(llvm::map_range(
       exportOp->getWorkgroupSize().value(),
       [&](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
-  int64_t flatWorkgroupSize =
-      workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
+  int64_t totalThreads = workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
   int subgroupSize =
       getSPIRVTargetEnvAttr(funcOp).getResourceLimits().getSubgroupSize();
 
@@ -193,12 +194,18 @@ void SPIRVTileAndPromotePass::runOnOperation() {
       op->setAttr(IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker,
                   StringAttr::get(context, getWorkgroupMemoryMarker()));
     } else if (isa<linalg::BatchMatmulOp, linalg::MatmulOp>(op)) {
-      auto lhsShape = op->getOperand(0).getType().cast<ShapedType>().getShape();
-      auto rhsShape = op->getOperand(1).getType().cast<ShapedType>().getShape();
-      bool canPromoteLHS =
-          canPerformVectorAccessUsingAllThreads(lhsShape, flatWorkgroupSize, 4);
-      bool canPromoteRHS =
-          canPerformVectorAccessUsingAllThreads(rhsShape, flatWorkgroupSize, 4);
+      auto lhsType = op->getOperand(0).getType().cast<ShapedType>();
+      auto rhsType = op->getOperand(1).getType().cast<ShapedType>();
+
+      auto elementNumBits = lhsType.getElementTypeBitWidth();
+      assert(kMaxVectorNumBits % elementNumBits == 0);
+      const int vectorSize = kMaxVectorNumBits / elementNumBits;
+
+      const bool canPromoteLHS = canPerformVectorAccessUsingAllThreads(
+          lhsType.getShape(), totalThreads, vectorSize);
+      const bool canPromoteRHS = canPerformVectorAccessUsingAllThreads(
+          rhsType.getShape(), totalThreads, vectorSize);
+
       StringAttr promoteMarker =
           StringAttr::get(context, getWorkgroupMemoryMarker());
       if (canPromoteLHS && canPromoteRHS) {
@@ -215,7 +222,7 @@ void SPIRVTileAndPromotePass::runOnOperation() {
   });
 
   // Only promote to workgroup size if there are multiple warps.
-  if (flatWorkgroupSize > subgroupSize) {
+  if (totalThreads > subgroupSize) {
     RewritePatternSet promotionPatterns(&getContext());
     auto replaceMarker = StringAttr::get(context, getWorkgroupMemoryMarker());
     populatePromotionPatterns(promotionPatterns, replaceMarker);
