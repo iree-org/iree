@@ -79,19 +79,6 @@ FailureOr<Flow::DispatchRegionOp> movePrecedingOpIntoDispatchRegion(
 FailureOr<Flow::DispatchRegionOp> wrapOpInDispatchRegion(RewriterBase &rewriter,
                                                          Operation *op);
 
-/// Sort the given ops topologically, so that they can be inlined into a
-/// dispatch region without dominance violations.
-///
-/// Example:
-///
-/// %0 = "some_op"()
-/// %1 = "another_op"(%1)
-///
-/// In the above example, "some_op" is before "another_op" in the result.
-// TODO: Improve mlir::sortTopologically. This function does currently not
-// support ops from different blocks.
-SmallVector<Operation *> orderOperations(ArrayRef<Operation *> ops);
-
 }  // namespace Flow
 }  // namespace IREE
 }  // namespace iree_compiler
