@@ -15,6 +15,7 @@
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 
 namespace mlir {
@@ -22,7 +23,7 @@ namespace iree_compiler {
 namespace detail {
 
 static LogicalResult setAppleMatmulConfig(linalg::LinalgOp op,
-                                          int subgroupSize) {
+                                          spirv::ResourceLimitsAttr limits) {
   const std::array<int64_t, 2> workgroupXY = {256, 1};
   std::array<int64_t, 3> threadMNK;
   auto inputType = op.getInputs()[0].getType().cast<ShapedType>();
@@ -31,7 +32,7 @@ static LogicalResult setAppleMatmulConfig(linalg::LinalgOp op,
   } else {
     threadMNK = {4, 4, 4};
   }
-  return setMatmulOpConfig(op, subgroupSize, workgroupXY, threadMNK);
+  return setMatmulOpConfig(limits, op, workgroupXY, threadMNK);
 }
 
 //===----------------------------------------------------------------------===//
@@ -40,17 +41,17 @@ static LogicalResult setAppleMatmulConfig(linalg::LinalgOp op,
 
 LogicalResult setAppleCodeGenConfig(const spirv::TargetEnv &targetEnv,
                                     Operation *rootOp) {
-  int subgroupSize = targetEnv.getResourceLimits().getSubgroupSize();
+  spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
+  int subgroupSize = limits.getSubgroupSize();
 
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp)) {
     if (isMatmulOrBatchMatmul(linalgOp))
-      return setAppleMatmulConfig(linalgOp, subgroupSize);
+      return setAppleMatmulConfig(linalgOp, limits);
   }
 
   return TypeSwitch<Operation *, LogicalResult>(rootOp)
-      .Case<linalg::BatchMatmulOp, linalg::MatmulOp>([subgroupSize](auto op) {
-        return setAppleMatmulConfig(op, subgroupSize);
-      })
+      .Case<linalg::BatchMatmulOp, linalg::MatmulOp>(
+          [limits](auto op) { return setAppleMatmulConfig(op, limits); })
       .Case<linalg::Conv2DNchwFchwOp, linalg::Conv2DNhwcHwcfOp>(
           [subgroupSize](auto op) {
             return setConvOpConfig(op, subgroupSize,
