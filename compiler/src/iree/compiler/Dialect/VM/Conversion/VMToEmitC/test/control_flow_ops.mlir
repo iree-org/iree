@@ -207,6 +207,22 @@ vm.module @my_module {
 
 // -----
 
+// TODO(simon-camp): add check statements
+// Test vm.call.variadic with multiple variadic packs.
+vm.module @my_module {
+  // CHECK: func.func @my_module_call_[[VARIADICFN:[^\(]+]]
+  vm.import @variadic_fn(%is : i32 ..., %fs : f32 ...) -> i32
+
+  // CHECK: func.func @my_module_call_variadic
+  vm.func @call_variadic(%i : i32, %f : f32) -> i32 {
+
+    %0 = vm.call.variadic @variadic_fn([%i, %i], [%f, %f, %f]) : (i32 ..., f32 ...) -> i32
+    vm.return %0 : i32
+  }
+}
+
+// -----
+
 vm.module @my_module {
   // CHECK-LABEL: @my_module_cond_branch_empty
   vm.func @cond_branch_empty(%arg0 : i32, %arg1 : i32, %arg2 : i32) -> i32 {
@@ -302,15 +318,11 @@ vm.module @my_module {
   // CHECK-SAME:      -> !emitc.opaque<"iree_status_t"> attributes {emitc.static} {
 
   // Calculate the size of the arguments. To avoid empty structs we insert a dummy value.
-  // CHECK-NEXT: %[[ARGSIZE0:.+]] = "emitc.constant"() {value = #emitc.opaque<"0">} : () -> !emitc.opaque<"iree_host_size_t">
-  // CHECK-NEXT: %[[ARGSIZE1:.+]] = emitc.call "sizeof"() {args = [i32]}
-  // CHECK-NEXT: %[[ARGSIZE:.+]] = emitc.call "EMITC_ADD"(%[[ARGSIZE0]], %[[ARGSIZE1]])
+  // CHECK-NEXT: %[[ARGSIZE:.+]] = "emitc.constant"() {value = #emitc.opaque<"0">} : () -> !emitc.opaque<"iree_host_size_t">
 
   // Calculate the size of the result. To avoid empty structs we insert a dummy value.
-  // CHECK-NEXT: %[[RESULTSIZE0:.+]] = "emitc.constant"() {value = #emitc.opaque<"0">} : () -> !emitc.opaque<"iree_host_size_t">
-  // CHECK-NEXT: %[[RESULTSIZE1:.+]] = emitc.call "sizeof"() {args = [i32]}
-  // CHECK-NEXT: %[[RESULTSIZE:.+]] = emitc.call "EMITC_ADD"(%[[RESULTSIZE0]], %[[RESULTSIZE1]])
-
+  // CHECK-NEXT: %[[RESULTSIZE:.+]] = "emitc.constant"() {value = #emitc.opaque<"0">} : () -> !emitc.opaque<"iree_host_size_t">
+  
   // Create a struct for the arguments and results.
   // CHECK: %[[ARGSTRUCT:.+]] = "emitc.constant"() {value = #emitc.opaque<"">} : () -> !emitc.opaque<"iree_vm_function_call_t">
   // CHECK-NEXT: %[[ARGSTRUCTFN:.+]] = emitc.apply "*"(%arg1) : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.opaque<"iree_vm_function_t">
