@@ -471,7 +471,7 @@ struct ScatterOpImplicitIndex : public OpRewritePattern<mhlo::ScatterOp> {
                                                      indices, reassociationMap);
 
     auto newScatter = rewriter.create<mhlo::ScatterOp>(
-        op.getLoc(), op.getResultTypes(), op.getOperands(), indices,
+        op.getLoc(), op.getResultTypes(), op.operands(), indices,
         op.getUpdates(), dimNumbers, op.getIndicesAreSorted(),
         op.getUniqueIndices());
     Region &region = newScatter.getUpdateComputation();
@@ -543,7 +543,7 @@ struct ScatterOpImplicitBatch : public OpRewritePattern<mhlo::ScatterOp> {
         dimNumbers.getIndexVectorDim() + 1);
 
     auto newScatter = rewriter.create<mhlo::ScatterOp>(
-        op.getLoc(), op.getResultTypes(), op.getOperands(), indices, updates,
+        op.getLoc(), op.getResultTypes(), op.operands(), indices, updates,
         newDimNumbers, op.getIndicesAreSorted(), op.getUniqueIndices());
     Region &region = newScatter.getUpdateComputation();
     rewriter.cloneRegionBefore(op.getUpdateComputation(), region, region.end());
@@ -640,8 +640,143 @@ struct ScatterOpCollapseBatch : public OpRewritePattern<mhlo::ScatterOp> {
         /*indexVectorDim=*/1);
 
     auto newScatter = rewriter.create<mhlo::ScatterOp>(
-        op.getLoc(), op.getResultTypes(), op.getOperands(), indices, updates,
+        op.getLoc(), op.getResultTypes(), op.operands(), indices, updates,
         newDimNumbers, op.getIndicesAreSorted(), op.getUniqueIndices());
+    Region &region = newScatter.getUpdateComputation();
+    rewriter.cloneRegionBefore(op.getUpdateComputation(), region, region.end());
+    rewriter.replaceOp(op, newScatter.getResults());
+    return success();
+  }
+};
+
+// mhlo.scatter can materialize a unit dimension at both indexed dimensions or
+// at unary dimensions in the destination matrix. linalg_ext.scatter only
+// allows unit dimensions at indexed dimensions. This pattern inserts all
+// unary dimensions that are not index dimensions to be compatible with
+// linalg_ext.scatter.
+//
+// If converts an mhlo.scatter as below:
+//  %result = "mhlo.scatter"(...) ({
+//    indices_are_sorted = true,
+//    scatter_dimension_numbers = #mhlo.scatter<
+//            update_window_dims = [1],
+//            inserted_window_dims = [0, 2],
+//            scatter_dims_to_operand_dims = [0],
+//            index_vector_dim = 1>,
+//    unique_indices = true} :
+//        (tensor<5x4x1xi32>, tensor<1x1xi32>, tensor<1x4xi32>)
+//
+// To:
+//  %result = "mhlo.scatter"(...) ({
+//    indices_are_sorted = true,
+//    scatter_dimension_numbers = #mhlo.scatter<
+//            update_window_dims = [1, 2],
+//            inserted_window_dims = [0],
+//            scatter_dims_to_operand_dims = [0],
+//            index_vector_dim = 1>,
+//     unique_indices = true} :
+//        (tensor<5x4x1xi32>, tensor<1x1xi32>, tensor<1x4x1xi32>)
+//  return %0 : tensor<5x4x1xi32>
+struct ScatterMaterializeInsertedDim
+    : public OpRewritePattern<mhlo::ScatterOp> {
+  using OpRewritePattern<mhlo::ScatterOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mhlo::ScatterOp op,
+                                PatternRewriter &rewriter) const final {
+    auto indices = op.getScatterIndices();
+    auto operand = op.operands().front();
+    auto indicesTy = indices.getType().cast<ShapedType>();
+    auto operandTy = operand.getType().cast<ShapedType>();
+    if (!operandTy.hasRank() || !indicesTy.hasRank()) {
+      return rewriter.notifyMatchFailure(op, "operand/indices have no rank");
+    }
+
+    auto dimNumbers = op.getScatterDimensionNumbers();
+    auto updateDims = dimNumbers.getUpdateWindowDims();
+
+    if (indicesTy.getRank() != 2 || dimNumbers.getIndexVectorDim() != 1) {
+      return rewriter.notifyMatchFailure(
+          op, "indices is not of shape [batch, indices]");
+    }
+
+    if (!updateDims.empty() && updateDims.front() == 0) {
+      return rewriter.notifyMatchFailure(
+          op, "updates is not of shape [batch, ...]");
+    }
+
+    auto scatterDimsToOperandDims = dimNumbers.getScatterDimsToOperandDims();
+    llvm::SmallVector<bool> isIndexDim(operandTy.getRank(), false);
+    for (auto val : scatterDimsToOperandDims) {
+      isIndexDim[val] = true;
+    }
+
+    int64_t firstNonIndex = 0;
+    for (int64_t s = scatterDimsToOperandDims.size(); firstNonIndex < s;
+         ++firstNonIndex) {
+      if (!isIndexDim[firstNonIndex]) break;
+    }
+
+    llvm::SmallVector<bool> isInsertDims(operandTy.getRank(), false);
+    for (auto val : dimNumbers.getInsertedWindowDims()) {
+      isInsertDims[val] = true;
+    }
+
+    int64_t frontInsertedDims = 0;
+    for (; frontInsertedDims < firstNonIndex; ++frontInsertedDims) {
+      if (!isInsertDims[frontInsertedDims]) {
+        break;
+      }
+    }
+
+    llvm::ArrayRef<bool> toInsertDims =
+        llvm::ArrayRef<bool>(isInsertDims).drop_front(frontInsertedDims);
+    if (!llvm::any_of(toInsertDims, [](auto d) { return d; })) {
+      return rewriter.notifyMatchFailure(op, "no dimensions to insert");
+    }
+
+    // Create a reassociation map that starts with the batch dims.
+    SmallVector<ReassociationExprs, 4> reassociationMap;
+    reassociationMap.push_back({rewriter.getAffineDimExpr(0)});
+
+    for (auto it : llvm::enumerate(llvm::ArrayRef<bool>(toInsertDims))) {
+      if (!it.value()) reassociationMap.push_back({});
+      reassociationMap.back().push_back(
+          rewriter.getAffineDimExpr(it.index() + 1));
+    }
+
+    llvm::SmallVector<Value> expandedUpdates;
+    for (auto update : op.getUpdates()) {
+      auto updatesTy = update.getType().cast<ShapedType>();
+
+      llvm::SmallVector<int64_t> newShape;
+      for (int i = 0, s = reassociationMap.size(); i < s; ++i) {
+        newShape.push_back(updatesTy.getDimSize(i));
+        for (int j = 1, s = reassociationMap[i].size(); j < s; ++j) {
+          newShape.push_back(1);
+        }
+      }
+
+      Value expandUpdate = rewriter.create<tensor::ExpandShapeOp>(
+          op.getLoc(),
+          RankedTensorType::get(newShape, updatesTy.getElementType()), update,
+          reassociationMap);
+      expandedUpdates.push_back(expandUpdate);
+    }
+
+    llvm::SmallVector<int64_t> newUpdatedWindowDims(toInsertDims.size());
+    llvm::SmallVector<int64_t> newInsertedWindowDims(frontInsertedDims);
+    std::iota(newUpdatedWindowDims.begin(), newUpdatedWindowDims.end(), 1);
+    std::iota(newInsertedWindowDims.begin(), newInsertedWindowDims.end(), 0);
+
+    auto newDimNumbers = mhlo::ScatterDimensionNumbersAttr::get(
+        op.getContext(), newUpdatedWindowDims, newInsertedWindowDims,
+        dimNumbers.getScatterDimsToOperandDims(),
+        /*indexVectorDim=*/1);
+
+    auto newScatter = rewriter.create<mhlo::ScatterOp>(
+        op.getLoc(), op.getResultTypes(), op.operands(), op.getScatterIndices(),
+        expandedUpdates, newDimNumbers, op.getIndicesAreSorted(),
+        op.getUniqueIndices());
     Region &region = newScatter.getUpdateComputation();
     rewriter.cloneRegionBefore(op.getUpdateComputation(), region, region.end());
     rewriter.replaceOp(op, newScatter.getResults());
@@ -1162,7 +1297,8 @@ struct MHLOToMHLOPreprocessingPass
 
     // scatter canonicalization patterns
     patterns.insert<ScatterOpImplicitIndex, ScatterOpImplicitBatch,
-                    ScatterOpCollapseBatch>(context);
+                    ScatterMaterializeInsertedDim, ScatterOpCollapseBatch>(
+        context);
 
     // dot_general canoncalization patterns.
     mhlo::populateGeneralDotOpLoweringPatterns(&patterns, context);

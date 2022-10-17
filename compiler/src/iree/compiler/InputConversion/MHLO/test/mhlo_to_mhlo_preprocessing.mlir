@@ -243,7 +243,7 @@ func.func @rng_normal(%arg0: tensor<f32>, %arg1: tensor<f32>) -> tensor<3x5xf32>
 // CHECK:         %[[RES:.+]] = mhlo.reshape %[[SLICE]] : (tensor<15xf32>) -> tensor<3x5xf32>
 // CHECK:         return %[[RES]]
 
-//-----
+// -----
 
 func.func @mul_float_bool_cast(%arg0 : tensor<?xi1>, %arg1 : tensor<?xf32>) -> tensor<?xf32> {
   %0 = "mhlo.convert"(%arg0) : (tensor<?xi1>) -> tensor<?xf32>
