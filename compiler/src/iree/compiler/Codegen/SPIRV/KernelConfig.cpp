@@ -34,6 +34,8 @@
 namespace mlir {
 namespace iree_compiler {
 
+using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
+
 //===----------------------------------------------------------------------===//
 // Utility Functions
 //===----------------------------------------------------------------------===//
@@ -204,8 +206,7 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
     threadTileSizes[i] = workgroupTileSizes[i] / workgroupSize[3 - i];
   }
 
-  auto pipeline =
-      IREE::Codegen::DispatchLoweringPassPipeline::SPIRVBaseVectorize;
+  auto pipeline = CodeGenPipeline::SPIRVBaseVectorize;
   TileSizesListType tileSizes;
   tileSizes.push_back(workgroupTileSizes);
   tileSizes.push_back(threadTileSizes);
@@ -344,10 +345,11 @@ static bool tileMatmulMToWorkgroupY(const int64_t dimM,
 
 namespace detail {
 
-LogicalResult setMatmulOpConfig(linalg::LinalgOp op, int64_t subgroupSize,
+LogicalResult setMatmulOpConfig(spirv::ResourceLimitsAttr limits,
+                                linalg::LinalgOp op,
                                 std::array<int64_t, 2> bestWorkgroupSizeXY,
                                 std::array<int64_t, 3> bestThreadTileSizeMNK,
-                                bool useWorkgroupMemory) {
+                                bool enablePromotion) {
   LLVM_DEBUG(llvm::dbgs() << "trying to deduce config as matmul...\n");
   OpOperand *lhs = op.getInputOperand(0);
   OpOperand *rhs = op.getInputOperand(1);
@@ -432,16 +434,15 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op, int64_t subgroupSize,
   }
   if (reductionTileSizes[kIndex] == 0) return success();
 
+  const int subgroupSize = limits.getSubgroupSize();
   int64_t totalThreads = workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
   LLVM_DEBUG({
     llvm::dbgs() << "total thread count = " << totalThreads << "\n";
     llvm::dbgs() << "subgroup size = " << subgroupSize << "\n";
   });
-  auto pipeline =
-      (useWorkgroupMemory && totalThreads > subgroupSize)
-          ? IREE::Codegen::DispatchLoweringPassPipeline::
-                SPIRVMatmulPromoteVectorize
-          : IREE::Codegen::DispatchLoweringPassPipeline::SPIRVBaseVectorize;
+  auto pipeline = (enablePromotion && totalThreads > subgroupSize)
+                      ? CodeGenPipeline::SPIRVMatmulPromoteVectorize
+                      : CodeGenPipeline::SPIRVBaseVectorize;
 
   SmallVector<int64_t> threadTileSizes(numLoops, 0);
   if (isBM) {
@@ -472,8 +473,7 @@ static LogicalResult setFftOpConfig(spirv::ResourceLimitsAttr limits,
                                     IREE::LinalgExt::FftOp op) {
   LLVM_DEBUG(llvm::dbgs() << "trying to deduce config as fft...\n");
   const int subgroupSize = limits.getSubgroupSize();
-  auto pipeline =
-      IREE::Codegen::DispatchLoweringPassPipeline::SPIRVBaseDistribute;
+  auto pipeline = CodeGenPipeline::SPIRVBaseDistribute;
 
   std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
 
@@ -602,8 +602,7 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
 
   return setOpConfigAndEntryPointFnTranslation(
       op->getParentOfType<func::FuncOp>(), op, tileSizes,
-      IREE::Codegen::DispatchLoweringPassPipeline::SPIRVSubgroupReduce,
-      workgroupSize);
+      CodeGenPipeline::SPIRVSubgroupReduce, workgroupSize);
 }
 
 //===----------------------------------------------------------------------===//
@@ -623,8 +622,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
   if (partitionedLoops.empty()) {
     // No tiled loops means we cannot tile (and distribute) at all. Use just one
     // single thread to run everything.
-    auto pipeline =
-        IREE::Codegen::DispatchLoweringPassPipeline::SPIRVBaseDistribute;
+    auto pipeline = CodeGenPipeline::SPIRVBaseDistribute;
     std::array<int64_t, 3> workgroupSize = {1, 1, 1};
     return setOpConfigAndEntryPointFnTranslation(funcOp, op, {}, pipeline,
                                                  workgroupSize);
@@ -656,8 +654,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
   // Special case for non-linalg ops.
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
   if (!linalgOp || linalgOp.getNumOutputs() != 1) {
-    auto pipeline =
-        IREE::Codegen::DispatchLoweringPassPipeline::SPIRVBaseDistribute;
+    auto pipeline = CodeGenPipeline::SPIRVBaseDistribute;
 
     initConfiguration();
     TileSizesListType tileSizes;
@@ -792,10 +789,8 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
     }
   }
 
-  auto pipeline =
-      vectorizable
-          ? IREE::Codegen::DispatchLoweringPassPipeline::SPIRVBaseVectorize
-          : IREE::Codegen::DispatchLoweringPassPipeline::SPIRVBaseDistribute;
+  auto pipeline = vectorizable ? CodeGenPipeline::SPIRVBaseVectorize
+                               : CodeGenPipeline::SPIRVBaseDistribute;
 
   TileSizesListType tileSizes;
   tileSizes.push_back(workgroupTileSizes);
@@ -884,8 +879,8 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
         } else {
           threadMNK = {8, 8, 4};
         }
-        auto result = detail::setMatmulOpConfig(op, /*subgroupSize=*/32,
-                                                workgroupXY, threadMNK);
+        auto result =
+            detail::setMatmulOpConfig(limits, op, workgroupXY, threadMNK);
         if (failed(result)) return result;
         if (getLoweringConfig(op)) return result;
 
