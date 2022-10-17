@@ -683,7 +683,7 @@ struct ScatterMaterializeInsertedDim
 
   LogicalResult matchAndRewrite(mhlo::ScatterOp op,
                                 PatternRewriter &rewriter) const final {
-    auto indices = op.scatter_indices();
+    auto indices = op.getScatterIndices();
     auto operand = op.operands().front();
     auto indicesTy = indices.getType().cast<ShapedType>();
     auto operandTy = operand.getType().cast<ShapedType>();
@@ -691,7 +691,7 @@ struct ScatterMaterializeInsertedDim
       return rewriter.notifyMatchFailure(op, "operand/indices have no rank");
     }
 
-    auto dimNumbers = op.scatter_dimension_numbers();
+    auto dimNumbers = op.getScatterDimensionNumbers();
     auto updateDims = dimNumbers.getUpdateWindowDims();
 
     if (indicesTy.getRank() != 2 || dimNumbers.getIndexVectorDim() != 1) {
@@ -745,7 +745,7 @@ struct ScatterMaterializeInsertedDim
     }
 
     llvm::SmallVector<Value> expandedUpdates;
-    for (auto update : op.updates()) {
+    for (auto update : op.getUpdates()) {
       auto updatesTy = update.getType().cast<ShapedType>();
 
       llvm::SmallVector<int64_t> newShape;
@@ -774,11 +774,11 @@ struct ScatterMaterializeInsertedDim
         /*indexVectorDim=*/1);
 
     auto newScatter = rewriter.create<mhlo::ScatterOp>(
-        op.getLoc(), op.getResultTypes(), op.operands(), op.scatter_indices(),
-        expandedUpdates, newDimNumbers, op.indices_are_sorted(),
-        op.unique_indices());
-    Region &region = newScatter.update_computation();
-    rewriter.cloneRegionBefore(op.update_computation(), region, region.end());
+        op.getLoc(), op.getResultTypes(), op.operands(), op.getScatterIndices(),
+        expandedUpdates, newDimNumbers, op.getIndicesAreSorted(),
+        op.getUniqueIndices());
+    Region &region = newScatter.getUpdateComputation();
+    rewriter.cloneRegionBefore(op.getUpdateComputation(), region, region.end());
     rewriter.replaceOp(op, newScatter.getResults());
     return success();
   }
