@@ -25,6 +25,9 @@ include(CMakeParseArguments)
 #     device. TEST_INPUT_FILE_ARG is automatically added if specified.
 # ARGS: additional arguments passed to the test binary. TEST_INPUT_FILE_ARG and
 #     --device=DRIVER are automatically added if specified.
+#     File-related arguments can be passed with `{{}}` locator,
+#     e.g., --function_input=@{{foo.npy}}. The locator is used to portably
+#     pass the file arguments to tests and add the file to DATA.
 # SRC: binary target to run as the test.
 # WILL_FAIL: The target will run, but its pass/fail status will be inverted.
 # LABELS: Additional labels to apply to the test. The package path is added
@@ -89,6 +92,25 @@ function(iree_native_test)
     list(APPEND _RULE_DATA "${_RULE_TEST_INPUT_FILE_ARG}")
   endif()
 
+  # Detect file location with `{{}}` and handle its portability for all entries
+  # in `_RULE_ARGS`.
+  foreach(_ARG ${_RULE_ARGS})
+    string(REGEX MATCH ".+{{(.+)}}" _FILE_ARG "${_ARG}")
+    if(_FILE_ARG)
+      set(_FILE_PATH ${CMAKE_MATCH_1})
+      list(APPEND _RULE_DATA "${_FILE_PATH}")
+      if (ANDROID)
+        cmake_path(GET _FILE_PATH FILENAME _FILE_BASENAME)
+        set(_FILE_PATH "${_ANDROID_ABS_DIR}/${_FILE_BASENAME}")
+      endif()
+      # remove the `{{}}` from `_ARG` and append it to `_TEST_ARGS`.
+      string(REGEX REPLACE "{{.+}}" "" _FILE_FLAG_PREFIX "${_ARG}")
+      list(APPEND _TEST_ARGS "${_FILE_FLAG_PREFIX}${_FILE_PATH}")
+    else()  # naive append
+      list(APPEND _TEST_ARGS "${_ARG}")
+    endif(_FILE_ARG)
+  endforeach(_ARG)
+
   # Replace binary passed by relative ::name with iree::package::name
   string(REGEX REPLACE "^::" "${_PACKAGE_NS}::" _SRC_TARGET ${_RULE_SRC})
 
@@ -101,7 +123,7 @@ function(iree_native_test)
       COMMAND
         "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_android_test.${IREE_HOST_SCRIPT_EXT}"
         "${_ANDROID_ABS_DIR}/$<TARGET_FILE_NAME:${_SRC_TARGET}>"
-        ${_RULE_ARGS}
+        ${_TEST_ARGS}
     )
     # Use environment variables to instruct the script to push artifacts
     # onto the Android device before running the test. This needs to match
@@ -126,7 +148,7 @@ function(iree_native_test)
       COMMAND
         "${IREE_ROOT_DIR}/build_tools/cmake/run_riscv_test.sh"
         "$<TARGET_FILE:${_SRC_TARGET}>"
-        ${_RULE_ARGS}
+        ${_TEST_ARGS}
     )
     iree_configure_test(${_TEST_NAME})
   else()
@@ -135,7 +157,7 @@ function(iree_native_test)
         ${_TEST_NAME}
       COMMAND
         "$<TARGET_FILE:${_SRC_TARGET}>"
-        ${_RULE_ARGS}
+        ${_TEST_ARGS}
     )
     iree_configure_test(${_TEST_NAME})
   endif()
