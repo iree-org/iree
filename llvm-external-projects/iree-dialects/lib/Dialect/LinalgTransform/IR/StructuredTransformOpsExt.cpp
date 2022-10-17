@@ -453,6 +453,15 @@ void mlir::TrackingListener::notifyOperationRemoved(Operation *op) {
   mayFail(replacePayloadOp(op, nullptr));
 }
 
+void mlir::TrackingListener::removeMappings(Operation *op) {
+  // Bail if in error state.
+  if (hadErrors)
+    return;
+
+  // Replacing the tracked op with null will stop the tracking.
+  mayFail(replacePayloadOp(op, nullptr));
+}
+
 //===----------------------------------------------------------------------===//
 // CanonicalizedSequenceOp
 //===----------------------------------------------------------------------===//
@@ -502,6 +511,69 @@ static LogicalResult performEnablerTransformations(
     return WalkResult::advance();
   });
   return failure(res.wasInterrupted());
+}
+
+/// Drop the association between payload operations and transform dialect
+/// handles when it is no longer necessary in a canonicalized sequence.
+/// Specifically, drop the association between payload operations and the
+/// operand handles if all handles to them will not be used after the current
+/// `transform`. Also drop the association between payload operations and result
+/// handles if results are never read. Note that the operand part is specific to
+/// sequence-like execution that is not guaranteed in the transform dialect in
+/// general.
+static void
+forgetUnnecessaryHandles(transform::TransformState &state,
+                         transform_ext::CanonicalizedSequenceOp sequence,
+                         transform::TransformOpInterface transform) {
+  auto *listener = state.getExtension<TrackingListener>();
+  assert(transform->getParentOp() == sequence &&
+         "only works for transform ops immediately nested in a canonicalized "
+         "sequence");
+  assert(listener && "expected tracking listener to be present");
+
+  // Checks if the operation or its ancestor is before `transform` in its block
+  // or is `transform` itself.
+  auto userIsBefore = [&](Operation *user) {
+    while (user && user->getParentOp() != sequence)
+      user = user->getParentOp();
+    if (!user)
+      return false;
+    return user->isBeforeInBlock(transform) || user == transform;
+  };
+
+  // Drop associations for operands that will not be read again. Ignore consumed
+  // operands that have been deassociated already. Consider all handles to each
+  // payload operation and only drop the association if all handles pointing to
+  // the same operation will are not used after the current transform op. The
+  // handle will be erased automatically after the last payload operation is
+  // deassociated from it.
+  llvm::SmallDenseMap<Value, bool> handlesUsedAfterTransform;
+  for (Value operand : transform->getOperands()) {
+    if (transform::isHandleConsumed(operand, transform))
+      continue;
+
+    for (Operation *payload : state.getPayloadOps(operand)) {
+      SmallVector<Value> allHandles;
+      (void)state.getHandlesForPayloadOp(payload, allHandles);
+      bool allHandlesUnused = llvm::all_of(allHandles, [&](Value handle) {
+        if (!handlesUsedAfterTransform.count(handle)) {
+          handlesUsedAfterTransform[handle] =
+              !llvm::all_of(handle.getUsers(), userIsBefore);
+        }
+        return !handlesUsedAfterTransform[handle];
+      });
+      if (allHandlesUnused)
+        listener->removeMappings(payload);
+    }
+  }
+
+  // Drop associations for results that will never be read.
+  for (Value result : transform->getResults()) {
+    if (!result.getUses().empty())
+      continue;
+    for (Operation *payload : state.getPayloadOps(result))
+      listener->removeMappings(payload);
+  }
 }
 
 DiagnosedSilenceableFailure transform_ext::CanonicalizedSequenceOp::apply(
@@ -576,8 +648,8 @@ DiagnosedSilenceableFailure transform_ext::CanonicalizedSequenceOp::apply(
 
   // Apply the sequenced ops one by one.
   for (Operation &transform : getBodyBlock()->without_terminator()) {
-    DiagnosedSilenceableFailure result =
-        state.applyTransform(cast<transform::TransformOpInterface>(transform));
+    auto transformOp = cast<transform::TransformOpInterface>(transform);
+    DiagnosedSilenceableFailure result = state.applyTransform(transformOp);
     if (result.isDefiniteFailure()) {
       LLVM_DEBUG(DBGS() << "failed: " << transform << "\n");
       return result;
@@ -590,6 +662,13 @@ DiagnosedSilenceableFailure transform_ext::CanonicalizedSequenceOp::apply(
       (void)result.silence();
     }
     LLVM_DEBUG(DBGS() << "successfully performed: " << transform << "\n");
+
+    // Canonicalization may replace payload operations associated with the
+    // transform dialect handles. Post-canonicalize reassociation is fragile and
+    // may fail. To make this less likely, drop any association that are no
+    // longer necessary, i.e., if the operand is no longer used in the sequence
+    // or elsewhere or if the result is never read.
+    forgetUnnecessaryHandles(state, *this, transformOp);
 
     if (failed(checkedListenerTransform(performCSE)))
       return DiagnosedSilenceableFailure::definiteFailure();
