@@ -201,6 +201,10 @@ static void addSPIRVLoweringPasses(OpPassManager &pm, bool enableFastMath) {
   pm.addPass(createCSEPass());
 
   pm.addPass(createMapMemRefStorageClassPass());
+  pm.addPass(createSPIRVEmulateI64Pass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
   pm.addPass(createConvertToSPIRVPass(enableFastMath));
 
   OpPassManager &spirvPM = pm.nest<spirv::ModuleOp>();

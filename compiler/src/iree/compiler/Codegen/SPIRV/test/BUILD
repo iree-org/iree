@@ -34,6 +34,7 @@ iree_lit_test_suite(
             "convert_to_spirv.mlir",
             "create_fast_slow_path.mlir",
             "distribute_to_invocations.mlir",
+            "emulate_i64.mlir",
             "pipeline_matmul_cooperative_ops.mlir",
             "pipeline_matmul_promotion.mlir",
             "pipeline_matmul_vectorization.mlir",

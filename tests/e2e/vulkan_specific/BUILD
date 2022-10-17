@@ -44,3 +44,23 @@ iree_check_single_backend_test_suite(
     driver = "vulkan",
     target_backend = "vulkan-spirv",
 )
+
+iree_check_single_backend_test_suite(
+    name = "check_vulkan-spirv_vulkan_i64_emulation",
+    srcs = [
+        "add_i64.mlir",
+        "mul_i64.mlir",
+    ],
+    compiler_flags = [
+        "--iree-input-type=mhlo",
+        "--iree-mhlo-demote-i64-to-i32=false",
+        "--iree-vulkan-target-triple=valhall-unknown-android31",
+    ],
+    driver = "vulkan",
+    tags = [
+        "manual",
+        "notap",
+        "vulkan_uses_shader_int64",
+    ],
+    target_backend = "vulkan-spirv",
+)
