@@ -46,6 +46,8 @@ void iree_hal_task_queue_initialize(iree_string_view_t identifier,
 
 void iree_hal_task_queue_deinitialize(iree_hal_task_queue_t* queue);
 
+void iree_hal_task_queue_trim(iree_hal_task_queue_t* queue);
+
 iree_status_t iree_hal_task_queue_submit(
     iree_hal_task_queue_t* queue, iree_host_size_t batch_count,
     const iree_hal_submission_batch_t* batches);
