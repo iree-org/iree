@@ -353,9 +353,9 @@ func.func @scatter_partial(%arg0: tensor<10x5xf32>, %arg1: tensor<3x1xi32>, %arg
 }
 
 // CHECK-LABEL: func.func @scatter_partial
-// CHECK:         %[[ARG0:[a-zA-Z0-9]+]]
-// CHECK:         %[[ARG1:[a-zA-Z0-9]+]]
-// CHECK:         %[[ARG2:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
 // CHECK:         %[[SCATTER:.+]] = iree_linalg_ext.scatter
 // CHECK-SAME:      unique_indices(false)
 // CHECK-SAME:      ins(%[[ARG2]], %[[ARG1]] : tensor<3x3xf32>, tensor<3x1xi32>)
