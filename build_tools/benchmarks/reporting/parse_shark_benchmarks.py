@@ -242,12 +242,13 @@ def main(args):
 
   # Generate Server GPU Dynamic.
   if args.gpu_iree_csv is not None:
-    html += generate_table(args.gpu_iree_csv,
-                           args.gpu_baseline_csv,
-                           shark_csv=args.gpu_shark_csv,
-                           shape_type="dynamic",
-                           device="cuda",
-                           title="Server NVIDIA Tesla A100 GPU (Dynamic Shapes)")
+    html += generate_table(
+        args.gpu_iree_csv,
+        args.gpu_baseline_csv,
+        shark_csv=args.gpu_shark_csv,
+        shape_type="dynamic",
+        device="cuda",
+        title="Server NVIDIA Tesla A100 GPU (Dynamic Shapes)")
 
   args.output_path.write_text(html)
 
