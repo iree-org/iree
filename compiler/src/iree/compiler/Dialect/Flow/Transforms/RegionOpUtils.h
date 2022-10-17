@@ -54,7 +54,9 @@ Flow::DispatchRegionOp makeEmptyDispatchRegion(OpBuilder &builder,
 ///   flow.return %1 : tensor<?xf32>
 /// }
 /// %2 = "yet_another_use"(%0) : (tensor<?xf32>) -> (tensor<?xf32>)
-LogicalResult clonePrecedingOpIntoDispatchRegion(
+///
+/// Returns the cloned target op.
+FailureOr<Operation *> clonePrecedingOpIntoDispatchRegion(
     RewriterBase &rewriter, Operation *target, Flow::DispatchRegionOp regionOp);
 
 /// Move a `target` op that is preceding the given dispatch region op into the
