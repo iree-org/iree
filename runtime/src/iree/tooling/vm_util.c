@@ -11,33 +11,11 @@
 #include <stdio.h>
 
 #include "iree/base/api.h"
+#include "iree/base/internal/file_io.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/module.h"
 #include "iree/tooling/numpy_io.h"
-
-// TODO(benvanik): drop use of stdio and make an iree_io_stream_t.
-#if defined(IREE_PLATFORM_WINDOWS)
-static uint64_t iree_file_query_length(FILE* file) {
-  _fseeki64(file, 0, SEEK_END);
-  uint64_t file_length = _ftelli64(file);
-  _fseeki64(file, 0, SEEK_SET);
-  return file_length;
-}
-static bool iree_file_is_eof(FILE* file, uint64_t file_length) {
-  return _ftelli64(file) == file_length;
-}
-#else
-static uint64_t iree_file_query_length(FILE* file) {
-  fseek(file, 0, SEEK_END);
-  uint64_t file_length = ftell(file);
-  fseek(file, 0, SEEK_SET);
-  return file_length;
-}
-static bool iree_file_is_eof(FILE* file, uint64_t file_length) {
-  return ftell(file) == file_length;
-}
-#endif  // IREE_PLATFORM_*
 
 static iree_status_t iree_allocate_and_copy_cstring_from_view(
     iree_allocator_t allocator, iree_string_view_t view, char** cstring) {
@@ -62,15 +40,15 @@ static iree_status_t iree_tooling_load_ndarrays_from_file(
                             file_path.data);
   }
 
-  uint64_t file_length = iree_file_query_length(file);
+  uint64_t file_length = 0;
+  iree_status_t status = iree_file_query_length(file, &file_length);
 
   iree_hal_buffer_params_t buffer_params = {0};
   buffer_params.usage = IREE_HAL_BUFFER_USAGE_DEFAULT;
   buffer_params.access = IREE_HAL_MEMORY_ACCESS_READ;
   buffer_params.type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
 
-  iree_status_t status = iree_ok_status();
-  while (iree_status_is_ok(status) && !iree_file_is_eof(file, file_length)) {
+  while (iree_status_is_ok(status) && !iree_file_is_at(file, file_length)) {
     iree_hal_buffer_view_t* buffer_view = NULL;
     status = iree_numpy_npy_load_ndarray(
         file, IREE_NUMPY_NPY_LOAD_OPTION_DEFAULT, buffer_params,

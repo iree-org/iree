@@ -11,7 +11,6 @@
 #if IREE_FILE_IO_ENABLE
 
 #include <errno.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -32,6 +31,14 @@
 // be using this method.
 #define IREE_FILE_BASE_ALIGNMENT 4096
 
+#if defined(IREE_PLATFORM_WINDOWS)
+#define iree_fseek64 _fseeki64
+#define iree_ftell64 _ftelli64
+#else
+#define iree_fseek64 fseek
+#define iree_ftell64 ftell
+#endif  // IREE_PLATFORM_WINDOWS
+
 iree_status_t iree_file_exists(const char* path) {
   IREE_ASSERT_ARGUMENT(path);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -44,6 +51,38 @@ iree_status_t iree_file_exists(const char* path) {
 
   IREE_TRACE_ZONE_END(z0);
   return status;
+}
+
+iree_status_t iree_file_query_length(FILE* file, uint64_t* out_length) {
+  IREE_ASSERT_ARGUMENT(out_length);
+  *out_length = 0;
+  if (!file) return iree_ok_status();
+
+  // Capture original offset so we can return to it.
+  uint64_t origin = iree_ftell64(file);
+
+  // Seek to the end of the file.
+  if (iree_fseek64(file, 0, SEEK_END) == -1) {
+    return iree_make_status(iree_status_code_from_errno(errno), "seek (end)");
+  }
+
+  // Query the position, telling us the total file length in bytes.
+  uint64_t file_length = iree_ftell64(file);
+  if (file_length == -1L) {
+    return iree_make_status(iree_status_code_from_errno(errno), "size query");
+  }
+
+  // Seek back to the file origin.
+  if (iree_fseek64(file, origin, SEEK_SET) == -1) {
+    return iree_make_status(iree_status_code_from_errno(errno), "seek (beg)");
+  }
+
+  *out_length = file_length;
+  return iree_ok_status();
+}
+
+bool iree_file_is_at(FILE* file, uint64_t position) {
+  return iree_ftell64(file) == position;
 }
 
 iree_status_t iree_file_contents_allocator_ctl(void* self,
@@ -84,21 +123,17 @@ void iree_file_contents_free(iree_file_contents_t* contents) {
 static iree_status_t iree_file_read_contents_impl(
     FILE* file, iree_allocator_t allocator,
     iree_file_contents_t** out_contents) {
-  // Seek to the end of the file.
-  if (fseek(file, 0, SEEK_END) == -1) {
-    return iree_make_status(iree_status_code_from_errno(errno), "seek (end)");
+  // Query total file length so we can preallocate storage.
+  // The file size may be larger than the buffer we can allocate (>2GB file on
+  // 32-bit devices) so we check that here early even though it may have false
+  // negatives (not enough virtual address space to allocate, etc).
+  uint64_t file_length = 0;
+  IREE_RETURN_IF_ERROR(iree_file_query_length(file, &file_length));
+  if (file_length > IREE_HOST_SIZE_MAX) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "file length exceeds host address range");
   }
-
-  // Query the position, telling us the total file length in bytes.
-  size_t file_size = ftell(file);
-  if (file_size == -1L) {
-    return iree_make_status(iree_status_code_from_errno(errno), "size query");
-  }
-
-  // Seek back to the file start.
-  if (fseek(file, 0, SEEK_SET) == -1) {
-    return iree_make_status(iree_status_code_from_errno(errno), "seek (beg)");
-  }
+  iree_host_size_t file_size = (iree_host_size_t)file_length;
 
   // Compute total size with alignment padding.
   // We allocate +1 to force a trailing \0 in case this is used as a cstring.
