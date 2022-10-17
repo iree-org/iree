@@ -471,7 +471,7 @@ struct ScatterOpImplicitIndex : public OpRewritePattern<mhlo::ScatterOp> {
                                                      indices, reassociationMap);
 
     auto newScatter = rewriter.create<mhlo::ScatterOp>(
-        op.getLoc(), op.getResultTypes(), op.getOperands(), indices,
+        op.getLoc(), op.getResultTypes(), op.operands(), indices,
         op.getUpdates(), dimNumbers, op.getIndicesAreSorted(),
         op.getUniqueIndices());
     Region &region = newScatter.getUpdateComputation();
@@ -543,7 +543,7 @@ struct ScatterOpImplicitBatch : public OpRewritePattern<mhlo::ScatterOp> {
         dimNumbers.getIndexVectorDim() + 1);
 
     auto newScatter = rewriter.create<mhlo::ScatterOp>(
-        op.getLoc(), op.getResultTypes(), op.getOperands(), indices, updates,
+        op.getLoc(), op.getResultTypes(), op.operands(), indices, updates,
         newDimNumbers, op.getIndicesAreSorted(), op.getUniqueIndices());
     Region &region = newScatter.getUpdateComputation();
     rewriter.cloneRegionBefore(op.getUpdateComputation(), region, region.end());
@@ -640,7 +640,7 @@ struct ScatterOpCollapseBatch : public OpRewritePattern<mhlo::ScatterOp> {
         /*indexVectorDim=*/1);
 
     auto newScatter = rewriter.create<mhlo::ScatterOp>(
-        op.getLoc(), op.getResultTypes(), op.getOperands(), indices, updates,
+        op.getLoc(), op.getResultTypes(), op.operands(), indices, updates,
         newDimNumbers, op.getIndicesAreSorted(), op.getUniqueIndices());
     Region &region = newScatter.getUpdateComputation();
     rewriter.cloneRegionBefore(op.getUpdateComputation(), region, region.end());
