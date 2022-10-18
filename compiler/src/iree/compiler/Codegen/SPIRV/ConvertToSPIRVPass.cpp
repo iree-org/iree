@@ -37,6 +37,7 @@
 #include "mlir/Conversion/TosaToArith/TosaToArith.h"
 #include "mlir/Conversion/VectorToSPIRV/VectorToSPIRV.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -235,7 +236,13 @@ struct HALInterfaceBindingSubspanConverter final
       return subspanOp.emitError()
              << "failed to convert SPIR-V type: " << resultType;
     }
-
+    assert(
+        (subspanOp.getByteOffset() == Value() ||
+         (subspanOp.getByteOffset().getDefiningOp<arith::ConstantIndexOp>() &&
+          subspanOp.getByteOffset()
+                  .getDefiningOp<arith::ConstantIndexOp>()
+                  .value() == 0)) &&
+        "subspan expects a 0 offset or no offset.");
     auto varOp = interfaceToResourceVars.lookup(subspanOp);
     // Fix up the variable's type.
     varOp.setTypeAttr(TypeAttr::get(convertedType));

@@ -187,8 +187,6 @@ static void addMemRefLoweringPasses(OpPassManager &pm) {
   // Turn multi-dimension memref into one-dimension. This is needed for SPIR-V
   // because we don't use upstream memref descriptors.
   pm.addPass(createFlattenMemRefSubspanPass());
-  // Flatten memref may expose more opportunities to fold subview ops.
-  pm.addPass(memref::createFoldMemRefAliasOpsPass());
 }
 
 /// Adds passes to perform the final SPIR-V conversion.

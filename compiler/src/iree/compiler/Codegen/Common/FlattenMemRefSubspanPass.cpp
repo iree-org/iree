@@ -41,6 +41,7 @@
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/AffineMap.h"
@@ -727,8 +728,15 @@ struct FlattenMemRefSubspanPass
       return signalPassFailure();
     }
 
-    // Then fold byte offset on subspan ops into consumer load/store ops.
+    // Fold subviews if any new oportuinity has been created.
+    RewritePatternSet foldSubviewPatterns(&getContext());
+    memref::populateFoldMemRefAliasOpPatterns(foldSubviewPatterns);
+    if (failed(applyPatternsAndFoldGreedily(getOperation()->getRegions(),
+                                            std::move(foldSubviewPatterns)))) {
+      return signalPassFailure();
+    }
 
+    // Then fold byte offset on subspan ops into consumer load/store ops.
     RewritePatternSet foldPatterns(&context);
     foldPatterns.add<FoldSubspanOffsetIntoLoadStore<memref::LoadOp>,
                      FoldSubspanOffsetIntoLoadStore<memref::StoreOp>>(&context);
