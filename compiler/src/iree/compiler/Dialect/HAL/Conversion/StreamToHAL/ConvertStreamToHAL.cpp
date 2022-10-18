@@ -30,6 +30,39 @@ static Value lookupDeviceFor(Operation *op, OpBuilder &builder) {
   return lookupOp.getResult();
 }
 
+// Returns the device queue affinity mask indicating which device queues the
+// operations are allowed to execute on.
+static Value buildQueueAffinityMaskFor(Operation *op, Value device,
+                                       OpBuilder &builder) {
+  // Try to find a specified affinity. This may be on the op provided or one of
+  // its parent regions.
+  auto affinityAttr = IREE::Stream::AffinityAttr::lookup(op);
+  if (auto queueAffinityAttr =
+          affinityAttr.dyn_cast_or_null<IREE::HAL::AffinityQueueAttr>()) {
+    return builder.create<arith::ConstantIntOp>(
+        op->getLoc(), queueAffinityAttr.getMask(), 64);
+  }
+
+  // No affinity specified; use default (any) affinity.
+  return builder.create<arith::ConstantIntOp>(op->getLoc(), -1, 64);
+}
+
+static std::tuple<Value, Value> lookupDeviceAndQueueAffinityFor(
+    Operation *op, OpBuilder &builder) {
+  // NOTE: we have this combined method so that we can reuse any expensive
+  // lookups we need to do. Today we aren't duplicating the lookups and don't
+  // bother.
+
+  // Get a device handle used to create resources and schedule work.
+  // It may be shared across many mutually-exclusive devices at runtime.
+  Value device = lookupDeviceFor(op, builder);
+
+  // Derive the queue affinity mask from the op and device combination.
+  Value queueAffinity = buildQueueAffinityMaskFor(op, device, builder);
+
+  return std::make_tuple(device, queueAffinity);
+}
+
 static Value lookupAllocatorFor(Operation *op, OpBuilder &builder) {
   auto device = lookupDeviceFor(op, builder);
   auto allocatorOp =
@@ -295,7 +328,8 @@ struct ResourceAllocaOpPattern
       IREE::Stream::ResourceAllocaOp allocaOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto loc = allocaOp.getLoc();
-    auto device = lookupDeviceFor(allocaOp, rewriter);
+    auto [device, queueAffinity] =
+        lookupDeviceAndQueueAffinityFor(allocaOp, rewriter);
     auto bufferType = rewriter.getType<IREE::HAL::BufferType>();
 
     // Transient allocations are device-local. Copies are required to get their
@@ -316,7 +350,6 @@ struct ResourceAllocaOpPattern
         loc, device, allocaOp.getResultTimepoint(), rewriter);
 
     // Queue allocation.
-    auto queueAffinity = rewriter.create<arith::ConstantIntOp>(loc, -1, 64);
     auto pool = rewriter.create<arith::ConstantIntOp>(loc, 0, 64);
     auto allocateOp = rewriter.create<IREE::HAL::DeviceQueueAllocaOp>(
         loc, bufferType, device, queueAffinity, waitFence, signalFence, pool,
@@ -334,7 +367,8 @@ struct ResourceDeallocaOpPattern
       IREE::Stream::ResourceDeallocaOp deallocaOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto loc = deallocaOp.getLoc();
-    auto device = lookupDeviceFor(deallocaOp, rewriter);
+    auto [device, queueAffinity] =
+        lookupDeviceAndQueueAffinityFor(deallocaOp, rewriter);
 
     // Gather wait/signal fence, which are optional.
     Value waitFence =
@@ -343,7 +377,6 @@ struct ResourceDeallocaOpPattern
         loc, device, deallocaOp.getResultTimepoint(), rewriter);
 
     // Queue allocation.
-    auto queueAffinity = rewriter.create<arith::ConstantIntOp>(loc, -1, 64);
     rewriter.create<IREE::HAL::DeviceQueueDeallocaOp>(
         loc, device, queueAffinity, waitFence, signalFence,
         adaptor.getOperand());
@@ -873,7 +906,8 @@ struct CmdExecuteOpPattern
       IREE::Stream::CmdExecuteOp executeOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto loc = executeOp.getLoc();
-    auto device = lookupDeviceFor(executeOp, rewriter);
+    auto [device, queueAffinity] =
+        lookupDeviceAndQueueAffinityFor(executeOp, rewriter);
 
     // If there are any wait timepoints it means there's prior queued execution
     // that we may need to wait behind and we can't execute inline. HAL
@@ -918,7 +952,6 @@ struct CmdExecuteOpPattern
         loc, device, executeOp.getResultTimepoint(), rewriter);
 
     // Queue execution.
-    auto queueAffinity = rewriter.create<arith::ConstantIntOp>(loc, -1, 64);
     rewriter.create<IREE::HAL::DeviceQueueExecuteOp>(loc, device, queueAffinity,
                                                      waitFence, signalFence,
                                                      ValueRange{commandBuffer});
@@ -1024,9 +1057,8 @@ struct TimepointChainExternalOpPattern
       return rewriter.notifyMatchFailure(
           exportOp, "only exports to HAL fences are supported");
     }
-    auto device = lookupDeviceFor(exportOp, rewriter);
-    auto queueAffinity =
-        rewriter.create<arith::ConstantIntOp>(exportOp.getLoc(), -1, 64);
+    auto [device, queueAffinity] =
+        lookupDeviceAndQueueAffinityFor(exportOp, rewriter);
     rewriter.replaceOpWithNewOp<IREE::HAL::DeviceQueueExecuteOp>(
         exportOp, device, queueAffinity,
         /*wait_fence=*/adaptor.getAwaitTimepoint(),

@@ -314,6 +314,53 @@ Attribute ExecutableTargetAttr::getMatchExpression() {
 }
 
 //===----------------------------------------------------------------------===//
+// #hal.affinity.queue
+//===----------------------------------------------------------------------===//
+
+// static
+Attribute AffinityQueueAttr::parse(AsmParser &p, Type type) {
+  int64_t mask = 0;
+  // `<`
+  if (failed(p.parseLess())) return {};
+  // `*` (any)
+  if (succeeded(p.parseOptionalStar())) {
+    mask = -1;
+  } else {
+    // `[`queue_bit[, ...] `]`
+    if (failed(p.parseCommaSeparatedList(AsmParser::Delimiter::Square, [&]() {
+          int64_t i = 0;
+          if (failed(p.parseInteger(i))) return failure();
+          mask |= 1ll << i;
+          return success();
+        }))) {
+      return {};
+    }
+  }
+  // `>`
+  if (failed(p.parseGreater())) return {};
+  return get(p.getContext(), mask);
+}
+
+void AffinityQueueAttr::print(AsmPrinter &p) const {
+  auto &os = p.getStream();
+  os << "<";
+  int64_t mask = getMask();
+  if (mask == -1) {
+    os << "*";
+  } else {
+    os << "[";
+    for (int i = 0, j = 0; i < sizeof(mask) * 8; ++i) {
+      if (mask & (1ll << i)) {
+        if (j++ > 0) os << ", ";
+        os << i;
+      }
+    }
+    os << "]";
+  }
+  os << ">";
+}
+
+//===----------------------------------------------------------------------===//
 // #hal.match.*
 //===----------------------------------------------------------------------===//
 
