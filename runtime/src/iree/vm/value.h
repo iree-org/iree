@@ -30,10 +30,12 @@ typedef enum iree_vm_value_type_e {
   IREE_VM_VALUE_TYPE_I32 = 3,
   // int64_t.
   IREE_VM_VALUE_TYPE_I64 = 4,
+  // halft_t.
+  IREE_VM_VALUE_TYPE_F16 = 5,
   // float.
-  IREE_VM_VALUE_TYPE_F32 = 5,
+  IREE_VM_VALUE_TYPE_F32 = 6,
   // double.
-  IREE_VM_VALUE_TYPE_F64 = 6,
+  IREE_VM_VALUE_TYPE_F64 = 7,
 
   IREE_VM_VALUE_TYPE_MAX = IREE_VM_VALUE_TYPE_F64,
   IREE_VM_VALUE_TYPE_COUNT = IREE_VM_VALUE_TYPE_MAX + 1,  // used for lookup
@@ -51,6 +53,7 @@ typedef struct iree_vm_value_t {
     int32_t i32;
     int64_t i64;
     float f32;
+    uint16_t f16_u16;
     double f64;
 
     uint8_t value_storage[IREE_VM_VALUE_STORAGE_SIZE];  // max size of all value
@@ -102,6 +105,13 @@ static inline int64_t iree_vm_value_get_i64(iree_vm_value_t *value) {
   return value->i64;
 }
 
+static inline iree_vm_value_t iree_vm_value_make_f16(uint16_t value) {
+  iree_vm_value_t result;
+  result.type = IREE_VM_VALUE_TYPE_F16;
+  result.f16_u16 = value;
+  return result;
+}
+
 static inline iree_vm_value_t iree_vm_value_make_f32(float value) {
   iree_vm_value_t result;
   result.type = IREE_VM_VALUE_TYPE_F32;
@@ -112,6 +122,11 @@ static inline iree_vm_value_t iree_vm_value_make_f32(float value) {
 // TODO(#5542): check the value type before accessing the union.
 static inline float iree_vm_value_get_f32(iree_vm_value_t *value) {
   return value->f32;
+}
+
+// TODO(#5542): check the value type before accessing the union.
+static inline uint16_t iree_vm_value_get_f16(iree_vm_value_t *value) {
+  return value->f16_u16;
 }
 
 static inline iree_vm_value_t iree_vm_value_make_f64(double value) {

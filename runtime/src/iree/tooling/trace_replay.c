@@ -13,10 +13,15 @@
 #include <string.h>
 
 #include "iree/base/internal/file_io.h"
+#include "iree/base/internal/math.h"
 #include "iree/base/internal/path.h"
 #include "iree/base/tracing.h"
 #include "iree/modules/hal/module.h"
 #include "iree/vm/bytecode_module.h"
+
+// Parameter for locally defined lcg similar to std::minstd_rand.
+#define IREE_PRNG_MULTIPLIER 48271
+#define IREE_PRNG_MODULUS 2147483647
 
 iree_status_t iree_trace_replay_initialize(
     iree_string_view_t root_path, iree_vm_instance_t* instance,
@@ -513,7 +518,7 @@ static iree_status_t iree_trace_replay_parse_hal_buffer_contents(
 // Writes an element of the given |element_type| with the given integral |value|
 // to |dst|.
 static void iree_trace_replay_write_element(
-    iree_hal_element_type_t element_type, int value, void* dst) {
+    iree_hal_element_type_t element_type, int32_t value, void* dst) {
 #define IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(ETYPE, CTYPE) \
   case IREE_HAL_ELEMENT_TYPE_##ETYPE:                      \
     *(CTYPE*)dst = (CTYPE)value;                           \
@@ -532,8 +537,13 @@ static void iree_trace_replay_write_element(
     IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(UINT_16, uint16_t)
     IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(UINT_32, uint32_t)
     IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(UINT_64, uint64_t)
+    // clang-format off
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
+      *(uint16_t*)dst = iree_math_f32_to_f16((float)value);
+      break;
     IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(FLOAT_32, float)
     IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(FLOAT_64, double)
+    // clang-format on
     default:
       IREE_ASSERT(false, "unhandled element type");
       break;
@@ -543,14 +553,78 @@ static void iree_trace_replay_write_element(
 }
 
 // Simple deterministic pseudorandom generator.
-// Typically in tests we want reproducible results both across runs and across
-// machines.
+// This function is same as C++'s std::minstd_rand.
+static uint32_t iree_tree_replay_pseudorandom_uint32(uint32_t* state) {
+  *state = (*state * IREE_PRNG_MULTIPLIER) % IREE_PRNG_MODULUS;
+  return *state;
+}
+
+// Returns a random uint8_t in the range of [0, UCHAR_MAX].
 static uint8_t iree_trace_replay_pseudorandom_uint8(uint32_t* state) {
-  // Same as C++'s std::minstd_rand.
-  *state = (*state * 48271) % 2147483647;
   // return the second-least-signicant out of the 4 bytes of state. it avoids
   // some mild issues with the least-significant and most-significant bytes.
-  return *state >> 8;
+  return iree_tree_replay_pseudorandom_uint32(state) >> 8;
+}
+
+// Returns a random uint32_t in the range [0, range).
+static inline uint32_t iree_trace_replay_pseudorandom_range(uint32_t* state,
+                                                            uint32_t range) {
+  return iree_tree_replay_pseudorandom_uint32(state) % range;
+}
+
+// Returns a random double in the range of [0, 1.0).
+static double iree_trace_replay_pseudorandom_double(uint32_t* state) {
+  const double inv_modulus = 1.0 / IREE_PRNG_MODULUS;
+  return iree_tree_replay_pseudorandom_uint32(state) * inv_modulus;
+}
+
+// Get minimum and maximum for integer-valued uniform distribution.
+static void iree_trace_replay_get_min_max_for_element_type(
+    iree_hal_element_type_t element_type, int32_t* min, int32_t* max) {
+  switch (element_type) {
+    case IREE_HAL_ELEMENT_TYPE_INT_8:
+    case IREE_HAL_ELEMENT_TYPE_SINT_8:
+      *min = -2;
+      *max = +2;
+      break;
+    case IREE_HAL_ELEMENT_TYPE_UINT_8:
+      *min = 0;
+      *max = +2;
+      break;
+    case IREE_HAL_ELEMENT_TYPE_INT_16:
+    case IREE_HAL_ELEMENT_TYPE_SINT_16:
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
+      *min = -4;
+      *max = +4;
+      break;
+    case IREE_HAL_ELEMENT_TYPE_UINT_16:
+      *min = 0;
+      *max = +4;
+      break;
+    case IREE_HAL_ELEMENT_TYPE_INT_32:
+    case IREE_HAL_ELEMENT_TYPE_SINT_32:
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
+      *min = -8;
+      *max = +8;
+      break;
+    case IREE_HAL_ELEMENT_TYPE_UINT_32:
+      *min = 0;
+      *max = +8;
+      break;
+    case IREE_HAL_ELEMENT_TYPE_INT_64:
+    case IREE_HAL_ELEMENT_TYPE_SINT_64:
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_64:
+      *min = -16;
+      *min = +16;
+      break;
+    case IREE_HAL_ELEMENT_TYPE_UINT_64:
+      *min = 0;
+      *max = +16;
+      break;
+    default:
+      IREE_ASSERT(false, "unhandled element type");
+      break;
+  }
 }
 
 // Fills the destination span with pseudorandom values of the given
@@ -560,15 +634,18 @@ static uint8_t iree_trace_replay_pseudorandom_uint8(uint32_t* state) {
 static void iree_trace_replay_generate_fully_specified_pseudorandom_buffer(
     iree_hal_element_type_t element_type, iree_byte_span_t span,
     uint32_t seed) {
-  const bool is_unsigned = iree_hal_element_numerical_type(element_type) ==
-                           IREE_HAL_NUMERICAL_TYPE_INTEGER_UNSIGNED;
   iree_host_size_t element_byte_count =
       iree_hal_element_dense_byte_count(element_type);
   uint8_t* data_end = span.data + span.data_length;
   uint32_t state = seed;
+  uint32_t range;
+  int32_t min, max;
+  iree_trace_replay_get_min_max_for_element_type(element_type, &min, &max);
+  range = (max - min + 1);
   for (uint8_t* data = span.data; data < data_end; data += element_byte_count) {
-    int value_in_uint8_range = iree_trace_replay_pseudorandom_uint8(&state);
-    int value = value_in_uint8_range + (is_unsigned ? 0 : -128);
+    // Generate "uniform" integer-valued numbers in the range [min, max].
+    int32_t value =
+        (int32_t)iree_trace_replay_pseudorandom_range(&state, range) + min;
     iree_trace_replay_write_element(element_type, value, data);
   }
 }

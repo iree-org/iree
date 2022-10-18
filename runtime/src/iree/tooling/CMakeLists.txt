@@ -211,6 +211,7 @@ iree_cc_library(
   DEPS
     ::yaml_util
     iree::base
+    iree::base::internal
     iree::base::internal::file_io
     iree::base::internal::path
     iree::base::tracing
