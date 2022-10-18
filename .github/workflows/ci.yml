@@ -564,7 +564,7 @@ jobs:
 
   # emscripten is not in the test matrix because it is set as
   # postsubmission-only.
-  cross_compile_targets:
+  cross_compile_and_test:
     needs: [setup, build_all]
     if: needs.setup.outputs.should-run == 'true'
     runs-on:
@@ -580,28 +580,28 @@ jobs:
             architecture: arm64-v8a
             abi: arm64-v8a
             docker_image: "gcr.io/iree-oss/android@sha256:76c2a52dcd6d07601227b965ac87d021c1d2d5e2d01f46ad58da28c89267f2ab"
-            run_scripts: "./build_tools/cmake/build_android.sh"
+            test_script: "echo 'bypass test'"
           - platform: riscv
             architecture: rv64
             abi: lp64d
             docker_image: "gcr.io/iree-oss/riscv@sha256:d6f0e293a50faf5abbd564c1d1bb9dc6456d7ce93d07b131c381fa64c1daed62"
-            run_scripts: "./build_tools/cmake/build_riscv.sh && ./build_tools/cmake/test_riscv.sh"
+            test_script: "./build_tools/cmake/test_riscv.sh"
           - platform: riscv
             architecture: rv32-linux
             abi: ilp32d
             docker_image: "gcr.io/iree-oss/riscv@sha256:d6f0e293a50faf5abbd564c1d1bb9dc6456d7ce93d07b131c381fa64c1daed62"
-            run_scripts: "./build_tools/cmake/build_riscv.sh && ./build_tools/cmake/test_riscv.sh"
+            test_script: "./build_tools/cmake/test_riscv.sh"
           - platform: riscv
             architecture: rv32-baremetal
             abi: ilp32
             docker_image: "gcr.io/iree-oss/riscv@sha256:d6f0e293a50faf5abbd564c1d1bb9dc6456d7ce93d07b131c381fa64c1daed62"
-            run_scripts: "./build_tools/cmake/build_riscv.sh && ./tests/riscv32/smoke.sh"
+            test_script: "./tests/riscv32/smoke.sh"
     env:
       PLATFORM: ${{ matrix.target.platform }}
       ARCHITECTURE: ${{ matrix.target.architecture }}
       ABI: ${{ matrix.target.abi }}
       DOCKER_IMAGE: ${{ matrix.target.docker_image }}
-      RUN_SCRIPTS: ${{ matrix.target.run_scripts }}
+      TEST_SCRIPT: ${{ matrix.target.test_script }}
       BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
       BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
       BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
@@ -614,9 +614,7 @@ jobs:
         run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting build dir archive"
         run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
-      - name: "Cross-compiling and optionally testing"
-        env:
-          BUILD_BENCHMARK_SUITE_DIR: ${{ steps.download_expected_output.outputs.benchmark-suite-dir }}
+      - name: "Build cross-compiling target"
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "${PLATFORM^^}_ARCH=${ARCHITECTURE}" \
@@ -626,7 +624,16 @@ jobs:
             --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
             "${DOCKER_IMAGE}" \
             bash -euo pipefail -c \
-              "${RUN_SCRIPTS}"
+              "./build_tools/cmake/build_${PLATFORM}.sh"
+      - name: "Test cross-compiling target"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "${PLATFORM^^}_ARCH=${ARCHITECTURE}" \
+            --env "BUILD_${PLATFORM^^}_DIR=build-${PLATFORM}-${ARCHITECTURE}" \
+            --env "BUILD_PRESET=test" \
+            "${DOCKER_IMAGE}" \
+            bash -euo pipefail -c \
+              "${TEST_SCRIPT}"
 
   emscripten:
     needs: [setup, build_all]
@@ -766,7 +773,7 @@ jobs:
       - tsan
 
       # Crosscompilation
-      - cross_compile_targets
+      - cross_compile_and_test
       - emscripten
 
       # Benchmark pipeline
