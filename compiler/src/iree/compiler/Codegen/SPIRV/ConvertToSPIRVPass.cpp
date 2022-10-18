@@ -51,6 +51,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Pass/Pass.h"
@@ -230,19 +231,19 @@ struct HALInterfaceBindingSubspanConverter final
       return success();
     }
 
+    Value offset = subspanOp.getByteOffset();
+    APInt offsetInt;
+    if (offset && matchPattern(offset, m_ConstantInt(&offsetInt)) &&
+        !offsetInt.isZero()) {
+      return subspanOp.emitOpError() << "should have no or zero byte offset";
+    }
+
     Type resultType = subspanOp.getOperation()->getResult(0).getType();
     Type convertedType = this->getTypeConverter()->convertType(resultType);
     if (!convertedType) {
       return subspanOp.emitError()
              << "failed to convert SPIR-V type: " << resultType;
     }
-    assert(
-        (subspanOp.getByteOffset() == Value() ||
-         (subspanOp.getByteOffset().getDefiningOp<arith::ConstantIndexOp>() &&
-          subspanOp.getByteOffset()
-                  .getDefiningOp<arith::ConstantIndexOp>()
-                  .value() == 0)) &&
-        "subspan expects a 0 offset or no offset.");
     auto varOp = interfaceToResourceVars.lookup(subspanOp);
     // Fix up the variable's type.
     varOp.setTypeAttr(TypeAttr::get(convertedType));
