@@ -13,7 +13,6 @@
 #include "iree/hal/api.h"
 #include "iree/modules/hal/types.h"
 #include "iree/vm/api.h"
-#include "iree/vm/shims.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_buffer_t
