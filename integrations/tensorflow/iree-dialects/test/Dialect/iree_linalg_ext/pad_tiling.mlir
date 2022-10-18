@@ -24,7 +24,7 @@ func.func @pad_tensor(%arg0 : tensor<?x?xf32>, %arg1 : index, %arg2 : index,
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //  CHECK-DAG:   %[[C10:.+]] = arith.constant 10 : index
 //  CHECK-DAG:   %[[C20:.+]] = arith.constant 20 : index
-//  CHECK-DAG:   %[[INIT:.+]] = linalg.init_tensor
+//  CHECK-DAG:   %[[INIT:.+]] = tensor.empty()
 //      CHECK:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //      CHECK:   %[[UBY:.+]] = affine.apply #[[MAP0]]()[%[[ARG1]], %[[ARG3]], %[[D0]]]
 //      CHECK:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]

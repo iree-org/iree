@@ -1322,10 +1322,10 @@ func.func @unpack_undo_padding(%input: memref<2x8x8x2xf32>, %output: memref<13x1
 // CHECK-DAG:    %[[C15:.+]] = arith.constant 15 : index
 // CHECK:        scf.for %[[I:.+]] = %[[C0]] to %[[C13]] step %[[C1]] {
 // CHECK:          scf.for %[[J:.+]] = %[[C0]] to %[[C15]] step %[[C1]] {
-// CHECK-DAG:        %[[OUTER_I:.+]] = affine.apply #[[MAP0]](%[[I]])
-// CHECK-DAG:        %[[INNER_I:.+]] = affine.apply #[[MAP1]](%[[I]])
-// CHECK-DAG:        %[[OUTER_J:.+]] = affine.apply #[[MAP2]](%[[J]])
-// CHECK-DAG:        %[[INNER_J:.+]] = affine.apply #[[MAP3]](%[[J]])
+// CHECK-DAG:        %[[OUTER_I:.+]] = affine.apply #[[MAP_FLOORI]](%[[I]])
+// CHECK-DAG:        %[[INNER_I:.+]] = affine.apply #[[MAP_MODI]](%[[I]])
+// CHECK-DAG:        %[[OUTER_J:.+]] = affine.apply #[[MAP_FLOORJ]](%[[J]])
+// CHECK-DAG:        %[[INNER_J:.+]] = affine.apply #[[MAP_MODJ]](%[[J]])
 // CHECK:            %[[VAL:.+]] = memref.load %[[INPUT]][%[[OUTER_I]], %[[OUTER_J]], %[[INNER_I]], %[[INNER_J]]]
 // CHECK:            memref.store %[[VAL]], %[[OUTPUT]][%[[I]], %[[J]]]
 
@@ -1385,5 +1385,35 @@ func.func @CKkc_to_KC(%arg0: memref<128x256xf32>, %arg1: memref<32x4x32x8xf32>) 
 // CHECK-DAG: %[[MODC:.+]] = affine.apply #[[MAP3]](%[[C]])
 // CHECK: %[[VAL:.+]] = memref.load %[[ARG1]][%[[FLOORC]], %[[FLOORK]], %[[MODK]], %[[MODC]]] : memref<32x4x32x8xf32>
 // CHECK: memref.store %[[VAL]], %[[ARG0]][%[[K]], %[[C]]] : memref<128x256xf32>
+// CHECK: }
+// CHECK: }
+
+// -----
+
+func.func @NPQK_to_NKPQk(%arg0: memref<1x56x56x64xf32>, %arg1: memref<1x2x56x56x32xf32>) {
+  iree_linalg_ext.pack %arg0 outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [32] into %arg1 : (memref<1x56x56x64xf32> memref<1x2x56x56x32xf32>)
+  return 
+}
+
+// CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1) -> (d0 * 32 + d1)>
+// CHECK: func.func @NPQK_to_NKPQk
+// CHECK-SAME:   %[[INPUT:[a-zA-Z0-9]+]]
+// CHECK-SAME:   %[[OUTPUT:[a-zA-Z0-9]+]]
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
+// CHECK-DAG: %[[C56:.+]] = arith.constant 56 : index
+// CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
+// CHECK: scf.for %[[N:.+]] = %[[C0]] to %[[C1]] step %[[C1]] {
+// CHECK: scf.for %[[K:.+]] = %[[C0]] to %[[C2]] step %[[C1]] {
+// CHECK: scf.for %[[P:.+]] = %[[C0]] to %[[C56]] step %[[C1]] {
+// CHECK: scf.for %[[Q:.+]] = %[[C0]] to %[[C56]] step %[[C1]] {
+// CHECK: scf.for %[[k:.+]] = %[[C0]] to %[[C32]] step %[[C1]] {
+// CHECK: %[[APPLY:.+]] = affine.apply #[[MAP0]](%[[K]], %[[k]])
+// CHECK: %[[VAL:.+]] = memref.load %[[INPUT]][%[[N]], %[[P]], %[[Q]], %[[APPLY]]] : memref<1x56x56x64xf32>
+// CHECK: memref.store %[[VAL]], %[[OUTPUT]][%[[N]], %[[K]], %[[P]], %[[Q]], %[[k]]] : memref<1x2x56x56x32xf32>
+// CHECK: }
+// CHECK: }
+// CHECK: }
 // CHECK: }
 // CHECK: }

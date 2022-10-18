@@ -127,6 +127,11 @@ iree_status_t Run(int* out_exit_code) {
                                     FLAG_function_inputs.size()},
       host_allocator, &inputs));
 
+  // If the function is async add fences so we can invoke it synchronously.
+  vm::ref<iree_hal_fence_t> finish_fence;
+  IREE_RETURN_IF_ERROR(iree_tooling_append_async_fence_inputs(
+      inputs.get(), &function, device, /*wait_fence=*/NULL, &finish_fence));
+
   vm::ref<iree_vm_list_t> outputs;
   IREE_RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr, 16,
                                            host_allocator, &outputs));
@@ -137,6 +142,12 @@ iree_status_t Run(int* out_exit_code) {
                      /*policy=*/nullptr, inputs.get(), outputs.get(),
                      host_allocator),
       "invoking function '%s'", function_name.c_str());
+
+  // If the function is async we need to wait for it to complete.
+  if (!!finish_fence) {
+    IREE_RETURN_IF_ERROR(
+        iree_hal_fence_wait(finish_fence.get(), iree_infinite_timeout()));
+  }
 
   if (FLAG_expected_outputs.empty()) {
     IREE_RETURN_IF_ERROR(

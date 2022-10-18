@@ -30,7 +30,7 @@ class Util_Op<string mnemonic, list<Trait> traits = []> :
 }
 
 class Util_PureOp<string mnemonic, list<Trait> traits = []> :
-    Util_Op<mnemonic, !listconcat(traits, [NoSideEffect])>;
+    Util_Op<mnemonic, !listconcat(traits, [Pure])>;
 
 //===----------------------------------------------------------------------===//
 // Byte buffers and host data
@@ -344,7 +344,7 @@ def Util_UnfoldableConstantOp : Util_Op<"unfoldable_constant"> {
   let hasCanonicalizer = 1;
 }
 
-def Util_UnreachableOp : Util_Op<"unreachable", [NoSideEffect, Terminator]> {
+def Util_UnreachableOp : Util_Op<"unreachable", [NoMemoryEffect, Terminator]> {
   let summary = [{unreachable assertion op}];
   let description = [{
     Signals to the compiler that the parent block should not be reachable.
@@ -422,7 +422,7 @@ def Util_InitializerOp : Util_Op<"initializer", [
 
 def Util_InitializerReturnOp : Util_Op<"initializer.return", [
   HasParent<"IREE::Util::InitializerOp">,
-  NoSideEffect,
+  Pure,
   ReturnLike,
   Terminator,
 ]> {

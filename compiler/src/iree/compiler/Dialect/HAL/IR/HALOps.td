@@ -20,7 +20,7 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
 
 class HAL_PureOp<string mnemonic, list<Trait> traits = []> :
-    HAL_Op<mnemonic, !listconcat(traits, [NoSideEffect])>;
+    HAL_Op<mnemonic, !listconcat(traits, [Pure])>;
 
 class HAL_MakeTupleOp<string mnemonic, list<Trait> traits = []> :
     HAL_PureOp<mnemonic, traits>;
@@ -53,6 +53,7 @@ def HAL_ExSharedDeviceOp : HAL_PureOp<"ex.shared_device", [
 //===----------------------------------------------------------------------===//
 
 def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
+  AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
     "getTiedResult",
     "getTiedResultOperandIndex",
@@ -78,13 +79,15 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
   let arguments = (ins
     AnyTypeOf<[HAL_Buffer, HAL_BufferView]>:$source,
     TypeAttr:$target_encoding,
-    HAL_ShapeDynamicDims:$target_dims
+    HAL_ShapeDynamicDims:$target_dims,
+    Optional<HAL_Fence>:$wait_fence
   );
   let results = (outs
     AnyTensor:$target
   );
 
   let assemblyFormat = [{
+    (`wait` `(` $wait_fence^ `)` `=` `` `>`)?
     $source `:` type($source)
     `->`
     custom<TypeAlias>($target_encoding, type($target)) (`{` $target_dims^ `}`)?
@@ -95,6 +98,11 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
     OpBuilder<(ins
       "Type":$resultType,
       "Value":$source
+    )>,
+    OpBuilder<(ins
+      "Type":$resultType,
+      "Value":$source,
+      "Value":$waitFence
     )>,
   ];
 
@@ -120,9 +128,6 @@ def HAL_TensorExportOp : HAL_PureOp<"tensor.export", [
   let summary = [{exports a tensor to a HAL buffer view}];
   let description = [{
     Defines an export of an SSA-form tensor to an external HAL buffer view.
-    An optional semaphore timepoint can be specified indicating when the
-    buffer view is available for use. If no semaphore timepoint is requested it
-    is assumed execution blocks until the buffer view is available.
 
     The provided `source_encoding`, if different from the `source` type,
     indicates that the ABI-facing type may differ from the internal
@@ -172,6 +177,45 @@ def HAL_TensorExportOp : HAL_PureOp<"tensor.export", [
   let hasVerifier = 1;
 
   let hasFolder = 1;
+}
+
+def HAL_TensorBarrierOp : HAL_Op<"tensor.barrier", [
+  AllTypesMatch<["sources", "results"]>,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedResult",
+    "getTiedResultOperandIndex",
+    "getTiedResultOperandIndices",
+  ]>,
+]> {
+  let summary = [{signals a fence when all tensors are available}];
+  let description = [{
+    Defines a barrier that is used to indicate availability of an entire set of
+    tensors by signaling a fence. The source tensors are returned for chaining.
+  }];
+
+  let arguments = (ins
+    Variadic<AnyTensor>:$sources,
+    HAL_Fence:$signal_fence
+  );
+  let results = (outs
+    Variadic<AnyTensor>:$results
+  );
+
+  let assemblyFormat = [{
+    `join` `` `(` $sources `:` type($sources) `)`
+    `=` `` `>`
+    $signal_fence `:` type($signal_fence)
+    attr-dict-with-keyword
+  }];
+
+  let builders = [
+    OpBuilder<(ins
+      "ValueRange":$sources,
+      "Value":$signalFence
+    )>,
+  ];
+
+  let hasCanonicalizer = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1128,7 +1172,7 @@ def HAL_DeviceAllocatorOp : HAL_PureOp<"device.allocator", [
 
 def HAL_DeviceSwitchOp : HAL_Op<"device.switch", [
     NoRegionArguments,
-    RecursiveSideEffects,
+    RecursiveMemoryEffects,
   ]> {
   let summary = [{runtime device switch pseudo op}];
   let description = [{

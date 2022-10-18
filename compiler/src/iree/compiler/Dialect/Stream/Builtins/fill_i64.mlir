@@ -15,7 +15,7 @@ stream.executable private @__builtin_fill_i64 {
   builtin.module {
     func.func @__builtin_fill_i64(%value: i64, %offset: index, %count: index, %out_binding: !stream.binding) {
       %out = stream.binding.subspan %out_binding[%offset] : !stream.binding -> !flow.dispatch.tensor<writeonly:?xi64>{%count}
-        %0 = linalg.init_tensor [%count] : tensor<?xi64>
+        %0 = tensor.empty(%count) : tensor<?xi64>
         %1 = linalg.fill ins(%value : i64) outs(%0 : tensor<?xi64>) -> tensor<?xi64>
         flow.dispatch.tensor.store %1, %out, offsets = [0], sizes = [%count], strides = [1] : tensor<?xi64> -> !flow.dispatch.tensor<writeonly:?xi64>{%count}
       return

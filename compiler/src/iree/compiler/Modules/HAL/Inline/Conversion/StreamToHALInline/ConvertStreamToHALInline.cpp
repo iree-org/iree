@@ -541,6 +541,18 @@ struct TimepointExportOpPattern
   }
 };
 
+struct TimepointChainExternalOpPattern
+    : public OpConversionPattern<IREE::Stream::TimepointChainExternalOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      IREE::Stream::TimepointChainExternalOp exportOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    return rewriter.notifyMatchFailure(
+        exportOp,
+        "timepoints are not supported across the ABI with inline execution");
+  }
+};
+
 struct TimepointJoinOpPattern
     : public OpConversionPattern<IREE::Stream::TimepointJoinOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -548,6 +560,21 @@ struct TimepointJoinOpPattern
       IREE::Stream::TimepointJoinOp joinOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<arith::ConstantIntOp>(joinOp, 0, 64);
+    return success();
+  }
+};
+
+struct TimepointBarrierOpPattern
+    : public OpConversionPattern<IREE::Stream::TimepointBarrierOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      IREE::Stream::TimepointBarrierOp barrierOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOp(barrierOp, {
+                                      adaptor.getResource(),
+                                      rewriter.create<arith::ConstantIntOp>(
+                                          barrierOp.getLoc(), 0, 64),
+                                  });
     return success();
   }
 };
@@ -620,7 +647,8 @@ void populateStreamToHALInlinePatterns(MLIRContext *context,
 
   patterns.insert<GlobalTimepointConversionPattern>(typeConverter, context);
   patterns.insert<TimepointImmediateOpPattern, TimepointImportOpPattern,
-                  TimepointExportOpPattern, TimepointJoinOpPattern,
+                  TimepointExportOpPattern, TimepointChainExternalOpPattern,
+                  TimepointJoinOpPattern, TimepointBarrierOpPattern,
                   TimepointAwaitOpPattern>(typeConverter, context);
 
   patterns.insert<ElideYieldOpPattern>(typeConverter, context);

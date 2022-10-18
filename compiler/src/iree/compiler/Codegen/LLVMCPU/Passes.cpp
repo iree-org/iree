@@ -52,6 +52,17 @@ static llvm::cl::opt<bool> clEnableMicrokernels(
     llvm::cl::desc("Enables microkernel lowering for vmvx (experimental)"),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clEnableMicrokernelsDecomposeLinalgGeneric(
+    "iree-vmvx-enable-microkernels-decompose-linalg-generic",
+    llvm::cl::desc("Enables decomposition of linalg.generic ops when "
+                   "microkernels are enabled (experimental)"),
+    llvm::cl::init(true));
+
+static llvm::cl::opt<bool> clEnableReassociateFpReductions(
+    "iree-llvmcpu-reassociate-fp-reductions",
+    llvm::cl::desc("Enables reassociation for FP reductions"),
+    llvm::cl::init(false));
+
 // MLIR file containing a top-level module that specifies the transformations to
 // apply to form dispatch regions.
 // Defined externally in KernelDispatch.cpp to control the codegen pass
@@ -414,7 +425,7 @@ void addVMVXDefaultPassPipeline(OpPassManager &passManager) {
   // Tensor-level micro-kernel optimizations.
   // Note that this must be done post-tiling because it changes the structure
   // of the dispatch region such that tiling is not always possible.
-  if (clEnableMicrokernels) {
+  if (clEnableMicrokernels && clEnableMicrokernelsDecomposeLinalgGeneric) {
     passManager.nest<ModuleOp>().nest<func::FuncOp>().addPass(
         createDecomposeLinalgGenericPass());
   }
@@ -442,10 +453,19 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   {
     LinalgFusePassOptions options;
-    for (int64_t i = 1; i < numLevels; ++i) {
+    // Run SplitReductionPass before the final reduction Fuse pass, because
+    // SplitReductionPass takes care of banked-tiling.
+    for (int64_t i = 1; i < numLevels - 1; ++i) {
       options.tilingLevel = i;
       nestedModulePM.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
     }
+  }
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLinalgSplitReductionPass(clEnableReassociateFpReductions));
+  {
+    LinalgFusePassOptions options;
+    options.tilingLevel = numLevels - 1;
+    nestedModulePM.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
   }
 
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -559,6 +579,10 @@ void addCPUAArchDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
     nestedModulePM.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
   }
 
+  // Run SplitReductionPass before the final reduction Fuse pass, because
+  // SplitReductionPass takes care of banked-tiling.
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLinalgSplitReductionPass(clEnableReassociateFpReductions));
   {
     LinalgSingleTilingExpertPassOptions options;
     options.tilingLevel =
@@ -649,7 +673,7 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
   // (HAL, IREE, Linalg, CF) -> LLVM
   passManager.addNestedPass<func::FuncOp>(arith::createArithExpandOpsPass());
   passManager.addNestedPass<func::FuncOp>(memref::createExpandOpsPass());
-  passManager.addPass(createConvertToLLVMPass());
+  passManager.addPass(createConvertToLLVMPass(clEnableReassociateFpReductions));
   passManager.addPass(createReconcileUnrealizedCastsPass());
 
   // We rely on MLIR symbol visibility being correct after this point and need

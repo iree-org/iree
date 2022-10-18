@@ -144,7 +144,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
       %2 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
       %3 = flow.dispatch.tensor.load %1, offsets = [%workgroup_id_y, %2, 0, 0], sizes = [1, 32, 10, 4096], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<writeonly:2x32x10x4096xf32> -> tensor<1x32x10x4096xf32>
       %4 = flow.dispatch.tensor.load %0, offsets = [%workgroup_id_y, %2, 0, 0], sizes = [1, 32, 10, 4096], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:2x32x10x4096xf32> -> tensor<1x32x10x4096xf32>
-      %5 = linalg.init_tensor [1, 32] : tensor<1x32xf32>
+      %5 = tensor.empty() : tensor<1x32xf32>
       %6 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 64, 4, 4]]>} ins(%cst : f32) outs(%5 : tensor<1x32xf32>) -> tensor<1x32xf32>
       %7 = linalg.generic {
         indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1)>],

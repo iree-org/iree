@@ -13,14 +13,14 @@ func.func @rfft_1d(%input: tensor<32xf32>) -> (tensor<17xf32>, tensor<17xf32>) {
 // CHECK-DAG:   %[[RealMatrix:.+]] = arith.constant dense<"0x0000803F{{.*}}"> : tensor<32x17xf32>
 // CHECK-DAG:   %[[ImagMatrix:.+]] = arith.constant dense<"0x00000080{{.*}}"> : tensor<32x17xf32>
 // CHECK-DAG:   %[[Zero:.+]] = arith.constant 0.000000e+00 : f32
-// CHECK:       %[[RealInit:.+]] = linalg.init_tensor [17] : tensor<17xf32>
+// CHECK:       %[[RealInit:.+]] = tensor.empty() : tensor<17xf32>
 // CHECK:       %[[RealFill:.+]] = linalg.fill
 // CHECK-SAME:    ins(%[[Zero]] :
 // CHECK-SAME:    outs(%[[RealInit]] :
 // CHECK:       %[[RealRes:.+]] = linalg.vecmat
 // CHECK-SAME:    ins(%[[Arg0]], %[[RealMatrix]] : tensor<32xf32>, tensor<32x17xf32>)
 // CHECK-SAME:    outs(%[[RealFill]] : tensor<17xf32>) -> tensor<17xf32>
-// CHECK:        %[[ImagInit:.+]] = linalg.init_tensor [17] : tensor<17xf32>
+// CHECK:        %[[ImagInit:.+]] = tensor.empty() : tensor<17xf32>
 // CHECK:        %[[ImagFill:.+]] = linalg.fill
 // CHECK-SAME:     ins(%[[Zero]] :
 // CHECK-SAME:     outs(%[[ImagInit]] :
@@ -49,14 +49,14 @@ func.func @rfft_2d(%input: tensor<1x32xf32>) -> (tensor<1x17xf32>, tensor<1x17xf
 // CHECK-DAG:   %[[RealMatrix:.+]] = arith.constant dense<"0x0000803F{{.*}}"> : tensor<32x17xf32>
 // CHECK-DAG:   %[[ImagMatrix:.+]] = arith.constant dense<"0x00000080{{.*}}"> : tensor<32x17xf32>
 // CHECK-DAG:   %[[Zero:.+]] = arith.constant 0.000000e+00 : f32
-// CHECK:        %[[RealInit:.+]] = linalg.init_tensor [1, 17] : tensor<1x17xf32>
+// CHECK:        %[[RealInit:.+]] = tensor.empty() : tensor<1x17xf32>
 // CHECK:        %[[RealFill:.+]] = linalg.fill
 // CHECK-SAME:     ins(%[[Zero]] :
 // CHECK-SAME:     outs(%[[RealInit]] :
 // CHECK:        %[[RealRes:.+]] = linalg.matmul
 // CHECK-SAME:     ins(%[[Arg0]], %[[RealMatrix]] : tensor<1x32xf32>, tensor<32x17xf32>)
 // CHECK-SAME:     outs(%[[RealFill]] : tensor<1x17xf32>) -> tensor<1x17xf32>
-// CHECK:        %[[ImagInit:.+]] = linalg.init_tensor [1, 17] : tensor<1x17xf32>
+// CHECK:        %[[ImagInit:.+]] = tensor.empty() : tensor<1x17xf32>
 // CHECK:        %[[ImagFill:.+]] = linalg.fill
 // CHECK-SAME:     ins(%[[Zero]] :
 // CHECK-SAME:     outs(%[[ImagInit]] :

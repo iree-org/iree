@@ -22,9 +22,9 @@ func.func @matmul(%arg0: tensor<24x48xf32> {linalg.buffer_layout = affine_map<(d
   %cst = arith.constant 0.000000e+00 : f32
   %c8 = arith.constant 8 : index
   %c48 = arith.constant 48 : index
-  %0 = linalg.init_tensor [2, 2, 8, 32] : tensor<2x2x8x32xf32>
+  %0 = tensor.empty() : tensor<2x2x8x32xf32>
   %1 = tensor.cast %0 : tensor<2x2x8x32xf32> to tensor<?x?x8x32xf32>
-  %2 = linalg.init_tensor [2, 2, 32, 8] : tensor<2x2x32x8xf32>
+  %2 = tensor.empty() : tensor<2x2x32x8xf32>
   %3 = tensor.cast %2 : tensor<2x2x32x8xf32> to tensor<?x?x32x8xf32>
   %4 = scf.for %arg3 = %c0 to %c24 step %c16 iter_args(%arg4 = %arg2) -> (tensor<24x32xf32>) {
     %5 = affine.min affine_map<(d0) -> (16, -d0 + 24)>(%arg3)

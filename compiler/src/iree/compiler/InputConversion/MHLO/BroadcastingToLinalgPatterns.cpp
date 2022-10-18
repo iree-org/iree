@@ -118,8 +118,8 @@ Value broadcast(OpBuilder &builder, Location loc, Value operand,
   }
 
   int nloops = resultExtents.size();
-  Value init = builder.create<linalg::InitTensorOp>(
-      loc, dynDims, resultShape, operandType.getElementType());
+  Value init = builder.create<tensor::EmptyOp>(
+      loc, resultShape, operandType.getElementType(), dynDims);
   auto generic = builder.create<linalg::GenericOp>(
       loc, TypeRange{init.getType()}, ValueRange{operand},
       /*outputBuffers=*/ValueRange{init},
@@ -331,7 +331,7 @@ struct ConvertConstantLikeOp
     int resultRank = resultTy.getRank();
     SmallVector<Extent> resultExtents;
     resultExtents.reserve(resultRank);
-    appendExtents(rewriter, loc, resultExtents, adaptor.operand(), resultTy);
+    appendExtents(rewriter, loc, resultExtents, adaptor.getOperand(), resultTy);
 
     auto resultTy0D = RankedTensorType::get({}, resultTy.getElementType());
     Value scalarConst = rewriter.create<mhlo::ConstantOp>(
@@ -723,8 +723,8 @@ struct ConvertDynamicReshapeOp
       mhlo::DynamicReshapeOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     Location loc = op.getLoc();
-    Value input = adaptor.operand();
-    Value outputShape = adaptor.output_shape();
+    Value input = adaptor.getOperand();
+    Value outputShape = adaptor.getOutputShape();
     auto outputShapeType = outputShape.getType().dyn_cast<RankedTensorType>();
     auto resultType = typeConverter->convertType(op.getType())
                           .dyn_cast_or_null<RankedTensorType>();

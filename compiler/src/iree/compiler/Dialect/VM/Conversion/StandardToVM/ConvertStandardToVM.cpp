@@ -832,6 +832,9 @@ class SignExtendIOpConversion : public OpConversionPattern<arith::ExtSIOp> {
     if (srcType.isInteger(8) && dstType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::ExtI8I32SOp>(srcOp, dstType,
                                                          adaptor.getIn());
+    } else if (srcType.isInteger(8) && dstType.isInteger(64)) {
+      rewriter.replaceOpWithNewOp<IREE::VM::ExtI8I64SOp>(srcOp, dstType,
+                                                         adaptor.getIn());
     } else if (srcType.isInteger(16) && dstType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::ExtI16I32SOp>(srcOp, dstType,
                                                           adaptor.getIn());
@@ -839,8 +842,6 @@ class SignExtendIOpConversion : public OpConversionPattern<arith::ExtSIOp> {
       rewriter.replaceOpWithNewOp<IREE::VM::ExtI32I64SOp>(srcOp, dstType,
                                                           adaptor.getIn());
     } else {
-      // TODO(benvanik): we should be building a sequence of extensions for
-      // things like i8 -> i64.
       return rewriter.notifyMatchFailure(srcOp, "unsupported sign extension");
     }
     return success();

@@ -6,7 +6,7 @@ func.func @matmul_bias_add(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %ar
   %c1 = arith.constant 1 : index
   %d0 = tensor.dim %arg0, %c0 : tensor<?x?xf32>
   %d1 = tensor.dim %arg1, %c1 : tensor<?x?xf32>
-  %init = linalg.init_tensor [%d0, %d1] : tensor<?x?xf32>
+  %init = tensor.empty(%d0, %d1) : tensor<?x?xf32>
   %0 = linalg.fill ins(%cst : f32) outs(%init : tensor<?x?xf32>) -> tensor<?x?xf32>
   %1 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[10, 20, 30]]>}
       ins(%arg0, %arg1 : tensor<?x?xf32>, tensor<?x?xf32>)
@@ -39,7 +39,7 @@ func.func @matmul_bias_add_static(%arg0 : tensor<20x60xf32>, %arg1 : tensor<60x1
   %cst = arith.constant 0.0 : f32
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
-  %init = linalg.init_tensor [20, 120] : tensor<20x120xf32>
+  %init = tensor.empty() : tensor<20x120xf32>
   %0 = linalg.fill ins(%cst : f32) outs(%init : tensor<20x120xf32>) -> tensor<20x120xf32>
   %1 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[10, 20, 30]]>}
       ins(%arg0, %arg1 : tensor<20x60xf32>, tensor<60x120xf32>)
@@ -63,12 +63,12 @@ func.func @matmul_bias_add_static(%arg0 : tensor<20x60xf32>, %arg1 : tensor<60x1
 //  CHECK-DAG:   %[[C10:.+]] = arith.constant 10 : index
 //  CHECK-DAG:   %[[C20:.+]] = arith.constant 20 : index
 //  CHECK-DAG:   %[[C120:.+]] = arith.constant 120 : index
-//      CHECK:   %[[INIT:.+]] = linalg.init_tensor [20, 120] : tensor<20x120xf32>
+//      CHECK:   %[[INIT:.+]] = tensor.empty() : tensor<20x120xf32>
 //      CHECK:   %[[RESULT:.+]] = scf.for %[[IV0:.+]] = %[[C0]] to %[[C20]] step %[[C10]]
 // CHECK-SAME:       iter_args(%[[ARG4:.+]] = %[[INIT]])
-//      CHECK:     %[[LHS:.+]] = vector.transfer_read %[[ARG0]][%[[IV0]], %[[C0]]]
 //      CHECK:     %[[YIELD:.+]] = scf.for %[[IV1:.+]] = %[[C0]] to %[[C120]]
 // CHECK-SAME:         iter_args(%[[ARG6:.+]] = %[[ARG4]])
+//  CHECK-DAG:       %[[LHS:.+]] = vector.transfer_read %[[ARG0]][%[[IV0]], %[[C0]]]
 //  CHECK-DAG:       %[[RHS:.+]] = vector.transfer_read %[[ARG1]][%[[C0]], %[[IV1]]]
 //  CHECK-DAG:       %[[BIAS:.+]] = vector.transfer_read %[[ARG2]][%[[IV1]]]
 //      CHECK:       %[[OUT:.+]] = vector.broadcast %[[BIAS]]

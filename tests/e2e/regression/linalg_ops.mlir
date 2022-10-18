@@ -7,7 +7,7 @@ func.func @multi_result() {
       [13, 14, 15, 16],
       [17, 18, 19, 20],
       [21, 22, 23, 24]]> : tensor<3x4xi32>
-  %init = linalg.init_tensor [3, 4] : tensor<3x4xi32>
+  %init = tensor.empty() : tensor<3x4xi32>
   %0:2 = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                        affine_map<(d0, d1) -> (d0, d1)>,
@@ -36,7 +36,7 @@ func.func @operand_fusion() {
   %input = util.unfoldable_constant dense<1.0> : tensor<1x225x225x3xf32>
   %filter = util.unfoldable_constant dense<1.0> : tensor<3x3x3x16xf32>
   %bias = util.unfoldable_constant dense<1.0> : tensor<16xf32>
-  %init = linalg.init_tensor [1, 112, 112, 16] : tensor<1x112x112x16xf32>
+  %init = tensor.empty() : tensor<1x112x112x16xf32>
   %cst = arith.constant 0.0 : f32
   %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<1x112x112x16xf32>) -> tensor<1x112x112x16xf32>
   %conv = linalg.conv_2d_nhwc_hwcf

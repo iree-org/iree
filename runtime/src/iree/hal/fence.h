@@ -51,6 +51,11 @@ IREE_API_EXPORT iree_status_t iree_hal_fence_create(
     iree_host_size_t capacity, iree_allocator_t host_allocator,
     iree_hal_fence_t** out_fence);
 
+// Creates a new fence with a single timepoint.
+IREE_API_EXPORT iree_status_t iree_hal_fence_create_at(
+    iree_hal_semaphore_t* semaphore, uint64_t value,
+    iree_allocator_t host_allocator, iree_hal_fence_t** out_fence);
+
 // Creates a new fence joining all |fences| as a wait-all operation.
 IREE_API_EXPORT iree_status_t iree_hal_fence_join(
     iree_host_size_t fence_count, iree_hal_fence_t** fences,

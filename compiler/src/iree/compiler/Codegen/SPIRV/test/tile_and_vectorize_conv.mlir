@@ -183,7 +183,7 @@ hal.executable private @low_padded_conv {
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:3x3x3x32xf32>
         %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:1x112x112x32xf32>
         %3 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<writeonly:1x112x112x32xf32>
-        %4 = linalg.init_tensor [1, 112, 112, 32] : tensor<1x112x112x32xf32>
+        %4 = tensor.empty() : tensor<1x112x112x32xf32>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
         %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -223,7 +223,7 @@ hal.executable private @low_padded_conv {
               %34 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, %arg2], sizes = [3, 3, 3, %33], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:3x3x3x32xf32> -> tensor<3x3x3x?xf32>
               %36 = affine.min affine_map<(d0) -> (-d0 + 112, 4)>(%arg1)[]
               %37 = affine.min affine_map<(d0) -> (-d0 + 32, 32)>(%arg2)[]
-              %38 = linalg.init_tensor [1, 1, %36, %37] : tensor<1x1x?x?xf32>
+              %38 = tensor.empty(%36, %37) : tensor<1x1x?x?xf32>
               %39 = linalg.fill ins(%cst : f32) outs(%38 : tensor<1x1x?x?xf32>) -> tensor<1x1x?x?xf32>
               %40 = linalg.conv_2d_nhwc_hwcf {lowering_config = #config, dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>} ins(%32, %34 : tensor<1x?x?x3xf32>, tensor<3x3x3x?xf32>) outs(%39 : tensor<1x1x?x?xf32>) -> tensor<1x1x?x?xf32>
               %41 = linalg.generic {lowering_config = #config, indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%40, %16 : tensor<1x1x?x?xf32>, tensor<1x1x?x?xf32>) outs(%20 : tensor<1x1x?x?xf32>) {
@@ -303,7 +303,7 @@ hal.executable private @low_high_padded_nhwc_depthwise_conv {
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:3x3x32xf32>
         %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:32xf32>
         %3 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<writeonly:1x112x112x32xf32>
-        %4 = linalg.init_tensor [1, 112, 112, 32] : tensor<1x112x112x32xf32>
+        %4 = tensor.empty() : tensor<1x112x112x32xf32>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
         %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -352,7 +352,7 @@ hal.executable private @low_high_padded_nhwc_depthwise_conv {
               %42 = flow.dispatch.tensor.load %1, offsets = [0, 0, %arg2], sizes = [3, 3, %41], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:3x3x32xf32> -> tensor<3x3x?xf32>
               %44 = affine.min affine_map<(d0) -> (-d0 + 112, 4)>(%arg1)[]
               %45 = affine.min affine_map<(d0) -> (-d0 + 32, 32)>(%arg2)[]
-              %46 = linalg.init_tensor [1, 1, %44, %45] : tensor<1x1x?x?xf32>
+              %46 = tensor.empty(%44, %45) : tensor<1x1x?x?xf32>
               %47 = linalg.fill ins(%cst : f32) outs(%46 : tensor<1x1x?x?xf32>) -> tensor<1x1x?x?xf32>
               %48 = linalg.depthwise_conv_2d_nhwc_hwc {lowering_config = #config, dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%40, %42 : tensor<1x?x?x?xf32>, tensor<3x3x?xf32>) outs(%47 : tensor<1x1x?x?xf32>) -> tensor<1x1x?x?xf32>
               %49 = linalg.generic {lowering_config = #config, indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%12, %48 : tensor<?xf32>, tensor<1x1x?x?xf32>) outs(%18 : tensor<1x1x?x?xf32>) {

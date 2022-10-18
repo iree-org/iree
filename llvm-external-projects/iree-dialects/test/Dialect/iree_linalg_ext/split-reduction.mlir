@@ -23,8 +23,8 @@ func.func @topk_split_reduction_1d(%input_values: tensor<30xf32>, %out_values: t
 // SINGLE-DAG:       %[[CPOS:.*]] = arith.constant 2147483647 : i32
 // SINGLE-DAG:       %[[C10:.*]] = arith.constant 10 : i32
 // SINGLE:           %[[D0:.*]] = tensor.expand_shape %[[ARG0]] {{\[\[}}0, 1]] : tensor<30xf32> into tensor<3x10xf32>
-// SINGLE:           %[[D1:.*]] = linalg.init_tensor [3, 3] : tensor<3x3xf32>
-// SINGLE:           %[[D2:.*]] = linalg.init_tensor [3, 3] : tensor<3x3xi32>
+// SINGLE:           %[[D1:.*]] = tensor.empty() : tensor<3x3xf32>
+// SINGLE:           %[[D2:.*]] = tensor.empty() : tensor<3x3xi32>
 // SINGLE:           %[[D3:.*]] = linalg.fill ins(%[[CNEG]] : f32) outs(%[[D1]] : tensor<3x3xf32>) -> tensor<3x3xf32>
 // SINGLE:           %[[D4:.*]] = linalg.fill ins(%[[CPOS]] : i32) outs(%[[D2]] : tensor<3x3xi32>) -> tensor<3x3xi32>
 // SINGLE:           %[[D5:.*]]:2 = iree_linalg_ext.topk dimension(1) ins(%[[D0]] : tensor<3x10xf32>) outs(%[[D3]], %[[D4]] : tensor<3x3xf32>, tensor<3x3xi32>) {
@@ -73,8 +73,8 @@ func.func @topk_split_reduction_nd(%input_values: tensor<3x10x40x8xf32>, %out_va
 // MULTIPLE-DAG:       %[[CPOS:.*]] = arith.constant 2147483647 : i32
 // MULTIPLE-DAG:       %[[C10:.*]] = arith.constant 10 : i32
 // MULTIPLE:           %[[D0:.*]] = tensor.expand_shape %[[ARG0]] {{\[\[}}0], [1], [2, 3], [4]] : tensor<3x10x40x8xf32> into tensor<3x10x4x10x8xf32>
-// MULTIPLE:           %[[D1:.*]] = linalg.init_tensor [3, 10, 4, 4, 8] : tensor<3x10x4x4x8xf32>
-// MULTIPLE:           %[[D2:.*]] = linalg.init_tensor [3, 10, 4, 4, 8] : tensor<3x10x4x4x8xi32>
+// MULTIPLE:           %[[D1:.*]] = tensor.empty() : tensor<3x10x4x4x8xf32>
+// MULTIPLE:           %[[D2:.*]] = tensor.empty() : tensor<3x10x4x4x8xi32>
 // MULTIPLE:           %[[D3:.*]] = linalg.fill ins(%[[CNEG]] : f32) outs(%[[D1]] : tensor<3x10x4x4x8xf32>) -> tensor<3x10x4x4x8xf32>
 // MULTIPLE:           %[[D4:.*]] = linalg.fill ins(%[[CPOS]] : i32) outs(%[[D2]] : tensor<3x10x4x4x8xi32>) -> tensor<3x10x4x4x8xi32>
 // MULTIPLE:           %[[D5:.*]]:2 = iree_linalg_ext.topk dimension(3) ins(%[[D0]] : tensor<3x10x4x10x8xf32>) outs(%[[D3]], %[[D4]] : tensor<3x10x4x4x8xf32>, tensor<3x10x4x4x8xi32>) {
@@ -123,8 +123,8 @@ func.func @topk_split_reduction_double(%input_values: tensor<400xf32>, %out_valu
 // DOUBLE-DAG:       %[[CPOS:.*]] = arith.constant 2147483647 : i32
 // DOUBLE-DAG:       %[[C10:.*]] = arith.constant 10 : i32
 // DOUBLE:           %[[D0:.*]] = tensor.expand_shape %[[ARG0]] {{\[\[}}0, 1]] : tensor<400xf32> into tensor<40x10xf32>
-// DOUBLE:           %[[D1:.*]] = linalg.init_tensor [40, 3] : tensor<40x3xf32>
-// DOUBLE:           %[[D2:.*]] = linalg.init_tensor [40, 3] : tensor<40x3xi32>
+// DOUBLE:           %[[D1:.*]] = tensor.empty() : tensor<40x3xf32>
+// DOUBLE:           %[[D2:.*]] = tensor.empty() : tensor<40x3xi32>
 // DOUBLE:           %[[D3:.*]] = linalg.fill ins(%[[CNEG]] : f32) outs(%[[D1]] : tensor<40x3xf32>) -> tensor<40x3xf32>
 // DOUBLE:           %[[D4:.*]] = linalg.fill ins(%[[CPOS]] : i32) outs(%[[D2]] : tensor<40x3xi32>) -> tensor<40x3xi32>
 // DOUBLE:           %[[D5:.*]]:2 = iree_linalg_ext.topk dimension(1) ins(%[[D0]] : tensor<40x10xf32>) outs(%[[D3]], %[[D4]] : tensor<40x3xf32>, tensor<40x3xi32>) {
@@ -144,8 +144,8 @@ func.func @topk_split_reduction_double(%input_values: tensor<400xf32>, %out_valu
 // DOUBLE:           %[[D8:.*]] = tensor.collapse_shape %[[D6:.*]] {{\[\[}}0, 1]] : tensor<40x3xi32> into tensor<120xi32>
 // DOUBLE:           %[[D9:.*]] = tensor.expand_shape %[[D7]] {{\[\[}}0, 1]] : tensor<120xf32> into tensor<10x12xf32>
 // DOUBLE:           %[[D10:.*]] = tensor.expand_shape %[[D8]] {{\[\[}}0, 1]] : tensor<120xi32> into tensor<10x12xi32>
-// DOUBLE:           %[[D11:.*]] = linalg.init_tensor [10, 3] : tensor<10x3xf32>
-// DOUBLE:           %[[D12:.*]] = linalg.init_tensor [10, 3] : tensor<10x3xi32>
+// DOUBLE:           %[[D11:.*]] = tensor.empty() : tensor<10x3xf32>
+// DOUBLE:           %[[D12:.*]] = tensor.empty() : tensor<10x3xi32>
 // DOUBLE:           %[[D13:.*]] = linalg.fill ins(%[[CNEG]] : f32) outs(%[[D11]] : tensor<10x3xf32>) -> tensor<10x3xf32>
 // DOUBLE:           %[[D14:.*]] = linalg.fill ins(%[[CPOS]] : i32) outs(%[[D12]] : tensor<10x3xi32>) -> tensor<10x3xi32>
 // DOUBLE:           %[[D15:.*]]:2 = iree_linalg_ext.topk dimension(1) ins(%[[D9]], %[[D10]] : tensor<10x12xf32>, tensor<10x12xi32>) outs(%[[D13]], %[[D14]] :  tensor<10x3xf32>, tensor<10x3xi32>) {

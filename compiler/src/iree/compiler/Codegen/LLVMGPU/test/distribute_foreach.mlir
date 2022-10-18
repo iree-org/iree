@@ -47,7 +47,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //         CHECK:   %[[C0:.*]] = arith.constant 0 : index
 //         CHECK:   %[[TX:.*]] = gpu.thread_id  x
 //         CHECK:   %[[OFF:.*]] = affine.apply #[[$MAP]](%[[TX]])
-//         CHECK:   %[[S:.*]] = memref.subview %{{.}}[0, %[[OFF]]] [1, 4] [1, 1] : memref<1x256xf32, #{{.*}}> to memref<1x4xf32, #{{.*}}>
+//         CHECK:   %[[S:.*]] = memref.subview %{{.*}}[0, %[[OFF]]] [1, 4] [1, 1] : memref<1x256xf32, #{{.*}}> to memref<1x4xf32, #{{.*}}>
 //         CHECK:   %[[A:.*]] = vector.transfer_read %{{.*}}[%[[C0]], %[[OFF]]], %{{.*}} {in_bounds = [true]} : memref<1x256xf32, #{{.*}}>, vector<4xf32>
 //         CHECK:   %[[B:.*]] = vector.transfer_read %{{.*}}[%[[C0]], %[[OFF]]], %{{.*}} {in_bounds = [true]} : memref<1x256xf32, #{{.*}}>, vector<4xf32>
 //         CHECK:   %[[C:.*]] = arith.addf %[[A]], %[[B]] : vector<4xf32>

@@ -57,7 +57,7 @@ static void createAsyncGroups(func::FuncOp funcOp) {
       // Ignore ops without side effects
       auto memInterface = dyn_cast<MemoryEffectOpInterface>(nextNode);
       if (memInterface && memInterface.hasNoEffect() &&
-          !nextNode->hasTrait<OpTrait::HasRecursiveSideEffects>())
+          !nextNode->hasTrait<OpTrait::HasRecursiveMemoryEffects>())
         continue;
       auto readOp = dyn_cast<vector::TransferReadOp>(nextNode);
       // ignore read from a different address space.

@@ -26,7 +26,7 @@ func.func @matmul_tensors() {
       %8 = affine.min #map2(%arg1)
       %9 = flow.dispatch.tensor.load %0, offsets = [%arg0, 0], sizes = [%5, 456], strides = [1, 1] : !flow.dispatch.tensor<readonly:123x456xf32> -> tensor<?x456xf32>
       %10 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [456, %8], strides = [1, 1] : !flow.dispatch.tensor<readonly:456x789xf32> -> tensor<456x?xf32>
-      %11 = linalg.init_tensor [%5, %8] : tensor<?x?xf32>
+      %11 = tensor.empty(%5, %8) : tensor<?x?xf32>
       %12 = linalg.fill ins(%cst : f32) outs(%11 : tensor<?x?xf32>) -> tensor<?x?xf32>
       %13 = linalg.matmul {lowering_config = #config} ins(%9, %10 : tensor<?x456xf32>, tensor<456x?xf32>) outs(%12 : tensor<?x?xf32>) -> tensor<?x?xf32>
       flow.dispatch.tensor.store %13, %2, offsets = [%arg0, %arg1], sizes = [%5, %8], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:123x789xf32>
@@ -77,7 +77,7 @@ func.func @add_tensors() {
       %8 = affine.min #map2(%arg1)
       %9 = flow.dispatch.tensor.load %0, offsets = [%arg0, %arg1], sizes = [%5, %8], strides = [1, 1] : !flow.dispatch.tensor<readonly:123x789xf32> -> tensor<?x?xf32>
       %10 = flow.dispatch.tensor.load %1, offsets = [%arg0, %arg1], sizes = [%5, %8], strides = [1, 1] : !flow.dispatch.tensor<readonly:123x789xf32> -> tensor<?x?xf32>
-      %11 = linalg.init_tensor [%5, %8] : tensor<?x?xf32>
+      %11 = tensor.empty(%5, %8) : tensor<?x?xf32>
       %12 = linalg.fill ins(%cst : f32) outs(%11 : tensor<?x?xf32>) -> tensor<?x?xf32>
       %13 = linalg.generic {indexing_maps = [#map3, #map3, #map3], iterator_types = ["parallel", "parallel"]} ins(%9, %10 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%12 : tensor<?x?xf32>) attrs =  {lowering_config = #config} {
       ^bb0(%arg2: f32, %arg3: f32, %arg4: f32):
@@ -131,12 +131,12 @@ func.func @unaligned_partial_loop() {
       %8 = affine.min affine_map<(d0) -> (-d0 + 30522, 256)>(%arg1)
       %9 = flow.dispatch.tensor.load %0, offsets = [%arg0, 0], sizes = [%c2, 768], strides = [1, 1] : !flow.dispatch.tensor<readonly:128x768xf32> -> tensor<?x768xf32>
       %10 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [768, %8], strides = [1, 1] : !flow.dispatch.tensor<readonly:768x30522xf32> -> tensor<768x?xf32>
-      %11 = linalg.init_tensor [2, %8] : tensor<2x?xf32>
+      %11 = tensor.empty(%8) : tensor<2x?xf32>
       %12 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[2, 256, 4]]>} ins(%cst : f32) outs(%11 : tensor<2x?xf32>) -> tensor<2x?xf32>
       %13 = tensor.cast %9 : tensor<?x768xf32> to tensor<2x768xf32>
       %14 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[2, 256, 4]]>} ins(%13, %10 : tensor<2x768xf32>, tensor<768x?xf32>) outs(%12 : tensor<2x?xf32>) -> tensor<2x?xf32>
       %15 = flow.dispatch.tensor.load %2, offsets = [%arg1], sizes = [%8], strides = [1] : !flow.dispatch.tensor<readonly:30522xf32> -> tensor<?xf32>
-      %16 = linalg.init_tensor [2, %8] : tensor<2x?xf32>
+      %16 = tensor.empty(%8) : tensor<2x?xf32>
       %17 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%14, %15 : tensor<2x?xf32>, tensor<?xf32>) outs(%16 : tensor<2x?xf32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[2, 256, 4]]>} {
       ^bb0(%arg2: f32, %arg3: f32, %arg4: f32):
         %19 = arith.addf %arg2, %arg3 : f32

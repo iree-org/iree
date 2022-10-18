@@ -37,14 +37,14 @@ namespace status_impl {
 void Helper::HandleInvalidStatusCtorArg(Status* status) {
   fprintf(stderr,
           "An OK status is not a valid constructor argument to StatusOr<T>\n");
-  abort();
+  iree_abort();
 }
 
 void Helper::Crash(const Status& status) {
   std::string message = status.ToString();
   fprintf(stderr, "Attempting to fetch value instead of handling error:\n%s\n",
           message.c_str());
-  abort();
+  iree_abort();
 }
 
 }  // namespace status_impl

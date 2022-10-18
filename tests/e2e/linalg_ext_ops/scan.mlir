@@ -1,7 +1,7 @@
 func.func @scan_1d_dim0_inclusive_sum() {
   %input = util.unfoldable_constant dense<[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]> : tensor<6xf32>
 
-  %init = linalg.init_tensor [6] : tensor<6xf32>
+  %init = tensor.empty() : tensor<6xf32>
   %t0 = util.unfoldable_constant dense<0.0> : tensor<f32>
   %0:2 = iree_linalg_ext.scan
          dimension(0) inclusive(true)
@@ -28,7 +28,7 @@ func.func @scan_1d_dim0_inclusive_sum() {
 func.func @scan_1d_dim0_exclusive_sum() {
   %input = util.unfoldable_constant dense<[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]> : tensor<6xf32>
 
-  %init = linalg.init_tensor [6] : tensor<6xf32>
+  %init = tensor.empty() : tensor<6xf32>
   %t0 = util.unfoldable_constant dense<10.0> : tensor<f32>
   %0:2 = iree_linalg_ext.scan
          dimension(0) inclusive(false)
@@ -55,7 +55,7 @@ func.func @scan_1d_dim0_exclusive_sum() {
 func.func @scan_1d_dim0_inclusive_mul() {
   %input = util.unfoldable_constant dense<[1, 2, 3, 4, 5, 6]> : tensor<6xi32>
 
-  %init = linalg.init_tensor [6] : tensor<6xi32>
+  %init = tensor.empty() : tensor<6xi32>
   %t0 = util.unfoldable_constant dense<1> : tensor<i32>
   %0:2 = iree_linalg_ext.scan
          dimension(0) inclusive(true)
@@ -83,7 +83,7 @@ func.func @scan_2d_dim0_inclusive_sum() {
   %input = util.unfoldable_constant dense<[[1, 2, 3],
                                            [4, 5, 6]]> : tensor<2x3xi32>
 
-  %init = linalg.init_tensor [2, 3] : tensor<2x3xi32>
+  %init = tensor.empty() : tensor<2x3xi32>
   %t0 = util.unfoldable_constant dense<[0, 0, 0]> : tensor<3xi32>
   %0:2 = iree_linalg_ext.scan
          dimension(0) inclusive(true)
@@ -111,7 +111,7 @@ func.func @scan_2d_dim1_inclusive_sum() {
   %input = util.unfoldable_constant dense<[[1, 2, 3],
                                            [4, 5, 6]]> : tensor<2x3xi32>
 
-  %init = linalg.init_tensor [2, 3] : tensor<2x3xi32>
+  %init = tensor.empty() : tensor<2x3xi32>
   %t0 = util.unfoldable_constant dense<[0, 0]> : tensor<2xi32>
   %0:2 = iree_linalg_ext.scan
          dimension(1) inclusive(true)

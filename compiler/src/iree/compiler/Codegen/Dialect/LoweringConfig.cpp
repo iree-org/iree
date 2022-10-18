@@ -295,6 +295,12 @@ SmallVector<Value, 4> getTileSizes(OpBuilder &b, Operation *op,
       }));
 }
 
+unsigned getNumTileLevels(Operation *op) {
+  IREE::Codegen::LoweringConfigAttr configAttr = getLoweringConfig(op);
+  if (!configAttr) return 0;
+  return configAttr.getTileSizes().size();
+}
+
 void setLoweringConfig(Operation *op,
                        IREE::Codegen::LoweringConfigAttr config) {
   op->setAttr(kConfigAttrName, config);

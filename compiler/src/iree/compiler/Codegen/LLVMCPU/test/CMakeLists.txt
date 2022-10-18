@@ -32,6 +32,7 @@ iree_lit_test_suite(
     "materialize_x86_64_launch_configuration.mlir"
     "peel_and_vectorize.mlir"
     "pipeline_tests.mlir"
+    "split_reduction_pipeline_tests.mlir"
     "synchronize_symbol_visibility.mlir"
     "test_config_mmt4d.mlir"
     "transform_dialect_bufferize.mlir"

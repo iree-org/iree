@@ -16,6 +16,67 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace LinalgExt {
+// Marker used as attribute name in generated Linalg rewriting transformations.
+struct LinalgTransforms {
+  static const StringLiteral kLinalgTransformMarker;
+};
+
+/// Helper class to control application of linalg transformation patterns.
+/// Control comes in 2 forms:
+///   1. attribute matching and setting behavior using the attribute named
+///      `kLinalgTransformMarker`. This can be used to build a state machine
+///      using attributes and incrementally applying patterns to advance states.
+///   2. filter function, which is a simple lambda on the Operation* that
+///      returns a LogicalResult.
+struct LinalgTransformationFilter {
+  using FilterFunction = std::function<LogicalResult(Operation *)>;
+
+  explicit LinalgTransformationFilter(
+      ArrayRef<StringAttr> matchDisjunction = {},
+      Optional<StringAttr> replacement = None);
+
+  explicit LinalgTransformationFilter(
+      const FilterFunction &f, ArrayRef<StringAttr> matchDisjunction = {},
+      Optional<StringAttr> replacement = None);
+
+  LinalgTransformationFilter(LinalgTransformationFilter &&) = default;
+  LinalgTransformationFilter(const LinalgTransformationFilter &) = default;
+  LogicalResult checkAndNotify(PatternRewriter &rewriter, Operation *op) const;
+  void replaceLinalgTransformationFilter(PatternRewriter &rewriter,
+                                         Operation *op) const;
+  bool hasReplacementFilter(Operation *op) const;
+
+  LinalgTransformationFilter &addFilter(const FilterFunction &f) {
+    if (f)
+      filters.push_back(f);
+    return *this;
+  }
+
+  template <typename... OpTypes>
+  LinalgTransformationFilter &addOpFilter() {
+    return addFilter(
+        [](Operation *op) { return success(isa<OpTypes...>(op)); });
+  }
+
+  LinalgTransformationFilter &addOpNameFilter(StringRef opName) {
+    return addFilter([opName](Operation *op) {
+      return success(op->getName().getStringRef() == opName);
+    });
+  }
+
+  LinalgTransformationFilter &setMatchByDefault() {
+    matchByDefault = true;
+    return *this;
+  }
+
+private:
+  SmallVector<FilterFunction> filters;
+  SmallVector<StringAttr> matchDisjunction;
+  Optional<StringAttr> replacement;
+  /// When set to true, if the attribute is not set, it will be treated as
+  /// a match. Default is false.
+  bool matchByDefault;
+};
 
 std::unique_ptr<OperationPass<func::FuncOp>> createTilingInterfaceTilingPass();
 
@@ -35,8 +96,8 @@ using TopkSplitReductionControlFn =
 void populateTopkSplitReductionPattern(
     RewritePatternSet &patterns,
     const TopkSplitReductionControlFn &splitReductionFn,
-    const linalg::LinalgTransformationFilter &f =
-        linalg::LinalgTransformationFilter());
+    const LinalgExt::LinalgTransformationFilter &f =
+        LinalgExt::LinalgTransformationFilter());
 
 std::unique_ptr<OperationPass<func::FuncOp>> createTopkSplitReductionPass();
 
@@ -46,62 +107,178 @@ const StringLiteral kSplitReductionDepthMarker = "__split_reduction_depth__";
 //===---------------------------------------------------------------------===//
 // Codegen Strategy passes that are moved into IREE.
 //===---------------------------------------------------------------------===//
+/// Options to control the application of enabling transformations.
+/// Hoisting transformations are always deemed beneficial and must be disabled
+/// explicitly.
+struct LinalgEnablingOptions {
+  /// Enable LICM.
+  bool licm = true;
+  LinalgEnablingOptions &enableLICM(bool val = true) {
+    licm = val;
+    return *this;
+  }
+  /// Enable hoisting of redundant vector transfer ops.
+  bool hoistRedundantVectorTransfers = true;
+  LinalgEnablingOptions &enableHoistRedundantVectorTransfers(bool val = true) {
+    hoistRedundantVectorTransfers = val;
+    return *this;
+  }
+  /// Enable hoisting of redundant vector transfer ops on tensor.
+  bool hoistRedundantVectorTransfersOnTensor = true;
+  LinalgEnablingOptions &
+  enableHoistRedundantVectorTransfersOnTensor(bool val = true) {
+    hoistRedundantVectorTransfersOnTensor = val;
+    return *this;
+  }
+};
+
 /// Create a LinalgStrategyTileAndFusePass.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLinalgStrategyTileAndFusePass(
     StringRef opName = "", const linalg::LinalgTilingAndFusionOptions &opt = {},
-    const linalg::LinalgTransformationFilter &filter =
-        linalg::LinalgTransformationFilter());
+    const LinalgExt::LinalgTransformationFilter &filter =
+        LinalgExt::LinalgTransformationFilter());
 
 /// Create a LinalgStrategyTilePass.
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyTilePass(
     StringRef opName = "",
     const linalg::LinalgTilingOptions &opt = linalg::LinalgTilingOptions(),
-    const linalg::LinalgTransformationFilter &filter =
-        linalg::LinalgTransformationFilter());
+    const LinalgExt::LinalgTransformationFilter &filter =
+        LinalgExt::LinalgTransformationFilter());
 
 /// Create a LinalgStrategyPadPass.
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyPadPass(
     StringRef opName = "",
     const linalg::LinalgPaddingOptions &opt = linalg::LinalgPaddingOptions(),
-    const linalg::LinalgTransformationFilter &filter =
-        linalg::LinalgTransformationFilter());
+    const LinalgExt::LinalgTransformationFilter &filter =
+        LinalgExt::LinalgTransformationFilter());
 
 /// Create a LinalgStrategyDecomposePass.
 // TODO: if/when we need finer control add an `opName` parameter.
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyDecomposePass(
-    const linalg::LinalgTransformationFilter &filter =
-        linalg::LinalgTransformationFilter());
+    const LinalgExt::LinalgTransformationFilter &filter =
+        LinalgExt::LinalgTransformationFilter());
 
 /// Create a LinalgStrategyPeelPass.
+using LoopsToPeelComputationFunction = std::function<void(
+    OpBuilder &, Operation *, SmallVectorImpl<scf::ForOp> &)>;
+
+struct LinalgPeelOptions {
+  LoopsToPeelComputationFunction loopsToPeelComputationFunction = nullptr;
+};
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyPeelPass(
-    StringRef opName = "",
-    const linalg::LinalgPeelOptions &opt = linalg::LinalgPeelOptions(),
-    const linalg::LinalgTransformationFilter &filter =
-        linalg::LinalgTransformationFilter());
+    StringRef opName = "", const LinalgPeelOptions &opt = LinalgPeelOptions(),
+    const LinalgExt::LinalgTransformationFilter &filter =
+        LinalgExt::LinalgTransformationFilter());
 
 /// Create a LinalgStrategyVectorizePass.
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyVectorizePass(
     StringRef opName = "",
-    linalg::LinalgVectorizationOptions opt =
-        linalg::LinalgVectorizationOptions(),
-    const linalg::LinalgTransformationFilter &filter =
-        linalg::LinalgTransformationFilter(),
+    const LinalgExt::LinalgTransformationFilter &filter =
+        LinalgExt::LinalgTransformationFilter(),
     bool padVectorize = false);
 
 /// Create a LinalgStrategyEnablePass.
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgStrategyEnablePass(
-    linalg::LinalgEnablingOptions opt = linalg::LinalgEnablingOptions(),
-    const linalg::LinalgTransformationFilter &filter =
-        linalg::LinalgTransformationFilter());
+    LinalgEnablingOptions opt = LinalgEnablingOptions(),
+    const LinalgExt::LinalgTransformationFilter &filter =
+        LinalgExt::LinalgTransformationFilter());
 
 /// Create a LinalgStrategyLowerVectorsPass.
+/// Vector lowering options control how ops are lowered down to 1-D and scf.for
+/// form.
+struct LinalgVectorLoweringOptions {
+  /// Enable lowering of vector.contract.
+  /// In a progressive lowering of vectors, this would be the 1st step.
+  bool contractionLowering = false;
+  LinalgVectorLoweringOptions &enableContractionLowering(bool val = true) {
+    contractionLowering = val;
+    return *this;
+  }
+  /// Enable lowering of vector.multi_reduce.
+  /// In a progressive lowering of vectors, this would be the 2nd step.
+  bool multiReductionLowering = false;
+  LinalgVectorLoweringOptions &enableMultiReductionLowering(bool val = true) {
+    multiReductionLowering = val;
+    return *this;
+  }
+  /// Trigger full / partial vector.transfer splits.
+  /// In a progressive lowering of vectors, this would be the 3rd step.
+  bool transferPartialRewrite = false;
+  LinalgVectorLoweringOptions &enableTransferPartialRewrite(bool val = true) {
+    transferPartialRewrite = val;
+    return *this;
+  }
+  /// Enable lowering of vector.transfer to scf.
+  /// In a progressive lowering of vectors, this would be the 4th step.
+  bool transferToSCFConversion = false;
+  LinalgVectorLoweringOptions &enableTransferToSCFConversion(bool val = true) {
+    transferToSCFConversion = val;
+    return *this;
+  }
+  /// Maximal transfer rank under which we do not lower further.
+  int64_t maxTransferRank = 1;
+  LinalgVectorLoweringOptions &setMaxTransferRank(int64_t val) {
+    maxTransferRank = val;
+    return *this;
+  }
+  /// Vector lowering operations may result in surprising behavior when
+  /// composing multiple codegen strategies and must be enabled explicitly.
+  /// In a progressive lowering of vectors, this would be the 5th step.
+  bool transferLowering = true;
+  LinalgVectorLoweringOptions &enableTransferLowering(bool val = true) {
+    transferLowering = val;
+    return *this;
+  }
+  /// Enable lowering of vector.shape_cast to insert/extract.
+  /// In a progressive lowering of vectors, this would be the 6th step.
+  bool shapeCastLowering = true;
+  LinalgVectorLoweringOptions &enableShapeCastLowering(bool val = true) {
+    shapeCastLowering = val;
+    return *this;
+  }
+  /// Enable lowering of vector.transpose.
+  /// In a progressive lowering of vectors, this would be the 7th step.
+  bool transposeLowering = false;
+  LinalgVectorLoweringOptions &enableVectorTransposeLowering(bool val = true) {
+    transposeLowering = val;
+    return *this;
+  }
+  /// Enable AVX2-specific lowerings.
+  bool avx2Lowering = false;
+  LinalgVectorLoweringOptions &enableAVX2Lowering(bool val = true) {
+    avx2Lowering = val;
+    return *this;
+  }
+
+  /// Configure the post staged-patterns late vector.transfer to scf
+  /// conversion.
+  VectorTransferToSCFOptions vectorTransferToSCFOptions;
+  LinalgVectorLoweringOptions &
+  setVectorTransferToSCFOptions(VectorTransferToSCFOptions options) {
+    vectorTransferToSCFOptions = options;
+    return *this;
+  }
+  /// Configure late vector transformations.
+  vector::VectorTransformsOptions vectorTransformOptions;
+  LinalgVectorLoweringOptions &
+  setVectorTransformsOptions(vector::VectorTransformsOptions options) {
+    vectorTransformOptions = options;
+    return *this;
+  }
+  /// Configure specialized vector lowerings.
+  x86vector::avx2::LoweringOptions avx2LoweringOptions;
+  LinalgVectorLoweringOptions &
+  setAVX2LoweringOptions(x86vector::avx2::LoweringOptions options) {
+    avx2LoweringOptions = options;
+    return *this;
+  }
+};
+
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLinalgStrategyLowerVectorsPass(
-    linalg::LinalgVectorLoweringOptions opt =
-        linalg::LinalgVectorLoweringOptions(),
-    const linalg::LinalgTransformationFilter &filter =
-        linalg::LinalgTransformationFilter());
+    LinalgVectorLoweringOptions opt = LinalgVectorLoweringOptions(),
+    const LinalgTransformationFilter &filter = LinalgTransformationFilter());
 
 /// Create a LinalgStrategyRemoveMarkersPass.
 std::unique_ptr<OperationPass<func::FuncOp>>

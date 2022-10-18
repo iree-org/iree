@@ -931,7 +931,8 @@ class ConvertHALInterfaceBindingSubspanOp : public ConvertToLLVMPattern {
 
 class ConvertToLLVMPass : public ConvertToLLVMBase<ConvertToLLVMPass> {
  public:
-  ConvertToLLVMPass() = default;
+  ConvertToLLVMPass(bool reassociateFpReductions)
+      : reassociateFpReductions(reassociateFpReductions){};
   ConvertToLLVMPass(const ConvertToLLVMPass &pass) {}
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<LLVM::LLVMDialect, arm_neon::ArmNeonDialect>();
@@ -947,6 +948,7 @@ class ConvertToLLVMPass : public ConvertToLLVMBase<ConvertToLLVMPass> {
       *this, "target-data-layout",
       llvm::cl::desc("Code generation target data layout."),
       llvm::cl::init("")};
+  bool reassociateFpReductions = false;
 };
 
 }  // namespace
@@ -1047,7 +1049,8 @@ void ConvertToLLVMPass::runOnOperation() {
   arith::populateArithToLLVMConversionPatterns(converter, patterns);
   populateVectorToSCFConversionPatterns(patterns);
   populateVectorToLLVMMatrixConversionPatterns(converter, patterns);
-  populateVectorToLLVMConversionPatterns(converter, patterns);
+  populateVectorToLLVMConversionPatterns(converter, patterns,
+                                         reassociateFpReductions);
   populateLinalgToLLVMConversionPatterns(converter, patterns);
   populateReconcileUnrealizedCastsPatterns(patterns);
 
@@ -1090,8 +1093,9 @@ void ConvertToLLVMPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass() {
-  return std::make_unique<ConvertToLLVMPass>();
+std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass(
+    bool reassociateFpReductions) {
+  return std::make_unique<ConvertToLLVMPass>(reassociateFpReductions);
 }
 
 }  // namespace iree_compiler

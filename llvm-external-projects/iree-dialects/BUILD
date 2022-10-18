@@ -170,6 +170,22 @@ gentbl_cc_library(
             "include/iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.cpp.inc",
         ),
         (
+            ["--gen-attrdef-decls"],
+            "include/iree-dialects/Dialect/LinalgExt/IR/LinalgExtAttrs.h.inc",
+        ),
+        (
+            ["--gen-attrdef-defs"],
+            "include/iree-dialects/Dialect/LinalgExt/IR/LinalgExtAttrs.cpp.inc",
+        ),
+        (
+            ["--gen-enum-decls"],
+            "include/iree-dialects/Dialect/LinalgExt/IR/LinalgExtEnums.h.inc",
+        ),
+        (
+            ["--gen-enum-defs"],
+            "include/iree-dialects/Dialect/LinalgExt/IR/LinalgExtEnums.cpp.inc",
+        ),
+        (
             ["--gen-op-decls"],
             "include/iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h.inc",
         ),
@@ -287,40 +303,15 @@ cc_library(
     ],
 )
 
-cc_library(
+# TODO(#9827): Remove aliases and/or backref.
+alias(
     name = "IREELinalgExtPasses",
-    srcs = glob([
-        "lib/Dialect/LinalgExt/Passes/*.cpp",
-    ]),
-    hdrs = glob([
-        "include/iree-dialects/Dialect/LinalgExt/Passes/*.h",
-    ]),
-    deps = [
-        ":IREEInputDialect",
-        ":IREELinalgExtDialect",
-        ":IREELinalgExtPassIncGen",
-        "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:AffineDialect",
-        "@llvm-project//mlir:ArithDialect",
-        "@llvm-project//mlir:ArithUtils",
-        "@llvm-project//mlir:DialectUtils",
-        "@llvm-project//mlir:FuncDialect",
-        "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:LinalgDialect",
-        "@llvm-project//mlir:LinalgTransforms",
-        "@llvm-project//mlir:LinalgUtils",
-        "@llvm-project//mlir:MathDialect",
-        "@llvm-project//mlir:MemRefDialect",
-        "@llvm-project//mlir:Parser",
-        "@llvm-project//mlir:Pass",
-        "@llvm-project//mlir:SCFDialect",
-        "@llvm-project//mlir:Support",
-        "@llvm-project//mlir:TensorDialect",
-        "@llvm-project//mlir:TensorUtils",
-        "@llvm-project//mlir:TilingInterface",
-        "@llvm-project//mlir:TransformUtils",
-        "@llvm-project//mlir:Transforms",
-    ],
+    actual = ":IREELinalgExtPassesAndTransforms",
+)
+
+alias(
+    name = "IREELinalgExtTransforms",
+    actual = ":IREELinalgExtPassesAndTransforms",
 )
 
 gentbl_cc_library(
@@ -362,18 +353,19 @@ cc_library(
 )
 
 cc_library(
-    name = "IREELinalgExtTransforms",
+    name = "IREELinalgExtPassesAndTransforms",
     srcs = glob([
+        "lib/Dialect/LinalgExt/Passes/*.cpp",
         "lib/Dialect/LinalgExt/Transforms/*.cpp",
     ]),
     hdrs = glob([
+        "include/iree-dialects/Dialect/LinalgExt/Passes/*.h",
         "include/iree-dialects/Dialect/LinalgExt/Transforms/*.h",
     ]),
     deps = [
         ":IREEInputDialect",
         ":IREELinalgExtDialect",
         ":IREELinalgExtPassIncGen",
-        ":IREELinalgExtPasses",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:AffineUtils",
@@ -476,6 +468,7 @@ cc_library(
     deps = [
         ":IREEDialectsTransforms",
         ":IREELinalgExtDialect",
+        ":IREELinalgExtPasses",
         ":IREELinalgExtTransforms",
         ":IREELinalgTransformIncGen",
         ":IREELinalgTransformStructuredIncGen",
@@ -645,6 +638,7 @@ cc_binary(
         "@llvm-project//mlir:LinalgTransformOps",
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:MemRefDialect",
+        "@llvm-project//mlir:MemRefTransforms",
         "@llvm-project//mlir:MlirOptLib",
         "@llvm-project//mlir:PDLDialect",
         "@llvm-project//mlir:PDLInterpDialect",

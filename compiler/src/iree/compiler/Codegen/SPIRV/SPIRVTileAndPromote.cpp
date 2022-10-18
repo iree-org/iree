@@ -32,6 +32,8 @@
 
 using mlir::iree_compiler::IREE::LinalgExt::TilingPatterns;
 
+constexpr int kMaxVectorNumBits = 128;
+
 namespace mlir {
 namespace iree_compiler {
 
@@ -40,7 +42,8 @@ namespace iree_compiler {
 //====---------------------------------------------------------------------===//
 
 static void populateTilingReductionPatterns(
-    RewritePatternSet &patterns, linalg::LinalgTransformationFilter filter) {
+    RewritePatternSet &patterns,
+    IREE::LinalgExt::LinalgTransformationFilter filter) {
   auto getTileSizeFn = [&](OpBuilder &builder, Operation *op) {
     return getTileSizes(builder, op, 2);
   };
@@ -57,7 +60,8 @@ static void populateTilingReductionPatterns(
 //===----------------------------------------------------------------------===//
 
 static void populateTilingToInvocationPatterns(
-    RewritePatternSet &patterns, linalg::LinalgTransformationFilter filter) {
+    RewritePatternSet &patterns,
+    IREE::LinalgExt::LinalgTransformationFilter filter) {
   linalg::TileSizeComputationFunction getTileSizeFn = [&](OpBuilder &builder,
                                                           Operation *op) {
     return getTileSizes(builder, op, 1);
@@ -110,11 +114,11 @@ static void populatePromotionPatterns(RewritePatternSet &patterns,
   auto promoteRHSOptions = baseOptions.setOperandsToPromote({1});
   auto promoteBothOptions = baseOptions.setOperandsToPromote({0, 1});
 
-  linalg::LinalgTransformationFilter promoteLHSFilter(
+  IREE::LinalgExt::LinalgTransformationFilter promoteLHSFilter(
       {StringAttr::get(context, promoteLHSMarker)}, replaceMarker);
-  linalg::LinalgTransformationFilter promoteRHSFilter(
+  IREE::LinalgExt::LinalgTransformationFilter promoteRHSFilter(
       {StringAttr::get(context, promoteRHSMarker)}, replaceMarker);
-  linalg::LinalgTransformationFilter promoteBothFilter(
+  IREE::LinalgExt::LinalgTransformationFilter promoteBothFilter(
       {StringAttr::get(context, promoteBothMarker)}, replaceMarker);
 
   patterns.insert<LinalgPromotionPattern<linalg::MatmulOp>,
@@ -153,7 +157,7 @@ void SPIRVTileAndPromotePass::runOnOperation() {
 
   {  // Tile reduction dimensions.
     RewritePatternSet tilingPatterns(context);
-    linalg::LinalgTransformationFilter filter(
+    IREE::LinalgExt::LinalgTransformationFilter filter(
         ArrayRef<StringAttr>(),
         StringAttr::get(context, getWorkgroupKTiledMarker()));
     populateTilingReductionPatterns(tilingPatterns, filter);
@@ -181,22 +185,27 @@ void SPIRVTileAndPromotePass::runOnOperation() {
   auto workgroupSize = llvm::to_vector<4>(llvm::map_range(
       exportOp->getWorkgroupSize().value(),
       [&](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
-  int64_t flatWorkgroupSize =
-      workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
+  int64_t totalThreads = workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
   int subgroupSize =
       getSPIRVTargetEnvAttr(funcOp).getResourceLimits().getSubgroupSize();
 
   funcOp.walk([&](Operation *op) {
     if (isa<linalg::FillOp, linalg::GenericOp>(op)) {
-      op->setAttr(linalg::LinalgTransforms::kLinalgTransformMarker,
+      op->setAttr(IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker,
                   StringAttr::get(context, getWorkgroupMemoryMarker()));
     } else if (isa<linalg::BatchMatmulOp, linalg::MatmulOp>(op)) {
-      auto lhsShape = op->getOperand(0).getType().cast<ShapedType>().getShape();
-      auto rhsShape = op->getOperand(1).getType().cast<ShapedType>().getShape();
-      bool canPromoteLHS =
-          canPerformVectorAccessUsingAllThreads(lhsShape, flatWorkgroupSize, 4);
-      bool canPromoteRHS =
-          canPerformVectorAccessUsingAllThreads(rhsShape, flatWorkgroupSize, 4);
+      auto lhsType = op->getOperand(0).getType().cast<ShapedType>();
+      auto rhsType = op->getOperand(1).getType().cast<ShapedType>();
+
+      auto elementNumBits = lhsType.getElementTypeBitWidth();
+      assert(kMaxVectorNumBits % elementNumBits == 0);
+      const int vectorSize = kMaxVectorNumBits / elementNumBits;
+
+      const bool canPromoteLHS = canPerformVectorAccessUsingAllThreads(
+          lhsType.getShape(), totalThreads, vectorSize);
+      const bool canPromoteRHS = canPerformVectorAccessUsingAllThreads(
+          rhsType.getShape(), totalThreads, vectorSize);
+
       StringAttr promoteMarker =
           StringAttr::get(context, getWorkgroupMemoryMarker());
       if (canPromoteLHS && canPromoteRHS) {
@@ -206,14 +215,14 @@ void SPIRVTileAndPromotePass::runOnOperation() {
       } else if (canPromoteRHS) {
         promoteMarker = StringAttr::get(context, promoteRHSMarker);
       }
-      op->setAttr(linalg::LinalgTransforms::kLinalgTransformMarker,
+      op->setAttr(IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker,
                   promoteMarker);
     }
     return WalkResult::advance();
   });
 
   // Only promote to workgroup size if there are multiple warps.
-  if (flatWorkgroupSize > subgroupSize) {
+  if (totalThreads > subgroupSize) {
     RewritePatternSet promotionPatterns(&getContext());
     auto replaceMarker = StringAttr::get(context, getWorkgroupMemoryMarker());
     populatePromotionPatterns(promotionPatterns, replaceMarker);
@@ -249,7 +258,7 @@ void SPIRVTileAndPromotePass::runOnOperation() {
 
   {  // Tile and distribute to invocations.
     RewritePatternSet tilingPatterns(&getContext());
-    linalg::LinalgTransformationFilter filter(
+    IREE::LinalgExt::LinalgTransformationFilter filter(
         {StringAttr::get(context, getWorkgroupMemoryMarker())}, llvm::None);
     populateTilingToInvocationPatterns(tilingPatterns, filter);
     if (failed(

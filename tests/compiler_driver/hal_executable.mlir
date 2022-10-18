@@ -51,7 +51,7 @@ hal.executable.source public @executable {
         %5 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 4)>(%arg0)[%workgroup_size_x]
         %6 = flow.dispatch.tensor.load %s0b0, offsets = [%arg0], sizes = [%5], strides = [1] : !flow.dispatch.tensor<readonly:4xf32> -> tensor<?xf32>
         %7 = flow.dispatch.tensor.load %s0b1, offsets = [%arg0], sizes = [%5], strides = [1] : !flow.dispatch.tensor<readonly:4xf32> -> tensor<?xf32>
-        %8 = linalg.init_tensor [%5] : tensor<?xf32>
+        %8 = tensor.empty(%5) : tensor<?xf32>
         %9 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%6, %7 : tensor<?xf32>, tensor<?xf32>) outs(%8 : tensor<?xf32>) attrs =  {name = "mul.1"} {
         ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):
           %s0b10 = arith.mulf %arg1, %arg2 : f32

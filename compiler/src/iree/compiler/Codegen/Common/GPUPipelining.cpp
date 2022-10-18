@@ -38,7 +38,7 @@ static Operation* replaceOpWithPredicatedOp(Operation* op, Value pred,
   // speculatively.
   if (!isa<nvgpu::DeviceAsyncCopyOp>(op)) {
     // Return/execute the op if it is a side effect free.
-    if (mlir::isSideEffectFree(op)) return op;
+    if (mlir::isMemoryEffectFree(op)) return op;
     // Return/execute the op if it is barrier, commit group, or ldmatrix op.
     if (isa<gpu::BarrierOp, nvgpu::DeviceAsyncCreateGroupOp, nvgpu::LdMatrixOp>(
             op))

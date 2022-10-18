@@ -1,7 +1,7 @@
 func.func @stride_slice() {
   %c15 = arith.constant 15 : i32
   %c16 = arith.constant 16 : i32
-  %0 = linalg.init_tensor [12, 15] : tensor<12x15xi32>
+  %0 = tensor.empty() : tensor<12x15xi32>
   %1 = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>],
       iterator_types = ["parallel", "parallel"]}
@@ -15,7 +15,7 @@ func.func @stride_slice() {
       %7 = arith.addi %6, %5 : i32
       linalg.yield %7 : i32
     } -> tensor<12x15xi32>
-  %2 = linalg.init_tensor [14, 16] : tensor<14x16xi32>
+  %2 = tensor.empty() : tensor<14x16xi32>
   %3 = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>],
       iterator_types = ["parallel", "parallel"]}
@@ -31,7 +31,7 @@ func.func @stride_slice() {
     } -> tensor<14x16xi32>
   %4 = tensor.extract_slice %1[2, 3] [3, 3] [2, 3] : tensor<12x15xi32> to tensor<3x3xi32>
   %5 = tensor.extract_slice %3[3, 2] [3, 3] [3, 2] : tensor<14x16xi32> to tensor<3x3xi32>
-  %6 = linalg.init_tensor [3, 3] : tensor<3x3xi32>
+  %6 = tensor.empty() : tensor<3x3xi32>
   %7 = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>,
                        affine_map<(d0, d1) -> (d0, d1)>],
@@ -79,7 +79,7 @@ func.func @issue_8825() {
   %11 = arith.select %10, %0, %9 : index
   %12 = arith.subi %11, %9 : index
   %13 = tensor.extract_slice %arg0[%9] [%12] [1] : tensor<4xf32> to tensor<?xf32>
-  %14 = linalg.init_tensor [%12] : tensor<?xf32>
+  %14 = tensor.empty(%12) : tensor<?xf32>
   %16 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel"]} ins(%13 : tensor<?xf32>) outs(%14 : tensor<?xf32>) {
     ^bb0(%arg1: f32, %arg2: f32):
       %16 = arith.sitofp %c3_i64 : i64 to f32

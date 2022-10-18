@@ -39,7 +39,7 @@ hal.executable private @matmul_static_shape_f16 {
             %10 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [4096, %9], strides = [1, 1] : !flow.dispatch.tensor<readonly:4096x4096xf16> -> tensor<4096x?xf16>
             %11 = affine.min affine_map<(d0) -> (-d0 + 4096, 8)>(%arg0)[]
             %12 = affine.min affine_map<(d0) -> (-d0 + 4096, 64)>(%arg1)[]
-            %13 = linalg.init_tensor [%11, %12] : tensor<?x?xf16>
+            %13 = tensor.empty(%11, %12) : tensor<?x?xf16>
             %14 = linalg.fill ins(%cst : f16) outs(%13 : tensor<?x?xf16>) -> tensor<?x?xf16>
             %15 = linalg.matmul {lowering_config = #config} ins(%8, %10 : tensor<?x4096xf16>, tensor<4096x?xf16>) outs(%14 : tensor<?x?xf16>) -> tensor<?x?xf16>
             flow.dispatch.tensor.store %15, %2, offsets = [%arg0, %arg1], sizes = [%7, %9], strides = [1, 1] : tensor<?x?xf16> -> !flow.dispatch.tensor<writeonly:4096x4096xf16>
@@ -101,7 +101,7 @@ hal.executable private @matmul_static_shape_f32 {
             %10 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [4096, %9], strides = [1, 1] : !flow.dispatch.tensor<readonly:4096x4096xf32> -> tensor<4096x?xf32>
             %11 = affine.min affine_map<(d0) -> (-d0 + 4096, 8)>(%arg0)[]
             %12 = affine.min affine_map<(d0) -> (-d0 + 4096, 64)>(%arg1)[]
-            %13 = linalg.init_tensor [%11, %12] : tensor<?x?xf32>
+            %13 = tensor.empty(%11, %12) : tensor<?x?xf32>
             %14 = linalg.fill ins(%cst : f32) outs(%13 : tensor<?x?xf32>) -> tensor<?x?xf32>
             %15 = linalg.matmul {lowering_config = #config} ins(%8, %10 : tensor<?x4096xf32>, tensor<4096x?xf32>) outs(%14 : tensor<?x?xf32>) -> tensor<?x?xf32>
             flow.dispatch.tensor.store %15, %2, offsets = [%arg0, %arg1], sizes = [%7, %9], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:4096x4096xf32>

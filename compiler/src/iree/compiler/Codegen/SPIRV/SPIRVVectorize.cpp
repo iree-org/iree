@@ -120,14 +120,11 @@ Optional<SmallVector<int64_t, 4>> getNativeVectorShape(Operation *op) {
 
 /// Add patterns to vectorize any supported Linalg ops.
 void populateVectorizationPatterns(RewritePatternSet &patterns) {
-  linalg::LinalgVectorizationOptions opt;
-  linalg::LinalgTransformationFilter f;
-  VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(patterns,
-                                                                   opt, f);
+  IREE::LinalgExt::LinalgTransformationFilter f;
+  VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(patterns, f);
   linalg::populateConvolutionVectorizationPatterns(patterns);
   patterns.add<LinalgVectorizationPattern>(
-      patterns.getContext(), f.addOpFilter<linalg::ContractionOpInterface>(),
-      opt);
+      patterns.getContext(), f.addOpFilter<linalg::ContractionOpInterface>());
 }
 
 /// Adds patterns to unroll vector ops to SPIR-V native vector size.

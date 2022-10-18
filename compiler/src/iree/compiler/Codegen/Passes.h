@@ -152,6 +152,9 @@ std::unique_ptr<Pass> createTransformDialectInterpreterPass(
 std::unique_ptr<OperationPass<func::FuncOp>> createGPUVectorizationPass(
     bool generateContract = true);
 
+/// Tile reductions and generate serial loops around reductions.
+std::unique_ptr<OperationPass<func::FuncOp>> createGPUTileReductionPass();
+
 // Distributes vector ops to all threads/warps in a GPU workgroup.
 // `getWarpSize` is for deciding the warp size to use; it takes the
 // current function containing those vector ops as the argument.
@@ -211,7 +214,8 @@ std::unique_ptr<OperationPass<ModuleOp>>
 createVerifyLinalgTransformLegalityPass();
 
 /// Performs the final conversion to LLVM dialect.
-std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass();
+std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass(
+    bool reassociateFpReordering = false);
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLLVMCPUEmitVectorizationRemarksPass();
@@ -510,6 +514,9 @@ std::unique_ptr<OperationPass<ModuleOp>> createSPIRVVectorizeLoadStore();
 // padding, while the slow path is for boundary tiles where we do need padding.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVCreateFastSlowPathPass();
+
+/// Emulates 64-bit integer ops with 32-bit integer ops.
+std::unique_ptr<OperationPass<ModuleOp>> createSPIRVEmulateI64Pass();
 
 //----------------------------------------------------------------------------//
 // SPIRV Codegen Pass Pipelines.

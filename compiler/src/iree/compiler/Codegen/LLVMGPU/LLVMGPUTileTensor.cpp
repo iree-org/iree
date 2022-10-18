@@ -55,7 +55,7 @@ static void populateTilingPatterns(RewritePatternSet &patterns,
                            .setTileSizeComputationFunction(tileSizesFn);
   MLIRContext *context = patterns.getContext();
 
-  linalg::LinalgTransformationFilter filter(
+  IREE::LinalgExt::LinalgTransformationFilter filter(
       ArrayRef<StringAttr>{
           StringAttr::get(context, getWorkgroupMemoryMarker())},
       StringAttr::get(context, getWorkgroupKTiledMarker()));
@@ -201,7 +201,7 @@ struct LLVMGPUTileTensorPass
     if (!isEntryPoint(funcOp)) return;
 
     funcOp->walk([&](linalg::LinalgOp op) {
-      op->removeAttr(linalg::LinalgTransforms::kLinalgTransformMarker);
+      op->removeAttr(IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker);
     });
 
     auto workgroupSize = llvm::to_vector<4>(llvm::map_range(

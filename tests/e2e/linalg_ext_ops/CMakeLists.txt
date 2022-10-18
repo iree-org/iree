@@ -77,10 +77,25 @@ iree_check_single_backend_test_suite(
     "scan.mlir"
     "sort.mlir"
     "top-k.mlir"
+    "unpack.mlir"
   TARGET_BACKEND
     "llvm-cpu"
   DRIVER
     "local-task"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_vmvx_ukernel_local-task
+  SRCS
+    "pack.mlir"
+  TARGET_BACKEND
+    "vmvx"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-vmvx-enable-microkernels"
+    "--iree-vmvx-enable-microkernels-decompose-linalg-generic=false"
 )
 
 iree_check_single_backend_test_suite(

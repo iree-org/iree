@@ -43,4 +43,24 @@ iree_check_single_backend_test_suite(
     "--iree-vulkan-target-triple=valhall-unknown-android31"
 )
 
+iree_check_single_backend_test_suite(
+  NAME
+    check_vulkan-spirv_vulkan_i64_emulation
+  SRCS
+    "add_i64.mlir"
+    "mul_i64.mlir"
+  TARGET_BACKEND
+    "vulkan-spirv"
+  DRIVER
+    "vulkan"
+  COMPILER_FLAGS
+    "--iree-input-type=mhlo"
+    "--iree-mhlo-demote-i64-to-i32=false"
+    "--iree-vulkan-target-triple=valhall-unknown-android31"
+  LABELS
+    "manual"
+    "notap"
+    "vulkan_uses_shader_int64"
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
