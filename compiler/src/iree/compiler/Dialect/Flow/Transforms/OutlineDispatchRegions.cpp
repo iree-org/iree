@@ -170,6 +170,7 @@ static LogicalResult convertToDispatchOp(DispatchWorkgroupsOp regionOp,
       regionOp.getResultTypes(), regionOp.getResultDims(),
       regionOp.getArguments(), regionOp.getArgumentDims(),
       regionOp.getTiedOperandsAttr());
+  dispatchOp->setDialectAttrs(regionOp->getDialectAttrs());
 
   // Replace uses of the existing results with the new results.
   for (int i = 0; i < regionOp.getNumResults(); ++i) {

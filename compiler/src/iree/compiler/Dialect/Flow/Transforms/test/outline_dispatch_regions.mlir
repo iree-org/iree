@@ -85,7 +85,10 @@ func.func @dispatchFn1(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
   %x = arith.constant 100 : index
   %y = arith.constant 50 : index
   // CHECK: flow.dispatch @dispatchFn1_dispatch_0::@dispatchFn1_dispatch_0
-  %0 = flow.dispatch.workgroups[%x, %y](%arg0) : (tensor<8x4xf32>) -> (tensor<4x8xf32>) = (
+  // CHECK-SAME: stream.affinity = #hal.affinity.queue<[0]>
+  %0 = flow.dispatch.workgroups[%x, %y](%arg0) : (tensor<8x4xf32>) -> (tensor<4x8xf32>) attributes {
+     stream.affinity = #hal.affinity.queue<[0]>
+  } = (
     %arg: !flow.dispatch.tensor<readonly:8x4xf32>, %ret: !flow.dispatch.tensor<writeonly:4x8xf32>
   ) {
     flow.return
@@ -100,7 +103,10 @@ func.func @dispatchFn2(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
   %x = arith.constant 100 : index
   %y = arith.constant 50 : index
   // CHECK: flow.dispatch @dispatchFn2_dispatch_0::@dispatchFn2_dispatch_0
-  %0 = flow.dispatch.workgroups[%x, %y](%arg0) : (tensor<8x4xf32>) -> (tensor<4x8xf32>) = (
+  // CHECK-SAME: stream.affinity = #hal.affinity.queue<[1]>
+  %0 = flow.dispatch.workgroups[%x, %y](%arg0) : (tensor<8x4xf32>) -> (tensor<4x8xf32>) attributes {
+    stream.affinity = #hal.affinity.queue<[1]>
+  } = (
     %arg: !flow.dispatch.tensor<readonly:8x4xf32>, %ret: !flow.dispatch.tensor<writeonly:4x8xf32>
   ) {
     flow.return
