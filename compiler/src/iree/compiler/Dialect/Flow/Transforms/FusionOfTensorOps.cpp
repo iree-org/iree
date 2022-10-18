@@ -245,16 +245,11 @@ struct FusionOfTensorOpsPass
             if (!producer) {
               return false;
             }
-
             // Do not fuse producer generic op if it has more than one user.
-            // IREE is not fully ready for fusing multi-result generic ops.
             if (auto producerGenericOp =
                     dyn_cast<linalg::GenericOp>(producer)) {
               return producerGenericOp->hasOneUse();
-              return producerGenericOp->hasOneUse() &&
-                     producerGenericOp.getNumResults() == 1;
             }
-
             // Fuse in all other cases.
             return true;
           };
