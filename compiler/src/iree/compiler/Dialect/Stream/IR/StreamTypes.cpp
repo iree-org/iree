@@ -212,8 +212,20 @@ AffinityAttr AffinityAttr::lookup(Operation *op) {
 // static
 bool AffinityAttr::areCompatible(AffinityAttr desiredAffinity,
                                  AffinityAttr requiredAffinity) {
+  if (desiredAffinity == requiredAffinity) return true;
+  if ((desiredAffinity && !requiredAffinity) ||
+      (requiredAffinity && !desiredAffinity)) {
+    return true;
+  }
   // We could do a fuzzier match here (interface isCompatible() etc).
-  return desiredAffinity == requiredAffinity;
+  return false;
+}
+
+// static
+bool AffinityAttr::canExecuteTogether(AffinityAttr lhs, AffinityAttr rhs) {
+  if (lhs == rhs) return true;
+  if ((lhs && !rhs) || (rhs && !lhs)) return true;
+  return lhs.isExecutableWith(rhs);
 }
 
 //===----------------------------------------------------------------------===//

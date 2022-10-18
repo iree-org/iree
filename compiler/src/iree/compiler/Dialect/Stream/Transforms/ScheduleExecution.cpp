@@ -104,6 +104,9 @@ struct ExecutePartitionBuilder {
     executeOp = parentBuilder.create<IREE::Stream::AsyncExecuteOp>(
         fusedLoc, resultTypes, resultSizes, /*awaitTimepoint=*/Value{},
         operands, operandSizes, tiedOperands);
+    if (partition->affinity) {
+      executeOp.setAffinityAttr(partition->affinity);
+    }
 
     // Add entry block and arguments.
     auto &entryBlock = executeOp.getBody().emplaceBlock();
@@ -137,6 +140,16 @@ struct ExecutePartitionBuilder {
       llvm::dbgs() << "Cloned op into partition " << ordinal << ": ";
       clonedOp->dump();
     });
+
+    // If the op has the same affinity as the partition region we can strip it.
+    // Note that some ops may have affinities that are more specific and we
+    // want to preserve those as long as possible.
+    if (auto affinityOp =
+            dyn_cast<IREE::Stream::AffinityOpInterface>(clonedOp)) {
+      if (affinityOp.getAffinity() == partition->affinity) {
+        affinityOp.setAffinity(nullptr);
+      }
+    }
 
     return true;
   }

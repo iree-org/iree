@@ -360,6 +360,42 @@ void AffinityQueueAttr::print(AsmPrinter &p) const {
   os << ">";
 }
 
+bool AffinityQueueAttr::isExecutableWith(
+    IREE::Stream::AffinityAttr other) const {
+  if (!other) return true;
+  // Only compatible with other queue affinities today. When we extend the
+  // attributes to specify device targets we'd want to check here.
+  auto otherQueueAttr = other.dyn_cast_or_null<AffinityQueueAttr>();
+  if (!otherQueueAttr) return false;
+  // If this affinity is a subset of the target affinity then it can execute
+  // with it.
+  if ((getMask() & otherQueueAttr.getMask()) == getMask()) return true;
+  // Otherwise not compatible.
+  return false;
+}
+
+IREE::Stream::AffinityAttr AffinityQueueAttr::joinOR(
+    IREE::Stream::AffinityAttr other) const {
+  if (!other) return *this;
+  if (!IREE::Stream::AffinityAttr::canExecuteTogether(*this, other)) {
+    return nullptr;
+  }
+  auto otherQueueAttr = other.dyn_cast_or_null<AffinityQueueAttr>();
+  return AffinityQueueAttr::get(getContext(),
+                                getMask() | otherQueueAttr.getMask());
+}
+
+IREE::Stream::AffinityAttr AffinityQueueAttr::joinAND(
+    IREE::Stream::AffinityAttr other) const {
+  if (!other) return *this;
+  if (!IREE::Stream::AffinityAttr::canExecuteTogether(*this, other)) {
+    return nullptr;
+  }
+  auto otherQueueAttr = other.dyn_cast_or_null<AffinityQueueAttr>();
+  return AffinityQueueAttr::get(getContext(),
+                                getMask() & otherQueueAttr.getMask());
+}
+
 //===----------------------------------------------------------------------===//
 // #hal.match.*
 //===----------------------------------------------------------------------===//

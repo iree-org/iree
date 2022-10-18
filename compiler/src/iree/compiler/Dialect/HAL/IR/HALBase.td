@@ -627,7 +627,11 @@ def HAL_ExecutableTargetAttr :
 //===----------------------------------------------------------------------===//
 
 def HAL_AffinityQueueAttr : AttrDef<HAL_Dialect, "AffinityQueue", [
-  Stream_AffinityAttr,
+  DeclareAttrInterfaceMethods<Stream_AffinityAttr, [
+    "isExecutableWith",
+    "joinOR",
+    "joinAND",
+  ]>,
 ]> {
   let mnemonic = "affinity.queue";
   let summary = [{specifies a set of allowed queues for an operation}];

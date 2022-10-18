@@ -45,6 +45,52 @@ def Stream_AffinityAttr : AttrInterface<"AffinityAttr"> {
         return {};
       }]
     >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns true if executable operations with this affinity specified may
+        be executed together with executable operations with another affinity.
+        When true operations will be submitted to the same execution queues.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"isExecutableWith",
+      /*args=*/(ins "IREE::Stream::AffinityAttr":$other),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return IREE::Stream::AffinityAttr::areCompatible($_attr, other);
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns an affinity describing the union with |other| constraints.
+        The returned affinity specifies that a particular operation may execute
+        on _either_ of the source affinities.
+      }],
+      /*retTy=*/"IREE::Stream::AffinityAttr",
+      /*methodName=*/"joinOR",
+      /*args=*/(ins "IREE::Stream::AffinityAttr":$other),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        assert(IREE::Stream::AffinityAttr::canExecuteTogether(*this, other) &&
+               "divergent affinities not yet implemented");
+        return *this;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns an affinity describing the intersection with |other|
+        constraints. The returned affinity specifies that a particular operation
+        may execute on _both_ of the source affinities.
+      }],
+      /*retTy=*/"IREE::Stream::AffinityAttr",
+      /*methodName=*/"joinAND",
+      /*args=*/(ins "IREE::Stream::AffinityAttr":$other),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        assert(IREE::Stream::AffinityAttr::canExecuteTogether(*this, other) &&
+               "divergent affinities not yet implemented");
+        return *this;
+      }]
+    >,
   ];
 
   let extraClassDeclaration = [{
@@ -62,6 +108,10 @@ def Stream_AffinityAttr : AttrInterface<"AffinityAttr"> {
     // |requiredAffinity|.
     static bool areCompatible(AffinityAttr desiredAffinity,
                               AffinityAttr requiredAffinity);
+
+    // Returns true if |lhs| and |rhs| indicate that their operations can
+    // execute together on the same execution queue.
+    static bool canExecuteTogether(AffinityAttr lhs, AffinityAttr rhs);
   }];
 }
 
@@ -95,7 +145,8 @@ def Stream_AffinityOp : OpInterface<"AffinityOpInterface"> {
       /*methodName=*/"setAffinity",
       /*args=*/(ins "IREE::Stream::AffinityAttr":$value),
       /*methodBody=*/[{
-        $_self->setAttr("affinity", value);
+        if (value) $_self->setAttr("affinity", value);
+        else $_self->removeAttr("affinity");
       }]
     >,
   ];
