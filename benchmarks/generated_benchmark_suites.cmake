@@ -1079,7 +1079,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=vulkan-spirv"
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=adreno-unknown-linux-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    # "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
   PUBLIC
 )
 add_dependencies(iree-benchmark-suites
@@ -1098,7 +1098,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=vulkan-spirv"
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=adreno-unknown-linux-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    # "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
   PUBLIC
 )
 add_dependencies(iree-benchmark-suites
@@ -1117,7 +1117,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=vulkan-spirv"
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=adreno-unknown-linux-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    # "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
   PUBLIC
 )
 add_dependencies(iree-benchmark-suites
@@ -1136,7 +1136,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=vulkan-spirv"
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=adreno-unknown-linux-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    # "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
   PUBLIC
 )
 add_dependencies(iree-benchmark-suites
@@ -1155,7 +1155,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=vulkan-spirv"
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=adreno-unknown-linux-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    # "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
   PUBLIC
 )
 add_dependencies(iree-benchmark-suites
@@ -1174,7 +1174,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=vulkan-spirv"
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=adreno-unknown-linux-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    # "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
   PUBLIC
 )
 add_dependencies(iree-benchmark-suites
@@ -1193,7 +1193,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=vulkan-spirv"
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=adreno-unknown-linux-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    # "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=16"
   PUBLIC
 )
@@ -1213,7 +1213,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=vulkan-spirv"
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=adreno-unknown-linux-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    # "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=16"
   PUBLIC
 )
@@ -1233,7 +1233,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=vulkan-spirv"
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=adreno-unknown-linux-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    # "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=16"
   PUBLIC
 )
@@ -1253,7 +1253,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=vulkan-spirv"
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=adreno-unknown-linux-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    # "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=16"
   PUBLIC
 )
@@ -1400,7 +1400,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=vulkan-spirv"
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=valhall-unknown-linux-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    # "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
   PUBLIC
 )
 add_dependencies(iree-benchmark-suites
@@ -1419,7 +1419,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=vulkan-spirv"
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=valhall-unknown-linux-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    # "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
   PUBLIC
 )
 add_dependencies(iree-benchmark-suites
@@ -1438,7 +1438,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=vulkan-spirv"
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=valhall-unknown-linux-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    # "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
   PUBLIC
 )
 add_dependencies(iree-benchmark-suites
@@ -1457,7 +1457,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=vulkan-spirv"
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=valhall-unknown-linux-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    # "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
   PUBLIC
 )
 add_dependencies(iree-benchmark-suites
@@ -1476,7 +1476,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=vulkan-spirv"
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=valhall-unknown-linux-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    # "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
   PUBLIC
 )
 add_dependencies(iree-benchmark-suites
@@ -1495,7 +1495,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=vulkan-spirv"
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=valhall-unknown-linux-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    # "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
   PUBLIC
 )
 add_dependencies(iree-benchmark-suites
@@ -1514,7 +1514,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=vulkan-spirv"
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=valhall-unknown-linux-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    # "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-flow-demote-f32-to-f16"
   PUBLIC
 )
@@ -1534,7 +1534,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=vulkan-spirv"
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=valhall-unknown-linux-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    # "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=32"
   PUBLIC
 )
@@ -1554,7 +1554,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=vulkan-spirv"
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=valhall-unknown-linux-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    # "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=32"
   PUBLIC
 )
@@ -1574,7 +1574,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=vulkan-spirv"
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=valhall-unknown-linux-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    # "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=32"
   PUBLIC
 )
@@ -1594,7 +1594,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=vulkan-spirv"
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=valhall-unknown-linux-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    # "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=32"
   PUBLIC
 )
@@ -1614,7 +1614,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=vulkan-spirv"
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=valhall-unknown-linux-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    # "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=32"
   PUBLIC
 )
@@ -1634,7 +1634,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=vulkan-spirv"
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=valhall-unknown-linux-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    # "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=32"
   PUBLIC
 )
@@ -1654,7 +1654,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=vulkan-spirv"
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=valhall-unknown-linux-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    # "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=32"
     "--iree-flow-demote-f32-to-f16"
   PUBLIC

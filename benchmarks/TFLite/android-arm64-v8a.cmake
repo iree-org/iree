@@ -226,7 +226,7 @@ iree_benchmark_suite(
   COMPILATION_FLAGS
     ${ANDROID_CPU_COMPILATION_FLAGS}
     "--iree-flow-mmt4d-target-options=arch=aarch64"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    # "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
@@ -295,7 +295,7 @@ iree_benchmark_suite(
   COMPILATION_FLAGS
     ${ANDROID_CPU_COMPILATION_FLAGS}
     "--iree-flow-mmt4d-target-options=arch=aarch64"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    # "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
@@ -328,7 +328,7 @@ iree_benchmark_suite(
     ${ANDROID_CPU_COMPILATION_FLAGS}
     "--iree-flow-mmt4d-target-options=arch=aarch64 features=+dotprod"
     "--iree-llvm-target-cpu-features=+dotprod"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    # "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
   BENCHMARK_TOOL
     iree-benchmark-module
   CONFIG
@@ -432,7 +432,7 @@ iree_benchmark_suite(
   COMPILATION_FLAGS
     ${ANDROID_CPU_COMPILATION_FLAGS}
     "--iree-flow-mmt4d-target-options=arch=aarch64"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    # "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
 
   BENCHMARK_TOOL
     iree-benchmark-module
@@ -466,7 +466,7 @@ iree_benchmark_suite(
     ${ANDROID_CPU_COMPILATION_FLAGS}
     "--iree-flow-mmt4d-target-options=arch=aarch64 features=+dotprod"
     "--iree-llvm-target-cpu-features=+dotprod"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    # "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
 
   BENCHMARK_TOOL
     iree-benchmark-module
