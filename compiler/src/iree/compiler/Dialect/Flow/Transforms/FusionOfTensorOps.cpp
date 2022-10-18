@@ -72,6 +72,9 @@ static bool areFusableOps(MLIRContext *context, Operation *producerOp,
     return true;
   }
 
+  // IREE is not ready for it yet.
+  if (consumerOp->getNumResults() > 1) return false;
+
   // If producer has a single user, always fuse
   if (producerOp->hasOneUse()) return true;
 
@@ -242,11 +245,16 @@ struct FusionOfTensorOpsPass
             if (!producer) {
               return false;
             }
+
             // Do not fuse producer generic op if it has more than one user.
+            // IREE is not fully ready for fusing multi-result generic ops.
             if (auto producerGenericOp =
                     dyn_cast<linalg::GenericOp>(producer)) {
               return producerGenericOp->hasOneUse();
+              return producerGenericOp->hasOneUse() &&
+                     producerGenericOp.getNumResults() == 1;
             }
+
             // Fuse in all other cases.
             return true;
           };
