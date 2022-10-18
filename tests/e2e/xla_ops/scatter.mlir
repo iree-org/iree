@@ -87,6 +87,33 @@ func.func @scatter_update_slice_2D() {
   return
 }
 
+func.func @scatter_update_slice_partial_2D() {
+  %arg0 = util.unfoldable_constant dense<0> : tensor<6x3xi32>
+  %arg1 = util.unfoldable_constant dense<[[2], [4]]> : tensor<2x1xi32>
+  %arg2 = util.unfoldable_constant dense<[[1, 2],
+                                          [4, 5]]> : tensor<2x2xi32>
+  %0 = "mhlo.scatter"(%arg0, %arg1, %arg2) ( {
+  ^bb0(%arg3: tensor<i32>, %arg4: tensor<i32>):  // no predecessors
+    "mhlo.return"(%arg4) : (tensor<i32>) -> ()
+  }) {
+    indices_are_sorted = false,
+    scatter_dimension_numbers = #mhlo.scatter<
+      update_window_dims = [1],
+      inserted_window_dims = [0],
+      scatter_dims_to_operand_dims = [0],
+      index_vector_dim = 1,
+    >,
+    unique_indices = true
+  } : (tensor<6x3xi32>, tensor<2x1xi32>, tensor<2x2xi32>) -> tensor<6x3xi32>
+  check.expect_eq_const(%0, dense<[[0, 0, 0],
+                                   [0, 0, 0],
+                                   [1, 2, 0],
+                                   [0, 0, 0],
+                                   [4, 5, 0],
+                                   [0, 0, 0]]> : tensor<6x3xi32>) : tensor<6x3xi32>
+  return
+}
+
 func.func @scatter_add_slice_2D() {
   %arg0 = util.unfoldable_constant dense<1> : tensor<6x3xi32>
   %arg1 = util.unfoldable_constant dense<[[2], [4]]> : tensor<2x1xi32>
