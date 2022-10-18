@@ -130,6 +130,21 @@ static void addTileAndDistributePasses(
   nestedModulePM.addPass(createCSEPass());
 }
 
+static void addTileAndDistributePasses2(
+    OpPassManager &pm, bool useFuseTensorPadWithConsumerPass = true) {
+  pm.addPass(createTileAndDistributeToWorkgroupsPass());
+  auto &nestedModulePM = pm.nest<ModuleOp>();
+  if (useFuseTensorPadWithConsumerPass) {
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createFuseTensorPadWithConsumerPass());
+  }
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createFoldAffineMinInDistributedLoopsPass());
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+}
+
+
 //===---------------------------------------------------------------------===//
 // Codegen configuration verifications.
 //===---------------------------------------------------------------------===//
@@ -613,7 +628,7 @@ void addCPUAArchDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
 }
 
 void addCPUDefaultPassPipeline(OpPassManager &passManager) {
-  addTileAndDistributePasses(passManager);
+  addTileAndDistributePasses2(passManager);
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   addBufferizePasses(nestedModulePM);
   nestedModulePM.addNestedPass<func::FuncOp>(

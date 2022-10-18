@@ -16,6 +16,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -2249,6 +2250,12 @@ UnPackOp::getTiledImplementation(OpBuilder &builder,
   Location loc = getLoc();
   auto ctx = builder.getContext();
 
+  // Take the minimum of two integers.
+  auto idMap = AffineMap::getMultiDimIdentityMap(2, ctx);
+  auto min = [&](OpFoldResult v1, OpFoldResult v2) -> OpFoldResult {
+    return makeComposedFoldedAffineMin(builder, loc, idMap, {v1, v2});
+  };
+
   AffineExpr dim0, dim1;
   bindDims(ctx, dim0, dim1);
   auto addMap = AffineMap::get(2, 0, {dim0 + dim1});
@@ -2275,12 +2282,15 @@ UnPackOp::getTiledImplementation(OpBuilder &builder,
                     getValueOrCreateConstantIndexOp(builder, loc,
                                                     dimAndTileMapping[dim]));
 
-      DivModValue lastCoord =
-          getDivMod(builder, loc,
-                    getValueOrCreateConstantIndexOp(
-                        builder, loc, add(offsets[dim], sizes[dim])),
-                    getValueOrCreateConstantIndexOp(builder, loc,
-                                                    dimAndTileMapping[dim]));
+      DivModValue lastCoord = getDivMod(
+          builder, loc,
+          getValueOrCreateConstantIndexOp(
+              builder, loc, sub(add(offsets[dim], sizes[dim]), oneAttr)),
+          getValueOrCreateConstantIndexOp(builder, loc,
+                                          dimAndTileMapping[dim]));
+
+      //firstCoord.quotient.dump();
+      //lastCoord.quotient.dump();
 
       inputIndices.push_back(firstCoord.quotient);
       inputSizes.push_back(
@@ -2290,9 +2300,12 @@ UnPackOp::getTiledImplementation(OpBuilder &builder,
       AffineExpr i, tile;
       bindDims(builder.getContext(), i);
       bindSymbols(builder.getContext(), tile);
-      outputExpandedSizes.push_back(makeComposedFoldedAffineApply(
+      OpFoldResult size = makeComposedFoldedAffineApply(
           builder, loc, i * tile,
-          ArrayRef<OpFoldResult>{inputSizes.back(), dimAndTileMapping[dim]}));
+          ArrayRef<OpFoldResult>{inputSizes.back(), dimAndTileMapping[dim]});
+      //size = min(size, sizes[dim]);
+      //outputExpandedSizes.back(size);
+      outputExpandedSizes.push_back(size);
     } else {
       inputIndices.push_back(offsets[dim]);
       inputSizes.push_back(sizes[dim]);
@@ -2311,8 +2324,33 @@ UnPackOp::getTiledImplementation(OpBuilder &builder,
                                    inputSizes, inputStrides));
 
   SmallVector<OpFoldResult> outputStrides(outputRank, oneAttr);
-  tiledOperands.push_back(
-      getSlice(builder, loc, getOutput(), offsets, sizes, outputStrides));
+#if 0
+  auto outputSlice =
+      getSlice(builder, loc, getOutput(), offsets, sizes, outputStrides);
+  SmallVector<OpFoldResult> low(getOutputRank(), builder.getIndexAttr(0));
+  SmallVector<int64_t> expandedShape;
+  SmallVector<OpFoldResult> high;
+  for (auto it : llvm::zip(sizes, outputExpandedSizes)) {
+    OpFoldResult beforePad = std::get<0>(it);
+    OpFoldResult afterPad = std::get<1>(it);
+    high.push_back(sub(afterPad, beforePad));
+    Optional<int64_t> cst = getConstantIntValue(high.back());
+    if (cst) expandedShape.push_back(cst.getValue());
+    else expandedShape.push_back(ShapedType::kDynamicSize);
+  }
+  auto padType =
+      RankedTensorType::get(expandedShape, getOutputType().getElementType());
+  auto padVal = builder.getZeroAttr(getOutputType().getElementType());
+  auto pad = tensor::createPadScalarOp(
+      padType, outputSlice, builder.create<arith::ConstantOp>(loc, padVal), low,
+      high, /*nofold=*/false, loc, builder);
+  tiledOperands.push_back(pad.getResult());
+#endif
+  auto empty = builder.create<tensor::EmptyOp>(
+      loc, outputExpandedSizes, getOutputType().getElementType());
+  tiledOperands.push_back(empty.getResult());
+  //tiledOperands.push_back(getSlice(builder, loc, getOutput(), offsets,
+                                   //outputExpandedSizes, outputStrides));
 
   SmallVector<Type, 4> tiledResultTypes;
   if (hasTensorSemantics()) {
@@ -2322,33 +2360,77 @@ UnPackOp::getTiledImplementation(OpBuilder &builder,
   Operation *tiledUnpackOp =
       cast<LinalgExtOp>(getOperation())
           .clone(builder, loc, tiledResultTypes, tiledOperands);
-  return {tiledUnpackOp};
+  //return {tiledUnpackOp};
 
   Operation *extractSlice = builder.create<tensor::ExtractSliceOp>(
       loc, tiledUnpackOp->getResult(0), outputNewOffsets, sizes, outputStrides);
 
-  return {extractSlice};
+  return {extractSlice, tiledUnpackOp};
 }
 
 LogicalResult UnPackOp::getResultTilePosition(
     OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
     ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
     SmallVector<OpFoldResult> &resultSizes) {
+  resultOffsets = llvm::to_vector(offsets);
+  resultSizes = llvm::to_vector(sizes);
+  return success();
+
   Location loc = getLoc();
+  auto ctx = builder.getContext();
+
+  // Take the minimum of two integers.
+  auto idMap = AffineMap::getMultiDimIdentityMap(2, ctx);
+  auto min = [&](OpFoldResult v1, OpFoldResult v2) -> OpFoldResult {
+    return makeComposedFoldedAffineMin(builder, loc, idMap, {v1, v2});
+  };
+
+  AffineExpr dim0, dim1;
+  bindDims(ctx, dim0, dim1);
+  auto addMap = AffineMap::get(2, 0, {dim0 + dim1});
+  auto add = [&](OpFoldResult v1, OpFoldResult v2) -> OpFoldResult {
+    return makeComposedFoldedAffineApply(builder, loc, addMap, {v1, v2});
+  };
+  auto subMap = AffineMap::get(2, 0, {dim0 - dim1});
+  auto sub = [&](OpFoldResult v1, OpFoldResult v2) -> OpFoldResult {
+    return makeComposedFoldedAffineApply(builder, loc, subMap, {v1, v2});
+  };
+
   Attribute zeroAttr = builder.getIndexAttr(0);
+  Attribute oneAttr = builder.getIndexAttr(1);
   DenseMap<int64_t, OpFoldResult> dimAndTileMapping = getDimAndTileMapping();
   for (auto dim : llvm::seq<int64_t>(0, getOutputRank())) {
     if (dimAndTileMapping.count(dim)) {
-      auto rem = builder.create<arith::RemUIOp>(
-          loc, getValueOrCreateConstantIndexOp(builder, loc, offsets[dim]),
+      DivModValue firstCoord =
+          getDivMod(builder, loc,
+                    getValueOrCreateConstantIndexOp(builder, loc, offsets[dim]),
+                    getValueOrCreateConstantIndexOp(builder, loc,
+                                                    dimAndTileMapping[dim]));
+
+      DivModValue lastCoord = getDivMod(
+          builder, loc,
+          getValueOrCreateConstantIndexOp(
+              builder, loc, sub(add(offsets[dim], sizes[dim]), oneAttr)),
           getValueOrCreateConstantIndexOp(builder, loc,
                                           dimAndTileMapping[dim]));
-      resultOffsets.push_back(rem.getResult());
+
+      auto inputSize =
+          add(sub(lastCoord.quotient, firstCoord.quotient), oneAttr);
+      resultOffsets.push_back(firstCoord.remainder);
+
+      AffineExpr i, tile;
+      bindDims(builder.getContext(), i);
+      bindSymbols(builder.getContext(), tile);
+      OpFoldResult size = makeComposedFoldedAffineApply(
+          builder, loc, i * tile,
+          ArrayRef<OpFoldResult>{inputSize, dimAndTileMapping[dim]});
+      resultSizes.push_back(size);
     } else {
       resultOffsets.push_back(zeroAttr);
+      resultSizes.push_back(sizes[dim]);
     }
   }
-  resultSizes = llvm::to_vector(sizes);
+  //resultSizes = llvm::to_vector(sizes);
   return success();
 }
 

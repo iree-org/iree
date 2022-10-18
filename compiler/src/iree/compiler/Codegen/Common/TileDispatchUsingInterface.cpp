@@ -374,6 +374,7 @@ FailureOr<TilingResult> TileDispatchUsingSCFForOp::returningMatchAndRewrite(
     return tilingResult;
   }
 
+  SmallVector<Operation *> tiledImplementation;
   {
     SmallVector<OpFoldResult> offsets, sizes;
     // If there is an interchange specified, permute the iteration domain and
@@ -453,12 +454,11 @@ FailureOr<TilingResult> TileDispatchUsingSCFForOp::returningMatchAndRewrite(
     if (!tilingResult.loops.empty())
       rewriter.setInsertionPoint(
           tilingResult.loops.back().getBody()->getTerminator());
-    SmallVector<Operation *> tiledImplementation =
-        op.getTiledImplementation(rewriter, offsets, sizes);
-    if (tiledImplementation.size() != 1) {
-      return rewriter.notifyMatchFailure(
-          op, "expected tiled implementation to return a single op");
-    }
+    tiledImplementation = op.getTiledImplementation(rewriter, offsets, sizes);
+    //if (tiledImplementation.size() != 1) {
+      //return rewriter.notifyMatchFailure(
+          //op, "expected tiled implementation to return a single op");
+    //}
     tilingResult.tiledOp = tiledImplementation[0];
 
     LLVM_DEBUG({
@@ -473,7 +473,9 @@ FailureOr<TilingResult> TileDispatchUsingSCFForOp::returningMatchAndRewrite(
   }
 
   // Update the filter.
-  filter.replaceLinalgTransformationFilter(rewriter, tilingResult.tiledOp);
+  for (auto tiledOp : tiledImplementation) {
+    filter.replaceLinalgTransformationFilter(rewriter, tiledOp);
+  }
 
   if (op->getNumResults() == 0) {
     rewriter.eraseOp(op);

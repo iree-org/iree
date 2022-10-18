@@ -16,7 +16,7 @@ namespace iree_compiler {
 static llvm::cl::opt<int> clMaxAllocationSizeInBytes(
     "iree-llvmcpu-stack-allocation-limit",
     llvm::cl::desc("maximum allowed stack allocation size in bytes"),
-    llvm::cl::init(32768));
+    llvm::cl::init(327680));
 
 namespace {
 struct LLVMCPUCheckIRBeforeLLVMConversionPass
