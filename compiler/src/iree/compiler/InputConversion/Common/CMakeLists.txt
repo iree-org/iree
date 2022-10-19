@@ -26,6 +26,7 @@ iree_cc_library(
     "PassDetail.h"
     "Passes.h"
     "Passes.h.inc"
+    "Utils.h"
   DEPS
     ::PassesIncGen
     MLIRPass
