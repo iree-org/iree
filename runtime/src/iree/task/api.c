@@ -5,6 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/task/api.h"
+#include "numa.h"
+#include "numaif.h"
 
 #include <stdbool.h>
 #include <string.h>
@@ -77,11 +79,23 @@ IREE_FLAG(
 
 // TODO(benvanik): add --task_topology_dump to dump out the current machine
 // configuration as seen by the topology utilities.
+IREE_FLAG(
+    bool, task_topology_dump, false,
+    "Dumps CPU NUMA hardware topology to dump out the current machine\n"
+    "configuration as seen by the topology utilities.\n");
 
 iree_status_t iree_task_topology_initialize_from_flags(
     iree_task_topology_t* out_topology) {
   IREE_ASSERT_ARGUMENT(out_topology);
   iree_task_topology_initialize(out_topology);
+  if (FLAG_task_topology_dump == true) {
+    printf("TEST: %d\n", numa_max_node());
+    printf("HARDWARE:\n");
+    //hardware();
+    printf("SET\n");
+  } else {
+    printf("NOT SET\n");
+  }
 
   if (FLAG_task_topology_group_count != 0) {
     iree_task_topology_initialize_from_group_count(
