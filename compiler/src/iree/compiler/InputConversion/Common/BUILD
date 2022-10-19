@@ -48,12 +48,15 @@ iree_compiler_cc_library(
         "IREEImportPublic.cpp",
         "ImportMLProgram.cpp",
         "Passes.cpp",
+        "QuantizedConvToConv.cpp",
         "QuantizedMatmulToMatmul.cpp",
         "SanitizeModuleNames.cpp",
         "TopLevelSCFToCFG.cpp",
+        "Utils.cpp",
     ],
     hdrs = [
         "Passes.h",
+        "Utils.h",
     ],
     deps = [
         ":PassHeaders",
