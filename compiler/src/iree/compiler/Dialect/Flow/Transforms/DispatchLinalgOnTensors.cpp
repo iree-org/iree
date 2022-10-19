@@ -597,7 +597,7 @@ static void fuseRootsWithConsumers(MLIRContext *context,
     };
 
     Optional<OpOperand *> fusableUse = getFusableUse(
-        currRoot, dominanceInfo, /*fuseMultiUse=*/aggressiveFusion);
+        currRoot, dominanceInfo, /*fuseMultiUse=*/true);
     if (!fusableUse) continue;
 
     // Analyse the use to see if it is fusable.
@@ -625,8 +625,16 @@ static bool isFusableWithProducer(OpOperand &operand, bool aggressiveFusion) {
 
   auto consumerLinalgOp = cast<linalg::LinalgOp>(consumer);
   if (consumerLinalgOp.isDpsInput(&operand)) {
+    bool fuseUses = false;
+    if (auto linalgRoot = dyn_cast<linalg::GenericOp>(producer)) {
+      SmallVector<unsigned> dims;
+      linalgRoot.getReductionDims(dims);
+      fuseUses = (dims.size() == 1 &&
+                  (linalgRoot.getStaticLoopRanges()[dims[0]] % (64 * 4) == 0) &&
+                  (linalgRoot.getStaticLoopRanges()[dims[0]] <= 4096));
+    }
     // Only fuse on inputs if both ops are generic ops.
-    if (!aggressiveFusion || !isa<linalg::GenericOp>(consumer) ||
+    if (!fuseUses || !isa<linalg::GenericOp>(consumer) ||
         !isa<linalg::GenericOp>(producer)) {
       return false;
     }
@@ -658,7 +666,7 @@ static void fuseRootsWithProducers(MLIRContext *context, Operation *root,
       }
 
       Optional<OpOperand *> fusableUse = getFusableUse(
-          producer, dominanceInfo, /*fuseMultiUse=*/aggressiveFusion);
+          producer, dominanceInfo, /*fuseMultiUse=*/false);
       if (!fusableUse || fusableUse.value()->getOwner() != candidate) continue;
 
       if (!isFusableWithProducer(operand, aggressiveFusion)) continue;
