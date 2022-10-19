@@ -429,7 +429,9 @@ iree_cc_test(
     ::internal
     ::synchronization
     ::threading
+    iree::base
     iree::base::cc
+    iree::base::target_platform
     iree::testing::gtest
     iree::testing::gtest_main
 )
