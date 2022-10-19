@@ -26,7 +26,6 @@ iree_cc_library(
     "PassDetail.h"
     "Passes.h"
     "Passes.h.inc"
-    "Utils.h"
   DEPS
     ::PassesIncGen
     MLIRPass
@@ -39,6 +38,7 @@ iree_cc_library(
     Common
   HDRS
     "Passes.h"
+    "Utils.h"
   SRCS
     "IREEImportPublic.cpp"
     "ImportMLProgram.cpp"
