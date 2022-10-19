@@ -914,59 +914,16 @@ struct LinalgExtPackOpVectorizationPass
 
     // TODO(hanchung): Support vectorization for the cases that outer dims are
     // not all 1s. This can be achieved by tiling + inferring shapes.
-#if 0
-    {
-      RewritePatternSet patterns(ctx);
-      auto tilingOptions =
-          linalg::LinalgTilingOptions().setTileSizeComputationFunction(
-              [](OpBuilder &builder, Operation *op) {
-                SmallVector<Value> tileSizes;
-                Location loc = op->getLoc();
-                auto packOp = cast<PackOp>(op);
-                auto innerDims =
-                    extractFromI64ArrayAttr(packOp.getInnerDimsPos());
-                DenseMap<int64_t, OpFoldResult> dimAndTileMapping =
-                    packOp.getDimAndTileMapping();
-                int inputRank = packOp.getInputRank();
-                for (int dim = 0; dim < inputRank; ++dim) {
-                  if (dimAndTileMapping.count(dim)) {
-                    tileSizes.push_back(getValueOrCreateConstantIndexOp(
-                        builder, loc, dimAndTileMapping[dim]));
-                  } else {
-                    tileSizes.push_back(
-                        getDimValue(builder, loc, packOp.getInput(), dim));
-                  }
-                }
-                return tileSizes;
-              });
-      auto funcOp = getOperation();
-      patterns.add<TilingInterfaceTilingPattern>(
-          ctx, tilingOptions,
-          LinalgExt::LinalgTransformationFilter(
-              ArrayRef<StringAttr>{},
-              StringAttr::get(&getContext(), "TILE_PACK_OP")));
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-        return signalPassFailure();
-      }
-      funcOp->walk([&](LinalgExt::PackOp op) {
-        op->removeAttr(
-            IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker);
-      });
-    }
-#endif
-
-    {
-      RewritePatternSet patterns(ctx);
-      patterns.add<GeneralizePackOpPattern>(ctx);
-      patterns.add<LinalgVectorizationPattern>(ctx);
-      linalg::populatePadOpVectorizationPatterns(patterns);
-      vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
-      vector::TransferReadOp::getCanonicalizationPatterns(patterns, ctx);
-      vector::TransferWriteOp::getCanonicalizationPatterns(patterns, ctx);
-      if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                              std::move(patterns)))) {
-        return signalPassFailure();
-      }
+    RewritePatternSet patterns(ctx);
+    patterns.add<GeneralizePackOpPattern>(ctx);
+    patterns.add<LinalgVectorizationPattern>(ctx);
+    linalg::populatePadOpVectorizationPatterns(patterns);
+    vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
+    vector::TransferReadOp::getCanonicalizationPatterns(patterns, ctx);
+    vector::TransferWriteOp::getCanonicalizationPatterns(patterns, ctx);
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(patterns)))) {
+      return signalPassFailure();
     }
   }
 };
