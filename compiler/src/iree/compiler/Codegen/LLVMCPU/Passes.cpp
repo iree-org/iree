@@ -52,6 +52,12 @@ static llvm::cl::opt<bool> clEnableMicrokernels(
     llvm::cl::desc("Enables microkernel lowering for vmvx (experimental)"),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clEnableMicrokernelsDecomposeLinalgGeneric(
+    "iree-vmvx-enable-microkernels-decompose-linalg-generic",
+    llvm::cl::desc("Enables decomposition of linalg.generic ops when "
+                   "microkernels are enabled (experimental)"),
+    llvm::cl::init(true));
+
 static llvm::cl::opt<bool> clEnableReassociateFpReductions(
     "iree-llvmcpu-reassociate-fp-reductions",
     llvm::cl::desc("Enables reassociation for FP reductions"),
@@ -419,7 +425,7 @@ void addVMVXDefaultPassPipeline(OpPassManager &passManager) {
   // Tensor-level micro-kernel optimizations.
   // Note that this must be done post-tiling because it changes the structure
   // of the dispatch region such that tiling is not always possible.
-  if (clEnableMicrokernels) {
+  if (clEnableMicrokernels && clEnableMicrokernelsDecomposeLinalgGeneric) {
     passManager.nest<ModuleOp>().nest<func::FuncOp>().addPass(
         createDecomposeLinalgGenericPass());
   }

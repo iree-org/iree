@@ -31,6 +31,7 @@ BACKEND_TESTS = [
     "reduction_broadcast_elementwise.mlir",
     "softmax.mlir",
     "strided_slice.mlir",
+    "transpose.mlir",
 ]
 
 iree_lit_test_suite(

@@ -177,7 +177,7 @@ LogicalResult ScatterOp::verify() {
         "index depth and update value does not cover rank of original value");
   }
 
-  // Validate the non-indexed update dims covier the full slice size of the
+  // Validate the non-indexed update dims cover the full slice size of the
   // original tensor.
   int64_t fullSliceDims = originalType.getRank() - indexDepth;
   for (auto it :
@@ -186,10 +186,10 @@ LogicalResult ScatterOp::verify() {
                                      updateType.getRank()))) {
     int64_t originalDim = std::get<0>(it);
     int64_t updateDim = std::get<1>(it);
-    if (updateType.getDimSize(updateDim) !=
+    if (updateType.getDimSize(updateDim) >
         originalType.getDimSize(originalDim)) {
-      return op->emitOpError("mismatch in shape of update value dim#")
-             << updateDim << " and original value at dim#" << originalDim;
+      return op->emitOpError("shape of update value dim#")
+             << updateDim << " exceeds original value at dim#" << originalDim;
     }
   }
 

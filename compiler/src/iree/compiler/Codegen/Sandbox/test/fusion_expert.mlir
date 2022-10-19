@@ -66,9 +66,9 @@ func.func @matmul_bias_add_static(%arg0 : tensor<20x60xf32>, %arg1 : tensor<60x1
 //      CHECK:   %[[INIT:.+]] = tensor.empty() : tensor<20x120xf32>
 //      CHECK:   %[[RESULT:.+]] = scf.for %[[IV0:.+]] = %[[C0]] to %[[C20]] step %[[C10]]
 // CHECK-SAME:       iter_args(%[[ARG4:.+]] = %[[INIT]])
-//      CHECK:     %[[LHS:.+]] = vector.transfer_read %[[ARG0]][%[[IV0]], %[[C0]]]
 //      CHECK:     %[[YIELD:.+]] = scf.for %[[IV1:.+]] = %[[C0]] to %[[C120]]
 // CHECK-SAME:         iter_args(%[[ARG6:.+]] = %[[ARG4]])
+//  CHECK-DAG:       %[[LHS:.+]] = vector.transfer_read %[[ARG0]][%[[IV0]], %[[C0]]]
 //  CHECK-DAG:       %[[RHS:.+]] = vector.transfer_read %[[ARG1]][%[[C0]], %[[IV1]]]
 //  CHECK-DAG:       %[[BIAS:.+]] = vector.transfer_read %[[ARG2]][%[[IV1]]]
 //      CHECK:       %[[OUT:.+]] = vector.broadcast %[[BIAS]]

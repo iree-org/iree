@@ -514,12 +514,12 @@ static void splitParallelAndReductionTiles(
     linalg::LinalgOp op, SmallVectorImpl<int64_t> &parallelSizes,
     SmallVectorImpl<int64_t> &reductionSizes) {
   reductionSizes.assign(parallelSizes.begin(), parallelSizes.end());
-  for (auto iteratorType : llvm::enumerate(op.iterator_types())) {
-    if (iteratorType.value().cast<StringAttr>().getValue() ==
-        getParallelIteratorTypeName()) {
-      reductionSizes[iteratorType.index()] = 0;
+  for (auto [index, iteratorTypeName] :
+       llvm::enumerate(op.getIteratorTypeNames())) {
+    if (iteratorTypeName == getParallelIteratorTypeName()) {
+      reductionSizes[index] = 0;
     } else {
-      parallelSizes[iteratorType.index()] = 0;
+      parallelSizes[index] = 0;
     }
   }
 }
@@ -528,15 +528,14 @@ static void setAlwaysVectorizeSizes(linalg::LinalgOp op,
                                     SmallVectorImpl<int64_t> &parallelSizes,
                                     SmallVectorImpl<int64_t> &reductionSizes) {
   SmallVector<int64_t, 4> staticLoopRanges = op.getStaticLoopRanges();
-  for (auto en :
-       llvm::enumerate(llvm::zip(staticLoopRanges, op.iterator_types()))) {
-    auto size = std::get<0>(en.value());
+  for (auto [index, valuePair] : llvm::enumerate(
+           llvm::zip(staticLoopRanges, op.getIteratorTypeNames()))) {
+    auto [size, iterType] = valuePair;
     if (!ShapedType::isDynamic(size)) continue;
-    auto iterType = std::get<1>(en.value()).cast<StringAttr>().getValue();
     if (iterType == getParallelIteratorTypeName()) {
-      parallelSizes[en.index()] = 1;
+      parallelSizes[index] = 1;
     } else {
-      reductionSizes[en.index()] = 1;
+      reductionSizes[index] = 1;
     }
   }
 

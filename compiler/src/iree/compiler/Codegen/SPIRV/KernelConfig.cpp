@@ -34,6 +34,8 @@
 namespace mlir {
 namespace iree_compiler {
 
+using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
+
 //===----------------------------------------------------------------------===//
 // Utility Functions
 //===----------------------------------------------------------------------===//
@@ -55,11 +57,10 @@ bool isMatmulOrBatchMatmul(linalg::LinalgOp linalgOp) {
 /// - `residualTilingFactor` indicates the remaining tiling scale factor.
 /// - `wgDimSize` will be updated with the decided workgroup dimension size.
 /// - `wgTileSize` will be updated with the decided workgroup tile size.
-/// - `threadTileSize` will be updated with the decided invocation tile size.
 static bool tileConvOneDim(const int64_t inputDim, const bool isInnerMostDim,
                            int64_t &residualThreads,
                            int64_t &residualTilingFactor, int64_t &wgDimSize,
-                           int64_t &wgTileSize, int64_t &threadTileSize) {
+                           int64_t &wgTileSize) {
   const int64_t lb = isInnerMostDim ? 2 : 1;
   for (int64_t dim = residualThreads; dim >= lb; dim >>= 1) {
     int64_t chosenTileSize = 0;
@@ -78,7 +79,6 @@ static bool tileConvOneDim(const int64_t inputDim, const bool isInnerMostDim,
     if (chosenTileSize) {
       wgDimSize = dim;
       wgTileSize = dim * chosenTileSize;
-      threadTileSize = chosenTileSize;
       residualThreads /= dim;
       residualTilingFactor /= chosenTileSize;
       return true;
@@ -94,10 +94,8 @@ static bool tileConvSquare(const int64_t oh, const int64_t ow,
                            int64_t &residualThreads,
                            int64_t &residualTilingFactor,
                            MutableArrayRef<int64_t> wgDimSizes,
-                           MutableArrayRef<int64_t> wgTileSizes,
-                           MutableArrayRef<int64_t> invoTileSizes) {
-  assert(wgDimSizes.size() == 2 && wgTileSizes.size() == 2 &&
-         invoTileSizes.size() == 2);
+                           MutableArrayRef<int64_t> wgTileSizes) {
+  assert(wgDimSizes.size() == 2 && wgTileSizes.size() == 2);
 
   const unsigned log2Threads = llvm::Log2_64(residualThreads);
   if (oh == ow && residualThreads != 1 && log2Threads % 2 == 0) {
@@ -111,7 +109,6 @@ static bool tileConvSquare(const int64_t oh, const int64_t ow,
     if (chosenTileSize != 0) {
       wgDimSizes.front() = wgDimSizes.back() = yz;
       wgTileSizes.front() = wgTileSizes.back() = yz * chosenTileSize;
-      invoTileSizes.front() = invoTileSizes.back() = chosenTileSize;
       return true;
     }
   }
@@ -161,26 +158,25 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
 
   SmallVector<int64_t, 3> workgroupSize(3, 1);  // (X, Y, Z)
   SmallVector<int64_t> workgroupTileSizes(4, 0);
-  SmallVector<int64_t> threadTileSizes(4, 0);
 
   if (isNCHW) {
     // OW -> x, OH -> y, OC -> z
     if (!tileConvOneDim(ow, /*isInnerMostDim=*/true, residualThreads,
                         residualTilingFactor, workgroupSize[0],
-                        workgroupTileSizes[3], threadTileSizes[3]) ||
+                        workgroupTileSizes[3]) ||
         !tileConvOneDim(oh, /*isInnerMostDim=*/false, residualThreads,
                         residualTilingFactor, workgroupSize[1],
-                        workgroupTileSizes[2], threadTileSizes[2]) ||
+                        workgroupTileSizes[2]) ||
         !tileConvOneDim(oc, /*isInnerMostDim=*/false, residualThreads,
                         residualTilingFactor, workgroupSize[2],
-                        workgroupTileSizes[1], threadTileSizes[1])) {
+                        workgroupTileSizes[1])) {
       return success();
     }
   } else {
     // OC -> x
     if (!tileConvOneDim(oc, /*isInnerMostDim=*/true, residualThreads,
                         residualTilingFactor, workgroupSize[0],
-                        workgroupTileSizes[3], threadTileSizes[3]))
+                        workgroupTileSizes[3]))
       return success();
 
     // Deduce the configruation for the OW and OH dimension. Try to make them
@@ -189,25 +185,28 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
     const bool tileToSquare = tileConvSquare(
         oh, ow, residualThreads, residualTilingFactor,
         llvm::makeMutableArrayRef(workgroupSize).drop_front(),
-        llvm::makeMutableArrayRef(workgroupTileSizes).drop_front().drop_back(),
-        llvm::makeMutableArrayRef(threadTileSizes).drop_front().drop_back());
+        llvm::makeMutableArrayRef(workgroupTileSizes).drop_front().drop_back());
 
     // Otherwise treat OW and OH separately to allow them to have different
     // number of threads and tiling size.
     if (!tileToSquare) {
       if (!tileConvOneDim(ow, /*isInnerMostDim=*/false, residualThreads,
                           residualTilingFactor, workgroupSize[1],
-                          workgroupTileSizes[2], threadTileSizes[2]) ||
+                          workgroupTileSizes[2]) ||
           !tileConvOneDim(oh, /*isInnerMostDim=*/false, residualThreads,
                           residualTilingFactor, workgroupSize[2],
-                          workgroupTileSizes[1], threadTileSizes[1])) {
+                          workgroupTileSizes[1])) {
         return success();
       }
     }
   }
 
-  auto pipeline =
-      IREE::Codegen::DispatchLoweringPassPipeline::SPIRVBaseVectorize;
+  SmallVector<int64_t> threadTileSizes(4, 0);
+  for (int i = 1; i <= 3; ++i) {
+    threadTileSizes[i] = workgroupTileSizes[i] / workgroupSize[3 - i];
+  }
+
+  auto pipeline = CodeGenPipeline::SPIRVBaseVectorize;
   TileSizesListType tileSizes;
   tileSizes.push_back(workgroupTileSizes);
   tileSizes.push_back(threadTileSizes);
@@ -289,11 +288,12 @@ static std::tuple<int, int, int, int> getMatmulBMNKIndex(linalg::LinalgOp op,
 
 /// Decides the tiling and distribution parameters for matmul's N dimension to
 /// workgroup X dimension.
-static bool tileMatmulNToWorkgroupX(
-    const int64_t dimN, const int64_t bestThreadN, int64_t &residualThreads,
-    const int64_t bestX, int64_t &residualTilingFactor, int64_t &wgDimSize,
-    int64_t &wgTileSize, int64_t &threadTileSize) {
-  threadTileSize = 0;
+static bool tileMatmulNToWorkgroupX(const int64_t dimN,
+                                    const int64_t bestThreadN,
+                                    int64_t &residualThreads,
+                                    const int64_t bestX,
+                                    int64_t &residualTilingFactor,
+                                    int64_t &wgDimSize, int64_t &wgTileSize) {
   // Deduce the configuration for the N dimension. Start with the best workgroup
   // X size, and reduce by a factor of two each time.
   for (int64_t x = bestX; x >= 2; x >>= 1) {
@@ -303,23 +303,23 @@ static bool tileMatmulNToWorkgroupX(
     if (dimN % (x * chosenTileSize) == 0) {
       wgDimSize = x;
       wgTileSize = x * chosenTileSize;
-      threadTileSize = chosenTileSize;
       residualThreads /= x;
       assert(residualTilingFactor % chosenTileSize == 0);
       residualTilingFactor /= chosenTileSize;
-      break;
+      return true;
     }
   }
-  return threadTileSize != 0;
+  return false;
 }
 
 /// Decides the tiling and distribution parameters for matmul's M dimension to
 /// workgroup Y dimension.
-static bool tileMatmulMToWorkgroupY(
-    const int64_t dimM, const int64_t bestThreadM, int64_t &residualThreads,
-    const int64_t bestY, int64_t &residualTilingFactor, int64_t &wgDimSize,
-    int64_t &wgTileSize, int64_t &threadTileSize) {
-  threadTileSize = 0;
+static bool tileMatmulMToWorkgroupY(const int64_t dimM,
+                                    const int64_t bestThreadM,
+                                    int64_t &residualThreads,
+                                    const int64_t bestY,
+                                    int64_t &residualTilingFactor,
+                                    int64_t &wgDimSize, int64_t &wgTileSize) {
   // Deduce the configuration for the M dimension. Start with the best workgroup
   // Y size, and reduce by a factor of two each time.
   for (int64_t y = residualThreads; y >= 1; y >>= 1) {
@@ -335,21 +335,21 @@ static bool tileMatmulMToWorkgroupY(
     if (chosenTileSize) {
       wgDimSize = y;
       wgTileSize = y * chosenTileSize;
-      threadTileSize = chosenTileSize;
       assert(residualTilingFactor > chosenTileSize);
       residualTilingFactor -= chosenTileSize;
-      break;
+      return true;
     }
   }
-  return threadTileSize != 0;
+  return false;
 }
 
 namespace detail {
 
-LogicalResult setMatmulOpConfig(linalg::LinalgOp op, int64_t subgroupSize,
+LogicalResult setMatmulOpConfig(spirv::ResourceLimitsAttr limits,
+                                linalg::LinalgOp op,
                                 std::array<int64_t, 2> bestWorkgroupSizeXY,
                                 std::array<int64_t, 3> bestThreadTileSizeMNK,
-                                bool useWorkgroupMemory) {
+                                bool enablePromotion) {
   LLVM_DEBUG(llvm::dbgs() << "trying to deduce config as matmul...\n");
   OpOperand *lhs = op.getInputOperand(0);
   OpOperand *rhs = op.getInputOperand(1);
@@ -365,12 +365,12 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op, int64_t subgroupSize,
   if (llvm::any_of(rhsShape, ShapedType::isDynamic)) return success();
 
   assert(llvm::is_contained({2u, 3u}, op.getNumParallelLoops()));
-  const bool isBM = op.getNumParallelLoops() == 3;
 
   int lastParallelDim = -1;
   auto [bIndex, mIndex, nIndex, kIndex] =
       getMatmulBMNKIndex(op, lastParallelDim);
   if (mIndex < 0 || nIndex < 0 || kIndex < 0) return success();
+  const bool isBM = bIndex >= 0;
 
   SmallVector<int64_t, 4> loopRanges = op.getStaticLoopRanges();
   const unsigned numLoops = loopRanges.size();
@@ -411,19 +411,16 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op, int64_t subgroupSize,
 
   SmallVector<int64_t, 3> workgroupSize(3, 1);  // (X, Y, Z)
   SmallVector<int64_t> workgroupTileSizes(numLoops, 0);
-  SmallVector<int64_t> threadTileSizes(numLoops, 0);
   SmallVector<int64_t> reductionTileSizes(numLoops, 0);
 
-  if (isBM) workgroupTileSizes[bIndex] = threadTileSizes[bIndex] = 1;
+  if (isBM) workgroupTileSizes[bIndex] = 1;
 
   if (!tileMatmulNToWorkgroupX(dimN, bestThreadN, residualThreads, bestX,
                                residualTilingFactor, workgroupSize[0],
-                               workgroupTileSizes[nIndex],
-                               threadTileSizes[nIndex]) ||
+                               workgroupTileSizes[nIndex]) ||
       !tileMatmulMToWorkgroupY(dimM, bestThreadM, residualThreads, bestY,
                                residualTilingFactor, workgroupSize[1],
-                               workgroupTileSizes[mIndex],
-                               threadTileSizes[mIndex])) {
+                               workgroupTileSizes[mIndex])) {
     return success();
   }
 
@@ -437,16 +434,22 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op, int64_t subgroupSize,
   }
   if (reductionTileSizes[kIndex] == 0) return success();
 
+  const int subgroupSize = limits.getSubgroupSize();
   int64_t totalThreads = workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
   LLVM_DEBUG({
     llvm::dbgs() << "total thread count = " << totalThreads << "\n";
     llvm::dbgs() << "subgroup size = " << subgroupSize << "\n";
   });
-  auto pipeline =
-      (useWorkgroupMemory && totalThreads > subgroupSize)
-          ? IREE::Codegen::DispatchLoweringPassPipeline::
-                SPIRVMatmulPromoteVectorize
-          : IREE::Codegen::DispatchLoweringPassPipeline::SPIRVBaseVectorize;
+  auto pipeline = (enablePromotion && totalThreads > subgroupSize)
+                      ? CodeGenPipeline::SPIRVMatmulPromoteVectorize
+                      : CodeGenPipeline::SPIRVBaseVectorize;
+
+  SmallVector<int64_t> threadTileSizes(numLoops, 0);
+  if (isBM) {
+    threadTileSizes[bIndex] = workgroupTileSizes[bIndex] / workgroupSize[2];
+  }
+  threadTileSizes[mIndex] = workgroupTileSizes[mIndex] / workgroupSize[1];
+  threadTileSizes[nIndex] = workgroupTileSizes[nIndex] / workgroupSize[0];
 
   TileSizesListType tileSizes;
   workgroupTileSizes.resize(lastParallelDim + 1);
@@ -470,8 +473,7 @@ static LogicalResult setFftOpConfig(spirv::ResourceLimitsAttr limits,
                                     IREE::LinalgExt::FftOp op) {
   LLVM_DEBUG(llvm::dbgs() << "trying to deduce config as fft...\n");
   const int subgroupSize = limits.getSubgroupSize();
-  auto pipeline =
-      IREE::Codegen::DispatchLoweringPassPipeline::SPIRVBaseDistribute;
+  auto pipeline = CodeGenPipeline::SPIRVBaseDistribute;
 
   std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
 
@@ -505,6 +507,23 @@ static LogicalResult setFftOpConfig(spirv::ResourceLimitsAttr limits,
 //===----------------------------------------------------------------------===//
 // Reduction Default Configuration
 //===----------------------------------------------------------------------===//
+
+// Check if the given function contains an op that may require a broadcast of
+// the reduced result.
+static bool isFusedWithBroadcast(linalg::LinalgOp reduce) {
+  func::FuncOp entryPoint = reduce->getParentOfType<func::FuncOp>();
+  int64_t reducedRank =
+      reduce->getResult(0).getType().cast<ShapedType>().getRank();
+  bool hasBroadcast = false;
+  entryPoint.walk([&](linalg::LinalgOp linalgOp) {
+    if (reduce != linalgOp && linalgOp.getNumLoops() > reducedRank) {
+      hasBroadcast = true;
+      return WalkResult::interrupt();
+    }
+    return WalkResult::advance();
+  });
+  return hasBroadcast;
+}
 
 /// Set the configuration for reductions that can be mapped to warp reductions.
 static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
@@ -541,16 +560,31 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
   Optional<int64_t> dimSize = op.getStaticLoopRanges()[reductionDims[0]];
   if (!dimSize || *dimSize % subgroupSize != 0) return failure();
 
+  const Type elementType =
+      op.getOutputs()[0].getType().cast<ShapedType>().getElementType();
+  if (!elementType.isIntOrFloat()) return failure();
+  // Reduction distribution only supports 32-bit types now.
+  if (elementType.getIntOrFloatBitWidth() != 32) return failure();
+
   // Let each thread handle `vectorSize` elements.
   unsigned vectorSize = 4;
   while ((*dimSize / vectorSize) % subgroupSize != 0) vectorSize /= 2;
 
-  std::array<int64_t, 3> workgroupSize = {*dimSize / vectorSize, 1, 1};
-  if (workgroupSize[0] >
-      targetEnv.getResourceLimits().getMaxComputeWorkgroupInvocations()) {
-    return failure();
+  // TODO: Add reduction tiling to handle larger reductions.
+  const int64_t maxWorkgroupSize =
+      targetEnv.getResourceLimits().getMaxComputeWorkgroupInvocations();
+  int64_t groupSize = *dimSize / vectorSize;
+  if (groupSize > maxWorkgroupSize) {
+    groupSize = llvm::APIntOps::GreatestCommonDivisor(
+                    {64, uint64_t(groupSize)}, {64, uint64_t(maxWorkgroupSize)})
+                    .getZExtValue();
+    // Workaround, the vector distribution doesn't handle cases where we fuse
+    // the reduction with a consumer that needs to be tiled.
+    // TODO(thomasraoux): remove the restriction once vector distribution is
+    // improved.
+    if (isFusedWithBroadcast(op)) return failure();
   }
-
+  std::array<int64_t, 3> workgroupSize = {groupSize, 1, 1};
   // Tile all the parallel dimension to 1.
   SmallVector<unsigned> partitionedLoops =
       cast<PartitionableLoopsInterface>(op.getOperation())
@@ -559,14 +593,16 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
   partitionedLoopsSet.insert(partitionedLoops.begin(), partitionedLoops.end());
   size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
   SmallVector<int64_t, 4> workgroupTileSizes(numLoops, 1);
+  SmallVector<int64_t, 4> reductionTileSizes(numLoops, 0);
+  reductionTileSizes.push_back(groupSize * vectorSize);
 
   TileSizesListType tileSizes;
   tileSizes.emplace_back(std::move(workgroupTileSizes));  // Workgroup level
+  tileSizes.emplace_back(std::move(reductionTileSizes));  // reduction level
 
   return setOpConfigAndEntryPointFnTranslation(
       op->getParentOfType<func::FuncOp>(), op, tileSizes,
-      IREE::Codegen::DispatchLoweringPassPipeline::SPIRVSubgroupReduce,
-      workgroupSize);
+      CodeGenPipeline::SPIRVSubgroupReduce, workgroupSize);
 }
 
 //===----------------------------------------------------------------------===//
@@ -586,8 +622,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
   if (partitionedLoops.empty()) {
     // No tiled loops means we cannot tile (and distribute) at all. Use just one
     // single thread to run everything.
-    auto pipeline =
-        IREE::Codegen::DispatchLoweringPassPipeline::SPIRVBaseDistribute;
+    auto pipeline = CodeGenPipeline::SPIRVBaseDistribute;
     std::array<int64_t, 3> workgroupSize = {1, 1, 1};
     return setOpConfigAndEntryPointFnTranslation(funcOp, op, {}, pipeline,
                                                  workgroupSize);
@@ -619,8 +654,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
   // Special case for non-linalg ops.
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
   if (!linalgOp || linalgOp.getNumOutputs() != 1) {
-    auto pipeline =
-        IREE::Codegen::DispatchLoweringPassPipeline::SPIRVBaseDistribute;
+    auto pipeline = CodeGenPipeline::SPIRVBaseDistribute;
 
     initConfiguration();
     TileSizesListType tileSizes;
@@ -755,10 +789,8 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
     }
   }
 
-  auto pipeline =
-      vectorizable
-          ? IREE::Codegen::DispatchLoweringPassPipeline::SPIRVBaseVectorize
-          : IREE::Codegen::DispatchLoweringPassPipeline::SPIRVBaseDistribute;
+  auto pipeline = vectorizable ? CodeGenPipeline::SPIRVBaseVectorize
+                               : CodeGenPipeline::SPIRVBaseDistribute;
 
   TileSizesListType tileSizes;
   tileSizes.push_back(workgroupTileSizes);
@@ -839,9 +871,16 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
         // Try to tile and vectorize first. It's common to see 32 threads
         // per subgroup for GPUs.
         std::array<int64_t, 2> workgroupXY = {32, 2};
-        std::array<int64_t, 3> threadMNK = {8, 8, 4};
-        auto result = detail::setMatmulOpConfig(op, /*subgroupSize=*/32,
-                                                workgroupXY, threadMNK);
+        std::array<int64_t, 3> threadMNK;
+        auto inputType =
+            op.getInputs()[0].getType().template cast<ShapedType>();
+        if (inputType.getElementType().getIntOrFloatBitWidth() == 16) {
+          threadMNK = {8, 8, 8};
+        } else {
+          threadMNK = {8, 8, 4};
+        }
+        auto result =
+            detail::setMatmulOpConfig(limits, op, workgroupXY, threadMNK);
         if (failed(result)) return result;
         if (getLoweringConfig(op)) return result;
 

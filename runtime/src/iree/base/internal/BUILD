@@ -127,6 +127,7 @@ iree_runtime_cc_library(
         ":synchronization",
         "//build_tools:default_linkopts",
         "//build_tools:dl",
+        "//runtime/src/iree/base",
         "//runtime/src/iree/base:core_headers",
         "//runtime/src/iree/base:tracing",
     ],
@@ -164,6 +165,7 @@ iree_runtime_cc_library(
         ":file_io",
         ":internal",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/base:target_platform",
         "//runtime/src/iree/base:tracing",
     ],
 )

@@ -199,6 +199,10 @@ static void addSPIRVLoweringPasses(OpPassManager &pm, bool enableFastMath) {
   pm.addPass(createCSEPass());
 
   pm.addPass(createMapMemRefStorageClassPass());
+  pm.addPass(createSPIRVEmulateI64Pass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
   pm.addPass(createConvertToSPIRVPass(enableFastMath));
 
   OpPassManager &spirvPM = pm.nest<spirv::ModuleOp>();
@@ -297,6 +301,7 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm) {
       createRemoveSingleIterationLoopPass());
 
   nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorizePass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -333,6 +338,8 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &pm) {
   auto &nestedModulePM = pm.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createGPUTileReductionPass());
+
   // Performs mechanical vectorization. This does not perform unrolling or
   // lowering, which is done later.
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUVectorizationPass(
@@ -349,6 +356,16 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &pm) {
   // forwarding, shape casting and casting op cancelling.
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());
+
+  // Simplify the IR for vector distribution.
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      memref::createFoldMemRefAliasOpsPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLoopInvariantCodeMotionPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
 
   auto getWarpSize = [](func::FuncOp func) {
     auto moduleOp = func->getParentOfType<ModuleOp>();

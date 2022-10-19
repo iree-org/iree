@@ -81,10 +81,10 @@ transform.with_pdl_patterns {
 
   transform.structured.canonicalized_sequence %arg0 failures(propagate) {
   ^bb1(%arg1: !pdl.operation):
-    %0 = pdl_match @pdl_target_attrA in %arg1
+    %0 = pdl_match @pdl_target_attrA in %arg1 : (!pdl.operation) -> !pdl.operation
     transform.structured.tile %0 [4, 4, 4]
-    %1 = pdl_match @pdl_target_attrC in %arg1
-    %2 = transform.get_closest_isolated_parent %1
+    %1 = pdl_match @pdl_target_attrC in %arg1 : (!pdl.operation) -> !pdl.operation
+    %2 = transform.get_closest_isolated_parent %1 : (!pdl.operation) -> !pdl.operation
     transform.structured.vectorize %2
   }
 }
@@ -128,8 +128,8 @@ transform.with_pdl_patterns {
 
   transform.structured.canonicalized_sequence %arg0 failures(propagate) {
   ^bb1(%arg1: !pdl.operation):
-    %0 = pdl_match @pdl_target in %arg1
-    %1 = get_closest_isolated_parent %0
+    %0 = pdl_match @pdl_target in %arg1 : (!pdl.operation) -> !pdl.operation
+    %1 = get_closest_isolated_parent %0 : (!pdl.operation) -> !pdl.operation
     transform.structured.vectorize %1
   }
 }

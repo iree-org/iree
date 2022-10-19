@@ -32,6 +32,7 @@
 #include "mlir/IR/Dominance.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/RegionUtils.h"
+#include "mlir/Transforms/TopologicalSortUtils.h"
 
 using namespace mlir;
 using namespace mlir::iree_compiler;
@@ -530,10 +531,11 @@ static unsigned decideFusableLinalgOps(FunctionOpInterface funcOp,
 static LogicalResult cloneProducers(RewriterBase &rewriter,
                                     Flow::DispatchRegionOp regionOp) {
   SmallVector<Operation *> cloneableOps = getCloneableOps(regionOp);
-  SmallVector<Operation *> orderedProducers =
-      Flow::orderOperations(cloneableOps);
+  bool sortResult = mlir::computeTopologicalSorting(cloneableOps);
+  (void)sortResult;
+  assert(sortResult && "could not compute topological sorting");
 
-  for (Operation *producer : llvm::reverse(orderedProducers))
+  for (Operation *producer : llvm::reverse(cloneableOps))
     if (failed(
             clonePrecedingOpIntoDispatchRegion(rewriter, producer, regionOp)))
       return failure();
@@ -596,13 +598,12 @@ static FailureOr<SmallVector<Flow::DispatchWorkgroupsOp>> createFusionGroups(
 
     // Sort producers topologically. All producers must be in the same block as
     // the root.
-    // TODO: Use mlir::computeTopologicalSorting. This is currently not possible
-    // because some of the producers are in different blocks.
-    SmallVector<Operation *> orderedProducers =
-        Flow::orderOperations(producers[it.index()]);
+    bool sortResult = mlir::computeTopologicalSorting(producers[it.index()]);
+    (void)sortResult;
+    assert(sortResult && "could not compute topological sorting");
 
     // Move ops into the region.
-    for (Operation *producer : llvm::reverse(orderedProducers)) {
+    for (Operation *producer : llvm::reverse(producers[it.index()])) {
       auto newRegionOp =
           movePrecedingOpIntoDispatchRegion(rewriter, producer, regionOp);
       if (failed(newRegionOp)) return failure();

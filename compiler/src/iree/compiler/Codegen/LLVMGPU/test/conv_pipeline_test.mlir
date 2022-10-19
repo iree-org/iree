@@ -38,8 +38,8 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 //         CHECK:      scf.for
 // CHECK-COUNT-2:        vector.transfer_read
 // CHECK-COUNT-4:        vector.contract
-//         CHECK:      scf.yield %{{.*}} : vector<4x4xf32>
-//         CHECK:    scf.yield %{{.*}} : vector<4x4xf32>
+//         CHECK:      scf.yield %{{.*}} : vector<1x4x4xf32>
+//         CHECK:    scf.yield %{{.*}} : vector<1x4x4xf32>
 //         CHECK:    vector.transfer_write {{.*}} : vector<4x4xf32>, memref<1x112x112x64xf32>
 
 // -----

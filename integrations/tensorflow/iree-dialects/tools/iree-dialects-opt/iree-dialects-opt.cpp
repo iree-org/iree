@@ -20,6 +20,7 @@
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/Linalg/Transforms/TilingInterfaceImpl.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/PDL/IR/PDL.h"
 #include "mlir/Dialect/PDLInterp/IR/PDLInterp.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -71,6 +72,7 @@ int main(int argc, char **argv) {
       >();
 
   // Core dialect passes.
+  memref::registerMemRefPasses();
   registerTransformsPasses();
   registerSCFPasses();
   // Local dialect passes.

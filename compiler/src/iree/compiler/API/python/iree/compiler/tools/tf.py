@@ -140,6 +140,7 @@ def build_import_command_line(input_path: str, tfs: TempFileSaver,
     output_file = tfs.alloc_optional("tf-output.mlir",
                                      export_as=options.output_file)
     cl.append(f"-o={output_file}")
+    cl.append(f"--output-format=mlir-ir")
 
   # MLIR flags.
   if options.output_mlir_debuginfo:

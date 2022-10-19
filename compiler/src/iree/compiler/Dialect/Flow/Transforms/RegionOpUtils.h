@@ -54,7 +54,9 @@ Flow::DispatchRegionOp makeEmptyDispatchRegion(OpBuilder &builder,
 ///   flow.return %1 : tensor<?xf32>
 /// }
 /// %2 = "yet_another_use"(%0) : (tensor<?xf32>) -> (tensor<?xf32>)
-LogicalResult clonePrecedingOpIntoDispatchRegion(
+///
+/// Returns the cloned target op.
+FailureOr<Operation *> clonePrecedingOpIntoDispatchRegion(
     RewriterBase &rewriter, Operation *target, Flow::DispatchRegionOp regionOp);
 
 /// Move a `target` op that is preceding the given dispatch region op into the
@@ -78,19 +80,6 @@ FailureOr<Flow::DispatchRegionOp> movePrecedingOpIntoDispatchRegion(
 /// Wrap the given op in a new dispatch region op.
 FailureOr<Flow::DispatchRegionOp> wrapOpInDispatchRegion(RewriterBase &rewriter,
                                                          Operation *op);
-
-/// Sort the given ops topologically, so that they can be inlined into a
-/// dispatch region without dominance violations.
-///
-/// Example:
-///
-/// %0 = "some_op"()
-/// %1 = "another_op"(%1)
-///
-/// In the above example, "some_op" is before "another_op" in the result.
-// TODO: Improve mlir::sortTopologically. This function does currently not
-// support ops from different blocks.
-SmallVector<Operation *> orderOperations(ArrayRef<Operation *> ops);
 
 }  // namespace Flow
 }  // namespace IREE

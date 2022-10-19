@@ -144,7 +144,7 @@ namespace {
 /// First pattern to introduce the loop nests.
 struct OpTilingPattern : public OpInterfaceRewritePattern<TilingInterface> {
   OpTilingPattern(MLIRContext *context, linalg::LinalgTilingOptions opt,
-                  linalg::LinalgTransformationFilter filt)
+                  LinalgTransformationFilter filt)
       : OpInterfaceRewritePattern<TilingInterface>(context), options(opt),
         filter(filt) {}
 
@@ -184,7 +184,7 @@ struct OpTilingPattern : public OpInterfaceRewritePattern<TilingInterface> {
 
 private:
   linalg::LinalgTilingOptions options;
-  linalg::LinalgTransformationFilter filter;
+  LinalgTransformationFilter filter;
 };
 } // namespace
 
