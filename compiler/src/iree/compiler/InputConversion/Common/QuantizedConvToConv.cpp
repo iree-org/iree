@@ -6,6 +6,7 @@
 
 #include "iree/compiler/InputConversion/Common/PassDetail.h"
 #include "iree/compiler/InputConversion/Common/Passes.h"
+#include "iree/compiler/InputConversion/Common/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -69,67 +70,6 @@ Value applyZeroPoint(ImplicitLocOpBuilder &rewriter, Value conv, Value sum,
       .getResult(0);
 }
 
-// Reduce the input value along the reduction dimensions
-Value reduceDims(ImplicitLocOpBuilder &rewriter, Value val, Type accETy,
-                 ArrayRef<bool> is_reduction) {
-  auto context = val.getContext();
-  RankedTensorType ty = val.getType().cast<RankedTensorType>();
-
-  llvm::SmallVector<int64_t> staticSizes;
-  SmallVector<Value> dynSizes;
-  for (int i = 0, s = is_reduction.size(); i < s; i++) {
-    if (is_reduction[i]) continue;
-
-    staticSizes.push_back(ty.getDimSize(i));
-    if (ty.isDynamicDim(i)) {
-      dynSizes.push_back(rewriter.create<tensor::DimOp>(val, i));
-    }
-  }
-
-  // Create a zero-filled accumulator.
-  Value initAcc =
-      rewriter.create<tensor::EmptyOp>(staticSizes, accETy, dynSizes);
-  Value zeroInt = rewriter.create<arith::ConstantIntOp>(0, accETy).getResult();
-  Value zeroAcc =
-      rewriter.create<linalg::FillOp>(zeroInt, initAcc).getResult(0);
-
-  SmallVector<AffineExpr> filterExprs(ty.getRank());
-  SmallVector<AffineExpr> outputExprs;
-  SmallVector<StringRef> iterators;
-
-  for (int i = 0, s = ty.getRank(); i < s; i++) {
-    if (!is_reduction[i]) {
-      auto expr = rewriter.getAffineDimExpr(iterators.size());
-      iterators.push_back(getParallelIteratorTypeName());
-
-      outputExprs.push_back(expr);
-      filterExprs[i] = expr;
-    }
-  }
-
-  for (int i = 0, s = filterExprs.size(); i < s; i++) {
-    if (!filterExprs[i]) {
-      auto expr = mlir::getAffineDimExpr(iterators.size(), context);
-      iterators.push_back(getReductionIteratorTypeName());
-      filterExprs[i] = expr;
-    }
-  }
-
-  SmallVector<AffineMap> affineMaps{AffineMap::get(4, 0, filterExprs, context),
-                                    AffineMap::get(4, 0, outputExprs, context)};
-
-  return rewriter
-      .create<linalg::GenericOp>(
-          zeroAcc.getType(), ValueRange{val}, ValueRange{zeroAcc}, affineMaps,
-          iterators,
-          [=](OpBuilder &b, Location loc, ValueRange args) {
-            Value ext = b.create<arith::ExtSIOp>(loc, accETy, args[0]);
-            Value sum = b.create<arith::AddIOp>(loc, ext, args[1]);
-            b.create<linalg::YieldOp>(loc, sum);
-          })
-      .getResult(0);
-}
-
 // Pattern lowering conv_2d_nhwc_hwcf_q to conv_2d_nhwc_hwcf.
 //
 // This is implementing the math explained in Section 2.3 of
@@ -178,7 +118,8 @@ struct QuantizedConvToConv
     //  sum(d) = filter(a, b, c, d)
     //  conv(a, b, c, d) -= iZp * filter(d)
     if (!iZpIsZero) {
-      Value filterSum = reduceDims(builder, filter, accETy,
+      Value filterSum =
+          sumReduceDimensionSubset(builder, filter, accETy,
                                    /*reduce_dim=*/{true, true, true, false});
       newConv = applyZeroPoint(builder, newConv, filterSum, iZp, {3});
     }
@@ -186,8 +127,9 @@ struct QuantizedConvToConv
     if (!fZpIsZero) {
       // Reduce along the input feature dimension:
       //   sum(a, b, c) = input(a, b, c, d)
-      Value inputSum = reduceDims(builder, input, accETy,
-                                  /*reduce_dim*/ {false, false, false, true});
+      Value inputSum =
+          sumReduceDimensionSubset(builder, input, accETy,
+                                   /*reduce_dim*/ {false, false, false, true});
 
       // Materialize a length-1 dimension at the end of the summation.
       SmallVector<ReassociationExprs, 4> reassociationMap(3);

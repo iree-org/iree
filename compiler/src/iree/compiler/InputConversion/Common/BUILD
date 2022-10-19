@@ -52,9 +52,11 @@ iree_compiler_cc_library(
         "QuantizedMatmulToMatmul.cpp",
         "SanitizeModuleNames.cpp",
         "TopLevelSCFToCFG.cpp",
+        "Utils.cpp",
     ],
     hdrs = [
         "Passes.h",
+        "Utils.h",
     ],
     deps = [
         ":PassHeaders",
