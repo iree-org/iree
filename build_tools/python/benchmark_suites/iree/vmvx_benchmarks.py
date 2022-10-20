@@ -34,8 +34,9 @@ class Android_VMVX_Benchmarks(object):
 
     gen_configs = [
         iree_definitions.ModuleGenerationConfig(
-            compile_config=self.DEFAULT_COMPILE_CONFIG, model=model) for model
-        in [tflite_models.MOBILENET_V2, tflite_models.MOBILENET_V3SMALL]
+            compile_config=self.DEFAULT_COMPILE_CONFIG,
+            imported_model=iree_definitions.ImportedModel.from_model(model)) for
+        model in [tflite_models.MOBILENET_V2, tflite_models.MOBILENET_V3SMALL]
     ]
     default_execution_configs = [
         benchmark_suites.iree.module_execution_configs.

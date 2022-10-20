@@ -34,7 +34,8 @@ class Linux_CUDA_Benchmarks(object):
 
     gen_configs = [
         iree_definitions.ModuleGenerationConfig(
-            compile_config=self.SM_80_COMPILE_CONFIG, model=model)
+            compile_config=self.SM_80_COMPILE_CONFIG,
+            imported_model=iree_definitions.ImportedModel.from_model(model))
         for model in model_groups.LARGE
     ]
     sm80_devices = device_collections.DEFAULT_DEVICE_COLLECTION.query_device_specs(
