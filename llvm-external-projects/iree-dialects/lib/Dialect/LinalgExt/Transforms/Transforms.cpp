@@ -9,13 +9,17 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/PassDetail.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
+#include "iree-dialects/Dialect/LinalgExt/Passes/Transforms.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
+#include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/PassManager.h"
@@ -29,6 +33,10 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace LinalgExt {
+
+//===----------------------------------------------------------------------===//
+// CodegenStrategy patterns and passes.
+//===----------------------------------------------------------------------===//
 
 FailureOr<linalg::TileLoopNest> tileConsumerAndFuseProducers(
     OpBuilder &b, linalg::LinalgOp consumerOp, ArrayRef<int64_t> tileSizes,
@@ -783,6 +791,148 @@ createLinalgStrategyLowerVectorsPass(
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLinalgStrategyRemoveMarkersPass() {
   return std::make_unique<LinalgStrategyRemoveMarkersPass>();
+}
+
+//===----------------------------------------------------------------------===//
+// LinalgExt patterns and passes.
+//===----------------------------------------------------------------------===//
+
+namespace {
+template <typename T>
+SmallVector<T> interchange(ArrayRef<T> elements,
+                           ArrayRef<int64_t> interchangeVector) {
+  SmallVector<T> vec = llvm::to_vector(elements);
+  for (auto en : llvm::enumerate(interchangeVector)) {
+    vec[en.value()] = elements[en.index()];
+  }
+  return vec;
+}
+
+/// Returns a tensor.pad op if padding value is set. Otherwise, returns the
+/// input directly. The method assumes that the `packOp` has static shapes.
+Value getInputOrPaddedInput(OpBuilder &builder, PackOp packOp) {
+  Value input = packOp.getInput();
+  if (!packOp.getPaddingValue()) {
+    return input;
+  }
+
+  Location loc = packOp.getLoc();
+  ShapedType inputType = packOp.getInputType();
+  int64_t inputRank = inputType.getRank();
+
+  SmallVector<int64_t> paddedShape;
+  DenseMap<int64_t, OpFoldResult> tileAndPosMapping =
+      packOp.getDimAndTileMapping();
+  for (int64_t dim = 0; dim < inputRank; ++dim) {
+    int64_t size = inputType.getDimSize(dim);
+    if (!tileAndPosMapping.count(dim)) {
+      paddedShape.push_back(size);
+      continue;
+    }
+
+    Optional<int64_t> tileSize =
+        getConstantIntValue(tileAndPosMapping.lookup(dim));
+    assert((!inputType.isDynamicDim(dim) && tileSize.hasValue()) &&
+           "something goes really wrong...");
+    int64_t sizeWithPad = llvm::alignTo(size, tileSize.getValue());
+    paddedShape.push_back(sizeWithPad);
+  }
+  auto resultType =
+      RankedTensorType::get(paddedShape, inputType.getElementType());
+  return tensor::createPadHighOp(resultType, input, packOp.getPaddingValue(),
+                                 /*nofold=*/false, loc, builder);
+}
+
+/// Rewrites iree_linalg_ext.pack to tensor.pad + rank-reduced linalg.generic
+/// (transpose) ops.
+struct GeneralizePackOpPattern : OpRewritePattern<PackOp> {
+  using OpRewritePattern<PackOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(PackOp packOp,
+                                PatternRewriter &rewriter) const final {
+    if (!packOp.hasTensorSemantics()) {
+      return rewriter.notifyMatchFailure(packOp, "require tensor semantics");
+    }
+
+    // The expand_shape op can be avoided if outer dimensions of result are all
+    // 1s. This can be relaxed if needed. A tensor.expand_shape will be
+    // generated in that case.
+    int64_t inputRank = packOp.getInputRank();
+    if (llvm::any_of(packOp.getOutputShape().take_front(inputRank),
+                     [](int64_t val) { return val != 1; })) {
+      return rewriter.notifyMatchFailure(
+          packOp, "require the outer dimension of the result are all 1s");
+    }
+
+    Value input = getInputOrPaddedInput(rewriter, packOp);
+
+    SmallVector<AffineExpr> inputExprs;
+    for (int64_t dim = 0; dim < inputRank; ++dim) {
+      inputExprs.push_back(rewriter.getAffineDimExpr(dim));
+    }
+    if (auto outerDims = packOp.getOuterDimsPerm()) {
+      inputExprs = interchange<AffineExpr>(inputExprs,
+                                           extractFromI64ArrayAttr(outerDims));
+    }
+    for (auto en :
+         llvm::enumerate(extractFromI64ArrayAttr(packOp.getInnerDimsPos()))) {
+      inputExprs[en.value()] =
+          rewriter.getAffineDimExpr(inputRank + en.index());
+    }
+
+    Location loc = packOp.getLoc();
+    auto inputType = input.getType().cast<RankedTensorType>();
+    auto nloops = packOp.getOutputRank();
+
+    Value empty = rewriter.create<tensor::EmptyOp>(loc, packOp.getOutputShape(),
+                                                   inputType.getElementType());
+    SmallVector<StringRef, 4> loopAttributeTypes(nloops,
+                                                 getParallelIteratorTypeName());
+    SmallVector<AffineMap, 2> indexingMaps = {
+        AffineMap::get(nloops, 0, inputExprs, rewriter.getContext()),
+        AffineMap::getMultiDimIdentityMap(nloops, rewriter.getContext())};
+
+    auto transposedOp = rewriter.create<linalg::GenericOp>(
+        loc, empty.getType(), input, empty, indexingMaps, loopAttributeTypes,
+        [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
+          nestedBuilder.create<linalg::YieldOp>(nestedLoc, args[0]);
+        });
+    rewriter.replaceOp(packOp, transposedOp.getResult(0));
+    return success();
+  }
+};
+
+struct LinalgExtPackOpVectorizationPass
+    : public LinalgExtPackOpVectorizationBase<
+          LinalgExtPackOpVectorizationPass> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry
+        .insert<linalg::LinalgDialect, func::FuncDialect, arith::ArithDialect,
+                tensor::TensorDialect, vector::VectorDialect>();
+  }
+
+  void runOnOperation() override {
+    MLIRContext *ctx = &getContext();
+
+    // TODO(hanchung): Support vectorization for the cases that outer dims are
+    // not all 1s. This can be achieved by tiling + inferring shapes.
+    RewritePatternSet patterns(ctx);
+    patterns.add<GeneralizePackOpPattern>(ctx);
+    patterns.add<LinalgVectorizationPattern>(ctx);
+    linalg::populatePadOpVectorizationPatterns(patterns);
+    vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
+    vector::TransferReadOp::getCanonicalizationPatterns(patterns, ctx);
+    vector::TransferWriteOp::getCanonicalizationPatterns(patterns, ctx);
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(patterns)))) {
+      return signalPassFailure();
+    }
+  }
+};
+} // namespace
+
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLinalgExtPackOpVectorizationPass() {
+  return std::make_unique<LinalgExtPackOpVectorizationPass>();
 }
 
 } // namespace LinalgExt

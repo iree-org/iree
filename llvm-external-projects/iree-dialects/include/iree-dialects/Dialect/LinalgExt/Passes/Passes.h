@@ -101,6 +101,9 @@ void populateTopkSplitReductionPattern(
 
 std::unique_ptr<OperationPass<func::FuncOp>> createTopkSplitReductionPass();
 
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLinalgExtPackOpVectorizationPass();
+
 // Marker used as attribute the depth of the split reduction transformations.
 const StringLiteral kSplitReductionDepthMarker = "__split_reduction_depth__";
 
