@@ -13,6 +13,7 @@ add_mlir_library(IREELinalgExtPasses
   LINK_LIBS PUBLIC
   IREEInputDialect
   IREELinalgExtDialect
+  IREELinalgExtUtils
   MLIRAffineDialect
   MLIRIR
   MLIRLinalgDialect
