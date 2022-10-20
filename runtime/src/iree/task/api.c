@@ -5,8 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/task/api.h"
-#include "numa.h"
-#include "numaif.h"
 
 #include <stdbool.h>
 #include <string.h>

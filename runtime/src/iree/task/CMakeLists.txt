@@ -10,17 +10,6 @@
 
 iree_add_all_subdirs()
 
-if(NOT NUMA_HEADERS_API_ROOT)
-  set(NUMA_HEADERS_API_ROOT "${IREE_ROOT_DIR}/third_party/numactl/")
-  message(STATUS "Using default NUMA directory at ${NUMA_HEADERS_API_ROOT}")
-endif()
-
-if(EXISTS ${NUMA_HEADERS_API_ROOT})
-  message(STATUS "NUMA Header Path: ${NUMA_HEADERS_API_ROOT}")
-else()
-  message(SEND_ERROR "Could not locate NUMA: ${NUMA_HEADERS_API_ROOT}")
-endif()
-
 # Task-based executor requires threading support.
 if(NOT IREE_ENABLE_THREADING)
   return()
@@ -33,36 +22,15 @@ if(IREE_ENABLE_CPUINFO)
   set(IREE_CPUINFO_TARGET cpuinfo)
 endif()
 
-#iree_cc_library(
-#  NAME
-#    numa
-#  HDRS
-#    "${NUMA_HEADERS_API_ROOT}/config.h"
-#    "${NUMA_HEADERS_API_ROOT}/numa.h"
-#    "${NUMA_HEADERS_API_ROOT}/numaif.h"
-#    "${NUMA_HEADERS_API_ROOT}/numaint.h"
-#    "${NUMA_HEADERS_API_ROOT}/util.h"
-#    "${NUMA_HEADERS_API_ROOT}/shm.h"
-#  SRCS
-#    "${NUMA_HEADERS_API_ROOT}/libnuma.c"
-#  PUBLIC
-#)
-
 iree_cc_library(
   NAME
     api
   HDRS
     "api.h"
-    "${NUMA_HEADERS_API_ROOT}/config.h"
-    "${NUMA_HEADERS_API_ROOT}/numa.h"
-    "${NUMA_HEADERS_API_ROOT}/numaif.h"
-    "${NUMA_HEADERS_API_ROOT}/numaint.h"
-    "${NUMA_HEADERS_API_ROOT}/util.h"
-    "${NUMA_HEADERS_API_ROOT}/shm.h"
   SRCS
     "api.c"
   DEPS
-    /usr/lib/x86_64-linux-gnu/libnuma.so
+    numa::libnuma
     ::task
     iree::base
     iree::base::internal::flags
