@@ -1712,6 +1712,23 @@ static LogicalResult commonVerifierPackAndUnPackOp(OpTy packOrUnPack) {
   return success();
 }
 
+/// Returns a `Value` which checks if all the offsets are in the bounds of
+/// `val`. The method assumes that the size of `offsets` match the rank of
+/// `val`.
+static Value areAllInBounds(OpBuilder &builder, Location loc, Value val,
+                            ArrayRef<OpFoldResult> offsets) {
+  ArithBuilder arithBuilder(builder, loc);
+  Value isInBounds;
+  for (auto dim : llvm::seq<int64_t>(0, offsets.size())) {
+    Value idx =
+        getValueOrCreateConstantIndexOp(builder, loc, offsets[dim]);
+    Value cond =
+        arithBuilder.slt(idx, getDimValue(builder, loc, val, dim));
+    isInBounds = dim == 0 ? cond : arithBuilder._and(isInBounds, cond);
+  }
+  return isInBounds;
+}
+
 //===----------------------------------------------------------------------===//
 // PackOp
 //===----------------------------------------------------------------------===//
@@ -1939,15 +1956,8 @@ static void generatePackOpScalarImplementationBody(PackOp packOp,
   };
   Value scalar;
   if (auto paddingValue = packOp.getPaddingValue()) {
-    ArithBuilder arithBuilder(builder, loc);
-    Value isInBounds;
-    for (auto dim : llvm::seq<int64_t>(0, inputRank)) {
-      Value idx =
-          getValueOrCreateConstantIndexOp(builder, loc, sourceIndices[dim]);
-      Value cond = arithBuilder.slt(
-          idx, getDimValue(builder, loc, packOp.getInput(), dim));
-      isInBounds = dim == 0 ? cond : arithBuilder._and(isInBounds, cond);
-    }
+    Value isInBounds =
+        areAllInBounds(builder, loc, packOp.getInput(), sourceIndices);
     scalar = builder
                  .create<scf::IfOp>(
                      loc, packOp.getElementType(), isInBounds, /*thenBuilder=*/
@@ -2029,6 +2039,8 @@ PackOp::getTiledImplementation(OpBuilder &builder,
   };
 
   int64_t inputRank = getInputRank();
+  SmallVector<int64_t> tiledInputShape;
+  SmallVector<Value> tiledInputDynDims;
   DenseMap<int64_t, OpFoldResult> dimAndTileMapping = getDimAndTileMapping();
   SmallVector<OpFoldResult> inputIndices, inputSizes;
   for (auto dim : llvm::seq<int64_t>(0, inputRank)) {
@@ -2056,14 +2068,47 @@ PackOp::getTiledImplementation(OpBuilder &builder,
     OpFoldResult dimSize = getDim(builder, loc, getInput(), dim);
     inputSizes.back() =
         min(inputSizes.back(), sub(dimSize, inputIndices.back()));
+    if (Optional<int64_t> cst = getConstantIntValue(inputSizes.back())) {
+      tiledInputShape.push_back(cst.getValue());
+    } else {
+      tiledInputShape.push_back(ShapedType::kDynamicSize);
+      tiledInputDynDims.push_back(inputSizes.back().dyn_cast<Value>());
+    }
   }
 
   auto oneAttr = builder.getI64IntegerAttr(1);
   SmallVector<OpFoldResult> strides(inputRank, oneAttr);
 
   SmallVector<Value> tiledOperands;
-  tiledOperands.push_back(
-      getSlice(builder, loc, getInput(), inputIndices, inputSizes, strides));
+  if (auto padValue = getPaddingValue()) {
+    Value isInBounds = areAllInBounds(builder, loc, getInput(), inputIndices);
+    Type elemType = getElementType();
+    auto tiledType = RankedTensorType::get(tiledInputShape, elemType);
+    Value tiledInput =
+        builder
+            .create<scf::IfOp>(
+                loc, tiledType, isInBounds, /*thenBuilder=*/
+                [&](OpBuilder &b, Location l) {
+                  Value slice = getSlice(builder, loc, getInput(), inputIndices,
+                                         inputSizes, strides);
+                  b.create<scf::YieldOp>(l, slice);
+                },
+                /*elseBuilder=*/
+                [&](OpBuilder &b, Location l) {
+                  Value generateOp = b.create<tensor::GenerateOp>(
+                      l, tiledType, tiledInputDynDims,
+                      [&](OpBuilder &gBuilder, Location gLoc,
+                          ValueRange indices) {
+                        gBuilder.create<tensor::YieldOp>(gLoc, padValue);
+                      });
+                  b.create<scf::YieldOp>(l, generateOp);
+                })
+            .getResult(0);
+    tiledOperands.push_back(tiledInput);
+  } else {
+    tiledOperands.push_back(
+        getSlice(builder, loc, getInput(), inputIndices, inputSizes, strides));
+  }
 
   SmallVector<OpFoldResult> outputOffsets, outputSizes;
   if (failed(getResultTilePosition(builder, 0, offsets, sizes, outputOffsets,

@@ -984,7 +984,10 @@ func.func @pad_and_pack_static(%input: tensor<13x15xf32>, %output: tensor<2x8x8x
 // CHECK-DAG:           %[[IN_I_SZ:.*]] = affine.min #[[MAP3]]
 // CHECK-DAG:           %[[IN_J:.*]] = affine.apply #[[MAP4]](%[[J]])
 // CHECK-DAG:           %[[IN_J_SZ:.*]] = affine.min #[[MAP5]]
-// CHECK:               %[[SUB_IN:.*]] = tensor.extract_slice %[[IN]][%[[IN_I]], %[[IN_J]]] [%[[IN_I_SZ]], %[[IN_J_SZ]]] [1, 1] : tensor<13x15xf32> to tensor<?x?xf32>
+// CHECK:               %[[SUB_IN:.*]] = scf.if
+// CHECK:                 tensor.extract_slice %[[IN]][%[[IN_I]], %[[IN_J]]] [%[[IN_I_SZ]], %[[IN_J_SZ]]] [1, 1] : tensor<13x15xf32> to tensor<?x?xf32>
+// CHECK:               } else {
+// CHECK:                 tensor.generate
 // CHECK:               %[[SUB_OUT:.*]] = tensor.extract_slice %[[OUT]][%[[I]], %[[J]], 0, 0] [%[[OUT_I_SZ]], %[[OUT_J_SZ]], 8, 2] [1, 1, 1, 1] : tensor<2x8x8x2xf32> to tensor<?x?x8x2xf32>
 // CHECK:               %[[SUB_RES:.*]] = iree_linalg_ext.pack
 // CHECK-SAME:            {__internal_linalg_transform__ = "tiling_pack_output"}
@@ -1032,7 +1035,10 @@ func.func @pad_and_pack_partially_dynamic(%input: tensor<?x?xf32>, %output: tens
 // CHECK-DAG:           %[[IN_I_SZ:.*]] = affine.min #[[MAP5]]
 // CHECK-DAG:           %[[IN_J:.*]] = affine.apply #[[MAP6]](%[[J]])
 // CHECK-DAG:           %[[IN_J_SZ:.*]] = affine.min #[[MAP7]]
-// CHECK:               %[[SUB_IN:.*]] = tensor.extract_slice %[[IN]][%[[IN_I]], %[[IN_J]]] [%[[IN_I_SZ]], %[[IN_J_SZ]]] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
+// CHECK:               %[[SUB_IN:.*]] = scf.if
+// CHECK:                 tensor.extract_slice %[[IN]][%[[IN_I]], %[[IN_J]]] [%[[IN_I_SZ]], %[[IN_J_SZ]]] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
+// CHECK:               } else {
+// CHECK:                 tensor.generate
 // CHECK:               %[[SUB_OUT:.*]] = tensor.extract_slice %[[OUT]][%[[I]], %[[J]], 0, 0] [%[[OUT_I_SZ]], %[[OUT_J_SZ]], 8, 2] [1, 1, 1, 1] : tensor<?x?x8x2xf32> to tensor<?x?x8x2xf32>
 // CHECK:               %[[SUB_RES:.*]] = iree_linalg_ext.pack
 // CHECK-SAME:            {__internal_linalg_transform__ = "tiling_pack_output"}
@@ -1081,7 +1087,10 @@ func.func @pad_and_pack_fully_dynamic(%input: tensor<?x?xf32>, %output: tensor<?
 // CHECK:               %[[IN_I_SZ:.*]] = affine.min #[[MAP4]]
 // CHECK:               %[[IN_J:.*]] = affine.apply #[[MAP3]](%[[J]])[%[[TILE_1]]]
 // CHECK:               %[[IN_J_SZ:.*]] = affine.min #[[MAP4]]
-// CHECK:               %[[SUB_IN:.*]] = tensor.extract_slice %[[IN]][%[[IN_I]], %[[IN_J]]] [%[[IN_I_SZ]], %[[IN_J_SZ]]] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
+// CHECK:               %[[SUB_IN:.*]] = scf.if
+// CHECK:                 tensor.extract_slice %[[IN]][%[[IN_I]], %[[IN_J]]] [%[[IN_I_SZ]], %[[IN_J_SZ]]] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
+// CHECK:               } else {
+// CHECK:                 tensor.generate
 // CHECK:               %[[SUB_OUT:.*]] = tensor.extract_slice %[[OUT]][%[[I]], %[[J]], 0, 0] [%[[OUT_I_SZ]], %[[OUT_J_SZ]], %[[TILE_0]], %[[TILE_1]]] [1, 1, 1, 1] : tensor<?x?x?x?xf32> to tensor<?x?x?x?xf32>
 // CHECK:               %[[PACK:.*]] = iree_linalg_ext.pack
 // CHECK-SAME:            {__internal_linalg_transform__ = "tiling_pack_output"}
