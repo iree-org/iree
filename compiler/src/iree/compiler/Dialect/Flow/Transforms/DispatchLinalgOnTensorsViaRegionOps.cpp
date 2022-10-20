@@ -429,7 +429,7 @@ static bool isFusableWithProducer(OpOperand &operand) {
   if (isa<linalg::LinalgOp>(consumer) && isa<linalg::LinalgOp>(producer)) {
     auto consumerLinalgOp = cast<linalg::LinalgOp>(consumer);
     auto producerLinalgOp = cast<linalg::LinalgOp>(producer);
-    if (consumerLinalgOp.isOutputTensor(&operand) &&
+    if (consumerLinalgOp.isOutput(&operand) &&
         producerLinalgOp.getNumLoops() ==
             producerLinalgOp.getNumParallelLoops()) {
       return true;

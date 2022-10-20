@@ -236,7 +236,7 @@ static SmallVector<int64_t> getMinTilingSizesForEachDim(
     const TargetMLTransformInfo &targetMLTransInfo) {
   unsigned numLoops = op.getNumLoops();
   SmallVector<int64_t> minTileSizes(numLoops, 1);
-  auto inputOutputOpOperands = op.getInputAndOutputOperands();
+  auto inputOutputOpOperands = op->getOpOperands();
 
   for (auto map : llvm::enumerate(op.getIndexingMapsArray())) {
     // Check the fastest varying dimension of the operand. Set the vector size
@@ -249,7 +249,7 @@ static SmallVector<int64_t> getMinTilingSizesForEachDim(
 
     // If the indexing map has result it has to be a shaped type.
     auto operandType =
-        inputOutputOpOperands[map.index()]->get().getType().cast<ShapedType>();
+        inputOutputOpOperands[map.index()].get().getType().cast<ShapedType>();
     int64_t tileSize = getVectorSize(entryPointFn, operandType);
 
     minTileSizes[fastestVaryingDim] =

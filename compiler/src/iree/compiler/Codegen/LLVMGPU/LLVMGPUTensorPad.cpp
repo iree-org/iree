@@ -35,8 +35,8 @@ static FailureOr<SmallVector<Value>> rewriteAsPaddedOp(
   // size. In this case, this corresponds with the maximum tile size from
   // distributing to workgroups.
   SmallVector<Value> paddedOperands;
-  paddedOperands.reserve(linalgOp.getNumInputsAndOutputs());
-  for (OpOperand *opOperand : linalgOp.getInputAndOutputOperands()) {
+  paddedOperands.reserve(linalgOp.getNumInputs() + linalgOp.getNumOutputs());
+  for (OpOperand *opOperand : linalgOp.getInputOperands()) {
     // Find DispatchTensorLoadOp's feeding into the linalg or abort.
     auto tensorLoad = dyn_cast_or_null<IREE::Flow::DispatchTensorLoadOp>(
         opOperand->get().getDefiningOp());

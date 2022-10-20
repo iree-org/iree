@@ -445,7 +445,7 @@ static void tieOperandsForOperandFusion(linalg::LinalgOp linalgOp,
     if (linalgOp.payloadUsesValueFromOperand(result.value())) {
       continue;
     }
-    for (OpOperand *input : linalgOp.getInputTensorOperands()) {
+    for (OpOperand *input : linalgOp.getInputOperands()) {
       Type inputElementType =
           input->get().getType().cast<RankedTensorType>().getElementType();
       Type resultElementType = result.value()

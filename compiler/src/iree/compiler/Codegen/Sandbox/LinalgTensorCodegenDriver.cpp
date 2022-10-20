@@ -95,8 +95,8 @@ static LogicalResult getPaddingAttrs(func::FuncOp funcOp,
   if (!linalgOp) return success();
 
   OpBuilder builder(funcOp.getContext());
-  for (auto operand : linalgOp.getInputAndOutputOperands()) {
-    auto elemType = getElementTypeOrSelf(operand->get().getType());
+  for (auto &operand : linalgOp->getOpOperands()) {
+    auto elemType = getElementTypeOrSelf(operand.get().getType());
     attrs.push_back(builder.getZeroAttr(elemType));
   }
 
