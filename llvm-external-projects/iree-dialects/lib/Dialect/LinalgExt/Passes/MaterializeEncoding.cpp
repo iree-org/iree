@@ -191,8 +191,6 @@ struct SetEncodingOpToPackOpConversion
                   ConversionPatternRewriter &rewriter) const override {
     // Pack op needs a padding value. Maybe that is an overkill. For now, just
     // use zero.
-    RankedTensorType sourceType = encodingOp.getSourceType();
-    Location loc = encodingOp.getLoc();
     auto packOp =
         lowerSetEncodingOpToPackOp(rewriter, encodingOp, adaptor.getSource());
     if (failed(packOp))
@@ -264,7 +262,9 @@ struct MaterializeTiledMatmul : public OpConversionPattern<linalg::MatmulOp> {
 
 struct MaterializeEncodingPass
     : public MaterializeEncodingBase<MaterializeEncodingPass> {
-  void getDependentDialects(DialectRegistry &registry) const { return; }
+  void getDependentDialects(DialectRegistry &registry) const override {
+    return;
+  }
 
   void runOnOperation() override;
 };
