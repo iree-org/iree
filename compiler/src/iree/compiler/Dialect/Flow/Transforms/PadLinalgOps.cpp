@@ -35,9 +35,9 @@ class PadMatmulOp : public OpInterfaceRewritePattern<linalg::LinalgOp> {
     if (!isBatchMatmul && !isMatmul) return failure();
 
     Location loc = linalgOp.getLoc();
-    Value lhs = linalgOp.getInputs()[0];
-    Value rhs = linalgOp.getInputs()[1];
-    Value result = linalgOp.getOutputs()[0];
+    Value lhs = linalgOp.getInputOperand(0)->get();
+    Value rhs = linalgOp.getInputOperand(1)->get();
+    Value result = linalgOp.getOutputOperand(0)->get();
 
     auto lhsType = lhs.getType().dyn_cast<RankedTensorType>();
     auto rhsType = rhs.getType().dyn_cast<RankedTensorType>();

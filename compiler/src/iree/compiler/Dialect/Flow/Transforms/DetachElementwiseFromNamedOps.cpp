@@ -44,7 +44,10 @@ struct DetachElementwisePattern
     if (!linalgOp.hasTensorSemantics()) return failure();
 
     // Nothing to do if the output tensor operand is already a fill op.
-    linalg::OpOperandVector outputOperands = linalgOp.getOutputTensorOperands();
+    linalg::OpOperandVector outputOperands;
+    if (!linalgOp.hasBufferSemantics()) {
+      outputOperands = linalgOp.getOutputOperands();
+    }
     // Right now all the cases we see have one output. This can be relaxed once
     // we see multiple output ops.
     if (outputOperands.size() != 1) return failure();

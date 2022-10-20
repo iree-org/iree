@@ -978,13 +978,13 @@ static bool isFusableWithProducer(OpOperand &operand, bool aggressiveFusion) {
   }
 
   auto consumerLinalgOp = cast<linalg::LinalgOp>(consumer);
-  if (consumerLinalgOp.isInputTensor(&operand)) {
+  if (consumerLinalgOp.isInput(&operand)) {
     // Only fuse on inputs if both ops are generic ops.
     if (!aggressiveFusion || !isa<linalg::GenericOp>(consumer) ||
         !isa<linalg::GenericOp>(producer)) {
       return false;
     }
-  } else if (!consumerLinalgOp.isOutputTensor(&operand)) {
+  } else if (!consumerLinalgOp.isOutput(&operand)) {
     return false;
   }
 

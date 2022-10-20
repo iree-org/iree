@@ -818,7 +818,6 @@ struct LinalgTrivialGenericConversion
 
     // Presumed to be a yield terminator: configure the emitter.
     CopyEmitter emitter;
-    auto allOperands = op.getInputAndOutputOperands();
     Operation &yieldOp = children.front();
     for (auto it : llvm::enumerate(yieldOp.getOperands())) {
       unsigned outputIndex = it.index();
@@ -981,10 +980,10 @@ struct LinalgContractionConversion
           op(llvm::cast<linalg::LinalgOp>(contract.getOperation())),
           lhsAnal(contract.lhs()),
           rhsAnal(contract.rhs()),
-          outAnal(op.getOutputs().front()) {
+          outAnal(op.getOutputOperands().front()->get()) {
       lhs = contract.lhs();
       rhs = contract.rhs();
-      out = op.getOutputs().front();
+      out = op.getOutputOperands().front()->get();
     }
   };
 

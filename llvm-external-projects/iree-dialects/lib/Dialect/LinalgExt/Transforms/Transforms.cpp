@@ -57,7 +57,8 @@ FailureOr<linalg::TileLoopNest> tileConsumerAndFuseProducers(
           tileLoopNest.fuseProducer(b, candidates.pop_back_val());
       if (failed(fusedProducer))
         continue;
-      candidates.append(fusedProducer->getInputAndOutputOperands());
+      candidates.append(fusedProducer->getInputOperands());
+      candidates.append(fusedProducer->getOutputOperands());
     }
   };
 

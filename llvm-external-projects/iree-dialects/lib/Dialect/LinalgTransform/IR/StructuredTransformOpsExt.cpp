@@ -128,11 +128,24 @@ static LogicalResult isEquivalentToOpImpl(PatternRewriter &rewriter,
                                           linalg::LinalgOp linalgOp,
                                           linalg::LinalgOp linalgModelOp) {
   // If basic properties do not match, return failure.
-  if (linalgOp.getInputs() != linalgModelOp.getInputs() ||
-      linalgOp.getOutputs() != linalgModelOp.getOutputs() ||
-      linalgOp.getIndexingMaps() != linalgModelOp.getIndexingMaps() ||
-      linalgOp.getIteratorTypesArray() != linalgModelOp.getIteratorTypesArray())
-    return failure();
+  {
+    linalg::OpOperandVector opInputs = linalgOp.getInputOperands();
+    linalg::OpOperandVector modelInputs = linalgModelOp.getInputOperands();
+    linalg::OpOperandVector opOutputs = linalgOp.getOutputOperands();
+    linalg::OpOperandVector modelOutputs = linalgModelOp.getOutputOperands();
+    auto notEqualFn = [](std::tuple<OpOperand *, OpOperand *> in) -> bool {
+      return std::get<0>(in)->get() != std::get<1>(in)->get();
+    };
+
+    if (opInputs.size() != modelInputs.size() ||
+        opOutputs.size() != modelOutputs.size() ||
+        llvm::any_of(llvm::zip(opInputs, modelInputs), notEqualFn) ||
+        llvm::any_of(llvm::zip(opOutputs, modelOutputs), notEqualFn) ||
+        linalgOp.getIndexingMaps() != linalgModelOp.getIndexingMaps() ||
+        linalgOp.getIteratorTypesArray() !=
+            linalgModelOp.getIteratorTypesArray())
+      return failure();
+  }
 
   // Build the block and go perform a body comparison.
   {
