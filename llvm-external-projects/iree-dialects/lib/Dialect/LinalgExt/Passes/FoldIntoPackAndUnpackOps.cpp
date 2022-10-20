@@ -36,7 +36,7 @@ struct FoldUnpackWithExtractSliceOp
                                 PatternRewriter &rewriter) const override {
     auto unpackOp = sliceOp.getSource().getDefiningOp<UnPackOp>();
     if (!unpackOp)
-      failure();
+      return failure();
 
     // Check all offsets are zeros, and all strides are 1.
     if (!areAllConstantIntValue(sliceOp.getMixedOffsets(), 0) ||
@@ -70,7 +70,9 @@ struct FoldUnpackWithExtractSliceOp
 namespace {
 struct FoldIntoPackAndUnpackOpsPass
     : public FoldIntoPackAndUnpackOpsBase<FoldIntoPackAndUnpackOpsPass> {
-  void getDependentDialects(DialectRegistry &registry) const { return; }
+  void getDependentDialects(DialectRegistry &registry) const override {
+    return;
+  }
 
   void runOnOperation() override;
 };
