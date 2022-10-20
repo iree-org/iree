@@ -446,6 +446,11 @@ void iree_hal_task_queue_deinitialize(iree_hal_task_queue_t* queue) {
   IREE_TRACE_ZONE_END(z0);
 }
 
+void iree_hal_task_queue_trim(iree_hal_task_queue_t* queue) {
+  IREE_ASSERT_ARGUMENT(queue);
+  iree_task_executor_trim(queue->executor);
+}
+
 static iree_status_t iree_hal_task_queue_submit_batch(
     iree_hal_task_queue_t* queue, const iree_hal_submission_batch_t* batch) {
   // Task to retire the submission and free the transient memory allocated for

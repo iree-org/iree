@@ -82,7 +82,11 @@ typedef struct iree_task_worker_t {
   // pool. Executors always outlive the workers they own.
   iree_task_executor_t* executor;
 
+  // Globally unique worker index (worker_base_index + local worker_index).
+  iree_host_size_t worker_index;
+
   // Bit the worker represents in the various worker bitsets.
+  // Local to the executor owning the worker.
   iree_task_affinity_set_t worker_bit;
 
   // Ideal thread affinity for the worker thread.
