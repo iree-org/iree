@@ -134,7 +134,7 @@ static LogicalResult isEquivalentToOpImpl(PatternRewriter &rewriter,
     linalg::OpOperandVector opOutputs = linalgOp.getOutputOperands();
     linalg::OpOperandVector modelOutputs = linalgModelOp.getOutputOperands();
     auto notEqualFn = [](std::tuple<OpOperand *, OpOperand *> in) -> bool {
-      return std::get<0>(in) != std::get<1>(in);
+      return std::get<0>(in)->get() != std::get<1>(in)->get();
     };
 
     if (opInputs.size() != modelInputs.size() ||
