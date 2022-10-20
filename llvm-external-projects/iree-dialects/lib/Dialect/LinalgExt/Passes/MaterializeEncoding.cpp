@@ -26,6 +26,9 @@ using namespace mlir::iree_compiler::IREE::LinalgExt;
 /// Given the `encoding` return (by value) the dimensions of the input that are
 /// tiled (`innerDimsPos`), the tile size to use (`innerTileSizes`) and
 /// permutation for the outer dimensions on the pack op (`outerDimsPerm`).
+// TODO(ravishankarm): THis is currently hard-coded here for convenience. When
+// used in IREE, this will be computed based on the architecture information in
+// `hal.executable.variant`.
 static LogicalResult getPackOpInfoFromEncoding(
     TensorEncoding encoding, SmallVector<int64_t> &innerDimsPos,
     SmallVector<int64_t> &innerTileSizes, SmallVector<int64_t> &outerDimsPerm) {
@@ -129,7 +132,7 @@ static FailureOr<PackOp> lowerSetEncodingOpToPackOp(RewriterBase &rewriter,
     return rewriter.notifyMatchFailure(encodingOp, "unhandled result encoding");
   }
 
-  // Create `init_tensor` operation for the result of the pack operation.
+  // Create `tensor.empty` operation for the result of the pack operation.
   Location loc = encodingOp.getLoc();
   SmallVector<OpFoldResult> sourceDims = getDims(rewriter, loc, source);
   SmallVector<OpFoldResult> innerTileSizesOfr =
@@ -137,7 +140,7 @@ static FailureOr<PackOp> lowerSetEncodingOpToPackOp(RewriterBase &rewriter,
   SmallVector<OpFoldResult> resultDims =
       PackOp::getResultShape(rewriter, loc, sourceDims, innerTileSizesOfr,
                              innerDimsPos, outerDimsPerm);
-  auto initTensor = rewriter.create<linalg::InitTensorOp>(
+  auto initTensor = rewriter.create<tensor::EmptyOp>(
       loc, resultDims, encodingOp.getSourceType().getElementType());
   Optional<Value> paddingValue = getPaddingValue(source);
   return rewriter.create<PackOp>(loc, source, initTensor, innerDimsPos,
@@ -157,11 +160,11 @@ lowerUnsetEncodingToUnpackOp(RewriterBase &rewriter, UnsetEncodingOp encodingOp,
                                        outerDimsPerm))) {
     return rewriter.notifyMatchFailure(encodingOp, "unhandled source encoding");
   }
-  // Create an `init_tensor` for the result of the unpack operation.
+  // Create an `tensor.empty` for the result of the unpack operation.
   Location loc = encodingOp.getLoc();
   SmallVector<OpFoldResult> resultDims =
       getDims(rewriter, loc, encodingOp.getSource());
-  auto initTensor = rewriter.create<linalg::InitTensorOp>(
+  auto initTensor = rewriter.create<tensor::EmptyOp>(
       loc, resultDims, encodingOp.getResultType().getElementType());
 
   SmallVector<OpFoldResult> innerTileSizesOfr =

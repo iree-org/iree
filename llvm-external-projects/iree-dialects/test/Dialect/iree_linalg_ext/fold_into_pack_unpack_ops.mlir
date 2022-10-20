@@ -12,7 +12,7 @@ func.func @fold_unpack_slice(%arg0 : tensor<?x?x8x4xf32>, %arg1 : tensor<?x?xf32
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?xf32>
 // CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[ARG3:[a-zA-Z0-9]+]]: index
-//      CHECK:   %[[INIT:.+]] = linalg.init_tensor [%[[ARG2]], %[[ARG3]]]
+//      CHECK:   %[[INIT:.+]] = tensor.empty(%[[ARG2]], %[[ARG3]]) : tensor<?x?xf32>
 //      CHECK:   %[[UNPACK:.+]] = iree_linalg_ext.unpack %[[ARG0]] inner_dims_pos = [0, 1] inner_tiles = [8, 4]
 // CHECK-SAME:       into %[[INIT]]
 //      CHECK:   return %[[UNPACK]]

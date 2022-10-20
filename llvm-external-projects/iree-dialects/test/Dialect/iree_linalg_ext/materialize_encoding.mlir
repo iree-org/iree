@@ -15,9 +15,9 @@ func.func @pack_unpack_gemm_lhs(%arg0 : tensor<?x?xf32>) -> tensor<?x?xf32> {
 //  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
 //  CHECK-DAG:   %[[OUTER_D0:.+]] = affine.apply #[[MAP0]]()[%[[D0]]]
 //  CHECK-DAG:   %[[OUTER_D1:.+]] = affine.apply #[[MAP1]]()[%[[D1]]]
-//      CHECK:   %[[PACK_DEST:.+]] = linalg.init_tensor [%[[OUTER_D0]], %[[OUTER_D1]], 8, 4]
+//      CHECK:   %[[PACK_DEST:.+]] = tensor.empty(%[[OUTER_D0]], %[[OUTER_D1]]) : tensor<?x?x8x4xf32>
 //      CHECK:   %[[PACK:.+]] = iree_linalg_ext.pack %[[ARG0]] inner_dims_pos = [0, 1] inner_tiles = [8, 4] into %[[PACK_DEST]]
-//      CHECK:   %[[UNPACK_DEST:.+]] = linalg.init_tensor [%[[D0]], %[[D1]]]
+//      CHECK:   %[[UNPACK_DEST:.+]] = tensor.empty(%[[D0]], %[[D1]]) : tensor<?x?xf32>
 //      CHECK:   %[[UNPACK:.+]] = iree_linalg_ext.unpack %[[PACK]] inner_dims_pos = [0, 1] inner_tiles = [8, 4] into %[[UNPACK_DEST]]
 //      CHECK:   return %[[UNPACK]]
 
@@ -84,13 +84,13 @@ func.func @pack_gemm(%arg0 : tensor<100x250xf32>, %arg1 : tensor<250x500xf32>, %
 // CHECK-SAME:     %[[ARG1:.+]]: tensor<250x500xf32>
 // CHECK-SAME:     %[[ARG2:.+]]: tensor<100x500xf32>
 //      CHECK:   %[[CST:.+]] = arith.constant 0.0
-//      CHECK:   %[[INIT_LHS:.+]] = linalg.init_tensor [13, 63, 8, 4]
+//      CHECK:   %[[INIT_LHS:.+]] = tensor.empty() : tensor<13x63x8x4xf32>
 //      CHECK:   %[[PACK_LHS:.+]] = iree_linalg_ext.pack %[[ARG0]] padding_value(%[[CST]] : f32)
 // CHECK-SAME:       into %[[INIT_LHS]]
-//      CHECK:   %[[INIT_RHS:.+]] = linalg.init_tensor [63, 63, 8, 4]
+//      CHECK:   %[[INIT_RHS:.+]] = tensor.empty() : tensor<63x63x8x4xf32>
 //      CHECK:   %[[PACK_RHS:.+]] = iree_linalg_ext.pack %[[ARG1]] padding_value(%[[CST]] : f32)
 // CHECK-SAME:       into %[[INIT_RHS]]
-//      CHECK:   %[[INIT_RESULT:.+]] = linalg.init_tensor [13, 63, 8, 8]
+//      CHECK:   %[[INIT_RESULT:.+]] = tensor.empty() : tensor<13x63x8x8xf32>
 //      CHECK:   %[[PACK_RESULT:.+]] = iree_linalg_ext.pack %[[ARG2]] padding_value(%[[CST]] : f32)
 // CHECK-SAME:       into %[[INIT_RESULT]]
 //      CHECK:   %[[MMT4D:.+]] = linalg.mmt4d

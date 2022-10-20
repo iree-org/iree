@@ -20,6 +20,12 @@ using namespace mlir::iree_compiler::IREE::LinalgExt;
 //===---------------------------------------------------------------------===//
 
 namespace {
+
+static bool areAllConstantIntValue(ArrayRef<OpFoldResult> ofrs, int64_t value) {
+  return llvm::all_of(
+      ofrs, [&](OpFoldResult ofr) { return isConstantIntValue(ofr, value); });
+}
+
 /// Fold a `unpack` -> `extract_slice` into the `unpack` since it already
 /// has extract_slice semantics.
 struct FoldUnpackWithExtractSliceOp
@@ -33,14 +39,10 @@ struct FoldUnpackWithExtractSliceOp
       failure();
 
     // Check all offsets are zeros, and all strides are 1.
-    if (llvm::any_of(
-            sliceOp.getMixedOffsets(),
-            [](OpFoldResult ofr) { return !isConstantIntValue(ofr, 0); }) ||
-        llvm::any_of(sliceOp.getMixedStrides(), [](OpFoldResult ofr) {
-          return !isConstantIntValue(ofr, 1);
-        })) {
+    if (!areAllConstantIntValue(sliceOp.getMixedOffsets(), 0) ||
+        !areAllConstantIntValue(sliceOp.getMixedStrides(), 1)) {
       return rewriter.notifyMatchFailure(
-          sliceOp, "expectes offsets to be 0s and strides to be 1s");
+          sliceOp, "expects offsets to be 0s and strides to be 1s");
     }
 
     // Create a new empty output tensor.
@@ -48,7 +50,7 @@ struct FoldUnpackWithExtractSliceOp
                            .getType()
                            .cast<RankedTensorType>()
                            .getElementType();
-    Value output = rewriter.create<linalg::InitTensorOp>(
+    Value output = rewriter.create<tensor::EmptyOp>(
         sliceOp.getLoc(), sliceOp.getMixedSizes(), elementType);
     rewriter.replaceOpWithNewOp<UnPackOp>(
         sliceOp, output.getType(), unpackOp.getInput(), output,
