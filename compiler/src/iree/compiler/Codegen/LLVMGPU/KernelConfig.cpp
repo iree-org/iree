@@ -264,9 +264,9 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
   const int64_t tileX = config.tileSize[0];
   const int64_t tileY = config.tileSize[1];
   const int64_t tileK = config.tileSize[2];
-  const int64_t workgroupSize[] = {config.workgroupSize[0],
-                                   config.workgroupSize[1],
-                                   config.workgroupSize[2]};
+  const std::array<int64_t, 3> workgroupSize{config.workgroupSize[0],
+                                             config.workgroupSize[1],
+                                             config.workgroupSize[2]};
   return setMatmulConfig(
       tileX, tileY, tileK, workgroupSize, softwarePipelineDepthSimt,
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt);
