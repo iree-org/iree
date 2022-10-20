@@ -254,11 +254,19 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
       }
     }
   }
-  // If we haven't found any config, fall back to default config.
-  int64_t tileX = 2;
-  int64_t tileY = 256;
-  int64_t tileK = 4;
-  SmallVector<int64_t, 3> workgroupSize = {2 * cudaWarpSize, 1, 1};
+  // If we haven't found any config, use the best tile size hoping that
+  // the workgroup specialization handles the main tile path efficiently.
+  SmallVector<TileWorkgroupSizePair> tileSizeConfig;
+  // Query the best configuration.
+  getMatmulConfig(tileSizeConfig);
+  constexpr size_t configIndex = 0;
+  const TileWorkgroupSizePair &config = tileSizeConfig[configIndex];
+  const int64_t tileX = config.tileSize[0];
+  const int64_t tileY = config.tileSize[1];
+  const int64_t tileK = config.tileSize[2];
+  const std::array<int64_t, 3> workgroupSize{config.workgroupSize[0],
+                                             config.workgroupSize[1],
+                                             config.workgroupSize[2]};
   return setMatmulConfig(
       tileX, tileY, tileK, workgroupSize, softwarePipelineDepthSimt,
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt);
