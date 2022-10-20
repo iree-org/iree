@@ -38,11 +38,11 @@ hal.executable @matmul_1x4096x9216 {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 512], [1, 4], [0, 0, 32]{{\]}}>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 256], [1, 4], [0, 0, 32]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize>
 //      CHECK: hal.executable.export public @matmul_1x4096x9216
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
-// CHECK-SAME:   workgroup_size = [128 : index, 1 : index, 1 : index]
+// CHECK-SAME:   workgroup_size = [64 : index, 1 : index, 1 : index]
 //      CHECK: func.func @matmul_1x4096x9216()
 //      CHECK:   linalg.matmul
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
