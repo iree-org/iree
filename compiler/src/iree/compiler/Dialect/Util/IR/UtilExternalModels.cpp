@@ -73,8 +73,7 @@ struct LinalgOpTiedOpInterface
   ::llvm::Optional<unsigned> getTiedResultOperandIndex(
       Operation *op, unsigned resultIndex) const {
     auto linalgOp = cast<OpTy>(op);
-    return {
-        linalgOp.getOutputOperands()[resultIndex]->getOperandNumber()};
+    return {linalgOp.getOutputOperands()[resultIndex]->getOperandNumber()};
   }
 
   SmallVector<int64_t, 4> getTiedResultOperandIndices(Operation *op) const {

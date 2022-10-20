@@ -133,16 +133,17 @@ static LogicalResult isEquivalentToOpImpl(PatternRewriter &rewriter,
     linalg::OpOperandVector modelInputs = linalgModelOp.getInputOperands();
     linalg::OpOperandVector opOutputs = linalgOp.getOutputOperands();
     linalg::OpOperandVector modelOutputs = linalgModelOp.getOutputOperands();
-    auto notEqualFn =
-      [](std::tuple<OpOperand *, OpOperand *> in) -> bool {
-        return std::get<0>(in) != std::get<1>(in);
-      };
+    auto notEqualFn = [](std::tuple<OpOperand *, OpOperand *> in) -> bool {
+      return std::get<0>(in) != std::get<1>(in);
+    };
 
-    if (opInputs.size() != modelInputs.size() || opOutputs.size() != modelOutputs.size() ||
+    if (opInputs.size() != modelInputs.size() ||
+        opOutputs.size() != modelOutputs.size() ||
         llvm::any_of(llvm::zip(opInputs, modelInputs), notEqualFn) ||
         llvm::any_of(llvm::zip(opOutputs, modelOutputs), notEqualFn) ||
         linalgOp.getIndexingMaps() != linalgModelOp.getIndexingMaps() ||
-        linalgOp.getIteratorTypesArray() != linalgModelOp.getIteratorTypesArray())
+        linalgOp.getIteratorTypesArray() !=
+            linalgModelOp.getIteratorTypesArray())
       return failure();
   }
 

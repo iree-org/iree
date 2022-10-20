@@ -402,9 +402,8 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
   // TODO(thomasraoux): This could be improved by checking if the linalg op
   // would fail vectorization.
   if (!linalgOp || op->getNumResults() != 1 ||
-      llvm::any_of(linalgOp.getIndexingMapsArray(), [](AffineMap m) {
-        return !m.isProjectedPermutation();
-      })) {
+      llvm::any_of(linalgOp.getIndexingMapsArray(),
+                   [](AffineMap m) { return !m.isProjectedPermutation(); })) {
     vectorSize = 1;
   } else {
     passPipeline =
@@ -488,9 +487,11 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   Optional<int64_t> dimSize = getLinalgDimSize(op, reductionDims[0]);
   if (!dimSize || *dimSize % cudaWarpSize != 0) return failure();
 
-  const Type elementType =
-      op.getOutputOperand(0)->get().getType().cast<ShapedType>()
-                                             .getElementType();
+  const Type elementType = op.getOutputOperand(0)
+                               ->get()
+                               .getType()
+                               .cast<ShapedType>()
+                               .getElementType();
   if (!elementType.isIntOrFloat()) return failure();
   // Reduction distribution only supports 32-bit types now.
   if (elementType.getIntOrFloatBitWidth() != 32) return failure();
