@@ -35,10 +35,10 @@ from typing import List, Optional, Sequence
 INDENT_SPACES = " " * 2
 
 
-def _get_string_list(values: List[str], quote: bool = True) -> List[str]:
+def _get_string_list(values: Sequence[str], quote: bool = True) -> List[str]:
   if quote:
-    values = [f'"{value}"' for value in values]
-  return values
+    return [f'"{value}"' for value in values]
+  return list(values)
 
 
 def _get_block_body(body: List[str]) -> List[str]:
@@ -56,7 +56,7 @@ def _get_string_arg_block(keyword: str,
 
 
 def _get_string_list_arg_block(keyword: str,
-                               values: List[str],
+                               values: Sequence[str],
                                quote: bool = True) -> List[str]:
   if len(values) == 0:
     return []
@@ -168,3 +168,31 @@ def build_add_dependencies(target: str, deps: List[str]) -> str:
   deps_list = _get_string_list(deps, quote=False)
   return _convert_block_to_string([f"add_dependencies({target}"] +
                                   _get_block_body(deps_list) + [")"])
+
+
+def build_iree_run_module_test(target_name: str,
+                               module_src: str,
+                               driver: str,
+                               expected_output: str,
+                               runner_args: Sequence[str],
+                               timeout_secs: Optional[int] = None,
+                               labels: Sequence[str] = [],
+                               deps: Sequence[str] = []) -> str:
+  name_block = _get_string_arg_block("NAME", target_name)
+  module_src_block = _get_string_arg_block("MODULE_SRC", module_src)
+  driver_block = _get_string_arg_block("DRIVER", driver)
+  expected_output_block = _get_string_arg_block("EXPECTED_OUTPUT",
+                                                expected_output)
+  timeout_block = _get_string_arg_block(
+      "TIMEOUT",
+      str(timeout_secs) if timeout_secs is not None else None)
+  runner_args_block = _get_string_list_arg_block("RUNNER_ARGS", runner_args)
+  labels_block = _get_string_list_arg_block("LABELS", labels)
+  deps_block = _get_string_list_arg_block("DEPS", deps)
+  return _convert_block_to_string(
+      _build_call_rule(rule_name="iree_run_module_test",
+                       parameter_blocks=[
+                           name_block, module_src_block, driver_block,
+                           expected_output_block, timeout_block,
+                           runner_args_block, labels_block, deps_block
+                       ]))

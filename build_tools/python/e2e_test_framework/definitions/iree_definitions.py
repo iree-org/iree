@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Classes for IREE compilation and run definitions."""
 
+from binhex import LINELEN
 import dataclasses
 from dataclasses import dataclass
 from enum import Enum
@@ -69,7 +70,6 @@ class ModuleExecutionConfig(object):
   tags: List[str]
   loader: RuntimeLoader
   driver: RuntimeDriver
-  tool: str
   extra_flags: List[str] = dataclasses.field(default_factory=list)
 
 
@@ -110,6 +110,12 @@ class ModuleGenerationConfig(object):
   """Describes a compile target to generate the module."""
   imported_model: ImportedModel
   compile_config: CompileConfig
+
+  def get_id(self) -> str:
+    return f"{self.imported_model.model.id}_{self.compile_config.id}"
+
+  def __hash__(self) -> int:
+    return hash(self.get_id())
 
 
 @dataclass(frozen=True)

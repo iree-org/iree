@@ -78,7 +78,7 @@ class ModelSourceType(Enum):
 
 class InputDataFormat(Enum):
   """Model input data format."""
-  RANDOM = "random"
+  ZERO = "zero"
   NUMPY_NPY = "numpy_npy"
 
 
@@ -126,11 +126,11 @@ class ModelInputData(object):
   source_url: str
 
 
-# Random dummy input data. The benchmark runner generates the random inputs with
-# a proper shape.
-RANDOM_MODEL_INPUT_DATA = ModelInputData(id="random",
-                                         model_id="",
-                                         name="random_dummy_input",
-                                         tags=[],
-                                         data_format=InputDataFormat.RANDOM,
-                                         source_url="")
+# Random dummy input data. The runner generates the random inputs with a proper
+# shape.
+ZERO_MODEL_INPUT_DATA = ModelInputData(id="zero",
+                                       model_id="",
+                                       name="zero_dummy_input",
+                                       tags=[],
+                                       data_format=InputDataFormat.ZERO,
+                                       source_url="")

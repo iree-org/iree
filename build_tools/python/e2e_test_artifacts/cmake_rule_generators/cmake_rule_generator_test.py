@@ -6,7 +6,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 from e2e_test_framework.definitions import common_definitions, iree_definitions
-from e2e_test_framework import cmake_rule_generator
+from build_tools.python.e2e_test_artifacts import cmake_rule_generator
 import unittest
 
 
