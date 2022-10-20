@@ -387,6 +387,7 @@ cc_library(
         ":IREEInputDialect",
         ":IREELinalgExtDialect",
         ":IREELinalgExtPassIncGen",
+        ":IREELinalgExtUtils",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:AffineUtils",

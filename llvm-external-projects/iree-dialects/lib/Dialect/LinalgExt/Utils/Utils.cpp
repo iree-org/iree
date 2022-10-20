@@ -16,8 +16,7 @@ namespace iree_compiler {
 namespace IREE {
 namespace LinalgExt {
 
-Value IREE::LinalgExt::getDimValue(OpBuilder &builder, Location loc, Value v,
-                                   int64_t dim) {
+Value getDimValue(OpBuilder &builder, Location loc, Value v, int64_t dim) {
   return TypeSwitch<Type, Value>(v.getType())
       .Case<RankedTensorType>([&](RankedTensorType t) -> Value {
         return builder.create<tensor::DimOp>(loc, v, dim);
@@ -27,8 +26,7 @@ Value IREE::LinalgExt::getDimValue(OpBuilder &builder, Location loc, Value v,
       });
 }
 
-OpFoldResult IREE::LinalgExt::getDim(OpBuilder &builder, Location loc, Value v,
-                                     int64_t dim) {
+OpFoldResult getDim(OpBuilder &builder, Location loc, Value v, int64_t dim) {
   auto t = v.getType().cast<ShapedType>();
   if (t.isDynamicDim(dim)) {
     return getDimValue(builder, loc, v, dim);
@@ -36,9 +34,8 @@ OpFoldResult IREE::LinalgExt::getDim(OpBuilder &builder, Location loc, Value v,
   return builder.getI64IntegerAttr(t.getDimSize(dim));
 }
 
-SmallVector<OpFoldResult> IREE::LinalgExt::getDims(OpBuilder &builder,
-                                                   Location loc,
-                                                   Value shapedTypeValue) {
+SmallVector<OpFoldResult> getDims(OpBuilder &builder, Location loc,
+                                  Value shapedTypeValue) {
   return llvm::to_vector(llvm::map_range(
       llvm::seq<int64_t>(
           0, shapedTypeValue.getType().cast<ShapedType>().getRank()),
