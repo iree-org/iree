@@ -7,6 +7,7 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "iree-dialects/Dialect/LinalgExt/Utils/Utils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -97,34 +98,6 @@ static bool areShapesCompatible(ArrayRef<int64_t> lhs, ArrayRef<int64_t> rhs) {
   return llvm::all_of(llvm::zip(lhs, rhs), [](std::tuple<int64_t, int64_t> it) {
     return isShapedTypeDimCompatible(std::get<0>(it), std::get<1>(it));
   });
-}
-
-Value IREE::LinalgExt::getDimValue(OpBuilder &builder, Location loc, Value v,
-                                   int64_t dim) {
-  return TypeSwitch<Type, Value>(v.getType())
-      .Case<RankedTensorType>([&](RankedTensorType t) -> Value {
-        return builder.create<tensor::DimOp>(loc, v, dim);
-      })
-      .Case<MemRefType>([&](MemRefType t) -> Value {
-        return builder.create<memref::DimOp>(loc, v, dim);
-      });
-}
-
-OpFoldResult IREE::LinalgExt::getDim(OpBuilder &builder, Location loc, Value v,
-                                     int64_t dim) {
-  auto t = v.getType().cast<ShapedType>();
-  if (t.isDynamicDim(dim)) {
-    return getDimValue(builder, loc, v, dim);
-  }
-  return builder.getI64IntegerAttr(t.getDimSize(dim));
-}
-SmallVector<OpFoldResult> IREE::LinalgExt::getDims(OpBuilder &builder,
-                                                   Location loc,
-                                                   Value shapedTypeValue) {
-  return llvm::to_vector(llvm::map_range(
-      llvm::seq<int64_t>(
-          0, shapedTypeValue.getType().cast<ShapedType>().getRank()),
-      [&](int64_t dim) { return getDim(builder, loc, shapedTypeValue, dim); }));
 }
 
 //===----------------------------------------------------------------------===//
@@ -1555,37 +1528,6 @@ static bool areNotFullTiles(ArrayRef<int64_t> inputShape,
   return false;
 }
 
-/// Check if two `RankedShapedTypes` are compatible. The shapes are compatible
-/// if there are no statically known shapes that mismatch. Shapes are still
-/// compatible if one is static and other is dynamic.
-static bool isCompatible(ShapedType a, ShapedType b) {
-  if (a.getRank() != b.getRank())
-    return false;
-  for (auto it : llvm::zip(a.getShape(), b.getShape())) {
-    auto aDim = std::get<0>(it);
-    auto bDim = std::get<1>(it);
-    if (!ShapedType::isDynamic(aDim) && !ShapedType::isDynamic(bDim) &&
-        aDim != bDim)
-      return false;
-  }
-  return true;
-}
-
-/// Interchange `elements` starting at offset `offset` based on the indexes in
-/// `interchangeVector`.
-template <typename T>
-static SmallVector<T> interchange(ArrayRef<T> elements,
-                                  ArrayRef<int64_t> interchangeVector,
-                                  int64_t offset) {
-  SmallVector<T> rearrangedElements = llvm::to_vector(elements);
-  if (interchangeVector.empty())
-    return rearrangedElements;
-  for (auto en : llvm::enumerate(interchangeVector)) {
-    rearrangedElements[en.index() + offset] = elements[en.value() + offset];
-  }
-  return rearrangedElements;
-}
-
 /// Return the `interchangeVector` based on `dims_pos`.
 static SmallVector<int64_t>
 computeInterchangeFromDimPos(ArrayRef<int64_t> innerDimsPos,
@@ -1663,7 +1605,7 @@ static DenseMap<int64_t, OpFoldResult> getDimAndTileMapping(OpTy op) {
   return dimAndTileMapping;
 }
 
-/// Utility fuction to build the iteration domain for `packOp` or `unPackOp`.
+/// Utility function to build the iteration domain for `packOp` or `unPackOp`.
 template <typename OpTy>
 static SmallVector<Range> getIterationDomain(OpTy op, OpBuilder &builder) {
   static_assert(llvm::is_one_of<OpTy, PackOp, UnPackOp>::value,
@@ -1740,7 +1682,6 @@ void PackOp::build(OpBuilder &builder, OperationState &state, Value source,
         (paddingValue ? paddingValue.value() : nullptr));
 }
 
-/// verifier for the pack operation.
 LogicalResult PackOp::verify() {
   Operation *op = getOperation();
   size_t numberOfBlockingFactors = getMixedTiles().size();
@@ -1776,7 +1717,7 @@ LogicalResult PackOp::verify() {
       extractFromI64ArrayAttr(getOuterDimsPerm());
   ShapedType expectedOutputType = getPackedType(
       getInputType(), getStaticTiles(), innerDimsPos, outerDimPerm);
-  if (!isCompatible(expectedOutputType, getOutputType())) {
+  if (!areShapesCompatible(expectedOutputType.getShape(), getOutputShape())) {
     return op->emitError(
                "infered type do not match provided output type. Expected ")
            << expectedOutputType << " but got: " << getOutputType();
@@ -1792,7 +1733,6 @@ LogicalResult PackOp::verify() {
   return success();
 }
 
-/// Get the tile sizes as `OpFoldResult`.
 SmallVector<OpFoldResult> PackOp::getMixedTiles() {
   return ::getMixedTiles(*this);
 }
@@ -2052,7 +1992,7 @@ PackOp::getTiledImplementation(OpBuilder &builder,
       inputSizes.push_back(sizes[dim]);
     }
 
-    // Limit the size of the input operand for incomplet tiles.
+    // Limit the size of the input operand for incomplete tiles.
     OpFoldResult dimSize = getDim(builder, loc, getInput(), dim);
     inputSizes.back() =
         min(inputSizes.back(), sub(dimSize, inputIndices.back()));
@@ -2100,8 +2040,8 @@ LogicalResult PackOp::getResultTilePosition(
     ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
     SmallVector<OpFoldResult> &resultSizes) {
   // The tiling is applied on outer dimensions. In this context, the outer
-  // dimenensions of result tile position is the same. The inner offsets are
-  // zeros becuase tiling is not applied to them.
+  // dimensions of result tile position is the same. The inner offsets are
+  // zeros because tiling is not applied to them.
   auto zeroAttr = builder.getI64IntegerAttr(0);
   resultOffsets.assign(offsets.begin(), offsets.end());
   resultOffsets.append(getOutputRank() - getInputRank(), zeroAttr);
@@ -2263,12 +2203,12 @@ LogicalResult UnPackOp::verify() {
   }
 
   // Verify input type against inferred type. The check includes the cases for
-  // incompilete tiles. We allow to `undo` the padding done in the pack.
+  // incomplete tiles. We allow to `undo` the padding done in the pack.
   SmallVector<int64_t> outerDimPerm =
       extractFromI64ArrayAttr(getOuterDimsPerm());
   ShapedType expectedInputType = PackOp::getPackedType(
       getOutputType(), getStaticTiles(), innerDimsPos, outerDimPerm);
-  if (!isCompatible(expectedInputType, getInputType())) {
+  if (!areShapesCompatible(expectedInputType.getShape(), getInputShape())) {
     return op->emitError(
                "infered type do not match provided input type. Expected ")
            << expectedInputType << " but got: " << getInputType();
