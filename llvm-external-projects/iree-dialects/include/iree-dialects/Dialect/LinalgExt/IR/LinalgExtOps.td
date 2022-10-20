@@ -471,9 +471,9 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
       inner_tiles = [8, 32] into %arg1 : (memref<128x256xf32> memref<16x8x8x32xf32>)
     ```
     Example KC_to_CKkc
-    
+
     ```mlir
-    iree_linalg_ext.pack %arg0 outer_dims_pos = [1, 0] inner_dims_pos = [0, 1] 
+    iree_linalg_ext.pack %arg0 outer_dims_pos = [1, 0] inner_dims_pos = [0, 1]
       inner_tiles = [32, 8] into %arg1 : (memref<128x256xf32> memref<32x4x32x8xf32>)
     ```
 
@@ -516,7 +516,7 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
   let builders = [
     OpBuilder<(ins "Value":$source, "Value":$output,
       "ArrayRef<int64_t>":$innerDimsPos,
-      "ArrayRef<OpFoldResult>":$innerTiles, 
+      "ArrayRef<OpFoldResult>":$innerTiles,
       CArg<"Optional<Value>", "llvm::None">:$paddingValue,
       CArg<"ArrayRef<int64_t>", "{}">:$outerDimsPerm)>
   ];
@@ -626,9 +626,9 @@ def IREELinalgExt_UnPackOp : IREELinalgExt_Op<"unpack", [
     ```
 
     Example CKkc_to_KC:
-    
+
     ```mlir
-    iree_linalg_ext.unpack %arg1 outer_dims_pos = [1, 0] inner_dims_pos = [0, 1] 
+    iree_linalg_ext.unpack %arg1 outer_dims_pos = [1, 0] inner_dims_pos = [0, 1]
       inner_tiles = [32, 8] into %arg0 : (memref<32x4x32x8xf32> memref<128x256xf32>)
     ```
   }];

@@ -10,6 +10,7 @@
 #include "iree-dialects/Dialect/LinalgExt/Passes/PassDetail.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Transforms.h"
+#include "iree-dialects/Dialect/LinalgExt/Utils/Utils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -798,15 +799,6 @@ createLinalgStrategyRemoveMarkersPass() {
 //===----------------------------------------------------------------------===//
 
 namespace {
-template <typename T>
-SmallVector<T> interchange(ArrayRef<T> elements,
-                           ArrayRef<int64_t> interchangeVector) {
-  SmallVector<T> vec = llvm::to_vector(elements);
-  for (auto en : llvm::enumerate(interchangeVector)) {
-    vec[en.value()] = elements[en.index()];
-  }
-  return vec;
-}
 
 /// Returns a tensor.pad op if padding value is set. Otherwise, returns the
 /// input directly. The method assumes that the `packOp` has static shapes.

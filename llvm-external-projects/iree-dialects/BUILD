@@ -268,6 +268,26 @@ gentbl_cc_library(
 )
 
 cc_library(
+    name = "IREELinalgExtUtils",
+    srcs = glob([
+        "lib/Dialect/LinalgExt/Utils/*.cpp",
+    ]),
+    hdrs = glob([
+        "include/iree-dialects/Dialect/LinalgExt/Utils/*.h",
+    ]),
+    includes = ["include"],
+    deps = [
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:DialectUtils",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:MemRefDialect",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TensorDialect",
+        "@llvm-project//mlir:TensorUtils",
+    ],
+)
+
+cc_library(
     name = "IREELinalgExtDialect",
     srcs = glob([
         "lib/Dialect/LinalgExt/IR/*.cpp",
@@ -280,6 +300,7 @@ cc_library(
         ":IREELinalgExtIncGen",
         ":IREELinalgExtInterfacesIncGen",
         ":IREELinalgExtPassIncGen",
+        ":IREELinalgExtUtils",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:AffineUtils",
@@ -366,6 +387,7 @@ cc_library(
         ":IREEInputDialect",
         ":IREELinalgExtDialect",
         ":IREELinalgExtPassIncGen",
+        ":IREELinalgExtUtils",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:AffineUtils",

@@ -17,25 +17,6 @@
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Interfaces/TilingInterface.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace LinalgExt {
-
-/// Returns a `memref.dim` or `tensor.dim` operation to get the shape of `v` at
-/// `dim`.
-Value getDimValue(OpBuilder &builder, Location loc, Value v, int64_t dim);
-
-/// Returns a `memref.dim` or `tensor.dim` operation to get the shape of `v` at
-/// `dim`. If the shape is constant, returns the shape as an `IntegerAttr`.
-OpFoldResult getDim(OpBuilder &builder, Location loc, Value v, int64_t dim);
-SmallVector<OpFoldResult> getDims(OpBuilder &builder, Location loc, Value v);
-
-} // namespace LinalgExt
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
-
 // clang-format off
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtEnums.h.inc" // IWYU pragma: export
