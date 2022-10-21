@@ -178,6 +178,7 @@ iree_compiler_cc_library(
     srcs = [
         "DecomposeLinalgGeneric.cpp",
         "FoldAffineMinInDistributedLoops.cpp",
+        "FoldAffineMinWithSCFIf.cpp",
         "GPUDistributeSharedMemoryCopy.cpp",
         "GPUPipelining.cpp",
         "GPUTileReduction.cpp",

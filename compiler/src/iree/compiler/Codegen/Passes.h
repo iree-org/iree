@@ -66,6 +66,9 @@ std::unique_ptr<OperationPass<ModuleOp>> createFlattenMemRefSubspanPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createFoldAffineMinInDistributedLoopsPass();
 
+/// Creates a pass to fold `affine.min` uses with scf.if.
+std::unique_ptr<OperationPass<func::FuncOp>> createFoldAffineMinWithSCFIfPass();
+
 /// After running the upstream TensorConstantBufferize pass, remove tensor_loads
 /// introduced for use only in tensor_extract. These can be folded to use a load
 /// of the created memref object that holds the constant values.
@@ -180,6 +183,9 @@ createConcretizePadResultShapePass();
 /// distributed loops.
 void populateFoldAffineMinInDistributedLoopsPatterns(
     RewritePatternSet &patterns);
+
+/// Populates `patterns` with patterns to fold `affine.min` uses with scf.if.
+void populateFoldAffineMinWithSCFIfPatterns(RewritePatternSet &patterns);
 
 /// Populates `patterns` with a very specific pattern that vectorizes a
 /// linalg.conv op for a single thread. The linalg.conv should compute on

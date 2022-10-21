@@ -55,6 +55,12 @@ def FoldAffineMinInDistributedLoops :
   let constructor = "mlir::iree_compiler::createFoldAffineMinInDistributedLoopsPass()";
 }
 
+def FoldAffineMinWithSCFIf :
+  Pass<"iree-codegen-fold-affinemin-with-scfif", "func::FuncOp"> {
+  let summary = "Fold `affine.min` uses in scf.if";
+  let constructor = "mlir::iree_compiler::createFoldAffineMinWithSCFIfPass()";
+}
+
 def FoldTensorExtractOp :
   Pass<"iree-codegen-fold-tensor-extract-op", ""> {
   let summary = "Fold `tensor.extract` operations prior to lowering to LLVM";

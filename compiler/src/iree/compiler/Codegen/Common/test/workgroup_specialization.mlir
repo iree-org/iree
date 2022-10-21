@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-codegen-enable-workgroup-specialization --iree-codegen-workgroup-specialization --canonicalize --cse --split-input-file %s | FileCheck %s
+// RUN: iree-opt --iree-codegen-enable-workgroup-specialization --iree-codegen-workgroup-specialization --iree-codegen-fold-affinemin-with-scfif --canonicalize --cse --split-input-file %s | FileCheck %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0], [16, 4, 0], [0, 0, 64]]>
 #map0 = affine_map<()[s0] -> (s0 * 64)>
@@ -158,5 +158,5 @@ func.func @unaligned_partial_loop() {
 // CHECK-SAME:                  ins(%{{.+}}, %{{.+}} : tensor<2x768xf32>, tensor<768x256xf32>) outs(%{{.+}} : tensor<2x256xf32>)
 // CHECK:       } else {
 // CHECK:         linalg.matmul
-// CHECK-SAME:                  ins(%{{.+}}, %{{.+}} : tensor<2x768xf32>, tensor<768x?xf32>) outs(%{{.+}} : tensor<2x?xf32>)
+// CHECK-SAME:                  ins(%{{.+}}, %{{.+}} : tensor<2x768xf32>, tensor<768x58xf32>) outs(%{{.+}} : tensor<2x58xf32>)
 
