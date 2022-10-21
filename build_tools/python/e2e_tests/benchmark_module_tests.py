@@ -29,7 +29,7 @@ def generate_e2e_module_test_config(
 
   test_configs = []
   for gen_config in source_generation_configs:
-    if gen_config.model.source_model.id != match_model_id:
+    if gen_config.imported_model.model.id != match_model_id:
       continue
     compile_config = gen_config.compile_config
     if not match_compile_tags <= set(compile_config.tags):

@@ -6,7 +6,7 @@
 """Represents the directory structure of the e2e test artifacts."""
 
 from dataclasses import dataclass
-from typing import Dict, List, Sequence
+from typing import Sequence
 import pathlib
 
 from e2e_test_artifacts import common_artifacts, iree_artifacts
@@ -18,34 +18,32 @@ IREE_ARTIFACTS_ROOT = pathlib.PurePath("iree")
 
 
 @dataclass(frozen=True)
-class RootDirectory(object):
+class ArtifactRoot(object):
   """Root artifact directory."""
-  # Map of model artifact, keyed by model id.
-  model_artifact_map: Dict[str, common_artifacts.ModelArtifact]
-  # Map of IREE model directory, keyed by model id.
-  iree_model_dir_map: Dict[str, iree_artifacts.ModelDirectory]
+  model_artifact_root: common_artifacts.ModelArtifactRoot
+  iree_artifact_root: iree_artifacts.ArtifactRoot
 
 
-def generate_root_directory_structure(
+def _generate_artifact_root(
     iree_module_generation_configs: Sequence[
         iree_definitions.ModuleGenerationConfig]
-) -> RootDirectory:
+) -> ArtifactRoot:
   """Generates and unions directory structures from the configs."""
 
   model_artifact_factory = common_artifacts.ModelArtifactFactory(
       parent_path=MODEL_ARTIFACTS_ROOT)
 
-  iree_model_subdirs = iree_artifacts.generate_directory_structures(
+  iree_artifact_root = iree_artifacts.generate_artifact_root(
       parent_path=IREE_ARTIFACTS_ROOT,
       model_artifact_factory=model_artifact_factory,
       module_generation_configs=iree_module_generation_configs)
 
-  return RootDirectory(
-      model_artifact_map=model_artifact_factory.get_model_artifact_map(),
-      iree_model_dir_map=iree_model_subdirs)
+  return ArtifactRoot(
+      model_artifact_root=model_artifact_factory.generate_artifact_root(),
+      iree_artifact_root=iree_artifact_root)
 
 
-def generate_full_directory_structure() -> RootDirectory:
+def generate_default_artifact_root() -> ArtifactRoot:
   """Generates artifacts from all configs."""
 
   (iree_benchmark_module_generation_configs,
@@ -55,5 +53,5 @@ def generate_full_directory_structure() -> RootDirectory:
       set(iree_benchmark_module_generation_configs))
   iree_module_generation_configs.sort(key=lambda config: config.get_id())
 
-  return generate_root_directory_structure(
+  return _generate_artifact_root(
       iree_module_generation_configs=iree_module_generation_configs)

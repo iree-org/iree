@@ -6,7 +6,6 @@
 """Represents the directory structure of common artifacts."""
 
 from dataclasses import dataclass
-from typing import Dict, List
 import collections
 import pathlib
 import urllib.parse
@@ -23,18 +22,25 @@ class ModelArtifact(object):
   file_path: pathlib.PurePath
 
 
+@dataclass(frozen=True)
+class ModelArtifactRoot(object):
+  # Map of model artifacts, keyed by model id.
+  model_artifact_map: collections.OrderedDict[str, ModelArtifact]
+
+
 class ModelArtifactFactory(object):
   """Creates and collects model artifacts."""
 
   _parent_path: pathlib.PurePath
-  _model_artifact_map: Dict[str, ModelArtifact]
+  _model_artifact_map: collections.OrderedDict[str, ModelArtifact]
 
   def __init__(self, parent_path: pathlib.PurePath):
     self._parent_path = parent_path
     self._model_artifact_map = collections.OrderedDict()
 
-  def get_model_artifact_map(self) -> Dict[str, ModelArtifact]:
-    return collections.OrderedDict(self._model_artifact_map)
+  def generate_artifact_root(self) -> ModelArtifactRoot:
+    return ModelArtifactRoot(
+        model_artifact_map=collections.OrderedDict(self._model_artifact_map))
 
   def create(self, model: common_definitions.Model) -> ModelArtifact:
     if model.id in self._model_artifact_map:

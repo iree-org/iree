@@ -14,11 +14,11 @@ import argparse
 # Add build_tools python dir to the search path.
 sys.path.insert(0, str(pathlib.Path(__file__).parent / ".." / "python"))
 
-import e2e_tests.cmake_rule_generator
+import e2e_tests.cmake_generator
 
 
 def main():
-  cmake_rules = e2e_tests.cmake_rule_generator.generate_rules(
+  cmake_rules = e2e_tests.cmake_generator.generate_rules(
       pathlib.PurePath("${ROOT_ARTIFACT_DIR}"))
   print("\n".join(cmake_rules))
 

@@ -155,6 +155,10 @@ iree_import_tflite_model(
     "${_ROOT_ARTIFACTS_DIR}/iree/0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32/MobileSSD_fp32.mlir"
 )
 
+add_dependencies(iree-benchmark-import-models
+  ${_PACKAGE_NAME}_iree-import-model-0e466f69-91d6-4e50-b62b-a82b6213a231
+)
+
 # Import the TFLite model "${_ROOT_ARTIFACTS_DIR}/models/4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8.tflite"
 iree_import_tflite_model(
   TARGET_NAME
@@ -163,6 +167,10 @@ iree_import_tflite_model(
     "${_ROOT_ARTIFACTS_DIR}/models/4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8.tflite"
   OUTPUT_MLIR_FILE
     "${_ROOT_ARTIFACTS_DIR}/iree/4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8/EfficientNet_int8.mlir"
+)
+
+add_dependencies(iree-benchmark-import-models
+  ${_PACKAGE_NAME}_iree-import-model-4a6f545e-1b4e-41a5-9236-792aa578184b
 )
 
 # Import the TFLite model "${_ROOT_ARTIFACTS_DIR}/models/58855e40-eba9-4a71-b878-6b35e3460244_MobileNetV3Small_fp32.tflite"
@@ -175,6 +183,10 @@ iree_import_tflite_model(
     "${_ROOT_ARTIFACTS_DIR}/iree/58855e40-eba9-4a71-b878-6b35e3460244_MobileNetV3Small_fp32/MobileNetV3Small_fp32.mlir"
 )
 
+add_dependencies(iree-benchmark-import-models
+  ${_PACKAGE_NAME}_iree-import-model-58855e40-eba9-4a71-b878-6b35e3460244
+)
+
 # Import the TFLite model "${_ROOT_ARTIFACTS_DIR}/models/5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32.tflite"
 iree_import_tflite_model(
   TARGET_NAME
@@ -183,6 +195,10 @@ iree_import_tflite_model(
     "${_ROOT_ARTIFACTS_DIR}/models/5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32.tflite"
   OUTPUT_MLIR_FILE
     "${_ROOT_ARTIFACTS_DIR}/iree/5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32/PoseNet_fp32.mlir"
+)
+
+add_dependencies(iree-benchmark-import-models
+  ${_PACKAGE_NAME}_iree-import-model-5afc3014-d29d-4e88-a840-fbaf678acf2b
 )
 
 # Import the TFLite model "${_ROOT_ARTIFACTS_DIR}/models/73a0402e-271b-4aa8-a6a5-ac05839ca569_MobileBertSquad_fp16.tflite"
@@ -195,6 +211,10 @@ iree_import_tflite_model(
     "${_ROOT_ARTIFACTS_DIR}/iree/73a0402e-271b-4aa8-a6a5-ac05839ca569_MobileBertSquad_fp16/MobileBertSquad_fp16.mlir"
 )
 
+add_dependencies(iree-benchmark-import-models
+  ${_PACKAGE_NAME}_iree-import-model-73a0402e-271b-4aa8-a6a5-ac05839ca569
+)
+
 # Import the TFLite model "${_ROOT_ARTIFACTS_DIR}/models/78eab9e5-9ff1-4769-9b55-933c81cc9a0f_MobileNetV1_fp32.0_float.tflite"
 iree_import_tflite_model(
   TARGET_NAME
@@ -203,6 +223,10 @@ iree_import_tflite_model(
     "${_ROOT_ARTIFACTS_DIR}/models/78eab9e5-9ff1-4769-9b55-933c81cc9a0f_MobileNetV1_fp32.0_float.tflite"
   OUTPUT_MLIR_FILE
     "${_ROOT_ARTIFACTS_DIR}/iree/78eab9e5-9ff1-4769-9b55-933c81cc9a0f_MobileNetV1_fp32/MobileNetV1_fp32.mlir"
+)
+
+add_dependencies(iree-benchmark-import-models
+  ${_PACKAGE_NAME}_iree-import-model-78eab9e5-9ff1-4769-9b55-933c81cc9a0f
 )
 
 # Import the TFLite model "${_ROOT_ARTIFACTS_DIR}/models/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32.0_224.tflite"
@@ -215,6 +239,10 @@ iree_import_tflite_model(
     "${_ROOT_ARTIFACTS_DIR}/iree/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32/MobileNetV2_fp32.mlir"
 )
 
+add_dependencies(iree-benchmark-import-models
+  ${_PACKAGE_NAME}_iree-import-model-7d45f8e5-bb5e-48d0-928d-8f125104578f
+)
+
 # Import the TFLite model "${_ROOT_ARTIFACTS_DIR}/models/bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8.tflite"
 iree_import_tflite_model(
   TARGET_NAME
@@ -223,6 +251,10 @@ iree_import_tflite_model(
     "${_ROOT_ARTIFACTS_DIR}/models/bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8.tflite"
   OUTPUT_MLIR_FILE
     "${_ROOT_ARTIFACTS_DIR}/iree/bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8/PersonDetect_int8.mlir"
+)
+
+add_dependencies(iree-benchmark-import-models
+  ${_PACKAGE_NAME}_iree-import-model-bc1338be-e3df-44fd-82e4-40ba9560a073
 )
 
 # Import the TFLite model "${_ROOT_ARTIFACTS_DIR}/models/c36c63b0-220a-4d78-8ade-c45ce47d89d3_DeepLabV3_fp32.tflite"
@@ -235,6 +267,10 @@ iree_import_tflite_model(
     "${_ROOT_ARTIFACTS_DIR}/iree/c36c63b0-220a-4d78-8ade-c45ce47d89d3_DeepLabV3_fp32/DeepLabV3_fp32.mlir"
 )
 
+add_dependencies(iree-benchmark-import-models
+  ${_PACKAGE_NAME}_iree-import-model-c36c63b0-220a-4d78-8ade-c45ce47d89d3
+)
+
 # Import the TFLite model "${_ROOT_ARTIFACTS_DIR}/models/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32.tflite"
 iree_import_tflite_model(
   TARGET_NAME
@@ -243,6 +279,10 @@ iree_import_tflite_model(
     "${_ROOT_ARTIFACTS_DIR}/models/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32.tflite"
   OUTPUT_MLIR_FILE
     "${_ROOT_ARTIFACTS_DIR}/iree/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/MobileBertSquad_fp32.mlir"
+)
+
+add_dependencies(iree-benchmark-import-models
+  ${_PACKAGE_NAME}_iree-import-model-cc69d69f-6d1f-4a1a-a31e-e021888d0d28
 )
 
 # Import the TFLite model "${_ROOT_ARTIFACTS_DIR}/models/e3997104-a3d2-46b4-9fbf-39069906d123_MobileBertSquad_int8.tflite"
@@ -255,6 +295,10 @@ iree_import_tflite_model(
     "${_ROOT_ARTIFACTS_DIR}/iree/e3997104-a3d2-46b4-9fbf-39069906d123_MobileBertSquad_int8/MobileBertSquad_int8.mlir"
 )
 
+add_dependencies(iree-benchmark-import-models
+  ${_PACKAGE_NAME}_iree-import-model-e3997104-a3d2-46b4-9fbf-39069906d123
+)
+
 # Import the Tensorflow model "${_ROOT_ARTIFACTS_DIR}/models/ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased"
 iree_import_tf_model(
   TARGET_NAME
@@ -265,6 +309,10 @@ iree_import_tf_model(
     "predict"
   OUTPUT_MLIR_FILE
     "${_ROOT_ARTIFACTS_DIR}/iree/ecf5c970-ee97-49f0-a4ed-df1f34e9d493_MiniLML12H384Uncased/MiniLML12H384Uncased.mlir"
+)
+
+add_dependencies(iree-benchmark-import-models
+  ${_PACKAGE_NAME}_iree-import-model-ecf5c970-ee97-49f0-a4ed-df1f34e9d493
 )
 
 # Compile the module "${_ROOT_ARTIFACTS_DIR}/iree/0e466f69-91d6-4e50-b62b-a82b6213a231_MobileSSD_fp32/1f2adf49-282e-4aff-9d4f-e63b1621f1e8/MobileSSD_fp32.vmfb"
@@ -281,6 +329,7 @@ iree_bytecode_module(
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-1f2adf49-282e-4aff-9d4f-e63b1621f1e8
 )
@@ -300,6 +349,7 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-32a56c8d-cc6c-41b8-8620-1f8eda0b8223
 )
@@ -320,6 +370,7 @@ iree_bytecode_module(
     "--iree-hal-benchmark-dispatch-repeat-count=32"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-6b601a8d-4824-42e0-bcc6-500c0c3fa346
 )
@@ -340,6 +391,7 @@ iree_bytecode_module(
     "--iree-hal-benchmark-dispatch-repeat-count=16"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-70b823ca-2807-4531-8c00-e02af7d70466
 )
@@ -358,6 +410,7 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=valhall-unknown-linux-android31"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-8da35f2b-a042-4b7d-9dcf-5ebbc1728765
 )
@@ -376,6 +429,7 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=adreno-unknown-linux-android31"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-c7eea358-d8d2-4199-9d75-bb741c399b1b
 )
@@ -395,6 +449,7 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-d3038b95-c889-456a-bff6-5cbabd10f1ad
 )
@@ -414,6 +469,7 @@ iree_bytecode_module(
     "--iree-flow-mmt4d-target-options=arch=aarch64"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-d463322c-24e6-4685-85ca-d541b41a405f
 )
@@ -433,6 +489,7 @@ iree_bytecode_module(
     "--iree-llvm-target-cpu=cascadelake"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-0e466f69-91d6-4e50-b62b-a82b6213a231-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
 )
@@ -456,6 +513,7 @@ iree_bytecode_module(
     "--riscv-v-fixed-length-vector-lmul-max=8"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-4a6f545e-1b4e-41a5-9236-792aa578184b-6d9ce240-ec14-4d8f-a8e4-1b20aa17b4e4
 )
@@ -479,6 +537,7 @@ iree_bytecode_module(
     "--riscv-v-fixed-length-vector-lmul-max=8"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-4a6f545e-1b4e-41a5-9236-792aa578184b-cdf579a9-5446-403b-a991-802a6c702e65
 )
@@ -498,6 +557,7 @@ iree_bytecode_module(
     "--iree-llvm-target-cpu=cascadelake"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-4a6f545e-1b4e-41a5-9236-792aa578184b-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
 )
@@ -516,6 +576,7 @@ iree_bytecode_module(
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-58855e40-eba9-4a71-b878-6b35e3460244-1f2adf49-282e-4aff-9d4f-e63b1621f1e8
 )
@@ -535,6 +596,7 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-58855e40-eba9-4a71-b878-6b35e3460244-32a56c8d-cc6c-41b8-8620-1f8eda0b8223
 )
@@ -555,6 +617,7 @@ iree_bytecode_module(
     "--iree-hal-benchmark-dispatch-repeat-count=32"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-58855e40-eba9-4a71-b878-6b35e3460244-6b601a8d-4824-42e0-bcc6-500c0c3fa346
 )
@@ -575,6 +638,7 @@ iree_bytecode_module(
     "--iree-hal-benchmark-dispatch-repeat-count=16"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-58855e40-eba9-4a71-b878-6b35e3460244-70b823ca-2807-4531-8c00-e02af7d70466
 )
@@ -592,6 +656,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-58855e40-eba9-4a71-b878-6b35e3460244-75336abd-8108-462c-9ce3-15443e3f32f4
 )
@@ -610,6 +675,7 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=valhall-unknown-linux-android31"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-58855e40-eba9-4a71-b878-6b35e3460244-8da35f2b-a042-4b7d-9dcf-5ebbc1728765
 )
@@ -628,6 +694,7 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=adreno-unknown-linux-android31"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-58855e40-eba9-4a71-b878-6b35e3460244-c7eea358-d8d2-4199-9d75-bb741c399b1b
 )
@@ -647,6 +714,7 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-58855e40-eba9-4a71-b878-6b35e3460244-d3038b95-c889-456a-bff6-5cbabd10f1ad
 )
@@ -666,6 +734,7 @@ iree_bytecode_module(
     "--iree-flow-mmt4d-target-options=arch=aarch64"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-58855e40-eba9-4a71-b878-6b35e3460244-d463322c-24e6-4685-85ca-d541b41a405f
 )
@@ -685,6 +754,7 @@ iree_bytecode_module(
     "--iree-llvm-target-cpu=cascadelake"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-58855e40-eba9-4a71-b878-6b35e3460244-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
 )
@@ -703,6 +773,7 @@ iree_bytecode_module(
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-1f2adf49-282e-4aff-9d4f-e63b1621f1e8
 )
@@ -722,6 +793,7 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-32a56c8d-cc6c-41b8-8620-1f8eda0b8223
 )
@@ -742,6 +814,7 @@ iree_bytecode_module(
     "--iree-hal-benchmark-dispatch-repeat-count=32"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-6b601a8d-4824-42e0-bcc6-500c0c3fa346
 )
@@ -762,6 +835,7 @@ iree_bytecode_module(
     "--iree-hal-benchmark-dispatch-repeat-count=16"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-70b823ca-2807-4531-8c00-e02af7d70466
 )
@@ -780,6 +854,7 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=valhall-unknown-linux-android31"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-8da35f2b-a042-4b7d-9dcf-5ebbc1728765
 )
@@ -798,6 +873,7 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=adreno-unknown-linux-android31"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-c7eea358-d8d2-4199-9d75-bb741c399b1b
 )
@@ -817,6 +893,7 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-d3038b95-c889-456a-bff6-5cbabd10f1ad
 )
@@ -836,6 +913,7 @@ iree_bytecode_module(
     "--iree-flow-mmt4d-target-options=arch=aarch64"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-d463322c-24e6-4685-85ca-d541b41a405f
 )
@@ -855,6 +933,7 @@ iree_bytecode_module(
     "--iree-llvm-target-cpu=cascadelake"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-5afc3014-d29d-4e88-a840-fbaf678acf2b-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
 )
@@ -875,6 +954,7 @@ iree_bytecode_module(
     "--iree-flow-demote-f32-to-f16"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-73a0402e-271b-4aa8-a6a5-ac05839ca569-32a56c8d-cc6c-41b8-8620-1f8eda0b8223_demote_f32_to_16
 )
@@ -896,6 +976,7 @@ iree_bytecode_module(
     "--iree-flow-demote-f32-to-f16"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-73a0402e-271b-4aa8-a6a5-ac05839ca569-6b601a8d-4824-42e0-bcc6-500c0c3fa346_demote_f32_to_16
 )
@@ -915,6 +996,7 @@ iree_bytecode_module(
     "--iree-flow-demote-f32-to-f16"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-73a0402e-271b-4aa8-a6a5-ac05839ca569-8da35f2b-a042-4b7d-9dcf-5ebbc1728765_demote_f32_to_16
 )
@@ -934,6 +1016,7 @@ iree_bytecode_module(
     "--iree-llvm-target-cpu=cascadelake"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-73a0402e-271b-4aa8-a6a5-ac05839ca569-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
 )
@@ -957,6 +1040,7 @@ iree_bytecode_module(
     "--riscv-v-fixed-length-vector-lmul-max=8"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-78eab9e5-9ff1-4769-9b55-933c81cc9a0f-cdf579a9-5446-403b-a991-802a6c702e65
 )
@@ -976,6 +1060,7 @@ iree_bytecode_module(
     "--iree-llvm-target-cpu=cascadelake"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-78eab9e5-9ff1-4769-9b55-933c81cc9a0f-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
 )
@@ -994,6 +1079,7 @@ iree_bytecode_module(
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-1f2adf49-282e-4aff-9d4f-e63b1621f1e8
 )
@@ -1013,6 +1099,7 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-32a56c8d-cc6c-41b8-8620-1f8eda0b8223
 )
@@ -1033,6 +1120,7 @@ iree_bytecode_module(
     "--iree-hal-benchmark-dispatch-repeat-count=32"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-6b601a8d-4824-42e0-bcc6-500c0c3fa346
 )
@@ -1053,6 +1141,7 @@ iree_bytecode_module(
     "--iree-hal-benchmark-dispatch-repeat-count=16"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-70b823ca-2807-4531-8c00-e02af7d70466
 )
@@ -1070,6 +1159,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-75336abd-8108-462c-9ce3-15443e3f32f4
 )
@@ -1088,6 +1178,7 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=valhall-unknown-linux-android31"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-8da35f2b-a042-4b7d-9dcf-5ebbc1728765
 )
@@ -1106,6 +1197,7 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=adreno-unknown-linux-android31"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-c7eea358-d8d2-4199-9d75-bb741c399b1b
 )
@@ -1125,6 +1217,7 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-d3038b95-c889-456a-bff6-5cbabd10f1ad
 )
@@ -1144,6 +1237,7 @@ iree_bytecode_module(
     "--iree-flow-mmt4d-target-options=arch=aarch64"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-d463322c-24e6-4685-85ca-d541b41a405f
 )
@@ -1163,6 +1257,7 @@ iree_bytecode_module(
     "--iree-llvm-target-cpu=cascadelake"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
 )
@@ -1186,6 +1281,7 @@ iree_bytecode_module(
     "--riscv-v-fixed-length-vector-lmul-max=8"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-bc1338be-e3df-44fd-82e4-40ba9560a073-6d9ce240-ec14-4d8f-a8e4-1b20aa17b4e4
 )
@@ -1209,6 +1305,7 @@ iree_bytecode_module(
     "--riscv-v-fixed-length-vector-lmul-max=8"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-bc1338be-e3df-44fd-82e4-40ba9560a073-cdf579a9-5446-403b-a991-802a6c702e65
 )
@@ -1228,6 +1325,7 @@ iree_bytecode_module(
     "--iree-llvm-target-cpu=cascadelake"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-bc1338be-e3df-44fd-82e4-40ba9560a073-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
 )
@@ -1246,6 +1344,7 @@ iree_bytecode_module(
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-c36c63b0-220a-4d78-8ade-c45ce47d89d3-1f2adf49-282e-4aff-9d4f-e63b1621f1e8
 )
@@ -1265,6 +1364,7 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-c36c63b0-220a-4d78-8ade-c45ce47d89d3-32a56c8d-cc6c-41b8-8620-1f8eda0b8223
 )
@@ -1285,6 +1385,7 @@ iree_bytecode_module(
     "--iree-hal-benchmark-dispatch-repeat-count=32"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-c36c63b0-220a-4d78-8ade-c45ce47d89d3-6b601a8d-4824-42e0-bcc6-500c0c3fa346
 )
@@ -1303,6 +1404,7 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=valhall-unknown-linux-android31"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-c36c63b0-220a-4d78-8ade-c45ce47d89d3-8da35f2b-a042-4b7d-9dcf-5ebbc1728765
 )
@@ -1321,6 +1423,7 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=adreno-unknown-linux-android31"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-c36c63b0-220a-4d78-8ade-c45ce47d89d3-c7eea358-d8d2-4199-9d75-bb741c399b1b
 )
@@ -1344,6 +1447,7 @@ iree_bytecode_module(
     "--riscv-v-fixed-length-vector-lmul-max=8"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-c36c63b0-220a-4d78-8ade-c45ce47d89d3-cdf579a9-5446-403b-a991-802a6c702e65
 )
@@ -1363,6 +1467,7 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-c36c63b0-220a-4d78-8ade-c45ce47d89d3-d3038b95-c889-456a-bff6-5cbabd10f1ad
 )
@@ -1382,6 +1487,7 @@ iree_bytecode_module(
     "--iree-flow-mmt4d-target-options=arch=aarch64"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-c36c63b0-220a-4d78-8ade-c45ce47d89d3-d463322c-24e6-4685-85ca-d541b41a405f
 )
@@ -1401,6 +1507,7 @@ iree_bytecode_module(
     "--iree-llvm-target-cpu=cascadelake"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-c36c63b0-220a-4d78-8ade-c45ce47d89d3-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
 )
@@ -1419,6 +1526,7 @@ iree_bytecode_module(
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-1f2adf49-282e-4aff-9d4f-e63b1621f1e8
 )
@@ -1438,6 +1546,7 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-32a56c8d-cc6c-41b8-8620-1f8eda0b8223
 )
@@ -1458,6 +1567,7 @@ iree_bytecode_module(
     "--iree-hal-benchmark-dispatch-repeat-count=32"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-6b601a8d-4824-42e0-bcc6-500c0c3fa346
 )
@@ -1476,6 +1586,7 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=valhall-unknown-linux-android31"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-8da35f2b-a042-4b7d-9dcf-5ebbc1728765
 )
@@ -1494,6 +1605,7 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=adreno-unknown-linux-android31"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-c7eea358-d8d2-4199-9d75-bb741c399b1b
 )
@@ -1517,6 +1629,7 @@ iree_bytecode_module(
     "--riscv-v-fixed-length-vector-lmul-max=8"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-cdf579a9-5446-403b-a991-802a6c702e65
 )
@@ -1536,6 +1649,7 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-d3038b95-c889-456a-bff6-5cbabd10f1ad
 )
@@ -1555,6 +1669,7 @@ iree_bytecode_module(
     "--iree-flow-mmt4d-target-options=arch=aarch64"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-d463322c-24e6-4685-85ca-d541b41a405f
 )
@@ -1574,6 +1689,7 @@ iree_bytecode_module(
     "--iree-llvm-target-cpu=cascadelake"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
 )
@@ -1592,6 +1708,7 @@ iree_bytecode_module(
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-e3997104-a3d2-46b4-9fbf-39069906d123-1f2adf49-282e-4aff-9d4f-e63b1621f1e8
 )
@@ -1615,6 +1732,7 @@ iree_bytecode_module(
     "--riscv-v-fixed-length-vector-lmul-max=8"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-e3997104-a3d2-46b4-9fbf-39069906d123-cdf579a9-5446-403b-a991-802a6c702e65
 )
@@ -1634,6 +1752,7 @@ iree_bytecode_module(
     "--iree-llvm-target-cpu=cascadelake"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-e3997104-a3d2-46b4-9fbf-39069906d123-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
 )
@@ -1654,6 +1773,7 @@ iree_bytecode_module(
     "--iree-llvm-target-cpu-features=+dotprod"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-e3997104-a3d2-46b4-9fbf-39069906d123-f672a6b9-99fc-47ce-8b1b-8e5f44a541a1
 )
@@ -1672,6 +1792,7 @@ iree_bytecode_module(
     "--iree-hal-cuda-llvm-target-arch=sm_80"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-ecf5c970-ee97-49f0-a4ed-df1f34e9d493-09cb5300-7f73-45cf-9f68-e114c77ca030
 )
@@ -1691,6 +1812,7 @@ iree_bytecode_module(
     "--iree-llvm-target-cpu=cascadelake"
   PUBLIC
 )
+
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-ecf5c970-ee97-49f0-a4ed-df1f34e9d493-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
 )

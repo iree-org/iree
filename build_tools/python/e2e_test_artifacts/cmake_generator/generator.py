@@ -9,34 +9,38 @@ The rules will build required artifacts to run e2e tests and benchmarks.
 """
 
 from typing import List
+import itertools
 import pathlib
 
-from e2e_test_artifacts.cmake_rule_generators import common_generators, iree_generators
+from e2e_test_artifacts.cmake_generator import common_generators, iree_generator
 import e2e_test_artifacts.artifacts
-import e2e_test_artifacts.cmake_rule_generators.utils as cmake_rule_generators_utils
 
 
 def generate_rules(
-    root_path: pathlib.PurePath,
-    root_directory: e2e_test_artifacts.artifacts.RootDirectory) -> List[str]:
-  """Generates cmake rules to build benchmarks.
+    package_name: str, root_path: pathlib.PurePath,
+    artifact_root: e2e_test_artifacts.artifacts.ArtifactRoot) -> List[str]:
+  """Generates cmake rules to build artifacts.
   
   Args:
+    package_name: root cmake package name.
     root_path: root directory to store all artifacts.
+    artifact_root: artifact root to be generated.
   Returns:
-    List of CMake rules.
+    List of cmake rules.
   """
 
   model_rule_map = common_generators.generate_model_rule_map(
-      root_path=root_path, model_artifact_map=root_directory.model_artifact_map)
+      root_path=root_path, artifact_root=artifact_root.model_artifact_root)
+  model_cmake_rules = list(
+      itertools.chain.from_iterable(
+          rule.cmake_rules for rule in model_rule_map.values()))
 
-  iree_rules = iree_generators.generate_rules(
+  iree_cmake_rules = iree_generator.generate_rules(
+      package_name=package_name,
       root_path=root_path,
-      iree_model_dir_map=root_directory.iree_model_dir_map,
+      artifact_root=artifact_root.iree_artifact_root,
       model_rule_map=model_rule_map)
 
   # Currently the rules are simple so the common rules can be always put at the
   # top. Need a topological sort once the dependency gets complicated.
-  all_model_rules: List[cmake_rule_generators_utils.CMakeRule] = list(
-      model_rule_map.values())
-  return [rule.get_rule() for rule in all_model_rules + iree_rules]
+  return model_cmake_rules + iree_cmake_rules

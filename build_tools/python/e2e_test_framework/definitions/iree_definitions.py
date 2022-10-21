@@ -112,6 +112,7 @@ class ModuleGenerationConfig(object):
   compile_config: CompileConfig
 
   def get_id(self) -> str:
+    """Returns the composite id."""
     return f"{self.imported_model.model.id}_{self.compile_config.id}"
 
   def __hash__(self) -> int:
