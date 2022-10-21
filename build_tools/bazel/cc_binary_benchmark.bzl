@@ -25,6 +25,7 @@ def cc_binary_benchmark(
         testonly = True,
         size = "small",
         timeout = None,
+        default_copts = [],
         **kwargs):
     """Creates a binary and a test for a cc benchmark target.
 
@@ -38,7 +39,7 @@ def cc_binary_benchmark(
         srcs = srcs,
         data = data,
         deps = deps,
-        copts = copts,
+        copts = default_copts + (copts or []),
         defines = defines,
         linkopts = linkopts,
         tags = tags,
