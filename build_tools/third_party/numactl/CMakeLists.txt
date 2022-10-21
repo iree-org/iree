@@ -19,32 +19,18 @@ external_cc_library(
     "numaif.h"
     "numaint.h"
     "util.h"
+    "affinity.h"
     "sysfs.h"
     "rtnetlink.h"
-    "affinity.h"
+    "shm.h"
   SRCS
+    "affinity.c"
+    "util.c"
+    "syscall.c"
     "sysfs.c"
     "rtnetlink.c"
-    "affinity.c"
-    "syscall.c"
+    "shm.c"
     "libnuma.c"
     "numactl.c"
   PUBLIC
 )
-
-# Define our own binary target for the CLI, for host builds only.
-# depending on the build configuration, so we prefer to just set our own name.
-if(NOT CMAKE_CROSSCOMPILING)
-  add_executable(iree-numa
-    "${NUMA_ROOT}/libnuma.c"
-    "${NUMA_ROOT}/numactl.c"
-    "${NUMA_ROOT}/syscall.c"
-    "${NUMA_ROOT}/affinity.c"
-    "${NUMA_ROOT}/sysfs.c"
-    "${NUMA_ROOT}/rtnetlink.c"
-  )
-  target_include_directories(iree-numa SYSTEM
-    PUBLIC
-      "${NUMA_ROOT}"
-  )
-endif()

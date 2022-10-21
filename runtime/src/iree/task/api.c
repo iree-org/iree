@@ -89,7 +89,7 @@ iree_status_t iree_task_topology_initialize_from_flags(
   if (FLAG_task_topology_dump == true) {
     printf("TEST: %d\n", numa_max_node());
     printf("HARDWARE:\n");
-    //hardware();
+    hardware();
     printf("SET\n");
   } else {
     printf("NOT SET\n");
