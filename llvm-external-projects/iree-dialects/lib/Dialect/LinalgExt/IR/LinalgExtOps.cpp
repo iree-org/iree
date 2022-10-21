@@ -1720,10 +1720,8 @@ static Value areAllInBounds(OpBuilder &builder, Location loc, Value val,
   ArithBuilder arithBuilder(builder, loc);
   Value isInBounds;
   for (auto dim : llvm::seq<int64_t>(0, offsets.size())) {
-    Value idx =
-        getValueOrCreateConstantIndexOp(builder, loc, offsets[dim]);
-    Value cond =
-        arithBuilder.slt(idx, getDimValue(builder, loc, val, dim));
+    Value idx = getValueOrCreateConstantIndexOp(builder, loc, offsets[dim]);
+    Value cond = arithBuilder.slt(idx, getDimValue(builder, loc, val, dim));
     isInBounds = dim == 0 ? cond : arithBuilder._and(isInBounds, cond);
   }
   return isInBounds;
