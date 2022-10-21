@@ -378,7 +378,8 @@ struct SimpleBinaryBroadcastingAdaptor : public BinaryBroadcastingAdaptor {
   }
   LogicalResult verifyBroadcastCompatibility(
       Operation *op, ArrayRef<Value> operands) override {
-    auto broadcastDimensions = llvm::cast<FromOpTy>(op).getBroadcastDimensions();
+    auto broadcastDimensions =
+        llvm::cast<FromOpTy>(op).getBroadcastDimensions();
     if (broadcastDimensions &&
         !hlo::isLegalNumpyRankedBroadcast(operands[0], operands[1],
                                           *broadcastDimensions)) {

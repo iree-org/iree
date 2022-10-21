@@ -303,7 +303,8 @@ struct ConvertCHLOCompareOp : public OpConversionPattern<CompareOpTy> {
         rewriter.create<chlo::BroadcastCompareOp>(
             loc, lhsImag, rhsImag,
             /*broadcast_dimensions=*/nullptr,
-            adaptor.getComparisonDirectionAttr(), adaptor.getCompareTypeAttr()));
+            adaptor.getComparisonDirectionAttr(),
+            adaptor.getCompareTypeAttr()));
 
     return success();
   }
