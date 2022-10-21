@@ -52,23 +52,26 @@ class Android_Adreno_Benchmarks(object):
     ]
     default_gen_configs = [
         iree_definitions.ModuleGenerationConfig(
-            compile_config=self.DEFAULT_COMPILE_CONFIG, model=model)
+            compile_config=self.DEFAULT_COMPILE_CONFIG,
+            imported_model=iree_definitions.ImportedModel.from_model(model))
         for model in default_models
     ]
     fuse_padding_gen_configs = [
         iree_definitions.ModuleGenerationConfig(
-            compile_config=self.FUSE_PADDING_COMPILE_CONFIG, model=model)
+            compile_config=self.FUSE_PADDING_COMPILE_CONFIG,
+            imported_model=iree_definitions.ImportedModel.from_model(model))
         for model in default_models
     ]
     fuse_padding_repeated_kernel_gen_configs = [
         iree_definitions.ModuleGenerationConfig(
             compile_config=self.FUSE_PADDING_REPEATED_KERNEL_COMPILE_CONFIG,
-            model=model) for model in [
-                tflite_models.MOBILESSD_FP32,
-                tflite_models.POSENET_FP32,
-                tflite_models.MOBILENET_V2,
-                tflite_models.MOBILENET_V3SMALL,
-            ]
+            imported_model=iree_definitions.ImportedModel.from_model(model))
+        for model in [
+            tflite_models.MOBILESSD_FP32,
+            tflite_models.POSENET_FP32,
+            tflite_models.MOBILENET_V2,
+            tflite_models.MOBILENET_V3SMALL,
+        ]
     ]
 
     adreno_devices = device_collections.DEFAULT_DEVICE_COLLECTION.query_device_specs(

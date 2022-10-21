@@ -73,11 +73,43 @@ class ModuleExecutionConfig(object):
   extra_flags: List[str] = dataclasses.field(default_factory=list)
 
 
+class MLIRDialectType(Enum):
+  """Imported MLIR dialect type."""
+  LINALG = "linalg"
+  TOSA = "tosa"
+  MHLO = "mhlo"
+
+
+MODEL_SOURCE_TO_DIALECT_TYPE_MAP = {
+    common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR:
+        MLIRDialectType.LINALG,
+    common_definitions.ModelSourceType.EXPORTED_TFLITE:
+        MLIRDialectType.TOSA,
+    common_definitions.ModelSourceType.EXPORTED_TF:
+        MLIRDialectType.MHLO,
+}
+
+
+@dataclass(frozen=True)
+class ImportedModel(object):
+  """Describes an imported MLIR model."""
+  model: common_definitions.Model
+  dialect_type: MLIRDialectType
+
+  @staticmethod
+  def from_model(model: common_definitions.Model):
+    # Currently we assume the model source type and its imported dialect is an
+    # 1-1 mapping.
+    return ImportedModel(
+        model=model,
+        dialect_type=MODEL_SOURCE_TO_DIALECT_TYPE_MAP[model.source_type])
+
+
 @dataclass(frozen=True)
 class ModuleGenerationConfig(object):
   """Describes a compile target to generate the module."""
+  imported_model: ImportedModel
   compile_config: CompileConfig
-  model: common_definitions.Model
 
 
 @dataclass(frozen=True)
