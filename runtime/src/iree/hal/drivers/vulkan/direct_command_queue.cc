@@ -22,8 +22,11 @@ namespace vulkan {
 
 DirectCommandQueue::DirectCommandQueue(
     VkDeviceHandle* logical_device,
-    iree_hal_command_category_t supported_categories, VkQueue queue)
-    : CommandQueue(logical_device, supported_categories, queue) {}
+    iree_hal_command_category_t supported_categories, VkQueue queue,
+    bool use_rgp)
+    : CommandQueue(logical_device, supported_categories, queue) {
+  this->enable_rgp = use_rgp;
+}
 
 DirectCommandQueue::~DirectCommandQueue() = default;
 
@@ -108,13 +111,40 @@ iree_status_t DirectCommandQueue::Submit(
                                             &timeline_submit_infos[i], &arena));
   }
 
-  iree_slim_mutex_lock(&queue_mutex_);
-  iree_status_t status = VK_RESULT_TO_STATUS(
-      syms()->vkQueueSubmit(queue_, static_cast<uint32_t>(submit_infos.size()),
-                            submit_infos.data(), VK_NULL_HANDLE),
-      "vkQueueSubmit");
-  iree_slim_mutex_unlock(&queue_mutex_);
-  IREE_RETURN_IF_ERROR(status);
+  iree_status_t status;
+  if (enable_rgp) {
+    VkDebugUtilsLabelEXT vkDebugUtilLabelEnd = {};
+    vkDebugUtilLabelEnd.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
+    vkDebugUtilLabelEnd.pNext = nullptr;
+    vkDebugUtilLabelEnd.pLabelName = "AmdFrameEnd";
+
+    VkDebugUtilsLabelEXT vkDebugUtilLabelBegin = {};
+    vkDebugUtilLabelBegin.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
+    vkDebugUtilLabelBegin.pNext = nullptr;
+    vkDebugUtilLabelBegin.pLabelName = "AmdFrameBegin";
+
+    iree_slim_mutex_lock(&queue_mutex_);
+
+    syms()->vkQueueInsertDebugUtilsLabelEXT(queue_, &vkDebugUtilLabelBegin);
+
+    status = VK_RESULT_TO_STATUS(
+        syms()->vkQueueSubmit(queue_,
+                              static_cast<uint32_t>(submit_infos.size()),
+                              submit_infos.data(), VK_NULL_HANDLE),
+        "vkQueueSubmit");
+
+    syms()->vkQueueWaitIdle(queue_);
+    syms()->vkQueueInsertDebugUtilsLabelEXT(queue_, &vkDebugUtilLabelEnd);
+
+    iree_slim_mutex_unlock(&queue_mutex_);
+    IREE_RETURN_IF_ERROR(status);
+  } else {
+    status = VK_RESULT_TO_STATUS(
+        syms()->vkQueueSubmit(queue_,
+                              static_cast<uint32_t>(submit_infos.size()),
+                              submit_infos.data(), VK_NULL_HANDLE),
+        "vkQueueSubmit");
+  }
 
   return iree_ok_status();
 }

@@ -22,7 +22,7 @@ class DirectCommandQueue final : public CommandQueue {
  public:
   DirectCommandQueue(VkDeviceHandle* logical_device,
                      iree_hal_command_category_t supported_categories,
-                     VkQueue queue);
+                     VkQueue queue, bool use_rgp);
   ~DirectCommandQueue() override;
 
   iree_status_t Submit(iree_host_size_t batch_count,
@@ -34,6 +34,7 @@ class DirectCommandQueue final : public CommandQueue {
   iree_status_t TranslateBatchInfo(
       const iree_hal_submission_batch_t* batch, VkSubmitInfo* submit_info,
       VkTimelineSemaphoreSubmitInfo* timeline_submit_info, Arena* arena);
+  bool enable_rgp;
 };
 
 }  // namespace vulkan

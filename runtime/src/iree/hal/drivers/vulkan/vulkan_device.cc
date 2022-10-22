@@ -535,12 +535,13 @@ static iree_status_t iree_hal_vulkan_create_transient_command_pool(
 static CommandQueue* iree_hal_vulkan_device_create_queue(
     VkDeviceHandle* logical_device,
     iree_hal_command_category_t command_category, uint32_t queue_family_index,
-    uint32_t queue_index) {
+    uint32_t queue_index, bool use_rgp) {
   VkQueue queue = VK_NULL_HANDLE;
   logical_device->syms()->vkGetDeviceQueue(*logical_device, queue_family_index,
                                            queue_index, &queue);
 
-  return new DirectCommandQueue(logical_device, command_category, queue);
+  return new DirectCommandQueue(logical_device, command_category, queue,
+                                use_rgp);
 }
 
 // Creates command queues for the given sets of queues and populates the
@@ -573,9 +574,11 @@ static iree_status_t iree_hal_vulkan_device_initialize_command_queues(
     iree_string_view_t queue_name =
         iree_make_string_view(queue_name_buffer, queue_name_length);
 
+    bool use_rgp = (bool)device->flags;
+
     CommandQueue* queue = iree_hal_vulkan_device_create_queue(
         device->logical_device, IREE_HAL_COMMAND_CATEGORY_ANY,
-        compute_queue_set->queue_family_index, i);
+        compute_queue_set->queue_family_index, i, use_rgp);
 
     iree_host_size_t queue_index = device->queue_count++;
     device->queues[queue_index] = queue;
@@ -611,9 +614,11 @@ static iree_status_t iree_hal_vulkan_device_initialize_command_queues(
     iree_string_view_t queue_name =
         iree_make_string_view(queue_name_buffer, queue_name_length);
 
+    bool use_rgp = (bool)device->flags;
+
     CommandQueue* queue = iree_hal_vulkan_device_create_queue(
         device->logical_device, IREE_HAL_COMMAND_CATEGORY_TRANSFER,
-        transfer_queue_set->queue_family_index, i);
+        transfer_queue_set->queue_family_index, i, use_rgp);
 
     iree_host_size_t queue_index = device->queue_count++;
     device->queues[queue_index] = queue;
