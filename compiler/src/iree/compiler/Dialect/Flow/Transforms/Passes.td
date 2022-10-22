@@ -42,6 +42,11 @@ def ConvertConv2DToImg2Col :
     Pass<"iree-flow-convert-conv2d-to-img2col", ""> {
   let summary = "Convert linalg convolution ops to matmul img2col based implementation";
   let constructor = "mlir::iree_compiler::IREE::Flow::createConvertConv2DToImg2ColPass()";
+  let options = [
+    Option<"optionUseBatchMatmul", "use-batch-matmul", "bool",
+           /*default=*/"false",
+           "Broadcast filters to the batch size to allow for using batch matmul with img2col">,
+  ];
 }
 
 def ConvertRegionToWorkgroups :

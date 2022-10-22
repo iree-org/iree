@@ -60,6 +60,12 @@ static llvm::cl::opt<bool> clEnableConvToImg2Col(
     llvm::cl::desc("Enable converting convolution ops to img2col form."),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clImg2ColBatchMatmul(
+    "iree-flow-enable-img2col-batch-matmul",
+    llvm::cl::desc(
+        "Enable broadcasting the filter when converting to img2col form."),
+    llvm::cl::init(false));
+
 static llvm::cl::opt<bool> clEnablePaddingLinalgOps(
     "iree-flow-enable-padding-linalg-ops",
     llvm::cl::desc("Enable padding linalg ops to an integer multiple of "
@@ -187,8 +193,13 @@ void buildGlobalOptimizationPassPipeline(
 /// uses case.
 static void buildOptionalPreprocessingPassPipeline(OpPassManager &passManager) {
   FunctionLikeNest(passManager)
+      .addPredicatedPass(clEnableConvNchwToNhwc,
+                         IREE::Flow::createConvertConvNchwToNhwcPass)
       .addPredicatedPass(clEnableConvToImg2Col,
-                         IREE::Flow::createConvertConv2DToImg2ColPass)
+                         []() {
+                           return IREE::Flow::createConvertConv2DToImg2ColPass(
+                               clImg2ColBatchMatmul);
+                         })
       .addPredicatedPass(
           !clMmt4dTargetOptions.empty(),
           []() {
