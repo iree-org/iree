@@ -87,7 +87,7 @@ static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
   bool isWorkgroupMemory = fromType.getMemorySpaceAsInt() == workgroupSpace ||
                            toType.getMemorySpaceAsInt() == workgroupSpace;
   if (isWorkgroupMemory) builder.create<gpu::BarrierOp>(loc);
-  Operation *copy = createLinalgCopyOp(builder, loc, from, to);
+  Operation *copy = builder.create<memref::CopyOp>(loc, from, to);
   if (isWorkgroupMemory) {
     setMarker(copy, getCopyToWorkgroupMemoryMarker());
     builder.create<gpu::BarrierOp>(loc);
