@@ -87,7 +87,7 @@ static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
   bool isWorkgroupMemory = fromType.getMemorySpaceAsInt() == workgroupSpace ||
                            toType.getMemorySpaceAsInt() == workgroupSpace;
   if (isWorkgroupMemory) builder.create<gpu::BarrierOp>(loc);
-  Operation *copy = createLinalgCopyOp(builder, loc, from, to);
+  Operation *copy = builder.create<memref::CopyOp>(loc, from, to);
   if (isWorkgroupMemory) {
     setMarker(copy, getCopyToWorkgroupMemoryMarker());
     builder.create<gpu::BarrierOp>(loc);
@@ -261,12 +261,12 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm) {
 
   addBufferizePasses(nestedModulePM, gpuAllocateWorkgroupMemoryFn);
 
-  nestedModulePM.addPass(createCanonicalizerPass());
-  nestedModulePM.addPass(createCSEPass());
-
   // Tile and distribute to GPU subgroups and vectorize.
   nestedModulePM.addNestedPass<func::FuncOp>(
       createSPIRVTileAndVectorizeToCooperativeOpsPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createGPUDistributeSharedMemoryCopy());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
@@ -319,12 +319,12 @@ void addSPIRVBaseDistributePassPipeline(OpPassManager &pm) {
 
   addBufferizePasses(nestedModulePM, gpuAllocateWorkgroupMemoryFn);
 
-  nestedModulePM.addPass(createCanonicalizerPass());
-  nestedModulePM.addPass(createCSEPass());
-
   // Tile and distribute to GPU invocations.
   nestedModulePM.addNestedPass<func::FuncOp>(
       createSPIRVTileAndDistributePass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createGPUDistributeSharedMemoryCopy());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
