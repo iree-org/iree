@@ -277,7 +277,13 @@ static inline float iree_math_f16_to_f32(const uint16_t f16_value) {
   const uint32_t sign = ((uint32_t)((f16_value & 0x8000u) >> 15)) << 31;
   uint32_t exp = ((f16_value & 0x7C00u) >> 10);
   uint32_t mantissa = 0;
-  if (exp > 0) {
+  if (exp == 0x1F) {
+    // Nan or Inf case.
+    exp = 0xFF << 23;
+    // For Nan mantissa should not be 0.
+    if ((f16_value & 0x3FFu) != 0) mantissa = 1;
+
+  } else if (exp > 0) {
     exp = (exp + 127 - 15) << 23;
     mantissa = ((uint32_t)(f16_value & 0x3FFu)) << (23 - 10);
   }
@@ -295,10 +301,18 @@ static inline uint16_t iree_math_f32_to_f16(const float f32_value) {
   uint32_t u32_value;
   memcpy(&u32_value, &f32_value, sizeof(u32_value));
   const uint32_t sign = ((u32_value & 0x80000000u) >> 31) << 15;
-  const uint32_t mantissa = (u32_value & 0x007FFFFFu) >> (23 - 10);
+  uint32_t mantissa = (u32_value & 0x007FFFFFu) >> (23 - 10);
   int32_t exp = ((u32_value & 0x7F800000u) >> 23) - 127 + 15;
   if (exp > 31) {
     exp = 31 << 10;
+    // zero out the matissa for infinity.
+    mantissa = 0;
+    // If this is a Nan value set the mantissa to a non zero value.
+    if (((u32_value & 0x7F800000u) >> 23) == 0xFF) {
+      if (((u32_value & 0x007FFFFFu) != 0)) {
+        mantissa = 1;
+      }
+    }
   } else if (exp < 0) {
     exp = 0;
   } else {

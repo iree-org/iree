@@ -172,8 +172,8 @@ TEST(F16ConversionTest, F32ToF16) {
   EXPECT_EQ(0x3400, iree_math_f32_to_f16(0.25f));
   EXPECT_EQ(0xd646, iree_math_f32_to_f16(-100.375f));
   // Overflow
-  EXPECT_EQ(0x7fff, iree_math_f32_to_f16(FLT_MAX));
-  EXPECT_EQ(0xffff, iree_math_f32_to_f16(-FLT_MAX));
+  EXPECT_EQ(0x7C00, iree_math_f32_to_f16(FLT_MAX));
+  EXPECT_EQ(0xFC00, iree_math_f32_to_f16(-FLT_MAX));
   // Underflow
   EXPECT_EQ(0, iree_math_f32_to_f16(FLT_MIN));
   EXPECT_EQ(0x8000, iree_math_f32_to_f16(-FLT_MIN));
@@ -188,8 +188,8 @@ TEST(F16ConversionTest, F32ToF16ToF32) {
   EXPECT_EQ(kF16Max, iree_math_f16_to_f32(iree_math_f32_to_f16(kF16Max)));
   EXPECT_EQ(kF16Min, iree_math_f16_to_f32(iree_math_f32_to_f16(kF16Min)));
   // Overflow
-  EXPECT_GE(FLT_MAX, iree_math_f16_to_f32(iree_math_f32_to_f16(FLT_MAX)));
-  EXPECT_LT(-FLT_MAX, iree_math_f16_to_f32(iree_math_f32_to_f16(-FLT_MAX)));
+  EXPECT_EQ(INFINITY, iree_math_f16_to_f32(iree_math_f32_to_f16(FLT_MAX)));
+  EXPECT_EQ(-INFINITY, iree_math_f16_to_f32(iree_math_f32_to_f16(-FLT_MAX)));
   EXPECT_GT(kF16Max + 1.f,
             iree_math_f16_to_f32(iree_math_f32_to_f16(kF16Max + 1.f)));
   // Underflow
@@ -197,6 +197,12 @@ TEST(F16ConversionTest, F32ToF16ToF32) {
   EXPECT_EQ(0.0f, iree_math_f16_to_f32(iree_math_f32_to_f16(-FLT_MIN)));
   EXPECT_EQ(0.0f,
             iree_math_f16_to_f32(iree_math_f32_to_f16(kF16Min - kF16Min / 2)));
+  // Inf and Nan
+  EXPECT_EQ(INFINITY, iree_math_f16_to_f32(iree_math_f32_to_f16(INFINITY)));
+  EXPECT_EQ(-INFINITY, iree_math_f16_to_f32(iree_math_f32_to_f16(-INFINITY)));
+  // Check that the result is a Nan with nan != nan.
+  float nan = iree_math_f16_to_f32(iree_math_f32_to_f16(NAN));
+  EXPECT_NE(nan, nan);
 }
 
 }  // namespace
