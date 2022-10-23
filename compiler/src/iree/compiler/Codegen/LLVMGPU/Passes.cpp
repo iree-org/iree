@@ -163,6 +163,7 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
   // distribute foreach threads
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUDistribute());
 
+  nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createGPUDistributeSharedMemoryCopy());
   nestedModulePM.addPass(createCanonicalizerPass());
