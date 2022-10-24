@@ -16,7 +16,6 @@
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
-#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
@@ -809,14 +808,14 @@ Value getInputOrPaddedInput(OpBuilder &builder, PackOp packOp) {
   }
 
   Location loc = packOp.getLoc();
-  ShapedType inputType = packOp.getInputType();
-  int64_t inputRank = inputType.getRank();
+  ShapedType outputType = packOp.getOutputType();
+  int64_t inputRank = packOp.getInputRank();
 
   SmallVector<int64_t> paddedShape;
   DenseMap<int64_t, OpFoldResult> tileAndPosMapping =
       packOp.getDimAndTileMapping();
   for (int64_t dim = 0; dim < inputRank; ++dim) {
-    int64_t size = inputType.getDimSize(dim);
+    int64_t size = outputType.getDimSize(dim);
     if (!tileAndPosMapping.count(dim)) {
       paddedShape.push_back(size);
       continue;
@@ -824,13 +823,13 @@ Value getInputOrPaddedInput(OpBuilder &builder, PackOp packOp) {
 
     Optional<int64_t> tileSize =
         getConstantIntValue(tileAndPosMapping.lookup(dim));
-    assert((!inputType.isDynamicDim(dim) && tileSize.hasValue()) &&
+    assert((!outputType.isDynamicDim(dim) && tileSize.hasValue()) &&
            "something goes really wrong...");
     int64_t sizeWithPad = llvm::alignTo(size, tileSize.getValue());
     paddedShape.push_back(sizeWithPad);
   }
   auto resultType =
-      RankedTensorType::get(paddedShape, inputType.getElementType());
+      RankedTensorType::get(paddedShape, outputType.getElementType());
   return tensor::createPadHighOp(resultType, input, packOp.getPaddingValue(),
                                  /*nofold=*/false, loc, builder);
 }
@@ -904,19 +903,59 @@ struct LinalgExtPackOpVectorizationPass
 
   void runOnOperation() override {
     MLIRContext *ctx = &getContext();
+    // Apply tiling to make outer dims be all 1s.
+    {
+      RewritePatternSet patterns(ctx);
+      auto tilingOptions =
+          linalg::LinalgTilingOptions().setTileSizeComputationFunction(
+              [](OpBuilder &builder, Operation *op) {
+                Location loc = op->getLoc();
+                auto packOp = cast<PackOp>(op);
+                auto innerDims =
+                    extractFromI64ArrayAttr(packOp.getInnerDimsPos());
+                int inputRank = packOp.getInputRank();
+                SmallVector<Value> tileSizes(
+                    inputRank, builder.create<arith::ConstantIndexOp>(loc, 1));
+                return tileSizes;
+              });
+      auto funcOp = getOperation();
+      patterns.add<TilingInterfaceTilingPattern>(
+          ctx, tilingOptions,
+          LinalgExt::LinalgTransformationFilter(
+              ArrayRef<StringAttr>{},
+              StringAttr::get(&getContext(), "TILE_PACK_OP")));
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
+      }
+      funcOp->walk([&](LinalgExt::PackOp op) {
+        op->removeAttr(
+            IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker);
+      });
+    }
 
-    // TODO(hanchung): Support vectorization for the cases that outer dims are
-    // not all 1s. This can be achieved by tiling + inferring shapes.
-    RewritePatternSet patterns(ctx);
-    patterns.add<GeneralizePackOpPattern>(ctx);
-    patterns.add<LinalgVectorizationPattern>(ctx);
-    linalg::populatePadOpVectorizationPatterns(patterns);
-    vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
-    vector::TransferReadOp::getCanonicalizationPatterns(patterns, ctx);
-    vector::TransferWriteOp::getCanonicalizationPatterns(patterns, ctx);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
-      return signalPassFailure();
+    // Generalize pack ops and canonicalize tiled ops.
+    {
+      RewritePatternSet patterns(ctx);
+      linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
+      patterns.add<GeneralizePackOpPattern>(ctx);
+      if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                              std::move(patterns)))) {
+        return signalPassFailure();
+      }
+    }
+
+    // Kick in generic vectorizer.
+    {
+      RewritePatternSet patterns(ctx);
+      patterns.add<LinalgVectorizationPattern>(ctx);
+      linalg::populatePadOpVectorizationPatterns(patterns);
+      vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
+      vector::TransferReadOp::getCanonicalizationPatterns(patterns, ctx);
+      vector::TransferWriteOp::getCanonicalizationPatterns(patterns, ctx);
+      if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                              std::move(patterns)))) {
+        return signalPassFailure();
+      }
     }
   }
 };

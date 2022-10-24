@@ -157,19 +157,26 @@ tileInterfaceOpImpl(OpBuilder &builder, TilingInterface tilableOp,
       loc, lb, ub, step, initValues,
       [&](OpBuilder &b, Location loc, Value iv, ValueRange args) {
         offsets.push_back(iv);
-        auto affineMaps = AffineMap::inferFromExprList({ArrayRef<AffineExpr>{
-            b.getAffineSymbolExpr(0),
-            b.getAffineSymbolExpr(1) - b.getAffineDimExpr(0)}})[0];
         // Similar to linalg tiling, the tile size is the min(tileSizes, ub -
         // iv) to account for cases where tile size does not divide (ub - lb)
         // exactly.
-        Value inBoundsTileSize = b.create<AffineMinOp>(
-            loc, affineMaps,
-            ValueRange{iv,
-                       getValueOrCreateConstantIndexOp(builder, loc,
-                                                       tileSizes[loopDepth]),
-                       ub});
-        tileSizes[loopDepth] = getAsOpFoldResult(inBoundsTileSize);
+        Optional<int64_t> ts = getConstantIntValue(tileSizes[loopDepth]);
+        if (ts && ts.getValue() == 1) {
+          // Do nothing because the boundary is always 1 when tiling with
+          // size 1.
+        } else {
+          // TODO(hanchung): Switch to use makeComposedFoldedAffineMin method.
+          auto affineMaps = AffineMap::inferFromExprList({ArrayRef<AffineExpr>{
+              b.getAffineSymbolExpr(0),
+              b.getAffineSymbolExpr(1) - b.getAffineDimExpr(0)}})[0];
+          Value inBoundsTileSize = b.create<AffineMinOp>(
+              loc, affineMaps,
+              ValueRange{iv,
+                         getValueOrCreateConstantIndexOp(builder, loc,
+                                                         tileSizes[loopDepth]),
+                         ub});
+          tileSizes[loopDepth] = getAsOpFoldResult(inBoundsTileSize);
+        }
         // Recursively proceed to generate the tiled loop for the next level.
         innerReturnValue =
             tileInterfaceOpImpl(b, tilableOp, (isBufferTiling ? outputs : args),
