@@ -104,10 +104,10 @@ class LibraryBuilder {
     this->sanitizerKind = sanitizerKind;
   }
 
-  // Defines a new runtime import function and returns its ordinal.
-  unsigned addImport(StringRef name, bool weak) {
+  // Defines a new runtime import function.
+  // The declared ordinal of the import matches the order they are declared.
+  void addImport(StringRef name, bool weak) {
     imports.push_back({name.str(), weak});
-    return imports.size() - 1;
   }
 
   // Defines a new entry point on the library implemented by |func|.

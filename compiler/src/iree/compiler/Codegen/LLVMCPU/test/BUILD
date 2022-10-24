@@ -23,6 +23,7 @@ iree_lit_test_suite(
             "aarch64_vector_lowering.mlir",
             "apply_scale_lowering.mlir",
             "assign_constant_ordinals.mlir",
+            "assign_import_ordinals.mlir",
             "check_ir_before_llvm_conversion.mlir",
             "convert_to_llvm.mlir",
             "emit_vectorization_remarks.mlir",

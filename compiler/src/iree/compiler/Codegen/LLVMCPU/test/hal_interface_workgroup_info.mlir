@@ -1,7 +1,5 @@
 // RUN: iree-opt --allow-unregistered-dialect --iree-convert-to-llvm --split-input-file %s | FileCheck %s
 
-llvm.func @sink(i64)
-
 // CHECK-LABEL: llvm.func @workgroup_id
 func.func @workgroup_id() {
   // CHECK: %[[STATE:.+]] = llvm.load %arg2 : !llvm.ptr<struct<"iree_hal_executable_workgroup_state_v0_t"
@@ -13,10 +11,11 @@ func.func @workgroup_id() {
   llvm.call @sink(%val) : (i64) -> ()
   return
 }
+llvm.func @sink(%arg0: i64) {
+  llvm.return
+}
 
 // -----
-
-llvm.func @sink(i64)
 
 // CHECK-LABEL: llvm.func @workgroup_size
 func.func @workgroup_size() {
@@ -29,10 +28,11 @@ func.func @workgroup_size() {
   llvm.call @sink(%val) : (i64) -> ()
   return
 }
+llvm.func @sink(%arg0: i64) {
+  llvm.return
+}
 
 // -----
-
-llvm.func @sink(i64)
 
 // CHECK-LABEL: llvm.func @workgroup_count
 func.func @workgroup_count() {
@@ -44,4 +44,7 @@ func.func @workgroup_count() {
   %val = arith.index_cast %workgroup_count_z : index to i64
   llvm.call @sink(%val) : (i64) -> ()
   return
+}
+llvm.func @sink(%arg0: i64) {
+  llvm.return
 }

@@ -98,7 +98,7 @@ static iree_status_t iree_hal_elf_executable_resolve_imports(
   // All calls from the loaded ELF route through our thunk function so that we
   // can adapt to ABI differences.
   executable->base.environment.import_thunk =
-      (iree_hal_executable_import_thunk_v0_t)iree_elf_call_i_ppp;
+      (iree_hal_executable_import_thunk_v0_t)iree_elf_thunk_i_ppp;
 
   // Allocate storage for the imports.
   // TODO(benvanik): allocate both as one block.
