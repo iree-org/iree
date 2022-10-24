@@ -96,6 +96,7 @@ iree_cc_binary(
     iree::modules::check
     iree::testing::gtest
     iree::tooling::context_util
+    iree::tooling::device_util
     iree::tooling::vm_util_cc
     iree::vm
     iree::vm::bytecode_module
@@ -130,6 +131,7 @@ iree_cc_binary(
     iree::modules::hal::types
     iree::tooling::comparison
     iree::tooling::context_util
+    iree::tooling::device_util
     iree::tooling::vm_util_cc
     iree::vm
     iree::vm::cc

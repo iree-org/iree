@@ -409,10 +409,14 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
                               default_device_uri.size()),
         iree_allocator_system(), &context, &device, &device_allocator));
 
+    IREE_RETURN_IF_ERROR(iree_hal_begin_profiling_from_flags(device));
+
     // Invoke the function and print results.
     IREE_RETURN_IF_ERROR(EvaluateFunction(context, device, device_allocator,
                                           function, function_name),
                          "evaluating export function %d", ordinal);
+
+    IREE_RETURN_IF_ERROR(iree_hal_end_profiling_from_flags(device));
 
     iree_vm_context_release(context);
     iree_hal_allocator_release(device_allocator);
