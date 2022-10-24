@@ -392,6 +392,26 @@ static iree_status_t iree_hal_task_device_wait_semaphores(
       &device->large_block_pool);
 }
 
+static iree_status_t iree_hal_task_device_profiling_begin(
+    iree_hal_device_t* device,
+    const iree_hal_device_profiling_options_t* options) {
+  // Unimplemented (and that's ok).
+  // We could hook in to vendor APIs (Intel/ARM/etc) or generic perf infra:
+  // https://man7.org/linux/man-pages/man2/perf_event_open.2.html
+  // Capturing things like:
+  //   PERF_COUNT_HW_CPU_CYCLES / PERF_COUNT_HW_INSTRUCTIONS
+  //   PERF_COUNT_HW_CACHE_REFERENCES / PERF_COUNT_HW_CACHE_MISSES
+  //   etc
+  // TODO(benvanik): shared iree/hal/local/profiling implementation of this.
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_task_device_profiling_end(
+    iree_hal_device_t* device) {
+  // Unimplemented (and that's ok).
+  return iree_ok_status();
+}
+
 static const iree_hal_device_vtable_t iree_hal_task_device_vtable = {
     .destroy = iree_hal_task_device_destroy,
     .id = iree_hal_task_device_id,
@@ -414,4 +434,6 @@ static const iree_hal_device_vtable_t iree_hal_task_device_vtable = {
     .queue_execute = iree_hal_task_device_queue_execute,
     .queue_flush = iree_hal_task_device_queue_flush,
     .wait_semaphores = iree_hal_task_device_wait_semaphores,
+    .profiling_begin = iree_hal_task_device_profiling_begin,
+    .profiling_end = iree_hal_task_device_profiling_end,
 };

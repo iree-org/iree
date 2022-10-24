@@ -1128,6 +1128,22 @@ static iree_status_t iree_hal_vulkan_device_wait_semaphores(
       device->logical_device, &semaphore_list, timeout, wait_flags);
 }
 
+static iree_status_t iree_hal_vulkan_device_profiling_begin(
+    iree_hal_device_t* device,
+    const iree_hal_device_profiling_options_t* options) {
+  // Unimplemented (and that's ok). If counters are requested we'd use
+  // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_performance_query.html
+  // to acquire a lock. For most other cases we can use something like the
+  // RenderDoc API to directly tell an attached tool that we want to capture.
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_vulkan_device_profiling_end(
+    iree_hal_device_t* device) {
+  // Unimplemented (and that's ok).
+  return iree_ok_status();
+}
+
 namespace {
 const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable = {
     /*.destroy=*/iree_hal_vulkan_device_destroy,
@@ -1153,5 +1169,7 @@ const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable = {
     /*.queue_execute=*/iree_hal_vulkan_device_queue_execute,
     /*.queue_flush=*/iree_hal_vulkan_device_queue_flush,
     /*.wait_semaphores=*/iree_hal_vulkan_device_wait_semaphores,
+    /*.profiling_begin=*/iree_hal_vulkan_device_profiling_begin,
+    /*.profiling_end=*/iree_hal_vulkan_device_profiling_end,
 };
 }  // namespace
