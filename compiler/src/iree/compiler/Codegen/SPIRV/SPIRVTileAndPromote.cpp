@@ -140,6 +140,12 @@ namespace {
 
 struct SPIRVTileAndPromotePass final
     : public SPIRVTileAndPromoteBase<SPIRVTileAndPromotePass> {
+  private:
+  // Distribute the workloads to warp if true otherwise distribute to threads.
+  bool distributeToWarp = false;
+  public:
+  SPIRVTileAndPromotePass(bool distributeToWarp)
+      : distributeToWarp(distributeToWarp) {}
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<gpu::GPUDialect>();
   }
@@ -255,7 +261,7 @@ void SPIRVTileAndPromotePass::runOnOperation() {
     funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
     llvm::dbgs() << "\n\n";
   });
-
+  if(!distributeToWarp)
   {  // Tile and distribute to invocations.
     RewritePatternSet tilingPatterns(&getContext());
     IREE::LinalgExt::LinalgTransformationFilter filter(
@@ -286,8 +292,10 @@ void SPIRVTileAndPromotePass::runOnOperation() {
   });
 }
 
-std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVTileAndPromotePass() {
-  return std::make_unique<SPIRVTileAndPromotePass>();
+std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVTileAndPromotePass(
+  bool distributeToWarp
+) {
+  return std::make_unique<SPIRVTileAndPromotePass>(distributeToWarp);
 }
 
 }  // namespace iree_compiler

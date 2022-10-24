@@ -34,6 +34,7 @@
 #include "mlir/Interfaces/VectorInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include <iostream>
 
 using mlir::iree_compiler::IREE::LinalgExt::LinalgVectorizationPattern;
 using mlir::iree_compiler::IREE::LinalgExt::TilingPatterns;
@@ -130,12 +131,14 @@ static void populateTilingToSubgroupPatterns(ArrayRef<int64_t> subgroupCounts,
   };
   auto tilingOptions =
       linalg::LinalgTilingOptions()
-          .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
+          .setLoopType(linalg::LinalgTilingLoopType::Loops)
           .setTileSizeComputationFunction(setTileSizesFn)
           .setDistributionOptions(distributionOptions);
 
-  auto filter = IREE::LinalgExt::LinalgTransformationFilter(
-      ArrayRef<StringAttr>{}, StringAttr::get(context, getVectorizeMarker()));
+  IREE::LinalgExt::LinalgTransformationFilter filter(
+      {StringAttr::get(context, getWorkgroupKTiledMarker()),
+       StringAttr::get(context, getWorkgroupMemoryMarker())},
+      StringAttr::get(context, getVectorizeMarker()));
   TilingPatterns<linalg::FillOp, linalg::MatmulOp, linalg::GenericOp>::insert(
       patterns, tilingOptions, filter);
 }
@@ -274,6 +277,7 @@ class SPIRVTileAndVectorizeToCooperativeOpsPass final
   }
 
   void runOnOperation() override {
+    std::cout<<"Here 1\n";
     MLIRContext *context = &getContext();
     func::FuncOp funcOp = getOperation();
 
@@ -288,7 +292,7 @@ class SPIRVTileAndVectorizeToCooperativeOpsPass final
       }
       return WalkResult::advance();
     });
-
+    std::cout<<"Here 2\n";
     if (!rootOp) {
       funcOp.emitError(
           "expected a linalg::ContractionOpInterface op with "
@@ -296,7 +300,10 @@ class SPIRVTileAndVectorizeToCooperativeOpsPass final
       return signalPassFailure();
     }
 
-    auto cooperativeOpSize = getTargetCooperativeOpSize(rootOp);
+    SmallVector<int64_t> cooperativeOpSize = getTargetCooperativeOpSize(rootOp);
+    std::cout<<"Here 3\n";
+    std::cout<<"Cooperative shape is: "<<cooperativeOpSize.size()<<" :"<< cooperativeOpSize[0]<<" "<<cooperativeOpSize[1]<<" "
+      <<"\n";
     auto subgroupCounts = deduceSubgroupCounts(rootOp);
 
     // Then tile and distribute to subgroups.

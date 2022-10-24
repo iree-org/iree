@@ -95,16 +95,21 @@ static LogicalResult setOpConfig(const spirv::TargetEnv &targetEnv,
   // the tile sizes for each subgroup, considering the input workload size and
   // native cooperative matrix size choices.
   int subgroupSize = resourceLimits.getSubgroupSize();
-  std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
+  std::array<int64_t, 3> workgroupSize = {subgroupSize, 8, 1};
+
+  //const std::array<int64_t, 2> workgroupXY = {subgroupSize, 2};
 
   TileSizesListType tileSizes;
   // Again because we only consider whether the input workload is perfectly
   // divisible by some native cooperative matrix size, not some multiples of it,
   // need to make sure the subgroup tile sizes are the same as the workgroup
   // one.
-  tileSizes.push_back({coopMatSize->m, coopMatSize->n, coopMatSize->k});
+  tileSizes.push_back({8*coopMatSize->m, coopMatSize->n, coopMatSize->k});
   tileSizes.push_back({coopMatSize->m, coopMatSize->n, coopMatSize->k});
 
+  //std::array<int64_t, 3> threadMNK= {16,16,16};
+  //return setMatmulOpConfig(resourceLimits, op, workgroupXY, threadMNK,
+  //                         /*enablePromotion=*/true, true);
   return setOpConfigAndEntryPointFnTranslation(
       op->getParentOfType<func::FuncOp>(), op, tileSizes, pipeline,
       workgroupSize);
