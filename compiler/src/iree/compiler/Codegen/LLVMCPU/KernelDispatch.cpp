@@ -1041,8 +1041,7 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                    IREE::LinalgExt::PackOp op) {
   TileSizesListType tileSizes = {getLinalgExtDefaultWorkgroupTileSizes(op)};
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, op, tileSizes,
-      DispatchLoweringPassPipeline::CPUPackUnpackCodegen);
+      entryPointFn, op, tileSizes, DispatchLoweringPassPipeline::CPUDataTiling);
 }
 
 /// Sets the lowering configuration for dispatch region for linalg_ext.fft

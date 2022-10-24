@@ -27,8 +27,8 @@ def CPU_BufferOpsTileAndVectorize
     : I32EnumAttrCase<"CPUBufferOpsTileAndVectorize", 6>;
 def CPU_TripleTilingExpert : I32EnumAttrCase<"CPUTripleTilingExpert", 7>;
 
-def CPU_LinalgExtPackUnpackCodegen
-    : I32EnumAttrCase<"CPUPackUnpackCodegen", 8>;
+def CPU_DataTiling
+    : I32EnumAttrCase<"CPUDataTiling", 8>;
 
 def Linalg_TransformInterpCodegen
     : I32EnumAttrCase<"TransformDialectInterpreterCodegen", 9>;
@@ -63,7 +63,7 @@ def DispatchLoweringPassPipelineEnum
                     CPU_DoubleTilingPadExpert, CPU_DoubleTilingPeelingExpert,
                     CPU_ConvTileAndDecomposeExpert, CPU_CPUAArchDoubleTilingExpert,
                     CPU_BufferOpsTileAndVectorize, CPU_TripleTilingExpert,
-                    CPU_LinalgExtPackUnpackCodegen,
+                    CPU_DataTiling,
                     Linalg_TransformInterpCodegen, LLVMGPU_SimpleDistribute,
                     LLVMGPU_Vectorize, LLVMGPU_MatmulSimt, LLVMGPU_MatmulTensorCore,
                     LLVMGPU_TransposeSharedMem, LLVMGPU_WarpReduction,
