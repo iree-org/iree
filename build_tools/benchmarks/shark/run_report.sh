@@ -25,13 +25,16 @@ pip install --upgrade pip
 pip install pandas
 pip install jinja2
 
+export SHARK_VERSION=`ls ${RAW_RESULTS_DIR} | grep "cpu_shark" | sed -e "s/^cpu_shark_\(.*\).csv$/\1/g"`
+export IREE_VERSION=`ls ${RAW_RESULTS_DIR} | grep "cpu_iree" | sed -e "s/^cpu_iree_\(.*\).csv$/\1/g"`
+
 python3 ./build_tools/benchmarks/reporting/parse_shark_benchmarks.py \
-  --shark_version="tbd" \
-  --iree_version="tbd" \
-  --cpu_shark_csv="${RAW_RESULTS_DIR}/cpu_shark.csv" \
-  --cpu_iree_csv="${RAW_RESULTS_DIR}/cpu_iree.csv" \
-  --cpu_baseline_csv="${RAW_RESULTS_DIR}/cpu_iree.csv" \
-  --gpu_shark_csv="${RAW_RESULTS_DIR}/cuda_shark.csv" \
-  --gpu_iree_csv="${RAW_RESULTS_DIR}/cuda_iree.csv" \
-  --gpu_baseline_csv="${RAW_RESULTS_DIR}/cuda_iree.csv" \
+  --shark_version="${SHARK_VERSION}" \
+  --iree_version="${IREE_VERSION}" \
+  --cpu_shark_csv="${RAW_RESULTS_DIR}/cpu_shark_${SHARK_VERSION}.csv" \
+  --cpu_iree_csv="${RAW_RESULTS_DIR}/cpu_iree_${IREE_VERSION}.csv" \
+  --cpu_baseline_csv="${RAW_RESULTS_DIR}/cpu_iree_${IREE_VERSION}.csv" \
+  --gpu_shark_csv="${RAW_RESULTS_DIR}/cuda_shark_${SHARK_VERSION}.csv" \
+  --gpu_iree_csv="${RAW_RESULTS_DIR}/cuda_iree_${IREE_VERSION}.csv" \
+  --gpu_baseline_csv="${RAW_RESULTS_DIR}/cuda_iree_${IREE_VERSION}.csv" \
   --output_path="${SUMMARY_PATH}"
