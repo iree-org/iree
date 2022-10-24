@@ -22,7 +22,7 @@ vm.module @global_ops {
   vm.func @test_global_load_ref() {
     %actual = vm.global.load.ref @g0 : !vm.buffer
     %expected = vm.const.ref.zero : !vm.buffer
-    %expecteddno = util.do_not_optimize(%expected) : !vm.buffer
+    %expecteddno = util.optimization_barrier %expected : !vm.buffer
     vm.check.eq %actual, %expecteddno : !vm.buffer
     vm.return
   }

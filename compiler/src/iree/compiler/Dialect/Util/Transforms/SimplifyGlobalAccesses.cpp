@@ -195,7 +195,7 @@ static bool optimizeBuckets(
 static bool rearrangeBlockGlobalAccesses(
     Block &block, DenseSet<StringRef> &immutableGlobals) {
   // Gather sequences of operations that are safe to reorder.
-  // Certain ops - like calls/do_not_optimize/etc - prevent us from moving any
+  // Certain ops - like calls/barriers/etc - prevent us from moving any
   // global operations across them.
   //
   // From each sequence we produce [symbol_name, [op, op, op, ...]] buckets.

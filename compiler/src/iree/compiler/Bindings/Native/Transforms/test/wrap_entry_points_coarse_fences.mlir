@@ -48,7 +48,7 @@ func.func @bareFunc() {
 // CHECK-LABEL: func.func private @_primitiveArgOnly(
 func.func @primitiveArgOnly(%arg0: i32) {
   %0 = arith.addi %arg0, %arg0 : i32
-  util.do_not_optimize(%0) : i32
+  util.optimization_barrier %0 : i32
   return
 }
 
@@ -64,7 +64,7 @@ func.func @primitiveArgOnly(%arg0: i32) {
 // CHECK-LABEL: func.func private @_tensorArgOnly(
 func.func @tensorArgOnly(%arg0: tensor<4xf32>) {
   %0 = arith.addf %arg0, %arg0 : tensor<4xf32>
-  util.do_not_optimize(%0) : tensor<4xf32>
+  util.optimization_barrier %0 : tensor<4xf32>
   return
 }
 
@@ -79,7 +79,7 @@ func.func @tensorArgOnly(%arg0: tensor<4xf32>) {
 // CHECK-LABEL: func.func private @_primitiveResultOnly(
 func.func @primitiveResultOnly() -> i32 {
   %0 = arith.constant 8 : i32
-  %1 = util.do_not_optimize(%0) : i32
+  %1 = util.optimization_barrier %0 : i32
   return %1 : i32
 }
 
@@ -95,7 +95,7 @@ func.func @primitiveResultOnly() -> i32 {
 // CHECK-LABEL: func.func private @_tensorResultOnly(
 func.func @tensorResultOnly() -> tensor<4xf32> {
   %0 = arith.constant dense<[0.0, 1.0, 2.0, 3.0]> : tensor<4xf32>
-  %1 = util.do_not_optimize(%0) : tensor<4xf32>
+  %1 = util.optimization_barrier %0 : tensor<4xf32>
   return %1 : tensor<4xf32>
 }
 

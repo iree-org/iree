@@ -18,8 +18,8 @@ func.func private @globalLoad() {
   // CHECK-NEXT: %[[LENGTH:.+]] = util.global.load @constantGlobal__length : index
   // CHECK: %[[SUBRANGE:.+]] = util.buffer.subspan %[[RESOURCE]][%[[OFFSET]]] : !util.buffer{%[[STORAGE_SIZE]]} -> !util.buffer{%[[LENGTH]]}
   %0 = util.global.load @constantGlobal : !util.buffer
-  // CHECK-NEXT: util.do_not_optimize(%[[SUBRANGE]])
-  util.do_not_optimize(%0) : !util.buffer
+  // CHECK-NEXT: util.optimization_barrier %[[SUBRANGE]]
+  util.optimization_barrier %0 : !util.buffer
   return
 }
 
@@ -59,10 +59,10 @@ func.func private @funcArgs(%resource0: !util.buffer, %resource1: !util.buffer) 
   // CHECK-NEXT: %[[SUBRANGE0:.+]] = util.buffer.subspan %[[RESOURCE0]][%[[OFFSET0]]] : !util.buffer{%[[STORAGE_SIZE0]]} -> !util.buffer{%[[LENGTH0]]}
   // CHECK-NEXT: %[[SUBRANGE1:.+]] = util.buffer.subspan %[[RESOURCE1]][%[[OFFSET1]]] : !util.buffer{%[[STORAGE_SIZE1]]} -> !util.buffer{%[[LENGTH1]]}
 
-  // CHECK-NEXT: util.do_not_optimize(%[[SUBRANGE0]])
-  util.do_not_optimize(%resource0) : !util.buffer
-  // CHECK-NEXT: util.do_not_optimize(%[[SUBRANGE1]])
-  util.do_not_optimize(%resource1) : !util.buffer
+  // CHECK-NEXT: util.optimization_barrier %[[SUBRANGE0]]
+  util.optimization_barrier %resource0 : !util.buffer
+  // CHECK-NEXT: util.optimization_barrier %[[SUBRANGE1]]
+  util.optimization_barrier %resource1 : !util.buffer
   return
 }
 
@@ -119,10 +119,10 @@ func.func private @caller(%resource0: !util.buffer, %resource1: !util.buffer) {
   // CHECK-NEXT: %[[RET_SUBRANGE0:.+]] = util.buffer.subspan %[[RET]]#0[%[[RET]]#2] : !util.buffer{%[[RET]]#1} -> !util.buffer{%[[RET]]#3}
   // CHECK-NEXT: %[[RET_SUBRANGE1:.+]] = util.buffer.subspan %[[RET]]#4[%[[RET]]#6] : !util.buffer{%[[RET]]#5} -> !util.buffer{%[[RET]]#7}
 
-  // CHECK-NEXT: util.do_not_optimize(%[[RET_SUBRANGE0]]) : !util.buffer
-  util.do_not_optimize(%0#0) : !util.buffer
-  // CHECK-NEXT: util.do_not_optimize(%[[RET_SUBRANGE1]]) : !util.buffer
-  util.do_not_optimize(%0#1) : !util.buffer
+  // CHECK-NEXT: util.optimization_barrier %[[RET_SUBRANGE0]] : !util.buffer
+  util.optimization_barrier %0#0 : !util.buffer
+  // CHECK-NEXT: util.optimization_barrier %[[RET_SUBRANGE1]] : !util.buffer
+  util.optimization_barrier %0#1 : !util.buffer
 
   return
 }
@@ -192,8 +192,8 @@ func.func private @callerWithSubrange(%arg: !util.buffer) {
   %ret1 = call @callee(%ret0_subspan) : (!util.buffer) -> (!util.buffer)
   // CHECK: %[[RET1_SUBRANGE:.+]] = util.buffer.subspan %[[RET1]]#0[%[[RET1]]#2] : !util.buffer{%[[RET1]]#1} -> !util.buffer{%[[RET1]]#3}
 
-  // CHECK-NEXT: util.do_not_optimize(%[[RET1_SUBRANGE]]) : !util.buffer
-  util.do_not_optimize(%ret1) : !util.buffer
+  // CHECK-NEXT: util.optimization_barrier %[[RET1_SUBRANGE]] : !util.buffer
+  util.optimization_barrier %ret1 : !util.buffer
 
   return
 }
@@ -225,10 +225,10 @@ func.func private @br(%resource0: !util.buffer, %resource1: !util.buffer) {
   // CHECK-NEXT: %[[BB1_SUBRANGE0:.+]] = util.buffer.subspan %[[BB1_RESOURCE0]][%[[BB1_OFFSET0]]] : !util.buffer{%[[BB1_STORAGE_SIZE0]]} -> !util.buffer{%[[BB1_LENGTH0]]}
   // CHECK-NEXT: %[[BB1_SUBRANGE1:.+]] = util.buffer.subspan %[[BB1_RESOURCE1]][%[[BB1_OFFSET1]]] : !util.buffer{%[[BB1_STORAGE_SIZE1]]} -> !util.buffer{%[[BB1_LENGTH1]]}
 
-  // CHECK-NEXT: util.do_not_optimize(%[[BB1_SUBRANGE0]])
-  util.do_not_optimize(%bb1_resource0) : !util.buffer
-  // CHECK-NEXT: util.do_not_optimize(%[[BB1_SUBRANGE1]])
-  util.do_not_optimize(%bb1_resource1) : !util.buffer
+  // CHECK-NEXT: util.optimization_barrier %[[BB1_SUBRANGE0]]
+  util.optimization_barrier %bb1_resource0 : !util.buffer
+  // CHECK-NEXT: util.optimization_barrier %[[BB1_SUBRANGE1]]
+  util.optimization_barrier %bb1_resource1 : !util.buffer
 
   return
 }
