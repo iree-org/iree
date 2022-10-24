@@ -16,6 +16,7 @@
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
@@ -32,7 +33,7 @@ namespace Flow {
 
 // Returns the element type of `t` if it is a `ShapedType`, else return
 // `t` itself.
-Type getElementTypeOrType(Type t) {
+static Type getElementTypeOrType(Type t) {
   if (auto shapedType = t.dyn_cast<ShapedType>()) {
     return shapedType.getElementType();
   }
@@ -92,11 +93,13 @@ static FailureOr<Value> padIfNeeded(OpBuilder &builder, Location loc,
     return value;
   }
 
-  Value zeroVal = getValueOrConstantIndexOp(
-      rewriter, loc,
-      builder.getZeroAttr(getElementTypeOrSelf(value.getType())));
+  FailureOr<Value> zeroVal =
+      getZero(builder, loc, getElementTypeOrSelf(value.getType()));
+  if (failed(zeroVal)) {
+    return failure();
+  }
   auto padOp = builder.create<tensor::PadOp>(loc, /*resultType=*/nullptr, value,
-                                             lowPad, highPad, zeroVal);
+                                             lowPad, highPad, zeroVal.value());
   return padOp.getResult();
 }
 
