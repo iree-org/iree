@@ -189,9 +189,8 @@ static Value pad(Location loc, PatternRewriter &rewriter, Value input,
       RankedTensorType::get(resultTypeShape, elementType);
   Value padValue = rewriter.create<arith::ConstantOp>(
       loc, elementType, rewriter.getZeroAttr(elementType));
-  return tensor::createPadScalarOp(resultType, input, padValue, lowPadding,
-                                   highPadding,
-                                   /* nofold = */ false, loc, rewriter);
+  return rewriter.create<tensor::PadOp>(loc, resultType, input, lowPadding,
+                                        highPadding, padValue);
 }
 
 // Returns a top-left slice from |input| shaped like |likeWhat|.
