@@ -171,6 +171,10 @@ createOutlineDispatchRegionsPass();
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createInjectDispatchTracingPass();
 
+// Crops the dispatch calls at the given index (-1 for nothing)
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createCropDispatchPipelinePass(int dispatchIndex = -1);
+
 // Exports all functions and dispatch executables as `() -> ()` benchmark funcs.
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createExportBenchmarkFuncsPass();
 

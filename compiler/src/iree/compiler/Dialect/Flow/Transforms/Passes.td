@@ -166,6 +166,16 @@ def InjectDispatchTracing :
   let constructor = "mlir::iree_compiler::IREE::Flow::createInjectDispatchTracingPass()";
 }
 
+def CropDispatchPipeline :
+    InterfacePass<"iree-flow-crop-dispatch-pipeline", "mlir::FunctionOpInterface"> {
+  let summary = "Crops the program at the specified index.";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createCropDispatchPipelinePass()";
+  let options = [
+    Option<"dispatchIndex", "dispatch-index", "int",
+           /*default=*/"-1", "index at which to crop the program">
+  ];
+}
+
 def InterchangeGenericOps :
     Pass<"iree-flow-interchange-generic-ops", ""> {
   let summary = "Interchange generic op loops to have all the reduction loops to be inner loops.";

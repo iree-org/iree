@@ -49,6 +49,7 @@ iree_cc_library(
     "InferNumericNarrowing.cpp"
     "InitializeEmptyTensors.cpp"
     "InjectDispatchTracing.cpp"
+    "CropDispatchPipeline.cpp"
     "InterchangeGenericOps.cpp"
     "InterchangeTransposeGenericOps.cpp"
     "OptimizeNumerics.cpp"

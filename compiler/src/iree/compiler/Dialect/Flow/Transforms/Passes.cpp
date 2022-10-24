@@ -35,6 +35,11 @@ static llvm::cl::opt<bool> clTraceDispatchTensors(
         "Trace runtime input/output tensors for each dispatch function."),
     llvm::cl::init(false));
 
+static llvm::cl::opt<int> clCropDispatchIndex(
+    "iree-flow-crop-at-index",
+    llvm::cl::desc("Crop the program at the specified index."),
+    llvm::cl::init(-1));
+
 static llvm::cl::opt<bool> clDemoteI64ToI32(
     "iree-flow-demote-i64-to-i32",
     llvm::cl::desc("Converts all i64 ops and values into i32 counterparts "
@@ -285,6 +290,12 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       // match later stages.
       .addPredicatedPass(clTraceDispatchTensors,
                          IREE::Flow::createInjectDispatchTracingPass)
+      .addPredicatedPass(clCropDispatchIndex >= 0,
+                         []() {
+                           return IREE::Flow::createCropDispatchPipelinePass(
+                               clCropDispatchIndex);
+                         })
+      .addPredicatedPass(clCropDispatchIndex >= 0, mlir::createCSEPass)
       // Cleanup the IR after we are done.
       .addPass(IREE::Flow::createCleanupTensorShapesPass)
       .addPass(mlir::createCanonicalizerPass)
