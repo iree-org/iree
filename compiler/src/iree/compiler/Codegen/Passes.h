@@ -265,6 +265,9 @@ void populateUnfusedFMAOpsPassPatterns(MLIRContext *context,
 /// to memrefs
 void addCPUDefaultPassPipeline(OpPassManager &passManager);
 
+/// Populates the passes to lower ops through data tiling transformations.
+void addCPUDataTilingPipeline(OpPassManager &passManager);
+
 /// Populates the passes to lower to tiled/distributed/bufferized ops, suitable
 /// for library call dispatch and lowering to loops.
 void addVMVXDefaultPassPipeline(OpPassManager &passManager);
