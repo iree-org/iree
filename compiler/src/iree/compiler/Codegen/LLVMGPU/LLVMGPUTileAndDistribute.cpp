@@ -60,7 +60,7 @@ static void populateTilingReductionPatterns(RewritePatternSet &patterns) {
                            .setTileSizeComputationFunction(tileSizesFn);
   MLIRContext *context = patterns.getContext();
 
-  linalg::LinalgTransformationFilter filter(
+  IREE::LinalgExt::LinalgTransformationFilter filter(
       ArrayRef<StringAttr>{
           StringAttr::get(context, getWorkgroupMemoryMarker())},
       StringAttr::get(context, getWorkgroupKTiledMarker()));
@@ -128,7 +128,7 @@ static void populateTilingToWarpPatterns(
                            .setTileSizeComputationFunction(getInnerTileSizeFn)
                            .setDistributionOptions(warpDistributionOptions);
   MLIRContext *context = patterns.getContext();
-  linalg::LinalgTransformationFilter filter(
+  IREE::LinalgExt::LinalgTransformationFilter filter(
       {StringAttr::get(context, getWorkgroupKTiledMarker()),
        StringAttr::get(context, getWorkgroupMemoryMarker())},
       StringAttr::get(context, getVectorizeMarker()));
@@ -160,7 +160,7 @@ static void populateTilingToInvocationPatterns(
           .setDistributionOptions(invocationDistributionOptions);
 
   MLIRContext *context = patterns.getContext();
-  linalg::LinalgTransformationFilter f(
+  IREE::LinalgExt::LinalgTransformationFilter f(
       {StringAttr::get(context, getWorkgroupKTiledMarker()),
        StringAttr::get(context, getWorkgroupMemoryMarker())},
       StringAttr::get(context, getVectorizeMarker()));
@@ -168,7 +168,7 @@ static void populateTilingToInvocationPatterns(
      // FFT doesn't support second level of tiling yet.
      return success(!isa<IREE::LinalgExt::FftOp>(op));
    }).setMatchByDefault();
-  patterns.insert<linalg::LinalgTilingPattern,
+  patterns.insert<IREE::LinalgExt::LinalgTilingPattern,
                   IREE::LinalgExt::TilingInterfaceTilingPattern>(
       context, tilingOptions, f);
 }
@@ -210,7 +210,7 @@ static void populatePromotionPatterns(MLIRContext *context,
           .setCopyInOutFns(copyToWorkgroupMemory, copyToWorkgroupMemory)
           .setOperandsToPromote(operandsToPromote)
           .setUseFullTileBuffers({false, false}),
-      linalg::LinalgTransformationFilter(
+      IREE::LinalgExt::LinalgTransformationFilter(
           {StringAttr::get(context, getWorkgroupKTiledMarker())},
           StringAttr::get(context, getWorkgroupMemoryMarker()))
           .setMatchByDefault()
@@ -221,7 +221,7 @@ static bool propagateCopyDestIntoProducerFill(memref::CopyOp copyOp) {
   // Look for a fill Op writing into the copyOp source.
   Operation *prevOp = copyOp->getPrevNode();
   while (prevOp) {
-    if (isSideEffectFree(prevOp)) {
+    if (isMemoryEffectFree(prevOp)) {
       prevOp = prevOp->getPrevNode();
       continue;
     }
@@ -244,13 +244,13 @@ static void insertInputValueIntoGeneric(Value source, linalg::GenericOp op) {
   SmallVector<AffineMap> maps;
   for (OpOperand *in : op.getInputOperands()) {
     newOperands.push_back(in->get());
-    maps.push_back(op.getTiedIndexingMap(in));
+    maps.push_back(op.getMatchingIndexingMap(in));
   }
   newOperands.push_back(source);
   assert(op.getNumOutputs() == 1);
   OpOperand *outOperand = op.getOutputOperand(0);
-  maps.push_back(op.getTiedIndexingMap(outOperand));
-  maps.push_back(op.getTiedIndexingMap(outOperand));
+  maps.push_back(op.getMatchingIndexingMap(outOperand));
+  maps.push_back(op.getMatchingIndexingMap(outOperand));
   Location loc = op.getLoc();
   SmallVector<StringRef> iterTypes(op.getNumLoops(),
                                    getParallelIteratorTypeName());
@@ -272,15 +272,16 @@ static bool propagateCopySourceIntoConsumerGeneric(
   // Look for a generic Op reading the copyOp target.
   Operation *nextOp = copyOp->getNextNode();
   while (nextOp) {
-    if (isSideEffectFree(nextOp)) {
+    if (isMemoryEffectFree(nextOp)) {
       nextOp = nextOp->getNextNode();
       continue;
     }
     auto consumer = dyn_cast<linalg::GenericOp>(nextOp);
     if (!consumer || consumer.getNumOutputs() != 1 ||
-        !consumer.getTiedIndexingMap(consumer.getOutputOperand(0)).isIdentity())
+        !consumer.getMatchingIndexingMap(consumer.getOutputOperand(0))
+             .isIdentity())
       break;
-    if (*consumer.outputs().begin() != copyOp.getTarget()) break;
+    if (*consumer.getOutputs().begin() != copyOp.getTarget()) break;
     insertInputValueIntoGeneric(copyOp.getSource(), consumer);
     toDelete.push_back(consumer);
     return true;
@@ -338,7 +339,7 @@ struct LLVMGPUTileAndDistributePass
     // Tile again at the workgroup level since reduction dimension were
     // ignored. Dimensions already tiled will be ignore since we tile to the
     // same size.
-    if (failed(tileReduction(funcOp))) {
+    if (failed(tileToSerialLoops(funcOp))) {
       return signalPassFailure();
     }
 

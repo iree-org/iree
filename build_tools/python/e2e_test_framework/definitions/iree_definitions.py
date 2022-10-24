@@ -23,6 +23,13 @@ class TargetBackend(Enum):
   VULKAN_SPIRV = "vulkan-spirv"
 
 
+class TargetABI(Enum):
+  VMVX = "vmvx"
+  LINUX_GNU = "linux-gnu"
+  LINUX_ANDROID29 = "linux-android29"
+  LINUX_ANDROID31 = "linux-android31"
+
+
 class RuntimeLoader(Enum):
   """IREE runtime loader."""
   EMBEDDED_ELF = "embedded-elf"
@@ -41,9 +48,9 @@ class RuntimeDriver(Enum):
 @dataclass(frozen=True)
 class CompileTarget(object):
   """Describes a target device to build for."""
-  target_architecture: common_definitions.DeviceArchitecture
-  target_platform: common_definitions.DevicePlatform
   target_backend: TargetBackend
+  target_architecture: common_definitions.DeviceArchitecture
+  target_abi: TargetABI
 
 
 @dataclass(frozen=True)
@@ -56,7 +63,7 @@ class CompileConfig(object):
 
 
 @dataclass(frozen=True)
-class VMFBExecutionConfig(object):
+class ModuleExecutionConfig(object):
   """Describes the options to run a module."""
   id: str
   tags: List[str]
@@ -66,17 +73,49 @@ class VMFBExecutionConfig(object):
   extra_flags: List[str] = dataclasses.field(default_factory=list)
 
 
+class MLIRDialectType(Enum):
+  """Imported MLIR dialect type."""
+  LINALG = "linalg"
+  TOSA = "tosa"
+  MHLO = "mhlo"
+
+
+MODEL_SOURCE_TO_DIALECT_TYPE_MAP = {
+    common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR:
+        MLIRDialectType.LINALG,
+    common_definitions.ModelSourceType.EXPORTED_TFLITE:
+        MLIRDialectType.TOSA,
+    common_definitions.ModelSourceType.EXPORTED_TF:
+        MLIRDialectType.MHLO,
+}
+
+
 @dataclass(frozen=True)
-class ModelCompileConfig(object):
-  """Describes a compile target to generate the module."""
-  compile_config: CompileConfig
+class ImportedModel(object):
+  """Describes an imported MLIR model."""
   model: common_definitions.Model
+  dialect_type: MLIRDialectType
+
+  @staticmethod
+  def from_model(model: common_definitions.Model):
+    # Currently we assume the model source type and its imported dialect is an
+    # 1-1 mapping.
+    return ImportedModel(
+        model=model,
+        dialect_type=MODEL_SOURCE_TO_DIALECT_TYPE_MAP[model.source_type])
+
+
+@dataclass(frozen=True)
+class ModuleGenerationConfig(object):
+  """Describes a compile target to generate the module."""
+  imported_model: ImportedModel
+  compile_config: CompileConfig
 
 
 @dataclass(frozen=True)
 class E2EModelRunConfig(object):
   """Describes an e2e run."""
-  model_compile_config: ModelCompileConfig
-  vmfb_execution_config: VMFBExecutionConfig
+  module_generation_config: ModuleGenerationConfig
+  module_execution_config: ModuleExecutionConfig
   target_device_spec: common_definitions.DeviceSpec
   input_data: common_definitions.ModelInputData

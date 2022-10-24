@@ -75,14 +75,14 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::Operation *target,
-        ::llvm::SmallVectorImpl<::mlir::Operation *> &results, 
+        ::llvm::SmallVectorImpl<::mlir::Operation *> &results,
         ::mlir::transform::TransformState &state);
   }];
 }
 
 def IREEBufferizeOp : Op<Transform_Dialect, "iree.bufferize",
     [FunctionalStyleTransformOpTrait, 
-     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     MemoryEffectsOpInterface,
      DeclareOpInterfaceMethods<TransformOpInterface>]> {
   let description = [{
     Target the whole hal.executable_variant op and call upstream comprehensive
@@ -117,7 +117,7 @@ def IREEBufferizeOp : Op<Transform_Dialect, "iree.bufferize",
 def ForeachThreadToWorkgroupOp : Op<Transform_Dialect, 
     "iree.foreach_thread_to_workgroup",
     [FunctionalStyleTransformOpTrait,
-     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     MemoryEffectsOpInterface,
      TransformOpInterface,
      TransformEachOpTrait]> {
   let description = [{

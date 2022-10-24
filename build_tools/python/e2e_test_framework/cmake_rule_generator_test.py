@@ -59,17 +59,44 @@ class CommonRuleFactoryTest(unittest.TestCase):
 
 class IreeRuleFactoryTest(unittest.TestCase):
 
+  TFLITE_MODEL = common_definitions.Model(
+      id="1234",
+      name="abcd",
+      tags=[],
+      source_type=common_definitions.ModelSourceType.EXPORTED_TFLITE,
+      source_url="https://example.com/xyz.tflite",
+      entry_function="main",
+      input_types=["1xf32"])
+  TF_MODEL = common_definitions.Model(
+      id="5678",
+      name="efgh",
+      tags=[],
+      source_type=common_definitions.ModelSourceType.EXPORTED_TF,
+      source_url="https://example.com/xyz_saved_model",
+      entry_function="predict",
+      input_types=["2xf32"])
+  LINALG_MODEL = common_definitions.Model(
+      id="9012",
+      name="ijkl",
+      tags=[],
+      source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
+      source_url="https://example.com/xyz.mlir",
+      entry_function="main",
+      input_types=["3xf32"])
+
   def setUp(self):
     self._factory = cmake_rule_generator.IreeRuleFactory("root/iree")
 
   def test_add_import_model_rule_import_model(self):
+    model_rule = cmake_rule_generator.ModelRule(target_name="model-1234",
+                                                file_path="aaa",
+                                                cmake_rule="bbb")
+
     rule = self._factory.add_import_model_rule(
-        model_id="1234",
-        model_name="abcd",
-        model_source_type=common_definitions.ModelSourceType.EXPORTED_TFLITE,
-        model_entry_function="main",
-        source_model_rule=cmake_rule_generator.ModelRule(
-            target_name="model-1234", file_path="aaa", cmake_rule="bbb"))
+        imported_model=iree_definitions.ImportedModel(
+            model=self.TFLITE_MODEL,
+            dialect_type=iree_definitions.MLIRDialectType.TOSA),
+        source_model_rule=model_rule)
 
     self.assertEqual(rule.target_name, "iree-import-model-1234")
     self.assertEqual(rule.mlir_dialect_type, "tosa")
@@ -77,16 +104,14 @@ class IreeRuleFactoryTest(unittest.TestCase):
 
   def test_add_import_model_rule_forward_mlir(self):
     model_rule = cmake_rule_generator.ModelRule(
-        target_name="model-1234",
-        file_path="root/models/1234.mlir",
-        cmake_rule="bbb")
+        target_name="model-0912",
+        file_path="root/models/0912.mlir",
+        cmake_rule="ccc")
 
     rule = self._factory.add_import_model_rule(
-        model_id="1234",
-        model_name="abcd",
-        model_source_type=common_definitions.ModelSourceType.
-        EXPORTED_LINALG_MLIR,
-        model_entry_function="main",
+        imported_model=iree_definitions.ImportedModel(
+            model=self.LINALG_MODEL,
+            dialect_type=iree_definitions.MLIRDialectType.LINALG),
         source_model_rule=model_rule)
 
     self.assertEqual(rule.target_name, model_rule.target_name)
@@ -108,8 +133,8 @@ class IreeRuleFactoryTest(unittest.TestCase):
             iree_definitions.CompileTarget(
                 target_architecture=common_definitions.DeviceArchitecture.
                 X86_64_CASCADELAKE,
-                target_platform=common_definitions.DevicePlatform.LINUX_GNU,
-                target_backend=iree_definitions.TargetBackend.LLVM_CPU)
+                target_backend=iree_definitions.TargetBackend.LLVM_CPU,
+                target_abi=iree_definitions.TargetABI.LINUX_GNU)
         ],
         extra_flags=[])
 
@@ -121,17 +146,15 @@ class IreeRuleFactoryTest(unittest.TestCase):
 
   def test_generate_cmake_rules(self):
     import_rule_1 = self._factory.add_import_model_rule(
-        model_id="1234",
-        model_name="abcd",
-        model_source_type=common_definitions.ModelSourceType.EXPORTED_TFLITE,
-        model_entry_function="main",
+        imported_model=iree_definitions.ImportedModel(
+            model=self.TFLITE_MODEL,
+            dialect_type=iree_definitions.MLIRDialectType.TOSA),
         source_model_rule=cmake_rule_generator.ModelRule(
             target_name="model-1234", file_path="aaa", cmake_rule="bbb"))
     import_rule_2 = self._factory.add_import_model_rule(
-        model_id="5678",
-        model_name="efgh",
-        model_source_type=common_definitions.ModelSourceType.EXPORTED_TF,
-        model_entry_function="main",
+        imported_model=iree_definitions.ImportedModel(
+            model=self.TF_MODEL,
+            dialect_type=iree_definitions.MLIRDialectType.MHLO),
         source_model_rule=cmake_rule_generator.ModelRule(
             target_name="model-5678", file_path="ccc", cmake_rule="eee"))
     compile_config = iree_definitions.CompileConfig(
@@ -141,8 +164,8 @@ class IreeRuleFactoryTest(unittest.TestCase):
             iree_definitions.CompileTarget(
                 target_architecture=common_definitions.DeviceArchitecture.
                 X86_64_CASCADELAKE,
-                target_platform=common_definitions.DevicePlatform.LINUX_GNU,
-                target_backend=iree_definitions.TargetBackend.LLVM_CPU)
+                target_backend=iree_definitions.TargetBackend.LLVM_CPU,
+                target_abi=iree_definitions.TargetABI.LINUX_GNU)
         ],
         extra_flags=[])
     compile_rule = self._factory.add_compile_module_rule(

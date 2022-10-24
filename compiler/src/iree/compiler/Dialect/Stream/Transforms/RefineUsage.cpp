@@ -336,9 +336,11 @@ static void insertUsageRefinementPatterns(MLIRContext *context,
                                           RewritePatternSet &patterns) {
   // NOTE: only ops that return values or contain regions need to be handled.
   patterns.insert<ApplyInitializerOp, ApplyFuncOp>(context, analysis);
-  patterns.insert<ApplyGenericOp<IREE::Util::DoNotOptimizeOp>,
+  patterns.insert<ApplyGenericOp<IREE::Util::OptimizationBarrierOp>,
                   ApplyGenericOp<mlir::arith::SelectOp>,
-                  ApplyGenericOp<mlir::func::CallOp>>(context, analysis);
+                  ApplyGenericOp<mlir::func::CallOp>,
+                  ApplyGenericOp<IREE::Stream::TimepointBarrierOp>>(context,
+                                                                    analysis);
   patterns.insert<ApplyStreamableOp<IREE::Stream::ResourceAllocOp>,
                   ApplyStreamableOp<IREE::Stream::ResourceAllocaOp>,
                   ApplyStreamableOp<IREE::Stream::TensorImportOp>,

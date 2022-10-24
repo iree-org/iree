@@ -18,7 +18,7 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
 
 class Stream_PureOp<string mnemonic, list<Trait> traits = []> :
-    Stream_Op<mnemonic, !listconcat(traits, [NoSideEffect])>;
+    Stream_Op<mnemonic, !listconcat(traits, [Pure])>;
 
 //===----------------------------------------------------------------------===//
 // Generic resource ops
@@ -1906,7 +1906,7 @@ def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
 
 def Stream_AsyncExecuteOp : Stream_Op<"async.execute", [
   AttrSizedOperandSegments,
-  RecursiveSideEffects,
+  RecursiveMemoryEffects,
   DeclareOpInterfaceMethods<RegionBranchOpInterface, [
     "getSuccessorEntryOperands",
   ]>,
@@ -1998,7 +1998,7 @@ def Stream_AsyncConcurrentOp : Stream_Op<"async.concurrent", [
     "IREE::Stream::AsyncConcurrentOp",
   ]>,
   AttrSizedOperandSegments,
-  RecursiveSideEffects,
+  RecursiveMemoryEffects,
   DeclareOpInterfaceMethods<RegionBranchOpInterface, [
     "getSuccessorEntryOperands",
   ]>,
@@ -2363,7 +2363,7 @@ def Stream_CmdDispatchOp : Stream_Op<"cmd.dispatch", [
 
 def Stream_CmdExecuteOp : Stream_Op<"cmd.execute", [
   AttrSizedOperandSegments,
-  RecursiveSideEffects,
+  RecursiveMemoryEffects,
   DeclareOpInterfaceMethods<RegionBranchOpInterface, [
     "getSuccessorEntryOperands",
   ]>,
@@ -2444,7 +2444,7 @@ def Stream_CmdSerialOp : Stream_Op<"cmd.serial", [
     "IREE::Stream::CmdSerialOp",
     "IREE::Stream::CmdConcurrentOp",
   ]>,
-  RecursiveSideEffects,
+  RecursiveMemoryEffects,
   DeclareOpInterfaceMethods<RegionBranchOpInterface>,
   SingleBlockImplicitTerminator<"IREE::Stream::YieldOp">,
   Stream_CmdPhaseOp,
@@ -2510,7 +2510,7 @@ def Stream_CmdConcurrentOp : Stream_Op<"cmd.concurrent", [
     "IREE::Stream::CmdSerialOp",
     "IREE::Stream::CmdConcurrentOp",
   ]>,
-  RecursiveSideEffects,
+  RecursiveMemoryEffects,
   DeclareOpInterfaceMethods<RegionBranchOpInterface>,
   SingleBlockImplicitTerminator<"IREE::Stream::YieldOp">,
   Stream_CmdPhaseOp,
@@ -2632,7 +2632,7 @@ def Stream_TimepointExportOp : Stream_PureOp<"timepoint.export", [
 ]> {
   let summary = [{exports a timepoint to an external dialect type}];
   let description = [{
-    Defines a conversion to an external dialect type such as `hal.semaphore`
+    Defines a conversion to an external dialect type such as `hal.fence`
     that is resolved during lowering into the stream dialect. This can be used
     to interoperate between levels of the stack that require specifying stream
     types and those that prior to lowering do not handle them.
@@ -2655,6 +2655,33 @@ def Stream_TimepointExportOp : Stream_PureOp<"timepoint.export", [
   }];
 
   let hasFolder = 1;
+}
+
+def Stream_TimepointChainExternalOp :
+    Stream_Op<"timepoint.chain_external", [
+      Stream_AffinityOp,
+    ]> {
+  let summary = [{exports a timepoint to an external dialect type}];
+  let description = [{
+    Defines a conversion to an external dialect type such as `hal.fence`
+    that is resolved during lowering into the stream dialect. This can be used
+    to interoperate between levels of the stack that require specifying stream
+    types and those that prior to lowering do not handle them.
+  }];
+
+  let arguments = (ins
+    Stream_Timepoint:$await_timepoint,
+    Variadic<AnyType>:$external_values,
+    OptionalAttr<Stream_AffinityAttr>:$affinity
+  );
+
+  let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
+    $await_timepoint
+    `=` `` `>`
+    `(` $external_values `:` type($external_values) `)`
+    attr-dict-with-keyword
+  }];
 }
 
 def Stream_TimepointJoinOp : Stream_PureOp<"timepoint.join", [
@@ -2682,6 +2709,63 @@ def Stream_TimepointJoinOp : Stream_PureOp<"timepoint.join", [
 
   let hasCanonicalizer = 1;
   let hasFolder = 1;
+}
+
+def Stream_TimepointBarrierOp : Stream_PureOp<"timepoint.barrier", [
+  AllTypesMatch<["resource", "result"]>,
+  Stream_AffinityOp,
+  Stream_TimelineOp,
+  Util_SizeAwareOp,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedResult",
+    "getTiedResultOperandIndex",
+    "getTiedResultOperandIndices",
+    "getTiedResultsIndexAndLength",
+  ]>,
+]> {
+  let summary = [{returns a timepoint indicating when a resource is available}];
+  let description = [{
+    After asynchronous execution scheduling resources may exist in different
+    states at different points in the execution timeline. This op enables
+    identifying when the version of a resource after a particular point in the
+    timeline is available. As timepoints transitively chain the timepoint must
+    only cover the resource availability but not be limited to its original
+    production timepoint.
+  }];
+
+  let arguments = (ins
+    AnyTypeOf<[
+      Stream_AnyStreamResource,
+      Stream_StagingResource,
+    ]>:$resource,
+    Stream_Size:$resource_size,
+    OptionalAttr<Stream_AffinityAttr>:$affinity
+  );
+  let results = (outs
+    AnyTypeOf<[
+      Stream_AnyStreamResource,
+      Stream_StagingResource,
+    ]>:$result,
+    Stream_Timepoint:$result_timepoint
+  );
+
+  let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
+    $resource `:` type($resource) `` `{` $resource_size `}`
+    `=` `` `>`
+    type($result_timepoint)
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return getResourceSize(); }
+    Value getResultSize(unsigned idx) { return getResourceSize(); }
+    SmallVector<Value> getAwaitTimepoints() { return {}; }
+  }];
+
+  let hasVerifier = 1;
+
+  let hasCanonicalizer = 1;
 }
 
 def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
@@ -2893,7 +2977,7 @@ def Stream_ReturnOp : Stream_Op<"return", [
   ParentOneOf<[
     "IREE::Stream::ExecutableExportOp",
   ]>,
-  NoSideEffect,
+  Pure,
   DeclareOpInterfaceMethods<RegionBranchTerminatorOpInterface, [
     "getMutableSuccessorOperands",
   ]>,
@@ -2923,7 +3007,7 @@ def Stream_YieldOp : Stream_Op<"yield", [
     "IREE::Stream::CmdSerialOp",
     "IREE::Stream::CmdConcurrentOp",
   ]>,
-  NoSideEffect,
+  Pure,
   DeclareOpInterfaceMethods<RegionBranchTerminatorOpInterface, [
     "getMutableSuccessorOperands",
   ]>,

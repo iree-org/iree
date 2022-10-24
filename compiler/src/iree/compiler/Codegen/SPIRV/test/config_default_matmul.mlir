@@ -32,7 +32,7 @@ hal.executable @batch_matmul_1x3x32 {
             : !flow.dispatch.tensor<readonly:1x3x3xf32> -> tensor<1x3x3xf32>
         %14 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [1, 3, 32], strides = [1, 1, 1]
             : !flow.dispatch.tensor<readonly:1x3x32xf32> -> tensor<1x3x32xf32>
-        %21 = linalg.init_tensor [1, 3, 32] : tensor<1x3x32xf32>
+        %21 = tensor.empty() : tensor<1x3x32xf32>
         %22 = linalg.fill ins(%cst : f32) outs(%21 : tensor<1x3x32xf32>) -> tensor<1x3x32xf32>
         %23 = linalg.batch_matmul {__internal_linalg_transform__ = "workgroup"}
             ins(%11, %14 : tensor<1x3x3xf32>, tensor<1x3x32xf32>) outs(%22 : tensor<1x3x32xf32>) -> tensor<1x3x32xf32>
@@ -45,7 +45,7 @@ hal.executable @batch_matmul_1x3x32 {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 1, 32], [0, 1, 1]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVDistribute>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseDistribute>
 //      CHECK: hal.executable.export public @batch_matmul_1x3x32
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [32 : index, 1 : index, 1 : index]
@@ -86,7 +86,7 @@ hal.executable private @matmul_64x16 {
             : !flow.dispatch.tensor<readonly:64x32xi8> -> tensor<64x32xi8>
         %10 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [32, 16], strides = [1, 1]
             : !flow.dispatch.tensor<readonly:32x16xi8> -> tensor<32x16xi8>
-        %15 = linalg.init_tensor [64, 16] : tensor<64x16xi32>
+        %15 = tensor.empty() : tensor<64x16xi32>
         %16 = linalg.fill ins(%c0_i32 : i32) outs(%15 : tensor<64x16xi32>) -> tensor<64x16xi32>
         %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup"}
             ins(%8, %10 : tensor<64x32xi8>, tensor<32x16xi8>) outs(%16 : tensor<64x16xi32>) -> tensor<64x16xi32>
@@ -99,7 +99,7 @@ hal.executable private @matmul_64x16 {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[4, 16], [1, 1]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVDistribute>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseDistribute>
 //      CHECK: hal.executable.export public @matmul_64x16
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [16 : index, 4 : index, 1 : index]
@@ -139,12 +139,12 @@ hal.executable @matmul_400x273 {
         %2 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:576x273xf32>
         %3 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:400x273xf32>
         %9 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [273], strides = [1] : !flow.dispatch.tensor<readonly:273xf32> -> tensor<273xf32>
-        %11 = linalg.init_tensor [400, 273] : tensor<400x273xf32>
+        %11 = tensor.empty() : tensor<400x273xf32>
         %13 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [400, 576], strides = [1, 1]
             : !flow.dispatch.tensor<readonly:400x576xf32> -> tensor<400x576xf32>
         %15 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [576, 273], strides = [1, 1]
             : !flow.dispatch.tensor<readonly:576x273xf32> -> tensor<576x273xf32>
-        %16 = linalg.init_tensor [400, 273] : tensor<400x273xf32>
+        %16 = tensor.empty() : tensor<400x273xf32>
         %17 = linalg.fill ins(%cst : f32) outs(%16 : tensor<400x273xf32>) -> tensor<400x273xf32>
         %18 = linalg.matmul ins(%13, %15 : tensor<400x576xf32>, tensor<576x273xf32>) outs(%17 : tensor<400x273xf32>) -> tensor<400x273xf32>
         %19 = linalg.generic {
@@ -164,7 +164,7 @@ hal.executable @matmul_400x273 {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[2, 32], [1, 1]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVDistribute>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseDistribute>
 //      CHECK: hal.executable.export public @matmul_400x273
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [32 : index, 2 : index, 1 : index]
@@ -205,12 +205,12 @@ hal.executable @matmul_25x546 {
         %3 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:25x546xf32>
         %9 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [546], strides = [1]
             : !flow.dispatch.tensor<readonly:546xf32> -> tensor<546xf32>
-        %11 = linalg.init_tensor [25, 546] : tensor<25x546xf32>
+        %11 = tensor.empty() : tensor<25x546xf32>
         %13 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [25, 512], strides = [1, 1]
             : !flow.dispatch.tensor<readonly:25x512xf32> -> tensor<25x512xf32>
         %15 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [512, 546], strides = [1, 1]
             : !flow.dispatch.tensor<readonly:512x546xf32> -> tensor<512x546xf32>
-        %16 = linalg.init_tensor [25, 546] : tensor<25x546xf32>
+        %16 = tensor.empty() : tensor<25x546xf32>
         %17 = linalg.fill ins(%cst : f32) outs(%16 : tensor<25x546xf32>) -> tensor<25x546xf32>
         %18 = linalg.matmul ins(%13, %15 : tensor<25x512xf32>, tensor<512x546xf32>) outs(%17 : tensor<25x546xf32>) -> tensor<25x546xf32>
         %19 = linalg.generic {
@@ -230,7 +230,7 @@ hal.executable @matmul_25x546 {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 2], [1, 1]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVDistribute>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseDistribute>
 //      CHECK: hal.executable.export public @matmul_25x546
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [2 : index, 32 : index, 1 : index]
@@ -281,12 +281,12 @@ hal.executable private @matmul_pointwise_256x1024 {
             : !flow.dispatch.tensor<readonly:256x1024xf16> -> tensor<256x1024xf16>
         %12 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [256, 1024], strides = [1, 1]
             : !flow.dispatch.tensor<readonly:256x1024xf16> -> tensor<256x1024xf16>
-        %13 = linalg.init_tensor [256, 1024] : tensor<256x1024xf16>
+        %13 = tensor.empty() : tensor<256x1024xf16>
         %15 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [256, 128], strides = [1, 1]
             : !flow.dispatch.tensor<readonly:256x128xf16> -> tensor<256x128xf16>
         %17 = flow.dispatch.tensor.load %3, offsets = [0, 0], sizes = [128, 1024], strides = [1, 1]
             : !flow.dispatch.tensor<readonly:128x1024xf16> -> tensor<128x1024xf16>
-        %18 = linalg.init_tensor [256, 1024] : tensor<256x1024xf16>
+        %18 = tensor.empty() : tensor<256x1024xf16>
         %19 = linalg.fill ins(%cst : f16) outs(%18 : tensor<256x1024xf16>) -> tensor<256x1024xf16>
         %20 = linalg.matmul ins(%15, %17 : tensor<256x128xf16>, tensor<128x1024xf16>) outs(%19 : tensor<256x1024xf16>) -> tensor<256x1024xf16>
         %21 = linalg.generic {
@@ -305,8 +305,8 @@ hal.executable private @matmul_pointwise_256x1024 {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[16, 256], [8, 8], [0, 0, 4]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorize>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[16, 256], [8, 8], [0, 0, 8]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseVectorize>
 //      CHECK: hal.executable.export public @matmul_pointwise_256x1024
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [32 : index, 2 : index, 1 : index]

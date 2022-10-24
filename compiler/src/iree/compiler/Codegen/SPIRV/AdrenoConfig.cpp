@@ -22,10 +22,17 @@ namespace iree_compiler {
 namespace detail {
 
 static LogicalResult setAdrenoMatmulConfig(linalg::LinalgOp op,
-                                           int subgroupSize) {
+                                           spirv::ResourceLimitsAttr limits) {
+  const int subgroupSize = limits.getSubgroupSize();
   const std::array<int64_t, 2> workgroupXY = {subgroupSize / 2, 2};
-  const std::array<int64_t, 3> threadMNK = {16, 4, 4};
-  return setMatmulOpConfig(op, subgroupSize, workgroupXY, threadMNK);
+  std::array<int64_t, 3> threadMNK;
+  auto inputType = op.getInputOperand(0)->get().getType().cast<ShapedType>();
+  if (inputType.getElementType().getIntOrFloatBitWidth() == 16) {
+    threadMNK = {16, 8, 8};
+  } else {
+    threadMNK = {16, 4, 4};
+  }
+  return setMatmulOpConfig(limits, op, workgroupXY, threadMNK);
 }
 
 //===----------------------------------------------------------------------===//
@@ -34,17 +41,17 @@ static LogicalResult setAdrenoMatmulConfig(linalg::LinalgOp op,
 
 LogicalResult setAdrenoCodeGenConfig(const spirv::TargetEnv &targetEnv,
                                      Operation *rootOp) {
-  int subgroupSize = targetEnv.getResourceLimits().getSubgroupSize();
+  spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
+  int subgroupSize = limits.getSubgroupSize();
 
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp)) {
     if (isMatmulOrBatchMatmul(linalgOp))
-      return setAdrenoMatmulConfig(linalgOp, subgroupSize);
+      return setAdrenoMatmulConfig(linalgOp, limits);
   }
 
   return TypeSwitch<Operation *, LogicalResult>(rootOp)
-      .Case<linalg::BatchMatmulOp, linalg::MatmulOp>([subgroupSize](auto op) {
-        return setAdrenoMatmulConfig(op, subgroupSize);
-      })
+      .Case<linalg::BatchMatmulOp, linalg::MatmulOp>(
+          [limits](auto op) { return setAdrenoMatmulConfig(op, limits); })
       .Case<linalg::Conv2DNchwFchwOp, linalg::Conv2DNhwcHwcfOp>(
           [subgroupSize](auto op) {
             return setConvOpConfig(op, subgroupSize,

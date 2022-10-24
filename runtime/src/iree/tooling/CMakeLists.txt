@@ -160,6 +160,7 @@ iree_cc_library(
   DEPS
     ::numpy_io
     iree::base
+    iree::base::internal::file_io
     iree::base::tracing
     iree::hal
     iree::modules::hal

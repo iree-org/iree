@@ -164,7 +164,7 @@ func.func @load_store_alloc_static(%value : f32, %i0: index, %i1 : index, %i2: i
 //      CHECK:   %[[INDEX0:.+]] = affine.apply #[[MAP]]()[%[[I0]], %[[I1]], %[[I2]]]
 //      CHECK:   memref.store %[[VAL]], %[[ALLOC]][%[[INDEX0]]] : memref<24xf32, 3>
 //      CHECK:   %[[INDEX1:.+]] = affine.apply #[[MAP]]()[%[[I0]], %[[I1]], %[[I2]]]
-//      CHECK:   %[[LOAD:.+]] = memref.load %0[%[[INDEX1]]] : memref<24xf32, 3>
+//      CHECK:   %[[LOAD:.+]] = memref.load %[[ALLOC]][%[[INDEX1]]] : memref<24xf32, 3>
 //      CHECK:   return %[[LOAD]]
 
 // -----
@@ -356,3 +356,22 @@ func.func @static_collapse_shape_to_1d_static(%offset : index, %i: index) {
 //      CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%arg0) : memref<?xf32>{%[[SIZE]]}
 //      CHECK:   %[[STATIC_CAST:.+]] = memref.cast %0 : memref<?xf32> to memref<336xf32>
 //      CHECK:   "unregistered.opaque"(%[[STATIC_CAST]])
+
+// -----
+
+func.func @subview(%offset : index, %i0: index, %i1: index) -> f32 {
+  %c0 = arith.constant 0 : index
+  %subspan = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%offset) : memref<32x128xf32>
+  %expand = memref.subview %subspan[%i0, %i1][16, 8][1, 1] : memref<32x128xf32> to memref<16x8xf32, strided<[128, 1], offset: ?>>
+  %value = memref.load %expand[%c0, %c0] : memref<16x8xf32, strided<[128, 1], offset: ?>>
+  return %value : f32
+}
+
+//      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2] -> (s0 * 128 + s1 + s2 floordiv 4)>
+//      CHECK: func.func @subview
+// CHECK-SAME: (%[[OFFSET:.+]]: index, %[[I0:.+]]: index, %[[I1:.+]]: index)
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:   %[[SIZE:.+]] = arith.constant 4096 : index
+//      CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%[[C0]]) : memref<?xf32>{%[[SIZE]]}
+//      CHECK:   %[[INDEX:.+]] = affine.apply #[[MAP]]()[%[[I0]], %[[I1]], %[[OFFSET]]]
+//      CHECK:   memref.load %[[SUBSPAN]][%[[INDEX]]]

@@ -65,6 +65,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:GPUDialect",
+        "@llvm-project//mlir:GPUTransformOps",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:LinalgUtils",

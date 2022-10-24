@@ -2,7 +2,7 @@ func.func @select_with_binary() {
   %control = arith.constant dense<[true, false, true, false]> : tensor<4xi1>
   %a = arith.constant dense<[1, 2, 3, 4]> : tensor<4xi32>
   %b = arith.constant dense<[5, 6, 7, 8]> : tensor<4xi32>
-  %init = linalg.init_tensor [4] : tensor<4xi32>
+  %init = tensor.empty() : tensor<4xi32>
   %c = linalg.generic {
       indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>,
                        affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],

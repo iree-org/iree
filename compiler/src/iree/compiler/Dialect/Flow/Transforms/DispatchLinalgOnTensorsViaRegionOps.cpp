@@ -11,6 +11,7 @@
 // Note: The heuristic part of the implementation is unchanged and copied from
 // DispatchLinalgOnTensors.cpp.
 
+#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree/compiler/Dialect/Flow/Conversion/TensorToFlow/ConvertTensorToFlow.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
@@ -31,6 +32,7 @@
 #include "mlir/IR/Dominance.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/RegionUtils.h"
+#include "mlir/Transforms/TopologicalSortUtils.h"
 
 using namespace mlir;
 using namespace mlir::iree_compiler;
@@ -213,7 +215,7 @@ bool isClonableIntoDispatchOp(Operation *op) {
   // TODO(#8637): `tensor.collapse_shape` and `tensor.expand_shape` are
   // trivially clonable too, but they cause problems
   // with bufferization. Make them clonable when fixed.
-  if (isa<arith::IndexCastOp, linalg::InitTensorOp, tensor::CastOp,
+  if (isa<arith::IndexCastOp, tensor::EmptyOp, tensor::CastOp,
           tensor::ExtractOp, tensor::ExtractSliceOp, tensor::PadOp>(op)) {
     return true;
   }
@@ -342,7 +344,7 @@ static bool areLinalgOpsFusableUsingTileAndFuse(OpOperand &use) {
   // serialized to match the workgroup counts of the fused operations.
   // Otherwise, check if the result of producer is accessed using identity
   // indexing.
-  AffineMap consumerIndexingMap = consumer.getTiedIndexingMap(&use);
+  AffineMap consumerIndexingMap = consumer.getMatchingIndexingMap(&use);
   if (!consumerIndexingMap.isIdentity()) {
     return false;
   }
@@ -427,7 +429,7 @@ static bool isFusableWithProducer(OpOperand &operand) {
   if (isa<linalg::LinalgOp>(consumer) && isa<linalg::LinalgOp>(producer)) {
     auto consumerLinalgOp = cast<linalg::LinalgOp>(consumer);
     auto producerLinalgOp = cast<linalg::LinalgOp>(producer);
-    if (consumerLinalgOp.isOutputTensor(&operand) &&
+    if (consumerLinalgOp.isOutput(&operand) &&
         producerLinalgOp.getNumLoops() ==
             producerLinalgOp.getNumParallelLoops()) {
       return true;
@@ -472,7 +474,7 @@ static unsigned decideFusableLinalgOps(FunctionOpInterface funcOp,
   unsigned numRootOps = 0;
   MLIRContext *context = funcOp->getContext();
   OpBuilder builder(context);
-  for (Block &block : funcOp.getBody()) {
+  for (Block &block : funcOp.getFunctionBody()) {
     // Dispatch region formation works by first cloning the root into
     // the dispatch region and then pulling operations in.
     // So procedure here is to
@@ -494,7 +496,7 @@ static unsigned decideFusableLinalgOps(FunctionOpInterface funcOp,
 
   // Once all root linalg ops have been tagged, put all remaining generic ops
   // into their own dispatches.
-  for (Block &block : funcOp.getBody()) {
+  for (Block &block : funcOp.getFunctionBody()) {
     SmallVector<Operation *> roots;
     for (Operation &op : llvm::reverse(block)) {
       // If it is part of a fusion group or root op, ignore it.
@@ -529,10 +531,11 @@ static unsigned decideFusableLinalgOps(FunctionOpInterface funcOp,
 static LogicalResult cloneProducers(RewriterBase &rewriter,
                                     Flow::DispatchRegionOp regionOp) {
   SmallVector<Operation *> cloneableOps = getCloneableOps(regionOp);
-  SmallVector<Operation *> orderedProducers =
-      Flow::orderOperations(cloneableOps);
+  bool sortResult = mlir::computeTopologicalSorting(cloneableOps);
+  (void)sortResult;
+  assert(sortResult && "could not compute topological sorting");
 
-  for (Operation *producer : llvm::reverse(orderedProducers))
+  for (Operation *producer : llvm::reverse(cloneableOps))
     if (failed(
             clonePrecedingOpIntoDispatchRegion(rewriter, producer, regionOp)))
       return failure();
@@ -595,13 +598,12 @@ static FailureOr<SmallVector<Flow::DispatchWorkgroupsOp>> createFusionGroups(
 
     // Sort producers topologically. All producers must be in the same block as
     // the root.
-    // TODO: Use mlir::computeTopologicalSorting. This is currently not possible
-    // because some of the producers are in different blocks.
-    SmallVector<Operation *> orderedProducers =
-        Flow::orderOperations(producers[it.index()]);
+    bool sortResult = mlir::computeTopologicalSorting(producers[it.index()]);
+    (void)sortResult;
+    assert(sortResult && "could not compute topological sorting");
 
     // Move ops into the region.
-    for (Operation *producer : llvm::reverse(orderedProducers)) {
+    for (Operation *producer : llvm::reverse(producers[it.index()])) {
       auto newRegionOp =
           movePrecedingOpIntoDispatchRegion(rewriter, producer, regionOp);
       if (failed(newRegionOp)) return failure();
@@ -764,7 +766,7 @@ void DispatchLinalgOnTensorsViaRegionOpsPass::runOnOperation() {
   funcOp.walk([](Operation *op) {
     removeFusionGroupsAttribute(op);
     removeRootOpAttribute(op);
-    op->removeAttr(linalg::LinalgTransforms::kLinalgTransformMarker);
+    op->removeAttr(IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker);
   });
 }
 

@@ -15,6 +15,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinOps.h"
 
@@ -24,11 +25,19 @@ namespace mlir {
 namespace iree_compiler {
 namespace detail {
 
-static LogicalResult setAMDMatmulConfig(linalg::LinalgOp op, int subgroupSize) {
+static LogicalResult setAMDMatmulConfig(linalg::LinalgOp op,
+                                        spirv::ResourceLimitsAttr limits) {
+  const int subgroupSize = limits.getSubgroupSize();
   const std::array<int64_t, 2> workgroupXY = {subgroupSize / 2, 8};
-  const std::array<int64_t, 3> threadMNK = {8, 4, 16};
-  return setMatmulOpConfig(op, subgroupSize, workgroupXY, threadMNK,
-                           /*useWorkgroupMemory=*/true);
+  std::array<int64_t, 3> threadMNK;
+  auto inputType = op.getInputOperand(0)->get().getType().cast<ShapedType>();
+  if (inputType.getElementType().getIntOrFloatBitWidth() == 16) {
+    threadMNK = {8, 8, 32};
+  } else {
+    threadMNK = {8, 4, 16};
+  }
+  return setMatmulOpConfig(limits, op, workgroupXY, threadMNK,
+                           /*enablePromotion=*/true);
 }
 
 // RDNA architecture:
@@ -45,17 +54,17 @@ static LogicalResult setAMDMatmulConfig(linalg::LinalgOp op, int subgroupSize) {
 
 LogicalResult setAMDCodeGenConfig(const spirv::TargetEnv &targetEnv,
                                   Operation *rootOp) {
-  int subgroupSize = targetEnv.getResourceLimits().getSubgroupSize();
+  spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
+  int subgroupSize = limits.getSubgroupSize();
 
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp)) {
     if (isMatmulOrBatchMatmul(linalgOp))
-      return setAMDMatmulConfig(linalgOp, subgroupSize);
+      return setAMDMatmulConfig(linalgOp, limits);
   }
 
   return TypeSwitch<Operation *, LogicalResult>(rootOp)
-      .Case<linalg::BatchMatmulOp, linalg::MatmulOp>([subgroupSize](auto op) {
-        return setAMDMatmulConfig(op, subgroupSize);
-      })
+      .Case<linalg::BatchMatmulOp, linalg::MatmulOp>(
+          [limits](auto op) { return setAMDMatmulConfig(op, limits); })
       .Case<linalg::Conv2DNchwFchwOp, linalg::Conv2DNhwcHwcfOp>(
           [subgroupSize](auto op) {
             bool hasPaddedInput =

@@ -50,3 +50,33 @@ iree_lit_test_suite(
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+
+if((IREE_TARGET_BACKEND_VMVX OR DEFINED IREE_HOST_BINARY_ROOT) AND
+   IREE_HAL_DRIVER_LOCAL_SYNC)
+  iree_bytecode_module(
+    NAME
+      iree_run_module_bytecode_module_vmvx
+    SRC
+      "iree-run-module.mlir"
+    MODULE_FILE_NAME
+      "iree_run_module_bytecode_module_vmvx.vmfb"
+    FLAGS
+      "--iree-hal-target-backends=vmvx"
+  )
+
+  iree_run_module_test(
+    NAME
+      iree_run_module_correctness_test
+    MODULE_SRC
+      "${CMAKE_CURRENT_BINARY_DIR}/iree_run_module_bytecode_module_vmvx.vmfb"
+    DRIVER
+      "local-sync"
+    RUNNER_ARGS
+      "--entry_function=abs"
+      "--function_input=f32=-10"
+    EXPECTED_OUTPUT
+      "f32=10"
+    DEPS
+      iree_tools_test_iree_run_module_bytecode_module_vmvx
+  )
+endif()

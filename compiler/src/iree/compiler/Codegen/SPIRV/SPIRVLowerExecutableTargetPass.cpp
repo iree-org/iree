@@ -14,6 +14,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
@@ -43,7 +44,8 @@ class SPIRVLowerExecutableTargetPass
         .insert<IREE::Codegen::IREECodegenDialect, AffineDialect,
                 gpu::GPUDialect, IREE::HAL::HALDialect, linalg::LinalgDialect,
                 IREE::LinalgExt::IREELinalgExtDialect, memref::MemRefDialect,
-                scf::SCFDialect, spirv::SPIRVDialect, vector::VectorDialect>();
+                bufferization::BufferizationDialect, scf::SCFDialect,
+                spirv::SPIRVDialect, vector::VectorDialect>();
   }
 
   void runOnOperation() override;
@@ -96,19 +98,19 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
 
   if (!testLoweringConfiguration && passPipeline.has_value()) {
     switch (*passPipeline) {
-      case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistribute:
-        addSPIRVTileAndDistributePassPipeline(pipeline);
+      case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVBaseDistribute:
+        addSPIRVBaseDistributePassPipeline(pipeline);
         break;
-      case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVVectorize:
-        addSPIRVTileAndVectorizePassPipeline(pipeline);
-        break;
-      case IREE::Codegen::DispatchLoweringPassPipeline::
-          SPIRVVectorizeToCooperativeOps:
-        addSPIRVTileAndVectorizeToCooperativeOpsPassPipeline(pipeline);
+      case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVBaseVectorize:
+        addSPIRVBaseVectorizePassPipeline(pipeline);
         break;
       case IREE::Codegen::DispatchLoweringPassPipeline::
-          SPIRVVectorizeWithWorkgroupMemory:
-        addSPIRVTileAndVectorizeWithWorkgroupMemoryPassPipeline(pipeline);
+          SPIRVCooperativeMatrixVectorize:
+        addSPIRVCooperativeMatrixVectorizePassPipeline(pipeline);
+        break;
+      case IREE::Codegen::DispatchLoweringPassPipeline::
+          SPIRVMatmulPromoteVectorize:
+        addSPIRVMatmulPromoteVectorizePassPipeline(pipeline);
         break;
       case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVSubgroupReduce:
         addSPIRVSubgroupReducePassPipeline(pipeline);

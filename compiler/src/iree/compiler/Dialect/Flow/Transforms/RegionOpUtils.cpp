@@ -95,15 +95,20 @@ LogicalResult Flow::reifyDynamicResultDims(OpBuilder &b, Value value,
   // There is at least one dynamic dimension, continue...
   ShapedType shapedType = value.getType().cast<ShapedType>();
 
-  // Case 2: Value is a block argument.
-  if (auto bbArg = value.dyn_cast<BlockArgument>()) {
-    b.setInsertionPointToStart(bbArg.getOwner());
+  // Helper function that generates tensor.dim ops.
+  auto emitTensorDimOps = [&]() {
     for (int64_t i = 0; i < shapedType.getRank(); ++i) {
       if (shapedType.isDynamicDim(i)) {
-        Value dim = b.create<tensor::DimOp>(bbArg.getLoc(), bbArg, i);
+        Value dim = b.create<tensor::DimOp>(value.getLoc(), value, i);
         dynamicDims.push_back(dim);
       }
     }
+  };
+
+  // Case 2: Value is a block argument.
+  if (auto bbArg = value.dyn_cast<BlockArgument>()) {
+    b.setInsertionPointToStart(bbArg.getOwner());
+    emitTensorDimOps();
     return success();
   }
 
@@ -140,21 +145,30 @@ LogicalResult Flow::reifyDynamicResultDims(OpBuilder &b, Value value,
     return success();
   }
 
-  return failure();
+  // None of the above. Insert tensor.dim ops.
+  b.setInsertionPointAfter(op);
+  emitTensorDimOps();
+  return success();
 }
 
 // Append a result to the given DispatchRegionOp. The newly created
 // DispatchRegionOp is returned.
 FailureOr<Flow::DispatchRegionOp> Flow::appendDispatchRegionResult(
-    RewriterBase &rewriter, Flow::DispatchRegionOp regionOp, Value result) {
+    RewriterBase &rewriter, Flow::DispatchRegionOp regionOp, Value result,
+    const SmallVector<Value> &dynamicDims) {
+#ifndef NDEBUG
+  auto tensorType = result.getType().cast<RankedTensorType>();
+  assert(tensorType.getNumDynamicDims() == dynamicDims.size() &&
+         "incorrect number of dynamicDims provided");
+#endif  // NDEBUG
+
   OpBuilder::InsertionGuard guard(rewriter);
 
   // Determine dynamic result dims.
   rewriter.setInsertionPoint(regionOp);
-  SmallVector<Value> dynamicDims(regionOp.getResultDims().begin(),
-                                 regionOp.getResultDims().end());
-  if (failed(reifyDynamicResultDims(rewriter, result, dynamicDims)))
-    return failure();
+  SmallVector<Value> regionDynamicDims(regionOp.getResultDims().begin(),
+                                       regionOp.getResultDims().end());
+  regionDynamicDims.append(dynamicDims);
 
   // Determine result types of new RegionOp.
   SmallVector<Type> resultTypes(regionOp.getResultTypes().begin(),
@@ -163,7 +177,7 @@ FailureOr<Flow::DispatchRegionOp> Flow::appendDispatchRegionResult(
 
   // Create new DispatchRegionOp and move over the body.
   auto newRegionOp = rewriter.create<Flow::DispatchRegionOp>(
-      regionOp->getLoc(), resultTypes, dynamicDims);
+      regionOp->getLoc(), resultTypes, regionDynamicDims);
   newRegionOp.getBody().takeBody(regionOp.getBody());
   rewriter.replaceOp(
       regionOp, newRegionOp.getResults().take_front(regionOp->getNumResults()));
@@ -195,7 +209,7 @@ Flow::DispatchRegionOp Flow::makeEmptyDispatchRegion(OpBuilder &builder,
 
 // Clone a `target` op that is preceding the given dispatch region op into the
 // dispatch region.
-LogicalResult Flow::clonePrecedingOpIntoDispatchRegion(
+FailureOr<Operation *> Flow::clonePrecedingOpIntoDispatchRegion(
     RewriterBase &rewriter, Operation *target,
     Flow::DispatchRegionOp regionOp) {
   Block &body = regionOp.getBody().front();
@@ -220,7 +234,7 @@ LogicalResult Flow::clonePrecedingOpIntoDispatchRegion(
     });
   }
 
-  return success();
+  return newTargetOp;
 }
 
 // Move a `target` op that is preceding the given dispatch region op into the
@@ -245,6 +259,15 @@ FailureOr<Flow::DispatchRegionOp> Flow::movePrecedingOpIntoDispatchRegion(
     if (!regionOp->isProperAncestor(use.getOwner()))
       usesOutsideOfRegion.push_back(&use);
 
+  // Compute dynamic result dims.
+  SmallVector<SmallVector<Value>> dynamicDims;
+  for (Value v : target->getResults()) {
+    OpBuilder::InsertionGuard guard(rewriter);
+    rewriter.setInsertionPoint(target);
+    SmallVector<Value> &dims = dynamicDims.emplace_back();
+    if (failed(reifyDynamicResultDims(rewriter, v, dims))) return failure();
+  }
+
   // Move op into dispatch region.
   target->moveBefore(&body.front());
 
@@ -255,8 +278,9 @@ FailureOr<Flow::DispatchRegionOp> Flow::movePrecedingOpIntoDispatchRegion(
     // Note: Appending results one-by-one here so that this can be extended to
     // specific results in the future. Many ops have just one result, so this
     // should not be a large overhead.
-    for (Value v : target->getResults()) {
-      auto newRegionOp = appendDispatchRegionResult(rewriter, regionOp, v);
+    for (const auto &it : llvm::enumerate(target->getResults())) {
+      auto newRegionOp = appendDispatchRegionResult(
+          rewriter, regionOp, it.value(), dynamicDims[it.index()]);
       if (failed(newRegionOp)) return failure();
       regionOp = *newRegionOp;
     }
@@ -284,86 +308,4 @@ FailureOr<Flow::DispatchRegionOp> Flow::wrapOpInDispatchRegion(
   // Move the op into the dispatch region.
   auto newRegionOp = movePrecedingOpIntoDispatchRegion(rewriter, op, regionOp);
   return newRegionOp;
-}
-
-/// Reorders the operations in `ops` such that they could be inlined into the
-/// dispatch region in that order to satisfy dependencies.
-SmallVector<Operation *> Flow::orderOperations(ArrayRef<Operation *> ops) {
-  LLVM_DEBUG({
-    llvm::dbgs() << "Ops to be inlined :\n";
-    for (auto op : ops) {
-      llvm::dbgs() << "\t";
-      op->print(llvm::dbgs());
-      llvm::dbgs() << "\n";
-    }
-  });
-
-  llvm::SmallMapVector<Operation *, SmallVector<Operation *>, 16>
-      insertAfterMap;
-  llvm::SetVector<Operation *> opSet(ops.begin(), ops.end());
-  llvm::SetVector<Operation *> leafOps(ops.begin(), ops.end());
-  // For each operation compute the list of operations in `ops` that use its
-  // results. Also compute the operations that form the leafs of the DAG of
-  // operations in `ops`.
-  for (auto op : ops) {
-    for (auto operand : op->getOperands()) {
-      auto definingOp = operand.getDefiningOp();
-      if (!definingOp || !opSet.count(definingOp)) continue;
-      insertAfterMap[definingOp].push_back(op);
-      if (leafOps.count(op)) leafOps.remove(op);
-    }
-  }
-
-  // The leaves are at the head of the ordered list.
-  SmallVector<Operation *> orderedOps(leafOps.begin(), leafOps.end());
-  orderedOps.reserve(ops.size());
-  llvm::SmallPtrSet<Operation *, 16> processed;
-  processed.insert(leafOps.begin(), leafOps.end());
-
-  // `readyOps` contains the list of operations that have been just added to the
-  // `orderedOps` list. With these marked ready, they might make further
-  // operations in `ops` ready as well.
-  // The complexity of the algorithm is driven by these
-  // - Each operations is added to `readyOps` list at most once, and is removed
-  //   after being processed
-  // - For every operation in `readyOps` every use of its results (within `ops`)
-  //   is looked at once.
-  // - For every use, the operands of the user are processed.
-  // Assuming operands is O(1), i.e. constant order, the complexity is O(sum of
-  // number of uses of each operation). Given that the size of `ops` is at max
-  // O(10), and not O(100), this is assumed to be reasonable.
-  ArrayRef<Operation *> readyOps(orderedOps);
-  size_t startPos = 0;
-  while (!readyOps.empty()) {
-    auto op = readyOps.front();
-    startPos++;
-    // Check all uses of `op` within `ops`. If all of the operations that define
-    // the operands of the user have been added to `orderedOps`, then the user
-    // is ready to be scheduled.
-    for (auto insertAfterOp : insertAfterMap[op]) {
-      if (processed.count(insertAfterOp)) continue;
-      if (llvm::all_of(insertAfterOp->getOperands(), [&](Value operand) {
-            Operation *operandDefiningOp = operand.getDefiningOp();
-            return !operandDefiningOp || !opSet.count(operandDefiningOp) ||
-                   processed.count(operandDefiningOp);
-          })) {
-        // readyOps.push_back(insertAfterOp);
-        orderedOps.push_back(insertAfterOp);
-        processed.insert(insertAfterOp);
-      }
-    }
-    readyOps = ArrayRef<Operation *>(orderedOps).drop_front(startPos);
-  }
-
-  LLVM_DEBUG({
-    llvm::dbgs() << "Ops to be inlined (sorted) : \n";
-    for (auto op : orderedOps) {
-      llvm::dbgs() << "\t";
-      op->print(llvm::dbgs());
-      llvm::dbgs() << "\n";
-    }
-  });
-  assert(orderedOps.size() == ops.size() &&
-         "ordering of inlined operations failed");
-  return orderedOps;
 }

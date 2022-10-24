@@ -14,6 +14,7 @@ iree_cc_library(
   NAME
     IR
   HDRS
+    "FlowAttrs.h.inc"
     "FlowDialect.h"
     "FlowEnums.h.inc"
     "FlowOpInterfaces.h.inc"
@@ -23,6 +24,7 @@ iree_cc_library(
     "FlowTypes.h"
     "FlowTypes.h.inc"
   SRCS
+    "FlowAttrs.cpp.inc"
     "FlowDialect.cpp"
     "FlowEnums.cpp.inc"
     "FlowOpFolders.cpp"
@@ -39,6 +41,7 @@ iree_cc_library(
     ::FlowTypesGen
     LLVMSupport
     MLIRAffineDialect
+    MLIRAffineUtils
     MLIRAnalysis
     MLIRArithDialect
     MLIRArithUtils

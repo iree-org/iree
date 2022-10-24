@@ -195,7 +195,7 @@ flow.executable @nested_ops_ex_0 {
   flow.executable.export @nested_ops_entry_0
   builtin.module {
     func.func @nested_ops_entry_0(%input0: tensor<5x6xf32>, %input1: tensor<5x6xf32>) -> tensor<5x6xf32> {
-      %init = linalg.init_tensor [5, 6] : tensor<5x6xf32>
+      %init = tensor.empty() : tensor<5x6xf32>
       %max = linalg.generic {indexing_maps = [#map0, #map0, #map0], iterator_types = ["parallel", "parallel"]} ins(%input0, %input1 : tensor<5x6xf32>, tensor<5x6xf32>) outs(%init : tensor<5x6xf32>) {
       ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):  // no predecessors
         %27 = arith.maxf %arg1, %arg2 : f32
@@ -210,7 +210,7 @@ flow.executable @nested_ops_ex_1 {
   flow.executable.export @nested_ops_entry_1
   builtin.module {
     func.func @nested_ops_entry_1(%input0: tensor<5x6xf32>, %input1: tensor<5x6xf32>) -> tensor<5x6xf32> {
-      %init = linalg.init_tensor [5, 6] : tensor<5x6xf32>
+      %init = tensor.empty() : tensor<5x6xf32>
       %max = linalg.generic {indexing_maps = [#map0, #map0, #map0], iterator_types = ["parallel", "parallel"]} ins(%input0, %input1 : tensor<5x6xf32>, tensor<5x6xf32>) outs(%init : tensor<5x6xf32>) {
       ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):  // no predecessors
         %27 = arith.maxf %arg1, %arg2 : f32
@@ -225,7 +225,7 @@ flow.executable @nested_ops_ex_2 {
   flow.executable.export @nested_ops_entry_2
   builtin.module {
     func.func @nested_ops_entry_2(%input0: tensor<5x6xf32>, %input1: tensor<5x6xf32>) -> tensor<5x6xf32> {
-      %init = linalg.init_tensor [5, 6] : tensor<5x6xf32>
+      %init = tensor.empty() : tensor<5x6xf32>
       %min = linalg.generic {indexing_maps = [#map0, #map0, #map0], iterator_types = ["parallel", "parallel"]} ins(%input0, %input1 : tensor<5x6xf32>, tensor<5x6xf32>) outs(%init : tensor<5x6xf32>) {
       ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):  // no predecessors
         %27 = arith.minf %arg1, %arg2 : f32
@@ -257,7 +257,7 @@ flow.executable @attributes_ex_0 {
   flow.executable.export @attributes_entry_0
   builtin.module {
     func.func @attributes_entry_0(%input0: tensor<5x6xf32>, %input1: tensor<5x6xf32>) -> tensor<5x6xf32> {
-      %init = linalg.init_tensor [5, 6] : tensor<5x6xf32>
+      %init = tensor.empty() : tensor<5x6xf32>
       %max = linalg.generic {indexing_maps = [#map0, #map0, #map0], iterator_types = ["parallel", "parallel"]} ins(%input0, %input1 : tensor<5x6xf32>, tensor<5x6xf32>) outs(%init : tensor<5x6xf32>) {
       ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):  // no predecessors
         %27 = arith.maxf %arg1, %arg2 : f32
@@ -272,7 +272,7 @@ flow.executable @attributes_ex_1 {
   flow.executable.export @attributes_entry_1
   builtin.module {
     func.func @attributes_entry_1(%input0: tensor<5x6xf32>, %input1: tensor<5x6xf32>) -> tensor<5x6xf32> {
-      %init = linalg.init_tensor [5, 6] : tensor<5x6xf32>
+      %init = tensor.empty() : tensor<5x6xf32>
       // map1 instead of map0
       %max = linalg.generic {indexing_maps = [#map1, #map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%input0, %input1 : tensor<5x6xf32>, tensor<5x6xf32>) outs(%init : tensor<5x6xf32>) {
       ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):  // no predecessors
@@ -289,7 +289,7 @@ flow.executable @attributes_ex_2 {
   flow.executable.export @attributes_entry_2
   builtin.module {
     func.func @attributes_entry_2(%input0: tensor<5x6xf32>, %input1: tensor<5x6xf32>) -> tensor<5x6xf32> {
-      %init = linalg.init_tensor [5, 6] : tensor<5x6xf32>
+      %init = tensor.empty() : tensor<5x6xf32>
       %max = linalg.generic {indexing_maps = [#map0, #map0, #map0], iterator_types = ["parallel", "parallel"]} ins(%input0, %input1 : tensor<5x6xf32>, tensor<5x6xf32>) outs(%init : tensor<5x6xf32>) {
       ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):  // no predecessors
         %27 = arith.maxf %arg1, %arg2 : f32

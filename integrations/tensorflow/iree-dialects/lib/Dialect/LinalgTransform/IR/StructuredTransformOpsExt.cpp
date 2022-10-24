@@ -6,6 +6,7 @@
 
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 
+#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/ScopedTransform.h"
 #include "iree-dialects/Transforms/Listener.h"
@@ -61,13 +62,15 @@
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE << "]: ")
 
 using namespace mlir;
+using mlir::iree_compiler::IREE::LinalgExt::LinalgEnablingOptions;
 
 //===----------------------------------------------------------------------===//
 // Additional constraints for PDLMatchOp.
 //===----------------------------------------------------------------------===//
 
 /// Hook for PDL driver to check if an operation (`values[0]`) is directly
-/// nested in a function with the name provided by an attribute (`values[1]`).
+/// nested in a function with the name provided by an attribute
+/// (`values[1]`).
 /// TODO: PDL needs user-defined "questions".
 static LogicalResult nestedInFunc(PatternRewriter &rewriter,
                                   Operation *operation, Attribute attr) {
@@ -125,10 +128,10 @@ static LogicalResult isEquivalentToOpImpl(PatternRewriter &rewriter,
                                           linalg::LinalgOp linalgOp,
                                           linalg::LinalgOp linalgModelOp) {
   // If basic properties do not match, return failure.
-  if (linalgOp.inputs() != linalgModelOp.inputs() ||
-      linalgOp.outputs() != linalgModelOp.outputs() ||
+  if (linalgOp.getInputs() != linalgModelOp.getInputs() ||
+      linalgOp.getOutputs() != linalgModelOp.getOutputs() ||
       linalgOp.getIndexingMaps() != linalgModelOp.getIndexingMaps() ||
-      linalgOp.iterator_types() != linalgModelOp.iterator_types())
+      linalgOp.getIteratorTypesArray() != linalgModelOp.getIteratorTypesArray())
     return failure();
 
   // Build the block and go perform a body comparison.
@@ -421,8 +424,8 @@ void mlir::TrackingListener::notifyOperationReplaced(Operation *op,
     return;
 
   // Exit early if the op is not tracked.
-  Value handle = getTransformState().getHandleForPayloadOp(op);
-  if (!handle)
+  SmallVector<Value> handles;
+  if (failed(getTransformState().getHandlesForPayloadOp(op, handles)))
     return;
 
   Operation *replacement = findSingleDefiningOp(op, newValues);
@@ -432,7 +435,7 @@ void mlir::TrackingListener::notifyOperationReplaced(Operation *op,
   }
 
   LLVM_DEBUG(DBGS() << "replacing tracked " << *op << " with " << *replacement
-                    << " for " << handle << "\n");
+                    << "\n");
   mayFail(replacePayloadOp(op, replacement));
 }
 
@@ -442,11 +445,11 @@ void mlir::TrackingListener::notifyOperationRemoved(Operation *op) {
     return;
 
   // Exit early if the op is not tracked.
-  Value handle = getTransformState().getHandleForPayloadOp(op);
-  if (!handle)
+  SmallVector<Value> handles;
+  if (failed(getTransformState().getHandlesForPayloadOp(op, handles)))
     return;
 
-  LLVM_DEBUG(DBGS() << "removing tracked " << *op << " for " << handle << "\n");
+  LLVM_DEBUG(DBGS() << "removing tracked " << *op << "\n");
   mayFail(replacePayloadOp(op, nullptr));
 }
 
@@ -458,7 +461,7 @@ void mlir::TrackingListener::notifyOperationRemoved(Operation *op) {
 /// removal, CSE) on the given function.
 static LogicalResult performEnablerTransformations(
     func::FuncOp func, RewriteListener &listener,
-    linalg::LinalgEnablingOptions options = linalg::LinalgEnablingOptions()) {
+    LinalgEnablingOptions options = LinalgEnablingOptions()) {
   MLIRContext *ctx = func->getContext();
   RewritePatternSet patterns(ctx);
   linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
@@ -492,7 +495,7 @@ static LogicalResult performEnablerTransformations(
 /// operation tracking information.
 static LogicalResult performEnablerTransformations(
     Operation *containerOp, RewriteListener &listener,
-    linalg::LinalgEnablingOptions options = linalg::LinalgEnablingOptions()) {
+    LinalgEnablingOptions options = LinalgEnablingOptions()) {
   auto res = containerOp->walk([&](func::FuncOp func) {
     if (failed(performEnablerTransformations(func, listener, options)))
       return WalkResult::interrupt();

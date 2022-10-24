@@ -26,7 +26,7 @@ hal.executable.source public @executable {
       %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<writeonly:f32>
 
       %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:f32> -> tensor<f32>
-      %3 = linalg.init_tensor [] : tensor<f32>
+      %3 = tensor.empty() : tensor<f32>
       %4 = linalg.generic {indexing_maps = [affine_map<() -> ()>, affine_map<() -> ()>], iterator_types = []} ins(%2 : tensor<f32>) outs(%3 : tensor<f32>) {
       ^bb0(%arg0: f32, %arg1: f32):
         %5 = math.absf %arg0 : f32

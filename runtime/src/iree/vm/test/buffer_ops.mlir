@@ -16,8 +16,8 @@ vm.module @buffer_ops {
   vm.func private @test_compare() {
     %rodata_a = vm.const.ref.rodata @rodata_cmp_3xi32_a : !vm.buffer
     %rodata_b = vm.const.ref.rodata @rodata_cmp_3xi32_b : !vm.buffer
-    %rodata_a_dno = util.do_not_optimize(%rodata_a) : !vm.buffer
-    %rodata_b_dno = util.do_not_optimize(%rodata_b) : !vm.buffer
+    %rodata_a_dno = util.optimization_barrier %rodata_a : !vm.buffer
+    %rodata_b_dno = util.optimization_barrier %rodata_b : !vm.buffer
 
     %c0 = vm.const.i64 0
     %length = vm.buffer.length %rodata_a_dno : !vm.buffer -> i64
@@ -37,8 +37,8 @@ vm.module @buffer_ops {
   vm.func private @test_compare_empty() {
     %rodata_a = vm.const.ref.rodata @rodata_cmp_3xi32_a : !vm.buffer
     %rodata_b = vm.const.ref.rodata @rodata_cmp_3xi32_b : !vm.buffer
-    %rodata_a_dno = util.do_not_optimize(%rodata_a) : !vm.buffer
-    %rodata_b_dno = util.do_not_optimize(%rodata_b) : !vm.buffer
+    %rodata_a_dno = util.optimization_barrier %rodata_a : !vm.buffer
+    %rodata_b_dno = util.optimization_barrier %rodata_b : !vm.buffer
 
     %c0 = vm.const.i64 0
     %c2 = vm.const.i64 2
@@ -58,7 +58,7 @@ vm.module @buffer_ops {
   vm.func private @test_alloc() {
     %c128 = vm.const.i64 128
     %buf = vm.buffer.alloc %c128 : !vm.buffer
-    %buf_dno = util.do_not_optimize(%buf) : !vm.buffer
+    %buf_dno = util.optimization_barrier %buf : !vm.buffer
     vm.check.nz %buf_dno, "!null" : !vm.buffer
 
     %buf_length = vm.buffer.length %buf_dno : !vm.buffer -> i64
@@ -72,7 +72,7 @@ vm.module @buffer_ops {
   vm.func private @test_alloc_empty() {
     %c0 = vm.const.i64 0
     %buf = vm.buffer.alloc %c0 : !vm.buffer
-    %buf_dno = util.do_not_optimize(%buf) : !vm.buffer
+    %buf_dno = util.optimization_barrier %buf : !vm.buffer
     vm.check.nz %buf_dno, "!null" : !vm.buffer
 
     %buf_length = vm.buffer.length %buf_dno : !vm.buffer -> i64
@@ -95,7 +95,7 @@ vm.module @buffer_ops {
     %c4 = vm.const.i64 4
     %c8 = vm.const.i64 8
     %buf = vm.buffer.clone %rodata, %c4, %c8 : !vm.buffer -> !vm.buffer
-    %buf_dno = util.do_not_optimize(%buf) : !vm.buffer
+    %buf_dno = util.optimization_barrier %buf : !vm.buffer
     vm.check.nz %buf_dno, "!null" : !vm.buffer
 
     // Compare the cloned range to the original.
@@ -112,14 +112,14 @@ vm.module @buffer_ops {
     // Allocate source zero-length buffer.
     %c0 = vm.const.i64 0
     %buf0 = vm.buffer.alloc %c0 : !vm.buffer
-    %buf0_dno = util.do_not_optimize(%buf0) : !vm.buffer
+    %buf0_dno = util.optimization_barrier %buf0 : !vm.buffer
     vm.check.nz %buf0_dno, "!null" : !vm.buffer
     %buf0_length = vm.buffer.length %buf0_dno : !vm.buffer -> i64
     vm.check.eq %c0, %buf0_length, "buffer length == 0" : i64
 
     // Clone it all (or, clone nothing?).
     %buf1 = vm.buffer.clone %buf0_dno, %c0, %c0 : !vm.buffer -> !vm.buffer
-    %buf1_dno = util.do_not_optimize(%buf1) : !vm.buffer
+    %buf1_dno = util.optimization_barrier %buf1 : !vm.buffer
     vm.check.nz %buf1_dno, "!null" : !vm.buffer
     %buf1_length = vm.buffer.length %buf1_dno : !vm.buffer -> i64
     vm.check.eq %c0, %buf1_length, "buffer length == 0" : i64
@@ -132,7 +132,7 @@ vm.module @buffer_ops {
   vm.func private @fail_clone_out_of_range() {
     // Fetch source .rodata blob.
     %rodata = vm.const.ref.rodata @rodata_3xi32 : !vm.buffer
-    %rodata_dno = util.do_not_optimize(%rodata) : !vm.buffer
+    %rodata_dno = util.optimization_barrier %rodata : !vm.buffer
     vm.check.nz %rodata_dno, "!null" : !vm.buffer
 
     // Try to clone off the end of the buffer.
@@ -156,7 +156,7 @@ vm.module @buffer_ops {
 
     // Allocate target buffer.
     %buf = vm.buffer.alloc %rodata_length : !vm.buffer
-    %buf_dno = util.do_not_optimize(%buf) : !vm.buffer
+    %buf_dno = util.optimization_barrier %buf : !vm.buffer
     vm.check.nz %buf_dno, "!null" : !vm.buffer
 
     // Copy the entire contents.
@@ -178,7 +178,7 @@ vm.module @buffer_ops {
     // Allocate target buffer.
     %c4 = vm.const.i64 4
     %buf = vm.buffer.alloc %c4 : !vm.buffer
-    %buf_dno = util.do_not_optimize(%buf) : !vm.buffer
+    %buf_dno = util.optimization_barrier %buf : !vm.buffer
     vm.check.nz %buf_dno, "!null" : !vm.buffer
 
     // Copy the middle 4-byte element.
@@ -200,7 +200,7 @@ vm.module @buffer_ops {
     %rodata = vm.const.ref.rodata @rodata_3xi32 : !vm.buffer
     %c128 = vm.const.i64 128
     %buf = vm.buffer.alloc %c128 : !vm.buffer
-    %buf_dno = util.do_not_optimize(%buf) : !vm.buffer
+    %buf_dno = util.optimization_barrier %buf : !vm.buffer
     vm.check.nz %buf_dno, "!null" : !vm.buffer
 
     // Try to clone off the end of the source buffer.
@@ -216,7 +216,7 @@ vm.module @buffer_ops {
     %rodata = vm.const.ref.rodata @rodata_3xi32 : !vm.buffer
     %c128 = vm.const.i64 128
     %buf = vm.buffer.alloc %c128 : !vm.buffer
-    %buf_dno = util.do_not_optimize(%buf) : !vm.buffer
+    %buf_dno = util.optimization_barrier %buf : !vm.buffer
     vm.check.nz %buf_dno, "!null" : !vm.buffer
 
     // Try to clone off the end of the source buffer.
@@ -234,7 +234,7 @@ vm.module @buffer_ops {
     %rodata_length = vm.buffer.length %rodata : !vm.buffer -> i64
     %c8 = vm.const.i64 8
     %buf = vm.buffer.alloc %c8 : !vm.buffer
-    %buf_dno = util.do_not_optimize(%buf) : !vm.buffer
+    %buf_dno = util.optimization_barrier %buf : !vm.buffer
     vm.check.nz %buf_dno, "!null" : !vm.buffer
 
     // Try to clone off the end of the target buffer.
@@ -250,7 +250,7 @@ vm.module @buffer_ops {
     %rodata = vm.const.ref.rodata @rodata_3xi32 : !vm.buffer
     %c8 = vm.const.i64 8
     %buf = vm.buffer.alloc %c8 : !vm.buffer
-    %buf_dno = util.do_not_optimize(%buf) : !vm.buffer
+    %buf_dno = util.optimization_barrier %buf : !vm.buffer
     vm.check.nz %buf_dno, "!null" : !vm.buffer
 
     // Try to clone off the end of the target buffer.
@@ -272,7 +272,7 @@ vm.module @buffer_ops {
     // Allocate zeroed buffer.
     %c8 = vm.const.i64 8
     %buf = vm.buffer.alloc %c8 : !vm.buffer
-    %buf_dno = util.do_not_optimize(%buf) : !vm.buffer
+    %buf_dno = util.optimization_barrier %buf : !vm.buffer
     vm.check.nz %buf_dno, "!null" : !vm.buffer
 
     // Fill the middle two elements.
@@ -298,7 +298,7 @@ vm.module @buffer_ops {
     // Allocate zeroed buffer.
     %c8 = vm.const.i64 8
     %buf = vm.buffer.alloc %c8 : !vm.buffer
-    %buf_dno = util.do_not_optimize(%buf) : !vm.buffer
+    %buf_dno = util.optimization_barrier %buf : !vm.buffer
 
     // Try filling from offset 1, which is not i16-aligned.
     %c1 = vm.const.i64 1
@@ -324,7 +324,7 @@ vm.module @buffer_ops {
     // Allocate zeroed buffer.
     %c8 = vm.const.i64 8
     %buf = vm.buffer.alloc %c8 : !vm.buffer
-    %buf_dno = util.do_not_optimize(%buf) : !vm.buffer
+    %buf_dno = util.optimization_barrier %buf : !vm.buffer
 
     // Try filling for length 1, which is not i16-aligned.
     %c0 = vm.const.i64 0
@@ -503,11 +503,11 @@ vm.module @buffer_ops {
   vm.export @test_store_i8 attributes {emitc.exclude}
   vm.func private @test_store_i8() {
     %ref = vm.const.ref.rodata @test_store_i8_ref : !vm.buffer
-    %ref_dno = util.do_not_optimize(%ref) : !vm.buffer
+    %ref_dno = util.optimization_barrier %ref : !vm.buffer
     %ref_length = vm.buffer.length %ref_dno : !vm.buffer -> i64
 
     %buf = vm.buffer.alloc %ref_length : !vm.buffer
-    %buf_dno = util.do_not_optimize(%buf) : !vm.buffer
+    %buf_dno = util.optimization_barrier %buf : !vm.buffer
 
     %c0 = vm.const.i64 0
     %e0 = vm.const.i32 0
@@ -536,11 +536,11 @@ vm.module @buffer_ops {
   vm.export @test_store_i16 attributes {emitc.exclude}
   vm.func private @test_store_i16() {
     %ref = vm.const.ref.rodata @test_store_i16_ref : !vm.buffer
-    %ref_dno = util.do_not_optimize(%ref) : !vm.buffer
+    %ref_dno = util.optimization_barrier %ref : !vm.buffer
     %ref_length = vm.buffer.length %ref_dno : !vm.buffer -> i64
 
     %buf = vm.buffer.alloc %ref_length : !vm.buffer
-    %buf_dno = util.do_not_optimize(%buf) : !vm.buffer
+    %buf_dno = util.optimization_barrier %buf : !vm.buffer
 
     %c0 = vm.const.i64 0
     %e0 = vm.const.i32 0
@@ -569,11 +569,11 @@ vm.module @buffer_ops {
   vm.export @test_store_i32 attributes {emitc.exclude}
   vm.func private @test_store_i32() {
     %ref = vm.const.ref.rodata @test_store_i32_ref : !vm.buffer
-    %ref_dno = util.do_not_optimize(%ref) : !vm.buffer
+    %ref_dno = util.optimization_barrier %ref : !vm.buffer
     %ref_length = vm.buffer.length %ref_dno : !vm.buffer -> i64
 
     %buf = vm.buffer.alloc %ref_length : !vm.buffer
-    %buf_dno = util.do_not_optimize(%buf) : !vm.buffer
+    %buf_dno = util.optimization_barrier %buf : !vm.buffer
 
     %c0 = vm.const.i64 0
     %e0 = vm.const.i32 0

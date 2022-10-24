@@ -273,6 +273,11 @@ typedef struct iree_task_executor_options_t {
   // Specifies the schedule mode used for worker and workload balancing.
   iree_task_scheduling_mode_t scheduling_mode;
 
+  // Base value added to each executor-local worker index.
+  // This allows workers to uniquely identify themselves in multi-executor
+  // configurations.
+  iree_host_size_t worker_base_index;
+
   // TODO(benvanik): add a scope_spin_ns to control wait-idle and other
   // scope-related waits coming from outside of the task system.
 

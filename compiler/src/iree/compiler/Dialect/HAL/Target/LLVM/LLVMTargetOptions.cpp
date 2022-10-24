@@ -207,11 +207,11 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
       "iree-llvm-list-targets",
       llvm::cl::desc("Lists all registered targets that the LLVM backend can "
                      "generate code for."),
-      llvm::cl::init(false));
-  if (clListTargets) {
-    llvm::TargetRegistry::printRegisteredTargetsForVersion(llvm::outs());
-    exit(0);
-  }
+      llvm::cl::init(false), llvm::cl::ValueDisallowed,
+      llvm::cl::callback([&](const bool &) {
+        llvm::TargetRegistry::printRegisteredTargetsForVersion(llvm::outs());
+        exit(0);
+      }));
 
   return targetOptions;
 }

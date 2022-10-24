@@ -25,6 +25,7 @@ CMAKE_BIN="${CMAKE_BIN:-$(which cmake)}"
 RISCV_ARCH="${RISCV_ARCH:-rv64}"
 RISCV_COMPILER_FLAGS="${RISCV_COMPILER_FLAGS:--O3}"
 IREE_HOST_BINARY_ROOT="$(realpath ${IREE_HOST_BINARY_ROOT})"
+BUILD_BENCHMARK_SUITE_DIR="${BUILD_BENCHMARK_SUITE_DIR:-$ROOT_DIR/build-benchmarks/benchmark_suites}"
 BUILD_RISCV_DIR="${BUILD_RISCV_DIR:-$ROOT_DIR/build-riscv}"
 BUILD_PRESET="${BUILD_PRESET:-test}"
 
@@ -89,6 +90,12 @@ case "${BUILD_PRESET}" in
       -DIREE_ENABLE_RUNTIME_TRACING=ON
     )
     ;;
+  benchmark-suite-test)
+    BUILD_BENCHMARK_SUITE_DIR="$(realpath ${BUILD_BENCHMARK_SUITE_DIR})"
+    args+=(
+      -DIREE_BENCHMARK_SUITE_DIR="${BUILD_BENCHMARK_SUITE_DIR}"
+    )
+    ;;
   *)
     echo "Unknown build preset: ${BUILD_PRESET}"
     exit 1
@@ -96,10 +103,19 @@ case "${BUILD_PRESET}" in
 esac
 
 "${CMAKE_BIN}" "${args[@]}" "${ROOT_DIR}"
-"${CMAKE_BIN}" --build "${BUILD_RISCV_DIR}" -- -k 0
 
-if [[ "${RISCV_ARCH}" == "rv64" || "${RISCV_ARCH}" == "rv32-linux" ]]; then
-  echo "Building test deps for RISC-V"
-  echo "-----------------------------"
-  "${CMAKE_BIN}" --build "${BUILD_RISCV_DIR}" --target iree-test-deps -- -k 0
+if [[ "${BUILD_PRESET}" == "benchmark-suite-test" ]] && \
+   [[ "${RISCV_ARCH}" == "rv64" || "${RISCV_ARCH}" == "rv32-linux" ]]; then
+  echo "Building iree-run-module and run-module-test deps for RISC-V"
+  echo "------------------------------------------------------------"
+  "${CMAKE_BIN}" --build "${BUILD_RISCV_DIR}" --target iree-run-module \
+    iree-run-module-test-deps -- -k 0
+else
+  "${CMAKE_BIN}" --build "${BUILD_RISCV_DIR}" -- -k 0
+
+  if [[ "${RISCV_ARCH}" == "rv64" || "${RISCV_ARCH}" == "rv32-linux" ]]; then
+    echo "Building test deps for RISC-V"
+    echo "-----------------------------"
+    "${CMAKE_BIN}" --build "${BUILD_RISCV_DIR}" --target iree-test-deps -- -k 0
+  fi
 fi

@@ -30,8 +30,9 @@ namespace iree_compiler {
 void populateUtilConversionPatterns(MLIRContext *context,
                                     TypeConverter &typeConverter,
                                     RewritePatternSet &patterns) {
-  patterns.insert<GenericConvertTypesPattern<IREE::Util::DoNotOptimizeOp>>(
-      typeConverter, context);
+  patterns
+      .insert<GenericConvertTypesPattern<IREE::Util::OptimizationBarrierOp>>(
+          typeConverter, context);
 
   typeConverter.addConversion([&](IREE::Util::PtrType type,
                                   SmallVectorImpl<Type> &results) {
@@ -60,8 +61,8 @@ void populateUtilConversionPatterns(MLIRContext *context,
                                     ConversionTarget &conversionTarget,
                                     TypeConverter &typeConverter,
                                     RewritePatternSet &patterns) {
-  addGenericLegalOp<IREE::Util::DoNotOptimizeOp>(conversionTarget,
-                                                 typeConverter);
+  addGenericLegalOp<IREE::Util::OptimizationBarrierOp>(conversionTarget,
+                                                       typeConverter);
   addGenericLegalOp<IREE::Util::ListCreateOp>(conversionTarget, typeConverter);
   addGenericLegalOp<IREE::Util::ListGetOp>(conversionTarget, typeConverter);
   addGenericLegalOp<IREE::Util::ListSetOp>(conversionTarget, typeConverter);
@@ -123,12 +124,12 @@ struct ConvertFuncOp : public OpConversionPattern<mlir::func::FuncOp> {
     // Replace function.
     auto newFuncOp = rewriter.cloneWithoutRegions(funcOp);
     newFuncOp.getBlocks().clear();
-    rewriter.inlineRegionBefore(funcOp.getBody(), newFuncOp.getBody(),
-                                newFuncOp.end());
+    rewriter.inlineRegionBefore(funcOp.getFunctionBody(),
+                                newFuncOp.getFunctionBody(), newFuncOp.end());
     newFuncOp.setType(rewriter.getFunctionType(newSignature.getConvertedTypes(),
                                                newResultTypes));
-    if (failed(rewriter.convertRegionTypes(&newFuncOp.getBody(), typeConverter,
-                                           &newSignature))) {
+    if (failed(rewriter.convertRegionTypes(&newFuncOp.getFunctionBody(),
+                                           typeConverter, &newSignature))) {
       return rewriter.notifyMatchFailure(funcOp,
                                          "failed to convert region types");
     }

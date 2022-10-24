@@ -28,8 +28,8 @@ func.func @quantized_matmul_lhs_zp_0_dynamic(%lhs : tensor<?x?xi8>, %rhs : tenso
 // CHECK-SAME:    %[[ACC:.+]]: tensor<?x?xi32>
 // CHECK:       %[[C0_I32:.+]] = arith.constant 0 : i32
 // CHECK:       %[[MATMUL:.+]] = linalg.matmul ins(%[[LHS]], %[[RHS]] : tensor<?x?xi8>, tensor<?x?xi8>) outs(%[[ACC]] : tensor<?x?xi32>)
-// CHECK-DAG:   %[[INIT_RESULT:.+]] = linalg.init_tensor
-// CHECK-DAG:   %[[INIT_LHS_SUMS_ACC:.+]] = linalg.init_tensor
+// CHECK-DAG:   %[[INIT_RESULT:.+]] = tensor.empty
+// CHECK-DAG:   %[[INIT_LHS_SUMS_ACC:.+]] = tensor.empty
 // CHECK:       %[[ZERO_LHS_SUMS_ACC:.+]] = linalg.fill
 // CHECK-SAME:    ins(%[[C0_I32]] :
 // CHECK-SAME:    outs(%[[INIT_LHS_SUMS_ACC]] :
@@ -55,13 +55,13 @@ func.func @quantized_matmul_rhs_zp_0_dynamic(%lhs : tensor<?x?xi8>, %rhs : tenso
 // CHECK-SAME:    %[[ACC:.+]]: tensor<?x?xi32>
 // CHECK:       %[[C0_I32:.+]] = arith.constant 0 : i32
 // CHECK:       %[[MATMUL:.+]] = linalg.matmul ins(%[[LHS]], %[[RHS]] : tensor<?x?xi8>, tensor<?x?xi8>) outs(%[[ACC]] : tensor<?x?xi32>)
-// CHECK-DAG:   %[[INIT_RESULT:.+]] = linalg.init_tensor
-// CHECK-DAG:   %[[INIT_RHS_SUMS_ACC:.+]] = linalg.init_tensor
+// CHECK-DAG:   %[[INIT_RESULT:.+]] = tensor.empty
+// CHECK-DAG:   %[[INIT_RHS_SUMS_ACC:.+]] = tensor.empty
 // CHECK:       %[[ZERO_RHS_SUMS_ACC:.+]] = linalg.fill
 // CHECK-SAME:    ins(%[[C0_I32]] :
 // CHECK-SAME:    outs(%[[INIT_RHS_SUMS_ACC]] :
 // CHECK:       %[[RHS_SUMS:.+]] = linalg.generic
-// CHECK-SAME:    "reduction", "parallel"
+// CHECK-SAME:    "parallel", "reduction"
 // CHECK-SAME:    ins(%[[RHS]] : tensor<?x?xi8>)
 // CHECK-SAME:    outs(%[[ZERO_RHS_SUMS_ACC]] : tensor<?xi32>)
 // CHECK:       %[[RESULT:.+]] = linalg.generic
@@ -82,8 +82,8 @@ func.func @quantized_matmul_neither_zp_0_dynamic(%lhs : tensor<?x?xi8>, %rhs : t
 // CHECK-DAG:   %[[C1_INDEX:.+]] = arith.constant 1 : index
 // CHECK-DAG:   %[[C0_I32:.+]] = arith.constant 0 : i32
 // CHECK:       %[[MATMUL:.+]] = linalg.matmul ins(%[[LHS]], %[[RHS]] : tensor<?x?xi8>, tensor<?x?xi8>) outs(%[[ACC]] : tensor<?x?xi32>)
-// CHECK-DAG:   %[[INIT_RESULT:.+]] = linalg.init_tensor
-// CHECK-DAG:   %[[INIT_LHS_SUMS_ACC:.+]] = linalg.init_tensor
+// CHECK-DAG:   %[[INIT_RESULT:.+]] = tensor.empty
+// CHECK-DAG:   %[[INIT_LHS_SUMS_ACC:.+]] = tensor.empty
 // CHECK:       %[[ZERO_LHS_SUMS_ACC:.+]] = linalg.fill
 // CHECK-SAME:    ins(%[[C0_I32]] :
 // CHECK-SAME:    outs(%[[INIT_LHS_SUMS_ACC]] :
@@ -91,12 +91,12 @@ func.func @quantized_matmul_neither_zp_0_dynamic(%lhs : tensor<?x?xi8>, %rhs : t
 // CHECK-SAME:    "parallel", "reduction"
 // CHECK-SAME:    ins(%[[LHS]] : tensor<?x?xi8>)
 // CHECK-SAME:    outs(%[[ZERO_LHS_SUMS_ACC]] : tensor<?xi32>)
-// CHECK:       %[[INIT_RHS_SUMS_ACC:.+]] = linalg.init_tensor
+// CHECK:       %[[INIT_RHS_SUMS_ACC:.+]] = tensor.empty
 // CHECK:       %[[ZERO_RHS_SUMS_ACC:.+]] = linalg.fill
 // CHECK-SAME:    ins(%[[C0_I32]] :
 // CHECK-SAME:    outs(%[[INIT_RHS_SUMS_ACC]] :
 // CHECK:       %[[RHS_SUMS:.+]] = linalg.generic
-// CHECK-SAME:    "reduction", "parallel"
+// CHECK-SAME:    "parallel", "reduction"
 // CHECK-SAME:    ins(%[[RHS]] : tensor<?x?xi8>)
 // CHECK-SAME:    outs(%[[ZERO_RHS_SUMS_ACC]] : tensor<?xi32>)
 // CHECK:       %[[LHS_ZP_TIMES_RHS_ZP:.+]] = arith.muli %[[LHS_ZP]], %[[RHS_ZP]]
@@ -121,8 +121,8 @@ func.func @quantized_matmul_neither_zp_0_3x4x5(%lhs : tensor<3x4xi8>, %rhs : ten
 // CHECK-DAG:   %[[C0_I32:.+]] = arith.constant 0 : i32
 // CHECK-DAG:   %[[C4_I32:.+]] = arith.constant 4 : i32
 // CHECK:       %[[MATMUL:.+]] = linalg.matmul ins(%[[LHS]], %[[RHS]] : tensor<3x4xi8>, tensor<4x5xi8>) outs(%[[ACC]] : tensor<3x5xi32>)
-// CHECK-DAG:   %[[INIT_RESULT:.+]] = linalg.init_tensor
-// CHECK-DAG:   %[[INIT_LHS_SUMS_ACC:.+]] = linalg.init_tensor
+// CHECK-DAG:   %[[INIT_RESULT:.+]] = tensor.empty
+// CHECK-DAG:   %[[INIT_LHS_SUMS_ACC:.+]] = tensor.empty
 // CHECK:       %[[ZERO_LHS_SUMS_ACC:.+]] = linalg.fill
 // CHECK-SAME:    ins(%[[C0_I32]] :
 // CHECK-SAME:    outs(%[[INIT_LHS_SUMS_ACC]] :
@@ -130,12 +130,12 @@ func.func @quantized_matmul_neither_zp_0_3x4x5(%lhs : tensor<3x4xi8>, %rhs : ten
 // CHECK-SAME:    "parallel", "reduction"
 // CHECK-SAME:    ins(%[[LHS]] : tensor<3x4xi8>)
 // CHECK-SAME:    outs(%[[ZERO_LHS_SUMS_ACC]] : tensor<3xi32>)
-// CHECK:       %[[INIT_RHS_SUMS_ACC:.+]] = linalg.init_tensor
+// CHECK:       %[[INIT_RHS_SUMS_ACC:.+]] = tensor.empty
 // CHECK:       %[[ZERO_RHS_SUMS_ACC:.+]] = linalg.fill
 // CHECK-SAME:    ins(%[[C0_I32]] :
 // CHECK-SAME:    outs(%[[INIT_RHS_SUMS_ACC]] :
 // CHECK:       %[[RHS_SUMS:.+]] = linalg.generic
-// CHECK-SAME:    "reduction", "parallel"
+// CHECK-SAME:    "parallel", "reduction"
 // CHECK-SAME:    ins(%[[RHS]] : tensor<4x5xi8>)
 // CHECK-SAME:    outs(%[[ZERO_RHS_SUMS_ACC]] : tensor<5xi32>)
 // CHECK:       %[[LHS_ZP_TIMES_RHS_ZP:.+]] = arith.muli %[[LHS_ZP]], %[[RHS_ZP]]

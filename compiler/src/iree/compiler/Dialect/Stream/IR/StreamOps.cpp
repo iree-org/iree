@@ -723,16 +723,6 @@ LogicalResult ResourceConstantsOp::verify() {
   if (op.getResultSizes().size() != count || op.getValues().size() != count) {
     return op.emitOpError() << "mismatched constant/result counts";
   }
-
-  // All resources must have the same lifetime.
-  auto anyType = op.getResults().front().getType();
-  for (auto result : op.getResults()) {
-    if (result.getType() != anyType) {
-      return op.emitError()
-             << "all constant resources must have the same lifetime";
-    }
-  }
-
   return success();
 }
 
@@ -2093,6 +2083,36 @@ LogicalResult TimepointJoinOp::verify() {
   // strictly required but if we could avoid it things will be easier to
   // implement at runtime (won't have to do a cuda<->vulkan sync, etc).
   return success();
+}
+
+//===----------------------------------------------------------------------===//
+// stream.timepoint.barrier
+//===----------------------------------------------------------------------===//
+
+LogicalResult TimepointBarrierOp::verify() {
+  TimepointBarrierOp op = *this;
+  if (failed(verifyOpValueSizes(op, op.getResource(), op.getResourceSize()))) {
+    return failure();
+  }
+  return success();
+}
+
+Value TimepointBarrierOp::getTiedResult(unsigned resultIndex) {
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getResource());
+}
+
+::llvm::Optional<unsigned> TimepointBarrierOp::getTiedResultOperandIndex(
+    unsigned resultIndex) {
+  return {0};
+}
+
+SmallVector<int64_t, 4> TimepointBarrierOp::getTiedResultOperandIndices() {
+  return {0};
+}
+
+std::pair<unsigned, unsigned>
+TimepointBarrierOp::getTiedResultsIndexAndLength() {
+  return {0, 1};
 }
 
 //===----------------------------------------------------------------------===//

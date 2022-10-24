@@ -26,7 +26,7 @@ vm.module @control_flow_ops {
   vm.export @test_check_eq_always
   vm.func @test_check_eq_always() {
     %c1 = vm.const.i32 1
-    %c1dno = util.do_not_optimize(%c1) : i32
+    %c1dno = util.optimization_barrier %c1 : i32
     vm.check.eq %c1, %c1dno, "error!" : i32
     vm.return
   }
@@ -35,8 +35,8 @@ vm.module @control_flow_ops {
   vm.func @fail_check_eq_never() {
     %c1 = vm.const.i32 1
     %c2 = vm.const.i32 2
-    %c1dno = util.do_not_optimize(%c1) : i32
-    %c2dno = util.do_not_optimize(%c2) : i32
+    %c1dno = util.optimization_barrier %c1 : i32
+    %c2dno = util.optimization_barrier %c2 : i32
     vm.check.eq %c1dno, %c2dno, "error!" : i32
     vm.return
   }
@@ -72,7 +72,7 @@ vm.module @control_flow_ops {
   vm.export @test_cond_br
   vm.func @test_cond_br() {
     %c1 = vm.const.i32 1
-    %c1dno = util.do_not_optimize(%c1) : i32
+    %c1dno = util.optimization_barrier %c1 : i32
     vm.cond_br %c1dno, ^bb1, ^bb2
   ^bb1:
     vm.check.eq %c1dno, %c1dno, "error!" : i32
@@ -85,7 +85,7 @@ vm.module @control_flow_ops {
   vm.export @test_cond_br_int_arg
   vm.func @test_cond_br_int_arg() {
     %c1 = vm.const.i32 1
-    %c1dno = util.do_not_optimize(%c1) : i32
+    %c1dno = util.optimization_barrier %c1 : i32
     vm.cond_br %c1dno, ^bb1(%c1dno : i32), ^bb2(%c1dno : i32)
   ^bb1(%arg1 : i32):
     vm.check.eq %arg1, %c1dno, "error!" : i32
@@ -98,7 +98,7 @@ vm.module @control_flow_ops {
   vm.export @test_cond_br_ref_arg
   vm.func @test_cond_br_ref_arg() {
     %c1 = vm.const.i32 1
-    %c1dno = util.do_not_optimize(%c1) : i32
+    %c1dno = util.optimization_barrier %c1 : i32
     %ref = vm.const.ref.zero : !vm.ref<?>
     vm.cond_br %c1dno, ^bb1(%ref : !vm.ref<?>), ^bb2(%ref : !vm.ref<?>)
   ^bb1(%arg1 : !vm.ref<?>):
@@ -115,9 +115,9 @@ vm.module @control_flow_ops {
   vm.export @test_cond_br_same_successor attributes {emitc.exclude}
   vm.func private @test_cond_br_same_successor() {
     %c1 = vm.const.i32 1
-    %c1dno = util.do_not_optimize(%c1) : i32
+    %c1dno = util.optimization_barrier %c1 : i32
     %c2 = vm.const.i32 2
-    %c2dno = util.do_not_optimize(%c2) : i32
+    %c2dno = util.optimization_barrier %c2 : i32
     vm.cond_br %c1dno, ^bb1(%c1dno : i32), ^bb1(%c2dno : i32)
   ^bb1(%arg1 : i32):
     vm.check.eq %arg1, %c1dno, "error!" : i32
@@ -133,17 +133,17 @@ vm.module @control_flow_ops {
     %ref_b = vm.const.ref.rodata @buffer_b : !vm.buffer
     %ref_c = vm.const.ref.rodata @buffer_c : !vm.buffer
 
-    %res:3 = vm.call @_return_arg_cycling(%ref_a, %ref_b, %ref_c) 
+    %res:3 = vm.call @_return_arg_cycling(%ref_a, %ref_b, %ref_c)
         : (!vm.buffer, !vm.buffer, !vm.buffer) -> (!vm.buffer, !vm.buffer, !vm.buffer)
     vm.check.eq %res#0, %ref_b : !vm.buffer
     vm.check.eq %res#1, %ref_c : !vm.buffer
     vm.check.eq %res#2, %ref_a : !vm.buffer
-    
+
     vm.return
   }
 
   vm.func private @_return_arg_cycling(%arg0 : !vm.buffer, %arg1: !vm.buffer,
-                                       %arg2: !vm.buffer) 
+                                       %arg2: !vm.buffer)
       -> (!vm.buffer, !vm.buffer, !vm.buffer) attributes {noinline} {
     vm.return %arg1, %arg2, %arg0 : !vm.buffer, !vm.buffer, !vm.buffer
   }
@@ -155,20 +155,20 @@ vm.module @control_flow_ops {
     %ref_c = vm.const.ref.rodata @buffer_c : !vm.buffer
     %cond = vm.const.i32 0
 
-    %res:3 = vm.call @_branch_arg_cycling(%ref_a, %ref_b, %ref_c, %cond) 
+    %res:3 = vm.call @_branch_arg_cycling(%ref_a, %ref_b, %ref_c, %cond)
         : (!vm.buffer, !vm.buffer, !vm.buffer, i32) -> (!vm.buffer, !vm.buffer, !vm.buffer)
     vm.check.eq %res#0, %ref_b : !vm.buffer
     vm.check.eq %res#1, %ref_c : !vm.buffer
     vm.check.eq %res#2, %ref_a : !vm.buffer
-    
+
     vm.return
   }
 
   vm.func private @_branch_arg_cycling(%arg0 : !vm.buffer, %arg1: !vm.buffer,
-                                       %arg2: !vm.buffer, %arg3: i32) 
+                                       %arg2: !vm.buffer, %arg3: i32)
       -> (!vm.buffer, !vm.buffer, !vm.buffer) attributes {noinline} {
-    vm.cond_br %arg3, 
-               ^bb1(%arg0, %arg1, %arg2: !vm.buffer, !vm.buffer, !vm.buffer), 
+    vm.cond_br %arg3,
+               ^bb1(%arg0, %arg1, %arg2: !vm.buffer, !vm.buffer, !vm.buffer),
                ^bb2(%arg1, %arg2, %arg0, %arg3: !vm.buffer, !vm.buffer, !vm.buffer, i32)
   ^bb1(%a: !vm.buffer, %b: !vm.buffer, %c: !vm.buffer):
     vm.return %a, %b, %c : !vm.buffer, !vm.buffer, !vm.buffer

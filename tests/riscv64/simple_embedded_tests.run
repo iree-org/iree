@@ -1,3 +1,0 @@
-// RUN: ${TEST_CMD} ${BUILD_RISCV_DIR}/samples/simple_embedding/simple_embedding_embedded
-// RUN: ${TEST_CMD} ${BUILD_RISCV_DIR}/samples/simple_embedding/simple_embedding_embedded_sync
-// RUN: ${TEST_CMD} ${BUILD_RISCV_DIR}/samples/simple_embedding/simple_embedding_vmvx_sync

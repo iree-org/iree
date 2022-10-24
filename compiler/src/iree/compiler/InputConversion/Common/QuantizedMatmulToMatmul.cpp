@@ -6,6 +6,7 @@
 
 #include "iree/compiler/InputConversion/Common/PassDetail.h"
 #include "iree/compiler/InputConversion/Common/Passes.h"
+#include "iree/compiler/InputConversion/Common/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -14,6 +15,7 @@
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/ImplicitLocOpBuilder.h"
 #include "mlir/Transforms/FoldUtils.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -21,65 +23,6 @@ namespace mlir {
 namespace iree_compiler {
 
 namespace {
-
-// Returns the add-reduction of the input 2D tensor `matrix` along one of the
-// two dimensions. The `parallelDim` argument specifies which of the two
-// dimensions (0 or 1) is the parallel (i.e. not reduction) dimension.
-// The input `matrix`'s element type is assumed to be signless integer.
-// The result's element type is `accElTy`. The input elements are sign-extended
-// to `accElTy` before being added.
-Value additiveReductionLeaving1ParallelDim(PatternRewriter &rewriter,
-                                           Location loc, Value matrix,
-                                           int parallelDim, Type accElTy) {
-  RankedTensorType matrixType = matrix.getType().cast<RankedTensorType>();
-  assert(matrixType.getRank() == 2);
-  assert(parallelDim == 0 || parallelDim == 1);
-  // Create the accumulator.
-  int64_t dstStaticSize = matrixType.getShape()[parallelDim];
-  SmallVector<Value> dstDynSizes;
-  if (dstStaticSize == ShapedType::kDynamicSize) {
-    dstDynSizes.push_back(
-        rewriter.create<tensor::DimOp>(loc, matrix, parallelDim));
-  }
-  Value initAcc =
-      rewriter
-          .create<linalg::InitTensorOp>(
-              loc, dstDynSizes, ArrayRef<int64_t>{dstStaticSize}, accElTy)
-          .getResult();
-  // Zero-fill the accumulator.
-  Value zeroInt =
-      rewriter.create<arith::ConstantIntOp>(loc, 0, accElTy).getResult();
-  Value zeroAcc =
-      rewriter.create<linalg::FillOp>(loc, zeroInt, initAcc).getResult(0);
-  // Create the indexing maps for the generic.
-  MLIRContext *context = rewriter.getContext();
-  AffineExpr expr[2];
-  bindDims(context, expr[0], expr[1]);
-  AffineExpr parallelExpr = expr[parallelDim];
-  AffineMap mapIdentity = AffineMap::get(2, 0, expr, context);
-  AffineMap mapToParallelDim = AffineMap::get(2, 0, parallelExpr, context);
-  SmallVector<AffineMap> indexingMaps{mapIdentity, mapToParallelDim};
-  // Create the iterators for the generic.
-  auto iterator = [=](int dim) -> StringRef {
-    return dim == parallelDim ? "parallel" : "reduction";
-  };
-  SmallVector<StringRef> iterators{iterator(0), iterator(1)};
-  // Create the generic.
-  return rewriter
-      .create<linalg::GenericOp>(
-          loc, zeroAcc.getType(), ValueRange{matrix}, ValueRange{zeroAcc},
-          indexingMaps, iterators,
-          [=](OpBuilder &b, Location loc, ValueRange args) {
-            Value matrixEl = args[0];
-            // Sign-extend the input matrix elem to accElTy before adding.
-            Value promotedMatrixEl =
-                b.create<arith::ExtSIOp>(loc, accElTy, matrixEl);
-            Value accEl = args[1];
-            Value sum = b.create<arith::AddIOp>(loc, promotedMatrixEl, accEl);
-            b.create<linalg::YieldOp>(loc, sum);
-          })
-      .getResult(0);
-}
 
 bool isConstantZero(Value val) {
   auto constIntOp = val.getDefiningOp<arith::ConstantIntOp>();
@@ -98,6 +41,7 @@ struct QuantizedMatmulToMatmul
   LogicalResult matchAndRewrite(linalg::QuantizedMatmulOp quantizedMatmulOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = quantizedMatmulOp.getLoc();
+    ImplicitLocOpBuilder builder(loc, rewriter);
     ValueRange inputs = quantizedMatmulOp.getInputs();
     assert(inputs.size() == 4);
     Value lhs = inputs[0];
@@ -107,10 +51,9 @@ struct QuantizedMatmulToMatmul
     ValueRange outputs = quantizedMatmulOp.getOutputs();
     // Compute the matmul part.
     Value acc = outputs[0];
-    Value matmul = rewriter
-                       .create<linalg::MatmulOp>(loc, ValueRange{lhs, rhs},
-                                                 ValueRange{acc})
-                       .getResult(0);
+    Value matmul =
+        builder.create<linalg::MatmulOp>(ValueRange{lhs, rhs}, ValueRange{acc})
+            .getResult(0);
     bool lhsZpIsConstantZero = isConstantZero(lhsZp);
     bool rhsZpIsConstantZero = isConstantZero(rhsZp);
     if (lhsZpIsConstantZero && rhsZpIsConstantZero) {
@@ -122,8 +65,8 @@ struct QuantizedMatmulToMatmul
     // Create the result. No need to zero-fill it as we will overwrite it.
     ShapedType accType = acc.getType().cast<ShapedType>();
     auto accDynShape = linalg::getDynOperands(loc, acc, rewriter);
-    Value initResult = rewriter.create<linalg::InitTensorOp>(
-        loc, accDynShape, accType.getShape(), accType.getElementType());
+    Value initResult = builder.create<tensor::EmptyOp>(
+        accType.getShape(), accType.getElementType(), accDynShape);
     // Create the indexing maps for the generic.
     MLIRContext *context = rewriter.getContext();
     AffineExpr m, n;
@@ -147,23 +90,23 @@ struct QuantizedMatmulToMatmul
     int indexOfLhsZpTimesRhsZpTimesKSizeInput = 0;
     Type accElTy = accType.getElementType();
     if (!rhsZpIsConstantZero) {
-      Value lhsSums =
-          additiveReductionLeaving1ParallelDim(rewriter, loc, lhs, 0, accElTy);
+      Value lhsSums = sumReduceDimensionSubset(builder, lhs, accElTy,
+                                               /*is_reduction=*/{false, true});
       indexOfLhsSumsInput = addInput(lhsSums, mapToRowDim);
       indexOfRhsZpInput = addInput(rhsZp, mapToNone);
     }
     if (!lhsZpIsConstantZero) {
-      Value rhsSums =
-          additiveReductionLeaving1ParallelDim(rewriter, loc, rhs, 1, accElTy);
+      Value rhsSums = sumReduceDimensionSubset(builder, rhs, accElTy,
+                                               /*is_reduction=*/{true, false});
       indexOfRhsSumsInput = addInput(rhsSums, mapToColumnDim);
       indexOfLhsZpInput = addInput(lhsZp, mapToNone);
     }
     if (!lhsZpIsConstantZero && !rhsZpIsConstantZero) {
-      Value lhsZpTimesRhsZp = rewriter.create<arith::MulIOp>(loc, lhsZp, rhsZp);
+      Value lhsZpTimesRhsZp = builder.create<arith::MulIOp>(lhsZp, rhsZp);
       Value kSize = rewriter.create<arith::IndexCastOp>(
-          loc, accElTy, rewriter.create<tensor::DimOp>(loc, lhs, 1));
+          loc, accElTy, builder.create<tensor::DimOp>(lhs, 1));
       Value lhsZpTimesRhsZpTimesKSize =
-          rewriter.create<arith::MulIOp>(loc, lhsZpTimesRhsZp, kSize);
+          builder.create<arith::MulIOp>(lhsZpTimesRhsZp, kSize);
       indexOfLhsZpTimesRhsZpTimesKSizeInput =
           addInput(lhsZpTimesRhsZpTimesKSize, mapToNone);
     }

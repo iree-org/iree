@@ -41,11 +41,11 @@ struct ExtractElementOpLowering
           op.getLoc(), args[0],
           RankedTensorType::get(tensorType.getShape(), i8Type));
       auto i8Value = rewriter.createOrFold<IREE::Flow::TensorLoadOp>(
-          op.getLoc(), i8Type, convertedOperand, op.indices());
+          op.getLoc(), i8Type, convertedOperand, op.getIndices());
       rewriter.replaceOpWithNewOp<arith::TruncIOp>(op, i1Type, i8Value);
     } else {
       rewriter.replaceOpWithNewOp<IREE::Flow::TensorLoadOp>(
-          op, tensorType.getElementType(), op.tensor(), op.indices());
+          op, tensorType.getElementType(), op.tensor(), op.getIndices());
     }
     return success();
   }

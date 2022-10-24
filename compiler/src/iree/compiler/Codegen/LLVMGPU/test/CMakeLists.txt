@@ -25,14 +25,17 @@ iree_lit_test_suite(
     "linalg_transform.mlir"
     "nvvm_pipeline_test.mlir"
     "reduce_bank_conflicts.mlir"
+    "reduction_pipeline.mlir"
     "rocdl_pipeline_test.mlir"
     "tensor_alloc.mlir"
+    "tensor_pad.mlir"
     "tensorcore_vectorization.mlir"
     "tile_on_tensor.mlir"
     "transform_dialect_bufferize.mlir"
     "transform_dialect_vector_distribution.mlir"
     "transpose_pipeline_test.mlir"
     "vector_to_gpu.mlir"
+    "workgroup_specialization_pipeline_test.mlir"
   TOOLS
     FileCheck
     iree-opt

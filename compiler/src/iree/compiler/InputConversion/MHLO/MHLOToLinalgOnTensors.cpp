@@ -70,7 +70,7 @@ struct ConcatenateOpConversion
     }
 
     Location loc = op.getLoc();
-    int dim = op.dimension();
+    int dim = op.getDimension();
     int rank = resultType.getRank();
     SmallVector<Value, 3> offsets, sizes, strides;
     for (int i = 0; i < rank; ++i) {
@@ -86,7 +86,7 @@ struct ConcatenateOpConversion
           rewriter.createOrFold<arith::AddIOp>(loc, resultDimSize, size);
     }
     sizes[dim] = resultDimSize;
-    Value result = rewriter.create<linalg::InitTensorOp>(
+    Value result = rewriter.create<tensor::EmptyOp>(
         loc, resultType.getShape(), resultType.getElementType());
 
     auto toOpFoldResult = [](Value v) -> OpFoldResult {
@@ -144,11 +144,11 @@ Value createLinalgMatmulOnTensors(OpBuilder b, Location loc,
                                   Value rhs) {
   Value zero = b.create<arith::ConstantOp>(
       loc, b.getZeroAttr(resultType.getElementType()));
-  Value initTensor = b.create<linalg::InitTensorOp>(
-      loc, /*dyn_size=*/ValueRange{}, resultType.getShape(),
-      resultType.getElementType());
+  Value emptyTensor = b.create<mlir::tensor::EmptyOp>(
+      loc, resultType.getShape(), resultType.getElementType(),
+      /*dyn_size=*/ValueRange{});
   Value zeroTensor =
-      b.create<linalg::FillOp>(loc, zero, initTensor).getResult(0);
+      b.create<linalg::FillOp>(loc, zero, emptyTensor).getResult(0);
 
   switch (lhs.getType().cast<RankedTensorType>().getRank()) {
     case 1:
@@ -176,12 +176,13 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
   LogicalResult matchAndRewrite(
       mhlo::FftOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (op.fft_type() != mhlo::FftType::RFFT) {
+    if (op.getFftType() != mhlo::FftType::RFFT) {
       return rewriter.notifyMatchFailure(op,
                                          "non RFFT types are supported yet");
     }
 
-    auto inputType = adaptor.operand().getType().dyn_cast<RankedTensorType>();
+    auto inputType =
+        adaptor.getOperand().getType().dyn_cast<RankedTensorType>();
     if (!inputType || !inputType.hasStaticShape() || inputType.getRank() > 2) {
       return rewriter.notifyMatchFailure(op, "only static 1D or 2D dft ops");
     }
@@ -189,7 +190,7 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
     int rank = inputType.getRank();
     int n = inputType.getDimSize(rank - 1);
     int fftLength =
-        op.fft_length().getSplatValue<IntegerAttr>().getInt() / 2 + 1;
+        op.getFftLength().getSplatValue<IntegerAttr>().getInt() / 2 + 1;
 
     Location loc = op.getLoc();
     auto matrixType =
@@ -201,156 +202,15 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
     auto realMatrix =
         getDFTMatmulCoeff(rewriter, loc, matrixType, /*isRealPart=*/true);
     auto real = createLinalgMatmulOnTensors(rewriter, loc, resultType,
-                                            adaptor.operand(), realMatrix);
+                                            adaptor.getOperand(), realMatrix);
 
     auto imagMatrix =
         getDFTMatmulCoeff(rewriter, loc, matrixType, /*isRealPart=*/false);
     auto imag = createLinalgMatmulOnTensors(rewriter, loc, resultType,
-                                            adaptor.operand(), imagMatrix);
+                                            adaptor.getOperand(), imagMatrix);
 
     // Pack the results back to mhlo::ComplexOp.
     rewriter.replaceOpWithNewOp<mhlo::ComplexOp>(op, op.getType(), real, imag);
-    return success();
-  }
-};
-
-// TODO(#9361): Retire the pattern. The implementation is partial, and it has
-// bad performance. It's added for not regressing scatter support.
-struct ScatterUpdateConversion : public OpConversionPattern<mhlo::ScatterOp> {
-  using OpConversionPattern<mhlo::ScatterOp>::OpConversionPattern;
-
-  LogicalResult matchAndRewrite(
-      mhlo::ScatterOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const final {
-    // Variadic Scatter support not yet implemented
-    if (op.operands().size() != 1 || op.updates().size() != 1) return failure();
-
-    // Check if it is a tensor_scatter_nd_update-like op.
-    if (op.getRegion().front().getNumArguments() != 2) return failure();
-
-    auto operandTy =
-        adaptor.operands()[0].getType().dyn_cast<RankedTensorType>();
-    auto indicesTy =
-        adaptor.scatter_indices().getType().dyn_cast<RankedTensorType>();
-    if (!operandTy || !indicesTy) return failure();
-
-    // Linalg operations put all the computation to the innermost loop. Since we
-    // also iterate over scatter_indices() with some loops, we can only check
-    // one scatter index in one iteration. If there are multiple indices (ie,
-    // the index depth is greater than 1), we don't have a way to keep the
-    // comparison state. E.g., if the index_depth is 2, like indices = [[0, 1]],
-    // we should use the update value only if (i == 0 and j == 1). However, we
-    // can not get both indices in one iteration unless we pack them together.
-    auto indexVectorDim = op.scatter_dimension_numbers().getIndexVectorDim();
-    if (indicesTy.getDimSize(indexVectorDim) != 1)
-      return rewriter.notifyMatchFailure(op, "require index depth to be 1");
-    if (indexVectorDim != indicesTy.getRank() - 1) {
-      return rewriter.notifyMatchFailure(
-          op, "require index_vector_dim to be the last dim");
-    }
-
-    // One of indices dims is index depth vector.
-    int64_t nloops = operandTy.getRank() + indicesTy.getRank() - 1;
-    SmallVector<AffineMap, 3> indexingMaps;
-    {
-      SmallVector<AffineExpr> exprs;
-      for (int64_t i = 0, e = operandTy.getRank(); i < e; ++i)
-        exprs.push_back(rewriter.getAffineDimExpr(i));
-      indexingMaps.push_back(AffineMap::get(nloops, /*symbolCount=*/0, exprs,
-                                            rewriter.getContext()));
-    }
-    {
-      SmallVector<AffineExpr> exprs;
-      for (int64_t i = operandTy.getRank(); i < nloops; ++i)
-        exprs.push_back(rewriter.getAffineDimExpr(i));
-      // The index depth is 1.
-      exprs.push_back(rewriter.getAffineConstantExpr(0));
-      indexingMaps.push_back(AffineMap::get(nloops, /*symbolCount=*/0, exprs,
-                                            rewriter.getContext()));
-
-      exprs.pop_back();
-      auto updateWindowDims =
-          op.scatter_dimension_numbers().getUpdateWindowDims();
-      for (auto d : updateWindowDims)
-        exprs.push_back(rewriter.getAffineDimExpr(d));
-      indexingMaps.push_back(AffineMap::get(nloops, /*symbolCount=*/0, exprs,
-                                            rewriter.getContext()));
-    }
-    indexingMaps.push_back(indexingMaps.front());
-
-    auto resultTy =
-        this->typeConverter->convertType(op.getResults()[0].getType())
-            .cast<ShapedType>();
-    auto scatterDimsToOperandDims =
-        op.scatter_dimension_numbers().getScatterDimsToOperandDims();
-    assert(scatterDimsToOperandDims.size() == 1);
-    // Do not need init_tensor because we'd like to initialize the output as
-    // operand.
-    auto loc = op.getLoc();
-    auto linalgOp = rewriter.create<linalg::GenericOp>(
-        loc, /*resultTensors=*/ArrayRef<Type>{resultTy},
-        /*inputs=*/
-        ValueRange{adaptor.operands()[0], adaptor.scatter_indices(),
-                   adaptor.updates()[0]},
-        /*outputs=*/adaptor.operands()[0], indexingMaps,
-        mhlo::getNParallelLoopsAttrs(nloops),
-        [](OpBuilder &b, Location loc, ValueRange args) {},
-        linalg::getPrunedAttributeList(op));
-
-    // Transform the scatter update computation region
-    //   update = a bunch of computation
-    //   return update
-    // to linalg.generic region:
-    //   update = a bunch of computation
-    //   result = idx == cmpIdx ? update : old_value
-    //   linalg.yield result
-    bool updateIsTrivial = (op.getRegion().front().getOperations().size() == 1);
-    Block *block = &linalgOp->getRegion(0).front();
-    auto args = block->getArguments();
-
-    BlockAndValueMapping mapping;
-    // The scatter update computation block arguments are tensors of scalars
-    // while the linalg.generic block arguments are scalars.
-    if (updateIsTrivial) {
-      // If there is no actual update computation, directly use the
-      // linalg.generic block arguments.
-      for (auto pair : llvm::zip_first(op.getRegion().front().getArguments(),
-                                       args.drop_front(2)))
-        mapping.map(std::get<0>(pair), std::get<1>(pair));
-    } else {
-      // Otherwise, convert the linalg.generic block scalar arguments to
-      // tensors, to avoid producing illegal mhlo instructions.
-      rewriter.setInsertionPointToStart(block);
-      for (auto pair : llvm::zip_first(op.getRegion().front().getArguments(),
-                                       args.drop_front(2)))
-        mapping.map(std::get<0>(pair),
-                    rewriter.create<tensor::FromElementsOp>(
-                        loc, std::get<0>(pair).getType(), std::get<1>(pair)));
-    }
-
-    // Transform the computation block over to the linalg.generic op.
-    rewriter.cloneRegionBefore(op.getRegion(), linalgOp->getRegion(0),
-                               linalgOp->getRegion(0).end(), mapping);
-    rewriter.mergeBlocks(&linalgOp->getRegion(0).back(), block, llvm::None);
-
-    // Generate: result = idx == cmpIdx ? update : old_value.
-    Operation *terminator = block->getTerminator();
-    rewriter.setInsertionPoint(terminator);
-    Value cmpIdx =
-        rewriter.create<linalg::IndexOp>(loc, scatterDimsToOperandDims[0]);
-    Value idx = rewriter.create<arith::IndexCastOp>(
-        loc, rewriter.getIndexType(), args[1]);
-    Value pred = rewriter.create<arith::CmpIOp>(
-        loc, rewriter.getI1Type(), arith::CmpIPredicate::eq, cmpIdx, idx);
-    Value result = terminator->getOperand(0);
-    if (!updateIsTrivial)
-      result = rewriter.create<tensor::ExtractOp>(loc, result, ValueRange({}));
-    result = rewriter.create<arith::SelectOp>(loc, args[2].getType(), pred,
-                                              args[2], result);
-
-    op.emitWarning("op is lowered to an inefficient way, which is unexpected");
-    rewriter.replaceOpWithNewOp<linalg::YieldOp>(terminator, result);
-    rewriter.replaceOp(op, linalgOp.getResults());
     return success();
   }
 };
@@ -508,7 +368,7 @@ struct ConvertMHLOToLinalgOnTensorsPass
       for (Type type : funcOp.getFunctionType().getResults()) {
         if (isIllegalType(type)) return false;
       }
-      for (Block &block : funcOp.getBody()) {
+      for (Block &block : funcOp.getFunctionBody()) {
         for (Type type : block.getArgumentTypes()) {
           if (isIllegalType(type)) return false;
         }
@@ -536,7 +396,6 @@ void populateMHLOToLinalgOnTensorsConversionPatterns(
   mhlo::populateHloToLinalgConversionPattern(context, typeConverter, &patterns);
   // TODO(#5809): Drop ConcatenateOp lowering in favor of the upstream version
   //              then remove the PatternBenefit here
-  patterns.insert<ScatterUpdateConversion>(typeConverter, context);
   patterns.insert<ConcatenateOpConversion, FftOpConversion>(
       typeConverter, context, PatternBenefit(1000));
 }

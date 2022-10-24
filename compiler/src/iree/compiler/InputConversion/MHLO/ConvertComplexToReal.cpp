@@ -105,16 +105,19 @@ struct ConvertAddSubOp : public OpConversionPattern<OpTy> {
       OpTy op, typename OpTy::Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     Location loc = op.getLoc();
-    if (!isComplexTensor(adaptor.lhs()) || !isComplexTensor(adaptor.rhs())) {
+    if (!isComplexTensor(adaptor.getLhs()) ||
+        !isComplexTensor(adaptor.getRhs())) {
       return rewriter.notifyMatchFailure(op, "not complex tensor");
     }
 
-    Value real = createOp(
-        rewriter, op, rewriter.createOrFold<mhlo::RealOp>(loc, adaptor.lhs()),
-        rewriter.createOrFold<mhlo::RealOp>(loc, adaptor.rhs()));
-    Value imag = createOp(
-        rewriter, op, rewriter.createOrFold<mhlo::ImagOp>(loc, adaptor.lhs()),
-        rewriter.createOrFold<mhlo::ImagOp>(loc, adaptor.rhs()));
+    Value real =
+        createOp(rewriter, op,
+                 rewriter.createOrFold<mhlo::RealOp>(loc, adaptor.getLhs()),
+                 rewriter.createOrFold<mhlo::RealOp>(loc, adaptor.getRhs()));
+    Value imag =
+        createOp(rewriter, op,
+                 rewriter.createOrFold<mhlo::ImagOp>(loc, adaptor.getLhs()),
+                 rewriter.createOrFold<mhlo::ImagOp>(loc, adaptor.getRhs()));
     Value result = rewriter.create<mhlo::ComplexOp>(loc, real, imag);
     rewriter.replaceOp(op, result);
     return success();
@@ -133,14 +136,15 @@ struct ConvertMulOp : public OpConversionPattern<MulOpTy> {
       ConversionPatternRewriter &rewriter) const override {
     Location loc = op.getLoc();
 
-    if (!isComplexTensor(adaptor.lhs()) || !isComplexTensor(adaptor.rhs())) {
+    if (!isComplexTensor(adaptor.getLhs()) ||
+        !isComplexTensor(adaptor.getRhs())) {
       return rewriter.notifyMatchFailure(op, "not complex tensor");
     }
 
-    auto lhsReal = rewriter.createOrFold<mhlo::RealOp>(loc, adaptor.lhs());
-    auto lhsImag = rewriter.createOrFold<mhlo::ImagOp>(loc, adaptor.lhs());
-    auto rhsReal = rewriter.createOrFold<mhlo::RealOp>(loc, adaptor.rhs());
-    auto rhsImag = rewriter.createOrFold<mhlo::ImagOp>(loc, adaptor.rhs());
+    auto lhsReal = rewriter.createOrFold<mhlo::RealOp>(loc, adaptor.getLhs());
+    auto lhsImag = rewriter.createOrFold<mhlo::ImagOp>(loc, adaptor.getLhs());
+    auto rhsReal = rewriter.createOrFold<mhlo::RealOp>(loc, adaptor.getRhs());
+    auto rhsImag = rewriter.createOrFold<mhlo::ImagOp>(loc, adaptor.getRhs());
 
     auto realComponent = rewriter.create<mhlo::SubtractOp>(
         loc,
@@ -173,12 +177,13 @@ struct ConvertDivOp : public OpConversionPattern<DivOpTy> {
       ConversionPatternRewriter &rewriter) const override {
     Location loc = op.getLoc();
 
-    if (!isComplexTensor(adaptor.lhs()) || !isComplexTensor(adaptor.rhs())) {
+    if (!isComplexTensor(adaptor.getLhs()) ||
+        !isComplexTensor(adaptor.getRhs())) {
       return rewriter.notifyMatchFailure(op, "not complex tensor");
     }
 
-    auto lhs = adaptor.lhs();
-    auto rhs = adaptor.rhs();
+    auto lhs = adaptor.getLhs();
+    auto rhs = adaptor.getRhs();
     auto rhsReal = rewriter.createOrFold<mhlo::RealOp>(loc, rhs);
     auto rhsImag = rewriter.createOrFold<mhlo::ImagOp>(loc, rhs);
 
@@ -213,14 +218,14 @@ struct ConvertAbsOp : public OpConversionPattern<mhlo::AbsOp> {
       ConversionPatternRewriter &rewriter) const override {
     Location loc = op.getLoc();
 
-    if (!isComplexTensor(adaptor.operand())) {
+    if (!isComplexTensor(adaptor.getOperand())) {
       return rewriter.notifyMatchFailure(op, "not complex tensor");
     }
 
     auto operandReal =
-        rewriter.createOrFold<mhlo::RealOp>(loc, adaptor.operand());
+        rewriter.createOrFold<mhlo::RealOp>(loc, adaptor.getOperand());
     auto operandImag =
-        rewriter.createOrFold<mhlo::ImagOp>(loc, adaptor.operand());
+        rewriter.createOrFold<mhlo::ImagOp>(loc, adaptor.getOperand());
     rewriter.replaceOpWithNewOp<mhlo::SqrtOp>(
         op,
         rewriter.create<mhlo::AddOp>(
@@ -242,12 +247,12 @@ struct ConvertExpOp : public OpConversionPattern<mhlo::ExpOp> {
       ConversionPatternRewriter &rewriter) const override {
     Location loc = op.getLoc();
 
-    if (!isComplexTensor(adaptor.operand())) {
+    if (!isComplexTensor(adaptor.getOperand())) {
       return rewriter.notifyMatchFailure(op, "not complex tensor");
     }
 
-    auto operandReal = rewriter.create<mhlo::RealOp>(loc, adaptor.operand());
-    auto operandImag = rewriter.create<mhlo::ImagOp>(loc, adaptor.operand());
+    auto operandReal = rewriter.create<mhlo::RealOp>(loc, adaptor.getOperand());
+    auto operandImag = rewriter.create<mhlo::ImagOp>(loc, adaptor.getOperand());
 
     Value expReal = rewriter.create<mhlo::ExpOp>(loc, operandReal);
     Value result = rewriter.createOrFold<mhlo::ComplexOp>(
@@ -274,15 +279,16 @@ struct ConvertCHLOCompareOp : public OpConversionPattern<CompareOpTy> {
       ConversionPatternRewriter &rewriter) const override {
     Location loc = op.getLoc();
 
-    if (!isComplexTensor(adaptor.lhs()) || !isComplexTensor(adaptor.rhs())) {
+    if (!isComplexTensor(adaptor.getLhs()) ||
+        !isComplexTensor(adaptor.getRhs())) {
       return rewriter.notifyMatchFailure(op, "not complex tensor");
     }
-    if (direction != op.comparison_direction()) {
+    if (direction != op.getComparisonDirection()) {
       return rewriter.notifyMatchFailure(op, "not matching direction");
     }
 
-    auto lhs = adaptor.lhs();
-    auto rhs = adaptor.rhs();
+    auto lhs = adaptor.getLhs();
+    auto rhs = adaptor.getRhs();
     auto lhsReal = rewriter.createOrFold<mhlo::RealOp>(loc, lhs);
     auto lhsImag = rewriter.createOrFold<mhlo::ImagOp>(loc, lhs);
     auto rhsReal = rewriter.createOrFold<mhlo::RealOp>(loc, rhs);
@@ -293,11 +299,12 @@ struct ConvertCHLOCompareOp : public OpConversionPattern<CompareOpTy> {
         rewriter.create<chlo::BroadcastCompareOp>(
             loc, lhsReal, rhsReal,
             /*broadcast_dimensions=*/nullptr,
-            adaptor.comparison_directionAttr(), adaptor.compare_typeAttr()),
+            adaptor.getComparisonDirectionAttr(), adaptor.getCompareTypeAttr()),
         rewriter.create<chlo::BroadcastCompareOp>(
             loc, lhsImag, rhsImag,
             /*broadcast_dimensions=*/nullptr,
-            adaptor.comparison_directionAttr(), adaptor.compare_typeAttr()));
+            adaptor.getComparisonDirectionAttr(),
+            adaptor.getCompareTypeAttr()));
 
     return success();
   }
@@ -318,15 +325,16 @@ struct ConvertMHLOCompareOp : public OpConversionPattern<CompareOpTy> {
       ConversionPatternRewriter &rewriter) const override {
     Location loc = op.getLoc();
 
-    if (!isComplexTensor(adaptor.lhs()) || !isComplexTensor(adaptor.rhs())) {
+    if (!isComplexTensor(adaptor.getLhs()) ||
+        !isComplexTensor(adaptor.getRhs())) {
       return rewriter.notifyMatchFailure(op, "not complex tensor");
     }
-    if (direction != op.comparison_direction()) {
+    if (direction != op.getComparisonDirection()) {
       return rewriter.notifyMatchFailure(op, "not matching direction");
     }
 
-    auto lhs = adaptor.lhs();
-    auto rhs = adaptor.rhs();
+    auto lhs = adaptor.getLhs();
+    auto rhs = adaptor.getRhs();
     auto lhsReal = rewriter.createOrFold<mhlo::RealOp>(loc, lhs);
     auto lhsImag = rewriter.createOrFold<mhlo::ImagOp>(loc, lhs);
     auto rhsReal = rewriter.createOrFold<mhlo::RealOp>(loc, rhs);
@@ -335,9 +343,9 @@ struct ConvertMHLOCompareOp : public OpConversionPattern<CompareOpTy> {
     // If the input op is an mhlo op, we need to convert the attributes to the
     // corresponding chlo one..
     chlo::ComparisonDirection chloCmpDirection =
-        *chloComparisonDirection(adaptor.comparison_direction());
+        *chloComparisonDirection(adaptor.getComparisonDirection());
 
-    Optional<mhlo::ComparisonType> mhloCmpType = adaptor.compare_type();
+    Optional<mhlo::ComparisonType> mhloCmpType = adaptor.getCompareType();
     chlo::ComparisonTypeAttr chloCmpType;
     if (mhloCmpType)
       chloCmpType = chlo::ComparisonTypeAttr::get(
@@ -376,7 +384,7 @@ struct ElideRealPattern : public OpConversionPattern<mhlo::RealOp> {
     auto complexProducer =
         adaptor.getOperands()[0].getDefiningOp<mhlo::ComplexOp>();
     if (complexProducer) {
-      rewriter.replaceOp(op, complexProducer.lhs());
+      rewriter.replaceOp(op, complexProducer.getLhs());
       return success();
     }
     return failure();
@@ -391,7 +399,7 @@ struct ElideImagPattern : public OpConversionPattern<mhlo::ImagOp> {
     auto complexProducer =
         adaptor.getOperands()[0].getDefiningOp<mhlo::ComplexOp>();
     if (complexProducer) {
-      rewriter.replaceOp(op, complexProducer.rhs());
+      rewriter.replaceOp(op, complexProducer.getRhs());
       return success();
     }
     return failure();

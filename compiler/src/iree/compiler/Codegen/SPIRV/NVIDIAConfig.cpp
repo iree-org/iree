@@ -15,6 +15,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 
 #define DEBUG_TYPE "iree-spirv-nvidia-config"
@@ -60,8 +61,8 @@ static LogicalResult setOpConfig(const spirv::TargetEnv &targetEnv,
     return success();
   }
 
-  Value lhs = op.getInputs()[0], rhs = op.getInputs()[1],
-        init = op.getOutputs()[0];
+  Value lhs = op.getInputOperand(0)->get(), rhs = op.getInputOperand(1)->get(),
+        init = op.getOutputOperand(0)->get();
 
   ArrayRef<int64_t> lhsShape = lhs.getType().cast<ShapedType>().getShape();
   ArrayRef<int64_t> rhsShape = rhs.getType().cast<ShapedType>().getShape();
@@ -84,7 +85,7 @@ static LogicalResult setOpConfig(const spirv::TargetEnv &targetEnv,
   if (!coopMatSize) return success();
 
   auto pipeline = IREE::Codegen::DispatchLoweringPassPipeline::
-      SPIRVVectorizeToCooperativeOps;
+      SPIRVCooperativeMatrixVectorize;
 
   // For now only support one subgroup per workgroup because in the above
   // configuration deduction step we only consider whether the input workload is
@@ -110,11 +111,18 @@ static LogicalResult setOpConfig(const spirv::TargetEnv &targetEnv,
 }
 
 static LogicalResult setNVIDIAMatmulConfig(linalg::LinalgOp op,
-                                           int subgroupSize) {
+                                           spirv::ResourceLimitsAttr limits) {
+  const int subgroupSize = limits.getSubgroupSize();
   const std::array<int64_t, 2> workgroupXY = {subgroupSize, 8};
-  const std::array<int64_t, 3> threadMNK = {4, 4, 32};
-  return setMatmulOpConfig(op, subgroupSize, workgroupXY, threadMNK,
-                           /*useWorkgroupMemory=*/true);
+  std::array<int64_t, 3> threadMNK;
+  auto inputType = op.getInputOperand(0)->get().getType().cast<ShapedType>();
+  if (inputType.getElementType().getIntOrFloatBitWidth() == 16) {
+    threadMNK = {8, 8, 32};
+  } else {
+    threadMNK = {4, 4, 32};
+  }
+  return setMatmulOpConfig(limits, op, workgroupXY, threadMNK,
+                           /*enablePromotion=*/true);
 }
 
 // Volta architecture:
@@ -149,7 +157,7 @@ static LogicalResult setNVIDIAMatmulConfig(linalg::LinalgOp op,
 
 LogicalResult setNVIDIACodeGenConfig(const spirv::TargetEnv &targetEnv,
                                      Operation *rootOp) {
-  int subgroupSize = targetEnv.getResourceLimits().getSubgroupSize();
+  spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
 
   // First try to see if we can use tensor cores.
   if (auto matmulOp = dyn_cast<linalg::MatmulOp>(rootOp)) {
@@ -159,13 +167,12 @@ LogicalResult setNVIDIACodeGenConfig(const spirv::TargetEnv &targetEnv,
 
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp)) {
     if (isMatmulOrBatchMatmul(linalgOp))
-      return setNVIDIAMatmulConfig(linalgOp, subgroupSize);
+      return setNVIDIAMatmulConfig(linalgOp, limits);
   }
 
   return TypeSwitch<Operation *, LogicalResult>(rootOp)
-      .Case<linalg::BatchMatmulOp, linalg::MatmulOp>([subgroupSize](auto op) {
-        return setNVIDIAMatmulConfig(op, subgroupSize);
-      })
+      .Case<linalg::BatchMatmulOp, linalg::MatmulOp>(
+          [limits](auto op) { return setNVIDIAMatmulConfig(op, limits); })
       .Default([](Operation *) { return success(); });
 }
 

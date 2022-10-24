@@ -273,6 +273,11 @@ static LogicalResult bufferizeLinalgExtOp(RewriterBase &rewriter,
   SmallVector<Value> newOperands = newInputBuffers;
   newOperands.append(newOutputBuffers.begin(), newOutputBuffers.end());
 
+  // PackOp has other operands besides ins and outs.
+  if (auto packOp = dyn_cast<IREE::LinalgExt::PackOp>(op.getOperation())) {
+    if (auto pad = packOp.getPaddingValue()) newOperands.push_back(pad);
+  }
+
   // Set insertion point now that potential alloc/dealloc are introduced.
   rewriter.setInsertionPoint(op);
   // Clone the op, but use the new operands. Move the existing block into the
@@ -420,6 +425,8 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
             LinalgExtOpInterface<IREE::LinalgExt::FftOp>>(*ctx);
         IREE::LinalgExt::PackOp::attachInterface<
             LinalgExtOpInterface<IREE::LinalgExt::PackOp>>(*ctx);
+        IREE::LinalgExt::UnPackOp::attachInterface<
+            LinalgExtOpInterface<IREE::LinalgExt::UnPackOp>>(*ctx);
         IREE::LinalgExt::ReverseOp::attachInterface<
             LinalgExtOpInterface<IREE::LinalgExt::ReverseOp>>(*ctx);
         IREE::LinalgExt::ScanOp::attachInterface<

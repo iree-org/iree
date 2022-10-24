@@ -13,6 +13,7 @@
 #include "iree/compiler/Utils/GraphUtils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Affine/ViewLikeInterfaceUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -221,7 +222,7 @@ static LogicalResult replaceStoreWithTiledVersion(
   SmallVector<OpFoldResult> tileStrides(tileOffsets.size(),
                                         rewriter.getIndexAttr(1));
   SmallVector<OpFoldResult> combinedOffsets, combinedSizes, combinedStrides;
-  if (failed(IREE::Flow::foldOffsetsSizesAndStrides(
+  if (failed(mergeOffsetsSizesAndStrides(
           rewriter, storeOp.getLoc(), storeOp.getMixedOffsets(),
           storeOp.getMixedSizes(), storeOp.getMixedStrides(),
           storeOp.getDroppedDims(), tileOffsets, tileSizes, tileStrides,
@@ -282,7 +283,7 @@ struct TileDispatchUsingSCFForOp
   /// Construct a generic pattern applied to all TilingInterface ops.
   TileDispatchUsingSCFForOp(MLIRContext *context,
                             linalg::LinalgTilingOptions options,
-                            linalg::LinalgTransformationFilter filter,
+                            IREE::LinalgExt::LinalgTransformationFilter filter,
                             PatternBenefit benefit = 1)
       : OpInterfaceRewritePattern<TilingInterface>(context, benefit),
         options(std::move(options)),
@@ -291,7 +292,7 @@ struct TileDispatchUsingSCFForOp
   /// Construct a generic pattern applied to `opName`.
   TileDispatchUsingSCFForOp(StringRef opName, MLIRContext *context,
                             linalg::LinalgTilingOptions options,
-                            linalg::LinalgTransformationFilter filter,
+                            IREE::LinalgExt::LinalgTransformationFilter filter,
                             PatternBenefit benefit = 1)
       : OpInterfaceRewritePattern<TilingInterface>(context, benefit),
         options(std::move(options)),
@@ -312,7 +313,7 @@ struct TileDispatchUsingSCFForOp
   linalg::LinalgTilingOptions options;
 
   /// Filter to control transformation.
-  linalg::LinalgTransformationFilter filter;
+  IREE::LinalgExt::LinalgTransformationFilter filter;
 };
 }  // namespace
 
@@ -504,18 +505,19 @@ struct TileAndFuseResult {
 struct TileAndFuseDispatchUsingSCFForOp
     : public OpInterfaceRewritePattern<TilingInterface> {
   /// Construct a generic pattern applied to all TilingInterface ops.
-  TileAndFuseDispatchUsingSCFForOp(MLIRContext *context,
-                                   linalg::LinalgTilingOptions options,
-                                   linalg::LinalgTransformationFilter filter,
-                                   PatternBenefit benefit = 1)
+  TileAndFuseDispatchUsingSCFForOp(
+      MLIRContext *context, linalg::LinalgTilingOptions options,
+      IREE::LinalgExt::LinalgTransformationFilter filter,
+      PatternBenefit benefit = 1)
       : OpInterfaceRewritePattern<TilingInterface>(context, benefit),
         tilingPattern(context, options, filter) {}
 
   /// Construct a generic pattern applied to `opName`.
-  TileAndFuseDispatchUsingSCFForOp(StringRef opName, MLIRContext *context,
-                                   linalg::LinalgTilingOptions options,
-                                   linalg::LinalgTransformationFilter filter,
-                                   PatternBenefit benefit = 1)
+  TileAndFuseDispatchUsingSCFForOp(
+      StringRef opName, MLIRContext *context,
+      linalg::LinalgTilingOptions options,
+      IREE::LinalgExt::LinalgTransformationFilter filter,
+      PatternBenefit benefit = 1)
       : OpInterfaceRewritePattern<TilingInterface>(context, benefit),
         tilingPattern(context, options, filter) {}
 
@@ -532,7 +534,7 @@ struct TileAndFuseDispatchUsingSCFForOp
 };
 }  // namespace
 
-/// Find all producers to fuse and return then in sorted order;
+/// Find all producers to fuse and return them in sorted order;
 static std::vector<Operation *> getAllFusableProducers(TilingInterface op) {
   llvm::SetVector<Operation *> producers;
   std::deque<Operation *> worklist;
@@ -716,7 +718,7 @@ struct SwapExtractSliceWithDispatchTensorLoad
     if (!loadOp) return failure();
 
     SmallVector<OpFoldResult> combinedOffsets, combinedSizes, combinedStrides;
-    if (failed(IREE::Flow::foldOffsetsSizesAndStrides(
+    if (failed(mergeOffsetsSizesAndStrides(
             rewriter, loadOp.getLoc(), loadOp, sliceOp, loadOp.getDroppedDims(),
             combinedOffsets, combinedSizes, combinedStrides))) {
       return rewriter.notifyMatchFailure(
@@ -741,9 +743,8 @@ struct SwapExtractSliceWithInitTensor
 
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
-    auto initTensorOp =
-        sliceOp.getSource().getDefiningOp<linalg::InitTensorOp>();
-    if (!initTensorOp) return failure();
+    auto emptyTensorOp = sliceOp.getSource().getDefiningOp<tensor::EmptyOp>();
+    if (!emptyTensorOp) return failure();
 
     SmallVector<OpFoldResult> mixedSizes = sliceOp.getMixedSizes();
     if (mixedSizes.size() != sliceOp.getType().getRank()) {
@@ -756,7 +757,7 @@ struct SwapExtractSliceWithInitTensor
       }
       std::swap(mixedSizes, rankReducedMixedSizes);
     }
-    rewriter.replaceOpWithNewOp<linalg::InitTensorOp>(
+    rewriter.replaceOpWithNewOp<tensor::EmptyOp>(
         sliceOp, mixedSizes, sliceOp.getType().getElementType());
     return success();
   }
@@ -766,7 +767,7 @@ struct SwapExtractSliceWithInitTensor
 
 void populateTileAndDistributeToWorkgroupsPatterns(
     RewritePatternSet &patterns, linalg::LinalgTilingOptions options,
-    linalg::LinalgTransformationFilter filter) {
+    IREE::LinalgExt::LinalgTransformationFilter filter) {
   MLIRContext *context = patterns.getContext();
   patterns.insert<TileAndFuseDispatchUsingSCFForOp>(context, std::move(options),
                                                     std::move(filter));

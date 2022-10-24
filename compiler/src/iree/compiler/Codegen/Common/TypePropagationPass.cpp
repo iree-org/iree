@@ -163,7 +163,7 @@ struct GenericOpTypePropagation
         modifiedOperandIndex.insert(operand.index());
       }
       // If the operand is an `outs` tensor, its type needs to be changed.
-      if (genericOp.isOutputTensor(&operand.value())) {
+      if (genericOp.isOutput(&operand.value())) {
         resultTypes.push_back(legalizedType);
       }
     }
@@ -217,7 +217,7 @@ struct GenericOpTypePropagation
         OpOperand *modifiedOpOperand =
             &modifiedOp->getOpOperand(modifiedOperandIndex);
         BlockArgument source =
-            modifiedOp.getTiedBlockArgument(modifiedOpOperand);
+            modifiedOp.getMatchingBlockArgument(modifiedOpOperand);
         Type destType = getElementTypeOrSelf(
             genericOp.getOperand(modifiedOperandIndex).getType());
 
@@ -240,10 +240,10 @@ struct GenericOpTypePropagation
       for (auto modifiedOperandIndex : modifiedOperandIndex) {
         OpOperand *modifiedOpOperand =
             &modifiedOp->getOpOperand(modifiedOperandIndex);
-        if (modifiedOp.isOutputTensor(modifiedOpOperand)) {
+        if (modifiedOp.isOutput(modifiedOpOperand)) {
           modifyYield = true;
           OpOperand *yieldOperand =
-              modifiedOp.getTiedYieldValue(modifiedOpOperand);
+              modifiedOp.getMatchingYieldValue(modifiedOpOperand);
           Optional<Type> legalizedType =
               getLegalizedElementType(yieldOperand->get().getType());
           if (!legalizedType) {

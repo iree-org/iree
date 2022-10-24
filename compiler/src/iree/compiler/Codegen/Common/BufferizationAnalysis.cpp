@@ -445,17 +445,18 @@ static void tieOperandsForOperandFusion(linalg::LinalgOp linalgOp,
     if (linalgOp.payloadUsesValueFromOperand(result.value())) {
       continue;
     }
-    for (OpOperand *input : linalgOp.getInputTensorOperands()) {
-      Type inputElementType =
-          input->get().getType().cast<RankedTensorType>().getElementType();
+    for (OpOperand *input : linalgOp.getInputOperands()) {
+      auto tensorType = input->get().getType().dyn_cast<RankedTensorType>();
+      if (!tensorType) continue;
+      Type inputElementType = tensorType.getElementType();
       Type resultElementType = result.value()
                                    ->get()
                                    .getType()
                                    .cast<RankedTensorType>()
                                    .getElementType();
       if (input->get().hasOneUse() && (inputElementType == resultElementType) &&
-          linalgOp.getTiedIndexingMap(input) ==
-              linalgOp.getTiedIndexingMap(result.value()) &&
+          linalgOp.getMatchingIndexingMap(input) ==
+              linalgOp.getMatchingIndexingMap(result.value()) &&
           !getEquivalentOpOfType<IREE::HAL::InterfaceBindingSubspanOp>(
               input->get(), plan) &&
           !isFromReadOnlyTensor(input->get(), plan)) {
@@ -556,8 +557,8 @@ LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
             [&](scf::IfOp ifOp) { return analyseScfIfOp(ifOp, plan); })
         .Case<scf::ForOp>(
             [&](scf::ForOp forOp) { return analyseScfForOp(forOp, plan); })
-        .Case<scf::YieldOp, linalg::InitTensorOp, tensor::DimOp,
-              tensor::ExtractOp, tensor::PadOp, bufferization::ToMemrefOp>(
+        .Case<scf::YieldOp, tensor::EmptyOp, tensor::DimOp, tensor::ExtractOp,
+              tensor::PadOp, bufferization::ToMemrefOp>(
             [&](Operation *op) { return success(); })
         .Default([&](Operation *op) -> LogicalResult {
           if (llvm::any_of(op->getOperands(),

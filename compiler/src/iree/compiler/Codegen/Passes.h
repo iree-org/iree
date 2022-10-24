@@ -13,6 +13,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Utils/CustomKernelsTargetInfo.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassOptions.h"
@@ -113,6 +114,10 @@ createTestPartitionableLoopsInterfacePass();
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createTileAndDistributeToWorkgroupsPass();
 
+/// Pass to specialize workgroup distribution loops
+std::unique_ptr<OperationPass<func::FuncOp>>
+createWorkgroupSpecializationPass();
+
 /// Pass to propagate type to avoid generating load/stores of illegal types.
 std::unique_ptr<OperationPass<func::FuncOp>> createTypePropagationPass();
 
@@ -146,6 +151,9 @@ std::unique_ptr<Pass> createTransformDialectInterpreterPass(
 /// Convert Linalg ops to Vector.
 std::unique_ptr<OperationPass<func::FuncOp>> createGPUVectorizationPass(
     bool generateContract = true);
+
+/// Tile reductions and generate serial loops around reductions.
+std::unique_ptr<OperationPass<func::FuncOp>> createGPUTileReductionPass();
 
 // Distributes vector ops to all threads/warps in a GPU workgroup.
 // `getWarpSize` is for deciding the warp size to use; it takes the
@@ -206,7 +214,8 @@ std::unique_ptr<OperationPass<ModuleOp>>
 createVerifyLinalgTransformLegalityPass();
 
 /// Performs the final conversion to LLVM dialect.
-std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass();
+std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass(
+    bool reassociateFpReordering = false);
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLLVMCPUEmitVectorizationRemarksPass();
@@ -255,6 +264,9 @@ void populateUnfusedFMAOpsPassPatterns(MLIRContext *context,
 /// code-generation. This pipeline does not vectorize, but instead just converts
 /// to memrefs
 void addCPUDefaultPassPipeline(OpPassManager &passManager);
+
+/// Populates the passes to lower ops through data tiling transformations.
+void addCPUDataTilingPipeline(OpPassManager &passManager);
 
 /// Populates the passes to lower to tiled/distributed/bufferized ops, suitable
 /// for library call dispatch and lowering to loops.
@@ -318,6 +330,14 @@ void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager);
 /// Links LLVMCPU HAL executables within the top-level program module.
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createLLVMCPULinkExecutablesPass();
+
+/// Assigns executable constant ordinals across all LLVMCPU variants.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
+createLLVMCPUAssignConstantOrdinalsPass();
+
+/// Assigns executable import ordinals across all LLVMCPU variants.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
+createLLVMCPUAssignImportOrdinalsPass();
 
 /// Populates passes needed to link HAL executables across LLVMCPU targets.
 void buildLLVMCPULinkingPassPipeline(OpPassManager &passManager);
@@ -411,29 +431,32 @@ createLLVMGPUReduceSharedMemoryBankConflicts(int64_t paddingSizeBits = 128);
 /// Converts vector ops to gpu dialect.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorToGPU();
 
+//. Pass to pad out tensors up to static dimensions.
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTensorPadPass();
+
 //------------------------------------------------------------------------------
 // SPIR-V Passes
 //------------------------------------------------------------------------------
 
 /// Pass pipeline to lower IREE HAL executables by tiling and distributing to
 /// workgroups and invocations. Each invocation handles a scalar.
-void addSPIRVTileAndDistributePassPipeline(OpPassManager &pm);
+void addSPIRVBaseDistributePassPipeline(OpPassManager &pm);
 
 /// Pass pipeline to lower IREE HAL executables by tiling and distributing to
 /// workgroups and invocations and vectorizing. Each invocation handles a
 /// vector.
-void addSPIRVTileAndVectorizePassPipeline(OpPassManager &pm);
+void addSPIRVBaseVectorizePassPipeline(OpPassManager &pm);
 
 /// Pass pipeline to lower IREE HAL executables by tiling and distributing
 /// to workgroups and subgroups and then vectorizing to SPIR-V cooperative
 /// matrix code.
-void addSPIRVTileAndVectorizeToCooperativeOpsPassPipeline(OpPassManager &pm);
+void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm);
 
 /// Pass pipeline to lower IREE HAL executables by tiling and distributing to
 /// workgroups, promoting to use workgroup memory, and then tiling and
 /// distributing to invocations and vectorizing. Each invocation handles a
 /// vector.
-void addSPIRVTileAndVectorizeWithWorkgroupMemoryPassPipeline(OpPassManager &pm);
+void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm);
 
 /// Pass pipeline to lower IREE HAL executables by tiling and distributing
 /// reduction to workgroups and then subgroups.
@@ -494,6 +517,9 @@ std::unique_ptr<OperationPass<ModuleOp>> createSPIRVVectorizeLoadStore();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVCreateFastSlowPathPass();
 
+/// Emulates 64-bit integer ops with 32-bit integer ops.
+std::unique_ptr<OperationPass<ModuleOp>> createSPIRVEmulateI64Pass();
+
 //----------------------------------------------------------------------------//
 // SPIRV Codegen Pass Pipelines.
 //----------------------------------------------------------------------------//
@@ -517,6 +543,10 @@ std::unique_ptr<Pass> createVMVXLowerLinalgMicrokernelsPass();
 
 /// Links VMVX HAL executables within the top-level program module.
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createVMVXLinkExecutablesPass();
+
+/// Assigns executable constant ordinals across all VMVX variants.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
+createVMVXAssignConstantOrdinalsPass();
 
 /// Populates passes needed to link HAL executables across VMVX targets.
 void buildVMVXLinkingPassPipeline(OpPassManager &passManager);

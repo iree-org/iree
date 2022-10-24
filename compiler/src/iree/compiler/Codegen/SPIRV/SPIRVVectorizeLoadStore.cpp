@@ -556,7 +556,8 @@ LogicalResult ProcessFunctionArgument::matchAndRewrite(
     signatureConverter.addInputs(arg.index(), arg.value().getType());
   }
   // Creates a new function with the update signature.
-  rewriter.applySignatureConversion(&funcOp.getBody(), signatureConverter);
+  rewriter.applySignatureConversion(&funcOp.getFunctionBody(),
+                                    signatureConverter);
 
   // Creates a new function with the update signature.
   rewriter.updateRootInPlace(funcOp, [&] {

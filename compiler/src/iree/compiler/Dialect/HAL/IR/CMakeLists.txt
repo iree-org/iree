@@ -41,6 +41,7 @@ iree_cc_library(
     ::HALTypesGen
     LLVMSupport
     MLIRArithDialect
+    MLIRControlFlowDialect
     MLIRFuncDialect
     MLIRIR
     MLIRMemRefDialect
@@ -65,6 +66,7 @@ iree_cc_library(
     ::IR
     LLVMSupport
     MLIRArithDialect
+    MLIRControlFlowDialect
     MLIRFuncDialect
     MLIRIR
     MLIRMemRefDialect

@@ -474,7 +474,7 @@ class StepExprVisitor
 template <typename OpTy>
 static Optional<unsigned> getInterfaceWorkgroupOpDim(Value value) {
   if (auto op = value.getDefiningOp<OpTy>()) {
-    return op.dimension().getZExtValue();
+    return op.getDimension().getZExtValue();
   }
   return llvm::None;
 }
@@ -502,7 +502,7 @@ Optional<LoopTilingAndDistributionInfo> isTiledAndDistributedLoop(
   auto stepApplyOp = forOp.getStep().getDefiningOp<AffineApplyOp>();
 
   if (!lbApplyOp || !stepApplyOp) {
-    // Try to see if this s a specical case where we have:
+    // Try to see if this is a specical case where we have:
     //   scf.for %iv = %id to %ub step %count
     Optional<unsigned> idDim;
     if (auto ifx = dyn_cast_or_null<ProcessorIDInterface>(
@@ -546,7 +546,7 @@ LogicalResult getFilteredOps(
     func::FuncOp funcOp, RootOpFilteringFn filteringFn,
     SmallVectorImpl<Operation *> &filteredOps,
     SmallVectorImpl<LoopTilingAndDistributionInfo> &tiledLoops) {
-  Region &region = funcOp.getBody();
+  Region &region = funcOp.getFunctionBody();
   if (!llvm::hasSingleElement(region)) {
     return funcOp.emitError("unable dispatch function with multiple blocks");
   }

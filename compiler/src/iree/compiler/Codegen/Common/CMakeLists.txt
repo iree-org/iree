@@ -90,6 +90,7 @@ iree_cc_library(
     "TileAndDistributeToWorkgroupsPass.cpp"
     "TypePropagationPass.cpp"
     "VectorizePad.cpp"
+    "WorkgroupSpecializationPass.cpp"
   DEPS
     IREELinalgExtDialect
     IREELinalgExtPasses
@@ -153,6 +154,7 @@ iree_cc_library(
     "FoldAffineMinInDistributedLoops.cpp"
     "GPUDistributeSharedMemoryCopy.cpp"
     "GPUPipelining.cpp"
+    "GPUTileReduction.cpp"
     "GPUVectorization.cpp"
     "LinalgOpInfo.cpp"
     "MemrefCopyToLinalg.cpp"

@@ -17,6 +17,7 @@ namespace VM {
 void registerToVMBytecodeTranslation() {
   TranslateFromMLIRRegistration toBytecodeModule(
       "iree-vm-ir-to-bytecode-module",
+      "Translates a vm.module to a bytecode module",
       [](mlir::ModuleOp moduleOp, llvm::raw_ostream &output) {
         return translateModuleToBytecode(
             moduleOp, BytecodeTargetOptions::FromFlags::get(), output);

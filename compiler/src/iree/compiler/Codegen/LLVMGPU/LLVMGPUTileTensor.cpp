@@ -18,6 +18,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 using mlir::iree_compiler::IREE::LinalgExt::TilingPatterns;
@@ -30,17 +31,20 @@ namespace iree_compiler {
 /// Patterns for workgroup level tiling. Workgroup tiling is done at the flow
 /// level but we may have extra tiling for the reduction dimension. Therefore we
 /// tile again without distributing.
-static void populateTilingReductionPatterns(RewritePatternSet &patterns) {
-  auto tileSizesFn = [&](OpBuilder &builder,
-                         Operation *op) -> SmallVector<Value, 4> {
+static void populateTilingPatterns(RewritePatternSet &patterns,
+                                   bool onlyReduction) {
+  auto tileSizesFn = [onlyReduction](OpBuilder &builder,
+                                     Operation *op) -> SmallVector<Value, 4> {
     auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
     auto partitionedLoops =
         interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
     SmallVector<Value, 4> tileSizes = getTileSizes(builder, op, 0);
-    auto zero = builder.create<arith::ConstantIndexOp>(op->getLoc(), 0);
-    for (unsigned depth : partitionedLoops) {
-      if (depth < tileSizes.size()) {
-        tileSizes[depth] = zero;
+    if (onlyReduction) {
+      auto zero = builder.create<arith::ConstantIndexOp>(op->getLoc(), 0);
+      for (unsigned depth : partitionedLoops) {
+        if (depth < tileSizes.size()) {
+          tileSizes[depth] = zero;
+        }
       }
     }
     return tileSizes;
@@ -51,23 +55,24 @@ static void populateTilingReductionPatterns(RewritePatternSet &patterns) {
                            .setTileSizeComputationFunction(tileSizesFn);
   MLIRContext *context = patterns.getContext();
 
-  linalg::LinalgTransformationFilter filter(
+  IREE::LinalgExt::LinalgTransformationFilter filter(
       ArrayRef<StringAttr>{
           StringAttr::get(context, getWorkgroupMemoryMarker())},
       StringAttr::get(context, getWorkgroupKTiledMarker()));
   filter.setMatchByDefault();
   TilingPatterns<linalg::MatmulOp, linalg::BatchMatmulOp, linalg::GenericOp,
-                 linalg::Conv2DNhwcHwcfOp>::insert(patterns, tilingOptions,
+                 linalg::Conv2DNhwcHwcfOp,
+                 linalg::Conv2DNchwFchwOp>::insert(patterns, tilingOptions,
                                                    filter);
 }
 
-LogicalResult tileReduction(func::FuncOp funcOp) {
+LogicalResult tileToSerialLoops(func::FuncOp funcOp, bool onlyReduction) {
   {
     // Tile again at the workgroup level since redution dimension were
     // ignored. Dimensions already tiled will be ignore since we tile to the
     // same size.
     RewritePatternSet wgTilingPatterns(funcOp.getContext());
-    populateTilingReductionPatterns(wgTilingPatterns);
+    populateTilingPatterns(wgTilingPatterns, onlyReduction);
     if (failed(applyPatternsAndFoldGreedily(funcOp,
                                             std::move(wgTilingPatterns)))) {
       return failure();
@@ -134,6 +139,50 @@ static LogicalResult tileParallelDims(func::FuncOp funcOp,
   return success();
 }
 
+// Tile convolution output window dimension by 1 to prepare downsizing.
+static LogicalResult tileAndUnrollConv(func::FuncOp funcOp) {
+  SmallVector<linalg::ConvolutionOpInterface, 1> convOps;
+  funcOp.walk([&convOps](linalg::ConvolutionOpInterface convOp) {
+    convOps.push_back(convOp);
+  });
+  for (linalg::ConvolutionOpInterface convOp : convOps) {
+    auto consumerOp = cast<linalg::LinalgOp>(*convOp);
+    OpBuilder builder(funcOp.getContext());
+    SmallVector<int64_t> tileSizes = getTileSizes(consumerOp, 1);
+    if (tileSizes.empty()) return success();
+    auto identityLoopOrder =
+        llvm::to_vector<4>(llvm::seq<int64_t>(0, tileSizes.size()));
+
+    FailureOr<linalg::TileLoopNest> loopNest =
+        IREE::LinalgExt::tileConsumerAndFuseProducers(
+            builder, consumerOp, tileSizes, identityLoopOrder, llvm::None);
+    if (failed(loopNest)) {
+      consumerOp.emitOpError("failed tiling and fusing producers");
+      return failure();
+    }
+
+    consumerOp->replaceAllUsesWith(loopNest->getRootOpReplacementResults());
+
+    // Fully unroll the generated loop. This allows us to remove the loop
+    // for parallel output window dimension, so it helps future vector
+    // transformations.
+    if (!loopNest->getLoopOps().empty()) {
+      assert(loopNest->getLoopOps().size() == 1);
+      scf::ForOp loopOp = loopNest->getLoopOps().front();
+      IntegerAttr ub;
+      if (!matchPattern(loopOp.getUpperBound(), m_Constant(&ub))) {
+        loopOp.emitOpError("upper bound should be a constant");
+        return failure();
+      }
+      if (failed(mlir::loopUnrollByFactor(loopOp, ub.getInt()))) {
+        loopOp.emitOpError("failed unrolling by factor 1");
+        return failure();
+      }
+    }
+  }
+  return success();
+}
+
 namespace {
 struct LLVMGPUTileTensorPass
     : public LLVMGPUTileTensorBase<LLVMGPUTileTensorPass> {
@@ -151,13 +200,8 @@ struct LLVMGPUTileTensorPass
     auto funcOp = getOperation();
     if (!isEntryPoint(funcOp)) return;
 
-    if (failed(tileReduction(funcOp))) {
-      return signalPassFailure();
-    }
-
-    LLVM_DEBUG({
-      llvm::dbgs() << "--- After tile reductions:";
-      funcOp.dump();
+    funcOp->walk([&](linalg::LinalgOp op) {
+      op->removeAttr(IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker);
     });
 
     auto workgroupSize = llvm::to_vector<4>(llvm::map_range(
@@ -169,6 +213,26 @@ struct LLVMGPUTileTensorPass
 
     LLVM_DEBUG({
       llvm::dbgs() << "--- After second level of tiling";
+      funcOp.dump();
+    });
+
+    // Tile to serial loops to the wg tile size to handle reductions and other
+    // dimension that have not been distributed.
+    if (failed(tileToSerialLoops(funcOp, /*onlyReduction=*/true))) {
+      return signalPassFailure();
+    }
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "--- After tile reductions:";
+      funcOp.dump();
+    });
+
+    if (failed(tileAndUnrollConv(funcOp))) {
+      return signalPassFailure();
+    }
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "--- After conv unrolling:";
       funcOp.dump();
     });
   }

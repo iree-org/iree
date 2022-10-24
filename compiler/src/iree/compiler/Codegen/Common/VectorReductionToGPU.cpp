@@ -96,7 +96,7 @@ static void moveScalarAndBindingUniformCode(
   auto canBeHoisted = [](Operation *op,
                          function_ref<bool(Value)> definedOutside) {
     return llvm::all_of(op->getOperands(), definedOutside) &&
-           (isSideEffectFree(op) ||
+           (isMemoryEffectFree(op) ||
             isa<IREE::HAL::InterfaceBindingSubspanOp,
                 IREE::HAL::InterfaceConstantLoadOp, memref::AssumeAlignmentOp>(
                 op)) &&
@@ -195,8 +195,8 @@ class VectorReduceToGPUPass
     auto cstGroupSize = builder.create<arith::ConstantIndexOp>(loc, groupSize);
     auto warpOp = builder.create<vector::WarpExecuteOnLane0Op>(
         loc, TypeRange(), threadX.getResult(), groupSize);
-    warpOp.getWarpRegion().takeBody(funcOp.getBody());
-    Block &newBlock = funcOp.getBody().emplaceBlock();
+    warpOp.getWarpRegion().takeBody(funcOp.getFunctionBody());
+    Block &newBlock = funcOp.getFunctionBody().emplaceBlock();
     threadX->moveBefore(&newBlock, newBlock.end());
     cstGroupSize->moveBefore(&newBlock, newBlock.end());
     warpOp->moveBefore(&newBlock, newBlock.end());

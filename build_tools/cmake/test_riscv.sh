@@ -14,72 +14,14 @@ set -xeuo pipefail
 export PS4='[$(date -u "+%T %Z")] '
 
 ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
-
+BUILD_RISCV_DIR="${BUILD_RISCV_DIR:-$ROOT_DIR/build-riscv}"
 RISCV_ARCH="${RISCV_ARCH:-rv64}"
+BUILD_PRESET="${BUILD_PRESET:-test}"
 
-if [[ "${RISCV_ARCH}" == "rv64" ]]; then
-  IREE_IMPORT_TFLITE_BIN="${IREE_IMPORT_TFLITE_BIN:-iree-import-tflite}"
-  LLVM_BIN_DIR="${LLVM_BIN_DIR}"
-fi
-
-# Environment variable used by the emulator and iree-compile for the
-# llvm-cpu bytecode codegen.
+# Environment variable used by the emulator.
 export RISCV_TOOLCHAIN_ROOT="${RISCV_RV64_LINUX_TOOLCHAIN_ROOT}"
 
-function generate_llvm_cpu_vmfb {
-  local target="${1}"; shift
-  local compile_args=(
-    --iree-hal-target-backends=llvm-cpu
-    --iree-llvm-embedded-linker-path="${IREE_HOST_BINARY_ROOT}/bin/lld"
-    --iree-llvm-target-triple=riscv64
-    --iree-llvm-target-cpu=generic-rv64
-    --iree-llvm-target-abi=lp64d
-  )
-  if [[ "${target}" == "mhlo" ]]; then
-    compile_args+=(
-      --iree-input-type=mhlo
-      --iree-llvm-target-cpu-features="+m,+a,+f,+d,+c"
-    )
-  elif [[ "${target}" == "tosa" ]]; then
-    local input_file="${1}"; shift
-    "${IREE_IMPORT_TFLITE_BIN}" -o "${BUILD_RISCV_DIR}/tosa.mlir" "${input_file}"
-    compile_args+=(
-      --iree-input-type=tosa
-      --iree-llvm-target-cpu-features="+m,+a,+f,+d,+c"
-      "${BUILD_RISCV_DIR}/tosa.mlir"
-    )
-  elif [[ "${target}" == "tosa-rvv" ]]; then
-    local input_file="${1}"; shift
-    "${IREE_IMPORT_TFLITE_BIN}" -o "${BUILD_RISCV_DIR}/tosa.mlir" "${input_file}"
-    compile_args+=(
-      --iree-input-type=tosa
-      --iree-llvm-target-cpu-features="+m,+a,+f,+d,+c,+v"
-      --riscv-v-fixed-length-vector-lmul-max=8
-      --riscv-v-vector-bits-min=512
-      "${BUILD_RISCV_DIR}/tosa.mlir"
-    )
-  fi
-  "${IREE_HOST_BINARY_ROOT}/bin/iree-compile" "${compile_args[@]}" "$@"
-}
-
-if [[ "${RISCV_ARCH}" == "rv64" ]]; then
-  generate_llvm_cpu_vmfb mhlo \
-    "${ROOT_DIR}/tools/test/iree-run-module.mlir" \
-    -o "${BUILD_RISCV_DIR}/iree-run-module-llvm_cpu.vmfb"
-
-  wget -P "${BUILD_RISCV_DIR}/" "https://storage.googleapis.com/iree-model-artifacts/person_detect.tflite"
-
-  generate_llvm_cpu_vmfb tosa \
-    "${BUILD_RISCV_DIR}/person_detect.tflite" \
-    -o "${BUILD_RISCV_DIR}/person_detect.vmfb"
-
-  generate_llvm_cpu_vmfb tosa-rvv \
-    "${BUILD_RISCV_DIR}/person_detect.tflite" \
-    -o "${BUILD_RISCV_DIR}/person_detect_rvv.vmfb"
-
-  ${PYTHON_BIN} "${ROOT_DIR}/third_party/llvm-project/llvm/utils/lit/lit.py" \
-    -v --path "${LLVM_BIN_DIR}" "${ROOT_DIR}/tests/riscv64"
-fi
+export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
 
 ctest_args=(
   "--timeout 900"
@@ -105,6 +47,17 @@ declare -a test_exclude_args=(
   "regression_llvm-cpu_lowering_config"
 )
 
+if [[ "${BUILD_PRESET}" == "benchmark-suite-test" ]]; then
+  declare -a label_args=(
+    "^test-type=run-module-test$"
+  )
+  label_include_regex="($(IFS="|" ; echo "${label_args[*]}"))"
+  echo "******** Running run-module CTest ********"
+  ctest --test-dir ${BUILD_RISCV_DIR} ${ctest_args[@]} \
+    --label-regex ${label_include_regex}
+  exit 0
+fi
+
 # Test runtime unit tests
 runtime_label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]}"))"
 runtime_ctest_args=(
@@ -114,6 +67,14 @@ runtime_ctest_args=(
 )
 echo "******** Running runtime CTest ********"
 ctest ${runtime_ctest_args[@]}
+
+tools_ctest_args=(
+  "--test-dir ${BUILD_RISCV_DIR}/tools/test"
+  ${ctest_args[@]}
+  "--label-exclude ${runtime_label_exclude_regex}"
+)
+echo "******** Running tools CTest ********"
+ctest ${tools_ctest_args[@]}
 
 if [[ "${RISCV_ARCH}" == "rv32-linux" ]]; then
   # mhlo.power is also disabled because musl math library is not compiled for

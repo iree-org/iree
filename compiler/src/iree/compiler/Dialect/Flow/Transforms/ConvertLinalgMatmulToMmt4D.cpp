@@ -78,7 +78,7 @@ static Value transpose(mlir::Location loc, PatternRewriter &rewriter,
     }
   }
 
-  Value outputTensor = rewriter.create<linalg::InitTensorOp>(
+  Value outputTensor = rewriter.create<tensor::EmptyOp>(
       loc, targetShape, inputType.getElementType());
 
   SmallVector<StringRef, 4> loopAttributeTypes(nloops, "parallel");
@@ -189,9 +189,8 @@ static Value pad(Location loc, PatternRewriter &rewriter, Value input,
       RankedTensorType::get(resultTypeShape, elementType);
   Value padValue = rewriter.create<arith::ConstantOp>(
       loc, elementType, rewriter.getZeroAttr(elementType));
-  return tensor::createPadScalarOp(resultType, input, padValue, lowPadding,
-                                   highPadding,
-                                   /* nofold = */ false, loc, rewriter);
+  return rewriter.create<tensor::PadOp>(loc, resultType, input, lowPadding,
+                                        highPadding, padValue);
 }
 
 // Returns a top-left slice from |input| shaped like |likeWhat|.
@@ -390,8 +389,8 @@ LinalgMatmulOpToLinalgMmt4DOpPattern::chooseTileParams(Value lhs, Value rhs,
   return llvm::None;
 }
 
-/// Canonicalizes [linalg.init_tensor -> linalg.fill -> linalg.generic] ->
-/// [linalg.init_tensor -> linalg.fill] where linalg.generic does only copy e.g
+/// Canonicalizes [tensor.empty() -> linalg.fill -> linalg.generic] ->
+/// [tensor.empty() -> linalg.fill] where linalg.generic does only copy e.g
 /// a transpose.
 struct FoldFillGenericOpPattern : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
@@ -424,7 +423,7 @@ struct FoldFillGenericOpPattern : public OpRewritePattern<linalg::GenericOp> {
     if (!fillOp) return failure();
 
     auto loc = genericOp.getLoc();
-    Value newInitTensor = rewriter.create<linalg::InitTensorOp>(
+    Value newInitTensor = rewriter.create<tensor::EmptyOp>(
         loc, outputType.getShape(), outputType.getElementType());
     rewriter.replaceOpWithNewOp<linalg::FillOp>(genericOp, fillOp.value(),
                                                 newInitTensor);
@@ -464,7 +463,7 @@ class ConvertLinalgMatmulToMmt4DPass final
     {
       RewritePatternSet patterns(&getContext());
       tensor::ExpandShapeOp::getCanonicalizationPatterns(patterns, context);
-      linalg::InitTensorOp::getCanonicalizationPatterns(patterns, context);
+      tensor::EmptyOp::getCanonicalizationPatterns(patterns, context);
       linalg::FillOp::getCanonicalizationPatterns(patterns, context);
       patterns.insert<FoldFillGenericOpPattern>(context);
       if (failed(applyPatternsAndFoldGreedily(getOperation(),

@@ -561,22 +561,22 @@ struct LinalgBinaryGenericConversion
         // 1:1 matching.
         return BinaryEmitter(
             BinaryEmitter::Descriptor(operand0->get(),
-                                      op.getTiedIndexingMap(operand0)),
+                                      op.getMatchingIndexingMap(operand0)),
             BinaryEmitter::Descriptor(operand1->get(),
-                                      op.getTiedIndexingMap(operand1)),
+                                      op.getMatchingIndexingMap(operand1)),
             BinaryEmitter::Descriptor(result->get(),
-                                      op.getTiedIndexingMap(result)),
+                                      op.getMatchingIndexingMap(result)),
             selection);
       } else if (binaryOp->getOperand(1) == operandScalar0 &&
                  binaryOp->getOperand(0) == operandScalar1) {
         // Inverted operands.
         return BinaryEmitter(
             BinaryEmitter::Descriptor(operand1->get(),
-                                      op.getTiedIndexingMap(operand1)),
+                                      op.getMatchingIndexingMap(operand1)),
             BinaryEmitter::Descriptor(operand0->get(),
-                                      op.getTiedIndexingMap(operand0)),
+                                      op.getMatchingIndexingMap(operand0)),
             BinaryEmitter::Descriptor(result->get(),
-                                      op.getTiedIndexingMap(result)),
+                                      op.getMatchingIndexingMap(result)),
             selection);
       } else {
         return None;
@@ -585,88 +585,90 @@ struct LinalgBinaryGenericConversion
 
     // Select the op to lower to and configure the emitter.
     // Emit from the iree_ukernel_x32b_opcode_t table.
+    Type resultType = binaryOp->getResult(0).getType();
+    if (!resultType.isIntOrFloat()) return failure();
     Optional<BinaryEmitter> emitter =
         TypeSwitch<Operation *, Optional<BinaryEmitter>>(binaryOp)
             .Case([&](arith::AddFOp op) -> Optional<BinaryEmitter> {
-              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+              if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "add");
               }
               return None;
             })
             .Case([&](arith::AddIOp op) -> Optional<BinaryEmitter> {
-              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+              if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "add");
               }
               return None;
             })
             .Case([&](arith::AndIOp op) -> Optional<BinaryEmitter> {
-              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+              if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "and");
               }
               return None;
             })
             .Case([&](arith::DivFOp op) -> Optional<BinaryEmitter> {
-              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+              if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "div");
               }
               return None;
             })
             .Case([&](arith::DivSIOp op) -> Optional<BinaryEmitter> {
-              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+              if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "divs");
               }
               return None;
             })
             .Case([&](arith::DivUIOp op) -> Optional<BinaryEmitter> {
-              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+              if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "divu");
               }
               return None;
             })
             .Case([&](arith::MulFOp op) -> Optional<BinaryEmitter> {
-              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+              if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "mul");
               }
               return None;
             })
             .Case([&](arith::MulIOp op) -> Optional<BinaryEmitter> {
-              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+              if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "mul");
               }
               return None;
             })
             .Case([&](arith::OrIOp op) -> Optional<BinaryEmitter> {
-              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+              if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "or");
               }
               return None;
             })
             .Case([&](arith::ShLIOp op) -> Optional<BinaryEmitter> {
-              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+              if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "shl");
               }
               return None;
             })
             .Case([&](arith::ShRSIOp op) -> Optional<BinaryEmitter> {
-              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+              if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "shrs");
               }
               return None;
             })
             .Case([&](arith::XOrIOp op) -> Optional<BinaryEmitter> {
-              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+              if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "xor");
               }
               return None;
             })
             .Case([&](arith::SubFOp op) -> Optional<BinaryEmitter> {
-              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+              if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "sub");
               }
               return None;
             })
             .Case([&](arith::SubIOp op) -> Optional<BinaryEmitter> {
-              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+              if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericBinary(op, "sub");
               }
               return None;
@@ -725,61 +727,64 @@ struct LinalgUnaryGenericConversion
       // Make sure that the binary op has operands that map to the
       // ins and detect the order.
       auto selection = UnaryEmitter::OpSelection::genericUnary(opcode);
-      return UnaryEmitter(UnaryEmitter::Descriptor(
-                              operand0->get(), op.getTiedIndexingMap(operand0)),
-                          UnaryEmitter::Descriptor(
-                              result->get(), op.getTiedIndexingMap(result)),
-                          selection);
+      return UnaryEmitter(
+          UnaryEmitter::Descriptor(operand0->get(),
+                                   op.getMatchingIndexingMap(operand0)),
+          UnaryEmitter::Descriptor(result->get(),
+                                   op.getMatchingIndexingMap(result)),
+          selection);
     };
 
     // Select the op to lower to and configure the emitter.
     // Emit from the iree_ukernel_x32b_opcode_t table.
+    Type resultType = unaryOp->getResult(0).getType();
+    if (!resultType.isIntOrFloat()) return failure();
     Optional<UnaryEmitter> emitter =
         TypeSwitch<Operation *, Optional<UnaryEmitter>>(unaryOp)
             .Case([&](math::AbsFOp op) -> Optional<UnaryEmitter> {
-              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+              if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericUnary(op, "abs");
               }
               return None;
             })
             .Case([&](math::CeilOp op) -> Optional<UnaryEmitter> {
-              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+              if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericUnary(op, "ceil");
               }
               return None;
             })
             .Case([&](math::CountLeadingZerosOp op) -> Optional<UnaryEmitter> {
-              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+              if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericUnary(op, "ctlz");
               }
               return None;
             })
             .Case([&](math::ExpOp op) -> Optional<UnaryEmitter> {
-              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+              if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericUnary(op, "exp");
               }
               return None;
             })
             .Case([&](math::FloorOp op) -> Optional<UnaryEmitter> {
-              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+              if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericUnary(op, "floor");
               }
               return None;
             })
             .Case([&](math::LogOp op) -> Optional<UnaryEmitter> {
-              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+              if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericUnary(op, "log");
               }
               return None;
             })
             .Case([&](arith::NegFOp op) -> Optional<UnaryEmitter> {
-              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+              if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericUnary(op, "neg");
               }
               return None;
             })
             .Case([&](math::RsqrtOp op) -> Optional<UnaryEmitter> {
-              if (op.getResult().getType().getIntOrFloatBitWidth() == 32) {
+              if (resultType.getIntOrFloatBitWidth() == 32) {
                 return configureGenericUnary(op, "rsqrt");
               }
               return None;
@@ -813,7 +818,6 @@ struct LinalgTrivialGenericConversion
 
     // Presumed to be a yield terminator: configure the emitter.
     CopyEmitter emitter;
-    auto allOperands = op.getInputAndOutputOperands();
     Operation &yieldOp = children.front();
     for (auto it : llvm::enumerate(yieldOp.getOperands())) {
       unsigned outputIndex = it.index();
@@ -823,9 +827,10 @@ struct LinalgTrivialGenericConversion
         OpOperand *input = op.getInputOperand(inputIndex);
         OpOperand *output = op.getOutputOperand(outputIndex);
         emitter.copies.emplace_back(
-            CopyEmitter::Descriptor{input->get(), op.getTiedIndexingMap(input)},
+            CopyEmitter::Descriptor{input->get(),
+                                    op.getMatchingIndexingMap(input)},
             CopyEmitter::Descriptor{output->get(),
-                                    op.getTiedIndexingMap(output)});
+                                    op.getMatchingIndexingMap(output)});
       } else {
         return rewriter.notifyMatchFailure(op, "does not yield blockargs");
       }
@@ -912,6 +917,48 @@ bool isMmt4d(ArrayAttr indexingMaps) {
   return indexingMaps == maps;
 }
 
+int getNumberOfUses(Value v) {
+  auto uses = v.getUses();
+  return std::distance(uses.begin(), uses.end());
+}
+
+template <typename OpType>
+OpType getUserOfType(Value v) {
+  auto uses = v.getUses();
+  for (const auto &u : uses) {
+    if (OpType user = llvm::dyn_cast<OpType>(u.getOwner())) {
+      return user;
+    }
+  }
+  return nullptr;
+}
+
+linalg::FillOp findFillOpSolelyZeroingOutputOf(linalg::LinalgOp op) {
+  Value out = op.getOutputOperand(0)->get();
+  if (getNumberOfUses(out) != 2) {
+    return nullptr;
+  }
+  linalg::FillOp fillOp = getUserOfType<linalg::FillOp>(out);
+  if (!fillOp) {
+    return nullptr;
+  }
+  if (!fillOp->isBeforeInBlock(op)) {
+    return nullptr;
+  }
+  Value fillValue = fillOp.value();
+  if (auto constIntOp = fillValue.getDefiningOp<arith::ConstantIntOp>()) {
+    if (constIntOp.value() == 0) {
+      return fillOp;
+    }
+  }
+  if (auto constFloatOp = fillValue.getDefiningOp<arith::ConstantFloatOp>()) {
+    if (constFloatOp.value().isZero()) {
+      return fillOp;
+    }
+  }
+  return nullptr;
+}
+
 /// Convert supported linalg contraction ops like matmul and mmt4d.
 struct LinalgContractionConversion
     : public OpInterfaceRewritePattern<linalg::ContractionOpInterface> {
@@ -933,10 +980,10 @@ struct LinalgContractionConversion
           op(llvm::cast<linalg::LinalgOp>(contract.getOperation())),
           lhsAnal(contract.lhs()),
           rhsAnal(contract.rhs()),
-          outAnal(op.outputs().front()) {
+          outAnal(op.getOutputOperands().front()->get()) {
       lhs = contract.lhs();
       rhs = contract.rhs();
-      out = op.outputs().front();
+      out = op.getOutputOperands().front()->get();
     }
   };
 
@@ -998,17 +1045,22 @@ struct LinalgContractionConversion
 
   LogicalResult handleConformingMatmul2D(OpInfo &info,
                                          PatternRewriter &rewriter) const {
-    auto loc = info.op.getLoc();
+    int flags = 0;
+    if (linalg::FillOp fillOp = findFillOpSolelyZeroingOutputOf(info.op)) {
+      rewriter.eraseOp(fillOp);  // let the matmul overwrite the accumulator.
+    } else {
+      flags |= IREE_VMVX_MATMUL_FLAG_ACCUMULATE;  // accumulate into existing.
+    }
+
     auto &lhsDesc = info.lhsAnal.getDesc(rewriter);
     auto &rhsDesc = info.rhsAnal.getDesc(rewriter);
     auto &outDesc = info.outAnal.getDesc(rewriter);
-
-    int flags = IREE_VMVX_MATMUL_FLAG_ACCUMULATE;
 
     Value m = lhsDesc.sizes[0];
     Value k = rhsDesc.sizes[0];
     Value n = rhsDesc.sizes[1];
 
+    auto loc = info.op.getLoc();
     auto lhsBuffer = lhsDesc.castToLinear(loc, rewriter);
     auto rhsBuffer = rhsDesc.castToLinear(loc, rewriter);
     auto outBuffer = outDesc.castToLinear(loc, rewriter);
@@ -1031,11 +1083,17 @@ struct LinalgContractionConversion
 
   LogicalResult handleConformingMmt4d(OpInfo &info,
                                       PatternRewriter &rewriter) const {
-    auto loc = info.op.getLoc();
+    int flags = 0;
+    if (linalg::FillOp fillOp = findFillOpSolelyZeroingOutputOf(info.op)) {
+      rewriter.eraseOp(fillOp);  // let the matmul overwrite the accumulator.
+    } else {
+      flags |= IREE_VMVX_MATMUL_FLAG_ACCUMULATE;  // accumulate into existing.
+    }
+
     auto &lhsDesc = info.lhsAnal.getDesc(rewriter);
     auto &rhsDesc = info.rhsAnal.getDesc(rewriter);
     auto &outDesc = info.outAnal.getDesc(rewriter);
-    int flags = IREE_VMVX_MATMUL_FLAG_ACCUMULATE;
+
     Value m = lhsDesc.sizes[0];
     Value n = rhsDesc.sizes[0];
     Value k = rhsDesc.sizes[1];
@@ -1043,6 +1101,7 @@ struct LinalgContractionConversion
     Value n0 = rhsDesc.sizes[2];
     Value k0 = rhsDesc.sizes[3];
 
+    auto loc = info.op.getLoc();
     auto lhsBuffer = lhsDesc.castToLinear(loc, rewriter);
     auto rhsBuffer = rhsDesc.castToLinear(loc, rewriter);
     auto outBuffer = outDesc.castToLinear(loc, rewriter);
@@ -1076,14 +1135,32 @@ class VMVXLowerLinalgMicrokernelsPass
   }
 
   void runOnOperation() override {
-    RewritePatternSet patterns(&getContext());
-    patterns.insert<LinalgBinaryGenericConversion, LinalgFillConversion,
-                    LinalgContractionConversion, LinalgTrivialGenericConversion,
-                    LinalgUnaryGenericConversion>(&getContext());
+    // Patterns that need to be applied first to match multiple linalg ops
+    // before they have been lowered.
+    {
+      RewritePatternSet patterns(&getContext());
+      // LinalgContractionConversion needs to match linalg::FillOp to determine
+      // whether to set the 'accumulate' flag or just erase the FillOp.
+      patterns.insert<LinalgContractionConversion>(&getContext());
 
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
-      return signalPassFailure();
+      if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                              std::move(patterns)))) {
+        return signalPassFailure();
+      }
+    }
+
+    // Other lowering patterns
+    {
+      RewritePatternSet patterns(&getContext());
+      patterns
+          .insert<LinalgBinaryGenericConversion, LinalgFillConversion,
+                  LinalgTrivialGenericConversion, LinalgUnaryGenericConversion>(
+              &getContext());
+
+      if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                              std::move(patterns)))) {
+        return signalPassFailure();
+      }
     }
 
     if (warnOnUnconverted) {

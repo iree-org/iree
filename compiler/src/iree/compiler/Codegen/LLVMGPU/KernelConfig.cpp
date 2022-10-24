@@ -129,7 +129,7 @@ static bool supportsTensorCore(func::FuncOp entryPoint, linalg::LinalgOp op) {
     if (it == body.op_end() || !isa<arith::MulFOp>(*(it++))) return false;
     if (it == body.op_end() || !isa<arith::AddFOp>(*(it++))) return false;
     if (it == body.op_end() || !isa<linalg::YieldOp>(*(it++))) return false;
-    AffineMap outputMap = op.getTiedIndexingMap(op.getOutputOperand(0));
+    AffineMap outputMap = op.getMatchingIndexingMap(op.getOutputOperand(0));
     if (outputMap.getNumResults() != outputMap.getNumDims() - 1) return false;
     OpBuilder b(op);
     for (unsigned i = 0, e = outputMap.getNumResults(); i < e - 1; i++) {
@@ -178,16 +178,16 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
   int64_t sizeM = ShapedType::kDynamicSize;
   int64_t sizeN = ShapedType::kDynamicSize;
   int64_t sizeK = ShapedType::kDynamicSize;
-  auto outputMap = op.getTiedIndexingMap(op.getOutputOperand(0));
+  auto outputMap = op.getMatchingIndexingMap(op.getOutputOperand(0));
   for (unsigned i = 0; i < lhsShape.size(); i++) {
-    if (op.getTiedIndexingMap(op.getInputOperand(0)).getDimPosition(i) ==
+    if (op.getMatchingIndexingMap(op.getInputOperand(0)).getDimPosition(i) ==
         outputMap.getDimPosition(outputMap.getNumResults() - 2)) {
       sizeM = lhsShape[i];
       break;
     }
   }
   for (unsigned i = 0; i < rhsShape.size(); i++) {
-    if (op.getTiedIndexingMap(op.getInputOperand(1)).getDimPosition(i) ==
+    if (op.getMatchingIndexingMap(op.getInputOperand(1)).getDimPosition(i) ==
         outputMap.getDimPosition(outputMap.getNumResults() - 1)) {
       sizeN = rhsShape[i];
       break;
@@ -197,7 +197,7 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
   op.getReductionDims(exprs);
   if (exprs.size() == 1) {
     for (unsigned i = 0; i < lhsShape.size(); i++) {
-      if (op.getTiedIndexingMap(op.getInputOperand(0)).getDimPosition(i) ==
+      if (op.getMatchingIndexingMap(op.getInputOperand(0)).getDimPosition(i) ==
           exprs[0]) {
         sizeK = lhsShape[i];
         break;
@@ -254,11 +254,19 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
       }
     }
   }
-  // If we haven't found any config, fall back to default config.
-  int64_t tileX = 2;
-  int64_t tileY = 256;
-  int64_t tileK = 4;
-  SmallVector<int64_t, 3> workgroupSize = {2 * cudaWarpSize, 1, 1};
+  // If we haven't found any config, use the best tile size hoping that
+  // the workgroup specialization handles the main tile path efficiently.
+  SmallVector<TileWorkgroupSizePair> tileSizeConfig;
+  // Query the best configuration.
+  getMatmulConfig(tileSizeConfig);
+  constexpr size_t configIndex = 0;
+  const TileWorkgroupSizePair &config = tileSizeConfig[configIndex];
+  const int64_t tileX = config.tileSize[0];
+  const int64_t tileY = config.tileSize[1];
+  const int64_t tileK = config.tileSize[2];
+  const std::array<int64_t, 3> workgroupSize{config.workgroupSize[0],
+                                             config.workgroupSize[1],
+                                             config.workgroupSize[2]};
   return setMatmulConfig(
       tileX, tileY, tileK, workgroupSize, softwarePipelineDepthSimt,
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt);
@@ -364,7 +372,7 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
 
   if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
     for (auto outputOperand : enumerate(genericOp.getOutputOperands())) {
-      if (!genericOp.getTiedIndexingMap(outputOperand.value())
+      if (!genericOp.getMatchingIndexingMap(outputOperand.value())
                .isProjectedPermutation()) {
         vectorSize = 1;
         break;
@@ -402,9 +410,8 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
   // TODO(thomasraoux): This could be improved by checking if the linalg op
   // would fail vectorization.
   if (!linalgOp || op->getNumResults() != 1 ||
-      llvm::any_of(linalgOp.getInputAndOutputOperands(), [&](OpOperand *input) {
-        return !linalgOp.getTiedIndexingMap(input).isProjectedPermutation();
-      })) {
+      llvm::any_of(linalgOp.getIndexingMapsArray(),
+                   [](AffineMap m) { return !m.isProjectedPermutation(); })) {
     vectorSize = 1;
   } else {
     passPipeline =
@@ -446,6 +453,20 @@ static Optional<int64_t> getLinalgDimSize(linalg::LinalgOp op, int64_t d) {
   return llvm::None;
 }
 
+// Check if the given function contains an op that may require a broadcast of
+// the reduced result.
+static bool isFusedWithBroadcast(func::FuncOp entryPoint,
+                                 linalg::LinalgOp reduce) {
+  int64_t reducedRank =
+      reduce->getResult(0).getType().cast<ShapedType>().getRank();
+  bool hasBroadcast = false;
+  entryPoint.walk([&](linalg::LinalgOp linalgOp) {
+    if (reduce != linalgOp && linalgOp.getNumLoops() > reducedRank)
+      hasBroadcast = true;
+  });
+  return hasBroadcast;
+}
+
 /// Set the configuration for reductions that can be mapped to warp reductions.
 static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
                                             linalg::LinalgOp op) {
@@ -462,7 +483,7 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   // Only support projected permutation, this could be extended to projected
   // permutated with broadcast.
   if (llvm::any_of(op.getInputOperands(), [&](OpOperand *input) {
-        return !op.getTiedIndexingMap(input).isProjectedPermutation();
+        return !op.getMatchingIndexingMap(input).isProjectedPermutation();
       }))
     return failure();
 
@@ -473,25 +494,44 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
     return failure();
   Optional<int64_t> dimSize = getLinalgDimSize(op, reductionDims[0]);
   if (!dimSize || *dimSize % cudaWarpSize != 0) return failure();
-  // TODO: Add reduction tiling to handle larger reductions.
-  if (*dimSize > 1024) return failure();
-  SmallVector<unsigned> parallelDims;
-  op.getParallelDims(parallelDims);
+
+  const Type elementType = op.getOutputOperand(0)
+                               ->get()
+                               .getType()
+                               .cast<ShapedType>()
+                               .getElementType();
+  if (!elementType.isIntOrFloat()) return failure();
+  // Reduction distribution only supports 32-bit types now.
+  if (elementType.getIntOrFloatBitWidth() != 32) return failure();
+
   unsigned vectorSize = 4;
   while ((*dimSize / vectorSize) % cudaWarpSize != 0) vectorSize /= 2;
 
-  std::array<int64_t, 3> workgroupSize = {*dimSize / vectorSize, 1, 1};
-
+  // TODO: Add reduction tiling to handle larger reductions.
+  const int64_t maxWorkgroupSize = 1024;
+  int64_t groupSize = *dimSize / vectorSize;
+  if (groupSize > maxWorkgroupSize) {
+    groupSize = llvm::APIntOps::GreatestCommonDivisor(
+                    {64, uint64_t(groupSize)}, {64, uint64_t(maxWorkgroupSize)})
+                    .getZExtValue();
+    // Workaround, the vector distribution doesn't handle cases where we fuse
+    // the reduction with a consumer that needs to be tiled.
+    // TODO(thomasraoux): remove the restriction once vector distribution is
+    // improved.
+    if (isFusedWithBroadcast(entryPoint, op)) return failure();
+  }
+  std::array<int64_t, 3> workgroupSize = {groupSize, 1, 1};
   SmallVector<unsigned> partitionedLoops =
       cast<PartitionableLoopsInterface>(op.getOperation())
           .getPartitionableLoops(kNumMaxParallelDims);
-  llvm::SmallDenseSet<unsigned, 4> partitionedLoopsSet;
-  partitionedLoopsSet.insert(partitionedLoops.begin(), partitionedLoops.end());
   size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
   // Tile all the parallel dimension to 1.
   SmallVector<int64_t, 4> workgroupTileSizes(numLoops, 1);
+  SmallVector<int64_t, 4> reductionTileSizes(numLoops, 0);
+  reductionTileSizes.push_back(groupSize * vectorSize);
   TileSizesListType tileSizes;
   tileSizes.emplace_back(std::move(workgroupTileSizes));  // Workgroup level
+  tileSizes.emplace_back(std::move(reductionTileSizes));  // reduction level
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, tileSizes,
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWarpReduction,
@@ -519,12 +559,14 @@ static LogicalResult setTransposeConfig(func::FuncOp entryPoint,
   // Determine the fastest moving dimensions for the source/destination indices
   // of each transpose. These inform the tile sizes.
   int64_t outputFastestDim = linalgOp.getNumLoops() - 1;
-  int64_t inputFastestDim = linalgOp.getTiedIndexingMap(transposedOperands[0])
-                                .getDimPosition(outputFastestDim);
+  int64_t inputFastestDim =
+      linalgOp.getMatchingIndexingMap(transposedOperands[0])
+          .getDimPosition(outputFastestDim);
   // Ensure the other transposed operands match
   for (int i = 1; i < transposedOperands.size(); ++i) {
-    if (inputFastestDim != linalgOp.getTiedIndexingMap(transposedOperands[i])
-                               .getDimPosition(outputFastestDim)) {
+    if (inputFastestDim !=
+        linalgOp.getMatchingIndexingMap(transposedOperands[i])
+            .getDimPosition(outputFastestDim)) {
       return failure();
     }
   }
@@ -557,12 +599,87 @@ static LogicalResult setTransposeConfig(func::FuncOp entryPoint,
       workgroupSize);
 }
 
+/// Decides the tiling and distribution parameters for one convolution
+/// dimension. Returns true if we can succesfully deduce.
+///
+/// - `inputDim` is the size of the dimension to be distributed.
+/// - `residualThreads` is the remaining threads we can distribute.
+/// - `residualTilingFactor` indicates the remaining tiling scale factor.
+/// - `wgDimSize` will be updated with the decided workgroup dimension size.
+/// - `wgTileSize` will be updated with the decided workgroup tile size.
+/// - `invoTileSize` will be updated with the decided invocation tile size.
+static bool distributeToOneDim(const int64_t inputDim,
+                               const bool isInnerMostDim,
+                               int64_t &residualThreads,
+                               int64_t &residualTilingFactor,
+                               int64_t &wgDimSize, int64_t &wgTileSize) {
+  const int64_t lb = isInnerMostDim ? 2 : 1;
+  for (int64_t dim = residualThreads; dim >= lb; dim >>= 1) {
+    int64_t chosenTileSize = 0;
+    if (isInnerMostDim) {
+      // Handle 4 elements per thread for the innermost dimension. We need
+      // this for vectorized load.
+      chosenTileSize = 4;
+      if (inputDim % (dim * chosenTileSize) != 0) continue;
+    } else {
+      for (int64_t t = residualTilingFactor; t >= 1; t >>= 1)
+        if (inputDim % (dim * t) == 0) {
+          chosenTileSize = t;
+          break;
+        }
+    }
+    if (chosenTileSize) {
+      wgDimSize = dim;
+      wgTileSize = dim * chosenTileSize;
+      residualThreads /= dim;
+      residualTilingFactor /= chosenTileSize;
+      return true;
+    }
+  }
+  return false;
+};
+
+/// Decides the tiling and distribution parameters for two convolution window
+/// dimensions to two workgroup dimensions as a square. Returns true if we can
+/// succesfully deduce.
+static bool distributeToSquare(const int64_t oh, const int64_t ow,
+                               int64_t &residualThreads,
+                               int64_t &residualTilingFactor,
+                               MutableArrayRef<int64_t> wgDimSizes,
+                               MutableArrayRef<int64_t> wgTileSizes) {
+  assert(wgDimSizes.size() == 2 && wgTileSizes.size() == 2);
+
+  const unsigned log2Threads = llvm::Log2_64(residualThreads);
+  if (oh == ow && residualThreads != 1 && log2Threads % 2 == 0) {
+    const int64_t yz = 1ll << (log2Threads / 2);
+
+    int64_t chosenTileSize = 1ll << (llvm::Log2_64(residualTilingFactor) / 2);
+    while (chosenTileSize >= 1 && ow % (yz * chosenTileSize) != 0) {
+      chosenTileSize >>= 1;
+    }
+
+    if (chosenTileSize != 0) {
+      wgDimSizes.front() = wgDimSizes.back() = yz;
+      wgTileSizes.front() = wgTileSizes.back() = yz * chosenTileSize;
+      return true;
+    }
+  }
+  return false;
+}
+
 static LogicalResult setConvolutionConfig(linalg::LinalgOp linalgOp,
                                           const int64_t subgroupSize,
                                           const int64_t bestTilingFactor) {
-  if (!isa<linalg::Conv2DNhwcHwcfOp>(linalgOp)) {
+  if (!isa<linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNchwFchwOp>(linalgOp)) {
     return failure();
   }
+  const bool isNCHW = isa<linalg::Conv2DNchwFchwOp>(*linalgOp);
+  const bool isNHWC = isa<linalg::Conv2DNhwcHwcfOp>(*linalgOp);
+
+  const int ohIndex = isNHWC ? 1 : 2;
+  const int owIndex = isNHWC ? 2 : 3;
+  const int ocIndex = isNHWC ? 3 : 1;
+
   Type inputType = linalgOp.getInputOperand(0)->get().getType();
   ArrayRef<int64_t> inputShape = inputType.cast<ShapedType>().getShape();
   Type outputType = linalgOp.getOutputOperand(0)->get().getType();
@@ -571,79 +688,73 @@ static LogicalResult setConvolutionConfig(linalg::LinalgOp linalgOp,
       llvm::any_of(outputShape.drop_front(), ShapedType::isDynamic)) {
     return failure();
   }
-  int64_t oh = outputShape[1], ow = outputShape[2], oc = outputShape[3];
-  // The core idea is to distribute the convolution OH/OW/OC dimension to the
-  // workgroup Z/Y/X dimension, with each thread in a workgroup handling
-  // multiple vector elements. We try to 1) utilize all threads in a subgroup,
-  // and 2) handle an optimal tile size along each dimension.
+  int64_t oh = outputShape[ohIndex], ow = outputShape[owIndex],
+          oc = outputShape[ocIndex];
+
+  // The core idea is to distribute the convolution dimensions to the workgroup
+  // Z/Y/X dimensions, with each thread in a workgroup handling multiple vector
+  // elements. We try to 1) utilize all threads in a subgroup, and 2) handle an
+  // optimal tile size along each dimension.
   int64_t residualThreads = subgroupSize;
   int64_t residualTilingFactor = bestTilingFactor;
-  SmallVector<int64_t, 3> workgroupSize(3, 1);    // (X, Y, Z)
-  SmallVector<int64_t> workgroupTileSizes(4, 0);  // (N, OH, OW, OC)
-  // Deduce the configuration for the OC dimension.
-  for (int64_t x = residualThreads; x >= 2; x >>= 1) {
-    // Handle 4 elements per thread for the innermost dimension. We need this
-    // for vectorized load.
-    int64_t chosenTileSize = 4;
-    if (oc % (x * chosenTileSize) == 0) {
-      workgroupSize[0] = x;
-      workgroupTileSizes[3] = x * chosenTileSize;
-      residualThreads /= x;
-      residualTilingFactor /= chosenTileSize;
-      break;
-    }
-  }
-  if (workgroupTileSizes[3] == 0) return failure();
-  // Deduce the configruation for the OW and OH dimension. Try to make them even
-  // if possible given we typically have images with the same height and width.
-  bool tileToSquare = false;
-  unsigned log2Threads = llvm::Log2_64(residualThreads);
-  if (ow == oh && residualThreads != 1 && log2Threads % 2 == 0) {
-    int64_t yz = 1ll << (log2Threads / 2);
-    int64_t chosenTileSize = 1ll << (llvm::Log2_64(residualTilingFactor) / 2);
-    while (chosenTileSize >= 1 && ow % (yz * chosenTileSize) != 0) {
-      chosenTileSize >>= 1;
-    }
-    if (chosenTileSize != 0) {
-      workgroupSize[1] = workgroupSize[2] = yz;
-      workgroupTileSizes[2] = workgroupTileSizes[1] = yz * chosenTileSize;
-      tileToSquare = true;
-    }
-  }
-  // Otherwise treat OW and OH separately to allow them to have different number
-  // of threads and tiling size.
-  if (!tileToSquare) {
-    // Decide the tiling and distribution parameters for one dimension.
-    auto decideOneDim = [&](int64_t inputDim, int64_t &wgDimSize,
-                            int64_t &wgTileSize) {
-      for (int64_t dim = residualThreads; dim >= 1; dim >>= 1) {
-        int64_t chosenTileSize = 0;
-        for (int64_t t = residualTilingFactor; t >= 1; t >>= 1) {
-          if (inputDim % (dim * t) == 0) {
-            chosenTileSize = t;
-            break;
-          }
-        }
-        if (chosenTileSize) {
-          wgDimSize = dim;
-          wgTileSize = dim * chosenTileSize;
-          residualThreads /= dim;
-          residualTilingFactor /= chosenTileSize;
-          return true;
-        }
-      }
-      return false;
-    };
-    if (!decideOneDim(ow, workgroupSize[1], workgroupTileSizes[2]) ||
-        !decideOneDim(oh, workgroupSize[2], workgroupTileSizes[1])) {
+
+  SmallVector<int64_t, 3> workgroupSize(3, 1);  // (X, Y, Z)
+  SmallVector<int64_t> workgroupTileSizes(4, 0);
+
+  if (isNCHW) {
+    // OW -> x, OH -> y, OC -> z
+    if (!distributeToOneDim(ow, /*isInnerMostDim=*/true, residualThreads,
+                            residualTilingFactor, workgroupSize[0],
+                            workgroupTileSizes[3]) ||
+        !distributeToOneDim(oh, /*isInnerMostDim=*/false, residualThreads,
+                            residualTilingFactor, workgroupSize[1],
+                            workgroupTileSizes[2]) ||
+        !distributeToOneDim(oc, /*isInnerMostDim=*/false, residualThreads,
+                            residualTilingFactor, workgroupSize[2],
+                            workgroupTileSizes[1])) {
       return failure();
+    }
+  } else {
+    // OC -> x
+    if (!distributeToOneDim(oc, /*isInnerMostDim=*/true, residualThreads,
+                            residualTilingFactor, workgroupSize[0],
+                            workgroupTileSizes[3]))
+      return failure();
+
+    // Deduce the configruation for the OW and OH dimension. Try to make them
+    // even if possible given we typically have images with the same height
+    // and width.
+    const bool tileToSquare = distributeToSquare(
+        oh, ow, residualThreads, residualTilingFactor,
+        llvm::makeMutableArrayRef(workgroupSize).drop_front(),
+        llvm::makeMutableArrayRef(workgroupTileSizes).drop_front().drop_back());
+
+    // Otherwise treat OW and OH separately to allow them to have different
+    // number of threads and tiling size.
+    if (!tileToSquare) {
+      if (!distributeToOneDim(ow, /*isInnerMostDim=*/false, residualThreads,
+                              residualTilingFactor, workgroupSize[1],
+                              workgroupTileSizes[2]) ||
+          !distributeToOneDim(oh, /*isInnerMostDim=*/false, residualThreads,
+                              residualTilingFactor, workgroupSize[2],
+                              workgroupTileSizes[1])) {
+        return failure();
+      }
     }
   }
   auto pipeline = IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorize;
   TileSizesListType tileSizes;
   // Add reduction tile sizes.
-  workgroupTileSizes.append({1, 1, 4});
+  if (isNCHW)
+    workgroupTileSizes.append({4, 1, 1});
+  else if (isNHWC)
+    workgroupTileSizes.append({1, 1, 4});
   tileSizes.push_back(workgroupTileSizes);
+
+  // Tile along OH by size 1 to enable downsizing 2-D convolution to 1-D.
+  SmallVector<int64_t> windowTileSizes(4, 0);
+  windowTileSizes[ohIndex] = 1;
+  tileSizes.push_back(windowTileSizes);
   auto funcOp = linalgOp->getParentOfType<func::FuncOp>();
   return setOpConfigAndEntryPointFnTranslation(funcOp, linalgOp, tileSizes,
                                                pipeline, workgroupSize);

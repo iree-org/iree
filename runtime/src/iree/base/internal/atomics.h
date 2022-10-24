@@ -185,7 +185,7 @@ typedef iree_atomic_int32_t iree_atomic_ref_count_t;
 // uninitialized stack memory.
 #define iree_atomic_ref_count_abort_if_uses(count_ptr)             \
   if (IREE_UNLIKELY(iree_atomic_ref_count_load(count_ptr) != 1)) { \
-    abort();                                                       \
+    iree_abort();                                                  \
   }
 
 // Asserts that the given reference count value is zero.

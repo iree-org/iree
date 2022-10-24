@@ -128,6 +128,7 @@ iree_status_t iree_task_executor_create(iree_task_executor_options_t options,
   // Bring up the workers; the threads will be created here but be suspended
   // (if the platform supports it) awaiting the first tasks getting scheduled.
   if (iree_status_is_ok(status)) {
+    executor->worker_base_index = options.worker_base_index;
     executor->worker_count = worker_count;
     executor->workers =
         (iree_task_worker_t*)((uint8_t*)executor + executor_base_size);

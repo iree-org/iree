@@ -115,3 +115,34 @@ func.func @splitResourceConstants() -> (!stream.resource<constant>, !stream.reso
   // CHECK: return %[[RES0]], %[[RES1]], %[[IF]]#2
   return %0#0, %0#1, %0#2 : !stream.resource<constant>, !stream.resource<constant>, !stream.timepoint
 }
+
+// -----
+
+// Tests that resources with varying lifetimes get split and processed
+// independently. This allows for fast-path constants while allowing variable
+// initializers to go the normal staging route. We expect to end up with two
+// constant storage buffers, two uploads, and a join for the final timepoint.
+
+// CHECK-LABEL: @mixedResourceConstants
+func.func @mixedResourceConstants() -> (!stream.resource<constant>, !stream.resource<variable>, !stream.timepoint) {
+  %c8 = arith.constant 8 : index
+  %c1024 = arith.constant 1024 : index
+
+  // CHECK: %[[CONSTANT_HOST:.+]] = util.buffer.constant {{.+}} = #composite_of_1024b
+  // CHECK: %[[CONSTANT_IF:.+]]:2 = scf.if {{.+}} -> (!stream.resource<constant>, !stream.timepoint)
+  // CHECK: %[[CONSTANT_VIEW:.+]] = stream.resource.subview %[[CONSTANT_IF]]#0
+
+  // CHECK: %[[VARIABLE_HOST:.+]] = util.buffer.constant {{.+}} = #composite_of_64b
+  // CHECK: %[[VARIABLE_BUFFER:.+]] = stream.resource.alloc {{.+}} : !stream.resource<variable>{%c64}
+  // CHECK: %[[VARIABLE_EXEC:.+]] = stream.cmd.execute {{.+}} %[[VARIABLE_BUFFER]]
+  // CHECK: %[[VARIABLE_VIEW:.+]] = stream.resource.subview %[[VARIABLE_BUFFER]]
+
+  // CHECK: %[[JOIN:.+]] = stream.timepoint.join max(%[[CONSTANT_IF]]#1, %[[VARIABLE_EXEC]])
+  %0:3 = stream.resource.constants :
+    !stream.resource<constant>{%c1024} = dense<100> : tensor<256xi32>,
+    !stream.resource<variable>{%c8} = dense<[101, 102]> : tensor<2xi32>
+    => !stream.timepoint
+
+  // CHECK: return %[[CONSTANT_VIEW]], %[[VARIABLE_VIEW]], %[[JOIN]]
+  return %0#0, %0#1, %0#2 : !stream.resource<constant>, !stream.resource<variable>, !stream.timepoint
+}

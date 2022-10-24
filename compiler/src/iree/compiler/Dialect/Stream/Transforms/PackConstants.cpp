@@ -255,7 +255,7 @@ struct UploadResult {
 // there are multiple storage buffers we invert the logic so that we put all the
 // async copies into a single region.
 static UploadResult buildStagingUpload(
-    IREE::Stream::ResourceConstantsOp constantsOp,
+    Location loc, IREE::Stream::AffinityAttr affinityAttr,
     IREE::Stream::ResourceType resourceType,
     ArrayRef<StorageResource> storageResources, ArrayRef<Value> storageBuffers,
     IndexSet &indexSet, OpBuilder &builder) {
@@ -289,12 +289,12 @@ static UploadResult buildStagingUpload(
     // Map the source staging resource rodata.
     auto mapOp = builder.create<IREE::Stream::ResourceMapOp>(
         storageResource.loc, stagingType, storageBuffer, indexSet.get(0),
-        totalLength, constantsOp.getAffinityAttr());
+        totalLength, affinityAttr);
 
     // Allocate the resulting storage resource of the final resource type.
     auto allocOp = builder.create<IREE::Stream::ResourceAllocOp>(
         storageResource.loc, resourceType, mapOp.getResultSize(),
-        /*uninitialized=*/builder.getUnitAttr(), constantsOp.getAffinityAttr());
+        /*uninitialized=*/builder.getUnitAttr(), affinityAttr);
 
     uploadResult.allocations.push_back({
         allocOp.getResults().front(),
@@ -321,11 +321,9 @@ static UploadResult buildStagingUpload(
 
   // Create the execution op capturing the resources.
   auto executeOp = builder.create<IREE::Stream::CmdExecuteOp>(
-      constantsOp.getLoc(), /*awaitTimepoint=*/Value{}, capturedResources,
+      loc, /*awaitTimepoint=*/Value{}, capturedResources,
       capturedResourceSizes);
-  if (constantsOp.getAffinity().has_value()) {
-    executeOp.setAffinityAttr(constantsOp.getAffinityAttr());
-  }
+  if (affinityAttr) executeOp.setAffinityAttr(affinityAttr);
   uploadResult.timepoint = executeOp.getResultTimepoint();
 
   // Map captured resources into the execution region.
@@ -355,7 +353,7 @@ static UploadResult buildStagingUpload(
 // constant resources. If the mapping fails (the target can't use the memory)
 // then fall back to staging uploads.
 static UploadResult buildTryMapConstantResources(
-    IREE::Stream::ResourceConstantsOp constantsOp,
+    Location loc, IREE::Stream::AffinityAttr affinityAttr,
     IREE::Stream::ResourceType resourceType,
     ArrayRef<StorageResource> storageResources, ArrayRef<Value> storageBuffers,
     IndexSet &indexSet, OpBuilder &builder) {
@@ -373,8 +371,7 @@ static UploadResult buildTryMapConstantResources(
     auto storageBuffer = std::get<1>(it);
     auto tryMapOp = builder.create<IREE::Stream::ResourceTryMapOp>(
         storageResource.loc, builder.getI1Type(), resourceType, storageBuffer,
-        zero, indexSet.get(storageResource.totalSize),
-        constantsOp.getAffinityAttr());
+        zero, indexSet.get(storageResource.totalSize), affinityAttr);
     if (!ok) {
       ok = tryMapOp.getDidMap();
     } else {
@@ -392,7 +389,7 @@ static UploadResult buildTryMapConstantResources(
   // if ok: return mapped resources
   // else: allocate and upload
   auto ifOp = builder.create<scf::IfOp>(
-      constantsOp.getLoc(), resultTypes, ok,
+      loc, resultTypes, ok,
       [&](OpBuilder &thenBuilder, Location loc) {
         // Just return the resources + an immediate timepoint.
         SmallVector<Value> ifResults = mappedResources;
@@ -402,9 +399,9 @@ static UploadResult buildTryMapConstantResources(
       },
       [&](OpBuilder &elseBuilder, Location loc) {
         // Fallback to upload and then
-        auto stagingResult =
-            buildStagingUpload(constantsOp, resourceType, storageResources,
-                               storageBuffers, indexSet, builder);
+        auto stagingResult = buildStagingUpload(
+            loc, affinityAttr, resourceType, storageResources, storageBuffers,
+            indexSet, builder);
         SmallVector<Value> ifResults;
         for (auto &allocation : stagingResult.allocations) {
           ifResults.push_back(allocation.resource);
@@ -427,6 +424,76 @@ static UploadResult buildTryMapConstantResources(
     });
   }
   return uploadResult;
+}
+
+static Value generateUpload(IREE::Stream::ResourceConstantsOp constantsOp,
+                            IREE::Stream::Lifetime lifetime,
+                            IREE::Stream::ResourceConfigAttr resourceConfig,
+                            IndexSet &indexSet, OpBuilder &builder) {
+  // Gather the slices produced by this constant pooling op.
+  SmallVector<ConstantSlice> slices;
+  slices.reserve(constantsOp.getResults().size());
+  for (auto [result, resultSize, value] :
+       llvm::zip(constantsOp.getResults(), constantsOp.getResultSizes(),
+                 constantsOp.getValues())) {
+    auto resourceType = result.getType().cast<IREE::Stream::ResourceType>();
+    if (resourceType.getLifetime() != lifetime) continue;
+    slices.push_back(ConstantSlice{
+        result,
+        resultSize,
+        value,
+    });
+  }
+
+  // Perform the packing of dense values to compute the storage resources we
+  // will need and where each value will be placed.
+  auto storageResources =
+      computePackingMap(slices, resourceConfig, constantsOp.getContext());
+  if (storageResources.empty()) return nullptr;
+
+  // Emit rodata storage for the constant values.
+  // As our upload paths may vary this ensures that we are only emitting
+  // them once regardless of how many strategies we emit IR for.
+  SmallVector<Value> storageBuffers;
+  for (auto &storageResource : storageResources) {
+    auto rodataOp = builder.create<IREE::Util::BufferConstantOp>(
+        storageResource.loc, /*name=*/nullptr, storageResource.data,
+        builder.getIndexAttr(resourceConfig.getMinBufferOffsetAlignment()),
+        /*mimeType=*/nullptr);
+    storageBuffers.push_back(rodataOp);
+  }
+
+  // If this is producing constants (vs variables) we can try to go on a
+  // fast-path where we directly map the constant memory. If producing
+  // variables then we always need to stage and clone.
+  auto anyResult = slices.front().result;
+  auto resourceType = anyResult.getType().cast<IREE::Stream::ResourceType>();
+  UploadResult uploadResult;
+  if (resourceType.getLifetime() == IREE::Stream::Lifetime::Constant) {
+    uploadResult = buildTryMapConstantResources(
+        constantsOp.getLoc(), constantsOp.getAffinityAttr(), resourceType,
+        storageResources, storageBuffers, indexSet, builder);
+  } else {
+    uploadResult = buildStagingUpload(
+        constantsOp.getLoc(), constantsOp.getAffinityAttr(), resourceType,
+        storageResources, storageBuffers, indexSet, builder);
+  }
+
+  // Build subviews for all packed spans back into storage buffers.
+  for (auto it : llvm::zip(storageResources, uploadResult.allocations)) {
+    auto &storageResource = std::get<0>(it);
+    auto &allocatedStorage = std::get<1>(it);
+    for (auto &span : storageResource.spans) {
+      auto loc = span.slice.result.getLoc();
+      auto subviewOp = builder.create<IREE::Stream::ResourceSubviewOp>(
+          loc, allocatedStorage.resource, allocatedStorage.resourceSize,
+          indexSet.get(span.offset), span.slice.resultSize);
+      span.slice.result.replaceAllUsesWith(subviewOp.getResult());
+    }
+  }
+
+  // Join on storage timepoints for our transitive dependencies to await.
+  return uploadResult.timepoint;
 }
 
 //===----------------------------------------------------------------------===//
@@ -465,77 +532,35 @@ class PackConstantsPass : public PackConstantsBase<PackConstantsPass> {
       auto resourceConfig =
           IREE::Stream::ResourceConfigAttr::lookup(constantsOp);
 
-      // Gather the slices produced by this constant pooling op.
-      SmallVector<ConstantSlice> slices;
-      slices.reserve(constantsOp.getResults().size());
-      for (auto it :
-           llvm::zip(constantsOp.getResults(), constantsOp.getResultSizes(),
-                     constantsOp.getValues())) {
-        auto result = std::get<0>(it);
-        auto resultSize = std::get<1>(it);
-        auto value = std::get<2>(it);
-        slices.push_back(ConstantSlice{
-            result,
-            resultSize,
-            value,
-        });
-      }
-
-      // Perform the packing of dense values to compute the storage resources we
-      // will need and where each value will be placed.
-      auto storageResources =
-          computePackingMap(slices, resourceConfig, constantsOp.getContext());
-      if (storageResources.empty()) return;
-
       OpBuilder builder(constantsOp);
       IndexSet indexSet(constantsOp.getLoc(), builder);
       indexSet.populate(constantsOp.getResultSizes());
 
-      // Emit rodata storage for the constant values.
-      // As our upload paths may vary this ensures that we are only emitting
-      // them once regardless of how many strategies we emit IR for.
-      SmallVector<Value> storageBuffers;
-      for (auto &storageResource : storageResources) {
-        auto rodataOp = builder.create<IREE::Util::BufferConstantOp>(
-            storageResource.loc, /*name=*/nullptr, storageResource.data,
-            builder.getIndexAttr(resourceConfig.getMinBufferOffsetAlignment()),
-            /*mimeType=*/nullptr);
-        storageBuffers.push_back(rodataOp);
+      // Perform upload/processing for immutable and mutable constants.
+      SmallVector<Value> timepoints;
+      if (auto timepoint =
+              generateUpload(constantsOp, IREE::Stream::Lifetime::Constant,
+                             resourceConfig, indexSet, builder)) {
+        timepoints.push_back(timepoint);
       }
-
-      // If this is producing constants (vs variables) we can try to go on a
-      // fast-path where we directly map the constant memory. If producing
-      // variables then we always need to stage and clone.
-      auto anyResult = constantsOp.getResults().front();
-      auto resourceType =
-          anyResult.getType().cast<IREE::Stream::ResourceType>();
-      UploadResult uploadResult;
-      if (resourceType.getLifetime() == IREE::Stream::Lifetime::Constant) {
-        uploadResult = buildTryMapConstantResources(
-            constantsOp, resourceType, storageResources, storageBuffers,
-            indexSet, builder);
-      } else {
-        uploadResult =
-            buildStagingUpload(constantsOp, resourceType, storageResources,
-                               storageBuffers, indexSet, builder);
+      if (auto timepoint =
+              generateUpload(constantsOp, IREE::Stream::Lifetime::Variable,
+                             resourceConfig, indexSet, builder)) {
+        timepoints.push_back(timepoint);
       }
-
-      // Build subviews for all packed spans back into storage buffers.
-      for (auto it : llvm::zip(storageResources, uploadResult.allocations)) {
-        auto &storageResource = std::get<0>(it);
-        auto &allocatedStorage = std::get<1>(it);
-        for (auto &span : storageResource.spans) {
-          auto loc = span.slice.result.getLoc();
-          auto subviewOp = builder.create<IREE::Stream::ResourceSubviewOp>(
-              loc, allocatedStorage.resource, allocatedStorage.resourceSize,
-              indexSet.get(span.offset), span.slice.resultSize);
-          span.slice.result.replaceAllUsesWith(subviewOp.getResult());
-        }
-      }
+      if (timepoints.empty()) return;
 
       // Join on storage timepoints for our transitive dependencies to await.
-      constantsOp.getResultTimepoint().replaceAllUsesWith(
-          uploadResult.timepoint);
+      // We could do this at a finer granularity if we were to split the
+      // constants op into multiple units earlier on.
+      Value joinTimepoint;
+      if (timepoints.size() > 1) {
+        joinTimepoint = builder.create<IREE::Stream::TimepointJoinOp>(
+            constantsOp.getLoc(), timepoints.front().getType(), timepoints);
+      } else {
+        joinTimepoint = timepoints.front();
+      }
+      constantsOp.getResultTimepoint().replaceAllUsesWith(joinTimepoint);
 
       constantsOp.erase();
     });

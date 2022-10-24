@@ -18,9 +18,7 @@ source "${SCRIPT_DIR}/functions.sh"
 # These use OS inventory management to fetch information about the VM operating
 # system (https://cloud.google.com/compute/docs/instances/os-inventory-management).
 # For some reason, querying these at startup is unreliable. It seems like the
-# guestInventory attributes take a really long time to be populated. For now,
-# anything in here we care about needs to be injected via the
-# `github-runner-labels` custom metadata attribute.
+# guestInventory attributes take a really long time to be populated.
 # OS_ID="$(get_os_info ShortName)"
 # OS_VERSION="$(get_os_info Version)"
 # KERNEL_RELEASE="$(get_os_info KernelRelease)"
@@ -52,7 +50,7 @@ ZONE="$(get_metadata instance/zone | awk -F/ '{print $NF}')"
 CPU_PLATFORM="$(get_metadata instance/cpu-platform)"
 MACHINE_TYPE="$(get_metadata instance/machine-type | awk -F/ '{print $NF}')"
 
-RUNNER_CUSTOM_LABELS="$(get_attribute github-runner-labels)"
+RUNNER_TYPE="$(get_attribute github-runner-type)"
 RUNNER_GROUP="$(get_attribute github-runner-group)"
 RUNNER_SCOPE="$(get_attribute github-runner-scope)"
 RUNNER_TRUST="$(get_attribute github-runner-trust)"
@@ -74,6 +72,7 @@ declare -a RUNNER_LABELS_ARRAY=(
   "cpu-platform=${CPU_PLATFORM}"
   "machine-type=${MACHINE_TYPE}"
   "config-ref=${CONFIG_REF}"
+  "${RUNNER_TYPE}"
   # These labels require guest attributes. See note above.
   # "arch=${ARCH}"
   # "${ARCH}"
@@ -83,8 +82,6 @@ declare -a RUNNER_LABELS_ARRAY=(
 )
 
 RUNNER_LABELS="$(IFS="," ; echo "${RUNNER_LABELS_ARRAY[*]}")"
-# Append custom labels, taking care to only add a comma if there are any
-RUNNER_LABELS="${RUNNER_LABELS}${RUNNER_CUSTOM_LABELS:+,${RUNNER_CUSTOM_LABELS}}"
 
 INSTANCE_ID="$(get_metadata instance/id)"
 GOOGLE_CLOUD_PROJECT="$(get_metadata project/project-id)"

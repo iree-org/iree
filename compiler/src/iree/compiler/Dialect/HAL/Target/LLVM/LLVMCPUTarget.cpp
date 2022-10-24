@@ -141,10 +141,6 @@ class LLVMCPUTargetBackend final : public TargetBackend {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
 
-    // Indicates that the runtime HAL driver operates only in the legacy
-    // synchronous mode.
-    configItems.emplace_back(b.getStringAttr("legacy_sync"), b.getUnitAttr());
-
     configItems.emplace_back(b.getStringAttr("executable_targets"),
                              getExecutableTargets(context));
 
@@ -243,6 +239,21 @@ class LLVMCPUTargetBackend final : public TargetBackend {
         }
       } break;
     }
+
+    // Declare dynamically imported functions.
+    auto importsAttrName =
+        StringAttr::get(variantOp.getContext(), "hal.executable.imports");
+    if (auto importsAttr =
+            variantOp->getAttrOfType<ArrayAttr>(importsAttrName)) {
+      for (auto importAttr : importsAttr.getAsValueRange<ArrayAttr>()) {
+        auto nameAttr = importAttr[0].cast<StringAttr>();
+        auto weakAttr = importAttr[1].cast<BoolAttr>();
+        libraryBuilder.addImport(nameAttr.getValue(), weakAttr.getValue());
+      }
+      variantOp->removeAttr(importsAttrName);
+    }
+
+    // Declare exported entry points.
     auto align16 = llvm::Attribute::getWithAlignment(context, llvm::Align(16));
     for (auto exportOp : variantOp.getBlock().getOps<ExecutableExportOp>()) {
       // Find the matching function in the LLVM module.
@@ -371,7 +382,7 @@ class LLVMCPUTargetBackend final : public TargetBackend {
     // Fixup visibility from any symbols we may link in - we want to hide all
     // but the query entry point.
     for (auto &func : *llvmModule) {
-      if (&func == queryLibraryFunc) {
+      if (&func == queryLibraryFunc || func.getName() == "iree_dll_main") {
         // Leave our library query function as public/external so that it is
         // exported from shared objects and available for linking in static
         // objects.

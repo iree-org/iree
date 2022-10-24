@@ -13,7 +13,7 @@ components and use different tooling depending on the needs of that component.
 |                 | iree_trace_runner_test                          | Bazel/CMake  | Host/Device         |
 |                 | iree_single_backend_generated_trace_runner_test | Bazel/CMake  | Host/Device         |
 |                 | iree_generated_trace_runner_test                | Bazel/CMake  | Host/Device         |
-|                 | iree_static_linker_test                         | CMake        | Host                |
+|                 | iree_static_linker_test                         | CMake        | Host/Device         |
 
 There are also more `*_test_suite` targets that groups test targets with the
 same configuration together.
@@ -286,12 +286,10 @@ func.func @negative() {
 Test cases are created in gtest for each public function exported by the module.
 
 Note the use of `util.unfoldable_constant` to specify test constants. If we were
-to use a regular constant, the compiler would "helpfully" fold away everything
-at compile time and our test would not actually test the runtime.
-`unfoldable_constant` hides the value of the constant from the compiler so it
-cannot use it at compile time. To hide an arbitrary SSA-value, you can use
-`util.do_not_optimize`. This wraps any value in an unoptimizable identity
-function.
+to use a regular constant the compiler would fold away everything at compile
+time and our test would not actually test the runtime. `unfoldable_constant`
+adds a barrier that prevents folding. To prevent folding/constant propagate on
+an arbitrary SSA-value you can use `util.optimization_barrier`.
 
 Next we use this input constant to exercise the runtime feature under test (in
 this case, just a single floor operation). Finally, we use a check dialect

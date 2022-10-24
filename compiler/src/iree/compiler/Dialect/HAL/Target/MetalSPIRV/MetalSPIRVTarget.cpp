@@ -87,7 +87,7 @@ class MetalSPIRVTargetBackend : public TargetBackend {
     // 1. Serialize the spirv::ModuleOp into binary format.
     SmallVector<uint32_t, 0> spvBinary;
     if (failed(spirv::serialize(spvModuleOp, spvBinary))) {
-      return variantOp.emitError() << "failed to serialize spv.module";
+      return variantOp.emitError() << "failed to serialize spirv.module";
     }
     if (!options.dumpIntermediatesPath.empty()) {
       dumpDataToPath<uint32_t>(options.dumpIntermediatesPath,

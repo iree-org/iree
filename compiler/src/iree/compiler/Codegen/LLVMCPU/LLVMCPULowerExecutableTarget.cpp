@@ -234,6 +234,9 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
             addCPUAArchDoubleTilingExpertPassPipeline(
                 executableLoweringPipeline);
             break;
+          case IREE::Codegen::DispatchLoweringPassPipeline::CPUDataTiling:
+            addCPUDataTilingPipeline(executableLoweringPipeline);
+            break;
           case IREE::Codegen::DispatchLoweringPassPipeline::VMVXDefault:
             addVMVXDefaultPassPipeline(executableLoweringPipeline);
             break;

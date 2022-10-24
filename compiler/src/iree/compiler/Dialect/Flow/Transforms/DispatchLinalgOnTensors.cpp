@@ -48,6 +48,7 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 #include "mlir/Transforms/RegionUtils.h"
+#include "mlir/Transforms/TopologicalSortUtils.h"
 
 #define DEBUG_TYPE "iree-flow-dispatch-linalg-on-tensors"
 
@@ -156,7 +157,7 @@ bool isClonableIntoDispatchOp(Operation *op) {
   // TODO(#8637): `tensor.collapse_shape` and `tensor.expand_shape` are
   // trivially clonable too, but they cause problems
   // with bufferization. Make them clonable when fixed.
-  if (isa<arith::IndexCastOp, linalg::InitTensorOp, tensor::CastOp,
+  if (isa<arith::IndexCastOp, tensor::EmptyOp, tensor::CastOp,
           tensor::ExtractOp, tensor::ExtractSliceOp, tensor::PadOp>(op)) {
     return true;
   }
@@ -390,7 +391,11 @@ static SmallVector<Operation *> getOperationsToMoveIntoDispatch(
       dispatchOps.push_back(producer);
     }
   }
-  return llvm::to_vector(llvm::reverse(orderOperations(dispatchOps)));
+
+  bool sortResult = mlir::computeTopologicalSorting(dispatchOps);
+  (void)sortResult;
+  assert(sortResult && "could not compute topological sorting");
+  return llvm::to_vector(llvm::reverse(dispatchOps));
 }
 
 //===---------------------------------------------------------------------===//
@@ -441,7 +446,9 @@ static void getUsedValuesDefinedAboveAfterCloningOps(
   }
   // The cloned operations form a DAG. Return the cloned operations so the
   // leaves come first, and can be cloned in-order into the dispatch region.
-  clonedOps = orderOperations(clonedOps);
+  bool sortResult = mlir::computeTopologicalSorting(clonedOps);
+  (void)sortResult;
+  assert(sortResult && "could not compute topological sorting");
 
   for (auto clonedOp : reverse(clonedOps)) {
     Operation *clone = builder.clone(*clonedOp);
@@ -665,7 +672,7 @@ namespace {
 template <typename OpType, template <typename> class Base>
 struct CreateDispatchRegionOp : Base<OpType> {
   CreateDispatchRegionOp(MLIRContext *context,
-                         const linalg::LinalgTransformationFilter &filter,
+                         const LinalgExt::LinalgTransformationFilter &filter,
                          PatternBenefit benefit = 1)
       : Base<OpType>(context, benefit), transformationFilter(filter) {}
 
@@ -707,7 +714,7 @@ struct CreateDispatchRegionOp : Base<OpType> {
   }
 
  private:
-  linalg::LinalgTransformationFilter transformationFilter;
+  LinalgExt::LinalgTransformationFilter transformationFilter;
 };
 }  // namespace
 
@@ -766,10 +773,11 @@ static bool isInsOperandBufferizable(OpOperand *insOperand,
   auto linalgOp = dyn_cast<linalg::LinalgOp>(insOperand->getOwner());
   if (!linalgOp) return false;
 
-  AffineMap insOperandIndexingMap = linalgOp.getTiedIndexingMap(insOperand);
+  AffineMap insOperandIndexingMap = linalgOp.getMatchingIndexingMap(insOperand);
 
   auto canTieWithOutsOperand = [&](OpOperand *outsOperand) {
-    AffineMap outsOperandIndexingMap = linalgOp.getTiedIndexingMap(outsOperand);
+    AffineMap outsOperandIndexingMap =
+        linalgOp.getMatchingIndexingMap(outsOperand);
 
     if (outsOperandIndexingMap != insOperandIndexingMap) {
       // if (!aggressiveFusion) return false;
@@ -817,8 +825,8 @@ static bool hasCompatibleOuterParallelLoops(
   }
 
   auto producerIndexingMap =
-      producer.getTiedIndexingMapForResult(operand.get().cast<OpResult>());
-  auto consumerIndexingMap = consumer.getTiedIndexingMap(&operand);
+      producer.getIndexingMapMatchingResult(operand.get().cast<OpResult>());
+  auto consumerIndexingMap = consumer.getMatchingIndexingMap(&operand);
   if (!producerIndexingMap.isProjectedPermutation() ||
       !consumerIndexingMap.isProjectedPermutation()) {
     return false;
@@ -970,13 +978,13 @@ static bool isFusableWithProducer(OpOperand &operand, bool aggressiveFusion) {
   }
 
   auto consumerLinalgOp = cast<linalg::LinalgOp>(consumer);
-  if (consumerLinalgOp.isInputTensor(&operand)) {
+  if (consumerLinalgOp.isInput(&operand)) {
     // Only fuse on inputs if both ops are generic ops.
     if (!aggressiveFusion || !isa<linalg::GenericOp>(consumer) ||
         !isa<linalg::GenericOp>(producer)) {
       return false;
     }
-  } else if (!consumerLinalgOp.isOutputTensor(&operand)) {
+  } else if (!consumerLinalgOp.isOutput(&operand)) {
     return false;
   }
 
@@ -1029,7 +1037,7 @@ static unsigned decideFusableLinalgOps(FunctionOpInterface funcOp,
   unsigned numRootOps = 0;
   MLIRContext *context = funcOp->getContext();
   OpBuilder builder(context);
-  for (Block &block : funcOp.getBody()) {
+  for (Block &block : funcOp.getFunctionBody()) {
     // Dispatch region formation works by first cloning the root into
     // the dispatch region and then pulling operations in.
     // So procedure here is to
@@ -1052,7 +1060,7 @@ static unsigned decideFusableLinalgOps(FunctionOpInterface funcOp,
 
   // Once all root linalg ops have been tagged, put all remaining generic ops
   // into their own dispatches.
-  for (Block &block : funcOp.getBody()) {
+  for (Block &block : funcOp.getFunctionBody()) {
     SmallVector<Operation *> roots;
     for (Operation &op : llvm::reverse(block)) {
       // If it is part of a fusion group or root op, ignore it.
@@ -1178,7 +1186,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
   });
 
   {
-    linalg::LinalgTransformationFilter filterForComputeOps(
+    LinalgExt::LinalgTransformationFilter filterForComputeOps(
         [](Operation *op) { return success(hasRootOpAttribute(op)); }, {},
         StringAttr::get(context, "indispatch"));
     filterForComputeOps.setMatchByDefault();
@@ -1217,7 +1225,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
 
   // Start with just moving the tensor.insert_slice into its dispatch.
   {
-    linalg::LinalgTransformationFilter filterForInsertSliceOps(
+    LinalgExt::LinalgTransformationFilter filterForInsertSliceOps(
         ArrayRef<StringAttr>{}, StringAttr::get(context, "indispatch"));
     RewritePatternSet insertSliceOpDispatchPatterns(context);
     insertSliceOpDispatchPatterns.insert<
@@ -1231,7 +1239,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
 
   // Now move all remaining ops that need to be cleaned up.
   {
-    linalg::LinalgTransformationFilter filterForCleanupOps(
+    LinalgExt::LinalgTransformationFilter filterForCleanupOps(
         ArrayRef<StringAttr>{}, StringAttr::get(context, "indispatch"));
     RewritePatternSet cleanUpDispatchPatterns(context);
     cleanUpDispatchPatterns.insert<
@@ -1247,7 +1255,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
   funcOp.walk([](Operation *op) {
     removeFusionGroupsAttribute(op);
     removeRootOpAttribute(op);
-    op->removeAttr(linalg::LinalgTransforms::kLinalgTransformMarker);
+    op->removeAttr(IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker);
   });
 }
 

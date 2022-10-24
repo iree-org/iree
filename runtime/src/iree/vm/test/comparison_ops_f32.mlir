@@ -7,9 +7,9 @@ vm.module @comparison_ops_f32 {
   vm.export @test_cmp_lt_0_f32
   vm.func @test_cmp_lt_0_f32() {
     %lhs = vm.const.f32 4.0
-    %lhs_dno = util.do_not_optimize(%lhs) : f32
+    %lhs_dno = util.optimization_barrier %lhs : f32
     %rhs = vm.const.f32 -4.0
-    %rhs_dno = util.do_not_optimize(%rhs) : f32
+    %rhs_dno = util.optimization_barrier %rhs : f32
     %actual = vm.cmp.lt.f32.o %lhs_dno, %rhs_dno : f32
     %expected = vm.const.i32 0
     vm.check.eq %actual, %expected, "4.0 < -4.0" : i32
@@ -19,9 +19,9 @@ vm.module @comparison_ops_f32 {
   vm.export @test_cmp_lt_1_f32
   vm.func @test_cmp_lt_1_f32() {
     %lhs = vm.const.f32 -4.0
-    %lhs_dno = util.do_not_optimize(%lhs) : f32
+    %lhs_dno = util.optimization_barrier %lhs : f32
     %rhs = vm.const.f32 4.0
-    %rhs_dno = util.do_not_optimize(%rhs) : f32
+    %rhs_dno = util.optimization_barrier %rhs : f32
     %actual = vm.cmp.lt.f32.o %lhs_dno, %rhs_dno : f32
     %expected = vm.const.i32 1
     vm.check.eq %actual, %expected, "-4.0 < 4.0" : i32
@@ -41,9 +41,9 @@ vm.module @comparison_ops_f32 {
     %false = vm.const.i32 0
 
     %cn2 = vm.const.f32 -2.0
-    %cn2_dno = util.do_not_optimize(%cn2) : f32
+    %cn2_dno = util.optimization_barrier %cn2 : f32
     %c2 = vm.const.f32 2.0
-    %c2_dno = util.do_not_optimize(%c2) : f32
+    %c2_dno = util.optimization_barrier %c2 : f32
 
     %cmp_0 = vm.cmp.eq.f32.near %cn2_dno, %c2_dno : f32
     vm.check.eq %cmp_0, %false, "-2 !~ 2" : i32
@@ -56,9 +56,9 @@ vm.module @comparison_ops_f32 {
 
     // off by 84 ULPs, arbitrary threshold sets these as "near enough"
     %c1a = vm.const.f32 1.00002
-    %c1a_dno = util.do_not_optimize(%c1a) : f32
+    %c1a_dno = util.optimization_barrier %c1a : f32
     %c1b = vm.const.f32 1.00003
-    %c1b_dno = util.do_not_optimize(%c1b) : f32
+    %c1b_dno = util.optimization_barrier %c1b : f32
 
     %cmp_4 = vm.cmp.eq.f32.near %c1a_dno, %c1b_dno : f32
     vm.check.eq %cmp_4, %true, "1.00002 ~ 1.00003" : i32
@@ -74,9 +74,9 @@ vm.module @comparison_ops_f32 {
     %false = vm.const.i32 0
 
     %cn2 = vm.const.f32 -2.0
-    %cn2_dno = util.do_not_optimize(%cn2) : f32
+    %cn2_dno = util.optimization_barrier %cn2 : f32
     %c2 = vm.const.f32 2.0
-    %c2_dno = util.do_not_optimize(%c2) : f32
+    %c2_dno = util.optimization_barrier %c2 : f32
 
     %cmp_0 = vm.cmp.lte.f32.o %cn2_dno, %c2_dno : f32
     vm.check.eq %cmp_0, %true, "-2 <= 2" : i32
@@ -94,9 +94,9 @@ vm.module @comparison_ops_f32 {
     %false = vm.const.i32 0
 
     %cn2 = vm.const.f32 -2.0
-    %cn2_dno = util.do_not_optimize(%cn2) : f32
+    %cn2_dno = util.optimization_barrier %cn2 : f32
     %c2 = vm.const.f32 2.0
-    %c2_dno = util.do_not_optimize(%c2) : f32
+    %c2_dno = util.optimization_barrier %c2 : f32
 
     %cmp_0 = vm.cmp.gt.f32.o %cn2_dno, %c2_dno : f32
     vm.check.eq %cmp_0, %false, "-2 > 2" : i32
@@ -114,9 +114,9 @@ vm.module @comparison_ops_f32 {
     %false = vm.const.i32 0
 
     %cn2 = vm.const.f32 -2.0
-    %cn2_dno = util.do_not_optimize(%cn2) : f32
+    %cn2_dno = util.optimization_barrier %cn2 : f32
     %c2 = vm.const.f32 2.0
-    %c2_dno = util.do_not_optimize(%c2) : f32
+    %c2_dno = util.optimization_barrier %c2 : f32
 
     %cmp_0 = vm.cmp.gte.f32.o %cn2_dno, %c2_dno : f32
     vm.check.eq %cmp_0, %false, "-2 >= 2" : i32

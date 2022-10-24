@@ -16,7 +16,7 @@ class FuncOp;
 namespace iree_compiler {
 
 /// Apply tiling to reduction dimensions based on op attributes.
-LogicalResult tileReduction(func::FuncOp funcOp);
+LogicalResult tileToSerialLoops(func::FuncOp funcOp, bool onlyReduction = true);
 
 }  // namespace iree_compiler
 }  // namespace mlir

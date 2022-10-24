@@ -461,7 +461,7 @@ rewriteForeachThreadToFlowDispatchWorkgroups(
 DiagnosedSilenceableFailure
 transform_dialect::ForeachThreadToFlowDispatchWorkgroupsOp::applyToOne(
     scf::ForeachThreadOp target, SmallVectorImpl<Operation *> &results,
-    transform::TransformState &state) {
+    transform::TransformState &) {
   SimplePatternRewriter rewriter(target->getContext());
   FailureOr<Flow::DispatchWorkgroupsOp> result =
       rewriteForeachThreadToFlowDispatchWorkgroups(target, rewriter);
@@ -471,9 +471,16 @@ transform_dialect::ForeachThreadToFlowDispatchWorkgroupsOp::applyToOne(
   return DiagnosedSilenceableFailure(success());
 }
 
+void transform_dialect::ForeachThreadToFlowDispatchWorkgroupsOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::consumesHandle(getTarget(), effects);
+  transform::producesHandle(getTransformed(), effects);
+  transform::modifiesPayload(effects);
+}
+
 DiagnosedSilenceableFailure transform_dialect::RegionToWorkgroupsOp::applyToOne(
     Flow::DispatchRegionOp target, SmallVectorImpl<Operation *> &results,
-    transform::TransformState &state) {
+    transform::TransformState &) {
   IRRewriter rewriter(target->getContext());
   FailureOr<Flow::DispatchWorkgroupsOp> result =
       rewriteFlowDispatchRegionToFlowDispatchWorkgroups(target, rewriter);
@@ -481,6 +488,13 @@ DiagnosedSilenceableFailure transform_dialect::RegionToWorkgroupsOp::applyToOne(
     return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
   results.push_back(*result);
   return DiagnosedSilenceableFailure(success());
+}
+
+void transform_dialect::RegionToWorkgroupsOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::consumesHandle(getTarget(), effects);
+  transform::producesHandle(getTransformed(), effects);
+  transform::modifiesPayload(effects);
 }
 
 DiagnosedSilenceableFailure
@@ -509,20 +523,31 @@ transform_dialect::ClonePrecedingOpIntoDispatchRegionOp::apply(
   // We are cloning ops one-by-one, so the order must be inversed (as opposed
   // to cloning all ops in one go).
   SmallVector<Operation *> targetOpsList(targetOps.begin(), targetOps.end());
-  bool sortResult = computeTopologicalSorting(
-      dispatchRegion.front()->getBlock(), targetOpsList);
+  bool sortResult = computeTopologicalSorting(targetOpsList);
   (void)sortResult;
   assert(sortResult && "unable to sort topologically");
   SmallVector<Operation *> orderedTargets =
       llvm::to_vector(llvm::reverse(targetOps));
   IRRewriter rewriter(regionOp->getContext());
-  for (Operation *target : orderedTargets)
-    if (failed(clonePrecedingOpIntoDispatchRegion(rewriter, target, regionOp)))
+  SmallVector<Operation *> clonedTargets;
+  for (Operation *target : orderedTargets) {
+    FailureOr<Operation *> clonedTarget =
+        clonePrecedingOpIntoDispatchRegion(rewriter, target, regionOp);
+    if (failed(clonedTarget))
       return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+    clonedTargets.push_back(*clonedTarget);
+  }
 
-  transformResults.set(getTransformed().cast<OpResult>(),
-                       regionOp.getOperation());
+  transformResults.set(getCloned().cast<OpResult>(), clonedTargets);
   return DiagnosedSilenceableFailure(success());
+}
+
+void transform_dialect::ClonePrecedingOpIntoDispatchRegionOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::onlyReadsHandle(getDispatchRegion(), effects);
+  transform::producesHandle(getCloned(), effects);
+  transform::modifiesPayload(effects);
 }
 
 DiagnosedSilenceableFailure
@@ -551,8 +576,7 @@ transform_dialect::MovePrecedingOpIntoDispatchRegionOp::apply(
   // We are cloning ops one-by-one, so the order must be inversed (as opposed
   // to cloning all ops in one go).
   SmallVector<Operation *> targetOpsList(targetOps.begin(), targetOps.end());
-  bool sortResult = computeTopologicalSorting(
-      dispatchRegion.front()->getBlock(), targetOpsList);
+  bool sortResult = computeTopologicalSorting(targetOpsList);
   (void)sortResult;
   assert(sortResult && "unable to sort topologically");
   SmallVector<Operation *> orderedTargets =
@@ -571,17 +595,21 @@ transform_dialect::MovePrecedingOpIntoDispatchRegionOp::apply(
   return DiagnosedSilenceableFailure(success());
 }
 
+void transform_dialect::MovePrecedingOpIntoDispatchRegionOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::consumesHandle(getDispatchRegion(), effects);
+  transform::producesHandle(getTransformed(), effects);
+  transform::modifiesPayload(effects);
+}
+
 // Clone a `target` op that is succeeding the given dispatch region op into the
 // dispatch region.
 //
 // All operands of the target are replaced with values defined inside of the
 // dispatch region when possible.
 //
-// If `updateUsesOutsideOfRegion` is set, all uses of the target op after the
-// dispatch region, are updated: The target op's results are returned from the
-// the dispatch region an used in those places.
-//
-// Example when `updateUsesOutsideOfRegion` is set:
+// Example:
 //
 // %r = flow.dispatch.region -> (tensor<?xf32>{%d0}) {
 //   %1 = "another_op"() : () -> (tensor<?xf32>)
@@ -590,20 +618,24 @@ transform_dialect::MovePrecedingOpIntoDispatchRegionOp::apply(
 // %0 = "some_op"(%r) : (tensor<?xf32>) -> (tensor<?xf32>)
 // %2 = "yet_another_use"(%0) : (tensor<?xf32>) -> (tensor<?xf32>)
 //
-// In this example, "some_op" will be cloned into the dispatch region and the
-// OpOperand of "yet_another_use" will be replaced:
+// In this example, "some_op" will be cloned into the dispatch region. The
+// OpOperand of "yet_another_use" will remain unchanged:
 //
 // %r:2 = flow.dispatch.region -> (tensor<?xf32>{%d0}) {
 //   %1 = "another_op"() : () -> (tensor<?xf32>)
 //   %0_clone = "some_op"(%1) : (tensor<?xf32>) -> (tensor<?xf32>)
-//   flow.return %1, %0_clone : tensor<?xf32>, tensor<?xf32>
+//   flow.return %1 : tensor<?xf32>
 // }
-// %2 = "yet_another_use"(%r#1) : (tensor<?xf32>) -> (tensor<?xf32>)
-static FailureOr<Flow::DispatchRegionOp> cloneSucceedingOpIntoDispatchRegion(
-    RewriterBase &rewriter, Operation *target, Flow::DispatchRegionOp regionOp,
-    bool updateUsesOutsideOfRegion) {
-  assert(regionOp->isBeforeInBlock(target) &&
-         "expected that region op comes first");
+// %0 = "some_op"(%r) : (tensor<?xf32>) -> (tensor<?xf32>)
+// %2 = "yet_another_use"(%0) : (tensor<?xf32>) -> (tensor<?xf32>)
+static FailureOr<Operation *> cloneSucceedingOpIntoDispatchRegion(
+    RewriterBase &rewriter, Operation *target,
+    Flow::DispatchRegionOp regionOp) {
+  if (!regionOp->isBeforeInBlock(target)) {
+    target->emitError() << "expected that region op comes first";
+    return failure();
+  }
+
   Block &body = regionOp.getBody().front();
 
   // Gather all uses of `target`.
@@ -612,17 +644,9 @@ static FailureOr<Flow::DispatchRegionOp> cloneSucceedingOpIntoDispatchRegion(
 
   // Clone op into dispatch region.
   auto returnOp = cast<Flow::ReturnOp>(body.getTerminator());
-  Operation *newTargetOp;
-  if (updateUsesOutsideOfRegion) {
-    // Optimization: If all uses outside of the region are updated, the target
-    // can simply be moved instead of cloned.
-    target->moveBefore(returnOp);
-    newTargetOp = target;
-  } else {
-    OpBuilder::InsertionGuard guard(rewriter);
-    rewriter.setInsertionPoint(returnOp);
-    newTargetOp = rewriter.clone(*target);
-  }
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPoint(returnOp);
+  Operation *newTargetOp = rewriter.clone(*target);
 
   // Replace all operands that are results of the regionOp.
   for (OpOperand &operand : newTargetOp->getOpOperands()) {
@@ -632,27 +656,93 @@ static FailureOr<Flow::DispatchRegionOp> cloneSucceedingOpIntoDispatchRegion(
     }
   }
 
+  return newTargetOp;
+}
+
+// Move a `target` op that is succeeding the given dispatch region op into the
+// dispatch region.
+//
+// All operands of the target are replaced with values defined inside of the
+// dispatch region when possible.
+//
+// All uses of the target op after the dispatch region, are updated: The target
+// op's results are returned from the the dispatch region an used in those
+// places.
+//
+// Example:
+//
+// %r = flow.dispatch.region -> (tensor<?xf32>{%d0}) {
+//   %1 = "another_op"() : () -> (tensor<?xf32>)
+//   flow.return %1 : tensor<?xf32>
+// }
+// %0 = "some_op"(%r) : (tensor<?xf32>) -> (tensor<?xf32>)
+// %2 = "yet_another_use"(%0) : (tensor<?xf32>) -> (tensor<?xf32>)
+//
+// In this example, "some_op" will be moved into the dispatch region and the
+// OpOperand of "yet_another_use" will be replaced:
+//
+// %r:2 = flow.dispatch.region -> (tensor<?xf32>{%d0}) {
+//   %1 = "another_op"() : () -> (tensor<?xf32>)
+//   %0 = "some_op"(%1) : (tensor<?xf32>) -> (tensor<?xf32>)
+//   flow.return %1, %0 : tensor<?xf32>, tensor<?xf32>
+// }
+// %2 = "yet_another_use"(%r#1) : (tensor<?xf32>) -> (tensor<?xf32>)
+static FailureOr<Flow::DispatchRegionOp> moveSucceedingOpIntoDispatchRegion(
+    RewriterBase &rewriter, Operation *target,
+    Flow::DispatchRegionOp regionOp) {
+  if (!regionOp->isBeforeInBlock(target)) {
+    target->emitError() << "expected that region op comes first";
+    return failure();
+  }
+
+  Block &body = regionOp.getBody().front();
+
+  // Gather all uses of `target`.
+  SmallVector<OpOperand *> usesOutsideOfRegion;
+  for (OpOperand &use : target->getUses()) usesOutsideOfRegion.push_back(&use);
+
+  // Compute dynamic result dims.
+  SmallVector<SmallVector<Value>> dynamicDims;
+  for (Value v : target->getResults()) {
+    OpBuilder::InsertionGuard guard(rewriter);
+    rewriter.setInsertionPoint(target);
+    SmallVector<Value> &dims = dynamicDims.emplace_back();
+    if (failed(Flow::reifyDynamicResultDims(rewriter, v, dims)))
+      return failure();
+  }
+
+  // Clone op into dispatch region.
+  auto returnOp = cast<Flow::ReturnOp>(body.getTerminator());
+  target->moveBefore(returnOp);
+
+  // Replace all operands that are results of the regionOp.
+  for (OpOperand &operand : target->getOpOperands()) {
+    if (operand.get().getDefiningOp() == regionOp) {
+      unsigned resultNumber = operand.get().cast<OpResult>().getResultNumber();
+      rewriter.updateRootInPlace(
+          target, [&]() { operand.set(returnOp->getOperand(resultNumber)); });
+    }
+  }
+
   // Replace all uses outside of the dispatch region.
-  if (updateUsesOutsideOfRegion) {
-    unsigned previousNumResults = regionOp->getNumResults();
+  unsigned previousNumResults = regionOp->getNumResults();
 
-    // Note: Appending results one-by-one here so that this can be extended to
-    // specific results in the future. Many ops have just one result, so this
-    // should not be a large overhead.
-    for (Value v : newTargetOp->getResults()) {
-      auto newRegionOp = appendDispatchRegionResult(rewriter, regionOp, v);
-      if (failed(newRegionOp)) return failure();
-      regionOp = *newRegionOp;
-    }
+  // Note: Appending results one-by-one here so that this can be extended to
+  // specific results in the future. Many ops have just one result, so this
+  // should not be a large overhead.
+  for (const auto &it : llvm::enumerate(target->getResults())) {
+    auto newRegionOp = appendDispatchRegionResult(
+        rewriter, regionOp, it.value(), dynamicDims[it.index()]);
+    if (failed(newRegionOp)) return failure();
+    regionOp = *newRegionOp;
+  }
 
-    // Replace uses of `target` after the dispatch region.
-    for (OpOperand *use : usesOutsideOfRegion) {
-      rewriter.updateRootInPlace(use->getOwner(), [&]() {
-        use->set(
-            regionOp->getResult(previousNumResults +
-                                use->get().cast<OpResult>().getResultNumber()));
-      });
-    }
+  // Replace uses of `target` after the dispatch region.
+  for (OpOperand *use : usesOutsideOfRegion) {
+    rewriter.updateRootInPlace(use->getOwner(), [&]() {
+      use->set(regionOp->getResult(
+          previousNumResults + use->get().cast<OpResult>().getResultNumber()));
+    });
   }
 
   return regionOp;
@@ -660,6 +750,49 @@ static FailureOr<Flow::DispatchRegionOp> cloneSucceedingOpIntoDispatchRegion(
 
 DiagnosedSilenceableFailure
 transform_dialect::CloneSucceedingOpIntoDispatchRegionOp::apply(
+    transform::TransformResults &transformResults,
+    transform::TransformState &state) {
+  ArrayRef<Operation *> targetOps = state.getPayloadOps(getTarget());
+  ArrayRef<Operation *> dispatchRegion =
+      state.getPayloadOps(getDispatchRegion());
+
+  if (dispatchRegion.size() != 1)
+    return DiagnosedSilenceableFailure(
+        this->emitOpError("requires exactly one dispatch region handle"));
+
+  auto regionOp = dyn_cast<Flow::DispatchRegionOp>(dispatchRegion.front());
+  if (!regionOp)
+    return DiagnosedSilenceableFailure(
+        this->emitOpError("expected 'dispatch.region' operand"));
+
+  SmallVector<Operation *> orderedTargets(targetOps.begin(), targetOps.end());
+  bool sortResult = computeTopologicalSorting(orderedTargets);
+  (void)sortResult;
+  assert(sortResult && "unable to sort topologically");
+  IRRewriter rewriter(regionOp->getContext());
+  SmallVector<Operation *> newTargets;
+  for (Operation *target : orderedTargets) {
+    auto newTarget =
+        cloneSucceedingOpIntoDispatchRegion(rewriter, target, regionOp);
+    if (failed(newTarget))
+      return DiagnosedSilenceableFailure::definiteFailure();
+    newTargets.push_back(*newTarget);
+  }
+
+  transformResults.set(getCloned().cast<OpResult>(), newTargets);
+  return DiagnosedSilenceableFailure(success());
+}
+
+void transform_dialect::CloneSucceedingOpIntoDispatchRegionOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::onlyReadsHandle(getDispatchRegion(), effects);
+  transform::producesHandle(getCloned(), effects);
+  transform::modifiesPayload(effects);
+}
+
+DiagnosedSilenceableFailure
+transform_dialect::MoveSucceedingOpIntoDispatchRegionOp::apply(
     transform::TransformResults &transformResults,
     transform::TransformState &state) {
   ArrayRef<Operation *> targetOps = state.getPayloadOps(getTarget());
@@ -676,22 +809,29 @@ transform_dialect::CloneSucceedingOpIntoDispatchRegionOp::apply(
         this->emitOpError("expected 'dispatch.region' operand"));
 
   SmallVector<Operation *> orderedTargets(targetOps.begin(), targetOps.end());
-  bool sortResult = computeTopologicalSorting(
-      dispatchRegion.front()->getBlock(), orderedTargets);
+  bool sortResult = computeTopologicalSorting(orderedTargets);
   (void)sortResult;
   assert(sortResult && "unable to sort topologically");
   IRRewriter rewriter(regionOp->getContext());
   for (Operation *target : orderedTargets) {
-    auto newRegionOp = cloneSucceedingOpIntoDispatchRegion(
-        rewriter, target, regionOp, getUpdateUsesOutsideOfRegion());
+    auto newRegionOp =
+        moveSucceedingOpIntoDispatchRegion(rewriter, target, regionOp);
     if (failed(newRegionOp))
-      return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+      return DiagnosedSilenceableFailure::definiteFailure();
     regionOp = *newRegionOp;
   }
 
   transformResults.set(getTransformed().cast<OpResult>(),
                        regionOp.getOperation());
   return DiagnosedSilenceableFailure(success());
+}
+
+void transform_dialect::MoveSucceedingOpIntoDispatchRegionOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::consumesHandle(getDispatchRegion(), effects);
+  transform::producesHandle(getTransformed(), effects);
+  transform::modifiesPayload(effects);
 }
 
 static Flow::DispatchRegionOp makeEmptyDispatchRegion(RewriterBase &rewriter,
@@ -719,6 +859,13 @@ transform_dialect::WrapInDispatchRegionOp::applyToOne(
 
   results.push_back(*regionOp);
   return DiagnosedSilenceableFailure(success());
+}
+
+void transform_dialect::WrapInDispatchRegionOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::consumesHandle(getTarget(), effects);
+  transform::producesHandle(getTransformed(), effects);
+  transform::modifiesPayload(effects);
 }
 
 #define GET_OP_CLASSES

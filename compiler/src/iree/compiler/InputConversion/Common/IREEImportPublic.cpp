@@ -105,7 +105,7 @@ class BufferViewToTensorPattern
       // will get it).
       rewriter.replaceOpWithNewOp<IREE::HAL::TensorImportOp>(
           srcOp, resultType, adaptor.getSource(), TypeAttr::get(resultType),
-          adaptor.getTargetDims());
+          adaptor.getTargetDims(), /*wait_fence=*/Value{});
     }
     return success();
   }
@@ -170,7 +170,7 @@ class BuiltinFuncOpPattern : public OpConversionPattern<func::FuncOp> {
         convertedResultTypes);
     auto newFuncOp = rewriter.create<func::FuncOp>(
         srcOp.getLoc(), srcOp.getName(), newFuncType);
-    rewriter.inlineRegionBefore(srcOp.getBody(), newFuncOp.getBody(),
+    rewriter.inlineRegionBefore(srcOp.getBody(), newFuncOp.getFunctionBody(),
                                 newFuncOp.end());
 
     // Retain function attributes in the allowlist.
@@ -187,7 +187,8 @@ class BuiltinFuncOpPattern : public OpConversionPattern<func::FuncOp> {
 
     // Tell the rewriter to convert the region signature.
     TypeConverter &typeConverter = *getTypeConverter();
-    if (failed(rewriter.convertRegionTypes(&newFuncOp.getBody(), typeConverter,
+    if (failed(rewriter.convertRegionTypes(&newFuncOp.getFunctionBody(),
+                                           typeConverter,
                                            &signatureConversion))) {
       return failure();
     }
@@ -305,7 +306,7 @@ void IREEImportPublicPass::runOnOperation() {
     for (Type type : funcOp.getFunctionType().getResults()) {
       if (isIllegalType(type)) return false;
     }
-    for (Block &block : funcOp.getBody()) {
+    for (Block &block : funcOp.getFunctionBody()) {
       for (Type type : block.getArgumentTypes()) {
         if (isIllegalType(type)) return false;
       }

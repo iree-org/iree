@@ -17,6 +17,7 @@ iree_compiler_cc_library(
     srcs = [
         "LowerLinalgMicrokernels.cpp",
         "Passes.cpp",
+        "VMVXAssignConstantOrdinals.cpp",
         "VMVXLinkExecutables.cpp",
     ],
     deps = [

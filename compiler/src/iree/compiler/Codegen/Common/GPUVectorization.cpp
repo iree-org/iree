@@ -26,23 +26,42 @@ using mlir::iree_compiler::IREE::LinalgExt::VectorizationPatterns;
 namespace mlir {
 namespace iree_compiler {
 
+// Max vector size we want to create. This could be changed to a pass option
+// based on target.
+static constexpr int64_t kMaxVectorSize = 4096;
+
 //====---------------------------------------------------------------------===//
 // Patterns for vectorization
 //====---------------------------------------------------------------------===//
 
 static void populateVectorizationPatterns(RewritePatternSet &patterns) {
   MLIRContext *ctx = patterns.getContext();
-  linalg::LinalgVectorizationOptions opt;
-  linalg::LinalgTransformationFilter f(
+  IREE::LinalgExt::LinalgTransformationFilter f(
       {StringAttr::get(ctx, getWorkgroupKTiledMarker()),
        StringAttr::get(ctx, getVectorizeMarker())},
       llvm::None);
   f.setMatchByDefault();
+  // When vectorizing if some ops didn't get tiled we may end up with large
+  // vectors being created that will later explode code size. If we have any
+  // vectors larger than what would fit in register skip vectorization.
+  f.addFilter([](Operation *op) {
+    auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+    if (!linalgOp) return success();
+    int64_t maxFlatVecSize = 1;
+    for (OpOperand &operand : linalgOp->getOpOperands()) {
+      auto type = operand.get().getType().dyn_cast<ShapedType>();
+      if (!type) continue;
+      if (!type.hasStaticShape()) return failure();
+      maxFlatVecSize = std::max(maxFlatVecSize, type.getNumElements());
+    }
+    return success(maxFlatVecSize <= kMaxVectorSize);
+  });
   VectorizationPatterns<linalg::FillOp, linalg::GenericOp,
-                        linalg::Conv1DNwcWcfOp>::insert(patterns, opt, f);
+                        linalg::Conv1DNwcWcfOp,
+                        linalg::Conv1DNcwFcwOp>::insert(patterns, f);
   patterns.add<linalg::CopyVectorizationPattern>(ctx);
   patterns.add<LinalgVectorizationPattern>(
-      ctx, f.addOpFilter<linalg::ContractionOpInterface>(), opt);
+      ctx, f.addOpFilter<linalg::ContractionOpInterface>());
 }
 
 namespace {
@@ -60,11 +79,17 @@ struct GPUVectorizationPass
 
     // Pre-process convolution ops.
     RewritePatternSet decompositionPattern(funcOp.getContext());
-    linalg::LinalgTransformationFilter f(
+    IREE::LinalgExt::LinalgTransformationFilter f(
         {StringAttr::get(context, getWorkgroupKTiledMarker())},
         StringAttr::get(context, getVectorizeMarker()));
     f.setMatchByDefault();
-    linalg::populateDecomposeConvolutionPatterns(decompositionPattern, f);
+    decompositionPattern
+        .add<IREE::LinalgExt::DownscaleSizeOneWindowed2DConvolution<
+                 linalg::Conv2DNhwcHwcfOp, linalg::Conv1DNwcWcfOp>,
+             IREE::LinalgExt::DownscaleSizeOneWindowed2DConvolution<
+                 linalg::Conv2DNchwFchwOp, linalg::Conv1DNcwFcwOp>,
+             IREE::LinalgExt::DownscaleDepthwiseConv2DNhwcHwcOp>(
+            funcOp.getContext(), f);
     if (failed(applyPatternsAndFoldGreedily(funcOp,
                                             std::move(decompositionPattern))))
       return signalPassFailure();
@@ -80,6 +105,8 @@ struct GPUVectorizationPass
             funcOp, std::move(vectorizationPatterns)))) {
       return signalPassFailure();
     }
+
+    linalg::hoistRedundantVectorTransfersOnTensor(funcOp);
   }
 };
 }  // namespace

@@ -79,7 +79,7 @@ ConstExprOpInfo ConstExprOpInfo::getForOp(Operation *op) {
     // Notably: IndexOp is not included because it establishes a hidden
     // dependency to the iterator and is non-const.
     if (llvm::isa<linalg::LinalgOp>(op) || llvm::isa<tensor::PadOp>(op) ||
-        llvm::isa<linalg::InitTensorOp>(op)) {
+        llvm::isa<tensor::EmptyOp>(op)) {
       return getInfoForDefaultConstExprOp(op);
     }
 
@@ -129,7 +129,7 @@ bool isHoistableConstExprLeaf(const ConstExprAnalysis::ConstValueInfo *info) {
     if (genericOp.getNumParallelLoops() == genericOp.getNumLoops() &&
         isa<linalg::YieldOp>(genericOp.getBody()->front())) {
       for (OpOperand *opOperand : genericOp.getInputOperands()) {
-        AffineMap indexingMap = genericOp.getTiedIndexingMap(opOperand);
+        AffineMap indexingMap = genericOp.getMatchingIndexingMap(opOperand);
         if (indexingMap.isProjectedPermutation() &&
             indexingMap.getNumDims() != indexingMap.getNumResults()) {
           return false;
@@ -140,7 +140,7 @@ bool isHoistableConstExprLeaf(const ConstExprAnalysis::ConstValueInfo *info) {
 
   // Never hoist init_tensor. These are sometimes used for pure shape metadata
   // and must not be separated from their consumers.
-  if (isa<linalg::InitTensorOp>(op)) {
+  if (isa<tensor::EmptyOp>(op)) {
     return false;
   }
 

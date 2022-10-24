@@ -31,7 +31,7 @@ hal.executable @conv_112x112x512 {
             : !flow.dispatch.tensor<readonly:1x225x225x3xf32> -> tensor<1x225x225x3xf32>
         %15 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [3, 3, 3, 512], strides = [1, 1, 1, 1]
             : !flow.dispatch.tensor<readonly:3x3x3x512xf32> -> tensor<3x3x3x512xf32>
-        %22 = linalg.init_tensor [1, 112, 112, 512] : tensor<1x112x112x512xf32>
+        %22 = tensor.empty() : tensor<1x112x112x512xf32>
         %23 = linalg.fill ins(%cst : f32) outs(%22 : tensor<1x112x112x512xf32>) -> tensor<1x112x112x512xf32>
         %24 = linalg.conv_2d_nhwc_hwcf {__internal_linalg_transform__ = "workgroup", dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>}
             ins(%13, %15 : tensor<1x225x225x3xf32>, tensor<3x3x3x512xf32>) outs(%23 : tensor<1x112x112x512xf32>) -> tensor<1x112x112x512xf32>
@@ -44,7 +44,7 @@ hal.executable @conv_112x112x512 {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 1, 8, 256], [0, 1, 8, 4], [0, 0, 0, 0, 1, 1, 4], [0, 1, 0, 0]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorize>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseVectorize>
 //      CHECK: hal.executable.export public @conv_112x112x512
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [64 : index, 1 : index, 1 : index]
@@ -85,7 +85,7 @@ hal.executable @conv_112x112x32 {
             : !flow.dispatch.tensor<readonly:1x225x225x3xf32> -> tensor<1x225x225x3xf32>
         %15 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [3, 3, 3, 32], strides = [1, 1, 1, 1]
             : !flow.dispatch.tensor<readonly:3x3x3x32xf32> -> tensor<3x3x3x32xf32>
-        %22 = linalg.init_tensor [1, 112, 112, 32] : tensor<1x112x112x32xf32>
+        %22 = tensor.empty() : tensor<1x112x112x32xf32>
         %23 = linalg.fill ins(%cst : f32) outs(%22 : tensor<1x112x112x32xf32>) -> tensor<1x112x112x32xf32>
         %24 = linalg.conv_2d_nhwc_hwcf {__internal_linalg_transform__ = "workgroup", dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>}
             ins(%13, %15 : tensor<1x225x225x3xf32>, tensor<3x3x3x32xf32>) outs(%23 : tensor<1x112x112x32xf32>) -> tensor<1x112x112x32xf32>
@@ -98,7 +98,7 @@ hal.executable @conv_112x112x32 {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 4, 16, 32], [0, 4, 2, 4], [0, 0, 0, 0, 1, 1, 4], [0, 1, 0, 0]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorize>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseVectorize>
 //      CHECK: hal.executable.export public @conv_112x112x32
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [8 : index, 8 : index, 1 : index]
@@ -138,7 +138,7 @@ hal.executable @conv_16x16x16 {
             : !flow.dispatch.tensor<readonly:1x33x33x3xf32> -> tensor<1x33x33x3xf32>
         %15 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [3, 3, 3, 16], strides = [1, 1, 1, 1]
             : !flow.dispatch.tensor<readonly:3x3x3x16xf32> -> tensor<3x3x3x16xf32>
-        %22 = linalg.init_tensor [1, 16, 16, 16] : tensor<1x16x16x16xf32>
+        %22 = tensor.empty() : tensor<1x16x16x16xf32>
         %23 = linalg.fill ins(%cst : f32) outs(%22 : tensor<1x16x16x16xf32>) -> tensor<1x16x16x16xf32>
         %24 = linalg.conv_2d_nhwc_hwcf {__internal_linalg_transform__ = "workgroup", dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>}
             ins(%13, %15 : tensor<1x33x33x3xf32>, tensor<3x3x3x16xf32>) outs(%23 : tensor<1x16x16x16xf32>) -> tensor<1x16x16x16xf32>
@@ -151,7 +151,7 @@ hal.executable @conv_16x16x16 {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 8, 8, 16], [0, 2, 2, 4], [0, 0, 0, 0, 1, 1, 4], [0, 1, 0, 0]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorize>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseVectorize>
 //      CHECK: hal.executable.export public @conv_16x16x16
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [4 : index, 4 : index, 4 : index]
@@ -193,7 +193,7 @@ hal.executable @dwconv_28x28x144 {
             : !flow.dispatch.tensor<readonly:1x57x57x144xf32> -> tensor<1x57x57x144xf32>
         %16 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [3, 3, 144], strides = [1, 1, 1]
             : !flow.dispatch.tensor<readonly:3x3x144xf32> -> tensor<3x3x144xf32>
-        %23 = linalg.init_tensor [1, 28, 28, 144] : tensor<1x28x28x144xf32>
+        %23 = tensor.empty() : tensor<1x28x28x144xf32>
         %24 = linalg.fill ins(%cst : f32) outs(%23 : tensor<1x28x28x144xf32>) -> tensor<1x28x28x144xf32>
         %25 = linalg.depthwise_conv_2d_nhwc_hwc {__internal_linalg_transform__ = "workgroup", dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>}
                   ins(%14, %16 : tensor<1x57x57x144xf32>, tensor<3x3x144xf32>) outs(%24 : tensor<1x28x28x144xf32>) -> tensor<1x28x28x144xf32>
@@ -206,7 +206,7 @@ hal.executable @dwconv_28x28x144 {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 4, 4, 16], [0, 1, 1, 4], [0, 0, 0, 0, 1, 1], [0, 1, 0, 0]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorize>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseVectorize>
 //      CHECK: hal.executable.export public @dwconv_28x28x144
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [4 : index, 4 : index, 4 : index]
@@ -247,7 +247,7 @@ hal.executable @dwconv_4x4x8 {
             : !flow.dispatch.tensor<readonly:1x9x9x8xf32> -> tensor<1x9x9x8xf32>
         %16 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [3, 3, 8], strides = [1, 1, 1]
             : !flow.dispatch.tensor<readonly:3x3x8xf32> -> tensor<3x3x8xf32>
-        %23 = linalg.init_tensor [1, 4, 4, 8] : tensor<1x4x4x8xf32>
+        %23 = tensor.empty() : tensor<1x4x4x8xf32>
         %24 = linalg.fill ins(%cst : f32) outs(%23 : tensor<1x4x4x8xf32>) -> tensor<1x4x4x8xf32>
         %25 = linalg.depthwise_conv_2d_nhwc_hwc {__internal_linalg_transform__ = "workgroup", dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>}
             ins(%14, %16 : tensor<1x9x9x8xf32>, tensor<3x3x8xf32>) outs(%24 : tensor<1x4x4x8xf32>) -> tensor<1x4x4x8xf32>
@@ -259,7 +259,7 @@ hal.executable @dwconv_4x4x8 {
   }
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 4, 4, 8], [0, 1, 1, 4], [0, 0, 0, 0, 1, 1], [0, 1, 0, 0]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorize>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseVectorize>
 //      CHECK: hal.executable.export public @dwconv_4x4x8
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [2 : index, 4 : index, 4 : index]

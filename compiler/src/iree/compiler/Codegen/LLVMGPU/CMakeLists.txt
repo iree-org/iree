@@ -29,6 +29,7 @@ iree_cc_library(
     "LLVMGPUReduceBankConflicts.cpp"
     "LLVMGPUTensorAlloc.cpp"
     "LLVMGPUTensorCoreVectorization.cpp"
+    "LLVMGPUTensorPad.cpp"
     "LLVMGPUTileAndDistribute.cpp"
     "LLVMGPUTileTensor.cpp"
     "LLVMGPUVectorLowering.cpp"
@@ -56,6 +57,7 @@ iree_cc_library(
     MLIRGPUOps
     MLIRGPUToNVVMTransforms
     MLIRGPUToROCDLTransforms
+    MLIRGPUTransformOps
     MLIRGPUTransforms
     MLIRIR
     MLIRLLVMCommonConversion
@@ -78,6 +80,7 @@ iree_cc_library(
     MLIRSCFToControlFlow
     MLIRSCFTransforms
     MLIRSupport
+    MLIRTensorDialect
     MLIRTransformDialect
     MLIRTransforms
     MLIRVectorDialect

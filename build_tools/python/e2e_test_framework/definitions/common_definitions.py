@@ -8,6 +8,7 @@
 from dataclasses import dataclass
 from enum import Enum
 from typing import List
+import dataclasses
 
 
 class ArchitectureType(Enum):
@@ -26,6 +27,10 @@ class ArchitectureInfo(object):
 
 class DeviceArchitecture(Enum):
   """Predefined architecture/microarchitecture."""
+
+  # VMVX virtual machine
+  VMVX_GENERIC = ArchitectureInfo(ArchitectureType.CPU, "vmvx", "generic")
+
   # x86_64 CPUs
   X86_64_CASCADELAKE = ArchitectureInfo(ArchitectureType.CPU, "x86_64",
                                         "cascadelake")
@@ -33,13 +38,14 @@ class DeviceArchitecture(Enum):
   # ARM CPUs
   ARMV8_2_A_GENERIC = ArchitectureInfo(ArchitectureType.CPU, "armv8.2-a",
                                        "generic")
+  ARMV9_A_GENERIC = ArchitectureInfo(ArchitectureType.CPU, "armv9-a", "generic")
 
   # RISC-V CPUs
   RV64_GENERIC = ArchitectureInfo(ArchitectureType.CPU, "rv64", "generic")
   RV32_GENERIC = ArchitectureInfo(ArchitectureType.CPU, "rv32", "generic")
 
   # Mobile GPUs
-  VALHALL_GENERIC = ArchitectureInfo(ArchitectureType.GPU, "valhall", "generic")
+  MALI_VALHALL = ArchitectureInfo(ArchitectureType.GPU, "mali", "valhall")
   ADRENO_GENERIC = ArchitectureInfo(ArchitectureType.GPU, "adreno", "generic")
 
   # CUDA GPUs
@@ -47,10 +53,17 @@ class DeviceArchitecture(Enum):
   CUDA_SM80 = ArchitectureInfo(ArchitectureType.GPU, "cuda", "sm_80")
 
 
+@dataclass(frozen=True)
+class PlatformInfo(object):
+  """Platform information of a device."""
+  os: str
+
+
 class DevicePlatform(Enum):
-  """OS platform and ABI."""
-  LINUX_GNU = "linux-gnu"
-  LINUX_ANDROID29 = "linux-android29"
+  """Predefined device platform information."""
+
+  GENERIC_LINUX = PlatformInfo("linux")
+  GENERIC_ANDROID = PlatformInfo("android")
 
 
 class ModelSourceType(Enum):
@@ -81,7 +94,7 @@ class DeviceSpec(object):
   # This is for modeling the spec of a heterogeneous processor. Depending on
   # which cores you run, the device has a different spec. Benchmark machines use
   # these parameters to set up the devices. E.g. set CPU mask.
-  device_parameters: List[str]
+  device_parameters: List[str] = dataclasses.field(default_factory=list)
 
 
 @dataclass(frozen=True)

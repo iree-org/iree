@@ -10,9 +10,9 @@
 #include <stdio.h>
 
 #include "iree/base/string_builder.h"
+#include "iree/vm/api.h"
 #include "iree/vm/bytecode_dispatch_util.h"
 #include "iree/vm/bytecode_module_impl.h"
-#include "iree/vm/stack.h"
 
 // Controls how bytecode disassembly is formatted.
 typedef enum iree_vm_bytecode_disasm_format_e {

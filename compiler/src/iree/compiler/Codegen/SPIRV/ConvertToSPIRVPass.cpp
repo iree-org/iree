@@ -36,6 +36,8 @@
 #include "mlir/Conversion/TensorToSPIRV/TensorToSPIRV.h"
 #include "mlir/Conversion/TosaToArith/TosaToArith.h"
 #include "mlir/Conversion/VectorToSPIRV/VectorToSPIRV.h"
+#include "mlir/Dialect/Arith/Transforms/Passes.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -49,6 +51,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Pass/Pass.h"
@@ -63,7 +66,7 @@ namespace {
 //===----------------------------------------------------------------------===//
 
 /// Map from hal.interface.binding.subspan ops to their corresponding
-/// spv.GlobalVariable ops.
+/// spirv.GlobalVariable ops.
 using InterfaceResourceMap =
     llvm::DenseMap<Operation *, spirv::GlobalVariableOp>;
 
@@ -89,7 +92,7 @@ std::pair<int32_t, int32_t> getInterfaceSetAndBinding(
 }
 
 /// Scans all hal.interface.binding.subspan ops in `module`, creates their
-/// corresponding spv.GlobalVariables when needed, and returns the map.
+/// corresponding spirv.GlobalVariables when needed, and returns the map.
 /// The created variables need to have their types fixed later.
 InterfaceResourceMap createResourceVariables(mlir::ModuleOp module) {
   SymbolTable symbolTable(module);
@@ -228,13 +231,19 @@ struct HALInterfaceBindingSubspanConverter final
       return success();
     }
 
+    Value offset = subspanOp.getByteOffset();
+    APInt offsetInt;
+    if (offset && matchPattern(offset, m_ConstantInt(&offsetInt)) &&
+        !offsetInt.isZero()) {
+      return subspanOp.emitOpError() << "should have no or zero byte offset";
+    }
+
     Type resultType = subspanOp.getOperation()->getResult(0).getType();
     Type convertedType = this->getTypeConverter()->convertType(resultType);
     if (!convertedType) {
       return subspanOp.emitError()
              << "failed to convert SPIR-V type: " << resultType;
     }
-
     auto varOp = interfaceToResourceVars.lookup(subspanOp);
     // Fix up the variable's type.
     varOp.setTypeAttr(TypeAttr::get(convertedType));
@@ -357,6 +366,7 @@ void ConvertToSPIRVPass::runOnOperation() {
   populateMemRefToSPIRVPatterns(typeConverter, patterns);
 
   // Pull in standard/math patterns to convert arithmetic ops and others.
+  arith::populateCeilFloorDivExpandOpsPatterns(patterns);
   arith::populateArithToSPIRVPatterns(typeConverter, patterns);
   populateFuncToSPIRVPatterns(typeConverter, patterns);
   populateMathToSPIRVPatterns(typeConverter, patterns);
@@ -373,7 +383,7 @@ void ConvertToSPIRVPass::runOnOperation() {
   // Pull in vector patterns to convert vector ops.
   mlir::populateVectorToSPIRVPatterns(typeConverter, patterns);
 
-  // Pull in builtin func to spv.func conversion.
+  // Pull in builtin func to spirv.func conversion.
   populateBuiltinFuncToSPIRVPatterns(typeConverter, patterns);
 
   // Add IREE HAL interface op conversions.
@@ -386,7 +396,7 @@ void ConvertToSPIRVPass::runOnOperation() {
       typeConverter, context);
 
   // Performs a prelimiary step to analyze all hal.interface.binding.subspan ops
-  // and create spv.GlobalVariables.
+  // and create spirv.GlobalVariables.
   auto interfaceToResourceVars = createResourceVariables(moduleOp);
   // For using use them in conversion.
   patterns.insert<HALInterfaceBindingSubspanConverter>(typeConverter, context,
@@ -396,7 +406,7 @@ void ConvertToSPIRVPass::runOnOperation() {
   /// - linalg.reshape becomes a no-op since all memrefs are linearized in
   ///   SPIR-V.
   /// - tensor_to_memref can become a no-op since tensors are lowered to
-  ///   !spv.array.
+  ///   !spirv.array.
   /// - unrealized_conversion_cast with the same source and target type.
   patterns.insert<
       FoldAsNoOp<memref::CollapseShapeOp>, FoldAsNoOp<memref::ExpandShapeOp>,
@@ -421,7 +431,7 @@ void ConvertToSPIRVPass::runOnOperation() {
     }
   }
 
-  // Collect all SPIR-V ops into a spv.module.
+  // Collect all SPIR-V ops into a spirv.module.
   auto builder = OpBuilder::atBlockBegin(moduleOp.getBody());
   auto spvModule = builder.create<spirv::ModuleOp>(
       moduleOp.getLoc(), spirv::AddressingModel::Logical,
@@ -429,7 +439,7 @@ void ConvertToSPIRVPass::runOnOperation() {
   Block *body = spvModule.getBody();
   Dialect *spvDialect = spvModule->getDialect();
   for (Operation &op : llvm::make_early_inc_range(*moduleOp.getBody())) {
-    // Skip the newly created spv.module itself.
+    // Skip the newly created spirv.module itself.
     if (&op == spvModule) continue;
     if (op.getDialect() == spvDialect) op.moveBefore(body, body->end());
   }

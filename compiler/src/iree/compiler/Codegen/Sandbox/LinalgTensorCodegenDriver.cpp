@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <optional>
+
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/CodegenStrategy.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
@@ -18,7 +20,7 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/SCF/Utils/Utils.h"
+#include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Dialect/X86Vector/Transforms.h"
 #include "mlir/Pass/PassManager.h"
@@ -29,6 +31,10 @@ using namespace mlir;
 // using namespace mlir::linalg;
 
 using mlir::iree_compiler::IREE::LinalgExt::CodegenStrategy;
+using mlir::iree_compiler::IREE::LinalgExt::LinalgPeelOptions;
+using mlir::iree_compiler::IREE::LinalgExt::LinalgTransformationFilter;
+using mlir::iree_compiler::IREE::LinalgExt::LinalgTransforms;
+using mlir::iree_compiler::IREE::LinalgExt::LinalgVectorLoweringOptions;
 
 #define DEBUG_TYPE "iree-linalg-tensor-codegen-driver"
 
@@ -89,8 +95,8 @@ static LogicalResult getPaddingAttrs(func::FuncOp funcOp,
   if (!linalgOp) return success();
 
   OpBuilder builder(funcOp.getContext());
-  for (auto operand : linalgOp.getInputAndOutputOperands()) {
-    auto elemType = getElementTypeOrSelf(operand->get().getType());
+  for (auto &operand : linalgOp->getOpOperands()) {
+    auto elemType = getElementTypeOrSelf(operand.get().getType());
     attrs.push_back(builder.getZeroAttr(elemType));
   }
 
@@ -107,10 +113,10 @@ static LogicalResult getPaddingDims(func::FuncOp funcOp,
   if (!rootOp.value()) return success();
 
   linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(rootOp.value());
-  for (auto en : llvm::enumerate(linalgOp.getIteratorTypes())) {
-    if (en.value().cast<StringAttr>().getValue() ==
-        utils::stringifyIteratorType(targetIterType)) {
-      paddingDims.push_back(en.index());
+  for (auto [index, iterType] :
+       llvm::enumerate(linalgOp.getIteratorTypesArray())) {
+    if (iterType == utils::stringifyIteratorType(targetIterType)) {
+      paddingDims.push_back(index);
     }
   }
 
@@ -136,6 +142,26 @@ getTileAndFuseOptionsFromConfig(func::FuncOp funcOp, int64_t tilingLevel) {
   options.tileInterchange.assign(
       loweringConfig.getTileInterchangeVals(tilingLevel));
   return options;
+}
+
+/// Default method to initialize the split reduction size in IREE. These could
+/// be overriden by the command line options if specified.
+static FailureOr<int64_t> getSplitReductionSizeFromConfig(func::FuncOp funcOp) {
+  FailureOr<Operation *> rootOp = getRootOp(funcOp);
+  if (failed(rootOp)) {
+    return failure();
+  }
+  unsigned numTileLevels =
+      mlir::iree_compiler::getNumTileLevels(rootOp.value());
+  assert(numTileLevels >= 1 && "at least 1 tiling level must be present");
+
+  // The last one is the reduction dimension.
+  auto reductionSizes =
+      mlir::iree_compiler::getTileSizes(rootOp.value(), numTileLevels - 1);
+  if (reductionSizes.size() == 0) {
+    return failure();
+  }
+  return reductionSizes[reductionSizes.size() - 1];
 }
 
 //===----------------------------------------------------------------------===//
@@ -182,6 +208,18 @@ struct LinalgFusePass : public LinalgFuseBase<LinalgFusePass> {
     this->doIREEDistribution = options.doIREEDistribution;
   }
   void runOnOperation() override;
+};
+
+struct LinalgSplitReductionPass
+    : public LinalgSplitReductionBase<LinalgSplitReductionPass> {
+  LinalgSplitReductionPass(bool enableFpReductionReordering, int64_t size = 0) {
+    this->size.setValue(size);
+    fpReductionReordering = enableFpReductionReordering;
+  }
+  void runOnOperation() override;
+
+ private:
+  bool fpReductionReordering = false;
 };
 
 struct LinalgSingleTilingExpertPass
@@ -267,7 +305,7 @@ void LinalgFusePass::runOnOperation() {
   FailureOr<linalg::LinalgTilingAndFusionOptions> defaultTilingOptions =
       getTileAndFuseOptionsFromConfig(funcOp, tilingLevel);
   if (failed(defaultTilingOptions)) {
-    return signalPassFailure();
+    return;
   }
   linalg::LinalgTilingAndFusionOptions tilingOptions =
       defaultTilingOptions.value();
@@ -366,6 +404,150 @@ void LinalgFusePass::runOnOperation() {
     return signalPassFailure();
   }
 }
+namespace {
+/// Pattern to wrap splitReduction transformation.
+struct CodegenSplitReduction
+    : public OpInterfaceRewritePattern<linalg::LinalgOp> {
+  CodegenSplitReduction(MLIRContext *context, bool fpReductionReordering,
+                        int64_t size, LinalgTransformationFilter filter,
+                        PatternBenefit benefit = 1)
+      : OpInterfaceRewritePattern<linalg::LinalgOp>(context, benefit),
+        fpReductionReordering(fpReductionReordering),
+        size(size),
+        filter(std::move(filter)) {}
+
+  LogicalResult matchAndRewrite(linalg::LinalgOp op,
+                                PatternRewriter &rewriter) const override {
+    // Make sure that
+    // - the pass has not been applied before
+    // - has tensor semantics
+    // - number of reduction loops == 1
+    // - has exactly 1 output
+    // - index map has only projected permutations
+    // - is a linalg generic op
+    // - has exactly 1 input
+    // - if enableReductionReordering is not set, then operand is an int
+    // - innermost dimension of the input operand is reduction
+    // TODO: support named ops, numInputs > 1, and modify lastDim check below
+    // accordingly. If fpReductionReordering is not enabled by default, it must
+    // be an integer or index type to proceed to allow associative reordering.
+    if (failed(filter.checkAndNotify(rewriter, op))) {
+      return rewriter.notifyMatchFailure(op, "pass has been applied before");
+    }
+    if (!op.hasTensorSemantics()) {
+      return rewriter.notifyMatchFailure(op, "doesn't have tensor semantics");
+    }
+    if (op.getNumReductionLoops() != 1) {
+      return rewriter.notifyMatchFailure(op, "number of reduction loops != 1");
+    }
+    if (op.getNumOutputs() != 1) {
+      return rewriter.notifyMatchFailure(op, "doesn't have exactly 1 output");
+    }
+    if (!op.hasOnlyProjectedPermutations()) {
+      return rewriter.notifyMatchFailure(
+          op, "index map doesn't have only projected permutations");
+    }
+    if (!isa<linalg::GenericOp>(op)) {
+      return rewriter.notifyMatchFailure(op, "is not a generic op");
+    }
+    if (op.getNumInputs() != 1) {
+      return rewriter.notifyMatchFailure(op, "doesn't have exactly 1 input");
+    }
+    auto elementType = op.getInputOperand(0)
+                           ->get()
+                           .getType()
+                           .dyn_cast<ShapedType>()
+                           .getElementType();
+    if (!(fpReductionReordering || elementType.isIntOrIndex())) {
+      return rewriter.notifyMatchFailure(
+          op, "enable reordering is not set and operand is not an int");
+    }
+
+    SmallVector<unsigned> dims;
+    op.getReductionDims(dims);
+    AffineMap map = op.getMatchingIndexingMap(op.getInputOperand(0));
+    unsigned lastIdx = map.getNumResults() - 1;
+    unsigned lastDim = map.getDimPosition(lastIdx);
+    if (lastDim != dims[0]) {
+      return rewriter.notifyMatchFailure(
+          op, "innermost dimension of the input operand is not reduction");
+    }
+
+    linalg::ControlSplitReductionFn fn = [this, lastIdx](linalg::LinalgOp op) {
+      return linalg::SplitReductionOptions{size, lastIdx,
+                                           /*innerParallel=*/true};
+    };
+
+    auto numLoops = op.getNumLoops();
+
+    // 1) Tile to extract a single vector-length array.
+    SmallVector<int64_t> tileSizesSVFirst(numLoops, 1);
+    tileSizesSVFirst[numLoops - 1] = 0;
+    auto optionsFirst = scf::SCFTilingOptions().setTileSizes(tileSizesSVFirst);
+    FailureOr<scf::SCFTilingResult> tileResFirst = scf::tileUsingSCFForOp(
+        rewriter, cast<TilingInterface>(op.getOperation()), optionsFirst);
+    if (failed(tileResFirst)) return failure();
+    rewriter.replaceOp(op, tileResFirst->replacements);
+    filter.replaceLinalgTransformationFilter(rewriter, tileResFirst->tiledOp);
+
+    // 2) Apply splitReduction on the single vector-length array. splitReduction
+    // already replaces the op.
+    FailureOr<linalg::SplitReductionResult> splitRes =
+        splitReduction(rewriter, tileResFirst->tiledOp, fn);
+    if (failed(splitRes)) return failure();
+    filter.replaceLinalgTransformationFilter(rewriter, splitRes->splitLinalgOp);
+    filter.replaceLinalgTransformationFilter(rewriter,
+                                             splitRes->resultCombiningLinalgOp);
+
+    // 3) Tile the first op generated by splitReduction with tile size of 1, to
+    // essentially create a reduction loop.
+    // Note that splitRes->splitLinalgOp.getNumLoops() = numLoops + 1.
+    SmallVector<int64_t> tileSizesSV(splitRes->splitLinalgOp.getNumLoops(), 0);
+    // The reduction happens only in the penultimate dimension, which we now
+    // tile.
+    tileSizesSV[numLoops - 1] = 1;
+    auto options = scf::SCFTilingOptions().setTileSizes(tileSizesSV);
+    FailureOr<scf::SCFTilingResult> tileRes = scf::tileUsingSCFForOp(
+        rewriter, cast<TilingInterface>(splitRes->splitLinalgOp.getOperation()),
+        options);
+    if (failed(tileRes)) return failure();
+    rewriter.replaceOp(splitRes->splitLinalgOp, tileRes->replacements);
+
+    return success();
+  }
+
+ private:
+  bool fpReductionReordering;
+  int64_t size;
+  LinalgTransformationFilter filter;
+};
+}  // namespace
+
+void LinalgSplitReductionPass::runOnOperation() {
+  func::FuncOp funcOp = getOperation();
+  int64_t useSize = size.getValue();
+  if (useSize == 0) {
+    auto splitReductionOptions = getSplitReductionSizeFromConfig(funcOp);
+    if (failed(splitReductionOptions)) {
+      return;
+    }
+    useSize = *splitReductionOptions;
+  }
+  RewritePatternSet patterns(&getContext());
+  patterns.add<CodegenSplitReduction>(
+      &getContext(), fpReductionReordering, useSize,
+      LinalgTransformationFilter(
+          ArrayRef<StringAttr>{},
+          StringAttr::get(&getContext(), "CODEGEN_SPLIT")));
+
+  if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    return signalPassFailure();
+  }
+  // Remove all the markers at the end.
+  funcOp->walk([&](linalg::LinalgOp op) {
+    op->removeAttr(LinalgTransforms::kLinalgTransformMarker);
+  });
+}
 
 void LinalgSingleTilingExpertPass::runOnOperation() {
   func::FuncOp funcOp = getOperation();
@@ -416,7 +598,7 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
 
   // Gather tiled loops that aren't distribution loops from previous tiling
   // stages.
-  linalg::LinalgPeelOptions peelingOptions;
+  LinalgPeelOptions peelingOptions;
   peelingOptions.loopsToPeelComputationFunction =
       [](OpBuilder &builder, Operation *op,
          SmallVectorImpl<scf::ForOp> &loopsToPeel) {
@@ -499,8 +681,8 @@ void LinalgVectorLoweringPass::runOnOperation() {
           .enableFullUnroll(unrollVectorTransfers)
           .enableLowerPermutationMaps();
 
-  linalg::LinalgVectorLoweringOptions vectorLoweringOptions =
-      linalg::LinalgVectorLoweringOptions()
+  LinalgVectorLoweringOptions vectorLoweringOptions =
+      LinalgVectorLoweringOptions()
           // Lowering of vector contractions.
           .enableContractionLowering(vectorLoweringStage >= 0)
           // Lowering of vector multi_reduction.
@@ -631,6 +813,12 @@ std::unique_ptr<OperationPass<func::FuncOp>> mlir::createLinalgFusePass(
   return std::make_unique<LinalgFusePass>(options);
 }
 
+std::unique_ptr<OperationPass<func::FuncOp>>
+mlir::createLinalgSplitReductionPass(const bool enableFpReductionReordering,
+                                     const int64_t size) {
+  return std::make_unique<LinalgSplitReductionPass>(enableFpReductionReordering,
+                                                    size);
+}
 std::unique_ptr<OperationPass<func::FuncOp>>
 mlir::createLinalgSingleTilingExpertPass() {
   return std::make_unique<LinalgSingleTilingExpertPass>();

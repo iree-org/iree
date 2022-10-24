@@ -44,6 +44,10 @@ public:
     return failure(hadErrors);
   }
 
+  /// Remove the mappings between the given operation and any handle that may be
+  /// associated with it in the transform op.
+  void removeMappings(Operation *op);
+
 private:
   InFlightDiagnostic emitError(Operation *op, const llvm::Twine &message = {}) {
     mayFail(failure());

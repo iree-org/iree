@@ -44,7 +44,10 @@ struct DetachElementwisePattern
     if (!linalgOp.hasTensorSemantics()) return failure();
 
     // Nothing to do if the output tensor operand is already a fill op.
-    linalg::OpOperandVector outputOperands = linalgOp.getOutputTensorOperands();
+    OpOperandVector outputOperands;
+    if (!linalgOp.hasBufferSemantics()) {
+      outputOperands = linalgOp.getOutputOperands();
+    }
     // Right now all the cases we see have one output. This can be relaxed once
     // we see multiple output ops.
     if (outputOperands.size() != 1) return failure();
@@ -69,8 +72,8 @@ struct DetachElementwisePattern
         dynamicDims.push_back(
             rewriter.create<tensor::DimOp>(loc, outputOperand, i));
     }
-    auto initOp = rewriter.create<linalg::InitTensorOp>(
-        loc, dynamicDims, outputType.getShape(), elementType);
+    auto initOp = rewriter.create<tensor::EmptyOp>(loc, outputType.getShape(),
+                                                   elementType, dynamicDims);
     Value zero = rewriter.create<arith::ConstantOp>(
         loc, rewriter.getZeroAttr(elementType));
     Value fill =
@@ -81,7 +84,7 @@ struct DetachElementwisePattern
                                [&]() { linalgOp.setOutputOperand(0, fill); });
 
     auto outputMap = mlir::compressUnusedDims(
-        linalgOp.getTiedIndexingMap(outputOperands.front()));
+        linalgOp.getMatchingIndexingMap(outputOperands.front()));
     // Only support identity map for output access for now; this is the case for
     // all existing contraction/convolution ops.
     if (!outputMap.isIdentity()) return failure();
@@ -91,9 +94,9 @@ struct DetachElementwisePattern
     iterators.reserve(outputMap.getNumResults());
     for (int i = 0, e = outputMap.getNumResults(); i < e; ++i) {
       int pos = outputMap.getResult(i).cast<AffineDimExpr>().getPosition();
-      auto attr = linalgOp.getIteratorTypes()[pos].cast<StringAttr>();
+      StringRef attr = linalgOp.getIteratorTypesArray()[pos];
       if (!linalg::isParallelIterator(attr)) return failure();
-      iterators.push_back(attr.getValue());
+      iterators.push_back(attr);
     }
 
     // Create a generic op to add back the original output tensor operand.
@@ -146,7 +149,7 @@ struct DetachSplatConstantOutsOperands
 
       Location loc = constOp.getLoc();
       Type elementType = resultType.getElementType();
-      Value initTensorOp = rewriter.create<linalg::InitTensorOp>(
+      Value emptyTensorOp = rewriter.create<tensor::EmptyOp>(
           loc, resultType.getShape(), elementType);
       Attribute constValue;
       if (elementType.isa<IntegerType>()) {
@@ -160,8 +163,8 @@ struct DetachSplatConstantOutsOperands
           rewriter.create<arith::ConstantOp>(loc, elementType, constValue);
 
       Value fillOp = rewriter
-                         .create<linalg::FillOp>(loc, resultType,
-                                                 scalarConstantOp, initTensorOp)
+                         .create<linalg::FillOp>(
+                             loc, resultType, scalarConstantOp, emptyTensorOp)
                          .getResult(0);
       rewriter.updateRootInPlace(linalgExtOp, [&]() {
         linalgExtOp->setOperand(outOperand->getOperandNumber(), fillOp);

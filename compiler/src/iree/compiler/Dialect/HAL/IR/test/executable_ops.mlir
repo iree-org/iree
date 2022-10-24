@@ -58,6 +58,39 @@ hal.executable @ex_with_workgroup_count_region {
 
 // -----
 
+#executable_target_format = #hal.executable.target<"backend", "format">
+
+// CHECK-LABEL: @ex_with_constants
+hal.executable @ex_with_constants {
+  // CHECK: hal.executable.variant public @backend
+  hal.executable.variant @backend, target = #executable_target_format {
+    // CHECK: hal.executable.constant.block(%{{.+}}: !hal.device) -> (i32, i32) as ("foo", "bar")
+    hal.executable.constant.block(%device: !hal.device) -> (i32, i32) as ("foo", "bar") {
+      %c0 = arith.constant 0 : i32
+      %c1 = arith.constant 1 : i32
+      hal.return %c0, %c1 : i32, i32
+    }
+    // CHECK: hal.executable.constant.block(%{{.+}}: !hal.device) -> i32 as "baz"
+    hal.executable.constant.block(%device: !hal.device) -> i32 as "baz" {
+      %c2 = arith.constant 2 : i32
+      hal.return %c2 : i32
+    }
+    builtin.module {
+      func.func @dispatch0() {
+        // CHECK: = hal.executable.constant.load "foo" : i32
+        %0 = hal.executable.constant.load "foo" : i32
+        // CHECK: = hal.executable.constant.load "bar" : i32
+        %1 = hal.executable.constant.load "bar" : i32
+        // CHECK: = hal.executable.constant.load "baz" : i32
+        %2 = hal.executable.constant.load "baz" : i32
+        func.return
+      }
+    }
+  }
+}
+
+// -----
+
 // CHECK-LABEL: @executable_create
 // CHECK-SAME: %[[DEVICE:.+]]: !hal.device,
 // CHECK-SAME: %[[LAYOUT0:.+]]: !hal.pipeline_layout,

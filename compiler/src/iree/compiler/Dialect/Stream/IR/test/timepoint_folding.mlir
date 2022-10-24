@@ -77,8 +77,23 @@ func.func @ExpandTimepointJoinOperands(%arg0: !stream.timepoint, %arg1: !stream.
 
 // -----
 
-// CHECK-LABEL: @ElideImmediateAwaits
-func.func @ElideImmediateAwaits(%arg0: !stream.resource<staging>) -> !stream.resource<staging> {
+// CHECK-LABEL: @ChainTimepoints
+// CHECK-SAME: (%[[FENCE:.+]]: !stream.timepoint, %[[SOURCE:.+]]: !stream.resource<external>)
+func.func @ChainTimepoints(%fence: !stream.timepoint, %source: !stream.resource<external>) -> (!stream.resource<external>, !stream.timepoint) {
+  %c0 = arith.constant 0 : index
+  %c128 = arith.constant 128 : index
+  // CHECK-NOT: stream.timepoint.await
+  %r0 = stream.timepoint.await %fence => %source : !stream.resource<external>{%c128}
+  // CHECK-NOT: stream.timepoint.barrier
+  %r1, %r1t = stream.timepoint.barrier %r0 : !stream.resource<external>{%c128} => !stream.timepoint
+  // CHECK: return %[[SOURCE]], %[[FENCE]]
+  return %r1, %r1t : !stream.resource<external>, !stream.timepoint
+}
+
+// -----
+
+// CHECK-LABEL: @ElideImmediateHostAwaits
+func.func @ElideImmediateHostAwaits(%arg0: !stream.resource<staging>) -> !stream.resource<staging> {
   %c100 = arith.constant 100 : index
   // CHECK-NOT: stream.timepoint.immediate
   %0 = stream.timepoint.immediate => !stream.timepoint
@@ -165,6 +180,32 @@ func.func @GroupAwaitsByTimepoint(
   %2:2 = stream.timepoint.await %arg0 => %arg3, %arg4 : !stream.resource<*>{%c102}, !stream.resource<*>{%c103}
   // CHECK-NEXT: return %[[RET]]#0, %[[RET]]#1, %[[RET]]#2, %[[RET]]#3
   return %0, %1, %2#0, %2#1 : !stream.resource<*>, !stream.resource<*>, !stream.resource<*>, !stream.resource<*>
+}
+
+// -----
+
+// Tests that the pattern doesn't kick in when it would be unsafe to group the
+// awaits due to operand dependencies.
+
+func.func private @materializeResource0() -> !stream.resource<*>
+func.func private @materializeResource1(!stream.resource<*>) -> !stream.resource<*>
+
+// CHECK-LABEL: @GroupAwaitsByTimepointUnsafe
+func.func @GroupAwaitsByTimepointUnsafe(
+  %arg0: !stream.timepoint
+) -> (!stream.resource<*>, !stream.resource<*>) {
+  %c100 = arith.constant 100 : index
+  %c101 = arith.constant 101 : index
+  // CHECK: call @materializeResource0
+  %r0a = call @materializeResource0() : () -> !stream.resource<*>
+  // CHECK-NEXT: stream.timepoint.await
+  %r0b = stream.timepoint.await %arg0 => %r0a : !stream.resource<*>{%c100}
+  // CHECK-NEXT: call @materializeResource1
+  %r1a = call @materializeResource1(%r0b) : (!stream.resource<*>) -> !stream.resource<*>
+  // CHECK-NEXT: stream.timepoint.await
+  %r1b = stream.timepoint.await %arg0 => %r1a : !stream.resource<*>{%c101}
+  // CHECK-NEXT: return
+  return %r0b, %r1b : !stream.resource<*>, !stream.resource<*>
 }
 
 // -----

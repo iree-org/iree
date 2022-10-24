@@ -11,6 +11,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/GPU/TransformOps/GPUTransformOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -66,19 +67,19 @@ transform_dialect::MapNestedForeachThreadToGpuThreads::applyToOne(
       extractFromI64ArrayAttr(getWorkgroupSize());
   // TODO: no magic constant but IREE uses this extensively.
   workgroupSize.resize(/*size=*/3, /*value=*/1);
+
+  auto transformOp = cast<transform::TransformOpInterface>(getOperation());
   SimplePatternRewriter rewriter(target);
-  auto walkResult = mlir::linalg::rewriteMapNestedForeachThreadToGpuThreads(
-      rewriter, target, workgroupSize, true);
-
-  if (walkResult.wasInterrupted())
-    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
-
-  auto newAttr = rewriter.getIndexArrayAttr(workgroupSize);
-  // TODO: should really be: exportOp.setWorkgroupSizeAttr(newAttr);
-  exportOp->setAttr(exportOp.getWorkgroupSizeAttrName(), newAttr);
-
+  DiagnosedSilenceableFailure diag =
+      mlir::transform::gpu::mapNestedForeachToThreadsImpl(
+          rewriter, target, workgroupSize, true, transformOp);
+  if (diag.succeeded()) {
+    auto newAttr = rewriter.getIndexArrayAttr(workgroupSize);
+    // TODO: should really be: exportOp.setWorkgroupSizeAttr(newAttr);
+    exportOp->setAttr(exportOp.getWorkgroupSizeAttrName(), newAttr);
+  }
   results.assign({target});
-  return DiagnosedSilenceableFailure(success());
+  return diag;
 }
 
 //===---------------------------------------------------------------------===//
@@ -127,7 +128,7 @@ static FailureOr<gpu::ThreadIdOp> isThreadIdxxZeroPredicate(scf::IfOp ifOp) {
   auto ULT = arith::CmpIPredicate::ult;
   auto ULE = arith::CmpIPredicate::ule;
   if (auto threadIdOp = pred.getLhs().getDefiningOp<gpu::ThreadIdOp>()) {
-    if (threadIdOp.dimension() != gpu::Dimension::x) return failure();
+    if (threadIdOp.getDimension() != gpu::Dimension::x) return failure();
     if (pred.getPredicate() == EQ && isConstantIntValue(pred.getRhs(), 0))
       return threadIdOp;
     if (pred.getPredicate() == SLE && isConstantIntValue(pred.getRhs(), 0))
@@ -144,7 +145,7 @@ static FailureOr<gpu::ThreadIdOp> isThreadIdxxZeroPredicate(scf::IfOp ifOp) {
   auto UGT = arith::CmpIPredicate::ugt;
   auto UGE = arith::CmpIPredicate::uge;
   if (auto threadIdOp = pred.getRhs().getDefiningOp<gpu::ThreadIdOp>()) {
-    if (threadIdOp.dimension() != gpu::Dimension::x) return failure();
+    if (threadIdOp.getDimension() != gpu::Dimension::x) return failure();
     if (pred.getPredicate() == EQ && isConstantIntValue(pred.getLhs(), 0))
       return threadIdOp;
     if (pred.getPredicate() == SGE && isConstantIntValue(pred.getLhs(), 0))

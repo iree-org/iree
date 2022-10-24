@@ -51,6 +51,7 @@ iree_cc_binary(
     iree::base::internal::flags
     iree::base::tracing
     iree::hal
+    iree::modules::hal::types
     iree::tooling::context_util
     iree::tooling::device_util
     iree::tooling::vm_util_cc
@@ -257,6 +258,7 @@ if(IREE_BUILD_COMPILER)
       iree::compiler::Tools::init_passes_and_dialects
       iree::compiler::Tools::init_targets
       iree::hal
+      iree::modules::hal::types
       iree::tooling::context_util
       iree::tooling::device_util
       iree::tooling::vm_util_cc

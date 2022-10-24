@@ -8,6 +8,8 @@ if(NOT IREE_TARGET_BACKEND_WEBGPU)
   return()
 endif()
 
+iree_add_all_subdirs()
+
 iree_cc_library(
   NAME
     WebGPU

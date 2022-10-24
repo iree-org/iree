@@ -201,13 +201,6 @@ static LogicalResult gpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
   return success();
 }
 
-void transform_dialect::IREEBufferizeOp::getEffects(
-    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::consumesHandle(getTarget(), effects);
-  transform::producesHandle(getResult(), effects);
-  transform::modifiesPayload(effects);
-}
-
 DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
     transform::TransformResults &results, transform::TransformState &state) {
   ArrayRef<Operation *> payload = state.getPayloadOps(getTarget());
@@ -485,12 +478,6 @@ transform_dialect::ForeachThreadToWorkgroupOp::applyToOne(
   return DiagnosedSilenceableFailure(success());
 }
 
-void transform_dialect::ForeachThreadToWorkgroupOp::getEffects(
-    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::consumesHandle(getTarget(), effects);
-  transform::producesHandle(getTransformed(), effects);
-}
-
 //===---------------------------------------------------------------------===//
 // TileToForeachThreadAndWorkgroupCountRegion
 //===---------------------------------------------------------------------===//
@@ -573,6 +560,10 @@ void transform_dialect::TileToForeachThreadAndWorkgroupCountRegion::getEffects(
   transform::onlyReadsHandle(getTileSizes(), effects);
   transform::onlyReadsHandle(getNumThreads(), effects);
   transform::producesHandle(getResults(), effects);
+  effects.emplace_back(MemoryEffects::Read::get(),
+                       transform::PayloadIRResource::get());
+  effects.emplace_back(MemoryEffects::Write::get(),
+                       transform::PayloadIRResource::get());
 }
 
 DiagnosedSilenceableFailure

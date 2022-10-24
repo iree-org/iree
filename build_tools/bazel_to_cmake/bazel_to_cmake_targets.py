@@ -68,46 +68,6 @@ EXPLICIT_TARGET_MAPPING = {
         "MhloDialect",
         "MLIRMhloUtils",
     ],
-    "@mlir-hlo//:hlo_legalize_shape_ops_to_standard": [
-        "tensorflow::external_mhlo_includes",
-        "MhloShapeOpsToStandard",
-    ],
-    "@mlir-hlo//:hlo_legalize_to_arithmetic": [
-        "tensorflow::external_mhlo_includes",
-        "MhloToArithmeticConversion",
-    ],
-    "@mlir-hlo//:hlo_legalize_to_lhlo": [
-        "tensorflow::external_mhlo_includes",
-        "MhloToLhloConversion",
-    ],
-    "@mlir-hlo//:hlo_legalize_to_memref": [
-        "tensorflow::external_mhlo_includes",
-        "MhloToMemrefConversion",
-    ],
-    "@mlir-hlo//:legalize_control_flow": [
-        "tensorflow::external_mhlo_includes",
-        "MhloToStandard",
-    ],
-    "@mlir-hlo//:legalize_einsum_to_dot_general": [
-        "tensorflow::external_mhlo_includes",
-        "MhloPasses",
-    ],
-    "@mlir-hlo//:legalize_gather_to_torch_index_select": [
-        "tensorflow::external_mhlo_includes",
-        "MhloPasses",
-    ],
-    "@mlir-hlo//:legalize_shape_computations": [
-        "tensorflow::external_mhlo_includes",
-        "MhloPasses",
-    ],
-    "@mlir-hlo//:legalize_to_linalg": [
-        "tensorflow::external_mhlo_includes",
-        "MhloToLinalg",
-    ],
-    "@mlir-hlo//:legalize_to_standard": [
-        "tensorflow::external_mhlo_includes",
-        "MhloToStandard",
-    ],
     "@mlir-hlo//:map_chlo_to_hlo_op": [
         "ChloOps",
         "MhloDialect",
@@ -121,23 +81,23 @@ EXPLICIT_TARGET_MAPPING = {
         "tensorflow::external_mhlo_includes",
         "MhloDialect",
     ],
-    "@mlir-hlo//:materialize_broadcasts": [
+    "@mlir-hlo//:mhlo_passes": [
         "tensorflow::external_mhlo_includes",
         "MhloPasses",
-    ],
-    "@mlir-hlo//:mhlo_control_flow_to_scf": [
-        "tensorflow::external_mhlo_includes",
+        "MhloShapeOpsToStandard",
+        "MhloToArithmeticConversion",
+        "MhloToLhloConversion",
+        "MhloToLinalg",
+        "MhloToMemrefConversion",
         "MhloToStandard",
-    ],
-    "@mlir-hlo//:mhlo_to_mhlo_lowering_patterns": [
-        "tensorflow::external_mhlo_includes",
-        "MhloPasses",
+        "StablehloToMhlo",
     ],
     "@mlir-hlo//:unfuse_batch_norm": [
         "tensorflow::external_mhlo_includes",
         "MhloPasses",
     ],
     "@mlir-hlo//stablehlo:chlo_ops": ["ChloOps",],
+    "@mlir-hlo//:stablehlo_legalize_to_hlo_pass": ["StablehloToMhlo",],
     "@mlir-hlo//stablehlo:broadcast_utils": ["StablehloBroadcastUtils",],
 
     # Torch-MLIR.

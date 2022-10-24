@@ -21,6 +21,7 @@ __all__ = [
     "DEFAULT_TESTING_BACKENDS",
     "compile_file",
     "compile_str",
+    "query_available_targets",
     "CompilerOptions",
     "InputType",
     "OutputFormat",
@@ -159,12 +160,12 @@ def build_compile_command_line(input_file: str, tfs: TempFileSaver,
   Returns:
     List of strings of command line.
   """
-  iree_translate = find_tool("iree-compile")
+  iree_compile = find_tool("iree-compile")
   if not options.target_backends:
     raise ValueError("Expected a non-empty list for 'target_backends'")
 
   cl = [
-      iree_translate,
+      iree_compile,
       input_file,
       f"--iree-input-type={options.input_type.value}",
       f"--iree-vm-bytecode-module-output-format={options.output_format.value}",
@@ -283,3 +284,16 @@ def compile_str(input_str: Union[str, bytes], **kwargs):
       with open(retained_output_file, "wb") as f:
         f.write(result)
     return result
+
+
+def query_available_targets():
+  """Returns a collection of target names that are registered."""
+  iree_compile = find_tool("iree-compile")
+  cl = [iree_compile, "--iree-hal-list-target-backends"]
+  result = invoke_immediate(cl).decode("utf-8")
+
+  target_backends = result.split("\n")[1:]
+  target_backends = [target.strip() for target in target_backends]
+  target_backends = [target for target in target_backends if target]
+
+  return target_backends

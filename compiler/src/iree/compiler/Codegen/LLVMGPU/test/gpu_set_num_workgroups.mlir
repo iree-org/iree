@@ -16,7 +16,7 @@ hal.executable @add_dispatch_0 {
       %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:16384xf32>
       %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:16384xf32>
       %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:16384xf32>
-      %3 = linalg.init_tensor [16384] : tensor<16384xf32>
+      %3 = tensor.empty() : tensor<16384xf32>
       %4 = flow.dispatch.tensor.load %0, offsets=[0], sizes=[16384], strides=[1] : !flow.dispatch.tensor<readonly:16384xf32> -> tensor<16384xf32>
       %5 = flow.dispatch.tensor.load %1, offsets=[0], sizes=[16384], strides=[1] : !flow.dispatch.tensor<readonly:16384xf32> -> tensor<16384xf32>
       %6 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%4, %5 : tensor<16384xf32>, tensor<16384xf32>) outs(%3 : tensor<16384xf32>) {
@@ -139,7 +139,7 @@ hal.executable private @reduction_aligned2 {
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:4x128x384xf32>
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:128x384xf32>
         %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [4, 128, 384], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:4x128x384xf32> -> tensor<4x128x384xf32>
-        %3 = linalg.init_tensor [128, 384] : tensor<128x384xf32>
+        %3 = tensor.empty() : tensor<128x384xf32>
         %4 = linalg.fill ins(%cst : f32) outs(%3 : tensor<128x384xf32>) -> tensor<128x384xf32>
         %5 = linalg.generic {
           indexing_maps = [affine_map<(d0, d1, d2) -> (d2, d0, d1)>,
@@ -308,7 +308,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb">
           : !flow.dispatch.tensor<readonly:128x256xf32> -> tensor<128x256xf32>
       %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [256, 1024], strides = [1, 1]
           : !flow.dispatch.tensor<readonly:256x1024xf32> -> tensor<256x1024xf32>
-      %15 = linalg.init_tensor [128, 1024] : tensor<128x1024xf32>
+      %15 = tensor.empty() : tensor<128x1024xf32>
       %16 = linalg.fill ins(%cst : f32) outs(%15 : tensor<128x1024xf32>) -> tensor<128x1024xf32>
       %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup", compilation_info = #compilation}
           ins(%3, %4 : tensor<128x256xf32>, tensor<256x1024xf32>) outs(%16 : tensor<128x1024xf32>) -> tensor<128x1024xf32>

@@ -33,7 +33,7 @@ struct ThreadIdOpInterface
     : public ProcessorIDInterface::ExternalModel<ThreadIdOpInterface,
                                                  gpu::ThreadIdOp> {
   unsigned getDimIndex(Operation *op) const {
-    return dimToIndex(cast<gpu::ThreadIdOp>(op).dimension());
+    return dimToIndex(cast<gpu::ThreadIdOp>(op).getDimension());
   }
 };
 
@@ -41,7 +41,7 @@ struct BlockDimOpInterface
     : public ProcessorCountInterface::ExternalModel<BlockDimOpInterface,
                                                     gpu::BlockDimOp> {
   unsigned getDimIndex(Operation *op) const {
-    return dimToIndex(cast<gpu::BlockDimOp>(op).dimension());
+    return dimToIndex(cast<gpu::BlockDimOp>(op).getDimension());
   }
 };
 

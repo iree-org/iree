@@ -7,6 +7,9 @@
 #ifndef IREE_BASE_INTERNAL_FILE_IO_H_
 #define IREE_BASE_INTERNAL_FILE_IO_H_
 
+#include <stdint.h>
+#include <stdio.h>
+
 #include "iree/base/api.h"
 
 #ifdef __cplusplus
@@ -19,6 +22,12 @@ extern "C" {
 // indicate that attempts to read or write the file will succeed.
 // Returns IREE_STATUS_NOT_FOUND if the file does not exist.
 iree_status_t iree_file_exists(const char* path);
+
+// Returns the remaining length of |file| in bytes from the current position.
+iree_status_t iree_file_query_length(FILE* file, uint64_t* out_length);
+
+// Returns true if |file| position is at |position|.
+bool iree_file_is_at(FILE* file, uint64_t position);
 
 // Loaded file contents.
 typedef struct iree_file_contents_t {

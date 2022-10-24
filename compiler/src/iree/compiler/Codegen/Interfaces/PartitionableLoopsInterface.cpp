@@ -208,7 +208,9 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
                             IREE::LinalgExt::IREELinalgExtDialect *dialect) {
     IREE::LinalgExt::FftOp::attachInterface<FftOpPartitionableLoops>(*ctx);
     IREE::LinalgExt::PackOp::attachInterface<
-        NoPartitionableLoops<IREE::LinalgExt::PackOp>>(*ctx);
+        OuterParallelAsPartitionableLoops<IREE::LinalgExt::PackOp>>(*ctx);
+    IREE::LinalgExt::UnPackOp::attachInterface<
+        NoPartitionableLoops<IREE::LinalgExt::UnPackOp>>(*ctx);
     IREE::LinalgExt::ScanOp::attachInterface<
         AllParallelAsPartitionableLoops<IREE::LinalgExt::ScanOp>>(*ctx);
     IREE::LinalgExt::ScatterOp::attachInterface<

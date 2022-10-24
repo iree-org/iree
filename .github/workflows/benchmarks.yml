@@ -37,6 +37,16 @@ on:
       tf-binaries-gcs-artifact:
         required: true
         type: string
+    outputs:
+      benchmarks-dir:
+        description: "Benchmarks directory"
+        value: ${{ jobs.build_suites.outputs.benchmarks-dir }}
+      benchmarks-archive:
+        description: "Benchmarks archive tarball"
+        value: ${{ jobs.build_suites.outputs.benchmarks-archive }}
+      benchmarks-gcs-artifact:
+        description: "Benchmarks GCS artifact"
+        value: ${{ jobs.build_suites.outputs.benchmarks-gcs-artifact }}
 
 env:
   # This duplicates the variable from ci.yml. The variable needs to be in env
@@ -61,11 +71,15 @@ jobs:
       TF_BINARIES_DIR: ${{ inputs.tf-binaries-dir }}
       TF_BINARIES_ARCHIVE: ${{ inputs.tf-binaries-archive }}
       TF_BINARIES_GCS_ARTIFACT: ${{ inputs.tf-binaries-gcs-artifact }}
+    outputs:
+      benchmarks-dir: ${{ steps.build.outputs.benchmarks-dir }}
+      benchmarks-archive: ${{ steps.archive.outputs.benchmarks-archive }}
+      benchmarks-gcs-artifact: ${{ steps.upload.outputs.benchmarks-gcs-artifact }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
-        with:
-          submodules: true
+      - name: "Checking out runtime submodules"
+        run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Downloading build dir archive"
         run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting install from build dir archive"
@@ -75,12 +89,34 @@ jobs:
       - name: "Extracting TF binaries archive"
         run: tar -xf "${TF_BINARIES_ARCHIVE}"
       - name: "Building benchmarks"
+        id: build
+        env:
+          BENCHMARKS_OUTPUT_DIR: build-benchmarks
         run: |
           build_tools/github_actions/docker_run.sh \
             --env "IREE_TF_BINARIES_DIR=${TF_BINARIES_DIR}" \
             --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
+            --env "BUILD_BENCHMARKS_DIR=${BENCHMARKS_OUTPUT_DIR}" \
             gcr.io/iree-oss/base@sha256:5d43683c6b50aebe1fca6c85f2012f3b0fa153bf4dd268e8767b619b1891423a \
             build_tools/cmake/build_benchmarks.sh
+          echo "::set-output name=benchmarks-dir::${BENCHMARKS_OUTPUT_DIR}"
+      - name: "Creating archive of benchmarks"
+        id: archive
+        env:
+          BENCHMARKS_ARCHIVE: benchmarks.tar
+          BENCHMARKS_DIR: ${{ steps.build.outputs.benchmarks-dir }}
+        run: |
+          tar --exclude '*.tflite' --exclude '*.mlir' -czf \
+            "${BENCHMARKS_ARCHIVE}" "${BENCHMARKS_DIR}/benchmark_suites"
+          echo "::set-output name=benchmarks-archive::${BENCHMARKS_ARCHIVE}"
+      - name: "Uploading benchmarks archive"
+        id: upload
+        env:
+          BENCHMARKS_ARCHIVE: ${{ steps.archive.outputs.benchmarks-archive }}
+          BENCHMARKS_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.benchmarks-archive }}
+        run: |
+          gcloud alpha storage cp "${BENCHMARKS_ARCHIVE}" "${BENCHMARKS_GCS_ARTIFACT}"
+          echo "::set-output name=benchmarks-gcs-artifact::${BENCHMARKS_GCS_ARTIFACT}"
 
   build_tools:
     runs-on:
@@ -108,8 +144,8 @@ jobs:
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
-        with:
-          submodules: true
+      - name: "Checking out runtime submodules"
+        run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Downloading build dir archive"
         run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting host binaries"

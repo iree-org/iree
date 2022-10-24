@@ -46,6 +46,26 @@ IREE_API_EXPORT iree_status_t iree_hal_fence_create(
   return iree_ok_status();
 }
 
+IREE_API_EXPORT iree_status_t iree_hal_fence_create_at(
+    iree_hal_semaphore_t* semaphore, uint64_t value,
+    iree_allocator_t host_allocator, iree_hal_fence_t** out_fence) {
+  IREE_ASSERT_ARGUMENT(semaphore);
+  IREE_ASSERT_ARGUMENT(out_fence);
+  *out_fence = NULL;
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_hal_fence_t* fence = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_fence_create(1, host_allocator, &fence));
+  iree_status_t status = iree_hal_fence_insert(fence, semaphore, value);
+  if (iree_status_is_ok(status)) {
+    *out_fence = fence;
+  } else {
+    iree_hal_fence_release(fence);
+  }
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 // TODO(benvanik): actually join efficiently. Today we just create a fence that
 // can hold the worst-case sum of all fence timepoints and then insert but it
 // could be made much better. In most cases the joined fences have a near

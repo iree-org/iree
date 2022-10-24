@@ -12,28 +12,16 @@ from dataclasses import dataclass
 from typing import List, Optional, Sequence
 import os
 import pathlib
-import string
 import urllib.parse
 
 from e2e_test_framework.definitions import common_definitions, iree_definitions
-
-
-def read_template_from_file(template_path: pathlib.Path) -> string.Template:
-  return string.Template(template_path.read_text())
-
-
-TEMPLATE_DIR = pathlib.Path(__file__).parent
-DOWNLOAD_ARTIFACT_CMAKE_TEMPLATE = read_template_from_file(
-    TEMPLATE_DIR / "iree_download_artifact_template.cmake")
-TFLITE_IMPORT_CMAKE_TEMPLATE = read_template_from_file(
-    TEMPLATE_DIR / "iree_tflite_import_template.cmake")
-TF_IMPORT_CMAKE_TEMPLATE = read_template_from_file(
-    TEMPLATE_DIR / "iree_tf_import_template.cmake")
-IREE_BYTECODE_MODULE_CMAKE_TEMPLATE = read_template_from_file(
-    TEMPLATE_DIR / "iree_bytecode_module_template.cmake")
+import cmake_builder.rules
 
 # Archive extensions used to pack models.
 ARCHIVE_FILE_EXTENSIONS = [".tar", ".gz"]
+
+# CMake variable name to store IREE package name.
+PACKAGE_NAME_CMAKE_VARIABLE = "_PACKAGE_NAME"
 
 
 @dataclass
@@ -58,6 +46,13 @@ class IreeModuleCompileRule(object):
   target_name: str
   output_module_path: str
   cmake_rule: str
+
+
+def _build_target_path(target_name: str):
+  """Returns the full target path by combining the variable of package name and
+  the target name.
+  """
+  return f"${{{PACKAGE_NAME_CMAKE_VARIABLE}}}_{target_name}"
 
 
 class CommonRuleFactory(object):
@@ -93,10 +88,12 @@ class CommonRuleFactory(object):
     model_path = f"{self._model_artifacts_dir}/{model.id}_{model.name}{model_ext}"
 
     if model_url.scheme == "https":
-      cmake_rule = DOWNLOAD_ARTIFACT_CMAKE_TEMPLATE.substitute(
-          __TARGET_NAME=target_name,
-          __OUTPUT_PATH=model_path,
-          __SOURCE_URL=model.source_url)
+      cmake_rule = (f'# Fetch the model from "{model.source_url}"\n' +
+                    cmake_builder.rules.build_iree_fetch_artifact(
+                        target_name=target_name,
+                        source_url=model.source_url,
+                        output=model_path,
+                        unpack=True))
     else:
       raise ValueError("Unsupported model url: {model.source_url}.")
 
@@ -128,62 +125,67 @@ class IreeRuleFactory(object):
 
   def add_import_model_rule(
       self,
-      model_id: str,
-      model_name: str,
-      model_source_type: common_definitions.ModelSourceType,
-      model_entry_function: str,
+      imported_model: iree_definitions.ImportedModel,
       source_model_rule: ModelRule,
   ) -> IreeModelImportRule:
     """Adds a rule to fetch the model and import into MLIR. Reuses the rule when
     possible."""
 
-    if model_id in self._import_model_rules:
-      return self._import_model_rules[model_id]
+    model = imported_model.model
+    if model.id in self._import_model_rules:
+      return self._import_model_rules[model.id]
 
     # If the source model is MLIR, no import rule is needed.
-    if model_source_type == common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR:
+    if model.source_type == common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR:
       import_model_rule = IreeModelImportRule(
           target_name=source_model_rule.target_name,
-          model_id=model_id,
-          model_name=model_name,
+          model_id=model.id,
+          model_name=model.name,
           output_file_path=source_model_rule.file_path,
-          mlir_dialect_type="linalg",
+          mlir_dialect_type=imported_model.dialect_type.value,
           cmake_rule=None)
-      self._import_model_rules[model_id] = import_model_rule
+      self._import_model_rules[model.id] = import_model_rule
       return import_model_rule
 
     # Import target: <package_name>_iree-import-model-<model_id>
-    target_name = f"iree-import-model-{model_id}"
+    target_name = f"iree-import-model-{model.id}"
 
     # Imported MLIR path: <iree_artifacts_dir>/<model_id>_<model_name>/<model_name>.mlir
-    output_file_path = f"{self._iree_artifacts_dir}/{model_id}_{model_name}/{model_name}.mlir"
+    output_file_path = f"{self._iree_artifacts_dir}/{model.id}_{model.name}/{model.name}.mlir"
 
-    if model_source_type == common_definitions.ModelSourceType.EXPORTED_TFLITE:
-      cmake_rule = TFLITE_IMPORT_CMAKE_TEMPLATE.substitute(
-          __TARGET_NAME=target_name,
-          __SOURCE_MODEL_PATH=source_model_rule.file_path,
-          __OUTPUT_PATH=output_file_path)
-      mlir_dialect_type = "tosa"
-    elif model_source_type == common_definitions.ModelSourceType.EXPORTED_TF:
-      cmake_rule = TF_IMPORT_CMAKE_TEMPLATE.substitute(
-          __TARGET_NAME=target_name,
-          __SOURCE_MODEL_PATH=source_model_rule.file_path,
-          __ENTRY_FUNCTION=model_entry_function,
-          __OUTPUT_PATH=output_file_path)
-      mlir_dialect_type = "mhlo"
+    if model.source_type == common_definitions.ModelSourceType.EXPORTED_TFLITE:
+      cmake_rule = (
+          f'# Import the TFLite model "{source_model_rule.file_path}"\n' +
+          cmake_builder.rules.build_iree_import_tflite_model(
+              target_path=_build_target_path(target_name),
+              source=source_model_rule.file_path,
+              output_mlir_file=output_file_path))
+    elif model.source_type == common_definitions.ModelSourceType.EXPORTED_TF:
+      cmake_rule = (
+          f'# Import the Tensorflow model "{source_model_rule.file_path}"\n' +
+          cmake_builder.rules.build_iree_import_tf_model(
+              target_path=_build_target_path(target_name),
+              source=source_model_rule.file_path,
+              entry_function=model.entry_function,
+              output_mlir_file=output_file_path))
     else:
       raise ValueError(
-          f"Unsupported source type '{model_source_type}' of the model '{model_id}'."
+          f"Unsupported source type '{model.source_type}' of the model '{model.id}'."
       )
 
-    import_model_rule = IreeModelImportRule(target_name=target_name,
-                                            model_id=model_id,
-                                            model_name=model_name,
-                                            output_file_path=output_file_path,
-                                            mlir_dialect_type=mlir_dialect_type,
-                                            cmake_rule=cmake_rule)
+    cmake_builder.rules.build_add_dependencies(
+        target="iree-benchmark-import-models",
+        deps=[_build_target_path(target_name)])
 
-    self._import_model_rules[model_id] = import_model_rule
+    import_model_rule = IreeModelImportRule(
+        target_name=target_name,
+        model_id=model.id,
+        model_name=model.name,
+        output_file_path=output_file_path,
+        mlir_dialect_type=imported_model.dialect_type.value,
+        cmake_rule=cmake_rule)
+
+    self._import_model_rules[model.id] = import_model_rule
     return import_model_rule
 
   def add_compile_module_rule(self,
@@ -212,12 +214,14 @@ class IreeRuleFactory(object):
         mlir_dialect_type=model_import_rule.mlir_dialect_type
     ) + compile_config.extra_flags
 
-    cmake_rule = IREE_BYTECODE_MODULE_CMAKE_TEMPLATE.substitute(
-        __TARGET_NAME=target_name,
-        __MODULE_OUTPUT_PATH=output_path,
-        __SOURCE_MODEL_PATH=model_import_rule.output_file_path,
-        __COMPILE_FLAGS=";".join(compile_flags),
-        __SOURCE_MODEL_TARGET=model_import_rule.target_name)
+    cmake_rule = (f'# Compile the module "{output_path}"\n' +
+                  cmake_builder.rules.build_iree_bytecode_module(
+                      target_name=target_name,
+                      src=model_import_rule.output_file_path,
+                      module_name=output_path,
+                      flags=compile_flags))
+    cmake_rule += cmake_builder.rules.build_add_dependencies(
+        target="iree-benchmark-suites", deps=[_build_target_path(target_name)])
     compile_module_rule = IreeModuleCompileRule(target_name=target_name,
                                                 output_module_path=output_path,
                                                 cmake_rule=cmake_rule)
@@ -257,29 +261,63 @@ class IreeRuleFactory(object):
     arch_info: common_definitions.ArchitectureInfo = target.target_architecture.value
     if arch_info.architecture == "x86_64":
       flags = [
-          f"--iree-llvm-target-triple=x86_64-unknown-{target.target_platform.value}",
+          f"--iree-llvm-target-triple=x86_64-unknown-{target.target_abi.value}",
           f"--iree-llvm-target-cpu={arch_info.microarchitecture.lower()}"
       ]
+    elif arch_info.architecture == "rv64":
+      flags = [
+          f"--iree-llvm-target-triple=riscv64-pc-{target.target_abi.value}",
+          "--iree-llvm-target-cpu=generic-rv64", "--iree-llvm-target-abi=lp64d",
+          "--iree-llvm-target-cpu-features=+m,+a,+f,+d,+v",
+          "--riscv-v-vector-bits-min=512",
+          "--riscv-v-fixed-length-vector-lmul-max=8"
+      ]
+    elif arch_info.architecture == "rv32":
+      flags = [
+          f"--iree-llvm-target-triple=riscv32-pc-{target.target_abi.value}",
+          "--iree-llvm-target-cpu=generic-rv32", "--iree-llvm-target-abi=ilp32",
+          "--iree-llvm-target-cpu-features=+m,+a,+f,+zvl512b,+zve32x",
+          "--riscv-v-vector-bits-min=512",
+          "--riscv-v-fixed-length-vector-lmul-max=8"
+      ]
+    elif arch_info.architecture == "adreno":
+      flags = [
+          f"--iree-vulkan-target-triple=adreno-unknown-{target.target_abi.value}",
+      ]
+    elif arch_info.architecture == "mali":
+      flags = [
+          f"--iree-vulkan-target-triple=valhall-unknown-{target.target_abi.value}",
+      ]
+    elif arch_info.architecture == "armv8.2-a":
+      flags = [
+          f"--iree-llvm-target-triple=aarch64-none-{target.target_abi.value}",
+      ]
+    elif arch_info.architecture == "cuda":
+      if target.target_abi != iree_definitions.TargetABI.LINUX_GNU:
+        raise ValueError(
+            f"Unsupported target ABI for CUDA backend: `{target.target_abi}`")
+      flags = [
+          f"--iree-hal-cuda-llvm-target-arch=sm_80",
+      ]
+    elif arch_info.architecture == "vmvx":
+      flags = []
     else:
-      raise ValueError(f"Unsupported architecture '{arch_info.architecture}'")
+      raise ValueError(f"Unsupported architecture: '{arch_info.architecture}'")
     return flags
 
 
 def _generate_iree_rules(
     common_rule_factory: CommonRuleFactory, iree_artifacts_dir: str,
-    model_compile_configs: Sequence[iree_definitions.ModelCompileConfig]
+    module_generation_configs: Sequence[iree_definitions.ModuleGenerationConfig]
 ) -> List[str]:
   iree_rule_factory = IreeRuleFactory(iree_artifacts_dir)
-  for model_compile_config in model_compile_configs:
-    model = model_compile_config.model
-    compile_config = model_compile_config.compile_config
+  for module_generation_config in module_generation_configs:
+    model = module_generation_config.imported_model.model
+    compile_config = module_generation_config.compile_config
 
     source_model_rule = common_rule_factory.add_model_rule(model)
     import_rule = iree_rule_factory.add_import_model_rule(
-        model_id=model.id,
-        model_name=model.name,
-        model_source_type=model.source_type,
-        model_entry_function=model.entry_function,
+        imported_model=module_generation_config.imported_model,
         source_model_rule=source_model_rule)
     iree_rule_factory.add_compile_module_rule(compile_config=compile_config,
                                               model_import_rule=import_rule)
@@ -289,7 +327,8 @@ def _generate_iree_rules(
 
 def generate_rules(
     model_artifacts_dir: str, iree_artifacts_dir: str,
-    iree_model_compile_configs: Sequence[iree_definitions.ModelCompileConfig]
+    iree_module_generation_configs: Sequence[
+        iree_definitions.ModuleGenerationConfig]
 ) -> List[str]:
   """Generates cmake rules to build benchmarks.
   
@@ -298,13 +337,13 @@ def generate_rules(
       variable syntax in the path.
     iree_artifacts_dir: root directory to store generated IREE artifacts. Can
       contain CMake variable syntax in the path.
-    iree_model_compile_configs: compile configs for IREE targets.
+    iree_module_generation_configs: compile configs for IREE targets.
   Returns:
     List of CMake rules.
   """
   common_rule_factory = CommonRuleFactory(model_artifacts_dir)
   iree_rules = _generate_iree_rules(common_rule_factory, iree_artifacts_dir,
-                                    iree_model_compile_configs)
+                                    iree_module_generation_configs)
   # Currently the rules are simple so the common rules can be always put at the
   # top. Need a topological sort once the dependency gets complicated.
   return common_rule_factory.generate_cmake_rules() + iree_rules

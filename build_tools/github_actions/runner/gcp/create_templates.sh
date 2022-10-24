@@ -43,8 +43,8 @@ SHORT_REF="${TEMPLATE_CONFIG_REF:0:10}"
 VERSION="${SHORT_REF}-${TIME_STRING}"
 STARTUP_SCRIPT_PATH="/tmp/startup_script.${SHORT_REF}.sh"
 GITHUB_RUNNER_SCOPE=iree-org
-GITHUB_RUNNER_VERSION="2.296.2"
-GITHUB_RUNNER_ARCHIVE_DIGEST="34a8f34956cdacd2156d4c658cce8dd54c5aef316a16bbbc95eb3ca4fd76429a"
+GITHUB_RUNNER_VERSION="2.298.2"
+GITHUB_RUNNER_ARCHIVE_DIGEST="0bfd792196ce0ec6f1c65d2a9ad00215b2926ef2c416b8d97615265194477117"
 GITHUB_TOKEN_PROXY_URL="https://ght-proxy-zbhz5clunq-ue.a.run.app"
 
 declare -a METADATA=(
@@ -95,7 +95,7 @@ function create_template() {
     "${METADATA[@]}"
     "github-runner-group=${group}"
     "github-runner-trust=${trust}"
-    "github-runner-labels=${type}"
+    "github-runner-type=${type}"
   )
 
   # Join on commas

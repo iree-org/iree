@@ -143,10 +143,10 @@ computeParallelTopk(Location loc, PatternRewriter &rewriter,
           rewriter.create<tensor::DimOp>(loc, valuesExpanded, i));
     }
   }
-  Value initTensorOutputValues = rewriter.create<mlir::linalg::InitTensorOp>(
-      loc, dynSizes, outputValuesExpandedType.getShape(), valueElementType);
-  Value initTensorOutputIndices = rewriter.create<mlir::linalg::InitTensorOp>(
-      loc, dynSizes, outputIndicesExpandedType.getShape(), indicesElementType);
+  Value emptyTensorOutputValues = rewriter.create<mlir::tensor::EmptyOp>(
+      loc, outputValuesExpandedType.getShape(), valueElementType, dynSizes);
+  Value emptyTensorOutputIndices = rewriter.create<mlir::tensor::EmptyOp>(
+      loc, outputIndicesExpandedType.getShape(), indicesElementType, dynSizes);
 
   // Initialize indices to positive infinity and values to negative infinity
   // for a top (maxk) comparison.
@@ -165,10 +165,10 @@ computeParallelTopk(Location loc, PatternRewriter &rewriter,
       rewriter.getIntegerAttr(indicesElementType, APInt::getSignedMaxValue(32));
   Value posInf = rewriter.create<arith::ConstantOp>(loc, posInfAttr);
   Value negInfTensor =
-      rewriter.create<linalg::FillOp>(loc, negInf, initTensorOutputValues)
+      rewriter.create<linalg::FillOp>(loc, negInf, emptyTensorOutputValues)
           .result();
   Value posInfTensor =
-      rewriter.create<linalg::FillOp>(loc, posInf, initTensorOutputIndices)
+      rewriter.create<linalg::FillOp>(loc, posInf, emptyTensorOutputIndices)
           .result();
 
   SmallVector<Type> parallelTopkResultTypes = {outputValuesExpandedType,
@@ -288,7 +288,7 @@ struct TopkOpSplitReduction : public OpRewritePattern<TopkOp> {
   using OpRewritePattern::OpRewritePattern;
 
   TopkOpSplitReduction(MLIRContext *context, TopkSplitReductionControlFn fn,
-                       linalg::LinalgTransformationFilter filt)
+                       LinalgTransformationFilter filt)
       : OpRewritePattern<TopkOp>(context), splitReductionFn(std::move(fn)),
         filter(std::move(filt)) {}
 
@@ -362,7 +362,7 @@ struct TopkOpSplitReduction : public OpRewritePattern<TopkOp> {
 
 private:
   TopkSplitReductionControlFn splitReductionFn;
-  mlir::linalg::LinalgTransformationFilter filter;
+  LinalgTransformationFilter filter;
 };
 
 } // namespace
@@ -398,7 +398,7 @@ struct TopkSplitReductionPass
 
     patterns.add<TopkOpSplitReduction>(
         patterns.getContext(), splitReductionFn,
-        mlir::linalg::LinalgTransformationFilter(
+        LinalgTransformationFilter(
             ArrayRef<StringAttr>{},
             StringAttr::get(patterns.getContext(), "SPLIT_REDUCTION")));
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
@@ -409,7 +409,7 @@ struct TopkSplitReductionPass
     // Remove all the markers at the end.
     auto funcOp = getOperation();
     funcOp->walk([&](TopkOp op) {
-      op->removeAttr(linalg::LinalgTransforms::kLinalgTransformMarker);
+      op->removeAttr(LinalgTransforms::kLinalgTransformMarker);
       op->removeAttr(kSplitReductionDepthMarker);
     });
   }
@@ -419,7 +419,7 @@ struct TopkSplitReductionPass
 void mlir::iree_compiler::IREE::LinalgExt::populateTopkSplitReductionPattern(
     RewritePatternSet &patterns,
     const TopkSplitReductionControlFn &splitReductionFn,
-    const linalg::LinalgTransformationFilter &f) {
+    const LinalgTransformationFilter &f) {
   patterns.add<TopkOpSplitReduction>(patterns.getContext(), splitReductionFn,
                                      f);
 }

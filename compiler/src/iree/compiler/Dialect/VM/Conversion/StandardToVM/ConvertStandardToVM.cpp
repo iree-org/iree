@@ -125,12 +125,13 @@ class FuncOpConversion : public OpConversionPattern<func::FuncOp> {
     // Note that attributes are dropped. Consider preserving some if needed.
     auto newFuncOp = rewriter.create<IREE::VM::FuncOp>(
         srcOp.getLoc(), srcOp.getName(), *newFuncType);
-    rewriter.inlineRegionBefore(srcOp.getBody(), newFuncOp.getBody(),
+    rewriter.inlineRegionBefore(srcOp.getBody(), newFuncOp.getFunctionBody(),
                                 newFuncOp.end());
 
     // Tell the rewriter to convert the region signature.
     TypeConverter &typeConverter = *getTypeConverter();
-    if (failed(rewriter.convertRegionTypes(&newFuncOp.getBody(), typeConverter,
+    if (failed(rewriter.convertRegionTypes(&newFuncOp.getFunctionBody(),
+                                           typeConverter,
                                            &signatureConversion))) {
       return failure();
     }
@@ -765,19 +766,20 @@ class CastingOpConversion : public OpConversionPattern<StdOp> {
   }
 };
 
-class IndexCastOpConversion : public OpConversionPattern<arith::IndexCastOp> {
-  using OpConversionPattern::OpConversionPattern;
+template <typename OpTy, typename ExtOpTy>
+class IndexCastOpConversion : public OpConversionPattern<OpTy> {
+  using OpConversionPattern<OpTy>::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      arith::IndexCastOp srcOp, OpAdaptor adaptor,
+      OpTy srcOp, typename OpTy::Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto srcType = adaptor.getIn().getType();
-    auto dstType = getTypeConverter()->convertType(srcOp.getResult().getType());
+    auto dstType =
+        this->getTypeConverter()->convertType(srcOp.getResult().getType());
     if (srcType == dstType) {
       rewriter.replaceOp(srcOp, adaptor.getOperands());
     } else if (srcType.getIntOrFloatBitWidth() <
                dstType.getIntOrFloatBitWidth()) {
-      rewriter.replaceOpWithNewOp<arith::ExtUIOp>(srcOp, dstType,
-                                                  adaptor.getIn());
+      rewriter.replaceOpWithNewOp<ExtOpTy>(srcOp, dstType, adaptor.getIn());
     } else {
       rewriter.replaceOpWithNewOp<arith::TruncIOp>(srcOp, dstType,
                                                    adaptor.getIn());
@@ -830,6 +832,9 @@ class SignExtendIOpConversion : public OpConversionPattern<arith::ExtSIOp> {
     if (srcType.isInteger(8) && dstType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::ExtI8I32SOp>(srcOp, dstType,
                                                          adaptor.getIn());
+    } else if (srcType.isInteger(8) && dstType.isInteger(64)) {
+      rewriter.replaceOpWithNewOp<IREE::VM::ExtI8I64SOp>(srcOp, dstType,
+                                                         adaptor.getIn());
     } else if (srcType.isInteger(16) && dstType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::ExtI16I32SOp>(srcOp, dstType,
                                                           adaptor.getIn());
@@ -837,8 +842,6 @@ class SignExtendIOpConversion : public OpConversionPattern<arith::ExtSIOp> {
       rewriter.replaceOpWithNewOp<IREE::VM::ExtI32I64SOp>(srcOp, dstType,
                                                           adaptor.getIn());
     } else {
-      // TODO(benvanik): we should be building a sequence of extensions for
-      // things like i8 -> i64.
       return rewriter.notifyMatchFailure(srcOp, "unsupported sign extension");
     }
     return success();
@@ -1085,9 +1088,10 @@ void populateStandardToVMPatterns(MLIRContext *context,
   patterns.insert<ConstantOpConversion>(context, typeConverter);
 
   patterns.insert<CastingOpConversion<UnrealizedConversionCastOp>,
-                  IndexCastOpConversion, ZeroExtendIOpConversion,
-                  SignExtendIOpConversion, TruncateIOpConversion>(typeConverter,
-                                                                  context);
+                  IndexCastOpConversion<arith::IndexCastOp, arith::ExtSIOp>,
+                  IndexCastOpConversion<arith::IndexCastUIOp, arith::ExtUIOp>,
+                  ZeroExtendIOpConversion, SignExtendIOpConversion,
+                  TruncateIOpConversion>(typeConverter, context);
 
   // Integer arithmetic ops.
   patterns
