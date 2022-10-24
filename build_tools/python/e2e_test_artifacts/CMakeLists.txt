@@ -17,3 +17,6 @@ iree_build_tools_py_test(
   SRC
     "iree_artifacts_test.py"
 )
+
+
+add_subdirectory(cmake_generator)
