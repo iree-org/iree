@@ -8,6 +8,7 @@
 from dataclasses import dataclass
 import collections
 import pathlib
+from typing import Sequence
 import urllib.parse
 
 from e2e_test_framework.definitions import common_definitions
@@ -23,31 +24,20 @@ class ModelArtifact(object):
 
 
 @dataclass(frozen=True)
-class ModelArtifactRoot(object):
+class ModelArtifactsRoot(object):
   # Map of model artifacts, keyed by model id.
   model_artifact_map: collections.OrderedDict[str, ModelArtifact]
 
 
-class ModelArtifactFactory(object):
-  """Creates and collects model artifacts."""
+def generate_model_artifacts_root(
+    parent_path: pathlib.PurePath,
+    models: Sequence[common_definitions.Model]) -> ModelArtifactsRoot:
+  """Generates model directory structure."""
 
-  _parent_path: pathlib.PurePath
-  _model_artifact_map: collections.OrderedDict[str, ModelArtifact]
-
-  def __init__(self, parent_path: pathlib.PurePath):
-    self._parent_path = parent_path
-    self._model_artifact_map = collections.OrderedDict()
-
-  def generate_artifact_root(self) -> ModelArtifactRoot:
-    return ModelArtifactRoot(
-        model_artifact_map=collections.OrderedDict(self._model_artifact_map))
-
-  def create(self, model: common_definitions.Model) -> ModelArtifact:
-    if model.id in self._model_artifact_map:
-      artifact = self._model_artifact_map[model.id]
-      if artifact.model != model:
-        raise ValueError(f"Model mismatched: {model.id}.")
-      return artifact
+  model_artifact_map = collections.OrderedDict()
+  for model in models:
+    if model.id in model_artifact_map:
+      raise ValueError(f"Duplicate model {model.id}.")
 
     model_url = urllib.parse.urlparse(model.source_url)
     # Drop the archive extensions.
@@ -57,7 +47,8 @@ class ModelArtifactFactory(object):
     model_ext = "".join(file_exts)
 
     # Model path: <model_artifacts_root>/<model_id>_<model_name><model_ext>
-    file_path = self._parent_path / f"{model.id}_{model.name}{model_ext}"
-    artifact = ModelArtifact(model=model, file_path=file_path)
-    self._model_artifact_map[model.id] = artifact
-    return artifact
+    file_path = parent_path / f"{model.id}_{model.name}{model_ext}"
+    model_artifact_map[model.id] = ModelArtifact(model=model,
+                                                 file_path=file_path)
+
+  return ModelArtifactsRoot(model_artifact_map=model_artifact_map)

@@ -24,12 +24,12 @@ class ModelRule(object):
 
 def generate_model_rule_map(
     root_path: pathlib.PurePath,
-    artifact_root: common_artifacts.ModelArtifactRoot
+    artifacts_root: common_artifacts.ModelArtifactsRoot
 ) -> collections.OrderedDict[str, ModelRule]:
   """Returns the model rules in an ordered map."""
 
   model_rules = collections.OrderedDict()
-  for model_artifact in artifact_root.model_artifact_map.values():
+  for model_artifact in artifacts_root.model_artifact_map.values():
     model = model_artifact.model
     # Model target: <package_name>-model-<model_id>
     target_name = f"model-{model.id}"

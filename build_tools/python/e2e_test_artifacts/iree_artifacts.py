@@ -17,23 +17,27 @@ from e2e_test_artifacts import common_artifacts
 @dataclass(frozen=True)
 class ModuleDirectory(object):
   """IREE module directory that accommodates the module and related files."""
-  dir_path: pathlib.PurePath
   module_path: pathlib.PurePath
   compile_config: iree_definitions.CompileConfig
 
 
 @dataclass(frozen=True)
+class ImportedModelArtifact(object):
+  """IREE imported model artifact."""
+  imported_model: iree_definitions.ImportedModel
+  file_path: pathlib.PurePath
+
+
+@dataclass(frozen=True)
 class ModelDirectory(object):
   """IREE model directory that accommodates the modules from the same model."""
-  dir_path: pathlib.PurePath
-  imported_model: iree_definitions.ImportedModel
-  imported_model_path: pathlib.PurePath
+  imported_model_artifact: ImportedModelArtifact
   # Map of module directories, keyed by the assoicated compile config id.
   module_dir_map: collections.OrderedDict[str, ModuleDirectory]
 
 
 @dataclass(frozen=True)
-class ArtifactRoot(object):
+class ArtifactsRoot(object):
   # Map of IREE model directories, keyed by model id.
   model_dir_map: collections.OrderedDict[str, ModelDirectory]
 
@@ -59,16 +63,14 @@ def _build_module_directory(
   dir_path = parent_path / compile_config.id
   # Module path: <parent_path>/<compile_config_id>/<model_name>.vmfb
   module_path = dir_path / f"{module_generation_config.imported_model.model.name}.vmfb"
-  return ModuleDirectory(dir_path=dir_path,
-                         module_path=module_path,
-                         compile_config=compile_config)
+  return ModuleDirectory(module_path=module_path, compile_config=compile_config)
 
 
-def generate_artifact_root(
+def generate_artifacts_root(
     parent_path: pathlib.PurePath,
-    model_artifact_factory: common_artifacts.ModelArtifactFactory,
+    model_artifacts_root: common_artifacts.ModelArtifactsRoot,
     module_generation_configs: Sequence[iree_definitions.ModuleGenerationConfig]
-) -> ArtifactRoot:
+) -> ArtifactsRoot:
   """Generates IREE directory structure from module generation configs."""
 
   all_imported_models = collections.OrderedDict(
@@ -91,15 +93,18 @@ def generate_artifact_root(
       module_dir_map[config.compile_config.id] = _build_module_directory(
           parent_path=model_dir_path, module_generation_config=config)
 
+    model_artifact = model_artifacts_root.model_artifact_map.get(model.id)
+    if model_artifact is None:
+      raise ValueError(f"Model artifact {model.id} not found.")
+
     imported_model_path = _get_imported_model_path(
         parent_path=model_dir_path,
         imported_model=imported_model,
-        model_artifact=model_artifact_factory.create(model))
+        model_artifact=model_artifact)
 
     model_dir_map[model.id] = ModelDirectory(
-        dir_path=model_dir_path,
-        imported_model=imported_model,
-        imported_model_path=imported_model_path,
+        imported_model_artifact=ImportedModelArtifact(
+            imported_model=imported_model, file_path=imported_model_path),
         module_dir_map=module_dir_map)
 
-  return ArtifactRoot(model_dir_map=model_dir_map)
+  return ArtifactsRoot(model_dir_map=model_dir_map)

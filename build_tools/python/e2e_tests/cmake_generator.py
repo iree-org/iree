@@ -29,14 +29,15 @@ def __get_iree_run_module_args(
 
 def generate_rules(root_path: pathlib.PurePath) -> List[str]:
   test_configs = benchmark_module_tests.generate_tests()
-  artifact_root = e2e_test_artifacts.artifacts.generate_default_artifact_root()
+  artifacts_root = e2e_test_artifacts.artifacts.generate_default_artifacts_root(
+  )
 
   cmake_rules = []
   for test_config in test_configs:
     generation_config = test_config.module_generation_config
     model = generation_config.imported_model.model
     execution_config = test_config.module_execution_config
-    iree_model_dir = artifact_root.iree_artifact_root.model_dir_map[model.id]
+    iree_model_dir = artifacts_root.iree_artifacts_root.model_dir_map[model.id]
     iree_module_dir = iree_model_dir.module_dir_map[
         generation_config.compile_config.id]
     module_src_path = str(root_path / iree_module_dir.module_path)

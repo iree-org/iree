@@ -30,23 +30,28 @@ class IreeModuleCompileRule(object):
 
 
 class IreeRuleBuilder(object):
+  """Builder to generate IREE CMake rules."""
+
+  _package_name: str
 
   def __init__(self, package_name: str):
     self._package_name = package_name
 
-  def build_iree_model_import_rule(
+  def build_model_import_rule(
       self, source_model_rule: common_generators.ModelRule,
       imported_model: iree_definitions.ImportedModel,
       output_file_path: pathlib.PurePath) -> IreeModelImportRule:
 
     model = imported_model.model
     if model.source_type == common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR:
+      if source_model_rule.file_path != str(output_file_path):
+        raise ValueError("Separate path for Linalg model isn't supported.")
       return IreeModelImportRule(target_name=source_model_rule.target_name,
-                                 output_file_path=source_model_rule.file_path,
+                                 output_file_path=str(output_file_path),
                                  cmake_rules=[])
 
-    # Import target: <package_name>_iree-import-model-<model_id>
-    target_name = f"iree-import-model-{model.id}"
+    # Import target name: iree-imported-model-<model_id>
+    target_name = f"iree-imported-model-{model.id}"
 
     if model.source_type == common_definitions.ModelSourceType.EXPORTED_TFLITE:
       cmake_rules = [
@@ -79,19 +84,19 @@ class IreeRuleBuilder(object):
                                output_file_path=str(output_file_path),
                                cmake_rules=cmake_rules)
 
-  def build_iree_module_compile_rule(
+  def build_module_compile_rule(
       self, model_import_rule: IreeModelImportRule,
       imported_model: iree_definitions.ImportedModel,
       compile_config: iree_definitions.CompileConfig,
       output_file_path: pathlib.PurePath) -> IreeModuleCompileRule:
 
-    # Module target: <package_name>_iree-module-<model_id>-<compile_config_id>
-    target_name = f"iree-module-{imported_model.model.id}-{compile_config.id}"
-
-    mlir_dialect_type = imported_model.dialect_type.value
-    compile_flags = self._generate_iree_compile_flags(
+    compile_flags = self._generate_compile_flags(
         compile_config=compile_config,
-        mlir_dialect_type=mlir_dialect_type) + compile_config.extra_flags
+        mlir_dialect_type=imported_model.dialect_type.value
+    ) + compile_config.extra_flags
+
+    # Module target name: iree-module-<model_id>-<compile_config_id>
+    target_name = f"iree-module-{imported_model.model.id}-{compile_config.id}"
 
     cmake_rules = [
         f'# Compile the module "{output_file_path}"',
@@ -111,9 +116,9 @@ class IreeRuleBuilder(object):
                                  output_module_path=str(output_file_path),
                                  cmake_rules=cmake_rules)
 
-  def _generate_iree_compile_flags(
-      self, compile_config: iree_definitions.CompileConfig,
-      mlir_dialect_type: str) -> List[str]:
+  def _generate_compile_flags(self,
+                              compile_config: iree_definitions.CompileConfig,
+                              mlir_dialect_type: str) -> List[str]:
     if len(compile_config.compile_targets) != 1:
       raise ValueError(f"Only one compile target is supported. Got:"
                        f" {compile_config.compile_targets}")
@@ -123,10 +128,10 @@ class IreeRuleBuilder(object):
         f"--iree-hal-target-backends={compile_target.target_backend.value}",
         f"--iree-input-type={mlir_dialect_type}"
     ]
-    flags.extend(self._generate_iree_compile_target_flags(compile_target))
+    flags.extend(self._generate_compile_target_flags(compile_target))
     return flags
 
-  def _generate_iree_compile_target_flags(
+  def _generate_compile_target_flags(
       self, target: iree_definitions.CompileTarget) -> List[str]:
     arch_info: common_definitions.ArchitectureInfo = target.target_architecture.value
     if arch_info.architecture == "x86_64":
@@ -184,29 +189,30 @@ class IreeRuleBuilder(object):
 
 def generate_rules(
     package_name: str, root_path: pathlib.PurePath,
-    artifact_root: iree_artifacts.ArtifactRoot,
+    artifacts_root: iree_artifacts.ArtifactsRoot,
     model_rule_map: Dict[str, common_generators.ModelRule]) -> List[str]:
   """Generates all rules to build IREE artifacts."""
 
   rule_builder = IreeRuleBuilder(package_name=package_name)
 
-  model_import_rules = []
-  module_compile_rules = []
-  for model_dir in artifact_root.model_dir_map.values():
-    imported_model = model_dir.imported_model
+  cmake_rules = []
+  for model_dir in artifacts_root.model_dir_map.values():
+    imported_model_artifact = model_dir.imported_model_artifact
+    imported_model = imported_model_artifact.imported_model
     model_rule = model_rule_map[imported_model.model.id]
-    model_import_rule = rule_builder.build_iree_model_import_rule(
+
+    model_import_rule = rule_builder.build_model_import_rule(
         source_model_rule=model_rule,
         imported_model=imported_model,
-        output_file_path=root_path / model_dir.imported_model_path)
-    model_import_rules.extend(model_import_rule.cmake_rules)
+        output_file_path=root_path / imported_model_artifact.file_path)
+    cmake_rules.extend(model_import_rule.cmake_rules)
 
     for module_dir in model_dir.module_dir_map.values():
-      module_compile_rule = rule_builder.build_iree_module_compile_rule(
+      module_compile_rule = rule_builder.build_module_compile_rule(
           model_import_rule=model_import_rule,
           imported_model=imported_model,
           compile_config=module_dir.compile_config,
           output_file_path=root_path / module_dir.module_path)
-      module_compile_rules.extend(module_compile_rule.cmake_rules)
+      cmake_rules.extend(module_compile_rule.cmake_rules)
 
-  return model_import_rules + module_compile_rules
+  return cmake_rules

@@ -10,7 +10,8 @@ from typing import Sequence
 import pathlib
 
 from e2e_test_artifacts import common_artifacts, iree_artifacts
-from e2e_test_framework.definitions import iree_definitions
+from e2e_test_framework.models import model_groups
+from e2e_test_framework.definitions import common_definitions, iree_definitions
 import benchmark_suites.iree.benchmark_collections
 
 MODEL_ARTIFACTS_ROOT = pathlib.PurePath("models")
@@ -18,32 +19,32 @@ IREE_ARTIFACTS_ROOT = pathlib.PurePath("iree")
 
 
 @dataclass(frozen=True)
-class ArtifactRoot(object):
+class ArtifactsRoot(object):
   """Root artifact directory."""
-  model_artifact_root: common_artifacts.ModelArtifactRoot
-  iree_artifact_root: iree_artifacts.ArtifactRoot
+  model_artifacts_root: common_artifacts.ModelArtifactsRoot
+  iree_artifacts_root: iree_artifacts.ArtifactsRoot
 
 
-def _generate_artifact_root(
+def _generate_artifacts_root(
+    models: Sequence[common_definitions.Model],
     iree_module_generation_configs: Sequence[
         iree_definitions.ModuleGenerationConfig]
-) -> ArtifactRoot:
+) -> ArtifactsRoot:
   """Generates and unions directory structures from the configs."""
 
-  model_artifact_factory = common_artifacts.ModelArtifactFactory(
-      parent_path=MODEL_ARTIFACTS_ROOT)
+  model_artifacts_root = common_artifacts.generate_model_artifacts_root(
+      parent_path=MODEL_ARTIFACTS_ROOT, models=models)
 
-  iree_artifact_root = iree_artifacts.generate_artifact_root(
+  iree_artifacts_root = iree_artifacts.generate_artifacts_root(
       parent_path=IREE_ARTIFACTS_ROOT,
-      model_artifact_factory=model_artifact_factory,
+      model_artifacts_root=model_artifacts_root,
       module_generation_configs=iree_module_generation_configs)
 
-  return ArtifactRoot(
-      model_artifact_root=model_artifact_factory.generate_artifact_root(),
-      iree_artifact_root=iree_artifact_root)
+  return ArtifactsRoot(model_artifacts_root=model_artifacts_root,
+                       iree_artifacts_root=iree_artifacts_root)
 
 
-def generate_default_artifact_root() -> ArtifactRoot:
+def generate_default_artifacts_root() -> ArtifactsRoot:
   """Generates artifacts from all configs."""
 
   (iree_benchmark_module_generation_configs,
@@ -53,5 +54,6 @@ def generate_default_artifact_root() -> ArtifactRoot:
       set(iree_benchmark_module_generation_configs))
   iree_module_generation_configs.sort(key=lambda config: config.get_id())
 
-  return _generate_artifact_root(
+  return _generate_artifacts_root(
+      models=model_groups.ALL,
       iree_module_generation_configs=iree_module_generation_configs)

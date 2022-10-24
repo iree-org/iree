@@ -38,11 +38,11 @@ def parse_arguments():
 
 
 def main(args: argparse.Namespace):
-  artifact_root = e2e_test_artifacts.artifacts.generate_default_artifact_root()
+  artifacts_root = e2e_test_artifacts.artifacts.generate_default_artifacts_root()
   cmake_rules = e2e_test_artifacts.cmake_generator.generator.generate_rules(
       package_name=f"${{{PACKAGE_NAME_CMAKE_VARIABLE}}}",
       root_path=pathlib.PurePath(f"${{{ROOT_ARTIFACTS_DIR_CMAKE_VARIABLE}}}"),
-      artifact_root=artifact_root)
+      artifacts_root=artifacts_root)
 
   cmake_file = GENERATED_BENCHMARK_SUITES_CMAKE_TEMPLATE.substitute(
       __ROOT_ARTIFACTS_DIR_VARIABLE=ROOT_ARTIFACTS_DIR_CMAKE_VARIABLE,
