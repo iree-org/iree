@@ -32,6 +32,15 @@ PartitionSet partitionStreamableOpsReference(
     IREE::Stream::AffinityAttr affinity;
     // Ops present in the partition; ops may be present in multiple partitions.
     SetVector<Operation *> ops;
+    // Ops that were cloned and are known not to have their values escape.
+    DenseSet<Operation *> clonedOps;
+    void insert(Operation *op) {
+      if (auto affinityOp = dyn_cast<IREE::Stream::AffinityOpInterface>(op)) {
+        affinity = affinity ? affinity.joinAND(affinityOp.getAffinity())
+                            : affinityOp.getAffinity();
+      }
+      ops.insert(op);
+    }
   };
   SmallVector<std::unique_ptr<PartitionBuilder>> builders;
   llvm::BitVector usableBuilders;
@@ -109,7 +118,7 @@ PartitionSet partitionStreamableOpsReference(
 
     // Prune candidates that do not have a compatible affinity.
     for (auto ordinal : candidates.set_bits()) {
-      if (!IREE::Stream::AffinityAttr::areCompatible(
+      if (!IREE::Stream::AffinityAttr::canExecuteTogether(
               affinityAttr, builders[ordinal]->affinity)) {
         LLVM_DEBUG(llvm::dbgs()
                    << "Candidate partition " << ordinal << " incompatible\n");
@@ -136,11 +145,13 @@ PartitionSet partitionStreamableOpsReference(
     if (consumers.any()) {
       // If we are a clonable op (like splat) clone us into every partition.
       // Otherwise we just pick the first we find (probably a bad heuristic).
-      if (streamableOp.preferCloneToConsumers()) {
+      if (streamableOp.preferCloneToConsumers() && consumers.count() > 1) {
         for (auto consumerOrdinal : consumers.set_bits()) {
           LLVM_DEBUG(llvm::dbgs() << "Cloning into consumer partition "
                                   << consumerOrdinal << "\n");
-          builders[consumerOrdinal]->ops.insert(&op);
+          auto &consumerBuilder = builders[consumerOrdinal];
+          consumerBuilder->insert(&op);
+          consumerBuilder->clonedOps.insert(&op);
           opInfo.membership.set(consumerOrdinal);
           opInfo.hazards.reset(consumerOrdinal);
         }
@@ -148,7 +159,8 @@ PartitionSet partitionStreamableOpsReference(
         int consumerOrdinal = consumers.find_last();
         LLVM_DEBUG(llvm::dbgs() << "Moving into consumer partition "
                                 << consumerOrdinal << "\n");
-        builders[consumerOrdinal]->ops.insert(&op);
+        auto &consumerBuilder = builders[consumerOrdinal];
+        consumerBuilder->insert(&op);
         opInfo.membership.set(consumerOrdinal);
         opInfo.hazards.reset(consumerOrdinal);
       }
@@ -161,7 +173,7 @@ PartitionSet partitionStreamableOpsReference(
     if (firstCandidateOrdinal != -1) {
       LLVM_DEBUG(llvm::dbgs() << "Moving to first candidate partition "
                               << firstCandidateOrdinal << " (continue)\n");
-      builders[firstCandidateOrdinal]->ops.insert(&op);
+      builders[firstCandidateOrdinal]->insert(&op);
       opInfo.membership.set(firstCandidateOrdinal);
       opInfo.hazards.reset(firstCandidateOrdinal);
       continue;
@@ -177,7 +189,7 @@ PartitionSet partitionStreamableOpsReference(
     auto builder = std::make_unique<PartitionBuilder>();
     builder->ordinal = builders.size();
     builder->affinity = affinityAttr;
-    builder->ops.insert(&op);
+    builder->insert(&op);
     LLVM_DEBUG(llvm::dbgs()
                << "Created partition " << builder->ordinal << "\n");
     builders.push_back(std::move(builder));
@@ -198,15 +210,19 @@ PartitionSet partitionStreamableOpsReference(
       }
       for (auto result : op->getResults()) {
         producedValues.insert(result);
-        // TODO(benvanik): optimize this - creates n^2/nlogn behavior.
-        for (auto user : result.getUsers()) {
-          if (!builder->ops.contains(user)) {
-            escapingValues.insert(result);
+        // Cloned ops never escape even if the originals did.
+        if (!builder->clonedOps.contains(op)) {
+          // TODO(benvanik): optimize this - creates n^2/nlogn behavior.
+          for (auto user : result.getUsers()) {
+            if (!builder->ops.contains(user)) {
+              escapingValues.insert(result);
+            }
           }
         }
       }
     }
     consumedValues.set_subtract(producedValues);
+    partition.affinity = builder->affinity;
     partition.ins = consumedValues;
     partition.outs = escapingValues;
 

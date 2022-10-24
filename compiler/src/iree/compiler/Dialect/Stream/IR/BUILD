@@ -105,6 +105,14 @@ iree_gentbl_cc_library(
     name = "StreamInterfacesGen",
     tbl_outs = [
         (
+            ["--gen-attr-interface-decls"],
+            "StreamAttrInterfaces.h.inc",
+        ),
+        (
+            ["--gen-attr-interface-defs"],
+            "StreamAttrInterfaces.cpp.inc",
+        ),
+        (
             ["--gen-op-interface-decls"],
             "StreamOpInterfaces.h.inc",
         ),
