@@ -28,7 +28,7 @@ flow.executable private @rank_0_binding {
       // CHECK: %[[SUBSPAN:.+]] = stream.binding.subspan %[[INPUT]][%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:i64>
       // CHECK: = flow.dispatch.tensor.load %[[SUBSPAN]]
       %tied_input = flow.dispatch.tensor.load %input, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:i64> -> tensor<i64>
-      util.do_not_optimize(%tied_input) : tensor<i64>
+      util.optimization_barrier %tied_input : tensor<i64>
       return
     }
   }

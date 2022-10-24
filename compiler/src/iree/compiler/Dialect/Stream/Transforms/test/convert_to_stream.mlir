@@ -125,8 +125,8 @@ func.func @while_test() {
   // CHECK: %[[CONSTANT_SIZE:.+]] = stream.resource.size %[[CONSTANT]] : !stream.resource<constant>
   // CHECK: %[[INITIAL:.+]] = stream.async.transfer %[[CONSTANT]] : !stream.resource<constant>{%[[CONSTANT_SIZE]]} -> !stream.resource<*>{%[[CONSTANT_SIZE]]}
   %cst = arith.constant dense<4> : tensor<i32>
-  // CHECK: %[[INITIAL_DNO:.+]] = util.do_not_optimize(%[[INITIAL]]) : !stream.resource<*>
-  %0 = util.do_not_optimize(%cst) : tensor<i32>
+  // CHECK: %[[INITIAL_DNO:.+]] = util.optimization_barrier %[[INITIAL]] : !stream.resource<*>
+  %0 = util.optimization_barrier %cst : tensor<i32>
 
   // CHECK: %[[VAR_SIZE:.+]] = stream.resource.size %[[INITIAL_DNO]] : !stream.resource<*>
   // CHECK: cf.br ^bb1(%[[INITIAL_DNO]], %[[VAR_SIZE]] : !stream.resource<*>, index)

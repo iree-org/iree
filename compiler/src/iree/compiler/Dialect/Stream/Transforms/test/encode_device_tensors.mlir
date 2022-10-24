@@ -11,8 +11,8 @@ stream.executable private @convert_load_i1 {
       // CHECK: %[[TILE_I8:.+]] = flow.dispatch.tensor.load %[[BINDING]], {{.+}} : !flow.dispatch.tensor<readonly:4xi8> -> tensor<?xi8>
       // CHECK: %[[TILE_I1:.+]] = arith.trunci %[[TILE_I8]] : tensor<?xi8> to tensor<?xi1>
       %tile = flow.dispatch.tensor.load %binding, offsets = [0], sizes = [4], strides = [1] : !flow.dispatch.tensor<readonly:4xi1> -> tensor<?xi1>
-      // CHECK: do_not_optimize(%[[TILE_I1]])
-      util.do_not_optimize(%tile) : tensor<?xi1>
+      // CHECK: util.optimization_barrier %[[TILE_I1]]
+      util.optimization_barrier %tile : tensor<?xi1>
       return
     }
   }
@@ -78,8 +78,8 @@ stream.executable private @convert_load_i33 {
       // CHECK: %[[TILE_I8:.+]] = flow.dispatch.tensor.load %[[BINDING]], {{.+}} : !flow.dispatch.tensor<readonly:4xi64> -> tensor<?xi64>
       // CHECK: %[[TILE_I1:.+]] = arith.trunci %[[TILE_I8]] : tensor<?xi64> to tensor<?xi33>
       %tile = flow.dispatch.tensor.load %binding, offsets = [0], sizes = [4], strides = [1] : !flow.dispatch.tensor<readonly:4xi33> -> tensor<?xi33>
-      // CHECK: do_not_optimize(%[[TILE_I1]])
-      util.do_not_optimize(%tile) : tensor<?xi33>
+      // CHECK: util.optimization_barrier %[[TILE_I1]]
+      util.optimization_barrier %tile : tensor<?xi33>
       return
     }
   }

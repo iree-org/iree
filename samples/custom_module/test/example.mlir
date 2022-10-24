@@ -60,7 +60,7 @@ module @example {
     // We don't do anything with it here but just demonstrate how index works.
     // CHECK-NEXT: LENGTH hello = 5
     %strlen = call @custom.string.length(%hello_str) : (!custom.string) -> index
-    util.do_not_optimize(%strlen) : index
+    util.optimization_barrier %strlen : index
 
     // Print "debug" if the runtime is compiled in debug mode and otherwise
     // prints "optimized".

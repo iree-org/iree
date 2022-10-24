@@ -606,48 +606,18 @@ namespace IREE {
 namespace Util {
 
 //===----------------------------------------------------------------------===//
-// util.do_not_optimize
+// util.optimization_barrier
 //===----------------------------------------------------------------------===//
 
-void DoNotOptimizeOp::build(OpBuilder &builder, OperationState &state,
-                            ValueRange operands,
-                            ArrayRef<NamedAttribute> attributes) {
+void OptimizationBarrierOp::build(OpBuilder &builder, OperationState &state,
+                                  ValueRange operands,
+                                  ArrayRef<NamedAttribute> attributes) {
   state.addOperands(operands);
   state.addTypes(llvm::to_vector<2>(operands.getTypes()));
   state.addAttributes(attributes);
 }
 
-ParseResult DoNotOptimizeOp::parse(OpAsmParser &parser, OperationState &state) {
-  SmallVector<OpAsmParser::UnresolvedOperand, 2> args;
-  // Operands and results have the same types.
-  auto &operandTypes = state.types;
-
-  if (failed(parser.parseLParen()) || failed(parser.parseOperandList(args)) ||
-      failed(parser.parseRParen()) ||
-      failed(parser.parseOptionalAttrDict(state.attributes)) ||
-      failed(parser.parseOptionalColonTypeList(state.types)) ||
-      failed(parser.resolveOperands(
-          args, operandTypes, parser.getCurrentLocation(), state.operands))) {
-    return failure();
-  }
-
-  return success();
-}
-
-void DoNotOptimizeOp::print(OpAsmPrinter &p) {
-  Operation *op = getOperation();
-  p << "(";
-  p.printOperands(op->getOperands());
-  p << ")";
-  p.printOptionalAttrDict(op->getAttrs());
-
-  if (op->getNumOperands() != 0) {
-    p << " : ";
-    interleaveComma(getOperandTypes(), p);
-  }
-}
-
-LogicalResult DoNotOptimizeOp::verify() {
+LogicalResult OptimizationBarrierOp::verify() {
   Operation *op = getOperation();
   if (op->getNumOperands() != op->getNumResults()) {
     return op->emitOpError()

@@ -305,25 +305,31 @@ def Util_SizeOfOp : Util_PureOp<"sizeof"> {
 // Compiler hints
 //===----------------------------------------------------------------------===//
 
-def Util_DoNotOptimizeOp : Util_Op<"do_not_optimize", [
+def Util_OptimizationBarrierOp : Util_Op<"optimization_barrier", [
   SameOperandsAndResultType,
 ]> {
-  let summary = "Prevents compiler optimizations of a value.";
+  let summary = "Prevents compiler optimizations across a value.";
   let description = [{
-    Wraps any operands in an unoptimizable identity. This operation is declared
-    as having side effects, so no compiler optimizations will be able to reason
-    about it. This prevents its results from being folded. It will be dropped as
-    the final step in compilation.
+    Wraps any operands in an unoptimizable identity to prevent its results from
+    being folded. It will be dropped during the final step in compilation and
+    has no effect at runtime.
   }];
-  let arguments = (ins Variadic<AnyType>:$arguments);
+  let arguments = (ins Variadic<AnyType>:$operands);
   let results = (outs Variadic<AnyType>:$results);
-  let hasVerifier = 1;
+
+  let assemblyFormat = [{
+    attr-dict
+    ($operands^ `:` type($operands))?
+  }];
+
   let builders = [
     OpBuilder<(ins
       "ValueRange":$operands,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes
     )>,
   ];
+
+  let hasVerifier = 1;
 }
 
 def Util_UnfoldableConstantOp : Util_Op<"unfoldable_constant"> {
@@ -331,7 +337,7 @@ def Util_UnfoldableConstantOp : Util_Op<"unfoldable_constant"> {
   let description = [{
     Similar to a std.constant, but is declared as having a side effect and has
     no folder. This is really just syntactic sugar as it is canonicalized to a
-    std.constant wrapped in an util.do_not_optimize.
+    std.constant wrapped in an util.optimization_barrier.
   }];
 
   let arguments = (ins AnyAttr:$value);
