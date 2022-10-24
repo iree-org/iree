@@ -280,7 +280,5 @@ transform.with_pdl_patterns {
   ^bb1(%arg1: !pdl.operation):
     %0 = transform.structured.match ops{["tensor.insert_slice"]} in %arg1
     %dispatch_op = transform.iree.wrap_in_dispatch_region %0
-    %1 = transform.structured.match ops{["tensor.extract_slice"]} in %arg1
-    transform.iree.move_preceding_op_into_dispatch_region %1 into %dispatch_op
   }
 }
