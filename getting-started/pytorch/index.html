@@ -400,8 +400,8 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#compile-the-mlir-to-iree-vm-flatbuffer" class="md-nav__link">
-    Compile the MLIR to IREE VM flatbuffer
+  <a href="#compile-the-mlir-to-an-iree-vm-flatbuffer" class="md-nav__link">
+    Compile the MLIR to an IREE VM flatbuffer
   </a>
   
 </li>
@@ -1089,8 +1089,8 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#compile-the-mlir-to-iree-vm-flatbuffer" class="md-nav__link">
-    Compile the MLIR to IREE VM flatbuffer
+  <a href="#compile-the-mlir-to-an-iree-vm-flatbuffer" class="md-nav__link">
+    Compile the MLIR to an IREE VM flatbuffer
   </a>
   
 </li>
@@ -1145,7 +1145,8 @@
 
 <h1 id="pytorch-integration">PyTorch Integration<a class="headerlink" href="#pytorch-integration" title="Permanent link">&para;</a></h1>
 <p>IREE supports compiling and running PyTorch programs represented as
-<code>nn.Module</code> <a href="https://pytorch.org/docs/stable/generated/torch.nn.Module.html">classes</a> as well as models defined using <a href="https://pytorch.org/functorch/"><code>functorch</code></a>.</p>
+<code>nn.Module</code> <a href="https://pytorch.org/docs/stable/generated/torch.nn.Module.html">classes</a>
+as well as models defined using <a href="https://pytorch.org/functorch/"><code>functorch</code></a>.</p>
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
 <p>Install IREE pip packages, either from pip or by
 <a href="../../building-from-source/python-bindings-and-importers/">building from source</a>:</p>
@@ -1153,19 +1154,29 @@
   iree-compiler <span class="se">\</span>
   iree-runtime
 </code></pre></div>
-<p>Install <a href="https://github.com/llvm/torch-mlir"><code>torch-mlir</code></a>, necessary for compiling PyTorch models to a format IREE is able to execute:</p>
+<p>Install <a href="https://github.com/llvm/torch-mlir"><code>torch-mlir</code></a>, necessary for
+compiling PyTorch models to a format IREE is able to execute:</p>
 <div class="highlight"><pre><span></span><code>pip install -f https://llvm.github.io/torch-mlir/package-index/ torch-mlir
 </code></pre></div>
-<p>A special <code>iree_torch</code> package is available to make it easy to compile PyTorch programs and run them on IREE:</p>
+<p>A special <code>iree_torch</code> package makes it easy to compile PyTorch programs and
+run them on IREE:</p>
 <div class="highlight"><pre><span></span><code>pip install git+https://github.com/iree-org/iree-torch.git
 </code></pre></div>
 <h2 id="running-a-model">Running a model<a class="headerlink" href="#running-a-model" title="Permanent link">&para;</a></h2>
-<p>Going from a loaded PyTorch model to one that's executing on IREE happens in four steps:</p>
-<p>1) Compile the model to <a href="https://mlir.llvm.org">MLIR</a>
- 2) Compile the MLIR to IREE VM flatbuffer
- 3) Load the VM flatbuffer into IREE
- 4) Execute the model via IREE</p>
-<p>!!! note In the following steps, we'll be borrowing the model from <a href="https://github.com/iree-org/iree-torch/blob/main/examples/bert.ipynb">this BERT colab</a> and assuming it is available as <code>model</code>.</p>
+<p>Going from a loaded PyTorch model to one that's executing on IREE happens in
+four steps:</p>
+<ol>
+<li>Compile the model to <a href="https://mlir.llvm.org">MLIR</a></li>
+<li>Compile the MLIR to IREE VM flatbuffer</li>
+<li>Load the VM flatbuffer into IREE</li>
+<li>Execute the model via IREE</li>
+</ol>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>In the following steps, we'll be borrowing the model from
+<a href="https://github.com/iree-org/iree-torch/blob/main/examples/bert.ipynb">this BERT colab</a>
+and assuming it is available as <code>model</code>.</p>
+</div>
 <h3 id="compile-the-model-to-mlir">Compile the model to MLIR<a class="headerlink" href="#compile-the-model-to-mlir" title="Permanent link">&para;</a></h3>
 <p>First, we need to trace and compile our model to MLIR:</p>
 <div class="highlight"><pre><span></span><code><span class="n">model</span> <span class="o">=</span> <span class="c1"># ... the model we&#39;re compiling</span>
@@ -1176,25 +1187,35 @@
     <span class="n">output_type</span><span class="o">=</span><span class="n">torch_mlir</span><span class="o">.</span><span class="n">OutputType</span><span class="o">.</span><span class="n">LINALG_ON_TENSORS</span><span class="p">,</span>
     <span class="n">use_tracing</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 </code></pre></div>
-<p>The full list of available output types can be found <a href="https://github.com/llvm/torch-mlir/blob/6403c0e56f0e93e231df1c8d3dc78df7dd721b80/python/torch_mlir/__init__.py#L19">here</a> and includes linalg on tensors, mhlo, and tosa.</p>
-<h3 id="compile-the-mlir-to-iree-vm-flatbuffer">Compile the MLIR to IREE VM flatbuffer<a class="headerlink" href="#compile-the-mlir-to-iree-vm-flatbuffer" title="Permanent link">&para;</a></h3>
-<p>Next, we compile the resulting MLIR to IREE VM flatbuffer: </p>
+<p>The full list of available output types can be found
+<a href="https://github.com/llvm/torch-mlir/blob/6403c0e56f0e93e231df1c8d3dc78df7dd721b80/python/torch_mlir/__init__.py#L19">here</a>
+and includes linalg on tensors, mhlo, and tosa.</p>
+<h3 id="compile-the-mlir-to-an-iree-vm-flatbuffer">Compile the MLIR to an IREE VM flatbuffer<a class="headerlink" href="#compile-the-mlir-to-an-iree-vm-flatbuffer" title="Permanent link">&para;</a></h3>
+<p>Next, we compile the resulting MLIR to IREE's deployable file format:</p>
 <div class="highlight"><pre><span></span><code><span class="n">iree_backend</span> <span class="o">=</span> <span class="s2">&quot;llvm-cpu&quot;</span>
 <span class="n">iree_vmfb</span> <span class="o">=</span> <span class="n">iree_torch</span><span class="o">.</span><span class="n">compile_to_vmfb</span><span class="p">(</span><span class="n">mlir</span><span class="p">,</span> <span class="n">iree_backend</span><span class="p">)</span>
 </code></pre></div>
-<p>Here we have a choice of backend we want to target. See <a href="https://iree-org.github.io/iree/deployment-configurations/">IREE Deployment Configurations</a> for a full list of targets.</p>
-<p>The generated flatbuffer can now be serialized and stored for another time or loaded and executed immediately.</p>
+<p>Here we have a choice of backend we want to target. See the
+<a href="https://iree-org.github.io/iree/deployment-configurations/">Deployment Configurations</a>
+section of this site for a full list of targets and configurations.</p>
+<p>The generated flatbuffer can now be serialized and stored for another time or
+loaded and executed immediately.</p>
 <h3 id="load-the-vm-flatbuffer-into-iree">Load the VM flatbuffer into IREE<a class="headerlink" href="#load-the-vm-flatbuffer-into-iree" title="Permanent link">&para;</a></h3>
-<p>Next, we load the flatbuffer into the IREE runtime. <code>iree_torch</code> provides a convenience method for loading this flatbuffer:</p>
+<p>Next, we load the flatbuffer into the IREE runtime. <code>iree_torch</code> provides a
+convenience method for loading this flatbuffer from Python:</p>
 <div class="highlight"><pre><span></span><code><span class="n">invoker</span> <span class="o">=</span> <span class="n">iree_torch</span><span class="o">.</span><span class="n">load_vmfb</span><span class="p">(</span><span class="n">iree_vmfb</span><span class="p">,</span> <span class="n">iree_backend</span><span class="p">)</span>
 </code></pre></div>
 <h3 id="execute-the-model-via-iree">Execute the model via IREE<a class="headerlink" href="#execute-the-model-via-iree" title="Permanent link">&para;</a></h3>
-<p>Finally, we can execute the loaded model on IREE:</p>
+<p>Finally, we can execute the loaded model:</p>
 <div class="highlight"><pre><span></span><code><span class="n">result</span> <span class="o">=</span> <span class="n">invoker</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">example_input</span><span class="p">)</span>
 </code></pre></div>
 <h2 id="training">Training<a class="headerlink" href="#training" title="Permanent link">&para;</a></h2>
-<p>Training with PyTorch in IREE is supported via <code>functorch</code>. The steps for loading the model, once defined, into IREE, is nearly identical to the above example.</p>
-<p>You can find a full end-to-end example of defining a basic regression model, training with it, and running inference on it <a href="https://github.com/iree-org/iree-torch/blob/main/examples/regression.py">here</a>.</p>
+<p>Training with PyTorch in IREE is supported via <code>functorch</code>. The steps for
+loading the model into IREE, once defined, are nearly identical to the above
+example.</p>
+<p>You can find a full end-to-end example of defining a basic regression model,
+training with it, and running inference on it
+<a href="https://github.com/iree-org/iree-torch/blob/main/examples/regression.py">here</a>.</p>
 <h2 id="samples">Samples<a class="headerlink" href="#samples" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -1210,9 +1231,18 @@
 </tr>
 </tbody>
 </table>
-<p>| Example scripts |
-| -- |
-<a href="https://github.com/iree-org/iree-torch/blob/main/examples/regression.py">Basic Inference and Training Example</a></p>
+<table>
+<thead>
+<tr>
+<th>Example scripts</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/iree-org/iree-torch/blob/main/examples/regression.py">Basic Inference and Training Example</a></td>
+</tr>
+</tbody>
+</table>
 
 
 
