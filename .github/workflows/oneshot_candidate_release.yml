@@ -6,7 +6,7 @@ on:
 jobs:
   tag_release:
     name: "Tag candidate release"
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
       - name: Checking out repository
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
