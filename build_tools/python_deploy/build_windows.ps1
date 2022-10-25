@@ -19,7 +19,7 @@ $env:CMAKE_GENERATOR='Ninja'
 $env:IREE_HAL_DRIVER_CUDA = 'ON'
 $env:IREE_HAL_DRIVER_VULKAN = 'ON'
 $env:IREE_EXTERNAL_HAL_DRIVERS = 'OFF'
-pip wheel -v -w wheelhouse compiler/
-pip wheel -v -w wheelhouse runtime/
+pip wheel -v -w ../bindist compiler/
+pip wheel -v -w ../bindist runtime/
 
 Write-Host "Build completed successfully" 

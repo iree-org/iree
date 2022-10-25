@@ -17,9 +17,9 @@ an appropriate manylinux image, etc.
 
 This is expected to be run from the project directory, containing the
 following sub-directories:
-  - main_checkout/ : Main IREE repository checkout.
+  - c/ : Main IREE repository checkout.
   - bindist/ : Directory where binary distribution artifacts are written.
-  - main_checkout/version_info.json : Version config information.
+  - c/version_info.json : Version config information.
 
 Within the build environment (which may be the naked runner or a docker image):
   - iree-build/ : The build tree.
@@ -33,14 +33,14 @@ Testing this script:
 It is not recommended to run cibuildwheel locally. However, this script can
 be executed as if running within such an environment. To do so, create
 a directory and:
-  ln -s /path/to/iree main_checkout
+  ln -s /path/to/iree c
   python -m venv .venv
   source .venv/bin/activate
 
-  python ./main_checkout/build_tools/github_actions/build_dist.py main-dist
-  python ./main_checkout/build_tools/github_actions/build_dist.py py-xla-compiler-tools-pkg
-  python ./main_checkout/build_tools/github_actions/build_dist.py py-tflite-compiler-tools-pkg
-  python ./main_checkout/build_tools/github_actions/build_dist.py py-tf-compiler-tools-pkg
+  python ./c/build_tools/github_actions/build_dist.py main-dist
+  python ./c/build_tools/github_actions/build_dist.py py-xla-compiler-tools-pkg
+  python ./c/build_tools/github_actions/build_dist.py py-tflite-compiler-tools-pkg
+  python ./c/build_tools/github_actions/build_dist.py py-tf-compiler-tools-pkg
 
 
 That is not a perfect approximation but is close.
@@ -59,7 +59,7 @@ import tarfile
 WORK_DIR = os.path.realpath(os.path.curdir)
 BUILD_DIR = os.path.join(WORK_DIR, "iree-build")
 INSTALL_DIR = os.path.join(WORK_DIR, "iree-install")
-IREESRC_DIR = os.path.join(WORK_DIR, "main_checkout")
+IREESRC_DIR = os.path.join(WORK_DIR, "c")
 TF_INTEGRATIONS_DIR = os.path.join(IREESRC_DIR, "integrations/tensorflow")
 BINDIST_DIR = os.environ.get("BINDIST_DIR")
 if BINDIST_DIR is None:
