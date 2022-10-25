@@ -51,6 +51,7 @@
 #include "mlir/Transforms/InliningUtils.h"
 #include "mlir/Transforms/LoopInvariantCodeMotionUtils.h"
 #include "mlir/Transforms/Passes.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/SmallVector.h"
@@ -447,8 +448,8 @@ void mlir::TrackingListener::notifyOperationReplaced(Operation *op,
     return;
   }
 
-  LLVM_DEBUG(DBGS() << "replacing tracked " << *op << " with " << *replacement
-                    << "\n");
+  LLVM_DEBUG(DBGS() << "replacing tracked @" << op << " : " << *op << " with "
+                    << *replacement << "\n");
   mayFail(replacePayloadOp(op, replacement));
 }
 
@@ -462,7 +463,7 @@ void mlir::TrackingListener::notifyOperationRemoved(Operation *op) {
   if (failed(getTransformState().getHandlesForPayloadOp(op, handles)))
     return;
 
-  LLVM_DEBUG(DBGS() << "removing tracked " << *op << "\n");
+  LLVM_DEBUG(DBGS() << "removing tracked @" << op << " : " << *op << "\n");
   mayFail(replacePayloadOp(op, nullptr));
 }
 
@@ -472,6 +473,7 @@ void mlir::TrackingListener::removeMappings(Operation *op) {
     return;
 
   // Replacing the tracked op with null will stop the tracking.
+  LLVM_DEBUG(DBGS() << "removing mappings @" << op << " : " << *op << "\n");
   mayFail(replacePayloadOp(op, nullptr));
 }
 
@@ -560,12 +562,15 @@ forgetUnnecessaryHandles(transform::TransformState &state,
   // the same operation will are not used after the current transform op. The
   // handle will be erased automatically after the last payload operation is
   // deassociated from it.
+  llvm::SmallDenseSet<Operation *> seen;
   llvm::SmallDenseMap<Value, bool> handlesUsedAfterTransform;
   for (Value operand : transform->getOperands()) {
     if (transform::isHandleConsumed(operand, transform))
       continue;
 
     for (Operation *payload : state.getPayloadOps(operand)) {
+      if (seen.contains(payload))
+        continue;
       SmallVector<Value> allHandles;
       (void)state.getHandlesForPayloadOp(payload, allHandles);
       bool allHandlesUnused = llvm::all_of(allHandles, [&](Value handle) {
@@ -575,8 +580,10 @@ forgetUnnecessaryHandles(transform::TransformState &state,
         }
         return !handlesUsedAfterTransform[handle];
       });
-      if (allHandlesUnused)
+      if (allHandlesUnused) {
         listener->removeMappings(payload);
+        seen.insert(payload);
+      }
     }
   }
 
@@ -584,8 +591,12 @@ forgetUnnecessaryHandles(transform::TransformState &state,
   for (Value result : transform->getResults()) {
     if (!result.getUses().empty())
       continue;
-    for (Operation *payload : state.getPayloadOps(result))
+    for (Operation *payload : state.getPayloadOps(result)) {
+      if (seen.contains(payload))
+        continue;
       listener->removeMappings(payload);
+      seen.insert(payload);
+    }
   }
 }
 
@@ -620,10 +631,14 @@ DiagnosedSilenceableFailure transform_ext::CanonicalizedSequenceOp::apply(
         for (Operation *target : roots) {
           // Make sure we always check the error state, no boolean
           // short-circuting.
-          LogicalResult result = transform(target, listener);
-          LogicalResult listenerResult = listener.checkErrorState();
-          if (failed(result) || failed(listenerResult))
+          if (failed(transform(target, listener))) {
+            target->emitOpError("Transform application failed.");
             return failure();
+          }
+          if (failed(listener.checkErrorState())) {
+            target->emitOpError("Listener failed.");
+            return failure();
+          }
         }
         return success();
       };
@@ -654,10 +669,14 @@ DiagnosedSilenceableFailure transform_ext::CanonicalizedSequenceOp::apply(
   };
 
   LLVM_DEBUG(DBGS() << "begin canonicalizing sequence\n");
-  if (failed(checkedListenerTransform(performCSE)))
-    return DiagnosedSilenceableFailure::definiteFailure();
-  if (failed(checkedListenerTransform(performCanonicalization)))
-    return DiagnosedSilenceableFailure::definiteFailure();
+  if (failed(checkedListenerTransform(performCSE))) {
+    return mlir::emitDefiniteFailure(
+        *this, "Failed to performCSE beform transform sequence");
+  }
+  if (failed(checkedListenerTransform(performCanonicalization))) {
+    return mlir::emitDefiniteFailure(
+        *this, "Failed to performCanonicalization beform transform sequence");
+  }
 
   // Apply the sequenced ops one by one.
   for (Operation &transform : getBodyBlock()->without_terminator()) {
@@ -683,12 +702,18 @@ DiagnosedSilenceableFailure transform_ext::CanonicalizedSequenceOp::apply(
     // or elsewhere or if the result is never read.
     forgetUnnecessaryHandles(state, *this, transformOp);
 
-    if (failed(checkedListenerTransform(performCSE)))
-      return DiagnosedSilenceableFailure::definiteFailure();
-    if (failed(checkedListenerTransform(performEnabler)))
-      return DiagnosedSilenceableFailure::definiteFailure();
-    if (failed(checkedListenerTransform(performCanonicalization)))
-      return DiagnosedSilenceableFailure::definiteFailure();
+    if (failed(checkedListenerTransform(performCSE))) {
+      return mlir::emitDefiniteFailure(&transform,
+                                       "Failed to performCSE after transform");
+    }
+    if (failed(checkedListenerTransform(performEnabler))) {
+      return mlir::emitDefiniteFailure(
+          &transform, "Failed to performEnabler after transform");
+    }
+    if (failed(checkedListenerTransform(performCanonicalization))) {
+      return mlir::emitDefiniteFailure(
+          &transform, "Failed to performCanonicalization after transform");
+    }
   }
 
   // Forward the operation mapping for values yielded from the sequence to the
