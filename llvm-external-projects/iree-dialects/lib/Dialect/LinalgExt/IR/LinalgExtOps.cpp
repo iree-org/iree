@@ -17,7 +17,6 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -2235,6 +2234,17 @@ UnPackOp::getTiledImplementation(OpBuilder &builder,
       outputNewOffsets.push_back(zeroAttr);
       outputExpandedSizes.push_back(sizes[dim]);
     }
+  }
+
+  // The tiling is applied on output dimensions. We have to apply the
+  // interchange on input dimensions if outer_dims_perm is set.
+  SmallVector<int64_t> dimsToOuterBlock =
+      extractFromI64ArrayAttr(getOuterDimsPerm());
+  if (!dimsToOuterBlock.empty()) {
+    SmallVector<int64_t> vec =
+        computeInterchangeFromDimPos(dimsToOuterBlock, getInputRank());
+    inputIndices = interchange<OpFoldResult>(inputIndices, vec);
+    inputSizes = interchange<OpFoldResult>(inputSizes, vec);
   }
 
   inputIndices.append(inputRank - outputRank, zeroAttr);
