@@ -67,35 +67,62 @@ jobs:
             build-family: macos
             build-package: py-runtime-pkg
             experimental: true
+
+          # Windows packages.
+          - runs-on: windows-latest
+            build-family: windows
+            build-package: py-compiler-pkg
+            experimental: true
+
     env:
       MANYLINUX_X86_64_IMAGE: gcr.io/iree-oss/manylinux2014_x86_64-release@sha256:794513562cca263480c0c169c708eec9ff70abfe279d6dc44e115b04488b9ab5
 
     steps:
       - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
         with:
-          path: "main_checkout"
+          path: "c"
           submodules: true
           ref: ${{ github.event.inputs.commit }}
 
       ##########################################################################
       # OS specific setup
       ##########################################################################
+      - name: Install Windows VS Deps
+        if: "matrix.build-family == 'windows'"
+        uses: egor-tensin/vs-shell@v2
+        with:
+          arch: x64
+
 
       ##########################################################################
       # Write version_info.json
       # Various tools will read this in order to embed release information.
       ##########################################################################
       - name: Write version info (release)
+        if: "matrix.build-family != 'windows'"
         shell: bash
         run: |
-          cat << EOF > ./main_checkout/version_info.json
+          cat << EOF > ./c/version_info.json
           {
             "package-suffix": "${{ github.event.inputs.package_suffix }}",
             "package-version": "${{ github.event.inputs.package_version }}",
-            "iree-revision": "$(cd ./main_checkout && git rev-parse HEAD)"
+            "iree-revision": "$(cd ./c && git rev-parse HEAD)"
           }
           EOF
-          cat ./main_checkout/version_info.json
+          cat ./c/version_info.json
+
+      ##########################################################################
+      # Write Windows version_info.json
+      # Various tools will read this in order to embed release information.
+      ##########################################################################
+      - name: Write version info (Windows release)
+        if: "matrix.build-family == 'windows'"
+        shell: powershell
+        run: |
+         cd ./c
+         ./build_tools/python_deploy/create_version.ps1 -version ${{ github.event.inputs.package_version }}
+         more version_info.json
+         cd ..
 
       ##########################################################################
       # Build the main distribution tarball.
@@ -116,7 +143,7 @@ jobs:
           docker run --rm -w=/work \
             -v $PWD:/work \
             "${MANYLINUX_X86_64_IMAGE}" \
-            bash -c 'export PATH=/opt/python/cp39-cp39/bin:$PATH; python ./main_checkout/build_tools/github_actions/build_dist.py main-dist'
+            bash -c 'export PATH=/opt/python/cp39-cp39/bin:$PATH; python ./c/build_tools/github_actions/build_dist.py main-dist'
 
       ##########################################################################
       # py-runtime-pkg
@@ -132,7 +159,7 @@ jobs:
           packages: "iree-runtime iree-runtime-instrumented"
           output_dir: "${{ github.workspace }}/bindist"
         run: |
-          ./main_checkout/build_tools/python_deploy/build_linux_packages.sh
+          ./c/build_tools/python_deploy/build_linux_packages.sh
 
       - name: Build runtime wheels (MacOS)
         if: "matrix.build-package == 'py-runtime-pkg' && matrix.build-family == 'macos'"
@@ -143,7 +170,7 @@ jobs:
           output_dir: "${{ github.workspace }}/bindist"
           override_python_versions: "3.11"
         run: |
-          ./main_checkout/build_tools/python_deploy/build_macos_packages.sh
+          ./c/build_tools/python_deploy/build_macos_packages.sh
 
       ##########################################################################
       # py-compiler-pkg
@@ -158,7 +185,7 @@ jobs:
           packages: "iree-compiler"
           output_dir: "${{ github.workspace }}/bindist"
         run: |
-          ./main_checkout/build_tools/python_deploy/build_linux_packages.sh
+          ./c/build_tools/python_deploy/build_linux_packages.sh
 
       - name: Build compiler wheels (MacOS)
         if: "matrix.build-package == 'py-compiler-pkg' && matrix.build-family == 'macos'"
@@ -169,7 +196,17 @@ jobs:
           output_dir: "${{ github.workspace }}/bindist"
           override_python_versions: "3.11"
         run: |
-          ./main_checkout/build_tools/python_deploy/build_macos_packages.sh
+          ./c/build_tools/python_deploy/build_macos_packages.sh
+
+      ##########################################################################
+      # Build Windows packages.
+      ##########################################################################
+      - name: Build Python wheels.
+        if: "matrix.build-family == 'windows'"
+        shell: powershell
+        run: |
+          cd c
+          ./build_tools/python_deploy/build_windows.ps1
 
       ##########################################################################
       # TF Compiler Tools
@@ -185,7 +222,7 @@ jobs:
           docker run --rm -w=/work \
             -v $PWD:/work \
             "${MANYLINUX_X86_64_IMAGE}" \
-            bash -c 'export PATH=/opt/python/cp39-cp39/bin:$PATH; python ./main_checkout/build_tools/github_actions/build_dist.py py-tf-compiler-tools-pkg'
+            bash -c 'export PATH=/opt/python/cp39-cp39/bin:$PATH; python ./c/build_tools/github_actions/build_dist.py py-tf-compiler-tools-pkg'
 
       - uses: actions/upload-artifact@82c141cc518b40d92cc801eee768e7aafc9c2fa2 # v2
         with:
