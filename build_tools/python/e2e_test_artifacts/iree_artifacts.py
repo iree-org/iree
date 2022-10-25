@@ -10,8 +10,8 @@ from typing import Sequence, OrderedDict
 import collections
 import pathlib
 
+from e2e_test_artifacts import model_artifacts
 from e2e_test_framework.definitions import common_definitions, iree_definitions
-from e2e_test_artifacts import common_artifacts
 
 
 @dataclass(frozen=True)
@@ -45,7 +45,7 @@ class ArtifactsRoot(object):
 def _get_imported_model_path(
     parent_path: pathlib.PurePath,
     imported_model: iree_definitions.ImportedModel,
-    model_artifact: common_artifacts.ModelArtifact) -> pathlib.PurePath:
+    model_artifact: model_artifacts.ModelArtifact) -> pathlib.PurePath:
   model = imported_model.model
   if model.source_type == common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR:
     # Uses the MLIR model directly.
@@ -68,7 +68,7 @@ def _build_module_directory(
 
 def generate_artifacts_root(
     parent_path: pathlib.PurePath,
-    model_artifacts_root: common_artifacts.ModelArtifactsRoot,
+    model_artifacts_root: model_artifacts.ArtifactsRoot,
     module_generation_configs: Sequence[iree_definitions.ModuleGenerationConfig]
 ) -> ArtifactsRoot:
   """Generates IREE directory structure from module generation configs."""

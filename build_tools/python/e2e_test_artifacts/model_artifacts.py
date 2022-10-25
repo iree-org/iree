@@ -24,14 +24,14 @@ class ModelArtifact(object):
 
 
 @dataclass(frozen=True)
-class ModelArtifactsRoot(object):
+class ArtifactsRoot(object):
   # Map of model artifacts, keyed by model id.
   model_artifact_map: OrderedDict[str, ModelArtifact]
 
 
-def generate_model_artifacts_root(
+def generate_artifacts_root(
     parent_path: pathlib.PurePath,
-    models: Sequence[common_definitions.Model]) -> ModelArtifactsRoot:
+    models: Sequence[common_definitions.Model]) -> ArtifactsRoot:
   """Generates model directory structure."""
 
   model_artifact_map = collections.OrderedDict()
@@ -51,4 +51,4 @@ def generate_model_artifacts_root(
     model_artifact_map[model.id] = ModelArtifact(model=model,
                                                  file_path=file_path)
 
-  return ModelArtifactsRoot(model_artifact_map=model_artifact_map)
+  return ArtifactsRoot(model_artifact_map=model_artifact_map)

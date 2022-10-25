@@ -10,7 +10,8 @@ from typing import Sequence
 import pathlib
 
 from benchmark_suites.iree import benchmark_collections
-from e2e_test_artifacts import common_artifacts, iree_artifacts
+from build_tools.python.e2e_test_artifacts import model_artifacts
+from e2e_test_artifacts import iree_artifacts
 from e2e_test_framework.models import model_groups
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 
@@ -21,7 +22,7 @@ IREE_ARTIFACTS_ROOT = pathlib.PurePath("iree")
 @dataclass(frozen=True)
 class ArtifactsRoot(object):
   """Root artifact directory."""
-  model_artifacts_root: common_artifacts.ModelArtifactsRoot
+  model_artifacts_root: model_artifacts.ArtifactsRoot
   iree_artifacts_root: iree_artifacts.ArtifactsRoot
 
 
@@ -32,7 +33,7 @@ def _generate_artifacts_root(
 ) -> ArtifactsRoot:
   """Generates and unions directory structures from the configs."""
 
-  model_artifacts_root = common_artifacts.generate_model_artifacts_root(
+  model_artifacts_root = model_artifacts.generate_artifacts_root(
       parent_path=MODEL_ARTIFACTS_ROOT, models=models)
 
   iree_artifacts_root = iree_artifacts.generate_artifacts_root(

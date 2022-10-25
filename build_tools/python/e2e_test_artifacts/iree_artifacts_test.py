@@ -9,20 +9,20 @@ import pathlib
 import unittest
 
 from e2e_test_framework.definitions import iree_definitions
-from e2e_test_artifacts import common_artifacts, iree_artifacts, test_configs
+from e2e_test_artifacts import model_artifacts, iree_artifacts, test_configs
 
 
 class IreeArtifactsTest(unittest.TestCase):
 
   def test_generate_artifacts_root(self):
-    model_artifacts_root = common_artifacts.ModelArtifactsRoot(
+    model_artifacts_root = model_artifacts.ArtifactsRoot(
         model_artifact_map=collections.OrderedDict({
             test_configs.TFLITE_MODEL.id:
-                common_artifacts.ModelArtifact(model=test_configs.TFLITE_MODEL,
-                                               file_path=pathlib.PurePath("x")),
+                model_artifacts.ModelArtifact(model=test_configs.TFLITE_MODEL,
+                                              file_path=pathlib.PurePath("x")),
             test_configs.TF_MODEL.id:
-                common_artifacts.ModelArtifact(model=test_configs.TF_MODEL,
-                                               file_path=pathlib.PurePath("y"))
+                model_artifacts.ModelArtifact(model=test_configs.TF_MODEL,
+                                              file_path=pathlib.PurePath("y"))
         }))
     parent_path = pathlib.PurePath("root", "iree")
 
@@ -91,11 +91,11 @@ class IreeArtifactsTest(unittest.TestCase):
         })))
 
   def test_generate_artifacts_root_model_not_found(self):
-    model_artifacts_root = common_artifacts.ModelArtifactsRoot(
+    model_artifacts_root = model_artifacts.ArtifactsRoot(
         model_artifact_map=collections.OrderedDict({
             test_configs.TF_MODEL.id:
-                common_artifacts.ModelArtifact(model=test_configs.TF_MODEL,
-                                               file_path=pathlib.PurePath("y"))
+                model_artifacts.ModelArtifact(model=test_configs.TF_MODEL,
+                                              file_path=pathlib.PurePath("y"))
         }))
     parent_path = pathlib.PurePath("root", "iree")
 

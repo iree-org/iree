@@ -6,7 +6,7 @@
 """Defines configs to help testing."""
 
 from e2e_test_framework.definitions import common_definitions, iree_definitions
-from e2e_test_artifacts import common_artifacts
+from e2e_test_artifacts import model_artifacts
 
 TFLITE_MODEL = common_definitions.Model(
     id="1234",
