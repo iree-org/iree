@@ -36,9 +36,10 @@ namespace {
 /// For example, this matches the following pattern:
 ///
 ///   %subspan = hal.interface.binding.subspan ... :
-///       !flow.dispatch.tensor<readonly:3x3x1x96xf32>
+///       !flow.dispatch.tensor<readonly:tensor<3x3x1x96xf32>>
 ///   %tensor = flow.dispatch.tensor.load %subspan :
-///       !flow.dispatch.tensor<readonly:3x3x1x96xf32> -> tensor<3x3x1x96xf32>
+///       !flow.dispatch.tensor<readonly:tensor<3x3x1x96xf32>> ->
+///       tensor<3x3x1x96xf32>
 ///   %0 = linalg.tensor_reshape %tensor [
 ///         affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 ///       ] : tensor<3x3x1x96xf32> into tensor<864xf32>
@@ -46,9 +47,9 @@ namespace {
 /// And turns it into:
 ///
 ///   %subspan = hal.interface.binding.subspan ... :
-///       !flow.dispatch.tensor<readonly:864xf32>
+///       !flow.dispatch.tensor<readonly:tensor<864xf32>>
 ///   %0 = flow.dispatch.tensor.load %subspan :
-///       !flow.dispatch.tensor<readonly:864xf32> -> tensor<864xf32>
+///       !flow.dispatch.tensor<readonly:tensor<864xf32>> -> tensor<864xf32>
 template <typename TensorReshapeOp>
 struct FoldReshapeIntoInterfaceTensorLoad : OpRewritePattern<TensorReshapeOp> {
   using OpRewritePattern<TensorReshapeOp>::OpRewritePattern;

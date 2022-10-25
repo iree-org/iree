@@ -15,10 +15,10 @@
       %c0 = arith.constant 0 : index
       %c10240 = arith.constant 10240 : index
       %cst = arith.constant 1.000000e+00 : f32
-      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:512x10240xf32>
-      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:512xf32>
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<512x10240xf32>>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:tensor<512xf32>>
       %5 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [512, 10240], strides = [1, 1]
-          : !flow.dispatch.tensor<readonly:512x10240xf32> -> tensor<512x10240xf32>
+          : !flow.dispatch.tensor<readonly:tensor<512x10240xf32>> -> tensor<512x10240xf32>
       %8 = tensor.empty() : tensor<512xf32>
       %9 = linalg.fill ins(%cst : f32) outs(%8 : tensor<512xf32>) -> tensor<512xf32>
       %10 = linalg.generic {
@@ -29,7 +29,7 @@
           linalg.yield %11 : f32
         } -> tensor<512xf32>
       flow.dispatch.tensor.store %10, %1, offsets = [0], sizes = [512], strides = [1]
-          : tensor<512xf32> -> !flow.dispatch.tensor<writeonly:512xf32>
+          : tensor<512xf32> -> !flow.dispatch.tensor<writeonly:tensor<512xf32>>
       return
     }
   }

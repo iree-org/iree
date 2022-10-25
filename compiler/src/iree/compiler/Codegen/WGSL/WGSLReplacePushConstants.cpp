@@ -124,7 +124,8 @@ class WGSLReplacePushConstantsPass
       alignmentAttr = constantLoadOps[0].getAlignmentAttr();
     }
 
-    // hal.interface.binding.subspan -> !flow.dispatch.tensor<readonly:Nxi32>
+    // hal.interface.binding.subspan ->
+    // !flow.dispatch.tensor<readonly:tensor<Nxi32>>
     //   * Group all push constants into a single tensor<Nxi32>
     //   * If individual data types differ, they'll be bitcast when extracted
     auto dispatchTensorType = IREE::Flow::DispatchTensorType::get(

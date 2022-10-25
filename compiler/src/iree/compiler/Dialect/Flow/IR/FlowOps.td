@@ -100,9 +100,9 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
     ```mlir
     %r = flow.dispatch.workgroups[%c5, %c5](%0, %1)
         : (tensor<5x5xf32>, tensor<5xf32>) -> tensor<5x5xf32> =
-              (%arg0: !flow.dispatch.tensor<readonly:5x5xf32>,
-               %arg1: !flow.dispatch.tensor<readonly:5xf32>,
-               %arg2: !flow.dispatch.tensor<writeonly:5x5xf32>) {
+              (%arg0: !flow.dispatch.tensor<readonly:tensor<5x5xf32>>,
+               %arg1: !flow.dispatch.tensor<readonly:tensor<5xf32>>,
+               %arg2: !flow.dispatch.tensor<writeonly:tensor<5x5xf32>>) {
       ...
     }
     ```
