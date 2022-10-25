@@ -20,6 +20,7 @@
 #include "iree/modules/hal/types.h"
 #include "iree/tooling/comparison.h"
 #include "iree/tooling/context_util.h"
+#include "iree/tooling/device_util.h"
 #include "iree/tooling/vm_util_cc.h"
 #include "iree/vm/api.h"
 #include "iree/vm/ref_cc.h"
@@ -120,6 +121,8 @@ iree_status_t Run(int* out_exit_code) {
         "looking up function '%s'", function_name.c_str());
   }
 
+  IREE_RETURN_IF_ERROR(iree_hal_begin_profiling_from_flags(device));
+
   vm::ref<iree_vm_list_t> inputs;
   IREE_RETURN_IF_ERROR(ParseToVariantList(
       device_allocator,
@@ -148,6 +151,8 @@ iree_status_t Run(int* out_exit_code) {
     IREE_RETURN_IF_ERROR(
         iree_hal_fence_wait(finish_fence.get(), iree_infinite_timeout()));
   }
+
+  IREE_RETURN_IF_ERROR(iree_hal_end_profiling_from_flags(device));
 
   if (FLAG_expected_outputs.empty()) {
     IREE_RETURN_IF_ERROR(
