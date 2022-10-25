@@ -2171,9 +2171,10 @@ SmallVector<Range> UnPackOp::getIterationDomain(OpBuilder &builder) {
 
 SmallVector<Operation *>
 UnPackOp::getTiledImplementation(OpBuilder &builder,
-                               ArrayRef<OpFoldResult> offsets,
-                               ArrayRef<OpFoldResult> sizes) {
-  if (!hasTensorSemantics()) return {};
+                                 ArrayRef<OpFoldResult> offsets,
+                                 ArrayRef<OpFoldResult> sizes) {
+  if (!hasTensorSemantics())
+    return {};
 
   Location loc = getLoc();
   auto ctx = builder.getContext();
