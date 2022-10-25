@@ -61,6 +61,7 @@ CMAKE_ARGS=(
 
   # Enable WebGPU compiler builds and tests. All deps get fetched as needed,
   # but some of the deps are too large to enable by default for all developers.
+  "-DTINT_ENABLE_ASAN=ON"
   "-DIREE_TARGET_BACKEND_WEBGPU=ON"
 )
 
