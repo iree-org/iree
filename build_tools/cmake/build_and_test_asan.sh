@@ -130,6 +130,7 @@ declare -a excluded_tests=(
   "iree/tests/e2e/models/mnist_fake_weights.mlir.test"
   "iree/tests/e2e/models/resnet50_fake_weights.mlir.test"
   "iree/tests/e2e/models/unidirectional_lstm.mlir.test"
+  "iree/tests/e2e/regression/globals.mlir.test"
   # TODO(#5715): Fix these
   "iree/samples/simple_embedding/simple_embedding_vulkan_test"
   "iree/tools/test/iree-benchmark-module.mlir.test"
