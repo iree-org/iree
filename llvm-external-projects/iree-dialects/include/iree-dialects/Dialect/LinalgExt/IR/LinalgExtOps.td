@@ -600,7 +600,9 @@ def IREELinalgExt_UnPackOp : IREELinalgExt_Op<"unpack", [
   DeclareOpInterfaceMethods<TilingInterface,
     ["getIterationDomain",
      "getLoopIteratorTypes",
-     "generateScalarImplementation"]>,
+     "generateScalarImplementation",
+     "getResultTilePosition",
+     "getTiledImplementation"]>,
   DeclareOpInterfaceMethods<MemoryEffectsOpInterface>
 ]>{
   let summary = "unpack operation";

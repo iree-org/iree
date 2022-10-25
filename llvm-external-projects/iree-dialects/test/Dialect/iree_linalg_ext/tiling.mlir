@@ -1095,3 +1095,50 @@ func.func @pad_and_pack_fully_dynamic(%input: tensor<?x?xf32>, %output: tensor<?
 // CHECK:           return %[[RES0:.*]] : tensor<?x?x?x?xf32>
 // CHECK:         }
 
+// -----
+
+func.func @unpack_static(%input: tensor<8x8x32x16xf32>, %output: tensor<256x128xf32>) -> tensor<256x128xf32> {
+  %0 = iree_linalg_ext.unpack {__internal_linalg_transform__ = "tiling_pack_input"} %input inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %output : (tensor<8x8x32x16xf32> tensor<256x128xf32>) -> tensor<256x128xf32>
+  return %0 : tensor<256x128xf32>
+}
+// CHECK-DAG:   #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (2, -d0 + s1)>
+// CHECK-DAG:   #[[MAP1:.+]] = affine_map<(d0)[s0, s1] -> (4, -d0 + s1)>
+// CHECK-DAG:   #[[MAP2:.+]] = affine_map<(d0) -> (d0 floordiv 32)>
+// CHECK-DAG:   #[[MAP3:.+]] = affine_map<(d0) -> (d0 mod 32)>
+// CHECK-DAG:   #[[MAP4:.+]] = affine_map<(d0, d1) -> ((d0 + d1 - 1) floordiv 32 - d0 floordiv 32 + 1)>
+// CHECK-DAG:   #[[MAP5:.+]] = affine_map<(d0, d1) -> (((d0 + d1 - 1) floordiv 32) * 32 - (d0 floordiv 32) * 32 + 32)>
+// CHECK-DAG:   #[[MAP6:.+]] = affine_map<(d0) -> (d0 floordiv 16)>
+// CHECK-DAG:   #[[MAP7:.+]] = affine_map<(d0) -> (d0 mod 16)>
+// CHECK-DAG:   #[[MAP8:.+]] = affine_map<(d0, d1) -> ((d0 + d1 - 1) floordiv 16 - d0 floordiv 16 + 1)>
+// CHECK-DAG:   #[[MAP9:.+]] = affine_map<(d0, d1) -> (((d0 + d1 - 1) floordiv 16) * 16 - (d0 floordiv 16) * 16 + 16)>
+// CHECK-LABEL: func.func @unpack_static
+// CHECK-SAME:    %[[IN:[A-Za-z0-9]+]]:
+// CHECK-SAME:    %[[OUT:[A-Za-z0-9]+]]:
+// CHECK-DAG:     %[[C0:.*]] = arith.constant 0 : index
+// CHECK-DAG:     %[[C2:.*]] = arith.constant 2 : index
+// CHECK-DAG:     %[[C4:.*]] = arith.constant 4 : index
+// CHECK-DAG:     %[[C128:.*]] = arith.constant 128 : index
+// CHECK-DAG:     %[[C256:.*]] = arith.constant 256 : index
+// CHECK:         %{{.+}} = scf.for %[[I:.+]] = %[[C0]] to %[[C256]] step %[[C2]]
+// CHECK-DAG:       %[[OUT_I_SZ:.+]] = affine.min #[[MAP0]](%[[I]])[%[[C2]], %[[C256]]]
+// CHECK:           %{{.+}} = scf.for %[[J:.+]] = %[[C0]] to %[[C128]] step %[[C4]]
+// CHECK-DAG:         %[[OUT_J_SZ:.+]] = affine.min #[[MAP1]](%[[J]])[%[[C4]], %[[C128]]]
+// CHECK-DAG:         %[[IN_I:.+]] = affine.apply #[[MAP2]](%[[I]])
+// CHECK-DAG:         %[[OFFSET_I:.+]] = affine.apply #[[MAP3]](%[[I]])
+// CHECK-DAG:         %[[IN_J:.+]] = affine.apply #[[MAP6]](%[[J]])
+// CHECK-DAG:         %[[OFFSET_J:.+]] = affine.apply #[[MAP7]](%[[J]])
+// CHECK-DAG:         %[[IN_I_SZ:.+]] = affine.apply #[[MAP4]](%[[I]], %[[OUT_I_SZ]])
+// CHECK-DAG:         %[[IN_J_SZ:.+]] = affine.apply #[[MAP8]](%[[J]], %[[OUT_J_SZ]])
+// CHECK:             %[[SLICE:.+]] = tensor.extract_slice %[[IN]]
+// CHECK-SAME:          [%[[IN_I]], %[[IN_J]], 0, 0] [%[[IN_I_SZ]], %[[IN_J_SZ]], 32, 16]
+// CHECK-SAME:        : tensor<8x8x32x16xf32> to tensor<?x?x32x16xf32>
+// CHECK:             %[[EMPTY:.+]] = tensor.empty
+// CHECK:             %[[UNPACK:.+]] = iree_linalg_ext.unpack
+// CHECK-SAME:          {__internal_linalg_transform__ = "tiling_pack_output"}
+// CHECK-SAME:          %[[SLICE]] inner_dims_pos = [0, 1] inner_tiles = [32, 16]
+// CHECK-SAME:          into %[[EMPTY]]
+// CHECK:             %[[UNPACK_SLICE:.+]] = tensor.extract_slice %[[UNPACK]]
+// CHECK-SAME:          [%[[OFFSET_I]], %[[OFFSET_J]]] [%[[OUT_I_SZ]], %[[OUT_J_SZ]]]
+// CHECK:             %[[RES:.+]] = tensor.insert_slice %[[UNPACK_SLICE]]
+// CHECK-SAME:          into %{{.+}}[%[[I]], %[[J]]] [%[[OUT_I_SZ]], %[[OUT_J_SZ]]]
+// CHECK:             scf.yield %[[RES]]
