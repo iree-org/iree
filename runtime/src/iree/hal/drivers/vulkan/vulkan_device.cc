@@ -1229,6 +1229,9 @@ static iree_status_t iree_hal_vulkan_device_wait_semaphores(
 static iree_status_t iree_hal_vulkan_device_profiling_begin(
     iree_hal_device_t* base_device,
     const iree_hal_device_profiling_options_t* options) {
+  iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
+  (void)device;
+
   // For now we only support RenderDoc. As much as possible we should try to use
   // standardized Vulkan layers to do profiling configuration/control like
   // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_performance_query.html
@@ -1239,7 +1242,6 @@ static iree_status_t iree_hal_vulkan_device_profiling_begin(
   if (iree_all_bits_set(options->mode,
                         IREE_HAL_DEVICE_PROFILING_MODE_QUEUE_OPERATIONS)) {
 #if defined(IREE_HAL_VULKAN_HAVE_RENDERDOC)
-    iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
     iree_hal_vulkan_begin_renderdoc_capture(device->renderdoc_api,
                                             device->instance, options);
 #endif  // IREE_HAL_VULKAN_HAVE_RENDERDOC
@@ -1249,8 +1251,10 @@ static iree_status_t iree_hal_vulkan_device_profiling_begin(
 
 static iree_status_t iree_hal_vulkan_device_profiling_end(
     iree_hal_device_t* base_device) {
-#if defined(IREE_HAL_VULKAN_HAVE_RENDERDOC)
   iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
+  (void)device;
+
+#if defined(IREE_HAL_VULKAN_HAVE_RENDERDOC)
   iree_hal_vulkan_end_renderdoc_capture(device->renderdoc_api,
                                         device->instance);
 #endif  // IREE_HAL_VULKAN_HAVE_RENDERDOC

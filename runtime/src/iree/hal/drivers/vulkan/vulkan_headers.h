@@ -7,6 +7,8 @@
 #ifndef IREE_HAL_DRIVERS_VULKAN_VULKAN_HEADERS_H_
 #define IREE_HAL_DRIVERS_VULKAN_VULKAN_HEADERS_H_
 
+#include "iree/base/target_platform.h"
+
 // We exclusively use Vulkan via queried function pointers. To ensure that there
 // are no accidental calls to the linker-loaded implicit functions we just
 // compile them all out.
@@ -32,6 +34,12 @@
 // See this article for more information:
 // https://djang86.blogspot.com/2019/01/what-is-vknoprototypes.html
 #define VK_NO_PROTOTYPES 1
+
+#if defined(IREE_PLATFORM_ANDROID)
+#define VK_USE_PLATFORM_ANDROID_KHR 1
+#elif defined(IREE_PLATFORM_WINDOWS)
+#define VK_USE_PLATFORM_WIN32_KHR 1
+#endif  // IREE_PLATFORM_*
 
 #include <vulkan/vulkan.h>  // IWYU pragma: export
 
