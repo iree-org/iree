@@ -38,6 +38,16 @@ SmallVector<T> interchange(ArrayRef<T> elements,
   }
   return vec;
 }
+template <typename T>
+SmallVector<T> undoInterchange(ArrayRef<T> elements,
+                               ArrayRef<int64_t> interchangeVector,
+                               int offset = 0) {
+  SmallVector<T> vec = llvm::to_vector(elements);
+  for (auto en : llvm::enumerate(interchangeVector)) {
+    vec[en.value() + offset] = elements[en.index() + offset];
+  }
+  return vec;
+}
 
 } // namespace LinalgExt
 } // namespace IREE
