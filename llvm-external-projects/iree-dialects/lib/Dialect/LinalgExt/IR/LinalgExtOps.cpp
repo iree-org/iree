@@ -1956,6 +1956,19 @@ PackOp::getTiledImplementation(OpBuilder &builder,
     return makeComposedFoldedAffineApply(builder, loc, subMap, {v1, v2});
   };
 
+  // The tiling is applied on interchanged dimensions. We have to undo the
+  // interchange to map sizes and offsets to the original input.
+  SmallVector<int64_t> dimsToOuterBlock =
+      extractFromI64ArrayAttr(getOuterDimsPerm());
+  SmallVector<OpFoldResult> origOffsets(offsets.begin(), offsets.end());
+  SmallVector<OpFoldResult> origSizes(sizes.begin(), sizes.end());
+  if (!dimsToOuterBlock.empty()) {
+    SmallVector<int64_t> vec =
+        computeInterchangeFromDimPos(dimsToOuterBlock, getInputRank());
+    origOffsets = undoInterchange<OpFoldResult>(origOffsets, vec);
+    origSizes = undoInterchange<OpFoldResult>(origSizes, vec);
+  }
+
   int64_t inputRank = getInputRank();
   DenseMap<int64_t, OpFoldResult> dimAndTileMapping = getDimAndTileMapping();
   SmallVector<OpFoldResult> inputIndices, inputSizes;
@@ -1968,16 +1981,16 @@ PackOp::getTiledImplementation(OpBuilder &builder,
       bindSymbols(ctx, tile);
       OpFoldResult inputIndex = makeComposedFoldedAffineApply(
           builder, loc, i * tile,
-          ArrayRef<OpFoldResult>{offsets[dim], dimAndTileMapping[dim]});
+          ArrayRef<OpFoldResult>{origOffsets[dim], dimAndTileMapping[dim]});
       inputIndices.push_back(inputIndex);
 
       OpFoldResult inputSize = makeComposedFoldedAffineApply(
           builder, loc, i * tile,
-          ArrayRef<OpFoldResult>{sizes[dim], dimAndTileMapping[dim]});
+          ArrayRef<OpFoldResult>{origSizes[dim], dimAndTileMapping[dim]});
       inputSizes.push_back(inputSize);
     } else {
-      inputIndices.push_back(offsets[dim]);
-      inputSizes.push_back(sizes[dim]);
+      inputIndices.push_back(origOffsets[dim]);
+      inputSizes.push_back(origSizes[dim]);
     }
 
     // Limit the size of the input operand for incomplete tiles.

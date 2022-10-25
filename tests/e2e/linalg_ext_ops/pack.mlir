@@ -349,3 +349,46 @@ func.func @dynamic_pack_pad_transpose_large() {
   check.expect_eq(%cast_pack, %transpose) : tensor<4x16x16x32xi32>
   return
 }
+
+func.func @dynamic_pack_transpose_inner_and_outer_dims_large() {
+  %d0 = util.unfoldable_constant 128 : index
+  %d1 = util.unfoldable_constant 256 : index
+  %source = call @generate_2D_source(%d0, %d1) : (index, index) -> tensor<?x?xi32>
+
+  %cm1 = arith.constant -1 : i32
+  %c32 = arith.constant 32 : index
+  %c16 = arith.constant 16 : index
+  %tiled_d0 = arith.ceildivui %d0, %c32 : index
+  %tiled_d1 = arith.ceildivui %d1, %c16 : index
+  %dyn_init_pack = tensor.empty(%tiled_d0, %tiled_d1) : tensor<?x?x16x32xi32>
+  %pack = iree_linalg_ext.pack %source padding_value (%cm1 : i32) outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 32] into %dyn_init_pack
+      : (tensor<?x?xi32> tensor<?x?x16x32xi32>) -> tensor<?x?x16x32xi32>
+  %cast_pack = tensor.cast %pack : tensor<?x?x16x32xi32> to tensor<16x4x16x32xi32>
+
+  %static_init_pack = tensor.empty() : tensor<16x4x16x32xi32>
+  %golden = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      outs(%static_init_pack : tensor<16x4x16x32xi32>) {
+    ^bb0(%b0: i32):
+      %0 = linalg.index 0 : index
+      %1 = linalg.index 1 : index
+      %2 = linalg.index 2 : index
+      %3 = linalg.index 3 : index
+      %stride0 = arith.constant 16 : index
+      %stride1 = arith.constant 8192 : index
+      %stride2 = arith.constant 1 : index
+      %stride3 = arith.constant 256 : index
+      %offset0 = arith.muli %0, %stride0 : index
+      %offset1 = arith.muli %1, %stride1 : index
+      %offset2 = arith.muli %2, %stride2 : index
+      %offset3 = arith.muli %3, %stride3 : index
+      %offset01 = arith.addi %offset0, %offset1 : index
+      %offset012 = arith.addi %offset01, %offset2 : index
+      %linearized = arith.addi %offset012, %offset3 : index
+      %linearized_i32 = arith.index_cast %linearized : index to i32
+      linalg.yield %linearized_i32 : i32
+    } -> tensor<16x4x16x32xi32>
+  check.expect_eq(%cast_pack, %golden) : tensor<16x4x16x32xi32>
+  return
+}
