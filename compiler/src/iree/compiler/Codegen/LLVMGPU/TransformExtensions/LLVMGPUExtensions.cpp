@@ -238,12 +238,11 @@ transform_dialect::VectorToWarpExecuteOnLane0Op::applyToOne(
     scf::IfOp target, SmallVectorImpl<Operation *> &results,
     transform::TransformState &state) {
   if (!isa<HAL::ExecutableOp, HAL::ExecutableVariantOp>(state.getTopLevel())) {
-    state.getTopLevel()->emitOpError(
-        "requires HAL::ExecutableOp or HAL::ExecutableVariantOp toplevel so "
-        "that IR is properly isolated. This is required so we can safely "
-        "inspect the HAL::ExecutableExportOp under multi-threaded pass "
-        "assumptions.");
-    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+    return emitDefaultSilenceableFailure(state.getTopLevel())
+           << "requires HAL::ExecutableOp or HAL::ExecutableVariantOp toplevel "
+              "so that IR is properly isolated. This is required so we can "
+              "safely inspect the HAL::ExecutableExportOp under multi-threaded "
+              "pass assumptions.";
   }
 
   auto halExecutableVariantOp =

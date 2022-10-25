@@ -569,7 +569,7 @@ forgetUnnecessaryHandles(transform::TransformState &state,
       continue;
 
     for (Operation *payload : state.getPayloadOps(operand)) {
-      if (seen.contains(payload))
+      if (!payload || seen.contains(payload))
         continue;
       SmallVector<Value> allHandles;
       (void)state.getHandlesForPayloadOp(payload, allHandles);
@@ -592,7 +592,7 @@ forgetUnnecessaryHandles(transform::TransformState &state,
     if (!result.getUses().empty())
       continue;
     for (Operation *payload : state.getPayloadOps(result)) {
-      if (seen.contains(payload))
+      if (!payload || seen.contains(payload))
         continue;
       listener->removeMappings(payload);
       seen.insert(payload);
