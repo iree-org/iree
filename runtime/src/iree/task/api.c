@@ -11,6 +11,7 @@
 
 #include "iree/base/internal/flags.h"
 #include "iree/base/tracing.h"
+#include "iree/task/numactl.h"
 #include "iree/task/topology.h"
 
 //===----------------------------------------------------------------------===//
@@ -87,12 +88,8 @@ iree_status_t iree_task_topology_initialize_from_flags(
   IREE_ASSERT_ARGUMENT(out_topology);
   iree_task_topology_initialize(out_topology);
   if (FLAG_task_topology_dump == true) {
-    printf("TEST: %d\n", numa_max_node());
     printf("HARDWARE:\n");
-    hardware();
-    printf("SET\n");
-  } else {
-    printf("NOT SET\n");
+    hardware_test();
   }
 
   if (FLAG_task_topology_group_count != 0) {
