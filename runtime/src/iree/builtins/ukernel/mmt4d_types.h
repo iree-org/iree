@@ -39,27 +39,8 @@ struct iree_ukernel_mmt4d_params_t {
 
 typedef struct iree_ukernel_mmt4d_params_t iree_ukernel_mmt4d_params_t;
 
-// Status codes returned by a mmt4d operation.
-enum iree_ukernel_mmt4d_status_t {
-  iree_ukernel_mmt4d_status_ok = 0,
-  iree_ukernel_mmt4d_status_bad_type,
-  iree_ukernel_mmt4d_status_bad_flags,
-  iree_ukernel_mmt4d_status_unsupported_huge_or_negative_dimension,
-  iree_ukernel_mmt4d_status_unsupported_generic_tile_size,
-};
-
-typedef enum iree_ukernel_mmt4d_status_t iree_ukernel_mmt4d_status_t;
-
 // TODO: move these flags to a header file shared with compiler/.
-#define IREE_VMVX_MATMUL_FLAG_ACCUMULATE 1
-
-#define IREE_UKERNEL_MMT4D_RETURN_IF_ERROR(X)     \
-  do {                                            \
-    iree_ukernel_mmt4d_status_t status = (X);     \
-    if (status != iree_ukernel_mmt4d_status_ok) { \
-      return status;                              \
-    }                                             \
-  } while (0)
+#define IREE_UKERNEL_FLAG_ACCUMULATE 1
 
 // Function pointer type for tile functions, i.e. typically architecture
 // specific functions computing one M0xN0 tile of the output matrix, i.e.
