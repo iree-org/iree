@@ -21,6 +21,11 @@ namespace Stream {
 #ifndef NDEBUG
 
 void dumpPartition(Partition &partition, AsmState &state) {
+  if (partition.affinity) {
+    llvm::dbgs() << " AFFINITY: ";
+    partition.affinity.dump();
+    llvm::dbgs() << "\n";
+  }
   llvm::dbgs() << " INS:\n  ";
   llvm::interleaveComma(partition.ins, llvm::dbgs(), [&](Value in) {
     in.printAsOperand(llvm::dbgs(), state);
@@ -56,6 +61,18 @@ void PartitionSet::dump(Operation *parentOp) {}
 #endif  // !NDEBUG
 
 LogicalResult Partition::verify(Location loc) {
+  // Ensure all ops are compatible with the partition affinity.
+  for (auto *op : ops) {
+    if (auto affinityOp = dyn_cast<IREE::Stream::AffinityOpInterface>(op)) {
+      if (!IREE::Stream::AffinityAttr::areCompatible(
+              affinity, affinityOp.getAffinity())) {
+        return op->emitError("op affinity ")
+               << affinityOp.getAffinity()
+               << " is not compatible with the partition affinity " << affinity;
+      }
+    }
+  }
+
   // Ensure values are defined either by other ops in the partition or are
   // declared as inputs.
   SetVector<Value> defValues;

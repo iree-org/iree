@@ -28,3 +28,14 @@
     ]>
   ]>
 } : () -> ()
+
+// -----
+
+"affinity.queue"() {
+  // CHECK: any = #hal.affinity.queue<*>
+  any = #hal.affinity.queue<*>,
+  // CHECK: q0 = #hal.affinity.queue<[0]>
+  q0 = #hal.affinity.queue<[0]>,
+  // CHECK: q123 = #hal.affinity.queue<[1, 2, 3]>
+  q123 = #hal.affinity.queue<[1, 2, 3]>
+} : () -> ()

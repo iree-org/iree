@@ -21,7 +21,8 @@ func.func @foo(%argA: tensor<?x?xf32>, %argB: tensor<5x10xf32>, %argC: tensor<10
     flow.return %argA : tensor<?x?xf32>
   }
 
-  //      CHECK: %[[r1:.*]] = flow.dispatch.workgroups(%[[argB]], %[[argC]]) : (tensor<5x10xf32>, tensor<10x11xf32>) -> tensor<5x11xf32> =
+  //      CHECK: %[[r1:.*]] = flow.dispatch.workgroups(%[[argB]], %[[argC]]) : (tensor<5x10xf32>, tensor<10x11xf32>) -> tensor<5x11xf32>
+  // CHECK-SAME:   stream.affinity = #hal.affinity.queue<[0]>
   // CHECK-NEXT: (%[[arg3:.*]]: !flow.dispatch.tensor<readonly:5x10xf32>, %[[arg4:.*]]: !flow.dispatch.tensor<readonly:10x11xf32>, %[[arg5:.*]]: !flow.dispatch.tensor<writeonly:5x11xf32>)
   //  CHECK-DAG:   %[[loadB:.*]] = flow.dispatch.tensor.load %[[arg3]], offsets = [0, 0], sizes = [5, 10], strides = [1, 1] : !flow.dispatch.tensor<readonly:5x10xf32> -> tensor<5x10xf32>
   //  CHECK-DAG:   %[[loadC:.*]] = flow.dispatch.tensor.load %[[arg4]], offsets = [0, 0], sizes = [10, 11], strides = [1, 1] : !flow.dispatch.tensor<readonly:10x11xf32> -> tensor<10x11xf32>
@@ -31,7 +32,7 @@ func.func @foo(%argA: tensor<?x?xf32>, %argB: tensor<5x10xf32>, %argC: tensor<10
   //      CHECK:   flow.dispatch.tensor.store %[[matmul]], %[[arg5]], offsets = [0, 0], sizes = [5, 11], strides = [1, 1] : tensor<5x11xf32> -> !flow.dispatch.tensor<writeonly:5x11xf32>
   //      CHECK:   flow.return
   //      CHECK: }
-  %r1 = flow.dispatch.region -> (tensor<5x11xf32>) {
+  %r1 = flow.dispatch.region {stream.affinity = #hal.affinity.queue<[0]>} -> (tensor<5x11xf32>) {
     %zero = arith.constant 0.0 : f32
     %0 = tensor.empty() : tensor<5x11xf32>
     %1 = linalg.fill ins(%zero : f32) outs(%0 : tensor<5x11xf32>) -> tensor<5x11xf32>
