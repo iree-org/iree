@@ -58,10 +58,6 @@ CMAKE_ARGS=(
   # (but not necessarily test on real hardware).
   "-DIREE_HAL_DRIVER_CUDA=ON"
   "-DIREE_TARGET_BACKEND_CUDA=ON"
-
-  # Enable WebGPU compiler builds and tests. All deps get fetched as needed,
-  # but some of the deps are too large to enable by default for all developers.
-  "-DIREE_TARGET_BACKEND_WEBGPU=ON"
 )
 
 echo "Configuring CMake"
