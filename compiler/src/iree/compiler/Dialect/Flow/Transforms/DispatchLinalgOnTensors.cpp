@@ -507,7 +507,7 @@ static BlockArgument getTiedOperandBlockArgument(BlockArgument resultArg) {
   // match and that the tied argument is readonly.
   auto type = tiedArg.getType().dyn_cast<IREE::Flow::DispatchTensorType>();
   if (!type || type.getAccess() != IREE::Flow::TensorAccess::ReadOnly ||
-      type.getEmbedElementType() != resultArgType.getEmbedElementType() ||
+      type.getBoundElementType() != resultArgType.getBoundElementType() ||
       llvm::any_of(llvm::zip(type.getShape(), resultArgType.getShape()),
                    [](std::tuple<int64_t, int64_t> sizes) {
                      return std::get<0>(sizes) != ShapedType::kDynamicSize &&

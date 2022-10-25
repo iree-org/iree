@@ -46,7 +46,7 @@ static MemRefType getMemrefTypeForTensor(
     IREE::Flow::DispatchTensorType tensorType,
     MemRefLayoutAttrInterface layout = {}, Attribute memorySpace = {}) {
   return MemRefType::get(tensorType.getShape(),
-                         tensorType.getEmbedElementType(), layout, memorySpace);
+                         tensorType.getBoundElementType(), layout, memorySpace);
 }
 
 /// Find the memref version of the given InterfaceBindingSubspanOp. If no such

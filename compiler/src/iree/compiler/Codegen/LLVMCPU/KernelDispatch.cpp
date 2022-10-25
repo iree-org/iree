@@ -300,7 +300,7 @@ static unsigned getReferenceTypeLengthInBytes(func::FuncOp entryPointFn) {
                   // are not vector-loadable, so using these to
                   // get vector length would be a pessimization.
                   if (!dispatchTensorType.getRank()) return nullptr;
-                  return dispatchTensorType.getEmbedElementType();
+                  return dispatchTensorType.getBoundElementType();
                 })
             .Case<ShapedType>([&](auto shapedType) -> Type {
               // Ignore operands that are 0D tensors. These

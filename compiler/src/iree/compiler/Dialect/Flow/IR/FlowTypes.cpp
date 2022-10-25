@@ -51,7 +51,7 @@ Type DispatchTensorType::getBoundType() const {
   return static_cast<Type>(static_cast<ImplType *>(impl)->boundType);
 }
 
-Type DispatchTensorType::getEmbedElementType() const {
+Type DispatchTensorType::getBoundElementType() const {
   Type boundType = getBoundType();
   if (boundType.isIntOrFloat()) {
     return boundType;
@@ -59,8 +59,8 @@ Type DispatchTensorType::getEmbedElementType() const {
   return boundType.cast<RankedTensorType>().getElementType();
 }
 
-unsigned DispatchTensorType::getEmbedElementTypeBitWidth() const {
-  return getEmbedElementType().getIntOrFloatBitWidth();
+unsigned DispatchTensorType::getBoundElementTypeBitWidth() const {
+  return getBoundElementType().getIntOrFloatBitWidth();
 }
 
 int64_t DispatchTensorType::getNumElements() const {
@@ -121,7 +121,7 @@ LogicalResult DispatchTensorType::verify(
     function_ref<InFlightDiagnostic()> emitError, uint32_t access,
     Type boundType) {
   if (!boundType.isIntOrFloat() && !boundType.isa<RankedTensorType>()) {
-    return emitError() << "unhandled embedded type in dispatch. Must by int, "
+    return emitError() << "unhandled bounded type in dispatch. Must by int, "
                           "float or ranked tensor type";
   }
   return success();

@@ -506,7 +506,7 @@ RankedTensorType DispatchTensorLoadOp::inferResultType(
         }
         return ShapedType::kDynamicSize;
       }));
-  return RankedTensorType::get(shape, sourceType.getEmbedElementType());
+  return RankedTensorType::get(shape, sourceType.getBoundElementType());
 }
 
 llvm::SmallBitVector DispatchTensorLoadOp::getDroppedDims() {

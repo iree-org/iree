@@ -69,15 +69,15 @@ class DispatchTensorType
   /// Returns the allowed operations the tensor.
   TensorAccess getAccess() const;
 
-  /// Returns the embedded type.
+  /// Returns the bounded type.
   Type getBoundType() const;
 
-  /// Return the element type of the embeded type.
-  Type getEmbedElementType() const;
+  /// Return the element type of the bounded type.
+  Type getBoundElementType() const;
 
   /// If an element type is an integer or a float, return its width. Otherwise,
   /// abort.
-  unsigned getEmbedElementTypeBitWidth() const;
+  unsigned getBoundElementTypeBitWidth() const;
 
   /// If it has static shape, return the number of elements. Otherwise, abort.
   int64_t getNumElements() const;
