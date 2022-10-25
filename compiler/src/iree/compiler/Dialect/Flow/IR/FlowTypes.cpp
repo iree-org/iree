@@ -38,25 +38,25 @@ DispatchTensorType DispatchTensorType::get(TensorAccess access,
 
 // static
 DispatchTensorType DispatchTensorType::get(TensorAccess access,
-                                           Type embedType) {
-  return Base::get(embedType.getContext(), static_cast<uint32_t>(access),
-                   embedType);
+                                           Type boundType) {
+  return Base::get(boundType.getContext(), static_cast<uint32_t>(access),
+                   boundType);
 }
 
 TensorAccess DispatchTensorType::getAccess() const {
   return static_cast<TensorAccess>(static_cast<ImplType *>(impl)->access);
 }
 
-Type DispatchTensorType::getEmbedType() const {
-  return static_cast<Type>(static_cast<ImplType *>(impl)->embedType);
+Type DispatchTensorType::getBoundType() const {
+  return static_cast<Type>(static_cast<ImplType *>(impl)->boundType);
 }
 
 Type DispatchTensorType::getEmbedElementType() const {
-  Type embedType = getEmbedType();
-  if (embedType.isIntOrFloat()) {
-    return embedType;
+  Type boundType = getBoundType();
+  if (boundType.isIntOrFloat()) {
+    return boundType;
   }
-  return embedType.cast<RankedTensorType>().getElementType();
+  return boundType.cast<RankedTensorType>().getElementType();
 }
 
 unsigned DispatchTensorType::getEmbedElementTypeBitWidth() const {
@@ -72,11 +72,11 @@ int64_t DispatchTensorType::getNumElements() const {
 }
 
 int64_t DispatchTensorType::getRank() const {
-  Type embedType = getEmbedType();
-  if (embedType.isIntOrIndexOrFloat()) {
+  Type boundType = getBoundType();
+  if (boundType.isIntOrIndexOrFloat()) {
     return 0;
   }
-  return embedType.cast<RankedTensorType>().getRank();
+  return boundType.cast<RankedTensorType>().getRank();
 }
 
 bool DispatchTensorType::hasRank() const { return true; }
@@ -98,11 +98,11 @@ unsigned DispatchTensorType::getDynamicDimIndex(unsigned index) const {
 }
 
 ArrayRef<int64_t> DispatchTensorType::getShape() const {
-  Type embedType = getEmbedType();
-  if (embedType.isIntOrIndexOrFloat()) {
+  Type boundType = getBoundType();
+  if (boundType.isIntOrIndexOrFloat()) {
     return {};
   }
-  return embedType.cast<RankedTensorType>().getShape();
+  return boundType.cast<RankedTensorType>().getShape();
 }
 
 int64_t DispatchTensorType::getNumDynamicDims() const {
@@ -119,8 +119,8 @@ bool DispatchTensorType::hasStaticShape(ArrayRef<int64_t> shape) const {
 
 LogicalResult DispatchTensorType::verify(
     function_ref<InFlightDiagnostic()> emitError, uint32_t access,
-    Type embedType) {
-  if (!embedType.isIntOrFloat() && !embedType.isa<RankedTensorType>()) {
+    Type boundType) {
+  if (!boundType.isIntOrFloat() && !boundType.isa<RankedTensorType>()) {
     return emitError() << "unhandled embedded type in dispatch. Must by int, "
                           "float or ranked tensor type";
   }
@@ -130,9 +130,9 @@ LogicalResult DispatchTensorType::verify(
 template <typename T>
 static T parseShapedType(AsmParser &parser) {
   StringRef accessStr;
-  Type embedType;
+  Type boundType;
   if (failed(parser.parseLess()) || failed(parser.parseKeyword(&accessStr)) ||
-      failed(parser.parseColon()) || failed(parser.parseType(embedType)) ||
+      failed(parser.parseColon()) || failed(parser.parseType(boundType)) ||
       failed(parser.parseGreater())) {
     return {};
   }
@@ -141,7 +141,7 @@ static T parseShapedType(AsmParser &parser) {
                     .Case("readwrite", TensorAccess::ReadWrite)
                     .Case("writeonly", TensorAccess::WriteOnly)
                     .Default(TensorAccess::ReadOnly);
-  return T::get(access, embedType);
+  return T::get(access, boundType);
 }
 
 static void printShapedType(DispatchTensorType &type, AsmPrinter &p) {
@@ -158,7 +158,7 @@ static void printShapedType(DispatchTensorType &type, AsmPrinter &p) {
     default:
       assert(false && "unhandled access");
   }
-  p << ":" << type.getEmbedType();
+  p << ":" << type.getBoundType();
 }
 
 // static

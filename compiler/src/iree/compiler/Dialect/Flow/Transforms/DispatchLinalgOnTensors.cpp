@@ -539,7 +539,7 @@ static void tryToTieOperandsAndResults(
     auto oldType =
         tiedOperandArgument.getType().cast<IREE::Flow::DispatchTensorType>();
     tiedOperandArgument.setType(IREE::Flow::DispatchTensorType::get(
-        IREE::Flow::TensorAccess::ReadWrite, oldType.getEmbedType()));
+        IREE::Flow::TensorAccess::ReadWrite, oldType.getBoundType()));
     outputArgument.replaceAllUsesWith(tiedOperandArgument);
     block->eraseArgument(outputArgument.getArgNumber());
     dispatchOp.setTiedResultOperandIndex(result.index(),

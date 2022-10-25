@@ -70,7 +70,7 @@ class DispatchTensorType
   TensorAccess getAccess() const;
 
   /// Returns the embedded type.
-  Type getEmbedType() const;
+  Type getBoundType() const;
 
   /// Return the element type of the embeded type.
   Type getEmbedElementType() const;
@@ -118,7 +118,7 @@ class DispatchTensorType
 
   /// Verify the construction of a tensor type.
   static LogicalResult verify(function_ref<InFlightDiagnostic()> emitError,
-                              uint32_t access, Type embedType);
+                              uint32_t access, Type boundType);
 
   /// Returns true of the given type can be used as an element of a vector type.
   /// In particular, vectors can consist of integer or float primitives.
@@ -127,11 +127,11 @@ class DispatchTensorType
   }
 
   RankedTensorType asRankedTensorType() const {
-    Type embedType = getEmbedType();
-    if (embedType.isIntOrIndexOrFloat()) {
-      return RankedTensorType::get({}, embedType);
+    Type boundType = getBoundType();
+    if (boundType.isIntOrIndexOrFloat()) {
+      return RankedTensorType::get({}, boundType);
     }
-    return embedType.cast<RankedTensorType>();
+    return boundType.cast<RankedTensorType>();
   }
 };
 
@@ -140,13 +140,13 @@ void printType(DispatchTensorType &type, DialectAsmPrinter &p);
 namespace detail {
 
 struct DispatchTensorTypeStorage : public TypeStorage {
-  DispatchTensorTypeStorage(uint32_t access, Type embedType)
-      : access(access), embedType(embedType) {}
+  DispatchTensorTypeStorage(uint32_t access, Type boundType)
+      : access(access), boundType(boundType) {}
 
   /// The hash key used for uniquing.
   using KeyTy = std::tuple<uint32_t, Type>;
   bool operator==(const KeyTy &key) const {
-    return key == KeyTy(access, embedType);
+    return key == KeyTy(access, boundType);
   }
 
   /// Construction.
@@ -158,7 +158,7 @@ struct DispatchTensorTypeStorage : public TypeStorage {
   }
 
   uint32_t access;
-  Type embedType;
+  Type boundType;
 };
 
 }  // namespace detail
