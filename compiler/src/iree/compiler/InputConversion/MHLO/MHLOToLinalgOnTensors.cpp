@@ -19,6 +19,7 @@
 #include "iree/compiler/InputConversion/MHLO/PassDetail.h"
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
 #include "iree/compiler/InputConversion/MHLO/Rewriters.h"
+#include "iree/compiler/Utils/ConversionUtils.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/legalize_to_linalg_utils.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/rewriters.h"
@@ -27,6 +28,7 @@
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/MLProgram/IR/MLProgram.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -261,6 +263,30 @@ class BuiltinFuncOpPattern : public OpConversionPattern<func::FuncOp> {
   }
 };
 
+class GlobalOpPattern : public OpConversionPattern<ml_program::GlobalOp> {
+ public:
+  using OpConversionPattern<ml_program::GlobalOp>::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      ml_program::GlobalOp globalOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    auto oldType = globalOp.getType();
+    auto newType = getTypeConverter()->convertType(oldType);
+    if (newType == oldType) return failure();
+    if (!newType) {
+      return rewriter.notifyMatchFailure(globalOp,
+                                         "result type conversion failed");
+    }
+    rewriter.updateRootInPlace(globalOp, [&]() {
+      globalOp.setType(newType);
+      if (auto oldValue = globalOp.getValueAttr()) {
+        globalOp.setValueAttr(
+            convertAttribute(globalOp.getLoc(), oldValue, *getTypeConverter()));
+      }
+    });
+    return success();
+  }
+};
+
 class GenericTypeConvert : public ConversionPattern {
  public:
   GenericTypeConvert(StringRef rootName, TypeConverter &converter,
@@ -334,6 +360,9 @@ struct ConvertMHLOToLinalgOnTensorsPass
                                                     patterns);
     populateMHLOComplexToRealPatterns(context, *typeConverter, patterns);
 
+    // TODO(*): expose patterns that do this much better from
+    // iree/compiler/Dialect/Util/Transforms/ConvertPrimitiveType.cpp
+
     // Structural patterns (functions, cfg, terminators).
     patterns.insert<BuiltinFuncOpPattern>(*typeConverter, context);
     patterns.insert<GenericTypeConvert>(func::ReturnOp::getOperationName(),
@@ -344,6 +373,14 @@ struct ConvertMHLOToLinalgOnTensorsPass
                                         *typeConverter, context);
     patterns.insert<GenericTypeConvert>(cf::BranchOp::getOperationName(),
                                         *typeConverter, context);
+    patterns.insert<GlobalOpPattern>(*typeConverter, context);
+    patterns.insert<GenericTypeConvert>(
+        ml_program::GlobalLoadOp::getOperationName(), *typeConverter, context);
+    patterns.insert<GenericTypeConvert>(
+        ml_program::GlobalLoadConstOp::getOperationName(), *typeConverter,
+        context);
+    patterns.insert<GenericTypeConvert>(
+        ml_program::GlobalStoreOp::getOperationName(), *typeConverter, context);
 
     ConversionTarget target(getContext());
     auto isIllegalType = [&](Type t) { return !typeConverter->isLegal(t); };
@@ -375,6 +412,10 @@ struct ConvertMHLOToLinalgOnTensorsPass
       }
       return true;
     });
+    target.addDynamicallyLegalOp<ml_program::GlobalOp>(
+        [&](ml_program::GlobalOp op) {
+          return typeConverter->isLegal(op.getType());
+        });
 
     // Let the rest fall through.
     target.addLegalDialect<BuiltinDialect>();
@@ -400,7 +441,7 @@ void populateMHLOToLinalgOnTensorsConversionPatterns(
       typeConverter, context, PatternBenefit(1000));
 }
 
-std::unique_ptr<OperationPass<func::FuncOp>> createMHLOToLinalgOnTensorsPass() {
+std::unique_ptr<OperationPass<ModuleOp>> createMHLOToLinalgOnTensorsPass() {
   return std::make_unique<ConvertMHLOToLinalgOnTensorsPass>();
 }
 
