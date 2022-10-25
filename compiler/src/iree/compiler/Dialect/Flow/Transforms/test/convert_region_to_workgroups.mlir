@@ -8,9 +8,9 @@ func.func @foo(%argA: tensor<?x?xf32>, %argB: tensor<5x10xf32>, %argC: tensor<10
   //  CHECK-DAG: %[[dim_argA_0:.*]] = tensor.dim %[[argA]], %[[c0]]
   //  CHECK-DAG: %[[dim_argA_1:.*]] = tensor.dim %[[argA]], %[[c1]]
   //      CHECK: %[[r0:.*]] = flow.dispatch.workgroups(%[[argA]], %[[dim_argA_0]], %[[dim_argA_1]]) : (tensor<?x?xf32>{%[[dim_argA_0]], %[[dim_argA_1]]}, index, index) -> %[[argA]]{%[[dim_argA_0]], %[[dim_argA_1]]} =
-  // CHECK-NEXT: (%[[arg1:.*]]: !flow.dispatch.tensor<readwrite:?x?xf32>, %[[arg2:.*]]: index, %[[arg3:.*]]: index) {
-  //      CHECK:   %[[load:.*]] = flow.dispatch.tensor.load %[[arg1]], offsets = [0, 0], sizes = [%[[arg2]], %[[arg3]]], strides = [1, 1] : !flow.dispatch.tensor<readwrite:?x?xf32>{%[[arg2]], %[[arg3]]} -> tensor<?x?xf32>
-  //      CHECK:   flow.dispatch.tensor.store %[[load]], %[[arg1]], offsets = [0, 0], sizes = [%[[arg2]], %[[arg3]]], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<readwrite:?x?xf32>{%[[arg2]], %[[arg3]]}
+  // CHECK-NEXT: (%[[arg1:.*]]: !flow.dispatch.tensor<readwrite:tensor<?x?xf32>>, %[[arg2:.*]]: index, %[[arg3:.*]]: index) {
+  //      CHECK:   %[[load:.*]] = flow.dispatch.tensor.load %[[arg1]], offsets = [0, 0], sizes = [%[[arg2]], %[[arg3]]], strides = [1, 1] : !flow.dispatch.tensor<readwrite:tensor<?x?xf32>>{%[[arg2]], %[[arg3]]} -> tensor<?x?xf32>
+  //      CHECK:   flow.dispatch.tensor.store %[[load]], %[[arg1]], offsets = [0, 0], sizes = [%[[arg2]], %[[arg3]]], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<readwrite:tensor<?x?xf32>>{%[[arg2]], %[[arg3]]}
   //      CHECK:   flow.return
   //      CHECK: }
   %c0 = arith.constant 0 : index
@@ -23,13 +23,13 @@ func.func @foo(%argA: tensor<?x?xf32>, %argB: tensor<5x10xf32>, %argC: tensor<10
 
   //      CHECK: %[[r1:.*]] = flow.dispatch.workgroups(%[[argB]], %[[argC]]) : (tensor<5x10xf32>, tensor<10x11xf32>) -> tensor<5x11xf32>
   // CHECK-SAME:   stream.affinity = #hal.affinity.queue<[0]>
-  // CHECK-NEXT: (%[[arg3:.*]]: !flow.dispatch.tensor<readonly:5x10xf32>, %[[arg4:.*]]: !flow.dispatch.tensor<readonly:10x11xf32>, %[[arg5:.*]]: !flow.dispatch.tensor<writeonly:5x11xf32>)
-  //  CHECK-DAG:   %[[loadB:.*]] = flow.dispatch.tensor.load %[[arg3]], offsets = [0, 0], sizes = [5, 10], strides = [1, 1] : !flow.dispatch.tensor<readonly:5x10xf32> -> tensor<5x10xf32>
-  //  CHECK-DAG:   %[[loadC:.*]] = flow.dispatch.tensor.load %[[arg4]], offsets = [0, 0], sizes = [10, 11], strides = [1, 1] : !flow.dispatch.tensor<readonly:10x11xf32> -> tensor<10x11xf32>
+  // CHECK-NEXT: (%[[arg3:.*]]: !flow.dispatch.tensor<readonly:tensor<5x10xf32>>, %[[arg4:.*]]: !flow.dispatch.tensor<readonly:tensor<10x11xf32>>, %[[arg5:.*]]: !flow.dispatch.tensor<writeonly:tensor<5x11xf32>>)
+  //  CHECK-DAG:   %[[loadB:.*]] = flow.dispatch.tensor.load %[[arg3]], offsets = [0, 0], sizes = [5, 10], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<5x10xf32>> -> tensor<5x10xf32>
+  //  CHECK-DAG:   %[[loadC:.*]] = flow.dispatch.tensor.load %[[arg4]], offsets = [0, 0], sizes = [10, 11], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<10x11xf32>> -> tensor<10x11xf32>
   //      CHECK:   %[[init_tensor:.*]] = tensor.empty() : tensor<5x11xf32>
   //      CHECK:   %[[fill:.*]] = linalg.fill ins(%{{.*}} : f32) outs(%[[init_tensor]] : tensor<5x11xf32>) -> tensor<5x11xf32>
   //      CHECK:   %[[matmul:.*]] = linalg.matmul ins(%[[loadB]], %[[loadC]] : tensor<5x10xf32>, tensor<10x11xf32>) outs(%[[fill]] : tensor<5x11xf32>) -> tensor<5x11xf32>
-  //      CHECK:   flow.dispatch.tensor.store %[[matmul]], %[[arg5]], offsets = [0, 0], sizes = [5, 11], strides = [1, 1] : tensor<5x11xf32> -> !flow.dispatch.tensor<writeonly:5x11xf32>
+  //      CHECK:   flow.dispatch.tensor.store %[[matmul]], %[[arg5]], offsets = [0, 0], sizes = [5, 11], strides = [1, 1] : tensor<5x11xf32> -> !flow.dispatch.tensor<writeonly:tensor<5x11xf32>>
   //      CHECK:   flow.return
   //      CHECK: }
   %r1 = flow.dispatch.region {stream.affinity = #hal.affinity.queue<[0]>} -> (tensor<5x11xf32>) {

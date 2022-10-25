@@ -16,15 +16,15 @@ builtin.module {
     %source_binding_size_y = hal.interface.constant.load[11] : index
     %source_binding_size_x = hal.interface.constant.load[12] : index
     %source = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
-        : !flow.dispatch.tensor<readonly:?x?xi32>{%source_binding_size_y, %source_binding_size_x}
+        : !flow.dispatch.tensor<readonly:tensor<?x?xi32>>{%source_binding_size_y, %source_binding_size_x}
     %dest = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
-        : !flow.dispatch.tensor<readwrite:?x?xi32>{%dest_binding_size_y, %dest_binding_size_x}
+        : !flow.dispatch.tensor<readwrite:tensor<?x?xi32>>{%dest_binding_size_y, %dest_binding_size_x}
     %source_load = flow.dispatch.tensor.load %source, offsets = [%source_offset_y, %source_offset_x],
         sizes = [1, %slice_size], strides = [%source_stride_y, %source_stride_x]
-        : !flow.dispatch.tensor<readonly:?x?xi32>{%source_binding_size_y, %source_binding_size_x} -> tensor<?xi32>
+        : !flow.dispatch.tensor<readonly:tensor<?x?xi32>>{%source_binding_size_y, %source_binding_size_x} -> tensor<?xi32>
     flow.dispatch.tensor.store %source_load, %dest, offsets = [%dest_offset_y, %dest_offset_x],
         sizes = [%slice_size, 1], strides = [%dest_stride_y, %dest_stride_x]
-        : tensor<?xi32> -> !flow.dispatch.tensor<readwrite:?x?xi32>{%dest_binding_size_y, %dest_binding_size_x}
+        : tensor<?xi32> -> !flow.dispatch.tensor<readwrite:tensor<?x?xi32>>{%dest_binding_size_y, %dest_binding_size_x}
     return
   }
 }
@@ -51,10 +51,10 @@ builtin.module {
 builtin.module {
   func.func @UpSampling1D() {
     %c0 = arith.constant 0 : index
-    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readwrite:2x16x3xf32>
-    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:2x8x3xf32>
-    %2 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [2, 1, 3], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:2x8x3xf32> -> tensor<2x3xf32>
-    flow.dispatch.tensor.store %2, %0, offsets = [0, 0, 0], sizes = [2, 1, 3], strides = [1, 1, 1] : tensor<2x3xf32> -> !flow.dispatch.tensor<readwrite:2x16x3xf32>
+    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readwrite:tensor<2x16x3xf32>>
+    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<2x8x3xf32>>
+    %2 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [2, 1, 3], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<2x8x3xf32>> -> tensor<2x3xf32>
+    flow.dispatch.tensor.store %2, %0, offsets = [0, 0, 0], sizes = [2, 1, 3], strides = [1, 1, 1] : tensor<2x3xf32> -> !flow.dispatch.tensor<readwrite:tensor<2x16x3xf32>>
     return
   }
 }
@@ -73,8 +73,8 @@ builtin.module {
   func.func @concatenate_cst() {
     %cst = arith.constant dense<0> : tensor<2x3xi32>
     %c0 = arith.constant 0 : index
-    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readwrite:2x5xi32>
-    flow.dispatch.tensor.store %cst, %0, offsets = [0, 2], sizes = [2, 3], strides = [1, 1] : tensor<2x3xi32> -> !flow.dispatch.tensor<readwrite:2x5xi32>
+    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readwrite:tensor<2x5xi32>>
+    flow.dispatch.tensor.store %cst, %0, offsets = [0, 2], sizes = [2, 3], strides = [1, 1] : tensor<2x3xi32> -> !flow.dispatch.tensor<readwrite:tensor<2x5xi32>>
     return
   }
 }

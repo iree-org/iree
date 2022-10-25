@@ -292,16 +292,24 @@ static unsigned getReferenceTypeLengthInBytes(func::FuncOp entryPointFn) {
   unsigned referenceTypeLengthInBytes = 4;
   entryPointFn.walk([&](IREE::HAL::InterfaceBindingSubspanOp subSpanOp) {
     Type type = subSpanOp.getResult().getType();
-    Type elementType = TypeSwitch<Type, Type>(type)
-                           .Case<ShapedType, IREE::Flow::DispatchTensorType>(
-                               [&](auto shapedType) -> Type {
-                                 // Ignore operands that are 0D tensors. These
-                                 // are not vector-loadable, so using these to
-                                 // get vector length would be a pessimization.
-                                 if (!shapedType.getRank()) return nullptr;
-                                 return shapedType.getElementType();
-                               })
-                           .Default([&](Type t) -> Type { return nullptr; });
+    Type elementType =
+        TypeSwitch<Type, Type>(type)
+            .Case<IREE::Flow::DispatchTensorType>(
+                [&](auto dispatchTensorType) -> Type {
+                  // Ignore operands that are 0D tensors. These
+                  // are not vector-loadable, so using these to
+                  // get vector length would be a pessimization.
+                  if (!dispatchTensorType.getRank()) return nullptr;
+                  return dispatchTensorType.getBoundElementType();
+                })
+            .Case<ShapedType>([&](auto shapedType) -> Type {
+              // Ignore operands that are 0D tensors. These
+              // are not vector-loadable, so using these to
+              // get vector length would be a pessimization.
+              if (!shapedType.getRank()) return nullptr;
+              return shapedType.getElementType();
+            })
+            .Default([&](Type t) -> Type { return nullptr; });
     if (!elementType || !elementType.isIntOrFloat()) return;
     unsigned typeWidthInBytes =
         IREE::Util::getRoundedElementByteWidth(elementType);
