@@ -6,14 +6,14 @@
 
 iree_build_tools_py_test(
   NAME
-    common_generators_test
+    model_rule_generator_test
   SRC
-    "common_generators_test.py"
+    "model_rule_generator_test.py"
 )
 
 iree_build_tools_py_test(
   NAME
-    iree_generator_test
+    iree_rule_generator_test
   SRC
-    "iree_generator_test.py"
+    "iree_rule_generator_test.py"
 )
