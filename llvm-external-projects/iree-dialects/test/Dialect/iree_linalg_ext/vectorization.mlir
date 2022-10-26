@@ -137,13 +137,13 @@ func.func @pad_and_pack(%arg0: tensor<13x15xf32>, %arg1: tensor<2x8x8x2xf32>, %a
 
 // -----
 
-func.func @NC_to_CNcn(%arg0: tensor<128x256xf32>, %arg1: tensor<32x4x32x8xf32>) -> tensor<32x4x32x8xf32> {
+func.func @KC_to_CKck(%arg0: tensor<128x256xf32>, %arg1: tensor<32x4x32x8xf32>) -> tensor<32x4x32x8xf32> {
   %0 = iree_linalg_ext.pack %arg0 outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 8] into %arg1 : (tensor<128x256xf32> tensor<32x4x32x8xf32>) -> tensor<32x4x32x8xf32>
   return %0 : tensor<32x4x32x8xf32>
 }
 // CHECK-DAG:   #[[MAP0:.+]] = affine_map<(d0) -> (d0 * 32)>
 // CHECK-DAG:   #[[MAP1:.+]] = affine_map<(d0) -> (d0 * 8)>
-// CHECK-LABEL: func.func @NC_to_CNcn
+// CHECK-LABEL: func.func @KC_to_CKck
 // CHECK-SAME:    %[[IN:[A-Za-z0-9]+]]:
 // CHECK-SAME:    %[[OUT:[A-Za-z0-9]+]]:
 // CHECK-DAG:     %[[CST:.+]] = arith.constant 0.000000e+00 : f32
@@ -151,19 +151,19 @@ func.func @NC_to_CNcn(%arg0: tensor<128x256xf32>, %arg1: tensor<32x4x32x8xf32>) 
 // CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG:     %[[C4:.+]] = arith.constant 4 : index
 // CHECK-DAG:     %[[C32:.+]] = arith.constant 32 : index
-// CHECK:         %[[RES0:.+]] = scf.for %[[I:.+]] = %[[C0]] to %[[C32]] step %[[C1]]
+// CHECK:         %[[RES0:.+]] = scf.for %[[C:.+]] = %[[C0]] to %[[C32]] step %[[C1]]
 // CHECK-SAME:      iter_args(%[[ITER0:.+]] = %[[OUT]])
-// CHECK:           %[[RES1:.+]] = scf.for %[[J:.+]] = %[[C0]] to %[[C4]] step %[[C1]]
+// CHECK:           %[[RES1:.+]] = scf.for %[[K:.+]] = %[[C0]] to %[[C4]] step %[[C1]]
 // CHECK-SAME:        iter_args(%[[ITER1:.+]] = %[[ITER0]])
-// CHECK-DAG:         %[[IDX0:.+]] = affine.apply #[[MAP0]](%[[I]])
-// CHECK-DAG:         %[[IDX1:.+]] = affine.apply #[[MAP1]](%[[J]])
+// CHECK-DAG:         %[[IN_K:.+]] = affine.apply #[[MAP0]](%[[K]])
+// CHECK-DAG:         %[[IN_C:.+]] = affine.apply #[[MAP1]](%[[C]])
 // CHECK:             %[[READ:.+]] = vector.transfer_read %[[IN]]
-// CHECK-SAME:          [%[[IDX0]], %[[IDX1]]]
+// CHECK-SAME:          [%[[IN_K]], %[[IN_C]]]
 // CHECK-SAME:          {in_bounds = [true, true]}
 // CHECK-SAME:          : tensor<128x256xf32>, vector<32x8xf32>
 // CHECK:             %[[BCAST:.+]] = vector.broadcast %[[READ]] : vector<32x8xf32> to vector<1x1x32x8xf32>
 // CHECK:             %[[WRITE:.+]] = vector.transfer_write %[[BCAST]]
-// CHECK-SAME:          %[[ITER1]][%[[I]], %[[J]], %[[C0]], %[[C0]]
+// CHECK-SAME:          %[[ITER1]][%[[C]], %[[K]], %[[C0]], %[[C0]]
 // CHECK-SAME:          {in_bounds = [true, true, true, true]}
 // CHECK-SAME:          : vector<1x1x32x8xf32>, tensor<32x4x32x8xf32>
 // CHECK:             scf.yield %[[WRITE]]

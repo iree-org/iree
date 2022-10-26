@@ -834,7 +834,7 @@ Value getInputOrPaddedInput(OpBuilder &builder, PackOp packOp) {
                                  /*nofold=*/false, loc, builder);
 }
 
-/// Rewrites iree_linalg_ext.pack to tensor.pad + rank-reduced linalg.generic
+/// Rewrites iree_linalg_ext.pack to tensor.pad + rank-up linalg.generic
 /// (transpose) ops.
 struct GeneralizePackOpPattern : OpRewritePattern<PackOp> {
   using OpRewritePattern<PackOp>::OpRewritePattern;
@@ -860,9 +860,11 @@ struct GeneralizePackOpPattern : OpRewritePattern<PackOp> {
     for (int64_t dim = 0; dim < inputRank; ++dim) {
       inputExprs.push_back(rewriter.getAffineDimExpr(dim));
     }
+    // The dimensions map in the order of output dimensions. Since the
+    // interchange is applied, we have to undo it for input.
     if (auto outerDims = packOp.getOuterDimsPerm()) {
-      inputExprs = interchange<AffineExpr>(inputExprs,
-                                           extractFromI64ArrayAttr(outerDims));
+      inputExprs = undoInterchange<AffineExpr>(
+          inputExprs, extractFromI64ArrayAttr(outerDims));
     }
     for (auto en :
          llvm::enumerate(extractFromI64ArrayAttr(packOp.getInnerDimsPos()))) {
