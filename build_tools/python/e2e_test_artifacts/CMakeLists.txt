@@ -4,6 +4,16 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-add_subdirectory(cmake_builder)
-add_subdirectory(e2e_test_artifacts)
-add_subdirectory(e2e_test_framework)
+iree_build_tools_py_test(
+  NAME
+    model_artifacts_test
+  SRC
+    "model_artifacts_test.py"
+)
+
+iree_build_tools_py_test(
+  NAME
+    iree_artifacts_test
+  SRC
+    "iree_artifacts_test.py"
+)
