@@ -2414,6 +2414,16 @@ LogicalResult UnsetEncodingOp::verify() {
   return success();
 }
 
+LogicalResult UnsetEncodingOp::reifyResultShapes(
+    OpBuilder &builder, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  OpBuilder::InsertionGuard g(builder);
+  builder.setInsertionPoint(getOperation());
+  reifiedReturnShapes.resize(1);
+  reifiedReturnShapes[0] = getValueOrCreateConstantIndexOp(
+      builder, getLoc(), getDims(builder, getLoc(), getSource()));
+  return success();
+}
+
 namespace {
 /// This is derived from mlir/lib/Dialect/Linalg/IR/LinalgOps.cpp without any
 /// changes.

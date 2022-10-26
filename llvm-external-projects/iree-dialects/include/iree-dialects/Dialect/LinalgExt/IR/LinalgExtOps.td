@@ -801,7 +801,7 @@ def IREELinalgExt_UnPackOp : IREELinalgExt_Op<"unpack", [
 }
 
 def IREELinalgExt_SetEncodingOp : IREELinalgExt_PureOp<"set_encoding",[
-   DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>
+   DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>, Pure
   ]> {
   let summary = "perform pack and pad operation on source";
   let description = [{
@@ -837,7 +837,9 @@ let builders = [
   }];
 }
 
-def IREELinalgExt_UnsetEncodingOp : IREELinalgExt_PureOp<"unset_encoding"> {
+def IREELinalgExt_UnsetEncodingOp : IREELinalgExt_PureOp<"unset_encoding", [
+    DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>, Pure
+  ]> {
   let summary = "perfom unpack and extract operation on source";
   let description = [{
     Operation to convert an tensor with encoding that represents
