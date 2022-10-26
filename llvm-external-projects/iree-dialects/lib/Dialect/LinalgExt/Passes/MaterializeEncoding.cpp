@@ -11,6 +11,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -135,7 +136,8 @@ static FailureOr<PackOp> lowerSetEncodingOpToPackOp(RewriterBase &rewriter,
 
   // Create `tensor.empty` operation for the result of the pack operation.
   Location loc = encodingOp.getLoc();
-  SmallVector<OpFoldResult> sourceDims = getDims(rewriter, loc, source);
+  SmallVector<OpFoldResult> sourceDims =
+      tensor::createDimValues(rewriter, loc, source);
   SmallVector<OpFoldResult> innerTileSizesOfr =
       getAsOpFoldResult(rewriter, innerTileSizes);
   SmallVector<OpFoldResult> resultDims =

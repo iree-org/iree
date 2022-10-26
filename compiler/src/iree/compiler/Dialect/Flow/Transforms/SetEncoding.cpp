@@ -19,6 +19,7 @@
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -65,15 +66,12 @@ static FailureOr<Value> padIfNeeded(OpBuilder &builder, Location loc,
   if (!padding) return value;
 
   OpFoldResult paddingOfr = builder.getIndexAttr(padding.value());
-  FailureOr<SmallVector<OpFoldResult>> shape =
-      LinalgExt::getDims(builder, loc, value);
-  if (failed(shape)) {
-    return failure();
-  }
+  SmallVector<OpFoldResult> shape =
+      tensor::createDimValues(builder, loc, value);
 
   OpFoldResult zero = builder.getIndexAttr(0);
-  SmallVector<OpFoldResult> lowPad(shape->size(), zero);
-  SmallVector<OpFoldResult> highPad(shape->size(), zero);
+  SmallVector<OpFoldResult> lowPad(shape.size(), zero);
+  SmallVector<OpFoldResult> highPad(shape.size(), zero);
 
   // The low padding is always zero. The high padding is
   // shape.ceildDiv(padding) - shape.
@@ -81,9 +79,9 @@ static FailureOr<Value> padIfNeeded(OpBuilder &builder, Location loc,
   bindSymbols(builder.getContext(), paddingExpr, shapeExpr);
   AffineExpr highPadExpr =
       shapeExpr.ceilDiv(paddingExpr) * paddingExpr - shapeExpr;
-  for (auto shape : llvm::enumerate(shape.value())) {
-    highPad[shape.index()] = makeComposedFoldedAffineApply(
-        builder, loc, highPadExpr, {paddingOfr, shape.value()});
+  for (auto en : llvm::enumerate(shape)) {
+    highPad[en.index()] = makeComposedFoldedAffineApply(
+        builder, loc, highPadExpr, {paddingOfr, en.value()});
   }
 
   // If all high padding evaluate to 0, then nothing to do.

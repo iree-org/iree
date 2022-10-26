@@ -17,6 +17,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -2280,7 +2281,8 @@ LogicalResult SetEncodingOp::reifyResultShapes(
   builder.setInsertionPoint(getOperation());
   reifiedReturnShapes.resize(1);
   reifiedReturnShapes[0] = getValueOrCreateConstantIndexOp(
-      builder, getLoc(), getDims(builder, getLoc(), getSource()));
+      builder, getLoc(),
+      tensor::createDimValues(builder, getLoc(), getSource()));
   return success();
 }
 
