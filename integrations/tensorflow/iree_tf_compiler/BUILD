@@ -39,6 +39,7 @@ cc_binary(
         "@llvm-project//mlir:MlirOptLib",
         "@llvm-project//mlir:ShapeTransforms",
         "@llvm-project//mlir:Transforms",
+        "@mlir-hlo//stablehlo:chlo_ops",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tensorflow_passes",
         "@org_tensorflow//tensorflow/compiler/mlir/tosa:tf_passes",
@@ -46,7 +47,6 @@ cc_binary(
         "@org_tensorflow//tensorflow/compiler/mlir/tosa:tfl_passes",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_tf",
         "@org_tensorflow//tensorflow/compiler/xla/mlir_hlo",
-        "@stablehlo//:chlo_ops",
     ],
 )
 

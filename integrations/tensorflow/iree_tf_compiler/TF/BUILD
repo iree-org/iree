@@ -51,6 +51,7 @@ cc_library(
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
+        "@mlir-hlo//stablehlo:chlo_ops",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:lower_tf_lib",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tensorflow_passes",
@@ -62,6 +63,5 @@ cc_library(
         "@org_tensorflow//tensorflow/compiler/xla/mlir_hlo:all_passes",
         "@org_tensorflow//tensorflow/compiler/xla/mlir_hlo:chlo_legalize_to_hlo",
         "@org_tensorflow//tensorflow/compiler/xla/mlir_hlo:mhlo_passes",
-        "@stablehlo//:chlo_ops",
     ],
 )
