@@ -10,8 +10,7 @@ from typing import Sequence
 import pathlib
 
 from benchmark_suites.iree import benchmark_collections
-from build_tools.python.e2e_test_artifacts import model_artifacts
-from e2e_test_artifacts import iree_artifacts
+from e2e_test_artifacts import model_artifacts, iree_artifacts
 from e2e_test_framework.models import model_groups
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 
