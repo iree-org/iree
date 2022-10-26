@@ -91,6 +91,10 @@ static llvm::cl::opt<bool> clEnableAggressiveFusion(
         "with reduction loops"),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clEnableDataTiling(
+    "iree-flow-enable-data-tiling", llvm::cl::desc("Enable data tiling path"),
+    llvm::cl::init(false));
+
 static llvm::cl::opt<std::string> clMmt4dTargetOptions(
     "iree-flow-mmt4d-target-options",
     llvm::cl::desc("Convert linalg.matmul ops to MMT4D ops targetting the "
@@ -265,6 +269,8 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       // transpose.
       .addPredicatedPass(clNormalizeInputIndexingMap,
                          createInterchangeTransposeGenericOpsPass)
+      // Enable data tiling after all linalg level transformations.
+      .addPredicatedPass(clEnableDataTiling, createSetEncodingPass)
       ////////////////////////////////////////////////////////////////////////
       // Dispatch region formation.
       .addPredicatedPass(!clDispatchTransformFileName.empty(),
