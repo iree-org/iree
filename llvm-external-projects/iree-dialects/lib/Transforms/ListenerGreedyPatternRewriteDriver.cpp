@@ -31,17 +31,10 @@ namespace {
 /// applies the locally optimal patterns in a roughly "bottom up" way.
 class GreedyPatternRewriteDriver : public RewriteListener {
 public:
-  //===----------------------------------------------------------------------===//
-  // BEGIN copied from mlir/lib/Transforms/Utils/GreedyPatternRewriteDriver.cpp
-  //===----------------------------------------------------------------------===//
-  explicit GreedyPatternRewriteDriver(
-      MLIRContext *ctx, const FrozenRewritePatternSet &patterns,
-      const GreedyRewriteConfig &config,
-      //===----------------------------------------------------------------------===//
-      // END copied from
-      // mlir/lib/Transforms/Utils/GreedyPatternRewriteDriver.cpp
-      //===----------------------------------------------------------------------===//
-      RewriteListener *listener);
+  explicit GreedyPatternRewriteDriver(Operation *rootOp,
+                                      const FrozenRewritePatternSet &patterns,
+                                      const GreedyRewriteConfig &config,
+                                      RewriteListener *listener);
   //===----------------------------------------------------------------------===//
   // BEGIN copied from mlir/lib/Transforms/Utils/GreedyPatternRewriteDriver.cpp
   //===----------------------------------------------------------------------===//
@@ -112,6 +105,8 @@ private:
   //===----------------------------------------------------------------------===//
   /// The pattern rewriter to use.
   PatternRewriterListener rewriter;
+  /// The operation under which all processed ops must be nested.
+  Operation *rootOp;
   //===----------------------------------------------------------------------===//
   // BEGIN copied from mlir/lib/Transforms/Utils/GreedyPatternRewriteDriver.cpp
   //===----------------------------------------------------------------------===//
@@ -127,9 +122,10 @@ private:
 // END copied from mlir/lib/Transforms/Utils/GreedyPatternRewriteDriver.cpp
 //===----------------------------------------------------------------------===//
 GreedyPatternRewriteDriver::GreedyPatternRewriteDriver(
-    MLIRContext *ctx, const FrozenRewritePatternSet &patterns,
+    Operation *rootOp, const FrozenRewritePatternSet &patterns,
     const GreedyRewriteConfig &config, RewriteListener *listener)
-    : matcher(patterns), folder(ctx), config(config), rewriter(ctx) {
+    : matcher(patterns), folder(rootOp->getContext()), config(config),
+      rewriter(rootOp->getContext()), rootOp(rootOp) {
   // Add self as a listener and the user-provided listener.
   rewriter.addListener(this);
   if (listener)
@@ -305,6 +301,15 @@ void GreedyPatternRewriteDriver::addToWorklist(Operation *op) {
   // Check to see if the worklist already contains this op.
   if (worklistMap.count(op))
     return;
+  //===----------------------------------------------------------------------===//
+  // END copied from mlir/lib/Transforms/Utils/GreedyPatternRewriteDriver.cpp
+  //===----------------------------------------------------------------------===//
+  // Enforce nested under constraint before adding to worklist.
+  if (!rootOp->isProperAncestor(op))
+    return;
+  //===----------------------------------------------------------------------===//
+  // BEGIN copied from mlir/lib/Transforms/Utils/GreedyPatternRewriteDriver.cpp
+  //===----------------------------------------------------------------------===//
 
   worklistMap[op] = worklist.size();
   worklist.push_back(op);
@@ -400,30 +405,14 @@ void GreedyPatternRewriteDriver::notifyMatchFailure(
 // END copied from mlir/lib/Transforms/Utils/GreedyPatternRewriteDriver.cpp
 //===----------------------------------------------------------------------===//
 LogicalResult mlir::applyPatternsAndFoldGreedily(
-    MutableArrayRef<Region> regions, const FrozenRewritePatternSet &patterns,
+    Operation *op, const FrozenRewritePatternSet &patterns,
     const GreedyRewriteConfig &config, RewriteListener *listener) {
-  //===----------------------------------------------------------------------===//
-  // BEGIN copied from mlir/lib/Transforms/Utils/GreedyPatternRewriteDriver.cpp
-  //===----------------------------------------------------------------------===//
-  if (regions.empty())
+  if (op->getRegions().empty())
     return success();
 
-  // The top-level operation must be known to be isolated from above to
-  // prevent performing canonicalizations on operations defined at or above
-  // the region containing 'op'.
-  auto regionIsIsolated = [](Region &region) {
-    return region.getParentOp()->hasTrait<OpTrait::IsIsolatedFromAbove>();
-  };
-  (void)regionIsIsolated;
-  assert(llvm::all_of(regions, regionIsIsolated) &&
-         "patterns can only be applied to operations IsolatedFromAbove");
-
   // Start the pattern driver.
-  //===----------------------------------------------------------------------===//
-  // END copied from mlir/lib/Transforms/Utils/GreedyPatternRewriteDriver.cpp
-  //===----------------------------------------------------------------------===//
-  GreedyPatternRewriteDriver driver(regions[0].getContext(), patterns, config,
-                                    listener);
+  GreedyPatternRewriteDriver driver(op, patterns, config, listener);
+  auto regions = op->getRegions();
   //===----------------------------------------------------------------------===//
   // BEGIN copied from mlir/lib/Transforms/Utils/GreedyPatternRewriteDriver.cpp
   //===----------------------------------------------------------------------===//
