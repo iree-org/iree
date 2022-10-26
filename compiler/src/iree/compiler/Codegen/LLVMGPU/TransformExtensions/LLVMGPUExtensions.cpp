@@ -423,8 +423,8 @@ struct WarpOpLoad : public OpRewritePattern<vector::WarpExecuteOnLane0Op> {
   }
 };
 
-/// Shared memory allocation are representated as AllocOp in IREE but they
-/// really have the semantic of global variables. Therefore hositing them is
+/// Shared memory allocations are representated as AllocOp in IREE but they
+/// really have the semantic of global variables. Therefore hoisting them is
 /// always correct for static allocations.
 struct HoistSharedMemoryAlloc : public OpRewritePattern<memref::AllocOp> {
   using OpRewritePattern<memref::AllocOp>::OpRewritePattern;
