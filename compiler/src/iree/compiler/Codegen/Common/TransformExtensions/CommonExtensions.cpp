@@ -67,7 +67,68 @@ struct GenerateToConstant : public OpRewritePattern<tensor::GenerateOp> {
     return success();
   }
 };
+
+struct PromoteCaptureToSharedOut
+    : public OpRewritePattern<tensor::ExtractSliceOp> {
+  using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::ExtractSliceOp extractSliceOp,
+                                PatternRewriter &rewriter) const override {
+    scf::ForeachThreadOp foreachThreadOp =
+        extractSliceOp->getParentOfType<scf::ForeachThreadOp>();
+
+    while (foreachThreadOp) {
+      // Check if the extract_slice source is a shared output.
+      auto outputIt =
+          llvm::find(foreachThreadOp.getOutputs(), extractSliceOp.getSource());
+      if (outputIt == foreachThreadOp.getOutputs().end()) {
+        foreachThreadOp =
+            foreachThreadOp->getParentOfType<scf::ForeachThreadOp>();
+        continue;
+      }
+
+      // Get the corresponding bbArg of the loop body.
+      BlockArgument bbArg =
+          foreachThreadOp.getOutputBlockArguments()[std::distance(
+              foreachThreadOp.getOutputs().begin(), outputIt)];
+
+      // Check if the extract_slice has a matching parallel_insert_slice (i.e.,
+      // same source/target, offsets, sizes and strides).
+      auto isMatchingParallelInsertSlice = [&](Operation &op) {
+        auto insertSlice = dyn_cast<tensor::ParallelInsertSliceOp>(&op);
+        if (!insertSlice) return false;
+        if (insertSlice.getDest() != bbArg) return false;
+        return llvm::equal(insertSlice.getMixedOffsets(),
+                           extractSliceOp.getMixedOffsets()) &&
+               llvm::equal(insertSlice.getMixedSizes(),
+                           extractSliceOp.getMixedSizes()) &&
+               llvm::equal(insertSlice.getMixedStrides(),
+                           extractSliceOp.getMixedStrides());
+      };
+      if (llvm::none_of(foreachThreadOp.getTerminator().getYieldingOps(),
+                        isMatchingParallelInsertSlice)) {
+        foreachThreadOp =
+            foreachThreadOp->getParentOfType<scf::ForeachThreadOp>();
+        continue;
+      }
+
+      // Promote extract_slice source to bbArg.
+      rewriter.updateRootInPlace(extractSliceOp, [&]() {
+        extractSliceOp.getSourceMutable().assign(bbArg);
+      });
+
+      return success();
+    }
+
+    return failure();
+  }
+};
 }  // namespace
+
+static void addForeachThreadCapturePromotionPatterns(
+    RewritePatternSet &patterns) {
+  patterns.add<PromoteCaptureToSharedOut>(patterns.getContext());
+}
 
 static void addRankReducingPatterns(RewritePatternSet &patterns) {
   populateReshapeToInterfaceTensorPatterns(patterns);
@@ -97,6 +158,12 @@ static void addAllRegisteredCanonicalizationPatterns(
     op.getCanonicalizationPatterns(patterns, ctx);
 }
 
+static void addConverToDPSPatterns(RewritePatternSet &patterns) {
+  populateReshapeToInterfaceTensorPatterns(patterns);
+  vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
+  linalg::populateFoldUnitExtentDimsPatterns(patterns);
+}
+
 DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
     Operation *target, SmallVectorImpl<Operation *> &results,
     transform::TransformState &state) {
@@ -109,6 +176,8 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
   MLIRContext *ctx = target->getContext();
   RewritePatternSet patterns(ctx);
   if (getCanonicalization()) addAllRegisteredCanonicalizationPatterns(patterns);
+  if (getPromoteForeachThreadCaptureToShared())
+    addForeachThreadCapturePromotionPatterns(patterns);
   if (getRankReducing()) addRankReducingPatterns(patterns);
   if (getSimplifyMemrefMetadata())
     memref::populateSimplifyExtractStridedMetadataOpPatterns(patterns);
