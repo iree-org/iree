@@ -367,6 +367,19 @@ static iree_status_t iree_hal_webgpu_device_wait_semaphores(
       "iree_hal_webgpu_device_wait_semaphores not yet implemented");
 }
 
+static iree_status_t iree_hal_webgpu_device_profiling_begin(
+    iree_hal_device_t* device,
+    const iree_hal_device_profiling_options_t* options) {
+  // Unimplemented (and that's ok).
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_webgpu_device_profiling_end(
+    iree_hal_device_t* device) {
+  // Unimplemented (and that's ok).
+  return iree_ok_status();
+}
+
 const iree_hal_device_vtable_t iree_hal_webgpu_device_vtable = {
     .destroy = iree_hal_webgpu_device_destroy,
     .id = iree_hal_webgpu_device_id,
@@ -389,4 +402,6 @@ const iree_hal_device_vtable_t iree_hal_webgpu_device_vtable = {
     .queue_execute = iree_hal_webgpu_device_queue_execute,
     .queue_flush = iree_hal_webgpu_device_queue_flush,
     .wait_semaphores = iree_hal_webgpu_device_wait_semaphores,
+    .profiling_begin = iree_hal_webgpu_device_profiling_begin,
+    .profiling_end = iree_hal_webgpu_device_profiling_end,
 };
