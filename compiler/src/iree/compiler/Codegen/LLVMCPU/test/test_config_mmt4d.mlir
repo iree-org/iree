@@ -19,20 +19,20 @@ hal.executable private @mmt4d_384x384x512_4x1x4_dispatch_0 {
         %c0 = arith.constant 0 : index
         %c96 = arith.constant 96 : index
         %c128 = arith.constant 128 : index
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:96x384x4x1xf32>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:128x384x4x1xf32>
-        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<readwrite:96x128x4x4xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<96x384x4x1xf32>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<128x384x4x1xf32>>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<readwrite:tensor<96x128x4x4xf32>>
         %8 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [96, 384, 4, 1], strides = [1, 1, 1, 1]
-            : !flow.dispatch.tensor<readonly:96x384x4x1xf32> -> tensor<96x384x4x1xf32>
+            : !flow.dispatch.tensor<readonly:tensor<96x384x4x1xf32>> -> tensor<96x384x4x1xf32>
         %10 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [128, 384, 4, 1], strides = [1, 1, 1, 1]
-            : !flow.dispatch.tensor<readonly:128x384x4x1xf32> -> tensor<128x384x4x1xf32>
+            : !flow.dispatch.tensor<readonly:tensor<128x384x4x1xf32>> -> tensor<128x384x4x1xf32>
         %11 = flow.dispatch.tensor.load %2, offsets = [0, 0, 0, 0], sizes = [96, 384, 4, 4], strides = [1, 1, 1, 1]
-            : !flow.dispatch.tensor<readwrite:96x128x4x4xf32> -> tensor<96x128x4x4xf32>
+            : !flow.dispatch.tensor<readwrite:tensor<96x128x4x4xf32>> -> tensor<96x128x4x4xf32>
         %12 = linalg.mmt4d {__internal_linalg_transform__ = "workgroup"}
             ins(%8, %10 : tensor<96x384x4x1xf32>, tensor<128x384x4x1xf32>)
             outs(%11 : tensor<96x128x4x4xf32>) -> tensor<96x128x4x4xf32>
         flow.dispatch.tensor.store %12, %2, offsets = [0, 0, 0, 0], sizes = [96, 128, 4, 4], strides = [1, 1, 1, 1]
-            : tensor<96x128x4x4xf32> -> !flow.dispatch.tensor<readwrite:96x128x4x4xf32>
+            : tensor<96x128x4x4xf32> -> !flow.dispatch.tensor<readwrite:tensor<96x128x4x4xf32>>
         return
       }
     }

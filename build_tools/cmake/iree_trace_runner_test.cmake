@@ -85,11 +85,10 @@ function(iree_trace_runner_test)
       "${_RULE_DRIVER}"
     SRC
       "${_RULE_TRACE_RUNNER}"
-    TEST_INPUT_FILE_ARG
-      ${_RULE_TRACE}
     DATA
       ${_MODULE_FILE_NAME}
     ARGS
+      "{{${_RULE_TRACE}}}"
       ${_RULE_RUNNER_ARGS}
     LABELS
       ${_RULE_LABELS}

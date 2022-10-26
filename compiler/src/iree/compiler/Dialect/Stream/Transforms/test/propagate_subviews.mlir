@@ -20,8 +20,8 @@ func.func private @globalLoad() {
   // CHECK-NEXT: %[[LENGTH:.+]] = util.global.load @constantGlobal__length : index
   // CHECK: %[[SUBVIEW:.+]] = stream.resource.subview %[[RESOURCE]][%[[OFFSET]]] : !stream.resource<constant>{%[[STORAGE_SIZE]]} -> !stream.resource<constant>{%[[LENGTH]]}
   %0 = util.global.load @constantGlobal : !stream.resource<constant>
-  // CHECK-NEXT: util.do_not_optimize(%[[SUBVIEW]])
-  util.do_not_optimize(%0) : !stream.resource<constant>
+  // CHECK-NEXT: util.optimization_barrier %[[SUBVIEW]]
+  util.optimization_barrier %0 : !stream.resource<constant>
   return
 }
 
@@ -61,10 +61,10 @@ func.func private @funcArgs(%resource0: !stream.resource<external>, %resource1: 
   // CHECK-NEXT: %[[SUBVIEW0:.+]] = stream.resource.subview %[[RESOURCE0]][%[[OFFSET0]]] : !stream.resource<external>{%[[STORAGE_SIZE0]]} -> !stream.resource<external>{%[[LENGTH0]]}
   // CHECK-NEXT: %[[SUBVIEW1:.+]] = stream.resource.subview %[[RESOURCE1]][%[[OFFSET1]]] : !stream.resource<transient>{%[[STORAGE_SIZE1]]} -> !stream.resource<transient>{%[[LENGTH1]]}
 
-  // CHECK-NEXT: util.do_not_optimize(%[[SUBVIEW0]])
-  util.do_not_optimize(%resource0) : !stream.resource<external>
-  // CHECK-NEXT: util.do_not_optimize(%[[SUBVIEW1]])
-  util.do_not_optimize(%resource1) : !stream.resource<transient>
+  // CHECK-NEXT: util.optimization_barrier %[[SUBVIEW0]]
+  util.optimization_barrier %resource0 : !stream.resource<external>
+  // CHECK-NEXT: util.optimization_barrier %[[SUBVIEW1]]
+  util.optimization_barrier %resource1 : !stream.resource<transient>
   return
 }
 
@@ -109,10 +109,10 @@ func.func private @caller(%resource0: !stream.resource<external>, %resource1: !s
   // CHECK-NEXT: %[[RET_SUBVIEW0:.+]] = stream.resource.subview %[[RET]]#0[%[[RET]]#2] : !stream.resource<external>{%[[RET]]#1} -> !stream.resource<external>{%[[RET]]#3}
   // CHECK-NEXT: %[[RET_SUBVIEW1:.+]] = stream.resource.subview %[[RET]]#4[%[[RET]]#6] : !stream.resource<transient>{%[[RET]]#5} -> !stream.resource<transient>{%[[RET]]#7}
 
-  // CHECK-NEXT: util.do_not_optimize(%[[RET_SUBVIEW0]]) : !stream.resource<external>
-  util.do_not_optimize(%0#0) : !stream.resource<external>
-  // CHECK-NEXT: util.do_not_optimize(%[[RET_SUBVIEW1]]) : !stream.resource<transient>
-  util.do_not_optimize(%0#1) : !stream.resource<transient>
+  // CHECK-NEXT: util.optimization_barrier %[[RET_SUBVIEW0]] : !stream.resource<external>
+  util.optimization_barrier %0#0 : !stream.resource<external>
+  // CHECK-NEXT: util.optimization_barrier %[[RET_SUBVIEW1]] : !stream.resource<transient>
+  util.optimization_barrier %0#1 : !stream.resource<transient>
 
   return
 }
@@ -144,10 +144,10 @@ func.func private @br(%resource0: !stream.resource<external>, %resource1: !strea
   // CHECK-NEXT: %[[BB1_SUBVIEW0:.+]] = stream.resource.subview %[[BB1_RESOURCE0]][%[[BB1_OFFSET0]]] : !stream.resource<external>{%[[BB1_STORAGE_SIZE0]]} -> !stream.resource<external>{%[[BB1_LENGTH0]]}
   // CHECK-NEXT: %[[BB1_SUBVIEW1:.+]] = stream.resource.subview %[[BB1_RESOURCE1]][%[[BB1_OFFSET1]]] : !stream.resource<transient>{%[[BB1_STORAGE_SIZE1]]} -> !stream.resource<transient>{%[[BB1_LENGTH1]]}
 
-  // CHECK-NEXT: util.do_not_optimize(%[[BB1_SUBVIEW0]])
-  util.do_not_optimize(%bb1_resource0) : !stream.resource<external>
-  // CHECK-NEXT: util.do_not_optimize(%[[BB1_SUBVIEW1]])
-  util.do_not_optimize(%bb1_resource1) : !stream.resource<transient>
+  // CHECK-NEXT: util.optimization_barrier %[[BB1_SUBVIEW0]]
+  util.optimization_barrier %bb1_resource0 : !stream.resource<external>
+  // CHECK-NEXT: util.optimization_barrier %[[BB1_SUBVIEW1]]
+  util.optimization_barrier %bb1_resource1 : !stream.resource<transient>
 
   return
 }

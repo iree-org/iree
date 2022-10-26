@@ -20,7 +20,7 @@ func.func @elementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
 //       CHECK:     %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %[[ARG0]]
 //       CHECK:     flow.return %x, %y, %z
 //       CHECK:   module {
-//  CHECK-NEXT:     func.func @elementwiseOps_dispatch_0{{.*}}(%arg0: !flow.dispatch.tensor<readonly:4xf32>, %arg1: !flow.dispatch.tensor<writeonly:4xf32>) {
+//  CHECK-NEXT:     func.func @elementwiseOps_dispatch_0{{.*}}(%arg0: !flow.dispatch.tensor<readonly:tensor<4xf32>>, %arg1: !flow.dispatch.tensor<writeonly:tensor<4xf32>>) {
 //       CHECK:       %{{.+}} = linalg.generic
 //       CHECK:         %{{.+}} = arith.addf %{{.+}}, %{{.+}} : f32
 //  CHECK-NEXT:         %{{.+}} = arith.subf %{{.+}}, %{{.+}} : f32

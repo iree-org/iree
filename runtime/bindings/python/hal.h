@@ -85,6 +85,9 @@ class HalDevice : public ApiRefCounted<HalDevice, iree_hal_device_t> {
   iree_hal_allocator_t* allocator() {
     return iree_hal_device_allocator(raw_ptr());
   }
+
+  void BeginProfiling(const py::kwargs& kwargs);
+  void EndProfiling();
 };
 
 class HalDriver : public ApiRefCounted<HalDriver, iree_hal_driver_t> {

@@ -432,13 +432,13 @@ namespace vulkan {
 #define IREE_VULKAN_DYNAMIC_SYMBOL_TABLE_WIN32_KHR(INS_PFN, DEV_PFN) \
   DEV_PFN(EXCLUDED, vkAcquireFullScreenExclusiveModeEXT)             \
   DEV_PFN(EXCLUDED, vkGetDeviceGroupSurfacePresentModes2EXT)         \
-  DEV_PFN(REQUIRED, vkGetFenceWin32HandleKHR)                        \
+  DEV_PFN(OPTIONAL, vkGetFenceWin32HandleKHR)                        \
   DEV_PFN(EXCLUDED, vkGetMemoryWin32HandleKHR)                       \
   DEV_PFN(EXCLUDED, vkGetMemoryWin32HandleNV)                        \
   DEV_PFN(EXCLUDED, vkGetMemoryWin32HandlePropertiesKHR)             \
-  DEV_PFN(REQUIRED, vkGetSemaphoreWin32HandleKHR)                    \
-  DEV_PFN(REQUIRED, vkImportFenceWin32HandleKHR)                     \
-  DEV_PFN(REQUIRED, vkImportSemaphoreWin32HandleKHR)                 \
+  DEV_PFN(OPTIONAL, vkGetSemaphoreWin32HandleKHR)                    \
+  DEV_PFN(OPTIONAL, vkImportFenceWin32HandleKHR)                     \
+  DEV_PFN(OPTIONAL, vkImportSemaphoreWin32HandleKHR)                 \
   DEV_PFN(EXCLUDED, vkReleaseFullScreenExclusiveModeEXT)             \
   INS_PFN(EXCLUDED, vkCreateWin32SurfaceKHR)                         \
   INS_PFN(EXCLUDED, vkGetPhysicalDeviceSurfacePresentModes2EXT)      \

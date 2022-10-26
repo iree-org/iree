@@ -24,22 +24,22 @@ hal.executable private @preset_config_matmul  {
       func.func @no_peel_static_matmul() {
         %cst = arith.constant 0.000000e+00 : f32
         %lhs_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
-            : !flow.dispatch.tensor<readonly:128x64xf32>
+            : !flow.dispatch.tensor<readonly:tensor<128x64xf32>>
         %rhs_binding = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
-            : !flow.dispatch.tensor<readonly:64x512xf32>
+            : !flow.dispatch.tensor<readonly:tensor<64x512xf32>>
         %result_binding = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
-            : !flow.dispatch.tensor<writeonly:128x512xf32>
+            : !flow.dispatch.tensor<writeonly:tensor<128x512xf32>>
         %lhs = flow.dispatch.tensor.load %lhs_binding, offsets = [0, 0], sizes = [128, 64], strides = [1, 1]
-            : !flow.dispatch.tensor<readonly:128x64xf32> -> tensor<128x64xf32>
+            : !flow.dispatch.tensor<readonly:tensor<128x64xf32>> -> tensor<128x64xf32>
         %rhs = flow.dispatch.tensor.load %rhs_binding, offsets = [0, 0], sizes = [64, 512], strides = [1, 1]
-            : !flow.dispatch.tensor<readonly:64x512xf32> -> tensor<64x512xf32>
+            : !flow.dispatch.tensor<readonly:tensor<64x512xf32>> -> tensor<64x512xf32>
         %init = tensor.empty() : tensor<128x512xf32>
         %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<128x512xf32>) -> tensor<128x512xf32>
         %gemm = linalg.matmul {compilation_info = #compilation}
             ins(%lhs, %rhs : tensor<128x64xf32>, tensor<64x512xf32>)
             outs(%fill : tensor<128x512xf32>) -> tensor<128x512xf32>
         flow.dispatch.tensor.store %gemm, %result_binding, offsets = [0, 0], sizes = [128, 512], strides = [1, 1]
-            : tensor<128x512xf32> -> !flow.dispatch.tensor<writeonly:128x512xf32>
+            : tensor<128x512xf32> -> !flow.dispatch.tensor<writeonly:tensor<128x512xf32>>
         return
       }
     }
@@ -80,22 +80,22 @@ hal.executable private @preset_config_matmul  {
       func.func @peel_static_matmul() {
         %cst = arith.constant 0.000000e+00 : f32
         %lhs_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
-            : !flow.dispatch.tensor<readonly:128x49xf32>
+            : !flow.dispatch.tensor<readonly:tensor<128x49xf32>>
         %rhs_binding = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
-            : !flow.dispatch.tensor<readonly:49x512xf32>
+            : !flow.dispatch.tensor<readonly:tensor<49x512xf32>>
         %result_binding = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
-            : !flow.dispatch.tensor<writeonly:128x512xf32>
+            : !flow.dispatch.tensor<writeonly:tensor<128x512xf32>>
         %lhs = flow.dispatch.tensor.load %lhs_binding, offsets = [0, 0], sizes = [128, 49], strides = [1, 1]
-            : !flow.dispatch.tensor<readonly:128x49xf32> -> tensor<128x49xf32>
+            : !flow.dispatch.tensor<readonly:tensor<128x49xf32>> -> tensor<128x49xf32>
         %rhs = flow.dispatch.tensor.load %rhs_binding, offsets = [0, 0], sizes = [49, 512], strides = [1, 1]
-            : !flow.dispatch.tensor<readonly:49x512xf32> -> tensor<49x512xf32>
+            : !flow.dispatch.tensor<readonly:tensor<49x512xf32>> -> tensor<49x512xf32>
         %init = tensor.empty() : tensor<128x512xf32>
         %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<128x512xf32>) -> tensor<128x512xf32>
         %gemm = linalg.matmul {compilation_info = #compilation}
             ins(%lhs, %rhs : tensor<128x49xf32>, tensor<49x512xf32>)
             outs(%fill : tensor<128x512xf32>) -> tensor<128x512xf32>
         flow.dispatch.tensor.store %gemm, %result_binding, offsets = [0, 0], sizes = [128, 512], strides = [1, 1]
-            : tensor<128x512xf32> -> !flow.dispatch.tensor<writeonly:128x512xf32>
+            : tensor<128x512xf32> -> !flow.dispatch.tensor<writeonly:tensor<128x512xf32>>
         return
       }
     }
@@ -154,22 +154,22 @@ hal.executable private @preset_config_matmul  {
         %dim1 = arith.index_cast %1 : i32 to index
         %dim2 = arith.index_cast %2 : i32 to index
         %lhs_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
-            : !flow.dispatch.tensor<readonly:?x?xf32>{%dim1, %dim0}
+            : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%dim1, %dim0}
         %rhs_binding = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
-            : !flow.dispatch.tensor<readonly:?x?xf32>{%dim0, %dim2}
+            : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%dim0, %dim2}
         %result_binding = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
-            : !flow.dispatch.tensor<writeonly:?x?xf32>{%dim1, %dim2}
+            : !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%dim1, %dim2}
         %lhs = flow.dispatch.tensor.load %lhs_binding, offsets = [0, 0], sizes = [%dim1, %dim0], strides = [1, 1]
-            : !flow.dispatch.tensor<readonly:?x?xf32>{%dim1, %dim0} -> tensor<?x?xf32>
+            : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%dim1, %dim0} -> tensor<?x?xf32>
         %rhs = flow.dispatch.tensor.load %rhs_binding, offsets = [0, 0], sizes = [%dim0, %dim2], strides = [1, 1]
-            : !flow.dispatch.tensor<readonly:?x?xf32>{%dim0, %dim2} -> tensor<?x?xf32>
+            : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%dim0, %dim2} -> tensor<?x?xf32>
         %init = tensor.empty(%dim1, %dim2) : tensor<?x?xf32>
         %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<?x?xf32>) -> tensor<?x?xf32>
         %gemm = linalg.matmul {compilation_info = #compilation}
             ins(%lhs, %rhs : tensor<?x?xf32>, tensor<?x?xf32>)
             outs(%fill : tensor<?x?xf32>) -> tensor<?x?xf32>
         flow.dispatch.tensor.store %gemm, %result_binding, offsets = [0, 0], sizes = [%dim1, %dim2], strides = [1, 1]
-            : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:?x?xf32>{%dim1, %dim2}
+            : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%dim1, %dim2}
         return
       }
     }

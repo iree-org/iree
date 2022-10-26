@@ -37,6 +37,96 @@
 using namespace iree::hal::vulkan;
 
 //===----------------------------------------------------------------------===//
+// RenderDoc integration
+//===----------------------------------------------------------------------===//
+
+// Configure cmake with -DIREE_ENABLE_RENDERDOC_PROFILING=ON in order to
+// enable profiling support. This should be left off in production builds to
+// avoid introducing a backdoor.
+#if defined(IREE_HAL_VULKAN_HAVE_RENDERDOC)
+
+// NOTE: C API, see https://renderdoc.org/docs/in_application_api.html.
+// When compiled in the API will no-op itself if not running under a RenderDoc
+// capture context (renderdoc.dll/so already loaded).
+#include "third_party/renderdoc/renderdoc_app.h"
+
+typedef RENDERDOC_API_1_5_0 RENDERDOC_API_LATEST;
+
+// Returns a handle to the RenderDoc API when it is hooking the process.
+// Returns NULL when RenderDoc is not present (or valid).
+static RENDERDOC_API_LATEST* iree_hal_vulkan_query_renderdoc_api(
+    VkInstance instance) {
+  pRENDERDOC_GetAPI RENDERDOC_GetAPI = NULL;
+#if defined(IREE_PLATFORM_WINDOWS)
+
+  // NOTE: RenderDoc only supports hooking so we can't use LoadLibrary - if
+  // we're going to use RenderDoc its library must already be loaded.
+  if (HMODULE hook_module = GetModuleHandleA("renderdoc.dll")) {
+    RENDERDOC_GetAPI =
+        (pRENDERDOC_GetAPI)GetProcAddress(hook_module, "RENDERDOC_GetAPI");
+  }
+
+#else
+
+  // dlopen/dlsym on posix-like systems. Note that each platform has its own
+  // naming for the injected module. Because RenderDoc only supports hooking
+  // (where the hosting process loads the library in magic ways for us) we use
+  // RTLD_NOLOAD to ensure we don't accidentally try to load it when not hooked.
+  void* hook_module = NULL;
+#if defined(IREE_PLATFORM_ANDROID)
+  hook_module = dlopen("libVkLayer_GLES_RenderDoc.so", RTLD_NOW | RTLD_NOLOAD);
+#elif defined(IREE_PLATFORM_APPLE)
+  hook_module = dlopen("librenderdoc.dylib", RTLD_NOW | RTLD_NOLOAD);
+#elif defined(IREE_PLATFORM_LINUX)
+  hook_module = dlopen("librenderdoc.so", RTLD_NOW | RTLD_NOLOAD);
+#else
+#error "RenderDoc profiling not supported on this platform"
+#endif  // IREE_PLATFORM_*
+  if (hook_module) {
+    RENDERDOC_GetAPI =
+        (pRENDERDOC_GetAPI)dlsym(hook_module, "RENDERDOC_GetAPI");
+  }
+
+#endif  // IREE_PLATFORM_WINDOWS
+
+  if (!RENDERDOC_GetAPI) return NULL;  // not found, no-op
+
+  RENDERDOC_API_LATEST* api = NULL;
+  int query_result =
+      RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_5_0, (void**)&api);
+  if (query_result != 1) {
+    // Failed to initialize API (old version, etc). No-op.
+    return NULL;
+  }
+
+  return api;
+}
+
+// Begins a new RenderDoc capture.
+static void iree_hal_vulkan_begin_renderdoc_capture(
+    RENDERDOC_API_LATEST* renderdoc_api, VkInstance instance,
+    const iree_hal_device_profiling_options_t* options) {
+  if (!renderdoc_api) return;
+  if (options->file_path) {
+    renderdoc_api->SetCaptureFilePathTemplate(options->file_path);
+  }
+  renderdoc_api->StartFrameCapture(
+      RENDERDOC_DEVICEPOINTER_FROM_VKINSTANCE(instance), NULL);
+}
+
+// Ends the active RenderDoc capture, if any active.
+static void iree_hal_vulkan_end_renderdoc_capture(
+    RENDERDOC_API_LATEST* renderdoc_api, VkInstance instance) {
+  if (!renderdoc_api) return;
+  if (renderdoc_api->IsFrameCapturing()) {
+    renderdoc_api->EndFrameCapture(
+        RENDERDOC_DEVICEPOINTER_FROM_VKINSTANCE(instance), NULL);
+  }
+}
+
+#endif  // IREE_HAL_VULKAN_HAVE_RENDERDOC
+
+//===----------------------------------------------------------------------===//
 // iree_hal_vulkan_device_t extensibility util
 //===----------------------------------------------------------------------===//
 
@@ -382,6 +472,10 @@ typedef struct iree_hal_vulkan_device_t {
   iree_arena_block_pool_t block_pool;
 
   BuiltinExecutables* builtin_executables;
+
+#if defined(IREE_HAL_VULKAN_HAVE_RENDERDOC)
+  RENDERDOC_API_LATEST* renderdoc_api;
+#endif  // IREE_HAL_VULKAN_HAVE_RENDERDOC
 } iree_hal_vulkan_device_t;
 
 namespace {
@@ -569,6 +663,10 @@ static iree_status_t iree_hal_vulkan_device_create_internal(
   device->physical_device = physical_device;
   device->logical_device = logical_device;
   device->logical_device->AddReference();
+
+#if defined(IREE_HAL_VULKAN_HAVE_RENDERDOC)
+  device->renderdoc_api = iree_hal_vulkan_query_renderdoc_api(instance);
+#endif  // IREE_HAL_VULKAN_HAVE_RENDERDOC
 
   iree_arena_block_pool_initialize(32 * 1024, host_allocator,
                                    &device->block_pool);
@@ -1128,6 +1226,41 @@ static iree_status_t iree_hal_vulkan_device_wait_semaphores(
       device->logical_device, &semaphore_list, timeout, wait_flags);
 }
 
+static iree_status_t iree_hal_vulkan_device_profiling_begin(
+    iree_hal_device_t* base_device,
+    const iree_hal_device_profiling_options_t* options) {
+  iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
+  (void)device;
+
+  // For now we only support RenderDoc. As much as possible we should try to use
+  // standardized Vulkan layers to do profiling configuration/control like
+  // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_performance_query.html
+  // to avoid the combinatorial explosion of vendor tooling hooks.
+  // Since RenderDoc is fairly simple, cross-platform, and cross-vendor we
+  // support it here. If this grows beyond a few lines of code we should shuffle
+  // it off to another file.
+  if (iree_all_bits_set(options->mode,
+                        IREE_HAL_DEVICE_PROFILING_MODE_QUEUE_OPERATIONS)) {
+#if defined(IREE_HAL_VULKAN_HAVE_RENDERDOC)
+    iree_hal_vulkan_begin_renderdoc_capture(device->renderdoc_api,
+                                            device->instance, options);
+#endif  // IREE_HAL_VULKAN_HAVE_RENDERDOC
+  }
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_vulkan_device_profiling_end(
+    iree_hal_device_t* base_device) {
+  iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
+  (void)device;
+
+#if defined(IREE_HAL_VULKAN_HAVE_RENDERDOC)
+  iree_hal_vulkan_end_renderdoc_capture(device->renderdoc_api,
+                                        device->instance);
+#endif  // IREE_HAL_VULKAN_HAVE_RENDERDOC
+  return iree_ok_status();
+}
+
 namespace {
 const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable = {
     /*.destroy=*/iree_hal_vulkan_device_destroy,
@@ -1153,5 +1286,7 @@ const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable = {
     /*.queue_execute=*/iree_hal_vulkan_device_queue_execute,
     /*.queue_flush=*/iree_hal_vulkan_device_queue_flush,
     /*.wait_semaphores=*/iree_hal_vulkan_device_wait_semaphores,
+    /*.profiling_begin=*/iree_hal_vulkan_device_profiling_begin,
+    /*.profiling_end=*/iree_hal_vulkan_device_profiling_end,
 };
 }  // namespace

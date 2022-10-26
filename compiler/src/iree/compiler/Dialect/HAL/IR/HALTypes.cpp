@@ -314,6 +314,89 @@ Attribute ExecutableTargetAttr::getMatchExpression() {
 }
 
 //===----------------------------------------------------------------------===//
+// #hal.affinity.queue
+//===----------------------------------------------------------------------===//
+
+// static
+Attribute AffinityQueueAttr::parse(AsmParser &p, Type type) {
+  int64_t mask = 0;
+  // `<`
+  if (failed(p.parseLess())) return {};
+  // `*` (any)
+  if (succeeded(p.parseOptionalStar())) {
+    mask = -1;
+  } else {
+    // `[`queue_bit[, ...] `]`
+    if (failed(p.parseCommaSeparatedList(AsmParser::Delimiter::Square, [&]() {
+          int64_t i = 0;
+          if (failed(p.parseInteger(i))) return failure();
+          mask |= 1ll << i;
+          return success();
+        }))) {
+      return {};
+    }
+  }
+  // `>`
+  if (failed(p.parseGreater())) return {};
+  return get(p.getContext(), mask);
+}
+
+void AffinityQueueAttr::print(AsmPrinter &p) const {
+  auto &os = p.getStream();
+  os << "<";
+  int64_t mask = getMask();
+  if (mask == -1) {
+    os << "*";
+  } else {
+    os << "[";
+    for (int i = 0, j = 0; i < sizeof(mask) * 8; ++i) {
+      if (mask & (1ll << i)) {
+        if (j++ > 0) os << ", ";
+        os << i;
+      }
+    }
+    os << "]";
+  }
+  os << ">";
+}
+
+bool AffinityQueueAttr::isExecutableWith(
+    IREE::Stream::AffinityAttr other) const {
+  if (!other) return true;
+  // Only compatible with other queue affinities today. When we extend the
+  // attributes to specify device targets we'd want to check here.
+  auto otherQueueAttr = other.dyn_cast_or_null<AffinityQueueAttr>();
+  if (!otherQueueAttr) return false;
+  // If this affinity is a subset of the target affinity then it can execute
+  // with it.
+  if ((getMask() & otherQueueAttr.getMask()) == getMask()) return true;
+  // Otherwise not compatible.
+  return false;
+}
+
+IREE::Stream::AffinityAttr AffinityQueueAttr::joinOR(
+    IREE::Stream::AffinityAttr other) const {
+  if (!other) return *this;
+  if (!IREE::Stream::AffinityAttr::canExecuteTogether(*this, other)) {
+    return nullptr;
+  }
+  auto otherQueueAttr = other.dyn_cast_or_null<AffinityQueueAttr>();
+  return AffinityQueueAttr::get(getContext(),
+                                getMask() | otherQueueAttr.getMask());
+}
+
+IREE::Stream::AffinityAttr AffinityQueueAttr::joinAND(
+    IREE::Stream::AffinityAttr other) const {
+  if (!other) return *this;
+  if (!IREE::Stream::AffinityAttr::canExecuteTogether(*this, other)) {
+    return nullptr;
+  }
+  auto otherQueueAttr = other.dyn_cast_or_null<AffinityQueueAttr>();
+  return AffinityQueueAttr::get(getContext(),
+                                getMask() & otherQueueAttr.getMask());
+}
+
+//===----------------------------------------------------------------------===//
 // #hal.match.*
 //===----------------------------------------------------------------------===//
 

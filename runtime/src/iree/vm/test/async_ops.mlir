@@ -18,15 +18,15 @@ vm.module @async_ops {
   vm.func @yield_sequence(%arg0: i32) -> i32 {
     %c1 = vm.const.i32 1
     %y0 = vm.add.i32 %arg0, %c1 : i32
-    %y0_dno = util.do_not_optimize(%y0) : i32
+    %y0_dno = util.optimization_barrier %y0 : i32
     vm.yield ^bb1
   ^bb1:
     %y1 = vm.add.i32 %y0_dno, %c1 : i32
-    %y1_dno = util.do_not_optimize(%y1) : i32
+    %y1_dno = util.optimization_barrier %y1 : i32
     vm.yield ^bb2
   ^bb2:
     %y2 = vm.add.i32 %y1_dno, %c1 : i32
-    %y2_dno = util.do_not_optimize(%y2) : i32
+    %y2_dno = util.optimization_barrier %y2 : i32
     vm.yield ^bb3
   ^bb3:
     vm.return %y2_dno : i32
@@ -41,10 +41,10 @@ vm.module @async_ops {
     %cond = vm.cmp.nz.i32 %arg0 : i32
     vm.cond_br %cond, ^true, ^false
   ^true:
-    %arg1_dno = util.do_not_optimize(%arg1) : i32
+    %arg1_dno = util.optimization_barrier %arg1 : i32
     vm.yield ^bb3(%arg1_dno : i32)
   ^false:
-    %arg2_dno = util.do_not_optimize(%arg2) : i32
+    %arg2_dno = util.optimization_barrier %arg2 : i32
     vm.yield ^bb3(%arg2_dno: i32)
   ^bb3(%result : i32):
     vm.return %result : i32

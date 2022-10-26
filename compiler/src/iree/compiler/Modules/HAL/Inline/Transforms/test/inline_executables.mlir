@@ -55,7 +55,7 @@ hal.executable private @ex {
 
         // Test for global constants:
         %global_constant = util.global.load @global_constant : !util.buffer
-        util.do_not_optimize(%global_constant) : !util.buffer
+        util.optimization_barrier %global_constant : !util.buffer
 
 
         %c4 = arith.constant 4 : index
@@ -105,7 +105,7 @@ func.func private @dispatch_0()
 
 // Globals get carried across:
 // CHECK: %[[GLOBAL_CONSTANT:.+]] = util.global.load @global_constant_0 : !util.buffer
-// CHECK: util.do_not_optimize(%[[GLOBAL_CONSTANT]])
+// CHECK: util.optimization_barrier %[[GLOBAL_CONSTANT]]
 
 // CHECK: %[[X_IDX:.+]] = arith.index_cast %[[X_I32]]
 // CHECK: scf.for %[[ELEMENT_INDEX:.+]] = %c0 to %[[X_IDX]]

@@ -20,19 +20,19 @@ hal.executable private @matmul_riscv  {
     builtin.module {
       func.func @matmul_riscv() {
         %cst = arith.constant 0.0 : f32
-        %lhs_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:384x512xf32>
-        %rhs_binding = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:512x128xf32>
-        %result_binding = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:384x128xf32>
+        %lhs_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<384x512xf32>>
+        %rhs_binding = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<512x128xf32>>
+        %result_binding = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:tensor<384x128xf32>>
         %lhs = flow.dispatch.tensor.load %lhs_binding, offsets = [0, 0], sizes = [384, 512], strides = [1, 1]
-            : !flow.dispatch.tensor<readonly:384x512xf32> -> tensor<384x512xf32>
+            : !flow.dispatch.tensor<readonly:tensor<384x512xf32>> -> tensor<384x512xf32>
         %rhs = flow.dispatch.tensor.load %rhs_binding, offsets = [0, 0], sizes = [512, 128], strides = [1, 1]
-            : !flow.dispatch.tensor<readonly:512x128xf32> -> tensor<512x128xf32>
+            : !flow.dispatch.tensor<readonly:tensor<512x128xf32>> -> tensor<512x128xf32>
         %init = tensor.empty() : tensor<384x128xf32>
         %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<384x128xf32>) -> tensor<384x128xf32>
         %gemm = linalg.matmul ins(%lhs, %rhs : tensor<384x512xf32>, tensor<512x128xf32>)
             outs(%fill : tensor<384x128xf32>) -> tensor<384x128xf32>
         flow.dispatch.tensor.store %gemm, %result_binding, offsets = [0, 0], sizes = [384, 128], strides = [1, 1]
-            : tensor<384x128xf32> -> !flow.dispatch.tensor<writeonly:384x128xf32>
+            : tensor<384x128xf32> -> !flow.dispatch.tensor<writeonly:tensor<384x128xf32>>
         return
       }
     }
@@ -69,15 +69,15 @@ hal.executable private @thin_depthwise_conv_static {
       func.func @thin_depthwise_conv_static() {
         %cst = arith.constant 0.0 : f32
         %input_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
-            : !flow.dispatch.tensor<readonly:1x57x57x72xf32>
+            : !flow.dispatch.tensor<readonly:tensor<1x57x57x72xf32>>
         %filter_binding = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
-            : !flow.dispatch.tensor<readonly:3x3x72xf32>
+            : !flow.dispatch.tensor<readonly:tensor<3x3x72xf32>>
         %result_binding = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
-            : !flow.dispatch.tensor<writeonly:1x28x28x72xf32>
+            : !flow.dispatch.tensor<writeonly:tensor<1x28x28x72xf32>>
         %input = flow.dispatch.tensor.load %input_binding, offsets = [0, 0, 0, 0], sizes = [1, 161, 161, 240], strides = [1, 1, 1, 1]
-            : !flow.dispatch.tensor<readonly:1x57x57x72xf32> -> tensor<1x57x57x72xf32>
+            : !flow.dispatch.tensor<readonly:tensor<1x57x57x72xf32>> -> tensor<1x57x57x72xf32>
         %filter = flow.dispatch.tensor.load %filter_binding, offsets = [0, 0, 0], sizes = [3, 3, 240], strides = [1, 1, 1]
-            : !flow.dispatch.tensor<readonly:3x3x72xf32> -> tensor<3x3x72xf32>
+            : !flow.dispatch.tensor<readonly:tensor<3x3x72xf32>> -> tensor<3x3x72xf32>
         %init = tensor.empty() : tensor<1x28x28x72xf32>
         %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<1x28x28x72xf32>) -> tensor<1x28x28x72xf32>
         %conv = linalg.depthwise_conv_2d_nhwc_hwc {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>}
@@ -85,7 +85,7 @@ hal.executable private @thin_depthwise_conv_static {
           outs(%fill : tensor<1x28x28x72xf32>) -> tensor<1x28x28x72xf32>
 
         flow.dispatch.tensor.store %conv, %result_binding, offsets = [0, 0, 0, 0], sizes = [1, 28, 28, 72], strides = [1, 1, 1, 1]
-            : tensor<1x28x28x72xf32> -> !flow.dispatch.tensor<writeonly:1x28x28x72xf32>
+            : tensor<1x28x28x72xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x28x28x72xf32>>
         return
       }
     }

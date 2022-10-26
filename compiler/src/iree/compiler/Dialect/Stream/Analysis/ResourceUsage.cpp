@@ -250,7 +250,7 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
           getState() ^= trueUsage.getState();
           getState() ^= falseUsage.getState();
         })
-        .Case([&](IREE::Util::DoNotOptimizeOp op) {
+        .Case([&](IREE::Util::OptimizationBarrierOp op) {
           auto sourceUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op.getOperand(0)),
               DFX::Resolution::REQUIRED);
@@ -455,7 +455,7 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
                 return WalkResult::advance();
               });
         })
-        .Case([&](IREE::Util::DoNotOptimizeOp op) {
+        .Case([&](IREE::Util::OptimizationBarrierOp op) {
           auto resultUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op.getResult(0)),
               DFX::Resolution::REQUIRED);

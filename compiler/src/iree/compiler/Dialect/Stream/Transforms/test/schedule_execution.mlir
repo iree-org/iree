@@ -33,6 +33,104 @@ func.func @partitioning(%arg0: !stream.resource<external>, %arg1: !stream.resour
 
 // -----
 
+// Tests basic partitioning of sequential dispatches with differing affinities.
+// Dispatches with the same affinities should be placed into the same execution
+// regions.
+
+// CHECK-LABEL: @partitioningWithAffinities
+// CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<external>)
+func.func @partitioningWithAffinities(%arg0: !stream.resource<external>) -> !stream.resource<external> {
+  %c1 = arith.constant 1 : index
+  %c20 = arith.constant 20 : index
+  %c1280 = arith.constant 1280 : index
+  %c255_i32 = arith.constant 255 : i32
+
+  // CHECK: %[[TRANSIENTS:.+]]:2, %[[TIMEPOINT0:.+]] = stream.async.execute
+  // CHECK-SAME: on(#hal.affinity.queue<[0]>)
+  // CHECK-SAME: with(%[[ARG0]] as %[[ARG0_CAPTURE:.+]]: !stream.resource<external>{%c20})
+  // CHECK-SAME: -> (!stream.resource<transient>{%c1280}, !stream.resource<transient>{%c20}) {
+  // CHECK-NEXT: %[[SPLAT:.+]] = stream.async.splat
+  %splat = stream.async.splat %c255_i32 : i32 -> !stream.resource<transient>{%c1280}
+  // CHECK-NEXT: %[[DISPATCH0:.+]] = stream.async.dispatch @ex::@dispatch_0[%c1](%[[ARG0_CAPTURE]], %[[SPLAT]])
+  %dispatch0 = stream.async.dispatch on(#hal.affinity.queue<[0]>) @ex::@dispatch_0[%c1](%arg0, %splat) : (!stream.resource<external>{%c20}, !stream.resource<transient>{%c20}) -> !stream.resource<transient>{%c1280}
+  // CHECK-NEXT: %[[DISPATCH1:.+]] = stream.async.dispatch @ex::@dispatch_1[%c1](%[[ARG0_CAPTURE]], %[[SPLAT]])
+  %dispatch1 = stream.async.dispatch on(#hal.affinity.queue<[0]>) @ex::@dispatch_1[%c1](%arg0, %splat) : (!stream.resource<external>{%c20}, !stream.resource<transient>{%c20}) -> !stream.resource<transient>{%c20}
+  // CHECK-NEXT: stream.yield %[[DISPATCH0]], %[[DISPATCH1]]
+  // CHECK-NEXT: } => !stream.timepoint
+
+  // CHECK: %[[RESULT:.+]], %[[TIMEPOINT1:.+]] = stream.async.execute
+  // CHECK-SAME: on(#hal.affinity.queue<[1]>)
+  // CHECK-SAME: await(%[[TIMEPOINT0]])
+  // CHECK-SAME: with(%[[TRANSIENTS]]#0 as %[[TRANSIENT0_CAPTURE:.+]]: !stream.resource<transient>{%c1280},
+  // CHECK-SAME:      %[[TRANSIENTS]]#1 as %[[TRANSIENT1_CAPTURE:.+]]: !stream.resource<transient>{%c20})
+  // CHECK-SAME: -> !stream.resource<external>{%c20}
+  // CHECK-NEXT: %[[DISPATCH2:.+]] = stream.async.dispatch @ex::@dispatch_2[%c1](%[[TRANSIENT0_CAPTURE]], %[[TRANSIENT1_CAPTURE]])
+  %dispatch2 = stream.async.dispatch on(#hal.affinity.queue<[1]>) @ex::@dispatch_2[%c1](%dispatch0, %dispatch1) : (!stream.resource<transient>{%c1280}, !stream.resource<transient>{%c20}) -> !stream.resource<external>{%c20}
+  // CHECK-NEXT: stream.yield %[[DISPATCH2]]
+  // CHECK-NEXT: } => !stream.timepoint
+
+  // CHECK-NEXT: %[[READY:.+]] = stream.timepoint.await
+  // CHECK-SAME:   on(#hal.affinity.queue<[1]>)
+  // CHECK-SAME:   %[[TIMEPOINT1]] => %[[RESULT]] : !stream.resource<external>{%c20}
+  // CHECK-NEXT: return %[[READY]]
+  return %dispatch2 : !stream.resource<external>
+}
+
+// -----
+
+// Tests partitioning of dispatches with differing affinities and no data
+// dependencies. Unrelated dispatches with differing affinities should end up
+// in concurrently executable regions.
+
+// CHECK-LABEL: @partitioningWithConcurrentAffinities
+// CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<external>)
+func.func @partitioningWithConcurrentAffinities(%arg0: !stream.resource<external>) -> !stream.resource<external> {
+  %c1 = arith.constant 1 : index
+  %c20 = arith.constant 20 : index
+  %c1280 = arith.constant 1280 : index
+  %c255_i32 = arith.constant 255 : i32
+
+  // CHECK: %[[TRANSIENT0:.+]], %[[TIMEPOINT0:.+]] = stream.async.execute
+  // CHECK-SAME: on(#hal.affinity.queue<[0]>)
+  // CHECK-SAME: with(%[[ARG0]] as %[[ARG0_CAPTURE0:.+]]: !stream.resource<external>{%c20})
+  // CHECK-SAME: !stream.resource<transient>{%c1280}
+  // CHECK-NEXT: %[[SPLAT0:.+]] = stream.async.splat
+  %splat = stream.async.splat %c255_i32 : i32 -> !stream.resource<transient>{%c1280}
+  // CHECK-NEXT: %[[DISPATCH0:.+]] = stream.async.dispatch @ex::@dispatch_0[%c1](%[[ARG0_CAPTURE0]], %[[SPLAT0]])
+  %dispatch0 = stream.async.dispatch on(#hal.affinity.queue<[0]>) @ex::@dispatch_0[%c1](%arg0, %splat) : (!stream.resource<external>{%c20}, !stream.resource<transient>{%c20}) -> !stream.resource<transient>{%c1280}
+  // CHECK-NEXT: stream.yield %[[DISPATCH0]]
+  // CHECK-NEXT: } => !stream.timepoint
+
+  // CHECK: %[[TRANSIENT1:.+]], %[[TIMEPOINT1:.+]] = stream.async.execute
+  // CHECK-SAME: on(#hal.affinity.queue<[1]>)
+  // CHECK-SAME: with(%[[ARG0]] as %[[ARG0_CAPTURE1:.+]]: !stream.resource<external>{%c20})
+  // CHECK-SAME: -> !stream.resource<transient>{%c20} {
+  // CHECK-NEXT: %[[SPLAT1:.+]] = stream.async.splat
+  // CHECK-NEXT: %[[DISPATCH1:.+]] = stream.async.dispatch @ex::@dispatch_1[%c1](%[[ARG0_CAPTURE1]], %[[SPLAT1]])
+  %dispatch1 = stream.async.dispatch on(#hal.affinity.queue<[1]>) @ex::@dispatch_1[%c1](%arg0, %splat) : (!stream.resource<external>{%c20}, !stream.resource<transient>{%c20}) -> !stream.resource<transient>{%c20}
+  // CHECK-NEXT: stream.yield %[[DISPATCH1]]
+  // CHECK-NEXT: } => !stream.timepoint
+
+  // CHECK: %[[JOIN:.+]] = stream.timepoint.join max(%[[TIMEPOINT0]], %[[TIMEPOINT1]])
+
+  // CHECK: %[[RESULT:.+]], %[[TIMEPOINT2:.+]] = stream.async.execute
+  // CHECK-SAME: await(%[[JOIN]])
+  // CHECK-SAME: with(%[[TRANSIENT0]] as %[[TRANSIENT0_CAPTURE:.+]]: !stream.resource<transient>{%c1280},
+  // CHECK-SAME:      %[[TRANSIENT1]] as %[[TRANSIENT1_CAPTURE:.+]]: !stream.resource<transient>{%c20})
+  // CHECK-NEXT: %[[DISPATCH2:.+]] = stream.async.dispatch @ex::@dispatch_2[%c1](%[[TRANSIENT0_CAPTURE]], %[[TRANSIENT1_CAPTURE]])
+  %dispatch2 = stream.async.dispatch on(#hal.affinity.queue<[2]>) @ex::@dispatch_2[%c1](%dispatch0, %dispatch1) : (!stream.resource<transient>{%c1280}, !stream.resource<transient>{%c20}) -> !stream.resource<external>{%c20}
+  // CHECK-NEXT: stream.yield %[[DISPATCH2]]
+  // CHECK-NEXT: } => !stream.timepoint
+
+  // CHECK-NEXT: %[[READY:.+]] = stream.timepoint.await
+  // CHECK-SAME:   on(#hal.affinity.queue<[2]>)
+  // CHECK-SAME:   %[[TIMEPOINT2]] => %[[RESULT]] : !stream.resource<external>{%c20}
+  // CHECK-NEXT: return %[[READY]]
+  return %dispatch2 : !stream.resource<external>
+}
+
+// -----
+
 // Tests that ops in multiple blocks are partitioned independently and that
 // timepoints are chained between the partitions. Note that the dispatches
 // happen in-place on the splat and we expect the execution regions to be tied.

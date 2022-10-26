@@ -504,9 +504,9 @@ RankedTensorType DispatchTensorLoadOp::inferResultType(
         if (auto attr = valueOrAttr.dyn_cast<Attribute>()) {
           return attr.cast<IntegerAttr>().getInt();
         }
-        return DispatchTensorType::kDynamicSize;
+        return ShapedType::kDynamicSize;
       }));
-  return RankedTensorType::get(shape, sourceType.getElementType());
+  return RankedTensorType::get(shape, sourceType.getBoundElementType());
 }
 
 llvm::SmallBitVector DispatchTensorLoadOp::getDroppedDims() {
@@ -708,7 +708,7 @@ void DispatchWorkgroupsOp::build(OpBuilder &builder, OperationState &state,
   }
   for (auto operand : llvm::enumerate(arguments)) {
     Type type = operand.value().getType();
-    if (auto tensorType = type.dyn_cast<TensorType>()) {
+    if (auto tensorType = type.dyn_cast<RankedTensorType>()) {
       type = DispatchTensorType::get(operandAliases[operand.index()]
                                          ? TensorAccess::ReadWrite
                                          : TensorAccess::ReadOnly,
@@ -722,7 +722,7 @@ void DispatchWorkgroupsOp::build(OpBuilder &builder, OperationState &state,
       continue;
     }
     Type type = resultType.value();
-    if (auto tensorType = type.dyn_cast<TensorType>()) {
+    if (auto tensorType = type.dyn_cast<RankedTensorType>()) {
       type = DispatchTensorType::get(TensorAccess::WriteOnly, tensorType);
     }
     workgroupBody->addArgument(type, state.location);

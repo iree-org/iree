@@ -42,12 +42,11 @@ namespace iree_compiler {
 // Utility functions.
 //===----------------------------------------------------------------------===//
 
-template <typename TensorType>
-static MemRefType getMemrefTypeForTensor(TensorType tensorType,
-                                         MemRefLayoutAttrInterface layout = {},
-                                         Attribute memorySpace = {}) {
-  return MemRefType::get(tensorType.getShape(), tensorType.getElementType(),
-                         layout, memorySpace);
+static MemRefType getMemrefTypeForTensor(
+    IREE::Flow::DispatchTensorType tensorType,
+    MemRefLayoutAttrInterface layout = {}, Attribute memorySpace = {}) {
+  return MemRefType::get(tensorType.getShape(),
+                         tensorType.getBoundElementType(), layout, memorySpace);
 }
 
 /// Find the memref version of the given InterfaceBindingSubspanOp. If no such

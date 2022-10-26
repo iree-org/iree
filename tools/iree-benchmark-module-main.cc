@@ -68,6 +68,7 @@
 #include "iree/hal/api.h"
 #include "iree/modules/hal/types.h"
 #include "iree/tooling/context_util.h"
+#include "iree/tooling/device_util.h"
 #include "iree/tooling/vm_util_cc.h"
 #include "iree/vm/api.h"
 #include "iree/vm/ref_cc.h"
@@ -451,6 +452,8 @@ class IREEBenchmark {
     iree_hal_device_release(device_);
   };
 
+  iree_hal_device_t* device() const { return device_; }
+
   iree_status_t Register() {
     IREE_TRACE_SCOPE0("IREEBenchmark::Register");
 
@@ -612,6 +615,8 @@ int main(int argc, char** argv) {
     printf("%s\n", iree::Status(std::move(status)).ToString().c_str());
     return ret;
   }
+  IREE_CHECK_OK(iree_hal_begin_profiling_from_flags(iree_benchmark.device()));
   ::benchmark::RunSpecifiedBenchmarks();
+  IREE_CHECK_OK(iree_hal_end_profiling_from_flags(iree_benchmark.device()));
   return 0;
 }

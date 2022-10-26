@@ -21,6 +21,17 @@ namespace iree_compiler {
 
 namespace {
 
+// Returns the stream affinity based on the given flow dialect |op|.
+// Returns an empty attribute when no affinity is specified.
+static IREE::Stream::AffinityAttr getAffinityFor(Operation *op) {
+  if (!op) return {};
+  // TODO(benvanik): support upstream interfaces or something more generic?
+  // We may want to allow users to come in with raw string forms or something
+  // that we parse and map to an attribute. That would prevent the need for
+  // frontends to create IREE attribute types.
+  return op->getAttrOfType<IREE::Stream::AffinityAttr>("stream.affinity");
+}
+
 // Inserts a sizeof calculation for the given tensor value type and dims.
 // This should only be used to produce sizes for values produced by an op; the
 // size of operands must be queried from the input resource.
@@ -31,7 +42,7 @@ static Value buildResultSizeOf(Location loc, Value tensorValue,
   // materialization of a bunch of redundant IR.
   return rewriter.createOrFold<IREE::Stream::TensorSizeOfOp>(
       loc, rewriter.getIndexType(), TypeAttr::get(tensorValue.getType()),
-      dynamicDims, /*affinity=*/nullptr);
+      dynamicDims, getAffinityFor(tensorValue.getDefiningOp()));
 }
 
 // Reshapes become clones here to preserve shape information (which may become
@@ -51,8 +62,7 @@ struct ConvertTensorReshapeOp
     rewriter.replaceOpWithNewOp<IREE::Stream::TensorCloneOp>(
         op, unknownType, source.resource, op.getSource().getType(),
         op.getSourceDims(), source.resourceSize, op.getResult().getType(),
-        adaptor.getResultDims(), resultSize,
-        /*affinity=*/nullptr);
+        adaptor.getResultDims(), resultSize, getAffinityFor(op));
     return success();
   }
 };
@@ -68,8 +78,7 @@ struct ConvertTensorEmptyOp
                                         op.getResultDims(), rewriter);
     rewriter.replaceOpWithNewOp<IREE::Stream::TensorEmptyOp>(
         op, unknownType, op.getResult().getType(), adaptor.getResultDims(),
-        resultSize,
-        /*affinity=*/nullptr);
+        resultSize, getAffinityFor(op));
     return success();
   }
 };
@@ -85,8 +94,7 @@ struct ConvertTensorSplatOp
                                         op.getResultDims(), rewriter);
     rewriter.replaceOpWithNewOp<IREE::Stream::TensorSplatOp>(
         op, unknownType, adaptor.getValue(), op.getResult().getType(),
-        adaptor.getResultDims(), resultSize,
-        /*affinity=*/nullptr);
+        adaptor.getResultDims(), resultSize, getAffinityFor(op));
     return success();
   }
 };
@@ -103,8 +111,7 @@ struct ConvertTensorCloneOp
     rewriter.replaceOpWithNewOp<IREE::Stream::TensorCloneOp>(
         op, unknownType, operand.resource, op.getOperand().getType(),
         op.getArgumentDims(), operand.resourceSize, op.getResult().getType(),
-        adaptor.getArgumentDims(), operand.resourceSize,
-        /*affinity=*/nullptr);
+        adaptor.getArgumentDims(), operand.resourceSize, getAffinityFor(op));
     return success();
   }
 };
@@ -124,8 +131,7 @@ struct ConvertTensorSliceOp
         op, unknownType, source.resource, op.getSource().getType(),
         op.getSourceDims(), source.resourceSize, adaptor.getStartIndices(),
         adaptor.getLengths(), op.getResult().getType(), adaptor.getResultDims(),
-        resultSize,
-        /*affinity=*/nullptr);
+        resultSize, getAffinityFor(op));
     return success();
   }
 };
@@ -144,8 +150,7 @@ struct ConvertTensorUpdateOp
         op, target.resource.getType(), target.resource,
         op.getTarget().getType(), adaptor.getTargetDims(), target.resourceSize,
         adaptor.getStartIndices(), update.resource, op.getUpdate().getType(),
-        op.getUpdateDims(), update.resourceSize,
-        /*affinity=*/nullptr);
+        op.getUpdateDims(), update.resourceSize, getAffinityFor(op));
     return success();
   }
 };
@@ -167,7 +172,7 @@ struct ConvertTensorLoadOp
       loadSource = rewriter.createOrFold<IREE::Stream::AsyncTransferOp>(
           op.getLoc(), stagingType, source.resource, source.resourceSize,
           source.resourceSize,
-          /*source_affinity=*/nullptr,
+          /*source_affinity=*/getAffinityFor(op),
           /*result_affinity=*/nullptr);
     }
 
@@ -194,7 +199,7 @@ struct ConvertTensorStoreOp
       storeTarget = rewriter.createOrFold<IREE::Stream::AsyncTransferOp>(
           op.getLoc(), stagingType, storeTarget, target.resourceSize,
           target.resourceSize,
-          /*source_affinity=*/nullptr,
+          /*source_affinity=*/getAffinityFor(op),
           /*result_affinity=*/nullptr);
     }
 
@@ -209,7 +214,7 @@ struct ConvertTensorStoreOp
           op.getLoc(), target.resource.getType(), newResult,
           target.resourceSize, target.resourceSize,
           /*source_affinity=*/nullptr,
-          /*result_affinity=*/nullptr);
+          /*result_affinity=*/getAffinityFor(op));
     }
     rewriter.replaceOp(op, {newResult});
 
@@ -236,7 +241,7 @@ struct ConvertTensorTraceOp
         exportSource = rewriter.create<IREE::Stream::AsyncTransferOp>(
             op.getLoc(), externalType, source.resource, source.resourceSize,
             source.resourceSize,
-            /*source_affinity=*/nullptr,
+            /*source_affinity=*/getAffinityFor(op),
             /*result_affinity=*/nullptr);
       }
       auto dynamicDims = IREE::Util::buildDynamicDimsForValue(
@@ -244,8 +249,7 @@ struct ConvertTensorTraceOp
       exportedTensors.push_back(rewriter.create<IREE::Stream::TensorExportOp>(
           op.getLoc(), tensorOperand.getType(), exportSource,
           TypeAttr::get(tensorOperand.getType()), dynamicDims,
-          source.resourceSize,
-          /*affinity=*/nullptr));
+          source.resourceSize, getAffinityFor(op)));
     }
     rewriter.replaceOpWithNewOp<IREE::Stream::TensorTraceOp>(
         op, adaptor.getKey(), exportedTensors);
@@ -306,8 +310,7 @@ struct ConvertDispatchOp : public OpConversionPattern<IREE::Flow::DispatchOp> {
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncDispatchOp>(
         op, resultTypes, adaptor.getWorkload(), adaptor.getEntryPoint(),
         dispatchOperands, dispatchOperandSizes, resultSizes,
-        adaptor.getTiedOperandsAttr(),
-        /*affinity=*/nullptr);
+        adaptor.getTiedOperandsAttr(), getAffinityFor(op));
     return success();
   }
 };

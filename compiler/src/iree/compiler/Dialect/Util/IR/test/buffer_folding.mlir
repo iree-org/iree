@@ -82,13 +82,13 @@ func.func @FoldNestedBufferSizeOp(%buffer: !util.buffer) {
     %buffer_size_inner = util.buffer.size %buffer : !util.buffer
     // CHECK: util.buffer.load %[[BUFFER]]{{.+}} : !util.buffer{%[[BUFFER_SIZE_INNER]]}
     %inner = util.buffer.load %buffer[%i] : !util.buffer{%buffer_size_inner} -> i8
-    util.do_not_optimize(%inner) : i8
+    util.optimization_barrier %inner : i8
   }
   // CHECK: %[[BUFFER_SIZE_OUTER:.+]] = util.buffer.size %[[BUFFER]]
   %buffer_size_outer = util.buffer.size %buffer : !util.buffer
   // CHECK: util.buffer.load %[[BUFFER]]{{.+}} : !util.buffer{%[[BUFFER_SIZE_OUTER]]}
   %outer = util.buffer.load %buffer[%c128] : !util.buffer{%buffer_size_outer} -> i8
-  util.do_not_optimize(%outer) : i8
+  util.optimization_barrier %outer : i8
   return
 }
 

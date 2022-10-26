@@ -14,8 +14,8 @@ func.func @globalLoad() {
   // CHECK-NEXT: %[[D2:.+]] = util.global.load @loadedGlobal__d2 : index
   // CHECK-NEXT: %[[TIED:.+]] = flow.tensor.tie_shape %[[TENSOR]] : tensor<4x?x?x2xf32>{%[[D1]], %[[D2]]}
   %0 = util.global.load @loadedGlobal : tensor<4x?x?x2xf32>
-  // CHECK-NEXT: util.do_not_optimize(%[[TIED]])
-  util.do_not_optimize(%0) : tensor<4x?x?x2xf32>
+  // CHECK-NEXT: util.optimization_barrier %[[TIED]]
+  util.optimization_barrier %0 : tensor<4x?x?x2xf32>
   return
 }
 
@@ -50,10 +50,10 @@ func.func @funcArgs(%arg0: tensor<4x?x?x2xf32>, %arg1: tensor<?xi32>) {
   // CHECK-NEXT: %[[TIED_ARG0:.+]] = flow.tensor.tie_shape %[[ARG0]] : tensor<4x?x?x2xf32>{%[[ARG0_D1]], %[[ARG0_D2]]}
   // CHECK-NEXT: %[[TIED_ARG1:.+]] = flow.tensor.tie_shape %[[ARG1]] : tensor<?xi32>{%[[ARG1_D0]]}
 
-  // CHECK-NEXT: util.do_not_optimize(%[[TIED_ARG0]])
-  util.do_not_optimize(%arg0) : tensor<4x?x?x2xf32>
-  // CHECK-NEXT: util.do_not_optimize(%[[TIED_ARG1]])
-  util.do_not_optimize(%arg1) : tensor<?xi32>
+  // CHECK-NEXT: util.optimization_barrier %[[TIED_ARG0]]
+  util.optimization_barrier %arg0 : tensor<4x?x?x2xf32>
+  // CHECK-NEXT: util.optimization_barrier %[[TIED_ARG1]]
+  util.optimization_barrier %arg1 : tensor<?xi32>
 
   return
 }
@@ -93,10 +93,10 @@ func.func @caller(%arg0: tensor<4x?x?x2xf32>, %arg1: tensor<?xi32>) {
   // CHECK-NEXT: %[[TIED_RET0:.+]] = flow.tensor.tie_shape %[[RET]]#0 : tensor<4x?x?x2xf32>{%[[RET]]#1, %[[RET]]#2}
   // CHECK-NEXT: %[[TIED_RET1:.+]] = flow.tensor.tie_shape %[[RET]]#3 : tensor<?xi32>{%[[RET]]#4}
 
-  // CHECK-NEXT: util.do_not_optimize(%[[TIED_RET0]])
-  util.do_not_optimize(%0#0) : tensor<4x?x?x2xf32>
-  // CHECK-NEXT: util.do_not_optimize(%[[TIED_RET1]])
-  util.do_not_optimize(%0#1) : tensor<?xi32>
+  // CHECK-NEXT: util.optimization_barrier %[[TIED_RET0]]
+  util.optimization_barrier %0#0 : tensor<4x?x?x2xf32>
+  // CHECK-NEXT: util.optimization_barrier %[[TIED_RET1]]
+  util.optimization_barrier %0#1 : tensor<?xi32>
 
   return
 }
@@ -123,10 +123,10 @@ func.func @br(%arg0: tensor<4x?x?x2xf32>, %arg1: tensor<?xi32>) {
   // CHECK-NEXT: %[[TIED_BB1_ARG0:.+]] = flow.tensor.tie_shape %[[BB1_ARG0]] : tensor<4x?x?x2xf32>{%[[BB1_ARG0_D1]], %[[BB1_ARG0_D2]]}
   // CHECK-NEXT: %[[TIED_BB1_ARG1:.+]] = flow.tensor.tie_shape %[[BB1_ARG1]] : tensor<?xi32>{%[[BB1_ARG1_D0]]}
 
-  // CHECK-NEXT: util.do_not_optimize(%[[TIED_BB1_ARG0]])
-  util.do_not_optimize(%bb1_arg0) : tensor<4x?x?x2xf32>
-  // CHECK-NEXT: util.do_not_optimize(%[[TIED_BB1_ARG1]])
-  util.do_not_optimize(%bb1_arg1) : tensor<?xi32>
+  // CHECK-NEXT: util.optimization_barrier %[[TIED_BB1_ARG0]]
+  util.optimization_barrier %bb1_arg0 : tensor<4x?x?x2xf32>
+  // CHECK-NEXT: util.optimization_barrier %[[TIED_BB1_ARG1]]
+  util.optimization_barrier %bb1_arg1 : tensor<?xi32>
 
   return
 }
@@ -148,8 +148,8 @@ func.func @select(%cond: i1, %arg0: tensor<4x?x?x2xf32>, %arg1: tensor<4x?x?x2xf
   // CHECK-NEXT: %[[SEL_TIED:.+]] = flow.tensor.tie_shape %[[SEL_TENSOR]] : tensor<4x?x?x2xf32>{%[[SEL_D1]], %[[SEL_D2]]}
   %0 = arith.select %cond, %arg0, %arg1 : tensor<4x?x?x2xf32>
 
-  // CHECK-NEXT: util.do_not_optimize(%[[SEL_TIED]])
-  util.do_not_optimize(%0) : tensor<4x?x?x2xf32>
+  // CHECK-NEXT: util.optimization_barrier %[[SEL_TIED]]
+  util.optimization_barrier %0 : tensor<4x?x?x2xf32>
 
   return
 }

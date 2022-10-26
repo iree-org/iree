@@ -3,11 +3,11 @@
 
 func.func @warp_reduction_dispatch() {
   %cst = arith.constant 1.000000e+00 : f32
-  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:512x10240xf32>
-  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:512xf32>
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<512x10240xf32>>
+  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:tensor<512xf32>>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
-  %2 = flow.dispatch.tensor.load %1, offsets = [%workgroup_id_x], sizes = [1], strides = [1] : !flow.dispatch.tensor<writeonly:512xf32> -> tensor<1xf32>
-  %3 = flow.dispatch.tensor.load %0, offsets = [%workgroup_id_x, 0], sizes = [1, 10240], strides = [1, 1] : !flow.dispatch.tensor<readonly:512x10240xf32> -> tensor<1x10240xf32>
+  %2 = flow.dispatch.tensor.load %1, offsets = [%workgroup_id_x], sizes = [1], strides = [1] : !flow.dispatch.tensor<writeonly:tensor<512xf32>> -> tensor<1xf32>
+  %3 = flow.dispatch.tensor.load %0, offsets = [%workgroup_id_x, 0], sizes = [1, 10240], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<512x10240xf32>> -> tensor<1x10240xf32>
   %4 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1], [0, 2048]]>} ins(%cst : f32) outs(%2 : tensor<1xf32>) -> tensor<1xf32>
   %5 = linalg.generic {
     indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>],
@@ -18,7 +18,7 @@ func.func @warp_reduction_dispatch() {
     %6 = arith.addf %in, %out : f32
     linalg.yield %6 : f32
   } -> tensor<1xf32>
-  flow.dispatch.tensor.store %5, %1, offsets = [%workgroup_id_x], sizes = [1], strides = [1] : tensor<1xf32> -> !flow.dispatch.tensor<writeonly:512xf32>
+  flow.dispatch.tensor.store %5, %1, offsets = [%workgroup_id_x], sizes = [1], strides = [1] : tensor<1xf32> -> !flow.dispatch.tensor<writeonly:tensor<512xf32>>
   return
 }
 
