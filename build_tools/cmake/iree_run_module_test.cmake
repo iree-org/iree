@@ -71,7 +71,7 @@ endfunction()
 #     "--function_input=1x224x224x3xf32=0"
 #   EXPECTED_OUTPUT
 #     "mobilenet_v1_fp32_expected_output.txt"
-#   UNSUPPORTED_PLATFORMS
+#   SUPPORTED_PLATFORMS
 #     "android-arm64-v8a"
 #     "riscv32-Linux"
 # )
@@ -90,7 +90,7 @@ function(iree_run_module_test)
   )
 
   iree_get_platform(_PLATFORM)
-  if(_PLATFORM IN_LIST _RULE_UNSUPPORTED_PLATFORMS)
+  if(_PLATFORM IN_LIST _RULE_SUPPORTED_PLATFORMS)
     return()
   endif()
 

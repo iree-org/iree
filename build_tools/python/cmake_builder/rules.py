@@ -175,6 +175,7 @@ def build_iree_run_module_test(target_name: str,
                                driver: str,
                                expected_output: str,
                                runner_args: Sequence[str],
+                               supported_platforms: Sequence[str],
                                timeout_secs: Optional[int] = None,
                                labels: Sequence[str] = [],
                                deps: Sequence[str] = []) -> str:
@@ -187,6 +188,8 @@ def build_iree_run_module_test(target_name: str,
       "TIMEOUT",
       str(timeout_secs) if timeout_secs is not None else None)
   runner_args_block = _get_string_list_arg_block("RUNNER_ARGS", runner_args)
+  supported_platforms_block = _get_string_list_arg_block(
+      "SUPPORTED_PLATFORMS", supported_platforms)
   labels_block = _get_string_list_arg_block("LABELS", labels)
   deps_block = _get_string_list_arg_block("DEPS", deps)
   return _convert_block_to_string(
@@ -194,5 +197,6 @@ def build_iree_run_module_test(target_name: str,
                        parameter_blocks=[
                            name_block, module_src_block, driver_block,
                            expected_output_block, timeout_block,
-                           runner_args_block, labels_block, deps_block
+                           runner_args_block, supported_platforms_block,
+                           labels_block, deps_block
                        ]))

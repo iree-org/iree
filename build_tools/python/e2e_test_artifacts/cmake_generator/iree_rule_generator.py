@@ -29,6 +29,13 @@ class IreeModuleCompileRule(object):
   cmake_rules: List[str]
 
 
+def get_module_compile_target_name(
+    imported_model: iree_definitions.ImportedModel,
+    compile_config: iree_definitions.CompileConfig) -> str:
+  # Module target name: iree-module-<model_id>-<compile_config_id>
+  return f"iree-module-{imported_model.model.id}-{compile_config.id}"
+
+
 class IreeRuleBuilder(object):
   """Builder to generate IREE CMake rules."""
 
@@ -97,8 +104,7 @@ class IreeRuleBuilder(object):
         mlir_dialect_type=imported_model.dialect_type.value
     ) + compile_config.extra_flags
 
-    # Module target name: iree-module-<model_id>-<compile_config_id>
-    target_name = f"iree-module-{imported_model.model.id}-{compile_config.id}"
+    target_name = get_module_compile_target_name(imported_model, compile_config)
 
     cmake_rules = [
         f'# Compile the module "{output_file_path}"',
