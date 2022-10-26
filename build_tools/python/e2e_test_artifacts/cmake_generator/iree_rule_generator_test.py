@@ -9,18 +9,20 @@ import pathlib
 import unittest
 
 from e2e_test_artifacts import iree_artifacts, test_configs
-from e2e_test_artifacts.cmake_generator import common_generators, iree_generator
+from e2e_test_artifacts.cmake_generator import model_rule_generator, iree_rule_generator
 
 
 class IreeRuleBuilderTest(unittest.TestCase):
 
   def setUp(self):
-    self._builder = iree_generator.IreeRuleBuilder(package_name="${package}")
+    self._builder = iree_rule_generator.IreeRuleBuilder(
+        package_name="${package}")
 
   def test_build_model_import_rule_tflite(self):
-    model_rule = common_generators.ModelRule(target_name="model-1234",
-                                             file_path="root/models/x.tflite",
-                                             cmake_rules=["abc"])
+    model_rule = model_rule_generator.ModelRule(
+        target_name="model-1234",
+        file_path="root/models/x.tflite",
+        cmake_rules=["abc"])
     output_file_path = pathlib.PurePath(
         "root", "iree", test_configs.TFLITE_MODEL.id,
         f"{test_configs.TFLITE_MODEL.name}.mlir")
@@ -35,9 +37,9 @@ class IreeRuleBuilderTest(unittest.TestCase):
     self.assertEqual(rule.output_file_path, str(output_file_path))
 
   def test_build_model_import_rule_linalg(self):
-    model_rule = common_generators.ModelRule(target_name="model-5678",
-                                             file_path="root/models/y.mlir",
-                                             cmake_rules=["abc"])
+    model_rule = model_rule_generator.ModelRule(target_name="model-5678",
+                                                file_path="root/models/y.mlir",
+                                                cmake_rules=["abc"])
 
     rule = self._builder.build_model_import_rule(
         source_model_rule=model_rule,
@@ -48,7 +50,7 @@ class IreeRuleBuilderTest(unittest.TestCase):
     self.assertEqual(rule.output_file_path, model_rule.file_path)
 
   def test_build_module_compile_rule(self):
-    model_import_rule = iree_generator.IreeModelImportRule(
+    model_import_rule = iree_rule_generator.IreeModelImportRule(
         target_name=f"iree-import-model-abcd",
         output_file_path=f"root/iree/abcd/1234.mlir",
         cmake_rules=["abc"])
@@ -103,16 +105,16 @@ class IreeGeneratorTest(unittest.TestCase):
         }))
     model_rule_map = {
         test_configs.TFLITE_MODEL.id:
-            common_generators.ModelRule(target_name=f"model-x",
-                                        file_path="x.tflite",
-                                        cmake_rules=["abc"]),
+            model_rule_generator.ModelRule(target_name=f"model-x",
+                                           file_path="x.tflite",
+                                           cmake_rules=["abc"]),
         test_configs.TF_MODEL.id:
-            common_generators.ModelRule(target_name=f"model-y",
-                                        file_path="y_saved_model",
-                                        cmake_rules=["abc"])
+            model_rule_generator.ModelRule(target_name=f"model-y",
+                                           file_path="y_saved_model",
+                                           cmake_rules=["abc"])
     }
 
-    cmake_rules = iree_generator.generate_rules(
+    cmake_rules = iree_rule_generator.generate_rules(
         package_name="${package}",
         root_path=pathlib.PurePath("iree_root"),
         artifacts_root=artifacts_root,

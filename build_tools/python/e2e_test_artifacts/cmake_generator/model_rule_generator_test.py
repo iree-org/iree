@@ -9,7 +9,7 @@ import pathlib
 import unittest
 
 from e2e_test_artifacts import common_artifacts, test_configs
-from e2e_test_artifacts.cmake_generator import common_generators
+from e2e_test_artifacts.cmake_generator import model_rule_generator
 
 
 class CommonGeneratorsTest(unittest.TestCase):
@@ -28,7 +28,7 @@ class CommonGeneratorsTest(unittest.TestCase):
         }))
     root_path = pathlib.PurePath("model_root")
 
-    rule_map = common_generators.generate_model_rule_map(
+    rule_map = model_rule_generator.generate_model_rule_map(
         root_path=root_path, artifacts_root=artifacts_root)
 
     self.assertEqual(list(rule_map.keys()),

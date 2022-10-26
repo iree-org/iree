@@ -14,8 +14,8 @@ import argparse
 # Add build_tools python dir to the search path.
 sys.path.insert(0, str(pathlib.Path(__file__).parent / ".." / "python"))
 
+from e2e_test_artifacts.cmake_generator import rule_generator
 import e2e_test_artifacts.artifacts
-import e2e_test_artifacts.cmake_generator.generator
 
 TEMPLATE_DIR = pathlib.Path(__file__).parent
 GENERATED_BENCHMARK_SUITES_CMAKE_TEMPLATE = string.Template(
@@ -40,7 +40,7 @@ def parse_arguments():
 def main(args: argparse.Namespace):
   artifacts_root = (
       e2e_test_artifacts.artifacts.generate_default_artifacts_root())
-  cmake_rules = e2e_test_artifacts.cmake_generator.generator.generate_rules(
+  cmake_rules = rule_generator.generate_rules(
       package_name=f"${{{PACKAGE_NAME_CMAKE_VARIABLE}}}",
       root_path=pathlib.PurePath(f"${{{ROOT_ARTIFACTS_DIR_CMAKE_VARIABLE}}}"),
       artifacts_root=artifacts_root)

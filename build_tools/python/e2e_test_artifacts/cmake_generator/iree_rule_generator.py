@@ -9,8 +9,8 @@ from dataclasses import dataclass
 from typing import Dict, List
 import pathlib
 
-from e2e_test_artifacts.cmake_generator import common_generators
 from e2e_test_artifacts import iree_artifacts
+from e2e_test_artifacts.cmake_generator import model_rule_generator
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 import cmake_builder.rules
 
@@ -38,7 +38,7 @@ class IreeRuleBuilder(object):
     self._package_name = package_name
 
   def build_model_import_rule(
-      self, source_model_rule: common_generators.ModelRule,
+      self, source_model_rule: model_rule_generator.ModelRule,
       imported_model: iree_definitions.ImportedModel,
       output_file_path: pathlib.PurePath) -> IreeModelImportRule:
 
@@ -190,7 +190,7 @@ class IreeRuleBuilder(object):
 def generate_rules(
     package_name: str, root_path: pathlib.PurePath,
     artifacts_root: iree_artifacts.ArtifactsRoot,
-    model_rule_map: Dict[str, common_generators.ModelRule]) -> List[str]:
+    model_rule_map: Dict[str, model_rule_generator.ModelRule]) -> List[str]:
   """Generates all rules to build IREE artifacts."""
 
   rule_builder = IreeRuleBuilder(package_name=package_name)

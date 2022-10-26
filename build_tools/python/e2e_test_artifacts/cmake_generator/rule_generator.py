@@ -12,7 +12,7 @@ from typing import List
 import itertools
 import pathlib
 
-from e2e_test_artifacts.cmake_generator import common_generators, iree_generator
+from e2e_test_artifacts.cmake_generator import model_rule_generator, iree_rule_generator
 import e2e_test_artifacts.artifacts
 
 
@@ -29,13 +29,13 @@ def generate_rules(
     List of cmake rules.
   """
 
-  model_rule_map = common_generators.generate_model_rule_map(
+  model_rule_map = model_rule_generator.generate_model_rule_map(
       root_path=root_path, artifacts_root=artifacts_root.model_artifacts_root)
   model_cmake_rules = list(
       itertools.chain.from_iterable(
           rule.cmake_rules for rule in model_rule_map.values()))
 
-  iree_cmake_rules = iree_generator.generate_rules(
+  iree_cmake_rules = iree_rule_generator.generate_rules(
       package_name=package_name,
       root_path=root_path,
       artifacts_root=artifacts_root.iree_artifacts_root,
