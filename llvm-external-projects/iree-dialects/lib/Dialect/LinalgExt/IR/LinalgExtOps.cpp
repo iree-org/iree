@@ -2185,17 +2185,14 @@ SmallVector<Operation *>
 UnPackOp::getTiledImplementation(OpBuilder &builder,
                                  ArrayRef<OpFoldResult> offsets,
                                  ArrayRef<OpFoldResult> sizes) {
+  // TODO(hanchung): Extend it to handle memref version.
+  // Tiling on buffers needs extra buffer because tiled unpack op could produce
+  // more data for incomplete tiles. Tiling on tensors satisfies IREE's needs.
   if (!hasTensorSemantics())
     return {};
 
   Location loc = getLoc();
   auto ctx = builder.getContext();
-
-  // Take the minimum of two integers.
-  auto idMap = AffineMap::getMultiDimIdentityMap(2, ctx);
-  auto min = [&](OpFoldResult v1, OpFoldResult v2) -> OpFoldResult {
-    return makeComposedFoldedAffineMin(builder, loc, idMap, {v1, v2});
-  };
 
   AffineExpr dim0, dim1;
   bindDims(ctx, dim0, dim1);
