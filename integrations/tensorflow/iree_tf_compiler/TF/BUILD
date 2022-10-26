@@ -62,6 +62,6 @@ cc_library(
         "@org_tensorflow//tensorflow/compiler/xla/mlir_hlo:all_passes",
         "@org_tensorflow//tensorflow/compiler/xla/mlir_hlo:chlo_legalize_to_hlo",
         "@org_tensorflow//tensorflow/compiler/xla/mlir_hlo:mhlo_passes",
-        "@stablehlo//stablehlo:chlo_ops",
+        "@stablehlo//:chlo_ops",
     ],
 )
