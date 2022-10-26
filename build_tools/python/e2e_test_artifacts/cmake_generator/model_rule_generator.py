@@ -11,7 +11,7 @@ import collections
 import pathlib
 import urllib.parse
 
-from e2e_test_artifacts import common_artifacts
+from e2e_test_artifacts import model_artifacts
 import cmake_builder.rules
 
 
@@ -23,8 +23,7 @@ class ModelRule(object):
 
 
 def generate_model_rule_map(
-    root_path: pathlib.PurePath,
-    artifacts_root: common_artifacts.ModelArtifactsRoot
+    root_path: pathlib.PurePath, artifacts_root: model_artifacts.ArtifactsRoot
 ) -> OrderedDict[str, ModelRule]:
   """Returns the model rules in an ordered map."""
 

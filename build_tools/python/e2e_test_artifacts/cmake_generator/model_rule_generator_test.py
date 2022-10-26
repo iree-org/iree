@@ -8,23 +8,23 @@ import collections
 import pathlib
 import unittest
 
-from e2e_test_artifacts import common_artifacts, test_configs
+from e2e_test_artifacts import model_artifacts, test_configs
 from e2e_test_artifacts.cmake_generator import model_rule_generator
 
 
 class CommonGeneratorsTest(unittest.TestCase):
 
   def test_generate_model_rule_map(self):
-    artifacts_root = common_artifacts.ModelArtifactsRoot(
+    artifacts_root = model_artifacts.ArtifactsRoot(
         model_artifact_map=collections.OrderedDict({
             test_configs.TFLITE_MODEL.id:
-                common_artifacts.ModelArtifact(model=test_configs.TFLITE_MODEL,
-                                               file_path=pathlib.PurePath(
-                                                   "1234.tflite")),
+                model_artifacts.ModelArtifact(model=test_configs.TFLITE_MODEL,
+                                              file_path=pathlib.PurePath(
+                                                  "1234.tflite")),
             test_configs.TF_MODEL.id:
-                common_artifacts.ModelArtifact(model=test_configs.TF_MODEL,
-                                               file_path=pathlib.PurePath(
-                                                   "5678_saved_model"))
+                model_artifacts.ModelArtifact(model=test_configs.TF_MODEL,
+                                              file_path=pathlib.PurePath(
+                                                  "5678_saved_model"))
         }))
     root_path = pathlib.PurePath("model_root")
 
