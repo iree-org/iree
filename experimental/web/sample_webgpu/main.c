@@ -83,8 +83,7 @@ iree_sample_state_t* setup_sample() {
                             sizeof(iree_sample_state_t), (void**)&sample_state);
 
   iree_runtime_instance_options_t instance_options;
-  iree_runtime_instance_options_initialize(IREE_API_VERSION_LATEST,
-                                           &instance_options);
+  iree_runtime_instance_options_initialize(&instance_options);
   // Note: no call to iree_runtime_instance_options_use_all_available_drivers().
 
   if (iree_status_is_ok(status)) {
