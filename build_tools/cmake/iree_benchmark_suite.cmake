@@ -30,7 +30,9 @@ function(iree_import_tflite_model)
   if(NOT IREE_IMPORT_TFLITE_PATH)
     message(SEND_ERROR "Benchmarks of ${_RULE_SOURCE} require"
                       " that iree-import-tflite be available "
-                      " (either on PATH or via IREE_IMPORT_TFLITE_PATH)")
+                      " (either on PATH or via IREE_IMPORT_TFLITE_PATH). "
+                      " Install from a release with "
+                      " `python -m pip install iree-tools-tflite -f https://iree-org.github.io/iree/pip-release-links.html`")
   endif()
 
   if(NOT TARGET "${_RULE_TARGET_NAME}")
@@ -82,7 +84,9 @@ function(iree_import_tf_model)
   if(NOT IREE_IMPORT_TF_PATH)
     message(SEND_ERROR "Benchmarks of ${_RULE_SOURCE} require"
                       " that iree-import-tf be available "
-                      " (either on PATH or via IREE_IMPORT_TF_PATH)")
+                      " (either on PATH or via IREE_IMPORT_TF_PATH). "
+                      " Install from a release with "
+                      " `python -m pip install iree-tools-tf -f https://iree-org.github.io/iree/pip-release-links.html`")
   endif()
 
   if(NOT TARGET "${_RULE_TARGET_NAME}")

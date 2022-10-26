@@ -52,6 +52,12 @@ static llvm::cl::opt<bool> clEnableMicrokernels(
     llvm::cl::desc("Enables microkernel lowering for vmvx (experimental)"),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clEnableMicrokernelsDecomposeLinalgGeneric(
+    "iree-vmvx-enable-microkernels-decompose-linalg-generic",
+    llvm::cl::desc("Enables decomposition of linalg.generic ops when "
+                   "microkernels are enabled (experimental)"),
+    llvm::cl::init(true));
+
 static llvm::cl::opt<bool> clEnableReassociateFpReductions(
     "iree-llvmcpu-reassociate-fp-reductions",
     llvm::cl::desc("Enables reassociation for FP reductions"),
@@ -419,7 +425,7 @@ void addVMVXDefaultPassPipeline(OpPassManager &passManager) {
   // Tensor-level micro-kernel optimizations.
   // Note that this must be done post-tiling because it changes the structure
   // of the dispatch region such that tiling is not always possible.
-  if (clEnableMicrokernels) {
+  if (clEnableMicrokernels && clEnableMicrokernelsDecomposeLinalgGeneric) {
     passManager.nest<ModuleOp>().nest<func::FuncOp>().addPass(
         createDecomposeLinalgGenericPass());
   }
@@ -606,6 +612,12 @@ void addCPUAArchDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
       createOptimizeVectorTransferPass(/*flatten=*/true));
 }
 
+void addCPUDataTilingPipeline(OpPassManager &passManager) {
+  addTileAndDistributePasses(passManager);
+  OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
+  addBufferizePasses(nestedModulePM);
+}
+
 void addCPUDefaultPassPipeline(OpPassManager &passManager) {
   addTileAndDistributePasses(passManager);
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
@@ -706,10 +718,11 @@ void buildLLVMCPULinkingPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<IREE::HAL::ExecutableOp>(
       mlir::createCanonicalizerPass());
 
-  // Assign final executable constant ordinals.
-  passManager.nest<IREE::HAL::ExecutableOp>()
-      .addNestedPass<IREE::HAL::ExecutableVariantOp>(
-          createLLVMCPUAssignConstantOrdinalsPass());
+  // Assign final executable constant and import ordinals.
+  auto &variantPM = passManager.nest<IREE::HAL::ExecutableOp>()
+                        .nest<IREE::HAL::ExecutableVariantOp>();
+  variantPM.addPass(createLLVMCPUAssignConstantOrdinalsPass());
+  variantPM.addPass(createLLVMCPUAssignImportOrdinalsPass());
 }
 
 }  // namespace iree_compiler

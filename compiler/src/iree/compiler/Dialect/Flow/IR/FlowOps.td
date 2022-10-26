@@ -18,7 +18,7 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
 
 class FLOW_PureOp<string mnemonic, list<Trait> traits = []> :
-    FLOW_Op<mnemonic, !listconcat(traits, [NoSideEffect])>;
+    FLOW_Op<mnemonic, !listconcat(traits, [Pure])>;
 
 //===----------------------------------------------------------------------===//
 // Partitioned regions
@@ -100,9 +100,9 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
     ```mlir
     %r = flow.dispatch.workgroups[%c5, %c5](%0, %1)
         : (tensor<5x5xf32>, tensor<5xf32>) -> tensor<5x5xf32> =
-              (%arg0: !flow.dispatch.tensor<readonly:5x5xf32>,
-               %arg1: !flow.dispatch.tensor<readonly:5xf32>,
-               %arg2: !flow.dispatch.tensor<writeonly:5x5xf32>) {
+              (%arg0: !flow.dispatch.tensor<readonly:tensor<5x5xf32>>,
+               %arg1: !flow.dispatch.tensor<readonly:tensor<5xf32>>,
+               %arg2: !flow.dispatch.tensor<writeonly:tensor<5x5xf32>>) {
       ...
     }
     ```
@@ -436,7 +436,8 @@ def FLOW_DispatchTensorLoadOp : FLOW_PureOp<"dispatch.tensor.load", [
     /// Return the expected rank of each of the `static_offsets`, `static_sizes`
     /// and `static_strides` attributes.
     std::array<unsigned, 3> getArrayAttrMaxRanks() {
-      unsigned sourceRank = getSource().getType().cast<DispatchTensorType>().asTensorType().getRank();
+      unsigned sourceRank =
+          getSource().getType().cast<DispatchTensorType>().asRankedTensorType().getRank();
       return {sourceRank, sourceRank, sourceRank};
     }
 
@@ -538,7 +539,8 @@ def FLOW_DispatchTensorStoreOp : FLOW_Op<"dispatch.tensor.store", [
     /// Return the expected rank of each of the `static_offsets`, `static_sizes`
     /// and `static_strides` attributes.
     std::array<unsigned, 3> getArrayAttrMaxRanks() {
-      unsigned resultRank = getTarget().getType().cast<DispatchTensorType>().asTensorType().getRank();
+      unsigned resultRank =
+           getTarget().getType().cast<DispatchTensorType>().asRankedTensorType().getRank();
       return {resultRank, resultRank, resultRank};
     }
 
@@ -574,7 +576,7 @@ def FLOW_DispatchTensorStoreOp : FLOW_Op<"dispatch.tensor.store", [
   let hasCanonicalizer = 1;
 }
 
-def FLOW_ReturnOp : FLOW_Op<"return", [NoSideEffect, ReturnLike, Terminator]> {
+def FLOW_ReturnOp : FLOW_Op<"return", [Pure, ReturnLike, Terminator]> {
   let summary = [{return from a flow.dispatch_region}];
   let description = [{
     Returns the given values from the region and back to the host code.

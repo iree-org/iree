@@ -26,8 +26,8 @@ namespace {
 
 SmallVector<Value> getValuesToYield(scf::PerformConcurrentlyOp op) {
   return llvm::to_vector(
-      llvm::map_range(op.getYieldingOps(), [](Operation &op) {
-        return cast<Value>(cast<tensor::ParallelInsertSliceOp>(&op).getDest());
+      llvm::map_range(op.getYieldingOps(), [](Operation &op) -> Value {
+        return cast<tensor::ParallelInsertSliceOp>(&op).getDest();
       }));
 }
 

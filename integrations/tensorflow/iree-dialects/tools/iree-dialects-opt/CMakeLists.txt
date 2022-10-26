@@ -19,6 +19,7 @@ set(LIBS
   MLIRLinalgDialect
   MLIRLinalgTransformOps
   MLIRMemRefDialect
+  MLIRMemRefTransforms
   MLIROptLib
   MLIRPDLDialect
   MLIRPDLInterpDialect

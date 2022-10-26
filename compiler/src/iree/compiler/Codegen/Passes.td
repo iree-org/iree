@@ -210,6 +210,12 @@ def GPUVectorization :
   ];
 }
 
+def GPUTileReduction :
+    Pass<"iree-codegen-gpu-tile-reduction", "func::FuncOp"> {
+  let summary = "Pass to tile linalg reduction dimensions.";
+  let constructor = "mlir::iree_compiler::createGPUTileReductionPass()";
+}
+
 def VectorReduceToGPU :
     Pass<"iree-codegen-reduction-to-gpu", "func::FuncOp"> {
   let summary = "Convert vector reduction to gpu ops.";
@@ -320,6 +326,12 @@ def LLVMCPUAssignConstantOrdinals :
     Pass<"iree-llvmcpu-assign-constant-ordinals", "IREE::HAL::ExecutableVariantOp"> {
   let summary = "Assigns executable constant ordinals across all LLVMCPU variants.";
   let constructor = "mlir::iree_compiler::createLLVMCPUAssignConstantOrdinalsPass()";
+}
+
+def LLVMCPUAssignImportOrdinals :
+    Pass<"iree-llvmcpu-assign-import-ordinals", "IREE::HAL::ExecutableVariantOp"> {
+  let summary = "Assigns executable import ordinals across all LLVMCPU variants.";
+  let constructor = "mlir::iree_compiler::createLLVMCPUAssignImportOrdinalsPass()";
 }
 
 //------------------------------------------------------------------------------
@@ -481,6 +493,12 @@ def SPIRVCreateFastSlowPath :
     Pass<"iree-spirv-create-fast-slow-path", "func::FuncOp"> {
   let summary = "Create separate fast and slow paths to handle padding";
   let constructor = "mlir::iree_compiler::createSPIRVCreateFastSlowPathPass()";
+}
+
+def SPIRVEmulateI64 :
+    Pass<"iree-spirv-emulate-i64", "ModuleOp"> {
+  let summary = "Emulate 64-bit integer opts with 32-bit integer ops";
+  let constructor = "mlir::iree_compiler::createSPIRVEmulateI64Pass()";
 }
 
 //------------------------------------------------------------------------------

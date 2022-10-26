@@ -35,9 +35,9 @@ hal.executable.source public @executable {
       // Bindings are dereferenced by their set/binding ordinal and may have a
       // byte offset from the base of the descriptor. Alignment information when
       // available can help code generation emit better loads/stores.
-      %s0b0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(32) : !flow.dispatch.tensor<readonly:4xf32>
-      %s0b1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%offset) alignment(32) : !flow.dispatch.tensor<readonly:4xf32>
-      %s0b2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(32) : !flow.dispatch.tensor<writeonly:4xf32>
+      %s0b0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(32) : !flow.dispatch.tensor<readonly:tensor<4xf32>>
+      %s0b1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%offset) alignment(32) : !flow.dispatch.tensor<readonly:tensor<4xf32>>
+      %s0b2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(32) : !flow.dispatch.tensor<writeonly:tensor<4xf32>>
 
       // Workgroup information can be queried from the interface.
       %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -49,15 +49,15 @@ hal.executable.source public @executable {
       %per_step = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_x, %workgroup_size_x]
       scf.for %arg0 = %base_index to %length step %per_step {
         %5 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 4)>(%arg0)[%workgroup_size_x]
-        %6 = flow.dispatch.tensor.load %s0b0, offsets = [%arg0], sizes = [%5], strides = [1] : !flow.dispatch.tensor<readonly:4xf32> -> tensor<?xf32>
-        %7 = flow.dispatch.tensor.load %s0b1, offsets = [%arg0], sizes = [%5], strides = [1] : !flow.dispatch.tensor<readonly:4xf32> -> tensor<?xf32>
+        %6 = flow.dispatch.tensor.load %s0b0, offsets = [%arg0], sizes = [%5], strides = [1] : !flow.dispatch.tensor<readonly:tensor<4xf32>> -> tensor<?xf32>
+        %7 = flow.dispatch.tensor.load %s0b1, offsets = [%arg0], sizes = [%5], strides = [1] : !flow.dispatch.tensor<readonly:tensor<4xf32>> -> tensor<?xf32>
         %8 = tensor.empty(%5) : tensor<?xf32>
         %9 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%6, %7 : tensor<?xf32>, tensor<?xf32>) outs(%8 : tensor<?xf32>) attrs =  {name = "mul.1"} {
         ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):
           %s0b10 = arith.mulf %arg1, %arg2 : f32
           linalg.yield %s0b10 : f32
         } -> tensor<?xf32>
-        flow.dispatch.tensor.store %9, %s0b2, offsets = [%arg0], sizes = [%5], strides = [1] : tensor<?xf32> -> !flow.dispatch.tensor<writeonly:4xf32>
+        flow.dispatch.tensor.store %9, %s0b2, offsets = [%arg0], sizes = [%5], strides = [1] : tensor<?xf32> -> !flow.dispatch.tensor<writeonly:tensor<4xf32>>
       }
 
       return

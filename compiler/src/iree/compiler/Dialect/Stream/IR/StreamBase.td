@@ -148,38 +148,6 @@ def Stream_GlobalPtr : Util_AnyPtrOf<[Stream_Tensor, Stream_PrimitiveType]>;
 // Stream attributes
 //===----------------------------------------------------------------------===//
 
-def Stream_AffinityAttr : AttrDef<Stream_Dialect, "Affinity", []> {
-  let mnemonic = "affinity";
-
-  let summary = [{defines execution context affinity}];
-  let description = [{
-    TBD. The intent is that this can specify host, device, and queue affinity.
-    Scopes can be annotated with an affinity to ensure execution within happens
-    in a particular location. Arrays of affinities or wildcard specifiers will
-    allow for refinement ("do it on this device but auto select a queue"). It
-    will also allow us to indicate host affinity such that device<->device and
-    host<->device can be identified in the IR structure. Today all affinities
-    are no-op'ed and assumed to be 'current device'.
-  }];
-
-  // TODO(benvanik): affinity.
-  let parameters = (ins);
-
-  let valueType = NoneType;
-
-  let extraClassDeclaration = [{
-    // Returns an affinity active for the given operation.
-    // This will recursively walk parent operations until one with the
-    // `stream.affinity` attribute is found.
-    static AffinityAttr lookup(Operation *op);
-
-    // Returns true if |desiredAffinity| (if any) is compatible with
-    // |requiredAffinity|.
-    static bool areCompatible(AffinityAttr desiredAffinity,
-                              AffinityAttr requiredAffinity);
-  }];
-}
-
 def Stream_Favor_Debug : I32EnumAttrCase<"Debug", 0, "debug">;
 def Stream_Favor_MinPeakMemory : I32EnumAttrCase<"MinPeakMemory", 1, "min-peak-memory">;
 def Stream_Favor_MaxConcurrency : I32EnumAttrCase<"MaxConcurrency", 2, "max-concurrency">;

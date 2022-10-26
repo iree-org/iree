@@ -19,6 +19,7 @@ import cmake_builder.rules
 
 # Archive extensions used to pack models.
 ARCHIVE_FILE_EXTENSIONS = [".tar", ".gz"]
+
 # CMake variable name to store IREE package name.
 PACKAGE_NAME_CMAKE_VARIABLE = "_PACKAGE_NAME"
 
@@ -124,70 +125,67 @@ class IreeRuleFactory(object):
 
   def add_import_model_rule(
       self,
-      model_id: str,
-      model_name: str,
-      model_source_type: common_definitions.ModelSourceType,
-      model_entry_function: str,
+      imported_model: iree_definitions.ImportedModel,
       source_model_rule: ModelRule,
   ) -> IreeModelImportRule:
     """Adds a rule to fetch the model and import into MLIR. Reuses the rule when
     possible."""
 
-    if model_id in self._import_model_rules:
-      return self._import_model_rules[model_id]
+    model = imported_model.model
+    if model.id in self._import_model_rules:
+      return self._import_model_rules[model.id]
 
     # If the source model is MLIR, no import rule is needed.
-    if model_source_type == common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR:
+    if model.source_type == common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR:
       import_model_rule = IreeModelImportRule(
           target_name=source_model_rule.target_name,
-          model_id=model_id,
-          model_name=model_name,
+          model_id=model.id,
+          model_name=model.name,
           output_file_path=source_model_rule.file_path,
-          mlir_dialect_type="linalg",
+          mlir_dialect_type=imported_model.dialect_type.value,
           cmake_rule=None)
-      self._import_model_rules[model_id] = import_model_rule
+      self._import_model_rules[model.id] = import_model_rule
       return import_model_rule
 
     # Import target: <package_name>_iree-import-model-<model_id>
-    target_name = f"iree-import-model-{model_id}"
+    target_name = f"iree-import-model-{model.id}"
 
     # Imported MLIR path: <iree_artifacts_dir>/<model_id>_<model_name>/<model_name>.mlir
-    output_file_path = f"{self._iree_artifacts_dir}/{model_id}_{model_name}/{model_name}.mlir"
+    output_file_path = f"{self._iree_artifacts_dir}/{model.id}_{model.name}/{model.name}.mlir"
 
-    if model_source_type == common_definitions.ModelSourceType.EXPORTED_TFLITE:
+    if model.source_type == common_definitions.ModelSourceType.EXPORTED_TFLITE:
       cmake_rule = (
           f'# Import the TFLite model "{source_model_rule.file_path}"\n' +
           cmake_builder.rules.build_iree_import_tflite_model(
               target_path=_build_target_path(target_name),
               source=source_model_rule.file_path,
               output_mlir_file=output_file_path))
-      mlir_dialect_type = "tosa"
-    elif model_source_type == common_definitions.ModelSourceType.EXPORTED_TF:
+    elif model.source_type == common_definitions.ModelSourceType.EXPORTED_TF:
       cmake_rule = (
           f'# Import the Tensorflow model "{source_model_rule.file_path}"\n' +
           cmake_builder.rules.build_iree_import_tf_model(
               target_path=_build_target_path(target_name),
               source=source_model_rule.file_path,
-              entry_function=model_entry_function,
+              entry_function=model.entry_function,
               output_mlir_file=output_file_path))
-      mlir_dialect_type = "mhlo"
     else:
       raise ValueError(
-          f"Unsupported source type '{model_source_type}' of the model '{model_id}'."
+          f"Unsupported source type '{model.source_type}' of the model '{model.id}'."
       )
 
     cmake_builder.rules.build_add_dependencies(
         target="iree-benchmark-import-models",
         deps=[_build_target_path(target_name)])
 
-    import_model_rule = IreeModelImportRule(target_name=target_name,
-                                            model_id=model_id,
-                                            model_name=model_name,
-                                            output_file_path=output_file_path,
-                                            mlir_dialect_type=mlir_dialect_type,
-                                            cmake_rule=cmake_rule)
+    import_model_rule = IreeModelImportRule(
+        target_name=target_name,
+        model_id=model.id,
+        model_name=model.name,
+        output_file_path=output_file_path,
+        mlir_dialect_type=imported_model.dialect_type.value,
+        cmake_rule=cmake_rule)
 
-    self._import_model_rules[model_id] = import_model_rule
+    self._import_model_rules[model.id] = import_model_rule
     return import_model_rule
 
   def add_compile_module_rule(self,
@@ -314,15 +312,12 @@ def _generate_iree_rules(
 ) -> List[str]:
   iree_rule_factory = IreeRuleFactory(iree_artifacts_dir)
   for module_generation_config in module_generation_configs:
-    model = module_generation_config.model
+    model = module_generation_config.imported_model.model
     compile_config = module_generation_config.compile_config
 
     source_model_rule = common_rule_factory.add_model_rule(model)
     import_rule = iree_rule_factory.add_import_model_rule(
-        model_id=model.id,
-        model_name=model.name,
-        model_source_type=model.source_type,
-        model_entry_function=model.entry_function,
+        imported_model=module_generation_config.imported_model,
         source_model_rule=source_model_rule)
     iree_rule_factory.add_compile_module_rule(compile_config=compile_config,
                                               model_import_rule=import_rule)

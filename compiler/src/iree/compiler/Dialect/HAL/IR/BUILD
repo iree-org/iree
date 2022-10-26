@@ -32,6 +32,7 @@ td_library(
         include = ["*.td"],
     ),
     deps = [
+        "//compiler/src/iree/compiler/Dialect/Stream/IR:td_files",
         "//compiler/src/iree/compiler/Dialect/Util/IR:td_files",
         "@llvm-project//mlir:BuiltinDialectTdFiles",
         "@llvm-project//mlir:FuncTdFiles",
@@ -71,6 +72,7 @@ iree_compiler_cc_library(
         ":HALInterfacesGen",
         ":HALOpsGen",
         ":HALTypesGen",
+        "//compiler/src/iree/compiler/Dialect/Stream/IR",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
         "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Support",

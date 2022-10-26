@@ -38,8 +38,10 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/AffineMap.h"
@@ -292,7 +294,13 @@ static Value linearizeIndices(Value sourceValue, ValueRange indices,
     } else if (auto allocaOp = dyn_cast<memref::AllocaOp>(sourceOp)) {
       getDimValues(sourceType, allocaOp.getDynamicSizes());
     } else {
-      return nullptr;
+      if (sourceType.hasStaticShape()) {
+        for (int64_t dim : sourceType.getShape()) {
+          dims.push_back(builder.create<arith::ConstantIndexOp>(loc, dim));
+        }
+      } else {
+        return nullptr;
+      }
     }
   }
 
@@ -308,6 +316,37 @@ static Value linearizeIndices(Value sourceValue, ValueRange indices,
   }
   return linearIndex;
 }
+
+/// Flattens memref subspan ops with more than 1 dimensions to 1 dimension.
+struct FlattenSubView final : public OpConversionPattern<memref::SubViewOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      memref::SubViewOp op, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    if (!isRankOneMemRef(adaptor.getSource().getType())) {
+      return rewriter.notifyMatchFailure(
+          op, "expected converted memref of rank == 1");
+    }
+    Type neededResultType =
+        getTypeConverter()->convertType(op.getResult().getType());
+    if (!neededResultType || !isRankOneMemRef(neededResultType))
+      return failure();
+    Value size = createTotalElementCountValue(op.getType(), op.sizes(),
+                                              op.getLoc(), rewriter);
+    SmallVector<Value> offsets = mlir::getValueOrCreateConstantIndexOp(
+        rewriter, op.getLoc(), op.getMixedOffsets());
+    Value linearOffset =
+        linearizeIndices(op.getSource(), offsets, op.getLoc(), rewriter);
+    Value stride = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 1);
+    Value newSubView = rewriter.create<memref::SubViewOp>(
+        op.getLoc(), adaptor.getSource(), ValueRange({linearOffset}),
+        ValueRange({size}), ValueRange({stride}));
+    rewriter.replaceOpWithNewOp<memref::CastOp>(op, neededResultType,
+                                                newSubView);
+    return success();
+  }
+};
 
 /// Linearizes indices in memref.load ops.
 struct LinearizeLoadIndices final : public OpConversionPattern<memref::LoadOp> {
@@ -632,7 +671,7 @@ struct FlattenMemRefSubspanPass
              FlattenGlobal, FlattenGetGlobal, LinearizeLoadIndices,
              LinearizeStoreIndices, LinearizeTransferReadIndices,
              LinearizeTransferWriteIndices, AdjustConversionCast,
-             FoldMemRefReshape<memref::CollapseShapeOp>,
+             FlattenSubView, FoldMemRefReshape<memref::CollapseShapeOp>,
              FoldMemRefReshape<memref::ExpandShapeOp>>(
             only1DStaticTypeConverter, &context);
 
@@ -679,6 +718,8 @@ struct FlattenMemRefSubspanPass
           Type inputType = castOp->getOperandTypes().front();
           return !inputType.isa<BaseMemRefType>() || isRankOneMemRef(inputType);
         });
+    target.addDynamicallyLegalOp<memref::SubViewOp>(
+        [](memref::SubViewOp op) { return isRankOneMemRef(op.getType()); });
 
     // Use partial conversion here so that we can ignore allocations created by
     // promotion and their load/store ops.
@@ -687,8 +728,15 @@ struct FlattenMemRefSubspanPass
       return signalPassFailure();
     }
 
-    // Then fold byte offset on subspan ops into consumer load/store ops.
+    // Fold subviews if any new oportuinity has been created.
+    RewritePatternSet foldSubviewPatterns(&getContext());
+    memref::populateFoldMemRefAliasOpPatterns(foldSubviewPatterns);
+    if (failed(applyPatternsAndFoldGreedily(getOperation()->getRegions(),
+                                            std::move(foldSubviewPatterns)))) {
+      return signalPassFailure();
+    }
 
+    // Then fold byte offset on subspan ops into consumer load/store ops.
     RewritePatternSet foldPatterns(&context);
     foldPatterns.add<FoldSubspanOffsetIntoLoadStore<memref::LoadOp>,
                      FoldSubspanOffsetIntoLoadStore<memref::StoreOp>>(&context);

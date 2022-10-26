@@ -236,7 +236,7 @@ static SmallVector<int64_t> getMinTilingSizesForEachDim(
     const TargetMLTransformInfo &targetMLTransInfo) {
   unsigned numLoops = op.getNumLoops();
   SmallVector<int64_t> minTileSizes(numLoops, 1);
-  auto inputOutputOpOperands = op.getInputAndOutputOperands();
+  auto inputOutputOpOperands = op->getOpOperands();
 
   for (auto map : llvm::enumerate(op.getIndexingMapsArray())) {
     // Check the fastest varying dimension of the operand. Set the vector size
@@ -249,7 +249,7 @@ static SmallVector<int64_t> getMinTilingSizesForEachDim(
 
     // If the indexing map has result it has to be a shaped type.
     auto operandType =
-        inputOutputOpOperands[map.index()]->get().getType().cast<ShapedType>();
+        inputOutputOpOperands[map.index()].get().getType().cast<ShapedType>();
     int64_t tileSize = getVectorSize(entryPointFn, operandType);
 
     minTileSizes[fastestVaryingDim] =
@@ -292,16 +292,24 @@ static unsigned getReferenceTypeLengthInBytes(func::FuncOp entryPointFn) {
   unsigned referenceTypeLengthInBytes = 4;
   entryPointFn.walk([&](IREE::HAL::InterfaceBindingSubspanOp subSpanOp) {
     Type type = subSpanOp.getResult().getType();
-    Type elementType = TypeSwitch<Type, Type>(type)
-                           .Case<ShapedType, IREE::Flow::DispatchTensorType>(
-                               [&](auto shapedType) -> Type {
-                                 // Ignore operands that are 0D tensors. These
-                                 // are not vector-loadable, so using these to
-                                 // get vector length would be a pessimization.
-                                 if (!shapedType.getRank()) return nullptr;
-                                 return shapedType.getElementType();
-                               })
-                           .Default([&](Type t) -> Type { return nullptr; });
+    Type elementType =
+        TypeSwitch<Type, Type>(type)
+            .Case<IREE::Flow::DispatchTensorType>(
+                [&](auto dispatchTensorType) -> Type {
+                  // Ignore operands that are 0D tensors. These
+                  // are not vector-loadable, so using these to
+                  // get vector length would be a pessimization.
+                  if (!dispatchTensorType.getRank()) return nullptr;
+                  return dispatchTensorType.getBoundElementType();
+                })
+            .Case<ShapedType>([&](auto shapedType) -> Type {
+              // Ignore operands that are 0D tensors. These
+              // are not vector-loadable, so using these to
+              // get vector length would be a pessimization.
+              if (!shapedType.getRank()) return nullptr;
+              return shapedType.getElementType();
+            })
+            .Default([&](Type t) -> Type { return nullptr; });
     if (!elementType || !elementType.isIntOrFloat()) return;
     unsigned typeWidthInBytes =
         IREE::Util::getRoundedElementByteWidth(elementType);
@@ -514,12 +522,12 @@ static void splitParallelAndReductionTiles(
     linalg::LinalgOp op, SmallVectorImpl<int64_t> &parallelSizes,
     SmallVectorImpl<int64_t> &reductionSizes) {
   reductionSizes.assign(parallelSizes.begin(), parallelSizes.end());
-  for (auto iteratorType : llvm::enumerate(op.iterator_types())) {
-    if (iteratorType.value().cast<StringAttr>().getValue() ==
-        getParallelIteratorTypeName()) {
-      reductionSizes[iteratorType.index()] = 0;
+  for (auto [index, iteratorTypeName] :
+       llvm::enumerate(op.getIteratorTypeNames())) {
+    if (iteratorTypeName == getParallelIteratorTypeName()) {
+      reductionSizes[index] = 0;
     } else {
-      parallelSizes[iteratorType.index()] = 0;
+      parallelSizes[index] = 0;
     }
   }
 }
@@ -528,15 +536,14 @@ static void setAlwaysVectorizeSizes(linalg::LinalgOp op,
                                     SmallVectorImpl<int64_t> &parallelSizes,
                                     SmallVectorImpl<int64_t> &reductionSizes) {
   SmallVector<int64_t, 4> staticLoopRanges = op.getStaticLoopRanges();
-  for (auto en :
-       llvm::enumerate(llvm::zip(staticLoopRanges, op.iterator_types()))) {
-    auto size = std::get<0>(en.value());
+  for (auto [index, valuePair] : llvm::enumerate(
+           llvm::zip(staticLoopRanges, op.getIteratorTypeNames()))) {
+    auto [size, iterType] = valuePair;
     if (!ShapedType::isDynamic(size)) continue;
-    auto iterType = std::get<1>(en.value()).cast<StringAttr>().getValue();
     if (iterType == getParallelIteratorTypeName()) {
-      parallelSizes[en.index()] = 1;
+      parallelSizes[index] = 1;
     } else {
-      reductionSizes[en.index()] = 1;
+      reductionSizes[index] = 1;
     }
   }
 
@@ -1022,14 +1029,11 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
       DispatchLoweringPassPipeline::CPUAArchDoubleTilingExpert);
 }
 
-/// Sets the lowering configuration for dispatch region for linalg_ext.fft
-/// root op.
-static LogicalResult setRootConfig(func::FuncOp entryPointFn,
-                                   IREE::LinalgExt::FftOp fftOp) {
-  unsigned numLoops = fftOp.getLoopIteratorTypes().size();
-  auto partitionedLoops =
-      cast<PartitionableLoopsInterface>(fftOp.getOperation())
-          .getPartitionableLoops(kNumMaxParallelDims);
+static SmallVector<int64_t> getLinalgExtDefaultWorkgroupTileSizes(
+    TilingInterface op) {
+  unsigned numLoops = op.getLoopIteratorTypes().size();
+  auto partitionedLoops = cast<PartitionableLoopsInterface>(op.getOperation())
+                              .getPartitionableLoops(kNumMaxParallelDims);
   SmallVector<int64_t> workgroupTileSizes(numLoops, defaultWorkgroupTileSize);
   llvm::DenseSet<unsigned> partitionedLoopsSet(partitionedLoops.begin(),
                                                partitionedLoops.end());
@@ -1038,7 +1042,22 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
       workgroupTileSizes[dim] = 0;
     }
   }
+  return workgroupTileSizes;
+}
 
+static LogicalResult setRootConfig(func::FuncOp entryPointFn,
+                                   IREE::LinalgExt::PackOp op) {
+  TileSizesListType tileSizes = {getLinalgExtDefaultWorkgroupTileSizes(op)};
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, op, tileSizes, DispatchLoweringPassPipeline::CPUDataTiling);
+}
+
+/// Sets the lowering configuration for dispatch region for linalg_ext.fft
+/// root op.
+static LogicalResult setRootConfig(func::FuncOp entryPointFn,
+                                   IREE::LinalgExt::FftOp fftOp) {
+  SmallVector<int64_t> workgroupTileSizes =
+      getLinalgExtDefaultWorkgroupTileSizes(fftOp);
   auto rank = fftOp.getOperandRank();
   if (workgroupTileSizes.size() >= rank && workgroupTileSizes[rank - 1] != 0) {
     APInt value;
@@ -1533,6 +1552,8 @@ static LogicalResult setRootConfigImpl(
         .Case<linalg::ContractionOpInterface>(
             [&](auto op) { return setRootConfig(entryPointFn, op); })
         .Case<linalg::LinalgOp>(
+            [&](auto op) { return setRootConfig(entryPointFn, op); })
+        .Case<IREE::LinalgExt::PackOp>(
             [&](auto op) { return setRootConfig(entryPointFn, op); })
         .Case<TilingInterface>(
             [&](auto op) { return setRootConfig(entryPointFn, op); })

@@ -48,6 +48,7 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 #include "mlir/Transforms/RegionUtils.h"
+#include "mlir/Transforms/TopologicalSortUtils.h"
 
 #define DEBUG_TYPE "iree-flow-dispatch-linalg-on-tensors"
 
@@ -390,7 +391,11 @@ static SmallVector<Operation *> getOperationsToMoveIntoDispatch(
       dispatchOps.push_back(producer);
     }
   }
-  return llvm::to_vector(llvm::reverse(orderOperations(dispatchOps)));
+
+  bool sortResult = mlir::computeTopologicalSorting(dispatchOps);
+  (void)sortResult;
+  assert(sortResult && "could not compute topological sorting");
+  return llvm::to_vector(llvm::reverse(dispatchOps));
 }
 
 //===---------------------------------------------------------------------===//
@@ -441,7 +446,9 @@ static void getUsedValuesDefinedAboveAfterCloningOps(
   }
   // The cloned operations form a DAG. Return the cloned operations so the
   // leaves come first, and can be cloned in-order into the dispatch region.
-  clonedOps = orderOperations(clonedOps);
+  bool sortResult = mlir::computeTopologicalSorting(clonedOps);
+  (void)sortResult;
+  assert(sortResult && "could not compute topological sorting");
 
   for (auto clonedOp : reverse(clonedOps)) {
     Operation *clone = builder.clone(*clonedOp);
@@ -500,13 +507,11 @@ static BlockArgument getTiedOperandBlockArgument(BlockArgument resultArg) {
   // match and that the tied argument is readonly.
   auto type = tiedArg.getType().dyn_cast<IREE::Flow::DispatchTensorType>();
   if (!type || type.getAccess() != IREE::Flow::TensorAccess::ReadOnly ||
-      type.getElementType() != resultArgType.getElementType() ||
+      type.getBoundElementType() != resultArgType.getBoundElementType() ||
       llvm::any_of(llvm::zip(type.getShape(), resultArgType.getShape()),
                    [](std::tuple<int64_t, int64_t> sizes) {
-                     return std::get<0>(sizes) !=
-                                IREE::Flow::DispatchTensorType::kDynamicSize &&
-                            std::get<1>(sizes) !=
-                                IREE::Flow::DispatchTensorType::kDynamicSize &&
+                     return std::get<0>(sizes) != ShapedType::kDynamicSize &&
+                            std::get<1>(sizes) != ShapedType::kDynamicSize &&
                             std::get<0>(sizes) != std::get<1>(sizes);
                    })) {
     return nullptr;
@@ -534,8 +539,7 @@ static void tryToTieOperandsAndResults(
     auto oldType =
         tiedOperandArgument.getType().cast<IREE::Flow::DispatchTensorType>();
     tiedOperandArgument.setType(IREE::Flow::DispatchTensorType::get(
-        IREE::Flow::TensorAccess::ReadWrite, oldType.getShape(),
-        oldType.getElementType()));
+        IREE::Flow::TensorAccess::ReadWrite, oldType.getBoundType()));
     outputArgument.replaceAllUsesWith(tiedOperandArgument);
     block->eraseArgument(outputArgument.getArgNumber());
     dispatchOp.setTiedResultOperandIndex(result.index(),
@@ -971,13 +975,13 @@ static bool isFusableWithProducer(OpOperand &operand, bool aggressiveFusion) {
   }
 
   auto consumerLinalgOp = cast<linalg::LinalgOp>(consumer);
-  if (consumerLinalgOp.isInputTensor(&operand)) {
+  if (consumerLinalgOp.isInput(&operand)) {
     // Only fuse on inputs if both ops are generic ops.
     if (!aggressiveFusion || !isa<linalg::GenericOp>(consumer) ||
         !isa<linalg::GenericOp>(producer)) {
       return false;
     }
-  } else if (!consumerLinalgOp.isOutputTensor(&operand)) {
+  } else if (!consumerLinalgOp.isOutput(&operand)) {
     return false;
   }
 

@@ -30,28 +30,37 @@ namespace Flow {
 // static
 DispatchTensorType DispatchTensorType::get(TensorAccess access,
                                            ArrayRef<int64_t> shape,
-                                           Type elementType) {
+                                           Type elementType,
+                                           Attribute encoding) {
   return Base::get(elementType.getContext(), static_cast<uint32_t>(access),
-                   shape, elementType);
+                   RankedTensorType::get(shape, elementType, encoding));
 }
 
 // static
 DispatchTensorType DispatchTensorType::get(TensorAccess access,
-                                           TensorType tensorType) {
-  return DispatchTensorType::get(access, tensorType.getShape(),
-                                 tensorType.getElementType());
+                                           Type boundType) {
+  return Base::get(boundType.getContext(), static_cast<uint32_t>(access),
+                   boundType);
 }
 
 TensorAccess DispatchTensorType::getAccess() const {
   return static_cast<TensorAccess>(static_cast<ImplType *>(impl)->access);
 }
 
-Type DispatchTensorType::getElementType() const {
-  return static_cast<ImplType *>(impl)->elementType;
+Type DispatchTensorType::getBoundType() const {
+  return static_cast<Type>(static_cast<ImplType *>(impl)->boundType);
 }
 
-unsigned DispatchTensorType::getElementTypeBitWidth() const {
-  return getElementType().getIntOrFloatBitWidth();
+Type DispatchTensorType::getBoundElementType() const {
+  Type boundType = getBoundType();
+  if (boundType.isIntOrFloat()) {
+    return boundType;
+  }
+  return boundType.cast<RankedTensorType>().getElementType();
+}
+
+unsigned DispatchTensorType::getBoundElementTypeBitWidth() const {
+  return getBoundElementType().getIntOrFloatBitWidth();
 }
 
 int64_t DispatchTensorType::getNumElements() const {
@@ -62,7 +71,13 @@ int64_t DispatchTensorType::getNumElements() const {
   return num;
 }
 
-int64_t DispatchTensorType::getRank() const { return getShape().size(); }
+int64_t DispatchTensorType::getRank() const {
+  Type boundType = getBoundType();
+  if (boundType.isIntOrIndexOrFloat()) {
+    return 0;
+  }
+  return boundType.cast<RankedTensorType>().getRank();
+}
 
 bool DispatchTensorType::hasRank() const { return true; }
 
@@ -73,26 +88,29 @@ int64_t DispatchTensorType::getDimSize(unsigned idx) const {
 
 bool DispatchTensorType::isDynamicDim(unsigned idx) const {
   assert(idx < getRank() && "invalid index for shaped type");
-  return isDynamic(getShape()[idx]);
+  return ShapedType::isDynamic(getShape()[idx]);
 }
 
 unsigned DispatchTensorType::getDynamicDimIndex(unsigned index) const {
   assert(index < getRank() && "invalid index");
-  assert(DispatchTensorType::isDynamic(getDimSize(index)) && "invalid index");
-  return llvm::count_if(getShape().take_front(index),
-                        DispatchTensorType::isDynamic);
+  assert(ShapedType::isDynamic(getDimSize(index)) && "invalid index");
+  return llvm::count_if(getShape().take_front(index), ShapedType::isDynamic);
 }
 
 ArrayRef<int64_t> DispatchTensorType::getShape() const {
-  return static_cast<ImplType *>(impl)->getShape();
+  Type boundType = getBoundType();
+  if (boundType.isIntOrIndexOrFloat()) {
+    return {};
+  }
+  return boundType.cast<RankedTensorType>().getShape();
 }
 
 int64_t DispatchTensorType::getNumDynamicDims() const {
-  return llvm::count_if(getShape(), isDynamic);
+  return llvm::count_if(getShape(), ShapedType::isDynamic);
 }
 
 bool DispatchTensorType::hasStaticShape() const {
-  return hasRank() && llvm::none_of(getShape(), isDynamic);
+  return hasRank() && llvm::none_of(getShape(), ShapedType::isDynamic);
 }
 
 bool DispatchTensorType::hasStaticShape(ArrayRef<int64_t> shape) const {
@@ -101,13 +119,10 @@ bool DispatchTensorType::hasStaticShape(ArrayRef<int64_t> shape) const {
 
 LogicalResult DispatchTensorType::verify(
     function_ref<InFlightDiagnostic()> emitError, uint32_t access,
-    ArrayRef<int64_t> shape, Type elementType) {
-  if (!isValidElementType(elementType)) {
-    return emitError() << "dispatch tensor elements must be int or float type";
-  }
-  if (any_of(shape, [](int64_t i) { return i < -1; })) {
-    return emitError()
-           << "dispatch tensor dimensions must be positive if defined";
+    Type boundType) {
+  if (!boundType.isIntOrFloat() && !boundType.isa<RankedTensorType>()) {
+    return emitError() << "unhandled bounded type in dispatch. Must by int, "
+                          "float or ranked tensor type";
   }
   return success();
 }
@@ -115,12 +130,10 @@ LogicalResult DispatchTensorType::verify(
 template <typename T>
 static T parseShapedType(AsmParser &parser) {
   StringRef accessStr;
-  SmallVector<int64_t, 4> shape;
-  Type elementType;
+  Type boundType;
   if (failed(parser.parseLess()) || failed(parser.parseKeyword(&accessStr)) ||
-      failed(parser.parseColon()) ||
-      failed(parser.parseDimensionList(shape, /*allowDynamic=*/true)) ||
-      failed(parser.parseType(elementType)) || failed(parser.parseGreater())) {
+      failed(parser.parseColon()) || failed(parser.parseType(boundType)) ||
+      failed(parser.parseGreater())) {
     return {};
   }
   auto access = llvm::StringSwitch<TensorAccess>(accessStr)
@@ -128,7 +141,7 @@ static T parseShapedType(AsmParser &parser) {
                     .Case("readwrite", TensorAccess::ReadWrite)
                     .Case("writeonly", TensorAccess::WriteOnly)
                     .Default(TensorAccess::ReadOnly);
-  return T::get(access, shape, elementType);
+  return T::get(access, boundType);
 }
 
 static void printShapedType(DispatchTensorType &type, AsmPrinter &p) {
@@ -145,16 +158,7 @@ static void printShapedType(DispatchTensorType &type, AsmPrinter &p) {
     default:
       assert(false && "unhandled access");
   }
-  p << ":";
-  for (int64_t dim : type.getShape()) {
-    if (ShapedType::isDynamic(dim)) {
-      p << '?';
-    } else {
-      p << dim;
-    }
-    p << 'x';
-  }
-  p << type.getElementType();
+  p << ":" << type.getBoundType();
 }
 
 // static

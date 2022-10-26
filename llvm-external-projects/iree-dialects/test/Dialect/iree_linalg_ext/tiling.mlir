@@ -958,6 +958,41 @@ func.func @NC_to_NCnc(%arg0: tensor<128x256xf32>, %arg1: tensor<4x8x32x32xf32>) 
 
 // -----
 
+func.func @KC_to_CKkc(%arg0: tensor<128x256xf32>, %arg1: tensor<32x4x32x8xf32>) -> tensor<32x4x32x8xf32> {
+  %0 = iree_linalg_ext.pack {__internal_linalg_transform__ = "tiling_pack_input"} %arg0 outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 8] into %arg1 : (tensor<128x256xf32> tensor<32x4x32x8xf32>) -> tensor<32x4x32x8xf32>
+  return %0 : tensor<32x4x32x8xf32>
+}
+// CHECK:       #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (2, -d0 + s1)>
+// CHECK:       #[[MAP1:.+]] = affine_map<(d0)[s0, s1] -> (4, -d0 + s1)>
+// CHECK:       #[[MAP2:.+]] = affine_map<(d0) -> (d0 * 32)>
+// CHECK:       #[[MAP3:.+]] = affine_map<(d0, d1) -> (d0 * 32, d1 * -32 + 128)>
+// CHECK:       #[[MAP4:.+]] = affine_map<(d0) -> (d0 * 8)>
+// CHECK:       #[[MAP5:.+]] = affine_map<(d0, d1) -> (d0 * 8, d1 * -8 + 256)>
+// CHECK-LABEL: func.func @KC_to_CKkc
+// CHECK-SAME:    %[[IN:[A-Za-z0-9]+]]:
+// CHECK-SAME:    %[[OUT:[A-Za-z0-9]+]]:
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[C2:.+]] = arith.constant 2 : index
+// CHECK-DAG:     %[[C32:.+]] = arith.constant 32 : index
+// CHECK:         scf.for %[[C:.+]] = %[[C0]] to %[[C32]] step %[[C2]]
+// CHECK-DAG:       %[[OUT_C_SZ:.+]] = affine.min #[[MAP0]](%[[C]])
+// CHECK:           scf.for %[[K:.+]] = %[[C0]] to %[[C4]] step %[[C4]]
+// CHECK-DAG:         %[[OUT_K_SZ:.+]] = affine.min #[[MAP1]](%[[K]])
+// CHECK-DAG:         %[[IN_K:.+]] = affine.apply #[[MAP2]](%[[K]])
+// CHECK-DAG:         %[[IN_C:.+]] = affine.apply #[[MAP4]](%[[C]])
+// CHECK-DAG:         %[[IN_K_SZ:.+]] = affine.min #[[MAP3]](%[[OUT_K_SZ]], %[[K]])
+// CHECK-DAG:         %[[IN_C_SZ:.+]] = affine.min #[[MAP5]](%[[OUT_C_SZ]], %[[C]])
+// CHECK:             %[[INPUT_SLICE:.+]] = tensor.extract_slice %[[IN]]
+// CHECK-SAME:          [%[[IN_K]], %[[IN_C]]] [%[[IN_K_SZ]], %[[IN_C_SZ]]]
+// CHECK:             %[[OUTPUT_SLICE:.+]] = tensor.extract_slice %[[OUT]]
+// CHECK-SAME:          [%[[C]], %[[K]], 0, 0] [%[[OUT_C_SZ]], %[[OUT_K_SZ]], 32, 8]
+// CHECK:             iree_linalg_ext.pack
+// CHECK-SAME:          {__internal_linalg_transform__ = "tiling_pack_output"}
+// CHECK-SAME:          %[[INPUT_SLICE]] outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 8]
+// CHECK-SAME:          into %[[OUTPUT_SLICE]]
+
+// -----
+
 func.func @pad_and_pack_static(%input: tensor<13x15xf32>, %output: tensor<2x8x8x2xf32>, %pad: f32) -> tensor<2x8x8x2xf32> {
   %0 = iree_linalg_ext.pack {__internal_linalg_transform__ = "tiling_pack_input"} %input padding_value(%pad : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 2] into %output : (tensor<13x15xf32> tensor<2x8x8x2xf32>) -> tensor<2x8x8x2xf32>
   return %0 : tensor<2x8x8x2xf32>

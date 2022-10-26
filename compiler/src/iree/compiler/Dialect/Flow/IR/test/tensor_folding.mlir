@@ -23,8 +23,8 @@ func.func @expandDynamicShapeConstant() -> (tensor<?x?xi32>, index, index) {
   // CHECK-DAG: %[[CST:.+]] = arith.constant dense<2> : tensor<2x4xi32>
   // CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
   // CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
-  // CHECK-DAG: %[[D0:.+]] = util.do_not_optimize(%[[C2]]) : index
-  // CHECK-DAG: %[[D1:.+]] = util.do_not_optimize(%[[C4]]) : index
+  // CHECK-DAG: %[[D0:.+]] = util.optimization_barrier %[[C2]] : index
+  // CHECK-DAG: %[[D1:.+]] = util.optimization_barrier %[[C4]] : index
   // CHECK: %[[T:.+]] = flow.tensor.reshape %[[CST]] : tensor<2x4xi32> -> tensor<?x?xi32>{%[[D0]], %[[D1]]}
   %0 = flow.tensor.constant dense<2> : tensor<2x4xi32> -> tensor<?x?xi32>
   %d0 = tensor.dim %0, %c0 : tensor<?x?xi32>
@@ -150,8 +150,8 @@ func.func @reshapeFromDynamicEmpty(%arg0: tensor<0x?xf32>, %dim0: index, %dim1: 
 func.func @reshapeToStaticEmpty(%arg0: tensor<4x?xf32>, %dim0: index) {
   // CHECK-NEXT: %[[RET:.+]] = flow.tensor.empty : tensor<4x0xf32>
   %0 = flow.tensor.reshape %arg0 : tensor<4x?xf32>{%dim0} -> tensor<4x0xf32>
-  // CHECK-NEXT: util.do_not_optimize(%[[RET]])
-  util.do_not_optimize(%0) : tensor<4x0xf32>
+  // CHECK-NEXT: util.optimization_barrier %[[RET]]
+  util.optimization_barrier %0 : tensor<4x0xf32>
   return
 }
 
@@ -162,8 +162,8 @@ func.func @reshapeToStaticEmpty(%arg0: tensor<4x?xf32>, %dim0: index) {
 func.func @reshapeToDynamicEmpty(%arg0: tensor<4x?xf32>, %dim0: index, %dim1: index) {
   // CHECK: %[[RET:.+]] = flow.tensor.empty : tensor<0x?xf32>{%[[DIM1]]}
   %0 = flow.tensor.reshape %arg0 : tensor<4x?xf32>{%dim0} -> tensor<0x?xf32>{%dim1}
-  // CHECK-NEXT: util.do_not_optimize(%[[RET]])
-  util.do_not_optimize(%0) : tensor<0x?xf32>
+  // CHECK-NEXT: util.optimization_barrier %[[RET]]
+  util.optimization_barrier %0 : tensor<0x?xf32>
   return
 }
 

@@ -10,7 +10,7 @@
 include "mlir/Pass/PassBase.td"
 
 def ConvertMHLOToLinalgOnTensors :
-    Pass<"iree-mhlo-to-linalg-on-tensors", "func::FuncOp"> {
+    Pass<"iree-mhlo-to-linalg-on-tensors", "ModuleOp"> {
   let summary = "Convert from XLA-HLO ops to Linalg ops on tensors";
   let constructor = "mlir::iree_compiler::MHLO::createMHLOToLinalgOnTensorsPass()";
 }

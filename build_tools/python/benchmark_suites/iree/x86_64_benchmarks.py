@@ -36,7 +36,8 @@ class Linux_x86_64_Benchmarks(object):
 
     gen_configs = [
         iree_definitions.ModuleGenerationConfig(
-            compile_config=self.CASCADELAKE_COMPILE_CONFIG, model=model)
+            compile_config=self.CASCADELAKE_COMPILE_CONFIG,
+            imported_model=iree_definitions.ImportedModel.from_model(model))
         for model in model_groups.SMALL + model_groups.LARGE
     ]
     default_execution_configs = [

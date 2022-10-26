@@ -35,9 +35,9 @@ class PadMatmulOp : public OpInterfaceRewritePattern<linalg::LinalgOp> {
     if (!isBatchMatmul && !isMatmul) return failure();
 
     Location loc = linalgOp.getLoc();
-    Value lhs = linalgOp.getInputs()[0];
-    Value rhs = linalgOp.getInputs()[1];
-    Value result = linalgOp.getOutputs()[0];
+    Value lhs = linalgOp.getInputOperand(0)->get();
+    Value rhs = linalgOp.getInputOperand(1)->get();
+    Value result = linalgOp.getOutputOperand(0)->get();
 
     auto lhsType = lhs.getType().dyn_cast<RankedTensorType>();
     auto rhsType = rhs.getType().dyn_cast<RankedTensorType>();
@@ -98,18 +98,16 @@ class PadMatmulOp : public OpInterfaceRewritePattern<linalg::LinalgOp> {
 
     Value paddedLhs = lhs;
     if (paddingForM > 0 || paddingForK > 0) {
-      paddedLhs = tensor::createPadScalarOp(
-          lhsPaddedType, lhs, lhsPaddingValue, createPadding({0, 0}),
-          createPadding({paddingForM, paddingForK}), /*nofold=*/false, loc,
-          rewriter);
+      paddedLhs = rewriter.create<tensor::PadOp>(
+          loc, lhsPaddedType, lhs, createPadding({0, 0}),
+          createPadding({paddingForM, paddingForK}), lhsPaddingValue);
     }
 
     Value paddedRhs = rhs;
     if (paddingForK > 0 || paddingForN > 0) {
-      paddedRhs = tensor::createPadScalarOp(
-          rhsPaddedType, rhs, rhsPaddingValue, createPadding({0, 0}),
-          createPadding({paddingForK, paddingForN}),
-          /*nofold=*/false, loc, rewriter);
+      paddedRhs = rewriter.create<tensor::PadOp>(
+          loc, rhsPaddedType, rhs, createPadding({0, 0}),
+          createPadding({paddingForK, paddingForN}), rhsPaddingValue);
     }
 
     // Padding for K-dim doesn't change result size.
@@ -121,12 +119,11 @@ class PadMatmulOp : public OpInterfaceRewritePattern<linalg::LinalgOp> {
     } else {
       auto newResultType = RankedTensorType::get(
           getFullShape({newMSize, newNSize}), resultType.getElementType());
-      auto resultPaddingValue = rewriter.create<arith::ConstantOp>(
+      Value resultPaddingValue = rewriter.create<arith::ConstantOp>(
           loc, rewriter.getZeroAttr(resultType.getElementType()));
-      Value paddedResult = tensor::createPadScalarOp(
-          newResultType, result, resultPaddingValue, createPadding({0, 0}),
-          createPadding({paddingForM, paddingForN}), /*nofold=*/false, loc,
-          rewriter);
+      Value paddedResult = rewriter.create<tensor::PadOp>(
+          loc, newResultType, result, createPadding({0, 0}),
+          createPadding({paddingForM, paddingForN}), resultPaddingValue);
       auto paddedMatmulOp =
           linalgOp.clone(rewriter, loc, {newResultType},
                          ArrayRef<Value>{paddedLhs, paddedRhs, paddedResult});

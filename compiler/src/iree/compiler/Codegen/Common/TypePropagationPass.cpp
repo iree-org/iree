@@ -163,7 +163,7 @@ struct GenericOpTypePropagation
         modifiedOperandIndex.insert(operand.index());
       }
       // If the operand is an `outs` tensor, its type needs to be changed.
-      if (genericOp.isOutputTensor(&operand.value())) {
+      if (genericOp.isOutput(&operand.value())) {
         resultTypes.push_back(legalizedType);
       }
     }
@@ -240,7 +240,7 @@ struct GenericOpTypePropagation
       for (auto modifiedOperandIndex : modifiedOperandIndex) {
         OpOperand *modifiedOpOperand =
             &modifiedOp->getOpOperand(modifiedOperandIndex);
-        if (modifiedOp.isOutputTensor(modifiedOpOperand)) {
+        if (modifiedOp.isOutput(modifiedOpOperand)) {
           modifyYield = true;
           OpOperand *yieldOperand =
               modifiedOp.getMatchingYieldValue(modifiedOpOperand);

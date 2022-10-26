@@ -7,6 +7,7 @@
 #ifndef IREE_DIALECTS_DIALECT_LINALGEXT_PASSES_TRANSFORMS_H_
 #define IREE_DIALECTS_DIALECT_LINALGEXT_PASSES_TRANSFORMS_H_
 
+#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Interfaces/TilingInterface.h"
@@ -35,11 +36,10 @@ FailureOr<TiledOp> tileLinalgExtOp(OpBuilder &b, TilingInterface tilableOp,
 /// Base pattern for tiling TiledOpInterfaceOps.
 struct TilingInterfaceBaseTilingPattern
     : public OpInterfaceRewritePattern<TilingInterface> {
-  TilingInterfaceBaseTilingPattern(MLIRContext *context,
-                                   linalg::LinalgTilingOptions options,
-                                   linalg::LinalgTransformationFilter filter =
-                                       linalg::LinalgTransformationFilter(),
-                                   PatternBenefit benefit = 1)
+  TilingInterfaceBaseTilingPattern(
+      MLIRContext *context, linalg::LinalgTilingOptions options,
+      LinalgTransformationFilter filter = LinalgTransformationFilter(),
+      PatternBenefit benefit = 1)
       : OpInterfaceRewritePattern(context, benefit), filter(filter),
         options(options) {}
 
@@ -49,17 +49,16 @@ struct TilingInterfaceBaseTilingPattern
 
 private:
   /// LinalgTransformMarker handles special attribute manipulations.
-  linalg::LinalgTransformationFilter filter;
+  LinalgTransformationFilter filter;
   /// Options to control tiling;
   linalg::LinalgTilingOptions options;
 };
 
 struct TilingInterfaceTilingPattern : public TilingInterfaceBaseTilingPattern {
-  TilingInterfaceTilingPattern(MLIRContext *context,
-                               linalg::LinalgTilingOptions options,
-                               linalg::LinalgTransformationFilter filter =
-                                   linalg::LinalgTransformationFilter(),
-                               PatternBenefit benefit = 1)
+  TilingInterfaceTilingPattern(
+      MLIRContext *context, linalg::LinalgTilingOptions options,
+      LinalgTransformationFilter filter = LinalgTransformationFilter(),
+      PatternBenefit benefit = 1)
       : TilingInterfaceBaseTilingPattern(context, options, filter, benefit) {}
 
   LogicalResult matchAndRewrite(TilingInterface tilableOp,

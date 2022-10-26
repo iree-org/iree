@@ -51,6 +51,7 @@
 #include "mlir/Transforms/InliningUtils.h"
 #include "mlir/Transforms/LoopInvariantCodeMotionUtils.h"
 #include "mlir/Transforms/Passes.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/SmallVector.h"
@@ -128,11 +129,24 @@ static LogicalResult isEquivalentToOpImpl(PatternRewriter &rewriter,
                                           linalg::LinalgOp linalgOp,
                                           linalg::LinalgOp linalgModelOp) {
   // If basic properties do not match, return failure.
-  if (linalgOp.getInputs() != linalgModelOp.getInputs() ||
-      linalgOp.getOutputs() != linalgModelOp.getOutputs() ||
-      linalgOp.getIndexingMaps() != linalgModelOp.getIndexingMaps() ||
-      linalgOp.iterator_types() != linalgModelOp.iterator_types())
-    return failure();
+  {
+    OpOperandVector opInputs = linalgOp.getInputOperands();
+    OpOperandVector modelInputs = linalgModelOp.getInputOperands();
+    OpOperandVector opOutputs = linalgOp.getOutputOperands();
+    OpOperandVector modelOutputs = linalgModelOp.getOutputOperands();
+    auto notEqualFn = [](std::tuple<OpOperand *, OpOperand *> in) -> bool {
+      return std::get<0>(in)->get() != std::get<1>(in)->get();
+    };
+
+    if (opInputs.size() != modelInputs.size() ||
+        opOutputs.size() != modelOutputs.size() ||
+        llvm::any_of(llvm::zip(opInputs, modelInputs), notEqualFn) ||
+        llvm::any_of(llvm::zip(opOutputs, modelOutputs), notEqualFn) ||
+        linalgOp.getIndexingMaps() != linalgModelOp.getIndexingMaps() ||
+        linalgOp.getIteratorTypesArray() !=
+            linalgModelOp.getIteratorTypesArray())
+      return failure();
+  }
 
   // Build the block and go perform a body comparison.
   {
@@ -434,8 +448,8 @@ void mlir::TrackingListener::notifyOperationReplaced(Operation *op,
     return;
   }
 
-  LLVM_DEBUG(DBGS() << "replacing tracked " << *op << " with " << *replacement
-                    << "\n");
+  LLVM_DEBUG(DBGS() << "replacing tracked @" << op << " : " << *op << " with "
+                    << *replacement << "\n");
   mayFail(replacePayloadOp(op, replacement));
 }
 
@@ -449,7 +463,17 @@ void mlir::TrackingListener::notifyOperationRemoved(Operation *op) {
   if (failed(getTransformState().getHandlesForPayloadOp(op, handles)))
     return;
 
-  LLVM_DEBUG(DBGS() << "removing tracked " << *op << "\n");
+  LLVM_DEBUG(DBGS() << "removing tracked @" << op << " : " << *op << "\n");
+  mayFail(replacePayloadOp(op, nullptr));
+}
+
+void mlir::TrackingListener::removeMappings(Operation *op) {
+  // Bail if in error state.
+  if (hadErrors)
+    return;
+
+  // Replacing the tracked op with null will stop the tracking.
+  LLVM_DEBUG(DBGS() << "removing mappings @" << op << " : " << *op << "\n");
   mayFail(replacePayloadOp(op, nullptr));
 }
 
@@ -504,6 +528,78 @@ static LogicalResult performEnablerTransformations(
   return failure(res.wasInterrupted());
 }
 
+/// Drop the association between payload operations and transform dialect
+/// handles when it is no longer necessary in a canonicalized sequence.
+/// Specifically, drop the association between payload operations and the
+/// operand handles if all handles to them will not be used after the current
+/// `transform`. Also drop the association between payload operations and result
+/// handles if results are never read. Note that the operand part is specific to
+/// sequence-like execution that is not guaranteed in the transform dialect in
+/// general.
+static void
+forgetUnnecessaryHandles(transform::TransformState &state,
+                         transform_ext::CanonicalizedSequenceOp sequence,
+                         transform::TransformOpInterface transform) {
+  auto *listener = state.getExtension<TrackingListener>();
+  assert(transform->getParentOp() == sequence &&
+         "only works for transform ops immediately nested in a canonicalized "
+         "sequence");
+  assert(listener && "expected tracking listener to be present");
+
+  // Checks if the operation or its ancestor is before `transform` in its block
+  // or is `transform` itself.
+  auto userIsBefore = [&](Operation *user) {
+    while (user && user->getParentOp() != sequence)
+      user = user->getParentOp();
+    if (!user)
+      return false;
+    return user->isBeforeInBlock(transform) || user == transform;
+  };
+
+  // Drop associations for operands that will not be read again. Ignore consumed
+  // operands that have been deassociated already. Consider all handles to each
+  // payload operation and only drop the association if all handles pointing to
+  // the same operation will are not used after the current transform op. The
+  // handle will be erased automatically after the last payload operation is
+  // deassociated from it.
+  llvm::SmallDenseSet<Operation *> seen;
+  llvm::SmallDenseMap<Value, bool> handlesUsedAfterTransform;
+  for (Value operand : transform->getOperands()) {
+    if (transform::isHandleConsumed(operand, transform))
+      continue;
+
+    for (Operation *payload : state.getPayloadOps(operand)) {
+      if (!payload || seen.contains(payload))
+        continue;
+      SmallVector<Value> allHandles;
+      (void)state.getHandlesForPayloadOp(payload, allHandles);
+      bool allHandlesUnused = llvm::all_of(allHandles, [&](Value handle) {
+        if (!handlesUsedAfterTransform.count(handle)) {
+          handlesUsedAfterTransform[handle] =
+              !llvm::all_of(handle.getUsers(), userIsBefore);
+        }
+        return !handlesUsedAfterTransform[handle];
+      });
+      if (allHandlesUnused) {
+        listener->removeMappings(payload);
+        seen.insert(payload);
+      }
+    }
+  }
+
+  // Drop associations for results that will never be read.
+  for (Value result : transform->getResults()) {
+    if (!result.getUses().empty())
+      continue;
+    for (Operation *payload : state.getPayloadOps(result)) {
+      if (!payload || seen.contains(payload))
+        continue;
+      listener->removeMappings(payload);
+      seen.insert(payload);
+    }
+  }
+}
+
 DiagnosedSilenceableFailure transform_ext::CanonicalizedSequenceOp::apply(
     transform::TransformResults &results, transform::TransformState &state) {
 
@@ -520,7 +616,8 @@ DiagnosedSilenceableFailure transform_ext::CanonicalizedSequenceOp::apply(
   auto &listener = state.addExtension<::mlir::TrackingListener>();
   auto detachListener = llvm::make_scope_exit(
       [&] { state.removeExtension<::mlir::TrackingListener>(); });
-  mapBlockArguments(state);
+  if (failed(mapBlockArguments(state)))
+    return DiagnosedSilenceableFailure::definiteFailure();
 
   auto checkedListenerTransform =
       [&](function_ref<LogicalResult(Operation *, RewriteListener &)>
@@ -534,10 +631,14 @@ DiagnosedSilenceableFailure transform_ext::CanonicalizedSequenceOp::apply(
         for (Operation *target : roots) {
           // Make sure we always check the error state, no boolean
           // short-circuting.
-          LogicalResult result = transform(target, listener);
-          LogicalResult listenerResult = listener.checkErrorState();
-          if (failed(result) || failed(listenerResult))
+          if (failed(transform(target, listener))) {
+            target->emitOpError("Transform application failed.");
             return failure();
+          }
+          if (failed(listener.checkErrorState())) {
+            target->emitOpError("Listener failed.");
+            return failure();
+          }
         }
         return success();
       };
@@ -568,15 +669,19 @@ DiagnosedSilenceableFailure transform_ext::CanonicalizedSequenceOp::apply(
   };
 
   LLVM_DEBUG(DBGS() << "begin canonicalizing sequence\n");
-  if (failed(checkedListenerTransform(performCSE)))
-    return DiagnosedSilenceableFailure::definiteFailure();
-  if (failed(checkedListenerTransform(performCanonicalization)))
-    return DiagnosedSilenceableFailure::definiteFailure();
+  if (failed(checkedListenerTransform(performCSE))) {
+    return mlir::emitDefiniteFailure(
+        *this, "Failed to performCSE beform transform sequence");
+  }
+  if (failed(checkedListenerTransform(performCanonicalization))) {
+    return mlir::emitDefiniteFailure(
+        *this, "Failed to performCanonicalization beform transform sequence");
+  }
 
   // Apply the sequenced ops one by one.
   for (Operation &transform : getBodyBlock()->without_terminator()) {
-    DiagnosedSilenceableFailure result =
-        state.applyTransform(cast<transform::TransformOpInterface>(transform));
+    auto transformOp = cast<transform::TransformOpInterface>(transform);
+    DiagnosedSilenceableFailure result = state.applyTransform(transformOp);
     if (result.isDefiniteFailure()) {
       LLVM_DEBUG(DBGS() << "failed: " << transform << "\n");
       return result;
@@ -590,12 +695,25 @@ DiagnosedSilenceableFailure transform_ext::CanonicalizedSequenceOp::apply(
     }
     LLVM_DEBUG(DBGS() << "successfully performed: " << transform << "\n");
 
-    if (failed(checkedListenerTransform(performCSE)))
-      return DiagnosedSilenceableFailure::definiteFailure();
-    if (failed(checkedListenerTransform(performEnabler)))
-      return DiagnosedSilenceableFailure::definiteFailure();
-    if (failed(checkedListenerTransform(performCanonicalization)))
-      return DiagnosedSilenceableFailure::definiteFailure();
+    // Canonicalization may replace payload operations associated with the
+    // transform dialect handles. Post-canonicalize reassociation is fragile and
+    // may fail. To make this less likely, drop any association that are no
+    // longer necessary, i.e., if the operand is no longer used in the sequence
+    // or elsewhere or if the result is never read.
+    forgetUnnecessaryHandles(state, *this, transformOp);
+
+    if (failed(checkedListenerTransform(performCSE))) {
+      return mlir::emitDefiniteFailure(&transform,
+                                       "Failed to performCSE after transform");
+    }
+    if (failed(checkedListenerTransform(performEnabler))) {
+      return mlir::emitDefiniteFailure(
+          &transform, "Failed to performEnabler after transform");
+    }
+    if (failed(checkedListenerTransform(performCanonicalization))) {
+      return mlir::emitDefiniteFailure(
+          &transform, "Failed to performCanonicalization after transform");
+    }
   }
 
   // Forward the operation mapping for values yielded from the sequence to the

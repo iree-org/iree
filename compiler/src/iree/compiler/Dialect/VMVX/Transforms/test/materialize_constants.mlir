@@ -35,13 +35,13 @@ func.func private @no_constants_required() {
 func.func private @constant_user() {
   // CHECK: %[[FOO_LOADED:.+]] = util.global.load @__constant_foo
   %value_0 = hal.executable.constant.load "foo" : i32
-  // CHECK: util.do_not_optimize(%[[FOO_LOADED]])
-  util.do_not_optimize(%value_0) : i32
+  // CHECK: util.optimization_barrier %[[FOO_LOADED]]
+  util.optimization_barrier %value_0 : i32
 
   // CHECK: %[[BAR_LOADED:.+]] = util.global.load @__constant_bar
   %value_1 = hal.executable.constant.load "bar" : i32
-  // CHECK: util.do_not_optimize(%[[BAR_LOADED]])
-  util.do_not_optimize(%value_1) : i32
+  // CHECK: util.optimization_barrier %[[BAR_LOADED]]
+  util.optimization_barrier %value_1 : i32
 
   return
 }

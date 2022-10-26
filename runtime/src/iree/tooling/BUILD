@@ -142,6 +142,7 @@ cc_library(
         ":numpy_io",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/base/internal:file_io",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/modules/hal",
         "//runtime/src/iree/vm",

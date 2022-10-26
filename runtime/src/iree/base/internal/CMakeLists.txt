@@ -120,6 +120,7 @@ iree_cc_library(
     ::internal
     ::path
     ::synchronization
+    iree::base
     iree::base::core_headers
     iree::base::tracing
   PUBLIC
@@ -165,6 +166,7 @@ iree_cc_library(
     ::file_io
     ::internal
     iree::base
+    iree::base::target_platform
     iree::base::tracing
   PUBLIC
 )
@@ -427,7 +429,9 @@ iree_cc_test(
     ::internal
     ::synchronization
     ::threading
+    iree::base
     iree::base::cc
+    iree::base::target_platform
     iree::testing::gtest
     iree::testing::gtest_main
 )

@@ -16,7 +16,7 @@ include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
 class HALLoader_PureOp<string mnemonic, list<Trait> traits = []> :
-    HALLoader_Op<mnemonic, !listconcat(traits, [NoSideEffect])>;
+    HALLoader_Op<mnemonic, !listconcat(traits, [Pure])>;
 
 //===----------------------------------------------------------------------===//
 // !hal.executable / iree_hal_executable_t

@@ -100,19 +100,9 @@ function(iree_run_module_test)
 
   iree_package_path(_PACKAGE_PATH)
 
-  # All the file paths referred in the _RULE_RUNNER_ARGS are relative paths to
-  # make it portable, and all the paths in `_RUNNER_DATA` are absolute paths to
-  # make sure it can be checked/copied by the `iree_native_test` flow.
-  list(APPEND _RUNNER_DATA ${_RULE_MODULE_SRC})
-  # Android test runs on device and needs to set the file location properly.
-  # TODO(#10744): Move it into `iree_native_test`
-  if(ANDROID)
-    cmake_path(GET _RULE_MODULE_SRC FILENAME _SRC_FILE_BASE)
-    set(_SRC_PATH "${_PACKAGE_PATH}/${_RULE_NAME}/${_SRC_FILE_BASE}")
-  else()
-    file(RELATIVE_PATH _SRC_PATH
-      "${CMAKE_CURRENT_BINARY_DIR}" "${_RULE_MODULE_SRC}")
-  endif()
+  # All the file paths referred in the _RUNNER_FILE_ARGS are absolute paths and
+  # the portability is handled by `iree_native_test`.
+  list(APPEND _RUNNER_FILE_ARGS "--module_file={{${_RULE_MODULE_SRC}}}")
 
   if(_RULE_EXPECTED_OUTPUT)
     # this may be a file or a literal output. In the latter case, the
@@ -127,7 +117,6 @@ function(iree_run_module_test)
       string(REPLACE "\n" " " _EXPECTED_OUTPUT_STR "${_EXPECTED_OUTPUT}")
       set(_EXPECTED_OUTPUT_STR "--expected_output=\"${_EXPECTED_OUTPUT_STR}\"")
       list(APPEND _RULE_RUNNER_ARGS ${_EXPECTED_OUTPUT_STR})
-      list(APPEND _RUNNER_DATA ${_OUTPUT_FILE_ABS_PATH})
     elseif(_OUTPUT_FILE_TYPE STREQUAL ".npy")
       # Large npy files are not stored in the codebase. Need to download them
       # from GCS iree-model-artifacts first and store them in the following possible
@@ -152,18 +141,8 @@ function(iree_run_module_test)
           ${IREE_BENCHMARK_SUITE_DIR}\n\
           Please check if you need to download it first.")
       else()
-        # Android runs on device and pushs the file into a different path.
-        # TODO(#10744): Move it into `iree_native_test`
-        if(ANDROID)
-          cmake_path(GET _OUTPUT_FILE_ABS_PATH FILENAME _OUTPUT_FILE_BASE)
-          list(APPEND
-            _RULE_RUNNER_ARGS "--expected_output=@${_PACKAGE_PATH}/${_RULE_NAME}/${_OUTPUT_FILE_BASE}")
-        else()
-          file(RELATIVE_PATH _OUTPUT_FILE_RELATIVE_PATH
-            "${CMAKE_CURRENT_BINARY_DIR}" "${_OUTPUT_FILE_ABS_PATH}")
-          list(APPEND _RULE_RUNNER_ARGS "--expected_output=@${_OUTPUT_FILE_RELATIVE_PATH}")
-        endif()
-        list(APPEND _RUNNER_DATA ${_OUTPUT_FILE_ABS_PATH})
+        list(APPEND _RUNNER_FILE_ARGS
+          "--expected_output=@{{${_OUTPUT_FILE_ABS_PATH}}}")
       endif()
     else()
       message(SEND_ERROR "Unsupported expected output file type: ${_RULE_EXPECTED_OUTPUT}")
@@ -181,14 +160,8 @@ function(iree_run_module_test)
       CONTENT
         "${_OUTPUT_FLAGS}"
     )
-    list(APPEND _RUNNER_DATA "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}_flagfile")
-    # Android test runs on device and needs to set the file location properly.
-    # TODO(#10744): Move it into `iree_native_test`
-    if(ANDROID)
-      set(_OUTPUT_FLAGFILE "${_PACKAGE_PATH}/${_RULE_NAME}/${_RULE_NAME}_flagfile")
-    else()
-      set(_OUTPUT_FLAGFILE "${_RULE_NAME}_flagfile")
-    endif()
+    list(APPEND _RUNNER_FILE_ARGS
+      "--flagfile={{${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}_flagfile}}")
   endif()
 
   # A target specifically for the test.
@@ -214,10 +187,7 @@ function(iree_run_module_test)
     SRC
       "${_RUNNER_TARGET}"
     ARGS
-      "--module_file=${_SRC_PATH}"
-      "--flagfile=${_OUTPUT_FLAGFILE}"
-    DATA
-      "${_RUNNER_DATA}"
+      ${_RUNNER_FILE_ARGS}
     WILL_FAIL
       ${_TEST_XFAIL}
     LABELS

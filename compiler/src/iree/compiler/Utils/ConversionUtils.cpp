@@ -51,5 +51,75 @@ LogicalResult verifyAllOperationsAreLegal(Operation *op,
   return failure();
 }
 
+Attribute convertAttribute(Location loc, Attribute oldAttr,
+                           TypeConverter &typeConverter) {
+  // Type attributes get their nested type converted.
+  if (auto oldTypeAttr = oldAttr.dyn_cast<TypeAttr>()) {
+    return TypeAttr::get(typeConverter.convertType(oldTypeAttr.getValue()));
+  }
+
+  // Return the same attribute if it doesn't have a type.
+  auto typedOldAttr = oldAttr.dyn_cast<TypedAttr>();
+  if (!typedOldAttr) return oldAttr;
+
+  // Convert the attribute type - if it's the same then it's already legal.
+  auto oldType = typedOldAttr.getType();
+  auto newType = typeConverter.convertType(oldType);
+  if (oldType == newType) return typedOldAttr;
+
+  if (auto intAttr = typedOldAttr.dyn_cast<IntegerAttr>()) {
+    APInt value = intAttr.getValue();
+    if (newType.isSignedInteger()) {
+      value = value.truncSSat(newType.getIntOrFloatBitWidth());
+    } else if (newType.isUnsignedInteger()) {
+      value = value.truncUSat(newType.getIntOrFloatBitWidth());
+    } else {
+      value = value.trunc(newType.getIntOrFloatBitWidth());
+    }
+    return IntegerAttr::get(newType, value);
+  } else if (auto floatAttr = typedOldAttr.dyn_cast<FloatAttr>()) {
+    auto newFloatType = newType.cast<FloatType>();
+    APFloat value = floatAttr.getValue();
+    bool losesInfo = false;
+    value.convert(newFloatType.getFloatSemantics(), APFloat::rmTowardZero,
+                  &losesInfo);
+    return FloatAttr::get(newType, value);
+  } else if (auto splatAttr = typedOldAttr.dyn_cast<SplatElementsAttr>()) {
+    // NOTE: splats are also dense but this way we avoid needing to convert the
+    // same splat value N times.
+    return SplatElementsAttr::get(
+        newType.cast<ShapedType>(),
+        convertAttribute(loc, splatAttr.getSplatValue<Attribute>(),
+                         typeConverter));
+  } else if (auto denseAttr = typedOldAttr.dyn_cast<DenseIntElementsAttr>()) {
+    auto newElementType = newType.cast<ShapedType>().getElementType();
+    auto newElementBitWidth = newElementType.getIntOrFloatBitWidth();
+    if (newElementType.isSignedInteger()) {
+      return denseAttr.mapValues(newElementType, [&](APInt src) {
+        return src.truncSSat(newElementBitWidth);
+      });
+    } else if (newElementType.isUnsignedInteger()) {
+      return denseAttr.mapValues(newElementType, [&](APInt src) {
+        return src.truncUSat(newElementBitWidth);
+      });
+    } else {
+      return denseAttr.mapValues(newElementType, [&](APInt src) {
+        return src.trunc(newElementBitWidth);
+      });
+    }
+  } else if (auto denseAttr = typedOldAttr.dyn_cast<DenseFPElementsAttr>()) {
+    auto newElementType =
+        newType.cast<ShapedType>().getElementType().cast<FloatType>();
+    const auto &newFloatSemantics = newElementType.getFloatSemantics();
+    return denseAttr.mapValues(newElementType, [&](APFloat src) {
+      bool losesInfo = false;
+      src.convert(newFloatSemantics, APFloat::rmTowardZero, &losesInfo);
+      return src.bitcastToAPInt();
+    });
+  }
+
+  return oldAttr;
+}
+
 }  // namespace iree_compiler
 }  // namespace mlir

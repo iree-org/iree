@@ -16,8 +16,8 @@ func.func @globalLoad() {
   // CHECK-NEXT: %[[SIZE:.+]] = stream.resource.size %[[UNREADY]]
   // CHECK-NEXT: %[[VALUE:.+]] = stream.timepoint.await %[[TIMEPOINT]] => %[[UNREADY]] : !stream.resource<constant>{%[[SIZE]]}
   %0 = util.global.load @constantGlobal : !stream.resource<constant>
-  // CHECK-NEXT: util.do_not_optimize(%[[VALUE]])
-  util.do_not_optimize(%0) : !stream.resource<constant>
+  // CHECK-NEXT: util.optimization_barrier %[[VALUE]]
+  util.optimization_barrier %0 : !stream.resource<constant>
   return
 }
 
@@ -58,10 +58,10 @@ func.func private @funcArgs(%arg0: !stream.resource<external>, %arg1: !stream.re
   // CHECK-NEXT: %[[SIZE1:.+]] = stream.resource.size %[[UNREADY1]] : !stream.resource<transient>
   // CHECK-NEXT: %[[READY1:.+]] = stream.timepoint.await %[[TIMEPOINT1]] => %[[UNREADY1]] : !stream.resource<transient>{%[[SIZE1]]}
 
-  // CHECK-NEXT: util.do_not_optimize(%[[READY0]])
-  util.do_not_optimize(%arg0) : !stream.resource<external>
-  // CHECK-NEXT: util.do_not_optimize(%[[READY1]])
-  util.do_not_optimize(%arg1) : !stream.resource<transient>
+  // CHECK-NEXT: util.optimization_barrier %[[READY0]]
+  util.optimization_barrier %arg0 : !stream.resource<external>
+  // CHECK-NEXT: util.optimization_barrier %[[READY1]]
+  util.optimization_barrier %arg1 : !stream.resource<transient>
   return
 }
 
@@ -109,10 +109,10 @@ func.func private @caller(%arg0: !stream.resource<external>, %arg1: !stream.reso
   // CHECK-NEXT: %[[RET_SIZE1:.+]] = stream.resource.size %[[RET]]#3 : !stream.resource<transient>
   // CHECK-NEXT: %[[RET_READY1:.+]] = stream.timepoint.await %[[RET]]#2 => %[[RET]]#3 : !stream.resource<transient>{%[[RET_SIZE1]]}
 
-  // CHECK-NEXT: util.do_not_optimize(%[[RET_READY0]]) : !stream.resource<external>
-  util.do_not_optimize(%0#0) : !stream.resource<external>
-  // CHECK-NEXT: util.do_not_optimize(%[[RET_READY1]]) : !stream.resource<transient>
-  util.do_not_optimize(%0#1) : !stream.resource<transient>
+  // CHECK-NEXT: util.optimization_barrier %[[RET_READY0]] : !stream.resource<external>
+  util.optimization_barrier %0#0 : !stream.resource<external>
+  // CHECK-NEXT: util.optimization_barrier %[[RET_READY1]] : !stream.resource<transient>
+  util.optimization_barrier %0#1 : !stream.resource<transient>
 
   return
 }
@@ -147,10 +147,10 @@ func.func private @br(%arg0: !stream.resource<external>, %arg1: !stream.resource
   // CHECK-NEXT: %[[SIZE1:.+]] = stream.resource.size %[[BB1_UNREADY1]] : !stream.resource<transient>
   // CHECK-NEXT: %[[READY1:.+]] = stream.timepoint.await %[[BB1_TIMEPOINT1]] => %[[BB1_UNREADY1]] : !stream.resource<transient>{%10}
 
-  // CHECK-NEXT: util.do_not_optimize(%[[READY0]])
-  util.do_not_optimize(%bb1_arg0) : !stream.resource<external>
-  // CHECK-NEXT: util.do_not_optimize(%[[READY1]])
-  util.do_not_optimize(%bb1_arg1) : !stream.resource<transient>
+  // CHECK-NEXT: util.optimization_barrier %[[READY0]]
+  util.optimization_barrier %bb1_arg0 : !stream.resource<external>
+  // CHECK-NEXT: util.optimization_barrier %[[READY1]]
+  util.optimization_barrier %bb1_arg1 : !stream.resource<transient>
   return
 }
 
@@ -184,7 +184,7 @@ func.func private @asyncExecuteConsume(%arg0: !stream.resource<external>, %arg1:
     stream.yield %arg0_capture, %arg1_capture : !stream.resource<external>{%arg0_size}, !stream.resource<transient>{%arg1_size}
   } => !stream.timepoint
   %ready_results:2 = stream.timepoint.await %results_timepoint => %results#0, %results#1 : !stream.resource<external>{%arg0_size}, !stream.resource<transient>{%arg1_size}
-  util.do_not_optimize(%ready_results#0) : !stream.resource<external>
-  util.do_not_optimize(%ready_results#1) : !stream.resource<transient>
+  util.optimization_barrier %ready_results#0 : !stream.resource<external>
+  util.optimization_barrier %ready_results#1 : !stream.resource<transient>
   return
 }

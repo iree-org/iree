@@ -44,7 +44,10 @@ struct DetachElementwisePattern
     if (!linalgOp.hasTensorSemantics()) return failure();
 
     // Nothing to do if the output tensor operand is already a fill op.
-    linalg::OpOperandVector outputOperands = linalgOp.getOutputTensorOperands();
+    OpOperandVector outputOperands;
+    if (!linalgOp.hasBufferSemantics()) {
+      outputOperands = linalgOp.getOutputOperands();
+    }
     // Right now all the cases we see have one output. This can be relaxed once
     // we see multiple output ops.
     if (outputOperands.size() != 1) return failure();
@@ -91,9 +94,9 @@ struct DetachElementwisePattern
     iterators.reserve(outputMap.getNumResults());
     for (int i = 0, e = outputMap.getNumResults(); i < e; ++i) {
       int pos = outputMap.getResult(i).cast<AffineDimExpr>().getPosition();
-      auto attr = linalgOp.getIteratorTypes()[pos].cast<StringAttr>();
+      StringRef attr = linalgOp.getIteratorTypesArray()[pos];
       if (!linalg::isParallelIterator(attr)) return failure();
-      iterators.push_back(attr.getValue());
+      iterators.push_back(attr);
     }
 
     // Create a generic op to add back the original output tensor operand.

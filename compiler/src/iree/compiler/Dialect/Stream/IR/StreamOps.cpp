@@ -723,16 +723,6 @@ LogicalResult ResourceConstantsOp::verify() {
   if (op.getResultSizes().size() != count || op.getValues().size() != count) {
     return op.emitOpError() << "mismatched constant/result counts";
   }
-
-  // All resources must have the same lifetime.
-  auto anyType = op.getResults().front().getType();
-  for (auto result : op.getResults()) {
-    if (result.getType() != anyType) {
-      return op.emitError()
-             << "all constant resources must have the same lifetime";
-    }
-  }
-
   return success();
 }
 

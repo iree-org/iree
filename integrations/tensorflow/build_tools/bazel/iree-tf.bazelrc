@@ -40,3 +40,6 @@ build:generic_gcc --copt=-Wno-parentheses --host_copt=-Wno-parentheses
 # TensorFlow uses cc_shared_library, which was added behind this experimental
 # flag in Bazel 5.1.0. Since we depend TensorFlow, we have to enable it too.
 build --experimental_cc_shared_library
+
+# Link protobufs by default.
+build --define tsl_link_protobuf=true

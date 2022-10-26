@@ -83,13 +83,13 @@ def TMTensorInterface : OpInterface<"TMTensorOp"> {
       /*desc=*/[{
         Return the input operands.
       }],
-      /*retTy=*/"mlir::linalg::OpOperandVector",
+      /*retTy=*/"mlir::OpOperandVector",
       /*methodName=*/"getInputOperands",
       /*args=*/(ins),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
         int64_t numInputs = getNumInputs();
-        mlir::linalg::OpOperandVector result;
+        mlir::OpOperandVector result;
         result.reserve(numInputs);
         llvm::transform(
           this->getOperation()->getOpOperands().take_front(numInputs),
@@ -115,12 +115,12 @@ def TMTensorInterface : OpInterface<"TMTensorOp"> {
       /*desc=*/[{
         Return the subset of input operands that are of buffer type.
       }],
-      /*retTy=*/"mlir::linalg::OpOperandVector",
+      /*retTy=*/"mlir::OpOperandVector",
       /*methodName=*/"getInputBufferOperands",
       /*args=*/(ins),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
-        mlir::linalg::OpOperandVector result;
+        mlir::OpOperandVector result;
         result.reserve(getNumInputs());
         llvm::copy_if(getInputOperands(),
           std::back_inserter(result),
@@ -134,12 +134,12 @@ def TMTensorInterface : OpInterface<"TMTensorOp"> {
       /*desc=*/[{
         Return the subset of input operands that are of tensor type.
       }],
-      /*retTy=*/"mlir::linalg::OpOperandVector",
+      /*retTy=*/"mlir::OpOperandVector",
       /*methodName=*/"getInputTensorOperands",
       /*args=*/(ins),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
-        mlir::linalg::OpOperandVector result;
+        mlir::OpOperandVector result;
         result.reserve(getNumInputs());
         llvm::copy_if(getInputOperands(),
           std::back_inserter(result),
@@ -156,13 +156,13 @@ def TMTensorInterface : OpInterface<"TMTensorOp"> {
       /*desc=*/[{
         Return the output operands.
       }],
-      /*retTy=*/"mlir::linalg::OpOperandVector",
+      /*retTy=*/"mlir::OpOperandVector",
       /*methodName=*/"getOutputOperands",
       /*args=*/(ins),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
         int64_t numOutputs = getNumOutputs();
-        mlir::linalg::OpOperandVector result;
+        mlir::OpOperandVector result;
         result.reserve(numOutputs);
         llvm::transform(
           this->getOperation()->getOpOperands()
@@ -190,12 +190,12 @@ def TMTensorInterface : OpInterface<"TMTensorOp"> {
       /*desc=*/[{
         Return the subset of output operands that are of buffer type.
       }],
-      /*retTy=*/"mlir::linalg::OpOperandVector",
+      /*retTy=*/"mlir::OpOperandVector",
       /*methodName=*/"getOutputBufferOperands",
       /*args=*/(ins),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
-        mlir::linalg::OpOperandVector result;
+        mlir::OpOperandVector result;
         result.reserve(getNumOutputs());
         llvm::copy_if(getOutputOperands(),
           std::back_inserter(result),
@@ -209,12 +209,12 @@ def TMTensorInterface : OpInterface<"TMTensorOp"> {
       /*desc=*/[{
         Return the subset of output operands that are of tensor type.
       }],
-      /*retTy=*/"mlir::linalg::OpOperandVector",
+      /*retTy=*/"mlir::OpOperandVector",
       /*methodName=*/"getOutputTensorOperands",
       /*args=*/(ins),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
-        mlir::linalg::OpOperandVector result;
+        mlir::OpOperandVector result;
         result.reserve(getNumOutputs());
         llvm::copy_if(getOutputOperands(),
           std::back_inserter(result),
@@ -269,13 +269,13 @@ def TMTensorInterface : OpInterface<"TMTensorOp"> {
       /*desc=*/[{
         Return the range over input and output operands.
       }],
-      /*retTy=*/"mlir::linalg::OpOperandVector",
+      /*retTy=*/"mlir::OpOperandVector",
       /*methodName=*/"getInputAndOutputOperands",
       /*args=*/(ins),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
         int64_t numInputsAndOutputs = getNumInputsAndOutputs();
-        mlir::linalg::OpOperandVector result;
+        mlir::OpOperandVector result;
         result.reserve(numInputsAndOutputs);
         llvm::transform(
           this->getOperation()->getOpOperands()

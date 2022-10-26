@@ -140,6 +140,7 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
   auto workgroupsOp = rewriter.create<IREE::Flow::DispatchWorkgroupsOp>(
       loc, workload, regionOp.getResultTypes(), regionOp.getResultDims(),
       arguments, argumentDims, tiedArguments);
+  workgroupsOp->setDialectAttrs(regionOp->getDialectAttrs());
   BlockAndValueMapping bvm;
   bvm.map(arguments, workgroupsOp.getInputBlockArguments());
 

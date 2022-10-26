@@ -15,10 +15,10 @@ stream.executable private @__builtin_splat_i64 {
   builtin.module {
     func.func @__builtin_splat_i64(%value: i64, %count: index, %out_binding: !stream.binding) {
       %c0 = arith.constant 0 : index
-      %out = stream.binding.subspan %out_binding[%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:?xi64>{%count}
+      %out = stream.binding.subspan %out_binding[%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:tensor<?xi64>>{%count}
       %0 = tensor.empty(%count) : tensor<?xi64>
       %1 = linalg.fill ins(%value : i64) outs(%0 : tensor<?xi64>) -> tensor<?xi64>
-      flow.dispatch.tensor.store %1, %out, offsets = [0], sizes = [%count], strides = [1] : tensor<?xi64> -> !flow.dispatch.tensor<writeonly:?xi64>{%count}
+      flow.dispatch.tensor.store %1, %out, offsets = [0], sizes = [%count], strides = [1] : tensor<?xi64> -> !flow.dispatch.tensor<writeonly:tensor<?xi64>>{%count}
       return
     }
   }

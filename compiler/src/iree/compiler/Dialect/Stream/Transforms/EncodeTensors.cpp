@@ -615,7 +615,7 @@ class EncodeHostTensorsPass
 // of 2 bit width.
 static IREE::Flow::DispatchTensorType alignDispatchTensorType(
     IREE::Flow::DispatchTensorType originalType) {
-  auto elementType = originalType.getElementType();
+  auto elementType = originalType.getBoundElementType();
   auto alignedType = alignElementType(elementType);
   if (alignedType == elementType) return originalType;
   return IREE::Flow::DispatchTensorType::get(

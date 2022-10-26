@@ -19,7 +19,7 @@ jobs:
   validate_packages:
     name: "Validate packages"
     # TODO(jennik): Look into testing windows and macos builds.
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
       - name: Download packages
         id: download_packages
@@ -73,7 +73,7 @@ jobs:
   publish_release:
     name: "Publish release"
     needs: validate_packages
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
       - name: Publish Release
         id: publish_release
