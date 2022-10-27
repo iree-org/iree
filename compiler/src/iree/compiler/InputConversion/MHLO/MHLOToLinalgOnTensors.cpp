@@ -28,6 +28,7 @@
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MLProgram/IR/MLProgram.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -44,6 +45,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 #include "stablehlo/dialect/ChloOps.h"
 
@@ -425,6 +427,18 @@ struct ConvertMHLOToLinalgOnTensorsPass
     if (failed(applyPartialConversion(getOperation(), target,
                                       std::move(patterns)))) {
       return signalPassFailure();
+    }
+
+    {
+      // Apply the patterns to remove unused operands and results.
+      RewritePatternSet removeUnusedOperandsResultsPatterns(&getContext());
+      linalg::populateEraseUnusedOperandsAndResultsPatterns(
+          removeUnusedOperandsResultsPatterns);
+      if (failed(applyPatternsAndFoldGreedily(
+              getOperation(),
+              std::move(removeUnusedOperandsResultsPatterns)))) {
+        return signalPassFailure();
+      }
     }
   }
 };
