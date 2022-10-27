@@ -41,6 +41,6 @@ def generate_rules(
       artifacts_root=artifacts_root.iree_artifacts_root,
       model_rule_map=model_rule_map)
 
-  # Currently the rules are simple so the common rules can be always put at the
+  # Currently the rules are simple so the model rules can be always put at the
   # top. Need a topological sort once the dependency gets complicated.
   return model_cmake_rules + iree_cmake_rules
