@@ -244,8 +244,8 @@ endfunction()
 #     mobilenet_v1_fp32_correctness_test
 #   BENCHMARK_MODULE_SRC
 #     "TFLite/MobileNetV1-fp32,imagenet"
-#   MODEL
-#     "PersonDetect_int8"
+#   MODEL (will override BENCHMARK_MODULE_SRC)
+#     "bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8"
 #   DRIVER
 #     "local-sync"
 #   RUNNER_ARGS
