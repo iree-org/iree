@@ -43,7 +43,13 @@
 #define IREE_UKERNEL_FLAG_PACK_TRANSPOSE_OUTER_BIT_POS 17
 
 // Static assertions ensuring consistency of the above flag values.
-#if defined(__STDC__)
+//
+#if defined(__ASSEMBLER__)
+// Note that __STDC__ may also be defined here (when the assembler driver is the
+// C compiler driver). So it's easiest to get this case out of the way first.
+//
+// Leave IREE_UKERNEL_STATIC_ASSERT undefined.
+#elif defined(__STDC__)  // Really C, as __ASSEMBLER__ is not defined.
 #define IREE_UKERNEL_STATIC_ASSERT(COND) _Static_assert(COND, #COND)
 #elif defined(__cplusplus)
 #define IREE_UKERNEL_STATIC_ASSERT(COND) static_assert(COND, #COND)

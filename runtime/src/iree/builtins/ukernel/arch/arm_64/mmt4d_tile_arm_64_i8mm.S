@@ -1,5 +1,5 @@
 #include "iree/builtins/ukernel/arch/arm_64/assembly.h"
-#include "iree/builtins/ukernel/exported_bit_flags.h"
+#include "iree/builtins/ukernel/exported_flag_bits.h"
 
 // Parameters:
 //   x0: int32_t* out_tile
