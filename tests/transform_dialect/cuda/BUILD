@@ -28,6 +28,8 @@ iree_lit_test_suite(
     srcs = [
         "reduction.mlir",
         "softmax.mlir",
+        "softmax_v2.mlir",
+        # First few ops of softmax only, acts as a proxy example.
         "softmax_partial.mlir",
     ],
     cfg = "//tests:lit.cfg.py",
@@ -35,14 +37,16 @@ iree_lit_test_suite(
     # they need to be included as data.
     data = [
         "reduction_codegen_spec.mlir",
-        "softmax_partial_codegen_spec.mlir",
         "softmax_codegen_spec.mlir",
+        "softmax_v2_codegen_spec.mlir",
         #
         # FIXME: This must be used with the custom dispatch region formation
         # because IREE's does not fuse the 6 ops softmax version even with
         # --iree-flow-enable-aggressive-fusion.
         #
         "softmax_dispatch_spec.mlir",
+        # First few ops of softmax only, acts as a proxy example.
+        "softmax_partial_codegen_spec.mlir",
     ],
     tags = [
         # CUDA cuInit fails with sanitizer on.
