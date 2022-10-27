@@ -50,6 +50,21 @@ iree_benchmark_suite_module_test(
 
 iree_benchmark_suite_module_test(
   NAME
+    "deeplab_v3_fp32_correctness_test"
+  MODEL
+    "c36c63b0-220a-4d78-8ade-c45ce47d89d3_DeepLabV3_fp32"
+  DRIVER
+    "local-sync"
+  EXPECTED_OUTPUT
+    "deeplab_v3_fp32_input_0_expected_output.npy"
+  RUNNER_ARGS
+    "--entry_function=main"
+    "--function_input=1x257x257x3xf32=0"
+    "--expected_f32_threshold=0.001"
+)
+
+iree_benchmark_suite_module_test(
+  NAME
     "person_detect_int8_correctness_test"
   MODEL
     "bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8"
