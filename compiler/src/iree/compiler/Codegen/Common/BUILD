@@ -108,6 +108,7 @@ iree_compiler_cc_library(
         "ForOpCanonicalizationPass.cpp",
         "FuseTensorPadWithConsumer.cpp",
         "IREEComprehensiveBufferizePass.cpp",
+        "MaterializeEncodingPass.cpp",
         "OptimizeVectorTransferPass.cpp",
         "PolynomialApproximationPass.cpp",
         "TestPartitionableLoopsInterface.cpp",

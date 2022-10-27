@@ -89,13 +89,20 @@ def IREEComprehensiveBufferize :
   ];
 }
 
+def IREEMaterializeEncoding :
+    Pass<"iree-codegen-materialize-encoding", "func::FuncOp"> {
+  let summary = "Materialize the encoding for tensor as specified by the backend";
+  let constructor = "mlir::iree_compiler::createIREEMaterializeEncodingPass()";
+}
+
 def OptimizeVectorTransfer :
     Pass<"iree-codegen-optimize-vector-transfer", "func::FuncOp"> {
   let summary =
       "Run optimization transformations on vector transfer operations";
   let constructor = "mlir::iree_compiler::createOptimizeVectorTransferPass()";
   let options = [
-    Option<"optionFlatten", "flatten", "bool", "false", "Flatten the vector type of vector transfers where possible (contiguous row-major data).">
+    Option<"optionFlatten", "flatten", "bool", "false",
+           "Flatten the vector type of vector transfers where possible (contiguous row-major data).">
   ];
 }
 
