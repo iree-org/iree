@@ -14,13 +14,16 @@ import argparse
 # Add build_tools python dir to the search path.
 sys.path.insert(0, str(pathlib.Path(__file__).parent / ".." / "python"))
 
-from benchmark_suites.iree import benchmark_collections
-from e2e_test_framework import cmake_rule_generator
+from e2e_test_artifacts.cmake_generator import rule_generator
+import e2e_test_artifacts.artifacts
 
 TEMPLATE_DIR = pathlib.Path(__file__).parent
 GENERATED_BENCHMARK_SUITES_CMAKE_TEMPLATE = string.Template(
     (TEMPLATE_DIR /
      "iree_generated_benchmark_suites_template.cmake").read_text())
+# CMake variable name to store IREE package name.
+PACKAGE_NAME_CMAKE_VARIABLE = "_PACKAGE_NAME"
+ROOT_ARTIFACTS_DIR_CMAKE_VARIABLE = "_ROOT_ARTIFACTS_DIR"
 
 
 def parse_arguments():
@@ -35,14 +38,17 @@ def parse_arguments():
 
 
 def main(args: argparse.Namespace):
-  module_generation_configs, _ = benchmark_collections.generate_benchmarks()
-  benchmark_rules = cmake_rule_generator.generate_rules(
-      model_artifacts_dir="${_MODEL_ARTIFACTS_DIR}",
-      iree_artifacts_dir="${_IREE_ARTIFACTS_DIR}",
-      iree_module_generation_configs=module_generation_configs)
+  artifacts_root = (
+      e2e_test_artifacts.artifacts.generate_default_artifacts_root())
+  cmake_rules = rule_generator.generate_rules(
+      package_name=f"${{{PACKAGE_NAME_CMAKE_VARIABLE}}}",
+      root_path=pathlib.PurePath(f"${{{ROOT_ARTIFACTS_DIR_CMAKE_VARIABLE}}}"),
+      artifacts_root=artifacts_root)
+
   cmake_file = GENERATED_BENCHMARK_SUITES_CMAKE_TEMPLATE.substitute(
-      __PACKAGE_NAME_VARIABLE=cmake_rule_generator.PACKAGE_NAME_CMAKE_VARIABLE,
-      __BENCHMARK_RULES='\n'.join(benchmark_rules))
+      __ROOT_ARTIFACTS_DIR_VARIABLE=ROOT_ARTIFACTS_DIR_CMAKE_VARIABLE,
+      __PACKAGE_NAME_VARIABLE=PACKAGE_NAME_CMAKE_VARIABLE,
+      __BENCHMARK_RULES='\n'.join(cmake_rules))
   with open(args.output, "w") as output_file:
     output_file.write(cmake_file)
 

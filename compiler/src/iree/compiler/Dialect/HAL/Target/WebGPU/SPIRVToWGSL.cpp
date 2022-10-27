@@ -45,22 +45,8 @@ llvm::Optional<std::string> compileSPIRVToWGSL(
     return llvm::None;
   }
 
-  // Run a few transforms to clean up the program. The browser/runtime/driver
-  // will likely run other transforms later.
-  tint::transform::Manager transformManager;
-  tint::transform::DataMap transformInputs;
-  // Cleans trivial `let`s produced by the SPIR-V reader by inlining them.
-  transformManager.Add<tint::transform::FoldTrivialSingleUseLets>();
-
-  auto output = transformManager.Run(program.get(), std::move(transformInputs));
-  if (!output.program.IsValid()) {
-    llvm::errs() << "Tint transforms failed on the parsed SPIR-V program\n";
-    diagFormatter.format(output.program.Diagnostics(), diagPrinter.get());
-    return llvm::None;
-  }
-
   tint::writer::wgsl::Options genOptions;
-  auto result = tint::writer::wgsl::Generate(&output.program, genOptions);
+  auto result = tint::writer::wgsl::Generate(program.get(), genOptions);
   if (!result.success) {
     llvm::errs() << "Tint failed to generate WGSL: " << result.error << "\n";
     return llvm::None;

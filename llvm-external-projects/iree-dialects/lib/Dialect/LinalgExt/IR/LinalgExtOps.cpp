@@ -1049,21 +1049,9 @@ LogicalResult ScanOp::getResultTilePosition(
   return failure();
 }
 
-static LogicalResult foldMemRefCast(Operation *op) {
-  bool folded = false;
-  for (OpOperand &operand : op->getOpOperands()) {
-    auto castOp = operand.get().getDefiningOp<memref::CastOp>();
-    if (castOp && memref::CastOp::canFoldIntoConsumerOp(castOp)) {
-      operand.set(castOp.getOperand());
-      folded = true;
-    }
-  }
-  return success(folded);
-}
-
 LogicalResult ScanOp::fold(ArrayRef<Attribute>,
                            SmallVectorImpl<OpFoldResult> &) {
-  return foldMemRefCast(*this);
+  return memref::foldMemRefCast(*this);
 }
 
 LogicalResult
@@ -1968,6 +1956,19 @@ PackOp::getTiledImplementation(OpBuilder &builder,
     return makeComposedFoldedAffineApply(builder, loc, subMap, {v1, v2});
   };
 
+  // The tiling is applied on interchanged dimensions. We have to undo the
+  // interchange to map sizes and offsets to the original input.
+  SmallVector<int64_t> dimsToOuterBlock =
+      extractFromI64ArrayAttr(getOuterDimsPerm());
+  SmallVector<OpFoldResult> origOffsets(offsets.begin(), offsets.end());
+  SmallVector<OpFoldResult> origSizes(sizes.begin(), sizes.end());
+  if (!dimsToOuterBlock.empty()) {
+    SmallVector<int64_t> vec =
+        computeInterchangeFromDimPos(dimsToOuterBlock, getInputRank());
+    origOffsets = undoInterchange<OpFoldResult>(origOffsets, vec);
+    origSizes = undoInterchange<OpFoldResult>(origSizes, vec);
+  }
+
   int64_t inputRank = getInputRank();
   DenseMap<int64_t, OpFoldResult> dimAndTileMapping = getDimAndTileMapping();
   SmallVector<OpFoldResult> inputIndices, inputSizes;
@@ -1980,16 +1981,16 @@ PackOp::getTiledImplementation(OpBuilder &builder,
       bindSymbols(ctx, tile);
       OpFoldResult inputIndex = makeComposedFoldedAffineApply(
           builder, loc, i * tile,
-          ArrayRef<OpFoldResult>{offsets[dim], dimAndTileMapping[dim]});
+          ArrayRef<OpFoldResult>{origOffsets[dim], dimAndTileMapping[dim]});
       inputIndices.push_back(inputIndex);
 
       OpFoldResult inputSize = makeComposedFoldedAffineApply(
           builder, loc, i * tile,
-          ArrayRef<OpFoldResult>{sizes[dim], dimAndTileMapping[dim]});
+          ArrayRef<OpFoldResult>{origSizes[dim], dimAndTileMapping[dim]});
       inputSizes.push_back(inputSize);
     } else {
-      inputIndices.push_back(offsets[dim]);
-      inputSizes.push_back(sizes[dim]);
+      inputIndices.push_back(origOffsets[dim]);
+      inputSizes.push_back(origSizes[dim]);
     }
 
     // Limit the size of the input operand for incomplete tiles.
@@ -2178,6 +2179,120 @@ UnPackOp::reifyResultShapes(OpBuilder &builder,
 
 SmallVector<Range> UnPackOp::getIterationDomain(OpBuilder &builder) {
   return ::getIterationDomain(*this, builder);
+}
+
+SmallVector<Operation *>
+UnPackOp::getTiledImplementation(OpBuilder &builder,
+                                 ArrayRef<OpFoldResult> offsets,
+                                 ArrayRef<OpFoldResult> sizes) {
+  // TODO(hanchung): Extend it to handle memref version.
+  // Tiling on buffers needs extra buffer because tiled unpack op could produce
+  // more data for incomplete tiles. Tiling on tensors satisfies IREE's needs.
+  if (!hasTensorSemantics())
+    return {};
+
+  Location loc = getLoc();
+  auto ctx = builder.getContext();
+
+  AffineExpr dim0, dim1;
+  bindDims(ctx, dim0, dim1);
+  auto addMap = AffineMap::get(2, 0, {dim0 + dim1});
+  auto add = [&](OpFoldResult v1, OpFoldResult v2) -> OpFoldResult {
+    return makeComposedFoldedAffineApply(builder, loc, addMap, {v1, v2});
+  };
+  auto subMap = AffineMap::get(2, 0, {dim0 - dim1});
+  auto sub = [&](OpFoldResult v1, OpFoldResult v2) -> OpFoldResult {
+    return makeComposedFoldedAffineApply(builder, loc, subMap, {v1, v2});
+  };
+
+  int64_t inputRank = getInputRank();
+  int64_t outputRank = getOutputRank();
+  Attribute zeroAttr = builder.getIndexAttr(0);
+  Attribute oneAttr = builder.getIndexAttr(1);
+  DenseMap<int64_t, OpFoldResult> dimAndTileMapping = getDimAndTileMapping();
+  SmallVector<OpFoldResult> inputIndices, inputSizes, outputNewOffsets,
+      outputExpandedSizes;
+  for (auto dim : llvm::seq<int64_t>(0, outputRank)) {
+    if (dimAndTileMapping.count(dim)) {
+      DivModValue firstCoord =
+          getDivMod(builder, loc,
+                    getValueOrCreateConstantIndexOp(builder, loc, offsets[dim]),
+                    getValueOrCreateConstantIndexOp(builder, loc,
+                                                    dimAndTileMapping[dim]));
+      DivModValue lastCoord = getDivMod(
+          builder, loc,
+          getValueOrCreateConstantIndexOp(
+              builder, loc, sub(add(offsets[dim], sizes[dim]), oneAttr)),
+          getValueOrCreateConstantIndexOp(builder, loc,
+                                          dimAndTileMapping[dim]));
+
+      inputIndices.push_back(firstCoord.quotient);
+      inputSizes.push_back(
+          add(sub(lastCoord.quotient, firstCoord.quotient), oneAttr));
+      outputNewOffsets.push_back(firstCoord.remainder);
+
+      AffineExpr i, tile;
+      bindDims(builder.getContext(), i);
+      bindSymbols(builder.getContext(), tile);
+      OpFoldResult size = makeComposedFoldedAffineApply(
+          builder, loc, i * tile,
+          ArrayRef<OpFoldResult>{inputSizes.back(), dimAndTileMapping[dim]});
+      outputExpandedSizes.push_back(size);
+    } else {
+      inputIndices.push_back(offsets[dim]);
+      inputSizes.push_back(sizes[dim]);
+      outputNewOffsets.push_back(zeroAttr);
+      outputExpandedSizes.push_back(sizes[dim]);
+    }
+  }
+
+  // The tiling is applied on output dimensions. We have to apply the
+  // interchange on input dimensions if outer_dims_perm is set.
+  SmallVector<int64_t> dimsToOuterBlock =
+      extractFromI64ArrayAttr(getOuterDimsPerm());
+  if (!dimsToOuterBlock.empty()) {
+    SmallVector<int64_t> vec =
+        computeInterchangeFromDimPos(dimsToOuterBlock, getInputRank());
+    inputIndices = interchange<OpFoldResult>(inputIndices, vec);
+    inputSizes = interchange<OpFoldResult>(inputSizes, vec);
+  }
+
+  inputIndices.append(inputRank - outputRank, zeroAttr);
+  auto mixedTiles = getMixedTiles();
+  inputSizes.append(mixedTiles.begin(), mixedTiles.end());
+  SmallVector<OpFoldResult> inputStrides(inputRank, oneAttr);
+
+  SmallVector<Value> tiledOperands;
+  tiledOperands.push_back(getSlice(builder, loc, getInput(), inputIndices,
+                                   inputSizes, inputStrides));
+
+  // The tiling is only avaiable on tensors. It's fine to create a tensor.empty
+  // instead of tensor.pad because the op is not a destination-style op.
+  auto empty = builder.create<tensor::EmptyOp>(
+      loc, outputExpandedSizes, getOutputType().getElementType());
+  tiledOperands.push_back(empty.getResult());
+
+  SmallVector<Type, 4> tiledResultTypes;
+  tiledResultTypes.push_back(tiledOperands[1].getType());
+
+  Operation *tiledUnpackOp =
+      cast<LinalgExtOp>(getOperation())
+          .clone(builder, loc, tiledResultTypes, tiledOperands);
+
+  SmallVector<OpFoldResult> outputStrides(outputRank, oneAttr);
+  Operation *extractSlice = builder.create<tensor::ExtractSliceOp>(
+      loc, tiledUnpackOp->getResult(0), outputNewOffsets, sizes, outputStrides);
+
+  return {tiledUnpackOp, extractSlice};
+}
+
+LogicalResult UnPackOp::getResultTilePosition(
+    OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
+    SmallVector<OpFoldResult> &resultSizes) {
+  resultOffsets = llvm::to_vector(offsets);
+  resultSizes = llvm::to_vector(sizes);
+  return success();
 }
 
 LogicalResult UnPackOp::verify() {

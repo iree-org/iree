@@ -58,6 +58,7 @@ iree_cc_library(
     "PassDetail.h"
     "Passes.cpp"
     "RegionOpUtils.cpp"
+    "SetEncoding.cpp"
     "SplitReduction.cpp"
     "StripAndSplatConstantVariables.cpp"
     "StripSignedness.cpp"
@@ -69,6 +70,7 @@ iree_cc_library(
     IREELinalgExtPasses
     IREELinalgExtTransformOps
     IREELinalgExtTransforms
+    IREELinalgExtUtils
     IREELinalgTransformDialect
     IREELinalgTransformDialectPasses
     LLVMSupport

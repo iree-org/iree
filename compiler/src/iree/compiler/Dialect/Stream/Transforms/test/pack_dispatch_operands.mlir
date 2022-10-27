@@ -7,8 +7,8 @@ stream.executable private @ex0 {
     // CHECK-SAME: (%arg0: i32, %arg1: !stream.binding)
     func.func @device_i1(%arg0: i1 {stream.values = [true, false]}, %arg1: !stream.binding) {
       // CHECK-NEXT: %[[DEV_I1:.+]] = arith.trunci %arg0 {stream.values = [true, false]} : i32 to i1
-      // CHECK-NEXT: util.do_not_optimize(%[[DEV_I1]])
-      util.do_not_optimize(%arg0) : i1
+      // CHECK-NEXT: util.optimization_barrier %[[DEV_I1]]
+      util.optimization_barrier %arg0 : i1
       return
     }
   }
@@ -38,8 +38,8 @@ stream.executable private @ex1 {
     func.func @device_bf16(%arg0: bf16, %arg1: !stream.binding) {
       // CHECK-NEXT: %[[DEV_I16:.+]] = arith.trunci %arg0 : i32 to i16
       // CHECK-NEXT: %[[DEV_BF16:.+]] = arith.bitcast %[[DEV_I16]] : i16 to bf16
-      // CHECK-NEXT: util.do_not_optimize(%[[DEV_BF16]])
-      util.do_not_optimize(%arg0) : bf16
+      // CHECK-NEXT: util.optimization_barrier %[[DEV_BF16]]
+      util.optimization_barrier %arg0 : bf16
       return
     }
   }
@@ -73,8 +73,8 @@ stream.executable private @ex2 {
       // CHECK-DAG: %[[DEV_HI64:.+]] = arith.extui %[[DEV_HI32]] : i32 to i64
       // CHECK-DAG: %[[DEV_HISHL:.+]] = arith.shli %[[DEV_HI64]], %c32
       // CHECK-DAG: %[[DEV_I64:.+]] = arith.ori %[[DEV_LO64]], %[[DEV_HISHL]] {stream.values = [-1, 8589934595]}
-      // CHECK-NEXT: util.do_not_optimize(%[[DEV_I64]])
-      util.do_not_optimize(%arg0) : i64
+      // CHECK-NEXT: util.optimization_barrier %[[DEV_I64]]
+      util.optimization_barrier %arg0 : i64
       return
     }
   }
@@ -117,8 +117,8 @@ stream.executable private @ex3 attributes {stream.resources = #resourceIndex32} 
       // CHECK-SAME:   stream.alignment = 16 : index
       // CHECK-SAME:   stream.values = [0 : index, 1234 : index]
       // CHECK-SAME: } : i32 to index
-      // CHECK: util.do_not_optimize(%[[DEV_INDEX]])
-      util.do_not_optimize(%arg0) : index
+      // CHECK: util.optimization_barrier %[[DEV_INDEX]]
+      util.optimization_barrier %arg0 : index
       return
     }
   }
@@ -166,8 +166,8 @@ stream.executable private @ex4 attributes {stream.resources = #resourceIndex64} 
       // CHECK-SAME:   stream.alignment = 16 : index
       // CHECK-SAME:   stream.values = [0 : index, 1234 : index]
       // CHECK-SAME: } : i64 to index
-      // CHECK: util.do_not_optimize(%[[DEV_INDEX]])
-      util.do_not_optimize(%arg0) : index
+      // CHECK: util.optimization_barrier %[[DEV_INDEX]]
+      util.optimization_barrier %arg0 : index
       return
     }
   }

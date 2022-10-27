@@ -30,10 +30,16 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
 
     The following additive attributes can be set, they add patterns in an 
     unspecified order:
-      - additional_iree_patterns: fancy patterns we shortcut into the system, will
-      need to be sliced out better in the future.
+      - additional_iree_patterns: fancy patterns we shortcut into the system,
+      will need to be sliced out better in the future.
       - canonicalization: adds all the canonicalization patterns of all
       registered dialects and ops.
+      - promote_foreach_thread_capture_to_shared: adds patterns that rewrite
+      uses of values captured by scf.foreach_thread with the matching
+      shared_outs bbarg. This checks that the values captured are
+      tensor.extract_slice with a matching tensor.parallel_insert_slice to
+      approximate the lack of cross-thread dependences. However this can still
+      be unsafe wrt parallelism so use carefully!
       - rank_reducing: adds patterns that results in rank-reducing behavior on
       subset-based operations.
       - simplify_memref_metadata: adds patterns that simplify the uses of
@@ -63,6 +69,7 @@ def ApplyPatternsOp : Op<Transform_Dialect, "iree.apply_patterns",
   let arguments = (ins PDL_Operation:$target,
                        UnitAttr:$additional_iree_patterns,
                        UnitAttr:$canonicalization,
+                       UnitAttr:$promote_foreach_thread_capture_to_shared,
                        UnitAttr:$rank_reducing,
                        UnitAttr:$simplify_memref_metadata,
                        UnitAttr:$swap_padding_elide_conditional,

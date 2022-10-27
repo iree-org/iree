@@ -5,4 +5,5 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 add_subdirectory(cmake_builder)
+add_subdirectory(e2e_test_artifacts)
 add_subdirectory(e2e_test_framework)

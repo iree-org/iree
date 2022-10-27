@@ -22,7 +22,7 @@ class DropCompilerHintsPass
   void runOnOperation() override {
     // We can't use patterns and applyPatternsAndFoldGreedily because that
     // automatically does canonicalization.
-    getOperation()->walk([&](DoNotOptimizeOp op) {
+    getOperation()->walk([&](IREE::Util::OptimizationBarrierOp op) {
       op.replaceAllUsesWith(op.getOperands());
       op.erase();
     });

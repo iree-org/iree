@@ -21,9 +21,9 @@ hal.executable private @nhwc_conv_static_shape_f32 {
         %c16 = arith.constant 16 : index
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f32
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:1x225x225x8xf32>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:3x3x8x16xf32>
-        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:1x112x112x16xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<1x225x225x8xf32>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<3x3x8x16xf32>>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<1x112x112x16xf32>>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
         %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -39,16 +39,16 @@ hal.executable private @nhwc_conv_static_shape_f32 {
             %7 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%workgroup_id_x]
             %8 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%workgroup_count_x]
             scf.for %arg2 = %7 to %c16 step %8 {
-              %9 = flow.dispatch.tensor.load %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 4, 4, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<writeonly:1x112x112x16xf32> -> tensor<1x4x4x16xf32>
+              %9 = flow.dispatch.tensor.load %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 4, 4, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<writeonly:tensor<1x112x112x16xf32>> -> tensor<1x4x4x16xf32>
               %10 = affine.apply affine_map<(d0) -> (d0 * 2)>(%arg0)
               %11 = affine.apply affine_map<(d0) -> (d0 * 2)>(%arg1)
-              %12 = flow.dispatch.tensor.load %0, offsets = [0, %10, %11, 0], sizes = [1, 9, 9, 8], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:1x225x225x8xf32> -> tensor<1x9x9x8xf32>
-              %13 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, %arg2], sizes = [3, 3, 8, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:3x3x8x16xf32> -> tensor<3x3x8x16xf32>
+              %12 = flow.dispatch.tensor.load %0, offsets = [0, %10, %11, 0], sizes = [1, 9, 9, 8], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1x225x225x8xf32>> -> tensor<1x9x9x8xf32>
+              %13 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, %arg2], sizes = [3, 3, 8, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<3x3x8x16xf32>> -> tensor<3x3x8x16xf32>
               %14 = linalg.fill ins(%cst : f32) outs(%9 : tensor<1x4x4x16xf32>) -> tensor<1x4x4x16xf32>
               %15 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, lowering_config = #config, strides = dense<2> : tensor<2xi64>}
                       ins(%12, %13 : tensor<1x9x9x8xf32>, tensor<3x3x8x16xf32>)
                       outs(%14 : tensor<1x4x4x16xf32>) -> tensor<1x4x4x16xf32>
-              flow.dispatch.tensor.store %15, %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 4, 4, 16], strides = [1, 1, 1, 1] : tensor<1x4x4x16xf32> -> !flow.dispatch.tensor<writeonly:1x112x112x16xf32>
+              flow.dispatch.tensor.store %15, %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 4, 4, 16], strides = [1, 1, 1, 1] : tensor<1x4x4x16xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x112x112x16xf32>>
             }
           }
         }
@@ -101,9 +101,9 @@ hal.executable private @nhwc_nhwc_depthwise_conv_static_shape_f32 {
         %c96 = arith.constant 96 : index
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f32
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:1x113x113x96xf32>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:3x3x96xf32>
-        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:1x56x56x96xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<1x113x113x96xf32>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<3x3x96xf32>>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<1x56x56x96xf32>>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
         %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -117,15 +117,15 @@ hal.executable private @nhwc_nhwc_depthwise_conv_static_shape_f32 {
             %5 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_id_x]
             %6 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_count_x]
             scf.for %arg2 = %5 to %c96 step %6 {
-              %7 = flow.dispatch.tensor.load %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 1, 8, 32], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<writeonly:1x56x56x96xf32> -> tensor<1x1x8x32xf32>
+              %7 = flow.dispatch.tensor.load %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 1, 8, 32], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<writeonly:tensor<1x56x56x96xf32>> -> tensor<1x1x8x32xf32>
               %8 = affine.apply affine_map<(d0) -> (d0 * 2)>(%arg0)
               %9 = affine.apply affine_map<(d0) -> (d0 * 2)>(%arg1)
-              %10 = flow.dispatch.tensor.load %0, offsets = [0, %8, %9, %arg2], sizes = [1, 3, 17, 32], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:1x113x113x96xf32> -> tensor<1x3x17x32xf32>
-              %11 = flow.dispatch.tensor.load %1, offsets = [0, 0, %arg2], sizes = [3, 3, 32], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:3x3x96xf32> -> tensor<3x3x32xf32>
+              %10 = flow.dispatch.tensor.load %0, offsets = [0, %8, %9, %arg2], sizes = [1, 3, 17, 32], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1x113x113x96xf32>> -> tensor<1x3x17x32xf32>
+              %11 = flow.dispatch.tensor.load %1, offsets = [0, 0, %arg2], sizes = [3, 3, 32], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<3x3x96xf32>> -> tensor<3x3x32xf32>
               %12 = linalg.fill ins(%cst : f32) outs(%7 : tensor<1x1x8x32xf32>) -> tensor<1x1x8x32xf32>
               %13 = linalg.depthwise_conv_2d_nhwc_hwc {dilations = dense<1> : tensor<2xi64>, lowering_config = #config, strides = dense<2> : tensor<2xi64>}
                       ins(%10, %11 : tensor<1x3x17x32xf32>, tensor<3x3x32xf32>) outs(%12 : tensor<1x1x8x32xf32>) -> tensor<1x1x8x32xf32>
-              flow.dispatch.tensor.store %13, %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 1, 8, 32], strides = [1, 1, 1, 1] : tensor<1x1x8x32xf32> -> !flow.dispatch.tensor<writeonly:1x56x56x96xf32>
+              flow.dispatch.tensor.store %13, %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 1, 8, 32], strides = [1, 1, 1, 1] : tensor<1x1x8x32xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x56x56x96xf32>>
             }
           }
         }
@@ -179,10 +179,10 @@ hal.executable private @low_padded_conv {
         %c0 = arith.constant 0 : index
         %c112 = arith.constant 112 : index
         %c32 = arith.constant 32 : index
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:1x224x224x3xf32>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:3x3x3x32xf32>
-        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:1x112x112x32xf32>
-        %3 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<writeonly:1x112x112x32xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:tensor<1x224x224x3xf32>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:tensor<3x3x3x32xf32>>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:tensor<1x112x112x32xf32>>
+        %3 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<writeonly:tensor<1x112x112x32xf32>>
         %4 = tensor.empty() : tensor<1x112x112x32xf32>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
@@ -200,7 +200,7 @@ hal.executable private @low_padded_conv {
               %12 = affine.min affine_map<(d0) -> (4, -d0 + 112)>(%arg1)[]
               %14 = affine.min affine_map<(d0) -> (4, -d0 + 112)>(%arg1)[]
               %15 = affine.min affine_map<(d0) -> (32, -d0 + 32)>(%arg2)[]
-              %16 = flow.dispatch.tensor.load %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 1, %14, %15], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:1x112x112x32xf32> -> tensor<1x1x?x?xf32>
+              %16 = flow.dispatch.tensor.load %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 1, %14, %15], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1x112x112x32xf32>> -> tensor<1x1x?x?xf32>
               %18 = affine.min affine_map<(d0) -> (4, -d0 + 112)>(%arg1)[]
               %19 = affine.min affine_map<(d0) -> (32, -d0 + 32)>(%arg2)[]
               %20 = tensor.extract_slice %4[0, %arg0, %arg1, %arg2] [1, 1, %18, %19] [1, 1, 1, 1] : tensor<1x112x112x32xf32> to tensor<1x1x?x?xf32>
@@ -214,13 +214,13 @@ hal.executable private @low_padded_conv {
               %28 = affine.min affine_map<(d0, d1) -> (d0 + d1 * 2, 224)>(%22, %arg1)
               %29 = affine.apply affine_map<(d0, d1) -> (d0 - d1)>(%28, %27)
               %30 = affine.apply affine_map<(d0, d1, d2) -> (d0 - d1 + d2)>(%22, %28, %27)
-              %31 = flow.dispatch.tensor.load %0, offsets = [0, %23, %27, 0], sizes = [1, %25, %29, 3], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:1x224x224x3xf32> -> tensor<1x?x?x3xf32>
+              %31 = flow.dispatch.tensor.load %0, offsets = [0, %23, %27, 0], sizes = [1, %25, %29, 3], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1x224x224x3xf32>> -> tensor<1x?x?x3xf32>
               %32 = tensor.pad %31 low[0, 0, 0, 0] high[0, %26, %30, 0] {
               ^bb0(%arg3: index, %arg4: index, %arg5: index, %arg6: index):
                 tensor.yield %cst : f32
               } : tensor<1x?x?x3xf32> to tensor<1x?x?x3xf32>
               %33 = affine.min affine_map<(d0) -> (-d0 + 32, 32)>(%arg2)[]
-              %34 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, %arg2], sizes = [3, 3, 3, %33], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:3x3x3x32xf32> -> tensor<3x3x3x?xf32>
+              %34 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, %arg2], sizes = [3, 3, 3, %33], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<3x3x3x32xf32>> -> tensor<3x3x3x?xf32>
               %36 = affine.min affine_map<(d0) -> (-d0 + 112, 4)>(%arg1)[]
               %37 = affine.min affine_map<(d0) -> (-d0 + 32, 32)>(%arg2)[]
               %38 = tensor.empty(%36, %37) : tensor<1x1x?x?xf32>
@@ -231,7 +231,7 @@ hal.executable private @low_padded_conv {
                 %42 = arith.subf %arg3, %arg4 : f32
                 linalg.yield %42 : f32
               } -> tensor<1x1x?x?xf32>
-              flow.dispatch.tensor.store %41, %3, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 1, %18, %19], strides = [1, 1, 1, 1] : tensor<1x1x?x?xf32> -> !flow.dispatch.tensor<writeonly:1x112x112x32xf32>
+              flow.dispatch.tensor.store %41, %3, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 1, %18, %19], strides = [1, 1, 1, 1] : tensor<1x1x?x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x112x112x32xf32>>
             }
           }
         }
@@ -299,10 +299,10 @@ hal.executable private @low_high_padded_nhwc_depthwise_conv {
         %c0 = arith.constant 0 : index
         %c112 = arith.constant 112 : index
         %c32 = arith.constant 32 : index
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:1x112x112x32xf32>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:3x3x32xf32>
-        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:32xf32>
-        %3 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<writeonly:1x112x112x32xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:tensor<1x112x112x32xf32>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:tensor<3x3x32xf32>>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:tensor<32xf32>>
+        %3 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<writeonly:tensor<1x112x112x32xf32>>
         %4 = tensor.empty() : tensor<1x112x112x32xf32>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
@@ -318,7 +318,7 @@ hal.executable private @low_high_padded_nhwc_depthwise_conv {
             %10 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_count_x]
             scf.for %arg2 = %9 to %c32 step %10 {
               %11 = affine.min affine_map<(d0) -> (32, -d0 + 32)>(%arg2)[]
-              %12 = flow.dispatch.tensor.load %2, offsets = [%arg2], sizes = [%11], strides = [1] : !flow.dispatch.tensor<readonly:32xf32> -> tensor<?xf32>
+              %12 = flow.dispatch.tensor.load %2, offsets = [%arg2], sizes = [%11], strides = [1] : !flow.dispatch.tensor<readonly:tensor<32xf32>> -> tensor<?xf32>
               %14 = affine.min affine_map<(d0) -> (4, -d0 + 112)>(%arg1)[]
               %16 = affine.min affine_map<(d0) -> (4, -d0 + 112)>(%arg1)[]
               %17 = affine.min affine_map<(d0) -> (16, -d0 + 32)>(%arg2)[]
@@ -343,13 +343,13 @@ hal.executable private @low_high_padded_nhwc_depthwise_conv {
               %36 = affine.min affine_map<(d0) -> (d0, 32)>(%arg2)
               %37 = affine.min affine_map<(d0, d1) -> (d0 + d1, 32)>(%arg2, %21)
               %38 = affine.apply affine_map<(d0, d1) -> (d0 - d1)>(%37, %36)
-              %39 = flow.dispatch.tensor.load %0, offsets = [0, %24, %31, %36], sizes = [1, %27, %34, %38], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:1x112x112x32xf32> -> tensor<1x?x?x?xf32>
+              %39 = flow.dispatch.tensor.load %0, offsets = [0, %24, %31, %36], sizes = [1, %27, %34, %38], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1x112x112x32xf32>> -> tensor<1x?x?x?xf32>
               %40 = tensor.pad %39 low[0, %22, %29, 0] high[0, %28, %35, 0] {
               ^bb0(%arg3: index, %arg4: index, %arg5: index, %arg6: index):
                 tensor.yield %cst : f32
               } : tensor<1x?x?x?xf32> to tensor<1x?x?x?xf32>
               %41 = affine.min affine_map<(d0) -> (-d0 + 32, 32)>(%arg2)[]
-              %42 = flow.dispatch.tensor.load %1, offsets = [0, 0, %arg2], sizes = [3, 3, %41], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:3x3x32xf32> -> tensor<3x3x?xf32>
+              %42 = flow.dispatch.tensor.load %1, offsets = [0, 0, %arg2], sizes = [3, 3, %41], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<3x3x32xf32>> -> tensor<3x3x?xf32>
               %44 = affine.min affine_map<(d0) -> (-d0 + 112, 4)>(%arg1)[]
               %45 = affine.min affine_map<(d0) -> (-d0 + 32, 32)>(%arg2)[]
               %46 = tensor.empty(%44, %45) : tensor<1x1x?x?xf32>
@@ -360,7 +360,7 @@ hal.executable private @low_high_padded_nhwc_depthwise_conv {
                 %50 = arith.addf %arg3, %arg4 : f32
                 linalg.yield %50 : f32
               } -> tensor<1x1x?x?xf32>
-              flow.dispatch.tensor.store %49, %3, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 1, %16, %17], strides = [1, 1, 1, 1] : tensor<1x1x?x?xf32> -> !flow.dispatch.tensor<writeonly:1x112x112x32xf32>
+              flow.dispatch.tensor.store %49, %3, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 1, %16, %17], strides = [1, 1, 1, 1] : tensor<1x1x?x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x112x112x32xf32>>
       }
     }
   }
@@ -421,9 +421,9 @@ hal.executable private @nchw_conv_static_shape_f32 {
         %c1280 = arith.constant 1280 : index
         %c8 = arith.constant 8 : index
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:2x1280x10x10xf32>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:1280x1280x3x3xf32>
-        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readwrite:2x1280x8x8xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<2x1280x10x10xf32>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<1280x1280x3x3xf32>>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readwrite:tensor<2x1280x8x8xf32>>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
         %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -439,14 +439,14 @@ hal.executable private @nchw_conv_static_shape_f32 {
             %7 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%workgroup_id_x]
             %8 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%workgroup_count_x]
             scf.for %arg2 = %7 to %c8 step %8 {
-              %9 = flow.dispatch.tensor.load %0, offsets = [0, 0, %arg1, %arg2], sizes = [2, 1280, 10, 10], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:2x1280x10x10xf32> -> tensor<2x1280x10x10xf32>
-              %10 = flow.dispatch.tensor.load %1, offsets = [%arg0, 0, 0, 0], sizes = [16, 1280, 3, 3], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:1280x1280x3x3xf32> -> tensor<16x1280x3x3xf32>
-              %11 = flow.dispatch.tensor.load %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [2, 16, 8, 8], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readwrite:2x1280x8x8xf32> -> tensor<2x16x8x8xf32>
+              %9 = flow.dispatch.tensor.load %0, offsets = [0, 0, %arg1, %arg2], sizes = [2, 1280, 10, 10], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<2x1280x10x10xf32>> -> tensor<2x1280x10x10xf32>
+              %10 = flow.dispatch.tensor.load %1, offsets = [%arg0, 0, 0, 0], sizes = [16, 1280, 3, 3], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1280x1280x3x3xf32>> -> tensor<16x1280x3x3xf32>
+              %11 = flow.dispatch.tensor.load %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [2, 16, 8, 8], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readwrite:tensor<2x1280x8x8xf32>> -> tensor<2x16x8x8xf32>
               %12 = linalg.conv_2d_nchw_fchw
                       {dilations = dense<1> : vector<2xi64>, lowering_config = #config, strides = dense<1> : vector<2xi64>}
                       ins(%9, %10 : tensor<2x1280x10x10xf32>, tensor<16x1280x3x3xf32>)
                       outs(%11 : tensor<2x16x8x8xf32>) -> tensor<2x16x8x8xf32>
-              flow.dispatch.tensor.store %12, %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [2, 16, 8, 8], strides = [1, 1, 1, 1] : tensor<2x16x8x8xf32> -> !flow.dispatch.tensor<readwrite:2x1280x8x8xf32>
+              flow.dispatch.tensor.store %12, %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [2, 16, 8, 8], strides = [1, 1, 1, 1] : tensor<2x16x8x8xf32> -> !flow.dispatch.tensor<readwrite:tensor<2x1280x8x8xf32>>
             }
           }
         }

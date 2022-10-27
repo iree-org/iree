@@ -16,10 +16,6 @@ include(CMakeParseArguments)
 # NAME: name of target
 # DRIVER: If specified, will pass --device=DRIVER to the test binary and adds
 #     a driver label to the test.
-# TEST_INPUT_FILE_ARG: If specified, the input file will be added to DATA and
-#     its device path appended to ARGS. Note that the device path may be
-#     different from the host path, so this parameter should be used to portably
-#     pass file arguments to tests.
 # DATA: Additional input files needed by the test binary. When running tests on
 #     a separate device (e.g. Android), these files will be pushed to the
 #     device. TEST_INPUT_FILE_ARG is automatically added if specified.
@@ -60,7 +56,7 @@ function(iree_native_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;SRC;DRIVER;TEST_INPUT_FILE_ARG;WILL_FAIL"
+    "NAME;SRC;DRIVER;WILL_FAIL"
     "ARGS;LABELS;DATA;TIMEOUT"
     ${ARGN}
   )
@@ -82,20 +78,10 @@ function(iree_native_test)
     set(_ANDROID_ABS_DIR "/data/local/tmp/${_PACKAGE_PATH}/${_RULE_NAME}")
   endif()
 
-  if(DEFINED _RULE_TEST_INPUT_FILE_ARG)
-    if(ANDROID)
-      get_filename_component(_TEST_INPUT_FILE_BASENAME "${_RULE_TEST_INPUT_FILE_ARG}" NAME)
-      list(APPEND _RULE_ARGS "${_ANDROID_ABS_DIR}/${_TEST_INPUT_FILE_BASENAME}")
-    else()
-      list(APPEND _RULE_ARGS "${_RULE_TEST_INPUT_FILE_ARG}")
-    endif()
-    list(APPEND _RULE_DATA "${_RULE_TEST_INPUT_FILE_ARG}")
-  endif()
-
   # Detect file location with `{{}}` and handle its portability for all entries
   # in `_RULE_ARGS`.
   foreach(_ARG ${_RULE_ARGS})
-    string(REGEX MATCH ".+{{(.+)}}" _FILE_ARG "${_ARG}")
+    string(REGEX MATCH ".*{{(.+)}}" _FILE_ARG "${_ARG}")
     if(_FILE_ARG)
       set(_FILE_PATH ${CMAKE_MATCH_1})
       list(APPEND _RULE_DATA "${_FILE_PATH}")

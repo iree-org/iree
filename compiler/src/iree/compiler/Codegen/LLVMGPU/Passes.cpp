@@ -60,7 +60,7 @@ static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
       from.getType().cast<MemRefType>().getMemorySpaceAsInt() == 3 ||
       to.getType().cast<MemRefType>().getMemorySpaceAsInt() == 3;
   if (sharedMemCopy) builder.create<gpu::BarrierOp>(loc);
-  Operation *copy = createLinalgCopyOp(builder, loc, from, to);
+  Operation *copy = builder.create<memref::CopyOp>(loc, from, to);
   if (sharedMemCopy) {
     setMarker(copy, getCopyToWorkgroupMemoryMarker());
     builder.create<gpu::BarrierOp>(loc);
@@ -163,6 +163,7 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
   // distribute foreach threads
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUDistribute());
 
+  nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createGPUDistributeSharedMemoryCopy());
   nestedModulePM.addPass(createCanonicalizerPass());

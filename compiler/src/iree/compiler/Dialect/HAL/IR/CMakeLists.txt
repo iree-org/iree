@@ -50,6 +50,7 @@ iree_cc_library(
     MLIRSupport
     MLIRTransformUtils
     MLIRViewLikeInterface
+    iree::compiler::Dialect::Stream::IR
     iree::compiler::Dialect::Util::IR
     iree::compiler::Utils
   PUBLIC

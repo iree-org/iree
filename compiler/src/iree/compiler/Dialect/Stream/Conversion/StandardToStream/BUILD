@@ -16,11 +16,11 @@ iree_compiler_cc_library(
     name = "StandardToStream",
     srcs = [
         "ConvertConstantOps.cpp",
-        "ConvertStandardToStream.cpp",
         "ConvertStructuralOps.cpp",
+        "Patterns.cpp",
     ],
     hdrs = [
-        "ConvertStandardToStream.h",
+        "Patterns.h",
     ],
     deps = [
         "//compiler/src/iree/compiler/Dialect/Stream/Conversion",

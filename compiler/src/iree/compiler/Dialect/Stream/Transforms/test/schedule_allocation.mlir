@@ -35,15 +35,15 @@ func.func @extractConstants(%timepoint: !stream.timepoint, %operand: !stream.res
 
   // Join the two async ops (constant upload and execution should overlap).
   // CHECK: %[[JOIN:.+]] = stream.timepoint.join max(%[[CST_TIMEPOINT]], %[[EXEC_TIMEPOINT]])
-  // CHECK: util.do_not_optimize(%[[JOIN]]) : !stream.timepoint
-  util.do_not_optimize(%result_timepoint) : !stream.timepoint
+  // CHECK: util.optimization_barrier %[[JOIN]] : !stream.timepoint
+  util.optimization_barrier %result_timepoint : !stream.timepoint
 
-  // CHECK: util.do_not_optimize(%[[CST_RETS]]#0)
-  util.do_not_optimize(%results#0) : !stream.resource<constant>
-  // CHECK: util.do_not_optimize(%[[CST_RETS]]#1)
-  util.do_not_optimize(%results#1) : !stream.resource<constant>
-  // CHECK: util.do_not_optimize(%[[OPERAND]])
-  util.do_not_optimize(%results#2) : !stream.resource<transient>
+  // CHECK: util.optimization_barrier %[[CST_RETS]]#0
+  util.optimization_barrier %results#0 : !stream.resource<constant>
+  // CHECK: util.optimization_barrier %[[CST_RETS]]#1
+  util.optimization_barrier %results#1 : !stream.resource<constant>
+  // CHECK: util.optimization_barrier %[[OPERAND]]
+  util.optimization_barrier %results#2 : !stream.resource<transient>
   return
 }
 
@@ -56,14 +56,14 @@ func.func @extractConstants(%timepoint: !stream.timepoint, %operand: !stream.res
 func.func @explicitAllocs(%size: index) {
   // CHECK: %[[ALLOC:.+]] = stream.resource.alloc : !stream.resource<external>{%[[SIZE]]}
   %alloc = stream.resource.alloc : !stream.resource<external>{%size}
-  // CHECK: util.do_not_optimize(%[[ALLOC]])
-  util.do_not_optimize(%alloc) : !stream.resource<external>
+  // CHECK: util.optimization_barrier %[[ALLOC]]
+  util.optimization_barrier %alloc : !stream.resource<external>
 
   %c0 = arith.constant 0 : index
   // CHECK: %[[EMPTY:.+]] = stream.resource.alloc : !stream.resource<transient>{%c0}
   %empty = stream.resource.alloc : !stream.resource<transient>{%c0}
-  // CHECK: util.do_not_optimize(%[[EMPTY]])
-  util.do_not_optimize(%empty) : !stream.resource<transient>
+  // CHECK: util.optimization_barrier %[[EMPTY]]
+  util.optimization_barrier %empty : !stream.resource<transient>
   return
 }
 
@@ -80,8 +80,8 @@ func.func @passthroughOperands(%operand: !stream.resource<transient>, %size: ind
     stream.yield %capture : !stream.resource<transient>{%size}
   // CHECK-NEXT: } => !stream.timepoint
   } => !stream.timepoint
-  // CHECK: util.do_not_optimize(%[[OPERAND]])
-  util.do_not_optimize(%result) : !stream.resource<transient>
+  // CHECK: util.optimization_barrier %[[OPERAND]]
+  util.optimization_barrier %result : !stream.resource<transient>
   return
 }
 
@@ -116,8 +116,8 @@ func.func @tiedOperands(%operand: !stream.resource<transient>, %size: index) {
     %0 = stream.async.fill %c255_i32, %capture[%c0 to %c128 for %c128] : i32 -> %capture as !stream.resource<transient>{%size}
     stream.yield %0 : !stream.resource<transient>{%size}
   } => !stream.timepoint
-  // CHECK: util.do_not_optimize(%[[OPERAND]])
-  util.do_not_optimize(%result) : !stream.resource<transient>
+  // CHECK: util.optimization_barrier %[[OPERAND]]
+  util.optimization_barrier %result : !stream.resource<transient>
   return
 }
 
@@ -142,12 +142,12 @@ func.func @producedResults(%size0: index, %size1: index) {
     %1 = stream.async.splat %c255_i32 : i32 -> !stream.resource<transient>{%size1}
     stream.yield %0, %1 : !stream.resource<transient>{%size0}, !stream.resource<transient>{%size1}
   } => !stream.timepoint
-  // CHECK: util.do_not_optimize(%[[TIMEPOINT]])
-  util.do_not_optimize(%result_timepoint) : !stream.timepoint
-  // CHECK: util.do_not_optimize(%[[ALLOC_RETS]]#0)
-  util.do_not_optimize(%results#0) : !stream.resource<transient>
-  // CHECK: util.do_not_optimize(%[[ALLOC_RETS]]#1)
-  util.do_not_optimize(%results#1) : !stream.resource<transient>
+  // CHECK: util.optimization_barrier %[[TIMEPOINT]]
+  util.optimization_barrier %result_timepoint : !stream.timepoint
+  // CHECK: util.optimization_barrier %[[ALLOC_RETS]]#0
+  util.optimization_barrier %results#0 : !stream.resource<transient>
+  // CHECK: util.optimization_barrier %[[ALLOC_RETS]]#1
+  util.optimization_barrier %results#1 : !stream.resource<transient>
   return
 }
 
@@ -162,22 +162,22 @@ func.func @producedResults(%size0: index, %size1: index) {
 func.func @locals(%size0: index, %size1: index, %await_timepoint: !stream.timepoint) -> !stream.timepoint {
   %c254_i32 = arith.constant 254 : i32
   %c255_i32 = arith.constant 255 : i32
-  //      CHECK: %[[SLICES:.+]]:3 = stream.resource.pack slices({
+  //      CHECK: %[[SLICES:.+]]:3 = stream.resource.pack on(#hal.affinity.queue<[0]>) slices({
   // CHECK-NEXT:   [0, 0] = %[[SIZE0]],
   // CHECK-NEXT:   [1, 1] = %[[SIZE1]]
   // CHECK-NEXT: })
-  // CHECK-NEXT: %[[ALLOCA:.+]], %[[ALLOCA_TIMEPOINT:.+]] = stream.resource.alloca uninitialized await(%[[AWAIT_TIMEPOINT]]) => !stream.resource<transient>{%[[SLICES]]#0} => !stream.timepoint
+  // CHECK-NEXT: %[[ALLOCA:.+]], %[[ALLOCA_TIMEPOINT:.+]] = stream.resource.alloca uninitialized on(#hal.affinity.queue<[0]>) await(%[[AWAIT_TIMEPOINT]]) => !stream.resource<transient>{%[[SLICES]]#0} => !stream.timepoint
   // CHECK-NEXT: %[[AWAIT_JOIN:.+]] = stream.timepoint.join max(%[[AWAIT_TIMEPOINT]], %[[ALLOCA_TIMEPOINT]])
-  // CHECK: %[[EXEC_TIMEPOINT:.+]] = stream.cmd.execute await(%[[AWAIT_JOIN]])
+  // CHECK: %[[EXEC_TIMEPOINT:.+]] = stream.cmd.execute on(#hal.affinity.queue<[0]>) await(%[[AWAIT_JOIN]])
   // CHECK-SAME: with(%[[ALLOCA]] as %[[CAPTURE:.+]]: !stream.resource<transient>{%[[SLICES]]#0})
-  %result_timepoint = stream.async.execute await(%await_timepoint) => with() {
+  %result_timepoint = stream.async.execute on(#hal.affinity.queue<[0]>) await(%await_timepoint) => with() {
     // CHECK: stream.cmd.fill %c254_i32, %[[CAPTURE]][%[[SLICES]]#1 for %[[SIZE0]]] : i32 -> !stream.resource<transient>{%[[SLICES]]#0}
     %0 = stream.async.splat %c254_i32 : i32 -> !stream.resource<transient>{%size0}
     // CHECK: stream.cmd.fill %c255_i32, %[[CAPTURE]][%[[SLICES]]#2 for %[[SIZE1]]] : i32 -> !stream.resource<transient>{%[[SLICES]]#0}
     %1 = stream.async.splat %c255_i32 : i32 -> !stream.resource<transient>{%size1}
     stream.yield
   } => !stream.timepoint
-  // CHECK: %[[DEALLOCA_TIMEPOINT:.+]] = stream.resource.dealloca await(%[[EXEC_TIMEPOINT]]) => %[[ALLOCA]] : !stream.resource<transient>{%[[SLICES]]#0} => !stream.timepoint
+  // CHECK: %[[DEALLOCA_TIMEPOINT:.+]] = stream.resource.dealloca on(#hal.affinity.queue<[0]>) await(%[[EXEC_TIMEPOINT]]) => %[[ALLOCA]] : !stream.resource<transient>{%[[SLICES]]#0} => !stream.timepoint
   // CHECK: %[[JOIN:.+]] = stream.timepoint.join max(%[[DEALLOCA_TIMEPOINT]], %[[EXEC_TIMEPOINT]]) => !stream.timepoint
   // CHECK: return %[[JOIN]]
   return %result_timepoint : !stream.timepoint
@@ -211,10 +211,10 @@ func.func @concurrentRegions(%operand: !stream.resource<transient>, %size: index
     }
     stream.yield %0#0, %0#1 : !stream.resource<transient>{%size}, !stream.resource<transient>{%size}
   } => !stream.timepoint
-  // CHECK: util.do_not_optimize(%[[OPERAND]])
-  util.do_not_optimize(%results#0) : !stream.resource<transient>
-  // CHECK: util.do_not_optimize(%[[ALLOC]])
-  util.do_not_optimize(%results#1) : !stream.resource<transient>
+  // CHECK: util.optimization_barrier %[[OPERAND]]
+  util.optimization_barrier %results#0 : !stream.resource<transient>
+  // CHECK: util.optimization_barrier %[[ALLOC]]
+  util.optimization_barrier %results#1 : !stream.resource<transient>
   return
 }
 
@@ -231,8 +231,8 @@ func.func @applyAsyncSplatOp(%size: index) {
     %0 = stream.async.splat %c255_i32 : i32 -> !stream.resource<transient>{%size}
     stream.yield %0 : !stream.resource<transient>{%size}
   } => !stream.timepoint
-  // CHECK: util.do_not_optimize(%[[ALLOC]])
-  util.do_not_optimize(%result) : !stream.resource<transient>
+  // CHECK: util.optimization_barrier %[[ALLOC]]
+  util.optimization_barrier %result : !stream.resource<transient>
   return
 }
 
@@ -251,8 +251,8 @@ func.func @applyAsyncCloneOp(%operand: !stream.resource<transient>, %size: index
     %0 = stream.async.clone %capture : !stream.resource<transient>{%size} -> !stream.resource<transient>{%size}
     stream.yield %0 : !stream.resource<transient>{%size}
   } => !stream.timepoint
-  // CHECK: util.do_not_optimize(%[[ALLOC]])
-  util.do_not_optimize(%result) : !stream.resource<transient>
+  // CHECK: util.optimization_barrier %[[ALLOC]]
+  util.optimization_barrier %result : !stream.resource<transient>
   return
 }
 
@@ -277,8 +277,8 @@ func.func @applyAsyncSliceOp(%operand: !stream.resource<transient>, %size: index
     %0 = stream.async.slice %capture[%c16 to %c144] : !stream.resource<transient>{%size} -> !stream.resource<transient>{%c128}
     stream.yield %0 : !stream.resource<transient>{%c128}
   } => !stream.timepoint
-  // CHECK: util.do_not_optimize(%[[ALLOC]])
-  util.do_not_optimize(%result) : !stream.resource<transient>
+  // CHECK: util.optimization_barrier %[[ALLOC]]
+  util.optimization_barrier %result : !stream.resource<transient>
   return
 }
 
@@ -297,8 +297,8 @@ func.func @applyAsyncFillOp(%operand: !stream.resource<transient>, %size: index)
     %0 = stream.async.fill %c255_i32, %capture[%c16 to %c144 for %c128] : i32 -> %capture as !stream.resource<transient>{%size}
     stream.yield %0 : !stream.resource<transient>{%size}
   } => !stream.timepoint
-  // CHECK: util.do_not_optimize(%[[OPERAND]])
-  util.do_not_optimize(%result) : !stream.resource<transient>
+  // CHECK: util.optimization_barrier %[[OPERAND]]
+  util.optimization_barrier %result : !stream.resource<transient>
   return
 }
 
@@ -324,8 +324,8 @@ func.func @applyAsyncUpdateOp(%update: !stream.resource<external>, %operand: !st
     %0 = stream.async.update %captured_update, %captured_operand[%c16 to %c144] : !stream.resource<external>{%c128} -> %captured_operand as !stream.resource<transient>{%size}
     stream.yield %0 : !stream.resource<transient>{%size}
   } => !stream.timepoint
-  // CHECK: util.do_not_optimize(%[[OPERAND]])
-  util.do_not_optimize(%result) : !stream.resource<transient>
+  // CHECK: util.optimization_barrier %[[OPERAND]]
+  util.optimization_barrier %result : !stream.resource<transient>
   return
 }
 
@@ -348,8 +348,8 @@ func.func @applyAsyncCopyOp(%source: !stream.resource<external>, %target: !strea
     %0 = stream.async.copy %captured_source[%c16 to %c144], %captured_target[%c16 to %c144], %c128 : !stream.resource<external>{%size} -> %captured_operand as !stream.resource<transient>{%size}
     stream.yield %0 : !stream.resource<transient>{%size}
   } => !stream.timepoint
-  // CHECK: util.do_not_optimize(%[[TARGET]])
-  util.do_not_optimize(%result) : !stream.resource<transient>
+  // CHECK: util.optimization_barrier %[[TARGET]]
+  util.optimization_barrier %result : !stream.resource<transient>
   return
 }
 
@@ -370,8 +370,8 @@ func.func @applyAsyncTransferOp(%operand: !stream.resource<transient>, %size: in
     %0 = stream.async.transfer %capture : !stream.resource<transient>{%size} -> !stream.resource<transient>{%size}
     stream.yield %0 : !stream.resource<transient>{%size}
   } => !stream.timepoint
-  // CHECK: util.do_not_optimize(%[[ALLOC]])
-  util.do_not_optimize(%result) : !stream.resource<transient>
+  // CHECK: util.optimization_barrier %[[ALLOC]]
+  util.optimization_barrier %result : !stream.resource<transient>
   return
 }
 
@@ -394,12 +394,12 @@ func.func @applyAsyncDispatchOp(%operand: !stream.resource<transient>, %size: in
     %0:2 = stream.async.dispatch @executable::@dispatch[%c1, %c1, %c1](%capture, %c4) : (!stream.resource<transient>{%size}, index) -> (%capture{%size}, !stream.resource<transient>{%size})
     stream.yield %0#0, %0#1 : !stream.resource<transient>{%size}, !stream.resource<transient>{%size}
   } => !stream.timepoint
-  // CHECK: util.do_not_optimize(%[[TIMEPOINT]])
-  util.do_not_optimize(%result_timepoint) : !stream.timepoint
-  // CHECK: util.do_not_optimize(%[[OPERAND]])
-  util.do_not_optimize(%results#0) : !stream.resource<transient>
-  // CHECK: util.do_not_optimize(%[[ALLOC]])
-  util.do_not_optimize(%results#1) : !stream.resource<transient>
+  // CHECK: util.optimization_barrier %[[TIMEPOINT]]
+  util.optimization_barrier %result_timepoint : !stream.timepoint
+  // CHECK: util.optimization_barrier %[[OPERAND]]
+  util.optimization_barrier %results#0 : !stream.resource<transient>
+  // CHECK: util.optimization_barrier %[[ALLOC]]
+  util.optimization_barrier %results#1 : !stream.resource<transient>
   return
 }
 

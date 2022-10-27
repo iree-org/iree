@@ -31,6 +31,10 @@ IREE_FLAG(int32_t, vulkan_debug_verbosity, 2,
 IREE_FLAG(bool, vulkan_tracing, true,
           "Enables Vulkan tracing (if IREE tracing is enabled).");
 
+IREE_FLAG(
+    bool, vulkan_dedicated_compute_queue, false,
+    "Use a dedicated queue with VK_QUEUE_COMPUTE_BIT for dispatch workloads.");
+
 static iree_status_t iree_hal_vulkan_create_driver_with_flags(
     iree_string_view_t identifier, iree_allocator_t host_allocator,
     iree_hal_driver_t** out_driver) {
@@ -62,6 +66,11 @@ static iree_status_t iree_hal_vulkan_create_driver_with_flags(
   }
   if (FLAG_vulkan_tracing) {
     driver_options.requested_features |= IREE_HAL_VULKAN_FEATURE_ENABLE_TRACING;
+  }
+
+  if (FLAG_vulkan_dedicated_compute_queue) {
+    driver_options.device_options.flags |=
+        IREE_HAL_VULKAN_DEVICE_FLAG_DEDICATED_COMPUTE_QUEUE;
   }
 
   // Load the Vulkan library. This will fail if the library cannot be found or

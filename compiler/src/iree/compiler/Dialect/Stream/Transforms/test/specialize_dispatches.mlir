@@ -25,16 +25,16 @@ stream.executable private @specializeEx {
       // CHECK: %[[C:.+]] = tensor.extract %[[LUT_I1]][%[[SITE]], %c0]
       // CHECK: %[[D:.+]] = tensor.extract %[[LUT_I1]][%[[SITE]], %c1]
 
-      // CHECK-NEXT: util.do_not_optimize(%[[BINDING]]) : !stream.binding
-      util.do_not_optimize(%binding) : !stream.binding
-      // CHECK-NEXT: util.do_not_optimize(%[[A]]) : i32
-      util.do_not_optimize(%a) : i32
-      // CHECK-NEXT: util.do_not_optimize(%[[B]]) : index
-      util.do_not_optimize(%b) : index
-      // CHECK-NEXT: util.do_not_optimize(%[[C]]) : i1
-      util.do_not_optimize(%c) : i1
-      // CHECK-NEXT: util.do_not_optimize(%[[D]]) : i1
-      util.do_not_optimize(%d) : i1
+      // CHECK-NEXT: util.optimization_barrier %[[BINDING]] : !stream.binding
+      util.optimization_barrier %binding : !stream.binding
+      // CHECK-NEXT: util.optimization_barrier %[[A]] : i32
+      util.optimization_barrier %a : i32
+      // CHECK-NEXT: util.optimization_barrier %[[B]] : index
+      util.optimization_barrier %b : index
+      // CHECK-NEXT: util.optimization_barrier %[[C]] : i1
+      util.optimization_barrier %c : i1
+      // CHECK-NEXT: util.optimization_barrier %[[D]] : i1
+      util.optimization_barrier %d : i1
       return
     }
   }

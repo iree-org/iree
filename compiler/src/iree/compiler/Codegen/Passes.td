@@ -328,6 +328,12 @@ def LLVMCPUAssignConstantOrdinals :
   let constructor = "mlir::iree_compiler::createLLVMCPUAssignConstantOrdinalsPass()";
 }
 
+def LLVMCPUAssignImportOrdinals :
+    Pass<"iree-llvmcpu-assign-import-ordinals", "IREE::HAL::ExecutableVariantOp"> {
+  let summary = "Assigns executable import ordinals across all LLVMCPU variants.";
+  let constructor = "mlir::iree_compiler::createLLVMCPUAssignImportOrdinalsPass()";
+}
+
 //------------------------------------------------------------------------------
 // LLVMGPU
 //------------------------------------------------------------------------------

@@ -15,10 +15,10 @@ package(
 iree_compiler_cc_library(
     name = "HALToStream",
     srcs = [
-        "ConvertHALToStream.cpp",
+        "Patterns.cpp",
     ],
     hdrs = [
-        "ConvertHALToStream.h",
+        "Patterns.h",
     ],
     deps = [
         "//compiler/src/iree/compiler/Dialect/HAL/IR",

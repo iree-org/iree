@@ -416,7 +416,8 @@ struct ExpandUnfoldableConstantOp
                                 PatternRewriter &rewriter) const override {
     auto stdConst =
         rewriter.create<arith::ConstantOp>(op.getLoc(), op.getValue());
-    rewriter.replaceOpWithNewOp<DoNotOptimizeOp>(op, stdConst.getResult());
+    rewriter.replaceOpWithNewOp<OptimizationBarrierOp>(op,
+                                                       stdConst.getResult());
     return success();
   }
 };

@@ -393,3 +393,50 @@ iree_status_t iree_hal_create_device_from_flags(
   return iree_hal_create_device(iree_hal_available_driver_registry(),
                                 device_uri, host_allocator, out_device);
 }
+
+//===----------------------------------------------------------------------===//
+// Profiling
+//===----------------------------------------------------------------------===//
+
+IREE_FLAG(
+    string, device_profiling_mode, "",
+    "HAL device profiling mode (one of ['queue', 'dispatch', 'executable']) "
+    "or empty to disable profiling. HAL implementations may require additional "
+    "flags in order to configure profiling support on "
+    "their devices.");
+IREE_FLAG(
+    string, device_profiling_file, "",
+    "Optional file path/prefix for profiling file output. Some implementations "
+    "may require a file name in order to capture profiling information.");
+
+iree_status_t iree_hal_begin_profiling_from_flags(iree_hal_device_t* device) {
+  if (!device) return iree_ok_status();
+
+  // Today we treat these as exclusive. When we have more implementations we
+  // can figure out how best to combine them.
+  iree_hal_device_profiling_options_t options = {0};
+  if (strlen(FLAG_device_profiling_mode) == 0) {
+    return iree_ok_status();
+  } else if (strcmp(FLAG_device_profiling_mode, "queue") == 0) {
+    options.mode |= IREE_HAL_DEVICE_PROFILING_MODE_QUEUE_OPERATIONS;
+  } else if (strcmp(FLAG_device_profiling_mode, "dispatch") == 0) {
+    options.mode |= IREE_HAL_DEVICE_PROFILING_MODE_DISPATCH_COUNTERS;
+  } else if (strcmp(FLAG_device_profiling_mode, "executable") == 0) {
+    options.mode |= IREE_HAL_DEVICE_PROFILING_MODE_EXECUTABLE_COUNTERS;
+  } else {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "unsupported profiling mode '%s'",
+                            FLAG_device_profiling_mode);
+  }
+
+  // We don't validate the file path as each tool has their own style.
+  options.file_path = FLAG_device_profiling_file;
+
+  return iree_hal_device_profiling_begin(device, &options);
+}
+
+iree_status_t iree_hal_end_profiling_from_flags(iree_hal_device_t* device) {
+  if (!device) return iree_ok_status();
+  if (strlen(FLAG_device_profiling_mode) == 0) return iree_ok_status();
+  return iree_hal_device_profiling_end(device);
+}

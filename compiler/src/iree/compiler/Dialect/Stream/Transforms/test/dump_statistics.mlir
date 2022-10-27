@@ -61,9 +61,9 @@ stream.executable private @func_a_ex_0 {
     func.func @dispatch_0(%arg0: !stream.binding {stream.alignment = 32 : index}, %arg1: !stream.binding {stream.alignment = 32 : index}, %arg2: !stream.binding {stream.alignment = 32 : index}) {
       %c4 = arith.constant 4 : index
       %c0 = arith.constant 0 : index
-      %0 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:4xi32>
-      %1 = stream.binding.subspan %arg1[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:4xi32>
-      %2 = stream.binding.subspan %arg2[%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:4xi32>
+      %0 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:tensor<4xi32>>
+      %1 = stream.binding.subspan %arg1[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:tensor<4xi32>>
+      %2 = stream.binding.subspan %arg2[%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:tensor<4xi32>>
       %workgroup_size_0 = flow.dispatch.workgroup.size[0] : index
       %workgroup_id_0 = flow.dispatch.workgroup.id[0] : index
       %workgroup_count_0 = flow.dispatch.workgroup.count[0] : index
@@ -71,15 +71,15 @@ stream.executable private @func_a_ex_0 {
       %4 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_0, %workgroup_size_0]
       scf.for %arg3 = %3 to %c4 step %4 {
         %5 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 4)>(%arg3)[%workgroup_size_0]
-        %6 = flow.dispatch.tensor.load %0, offsets = [%arg3], sizes = [%5], strides = [1] : !flow.dispatch.tensor<readonly:4xi32> -> tensor<?xi32>
-        %7 = flow.dispatch.tensor.load %1, offsets = [%arg3], sizes = [%5], strides = [1] : !flow.dispatch.tensor<readonly:4xi32> -> tensor<?xi32>
+        %6 = flow.dispatch.tensor.load %0, offsets = [%arg3], sizes = [%5], strides = [1] : !flow.dispatch.tensor<readonly:tensor<4xi32>> -> tensor<?xi32>
+        %7 = flow.dispatch.tensor.load %1, offsets = [%arg3], sizes = [%5], strides = [1] : !flow.dispatch.tensor<readonly:tensor<4xi32>> -> tensor<?xi32>
         %8 = tensor.empty(%5) : tensor<?xi32>
         %9 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%6, %7 : tensor<?xi32>, tensor<?xi32>) outs(%8 : tensor<?xi32>) {
         ^bb0(%arg4: i32, %arg5: i32, %arg6: i32):  // no predecessors
           %10 = arith.maxsi %arg4, %arg5 : i32
           linalg.yield %10 : i32
         } -> tensor<?xi32>
-        flow.dispatch.tensor.store %9, %2, offsets = [%arg3], sizes = [%5], strides = [1] : tensor<?xi32> -> !flow.dispatch.tensor<writeonly:4xi32>
+        flow.dispatch.tensor.store %9, %2, offsets = [%arg3], sizes = [%5], strides = [1] : tensor<?xi32> -> !flow.dispatch.tensor<writeonly:tensor<4xi32>>
       }
       return
     }
@@ -92,9 +92,9 @@ stream.executable private @func_a_ex_1 {
     func.func @dispatch_1(%arg0: !stream.binding {stream.alignment = 32 : index}, %arg1: !stream.binding {stream.alignment = 32 : index}, %arg2: !stream.binding {stream.alignment = 32 : index}) {
       %c3 = arith.constant 3 : index
       %c0 = arith.constant 0 : index
-      %0 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:3xi32>
-      %1 = stream.binding.subspan %arg1[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:3xi32>
-      %2 = stream.binding.subspan %arg2[%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:3xi32>
+      %0 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:tensor<3xi32>>
+      %1 = stream.binding.subspan %arg1[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:tensor<3xi32>>
+      %2 = stream.binding.subspan %arg2[%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:tensor<3xi32>>
       %workgroup_size_0 = flow.dispatch.workgroup.size[0] : index
       %workgroup_id_0 = flow.dispatch.workgroup.id[0] : index
       %workgroup_count_0 = flow.dispatch.workgroup.count[0] : index
@@ -102,15 +102,15 @@ stream.executable private @func_a_ex_1 {
       %4 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_0, %workgroup_size_0]
       scf.for %arg3 = %3 to %c3 step %4 {
         %5 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 3)>(%arg3)[%workgroup_size_0]
-        %6 = flow.dispatch.tensor.load %0, offsets = [%arg3], sizes = [%5], strides = [1] : !flow.dispatch.tensor<readonly:3xi32> -> tensor<?xi32>
-        %7 = flow.dispatch.tensor.load %1, offsets = [%arg3], sizes = [%5], strides = [1] : !flow.dispatch.tensor<readonly:3xi32> -> tensor<?xi32>
+        %6 = flow.dispatch.tensor.load %0, offsets = [%arg3], sizes = [%5], strides = [1] : !flow.dispatch.tensor<readonly:tensor<3xi32>> -> tensor<?xi32>
+        %7 = flow.dispatch.tensor.load %1, offsets = [%arg3], sizes = [%5], strides = [1] : !flow.dispatch.tensor<readonly:tensor<3xi32>> -> tensor<?xi32>
         %8 = tensor.empty(%5) : tensor<?xi32>
         %9 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%6, %7 : tensor<?xi32>, tensor<?xi32>) outs(%8 : tensor<?xi32>) {
         ^bb0(%arg4: i32, %arg5: i32, %arg6: i32):  // no predecessors
           %10 = arith.maxsi %arg4, %arg5 : i32
           linalg.yield %10 : i32
         } -> tensor<?xi32>
-        flow.dispatch.tensor.store %9, %2, offsets = [%arg3], sizes = [%5], strides = [1] : tensor<?xi32> -> !flow.dispatch.tensor<writeonly:3xi32>
+        flow.dispatch.tensor.store %9, %2, offsets = [%arg3], sizes = [%5], strides = [1] : tensor<?xi32> -> !flow.dispatch.tensor<writeonly:tensor<3xi32>>
       }
       return
     }

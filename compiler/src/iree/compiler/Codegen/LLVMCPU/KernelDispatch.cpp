@@ -292,16 +292,24 @@ static unsigned getReferenceTypeLengthInBytes(func::FuncOp entryPointFn) {
   unsigned referenceTypeLengthInBytes = 4;
   entryPointFn.walk([&](IREE::HAL::InterfaceBindingSubspanOp subSpanOp) {
     Type type = subSpanOp.getResult().getType();
-    Type elementType = TypeSwitch<Type, Type>(type)
-                           .Case<ShapedType, IREE::Flow::DispatchTensorType>(
-                               [&](auto shapedType) -> Type {
-                                 // Ignore operands that are 0D tensors. These
-                                 // are not vector-loadable, so using these to
-                                 // get vector length would be a pessimization.
-                                 if (!shapedType.getRank()) return nullptr;
-                                 return shapedType.getElementType();
-                               })
-                           .Default([&](Type t) -> Type { return nullptr; });
+    Type elementType =
+        TypeSwitch<Type, Type>(type)
+            .Case<IREE::Flow::DispatchTensorType>(
+                [&](auto dispatchTensorType) -> Type {
+                  // Ignore operands that are 0D tensors. These
+                  // are not vector-loadable, so using these to
+                  // get vector length would be a pessimization.
+                  if (!dispatchTensorType.getRank()) return nullptr;
+                  return dispatchTensorType.getBoundElementType();
+                })
+            .Case<ShapedType>([&](auto shapedType) -> Type {
+              // Ignore operands that are 0D tensors. These
+              // are not vector-loadable, so using these to
+              // get vector length would be a pessimization.
+              if (!shapedType.getRank()) return nullptr;
+              return shapedType.getElementType();
+            })
+            .Default([&](Type t) -> Type { return nullptr; });
     if (!elementType || !elementType.isIntOrFloat()) return;
     unsigned typeWidthInBytes =
         IREE::Util::getRoundedElementByteWidth(elementType);
@@ -1021,14 +1029,11 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
       DispatchLoweringPassPipeline::CPUAArchDoubleTilingExpert);
 }
 
-/// Sets the lowering configuration for dispatch region for linalg_ext.fft
-/// root op.
-static LogicalResult setRootConfig(func::FuncOp entryPointFn,
-                                   IREE::LinalgExt::FftOp fftOp) {
-  unsigned numLoops = fftOp.getLoopIteratorTypes().size();
-  auto partitionedLoops =
-      cast<PartitionableLoopsInterface>(fftOp.getOperation())
-          .getPartitionableLoops(kNumMaxParallelDims);
+static SmallVector<int64_t> getLinalgExtDefaultWorkgroupTileSizes(
+    TilingInterface op) {
+  unsigned numLoops = op.getLoopIteratorTypes().size();
+  auto partitionedLoops = cast<PartitionableLoopsInterface>(op.getOperation())
+                              .getPartitionableLoops(kNumMaxParallelDims);
   SmallVector<int64_t> workgroupTileSizes(numLoops, defaultWorkgroupTileSize);
   llvm::DenseSet<unsigned> partitionedLoopsSet(partitionedLoops.begin(),
                                                partitionedLoops.end());
@@ -1037,7 +1042,22 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
       workgroupTileSizes[dim] = 0;
     }
   }
+  return workgroupTileSizes;
+}
 
+static LogicalResult setRootConfig(func::FuncOp entryPointFn,
+                                   IREE::LinalgExt::PackOp op) {
+  TileSizesListType tileSizes = {getLinalgExtDefaultWorkgroupTileSizes(op)};
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, op, tileSizes, DispatchLoweringPassPipeline::CPUDataTiling);
+}
+
+/// Sets the lowering configuration for dispatch region for linalg_ext.fft
+/// root op.
+static LogicalResult setRootConfig(func::FuncOp entryPointFn,
+                                   IREE::LinalgExt::FftOp fftOp) {
+  SmallVector<int64_t> workgroupTileSizes =
+      getLinalgExtDefaultWorkgroupTileSizes(fftOp);
   auto rank = fftOp.getOperandRank();
   if (workgroupTileSizes.size() >= rank && workgroupTileSizes[rank - 1] != 0) {
     APInt value;
@@ -1532,6 +1552,8 @@ static LogicalResult setRootConfigImpl(
         .Case<linalg::ContractionOpInterface>(
             [&](auto op) { return setRootConfig(entryPointFn, op); })
         .Case<linalg::LinalgOp>(
+            [&](auto op) { return setRootConfig(entryPointFn, op); })
+        .Case<IREE::LinalgExt::PackOp>(
             [&](auto op) { return setRootConfig(entryPointFn, op); })
         .Case<TilingInterface>(
             [&](auto op) { return setRootConfig(entryPointFn, op); })

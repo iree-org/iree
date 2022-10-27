@@ -113,7 +113,7 @@ vm.module @list_variant_ops {
     vm.list.resize %list, %c1 : (!vm.list<?>, i32)
 
     %ref = vm.list.get.ref %list, %c1 : (!vm.list<?>, i32) -> !vm.buffer
-    %ref_dno = util.do_not_optimize(%ref) : !vm.buffer
+    %ref_dno = util.optimization_barrier %ref : !vm.buffer
     vm.return
   }
 

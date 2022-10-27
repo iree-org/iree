@@ -86,9 +86,9 @@ static bool padTensor(Location loc, OpOperand *operand,
   SmallVector<OpFoldResult> zeroStaticLow(shape.size(),
                                           builder.getI64IntegerAttr(0));
   SmallVector<Value> nullLow;
-  Value padded = tensor::createPadScalarOp(
-      resultType, operand->get(), zeroConstant, zeroStaticLow, newPaddingSizes,
-      false, loc, builder);
+  Value padded = builder.create<tensor::PadOp>(loc, resultType, operand->get(),
+                                               zeroStaticLow, newPaddingSizes,
+                                               zeroConstant);
   operand->set(padded);
   return true;
 }

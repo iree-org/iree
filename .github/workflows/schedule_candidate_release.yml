@@ -9,7 +9,7 @@ on:
 jobs:
   tag_release:
     name: "Tag candidate release"
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     # Don't run this in everyone's forks.
     if: github.repository == 'iree-org/iree'
     steps:

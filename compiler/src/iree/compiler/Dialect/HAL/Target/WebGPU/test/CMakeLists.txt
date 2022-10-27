@@ -8,7 +8,6 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "memory_access.mlir"
     "smoketest.mlir"
   TOOLS
     FileCheck

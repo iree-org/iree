@@ -144,27 +144,22 @@ ResourceConfigAttr ResourceConfigAttr::getDefaultHostConstraints(
       clResourceMaxRange, clResourceMinOffsetAlignment, clResourceIndexBits);
 }
 
-// TODO(benvanik): find a way to go affinity -> resource config.
-// For now we just always fall back to the conservative host config.
-static ResourceConfigAttr inferResourceConfigFromAffinity(
-    AffinityAttr affinityAttr) {
-  return {};
-}
-
 // static
 ResourceConfigAttr ResourceConfigAttr::lookup(Operation *op) {
   auto *context = op->getContext();
   auto attrId = StringAttr::get(context, "stream.resources");
   while (op) {
+    // Use an override if specified.
+    auto attr = op->getAttrOfType<ResourceConfigAttr>(attrId);
+    if (attr) return attr;
+    // See if the affinity specified provides a resource configuration.
     if (auto affinityOp = llvm::dyn_cast<AffinityOpInterface>(op)) {
       auto affinityAttr = affinityOp.getAffinity();
       if (affinityAttr) {
-        auto attr = inferResourceConfigFromAffinity(affinityAttr);
+        auto attr = affinityAttr.getResourceConfigAttr();
         if (attr) return attr;
       }
     }
-    auto attr = op->getAttrOfType<ResourceConfigAttr>(attrId);
-    if (attr) return attr;
     op = op->getParentOp();
   }
   // No config found; use conservative host config.
@@ -217,8 +212,20 @@ AffinityAttr AffinityAttr::lookup(Operation *op) {
 // static
 bool AffinityAttr::areCompatible(AffinityAttr desiredAffinity,
                                  AffinityAttr requiredAffinity) {
+  if (desiredAffinity == requiredAffinity) return true;
+  if ((desiredAffinity && !requiredAffinity) ||
+      (requiredAffinity && !desiredAffinity)) {
+    return true;
+  }
   // We could do a fuzzier match here (interface isCompatible() etc).
-  return desiredAffinity == requiredAffinity;
+  return false;
+}
+
+// static
+bool AffinityAttr::canExecuteTogether(AffinityAttr lhs, AffinityAttr rhs) {
+  if (lhs == rhs) return true;
+  if ((lhs && !rhs) || (rhs && !lhs)) return true;
+  return lhs.isExecutableWith(rhs);
 }
 
 //===----------------------------------------------------------------------===//
@@ -354,6 +361,7 @@ Value ResourceType::createSubrangeOp(Location loc, Value resource,
 // Dialect registration
 //===----------------------------------------------------------------------===//
 
+#include "iree/compiler/Dialect/Stream/IR/StreamAttrInterfaces.cpp.inc"  // IWYU pragma: export
 #include "iree/compiler/Dialect/Stream/IR/StreamOpInterfaces.cpp.inc"  // IWYU pragma: keep
 #include "iree/compiler/Dialect/Stream/IR/StreamTypeInterfaces.cpp.inc"  // IWYU pragma: keep
 
