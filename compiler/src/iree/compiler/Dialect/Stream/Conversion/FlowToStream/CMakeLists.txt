@@ -14,9 +14,9 @@ iree_cc_library(
   NAME
     FlowToStream
   HDRS
-    "ConvertFlowToStream.h"
+    "Patterns.h"
   SRCS
-    "ConvertFlowToStream.cpp"
+    "Patterns.cpp"
   DEPS
     MLIRArithDialect
     MLIRFuncDialect

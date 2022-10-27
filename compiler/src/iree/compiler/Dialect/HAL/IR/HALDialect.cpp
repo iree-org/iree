@@ -6,7 +6,7 @@
 
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 
-#include "iree/compiler/Dialect/HAL/Conversion/HALToVM/ConvertHALToVM.h"
+#include "iree/compiler/Dialect/HAL/Conversion/HALToVM/Patterns.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/HAL/hal.imports.h"

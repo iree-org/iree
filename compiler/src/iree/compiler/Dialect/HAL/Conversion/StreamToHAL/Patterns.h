@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_DIALECT_HAL_CONVERSION_STREAMTOHAL_CONVERTSTREAMTOHAL_H_
-#define IREE_COMPILER_DIALECT_HAL_CONVERSION_STREAMTOHAL_CONVERTSTREAMTOHAL_H_
+#ifndef IREE_COMPILER_DIALECT_HAL_CONVERSION_STREAMTOHAL_PATTERNS_H_
+#define IREE_COMPILER_DIALECT_HAL_CONVERSION_STREAMTOHAL_PATTERNS_H_
 
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -22,4 +22,4 @@ void populateStreamToHALPatterns(MLIRContext *context,
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_HAL_CONVERSION_STREAMTOHAL_CONVERTSTREAMTOHAL_H_
+#endif  // IREE_COMPILER_DIALECT_HAL_CONVERSION_STREAMTOHAL_PATTERNS_H_

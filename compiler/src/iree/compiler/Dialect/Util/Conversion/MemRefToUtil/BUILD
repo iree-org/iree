@@ -15,10 +15,10 @@ package(
 iree_compiler_cc_library(
     name = "MemRefToUtil",
     srcs = [
-        "ConvertMemRefToUtil.cpp",
+        "Patterns.cpp",
     ],
     hdrs = [
-        "ConvertMemRefToUtil.h",
+        "Patterns.h",
     ],
     deps = [
         "//compiler/src/iree/compiler/Dialect/Util/IR",
