@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Modules/HAL/Inline/Conversion/HALInlineToVM/ConvertHALInlineToVM.h"
+#include "iree/compiler/Modules/HAL/Inline/Conversion/HALInlineToVM/Patterns.h"
 
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionTarget.h"

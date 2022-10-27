@@ -15,10 +15,10 @@ package(
 iree_compiler_cc_library(
     name = "HALInlineToVM",
     srcs = [
-        "ConvertHALInlineToVM.cpp",
+        "Patterns.cpp",
     ],
     hdrs = [
-        "ConvertHALInlineToVM.h",
+        "Patterns.h",
     ],
     deps = [
         "//compiler/src/iree/compiler/Dialect/Util/IR",
