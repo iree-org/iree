@@ -212,7 +212,6 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
 
   // Combine the initializers we emitted during resource cache materialization.
   passManager.addPass(IREE::Util::createCombineInitializersPass());
-  addCleanupPatterns(passManager);
 
   //----------------------------------------------------------------------------
   // Executable serialization
@@ -229,6 +228,32 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
     // NOTE: symbol DCE will destroy executable target contents, so only run it
     // if we serialized things.
     passManager.addPass(mlir::createSymbolDCEPass());
+  }
+
+  //----------------------------------------------------------------------------
+  // Whole-program optimization
+  //----------------------------------------------------------------------------
+
+  {
+    // We run these under a fixed-point iteration such that we can perform
+    // inter-procedural, intra-procedural, and canonicalization as separably
+    // verifiable/reusable passes. IPO will fold duplicate arguments/results and
+    // inline constants to allow the local optimizations to work more
+    // effectively.
+    OpPassManager ipoPipeline(mlir::ModuleOp::getOperationName());
+
+    // IPO and other cleanups.
+    addCleanupPatterns(ipoPipeline);
+
+    // Large IPO pass. Note that this can introduce a significant amount of
+    // duplication/inlined constants and we'll want to ensure we're running
+    // cleanup again after (this entire set of patterns is run in a fixed-point
+    // iteration to do that).
+    ipoPipeline.addPass(IREE::Util::createIPOPass());
+
+    // Run fixed-point iteration on the IPO pipeline.
+    passManager.addPass(
+        IREE::Util::createFixedPointIteratorPass(std::move(ipoPipeline)));
   }
 }
 
