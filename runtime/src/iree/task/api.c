@@ -78,8 +78,9 @@ IREE_FLAG(
 
 // TODO(benvanik): add --task_topology_dump to dump out the current machine
 // configuration as seen by the topology utilities.
+
 IREE_FLAG(
-    bool, task_topology_dump, false,
+    bool, numa_topology_dump, false,
     "Dumps CPU NUMA hardware topology to dump out the current machine\n"
     "configuration as seen by the topology utilities.\n");
 
@@ -87,9 +88,9 @@ iree_status_t iree_task_topology_initialize_from_flags(
     iree_task_topology_t* out_topology) {
   IREE_ASSERT_ARGUMENT(out_topology);
   iree_task_topology_initialize(out_topology);
-  if (FLAG_task_topology_dump == true) {
-    printf("HARDWARE:\n");
-    hardware_test();
+  if (FLAG_numa_topology_dump == true) {
+    printf("HARDWARE TOPOLOGY:\n");
+    hardware_topology();
   }
 
   if (FLAG_task_topology_group_count != 0) {

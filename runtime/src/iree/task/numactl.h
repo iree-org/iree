@@ -40,6 +40,6 @@ int exitcode;
 char *fmt_mem(unsigned long long mem, char *buf);
 void print_distances(int maxnode);
 void print_node_cpus(int node);
-void hardware_test(void);
+void hardware_topology(void);
 
 #endif  // IREE_TASK_NUMACTL_H_

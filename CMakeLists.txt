@@ -366,6 +366,8 @@ function(iree_fix_ndebug)
 endfunction()
 iree_fix_ndebug()
 
+set(IREE_NUMA ON)
+
 #-------------------------------------------------------------------------------
 # IREE utility definitions
 #-------------------------------------------------------------------------------
@@ -374,6 +376,7 @@ list(APPEND CMAKE_MODULE_PATH
   ${CMAKE_CURRENT_LIST_DIR}/build_tools/cmake/
 )
 
+include(iree_numa_library)
 include(iree_macros)
 include(iree_copts)
 include(iree_cc_binary)

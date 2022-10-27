@@ -54,7 +54,7 @@ void print_node_cpus(int node) {
 	putchar('\n');
 }
 
-void hardware_test(void) {
+void hardware_topology(void) {
 	int i;
 	int numnodes=0;
 	int prevnode=-1;
