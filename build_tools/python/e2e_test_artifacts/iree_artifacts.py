@@ -85,8 +85,8 @@ def generate_artifacts_root(
   model_dir_map = collections.OrderedDict()
   for imported_model in all_imported_models.values():
     model = imported_model.model
-    # IREE model dir: <parent_path>/<model_name>
-    model_dir_path = parent_path / f"{model.name}"
+    # IREE model dir: <parent_path>/<model_id>_<model_name>
+    model_dir_path = parent_path / f"{model.id}_{model.name}"
 
     module_dir_map = collections.OrderedDict()
     for config in grouped_generation_configs[model.id]:

@@ -123,7 +123,7 @@ def generate_rules() -> List[str]:
     execution_config = test_config.execution_config
     cmake_rule = cmake_builder.rules.build_iree_benchmark_suite_module_test(
         target_name=test_config.name,
-        model=f"{model.name}",
+        model=f"{model.id}_{model.name}",
         driver=execution_config.driver.value,
         expected_output=test_config.expected_output,
         runner_args=__get_iree_run_module_args(test_config))

@@ -218,8 +218,9 @@ endfunction()
 #   BENCHMARK_MODULE_SRC: IREE module flagfile path built from benchmark_suite.
 #       The flagfile for different compile configurations are stored in the
 #       subdirectories.
-#   MODEL: Model name defined in "build_tools/python/e2e_test_framework/models".
-#       This option overrides and will replace BENCHMARK_MODULE_SRC.
+#   MODEL: Model "<UUID>_<name>" defined in
+#       "build_tools/python/e2e_test_framework/models". This option overrides
+#       and will replace BENCHMARK_MODULE_SRC.
 #   DRIVER: Driver to run the module with.
 #   RUNNER_ARGS: additional args to pass to iree-run-module. The driver
 #       and input file are passed automatically.
@@ -287,7 +288,9 @@ function(iree_benchmark_suite_module_test)
       message(WARNING "No compile config for ${_PLATFORM}. Skip ${_RULE_MODEL}.")
       return()
     endif()
-    set(_SRC "${IREE_BENCHMARK_SUITE_DIR}/iree/${_RULE_MODEL}/${_IREE_MODULE_COMPILE_CONFIG_ID}/${_RULE_MODEL}.vmfb")
+    # Drop the "<UUID>_" prefix.
+    string(SUBSTRING "${_RULE_MODEL}" 37 -1 _MODEL_NAME)
+    set(_SRC "${IREE_BENCHMARK_SUITE_DIR}/iree/${_RULE_MODEL}/${_IREE_MODULE_COMPILE_CONFIG_ID}/${_MODEL_NAME}.vmfb")
   else()
     set(_MODULE_FLAG_DIR "${IREE_BENCHMARK_SUITE_DIR}/${_RULE_BENCHMARK_MODULE_SRC}/")
     # Find the platform specific module flag file with matching path name.

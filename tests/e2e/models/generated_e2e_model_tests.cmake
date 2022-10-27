@@ -24,7 +24,7 @@ iree_benchmark_suite_module_test(
   NAME
     "mobilenet_v1_fp32_correctness_test"
   MODEL
-    "MobileNetV1_fp32"
+    "78eab9e5-9ff1-4769-9b55-933c81cc9a0f_MobileNetV1_fp32"
   DRIVER
     "local-sync"
   EXPECTED_OUTPUT
@@ -38,7 +38,7 @@ iree_benchmark_suite_module_test(
   NAME
     "efficientnet_int8_correctness_test"
   MODEL
-    "EfficientNet_int8"
+    "4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8"
   DRIVER
     "local-sync"
   EXPECTED_OUTPUT
@@ -52,7 +52,7 @@ iree_benchmark_suite_module_test(
   NAME
     "person_detect_int8_correctness_test"
   MODEL
-    "PersonDetect_int8"
+    "bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8"
   DRIVER
     "local-sync"
   EXPECTED_OUTPUT
