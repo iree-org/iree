@@ -8,6 +8,8 @@
 function(iree_get_platform PLATFORM)
   if(ANDROID AND CMAKE_ANDROID_ARCH_ABI STREQUAL "arm64-v8a")
     set(_PLATFORM "android-arm64-v8a")
+  elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+    set(_PLATFORM "x86_64")
   else()
     set(_PLATFORM "${CMAKE_SYSTEM_PROCESSOR}-${CMAKE_SYSTEM_NAME}")
   endif()
@@ -69,7 +71,7 @@ endfunction()
 #     "--function_input=1x224x224x3xf32=0"
 #   EXPECTED_OUTPUT
 #     "mobilenet_v1_fp32_expected_output.txt"
-#   SUPPORTED_PLATFORMS
+#   UNSUPPORTED_PLATFORMS
 #     "android-arm64-v8a"
 #     "riscv32-Linux"
 # )
@@ -88,7 +90,7 @@ function(iree_run_module_test)
   )
 
   iree_get_platform(_PLATFORM)
-  if(_PLATFORM IN_LIST _RULE_SUPPORTED_PLATFORMS)
+  if(_PLATFORM IN_LIST _RULE_UNSUPPORTED_PLATFORMS)
     return()
   endif()
 
@@ -216,6 +218,8 @@ endfunction()
 #   BENCHMARK_MODULE_SRC: IREE module flagfile path built from benchmark_suite.
 #       The flagfile for different compile configurations are stored in the
 #       subdirectories.
+#   MODEL: Model name defined in "build_tools/python/e2e_test_framework/models".
+#       This option overrides and will replace BENCHMARK_MODULE_SRC.
 #   DRIVER: Driver to run the module with.
 #   RUNNER_ARGS: additional args to pass to iree-run-module. The driver
 #       and input file are passed automatically.
@@ -239,6 +243,8 @@ endfunction()
 #     mobilenet_v1_fp32_correctness_test
 #   BENCHMARK_MODULE_SRC
 #     "TFLite/MobileNetV1-fp32,imagenet"
+#   MODEL
+#     "PersonDetect_int8"
 #   DRIVER
 #     "local-sync"
 #   RUNNER_ARGS
@@ -276,11 +282,12 @@ function(iree_benchmark_suite_module_test)
 
   if(DEFINED _RULE_MODEL)
     string(TOUPPER "${_PLATFORM}" _UPPER_PLATFORM)
-    if(NOT DEFINED _MODULE_COMPILE_CONFIG_${_UPPER_PLATFORM})
+    set(_IREE_MODULE_COMPILE_CONFIG_ID "${IREE_MODULE_COMPILE_CONFIG_ID_${_UPPER_PLATFORM}}")
+    if("${_IREE_MODULE_COMPILE_CONFIG_ID}" STREQUAL "")
       message(WARNING "No compile config for ${_PLATFORM}. Skip ${_RULE_MODEL}.")
       return()
     endif()
-    set(_SRC "${IREE_BENCHMARK_SUITE_DIR}/iree/${_RULE_MODEL}/${_MODULE_COMPILE_CONFIG_${_UPPER_PLATFORM}}/${_RULE_MODEL}.vmfb")
+    set(_SRC "${IREE_BENCHMARK_SUITE_DIR}/iree/${_RULE_MODEL}/${_IREE_MODULE_COMPILE_CONFIG_ID}/${_RULE_MODEL}.vmfb")
   else()
     set(_MODULE_FLAG_DIR "${IREE_BENCHMARK_SUITE_DIR}/${_RULE_BENCHMARK_MODULE_SRC}/")
     # Find the platform specific module flag file with matching path name.

@@ -216,4 +216,4 @@ iree_static_linker_test(
 #    "android-arm64-v8a"
 #)
 
-include(test.cmake)
+include(generated_e2e_model_tests.cmake)

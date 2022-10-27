@@ -23,7 +23,7 @@ class CMakePlatform(enum.Enum):
   ANDROID_ARMV8_A = "android-arm64-v8a"
   LINUX_RISCV32 = "riscv32-linux"
   LINUX_RISCV64 = "riscv64-linux"
-  LINUX_X86_64 = "x86_64-linux"
+  LINUX_X86_64 = "x86_64"
 
 
 # Compile config used for each CMake system platform.
@@ -114,7 +114,7 @@ def generate_rules() -> List[str]:
 
   for platform in CMakePlatform:
     cmake_rule = cmake_builder.rules.build_set(
-        variable_name=f"_MODULE_COMPILE_CONFIG_{platform.value.upper()}",
+        variable_name=f"IREE_MODULE_COMPILE_CONFIG_ID_{platform.value.upper()}",
         value=f'"{PLATFORM_COMPILE_CONFIG_MAP[platform].id}"')
     cmake_rules.append(cmake_rule)
 
