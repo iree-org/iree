@@ -162,6 +162,40 @@ def build_iree_import_tflite_model(target_path: str, source: str,
                        ]))
 
 
+def build_iree_benchmark_suite_module_test(
+    target_name: str,
+    model: str,
+    driver: str,
+    expected_output: str,
+    runner_args: Sequence[str],
+    timeout_secs: Optional[int] = None,
+    labels: Sequence[str] = [],
+    xfail_platforms: Sequence[str] = [],
+    unsupported_platforms: Sequence[str] = []) -> str:
+  name_block = _get_string_arg_block("NAME", target_name)
+  model_block = _get_string_arg_block("MODEL", model)
+  driver_block = _get_string_arg_block("DRIVER", driver)
+  expected_output_block = _get_string_arg_block("EXPECTED_OUTPUT",
+                                                expected_output)
+  timeout_block = _get_string_arg_block(
+      "TIMEOUT",
+      str(timeout_secs) if timeout_secs is not None else None)
+  runner_args_block = _get_string_list_arg_block("RUNNER_ARGS", runner_args)
+  labels_block = _get_string_list_arg_block("LABELS", labels)
+  xfail_platforms_block = _get_string_list_arg_block("XFAIL_PLATFORMS",
+                                                     xfail_platforms)
+  unsupported_platforms_block = _get_string_list_arg_block(
+      "UNSUPPORTED_PLATFORMS", unsupported_platforms)
+  return _convert_block_to_string(
+      _build_call_rule(rule_name="iree_benchmark_suite_module_test",
+                       parameter_blocks=[
+                           name_block, model_block, driver_block,
+                           expected_output_block, timeout_block,
+                           runner_args_block, labels_block,
+                           xfail_platforms_block, unsupported_platforms_block
+                       ]))
+
+
 def build_add_dependencies(target: str, deps: List[str]) -> str:
   if len(deps) == 0:
     raise ValueError("Target dependencies can't be empty.")
@@ -170,33 +204,6 @@ def build_add_dependencies(target: str, deps: List[str]) -> str:
                                   _get_block_body(deps_list) + [")"])
 
 
-def build_iree_run_module_test(target_name: str,
-                               module_src: str,
-                               driver: str,
-                               expected_output: str,
-                               runner_args: Sequence[str],
-                               supported_platforms: Sequence[str],
-                               timeout_secs: Optional[int] = None,
-                               labels: Sequence[str] = [],
-                               deps: Sequence[str] = []) -> str:
-  name_block = _get_string_arg_block("NAME", target_name)
-  module_src_block = _get_string_arg_block("MODULE_SRC", module_src)
-  driver_block = _get_string_arg_block("DRIVER", driver)
-  expected_output_block = _get_string_arg_block("EXPECTED_OUTPUT",
-                                                expected_output)
-  timeout_block = _get_string_arg_block(
-      "TIMEOUT",
-      str(timeout_secs) if timeout_secs is not None else None)
-  runner_args_block = _get_string_list_arg_block("RUNNER_ARGS", runner_args)
-  supported_platforms_block = _get_string_list_arg_block(
-      "SUPPORTED_PLATFORMS", supported_platforms)
-  labels_block = _get_string_list_arg_block("LABELS", labels)
-  deps_block = _get_string_list_arg_block("DEPS", deps)
-  return _convert_block_to_string(
-      _build_call_rule(rule_name="iree_run_module_test",
-                       parameter_blocks=[
-                           name_block, module_src_block, driver_block,
-                           expected_output_block, timeout_block,
-                           runner_args_block, supported_platforms_block,
-                           labels_block, deps_block
-                       ]))
+def build_set(variable_name: str, value: str) -> str:
+  return _convert_block_to_string([f"set({variable_name}"] +
+                                  _get_block_body([value]) + [")"])

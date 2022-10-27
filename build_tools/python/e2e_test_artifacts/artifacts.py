@@ -10,7 +10,6 @@ from typing import Sequence
 import pathlib
 
 from benchmark_suites.iree import benchmark_collections
-from e2e_model_tests import benchmark_model_tests
 from e2e_test_artifacts import model_artifacts, iree_artifacts
 from e2e_test_framework.models import model_groups
 from e2e_test_framework.definitions import common_definitions, iree_definitions
@@ -48,16 +47,10 @@ def _generate_artifacts_root(
 def generate_default_artifacts_root() -> ArtifactsRoot:
   """Generates artifacts from all configs."""
 
-  # Unions and dedups all IREE module generation configs.
-  iree_module_gen_config_set = set()
-  iree_benchmark_gen_configs, _ = benchmark_collections.generate_benchmarks()
-  iree_module_gen_config_set.update(iree_benchmark_gen_configs)
-  iree_module_gen_config_set.update(
-      test_config.module_generation_config
-      for test_config in benchmark_model_tests.generate_model_tests())
-  iree_module_gen_configs = list(iree_module_gen_config_set)
-  iree_module_gen_configs.sort(key=lambda config: config.get_id())
+  # Currently benchmark is the only source of module generation configs.
+  (iree_module_generation_configs,
+   _) = benchmark_collections.generate_benchmarks()
 
   return _generate_artifacts_root(
       models=model_groups.ALL,
-      iree_module_generation_configs=iree_module_gen_configs)
+      iree_module_generation_configs=iree_module_generation_configs)

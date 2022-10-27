@@ -18,8 +18,7 @@ import e2e_model_tests.cmake_generator
 
 
 def main():
-  cmake_rules = e2e_model_tests.cmake_generator.generate_rules(
-      pathlib.PurePath("${ROOT_ARTIFACT_DIR}"))
+  cmake_rules = e2e_model_tests.cmake_generator.generate_rules()
   print("\n".join(cmake_rules))
 
 
