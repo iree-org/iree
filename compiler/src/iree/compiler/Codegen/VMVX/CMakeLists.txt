@@ -19,6 +19,7 @@ iree_cc_library(
     "VMVXAssignConstantOrdinals.cpp"
     "VMVXLinkExecutables.cpp"
   DEPS
+    IREELinalgExtDialect
     LLVMSupport
     MLIRArithDialect
     MLIRBufferizationDialect

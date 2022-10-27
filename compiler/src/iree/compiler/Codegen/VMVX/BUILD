@@ -28,6 +28,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/VMVX/IR",
         "//compiler/src/iree/compiler/Dialect/VMVX/IR:VMVXDialect",
         "//compiler/src/iree/compiler/Utils",
+        "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
         "//runtime/src/iree/builtins/ukernel",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithDialect",
