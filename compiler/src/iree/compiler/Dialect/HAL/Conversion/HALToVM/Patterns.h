@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_DIALECT_HAL_CONVERSION_HALTOVM_CONVERTHALTOVM_H_
-#define IREE_COMPILER_DIALECT_HAL_CONVERSION_HALTOVM_CONVERTHALTOVM_H_
+#ifndef IREE_COMPILER_DIALECT_HAL_CONVERSION_HALTOVM_PATTERNS_H_
+#define IREE_COMPILER_DIALECT_HAL_CONVERSION_HALTOVM_PATTERNS_H_
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
@@ -31,4 +31,4 @@ IREE::VM::RodataOp createExecutableBinaryRodata(
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_HAL_CONVERSION_HALTOVM_CONVERTHALTOVM_H_
+#endif  // IREE_COMPILER_DIALECT_HAL_CONVERSION_HALTOVM_PATTERNS_H_

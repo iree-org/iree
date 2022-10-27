@@ -12,7 +12,7 @@
 // DispatchLinalgOnTensors.cpp.
 
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
-#include "iree/compiler/Dialect/Flow/Conversion/TensorToFlow/ConvertTensorToFlow.h"
+#include "iree/compiler/Dialect/Flow/Conversion/TensorToFlow/Patterns.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/ConvertRegionToWorkgroups.h"

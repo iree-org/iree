@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Stream/Conversion/HALToStream/ConvertHALToStream.h"
+#include "iree/compiler/Dialect/Stream/Conversion/HALToStream/Patterns.h"
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Stream/Conversion/PatternUtils.h"

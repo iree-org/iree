@@ -4,23 +4,23 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_DIALECT_STREAM_CONVERSION_FLOWTOSTREAM_CONVERTFLOWTOSTREAM_H_
-#define IREE_COMPILER_DIALECT_STREAM_CONVERSION_FLOWTOSTREAM_CONVERTFLOWTOSTREAM_H_
+#ifndef IREE_COMPILER_DIALECT_STREAM_CONVERSION_UTILTOSTREAM_PATTERNS_H_
+#define IREE_COMPILER_DIALECT_STREAM_CONVERSION_UTILTOSTREAM_PATTERNS_H_
 
 #include "mlir/IR/MLIRContext.h"
-#include "mlir/IR/OperationSupport.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
 namespace iree_compiler {
 
-// Populates conversion patterns that perform flow->stream conversion.
+// Populates conversion patterns that perform util->stream conversion.
 // These patterns ensure that nested types are run through the provided
 // |typeConverter|.
-void populateFlowToStreamConversionPatterns(MLIRContext *context,
+void populateUtilToStreamConversionPatterns(MLIRContext *context,
                                             TypeConverter &typeConverter,
                                             RewritePatternSet &patterns);
-void populateFlowToStreamConversionPatterns(MLIRContext *context,
+void populateUtilToStreamConversionPatterns(MLIRContext *context,
                                             ConversionTarget &conversionTarget,
                                             TypeConverter &typeConverter,
                                             RewritePatternSet &patterns);
@@ -28,4 +28,4 @@ void populateFlowToStreamConversionPatterns(MLIRContext *context,
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_STREAM_CONVERSION_FLOWTOSTREAM_CONVERTFLOWTOSTREAM_H_
+#endif  // IREE_COMPILER_DIALECT_STREAM_CONVERSION_UTILTOSTREAM_PATTERNS_H_
