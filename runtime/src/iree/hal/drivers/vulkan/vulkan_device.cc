@@ -1232,20 +1232,35 @@ static iree_status_t iree_hal_vulkan_device_profiling_begin(
   iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
   (void)device;
 
-  // For now we only support RenderDoc. As much as possible we should try to use
-  // standardized Vulkan layers to do profiling configuration/control like
-  // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_performance_query.html
-  // to avoid the combinatorial explosion of vendor tooling hooks.
-  // Since RenderDoc is fairly simple, cross-platform, and cross-vendor we
-  // support it here. If this grows beyond a few lines of code we should shuffle
-  // it off to another file.
   if (iree_all_bits_set(options->mode,
                         IREE_HAL_DEVICE_PROFILING_MODE_QUEUE_OPERATIONS)) {
+    // AMD-specific - we could snoop the device to only do this for the vendor
+    // but this is relatively cheap and could be useful to others. Ideally
+    // there would be a khronos standard for this.
+    // TODO(benvanik): figure out if we need to do this for all queues.
+    auto& syms = device->logical_device->syms();
+    if (syms->vkQueueInsertDebugUtilsLabelEXT) {
+      VkDebugUtilsLabelEXT begin_label = {};
+      begin_label.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
+      begin_label.pNext = NULL;
+      begin_label.pLabelName = "AmdFrameBegin";
+      device->logical_device->syms()->vkQueueInsertDebugUtilsLabelEXT(
+          device->dispatch_queues[0]->handle(), &begin_label);
+    }
+
+    // For now we only support RenderDoc. As much as possible we should try to
+    // use standardized Vulkan layers to do profiling configuration/control like
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_performance_query.html
+    // to avoid the combinatorial explosion of vendor tooling hooks.
+    // Since RenderDoc is fairly simple, cross-platform, and cross-vendor we
+    // support it here. If this grows beyond a few lines of code we should
+    // shuffle it off to another file.
 #if defined(IREE_HAL_VULKAN_HAVE_RENDERDOC)
     iree_hal_vulkan_begin_renderdoc_capture(device->renderdoc_api,
                                             device->instance, options);
 #endif  // IREE_HAL_VULKAN_HAVE_RENDERDOC
   }
+
   return iree_ok_status();
 }
 
@@ -1258,6 +1273,18 @@ static iree_status_t iree_hal_vulkan_device_profiling_end(
   iree_hal_vulkan_end_renderdoc_capture(device->renderdoc_api,
                                         device->instance);
 #endif  // IREE_HAL_VULKAN_HAVE_RENDERDOC
+
+  // AMD-specific.
+  auto& syms = device->logical_device->syms();
+  if (syms->vkQueueInsertDebugUtilsLabelEXT) {
+    VkDebugUtilsLabelEXT end_label = {};
+    end_label.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
+    end_label.pNext = NULL;
+    end_label.pLabelName = "AmdFrameEnd";
+    device->logical_device->syms()->vkQueueInsertDebugUtilsLabelEXT(
+        device->dispatch_queues[0]->handle(), &end_label);
+  }
+
   return iree_ok_status();
 }
 
