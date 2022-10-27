@@ -15,12 +15,12 @@ func.func @batch_matmul_transpose(%a: tensor<4x384x384xf32>, %b: tensor<4x384x32
 
 // Check that linalg.generic's input and output indexing maps are exchanged.
 
-//      CHECK: #map0 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-//      CHECK: #map1 = affine_map<(d0, d1, d2) -> (d1, d0, d2)>
+//      CHECK: #[[$MAP0:.+]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+//      CHECK: #[[$MAP1:.+]] = affine_map<(d0, d1, d2) -> (d1, d0, d2)>
 // CHECK-LABEL: func.func @batch_matmul_transpose
 //      CHECK:   %[[MATMUL:.+]] = linalg.batch_matmul
 //      CHECK:   linalg.generic
-// CHECK-SAME:     indexing_maps = [#map0, #map1]
+// CHECK-SAME:     indexing_maps = [#[[$MAP0]], #[[$MAP1]]]
 // CHECK-SAME:     outs(%[[OUT:.+]] : tensor<384x4x32xf32>)
 
 // -----
@@ -42,11 +42,11 @@ func.func @matmul_transpose(%a: tensor<128x384xf32>, %b: tensor<384x384xf32>) ->
 
 // Check that linalg.generic's input and output indexing maps are exchanged.
 
-//      CHECK: #map0 = affine_map<(d0, d1) -> (d0, d1)>
-//      CHECK: #map1 = affine_map<(d0, d1) -> (d1, d0)>
+//      CHECK: #[[$MAP0:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+//      CHECK: #[[$MAP1:.+]] = affine_map<(d0, d1) -> (d1, d0)>
 // CHECK-LABEL: func.func @matmul_transpose
 //      CHECK:   %[[MATMUL:.+]] = linalg.matmul
 //      CHECK:   linalg.generic
-// CHECK-SAME:     indexing_maps = [#map0, #map1]
+// CHECK-SAME:     indexing_maps = [#[[$MAP0]], #[[$MAP1]]]
 // CHECK-SAME:     ins(%[[MATMUL]] : tensor<128x384xf32>
 // CHECK-SAME:     outs(%[[OUT:.+]] : tensor<384x128xf32>)
