@@ -30,6 +30,7 @@ iree_cc_library(
   SRCS
     "common.c"
   DEPS
+    ::exported_flag_bits
     iree::base::core_headers
     iree::builtins::ukernel::arch::config
   PUBLIC

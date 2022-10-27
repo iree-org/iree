@@ -28,6 +28,7 @@ iree_runtime_cc_library(
         "pack_types.h",
     ],
     deps = [
+        ":exported_flag_bits",
         "//runtime/src/iree/base:core_headers",
         "//runtime/src/iree/builtins/ukernel/arch:config",
     ],
