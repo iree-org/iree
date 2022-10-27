@@ -33,7 +33,7 @@
 // * The high 16 bits (bits 16..31) are for ukernel-specific bits.
 
 // Common bits (bits 0..15)
-#define IREE_UKERNEL_FLAG_ACCUMULATE 1
+#define IREE_UKERNEL_FLAG_ACCUMULATE 0x1u
 #define IREE_UKERNEL_FLAG_ACCUMULATE_BIT_POS 0
 
 // UKernel-specific bits (bits 16..31)

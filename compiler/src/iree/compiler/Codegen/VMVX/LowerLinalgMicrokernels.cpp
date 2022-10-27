@@ -890,20 +890,6 @@ struct LinalgFillConversion : public OpRewritePattern<linalg::FillOp> {
 struct LinalgExtPackConversion
     : public OpRewritePattern<IREE::LinalgExt::PackOp> {
   using OpRewritePattern::OpRewritePattern;
-  struct OpInfo {
-    IREE::LinalgExt::PackOp op;
-    Value scalar;
-    Value out;
-    StridedBufferAnalysis outAnal;
-    int64_t getRank() { return outAnal.getRank(); }
-
-    OpInfo(IREE::LinalgExt::PackOp op)
-        : op(op), outAnal(op.getOutputs().front()) {
-      scalar = op.getInputs().front();
-      out = op.getOutputs().front();
-    }
-  };
-
   static bool isSupportedElementTypes(Type inElType, Type outElType) {
     if (inElType.isF32() && outElType.isF32()) {
       return true;
@@ -919,12 +905,8 @@ struct LinalgExtPackConversion
 
   LogicalResult matchAndRewrite(IREE::LinalgExt::PackOp op,
                                 PatternRewriter &rewriter) const override {
-    OpInfo info(op);
-    Value in = op.getInputs().front();
-    Value out = op.getOutputs().front();
-
-    MemRefType inType = in.getType().cast<MemRefType>();
-    MemRefType outType = out.getType().cast<MemRefType>();
+    MemRefType inType = op.getInputType().cast<MemRefType>();
+    MemRefType outType = op.getOutputType().cast<MemRefType>();
 
     if (!isSupportedElementTypes(inType.getElementType(),
                                  outType.getElementType())) {
@@ -988,8 +970,8 @@ struct LinalgExtPackConversion
           "expected the output's inner dimensions to be contiguous row-major");
     }
 
-    StridedBufferAnalysis inAnalysis(in);
-    StridedBufferAnalysis outAnalysis(out);
+    StridedBufferAnalysis inAnalysis(op.getInput());
+    StridedBufferAnalysis outAnalysis(op.getOutput());
 
     if (!inAnalysis.isValid()) {
       return rewriter.notifyMatchFailure(
@@ -1025,7 +1007,7 @@ struct LinalgExtPackConversion
     Value outStride0 = outDesc.strides[0];
 
     rewriter.replaceOpWithNewOp<IREE::VMVX::PackOp>(
-        info.op,
+        op,
         // input
         inBuffer, inDesc.offset, inStride0,
         // output
