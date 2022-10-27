@@ -11,11 +11,13 @@
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Transforms.h"
 #include "iree-dialects/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
@@ -907,9 +909,9 @@ struct LinalgExtPackOpVectorizationPass
     MLIRContext *ctx = &getContext();
     // Apply tiling to make outer dims be all 1s.
     {
-      RewritePatternSet patterns(ctx);
-      auto tilingOptions =
-          linalg::LinalgTilingOptions().setTileSizeComputationFunction(
+      SimplePatternRewriter rewriter(ctx);
+      auto options =
+          scf::SCFTilingOptions().setTileSizeComputationFunction(
               [](OpBuilder &builder, Operation *op) {
                 Location loc = op->getLoc();
                 auto packOp = cast<PackOp>(op);
@@ -921,17 +923,12 @@ struct LinalgExtPackOpVectorizationPass
                 return tileSizes;
               });
       auto funcOp = getOperation();
-      patterns.add<TilingInterfaceTilingPattern>(
-          ctx, tilingOptions,
-          LinalgExt::LinalgTransformationFilter(
-              ArrayRef<StringAttr>{},
-              StringAttr::get(&getContext(), "TILE_PACK_OP")));
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-        return signalPassFailure();
-      }
       funcOp->walk([&](LinalgExt::PackOp op) {
-        op->removeAttr(
-            IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker);
+        FailureOr<scf::SCFTilingResult> tilingResult = scf::tileUsingSCFForOp(
+            rewriter, cast<TilingInterface>(op.getOperation()), options);
+        if (failed(tilingResult))
+          return signalPassFailure();
+        rewriter.replaceOp(op, tilingResult->replacements);
       });
     }
 
