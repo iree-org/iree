@@ -910,18 +910,16 @@ struct LinalgExtPackOpVectorizationPass
     // Apply tiling to make outer dims be all 1s.
     {
       SimplePatternRewriter rewriter(ctx);
-      auto options =
-          scf::SCFTilingOptions().setTileSizeComputationFunction(
-              [](OpBuilder &builder, Operation *op) {
-                Location loc = op->getLoc();
-                auto packOp = cast<PackOp>(op);
-                auto innerDims =
-                    extractFromI64ArrayAttr(packOp.getInnerDimsPos());
-                int inputRank = packOp.getInputRank();
-                SmallVector<Value> tileSizes(
-                    inputRank, builder.create<arith::ConstantIndexOp>(loc, 1));
-                return tileSizes;
-              });
+      auto options = scf::SCFTilingOptions().setTileSizeComputationFunction(
+          [](OpBuilder &builder, Operation *op) {
+            Location loc = op->getLoc();
+            auto packOp = cast<PackOp>(op);
+            auto innerDims = extractFromI64ArrayAttr(packOp.getInnerDimsPos());
+            int inputRank = packOp.getInputRank();
+            SmallVector<Value> tileSizes(
+                inputRank, builder.create<arith::ConstantIndexOp>(loc, 1));
+            return tileSizes;
+          });
       auto funcOp = getOperation();
       funcOp->walk([&](LinalgExt::PackOp op) {
         FailureOr<scf::SCFTilingResult> tilingResult = scf::tileUsingSCFForOp(
