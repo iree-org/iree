@@ -878,12 +878,8 @@ static void insertSerializationBarriers(Location loc, Block &block,
   // TODO(benvanik): derive based on the type of operations that surround the
   // barriers. Can use deriveCommandCategories on the ranges to see what kind
   // of ops happen above and below, but really some analysis is required.
-  auto sourceStage = IREE::HAL::ExecutionStageBitfield::CommandRetire |
-                     IREE::HAL::ExecutionStageBitfield::Transfer |
-                     IREE::HAL::ExecutionStageBitfield::Dispatch;
-  auto targetStage = IREE::HAL::ExecutionStageBitfield::CommandIssue |
-                     IREE::HAL::ExecutionStageBitfield::Transfer |
-                     IREE::HAL::ExecutionStageBitfield::Dispatch;
+  auto sourceStage = IREE::HAL::ExecutionStageBitfield::Dispatch;
+  auto targetStage = IREE::HAL::ExecutionStageBitfield::Dispatch;
   auto flags = IREE::HAL::ExecutionBarrierFlagBitfield::None;
 
   // Insert barriers after every op.
