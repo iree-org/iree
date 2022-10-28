@@ -47,7 +47,7 @@ static FailureOr<unsigned> findIndexOfConstResult(const AffineMap &map,
 static SmallVector<OpOperand *> getUsesInRegion(Value value, Region *region) {
   SmallVector<OpOperand *> uses;
   for (OpOperand &use : value.getUses()) {
-    if (use.getOwner()->getParentRegion() == region) {
+    if (region->isAncestor(use.getOwner()->getParentRegion())) {
       uses.push_back(&use);
     }
   }
