@@ -23,7 +23,6 @@ iree_runtime_cc_library(
     srcs = [
         "allocator.c",
         "allocator.h",
-        "api.c",
         "assert.h",
         "bitfield.c",
         "bitfield.h",
