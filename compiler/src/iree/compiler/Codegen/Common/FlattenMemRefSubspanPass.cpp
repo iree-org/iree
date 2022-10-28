@@ -75,15 +75,6 @@ static bool isRankOneMemRef(Type type) {
   return false;
 }
 
-/// Returns true if the given `type` is a MemRef of rank 1.
-static bool isStaticMemRef(Type type) {
-  if (auto memrefType = type.dyn_cast<MemRefType>()) {
-    auto memrefShape = memrefType.getShape();
-    return llvm::any_of(memrefShape, [](int64_t s) { return s != ShapedType::kDynamicSize; });
-  }
-  return false;
-}
-
 /// Flattens n-D MemRef to 1-D MemRef and allows other types.
 struct FlattenMemRefTypeConverter final : public TypeConverter {
   FlattenMemRefTypeConverter() {
@@ -384,8 +375,9 @@ struct LinearizeLoadIndices final : public OpConversionPattern<memref::LoadOp> {
 
 
 /// Linearizes indices in gpu.subgroup_mma_load_matrix ops.
-struct LinearizeMMALoadIndices final : public OpConversionPattern<gpu::SubgroupMmaLoadMatrixOp> {
-  using OpConversionPattern<gpu::SubgroupMmaLoadMatrixOp>::OpConversionPattern;
+struct LinearizeMMALoadIndices final
+    : public OpConversionPattern<gpu::SubgroupMmaLoadMatrixOp> {
+  using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
       gpu::SubgroupMmaLoadMatrixOp loadOp, OpAdaptor adaptor,
@@ -401,8 +393,9 @@ struct LinearizeMMALoadIndices final : public OpConversionPattern<gpu::SubgroupM
       return loadOp.emitOpError() << "failed to linearize index";
     }
 
-    rewriter.replaceOpWithNewOp<gpu::SubgroupMmaLoadMatrixOp>(loadOp,loadOp.getRes().getType(), adaptor.getSrcMemref(),
-                                                linearIndex,loadOp.getLeadDimension());
+    rewriter.replaceOpWithNewOp<gpu::SubgroupMmaLoadMatrixOp>(
+        loadOp, loadOp.getType(), adaptor.getSrcMemref(), linearIndex,
+        loadOp.getLeadDimension());
     return success();
   }
 };
@@ -435,7 +428,7 @@ struct LinearizeStoreIndices final
 /// Linearizes indices in gpu.subgroup_mma_store_matrix ops.
 struct LinearizeMMAStoreIndices final
     : public OpConversionPattern<gpu::SubgroupMmaStoreMatrixOp> {
-  using OpConversionPattern<gpu::SubgroupMmaStoreMatrixOp>::OpConversionPattern;
+  using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
       gpu::SubgroupMmaStoreMatrixOp storeOp, OpAdaptor adaptor,
@@ -445,14 +438,15 @@ struct LinearizeMMAStoreIndices final
           storeOp, "expected converted memref of rank == 1");
     }
 
-    Value linearIndex = linearizeIndices(
-        storeOp.getDstMemref(), storeOp.getIndices(), storeOp.getLoc(), rewriter);
+    Value linearIndex =
+        linearizeIndices(storeOp.getDstMemref(), storeOp.getIndices(),
+                         storeOp.getLoc(), rewriter);
     if (!linearIndex) {
       return storeOp.emitOpError() << "failed to linearize index";
     }
 
     rewriter.replaceOpWithNewOp<gpu::SubgroupMmaStoreMatrixOp>(
-        storeOp,storeOp.getSrc(), adaptor.getDstMemref(), linearIndex,
+        storeOp, storeOp.getSrc(), adaptor.getDstMemref(), linearIndex,
         storeOp.getLeadDimension());
     return success();
   }
@@ -685,6 +679,22 @@ struct RemoveAssumeAlignOp
   }
 };
 
+struct RemoveDynamicCastOp final : public OpRewritePattern<memref::CastOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(memref::CastOp castOp,
+                                PatternRewriter &rewriter) const override {
+    auto srcType = castOp.getSource().getType().cast<MemRefType>();
+    auto dstType = castOp.getType().cast<MemRefType>();
+    if (srcType.getRank() == 1 && srcType.hasStaticShape() &&
+        dstType.getRank() == 1 && !dstType.hasStaticShape()) {
+      rewriter.replaceOp(castOp, castOp.getSource());
+      return success();
+    }
+    return failure();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Pass
 //===----------------------------------------------------------------------===//
@@ -702,20 +712,20 @@ struct FlattenMemRefSubspanPass
     // First flatten the dimensions of subspan op and their consumer load/store
     // ops. This requires setting up conversion targets with type converter.
 
-    MLIRContext &context = getContext();
+    MLIRContext *context = &getContext();
 
     // This pass currently doesn't support alignment hints so remove them first.
-    RewritePatternSet patterns(&context);
-    patterns.add<RemoveAssumeAlignOp>(&context);
+    RewritePatternSet patterns(context);
+    patterns.add<RemoveAssumeAlignOp>(context);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
 
-    RewritePatternSet flattenPatterns(&context);
+    RewritePatternSet flattenPatterns(context);
 
     // For subspan ops that "generate" MemRef values, convert all MemRef types
     // to 1-D dynamic sized one. This matches how IREE models buffers nicely.
     FlattenMemRefTypeConverter fullyDynamicTypeConverter;
     flattenPatterns.add<FlattenBindingSubspan>(fullyDynamicTypeConverter,
-                                               &context);
+                                               context);
 
     // For other ops that generate MemRef values, we may not be able to go fully
     // dynamic (e.g., memref::GlobalOp). Still convert everything to 1-D though.
@@ -725,10 +735,6 @@ struct FlattenMemRefSubspanPass
           // 1-D MemRef types are okay.
           if (isRankOneMemRef(type)) return type;
 
-          else if(isStaticMemRef(type)){
-            return MemRefType::get(type.getNumElements(), type.getElementType(),
-                                   AffineMap(), type.getMemorySpace());
-          }
           // Fall back to the default conversion flow.
           return llvm::None;
         });
@@ -740,9 +746,9 @@ struct FlattenMemRefSubspanPass
              LinearizeTransferWriteIndices, AdjustConversionCast,
              FlattenSubView, FoldMemRefReshape<memref::CollapseShapeOp>,
              FoldMemRefReshape<memref::ExpandShapeOp>>(
-            only1DStaticTypeConverter, &context);
+            only1DStaticTypeConverter, context);
 
-    ConversionTarget target(context);
+    ConversionTarget target(*context);
     target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
     target.addDynamicallyLegalOp<memref::AllocaOp, memref::AllocOp,
                                  memref::GetGlobalOp>([](Operation *op) {
@@ -765,15 +771,17 @@ struct FlattenMemRefSubspanPass
     target.addDynamicallyLegalOp<memref::LoadOp>([](memref::LoadOp loadOp) {
       return isRankOneMemRef(loadOp.getMemRefType());
     });
-    target.addDynamicallyLegalOp<gpu::SubgroupMmaLoadMatrixOp>([](gpu::SubgroupMmaLoadMatrixOp loadOp) {
-      return isRankOneMemRef(loadOp.getSrcMemref().getType());
-    });
+    target.addDynamicallyLegalOp<gpu::SubgroupMmaLoadMatrixOp>(
+        [](gpu::SubgroupMmaLoadMatrixOp loadOp) {
+          return isRankOneMemRef(loadOp.getSrcMemref().getType());
+        });
     target.addDynamicallyLegalOp<memref::StoreOp>([](memref::StoreOp storeOp) {
       return isRankOneMemRef(storeOp.getMemRefType());
     });
-      target.addDynamicallyLegalOp<gpu::SubgroupMmaStoreMatrixOp>([](gpu::SubgroupMmaStoreMatrixOp storeOp) {
-      return isRankOneMemRef(storeOp.getDstMemref().getType());
-    });
+    target.addDynamicallyLegalOp<gpu::SubgroupMmaStoreMatrixOp>(
+        [](gpu::SubgroupMmaStoreMatrixOp storeOp) {
+          return isRankOneMemRef(storeOp.getDstMemref().getType());
+        });
     target.addDynamicallyLegalOp<vector::TransferReadOp>(
         [](vector::TransferReadOp readOp) {
           return isRankOneMemRef(
@@ -802,7 +810,7 @@ struct FlattenMemRefSubspanPass
     }
 
     // Fold subviews if any new oportuinity has been created.
-    RewritePatternSet foldSubviewPatterns(&getContext());
+    RewritePatternSet foldSubviewPatterns(context);
     memref::populateFoldMemRefAliasOpPatterns(foldSubviewPatterns);
     if (failed(applyPatternsAndFoldGreedily(getOperation()->getRegions(),
                                             std::move(foldSubviewPatterns)))) {
@@ -810,12 +818,26 @@ struct FlattenMemRefSubspanPass
     }
 
     // Then fold byte offset on subspan ops into consumer load/store ops.
-    RewritePatternSet foldPatterns(&context);
+    RewritePatternSet foldPatterns(context);
     foldPatterns.add<FoldSubspanOffsetIntoLoadStore<memref::LoadOp>,
-                     FoldSubspanOffsetIntoLoadStore<memref::StoreOp>>(&context);
+                     FoldSubspanOffsetIntoLoadStore<memref::StoreOp>>(context);
 
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(foldPatterns)))) {
+      return signalPassFailure();
+    }
+
+    // Finally run canonicalization patterns for memref allocations. This helps
+    // to fold, e.g., `memref.alloc(%c24) : memref<?xf32, 3>` into
+    // `memref.alloc() : memref<24xf32, 3>` for later steps depending on static
+    // shaped memref allocations.
+    RewritePatternSet cleanupPatterns(context);
+    memref::AllocOp::getCanonicalizationPatterns(cleanupPatterns, context);
+    memref::AllocaOp::getCanonicalizationPatterns(cleanupPatterns, context);
+    cleanupPatterns.add<RemoveDynamicCastOp>(context);
+
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(cleanupPatterns)))) {
       return signalPassFailure();
     }
   }

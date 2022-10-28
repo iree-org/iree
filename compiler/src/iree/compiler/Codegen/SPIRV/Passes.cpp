@@ -45,7 +45,7 @@ namespace iree_compiler {
 // Flag to test out new cooperative matrix features
 static llvm::cl::opt<bool> promoteAndGPUCooperativeMatrix(
     "iree-spirv-promote-and-gpu-cooperative-matrix", llvm::cl::desc("promote to shared memory and add vector to gpu conversions for cooperative matrix"),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 // Allocation callbacks to use with upstream comprehensive bufferization
 static FailureOr<Value> gpuAllocateWorkgroupMemoryFn(OpBuilder &builder,
