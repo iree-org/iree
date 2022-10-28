@@ -20,7 +20,6 @@
 #include "iree/testing/status_matchers.h"
 #include "iree/tooling/device_util.h"
 #include "iree/vm/api.h"
-#include "iree/vm/ref_cc.h"
 
 namespace iree {
 namespace {

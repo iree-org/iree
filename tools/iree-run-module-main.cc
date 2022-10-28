@@ -22,7 +22,6 @@
 #include "iree/tooling/device_util.h"
 #include "iree/tooling/vm_util_cc.h"
 #include "iree/vm/api.h"
-#include "iree/vm/ref_cc.h"
 
 IREE_FLAG(string, entry_function, "",
           "Name of a function contained in the module specified by module_file "

@@ -16,7 +16,7 @@
 #include "iree/modules/hal/module.h"
 #include "iree/tooling/buffer_view_matchers.h"
 #include "iree/tooling/vm_util.h"
-#include "iree/vm/ref_cc.h"
+#include "iree/vm/api.h"
 
 using namespace iree;
 

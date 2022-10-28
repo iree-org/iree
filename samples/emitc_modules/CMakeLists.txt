@@ -30,7 +30,6 @@ iree_cc_test(
     iree::testing::gtest
     iree::testing::gtest_main
     iree::vm
-    iree::vm::cc
 )
 
 iree_cc_test(
@@ -45,7 +44,6 @@ iree_cc_test(
     iree::testing::gtest
     iree::testing::gtest_main
     iree::vm
-    iree::vm::cc
 )
 
 iree_c_module(

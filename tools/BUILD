@@ -35,7 +35,6 @@ cc_binary(
         "//runtime/src/iree/tooling:device_util",
         "//runtime/src/iree/tooling:vm_util_cc",
         "//runtime/src/iree/vm",
-        "//runtime/src/iree/vm:cc",
         "@com_google_benchmark//:benchmark",
     ],
 )
@@ -138,7 +137,6 @@ cc_binary(
         "//runtime/src/iree/tooling:vm_util_cc",
         "//runtime/src/iree/vm",
         "//runtime/src/iree/vm:bytecode_module",
-        "//runtime/src/iree/vm:cc",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LLVMToLLVMIRTranslation",
@@ -163,7 +161,6 @@ cc_binary(
         "//runtime/src/iree/tooling:device_util",
         "//runtime/src/iree/tooling:vm_util_cc",
         "//runtime/src/iree/vm",
-        "//runtime/src/iree/vm:cc",
     ],
 )
 

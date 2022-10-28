@@ -27,7 +27,6 @@ iree_cc_library(
   HDRS
     "native_module_cc.h"
     "native_module_packing.h"
-    "ref_cc.h"
   DEPS
     ::vm
     iree::base
@@ -61,6 +60,7 @@ iree_cc_library(
     "module.c"
     "native_module.c"
     "ref.c"
+    "ref_cc.h"
     "shims.c"
     "stack.c"
   DEPS

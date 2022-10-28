@@ -70,7 +70,6 @@
 #include "iree/tooling/device_util.h"
 #include "iree/tooling/vm_util_cc.h"
 #include "iree/vm/api.h"
-#include "iree/vm/ref_cc.h"
 
 constexpr char kNanosecondsUnitString[] = "ns";
 constexpr char kMicrosecondsUnitString[] = "us";

@@ -57,7 +57,6 @@ iree_cc_library(
     iree::hal
     iree::modules::hal
     iree::vm
-    iree::vm::cc
   PUBLIC
 )
 
@@ -75,7 +74,6 @@ iree_cc_test(
     iree::testing::gtest
     iree::testing::gtest_main
     iree::vm
-    iree::vm::cc
 )
 
 iree_cc_library(
@@ -180,7 +178,7 @@ iree_cc_library(
     iree::base
     iree::base::internal::span
     iree::base::tracing
-    iree::vm::cc
+    iree::vm
   PUBLIC
 )
 
@@ -198,7 +196,6 @@ iree_cc_test(
     iree::testing::gtest
     iree::testing::gtest_main
     iree::vm
-    iree::vm::cc
 )
 
 # libyaml does not build cleanly on bare-metal systems

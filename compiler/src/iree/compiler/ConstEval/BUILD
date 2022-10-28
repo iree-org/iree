@@ -80,7 +80,6 @@ iree_compiler_cc_library(
         "//runtime/src/iree/tooling:vm_util",
         "//runtime/src/iree/vm",
         "//runtime/src/iree/vm:bytecode_module",
-        "//runtime/src/iree/vm:cc",
         "@llvm-project//mlir:IR",
     ],
 )
