@@ -54,28 +54,6 @@ static SmallVector<OpOperand *> getUsesInRegion(Value value, Region *region) {
   return uses;
 }
 
-LogicalResult matchTileAndDistributionLoop(Value iv, OpFoldResult &lb,
-                                           OpFoldResult &ub,
-                                           OpFoldResult &step) {
-  scf::ForOp forOp = scf::getForInductionVarOwner(iv);
-  if (!forOp) return failure();
-
-  auto loopInfo = isTiledAndDistributedLoop(forOp);
-  if (!loopInfo) return failure();
-
-  Optional<int64_t> untiledStep = getConstantIntValue(loopInfo->untiledStep);
-  // For IREE right now the original untiled loop should have step 1..
-  if (!untiledStep || *untiledStep != 1) return failure();
-  // ..and we tile according to some static tile sizes for processors.
-  if (!loopInfo->tileSize) return failure();
-
-  lb = loopInfo->untiledLowerBound;
-  ub = loopInfo->untiledUpperBound;
-  // The "step" expected by the upstream utility is really the tiling size.
-  step = OpBuilder(iv.getContext()).getIndexAttr(loopInfo->tileSize.value());
-  return success();
-}
-
 /// Match affine.min affine_map<(d0) -> (-d0 + UB, TILESIZE)>(%iv) from a
 /// tile-and-distribution loop.
 static LogicalResult matchBoundedTileSizeOp(AffineMinOp minOp, int64_t &lb,
@@ -86,8 +64,8 @@ static LogicalResult matchBoundedTileSizeOp(AffineMinOp minOp, int64_t &lb,
   if (map.getNumResults() != 2) return failure();
 
   OpFoldResult lbOfr, ubOfr, tileSizeOfr;
-  if (failed(matchTileAndDistributionLoop(minOp.getOperand(0), lbOfr, ubOfr,
-                                          tileSizeOfr)))
+  if (failed(matchTileAndDistributedLoop(minOp.getOperand(0), lbOfr, ubOfr,
+                                         tileSizeOfr)))
     return failure();
 
   Optional<int64_t> lbOpt = getConstantIntValue(lbOfr);
