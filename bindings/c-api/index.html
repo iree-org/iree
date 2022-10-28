@@ -1248,13 +1248,7 @@ through the Hardware Abstraction Layer (HAL) interface.</p>
 <span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/vm/bytecode_module.h&quot;</span><span class="cp"></span>
 </code></pre></div>
 <p>Check the API version and register components:</p>
-<div class="highlight"><pre><span></span><code><span class="c1">// Statically linking the runtime should never have version conflicts,</span>
-<span class="c1">// however dynamically linking against a runtime shared object must</span>
-<span class="c1">// always verify that the version is as expected.</span>
-<span class="n">iree_api_version_t</span><span class="w"> </span><span class="n">actual_version</span><span class="p">;</span><span class="w"></span>
-<span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_api_version_check</span><span class="p">(</span><span class="n">IREE_API_VERSION_LATEST</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">actual_version</span><span class="p">));</span><span class="w"></span>
-
-<span class="c1">// Device drivers are managed through registries.</span>
+<div class="highlight"><pre><span></span><code><span class="c1">// Device drivers are managed through registries.</span>
 <span class="c1">// Applications may use multiple registries to more finely control driver</span>
 <span class="c1">// lifetimes and visibility.</span>
 <span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_hal_local_task_driver_module_register</span><span class="p">(</span><span class="w"></span>
