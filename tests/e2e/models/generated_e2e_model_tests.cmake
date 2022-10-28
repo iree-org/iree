@@ -32,6 +32,9 @@ iree_benchmark_suite_module_test(
   RUNNER_ARGS
     "--entry_function=main"
     "--function_input=1x224x224x3xf32=0"
+  UNSUPPORTED_PLATFORMS
+    "riscv32-linux"
+    "android-arm64-v8a"
 )
 
 iree_benchmark_suite_module_test(
@@ -46,6 +49,8 @@ iree_benchmark_suite_module_test(
   RUNNER_ARGS
     "--entry_function=main"
     "--function_input=1x224x224x3xui8=0"
+  UNSUPPORTED_PLATFORMS
+    "android-arm64-v8a"
 )
 
 iree_benchmark_suite_module_test(
@@ -61,6 +66,8 @@ iree_benchmark_suite_module_test(
     "--entry_function=main"
     "--function_input=1x257x257x3xf32=0"
     "--expected_f32_threshold=0.001"
+  UNSUPPORTED_PLATFORMS
+    "riscv32-linux"
 )
 
 iree_benchmark_suite_module_test(
@@ -75,5 +82,7 @@ iree_benchmark_suite_module_test(
   RUNNER_ARGS
     "--entry_function=main"
     "--function_input=1x96x96x1xi8=0"
+  UNSUPPORTED_PLATFORMS
+    "android-arm64-v8a"
 )
 

@@ -55,8 +55,7 @@ class ModelTestConfig(object):
   unsupported_platforms: List[CMakePlatform] = dataclasses.field(
       default_factory=list)
   # Platforms to expect this test failed.
-  expected_fail_platforms: List[CMakePlatform] = dataclasses.field(
-      default_factory=list)
+  xfail_platforms: List[CMakePlatform] = dataclasses.field(default_factory=list)
   # Extra flags for `iree-run-module`.
   extra_test_flags: List[str] = dataclasses.field(default_factory=list)
 
@@ -126,7 +125,13 @@ def generate_rules() -> List[str]:
         model=f"{model.id}_{model.name}",
         driver=execution_config.driver.value,
         expected_output=test_config.expected_output,
-        runner_args=__get_iree_run_module_args(test_config))
+        runner_args=__get_iree_run_module_args(test_config),
+        xfail_platforms=[
+            platform.value for platform in test_config.xfail_platforms
+        ],
+        unsupported_platforms=[
+            platform.value for platform in test_config.unsupported_platforms
+        ])
     cmake_rules.append(cmake_rule)
 
   return cmake_rules
