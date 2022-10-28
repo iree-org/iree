@@ -1,7 +1,5 @@
-#include "assembly.h"
-
-// TODO: share these bits with C/C++.
-.equ ACCUMULATE_FLAG_BIT_POS,0
+#include "iree/builtins/ukernel/arch/arm_64/assembly.h"
+#include "iree/builtins/ukernel/exported_flag_bits.h"
 
 // Parameters:
 //   x0: int32_t* out_tile
@@ -14,7 +12,7 @@
 BEGIN_FUNCTION iree_ukernel_mmt4d_i8i8i32_tile_8x8x4_arm_64_dotprod
 
         // Do we accumulate into or clear the accumulator tile?
-        tbnz w4, ACCUMULATE_FLAG_BIT_POS, 1f
+        tbnz w4, IREE_UKERNEL_FLAG_ACCUMULATE_BIT_POS, 1f
 
     0:
         // No-accumulate case. Clear the 8x8 accumulator tile.
