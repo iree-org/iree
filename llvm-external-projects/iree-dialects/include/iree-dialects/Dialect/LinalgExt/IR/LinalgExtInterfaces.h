@@ -11,6 +11,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OpDefinition.h"
+#include "mlir/Interfaces/DestinationStyleOpInterface.h"
 #include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Support/LLVM.h"
 
@@ -19,11 +20,6 @@ namespace iree_compiler {
 namespace IREE {
 namespace LinalgExt {
 class LinalgExtOp;
-
-/// OpOperand vector that implicitly converts to a Value vector.
-struct OpOperandVector : public SmallVector<OpOperand *> {
-  operator SmallVector<Value>();
-};
 
 namespace detail {
 LogicalResult verifyLinalgExtOpInterface(Operation *op);

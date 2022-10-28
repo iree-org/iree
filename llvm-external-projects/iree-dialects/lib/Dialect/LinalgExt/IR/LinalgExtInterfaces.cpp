@@ -13,14 +13,6 @@ using namespace mlir;
 namespace IREE = mlir::iree_compiler::IREE;
 using namespace IREE::LinalgExt;
 
-OpOperandVector::operator SmallVector<Value>() {
-  SmallVector<Value> result;
-  result.reserve(this->size());
-  llvm::transform(*this, std::back_inserter(result),
-                  [](OpOperand *opOperand) { return opOperand->get(); });
-  return result;
-}
-
 LogicalResult
 IREE::LinalgExt::detail::verifyLinalgExtOpInterface(Operation *op) {
   LinalgExtOp linalgExtOp = cast<LinalgExtOp>(op);
