@@ -13,6 +13,7 @@
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "llvm/ADT/APInt.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
@@ -20,14 +21,20 @@
 
 #define DEBUG_TYPE "iree-spirv-nvidia-config"
 
+using llvm::APIntOps::GreatestCommonDivisor;
+
+constexpr unsigned numSubgroupsPerWorkgroup = 4;
+
 namespace mlir {
 namespace iree_compiler {
 namespace detail {
 
 struct CooperativeMatrixSize {
-  int64_t m;
-  int64_t n;
-  int64_t k;
+  int64_t m;       // Native cooperative matrix size along M dimension
+  int64_t n;       // Native cooperative matrix size along N dimension
+  int64_t k;       // Native cooperative matrix size along K dimension
+  int64_t mCount;  // # subgroups along M dimension
+  int64_t nCount;  // # subgroups along N dimension
 };
 
 /// Returns the cooperative matrix (M, N, K) sizes that are supported by the
@@ -42,27 +49,39 @@ static Optional<CooperativeMatrixSize> getCooperativeMatrixSize(
         property.getCType() == resultType &&
         property.getResultType() == resultType &&
         property.getScope().getValue() == spirv::Scope::Subgroup) {
-      int matmulM = property.getMSize();
-      int matmulN = property.getNSize();
-      int matmulK = property.getKSize();
+      unsigned matmulM = property.getMSize();
+      unsigned matmulN = property.getNSize();
+      unsigned matmulK = property.getKSize();
       if (m % matmulM == 0 && n % matmulN == 0 && k % matmulK == 0) {
-        return CooperativeMatrixSize{matmulM, matmulN, matmulK};
+        uint64_t subgroupCount = numSubgroupsPerWorkgroup;
+        APInt nMultiplier(/*numBits=*/64, uint64_t(n / matmulN));
+        APInt mMultiplier(/*numBits=*/64, uint64_t(m / matmulM));
+        APInt nCount =
+            GreatestCommonDivisor(nMultiplier, APInt(64, subgroupCount));
+        subgroupCount /= nCount.getZExtValue();
+        APInt mCount =
+            GreatestCommonDivisor(mMultiplier, APInt(64, subgroupCount));
+
+        return CooperativeMatrixSize{matmulM, matmulN, matmulK,
+                                     mCount.getSExtValue(),
+                                     nCount.getSExtValue()};
       }
     }
   }
   return llvm::None;
 }
 
-static LogicalResult setOpConfig(const spirv::TargetEnv &targetEnv,
-                                 linalg::MatmulOp op) {
+static LogicalResult setCooperativeMatrixConfig(
+    const spirv::TargetEnv &targetEnv, linalg::MatmulOp op) {
   // This configuration is only for cooperative matrix.
   if (!targetEnv.allows(spirv::Capability::CooperativeMatrixNV) ||
       !targetEnv.allows(spirv::Extension::SPV_NV_cooperative_matrix)) {
     return success();
   }
 
-  Value lhs = op.getInputOperand(0)->get(), rhs = op.getInputOperand(1)->get(),
-        init = op.getOutputOperand(0)->get();
+  Value lhs = op.getInputOperand(0)->get();
+  Value rhs = op.getInputOperand(1)->get();
+  Value init = op.getOutputOperand(0)->get();
 
   ArrayRef<int64_t> lhsShape = lhs.getType().cast<ShapedType>().getShape();
   ArrayRef<int64_t> rhsShape = rhs.getType().cast<ShapedType>().getShape();
@@ -78,8 +97,8 @@ static LogicalResult setOpConfig(const spirv::TargetEnv &targetEnv,
     return v.getType().cast<ShapedType>().getElementType();
   };
 
-  auto resourceLimits = targetEnv.getResourceLimits();
-  auto coopMatSize = getCooperativeMatrixSize(
+  spirv::ResourceLimitsAttr resourceLimits = targetEnv.getResourceLimits();
+  Optional<CooperativeMatrixSize> coopMatSize = getCooperativeMatrixSize(
       resourceLimits, getElementType(lhs), getElementType(rhs),
       getElementType(init), lhsShape[0], rhsShape[1], lhsShape[1]);
   if (!coopMatSize) return success();
@@ -87,29 +106,15 @@ static LogicalResult setOpConfig(const spirv::TargetEnv &targetEnv,
   auto pipeline = IREE::Codegen::DispatchLoweringPassPipeline::
       SPIRVCooperativeMatrixVectorize;
 
-  // For now only support one subgroup per workgroup because in the above
-  // configuration deduction step we only consider whether the input workload is
-  // perfectly divisible by some native cooperative matrix size.
-  //
-  // TODO: Use some heuristics to deduce how many subgroups should be used and
-  // the tile sizes for each subgroup, considering the input workload size and
-  // native cooperative matrix size choices.
-  int subgroupSize = resourceLimits.getSubgroupSize();
-  std::array<int64_t, 3> workgroupSize = {subgroupSize, 8, 1};
-
-  //const std::array<int64_t, 2> workgroupXY = {subgroupSize, 2};
+  const int subgroupSize = resourceLimits.getSubgroupSize();
+  const int64_t numSubgroups = coopMatSize->mCount * coopMatSize->nCount;
+  std::array<int64_t, 3> workgroupSize{subgroupSize, numSubgroups, 1};
 
   TileSizesListType tileSizes;
-  // Again because we only consider whether the input workload is perfectly
-  // divisible by some native cooperative matrix size, not some multiples of it,
-  // need to make sure the subgroup tile sizes are the same as the workgroup
-  // one.
-  tileSizes.push_back({8*coopMatSize->m, coopMatSize->n, coopMatSize->k});
+  tileSizes.push_back({coopMatSize->mCount * coopMatSize->m,
+                       coopMatSize->nCount * coopMatSize->n, coopMatSize->k});
   tileSizes.push_back({coopMatSize->m, coopMatSize->n, coopMatSize->k});
 
-  //std::array<int64_t, 3> threadMNK= {16,16,16};
-  //return setMatmulOpConfig(resourceLimits, op, workgroupXY, threadMNK,
-  //                         /*enablePromotion=*/true, true);
   return setOpConfigAndEntryPointFnTranslation(
       op->getParentOfType<func::FuncOp>(), op, tileSizes, pipeline,
       workgroupSize);
@@ -166,7 +171,8 @@ LogicalResult setNVIDIACodeGenConfig(const spirv::TargetEnv &targetEnv,
 
   // First try to see if we can use tensor cores.
   if (auto matmulOp = dyn_cast<linalg::MatmulOp>(rootOp)) {
-    if (failed(setOpConfig(targetEnv, matmulOp))) return failure();
+    if (failed(setCooperativeMatrixConfig(targetEnv, matmulOp)))
+      return failure();
     if (getLoweringConfig(rootOp)) return success();
   }
 
