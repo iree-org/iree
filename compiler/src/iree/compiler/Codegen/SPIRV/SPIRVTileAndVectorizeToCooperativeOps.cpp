@@ -34,7 +34,6 @@
 #include "mlir/Interfaces/VectorInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include <iostream>
 
 using mlir::iree_compiler::IREE::LinalgExt::LinalgVectorizationPattern;
 using mlir::iree_compiler::IREE::LinalgExt::TilingPatterns;
@@ -277,7 +276,6 @@ class SPIRVTileAndVectorizeToCooperativeOpsPass final
   }
 
   void runOnOperation() override {
-    std::cout<<"Here 1\n";
     MLIRContext *context = &getContext();
     func::FuncOp funcOp = getOperation();
 
@@ -292,7 +290,6 @@ class SPIRVTileAndVectorizeToCooperativeOpsPass final
       }
       return WalkResult::advance();
     });
-    std::cout<<"Here 2\n";
     if (!rootOp) {
       funcOp.emitError(
           "expected a linalg::ContractionOpInterface op with "
@@ -301,9 +298,6 @@ class SPIRVTileAndVectorizeToCooperativeOpsPass final
     }
 
     SmallVector<int64_t> cooperativeOpSize = getTargetCooperativeOpSize(rootOp);
-    std::cout<<"Here 3\n";
-    std::cout<<"Cooperative shape is: "<<cooperativeOpSize.size()<<" :"<< cooperativeOpSize[0]<<" "<<cooperativeOpSize[1]<<" "
-      <<"\n";
     auto subgroupCounts = deduceSubgroupCounts(rootOp);
 
     // Then tile and distribute to subgroups.
