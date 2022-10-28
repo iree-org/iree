@@ -51,7 +51,7 @@ static iree_status_t iree_mmt4d_benchmark(
   iree_ukernel_mmt4d_params_t params;
   memset(&params, 0, sizeof params);
   params.type = user_data->type;
-  params.flags = FLAG_accumulate ? IREE_UKERNEL_FLAG_ACCUMULATE : 0;
+  params.flags = FLAG_accumulate ? IREE_VMVX_MATMUL_FLAG_ACCUMULATE : 0;
   params.M = FLAG_m_size;
   params.N = FLAG_n_size;
   params.K = FLAG_k_size;
@@ -91,10 +91,10 @@ static iree_status_t iree_mmt4d_benchmark(
   while (iree_benchmark_keep_running(benchmark_state,
                                      /*batch_count=*/FLAG_batch_count)) {
     for (int i = 0; i < FLAG_batch_count; ++i) {
-      iree_ukernel_status_t status = iree_ukernel_mmt4d(&params);
-      if (status != iree_ukernel_status_ok) {
+      iree_ukernel_mmt4d_status_t status = iree_ukernel_mmt4d(&params);
+      if (status != iree_ukernel_mmt4d_status_ok) {
         fprintf(stderr, "FATAL: iree_ukernel_mmt4d failed: %s\n",
-                iree_ukernel_status_message(status));
+                iree_ukernel_mmt4d_status_message(status));
         iree_abort();
       }
     }
