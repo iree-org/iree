@@ -895,7 +895,7 @@ static LogicalResult setRootConfig(
   auto lhsShapedType = contractionOp.lhs().getType().cast<ShapedType>();
   auto rhsShapedType = contractionOp.rhs().getType().cast<ShapedType>();
   auto resShapedType =
-      linalgOp.getOutputOperand(0)->get().getType().cast<ShapedType>();
+      linalgOp.getDpsInitOperand(0)->get().getType().cast<ShapedType>();
   int64_t vectorSize = getVectorSize(entryPointFn, lhsShapedType);
   vectorSize = std::min(vectorSize, getVectorSize(entryPointFn, rhsShapedType));
   vectorSize = std::min(vectorSize, getVectorSize(entryPointFn, resShapedType));
@@ -1106,7 +1106,7 @@ static bool isSupportedTransposeOp(linalg::GenericOp genericOp) {
 
   // Check that the op has only one input and one output.
   // TODO(diegocaballero): Generalize to multiple inputs.
-  if ((genericOp.getNumInputs() != 1) || (genericOp.getNumOutputs() != 1)) {
+  if ((genericOp.getNumDpsInputs() != 1) || (genericOp.getNumDpsInits() != 1)) {
     return false;
   }
 

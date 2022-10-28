@@ -46,7 +46,7 @@ struct DetachElementwisePattern
     // Nothing to do if the output tensor operand is already a fill op.
     OpOperandVector outputOperands;
     if (!linalgOp.hasBufferSemantics()) {
-      outputOperands = linalgOp.getOutputOperands();
+      outputOperands = linalgOp.getDpsInitOperands();
     }
     // Right now all the cases we see have one output. This can be relaxed once
     // we see multiple output ops.
@@ -81,7 +81,7 @@ struct DetachElementwisePattern
 
     // Update the contraction op to use the new zero tensor as output operand.
     rewriter.updateRootInPlace(linalgOp,
-                               [&]() { linalgOp.setOutputOperand(0, fill); });
+                               [&]() { linalgOp.setDpsInitOperand(0, fill); });
 
     auto outputMap = mlir::compressUnusedDims(
         linalgOp.getMatchingIndexingMap(outputOperands.front()));

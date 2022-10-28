@@ -798,7 +798,7 @@ static bool isInsOperandBufferizable(OpOperand *insOperand,
     }
     return true;
   };
-  return llvm::any_of(linalgOp.getOutputOperands(), canTieWithOutsOperand);
+  return llvm::any_of(linalgOp.getDpsInitOperands(), canTieWithOutsOperand);
 }
 
 /// Method to check if two `linalg.generic` op with producer-consumer
@@ -975,13 +975,13 @@ static bool isFusableWithProducer(OpOperand &operand, bool aggressiveFusion) {
   }
 
   auto consumerLinalgOp = cast<linalg::LinalgOp>(consumer);
-  if (consumerLinalgOp.isInput(&operand)) {
+  if (consumerLinalgOp.isDpsInput(&operand)) {
     // Only fuse on inputs if both ops are generic ops.
     if (!aggressiveFusion || !isa<linalg::GenericOp>(consumer) ||
         !isa<linalg::GenericOp>(producer)) {
       return false;
     }
-  } else if (!consumerLinalgOp.isOutput(&operand)) {
+  } else if (!consumerLinalgOp.isDpsInit(&operand)) {
     return false;
   }
 

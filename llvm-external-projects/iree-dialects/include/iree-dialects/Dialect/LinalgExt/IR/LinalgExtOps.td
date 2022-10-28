@@ -38,6 +38,18 @@ class IREELinalgExt_Op<string mnemonic, list<Trait> traits = []> :
       SmallVector<Value> dest(getOutputs().begin(), getOutputs().end());
       return dest;
     }
+
+    OpOperandVector getDpsInitOperands() {
+      return cast<LinalgExtOp>(getOperation()).getOutputOperands();
+    }
+
+    OpOperand *getDpsInitOperand(int64_t index) {
+      return cast<LinalgExtOp>(getOperation()).getOutputOperand(index);
+    }
+
+    void setDpsInitOperand(int64_t index, Value v) {
+      return cast<LinalgExtOp>(getOperation()).setOutputOperand(index, v);
+    }
   }];
 }
 
