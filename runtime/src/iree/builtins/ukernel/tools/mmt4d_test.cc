@@ -99,7 +99,8 @@ static void iree_mmt4d_reference(const iree_ukernel_mmt4d_params_t& params) {
       iree_mmt4d_reference<float, float, float>(params);
       break;
     case iree_ukernel_mmt4d_type_i8i8i32:
-      iree_mmt4d_reference<int8_t, int8_t, int32_t>(params);
+      iree_mmt4d_reference<iree_ukernel_int8_t, iree_ukernel_int8_t,
+                           iree_ukernel_int32_t>(params);
       break;
     default:
       assert(false && "unknown type");
@@ -256,7 +257,7 @@ static void test_matmuls_for_various_MNK_shapes_and_flags(
 // and if the CPU supports the corresponding feature, the mmt4d tests are run a
 // second time with that CPU feature enabled.
 static void mmt4d_test(iree_ukernel_mmt4d_type_t type, int M0, int N0, int K0,
-                       uint64_t cpu_data_field_0_bit) {
+                       iree_ukernel_uint64_t cpu_data_field_0_bit) {
   // Letting each test create its own engine makes them independent: a testcase
   // succeeds or fails the same way if we isolate it or reorder it. The
   // potential downside of repeating the same pseudorandom sequence is OK
@@ -270,7 +271,8 @@ static void mmt4d_test(iree_ukernel_mmt4d_type_t type, int M0, int N0, int K0,
   params.M0 = M0;
   params.N0 = N0;
   params.K0 = K0;
-  const uint64_t local_cpu_data_default[IREE_CPU_DATA_FIELD_COUNT] = {0};
+  const iree_ukernel_uint64_t
+      local_cpu_data_default[IREE_CPU_DATA_FIELD_COUNT] = {0};
   params.cpu_data = local_cpu_data_default;
   // First try without any optional CPU feature. This matters even when the
   // feature is supported by the CPU because we want to test the fallback to
@@ -278,8 +280,9 @@ static void mmt4d_test(iree_ukernel_mmt4d_type_t type, int M0, int N0, int K0,
   test_matmuls_for_various_MNK_shapes_and_flags(params, engine);
   // If this is nonzero, we are asked to test again with this CPU feature.
   if (cpu_data_field_0_bit) {
-    const uint64_t local_cpu_data_with_bit[IREE_CPU_DATA_FIELD_COUNT] = {
-        cpu_data_field_0_bit};
+    const iree_ukernel_uint64_t
+        local_cpu_data_with_bit[IREE_CPU_DATA_FIELD_COUNT] = {
+            cpu_data_field_0_bit};
     params.cpu_data = local_cpu_data_with_bit;
     // Check if the CPU supports the feature (otherwise, we crash).
     bool supported = iree_cpu_data_field(0) & params.cpu_data[0];

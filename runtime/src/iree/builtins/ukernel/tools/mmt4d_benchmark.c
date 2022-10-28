@@ -38,7 +38,7 @@ struct iree_mmt4d_benchmark_user_data_t {
   int M0;
   int N0;
   int K0;
-  const uint64_t* cpu_data;
+  const iree_ukernel_uint64_t* cpu_data;
 };
 
 typedef struct iree_mmt4d_benchmark_user_data_t
@@ -87,7 +87,7 @@ static iree_status_t iree_mmt4d_benchmark(
   params.lhs_buffer = lhs_buffer;
   params.rhs_buffer = rhs_buffer;
   params.out_buffer = out_buffer;
-  int64_t total_iterations = 0;
+  iree_ukernel_int64_t total_iterations = 0;
   while (iree_benchmark_keep_running(benchmark_state,
                                      /*batch_count=*/FLAG_batch_count)) {
     for (int i = 0; i < FLAG_batch_count; ++i) {
@@ -136,8 +136,8 @@ static void iree_mmt4d_benchmark_register(
 #define MMT4D_BENCHMARK_REGISTER(_type, _m0, _n0, _k0, _cpu_data_field_0, \
                                  _label)                                  \
   do {                                                                    \
-    static const uint64_t local_cpu_data[IREE_CPU_DATA_FIELD_COUNT] = {   \
-        _cpu_data_field_0};                                               \
+    static const iree_ukernel_uint64_t                                    \
+        local_cpu_data[IREE_CPU_DATA_FIELD_COUNT] = {_cpu_data_field_0};  \
     static const iree_mmt4d_benchmark_user_data_t user_data = {           \
         .type = iree_ukernel_mmt4d_type_##_type,                          \
         .M0 = _m0,                                                        \

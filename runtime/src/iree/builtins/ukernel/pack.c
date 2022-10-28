@@ -8,8 +8,9 @@
 
 static iree_ukernel_status_t iree_ukernel_pack_validate(
     const iree_ukernel_pack_params_t* params) {
-  const uint32_t allflags = IREE_UKERNEL_FLAG_PACK_TRANSPOSE_INNER |
-                            IREE_UKERNEL_FLAG_PACK_TRANSPOSE_OUTER;
+  const iree_ukernel_uint32_t allflags =
+      IREE_UKERNEL_FLAG_PACK_TRANSPOSE_INNER |
+      IREE_UKERNEL_FLAG_PACK_TRANSPOSE_OUTER;
   if (params->flags & ~allflags) {
     return iree_ukernel_status_bad_flags;
   }

@@ -41,6 +41,7 @@ iree_cc_library(
     "common.c"
   DEPS
     ::exported_flag_bits
+    ::static_assert
     iree::base::core_headers
     iree::builtins::ukernel::arch::config
   PUBLIC

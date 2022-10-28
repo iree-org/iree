@@ -61,29 +61,29 @@ static iree_ukernel_status_t iree_ukernel_mmt4d_select_tile_func(
 static void iree_ukernel_mmt4d_using_tile_func(
     const iree_ukernel_mmt4d_params_t* params,
     iree_ukernel_mmt4d_tile_func_t tile_func) {
-  const int32_t M = params->M;
-  const int32_t N = params->N;
-  const int32_t K = params->K;
-  const int16_t M0 = params->M0;
-  const int16_t N0 = params->N0;
-  const int16_t lhs_elem_size_log2 =
+  const iree_ukernel_int32_t M = params->M;
+  const iree_ukernel_int32_t N = params->N;
+  const iree_ukernel_int32_t K = params->K;
+  const iree_ukernel_int16_t M0 = params->M0;
+  const iree_ukernel_int16_t N0 = params->N0;
+  const iree_ukernel_int16_t lhs_elem_size_log2 =
       iree_ukernel_mmt4d_lhs_elem_size_log2(params->type);
-  const int16_t rhs_elem_size_log2 =
+  const iree_ukernel_int16_t rhs_elem_size_log2 =
       iree_ukernel_mmt4d_rhs_elem_size_log2(params->type);
-  const int16_t out_elem_size_log2 =
+  const iree_ukernel_int16_t out_elem_size_log2 =
       iree_ukernel_mmt4d_out_elem_size_log2(params->type);
   char* out_tile_row = params->out_buffer;
   const char* lhs_panel = params->lhs_buffer;
-  int32_t out_tile_size = (M0 * N0) << out_elem_size_log2;
+  iree_ukernel_int32_t out_tile_size = (M0 * N0) << out_elem_size_log2;
   iree_ukernel_ssize_t lhs_panel_stride = params->lhs_stride
                                           << lhs_elem_size_log2;
   iree_ukernel_ssize_t rhs_panel_stride = params->rhs_stride
                                           << rhs_elem_size_log2;
   iree_ukernel_ssize_t out_stride = params->out_stride << out_elem_size_log2;
-  for (int32_t i = 0; i < M; ++i) {
+  for (iree_ukernel_int32_t i = 0; i < M; ++i) {
     char* out_tile = out_tile_row;
     const char* rhs_panel = params->rhs_buffer;
-    for (int32_t j = 0; j < N; ++j) {
+    for (iree_ukernel_int32_t j = 0; j < N; ++j) {
       tile_func(out_tile, lhs_panel, rhs_panel, K, params->flags, params);
       out_tile += out_tile_size;
       rhs_panel += rhs_panel_stride;

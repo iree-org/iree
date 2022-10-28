@@ -27,16 +27,17 @@ enum { iree_ukernel_mmt4d_tile_generic_max_bytes = 4096 };
 // Generic implementation of matmul tile, i8*i8->i32 case.
 static void iree_ukernel_mmt4d_tile_i8i8i32_generic(
     void* out_tile_untyped, const void* lhs_panel_untyped,
-    const void* rhs_panel_untyped, int32_t K, uint32_t flags,
-    const iree_ukernel_mmt4d_params_t* params) {
-  int32_t* out_tile = out_tile_untyped;
-  const int8_t* lhs_panel = lhs_panel_untyped;
-  const int8_t* rhs_panel = rhs_panel_untyped;
-  int16_t M0 = params->M0;
-  int16_t N0 = params->N0;
-  int16_t K0 = params->K0;
+    const void* rhs_panel_untyped, iree_ukernel_int32_t K,
+    iree_ukernel_uint32_t flags, const iree_ukernel_mmt4d_params_t* params) {
+  iree_ukernel_int32_t* out_tile = out_tile_untyped;
+  const iree_ukernel_int8_t* lhs_panel = lhs_panel_untyped;
+  const iree_ukernel_int8_t* rhs_panel = rhs_panel_untyped;
+  iree_ukernel_int16_t M0 = params->M0;
+  iree_ukernel_int16_t N0 = params->N0;
+  iree_ukernel_int16_t K0 = params->K0;
   // Initialize the local accumulator tile.
-  int32_t acc[iree_ukernel_mmt4d_tile_generic_max_bytes / sizeof(*out_tile)];
+  iree_ukernel_int32_t
+      acc[iree_ukernel_mmt4d_tile_generic_max_bytes / sizeof(*out_tile)];
   if (flags & IREE_UKERNEL_FLAG_ACCUMULATE) {
     for (int i = 0; i < M0 * N0; ++i) acc[i] = out_tile[i];
   } else {
@@ -47,8 +48,8 @@ static void iree_ukernel_mmt4d_tile_i8i8i32_generic(
     for (iree_ukernel_ssize_t i0 = 0; i0 < M0; ++i0) {
       for (iree_ukernel_ssize_t j0 = 0; j0 < N0; ++j0) {
         for (iree_ukernel_ssize_t k0 = 0; k0 < K0; ++k0) {
-          int32_t lhs_val_int32 = lhs_panel[i0 * K0 + k0];
-          int32_t rhs_val_int32 = rhs_panel[j0 * K0 + k0];
+          iree_ukernel_int32_t lhs_val_int32 = lhs_panel[i0 * K0 + k0];
+          iree_ukernel_int32_t rhs_val_int32 = rhs_panel[j0 * K0 + k0];
           acc[i0 * N0 + j0] += lhs_val_int32 * rhs_val_int32;
         }
       }
@@ -63,14 +64,14 @@ static void iree_ukernel_mmt4d_tile_i8i8i32_generic(
 // Generic implementation of matmul tile, f32*f32->f32 case.
 static void iree_ukernel_mmt4d_tile_f32f32f32_generic(
     void* out_tile_untyped, const void* lhs_panel_untyped,
-    const void* rhs_panel_untyped, int32_t K, uint32_t flags,
-    const iree_ukernel_mmt4d_params_t* params) {
+    const void* rhs_panel_untyped, iree_ukernel_int32_t K,
+    iree_ukernel_uint32_t flags, const iree_ukernel_mmt4d_params_t* params) {
   float* out_tile = out_tile_untyped;
   const float* lhs_panel = lhs_panel_untyped;
   const float* rhs_panel = rhs_panel_untyped;
-  int16_t M0 = params->M0;
-  int16_t N0 = params->N0;
-  int16_t K0 = params->K0;
+  iree_ukernel_int16_t M0 = params->M0;
+  iree_ukernel_int16_t N0 = params->N0;
+  iree_ukernel_int16_t K0 = params->K0;
   // Initialize the local accumulator tile.
   float acc[iree_ukernel_mmt4d_tile_generic_max_bytes / sizeof(*out_tile)];
   if (flags & IREE_UKERNEL_FLAG_ACCUMULATE) {

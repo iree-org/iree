@@ -34,7 +34,7 @@ struct iree_ukernel_pack_params_t {
   iree_ukernel_ssize_t out_size2;
   iree_ukernel_ssize_t out_size3;
   const void* padding_value;
-  uint32_t flags;
+  iree_ukernel_uint32_t flags;
 };
 
 typedef struct iree_ukernel_pack_params_t iree_ukernel_pack_params_t;
