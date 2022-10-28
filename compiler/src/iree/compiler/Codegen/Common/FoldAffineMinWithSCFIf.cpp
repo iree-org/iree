@@ -130,19 +130,17 @@ struct FoldAffineMinWithSCFIf final : public OpRewritePattern<scf::IfOp> {
         getUsesInRegion(minOp, &ifOp.getElseRegion());
     if (usesInElse.empty()) return failure();
 
-    OpBuilder builder(ifOp);
-    OpBuilder::InsertionGuard guard(builder);
     int64_t lb, ub, tileSize;
     Value valueToReplace;
     if (succeeded(matchBoundedTileSizeOp(minOp, lb, ub, tileSize))) {
       // The other part is the partial tile size, (ub - lb) % tileSize.
-      valueToReplace = builder.create<arith::ConstantIndexOp>(
+      valueToReplace = rewriter.create<arith::ConstantIndexOp>(
           minOp.getLoc(), (ub - lb) % tileSize);
     } else {
       // A general case. Construct a new affine map without the constant result.
       AffineMap newMap = minMap.dropResult(affineCstIndex);
-      valueToReplace = builder.create<AffineApplyOp>(minOp.getLoc(), newMap,
-                                                     minOp.getMapOperands());
+      valueToReplace = rewriter.create<AffineApplyOp>(minOp.getLoc(), newMap,
+                                                      minOp.getMapOperands());
     }
     for (auto use : usesInElse) {
       use->set(valueToReplace);
