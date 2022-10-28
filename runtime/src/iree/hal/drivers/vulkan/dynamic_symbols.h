@@ -17,7 +17,6 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/dynamic_library.h"
-#include "iree/base/status_cc.h"
 #include "iree/hal/drivers/vulkan/dynamic_symbol_tables.h"  // IWYU pragma: export
 #include "iree/hal/drivers/vulkan/util/ref_ptr.h"
 

@@ -31,7 +31,6 @@ iree_cc_library(
   DEPS
     ::vm
     iree::base
-    iree::base::cc
     iree::base::core_headers
     iree::base::internal::span
   PUBLIC
@@ -108,7 +107,6 @@ iree_cc_test(
     ::impl
     ::native_module_test_hdrs
     iree::base
-    iree::base::cc
     iree::testing::gtest
     iree::testing::gtest_main
 )
@@ -200,7 +198,7 @@ iree_cc_test(
   DEPS
     ::bytecode_module
     ::vm
-    iree::base::cc
+    iree::base
     iree::testing::gtest
     iree::testing::gtest_main
     iree::vm::test::all_bytecode_modules_c

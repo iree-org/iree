@@ -47,7 +47,7 @@ iree_runtime_cc_library(
         "status_matchers.h",
     ],
     deps = [
-        "//runtime/src/iree/base:cc",
+        "//runtime/src/iree/base",
         "@com_google_googletest//:gtest",
     ],
 )

@@ -47,7 +47,6 @@ iree_cc_binary(
   DEPS
     benchmark
     iree::base
-    iree::base::cc
     iree::base::internal::flags
     iree::base::tracing
     iree::hal
@@ -87,7 +86,6 @@ iree_cc_binary(
     "iree-check-module-main.cc"
   DEPS
     iree::base
-    iree::base::cc
     iree::base::core_headers
     iree::base::internal::file_io
     iree::base::internal::flags
@@ -124,7 +122,6 @@ iree_cc_binary(
     "iree-run-module-main.cc"
   DEPS
     iree::base
-    iree::base::cc
     iree::base::internal::flags
     iree::base::tracing
     iree::hal
@@ -250,7 +247,6 @@ if(IREE_BUILD_COMPILER)
       MLIRSupport
       MLIRTargetLLVMIRExport
       iree::base
-      iree::base::cc
       iree::base::internal::flags
       iree::base::tracing
       iree::compiler::Dialect::HAL::Target

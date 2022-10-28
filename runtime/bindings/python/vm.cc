@@ -8,7 +8,6 @@
 
 #include "./status_utils.h"
 #include "iree/base/api.h"
-#include "iree/base/status_cc.h"
 #include "iree/base/tracing.h"
 // TODO: We shouldn't need the HAL API but it is used for direct printing
 // summaries of HAL objects in lists. We should have a better way of doing this

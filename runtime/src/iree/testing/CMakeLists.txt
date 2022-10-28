@@ -58,7 +58,7 @@ iree_cc_library(
   DEPS
     gmock
     gtest
-    iree::base::cc
+    iree::base
   TESTONLY
   PUBLIC
 )

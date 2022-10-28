@@ -32,6 +32,7 @@ iree_runtime_cc_library(
         "loop_inline.h",
         "status.c",
         "status.h",
+        "status_cc.h",
         "string_builder.c",
         "string_builder.h",
         "string_view.c",
@@ -46,21 +47,6 @@ iree_runtime_cc_library(
     deps = [
         ":core_headers",
         ":tracing",
-    ],
-)
-
-# TODO(benvanik): make these srcs and only expose an api_cc.h.
-iree_runtime_cc_library(
-    name = "cc",
-    srcs = [
-        "status_cc.cc",
-    ],
-    hdrs = [
-        "status_cc.h",
-    ],
-    deps = [
-        ":base",
-        ":core_headers",
     ],
 )
 
@@ -81,7 +67,6 @@ iree_runtime_cc_test(
     ],
     deps = [
         ":base",
-        ":cc",
         ":loop_test_hdrs",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
@@ -107,7 +92,6 @@ iree_runtime_cc_test(
     srcs = ["status_test.cc"],
     deps = [
         ":base",
-        ":cc",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
     ],
@@ -175,7 +159,6 @@ iree_runtime_cc_test(
     ],
     deps = [
         ":base",
-        ":cc",
         ":loop_sync",
         ":loop_test_hdrs",
         "//runtime/src/iree/testing:gtest",

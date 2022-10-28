@@ -147,7 +147,7 @@ iree_cc_test(
     "file_io_test.cc"
   DEPS
     ::file_io
-    iree::base::cc
+    iree::base
     iree::base::core_headers
     iree::testing::gtest
     iree::testing::gtest_main
@@ -430,7 +430,6 @@ iree_cc_test(
     ::synchronization
     ::threading
     iree::base
-    iree::base::cc
     iree::base::target_platform
     iree::testing::gtest
     iree::testing::gtest_main

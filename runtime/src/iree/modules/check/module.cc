@@ -19,7 +19,6 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/math.h"
-#include "iree/base/status_cc.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/module.h"
 #include "iree/testing/gtest.h"

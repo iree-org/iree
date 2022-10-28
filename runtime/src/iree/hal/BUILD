@@ -80,7 +80,6 @@ iree_runtime_cc_test(
     deps = [
         ":hal",
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:cc",
         "//runtime/src/iree/base/internal:span",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",

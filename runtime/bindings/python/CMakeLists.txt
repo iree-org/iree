@@ -48,7 +48,6 @@ iree_pyext_module(
     IREE_TRACING_HOOK_CPP_NEW_DELETE=0
   DEPS
     iree::base
-    iree::base::cc
     iree::base::internal::flags
     iree::base::tracing
     iree::hal

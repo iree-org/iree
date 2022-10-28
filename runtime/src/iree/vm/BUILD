@@ -41,7 +41,6 @@ iree_runtime_cc_library(
     deps = [
         ":vm",
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:cc",
         "//runtime/src/iree/base:core_headers",
         "//runtime/src/iree/base/internal:span",
     ],
@@ -119,7 +118,6 @@ iree_runtime_cc_test(
         ":impl",
         ":native_module_test_hdrs",
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:cc",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
     ],
@@ -237,7 +235,7 @@ iree_runtime_cc_test(
     deps = [
         ":bytecode_module",
         ":vm",
-        "//runtime/src/iree/base:cc",
+        "//runtime/src/iree/base",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
         "//runtime/src/iree/vm/test:all_bytecode_modules_c",

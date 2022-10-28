@@ -62,7 +62,6 @@ iree_cc_library(
     ::dynamic_symbols
     Vulkan::Headers
     iree::base
-    iree::base::cc
     iree::base::core_headers
     iree::base::internal
     iree::base::internal::arena
@@ -95,7 +94,6 @@ iree_cc_library(
   DEPS
     Vulkan::Headers
     iree::base
-    iree::base::cc
     iree::base::core_headers
     iree::base::internal::dynamic_library
     iree::base::tracing

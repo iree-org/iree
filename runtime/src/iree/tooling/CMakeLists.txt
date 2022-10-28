@@ -51,7 +51,6 @@ iree_cc_library(
     ::buffer_view_matchers
     ::vm_util
     iree::base
-    iree::base::cc
     iree::base::internal::flags
     iree::base::internal::span
     iree::base::tracing
@@ -179,7 +178,6 @@ iree_cc_library(
   DEPS
     ::vm_util
     iree::base
-    iree::base::cc
     iree::base::internal::span
     iree::base::tracing
     iree::vm::cc

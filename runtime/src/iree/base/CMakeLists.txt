@@ -23,6 +23,7 @@ iree_cc_library(
     "loop_inline.h"
     "status.c"
     "status.h"
+    "status_cc.h"
     "string_builder.c"
     "string_builder.h"
     "string_view.c"
@@ -48,19 +49,6 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
-  NAME
-    cc
-  HDRS
-    "status_cc.h"
-  SRCS
-    "status_cc.cc"
-  DEPS
-    ::base
-    ::core_headers
-  PUBLIC
-)
-
 iree_cc_test(
   NAME
     bitfield_test
@@ -79,7 +67,6 @@ iree_cc_test(
     "loop_inline_test.cc"
   DEPS
     ::base
-    ::cc
     ::loop_test_hdrs
     ::tracing
     iree::testing::gtest
@@ -93,7 +80,6 @@ iree_cc_library(
     "loop_test.h"
   DEPS
     ::base
-    ::cc
     ::tracing
     iree::base::internal::wait_handle
     iree::testing::gtest
@@ -108,7 +94,6 @@ iree_cc_test(
     "status_test.cc"
   DEPS
     ::base
-    ::cc
     iree::testing::gtest
     iree::testing::gtest_main
 )
@@ -165,7 +150,6 @@ iree_cc_test(
     "loop_sync_test.cc"
   DEPS
     ::base
-    ::cc
     ::loop_sync
     ::loop_test_hdrs
     ::tracing
