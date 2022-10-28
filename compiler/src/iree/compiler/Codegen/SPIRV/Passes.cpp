@@ -42,11 +42,6 @@
 namespace mlir {
 namespace iree_compiler {
 
-// Flag to test out new cooperative matrix features
-static llvm::cl::opt<bool> promoteAndGPUCooperativeMatrix(
-    "iree-spirv-promote-and-gpu-cooperative-matrix", llvm::cl::desc("promote to shared memory and add vector to gpu conversions for cooperative matrix"),
-    llvm::cl::init(true));
-
 // Allocation callbacks to use with upstream comprehensive bufferization
 static FailureOr<Value> gpuAllocateWorkgroupMemoryFn(OpBuilder &builder,
                                                      Location loc,
@@ -266,27 +261,22 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm) {
 
   addBufferizePasses(nestedModulePM, gpuAllocateWorkgroupMemoryFn);
 
-  // Tile and distribute to GPU subgroups and vectorize.
-  if(promoteAndGPUCooperativeMatrix){
-    nestedModulePM.addNestedPass<func::FuncOp>(
-      createSPIRVTileAndPromotePass(/*distributeToWarp=*/true));
-    nestedModulePM.addNestedPass<func::FuncOp>(
-      createRemoveSingleIterationLoopPass());
-    //nestedModulePM.addNestedPass<func::FuncOp>(
-    //  createLLVMGPUTileAndDistribute(/*distributeToWarp=*/true));
-    nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
-    nestedModulePM.addNestedPass<func::FuncOp>(
-      createGPUDistributeSharedMemoryCopy());
-  }
+  // Tile to GPU workgroups and promote.
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createSPIRVTileAndVectorizeToCooperativeOpsPass());
+      createSPIRVTileAndPromotePass(/*skipThreadLevel=*/true));
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createRemoveSingleIterationLoopPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createGPUDistributeSharedMemoryCopy());
-  nestedModulePM.addPass(createCanonicalizerPass());
-  nestedModulePM.addPass(createCSEPass());
+
+  // Tile and distribute to GPU subgroups and vectorize.
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createSPIRVTileAndVectorizeToCooperativeOpsPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
 
   // Perform various vector-level cross-op optimizations like load-store
   // forwarding, shape casting and casting op cancelling.
@@ -296,20 +286,9 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm) {
   // Fold subview ops is reqiured for converting vector transfer ops into SPIR-V
   // cooperative ops in the next step.
   nestedModulePM.addPass(memref::createFoldMemRefAliasOpsPass());
-  
 
-  if(promoteAndGPUCooperativeMatrix){
-    nestedModulePM.addNestedPass<func::FuncOp>(
-      createSPIRVVectorToGPUPass());
-    nestedModulePM.addNestedPass<func::FuncOp>(
-      createSPIRVVectorizePass());
-    nestedModulePM.addNestedPass<func::FuncOp>(
-      createRemoveSingleIterationLoopPass());
-  }
-  else{
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createSPIRVVectorToCooperativeOpsPass());
-  }
+  nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorToGPUPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorizePass());
 }
 
 void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm) {
