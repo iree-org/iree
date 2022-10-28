@@ -37,7 +37,7 @@ static void iree_ukernel_mmt4d_tile_i8i8i32_generic(
   int16_t K0 = params->K0;
   // Initialize the local accumulator tile.
   int32_t acc[iree_ukernel_mmt4d_tile_generic_max_bytes / sizeof(*out_tile)];
-  if (flags & IREE_UKERNEL_FLAG_ACCUMULATE) {
+  if (flags & IREE_VMVX_MATMUL_FLAG_ACCUMULATE) {
     for (int i = 0; i < M0 * N0; ++i) acc[i] = out_tile[i];
   } else {
     for (int i = 0; i < M0 * N0; ++i) acc[i] = 0;
@@ -73,7 +73,7 @@ static void iree_ukernel_mmt4d_tile_f32f32f32_generic(
   int16_t K0 = params->K0;
   // Initialize the local accumulator tile.
   float acc[iree_ukernel_mmt4d_tile_generic_max_bytes / sizeof(*out_tile)];
-  if (flags & IREE_UKERNEL_FLAG_ACCUMULATE) {
+  if (flags & IREE_VMVX_MATMUL_FLAG_ACCUMULATE) {
     for (int i = 0; i < M0 * N0; ++i) acc[i] = out_tile[i];
   } else {
     for (int i = 0; i < M0 * N0; ++i) acc[i] = 0;
@@ -97,24 +97,24 @@ static void iree_ukernel_mmt4d_tile_f32f32f32_generic(
 }
 
 // Generic implementation of matmul tile
-iree_ukernel_status_t iree_ukernel_mmt4d_select_tile_func_generic(
+iree_ukernel_mmt4d_status_t iree_ukernel_mmt4d_select_tile_func_generic(
     const iree_ukernel_mmt4d_params_t* params,
     iree_ukernel_mmt4d_tile_func_t* out_tile_func) {
   int tile_elems = params->M0 * params->N0;
   int tile_bytes = tile_elems
                    << iree_ukernel_mmt4d_out_elem_size_log2(params->type);
   if (tile_bytes > iree_ukernel_mmt4d_tile_generic_max_bytes) {
-    return iree_ukernel_status_unsupported_generic_tile_size;
+    return iree_ukernel_mmt4d_status_unsupported_generic_tile_size;
   }
   switch (params->type) {
     case iree_ukernel_mmt4d_type_f32f32f32:
       *out_tile_func = iree_ukernel_mmt4d_tile_f32f32f32_generic;
-      return iree_ukernel_status_ok;
+      return iree_ukernel_mmt4d_status_ok;
     case iree_ukernel_mmt4d_type_i8i8i32:
       *out_tile_func = iree_ukernel_mmt4d_tile_i8i8i32_generic;
-      return iree_ukernel_status_ok;
+      return iree_ukernel_mmt4d_status_ok;
     default:
       // shouldn't happen, validated earlier.
-      return iree_ukernel_status_bad_type;
+      return iree_ukernel_mmt4d_status_bad_type;
   }
 }

@@ -14,8 +14,12 @@ extern "C" {
 #endif  // __cplusplus
 
 // Main entry point.
-IREE_UKERNEL_EXPORT iree_ukernel_status_t
+IREE_UKERNEL_EXPORT iree_ukernel_mmt4d_status_t
 iree_ukernel_mmt4d(const iree_ukernel_mmt4d_params_t* params);
+
+// Convert a status code to a human-readable string.
+IREE_UKERNEL_EXPORT const char* iree_ukernel_mmt4d_status_message(
+    iree_ukernel_mmt4d_status_t status);
 
 #ifdef __cplusplus
 }  // extern "C"

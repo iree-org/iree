@@ -19,7 +19,7 @@ iree_cc_library(
     "mmt4d_test_utils.cc"
   DEPS
     iree::base
-    iree::builtins::ukernel::common
+    iree::builtins::ukernel::types
     iree::schemas::cpu_data
   PUBLIC
 )

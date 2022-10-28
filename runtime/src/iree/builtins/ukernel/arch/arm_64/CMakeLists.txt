@@ -44,7 +44,7 @@ iree_cc_library(
   DEPS
     iree::base::core_headers
     iree::schemas::cpu_data
-    iree::builtins::ukernel::common
+    iree::builtins::ukernel::types
     ${IREE_UKERNEL_MMT4D_TILE_ARM_64_DEPS}
   PUBLIC
 )

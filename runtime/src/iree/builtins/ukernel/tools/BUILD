@@ -19,7 +19,7 @@ cc_library(
     hdrs = ["mmt4d_test_utils.h"],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/builtins/ukernel:common",
+        "//runtime/src/iree/builtins/ukernel:types",
         "//runtime/src/iree/schemas:cpu_data",
     ],
 )
