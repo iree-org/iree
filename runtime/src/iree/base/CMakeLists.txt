@@ -14,7 +14,6 @@ iree_cc_library(
   SRCS
     "allocator.c"
     "allocator.h"
-    "api.c"
     "assert.h"
     "bitfield.c"
     "bitfield.h"
