@@ -160,6 +160,14 @@ static FailureOr<scf::SCFTileAndFuseOptions> getTileAndFuseOptionsFromConfig(
   scf::SCFTileAndFuseOptions options;
 
   SmallVector<int64_t> tileSizes = loweringConfig.getTileSizeVals(tilingLevel);
+  auto linalgOp = cast<linalg::LinalgOp>(rootOp.value());
+  for (unsigned i = linalgOp.getNumParallelLoops(); i < linalgOp.getNumLoops();
+       ++i) {
+    if (i >= tileSizes.size()) {
+      break;
+    }
+    tileSizes[i] = 0;
+  }
   options.tilingOptions.setTileSizeComputationFunction(
       [tileSizes](OpBuilder &b, Operation *op) {
         return clipAndCreateTileSize(b, op, tileSizes, false);
