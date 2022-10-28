@@ -357,13 +357,8 @@ LinalgTileAndFusePattern::matchAndRewrite(linalg::LinalgOp op,
     return rewriter.notifyMatchFailure(
         op, "expect the tile interchange permutes the root loops");
 
-  SmallVector<unsigned> tmpInterchange;
-  for (auto value : rootInterchange) {
-    tmpInterchange.push_back(value);
-  }
-
   scf::SCFTileAndFuseOptions updatedOptions = options;
-  updatedOptions.tilingOptions.setInterchange(tmpInterchange);
+  updatedOptions.tilingOptions.setInterchange(rootInterchange);
 
   // Tile `op` and fuse its producers.
   FailureOr<scf::SCFTileAndFuseResult> tiledResults =

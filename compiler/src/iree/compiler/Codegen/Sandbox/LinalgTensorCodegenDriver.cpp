@@ -143,26 +143,6 @@ static LogicalResult getPaddingDims(func::FuncOp funcOp,
   return success();
 }
 
-static SmallVector<Value> clipAndCreateTileSize(
-    OpBuilder &b, Operation *op, SmallVector<int64_t> tileSizes) {
-  auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-  assert(linalgOp && "can only compute tile size on linalg ops");
-
-  SmallVector<int64_t> clippedTileSizes =
-      tileSizes.size() <= linalgOp.getNumLoops()
-          ? tileSizes
-          : SmallVector<int64_t>(tileSizes.begin(),
-                                 tileSizes.begin() + linalgOp.getNumLoops());
-
-  OpBuilder::InsertionGuard guard(b);
-  b.setInsertionPointToStart(
-      &op->getParentOfType<func::FuncOp>().getBody().front());
-  return llvm::to_vector<4>(map_range(clippedTileSizes, [&](int64_t s) {
-    Value v = b.create<arith::ConstantIndexOp>(op->getLoc(), s);
-    return v;
-  }));
-}
-
 /// Default method to initialize the tiling options for fusion in IREE. These
 /// could be ovveridden by the command line options if specified.
 static FailureOr<scf::SCFTileAndFuseOptions> getTileAndFuseOptionsFromConfig(
@@ -182,14 +162,11 @@ static FailureOr<scf::SCFTileAndFuseOptions> getTileAndFuseOptionsFromConfig(
   SmallVector<int64_t> tileSizes = loweringConfig.getTileSizeVals(tilingLevel);
   options.tilingOptions.setTileSizeComputationFunction(
       [tileSizes](OpBuilder &b, Operation *op) {
-        return clipAndCreateTileSize(b, op, tileSizes);
+        return clipAndCreateTileSize(b, op, tileSizes, false);
       });
 
-  SmallVector<unsigned> tmpTileInterchange;
-  for (auto value : loweringConfig.getTileInterchangeVals(tilingLevel)) {
-    tmpTileInterchange.push_back(value);
-  }
-  options.tilingOptions.setInterchange(tmpTileInterchange);
+  options.tilingOptions.setInterchange(
+      loweringConfig.getTileInterchangeVals(tilingLevel));
 
   return options;
 }
@@ -357,22 +334,18 @@ void LinalgFusePass::runOnOperation() {
   }
   scf::SCFTileAndFuseOptions tileAndFuseOptions =
       defaultTileAndFuseOptionsOptions.value();
-  bool doTiling =
+  bool doTileAndFuse =
       tileAndFuseOptions.tilingOptions.tileSizeComputationFunction != nullptr;
   if (!tileSizes.empty()) {
-    doTiling = true;
+    doTileAndFuse = true;
     SmallVector<int64_t> tmpTileSizes = llvm::to_vector(tileSizes);
     tileAndFuseOptions.tilingOptions.setTileSizeComputationFunction(
         [tmpTileSizes](OpBuilder &b, Operation *op) {
-          return clipAndCreateTileSize(b, op, tmpTileSizes);
+          return clipAndCreateTileSize(b, op, tmpTileSizes, false);
         });
   }
   if (!tileInterchange.empty()) {
-    SmallVector<unsigned> tmpTileInterchange;
-    for (auto value : tileInterchange) {
-      tmpTileInterchange.push_back(value);
-    }
-    tileAndFuseOptions.tilingOptions.setInterchange(tmpTileInterchange);
+    tileAndFuseOptions.tilingOptions.setInterchange(tileInterchange);
   }
   /*
   if (doIREEDistribution) {
@@ -380,6 +353,22 @@ void LinalgFusePass::runOnOperation() {
         ::mlir::iree_compiler::getIREELinalgLoopDistributionOptions());
   }
   */
+
+  linalg::LinalgTilingOptions tilingOptions;
+  bool doTiling =
+      getTilingOptionsFromConfig(funcOp, tilingLevel, tilingOptions, true);
+  if (!tileSizes.empty()) {
+    doTiling = true;
+    SmallVector<int64_t> tmpTileSizes = llvm::to_vector(tileSizes);
+    tilingOptions.setTileSizeComputationFunction(
+        [tmpTileSizes](OpBuilder &b, Operation *op) {
+          return clipAndCreateTileSize(b, op, tmpTileSizes, true);
+        });
+  }
+  if (!tileInterchange.empty()) {
+    tilingOptions = tilingOptions.setInterchange(
+        SmallVector<unsigned>(tileInterchange.begin(), tileInterchange.end()));
+  }
 
   if (setAnchorOpToRootOp) {
     FailureOr<Operation *> rootOp = getRootOp(funcOp);
@@ -448,7 +437,8 @@ void LinalgFusePass::runOnOperation() {
   paddingOptions.setTransposePaddings(transposePaddingVectors);
 
   CodegenStrategy strategy;
-  strategy.tileAndFuseIf(doTiling, anchorOpName, tileAndFuseOptions)
+  strategy.tileAndFuseIf(doTileAndFuse, anchorOpName, tileAndFuseOptions)
+      .tileIf(doTiling, anchorOpName, tilingOptions)
       .padIf(pad, anchorOpName, paddingOptions)
       .vectorizeIf(vectorize, "", nullptr, vectorizePadding);
 
