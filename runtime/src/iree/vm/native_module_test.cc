@@ -15,7 +15,7 @@
 #include "iree/vm/instance.h"
 #include "iree/vm/invocation.h"
 #include "iree/vm/list.h"
-#include "iree/vm/ref_cc.h"
+#include "iree/vm/ref.h"
 #include "iree/vm/value.h"
 
 namespace iree {

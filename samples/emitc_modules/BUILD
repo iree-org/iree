@@ -31,7 +31,6 @@ iree_runtime_cc_test(
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
         "//runtime/src/iree/vm",
-        "//runtime/src/iree/vm:cc",
     ],
 )
 
@@ -63,6 +62,5 @@ iree_runtime_cc_test(
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
         "//runtime/src/iree/vm",
-        "//runtime/src/iree/vm:cc",
     ],
 )

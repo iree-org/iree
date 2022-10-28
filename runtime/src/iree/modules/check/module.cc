@@ -22,8 +22,8 @@
 #include "iree/hal/api.h"
 #include "iree/modules/hal/module.h"
 #include "iree/testing/gtest.h"
+#include "iree/vm/api.h"
 #include "iree/vm/native_module_cc.h"
-#include "iree/vm/ref_cc.h"
 
 //===----------------------------------------------------------------------===//
 // VM module interface implementation

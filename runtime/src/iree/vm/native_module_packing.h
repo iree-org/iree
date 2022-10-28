@@ -16,7 +16,6 @@
 #include "iree/base/internal/span.h"
 #include "iree/vm/module.h"
 #include "iree/vm/ref.h"
-#include "iree/vm/ref_cc.h"
 #include "iree/vm/stack.h"
 
 // std::string_view is available starting in C++17.

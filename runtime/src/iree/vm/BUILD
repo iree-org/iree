@@ -36,7 +36,6 @@ iree_runtime_cc_library(
     hdrs = [
         "native_module_cc.h",
         "native_module_packing.h",
-        "ref_cc.h",
     ],
     deps = [
         ":vm",
@@ -61,6 +60,7 @@ iree_runtime_cc_library(
         "module.c",
         "native_module.c",
         "ref.c",
+        "ref_cc.h",
         "shims.c",
         "stack.c",
     ],

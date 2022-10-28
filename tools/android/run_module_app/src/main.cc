@@ -19,7 +19,6 @@
 #include "iree/tooling/vm_util_cc.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
-#include "iree/vm/ref_cc.h"
 
 namespace iree {
 namespace {

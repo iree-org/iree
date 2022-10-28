@@ -8,7 +8,7 @@
 
 #include <vector>
 
-#include "iree/vm/ref_cc.h"
+#include "iree/vm/api.h"
 
 namespace iree {
 

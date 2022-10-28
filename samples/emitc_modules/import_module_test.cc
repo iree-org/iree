@@ -8,7 +8,6 @@
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 #include "iree/vm/api.h"
-#include "iree/vm/ref_cc.h"
 #include "samples/emitc_modules/import_module_a.h"
 #include "samples/emitc_modules/import_module_b.h"
 

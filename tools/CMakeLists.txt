@@ -55,7 +55,6 @@ iree_cc_binary(
     iree::tooling::device_util
     iree::tooling::vm_util_cc
     iree::vm
-    iree::vm::cc
 )
 
 iree_cc_binary(
@@ -131,7 +130,6 @@ iree_cc_binary(
     iree::tooling::device_util
     iree::tooling::vm_util_cc
     iree::vm
-    iree::vm::cc
 )
 
 iree_cc_binary(
@@ -262,7 +260,6 @@ if(IREE_BUILD_COMPILER)
       iree::tooling::vm_util_cc
       iree::vm
       iree::vm::bytecode_module
-      iree::vm::cc
     DATA
       ${IREE_LLD_TARGET}
     HOSTONLY
