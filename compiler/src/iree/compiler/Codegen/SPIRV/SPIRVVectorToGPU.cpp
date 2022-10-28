@@ -23,8 +23,7 @@ namespace {
 struct SPIRVVectorToGPUPass
     : public SPIRVVectorToGPUBase<SPIRVVectorToGPUPass> {
   void getDependentDialects(DialectRegistry& registry) const override {
-    registry.insert<gpu::GPUDialect, nvgpu::NVGPUDialect, AffineDialect,
-                    memref::MemRefDialect>();
+    registry.insert<AffineDialect, gpu::GPUDialect, memref::MemRefDialect>();
   }
 
   void runOnOperation() override {
