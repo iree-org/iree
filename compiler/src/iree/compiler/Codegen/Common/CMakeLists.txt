@@ -147,12 +147,14 @@ iree_cc_library(
   NAME
     Common
   HDRS
+    "GPUPatterns.h"
     "LinalgOpInfo.h"
     "UserConfig.h"
   SRCS
     "DecomposeLinalgGeneric.cpp"
     "FoldAffineMinInDistributedLoops.cpp"
     "GPUDistributeSharedMemoryCopy.cpp"
+    "GPUPatterns.cpp"
     "GPUPipelining.cpp"
     "GPUTileReduction.cpp"
     "GPUVectorization.cpp"
