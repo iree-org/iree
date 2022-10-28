@@ -345,6 +345,7 @@ void ConvertToSPIRVPass::runOnOperation() {
   SPIRVConversionOptions options = {};
   options.enableFastMathMode = this->enableFastMath;
   SPIRVTypeConverter typeConverter(targetAttr, options);
+  // Additionally pull in conversion rules for GPU subgroup MMA ops.
   typeConverter.addConversion([&](gpu::MMAMatrixType type) -> Type {
       return convertMMAToSPIRVType(type);
     });
@@ -414,7 +415,7 @@ void ConvertToSPIRVPass::runOnOperation() {
   ///   !spirv.array.
   /// - unrealized_conversion_cast with the same source and target type.
   patterns.insert<
-      FoldAsNoOp<memref::CollapseShapeOp>,FoldAsNoOp<memref::CastOp> ,FoldAsNoOp<memref::ExpandShapeOp>,
+      FoldAsNoOp<memref::CollapseShapeOp>, FoldAsNoOp<memref::ExpandShapeOp>,
       FoldAsNoOp<bufferization::ToMemrefOp>, RemoveIdentityConversionCast>(
       typeConverter, context);
 

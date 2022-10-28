@@ -373,7 +373,6 @@ struct LinearizeLoadIndices final : public OpConversionPattern<memref::LoadOp> {
   }
 };
 
-
 /// Linearizes indices in gpu.subgroup_mma_load_matrix ops.
 struct LinearizeMMALoadIndices final
     : public OpConversionPattern<gpu::SubgroupMmaLoadMatrixOp> {
@@ -446,7 +445,7 @@ struct LinearizeMMAStoreIndices final
     }
 
     rewriter.replaceOpWithNewOp<gpu::SubgroupMmaStoreMatrixOp>(
-        storeOp, storeOp.getSrc(), adaptor.getDstMemref(), linearIndex,
+        storeOp, adaptor.getSrc(), adaptor.getDstMemref(), linearIndex,
         storeOp.getLeadDimension());
     return success();
   }
@@ -679,6 +678,7 @@ struct RemoveAssumeAlignOp
   }
 };
 
+/// Removes memref.cast that turns static shapes into dynamic shapes.
 struct RemoveDynamicCastOp final : public OpRewritePattern<memref::CastOp> {
   using OpRewritePattern::OpRewritePattern;
 
@@ -686,6 +686,8 @@ struct RemoveDynamicCastOp final : public OpRewritePattern<memref::CastOp> {
                                 PatternRewriter &rewriter) const override {
     auto srcType = castOp.getSource().getType().cast<MemRefType>();
     auto dstType = castOp.getType().cast<MemRefType>();
+    // Restrict to the cases we generate in this pass--1-D static shape to 1-D
+    // dynamic shape.
     if (srcType.getRank() == 1 && srcType.hasStaticShape() &&
         dstType.getRank() == 1 && !dstType.hasStaticShape()) {
       rewriter.replaceOp(castOp, castOp.getSource());
@@ -741,7 +743,7 @@ struct FlattenMemRefSubspanPass
     flattenPatterns
         .add<FlattenAlloc<memref::AllocaOp>, FlattenAlloc<memref::AllocOp>,
              FlattenGlobal, FlattenGetGlobal, LinearizeLoadIndices,
-             LinearizeMMALoadIndices, LinearizeStoreIndices, 
+             LinearizeMMALoadIndices, LinearizeStoreIndices,
              LinearizeMMAStoreIndices, LinearizeTransferReadIndices,
              LinearizeTransferWriteIndices, AdjustConversionCast,
              FlattenSubView, FoldMemRefReshape<memref::CollapseShapeOp>,

@@ -461,7 +461,7 @@ LogicalResult setMatmulOpConfig(spirv::ResourceLimitsAttr limits,
                                 linalg::LinalgOp op,
                                 std::array<int64_t, 2> bestWorkgroupSizeXY,
                                 std::array<int64_t, 3> bestThreadTileSizeMNK,
-                                bool enablePromotion, bool allowCooperative) {
+                                bool enablePromotion) {
   LLVM_DEBUG(llvm::dbgs() << "trying to deduce config as matmul...\n");
   OpOperand *lhs = op.getInputOperand(0);
   OpOperand *rhs = op.getInputOperand(1);
@@ -559,9 +559,6 @@ LogicalResult setMatmulOpConfig(spirv::ResourceLimitsAttr limits,
                               subgroupSize, maxBytes, elementBits)
           ? CodeGenPipeline::SPIRVMatmulPromoteVectorize
           : CodeGenPipeline::SPIRVBaseVectorize;
-
-  if(allowCooperative)
-    pipeline = CodeGenPipeline::SPIRVCooperativeMatrixVectorize;
 
   SmallVector<int64_t> threadTileSizes(numLoops, 0);
   if (isBM) {

@@ -39,7 +39,7 @@ LogicalResult setMatmulOpConfig(spirv::ResourceLimitsAttr limits,
                                 linalg::LinalgOp linalgOp,
                                 std::array<int64_t, 2> bestWorkgroupSizeXY,
                                 std::array<int64_t, 3> bestThreadTileSizeMNK,
-                                bool enablePromotion = false, bool allowCooperative=false);
+                                bool enablePromotion = false);
 
 /// Sets CodeGen configuration for GPUs from a specific vendor.
 ///

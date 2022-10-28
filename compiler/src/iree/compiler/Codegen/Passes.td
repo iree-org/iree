@@ -430,9 +430,8 @@ def ConvertToSPIRV : Pass<"iree-convert-to-spirv", "ModuleOp"> {
   let constructor = "mlir::iree_compiler::createConvertToSPIRVPass()";
 }
 
-def SPIRVVectorToGPU :
-    Pass<"iree-spirv-vector-to-gpu", "func::FuncOp"> {
-  let summary = "Pass to convert vector to gpu.";
+def SPIRVVectorToGPU : Pass<"iree-spirv-vector-to-gpu", "func::FuncOp"> {
+  let summary = "Pass to convert vector ops to GPU subgroup MMA ops.";
   let constructor = "mlir::iree_compiler::createSPIRVVectorToGPUPass()";
 }
 

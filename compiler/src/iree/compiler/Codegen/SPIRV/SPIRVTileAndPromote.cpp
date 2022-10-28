@@ -138,19 +138,21 @@ static void populatePromotionPatterns(RewritePatternSet &patterns,
 
 namespace {
 
-struct SPIRVTileAndPromotePass final
+class SPIRVTileAndPromotePass final
     : public SPIRVTileAndPromoteBase<SPIRVTileAndPromotePass> {
-  private:
-  // Distribute the workloads to warp if true otherwise distribute to threads.
-  bool distributeToWarp = false;
-  public:
-  SPIRVTileAndPromotePass(bool distributeToWarp)
-      : distributeToWarp(distributeToWarp) {}
+ public:
+  SPIRVTileAndPromotePass(bool skipThreadLevel)
+      : skipThreadLevel(skipThreadLevel) {}
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<gpu::GPUDialect>();
   }
 
   void runOnOperation() override;
+
+ private:
+  // Whether to skip thread level tiling and distribution.
+  bool skipThreadLevel = false;
 };
 
 }  // namespace
@@ -261,8 +263,8 @@ void SPIRVTileAndPromotePass::runOnOperation() {
     funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
     llvm::dbgs() << "\n\n";
   });
-  if(!distributeToWarp)
-  {  // Tile and distribute to invocations.
+
+  if (!skipThreadLevel) {  // Tile and distribute to invocations.
     RewritePatternSet tilingPatterns(&getContext());
     IREE::LinalgExt::LinalgTransformationFilter filter(
         {StringAttr::get(context, getWorkgroupMemoryMarker())}, llvm::None);
@@ -283,19 +285,18 @@ void SPIRVTileAndPromotePass::runOnOperation() {
       // to figure out and fix.
       // return signalPassFailure();
     }
-  }
 
-  LLVM_DEBUG({
-    llvm::dbgs() << "--- After tiling to invocations ---\n";
-    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-    llvm::dbgs() << "\n\n";
-  });
+    LLVM_DEBUG({
+      llvm::dbgs() << "--- After tiling to invocations ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
+  }
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVTileAndPromotePass(
-  bool distributeToWarp
-) {
-  return std::make_unique<SPIRVTileAndPromotePass>(distributeToWarp);
+    bool skipThreadLevel) {
+  return std::make_unique<SPIRVTileAndPromotePass>(skipThreadLevel);
 }
 
 }  // namespace iree_compiler
