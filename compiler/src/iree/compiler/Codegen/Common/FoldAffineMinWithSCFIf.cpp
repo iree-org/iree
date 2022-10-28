@@ -113,7 +113,7 @@ struct FoldAffineMinWithSCFIf final : public OpRewritePattern<scf::IfOp> {
     } else {
       return failure();
     }
-    auto cstOp = dyn_cast<arith::ConstantIndexOp>(b.getDefiningOp());
+    auto cstOp = b.getDefiningOp<arith::ConstantIndexOp>();
     if (!cstOp) return failure();
     int64_t cstInt = cstOp.value();
 
