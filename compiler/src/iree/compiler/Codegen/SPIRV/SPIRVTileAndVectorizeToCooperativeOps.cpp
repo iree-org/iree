@@ -83,7 +83,6 @@ static SmallVector<linalg::ProcInfo, 2> getSubgroupIdsAndCounts(
   Value subgroupId = builder.create<gpu::SubgroupIdOp>(loc, indexType);
   SmallVector<linalg::ProcInfo, 2> procInfo(numSubgroups.size());
 
-  // subgroupID = id.z * count.y * count.x + id.y * count.x + id.x
   for (size_t i = 0, e = numSubgroups.size(); i != e; ++i) {
     Value nprocs = builder.create<arith::ConstantIndexOp>(loc, numSubgroups[i]);
     AffineExpr d0 = getAffineDimExpr(0, builder.getContext());

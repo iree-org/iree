@@ -111,8 +111,10 @@ static LogicalResult setCooperativeMatrixConfig(
   std::array<int64_t, 3> workgroupSize{subgroupSize, numSubgroups, 1};
 
   TileSizesListType tileSizes;
+  // Workgroup Level
   tileSizes.push_back({coopMatSize->mCount * coopMatSize->m,
                        coopMatSize->nCount * coopMatSize->n, coopMatSize->k});
+  // Subgroup Level
   tileSizes.push_back({coopMatSize->m, coopMatSize->n, coopMatSize->k});
 
   return setOpConfigAndEntryPointFnTranslation(
