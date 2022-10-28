@@ -195,6 +195,7 @@ iree_compiler_cc_library(
         "WorkGroupSwizzle.cpp",
     ],
     hdrs = [
+        "GPUPatterns.h",
         "LinalgOpInfo.h",
         "UserConfig.h",
     ],
