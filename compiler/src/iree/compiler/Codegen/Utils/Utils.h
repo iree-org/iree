@@ -161,6 +161,10 @@ Optional<LoopTilingAndDistributionInfo> isTiledAndDistributedLoop(
 SmallVector<LoopTilingAndDistributionInfo> getTiledAndDistributedLoopInfo(
     func::FuncOp funcOp);
 
+/// Match a tile-and-distributed loop and get the loop bounds and step.
+LogicalResult matchTileAndDistributedLoop(Value iv, OpFoldResult &lb,
+                                          OpFoldResult &ub, OpFoldResult &step);
+
 Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
                               ArrayRef<NamedAttribute> attributes = {});
 

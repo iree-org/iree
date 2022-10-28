@@ -594,6 +594,42 @@ SmallVector<LoopTilingAndDistributionInfo> getTiledAndDistributedLoopInfo(
   return info;
 }
 
+#ifndef NDEBUG
+inline raw_ostream &operator<<(raw_ostream &os,
+                               const LoopTilingAndDistributionInfo &info) {
+  os << "Loop tiling and distribution info:\n"
+     << "\t[untiled lower bound] " << info.untiledLowerBound << "\n"
+     << "\t[untiled upper bound] " << info.untiledUpperBound << "\n"
+     << "\t[untiled step] " << info.untiledStep << "\n"
+     << "\t[tile size] " << info.tileSize << "\n"
+     << "\t[processor dimension] " << info.processorDistributionDim << "\n";
+  return os;
+}
+#endif
+
+LogicalResult matchTileAndDistributedLoop(Value iv, OpFoldResult &lb,
+                                          OpFoldResult &ub,
+                                          OpFoldResult &step) {
+  scf::ForOp forOp = scf::getForInductionVarOwner(iv);
+  if (!forOp) return failure();
+
+  auto loopInfo = isTiledAndDistributedLoop(forOp);
+  if (!loopInfo) return failure();
+  LLVM_DEBUG(llvm::dbgs() << *loopInfo);
+
+  Optional<int64_t> untiledStep = getConstantIntValue(loopInfo->untiledStep);
+  // For IREE right now the original untiled loop should have step 1..
+  if (!untiledStep || *untiledStep != 1) return failure();
+  // ..and we tile according to some static tile sizes for processors.
+  if (!loopInfo->tileSize) return failure();
+
+  lb = loopInfo->untiledLowerBound;
+  ub = loopInfo->untiledUpperBound;
+  // The "step" expected by the upstream utility is really the tiling size.
+  step = OpBuilder(iv.getContext()).getIndexAttr(loopInfo->tileSize.value());
+  return success();
+}
+
 /// Create a linalg::GenericOp version of an n-D copy that can further tile,
 /// lower to loops or vectorize, unlike the current implementation of
 /// memref::CopyOp.
