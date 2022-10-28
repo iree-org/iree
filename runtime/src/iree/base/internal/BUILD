@@ -150,7 +150,7 @@ iree_runtime_cc_test(
     tags = ["requires-filesystem"],
     deps = [
         ":file_io",
-        "//runtime/src/iree/base:cc",
+        "//runtime/src/iree/base",
         "//runtime/src/iree/base:core_headers",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
@@ -413,7 +413,6 @@ iree_runtime_cc_test(
         ":synchronization",
         ":threading",
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:cc",
         "//runtime/src/iree/base:target_platform",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",

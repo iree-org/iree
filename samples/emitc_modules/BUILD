@@ -28,7 +28,6 @@ iree_runtime_cc_test(
     deps = [
         ":add_module",
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:cc",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
         "//runtime/src/iree/vm",
@@ -61,7 +60,6 @@ iree_runtime_cc_test(
         ":import_module_a",
         ":import_module_b",
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:cc",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
         "//runtime/src/iree/vm",

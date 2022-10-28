@@ -71,7 +71,6 @@ iree_cc_test(
   DEPS
     ::hal
     iree::base
-    iree::base::cc
     iree::base::internal::span
     iree::testing::gtest
     iree::testing::gtest_main

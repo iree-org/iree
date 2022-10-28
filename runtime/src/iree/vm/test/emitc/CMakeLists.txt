@@ -14,7 +14,7 @@ iree_cc_test(
   SRCS
     "module_test.cc"
   DEPS
-    iree::base::cc
+    iree::base
     iree::testing::gtest
     iree::testing::gtest_main
     iree::vm
