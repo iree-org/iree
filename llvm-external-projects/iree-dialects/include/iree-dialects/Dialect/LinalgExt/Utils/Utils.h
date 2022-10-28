@@ -49,6 +49,10 @@ SmallVector<T> undoInterchange(ArrayRef<T> elements,
   return vec;
 }
 
+/// Returns the `interchangeVector` based on `dimsPos`.
+SmallVector<int64_t> computeInterchangeFromDimPos(ArrayRef<int64_t> dimsPos,
+                                                  int64_t rank);
+
 } // namespace LinalgExt
 } // namespace IREE
 } // namespace iree_compiler
