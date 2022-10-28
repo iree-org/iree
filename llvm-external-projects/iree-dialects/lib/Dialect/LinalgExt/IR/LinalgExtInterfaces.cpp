@@ -17,11 +17,6 @@ LogicalResult
 IREE::LinalgExt::detail::verifyLinalgExtOpInterface(Operation *op) {
   LinalgExtOp linalgExtOp = cast<LinalgExtOp>(op);
   if (op->getNumResults()) {
-    if (!linalgExtOp.hasTensorSemantics()) {
-      return linalgExtOp.emitOpError(
-          "expected inputs and outputs to be RankedTensorType or scalar");
-    }
-
     if (op->getNumResults() != linalgExtOp.getNumOutputs()) {
       return linalgExtOp.emitOpError(
           "expected number of outputs to be same as the number of results");
@@ -33,11 +28,6 @@ IREE::LinalgExt::detail::verifyLinalgExtOpInterface(Operation *op) {
                << en.index() << " " << outputType
                << " to be same as result type " << en.value();
       }
-    }
-  } else {
-    if (!linalgExtOp.hasBufferSemantics()) {
-      return linalgExtOp.emitOpError(
-          "expected inputs and outputs to be MemRefType or scalar");
     }
   }
   return success();

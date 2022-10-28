@@ -195,7 +195,8 @@ static LogicalResult replaceDestinationBuffer(OpResult resultValue,
   return TypeSwitch<Operation *, LogicalResult>(op)
       .Case<linalg::LinalgOp, IREE::LinalgExt::LinalgExtOp>([&](auto linalgOp) {
         unsigned resultNumber = resultValue.getResultNumber();
-        linalgOp.setDpsInitOperand(resultNumber, destinationValue);
+        cast<DestinationStyleOpInterface>(linalgOp.getOperation())
+            .setDpsInitOperand(resultNumber, destinationValue);
         return success();
       })
       .Case<tensor::EmptyOp>([&](auto emptyTensorOp) {
