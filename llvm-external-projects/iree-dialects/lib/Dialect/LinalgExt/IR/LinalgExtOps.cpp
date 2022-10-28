@@ -2276,7 +2276,7 @@ UnPackOp::getTiledImplementation(OpBuilder &builder,
   tiledResultTypes.push_back(tiledOperands[1].getType());
 
   Operation *tiledUnpackOp =
-      cast<LinalgExtOp>(getOperation())
+      cast<DestinationStyleOpInterface>(getOperation())
           .clone(builder, loc, tiledResultTypes, tiledOperands);
 
   SmallVector<OpFoldResult> outputStrides(outputRank, oneAttr);
