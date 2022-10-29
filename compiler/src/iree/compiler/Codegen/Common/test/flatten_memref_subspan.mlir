@@ -375,3 +375,34 @@ func.func @subview(%offset : index, %i0: index, %i1: index) -> f32 {
 //      CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%[[C0]]) : memref<?xf32>{%[[SIZE]]}
 //      CHECK:   %[[INDEX:.+]] = affine.apply #[[MAP]]()[%[[I0]], %[[I1]], %[[OFFSET]]]
 //      CHECK:   memref.load %[[SUBSPAN]][%[[INDEX]]]
+
+// -----
+
+func.func @subgroup_mma_load(%i0: index, %i1: index) -> !gpu.mma_matrix<16x16xf16, "AOp"> {
+  %alloc = memref.alloc() : memref<32x32xf16, 3>
+  %0 = gpu.subgroup_mma_load_matrix %alloc[%i0, %i1] {leadDimension = 32 : index} : memref<32x32xf16, 3> -> !gpu.mma_matrix<16x16xf16, "AOp">
+  return %0 : !gpu.mma_matrix<16x16xf16, "AOp">
+}
+
+//       CHECK: #[[$MAP:.+]] = affine_map<()[s0, s1] -> (s0 * 32 + s1)>
+// CHECK-LABEL: func.func @subgroup_mma_load
+//  CHECK-SAME: (%[[I0:.+]]: index, %[[I1:.+]]: index)
+//       CHECK:  %[[ALLOC:.+]] = memref.alloc() : memref<1024xf16, 3>
+//       CHECK:  %[[IDX:.+]] = affine.apply #[[$MAP]]()[%[[I0]], %[[I1]]]
+//       CHECK:  %[[LD:.+]] = gpu.subgroup_mma_load_matrix %[[ALLOC]][%[[IDX]]] {leadDimension = 32 : index} : memref<1024xf16, 3> -> !gpu.mma_matrix<16x16xf16, "AOp">
+//       CHECK:  return %[[LD]]
+
+// -----
+
+func.func @subgroup_mma_store(%i0: index, %i1: index, %val: !gpu.mma_matrix<16x16xf16, "COp">) {
+  %alloc = memref.alloc() : memref<32x32xf16, 3>
+  gpu.subgroup_mma_store_matrix %val, %alloc[%i0, %i1] {leadDimension = 128 : index} : !gpu.mma_matrix<16x16xf16, "COp">, memref<32x32xf16, 3>
+  return
+}
+
+//       CHECK: #[[$MAP:.+]] = affine_map<()[s0, s1] -> (s0 * 32 + s1)>
+// CHECK-LABEL: func.func @subgroup_mma_store
+//  CHECK-SAME: (%[[I0:.+]]: index, %[[I1:.+]]: index, %[[VAL:.+]]: !gpu.mma_matrix<16x16xf16, "COp">) {
+//       CHECK:   %[[ALLOC:.+]] = memref.alloc() : memref<1024xf16, 3>
+//       CHECK:   %[[IDX:.+]] = affine.apply #[[$MAP]]()[%[[I0]], %[[I1]]]
+//       CHECK:   gpu.subgroup_mma_store_matrix %[[VAL]], %[[ALLOC]][%[[IDX]]] {leadDimension = 128 : index} : !gpu.mma_matrix<16x16xf16, "COp">, memref<1024xf16, 3>

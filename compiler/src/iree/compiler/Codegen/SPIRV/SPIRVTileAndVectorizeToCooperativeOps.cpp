@@ -260,7 +260,7 @@ class SPIRVTileAndVectorizeToCooperativeOpsPass final
     func::FuncOp funcOp = getOperation();
 
     // First we need to discover the CodeGen lowering configuration. It was
-    // decided earlier and attached to a Linalg op as an attribute.
+    // decided earlier and attached to a linalg op as an attribute.
 
     linalg::LinalgOp rootOp;
     funcOp.walk([&](linalg::ContractionOpInterface contractOp) {
@@ -276,7 +276,7 @@ class SPIRVTileAndVectorizeToCooperativeOpsPass final
     }
 
     SmallVector<int64_t> cooperativeOpSize = getTargetCooperativeOpSize(rootOp);
-    auto subgroupCounts = deduceSubgroupCounts(rootOp);
+    SmallVector<int64_t> subgroupCounts = deduceSubgroupCounts(rootOp);
 
     // Then tile and distribute to subgroups.
 
