@@ -293,7 +293,8 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm) {
   // cooperative ops in the next step.
   nestedModulePM.addPass(memref::createFoldMemRefAliasOpsPass());
 
-  nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorToGPUPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createSPIRVVectorToGPUSubgroupMMAOpsPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorizePass());
 }
 

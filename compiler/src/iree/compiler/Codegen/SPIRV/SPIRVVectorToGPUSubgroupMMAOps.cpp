@@ -16,8 +16,8 @@ namespace mlir {
 namespace iree_compiler {
 
 namespace {
-struct SPIRVVectorToGPUPass
-    : public SPIRVVectorToGPUBase<SPIRVVectorToGPUPass> {
+struct SPIRVVectorToGPUSubgroupMMAPass final
+    : public SPIRVVectorToGPUSubgroupMMABase<SPIRVVectorToGPUSubgroupMMAPass> {
   void getDependentDialects(DialectRegistry& registry) const override {
     registry.insert<AffineDialect, gpu::GPUDialect, memref::MemRefDialect>();
   }
@@ -45,8 +45,9 @@ struct SPIRVVectorToGPUPass
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVVectorToGPUPass() {
-  return std::make_unique<SPIRVVectorToGPUPass>();
+std::unique_ptr<OperationPass<func::FuncOp>>
+createSPIRVVectorToGPUSubgroupMMAOpsPass() {
+  return std::make_unique<SPIRVVectorToGPUSubgroupMMAPass>();
 }
 
 }  // namespace iree_compiler
