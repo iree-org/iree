@@ -117,8 +117,8 @@ static void populateTilingToWarpPatterns(
   auto getWarpProcInfoFn = [warpPerWorkgroup](
                                OpBuilder &builder, Location loc,
                                ArrayRef<Range> parallelLoopRanges) {
-    return getSubgroupIdsAndCounts(builder, loc, parallelLoopRanges.size(),
-                                   warpPerWorkgroup);
+    return getSubgroupIdsAndCounts(builder, loc, /*warpSize=*/32u,
+                                   parallelLoopRanges.size(), warpPerWorkgroup);
   };
   linalg::LinalgLoopDistributionOptions warpDistributionOptions;
   warpDistributionOptions.procInfo = getWarpProcInfoFn;

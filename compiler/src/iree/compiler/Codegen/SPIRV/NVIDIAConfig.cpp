@@ -23,7 +23,10 @@
 
 using llvm::APIntOps::GreatestCommonDivisor;
 
+// The default number of subgroups to use per workgroup.
 constexpr unsigned numSubgroupsPerWorkgroup = 4;
+// The default number of tiles along K dimension to use per workgroup.
+constexpr unsigned numKTilesPerWorkgroup = 2;
 
 namespace mlir {
 namespace iree_compiler {
@@ -35,6 +38,7 @@ struct CooperativeMatrixSize {
   int64_t k;       // Native cooperative matrix size along K dimension
   int64_t mCount;  // # subgroups along M dimension
   int64_t nCount;  // # subgroups along N dimension
+  int64_t kCount;  // # tiles along K dimension
 };
 
 /// Returns the cooperative matrix (M, N, K) sizes that are supported by the
@@ -55,16 +59,20 @@ static Optional<CooperativeMatrixSize> getCooperativeMatrixSize(
       if (m % matmulM == 0 && n % matmulN == 0 && k % matmulK == 0) {
         uint64_t subgroupCount = numSubgroupsPerWorkgroup;
         APInt nMultiplier(/*numBits=*/64, uint64_t(n / matmulN));
-        APInt mMultiplier(/*numBits=*/64, uint64_t(m / matmulM));
-        APInt nCount =
+        APInt nCountVal =
             GreatestCommonDivisor(nMultiplier, APInt(64, subgroupCount));
-        subgroupCount /= nCount.getZExtValue();
-        APInt mCount =
+        int64_t nCount = nCountVal.getSExtValue();
+
+        subgroupCount /= nCountVal.getZExtValue();
+        APInt mMultiplier(/*numBits=*/64, uint64_t(m / matmulM));
+        APInt mCountVal =
             GreatestCommonDivisor(mMultiplier, APInt(64, subgroupCount));
+        int64_t mCount = mCountVal.getSExtValue();
+
+        int64_t kCount = std::min<int64_t>(k / matmulK, numKTilesPerWorkgroup);
 
         return CooperativeMatrixSize{matmulM, matmulN, matmulK,
-                                     mCount.getSExtValue(),
-                                     nCount.getSExtValue()};
+                                     mCount,  nCount,  kCount};
       }
     }
   }
@@ -107,15 +115,19 @@ static LogicalResult setCooperativeMatrixConfig(
       SPIRVCooperativeMatrixVectorize;
 
   const int subgroupSize = resourceLimits.getSubgroupSize();
-  const int64_t numSubgroups = coopMatSize->mCount * coopMatSize->nCount;
-  std::array<int64_t, 3> workgroupSize{subgroupSize, numSubgroups, 1};
+  std::array<int64_t, 3> workgroupSize{coopMatSize->nCount * subgroupSize,
+                                       coopMatSize->mCount, 1};
 
   TileSizesListType tileSizes;
-  // Workgroup Level
+  // Workgroup level. We don't include K here, which is placed at the third
+  // level for tiling.
   tileSizes.push_back({coopMatSize->mCount * coopMatSize->m,
-                       coopMatSize->nCount * coopMatSize->n, coopMatSize->k});
-  // Subgroup Level
+                       coopMatSize->nCount * coopMatSize->n});
+  // Subgroup level. We include K here, so that we have a way to get the full
+  // native cooperative matrix size configuration.
   tileSizes.push_back({coopMatSize->m, coopMatSize->n, coopMatSize->k});
+  // Reduction level. For tiling the K dimension.
+  tileSizes.push_back({0, 0, coopMatSize->kCount * coopMatSize->k});
 
   return setOpConfigAndEntryPointFnTranslation(
       op->getParentOfType<func::FuncOp>(), op, tileSizes, pipeline,

@@ -19,6 +19,7 @@
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/Debug.h"
@@ -28,6 +29,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
@@ -65,34 +67,12 @@ static SmallVector<int64_t> deduceSubgroupCounts(linalg::LinalgOp op) {
 
   SmallVector<int64_t> subgroupTileSizes = getTileSizes(op, 1);
 
-  assert(workgroupTileSizes.size() == subgroupTileSizes.size());
-  for (int i = 0, e = subgroupTileSizes.size(); i < e; ++i) {
+  assert(workgroupTileSizes.size() <= subgroupTileSizes.size());
+  for (int i = 0, e = workgroupTileSizes.size(); i < e; ++i) {
     assert(workgroupTileSizes[i] % subgroupTileSizes[i] == 0);
     subgroupCounts[i] = workgroupTileSizes[i] / subgroupTileSizes[i];
   }
   return subgroupCounts;
-}
-
-/// Computes subgroup IDs and counts for distribution.
-///
-/// GPU's subgroup ID builtin is a single number. We need to delinearize it to
-/// all workgroup tiled dimensions for distribution at the subgroup level.
-static SmallVector<linalg::ProcInfo, 2> getSubgroupIdsAndCounts(
-    OpBuilder &builder, Location loc, ArrayRef<int64_t> numSubgroups) {
-  Type indexType = builder.getIndexType();
-  Value subgroupId = builder.create<gpu::SubgroupIdOp>(loc, indexType);
-  SmallVector<linalg::ProcInfo, 2> procInfo(numSubgroups.size());
-
-  for (size_t i = 0, e = numSubgroups.size(); i != e; ++i) {
-    Value nprocs = builder.create<arith::ConstantIndexOp>(loc, numSubgroups[i]);
-    AffineExpr d0 = getAffineDimExpr(0, builder.getContext());
-    AffineExpr s0 = getAffineSymbolExpr(0, builder.getContext());
-    Value procId =
-        makeComposedAffineApply(builder, loc, d0 % s0, {subgroupId, nprocs});
-    procInfo[e - i - 1] = linalg::ProcInfo{procId, nprocs};
-    subgroupId = builder.create<arith::DivSIOp>(loc, subgroupId, nprocs);
-  }
-  return procInfo;
 }
 
 /// Adds patterns to tile Linalg ops with workgroup markers to subgroups.
@@ -103,13 +83,14 @@ static void populateTilingToSubgroupPatterns(ArrayRef<int64_t> subgroupCounts,
   auto getSubgroupProcInfoFn = [subgroupCounts](
                                    OpBuilder &builder, Location loc,
                                    ArrayRef<Range> parallelLoopRanges) {
+    // TODO: query this from the target environment
+    const unsigned subgroupSize = 32;
     auto counts = llvm::to_vector<3>(subgroupCounts);
-    // Only consider parallel dimensions for tiling and distribution. Reduction
-    // dimension distribution needs synchronization. We'll use vector unroll
-    // later to "tile" along reduction dimensions.
-    unsigned size = std::min(parallelLoopRanges.size(), static_cast<size_t>(3));
-    counts.resize(size, 1);
-    return getSubgroupIdsAndCounts(builder, loc, counts);
+    // `getSubgroupIdsAndCounts` assumes we follow GPU (X, Y, Z) order.
+    std::reverse(counts.begin(), counts.end());
+    auto results = getSubgroupIdsAndCounts(builder, loc, subgroupSize,
+                                           parallelLoopRanges.size(), counts);
+    return results;
   };
 
   linalg::LinalgLoopDistributionOptions distributionOptions;
@@ -279,7 +260,7 @@ class SPIRVTileAndVectorizeToCooperativeOpsPass final
     func::FuncOp funcOp = getOperation();
 
     // First we need to discover the CodeGen lowering configuration. It was
-    // decided earlier and attached to a linalg op as an attribute.
+    // decided earlier and attached to a Linalg op as an attribute.
 
     linalg::LinalgOp rootOp;
     funcOp.walk([&](linalg::ContractionOpInterface contractOp) {
@@ -290,9 +271,7 @@ class SPIRVTileAndVectorizeToCooperativeOpsPass final
       return WalkResult::advance();
     });
     if (!rootOp) {
-      funcOp.emitError(
-          "expected a linalg::ContractionOpInterface op with "
-          "lowering_config attribute");
+      funcOp.emitError("expected lowering confg on a Linalg contraction op");
       return signalPassFailure();
     }
 
