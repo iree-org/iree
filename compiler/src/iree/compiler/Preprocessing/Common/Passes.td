@@ -22,6 +22,18 @@ def ConvertConvNchwToNhwc :
       "mlir::iree_compiler::IREE::createConvertConvNchwToNhwcPass()";
 }
 
+def GeneralizeAndFuse :
+    Pass<"iree-flow-generalize-and-fuse", ""> {
+  let summary = "Generalizes named op and try to fuse them.";
+  let constructor = "mlir::iree_compiler::IREE::createGeneralizeAndFusePass()";
+}
+
+def ConvertLinalgMatmulToMmt :
+    Pass<"iree-flow-convert-linalg-matmul-to-mmt", ""> {
+  let summary = "Convert linalg.matmul to linalg.transpose + linalg.matmul";
+  let constructor = "mlir::iree_compiler::IREE::createConvertLinalgMatmulToMmtPass()";
+}
+
 def PadLinalgOps :
     Pass<"iree-preprocessing-pad-linalg-ops", ""> {
   let summary = "Pad linalg ops to the next integer multiple of paddingSize.";
