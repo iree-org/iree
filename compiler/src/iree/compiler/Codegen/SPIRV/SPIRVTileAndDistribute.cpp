@@ -98,7 +98,9 @@ static void populateTilingReductionPatterns(
 
   TilingPatterns<linalg::BatchMatmulOp, linalg::Conv2DNchwFchwOp,
                  linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp,
-                 linalg::MatmulOp>::insert(patterns, tilingOptions, filter);
+                 linalg::MatmulOp, linalg::GenericOp>::insert(patterns,
+                                                              tilingOptions,
+                                                              filter);
 }
 
 //===----------------------------------------------------------------------===//

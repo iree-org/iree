@@ -25,6 +25,12 @@ std::unique_ptr<Pass> createConvertConv2DToImg2ColPass();
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createConvertConvNchwToNhwcPass();
 
+// Generalizes named op and try to fuse them
+std::unique_ptr<Pass> createGeneralizeAndFusePass();
+
+// Pass to convert a linalg.matmul into linalg.transpose + linalg.matmul.
+std::unique_ptr<Pass> createConvertLinalgMatmulToMmtPass();
+
 // A pass to pad linalg ops to the next integer multiple of `paddingSize`.
 std::unique_ptr<Pass> createPadLinalgOpsToIntegerMultiplePass();
 
