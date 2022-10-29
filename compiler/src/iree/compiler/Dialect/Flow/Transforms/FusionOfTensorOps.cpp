@@ -160,8 +160,9 @@ static bool hasReduction(Operation *op) {
   const Type elementType =
       linalg.getOutputs()[0].getType().cast<ShapedType>().getElementType();
   if (!elementType.isIntOrFloat()) return false;
-  // Reduction distribution only supports 32-bit types now.
-  if (elementType.getIntOrFloatBitWidth() != 32) return false;
+  // Reduction distribution relaxed to support 16 and 32 bit
+  auto bitWidth = elementType.getIntOrFloatBitWidth();
+  if (bitWidth != 32 && bitWidth != 16) return false;
   linalg.getReductionDims(dims);
   return dims.size() == 1 &&
          (linalg.getStaticLoopRanges()[dims[0]] % (64 * 4) == 0) &&
