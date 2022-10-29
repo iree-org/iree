@@ -108,11 +108,10 @@ static void populateTilingToSubgroupPatterns(ArrayRef<int64_t> subgroupCounts,
           return builder.create<arith::ConstantIndexOp>(op->getLoc(), v);
         }));
   };
-  auto tilingOptions =
-      linalg::LinalgTilingOptions()
-          .setLoopType(linalg::LinalgTilingLoopType::Loops)
-          .setTileSizeComputationFunction(setTileSizesFn)
-          .setDistributionOptions(distributionOptions);
+  auto tilingOptions = linalg::LinalgTilingOptions()
+                           .setLoopType(linalg::LinalgTilingLoopType::Loops)
+                           .setTileSizeComputationFunction(setTileSizesFn)
+                           .setDistributionOptions(distributionOptions);
 
   IREE::LinalgExt::LinalgTransformationFilter filter(
       {StringAttr::get(context, getWorkgroupKTiledMarker()),

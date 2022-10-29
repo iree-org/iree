@@ -57,7 +57,7 @@ static Optional<CooperativeMatrixSize> getCooperativeMatrixSize(
       const unsigned matmulN = property.getNSize();
       const unsigned matmulK = property.getKSize();
       if (m % matmulM == 0 && n % matmulN == 0 && k % matmulK == 0) {
-        const uint64_t nTileCount = n/ matmulN;
+        const uint64_t nTileCount = n / matmulN;
         const uint64_t mTileCount = m / matmulM;
         const APInt nTileCountAPInt(/*numBits=*/64, nTileCount);
         const APInt mTileCountAPInt(/*numBits=*/64, mTileCount);
