@@ -609,6 +609,12 @@ static bool isFusableWithProducer(
 
   auto consumerLinalgOp = cast<linalg::LinalgOp>(consumer);
   if (consumerLinalgOp.isDpsInput(&operand)) {
+    // TODO: Add some marker on transpose and MatmulOp to indicate mmt.
+    bool fuseTransposeAndMatmul =
+        isa<linalg::MatmulOp>(consumer) && isa<linalg::TransposeOp>(producer);
+    if (fuseTransposeAndMatmul) {
+      return true;
+    }
     // Only fuse on inputs if both ops are generic ops.
     if (!isa<linalg::GenericOp>(consumer) ||
         !isa<linalg::GenericOp>(producer)) {

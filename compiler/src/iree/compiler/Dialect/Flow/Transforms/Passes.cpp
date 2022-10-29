@@ -101,6 +101,11 @@ static llvm::cl::opt<bool> clEnableDataTiling(
     "iree-flow-enable-data-tiling", llvm::cl::desc("Enable data tiling path"),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clEnableTransposeMatmulLayout(
+    "iree-flow-enable-transpose-matmul-layout",
+    llvm::cl::desc("Enable transposing the B matrix for matmuls."),
+    llvm::cl::init(false));
+
 static llvm::cl::opt<bool> clNormalizeInputIndexingMap(
     "iree-flow-normalize-input-indexing-map",
     llvm::cl::desc("Enable normalizing input indexing map to identity"),
