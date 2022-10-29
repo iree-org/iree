@@ -33,7 +33,6 @@ iree_cc_library(
     "SPIRVTileAndDistribute.cpp"
     "SPIRVTileAndPromote.cpp"
     "SPIRVTileAndVectorizeToCooperativeOps.cpp"
-    "SPIRVVectorToCooperativeOps.cpp"
     "SPIRVVectorToGPUSubgroupMMAOps.cpp"
     "SPIRVVectorize.cpp"
     "SPIRVVectorizeLoadStore.cpp"

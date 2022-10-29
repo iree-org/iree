@@ -482,13 +482,6 @@ def SPIRVVectorize : Pass<"iree-spirv-vectorize", "func::FuncOp"> {
   let constructor = "mlir::iree_compiler::createSPIRVVectorizePass()";
 }
 
-def SPIRVVectorToCooperativeOps :
-    Pass<"iree-spirv-vector-to-cooperative-ops", "func::FuncOp"> {
-  let summary = "Convert vector ops to SPIR-V cooperative ops";
-  let constructor =
-      "mlir::iree_compiler::createSPIRVVectorToCooperativeOpsPass()";
-}
-
 def SPIRVVectorizeLoadStore :
     Pass<"iree-spirv-vectorize-load-store", "ModuleOp"> {
   let summary = "Vectorize load/store of memrefs for better memory access";
