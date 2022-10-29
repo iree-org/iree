@@ -13,8 +13,8 @@
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "llvm/ADT/APInt.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -53,21 +53,37 @@ static Optional<CooperativeMatrixSize> getCooperativeMatrixSize(
         property.getCType() == resultType &&
         property.getResultType() == resultType &&
         property.getScope().getValue() == spirv::Scope::Subgroup) {
-      unsigned matmulM = property.getMSize();
-      unsigned matmulN = property.getNSize();
-      unsigned matmulK = property.getKSize();
+      const unsigned matmulM = property.getMSize();
+      const unsigned matmulN = property.getNSize();
+      const unsigned matmulK = property.getKSize();
       if (m % matmulM == 0 && n % matmulN == 0 && k % matmulK == 0) {
-        uint64_t subgroupCount = numSubgroupsPerWorkgroup;
-        APInt nMultiplier(/*numBits=*/64, uint64_t(n / matmulN));
-        APInt nCountVal =
-            GreatestCommonDivisor(nMultiplier, APInt(64, subgroupCount));
-        int64_t nCount = nCountVal.getSExtValue();
+        const uint64_t nTileCount = n/ matmulN;
+        const uint64_t mTileCount = m / matmulM;
+        const APInt nTileCountAPInt(/*numBits=*/64, nTileCount);
+        const APInt mTileCountAPInt(/*numBits=*/64, mTileCount);
 
-        subgroupCount /= nCountVal.getZExtValue();
-        APInt mMultiplier(/*numBits=*/64, uint64_t(m / matmulM));
-        APInt mCountVal =
-            GreatestCommonDivisor(mMultiplier, APInt(64, subgroupCount));
-        int64_t mCount = mCountVal.getSExtValue();
+        int64_t nCount = 0, mCount = 0;
+        uint64_t subgroupCount = numSubgroupsPerWorkgroup;
+        uint64_t squareRoot = 1u << (llvm::Log2_64(subgroupCount) / 2);
+
+        // See if the square root of subgroupCount can divide mTileCount. If so
+        // it means we can distribute to both dimensions evenly. Otherwise, try
+        // to distribute to N and then M.
+        if (mTileCount > squareRoot && mTileCount % squareRoot == 0) {
+          mCount = squareRoot;
+          APInt nGCD = GreatestCommonDivisor(
+              nTileCountAPInt, APInt(64, subgroupCount / squareRoot));
+          nCount = nGCD.getSExtValue();
+        } else {
+          APInt nGCD =
+              GreatestCommonDivisor(nTileCountAPInt, APInt(64, subgroupCount));
+          nCount = nGCD.getSExtValue();
+
+          subgroupCount /= nCount;
+          APInt mGCD =
+              GreatestCommonDivisor(mTileCountAPInt, APInt(64, subgroupCount));
+          mCount = mGCD.getSExtValue();
+        }
 
         int64_t kCount = std::min<int64_t>(k / matmulK, numKTilesPerWorkgroup);
 
