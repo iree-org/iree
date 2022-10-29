@@ -96,8 +96,8 @@ static void populateTilingReductionPatterns(
                            .setLoopType(linalg::LinalgTilingLoopType::Loops)
                            .setTileSizeComputationFunction(computeFn);
 
-  TilingPatterns<linalg::BatchMatmulOp, linalg::MatmulOp>::insert(
-      patterns, tilingOptions, filter);
+  TilingPatterns<linalg::BatchMatmulOp, linalg::MatmulOp,
+                 linalg::GenericOp>::insert(patterns, tilingOptions, filter);
   filter.addFilter([](Operation *op) {
     return success(isa<linalg::ConvolutionOpInterface>(op));
   });
