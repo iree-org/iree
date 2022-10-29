@@ -266,6 +266,10 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm) {
       createSPIRVTileAndPromotePass(/*skipThreadLevel=*/true));
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
+  // Run canonicalization patterns to propagate constant shape sizes after
+  // removing trip-one loops.
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createGPUDistributeSharedMemoryCopy());
@@ -275,6 +279,8 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm) {
       createSPIRVTileAndVectorizeToCooperativeOpsPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
+  // Run canonicalization patterns to propagate constant shape sizes after
+  // removing trip-one loops.
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
