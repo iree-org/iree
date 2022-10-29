@@ -69,7 +69,7 @@ func.func @resourceConstants() -> (!stream.resource<constant>, !stream.resource<
   index_bits = 32
 }>
 
-// CHECK: #composite_of_16b0 = #util.composite<16xi8, [
+// CHECK: #composite_of_16b = #util.composite<16xi8, [
 // CHECK:     dense<100> : tensor<1xi32>,
 // CHECK:     dense<0> : vector<12xi8>,
 // CHECK: ]>
@@ -84,7 +84,7 @@ func.func @splitResourceConstants() -> (!stream.resource<constant>, !stream.reso
   %c4 = arith.constant 4 : index
   %c8 = arith.constant 8 : index
 
-  // CHECK: %[[RODATA0:.+]] = util.buffer.constant {alignment = 16 : index} : !util.buffer = #composite_of_16b0
+  // CHECK: %[[RODATA0:.+]] = util.buffer.constant {alignment = 16 : index} : !util.buffer = #composite_of_16b
   // CHECK: %[[RODATA1:.+]] = util.buffer.constant {alignment = 16 : index} : !util.buffer = #composite_of_16b1
   %0:3 = stream.resource.constants :
     !stream.resource<constant>{%c4} = dense<100> : tensor<1xi32>,

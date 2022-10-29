@@ -327,4 +327,9 @@ struct ref_type_descriptor {
     return name##_descriptor.type;                                          \
   }
 
+// Optional C++ iree::vm::ref<T> wrapper.
+#ifdef __cplusplus
+#include "iree/vm/ref_cc.h"
+#endif  // __cplusplus
+
 #endif  // IREE_VM_REF_H_

@@ -194,7 +194,7 @@ ChangeStatus FloatRangeValueElement::updateValue(Value value,
           newState ^= inner;
           // Stop traversal if tied OpOperand is not used in the op body.
           if (!linalgOp.payloadUsesValueFromOperand(
-                  linalgOp.getOutputOperand(result.getResultNumber())))
+                  linalgOp.getDpsInitOperand(result.getResultNumber())))
             return WalkResult::skip();
           return WalkResult::advance();
         } else if (auto minfOp = dyn_cast<arith::MinFOp>(definingOp)) {

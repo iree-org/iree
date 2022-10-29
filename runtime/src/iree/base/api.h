@@ -7,25 +7,12 @@
 // API Versioning
 // -----------------------------------------------------------------------------
 //
-// The C API is designed to be versioned such that breaking changes either in
-// ABI (data types, struct sizes, etc) or signatures (function arguments change)
-// will result in a bump of the IREE_API_VERSION_LATEST value.
-//
-// When linked in statically the runtime should never have a version conflict,
-// however dynamic linking where the runtime is a shared object loaded at
-// runtime (via dlopen/etc) must always verify the version is as expected.
-//
-// In the current experimental state of the runtime the API may break frequently
-// and the version is pinned at 0.
-//
-// Example:
-//   void* library = dlopen("iree_rt.so", RTLD_LAZY | RTLD_LOCAL);
-//   iree_api_version_t actual_version;
-//   iree_status_t status = \
-//       ((PFN_iree_api_version_check)dlsym(library, "iree_api_version_check"))(
-//       IREE_API_VERSION_LATEST, &actual_version);
-//   IREE_CHECK_OK(status);
-//   dlclose(library);
+// The core IREE runtime is designed to be statically linked into either hosting
+// applications or binding layers (python, rust, etc). It is not designed to be
+// stable across shared library versions and no guarantees are made about
+// exported function signatures or structures. If a user does package the
+// runtime in a shared library and exports the symbols they will need to handle
+// versioning themselves if attempting to perform version shifting.
 //
 // Object Ownership and Lifetime
 // -----------------------------------------------------------------------------
@@ -116,25 +103,6 @@ extern "C" {
 // Sprinkle this wherever to make it easier to find structs/functions that are
 // not yet stable.
 #define IREE_API_UNSTABLE
-
-// Known versions of the API that can be referenced in code.
-// Out-of-bounds values are possible in forward-versioned changes.
-typedef enum iree_api_version_e {
-  IREE_API_VERSION_0 = 0,
-  // Always set to the latest version of the library from source.
-  IREE_API_VERSION_LATEST = IREE_API_VERSION_0,
-} iree_api_version_t;
-
-// Checks whether the |expected_version| of the caller matches the implemented
-// version of |out_actual_version|. Forward compatibility of the API is
-// supported but backward compatibility is not: newer binaries using older
-// shared libraries of the runtime will fail.
-//
-// Returns IREE_STATUS_OUT_OF_RANGE if the actual version is not compatible with
-// the expected version.
-IREE_API_EXPORT iree_status_t
-iree_api_version_check(iree_api_version_t expected_version,
-                       iree_api_version_t* out_actual_version);
 
 #ifdef __cplusplus
 }  // extern "C"

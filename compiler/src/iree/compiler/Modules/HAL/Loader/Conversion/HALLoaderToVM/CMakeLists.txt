@@ -14,9 +14,9 @@ iree_cc_library(
   NAME
     HALLoaderToVM
   HDRS
-    "ConvertHALLoaderToVM.h"
+    "Patterns.h"
   SRCS
-    "ConvertHALLoaderToVM.cpp"
+    "Patterns.cpp"
   DEPS
     MLIRArithDialect
     MLIRFuncDialect

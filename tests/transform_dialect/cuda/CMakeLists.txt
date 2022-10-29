@@ -17,11 +17,6 @@ endif()
 iree_lit_test_suite(
   NAME
     lit
-  SRCS
-    "reduction.mlir"
-    "softmax.mlir"
-    "softmax_partial.mlir"
-    "softmax_v2.mlir"
   TOOLS
     FileCheck
     iree-compile

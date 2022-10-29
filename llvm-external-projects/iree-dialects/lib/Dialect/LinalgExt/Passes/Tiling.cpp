@@ -192,11 +192,13 @@ tileInterfaceOpImpl(OpBuilder &builder, TilingInterface tilableOp,
 
 FailureOr<TiledOp> tileInterfaceOp(OpBuilder &b, TilingInterface tilableOp,
                                    const linalg::LinalgTilingOptions &options) {
-  SmallVector<Value> dest = tilableOp.getDestinationOperands(b);
-  if (dest.empty()) {
-    return static_cast<LogicalResult>(tilableOp.emitOpError(
-        "cannot tile operation without destination operands"));
-  }
+
+  // Gather destination tensors.
+  SmallVector<Value> dest;
+  Location loc = tilableOp.getLoc();
+
+  if (failed(tensor::getOrCreateDestinations(b, loc, tilableOp, dest)))
+    return tilableOp->emitOpError("failed to get destination tensors");
 
   SmallVector<utils::IteratorType> iteratorTypes =
       tilableOp.getLoopIteratorTypes();

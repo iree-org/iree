@@ -116,8 +116,8 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
   LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
     if (!matmulOp.hasTensorSemantics()) return failure();
-    auto inputs = matmulOp.getInputOperands();
-    auto outputs = matmulOp.getOutputOperands();
+    auto inputs = matmulOp.getDpsInputOperands();
+    auto outputs = matmulOp.getDpsInitOperands();
     auto hasEncoding = [](OpOperand *operand) -> bool {
       auto type = operand->get().getType().dyn_cast<RankedTensorType>();
       return type && type.getEncoding();

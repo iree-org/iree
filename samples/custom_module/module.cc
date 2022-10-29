@@ -9,9 +9,8 @@
 #include <cstdio>
 
 #include "iree/base/api.h"
-#include "iree/base/status_cc.h"
+#include "iree/vm/api.h"
 #include "iree/vm/native_module_cc.h"
-#include "iree/vm/ref_cc.h"
 
 // NOTE: this module is written in C++ using the native module wrapper and uses
 // template magic to handle marshaling arguments. For a lot of uses this is a

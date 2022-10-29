@@ -195,7 +195,8 @@ static LogicalResult replaceDestinationBuffer(OpResult resultValue,
   return TypeSwitch<Operation *, LogicalResult>(op)
       .Case<linalg::LinalgOp, IREE::LinalgExt::LinalgExtOp>([&](auto linalgOp) {
         unsigned resultNumber = resultValue.getResultNumber();
-        linalgOp.setOutputOperand(resultNumber, destinationValue);
+        cast<DestinationStyleOpInterface>(linalgOp.getOperation())
+            .setDpsInitOperand(resultNumber, destinationValue);
         return success();
       })
       .Case<tensor::EmptyOp>([&](auto emptyTensorOp) {
@@ -338,7 +339,7 @@ struct AdaptLinalgInputOperandToOutputOperand
     // There is only one result tensor.
     if (op->getNumResults() != 1) return failure();
     // The output tensor is unused in the body computation.
-    auto outputOperand = op.getOutputOperand(0);
+    auto outputOperand = op.getDpsInitOperand(0);
     if (op.payloadUsesValueFromOperand(outputOperand)) return failure();
 
     // Find an input operand which meets:
@@ -347,7 +348,7 @@ struct AdaptLinalgInputOperandToOutputOperand
     OpOperand *operand = nullptr;
     SmallVector<Value> newOperands;
     SmallVector<AffineMap> maps;
-    for (auto in : op.getInputOperands()) {
+    for (auto in : op.getDpsInputOperands()) {
       if (!operand && !isReadOnly(in->get()) &&
           op.getMatchingIndexingMap(in) ==
               op.getMatchingIndexingMap(outputOperand) &&
@@ -373,7 +374,7 @@ struct AdaptLinalgInputOperandToOutputOperand
     // Repair the payload entry block.
     Block &payload = newOp.getRegion().front();
     payload.getArgument(operand->getOperandNumber())
-        .replaceAllUsesWith(payload.getArgument(op.getNumInputs()));
+        .replaceAllUsesWith(payload.getArgument(op.getNumDpsInputs()));
     payload.eraseArgument(operand->getOperandNumber());
 
     rewriter.replaceOp(op, newOp.getResults());
@@ -390,7 +391,7 @@ struct RemoveCstOutsDependency
     rewriter.startRootUpdate(op);
     bool modifiedOutput = false;
     Location loc = op.getLoc();
-    for (OpOperand *opOperand : op.getOutputOperands()) {
+    for (OpOperand *opOperand : op.getDpsInitOperands()) {
       DenseElementsAttr attr;
       if (!matchPattern(opOperand->get(), m_Constant(&attr))) continue;
       if (!attr.isSplat()) continue;

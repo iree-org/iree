@@ -242,13 +242,13 @@ static bool propagateCopyDestIntoProducerFill(memref::CopyOp copyOp) {
 static void insertInputValueIntoGeneric(Value source, linalg::GenericOp op) {
   SmallVector<Value> newOperands;
   SmallVector<AffineMap> maps;
-  for (OpOperand *in : op.getInputOperands()) {
+  for (OpOperand *in : op.getDpsInputOperands()) {
     newOperands.push_back(in->get());
     maps.push_back(op.getMatchingIndexingMap(in));
   }
   newOperands.push_back(source);
-  assert(op.getNumOutputs() == 1);
-  OpOperand *outOperand = op.getOutputOperand(0);
+  assert(op.getNumDpsInits() == 1);
+  OpOperand *outOperand = op.getDpsInitOperand(0);
   maps.push_back(op.getMatchingIndexingMap(outOperand));
   maps.push_back(op.getMatchingIndexingMap(outOperand));
   Location loc = op.getLoc();
@@ -277,8 +277,8 @@ static bool propagateCopySourceIntoConsumerGeneric(
       continue;
     }
     auto consumer = dyn_cast<linalg::GenericOp>(nextOp);
-    if (!consumer || consumer.getNumOutputs() != 1 ||
-        !consumer.getMatchingIndexingMap(consumer.getOutputOperand(0))
+    if (!consumer || consumer.getNumDpsInits() != 1 ||
+        !consumer.getMatchingIndexingMap(consumer.getDpsInitOperand(0))
              .isIdentity())
       break;
     if (*consumer.getOutputs().begin() != copyOp.getTarget()) break;

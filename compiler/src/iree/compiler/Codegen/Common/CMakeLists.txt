@@ -147,6 +147,7 @@ iree_cc_library(
   NAME
     Common
   HDRS
+    "GPUPatterns.h"
     "LinalgOpInfo.h"
     "UserConfig.h"
   SRCS
