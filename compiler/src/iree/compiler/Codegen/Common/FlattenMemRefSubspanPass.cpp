@@ -641,20 +641,20 @@ struct FlattenMemRefSubspanPass
     // First flatten the dimensions of subspan op and their consumer load/store
     // ops. This requires setting up conversion targets with type converter.
 
-    MLIRContext &context = getContext();
+    MLIRContext *context = &getContext();
 
     // This pass currently doesn't support alignment hints so remove them first.
-    RewritePatternSet patterns(&context);
-    patterns.add<RemoveAssumeAlignOp>(&context);
+    RewritePatternSet patterns(context);
+    patterns.add<RemoveAssumeAlignOp>(context);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
 
-    RewritePatternSet flattenPatterns(&context);
+    RewritePatternSet flattenPatterns(context);
 
     // For subspan ops that "generate" MemRef values, convert all MemRef types
     // to 1-D dynamic sized one. This matches how IREE models buffers nicely.
     FlattenMemRefTypeConverter fullyDynamicTypeConverter;
     flattenPatterns.add<FlattenBindingSubspan>(fullyDynamicTypeConverter,
-                                               &context);
+                                               context);
 
     // For other ops that generate MemRef values, we may not be able to go fully
     // dynamic (e.g., memref::GlobalOp). Still convert everything to 1-D though.
@@ -673,9 +673,9 @@ struct FlattenMemRefSubspanPass
              LinearizeTransferWriteIndices, AdjustConversionCast,
              FlattenSubView, FoldMemRefReshape<memref::CollapseShapeOp>,
              FoldMemRefReshape<memref::ExpandShapeOp>>(
-            only1DStaticTypeConverter, &context);
+            only1DStaticTypeConverter, context);
 
-    ConversionTarget target(context);
+    ConversionTarget target(*context);
     target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
     target.addDynamicallyLegalOp<memref::AllocaOp, memref::AllocOp,
                                  memref::GetGlobalOp>([](Operation *op) {
@@ -729,7 +729,7 @@ struct FlattenMemRefSubspanPass
     }
 
     // Fold subviews if any new oportuinity has been created.
-    RewritePatternSet foldSubviewPatterns(&getContext());
+    RewritePatternSet foldSubviewPatterns(context);
     memref::populateFoldMemRefAliasOpPatterns(foldSubviewPatterns);
     if (failed(applyPatternsAndFoldGreedily(getOperation()->getRegions(),
                                             std::move(foldSubviewPatterns)))) {
@@ -737,9 +737,9 @@ struct FlattenMemRefSubspanPass
     }
 
     // Then fold byte offset on subspan ops into consumer load/store ops.
-    RewritePatternSet foldPatterns(&context);
+    RewritePatternSet foldPatterns(context);
     foldPatterns.add<FoldSubspanOffsetIntoLoadStore<memref::LoadOp>,
-                     FoldSubspanOffsetIntoLoadStore<memref::StoreOp>>(&context);
+                     FoldSubspanOffsetIntoLoadStore<memref::StoreOp>>(context);
 
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(foldPatterns)))) {
