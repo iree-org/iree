@@ -61,8 +61,9 @@ static LogicalResult setOpConfig(const spirv::TargetEnv &targetEnv,
     return success();
   }
 
-  Value lhs = op.getInputOperand(0)->get(), rhs = op.getInputOperand(1)->get(),
-        init = op.getOutputOperand(0)->get();
+  Value lhs = op.getDpsInputOperand(0)->get(),
+        rhs = op.getDpsInputOperand(1)->get(),
+        init = op.getDpsInitOperand(0)->get();
 
   ArrayRef<int64_t> lhsShape = lhs.getType().cast<ShapedType>().getShape();
   ArrayRef<int64_t> rhsShape = rhs.getType().cast<ShapedType>().getShape();
@@ -115,7 +116,7 @@ static LogicalResult setNVIDIAMatmulConfig(linalg::LinalgOp op,
   const int subgroupSize = limits.getSubgroupSize();
   const std::array<int64_t, 2> workgroupXY = {subgroupSize, 8};
   std::array<int64_t, 3> threadMNK;
-  auto inputType = op.getInputOperand(0)->get().getType().cast<ShapedType>();
+  auto inputType = op.getDpsInputOperand(0)->get().getType().cast<ShapedType>();
   if (inputType.getElementType().getIntOrFloatBitWidth() == 16) {
     threadMNK = {8, 8, 32};
   } else {

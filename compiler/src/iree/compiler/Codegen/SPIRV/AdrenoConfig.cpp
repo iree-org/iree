@@ -26,7 +26,7 @@ static LogicalResult setAdrenoMatmulConfig(linalg::LinalgOp op,
   const int subgroupSize = limits.getSubgroupSize();
   const std::array<int64_t, 2> workgroupXY = {subgroupSize / 2, 2};
   std::array<int64_t, 3> threadMNK;
-  auto inputType = op.getInputOperand(0)->get().getType().cast<ShapedType>();
+  auto inputType = op.getDpsInputOperand(0)->get().getType().cast<ShapedType>();
   if (inputType.getElementType().getIntOrFloatBitWidth() == 16) {
     threadMNK = {16, 8, 8};
   } else {

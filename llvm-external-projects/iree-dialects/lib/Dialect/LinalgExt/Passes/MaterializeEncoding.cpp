@@ -233,8 +233,8 @@ struct MaterializeTiledMatmul : public OpConversionPattern<linalg::MatmulOp> {
                   ConversionPatternRewriter &rewriter) const override {
     if (!matmulOp.hasTensorSemantics())
       return failure();
-    auto inputs = matmulOp.getInputOperands();
-    auto outputs = matmulOp.getOutputOperands();
+    auto inputs = matmulOp.getDpsInputOperands();
+    auto outputs = matmulOp.getDpsInitOperands();
     Optional<TensorEncoding> lhsEncoding =
         getEncoding(inputs[0]->get().getType().cast<RankedTensorType>());
     Optional<TensorEncoding> rhsEncoding =

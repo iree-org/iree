@@ -287,7 +287,7 @@ ScatterOp::getTiledImplementation(OpBuilder &builder,
     resultTypes.push_back(tiledOriginal.getType());
   }
   Operation *tiledScatterOp =
-      cast<LinalgExtOp>(getOperation())
+      cast<DestinationStyleOpInterface>(getOperation())
           .clone(builder, loc, resultTypes,
                  ValueRange{tiledUpdate, tiledIndices, tiledOriginal});
   return {tiledScatterOp};
@@ -475,7 +475,7 @@ SortOp::getTiledImplementation(OpBuilder &builder,
     resultTypes = llvm::to_vector<4>(
         llvm::map_range(tiledOperands, [&](Value v) { return v.getType(); }));
   }
-  Operation *tiledSortOp = cast<LinalgExtOp>(getOperation())
+  Operation *tiledSortOp = cast<DestinationStyleOpInterface>(getOperation())
                                .clone(builder, loc, resultTypes, tiledOperands);
   return {tiledSortOp};
 }
@@ -805,7 +805,7 @@ FftOp::getTiledImplementation(OpBuilder &builder,
       resultTypes.push_back(tiledOperands.back().getType());
     }
   }
-  Operation *tiledFftOp = cast<LinalgExtOp>(getOperation())
+  Operation *tiledFftOp = cast<DestinationStyleOpInterface>(getOperation())
                               .clone(builder, loc, resultTypes, tiledOperands);
   return {tiledFftOp};
 }
@@ -1020,7 +1020,7 @@ ScanOp::getTiledImplementation(OpBuilder &builder,
     resultTypes.push_back(tiledOperands[2].getType());
   }
 
-  Operation *tiledScanOp = cast<LinalgExtOp>(getOperation())
+  Operation *tiledScanOp = cast<DestinationStyleOpInterface>(getOperation())
                                .clone(builder, loc, resultTypes, tiledOperands);
   return {tiledScanOp};
 }
@@ -1169,7 +1169,7 @@ ReverseOp::getTiledImplementation(OpBuilder &builder,
         getSlice(builder, loc, output(), mirrorOffsets, sizes, strides));
   }
 
-  Operation *tiledRevOp = cast<LinalgExtOp>(getOperation())
+  Operation *tiledRevOp = cast<DestinationStyleOpInterface>(getOperation())
                               .clone(builder, loc, resultTypes, tiledOperands);
 
   return {tiledRevOp};
@@ -1446,7 +1446,7 @@ TopkOp::getTiledImplementation(OpBuilder &builder,
     resultTypes.push_back(tiledOperands[tiledOperands.size() - 1].getType());
   }
 
-  Operation *tiledTopkOp = cast<LinalgExtOp>(getOperation())
+  Operation *tiledTopkOp = cast<DestinationStyleOpInterface>(getOperation())
                                .clone(builder, loc, resultTypes, tiledOperands);
   return {tiledTopkOp};
 }
@@ -2030,7 +2030,7 @@ PackOp::getTiledImplementation(OpBuilder &builder,
   }
 
   Operation *tiledPackOp =
-      cast<LinalgExtOp>(getOperation())
+      cast<DestinationStyleOpInterface>(getOperation())
           .clone(builder, loc, tiledResultTypes, tiledOperands);
 
   return {tiledPackOp};
@@ -2276,7 +2276,7 @@ UnPackOp::getTiledImplementation(OpBuilder &builder,
   tiledResultTypes.push_back(tiledOperands[1].getType());
 
   Operation *tiledUnpackOp =
-      cast<LinalgExtOp>(getOperation())
+      cast<DestinationStyleOpInterface>(getOperation())
           .clone(builder, loc, tiledResultTypes, tiledOperands);
 
   SmallVector<OpFoldResult> outputStrides(outputRank, oneAttr);
@@ -2475,7 +2475,8 @@ struct FoldTensorCastOp : public OpInterfaceRewritePattern<LinalgExtOp> {
     }
     // Clone op.
     Operation *newOp =
-        op.clone(rewriter, op->getLoc(), newResultTypes, newOperands);
+        cast<DestinationStyleOpInterface>(op.getOperation())
+            .clone(rewriter, op->getLoc(), newResultTypes, newOperands);
     SmallVector<Value, 4> replacements;
     replacements.reserve(newOp->getNumResults());
     for (auto result : llvm::zip(op->getResults(), newOp->getResults())) {

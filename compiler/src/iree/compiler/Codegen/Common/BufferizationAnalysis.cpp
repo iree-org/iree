@@ -198,8 +198,10 @@ static LogicalResult analysePadTensorOp(tensor::PadOp padTensorOp,
 template <typename OpType>
 static SmallVector<Value> getTiedOperandsForLinalgOps(
     OpType linalgOp, const BufferizationPlan &plan) {
+  auto dpsOp = dyn_cast<DestinationStyleOpInterface>(linalgOp.getOperation());
+  if (!dpsOp) return {};
   SmallVector<Value> tiedOperands(linalgOp.getOperation()->getNumResults());
-  auto outputOperands = linalgOp.getOutputOperands();
+  auto outputOperands = dpsOp.getDpsInitOperands();
   for (auto outTensor : llvm::enumerate(outputOperands)) {
     // If the `outs` tensor has a single use (this op) and is not from a
     // read-only buffer, the `outs` tensor can be tied to the result.
@@ -216,16 +218,19 @@ static SmallVector<Value> getTiedOperandsForLinalgOps(
 template <typename OpType>
 static LogicalResult analyseLinalgOps(OpType linalgOp,
                                       BufferizationPlan &plan) {
-  if (!linalgOp.hasTensorSemantics()) return success();
+  auto dpsOp = dyn_cast<DestinationStyleOpInterface>(linalgOp.getOperation());
+  if (!dpsOp) return failure();
+  if (!dpsOp.hasTensorSemantics()) return success();
   auto results = linalgOp->getResults();
   auto tiedOperands = getTiedOperandsForLinalgOps(linalgOp, plan);
+  if (tiedOperands.empty()) return failure();
   for (auto it : llvm::enumerate(llvm::zip(results, tiedOperands))) {
     Value resultTensor = std::get<0>(it.value());
     Value tiedOperand = std::get<1>(it.value());
     if (tiedOperand) {
       plan.unionSets(resultTensor, tiedOperand);
     }
-    plan.insert(linalgOp.getOutputOperand(it.index())->get());
+    plan.insert(dpsOp.getDpsInitOperand(it.index())->get());
     plan.insert(resultTensor);
   }
   return success();
@@ -441,11 +446,11 @@ static void hasDestructiveUpdatePattern(Value source, BufferizationPlan &plan) {
 ///    not using a buffer from the dispatch ABI.
 static void tieOperandsForOperandFusion(linalg::LinalgOp linalgOp,
                                         BufferizationPlan &plan) {
-  for (auto result : enumerate(linalgOp.getOutputOperands())) {
+  for (auto result : enumerate(linalgOp.getDpsInitOperands())) {
     if (linalgOp.payloadUsesValueFromOperand(result.value())) {
       continue;
     }
-    for (OpOperand *input : linalgOp.getInputOperands()) {
+    for (OpOperand *input : linalgOp.getDpsInputOperands()) {
       auto tensorType = input->get().getType().dyn_cast<RankedTensorType>();
       if (!tensorType) continue;
       Type inputElementType = tensorType.getElementType();

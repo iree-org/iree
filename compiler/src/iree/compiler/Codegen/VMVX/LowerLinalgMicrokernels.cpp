@@ -546,7 +546,7 @@ struct LinalgBinaryGenericConversion
     // so we use getOpOperand() vs restricting to just the generic ins.
     OpOperand *operand0 = &op->getOpOperand(operandScalar0.getArgNumber());
     OpOperand *operand1 = &op->getOpOperand(operandScalar1.getArgNumber());
-    OpOperand *result = op.getOutputOperand(0);
+    OpOperand *result = op.getDpsInitOperand(0);
 
     // Returns an emitter for a generic binary compatible operation where
     // |binaryOp| has a 1:1 correspondance with |opcode|.
@@ -717,7 +717,7 @@ struct LinalgUnaryGenericConversion
     // Note that the operands may map to an out if the aliasing is safe,
     // so we use getOpOperand() vs restricting to just the generic ins.
     OpOperand *operand0 = &op->getOpOperand(operandScalar0.getArgNumber());
-    OpOperand *result = op.getOutputOperand(0);
+    OpOperand *result = op.getDpsInitOperand(0);
 
     // Returns an emitter for a generic binary compatible operation where
     // |binaryOp| has a 1:1 correspondance with |opcode|.
@@ -824,8 +824,8 @@ struct LinalgTrivialGenericConversion
       Value yieldOperand = it.value();
       if (auto blockArg = yieldOperand.dyn_cast<BlockArgument>()) {
         unsigned inputIndex = blockArg.getArgNumber();
-        OpOperand *input = op.getInputOperand(inputIndex);
-        OpOperand *output = op.getOutputOperand(outputIndex);
+        OpOperand *input = op.getDpsInputOperand(inputIndex);
+        OpOperand *output = op.getDpsInitOperand(outputIndex);
         emitter.copies.emplace_back(
             CopyEmitter::Descriptor{input->get(),
                                     op.getMatchingIndexingMap(input)},
@@ -934,7 +934,7 @@ OpType getUserOfType(Value v) {
 }
 
 linalg::FillOp findFillOpSolelyZeroingOutputOf(linalg::LinalgOp op) {
-  Value out = op.getOutputOperand(0)->get();
+  Value out = op.getDpsInitOperand(0)->get();
   if (getNumberOfUses(out) != 2) {
     return nullptr;
   }
@@ -980,10 +980,10 @@ struct LinalgContractionConversion
           op(llvm::cast<linalg::LinalgOp>(contract.getOperation())),
           lhsAnal(contract.lhs()),
           rhsAnal(contract.rhs()),
-          outAnal(op.getOutputOperands().front()->get()) {
+          outAnal(op.getDpsInitOperands().front()->get()) {
       lhs = contract.lhs();
       rhs = contract.rhs();
-      out = op.getOutputOperands().front()->get();
+      out = op.getDpsInitOperands().front()->get();
     }
   };
 

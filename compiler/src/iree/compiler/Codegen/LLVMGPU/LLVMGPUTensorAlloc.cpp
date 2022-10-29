@@ -104,7 +104,7 @@ struct LLVMGPUTensorAllocPass
       switch (promoteSharedMemPattern) {
         case GPUPromoteSharedMemPattern::ContractionOpPattern:
           // Promote all the input operands
-          for (auto operand : linalgOp.getInputOperands()) {
+          for (auto operand : linalgOp.getDpsInputOperands()) {
             FailureOr<Value> ret = bufferization::allocateTensorForShapedValue(
                 builder, op->getLoc(), operand->get(), false, options, true);
             if (failed(ret)) {

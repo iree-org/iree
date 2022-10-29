@@ -17,7 +17,7 @@ func.func @conv2d_zps(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<3x4x5x1024xi8>,
 
 // -----
 
-// CHECK: #map0 = affine_map<(d0, d1, d2, d3) -> (d1, d2, d3, d0)>
+// CHECK: #map = affine_map<(d0, d1, d2, d3) -> (d1, d2, d3, d0)>
 // CHECK: #map1 = affine_map<(d0, d1, d2, d3) -> (d0)>
 // CHECK: #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 // CHECK: #map3 = affine_map<(d0, d1, d2, d3) -> (d3)>
@@ -33,7 +33,7 @@ func.func @conv2d_filter_zp(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<3x4x5x102
   // CHECK-DAG: %[[SUM_FILL:.+]] = linalg.fill ins(%[[C0]] : i32) outs(%1 : tensor<1024xi32>) -> tensor<1024xi32>
 
   // CHECK: %[[SUM:.+]] = linalg.generic 
-  // CHECK-SAME:  indexing_maps = [#map0, #map1]
+  // CHECK-SAME:  indexing_maps = [#map, #map1]
   // CHECK-SAME:  iterator_types = ["parallel", "reduction", "reduction", "reduction"]}
   // CHECK-SAME:  ins(%arg1 : tensor<3x4x5x1024xi8>)
   // CHECK-SAME:  outs(%[[SUM_FILL]] : tensor<1024xi32>)
@@ -60,7 +60,7 @@ func.func @conv2d_filter_zp(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<3x4x5x102
 
 // -----
 
-// CHECK: #map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+// CHECK: #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 // CHECK: #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 
 // CHECK-LABEL: func.func @conv2d_input_zp
@@ -75,7 +75,7 @@ func.func @conv2d_input_zp(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<3x4x5x1024
   // CHECK: %[[INIT:.+]] = tensor.empty() : tensor<1x14x16xi32>
   // CHECK: %[[FILL:.+]] = linalg.fill ins(%[[C0]] : i32) outs(%[[INIT]] : tensor<1x14x16xi32>)
   // CHECK: %[[SUM:.+]] = linalg.generic
-  // CHECK-SAME:  indexing_maps = [#map0, #map1]
+  // CHECK-SAME:  indexing_maps = [#map, #map1]
   // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "reduction"]
   // CHECK-SAME:  ins(%arg0 : tensor<1x14x16x5xi8>)
   // CHECK-SAME:  outs(%[[FILL]] : tensor<1x14x16xi32>)
@@ -93,7 +93,7 @@ func.func @conv2d_input_zp(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<3x4x5x1024
 
   // CHECK: %[[INIT:.+]] = tensor.empty() : tensor<1x12x13x1024xi32>
   // CHECK: %[[GENERIC:.+]] = linalg.generic 
-  // CHECK-SAME:  indexing_maps = [#map0, #map1, #map0]
+  // CHECK-SAME:  indexing_maps = [#map, #map1, #map]
   // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
   // CHECK-SAME:  ins(%[[CONV]], %[[COLLAPSE]] : tensor<1x12x13x1024xi32>, tensor<1x12x13xi32>)
   // CHECK-SAME:  outs(%[[INIT]] : tensor<1x12x13x1024xi32>)
@@ -109,7 +109,7 @@ func.func @conv2d_input_zp(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<3x4x5x1024
 
 // -----
 
-// CHECK: #map0 = affine_map<(d0, d1, d2, d3) -> (d1, d2, d3, d0)>
+// CHECK: #map = affine_map<(d0, d1, d2, d3) -> (d1, d2, d3, d0)>
 // CHECK: #map1 = affine_map<(d0, d1, d2, d3) -> (d0)>
 // CHECK: #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 // CHECK: #map3 = affine_map<(d0, d1, d2, d3) -> (d3)>
@@ -239,7 +239,7 @@ func.func @conv2d_dyn_input_zp(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<?x?x5x
 
 // -----
 
-// CHECK: #map0 = affine_map<(d0, d1, d2, d3) -> (d1, d2, d3, d0)>
+// CHECK: #map = affine_map<(d0, d1, d2, d3) -> (d1, d2, d3, d0)>
 // CHECK: #map1 = affine_map<(d0, d1, d2, d3) -> (d0)>
 // CHECK: #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 // CHECK: #map3 = affine_map<(d0, d1, d2, d3) -> (d3)>
@@ -266,7 +266,7 @@ func.func @conv2d_all_dyn(%arg0: tensor<?x?x?x?xi8>, %arg1: tensor<?x?x?x?xi8>, 
   // CHECK: %[[EMPTY:.+]] = tensor.empty(%[[DIM3]]) : tensor<?xi32>
   // CHECK: %[[FILL:.+]] = linalg.fill ins(%[[C0]] : i32) outs(%[[EMPTY]] : tensor<?xi32>)
   // CHECK: %[[FSUM:.+]] = linalg.generic 
-  // CHECK-SAME:  indexing_maps = [#map0, #map1]
+  // CHECK-SAME:  indexing_maps = [#map, #map1]
   // CHECK-SAME:  iterator_types = ["parallel", "reduction", "reduction", "reduction"]
   // CHECK-SAME:  ins(%arg1 : tensor<?x?x?x?xi8>)
   // CHECK-SAME:  outs(%[[FILL]] : tensor<?xi32>)

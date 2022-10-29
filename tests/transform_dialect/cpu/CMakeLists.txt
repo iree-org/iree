@@ -13,8 +13,6 @@ iree_add_all_subdirs()
 iree_lit_test_suite(
   NAME
     lit
-  SRCS
-    "matmul.mlir"
   TOOLS
     ${IREE_LLD_TARGET}
     FileCheck
