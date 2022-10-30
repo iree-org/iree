@@ -242,8 +242,8 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
 /// Given the linalg `op` with `lhsShape` and `rhsShape`, tries to treat as a
 /// (batch) matmul like op and deduce the index of the loop corresponding to
 /// B/M/N/K dimension respectively. Returns -1 as the index if unable to deduce.
-static std::tuple<int, int, int, int> getMatmulBMNKIndex(linalg::LinalgOp op,
-                                                         int &lastParallelDim) {
+std::tuple<int, int, int, int> getMatmulBMNKIndex(linalg::LinalgOp op,
+                                                  int *lastParallelDim) {
   OpOperand *lhs = op.getDpsInputOperand(0);
   OpOperand *rhs = op.getDpsInputOperand(1);
   auto lhsShape = lhs->get().getType().cast<ShapedType>().getShape();
@@ -279,7 +279,7 @@ static std::tuple<int, int, int, int> getMatmulBMNKIndex(linalg::LinalgOp op,
       if (nIndex >= 0 && bIndex < 0) bIndex = nIndex;
       nIndex = i;
     }
-    lastParallelDim = i;
+    if (lastParallelDim) *lastParallelDim = i;
   }
 
   LLVM_DEBUG({
@@ -480,7 +480,7 @@ LogicalResult setMatmulOpConfig(spirv::ResourceLimitsAttr limits,
 
   int lastParallelDim = -1;
   const auto [bIndex, mIndex, nIndex, kIndex] =
-      getMatmulBMNKIndex(op, lastParallelDim);
+      getMatmulBMNKIndex(op, &lastParallelDim);
   if (mIndex < 0 || nIndex < 0 || kIndex < 0) return success();
   const bool isBM = bIndex >= 0;
 

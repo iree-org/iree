@@ -22,6 +22,7 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -63,15 +64,21 @@ static SmallVector<int64_t> getTargetCooperativeOpSize(linalg::LinalgOp op) {
 /// tiling sizes for the workgroup and subgroup.
 static SmallVector<int64_t> deduceSubgroupCounts(linalg::LinalgOp op) {
   SmallVector<int64_t> workgroupTileSizes = getTileSizes(op, 0);
-  SmallVector<int64_t> subgroupCounts(workgroupTileSizes.size(), 1);
-
   SmallVector<int64_t> subgroupTileSizes = getTileSizes(op, 1);
+  assert(workgroupTileSizes.size() == subgroupTileSizes.size());
 
-  assert(workgroupTileSizes.size() <= subgroupTileSizes.size());
+  SmallVector<int64_t> subgroupCounts;
   for (int i = 0, e = workgroupTileSizes.size(); i < e; ++i) {
+    if (subgroupTileSizes[i] == 0) continue;
+    if (linalg::isReductionIterator(op.getIteratorTypesArray()[i])) continue;
     assert(workgroupTileSizes[i] % subgroupTileSizes[i] == 0);
-    subgroupCounts[i] = workgroupTileSizes[i] / subgroupTileSizes[i];
+    subgroupCounts.push_back(workgroupTileSizes[i] / subgroupTileSizes[i]);
   }
+  LLVM_DEBUG({
+    llvm::dbgs() << "deduced subgroup counts (X, Y, Z) = [";
+    llvm::interleaveComma(subgroupCounts, llvm::dbgs());
+    llvm::dbgs() << "]\n";
+  });
   return subgroupCounts;
 }
 
@@ -88,9 +95,8 @@ static void populateTilingToSubgroupPatterns(ArrayRef<int64_t> subgroupCounts,
     auto counts = llvm::to_vector<3>(subgroupCounts);
     // `getSubgroupIdsAndCounts` assumes we follow GPU (X, Y, Z) order.
     std::reverse(counts.begin(), counts.end());
-    auto results = getSubgroupIdsAndCounts(builder, loc, subgroupSize,
-                                           parallelLoopRanges.size(), counts);
-    return results;
+    return getSubgroupIdsAndCounts(builder, loc, subgroupSize,
+                                   parallelLoopRanges.size(), counts);
   };
 
   linalg::LinalgLoopDistributionOptions distributionOptions;
@@ -117,8 +123,8 @@ static void populateTilingToSubgroupPatterns(ArrayRef<int64_t> subgroupCounts,
       {StringAttr::get(context, getWorkgroupKTiledMarker()),
        StringAttr::get(context, getWorkgroupMemoryMarker())},
       StringAttr::get(context, getVectorizeMarker()));
-  TilingPatterns<linalg::FillOp, linalg::MatmulOp, linalg::GenericOp>::insert(
-      patterns, tilingOptions, filter);
+  TilingPatterns<linalg::BatchMatmulOp, linalg::FillOp, linalg::MatmulOp,
+                 linalg::GenericOp>::insert(patterns, tilingOptions, filter);
 }
 
 //===----------------------------------------------------------------------===//
