@@ -852,6 +852,7 @@ struct FlattenMemRefSubspanPass
     RewritePatternSet cleanupPatterns(context);
     memref::AllocOp::getCanonicalizationPatterns(cleanupPatterns, context);
     memref::AllocaOp::getCanonicalizationPatterns(cleanupPatterns, context);
+    memref::SubViewOp::getCanonicalizationPatterns(cleanupPatterns, context);
     cleanupPatterns.add<RemoveDynamicCastOp>(context);
 
     if (failed(applyPatternsAndFoldGreedily(getOperation(),

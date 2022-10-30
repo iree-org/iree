@@ -14,6 +14,7 @@
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
@@ -51,8 +52,8 @@ static void populateTilingReductionPatterns(
   auto tilingOptions = linalg::LinalgTilingOptions()
                            .setLoopType(linalg::LinalgTilingLoopType::Loops)
                            .setTileSizeComputationFunction(getTileSizeFn);
-  TilingPatterns<linalg::BatchMatmulOp, linalg::MatmulOp>::insert(
-      patterns, tilingOptions, filter);
+  TilingPatterns<linalg::BatchMatmulOp, linalg::MatmulOp,
+                 linalg::GenericOp>::insert(patterns, tilingOptions, filter);
 }
 
 //===----------------------------------------------------------------------===//
@@ -122,14 +123,17 @@ static void populatePromotionPatterns(RewritePatternSet &patterns,
       {StringAttr::get(context, promoteBothMarker)}, replaceMarker);
 
   patterns.insert<LinalgPromotionPattern<linalg::MatmulOp>,
-                  LinalgPromotionPattern<linalg::BatchMatmulOp>>(
-      patterns.getContext(), promoteLHSOptions, promoteLHSFilter);
+                  LinalgPromotionPattern<linalg::BatchMatmulOp>,
+                  LinalgPromotionPattern<linalg::GenericOp>>(
+      context, promoteLHSOptions, promoteLHSFilter);
   patterns.insert<LinalgPromotionPattern<linalg::MatmulOp>,
-                  LinalgPromotionPattern<linalg::BatchMatmulOp>>(
-      patterns.getContext(), promoteRHSOptions, promoteRHSFilter);
+                  LinalgPromotionPattern<linalg::BatchMatmulOp>,
+                  LinalgPromotionPattern<linalg::GenericOp>>(
+      context, promoteRHSOptions, promoteRHSFilter);
   patterns.insert<LinalgPromotionPattern<linalg::MatmulOp>,
-                  LinalgPromotionPattern<linalg::BatchMatmulOp>>(
-      patterns.getContext(), promoteBothOptions, promoteBothFilter);
+                  LinalgPromotionPattern<linalg::BatchMatmulOp>,
+                  LinalgPromotionPattern<linalg::GenericOp>>(
+      context, promoteBothOptions, promoteBothFilter);
 }
 
 //===----------------------------------------------------------------------===//
@@ -206,12 +210,22 @@ void SPIRVTileAndPromotePass::runOnOperation() {
       IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker;
   auto workgroupMarker = StringAttr::get(context, getWorkgroupMemoryMarker());
 
-  funcOp.walk([&](Operation *op) {
-    if (isa<linalg::FillOp, linalg::GenericOp>(op)) {
+  funcOp.walk([&](linalg::LinalgOp op) {
+    if (isa<linalg::FillOp>(*op)) {
       op->setAttr(markerAttrName, workgroupMarker);
-    } else if (isa<linalg::BatchMatmulOp, linalg::MatmulOp>(op)) {
-      auto lhsType = op->getOperand(0).getType().cast<ShapedType>();
-      auto rhsType = op->getOperand(1).getType().cast<ShapedType>();
+      return WalkResult::advance();
+    }
+
+    if (isa<linalg::GenericOp>(*op) && !isMatmulOrBatchMatmul(op)) {
+      op->setAttr(markerAttrName, workgroupMarker);
+      return WalkResult::advance();
+    }
+
+    if (isa<linalg::BatchMatmulOp, linalg::GenericOp, linalg::MatmulOp>(*op)) {
+      Value lhs = op.getDpsInputOperand(0)->get();
+      Value rhs = op.getDpsInputOperand(1)->get();
+      auto lhsType = lhs.getType().cast<ShapedType>();
+      auto rhsType = rhs.getType().cast<ShapedType>();
 
       auto elementNumBits = lhsType.getElementTypeBitWidth();
       assert(kMaxVectorNumBits % elementNumBits == 0);

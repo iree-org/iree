@@ -159,6 +159,78 @@ hal.executable public @batch_matmul_16x128x256x512_div {
 
 // -----
 
+// Linalg.generic that is a batch matmul.
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable @generic_batch_matmul_32x8x512x64 {
+  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
+    spirv.target_env = #spirv.target_env<
+      #spirv.vce<v1.5,
+      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixNV],
+      [SPV_KHR_variable_pointers, SPV_NV_cooperative_matrix]>, NVIDIA:DiscreteGPU,
+      #spirv.resource_limits<
+        cooperative_matrix_properties_nv = [
+          #spirv.coop_matrix_props<
+            a_type = i8, b_type = i8, c_type = i32, k_size = 32,
+            m_size = 8, n_size = 8, result_type = i32, scope  = <Subgroup>>,
+          #spirv.coop_matrix_props<
+            a_type = f16, b_type = f16, c_type = f16, k_size = 16,
+            m_size = 16, n_size = 16, result_type = f16, scope  = <Subgroup>>,
+          #spirv.coop_matrix_props<
+            a_type = f16, b_type = f16, c_type = f32, k_size = 16,
+            m_size = 16, n_size = 16, result_type = f32, scope  = <Subgroup>>
+        ],
+        max_compute_shared_memory_size = 49152,
+        max_compute_workgroup_invocations = 1024,
+        max_compute_workgroup_size = [2147483647, 65535, 65535],
+        subgroup_size = 32>
+     >}> {
+    hal.executable.export @generic_batch_matmul_32x8x512x64 layout(#pipeline_layout)
+    builtin.module {
+      func.func @generic_batch_matmul_32x8x512x64() {
+        %c0 = arith.constant 0 : index
+        %cst = arith.constant 0.000000e+00 : f16
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<128x32x64xf16>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<32x64x512xf16>>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<32x128x512xf16>>
+        %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [2, 32, 64], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<128x32x64xf16>> -> tensor<128x32x64xf16>
+        %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [32, 64, 512], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<32x64x512xf16>> -> tensor<32x64x512xf16>
+        %5 = tensor.empty() : tensor<32x128x512xf16>
+        %6 = linalg.fill ins(%cst : f16) outs(%5 : tensor<32x128x512xf16>) -> tensor<32x128x512xf16>
+        %7 = linalg.generic {
+          indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d1, d0, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>],
+          iterator_types = ["parallel", "parallel", "parallel", "reduction"]}
+        ins(%3, %4 : tensor<128x32x64xf16>, tensor<32x64x512xf16>) outs(%6 : tensor<32x128x512xf16>)
+        attrs = {linalg.memoized_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>]} {
+        ^bb0(%arg0: f16, %arg1: f16, %arg2: f16):
+          %8 = arith.mulf %arg0, %arg1 : f16
+          %9 = arith.addf %arg2, %8 : f16
+          linalg.yield %9 : f16
+        } -> tensor<32x128x512xf16>
+        flow.dispatch.tensor.store %7, %2, offsets = [0, 0, 0], sizes = [32, 2, 512], strides = [1, 1, 1] : tensor<32x128x512xf16> -> !flow.dispatch.tensor<writeonly:tensor<32x128x512xf16>>
+        return
+      }
+    }
+  }
+}
+
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 32, 32, 32], [1, 16, 16, 16], [0, 0, 0, 32]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize>
+//      CHECK: hal.executable.export public @generic_batch_matmul_32x8x512x64
+// CHECK-SAME:   translation_info = #[[TRANSLATION]]
+// CHECK-SAME:   workgroup_size = [64 : index, 2 : index, 1 : index]
+//      CHECK: func.func @generic_batch_matmul_32x8x512x64()
+//      CHECK:   linalg.generic
+// CHECK-SAME:     lowering_config = #[[CONFIG]]
+
+// -----
+
 // Small K - not supported by cooperative matrix.
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
