@@ -475,6 +475,10 @@ def SPIRVTileAndPromote : Pass<"iree-spirv-tile-and-promote", "func::FuncOp"> {
                 "workgroup memory and then tile to invocations";
   let constructor =
     "mlir::iree_compiler::createSPIRVTileAndPromotePass()";
+  let options = [
+    Option<"skipThread", "skip-thread", "bool", /*default=*/"false",
+          "Skip tiling and distributing to GPU threads">,
+  ];
 }
 
 def SPIRVVectorize : Pass<"iree-spirv-vectorize", "func::FuncOp"> {
