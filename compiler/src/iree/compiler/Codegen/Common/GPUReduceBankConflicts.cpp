@@ -46,13 +46,13 @@ namespace {
 /// usage. In order to get better memory access patterns we should do shared
 /// memory swizzling which requires more complex transformations. This pass can
 /// be removed once the better solution is implemented.
-struct LLVMGPUReduceBankConflictsPass
-    : public LLVMGPUReduceBankConflictsBase<LLVMGPUReduceBankConflictsPass> {
+struct GPUReduceBankConflictsPass
+    : public GPUReduceBankConflictsBase<GPUReduceBankConflictsPass> {
  private:
   int64_t paddingSizeBits;
 
  public:
-  LLVMGPUReduceBankConflictsPass(int64_t paddingSizeBits)
+  GPUReduceBankConflictsPass(int64_t paddingSizeBits)
       : paddingSizeBits(paddingSizeBits) {}
 
   void runOnOperation() override {
@@ -73,8 +73,8 @@ struct LLVMGPUReduceBankConflictsPass
 }  // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-createLLVMGPUReduceSharedMemoryBankConflicts(int64_t paddingSizeBits) {
-  return std::make_unique<LLVMGPUReduceBankConflictsPass>(paddingSizeBits);
+createGPUReduceSharedMemoryBankConflicts(int64_t paddingSizeBits) {
+  return std::make_unique<GPUReduceBankConflictsPass>(paddingSizeBits);
 }
 
 }  // namespace iree_compiler
