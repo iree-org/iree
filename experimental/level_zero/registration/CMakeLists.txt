@@ -13,7 +13,6 @@ iree_cc_library(
     "driver_module.c"
   DEPS
     iree::base
-    iree::base::cc
     iree::base::core_headers
     iree::base::tracing
     iree::experimental::level_zero
