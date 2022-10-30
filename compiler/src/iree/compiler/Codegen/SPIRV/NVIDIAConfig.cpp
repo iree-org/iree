@@ -96,21 +96,32 @@ static Optional<CooperativeMatrixSize> getCooperativeMatrixSize(
 }
 
 static LogicalResult setCooperativeMatrixConfig(
-    const spirv::TargetEnv &targetEnv, linalg::MatmulOp op) {
+    const spirv::TargetEnv &targetEnv, linalg::LinalgOp op) {
   // This configuration is only for cooperative matrix.
   if (!targetEnv.allows(spirv::Capability::CooperativeMatrixNV) ||
       !targetEnv.allows(spirv::Extension::SPV_NV_cooperative_matrix)) {
     return success();
   }
 
+  if (!isa<linalg::BatchMatmulOp, linalg::MatmulOp>(*op)) return success();
+
+  if (op.hasDynamicShape()) return success();
+
   Value lhs = op.getDpsInputOperand(0)->get();
   Value rhs = op.getDpsInputOperand(1)->get();
   Value init = op.getDpsInitOperand(0)->get();
 
-  ArrayRef<int64_t> lhsShape = lhs.getType().cast<ShapedType>().getShape();
-  ArrayRef<int64_t> rhsShape = rhs.getType().cast<ShapedType>().getShape();
-  if (llvm::any_of(lhsShape, ShapedType::isDynamic)) return success();
-  if (llvm::any_of(rhsShape, ShapedType::isDynamic)) return success();
+  int lastParallelDim = -1;
+  const auto [bIndex, mIndex, nIndex, kIndex] =
+      getMatmulBMNKIndex(op, &lastParallelDim);
+  if (mIndex < 0 || nIndex < 0 || kIndex < 0) return success();
+  const bool isBM = bIndex >= 0;
+
+  SmallVector<int64_t, 4> loopRanges = op.getStaticLoopRanges();
+
+  const int64_t dimM = loopRanges[mIndex];
+  const int64_t dimK = loopRanges[kIndex];
+  const int64_t dimN = loopRanges[nIndex];
 
   // TODO: Cooperative matrix support is fairly restricted. We can only have
   // a curated list of fused element wise ops as defined in the extension
@@ -124,26 +135,40 @@ static LogicalResult setCooperativeMatrixConfig(
   spirv::ResourceLimitsAttr resourceLimits = targetEnv.getResourceLimits();
   Optional<CooperativeMatrixSize> coopMatSize = getCooperativeMatrixSize(
       resourceLimits, getElementType(lhs), getElementType(rhs),
-      getElementType(init), lhsShape[0], rhsShape[1], lhsShape[1]);
+      getElementType(init), dimM, dimN, dimK);
   if (!coopMatSize) return success();
 
   auto pipeline = IREE::Codegen::DispatchLoweringPassPipeline::
       SPIRVCooperativeMatrixVectorize;
 
-  const int subgroupSize = resourceLimits.getSubgroupSize();
-  std::array<int64_t, 3> workgroupSize{coopMatSize->nCount * subgroupSize,
-                                       coopMatSize->mCount, 1};
+  std::array<int64_t, 3> workgroupSize{
+      coopMatSize->nCount * resourceLimits.getSubgroupSize(),
+      coopMatSize->mCount, 1};
+
+  SmallVector<int64_t> workgroupTileSizes(kIndex + 1, 0);
+  if (isBM) workgroupTileSizes[bIndex] = 1;
+  workgroupTileSizes[mIndex] = coopMatSize->mCount * coopMatSize->m;
+  workgroupTileSizes[nIndex] = coopMatSize->nCount * coopMatSize->n;
+  workgroupTileSizes[kIndex] = coopMatSize->kCount * coopMatSize->k;
+
+  SmallVector<int64_t> subgroupTileSizes(kIndex + 1, 0);
+  if (isBM) subgroupTileSizes[bIndex] = 1;
+  subgroupTileSizes[mIndex] = coopMatSize->m;
+  subgroupTileSizes[nIndex] = coopMatSize->n;
+  subgroupTileSizes[kIndex] = coopMatSize->k;
+
+  // Also create one level for reduction. This is needed because of
+  // SPIRVTileAndPromotePass requires it.
+  // TODO(#10499): Consolidate tiling configuration across different pipelines.
+  SmallVector<int64_t> reductionTileSizes;
+  reductionTileSizes.append(lastParallelDim + 1, 0);
+  reductionTileSizes.push_back(coopMatSize->kCount * coopMatSize->k);
 
   TileSizesListType tileSizes;
-  // Workgroup level. We don't include K here, which is placed at the third
-  // level for tiling.
-  tileSizes.push_back({coopMatSize->mCount * coopMatSize->m,
-                       coopMatSize->nCount * coopMatSize->n});
-  // Subgroup level. We include K here, so that we have a way to get the full
-  // native cooperative matrix size configuration.
-  tileSizes.push_back({coopMatSize->m, coopMatSize->n, coopMatSize->k});
-  // Reduction level. For tiling the K dimension.
-  tileSizes.push_back({0, 0, coopMatSize->kCount * coopMatSize->k});
+  tileSizes.reserve(3);
+  tileSizes.push_back(workgroupTileSizes);
+  tileSizes.push_back(subgroupTileSizes);
+  tileSizes.push_back(reductionTileSizes);
 
   return setOpConfigAndEntryPointFnTranslation(
       op->getParentOfType<func::FuncOp>(), op, tileSizes, pipeline,
@@ -151,7 +176,12 @@ static LogicalResult setCooperativeMatrixConfig(
 }
 
 static LogicalResult setNVIDIAMatmulConfig(linalg::LinalgOp op,
-                                           spirv::ResourceLimitsAttr limits) {
+                                           const spirv::TargetEnv &targetEnv) {
+  // First try to see if we can use tensor cores.
+  spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
+  if (failed(setCooperativeMatrixConfig(targetEnv, op))) return failure();
+  if (getLoweringConfig(op)) return success();
+
   const int subgroupSize = limits.getSubgroupSize();
   const std::array<int64_t, 2> workgroupXY = {subgroupSize, 8};
   std::array<int64_t, 3> threadMNK;
@@ -197,23 +227,14 @@ static LogicalResult setNVIDIAMatmulConfig(linalg::LinalgOp op,
 
 LogicalResult setNVIDIACodeGenConfig(const spirv::TargetEnv &targetEnv,
                                      Operation *rootOp) {
-  spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
-
-  // First try to see if we can use tensor cores.
-  if (auto matmulOp = dyn_cast<linalg::MatmulOp>(rootOp)) {
-    if (failed(setCooperativeMatrixConfig(targetEnv, matmulOp)))
-      return failure();
-    if (getLoweringConfig(rootOp)) return success();
-  }
-
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp)) {
     if (isMatmulOrBatchMatmul(linalgOp))
-      return setNVIDIAMatmulConfig(linalgOp, limits);
+      return setNVIDIAMatmulConfig(linalgOp, targetEnv);
   }
 
   return TypeSwitch<Operation *, LogicalResult>(rootOp)
       .Case<linalg::BatchMatmulOp, linalg::MatmulOp>(
-          [limits](auto op) { return setNVIDIAMatmulConfig(op, limits); })
+          [&](auto op) { return setNVIDIAMatmulConfig(op, targetEnv); })
       .Default([](Operation *) { return success(); });
 }
 
