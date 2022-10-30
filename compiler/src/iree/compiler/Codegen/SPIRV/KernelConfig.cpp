@@ -226,12 +226,12 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
     return failure();
   }
 
-  // The conversion pipeline requires the input channel dimension to be some
-  // multipler of four, or less than four.
-  if (ic && !(*ic % 4 == 0 || *ic < 4)) return failure();
-
   const int bitwidth = outputType.cast<ShapedType>().getElementTypeBitWidth();
   const int vectorSize = kMaxVectorNumBits / bitwidth;
+
+  // We use `vectorSize` as the tile size along IC dimension. If smaller than
+  // 4, it will be unrolled into size 1.
+  if (ic && !(*ic % vectorSize == 0 || *ic < 4)) return success();
 
   // The core idea is to distribute the convolution dimensions to the workgroup
   // Z/Y/X dimensions, with each thread in a workgroup handling multiple vector
@@ -307,7 +307,7 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
   if (ic) {
     // Tile input channel dimension with size 4 to avoid code bloat in
     // vectorization later.
-    reductionTileSizes[convDims.inputChannel.front()] = 4;
+    reductionTileSizes[convDims.inputChannel.front()] = vectorSize;
   }
   tileSizes.push_back(reductionTileSizes);
 

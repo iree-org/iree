@@ -459,7 +459,7 @@ hal.executable private @nchw_conv_static_shape_f32 {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[0, 1, 32, 64], [1, 1, 4, 8], [0, 0, 0, 0, 1, 1, 4], [0, 1, 0, 0]]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[0, 1, 64, 64], [1, 1, 8, 8], [0, 0, 0, 0, 1, 1, 8], [0, 1, 0, 0]]>
 #translation = #iree_codegen.translation_info<SPIRVBaseVectorize>
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
@@ -494,29 +494,29 @@ hal.executable private @nhwc_conv_static_shape_f16_batch2 {
         %workgroup_id_z = hal.interface.workgroup.id[2] : index
         %workgroup_count_z = hal.interface.workgroup.count[2] : index
         scf.for %arg0 = %workgroup_id_z to %c64 step %workgroup_count_z {
-          %4 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_id_y]
-          %5 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_count_y]
+          %4 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
+          %5 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_count_y]
           scf.for %arg1 = %4 to %c64 step %5 {
             %6 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
             %7 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_count_x]
             scf.for %arg2 = %6 to %c320 step %7 {
-              %8 = flow.dispatch.tensor.load %3, offsets = [0, %arg0, %arg1, %arg2], sizes = [2, 1, 32, 64], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<writeonly:tensor<2x64x64x320xf16>> -> tensor<2x1x32x64xf16>
-              %9 = flow.dispatch.tensor.load %0, offsets = [0, %arg0, %arg1, 0], sizes = [2, 3, 34, 320], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<2x66x66x320xf16>> -> tensor<2x3x34x320xf16>
+              %8 = flow.dispatch.tensor.load %3, offsets = [0, %arg0, %arg1, %arg2], sizes = [2, 1, 64, 64], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<writeonly:tensor<2x64x64x320xf16>> -> tensor<2x1x64x64xf16>
+              %9 = flow.dispatch.tensor.load %0, offsets = [0, %arg0, %arg1, 0], sizes = [2, 3, 66, 320], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<2x66x66x320xf16>> -> tensor<2x3x66x320xf16>
               %10 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, %arg2], sizes = [3, 3, 320, 64], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<3x3x320x320xf16>> -> tensor<3x3x320x64xf16>
               %11 = linalg.fill {lowering_config = #config}
-                ins(%cst : f16) outs(%8 : tensor<2x1x32x64xf16>) -> tensor<2x1x32x64xf16>
+                ins(%cst : f16) outs(%8 : tensor<2x1x64x64xf16>) -> tensor<2x1x64x64xf16>
               %12 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, lowering_config = #config, strides = dense<1> : tensor<2xi64>}
-                ins(%9, %10 : tensor<2x3x34x320xf16>, tensor<3x3x320x64xf16>) outs(%11 : tensor<2x1x32x64xf16>) -> tensor<2x1x32x64xf16>
-              %13 = flow.dispatch.tensor.load %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [2, 1, 32, 64], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<2x64x64x320xf16>> -> tensor<2x1x32x64xf16>
+                ins(%9, %10 : tensor<2x3x66x320xf16>, tensor<3x3x320x64xf16>) outs(%11 : tensor<2x1x64x64xf16>) -> tensor<2x1x64x64xf16>
+              %13 = flow.dispatch.tensor.load %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [2, 1, 64, 64], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<2x64x64x320xf16>> -> tensor<2x1x64x64xf16>
               %14 = linalg.generic {
                   indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
                   iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
-                ins(%13 : tensor<2x1x32x64xf16>) outs(%12 : tensor<2x1x32x64xf16>) attrs =  {lowering_config = #config} {
+                ins(%13 : tensor<2x1x64x64xf16>) outs(%12 : tensor<2x1x64x64xf16>) attrs =  {lowering_config = #config} {
               ^bb0(%in: f16, %out: f16):
                 %15 = arith.divf %out, %in : f16
                 linalg.yield %15 : f16
-              } -> tensor<2x1x32x64xf16>
-              flow.dispatch.tensor.store %14, %3, offsets = [0, %arg0, %arg1, %arg2], sizes = [2, 1, 32, 64], strides = [1, 1, 1, 1] : tensor<2x1x32x64xf16> -> !flow.dispatch.tensor<writeonly:tensor<2x64x64x320xf16>>
+              } -> tensor<2x1x64x64xf16>
+              flow.dispatch.tensor.store %14, %3, offsets = [0, %arg0, %arg1, %arg2], sizes = [2, 1, 64, 64], strides = [1, 1, 1, 1] : tensor<2x1x64x64xf16> -> !flow.dispatch.tensor<writeonly:tensor<2x64x64x320xf16>>
             }
           }
         }
@@ -534,23 +534,26 @@ hal.executable private @nhwc_conv_static_shape_f16_batch2 {
 // Check additional loops generated from tiling along N dimension
 // CHECK: scf.for %{{.+}} = %c0 to %c2 step %c1
 
-// CHECK:   scf.for %{{.+}} = %c0 to %c32 step %c4
+// Tiling and distribution to threads
+// CHECK:   scf.for %{{.+}} = %c0 to %c64 step %c8
 // CHECK:     scf.for %{{.+}} = %c0 to %c64 step %c8
 
 // Check tiling loop along filter height/width and input channel
 //      CHECK: scf.for %{{.*}} = %c0 to %c3 step %c1
-// CHECK-SAME:     -> (vector<8xf16>, vector<8xf16>, vector<8xf16>, vector<8xf16>)
+// CHECK-SAME:     -> (vector<8xf16>, vector<8xf16>, vector<8xf16>, vector<8xf16>, vector<8xf16>, vector<8xf16>, vector<8xf16>, vector<8xf16>)
 //      CHECK:   scf.for %{{.*}} = %c0 to %c3 step %c1
-// CHECK-SAME:       -> (vector<8xf16>, vector<8xf16>, vector<8xf16>, vector<8xf16>)
-//      CHECK:     scf.for %{{.*}} = %c0 to %c320 step %c4
-// CHECK-SAME:         -> (vector<8xf16>, vector<8xf16>, vector<8xf16>, vector<8xf16>)
+// CHECK-SAME:       -> (vector<8xf16>, vector<8xf16>, vector<8xf16>, vector<8xf16>, vector<8xf16>, vector<8xf16>, vector<8xf16>, vector<8xf16>)
+//      CHECK:     scf.for %{{.*}} = %c0 to %c320 step %c8
+// CHECK-SAME:         -> (vector<8xf16>, vector<8xf16>, vector<8xf16>, vector<8xf16>, vector<8xf16>, vector<8xf16>, vector<8xf16>, vector<8xf16>)
 
-// CHECK-COUNT-32: vector.fma
-
-// CHECK-COUNT-3: scf.yield
-
-// CHECK-COUNT-4: vector.transfer_read {{.+}} vector<8xf16>
-// CHECK-COUNT-8: arith.divf {{.+}} : vector<4xf16>
-// CHECK-COUNT-4: vector.transfer_write {{.+}} : vector<8xf16>
+//   CHECK-COUNT-8: vector.transfer_read {{.+}} : tensor<2x3x66x320xf16>, vector<8xf16>
+//   CHECK-COUNT-8: vector.transfer_read {{.+}} : tensor<3x3x320x64xf16>, vector<8xf16>
+// CHECK-COUNT-128: vector.fma
 
 // CHECK-COUNT-3: scf.yield
+
+//  CHECK-COUNT-8: vector.transfer_read {{.+}} : tensor<2x1x64x64xf16>, vector<8xf16>
+// CHECK-COUNT-16: arith.divf {{.+}} : vector<4xf16>
+//  CHECK-COUNT-8: vector.transfer_write {{.+}} : vector<8xf16>, tensor<2x1x64x64xf16>
+
+// CHECK-COUNT-2: scf.yield
