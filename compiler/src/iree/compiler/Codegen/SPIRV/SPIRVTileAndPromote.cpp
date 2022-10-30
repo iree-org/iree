@@ -138,13 +138,21 @@ static void populatePromotionPatterns(RewritePatternSet &patterns,
 
 namespace {
 
-struct SPIRVTileAndPromotePass final
+class SPIRVTileAndPromotePass final
     : public SPIRVTileAndPromoteBase<SPIRVTileAndPromotePass> {
+ public:
+  SPIRVTileAndPromotePass(bool skipThreadLevel)
+      : skipThreadLevel(skipThreadLevel) {}
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<gpu::GPUDialect>();
   }
 
   void runOnOperation() override;
+
+ private:
+  // Whether to skip thread level tiling and distribution.
+  bool skipThreadLevel = false;
 };
 
 }  // namespace
@@ -256,7 +264,7 @@ void SPIRVTileAndPromotePass::runOnOperation() {
     llvm::dbgs() << "\n\n";
   });
 
-  {  // Tile and distribute to invocations.
+  if (!skipThreadLevel) {  // Tile and distribute to invocations.
     RewritePatternSet tilingPatterns(&getContext());
     IREE::LinalgExt::LinalgTransformationFilter filter(
         {StringAttr::get(context, getWorkgroupMemoryMarker())}, llvm::None);
@@ -277,17 +285,18 @@ void SPIRVTileAndPromotePass::runOnOperation() {
       // to figure out and fix.
       // return signalPassFailure();
     }
-  }
 
-  LLVM_DEBUG({
-    llvm::dbgs() << "--- After tiling to invocations ---\n";
-    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-    llvm::dbgs() << "\n\n";
-  });
+    LLVM_DEBUG({
+      llvm::dbgs() << "--- After tiling to invocations ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
+  }
 }
 
-std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVTileAndPromotePass() {
-  return std::make_unique<SPIRVTileAndPromotePass>();
+std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVTileAndPromotePass(
+    bool skipThreadLevel) {
+  return std::make_unique<SPIRVTileAndPromotePass>(skipThreadLevel);
 }
 
 }  // namespace iree_compiler

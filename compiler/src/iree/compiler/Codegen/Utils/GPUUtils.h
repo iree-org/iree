@@ -30,7 +30,7 @@ llvm::SmallVector<linalg::ProcInfo, 2> getGPUThreadIdsAndCounts(
 /// size so that `workgroupSize.x % warpSize == 0`. This is why we can have
 /// warpId = { threadId.x / warpSize, threadId.y, threadId.z }.
 llvm::SmallVector<linalg::ProcInfo, 2> getSubgroupIdsAndCounts(
-    OpBuilder &builder, Location loc, unsigned numDims,
+    OpBuilder &builder, Location loc, unsigned warpSize, unsigned numDims,
     llvm::ArrayRef<int64_t> numSubgroups);
 
 /// Return the workgroup size associated to the funcOp entry point.

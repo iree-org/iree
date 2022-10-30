@@ -35,8 +35,8 @@ llvm::SmallVector<mlir::linalg::ProcInfo, 2> getGPUThreadIdsAndCounts(
 }
 
 llvm::SmallVector<mlir::linalg::ProcInfo, 2> getSubgroupIdsAndCounts(
-    mlir::OpBuilder &builder, mlir::Location loc, unsigned numDims,
-    llvm::ArrayRef<int64_t> numSubgroups) {
+    mlir::OpBuilder &builder, mlir::Location loc, unsigned warpSize,
+    unsigned numDims, llvm::ArrayRef<int64_t> numSubgroups) {
   assert(numDims <= kNumGPUDims);
   llvm::SmallVector<mlir::linalg::ProcInfo, 2> procInfo(numDims);
   std::array<gpu::Dimension, kNumGPUDims> dimAttr{
@@ -48,7 +48,7 @@ llvm::SmallVector<mlir::linalg::ProcInfo, 2> getSubgroupIdsAndCounts(
     if (i == 0) {
       mlir::AffineExpr d0 = builder.getAffineDimExpr(0);
       subgroupId = mlir::makeComposedAffineApply(
-          builder, loc, d0.floorDiv(builder.getAffineConstantExpr(kWarpSize)),
+          builder, loc, d0.floorDiv(builder.getAffineConstantExpr(warpSize)),
           {subgroupId});
     }
     procInfo[numDims - 1 - i] = {

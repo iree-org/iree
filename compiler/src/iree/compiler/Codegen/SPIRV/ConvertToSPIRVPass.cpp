@@ -40,6 +40,7 @@
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Math/Transforms/Passes.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -344,11 +345,16 @@ void ConvertToSPIRVPass::runOnOperation() {
   SPIRVConversionOptions options = {};
   options.enableFastMathMode = this->enableFastMath;
   SPIRVTypeConverter typeConverter(targetAttr, options);
+  // Additionally pull in conversion rules for GPU subgroup MMA ops.
+  typeConverter.addConversion([&](gpu::MMAMatrixType type) -> Type {
+    return convertMMAToSPIRVType(type);
+  });
   RewritePatternSet patterns(&getContext());
   ScfToSPIRVContext scfToSPIRVContext;
 
   // Pull in GPU patterns to convert processor ID ops and loop ops.
   populateGPUToSPIRVPatterns(typeConverter, patterns);
+  populateGpuWMMAToSPIRVConversionPatterns(typeConverter, patterns);
 
   // Pull in SCF patterns to convert control flow ops.
   populateSCFToSPIRVPatterns(typeConverter, scfToSPIRVContext, patterns);

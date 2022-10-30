@@ -1,11 +1,6 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass{test-lowering-configuration=true}))' %s | FileCheck %s
 
-#map0 = affine_map<()[s0, s1] -> (s0 * s1)>
-#map1 = affine_map<(d0)[s0] -> (s0, -d0 + 256)>
-#map2 = affine_map<(d0)[s0] -> (s0, -d0 + 1024)>
-#map3 = affine_map<(d0)[s0] -> (-d0 + 256, s0)>
-#map4 = affine_map<(d0)[s0] -> (-d0 + 1024, s0)>
-#map5 = affine_map<(d0, d1) -> (d0, d1)>
+#map = affine_map<(d0, d1) -> (d0, d1)>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -63,10 +58,9 @@ hal.executable public @matmul_256x1024x128_div_sub {
         %25 = linalg.fill ins(%cst : f16) outs(%24 : tensor<256x1024xf16>) -> tensor<256x1024xf16>
         %26 = linalg.matmul ins(%19, %21 : tensor<256x128xf16>, tensor<128x1024xf16>) outs(%25 : tensor<256x1024xf16>) -> tensor<256x1024xf16>
         %27 = linalg.generic {
-            indexing_maps = [#map5, #map5, #map5, #map5], iterator_types = ["parallel", "parallel"]}
+            indexing_maps = [#map, #map, #map, #map], iterator_types = ["parallel", "parallel"]}
             ins(%26, %11, %14 : tensor<256x1024xf16>, tensor<256x1024xf16>, tensor<256x1024xf16>)
-            outs(%17 : tensor<256x1024xf16>)
-            attrs =  {__internal_linalg_transform__ = "workgroup"} {
+            outs(%17 : tensor<256x1024xf16>) {
           ^bb0(%arg2: f16, %arg3: f16, %arg4: f16, %arg5: f16):  // no predecessors
             %28 = arith.divf %arg2, %arg3 : f16
             %29 = arith.subf %28, %arg4 : f16
@@ -80,11 +74,11 @@ hal.executable public @matmul_256x1024x128_div_sub {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[16, 16, 16], [16, 16, 16]{{\]}}>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 32], [16, 16, 16], [0, 0, 32]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize>
 //      CHECK: hal.executable.export public @matmul_256x1024x128_div_sub
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
-// CHECK-SAME:   workgroup_size = [32 : index, 1 : index, 1 : index]
+// CHECK-SAME:   workgroup_size = [64 : index, 2 : index, 1 : index]
 //      CHECK: func.func @matmul_256x1024x128_div_sub()
 //      CHECK:   linalg.matmul
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
@@ -93,11 +87,6 @@ hal.executable public @matmul_256x1024x128_div_sub {
 
 // Small K - not supported by cooperative matrix.
 
-#map0 = affine_map<()[s0, s1] -> (s0 * s1)>
-#map1 = affine_map<(d0)[s0] -> (s0, -d0 + 256)>
-#map2 = affine_map<(d0)[s0] -> (s0, -d0 + 1024)>
-#map3 = affine_map<(d0)[s0] -> (-d0 + 256, s0)>
-#map4 = affine_map<(d0)[s0] -> (-d0 + 1024, s0)>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
