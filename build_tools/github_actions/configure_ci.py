@@ -63,7 +63,7 @@ def get_trailers() -> Mapping[str, str]:
   title = os.environ["PR_TITLE"]
   body = os.environ.get("PR_BODY", "")
 
-  description = f"{title}" "\n\n" f"${body}"
+  description = f"{title}" "\n\n" f"{body}"
 
   print("Parsing PR description:", description, sep="\n")
 
