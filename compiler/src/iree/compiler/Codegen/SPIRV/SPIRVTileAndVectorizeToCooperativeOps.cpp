@@ -264,6 +264,40 @@ class CombineContractTranspose final
   }
 };
 
+// Merge broadcast op into the transfer read op. Broadcast are not supported on
+// MMA types.
+struct CombineTransferReadOpBroadcast final
+    : public OpRewritePattern<vector::BroadcastOp> {
+  using OpRewritePattern<vector::BroadcastOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(vector::BroadcastOp op,
+                                PatternRewriter &rewriter) const override {
+    auto transferReadOp =
+        op.getSource().getDefiningOp<vector::TransferReadOp>();
+    if (!transferReadOp || transferReadOp.getMask() ||
+        transferReadOp.hasOutOfBoundsDim()) {
+      return failure();
+    }
+    int64_t rankDiff =
+        op.getVectorType().getRank() - transferReadOp.getVectorType().getRank();
+    SmallVector<AffineExpr> exprs(rankDiff, rewriter.getAffineConstantExpr(0));
+    ArrayRef<AffineExpr> originalExpr =
+        transferReadOp.getPermutationMap().getResults();
+    exprs.append(originalExpr.begin(), originalExpr.end());
+    AffineMap newMap =
+        AffineMap::get(transferReadOp.getPermutationMap().getNumDims(),
+                       transferReadOp.getPermutationMap().getNumSymbols(),
+                       exprs, op.getContext());
+    ArrayAttr inBounds = rewriter.getBoolArrayAttr(
+        SmallVector<bool>(op.getVectorType().getRank(), true));
+    rewriter.replaceOpWithNewOp<vector::TransferReadOp>(
+        op, op.getType(), transferReadOp.getSource(),
+        transferReadOp.getIndices(), newMap, transferReadOp.getPadding(),
+        transferReadOp.getMask(), inBounds);
+    return success();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Main pass
 //===----------------------------------------------------------------------===//
@@ -391,6 +425,22 @@ class SPIRVVectorizeToCooperativeOpsPass final
 
     LLVM_DEBUG({
       llvm::dbgs() << "--- After vectorization ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
+
+    {
+      RewritePatternSet combineBroadcastPatterns(context);
+      combineBroadcastPatterns.insert<CombineTransferReadOpBroadcast>(
+          funcOp.getContext());
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(combineBroadcastPatterns)))) {
+        return signalPassFailure();
+      }
+    }
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "--- After combining transfer_read and broadcast ---\n";
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });
