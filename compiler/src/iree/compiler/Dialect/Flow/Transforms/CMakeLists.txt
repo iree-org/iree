@@ -24,7 +24,6 @@ iree_cc_library(
     Transforms
   HDRS
     "ConvertRegionToWorkgroups.h"
-    "DispatchLinalgOnTensors.h"
     "DispatchRegionHeuristic.h"
     "Passes.h"
     "Passes.h.inc"

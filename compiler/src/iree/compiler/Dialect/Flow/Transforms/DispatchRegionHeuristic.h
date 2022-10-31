@@ -19,6 +19,10 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
+// TODO: The purpose of these declarations is to make split the commit into
+// multiple smaller ones. They will be removed again (made private) in a
+// subsequent commit.
+
 /// Mapping of root op to other ops that are in the same fusion group.
 using FusionGroupMapping =
     llvm::DenseMap<Operation *, llvm::SmallVector<Operation *>>;

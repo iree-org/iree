@@ -70,7 +70,6 @@ iree_compiler_cc_library(
     ],
     hdrs = [
         "ConvertRegionToWorkgroups.h",
-        "DispatchLinalgOnTensors.h",
         "DispatchRegionHeuristic.h",
         "Passes.h",
         "Passes.h.inc",

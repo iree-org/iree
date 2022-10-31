@@ -17,6 +17,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/ConvertRegionToWorkgroups.h"
+#include "iree/compiler/Dialect/Flow/Transforms/DispatchRegionHeuristic.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
@@ -40,11 +41,6 @@ using namespace mlir::iree_compiler;
 using namespace mlir::iree_compiler::IREE;
 
 #define DEBUG_TYPE "iree-flow-dispatch-linalg-on-tensors-via-region-ops"
-
-static const int kInlineConstantByteLength = 256;
-static const bool kEnableMultiResultDispatches = false;
-static const char kRootOpAttr[] = "__root_op__";
-static const char kFusionGroupsAttr[] = "__fused_op__";
 
 //===----------------------------------------------------------------------===//
 // Helpers for fusion group formation
@@ -120,131 +116,8 @@ static LogicalResult simplifyDimOps(RewriterBase &rewriter,
 }
 
 //===----------------------------------------------------------------------===//
-// Root and fusion group attribute handling
-//===----------------------------------------------------------------------===//
-
-/// Returns true if an op has a root operation.
-static bool hasRootOpAttribute(Operation *op) {
-  return static_cast<bool>(op->getAttrOfType<IntegerAttr>(kRootOpAttr));
-}
-
-/// Removes root attribute. Asserts if root attribute is not present.
-static void removeRootOpAttribute(Operation *op) {
-  op->removeAttr(kRootOpAttr);
-}
-
-/// Sets the root attribute for an operation. The root attribute needs a number
-/// to identify the root. Asserts if root attribute is already set on an
-/// operation.
-static void setRootAttribute(MLIRContext *context, Operation *op,
-                             int64_t rootNumber) {
-  assert(!op->hasAttr(kRootOpAttr) &&
-         "invalid to update root attribute on an op");
-  op->setAttr(kRootOpAttr,
-              IntegerAttr::get(IntegerType::get(context, 64), rootNumber));
-}
-
-/// Returns the number of the root. Asserts if the operation is not already set
-/// as a root.
-static int64_t getRootNumber(Operation *op) {
-  return op->getAttrOfType<IntegerAttr>(kRootOpAttr).getInt();
-}
-
-/// Returns true if an op is part of a fusion group.
-static bool hasFusionGroupsAttribute(Operation *op) {
-  return static_cast<bool>(op->getAttrOfType<ArrayAttr>(kFusionGroupsAttr));
-}
-
-/// Returns the fusion groups for the given `op`.
-static SmallVector<int64_t, 1> getFusionGroups(Operation *op) {
-  SmallVector<int64_t, 1> fusionGroups = {};
-  if (auto fusionGroupsAttr = op->getAttrOfType<ArrayAttr>(kFusionGroupsAttr)) {
-    fusionGroups = llvm::to_vector<1>(llvm::map_range(
-        fusionGroupsAttr,
-        [](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
-  }
-  return fusionGroups;
-}
-
-/// Appends the given `op` to the `newGroups` fusion groups.
-static void appendToFusionGroup(Operation *op, ArrayRef<int64_t> newGroups) {
-  SmallVector<int64_t, 1> fusionGroups = getFusionGroups(op);
-  fusionGroups.append(newGroups.begin(), newGroups.end());
-  op->setAttr(kFusionGroupsAttr, Builder(op).getI64ArrayAttr(fusionGroups));
-}
-
-/// Returns true if the given `op` is in the `targetGroup` fusion group.
-static bool isInFusionGroup(Operation *op, unsigned targetGroup) {
-  if (ArrayAttr opGroupAttr = op->getAttrOfType<ArrayAttr>(kFusionGroupsAttr)) {
-    return llvm::any_of(opGroupAttr, [&targetGroup](Attribute attr) {
-      return attr.cast<IntegerAttr>().getInt() == targetGroup;
-    });
-  }
-  return false;
-}
-
-/// Removes the fusion groups attribute.
-static void removeFusionGroupsAttribute(Operation *op) {
-  op->removeAttr(kFusionGroupsAttr);
-}
-
-//===----------------------------------------------------------------------===//
 // Op property charecterizations
 //===----------------------------------------------------------------------===//
-
-/// Operations that are treated as root operations for dispatch region
-/// formation.
-static bool isRootOp(Operation *op) {
-  if (op->getParentOfType<IREE::Flow::DispatchRegionOp>() ||
-      op->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>()) {
-    return false;
-  }
-  // Any Linalg named op or generic op with reduction iterator types is a root
-  // op.
-  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
-    if (isa<linalg::GenericOp>(op)) {
-      return linalgOp.getNumReductionLoops() != 0;
-    }
-    return !isa<linalg::FillOp>(op);
-  }
-  return isa<TilingInterface>(op);
-}
-
-/// Operations that are cloned into dispatch regions formed with other
-/// operations as roots.
-bool isClonableIntoDispatchOp(Operation *op) {
-  // TODO(#8637): `tensor.collapse_shape` and `tensor.expand_shape` are
-  // trivially clonable too, but they cause problems
-  // with bufferization. Make them clonable when fixed.
-  if (isa<arith::IndexCastOp, tensor::EmptyOp, tensor::CastOp,
-          tensor::ExtractOp, tensor::ExtractSliceOp, tensor::PadOp>(op)) {
-    return true;
-  }
-  if (auto constantOp = dyn_cast<arith::ConstantOp>(op)) {
-    auto constantValueAttr = constantOp.getValue();
-    auto constantType = constantOp.getType();
-    if (constantValueAttr.isa<SplatElementsAttr>()) {
-      return true;
-    } else if (auto denseAttr =
-                   constantValueAttr.dyn_cast<DenseElementsAttr>()) {
-      auto shapedType = constantOp.getType().cast<ShapedType>();
-      uint64_t estimatedByteLength =
-          (shapedType.getNumElements() * shapedType.getElementTypeBitWidth()) /
-          8;
-      return denseAttr.isSplat() ||
-             estimatedByteLength <= kInlineConstantByteLength;
-    } else if (constantType.isIntOrIndexOrFloat()) {
-      return true;
-    }
-  }
-  if (llvm::all_of(op->getOperands(),
-                   [&](Value v) { return v.getType().isIntOrFloat(); }) &&
-      llvm::all_of(op->getResults(),
-                   [&](Value v) { return v.getType().isIntOrFloat(); })) {
-    return true;
-  }
-  return false;
-}
 
 /// Checks if the `Value` has a use within the dispatch that is unfusable.
 static bool hasUnfusableUseInDispatch(Value v, Operation *dispatchOp) {
@@ -316,7 +189,7 @@ static SmallVector<Operation *> getCloneableOps(
     visited.insert(outsideValue);
 
     Operation *definingOp = outsideValue.getDefiningOp();
-    if (!definingOp || !(isClonableIntoDispatchOp(definingOp)) ||
+    if (!definingOp || !(Flow::isClonableIntoDispatchOp(definingOp)) ||
         hasUnfusableUseInDispatch(outsideValue, regionOp)) {
       valuesDefinedAbove.insert(outsideValue);
       continue;
@@ -326,202 +199,6 @@ static SmallVector<Operation *> getCloneableOps(
   }
 
   return result;
-}
-
-static bool areLinalgOpsFusableUsingTileAndFuse(OpOperand &use) {
-  auto producer = use.get().getDefiningOp<linalg::LinalgOp>();
-  auto consumer = dyn_cast<linalg::LinalgOp>(use.getOwner());
-  if (!producer || !consumer) return false;
-
-  // 1. Producer has a single result.
-  if (producer->getNumResults() != 1) return false;
-
-  // 2. Consumer is elementwise parallel.
-  if (consumer.getNumLoops() != consumer.getNumParallelLoops()) return false;
-
-  // 3. Check if a reduction result is used in the following elementwise
-  // operation with broadcast. If so, we can fuse the reduction into the
-  // elementwise op. The elementwise op on the reduced dimension will be
-  // serialized to match the workgroup counts of the fused operations.
-  // Otherwise, check if the result of producer is accessed using identity
-  // indexing.
-  AffineMap consumerIndexingMap = consumer.getMatchingIndexingMap(&use);
-  if (!consumerIndexingMap.isIdentity()) {
-    return false;
-  }
-  return true;
-}
-
-/// Checks if the producer and consumer LinalgOps can be fused.
-static bool areFusableLinalgOps(OpOperand &use) {
-  return areLinalgOpsFusableUsingTileAndFuse(use);
-}
-
-/// Returns true if this is a fusable use.
-static bool isFusableWithConsumer(OpOperand &use) {
-  // Check for linalg producer -> consumer fusion with tile + fuse.
-  return areFusableLinalgOps(use);
-}
-
-/// For all uses of an operation, finds the use that dominates all other uses.
-static Optional<OpOperand *> getFusableUse(Operation *op,
-                                           DominanceInfo const &dominanceInfo) {
-  if (!kEnableMultiResultDispatches) {
-    if (op->hasOneUse()) {
-      OpOperand &use = *(op->use_begin());
-      return &use;
-    }
-    return llvm::None;
-  }
-  for (auto &use : op->getUses()) {
-    Operation *user = use.getOwner();
-    if (llvm::all_of(op->getUsers(), [&](Operation *c) {
-          return dominanceInfo.dominates(user, c);
-        })) {
-      return &use;
-    }
-  }
-  return llvm::None;
-}
-
-/// Fuses roots with its consumers. If a root is fused with its consumer, it is
-/// no more tagged as a root to aid with the dispatch region formation.
-static void fuseRootsWithConsumers(MLIRContext *context,
-                                   ArrayRef<Operation *> roots,
-                                   DominanceInfo const &dominanceInfo) {
-  SmallVector<Operation *> workList(roots.begin(), roots.end());
-  // Fuse with consumers where possible.
-  while (!workList.empty()) {
-    Operation *currRoot = workList.pop_back_val();
-    assert(hasRootOpAttribute(currRoot) &&
-           "unexpected non-root op in worklist");
-
-    // Helper function to make the consumer the root instead of the producer
-    // when they are to be fused.
-    auto updateRootTo = [&context, &currRoot](Operation *newRoot) {
-      int64_t rootNumber = getRootNumber(currRoot);
-      setRootAttribute(context, newRoot, rootNumber);
-      removeRootOpAttribute(currRoot);
-      appendToFusionGroup(currRoot, rootNumber);
-    };
-
-    Optional<OpOperand *> fusableUse = getFusableUse(currRoot, dominanceInfo);
-    if (!fusableUse) continue;
-
-    // Analyse the use to see if it is fusable.
-    Operation *consumerOp = fusableUse.value()->getOwner();
-    if (hasRootOpAttribute(consumerOp) ||
-        hasFusionGroupsAttribute(consumerOp)) {
-      continue;
-    }
-
-    if (isFusableWithConsumer(*(fusableUse.value()))) {
-      updateRootTo(consumerOp);
-      workList.push_back(consumerOp);
-    }
-  }
-}
-
-/// Method to check if the consumer of a use can be fused with its producer.
-static bool isFusableWithProducer(OpOperand &operand) {
-  Operation *producer = operand.get().getDefiningOp();
-  Operation *consumer = operand.getOwner();
-
-  if (isa<linalg::LinalgOp>(consumer) && isa<linalg::LinalgOp>(producer)) {
-    auto consumerLinalgOp = cast<linalg::LinalgOp>(consumer);
-    auto producerLinalgOp = cast<linalg::LinalgOp>(producer);
-    if (consumerLinalgOp.isDpsInit(&operand) &&
-        producerLinalgOp.getNumLoops() ==
-            producerLinalgOp.getNumParallelLoops()) {
-      return true;
-    }
-  }
-  return false;
-}
-
-/// Starting from the `root` op, traverse the operand use-def chain
-/// in reverse to fuse with producers.
-static void fuseRootsWithProducers(MLIRContext *context, Operation *root,
-                                   unsigned groupNum,
-                                   DominanceInfo const &dominanceInfo) {
-  // We probably want a worklist algorithm here, but for now just look at
-  // immediate producers.
-  for (OpOperand &operand : root->getOpOperands()) {
-    Operation *producer = operand.get().getDefiningOp();
-    if (!producer) continue;
-    if (hasFusionGroupsAttribute(producer) || hasRootOpAttribute(producer)) {
-      continue;
-    }
-
-    Optional<OpOperand *> fusableUse = getFusableUse(producer, dominanceInfo);
-    if (!fusableUse || fusableUse.value()->getOwner() != root) continue;
-
-    if (isFusableWithProducer(operand)) {
-      appendToFusionGroup(producer, groupNum);
-    }
-  }
-}
-
-/// Some heuristic is needed to fuse a dispatchable op with root operations
-/// using tile + fuse. Using some heuristic, each root operation is tagged with
-/// an ID (using an IntegerAttr with name `kRootOpAttr`) and all dispatchable
-/// ops to be fused with it is tagged with the same ID (using a list of
-/// IntegerAttr with name `kFusionGroupsAttr`). Each dispatchable operation can
-/// be marked to fuse with multiple root operations (i.e. replicated). For now a
-/// very simple heuristic is used below, but the mechanism should be general
-/// enough to capture any heuristic.
-static unsigned decideFusableLinalgOps(FunctionOpInterface funcOp,
-                                       DominanceInfo const &dominanceInfo) {
-  unsigned numRootOps = 0;
-  MLIRContext *context = funcOp->getContext();
-  OpBuilder builder(context);
-  for (Block &block : funcOp.getFunctionBody()) {
-    // Dispatch region formation works by first cloning the root into
-    // the dispatch region and then pulling operations in.
-    // So procedure here is to
-    // - First find the roots
-    // - To fuse with consumers make the consumer the root.
-    SmallVector<Operation *> roots;
-    for (Operation &op : llvm::reverse(block)) {
-      // Start with a root operation and fuse its producers.
-      if (hasFusionGroupsAttribute(&op) || !isRootOp(&op)) continue;
-      unsigned newGroup = numRootOps++;
-      setRootAttribute(context, &op, newGroup);
-
-      fuseRootsWithProducers(context, &op, newGroup, dominanceInfo);
-      roots.push_back(&op);
-    }
-    roots = llvm::to_vector(llvm::reverse(roots));
-    fuseRootsWithConsumers(context, roots, dominanceInfo);
-  }
-
-  // Once all root linalg ops have been tagged, put all remaining generic ops
-  // into their own dispatches.
-  for (Block &block : funcOp.getFunctionBody()) {
-    SmallVector<Operation *> roots;
-    for (Operation &op : llvm::reverse(block)) {
-      // If it is part of a fusion group or root op, ignore it.
-      if (hasFusionGroupsAttribute(&op) || hasRootOpAttribute(&op)) continue;
-      // Only look for Linalg ops here. Avoid moving `linalg.fill` that aren't
-      // fused with anything else into their own dispatches since it is better
-      // to convert them to splats.
-      if (!isa<linalg::LinalgOp>(op) || isa<linalg::FillOp>(op)) continue;
-
-      unsigned newGroup = numRootOps++;
-      setRootAttribute(context, &op, newGroup);
-      roots.push_back(&op);
-    }
-    roots = llvm::to_vector(llvm::reverse(roots));
-    fuseRootsWithConsumers(context, roots, dominanceInfo);
-  }
-
-  LLVM_DEBUG({
-    llvm::dbgs() << "\n--- After annotating linalg op fusion scheme ---\n";
-    funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-    llvm::dbgs() << "\n\n";
-  });
-
-  return numRootOps;
 }
 
 //===----------------------------------------------------------------------===//
@@ -554,34 +231,23 @@ static void buildWorkloadRegionBody(OpBuilder &builder, Location loc,
 
 /// Create Flow::DispatchGroupsOps based on a fusion heuristic.
 static FailureOr<SmallVector<Flow::DispatchWorkgroupsOp>> createFusionGroups(
-    TensorDimTrackingRewriter &rewriter, FunctionOpInterface funcOp,
+    TensorDimTrackingRewriter &rewriter,
+    const Flow::FusionGroupMapping &fusionGroups, FunctionOpInterface funcOp,
     DominanceInfo const &dominanceInfo, bool generateWorkloadRegion) {
-  // Decide fusion groups (heuristic).
-  unsigned numRoots = decideFusableLinalgOps(funcOp, dominanceInfo);
-  SmallVector<Operation *> roots(numRoots, nullptr);
-  DenseMap<unsigned, SmallVector<Operation *>> producers;
-
-  // TODO: Incrementally add ops to an empty DispatchGroupOp instead of
-  // annotating fusion group IDs via attributes.
-  funcOp.walk([&](Operation *op) {
-    if (hasRootOpAttribute(op)) roots[getRootNumber(op)] = op;
-    if (hasFusionGroupsAttribute(op)) {
-      assert(getFusionGroups(op).size() == 1 && "expected exactly one group");
-      producers[getFusionGroups(op).front()].push_back(op);
-    }
-  });
-
   // Create a DispatchRegionOp for every fusion group.
   OpBuilder::InsertionGuard g(rewriter);
   SmallVector<Flow::DispatchRegionOp> regionOps;
   DenseMap<Flow::DispatchRegionOp, SmallVector<Value>> workloads;
-  for (const auto &it : llvm::enumerate(roots)) {
+  for (const auto &it : fusionGroups) {
+    Operation *rootOp = it.first;
+    SmallVector<Operation *> producers = it.second;
+
     // Compute workload.
     SmallVector<Value> workload;
     if (generateWorkloadRegion) {
-      rewriter.setInsertionPoint(it.value());
+      rewriter.setInsertionPoint(rootOp);
       FailureOr<SmallVector<Value>> maybeWorkload =
-          getWorkloadForRootOp(rewriter, it.value());
+          getWorkloadForRootOp(rewriter, rootOp);
       if (failed(maybeWorkload)) return failure();
       workload = *maybeWorkload;
     }
@@ -592,25 +258,25 @@ static FailureOr<SmallVector<Flow::DispatchWorkgroupsOp>> createFusionGroups(
 
     // Create fusion group.
     Flow::DispatchRegionOp regionOp;
-    auto maybeRegionOp = Flow::wrapOpInDispatchRegion(rewriter, it.value());
+    auto maybeRegionOp = Flow::wrapOpInDispatchRegion(rewriter, rootOp);
     if (failed(maybeRegionOp)) return failure();
     regionOp = *maybeRegionOp;
-    workloads[regionOp] = workload;
 
     // Sort producers topologically. All producers must be in the same block as
     // the root.
-    bool sortResult = mlir::computeTopologicalSorting(producers[it.index()]);
+    bool sortResult = mlir::computeTopologicalSorting(producers);
     (void)sortResult;
     assert(sortResult && "could not compute topological sorting");
 
     // Move ops into the region.
-    for (Operation *producer : llvm::reverse(producers[it.index()])) {
+    for (Operation *producer : llvm::reverse(producers)) {
       auto newRegionOp =
           movePrecedingOpIntoDispatchRegion(rewriter, producer, regionOp);
       if (failed(newRegionOp)) return failure();
       regionOp = *newRegionOp;
     }
 
+    workloads[regionOp] = workload;
     regionOps.push_back(regionOp);
   }
 
@@ -722,9 +388,13 @@ void DispatchLinalgOnTensorsViaRegionOpsPass::runOnOperation() {
   DominanceInfo const &dominanceInfo = getAnalysis<DominanceInfo>();
   TensorDimTrackingRewriter rewriter(funcOp);
 
+  // Step 0: Decide fusion groups (heuristic).
+  Flow::FusionGroupMapping fusionGroups = Flow::decideFusableLinalgOps(
+      funcOp, dominanceInfo, /*aggressiveFusion=*/false);
+
   // Step 1: Create a DispatchWorkgroupsOp for every fusion group.
-  auto maybeWorkgroupsOps = createFusionGroups(rewriter, funcOp, dominanceInfo,
-                                               generateWorkloadRegion);
+  auto maybeWorkgroupsOps = createFusionGroups(
+      rewriter, fusionGroups, funcOp, dominanceInfo, generateWorkloadRegion);
   if (failed(maybeWorkgroupsOps)) return signalPassFailure();
   SmallVector<Flow::DispatchWorkgroupsOp> workgroupsOps = *maybeWorkgroupsOps;
 
@@ -781,13 +451,6 @@ void DispatchLinalgOnTensorsViaRegionOpsPass::runOnOperation() {
             funcOp, std::move(foldExtractInsertSliceOps))))
       return signalPassFailure();
   }
-
-  // Finally walk all the ops and remove the attributes
-  funcOp.walk([](Operation *op) {
-    removeFusionGroupsAttribute(op);
-    removeRootOpAttribute(op);
-    op->removeAttr(IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker);
-  });
 }
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
