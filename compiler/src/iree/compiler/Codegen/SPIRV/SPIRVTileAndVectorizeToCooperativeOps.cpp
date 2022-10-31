@@ -268,15 +268,15 @@ class SPIRVTileAndVectorizeToCooperativeOpsPass final
     // decided earlier and attached to a linalg op as an attribute.
 
     linalg::LinalgOp rootOp;
-    funcOp.walk([&](linalg::ContractionOpInterface contractOp) {
-      if (getLoweringConfig(contractOp)) {
-        rootOp = cast<linalg::LinalgOp>(contractOp.getOperation());
+    funcOp.walk([&](linalg::LinalgOp linalgOp) {
+      if (isMatmulOrBatchMatmul(linalgOp) && getLoweringConfig(linalgOp)) {
+        rootOp = linalgOp;
         return WalkResult::interrupt();
       }
       return WalkResult::advance();
     });
     if (!rootOp) {
-      funcOp.emitError("expected lowering confg on a Linalg contraction op");
+      funcOp.emitError("expected lowering confg on a (batch) matmul op");
       return signalPassFailure();
     }
 

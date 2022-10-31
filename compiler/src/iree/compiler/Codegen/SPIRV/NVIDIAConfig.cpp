@@ -97,13 +97,12 @@ static Optional<CooperativeMatrixSize> getCooperativeMatrixSize(
 
 static LogicalResult setCooperativeMatrixConfig(
     const spirv::TargetEnv &targetEnv, linalg::LinalgOp op) {
+  LLVM_DEBUG(llvm::dbgs() << "trying to matmul tensorcore config...\n");
   // This configuration is only for cooperative matrix.
   if (!targetEnv.allows(spirv::Capability::CooperativeMatrixNV) ||
       !targetEnv.allows(spirv::Extension::SPV_NV_cooperative_matrix)) {
     return success();
   }
-
-  if (!isa<linalg::BatchMatmulOp, linalg::MatmulOp>(*op)) return success();
 
   if (op.hasDynamicShape()) return success();
 
@@ -122,6 +121,11 @@ static LogicalResult setCooperativeMatrixConfig(
   const int64_t dimM = loopRanges[mIndex];
   const int64_t dimK = loopRanges[kIndex];
   const int64_t dimN = loopRanges[nIndex];
+  LLVM_DEBUG({
+    llvm::dbgs() << "input matmul shape (B, M, N, K) = ("
+                 << (bIndex >= 0 ? loopRanges[bIndex] : -1) << ", " << dimM
+                 << ", " << dimN << ", " << dimK << ")\n";
+  });
 
   // TODO: Cooperative matrix support is fairly restricted. We can only have
   // a curated list of fused element wise ops as defined in the extension
