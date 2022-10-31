@@ -1,4 +1,5 @@
 // RUN: iree-opt --split-input-file --verify-diagnostics --pass-pipeline="func.func(iree-flow-dispatch-linalg-on-tensors-pass{aggressive-fusion=true}), cse, canonicalize, cse" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --verify-diagnostics --iree-flow-dispatch-via-region-ops --pass-pipeline="func.func(iree-flow-dispatch-linalg-on-tensors-pass{aggressive-fusion=true}), cse, canonicalize, cse" %s | FileCheck %s --check-prefix=CHECK-VIA-REGIONS
 
 func.func @tile_matmul_alone(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
              %arg2 : tensor<?x?xf32>) -> tensor<?x?xf32> {
@@ -1288,6 +1289,7 @@ func.func @concat_pattern(%src1 : tensor<2x40xf32>, %src2 : tensor<3x40xf32>,
       : tensor<3x40xf32> into tensor<5x40xf32>
   return %1 : tensor<5x40xf32>
 }
+
 //      CHECK: func.func @concat_pattern
 // CHECK-SAME:     %[[SRC1:.+]]: tensor<2x40xf32>
 // CHECK-SAME:     %[[SRC2:.+]]: tensor<3x40xf32>
@@ -1295,6 +1297,14 @@ func.func @concat_pattern(%src1 : tensor<2x40xf32>, %src2 : tensor<3x40xf32>,
 //      CHECK:   %[[UPDATE1:.+]] = flow.tensor.update %[[SRC1]], %[[DEST]]
 //      CHECK:   %[[UPDATE2:.+]] = flow.tensor.update %[[SRC2]], %[[UPDATE1]]
 //      CHECK:   return %[[UPDATE2]]
+
+//      CHECK-VIA-REGIONS: func.func @concat_pattern
+// CHECK-VIA-REGIONS-SAME:     %[[SRC1:.+]]: tensor<2x40xf32>
+// CHECK-VIA-REGIONS-SAME:     %[[SRC2:.+]]: tensor<3x40xf32>
+// CHECK-VIA-REGIONS-SAME:     %[[DEST:.+]]: tensor<5x40xf32>
+//      CHECK-VIA-REGIONS:   %[[UPDATE1:.+]] = flow.tensor.update %[[SRC1]], %[[DEST]]
+//      CHECK-VIA-REGIONS:   %[[UPDATE2:.+]] = flow.tensor.update %[[SRC2]], %[[UPDATE1]]
+//      CHECK-VIA-REGIONS:   return %[[UPDATE2]]
 
 // -----
 

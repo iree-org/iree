@@ -16,9 +16,11 @@ iree_compiler_cc_library(
     name = "TensorToFlow",
     srcs = [
         "Patterns.cpp",
+        "Utils.cpp",
     ],
     hdrs = [
         "Patterns.h",
+        "Utils.h",
     ],
     deps = [
         "//compiler/src/iree/compiler/Dialect/Flow/IR",
