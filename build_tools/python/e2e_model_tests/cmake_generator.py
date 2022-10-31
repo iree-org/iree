@@ -21,8 +21,8 @@ import cmake_builder.rules
 class CMakePlatform(enum.Enum):
   """Enum of CMake system platform string."""
   ANDROID_ARMV8_A = "android-arm64-v8a"
-  LINUX_RISCV32 = "riscv32-linux"
-  LINUX_RISCV64 = "riscv64-linux"
+  LINUX_RISCV32 = "riscv32-Linux"
+  LINUX_RISCV64 = "riscv64-Linux"
   LINUX_X86_64 = "x86_64"
 
 
