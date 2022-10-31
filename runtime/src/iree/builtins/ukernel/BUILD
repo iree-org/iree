@@ -35,6 +35,7 @@ iree_runtime_cc_library(
     ],
     deps = [
         ":exported_flag_bits",
+        ":static_assert",
         "//runtime/src/iree/base:core_headers",
         "//runtime/src/iree/builtins/ukernel/arch:config",
     ],

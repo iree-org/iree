@@ -2,11 +2,11 @@
 #include "iree/builtins/ukernel/exported_flag_bits.h"
 
 // Parameters:
-//   x0: int32_t* out_tile
-//   x1: const int8_t* lhs_panel
-//   x2: const int8_t* rhs_panel
-//   w3: int32_t K. Note: K>=1, as the K==0 case was handled as an early-return.
-//   w4: uint32_t flags
+//   x0: iree_ukernel_int32_t* out_tile
+//   x1: const iree_ukernel_int8_t* lhs_panel
+//   x2: const iree_ukernel_int8_t* rhs_panel
+//   w3: iree_ukernel_int32_t K. Note: K>=1, as the K==0 case was handled as an early-return.
+//   w4: iree_ukernel_uint32_t flags
 //   x5: (UNUSED) params - relevant params K and flags already passed above.
 
 BEGIN_FUNCTION iree_ukernel_mmt4d_f32f32f32_tile_8x8x1_arm_64

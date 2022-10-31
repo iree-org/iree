@@ -695,7 +695,7 @@ static iree_status_t iree_vmvx_mmt4d(iree_ukernel_mmt4d_type_t type,
       .M0 = M0,
       .N0 = N0,
       .K0 = K0,
-      .cpu_data = iree_cpu_data_fields(),
+      .cpu_data = (const iree_ukernel_uint64_t*)iree_cpu_data_fields(),
   };
   iree_ukernel_status_t status = iree_ukernel_mmt4d(&ukernel_params);
   IREE_TRACE_ZONE_END(z0);
