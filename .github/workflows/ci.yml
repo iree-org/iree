@@ -63,7 +63,8 @@ jobs:
       # The commit being checked out is the merge commit for the PR. Its first
       # parent will be the tip of main.
       BASE_REF: HEAD^
-      PR_DESCRIPTION: ${{ github.event.pull_request.body }}
+      PR_TITLE: ${{ github.event.pull_request.title }}
+      PR_BODY: ${{ github.event.pull_request.body }}
     outputs:
       should-run: ${{ steps.configure.outputs.should-run }}
       ci-stage: ${{ steps.configure.outputs.ci-stage }}
