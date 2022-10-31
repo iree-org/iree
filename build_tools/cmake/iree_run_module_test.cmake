@@ -213,8 +213,9 @@ endfunction()
 #
 # Parameters:
 #   NAME: Name of the target
-#   MODEL: Model "<UUID>_<name>" defined in
-#       "build_tools/python/e2e_test_framework/models".
+#   MODEL: "<UUID>_<model name>" of models defined under
+#       "build_tools/python/e2e_test_framework/models" with UUID in
+#       "build_tools/python/e2e_test_framework/unique_ids.py".
 #   DRIVER: Driver to run the module with.
 #   RUNNER_ARGS: additional args to pass to iree-run-module. The driver
 #       and input file are passed automatically.
