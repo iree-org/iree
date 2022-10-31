@@ -12,11 +12,21 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
+    static_assert
+  HDRS
+    "static_assert.h"
+  DEPS
+
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     exported_flag_bits
   HDRS
     "exported_flag_bits.h"
   DEPS
-
+    ::static_assert
   PUBLIC
 )
 
