@@ -31,6 +31,7 @@ iree_cc_library(
     "api.c"
   DEPS
     ::task
+    iree::base
     iree::base::internal::flags
     iree::base::tracing
   PUBLIC

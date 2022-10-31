@@ -265,6 +265,9 @@ void populateUnfusedFMAOpsPassPatterns(MLIRContext *context,
 /// to memrefs
 void addCPUDefaultPassPipeline(OpPassManager &passManager);
 
+/// Populates the passes to lower ops through data tiling transformations.
+void addCPUDataTilingPipeline(OpPassManager &passManager);
+
 /// Populates the passes to lower to tiled/distributed/bufferized ops, suitable
 /// for library call dispatch and lowering to loops.
 void addVMVXDefaultPassPipeline(OpPassManager &passManager);
@@ -331,6 +334,10 @@ createLLVMCPULinkExecutablesPass();
 /// Assigns executable constant ordinals across all LLVMCPU variants.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createLLVMCPUAssignConstantOrdinalsPass();
+
+/// Assigns executable import ordinals across all LLVMCPU variants.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
+createLLVMCPUAssignImportOrdinalsPass();
 
 /// Populates passes needed to link HAL executables across LLVMCPU targets.
 void buildLLVMCPULinkingPassPipeline(OpPassManager &passManager);
@@ -419,7 +426,7 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUMultiBuffering(
 /// Apply transformation to reduce the number of bank conflicts when accessing
 /// shared memory by padding fastest moving dimension with the specified size.
 std::unique_ptr<OperationPass<func::FuncOp>>
-createLLVMGPUReduceSharedMemoryBankConflicts(int64_t paddingSizeBits = 128);
+createGPUReduceSharedMemoryBankConflicts(int64_t paddingSizeBits = 128);
 
 /// Converts vector ops to gpu dialect.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorToGPU();
@@ -478,17 +485,17 @@ std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVTileAndDistributePass();
 
 /// Pass to promote Linalg ops with buffer semantics to use workgroup memory and
 /// then tile to invocations.
-std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVTileAndPromotePass();
+std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVTileAndPromotePass(
+    bool skipThreadLevel = false);
 
 /// Pass to tile Linalg ops with buffer semantics to subgroups and vectorize to
 /// vector ops suitable for lowering to SPIR-V cooperative ops.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVTileAndVectorizeToCooperativeOpsPass();
 
-/// Pass to convert vector read/write/arithmetic operations to the corresponding
-/// cooperative matrix ops when possible.
+/// Converts vector ops to gpu subgroup MMA ops.
 std::unique_ptr<OperationPass<func::FuncOp>>
-createSPIRVVectorToCooperativeOpsPass();
+createSPIRVVectorToGPUSubgroupMMAOpsPass();
 
 /// Pass to tile Linalg ops with tensor semantics to invocations.
 std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVTilePass();

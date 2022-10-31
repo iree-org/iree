@@ -512,7 +512,8 @@ struct ExpandDynamicShapeConstant : public OpRewritePattern<TensorConstantOp> {
                               op.getLoc(), staticType.getDimSize(i))
                           .getResult();
       dynamicDims.push_back(
-          rewriter.create<IREE::Util::DoNotOptimizeOp>(op.getLoc(), dimValue)
+          rewriter
+              .create<IREE::Util::OptimizationBarrierOp>(op.getLoc(), dimValue)
               .getResult(0));
     }
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorReshapeOp>(

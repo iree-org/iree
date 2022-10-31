@@ -9,9 +9,11 @@
 
 include "iree/compiler/Dialect/HAL/IR/HALDialect.td"
 include "iree/compiler/Dialect/HAL/IR/HALInterfaces.td"
+include "iree/compiler/Dialect/Stream/IR/StreamInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilTypes.td"
 include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/EnumAttr.td"
+include "mlir/IR/SubElementInterfaces.td"
 
 //===----------------------------------------------------------------------===//
 // HAL enums
@@ -511,7 +513,9 @@ def HAL_InterfaceBindingAttr :
 //===----------------------------------------------------------------------===//
 
 def HAL_DeviceTargetAttr :
-    AttrDef<HAL_Dialect, "DeviceTarget", []> {
+    AttrDef<HAL_Dialect, "DeviceTarget", [
+      DeclareAttrInterfaceMethods<SubElementAttrInterface>,
+    ]> {
   let mnemonic = "device.target";
   let summary = [{generic device target specification}];
   let description = [{
@@ -569,7 +573,9 @@ def HAL_DeviceTargetAttr :
 }
 
 def HAL_ExecutableTargetAttr :
-    AttrDef<HAL_Dialect, "ExecutableTarget", []> {
+    AttrDef<HAL_Dialect, "ExecutableTarget", [
+      DeclareAttrInterfaceMethods<SubElementAttrInterface>,
+    ]> {
   let mnemonic = "executable.target";
   let summary = [{generic executable target specification}];
   let description = [{
@@ -597,11 +603,13 @@ def HAL_ExecutableTargetAttr :
     one of many different executable targets. Assume an N:M mapping between the
     two in all cases.
   }];
+
   let parameters = (ins
     AttrParameter<"StringAttr", "">:$backend,
     AttrParameter<"StringAttr", "">:$format,
     AttrParameter<"DictionaryAttr", "">:$configuration
   );
+
   let builders = [
     AttrBuilder<(ins "StringRef":$backend, "StringRef":$format)>,
   ];
@@ -615,6 +623,47 @@ def HAL_ExecutableTargetAttr :
     // device that can load an executable of this target.
     Attribute getMatchExpression();
   }];
+
+  let hasCustomAssemblyFormat = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// #hal.affinity.queue<*>
+//===----------------------------------------------------------------------===//
+
+def HAL_AffinityQueueAttr : AttrDef<HAL_Dialect, "AffinityQueue", [
+  DeclareAttrInterfaceMethods<Stream_AffinityAttr, [
+    "isExecutableWith",
+    "joinOR",
+    "joinAND",
+  ]>,
+]> {
+  let mnemonic = "affinity.queue";
+  let summary = [{specifies a set of allowed queues for an operation}];
+  let description = [{
+    WIP; see https://github.com/iree-org/iree/issues/10765.
+    This may change in the future to either be a nested attribute on a larger
+    affinity struct or be defined by an implementation of the affinity attr
+    interface. For now this allows higher levels of the stack to specify
+    queues such that the stream dialect can understand them and they can be
+    lowered into the HAL dialect.
+
+    Specifies that an annotated operation or scope is only allowed to execute on
+    the set of queues (0-64) provided. Operations will not run on other queues.
+
+    Example:
+    ```mlir
+    // any queue
+    #hal.affinity.queue<*>
+    // queues 4 and 5
+    #hal.affinity.queue<[4, 5]>
+    ```
+  }];
+
+  let parameters = (ins
+    AttrParameter<"int64_t", "">:$mask
+  );
+
   let hasCustomAssemblyFormat = 1;
 }
 
@@ -637,6 +686,7 @@ def HAL_MatchAlwaysAttr :
 
 def HAL_MatchAnyAttr :
     AttrDef<HAL_Dialect, "MatchAny", [
+      DeclareAttrInterfaceMethods<SubElementAttrInterface>,
       DeclareAttrInterfaceMethods<HAL_MatchAttrInterface>,
     ]> {
   let mnemonic = "match.any";
@@ -657,6 +707,7 @@ def HAL_MatchAnyAttr :
 
 def HAL_MatchAllAttr :
     AttrDef<HAL_Dialect, "MatchAll", [
+      DeclareAttrInterfaceMethods<SubElementAttrInterface>,
       DeclareAttrInterfaceMethods<HAL_MatchAttrInterface>,
     ]> {
   let mnemonic = "match.all";

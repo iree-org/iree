@@ -231,14 +231,14 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
       mhlo::ScatterOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const final {
     if (!hasCanonicalDimensionNumbers(op)) return failure();
-    if (llvm::size(op.operands()) != 1)
+    if (llvm::size(op.getInputs()) != 1)
       return op.emitError("NYI variadic operands scatter");
     if (llvm::size(op.getUpdates()) != 1)
       return op.emitError("NYI variadic updates scatter");
 
     ImplicitLocOpBuilder b(op.getLoc(), rewriter);
 
-    Value original = adaptor.operands().front();
+    Value original = adaptor.getInputs().front();
     Value indices = adaptor.getScatterIndices();
     Value updates = adaptor.getUpdates().front();
 
@@ -441,7 +441,7 @@ struct TopkOpConversion : public OpConversionPattern<chlo::TopKOp> {
     Value operand = adaptor.getOperand();
 
     auto inputValuesType = operand.getType().dyn_cast<ShapedType>();
-    auto outputValuesType = op.values().getType().dyn_cast<ShapedType>();
+    auto outputValuesType = op.getValues().getType().dyn_cast<ShapedType>();
     auto outputIndicesType = op.getIndices().getType().dyn_cast<ShapedType>();
     if (!inputValuesType || !outputValuesType || !outputIndicesType) {
       return rewriter.notifyMatchFailure(

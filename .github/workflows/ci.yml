@@ -561,73 +561,10 @@ jobs:
   ############################## Crosscompilation ##############################
   # Jobs that cross-compile IREE for other platforms
   ##############################################################################
-  android_arm64:
-    needs: [setup, build_all]
-    if: needs.setup.outputs.should-run == 'true'
-    runs-on:
-      - self-hosted  # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - cpu
-      - os-family=Linux
-    env:
-      ANDROID_ABI: "arm64-v8a"
-      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
-      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
-    steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
-      - name: "Checking out runtime submodules"
-        run: ./build_tools/scripts/git/update_runtime_submodules.sh
-      - name: "Downloading build dir archive"
-        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
-      - name: "Extracting install from build dir archive"
-        run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
-      - name: "Building for Android"
-        run: |
-          build_tools/github_actions/docker_run.sh \
-            --env "ANDROID_ABI=${ANDROID_ABI}" \
-            --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
-            gcr.io/iree-oss/android@sha256:76c2a52dcd6d07601227b965ac87d021c1d2d5e2d01f46ad58da28c89267f2ab \
-            build_tools/cmake/build_android.sh
 
-  baremetal_riscv32:
-    needs: [setup, build_all]
-    if: needs.setup.outputs.should-run == 'true'
-    runs-on:
-      - self-hosted  # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - cpu
-      - os-family=Linux
-    env:
-      BUILD_RISCV_DIR: "build-riscv32-baremetal"
-      BUILD_ARCH: "rv32-baremetal"
-      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
-      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
-    steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
-      - name: "Checking out runtime submodules"
-        run: ./build_tools/scripts/git/update_runtime_submodules.sh
-      - name: "Downloading build dir archive"
-        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
-      - name: "Extracting install from build dir archive"
-        run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
-      - name: "Cross-compiling and testing riscv32 baremetal"
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            --env "RISCV_ARCH=${BUILD_ARCH}" \
-            --env "BUILD_RISCV_DIR=${BUILD_RISCV_DIR}" \
-            --env "BUILD_PRESET=test" \
-            --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
-            gcr.io/iree-oss/riscv@sha256:d6f0e293a50faf5abbd564c1d1bb9dc6456d7ce93d07b131c381fa64c1daed62 \
-            bash -euo pipefail -c \
-            "./build_tools/cmake/build_riscv.sh && tests/riscv32/smoke.sh"
-
-  linux_riscv:
+  # emscripten is not in the test matrix because it is set as
+  # postsubmission-only.
+  cross_compile_and_test:
     needs: [setup, build_all]
     if: needs.setup.outputs.should-run == 'true'
     runs-on:
@@ -638,10 +575,33 @@ jobs:
       - os-family=Linux
     strategy:
       matrix:
-        architecture: [rv64, rv32-linux]
+        target:
+          - platform: android
+            architecture: arm64-v8a
+            abi: arm64-v8a
+            docker_image: "gcr.io/iree-oss/android@sha256:76c2a52dcd6d07601227b965ac87d021c1d2d5e2d01f46ad58da28c89267f2ab"
+            test_script: "echo 'bypass tests'"
+          - platform: riscv
+            architecture: rv64
+            abi: lp64d
+            docker_image: "gcr.io/iree-oss/riscv@sha256:d6f0e293a50faf5abbd564c1d1bb9dc6456d7ce93d07b131c381fa64c1daed62"
+            test_script: "./build_tools/cmake/test_riscv.sh"
+          - platform: riscv
+            architecture: rv32-linux
+            abi: ilp32d
+            docker_image: "gcr.io/iree-oss/riscv@sha256:d6f0e293a50faf5abbd564c1d1bb9dc6456d7ce93d07b131c381fa64c1daed62"
+            test_script: "./build_tools/cmake/test_riscv.sh"
+          - platform: riscv
+            architecture: rv32-baremetal
+            abi: ilp32
+            docker_image: "gcr.io/iree-oss/riscv@sha256:d6f0e293a50faf5abbd564c1d1bb9dc6456d7ce93d07b131c381fa64c1daed62"
+            test_script: "./tests/riscv32/smoke.sh"
     env:
-      BUILD_RISCV_DIR: build-${{ matrix.architecture }}
-      BUILD_ARCH: ${{ matrix.architecture }}
+      PLATFORM: ${{ matrix.target.platform }}
+      ARCHITECTURE: ${{ matrix.target.architecture }}
+      ABI: ${{ matrix.target.abi }}
+      DOCKER_IMAGE: ${{ matrix.target.docker_image }}
+      TEST_SCRIPT: ${{ matrix.target.test_script }}
       BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
       BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
       BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
@@ -654,18 +614,25 @@ jobs:
         run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting build dir archive"
         run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
-      - name: "Cross-compiling and testing RISC-V Linux"
-        env:
-          BUILD_BENCHMARK_SUITE_DIR: ${{ steps.download_expected_output.outputs.benchmark-suite-dir }}
+      - name: "Build cross-compiling target"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            --env "RISCV_ARCH=${BUILD_ARCH}" \
-            --env "BUILD_RISCV_DIR=${BUILD_RISCV_DIR}" \
+            --env "${PLATFORM^^}_ARCH=${ARCHITECTURE}" \
+            --env "BUILD_${PLATFORM^^}_DIR=build-${PLATFORM}-${ARCHITECTURE}" \
+            --env "${PLATFORM^^}_ABI=${ABI}" \
             --env "BUILD_PRESET=test" \
             --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
-            gcr.io/iree-oss/riscv@sha256:d6f0e293a50faf5abbd564c1d1bb9dc6456d7ce93d07b131c381fa64c1daed62 \
+            "${DOCKER_IMAGE}" \
+            ./build_tools/cmake/build_${PLATFORM}.sh
+      - name: "Test cross-compiling target"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "${PLATFORM^^}_ARCH=${ARCHITECTURE}" \
+            --env "BUILD_${PLATFORM^^}_DIR=build-${PLATFORM}-${ARCHITECTURE}" \
+            --env "BUILD_PRESET=test" \
+            "${DOCKER_IMAGE}" \
             bash -euo pipefail -c \
-              "./build_tools/cmake/build_riscv.sh && ./build_tools/cmake/test_riscv.sh"
+              "${TEST_SCRIPT}"
 
   emscripten:
     needs: [setup, build_all]
@@ -805,9 +772,7 @@ jobs:
       - tsan
 
       # Crosscompilation
-      - android_arm64
-      - baremetal_riscv32
-      - linux_riscv
+      - cross_compile_and_test
       - emscripten
 
       # Benchmark pipeline

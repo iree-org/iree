@@ -100,9 +100,9 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
     ```mlir
     %r = flow.dispatch.workgroups[%c5, %c5](%0, %1)
         : (tensor<5x5xf32>, tensor<5xf32>) -> tensor<5x5xf32> =
-              (%arg0: !flow.dispatch.tensor<readonly:5x5xf32>,
-               %arg1: !flow.dispatch.tensor<readonly:5xf32>,
-               %arg2: !flow.dispatch.tensor<writeonly:5x5xf32>) {
+              (%arg0: !flow.dispatch.tensor<readonly:tensor<5x5xf32>>,
+               %arg1: !flow.dispatch.tensor<readonly:tensor<5xf32>>,
+               %arg2: !flow.dispatch.tensor<writeonly:tensor<5x5xf32>>) {
       ...
     }
     ```
@@ -436,7 +436,8 @@ def FLOW_DispatchTensorLoadOp : FLOW_PureOp<"dispatch.tensor.load", [
     /// Return the expected rank of each of the `static_offsets`, `static_sizes`
     /// and `static_strides` attributes.
     std::array<unsigned, 3> getArrayAttrMaxRanks() {
-      unsigned sourceRank = getSource().getType().cast<DispatchTensorType>().asTensorType().getRank();
+      unsigned sourceRank =
+          getSource().getType().cast<DispatchTensorType>().asRankedTensorType().getRank();
       return {sourceRank, sourceRank, sourceRank};
     }
 
@@ -538,7 +539,8 @@ def FLOW_DispatchTensorStoreOp : FLOW_Op<"dispatch.tensor.store", [
     /// Return the expected rank of each of the `static_offsets`, `static_sizes`
     /// and `static_strides` attributes.
     std::array<unsigned, 3> getArrayAttrMaxRanks() {
-      unsigned resultRank = getTarget().getType().cast<DispatchTensorType>().asTensorType().getRank();
+      unsigned resultRank =
+           getTarget().getType().cast<DispatchTensorType>().asRankedTensorType().getRank();
       return {resultRank, resultRank, resultRank};
     }
 

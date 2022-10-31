@@ -248,3 +248,37 @@ transform.with_pdl_patterns {
     transform.iree.clone_succeeding_op_into_dispatch_region %1 into %dispatch_op
   }
 }
+
+// -----
+
+// This is a regression for reifyDynamicResultDims. 
+
+// CHECK-LABEL: func @reify_result_dims_regression(
+func.func @reify_result_dims_regression(%s1: index, %s2: index) -> (tensor<4x?xf32>) {
+  // CHECK: %[[dest:.*]] = "test.dummy_dest"
+  // CHECK: %[[c1:.*]] = arith.constant 1 : index
+  // CHECK: %[[dim1:.*]] = tensor.dim %[[dest]], %[[c1]]
+  // CHECK: %[[src:.*]] = "test.dummy_src"
+  // CHECK: %[[region:.*]] = flow.dispatch.region -> (tensor<4x?xf32>{%[[dim1]]}) {
+  // CHECK:   %[[insert:.*]] = tensor.insert_slice %[[src]] into %[[dest]]
+  // CHECK:   flow.return %[[insert]]
+  // CHECK: }
+  // CHECK: return %[[region]]
+
+  // This op does not implement any interface for querying dynamic result dims.
+  // Generate a tensor.dim op.
+  %dest = "test.dummy_dest"() : () -> (tensor<4x?xf32>)
+  %src = "test.dummy_src"() : () -> (tensor<?x?xf32>)
+  %1 = tensor.insert_slice %src into %dest [5, 16] [%s1, %s2] [1, 1]
+      : tensor<?x?xf32> into tensor<4x?xf32>
+  return %1 : tensor<4x?xf32>
+}
+
+transform.with_pdl_patterns {
+^bb0(%arg0: !pdl.operation):
+  transform.sequence %arg0 : !pdl.operation failures(propagate) {
+  ^bb1(%arg1: !pdl.operation):
+    %0 = transform.structured.match ops{["tensor.insert_slice"]} in %arg1
+    %dispatch_op = transform.iree.wrap_in_dispatch_region %0
+  }
+}

@@ -27,7 +27,6 @@ cc_binary(
     srcs = ["iree-benchmark-module-main.cc"],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:cc",
         "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/hal",
@@ -36,7 +35,6 @@ cc_binary(
         "//runtime/src/iree/tooling:device_util",
         "//runtime/src/iree/tooling:vm_util_cc",
         "//runtime/src/iree/vm",
-        "//runtime/src/iree/vm:cc",
         "@com_google_benchmark//:benchmark",
     ],
 )
@@ -66,7 +64,6 @@ cc_binary(
     srcs = ["iree-check-module-main.cc"],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:cc",
         "//runtime/src/iree/base:core_headers",
         "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/base/internal:file_io",
@@ -75,6 +72,7 @@ cc_binary(
         "//runtime/src/iree/modules/check",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/tooling:context_util",
+        "//runtime/src/iree/tooling:device_util",
         "//runtime/src/iree/tooling:vm_util_cc",
         "//runtime/src/iree/vm",
         "//runtime/src/iree/vm:bytecode_module",
@@ -130,7 +128,6 @@ cc_binary(
         "//compiler/src/iree/compiler/Tools:init_passes_and_dialects",
         "//compiler/src/iree/compiler/Tools:init_targets",
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:cc",
         "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/hal",
@@ -140,7 +137,6 @@ cc_binary(
         "//runtime/src/iree/tooling:vm_util_cc",
         "//runtime/src/iree/vm",
         "//runtime/src/iree/vm:bytecode_module",
-        "//runtime/src/iree/vm:cc",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LLVMToLLVMIRTranslation",
@@ -156,16 +152,15 @@ cc_binary(
     srcs = ["iree-run-module-main.cc"],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:cc",
         "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/modules/hal:types",
         "//runtime/src/iree/tooling:comparison",
         "//runtime/src/iree/tooling:context_util",
+        "//runtime/src/iree/tooling:device_util",
         "//runtime/src/iree/tooling:vm_util_cc",
         "//runtime/src/iree/vm",
-        "//runtime/src/iree/vm:cc",
     ],
 )
 

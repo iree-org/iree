@@ -322,7 +322,7 @@ struct ConvertConstantLikeOp
     // Lower to MHLO constant if statically shaped.
     if (resultTy.hasStaticShape()) {
       rewriter.replaceOpWithNewOp<mhlo::ConstantOp>(
-          op, DenseElementsAttr::get(resultTy, op.value()));
+          op, DenseElementsAttr::get(resultTy, op.getValue()));
       return success();
     }
 
@@ -335,7 +335,7 @@ struct ConvertConstantLikeOp
 
     auto resultTy0D = RankedTensorType::get({}, resultTy.getElementType());
     Value scalarConst = rewriter.create<mhlo::ConstantOp>(
-        loc, DenseElementsAttr::get(resultTy0D, op.value()));
+        loc, DenseElementsAttr::get(resultTy0D, op.getValue()));
     Value broadcasted =
         broadcastScalar(rewriter, loc, scalarConst, resultExtents);
     rewriter.replaceOp(op, {broadcasted});
@@ -378,7 +378,8 @@ struct SimpleBinaryBroadcastingAdaptor : public BinaryBroadcastingAdaptor {
   }
   LogicalResult verifyBroadcastCompatibility(
       Operation *op, ArrayRef<Value> operands) override {
-    auto broadcastDimensions = llvm::cast<FromOpTy>(op).broadcast_dimensions();
+    auto broadcastDimensions =
+        llvm::cast<FromOpTy>(op).getBroadcastDimensions();
     if (broadcastDimensions &&
         !hlo::isLegalNumpyRankedBroadcast(operands[0], operands[1],
                                           *broadcastDimensions)) {
@@ -411,7 +412,7 @@ struct CompareBinaryBroadcastingAdaptor : public BinaryBroadcastingAdaptor {
   LogicalResult verifyBroadcastCompatibility(
       Operation *op, ArrayRef<Value> operands) override {
     auto broadcastDimensions =
-        llvm::cast<chlo::BroadcastCompareOp>(op).broadcast_dimensions();
+        llvm::cast<chlo::BroadcastCompareOp>(op).getBroadcastDimensions();
     if (broadcastDimensions &&
         !hlo::isLegalNumpyRankedBroadcast(operands[0], operands[1],
                                           *broadcastDimensions)) {
@@ -422,21 +423,21 @@ struct CompareBinaryBroadcastingAdaptor : public BinaryBroadcastingAdaptor {
   BroadcastValues getFromBroadcastValues(Operation *op,
                                          ArrayRef<Value> operands) override {
     chlo::BroadcastCompareOpAdaptor adaptor(operands, op->getAttrDictionary());
-    return std::make_pair(adaptor.lhs(), adaptor.rhs());
+    return std::make_pair(adaptor.getLhs(), adaptor.getRhs());
   }
   Operation *createTargetOperation(Location loc, Operation *op, Type resultType,
                                    ArrayRef<Value> operands,
                                    BroadcastValues broadcastValues,
                                    OpBuilder &builder) override {
     chlo::BroadcastCompareOpAdaptor adaptor(operands, op->getAttrDictionary());
-    Optional<chlo::ComparisonType> chloCmpType = adaptor.compare_type();
+    Optional<chlo::ComparisonType> chloCmpType = adaptor.getCompareType();
     mhlo::ComparisonTypeAttr mhloCmpType;
     if (chloCmpType)
       mhloCmpType = mhlo::ComparisonTypeAttr::get(
           builder.getContext(), *chlo::mhloComparisonType(*chloCmpType));
     return builder.create<mhlo::CompareOp>(
         loc, resultType, broadcastValues.first, broadcastValues.second,
-        *chlo::mhloComparisonDirection(adaptor.comparison_direction()),
+        *chlo::mhloComparisonDirection(adaptor.getComparisonDirection()),
         mhloCmpType);
   }
 };
@@ -609,9 +610,9 @@ struct ConvertSelectOp : public OpConversionPattern<chlo::BroadcastSelectOp> {
     Location loc = op.getLoc();
 
     // Only support ranked operands.
-    Value pred = adaptor.pred();
-    Value thenValue = adaptor.on_true();
-    Value elseValue = adaptor.on_false();
+    Value pred = adaptor.getPred();
+    Value thenValue = adaptor.getOnTrue();
+    Value elseValue = adaptor.getOnFalse();
     auto predType = pred.getType().dyn_cast<RankedTensorType>();
     auto thenType = thenValue.getType().dyn_cast<RankedTensorType>();
     auto elseType = elseValue.getType().dyn_cast<RankedTensorType>();

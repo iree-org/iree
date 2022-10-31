@@ -15,10 +15,10 @@ package(
 iree_compiler_cc_library(
     name = "TensorToFlow",
     srcs = [
-        "ConvertTensorToFlow.cpp",
+        "Patterns.cpp",
     ],
     hdrs = [
-        "ConvertTensorToFlow.h",
+        "Patterns.h",
     ],
     deps = [
         "//compiler/src/iree/compiler/Dialect/Flow/IR",

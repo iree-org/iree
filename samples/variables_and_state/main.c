@@ -121,8 +121,7 @@ iree_status_t run_sample(iree_string_view_t bytecode_module_path,
   fprintf(stdout, "Configuring IREE runtime instance and '%s' device\n",
           driver_name.data);
   iree_runtime_instance_options_t instance_options;
-  iree_runtime_instance_options_initialize(IREE_API_VERSION_LATEST,
-                                           &instance_options);
+  iree_runtime_instance_options_initialize(&instance_options);
   iree_runtime_instance_options_use_all_available_drivers(&instance_options);
   iree_runtime_instance_t* instance = NULL;
   if (iree_status_is_ok(status)) {

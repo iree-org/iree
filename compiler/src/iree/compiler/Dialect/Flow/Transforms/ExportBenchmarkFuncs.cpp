@@ -79,12 +79,12 @@ static IREE::Util::GlobalOp createBufferLikeGlobalOp(
   // hal.tensor.export
   auto bufferExportOp = initializerBuilder.create<IREE::HAL::TensorExportOp>(
       loc, globalOp.getType(), splatOp.getResult());
-  // util.do_not_optimize (try to prevent optimizations across the export)
-  auto dnoOp = initializerBuilder.create<IREE::Util::DoNotOptimizeOp>(
+  // util.optimization_barrier (try to prevent optimizations across the export)
+  auto barrierOp = initializerBuilder.create<IREE::Util::OptimizationBarrierOp>(
       loc, bufferExportOp.getTarget());
   // util.global.store
-  initializerBuilder.create<IREE::Util::GlobalStoreOp>(loc, dnoOp.getResult(0),
-                                                       globalOp.getName());
+  initializerBuilder.create<IREE::Util::GlobalStoreOp>(
+      loc, barrierOp.getResult(0), globalOp.getName());
   initializerBuilder.create<IREE::Util::InitializerReturnOp>(loc);
 
   return globalOp;
@@ -233,10 +233,10 @@ static LogicalResult createEntryPointBenchmarkFunc(
   }
   auto callOp = blockBuilder.create<mlir::func::CallOp>(loc, entryFuncOp, args);
 
-  // Sink all results with do_not_optimize to ensure that DCE does not
-  // remove the call.
+  // Sink all results with a barrier to ensure that DCE does not remove the
+  // call.
   for (auto result : callOp.getResults()) {
-    blockBuilder.create<IREE::Util::DoNotOptimizeOp>(loc, result);
+    blockBuilder.create<IREE::Util::OptimizationBarrierOp>(loc, result);
   }
   blockBuilder.create<mlir::func::ReturnOp>(loc);
 

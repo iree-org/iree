@@ -24,7 +24,6 @@ iree_lit_test_suite(
     "legalize.mlir"
     "linalg_transform.mlir"
     "nvvm_pipeline_test.mlir"
-    "reduce_bank_conflicts.mlir"
     "reduction_pipeline.mlir"
     "rocdl_pipeline_test.mlir"
     "tensor_alloc.mlir"

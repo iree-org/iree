@@ -612,6 +612,12 @@ void addCPUAArchDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
       createOptimizeVectorTransferPass(/*flatten=*/true));
 }
 
+void addCPUDataTilingPipeline(OpPassManager &passManager) {
+  addTileAndDistributePasses(passManager);
+  OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
+  addBufferizePasses(nestedModulePM);
+}
+
 void addCPUDefaultPassPipeline(OpPassManager &passManager) {
   addTileAndDistributePasses(passManager);
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
@@ -712,10 +718,11 @@ void buildLLVMCPULinkingPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<IREE::HAL::ExecutableOp>(
       mlir::createCanonicalizerPass());
 
-  // Assign final executable constant ordinals.
-  passManager.nest<IREE::HAL::ExecutableOp>()
-      .addNestedPass<IREE::HAL::ExecutableVariantOp>(
-          createLLVMCPUAssignConstantOrdinalsPass());
+  // Assign final executable constant and import ordinals.
+  auto &variantPM = passManager.nest<IREE::HAL::ExecutableOp>()
+                        .nest<IREE::HAL::ExecutableVariantOp>();
+  variantPM.addPass(createLLVMCPUAssignConstantOrdinalsPass());
+  variantPM.addPass(createLLVMCPUAssignImportOrdinalsPass());
 }
 
 }  // namespace iree_compiler

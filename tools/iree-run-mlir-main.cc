@@ -40,7 +40,6 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
-#include "iree/base/status_cc.h"
 #include "iree/base/tracing.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
@@ -55,7 +54,6 @@
 #include "iree/tooling/vm_util_cc.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
-#include "iree/vm/ref_cc.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -409,10 +407,14 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
                               default_device_uri.size()),
         iree_allocator_system(), &context, &device, &device_allocator));
 
+    IREE_RETURN_IF_ERROR(iree_hal_begin_profiling_from_flags(device));
+
     // Invoke the function and print results.
     IREE_RETURN_IF_ERROR(EvaluateFunction(context, device, device_allocator,
                                           function, function_name),
                          "evaluating export function %d", ordinal);
+
+    IREE_RETURN_IF_ERROR(iree_hal_end_profiling_from_flags(device));
 
     iree_vm_context_release(context);
     iree_hal_allocator_release(device_allocator);

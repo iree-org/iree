@@ -76,6 +76,39 @@ typedef struct iree_hal_device_info_t {
   iree_string_view_t name;
 } iree_hal_device_info_t;
 
+// Defines what information is captured during profiling.
+// Not all implementations will support all modes.
+enum iree_hal_device_profiling_mode_bits_t {
+  IREE_HAL_DEVICE_PROFILING_MODE_NONE = 0u,
+
+  // Capture queue operations such as command buffer submissions and the
+  // transfer/dispatch commands within them. This gives a high-level overview
+  // of HAL API usage with minimal overhead.
+  IREE_HAL_DEVICE_PROFILING_MODE_QUEUE_OPERATIONS = 1u << 0,
+
+  // Capture aggregated dispatch performance counters across all commands within
+  // the profiled range.
+  IREE_HAL_DEVICE_PROFILING_MODE_DISPATCH_COUNTERS = 1u << 1,
+
+  // Capture detailed executable performance counters correlated to source
+  // locations. This can have a significant performance impact and should only
+  // be used when investigating the performance of an individual dispatch.
+  IREE_HAL_DEVICE_PROFILING_MODE_EXECUTABLE_COUNTERS = 1u << 2,
+};
+typedef uint32_t iree_hal_device_profiling_mode_t;
+
+// Controls profiling options.
+typedef struct iree_hal_device_profiling_options_t {
+  // Defines what kind of profiling information is captured.
+  iree_hal_device_profiling_mode_t mode;
+
+  // A file system path where profile data will be written if supported by the
+  // profiling implementation. Depending on the tool this may be a template
+  // path/prefix for a unique per capture name or a full path that will be
+  // overwritten each capture.
+  const char* file_path;
+} iree_hal_device_profiling_options_t;
+
 // A transfer source or destination.
 typedef struct iree_hal_transfer_buffer_t {
   // A host-allocated void* buffer.
@@ -381,6 +414,39 @@ IREE_API_EXPORT iree_status_t iree_hal_device_wait_semaphores(
     iree_hal_device_t* device, iree_hal_wait_mode_t wait_mode,
     const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout);
 
+// Begins a profile capture on |device| with the given |options|.
+// This will use an implementation-defined profiling API to capture all
+// supported device operations until the iree_hal_device_profiling_end is
+// called. If the device or current build configuration do not support profiling
+// this method is a no-op. See implementation-specific device creation APIs and
+// driver module registration for more information.
+//
+// WARNING: the device must be idle before calling this method. Behavior is
+// undefined if there are any in-flight or pending queue operations or access
+// from another thread while profiling is starting/stopping.
+//
+// WARNING: profiling in any mode can dramatically increase overhead with some
+// modes being significantly more expensive in both host and device time enough
+// to invalidate performance numbers from other mechanisms (perf/tracy/etc).
+// When measuring end-to-end performance use only
+// IREE_HAL_DEVICE_PROFILING_MODE_QUEUE_OPERATIONS.
+//
+// Examples of APIs this maps to (where supported):
+// - CPU: perf_event_open/close or vendor APIs
+// - CUDA: cuProfilerStart/cuProfilerStop
+// - Direct3D: PIXBeginCapture/PIXEndCapture
+// - Metal: [MTLCaptureManager startCapture/stopCapture]
+// - Vulkan: vkAcquireProfilingLockKHR/vkReleaseProfilingLockKHR +
+//           RenderDoc StartFrameCapture/EndFrameCapture
+IREE_API_EXPORT iree_status_t iree_hal_device_profiling_begin(
+    iree_hal_device_t* device,
+    const iree_hal_device_profiling_options_t* options);
+
+// Ends a profile previous started with iree_hal_device_profiling_begin.
+// The device must be idle before calling this method.
+IREE_API_EXPORT iree_status_t
+iree_hal_device_profiling_end(iree_hal_device_t* device);
+
 //===----------------------------------------------------------------------===//
 // iree_hal_device_t implementation details
 //===----------------------------------------------------------------------===//
@@ -468,6 +534,11 @@ typedef struct iree_hal_device_vtable_t {
   iree_status_t(IREE_API_PTR* wait_semaphores)(
       iree_hal_device_t* device, iree_hal_wait_mode_t wait_mode,
       const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout);
+
+  iree_status_t(IREE_API_PTR* profiling_begin)(
+      iree_hal_device_t* device,
+      const iree_hal_device_profiling_options_t* options);
+  iree_status_t(IREE_API_PTR* profiling_end)(iree_hal_device_t* device);
 } iree_hal_device_vtable_t;
 IREE_HAL_ASSERT_VTABLE_LAYOUT(iree_hal_device_vtable_t);
 

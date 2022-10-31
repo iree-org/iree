@@ -96,7 +96,7 @@ void buildMHLOInputConversionPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<func::FuncOp>(
       mhlo::createLegalizeShapeComputationsPass());
   passManager.addNestedPass<func::FuncOp>(createConvertMHLOToLinalgExtPass());
-  passManager.addNestedPass<func::FuncOp>(createMHLOToLinalgOnTensorsPass());
+  passManager.addPass(createMHLOToLinalgOnTensorsPass());
   // Ensure conversion completed.
   passManager.addPass(createReconcileUnrealizedCastsPass());
 

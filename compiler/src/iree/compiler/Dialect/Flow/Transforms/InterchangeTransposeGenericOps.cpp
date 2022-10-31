@@ -39,7 +39,7 @@ struct TransposeGenericOpPattern : public OpRewritePattern<linalg::GenericOp> {
 
     Optional<AffineMap> mapForInterchange;
 
-    for (auto operand : genericOp.getInputOperands()) {
+    for (auto operand : genericOp.getDpsInputOperands()) {
       auto producer = operand->get().getDefiningOp<linalg::LinalgOp>();
       if (!producer) continue;
 

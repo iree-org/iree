@@ -35,6 +35,7 @@ iree_runtime_cc_library(
     hdrs = ["api.h"],
     deps = [
         ":task",
+        "//runtime/src/iree/base",
         "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/base/internal:flags",
     ],

@@ -69,6 +69,20 @@ class DeviceHalTest(unittest.TestCase):
     self.allocator.trim()
     # Just running is sufficient.
 
+  def testProfilingDefaults(self):
+    self.device.begin_profiling()
+    self.device.end_profiling()
+    # Just running is sufficient.
+
+  def testProfilingOptions(self):
+    self.device.begin_profiling(mode="queue", file_path="foo.rdc")
+    self.device.end_profiling()
+    # Just running is sufficient.
+
+  def testProfilingInvalidOptions(self):
+    with self.assertRaisesRegex(ValueError, "unrecognized profiling mode"):
+      self.device.begin_profiling(mode="SOMETHING THAT DOESN'T EXIST")
+
   def testStatistics(self):
     stats_dict = self.allocator.statistics
     stats_str = self.allocator.formatted_statistics

@@ -153,6 +153,7 @@ void buildGlobalOptimizationPassPipeline(
   // ops).
   pipeline.addPass(IREE::Util::createApplyPatternsPass());
   pipeline.addPass(IREE::Util::createFoldGlobalsPass());
+  pipeline.addPass(IREE::Util::createIPOPass());
 
   if (transformOptions.constExprHoisting) {
     pipeline.addPass(IREE::Util::createHoistIntoGlobalsPass());

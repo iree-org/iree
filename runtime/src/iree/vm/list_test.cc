@@ -13,7 +13,7 @@
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 #include "iree/vm/instance.h"
-#include "iree/vm/ref_cc.h"
+#include "iree/vm/ref.h"
 
 class A : public iree::vm::RefObject<A> {
  public:

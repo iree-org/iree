@@ -61,8 +61,8 @@ static iree_status_t iree_hal_local_task_driver_factory_try_create(
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_task_driver_create(
-        driver_name, &default_params, executor, loader_count, loaders,
-        device_allocator, host_allocator, out_driver);
+        driver_name, &default_params, /*queue_count=*/1, &executor,
+        loader_count, loaders, device_allocator, host_allocator, out_driver);
   }
 
   iree_hal_allocator_release(device_allocator);

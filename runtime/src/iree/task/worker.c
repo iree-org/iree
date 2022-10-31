@@ -28,6 +28,7 @@ iree_status_t iree_task_worker_initialize(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   out_worker->executor = executor;
+  out_worker->worker_index = executor->worker_base_index + worker_index;
   out_worker->worker_bit = iree_task_affinity_for_worker(worker_index);
   out_worker->ideal_thread_affinity = topology_group->ideal_thread_affinity;
   out_worker->constructive_sharing_mask =
@@ -182,8 +183,7 @@ static void iree_task_worker_execute(
     case IREE_TASK_TYPE_DISPATCH_SHARD: {
       iree_task_dispatch_shard_execute(
           (iree_task_dispatch_shard_t*)task, worker->processor_id,
-          iree_task_affinity_set_count_trailing_zeros(worker->worker_bit),
-          worker->local_memory, pending_submission);
+          worker->worker_index, worker->local_memory, pending_submission);
       break;
     }
     default:

@@ -203,16 +203,16 @@ func.func @scatter_dim_mismatch(
 
 func.func @scatter_dim_mismatch(
     %update : tensor<?x4xf32>, %indices : tensor<?x1xi32>,
-    %original : tensor<?x?xf32>) -> tensor<?x?xf32> {
-  // expected-error @+1 {{mismatch in shape of update value dim#1 and original value at dim#1}}
+    %original : tensor<?x3xf32>) -> tensor<?x3xf32> {
+  // expected-error @+1 {{op shape of update value dim#1 exceeds original value at dim#1}}
   %0 = iree_linalg_ext.scatter unique_indices(true)
     ins(%update, %indices : tensor<?x4xf32>, tensor<?x1xi32>)
-    outs(%original : tensor<?x?xf32>) {
+    outs(%original : tensor<?x3xf32>) {
     ^bb0(%arg1: f32, %arg2: f32):
       %1 = arith.addf %arg1, %arg2 : f32
       iree_linalg_ext.yield %1 : f32
-    } -> tensor<?x?xf32>
-  return %0 : tensor<?x?xf32>
+    } -> tensor<?x3xf32>
+  return %0 : tensor<?x3xf32>
 }
 
 // -----

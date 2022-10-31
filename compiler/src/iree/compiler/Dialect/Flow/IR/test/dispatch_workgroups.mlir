@@ -16,12 +16,12 @@ func.func @complexWorkgroupsUsage(
   // CHECK-SAME: ](%[[ARG0]], %[[ARG1]], %c128, %c128)
   // CHECK-SAME: : (tensor<?x4xf32>{%c128}, index, index, index) -> tensor<4x?xf32>{%c128} =
   %0 = flow.dispatch.workgroups[%x, %y](%arg0, %arg1, %c128, %c128) : (tensor<?x4xf32>{%c128}, index, index, index) -> tensor<4x?xf32>{%c128} =
-  // CHECK-NEXT: (%[[INNER_ARG0:.+]]: !flow.dispatch.tensor<readonly:?x4xf32>
+  // CHECK-NEXT: (%[[INNER_ARG0:.+]]: !flow.dispatch.tensor<readonly:tensor<?x4xf32>>
   // CHECK-SAME:  %[[INNER_ARG1:.+]]: index, %[[INNER_ARG0_DIM0:.+]]: index, %[[INNER_RET0_DIM1:.+]]: index,
-  // CHECK-SAME:  %[[INNER_RET0:.+]]: !flow.dispatch.tensor<writeonly:4x?xf32>) {
-  (%arg0_capture: !flow.dispatch.tensor<readonly:?x4xf32>,
+  // CHECK-SAME:  %[[INNER_RET0:.+]]: !flow.dispatch.tensor<writeonly:tensor<4x?xf32>>) {
+  (%arg0_capture: !flow.dispatch.tensor<readonly:tensor<?x4xf32>>,
    %arg1_capture: index, %arg0_dim0: index, %ret0_dim1: index,
-   %ret0: !flow.dispatch.tensor<writeonly:4x?xf32>) {
+   %ret0: !flow.dispatch.tensor<writeonly:tensor<4x?xf32>>) {
 
     // Query symbolic workgroup info:
 
@@ -40,8 +40,8 @@ func.func @complexWorkgroupsUsage(
 
     // Load tensors (optional offsets/sizes/strides):
 
-    // CHECK: %[[ARG0_VALUE:.+]] = flow.dispatch.tensor.load %[[INNER_ARG0]], {{.*}} : !flow.dispatch.tensor<readonly:?x4xf32>{%[[INNER_ARG0_DIM0]]} -> tensor<?x4xf32>
-    %arg0_value = flow.dispatch.tensor.load %arg0_capture, offsets=[0, 0], sizes=[%arg0_dim0, 4], strides=[1, 1] : !flow.dispatch.tensor<readonly:?x4xf32>{%arg0_dim0} -> tensor<?x4xf32>
+    // CHECK: %[[ARG0_VALUE:.+]] = flow.dispatch.tensor.load %[[INNER_ARG0]], {{.*}} : !flow.dispatch.tensor<readonly:tensor<?x4xf32>>{%[[INNER_ARG0_DIM0]]} -> tensor<?x4xf32>
+    %arg0_value = flow.dispatch.tensor.load %arg0_capture, offsets=[0, 0], sizes=[%arg0_dim0, 4], strides=[1, 1] : !flow.dispatch.tensor<readonly:tensor<?x4xf32>>{%arg0_dim0} -> tensor<?x4xf32>
 
     // Operate on tensors:
 
@@ -50,8 +50,8 @@ func.func @complexWorkgroupsUsage(
 
     // Store tensors (optional offsets/sizes/strides):
 
-    // CHECK: flow.dispatch.tensor.store %[[RET0_VALUE]], %[[INNER_RET0]], {{.*}} : tensor<4x?xf32> -> !flow.dispatch.tensor<writeonly:4x?xf32>{%[[INNER_RET0_DIM1]]}
-    flow.dispatch.tensor.store %ret0_value, %ret0, offsets=[0, 0], sizes=[4, %ret0_dim1], strides=[1, 1] : tensor<4x?xf32> -> !flow.dispatch.tensor<writeonly:4x?xf32>{%ret0_dim1}
+    // CHECK: flow.dispatch.tensor.store %[[RET0_VALUE]], %[[INNER_RET0]], {{.*}} : tensor<4x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<4x?xf32>>{%[[INNER_RET0_DIM1]]}
+    flow.dispatch.tensor.store %ret0_value, %ret0, offsets=[0, 0], sizes=[4, %ret0_dim1], strides=[1, 1] : tensor<4x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<4x?xf32>>{%ret0_dim1}
 
     // CHECK-NEXT: flow.return
     flow.return
@@ -78,13 +78,13 @@ func.func @inplaceDispatch(
   // CHECK-SAME: ](%[[ARG0]], %[[ARG1]])
   // CHECK-SAME: : (tensor<?x4xf32>{%c128}, index) -> %arg0{%c128} =
   %0 = flow.dispatch.workgroups[%x, %y](%arg0, %arg1) : (tensor<?x4xf32>{%c128}, index) -> %arg0{%c128} =
-  // CHECK-NEXT: (%[[INNER_ARG0:.+]]: !flow.dispatch.tensor<readwrite:?x4xf32>
+  // CHECK-NEXT: (%[[INNER_ARG0:.+]]: !flow.dispatch.tensor<readwrite:tensor<?x4xf32>>
   // CHECK-SAME:  %[[INNER_ARG1:.+]]: index) {
-  (%arg0_capture: !flow.dispatch.tensor<readwrite:?x4xf32>, %arg1_capture: index) {
-    // CHECK: %[[VALUE:.+]] = flow.dispatch.tensor.load %[[INNER_ARG0]], {{.*}} : !flow.dispatch.tensor<readwrite:?x4xf32>{%[[INNER_ARG1]]} -> tensor<?x4xf32>
-    %t = flow.dispatch.tensor.load %arg0_capture, offsets=[0, 0], sizes=[%arg1_capture, 4], strides=[1, 1] : !flow.dispatch.tensor<readwrite:?x4xf32>{%arg1_capture} -> tensor<?x4xf32>
-    // CHECK: flow.dispatch.tensor.store %[[VALUE]], %[[INNER_ARG0]], {{.*}}: tensor<?x4xf32> -> !flow.dispatch.tensor<readwrite:?x4xf32>{%[[INNER_ARG1]]}
-    flow.dispatch.tensor.store %t, %arg0_capture, offsets=[0, 0], sizes=[%arg1_capture, 4], strides=[1, 1] : tensor<?x4xf32> -> !flow.dispatch.tensor<readwrite:?x4xf32>{%arg1_capture}
+  (%arg0_capture: !flow.dispatch.tensor<readwrite:tensor<?x4xf32>>, %arg1_capture: index) {
+    // CHECK: %[[VALUE:.+]] = flow.dispatch.tensor.load %[[INNER_ARG0]], {{.*}} : !flow.dispatch.tensor<readwrite:tensor<?x4xf32>>{%[[INNER_ARG1]]} -> tensor<?x4xf32>
+    %t = flow.dispatch.tensor.load %arg0_capture, offsets=[0, 0], sizes=[%arg1_capture, 4], strides=[1, 1] : !flow.dispatch.tensor<readwrite:tensor<?x4xf32>>{%arg1_capture} -> tensor<?x4xf32>
+    // CHECK: flow.dispatch.tensor.store %[[VALUE]], %[[INNER_ARG0]], {{.*}}: tensor<?x4xf32> -> !flow.dispatch.tensor<readwrite:tensor<?x4xf32>>{%[[INNER_ARG1]]}
+    flow.dispatch.tensor.store %t, %arg0_capture, offsets=[0, 0], sizes=[%arg1_capture, 4], strides=[1, 1] : tensor<?x4xf32> -> !flow.dispatch.tensor<readwrite:tensor<?x4xf32>>{%arg1_capture}
     // CHECK-NEXT: flow.return
     flow.return
   }
@@ -105,8 +105,8 @@ func.func @dispatchWithCountRegion(%arg0: tensor<4xi32>) -> tensor<4xi32> {
   // CHECK-SAME: %[[WORKGROUP_COUNT_X]], %[[WORKGROUP_COUNT_Y]]
   // CHECK-SAME: ](%[[ARG0]]) : (tensor<4xi32>) -> %[[ARG0]] =
   %0 = flow.dispatch.workgroups[%x, %y](%arg0) : (tensor<4xi32>) -> %arg0 =
-  // CHECK-NEXT: (%{{.+}}: !flow.dispatch.tensor<readwrite:4xi32>) {
-  (%arg0_capture: !flow.dispatch.tensor<readwrite:4xi32>) {
+  // CHECK-NEXT: (%{{.+}}: !flow.dispatch.tensor<readwrite:tensor<4xi32>>) {
+  (%arg0_capture: !flow.dispatch.tensor<readwrite:tensor<4xi32>>) {
     // CHECK-NEXT: flow.return
     flow.return
   // CHECK-NEXT: count(%[[X_CAPTURE:.+]]: index, %[[Y_CAPTURE:.+]]: index)

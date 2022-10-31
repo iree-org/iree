@@ -28,8 +28,8 @@ func.func @layernorm() {
   %cst_2 = arith.constant dense<9.99999996E-13> : tensor<128x1xf32>
   %cst_3 = arith.constant dense<3.840000e+02> : tensor<128x1xf32>
   %cst_4 = arith.constant dense<5.000000e+00> : tensor<128x384xf32>
-  %0 = util.do_not_optimize(%cst_4) : tensor<128x384xf32>
-  %1 = util.do_not_optimize(%cst_3) : tensor<128x1xf32>
+  %0 = util.optimization_barrier %cst_4 : tensor<128x384xf32>
+  %1 = util.optimization_barrier %cst_3 : tensor<128x1xf32>
   %2 = tensor.empty() : tensor<128xf32>
   %3 = linalg.fill ins(%cst_0 : f32) outs(%2 : tensor<128xf32>) -> tensor<128xf32>
   %4 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>], iterator_types = ["parallel", "reduction"]} ins(%0 : tensor<128x384xf32>) outs(%3 : tensor<128xf32>) {
@@ -58,7 +58,7 @@ func.func @layernorm() {
     %16 = arith.addf %15, %arg1 : f32
     linalg.yield %16 : f32
   } -> tensor<128xf32>
-  %12 = util.do_not_optimize(%cst_2) : tensor<128x1xf32>
+  %12 = util.optimization_barrier %cst_2 : tensor<128x1xf32>
   %13 = tensor.collapse_shape %12 [[0, 1]] : tensor<128x1xf32> into tensor<128xf32>
   %14 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%9, %11, %7, %13 : tensor<128x384xf32>, tensor<128xf32>, tensor<128xf32>, tensor<128xf32>) outs(%8 : tensor<128x384xf32>) {
   ^bb0(%arg0: f32, %arg1: f32, %arg2: f32, %arg3: f32, %arg4: f32):

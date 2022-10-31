@@ -14,9 +14,9 @@ iree_cc_library(
   NAME
     HALToHAL
   HDRS
-    "ConvertHALToHAL.h"
+    "Patterns.h"
   SRCS
-    "ConvertHALToHAL.cpp"
+    "Patterns.cpp"
   DEPS
     MLIRIR
     MLIRTransforms

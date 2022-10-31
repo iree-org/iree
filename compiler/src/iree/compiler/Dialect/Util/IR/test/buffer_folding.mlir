@@ -70,6 +70,30 @@ func.func @FoldBufferSizeOp(%arg0: !util.buffer, %arg1: index) -> (index, i32) {
 
 // -----
 
+// CHECK-LABEL: @FoldNestedBufferSizeOp
+// CHECK-SAME: (%[[BUFFER:.+]]: !util.buffer)
+func.func @FoldNestedBufferSizeOp(%buffer: !util.buffer) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c128 = arith.constant 128 : index
+  // CHECK: scf.for
+  scf.for %i = %c0 to %c128 step %c1 {
+    // CHECK: %[[BUFFER_SIZE_INNER:.+]] = util.buffer.size %[[BUFFER]]
+    %buffer_size_inner = util.buffer.size %buffer : !util.buffer
+    // CHECK: util.buffer.load %[[BUFFER]]{{.+}} : !util.buffer{%[[BUFFER_SIZE_INNER]]}
+    %inner = util.buffer.load %buffer[%i] : !util.buffer{%buffer_size_inner} -> i8
+    util.optimization_barrier %inner : i8
+  }
+  // CHECK: %[[BUFFER_SIZE_OUTER:.+]] = util.buffer.size %[[BUFFER]]
+  %buffer_size_outer = util.buffer.size %buffer : !util.buffer
+  // CHECK: util.buffer.load %[[BUFFER]]{{.+}} : !util.buffer{%[[BUFFER_SIZE_OUTER]]}
+  %outer = util.buffer.load %buffer[%c128] : !util.buffer{%buffer_size_outer} -> i8
+  util.optimization_barrier %outer : i8
+  return
+}
+
+// -----
+
 // CHECK-LABEL: @FoldConstantBufferSizeOp
 func.func @FoldConstantBufferSizeOp() -> index {
   // CHECK-NOT: util.buffer.constant

@@ -17,6 +17,145 @@
 
 using namespace mlir;
 
+///
+/// Copied from usptream's OperationSupport.cpp until CSE improvements land.
+///
+static bool
+isRegionEquivalentTo(Region *lhs, Region *rhs,
+                     function_ref<LogicalResult(Value, Value)> mapOperands,
+                     function_ref<LogicalResult(Value, Value)> mapResults,
+                     OperationEquivalence::Flags flags);
+
+static bool OperationEquivalence__isEquivalentTo(
+    Operation *lhs, Operation *rhs,
+    function_ref<LogicalResult(Value, Value)> mapOperands,
+    function_ref<LogicalResult(Value, Value)> mapResults,
+    OperationEquivalence::Flags flags) {
+  if (lhs == rhs)
+    return true;
+
+  // Compare the operation properties.
+  if (lhs->getName() != rhs->getName() ||
+      lhs->getAttrDictionary() != rhs->getAttrDictionary() ||
+      lhs->getNumRegions() != rhs->getNumRegions() ||
+      lhs->getNumSuccessors() != rhs->getNumSuccessors() ||
+      lhs->getNumOperands() != rhs->getNumOperands() ||
+      lhs->getNumResults() != rhs->getNumResults())
+    return false;
+  if (!(flags & OperationEquivalence::IgnoreLocations) &&
+      lhs->getLoc() != rhs->getLoc())
+    return false;
+
+  ValueRange lhsOperands = lhs->getOperands(), rhsOperands = rhs->getOperands();
+  SmallVector<Value> lhsOperandStorage, rhsOperandStorage;
+  if (lhs->hasTrait<mlir::OpTrait::IsCommutative>()) {
+    auto sortValues = [](ValueRange values) {
+      SmallVector<Value> sortedValues = llvm::to_vector(values);
+      llvm::sort(sortedValues, [](Value a, Value b) {
+        auto aArg = a.dyn_cast<BlockArgument>();
+        auto bArg = b.dyn_cast<BlockArgument>();
+
+        // Case 1. Both `a` and `b` are `BlockArgument`s.
+        if (aArg && bArg) {
+          if (aArg.getParentBlock() == bArg.getParentBlock())
+            return aArg.getArgNumber() < bArg.getArgNumber();
+          return aArg.getParentBlock() < bArg.getParentBlock();
+        }
+
+        // Case 2. One of then is a `BlockArgument` and other is not. Treat
+        // `BlockArgument` as lesser.
+        if (aArg && !bArg)
+          return true;
+        if (bArg && !aArg)
+          return false;
+
+        // Case 3. Both are values.
+        return a.getAsOpaquePointer() < b.getAsOpaquePointer();
+      });
+      return sortedValues;
+    };
+    lhsOperandStorage = sortValues(lhsOperands);
+    lhsOperands = lhsOperandStorage;
+    rhsOperandStorage = sortValues(rhsOperands);
+    rhsOperands = rhsOperandStorage;
+  }
+  auto checkValueRangeMapping =
+      [](ValueRange lhs, ValueRange rhs,
+         function_ref<LogicalResult(Value, Value)> mapValues) {
+        for (auto operandPair : llvm::zip(lhs, rhs)) {
+          Value curArg = std::get<0>(operandPair);
+          Value otherArg = std::get<1>(operandPair);
+          if (curArg.getType() != otherArg.getType())
+            return false;
+          if (failed(mapValues(curArg, otherArg)))
+            return false;
+        }
+        return true;
+      };
+  // Check mapping of operands and results.
+  if (!checkValueRangeMapping(lhsOperands, rhsOperands, mapOperands))
+    return false;
+  if (!checkValueRangeMapping(lhs->getResults(), rhs->getResults(), mapResults))
+    return false;
+  for (auto regionPair : llvm::zip(lhs->getRegions(), rhs->getRegions()))
+    if (!isRegionEquivalentTo(&std::get<0>(regionPair),
+                              &std::get<1>(regionPair), mapOperands, mapResults,
+                              flags))
+      return false;
+  return true;
+}
+
+static bool
+isRegionEquivalentTo(Region *lhs, Region *rhs,
+                     function_ref<LogicalResult(Value, Value)> mapOperands,
+                     function_ref<LogicalResult(Value, Value)> mapResults,
+                     OperationEquivalence::Flags flags) {
+  DenseMap<Block *, Block *> blocksMap;
+  auto blocksEquivalent = [&](Block &lBlock, Block &rBlock) {
+    // Check block arguments.
+    if (lBlock.getNumArguments() != rBlock.getNumArguments())
+      return false;
+
+    // Map the two blocks.
+    auto insertion = blocksMap.insert({&lBlock, &rBlock});
+    if (insertion.first->getSecond() != &rBlock)
+      return false;
+
+    for (auto argPair :
+         llvm::zip(lBlock.getArguments(), rBlock.getArguments())) {
+      Value curArg = std::get<0>(argPair);
+      Value otherArg = std::get<1>(argPair);
+      if (curArg.getType() != otherArg.getType())
+        return false;
+      if (!(flags & OperationEquivalence::IgnoreLocations) &&
+          curArg.getLoc() != otherArg.getLoc())
+        return false;
+      // Check if this value was already mapped to another value.
+      if (failed(mapOperands(curArg, otherArg)))
+        return false;
+    }
+
+    auto opsEquivalent = [&](Operation &lOp, Operation &rOp) {
+      // Check for op equality (recursively).
+      if (!OperationEquivalence__isEquivalentTo(&lOp, &rOp, mapOperands,
+                                                mapResults, flags))
+        return false;
+      // Check successor mapping.
+      for (auto successorsPair :
+           llvm::zip(lOp.getSuccessors(), rOp.getSuccessors())) {
+        Block *curSuccessor = std::get<0>(successorsPair);
+        Block *otherSuccessor = std::get<1>(successorsPair);
+        auto insertion = blocksMap.insert({curSuccessor, otherSuccessor});
+        if (insertion.first->getSecond() != otherSuccessor)
+          return false;
+      }
+      return true;
+    };
+    return llvm::all_of_zip(lBlock, rBlock, opsEquivalent);
+  };
+  return llvm::all_of_zip(*lhs, *rhs, blocksEquivalent);
+}
+
 //===----------------------------------------------------------------------===//
 // BEGIN copied from mlir/lib/Transforms/CSE.cpp
 //===----------------------------------------------------------------------===//
@@ -37,39 +176,106 @@ struct SimpleOperationInfo : public llvm::DenseMapInfo<Operation *> {
     if (lhs == getTombstoneKey() || lhs == getEmptyKey() ||
         rhs == getTombstoneKey() || rhs == getEmptyKey())
       return false;
-    return OperationEquivalence::isEquivalentTo(
+
+    // If op has no regions, operation equivalence w.r.t operands alone is
+    // enough.
+    if (lhs->getNumRegions() == 0 && rhs->getNumRegions() == 0) {
+      return OperationEquivalence__isEquivalentTo(
+          const_cast<Operation *>(lhsC), const_cast<Operation *>(rhsC),
+          OperationEquivalence::exactValueMatch,
+          OperationEquivalence::ignoreValueEquivalence,
+          OperationEquivalence::IgnoreLocations);
+    }
+
+    // If lhs or rhs does not have a single region with a single block, they
+    // aren't CSEed for now.
+    if (lhs->getNumRegions() != 1 || rhs->getNumRegions() != 1 ||
+        !llvm::hasSingleElement(lhs->getRegion(0)) ||
+        !llvm::hasSingleElement(rhs->getRegion(0)))
+      return false;
+
+    // Compare the two blocks.
+    Block &lhsBlock = lhs->getRegion(0).front();
+    Block &rhsBlock = rhs->getRegion(0).front();
+
+    // Don't CSE if number of arguments differ.
+    if (lhsBlock.getNumArguments() != rhsBlock.getNumArguments())
+      return false;
+
+    // Map to store `Value`s from `lhsBlock` that are equivalent to `Value`s
+    // in `rhsBlock`. `Value`s from `lhsBlock` are the key.
+    DenseMap<Value, Value> areEquivalentValues;
+    for (auto bbArgs : llvm::zip(lhs->getRegion(0).getArguments(),
+                                 rhs->getRegion(0).getArguments())) {
+      areEquivalentValues[std::get<0>(bbArgs)] = std::get<1>(bbArgs);
+    }
+
+    // Helper function to get the parent operation.
+    auto getParent = [](Value v) -> Operation * {
+      if (auto blockArg = v.dyn_cast<BlockArgument>())
+        return blockArg.getParentBlock()->getParentOp();
+      return v.getDefiningOp()->getParentOp();
+    };
+
+    // Callback to compare if operands of ops in the region of `lhs` and `rhs`
+    // are equivalent.
+    auto mapOperands = [&](Value lhsValue, Value rhsValue) -> LogicalResult {
+      if (lhsValue == rhsValue)
+        return success();
+      if (areEquivalentValues.lookup(lhsValue) == rhsValue)
+        return success();
+      return failure();
+    };
+
+    // Callback to compare if results of ops in the region of `lhs` and `rhs`
+    // are equivalent.
+    auto mapResults = [&](Value lhsResult, Value rhsResult) -> LogicalResult {
+      if (getParent(lhsResult) == lhs && getParent(rhsResult) == rhs) {
+        auto insertion = areEquivalentValues.insert({lhsResult, rhsResult});
+        return success(insertion.first->second == rhsResult);
+      }
+      return success();
+    };
+
+    return OperationEquivalence__isEquivalentTo(
         const_cast<Operation *>(lhsC), const_cast<Operation *>(rhsC),
-        /*mapOperands=*/OperationEquivalence::exactValueMatch,
-        /*mapResults=*/OperationEquivalence::ignoreValueEquivalence,
-        OperationEquivalence::IgnoreLocations);
+        mapOperands, mapResults, OperationEquivalence::IgnoreLocations);
   }
 };
 } // namespace
 
 namespace {
 /// Simple common sub-expression elimination.
+//===----------------------------------------------------------------------===//
+// END copied from mlir/lib/Transforms/CSE.cpp
+//===----------------------------------------------------------------------===//
+/// Copy of CSE::runOnOperation, without the pass baggage.
+// struct CSE : public impl::CSEBase<CSE> {
 struct CSE {
-  /// Shared implementation of operation elimination and scoped map definitions.
+  //===----------------------------------------------------------------------===//
+  // BEGIN copied from mlir/lib/Transforms/CSE.cpp
+  //===----------------------------------------------------------------------===//
+  /// Shared implementation of operation elimination and scoped map
+  /// definitions.
   using AllocatorTy = llvm::RecyclingAllocator<
       llvm::BumpPtrAllocator,
       llvm::ScopedHashTableVal<Operation *, Operation *>>;
   using ScopedMapTy = llvm::ScopedHashTable<Operation *, Operation *,
                                             SimpleOperationInfo, AllocatorTy>;
 
-  //===----------------------------------------------------------------------===//
-  // END copied from mlir/lib/Transforms/CSE.cpp
-  //===----------------------------------------------------------------------===//
-  CSE(DominanceInfo *domInfo, RewriteListener *listener)
-      : domInfo(domInfo), listener(listener) {}
-  //===----------------------------------------------------------------------===//
-  // BEGIN copied from mlir/lib/Transforms/CSE.cpp
-  //===----------------------------------------------------------------------===//
+  /// Cache holding MemoryEffects information between two operations. The
+  /// first operation is stored has the key. The second operation is stored
+  /// inside a pair in the value. The pair also hold the MemoryEffects between
+  /// those two operations. If the MemoryEffects is nullptr then we assume
+  /// there is no operation with MemoryEffects::Write between the two
+  /// operations.
+  using MemEffectsCache =
+      DenseMap<Operation *, std::pair<Operation *, MemoryEffects::Effect *>>;
 
   /// Represents a single entry in the depth first traversal of a CFG.
   struct CFGStackNode {
     CFGStackNode(ScopedMapTy &knownValues, DominanceInfoNode *node)
-        : scope(knownValues), node(node), childIterator(node->begin()),
-          processed(false) {}
+        : scope(knownValues), node(node), childIterator(node->begin()) {}
 
     /// Scope for the known values.
     ScopedMapTy::ScopeTy scope;
@@ -78,7 +284,7 @@ struct CSE {
     DominanceInfoNode::const_iterator childIterator;
 
     /// If this node has been fully processed yet or not.
-    bool processed;
+    bool processed = false;
   };
 
   /// Attempt to eliminate a redundant operation. Returns success if the
@@ -87,26 +293,116 @@ struct CSE {
                                   bool hasSSADominance);
   void simplifyBlock(ScopedMapTy &knownValues, Block *bb, bool hasSSADominance);
   void simplifyRegion(ScopedMapTy &knownValues, Region &region);
-  /// Return the number of erased operations.
-  unsigned simplify(Operation *rootOp);
+
+  // void runOnOperation() override;
+  void doItOnOperation(Operation *rootOp, DominanceInfo *domInfo,
+                       RewriteListener *listener);
 
 private:
+  void replaceUsesAndDelete(ScopedMapTy &knownValues, Operation *op,
+                            Operation *existing, bool hasSSADominance);
+
+  /// Check if there is side-effecting operations other than the given effect
+  /// between the two operations.
+  bool hasOtherSideEffectingOpInBetween(Operation *fromOp, Operation *toOp);
+
   /// Operations marked as dead and to be erased.
   std::vector<Operation *> opsToErase;
-
-  /// The dominance info to use.
-  DominanceInfo *domInfo;
+  DominanceInfo *domInfo = nullptr;
+  MemEffectsCache memEffectsCache;
   //===----------------------------------------------------------------------===//
   // END copied from mlir/lib/Transforms/CSE.cpp
   //===----------------------------------------------------------------------===//
   /// An optional listener to notify of replaced or erased operations.
   RewriteListener *listener;
+  int64_t numDCE = 0, numCSE = 0;
   //===----------------------------------------------------------------------===//
   // BEGIN copied from mlir/lib/Transforms/CSE.cpp
   //===----------------------------------------------------------------------===//
 };
-
 } // namespace
+
+void CSE::replaceUsesAndDelete(ScopedMapTy &knownValues, Operation *op,
+                               Operation *existing, bool hasSSADominance) {
+  // If we find one then replace all uses of the current operation with the
+  // existing one and mark it for deletion. We can only replace an operand in
+  // an operation if it has not been visited yet.
+  if (hasSSADominance) {
+    // If the region has SSA dominance, then we are guaranteed to have not
+    // visited any use of the current operation.
+    //===----------------------------------------------------------------------===//
+    // END copied from mlir/lib/Transforms/CSE.cpp
+    //===----------------------------------------------------------------------===//
+    if (listener)
+      listener->notifyOperationReplaced(op, existing->getResults());
+    //===----------------------------------------------------------------------===//
+    // BEGIN copied from mlir/lib/Transforms/CSE.cpp
+    //===----------------------------------------------------------------------===//
+    op->replaceAllUsesWith(existing);
+    opsToErase.push_back(op);
+  } else {
+    // When the region does not have SSA dominance, we need to check if we
+    // have visited a use before replacing any use.
+    for (auto it : llvm::zip(op->getResults(), existing->getResults())) {
+      std::get<0>(it).replaceUsesWithIf(
+          std::get<1>(it), [&](OpOperand &operand) {
+            return !knownValues.count(operand.getOwner());
+          });
+    }
+
+    // There may be some remaining uses of the operation.
+    if (op->use_empty())
+      opsToErase.push_back(op);
+  }
+
+  // If the existing operation has an unknown location and the current
+  // operation doesn't, then set the existing op's location to that of the
+  // current op.
+  if (existing->getLoc().isa<UnknownLoc>() && !op->getLoc().isa<UnknownLoc>())
+    existing->setLoc(op->getLoc());
+
+  ++numCSE;
+}
+
+bool CSE::hasOtherSideEffectingOpInBetween(Operation *fromOp, Operation *toOp) {
+  assert(fromOp->getBlock() == toOp->getBlock());
+  assert(
+      isa<MemoryEffectOpInterface>(fromOp) &&
+      cast<MemoryEffectOpInterface>(fromOp).hasEffect<MemoryEffects::Read>() &&
+      isa<MemoryEffectOpInterface>(toOp) &&
+      cast<MemoryEffectOpInterface>(toOp).hasEffect<MemoryEffects::Read>());
+  Operation *nextOp = fromOp->getNextNode();
+  auto result =
+      memEffectsCache.try_emplace(fromOp, std::make_pair(fromOp, nullptr));
+  if (result.second) {
+    auto memEffectsCachePair = result.first->second;
+    if (memEffectsCachePair.second == nullptr) {
+      // No MemoryEffects::Write has been detected until the cached operation.
+      // Continue looking from the cached operation to toOp.
+      nextOp = memEffectsCachePair.first;
+    } else {
+      // MemoryEffects::Write has been detected before so there is no need to
+      // check further.
+      return true;
+    }
+  }
+  while (nextOp && nextOp != toOp) {
+    auto nextOpMemEffects = dyn_cast<MemoryEffectOpInterface>(nextOp);
+    // TODO: Do we need to handle other effects generically?
+    // If the operation does not implement the MemoryEffectOpInterface we
+    // conservatively assumes it writes.
+    if ((nextOpMemEffects &&
+         nextOpMemEffects.hasEffect<MemoryEffects::Write>()) ||
+        !nextOpMemEffects) {
+      result.first->second =
+          std::make_pair(nextOp, MemoryEffects::Write::get());
+      return true;
+    }
+    nextOp = nextOp->getNextNode();
+  }
+  result.first->second = std::make_pair(toOp, nullptr);
+  return false;
+}
 
 /// Attempt to eliminate a redundant operation.
 LogicalResult CSE::simplifyOperation(ScopedMapTy &knownValues, Operation *op,
@@ -118,61 +414,46 @@ LogicalResult CSE::simplifyOperation(ScopedMapTy &knownValues, Operation *op,
   // If the operation is already trivially dead just add it to the erase list.
   if (isOpTriviallyDead(op)) {
     opsToErase.push_back(op);
+    ++numDCE;
     return success();
   }
 
   // Don't simplify operations with nested blocks. We don't currently model
   // equality comparisons correctly among other things. It is also unclear
   // whether we would want to CSE such operations.
-  if (op->getNumRegions() != 0)
+  if (!(op->getNumRegions() == 0 ||
+        (op->getNumRegions() == 1 && llvm::hasSingleElement(op->getRegion(0)))))
     return failure();
 
-  // TODO: We currently only eliminate non side-effecting
-  // operations.
-  if (!MemoryEffectOpInterface::hasNoEffect(op))
+  // Some simple use case of operation with memory side-effect are dealt with
+  // here. Operations with no side-effect are done after.
+  if (!MemoryEffectOpInterface::hasNoEffect(op)) {
+    auto memEffects = dyn_cast<MemoryEffectOpInterface>(op);
+    // TODO: Only basic use case for operations with MemoryEffects::Read can
+    // be eleminated now. More work needs to be done for more complicated
+    // patterns and other side-effects.
+    if (!memEffects || !memEffects.onlyHasEffect<MemoryEffects::Read>())
+      return failure();
+
+    // Look for an existing definition for the operation.
+    if (auto *existing = knownValues.lookup(op)) {
+      if (existing->getBlock() == op->getBlock() &&
+          !hasOtherSideEffectingOpInBetween(existing, op)) {
+        // The operation that can be deleted has been reach with no
+        // side-effecting operations in between the existing operation and
+        // this one so we can remove the duplicate.
+        replaceUsesAndDelete(knownValues, op, existing, hasSSADominance);
+        return success();
+      }
+    }
+    knownValues.insert(op, op);
     return failure();
+  }
 
   // Look for an existing definition for the operation.
   if (auto *existing = knownValues.lookup(op)) {
-    // If we find one then replace all uses of the current operation with the
-    // existing one and mark it for deletion. We can only replace an operand in
-    // an operation if it has not been visited yet.
-    if (hasSSADominance) {
-      // If the region has SSA dominance, then we are guaranteed to have not
-      // visited any use of the current operation.
-      //===----------------------------------------------------------------------===//
-      // END copied from mlir/lib/Transforms/CSE.cpp
-      //===----------------------------------------------------------------------===//
-      if (listener)
-        listener->notifyOperationReplaced(op, existing->getResults());
-      //===----------------------------------------------------------------------===//
-      // BEGIN copied from mlir/lib/Transforms/CSE.cpp
-      //===----------------------------------------------------------------------===//
-      op->replaceAllUsesWith(existing);
-      opsToErase.push_back(op);
-    } else {
-      // When the region does not have SSA dominance, we need to check if we
-      // have visited a use before replacing any use.
-      for (auto it : llvm::zip(op->getResults(), existing->getResults())) {
-        std::get<0>(it).replaceUsesWithIf(
-            std::get<1>(it), [&](OpOperand &operand) {
-              return !knownValues.count(operand.getOwner());
-            });
-      }
-
-      // There may be some remaining uses of the operation.
-      if (op->use_empty())
-        opsToErase.push_back(op);
-    }
-
-    // If the existing operation has an unknown location and the current
-    // operation doesn't, then set the existing op's location to that of the
-    // current op.
-    if (existing->getLoc().isa<UnknownLoc>() &&
-        !op->getLoc().isa<UnknownLoc>()) {
-      existing->setLoc(op->getLoc());
-    }
-
+    replaceUsesAndDelete(knownValues, op, existing, hasSSADominance);
+    ++numCSE;
     return success();
   }
 
@@ -192,9 +473,9 @@ void CSE::simplifyBlock(ScopedMapTy &knownValues, Block *bb,
     if (op.getNumRegions() == 0)
       continue;
 
-    // If this operation is isolated above, we can't process nested regions with
-    // the given 'knownValues' map. This would cause the insertion of implicit
-    // captures in explicit capture only regions.
+    // If this operation is isolated above, we can't process nested regions
+    // with the given 'knownValues' map. This would cause the insertion of
+    // implicit captures in explicit capture only regions.
     if (op.mightHaveTrait<OpTrait::IsIsolatedFromAbove>()) {
       ScopedMapTy nestedKnownValues;
       for (auto &region : op.getRegions())
@@ -206,6 +487,8 @@ void CSE::simplifyBlock(ScopedMapTy &knownValues, Block *bb,
     for (auto &region : op.getRegions())
       simplifyRegion(knownValues, region);
   }
+  // Clear the MemoryEffects cache since its usage is by block only.
+  memEffectsCache.clear();
 }
 
 void CSE::simplifyRegion(ScopedMapTy &knownValues, Region &region) {
@@ -263,32 +546,29 @@ void CSE::simplifyRegion(ScopedMapTy &knownValues, Region &region) {
   }
 }
 
-unsigned CSE::simplify(Operation *rootOp) {
+//===----------------------------------------------------------------------===//
+// END copied from mlir/lib/Transforms/CSE.cpp
+//===----------------------------------------------------------------------===//
+
+/// Copy of CSE::runOnOperation, without the pass baggage.
+void CSE::doItOnOperation(Operation *rootOp, DominanceInfo *domInfo,
+                          RewriteListener *listener) {
   /// A scoped hash table of defining operations within a region.
   ScopedMapTy knownValues;
+  this->domInfo = domInfo;
+  this->listener = listener;
 
   for (auto &region : rootOp->getRegions())
     simplifyRegion(knownValues, region);
 
   /// Erase any operations that were marked as dead during simplification.
   for (auto *op : opsToErase) {
-    //===----------------------------------------------------------------------===//
-    // END copied from mlir/lib/Transforms/CSE.cpp
-    //===----------------------------------------------------------------------===//
     if (listener)
       listener->notifyOperationRemoved(op);
-    //===----------------------------------------------------------------------===//
-    // BEGIN copied from mlir/lib/Transforms/CSE.cpp
-    //===----------------------------------------------------------------------===//
     op->erase();
   }
-
-  return opsToErase.size();
+  opsToErase.clear();
 }
-
-//===----------------------------------------------------------------------===//
-// END copied from mlir/lib/Transforms/CSE.cpp
-//===----------------------------------------------------------------------===//
 
 /// Run CSE on the provided operation
 LogicalResult mlir::eliminateCommonSubexpressions(Operation *op,
@@ -296,14 +576,11 @@ LogicalResult mlir::eliminateCommonSubexpressions(Operation *op,
                                                   RewriteListener *listener) {
   assert(op->hasTrait<OpTrait::IsIsolatedFromAbove>() &&
          "can only do CSE on isolated-from-above ops");
-
   Optional<DominanceInfo> defaultDomInfo;
   if (domInfo == nullptr) {
     defaultDomInfo.emplace(op);
     domInfo = &*defaultDomInfo;
   }
-
-  CSE cse(domInfo, listener);
-  cse.simplify(op);
+  CSE().doItOnOperation(op, domInfo, listener);
   return success();
 }

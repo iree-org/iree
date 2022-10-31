@@ -54,29 +54,30 @@ class DispatchTensorType
  public:
   using ImplType = detail::DispatchTensorTypeStorage;
 
-  static constexpr int64_t kDynamicSize = -1;
-
   using Base::Base;
 
   /// Get or create a new DispatchTensorType of the provided shape and
   /// element type. Assumes the arguments define a well-formed
   /// DispatchTensorType.
   static DispatchTensorType get(TensorAccess access, ArrayRef<int64_t> shape,
-                                Type elementType);
+                                Type elementType, Attribute encoding = {});
 
-  static DispatchTensorType get(TensorAccess access, TensorType tensorType);
+  static DispatchTensorType get(TensorAccess access, Type type);
 
   static DispatchTensorType parse(AsmParser &parser);
 
   /// Returns the allowed operations the tensor.
   TensorAccess getAccess() const;
 
-  /// Return the element type.
-  Type getElementType() const;
+  /// Returns the bounded type.
+  Type getBoundType() const;
+
+  /// Return the element type of the bounded type.
+  Type getBoundElementType() const;
 
   /// If an element type is an integer or a float, return its width. Otherwise,
   /// abort.
-  unsigned getElementTypeBitWidth() const;
+  unsigned getBoundElementTypeBitWidth() const;
 
   /// If it has static shape, return the number of elements. Otherwise, abort.
   int64_t getNumElements() const;
@@ -115,15 +116,9 @@ class DispatchTensorType
   /// dimensions, given its `index` within the shape.
   unsigned getDynamicDimIndex(unsigned index) const;
 
-  /// Whether the given dimension size indicates a dynamic dimension.
-  static constexpr bool isDynamic(int64_t dSize) {
-    return dSize == kDynamicSize;
-  }
-
   /// Verify the construction of a tensor type.
   static LogicalResult verify(function_ref<InFlightDiagnostic()> emitError,
-                              uint32_t access, ArrayRef<int64_t> shape,
-                              Type elementType);
+                              uint32_t access, Type boundType);
 
   /// Returns true of the given type can be used as an element of a vector type.
   /// In particular, vectors can consist of integer or float primitives.
@@ -131,8 +126,12 @@ class DispatchTensorType
     return TensorType::isValidElementType(t);
   }
 
-  TensorType asTensorType() const {
-    return RankedTensorType::get(getShape(), getElementType());
+  RankedTensorType asRankedTensorType() const {
+    Type boundType = getBoundType();
+    if (boundType.isIntOrIndexOrFloat()) {
+      return RankedTensorType::get({}, boundType);
+    }
+    return boundType.cast<RankedTensorType>();
   }
 };
 
@@ -141,39 +140,25 @@ void printType(DispatchTensorType &type, DialectAsmPrinter &p);
 namespace detail {
 
 struct DispatchTensorTypeStorage : public TypeStorage {
-  DispatchTensorTypeStorage(uint32_t access, unsigned shapeSize, Type elementTy,
-                            const int64_t *shapeElements)
-      : access(access),
-        shapeElements(shapeElements),
-        shapeSize(shapeSize),
-        elementType(elementTy) {}
+  DispatchTensorTypeStorage(uint32_t access, Type boundType)
+      : access(access), boundType(boundType) {}
 
   /// The hash key used for uniquing.
-  using KeyTy = std::tuple<uint32_t, ArrayRef<int64_t>, Type>;
+  using KeyTy = std::tuple<uint32_t, Type>;
   bool operator==(const KeyTy &key) const {
-    return key == KeyTy(access, getShape(), elementType);
+    return key == KeyTy(access, boundType);
   }
 
   /// Construction.
   static DispatchTensorTypeStorage *construct(TypeStorageAllocator &allocator,
                                               const KeyTy &key) {
-    // Copy the shape into the bump pointer.
-    ArrayRef<int64_t> shape = allocator.copyInto(std::get<1>(key));
-
     // Initialize the memory using placement new.
     return new (allocator.allocate<DispatchTensorTypeStorage>())
-        DispatchTensorTypeStorage(std::get<0>(key), shape.size(),
-                                  std::get<2>(key), shape.data());
-  }
-
-  ArrayRef<int64_t> getShape() const {
-    return ArrayRef<int64_t>(shapeElements, shapeSize);
+        DispatchTensorTypeStorage(std::get<0>(key), std::get<1>(key));
   }
 
   uint32_t access;
-  const int64_t *shapeElements;
-  unsigned shapeSize;
-  Type elementType;
+  Type boundType;
 };
 
 }  // namespace detail

@@ -1,3 +1,1 @@
 # RUN: %PYTHON -m iree_tfl_tests.east_text_detector_test --artifacts_dir=%t
-# XFAIL: *
-# TODO(#10748): Disabled due to failure in `iree-import-tflite`.

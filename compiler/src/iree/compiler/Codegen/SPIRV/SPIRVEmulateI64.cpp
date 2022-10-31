@@ -184,7 +184,7 @@ struct SPIRVEmulateI64Pass final
         });
 
     RewritePatternSet patterns(ctx);
-    arith::populateWideIntEmulationPatterns(typeConverter, patterns);
+    arith::populateArithWideIntEmulationPatterns(typeConverter, patterns);
     populateMemrefEmulationPatterns(typeConverter, patterns);
     populateIreeI64EmulationPatterns(typeConverter, patterns);
 

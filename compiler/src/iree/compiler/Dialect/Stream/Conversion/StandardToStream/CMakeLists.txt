@@ -14,11 +14,11 @@ iree_cc_library(
   NAME
     StandardToStream
   HDRS
-    "ConvertStandardToStream.h"
+    "Patterns.h"
   SRCS
     "ConvertConstantOps.cpp"
-    "ConvertStandardToStream.cpp"
     "ConvertStructuralOps.cpp"
+    "Patterns.cpp"
   DEPS
     LLVMSupport
     MLIRArithDialect

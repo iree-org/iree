@@ -13,18 +13,18 @@ stream.executable private @deduplicateOperandsEx {
   builtin.module  {
     // CHECK: func.func @dispatch(%[[BINDING:.+]]: !stream.binding, %[[A01:.+]]: i32, %[[B0:.+]]: index, %[[C:.+]]: i1, %[[B1:.+]]: index)
     func.func @dispatch(%binding: !stream.binding, %a0: i32, %b0: index, %c: i1, %a1: i32, %b1: index) {
-      // CHECK-NEXT: util.do_not_optimize(%[[BINDING]]) : !stream.binding
-      util.do_not_optimize(%binding) : !stream.binding
-      // CHECK-NEXT: util.do_not_optimize(%[[A01]]) : i32
-      util.do_not_optimize(%a0) : i32
-      // CHECK-NEXT: util.do_not_optimize(%[[A01]]) : i32
-      util.do_not_optimize(%a1) : i32
-      // CHECK-NEXT: util.do_not_optimize(%[[B0]]) : index
-      util.do_not_optimize(%b0) : index
-      // CHECK-NEXT: util.do_not_optimize(%[[B1]]) : index
-      util.do_not_optimize(%b1) : index
-      // CHECK-NEXT: util.do_not_optimize(%[[C]]) : i1
-      util.do_not_optimize(%c) : i1
+      // CHECK-NEXT: util.optimization_barrier %[[BINDING]] : !stream.binding
+      util.optimization_barrier %binding : !stream.binding
+      // CHECK-NEXT: util.optimization_barrier %[[A01]] : i32
+      util.optimization_barrier %a0 : i32
+      // CHECK-NEXT: util.optimization_barrier %[[A01]] : i32
+      util.optimization_barrier %a1 : i32
+      // CHECK-NEXT: util.optimization_barrier %[[B0]] : index
+      util.optimization_barrier %b0 : index
+      // CHECK-NEXT: util.optimization_barrier %[[B1]] : index
+      util.optimization_barrier %b1 : index
+      // CHECK-NEXT: util.optimization_barrier %[[C]] : i1
+      util.optimization_barrier %c : i1
       return
     }
   }
@@ -63,14 +63,14 @@ stream.executable private @inlineConstantOperandsEx {
     // CHECK: func.func @dispatch(%[[BINDING:.+]]: !stream.binding, %[[A:.+]]: i32, %[[C:.+]]: i1)
     func.func @dispatch(%binding: !stream.binding, %a: i32, %b: index, %c: i1) {
       // CHECK: %[[B:.+]] = arith.constant 20 : index
-      // CHECK-NEXT: util.do_not_optimize(%[[BINDING]]) : !stream.binding
-      util.do_not_optimize(%binding) : !stream.binding
-      // CHECK-NEXT: util.do_not_optimize(%[[A]]) : i32
-      util.do_not_optimize(%a) : i32
-      // CHECK-NEXT: util.do_not_optimize(%[[B]]) : index
-      util.do_not_optimize(%b) : index
-      // CHECK-NEXT: util.do_not_optimize(%[[C]]) : i1
-      util.do_not_optimize(%c) : i1
+      // CHECK-NEXT: util.optimization_barrier %[[BINDING]] : !stream.binding
+      util.optimization_barrier %binding : !stream.binding
+      // CHECK-NEXT: util.optimization_barrier %[[A]] : i32
+      util.optimization_barrier %a : i32
+      // CHECK-NEXT: util.optimization_barrier %[[B]] : index
+      util.optimization_barrier %b : index
+      // CHECK-NEXT: util.optimization_barrier %[[C]] : i1
+      util.optimization_barrier %c : i1
       return
     }
   }

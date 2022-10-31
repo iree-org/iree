@@ -15,10 +15,10 @@ package(
 iree_compiler_cc_library(
     name = "FlowToStream",
     srcs = [
-        "ConvertFlowToStream.cpp",
+        "Patterns.cpp",
     ],
     hdrs = [
-        "ConvertFlowToStream.h",
+        "Patterns.h",
     ],
     deps = [
         "//compiler/src/iree/compiler/Dialect/Flow/IR",

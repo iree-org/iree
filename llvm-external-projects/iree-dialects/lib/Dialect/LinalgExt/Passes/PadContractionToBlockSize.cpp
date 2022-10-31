@@ -86,9 +86,9 @@ static bool padTensor(Location loc, OpOperand *operand,
   SmallVector<OpFoldResult> zeroStaticLow(shape.size(),
                                           builder.getI64IntegerAttr(0));
   SmallVector<Value> nullLow;
-  Value padded = tensor::createPadScalarOp(
-      resultType, operand->get(), zeroConstant, zeroStaticLow, newPaddingSizes,
-      false, loc, builder);
+  Value padded = builder.create<tensor::PadOp>(loc, resultType, operand->get(),
+                                               zeroStaticLow, newPaddingSizes,
+                                               zeroConstant);
   operand->set(padded);
   return true;
 }
@@ -105,9 +105,9 @@ struct PadContractionToBlockSizePass
     getOperation()->walk([&](linalg::ContractionOpInterface op) {
       auto linalgOp = llvm::cast<linalg::LinalgOp>(op.getOperation());
       Location loc = op.getLoc();
-      OpOperand *lhs = linalgOp.getInputOperand(0);
-      OpOperand *rhs = linalgOp.getInputOperand(1);
-      OpOperand *output = linalgOp.getOutputOperand(0);
+      OpOperand *lhs = linalgOp.getDpsInputOperand(0);
+      OpOperand *rhs = linalgOp.getDpsInputOperand(1);
+      OpOperand *output = linalgOp.getDpsInitOperand(0);
       Value origOutput = output->get();
       OpResult result = op.getOperation()->getResult(0);
 

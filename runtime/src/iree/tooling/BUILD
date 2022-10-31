@@ -46,14 +46,12 @@ cc_library(
         ":buffer_view_matchers",
         ":vm_util",
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:cc",
         "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/base/internal:span",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/modules/hal",
         "//runtime/src/iree/vm",
-        "//runtime/src/iree/vm:cc",
     ],
 )
 
@@ -69,7 +67,6 @@ cc_test(
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
         "//runtime/src/iree/vm",
-        "//runtime/src/iree/vm:cc",
     ],
 )
 
@@ -157,10 +154,9 @@ cc_library(
     deps = [
         ":vm_util",
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:cc",
         "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/base/internal:span",
-        "//runtime/src/iree/vm:cc",
+        "//runtime/src/iree/vm",
     ],
 )
 
@@ -176,7 +172,6 @@ cc_test(
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
         "//runtime/src/iree/vm",
-        "//runtime/src/iree/vm:cc",
     ],
 )
 

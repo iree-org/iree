@@ -14,9 +14,9 @@ iree_cc_library(
   NAME
     StreamToHALInline
   HDRS
-    "ConvertStreamToHALInline.h"
+    "Patterns.h"
   SRCS
-    "ConvertStreamToHALInline.cpp"
+    "Patterns.cpp"
   DEPS
     LLVMSupport
     MLIRArithDialect

@@ -87,7 +87,7 @@ static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
   bool isWorkgroupMemory = fromType.getMemorySpaceAsInt() == workgroupSpace ||
                            toType.getMemorySpaceAsInt() == workgroupSpace;
   if (isWorkgroupMemory) builder.create<gpu::BarrierOp>(loc);
-  Operation *copy = createLinalgCopyOp(builder, loc, from, to);
+  Operation *copy = builder.create<memref::CopyOp>(loc, from, to);
   if (isWorkgroupMemory) {
     setMarker(copy, getCopyToWorkgroupMemoryMarker());
     builder.create<gpu::BarrierOp>(loc);
@@ -187,8 +187,6 @@ static void addMemRefLoweringPasses(OpPassManager &pm) {
   // Turn multi-dimension memref into one-dimension. This is needed for SPIR-V
   // because we don't use upstream memref descriptors.
   pm.addPass(createFlattenMemRefSubspanPass());
-  // Flatten memref may expose more opportunities to fold subview ops.
-  pm.addPass(memref::createFoldMemRefAliasOpsPass());
 }
 
 /// Adds passes to perform the final SPIR-V conversion.
@@ -207,8 +205,12 @@ static void addSPIRVLoweringPasses(OpPassManager &pm, bool enableFastMath) {
 
   pm.addPass(createConvertToSPIRVPass(enableFastMath));
 
+  auto getTargetEnv = [](spirv::ModuleOp moduleOp) {
+    return getSPIRVTargetEnvAttr(moduleOp);
+  };
+
   OpPassManager &spirvPM = pm.nest<spirv::ModuleOp>();
-  spirvPM.addPass(spirv::createUnifyAliasedResourcePass());
+  spirvPM.addPass(spirv::createUnifyAliasedResourcePass(getTargetEnv));
   spirvPM.addPass(spirv::createLowerABIAttributesPass());
   spirvPM.addPass(createCanonicalizerPass());
   spirvPM.addPass(createCSEPass());
@@ -263,12 +265,26 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm) {
 
   addBufferizePasses(nestedModulePM, gpuAllocateWorkgroupMemoryFn);
 
+  // Tile to GPU workgroups and promote.
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createSPIRVTileAndPromotePass(/*skipThreadLevel=*/true));
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createRemoveSingleIterationLoopPass());
+  // Run canonicalization patterns to propagate constant shape sizes after
+  // removing trip-one loops.
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createGPUDistributeSharedMemoryCopy());
 
   // Tile and distribute to GPU subgroups and vectorize.
   nestedModulePM.addNestedPass<func::FuncOp>(
       createSPIRVTileAndVectorizeToCooperativeOpsPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createRemoveSingleIterationLoopPass());
+  // Run canonicalization patterns to propagate constant shape sizes after
+  // removing trip-one loops.
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
@@ -282,7 +298,8 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm) {
   nestedModulePM.addPass(memref::createFoldMemRefAliasOpsPass());
 
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createSPIRVVectorToCooperativeOpsPass());
+      createSPIRVVectorToGPUSubgroupMMAOpsPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorizePass());
 }
 
 void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm) {
@@ -298,6 +315,8 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm) {
       createGPUDistributeSharedMemoryCopy());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createGPUReduceSharedMemoryBankConflicts());
 
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
@@ -321,12 +340,12 @@ void addSPIRVBaseDistributePassPipeline(OpPassManager &pm) {
 
   addBufferizePasses(nestedModulePM, gpuAllocateWorkgroupMemoryFn);
 
-  nestedModulePM.addPass(createCanonicalizerPass());
-  nestedModulePM.addPass(createCSEPass());
-
   // Tile and distribute to GPU invocations.
   nestedModulePM.addNestedPass<func::FuncOp>(
       createSPIRVTileAndDistributePass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createGPUDistributeSharedMemoryCopy());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 

@@ -9,6 +9,7 @@
 
 #include <cstdint>
 
+#include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseMapInfo.h"
@@ -144,18 +145,6 @@ struct DescriptorSetBindingValue {
 
 // It's unfortunate this is required.
 namespace mlir {
-template <>
-struct FieldParser<mlir::iree_compiler::IREE::HAL::DescriptorType> {
-  static FailureOr<mlir::iree_compiler::IREE::HAL::DescriptorType> parse(
-      AsmParser &parser) {
-    std::string value;
-    if (parser.parseKeywordOrString(&value)) return failure();
-    auto result = mlir::iree_compiler::IREE::HAL::symbolizeEnum<
-        mlir::iree_compiler::IREE::HAL::DescriptorType>(value);
-    if (!result.has_value()) return failure();
-    return result.value();
-  }
-};
 static inline AsmPrinter &operator<<(
     AsmPrinter &printer, mlir::iree_compiler::IREE::HAL::DescriptorType param) {
   printer << mlir::iree_compiler::IREE::HAL::stringifyEnum(param);

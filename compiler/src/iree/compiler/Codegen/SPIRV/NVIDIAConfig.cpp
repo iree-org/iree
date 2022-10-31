@@ -14,20 +14,31 @@
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 
 #define DEBUG_TYPE "iree-spirv-nvidia-config"
 
+using llvm::APIntOps::GreatestCommonDivisor;
+
+// The default number of subgroups to use per workgroup.
+constexpr unsigned numSubgroupsPerWorkgroup = 4;
+// The default number of tiles along K dimension to use per workgroup.
+constexpr unsigned numKTilesPerWorkgroup = 2;
+
 namespace mlir {
 namespace iree_compiler {
 namespace detail {
 
 struct CooperativeMatrixSize {
-  int64_t m;
-  int64_t n;
-  int64_t k;
+  int64_t m;       // Native cooperative matrix size along M dimension
+  int64_t n;       // Native cooperative matrix size along N dimension
+  int64_t k;       // Native cooperative matrix size along K dimension
+  int64_t mCount;  // # subgroups along M dimension
+  int64_t nCount;  // # subgroups along N dimension
+  int64_t kCount;  // # tiles along K dimension
 };
 
 /// Returns the cooperative matrix (M, N, K) sizes that are supported by the
@@ -42,32 +53,75 @@ static Optional<CooperativeMatrixSize> getCooperativeMatrixSize(
         property.getCType() == resultType &&
         property.getResultType() == resultType &&
         property.getScope().getValue() == spirv::Scope::Subgroup) {
-      int matmulM = property.getMSize();
-      int matmulN = property.getNSize();
-      int matmulK = property.getKSize();
+      const unsigned matmulM = property.getMSize();
+      const unsigned matmulN = property.getNSize();
+      const unsigned matmulK = property.getKSize();
       if (m % matmulM == 0 && n % matmulN == 0 && k % matmulK == 0) {
-        return CooperativeMatrixSize{matmulM, matmulN, matmulK};
+        const uint64_t nTileCount = n / matmulN;
+        const uint64_t mTileCount = m / matmulM;
+        const APInt nTileCountAPInt(/*numBits=*/64, nTileCount);
+        const APInt mTileCountAPInt(/*numBits=*/64, mTileCount);
+
+        int64_t nCount = 0, mCount = 0;
+        uint64_t subgroupCount = numSubgroupsPerWorkgroup;
+        uint64_t squareRoot = 1u << (llvm::Log2_64(subgroupCount) / 2);
+
+        // See if the square root of subgroupCount can divide mTileCount. If so
+        // it means we can distribute to both dimensions evenly. Otherwise, try
+        // to distribute to N and then M.
+        if (mTileCount > squareRoot && mTileCount % squareRoot == 0) {
+          mCount = squareRoot;
+          APInt nGCD = GreatestCommonDivisor(
+              nTileCountAPInt, APInt(64, subgroupCount / squareRoot));
+          nCount = nGCD.getSExtValue();
+        } else {
+          APInt nGCD =
+              GreatestCommonDivisor(nTileCountAPInt, APInt(64, subgroupCount));
+          nCount = nGCD.getSExtValue();
+
+          subgroupCount /= nCount;
+          APInt mGCD =
+              GreatestCommonDivisor(mTileCountAPInt, APInt(64, subgroupCount));
+          mCount = mGCD.getSExtValue();
+        }
+
+        int64_t kCount = std::min<int64_t>(k / matmulK, numKTilesPerWorkgroup);
+
+        return CooperativeMatrixSize{matmulM, matmulN, matmulK,
+                                     mCount,  nCount,  kCount};
       }
     }
   }
   return llvm::None;
 }
 
-static LogicalResult setOpConfig(const spirv::TargetEnv &targetEnv,
-                                 linalg::MatmulOp op) {
+static LogicalResult setCooperativeMatrixConfig(
+    const spirv::TargetEnv &targetEnv, linalg::LinalgOp op) {
   // This configuration is only for cooperative matrix.
   if (!targetEnv.allows(spirv::Capability::CooperativeMatrixNV) ||
       !targetEnv.allows(spirv::Extension::SPV_NV_cooperative_matrix)) {
     return success();
   }
 
-  Value lhs = op.getInputs()[0], rhs = op.getInputs()[1],
-        init = op.getOutputs()[0];
+  if (!isa<linalg::BatchMatmulOp, linalg::MatmulOp>(*op)) return success();
 
-  ArrayRef<int64_t> lhsShape = lhs.getType().cast<ShapedType>().getShape();
-  ArrayRef<int64_t> rhsShape = rhs.getType().cast<ShapedType>().getShape();
-  if (llvm::any_of(lhsShape, ShapedType::isDynamic)) return success();
-  if (llvm::any_of(rhsShape, ShapedType::isDynamic)) return success();
+  if (op.hasDynamicShape()) return success();
+
+  Value lhs = op.getDpsInputOperand(0)->get();
+  Value rhs = op.getDpsInputOperand(1)->get();
+  Value init = op.getDpsInitOperand(0)->get();
+
+  int lastParallelDim = -1;
+  const auto [bIndex, mIndex, nIndex, kIndex] =
+      getMatmulBMNKIndex(op, &lastParallelDim);
+  if (mIndex < 0 || nIndex < 0 || kIndex < 0) return success();
+  const bool isBM = bIndex >= 0;
+
+  SmallVector<int64_t, 4> loopRanges = op.getStaticLoopRanges();
+
+  const int64_t dimM = loopRanges[mIndex];
+  const int64_t dimK = loopRanges[kIndex];
+  const int64_t dimN = loopRanges[nIndex];
 
   // TODO: Cooperative matrix support is fairly restricted. We can only have
   // a curated list of fused element wise ops as defined in the extension
@@ -78,32 +132,43 @@ static LogicalResult setOpConfig(const spirv::TargetEnv &targetEnv,
     return v.getType().cast<ShapedType>().getElementType();
   };
 
-  auto resourceLimits = targetEnv.getResourceLimits();
-  auto coopMatSize = getCooperativeMatrixSize(
+  spirv::ResourceLimitsAttr resourceLimits = targetEnv.getResourceLimits();
+  Optional<CooperativeMatrixSize> coopMatSize = getCooperativeMatrixSize(
       resourceLimits, getElementType(lhs), getElementType(rhs),
-      getElementType(init), lhsShape[0], rhsShape[1], lhsShape[1]);
+      getElementType(init), dimM, dimN, dimK);
   if (!coopMatSize) return success();
 
   auto pipeline = IREE::Codegen::DispatchLoweringPassPipeline::
       SPIRVCooperativeMatrixVectorize;
 
-  // For now only support one subgroup per workgroup because in the above
-  // configuration deduction step we only consider whether the input workload is
-  // perfectly divisible by some native cooperative matrix size.
-  //
-  // TODO: Use some heuristics to deduce how many subgroups should be used and
-  // the tile sizes for each subgroup, considering the input workload size and
-  // native cooperative matrix size choices.
-  int subgroupSize = resourceLimits.getSubgroupSize();
-  std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
+  std::array<int64_t, 3> workgroupSize{
+      coopMatSize->nCount * resourceLimits.getSubgroupSize(),
+      coopMatSize->mCount, 1};
+
+  SmallVector<int64_t> workgroupTileSizes(kIndex + 1, 0);
+  if (isBM) workgroupTileSizes[bIndex] = 1;
+  workgroupTileSizes[mIndex] = coopMatSize->mCount * coopMatSize->m;
+  workgroupTileSizes[nIndex] = coopMatSize->nCount * coopMatSize->n;
+  workgroupTileSizes[kIndex] = coopMatSize->kCount * coopMatSize->k;
+
+  SmallVector<int64_t> subgroupTileSizes(kIndex + 1, 0);
+  if (isBM) subgroupTileSizes[bIndex] = 1;
+  subgroupTileSizes[mIndex] = coopMatSize->m;
+  subgroupTileSizes[nIndex] = coopMatSize->n;
+  subgroupTileSizes[kIndex] = coopMatSize->k;
+
+  // Also create one level for reduction. This is needed because of
+  // SPIRVTileAndPromotePass requires it.
+  // TODO(#10499): Consolidate tiling configuration across different pipelines.
+  SmallVector<int64_t> reductionTileSizes;
+  reductionTileSizes.append(lastParallelDim + 1, 0);
+  reductionTileSizes.push_back(coopMatSize->kCount * coopMatSize->k);
 
   TileSizesListType tileSizes;
-  // Again because we only consider whether the input workload is perfectly
-  // divisible by some native cooperative matrix size, not some multiples of it,
-  // need to make sure the subgroup tile sizes are the same as the workgroup
-  // one.
-  tileSizes.push_back({coopMatSize->m, coopMatSize->n, coopMatSize->k});
-  tileSizes.push_back({coopMatSize->m, coopMatSize->n, coopMatSize->k});
+  tileSizes.reserve(3);
+  tileSizes.push_back(workgroupTileSizes);
+  tileSizes.push_back(subgroupTileSizes);
+  tileSizes.push_back(reductionTileSizes);
 
   return setOpConfigAndEntryPointFnTranslation(
       op->getParentOfType<func::FuncOp>(), op, tileSizes, pipeline,
@@ -111,11 +176,16 @@ static LogicalResult setOpConfig(const spirv::TargetEnv &targetEnv,
 }
 
 static LogicalResult setNVIDIAMatmulConfig(linalg::LinalgOp op,
-                                           spirv::ResourceLimitsAttr limits) {
+                                           const spirv::TargetEnv &targetEnv) {
+  // First try to see if we can use tensor cores.
+  spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
+  if (failed(setCooperativeMatrixConfig(targetEnv, op))) return failure();
+  if (getLoweringConfig(op)) return success();
+
   const int subgroupSize = limits.getSubgroupSize();
   const std::array<int64_t, 2> workgroupXY = {subgroupSize, 8};
   std::array<int64_t, 3> threadMNK;
-  auto inputType = op.getInputs()[0].getType().cast<ShapedType>();
+  auto inputType = op.getDpsInputOperand(0)->get().getType().cast<ShapedType>();
   if (inputType.getElementType().getIntOrFloatBitWidth() == 16) {
     threadMNK = {8, 8, 32};
   } else {
@@ -157,22 +227,14 @@ static LogicalResult setNVIDIAMatmulConfig(linalg::LinalgOp op,
 
 LogicalResult setNVIDIACodeGenConfig(const spirv::TargetEnv &targetEnv,
                                      Operation *rootOp) {
-  spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
-
-  // First try to see if we can use tensor cores.
-  if (auto matmulOp = dyn_cast<linalg::MatmulOp>(rootOp)) {
-    if (failed(setOpConfig(targetEnv, matmulOp))) return failure();
-    if (getLoweringConfig(rootOp)) return success();
-  }
-
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp)) {
     if (isMatmulOrBatchMatmul(linalgOp))
-      return setNVIDIAMatmulConfig(linalgOp, limits);
+      return setNVIDIAMatmulConfig(linalgOp, targetEnv);
   }
 
   return TypeSwitch<Operation *, LogicalResult>(rootOp)
       .Case<linalg::BatchMatmulOp, linalg::MatmulOp>(
-          [limits](auto op) { return setNVIDIAMatmulConfig(op, limits); })
+          [&](auto op) { return setNVIDIAMatmulConfig(op, targetEnv); })
       .Default([](Operation *) { return success(); });
 }
 

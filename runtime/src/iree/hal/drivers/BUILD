@@ -46,6 +46,7 @@ iree_runtime_cc_library(
     deps = [
                "//runtime/src/iree/base",
                "//runtime/src/iree/base:tracing",
+               "//runtime/src/iree/hal",
            ] + select({
                ":cuda_enabled": ["//runtime/src/iree/hal/drivers/cuda/registration"],
                "//conditions:default": [],

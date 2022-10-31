@@ -401,13 +401,29 @@ void excludeTiedOperandAndResultIndices(
 // IREE::Util::SizeAwareTypeInterface
 //===----------------------------------------------------------------------===//
 
+// Walks up the ancestors of |sourceBlock| until |targetBlock| is reached.
+// Returns an insertion point in the |targetBlock|.
+static std::pair<Block *, Block::iterator> findCommonBlockInsertionPoint(
+    Block *targetBlock, Block *sourceBlock,
+    Block::iterator sourceInsertionPoint) {
+  auto *ancestorOp = targetBlock->findAncestorOpInBlock(*sourceInsertionPoint);
+  if (ancestorOp) {
+    return std::make_pair(ancestorOp->getBlock(), Block::iterator(ancestorOp));
+  }
+  return std::make_pair(sourceBlock, sourceInsertionPoint);
+}
+
 bool isValueUsableForOp(Value value, Block *block,
                         Block::iterator insertionPoint) {
+  // If the insertion point is nested within an op in the defining block we can
+  // use the parent op as the insertion point to check.
+  auto *definingBlock = value.getParentBlock();
+  std::tie(block, insertionPoint) =
+      findCommonBlockInsertionPoint(definingBlock, block, insertionPoint);
   if (block == nullptr) {
     // Op is not in a block; can't analyze (maybe?).
     return false;
   }
-  auto *definingBlock = value.getParentBlock();
   if (definingBlock == block) {
     // Defined in the same block; ensure block order.
     if (value.isa<BlockArgument>()) return true;

@@ -272,22 +272,6 @@ def LinalgExtInterface : OpInterface<"LinalgExtOp"> {
         return result;
       }]
     >,
-    InterfaceMethod<
-      /*desc=*/[{
-        Return the result tied to `opOperand`.
-      }],
-      /*retTy=*/"OpResult",
-      /*methodName=*/"getTiedOpResult",
-      /*args=*/(ins "OpOperand*":$opOperand),
-      /*methodBody=*/"",
-      /*defaultImplementation=*/[{
-        assert(opOperand->getOwner() == this->getOperation());
-        int64_t resultIndex = opOperand->getOperandNumber() - getNumInputs();
-        assert(resultIndex >= 0 &&
-               resultIndex < this->getOperation()->getNumResults() );
-        return this->getOperation()->getResult(resultIndex);
-      }]
-    >,
     //===------------------------------------------------------------------===//
     // Input and Output arguments handling.
     //===------------------------------------------------------------------===//
@@ -375,19 +359,6 @@ def LinalgExtInterface : OpInterface<"LinalgExtOp"> {
         return {};
       }]
     >,
-    InterfaceMethod<
-      /*desc=*/[{
-        Return true if the `opOperand` is a scalar value.
-      }],
-      /*retTy=*/"bool",
-      /*methodName=*/"isScalar",
-      /*args=*/(ins "OpOperand*":$opOperand),
-      /*methodBody=*/"",
-      /*defaultImplementation=*/[{
-        assert(opOperand->getOwner() == this->getOperation());
-        return !opOperand->get().getType().template isa<ShapedType>();
-      }]
-    >,
     //===------------------------------------------------------------------===//
     // Non input and output operands handling
     //===------------------------------------------------------------------===//
@@ -413,91 +384,6 @@ def LinalgExtInterface : OpInterface<"LinalgExtOp"> {
           std::back_inserter(result),
           [](OpOperand &opOperand) {return &opOperand;});
         return result;
-      }]
-    >,
-    //===------------------------------------------------------------------===//
-    // Other interface methods.
-    //===------------------------------------------------------------------===//
-    InterfaceMethod<
-      /*desc=*/[{
-        Return whether the op has only MemRef input and outputs.
-      }],
-      /*retTy=*/"bool",
-      /*methodName=*/"hasBufferSemantics",
-      /*args=*/(ins),
-      /*methodBody=*/"",
-      /*defaultImplementation=*/[{
-        return this->getOperation()->getNumResults() == 0 &&
-          llvm::all_of(getInputOperands(), [&](OpOperand *opOperand) {
-            return isScalar(opOperand) ||
-              opOperand->get().getType().template isa<MemRefType>();
-          }) &&
-          llvm::all_of(getOutputOperands(), [](OpOperand *opOperand) {
-            return opOperand->get().getType().template isa<MemRefType>();
-          });
-      }]
-    >,
-    InterfaceMethod<
-      /*desc=*/[{
-        Return whether the op has only RankedTensor input and outputs.
-      }],
-      /*retTy=*/"bool",
-      /*methodName=*/"hasTensorSemantics",
-      /*args=*/(ins),
-      /*methodBody=*/"",
-      /*defaultImplementation=*/[{
-        return
-          llvm::all_of(getInputOperands(), [&](OpOperand *opOperand) {
-            return isScalar(opOperand) ||
-              opOperand->get().getType().template isa<RankedTensorType>();
-          }) &&
-          llvm::all_of(getOutputOperands(), [](OpOperand *opOperand) {
-            return opOperand->get().getType().template isa<RankedTensorType>();
-          });
-      }]
-    >,
-    //===------------------------------------------------------------------===//
-    // Other static interface methods.
-    //===------------------------------------------------------------------===//
-    InterfaceMethod<
-      /*desc=*/[{
-        Clone the current operation with the given location and operands. This
-        is used to abstract away the optional underlying region creation. This
-        does not change the balance between input, output_buffer and
-        init_tensors operands.
-      }],
-      /*retTy=*/"Operation *",
-      /*methodName=*/"clone",
-      (ins "OpBuilder &":$b, "Location":$loc, "TypeRange":$resultTypes,
-           "ValueRange":$operands),
-      [{
-        BlockAndValueMapping bvm;
-        OperationState state(
-          loc, ConcreteOp::getOperationName(), operands, resultTypes,
-          $_op->getAttrs());
-        for (Region &r : $_op->getRegions())
-          r.cloneInto(state.addRegion(), bvm);
-        return b.create(state);
-      }]
-    >,
-    InterfaceMethod<
-      /*desc=*/[{
-        Clone the current operation with the given location and operands but
-        leave the regions empty. This is used to abstract away the optional
-        underlying region creation. This does not change the balance between
-        input, output_buffer and init_tensors operands.
-      }],
-      /*retTy=*/"Operation *",
-      /*methodName=*/"cloneWithoutRegions",
-      (ins "OpBuilder &":$b, "Location":$loc, "TypeRange":$resultTypes,
-           "ValueRange":$operands),
-      [{
-        OperationState state(
-          loc, ConcreteOp::getOperationName(), operands, resultTypes,
-          $_op->getAttrs());
-        for (size_t cnt = 0, e = $_op->getNumRegions(); cnt < e; ++cnt)
-          state.addRegion();
-        return b.create(state);
       }]
     >
   ];

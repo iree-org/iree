@@ -213,8 +213,8 @@ func.func @dot_is_mul(%arg0: tensor<?x1xf16>, %arg1: tensor<1x?xf16>) -> tensor<
   // CHECK-DAG: %[[SZ:.+]] = "mhlo.concatenate"(%[[D0]], %[[D1]]) {dimension = 0 : i64}
   // CHECK-DAG: %[[L:.+]] = "mhlo.dynamic_broadcast_in_dim"(%arg0, %[[SZ]]) {broadcast_dimensions = dense<[0, 1]> : tensor<2xi64>}
   // CHECK-DAG: %[[R:.+]] = "mhlo.dynamic_broadcast_in_dim"(%arg1, %[[SZ]]) {broadcast_dimensions = dense<[0, 1]> : tensor<2xi64>}
-  // CHECK-DAG: %[[CL:.+]] = mhlo.convert(%[[L]]) : (tensor<?x?xf16>) -> tensor<?x?xf32>
-  // CHECK-DAG: %[[CR:.+]] = mhlo.convert(%[[R]]) : (tensor<?x?xf16>) -> tensor<?x?xf32>
+  // CHECK-DAG: %[[CL:.+]] = mhlo.convert %[[L]] : (tensor<?x?xf16>) -> tensor<?x?xf32>
+  // CHECK-DAG: %[[CR:.+]] = mhlo.convert %[[R]] : (tensor<?x?xf16>) -> tensor<?x?xf32>
   // CHECK: %[[RESULT:.+]] = mhlo.multiply %[[CL]], %[[CR]] : tensor<?x?xf32>
   %0 = "mhlo.dot"(%arg0, %arg1) {precision_config = [#mhlo<precision DEFAULT>, #mhlo<precision DEFAULT>]} : (tensor<?x1xf16>, tensor<1x?xf16>) -> tensor<?x?xf32>
   // CHECK: return %[[RESULT]]
@@ -256,8 +256,8 @@ func.func @dot_general_to_mul_cast(%arg0: tensor<4x17xf16>, %arg1: tensor<4x309x
   // CHECK: %[[RRESHAPE:.+]] = mhlo.dynamic_reshape %arg1, %[[RSHAPE]]
   // CHECK: %[[LBROAD:.+]] = "mhlo.dynamic_broadcast_in_dim"(%[[LRESHAPE]], %[[OSHAPE]]) {broadcast_dimensions = dense<[0, 1]> : tensor<2xi64>}
   // CHECK: %[[RBROAD:.+]] = "mhlo.dynamic_broadcast_in_dim"(%[[RRESHAPE]], %[[OSHAPE]]) {broadcast_dimensions = dense<[0, 2]> : tensor<2xi64>}
-  // CHECK: %[[L:.+]] = mhlo.convert(%[[LBROAD]]) : (tensor<4x17x309xf16>) -> tensor<4x17x309xf32>
-  // CHECK: %[[R:.+]] = mhlo.convert(%[[RBROAD]]) : (tensor<4x17x309xf16>) -> tensor<4x17x309xf32>
+  // CHECK: %[[L:.+]] = mhlo.convert %[[LBROAD]] : (tensor<4x17x309xf16>) -> tensor<4x17x309xf32>
+  // CHECK: %[[R:.+]] = mhlo.convert %[[RBROAD]] : (tensor<4x17x309xf16>) -> tensor<4x17x309xf32>
   // CHECK: %[[MUL:.+]] = mhlo.multiply %[[L]], %[[R]]
   %0 = "mhlo.dot_general"(%arg0, %arg1) {dot_dimension_numbers = #mhlo.dot<lhs_batching_dimensions = [0], rhs_batching_dimensions = [0]>} : (tensor<4x17xf16>, tensor<4x309xf16>) -> tensor<4x17x309xf32>
   // CHECK: return %[[MUL]]

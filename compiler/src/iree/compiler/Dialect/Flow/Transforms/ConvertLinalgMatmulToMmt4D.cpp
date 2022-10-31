@@ -189,9 +189,8 @@ static Value pad(Location loc, PatternRewriter &rewriter, Value input,
       RankedTensorType::get(resultTypeShape, elementType);
   Value padValue = rewriter.create<arith::ConstantOp>(
       loc, elementType, rewriter.getZeroAttr(elementType));
-  return tensor::createPadScalarOp(resultType, input, padValue, lowPadding,
-                                   highPadding,
-                                   /* nofold = */ false, loc, rewriter);
+  return rewriter.create<tensor::PadOp>(loc, resultType, input, lowPadding,
+                                        highPadding, padValue);
 }
 
 // Returns a top-left slice from |input| shaped like |likeWhat|.
@@ -254,9 +253,9 @@ class LinalgMatmulOpToLinalgMmt4DOpPattern
                                 PatternRewriter &rewriter) const override {
     Location loc = matmulOp.getLoc();
 
-    Value lhs = matmulOp.getInputOperand(0)->get();
-    Value rhs = matmulOp.getInputOperand(1)->get();
-    Value acc = matmulOp.getOutputOperand(0)->get();
+    Value lhs = matmulOp.getDpsInputOperand(0)->get();
+    Value rhs = matmulOp.getDpsInputOperand(1)->get();
+    Value acc = matmulOp.getDpsInitOperand(0)->get();
 
     // This transformation supports any mixing of static and dynamic dimensions,
     // with one exception: the dynamic-ness of each dimension of the accumulator
@@ -397,8 +396,8 @@ struct FoldFillGenericOpPattern : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
-    if (genericOp.getNumInputs() != 1) return failure();
-    if (genericOp.getNumOutputs() != 1) return failure();
+    if (genericOp.getNumDpsInputs() != 1) return failure();
+    if (genericOp.getNumDpsInits() != 1) return failure();
 
     // Check linalg.generic does have copy only semantics.
     if (genericOp.getNumParallelLoops() != genericOp.getNumLoops()) {

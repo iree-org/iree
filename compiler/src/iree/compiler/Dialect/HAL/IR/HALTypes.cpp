@@ -198,6 +198,20 @@ void DeviceTargetAttr::print(AsmPrinter &p) const {
   os << ">";
 }
 
+void DeviceTargetAttr::walkImmediateSubElements(
+    function_ref<void(Attribute)> walkAttrsFn,
+    function_ref<void(Type)> walkTypesFn) const {
+  if (auto configuration = getConfiguration()) {
+    walkAttrsFn(configuration);
+  }
+}
+
+Attribute DeviceTargetAttr::replaceImmediateSubElements(
+    ArrayRef<Attribute> replAttrs, ArrayRef<Type> replTypes) const {
+  return DeviceTargetAttr::get(getContext(), getDeviceID(),
+                               replAttrs[0].dyn_cast_or_null<DictionaryAttr>());
+}
+
 std::string DeviceTargetAttr::getSymbolNameFragment() {
   return sanitizeSymbolName(getDeviceID().getValue().lower());
 }
@@ -305,12 +319,110 @@ void ExecutableTargetAttr::print(AsmPrinter &p) const {
   os << ">";
 }
 
+void ExecutableTargetAttr::walkImmediateSubElements(
+    function_ref<void(Attribute)> walkAttrsFn,
+    function_ref<void(Type)> walkTypesFn) const {
+  if (auto configuration = getConfiguration()) {
+    walkAttrsFn(configuration);
+  }
+}
+
+Attribute ExecutableTargetAttr::replaceImmediateSubElements(
+    ArrayRef<Attribute> replAttrs, ArrayRef<Type> replTypes) const {
+  return ExecutableTargetAttr::get(
+      getContext(), getBackend(), getFormat(),
+      replAttrs[0].dyn_cast_or_null<DictionaryAttr>());
+}
+
 std::string ExecutableTargetAttr::getSymbolNameFragment() {
   return sanitizeSymbolName(getFormat().getValue().lower());
 }
 
 Attribute ExecutableTargetAttr::getMatchExpression() {
   return DeviceMatchExecutableFormatAttr::get(getContext(), getFormat());
+}
+
+//===----------------------------------------------------------------------===//
+// #hal.affinity.queue
+//===----------------------------------------------------------------------===//
+
+// static
+Attribute AffinityQueueAttr::parse(AsmParser &p, Type type) {
+  int64_t mask = 0;
+  // `<`
+  if (failed(p.parseLess())) return {};
+  // `*` (any)
+  if (succeeded(p.parseOptionalStar())) {
+    mask = -1;
+  } else {
+    // `[`queue_bit[, ...] `]`
+    if (failed(p.parseCommaSeparatedList(AsmParser::Delimiter::Square, [&]() {
+          int64_t i = 0;
+          if (failed(p.parseInteger(i))) return failure();
+          mask |= 1ll << i;
+          return success();
+        }))) {
+      return {};
+    }
+  }
+  // `>`
+  if (failed(p.parseGreater())) return {};
+  return get(p.getContext(), mask);
+}
+
+void AffinityQueueAttr::print(AsmPrinter &p) const {
+  auto &os = p.getStream();
+  os << "<";
+  int64_t mask = getMask();
+  if (mask == -1) {
+    os << "*";
+  } else {
+    os << "[";
+    for (int i = 0, j = 0; i < sizeof(mask) * 8; ++i) {
+      if (mask & (1ll << i)) {
+        if (j++ > 0) os << ", ";
+        os << i;
+      }
+    }
+    os << "]";
+  }
+  os << ">";
+}
+
+bool AffinityQueueAttr::isExecutableWith(
+    IREE::Stream::AffinityAttr other) const {
+  if (!other) return true;
+  // Only compatible with other queue affinities today. When we extend the
+  // attributes to specify device targets we'd want to check here.
+  auto otherQueueAttr = other.dyn_cast_or_null<AffinityQueueAttr>();
+  if (!otherQueueAttr) return false;
+  // If this affinity is a subset of the target affinity then it can execute
+  // with it.
+  if ((getMask() & otherQueueAttr.getMask()) == getMask()) return true;
+  // Otherwise not compatible.
+  return false;
+}
+
+IREE::Stream::AffinityAttr AffinityQueueAttr::joinOR(
+    IREE::Stream::AffinityAttr other) const {
+  if (!other) return *this;
+  if (!IREE::Stream::AffinityAttr::canExecuteTogether(*this, other)) {
+    return nullptr;
+  }
+  auto otherQueueAttr = other.dyn_cast_or_null<AffinityQueueAttr>();
+  return AffinityQueueAttr::get(getContext(),
+                                getMask() | otherQueueAttr.getMask());
+}
+
+IREE::Stream::AffinityAttr AffinityQueueAttr::joinAND(
+    IREE::Stream::AffinityAttr other) const {
+  if (!other) return *this;
+  if (!IREE::Stream::AffinityAttr::canExecuteTogether(*this, other)) {
+    return nullptr;
+  }
+  auto otherQueueAttr = other.dyn_cast_or_null<AffinityQueueAttr>();
+  return AffinityQueueAttr::get(getContext(),
+                                getMask() & otherQueueAttr.getMask());
 }
 
 //===----------------------------------------------------------------------===//
@@ -360,6 +472,17 @@ void MatchAnyAttr::print(AsmPrinter &p) const {
   printMultiMatchAttrList(getConditions(), p);
 }
 
+void MatchAnyAttr::walkImmediateSubElements(
+    function_ref<void(Attribute)> walkAttrsFn,
+    function_ref<void(Type)> walkTypesFn) const {
+  walkAttrsFn(getConditions());
+}
+
+Attribute MatchAnyAttr::replaceImmediateSubElements(
+    ArrayRef<Attribute> replAttrs, ArrayRef<Type> replTypes) const {
+  return MatchAnyAttr::get(getContext(), replAttrs[0].cast<ArrayAttr>());
+}
+
 Value MatchAnyAttr::buildConditionExpression(Location loc, Value value,
                                              OpBuilder builder) const {
   // #hal.match.any<[a, b, c]> -> or(or(a, b), c)
@@ -387,6 +510,17 @@ Attribute MatchAllAttr::parse(AsmParser &p, Type type) {
 
 void MatchAllAttr::print(AsmPrinter &p) const {
   printMultiMatchAttrList(getConditions(), p);
+}
+
+void MatchAllAttr::walkImmediateSubElements(
+    function_ref<void(Attribute)> walkAttrsFn,
+    function_ref<void(Type)> walkTypesFn) const {
+  walkAttrsFn(getConditions());
+}
+
+Attribute MatchAllAttr::replaceImmediateSubElements(
+    ArrayRef<Attribute> replAttrs, ArrayRef<Type> replTypes) const {
+  return MatchAllAttr::get(getContext(), replAttrs[0].cast<ArrayAttr>());
 }
 
 Value MatchAllAttr::buildConditionExpression(Location loc, Value value,

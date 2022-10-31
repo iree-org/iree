@@ -3,74 +3,91 @@
 // Codegen
 transform.structured.canonicalized_sequence failures(propagate) {
 ^bb1(%variant_op: !pdl.operation):
-  // First level of tiling + fusion parallelizes to blocks.
-  // The mapping  to block ids can only happen after bufferization atm
-  %root = transform.structured.match interface{LinalgOp}
-    attributes{iterator_types = ["parallel", "parallel", "parallel"]} in %variant_op
-  %fill = transform.structured.match ops{["linalg.fill"]} in %variant_op
-  %red = transform.structured.match interface{LinalgOp}
-    attributes{iterator_types = ["parallel", "parallel", "reduction"]} in %variant_op
-  %not_root = merge_handles %fill, %red
-  %foreach_thread, %tiled_generic =
-    transform.iree.tile_to_foreach_thread_and_workgroup_count_region %root tile_sizes [1, 4]
-  transform.structured.fuse_into_containing_op %not_root into %foreach_thread
-  
-  // Second level of tiling + fusion parallelizes to threads.
+  %ops = transform.structured.match ops{["linalg.fill", "linalg.generic"]}
+    in %variant_op
+  %input_max_fill,
+  %input_max,
+  %exps_sum_fill,
+  %exps,
+  %exps_sum,
+  %div = transform.split_handles %ops in [6]
+    : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation,
+                           !pdl.operation, !pdl.operation, !pdl.operation)
+
+  // Step 1. First level of tiling + fusion parallelizes to blocks.
+  // ==============================================================
+  // This must be used with the custom dispatch region formation because IREE's
+  // does not fuse even with --iree-flow-enable-aggressive-fusion.
+  // %foreach_thread, %_ =
+  // transform.iree.tile_to_foreach_thread_and_workgroup_count_region %div tile_sizes [1, 4]
+  //   (mapped to dims [0, 1, 2])
+  %foreach_thread, %_ =
+    transform.structured.tile_to_foreach_thread_op %div tile_sizes [1, 4]
+      (mapped to dims [0, 1, 2])
+  // TODO: Merging and fusing merged handles does not work properly atm.
+  transform.structured.fuse_into_containing_op %exps_sum into %foreach_thread
+  transform.structured.fuse_into_containing_op %exps into %foreach_thread
+  transform.structured.fuse_into_containing_op %exps_sum_fill into %foreach_thread
+  transform.structured.fuse_into_containing_op %input_max into %foreach_thread
+  transform.structured.fuse_into_containing_op %input_max_fill into %foreach_thread
+  // By default, fusion into scf.foreach_thread does not promote captured values
+  // to shared as this involves a cross-thread dependence analysis.
+  // Instead, we activate it explicitly post-hoc to promote all the extract_slice
+  // ops that we find and match the prerequisites
+  %func = transform.structured.match ops{["func.func"]} in %variant_op
+  %funcx = transform.iree.apply_patterns %func { promote_foreach_thread_capture_to_shared }
+ 
+  // Step 2. Second level of tiling + fusion parallelizes to threads.
+  // ================================================================
+  %tiled_ops = transform.structured.match ops{["linalg.fill", "linalg.generic"]}
+    in %variant_op
+  %tiled_input_max_fill,
+  %tiled_input_max,
+  %tiled_exps_sum_fill,
+  %tiled_exp_and_exps_sum,
+  %tiled_exp_and_exps_sum_2,
+  %tiled_div = transform.split_handles %tiled_ops in [6]
+    : (!pdl.operation) -> (!pdl.operation, !pdl.operation, !pdl.operation,
+                           !pdl.operation, !pdl.operation, !pdl.operation)
   // Leaving the reduction untiled on threadIdx.x makes it sequential on
-  // threadIdx.x. After distribution, predication by if (threadIdx.x == 0) is
+  // threadIdx.x. After distribution, predication by `if (threadIdx.x == 0)` is
   // introduced and opportunities for distributing vector ops across warps
   // appear.
-  %fill_linalg = transform.structured.match ops{["linalg.fill"]} in %variant_op
-  %reduction_linalg = transform.structured.match ops{["linalg.generic"]}
-    attributes{iterator_types = ["parallel", "parallel", "reduction"]} in %variant_op
-  %parallel_linalg = transform.structured.match ops{["linalg.generic"]}
-    attributes{iterator_types = ["parallel", "parallel", "parallel"]} in %variant_op
-  %foreach_thread_reduction, %tiled_reduction_generic =
-    transform.structured.tile_to_foreach_thread_op %reduction_linalg tile_sizes [1, 1]
+  %reduction_linalg_ops = transform.merge_handles %tiled_input_max,
+                                                  %tiled_exp_and_exps_sum,
+                                                  %tiled_exp_and_exps_sum_2
+    : !pdl.operation
+  transform.structured.tile_to_foreach_thread_op %reduction_linalg_ops tile_sizes [1, 1]
+    (mapped to dims [2, 1, 0])
+  // Fully parallel ops are tiled and mapped.
+  %parallel_linalg_ops = transform.merge_handles %tiled_input_max_fill,
+                                                 %tiled_exps_sum_fill,
+                                                 %tiled_div
+    : !pdl.operation
+  transform.structured.tile_to_foreach_thread_op %parallel_linalg_ops num_threads [1, 4, 32]
       (mapped to dims [2, 1, 0])
-  // TODO: this fusion currently does not happen properly, this is related to the clone
-  // behavior when fusing into scf.foreach_thread.
-  // Once fixed we'll be able to fuse.
-  // Fusion will save us one roundtrip to memory.
-  // transform.structured.fuse_into_containing_op %fill_linalg into %foreach_thread_reduction
-  transform.structured.tile_to_foreach_thread_op %parallel_linalg num_threads [1, 4, 32]
-      (mapped to dims [2, 1, 0])
+     
+  // Step 3. Rank-reduce and vectorize.
+  // ==================================
+  %funcx_2 = transform.structured.match ops{["func.func"]} in %variant_op
+  %funcx_3 = transform.iree.apply_patterns %funcx_2 { rank_reducing }
+  transform.structured.vectorize %funcx_3
 
-
-  // Inability to tile reductions to scf.foreach_thread has 2 implications:
-  //   1. since no scf.foreach_thread is present, no gpu.barrier is added.
-  //      This should be fixed independently: ops that are not nested in an scf.foreach_thread
-  //      should have a gpu.barrier. Later needs to be complemented by a barrier
-  //      removal pass.
-  //   2. Similarly, needs to be predicated under an if threadIx == 0 to avoid
-  //      multiple threads updating the buffer inplace once bufferized.
-  //
-  // Instead, we can vectorize and go to vector SSA values that sidestep these
-  // issues.
-  // Everyone will race to the write while still computing the same value.
-  //
-  // That is still not good enough because we need to predicate this in order
-  // to enable the parallel reduction on warps.
-  %func = transform.structured.match ops{["func.func"]} in %variant_op
-  %funcx = transform.iree.apply_patterns %func { rank_reducing }
-  transform.structured.vectorize %funcx
-
-  // Bufferization is necessary for:
-  //   1. lowering scf.foreach_thread to workgroup (block level parallelism)
-  //   2. lowering scf.foreach_thread to gpu (thread level parallelism)
-  //   3. introducing predication (due to 1. + 2.) which enables rewriting to
-  //      warp_execute_on_lane_0 and later vector distribution.
+  // Step 4. Bufferize.
+  // ==================
   %variant_op_2 = transform.iree.bufferize { target_gpu } %variant_op
 
+  // Step 5. Post-bufferization mapping to blocks and threads.
+  // =========================================================
   %func_2 = transform.structured.match ops{["func.func"]} in %variant_op_2
   %func_3 = transform.iree.foreach_thread_to_workgroup %func_2
   transform.iree.map_nested_foreach_thread_to_gpu_threads %func_3
     { workgroup_size = [32, 4, 1] }
 
+  // Step 6. Post-bufferization vector distribution with rank-reduction.
+  // ===================================================================
   %end_func = transform.structured.match ops{["func.func"]} in %variant_op_2
   %end_func_2 = transform.iree.apply_patterns %end_func { rank_reducing }
-
-  // Vector distribution needs to happen on buffers.
   %if_op = transform.structured.match ops{["scf.if"]} in %variant_op_2
   %warp = transform.iree.vector.to_warp_execute_on_lane_0 %if_op { warp_size = 32 }
   transform.iree.vector.warp_distribute %end_func_2
