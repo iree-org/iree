@@ -602,14 +602,22 @@ struct FoldSubspanOffsetIntoLoadStore final : public OpRewritePattern<OpType> {
 
   LogicalResult matchAndRewrite(OpType op,
                                 PatternRewriter &rewriter) const override {
-    auto memrefType = op.getMemref().getType().template cast<MemRefType>();
+    Value memref;
+    if constexpr (std::is_same<OpType, gpu::SubgroupMmaLoadMatrixOp>::value) {
+      memref = op.getSrcMemref();
+    } else if constexpr (std::is_same<OpType,
+                                      gpu::SubgroupMmaStoreMatrixOp>::value) {
+      memref = op.getDstMemref();
+    } else {
+      memref = op.getMemref();
+    }
+    auto memrefType = memref.getType().template cast<MemRefType>();
     if (!isRankOneMemRef(memrefType)) {
       return rewriter.notifyMatchFailure(op, "expected 1-D memref");
     }
 
     auto subspanOp =
-        op.getMemref()
-            .template getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
+        memref.template getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
     if (!subspanOp) return failure();
 
     // If the subspan op has a zero byte offset then we are done.
@@ -628,10 +636,9 @@ struct FoldSubspanOffsetIntoLoadStore final : public OpRewritePattern<OpType> {
     // Create a new subspan op with zero byte offset at the original location.
     auto ip = rewriter.saveInsertionPoint();
     rewriter.setInsertionPointAfter(subspanOp);
-    Value zero =
-        rewriter.create<arith::ConstantIndexOp>(op.getMemref().getLoc(), 0);
+    Value zero = rewriter.create<arith::ConstantIndexOp>(memref.getLoc(), 0);
     Value newSubspan = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        op.getMemref().getLoc(), subspanOp.getType(), subspanOp.getSet(),
+        memref.getLoc(), subspanOp.getType(), subspanOp.getSet(),
         subspanOp.getBinding(), subspanOp.getDescriptorType(), zero,
         subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr());
     rewriter.restoreInsertionPoint(ip);
@@ -642,8 +649,8 @@ struct FoldSubspanOffsetIntoLoadStore final : public OpRewritePattern<OpType> {
     auto addMap = AffineMap::get(0, 2, {sym0 + sym1}, context);
     auto divMap = AffineMap::get(0, 2, {sym0.floorDiv(sym1)}, context);
 
-    Value byteValue = rewriter.create<arith::ConstantIndexOp>(
-        op.getMemref().getLoc(), numBytes.value());
+    Value byteValue = rewriter.create<arith::ConstantIndexOp>(memref.getLoc(),
+                                                              numBytes.value());
     // We assume that upper layers guarantee the byte offset is perfectly
     // divisible by the element byte count so the content is well aligned.
     Value offset = rewriter.create<AffineApplyOp>(
@@ -652,15 +659,20 @@ struct FoldSubspanOffsetIntoLoadStore final : public OpRewritePattern<OpType> {
     // Get the new index by adding the old index with the offset.
     Value newIndex = rewriter.create<AffineApplyOp>(
         op.getLoc(), addMap, ValueRange{op.getIndices().front(), offset});
-
-    if (std::is_same<OpType, memref::LoadOp>::value) {
+    if constexpr (std::is_same<OpType, gpu::SubgroupMmaLoadMatrixOp>::value) {
+      rewriter.replaceOpWithNewOp<gpu::SubgroupMmaLoadMatrixOp>(
+          op, op.getType(), newSubspan, newIndex, op.getLeadDimension());
+    } else if constexpr (std::is_same<OpType,
+                                      gpu::SubgroupMmaStoreMatrixOp>::value) {
+      rewriter.replaceOpWithNewOp<gpu::SubgroupMmaStoreMatrixOp>(
+          op, op.getSrc(), newSubspan, newIndex, op.getLeadDimension());
+    } else if constexpr (std::is_same<OpType, memref::LoadOp>::value) {
       rewriter.replaceOpWithNewOp<memref::LoadOp>(
           op, memrefType.getElementType(), ValueRange{newSubspan, newIndex});
     } else {
       rewriter.replaceOpWithNewOp<memref::StoreOp>(
           op, TypeRange{}, ValueRange{op.getOperand(0), newSubspan, newIndex});
     }
-
     return success();
   }
 };
@@ -821,8 +833,12 @@ struct FlattenMemRefSubspanPass
 
     // Then fold byte offset on subspan ops into consumer load/store ops.
     RewritePatternSet foldPatterns(context);
-    foldPatterns.add<FoldSubspanOffsetIntoLoadStore<memref::LoadOp>,
-                     FoldSubspanOffsetIntoLoadStore<memref::StoreOp>>(context);
+    foldPatterns
+        .add<FoldSubspanOffsetIntoLoadStore<memref::LoadOp>,
+             FoldSubspanOffsetIntoLoadStore<memref::StoreOp>,
+             FoldSubspanOffsetIntoLoadStore<gpu::SubgroupMmaLoadMatrixOp>,
+             FoldSubspanOffsetIntoLoadStore<gpu::SubgroupMmaStoreMatrixOp>>(
+            context);
 
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(foldPatterns)))) {
