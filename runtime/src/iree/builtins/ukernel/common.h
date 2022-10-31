@@ -21,7 +21,7 @@
 //    a. It's OK to have a `#ifdef __aarch64__` but not a `#ifdef __ANDROID__`.
 // 3. Microkernels are pure/reentrant/stateless.
 //    a. Pure: the only effect of calling a ukernel is to write to destination
-//       buffers specified by pointers passes as ukernel arguments.
+//       buffers specified by pointers passed as ukernel arguments.
 //    b. Reentrant: ukernels may be called concurrently with
 //       themselves, other ukernels, or any other code, on any thread.
 //    c. Stateless: ukernels can't mutate any global (or static local) variable.
@@ -53,7 +53,7 @@
 // 3. Microkernels are typically called on tiles, after the workload has been
 //    tiled and distributed to several threads. Keeping microkernels pure,
 //    reentrant and stateless keeps them automatically compatible with any
-//    tiling and distribution we may use in the future.
+//    tiling and distribution that we may use in the future.
 //
 // FAQ:
 // Q: Can a microkernel save, change, and restore the CPU float rounding mode?
