@@ -526,6 +526,11 @@ struct ScatterOpImplicitBatch : public OpRewritePattern<mhlo::ScatterOp> {
           op, "Unable to add implicit batch dim to indice.");
     }
 
+    llvm::SmallVector<int64_t> newUpdateWindowDims;
+    for (auto dim : dimNumbers.getUpdateWindowDims()) {
+      newUpdateWindowDims.push_back(dim + 1);
+    }
+
     llvm::SmallVector<Value> updates;
     for (Value update : op.getUpdates()) {
       update = addUnitBatchDim(op.getLoc(), update, rewriter);
@@ -537,7 +542,7 @@ struct ScatterOpImplicitBatch : public OpRewritePattern<mhlo::ScatterOp> {
     }
 
     auto newDimNumbers = mhlo::ScatterDimensionNumbersAttr::get(
-        op.getContext(), dimNumbers.getUpdateWindowDims(),
+        op.getContext(), newUpdateWindowDims,
         dimNumbers.getInsertedWindowDims(),
         dimNumbers.getScatterDimsToOperandDims(),
         dimNumbers.getIndexVectorDim() + 1);
@@ -1296,9 +1301,10 @@ struct MHLOToMHLOPreprocessingPass
     patterns.insert<ExpandRngNormal, MulCastOfBool>(context);
 
     // scatter canonicalization patterns
-    patterns.insert<ScatterOpImplicitIndex, ScatterOpImplicitBatch,
-                    ScatterMaterializeInsertedDim, ScatterOpCollapseBatch>(
-        context);
+    patterns.insert<ScatterOpImplicitIndex>(context);
+    patterns.insert<ScatterOpImplicitBatch>(context);
+    patterns.insert<ScatterMaterializeInsertedDim>(context);
+    patterns.insert<ScatterOpCollapseBatch>(context);
 
     // dot_general canoncalization patterns.
     mhlo::populateGeneralDotOpLoweringPatterns(&patterns, context);
