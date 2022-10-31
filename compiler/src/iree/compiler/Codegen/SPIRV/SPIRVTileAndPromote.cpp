@@ -93,15 +93,10 @@ static const char promoteLHSMarker[] = "promote_lhs";
 static const char promoteRHSMarker[] = "promote_rhs";
 static const char promoteBothMarker[] = "promote_lhs_and_rhs";
 
-LogicalResult copyToWorkgroupMemory(OpBuilder &builder, Value src, Value dst) {
-  Operation *copyOp = builder.create<memref::CopyOp>(src.getLoc(), src, dst);
-  setMarker(copyOp, getCopyToWorkgroupMemoryMarker());
-  return success();
-}
-
 template <typename T>
 using LinalgPromotionPattern =
     mlir::iree_compiler::IREE::LinalgExt::LinalgPromotionPattern<T>;
+
 static void populatePromotionPatterns(RewritePatternSet &patterns,
                                       StringAttr replaceMarker) {
   MLIRContext *context = patterns.getContext();
