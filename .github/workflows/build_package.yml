@@ -73,6 +73,9 @@ jobs:
           path: "c"
           submodules: true
           ref: ${{ github.event.inputs.commit }}
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
 
       ##########################################################################
       # OS specific setup
@@ -84,7 +87,7 @@ jobs:
           sudo ./c/build_tools/python_deploy/install_macos_deps.sh
 
       ##########################################################################
-      # OS specific setup
+      # OS specific setup (Windows)
       ##########################################################################
       - name: Install Windows VS Deps
         if: "matrix.build-family == 'windows'"
