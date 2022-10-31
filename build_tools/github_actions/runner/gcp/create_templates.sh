@@ -69,6 +69,8 @@ declare -a common_args=(
   # off the VM gets no external IP and is impossible to SSH into. This knowledge
   # was hard won.
   --network-interface=network=default,address='',network-tier=PREMIUM
+  # Matches firewall rule for health check traffic
+  --tags="allow-health-checks"
   --provisioning-model=STANDARD
   --scopes=https://www.googleapis.com/auth/cloud-platform
   --no-shielded-secure-boot
