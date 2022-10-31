@@ -110,7 +110,7 @@ class IREE_MUST_USE_RESULT Status;
 class Status final {
  public:
   // Return a combination of the error code name and message.
-  static inline IREE_MUST_USE_RESULT std::string ToString(
+  IREE_MUST_USE_RESULT static inline std::string ToString(
       iree_status_t status) {
     if (iree_status_is_ok(status)) {
       return "OK";
