@@ -65,7 +65,8 @@ jobs:
       # The commit being checked out is the merge commit for the PR. Its first
       # parent will be the tip of main.
       BASE_REF: HEAD^
-      PR_DESCRIPTION: ${{ github.event.pull_request.body }}
+      PR_TITLE: ${{ github.event.pull_request.body }}
+      PR_BODY: ${{ github.event.pull_request.body }}
     outputs:
       should-run: ${{ steps.configure.outputs.should-run }}
       ci-stage: ${{ steps.configure.outputs.ci-stage }}
@@ -86,8 +87,6 @@ jobs:
           # repo instead of using checkout, e.g. with
           # https://github.com/nektos/act where there will be more.
           git log --oneline --graph --max-count=3
-
-          echo "PR_DESCRIPTION=${PR_DESCRIPTION}"
 
           ./build_tools/github_actions/configure_ci.py
 

@@ -60,7 +60,11 @@ def set_output(d: Mapping[str, str]):
 
 
 def get_trailers() -> Mapping[str, str]:
-  description = os.environ.get("PR_DESCRIPTION", "")
+  title = os.environ["PR_TITLE"]
+  body = os.environ.get("PR_BODY", "")
+
+  description = f"{title}" "\n\n" f"${body}"
+
   trailer_lines = subprocess.run(["git", "interpret-trailers", "--parse"],
                                  input=description,
                                  stdout=subprocess.PIPE,
