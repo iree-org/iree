@@ -7,9 +7,7 @@
 # Utility function to return the platform name in crosscompile.
 function(iree_get_platform PLATFORM)
   if(ANDROID AND CMAKE_ANDROID_ARCH_ABI STREQUAL "arm64-v8a")
-    set(_PLATFORM "android-arm64-v8a")
-  elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
-    set(_PLATFORM "x86_64")
+    set(_PLATFORM "arm64-v8a-Android")
   else()
     set(_PLATFORM "${CMAKE_SYSTEM_PROCESSOR}-${CMAKE_SYSTEM_NAME}")
   endif()
@@ -215,12 +213,8 @@ endfunction()
 #
 # Parameters:
 #   NAME: Name of the target
-#   BENCHMARK_MODULE_SRC: IREE module flagfile path built from benchmark_suite.
-#       The flagfile for different compile configurations are stored in the
-#       subdirectories.
 #   MODEL: Model "<UUID>_<name>" defined in
-#       "build_tools/python/e2e_test_framework/models". This option overrides
-#       and will replace BENCHMARK_MODULE_SRC.
+#       "build_tools/python/e2e_test_framework/models".
 #   DRIVER: Driver to run the module with.
 #   RUNNER_ARGS: additional args to pass to iree-run-module. The driver
 #       and input file are passed automatically.
@@ -242,9 +236,7 @@ endfunction()
 # iree_benchmark_suite_module_test(
 #   NAME
 #     mobilenet_v1_fp32_correctness_test
-#   BENCHMARK_MODULE_SRC
-#     "TFLite/MobileNetV1-fp32,imagenet"
-#   MODEL (will override BENCHMARK_MODULE_SRC)
+#   MODEL
 #     "bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8"
 #   DRIVER
 #     "local-sync"
@@ -265,7 +257,7 @@ function(iree_benchmark_suite_module_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;BENCHMARK_MODULE_SRC;MODEL;DRIVER;EXPECTED_OUTPUT;TIMEOUT"
+    "NAME;MODEL;DRIVER;EXPECTED_OUTPUT;TIMEOUT"
     "RUNNER_ARGS;LABELS;XFAIL_PLATFORMS;UNSUPPORTED_PLATFORMS"
     ${ARGN}
   )
@@ -281,60 +273,20 @@ function(iree_benchmark_suite_module_test)
     return()
   endif()
 
-  if(DEFINED _RULE_MODEL)
-    string(TOUPPER "${_PLATFORM}" _UPPER_PLATFORM)
-    set(_IREE_MODULE_COMPILE_CONFIG_ID "${IREE_MODULE_COMPILE_CONFIG_ID_${_UPPER_PLATFORM}}")
-    if("${_IREE_MODULE_COMPILE_CONFIG_ID}" STREQUAL "")
-      message(WARNING "No compile config for ${_PLATFORM}. Skip ${_RULE_MODEL}.")
-      return()
-    endif()
-    # Drop the "<UUID>_" prefix.
-    string(SUBSTRING "${_RULE_MODEL}" 37 -1 _MODEL_NAME)
-    set(_SRC "${IREE_BENCHMARK_SUITE_DIR}/iree/${_RULE_MODEL}/${_IREE_MODULE_COMPILE_CONFIG_ID}/${_MODEL_NAME}.vmfb")
-  else()
-    set(_MODULE_FLAG_DIR "${IREE_BENCHMARK_SUITE_DIR}/${_RULE_BENCHMARK_MODULE_SRC}/")
-    # Find the platform specific module flag file with matching path name.
-    # TODO(#10391): Update this logic with the new benchmark framework.
-    if(_PLATFORM STREQUAL "riscv64-Linux")
-      set(_FLAGFILE_HINT_PATH "${_MODULE_FLAG_DIR}/iree-llvm-cpu*RV64*__full-inference,default-flags/flagfile")
-    elseif(_PLATFORM STREQUAL "riscv32-Linux")
-      set(_FLAGFILE_HINT_PATH "${_MODULE_FLAG_DIR}/iree-llvm-cpu*RV32*__full-inference,default-flags/flagfile")
-    elseif(_PLATFORM STREQUAL "android-arm64-v8a")
-      set(_FLAGFILE_HINT_PATH "${_MODULE_FLAG_DIR}/iree-llvm-cpu*ARM64-v8A*__big-core,full-inference,default-flags/flagfile")
-    else()  # X86_64
-      set(_FLAGFILE_HINT_PATH "${_MODULE_FLAG_DIR}/iree-llvm-cpu*x86_64*__full-inference,default-flags/flagfile")
-    endif()
-    file(GLOB _FLAGFILE_PATH
-        LIST_DIRECTORIES FALSE
-        "${_FLAGFILE_HINT_PATH}"
-      )
-    if(NOT _FLAGFILE_PATH)
-      message(SEND_ERROR "Could not locate flagfile matching '${_FLAGFILE_HINT_PATH}' for ${_RULE_BENCHMARK_MODULE_SRC}")
-      return()
-    endif()
-
-    list(LENGTH _FLAGFILE_PATH _FLAGFILE_COUNT)
-    if(_FLAGFILE_COUNT GREATER 1)
-      message(SEND_ERROR "Found multiple files matching '${_FLAGFILE_HINT_PATH}' for ${_RULE_BENCHMARK_MODULE_SRC}: ${_FLAGFILE_PATH}")
-    endif()
-
-    cmake_path(GET _FLAGFILE_PATH PARENT_PATH _FLAG_FILE_DIR)
-    file(STRINGS "${_FLAGFILE_PATH}" _FLAGS ENCODING UTF-8)
-    # Parse the flagfile to find the vmfb location.
-    # TODO(#10391): Update this logic with the new benchmark framework.
-    foreach(_FLAG ${_FLAGS})
-      if(_FLAG MATCHES "--module_file=")
-        string(REPLACE "--module_file=" "" _SRC "${_FLAG}")
-        set(_SRC "${_FLAG_FILE_DIR}/${_SRC}")
-      endif()
-    endforeach(_FLAG)
+  string(TOUPPER "${_PLATFORM}" _UPPER_PLATFORM)
+  set(_IREE_MODULE_COMPILE_CONFIG_ID "${IREE_MODULE_COMPILE_CONFIG_ID_${_UPPER_PLATFORM}}")
+  if("${_IREE_MODULE_COMPILE_CONFIG_ID}" STREQUAL "")
+    message(WARNING "No compile config for ${_PLATFORM}. Skip ${_RULE_MODEL}.")
+    return()
   endif()
 
+  # Drop the "<UUID>_" prefix.
+  string(SUBSTRING "${_RULE_MODEL}" 37 -1 _MODEL_NAME)
   iree_run_module_test(
     NAME
       "${_RULE_NAME}"
     MODULE_SRC
-      "${_SRC}"
+      "${IREE_BENCHMARK_SUITE_DIR}/iree/${_RULE_MODEL}/${_IREE_MODULE_COMPILE_CONFIG_ID}/${_MODEL_NAME}.vmfb"
     DRIVER
       "${_RULE_DRIVER}"
     EXPECTED_OUTPUT

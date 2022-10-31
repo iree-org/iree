@@ -4,7 +4,7 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-"""Generates a CMake file to build the benchmark suites."""
+"""Generates a CMake file to define e2e mdoel tests."""
 
 import string
 import sys
@@ -19,9 +19,6 @@ import e2e_model_tests.cmake_generator
 TEMPLATE_DIR = pathlib.Path(__file__).parent
 GENERATED_E2E_MODEL_TESTS_CMAKE_TEMPLATE = string.Template(
     (TEMPLATE_DIR / "generated_e2e_model_tests_template.cmake").read_text())
-# CMake variable name to store IREE package name.
-PACKAGE_NAME_CMAKE_VARIABLE = "_PACKAGE_NAME"
-ROOT_ARTIFACTS_DIR_CMAKE_VARIABLE = "_ROOT_ARTIFACTS_DIR"
 
 
 def parse_arguments():

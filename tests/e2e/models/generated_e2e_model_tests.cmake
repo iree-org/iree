@@ -4,7 +4,7 @@
 # file.                                                                        #
 ################################################################################
 
-set(IREE_MODULE_COMPILE_CONFIG_ID_ANDROID-ARM64-V8A
+set(IREE_MODULE_COMPILE_CONFIG_ID_ARM64-V8A-ANDROID
   "1f2adf49-282e-4aff-9d4f-e63b1621f1e8"
 )
 
@@ -16,7 +16,7 @@ set(IREE_MODULE_COMPILE_CONFIG_ID_RISCV64-LINUX
   "cdf579a9-5446-403b-a991-802a6c702e65"
 )
 
-set(IREE_MODULE_COMPILE_CONFIG_ID_X86_64
+set(IREE_MODULE_COMPILE_CONFIG_ID_X86_64-LINUX
   "e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
 )
 
@@ -34,7 +34,7 @@ iree_benchmark_suite_module_test(
     "--function_input=1x224x224x3xf32=0"
   UNSUPPORTED_PLATFORMS
     "riscv32-Linux"
-    "android-arm64-v8a"
+    "arm64-v8a-Android"
 )
 
 iree_benchmark_suite_module_test(
@@ -50,7 +50,7 @@ iree_benchmark_suite_module_test(
     "--entry_function=main"
     "--function_input=1x224x224x3xui8=0"
   UNSUPPORTED_PLATFORMS
-    "android-arm64-v8a"
+    "arm64-v8a-Android"
 )
 
 iree_benchmark_suite_module_test(
@@ -83,6 +83,6 @@ iree_benchmark_suite_module_test(
     "--entry_function=main"
     "--function_input=1x96x96x1xi8=0"
   UNSUPPORTED_PLATFORMS
-    "android-arm64-v8a"
+    "arm64-v8a-Android"
 )
 
