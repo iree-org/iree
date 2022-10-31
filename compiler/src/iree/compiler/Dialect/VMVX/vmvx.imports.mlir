@@ -525,7 +525,7 @@ vm.import @pack.i8i8(
   %out_size1 : i64,
   %out_size2 : i64,
   %out_size3 : i64,
-  %padding_value : i8,
+  %padding_value : i32,
   %flags : i32
 )
 
