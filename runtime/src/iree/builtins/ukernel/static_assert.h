@@ -22,7 +22,7 @@
 // here! It is defined by G++ but not by Clang++! So, let's also handle
 // __cplusplus before __STDC__.
 #define IREE_UKERNEL_STATIC_ASSERT(COND) static_assert(COND, #COND)
-#elif defined(__STDC__)
+#elif defined(__STDC__) || defined(_MSC_VER)
 // Really C, as neither __ASSEMBLER__ nor __cplusplus are defined.
 #define IREE_UKERNEL_STATIC_ASSERT(COND) _Static_assert(COND, #COND)
 #else
