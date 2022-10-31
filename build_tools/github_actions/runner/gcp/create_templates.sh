@@ -49,7 +49,7 @@ fi
 # the date in ISO8601 format, but again, character limits and creation date is
 # in the template metadata.
 # 3 legal characters. Note this is using bash to expand the braced sequences.
-SUFFIX="$(shuf --zero-terminated --echo --head-count=3 --repeat {a..z} {0..9})"
+SUFFIX="$(shuf --echo --head-count=3 --repeat {a..z} {0..9} | tr -d '\n')"
 SHORT_REF="${TEMPLATE_CONFIG_REF:0:10}"
 VERSION="${SHORT_REF}-${SUFFIX}"
 if (( TESTING!=0 )); then
