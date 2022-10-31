@@ -158,6 +158,12 @@ def GPUDistributeSharedMemoryCopy :
   let constructor = "mlir::iree_compiler::createGPUDistributeSharedMemoryCopy()";
 }
 
+def GPUReduceBankConflicts :
+    Pass<"iree-gpu-reduce-bank-conflicts", "func::FuncOp"> {
+  let summary = "Pass to try to reduce the number of bank conflicts.";
+  let constructor = "mlir::iree_compiler::createGPUReduceSharedMemoryBankConflicts()";
+}
+
 def GPUPipelining : Pass<"iree-gpu-pipelining", "func::FuncOp"> {
   let summary = "Pass to do software pipelining.";
   let constructor = "mlir::iree_compiler::createGPUPipeliningPass()";
@@ -401,12 +407,6 @@ def LLVMGPUMultiBuffering :
     Pass<"iree-llvmgpu-multi-buffering", "func::FuncOp"> {
   let summary = "Pass to do multi buffering.";
   let constructor = "mlir::iree_compiler::createLLVMGPUMultiBuffering()";
-}
-
-def LLVMGPUReduceBankConflicts :
-    Pass<"iree-llvmgpu-reduce-bank-conflicts", "func::FuncOp"> {
-  let summary = "Pass try reduce the number of bank conflicts.";
-  let constructor = "mlir::iree_compiler::createLLVMGPUReduceSharedMemoryBankConflicts()";
 }
 
 def LLVMGPUVectorToGPU :

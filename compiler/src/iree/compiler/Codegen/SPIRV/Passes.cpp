@@ -315,6 +315,8 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm) {
       createGPUDistributeSharedMemoryCopy());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createGPUReduceSharedMemoryBankConflicts());
 
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());

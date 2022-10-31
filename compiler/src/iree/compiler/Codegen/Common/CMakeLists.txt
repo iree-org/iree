@@ -156,6 +156,7 @@ iree_cc_library(
     "GPUDistributeSharedMemoryCopy.cpp"
     "GPUPatterns.cpp"
     "GPUPipelining.cpp"
+    "GPUReduceBankConflicts.cpp"
     "GPUTileReduction.cpp"
     "GPUVectorization.cpp"
     "LinalgOpInfo.cpp"
@@ -185,6 +186,7 @@ iree_cc_library(
     MLIRBufferizationTransforms
     MLIRFuncDialect
     MLIRGPUOps
+    MLIRGPUTransforms
     MLIRIR
     MLIRLLVMCommonConversion
     MLIRLLVMDialect
