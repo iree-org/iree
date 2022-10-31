@@ -12,11 +12,25 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    types
+    exported_flag_bits
+  HDRS
+    "exported_flag_bits.h"
+  DEPS
+
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    common
   HDRS
     "common.h"
     "mmt4d_types.h"
+    "pack_types.h"
+  SRCS
+    "common.c"
   DEPS
+    ::exported_flag_bits
     iree::base::core_headers
     iree::builtins::ukernel::arch::config
   PUBLIC
@@ -30,7 +44,7 @@ iree_cc_library(
   SRCS
     "mmt4d_select_tile_generic.c"
   DEPS
-    ::types
+    ::common
   PUBLIC
 )
 
@@ -43,7 +57,7 @@ iree_cc_library(
     "elementwise_generic.c"
     "elementwise_impl.c.inc"
   DEPS
-    ::types
+    ::common
   PUBLIC
 )
 
@@ -53,12 +67,14 @@ iree_cc_library(
   HDRS
     "elementwise.h"
     "mmt4d.h"
+    "pack.h"
   SRCS
     "mmt4d.c"
+    "pack.c"
   DEPS
+    ::common
     ::elementwise
     ::generic
-    ::types
     iree::builtins::ukernel::arch::ukernel_arch
   PUBLIC
 )

@@ -48,6 +48,9 @@
 // These headers are clean:
 #include "iree/base/attributes.h"
 
+// Include common flag values, shared with the compiler.
+#include "iree/builtins/ukernel/exported_flag_bits.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
@@ -114,6 +117,29 @@ typedef int64_t iree_ukernel_ssize_t;
 #else
 #error Unexpected pointer size
 #endif
+
+// Status codes returned by a mmt4d operation.
+enum iree_ukernel_status_t {
+  iree_ukernel_status_ok = 0,
+  iree_ukernel_status_bad_type,
+  iree_ukernel_status_bad_flags,
+  iree_ukernel_status_unsupported_huge_or_negative_dimension,
+  iree_ukernel_status_unsupported_generic_tile_size,
+};
+
+typedef enum iree_ukernel_status_t iree_ukernel_status_t;
+
+// Convert a status code to a human-readable string.
+IREE_UKERNEL_EXPORT const char* iree_ukernel_status_message(
+    iree_ukernel_status_t status);
+
+#define IREE_UKERNEL_RETURN_IF_ERROR(X)     \
+  do {                                      \
+    iree_ukernel_status_t status = (X);     \
+    if (status != iree_ukernel_status_ok) { \
+      return status;                        \
+    }                                       \
+  } while (0)
 
 #ifdef __cplusplus
 }  // extern "C"
