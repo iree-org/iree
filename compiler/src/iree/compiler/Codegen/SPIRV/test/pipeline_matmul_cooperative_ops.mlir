@@ -219,3 +219,80 @@ hal.executable public @batch_matmul_16x128x256x512_div {
 //         CHECK:     %[[LD4:.+]] = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C256]], %[[COL_MAJOR]] : !spirv.ptr<f16, StorageBuffer> as !spirv.coopmatrix<16x16xf16, Subgroup>
 //         CHECK:     %[[DIV:.+]] = spirv.FDiv %[[LD_FN]], %[[LD4]] : !spirv.coopmatrix<16x16xf16, Subgroup>
 //         CHECK:     spirv.NV.CooperativeMatrixStore %{{.+}}, %[[DIV]], %[[C256]], %[[COL_MAJOR]]
+
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>,
+    #hal.descriptor_set.binding<3, storage_buffer>,
+    #hal.descriptor_set.binding<4, storage_buffer>
+  ]>
+]>
+
+hal.executable public @matmul_32x32x32_div {
+  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+    spirv.target_env = #spirv.target_env<
+      #spirv.vce<v1.5,
+      [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixNV],
+      [SPV_KHR_variable_pointers, SPV_NV_cooperative_matrix]>, NVIDIA:DiscreteGPU,
+      #spirv.resource_limits<
+        cooperative_matrix_properties_nv = [
+          #spirv.coop_matrix_props<
+            a_type = i8, b_type = i8, c_type = i32, k_size = 32,
+            m_size = 8, n_size = 8, result_type = i32, scope = <Subgroup>>,
+          #spirv.coop_matrix_props<
+            a_type = f16, b_type = f16, c_type = f16, k_size = 16,
+            m_size = 16, n_size = 16, result_type = f16, scope = <Subgroup>>,
+          #spirv.coop_matrix_props<
+            a_type = f16, b_type = f16, c_type = f32, k_size = 16,
+            m_size = 16, n_size = 16, result_type = f32, scope = <Subgroup>>
+        ],
+        max_compute_shared_memory_size = 49152,
+        max_compute_workgroup_invocations = 1024,
+        max_compute_workgroup_size = [2147483647, 65535, 65535],
+        subgroup_size = 32>
+       >}> {
+    hal.executable.export public @matmul_32x32x32_div layout(#pipeline_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module  {
+      func.func @matmul_32x32x32_div() {
+        %c0 = arith.constant 0 : index
+        %cst = arith.constant 0.000000e+00 : f16
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<32x32xf16>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<32x32xf16>>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<32x32xf16>>
+        %3 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<32x32xf16>>
+        %4 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [32, 32], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<32x32xf16>> -> tensor<32x32xf16>
+        %5 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [32, 32], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<32x32xf16>> -> tensor<32x32xf16>
+        %6 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [32, 32], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<32x32xf16>> -> tensor<32x32xf16>
+        %7 = tensor.empty() : tensor<32x32xf16>
+        %8 = linalg.fill ins(%cst : f16) outs(%7 : tensor<32x32xf16>) -> tensor<32x32xf16>
+        %9 = linalg.matmul ins(%4, %5 : tensor<32x32xf16>, tensor<32x32xf16>) outs(%8 : tensor<32x32xf16>) -> tensor<32x32xf16>
+        %10 = linalg.generic {
+            indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
+            iterator_types = ["parallel", "parallel"]}
+        ins(%9, %6 : tensor<32x32xf16>, tensor<32x32xf16>) outs(%7 : tensor<32x32xf16>) {
+        ^bb0(%in: f16, %in_0: f16, %out: f16):
+          %11 = arith.divf %in, %in_0 : f16
+          linalg.yield %11 : f16
+        } -> tensor<32x32xf16>
+        flow.dispatch.tensor.store %10, %3, offsets = [0, 0], sizes = [32, 32], strides = [1, 1] : tensor<32x32xf16> -> !flow.dispatch.tensor<writeonly:tensor<32x32xf16>>
+        return
+      }
+    }
+  }
+}
+
+//   CHECK-LABEL: spirv.module Logical GLSL450
+// CHECK-COUNT-4: spirv.NV.CooperativeMatrixLoad
+// CHECK-COUNT-2: spirv.NV.CooperativeMatrixMulAdd
+//         CHECK: spirv.NV.CooperativeMatrixLoad
+//         CHECK: spirv.FDiv
+//         CHECK: spirv.NV.CooperativeMatrixStore
