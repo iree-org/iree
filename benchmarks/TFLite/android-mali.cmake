@@ -27,8 +27,7 @@ iree_benchmark_suite(
     "android-mali"
 
   MODULES
-    # TODO(#10748): Disabled since the iree-import-tflite fails on this model.
-    # "${DEEPLABV3_FP32_MODULE}"
+    "${DEEPLABV3_FP32_MODULE}"
     "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
     "${MOBILEBERT_FP32_MODULE}"
@@ -100,8 +99,7 @@ iree_benchmark_suite(
     "android-mali"
 
   MODULES
-    # TODO(#10748): Disabled since the iree-import-tflite fails on this model.
-    # "${DEEPLABV3_FP32_MODULE}"
+    "${DEEPLABV3_FP32_MODULE}"
     "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
     "${MOBILEBERT_FP32_MODULE}"
@@ -167,8 +165,7 @@ iree_benchmark_suite(
     "android-mali"
 
   MODULES
-    # TODO(#10748): Disabled since the iree-import-tflite fails on this model.
-    # "${DEEPLABV3_FP32_MODULE}"
+    "${DEEPLABV3_FP32_MODULE}"
     "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
     "${MOBILEBERT_FP32_MODULE}"
