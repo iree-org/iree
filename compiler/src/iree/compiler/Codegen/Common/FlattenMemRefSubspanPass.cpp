@@ -717,6 +717,25 @@ struct RemoveDynamicCastOp final : public OpRewritePattern<memref::CastOp> {
   }
 };
 
+/// Removes memref.cast that turns dynamic shapes into static shapes.
+struct RemoveStaticCastOp final : public OpRewritePattern<memref::CastOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(memref::CastOp castOp,
+                                PatternRewriter &rewriter) const override {
+    auto srcType = castOp.getSource().getType().cast<MemRefType>();
+    auto dstType = castOp.getType().cast<MemRefType>();
+    // Restrict to the cases we generate in this pass--1-D static shape to 1-D
+    // dynamic shape.
+    if (srcType.getRank() == 1 && !srcType.hasStaticShape() &&
+        dstType.getRank() == 1 && dstType.hasStaticShape()) {
+      rewriter.replaceOp(castOp, castOp.getSource());
+      return success();
+    }
+    return failure();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Pass
 //===----------------------------------------------------------------------===//
@@ -869,6 +888,7 @@ struct FlattenMemRefSubspanPass
     memref::AllocaOp::getCanonicalizationPatterns(cleanupPatterns, context);
     memref::SubViewOp::getCanonicalizationPatterns(cleanupPatterns, context);
     cleanupPatterns.add<RemoveDynamicCastOp>(context);
+    cleanupPatterns.add<RemoveStaticCastOp>(context);
 
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(cleanupPatterns)))) {
