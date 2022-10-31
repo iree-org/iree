@@ -15,6 +15,6 @@ iree_add_all_subdirs()
 # Copy Python packaging files to the build dir so that we can install from
 # there.
 if(IREE_BUILD_PYTHON_BINDINGS)
-  configure_file(pyproject.toml pyproject.toml COPYONLY)
   configure_file(setup.py setup.py @ONLY)
+  configure_file(pyproject.toml pyproject.toml COPYONLY)
 endif()
