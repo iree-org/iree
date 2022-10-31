@@ -26,11 +26,11 @@ endif()
 iree_lit_test_suite(
     name = "lit",
     srcs = [
-        #"reduction.mlir",
-        #"softmax.mlir",
-        #"softmax_v2.mlir",
+        "reduction.mlir",
+        "softmax.mlir",
+        "softmax_v2.mlir",
         # First few ops of softmax only, acts as a proxy example.
-        #"softmax_partial.mlir",
+        "softmax_partial.mlir",
     ],
     cfg = "//tests:lit.cfg.py",
     # transform dialect spec files are MLIR files that specify a transformation,
