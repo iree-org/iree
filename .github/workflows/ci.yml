@@ -87,6 +87,8 @@ jobs:
           # https://github.com/nektos/act where there will be more.
           git log --oneline --graph --max-count=3
 
+          echo "PR_DESCRIPTION=${PR_DESCRIPTION}"
+
           ./build_tools/github_actions/configure_ci.py
 
 
