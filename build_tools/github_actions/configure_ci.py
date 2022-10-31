@@ -65,6 +65,8 @@ def get_trailers() -> Mapping[str, str]:
 
   description = f"{title}" "\n\n" f"${body}"
 
+  print("Parsing PR description:", description, sep="\n")
+
   trailer_lines = subprocess.run(["git", "interpret-trailers", "--parse"],
                                  input=description,
                                  stdout=subprocess.PIPE,
