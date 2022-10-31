@@ -38,16 +38,18 @@ struct HALOpAsmInterface : public OpAsmDialectInterface {
   /// end with a numeric digit([0-9]+). Returns success if an alias was
   /// provided, failure otherwise.
   AliasResult getAlias(Attribute attr, raw_ostream &os) const override {
-    if (auto targetAttr = attr.dyn_cast<DeviceTargetAttr>()) {
-      os << "device_target_" << targetAttr.getSymbolNameFragment();
-      return AliasResult::OverridableAlias;
-    } else if (auto targetAttr = attr.dyn_cast<ExecutableTargetAttr>()) {
-      os << "executable_target_" << targetAttr.getSymbolNameFragment();
-      return AliasResult::OverridableAlias;
-    } else if (auto layoutAttr = attr.dyn_cast<PipelineLayoutAttr>()) {
-      os << "pipeline_layout";
-      return AliasResult::OverridableAlias;
-    }
+    // TODO: there seems to be a dependence inversion when pretty printing
+    // device_target_ and executable_target_ aliases.
+    // if (auto targetAttr = attr.dyn_cast<DeviceTargetAttr>()) {
+    //   os << "device_target_" << targetAttr.getSymbolNameFragment();
+    //   return AliasResult::OverridableAlias;
+    // } else if (auto targetAttr = attr.dyn_cast<ExecutableTargetAttr>()) {
+    //   os << "executable_target_" << targetAttr.getSymbolNameFragment();
+    //   return AliasResult::OverridableAlias;
+    // } else if (auto layoutAttr = attr.dyn_cast<PipelineLayoutAttr>()) {
+    //   os << "pipeline_layout";
+    //   return AliasResult::OverridableAlias;
+    // }
     return AliasResult::NoAlias;
   }
 };
