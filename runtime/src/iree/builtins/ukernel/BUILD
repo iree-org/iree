@@ -20,7 +20,7 @@ iree_runtime_cc_library(
 iree_runtime_cc_library(
     name = "exported_flag_bits",
     hdrs = ["exported_flag_bits.h"],
-    deps = [":static_assert",],
+    deps = [":static_assert"],
 )
 
 # :types is the type declarations used by both the entry points and the
