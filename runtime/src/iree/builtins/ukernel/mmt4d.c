@@ -13,17 +13,17 @@
 
 #define OUTSIDE_UINT_RANGE(value, bits) (((value) < 0) || ((value) >> (bits)))
 
-static iree_ukernel_mmt4d_status_t iree_ukernel_mmt4d_validate(
+static iree_ukernel_status_t iree_ukernel_mmt4d_validate(
     const iree_ukernel_mmt4d_params_t* params) {
-  if (params->flags & ~IREE_VMVX_MATMUL_FLAG_ACCUMULATE) {
-    return iree_ukernel_mmt4d_status_bad_flags;
+  if (params->flags & ~IREE_UKERNEL_FLAG_ACCUMULATE) {
+    return iree_ukernel_status_bad_flags;
   }
   switch (params->type) {
     case iree_ukernel_mmt4d_type_f32f32f32:
     case iree_ukernel_mmt4d_type_i8i8i32:
       break;
     default:
-      return iree_ukernel_mmt4d_status_bad_type;
+      return iree_ukernel_status_bad_type;
   }
   // Some implementations may wish to avoid supporting absurdly wide types. For
   // instance, K is the innermost (i.e. hottest) loop bound, so some 32bit
@@ -34,21 +34,21 @@ static iree_ukernel_mmt4d_status_t iree_ukernel_mmt4d_validate(
       OUTSIDE_UINT_RANGE(params->K, 31) || OUTSIDE_UINT_RANGE(params->M0, 15) ||
       OUTSIDE_UINT_RANGE(params->N0, 15) ||
       OUTSIDE_UINT_RANGE(params->K0, 15)) {
-    return iree_ukernel_mmt4d_status_unsupported_huge_or_negative_dimension;
+    return iree_ukernel_status_unsupported_huge_or_negative_dimension;
   }
-  return iree_ukernel_mmt4d_status_ok;
+  return iree_ukernel_status_ok;
 }
 
 // On success, *out_tile_func is the tile function to use to perform the mmt4d
 // with the given *params.
-static iree_ukernel_mmt4d_status_t iree_ukernel_mmt4d_select_tile_func(
+static iree_ukernel_status_t iree_ukernel_mmt4d_select_tile_func(
     const iree_ukernel_mmt4d_params_t* params,
     iree_ukernel_mmt4d_tile_func_t* out_tile_func) {
   iree_ukernel_mmt4d_tile_func_t arch_tile_func =
       iree_ukernel_mmt4d_select_tile_func_arch(params);
   if (arch_tile_func) {
     *out_tile_func = arch_tile_func;
-    return iree_ukernel_mmt4d_status_ok;
+    return iree_ukernel_status_ok;
   }
   return iree_ukernel_mmt4d_select_tile_func_generic(params, out_tile_func);
 }
@@ -124,61 +124,45 @@ static void iree_ukernel_mmt4d_zero_out(
 // the entire loop nest.
 // The value |true| is written to the out-param |*done| if an early-return path
 // was taken and the mmt4d work is already done.
-static iree_ukernel_mmt4d_status_t iree_ukernel_mmt4d_early(
+static iree_ukernel_status_t iree_ukernel_mmt4d_early(
     const iree_ukernel_mmt4d_params_t* params, bool* done) {
   // Trivial cases
   if (params->M == 0 || params->N == 0) {
     *done = true;
-    return iree_ukernel_mmt4d_status_ok;
+    return iree_ukernel_status_ok;
   }
   if (params->K == 0) {
-    if (params->flags & IREE_VMVX_MATMUL_FLAG_ACCUMULATE) {
+    if (params->flags & IREE_UKERNEL_FLAG_ACCUMULATE) {
       // Nothing to do!
     } else {
       iree_ukernel_mmt4d_zero_out(params);
     }
     *done = true;
-    return iree_ukernel_mmt4d_status_ok;
+    return iree_ukernel_status_ok;
   }
 
   // Targets that want to specialize the entire loop nest can do so here.
 
-  return iree_ukernel_mmt4d_status_ok;
+  return iree_ukernel_status_ok;
 }
 
-IREE_UKERNEL_EXPORT iree_ukernel_mmt4d_status_t
+IREE_UKERNEL_EXPORT iree_ukernel_status_t
 iree_ukernel_mmt4d(const iree_ukernel_mmt4d_params_t* params) {
   // Validate params.
-  IREE_UKERNEL_MMT4D_RETURN_IF_ERROR(iree_ukernel_mmt4d_validate(params));
+  IREE_UKERNEL_RETURN_IF_ERROR(iree_ukernel_mmt4d_validate(params));
 
   // Maybe handle this mmt4d "early", without needing to select a tile_func.
   // Typical cases include trivial cases (e.g. when params->K == 0) and hardware
   // targets that want to handle the entire loop nest in target-specific code.
   bool done = false;
-  IREE_UKERNEL_MMT4D_RETURN_IF_ERROR(iree_ukernel_mmt4d_early(params, &done));
-  if (done) return iree_ukernel_mmt4d_status_ok;
+  IREE_UKERNEL_RETURN_IF_ERROR(iree_ukernel_mmt4d_early(params, &done));
+  if (done) return iree_ukernel_status_ok;
 
   // Select a target-specific tile_func (inner loop on K, computing one M0xN0
   // tile) and use that with generic outer loops.
   iree_ukernel_mmt4d_tile_func_t tile_func;
-  IREE_UKERNEL_MMT4D_RETURN_IF_ERROR(
+  IREE_UKERNEL_RETURN_IF_ERROR(
       iree_ukernel_mmt4d_select_tile_func(params, &tile_func));
   iree_ukernel_mmt4d_using_tile_func(params, tile_func);
-  return iree_ukernel_mmt4d_status_ok;
-}
-
-IREE_UKERNEL_EXPORT const char* iree_ukernel_mmt4d_status_message(
-    iree_ukernel_mmt4d_status_t status) {
-  switch (status) {
-    case iree_ukernel_mmt4d_status_bad_flags:
-      return "bad mmt4d flags";
-    case iree_ukernel_mmt4d_status_bad_type:
-      return "bad mmt4d type enum";
-    case iree_ukernel_mmt4d_status_unsupported_huge_or_negative_dimension:
-      return "unsupported huge or negative size in mmt4d";
-    case iree_ukernel_mmt4d_status_unsupported_generic_tile_size:
-      return "tile size too large for the generic tile implementation";
-    default:
-      return "unknown";
-  }
+  return iree_ukernel_status_ok;
 }

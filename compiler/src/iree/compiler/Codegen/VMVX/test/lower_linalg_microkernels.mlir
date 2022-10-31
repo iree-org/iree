@@ -559,3 +559,51 @@ func.func @rsqrt(%arg0 : memref<64x64xf32>, %arg1 : memref<64xf32>) {
   }
   func.return
 }
+
+// CHECK-LABEL: @pack_i8i8
+//   CHECK-DAG: %[[BB0:.*]], %[[OFFSET0:.*]], %[[SIZES0:.*]]:2, %[[STRIDES0:.*]]:2 = vmvx.get_buffer_descriptor %arg0
+//   CHECK-DAG: %[[BB1:.*]], %[[OFFSET1:.*]], %[[SIZES1:.*]]:4, %[[STRIDES1:.*]]:4 = vmvx.get_buffer_descriptor %arg1
+//       CHECK: vmvx.pack
+//  CHECK-SAME:   in(%[[BB0]] offset %[[OFFSET0]] stride0 %[[STRIDES0]]#0 : !util.buffer)
+//  CHECK-SAME:   out(%[[BB1]] offset %[[OFFSET1]] stride0 %[[STRIDES1]]#0 : !util.buffer)
+//  CHECK-SAME:   in_shape(%[[SIZES0]]#0, %[[SIZES0]]#1)
+//  CHECK-SAME:   out_shape(%[[SIZES1]]#0, %[[SIZES1]]#1, %[[SIZES1]]#2, %[[SIZES1]]#3)
+//  CHECK-SAME:   padding_value(%arg2 : i8)
+//  CHECK-SAME:   flags(0)
+func.func @pack_i8i8(%arg0 : memref<35x48xi8>, %arg1 : memref<5x6x7x8xi8>, %arg2 : i8) {
+  iree_linalg_ext.pack %arg0 padding_value(%arg2 : i8) inner_dims_pos = [0, 1] inner_tiles = [7, 8] into %arg1
+      : (memref<35x48xi8> memref<5x6x7x8xi8>)
+  func.return
+}
+
+// CHECK-LABEL: @pack_i32i32_transpose_inner_dims
+//   CHECK-DAG: %[[BB0:.*]], %[[OFFSET0:.*]], %[[SIZES0:.*]]:2, %[[STRIDES0:.*]]:2 = vmvx.get_buffer_descriptor %arg0
+//   CHECK-DAG: %[[BB1:.*]], %[[OFFSET1:.*]], %[[SIZES1:.*]]:4, %[[STRIDES1:.*]]:4 = vmvx.get_buffer_descriptor %arg1
+//       CHECK: vmvx.pack
+//  CHECK-SAME:   in(%[[BB0]] offset %[[OFFSET0]] stride0 %[[STRIDES0]]#0 : !util.buffer)
+//  CHECK-SAME:   out(%[[BB1]] offset %[[OFFSET1]] stride0 %[[STRIDES1]]#0 : !util.buffer)
+//  CHECK-SAME:   in_shape(%[[SIZES0]]#0, %[[SIZES0]]#1)
+//  CHECK-SAME:   out_shape(%[[SIZES1]]#0, %[[SIZES1]]#1, %[[SIZES1]]#2, %[[SIZES1]]#3)
+//  CHECK-SAME:   padding_value(%arg2 : i32)
+//  CHECK-SAME:   flags(65536)
+func.func @pack_i32i32_transpose_inner_dims(%arg0 : memref<35x48xi32>, %arg1 : memref<5x6x8x7xi32>, %arg2 : i32) {
+  iree_linalg_ext.pack %arg0 padding_value(%arg2 : i32) inner_dims_pos = [1, 0] inner_tiles = [8, 7] into %arg1
+      : (memref<35x48xi32> memref<5x6x8x7xi32>)
+  func.return
+}
+
+// CHECK-LABEL: @pack_f32f32_transpose_inner_and_outer_dims
+//   CHECK-DAG: %[[BB0:.*]], %[[OFFSET0:.*]], %[[SIZES0:.*]]:2, %[[STRIDES0:.*]]:2 = vmvx.get_buffer_descriptor %arg0
+//   CHECK-DAG: %[[BB1:.*]], %[[OFFSET1:.*]], %[[SIZES1:.*]]:4, %[[STRIDES1:.*]]:4 = vmvx.get_buffer_descriptor %arg1
+//       CHECK: vmvx.pack
+//  CHECK-SAME:   in(%[[BB0]] offset %[[OFFSET0]] stride0 %[[STRIDES0]]#0 : !util.buffer)
+//  CHECK-SAME:   out(%[[BB1]] offset %[[OFFSET1]] stride0 %[[STRIDES1]]#0 : !util.buffer)
+//  CHECK-SAME:   in_shape(%[[SIZES0]]#0, %[[SIZES0]]#1)
+//  CHECK-SAME:   out_shape(%[[SIZES1]]#0, %[[SIZES1]]#1, %[[SIZES1]]#2, %[[SIZES1]]#3)
+//  CHECK-SAME:   padding_value(%arg2 : f32)
+//  CHECK-SAME:   flags(196608)
+func.func @pack_f32f32_transpose_inner_and_outer_dims(%arg0 : memref<35x48xf32>, %arg1 : memref<6x5x8x7xf32>, %arg2 : f32) {
+  iree_linalg_ext.pack %arg0 padding_value(%arg2 : f32) outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [8, 7] into %arg1
+      : (memref<35x48xf32> memref<6x5x8x7xf32>)
+  func.return
+}
