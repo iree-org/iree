@@ -41,7 +41,7 @@ class ConversionPass : public ConversionBase<ConversionPass> {
     registry.insert<IREE::Util::UtilDialect, IREE::HAL::HALDialect,
                     IREE::HAL::Inline::HALInlineDialect,
                     IREE::HAL::Loader::HALLoaderDialect,
-                    mlir::arith::ArithDialect>();
+                    mlir::arith::ArithDialect, mlir::AffineDialect>();
   }
 
   void runOnOperation() override {
@@ -51,7 +51,7 @@ class ConversionPass : public ConversionBase<ConversionPass> {
     ConversionTarget conversionTarget(*context);
     conversionTarget
         .addLegalDialect<mlir::func::FuncDialect, mlir::scf::SCFDialect,
-                         mlir::arith::ArithDialect>();
+                         mlir::arith::ArithDialect, mlir::AffineDialect>();
 
     TypeConverter typeConverter;
     RewritePatternSet patterns(context);
