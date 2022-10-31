@@ -493,11 +493,6 @@ std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVTileAndPromotePass(
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVTileAndVectorizeToCooperativeOpsPass();
 
-/// Pass to convert vector read/write/arithmetic operations to the corresponding
-/// cooperative matrix ops when possible.
-std::unique_ptr<OperationPass<func::FuncOp>>
-createSPIRVVectorToCooperativeOpsPass();
-
 /// Converts vector ops to gpu subgroup MMA ops.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVVectorToGPUSubgroupMMAOpsPass();
