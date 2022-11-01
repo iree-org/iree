@@ -50,7 +50,7 @@ static FailureOr<SmallVector<Value>> rewriteAsPaddedOp(
     SmallVector<int64_t> paddedShape(shape.begin(), shape.end());
     for (const auto &en : llvm::enumerate(tensorLoad.getMixedSizes())) {
       if (Optional<int64_t> cst = getConstantIntValue(en.value())) {
-        paddedShape[en.index()] = cst.getValue();
+        paddedShape[en.index()] = cst.value();
       } else {
         FailureOr<int64_t> upperBound =
             linalg::getConstantUpperBoundForIndex(en.value().get<Value>());
