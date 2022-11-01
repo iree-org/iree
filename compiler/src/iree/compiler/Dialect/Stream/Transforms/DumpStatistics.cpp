@@ -110,6 +110,7 @@ struct Statistics {
   size_t fillCount = 0;
   size_t copyCount = 0;
   size_t dispatchCount = 0;
+  size_t collectiveCount = 0;
 
   // Executables:
   size_t executableCount = 0;
@@ -152,7 +153,9 @@ struct Statistics {
             .Case<IREE::Stream::CmdFillOp>([&](auto op) { ++fillCount; })
             .Case<IREE::Stream::CmdCopyOp>([&](auto op) { ++copyCount; })
             .Case<IREE::Stream::CmdDispatchOp>(
-                [&](auto op) { ++dispatchCount; });
+                [&](auto op) { ++dispatchCount; })
+            .Case<IREE::Stream::CmdCollectiveOp>(
+                [&](auto op) { ++collectiveCount; });
       });
     }
 
@@ -227,6 +230,7 @@ static void prettyPrintStatistics(const UsageInfo &usageInfo,
   os << llvm::formatv("//   DMA Fills: {0}\n", stats.fillCount);
   os << llvm::formatv("//  DMA Copies: {0}\n", stats.copyCount);
   os << llvm::formatv("//  Dispatches: {0}\n", stats.dispatchCount);
+  os << llvm::formatv("// Collectives: {0}\n", stats.collectiveCount);
 
   os << llvm::formatv(
       "// Executables: {0}, {1}% reuse\n", stats.executableCount,

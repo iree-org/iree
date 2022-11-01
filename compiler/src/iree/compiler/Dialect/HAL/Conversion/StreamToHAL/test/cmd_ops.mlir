@@ -204,3 +204,65 @@ func.func @cmdExecuteAffinities(%arg0: !stream.resource<transient>, %arg1: index
   // CHECK-SAME: commands([%[[CMD]]])
   return %0 : !stream.timepoint
 }
+
+// -----
+
+// CHECK-LABEL: @cmdCollective
+func.func @cmdCollective(%arg0: !stream.resource<transient>, %arg1: index, %arg2: !stream.resource<transient>, %arg3: index, %arg4: !stream.channel) -> !stream.timepoint {
+  %c0 = arith.constant 0 : index
+  %c128 = arith.constant 128 : index
+  // CHECK: %[[CMD:.+]] = hal.command_buffer.create
+  %0 = stream.cmd.execute with(%arg0 as %arg5: !stream.resource<transient>{%arg1}, %arg2 as %arg6: !stream.resource<transient>{%arg3}) {
+
+    // Out-of-place all-reduce:
+    // CHECK-NEXT: hal.command_buffer.collective
+    // CHECK-SAME: channel(%arg4 : !hal.channel)
+    // CHECK-SAME: op(<all_reduce with sum : f32>)
+    // CHECK-SAME: send(%arg0 : !hal.buffer)[%c0, %c128]
+    // CHECK-SAME: recv(%arg2 : !hal.buffer)[%c0, %c128]
+    // CHECK-SAME: count(%c128)
+    stream.cmd.collective<all_reduce with sum : f32>[%c128] channel(%arg4) {
+      ro %arg5[%c0 for %c128] : !stream.resource<transient>{%arg1},
+      wo %arg6[%c0 for %c128] : !stream.resource<transient>{%arg3}
+    }
+    // CHECK-NEXT: hal.command_buffer.execution_barrier<%[[CMD]]
+
+    // In-place all-reduce:
+    // CHECK-NEXT: hal.command_buffer.collective
+    // CHECK-SAME: channel(%arg4 : !hal.channel)
+    // CHECK-SAME: op(<all_reduce with average : f32>)
+    // CHECK-SAME: send(%arg0 : !hal.buffer)[%c0, %c128]
+    // CHECK-SAME: recv(%arg0 : !hal.buffer)[%c0, %c128]
+    // CHECK-SAME: count(%c128)
+    stream.cmd.collective<all_reduce with average : f32>[%c128] channel(%arg4) {
+      ro %arg5[%c0 for %c128] : !stream.resource<transient>{%arg1},
+      wo %arg5[%c0 for %c128] : !stream.resource<transient>{%arg3}
+    }
+    // CHECK-NEXT: hal.command_buffer.execution_barrier<%[[CMD]]
+
+    // Send:
+    // CHECK-NEXT: hal.command_buffer.collective
+    // CHECK-SAME: channel(%arg4 : !hal.channel)
+    // CHECK-SAME: op(<send : f32>)
+    // CHECK-SAME: send(%arg0 : !hal.buffer)[%c0, %c128]
+    // CHECK-SAME: count(%c128)
+    stream.cmd.collective<send : f32>[%c128] channel(%arg4) {
+      ro %arg5[%c0 for %c128] : !stream.resource<transient>{%arg1}
+    }
+    // CHECK-NEXT: hal.command_buffer.execution_barrier<%[[CMD]]
+
+    // Recv:
+    // CHECK-NEXT: hal.command_buffer.collective
+    // CHECK-SAME: channel(%arg4 : !hal.channel)
+    // CHECK-SAME: op(<recv : f32>)
+    // CHECK-SAME: recv(%arg0 : !hal.buffer)[%c0, %c128]
+    // CHECK-SAME: count(%c128)
+    stream.cmd.collective<recv : f32>[%c128] channel(%arg4) {
+      wo %arg5[%c0 for %c128] : !stream.resource<transient>{%arg1}
+    }
+    // CHECK-NEXT: hal.command_buffer.execution_barrier<%[[CMD]]
+
+  } => !stream.timepoint
+  // CHECK-NEXT: hal.command_buffer.finalize<%[[CMD]]
+  return %0 : !stream.timepoint
+}

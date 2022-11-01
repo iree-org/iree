@@ -9,6 +9,7 @@
 // CHECK-PRETTY:   DMA Fills: 0
 // CHECK-PRETTY:  DMA Copies: 2
 // CHECK-PRETTY:  Dispatches: 3
+// CHECK-PRETTY: Collectives: 0
 // CHECK-PRETTY: Executables: 2, 33% reuse
 
 // CHECK-CSV: ; Aggregate Statistics
