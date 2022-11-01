@@ -159,9 +159,6 @@ tileInterfaceOpImpl(OpBuilder &builder, TilingInterface tilableOp,
       loc, lb, ub, step, initValues,
       [&](OpBuilder &b, Location loc, Value iv, ValueRange args) {
         offsets.push_back(iv);
-        // Similar to linalg tiling, the tile size is the min(tileSizes, ub -
-        // iv) to account for cases where tile size does not divide (ub - lb)
-        // exactly.
         auto affineMaps = AffineMap::inferFromExprList({ArrayRef<AffineExpr>{
             b.getAffineSymbolExpr(0),
             b.getAffineSymbolExpr(1) - b.getAffineDimExpr(0)}})[0];
