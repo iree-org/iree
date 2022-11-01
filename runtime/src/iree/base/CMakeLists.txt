@@ -189,3 +189,43 @@ else()
     PUBLIC
   )
 endif()
+
+if(EMSCRIPTEN)
+  iree_cc_library(
+    NAME
+      loop_emscripten
+    HDRS
+      "loop_emscripten.h"
+    SRCS
+      "loop_emscripten.c"
+    DEPS
+      ::base
+      ::tracing
+    PUBLIC
+  )
+
+  iree_link_js_library(
+    NAME
+      iree_base_loop_emscripten
+    SRCS
+      "loop_emscripten.js"
+  )
+
+  # TODO(scotttodd): rewrite as a JS/C file and test with Promises
+  #   The C++ test uses IREE_LOOP_COMMAND_DRAIN, which is not implemented here
+  #   This test is just useful for the initial bring-up.
+  iree_cc_test(
+    NAME
+      loop_emscripten_test
+    SRCS
+      "loop_emscripten_test.cc"
+    DEPS
+      ::base
+      ::cc
+      ::loop_emscripten
+      ::loop_test_hdrs
+      ::tracing
+      iree::testing::gtest
+      iree::testing::gtest_main
+  )
+endif()
