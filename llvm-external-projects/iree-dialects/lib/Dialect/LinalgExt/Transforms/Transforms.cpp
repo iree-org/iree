@@ -814,29 +814,31 @@ Value getInputOrPaddedInput(OpBuilder &builder, PackOp packOp) {
     return input;
   }
 
+
   Location loc = packOp.getLoc();
-  ShapedType outputType = packOp.getOutputType();
-  int64_t inputRank = packOp.getInputRank();
+  ShapedType inputType = packOp.getInputType();
+  int64_t inputRank = inputType.getRank();
+  assert(llvm::all_of(packOp.getOutputShape().take_front(inputRank),
+                      [](int64_t val) { return val == 1; }));
 
   SmallVector<int64_t> paddedShape;
   DenseMap<int64_t, OpFoldResult> tileAndPosMapping =
       packOp.getDimAndTileMapping();
   for (int64_t dim = 0; dim < inputRank; ++dim) {
-    int64_t size = outputType.getDimSize(dim);
+    int64_t size = inputType.getDimSize(dim);
     if (!tileAndPosMapping.count(dim)) {
       paddedShape.push_back(size);
       continue;
     }
 
+    // The size is less than or equal to tileSize because outer dims are all 1s.
     Optional<int64_t> tileSize =
         getConstantIntValue(tileAndPosMapping.lookup(dim));
-    assert((!outputType.isDynamicDim(dim) && tileSize.hasValue()) &&
-           "something goes really wrong...");
-    int64_t sizeWithPad = llvm::alignTo(size, tileSize.getValue());
-    paddedShape.push_back(sizeWithPad);
+    assert(tileSize.hasValue() && "dynamic inner tile size is not supported");
+    paddedShape.push_back(tileSize.value());
   }
   auto resultType =
-      RankedTensorType::get(paddedShape, outputType.getElementType());
+      RankedTensorType::get(paddedShape, inputType.getElementType());
   return tensor::createPadHighOp(resultType, input, packOp.getPaddingValue(),
                                  /*nofold=*/false, loc, builder);
 }
