@@ -54,7 +54,6 @@ struct LinalgSingleTilingExpertPassOptions {
   SmallVector<int64_t> packPaddings = {};
   SmallVector<int64_t> hoistPaddings = {};
   SmallVector<std::string> transposePaddings = {};
-  bool scalarizeDynamicDims = false;
   bool generalize = false;
   SmallVector<int64_t> iteratorInterchange = {};
   bool decomposeToLowerDimOp = false;

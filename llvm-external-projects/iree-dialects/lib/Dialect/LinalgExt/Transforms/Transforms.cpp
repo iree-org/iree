@@ -191,6 +191,26 @@ LinalgTileAndFuseTensorOpsBasePattern::returningMatchAndRewrite(
   return tileLoopNest;
 }
 
+/// Peel loops after tiling.
+static void peelTiledLinalgOp(RewriterBase &rewriter,
+                              linalg::TiledLinalgOp &res,
+                              ArrayRef<int64_t> peeledLoops,
+                              linalg::LinalgTilingLoopType loopType) {
+  for (int64_t loop : peeledLoops) {
+    assert(loop < static_cast<int64_t>(res.loops.size()) &&
+           "requested peeling of non-existing loop");
+    SmallVector<Value, 4> loopResults;
+    Operation *loopOp = res.loops[loop];
+    loopResults = linalg::peelLoop(rewriter, loopOp);
+
+    // The result of the loop nest may change with peeling.
+    if (res.tensorResults.size() == loopOp->getNumResults() &&
+        std::equal(res.tensorResults.begin(), res.tensorResults.end(),
+                   loopOp->getResults().begin()))
+      res.tensorResults = loopResults;
+  }
+}
+
 /// Linalg tiling pattern.
 LinalgTilingPattern::LinalgTilingPattern(
     MLIRContext *context, linalg::LinalgTilingOptions options,
