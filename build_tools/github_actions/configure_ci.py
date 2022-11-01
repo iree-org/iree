@@ -75,7 +75,7 @@ def get_trailers() -> Mapping[str, str]:
                                  timeout=60).stdout.splitlines()
   return {
       k.lower().strip(): v.strip()
-      for k, v in (line.split(":") for line in trailer_lines)
+      for k, v in (line.split(":", maxsplit=1) for line in trailer_lines)
   }
 
 
