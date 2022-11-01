@@ -1,18 +1,21 @@
 // RUN: iree-opt --split-input-file --verify-diagnostics --iree-mhlo-to-mhlo-preprocessing %s | FileCheck %s
 
-func.func @scatter_implicit_batch(%arg0: tensor<5x5xi32>, %arg1: tensor<2xi32>, %arg2: tensor<i32>) -> tensor<5x5xi32> {
+func.func @scatter_implicit_batch(%arg0: tensor<5x6x7xi32>, %arg1: tensor<2xi32>, %arg2: tensor<7xi32>) -> tensor<5x6x7xi32> {
   %0 = "mhlo.scatter"(%arg0, %arg1, %arg2) ({
   ^bb0(%arg3: tensor<i32>, %arg4: tensor<i32>):
     "mhlo.return"(%arg4) : (tensor<i32>) -> ()
-  }) {indices_are_sorted = true, scatter_dimension_numbers = #mhlo.scatter<inserted_window_dims = [0, 1], scatter_dims_to_operand_dims = [0, 1]>, unique_indices = true} : (tensor<5x5xi32>, tensor<2xi32>, tensor<i32>) -> tensor<5x5xi32>
-  return %0 : tensor<5x5xi32>
+  }) {indices_are_sorted = true, scatter_dimension_numbers = #mhlo.scatter<update_window_dims = [0], inserted_window_dims = [0, 1], scatter_dims_to_operand_dims = [0, 1]>, unique_indices = true} : (tensor<5x6x7xi32>, tensor<2xi32>, tensor<7xi32>) -> tensor<5x6x7xi32>
+  return %0 : tensor<5x6x7xi32>
 }
 
 // CHECK-LABEL: func.func @scatter_implicit_batch
 // CHECK-DAG: %[[RE_I:.+]] = tensor.expand_shape %{{.*}} {{\[\[}}0, 1]] : tensor<2xi32> into tensor<1x2xi32>
-// CHECK-DAG: %[[RE_U:.+]] = tensor.expand_shape %{{.*}} [] : tensor<i32> into tensor<1xi32>
+// CHECK-DAG: %[[RE_U:.+]] = tensor.expand_shape %{{.*}} {{\[\[}}0, 1]] : tensor<7xi32> into tensor<1x7xi32>
 // CHECK:     %[[SCATTER:.+]] = "mhlo.scatter"(%{{.*}}, %[[RE_I]], %[[RE_U]])
 // CHECK:       mhlo.return %{{.*}}
+// CHECK:            update_window_dims = [1],
+// CHECK-SAME:       inserted_window_dims = [0, 1]
+// CHECK-SAME:       scatter_dims_to_operand_dims = [0, 1]
 
 // -----
 

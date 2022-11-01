@@ -526,6 +526,13 @@ struct ScatterOpImplicitBatch : public OpRewritePattern<mhlo::ScatterOp> {
           op, "Unable to add implicit batch dim to indice.");
     }
 
+    llvm::SmallVector<int64_t> newUpdateWindowDims;
+    for (auto dim : dimNumbers.getUpdateWindowDims()) {
+      // Batch dimension is inserted at the start so window dimensions are shift
+      // forwards.
+      newUpdateWindowDims.push_back(dim + 1);
+    }
+
     llvm::SmallVector<Value> updates;
     for (Value update : op.getUpdates()) {
       update = addUnitBatchDim(op.getLoc(), update, rewriter);
@@ -537,7 +544,7 @@ struct ScatterOpImplicitBatch : public OpRewritePattern<mhlo::ScatterOp> {
     }
 
     auto newDimNumbers = mhlo::ScatterDimensionNumbersAttr::get(
-        op.getContext(), dimNumbers.getUpdateWindowDims(),
+        op.getContext(), newUpdateWindowDims,
         dimNumbers.getInsertedWindowDims(),
         dimNumbers.getScatterDimsToOperandDims(),
         dimNumbers.getIndexVectorDim() + 1);
