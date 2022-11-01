@@ -64,7 +64,7 @@ static Optional<CooperativeMatrixSize> getCooperativeMatrixSize(
 
         int64_t nCount = 0, mCount = 0;
         uint64_t subgroupCount = numSubgroupsPerWorkgroup;
-        uint64_t squareRoot = 1u << (llvm::Log2_64(subgroupCount) / 2);
+        uint64_t squareRoot = 1ull << (llvm::Log2_64(subgroupCount) / 2);
 
         // See if the square root of subgroupCount can divide mTileCount. If so
         // it means we can distribute to both dimensions evenly. Otherwise, try

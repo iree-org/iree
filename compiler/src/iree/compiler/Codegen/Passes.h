@@ -36,6 +36,11 @@ LogicalResult verifyLoweringConfiguration(
 // Misc/common conversions
 //------------------------------------------------------------------------------
 
+/// Post-bufferization passes run to cleanup the IR
+/// (ResolveShapedTypeResultDims, Canonicalization/CSE and
+/// CleanupBufferAllocView).
+void addIREEPostBufferizationPasses(OpPassManager &passManager);
+
 using bufferization::BufferizationOptions;
 void addIREEComprehensiveBufferizePasses(
     OpPassManager &passManager,
@@ -47,9 +52,9 @@ void addIREEComprehensiveBufferizePasses(
 /// allocations and view operations.
 std::unique_ptr<OperationPass<func::FuncOp>> createCleanupBufferAllocViewPass();
 
-/// Pass to bufferize dispatches that are copying from one interface to another.
-/// This will create a `linalg.generic` op which is a copy that can then be
-/// used by backends to handle appropriately.
+/// Pass to bufferize dispatches that are copying from one interface to
+/// another. This will create a `linalg.generic` op which is a copy that can
+/// then be used by backends to handle appropriately.
 std::unique_ptr<OperationPass<ModuleOp>>
 createBufferizeCopyOnlyDispatchesPass();
 
@@ -57,32 +62,33 @@ createBufferizeCopyOnlyDispatchesPass();
 // one op in the body.
 std::unique_ptr<Pass> createDecomposeLinalgGenericPass();
 
-/// Flattens n-D MemRef subspan ops to 1-D MemRef and folds the byte offsets on
-/// subspan ops to the consumer load/store ops, in preparation for lowering to
-/// backends that require linearized access.
+/// Flattens n-D MemRef subspan ops to 1-D MemRef and folds the byte offsets
+/// on subspan ops to the consumer load/store ops, in preparation for lowering
+/// to backends that require linearized access.
 std::unique_ptr<OperationPass<ModuleOp>> createFlattenMemRefSubspanPass();
 
 /// Creates a pass to fold `affine.min` ops in tiled and distributed loops.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createFoldAffineMinInDistributedLoopsPass();
 
-/// After running the upstream TensorConstantBufferize pass, remove tensor_loads
-/// introduced for use only in tensor_extract. These can be folded to use a load
-/// of the created memref object that holds the constant values.
+/// After running the upstream TensorConstantBufferize pass, remove
+/// tensor_loads introduced for use only in tensor_extract. These can be
+/// folded to use a load of the created memref object that holds the constant
+/// values.
 std::unique_ptr<OperationPass<>> createFoldTensorExtractOpPass();
 
 /// An ad-hoc pass to canonicalize selected loop carried dependencies on
 /// scf.for.
 std::unique_ptr<OperationPass<func::FuncOp>> createForOpCanonicalizationPass();
 
-/// Pass to perform linalg on tensor bufferization. The function passed into the
-/// pass through the `allocationFn` argument is invoked whenever a new buffer is
-/// to be created. The callback will be passed the Values for the dynamic
-/// dimensions in the memref type that is to be allocated.  The callback is
-/// expected to return a MemRefType Value.  When no `allocationFn` is specified,
-/// the default allocator generates an `std.alloc` instruction with the
-/// allocated MemRefType having no stride map (i.e. default row-major striding)
-/// and default memory space.
+/// Pass to perform linalg on tensor bufferization. The function passed into
+/// the pass through the `allocationFn` argument is invoked whenever a new
+/// buffer is to be created. The callback will be passed the Values for the
+/// dynamic dimensions in the memref type that is to be allocated.  The
+/// callback is expected to return a MemRefType Value.  When no `allocationFn`
+/// is specified, the default allocator generates an `std.alloc` instruction
+/// with the allocated MemRefType having no stride map (i.e. default row-major
+/// striding) and default memory space.
 std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
     Optional<BufferizationOptions::AllocationFn> allocationFn = None,
     Optional<BufferizationOptions::DeallocationFn> deallocationFn = None,
@@ -261,20 +267,20 @@ void populateUnfusedFMAOpsPassPatterns(MLIRContext *context,
 //----------------------------------------------------------------------------//
 
 /// Populates the passes to lower to scalars operations for linalg based
-/// code-generation. This pipeline does not vectorize, but instead just converts
-/// to memrefs
+/// code-generation. This pipeline does not vectorize, but instead just
+/// converts to memrefs
 void addCPUDefaultPassPipeline(OpPassManager &passManager);
 
 /// Populates the passes to lower ops through data tiling transformations.
 void addCPUDataTilingPipeline(OpPassManager &passManager);
 
-/// Populates the passes to lower to tiled/distributed/bufferized ops, suitable
-/// for library call dispatch and lowering to loops.
+/// Populates the passes to lower to tiled/distributed/bufferized ops,
+/// suitable for library call dispatch and lowering to loops.
 void addVMVXDefaultPassPipeline(OpPassManager &passManager);
 
-/// Populates the passes to lower linalg ops on buffers. Currenly this pipeline
-/// is only used for dispatches that just copy data from input interfaces to
-/// output interface.
+/// Populates the passes to lower linalg ops on buffers. Currenly this
+/// pipeline is only used for dispatches that just copy data from input
+/// interfaces to output interface.
 void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager);
 
 /// Populates the passes needed to multi level tile and lowering of linalg ops
@@ -305,13 +311,13 @@ LogicalResult verifyConvTileAndDecomposeExpertConfig(
     ArrayRef<int64_t> workgroupSize = {});
 void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager);
 
-/// Populates the passes from Sandbox for testing transformations from sandbox.
-/// Unlike other pipelines this pass mangaer is nested at the
+/// Populates the passes from Sandbox for testing transformations from
+/// sandbox. Unlike other pipelines this pass mangaer is nested at the
 /// `hal.executable.variant` op.
 void addTransformDialectInterpreterPasses(OpPassManager &passManager);
 
-/// Populates the passes needed to multi level tile, fuse and vectorize lowering
-/// of linalg ops on tensors to vectors operations.
+/// Populates the passes needed to multi level tile, fuse and vectorize
+/// lowering of linalg ops on tensors to vectors operations.
 void addCPUAArchDoubleTilingExpertPassPipeline(OpPassManager &passManager);
 
 //----------------------------------------------------------------------------//
@@ -380,13 +386,13 @@ void addGPUWarpReductionPassPipeline(OpPassManager &pm);
 void addGPUTransformDialectInterpreterPasses(OpPassManager &pm);
 
 /// Simple lowering only distributute linalg ops on blocks and threads. This
-/// will result in scalar operations. Expects pass manager to be a module-level
-/// pass manager.
+/// will result in scalar operations. Expects pass manager to be a
+/// module-level pass manager.
 void addGPUSimpleDistributePassPipeline(OpPassManager &pm);
 
-/// Populates passes needed to lower a XLA HLO op to NVVM/ROCDL dialect via the
-/// structured ops path. The pass manager `pm` in here should operate on the
-/// module within the IREE::HAL::ExecutableOp.
+/// Populates passes needed to lower a XLA HLO op to NVVM/ROCDL dialect via
+/// the structured ops path. The pass manager `pm` in here should operate on
+/// the module within the IREE::HAL::ExecutableOp.
 void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM);
 
 /// Performs the final conversion to NNVM+LLVM dialect.
@@ -480,16 +486,17 @@ createSPIRVFoldProcessorIDUsesPass();
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createSPIRVLowerExecutableTargetPass();
 
-/// Pass to tile and distribute Linalg ops with buffer semantics to invocations.
+/// Pass to tile and distribute Linalg ops with buffer semantics to
+/// invocations.
 std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVTileAndDistributePass();
 
-/// Pass to promote Linalg ops with buffer semantics to use workgroup memory and
-/// then tile to invocations.
+/// Pass to promote Linalg ops with buffer semantics to use workgroup memory
+/// and then tile to invocations.
 std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVTileAndPromotePass(
     bool skipThreadLevel = false);
 
-/// Pass to tile Linalg ops with buffer semantics to subgroups and vectorize to
-/// vector ops suitable for lowering to SPIR-V cooperative ops.
+/// Pass to tile Linalg ops with buffer semantics to subgroups and vectorize
+/// to vector ops suitable for lowering to SPIR-V cooperative ops.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVTileAndVectorizeToCooperativeOpsPass();
 
@@ -513,7 +520,8 @@ std::unique_ptr<OperationPass<ModuleOp>> createSPIRVVectorizeLoadStore();
 
 // Uses `tensor.pad` ops as anchors to create separate fast and slow paths
 // inside the kernel. The fast path is for inner tiles where we don't need
-// padding, while the slow path is for boundary tiles where we do need padding.
+// padding, while the slow path is for boundary tiles where we do need
+// padding.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVCreateFastSlowPathPass();
 
@@ -524,8 +532,8 @@ std::unique_ptr<OperationPass<ModuleOp>> createSPIRVEmulateI64Pass();
 // SPIRV Codegen Pass Pipelines.
 //----------------------------------------------------------------------------//
 
-/// Populates passes needed to lower linalg/arith/math ops to SPIR-V ops via the
-/// structured ops path. The pass manager `pm` here operate on the module
+/// Populates passes needed to lower linalg/arith/math ops to SPIR-V ops via
+/// the structured ops path. The pass manager `pm` here operate on the module
 /// within the IREE::HAL::ExecutableOp.
 void buildSPIRVCodegenPassPipeline(OpPassManager &pm, bool enableFastMath);
 

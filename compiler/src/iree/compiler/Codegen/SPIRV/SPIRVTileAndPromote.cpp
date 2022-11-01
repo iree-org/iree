@@ -93,15 +93,10 @@ static const char promoteLHSMarker[] = "promote_lhs";
 static const char promoteRHSMarker[] = "promote_rhs";
 static const char promoteBothMarker[] = "promote_lhs_and_rhs";
 
-LogicalResult copyToWorkgroupMemory(OpBuilder &builder, Value src, Value dst) {
-  Operation *copyOp = builder.create<memref::CopyOp>(src.getLoc(), src, dst);
-  setMarker(copyOp, getCopyToWorkgroupMemoryMarker());
-  return success();
-}
-
 template <typename T>
 using LinalgPromotionPattern =
     mlir::iree_compiler::IREE::LinalgExt::LinalgPromotionPattern<T>;
+
 static void populatePromotionPatterns(RewritePatternSet &patterns,
                                       StringAttr replaceMarker) {
   MLIRContext *context = patterns.getContext();
@@ -257,24 +252,8 @@ void SPIRVTileAndPromotePass::runOnOperation() {
                                             std::move(promotionPatterns)))) {
       return signalPassFailure();
     }
-
-    // Insert barriers before and after copies to workgroup memory and skip
-    // insert barriers between back to back copy to workgroup memory.
-    OpBuilder builder(&getContext());
-    funcOp.walk([&builder](memref::CopyOp copyOp) {
-      if (hasMarker(copyOp, getCopyToWorkgroupMemoryMarker())) {
-        Operation *prevOp = copyOp->getPrevNode();
-        if (!prevOp || !hasMarker(prevOp, getCopyToWorkgroupMemoryMarker())) {
-          builder.setInsertionPoint(copyOp);
-          builder.create<gpu::BarrierOp>(copyOp.getLoc());
-        }
-        Operation *nextOp = copyOp->getNextNode();
-        if (!nextOp || !hasMarker(nextOp, getCopyToWorkgroupMemoryMarker())) {
-          builder.setInsertionPointAfter(copyOp);
-          builder.create<gpu::BarrierOp>(copyOp.getLoc());
-        }
-      }
-    });
+    // Insert barriers before and after copies to workgroup memory.
+    insertBarriersAroundSharedMemoryCopy(funcOp);
 
     // If we fail to promote (e.g., for cases where we just have one tile so
     // that there are no subview ops), still update markers to make sure
