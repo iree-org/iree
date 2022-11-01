@@ -6,15 +6,23 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 #
-# Runs SHARK tank using both SHARK-Runtime and IREE-Runtime, producing benchmark
-# numbers.
+# Runs `mmperf` (https://github.com/mmperf/mmperf).
+#
+# `mmperf` benchmarks matrix-multiply workloads on IREE and other backends such
+# as RUY, TVM, Halide, CuBLAS, etc. Some backends are included as submodules
+# in the `mmperf` repo and built from source, and other backends are expected
+# to already be installed.
+#
+# Please refer to `build_tools/docker/mmperf/Dockerfile` for commands on
+# installing various backends.
+#
+# Currently x86 CPU and CUDA are supported. Benchmarks are run directly on the
+# machine the script is executed on.
 #
 # Usage:
-#    ./run_shark.sh \
-#        <SHA of https://github.com/nod-ai/SHARK.git to pin to> \
-#        <pytest regex> e.g. "cpu", "cuda", "cuda and torch".
-#        <driver> e.g. "cpu", "cuda", "vulkan"
-#        <output directory>
+#    ./run_mmperf.sh \
+#        <results directory> \
+#        <backend> e.g. "cpu", "cuda".
 
 set -xeuo pipefail
 
@@ -22,22 +30,21 @@ export REPORT_DIR=$1
 # Either `cpu` or `cuda`.
 export BACKEND=$2
 
-git clone https://github.com/mmperf/mmperf.git
-cd mmperf
+git clone --recurse-submodules https://github.com/mmperf/mmperf.git
+pushd mmperf
 
 # Update IREE.
-cd external/iree
-git fetch --all
+pushd external/iree
+git fetch
 git checkout origin/main
-git submodule update --init --recursive
-cd -
+git submodule update --init --jobs 8 --depth 1
+popd
 
 # Create virtual environment.
 python3 -m venv mmperf.venv
 source mmperf.venv/bin/activate
 pip install -r requirements.txt
 pip install -r ./external/llvm-project/mlir/python/requirements.txt
-pip install requests
 
 # Build mmperf.
 if [ ${BACKEND} == "cuda" ]; then
@@ -69,5 +76,5 @@ fi
 cmake --build ../mmperf-build -j32 --verbose
 
 # Run benchmark.
-cd ../
+popd
 python3 mmperf/mmperf.py ./mmperf-build/matmul/ ${REPORT_DIR}

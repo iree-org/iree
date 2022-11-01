@@ -4,7 +4,14 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# An image for running SHARK tank: https://github.com/nod-ai/SHARK.
+# An image for running mmperf: https://github.com/mmperf/mmperf.
+#
+# mmperf benchmarks matrix-multiplication workloads on IREE and various backends
+# such as OpenBLAS, MKL, TVM, Halide, CuBLAS, etc.
+#
+# These backends are included either in this image or as a submodule in the
+# mmperf repo. Later versions of Clang, LLVM, Python and Ubuntu are needed
+# to satisfy the dependency requirements of the backends.
 
 FROM ubuntu:22.04
 
