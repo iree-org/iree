@@ -269,6 +269,18 @@ def GPUTileReduction :
   let constructor = "mlir::iree_compiler::createGPUTileReductionPass()";
 }
 
+def GPUTileTensor :
+    Pass<"iree-gpu-tile-tensor", "func::FuncOp"> {
+  let summary = "Pass to tile linalg on tensor ops within a workgroup.";
+  let constructor = "mlir::iree_compiler::createGPUTileTensor()";
+}
+
+def GPUDistribute :
+    Pass<"iree-gpu-distribute", "func::FuncOp"> {
+  let summary = "Pass to distribute foreachthread ops.";
+  let constructor = "mlir::iree_compiler::createGPUDistribute()";
+}
+
 def VectorReduceToGPU :
     Pass<"iree-codegen-reduction-to-gpu", "func::FuncOp"> {
   let summary = "Convert vector reduction to gpu ops.";
@@ -516,6 +528,12 @@ def SPIRVTileAndVectorizeToCooperativeOps : Pass<
                 "cooperative ops";
   let constructor =
     "mlir::iree_compiler::createSPIRVTileAndVectorizeToCooperativeOpsPass()";
+}
+
+def SPIRVTensorAlloc :
+    Pass<"iree-spirv-alloc", "func::FuncOp"> {
+  let summary = "Pass to create allocation for some values.";
+  let constructor = "mlir::iree_compiler::createSPIRVTensorAlloc()";
 }
 
 def SPIRVTileAndPromote : Pass<"iree-spirv-tile-and-promote", "func::FuncOp"> {

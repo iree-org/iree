@@ -37,6 +37,9 @@ int64_t getTileBytes(int64_t mTileSize, int64_t nTileSize, int64_t kTileSize,
 int64_t getMultiBufferMemoryUsage(int64_t usedBytes, unsigned depth,
                                   unsigned storeStage);
 
+/// Has two or three parallel loops
+bool hasTwoOrThreeLoopsInfo(linalg::LinalgOp linalgOp);
+
 namespace detail {
 
 const int bankConflictReductionPaddingBits = 128;
@@ -47,6 +50,10 @@ const int bankConflictReductionPaddingBits = 128;
 LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
                               const int64_t subgroupSize,
                               const int64_t bestTilingFactor);
+
+/// Sets CodeGen configurations via attributes to the given transpose `linalgOp`
+/// with the given best workgroup size and tile size hints.
+LogicalResult setTransposeConfig(linalg::LinalgOp linalgOp);
 
 /// Sets CodeGen configurations via attributes to the given matmul `linalgOp`
 /// with the given best workgroup size and tile size hints.

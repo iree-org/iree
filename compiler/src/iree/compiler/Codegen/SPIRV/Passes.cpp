@@ -256,9 +256,14 @@ void addSPIRVBaseVectorizePassPipeline(OpPassManager &pm) {
   // Tile to GPU invocations and vectorize.
   nestedModulePM.addNestedPass<func::FuncOp>(
       createSPIRVCreateFastSlowPathPass());
+  
+  nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVTensorAlloc());
   nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVTilePass());
+  addBufferizePasses(nestedModulePM, gpuAllocateWorkgroupMemoryFn);
+
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
+
   nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorizePass());
   nestedModulePM.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
   nestedModulePM.addPass(createCanonicalizerPass());
@@ -266,6 +271,11 @@ void addSPIRVBaseVectorizePassPipeline(OpPassManager &pm) {
 
   // Bufferize and distribute.
   addSPIRVBufferizePasses(nestedModulePM, gpuAllocateFunctionMemoryFn);
+
+  
+  nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createGPUDistributeSharedMemoryCopy());
 
   // Generate loop nests for all remaining ops and remove trivial loops.
   addLoopMaterializationPasses(nestedModulePM);
@@ -482,6 +492,50 @@ void addSPIRVWinogradVectorizePassPipeline(OpPassManager &pm) {
   // forwarding, shape casting and casting op cancelling.
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());
+}
+
+void addSPIRVTransposePassPipeline(OpPassManager &pm) {
+  addTileAndDistributeToWorkgroupsPasses(
+      pm, /*useFuseTensorPadWithConsumerPass=*/ false);
+  auto &nestedModulePM = pm.nest<ModuleOp>();
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createWorkgroupSpecializationPass());
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createRemoveSingleIterationLoopPass());
+
+  nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVTensorAlloc());
+  nestedModulePM.addNestedPass<func::FuncOp>(createGPUTileTensor(false));
+
+  nestedModulePM.addNestedPass<func::FuncOp>(createGPUVectorizationPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorizePass());
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createOptimizeVectorTransferPass());
+
+  addBufferizePasses(nestedModulePM, gpuAllocateWorkgroupMemoryFn);
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+
+  // distribute foreach threads
+  nestedModulePM.addNestedPass<func::FuncOp>(createGPUDistribute());
+
+  nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createGPUDistributeSharedMemoryCopy());
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createGPUReduceSharedMemoryBankConflicts(/*paddingSizeBits=*/32));
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createRemoveSingleIterationLoopPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorizePass());
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
 }
 
 //===----------------------------------------------------------------------===//

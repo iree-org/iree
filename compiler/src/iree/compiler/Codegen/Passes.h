@@ -178,6 +178,13 @@ std::unique_ptr<OperationPass<func::FuncOp>> createGPUVectorizationPass(
 /// Tile reductions and generate serial loops around reductions.
 std::unique_ptr<OperationPass<func::FuncOp>> createGPUTileReductionPass();
 
+/// Perform tiling.
+std::unique_ptr<OperationPass<func::FuncOp>> createGPUTileTensor(
+    bool distributeToWarp = false);
+
+/// Distribution to threads.
+std::unique_ptr<OperationPass<func::FuncOp>> createGPUDistribute();
+
 // Distributes vector ops to all threads/warps in a GPU workgroup.
 // `getWarpSize` is for deciding the warp size to use; it takes the
 // current function containing those vector ops as the argument.
@@ -507,6 +514,9 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm,
 /// reduction to workgroups and then subgroups.
 void addSPIRVSubgroupReducePassPipeline(OpPassManager &pm);
 
+// Lowering Transpose using shared memory 
+void addSPIRVTransposePassPipeline(OpPassManager &pm);
+
 /// Pass to perform the final conversion to SPIR-V dialect.
 ///
 /// This pass converts remaining interface ops into SPIR-V global variables,
@@ -524,6 +534,8 @@ createSPIRVFoldProcessorIDUsesPass();
 /// scalar + vector code.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createSPIRVLowerExecutableTargetPass();
+
+std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVTensorAlloc();
 
 /// Pass to tile and distribute Linalg ops with buffer semantics to
 /// invocations.

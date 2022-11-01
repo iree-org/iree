@@ -10,8 +10,10 @@
 #include <numeric>
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Codegen/Common/LinalgOpInfo.h"
 #include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
+#include "iree/compiler/Codegen/SPIRV/TransposeUtils.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -40,6 +42,12 @@ using llvm::APIntOps::GreatestCommonDivisor;
 constexpr unsigned numTilesPerSubgroupDimK = 2;
 
 constexpr int kMaxVectorNumBits = 128;
+
+static llvm::cl::opt<bool> clPromoteTranspose(
+    "iree-codegen-vulkan-promote-transpose",
+    llvm::cl::desc(
+        "whether to promote transposes to shared memory or not"),
+    llvm::cl::init(false));
 
 namespace mlir {
 namespace iree_compiler {
@@ -271,6 +279,75 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
 }
 
 }  // namespace detail
+
+bool hasTwoOrThreeLoopsInfo(linalg::LinalgOp linalgOp) {
+  return linalgOp.getNumParallelLoops() >= 2 &&
+         linalgOp.getNumParallelLoops() <= 3;
+}
+
+namespace detail {
+
+LogicalResult setTransposeConfig(linalg::LinalgOp linalgOp) {
+  LinalgOpInfo opInfo(linalgOp, sharedMemTransposeFilter);
+
+  // Checks preconditions for shared mem transpose.
+  if (!opInfo.isTranspose() || opInfo.isDynamic() || opInfo.isReduction() ||
+      !isa<linalg::GenericOp>(linalgOp) || !hasTwoOrThreeLoopsInfo(linalgOp)) {
+    return failure();
+  }
+
+  ArrayRef<OpOperand *> transposedOperands = opInfo.getTransposeOperands();
+
+  // Determine the fastest moving dimensions for the source/destination indices
+  // of each transpose. These inform the tile sizes.
+  int64_t outputFastestDim = linalgOp.getNumLoops() - 1;
+  int64_t inputFastestDim =
+      linalgOp.getMatchingIndexingMap(transposedOperands[0])
+          .getDimPosition(outputFastestDim);
+  // Ensure the other transposed operands match
+  for (int i = 1; i < transposedOperands.size(); ++i) {
+    if (inputFastestDim !=
+        linalgOp.getMatchingIndexingMap(transposedOperands[i])
+            .getDimPosition(outputFastestDim)) {
+      return failure();
+    }
+  }
+
+  SmallVector<int64_t> workgroupTileSizes(4, 1);
+  workgroupTileSizes[0] = 32;
+  workgroupTileSizes[1] = 32;
+  workgroupTileSizes[2] = 32;
+  workgroupTileSizes[3] = 32;
+  int32_t tileM = 32;
+  int32_t tileN = 32;
+  TileSizesListType tileSizes;
+  // Set all tile sizes to 1 except for fastest moving dimensions.
+  SmallVector<int64_t> tileSizesTemp(linalgOp.getNumLoops(), 1);
+  tileSizesTemp[outputFastestDim] = 32;
+  tileSizesTemp[inputFastestDim] = 32;
+  tileSizes.push_back(workgroupTileSizes);
+  tileSizes.push_back(tileSizesTemp);
+
+  // Check alignment with tile size for each transpose. Only the fastest moving
+  // dims need to match the transpose tile.
+  auto loopRanges = linalgOp.getStaticLoopRanges();
+  if (loopRanges[outputFastestDim] % tileM != 0 ||
+      loopRanges[inputFastestDim] % tileN != 0) {
+    return failure();
+  }
+
+  // Workgroup size contains 8 warps. Configured with 8 threads on fastest
+  // moving dimension so each thread can execute a vectorized copy of 4
+  // contigious elements at a time from the 32 block.
+  std::array<int64_t, 3> workgroupSize = {8, 32, 1};
+
+  return setOpConfigAndEntryPointFnTranslation(
+      linalgOp->getParentOfType<func::FuncOp>(), linalgOp, tileSizes,
+      IREE::Codegen::DispatchLoweringPassPipeline::SPIRVTransposeSharedMem,
+      workgroupSize);
+}
+
+} // namespace detail
 
 //===----------------------------------------------------------------------===//
 // Matmul Default Configuration
@@ -1351,6 +1428,9 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
         // which will mark it as a root.
         if (op.getNumLoops() != op.getNumParallelLoops()) {
           return setDefaultOpConfig(limits, op);
+        } else if (clPromoteTranspose && op.getNumLoops() == op.getNumParallelLoops() &&
+                   succeeded(detail::setTransposeConfig(op))) {
+	  return success();
         }
         return success();
       })

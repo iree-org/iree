@@ -178,6 +178,10 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
       case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVWinogradVectorize:
         addSPIRVWinogradVectorizePassPipeline(pipeline);
         break;
+      case IREE::Codegen::DispatchLoweringPassPipeline::
+          SPIRVTransposeSharedMem:
+        addSPIRVTransposePassPipeline(pipeline);
+        break;
       default:
         variantOp.emitOpError("Unsupported pipeline on GPU target.");
         return signalPassFailure();

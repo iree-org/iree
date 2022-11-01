@@ -49,8 +49,8 @@ def SPIRV_SubgroupReduce
     : I32EnumAttrCase<"SPIRVSubgroupReduce", 19>;
 def SPIRV_WinogradVectorize
     : I32EnumAttrCase<"SPIRVWinogradVectorize", 20>;
-
-def VMVX_Default : I32EnumAttrCase<"VMVXDefault", 21>;
+def SPIRV_TransposeSharedMem : I32EnumAttrCase<"SPIRVTransposeSharedMem", 21>;
+def VMVX_Default : I32EnumAttrCase<"VMVXDefault", 22>;
 
 
 def Linalg_TransformInterpCodegen
@@ -77,7 +77,7 @@ def DispatchLoweringPassPipelineEnum
                     SPIRV_SubgroupReduce, SPIRV_WinogradVectorize,
                     VMVX_Default,
                     // Transform dialect based codegen
-                    Linalg_TransformInterpCodegen,
+                    Linalg_TransformInterpCodegen, SPIRV_TransposeSharedMem,
                     Linalg_TransformJitCodegen,
                     None
                   ]> {
