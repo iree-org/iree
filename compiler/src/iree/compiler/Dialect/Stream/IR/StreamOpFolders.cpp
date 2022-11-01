@@ -2015,7 +2015,7 @@ void CmdCopyOp::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 //===----------------------------------------------------------------------===//
-// stream.cmd.dispatch
+// stream.cmd.collective
 //===----------------------------------------------------------------------===//
 
 namespace {
@@ -2032,9 +2032,10 @@ namespace {
 //  stream.cmd.dispatch ... {
 //    rw %0[%new_offset] ... {%subview_length}
 //  }
-struct FoldSubviewsIntoCmdDispatchOp : public OpRewritePattern<CmdDispatchOp> {
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(CmdDispatchOp op,
+template <typename Op>
+struct FoldSubviewsIntoDispatchOp : public OpRewritePattern<Op> {
+  using OpRewritePattern<Op>::OpRewritePattern;
+  LogicalResult matchAndRewrite(Op op,
                                 PatternRewriter &rewriter) const override {
     SmallVector<ResourceSubviewOp> resourceSubviewOps;
     resourceSubviewOps.reserve(op.getResources().size());
@@ -2072,9 +2073,18 @@ struct FoldSubviewsIntoCmdDispatchOp : public OpRewritePattern<CmdDispatchOp> {
 
 }  // namespace
 
+void CmdCollectiveOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                  MLIRContext *context) {
+  results.insert<FoldSubviewsIntoDispatchOp<CmdCollectiveOp>>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// stream.cmd.dispatch
+//===----------------------------------------------------------------------===//
+
 void CmdDispatchOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                 MLIRContext *context) {
-  results.insert<FoldSubviewsIntoCmdDispatchOp>(context);
+  results.insert<FoldSubviewsIntoDispatchOp<CmdDispatchOp>>(context);
 }
 
 //===----------------------------------------------------------------------===//
