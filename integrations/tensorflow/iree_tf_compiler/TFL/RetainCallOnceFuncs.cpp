@@ -36,7 +36,7 @@ class RetainCallOnceFuncsPass
 
     for (auto func : moduleOp.getOps<mlir::func::FuncOp>()) {
       for (auto callOnce : func.getOps<mlir::TFL::CallOnceOp>()) {
-        auto callFunc = funcMap[callOnce.session_init_function()];
+        auto callFunc = funcMap[callOnce.getSessionInitFunction()];
         callOnce->setAttr("session_init_function_symbol",
                           SymbolRefAttr::get(callFunc));
       }

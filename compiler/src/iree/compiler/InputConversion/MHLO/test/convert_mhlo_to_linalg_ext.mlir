@@ -407,7 +407,7 @@ func.func @rfft_1d(%input: tensor<8xf32>) -> (tensor<5xf32>, tensor<5xf32>) {
 // CHECK-SAME:     outs(%[[R2]]#0, %[[R2]]#1
 // CHECK:        %[[RES_REAL:.+]] = tensor.extract_slice %[[R3]]#0[0] [5] [1] : tensor<8xf32> to tensor<5xf32>
 // CHECK:        %[[RES_IMAG:.+]] = tensor.extract_slice %[[R3]]#1[0] [5] [1] : tensor<8xf32> to tensor<5xf32>
-// CHECK:        %{{.+}} = mhlo.complex(%[[RES_REAL]], %[[RES_IMAG]])
+// CHECK:        %{{.+}} = mhlo.complex %[[RES_REAL]], %[[RES_IMAG]]
 
 // -----
 
