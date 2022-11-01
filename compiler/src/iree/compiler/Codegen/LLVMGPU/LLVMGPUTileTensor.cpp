@@ -17,6 +17,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -194,7 +195,7 @@ struct LLVMGPUTileTensorPass
   LLVMGPUTileTensorPass(bool distributeToWarp)
       : distributeToWarp(distributeToWarp) {}
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<AffineDialect, gpu::GPUDialect>();
+    registry.insert<AffineDialect, gpu::GPUDialect, scf::SCFDialect>();
   }
   void runOnOperation() override {
     auto funcOp = getOperation();
