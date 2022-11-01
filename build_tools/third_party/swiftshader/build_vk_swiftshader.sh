@@ -78,6 +78,7 @@ fi
 cmake -B "${SWIFTSHADER_INSTALL_DIR?}" \
     -GNinja \
     -DSWIFTSHADER_BUILD_TESTS=OFF \
+    -DSWIFTSHADER_WARNINGS_AS_ERRORS=OFF \
     "${SWIFTSHADER_DIR?}"
 
 # Build the project, choosing just the vk_swiftshader target.

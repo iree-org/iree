@@ -47,7 +47,6 @@ iree_cc_binary(
   DEPS
     benchmark
     iree::base
-    iree::base::cc
     iree::base::internal::flags
     iree::base::tracing
     iree::hal
@@ -56,7 +55,6 @@ iree_cc_binary(
     iree::tooling::device_util
     iree::tooling::vm_util_cc
     iree::vm
-    iree::vm::cc
 )
 
 iree_cc_binary(
@@ -87,7 +85,6 @@ iree_cc_binary(
     "iree-check-module-main.cc"
   DEPS
     iree::base
-    iree::base::cc
     iree::base::core_headers
     iree::base::internal::file_io
     iree::base::internal::flags
@@ -124,7 +121,6 @@ iree_cc_binary(
     "iree-run-module-main.cc"
   DEPS
     iree::base
-    iree::base::cc
     iree::base::internal::flags
     iree::base::tracing
     iree::hal
@@ -134,7 +130,6 @@ iree_cc_binary(
     iree::tooling::device_util
     iree::tooling::vm_util_cc
     iree::vm
-    iree::vm::cc
 )
 
 iree_cc_binary(
@@ -250,7 +245,6 @@ if(IREE_BUILD_COMPILER)
       MLIRSupport
       MLIRTargetLLVMIRExport
       iree::base
-      iree::base::cc
       iree::base::internal::flags
       iree::base::tracing
       iree::compiler::Dialect::HAL::Target
@@ -266,7 +260,6 @@ if(IREE_BUILD_COMPILER)
       iree::tooling::vm_util_cc
       iree::vm
       iree::vm::bytecode_module
-      iree::vm::cc
     DATA
       ${IREE_LLD_TARGET}
     HOSTONLY

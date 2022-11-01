@@ -205,8 +205,12 @@ static void addSPIRVLoweringPasses(OpPassManager &pm, bool enableFastMath) {
 
   pm.addPass(createConvertToSPIRVPass(enableFastMath));
 
+  auto getTargetEnv = [](spirv::ModuleOp moduleOp) {
+    return getSPIRVTargetEnvAttr(moduleOp);
+  };
+
   OpPassManager &spirvPM = pm.nest<spirv::ModuleOp>();
-  spirvPM.addPass(spirv::createUnifyAliasedResourcePass());
+  spirvPM.addPass(spirv::createUnifyAliasedResourcePass(getTargetEnv));
   spirvPM.addPass(spirv::createLowerABIAttributesPass());
   spirvPM.addPass(createCanonicalizerPass());
   spirvPM.addPass(createCSEPass());
@@ -261,12 +265,26 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm) {
 
   addBufferizePasses(nestedModulePM, gpuAllocateWorkgroupMemoryFn);
 
-  // Tile and distribute to GPU subgroups and vectorize.
+  // Tile to GPU workgroups and promote.
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createSPIRVTileAndVectorizeToCooperativeOpsPass());
+      createSPIRVTileAndPromotePass(/*skipThreadLevel=*/true));
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createRemoveSingleIterationLoopPass());
+  // Run canonicalization patterns to propagate constant shape sizes after
+  // removing trip-one loops.
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createGPUDistributeSharedMemoryCopy());
+
+  // Tile and distribute to GPU subgroups and vectorize.
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createSPIRVTileAndVectorizeToCooperativeOpsPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createRemoveSingleIterationLoopPass());
+  // Run canonicalization patterns to propagate constant shape sizes after
+  // removing trip-one loops.
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
@@ -280,7 +298,8 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm) {
   nestedModulePM.addPass(memref::createFoldMemRefAliasOpsPass());
 
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createSPIRVVectorToCooperativeOpsPass());
+      createSPIRVVectorToGPUSubgroupMMAOpsPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorizePass());
 }
 
 void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm) {
@@ -296,6 +315,8 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm) {
       createGPUDistributeSharedMemoryCopy());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createGPUReduceSharedMemoryBankConflicts());
 
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());

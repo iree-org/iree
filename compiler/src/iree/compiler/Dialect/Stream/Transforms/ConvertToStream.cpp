@@ -5,11 +5,11 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
-#include "iree/compiler/Dialect/Stream/Conversion/FlowToStream/ConvertFlowToStream.h"
-#include "iree/compiler/Dialect/Stream/Conversion/HALToStream/ConvertHALToStream.h"
+#include "iree/compiler/Dialect/Stream/Conversion/FlowToStream/Patterns.h"
+#include "iree/compiler/Dialect/Stream/Conversion/HALToStream/Patterns.h"
 #include "iree/compiler/Dialect/Stream/Conversion/PatternUtils.h"
-#include "iree/compiler/Dialect/Stream/Conversion/StandardToStream/ConvertStandardToStream.h"
-#include "iree/compiler/Dialect/Stream/Conversion/UtilToStream/ConvertUtilToStream.h"
+#include "iree/compiler/Dialect/Stream/Conversion/StandardToStream/Patterns.h"
+#include "iree/compiler/Dialect/Stream/Conversion/UtilToStream/Patterns.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"

@@ -10,7 +10,7 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Transforms.h"
-#include "iree/compiler/Dialect/Flow/Conversion/TensorToFlow/ConvertTensorToFlow.h"
+#include "iree/compiler/Dialect/Flow/Conversion/TensorToFlow/Patterns.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
@@ -798,7 +798,7 @@ static bool isInsOperandBufferizable(OpOperand *insOperand,
     }
     return true;
   };
-  return llvm::any_of(linalgOp.getOutputOperands(), canTieWithOutsOperand);
+  return llvm::any_of(linalgOp.getDpsInitOperands(), canTieWithOutsOperand);
 }
 
 /// Method to check if two `linalg.generic` op with producer-consumer
@@ -975,13 +975,13 @@ static bool isFusableWithProducer(OpOperand &operand, bool aggressiveFusion) {
   }
 
   auto consumerLinalgOp = cast<linalg::LinalgOp>(consumer);
-  if (consumerLinalgOp.isInput(&operand)) {
+  if (consumerLinalgOp.isDpsInput(&operand)) {
     // Only fuse on inputs if both ops are generic ops.
     if (!aggressiveFusion || !isa<linalg::GenericOp>(consumer) ||
         !isa<linalg::GenericOp>(producer)) {
       return false;
     }
-  } else if (!consumerLinalgOp.isOutput(&operand)) {
+  } else if (!consumerLinalgOp.isDpsInit(&operand)) {
     return false;
   }
 

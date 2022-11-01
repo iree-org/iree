@@ -19,8 +19,7 @@ static void iree_runtime_demo_perform_mul(iree_runtime_session_t* session);
 int main(int argc, char** argv) {
   // Create and configure the instance shared across all sessions.
   iree_runtime_instance_options_t instance_options;
-  iree_runtime_instance_options_initialize(IREE_API_VERSION_LATEST,
-                                           &instance_options);
+  iree_runtime_instance_options_initialize(&instance_options);
   iree_runtime_instance_options_use_all_available_drivers(&instance_options);
   iree_runtime_instance_t* instance = NULL;
   IREE_CHECK_OK(iree_runtime_instance_create(

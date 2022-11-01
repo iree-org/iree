@@ -48,7 +48,7 @@ iree_cc_library(
   SRCS
     "mmt4d_select_tile_arch.c"
   DEPS
-    iree::builtins::ukernel::types
+    iree::builtins::ukernel::common
     ${IREE_UKERNEL_ARCH_DEPS}
   PUBLIC
 )

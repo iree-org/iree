@@ -50,29 +50,29 @@ class LowerGlobalTensorsPass
       // for each handle, save out the constant value.
       for (auto init : func.getOps<mlir::TFL::CallOnceOp>()) {
         auto findInitFunc =
-            symNameToFunction.find(init.session_init_function());
+            symNameToFunction.find(init.getSessionInitFunction());
         if (findInitFunc == symNameToFunction.end()) {
           init.emitError("Unable to find initialization function: " +
-                         init.session_init_function());
+                         init.getSessionInitFunction());
           continue;
         }
         func::FuncOp initFunc = std::get<1>(*findInitFunc);
         for (auto assign : initFunc.getOps<mlir::TFL::AssignVariableOp>()) {
           auto handle = dyn_cast<mlir::TFL::VarHandleOp>(
-              assign.resource_id().getDefiningOp());
+              assign.getResourceId().getDefiningOp());
           if (!handle) continue;
 
           DenseElementsAttr constant;
-          if (!matchPattern(assign.value(), m_Constant(&constant))) {
+          if (!matchPattern(assign.getValue(), m_Constant(&constant))) {
             // Quantized types we can not use the m_Constant matcher.
             if (auto constOp = dyn_cast<mlir::TFL::QConstOp>(
-                    assign.value().getDefiningOp())) {
-              constant = constOp.value().cast<DenseElementsAttr>();
+                    assign.getValue().getDefiningOp())) {
+              constant = constOp.getValue().cast<DenseElementsAttr>();
             }
           }
           if (!constant) continue;
 
-          auto name = handle.shared_name();
+          auto name = handle.getSharedName();
           sharedNameToConstant[name] = constant;
           sharedNameToLoc[name] = handle.getLoc();
         }
@@ -123,11 +123,11 @@ class LowerGlobalTensorsPass
     // Replace the assign ops with a global store operation.
     for (auto assign : assignOps) {
       auto handle = dyn_cast<mlir::TFL::VarHandleOp>(
-          assign.resource_id().getDefiningOp());
+          assign.getResourceId().getDefiningOp());
       if (!handle) continue;
 
-      Value value = assign.value();
-      auto globalOpIt = symbolRefMap.find(handle.shared_name());
+      Value value = assign.getValue();
+      auto globalOpIt = symbolRefMap.find(handle.getSharedName());
       if (globalOpIt == symbolRefMap.end()) {
         assign->emitError(
             "Unable to find corresponding GlobalOp for op's VarHandle");
@@ -150,11 +150,11 @@ class LowerGlobalTensorsPass
     }
 
     for (auto read : readOps) {
-      auto handle =
-          dyn_cast<mlir::TFL::VarHandleOp>(read.resource_id().getDefiningOp());
+      auto handle = dyn_cast<mlir::TFL::VarHandleOp>(
+          read.getResourceId().getDefiningOp());
       if (!handle) continue;
 
-      auto globalOpIt = symbolRefMap.find(handle.shared_name());
+      auto globalOpIt = symbolRefMap.find(handle.getSharedName());
       if (globalOpIt == symbolRefMap.end()) continue;
       auto globalOp = std::get<1>(*globalOpIt);
 

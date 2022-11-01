@@ -57,8 +57,8 @@ typedef enum {
 
 // Macros to access various typed, dereferenced pointers.
 #define ASF32(ptr) *((float*)ptr)
-#define ASUI32(ptr) *((uint32_t*)ptr)
-#define ASSI32(ptr) *((int32_t*)ptr)
+#define ASUI32(ptr) *((iree_ukernel_uint32_t*)ptr)
+#define ASSI32(ptr) *((iree_ukernel_int32_t*)ptr)
 
 //===----------------------------------------------------------------------===//
 // Math helper functions (extracted from base/internal/math.h and adapted
@@ -73,7 +73,7 @@ typedef enum {
 #pragma intrinsic(_BitScanForward)
 #endif  // IREE_COMPILER_MSVC
 
-static inline int iree_ukernel_count_leading_zeros_u32(const uint32_t n) {
+static inline int iree_ukernel_count_leading_zeros_u32(const iree_ukernel_uint32_t n) {
 #if defined(_MSC_VER)
   unsigned long result = 0;  // NOLINT(runtime/int)
   if (_BitScanReverse(&result, n)) {
@@ -115,7 +115,7 @@ static inline int iree_ukernel_count_leading_zeros_u32(const uint32_t n) {
       iree_ukernel_ssize_t lhs_stride0, iree_ukernel_ssize_t lhs_stride1,       \
       const dtype* rhs, iree_ukernel_ssize_t rhs_offset,                       \
       iree_ukernel_ssize_t rhs_stride0, iree_ukernel_ssize_t rhs_stride1,       \
-      dtype* IREE_RESTRICT out, iree_ukernel_ssize_t out_offset,               \
+      dtype* IREE_UKERNEL_RESTRICT out, iree_ukernel_ssize_t out_offset,               \
       iree_ukernel_ssize_t out_stride0, iree_ukernel_ssize_t out_stride1,       \
       iree_ukernel_ssize_t size0, iree_ukernel_ssize_t size1) {                 \
     return iree_ukernel_generic_##category##_2d(                              \
@@ -131,7 +131,7 @@ static inline int iree_ukernel_count_leading_zeros_u32(const uint32_t n) {
   IREE_UKERNEL_EXPORT int iree_ukernel_##category##_##opcode##_2d(        \
       const dtype* in, iree_ukernel_ssize_t in_offset,                     \
       iree_ukernel_ssize_t in_stride0, iree_ukernel_ssize_t in_stride1,     \
-      dtype* IREE_RESTRICT out, iree_ukernel_ssize_t out_offset,           \
+      dtype* IREE_UKERNEL_RESTRICT out, iree_ukernel_ssize_t out_offset,           \
       iree_ukernel_ssize_t out_stride0, iree_ukernel_ssize_t out_stride1,   \
       iree_ukernel_ssize_t size0, iree_ukernel_ssize_t size1) {             \
     return iree_ukernel_generic_##category##_2d(                          \
@@ -146,8 +146,8 @@ static inline int iree_ukernel_count_leading_zeros_u32(const uint32_t n) {
 // Computes a single element of an x32b opcode. On error, should set
 // |*result_code| to a non-zero value (but should not touch it otherwise).
 static void iree_ukernel_generic_x32b_op(iree_ukernel_x32b_opcode_t opcode,
-                                         int* result_code, const uint32_t* lhs,
-                                         const uint32_t* rhs, uint32_t* out) {
+                                         int* result_code, const iree_ukernel_uint32_t* lhs,
+                                         const iree_ukernel_uint32_t* rhs, iree_ukernel_uint32_t* out) {
   switch (opcode) {
     case IREE_UKERNEL_X32B_ADDF:
       ASF32(out) = ASF32(lhs) + ASF32(rhs);
@@ -202,8 +202,8 @@ static void iree_ukernel_generic_x32b_op(iree_ukernel_x32b_opcode_t opcode,
 // Computes a single element of an x32u opcode. On error, should set
 // |*result_code| to a non-zero value (but should not touch it otherwise).
 static void iree_ukernel_generic_x32u_op(iree_ukernel_x32u_opcode_t opcode,
-                                         int* result_code, const uint32_t* in,
-                                         uint32_t* out) {
+                                         int* result_code, const iree_ukernel_uint32_t* in,
+                                         iree_ukernel_uint32_t* out) {
   switch (opcode) {
     case IREE_UKERNEL_X32U_ABSF:
       ASF32(out) = fabsf(ASF32(in));
@@ -242,13 +242,13 @@ static void iree_ukernel_generic_x32u_op(iree_ukernel_x32u_opcode_t opcode,
 static int iree_ukernel_generic_x32b_2d(
     iree_ukernel_x32b_opcode_t opcode,
     // LHS.
-    const uint32_t* lhs, iree_ukernel_ssize_t lhs_offset,
+    const iree_ukernel_uint32_t* lhs, iree_ukernel_ssize_t lhs_offset,
     iree_ukernel_ssize_t lhs_stride0, iree_ukernel_ssize_t lhs_stride1,
     // RHS
-    const uint32_t* rhs, iree_ukernel_ssize_t rhs_offset,
+    const iree_ukernel_uint32_t* rhs, iree_ukernel_ssize_t rhs_offset,
     iree_ukernel_ssize_t rhs_stride0, iree_ukernel_ssize_t rhs_stride1,
     // OUT.
-    uint32_t* IREE_RESTRICT out, iree_ukernel_ssize_t out_offset,
+    iree_ukernel_uint32_t* IREE_UKERNEL_RESTRICT out, iree_ukernel_ssize_t out_offset,
     iree_ukernel_ssize_t out_stride0, iree_ukernel_ssize_t out_stride1,
     // Sizes.
     iree_ukernel_ssize_t size0, iree_ukernel_ssize_t size1) {
@@ -269,10 +269,10 @@ static int iree_ukernel_generic_x32b_2d(
 static int iree_ukernel_generic_x32u_2d(
     iree_ukernel_x32u_opcode_t opcode,
     // IN.
-    const uint32_t* in, iree_ukernel_ssize_t in_offset,
+    const iree_ukernel_uint32_t* in, iree_ukernel_ssize_t in_offset,
     iree_ukernel_ssize_t in_stride0, iree_ukernel_ssize_t in_stride1,
     // OUT.
-    uint32_t* IREE_RESTRICT out, iree_ukernel_ssize_t out_offset,
+    iree_ukernel_uint32_t* IREE_UKERNEL_RESTRICT out, iree_ukernel_ssize_t out_offset,
     iree_ukernel_ssize_t out_stride0, iree_ukernel_ssize_t out_stride1,
     // Sizes.
     iree_ukernel_ssize_t size0, iree_ukernel_ssize_t size1) {

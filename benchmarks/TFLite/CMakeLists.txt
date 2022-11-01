@@ -16,20 +16,19 @@
 #                                                                              #
 ################################################################################
 
-# TODO(#10748): Disabled since the iree-import-tflite fails on this model.
-# set(DEEPLABV3_FP32_MODULE
-#   NAME
-#     "DeepLabV3"
-#   TAGS
-#     "fp32"
-#   SOURCE
-#     # Mirror of https://tfhub.dev/tensorflow/lite-model/deeplabv3/1/default/1
-#     "https://storage.googleapis.com/iree-model-artifacts/deeplabv3.tflite"
-#   ENTRY_FUNCTION
-#     "main"
-#   FUNCTION_INPUTS
-#     "1x257x257x3xf32"
-# )
+set(DEEPLABV3_FP32_MODULE
+  NAME
+    "DeepLabV3"
+  TAGS
+    "fp32"
+  SOURCE
+    # Mirror of https://tfhub.dev/tensorflow/lite-model/deeplabv3/1/default/1
+    "https://storage.googleapis.com/iree-model-artifacts/deeplabv3.tflite"
+  ENTRY_FUNCTION
+    "main"
+  FUNCTION_INPUTS
+    "1x257x257x3xf32"
+)
 
 set(MOBILESSD_FP32_MODULE
   NAME

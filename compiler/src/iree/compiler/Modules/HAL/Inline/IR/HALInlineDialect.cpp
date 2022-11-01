@@ -7,7 +7,7 @@
 #include "iree/compiler/Modules/HAL/Inline/IR/HALInlineDialect.h"
 
 #include "iree/compiler/Dialect/VM/Conversion/ConversionDialectInterface.h"
-#include "iree/compiler/Modules/HAL/Inline/Conversion/HALInlineToVM/ConvertHALInlineToVM.h"
+#include "iree/compiler/Modules/HAL/Inline/Conversion/HALInlineToVM/Patterns.h"
 #include "iree/compiler/Modules/HAL/Inline/IR/HALInlineOps.h"
 #include "iree/compiler/Modules/HAL/Inline/hal_inline.imports.h"
 #include "llvm/Support/SourceMgr.h"

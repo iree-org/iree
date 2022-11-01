@@ -31,7 +31,7 @@ iree_cc_library(
     ${NATIVE_APP_GLUE_DIR}
   DEPS
     ::android_native_app_glue
-    iree::base::cc
+    iree::base
     iree::modules::hal
     iree::tooling::device_util
     iree::tooling::vm_util_cc

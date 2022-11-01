@@ -129,7 +129,7 @@ static bool supportsTensorCore(func::FuncOp entryPoint, linalg::LinalgOp op) {
     if (it == body.op_end() || !isa<arith::MulFOp>(*(it++))) return false;
     if (it == body.op_end() || !isa<arith::AddFOp>(*(it++))) return false;
     if (it == body.op_end() || !isa<linalg::YieldOp>(*(it++))) return false;
-    AffineMap outputMap = op.getMatchingIndexingMap(op.getOutputOperand(0));
+    AffineMap outputMap = op.getMatchingIndexingMap(op.getDpsInitOperand(0));
     if (outputMap.getNumResults() != outputMap.getNumDims() - 1) return false;
     OpBuilder b(op);
     for (unsigned i = 0, e = outputMap.getNumResults(); i < e - 1; i++) {
@@ -172,22 +172,22 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
       };
   // Infer the MxN size of the matmul based on operands and indexing maps.
   auto lhsShape =
-      op.getInputOperand(0)->get().getType().cast<ShapedType>().getShape();
+      op.getDpsInputOperand(0)->get().getType().cast<ShapedType>().getShape();
   auto rhsShape =
-      op.getInputOperand(1)->get().getType().cast<ShapedType>().getShape();
+      op.getDpsInputOperand(1)->get().getType().cast<ShapedType>().getShape();
   int64_t sizeM = ShapedType::kDynamicSize;
   int64_t sizeN = ShapedType::kDynamicSize;
   int64_t sizeK = ShapedType::kDynamicSize;
-  auto outputMap = op.getMatchingIndexingMap(op.getOutputOperand(0));
+  auto outputMap = op.getMatchingIndexingMap(op.getDpsInitOperand(0));
   for (unsigned i = 0; i < lhsShape.size(); i++) {
-    if (op.getMatchingIndexingMap(op.getInputOperand(0)).getDimPosition(i) ==
+    if (op.getMatchingIndexingMap(op.getDpsInputOperand(0)).getDimPosition(i) ==
         outputMap.getDimPosition(outputMap.getNumResults() - 2)) {
       sizeM = lhsShape[i];
       break;
     }
   }
   for (unsigned i = 0; i < rhsShape.size(); i++) {
-    if (op.getMatchingIndexingMap(op.getInputOperand(1)).getDimPosition(i) ==
+    if (op.getMatchingIndexingMap(op.getDpsInputOperand(1)).getDimPosition(i) ==
         outputMap.getDimPosition(outputMap.getNumResults() - 1)) {
       sizeN = rhsShape[i];
       break;
@@ -197,8 +197,8 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
   op.getReductionDims(exprs);
   if (exprs.size() == 1) {
     for (unsigned i = 0; i < lhsShape.size(); i++) {
-      if (op.getMatchingIndexingMap(op.getInputOperand(0)).getDimPosition(i) ==
-          exprs[0]) {
+      if (op.getMatchingIndexingMap(op.getDpsInputOperand(0))
+              .getDimPosition(i) == exprs[0]) {
         sizeK = lhsShape[i];
         break;
       }
@@ -212,7 +212,7 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
     if (supportsTensorCore(entryPoint, op)) {
       SmallVector<TileWorkgroupSizePair> TCtileSizeConfig;
 
-      getTensorCoreConfig(TCtileSizeConfig, op.getInputOperand(0)
+      getTensorCoreConfig(TCtileSizeConfig, op.getDpsInputOperand(0)
                                                 ->get()
                                                 .getType()
                                                 .cast<RankedTensorType>()
@@ -371,14 +371,14 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
   }
 
   if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
-    for (auto outputOperand : enumerate(genericOp.getOutputOperands())) {
+    for (auto outputOperand : enumerate(genericOp.getDpsInitOperands())) {
       if (!genericOp.getMatchingIndexingMap(outputOperand.value())
                .isProjectedPermutation()) {
         vectorSize = 1;
         break;
       }
       ArrayRef<int64_t> shape = cast<linalg::LinalgOp>(op)
-                                    .getOutputOperand(outputOperand.index())
+                                    .getDpsInitOperand(outputOperand.index())
                                     ->get()
                                     .getType()
                                     .cast<ShapedType>()
@@ -482,7 +482,7 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
 
   // Only support projected permutation, this could be extended to projected
   // permutated with broadcast.
-  if (llvm::any_of(op.getInputOperands(), [&](OpOperand *input) {
+  if (llvm::any_of(op.getDpsInputOperands(), [&](OpOperand *input) {
         return !op.getMatchingIndexingMap(input).isProjectedPermutation();
       }))
     return failure();
@@ -495,7 +495,7 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   Optional<int64_t> dimSize = getLinalgDimSize(op, reductionDims[0]);
   if (!dimSize || *dimSize % cudaWarpSize != 0) return failure();
 
-  const Type elementType = op.getOutputOperand(0)
+  const Type elementType = op.getDpsInitOperand(0)
                                ->get()
                                .getType()
                                .cast<ShapedType>()
@@ -680,9 +680,9 @@ static LogicalResult setConvolutionConfig(linalg::LinalgOp linalgOp,
   const int owIndex = isNHWC ? 2 : 3;
   const int ocIndex = isNHWC ? 3 : 1;
 
-  Type inputType = linalgOp.getInputOperand(0)->get().getType();
+  Type inputType = linalgOp.getDpsInputOperand(0)->get().getType();
   ArrayRef<int64_t> inputShape = inputType.cast<ShapedType>().getShape();
-  Type outputType = linalgOp.getOutputOperand(0)->get().getType();
+  Type outputType = linalgOp.getDpsInitOperand(0)->get().getType();
   ArrayRef<int64_t> outputShape = outputType.cast<ShapedType>().getShape();
   if (ShapedType::isDynamic(inputShape[3]) ||
       llvm::any_of(outputShape.drop_front(), ShapedType::isDynamic)) {

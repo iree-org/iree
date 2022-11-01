@@ -33,7 +33,7 @@ iree_cc_library(
     "SPIRVTileAndDistribute.cpp"
     "SPIRVTileAndPromote.cpp"
     "SPIRVTileAndVectorizeToCooperativeOps.cpp"
-    "SPIRVVectorToCooperativeOps.cpp"
+    "SPIRVVectorToGPUSubgroupMMAOps.cpp"
     "SPIRVVectorize.cpp"
     "SPIRVVectorizeLoadStore.cpp"
     "Utils.cpp"
@@ -87,6 +87,7 @@ iree_cc_library(
     MLIRTransforms
     MLIRVectorDialect
     MLIRVectorInterfaces
+    MLIRVectorToGPU
     MLIRVectorToSPIRV
     MLIRVectorTransforms
     iree::compiler::Codegen::Common

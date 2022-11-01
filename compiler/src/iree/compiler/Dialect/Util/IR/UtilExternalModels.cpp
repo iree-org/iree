@@ -67,13 +67,13 @@ struct LinalgOpTiedOpInterface
   Value getTiedResult(Operation *op, unsigned resultIndex) const {
     auto linalgOp = cast<OpTy>(op);
     return IREE::Util::TiedOpInterface::findTiedBaseValue(
-        linalgOp.getOutputOperands()[resultIndex]->get());
+        linalgOp.getDpsInitOperands()[resultIndex]->get());
   }
 
   ::llvm::Optional<unsigned> getTiedResultOperandIndex(
       Operation *op, unsigned resultIndex) const {
     auto linalgOp = cast<OpTy>(op);
-    return {linalgOp.getOutputOperands()[resultIndex]->getOperandNumber()};
+    return {linalgOp.getDpsInitOperands()[resultIndex]->getOperandNumber()};
   }
 
   SmallVector<int64_t, 4> getTiedResultOperandIndices(Operation *op) const {

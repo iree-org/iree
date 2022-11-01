@@ -128,7 +128,7 @@ bool isHoistableConstExprLeaf(const ConstExprAnalysis::ConstValueInfo *info) {
     // op cheaper.
     if (genericOp.getNumParallelLoops() == genericOp.getNumLoops() &&
         isa<linalg::YieldOp>(genericOp.getBody()->front())) {
-      for (OpOperand *opOperand : genericOp.getInputOperands()) {
+      for (OpOperand *opOperand : genericOp.getDpsInputOperands()) {
         AffineMap indexingMap = genericOp.getMatchingIndexingMap(opOperand);
         if (indexingMap.isProjectedPermutation() &&
             indexingMap.getNumDims() != indexingMap.getNumResults()) {
@@ -151,7 +151,7 @@ bool isHoistableConstExprConsumingOperand(OpOperand *operand) {
   Operation *op = operand->getOwner();
   // For linalg ops, we only want to hoist inputs.
   if (auto structuredOp = dyn_cast<linalg::LinalgOp>(op)) {
-    return operand->getOperandNumber() < structuredOp.getNumInputs();
+    return operand->getOperandNumber() < structuredOp.getNumDpsInputs();
   }
 
   // Fallback to yes.

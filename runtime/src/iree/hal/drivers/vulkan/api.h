@@ -153,12 +153,26 @@ typedef struct iree_hal_vulkan_queue_set_t {
 // TODO(benvanik): replace with flag list (easier to version).
 enum iree_hal_vulkan_device_flag_bits_t {
   IREE_HAL_VULKAN_DEVICE_FLAG_NONE = 0u,
+
+  // Prefer choosing a dedicated VK_QUEUE_COMPUTE_BIT without
+  // VK_QUEUE_GRAPHICS_BIT capabilities. When integrating into an application
+  // that makes heavy use of the primary graphics/compute queue this can allow
+  // IREE execution to run asynchronously with the graphics workloads.
+  // See: https://gpuopen.com/learn/concurrent-execution-asynchronous-queues/
+  IREE_HAL_VULKAN_DEVICE_FLAG_DEDICATED_COMPUTE_QUEUE = 1u << 0,
 };
 typedef uint32_t iree_hal_vulkan_device_flags_t;
 
 typedef struct iree_hal_vulkan_device_options_t {
   // Flags controlling device behavior.
   iree_hal_vulkan_device_flags_t flags;
+
+  // Sets the VMA preferredLargeHeapBlockSize field to control the preferred
+  // size of a large heap block allocation. This effectively specifies the
+  // minimum amount of memory required and will always allocate at least this
+  // much.
+  // NOTE: this is temporary and likely to get removed in the future.
+  iree_device_size_t large_heap_block_size;
 } iree_hal_vulkan_device_options_t;
 
 IREE_API_EXPORT void iree_hal_vulkan_device_options_initialize(

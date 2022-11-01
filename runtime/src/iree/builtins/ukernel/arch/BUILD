@@ -35,6 +35,6 @@ iree_runtime_cc_library(
         "mmt4d_select_tile_arch.h",
     ],
     deps = [
-        "//runtime/src/iree/builtins/ukernel:types",
+        "//runtime/src/iree/builtins/ukernel:common",
     ],
 )

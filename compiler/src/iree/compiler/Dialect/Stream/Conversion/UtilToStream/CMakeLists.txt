@@ -14,9 +14,9 @@ iree_cc_library(
   NAME
     UtilToStream
   HDRS
-    "ConvertUtilToStream.h"
+    "Patterns.h"
   SRCS
-    "ConvertUtilToStream.cpp"
+    "Patterns.cpp"
   DEPS
     MLIRFuncDialect
     MLIRIR

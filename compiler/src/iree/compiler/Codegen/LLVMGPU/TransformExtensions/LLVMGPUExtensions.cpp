@@ -422,6 +422,30 @@ struct WarpOpLoad : public OpRewritePattern<vector::WarpExecuteOnLane0Op> {
     return success();
   }
 };
+
+/// Shared memory allocations are representated as AllocOp in IREE but they
+/// really have the semantic of global variables. Therefore hoisting them is
+/// always correct for static allocations.
+struct HoistSharedMemoryAlloc : public OpRewritePattern<memref::AllocOp> {
+  using OpRewritePattern<memref::AllocOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(memref::AllocOp alloc,
+                                PatternRewriter &rewriter) const override {
+    if (alloc.getType().getMemorySpaceAsInt() !=
+            gpu::GPUDialect::getWorkgroupAddressSpace() ||
+        alloc.getNumOperands() != 0)
+      return failure();
+    auto warpParent = alloc->getParentOfType<vector::WarpExecuteOnLane0Op>();
+    if (!warpParent) return failure();
+    alloc->moveBefore(warpParent);
+    // Conservatively move the dealloc after the warpOp. This may extend the
+    // liverange of the allocation but is always correct.
+    for (Operation *user : alloc->getUsers()) {
+      if (isa<memref::DeallocOp>(user)) user->moveAfter(warpParent);
+    }
+    return success();
+  }
+};
+
 }  // namespace
 
 static void populateMultiReductionLoweringPatterns(Operation *target,
@@ -458,7 +482,8 @@ static void populatePropagateVectorDistribution(Operation *target,
   assert(target->hasTrait<OpTrait::IsIsolatedFromAbove>());
   vector::populatePropagateWarpVectorDistributionPatterns(patterns, benefit);
   vector::populateDistributeReduction(patterns, warpReduction, benefit);
-  patterns.add<WarpOpLoad>(target->getContext(), benefit);
+  patterns.add<WarpOpLoad, HoistSharedMemoryAlloc>(target->getContext(),
+                                                   benefit);
 }
 
 static void warpSyncronizationFn(Location loc, OpBuilder &builder,

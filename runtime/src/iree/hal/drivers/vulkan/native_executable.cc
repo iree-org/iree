@@ -35,6 +35,7 @@ static iree_status_t iree_hal_vulkan_create_shader_module(
     VkDeviceHandle* logical_device, iree_const_byte_span_t code,
     VkShaderModule* out_shader_module) {
   IREE_TRACE_SCOPE();
+
   VkShaderModuleCreateInfo create_info;
   create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
   create_info.pNext = NULL;
@@ -45,6 +46,7 @@ static iree_status_t iree_hal_vulkan_create_shader_module(
                          *logical_device, &create_info,
                          logical_device->allocator(), out_shader_module),
                      "vkCreateShaderModule");
+
   return iree_ok_status();
 }
 
@@ -132,6 +134,18 @@ static iree_status_t iree_hal_vulkan_create_pipelines(
   if (iree_status_is_ok(status)) {
     for (iree_host_size_t i = 0; i < pipeline_count; ++i) {
       out_entry_points[i].pipeline = pipelines[i];
+
+      // Set pipeline name for tooling.
+      if (PFN_vkSetDebugUtilsObjectNameEXT set_name =
+              logical_device->syms()->vkSetDebugUtilsObjectNameEXT) {
+        VkDebugUtilsObjectNameInfoEXT name_info = {};
+        name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+        name_info.pNext = NULL;
+        name_info.objectHandle = (uint64_t)pipelines[i];
+        name_info.objectType = VK_OBJECT_TYPE_PIPELINE;
+        name_info.pObjectName = flatbuffers_string_vec_at(entry_points_vec, i);
+        set_name(*logical_device, &name_info);
+      }
     }
   }
 

@@ -19,7 +19,6 @@ iree_runtime_cc_library(
     hdrs = ["module.h"],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:cc",
         "//runtime/src/iree/base/internal",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/modules/hal",
@@ -35,7 +34,6 @@ iree_runtime_cc_test(
     deps = [
         ":check",
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:cc",
         "//runtime/src/iree/base/internal",
         "//runtime/src/iree/base/internal:span",
         "//runtime/src/iree/hal",

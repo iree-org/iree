@@ -66,8 +66,8 @@ FailureOr<linalg::TileLoopNest> tileConsumerAndFuseProducers(
           tileLoopNest.fuseProducer(b, candidates.pop_back_val());
       if (failed(fusedProducer))
         continue;
-      candidates.append(fusedProducer->getInputOperands());
-      candidates.append(fusedProducer->getOutputOperands());
+      candidates.append(fusedProducer->getDpsInputOperands());
+      candidates.append(fusedProducer->getDpsInitOperands());
     }
   };
 
@@ -86,13 +86,13 @@ FailureOr<linalg::TileLoopNest> tileConsumerAndFuseProducers(
   if (failed(tileLoopNest.tileRootOp(b, outerTileSizes, tileInterchange,
                                      tileDistribution)))
     return failure();
-  fuseProducersGreedily(tileLoopNest.getRootOp().getOutputOperands());
+  fuseProducersGreedily(tileLoopNest.getRootOp().getDpsInitOperands());
 
   // Tile the remaining loops and fuse the input operands.
   if (failed(tileLoopNest.tileRootOp(b, innerTileSizes, tileInterchange,
                                      tileDistribution)))
     return failure();
-  fuseProducersGreedily(tileLoopNest.getRootOp().getInputOperands());
+  fuseProducersGreedily(tileLoopNest.getRootOp().getDpsInputOperands());
 
   // Exit if the tile loop nest is empty since all tile sizes are zero.
   if (tileLoopNest.isEmpty())

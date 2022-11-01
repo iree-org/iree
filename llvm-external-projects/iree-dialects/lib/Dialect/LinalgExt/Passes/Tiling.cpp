@@ -95,10 +95,12 @@ tileInterfaceOpImpl(OpBuilder &builder, TilingInterface tilableOp,
           tilableOp.emitOpError("failed to get tiled implementation"));
     }
     assert(
-        tiledOps.size() == 1 &&
+        (tiledOps.size() == 1 ||
+         (tiledOps.size() == 2 &&
+          isa<IREE::LinalgExt::UnPackOp>(tilableOp.getOperation()))) &&
         "expected only a single operation returned from tiling implementation");
-    ret.op = tiledOps[0];
-    for (auto result : llvm::enumerate(ret.op->getResults())) {
+    ret.op.assign(tiledOps);
+    for (auto result : llvm::enumerate(ret.op.back()->getResults())) {
       if (!result.value().getType().isa<RankedTensorType>()) {
         ret.results.push_back(result.value());
         continue;
@@ -110,8 +112,8 @@ tileInterfaceOpImpl(OpBuilder &builder, TilingInterface tilableOp,
         SmallVector<OpFoldResult> resultStrides(resultOffsets.size(),
                                                 builder.getIndexAttr(1));
         Value insertSlice = builder.create<tensor::InsertSliceOp>(
-            loc, ret.op->getResult(result.index()), outputs[result.index()],
-            resultOffsets, resultSizes, resultStrides);
+            loc, ret.op.back()->getResult(result.index()),
+            outputs[result.index()], resultOffsets, resultSizes, resultStrides);
         ret.results.push_back(insertSlice);
       }
     }
@@ -190,11 +192,13 @@ tileInterfaceOpImpl(OpBuilder &builder, TilingInterface tilableOp,
 
 FailureOr<TiledOp> tileInterfaceOp(OpBuilder &b, TilingInterface tilableOp,
                                    const linalg::LinalgTilingOptions &options) {
-  SmallVector<Value> dest = tilableOp.getDestinationOperands(b);
-  if (dest.empty()) {
-    return static_cast<LogicalResult>(tilableOp.emitOpError(
-        "cannot tile operation without destination operands"));
-  }
+
+  // Gather destination tensors.
+  SmallVector<Value> dest;
+  Location loc = tilableOp.getLoc();
+
+  if (failed(tensor::getOrCreateDestinations(b, loc, tilableOp, dest)))
+    return tilableOp->emitOpError("failed to get destination tensors");
 
   SmallVector<utils::IteratorType> iteratorTypes =
       tilableOp.getLoopIteratorTypes();
@@ -218,7 +222,7 @@ FailureOr<TiledOp> tileInterfaceOp(OpBuilder &b, TilingInterface tilableOp,
 
   // Trivial early exit case of tile sizes being zero for all parallel loops.
   if (llvm::all_of(tileSizes, isUntiledLoop)) {
-    return TiledOp{tilableOp, {}, {}};
+    return TiledOp{{tilableOp}, {}, {}};
   }
 
   SmallVector<Range> loopBounds = tilableOp.getIterationDomain(b);
@@ -258,11 +262,12 @@ TilingInterfaceBaseTilingPattern::matchAndRewriteBase(TilingInterface tilableOp,
   }
 
   FailureOr<TiledOp> res = tileInterfaceOp(rewriter, tilableOp, options);
-  if (failed(res))
+  if (failed(res)) {
     return res;
+  }
   result = *res;
-  if (result.op) {
-    filter.replaceLinalgTransformationFilter(rewriter, result.op);
+  for (auto op : result.op) {
+    filter.replaceLinalgTransformationFilter(rewriter, op);
   }
   return success();
 }
@@ -284,9 +289,9 @@ TilingInterfaceTilingPattern::matchAndRewrite(TilingInterface tilableOp,
     return failure();
   }
   // Check for do-nothing case.
-  if (!tiledOp.op)
+  if (tiledOp.op.empty())
     return failure();
-  if (tiledOp.op != tilableOp) {
+  if (tiledOp.op.back() != tilableOp) {
     if (tiledOp.results.empty()) {
       rewriter.eraseOp(tilableOp);
     } else {

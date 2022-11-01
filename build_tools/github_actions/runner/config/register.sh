@@ -55,9 +55,22 @@ RUNNER_GROUP="$(get_attribute github-runner-group)"
 RUNNER_SCOPE="$(get_attribute github-runner-scope)"
 RUNNER_TRUST="$(get_attribute github-runner-trust)"
 RUNNER_VERSION="$(get_attribute github-runner-version)"
-RUNNER_ENVIRONMENT="$(get_attribute github-runner-environment)"
 TOKEN_PROXY_URL="$(get_attribute github-token-proxy-url)"
 CONFIG_REF="$(get_attribute github-runner-config-ref)"
+
+# So this is a bit of a hack, but it enables us to use the same instance
+# template regardless of environment. This means we can test a template by
+# deploying it to the testing environment and then promote *the same template*
+# to the prod environment. Otherwise it's difficult to tell the mapping between
+# prod and testing templates. Ideally, this would be explicit metadata that was
+# dynamic with the instance group itself, but instance groups don't have
+# anything like that and all the metadata on the instances has to be specified
+# in the templates.
+RUNNER_ENVIRONMENT="prod"
+if [[ "${HOSTNAME}" == *-testing-* ]]; then
+  RUNNER_ENVIRONMENT="testing"
+fi
+
 
 declare -a RUNNER_LABELS_ARRAY=(
   "os-family=${OS_FAMILY}"

@@ -19,7 +19,6 @@
 #include <type_traits>
 #include <utility>
 
-#include "iree/base/status_cc.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 

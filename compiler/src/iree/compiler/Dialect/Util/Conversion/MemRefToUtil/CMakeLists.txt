@@ -14,9 +14,9 @@ iree_cc_library(
   NAME
     MemRefToUtil
   HDRS
-    "ConvertMemRefToUtil.h"
+    "Patterns.h"
   SRCS
-    "ConvertMemRefToUtil.cpp"
+    "Patterns.cpp"
   DEPS
     MLIRAffineDialect
     MLIRArithDialect

@@ -167,7 +167,7 @@ Update the testing instance group to your new template using
 canary to the test group):
 
 ```shell
-build_tools/github_actions/runner/gcp/update_instance_group.py direct-update \
+build_tools/github_actions/runner/gcp/update_instance_groups.py direct-update \
   --env=testing --region=all --group=all --type=all --version="${VERSION?}"
 ```
 
@@ -204,7 +204,7 @@ To deploy to prod, create new prod templates. Then use the update script to
 canary to a single instance:
 
 ```shell
-build_tools/github_actions/runner/update_instance_group.py canary-update \
+build_tools/github_actions/runner/update_instance_groups.py canary-update \
   --prod --region=all --group=all --type=all --version="${VERSION}"
 ```
 
@@ -214,7 +214,7 @@ on the order of days before proceeding. When you are satisfied that your new
 configuration is good, complete the update with your new template:
 
 ```shell
-build_tools/github_actions/runner/update_instance_group.py promote-canary \
+build_tools/github_actions/runner/update_instance_groups.py promote-canary \
   --prod --region=all --group=all --type=all
 ```
 
