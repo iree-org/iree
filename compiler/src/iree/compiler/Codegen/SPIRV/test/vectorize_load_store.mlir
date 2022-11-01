@@ -306,3 +306,19 @@ func.func @scalarize_indivisible_vector_transfer_write_op(%value: vector<4xf32>,
 
 // CHECK:         %[[SUBSPAN:.+]] = hal.interface.binding.subspan
 // CHECK-COUNT-4: memref.store %{{.+}}, %[[SUBSPAN]]
+
+// -----
+
+// CHECK-LABEL: func.func @vectorize_alloc_with_mma_load_store
+//  CHECK-SAME: (%[[I0:.+]]: index, %[[I1:.+]]: index)
+func.func @vectorize_alloc_with_mma_load_store(%i0: index, %i1: index) {
+  %alloc = memref.alloc() : memref<32x32xf16, 3>
+  %0 = gpu.subgroup_mma_load_matrix %alloc[%i0, %i1] {leadDimension = 32 : index} : memref<32x32xf16, 3> -> !gpu.mma_matrix<16x16xf16, "COp">
+  gpu.subgroup_mma_store_matrix %0, %alloc[%i0, %i1] {leadDimension = 32 : index} : !gpu.mma_matrix<16x16xf16, "COp">, memref<32x32xf16, 3>
+  return
+}
+
+// CHECK: %[[ALLOC:.+]] = memref.alloc() : memref<32x4xvector<4xf32>, 3>
+// CHECK: %[[IDX:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 8)>()[%[[I1]]]
+// CHECK: %[[LD:.+]] = gpu.subgroup_mma_load_matrix %[[ALLOC]][%[[I0]], %[[IDX]]] {leadDimension = 4 : index} : memref<32x4xvector<4xf32>, 3> -> !gpu.mma_matrix<16x16xf16, "COp">
+// CHECK: gpu.subgroup_mma_store_matrix %[[LD]], %[[ALLOC]][%[[I0]], %[[IDX]]] {leadDimension = 4 : index} : !gpu.mma_matrix<16x16xf16, "COp">, memref<32x4xvector<4xf32>, 3>
