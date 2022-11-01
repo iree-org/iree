@@ -99,6 +99,29 @@ func.func @dupe_arg_caller_b(%arg0: index) -> index {
 
 // -----
 
+// Tests that duplicate arguments that point at a base unused argument ensure
+// that base argument stays live. Note that %arg0 is not used in the callee
+// but a duplicate of it is.
+
+// CHECK-LABEL: func.func private @dupe_unused_arg_callee
+// CHECK-SAME: (%[[CALLEE_ARG0:.+]]: index) -> index
+func.func private @dupe_unused_arg_callee(%arg0: index, %arg0_dupe: index) -> index {
+  // CHECK: %[[CALLEE_RET0:.+]] = arith.addi %[[CALLEE_ARG0]], %[[CALLEE_ARG0]]
+  %ret0 = arith.addi %arg0_dupe, %arg0_dupe : index
+  // CHECK: return %[[CALLEE_RET0]]
+  return %ret0 : index
+}
+
+// CHECK: func.func @dupe_unused_arg_caller(%[[CALLER_ARG0:.+]]: index)
+func.func @dupe_unused_arg_caller(%arg0: index) -> index {
+  // CHECK: %[[CALLER_RET0:.+]] = call @dupe_unused_arg_callee(%[[CALLER_ARG0]]) : (index) -> index
+  %ret0 = call @dupe_unused_arg_callee(%arg0, %arg0) : (index, index) -> index
+  // CHECK: return %[[CALLER_RET0]]
+  return %ret0 : index
+}
+
+// -----
+
 // Tests that uniformly duplicate results get combined.
 
 // CHECK-LABEL: func.func private @dupe_result_callee
