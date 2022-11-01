@@ -321,6 +321,17 @@ static FuncAnalysis analyzeFuncOp(func::FuncOp funcOp, Explorer &explorer) {
     }
   }
 
+  // Any argument that is the base of a duplicate needs to inherit the usage
+  // of all pointing at it.
+  // For example, %arg0 unused + %arg1 used dupe(%arg0) needs to ensure that
+  // %arg0 is preserved.
+  for (unsigned i = 0; i < argCount; ++i) {
+    int dupeIndex = analysis.callerUniformArgDupeMap[i];
+    if (dupeIndex != i && analysis.calleeUsedArgs.test(i)) {
+      analysis.calleeUsedArgs.set(dupeIndex);
+    }
+  }
+
   // We can drop any pass-through args that are exclusively used by returns as
   // we know all callers will stop passing them.
   for (unsigned i = 0; i < resultCount; ++i) {
