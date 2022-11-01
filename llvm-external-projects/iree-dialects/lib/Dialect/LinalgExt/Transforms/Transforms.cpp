@@ -814,7 +814,6 @@ Value getInputOrPaddedInput(OpBuilder &builder, PackOp packOp) {
     return input;
   }
 
-
   Location loc = packOp.getLoc();
   ShapedType inputType = packOp.getInputType();
   int64_t inputRank = inputType.getRank();
