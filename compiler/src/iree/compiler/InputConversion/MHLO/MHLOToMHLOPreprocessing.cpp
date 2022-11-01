@@ -528,6 +528,8 @@ struct ScatterOpImplicitBatch : public OpRewritePattern<mhlo::ScatterOp> {
 
     llvm::SmallVector<int64_t> newUpdateWindowDims;
     for (auto dim : dimNumbers.getUpdateWindowDims()) {
+      // Batch dimension is inserted at the start so window dimensions are shift
+      // forwards.
       newUpdateWindowDims.push_back(dim + 1);
     }
 
@@ -1301,10 +1303,9 @@ struct MHLOToMHLOPreprocessingPass
     patterns.insert<ExpandRngNormal, MulCastOfBool>(context);
 
     // scatter canonicalization patterns
-    patterns.insert<ScatterOpImplicitIndex>(context);
-    patterns.insert<ScatterOpImplicitBatch>(context);
-    patterns.insert<ScatterMaterializeInsertedDim>(context);
-    patterns.insert<ScatterOpCollapseBatch>(context);
+    patterns.insert<ScatterOpImplicitIndex, ScatterOpImplicitBatch,
+                    ScatterMaterializeInsertedDim, ScatterOpCollapseBatch>(
+        context);
 
     // dot_general canoncalization patterns.
     mhlo::populateGeneralDotOpLoweringPatterns(&patterns, context);
