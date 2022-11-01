@@ -233,5 +233,25 @@ void propagateSharedMemoryCopy(func::FuncOp funcOp) {
   for (Operation *op : toDelete) op->erase();
 }
 
+void insertBarriersAroundSharedMemoryCopy(func::FuncOp funcOp) {
+  OpBuilder builder(funcOp.getContext());
+  // Insert barriers before and after copies to workgroup memory and skip
+  // insert barriers between back to back copy to workgroup memory.
+  funcOp.walk([&builder](Operation *copyOp) {
+    if (hasMarker(copyOp, getCopyToWorkgroupMemoryMarker())) {
+      Operation *prevOp = copyOp->getPrevNode();
+      if (!prevOp || !hasMarker(prevOp, getCopyToWorkgroupMemoryMarker())) {
+        builder.setInsertionPoint(copyOp);
+        builder.create<gpu::BarrierOp>(copyOp->getLoc());
+      }
+      Operation *nextOp = copyOp->getNextNode();
+      if (!nextOp || !hasMarker(nextOp, getCopyToWorkgroupMemoryMarker())) {
+        builder.setInsertionPointAfter(copyOp);
+        builder.create<gpu::BarrierOp>(copyOp->getLoc());
+      }
+    }
+  });
+}
+
 }  // namespace iree_compiler
 }  // namespace mlir

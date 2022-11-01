@@ -69,6 +69,9 @@ LogicalResult copyToWorkgroupMemory(OpBuilder &builder, Value src, Value dst);
 /// linalg.generic when possible.
 void propagateSharedMemoryCopy(func::FuncOp funcOp);
 
+/// Inserts barriers before and after shared memory copy.
+void insertBarriersAroundSharedMemoryCopy(func::FuncOp funcOp);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 

@@ -231,23 +231,8 @@ struct LLVMGPUTileAndDistributePass
                                               std::move(promotionPatterns)))) {
         return signalPassFailure();
       }
-      // Insert barriers before and after copies to workgroup memory and skip
-      // insert barriers between back to back copy to workgroup memory.
-      OpBuilder builder(&getContext());
-      funcOp.walk([&builder](Operation *copyOp) {
-        if (hasMarker(copyOp, getCopyToWorkgroupMemoryMarker())) {
-          Operation *prevOp = copyOp->getPrevNode();
-          if (!prevOp || !hasMarker(prevOp, getCopyToWorkgroupMemoryMarker())) {
-            builder.setInsertionPoint(copyOp);
-            builder.create<gpu::BarrierOp>(copyOp->getLoc());
-          }
-          Operation *nextOp = copyOp->getNextNode();
-          if (!nextOp || !hasMarker(nextOp, getCopyToWorkgroupMemoryMarker())) {
-            builder.setInsertionPointAfter(copyOp);
-            builder.create<gpu::BarrierOp>(copyOp->getLoc());
-          }
-        }
-      });
+      // Insert barriers before and after copies to workgroup memory.
+      insertBarriersAroundSharedMemoryCopy(funcOp);
     }
 
     {
