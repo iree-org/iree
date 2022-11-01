@@ -6,6 +6,9 @@
 
 #include "iree/compiler/Codegen/Common/GPUPatterns.h"
 
+#include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -138,11 +141,48 @@ struct FlattenTransferReadOp : public OpRewritePattern<vector::TransferReadOp> {
     return success();
   }
 };
+
+template <typename T>
+using LinalgPromotionPattern =
+    mlir::iree_compiler::IREE::LinalgExt::LinalgPromotionPattern<T>;
+
+/// Returns true if op is appropriate contract for promotion.
+static LogicalResult contractOpFilter(Operation *op) {
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+  if (!linalgOp) return failure();
+  // Limit promotion to matmul and batch matmul, there may be generic
+  // ops with more batch dimensions we didn't distribute and therefore
+  // cannot find a higher bound.
+  return success(linalg::isaContractionOpInterface(op) &&
+                 linalgOp.getNumParallelLoops() >= 2 &&
+                 linalgOp.getNumParallelLoops() <= 3);
+}
+
 }  // namespace
 
 void populateVectorTransferToGPUMMAPreparationPatterns(
     RewritePatternSet &patterns) {
   patterns.add<FlattenTransferReadOp>(patterns.getContext());
+}
+
+void populateContractPromotionPatterns(RewritePatternSet &patterns,
+                                       ArrayRef<int64_t> operandsToPromote) {
+  MLIRContext *context = patterns.getContext();
+  patterns.insert<LinalgPromotionPattern<linalg::MatmulOp>,
+                  LinalgPromotionPattern<linalg::BatchMatmulOp>,
+                  LinalgPromotionPattern<linalg::GenericOp>>(
+      context,
+      linalg::LinalgPromotionOptions()
+          .setAllocationDeallocationFns(allocateWorkgroupMemory,
+                                        deallocateWorkgroupMemory)
+          .setCopyInOutFns(copyToWorkgroupMemory, copyToWorkgroupMemory)
+          .setOperandsToPromote(operandsToPromote)
+          .setUseFullTileBuffers({false, false}),
+      IREE::LinalgExt::LinalgTransformationFilter(
+          {StringAttr::get(context, getWorkgroupKTiledMarker())},
+          StringAttr::get(context, getWorkgroupMemoryMarker()))
+          .setMatchByDefault()
+          .addFilter(contractOpFilter));
 }
 
 }  // namespace iree_compiler

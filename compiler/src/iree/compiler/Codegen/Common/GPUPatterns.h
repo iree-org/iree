@@ -16,6 +16,11 @@ namespace iree_compiler {
 void populateVectorTransferToGPUMMAPreparationPatterns(
     RewritePatternSet &patterns);
 
+/// Adds patterns for promoting Linalg contract op's operands to use GPU shared
+/// memory.
+void populateContractPromotionPatterns(RewritePatternSet &patterns,
+                                       ArrayRef<int64_t> operandsToPromote);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 
