@@ -12,6 +12,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
@@ -69,6 +70,10 @@ static LogicalResult tileReduction(linalg::GenericOp op) {
 
 struct GPUTileReductionPass
     : public GPUTileReductionBase<GPUTileReductionPass> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<scf::SCFDialect>();
+  }
+
   void runOnOperation() override {
     func::FuncOp funcOp = getOperation();
     SmallVector<linalg::GenericOp> genericOps;
