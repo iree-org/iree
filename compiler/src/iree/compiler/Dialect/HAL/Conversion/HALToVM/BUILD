@@ -23,10 +23,10 @@ iree_compiler_cc_library(
         "ConvertExecutableOps.cpp",
         "ConvertExperimentalOps.cpp",
         "ConvertFenceOps.cpp",
-        "ConvertHALToVM.cpp",
+        "Patterns.cpp",
     ],
     hdrs = [
-        "ConvertHALToVM.h",
+        "Patterns.h",
     ],
     deps = [
         "//compiler/src/iree/compiler/Dialect/HAL:hal_imports",

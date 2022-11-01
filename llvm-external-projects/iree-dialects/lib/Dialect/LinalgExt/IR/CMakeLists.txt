@@ -13,6 +13,7 @@ add_mlir_library(IREELinalgExtDialect
   IREELinalgExtUtils
   MLIRAffineDialect
   MLIRArithUtils
+  MLIRDestinationStyleOpInterface
   MLIRDialectUtils
   MLIRIR
   MLIRInferTypeOpInterface

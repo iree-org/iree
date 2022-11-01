@@ -19,7 +19,6 @@ iree_cc_library(
     "module.cc"
   DEPS
     iree::base
-    iree::base::cc
     iree::base::internal
     iree::hal
     iree::modules::hal
@@ -38,7 +37,6 @@ iree_cc_test(
   DEPS
     ::check
     iree::base
-    iree::base::cc
     iree::base::internal
     iree::base::internal::span
     iree::hal

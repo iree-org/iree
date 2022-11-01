@@ -12,6 +12,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
@@ -67,8 +68,27 @@ static LogicalResult tileReduction(linalg::GenericOp op) {
   return success();
 }
 
+static LogicalResult tileFusedOps(linalg::GenericOp op) {
+  // First split the reduction.
+  SimpleRewriter rewriter(op.getContext());
+  rewriter.setInsertionPoint(op);
+  SmallVector<int64_t> tileSizes = getTileSizes(op, 1);
+  if (tileSizes.empty()) return success();
+  linalg::LinalgTilingOptions tileOption;
+  tileOption.setTileSizes(tileSizes);
+  FailureOr<linalg::TiledLinalgOp> tiledOps =
+      linalg::tileLinalgOp(rewriter, op, tileOption);
+  if (failed(tiledOps)) return failure();
+  rewriter.replaceOp(op, tiledOps->tensorResults);
+  return success();
+}
+
 struct GPUTileReductionPass
     : public GPUTileReductionBase<GPUTileReductionPass> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<scf::SCFDialect>();
+  }
+
   void runOnOperation() override {
     func::FuncOp funcOp = getOperation();
     SmallVector<linalg::GenericOp> genericOps;
@@ -76,6 +96,10 @@ struct GPUTileReductionPass
     for (linalg::GenericOp op : genericOps) {
       if (op.getNumReductionLoops() > 0) {
         if (failed(tileReduction(op))) {
+          return signalPassFailure();
+        }
+      } else {
+        if (failed(tileFusedOps(op))) {
           return signalPassFailure();
         }
       }

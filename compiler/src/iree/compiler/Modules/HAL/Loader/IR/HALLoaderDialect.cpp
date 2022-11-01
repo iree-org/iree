@@ -7,7 +7,7 @@
 #include "iree/compiler/Modules/HAL/Loader/IR/HALLoaderDialect.h"
 
 #include "iree/compiler/Dialect/VM/Conversion/ConversionDialectInterface.h"
-#include "iree/compiler/Modules/HAL/Loader/Conversion/HALLoaderToVM/ConvertHALLoaderToVM.h"
+#include "iree/compiler/Modules/HAL/Loader/Conversion/HALLoaderToVM/Patterns.h"
 #include "iree/compiler/Modules/HAL/Loader/IR/HALLoaderOps.h"
 #include "iree/compiler/Modules/HAL/Loader/hal_loader.imports.h"
 #include "llvm/Support/SourceMgr.h"

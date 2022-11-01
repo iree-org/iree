@@ -13,7 +13,6 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/span.h"
-#include "iree/base/status_cc.h"
 #include "iree/vm/instance.h"
 #include "iree/vm/module.h"
 #include "iree/vm/native_module_packing.h"  // IWYU pragma: export

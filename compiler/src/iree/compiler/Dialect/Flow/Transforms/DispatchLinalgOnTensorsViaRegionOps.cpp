@@ -12,7 +12,7 @@
 // DispatchLinalgOnTensors.cpp.
 
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
-#include "iree/compiler/Dialect/Flow/Conversion/TensorToFlow/ConvertTensorToFlow.h"
+#include "iree/compiler/Dialect/Flow/Conversion/TensorToFlow/Patterns.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/ConvertRegionToWorkgroups.h"
@@ -429,7 +429,7 @@ static bool isFusableWithProducer(OpOperand &operand) {
   if (isa<linalg::LinalgOp>(consumer) && isa<linalg::LinalgOp>(producer)) {
     auto consumerLinalgOp = cast<linalg::LinalgOp>(consumer);
     auto producerLinalgOp = cast<linalg::LinalgOp>(producer);
-    if (consumerLinalgOp.isOutput(&operand) &&
+    if (consumerLinalgOp.isDpsInit(&operand) &&
         producerLinalgOp.getNumLoops() ==
             producerLinalgOp.getNumParallelLoops()) {
       return true;

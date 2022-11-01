@@ -4,14 +4,14 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/HAL/Conversion/StandardToHAL/ConvertStandardToHAL.h"
-#include "iree/compiler/Dialect/HAL/Conversion/UtilToHAL/ConvertUtilToHAL.h"
+#include "iree/compiler/Dialect/HAL/Conversion/StandardToHAL/Patterns.h"
+#include "iree/compiler/Dialect/HAL/Conversion/UtilToHAL/Patterns.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Util/Conversion/ConversionPatterns.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
-#include "iree/compiler/Modules/HAL/Inline/Conversion/HALToHALInline/ConvertHALToHALInline.h"
-#include "iree/compiler/Modules/HAL/Inline/Conversion/StreamToHALInline/ConvertStreamToHALInline.h"
+#include "iree/compiler/Modules/HAL/Inline/Conversion/HALToHALInline/Patterns.h"
+#include "iree/compiler/Modules/HAL/Inline/Conversion/StreamToHALInline/Patterns.h"
 #include "iree/compiler/Modules/HAL/Inline/IR/HALInlineDialect.h"
 #include "iree/compiler/Modules/HAL/Inline/Transforms/PassDetail.h"
 #include "iree/compiler/Modules/HAL/Inline/Transforms/Passes.h"
@@ -38,7 +38,7 @@ class ConversionPass : public ConversionBase<ConversionPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Util::UtilDialect, IREE::HAL::HALDialect,
                     IREE::HAL::Inline::HALInlineDialect,
-                    mlir::arith::ArithDialect>();
+                    mlir::arith::ArithDialect, mlir::AffineDialect>();
   }
 
   void runOnOperation() override {
@@ -48,7 +48,7 @@ class ConversionPass : public ConversionBase<ConversionPass> {
     ConversionTarget conversionTarget(*context);
     conversionTarget
         .addLegalDialect<mlir::func::FuncDialect, mlir::scf::SCFDialect,
-                         mlir::arith::ArithDialect>();
+                         mlir::arith::ArithDialect, mlir::AffineDialect>();
 
     TypeConverter typeConverter;
     RewritePatternSet patterns(context);

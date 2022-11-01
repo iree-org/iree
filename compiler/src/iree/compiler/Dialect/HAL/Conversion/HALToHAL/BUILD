@@ -15,10 +15,10 @@ package(
 iree_compiler_cc_library(
     name = "HALToHAL",
     srcs = [
-        "ConvertHALToHAL.cpp",
+        "Patterns.cpp",
     ],
     hdrs = [
-        "ConvertHALToHAL.h",
+        "Patterns.h",
     ],
     deps = [
         "//compiler/src/iree/compiler/Dialect/HAL/IR",

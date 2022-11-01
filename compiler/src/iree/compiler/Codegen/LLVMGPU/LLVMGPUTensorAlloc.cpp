@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Passes.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Transforms/Passes.h"
 
 #define DEBUG_TYPE "iree-llvmgpu-alloc"
@@ -76,7 +77,7 @@ struct LLVMGPUTensorAllocPass
   LLVMGPUTensorAllocPass(GPUPromoteSharedMemPattern promoteSharedMemPattern)
       : promoteSharedMemPattern(promoteSharedMemPattern) {}
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<bufferization::BufferizationDialect>();
+    registry.insert<bufferization::BufferizationDialect, scf::SCFDialect>();
   }
   void runOnOperation() override {
     auto funcOp = getOperation();
@@ -104,7 +105,7 @@ struct LLVMGPUTensorAllocPass
       switch (promoteSharedMemPattern) {
         case GPUPromoteSharedMemPattern::ContractionOpPattern:
           // Promote all the input operands
-          for (auto operand : linalgOp.getInputOperands()) {
+          for (auto operand : linalgOp.getDpsInputOperands()) {
             FailureOr<Value> ret = bufferization::allocateTensorForShapedValue(
                 builder, op->getLoc(), operand->get(), false, options, true);
             if (failed(ret)) {

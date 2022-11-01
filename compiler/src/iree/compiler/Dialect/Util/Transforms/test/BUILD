@@ -26,6 +26,7 @@ iree_lit_test_suite(
             "fuse_globals.mlir",
             "hoist_into_globals.mlir",
             "hoist_into_globals_linalg.mlir",
+            "ipo.mlir",
             "promote_f16_to_f32.mlir",
             "propagate_subranges.mlir",
             "simplify_global_accesses.mlir",

@@ -75,7 +75,7 @@ void iree_mmt4d_test_random_engine_destroy(iree_mmt4d_test_random_engine_t* e) {
 
 static int iree_mmt4d_test_random_engine_get_in_uint16_range(
     iree_mmt4d_test_random_engine_t* e) {
-  uint32_t v = e->cpp_random_engine();
+  iree_ukernel_uint32_t v = e->cpp_random_engine();
   // return the second-least-signicant out of the 4 bytes of state. It avoids
   // some mild issues with the least-significant and most-significant bytes.
   return (v >> 8) & 0xffff;
@@ -116,10 +116,12 @@ void write_random_buffer(void* buffer, iree_ukernel_ssize_t size_in_bytes,
       write_random_buffer(static_cast<float*>(buffer), size_in_bytes, engine);
       return;
     case iree_mmt4d_scalar_type_i32:
-      write_random_buffer(static_cast<int32_t*>(buffer), size_in_bytes, engine);
+      write_random_buffer(static_cast<iree_ukernel_int32_t*>(buffer),
+                          size_in_bytes, engine);
       return;
     case iree_mmt4d_scalar_type_i8:
-      write_random_buffer(static_cast<int8_t*>(buffer), size_in_bytes, engine);
+      write_random_buffer(static_cast<iree_ukernel_int8_t*>(buffer),
+                          size_in_bytes, engine);
       return;
     default:
       assert(false && "unknown type");

@@ -78,12 +78,6 @@ Include headers:
 Check the API version and register components:
 
 ``` c
-// Statically linking the runtime should never have version conflicts,
-// however dynamically linking against a runtime shared object must
-// always verify that the version is as expected.
-iree_api_version_t actual_version;
-IREE_CHECK_OK(iree_api_version_check(IREE_API_VERSION_LATEST, &actual_version));
-
 // Device drivers are managed through registries.
 // Applications may use multiple registries to more finely control driver
 // lifetimes and visibility.

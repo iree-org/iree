@@ -298,6 +298,7 @@ static uint32_t iree_hal_vulkan_find_first_queue_family_with_flags(
 // Note that both queue families may be the same if there is only one family
 // available.
 static iree_status_t iree_hal_vulkan_select_queue_families(
+    const iree_hal_vulkan_device_options_t* options,
     VkPhysicalDevice physical_device, iree::hal::vulkan::DynamicSymbols* syms,
     iree_hal_vulkan_queue_family_info_t* out_family_info) {
   // Enumerate queue families available on the device.
@@ -316,13 +317,21 @@ static iree_status_t iree_hal_vulkan_select_queue_families(
   out_family_info->transfer_index = IREE_HAL_VULKAN_INVALID_QUEUE_FAMILY_INDEX;
   out_family_info->transfer_queue_count = 0;
 
-  // Try to find a dedicated compute queue (no graphics caps).
-  // Some may support both transfer and compute. If that fails then fallback
-  // to any queue that supports compute.
-  out_family_info->dispatch_index =
-      iree_hal_vulkan_find_first_queue_family_with_flags(
-          queue_family_count, queue_family_properties, VK_QUEUE_COMPUTE_BIT,
-          VK_QUEUE_GRAPHICS_BIT);
+  // By default we choose graphics+compute as on most current GPUs this is a
+  // primary queue and may run at the fastest clock speed.
+  // If the user is integrating into applications with existing graphics
+  // workloads then they can request that we instead try to find a dedicated
+  // compute-only queue such that we can run async with the rest of their
+  // existing workload.
+  if (iree_all_bits_set(options->flags,
+                        IREE_HAL_VULKAN_DEVICE_FLAG_DEDICATED_COMPUTE_QUEUE)) {
+    // Try to find a dedicated compute queue. If this fails then we'll fall back
+    // to any queue supporting compute.
+    out_family_info->dispatch_index =
+        iree_hal_vulkan_find_first_queue_family_with_flags(
+            queue_family_count, queue_family_properties, VK_QUEUE_COMPUTE_BIT,
+            VK_QUEUE_GRAPHICS_BIT);
+  }
   if (out_family_info->dispatch_index ==
       IREE_HAL_VULKAN_INVALID_QUEUE_FAMILY_INDEX) {
     out_family_info->dispatch_index =
@@ -392,13 +401,14 @@ static iree_status_t iree_hal_vulkan_select_queue_families(
 // Builds a set of compute and transfer queues based on the queues available on
 // the device and some magic heuristical goo.
 static iree_status_t iree_hal_vulkan_build_queue_sets(
+    const iree_hal_vulkan_device_options_t* options,
     VkPhysicalDevice physical_device, iree::hal::vulkan::DynamicSymbols* syms,
     iree_hal_vulkan_queue_set_t* out_compute_queue_set,
     iree_hal_vulkan_queue_set_t* out_transfer_queue_set) {
   // Select which queues to use (and fail the implementation can't handle them).
   iree_hal_vulkan_queue_family_info_t queue_family_info;
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_select_queue_families(
-      physical_device, syms, &queue_family_info));
+      options, physical_device, syms, &queue_family_info));
 
   // Build queue indices for the selected queue families.
   memset(out_compute_queue_set, 0, sizeof(*out_compute_queue_set));
@@ -492,6 +502,7 @@ IREE_API_EXPORT void iree_hal_vulkan_device_options_initialize(
     iree_hal_vulkan_device_options_t* out_options) {
   memset(out_options, 0, sizeof(*out_options));
   out_options->flags = 0;
+  out_options->large_heap_block_size = 64 * 1024 * 1024;
 }
 
 // Creates a transient command pool for the given queue family.
@@ -689,8 +700,8 @@ static iree_status_t iree_hal_vulkan_device_create_internal(
   // Create the device memory allocator that will service all buffer
   // allocation requests.
   iree_status_t status = iree_hal_vulkan_vma_allocator_create(
-      instance, physical_device, logical_device, (iree_hal_device_t*)device,
-      &device->device_allocator);
+      options, instance, physical_device, logical_device,
+      (iree_hal_device_t*)device, &device->device_allocator);
 
   // Create command pools for each queue family. If we don't have a transfer
   // queue then we'll ignore that one and just use the dispatch pool.
@@ -814,7 +825,7 @@ iree_status_t iree_hal_vulkan_device_create(
   // Find queue families we will expose as HAL queues.
   iree_hal_vulkan_queue_family_info_t queue_family_info;
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_select_queue_families(
-      physical_device, instance_syms, &queue_family_info));
+      options, physical_device, instance_syms, &queue_family_info));
 
   bool has_dedicated_transfer_queues =
       queue_family_info.transfer_queue_count > 0;
@@ -920,8 +931,8 @@ iree_status_t iree_hal_vulkan_device_create(
   iree_hal_vulkan_queue_set_t transfer_queue_set;
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_build_queue_sets(
-        physical_device, logical_device->syms().get(), &compute_queue_set,
-        &transfer_queue_set);
+        options, physical_device, logical_device->syms().get(),
+        &compute_queue_set, &transfer_queue_set);
   }
 
   // Allocate and initialize the device.
@@ -1232,20 +1243,35 @@ static iree_status_t iree_hal_vulkan_device_profiling_begin(
   iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
   (void)device;
 
-  // For now we only support RenderDoc. As much as possible we should try to use
-  // standardized Vulkan layers to do profiling configuration/control like
-  // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_performance_query.html
-  // to avoid the combinatorial explosion of vendor tooling hooks.
-  // Since RenderDoc is fairly simple, cross-platform, and cross-vendor we
-  // support it here. If this grows beyond a few lines of code we should shuffle
-  // it off to another file.
   if (iree_all_bits_set(options->mode,
                         IREE_HAL_DEVICE_PROFILING_MODE_QUEUE_OPERATIONS)) {
+    // AMD-specific - we could snoop the device to only do this for the vendor
+    // but this is relatively cheap and could be useful to others. Ideally
+    // there would be a khronos standard for this.
+    // TODO(benvanik): figure out if we need to do this for all queues.
+    auto& syms = device->logical_device->syms();
+    if (syms->vkQueueInsertDebugUtilsLabelEXT) {
+      VkDebugUtilsLabelEXT begin_label = {};
+      begin_label.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
+      begin_label.pNext = NULL;
+      begin_label.pLabelName = "AmdFrameBegin";
+      device->logical_device->syms()->vkQueueInsertDebugUtilsLabelEXT(
+          device->dispatch_queues[0]->handle(), &begin_label);
+    }
+
+    // For now we only support RenderDoc. As much as possible we should try to
+    // use standardized Vulkan layers to do profiling configuration/control like
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_performance_query.html
+    // to avoid the combinatorial explosion of vendor tooling hooks.
+    // Since RenderDoc is fairly simple, cross-platform, and cross-vendor we
+    // support it here. If this grows beyond a few lines of code we should
+    // shuffle it off to another file.
 #if defined(IREE_HAL_VULKAN_HAVE_RENDERDOC)
     iree_hal_vulkan_begin_renderdoc_capture(device->renderdoc_api,
                                             device->instance, options);
 #endif  // IREE_HAL_VULKAN_HAVE_RENDERDOC
   }
+
   return iree_ok_status();
 }
 
@@ -1258,6 +1284,18 @@ static iree_status_t iree_hal_vulkan_device_profiling_end(
   iree_hal_vulkan_end_renderdoc_capture(device->renderdoc_api,
                                         device->instance);
 #endif  // IREE_HAL_VULKAN_HAVE_RENDERDOC
+
+  // AMD-specific.
+  auto& syms = device->logical_device->syms();
+  if (syms->vkQueueInsertDebugUtilsLabelEXT) {
+    VkDebugUtilsLabelEXT end_label = {};
+    end_label.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
+    end_label.pNext = NULL;
+    end_label.pLabelName = "AmdFrameEnd";
+    device->logical_device->syms()->vkQueueInsertDebugUtilsLabelEXT(
+        device->dispatch_queues[0]->handle(), &end_label);
+  }
+
   return iree_ok_status();
 }
 

@@ -44,14 +44,15 @@ LogicalResult mlir::transform::parseTransformModuleFromFile(
     OwningOpRef<ModuleOp> &transformModule) {
   if (transformFileName.empty()) {
     llvm::errs() << "no transform file name specified, assuming the transform "
-                    "module is embedded in the IR next to the top-level";
+                    "module is embedded in the IR next to the top-level\n";
     return success();
   }
   // Parse transformFileName content into a ModuleOp.
   std::string errorMessage;
   auto memoryBuffer = mlir::openInputFile(transformFileName, &errorMessage);
   if (!memoryBuffer) {
-    llvm::errs() << "failed to parse transform file: " << transformFileName;
+    llvm::errs() << "failed to parse transform file: " << transformFileName
+                 << "\n";
     return failure();
   }
   // Tell sourceMgr about this buffer, the parser will pick it up.

@@ -52,9 +52,6 @@ typedef struct iree_runtime_instance_t iree_runtime_instance_t;
 
 // Options used to configure instance creation.
 typedef struct iree_runtime_instance_options_t {
-  // Should be set to IREE_API_VERSION_LATEST.
-  iree_api_version_t api_version;
-
   // TODO(benvanik): inject logging hooks.
 
   // A driver registry used to enumerate and create HAL devices.
@@ -65,7 +62,6 @@ typedef struct iree_runtime_instance_options_t {
 
 // Initializes |out_options| to its default values.
 IREE_API_EXPORT void iree_runtime_instance_options_initialize(
-    iree_api_version_t api_version,
     iree_runtime_instance_options_t* out_options);
 
 // Sets the instance to use all available drivers registered in the current

@@ -115,7 +115,7 @@ func.func @dynamic_unpack_large() {
   return
 }
 
-func.func @dynamic_unpack_transpose_large() {
+func.func @dynamic_unpack_transpose_inner_dims_large() {
   %d0 = util.unfoldable_constant 128 : index
   %d1 = util.unfoldable_constant 256 : index
   %source = call @generate_2D_source(%d0, %d1) : (index, index) -> tensor<?x?xi32>
@@ -130,6 +130,48 @@ func.func @dynamic_unpack_transpose_large() {
 
   %init_unpack = tensor.empty(%d0, %d1) : tensor<?x?xi32>
   %unpack = iree_linalg_ext.unpack %pack inner_dims_pos = [1, 0] inner_tiles = [16, 32] into %init_unpack
+      : (tensor<?x?x16x32xi32> tensor<?x?xi32>) -> tensor<?x?xi32>
+
+  check.expect_eq(%unpack, %source) : tensor<?x?xi32>
+  return
+}
+
+func.func @dynamic_unpack_transpose_outer_dims_large() {
+  %d0 = util.unfoldable_constant 128 : index
+  %d1 = util.unfoldable_constant 256 : index
+  %source = call @generate_2D_source(%d0, %d1) : (index, index) -> tensor<?x?xi32>
+
+  %c32 = arith.constant 32 : index
+  %c16 = arith.constant 16 : index
+  %tiled_d0 = arith.ceildivui %d0, %c32 : index
+  %tiled_d1 = arith.ceildivui %d1, %c16 : index
+  %dyn_init_pack = tensor.empty(%tiled_d0, %tiled_d1) : tensor<?x?x32x16xi32>
+  %pack = iree_linalg_ext.pack %source outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %dyn_init_pack
+      : (tensor<?x?xi32> tensor<?x?x32x16xi32>) -> tensor<?x?x32x16xi32>
+
+  %init_unpack = tensor.empty(%d0, %d1) : tensor<?x?xi32>
+  %unpack = iree_linalg_ext.unpack %pack outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %init_unpack
+      : (tensor<?x?x32x16xi32> tensor<?x?xi32>) -> tensor<?x?xi32>
+
+  check.expect_eq(%unpack, %source) : tensor<?x?xi32>
+  return
+}
+
+func.func @dynamic_unpack_transpose_inner_and_outer_dims_large() {
+  %d0 = util.unfoldable_constant 128 : index
+  %d1 = util.unfoldable_constant 256 : index
+  %source = call @generate_2D_source(%d0, %d1) : (index, index) -> tensor<?x?xi32>
+
+  %c32 = arith.constant 32 : index
+  %c16 = arith.constant 16 : index
+  %tiled_d0 = arith.ceildivui %d0, %c32 : index
+  %tiled_d1 = arith.ceildivui %d1, %c16 : index
+  %dyn_init_pack = tensor.empty(%tiled_d0, %tiled_d1) : tensor<?x?x16x32xi32>
+  %pack = iree_linalg_ext.pack %source outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 32] into %dyn_init_pack
+      : (tensor<?x?xi32> tensor<?x?x16x32xi32>) -> tensor<?x?x16x32xi32>
+
+  %init_unpack = tensor.empty(%d0, %d1) : tensor<?x?xi32>
+  %unpack = iree_linalg_ext.unpack %pack outer_dims_perm = [1, 0]  inner_dims_pos = [1, 0] inner_tiles = [16, 32] into %init_unpack
       : (tensor<?x?x16x32xi32> tensor<?x?xi32>) -> tensor<?x?xi32>
 
   check.expect_eq(%unpack, %source) : tensor<?x?xi32>
@@ -179,7 +221,7 @@ func.func @dynamic_unpack_extract_slice_large() {
   return
 }
 
-func.func @unpack_extract_slice_transpose_large() {
+func.func @unpack_extract_slice_transpose_inner_dims_large() {
   %height = arith.constant 100 : index
   %width = arith.constant 250 : index
   %0 = call @generate_2D_source(%height, %width) : (index, index) -> tensor<?x?xi32>
@@ -200,7 +242,48 @@ func.func @unpack_extract_slice_transpose_large() {
   return
 }
 
-func.func @dynamic_unpack_extract_slice_transpose_large() {
+func.func @unpack_extract_slice_transpose_outer_dims_large() {
+  %height = arith.constant 100 : index
+  %width = arith.constant 250 : index
+  %0 = call @generate_2D_source(%height, %width) : (index, index) -> tensor<?x?xi32>
+  %source = tensor.cast %0 : tensor<?x?xi32> to tensor<100x250xi32>
+  %padding_value = arith.constant 42 : i32
+
+  %init_pack = tensor.empty() : tensor<16x4x32x16xi32>
+  %pack = iree_linalg_ext.pack %source padding_value(%padding_value : i32)
+      outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %init_pack
+      : (tensor<100x250xi32> tensor<16x4x32x16xi32>) -> tensor<16x4x32x16xi32>
+
+  %init_unpack = tensor.empty() : tensor<100x250xi32>
+  %unpack = iree_linalg_ext.unpack %pack outer_dims_perm = [1, 0]  inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %init_unpack
+      : (tensor<16x4x32x16xi32> tensor<100x250xi32>) -> tensor<100x250xi32>
+
+  check.expect_eq(%unpack, %source) : tensor<100x250xi32>
+  return
+}
+
+func.func @unpack_extract_slice_transpose_inner_and_outer_dims_large() {
+  %height = arith.constant 100 : index
+  %width = arith.constant 250 : index
+  %0 = call @generate_2D_source(%height, %width) : (index, index) -> tensor<?x?xi32>
+  %source = tensor.cast %0 : tensor<?x?xi32> to tensor<100x250xi32>
+  %padding_value = arith.constant 42 : i32
+
+  %init_pack = tensor.empty() : tensor<16x4x16x32xi32>
+  %pack = iree_linalg_ext.pack %source padding_value(%padding_value : i32)
+      outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 32] into %init_pack
+      : (tensor<100x250xi32> tensor<16x4x16x32xi32>) -> tensor<16x4x16x32xi32>
+
+  %init_unpack = tensor.empty() : tensor<100x250xi32>
+  %unpack = iree_linalg_ext.unpack %pack
+      outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 32] into %init_unpack
+      : (tensor<16x4x16x32xi32> tensor<100x250xi32>) -> tensor<100x250xi32>
+
+  check.expect_eq(%unpack, %source) : tensor<100x250xi32>
+  return
+}
+
+func.func @dynamic_unpack_extract_slice_transpose_inner_dims_large() {
   %d0 = util.unfoldable_constant 100 : index
   %d1 = util.unfoldable_constant 250 : index
   %source = call @generate_2D_source(%d0, %d1) : (index, index) -> tensor<?x?xi32>
@@ -218,6 +301,53 @@ func.func @dynamic_unpack_extract_slice_transpose_large() {
   %init_unpack = tensor.empty(%d0, %d1) : tensor<?x?xi32>
   %unpack = iree_linalg_ext.unpack %pack
       inner_dims_pos = [1, 0] inner_tiles = [16, 32] into %init_unpack
+      : (tensor<?x?x16x32xi32> tensor<?x?xi32>) -> tensor<?x?xi32>
+
+  check.expect_eq(%unpack, %source) : tensor<?x?xi32>
+  return
+}
+
+func.func @dynamic_unpack_extract_slice_transpose_outer_dims_large() {
+  %d0 = util.unfoldable_constant 100 : index
+  %d1 = util.unfoldable_constant 250 : index
+  %source = call @generate_2D_source(%d0, %d1) : (index, index) -> tensor<?x?xi32>
+  %padding_value = arith.constant 42 : i32
+
+  %c32 = arith.constant 32 : index
+  %c16 = arith.constant 16 : index
+  %tiled_d0 = arith.ceildivui %d0, %c32 : index
+  %tiled_d1 = arith.ceildivui %d1, %c16 : index
+  %dyn_init_pack = tensor.empty(%tiled_d0, %tiled_d1) : tensor<?x?x32x16xi32>
+  %pack = iree_linalg_ext.pack %source padding_value(%padding_value : i32)
+      outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %dyn_init_pack
+      : (tensor<?x?xi32> tensor<?x?x32x16xi32>) -> tensor<?x?x32x16xi32>
+
+  %init_unpack = tensor.empty(%d0, %d1) : tensor<?x?xi32>
+  %unpack = iree_linalg_ext.unpack %pack outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %init_unpack
+      : (tensor<?x?x32x16xi32> tensor<?x?xi32>) -> tensor<?x?xi32>
+
+  check.expect_eq(%unpack, %source) : tensor<?x?xi32>
+  return
+}
+
+func.func @dynamic_unpack_extract_slice_transpose_inner_and_outer_dims_large() {
+  %d0 = util.unfoldable_constant 100 : index
+  %d1 = util.unfoldable_constant 250 : index
+  %source = call @generate_2D_source(%d0, %d1) : (index, index) -> tensor<?x?xi32>
+  %padding_value = arith.constant 42 : i32
+
+  %c16 = arith.constant 16 : index
+  %c32 = arith.constant 32 : index
+  %tiled_d0 = arith.ceildivui %d0, %c32 : index
+  %tiled_d1 = arith.ceildivui %d1, %c16 : index
+  %init_pack = tensor.empty(%tiled_d0, %tiled_d1) : tensor<?x?x16x32xi32>
+  %pack = iree_linalg_ext.pack %source padding_value(%padding_value : i32)
+      outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 32] into %init_pack
+      : (tensor<?x?xi32> tensor<?x?x16x32xi32>) -> tensor<?x?x16x32xi32>
+
+  %init_unpack = tensor.empty(%d0, %d1) : tensor<?x?xi32>
+  %unpack = iree_linalg_ext.unpack %pack
+      outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 32] into %init_unpack
       : (tensor<?x?x16x32xi32> tensor<?x?xi32>) -> tensor<?x?xi32>
 
   check.expect_eq(%unpack, %source) : tensor<?x?xi32>

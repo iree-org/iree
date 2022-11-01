@@ -130,10 +130,10 @@ static LogicalResult isEquivalentToOpImpl(PatternRewriter &rewriter,
                                           linalg::LinalgOp linalgModelOp) {
   // If basic properties do not match, return failure.
   {
-    OpOperandVector opInputs = linalgOp.getInputOperands();
-    OpOperandVector modelInputs = linalgModelOp.getInputOperands();
-    OpOperandVector opOutputs = linalgOp.getOutputOperands();
-    OpOperandVector modelOutputs = linalgModelOp.getOutputOperands();
+    OpOperandVector opInputs = linalgOp.getDpsInputOperands();
+    OpOperandVector modelInputs = linalgModelOp.getDpsInputOperands();
+    OpOperandVector opOutputs = linalgOp.getDpsInitOperands();
+    OpOperandVector modelOutputs = linalgModelOp.getDpsInitOperands();
     auto notEqualFn = [](std::tuple<OpOperand *, OpOperand *> in) -> bool {
       return std::get<0>(in)->get() != std::get<1>(in)->get();
     };
@@ -344,15 +344,24 @@ transform_ext::StructuredTransformOpsExtension::
 static linalg::LinalgOp findSingleLinalgOpDefiningAll(ValueRange range) {
   linalg::LinalgOp sourceOp = nullptr;
   for (Value value : range) {
-    // See through tensor casts.
+    // See through tensor casts and reshape ops.
     //
     // TODO: we may need some generalization (interfaces?) of this for other
     // operations, especially multi-operand ones to understand which of their
     // operands may be coming from a Linalg op. Or a completely different
     // mechanism of tracking op replacement at creation, or even different
     // patterns that identify the "main" result of a transformation.
-    while (auto castOp = value.getDefiningOp<tensor::CastOp>())
-      value = castOp.getSource();
+    while (isa<tensor::CastOp, tensor::CollapseShapeOp, tensor::ExpandShapeOp>(
+        value.getDefiningOp())) {
+      value = llvm::TypeSwitch<Operation *, Value>(value.getDefiningOp())
+                  .Case([](tensor::CastOp op) { return op.getSource(); })
+                  .Case([](tensor::CollapseShapeOp op) { return op.getSrc(); })
+                  .Case([](tensor::ExpandShapeOp op) { return op.getSrc(); })
+                  .Default([](Operation *) {
+                    llvm_unreachable("Wrong op type");
+                    return Value();
+                  });
+    }
 
     if (auto currentSourceOp = value.getDefiningOp<linalg::LinalgOp>()) {
       if (!sourceOp || sourceOp == currentSourceOp) {

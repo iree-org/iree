@@ -14,7 +14,7 @@ iree_cc_library(
   NAME
     HALToVM
   HDRS
-    "ConvertHALToVM.h"
+    "Patterns.h"
   SRCS
     "ConvertAllocatorOps.cpp"
     "ConvertBufferOps.cpp"
@@ -24,7 +24,7 @@ iree_cc_library(
     "ConvertExecutableOps.cpp"
     "ConvertExperimentalOps.cpp"
     "ConvertFenceOps.cpp"
-    "ConvertHALToVM.cpp"
+    "Patterns.cpp"
   DEPS
     LLVMSupport
     MLIRArithDialect

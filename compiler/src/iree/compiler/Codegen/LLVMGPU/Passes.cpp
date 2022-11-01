@@ -170,7 +170,7 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
   nestedModulePM.addPass(createCSEPass());
 
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMGPUReduceSharedMemoryBankConflicts());
+      createGPUReduceSharedMemoryBankConflicts());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createWorkGroupSwizzle(logSwizzleTile));
   nestedModulePM.addPass(createCanonicalizerPass());
@@ -233,7 +233,7 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   if (!llvmgpuUseMMASync) {
     nestedModulePM.addNestedPass<func::FuncOp>(
-        createLLVMGPUReduceSharedMemoryBankConflicts());
+        createGPUReduceSharedMemoryBankConflicts());
   }
 
   // Vector -> MMA ops
@@ -284,7 +284,7 @@ void addGPUTransposePassPipeline(OpPassManager &pm) {
 
   // May or may not need to reduce shared mememory conflicts
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMGPUReduceSharedMemoryBankConflicts(/*paddingSizeBits=*/32));
+      createGPUReduceSharedMemoryBankConflicts(/*paddingSizeBits=*/32));
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
   nestedModulePM.addPass(createCanonicalizerPass());

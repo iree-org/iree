@@ -507,4 +507,10 @@ IREE_API_EXPORT void iree_status_fprint(FILE* file, iree_status_t status);
 }  // extern "C"
 #endif  // __cplusplus
 
+// Optional C++ iree::Status wrapper.
+// This makes it easier to safely use iree_status_t in C++ code and not leak.
+#ifdef __cplusplus
+#include "iree/base/status_cc.h"
+#endif  // __cplusplus
+
 #endif  // IREE_BASE_STATUS_H_

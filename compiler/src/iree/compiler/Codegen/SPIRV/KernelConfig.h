@@ -67,6 +67,12 @@ LogicalResult setNVIDIACodeGenConfig(const spirv::TargetEnv &targetEnv,
 /// Returns true if the given `linalgOp` is a (batch) matmul op.
 bool isMatmulOrBatchMatmul(linalg::LinalgOp linalgOp);
 
+/// Given the linalg `op` with `lhsShape` and `rhsShape`, tries to treat as a
+/// (batch) matmul like op and deduce the index of the loop corresponding to
+/// B/M/N/K dimension respectively. Returns -1 as the index if unable to deduce.
+std::tuple<int, int, int, int> getMatmulBMNKIndex(
+    linalg::LinalgOp op, int *lastParallelDim = nullptr);
+
 /// Attaches the `translation_info` attribute to entry points in `moduleOp` and
 /// `lowering_config` attributes to all root ops in `moduleOp`'s region.
 /// These attributes are used to drive the CodeGen pipeline.

@@ -25,6 +25,7 @@ iree_lit_test_suite(
         "hostonly",
     ],
     tools = [
+        "//tools:iree-opt",
         "//tools:iree-run-mlir",
         "@llvm-project//lld",
         "@llvm-project//llvm:FileCheck",

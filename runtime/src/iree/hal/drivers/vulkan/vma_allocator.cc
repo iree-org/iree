@@ -82,9 +82,9 @@ static void VKAPI_PTR iree_hal_vulkan_vma_free_callback(
 #endif  // IREE_STATISTICS_ENABLE
 
 iree_status_t iree_hal_vulkan_vma_allocator_create(
-    VkInstance instance, VkPhysicalDevice physical_device,
-    VkDeviceHandle* logical_device, iree_hal_device_t* device,
-    iree_hal_allocator_t** out_allocator) {
+    const iree_hal_vulkan_device_options_t* options, VkInstance instance,
+    VkPhysicalDevice physical_device, VkDeviceHandle* logical_device,
+    iree_hal_device_t* device, iree_hal_allocator_t** out_allocator) {
   IREE_ASSERT_ARGUMENT(instance);
   IREE_ASSERT_ARGUMENT(physical_device);
   IREE_ASSERT_ARGUMENT(logical_device);
@@ -141,7 +141,7 @@ iree_status_t iree_hal_vulkan_vma_allocator_create(
   create_info.physicalDevice = physical_device;
   create_info.device = *logical_device;
   create_info.instance = instance;
-  create_info.preferredLargeHeapBlockSize = 64 * 1024 * 1024;
+  create_info.preferredLargeHeapBlockSize = options->large_heap_block_size;
   create_info.pAllocationCallbacks = logical_device->allocator();
   create_info.pDeviceMemoryCallbacks = &device_memory_callbacks;
   create_info.pHeapSizeLimit = NULL;

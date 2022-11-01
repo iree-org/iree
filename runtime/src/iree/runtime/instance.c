@@ -21,10 +21,8 @@
 //===----------------------------------------------------------------------===//
 
 IREE_API_EXPORT void iree_runtime_instance_options_initialize(
-    iree_api_version_t api_version,
     iree_runtime_instance_options_t* out_options) {
   memset(out_options, 0, sizeof(*out_options));
-  out_options->api_version = api_version;
 }
 
 IREE_API_EXPORT void iree_runtime_instance_options_use_all_available_drivers(
@@ -65,13 +63,6 @@ IREE_API_EXPORT iree_status_t iree_runtime_instance_create(
   IREE_ASSERT_ARGUMENT(out_instance);
   *out_instance = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
-
-  // Check that the API version matches what the runtime expects. The check here
-  // should always succeed when the runtime and the underlying system are linked
-  // together into the same binary.
-  iree_api_version_t actual_version = IREE_API_VERSION_0;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_api_version_check(options->api_version, &actual_version));
 
   // Allocate the instance state.
   iree_runtime_instance_t* instance = NULL;

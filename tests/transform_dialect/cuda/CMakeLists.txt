@@ -20,6 +20,8 @@ iree_lit_test_suite(
   SRCS
     "reduction.mlir"
     "softmax.mlir"
+    "softmax_partial.mlir"
+    "softmax_v2.mlir"
   TOOLS
     FileCheck
     iree-compile
@@ -29,7 +31,8 @@ iree_lit_test_suite(
     reduction_codegen_spec.mlir
     softmax_codegen_spec.mlir
     softmax_dispatch_spec.mlir
-    softmax_fused_codegen_spec.mlir
+    softmax_partial_codegen_spec.mlir
+    softmax_v2_codegen_spec.mlir
   LABELS
     "noasan"
     "nomsan"

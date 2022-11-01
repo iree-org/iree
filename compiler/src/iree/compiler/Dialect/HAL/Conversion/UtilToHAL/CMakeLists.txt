@@ -14,9 +14,9 @@ iree_cc_library(
   NAME
     UtilToHAL
   HDRS
-    "ConvertUtilToHAL.h"
+    "Patterns.h"
   SRCS
-    "ConvertUtilToHAL.cpp"
+    "Patterns.cpp"
   DEPS
     MLIRFuncDialect
     MLIRIR

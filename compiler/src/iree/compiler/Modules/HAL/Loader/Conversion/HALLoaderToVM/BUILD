@@ -15,10 +15,10 @@ package(
 iree_compiler_cc_library(
     name = "HALLoaderToVM",
     srcs = [
-        "ConvertHALLoaderToVM.cpp",
+        "Patterns.cpp",
     ],
     hdrs = [
-        "ConvertHALLoaderToVM.h",
+        "Patterns.h",
     ],
     deps = [
         "//compiler/src/iree/compiler/Dialect/HAL/Conversion/HALToVM",

@@ -1,8 +1,18 @@
 iree_cc_library(
   NAME
+    assembly
+  HDRS
+    "assembly.h"
+)
+
+iree_cc_library(
+  NAME
     mmt4d_tile_arm_64
   SRCS
     "mmt4d_tile_arm_64.S"
+  DEPS
+    ::assembly
+    iree::builtins::ukernel::exported_flag_bits
 )
 list(APPEND IREE_UKERNEL_MMT4D_TILE_ARM_64_DEPS "iree::builtins::ukernel::arch::arm_64::mmt4d_tile_arm_64")
 
@@ -15,6 +25,10 @@ if(IREE_UKERNEL_BUILD_ARM_64_DOTPROD)
       "mmt4d_tile_arm_64_dotprod.S"
     COPTS
       "-march=armv8.2-a+dotprod"
+    DEPS
+      ::assembly
+      iree::builtins::ukernel::exported_flag_bits
+
   )
   list(APPEND IREE_UKERNEL_MMT4D_TILE_ARM_64_DEPS "iree::builtins::ukernel::arch::arm_64::mmt4d_tile_arm_64_dotprod")
 endif()
@@ -28,6 +42,9 @@ if(IREE_UKERNEL_BUILD_ARM_64_I8MM)
       "mmt4d_tile_arm_64_i8mm.S"
     COPTS
       "-march=armv8.2-a+i8mm"
+    DEPS
+      ::assembly
+      iree::builtins::ukernel::exported_flag_bits
   )
   list(APPEND IREE_UKERNEL_MMT4D_TILE_ARM_64_DEPS "iree::builtins::ukernel::arch::arm_64::mmt4d_tile_arm_64_i8mm")
 endif()
@@ -44,7 +61,7 @@ iree_cc_library(
   DEPS
     iree::base::core_headers
     iree::schemas::cpu_data
-    iree::builtins::ukernel::types
+    iree::builtins::ukernel::common
     ${IREE_UKERNEL_MMT4D_TILE_ARM_64_DEPS}
   PUBLIC
 )

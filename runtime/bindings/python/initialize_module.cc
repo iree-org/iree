@@ -11,7 +11,6 @@
 #include "./status_utils.h"
 #include "./vm.h"
 #include "iree/base/internal/flags.h"
-#include "iree/base/status_cc.h"
 #include "iree/hal/drivers/init.h"
 
 namespace iree {

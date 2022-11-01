@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-hal-loader-conversion %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-hal-loader-conversion --canonicalize %s | FileCheck %s
 
 // NOTE: all other stream.cmd.* ops are handled by the hal_inline conversions.
 
@@ -43,23 +43,23 @@ func.func @cmdDispatch(%buffer0: !stream.resource<transient>, %buffer0_size: ind
   // CHECK-DAG: %[[CONSTANT1:.+]] = arith.constant 5
   %constant1 = arith.constant 5 : i32
 
-  // CHECK: %[[BUFFER0_REL_OFFSET:.+]] = arith.constant 200
+  // CHECK-DAG: %[[BUFFER0_REL_OFFSET:.+]] = arith.constant 200
   %buffer0_offset = arith.constant 200 : index
-  // CHECK: %[[BUFFER0_REL_LENGTH:.+]] = arith.constant 128
+  // CHECK-DAG: %[[BUFFER0_REL_LENGTH:.+]] = arith.constant 128
   %buffer0_length = arith.constant 128 : index
-  // CHECK: %[[BUFFER1_REL_OFFSET:.+]] = arith.constant 300
+  // CHECK-DAG: %[[BUFFER1_REL_OFFSET:.+]] = arith.constant 300
   %buffer1_offset = arith.constant 300 : index
-  // CHECK: %[[BUFFER1_REL_LENGTH:.+]] = arith.constant 256
+  // CHECK-DAG: %[[BUFFER1_REL_LENGTH:.+]] = arith.constant 256
   %buffer1_length = arith.constant 256 : index
 
   %fence = stream.cmd.execute with(%buffer0 as %buffer0_inner: !stream.resource<transient>{%buffer0_size},
                                    %buffer1 as %buffer1_inner: !stream.resource<external>{%buffer1_size}) {
     // Lookup the loaded executable (resolved during iree-hal-loader-materialize-executables):
-    // CHECK: %[[EXECUTABLE:.+]] = hal_loader.executable.lookup executable(@ex) : !hal.executable
+    // CHECK-DAG: %[[EXECUTABLE:.+]] = hal_loader.executable.lookup executable(@ex) : !hal.executable
 
     // %buffer1 is external and a subspan is needed to resolve the absolute
     // storage range. This will (mostly) eventually fold/canonicalize away.
-    // CHECK: %[[BUFFER1_STORAGE:.+]] = hal_inline.buffer.storage<%[[BUFFER1]]
+    // CHECK-DAG: %[[BUFFER1_STORAGE:.+]] = hal_inline.buffer.storage<%[[BUFFER1]]
 
     // Workload calculation gets inlined and folds during conversion; this is
     // the original worload ceildiv 4 on x/y:

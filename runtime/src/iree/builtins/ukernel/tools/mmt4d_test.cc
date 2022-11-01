@@ -59,7 +59,7 @@
 
 template <typename lhs_t, typename rhs_t, typename out_t>
 static void iree_mmt4d_reference(const iree_ukernel_mmt4d_params_t& params) {
-  bool accumulate = params.flags & IREE_VMVX_MATMUL_FLAG_ACCUMULATE;
+  bool accumulate = params.flags & IREE_UKERNEL_FLAG_ACCUMULATE;
   iree_ukernel_ssize_t lhs_tile_size = params.M0 * params.K0;
   iree_ukernel_ssize_t rhs_tile_size = params.N0 * params.K0;
   iree_ukernel_ssize_t out_tile_size = params.M0 * params.N0;
@@ -99,7 +99,8 @@ static void iree_mmt4d_reference(const iree_ukernel_mmt4d_params_t& params) {
       iree_mmt4d_reference<float, float, float>(params);
       break;
     case iree_ukernel_mmt4d_type_i8i8i32:
-      iree_mmt4d_reference<int8_t, int8_t, int32_t>(params);
+      iree_mmt4d_reference<iree_ukernel_int8_t, iree_ukernel_int8_t,
+                           iree_ukernel_int32_t>(params);
       break;
     default:
       assert(false && "unknown type");
@@ -128,10 +129,10 @@ static void test_one_matmul_using_given_lhs_rhs(
          out_buffer_size);
 
   iree_mmt4d_reference(reference_params);
-  iree_ukernel_mmt4d_status_t status = iree_ukernel_mmt4d(&actual_params);
-  if (status != iree_ukernel_mmt4d_status_ok) {
+  iree_ukernel_status_t status = iree_ukernel_mmt4d(&actual_params);
+  if (status != iree_ukernel_status_ok) {
     fprintf(stderr, "FATAL: iree_ukernel_mmt4d failed: %s\n",
-            iree_ukernel_mmt4d_status_message(status));
+            iree_ukernel_status_message(status));
     iree_abort();
   }
 
@@ -148,7 +149,7 @@ static void test_one_matmul_using_given_lhs_rhs(
     fprintf(stderr, "mmt4d test failure with the following params:\n");
     fprintf(stderr, "  type=%s\n", get_mmt4d_type_str(&p));
     fprintf(stderr, "  flags: accumulate=%d\n",
-            (int)(p.flags & IREE_VMVX_MATMUL_FLAG_ACCUMULATE));
+            (int)(p.flags & IREE_UKERNEL_FLAG_ACCUMULATE));
     fprintf(stderr, "  M=%d, N=%d, K=%d\n", (int)p.M, (int)p.N, (int)p.K);
     fprintf(stderr, "  M0=%d, N0=%d, K0=%d\n", (int)p.M0, (int)p.N0, (int)p.K0);
     fprintf(stderr, "  lhs_stride=%zu, rhs_stride=%zu, out_stride=%zu\n",
@@ -245,7 +246,7 @@ static void test_matmuls_for_various_MNK_shapes_and_flags(
     params.N = shape.n;
     params.K = shape.k;
     for (bool accumulate : {false, true}) {
-      params.flags = accumulate ? IREE_VMVX_MATMUL_FLAG_ACCUMULATE : 0;
+      params.flags = accumulate ? IREE_UKERNEL_FLAG_ACCUMULATE : 0;
       test_one_matmul_creating_lhs_rhs_for_given_shape(params, engine);
     }
   }
@@ -256,7 +257,7 @@ static void test_matmuls_for_various_MNK_shapes_and_flags(
 // and if the CPU supports the corresponding feature, the mmt4d tests are run a
 // second time with that CPU feature enabled.
 static void mmt4d_test(iree_ukernel_mmt4d_type_t type, int M0, int N0, int K0,
-                       uint64_t cpu_data_field_0_bit) {
+                       iree_ukernel_uint64_t cpu_data_field_0_bit) {
   // Letting each test create its own engine makes them independent: a testcase
   // succeeds or fails the same way if we isolate it or reorder it. The
   // potential downside of repeating the same pseudorandom sequence is OK
@@ -270,7 +271,8 @@ static void mmt4d_test(iree_ukernel_mmt4d_type_t type, int M0, int N0, int K0,
   params.M0 = M0;
   params.N0 = N0;
   params.K0 = K0;
-  const uint64_t local_cpu_data_default[IREE_CPU_DATA_FIELD_COUNT] = {0};
+  const iree_ukernel_uint64_t
+      local_cpu_data_default[IREE_CPU_DATA_FIELD_COUNT] = {0};
   params.cpu_data = local_cpu_data_default;
   // First try without any optional CPU feature. This matters even when the
   // feature is supported by the CPU because we want to test the fallback to
@@ -278,8 +280,9 @@ static void mmt4d_test(iree_ukernel_mmt4d_type_t type, int M0, int N0, int K0,
   test_matmuls_for_various_MNK_shapes_and_flags(params, engine);
   // If this is nonzero, we are asked to test again with this CPU feature.
   if (cpu_data_field_0_bit) {
-    const uint64_t local_cpu_data_with_bit[IREE_CPU_DATA_FIELD_COUNT] = {
-        cpu_data_field_0_bit};
+    const iree_ukernel_uint64_t
+        local_cpu_data_with_bit[IREE_CPU_DATA_FIELD_COUNT] = {
+            cpu_data_field_0_bit};
     params.cpu_data = local_cpu_data_with_bit;
     // Check if the CPU supports the feature (otherwise, we crash).
     bool supported = iree_cpu_data_field(0) & params.cpu_data[0];

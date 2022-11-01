@@ -38,6 +38,7 @@ iree_cc_library(
     MLIRSupport
     MLIRTensorDialect
     MLIRTilingInterface
+    MLIRTransformUtils
     iree::compiler::Codegen::Interfaces::PartitionableLoopsInterface
     iree::compiler::Codegen::Interfaces::ProcessorOpInterfaces
     iree::compiler::Dialect::Flow::IR

@@ -20,12 +20,18 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
+#include "mlir/Dialect/Bufferization/Transforms/AllocTensorElimination.h"
+// #include "mlir/Dialect/Bufferization/Transforms/BufferUtils.h"
+#include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
+// #include "mlir/Dialect/Bufferization/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Transforms/Passes.h"
 
 using namespace mlir;
 using namespace mlir::iree_compiler;
@@ -202,126 +208,13 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
 }
 
 //===---------------------------------------------------------------------===//
-// IREEBufferizeOp
+// ForeachThreadToWorkgroupOp
 //===---------------------------------------------------------------------===//
-
-// TODO: Maybe we need both a transform.iree.cpu.bufferize and a
-// transform.iree.gpu.bufferize rather than a single common bufferize op?
-//
-//===---------------------------------------------------------------------===//
-// Default allocation functions for CPU backend
-// TODO: register the bufferization behavior in a target-specific way.
-// TODO: Maybe bufferize should have a separate cpu and a gpu version. This is
-// unclear though: what happens on heterogeneous HW ?
-//===---------------------------------------------------------------------===//
-
-// Allocation callbacks to use with upstream comprehensive bufferization
-static FailureOr<Value> cpuComprehensiveBufferizeAllocationFn(
-    OpBuilder &builder, Location loc, MemRefType memRefType,
-    ValueRange dynamicSizes, unsigned alignment) {
-  return builder
-      .create<memref::AllocaOp>(loc, memRefType, dynamicSizes,
-                                builder.getI64IntegerAttr(alignment))
-      .getResult();
-}
-
-static LogicalResult cpuComprehensiveBufferizeDeallocationFn(OpBuilder &builder,
-                                                             Location loc,
-                                                             Value allocation) {
-  return success();
-}
-
-static LogicalResult cpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
-                                                     Location loc, Value from,
-                                                     Value to) {
-  // TODO: ideally we should use linalg.copy which was recently reintroduced
-  // as an OpDSL named op. However, IREE-specific patterns to cleanup spurious
-  // post-bufferization copies do not trigger properly.
-  // So we keep using `createLinalgCopyOp` which builds a GenericOp.
-  // builder.create<linalg::CopyOp>(loc, from, to);
-  mlir::iree_compiler::createLinalgCopyOp(builder, loc, from, to);
-  return success();
-}
-
-static FailureOr<Value> gpuComprehensiveBufferizeAllocationFn(
-    OpBuilder &builder, Location loc, MemRefType memRefType,
-    ValueRange dynamicSizes, unsigned alignment) {
-  // TODO: use gpu::GPUDialect::getWorkgroupAddressSpace() but this requires
-  // moving out of CommonExtensions.
-  MemRefType allocType = MemRefType::get(memRefType.getShape(),
-                                         memRefType.getElementType(), {}, 3);
-  return builder
-      .create<memref::AllocOp>(loc, allocType, dynamicSizes,
-                               builder.getI64IntegerAttr(alignment))
-      .getResult();
-}
-
-static LogicalResult gpuComprehensiveBufferizeDeallocationFn(OpBuilder &builder,
-                                                             Location loc,
-                                                             Value allocation) {
-  builder.create<memref::DeallocOp>(loc, allocation);
-  return success();
-}
-
-static LogicalResult gpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
-                                                     Location loc, Value from,
-                                                     Value to) {
-  // TODO: ideally we should use linalg.copy which was recently reintroduced
-  // as an OpDSL named op. However, IREE-specific patterns to cleanup spurious
-  // post-bufferization copies do not trigger properly.
-  // So we keep using `createLinalgCopyOp` which builds a GenericOp.
-  // builder.create<linalg::CopyOp>(loc, from, to);
-  mlir::iree_compiler::createLinalgCopyOp(builder, loc, from, to);
-  return success();
-}
-
-DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
-    transform::TransformResults &results, transform::TransformState &state) {
-  ArrayRef<Operation *> payload = state.getPayloadOps(getTarget());
-  if (payload.size() != 1 ||
-      !isa<ModuleOp, HAL::ExecutableOp, HAL::ExecutableVariantOp>(
-          payload.front())) {
-    return mlir::emitDefiniteFailure(
-        state.getTopLevel(),
-        "requires exactly a single HAL::ExecutableOp or "
-        "HAL::ExecutableVariantOp target op.");
-  }
-  PassManager pm(getContext());
-  // Bufferize the dispatch.
-  using mlir::bufferization::BufferizationOptions;
-  BufferizationOptions::AllocationFn allocationFn =
-      cpuComprehensiveBufferizeAllocationFn;
-  BufferizationOptions::DeallocationFn deallocationFn =
-      cpuComprehensiveBufferizeDeallocationFn;
-  BufferizationOptions::MemCpyFn memcpyFn = cpuComprehensiveBufferizeCopyFn;
-  if (getTargetGpu()) {
-    allocationFn = gpuComprehensiveBufferizeAllocationFn;
-    deallocationFn = gpuComprehensiveBufferizeDeallocationFn;
-    memcpyFn = gpuComprehensiveBufferizeCopyFn;
-  }
-  mlir::iree_compiler::addIREEComprehensiveBufferizePasses(
-      pm, allocationFn, deallocationFn, memcpyFn);
-  WalkResult res = state.getTopLevel()->walk([&](ModuleOp moduleOp) {
-    if (failed(pm.run(moduleOp))) {
-      getOperation()->emitError()
-          << "failed to bufferize ModuleOp:\n"
-          << *(moduleOp.getOperation()) << "\nunder top-level:\n"
-          << *state.getTopLevel();
-      return WalkResult::interrupt();
-    }
-    return WalkResult::advance();
-  });
-
-  if (res.wasInterrupted())
-    return DiagnosedSilenceableFailure::definiteFailure();
-
-  results.set(getOperation()->getOpResult(0), payload.front());
-  return DiagnosedSilenceableFailure::success();
-}
 
 /// Populate the workgroup_count region of `dispatchOp`.
-/// For now, this only supports constant index ops and empty workload operands.
-/// Assumes the HAL::ExecutableExportOp is built with an empty region.
+/// For now, this only supports constant index ops and empty workload
+/// operands. Assumes the HAL::ExecutableExportOp is built with an empty
+/// region.
 static LogicalResult populateWorkgroupCountComputingRegion(
     PatternRewriter &rewriter, scf::ForeachThreadOp foreachThreadOp,
     HAL::ExecutableExportOp exportOp) {
@@ -694,6 +587,260 @@ transform_dialect::TileToForeachThreadAndWorkgroupCountRegion::apply(
   transformResults.set(getForeachThreadOp().cast<OpResult>(), tileOps);
   transformResults.set(getTiledOp().cast<OpResult>(), tiledOps);
   return DiagnosedSilenceableFailure(success());
+}
+
+//===---------------------------------------------------------------------===//
+// IREEBufferizeOp
+//===---------------------------------------------------------------------===//
+
+// Important note: this transform is load-bearing and is the glue between
+// different dialects that want to operate on tensors.
+// Originaly, it used to just call `addIREEComprehensiveBufferizePasses` but
+// this introduces a lot of complexity in the registration process due to the
+// use of nested pass pipelines, to a point that it is a major endeavor to
+// connect a new dialect.
+// Instead, avoid calling the passes and only take what we need from them.
+//
+// TODO: Maybe we need both a transform.iree.cpu.bufferize and a
+// transform.iree.gpu.bufferize rather than a single common bufferize op?
+//
+// Note: This has become so specific that it may be worth it to separate in its
+// own .cpp file.
+using mlir::bufferization::BufferizationOptions;
+using mlir::bufferization::OneShotAnalysisState;
+using mlir::bufferization::OneShotBufferizationOptions;
+
+//===---------------------------------------------------------------------===//
+// Default allocation functions for CPU backend
+// TODO: register the bufferization behavior in a target-specific way.
+// TODO: Maybe bufferize should have a separate cpu and a gpu version. This is
+// unclear though: what happens on heterogeneous HW ?
+//===---------------------------------------------------------------------===//
+
+// Allocation callbacks to use with upstream comprehensive bufferization
+static FailureOr<Value> cpuComprehensiveBufferizeAllocationFn(
+    OpBuilder &builder, Location loc, MemRefType memRefType,
+    ValueRange dynamicSizes, unsigned alignment) {
+  return builder
+      .create<memref::AllocaOp>(loc, memRefType, dynamicSizes,
+                                builder.getI64IntegerAttr(alignment))
+      .getResult();
+}
+
+static LogicalResult cpuComprehensiveBufferizeDeallocationFn(OpBuilder &builder,
+                                                             Location loc,
+                                                             Value allocation) {
+  return success();
+}
+
+static LogicalResult cpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
+                                                     Location loc, Value from,
+                                                     Value to) {
+  // TODO: ideally we should use linalg.copy which was recently reintroduced
+  // as an OpDSL named op. However, IREE-specific patterns to cleanup spurious
+  // post-bufferization copies do not trigger properly.
+  // So we keep using `createLinalgCopyOp` which builds a GenericOp.
+  // builder.create<linalg::CopyOp>(loc, from, to);
+  mlir::iree_compiler::createLinalgCopyOp(builder, loc, from, to);
+  return success();
+}
+
+static FailureOr<Value> gpuComprehensiveBufferizeAllocationFn(
+    OpBuilder &builder, Location loc, MemRefType memRefType,
+    ValueRange dynamicSizes, unsigned alignment) {
+  // TODO: use gpu::GPUDialect::getWorkgroupAddressSpace() but this requires
+  // moving out of CommonExtensions.
+  MemRefType allocType = MemRefType::get(memRefType.getShape(),
+                                         memRefType.getElementType(), {}, 3);
+  return builder
+      .create<memref::AllocOp>(loc, allocType, dynamicSizes,
+                               builder.getI64IntegerAttr(alignment))
+      .getResult();
+}
+
+static LogicalResult gpuComprehensiveBufferizeDeallocationFn(OpBuilder &builder,
+                                                             Location loc,
+                                                             Value allocation) {
+  builder.create<memref::DeallocOp>(loc, allocation);
+  return success();
+}
+
+static LogicalResult gpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
+                                                     Location loc, Value from,
+                                                     Value to) {
+  // TODO: ideally we should use linalg.copy which was recently reintroduced
+  // as an OpDSL named op. However, IREE-specific patterns to cleanup spurious
+  // post-bufferization copies do not trigger properly.
+  // So we keep using `createLinalgCopyOp` which builds a GenericOp.
+  // builder.create<linalg::CopyOp>(loc, from, to);
+  mlir::iree_compiler::createLinalgCopyOp(builder, loc, from, to);
+  return success();
+}
+
+/// Temporarily copied from IREEComprehensiveBufferizePass.cpp to avoid buying
+/// into nested pass pipeline mess.
+static LogicalResult emptyTensorElimination(
+    Operation *op, OneShotBufferizationOptions options) {
+  // Analyze IR.
+  options.testAnalysisOnly = false;
+  options.printConflicts = false;
+  OneShotAnalysisState state(op, options);
+  if (failed(analyzeOp(op, state))) return failure();
+
+  // Rewrite init_tensors that are anchored on specific ops.
+  IRRewriter rewriter(op->getContext());
+  if (failed(bufferization::insertSliceAnchoredAllocTensorEliminationStep(
+          rewriter, op, state)))
+    return failure();
+  if (failed(
+          storeTensorOpAnchoredInitTensorEliminationStep(rewriter, op, state)))
+    return failure();
+
+  return success();
+}
+
+/// Temporarily copied from IREEComprehensiveBufferizePass.cpp to avoid buying
+/// into nested pass pipeline mess.
+// The following is copied from bufferization::runOneShotBufferize with
+// modifications.
+static LogicalResult runIREEOneShotBufferize(
+    Operation *op, const OneShotBufferizationOptions &options) {
+  OneShotAnalysisState state(op, options);
+  if (failed(analyzeOp(op, state))) return failure();
+  if (options.testAnalysisOnly) return success();
+  return bufferization::runOneShotBufferize(op, options);
+}
+
+/// Temporarily copied from IREEComprehensiveBufferizePass.cpp to avoid buying
+/// into nested pass pipeline mess.
+static LogicalResult runIREEBufferizeOnModule(
+    ModuleOp moduleOp, BufferizationOptions::AllocationFn allocationFn,
+    BufferizationOptions::DeallocationFn deallocationFn,
+    BufferizationOptions::MemCpyFn memCpyFn) {
+  OneShotBufferizationOptions options;
+  options.allocationFn = allocationFn;
+  options.deallocationFn = deallocationFn;
+  options.memCpyFn = memCpyFn;
+  // options.testAnalysisOnly = testAnalysisOnly;
+  // options.printConflicts = printConflicts;
+
+  // bufferization.to_memref is used to bufferize constants in IREE. IREE has
+  // it's own logic to handle constants. We'd like to leave the arith.constant
+  // as is and insert bufferization.to_memref to convert the tensor to memref.
+  options.opFilter.denyOperation<arith::ConstantOp>();
+  options.opFilter.denyOperation<bufferization::ToMemrefOp>();
+
+  // This type converter converts tensor types to memref types when no exact
+  // memref type can be inferred from the context.
+  options.unknownTypeConverterFn = [](Value value, unsigned memorySpace,
+                                      const BufferizationOptions &options) {
+    auto tensorType = value.getType().cast<TensorType>();
+
+    // Special rule for ConstantOps: These always lower to some memref with a
+    // static identity layout.
+    if (value.getDefiningOp<arith::ConstantOp>())
+      return bufferization::getMemRefTypeWithStaticIdentityLayout(tensorType,
+                                                                  memorySpace);
+
+    // Default case: Fully dynamic layout map for best compatibility.
+    return bufferization::getMemRefTypeWithFullyDynamicLayout(tensorType,
+                                                              memorySpace);
+  };
+
+  if (failed(emptyTensorElimination(moduleOp.getOperation(), options)))
+    return failure();
+
+  return runIREEOneShotBufferize(moduleOp, options);
+}
+
+namespace {
+/// Pattern to rewrite tensor.empty to tensor.alloc.
+struct EmptyTensorLoweringPattern : public OpRewritePattern<tensor::EmptyOp> {
+  using OpRewritePattern<tensor::EmptyOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::EmptyOp op,
+                                PatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<bufferization::AllocTensorOp>(
+        op, op.getType(), op.getDynamicSizes());
+    return success();
+  }
+};
+}  // namespace
+
+DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
+    transform::TransformResults &results, transform::TransformState &state) {
+  ArrayRef<Operation *> payload = state.getPayloadOps(getTarget());
+  if (payload.size() != 1 ||
+      !isa<ModuleOp, HAL::ExecutableOp, HAL::ExecutableVariantOp>(
+          payload.front())) {
+    return mlir::emitDefiniteFailure(
+        state.getTopLevel(),
+        "requires exactly a single HAL::ExecutableOp or "
+        "HAL::ExecutableVariantOp target op.");
+  }
+
+  //===-------------------------------------------------------------------===//
+  // DO NOT JUST CALL `addIREEComprehensiveBufferizePasses` as this results in
+  // a lot of registration issues due to nested pass pipeline mess.
+  // Instead, take what we need from it.
+  //===-------------------------------------------------------------------===//
+  // Bufferize the dispatch.
+  using mlir::bufferization::BufferizationOptions;
+  BufferizationOptions::AllocationFn allocationFn =
+      cpuComprehensiveBufferizeAllocationFn;
+  BufferizationOptions::DeallocationFn deallocationFn =
+      cpuComprehensiveBufferizeDeallocationFn;
+  BufferizationOptions::MemCpyFn memCpyFn = cpuComprehensiveBufferizeCopyFn;
+  if (getTargetGpu()) {
+    allocationFn = gpuComprehensiveBufferizeAllocationFn;
+    deallocationFn = gpuComprehensiveBufferizeDeallocationFn;
+    memCpyFn = gpuComprehensiveBufferizeCopyFn;
+  }
+
+  //   1. Rewrite tensor.empty to tensor.alloc, without the pass baggage.
+  RewritePatternSet patterns(getContext());
+  patterns.add<EmptyTensorLoweringPattern>(patterns.getContext());
+  TrackingListener listener(state);
+  GreedyRewriteConfig config;
+  LogicalResult result = applyPatternsAndFoldGreedily(
+      state.getTopLevel(), std::move(patterns), config, &listener);
+  LogicalResult listenerResult = listener.checkErrorState();
+  if (failed(result)) {
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                     "greedy pattern application failed");
+  }
+  if (failed(listenerResult))
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                     "listener tracking failed");
+
+  //   2. Run one-shot-bufferize, without the pass baggage.
+  WalkResult res = state.getTopLevel()->walk([&](ModuleOp moduleOp) {
+    if (failed(runIREEBufferizeOnModule(moduleOp, allocationFn, deallocationFn,
+                                        memCpyFn)))
+      return WalkResult::interrupt();
+    return WalkResult::advance();
+  });
+  if (res.wasInterrupted())
+    return DiagnosedSilenceableFailure::definiteFailure();
+
+  //   3. Post-bufferization passes are fine.
+  PassManager pm(getContext());
+  addIREEPostBufferizationPasses(pm);
+  res = state.getTopLevel()->walk([&](ModuleOp moduleOp) {
+    if (failed(pm.run(moduleOp))) {
+      getOperation()->emitError()
+          << "failed to post-bufferization passes on module:\n"
+          << *(moduleOp.getOperation()) << "\nunder top-level:\n"
+          << *state.getTopLevel();
+      return WalkResult::interrupt();
+    }
+    return WalkResult::advance();
+  });
+  if (res.wasInterrupted())
+    return DiagnosedSilenceableFailure::definiteFailure();
+
+  results.set(getOperation()->getOpResult(0), payload.front());
+  return DiagnosedSilenceableFailure::success();
 }
 
 #define GET_OP_CLASSES

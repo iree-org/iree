@@ -13,6 +13,7 @@ include "iree/compiler/Dialect/Stream/IR/StreamInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilTypes.td"
 include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/EnumAttr.td"
+include "mlir/IR/SubElementInterfaces.td"
 
 //===----------------------------------------------------------------------===//
 // HAL enums
@@ -512,7 +513,9 @@ def HAL_InterfaceBindingAttr :
 //===----------------------------------------------------------------------===//
 
 def HAL_DeviceTargetAttr :
-    AttrDef<HAL_Dialect, "DeviceTarget", []> {
+    AttrDef<HAL_Dialect, "DeviceTarget", [
+      DeclareAttrInterfaceMethods<SubElementAttrInterface>,
+    ]> {
   let mnemonic = "device.target";
   let summary = [{generic device target specification}];
   let description = [{
@@ -570,7 +573,9 @@ def HAL_DeviceTargetAttr :
 }
 
 def HAL_ExecutableTargetAttr :
-    AttrDef<HAL_Dialect, "ExecutableTarget", []> {
+    AttrDef<HAL_Dialect, "ExecutableTarget", [
+      DeclareAttrInterfaceMethods<SubElementAttrInterface>,
+    ]> {
   let mnemonic = "executable.target";
   let summary = [{generic executable target specification}];
   let description = [{
@@ -681,6 +686,7 @@ def HAL_MatchAlwaysAttr :
 
 def HAL_MatchAnyAttr :
     AttrDef<HAL_Dialect, "MatchAny", [
+      DeclareAttrInterfaceMethods<SubElementAttrInterface>,
       DeclareAttrInterfaceMethods<HAL_MatchAttrInterface>,
     ]> {
   let mnemonic = "match.any";
@@ -701,6 +707,7 @@ def HAL_MatchAnyAttr :
 
 def HAL_MatchAllAttr :
     AttrDef<HAL_Dialect, "MatchAll", [
+      DeclareAttrInterfaceMethods<SubElementAttrInterface>,
       DeclareAttrInterfaceMethods<HAL_MatchAttrInterface>,
     ]> {
   let mnemonic = "match.all";
