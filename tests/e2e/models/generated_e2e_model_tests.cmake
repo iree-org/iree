@@ -4,7 +4,7 @@
 # file.                                                                        #
 ################################################################################
 
-set(IREE_MODULE_COMPILE_CONFIG_ID_ARM64-V8A-ANDROID
+set(IREE_MODULE_COMPILE_CONFIG_ID_AARCH64-ANDROID
   "1f2adf49-282e-4aff-9d4f-e63b1621f1e8"
 )
 
@@ -34,7 +34,7 @@ iree_benchmark_suite_module_test(
     "--function_input=1x224x224x3xf32=0"
   UNSUPPORTED_PLATFORMS
     "riscv32-Linux"
-    "arm64-v8a-Android"
+    "aarch64-Android"
 )
 
 iree_benchmark_suite_module_test(
@@ -50,7 +50,7 @@ iree_benchmark_suite_module_test(
     "--entry_function=main"
     "--function_input=1x224x224x3xui8=0"
   UNSUPPORTED_PLATFORMS
-    "arm64-v8a-Android"
+    "aarch64-Android"
 )
 
 iree_benchmark_suite_module_test(
@@ -83,6 +83,6 @@ iree_benchmark_suite_module_test(
     "--entry_function=main"
     "--function_input=1x96x96x1xi8=0"
   UNSUPPORTED_PLATFORMS
-    "arm64-v8a-Android"
+    "aarch64-Android"
 )
 

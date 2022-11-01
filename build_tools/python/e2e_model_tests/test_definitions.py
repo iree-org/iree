@@ -18,7 +18,7 @@ from benchmark_suites.iree import (riscv_benchmarks, x86_64_benchmarks,
 
 class CMakePlatform(enum.Enum):
   """Enum of CMake system platform string."""
-  ANDROID_ARMV8_A = "arm64-v8a-Android"
+  ANDROID_ARMV8_A = "aarch64-Android"
   LINUX_RISCV32 = "riscv32-Linux"
   LINUX_RISCV64 = "riscv64-Linux"
   LINUX_X86_64 = "x86_64-Linux"
