@@ -502,6 +502,7 @@ IREE_API_EXPORT void iree_hal_vulkan_device_options_initialize(
     iree_hal_vulkan_device_options_t* out_options) {
   memset(out_options, 0, sizeof(*out_options));
   out_options->flags = 0;
+  out_options->large_heap_block_size = 64 * 1024 * 1024;
 }
 
 // Creates a transient command pool for the given queue family.
@@ -699,8 +700,8 @@ static iree_status_t iree_hal_vulkan_device_create_internal(
   // Create the device memory allocator that will service all buffer
   // allocation requests.
   iree_status_t status = iree_hal_vulkan_vma_allocator_create(
-      instance, physical_device, logical_device, (iree_hal_device_t*)device,
-      &device->device_allocator);
+      options, instance, physical_device, logical_device,
+      (iree_hal_device_t*)device, &device->device_allocator);
 
   // Create command pools for each queue family. If we don't have a transfer
   // queue then we'll ignore that one and just use the dispatch pool.

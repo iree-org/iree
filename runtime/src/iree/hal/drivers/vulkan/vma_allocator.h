@@ -34,7 +34,8 @@ extern "C" {
 //   https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator
 //   https://gpuopen-librariesandsdks.github.io/VulkanMemoryAllocator/html/
 iree_status_t iree_hal_vulkan_vma_allocator_create(
-    VkInstance instance, VkPhysicalDevice physical_device,
+    const iree_hal_vulkan_device_options_t* options, VkInstance instance,
+    VkPhysicalDevice physical_device,
     iree::hal::vulkan::VkDeviceHandle* logical_device,
     iree_hal_device_t* device, iree_hal_allocator_t** out_allocator);
 
