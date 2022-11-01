@@ -281,7 +281,7 @@ function(iree_benchmark_suite_module_test)
     return()
   endif()
 
-  # Drop the "<UUID>_" prefix.
+  # Drop the UUID prefix ".{8}-.{4}-.{4}-.{4}-.{12}_", 37 characters in total.
   string(SUBSTRING "${_RULE_MODEL}" 37 -1 _MODEL_NAME)
   iree_run_module_test(
     NAME
