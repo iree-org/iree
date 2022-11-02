@@ -1002,12 +1002,6 @@ static bool isFusableWithProducer(OpOperand &operand, bool aggressiveFusion) {
   Operation *producer = operand.get().getDefiningOp();
   Operation *consumer = operand.getOwner();
 
-  // Fuse linalg ops with set encoding op if the operand is an `outs` value.
-  if (isa<linalg::LinalgOp>(consumer) &&
-      isa<IREE::LinalgExt::SetEncodingOp>(producer)) {
-    return cast<DestinationStyleOpInterface>(consumer).isDpsInit(&operand);
-  }
-
   if (!isa<linalg::LinalgOp>(consumer) || !isa<linalg::LinalgOp>(producer)) {
     return false;
   }
