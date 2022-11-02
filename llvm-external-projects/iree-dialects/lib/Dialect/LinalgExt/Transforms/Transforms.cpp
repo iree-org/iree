@@ -27,7 +27,6 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/LoopInvariantCodeMotionUtils.h"
 #include "mlir/Transforms/Passes.h"
-#include "llvm/ADT/SetVector.h"
 
 using namespace mlir;
 
@@ -851,8 +850,7 @@ Value getInputOrPaddedInput(OpBuilder &builder, PackOp packOp) {
       continue;
     }
 
-    // The size is less than or equal to tileSize because outer dims to be all
-    // 1s.
+    // The size is less than or equal to tileSize because outer dims are all 1s.
     Optional<int64_t> tileSize =
         getConstantIntValue(tileAndPosMapping.lookup(dim));
     assert(tileSize.hasValue() && "dynamic inner tile size is not supported");
