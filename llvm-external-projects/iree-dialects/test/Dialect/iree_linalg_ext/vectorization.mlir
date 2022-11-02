@@ -184,7 +184,7 @@ func.func @simple_KCRSsr_to_KCRS(%arg0: tensor<1x1x1x1x8x32xf32>, %arg1: tensor<
 // CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG:     %[[ZERO:.+]] = arith.constant 0.000000e+00 : f32
 // CHECK:         %[[READ:.+]] = vector.transfer_read %[[IN]]
-// CHECK-SAME       [[%[[C0]], %[[C0]], %[[C0]], %[[C0]], %[[C0]], %[[C0]]], %[[CST]]
+// CHECK-SAME:      [%[[C0]], %[[C0]], %[[C0]], %[[C0]], %[[C0]], %[[C0]]], %[[ZERO]]
 // CHECK-SAME:      {in_bounds = [true, true]} : tensor<1x1x1x1x8x32xf32>, vector<8x32xf32>
 // CHECK:         %[[TRANSP:.+]] = vector.transpose %[[READ]], [1, 0]
 // CHECK:         %[[WRITE:.+]] = vector.transfer_write %[[TRANSP]]
@@ -201,10 +201,16 @@ func.func @simple_unpack_and_extract_slice(%input: tensor<1x1x8x2xf32>, %output:
 // CHECK-LABEL: func.func @simple_unpack_and_extract_slice
 // CHECK-SAME:    %[[IN:[A-Za-z0-9]+]]:
 // CHECK-SAME:    %[[OUT:[A-Za-z0-9]+]]:
-// CHECK:         %[[SLICE_IN:.+]] = tensor.extract_slice %[[IN]]
-// CHECK-SAME:      [0, 0, 0, 0] [1, 1, 8, 2] [1, 1, 1, 1]
-// CHECK-SAME:      : tensor<1x1x8x2xf32> to tensor<8x2xf32>
-// CHECK:         %[[RES:.+]] = tensor.extract_slice %[[SLICE_IN]]
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[ZERO:.+]] = arith.constant 0.000000e+00 : f32
+// CHECK-DAG:     %[[EMPTY:.+]] = tensor.empty() : tensor<8x2xf32>
+// CHECK:         %[[READ:.+]] = vector.transfer_read %[[IN]]
+// CHECK-SAME:      [%[[C0]], %[[C0]], %[[C0]], %[[C0]]], %[[ZERO]]
+// CHECK-SAME:      {in_bounds = [true, true]} : tensor<1x1x8x2xf32>, vector<8x2xf32>
+// CHECK:         %[[WRITE:.+]] = vector.transfer_write %[[READ]],
+// CHECK-SAME:      %[[EMPTY]][%[[C0]], %[[C0]]]
+// CHECK-SAME:      {in_bounds = [true, true]} : vector<8x2xf32>, tensor<8x2xf32>
+// CHECK:         %[[RES:.+]] = tensor.extract_slice %[[WRITE]]
 // CHECK-SAME:      [0, 0] [5, 1] [1, 1] : tensor<8x2xf32> to tensor<5x1xf32>
 // CHECK:         return %[[RES:.+]]
 
@@ -217,7 +223,12 @@ func.func @simple_CNnc_to_NC(%arg0: tensor<1x1x32x8xf32>, %arg1: tensor<32x8xf32
 // CHECK-LABEL: func.func @simple_CNnc_to_NC
 // CHECK-SAME:    %[[IN:[A-Za-z0-9]+]]:
 // CHECK-SAME:    %[[OUT:[A-Za-z0-9]+]]:
-// CHECK:         %[[SLICE_IN:.+]] = tensor.extract_slice %[[IN]]
-// CHECK-SAME:      [0, 0, 0, 0] [1, 1, 32, 8] [1, 1, 1, 1]
-// CHECK-SAME:      : tensor<1x1x32x8xf32> to tensor<32x8xf32>
-// CHECK:         return %[[SLICE_IN]]
+// CHECK-DAG:     %[[ZERO:.+]] = arith.constant 0.000000e+00 : f32
+// CHECK-DAG:     %[[EMPTY:.+]] = tensor.empty() : tensor<32x8xf32>
+// CHECK:         %[[READ:.+]] = vector.transfer_read %[[IN]]
+// CHECK-SAME:      [%[[C0]], %[[C0]], %[[C0]], %[[C0]]], %[[ZERO]]
+// CHECK-SAME:      {in_bounds = [true, true]} : tensor<1x1x32x8xf32>, vector<32x8xf32>
+// CHECK:         %[[WRITE:.+]] = vector.transfer_write %[[READ]],
+// CHECK-SAME:      %[[EMPTY]][%[[C0]], %[[C0]]]
+// CHECK-SAME:      {in_bounds = [true, true]} : vector<32x8xf32>, tensor<32x8xf32>
+// CHECK:         return %[[WRITE]]

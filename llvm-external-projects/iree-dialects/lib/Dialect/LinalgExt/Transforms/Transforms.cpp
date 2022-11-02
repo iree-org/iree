@@ -972,28 +972,11 @@ struct GeneralizeUnPackOpPattern : OpRewritePattern<UnPackOp> {
     auto transpType = RankedTensorType::get(transpShape, elemType);
 
     Value empty = rewriter.create<tensor::EmptyOp>(loc, transpShape, elemType);
-
-    // TODO(hanchung): use linalg.transpose op after bumping MLIR. There is a
-    // bug in linalg.tranpose op that is not landed to IREE yet. See
-    // https://github.com/llvm/llvm-project/issues/58713
-    int numLoops = transpShape.size();
-    SmallVector<StringRef> loopTypes(numLoops, getParallelIteratorTypeName());
-
-    SmallVector<AffineExpr> outputExprs = llvm::to_vector<4>(
-        llvm::map_range(interchangeVector, [&](int64_t index) -> AffineExpr {
-          return rewriter.getAffineDimExpr(index);
-        }));
-    SmallVector<AffineMap, 2> indexingMaps = {
-        AffineMap::getMultiDimIdentityMap(numLoops, rewriter.getContext()),
-        AffineMap::get(numLoops, 0, outputExprs, rewriter.getContext())};
-
-    auto transposedOp = rewriter.create<linalg::GenericOp>(
-        loc, empty.getType(), innerTile, empty, indexingMaps, loopTypes,
-        [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
-          nestedBuilder.create<linalg::YieldOp>(nestedLoc, args[0]);
-        });
+    auto transposedOp = rewriter.create<linalg::TransposeOp>(
+        loc, innerTile, empty, interchangeVector);
 
     // Handle in-complete tiles.
+    int numLoops = transpShape.size();
     SmallVector<OpFoldResult> tileStrides(numLoops, oneIdxAttr);
     SmallVector<OpFoldResult> tileOffsets(numLoops, zeroIdxAttr);
     SmallVector<OpFoldResult> tileSizes;
@@ -1002,7 +985,7 @@ struct GeneralizeUnPackOpPattern : OpRewritePattern<UnPackOp> {
     }
     tileSizes = interchange<OpFoldResult>(tileSizes, interchangeVector);
     auto partialTile = rewriter.create<tensor::ExtractSliceOp>(
-        loc, transposedOp.getResult(0), tileOffsets, tileSizes, tileStrides);
+        loc, transposedOp.getResult()[0], tileOffsets, tileSizes, tileStrides);
 
     SmallVector<OpFoldResult> writeSizes;
     SmallVector<OpFoldResult> writeStrides(outputRank, oneIdxAttr);
