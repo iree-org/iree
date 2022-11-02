@@ -1994,14 +1994,14 @@ func.func @gemm_fill_encoded(
   %cst = arith.constant 0.0 : f32
   %d0 = tensor.dim %arg0, %c0 : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>
   %d1 = tensor.dim %arg1, %c1 : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RHS_TRANSPOSE>>
-  %empty = tensor.empty(%d0, %d1): tensor<?x?xf32>
-  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<?x?xf32>) -> tensor<?x?xf32>
-  %encoding = iree_linalg_ext.set_encoding %fill : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RESULT>>
+  %empty = tensor.empty(%d0, %d1) : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RESULT>>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RESULT>>)
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RESULT>>
   %0 = linalg.matmul
       ins(%arg0, %arg1
           : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>,
             tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RHS_TRANSPOSE>>)
-      outs(%encoding : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RESULT>>)
+      outs(%fill : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RESULT>>)
       -> tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RESULT>>
   return %0 : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RESULT>>
 }
@@ -2014,11 +2014,10 @@ func.func @gemm_fill_encoded(
 // CHECK-SAME:     %[[RESULT:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RESULT>>>
 //  CHECK-DAG:     %[[LHS:.+]] = flow.dispatch.tensor.load %[[LHS_IN]]
 //  CHECK-DAG:     %[[RHS:.+]] = flow.dispatch.tensor.load %[[RHS_IN]]
-//  CHECK-DAG:     %[[INIT:.+]] = tensor.empty
+//      CHECK:     %[[EMPTY:.+]] = tensor.empty
 //      CHECK:     %[[FILL:.+]] = linalg.fill
-// CHECK-SAME:         outs(%[[INIT]] :
-//      CHECK:     %[[ENCODING:.+]] = iree_linalg_ext.set_encoding %[[FILL]]
+// CHECK-SAME:         outs(%[[EMPTY]] :
 //      CHECK:     %[[GEMM:.+]] = linalg.matmul
 // CHECK-SAME:         ins(%[[LHS]], %[[RHS]] :
-// CHECK-SAME:         outs(%[[ENCODING]] :
+// CHECK-SAME:         outs(%[[FILL]] :
 //      CHECK:     flow.dispatch.tensor.store %[[GEMM]], %[[RESULT]]

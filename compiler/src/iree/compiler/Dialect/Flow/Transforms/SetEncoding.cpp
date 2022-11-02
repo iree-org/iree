@@ -19,6 +19,7 @@
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -192,6 +193,31 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
   int64_t padding;
 };
 
+/// Pattern to fold a `linalg.fill` -> `iree_linalg_ext.set_encoding`
+/// operation into a `linalg.fill` of the encoded type.
+struct FoldFillWithSetEncoding
+    : public OpRewritePattern<IREE::LinalgExt::SetEncodingOp> {
+  using OpRewritePattern<IREE::LinalgExt::SetEncodingOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(IREE::LinalgExt::SetEncodingOp encodingOp,
+                                PatternRewriter &rewriter) const override {
+    auto fillOp = encodingOp.getSource().getDefiningOp<linalg::FillOp>();
+    if (!fillOp) return failure();
+
+    // Create a new fill op, with outs being defined by a new `tensor.empty` op.
+    RankedTensorType encodingType = encodingOp.getResultType();
+    Location loc = fillOp.getLoc();
+    SmallVector<OpFoldResult> dimValues =
+        tensor::createDimValues(rewriter, loc, fillOp.getOutputs()[0]);
+    auto newEmptyOp = rewriter.create<tensor::EmptyOp>(
+        loc, dimValues, encodingType.getElementType(),
+        encodingType.getEncoding());
+    rewriter.replaceOpWithNewOp<linalg::FillOp>(encodingOp, fillOp.getInputs(),
+                                                ValueRange{newEmptyOp});
+    return success();
+  }
+};
+
 struct SetEncodingPass : public SetEncodingBase<SetEncodingPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::LinalgExt::IREELinalgExtDialect>();
@@ -205,6 +231,7 @@ void SetEncodingPass::runOnOperation() {
   MLIRContext *context = &getContext();
   RewritePatternSet patterns(context);
   patterns.insert<SetMatmulEncoding>(context, defaultPadding);
+  patterns.insert<FoldFillWithSetEncoding>(context);
   if (failed(
           applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
     return signalPassFailure();
