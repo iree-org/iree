@@ -1008,9 +1008,8 @@ struct GeneralizeUnPackOpPattern : OpRewritePattern<UnPackOp> {
   }
 };
 
-struct LinalgExtPackOpVectorizationPass
-    : public LinalgExtPackOpVectorizationBase<
-          LinalgExtPackOpVectorizationPass> {
+struct LinalgExtVectorizationPass
+    : public LinalgExtVectorizationBase<LinalgExtVectorizationPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, func::FuncDialect,
                     arith::ArithDialect, scf::SCFDialect, tensor::TensorDialect,
@@ -1071,8 +1070,8 @@ struct LinalgExtPackOpVectorizationPass
 } // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-createLinalgExtPackOpVectorizationPass() {
-  return std::make_unique<LinalgExtPackOpVectorizationPass>();
+createLinalgExtVectorizationPass() {
+  return std::make_unique<LinalgExtVectorizationPass>();
 }
 
 } // namespace LinalgExt
