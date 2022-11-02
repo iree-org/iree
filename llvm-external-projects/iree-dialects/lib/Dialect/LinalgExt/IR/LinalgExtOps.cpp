@@ -1516,32 +1516,6 @@ static bool areNotFullTiles(ArrayRef<int64_t> inputShape,
   return false;
 }
 
-/// Return the `interchangeVector` based on `dims_pos`.
-static SmallVector<int64_t>
-computeInterchangeFromDimPos(ArrayRef<int64_t> innerDimsPos,
-                             int64_t inputRank) {
-  SmallVector<int64_t> interchangeVector;
-  interchangeVector.reserve(innerDimsPos.size());
-  // First map dims and their position. For example, dims_pos = [2, 0] will map
-  // to:
-  // [
-  //  [ key: 2, value: 0]
-  //  [ key: 0, value: 1]
-  // ]
-  // where key is the idx in dims_pos while value its position in dims_pos.
-  DenseMap<int64_t, int64_t> dimsAndPosMapping;
-  for (int64_t dimsIdx = 0, end = innerDimsPos.size(); dimsIdx < end; dimsIdx++)
-    dimsAndPosMapping[innerDimsPos[dimsIdx]] = dimsIdx;
-
-  // Scan the position in order and insert the value in the map
-  // to compute the interchange vector.
-  for (int64_t dimsIdx = 0; dimsIdx < inputRank; dimsIdx++) {
-    if (dimsAndPosMapping.count(dimsIdx))
-      interchangeVector.push_back(dimsAndPosMapping[dimsIdx]);
-  }
-  return interchangeVector;
-}
-
 /// Utility function shared between Pack and UnPack to get the tile sizes as
 /// OpFoldResults.
 // TODO: interface or base class in .td

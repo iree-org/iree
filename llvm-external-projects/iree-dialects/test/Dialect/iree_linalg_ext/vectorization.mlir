@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt --iree-linalg-ext-pack-op-vectorization --split-input-file %s | FileCheck %s
+// RUN: iree-dialects-opt --iree-linalg-ext-vectorization --split-input-file %s | FileCheck %s
 
 func.func @simple_KCRS_to_KCRSsr(%arg0: tensor<1x1x32x8xf32>, %arg1: tensor<1x1x1x1x8x32xf32>) -> tensor<1x1x1x1x8x32xf32> {
   %0 = iree_linalg_ext.pack %arg0 inner_dims_pos = [3, 2] inner_tiles = [8, 32] into %arg1 : (tensor<1x1x32x8xf32> tensor<1x1x1x1x8x32xf32>) -> tensor<1x1x1x1x8x32xf32>
@@ -171,3 +171,64 @@ func.func @KC_to_CKck(%arg0: tensor<128x256xf32>, %arg1: tensor<32x4x32x8xf32>) 
 // CHECK:           scf.yield %[[RES1]]
 // CHECK:         }
 // CHECK:         return %[[RES0]]
+
+// -----
+
+func.func @simple_KCRSsr_to_KCRS(%arg0: tensor<1x1x1x1x8x32xf32>, %arg1: tensor<1x1x32x8xf32>) -> tensor<1x1x32x8xf32> {
+  %0 = iree_linalg_ext.unpack %arg0 inner_dims_pos = [3, 2] inner_tiles = [8, 32] into %arg1 : (tensor<1x1x1x1x8x32xf32> tensor<1x1x32x8xf32>) -> tensor<1x1x32x8xf32>
+  return %0 : tensor<1x1x32x8xf32>
+}
+// CHECK-LABEL: func.func @simple_KCRSsr_to_KCRS
+// CHECK-SAME:    %[[IN:[A-Za-z0-9]+]]:
+// CHECK-SAME:    %[[OUT:[A-Za-z0-9]+]]:
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[ZERO:.+]] = arith.constant 0.000000e+00 : f32
+// CHECK:         %[[READ:.+]] = vector.transfer_read %[[IN]]
+// CHECK-SAME:      [%[[C0]], %[[C0]], %[[C0]], %[[C0]], %[[C0]], %[[C0]]], %[[ZERO]]
+// CHECK-SAME:      {in_bounds = [true, true]} : tensor<1x1x1x1x8x32xf32>, vector<8x32xf32>
+// CHECK:         %[[TRANSP:.+]] = vector.transpose %[[READ]], [1, 0]
+// CHECK:         %[[WRITE:.+]] = vector.transfer_write %[[TRANSP]]
+// CHECK-SAME:      %[[OUT]][%[[C0]], %[[C0]], %[[C0]], %[[C0]]]
+// CHECK-SAME:      {in_bounds = [true, true]} : vector<32x8xf32>, tensor<1x1x32x8xf32>
+// CHECK:         return %[[WRITE]]
+
+// -----
+
+func.func @simple_unpack_and_extract_slice(%input: tensor<1x1x8x2xf32>, %output: tensor<5x1xf32>) -> tensor<5x1xf32> {
+  %0 = iree_linalg_ext.unpack %input inner_dims_pos = [0, 1] inner_tiles = [8, 2] into %output : (tensor<1x1x8x2xf32> tensor<5x1xf32>) -> tensor<5x1xf32>
+  return %0 : tensor<5x1xf32>
+}
+// CHECK-LABEL: func.func @simple_unpack_and_extract_slice
+// CHECK-SAME:    %[[IN:[A-Za-z0-9]+]]:
+// CHECK-SAME:    %[[OUT:[A-Za-z0-9]+]]:
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[ZERO:.+]] = arith.constant 0.000000e+00 : f32
+// CHECK-DAG:     %[[EMPTY:.+]] = tensor.empty() : tensor<8x2xf32>
+// CHECK:         %[[READ:.+]] = vector.transfer_read %[[IN]]
+// CHECK-SAME:      [%[[C0]], %[[C0]], %[[C0]], %[[C0]]], %[[ZERO]]
+// CHECK-SAME:      {in_bounds = [true, true]} : tensor<1x1x8x2xf32>, vector<8x2xf32>
+// CHECK:         %[[WRITE:.+]] = vector.transfer_write %[[READ]],
+// CHECK-SAME:      %[[EMPTY]][%[[C0]], %[[C0]]]
+// CHECK-SAME:      {in_bounds = [true, true]} : vector<8x2xf32>, tensor<8x2xf32>
+// CHECK:         %[[RES:.+]] = tensor.extract_slice %[[WRITE]]
+// CHECK-SAME:      [0, 0] [5, 1] [1, 1] : tensor<8x2xf32> to tensor<5x1xf32>
+// CHECK:         return %[[RES:.+]]
+
+// -----
+
+func.func @simple_CNnc_to_NC(%arg0: tensor<1x1x32x8xf32>, %arg1: tensor<32x8xf32>) -> tensor<32x8xf32>{
+  %0 = iree_linalg_ext.unpack %arg0 outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 8] into %arg1 : (tensor<1x1x32x8xf32> tensor<32x8xf32>) -> tensor<32x8xf32>
+  return %0 : tensor<32x8xf32>
+}
+// CHECK-LABEL: func.func @simple_CNnc_to_NC
+// CHECK-SAME:    %[[IN:[A-Za-z0-9]+]]:
+// CHECK-SAME:    %[[OUT:[A-Za-z0-9]+]]:
+// CHECK-DAG:     %[[ZERO:.+]] = arith.constant 0.000000e+00 : f32
+// CHECK-DAG:     %[[EMPTY:.+]] = tensor.empty() : tensor<32x8xf32>
+// CHECK:         %[[READ:.+]] = vector.transfer_read %[[IN]]
+// CHECK-SAME:      [%[[C0]], %[[C0]], %[[C0]], %[[C0]]], %[[ZERO]]
+// CHECK-SAME:      {in_bounds = [true, true]} : tensor<1x1x32x8xf32>, vector<32x8xf32>
+// CHECK:         %[[WRITE:.+]] = vector.transfer_write %[[READ]],
+// CHECK-SAME:      %[[EMPTY]][%[[C0]], %[[C0]]]
+// CHECK-SAME:      {in_bounds = [true, true]} : vector<32x8xf32>, tensor<32x8xf32>
+// CHECK:         return %[[WRITE]]

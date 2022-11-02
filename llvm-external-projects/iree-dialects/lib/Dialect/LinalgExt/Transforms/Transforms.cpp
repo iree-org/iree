@@ -922,13 +922,95 @@ struct GeneralizePackOpPattern : OpRewritePattern<PackOp> {
   }
 };
 
-struct LinalgExtPackOpVectorizationPass
-    : public LinalgExtPackOpVectorizationBase<
-          LinalgExtPackOpVectorizationPass> {
+/// Rewrites iree_linalg_ext.unpack to rank-reduced extract_slice op + transpose
+/// op + insert_slice op. It requires the outer dims are all 1s.
+struct GeneralizeUnPackOpPattern : OpRewritePattern<UnPackOp> {
+  using OpRewritePattern<UnPackOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(UnPackOp unpackOp,
+                                PatternRewriter &rewriter) const final {
+    if (!unpackOp.hasTensorSemantics()) {
+      return rewriter.notifyMatchFailure(unpackOp, "require tensor semantics");
+    }
+
+    int64_t outputRank = unpackOp.getOutputRank();
+    if (llvm::any_of(unpackOp.getInputShape().take_front(outputRank),
+                     [](int64_t val) { return val != 1; })) {
+      return rewriter.notifyMatchFailure(
+          unpackOp, "require the outer dimension of the result are all 1s");
+    }
+
+    int64_t inputRank = unpackOp.getInputRank();
+
+    Location loc = unpackOp.getLoc();
+    Attribute zeroIdxAttr = rewriter.getIndexAttr(0);
+    Attribute oneIdxAttr = rewriter.getIndexAttr(1);
+    SmallVector<OpFoldResult> readOffsets(inputRank, zeroIdxAttr);
+    SmallVector<OpFoldResult> readStrides(inputRank, oneIdxAttr);
+
+    auto mixedTiles = unpackOp.getMixedTiles();
+    SmallVector<OpFoldResult> readSizes(outputRank, oneIdxAttr);
+    readSizes.append(mixedTiles.begin(), mixedTiles.end());
+
+    // Explicitly create the type for extract_slice op because the inner tile
+    // size could be 1. We want to represent the whole inner tile in this case.
+    ArrayRef<int64_t> readShape =
+        unpackOp.getInputShape().drop_front(outputRank);
+    Type elemType = unpackOp.getInputType().getElementType();
+    auto readType = RankedTensorType::get(readShape, elemType);
+    Value innerTile = rewriter.create<tensor::ExtractSliceOp>(
+        loc, readType, unpackOp.getInput(), readOffsets, readSizes,
+        readStrides);
+
+    SmallVector<int64_t> innerDimsPos =
+        extractFromI64ArrayAttr(unpackOp.getInnerDimsPos());
+    auto interchangeVector =
+        computeInterchangeFromDimPos(innerDimsPos, outputRank);
+    SmallVector<int64_t> transpShape =
+        interchange<int64_t>(readShape, interchangeVector);
+
+    Value empty = rewriter.create<tensor::EmptyOp>(loc, transpShape, elemType);
+    auto transposedOp = rewriter.create<linalg::TransposeOp>(
+        loc, innerTile, empty, interchangeVector);
+
+    // Handle in-complete tiles.
+    int numLoops = transpShape.size();
+    SmallVector<OpFoldResult> tileStrides(numLoops, oneIdxAttr);
+    SmallVector<OpFoldResult> tileOffsets(numLoops, zeroIdxAttr);
+    SmallVector<OpFoldResult> tileSizes;
+    for (int dim : innerDimsPos) {
+      tileSizes.push_back(getDim(rewriter, loc, unpackOp.getOutput(), dim));
+    }
+    tileSizes = interchange<OpFoldResult>(tileSizes, interchangeVector);
+    auto partialTile = rewriter.create<tensor::ExtractSliceOp>(
+        loc, transposedOp.getResult()[0], tileOffsets, tileSizes, tileStrides);
+
+    SmallVector<OpFoldResult> writeSizes;
+    SmallVector<OpFoldResult> writeStrides(outputRank, oneIdxAttr);
+    SmallVector<OpFoldResult> writeOffsets(outputRank, zeroIdxAttr);
+    DenseMap<int64_t, OpFoldResult> dimAndTileMapping =
+        unpackOp.getDimAndTileMapping();
+    for (int i = 0, idx = 0; i < outputRank; ++i) {
+      if (dimAndTileMapping.count(i)) {
+        writeSizes.push_back(tileSizes[idx++]);
+      } else {
+        writeSizes.push_back(oneIdxAttr);
+      }
+    }
+    auto insert = rewriter.create<tensor::InsertSliceOp>(
+        loc, partialTile, unpackOp.getOutput(), writeOffsets, writeSizes,
+        writeStrides);
+    rewriter.replaceOp(unpackOp, insert.getResult());
+
+    return success();
+  }
+};
+
+struct LinalgExtVectorizationPass
+    : public LinalgExtVectorizationBase<LinalgExtVectorizationPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<linalg::LinalgDialect, func::FuncDialect, arith::ArithDialect,
-                tensor::TensorDialect, vector::VectorDialect>();
+    registry.insert<linalg::LinalgDialect, func::FuncDialect,
+                    arith::ArithDialect, scf::SCFDialect, tensor::TensorDialect,
+                    vector::VectorDialect>();
   }
 
   void runOnOperation() override {
@@ -956,11 +1038,11 @@ struct LinalgExtPackOpVectorizationPass
       });
     }
 
-    // Generalize pack ops and canonicalize tiled ops.
+    // Generalize pack and unpack ops and canonicalize tiled ops.
     {
       RewritePatternSet patterns(ctx);
       linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
-      patterns.add<GeneralizePackOpPattern>(ctx);
+      patterns.add<GeneralizePackOpPattern, GeneralizeUnPackOpPattern>(ctx);
       if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                               std::move(patterns)))) {
         return signalPassFailure();
@@ -985,8 +1067,8 @@ struct LinalgExtPackOpVectorizationPass
 } // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-createLinalgExtPackOpVectorizationPass() {
-  return std::make_unique<LinalgExtPackOpVectorizationPass>();
+createLinalgExtVectorizationPass() {
+  return std::make_unique<LinalgExtVectorizationPass>();
 }
 
 } // namespace LinalgExt
