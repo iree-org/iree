@@ -11,7 +11,7 @@ jobs:
     name: Adding issue to the IREE GitHub project
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/add-to-project@7a0820f97673dfefc999713a9a6d6b7ee128bba5 # v0.0.3
+      - uses: actions/add-to-project@a9f041ddd462ed185893ea1024cec954f50dbe42 # v0.3.0
         with:
           project-url: https://github.com/orgs/iree-org/projects/1
           github-token: ${{ secrets.ADD_TO_PROJECT_TOKEN }}
