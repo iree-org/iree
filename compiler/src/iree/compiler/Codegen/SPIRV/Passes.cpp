@@ -321,8 +321,12 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm) {
 }
 
 void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm,
-                                                unsigned pipelineDepth) {
-  LLVM_DEBUG(llvm::dbgs() << "Pipeline Depth: " << pipelineDepth << "\n");
+                                                unsigned pipelineDepth,
+                                                unsigned storeStage) {
+  // Guards against 0 for consistency with older user provided tuning configs.
+  pipelineDepth = pipelineDepth ? pipelineDepth : 1;
+  LLVM_DEBUG(llvm::dbgs() << "Non-zero Pipeline Depth: " << pipelineDepth
+                          << "\n";);
   addTileAndDistributeToWorkgroupsPasses(
       pm, /*useFuseTensorPadWithConsumerPass=*/false,
       /*useWARForCooperativeMatrixCodegen=*/true);
@@ -333,9 +337,9 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm,
   // Tile and distribute to GPU invocations.
   nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVTileAndPromotePass());
 
-  if (pipelineDepth > 1)
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createGPUMultiBuffering(pipelineDepth));
+  if (pipelineDepth > 1 || storeStage == 0)
+    nestedModulePM.addNestedPass<func::FuncOp>(createGPUMultiBuffering(
+        storeStage == 0 ? pipelineDepth + 1 : pipelineDepth));
 
   nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -354,10 +358,12 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm,
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
+      memref::createFoldMemRefAliasOpsPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());
 
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createGPUPipeliningPass(pipelineDepth ? pipelineDepth : 1));
+  nestedModulePM.addNestedPass<func::FuncOp>(createGPUPipeliningPass(
+      /*epiloguePeeling=*/true, pipelineDepth, storeStage));
 
   addLoopMaterializationPasses(nestedModulePM);
 }
