@@ -6,6 +6,11 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+# For deploying an IREE release to PyPI. You will need the account password,
+# which Googlers can access at http://go/iree-pypi-password.
+# Usage:
+# ./pypi_deploy.sh candidate-20220930.282
+
 set -euo pipefail
 
 RELEASE="$1"
