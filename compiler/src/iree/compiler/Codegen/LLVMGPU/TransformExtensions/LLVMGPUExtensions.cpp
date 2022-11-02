@@ -458,13 +458,16 @@ static void populateMultiReductionLoweringPatterns(Operation *target,
   patterns.add<InsertElementToBroadcast>(target->getContext(), benefit);
 }
 
-static AffineMap simpleDistributionFunction(vector::TransferWriteOp writeOp) {
+static AffineMap simpleDistributionFunction(Value val) {
+  AffineMap map = AffineMap::get(val.getContext());
+  auto vecType = val.getType().dyn_cast<VectorType>();
+  if (!vecType) return map;
   // Create a map (d0, d1) -> (d1) to distribute along the inner
   // dimension. Once we support n-d distribution we can add more
   // complex cases.
-  int64_t vecRank = writeOp.getVectorType().getRank();
-  OpBuilder builder(writeOp.getContext());
-  auto map = AffineMap::get(vecRank, 0, builder.getAffineDimExpr(vecRank - 1));
+  int64_t vecRank = vecType.getRank();
+  OpBuilder builder(val.getContext());
+  map = AffineMap::get(vecRank, 0, builder.getAffineDimExpr(vecRank - 1));
   return map;
 }
 
@@ -480,7 +483,8 @@ static void populatePropagateVectorDistribution(Operation *target,
                                                 RewritePatternSet &patterns,
                                                 PatternBenefit benefit) {
   assert(target->hasTrait<OpTrait::IsIsolatedFromAbove>());
-  vector::populatePropagateWarpVectorDistributionPatterns(patterns, benefit);
+  vector::populatePropagateWarpVectorDistributionPatterns(
+      patterns, simpleDistributionFunction, benefit);
   vector::populateDistributeReduction(patterns, warpReduction, benefit);
   patterns.add<WarpOpLoad, HoistSharedMemoryAlloc>(target->getContext(),
                                                    benefit);

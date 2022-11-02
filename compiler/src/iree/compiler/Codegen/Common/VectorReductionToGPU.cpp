@@ -220,34 +220,9 @@ class VectorReduceToGPUPass
       llvm::dbgs() << "\n\n";
     });
 
-    // 4. Distribute transfer write operations.
+    // 4. Distribute transfer write operations and propagate vector
+    // distribution.
     {
-      auto distributionFn = [](vector::TransferWriteOp writeOp) {
-        // Create a map (d0, d1) -> (d1) to distribute along the inner
-        // dimension. Once we support n-d distribution we can add more
-        // complex cases.
-        int64_t vecRank = writeOp.getVectorType().getRank();
-        OpBuilder builder(writeOp.getContext());
-        auto map =
-            AffineMap::get(vecRank, 0, builder.getAffineDimExpr(vecRank - 1));
-        return map;
-      };
-      RewritePatternSet patterns(ctx);
-      vector::populateDistributeTransferWriteOpPatterns(patterns,
-                                                        distributionFn);
-      (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
-    }
-
-    DEBUG_WITH_TYPE(DEBUG_TYPE, {
-      llvm::dbgs() << "\n--- After Step 4: Distribute transfer write ops ---\n";
-      funcOp.dump();
-      llvm::dbgs() << "\n\n";
-    });
-
-    // 5. Propagate vector distribution.
-    {
-      RewritePatternSet patterns(ctx);
-      vector::populatePropagateWarpVectorDistributionPatterns(patterns);
       auto getWarpSize = this->getWarpSize ? this->getWarpSize
                                            : [](func::FuncOp) { return 32; };
       auto groupReductionFn = [&](Location loc, OpBuilder &builder, Value input,
@@ -255,17 +230,34 @@ class VectorReduceToGPUPass
         return groupReduction(loc, builder, input, kind, size,
                               getWarpSize(funcOp));
       };
+      auto distributionFn = [](Value val) {
+        AffineMap map = AffineMap::get(val.getContext());
+        auto vecType = val.getType().dyn_cast<VectorType>();
+        if (!vecType) return map;
+        // Create a map (d0, d1) -> (d1) to distribute along the inner
+        // dimension. Once we support n-d distribution we can add more
+        // complex cases.
+        int64_t vecRank = vecType.getRank();
+        OpBuilder builder(val.getContext());
+        map = AffineMap::get(vecRank, 0, builder.getAffineDimExpr(vecRank - 1));
+        return map;
+      };
+      RewritePatternSet patterns(ctx);
+      vector::populatePropagateWarpVectorDistributionPatterns(patterns,
+                                                              distributionFn);
       vector::populateDistributeReduction(patterns, groupReductionFn);
+      vector::populateDistributeTransferWriteOpPatterns(patterns,
+                                                        distributionFn);
       (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     }
 
     DEBUG_WITH_TYPE(DEBUG_TYPE, {
-      llvm::dbgs() << "\n--- After Step 5: Propagate distribution ---\n";
+      llvm::dbgs() << "\n--- After Step 4: Propagate distribution ---\n";
       funcOp.dump();
       llvm::dbgs() << "\n\n";
     });
 
-    // 6. Lower the remaining WarpExecuteOnLane0 ops.
+    // 5. Lower the remaining WarpExecuteOnLane0 ops.
     {
       RewritePatternSet patterns(ctx);
       vector::WarpExecuteOnLane0LoweringOptions options;
@@ -279,7 +271,7 @@ class VectorReduceToGPUPass
     }
 
     DEBUG_WITH_TYPE(DEBUG_TYPE, {
-      llvm::dbgs() << "\n--- After Step 6: Lower remaining ops ---\n";
+      llvm::dbgs() << "\n--- After Step 5: Lower remaining ops ---\n";
       funcOp.dump();
       llvm::dbgs() << "\n\n";
     });
