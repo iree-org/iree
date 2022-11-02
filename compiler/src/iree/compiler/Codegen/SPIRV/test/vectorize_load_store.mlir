@@ -322,3 +322,36 @@ func.func @vectorize_alloc_with_mma_load_store(%i0: index, %i1: index) {
 // CHECK: %[[IDX:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 8)>()[%[[I1]]]
 // CHECK: %[[LD:.+]] = gpu.subgroup_mma_load_matrix %[[ALLOC]][%[[I0]], %[[IDX]]] {leadDimension = 4 : index} : memref<32x4xvector<4xf32>, 3> -> !gpu.mma_matrix<16x16xf16, "COp">
 // CHECK: gpu.subgroup_mma_store_matrix %[[LD]], %[[ALLOC]][%[[I0]], %[[IDX]]] {leadDimension = 4 : index} : !gpu.mma_matrix<16x16xf16, "COp">, memref<32x4xvector<4xf32>, 3>
+
+// -----
+
+// CHECK-LABEL: func.func @vectorize_alloc_with_mma_load_store
+//  CHECK-SAME: (%[[I0:.+]]: index, %[[I1:.+]]: index)
+func.func @vectorize_alloc_with_mma_load_store(%i0: index, %i1: index) {
+  %alloc = memref.alloc() : memref<32x32xf16, 3>
+  %0 = gpu.subgroup_mma_load_matrix %alloc[%i0, %i1] {leadDimension = 16 : index} : memref<32x32xf16, 3> -> !gpu.mma_matrix<16x16xf16, "COp">
+  gpu.subgroup_mma_store_matrix %0, %alloc[%i0, %i1] {leadDimension = 16 : index} : !gpu.mma_matrix<16x16xf16, "COp">, memref<32x32xf16, 3>
+  return
+}
+
+//      CHECK: affine.apply affine_map<()[s0] -> (s0 floordiv 8)>()
+//      CHECK: gpu.subgroup_mma_load_matrix
+// CHECK-SAME:   leadDimension = 2 : index
+//      CHECK: gpu.subgroup_mma_store_matrix
+// CHECK-SAME:   leadDimension = 2 : index
+
+// -----
+
+// CHECK-LABEL: func.func @vectorize_alloc_with_mma_load_store_unaligned_case
+func.func @vectorize_alloc_with_mma_load_store_unaligned_case(%i0: index, %i1: index) {
+  %alloc = memref.alloc() : memref<32x32xf16, 3>
+  %0 = gpu.subgroup_mma_load_matrix %alloc[%i0, %i1] {leadDimension = 18 : index} : memref<32x32xf16, 3> -> !gpu.mma_matrix<16x16xf16, "COp">
+  gpu.subgroup_mma_store_matrix %0, %alloc[%i0, %i1] {leadDimension = 18 : index} : !gpu.mma_matrix<16x16xf16, "COp">, memref<32x32xf16, 3>
+  return
+}
+
+//  CHECK-NOT: affine.apply
+//      CHECK: gpu.subgroup_mma_load_matrix
+// CHECK-SAME:   leadDimension = 18 : index
+//      CHECK: gpu.subgroup_mma_store_matrix
+// CHECK-SAME:   leadDimension = 18 : index

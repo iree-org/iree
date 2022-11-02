@@ -257,7 +257,7 @@ func.func @mul_float_bool_cast(%arg0 : tensor<?xi1>, %arg1 : tensor<?xf32>) -> t
 // CHECK: %[[FTOB:.+]] = mhlo.convert %[[BTOF]] : (tensor<?xf32>) -> tensor<?xi1>
 // CHECK: %[[SHP:.+]] = shape.shape_of %[[BTOF]] : tensor<?xf32> -> tensor<1xindex>
 // CHECK: %[[BROADCAST:.+]] = "mhlo.dynamic_broadcast_in_dim"(%[[ZERO]], %[[SHP]]) {broadcast_dimensions = dense<> : tensor<0xi64>}
-// CHECK: %[[SELECT:.+]] = "mhlo.select"(%[[FTOB]], %arg1, %[[BROADCAST]])
+// CHECK: %[[SELECT:.+]] = mhlo.select %[[FTOB]], %arg1, %[[BROADCAST]]
 
 // -----
 

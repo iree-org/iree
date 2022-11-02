@@ -18,6 +18,7 @@ iree_lit_test_suite(
   TOOLS
     ${IREE_LLD_TARGET}
     FileCheck
+    iree-opt
     iree-run-mlir
   DATA
     iree::tests::e2e::linalg_transform::transform_dialect_codegen_spec.mlir

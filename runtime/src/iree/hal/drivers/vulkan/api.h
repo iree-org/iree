@@ -166,6 +166,13 @@ typedef uint32_t iree_hal_vulkan_device_flags_t;
 typedef struct iree_hal_vulkan_device_options_t {
   // Flags controlling device behavior.
   iree_hal_vulkan_device_flags_t flags;
+
+  // Sets the VMA preferredLargeHeapBlockSize field to control the preferred
+  // size of a large heap block allocation. This effectively specifies the
+  // minimum amount of memory required and will always allocate at least this
+  // much.
+  // NOTE: this is temporary and likely to get removed in the future.
+  iree_device_size_t large_heap_block_size;
 } iree_hal_vulkan_device_options_t;
 
 IREE_API_EXPORT void iree_hal_vulkan_device_options_initialize(

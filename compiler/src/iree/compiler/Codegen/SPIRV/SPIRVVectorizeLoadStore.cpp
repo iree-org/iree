@@ -76,8 +76,7 @@ static unsigned calculateMemRefVectorNumBits(
   unsigned minBits = kMaxVectorNumBits;
   for (Operation *op : uses) {
     if (isa<gpu::SubgroupMmaLoadMatrixOp, gpu::SubgroupMmaStoreMatrixOp>(op)) {
-      // GPU subgroup MMA ops do not care about the memref element type. It can
-      // load from whatever memref element type.
+      // We look at this in the next step.
       continue;
     }
     auto transferOp = dyn_cast<VectorTransferOpInterface>(op);
@@ -86,6 +85,31 @@ static unsigned calculateMemRefVectorNumBits(
     if (!transferSize) return 0;
     minBits = std::min(minBits, *transferSize);
   }
+
+  for (Operation *op : uses) {
+    Value memrefVal;
+    int64_t stride;
+    if (auto loadOp = dyn_cast<gpu::SubgroupMmaLoadMatrixOp>(op)) {
+      memrefVal = loadOp.getSrcMemref();
+      stride = loadOp.getLeadDimension().getSExtValue();
+    } else if (auto storeOp = dyn_cast<gpu::SubgroupMmaStoreMatrixOp>(op)) {
+      memrefVal = storeOp.getDstMemref();
+      stride = storeOp.getLeadDimension().getSExtValue();
+    }
+    if (!memrefVal) continue;
+
+    // GPU subgroup MMA ops do not care about the memref element type. But we
+    // still need to make sure we can load/store with good strides.
+    // The `leadingDimension` attributes specifies the stride (numer of
+    // *elements*) over the memref for the leading dimension.
+    auto memrefType = memrefVal.getType().cast<MemRefType>();
+    Optional<unsigned> elementBits = getBitWidth(memrefType.getElementType());
+    if (!elementBits) return 0;
+    int64_t strideBits = stride * *elementBits;
+    // Make sure the stride is aligned with the planned vector bitwidth.
+    if (strideBits % minBits != 0) return 0;
+  }
+
   return minBits;
 }
 
@@ -126,6 +150,7 @@ static unsigned isMemRefVectorizable(Value value,
 
   if (getUsesIfAllTransferOp(value, uses)) {
     unsigned vectorBits = calculateMemRefVectorNumBits(uses);
+    if (!vectorBits) return 0;
     unsigned vectorSize = vectorBits / elementNumBits;
     LLVM_DEBUG(llvm::dbgs() << "vectorBits=" << vectorBits << "\n");
     LLVM_DEBUG(llvm::dbgs() << "elementNumBits=" << elementNumBits << "\n");
@@ -458,9 +483,14 @@ struct ProcessSubgroupMMALoad final
                                  adaptor.getIndices(), rewriter, loc);
     if (failed(indices)) return failure();
 
+    // Compute how many bits the mma op stride corresponds to for the scalar
+    // memref, and rescale it to vector memref.
+    int64_t stride = loadOp.getLeadDimension().getSExtValue();
+    auto scalarBits = getBitWidth(scalarMemrefType.getElementType());
+    auto vectorBits = getBitWidth(vectorMemrefType.getElementType());
+    int64_t strideBits = stride * *scalarBits;
     auto newLeadDimSize = rewriter.getIntegerAttr(
-        loadOp.getLeadDimensionAttr().getType(),
-        vectorMemrefType.getDimSize(vectorMemrefType.getRank() - 1));
+        loadOp.getLeadDimensionAttr().getType(), strideBits / *vectorBits);
 
     rewriter.replaceOpWithNewOp<gpu::SubgroupMmaLoadMatrixOp>(
         loadOp, loadOp.getType(), adaptor.getSrcMemref(), indices.value(),
@@ -491,9 +521,14 @@ struct ProcessSubgroupMMAStore final
                                  adaptor.getIndices(), rewriter, loc);
     if (failed(indices)) return failure();
 
+    // Compute how many bits the mma op stride corresponds to for the scalar
+    // memref, and rescale it to vector memref.
+    int64_t stride = storeOp.getLeadDimension().getSExtValue();
+    auto scalarBits = getBitWidth(scalarMemrefType.getElementType());
+    auto vectorBits = getBitWidth(vectorMemrefType.getElementType());
+    int64_t strideBits = stride * *scalarBits;
     auto newLeadDimSize = rewriter.getIntegerAttr(
-        storeOp.getLeadDimensionAttr().getType(),
-        vectorMemrefType.getDimSize(vectorMemrefType.getRank() - 1));
+        storeOp.getLeadDimensionAttr().getType(), strideBits / *vectorBits);
 
     rewriter.replaceOpWithNewOp<gpu::SubgroupMmaStoreMatrixOp>(
         storeOp, adaptor.getSrc(), adaptor.getDstMemref(), indices.value(),

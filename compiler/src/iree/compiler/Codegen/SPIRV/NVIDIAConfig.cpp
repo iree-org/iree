@@ -13,6 +13,7 @@
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "llvm/ADT/APInt.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -64,7 +65,7 @@ static Optional<CooperativeMatrixSize> getCooperativeMatrixSize(
 
         int64_t nCount = 0, mCount = 0;
         uint64_t subgroupCount = numSubgroupsPerWorkgroup;
-        uint64_t squareRoot = 1u << (llvm::Log2_64(subgroupCount) / 2);
+        uint64_t squareRoot = 1ull << (llvm::Log2_64(subgroupCount) / 2);
 
         // See if the square root of subgroupCount can divide mTileCount. If so
         // it means we can distribute to both dimensions evenly. Otherwise, try
@@ -85,7 +86,12 @@ static Optional<CooperativeMatrixSize> getCooperativeMatrixSize(
           mCount = mGCD.getSExtValue();
         }
 
-        int64_t kCount = std::min<int64_t>(k / matmulK, numKTilesPerWorkgroup);
+        const uint64_t kTileCount = k / matmulK;
+        const APInt kTileCountAPInt(/*numBits=*/64, kTileCount);
+
+        APInt kGCD = GreatestCommonDivisor(kTileCountAPInt,
+                                           APInt(64, numKTilesPerWorkgroup));
+        int64_t kCount = kGCD.getSExtValue();
 
         return CooperativeMatrixSize{matmulM, matmulN, matmulK,
                                      mCount,  nCount,  kCount};
