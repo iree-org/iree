@@ -20,6 +20,7 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -44,10 +45,11 @@ static bool getUsesIfAllTransferOp(Value value,
   for (Operation *userOp : value.getUsers()) {
     if (isa<memref::DeallocOp, memref::AssumeAlignmentOp>(userOp)) continue;
     // Only vectorize memref used by vector transfer ops.
-    if (!isa<vector::TransferReadOp, vector::TransferWriteOp>(userOp)) {
+    if (!isa<gpu::SubgroupMmaLoadMatrixOp, gpu::SubgroupMmaStoreMatrixOp,
+             vector::TransferReadOp, vector::TransferWriteOp>(userOp)) {
       uses.clear();
       LLVM_DEBUG(llvm::dbgs()
-                 << "failed: non-transfer user: " << *userOp << "\n");
+                 << "failed: non-transfer-like user: " << *userOp << "\n");
       return false;
     }
     uses.push_back(userOp);
@@ -73,12 +75,41 @@ static unsigned calculateMemRefVectorNumBits(
     SmallVectorImpl<Operation *> &uses) {
   unsigned minBits = kMaxVectorNumBits;
   for (Operation *op : uses) {
+    if (isa<gpu::SubgroupMmaLoadMatrixOp, gpu::SubgroupMmaStoreMatrixOp>(op)) {
+      // We look at this in the next step.
+      continue;
+    }
     auto transferOp = dyn_cast<VectorTransferOpInterface>(op);
     if (!transferOp) return 0;
     Optional<unsigned> transferSize = getBitWidth(transferOp.getVectorType());
     if (!transferSize) return 0;
     minBits = std::min(minBits, *transferSize);
   }
+
+  for (Operation *op : uses) {
+    Value memrefVal;
+    int64_t stride;
+    if (auto loadOp = dyn_cast<gpu::SubgroupMmaLoadMatrixOp>(op)) {
+      memrefVal = loadOp.getSrcMemref();
+      stride = loadOp.getLeadDimension().getSExtValue();
+    } else if (auto storeOp = dyn_cast<gpu::SubgroupMmaStoreMatrixOp>(op)) {
+      memrefVal = storeOp.getDstMemref();
+      stride = storeOp.getLeadDimension().getSExtValue();
+    }
+    if (!memrefVal) continue;
+
+    // GPU subgroup MMA ops do not care about the memref element type. But we
+    // still need to make sure we can load/store with good strides.
+    // The `leadingDimension` attributes specifies the stride (numer of
+    // *elements*) over the memref for the leading dimension.
+    auto memrefType = memrefVal.getType().cast<MemRefType>();
+    Optional<unsigned> elementBits = getBitWidth(memrefType.getElementType());
+    if (!elementBits) return 0;
+    int64_t strideBits = stride * *elementBits;
+    // Make sure the stride is aligned with the planned vector bitwidth.
+    if (strideBits % minBits != 0) return 0;
+  }
+
   return minBits;
 }
 
@@ -119,6 +150,7 @@ static unsigned isMemRefVectorizable(Value value,
 
   if (getUsesIfAllTransferOp(value, uses)) {
     unsigned vectorBits = calculateMemRefVectorNumBits(uses);
+    if (!vectorBits) return 0;
     unsigned vectorSize = vectorBits / elementNumBits;
     LLVM_DEBUG(llvm::dbgs() << "vectorBits=" << vectorBits << "\n");
     LLVM_DEBUG(llvm::dbgs() << "elementNumBits=" << elementNumBits << "\n");
@@ -206,6 +238,14 @@ class MemRefConversionPattern : public OpConversionPattern<OpTy> {
  protected:
   Optional<MemRefType> getVectorizedMemRefType(
       ConversionPatternRewriter &rewriter, Value memRefValue) const;
+
+  /// Adjusts indices for vector transfer / GPU MMA load/store ops to index into
+  /// vector memref.
+  FailureOr<SmallVector<Value>> adjustIndices(
+      MemRefType scalarMemrefType, MemRefType vectorMemrefType,
+      ValueRange indices, ConversionPatternRewriter &rewriter,
+      Location loc) const;
+
   const MemRefUsageAnalysis &memrefUsageAnalysis;
 };
 
@@ -242,29 +282,18 @@ class ProcessTransferRead final
 
     Optional<unsigned> vectorMemrefElemSize =
         getBitWidth(vectorMemrefType.getElementType());
-    Optional<unsigned> scalarMemrefElemSize =
-        getBitWidth(scalarMemrefType.getElementType());
     Optional<unsigned> readVecSize = getBitWidth(readVectorType);
-    if (!vectorMemrefElemSize || !scalarMemrefElemSize || !readVecSize)
-      return failure();
 
-    MLIRContext *context = rewriter.getContext();
-    AffineExpr sym0, sym1;
-    bindSymbols(context, sym0, sym1);
-    auto divMap = AffineMap::get(0, 2, {sym0.floorDiv(sym1)}, context);
-
-    unsigned ratio = *vectorMemrefElemSize / *scalarMemrefElemSize;
-    Value valueRatio = rewriter.create<arith::ConstantIndexOp>(loc, ratio);
-    auto indices = llvm::to_vector<4>(adaptor.getIndices());
-    indices.back() = rewriter.create<AffineApplyOp>(
-        loc, divMap, ValueRange{indices.back(), valueRatio});
+    auto indices = adjustIndices(scalarMemrefType, vectorMemrefType,
+                                 adaptor.getIndices(), rewriter, loc);
+    if (failed(indices)) return failure();
 
     // If the transfer_read can be replaced by a load after vectorization use
     // LoadOp and cast back to the original type.
     if (*vectorMemrefElemSize == *readVecSize) {
       Type elemType = vectorMemrefType.getElementType();
       Value newLoad = rewriter.create<memref::LoadOp>(
-          loc, elemType, adaptor.getSource(), indices);
+          loc, elemType, adaptor.getSource(), indices.value());
       Type serializedVecType =
           VectorType::get(read.getVectorType().getNumElements(),
                           read.getVectorType().getElementType());
@@ -274,7 +303,7 @@ class ProcessTransferRead final
           read, read.getVectorType(), newLoad);
     } else {
       rewriter.replaceOpWithNewOp<vector::TransferReadOp>(
-          read, read.getVectorType(), adaptor.getSource(), indices);
+          read, read.getVectorType(), adaptor.getSource(), indices.value());
     }
     return success();
   }
@@ -303,22 +332,11 @@ class ProcessTransferWrite final
 
     Optional<unsigned> vectorMemrefElemSize =
         getBitWidth(vectorMemrefType.getElementType());
-    Optional<unsigned> scalarMemrefElemSize =
-        getBitWidth(scalarMemrefType.getElementType());
     Optional<unsigned> writeVecSize = getBitWidth(writeVectorType);
-    if (!vectorMemrefElemSize || !scalarMemrefElemSize || !writeVecSize)
-      return failure();
 
-    MLIRContext *context = rewriter.getContext();
-    AffineExpr sym0, sym1;
-    bindSymbols(context, sym0, sym1);
-    auto divMap = AffineMap::get(0, 2, {sym0.floorDiv(sym1)}, context);
-
-    unsigned ratio = *vectorMemrefElemSize / *scalarMemrefElemSize;
-    Value valueRatio = rewriter.create<arith::ConstantIndexOp>(loc, ratio);
-    SmallVector<Value, 4> indices(adaptor.getIndices());
-    indices.back() = rewriter.create<AffineApplyOp>(
-        loc, divMap, ValueRange{indices.back(), valueRatio});
+    auto indices = adjustIndices(scalarMemrefType, vectorMemrefType,
+                                 adaptor.getIndices(), rewriter, loc);
+    if (failed(indices)) return failure();
 
     // If the transfer_write can be replaced by a store after vectorization cast
     // the original value and use StoreOp.
@@ -330,10 +348,10 @@ class ProcessTransferWrite final
       data = rewriter.create<vector::BitCastOp>(
           loc, vectorMemrefType.getElementType(), data);
       rewriter.replaceOpWithNewOp<memref::StoreOp>(
-          write, data, adaptor.getSource(), indices);
+          write, data, adaptor.getSource(), indices.value());
     } else {
       rewriter.replaceOpWithNewOp<vector::TransferWriteOp>(
-          write, adaptor.getVector(), adaptor.getSource(), indices);
+          write, adaptor.getVector(), adaptor.getSource(), indices.value());
     }
     return success();
   }
@@ -376,6 +394,30 @@ Optional<MemRefType> MemRefConversionPattern<OpTy>::getVectorizedMemRefType(
   return MemRefType::get(newShape, vectorType, {}, type.getMemorySpaceAsInt());
 }
 
+template <typename OpTy>
+FailureOr<SmallVector<Value>> MemRefConversionPattern<OpTy>::adjustIndices(
+    MemRefType scalarMemrefType, MemRefType vectorMemrefType,
+    ValueRange indices, ConversionPatternRewriter &rewriter,
+    Location loc) const {
+  Optional<unsigned> vectorMemrefElemSize =
+      getBitWidth(vectorMemrefType.getElementType());
+  Optional<unsigned> scalarMemrefElemSize =
+      getBitWidth(scalarMemrefType.getElementType());
+  if (!vectorMemrefElemSize || !scalarMemrefElemSize) return failure();
+
+  MLIRContext *context = rewriter.getContext();
+  AffineExpr sym0, sym1;
+  bindSymbols(context, sym0, sym1);
+  auto divMap = AffineMap::get(0, 2, {sym0.floorDiv(sym1)}, context);
+
+  unsigned ratio = *vectorMemrefElemSize / *scalarMemrefElemSize;
+  Value valueRatio = rewriter.create<arith::ConstantIndexOp>(loc, ratio);
+  auto newIndices = llvm::to_vector(indices);
+  newIndices.back() = rewriter.create<AffineApplyOp>(
+      loc, divMap, ValueRange{indices.back(), valueRatio});
+  return newIndices;
+}
+
 class ProcessAlloc final : public MemRefConversionPattern<memref::AllocOp> {
  public:
   using MemRefConversionPattern::MemRefConversionPattern;
@@ -415,6 +457,82 @@ class ProcessInterfaceBindingSubspan final
         subspanOp, *vecMemRef, subspanOp.getSet(), subspanOp.getBinding(),
         subspanOp.getDescriptorType(), subspanOp.getByteOffset(),
         subspanOp.getDynamicDims(), subspanOp.getAlignmentAttr());
+    return success();
+  }
+};
+
+struct ProcessSubgroupMMALoad final
+    : public MemRefConversionPattern<gpu::SubgroupMmaLoadMatrixOp> {
+  using MemRefConversionPattern::MemRefConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      gpu::SubgroupMmaLoadMatrixOp loadOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    auto scalarMemrefType =
+        loadOp.getSrcMemref().getType().dyn_cast<MemRefType>();
+    auto vectorMemrefType =
+        adaptor.getSrcMemref().getType().dyn_cast<MemRefType>();
+
+    if (!vectorMemrefType.getLayout().isIdentity()) {
+      return rewriter.notifyMatchFailure(loadOp,
+                                         "non-identity memref unsupported");
+    }
+
+    Location loc = loadOp.getLoc();
+    auto indices = adjustIndices(scalarMemrefType, vectorMemrefType,
+                                 adaptor.getIndices(), rewriter, loc);
+    if (failed(indices)) return failure();
+
+    // Compute how many bits the mma op stride corresponds to for the scalar
+    // memref, and rescale it to vector memref.
+    int64_t stride = loadOp.getLeadDimension().getSExtValue();
+    auto scalarBits = getBitWidth(scalarMemrefType.getElementType());
+    auto vectorBits = getBitWidth(vectorMemrefType.getElementType());
+    int64_t strideBits = stride * *scalarBits;
+    auto newLeadDimSize = rewriter.getIntegerAttr(
+        loadOp.getLeadDimensionAttr().getType(), strideBits / *vectorBits);
+
+    rewriter.replaceOpWithNewOp<gpu::SubgroupMmaLoadMatrixOp>(
+        loadOp, loadOp.getType(), adaptor.getSrcMemref(), indices.value(),
+        newLeadDimSize);
+    return success();
+  }
+};
+
+struct ProcessSubgroupMMAStore final
+    : public MemRefConversionPattern<gpu::SubgroupMmaStoreMatrixOp> {
+  using MemRefConversionPattern::MemRefConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      gpu::SubgroupMmaStoreMatrixOp storeOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    auto scalarMemrefType =
+        storeOp.getDstMemref().getType().dyn_cast<MemRefType>();
+    auto vectorMemrefType =
+        adaptor.getDstMemref().getType().dyn_cast<MemRefType>();
+
+    if (!vectorMemrefType.getLayout().isIdentity()) {
+      return rewriter.notifyMatchFailure(storeOp,
+                                         "non-identity memref unsupported");
+    }
+
+    Location loc = storeOp.getLoc();
+    auto indices = adjustIndices(scalarMemrefType, vectorMemrefType,
+                                 adaptor.getIndices(), rewriter, loc);
+    if (failed(indices)) return failure();
+
+    // Compute how many bits the mma op stride corresponds to for the scalar
+    // memref, and rescale it to vector memref.
+    int64_t stride = storeOp.getLeadDimension().getSExtValue();
+    auto scalarBits = getBitWidth(scalarMemrefType.getElementType());
+    auto vectorBits = getBitWidth(vectorMemrefType.getElementType());
+    int64_t strideBits = stride * *scalarBits;
+    auto newLeadDimSize = rewriter.getIntegerAttr(
+        storeOp.getLeadDimensionAttr().getType(), strideBits / *vectorBits);
+
+    rewriter.replaceOpWithNewOp<gpu::SubgroupMmaStoreMatrixOp>(
+        storeOp, adaptor.getSrc(), adaptor.getDstMemref(), indices.value(),
+        newLeadDimSize);
     return success();
   }
 };
@@ -578,8 +696,8 @@ void SPIRVVectorizeLoadStorePass::runOnOperation() {
   RewritePatternSet conversionPatterns(context);
   conversionPatterns
       .add<ProcessFunctionArgument, ProcessTransferRead, ProcessTransferWrite,
-           ProcessAlloc, ProcessInterfaceBindingSubspan>(context,
-                                                         *memrefUsageAnalysis);
+           ProcessSubgroupMMALoad, ProcessSubgroupMMAStore, ProcessAlloc,
+           ProcessInterfaceBindingSubspan>(context, *memrefUsageAnalysis);
   conversionPatterns.add<PassThroughConversion<memref::DeallocOp>,
                          PassThroughConversion<memref::AssumeAlignmentOp>>(
       context);
@@ -599,6 +717,8 @@ void SPIRVVectorizeLoadStorePass::runOnOperation() {
       });
   target.markUnknownOpDynamicallyLegal([&](Operation *op) {
     if (isa<vector::TransferWriteOp, vector::TransferReadOp>(op))
+      return !memrefUsageAnalysis->shouldConvertTransfer(op);
+    if (isa<gpu::SubgroupMmaLoadMatrixOp, gpu::SubgroupMmaStoreMatrixOp>(op))
       return !memrefUsageAnalysis->shouldConvertTransfer(op);
     if (auto dealloc = dyn_cast<memref::DeallocOp>(op))
       return !memrefUsageAnalysis->shouldVectorizeMemRef(dealloc.getMemref());
