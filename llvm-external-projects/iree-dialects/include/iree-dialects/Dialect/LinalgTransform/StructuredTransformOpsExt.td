@@ -104,14 +104,4 @@ def LowerToLLVMOp : Op<Transform_Dialect, "lower_to_llvm",
   let cppNamespace = "transform_ext";
 }
 
-def PrintOp : Op<Transform_Dialect, "print",
-    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-     DeclareOpInterfaceMethods<TransformOpInterface>]> {
-  let arguments = (ins Optional<PDL_Operation>:$target,
-                       StrAttr:$name);
-  let description = [{Prints the module.}];
-  let assemblyFormat = "($target^)? attr-dict";
-  let cppNamespace = "transform_ext";
-}
-
 #endif // STRUCTURED_TRANSFORM_OPS_EXT

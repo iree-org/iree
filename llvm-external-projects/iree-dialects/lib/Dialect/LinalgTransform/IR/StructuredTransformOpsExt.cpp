@@ -1103,35 +1103,3 @@ transform_ext::LowerVectorsOp::apply(mlir::transform::TransformResults &results,
   // TODO: make composable...
   return DiagnosedSilenceableFailure::success();
 }
-
-//===---------------------------------------------------------------------===//
-// PrintOp
-//===---------------------------------------------------------------------===//
-
-DiagnosedSilenceableFailure
-transform_ext::PrintOp::apply(mlir::transform::TransformResults &results,
-                              mlir::transform::TransformState &state) {
-  if (!getTarget()) {
-    llvm::outs() << "[[[ IR printer: " << getName() << " top-level ]]]\n";
-    state.getTopLevel()->dump();
-    return DiagnosedSilenceableFailure::success();
-  }
-
-  llvm::outs() << "[[[ IR printer: " << getName() << " ]]]\n";
-  ArrayRef<Operation *> targets = state.getPayloadOps(getTarget());
-  for (Operation *target : targets)
-    llvm::outs() << *target << "\n";
-  return DiagnosedSilenceableFailure::success();
-}
-
-void transform_ext::PrintOp::getEffects(
-    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  effects.emplace_back(MemoryEffects::Read::get(), getTarget(),
-                       mlir::transform::TransformMappingResource::get());
-  effects.emplace_back(MemoryEffects::Read::get(),
-                       mlir::transform::PayloadIRResource::get());
-
-  // There is no resource for stdout file descriptor, so just declare print
-  // writes into the default resource.
-  effects.emplace_back(MemoryEffects::Write::get());
-}
