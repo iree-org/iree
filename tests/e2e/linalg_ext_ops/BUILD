@@ -84,8 +84,8 @@ iree_check_single_backend_test_suite(
         [
             "pack.mlir",
             "reverse.mlir",
-            "scatter.mlir",
             "scan.mlir",
+            "scatter.mlir",
             "sort.mlir",
             "top-k.mlir",
             "unpack.mlir",
