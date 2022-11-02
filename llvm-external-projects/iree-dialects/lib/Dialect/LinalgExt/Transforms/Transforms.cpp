@@ -953,13 +953,10 @@ struct GeneralizeUnPackOpPattern : OpRewritePattern<UnPackOp> {
     SmallVector<OpFoldResult> readSizes(outputRank, oneIdxAttr);
     readSizes.append(mixedTiles.begin(), mixedTiles.end());
 
-    // Explicitly create the type because the inner tile size could be 1. We
-    // want to represent the whole inner tile in this case.
-    SmallVector<int64_t> readShape;
-    for (auto sz : mixedTiles) {
-      auto cst = getConstantIntValue(sz);
-      readShape.push_back(cst ? cst.value() : ShapedType::kDynamicSize);
-    }
+    // Explicitly create the type for extract_slice op because the inner tile
+    // size could be 1. We want to represent the whole inner tile in this case.
+    ArrayRef<int64_t> readShape =
+        unpackOp.getInputShape().drop_front(outputRank);
     Type elemType = unpackOp.getInputType().getElementType();
     auto readType = RankedTensorType::get(readShape, elemType);
     Value innerTile = rewriter.create<tensor::ExtractSliceOp>(
@@ -995,6 +992,7 @@ struct GeneralizeUnPackOpPattern : OpRewritePattern<UnPackOp> {
         [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
           nestedBuilder.create<linalg::YieldOp>(nestedLoc, args[0]);
         });
+
     // Handle in-complete tiles.
     SmallVector<OpFoldResult> tileStrides(numLoops, oneIdxAttr);
     SmallVector<OpFoldResult> tileOffsets(numLoops, zeroIdxAttr);
@@ -1031,9 +1029,9 @@ struct LinalgExtPackOpVectorizationPass
     : public LinalgExtPackOpVectorizationBase<
           LinalgExtPackOpVectorizationPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<linalg::LinalgDialect, func::FuncDialect, arith::ArithDialect,
-                tensor::TensorDialect, vector::VectorDialect>();
+    registry.insert<linalg::LinalgDialect, func::FuncDialect,
+                    arith::ArithDialect, scf::SCFDialect, tensor::TensorDialect,
+                    vector::VectorDialect>();
   }
 
   void runOnOperation() override {
