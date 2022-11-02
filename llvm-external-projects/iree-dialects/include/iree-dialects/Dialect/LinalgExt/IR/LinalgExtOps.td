@@ -85,12 +85,14 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
   let arguments = (ins
       Variadic<AnyRankedTensorOrMemRefType>:$inputs,
       Variadic<AnyRankedTensorOrMemRefType>:$outputs,
+      I64ElementsAttr:$dimension_map,
       DefaultValuedAttr<BoolAttr, "true">:$unique_indices
   );
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let regions = (region AnyRegion:$region);
   let assemblyFormat = [{
-    attr-dict `unique_indices` `(` $unique_indices `)`
+    attr-dict `dimension_map` `(` $dimension_map `)`
+              `unique_indices` `(` $unique_indices `)`
     (`ins` `(` $inputs^ `:` type($inputs) `)`)?
     `outs` `(` $outputs `:` type($outputs) `)`
     $region (`->` type($results)^)?
@@ -136,6 +138,14 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
 
     bool isScalarUpdate() {
       return getUpdateSliceRank() == 0;
+    }
+
+    SmallVector<int64_t> dimensionMap() {
+      SmallVector<int64_t> ret;
+      for (const APInt& elem : getDimensionMap()) {
+        ret.push_back(elem.getLimitedValue());
+      }
+      return ret;
     }
 
     // Method to implement for specifying output range for

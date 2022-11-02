@@ -127,6 +127,26 @@ LogicalResult ScatterOp::verify() {
     return op->emitOpError("expected index depth is static");
   }
 
+  auto dimMapTy = getDimensionMap().getType().cast<ShapedType>();
+  if (dimMapTy.getRank() != 1 || dimMapTy.getNumElements() != indexDepth) {
+    return op->emitOpError("invalid number of dimension map entries ");
+  }
+
+  auto dimMap = dimensionMap();
+  for (auto it = dimMap.begin(), e = dimMap.end(); it < e; ++it) {
+    if (std::binary_search(it + 1, dimMap.end(), *it)) {
+      return op->emitOpError("dimension map contains duplicate entries");
+    }
+  }
+
+  auto originalType = getOriginalType();
+  for (auto it : llvm::enumerate(dimMap)) {
+    if (it.value() < 0 || it.value() >= originalType.getRank()) {
+      return op->emitOpError("dimension map entry invalid at entry #0")
+             << it.index();
+    }
+  }
+
   // The first dimension of the indices should match the first dimension of the
   // output. They indicate to the number of updates.
   auto updateType = getUpdateType();
@@ -137,7 +157,6 @@ LogicalResult ScatterOp::verify() {
     return op->emitOpError(
         "mismatch in shape of indices and update value at dim#0");
   }
-  auto originalType = getOriginalType();
   if (updateType.getRank() - 1 > originalType.getRank()) {
     return op->emitOpError(
         "update value rank exceeds the rank of the original value");
@@ -336,14 +355,18 @@ LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
     starts[it.index() + offset] = it.value();
   }
 
+  auto dimMap = dimensionMap();
+
   for (auto i : llvm::seq<unsigned>(0, indexDepth)) {
     loadIndices.back() = b.create<arith::ConstantIndexOp>(loc, i);
     Value idx = b.create<memref::LoadOp>(loc, indices(), loadIndices);
     Value cast = b.create<arith::IndexCastOp>(loc, b.getIndexType(), idx);
 
-    if (starts[i])
-      cast = b.create<arith::AddIOp>(loc, cast, starts[i]);
-    starts[i] = cast;
+    auto dim = dimMap[i];
+
+    if (starts[dim])
+      cast = b.create<arith::AddIOp>(loc, cast, starts[dim]);
+    starts[dim] = cast;
   }
 
   Value init = b.create<memref::LoadOp>(loc, original(), starts);
