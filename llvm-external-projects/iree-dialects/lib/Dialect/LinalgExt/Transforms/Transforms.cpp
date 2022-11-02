@@ -967,7 +967,6 @@ struct GeneralizeUnPackOpPattern : OpRewritePattern<UnPackOp> {
         computeInterchangeFromDimPos(innerDimsPos, outputRank);
     SmallVector<int64_t> transpShape =
         interchange<int64_t>(readShape, interchangeVector);
-    auto transpType = RankedTensorType::get(transpShape, elemType);
 
     Value empty = rewriter.create<tensor::EmptyOp>(loc, transpShape, elemType);
     auto transposedOp = rewriter.create<linalg::TransposeOp>(
