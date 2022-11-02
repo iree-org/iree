@@ -16,7 +16,7 @@
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
-#include "mlir/Dialect/Linalg/Utils/Utils.h"
+#include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
@@ -820,6 +820,12 @@ createLinalgStrategyRemoveMarkersPass() {
 
 namespace {
 
+/// A simple pattern rewriter that implements no special logic.
+class SimpleRewriter : public PatternRewriter {
+public:
+  SimpleRewriter(MLIRContext *context) : PatternRewriter(context) {}
+};
+
 /// Returns a tensor.pad op if padding value is set. Otherwise, returns the
 /// input directly. The method assumes that the `packOp` has static shapes.
 Value getInputOrPaddedInput(OpBuilder &builder, PackOp packOp) {
@@ -831,6 +837,8 @@ Value getInputOrPaddedInput(OpBuilder &builder, PackOp packOp) {
   Location loc = packOp.getLoc();
   ShapedType inputType = packOp.getInputType();
   int64_t inputRank = inputType.getRank();
+  assert(llvm::all_of(packOp.getOutputShape().take_front(inputRank),
+                      [](int64_t val) { return val == 1; }));
 
   SmallVector<int64_t> paddedShape;
   DenseMap<int64_t, OpFoldResult> tileAndPosMapping =
@@ -842,12 +850,11 @@ Value getInputOrPaddedInput(OpBuilder &builder, PackOp packOp) {
       continue;
     }
 
+    // The size is less than or equal to tileSize because outer dims are all 1s.
     Optional<int64_t> tileSize =
         getConstantIntValue(tileAndPosMapping.lookup(dim));
-    assert((!inputType.isDynamicDim(dim) && tileSize.hasValue()) &&
-           "something goes really wrong...");
-    int64_t sizeWithPad = llvm::alignTo(size, tileSize.getValue());
-    paddedShape.push_back(sizeWithPad);
+    assert(tileSize.hasValue() && "dynamic inner tile size is not supported");
+    paddedShape.push_back(tileSize.value());
   }
   auto resultType =
       RankedTensorType::get(paddedShape, inputType.getElementType());
@@ -855,7 +862,7 @@ Value getInputOrPaddedInput(OpBuilder &builder, PackOp packOp) {
                                  /*nofold=*/false, loc, builder);
 }
 
-/// Rewrites iree_linalg_ext.pack to tensor.pad + rank-reduced linalg.generic
+/// Rewrites iree_linalg_ext.pack to tensor.pad + rank-up linalg.generic
 /// (transpose) ops.
 struct GeneralizePackOpPattern : OpRewritePattern<PackOp> {
   using OpRewritePattern<PackOp>::OpRewritePattern;
@@ -881,9 +888,11 @@ struct GeneralizePackOpPattern : OpRewritePattern<PackOp> {
     for (int64_t dim = 0; dim < inputRank; ++dim) {
       inputExprs.push_back(rewriter.getAffineDimExpr(dim));
     }
+    // The dimensions map in the order of output dimensions. Since the
+    // interchange is applied, we have to undo it for input.
     if (auto outerDims = packOp.getOuterDimsPerm()) {
-      inputExprs = interchange<AffineExpr>(inputExprs,
-                                           extractFromI64ArrayAttr(outerDims));
+      inputExprs = undoInterchange<AffineExpr>(
+          inputExprs, extractFromI64ArrayAttr(outerDims));
     }
     for (auto en :
          llvm::enumerate(extractFromI64ArrayAttr(packOp.getInnerDimsPos()))) {
@@ -924,19 +933,52 @@ struct LinalgExtPackOpVectorizationPass
 
   void runOnOperation() override {
     MLIRContext *ctx = &getContext();
+    // Apply tiling to make outer dims be all 1s.
+    {
+      SimpleRewriter rewriter(ctx);
+      auto options = scf::SCFTilingOptions().setTileSizeComputationFunction(
+          [](OpBuilder &builder, Operation *op) {
+            Location loc = op->getLoc();
+            auto packOp = cast<PackOp>(op);
+            auto innerDims = extractFromI64ArrayAttr(packOp.getInnerDimsPos());
+            int inputRank = packOp.getInputRank();
+            SmallVector<Value> tileSizes(
+                inputRank, builder.create<arith::ConstantIndexOp>(loc, 1));
+            return tileSizes;
+          });
+      auto funcOp = getOperation();
+      funcOp->walk([&](LinalgExt::PackOp op) {
+        FailureOr<scf::SCFTilingResult> tilingResult = scf::tileUsingSCFForOp(
+            rewriter, cast<TilingInterface>(op.getOperation()), options);
+        if (failed(tilingResult))
+          return signalPassFailure();
+        rewriter.replaceOp(op, tilingResult->replacements);
+      });
+    }
 
-    // TODO(hanchung): Support vectorization for the cases that outer dims are
-    // not all 1s. This can be achieved by tiling + inferring shapes.
-    RewritePatternSet patterns(ctx);
-    patterns.add<GeneralizePackOpPattern>(ctx);
-    patterns.add<LinalgVectorizationPattern>(ctx);
-    linalg::populatePadOpVectorizationPatterns(patterns);
-    vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
-    vector::TransferReadOp::getCanonicalizationPatterns(patterns, ctx);
-    vector::TransferWriteOp::getCanonicalizationPatterns(patterns, ctx);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
-      return signalPassFailure();
+    // Generalize pack ops and canonicalize tiled ops.
+    {
+      RewritePatternSet patterns(ctx);
+      linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
+      patterns.add<GeneralizePackOpPattern>(ctx);
+      if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                              std::move(patterns)))) {
+        return signalPassFailure();
+      }
+    }
+
+    // Kick in generic vectorizer.
+    {
+      RewritePatternSet patterns(ctx);
+      patterns.add<LinalgVectorizationPattern>(ctx);
+      linalg::populatePadOpVectorizationPatterns(patterns);
+      vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
+      vector::TransferReadOp::getCanonicalizationPatterns(patterns, ctx);
+      vector::TransferWriteOp::getCanonicalizationPatterns(patterns, ctx);
+      if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                              std::move(patterns)))) {
+        return signalPassFailure();
+      }
     }
   }
 };

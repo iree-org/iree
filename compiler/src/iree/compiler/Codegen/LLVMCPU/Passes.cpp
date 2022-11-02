@@ -615,6 +615,9 @@ void addCPUAArchDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
 void addCPUDataTilingPipeline(OpPassManager &passManager) {
   addTileAndDistributePasses(passManager);
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
+  // TODO(#10889): Enable vectorization.
+  // nestedModulePM.addNestedPass<func::FuncOp>(
+  // IREE::LinalgExt::createLinalgExtPackOpVectorizationPass());
   addBufferizePasses(nestedModulePM);
 }
 
