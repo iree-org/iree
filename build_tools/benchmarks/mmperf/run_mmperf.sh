@@ -73,7 +73,7 @@ MKL_DIR=/opt/intel/mkl BLIS_DIR=/opt/blis cmake \
   -DUSE_TVM=ON \
   -B ../mmperf-build .
 fi
-cmake --build ../mmperf-build -j32 --verbose
+cmake --build ../mmperf-build --verbose
 
 # Run benchmark.
 popd
