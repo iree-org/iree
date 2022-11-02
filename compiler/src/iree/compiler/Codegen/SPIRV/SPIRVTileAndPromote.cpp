@@ -12,6 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
+#include "iree/compiler/Codegen/Common/GPUPatterns.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
@@ -140,8 +141,8 @@ namespace {
 class SPIRVTileAndPromotePass final
     : public SPIRVTileAndPromoteBase<SPIRVTileAndPromotePass> {
  public:
-  SPIRVTileAndPromotePass(bool skipThreadLevel)
-      : skipThreadLevel(skipThreadLevel) {}
+  SPIRVTileAndPromotePass(bool promoteCMatrix, bool skipThreadLevel)
+      : promoteCMatrix(promoteCMatrix), skipThreadLevel(skipThreadLevel) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<gpu::GPUDialect>();
@@ -149,13 +150,17 @@ class SPIRVTileAndPromotePass final
 
   LogicalResult initializeOptions(StringRef options) override {
     if (failed(Pass::initializeOptions(options))) return failure();
-    skipThreadLevel |= this->skipThread;  // Consider pass option too
+    // Consider pass option too
+    promoteCMatrix |= this->promoteC;
+    skipThreadLevel |= this->skipThread;
     return success();
   }
 
   void runOnOperation() override;
 
  private:
+  // Whether to promote C matrix to use shared memory.
+  bool promoteCMatrix = false;
   // Whether to skip thread level tiling and distribution.
   bool skipThreadLevel = false;
 };
@@ -168,23 +173,46 @@ void SPIRVTileAndPromotePass::runOnOperation() {
   FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
   if (failed(exportOp)) return;
 
+  // Promote C matrix and propagate the potential fill producer into the
+  // allocation. This needs to be done before reduction tiling.
+  if (promoteCMatrix) {
+    RewritePatternSet patterns(&getContext());
+    populateContractPromotionPatterns(patterns, {2});
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      return signalPassFailure();
+    }
+    propagateSharedMemoryCopy(funcOp);
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "--- After promoting C matrix ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
+  }
+
+  StringLiteral markerAttrName =
+      IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker;
+  auto workgroupMarker = StringAttr::get(context, getWorkgroupMemoryMarker());
+  auto kTiledMarker = StringAttr::get(context, getWorkgroupKTiledMarker());
+
   {  // Tile reduction dimensions.
-    RewritePatternSet tilingPatterns(context);
+    RewritePatternSet patterns(context);
     IREE::LinalgExt::LinalgTransformationFilter filter(
-        ArrayRef<StringAttr>(),
-        StringAttr::get(context, getWorkgroupKTiledMarker()));
-    populateTilingReductionPatterns(tilingPatterns, filter);
-    if (failed(
-            applyPatternsAndFoldGreedily(funcOp, std::move(tilingPatterns)))) {
+        // Going through C matrix promotion we will have the marker..
+        {workgroupMarker}, kTiledMarker);
+    // Not going through C matrix promotion we will have no marker..
+    filter.setMatchByDefault();
+    populateTilingReductionPatterns(patterns, filter);
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       funcOp.emitOpError() << "failed tiling reduction";
       return signalPassFailure();
     }
-
+  }
+  {
     RewritePatternSet patterns =
         linalg::getLinalgTilingCanonicalizationPatterns(context);
     scf::populateSCFForLoopCanonicalizationPatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-      funcOp.emitOpError() << "failed canonicalization after tiling reduction";
       return signalPassFailure();
     }
   }
@@ -201,70 +229,63 @@ void SPIRVTileAndPromotePass::runOnOperation() {
   int64_t totalThreads = workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
   int subgroupSize =
       getSPIRVTargetEnvAttr(funcOp).getResourceLimits().getSubgroupSize();
-  StringLiteral markerAttrName =
-      IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker;
-  auto workgroupMarker = StringAttr::get(context, getWorkgroupMemoryMarker());
-
-  funcOp.walk([&](linalg::LinalgOp op) {
-    if (isa<linalg::FillOp>(*op)) {
-      op->setAttr(markerAttrName, workgroupMarker);
-      return WalkResult::advance();
-    }
-
-    if (isa<linalg::GenericOp>(*op) && !isMatmulOrBatchMatmul(op)) {
-      op->setAttr(markerAttrName, workgroupMarker);
-      return WalkResult::advance();
-    }
-
-    if (isa<linalg::BatchMatmulOp, linalg::GenericOp, linalg::MatmulOp>(*op)) {
-      Value lhs = op.getDpsInputOperand(0)->get();
-      Value rhs = op.getDpsInputOperand(1)->get();
-      auto lhsType = lhs.getType().cast<ShapedType>();
-      auto rhsType = rhs.getType().cast<ShapedType>();
-
-      auto elementNumBits = lhsType.getElementTypeBitWidth();
-      assert(kMaxVectorNumBits % elementNumBits == 0);
-      const int vectorSize = kMaxVectorNumBits / elementNumBits;
-
-      const bool canPromoteLHS = canPerformVectorAccessUsingAllThreads(
-          lhsType.getShape(), totalThreads, vectorSize);
-      const bool canPromoteRHS = canPerformVectorAccessUsingAllThreads(
-          rhsType.getShape(), totalThreads, vectorSize);
-
-      StringAttr promoteMarker = workgroupMarker;
-      if (canPromoteLHS && canPromoteRHS) {
-        promoteMarker = StringAttr::get(context, promoteBothMarker);
-      } else if (canPromoteLHS) {
-        promoteMarker = StringAttr::get(context, promoteLHSMarker);
-      } else if (canPromoteRHS) {
-        promoteMarker = StringAttr::get(context, promoteRHSMarker);
-      }
-      op->setAttr(markerAttrName, promoteMarker);
-    }
-    return WalkResult::advance();
-  });
 
   // Only promote to workgroup size if there are multiple warps.
   if (totalThreads > subgroupSize) {
+    // Attach markers to contract ops to drive promotion.
+    funcOp.walk([&](linalg::LinalgOp op) {
+      if (isMatmulOrBatchMatmul(op)) {
+        Value lhs = op.getDpsInputOperand(0)->get();
+        Value rhs = op.getDpsInputOperand(1)->get();
+        auto lhsType = lhs.getType().cast<ShapedType>();
+        auto rhsType = rhs.getType().cast<ShapedType>();
+
+        auto elementNumBits = lhsType.getElementTypeBitWidth();
+        assert(kMaxVectorNumBits % elementNumBits == 0);
+        const int vectorSize = kMaxVectorNumBits / elementNumBits;
+
+        const bool canPromoteLHS = canPerformVectorAccessUsingAllThreads(
+            lhsType.getShape(), totalThreads, vectorSize);
+        const bool canPromoteRHS = canPerformVectorAccessUsingAllThreads(
+            rhsType.getShape(), totalThreads, vectorSize);
+
+        StringAttr promoteMarker = workgroupMarker;
+        if (canPromoteLHS && canPromoteRHS) {
+          promoteMarker = StringAttr::get(context, promoteBothMarker);
+        } else if (canPromoteLHS) {
+          promoteMarker = StringAttr::get(context, promoteLHSMarker);
+        } else if (canPromoteRHS) {
+          promoteMarker = StringAttr::get(context, promoteRHSMarker);
+        }
+        op->setAttr(markerAttrName, promoteMarker);
+      }
+    });
+
     RewritePatternSet promotionPatterns(&getContext());
     populatePromotionPatterns(promotionPatterns, workgroupMarker);
     if (failed(applyPatternsAndFoldGreedily(funcOp,
                                             std::move(promotionPatterns)))) {
       return signalPassFailure();
     }
+
     // Insert barriers before and after copies to workgroup memory.
     insertBarriersAroundSharedMemoryCopy(funcOp);
 
+    LLVM_DEBUG({
+      llvm::dbgs() << "--- After inserting barriers ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
+
     // If we fail to promote (e.g., for cases where we just have one tile so
-    // that there are no subview ops), still update markers to make sure
-    // following steps work as expected.
+    // that there are no subview ops), clear markers to enable following steps.
     funcOp.walk([&](linalg::LinalgOp linalgOp) {
       auto marker = linalgOp->getAttrOfType<StringAttr>(markerAttrName);
       if (!marker) return WalkResult::advance();
       if (marker.getValue() == promoteLHSMarker ||
           marker.getValue() == promoteRHSMarker ||
           marker.getValue() == promoteBothMarker)
-        linalgOp->setAttr(markerAttrName, workgroupMarker);
+        linalgOp->removeAttr(markerAttrName);
       return WalkResult::advance();
     });
   }
@@ -273,6 +294,14 @@ void SPIRVTileAndPromotePass::runOnOperation() {
     llvm::dbgs() << "--- After promotion ---\n";
     funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
     llvm::dbgs() << "\n\n";
+  });
+
+  // Attach markers to ops without them to drive tiling next.
+  funcOp.walk([&](linalg::LinalgOp op) {
+    auto marker = op->getAttrOfType<StringAttr>(markerAttrName);
+    if (!marker || marker.getValue() != getCopyToWorkgroupMemoryMarker()) {
+      op->setAttr(markerAttrName, workgroupMarker);
+    }
   });
 
   if (!skipThreadLevel) {  // Tile and distribute to invocations.
@@ -306,8 +335,9 @@ void SPIRVTileAndPromotePass::runOnOperation() {
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVTileAndPromotePass(
-    bool skipThreadLevel) {
-  return std::make_unique<SPIRVTileAndPromotePass>(skipThreadLevel);
+    bool promoteCMatrix, bool skipThreadLevel) {
+  return std::make_unique<SPIRVTileAndPromotePass>(promoteCMatrix,
+                                                   skipThreadLevel);
 }
 
 }  // namespace iree_compiler

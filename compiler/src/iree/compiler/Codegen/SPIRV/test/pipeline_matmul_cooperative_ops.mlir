@@ -77,6 +77,7 @@ hal.executable public @matmul_256x1024x128_div_add {
 //   CHECK-LABEL: spirv.module Logical GLSL450
 
 // CHECK-COUNT-2:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<128 x vector<4xf32>>)>, Workgroup>
+//         CHECK:   spirv.GlobalVariable @[[C_MEM:.+]] : !spirv.ptr<!spirv.struct<(!spirv.array<128 x vector<4xf32>>)>, Workgroup>
 
 //         CHECK:   spirv.func @matmul_256x1024x128_div_add
 
@@ -109,11 +110,15 @@ hal.executable public @matmul_256x1024x128_div_add {
 //         CHECK:       spirv.mlir.merge
 
 //         CHECK:     %[[LD_FN:.+]] = spirv.Load "Function" %[[LOCAL_VAR]] : !spirv.coopmatrix<16x16xf16, Subgroup>
-//         CHECK:     %[[LD4:.+]] = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C128]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, StorageBuffer> as !spirv.coopmatrix<16x16xf16, Subgroup>
-//         CHECK:     %[[LD5:.+]] = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C128]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, StorageBuffer> as !spirv.coopmatrix<16x16xf16, Subgroup>
-//         CHECK:     %[[DIV:.+]] = spirv.FDiv %[[LD_FN]], %[[LD4]] : !spirv.coopmatrix<16x16xf16, Subgroup>
-//         CHECK:     %[[ADD:.+]] = spirv.FAdd %[[DIV]], %[[LD5]] : !spirv.coopmatrix<16x16xf16, Subgroup>
-//         CHECK:     spirv.NV.CooperativeMatrixStore %{{.+}}, %[[ADD]], %[[C128]], %[[COL_MAJOR]]
+//         CHECK:     %[[AC:.+]] = spirv.AccessChain %[[C_MEM]]
+//         CHECK:     spirv.NV.CooperativeMatrixStore %[[AC]], %[[LD_FN]], %[[C4]], %[[COL_MAJOR]]
+
+//         CHECK:     spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
+//         CHECK:     spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
+//         CHECK:     spirv.Load "Workgroup" %{{.+}} : vector<4xf32>
+// CHECK-COUNT-2:     spirv.FDiv %{{.+}}, %{{.+}} : vector<4xf16>
+// CHECK-COUNT-2:     spirv.FAdd %{{.+}}, %{{.+}} : vector<4xf16>
+//         CHECK:     spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
 
 // -----
 
@@ -186,6 +191,7 @@ hal.executable public @batch_matmul_16x128x256x512_div {
 //   CHECK-LABEL: spirv.module Logical GLSL450
 
 // CHECK-COUNT-2:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<128 x vector<4xf32>>)>, Workgroup>
+//         CHECK:   spirv.GlobalVariable @[[C_MEM:.+]] : !spirv.ptr<!spirv.struct<(!spirv.array<128 x vector<4xf32>>)>, Workgroup>
 
 //         CHECK:   spirv.func @batch_matmul_16x128x256x512_div
 
@@ -217,9 +223,14 @@ hal.executable public @batch_matmul_16x128x256x512_div {
 //         CHECK:       spirv.mlir.merge
 
 //         CHECK:     %[[LD_FN:.+]] = spirv.Load "Function" %[[LOCAL_VAR]] : !spirv.coopmatrix<16x16xf16, Subgroup>
-//         CHECK:     %[[LD4:.+]] = spirv.NV.CooperativeMatrixLoad %{{.+}}, %[[C32]], %[[COL_MAJOR]] : !spirv.ptr<vector<4xf32>, StorageBuffer> as !spirv.coopmatrix<16x16xf16, Subgroup>
-//         CHECK:     %[[DIV:.+]] = spirv.FDiv %[[LD_FN]], %[[LD4]] : !spirv.coopmatrix<16x16xf16, Subgroup>
-//         CHECK:     spirv.NV.CooperativeMatrixStore %{{.+}}, %[[DIV]], %[[C32]], %[[COL_MAJOR]]
+//         CHECK:     %[[AC:.+]] = spirv.AccessChain %[[C_MEM]]
+//         CHECK:     spirv.NV.CooperativeMatrixStore %[[AC]], %[[LD_FN]], %[[C4]], %[[COL_MAJOR]]
+
+//         CHECK:     spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
+//         CHECK:     spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
+//         CHECK:     spirv.Load "Workgroup" %{{.+}} : vector<4xf32>
+// CHECK-COUNT-2:     spirv.FDiv %{{.+}}, %{{.+}} : vector<4xf16>
+//         CHECK:     spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
 
 
 // -----
@@ -366,6 +377,7 @@ hal.executable public @generic_batch_matmul_32x128x512x64 {
 //   CHECK-LABEL: spirv.module Logical GLSL450
 
 // CHECK-COUNT-2:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<128 x vector<4xf32>>)>, Workgroup>
+//         CHECK:   spirv.GlobalVariable @[[C_MEM:.+]] : !spirv.ptr<!spirv.struct<(!spirv.array<128 x vector<4xf32>>)>, Workgroup>
 
 //         CHECK:   spirv.func @generic_batch_matmul_32x128x512x64
 
@@ -398,4 +410,5 @@ hal.executable public @generic_batch_matmul_32x128x512x64 {
 //         CHECK:       spirv.mlir.merge
 
 //         CHECK:     %[[LD_FN:.+]] = spirv.Load "Function" %[[LOCAL_VAR]] : !spirv.coopmatrix<16x16xf16, Subgroup>
-//         CHECK:     spirv.NV.CooperativeMatrixStore %{{.+}}, %[[LD_FN]], %[[C64]], %[[COL_MAJOR]]
+//         CHECK:     %[[AC:.+]] = spirv.AccessChain %[[C_MEM]]
+//         CHECK:     spirv.NV.CooperativeMatrixStore %{{.+}}, %[[LD_FN]], %[[C4]], %[[COL_MAJOR]]

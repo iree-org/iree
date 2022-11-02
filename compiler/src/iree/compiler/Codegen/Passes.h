@@ -493,7 +493,7 @@ std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVTileAndDistributePass();
 /// Pass to promote Linalg ops with buffer semantics to use workgroup memory
 /// and then tile to invocations.
 std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVTileAndPromotePass(
-    bool skipThreadLevel = false);
+    bool promoteCMatrix = false, bool skipThreadLevel = false);
 
 /// Pass to tile Linalg ops with buffer semantics to subgroups and vectorize
 /// to vector ops suitable for lowering to SPIR-V cooperative ops.
