@@ -453,20 +453,6 @@ static Optional<int64_t> getLinalgDimSize(linalg::LinalgOp op, int64_t d) {
   return llvm::None;
 }
 
-// Check if the given function contains an op that may require a broadcast of
-// the reduced result.
-static bool isFusedWithBroadcast(func::FuncOp entryPoint,
-                                 linalg::LinalgOp reduce) {
-  int64_t reducedRank =
-      reduce->getResult(0).getType().cast<ShapedType>().getRank();
-  bool hasBroadcast = false;
-  entryPoint.walk([&](linalg::LinalgOp linalgOp) {
-    if (reduce != linalgOp && linalgOp.getNumLoops() > reducedRank)
-      hasBroadcast = true;
-  });
-  return hasBroadcast;
-}
-
 /// Set the configuration for reductions that can be mapped to warp reductions.
 static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
                                             linalg::LinalgOp op) {
@@ -514,11 +500,6 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
     groupSize = llvm::APIntOps::GreatestCommonDivisor(
                     {64, uint64_t(groupSize)}, {64, uint64_t(maxWorkgroupSize)})
                     .getZExtValue();
-    // Workaround, the vector distribution doesn't handle cases where we fuse
-    // the reduction with a consumer that needs to be tiled.
-    // TODO(thomasraoux): remove the restriction once vector distribution is
-    // improved.
-    if (isFusedWithBroadcast(entryPoint, op)) return failure();
   }
   std::array<int64_t, 3> workgroupSize = {groupSize, 1, 1};
   SmallVector<unsigned> partitionedLoops =

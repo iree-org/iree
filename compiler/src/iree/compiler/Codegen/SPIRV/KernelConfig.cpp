@@ -624,23 +624,6 @@ static LogicalResult setFftOpConfig(spirv::ResourceLimitsAttr limits,
 // Reduction Default Configuration
 //===----------------------------------------------------------------------===//
 
-// Check if the given function contains an op that may require a broadcast of
-// the reduced result.
-static bool isFusedWithBroadcast(linalg::LinalgOp reduce) {
-  func::FuncOp entryPoint = reduce->getParentOfType<func::FuncOp>();
-  int64_t reducedRank =
-      reduce->getResult(0).getType().cast<ShapedType>().getRank();
-  bool hasBroadcast = false;
-  entryPoint.walk([&](linalg::LinalgOp linalgOp) {
-    if (reduce != linalgOp && linalgOp.getNumLoops() > reducedRank) {
-      hasBroadcast = true;
-      return WalkResult::interrupt();
-    }
-    return WalkResult::advance();
-  });
-  return hasBroadcast;
-}
-
 /// Set the configuration for reductions that can be mapped to warp reductions.
 static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
                                         linalg::GenericOp op) {
@@ -694,11 +677,6 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
     groupSize = llvm::APIntOps::GreatestCommonDivisor(
                     {64, uint64_t(groupSize)}, {64, uint64_t(maxWorkgroupSize)})
                     .getZExtValue();
-    // Workaround, the vector distribution doesn't handle cases where we fuse
-    // the reduction with a consumer that needs to be tiled.
-    // TODO(thomasraoux): remove the restriction once vector distribution is
-    // improved.
-    if (isFusedWithBroadcast(op)) return failure();
   }
   std::array<int64_t, 3> workgroupSize = {groupSize, 1, 1};
   // Tile all the parallel dimension to 1.
