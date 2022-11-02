@@ -26,6 +26,7 @@ namespace iree_compiler {
 namespace detail {
 
 constexpr unsigned AMDSoftwarePipelineDepth = 2;
+constexpr unsigned AMDSoftwarePipelineStoreStage = 0;
 
 constexpr unsigned AMDNumSubgroupsPerWorkgroup = 4;
 // The number of tiles along M and N dimensions per workgroup.
@@ -50,7 +51,8 @@ static LogicalResult setAMDMatmulConfig(linalg::LinalgOp op,
     threadMNK = {8, 4, 16};
   }
   return setMatmulOpConfig(limits, op, workgroupXY, threadMNK,
-                           /*enablePromotion=*/true, AMDSoftwarePipelineDepth);
+                           /*enablePromotion=*/true, AMDSoftwarePipelineDepth,
+                           AMDSoftwarePipelineStoreStage);
 }
 
 // RDNA architecture:

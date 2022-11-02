@@ -51,34 +51,29 @@ hal.executable @matmul_f32_128x256x64 {
   }
 }
 
-//       CHECK-DAG: #[[MAP:.+]] = affine_map<(d0) -> ((d0 floordiv 16) mod 2)>
-//       CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize pipeline_depth = 2>
+//       CHECK-DAG: #[[MAP:.+]] = affine_map<(d0) -> ((d0 floordiv 16) mod 3)>
+//       CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize pipeline_depth = 2 store_stage = 0>
 //           CHECK: hal.executable.export public @matmul_f32_128x256x64
 //      CHECK-SAME:   translation_info = #[[TRANSLATION]]
 //      CHECK-SAME:   workgroup_size = [16 : index, 8 : index, 1 : index]
 //           CHECK: func.func @matmul_f32_128x256x64()
 //           CHECK:   %[[CST0:.+]] = arith.constant 0.000000e+00 : f32
-//           CHECK:   memref.alloc() : memref<2x64x20xf32, 3>
-//           CHECK:   memref.alloc() : memref<2x16x68xf32, 3>
+//           CHECK:   memref.alloc() : memref<3x64x20xf32, 3>
+//           CHECK:   memref.alloc() : memref<3x16x68xf32, 3>
+//           CHECK:   gpu.barrier {__pipelining_first_stage__}
+//           CHECK:   gpu.barrier {__pipelining_first_stage__}
 //           CHECK:   scf.for
-//           CHECK:     affine.apply #[[MAP]]
-//           CHECK:     gpu.barrier
-//   CHECK-COUNT-2:     vector.transfer_write %{{.+}}, %{{.+}} {in_bounds = [true]} : vector<4xf32>, memref<1x4xf32, strided<[20, 1], offset: ?>, 3>
-//   CHECK-COUNT-2:     vector.transfer_write %{{.+}}, %{{.+}} {in_bounds = [true]} : vector<4xf32>, memref<1x4xf32, strided<[68, 1], offset: ?>, 3>
-//           CHECK:     gpu.barrier
-//  CHECK-COUNT-32:     vector.transfer_read %{{.+}}, %[[CST0]] {in_bounds = [true]} : memref<8x16xf32, strided<[20, 1], offset: ?>, 3>, vector<4xf32>
-//  CHECK-COUNT-16:     vector.transfer_read %{{.+}}, %[[CST0]] {in_bounds = [true]} : memref<16x4xf32, strided<[68, 1], offset: ?>, 3>, vector<4xf32>
+//  CHECK-COUNT-32:     vector.transfer_read %{{.+}}, %[[CST0]] {in_bounds = [true]} : memref<3x64x20xf32, 3>, vector<4xf32>
+//  CHECK-COUNT-16:     vector.transfer_read %{{.+}}, %[[CST0]] {in_bounds = [true]} : memref<3x16x68xf32, 3>, vector<4xf32>
 // CHECK-COUNT-128:     vector.fma %{{.+}}, %{{.+}}, %{{.+}} : vector<4xf32>
-//   CHECK-COUNT-2:     vector.transfer_read %{{.+}}, %[[CST0]] {__pipelining_global_load__, in_bounds = [true]} : memref<1x4xf32, strided<[512, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
-//   CHECK-COUNT-2:     vector.transfer_read %{{.+}}, %[[CST0]] {__pipelining_global_load__, in_bounds = [true]} : memref<1x4xf32, strided<[256, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
 //           CHECK:     scf.yield
-//           CHECK:   gpu.barrier
-//   CHECK-COUNT-2:   vector.transfer_write %{{.+}}, %{{.+}} {in_bounds = [true]} : vector<4xf32>, memref<1x4xf32, strided<[20, 1], offset: ?>, 3>
-//   CHECK-COUNT-2:   vector.transfer_write %{{.+}}, %{{.+}} {in_bounds = [true]} : vector<4xf32>, memref<1x4xf32, strided<[68, 1], offset: ?>, 3>
-//           CHECK:   gpu.barrier
-//  CHECK-COUNT-32:   vector.transfer_read %{{.+}}, %[[CST0]] {in_bounds = [true]} : memref<8x16xf32, strided<[20, 1], offset: ?>, 3>, vector<4xf32>
-//  CHECK-COUNT-16:   vector.transfer_read %{{.+}}, %[[CST0]] {in_bounds = [true]} : memref<16x4xf32, strided<[68, 1], offset: ?>, 3>, vector<4xf32>
+//  CHECK-COUNT-32:   vector.transfer_read %{{.+}}, %[[CST0]] {in_bounds = [true]} : memref<3x64x20xf32, 3>, vector<4xf32>
+//  CHECK-COUNT-16:   vector.transfer_read %{{.+}}, %[[CST0]] {in_bounds = [true]} : memref<3x16x68xf32, 3>, vector<4xf32>
 // CHECK-COUNT-128:   vector.fma %{{.+}}, %{{.+}}, %{{.+}} : vector<4xf32>
-//   CHECK-COUNT-8:   vector.transfer_read %{{.+}}, %[[CST0]] {in_bounds = [true]} : memref<8x4xf32, strided<[256, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
+//  CHECK-COUNT-32:   vector.transfer_read %{{.+}}, %[[CST0]] {in_bounds = [true]} : memref<3x64x20xf32, 3>, vector<4xf32>
+//  CHECK-COUNT-16:   vector.transfer_read %{{.+}}, %[[CST0]] {in_bounds = [true]} : memref<3x16x68xf32, 3>, vector<4xf32>
+// CHECK-COUNT-128:   vector.fma %{{.+}}, %{{.+}}, %{{.+}} : vector<4xf32>
+//   CHECK-COUNT-8:   vector.transfer_write %{{.+}}, %{{.+}} {in_bounds = [true]} : vector<4xf32>, memref<128x256xf32, #hal.descriptor_type<storage_buffer>>
+//   CHECK-COUNT-8:   vector.transfer_read %{{.+}}, %[[CST0]] {in_bounds = [true]} : memref<128x256xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
 //   CHECK-COUNT-8:   arith.divf %{{.+}}, %{{.+}} : vector<4xf32>
-//   CHECK-COUNT-8:   vector.transfer_write %{{.+}}, %{{.+}} {in_bounds = [true]} : vector<4xf32>, memref<8x4xf32, strided<[256, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>
+//   CHECK-COUNT-8:   vector.transfer_write %{{.+}}, %{{.+}} {in_bounds = [true]} : vector<4xf32>, memref<128x256xf32, #hal.descriptor_type<storage_buffer>>
