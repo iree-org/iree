@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/Passes.h"
@@ -136,13 +137,11 @@ LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
   }
 
   // Verify shared memory usage of operands after tiling <= maxSharedMemory.
-  unsigned bytesSize =
-      inputType.cast<ShapedType>().getElementType().getIntOrFloatBitWidth() / 8;
-
-  unsigned totalSharedMemSizeBytes =
-      (firstLevelTileSizes[0] * thirdLevelTileSizes[2] +
-       firstLevelTileSizes[1] * thirdLevelTileSizes[2]) *
-      bytesSize;
+  unsigned tilingSharedMemSizeBytes = getTileBytes(
+      firstLevelTileSizes[0], firstLevelTileSizes[1], thirdLevelTileSizes[2],
+      inputType.cast<ShapedType>().getElementType().getIntOrFloatBitWidth());
+  unsigned totalSharedMemSizeBytes = getMultiBufferMemoryUsage(
+      tilingSharedMemSizeBytes, translationInfo.getSoftwarePipelineDepth());
 
   if (totalSharedMemSizeBytes > maxSharedMemory) {
     return op->emitOpError("expected shared memory usage <= ")

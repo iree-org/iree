@@ -206,7 +206,7 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
       createRemoveSingleIterationLoopPass());
   if (pipelineDepth > 1)
     nestedModulePM.addNestedPass<func::FuncOp>(
-        createLLVMGPUMultiBuffering(pipelineDepth));
+        createGPUMultiBuffering(pipelineDepth));
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
