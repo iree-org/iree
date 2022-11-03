@@ -100,6 +100,22 @@ static bool areShapesCompatible(ArrayRef<int64_t> lhs, ArrayRef<int64_t> rhs) {
   });
 }
 
+/// Return true if `dimsPos` is invalid. It is invalid when: a) it contains
+/// duplicate. b) At least one dimension is out of bound (`dimPos` is >= 0 and <
+/// rank). c) the number of elements in `dimsPos` is > than `rank`.
+static bool isInvalid(ArrayRef<int64_t> dimsPos, int64_t rank) {
+  // early exit.
+  if (dimsPos.size() > rank)
+    return true;
+  DenseSet<int64_t> uniqued;
+  for (int64_t dim : dimsPos)
+    uniqued.insert(dim);
+  if (dimsPos.size() != uniqued.size())
+    return true;
+  return llvm::any_of(
+      dimsPos, [rank](int64_t dimPos) { return dimPos < 0 || dimPos >= rank; });
+}
+
 //===----------------------------------------------------------------------===//
 // ScatterOp
 //===----------------------------------------------------------------------===//
@@ -127,6 +143,15 @@ LogicalResult ScatterOp::verify() {
     return op->emitOpError("expected index depth is static");
   }
 
+  auto dimMap = dimensionMap();
+  if (dimMap.size() != indexDepth) {
+    return op->emitOpError("invalid number of dimension map entries ");
+  }
+
+  auto originalType = getOriginalType();
+  if (isInvalid(dimMap, originalType.getRank()))
+    return op->emitOpError("dimension map is invalid");
+
   // The first dimension of the indices should match the first dimension of the
   // output. They indicate to the number of updates.
   auto updateType = getUpdateType();
@@ -137,7 +162,6 @@ LogicalResult ScatterOp::verify() {
     return op->emitOpError(
         "mismatch in shape of indices and update value at dim#0");
   }
-  auto originalType = getOriginalType();
   if (updateType.getRank() - 1 > originalType.getRank()) {
     return op->emitOpError(
         "update value rank exceeds the rank of the original value");
@@ -336,14 +360,18 @@ LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
     starts[it.index() + offset] = it.value();
   }
 
+  auto dimMap = dimensionMap();
+
   for (auto i : llvm::seq<unsigned>(0, indexDepth)) {
     loadIndices.back() = b.create<arith::ConstantIndexOp>(loc, i);
     Value idx = b.create<memref::LoadOp>(loc, indices(), loadIndices);
-    Value cast = b.create<arith::IndexCastOp>(loc, b.getIndexType(), idx);
+    Value ret = b.create<arith::IndexCastOp>(loc, b.getIndexType(), idx);
 
-    if (starts[i])
-      cast = b.create<arith::AddIOp>(loc, cast, starts[i]);
-    starts[i] = cast;
+    auto dim = dimMap[i];
+
+    if (starts[dim])
+      ret = b.create<arith::AddIOp>(loc, ret, starts[dim]);
+    starts[dim] = ret;
   }
 
   Value init = b.create<memref::LoadOp>(loc, original(), starts);
@@ -1478,22 +1506,6 @@ TopkOp::reifyResultShapes(OpBuilder &b,
 static bool hasZeros(ArrayRef<OpFoldResult> tiles) {
   return llvm::any_of(
       tiles, [&](OpFoldResult tile) { return isConstantIntValue(tile, 0); });
-}
-
-/// Return true if `dimsPos` is invalid. It is invalid when: a) it contains
-/// duplicate. b) At least one dimension is out of bound (`dimPos` is >= 0 and <
-/// rank). c) the number of elements in `dimsPos` is > than `rank`.
-static bool isInvalid(ArrayRef<int64_t> dimsPos, int64_t rank) {
-  // early exit.
-  if (dimsPos.size() > rank)
-    return true;
-  DenseSet<int64_t> uniqued;
-  for (int64_t dim : dimsPos)
-    uniqued.insert(dim);
-  if (dimsPos.size() != uniqued.size())
-    return true;
-  return llvm::any_of(
-      dimsPos, [rank](int64_t dimPos) { return dimPos < 0 || dimPos >= rank; });
 }
 
 /// Check if we have enough static information to catch undefined behavior when

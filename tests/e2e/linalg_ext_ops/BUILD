@@ -19,6 +19,7 @@ iree_check_single_backend_test_suite(
         [
             "reverse.mlir",
             "scan.mlir",
+            "scatter.mlir",
             "sort.mlir",
             "top-k.mlir",
         ],
@@ -84,6 +85,7 @@ iree_check_single_backend_test_suite(
             "pack.mlir",
             "reverse.mlir",
             "scan.mlir",
+            "scatter.mlir",
             "sort.mlir",
             "top-k.mlir",
             "unpack.mlir",
@@ -123,6 +125,7 @@ iree_check_single_backend_test_suite(
         [
             "reverse.mlir",
             "scan.mlir",
+            "scatter.mlir",
             "sort.mlir",
             "top-k.mlir",
         ],
@@ -142,6 +145,7 @@ iree_check_single_backend_test_suite(
         # keep sorted
         [
             "reverse.mlir",
+            "scatter.mlir",
             # Top-k test disabled due to miscompile on vulkan.
             #    "top-k.mlir",
             "sort.mlir",

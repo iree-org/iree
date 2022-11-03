@@ -41,6 +41,7 @@ func.func @scatter_update(
 // CHECK-SAME:            %[[INDICES:.*]]: tensor<3x1xi32>,
 // CHECK-SAME:            %[[UPDATES:.*]]: tensor<3xi32>) -> tensor<8xi32> {
 // CHECK:           %[[SCATTER:.*]] = iree_linalg_ext.scatter
+// CHECK-SAME:            dimension_map = [0]
 // CHECK-SAME:            unique_indices(true)
 // CHECK-SAME:            ins(%[[UPDATES]], %[[INDICES]] : tensor<3xi32>, tensor<3x1xi32>)
 // CHECK-SAME:            outs(%[[ORIGINAL]] : tensor<8xi32>) {

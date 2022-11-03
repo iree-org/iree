@@ -837,6 +837,7 @@ func.func @scatter(
     %original : tensor<?x?xf32>, %indices : tensor<?x1xi32>,
     %update : tensor<?x?xf32>) -> tensor<?x?xf32> {
   %0 = iree_linalg_ext.scatter
+      dimension_map = [0]
       unique_indices(true)
       ins(%update, %indices : tensor<?x?xf32>, tensor<?x1xi32>)
       outs(%original : tensor<?x?xf32>) {
@@ -866,6 +867,7 @@ func.func @scatter(
 //  CHECK-DAG:       %[[INDICES:.+]] = flow.dispatch.tensor.load %[[ARG1_CAPTURE]]
 //  CHECK-DAG:       %[[ORIGINAL:.+]] = flow.dispatch.tensor.load %[[ARG0_CAPTURE]]
 //  CHECK-DAG:       %[[SCATTER:.+]] = iree_linalg_ext.scatter
+// CHECK-SAME:               dimension_map = [0]
 // CHECK-SAME:               unique_indices(true)
 // CHECK-SAME:               ins(%[[UPDATE]], %[[INDICES]] : tensor<?x?xf32>, tensor<?x1xi32>)
 // CHECK-SAME:               outs(%[[ORIGINAL]] : tensor<?x?xf32>)
@@ -925,6 +927,7 @@ func.func @scatter_static(%arg0 : tensor<4xi32>, %arg1 : tensor<4x1xi32>, %arg2 
   %cst_1 = arith.constant dense<[[1], [3], [4], [7]]> : tensor<4x1xi32>
   %cst_2 = arith.constant dense<0> : tensor<8xi32>
   %0 = iree_linalg_ext.scatter
+      dimension_map = [0]
       unique_indices(true)
       ins(%arg0, %arg1 : tensor<4xi32>, tensor<4x1xi32>)
       outs(%arg2 : tensor<8xi32>)  {

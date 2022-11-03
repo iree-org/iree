@@ -5,6 +5,7 @@ func.func @scatter_tiling(
     %update : tensor<?x?xf32>) -> tensor<?x?xf32> {
   %0 = iree_linalg_ext.scatter
     {__internal_linalg_transform__ = "tiling_input"}
+    dimension_map = [0]
     unique_indices(true)
     ins(%update, %indices : tensor<?x?xf32>, tensor<?x1xi32>)
     outs(%original : tensor<?x?xf32>) {
@@ -57,6 +58,7 @@ func.func @scatter_tiling_memref(
     %update : memref<?x?xf32>) {
   iree_linalg_ext.scatter
     {__internal_linalg_transform__ = "tiling_input"}
+    dimension_map = [0]
     unique_indices(true)
     ins(%update, %indices : memref<?x?xf32>, memref<?x1xi32>)
     outs(%original : memref<?x?xf32>) {
@@ -102,6 +104,7 @@ func.func @scatter_tiling_distribution(
     %update : tensor<?x?xf32>) -> tensor<?x?xf32> {
   %0 = iree_linalg_ext.scatter
     {__internal_linalg_transform__ = "distribute_input"}
+    dimension_map = [0]
     unique_indices(true)
     ins(%update, %indices : tensor<?x?xf32>, tensor<?x1xi32>)
     outs(%original : tensor<?x?xf32>) {
@@ -152,6 +155,7 @@ func.func @scatter_no_tiling(
     %update : tensor<?x?xf32>) -> tensor<?x?xf32> {
   %0 = iree_linalg_ext.scatter
     {__internal_linalg_transform__ = "no_tiling_input"}
+    dimension_map = [0]
     unique_indices(true)
     ins(%update, %indices : tensor<?x?xf32>, tensor<?x1xi32>)
     outs(%original : tensor<?x?xf32>) {
@@ -179,6 +183,7 @@ func.func @scatter_repeated_indices_tiling(
     %update : tensor<?x?xf32>) -> tensor<?x?xf32> {
   %0 = iree_linalg_ext.scatter
     {__internal_linalg_transform__ = "tiling_repeated_indices_scatter_input"}
+    dimension_map = [0]
     unique_indices(false)
     ins(%update, %indices : tensor<?x?xf32>, tensor<?x1xi32>)
     outs(%original : tensor<?x?xf32>) {
@@ -227,6 +232,7 @@ func.func @scatter_repeated_indices_no_tiling(
   // expected-error @+1 {{unimplemented tiling of non-parallel loop iterator type}}
   %0 = iree_linalg_ext.scatter
     {__internal_linalg_transform__ = "tiling_input"}
+    dimension_map = [0]
     unique_indices(false)
     ins(%update, %indices : tensor<?x?xf32>, tensor<?x1xi32>)
     outs(%original : tensor<?x?xf32>) {

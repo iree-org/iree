@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <algorithm>
+
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/InputConversion/TMTensor/PassDetail.h"
@@ -38,6 +40,33 @@ struct TMTensorOpConversion : public OpRewritePattern<SrcOpTy> {
     return success();
   }
 };
+
+struct ScatterOpConversion
+    : public OpRewritePattern<mlir::torch::TMTensor::ScatterOp> {
+  using OpRewritePattern<mlir::torch::TMTensor::ScatterOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(mlir::torch::TMTensor::ScatterOp op,
+                                PatternRewriter &rewriter) const override {
+    auto indicesTy = op.getIndicesType();
+    if (!indicesTy.hasRank()) return failure();
+
+    if (indicesTy.isDynamicDim(indicesTy.getRank() - 1)) {
+      return rewriter.notifyMatchFailure(op, "number of indices is unknown");
+    }
+
+    auto numIndices = indicesTy.getShape().back();
+    llvm::SmallVector<int64_t> dimMap(numIndices);
+    for (int i = 0; i < numIndices; i++) dimMap[i] = i;
+
+    auto scatterOp = rewriter.create<IREE::LinalgExt::ScatterOp>(
+        op.getLoc(), op->getResultTypes(), op.getInputs(), op.getOutputs(),
+        rewriter.getI64ArrayAttr(dimMap), op.getUniqueIndices());
+
+    rewriter.inlineRegionBefore(op.getRegion(), scatterOp.getRegion(),
+                                scatterOp.getRegion().begin());
+    rewriter.replaceOp(op, scatterOp->getResults());
+    return success();
+  }
+};
 }  // namespace
 
 namespace {
@@ -63,10 +92,11 @@ struct ConvertTMTensorToLinalgExtPass
       context);
 
     INSERT_TMTENSOR_CONVERSION_PATTERN(YieldOp);
-    INSERT_TMTENSOR_CONVERSION_PATTERN(ScatterOp);
     INSERT_TMTENSOR_CONVERSION_PATTERN(ScanOp);
 
 #undef INSERT_TMTENSOR_CONVERSION_PATTERN
+
+    patterns.add<ScatterOpConversion>(context);
 
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {

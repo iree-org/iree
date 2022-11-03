@@ -210,10 +210,6 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
     if (indexVectorDim != indicesRank - 1) return false;
     if (scatterDimsToOperandDims.size() != indexDepth) return false;
 
-    for (auto en : llvm::enumerate(scatterDimsToOperandDims)) {
-      if (en.index() != en.value()) return false;
-    }
-
     auto insertedWindowDims = dimNumbers.getInsertedWindowDims();
     for (auto en : llvm::enumerate(insertedWindowDims)) {
       if (en.index() != en.value()) return false;
@@ -242,9 +238,16 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
     Value indices = adaptor.getScatterIndices();
     Value updates = adaptor.getUpdates().front();
 
+    llvm::SmallVector<int64_t> scatterDimMap;
+    for (auto dim :
+         op.getScatterDimensionNumbers().getScatterDimsToOperandDims()) {
+      scatterDimMap.push_back(dim);
+    }
+
     auto scatterOp = rewriter.create<IREE::LinalgExt::ScatterOp>(
         op.getLoc(), op->getResultTypes(), ValueRange{updates, indices},
-        ValueRange{original}, op.getUniqueIndices());
+        ValueRange{original}, rewriter.getI64ArrayAttr(scatterDimMap),
+        op.getUniqueIndices());
 
     rewriter.inlineRegionBefore(op.getUpdateComputation(),
                                 scatterOp.getRegion(),

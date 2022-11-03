@@ -101,7 +101,7 @@ func.func @sort_multi(%arg0: memref<128xf32>, %arg1: memref<128xi32>) {
 func.func @scatter_update_scalar_1D(
     %original: memref<8xi32>, %indices: memref<3x1xi32>,
     %updates: memref<3xi32>) {
-  iree_linalg_ext.scatter unique_indices(true)
+  iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
     ins(%updates, %indices : memref<3xi32>, memref<3x1xi32>)
     outs(%original : memref<8xi32>)  {
   ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
@@ -127,7 +127,7 @@ func.func @scatter_update_scalar_1D(
 func.func @scatter_add_scalar_2D(
     %original: memref<4x3xi32>, %indices: memref<3x2xi32>,
     %updates: memref<3xi32>) {
-  iree_linalg_ext.scatter unique_indices(true)
+  iree_linalg_ext.scatter dimension_map = [0, 1] unique_indices(true)
     ins(%updates, %indices : memref<3xi32>, memref<3x2xi32>)
     outs(%original : memref<4x3xi32>)  {
   ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
@@ -158,7 +158,7 @@ func.func @scatter_add_scalar_2D(
 func.func @scatter_update_slice_2D(
     %original: memref<4x3xi32>, %indices: memref<2x1xi32>,
     %updates: memref<2x3xi32>) {
-  iree_linalg_ext.scatter unique_indices(true)
+  iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
     ins(%updates, %indices : memref<2x3xi32>, memref<2x1xi32>)
     outs(%original : memref<4x3xi32>)  {
   ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
@@ -188,7 +188,7 @@ func.func @scatter_update_slice_2D(
 func.func @scatter_add_scalar_1D(
     %original: memref<8xi32>, %indices: memref<3x1xi32>,
     %updates: memref<3xi32>) {
-  iree_linalg_ext.scatter unique_indices(true)
+  iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
     ins(%updates, %indices : memref<3xi32>, memref<3x1xi32>)
     outs(%original : memref<8xi32>)  {
   ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
@@ -217,7 +217,7 @@ func.func @scatter_add_scalar_1D(
 func.func @scatter_add_slice_2D(
     %original: memref<4x3xi32>, %indices: memref<2x1xi32>,
     %updates: memref<2x3xi32>) {
-  iree_linalg_ext.scatter unique_indices(true)
+  iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
     ins(%updates, %indices : memref<2x3xi32>, memref<2x1xi32>)
     outs(%original : memref<4x3xi32>)  {
   ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
@@ -247,7 +247,7 @@ func.func @scatter_add_slice_2D(
 func.func @scatter_update_scalar_dynamic_1D(
     %original: memref<?xi32>, %indices: memref<?x1xi32>,
     %updates: memref<?xi32>) {
-  iree_linalg_ext.scatter unique_indices(true)
+  iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
     ins(%updates, %indices : memref<?xi32>, memref<?x1xi32>)
     outs(%original : memref<?xi32>)  {
   ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
@@ -273,7 +273,7 @@ func.func @scatter_update_scalar_dynamic_1D(
 func.func @scatter_add_scalar_dynamic_2D(
     %original: memref<?x?xi32>, %indices: memref<?x2xi32>,
     %updates: memref<?xi32>) {
-  iree_linalg_ext.scatter unique_indices(true)
+  iree_linalg_ext.scatter dimension_map = [0, 1] unique_indices(true)
     ins(%updates, %indices : memref<?xi32>, memref<?x2xi32>)
     outs(%original : memref<?x?xi32>)  {
   ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
@@ -304,7 +304,7 @@ func.func @scatter_add_scalar_dynamic_2D(
 func.func @scatter_update_slice_dynamic_2D(
     %original: memref<?x?xi32>, %indices: memref<?x1xi32>,
     %updates: memref<?x?xi32>) {
-  iree_linalg_ext.scatter unique_indices(true)
+  iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
     ins(%updates, %indices : memref<?x?xi32>, memref<?x1xi32>)
     outs(%original : memref<?x?xi32>)  {
   ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
@@ -331,6 +331,7 @@ func.func @scatter_update_slice_dynamic_2D(
 
 func.func @scatter_partial_slices(%arg0: memref<2x64x12xf32>, %arg1: memref<2x3xi32>, %arg2: memref<2x1x12xf32>) {
   iree_linalg_ext.scatter
+    dimension_map = [0, 1, 2]
     unique_indices(true)
     ins(%arg2, %arg1 : memref<2x1x12xf32>, memref<2x3xi32>)
     outs(%arg0 : memref<2x64x12xf32>) {
