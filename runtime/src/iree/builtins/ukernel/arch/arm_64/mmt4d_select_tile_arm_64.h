@@ -12,7 +12,7 @@
 // Returns the arm64 tile function to use for the mmt4d with given params, or
 // NULL if no suitable arm64 tile function exists for these params, in which
 // case the caller may fall back to a generic tile function.
-iree_ukernel_mmt4d_tile_func_t iree_ukernel_mmt4d_select_tile_func_arm_64(
-    const iree_ukernel_mmt4d_params_t* params);
+iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func_arm_64(
+    const iree_uk_mmt4d_params_t* params);
 
 #endif  // IREE_BUILTINS_UKERNEL_ARM_64_MMT4D_SELECT_TILE_ARM_64_H_
