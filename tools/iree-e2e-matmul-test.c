@@ -341,6 +341,47 @@ static iree_status_t get_matmul_sizes(
   return iree_ok_status();
 }
 
+#define IREE_TRACE_REPLAY_REFERENCE_GEMM(LHSTYPE, RHSTYPE, RESTYPE, ACCTYPE)  \
+  static void reference_matmul_##LHSTYPE##_##RHSTYPE##_##RESTYPE##_##ACCTYPE( \
+      iree_hal_dim_t m_size, iree_hal_dim_t k_size, iree_hal_dim_t n_size,    \
+      iree_hal_element_type_t lhs_type, iree_hal_element_type_t rhs_type,     \
+      iree_hal_element_type_t acc_type, LHSTYPE* lhs_data, RHSTYPE* rhs_data, \
+      ACCTYPE* acc_data, RESTYPE* result_data, iree_hal_dim_t m,              \
+      iree_hal_dim_t n) {                                                     \
+    ACCTYPE acc = acc_data[n + m * n_size];                                   \
+    for (iree_hal_dim_t k = 0; k < k_size; ++k) {                             \
+      LHSTYPE lhs_value = lhs_data[k + m * k_size];                           \
+      RHSTYPE rhs_value = rhs_data[n + k * n_size];                           \
+      acc += (ACCTYPE)lhs_value * (ACCTYPE)rhs_value;                         \
+    }                                                                         \
+    result_data[n + m * n_size] = acc;                                        \
+  }
+
+// Reference GEMM : float <= float * float + float
+IREE_TRACE_REPLAY_REFERENCE_GEMM(float, float, float, float)
+
+// Reference GEMM : i32 <= i8 * i8 + i32
+IREE_TRACE_REPLAY_REFERENCE_GEMM(int8_t, int8_t, int32_t, int32_t)
+
+// Reference GEMM : f16 <= f16 * f16 + f16
+static void reference_matmul_f16_f16_f16_f16(
+    iree_hal_dim_t m_size, iree_hal_dim_t k_size, iree_hal_dim_t n_size,
+    iree_hal_element_type_t lhs_type, iree_hal_element_type_t rhs_type,
+    iree_hal_element_type_t acc_type, uint16_t* lhs_data, uint16_t* rhs_data,
+    uint16_t* acc_data, uint16_t* result_data, iree_hal_dim_t m,
+    iree_hal_dim_t n) {
+  float acc = iree_math_f16_to_f32(acc_data[n + m * n_size]);
+  for (iree_hal_dim_t k = 0; k < k_size; ++k) {
+    acc = iree_math_round_to_nearest_f16(
+        iree_math_round_to_nearest_f16(
+            (iree_math_f16_to_f32(lhs_data[k + m * k_size]) *
+             iree_math_f16_to_f32(rhs_data[n + k * n_size]))) +
+        acc);
+  }
+  result_data[n + m * n_size] = iree_math_f32_to_f16(acc);
+}
+
+#if 0  // dead code (remove)
 // Helper for reference_matmul_element. i32*i32->i32 case.
 // This reference implementation takes data as void* and cast those to int
 // and runs a reference matmul on casted int. This reference matmul only
@@ -367,6 +408,7 @@ static void reference_matmul_element_generic(
   write_int_to_matrix_element(acc_i32, m_size, n_size, acc_type, result_data, m,
                               n);
 }
+#endif
 
 // Helper for reference_matmul.
 // Computes one element in the result matrix.
@@ -375,9 +417,36 @@ static void reference_matmul_element(
     iree_hal_element_type_t lhs_type, iree_hal_element_type_t rhs_type,
     iree_hal_element_type_t acc_type, void* lhs_data, void* rhs_data,
     void* acc_data, void* result_data, iree_hal_dim_t m, iree_hal_dim_t n) {
+  if (lhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32 &&
+      rhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32 &&
+      acc_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
+    reference_matmul_float_float_float_float(
+        m_size, k_size, n_size, lhs_type, rhs_type, acc_type, (float*)lhs_data,
+        (float*)rhs_data, (float*)acc_data, (float*)result_data, m, n);
+  } else if (iree_hal_element_type_is_integer(lhs_type, 8) &&
+             iree_hal_element_type_is_integer(rhs_type, 8) &&
+             iree_hal_element_type_is_integer(acc_type, 32)) {
+    reference_matmul_int8_t_int8_t_int32_t_int32_t(
+        m_size, k_size, n_size, lhs_type, rhs_type, acc_type, (int8_t*)lhs_data,
+        (int8_t*)rhs_data, (int32_t*)acc_data, (int32_t*)result_data, m, n);
+  } else if (lhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_16 &&
+             rhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_16 &&
+             acc_type == IREE_HAL_ELEMENT_TYPE_FLOAT_16) {
+    reference_matmul_f16_f16_f16_f16(m_size, k_size, n_size, lhs_type, rhs_type,
+                                     acc_type, (uint16_t*)lhs_data,
+                                     (uint16_t*)rhs_data, (uint16_t*)acc_data,
+                                     (uint16_t*)result_data, m, n);
+  } else {
+    iree_status_abort(
+        iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                         "unhandled combination of element types in matmul"));
+  }
+
+#if 0
   reference_matmul_element_generic(m_size, k_size, n_size, lhs_type, rhs_type,
                                    acc_type, (void*)lhs_data, (void*)rhs_data,
                                    (void*)acc_data, (void*)result_data, m, n);
+#endif
 }
 
 // Reference matmul implementation, used to compare matmul results against.
