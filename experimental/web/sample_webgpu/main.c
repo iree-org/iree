@@ -426,22 +426,16 @@ static iree_status_t print_buffer_view(iree_hal_device_t* device,
   if (iree_status_is_ok(status)) {
     status = iree_hal_semaphore_create(device, 0ull, &fence_semaphore);
   }
-  uint64_t wait_value = 0ull;
   uint64_t signal_value = 1ull;
   if (iree_status_is_ok(status)) {
-    iree_hal_semaphore_list_t wait_semaphores = {
-        .count = 0,
-        .semaphores = NULL,
-        .payload_values = &wait_value,
-    };
     iree_hal_semaphore_list_t signal_semaphores = {
         .count = 1,
         .semaphores = &fence_semaphore,
         .payload_values = &signal_value,
     };
-    status = iree_hal_device_queue_execute(device, IREE_HAL_QUEUE_AFFINITY_ANY,
-                                           wait_semaphores, signal_semaphores,
-                                           1, &command_buffer);
+    status = iree_hal_device_queue_execute(
+        device, IREE_HAL_QUEUE_AFFINITY_ANY, iree_hal_semaphore_list_empty(),
+        signal_semaphores, 1, &command_buffer);
   }
   // TODO(scotttodd): Make this async - pass a wait source to iree_loop_wait_one
   if (iree_status_is_ok(status)) {
