@@ -12,7 +12,6 @@
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/webgpu/buffer.h"
 #include "iree/hal/drivers/webgpu/platform/webgpu.h"
-#include "iree/hal/utils/buffer_transfer.h"
 #include "iree/modules/hal/module.h"
 #include "iree/runtime/api.h"
 #include "iree/vm/api.h"
@@ -388,9 +387,10 @@ static iree_status_t print_buffer_view(iree_hal_device_t* device,
                                        iree_hal_buffer_view_t* buffer_view) {
   iree_status_t status = iree_ok_status();
 
+  iree_hal_buffer_t* buffer = iree_hal_buffer_view_buffer(buffer_view);
+  iree_device_size_t data_offset = iree_hal_buffer_byte_offset(buffer);
   iree_device_size_t data_length =
       iree_hal_buffer_view_byte_length(buffer_view);
-  iree_hal_buffer_t* buffer = iree_hal_buffer_view_buffer(buffer_view);
 
   // ----------------------------------------------
   // Transfer from device memory to mappable host memory.
@@ -401,26 +401,57 @@ static iree_status_t print_buffer_view(iree_hal_device_t* device,
           IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
       .usage = IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING,
   };
-  status = iree_hal_allocator_allocate_buffer(
-      iree_hal_device_allocator(device), target_params, data_length,
-      iree_const_byte_span_empty(), &mappable_buffer);
-  // Issue synchronous device copy.
   if (iree_status_is_ok(status)) {
-    const iree_hal_transfer_command_t transfer_command = {
-        .type = IREE_HAL_TRANSFER_COMMAND_TYPE_COPY,
-        .copy =
-            {
-                .source_buffer = buffer,
-                .source_offset = 0,
-                .target_buffer = mappable_buffer,
-                .target_offset = target_offset,
-                .length = data_length,
-            },
-    };
-    status = iree_hal_device_transfer_and_wait(
-        device, /*wait_semaphore=*/NULL,
-        /*wait_value=*/0ull, 1, &transfer_command, iree_infinite_timeout());
+    status = iree_hal_allocator_allocate_buffer(
+        iree_hal_device_allocator(device), target_params, data_length,
+        iree_const_byte_span_empty(), &mappable_buffer);
   }
+  const iree_hal_transfer_command_t transfer_command = {
+      .type = IREE_HAL_TRANSFER_COMMAND_TYPE_COPY,
+      .copy =
+          {
+              .source_buffer = buffer,
+              .source_offset = data_offset,
+              .target_buffer = mappable_buffer,
+              .target_offset = target_offset,
+              .length = data_length,
+          },
+  };
+  iree_hal_command_buffer_t* command_buffer = NULL;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_create_transfer_command_buffer(
+        device, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+        IREE_HAL_QUEUE_AFFINITY_ANY, /*transfer_count=*/1, &transfer_command,
+        &command_buffer);
+  }
+  iree_hal_semaphore_t* fence_semaphore = NULL;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_semaphore_create(device, 0ull, &fence_semaphore);
+  }
+  uint64_t wait_value = 0ull;
+  uint64_t signal_value = 1ull;
+  if (iree_status_is_ok(status)) {
+    iree_hal_semaphore_list_t wait_semaphores = {
+        .count = 0,
+        .semaphores = NULL,
+        .payload_values = &wait_value,
+    };
+    iree_hal_semaphore_list_t signal_semaphores = {
+        .count = 1,
+        .semaphores = &fence_semaphore,
+        .payload_values = &signal_value,
+    };
+    status = iree_hal_device_queue_execute(device, IREE_HAL_QUEUE_AFFINITY_ANY,
+                                           wait_semaphores, signal_semaphores,
+                                           1, &command_buffer);
+  }
+  // TODO(scotttodd): Make this async - pass a wait source to iree_loop_wait_one
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_semaphore_wait(fence_semaphore, signal_value,
+                                     iree_infinite_timeout());
+  }
+  iree_hal_command_buffer_release(command_buffer);
+  iree_hal_semaphore_release(fence_semaphore);
   // ----------------------------------------------
 
   iree_buffer_map_userdata_t* userdata = NULL;

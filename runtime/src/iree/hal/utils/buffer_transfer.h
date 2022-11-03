@@ -18,13 +18,6 @@ extern "C" {
 // iree_hal_device_transfer_range implementations
 //===----------------------------------------------------------------------===//
 
-// DO NOT SUBMIT - ok to make part of the API? document differences
-IREE_API_EXPORT iree_status_t iree_hal_device_transfer_and_wait(
-    iree_hal_device_t* device, iree_hal_semaphore_t* wait_semaphore,
-    uint64_t wait_value, iree_host_size_t transfer_count,
-    const iree_hal_transfer_command_t* transfer_commands,
-    iree_timeout_t timeout);
-
 // Performs a full transfer operation on a device transfer queue.
 // This creates a transfer command buffer, submits it against the device, and
 // waits for it to complete synchronously. Implementations that can do this
