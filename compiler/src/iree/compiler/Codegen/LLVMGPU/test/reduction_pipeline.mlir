@@ -134,7 +134,30 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 }
 }
 
-// TODO: enable group reduce for large reduction + broadcast fused.
 //   CHECK-LABEL:  func.func @warp_reduction_broadcast_dispatch
-//     CHECK-NOT:    gpu.shuffle
+//         CHECK:    scf.for {{.*}} -> (vector<4xf32>) {
+//         CHECK:      vector.transfer_read {{.*}} : memref<1x5x2048xf32, strided<[10240, 2048, 1], offset: ?>>, vector<4xf32>
+//         CHECK:      arith.addf {{.*}} : vector<4xf32>
+//         CHECK:      scf.yield
+//         CHECK:    vector.reduction <add>, %{{.*}} : vector<4xf32> into f32
+//         CHECK:    gpu.shuffle  xor
+//         CHECK:    arith.addf
+//         CHECK:    gpu.shuffle  xor
+//         CHECK:    arith.addf
+//         CHECK:    gpu.shuffle  xor
+//         CHECK:    arith.addf
+//         CHECK:    gpu.shuffle  xor
+//         CHECK:    arith.addf
+//         CHECK:    gpu.shuffle  xor
+//         CHECK:    arith.addf
+//         CHECK:    memref.store {{.*}} : memref<16xf32, 3>
+//         CHECK:    gpu.barrier
+//         CHECK:    vector.transfer_read
+//         CHECK:    vector.reduction
+//         CHECK:    arith.addf
+//         CHECK:    vector.broadcast %{{.*}} : f32 to vector<4xf32>
+//         CHECK:    %15 = arith.divf {{.*}} : vector<4xf32>
+//         CHECK:    scf.for
+//         CHECK:      vector.transfer_write {{.*}} : vector<4xf32>, memref<512x10240xf32>
+//         CHECK:    }
 //         CHECK:    return
