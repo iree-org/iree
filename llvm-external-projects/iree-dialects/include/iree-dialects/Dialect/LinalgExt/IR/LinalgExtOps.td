@@ -74,6 +74,11 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
     rank(%original) - index_depth values match %(originals) last dimensions,
     with the previous dims extending from the index offsets.
 
+    The dimension_map attributes describes which index value maps to which
+    dimension in the destionation. It cannot contain duplicate values, must
+    have as many entries as index depth, and values must be within the rank of
+    the destination.
+
     The unique_indices attribute carries the information whether all the indices
     are unique. If there are repeated indices, the first iteration loop will be
     marked as reduction.
@@ -85,13 +90,13 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
   let arguments = (ins
       Variadic<AnyRankedTensorOrMemRefType>:$inputs,
       Variadic<AnyRankedTensorOrMemRefType>:$outputs,
-      I64ElementsAttr:$dimension_map,
+      I64ArrayAttr:$dimension_map,
       DefaultValuedAttr<BoolAttr, "true">:$unique_indices
   );
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let regions = (region AnyRegion:$region);
   let assemblyFormat = [{
-    attr-dict `dimension_map` `(` $dimension_map `)`
+    attr-dict `dimension_map` `=` $dimension_map
               `unique_indices` `(` $unique_indices `)`
     (`ins` `(` $inputs^ `:` type($inputs) `)`)?
     `outs` `(` $outputs `:` type($outputs) `)`
@@ -141,11 +146,7 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
     }
 
     SmallVector<int64_t> dimensionMap() {
-      SmallVector<int64_t> ret;
-      for (const APInt& elem : getDimensionMap()) {
-        ret.push_back(elem.getLimitedValue());
-      }
-      return ret;
+      return extractFromI64ArrayAttr(getDimensionMap());
     }
 
     // Method to implement for specifying output range for

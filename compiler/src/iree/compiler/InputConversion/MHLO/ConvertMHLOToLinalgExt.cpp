@@ -246,7 +246,7 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
 
     auto scatterOp = rewriter.create<IREE::LinalgExt::ScatterOp>(
         op.getLoc(), op->getResultTypes(), ValueRange{updates, indices},
-        ValueRange{original}, rewriter.getI64TensorAttr(scatterDimMap),
+        ValueRange{original}, rewriter.getI64ArrayAttr(scatterDimMap),
         op.getUniqueIndices());
 
     rewriter.inlineRegionBefore(op.getUpdateComputation(),
