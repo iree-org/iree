@@ -645,6 +645,11 @@ void addTransformDialectInterpreterPasses(OpPassManager &passManager) {
   passManager.addPass(createDropSchedulePass());
 }
 
+void addTransformDialectJitterPasses(OpPassManager &passManager) {
+  // Give control to the transform dialect.
+  passManager.addPass(mlir::iree_compiler::createTransformDialectJitterPass());
+}
+
 static void addLowerToLLVMPasses(OpPassManager &passManager) {
   // LinalgExt -> SCF
   passManager.addNestedPass<func::FuncOp>(

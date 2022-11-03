@@ -421,6 +421,11 @@ void addGPUTransformDialectInterpreterPasses(OpPassManager &passManager) {
   passManager.addPass(createDropSchedulePass());
 }
 
+void addGPUTransformDialectJitterPasses(OpPassManager &passManager) {
+  // Give control to the transform dialect.
+  passManager.addPass(mlir::iree_compiler::createTransformDialectJitterPass());
+}
+
 void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM) {
   pm.nest<ModuleOp>().nest<func::FuncOp>().addPass(createTypePropagationPass());
   pm.nest<ModuleOp>().addPass(createBufferizeCopyOnlyDispatchesPass());

@@ -204,6 +204,12 @@ def TransformDialectInterpreter :
             "dialect spec embedded next to the top-level op.">,
   ];
 }
+def TransformDialectJitter :
+    Pass<"iree-transform-dialect-jitter"> {
+  let summary = "Pass to create and apply transform dialect on the fly.";
+  let constructor =
+    "mlir::iree_compiler::createTransformDialectJitterPass()";
+}
 
 def GPUVectorization :
     Pass<"iree-codegen-gpu-vectorization", "func::FuncOp"> {

@@ -36,6 +36,11 @@ llvm::cl::opt<std::string> clGPUCodegenTransformDialectFileName(
         "MLIR file containing a transform dialect specification to apply"),
     llvm::cl::init(""));
 
+llvm::cl::opt<bool> clGPUEnableTransformDialectJit(
+    "iree-codegen-llvmgpu-enable-transform-dialect-jit",
+    llvm::cl::desc("enable the usage of the transform dialect JIT"),
+    llvm::cl::init(false));
+
 llvm::cl::list<int64_t> clGPUCodegenTransformDialectTileSizes(
     "iree-codegen-llvmgpu-workgroup-tile-sizes",
     llvm::cl::desc("Fixed tile sizes when using the transform dialect starting "
@@ -801,12 +806,23 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
       return funcOp.emitOpError("failed to get compute ops");
     }
 
+    // If using the transform dialect, call the proper pipeline.
+    assert((clGPUCodegenTransformDialectFileName.empty() ||
+            !clGPUEnableTransformDialectJit) &&
+           "Can't use both transform dialect interpreted and jitted modes");
     if (clGPUCodegenTransformDialectFileName.size() > 0) {
       auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
           moduleOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
                                      TransformDialectInterpreterCodegen);
       setTranslationInfo(funcOp, translationInfo);
       if (clGPUCodegenTransformDialectTileSizes.empty()) continue;
+    }
+    if (clGPUEnableTransformDialectJit) {
+      auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+          moduleOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
+                                     TransformDialectJitterCodegen);
+      setTranslationInfo(funcOp, translationInfo);
+      continue;
     }
 
     Operation *rootOperation = nullptr;
