@@ -24,6 +24,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRV.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -163,8 +164,21 @@ Optional<SmallVector<int64_t, 4>> getCooperativeOpVectorShape(
   if (auto writeOp = dyn_cast<vector::TransferWriteOp>(op)) {
     auto insert =
         writeOp.getVector().getDefiningOp<vector::InsertStridedSliceOp>();
-    if (!insert) return llvm::None;
-    return llvm::to_vector<4>(insert.getSourceVectorType().getShape());
+    if (insert) {
+      return llvm::to_vector<4>(insert.getSourceVectorType().getShape());
+    }
+
+    // Also allow unrolling the transfer_write for initializing workgroup
+    // memory.
+    Optional<unsigned> space = spirv::mapVulkanStorageClassToMemorySpace(
+        spirv::StorageClass::Workgroup);
+    auto memrefType = writeOp.getSource().getType().cast<MemRefType>();
+    if (memrefType.getMemorySpaceAsInt() == *space) {
+      // Native shape is for ([B, ]M, N, K), here we only need ([B, ]M, N).
+      return llvm::to_vector<4>(nativeShape.drop_back());
+    }
+
+    return llvm::None;
   }
 
   if (auto readOp = dyn_cast<vector::TransferReadOp>(op)) {

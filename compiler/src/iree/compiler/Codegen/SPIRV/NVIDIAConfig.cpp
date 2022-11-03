@@ -198,26 +198,24 @@ static LogicalResult setCooperativeMatrixConfig(
   vectorSizes[nIndex] = coopMatSize->nSize;
   vectorSizes[kIndex] = coopMatSize->kSize;
 
-  SmallVector<int64_t> subgroupTileSizes(kIndex + 1, 0);
+  SmallVector<int64_t> subgroupTileSizes(lastParallelDim + 1, 0);
   if (isBM) subgroupTileSizes[bIndex] = 1;
   subgroupTileSizes[mIndex] = coopMatSize->mTileCount * vectorSizes[mIndex];
   subgroupTileSizes[nIndex] = coopMatSize->nTileCount * vectorSizes[nIndex];
-  subgroupTileSizes[kIndex] = coopMatSize->kTileCount * vectorSizes[kIndex];
 
-  SmallVector<int64_t> workgroupTileSizes(kIndex + 1, 0);
+  SmallVector<int64_t> workgroupTileSizes(lastParallelDim + 1, 0);
   if (isBM) workgroupTileSizes[bIndex] = 1;
   workgroupTileSizes[mIndex] =
       coopMatSize->mWarpCount * subgroupTileSizes[mIndex];
   workgroupTileSizes[nIndex] =
       coopMatSize->nWarpCount * subgroupTileSizes[nIndex];
-  workgroupTileSizes[kIndex] = subgroupTileSizes[kIndex];
 
   // Also create one level for reduction. This is needed because of
   // SPIRVTileAndPromotePass requires it.
   // TODO(#10499): Consolidate tiling configuration across different pipelines.
   SmallVector<int64_t> reductionTileSizes;
-  reductionTileSizes.append(lastParallelDim + 1, 0);
-  reductionTileSizes.push_back(workgroupTileSizes[kIndex]);
+  reductionTileSizes.append(kIndex, 0);
+  reductionTileSizes.push_back(coopMatSize->kTileCount * coopMatSize->kSize);
 
   TileSizesListType tileSizes;
   tileSizes.reserve(3);
