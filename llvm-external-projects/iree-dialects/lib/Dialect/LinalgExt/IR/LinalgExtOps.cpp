@@ -365,13 +365,13 @@ LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
   for (auto i : llvm::seq<unsigned>(0, indexDepth)) {
     loadIndices.back() = b.create<arith::ConstantIndexOp>(loc, i);
     Value idx = b.create<memref::LoadOp>(loc, indices(), loadIndices);
-    Value cast = b.create<arith::IndexCastOp>(loc, b.getIndexType(), idx);
+    Value ret = b.create<arith::IndexCastOp>(loc, b.getIndexType(), idx);
 
     auto dim = dimMap[i];
 
     if (starts[dim])
-      cast = b.create<arith::AddIOp>(loc, cast, starts[dim]);
-    starts[dim] = cast;
+      ret = b.create<arith::AddIOp>(loc, ret, starts[dim]);
+    starts[dim] = ret;
   }
 
   Value init = b.create<memref::LoadOp>(loc, original(), starts);
