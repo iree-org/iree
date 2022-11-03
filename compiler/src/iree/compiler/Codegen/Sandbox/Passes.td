@@ -81,6 +81,10 @@ def LinalgSplitReduction : Pass<"linalg-split-reduction", "func::FuncOp"> {
     // relying on tiling from TileAndFuse pass).
     Option<"size", "size", "int64_t", /*default=*/"0",
       "Size that splitReduction should use for parallel reduction results.">,
+    // This corresponds to the (product of) values in the penultimate level of
+    // tiling. This specifies the unrolling factor for vectorization.
+    Option<"unroll", "unroll", "uint64_t", /*default=*/"1",
+      "Unroll factor that splitReduction should use for vectorization.">,
   ];
 }
 

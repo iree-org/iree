@@ -61,7 +61,7 @@ static llvm::cl::opt<bool> clEnableMicrokernelsDecomposeLinalgGeneric(
 static llvm::cl::opt<bool> clEnableReassociateFpReductions(
     "iree-llvmcpu-reassociate-fp-reductions",
     llvm::cl::desc("Enables reassociation for FP reductions"),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 // MLIR file containing a top-level module that specifies the transformations to
 // apply to form dispatch regions.
