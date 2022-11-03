@@ -4,10 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// clang-format off
-#include <stdint.h>  // include before ukernel/common.h to keep standard types
-// clang-format on
-
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -71,9 +67,9 @@ static iree_status_t iree_mmt4d_benchmark(
   void* lhs_buffer = malloc(lhs_buffer_size);
   void* rhs_buffer = malloc(lhs_buffer_size);
   void* out_buffer = malloc(lhs_buffer_size);
-  iree_mmt4d_scalar_type_t lhs_type = iree_ukernel_mmt4d_lhs_type(&params);
-  iree_mmt4d_scalar_type_t rhs_type = iree_ukernel_mmt4d_rhs_type(&params);
-  iree_mmt4d_scalar_type_t out_type = iree_ukernel_mmt4d_out_type(&params);
+  iree_ukernel_type_t lhs_type = iree_ukernel_mmt4d_lhs_type(params.type);
+  iree_ukernel_type_t rhs_type = iree_ukernel_mmt4d_rhs_type(params.type);
+  iree_ukernel_type_t out_type = iree_ukernel_mmt4d_out_type(params.type);
   iree_mmt4d_test_random_engine_t* engine =
       iree_mmt4d_test_random_engine_create();
   // It's just about plausible that on some platform, for some number type,

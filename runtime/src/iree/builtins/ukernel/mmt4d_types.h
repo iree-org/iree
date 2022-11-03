@@ -9,17 +9,30 @@
 
 #include "iree/builtins/ukernel/common.h"
 
-// Supported combinations of data types (order: LHS, RHS, OUT).
-enum iree_ukernel_mmt4d_type_t {
-  iree_ukernel_mmt4d_type_none = 0,
-  iree_ukernel_mmt4d_type_f32f32f32,
-  iree_ukernel_mmt4d_type_i8i8i32,
-};
+typedef enum iree_ukernel_mmt4d_type_t {
+  iree_ukernel_mmt4d_type_f32f32f32 =
+      IREE_UKERNEL_PACK_3_TYPES_LITERAL(FLOAT_32, FLOAT_32, FLOAT_32),
+  iree_ukernel_mmt4d_type_i8i8i32 =
+      IREE_UKERNEL_PACK_3_TYPES_LITERAL(INT_8, INT_8, INT_32),
+} iree_ukernel_mmt4d_type_t;
 
-typedef enum iree_ukernel_mmt4d_type_t iree_ukernel_mmt4d_type_t;
+static inline iree_ukernel_type_t iree_ukernel_mmt4d_lhs_type(
+    iree_ukernel_mmt4d_type_t type) {
+  return IREE_UKERNEL_UNPACK_TYPE(0, type);
+}
+
+static inline iree_ukernel_type_t iree_ukernel_mmt4d_rhs_type(
+    iree_ukernel_mmt4d_type_t type) {
+  return IREE_UKERNEL_UNPACK_TYPE(1, type);
+}
+
+static inline iree_ukernel_type_t iree_ukernel_mmt4d_out_type(
+    iree_ukernel_mmt4d_type_t type) {
+  return IREE_UKERNEL_UNPACK_TYPE(2, type);
+}
 
 // Parameters for a mmt4d operation.
-struct iree_ukernel_mmt4d_params_t {
+typedef struct iree_ukernel_mmt4d_params_t {
   iree_ukernel_mmt4d_type_t type;
   iree_ukernel_uint32_t flags;
   const void* lhs_buffer;
@@ -35,12 +48,7 @@ struct iree_ukernel_mmt4d_params_t {
   iree_ukernel_int32_t N0;
   iree_ukernel_int32_t K0;
   const iree_ukernel_uint64_t* cpu_data;
-};
-
-typedef struct iree_ukernel_mmt4d_params_t iree_ukernel_mmt4d_params_t;
-
-// TODO: move these flags to a header file shared with compiler/.
-#define IREE_UKERNEL_FLAG_ACCUMULATE 1
+} iree_ukernel_mmt4d_params_t;
 
 // Function pointer type for tile functions, i.e. typically architecture
 // specific functions computing one M0xN0 tile of the output matrix, i.e.
@@ -64,49 +72,5 @@ typedef void (*iree_ukernel_mmt4d_tile_func_t)(
   void NAME(void* out_tile, const void* lhs_panel, const void* rhs_panel, \
             iree_ukernel_int32_t K, iree_ukernel_uint32_t flags,          \
             const iree_ukernel_mmt4d_params_t* params);
-
-// Log2 of size of LHS matrix element type, e.g. f32 --> size=4 --> log2=2
-static inline int iree_ukernel_mmt4d_lhs_elem_size_log2(
-    iree_ukernel_mmt4d_type_t type) {
-  switch (type) {
-    case iree_ukernel_mmt4d_type_f32f32f32:
-      return 2;
-    default:
-      return 0;
-  }
-}
-
-static inline int iree_ukernel_mmt4d_lhs_elem_size(
-    iree_ukernel_mmt4d_type_t type) {
-  return 1 << iree_ukernel_mmt4d_lhs_elem_size_log2(type);
-}
-
-// Log2 of size of RHS matrix element type, e.g. f32 --> size=4 --> log2=2
-static inline int iree_ukernel_mmt4d_rhs_elem_size_log2(
-    iree_ukernel_mmt4d_type_t type) {
-  return iree_ukernel_mmt4d_lhs_elem_size_log2(type);  // for now it's the same
-}
-
-static inline int iree_ukernel_mmt4d_rhs_elem_size(
-    iree_ukernel_mmt4d_type_t type) {
-  return 1 << iree_ukernel_mmt4d_rhs_elem_size_log2(type);
-}
-
-// Log2 of size of OUT matrix element type, e.g. f32 --> size=4 --> log2=2
-static inline int iree_ukernel_mmt4d_out_elem_size_log2(
-    iree_ukernel_mmt4d_type_t type) {
-  switch (type) {
-    case iree_ukernel_mmt4d_type_f32f32f32:
-    case iree_ukernel_mmt4d_type_i8i8i32:
-      return 2;
-    default:
-      return 0;
-  }
-}
-
-static inline int iree_ukernel_mmt4d_out_elem_size(
-    iree_ukernel_mmt4d_type_t type) {
-  return 1 << iree_ukernel_mmt4d_out_elem_size_log2(type);
-}
 
 #endif  // IREE_BUILTINS_UKERNEL_MMT4D_TYPES_H_

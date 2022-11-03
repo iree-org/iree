@@ -650,9 +650,9 @@ static iree_status_t iree_vmvx_mmt4d(iree_ukernel_mmt4d_type_t type,
   iree_host_size_t lhs_tile_size = M0 * K0;
   iree_host_size_t rhs_tile_size = N0 * K0;
   iree_host_size_t out_tile_size = M0 * N0;
-  int lhs_elem_size = iree_ukernel_mmt4d_lhs_elem_size(type);
-  int rhs_elem_size = iree_ukernel_mmt4d_rhs_elem_size(type);
-  int out_elem_size = iree_ukernel_mmt4d_out_elem_size(type);
+  int lhs_elem_size = iree_ukernel_type_size(iree_ukernel_mmt4d_lhs_type(type));
+  int rhs_elem_size = iree_ukernel_type_size(iree_ukernel_mmt4d_rhs_type(type));
+  int out_elem_size = iree_ukernel_type_size(iree_ukernel_mmt4d_out_type(type));
   // Here are abusing the 2D-specific macros MAP_BUFFER_2D_* to query 4D arrays.
   // Thanks to the requirement that all dimensions but the outer-most one are
   // contiguous row-major, the outer-most stride is the only nontrivial stride,
@@ -758,16 +758,17 @@ static iree_status_t iree_vmvx_pack_f(iree_ukernel_pack_type_t type,
                                       const iree_vm_abi_pack_f_t* args) {
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_host_size_t out_tile_size = args->out_size2 * args->out_size3;
-  int elem_size = iree_ukernel_pack_elem_size(type);
+  int in_elem_size = iree_ukernel_type_size(iree_ukernel_pack_in_type(type));
+  int out_elem_size = iree_ukernel_type_size(iree_ukernel_pack_out_type(type));
   MAP_BUFFER_2D_UNTYPED_RO(in,
-                           /*dtype_size=*/elem_size,
+                           /*dtype_size=*/in_elem_size,
                            /*buffer_ref=*/args->in_ref,
                            /*offset=*/args->in_offset,
                            /*stride0=*/args->in_stride0,
                            /*stride1=*/1,
                            /*size0=*/args->in_size0,
                            /*size1=*/args->in_size1);
-  MAP_BUFFER_2D_UNTYPED_RW(out, /*dtype_size=*/elem_size,
+  MAP_BUFFER_2D_UNTYPED_RW(out, /*dtype_size=*/out_elem_size,
                            /*buffer_ref=*/args->out_ref,
                            /*offset=*/args->out_offset,
                            /*stride0=*/args->out_stride0,
@@ -802,16 +803,17 @@ static iree_status_t iree_vmvx_pack_i(iree_ukernel_pack_type_t type,
                                       const iree_vm_abi_pack_i_t* args) {
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_host_size_t out_tile_size = args->out_size2 * args->out_size3;
-  int elem_size = iree_ukernel_pack_elem_size(type);
+  int in_elem_size = iree_ukernel_type_size(iree_ukernel_pack_in_type(type));
+  int out_elem_size = iree_ukernel_type_size(iree_ukernel_pack_out_type(type));
   MAP_BUFFER_2D_UNTYPED_RO(in,
-                           /*dtype_size=*/elem_size,
+                           /*dtype_size=*/in_elem_size,
                            /*buffer_ref=*/args->in_ref,
                            /*offset=*/args->in_offset,
                            /*stride0=*/args->in_stride0,
                            /*stride1=*/1,
                            /*size0=*/args->in_size0,
                            /*size1=*/args->in_size1);
-  MAP_BUFFER_2D_UNTYPED_RW(out, /*dtype_size=*/elem_size,
+  MAP_BUFFER_2D_UNTYPED_RW(out, /*dtype_size=*/out_elem_size,
                            /*buffer_ref=*/args->out_ref,
                            /*offset=*/args->out_offset,
                            /*stride0=*/args->out_stride0,

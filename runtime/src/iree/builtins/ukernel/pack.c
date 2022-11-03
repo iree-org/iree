@@ -49,7 +49,9 @@ iree_ukernel_status_t iree_ukernel_pack(
       params->out_size2 == 0 || params->out_size3 == 0) {
     return iree_ukernel_status_ok;
   }
-  iree_ukernel_ssize_t elem_size = iree_ukernel_pack_elem_size(params->type);
+  // For now, the input and output element types are always the same.
+  iree_ukernel_type_t elem_type = iree_ukernel_pack_in_type(params->type);
+  iree_ukernel_ssize_t elem_size = iree_ukernel_type_size(elem_type);
   iree_ukernel_ssize_t lsize0 = params->out_size0;
   iree_ukernel_ssize_t lsize1 = params->out_size1;
   iree_ukernel_ssize_t lsize2 = params->out_size2;

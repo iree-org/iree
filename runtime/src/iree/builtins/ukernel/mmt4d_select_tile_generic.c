@@ -102,8 +102,8 @@ iree_ukernel_status_t iree_ukernel_mmt4d_select_tile_func_generic(
     const iree_ukernel_mmt4d_params_t* params,
     iree_ukernel_mmt4d_tile_func_t* out_tile_func) {
   int tile_elems = params->M0 * params->N0;
-  int tile_bytes = tile_elems
-                   << iree_ukernel_mmt4d_out_elem_size_log2(params->type);
+  iree_ukernel_type_t out_type = iree_ukernel_mmt4d_out_type(params->type);
+  int tile_bytes = tile_elems << iree_ukernel_type_size_log2(out_type);
   if (tile_bytes > iree_ukernel_mmt4d_tile_generic_max_bytes) {
     return iree_ukernel_status_unsupported_generic_tile_size;
   }

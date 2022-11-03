@@ -11,54 +11,22 @@
 
 #include "iree/schemas/cpu_data.h"
 
-iree_mmt4d_scalar_type_t iree_ukernel_mmt4d_lhs_type(
-    const iree_ukernel_mmt4d_params_t* params) {
-  switch (params->type) {
-    case iree_ukernel_mmt4d_type_f32f32f32:
-      return iree_mmt4d_scalar_type_f32;
-    case iree_ukernel_mmt4d_type_i8i8i32:
-      return iree_mmt4d_scalar_type_i8;
-    default:
-      assert(false && "unknown type");
-      return iree_mmt4d_scalar_type_unknown;
-  }
-}
-
-iree_mmt4d_scalar_type_t iree_ukernel_mmt4d_rhs_type(
-    const iree_ukernel_mmt4d_params_t* params) {
-  // same for now
-  return iree_ukernel_mmt4d_lhs_type(params);
-}
-
-iree_mmt4d_scalar_type_t iree_ukernel_mmt4d_out_type(
-    const iree_ukernel_mmt4d_params_t* params) {
-  switch (params->type) {
-    case iree_ukernel_mmt4d_type_f32f32f32:
-      return iree_mmt4d_scalar_type_f32;
-    case iree_ukernel_mmt4d_type_i8i8i32:
-      return iree_mmt4d_scalar_type_i32;
-    default:
-      assert(false && "unknown type");
-      return iree_mmt4d_scalar_type_unknown;
-  }
-}
-
 iree_ukernel_ssize_t iree_ukernel_mmt4d_lhs_buffer_size(
     const iree_ukernel_mmt4d_params_t* params) {
   return params->M * params->lhs_stride *
-         iree_ukernel_mmt4d_lhs_elem_size(params->type);
+         iree_ukernel_type_size(iree_ukernel_mmt4d_lhs_type(params->type));
 }
 
 iree_ukernel_ssize_t iree_ukernel_mmt4d_rhs_buffer_size(
     const iree_ukernel_mmt4d_params_t* params) {
   return params->N * params->rhs_stride *
-         iree_ukernel_mmt4d_rhs_elem_size(params->type);
+         iree_ukernel_type_size(iree_ukernel_mmt4d_rhs_type(params->type));
 }
 
 iree_ukernel_ssize_t iree_ukernel_mmt4d_out_buffer_size(
     const iree_ukernel_mmt4d_params_t* params) {
   return params->M * params->out_stride *
-         iree_ukernel_mmt4d_out_elem_size(params->type);
+         iree_ukernel_type_size(iree_ukernel_mmt4d_out_type(params->type));
 }
 
 struct iree_mmt4d_test_random_engine_t {
@@ -109,17 +77,17 @@ static void write_random_buffer(T* buffer, iree_ukernel_ssize_t size_in_bytes,
 }
 
 void write_random_buffer(void* buffer, iree_ukernel_ssize_t size_in_bytes,
-                         iree_mmt4d_scalar_type_t type,
+                         iree_ukernel_type_t type,
                          iree_mmt4d_test_random_engine_t* engine) {
   switch (type) {
-    case iree_mmt4d_scalar_type_f32:
+    case IREE_UKERNEL_TYPE_FLOAT_32:
       write_random_buffer(static_cast<float*>(buffer), size_in_bytes, engine);
       return;
-    case iree_mmt4d_scalar_type_i32:
+    case IREE_UKERNEL_TYPE_INT_32:
       write_random_buffer(static_cast<iree_ukernel_int32_t*>(buffer),
                           size_in_bytes, engine);
       return;
-    case iree_mmt4d_scalar_type_i8:
+    case IREE_UKERNEL_TYPE_INT_8:
       write_random_buffer(static_cast<iree_ukernel_int8_t*>(buffer),
                           size_in_bytes, engine);
       return;
