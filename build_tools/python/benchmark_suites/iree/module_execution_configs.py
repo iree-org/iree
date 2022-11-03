@@ -48,9 +48,9 @@ VULKAN_BATCH_SIZE_32_CONFIG = iree_definitions.ModuleExecutionConfig(
 
 
 def get_elf_local_task_config(thread_num: int):
+  config_id = f"{unique_ids.IREE_MODULE_EXECUTION_CONFIG_LOCAL_TASK_BASE}_{thread_num}"
   return iree_definitions.ModuleExecutionConfig(
-      id=
-      f"{unique_ids.IREE_MODULE_EXECUTION_CONFIG_LOCAL_TASK_BASE}_{thread_num}",
+      id=config_id,
       tags=[f"{thread_num}-thread", "full-inference", "default-flags"],
       loader=iree_definitions.RuntimeLoader.EMBEDDED_ELF,
       driver=iree_definitions.RuntimeDriver.LOCAL_TASK,
@@ -59,9 +59,9 @@ def get_elf_local_task_config(thread_num: int):
 
 
 def get_vmvx_local_task_config(thread_num: int):
+  config_id = f"{unique_ids.IREE_MODULE_EXECUTION_CONFIG_LOCAL_TASK_BASE}_{thread_num}"
   return iree_definitions.ModuleExecutionConfig(
-      id=
-      f"{unique_ids.IREE_MODULE_EXECUTION_CONFIG_LOCAL_TASK_BASE}_{thread_num}",
+      id=config_id,
       tags=[f"{thread_num}-thread", "full-inference", "default-flags"],
       loader=iree_definitions.RuntimeLoader.VMVX_MODULE,
       driver=iree_definitions.RuntimeDriver.LOCAL_TASK,
