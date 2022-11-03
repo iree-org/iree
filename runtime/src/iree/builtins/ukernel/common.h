@@ -90,7 +90,7 @@
 // source of information about the target we're compiling against, as opposed to
 // including iree/base/target_platform.h.
 //
-// For example, using IREE_UKERNEL_ARCH_ARM_64 (from arch/config.h) rather than
+// For example, using IREE_UK_ARCH_ARM_64 (from arch/config.h) rather than
 // IREE_ARCH_ARM_64 (from target_platform.h) means that we can control from a
 // single place in the build system whether we enable ARM_64-specific code paths
 // or stick to generic code.
@@ -99,7 +99,7 @@
 // Include common flag values, shared with the compiler.
 #include "iree/builtins/ukernel/exported_flag_bits.h"
 
-// Include IREE_UKERNEL_STATIC_ASSERT.
+// Include IREE_UK_STATIC_ASSERT.
 #include "iree/builtins/ukernel/static_assert.h"
 
 #ifdef __cplusplus
@@ -115,19 +115,19 @@ extern "C" {
 // that embeds this one to transitively export functions but may want to have
 // the functions exported based on how we link them. For now this is used as
 // documentation.
-#define IREE_UKERNEL_EXPORT
+#define IREE_UK_EXPORT
 
 // Local fork of IREE_RESTRICT. We can't #include iree/base/attributes.h because
 // it drags in platform headers, via target_platform.h. TODO, consider sharing
 // this and other attributes that can be defined without any #include.
 #if defined(_MSC_VER) && _MSC_VER >= 1900
-#define IREE_UKERNEL_RESTRICT __restrict
+#define IREE_UK_RESTRICT __restrict
 #elif defined(_MSC_VER)
-#define IREE_UKERNEL_RESTRICT
+#define IREE_UK_RESTRICT
 #elif defined(__cplusplus)
-#define IREE_UKERNEL_RESTRICT __restrict__
+#define IREE_UK_RESTRICT __restrict__
 #else
-#define IREE_UKERNEL_RESTRICT restrict
+#define IREE_UK_RESTRICT restrict
 #endif  // _MSC_VER
 
 //===----------------------------------------------------------------------===//
@@ -137,53 +137,53 @@ extern "C" {
 //===----------------------------------------------------------------------===//
 
 // These typedefs are making assumptions about the widths of standard C types.
-// These assumptions are guarded by the IREE_UKERNEL_STATIC_ASSERT's below.
+// These assumptions are guarded by the IREE_UK_STATIC_ASSERT's below.
 // If someday these assumptions fail, then we can always add #if's to control
-// these typedefs, perhaps similarly to what is done for iree_ukernel_ssize_t
+// these typedefs, perhaps similarly to what is done for iree_uk_ssize_t
 // below.
-typedef signed char iree_ukernel_int8_t;
-typedef short iree_ukernel_int16_t;
-typedef int iree_ukernel_int32_t;
-typedef long long iree_ukernel_int64_t;
-typedef unsigned char iree_ukernel_uint8_t;
-typedef unsigned short iree_ukernel_uint16_t;
-typedef unsigned int iree_ukernel_uint32_t;
-typedef unsigned long long iree_ukernel_uint64_t;
+typedef signed char iree_uk_int8_t;
+typedef short iree_uk_int16_t;
+typedef int iree_uk_int32_t;
+typedef long long iree_uk_int64_t;
+typedef unsigned char iree_uk_uint8_t;
+typedef unsigned short iree_uk_uint16_t;
+typedef unsigned int iree_uk_uint32_t;
+typedef unsigned long long iree_uk_uint64_t;
 
-IREE_UKERNEL_STATIC_ASSERT(sizeof(iree_ukernel_int8_t) == 1);
-IREE_UKERNEL_STATIC_ASSERT(sizeof(iree_ukernel_int16_t) == 2);
-IREE_UKERNEL_STATIC_ASSERT(sizeof(iree_ukernel_int32_t) == 4);
-IREE_UKERNEL_STATIC_ASSERT(sizeof(iree_ukernel_int64_t) == 8);
-IREE_UKERNEL_STATIC_ASSERT(sizeof(iree_ukernel_uint8_t) == 1);
-IREE_UKERNEL_STATIC_ASSERT(sizeof(iree_ukernel_uint16_t) == 2);
-IREE_UKERNEL_STATIC_ASSERT(sizeof(iree_ukernel_uint32_t) == 4);
-IREE_UKERNEL_STATIC_ASSERT(sizeof(iree_ukernel_uint64_t) == 8);
+IREE_UK_STATIC_ASSERT(sizeof(iree_uk_int8_t) == 1);
+IREE_UK_STATIC_ASSERT(sizeof(iree_uk_int16_t) == 2);
+IREE_UK_STATIC_ASSERT(sizeof(iree_uk_int32_t) == 4);
+IREE_UK_STATIC_ASSERT(sizeof(iree_uk_int64_t) == 8);
+IREE_UK_STATIC_ASSERT(sizeof(iree_uk_uint8_t) == 1);
+IREE_UK_STATIC_ASSERT(sizeof(iree_uk_uint16_t) == 2);
+IREE_UK_STATIC_ASSERT(sizeof(iree_uk_uint32_t) == 4);
+IREE_UK_STATIC_ASSERT(sizeof(iree_uk_uint64_t) == 8);
 
-#define IREE_UKERNEL_INT8_MIN (-127i8 - 1)
-#define IREE_UKERNEL_INT16_MIN (-32767i16 - 1)
-#define IREE_UKERNEL_INT32_MIN (-2147483647i32 - 1)
-#define IREE_UKERNEL_INT64_MIN (-9223372036854775807i64 - 1)
-#define IREE_UKERNEL_INT8_MAX 127i8
-#define IREE_UKERNEL_INT16_MAX 32767i16
-#define IREE_UKERNEL_INT32_MAX 2147483647i32
-#define IREE_UKERNEL_INT64_MAX 9223372036854775807i64
-#define IREE_UKERNEL_UINT8_MAX 0xffui8
-#define IREE_UKERNEL_UINT16_MAX 0xffffui16
-#define IREE_UKERNEL_UINT32_MAX 0xffffffffui32
-#define IREE_UKERNEL_UINT64_MAX 0xffffffffffffffffui64
+#define IREE_UK_INT8_MIN (-127i8 - 1)
+#define IREE_UK_INT16_MIN (-32767i16 - 1)
+#define IREE_UK_INT32_MIN (-2147483647i32 - 1)
+#define IREE_UK_INT64_MIN (-9223372036854775807i64 - 1)
+#define IREE_UK_INT8_MAX 127i8
+#define IREE_UK_INT16_MAX 32767i16
+#define IREE_UK_INT32_MAX 2147483647i32
+#define IREE_UK_INT64_MAX 9223372036854775807i64
+#define IREE_UK_UINT8_MAX 0xffui8
+#define IREE_UK_UINT16_MAX 0xffffui16
+#define IREE_UK_UINT32_MAX 0xffffffffui32
+#define IREE_UK_UINT64_MAX 0xffffffffffffffffui64
 
 //===----------------------------------------------------------------------===//
 // Local replacement for ssize_t
 //===----------------------------------------------------------------------===//
 
-// Use iree_ukernel_ssize_t for all sizes that may need pointer width.
+// Use iree_uk_ssize_t for all sizes that may need pointer width.
 // For any argument that is known to fit in a specific size prefer that to
 // ensure this code operates well on systems with small/weird widths (x32/ilp32,
 // etc).
-#if IREE_UKERNEL_POINTER_SIZE == 4
-typedef iree_ukernel_int32_t iree_ukernel_ssize_t;
-#elif IREE_UKERNEL_POINTER_SIZE == 8
-typedef iree_ukernel_int64_t iree_ukernel_ssize_t;
+#if IREE_UK_POINTER_SIZE == 4
+typedef iree_uk_int32_t iree_uk_ssize_t;
+#elif IREE_UK_POINTER_SIZE == 8
+typedef iree_uk_int64_t iree_uk_ssize_t;
 #else
 #error Unexpected pointer size
 #endif
@@ -206,24 +206,23 @@ typedef iree_ukernel_int64_t iree_ukernel_ssize_t;
 // Status codes returned by microkernels.
 //===----------------------------------------------------------------------===//
 
-typedef enum iree_ukernel_status_e {
-  iree_ukernel_status_ok = 0,
-  iree_ukernel_status_bad_type,
-  iree_ukernel_status_bad_flags,
-  iree_ukernel_status_unsupported_huge_or_negative_dimension,
-  iree_ukernel_status_unsupported_generic_tile_size,
-} iree_ukernel_status_t;
+typedef enum iree_uk_status_e {
+  iree_uk_status_ok = 0,
+  iree_uk_status_bad_type,
+  iree_uk_status_bad_flags,
+  iree_uk_status_unsupported_huge_or_negative_dimension,
+  iree_uk_status_unsupported_generic_tile_size,
+} iree_uk_status_t;
 
 // Convert a status code to a human-readable string.
-IREE_UKERNEL_EXPORT const char* iree_ukernel_status_message(
-    iree_ukernel_status_t status);
+IREE_UK_EXPORT const char* iree_uk_status_message(iree_uk_status_t status);
 
-#define IREE_UKERNEL_RETURN_IF_ERROR(X)     \
-  do {                                      \
-    iree_ukernel_status_t status = (X);     \
-    if (status != iree_ukernel_status_ok) { \
-      return status;                        \
-    }                                       \
+#define IREE_UK_RETURN_IF_ERROR(X)     \
+  do {                                 \
+    iree_uk_status_t status = (X);     \
+    if (status != iree_uk_status_ok) { \
+      return status;                   \
+    }                                  \
   } while (0)
 
 //===----------------------------------------------------------------------===//
@@ -240,7 +239,7 @@ IREE_UKERNEL_EXPORT const char* iree_ukernel_status_message(
 //===----------------------------------------------------------------------===//
 
 // Implementation note: we make this very bare-bones, with
-// iree_ukernel_type_t just a typedef for iree_ukernel_uint8_t and
+// iree_uk_type_t just a typedef for iree_uk_uint8_t and
 // the values given by macros, as opposed to trying to do something nicer, more
 // strongly typed, etc, because of the following design goals:
 // * Minimize divergence from iree_hal_element_type_t.
@@ -256,11 +255,11 @@ IREE_UKERNEL_EXPORT const char* iree_ukernel_status_message(
 //
 // Used as a bit-field. Current layout:
 // * Bits 4..7 encode the 'category', e.g. integer or floating-point.
-//   See IREE_UKERNEL_TYPE_CATEGORY_MASK.
+//   See IREE_UK_TYPE_CATEGORY_MASK.
 // * Bit 3 is currently unused and reserved. It should always be set to 0.
 // * Bit 0..2 encode the bit-count-log2, i.e. the bit width, required to be
-//   a power of 2. See IREE_UKERNEL_TYPE_BIT_COUNT_LOG2_MASK.
-typedef iree_ukernel_uint8_t iree_ukernel_type_t;
+//   a power of 2. See IREE_UK_TYPE_BIT_COUNT_LOG2_MASK.
+typedef iree_uk_uint8_t iree_uk_type_t;
 
 // Mask and bit values for the 'category' field within an element type.
 // The general schema is that we use low values, from 1 upward, for integer-ish
@@ -268,111 +267,108 @@ typedef iree_ukernel_uint8_t iree_ukernel_type_t;
 // categories. This way, we simultaneously we keep it easy to implement the
 // "is floating-point" test and we keep it open how many values will be used for
 // integer-ish vs float-ish categories.
-#define IREE_UKERNEL_TYPE_CATEGORY_MASK 0xF0u
+#define IREE_UK_TYPE_CATEGORY_MASK 0xF0u
 // None-category, only used for the none-element-type (value 0).
-#define IREE_UKERNEL_TYPE_CATEGORY_NONE 0x00u
+#define IREE_UK_TYPE_CATEGORY_NONE 0x00u
 // Opaque means that the values are just bits. Use in microkernel that only copy
 // elements, and do not perform arithmetic on them.
-#define IREE_UKERNEL_TYPE_CATEGORY_OPAQUE 0x10u
+#define IREE_UK_TYPE_CATEGORY_OPAQUE 0x10u
 // Signless integers. Use in microkernels that perform same-bit-width integer
 // arithmetic that is insensitive to signedness. For example, same-bit-width
 // element-wise integer add and mul ops.
-#define IREE_UKERNEL_TYPE_CATEGORY_INTEGER 0x20u
+#define IREE_UK_TYPE_CATEGORY_INTEGER 0x20u
 // Signed integers. Use in microkernels that are specifically performing signed
 // integer arithmetic. For example, any mixed-bit-width op that involves a
 // sign-extension (as in arith.extsi).
-#define IREE_UKERNEL_TYPE_CATEGORY_INTEGER_SIGNED 0x30u
+#define IREE_UK_TYPE_CATEGORY_INTEGER_SIGNED 0x30u
 // Unsigned integers. Similar comments as for signed integers.
-#define IREE_UKERNEL_TYPE_CATEGORY_INTEGER_UNSIGNED 0x40u
+#define IREE_UK_TYPE_CATEGORY_INTEGER_UNSIGNED 0x40u
 // "Brain" floating-point format. Currently only used for bfloat16.
-#define IREE_UKERNEL_TYPE_CATEGORY_FLOAT_BRAIN 0xE0u
+#define IREE_UK_TYPE_CATEGORY_FLOAT_BRAIN 0xE0u
 // IEEE754 floating-point format.
-#define IREE_UKERNEL_TYPE_CATEGORY_FLOAT_IEEE 0xF0u
+#define IREE_UK_TYPE_CATEGORY_FLOAT_IEEE 0xF0u
 
 // Mask value for the 'bit-count-log2' field within an element type. 3 bits
 // allow representing any power-of-two bit width from 1-bit to 128-bit, which
 // matches what iree_hal_element_type_t can currently represent (as far as
 // powers of two are concerned). If needed in the future, we could grow this
 // by claiming the currently reserved bit 3.
-#define IREE_UKERNEL_TYPE_BIT_COUNT_LOG2_MASK 0x07u
+#define IREE_UK_TYPE_BIT_COUNT_LOG2_MASK 0x07u
 
 // Similar to iree_hal_element_types_t. We leave it a raw _e enum tag without a
 // typedef because the enum type should never be used, only the enum values are
 // expected to be used.
 enum {
-  IREE_UKERNEL_TYPE_NONE = IREE_UKERNEL_TYPE_CATEGORY_NONE | 0,
-  IREE_UKERNEL_TYPE_OPAQUE_8 = IREE_UKERNEL_TYPE_CATEGORY_OPAQUE | 3,
-  IREE_UKERNEL_TYPE_OPAQUE_16 = IREE_UKERNEL_TYPE_CATEGORY_OPAQUE | 4,
-  IREE_UKERNEL_TYPE_OPAQUE_32 = IREE_UKERNEL_TYPE_CATEGORY_OPAQUE | 5,
-  IREE_UKERNEL_TYPE_OPAQUE_64 = IREE_UKERNEL_TYPE_CATEGORY_OPAQUE | 6,
-  IREE_UKERNEL_TYPE_INT_8 = IREE_UKERNEL_TYPE_CATEGORY_INTEGER | 3,
-  IREE_UKERNEL_TYPE_INT_16 = IREE_UKERNEL_TYPE_CATEGORY_INTEGER | 4,
-  IREE_UKERNEL_TYPE_INT_32 = IREE_UKERNEL_TYPE_CATEGORY_INTEGER | 5,
-  IREE_UKERNEL_TYPE_INT_64 = IREE_UKERNEL_TYPE_CATEGORY_INTEGER | 6,
-  IREE_UKERNEL_TYPE_SINT_8 = IREE_UKERNEL_TYPE_CATEGORY_INTEGER_SIGNED | 3,
-  IREE_UKERNEL_TYPE_SINT_16 = IREE_UKERNEL_TYPE_CATEGORY_INTEGER_SIGNED | 4,
-  IREE_UKERNEL_TYPE_SINT_32 = IREE_UKERNEL_TYPE_CATEGORY_INTEGER_SIGNED | 5,
-  IREE_UKERNEL_TYPE_SINT_64 = IREE_UKERNEL_TYPE_CATEGORY_INTEGER_SIGNED | 6,
-  IREE_UKERNEL_TYPE_UINT_8 = IREE_UKERNEL_TYPE_CATEGORY_INTEGER_UNSIGNED | 3,
-  IREE_UKERNEL_TYPE_UINT_16 = IREE_UKERNEL_TYPE_CATEGORY_INTEGER_UNSIGNED | 4,
-  IREE_UKERNEL_TYPE_UINT_32 = IREE_UKERNEL_TYPE_CATEGORY_INTEGER_UNSIGNED | 5,
-  IREE_UKERNEL_TYPE_UINT_64 = IREE_UKERNEL_TYPE_CATEGORY_INTEGER_UNSIGNED | 6,
-  IREE_UKERNEL_TYPE_FLOAT_16 = IREE_UKERNEL_TYPE_CATEGORY_FLOAT_IEEE | 4,
-  IREE_UKERNEL_TYPE_FLOAT_32 = IREE_UKERNEL_TYPE_CATEGORY_FLOAT_IEEE | 5,
-  IREE_UKERNEL_TYPE_FLOAT_64 = IREE_UKERNEL_TYPE_CATEGORY_FLOAT_IEEE | 6,
-  IREE_UKERNEL_TYPE_BFLOAT_16 = IREE_UKERNEL_TYPE_CATEGORY_FLOAT_BRAIN | 4,
+  IREE_UK_TYPE_NONE = IREE_UK_TYPE_CATEGORY_NONE | 0,
+  IREE_UK_TYPE_OPAQUE_8 = IREE_UK_TYPE_CATEGORY_OPAQUE | 3,
+  IREE_UK_TYPE_OPAQUE_16 = IREE_UK_TYPE_CATEGORY_OPAQUE | 4,
+  IREE_UK_TYPE_OPAQUE_32 = IREE_UK_TYPE_CATEGORY_OPAQUE | 5,
+  IREE_UK_TYPE_OPAQUE_64 = IREE_UK_TYPE_CATEGORY_OPAQUE | 6,
+  IREE_UK_TYPE_INT_8 = IREE_UK_TYPE_CATEGORY_INTEGER | 3,
+  IREE_UK_TYPE_INT_16 = IREE_UK_TYPE_CATEGORY_INTEGER | 4,
+  IREE_UK_TYPE_INT_32 = IREE_UK_TYPE_CATEGORY_INTEGER | 5,
+  IREE_UK_TYPE_INT_64 = IREE_UK_TYPE_CATEGORY_INTEGER | 6,
+  IREE_UK_TYPE_SINT_8 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNED | 3,
+  IREE_UK_TYPE_SINT_16 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNED | 4,
+  IREE_UK_TYPE_SINT_32 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNED | 5,
+  IREE_UK_TYPE_SINT_64 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNED | 6,
+  IREE_UK_TYPE_UINT_8 = IREE_UK_TYPE_CATEGORY_INTEGER_UNSIGNED | 3,
+  IREE_UK_TYPE_UINT_16 = IREE_UK_TYPE_CATEGORY_INTEGER_UNSIGNED | 4,
+  IREE_UK_TYPE_UINT_32 = IREE_UK_TYPE_CATEGORY_INTEGER_UNSIGNED | 5,
+  IREE_UK_TYPE_UINT_64 = IREE_UK_TYPE_CATEGORY_INTEGER_UNSIGNED | 6,
+  IREE_UK_TYPE_FLOAT_16 = IREE_UK_TYPE_CATEGORY_FLOAT_IEEE | 4,
+  IREE_UK_TYPE_FLOAT_32 = IREE_UK_TYPE_CATEGORY_FLOAT_IEEE | 5,
+  IREE_UK_TYPE_FLOAT_64 = IREE_UK_TYPE_CATEGORY_FLOAT_IEEE | 6,
+  IREE_UK_TYPE_BFLOAT_16 = IREE_UK_TYPE_CATEGORY_FLOAT_BRAIN | 4,
 };
 
-IREE_UKERNEL_STATIC_ASSERT(IREE_UKERNEL_TYPE_NONE == 0);
+IREE_UK_STATIC_ASSERT(IREE_UK_TYPE_NONE == 0);
 
-#define IREE_UKERNEL_VALUE_IN_UNSIGNED_INT_RANGE(VALUE, BIT_COUNT) \
+#define IREE_UK_VALUE_IN_UNSIGNED_INT_RANGE(VALUE, BIT_COUNT) \
   (((VALUE) >= 0) && !((VALUE) >> (BIT_COUNT)))
 
 // Accessors.
-static inline iree_ukernel_uint8_t iree_ukernel_type_category(
-    iree_ukernel_type_t t) {
-  return t & IREE_UKERNEL_TYPE_CATEGORY_MASK;
+static inline iree_uk_uint8_t iree_uk_type_category(iree_uk_type_t t) {
+  return t & IREE_UK_TYPE_CATEGORY_MASK;
 }
 
-static inline int iree_ukernel_type_bit_count_log2(iree_ukernel_type_t t) {
-  return t & IREE_UKERNEL_TYPE_BIT_COUNT_LOG2_MASK;
+static inline int iree_uk_type_bit_count_log2(iree_uk_type_t t) {
+  return t & IREE_UK_TYPE_BIT_COUNT_LOG2_MASK;
 }
 
 // Behavior is undefined if the bit-count is not a multiple of 8!
 // The current implementation might return a negative value, but don't rely on
 // that.
-static inline int iree_ukernel_type_size_log2(iree_ukernel_type_t t) {
-  return iree_ukernel_type_bit_count_log2(t) - 3;
+static inline int iree_uk_type_size_log2(iree_uk_type_t t) {
+  return iree_uk_type_bit_count_log2(t) - 3;
 }
 
-static inline int iree_ukernel_type_bit_count(iree_ukernel_type_t t) {
-  return 1 << iree_ukernel_type_bit_count_log2(t);
+static inline int iree_uk_type_bit_count(iree_uk_type_t t) {
+  return 1 << iree_uk_type_bit_count_log2(t);
 }
 
 // Behavior is undefined if the bit-count is not a multiple of 8!
 // Real C UB here (bit shift by negative amount), intentionally inviting the
 // compiler to assume this can't happen.
-static inline int iree_ukernel_type_size(iree_ukernel_type_t t) {
-  return 1 << iree_ukernel_type_size_log2(t);
+static inline int iree_uk_type_size(iree_uk_type_t t) {
+  return 1 << iree_uk_type_size_log2(t);
 }
 
-typedef iree_ukernel_uint16_t iree_ukernel_type_pair_t;
-typedef iree_ukernel_uint32_t iree_ukernel_type_triple_t;
+typedef iree_uk_uint16_t iree_uk_type_pair_t;
+typedef iree_uk_uint32_t iree_uk_type_triple_t;
 
-#define IREE_UKERNEL_PACK_2_TYPES(B0, B1) ((B0) + ((B1) << 8))
-#define IREE_UKERNEL_PACK_3_TYPES(B0, B1, B2) \
-  ((B0) + ((B1) << 8) + ((B2) << 16))
-#define IREE_UKERNEL_PACK_2_TYPES_LITERAL(T0, T1) \
-  IREE_UKERNEL_PACK_2_TYPES(IREE_UKERNEL_TYPE_##T0, IREE_UKERNEL_TYPE_##T1)
-#define IREE_UKERNEL_PACK_3_TYPES_LITERAL(T0, T1, T2)                       \
-  IREE_UKERNEL_PACK_3_TYPES(IREE_UKERNEL_TYPE_##T0, IREE_UKERNEL_TYPE_##T1, \
-                            IREE_UKERNEL_TYPE_##T2)
+#define IREE_UK_PACK_2_TYPES(B0, B1) ((B0) + ((B1) << 8))
+#define IREE_UK_PACK_3_TYPES(B0, B1, B2) ((B0) + ((B1) << 8) + ((B2) << 16))
+#define IREE_UK_PACK_2_TYPES_LITERAL(T0, T1) \
+  IREE_UK_PACK_2_TYPES(IREE_UK_TYPE_##T0, IREE_UK_TYPE_##T1)
+#define IREE_UK_PACK_3_TYPES_LITERAL(T0, T1, T2) \
+  IREE_UK_PACK_3_TYPES(IREE_UK_TYPE_##T0, IREE_UK_TYPE_##T1, IREE_UK_TYPE_##T2)
 
-#define IREE_UKERNEL_UNPACK_TYPE(POS, WORD) (((WORD) >> (8 * (POS))) & 0xFF)
+#define IREE_UK_UNPACK_TYPE(POS, WORD) (((WORD) >> (8 * (POS))) & 0xFF)
 
-static inline iree_ukernel_type_t iree_ukernel_unpack_type(
-    int pos, iree_ukernel_uint32_t word) {
-  return IREE_UKERNEL_UNPACK_TYPE(pos, word);
+static inline iree_uk_type_t iree_uk_unpack_type(int pos,
+                                                 iree_uk_uint32_t word) {
+  return IREE_UK_UNPACK_TYPE(pos, word);
 }
 
 #ifdef __cplusplus

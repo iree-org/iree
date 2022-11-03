@@ -22,34 +22,33 @@
 // The size or architecture-specific tiles is relevant here because this
 // generic code is what will be run as a fallback if the device is found not to
 // support the CPU feature that the tile sizes were picked to target.
-enum { iree_ukernel_mmt4d_tile_generic_max_bytes = 4096 };
+enum { iree_uk_mmt4d_tile_generic_max_bytes = 4096 };
 
 // Generic implementation of matmul tile, i8*i8->i32 case.
-static void iree_ukernel_mmt4d_tile_i8i8i32_generic(
+static void iree_uk_mmt4d_tile_i8i8i32_generic(
     void* out_tile_untyped, const void* lhs_panel_untyped,
-    const void* rhs_panel_untyped, iree_ukernel_int32_t K,
-    iree_ukernel_uint32_t flags, const iree_ukernel_mmt4d_params_t* params) {
-  iree_ukernel_int32_t* out_tile = out_tile_untyped;
-  const iree_ukernel_int8_t* lhs_panel = lhs_panel_untyped;
-  const iree_ukernel_int8_t* rhs_panel = rhs_panel_untyped;
-  iree_ukernel_int16_t M0 = params->M0;
-  iree_ukernel_int16_t N0 = params->N0;
-  iree_ukernel_int16_t K0 = params->K0;
+    const void* rhs_panel_untyped, iree_uk_int32_t K, iree_uk_uint32_t flags,
+    const iree_uk_mmt4d_params_t* params) {
+  iree_uk_int32_t* out_tile = out_tile_untyped;
+  const iree_uk_int8_t* lhs_panel = lhs_panel_untyped;
+  const iree_uk_int8_t* rhs_panel = rhs_panel_untyped;
+  iree_uk_int16_t M0 = params->M0;
+  iree_uk_int16_t N0 = params->N0;
+  iree_uk_int16_t K0 = params->K0;
   // Initialize the local accumulator tile.
-  iree_ukernel_int32_t
-      acc[iree_ukernel_mmt4d_tile_generic_max_bytes / sizeof(*out_tile)];
-  if (flags & IREE_UKERNEL_FLAG_ACCUMULATE) {
+  iree_uk_int32_t acc[iree_uk_mmt4d_tile_generic_max_bytes / sizeof(*out_tile)];
+  if (flags & IREE_UK_FLAG_ACCUMULATE) {
     for (int i = 0; i < M0 * N0; ++i) acc[i] = out_tile[i];
   } else {
     for (int i = 0; i < M0 * N0; ++i) acc[i] = 0;
   }
   // Accumulation loop.
-  for (iree_ukernel_ssize_t k = 0; k < K; ++k) {
-    for (iree_ukernel_ssize_t i0 = 0; i0 < M0; ++i0) {
-      for (iree_ukernel_ssize_t j0 = 0; j0 < N0; ++j0) {
-        for (iree_ukernel_ssize_t k0 = 0; k0 < K0; ++k0) {
-          iree_ukernel_int32_t lhs_val_int32 = lhs_panel[i0 * K0 + k0];
-          iree_ukernel_int32_t rhs_val_int32 = rhs_panel[j0 * K0 + k0];
+  for (iree_uk_ssize_t k = 0; k < K; ++k) {
+    for (iree_uk_ssize_t i0 = 0; i0 < M0; ++i0) {
+      for (iree_uk_ssize_t j0 = 0; j0 < N0; ++j0) {
+        for (iree_uk_ssize_t k0 = 0; k0 < K0; ++k0) {
+          iree_uk_int32_t lhs_val_int32 = lhs_panel[i0 * K0 + k0];
+          iree_uk_int32_t rhs_val_int32 = rhs_panel[j0 * K0 + k0];
           acc[i0 * N0 + j0] += lhs_val_int32 * rhs_val_int32;
         }
       }
@@ -62,28 +61,28 @@ static void iree_ukernel_mmt4d_tile_i8i8i32_generic(
 }
 
 // Generic implementation of matmul tile, f32*f32->f32 case.
-static void iree_ukernel_mmt4d_tile_f32f32f32_generic(
+static void iree_uk_mmt4d_tile_f32f32f32_generic(
     void* out_tile_untyped, const void* lhs_panel_untyped,
-    const void* rhs_panel_untyped, iree_ukernel_int32_t K,
-    iree_ukernel_uint32_t flags, const iree_ukernel_mmt4d_params_t* params) {
+    const void* rhs_panel_untyped, iree_uk_int32_t K, iree_uk_uint32_t flags,
+    const iree_uk_mmt4d_params_t* params) {
   float* out_tile = out_tile_untyped;
   const float* lhs_panel = lhs_panel_untyped;
   const float* rhs_panel = rhs_panel_untyped;
-  iree_ukernel_int16_t M0 = params->M0;
-  iree_ukernel_int16_t N0 = params->N0;
-  iree_ukernel_int16_t K0 = params->K0;
+  iree_uk_int16_t M0 = params->M0;
+  iree_uk_int16_t N0 = params->N0;
+  iree_uk_int16_t K0 = params->K0;
   // Initialize the local accumulator tile.
-  float acc[iree_ukernel_mmt4d_tile_generic_max_bytes / sizeof(*out_tile)];
-  if (flags & IREE_UKERNEL_FLAG_ACCUMULATE) {
+  float acc[iree_uk_mmt4d_tile_generic_max_bytes / sizeof(*out_tile)];
+  if (flags & IREE_UK_FLAG_ACCUMULATE) {
     for (int i = 0; i < M0 * N0; ++i) acc[i] = out_tile[i];
   } else {
     for (int i = 0; i < M0 * N0; ++i) acc[i] = 0;
   }
   // Accumulation loop.
-  for (iree_ukernel_ssize_t k = 0; k < K; ++k) {
-    for (iree_ukernel_ssize_t i0 = 0; i0 < M0; ++i0) {
-      for (iree_ukernel_ssize_t j0 = 0; j0 < N0; ++j0) {
-        for (iree_ukernel_ssize_t k0 = 0; k0 < K0; ++k0) {
+  for (iree_uk_ssize_t k = 0; k < K; ++k) {
+    for (iree_uk_ssize_t i0 = 0; i0 < M0; ++i0) {
+      for (iree_uk_ssize_t j0 = 0; j0 < N0; ++j0) {
+        for (iree_uk_ssize_t k0 = 0; k0 < K0; ++k0) {
           float lhs_val = lhs_panel[i0 * K0 + k0];
           float rhs_val = rhs_panel[j0 * K0 + k0];
           acc[i0 * N0 + j0] += lhs_val * rhs_val;
@@ -98,24 +97,24 @@ static void iree_ukernel_mmt4d_tile_f32f32f32_generic(
 }
 
 // Generic implementation of matmul tile
-iree_ukernel_status_t iree_ukernel_mmt4d_select_tile_func_generic(
-    const iree_ukernel_mmt4d_params_t* params,
-    iree_ukernel_mmt4d_tile_func_t* out_tile_func) {
+iree_uk_status_t iree_uk_mmt4d_select_tile_func_generic(
+    const iree_uk_mmt4d_params_t* params,
+    iree_uk_mmt4d_tile_func_t* out_tile_func) {
   int tile_elems = params->M0 * params->N0;
-  iree_ukernel_type_t out_type = iree_ukernel_mmt4d_out_type(params->type);
-  int tile_bytes = tile_elems << iree_ukernel_type_size_log2(out_type);
-  if (tile_bytes > iree_ukernel_mmt4d_tile_generic_max_bytes) {
-    return iree_ukernel_status_unsupported_generic_tile_size;
+  iree_uk_type_t out_type = iree_uk_mmt4d_out_type(params->type);
+  int tile_bytes = tile_elems << iree_uk_type_size_log2(out_type);
+  if (tile_bytes > iree_uk_mmt4d_tile_generic_max_bytes) {
+    return iree_uk_status_unsupported_generic_tile_size;
   }
   switch (params->type) {
-    case iree_ukernel_mmt4d_type_f32f32f32:
-      *out_tile_func = iree_ukernel_mmt4d_tile_f32f32f32_generic;
-      return iree_ukernel_status_ok;
-    case iree_ukernel_mmt4d_type_i8i8i32:
-      *out_tile_func = iree_ukernel_mmt4d_tile_i8i8i32_generic;
-      return iree_ukernel_status_ok;
+    case iree_uk_mmt4d_type_f32f32f32:
+      *out_tile_func = iree_uk_mmt4d_tile_f32f32f32_generic;
+      return iree_uk_status_ok;
+    case iree_uk_mmt4d_type_i8i8i32:
+      *out_tile_func = iree_uk_mmt4d_tile_i8i8i32_generic;
+      return iree_uk_status_ok;
     default:
       // shouldn't happen, validated earlier.
-      return iree_ukernel_status_bad_type;
+      return iree_uk_status_bad_type;
   }
 }
