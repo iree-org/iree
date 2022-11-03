@@ -130,8 +130,7 @@ func.func @fold_fill_with_set_encoding(%arg0 : index, %arg1 : index)
   return %2 : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>
 }
 //      CHECK: func @fold_fill_with_set_encoding(
-//      CHECK:   %[[EMPTY:.+]] = tensor.empty
-// CHECK-SAME:       tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>
+//      CHECK:   %[[EMPTY:.+]] = tensor.empty(%{{.+}}, %{{.+}}) : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>
 //      CHECK:   %[[FILL:.+]] = linalg.fill
 // CHECK-SAME:       outs(%[[EMPTY]] : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>)
 //      CHECK:   return %[[FILL]]
