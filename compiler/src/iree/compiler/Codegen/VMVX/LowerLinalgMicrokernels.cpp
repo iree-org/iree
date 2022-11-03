@@ -939,7 +939,7 @@ struct LinalgExtPackConversion
     if (innerDimsPos[0] == 0 && innerDimsPos[1] == 1) {
       // nothing to do
     } else if (innerDimsPos[0] == 1 && innerDimsPos[1] == 0) {
-      flags |= IREE_UKERNEL_FLAG_PACK_TRANSPOSE_INNER;
+      flags |= IREE_UK_FLAG_PACK_TRANSPOSE_INNER;
     } else {
       return rewriter.notifyMatchFailure(op, "unsupported inner_dims_pos");
     }
@@ -947,7 +947,7 @@ struct LinalgExtPackConversion
     if (outerDimsPerm[0] == 0 && outerDimsPerm[1] == 1) {
       // nothing to do
     } else if (outerDimsPerm[0] == 1 && outerDimsPerm[1] == 0) {
-      flags |= IREE_UKERNEL_FLAG_PACK_TRANSPOSE_OUTER;
+      flags |= IREE_UK_FLAG_PACK_TRANSPOSE_OUTER;
     } else {
       return rewriter.notifyMatchFailure(op, "unsupported outer_dims_perm");
     }
@@ -1184,7 +1184,7 @@ struct LinalgContractionConversion
     if (linalg::FillOp fillOp = findFillOpSolelyZeroingOutputOf(info.op)) {
       rewriter.eraseOp(fillOp);  // let the matmul overwrite the accumulator.
     } else {
-      flags |= IREE_UKERNEL_FLAG_ACCUMULATE;  // accumulate into existing.
+      flags |= IREE_UK_FLAG_ACCUMULATE;  // accumulate into existing.
     }
 
     auto &lhsDesc = info.lhsAnal.getDesc(rewriter);
@@ -1222,7 +1222,7 @@ struct LinalgContractionConversion
     if (linalg::FillOp fillOp = findFillOpSolelyZeroingOutputOf(info.op)) {
       rewriter.eraseOp(fillOp);  // let the matmul overwrite the accumulator.
     } else {
-      flags |= IREE_UKERNEL_FLAG_ACCUMULATE;  // accumulate into existing.
+      flags |= IREE_UK_FLAG_ACCUMULATE;  // accumulate into existing.
     }
 
     auto &lhsDesc = info.lhsAnal.getDesc(rewriter);
