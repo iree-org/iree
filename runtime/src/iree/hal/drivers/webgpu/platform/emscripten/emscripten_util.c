@@ -57,31 +57,11 @@ void iree_wgpuShaderModuleDrop(WGPUShaderModule shaderModule) {
 // Speculative WebGPU API additions
 //===----------------------------------------------------------------------===//
 
-static void iree_hal_webgpu_buffer_map_sync_callback(
-    WGPUBufferMapAsyncStatus status, void* userdata) {
-  IREEWGPUBufferMapSyncStatus* sync_status =
-      (IREEWGPUBufferMapSyncStatus*)userdata;
-  switch (status) {
-    case WGPUBufferMapAsyncStatus_Success:
-      *sync_status = IREEWGPUBufferMapSyncStatus_Success;
-      break;
-    case WGPUBufferMapAsyncStatus_Error:
-      *sync_status = IREEWGPUBufferMapSyncStatus_Error;
-      break;
-    default:
-    case WGPUBufferMapAsyncStatus_Unknown:
-      *sync_status = IREEWGPUBufferMapSyncStatus_Unknown;
-      break;
-    case WGPUBufferMapAsyncStatus_DeviceLost:
-      *sync_status = IREEWGPUBufferMapSyncStatus_DeviceLost;
-      break;
-  }
-}
-
 IREEWGPUBufferMapSyncStatus iree_wgpuBufferMapSync(WGPUDevice device,
                                                    WGPUBuffer buffer,
                                                    WGPUMapModeFlags mode,
                                                    size_t offset, size_t size) {
   // WebGPU (browser/Emscripten) does not support synchronous buffer mapping.
+  // We could maybe emulate this with Asyncify and wgpuBufferMapAsync.
   return IREEWGPUBufferMapSyncStatus_Error;
 }

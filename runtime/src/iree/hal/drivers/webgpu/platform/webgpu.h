@@ -11,7 +11,7 @@
 #include "iree/hal/api.h"
 
 #define WGPU_SKIP_PROCS 1
-#if defined(__EMSCRIPTEN__)
+#if defined(IREE_PLATFORM_EMSCRIPTEN)
 #include <emscripten/html5_webgpu.h>
 #else
 #include "third_party/webgpu-headers/webgpu.h"  // IWYU pragma: export
