@@ -9,7 +9,7 @@
 //   w4: iree_uk_uint32_t flags
 //   x5: (UNUSED) params - relevant params K and flags already passed above.
 
-BEGIN_FUNCTION iree_uk_mmt4d_i8i8i32_tile_8x8x8_arm_64_i8mm
+BEGIN_FUNCTION iree_uk_mmt4d_tile_i8i8i32_8x8x8_arm_64_i8mm
 
         // Save callee-saved NEON registers
         stp d8, d9, [sp, -64]!
@@ -286,6 +286,6 @@ BEGIN_FUNCTION iree_uk_mmt4d_i8i8i32_tile_8x8x8_arm_64_i8mm
         ldp d8, d9, [sp], 64
         ret
 
-END_FUNCTION iree_uk_mmt4d_i8i8i32_tile_8x8x8_arm_64_i8mm
+END_FUNCTION iree_uk_mmt4d_tile_i8i8i32_8x8x8_arm_64_i8mm
 
 ALLOW_NON_EXECUTABLE_STACK
