@@ -691,6 +691,24 @@ func.func @pack(%arg0: memref<3x3xf32>, %arg1: memref<3x3x1x1xf32>) {
 
 // -----
 
+func.func @extra_pad_and_pack(%input: tensor<13x15xf32>, %output: tensor<3x8x8x2xf32>, %pad: f32) -> tensor<3x8x8x2xf32> {
+  // expected-error@+1 {{infered type do not match provided output type. Expected 'tensor<2x8x8x2xf32>' but got: 'tensor<3x8x8x2xf32>}}
+  %0 = iree_linalg_ext.pack %input padding_value(%pad: f32) inner_dims_pos = [0, 1] inner_tiles = [8, 2] into %output : (tensor<13x15xf32> tensor<3x8x8x2xf32>) -> tensor<3x8x8x2xf32>
+  return %0 : tensor<3x8x8x2xf32>
+}
+// CHECK:      func @extra_pad_and_pack(
+// CHECK-SAME:   %[[INPUT:.+]]: tensor<13x15xf32>
+// CHECK-SAME:   %[[OUTPUT:.+]]: tensor<3x8x8x2xf32>
+// CHECK-SAME:   %[[PAD:.+]]: f32
+// CHECK:        %[[RES:.+]] = iree_linalg_ext.pack %[[INPUT]]
+// CHECK-SAME:     padding_value(%[[PAD]] : f32)
+// CHECK-SAME:     inner_dims_pos = [0, 1]
+// CHECK-SAME:     inner_tiles = [8, 2]
+// CHECK-SAME:     into %[[OUTPUT]]
+// CHECK:       return %[[RES]]
+
+// -----
+
 func.func @pad_and_pack_static(%input: tensor<13x15xf32>, %output: tensor<2x8x8x2xf32>, %pad: f32) -> tensor<2x8x8x2xf32> {
   %0 = iree_linalg_ext.pack %input padding_value(%pad : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 2] into %output : (tensor<13x15xf32> tensor<2x8x8x2xf32>) -> tensor<2x8x8x2xf32>
   return %0 : tensor<2x8x8x2xf32>
