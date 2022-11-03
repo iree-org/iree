@@ -567,7 +567,7 @@ jobs:
   # postsubmission-only.
   cross_compile_and_test:
     needs: [setup, build_all]
-    if: needs.setup.outputs.should-run == 'true'
+    if: needs.setup.outputs.should-run == 'true' && contains(fromJson(${{ matrix.target.ci_stages }})), needs.setup.outputs.ci-stage)
     runs-on:
       - self-hosted  # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -582,21 +582,29 @@ jobs:
             abi: arm64-v8a
             docker_image: "gcr.io/iree-oss/android@sha256:76c2a52dcd6d07601227b965ac87d021c1d2d5e2d01f46ad58da28c89267f2ab"
             test_script: "echo 'bypass tests'"
+            ci_stages: ["presubmit", "postsubmit"]
           - platform: riscv
             architecture: rv64
             abi: lp64d
             docker_image: "gcr.io/iree-oss/riscv@sha256:d6f0e293a50faf5abbd564c1d1bb9dc6456d7ce93d07b131c381fa64c1daed62"
             test_script: "./build_tools/cmake/test_riscv.sh"
+            ci_stages: ["presubmit", "postsubmit"]
           - platform: riscv
             architecture: rv32-linux
             abi: ilp32d
             docker_image: "gcr.io/iree-oss/riscv@sha256:d6f0e293a50faf5abbd564c1d1bb9dc6456d7ce93d07b131c381fa64c1daed62"
             test_script: "./build_tools/cmake/test_riscv.sh"
+            ci_stages: ["presubmit", "postsubmit"]
           - platform: riscv
             architecture: rv32-baremetal
             abi: ilp32
             docker_image: "gcr.io/iree-oss/riscv@sha256:d6f0e293a50faf5abbd564c1d1bb9dc6456d7ce93d07b131c381fa64c1daed62"
             test_script: "./tests/riscv32/smoke.sh"
+            ci_stages: ["presubmit", "postsubmit"]
+          - platform: emscripten
+            docker_image: "gcr.io/iree-oss/emscripten@sha256:8ccc1c8de11919faf23aeaa585b13e5c5050952db76c101d6f61367280a3546f"
+            test_script: "echo 'bypass tests'"
+            ci_stages: ["postsubmit"]
     env:
       PLATFORM: ${{ matrix.target.platform }}
       ARCHITECTURE: ${{ matrix.target.architecture }}
@@ -634,35 +642,6 @@ jobs:
             "${DOCKER_IMAGE}" \
             bash -euo pipefail -c \
               "${TEST_SCRIPT}"
-
-  emscripten:
-    needs: [setup, build_all]
-    if: needs.setup.outputs.should-run == 'true' && needs.setup.outputs.ci-stage == 'postsubmit'
-    runs-on:
-      - self-hosted  # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - cpu
-      - os-family=Linux
-    env:
-      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
-      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
-    steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
-      - name: "Checking out runtime submodules"
-        run: ./build_tools/scripts/git/update_runtime_submodules.sh
-      - name: "Downloading build dir archive"
-        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
-      - name: "Extracting install from build dir archive"
-        run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
-      - name: "Building the runtime for the web using Emscripten"
-        run: |
-          build_tools/github_actions/docker_run.sh \
-            --env "IREE_HOST_BINARY_ROOT=${BUILD_DIR}/install" \
-            gcr.io/iree-oss/emscripten@sha256:8ccc1c8de11919faf23aeaa585b13e5c5050952db76c101d6f61367280a3546f \
-            build_tools/cmake/build_runtime_emscripten.sh
 
   # TODO(#10391): Update the benchmark dependency with the new benchmark
   # framework. The step only requires the compiled benchmark modules, not the
@@ -774,7 +753,6 @@ jobs:
 
       # Crosscompilation
       - cross_compile_and_test
-      - emscripten
 
       # Benchmark pipeline
       - benchmarks
