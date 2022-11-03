@@ -8,6 +8,7 @@
 #define IREE_DIALECTS_DIALECT_LINALGEXT_TRANSFORMS_CODEGENSTRATEGY_H_
 
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
+#include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Pass/PassManager.h"
 
 #include <utility>
@@ -141,6 +142,9 @@ struct Vectorize : public Transformation {
   void
   addToPassPipeline(OpPassManager &pm,
                     LinalgExt::LinalgTransformationFilter m) const override {
+    // Adding LowerAffine to avoid e.g. `affine.apply` that's not vectorisable
+    // ATM. See https://github.com/iree-org/iree/issues/10876.
+    pm.addPass(createLowerAffinePass());
     pm.addPass(createLinalgStrategyVectorizePass(opName, m, vectorizePadding));
   }
 
