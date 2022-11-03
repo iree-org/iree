@@ -26,77 +26,114 @@ using llvm::APIntOps::GreatestCommonDivisor;
 
 // The default number of subgroups to use per workgroup.
 constexpr unsigned numSubgroupsPerWorkgroup = 4;
-// The default number of tiles along K dimension to use per workgroup.
-constexpr unsigned numKTilesPerWorkgroup = 2;
+// The default number of tiles along each dimension to use per workgroup.
+constexpr unsigned numTilesPerSubgroupDim = 2;
 
 namespace mlir {
 namespace iree_compiler {
 namespace detail {
 
 struct CooperativeMatrixSize {
-  int64_t m;       // Native cooperative matrix size along M dimension
-  int64_t n;       // Native cooperative matrix size along N dimension
-  int64_t k;       // Native cooperative matrix size along K dimension
-  int64_t mCount;  // # subgroups along M dimension
-  int64_t nCount;  // # subgroups along N dimension
-  int64_t kCount;  // # tiles along K dimension
+  int64_t mSize;       // Native cooperative matrix size along M dimension
+  int64_t nSize;       // Native cooperative matrix size along N dimension
+  int64_t kSize;       // Native cooperative matrix size along K dimension
+  int64_t mWarpCount;  // # subgroups along M dimension
+  int64_t nWarpCount;  // # subgroups along N dimension
+  int64_t mTileCount;  // # tiles per subgroup along M dimension
+  int64_t nTileCount;  // # tiles per subgroup along N dimension
+  int64_t kTileCount;  // # tiles along K dimension
 };
 
 /// Returns the cooperative matrix (M, N, K) sizes that are supported by the
 /// target environment and match the given parameters.
 static Optional<CooperativeMatrixSize> getCooperativeMatrixSize(
-    spirv::ResourceLimitsAttr resourceLimits, Type lhsType, Type rhsType,
-    Type resultType, int64_t m, int64_t n, int64_t k) {
+    spirv::ResourceLimitsAttr resourceLimits, Type aType, Type bType,
+    Type cType, int64_t m, int64_t n, int64_t k) {
   auto properties = resourceLimits.getCooperativeMatrixPropertiesNv()
                         .getAsRange<spirv::CooperativeMatrixPropertiesNVAttr>();
   for (auto property : properties) {
-    if (property.getAType() == lhsType && property.getBType() == rhsType &&
-        property.getCType() == resultType &&
-        property.getResultType() == resultType &&
-        property.getScope().getValue() == spirv::Scope::Subgroup) {
-      const unsigned matmulM = property.getMSize();
-      const unsigned matmulN = property.getNSize();
-      const unsigned matmulK = property.getKSize();
-      if (m % matmulM == 0 && n % matmulN == 0 && k % matmulK == 0) {
-        const uint64_t nTileCount = n / matmulN;
-        const uint64_t mTileCount = m / matmulM;
-        const APInt nTileCountAPInt(/*numBits=*/64, nTileCount);
-        const APInt mTileCountAPInt(/*numBits=*/64, mTileCount);
-
-        int64_t nCount = 0, mCount = 0;
-        uint64_t subgroupCount = numSubgroupsPerWorkgroup;
-        uint64_t squareRoot = 1ull << (llvm::Log2_64(subgroupCount) / 2);
-
-        // See if the square root of subgroupCount can divide mTileCount. If so
-        // it means we can distribute to both dimensions evenly. Otherwise, try
-        // to distribute to N and then M.
-        if (mTileCount > squareRoot && mTileCount % squareRoot == 0) {
-          mCount = squareRoot;
-          APInt nGCD = GreatestCommonDivisor(
-              nTileCountAPInt, APInt(64, subgroupCount / squareRoot));
-          nCount = nGCD.getSExtValue();
-        } else {
-          APInt nGCD =
-              GreatestCommonDivisor(nTileCountAPInt, APInt(64, subgroupCount));
-          nCount = nGCD.getSExtValue();
-
-          subgroupCount /= nCount;
-          APInt mGCD =
-              GreatestCommonDivisor(mTileCountAPInt, APInt(64, subgroupCount));
-          mCount = mGCD.getSExtValue();
-        }
-
-        const uint64_t kTileCount = k / matmulK;
-        const APInt kTileCountAPInt(/*numBits=*/64, kTileCount);
-
-        APInt kGCD = GreatestCommonDivisor(kTileCountAPInt,
-                                           APInt(64, numKTilesPerWorkgroup));
-        int64_t kCount = kGCD.getSExtValue();
-
-        return CooperativeMatrixSize{matmulM, matmulN, matmulK,
-                                     mCount,  nCount,  kCount};
-      }
+    if (property.getAType() != aType || property.getBType() != bType ||
+        property.getCType() != cType || property.getResultType() != cType ||
+        property.getScope().getValue() != spirv::Scope::Subgroup) {
+      continue;  // Cannot use this cooperative matrix configuration
     }
+
+    const unsigned matmulM = property.getMSize();
+    const unsigned matmulN = property.getNSize();
+    const unsigned matmulK = property.getKSize();
+    if (m % matmulM != 0 || n % matmulN != 0 || k % matmulK != 0) continue;
+
+    uint64_t nTotalTileCount = n / matmulN;
+    uint64_t mTotalTileCount = m / matmulM;
+
+    uint64_t remainingWarps = numSubgroupsPerWorkgroup;
+    uint64_t remainingTiles = numTilesPerSubgroupDim * numTilesPerSubgroupDim;
+    uint64_t warpSqrt = 1ull << (llvm::Log2_64(remainingWarps) / 2);
+    uint64_t tileSqrt = 1ull << (llvm::Log2_64(remainingTiles) / 2);
+
+    int64_t mWarpCount = 0, nWarpCount = 0;
+    int64_t mTileCount = 0, nTileCount = 0;
+
+    // See if the square root can divide mTotalTileCount. If so it means we can
+    // distribute to both dimensions evenly. Otherwise, try to distribute to N
+    // and then M.
+    if (mTotalTileCount > (warpSqrt * tileSqrt) &&
+        mTotalTileCount % (warpSqrt * tileSqrt) == 0) {
+      mWarpCount = warpSqrt;
+      mTileCount = tileSqrt;
+
+      remainingWarps /= warpSqrt;
+      remainingTiles /= tileSqrt;
+
+      APInt nGCD = GreatestCommonDivisor(APInt(64, nTotalTileCount),
+                                         APInt(64, remainingWarps));
+      nWarpCount = nGCD.getSExtValue();
+      nTotalTileCount /= nWarpCount;
+      remainingWarps /= nWarpCount;
+
+      nGCD = GreatestCommonDivisor(APInt(64, nTotalTileCount),
+                                   APInt(64, remainingTiles));
+      nTileCount = nGCD.getSExtValue();
+    } else {
+      APInt nGCD = GreatestCommonDivisor(APInt(64, nTotalTileCount),
+                                         APInt(64, remainingWarps));
+      nWarpCount = nGCD.getSExtValue();
+      nTotalTileCount /= nWarpCount;
+      remainingWarps /= nWarpCount;
+
+      nGCD = GreatestCommonDivisor(APInt(64, nTotalTileCount),
+                                   APInt(64, remainingTiles));
+      nTileCount = nGCD.getSExtValue();
+      remainingTiles /= nTileCount;
+
+      APInt mGCD = GreatestCommonDivisor(APInt(64, mTotalTileCount),
+                                         APInt(64, remainingWarps));
+      mWarpCount = mGCD.getSExtValue();
+      mTotalTileCount /= mWarpCount;
+      remainingWarps /= mWarpCount;
+
+      mGCD = GreatestCommonDivisor(APInt(64, mTotalTileCount),
+                                   APInt(64, remainingTiles));
+      mTileCount = mGCD.getSExtValue();
+    }
+
+    const uint64_t kTotalTileCount = k / matmulK;
+    APInt kGCD = GreatestCommonDivisor(APInt(64, kTotalTileCount),
+                                       APInt(64, numTilesPerSubgroupDim));
+    int64_t kTileCount = kGCD.getSExtValue();
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "chosen cooperative matrix configuration:\n";
+      llvm::dbgs() << "  (M, N, K) size = (" << matmulM << ", " << matmulN
+                   << ", " << matmulK << ")\n";
+      llvm::dbgs() << "  (M, N) subgroup count = (" << mWarpCount << ", "
+                   << nWarpCount << ")\n";
+      llvm::dbgs() << "  (M, N, K) tile count per subgroup = (" << mTileCount
+                   << ", " << nTileCount << ", " << kTileCount << ")\n";
+    });
+    return CooperativeMatrixSize{matmulM,    matmulN,    matmulK,
+                                 mWarpCount, nWarpCount, mTileCount,
+                                 nTileCount, kTileCount};
   }
   return llvm::None;
 }
@@ -152,33 +189,40 @@ static LogicalResult setCooperativeMatrixConfig(
       SPIRVCooperativeMatrixVectorize;
 
   std::array<int64_t, 3> workgroupSize{
-      coopMatSize->nCount * resourceLimits.getSubgroupSize(),
-      coopMatSize->mCount, 1};
+      coopMatSize->nWarpCount * resourceLimits.getSubgroupSize(),
+      coopMatSize->mWarpCount, 1};
 
-  SmallVector<int64_t> workgroupTileSizes(kIndex + 1, 0);
-  if (isBM) workgroupTileSizes[bIndex] = 1;
-  workgroupTileSizes[mIndex] = coopMatSize->mCount * coopMatSize->m;
-  workgroupTileSizes[nIndex] = coopMatSize->nCount * coopMatSize->n;
-  workgroupTileSizes[kIndex] = coopMatSize->kCount * coopMatSize->k;
+  SmallVector<int64_t> vectorSizes(kIndex + 1, 0);
+  if (isBM) vectorSizes[bIndex] = 1;
+  vectorSizes[mIndex] = coopMatSize->mSize;
+  vectorSizes[nIndex] = coopMatSize->nSize;
+  vectorSizes[kIndex] = coopMatSize->kSize;
 
-  SmallVector<int64_t> subgroupTileSizes(kIndex + 1, 0);
+  SmallVector<int64_t> subgroupTileSizes(lastParallelDim + 1, 0);
   if (isBM) subgroupTileSizes[bIndex] = 1;
-  subgroupTileSizes[mIndex] = coopMatSize->m;
-  subgroupTileSizes[nIndex] = coopMatSize->n;
-  subgroupTileSizes[kIndex] = coopMatSize->k;
+  subgroupTileSizes[mIndex] = coopMatSize->mTileCount * vectorSizes[mIndex];
+  subgroupTileSizes[nIndex] = coopMatSize->nTileCount * vectorSizes[nIndex];
+
+  SmallVector<int64_t> workgroupTileSizes(lastParallelDim + 1, 0);
+  if (isBM) workgroupTileSizes[bIndex] = 1;
+  workgroupTileSizes[mIndex] =
+      coopMatSize->mWarpCount * subgroupTileSizes[mIndex];
+  workgroupTileSizes[nIndex] =
+      coopMatSize->nWarpCount * subgroupTileSizes[nIndex];
 
   // Also create one level for reduction. This is needed because of
   // SPIRVTileAndPromotePass requires it.
   // TODO(#10499): Consolidate tiling configuration across different pipelines.
   SmallVector<int64_t> reductionTileSizes;
-  reductionTileSizes.append(lastParallelDim + 1, 0);
-  reductionTileSizes.push_back(coopMatSize->kCount * coopMatSize->k);
+  reductionTileSizes.append(kIndex, 0);
+  reductionTileSizes.push_back(coopMatSize->kTileCount * coopMatSize->kSize);
 
   TileSizesListType tileSizes;
   tileSizes.reserve(3);
   tileSizes.push_back(workgroupTileSizes);
   tileSizes.push_back(subgroupTileSizes);
   tileSizes.push_back(reductionTileSizes);
+  tileSizes.push_back(vectorSizes);
 
   return setOpConfigAndEntryPointFnTranslation(
       op->getParentOfType<func::FuncOp>(), op, tileSizes, pipeline,

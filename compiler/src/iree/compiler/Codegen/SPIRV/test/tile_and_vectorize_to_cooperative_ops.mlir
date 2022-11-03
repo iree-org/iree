@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(builtin.module(func.func(iree-spirv-tile-and-vectorize-to-cooperative-ops))))' -canonicalize -cse %s | FileCheck %s
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 32], [16, 16, 16], [0, 0, 32]]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[32, 32], [16, 16], [0, 0, 32], [16, 16, 16]]>
 #translation = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -169,7 +169,7 @@ hal.executable public @matmul_256x1024x128_div_add {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[1, 32, 32, 32], [1, 16, 16, 16], [0, 0, 0, 32]]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[1, 32, 32], [1, 16, 16], [0, 0, 0, 32], [1, 16, 16, 16]]>
 #translation = #iree_codegen.translation_info<SPIRVCooperativeMatrixVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
