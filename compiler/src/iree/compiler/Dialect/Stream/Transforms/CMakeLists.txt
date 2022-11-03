@@ -28,6 +28,7 @@ iree_cc_library(
     "LayoutSlices.cpp"
     "MaterializeBuiltins.cpp"
     "MaterializeCopyOnWrite.cpp"
+    "MemoizeChannels.cpp"
     "OutlineConstants.cpp"
     "PackAllocations.cpp"
     "PackConstants.cpp"
