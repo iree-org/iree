@@ -148,7 +148,8 @@ static bool isRootOp(Operation *op) {
     }
     return !isa<linalg::FillOp>(op);
   }
-  return isa<TilingInterface>(op);
+  return isa<TilingInterface>(op) ||
+         isa<LinalgExt::SetEncodingOp, LinalgExt::UnsetEncodingOp>(op);
 }
 
 /// Operations that are cloned into dispatch regions formed with other
@@ -157,8 +158,9 @@ bool isClonableIntoDispatchOp(Operation *op) {
   // TODO(#8637): `tensor.collapse_shape` and `tensor.expand_shape` are
   // trivially clonable too, but they cause problems
   // with bufferization. Make them clonable when fixed.
-  if (isa<arith::IndexCastOp, tensor::EmptyOp, tensor::CastOp,
-          tensor::ExtractOp, tensor::ExtractSliceOp, tensor::PadOp>(op)) {
+  if (isa<AffineApplyOp, arith::IndexCastOp, linalg::FillOp, tensor::EmptyOp,
+          tensor::CastOp, tensor::ExtractOp, tensor::ExtractSliceOp,
+          tensor::PadOp>(op)) {
     return true;
   }
   if (auto constantOp = dyn_cast<arith::ConstantOp>(op)) {
@@ -262,12 +264,44 @@ static bool hasComputeUsesOutsideDispatch(
   });
 }
 
+/// Populate the workgroup count region of dispatch operations. This region
+/// mostly contains operations that are placeholders for the actual computation
+/// that will be materialized in the backends.
+static void materializeDispatchWorkgroupCountRegion(
+    OpBuilder &builder, IREE::Flow::DispatchWorkgroupsOp dispatchOp,
+    Operation *rootOp, ValueRange workload) {
+  Region &workgroupCountRegion = dispatchOp.getWorkgroupCount();
+  if (!workgroupCountRegion.empty()) return;
+
+  auto workloadArgTypes = llvm::to_vector(
+      llvm::map_range(workload, [](Value v) { return v.getType(); }));
+  Location loc = dispatchOp.getLoc();
+  SmallVector<Location> locs(workload.size(), loc);
+  OpBuilder::InsertionGuard g(builder);
+  Block *body =
+      builder.createBlock(&workgroupCountRegion, workgroupCountRegion.end(),
+                          workloadArgTypes, locs);
+  auto numWorkgroupsOp =
+      TypeSwitch<Operation *, Operation *>(rootOp)
+          .Case<IREE::LinalgExt::SetEncodingOp>([&](auto setEncodingOp) {
+            return builder
+                .create<IREE::Flow::DispatchWorkgroupCountFromSetEncodingOp>(
+                    loc, body->getArguments());
+          })
+          .Default([&](Operation *) {
+            return builder
+                .create<IREE::Flow::DispatchWorkgroupCountFromDagRootOp>(
+                    loc, body->getArguments());
+          });
+  builder.create<IREE::Flow::ReturnOp>(loc, numWorkgroupsOp->getResults());
+}
+
 /// Creates a flow.dispatch.workgroup op without arguments.
 /// All the necessary operands are transiently captured and rewritten late as
 /// operands. This greatly simplifies transformations into the resulting op.
 static FailureOr<SmallVector<Operation *>>
 buildOperandLessFlowDispatchWorkgroupOp(PatternRewriter &rewriter, Location loc,
-                                        ArrayRef<Value> workload,
+                                        ValueRange workload,
                                         ArrayRef<Operation *> dispatchOps) {
   SmallVector<Value> resultDynamicDims;
   SmallVector<Type> resultTypes;
@@ -344,23 +378,10 @@ buildOperandLessFlowDispatchWorkgroupOp(PatternRewriter &rewriter, Location loc,
                           << *dispatchOp << "\n");
 
   // 4. Add a region for workgroup_count computation.
-  Region &workgroupCountRegion = dispatchOp.getWorkgroupCount();
-  Block *body = rewriter.createBlock(&workgroupCountRegion);
-  // Assuming that there is an insertion guard in place already, change the
-  // insertion point to the body.
-  rewriter.setInsertionPointToStart(body);
-  SmallVector<Value> workloadArgs;
-  for (auto workload : llvm::enumerate(workload)) {
-    workloadArgs.push_back(body->addArgument(workload.value().getType(), loc));
-  }
-  auto numWorkgroupsOp =
-      rewriter.create<DispatchWorkgroupCountFromDagRootOp>(loc, workloadArgs);
-  rewriter.create<ReturnOp>(loc, numWorkgroupsOp.getResults());
+  materializeDispatchWorkgroupCountRegion(rewriter, dispatchOp,
+                                          dispatchOps.back(), workload);
 
   LLVM_DEBUG(llvm::dbgs() << "After workgroup_count creation \n"
-                          << *dispatchOp << "\n");
-
-  LLVM_DEBUG(llvm::dbgs() << "Created dispatchOp shell \n"
                           << *dispatchOp << "\n");
   return clonedOps;
 }
@@ -585,9 +606,8 @@ static LogicalResult legalizeDispatchWorkgroupOperands(
       // Create a new basic block argument for this value.
       Type bbArgType = value.getType();
       if (tensorType) {
-        bbArgType = IREE::Flow::DispatchTensorType::get(
-            TensorAccess::ReadOnly, tensorType.getShape(),
-            tensorType.getElementType());
+        bbArgType = IREE::Flow::DispatchTensorType::get(TensorAccess::ReadOnly,
+                                                        tensorType);
       }
       bbArg = block.insertArgument(numOperands, bbArgType, value.getLoc());
     }
@@ -897,6 +917,18 @@ static bool isFusableWithConsumer(OpOperand &fusedOperand,
   Operation *producer = fusedOperand.get().getDefiningOp();
   Operation *consumer = fusedOperand.getOwner();
 
+  // Fuse unset_encoding operations with `tensor.extract_slice`.
+  if (isa<LinalgExt::UnsetEncodingOp>(producer) &&
+      isa<tensor::ExtractSliceOp>(consumer)) {
+    auto sliceOp = cast<tensor::ExtractSliceOp>(consumer);
+    return llvm::all_of(
+               sliceOp.getMixedOffsets(),
+               [](OpFoldResult ofr) { return isConstantIntValue(ofr, 0); }) &&
+           llvm::all_of(sliceOp.getMixedStrides(), [](OpFoldResult ofr) {
+             return isConstantIntValue(ofr, 1);
+           });
+  }
+
   auto producerLinalgOp = dyn_cast<linalg::LinalgOp>(producer);
   auto consumerLinalgOp = dyn_cast<linalg::LinalgOp>(consumer);
   if (!producerLinalgOp || !consumerLinalgOp) return false;
@@ -1190,10 +1222,13 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
     RewritePatternSet computeOpDispatchPatterns(context);
     computeOpDispatchPatterns.insert<
         CreateDispatchRegionOp<TilingInterface, OpInterfaceRewritePattern>,
+        CreateDispatchRegionOp<LinalgExt::SetEncodingOp, OpRewritePattern>,
+        CreateDispatchRegionOp<LinalgExt::UnsetEncodingOp, OpRewritePattern>,
         CreateDispatchRegionOp<tensor::InsertSliceOp, OpRewritePattern>>(
         context, filterForComputeOps);
     if (failed(createDispatchRegionsFromRootOps(
             funcOp, std::move(computeOpDispatchPatterns)))) {
+      funcOp.emitOpError("failed to create dispatch region based on operation");
       return signalPassFailure();
     }
   }
@@ -1214,6 +1249,8 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
         convertToFlowPatterns, context);
     if (failed(applyPatternsAndFoldGreedily(
             funcOp, std::move(convertToFlowPatterns)))) {
+      funcOp.emitOpError(
+          "failed to convert operation outside dispatch region into flow ops");
       return signalPassFailure();
     }
   }
@@ -1230,6 +1267,9 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
         context, filterForInsertSliceOps);
     if (failed(createDispatchRegionsFromRootOps(
             funcOp, std::move(insertSliceOpDispatchPatterns)))) {
+      funcOp.emitOpError(
+          "failed to move non-contiguous insert_slice ops into dispatch "
+          "region");
       return signalPassFailure();
     }
   }
@@ -1244,6 +1284,9 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
         context, filterForCleanupOps);
     if (failed(createDispatchRegionsFromRootOps(
             funcOp, std::move(cleanUpDispatchPatterns)))) {
+      funcOp.emitOpError(
+          "failed to move non-contiguous extract_slice ops into dispatch "
+          "region");
       return signalPassFailure();
     }
   }
