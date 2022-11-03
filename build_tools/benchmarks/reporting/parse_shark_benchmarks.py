@@ -108,6 +108,11 @@ def _generate_table(df_iree, df_shark, df_baseline, title):
                                          (df_shark.dialect == dialect) &
                                          (df_shark.data_type == data_type) &
                                          (df_shark.device == device)]
+            if shark_results.empty:
+              print(
+                  f"Warning: No SHARK results for {model}, {dialect}, {data_type}, {device}."
+              )
+              continue
 
             shark_latency = shark_results.loc[shark_results.engine ==
                                               "shark_iree_c"]
