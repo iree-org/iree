@@ -36,6 +36,9 @@ target_link_options(${_NAME} PRIVATE
   #
   "-sASSERTIONS=1"
   #
+  # Programs loaded dynamically can require additional memory, so allow growth.
+  "-sALLOW_MEMORY_GROWTH"
+  #
   # For https://emscripten.org/docs/debugging/Sanitizers.html#address-sanitizer
   # "-fsanitize=address"
   # "-sALLOW_MEMORY_GROWTH"

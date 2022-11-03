@@ -111,7 +111,7 @@ static iree_status_t iree_hal_webgpu_create_wgsl_shader_module(
             .next = NULL,
             .sType = WGPUSType_ShaderModuleWGSLDescriptor,
         },
-#if defined(__EMSCRIPTEN__)
+#if defined(IREE_PLATFORM_EMSCRIPTEN)
     // Emscripten uses this older name.
     .source = code,
 #else

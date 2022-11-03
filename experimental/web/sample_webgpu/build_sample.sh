@@ -43,20 +43,27 @@ INSTALL_ROOT="${1:-${ROOT_DIR}/build-host/install}"
 # Compile from .mlir input to portable .vmfb file using host tools            #
 ###############################################################################
 
+echo "=== Compiling sample MLIR files to VM FlatBuffer outputs (.vmfb) ==="
 COMPILE_TOOL="${INSTALL_ROOT?}/bin/iree-compile"
 
 compile_sample() {
   echo "  Compiling '$1' sample for WebGPU..."
-  ${COMPILE_TOOL?} $2 \
-    --iree-input-type=mhlo \
+  ${COMPILE_TOOL?} $3 \
+    --iree-input-type=$2 \
     --iree-hal-target-backends=webgpu \
     --o ${BINARY_DIR}/$1_webgpu.vmfb
 }
 
-echo "=== Compiling sample MLIR files to VM FlatBuffer outputs (.vmfb) ==="
-compile_sample "simple_abs"     "${ROOT_DIR?}/samples/models/simple_abs.mlir"
-# compile_sample "fullyconnected" "${ROOT_DIR?}/tests/e2e/models/fullyconnected.mlir"
+compile_sample "simple_abs"     "mhlo" "${ROOT_DIR?}/samples/models/simple_abs.mlir"
+compile_sample "fullyconnected" "mhlo" "${ROOT_DIR?}/tests/e2e/models/fullyconnected.mlir"
+
+# Does not run yet (uses internal readback, which needs async buffer mapping?)
 # compile_sample "collatz"        "${ROOT_DIR?}/tests/e2e/models/collatz.mlir"
+
+# Slow, so just run on demand
+# compile_sample "mobilebert" "tosa" "D:/dev/projects/iree-data/models/2022_10_28/mobilebertsquad.tflite.mlir"
+# compile_sample "posenet"    "tosa" "D:/dev/projects/iree-data/models/2022_10_28/posenet.tflite.mlir"
+# compile_sample "mobilessd"  "tosa" "D:/dev/projects/iree-data/models/2022_10_28/mobile_ssd_v2_float_coco.tflite.mlir"
 
 ###############################################################################
 # Build the web artifacts using Emscripten                                    #

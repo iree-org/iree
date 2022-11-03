@@ -37,21 +37,6 @@ iree_status_t iree_hal_heap_buffer_create(
     iree_const_byte_span_t initial_data, iree_allocator_t data_allocator,
     iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer);
 
-// Wraps an existing host allocation in a buffer.
-// When the buffer is destroyed the provided |release_callback| will be called.
-//
-// The buffer must be aligned to at least IREE_HAL_HEAP_BUFFER_ALIGNMENT and if
-// it is not the call will fail with IREE_STATUS_OUT_OF_RANGE.
-//
-// |out_buffer| must be released by the caller. |data| must be kept live for the
-// lifetime of the wrapping buffer.
-iree_status_t iree_hal_heap_buffer_wrap(
-    iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
-    iree_hal_memory_access_t allowed_access,
-    iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
-    iree_byte_span_t data, iree_hal_buffer_release_callback_t release_callback,
-    iree_hal_buffer_t** out_buffer);
-
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

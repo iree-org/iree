@@ -139,11 +139,29 @@ SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
       </div>
       <div class="row" style="padding:4px">
         <div class="col-sm">
-          collatz
-          (<a href="https://github.com/iree-org/iree/blob/main/tests/e2e/models/collatz.mlir">source</a>)
+          mobilebert
+          (<a href="https://tfhub.dev/iree/lite-model/mobilebert/fp32/1">source</a>)
         </div>
         <div class="col-sm-auto">
-          <button class="btn btn-secondary" onclick="loadSample('collatz')">Load sample</button>
+          <button class="btn btn-secondary" onclick="loadSample('mobilebert')">Load sample</button>
+        </div>
+      </div>
+      <div class="row" style="padding:4px">
+        <div class="col-sm">
+          posenet
+          (<a href="https://tfhub.dev/tensorflow/lite-model/posenet/mobilenet/float/075/1/default/1">source</a>)
+        </div>
+        <div class="col-sm-auto">
+          <button class="btn btn-secondary" onclick="loadSample('posenet')">Load sample</button>
+        </div>
+      </div>
+      <div class="row" style="padding:4px">
+        <div class="col-sm">
+          mobilessd
+          (<a href="https://storage.googleapis.com/download.tensorflow.org/models/tflite/gpu/mobile_ssd_v2_float_coco.tflite">source</a>)
+        </div>
+        <div class="col-sm-auto">
+          <button class="btn btn-secondary" onclick="loadSample('mobilessd')">Load sample</button>
         </div>
       </div>
     </div>
@@ -339,9 +357,19 @@ SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
           "1x5xf32=1,-2,-3,4,-5",
           "1x5x3x1xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1",
         ].join("\n");
-      } else if (sampleName === "collatz") {
-        functionNameInput.value = "collatz";
-        functionArgumentsInput.value = "";
+      } else if (sampleName === "mobilebert") {
+        functionNameInput.value = "main";
+        functionArgumentsInput.value = [
+          "1x384xi32",
+          "1x384xi32",
+          "1x384xi32",
+        ].join("\n");
+      } else if (sampleName === "posenet") {
+        functionNameInput.value = "main";
+        functionArgumentsInput.value = "1x353x257x3xf32";
+      } else if (sampleName === "mobilessd") {
+        functionNameInput.value = "main";
+        functionArgumentsInput.value = "1x320x320x3xf32";
       }
 
       updateUrlWithFormValues();
