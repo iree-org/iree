@@ -14,7 +14,6 @@
 #include "iree/hal/drivers/webgpu/platform/webgpu.h"
 #include "iree/modules/hal/module.h"
 #include "iree/runtime/api.h"
-#include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
 
 //===----------------------------------------------------------------------===//
@@ -122,7 +121,6 @@ iree_program_state_t* load_program(iree_sample_state_t* sample_state,
 
   iree_runtime_session_options_t session_options;
   iree_runtime_session_options_initialize(&session_options);
-  session_options.context_flags = IREE_VM_CONTEXT_FLAG_TRACE_EXECUTION;
   if (iree_status_is_ok(status)) {
     status = iree_runtime_session_create_with_device(
         sample_state->instance, &session_options, sample_state->device,
