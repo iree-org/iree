@@ -324,29 +324,34 @@ static iree_status_t get_matmul_sizes(
   return iree_ok_status();
 }
 
-#define IREE_TRACE_REPLAY_REFERENCE_GEMM(LHSTYPE, RHSTYPE, RESTYPE, ACCTYPE)  \
-  static void reference_matmul_##LHSTYPE##_##RHSTYPE##_##RESTYPE##_##ACCTYPE( \
-      iree_hal_dim_t m_size, iree_hal_dim_t k_size, iree_hal_dim_t n_size,    \
-      iree_hal_element_type_t lhs_type, iree_hal_element_type_t rhs_type,     \
-      iree_hal_element_type_t acc_type, LHSTYPE* lhs_data, RHSTYPE* rhs_data, \
-      ACCTYPE* acc_data, RESTYPE* result_data, iree_hal_dim_t m,              \
-      iree_hal_dim_t n) {                                                     \
-    ACCTYPE acc = acc_data[n + m * n_size];                                   \
-    for (iree_hal_dim_t k = 0; k < k_size; ++k) {                             \
-      LHSTYPE lhs_value = lhs_data[k + m * k_size];                           \
-      RHSTYPE rhs_value = rhs_data[n + k * n_size];                           \
-      acc += (ACCTYPE)lhs_value * (ACCTYPE)rhs_value;                         \
-    }                                                                         \
-    result_data[n + m * n_size] = acc;                                        \
+#define IREE_TRACE_REPLAY_REFERENCE_MATMUL(LHSTYPE, RHSTYPE, RESTYPE, ACCTYPE) \
+  static void reference_matmul_##LHSTYPE##_##RHSTYPE##_##RESTYPE##_##ACCTYPE(  \
+      iree_hal_dim_t m_size, iree_hal_dim_t k_size, iree_hal_dim_t n_size,     \
+      iree_hal_element_type_t lhs_type, iree_hal_element_type_t rhs_type,      \
+      iree_hal_element_type_t acc_type, LHSTYPE* lhs_data, RHSTYPE* rhs_data,  \
+      ACCTYPE* acc_data, RESTYPE* result_data, iree_hal_dim_t m,               \
+      iree_hal_dim_t n) {                                                      \
+    ACCTYPE acc = acc_data[n + m * n_size];                                    \
+    for (iree_hal_dim_t k = 0; k < k_size; ++k) {                              \
+      LHSTYPE lhs_value = lhs_data[k + m * k_size];                            \
+      RHSTYPE rhs_value = rhs_data[n + k * n_size];                            \
+      acc += (ACCTYPE)lhs_value * (ACCTYPE)rhs_value;                          \
+    }                                                                          \
+    result_data[n + m * n_size] = acc;                                         \
   }
 
-// Reference GEMM : float <= float * float + float
-IREE_TRACE_REPLAY_REFERENCE_GEMM(float, float, float, float)
+// Reference mamtul instantiations from macro IREE_TRACE_REPLAY_REFERENCE_MATMUL
+// for the f32 input, f32 accumlation, and f32 result.
+// [float <= float * float + float]
+IREE_TRACE_REPLAY_REFERENCE_MATMUL(float, float, float, float)
 
-// Reference GEMM : i32 <= i8 * i8 + i32
-IREE_TRACE_REPLAY_REFERENCE_GEMM(int8_t, int8_t, int32_t, int32_t)
+// Reference mamtul instantiations from macro IREE_TRACE_REPLAY_REFERENCE_MATMUL
+// for the int8_t input, int32_t accumlation, and int32_t result.
+// [i32 <= i8 * i8 + i32]
+IREE_TRACE_REPLAY_REFERENCE_MATMUL(int8_t, int8_t, int32_t, int32_t)
 
-// Reference GEMM : f16 <= f16 * f16 + f16
+// Reference mamtul for the half_t input, half_t accumlation, and half_t result.
+// [f16 <= f16 * f16 + f16]
 static void reference_matmul_f16_f16_f16_f16(
     iree_hal_dim_t m_size, iree_hal_dim_t k_size, iree_hal_dim_t n_size,
     iree_hal_element_type_t lhs_type, iree_hal_element_type_t rhs_type,
@@ -395,12 +400,6 @@ static void reference_matmul_element(
         iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                          "unhandled combination of element types in matmul"));
   }
-
-#if 0
-  reference_matmul_element_generic(m_size, k_size, n_size, lhs_type, rhs_type,
-                                   acc_type, (void*)lhs_data, (void*)rhs_data,
-                                   (void*)acc_data, (void*)result_data, m, n);
-#endif
 }
 
 // Reference matmul implementation, used to compare matmul results against.
