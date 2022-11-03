@@ -246,8 +246,8 @@ static void write_int_to_matrix_element(int32_t value, iree_hal_dim_t m_size,
     ((float*)data)[index] = value;
     return;
   }
-  iree_status_abort(iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                                     "unhandled matmul result type"));
+  IREE_CHECK_OK(iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                 "unhandled matmul result type"));
 }
 
 // Reads an element from a mapped row-major matrix buffer.
