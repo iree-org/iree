@@ -1726,10 +1726,6 @@ void PackOp::build(OpBuilder &builder, OperationState &state, Value source,
 }
 
 LogicalResult PackOp::verify() {
-  Operation *op = getOperation();
-  size_t numberOfBlockingFactors = getMixedTiles().size();
-  SmallVector<int64_t> innerDimsPos =
-      extractFromI64ArrayAttr(getInnerDimsPos());
   if (failed(commonVerifierPackAndUnPackOp(*this))) {
     return failure();
   }
@@ -1740,13 +1736,13 @@ LogicalResult PackOp::verify() {
   auto dimAndTileMapping = getDimAndTileMapping();
   if (!getPaddingValue() &&
       areNotFullTiles(getInputShape(), dimAndTileMapping)) {
-    return op->emitError("invalid tile factor provided. Only full tiles are "
-                         "supported when padding_value is not set");
+    return emitOpError("invalid tile factor provided. Only full tiles are "
+                       "supported when padding_value is not set");
   }
 
   if (auto paddingValue = getPaddingValue()) {
     if (paddingValue.getType() != getInputType().getElementType()) {
-      return op->emitError("expected padding_value has ")
+      return emitOpError("expected padding_value has ")
              << getInputType().getElementType()
              << " but got: " << paddingValue.getType();
     }
@@ -2322,10 +2318,6 @@ LogicalResult UnPackOp::getResultTilePosition(
 }
 
 LogicalResult UnPackOp::verify() {
-  Operation *op = getOperation();
-  size_t numberOfBlockingFactors = getMixedTiles().size();
-  SmallVector<int64_t> innerDimsPos =
-      extractFromI64ArrayAttr(getInnerDimsPos());
   if (failed(commonVerifierPackAndUnPackOp(*this))) {
     return failure();
   }
