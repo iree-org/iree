@@ -26,6 +26,7 @@ add_mlir_library(IREELinalgExtDialect
   MLIRSCFDialect
   MLIRFuncDialect
   MLIRTensorDialect
+  MLIRTensorUtils
   MLIRTilingInterface
   MLIRViewLikeInterface
 )

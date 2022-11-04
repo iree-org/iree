@@ -17,6 +17,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -114,6 +115,22 @@ static bool isInvalid(ArrayRef<int64_t> dimsPos, int64_t rank) {
     return true;
   return llvm::any_of(
       dimsPos, [rank](int64_t dimPos) { return dimPos < 0 || dimPos >= rank; });
+}
+
+/// Returns true if the dimension of `sourceShape` is smaller than the dimension
+/// of the `limitShape`.
+static bool isSmallerThan(ArrayRef<int64_t> sourceShape,
+                          ArrayRef<int64_t> limitShape) {
+  assert(
+      sourceShape.size() == limitShape.size() &&
+      "expected source shape rank, and limit of the shape to have same rank");
+  return llvm::all_of(
+      llvm::zip(sourceShape, limitShape), [](std::tuple<int64_t, int64_t> it) {
+        int64_t sourceExtent = std::get<0>(it);
+        int64_t limit = std::get<1>(it);
+        return sourceExtent == ShapedType::kDynamicSize ||
+               limit == ShapedType::kDynamicSize || sourceExtent <= limit;
+      });
 }
 
 //===----------------------------------------------------------------------===//
@@ -1510,15 +1527,16 @@ static bool hasZeros(ArrayRef<OpFoldResult> tiles) {
 
 /// Check if we have enough static information to catch undefined behavior when
 /// the tile size does not divide perfectly the dimension of the input tensor.
-static bool areNotFullTiles(ArrayRef<int64_t> inputShape,
-                            DenseMap<int64_t, OpFoldResult> dimAndTileMapping) {
+static bool
+areNotFullTiles(ArrayRef<int64_t> inputShape,
+                DenseMap<int64_t, OpFoldResult> const &dimAndTileMapping) {
   int64_t rank = inputShape.size();
   for (int64_t dim = 0; dim < rank; dim++) {
     if (inputShape[dim] == ShapedType::kDynamicSize)
       continue;
-    if (dimAndTileMapping.count(dim)) {
-      Optional<int64_t> constantTile =
-          getConstantIntValue(dimAndTileMapping[dim]);
+    auto it = dimAndTileMapping.find(dim);
+    if (it != dimAndTileMapping.end()) {
+      Optional<int64_t> constantTile = getConstantIntValue(it->second);
       if (!constantTile)
         continue;
       if (inputShape[dim] % (*constantTile) != 0)
@@ -1607,23 +1625,78 @@ static LogicalResult commonVerifierPackAndUnPackOp(OpTy packOrUnPack) {
   static_assert(llvm::is_one_of<OpTy, PackOp, UnPackOp>::value,
                 "applies to only pack or unpack operations");
   Operation *op = packOrUnPack.getOperation();
-  int64_t rank = (std::is_same<OpTy, PackOp>::value)
-                     ? packOrUnPack.getInputRank()
-                     : packOrUnPack.getOutputRank();
+  ShapedType unpackedType = (std::is_same<OpTy, PackOp>::value)
+                                ? packOrUnPack.getInputType()
+                                : packOrUnPack.getOutputType();
+  int64_t unpackedRank = unpackedType.getRank();
   SmallVector<int64_t> innerDimsPos =
       extractFromI64ArrayAttr(packOrUnPack.getInnerDimsPos());
   SmallVector<int64_t> outerDimPerm =
       extractFromI64ArrayAttr(packOrUnPack.getOuterDimsPerm());
   // Verify tiles. Make sure each provided tile is non-zero.
-  if (hasZeros(packOrUnPack.getMixedTiles()))
+  SmallVector<OpFoldResult> mixedTiles = packOrUnPack.getMixedTiles();
+  if (hasZeros(mixedTiles))
     return op->emitError("invalid tile factor");
-  if (isInvalid(innerDimsPos, rank))
+  if (isInvalid(innerDimsPos, unpackedRank))
     return op->emitError("invalid inner_dims_pos vector");
-  if (isInvalid(outerDimPerm, rank))
+  if (isInvalid(outerDimPerm, unpackedRank))
     return op->emitError("invalid outer_dims_perm vector");
-  if (packOrUnPack.getMixedTiles().size() != innerDimsPos.size()) {
+  if (mixedTiles.size() != innerDimsPos.size()) {
     return op->emitError(
         "blocking factors must equal the number of dimensions to block");
+  }
+
+  // Blocking factors must be less or equal than the input rank, and must
+  // match the number of `dims_pos`.
+  if (mixedTiles.size() > unpackedRank) {
+    return op->emitError(
+        "blocking factors must be less or equal than the input rank");
+  }
+
+  ShapedType packedType = (std::is_same<OpTy, PackOp>::value)
+                              ? packOrUnPack.getOutputType()
+                              : packOrUnPack.getInputType();
+  int64_t packedRank = packedType.getRank();
+  // Require output rank to match input rank + number of blocking factors.
+  if (unpackedRank + mixedTiles.size() != packedRank) {
+    return op->emitError(
+        "packed rank must equal unpacked rank + blocking factors");
+  }
+
+  // Verify result shape is greater than the minimum expected
+  // by the pack operation, and that the output shape
+  // represents full tiles.
+  ShapedType expectedPackedType = PackOp::getPackedType(
+      unpackedType, packOrUnPack.getStaticTiles(), innerDimsPos, outerDimPerm);
+  if (!isSmallerThan(expectedPackedType.getShape(), packedType.getShape())) {
+    return op->emitError("the shape of output is not large enough to hold the "
+                         "packed data. Expected at least ")
+           << expectedPackedType << ", got " << packedType;
+  }
+  if (!llvm::all_of(
+          llvm::zip(packedType.getShape().take_back(mixedTiles.size()),
+                    mixedTiles),
+          [](std::tuple<int64_t, OpFoldResult> it) {
+            Optional<int64_t> constTileSize =
+                getConstantIntValue(std::get<1>(it));
+            int64_t shape = std::get<0>(it);
+            if (!constTileSize) {
+              // If specified tile size is dynamic, output shape should
+              // be dynamic too.
+              return shape == ShapedType::kDynamicSize;
+            } else {
+              if (shape == ShapedType::kDynamicSize) {
+                // For the shape being dynamic when tile size is
+                // specified, return true. In canonical form a constant
+                // tile size should lead to constant shape of the tiled
+                // dimension, but not needed for verification.
+                return true;
+              }
+              return shape == constTileSize.value();
+            }
+          })) {
+    return op->emitError("mismatch in inner tile sizes specified and shaped of "
+                         "tiled dimension in the packed type");
   }
   return success();
 }
@@ -1645,10 +1718,7 @@ void PackOp::build(OpBuilder &builder, OperationState &state, Value source,
   SmallVector<Value> dynamicTileSizes;
   dispatchIndexOpFoldResults(innerTiles, dynamicTileSizes, staticTileSizes,
                              ShapedType::kDynamicSize);
-  ShapedType resultType =
-      getPackedType(source.getType().cast<ShapedType>(), staticTileSizes,
-                    innerDimsPos, outerDimsPerm);
-  build(builder, state, resultType, source, output,
+  build(builder, state, output.getType(), source, output,
         outerDimsPerm.empty() ? nullptr
                               : builder.getI64ArrayAttr(outerDimsPerm),
         builder.getI64ArrayAttr(innerDimsPos), dynamicTileSizes,
@@ -1657,50 +1727,24 @@ void PackOp::build(OpBuilder &builder, OperationState &state, Value source,
 }
 
 LogicalResult PackOp::verify() {
-  Operation *op = getOperation();
-  size_t numberOfBlockingFactors = getMixedTiles().size();
-  SmallVector<int64_t> innerDimsPos =
-      extractFromI64ArrayAttr(getInnerDimsPos());
   if (failed(commonVerifierPackAndUnPackOp(*this))) {
     return failure();
-  }
-
-  // Blocking factors must be less or equal than the input rank, and must
-  // match the number of `dims_pos`.
-  if (numberOfBlockingFactors > getInputRank()) {
-    return op->emitError(
-        "blocking factors must be less or equal than the input rank");
-  }
-
-  // Require output rank to match input rank + number of blocking factors.
-  if ((getInputRank() + numberOfBlockingFactors) != getOutputRank()) {
-    return op->emitError(
-        "output rank must equal input rank + blocking factors");
   }
 
   // Bail out if the tile does not divide the dimension fully. In the case of
   // dynamic tile factors or dimensions, having a partial tile is undefined
   // behavior.
+  auto dimAndTileMapping = getDimAndTileMapping();
   if (!getPaddingValue() &&
-      areNotFullTiles(getInputShape(), getDimAndTileMapping())) {
-    return op->emitError("invalid tile factor provided. Only full tiles are "
-                         "supported when padding_value is not set");
-  }
-  // Verify result type against inferred type.
-  SmallVector<int64_t> outerDimPerm =
-      extractFromI64ArrayAttr(getOuterDimsPerm());
-  ShapedType expectedOutputType = getPackedType(
-      getInputType(), getStaticTiles(), innerDimsPos, outerDimPerm);
-  if (!areShapesCompatible(expectedOutputType.getShape(), getOutputShape())) {
-    return op->emitError(
-               "infered type do not match provided output type. Expected ")
-           << expectedOutputType << " but got: " << getOutputType();
+      areNotFullTiles(getInputShape(), dimAndTileMapping)) {
+    return emitOpError("invalid tile factor provided. Only full tiles are "
+                       "supported when padding_value is not set");
   }
 
   if (auto paddingValue = getPaddingValue()) {
-    if (paddingValue.getType() != expectedOutputType.getElementType()) {
-      return op->emitError("expected padding_value has ")
-             << expectedOutputType.getElementType()
+    if (paddingValue.getType() != getInputType().getElementType()) {
+      return emitOpError("expected padding_value has ")
+             << getInputType().getElementType()
              << " but got: " << paddingValue.getType();
     }
   }
@@ -1738,10 +1782,7 @@ SmallVector<OpFoldResult> PackOp::getResultShape(
 }
 
 SmallVector<OpFoldResult> PackOp::getResultShape(OpBuilder &builder) {
-  return getResultShape(builder, getLoc(),
-                        getDims(builder, getLoc(), getInput()), getMixedTiles(),
-                        extractFromI64ArrayAttr(getInnerDimsPos()),
-                        extractFromI64ArrayAttr(getOuterDimsPerm()));
+  return tensor::createDimValues(builder, getLoc(), getOutput());
 }
 
 ShapedType PackOp::getPackedType(ShapedType sourceType,
@@ -2057,12 +2098,8 @@ LogicalResult PackOp::getResultTilePosition(
 LogicalResult
 PackOp::reifyResultShapes(OpBuilder &builder,
                           ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
-  OpBuilder::InsertionGuard g(builder);
-  builder.setInsertionPoint(getOperation());
-  reifiedReturnShapes.resize(1);
-  reifiedReturnShapes[0] = getValueOrCreateConstantIndexOp(
-      builder, getLoc(), getResultShape(builder));
-  return success();
+  return cast<LinalgExtOp>(getOperation())
+      .reifyResultShapes(builder, reifiedReturnShapes);
 }
 
 //===----------------------------------------------------------------------===//
@@ -2282,37 +2319,8 @@ LogicalResult UnPackOp::getResultTilePosition(
 }
 
 LogicalResult UnPackOp::verify() {
-  Operation *op = getOperation();
-  size_t numberOfBlockingFactors = getMixedTiles().size();
-  SmallVector<int64_t> innerDimsPos =
-      extractFromI64ArrayAttr(getInnerDimsPos());
   if (failed(commonVerifierPackAndUnPackOp(*this))) {
     return failure();
-  }
-
-  // Blocking factors must be less or equal than the output rank, and must
-  // match the number of `dims_pos`.
-  if (numberOfBlockingFactors > getOutputRank()) {
-    return op->emitError(
-        "blocking factors must be less or equal than the output rank");
-  }
-
-  // Require input rank to match output rank + number of blocking factors.
-  if ((getOutputRank() + numberOfBlockingFactors) != getInputRank()) {
-    return op->emitError(
-        "input rank must equal output rank + blocking factors");
-  }
-
-  // Verify input type against inferred type. The check includes the cases for
-  // incomplete tiles. We allow to `undo` the padding done in the pack.
-  SmallVector<int64_t> outerDimPerm =
-      extractFromI64ArrayAttr(getOuterDimsPerm());
-  ShapedType expectedInputType = PackOp::getPackedType(
-      getOutputType(), getStaticTiles(), innerDimsPos, outerDimPerm);
-  if (!areShapesCompatible(expectedInputType.getShape(), getInputShape())) {
-    return op->emitError(
-               "infered type do not match provided input type. Expected ")
-           << expectedInputType << " but got: " << getInputType();
   }
   return success();
 }
