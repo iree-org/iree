@@ -383,6 +383,9 @@ iree_status_t iree_wait_any(iree_wait_set_t* set, iree_time_t deadline_ns,
 
 iree_status_t iree_wait_one(iree_wait_handle_t* handle,
                             iree_time_t deadline_ns) {
+  if (handle->type == IREE_WAIT_PRIMITIVE_TYPE_NONE) {
+    return iree_ok_status();
+  }
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Remap absolute timeout to relative timeout, handling special values as

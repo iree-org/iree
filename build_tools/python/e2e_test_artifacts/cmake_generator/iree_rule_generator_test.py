@@ -47,7 +47,8 @@ class IreeRuleBuilderTest(unittest.TestCase):
         output_file_path=pathlib.PurePath(model_rule.file_path))
 
     self.assertEqual(rule.target_name, model_rule.target_name)
-    self.assertEqual(rule.output_file_path, model_rule.file_path)
+    self.assertEqual(pathlib.PurePath(rule.output_file_path),
+                     pathlib.PurePath(model_rule.file_path))
 
   def test_build_module_compile_rule(self):
     model_import_rule = iree_rule_generator.IreeModelImportRule(
