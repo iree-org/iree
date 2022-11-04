@@ -62,6 +62,8 @@ static void populateVectorizationPatterns(RewritePatternSet &patterns) {
   patterns.add<linalg::CopyVectorizationPattern>(ctx);
   patterns.add<LinalgVectorizationPattern>(
       ctx, f.addOpFilter<linalg::ContractionOpInterface>());
+
+  linalg::populatePadOpVectorizationPatterns(patterns);
 }
 
 namespace {

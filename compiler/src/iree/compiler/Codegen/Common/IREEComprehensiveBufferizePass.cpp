@@ -32,6 +32,8 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
+
 
 #define DEBUG_TYPE "iree-codegen-linalg-bufferize"
 
@@ -78,6 +80,8 @@ class IREEComprehensiveBufferizePass
                 memref::MemRefDialect,
                 scf::SCFDialect,
                 tensor::TensorDialect,
+                                gpu::GPUDialect,
+
                 vector::VectorDialect>();
     // clang-format on
   }
@@ -195,6 +199,9 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
   options.deallocationFn = deallocationFn;
   options.memCpyFn = memCpyFn;
 
+  llvm::dbgs() << "Dumping output for Matthias\n";
+  moduleOp.dump();
+
   if (failed(runIREEOneShotBufferize(moduleOp, options))) {
     return signalPassFailure();
   }
@@ -213,6 +220,50 @@ std::unique_ptr<OperationPass<ModuleOp>> createEliminateEmptyTensorsPass() {
   return std::make_unique<EliminateEmptyTensorsPass>();
 }
 
+static FailureOr<Value> gpuAllocationFn(OpBuilder &builder, Location loc,
+                                        MemRefType memRefType,
+                                        ValueRange dynamicSizes,
+                                        unsigned alignment) {
+  llvm::dbgs() << "gpuAllocationFn: \n";
+
+  MemRefType allocType = MemRefType::get(memRefType.getShape(),
+                                         memRefType.getElementType(), {}, 3);
+  return builder.create<memref::AllocOp>(loc, allocType, dynamicSizes)
+      .getResult();
+}
+
+static LogicalResult gpuDeallocationFn(OpBuilder &builder, Location loc,
+                                       Value allocation) {
+  llvm::dbgs() << "gpuDeallocationFn: \n";
+
+  return success();
+}
+
+static StringRef getCopyToWorkgroupMemoryMarker() {
+  return "copy_to_workgroup_memory";
+}
+
+static void setMarker(Operation *op, StringRef marker) {
+  op->setAttr("__internal_linalg_transform__",
+              StringAttr::get(op->getContext(), marker));
+}
+
+static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
+                               Value to) {
+  llvm::dbgs() << "gpuCopyFn -- from: " << from.getDefiningOp()->getName().getStringRef().data() << " to: " << to.getDefiningOp()->getName().getStringRef().data() << "\n";
+
+  bool sharedMemCopy =
+      from.getType().cast<MemRefType>().getMemorySpaceAsInt() == 3 ||
+      to.getType().cast<MemRefType>().getMemorySpaceAsInt() == 3;
+  if (sharedMemCopy) builder.create<gpu::BarrierOp>(loc);
+  Operation *copy = builder.create<memref::CopyOp>(loc, from, to);
+  if (sharedMemCopy) {
+    setMarker(copy, getCopyToWorkgroupMemoryMarker());
+    builder.create<gpu::BarrierOp>(loc);
+  }
+  return success();
+}
+
 std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
     Optional<BufferizationOptions::AllocationFn> allocationFn,
     Optional<BufferizationOptions::DeallocationFn> deallocationFn,
@@ -220,6 +271,9 @@ std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
   if (!allocationFn) allocationFn = defaultAllocationFn;
   if (!deallocationFn) deallocationFn = defaultDeallocationFn;
   if (!memCpyFn) memCpyFn = defaultMemCpyFn;
+  // if (!deallocationFn) deallocationFn = gpuDeallocationFn;
+  // if (!allocationFn) allocationFn = gpuAllocationFn;
+  // if (!memCpyFn) memCpyFn = gpuCopyFn;
   return std::make_unique<IREEComprehensiveBufferizePass>(
       allocationFn, deallocationFn, memCpyFn);
 }

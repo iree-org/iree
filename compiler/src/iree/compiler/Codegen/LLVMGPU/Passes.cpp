@@ -44,6 +44,8 @@ static FailureOr<Value> gpuAllocationFn(OpBuilder &builder, Location loc,
                                         MemRefType memRefType,
                                         ValueRange dynamicSizes,
                                         unsigned alignment) {
+  llvm::dbgs() << "gpuAllocationFn: \n";
+
   MemRefType allocType = MemRefType::get(memRefType.getShape(),
                                          memRefType.getElementType(), {}, 3);
   return builder.create<memref::AllocOp>(loc, allocType, dynamicSizes)
@@ -52,11 +54,15 @@ static FailureOr<Value> gpuAllocationFn(OpBuilder &builder, Location loc,
 
 static LogicalResult gpuDeallocationFn(OpBuilder &builder, Location loc,
                                        Value allocation) {
+  llvm::dbgs() << "gpuDeallocationFn: \n";
+
   return success();
 }
 
 static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
                                Value to) {
+  llvm::dbgs() << "gpuCopyFn -- from: " << from.getDefiningOp()->getName().getStringRef().data() << " to: " << to.getDefiningOp()->getName().getStringRef().data() << "\n";
+
   auto fromType = from.getType().cast<MemRefType>();
   auto toType = to.getType().cast<MemRefType>();
 
@@ -266,13 +272,17 @@ void addGPUTransposePassPipeline(OpPassManager &pm) {
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
-  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUTensorPadPass());
-
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
 
+  // My passes
+  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUTensorPadPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMGPUTensorAlloc(GPUPromoteSharedMemPattern::TransposeOpPattern));
+
+  // Second level tiling
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUTileTensor(false));
 
   // Linalg -> vector

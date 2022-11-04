@@ -50,7 +50,7 @@ struct LLVMGPUVectorLoweringPass
 
     RewritePatternSet vectorToLoopsPatterns(&getContext());
     VectorTransferToSCFOptions vectorToSCFOptions;
-    vectorToSCFOptions.enableFullUnroll();
+    // vectorToSCFOptions.enableFullUnroll();
     populateVectorToSCFConversionPatterns(vectorToLoopsPatterns,
                                           vectorToSCFOptions);
     memref::populateFoldMemRefAliasOpPatterns(vectorToLoopsPatterns);

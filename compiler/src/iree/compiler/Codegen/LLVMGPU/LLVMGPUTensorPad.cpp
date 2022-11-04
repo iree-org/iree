@@ -14,6 +14,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "llvm/Support/Debug.h"
 
 #define DEBUG_TYPE "iree-llvmgpu-tensor-pad"
 
@@ -34,9 +35,14 @@ static FailureOr<SmallVector<Value>> rewriteAsPaddedOp(
   // Pad each input operand in shared memory up to the targets bounding box
   // size. In this case, this corresponds with the maximum tile size from
   // distributing to workgroups.
+  llvm::dbgs() << "TensorPad::rewriteAsPaddedOp()\n";
+  llvm::dbgs() << "the inputs: " <<   linalgOp.getNumDpsInputs() << "\n";
+  llvm::dbgs() << "the inits: " <<   linalgOp.getNumDpsInits() << "\n";
   SmallVector<Value> paddedOperands;
   paddedOperands.reserve(linalgOp.getNumDpsInputs() +
                          linalgOp.getNumDpsInits());
+  // Pad only the inputs
+  // for (OpOperand &opOperand : linalgOp->getOpOperands().take_front(linalgOp.getNumDpsInputs())) {
   for (OpOperand &opOperand : linalgOp->getOpOperands()) {
     // Find DispatchTensorLoadOp's feeding into the linalg or abort.
     auto tensorLoad = dyn_cast_or_null<IREE::Flow::DispatchTensorLoadOp>(
@@ -70,6 +76,42 @@ static FailureOr<SmallVector<Value>> rewriteAsPaddedOp(
         rewriter, loc, paddedTensorType, tensorLoad, paddingValue,
         /*nofold=*/false);
     paddedOperands.push_back(paddedValue);
+  }
+
+  // Tensor.empty on the outputs
+  if (false) {
+
+
+  for (OpOperand &opOperand : linalgOp->getOpOperands().take_back(linalgOp.getNumDpsInits())) {
+    // Find DispatchTensorLoadOp's feeding into the linalg or abort.
+    auto tensorLoad = dyn_cast_or_null<IREE::Flow::DispatchTensorLoadOp>(
+        opOperand.get().getDefiningOp());
+    if (!tensorLoad) {
+      return rewriter.notifyMatchFailure(linalgOp, "does not have tensor load");
+    }
+
+    // Determine the padded shape from the load
+    ArrayRef<int64_t> shape = linalgOp.getShape(&opOperand);
+    SmallVector<int64_t> paddedShape(shape.begin(), shape.end());
+    for (const auto &en : llvm::enumerate(tensorLoad.getMixedSizes())) {
+      if (Optional<int64_t> cst = getConstantIntValue(en.value())) {
+        paddedShape[en.index()] = cst.value();
+      } else {
+        FailureOr<int64_t> upperBound =
+            linalg::getConstantUpperBoundForIndex(en.value().get<Value>());
+        if (failed(upperBound)) {
+          return rewriter.notifyMatchFailure(
+              linalgOp, "No constant bounding box can be found for padding");
+        }
+        paddedShape[en.index()] = *upperBound;
+      }
+    }
+
+    // auto tensorEmptyType =
+    //     RankedTensorType::get(paddedShape, getElementTypeOrSelf(tensorLoad));
+    Value emtpyValue = rewriter.create<tensor::EmptyOp>(loc, paddedShape, getElementTypeOrSelf(tensorLoad));
+    paddedOperands.push_back(emtpyValue);
+  }
   }
 
   // Clone linalgOp to paddedOp with padded input/output shapes.

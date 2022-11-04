@@ -202,8 +202,13 @@ struct LLVMGPUTileTensorPass
     registry.insert<AffineDialect, gpu::GPUDialect, scf::SCFDialect>();
   }
   void runOnOperation() override {
+    llvm::dbgs() << "runOnOperation()\n";
+
     auto funcOp = getOperation();
     if (!isEntryPoint(funcOp)) return;
+
+    llvm::dbgs() << "runOnOperation() post\n";
+
 
     funcOp->walk([&](linalg::LinalgOp op) {
       op->removeAttr(IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker);
