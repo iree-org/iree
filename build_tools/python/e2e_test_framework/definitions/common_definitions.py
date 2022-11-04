@@ -8,6 +8,7 @@
 from dataclasses import dataclass
 from enum import Enum
 from typing import List
+from e2e_test_framework.definitions import serialization
 import dataclasses
 
 
@@ -97,6 +98,7 @@ class DeviceSpec(object):
   device_parameters: List[str] = dataclasses.field(default_factory=list)
 
 
+@serialization.serializable(id_field="id", container_key="models")
 @dataclass(frozen=True)
 class Model(object):
   """Model to be benchmarked."""
