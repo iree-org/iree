@@ -10,6 +10,7 @@
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "iree-dialects/Dialect/LinalgTransform/TransformInterpreterUtils.h"
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
+#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/LLVMCPU/TransformExtensions/LLVMCPUExtensions.h"
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensions.h"
 #include "iree/compiler/Codegen/PassDetail.h"
@@ -52,6 +53,7 @@ using namespace mlir;
 
 // TODO: significantly better namespacing.
 using ::mlir::iree_compiler::IREE::transform_dialect::ApplyPatternsOp;
+using ::mlir::iree_compiler::IREE::transform_dialect::ConfigExtractPart;
 using ::mlir::iree_compiler::IREE::transform_dialect::
     ForeachThreadToWorkgroupOp;
 using ::mlir::iree_compiler::IREE::transform_dialect::IREEBufferizeOp;
@@ -204,6 +206,11 @@ static void buildReductionCudaStrategy(ImplicitLocOpBuilder &b,
       b.create<MatchOp>(variantH, linalg::FillOp::getOperationName());
   Value originalGenericH =
       b.create<MatchOp>(variantH, linalg::GenericOp::getOperationName());
+  // Atm `tileSizes` just get DCE'd, need to pipe through tfdWithTileSizes API.
+  // TODO(ftynse): hmm this seems tricky to control.
+  Value tileSizes =
+      b.create<ConfigExtractPart>(originalGenericH, "tile_sizes", 0);
+  print(b, tileSizes);
 
   // Step 1. Split the reduction to get meatier parallelism.
   // TODO: use a scf.foreach_thread for this.
@@ -215,13 +222,22 @@ static void buildReductionCudaStrategy(ImplicitLocOpBuilder &b,
   Value splitLinalgH = splitReductionTransformOp.getSplitLinalgOp();
   Value combinerH = splitReductionTransformOp.getCombiningLinalgOp();
 
+  (void)originalFillH;
+  (void)splitFillH;
+  (void)splitLinalgH;
+  (void)combinerH;
+
+#if 0
   // Step 2. First level of tiling + fusion parallelizes to blocks.
   // clang-format off
   tfdWithTileSizes<TileToForeachThreadAndWorkgroupCountRegionOp>(
     b,
     /*rootH=*/combinerH,
     /*opsHToFuse=*/{originalFillH, splitFillH, splitLinalgH},
-    /*tileSizes=*/ArrayRef<int64_t>{1});
+
+    // TODO(ftynse): Need to pipe a variadic number of sizes through this API.
+    tileSizes);
+    ///*tileSizes=*/ArrayRef<int64_t>{1});
   // clang-format on
 
   // Step 3. Second level of tiling + fusion parallelizes to threads.
@@ -257,6 +273,8 @@ static void buildReductionCudaStrategy(ImplicitLocOpBuilder &b,
 
   // Step 7. Post-bufferization vector distribution with rank-reduction.
   distributeVectors(b, funcH);
+
+#endif
 }
 
 namespace {
@@ -318,6 +336,12 @@ class TransformDialectJitterPass
 
   void runOnOperation() override {
     Operation *target = getOperation();
+    LLVM_DEBUG(DBGS() << "input IR:\n" << *target);
+
+    // TODO: connect the config above to the reduction below.
+    // This connects to Codegen/LLVMGPU/KernelConfig.cpp
+    //   LogicalResult initGPULaunchConfig(ModuleOp moduleOp)
+    //     LogicalResult setWarpReductionConfig(func::FuncOp, LinalgOp)
     MLIRContext *ctx = target->getContext();
     Location loc = target->getLoc();
 
@@ -326,7 +350,7 @@ class TransformDialectJitterPass
     Region &topLevelTransformRegion = topLevelTransformModule.getBodyRegion();
     b.setInsertionPointToStart(&topLevelTransformRegion.front());
     b.create<::transform_ext::CanonicalizedSequenceOp>(
-        target->getLoc(), transform::FailurePropagationMode::Suppress,
+        target->getLoc(), transform::FailurePropagationMode::Propagate,
         [](OpBuilder &b, Location loc, Value variantH) {
           ImplicitLocOpBuilder ib(loc, b);
           buildReductionCudaStrategy(ib, variantH);

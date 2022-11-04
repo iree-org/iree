@@ -29,6 +29,7 @@
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
+#include "mlir/IR/Builders.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
 
@@ -937,6 +938,74 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
     return DiagnosedSilenceableFailure::definiteFailure();
 
   results.set(getOperation()->getOpResult(0), payload.front());
+  return DiagnosedSilenceableFailure::success();
+}
+
+//===---------------------------------------------------------------------===//
+// ConfigExtractPart
+//===---------------------------------------------------------------------===//
+void transform_dialect::ConfigExtractPart::build(OpBuilder &builder,
+                                                 OperationState &result,
+                                                 Value target,
+                                                 StringRef attrName,
+                                                 Optional<int64_t> maybeLevel) {
+  MLIRContext *ctx = builder.getContext();
+  result.addOperands(target);
+  result.addAttribute(ConfigExtractPart::getAttrNameAttrName(result.name),
+                      builder.getStringAttr(attrName));
+  if (maybeLevel) {
+    result.addAttribute(ConfigExtractPart::getLevelAttrName(result.name),
+                        builder.getI64IntegerAttr(*maybeLevel));
+  }
+  result.addTypes({pdl::OperationType::get(ctx)});
+}
+
+void transform_dialect::ConfigExtractPart::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::producesHandle(getResultConfigPart(), effects);
+  transform::modifiesPayload(effects);
+}
+
+DiagnosedSilenceableFailure transform_dialect::ConfigExtractPart::apply(
+    transform::TransformResults &transformResults,
+    transform::TransformState &state) {
+  ArrayRef<Operation *> targetOps = state.getPayloadOps(getTarget());
+  if (targetOps.empty()) {
+    transformResults.set(getResultConfigPart().cast<OpResult>(), {});
+    return DiagnosedSilenceableFailure::success();
+  }
+
+  assert(targetOps.size() == 1 && "expected single target op in payload");
+  Operation *target = targetOps.front();
+  auto config = iree_compiler::getLoweringConfig(target);
+  if (!config) {
+    transformResults.set(getResultConfigPart().cast<OpResult>(), {});
+    return emitSilenceableFailure(target) << " has no IREE config";
+  }
+
+  // TODO: op verifier etc.
+  if (getAttrName() != "tile_sizes")
+    return emitDefiniteFailure("unsupported attr");
+
+  if (!getLevel()) {
+    transformResults.set(getResultConfigPart().cast<OpResult>(), {});
+    return emitSilenceableFailure(target) << " level is required for tiling";
+  }
+  auto vals = config.getTileSizeVals(*getLevel());
+  if (vals.empty()) {
+    transformResults.set(getResultConfigPart().cast<OpResult>(), {});
+    return emitSilenceableFailure(target) << " no tiling at level";
+  }
+  SmallVector<Operation *> results;
+  OpBuilder b(target);
+  for (int64_t ts : vals)
+    results.push_back(b.create<arith::ConstantIndexOp>(target->getLoc(), ts));
+  transformResults.set(getResultConfigPart().cast<OpResult>(), results);
+  // This is necessary to see that the constants are indeed created before being
+  // DCE'd away (until we connect things properly).
+  // TODO: drop this.
+  target->getParentOfType<ModuleOp>().dump();
   return DiagnosedSilenceableFailure::success();
 }
 
