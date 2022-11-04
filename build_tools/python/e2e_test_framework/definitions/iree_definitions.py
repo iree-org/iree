@@ -55,7 +55,7 @@ class CompileTarget(object):
   target_abi: TargetABI
 
 
-@serialization.serializable(id_field="id", container_key="iree_compile_configs")
+@serialization.serializable(keyed_obj=True, type_key="iree_compile_configs")
 @dataclass(frozen=True)
 class CompileConfig(object):
   """Describes the options to build a module."""
@@ -65,8 +65,7 @@ class CompileConfig(object):
   extra_flags: List[str] = dataclasses.field(default_factory=list)
 
 
-@serialization.serializable(id_field="id",
-                            container_key="iree_module_execution_configs")
+@serialization.serializable(keyed_obj=True, type_key="iree_module_execution_configs")
 @dataclass(frozen=True)
 class ModuleExecutionConfig(object):
   """Describes the options to run a module."""
@@ -119,6 +118,7 @@ class ModuleGenerationConfig(object):
   compile_config: CompileConfig
 
 
+@serialization.serializable
 @dataclass(frozen=True)
 class E2EModelRunConfig(object):
   """Describes an e2e run."""

@@ -1,7 +1,10 @@
 import collections
+import dataclasses
 import json
+import typing
 from e2e_test_framework.definitions import common_definitions, iree_definitions, serialization
 from e2e_test_framework.models import tflite_models
+from benchmark_suites.iree import benchmark_collections
 
 
 def main():
@@ -19,7 +22,7 @@ def main():
       imported_model=iree_definitions.ImportedModel.from_model(
           tflite_models.MOBILENET_V2),
       compile_config=compile_config)
-  config = iree_definitions.ModuleExecutionConfig(
+  exec_config = iree_definitions.ModuleExecutionConfig(
       id="abcd",
       tags=[],
       loader=iree_definitions.RuntimeLoader.EMBEDDED_ELF,
@@ -27,12 +30,17 @@ def main():
       tool="test",
       extra_flags=[])
 
-  container_map = collections.OrderedDict()
-  print(
-      json.dumps(gen_config,
-                 cls=serialization.CustomEncoder,
-                 container_map=container_map))
-  print(container_map)
+  _, run_configs = benchmark_collections.generate_benchmarks()
+
+  serialized_obj_map = collections.OrderedDict()
+  serialized_obj = serialization.serialize(run_configs, serialized_obj_map)
+  objs = serialization.deserialize(
+      serialized_obj, typing.List[iree_definitions.E2EModelRunConfig],
+      serialized_obj_map)
+  for a, b in zip(run_configs, objs):
+    print(a)
+    print(b)
+  print(run_configs == objs)
 
 
 if __name__ == "__main__":

@@ -83,6 +83,7 @@ class InputDataFormat(Enum):
   NUMPY_NPY = "numpy_npy"
 
 
+@serialization.serializable(keyed_obj=True, type_key="device_specs")
 @dataclass(frozen=True)
 class DeviceSpec(object):
   """Benchmark device specification."""
@@ -98,7 +99,7 @@ class DeviceSpec(object):
   device_parameters: List[str] = dataclasses.field(default_factory=list)
 
 
-@serialization.serializable(id_field="id", container_key="models")
+@serialization.serializable(keyed_obj=True, type_key="models")
 @dataclass(frozen=True)
 class Model(object):
   """Model to be benchmarked."""
@@ -114,6 +115,7 @@ class Model(object):
   input_types: List[str]
 
 
+@serialization.serializable
 @dataclass(frozen=True)
 class ModelInputData(object):
   """Input data to benchmark the model."""
