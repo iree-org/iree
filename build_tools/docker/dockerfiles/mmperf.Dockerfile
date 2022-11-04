@@ -13,7 +13,8 @@
 # mmperf repo. Later versions of Clang, LLVM, Python and Ubuntu are needed
 # to satisfy the dependency requirements of the backends.
 
-FROM ubuntu:22.04
+# Ubuntu 22.04.
+FROM ubuntu@sha256:817cfe4672284dcbfee885b1a66094fd907630d610cab329114d036716be49ba
 
 ######## Basic ########
 RUN apt-get update \
@@ -87,12 +88,12 @@ RUN wget https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCT
 WORKDIR /
 
 ENV MKL_DIR="/opt/intel/mkl"
-############## \
+##############
 
 ######## OPENBLAS ########
 RUN apt-get update \
   && apt-get install -y libopenblas-dev
-############## \
+##############
 
 ######## BLIS ########
 WORKDIR /install-blis
@@ -107,4 +108,12 @@ RUN git clone --recurse-submodules https://github.com/flame/blis \
 WORKDIR /
 
 ENV BLIS_DIR="/opt/blis"
-############## \
+##############
+
+######## MMPERF ########
+COPY build_tools/docker/context/setup_mmperf.sh /usr/local/bin
+
+# Generate a version of mmperf for CPU.
+RUN mkdir -p "/usr/local/src/mmperf" && /usr/local/bin/setup_mmperf.sh "/usr/local/src/mmperf"
+
+##############

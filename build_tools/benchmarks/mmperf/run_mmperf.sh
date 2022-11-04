@@ -21,60 +21,64 @@
 #
 # Usage:
 #    ./run_mmperf.sh \
+#        <mmperf repo dir> \
+#        <mmperf build dir> \
 #        <results directory> \
 #        <backend> e.g. "cpu", "cuda".
 
 set -xeuo pipefail
 
-export REPORT_DIR=$1
+export REPO_DIR=$1
+export BUILD_DIR=$2
+export REPORT_DIR=$3
 # Either `cpu` or `cuda`.
-export BACKEND=$2
+export BACKEND=$4
 
-git clone --recurse-submodules https://github.com/mmperf/mmperf.git
-pushd mmperf
+pushd ${REPO_DIR}
+# Set all repos as a safe directory.
+for i in $(find ${REPO_DIR} -name '.git' | xargs dirname); do
+  git config --global --add safe.directory $i
+done
+
+source mmperf.venv/bin/activate
 
 # Update IREE.
 pushd external/iree
+git restore .
+git submodule foreach --recursive git restore .
 git fetch
 git checkout origin/main
 git submodule update --init --jobs 8 --depth 1
 popd
 
-# Create virtual environment.
-python3 -m venv mmperf.venv
-source mmperf.venv/bin/activate
-pip install -r requirements.txt
-pip install -r ./external/llvm-project/mlir/python/requirements.txt
-
 # Build mmperf.
 if [ ${BACKEND} == "cuda" ]; then
-cmake \
-  -GNinja \
-  -DCMAKE_CXX_COMPILER=/usr/bin/clang++ \
-  -DCMAKE_C_COMPILER=/usr/bin/clang \
-  -DUSE_IREE=ON \
-  -DIREE_CUDA=ON \
-  -DUSE_CUBLAS=ON \
-  -B ../mmperf-build .
+  cmake \
+    -GNinja \
+    -DCMAKE_CXX_COMPILER=/usr/bin/clang++ \
+    -DCMAKE_C_COMPILER=/usr/bin/clang \
+    -DUSE_IREE=ON \
+    -DIREE_CUDA=ON \
+    -DUSE_CUBLAS=ON \
+    -B ${BUILD_DIR} .
 else
-MKL_DIR=/opt/intel/mkl BLIS_DIR=/opt/blis cmake \
-  -GNinja \
-  -DCMAKE_CXX_COMPILER=/usr/bin/clang++ \
-  -DCMAKE_C_COMPILER=/usr/bin/clang \
-  -DMKL_DIR=/opt/intel/mkl \
-  -DBLIS_DIR=/opt/blis \
-  -DUSE_MKL=ON \
-  -DUSE_RUY=ON \
-  -DUSE_IREE=ON \
-  -DIREE_LLVMCPU=ON \
-  -DUSE_HALIDE=ON \
-  -DUSE_OPENBLAS=ON \
-  -DUSE_BLIS=ON \
-  -DUSE_TVM=ON \
-  -B ../mmperf-build .
+  MKL_DIR=/opt/intel/mkl BLIS_DIR=/opt/blis cmake \
+    -GNinja \
+    -DCMAKE_CXX_COMPILER=/usr/bin/clang++ \
+    -DCMAKE_C_COMPILER=/usr/bin/clang \
+    -DMKL_DIR=/opt/intel/mkl \
+    -DBLIS_DIR=/opt/blis \
+    -DUSE_MKL=ON \
+    -DUSE_RUY=ON \
+    -DUSE_IREE=ON \
+    -DIREE_LLVMCPU=ON \
+    -DUSE_HALIDE=ON \
+    -DUSE_OPENBLAS=ON \
+    -DUSE_BLIS=ON \
+    -DUSE_TVM=ON \
+    -B ${BUILD_DIR} .
 fi
-cmake --build ../mmperf-build --verbose
+cmake --build ${BUILD_DIR} --verbose
 
 # Run benchmark.
-popd
-python3 mmperf/mmperf.py ./mmperf-build/matmul/ ${REPORT_DIR}
+python3 mmperf.py ${BUILD_DIR}/matmul ${REPORT_DIR}
