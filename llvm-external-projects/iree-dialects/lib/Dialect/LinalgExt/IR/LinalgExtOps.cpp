@@ -121,7 +121,9 @@ static bool isInvalid(ArrayRef<int64_t> dimsPos, int64_t rank) {
 /// of the `limitShape`.
 static bool isSmallerThan(ArrayRef<int64_t> sourceShape,
                           ArrayRef<int64_t> limitShape) {
-  assert(sourceShape.size() == limitShape.size());
+  assert(
+      sourceShape.size() == limitShape.size() &&
+      "expected source shape rank, and limit of the shape to have same rank");
   return llvm::all_of(
       llvm::zip(sourceShape, limitShape), [](std::tuple<int64_t, int64_t> it) {
         int64_t sourceExtent = std::get<0>(it);
@@ -1664,7 +1666,6 @@ static LogicalResult commonVerifierPackAndUnPackOp(OpTy packOrUnPack) {
   // Verify result shape is greater than the minimum expected
   // by the pack operation, and that the output shape
   // represents full tiles.
-  // Verify result type against inferred type.
   ShapedType expectedPackedType = PackOp::getPackedType(
       unpackedType, packOrUnPack.getStaticTiles(), innerDimsPos, outerDimPerm);
   if (!isSmallerThan(expectedPackedType.getShape(), packedType.getShape())) {
