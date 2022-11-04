@@ -355,6 +355,42 @@ func.func @applyAsyncCopyOp(%source: !stream.resource<external>, %target: !strea
 
 // -----
 
+// Tests that fully in-place execution regions with nesting don't allocate any
+// transients. Both copies are concurrently in-place to the same provided
+// target buffer.
+
+// CHECK-LABEL: @applyConcurrentAsyncCopyOp
+// CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<external>,
+// CHECK-SAME:  %[[TARGET:.+]]: !stream.resource<transient>,
+// CHECK-SAME:  %[[SIZE:.+]]: index)
+func.func @applyConcurrentAsyncCopyOp(%source: !stream.resource<external>, %target: !stream.resource<transient>, %size: index) {
+  %c0 = arith.constant 0 : index
+  %c16 = arith.constant 16 : index
+  %c128 = arith.constant 128 : index
+  %c144 = arith.constant 144 : index
+  // CHECK: stream.cmd.execute
+  // CHECK-SAME: with(%[[SOURCE]] as %[[SOURCE_CAPTURE:.+]]: !stream.resource<external>{%[[SIZE]]},
+  // CHECK-SAME:      %[[TARGET]] as %[[TARGET_CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]})
+  %result, %result_timepoint = stream.async.execute with(%source as %captured_source: !stream.resource<external>{%size}, %target as %captured_target: !stream.resource<transient>{%size}) -> (%target as !stream.resource<transient>{%size}) {
+    // CHECK: stream.cmd.concurrent
+    %0 = stream.async.concurrent with(%captured_source as %concurrent_source: !stream.resource<external>{%size}, %captured_target as %concurrent_target: !stream.resource<transient>{%size}) -> (%captured_target as !stream.resource<transient>{%size}) {
+      // CHECK: stream.cmd.copy %[[SOURCE_CAPTURE]][%c0_0], %[[TARGET_CAPTURE]][%c0_0], %c16
+      // CHECK-SAME: : !stream.resource<external>{%[[SIZE]]} -> !stream.resource<transient>{%[[SIZE]]}
+      %copy0 = stream.async.copy %concurrent_source[%c0 to %c16], %concurrent_target[%c0 to %c16], %c16 : !stream.resource<external>{%size} -> %concurrent_target as !stream.resource<transient>{%size}
+      // CHECK: stream.cmd.copy %[[SOURCE_CAPTURE]][%c16_1], %[[TARGET_CAPTURE]][%c16_2], %c128
+      // CHECK-SAME: : !stream.resource<external>{%[[SIZE]]} -> !stream.resource<transient>{%[[SIZE]]}
+      %copy1 = stream.async.copy %concurrent_source[%c16 to %c144], %copy0[%c16 to %c144], %c128 : !stream.resource<external>{%size} -> %copy0 as !stream.resource<transient>{%size}
+      stream.yield %copy1 : !stream.resource<transient>{%size}
+    }
+    stream.yield %0 : !stream.resource<transient>{%size}
+  } => !stream.timepoint
+  // CHECK: util.optimization_barrier %[[TARGET]]
+  util.optimization_barrier %result : !stream.resource<transient>
+  return
+}
+
+// -----
+
 // TODO(benvanik): test affinity changes that would introduce invalidate/fill.
 
 // CHECK-LABEL: @applyAsyncTransferOp
