@@ -188,6 +188,20 @@ def Stream_StreamableOp : OpInterface<"StreamableOpInterface"> {
         return false;
       }]
     >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns true if this op can be scheduled to run concurrently with the
+        given user op that consumes (directly or indirectly) the results of
+        this op.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"canScheduleConcurrentlyWithConsumer",
+      /*args=*/(ins "Operation *":$consumerOp),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return false;
+      }]
+    >,
   ];
 }
 

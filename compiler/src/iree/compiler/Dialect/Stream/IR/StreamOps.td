@@ -1596,7 +1596,7 @@ def Stream_AsyncUpdateOp : Stream_Op<"async.update", [
   Stream_AffinityOp,
   Stream_AsyncPhaseOp,
   DeclareOpInterfaceMethods<Stream_StreamableOp, [
-    "isMetadata",
+    "canScheduleConcurrentlyWithConsumer",
   ]>,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
@@ -1651,7 +1651,9 @@ def Stream_AsyncCopyOp : Stream_Op<"async.copy", [
   AllTypesMatch<["target", "result"]>,
   Stream_AffinityOp,
   Stream_AsyncPhaseOp,
-  Stream_StreamableOp,
+  DeclareOpInterfaceMethods<Stream_StreamableOp, [
+    "canScheduleConcurrentlyWithConsumer",
+  ]>,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
     "getTiedResult",

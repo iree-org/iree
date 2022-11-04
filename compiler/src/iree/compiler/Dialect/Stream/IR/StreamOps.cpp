@@ -256,6 +256,59 @@ static IREE::Util::ValueAccess computeValueAccess(Value rootValue) {
   return access;
 }
 
+static bool doesRead(ResourceAccessBitfield access) {
+  return bitEnumContainsAny(access, ResourceAccessBitfield::Read);
+}
+static bool doesWrite(ResourceAccessBitfield access) {
+  return bitEnumContainsAny(access, ResourceAccessBitfield::Write);
+}
+static bool isReadOnly(ResourceAccessBitfield access) {
+  return access == ResourceAccessBitfield::Read;
+}
+static bool isWriteOnly(ResourceAccessBitfield access) {
+  return access == ResourceAccessBitfield::Write;
+}
+static bool isReadWrite(ResourceAccessBitfield access) {
+  return bitEnumContainsAny(
+      access, ResourceAccessBitfield::Read | ResourceAccessBitfield::Write);
+}
+
+// Recursively walks up the use-def chain to find the base value of a tied
+// result but stops at any op that may change the effective range (subspan/etc).
+static Value findTiedBaseValueInRange(Value derivedValue) {
+  Value baseValue = derivedValue;
+  while (auto definingOp = dyn_cast_or_null<IREE::Util::TiedOpInterface>(
+             baseValue.getDefiningOp())) {
+    if (isa<IREE::Stream::ResourceSubviewOp>(definingOp)) break;
+    auto tiedValue = definingOp.getTiedResultOperand(baseValue);
+    if (!tiedValue) break;
+    baseValue = tiedValue;
+  }
+  return baseValue;
+}
+
+// Conservatively checks whether the given accesses of two resources may have a
+// hazard. Only returns false if it can be guaranteed that the two resources
+// have no overlap. Start offsets may be nullptr if known to start at zero.
+static bool checkPossibleResourceHazard(ResourceAccessBitfield lhsAccess,
+                                        Value lhs, Value lhsStart, Value lhsEnd,
+                                        ResourceAccessBitfield rhsAccess,
+                                        Value rhs, Value rhsStart,
+                                        Value rhsEnd) {
+  // If both are reads then no hazard possible.
+  if (isReadOnly(lhsAccess) && isReadOnly(rhsAccess)) return false;
+
+  // Test to see if the resources are the same.
+  if (lhs != rhs) return false;
+
+  // Extremely basic overlap detection. We really should be using some analysis
+  // to figure out these relationships and may want to do that by adding
+  // annotations to the values or something (we really just need to know <=).
+  if (rhsStart == lhsEnd || lhsStart == rhsEnd) return false;
+
+  return true;
+}
+
 static void eraseStreamRegionResults(Region &region,
                                      ArrayRef<unsigned> excludedResultIndices) {
   for (auto &block : region.getBlocks()) {
@@ -1296,7 +1349,31 @@ LogicalResult AsyncUpdateOp::verify() {
   return success();
 }
 
-bool AsyncUpdateOp::isMetadata() { return true; }
+// TODO(#7729): use SubviewEffectOpInterface to do this across all ops.
+bool AsyncUpdateOp::canScheduleConcurrentlyWithConsumer(Operation *consumerOp) {
+  auto consumerUpdateOp = dyn_cast<AsyncUpdateOp>(consumerOp);
+  if (!consumerUpdateOp) return false;
+
+  // Since the values may be tied we need to walk to the root and compare those.
+  // If they don't point at the same resource then we can be reasonably sure
+  // there's no overlap 🤞.
+  auto producerSource = findTiedBaseValueInRange(getUpdate());
+  auto producerTarget = findTiedBaseValueInRange(getTarget());
+  auto consumerSource = findTiedBaseValueInRange(consumerUpdateOp.getUpdate());
+  auto consumerTarget = findTiedBaseValueInRange(consumerUpdateOp.getTarget());
+
+  // Source overlaps are ok - no hazard with read-after-read.
+  // Target overlaps are a hazard - hazard with write-after-write.
+  // Source/target overlaps are a hazard - hazard with read-after-write.
+  bool sourceTargetHazard = producerSource == consumerTarget;
+  bool targetSourceHazard = producerTarget == consumerSource;
+  bool targetTargetHazard = checkPossibleResourceHazard(
+      ResourceAccessBitfield::Write, producerTarget, getTargetOffset(),
+      getTargetEnd(), ResourceAccessBitfield::Write, consumerTarget,
+      consumerUpdateOp.getTargetOffset(), consumerUpdateOp.getTargetEnd());
+
+  return !sourceTargetHazard && !targetSourceHazard && !targetTargetHazard;
+}
 
 Value AsyncUpdateOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());
@@ -1329,6 +1406,38 @@ LogicalResult AsyncCopyOp::verify() {
     return failure();
   }
   return success();
+}
+
+// TODO(#7729): use SubviewEffectOpInterface to do this across all ops.
+bool AsyncCopyOp::canScheduleConcurrentlyWithConsumer(Operation *consumerOp) {
+  auto consumerCopyOp = dyn_cast<AsyncCopyOp>(consumerOp);
+  if (!consumerCopyOp) return false;
+
+  // Since the values may be tied we need to walk to the root and compare those.
+  // If they don't point at the same resource then we can be reasonably sure
+  // there's no overlap 🤞.
+  auto producerSource = findTiedBaseValueInRange(getSource());
+  auto producerTarget = findTiedBaseValueInRange(getTarget());
+  auto consumerSource = findTiedBaseValueInRange(consumerCopyOp.getSource());
+  auto consumerTarget = findTiedBaseValueInRange(consumerCopyOp.getTarget());
+
+  // Source overlaps are ok - no hazard with read-after-read.
+  // Target overlaps are a hazard - hazard with write-after-write.
+  // Source/target overlaps are a hazard - hazard with read-after-write.
+  bool sourceTargetHazard = checkPossibleResourceHazard(
+      ResourceAccessBitfield::Read, producerSource, getSourceOffset(),
+      getSourceEnd(), ResourceAccessBitfield::Write, consumerTarget,
+      consumerCopyOp.getTargetOffset(), consumerCopyOp.getTargetEnd());
+  bool targetSourceHazard = checkPossibleResourceHazard(
+      ResourceAccessBitfield::Write, producerTarget, getTargetOffset(),
+      getTargetEnd(), ResourceAccessBitfield::Read, consumerSource,
+      consumerCopyOp.getSourceOffset(), consumerCopyOp.getSourceEnd());
+  bool targetTargetHazard = checkPossibleResourceHazard(
+      ResourceAccessBitfield::Write, producerTarget, getTargetOffset(),
+      getTargetEnd(), ResourceAccessBitfield::Write, consumerTarget,
+      consumerCopyOp.getTargetOffset(), consumerCopyOp.getTargetEnd());
+
+  return !sourceTargetHazard && !targetSourceHazard && !targetTargetHazard;
 }
 
 Value AsyncCopyOp::getTiedResult(unsigned resultIndex) {

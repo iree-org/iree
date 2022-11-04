@@ -293,6 +293,10 @@ PartitionSet partitionRegionConcurrencyReference(
       continue;
     }
 
+    // NOTE: it's ok if this op is not streamable as we still need to track the
+    // hazards for other ops that it may use/may use it.
+    auto streamableOp = dyn_cast<IREE::Stream::StreamableOpInterface>(op);
+
     // Initialize op info for this op - whether streamable or not. We track
     // transitive hazards on each op. Note that thanks to the ordering of ops
     // in SSA form (_reversed here!_) we know that once we visit this op no
@@ -313,8 +317,15 @@ PartitionSet partitionRegionConcurrencyReference(
     llvm::BitVector consumers(builders.size(), /*t=*/false);
     for (auto user : op.getUsers()) {
       auto &userInfo = opInfos[user];
+      bool ignoreHazards =
+          streamableOp ? streamableOp.canScheduleConcurrentlyWithConsumer(user)
+                       : false;
       LLVM_DEBUG({
-        llvm::dbgs() << "Testing user:\n";
+        llvm::dbgs() << "Testing ";
+        if (ignoreHazards) {
+          llvm::dbgs() << "<concurrently schedulable> ";
+        }
+        llvm::dbgs() << "user:\n";
         user->print(llvm::dbgs(), *asmState);
         for (auto membershipOrdinal : userInfo.membership.set_bits()) {
           llvm::dbgs() << "  member of wave " << membershipOrdinal << "\n";
@@ -325,7 +336,7 @@ PartitionSet partitionRegionConcurrencyReference(
         }
       });
       consumers |= userInfo.membership;
-      opInfo.hazards |= userInfo.membership;
+      if (!ignoreHazards) opInfo.hazards |= userInfo.membership;
       opInfo.hazards |= userInfo.hazards;
     }
     llvm::BitVector candidates(builders.size(), /*t=*/true);
@@ -333,7 +344,6 @@ PartitionSet partitionRegionConcurrencyReference(
 
     // If this op is not streamable then bail here; we've still setup the hazard
     // map for following iteration.
-    auto streamableOp = dyn_cast<IREE::Stream::StreamableOpInterface>(op);
     if (!streamableOp || streamableOp.isMetadata()) {
       LLVM_DEBUG(llvm::dbgs() << "Not streamable/is subview (skip)\n");
       continue;
