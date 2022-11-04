@@ -11,7 +11,7 @@ from typing import List
 import dataclasses
 
 from e2e_test_framework.definitions import common_definitions
-from e2e_test_framework.definitions import serialization
+from e2e_test_framework import serialization
 
 
 class TargetBackend(Enum):

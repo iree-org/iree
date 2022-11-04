@@ -2,7 +2,8 @@ import collections
 import dataclasses
 import json
 import typing
-from e2e_test_framework.definitions import common_definitions, iree_definitions, serialization
+from e2e_test_framework import serialization
+from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework.models import tflite_models
 from benchmark_suites.iree import benchmark_collections
 

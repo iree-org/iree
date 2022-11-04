@@ -8,7 +8,7 @@
 from dataclasses import dataclass
 from enum import Enum
 from typing import List
-from e2e_test_framework.definitions import serialization
+from e2e_test_framework import serialization
 import dataclasses
 
 
