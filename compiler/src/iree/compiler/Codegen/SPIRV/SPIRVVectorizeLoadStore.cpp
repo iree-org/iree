@@ -46,7 +46,7 @@ static bool getUsesIfAllTransferOp(Value value,
   assert(uses.empty() && "expected uses to be empty");
   for (Operation *userOp : value.getUsers()) {
     if (isa<memref::DeallocOp, memref::AssumeAlignmentOp>(userOp)) continue;
-    // Only vectorize memref used by vector transfer ops.
+
     if (!isa<gpu::SubgroupMmaLoadMatrixOp, gpu::SubgroupMmaStoreMatrixOp,
              vector::TransferReadOp, vector::TransferWriteOp>(userOp)) {
       uses.clear();
@@ -54,18 +54,16 @@ static bool getUsesIfAllTransferOp(Value value,
                  << "failed: non-transfer-like user: " << *userOp << "\n");
       return false;
     }
-    bool isMinorIdentity = true;
-    if (auto readOp = dyn_cast<vector::TransferReadOp>(userOp)) {
-      isMinorIdentity = readOp.getPermutationMap().isMinorIdentity();
-    } else if (auto writeOp = dyn_cast<vector::TransferWriteOp>(userOp)) {
-      isMinorIdentity = writeOp.getPermutationMap().isMinorIdentity();
+
+    if (auto transferOp = dyn_cast<VectorTransferOpInterface>(userOp)) {
+      if (!transferOp.permutation_map().isMinorIdentity()) {
+        uses.clear();
+        LLVM_DEBUG(llvm::dbgs() << "failed: non-minor-identity transfer user: "
+                                << *userOp << "\n");
+        return false;
+      }
     }
-    if (!isMinorIdentity) {
-      uses.clear();
-      LLVM_DEBUG(llvm::dbgs() << "failed: non-minor-identity transfer user: "
-                              << *userOp << "\n");
-      return false;
-    }
+
     uses.push_back(userOp);
   }
   return true;
