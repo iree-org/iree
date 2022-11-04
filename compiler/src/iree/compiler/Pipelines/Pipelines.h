@@ -28,15 +28,29 @@ struct IREEVMPipelineHooks {
   std::function<void(OpPassManager &)> buildConstEvalPassPipelineCallback;
 };
 
+enum class IREEVMPipelinePhase {
+  Input,
+  ABI,
+  Flow,
+  Stream,
+  HAL,
+  VM,
+  End,
+};
+
 // Builds a pass pipeline to perform end-to-end compilation from a
 // supported MLIR-based input to the IREE vm dialect.
+//
+// If a |runTo| phase is specified the pipeline will stop and output the full
+// IR after the phase completes.
 void buildIREEVMTransformPassPipeline(
     BindingOptions bindingOptions, InputDialectOptions inputOptions,
     HighLevelOptimizationOptions highLevelOptimizationOptions,
     SchedulingOptions schedulingOptions,
     IREE::HAL::TargetOptions executableOptions,
     IREE::VM::TargetOptions targetOptions, IREEVMPipelineHooks &hooks,
-    OpPassManager &passManager);
+    OpPassManager &passManager,
+    IREEVMPipelinePhase compileTo = IREEVMPipelinePhase::End);
 
 // Builds the above with options initialized from flags.
 void buildDefaultIREEVMTransformPassPipeline(OpPassManager &passManager);
