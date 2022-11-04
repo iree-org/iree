@@ -157,6 +157,21 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
   }
 
   if (!testLoweringConfiguration && translationInfo.has_value()) {
+    // print config values:
+    llvm::errs() << "--- pass pipeline:\n";
+    translationInfo.value().dump();
+    moduleOp.walk([](linalg::LinalgOp linalgOp) {
+      auto config = getLoweringConfig(linalgOp.getOperation());
+      if(config) {
+        llvm::errs() << "--- op:\n";
+        linalgOp.dump();
+        llvm::errs() << "--- config:\n";
+        config.dump();
+        // to get the tile sizes in int64_t: config.getTileSizeVals(level);
+      }
+    });
+
+    
     switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
       case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute:
         addGPUSimpleDistributePassPipeline(executableLoweringPipeline);
