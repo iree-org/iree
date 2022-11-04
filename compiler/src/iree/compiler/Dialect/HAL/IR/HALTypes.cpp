@@ -342,6 +342,26 @@ Attribute ExecutableTargetAttr::getMatchExpression() {
   return DeviceMatchExecutableFormatAttr::get(getContext(), getFormat());
 }
 
+// static
+ExecutableTargetAttr ExecutableTargetAttr::lookup(Operation *op) {
+  auto *context = op->getContext();
+  auto attrId = StringAttr::get(context, "hal.executable.target");
+  while (op) {
+    // Take directly from the enclosing variant.
+    if (auto variantOp = llvm::dyn_cast<ExecutableVariantOp>(op)) {
+      return variantOp.getTarget();
+    }
+    // Use an override if specified.
+    auto attr = op->getAttrOfType<ExecutableTargetAttr>(attrId);
+    if (attr) return attr;
+    // Continue walk.
+    op = op->getParentOp();
+  }
+  // No target found during walk. No default to provide so fail and let the
+  // caller decide what to do (assert/fallback/etc).
+  return nullptr;
+}
+
 //===----------------------------------------------------------------------===//
 // #hal.affinity.queue
 //===----------------------------------------------------------------------===//
