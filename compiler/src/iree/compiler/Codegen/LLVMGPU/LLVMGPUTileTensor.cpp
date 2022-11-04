@@ -69,7 +69,7 @@ static void populateTilingPatterns(RewritePatternSet &patterns,
 
 LogicalResult tileToSerialLoops(func::FuncOp funcOp, bool onlyReduction) {
   {
-    // Tile again at the workgroup level since redution dimension were
+    // Tile again at the workgroup level since reduction dimension were
     // ignored. Dimensions already tiled will be ignore since we tile to the
     // same size.
     RewritePatternSet wgTilingPatterns(funcOp.getContext());

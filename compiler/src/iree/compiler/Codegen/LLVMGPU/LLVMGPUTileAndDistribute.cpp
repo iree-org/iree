@@ -191,7 +191,7 @@ struct LLVMGPUTileAndDistributePass
     auto funcOp = getOperation();
     if (!isEntryPoint(funcOp)) return;
 
-    // Promote C matrix and propagate the potential  fill producer into the temp
+    // Promote C matrix and propagate the potential fill producer into the temp
     // allocation. This needs to be done before reduction tiling.
     {
       RewritePatternSet promotionPatterns(&getContext());

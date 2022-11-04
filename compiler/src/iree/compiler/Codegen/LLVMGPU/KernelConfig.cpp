@@ -409,7 +409,7 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
   }
 
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-  // Pick a vectorSize of 1 for op that we know won't get vectorizedd.
+  // Pick a vectorSize of 1 for op that we know won't get vectorized.
   // Also skip vectorization for linalg on memref (no result) as the pipeline
   // relies on tensor level tiling.
   // TODO(thomasraoux): This could be improved by checking if the linalg op
