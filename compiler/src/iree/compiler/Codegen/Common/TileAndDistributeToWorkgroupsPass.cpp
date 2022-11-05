@@ -128,6 +128,7 @@ static LogicalResult getTileAndDistributeConfig(
   return success();
 }
 
+/// Get the materialization information from a `iree_linalg_ext.pack` operation.
 static FailureOr<IREE::LinalgExt::MaterializeEncodingInfo>
 getMaterializationInfo(IREE::LinalgExt::PackOp packOp) {
   IREE::LinalgExt::MaterializeEncodingInfo encodingInfo;
@@ -245,6 +246,13 @@ struct LowerDispatchWorkgroupCountForDagRootOp
   SmallVector<unsigned> partitionedLoops;
 };
 
+/// Pattern to lower a `flow.dispatch.workgroup_count_from_set_encoding` op.
+/// At the Flow level this op uses the logical shape of the tensor
+/// as the workload. This gets materialized into an physical tensor
+/// Lower this operation accounting for the change of shape from
+/// the logical shape to the physical shape. It lowers to
+/// a `flow.dispatch.workgroup_count_from_root_dag` where the root
+/// is the `pack` op that materialized the encoding.
 struct LowerDispatchWorkgroupCountFromSetEncodingOp
     : public OpRewritePattern<
           IREE::Flow::DispatchWorkgroupCountFromSetEncodingOp> {
