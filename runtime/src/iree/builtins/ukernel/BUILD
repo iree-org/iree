@@ -45,10 +45,12 @@ iree_runtime_cc_library(
 iree_runtime_cc_library(
     name = "generic",
     srcs = [
-        "mmt4d_select_tile_generic.c",
+        "mmt4d_generic.c",
+        "pack_generic.c",
     ],
     hdrs = [
-        "mmt4d_select_tile_generic.h",
+        "mmt4d_generic.h",
+        "pack_generic.h",
     ],
     deps = [
         ":common",

@@ -51,9 +51,11 @@ iree_cc_library(
   NAME
     generic
   HDRS
-    "mmt4d_select_tile_generic.h"
+    "mmt4d_generic.h"
+    "pack_generic.h"
   SRCS
-    "mmt4d_select_tile_generic.c"
+    "mmt4d_generic.c"
+    "pack_generic.c"
   DEPS
     ::common
   PUBLIC

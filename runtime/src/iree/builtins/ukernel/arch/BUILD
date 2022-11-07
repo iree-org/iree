@@ -29,10 +29,12 @@ iree_runtime_cc_library(
 iree_runtime_cc_library(
     name = "ukernel_arch",
     srcs = [
-        "mmt4d_select_tile_arch.c",
+        "mmt4d_arch.c",
+        "pack_arch.c",
     ],
     hdrs = [
-        "mmt4d_select_tile_arch.h",
+        "mmt4d_arch.h",
+        "pack_arch.h",
     ],
     deps = [
         "//runtime/src/iree/builtins/ukernel:common",

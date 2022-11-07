@@ -6,10 +6,8 @@
 
 #include "iree/builtins/ukernel/mmt4d.h"
 
-#include <stdbool.h>
-
-#include "iree/builtins/ukernel/arch/mmt4d_select_tile_arch.h"
-#include "iree/builtins/ukernel/mmt4d_select_tile_generic.h"
+#include "iree/builtins/ukernel/arch/mmt4d_arch.h"
+#include "iree/builtins/ukernel/mmt4d_generic.h"
 
 #define OUTSIDE_UINT_RANGE(value, bits) (((value) < 0) || ((value) >> (bits)))
 

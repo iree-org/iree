@@ -6,11 +6,12 @@
 
 #include "iree/builtins/ukernel/pack.h"
 
+#include <algorithm>
 #include <cstring>
-#include <utility>
 #include <vector>
 
 #include "iree/base/api.h"
+#include "iree/base/internal/cpu.h"
 #include "iree/builtins/ukernel/tools/ukernel_test_utils.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
@@ -19,32 +20,35 @@ static void iree_pack_reference(const iree_uk_pack_params_t& params) {
   // For now, the input and output element types are always the same.
   iree_uk_type_t elem_type = iree_uk_pack_in_type(params.type);
   iree_uk_ssize_t elem_size = iree_uk_type_size(elem_type);
-  iree_uk_ssize_t lsize0 = params.out_size0;
-  iree_uk_ssize_t lsize1 = params.out_size1;
-  iree_uk_ssize_t lsize2 = params.out_size2;
-  iree_uk_ssize_t lsize3 = params.out_size3;
+  iree_uk_ssize_t outer_size0 = params.out_size0;
+  iree_uk_ssize_t outer_size1 = params.out_size1;
+  iree_uk_ssize_t tile_size0 = params.out_size2;
+  iree_uk_ssize_t tile_size1 = params.out_size3;
   iree_uk_ssize_t out_stride_l0 = params.out_stride0;
   iree_uk_ssize_t out_stride_l1 = params.out_size3 * params.out_size2;
   iree_uk_ssize_t out_stride_l2 = params.out_size3;
   iree_uk_ssize_t out_stride_l3 = 1;
   if (params.flags & IREE_UK_FLAG_PACK_TRANSPOSE_OUTER) {
-    std::swap(lsize0, lsize1);
+    std::swap(outer_size0, outer_size1);
     std::swap(out_stride_l0, out_stride_l1);
   }
   if (params.flags & IREE_UK_FLAG_PACK_TRANSPOSE_INNER) {
-    std::swap(lsize2, lsize3);
+    std::swap(tile_size0, tile_size1);
     std::swap(out_stride_l2, out_stride_l3);
   }
-  assert(lsize0 * lsize2 == params.in_size0);
-  assert(lsize1 * lsize3 == params.in_size1);
-  for (iree_uk_ssize_t l0 = 0; l0 < lsize0; ++l0) {
-    for (iree_uk_ssize_t l2 = 0; l2 < lsize2; ++l2) {
-      for (iree_uk_ssize_t l1 = 0; l1 < lsize1; ++l1) {
-        for (iree_uk_ssize_t l3 = 0; l3 < lsize3; ++l3) {
-          iree_uk_ssize_t out_offset = l0 * out_stride_l0 + l2 * out_stride_l2 +
-                                       l1 * out_stride_l1 + l3 * out_stride_l3;
-          iree_uk_ssize_t i0 = l0 * lsize2 + l2;
-          iree_uk_ssize_t i1 = l1 * lsize3 + l3;
+  assert(outer_size0 * tile_size0 >= params.in_size0);
+  assert(outer_size1 * tile_size1 >= params.in_size1);
+  assert((outer_size0 - 1) * tile_size0 < params.in_size0);
+  assert((outer_size1 - 1) * tile_size1 < params.in_size1);
+  for (iree_uk_ssize_t outer_i0 = 0; outer_i0 < outer_size0; ++outer_i0) {
+    for (iree_uk_ssize_t outer_i1 = 0; outer_i1 < outer_size1; ++outer_i1) {
+      for (iree_uk_ssize_t tile_i0 = 0; tile_i0 < tile_size0; ++tile_i0) {
+        for (iree_uk_ssize_t tile_i1 = 0; tile_i1 < tile_size1; ++tile_i1) {
+          iree_uk_ssize_t out_offset =
+              outer_i0 * out_stride_l0 + tile_i0 * out_stride_l2 +
+              outer_i1 * out_stride_l1 + tile_i1 * out_stride_l3;
+          iree_uk_ssize_t i0 = outer_i0 * tile_size0 + tile_i0;
+          iree_uk_ssize_t i1 = outer_i1 * tile_size1 + tile_i1;
           char* out_ptr = ((char*)params.out_buffer) + out_offset * elem_size;
           if (i0 >= params.in_size0 || i1 >= params.in_size1) {
             memcpy(out_ptr, params.padding_value, elem_size);
@@ -139,9 +143,8 @@ static void test_one_pack_creating_input_for_given_shape(
   // Populate strides first - we need them below to compute buffer lengths.
   // Randomly make strides either tight or not to exercise all cases.
   params.in_stride0 =
-      params.in_size1 + iree_uk_test_random_engine_get_0_or_1(engine);
+      params.in_size1 + iree_uk_test_random_engine_get_0_1(engine);
   params.out_stride0 = params.out_size1 * params.out_size2 * params.out_size3;
-  iree_uk_test_random_engine_get_0_or_1(engine);
   iree_uk_type_t in_type = iree_uk_pack_in_type(params.type);
   iree_uk_ssize_t in_buffer_size = iree_uk_test_2d_buffer_length(
       in_type, params.in_size0, params.in_stride0);
@@ -152,53 +155,133 @@ static void test_one_pack_creating_input_for_given_shape(
   free(in_buffer);
 }
 
-static void pack_test(const iree_uk_pack_type_t& type) {
-  iree_uk_test_random_engine_t* engine = iree_uk_test_random_engine_create();
-  struct untransposed_out_shape_t {
-    int size0, size1, size2, size3;
+static void pack_test_for_various_tile_shapes_and_flags(
+    iree_uk_pack_type_t type, int tile_size0, int tile_size1,
+    const iree_uk_uint64_t* cpu_data, iree_uk_test_random_engine_t* engine) {
+  struct outer_shape_t {
+    int size0, size1;
   };
-  std::vector<untransposed_out_shape_t> untransposed_out_shapes{
+  std::vector<outer_shape_t> outer_shapes{
       // Degenerate cases. Vacuous.
-      {0, 1, 1, 1},
-      {1, 0, 1, 1},
+      {0, 1},
+      {1, 0},
       // Non-degenerate cases.
-      {1, 1, 1, 1},
-      {2, 2, 2, 2},
-      {3, 3, 2, 2},
-      {2, 2, 3, 3},
-      {2, 3, 2, 3},
-      {11, 13, 7, 5},
-      {4, 8, 16, 32},
+      {1, 1},
+      {2, 2},
+      {3, 2},
+      {8, 8},
+      {11, 13},
+      {123, 45},
   };
-  for (const auto& shape : untransposed_out_shapes) {
+  for (const auto& outer_shape : outer_shapes) {
     for (bool transpose_inner : {false, true}) {
       for (bool transpose_outer : {false, true}) {
         iree_uk_pack_params_t params = {};
         params.type = type;
-        params.in_size0 = shape.size0 * shape.size2;
-        params.in_size1 = shape.size1 * shape.size3;
-        params.out_size0 = shape.size0;
-        params.out_size1 = shape.size1;
-        params.out_size2 = shape.size2;
-        params.out_size3 = shape.size3;
+        params.cpu_data = cpu_data;
+        iree_uk_ssize_t out_size0 = outer_shape.size0;
+        iree_uk_ssize_t out_size1 = outer_shape.size1;
+        iree_uk_ssize_t out_size2 = tile_size0;
+        iree_uk_ssize_t out_size3 = tile_size1;
+        params.out_size0 = out_size0;
+        params.out_size1 = out_size1;
+        params.out_size2 = out_size2;
+        params.out_size3 = out_size3;
         params.flags = 0;
         if (transpose_outer) {
           params.flags |= IREE_UK_FLAG_PACK_TRANSPOSE_OUTER;
-          std::swap(params.out_size0, params.out_size1);
+          std::swap(out_size0, out_size1);
         }
         if (transpose_inner) {
           params.flags |= IREE_UK_FLAG_PACK_TRANSPOSE_INNER;
-          std::swap(params.out_size2, params.out_size3);
+          std::swap(out_size2, out_size3);
         }
+        iree_uk_ssize_t pad_size0 =
+            iree_uk_test_random_engine_get_0_65535(engine) % out_size2;
+        iree_uk_ssize_t pad_size1 =
+            iree_uk_test_random_engine_get_0_65535(engine) % out_size3;
+        params.in_size0 =
+            std::max<iree_uk_ssize_t>(0, out_size0 * out_size2 - pad_size0);
+        params.in_size1 =
+            std::max<iree_uk_ssize_t>(0, out_size1 * out_size3 - pad_size1);
+        iree_uk_type_t out_type = iree_uk_pack_out_type(type);
+        int out_elem_size = iree_uk_type_size(out_type);
+        void* padding_value_buffer = malloc(out_elem_size);
+        iree_uk_test_write_random_buffer(padding_value_buffer, out_elem_size,
+                                         out_type, engine);
+        params.padding_value = padding_value_buffer;
         test_one_pack_creating_input_for_given_shape(params, engine);
+        free(padding_value_buffer);
       }
     }
   }
+}
+
+static void pack_test(iree_uk_pack_type_t type, int tile_size0, int tile_size1,
+                      iree_uk_uint64_t cpu_data_field_0_bit) {
+  const iree_uk_uint64_t local_cpu_data_default[IREE_CPU_DATA_FIELD_COUNT] = {
+      0};
+  iree_uk_test_random_engine_t* engine = iree_uk_test_random_engine_create();
+  // First try without any optional CPU feature. This matters even when the
+  // feature is supported by the CPU because we want to test the fallback to
+  // architecture-default or generic code.
+  pack_test_for_various_tile_shapes_and_flags(type, tile_size0, tile_size1,
+                                              local_cpu_data_default, engine);
+  // If this is nonzero, we are asked to test again with this CPU feature.
+  if (cpu_data_field_0_bit) {
+    const iree_uk_uint64_t local_cpu_data_with_bit[IREE_CPU_DATA_FIELD_COUNT] =
+        {cpu_data_field_0_bit};
+    // Check if the CPU supports the feature (otherwise, we crash).
+    bool supported = iree_cpu_data_field(0) & cpu_data_field_0_bit;
+    char cpu_feat_str[32];
+    iree_uk_test_cpu_features_str(cpu_feat_str, sizeof cpu_feat_str,
+                                  local_cpu_data_with_bit, 1);
+    if (supported) {
+      // Run with the optional CPU feature.
+      printf("Device supports CPU feature: %s\n", cpu_feat_str);
+      pack_test_for_various_tile_shapes_and_flags(
+          type, tile_size0, tile_size1, local_cpu_data_with_bit, engine);
+    } else {
+      printf("Skipped: device does not support CPU feature: %s\n",
+             cpu_feat_str);
+    }
+  }
+
   iree_uk_test_random_engine_destroy(engine);
 }
 
-TEST(PackTest, f32f32) { pack_test(iree_uk_pack_type_f32f32); }
+#define PACK_TEST(type, tile_size0, tile_size1, test_suffix, feature_bit)     \
+  TEST(PackTest, type##_tile_##tile_size0##x##tile_size1##_##test_suffix) {   \
+    pack_test(iree_uk_pack_type_##type, tile_size0, tile_size1, feature_bit); \
+  }
 
-TEST(PackTest, i8i8) { pack_test(iree_uk_pack_type_i8i8); }
+// Generic tests, not matching any particular CPU feature. This is the place to
+// test weird tile shapes to ensure e.g. that we haven't unwittingly baked in a
+// power-of-two assumption
+PACK_TEST(f32f32, 3, 5, generic, 0)
+PACK_TEST(i8i8, 4, 2, generic, 0)
+PACK_TEST(i32i32, 3, 4, generic, 0)
 
-TEST(PackTest, i32i32) { pack_test(iree_uk_pack_type_i32i32); }
+// ARM_64 tests.
+#if defined(IREE_UK_ARCH_ARM_64)
+
+#define PACK_ARM_64_TEST(type, tile_size0, tile_size1) \
+  PACK_TEST(type, tile_size0, tile_size1, arm_64, 0)
+
+#define PACK_ARM_64_TEST_WITH_CPU_FEATURE(type, tile_size0, tile_size1, \
+                                          FEATURE)                      \
+  PACK_TEST(type, tile_size0, tile_size1, arm_64_##FEATURE,             \
+            IREE_CPU_DATA_FIELD_0_AARCH64_HAVE_##FEATURE)
+
+PACK_ARM_64_TEST(f32f32, 8, 1)
+PACK_ARM_64_TEST(i8i8, 8, 1)
+PACK_ARM_64_TEST_WITH_CPU_FEATURE(i8i8, 8, 4, DOTPROD)
+PACK_ARM_64_TEST_WITH_CPU_FEATURE(i8i8, 8, 8, I8MM)
+
+#endif  // defined(IREE_UK_ARCH_ARM_64)
+
+int main(int argc, char** argv) {
+  ::testing::InitGoogleTest(&argc, argv);
+  iree_cpu_initialize(iree_allocator_system());
+  return RUN_ALL_TESTS();
+}

@@ -27,11 +27,16 @@ if(IREE_UK_ENABLE_ARCH_SPECIFIC_CODE)
   if((CMAKE_SYSTEM_PROCESSOR STREQUAL aarch64) OR (CMAKE_SYSTEM_PROCESSOR STREQUAL arm64))
     set(IREE_UK_ARCH_ARM_64 TRUE)
     add_subdirectory(arm_64)
-    list(APPEND IREE_UK_ARCH_DEPS "iree::builtins::ukernel::arch::arm_64::mmt4d_select_tile_arm_64")
+    list(APPEND IREE_UK_ARCH_DEPS
+      "iree::builtins::ukernel::arch::arm_64::mmt4d_arm_64"
+      "iree::builtins::ukernel::arch::arm_64::pack_arm_64"
+    )
   endif()
 endif()  # IREE_UK_ENABLE_ARCH_SPECIFIC_CODE
 
 set(IREE_UK_POINTER_SIZE "${CMAKE_SIZEOF_VOID_P}")
+
+configure_file(config.h.in config.h)
 
 iree_cc_library(
   NAME
@@ -44,13 +49,13 @@ iree_cc_library(
   NAME
     ukernel_arch
   HDRS
-    "mmt4d_select_tile_arch.h"
+    "mmt4d_arch.h"
+    "pack_arch.h"
   SRCS
-    "mmt4d_select_tile_arch.c"
+    "mmt4d_arch.c"
+    "pack_arch.c"
   DEPS
     iree::builtins::ukernel::common
     ${IREE_UK_ARCH_DEPS}
   PUBLIC
 )
-
-configure_file(config.h.in config.h)

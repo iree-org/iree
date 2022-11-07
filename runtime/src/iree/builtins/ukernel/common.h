@@ -192,6 +192,12 @@ typedef iree_uk_int64_t iree_uk_ssize_t;
 #error Unexpected pointer size
 #endif
 
+static inline void iree_uk_ssize_swap(iree_uk_ssize_t* a, iree_uk_ssize_t* b) {
+  iree_uk_ssize_t t = *a;
+  *a = *b;
+  *b = t;
+}
+
 //===----------------------------------------------------------------------===//
 // Local replacement for stdbool.h
 //===----------------------------------------------------------------------===//
@@ -216,6 +222,7 @@ typedef enum iree_uk_status_e {
   iree_uk_status_bad_flags,
   iree_uk_status_unsupported_huge_or_negative_dimension,
   iree_uk_status_unsupported_generic_tile_size,
+  iree_uk_status_shapes_mismatch,
 } iree_uk_status_t;
 
 // Convert a status code to a human-readable string.
@@ -441,6 +448,16 @@ static inline iree_uk_type_t iree_uk_unpack_type(int pos,
 #else
 #define IREE_UK_ATTRIBUTE_NOINLINE
 #endif  // IREE_UK_HAVE_ATTRIBUTE(noinline)
+
+// The `restrict` here have the effect of enabling the compiler to rewrite this
+// as a memcpy call, shrinking code size of the (slow anyway) generic code paths
+// that would use this.
+static inline void iree_uk_memcpy(void* IREE_UK_RESTRICT dst,
+                                  const void* IREE_UK_RESTRICT src,
+                                  iree_uk_ssize_t size) {
+  for (iree_uk_ssize_t i = 0; i < size; ++i)
+    ((char*)dst)[i] = ((const char*)src)[i];
+}
 
 #ifdef __cplusplus
 }  // extern "C"
