@@ -598,10 +598,14 @@ static FailureOr<SmallVector<Flow::DispatchWorkgroupsOp>> createFusionGroups(
   // TODO: Incrementally add ops to an empty DispatchGroupOp instead of
   // annotating fusion group IDs via attributes.
   funcOp.walk([&](Operation *op) {
-    if (hasRootOpAttribute(op)) roots[getRootNumber(op)] = op;
+    if (hasRootOpAttribute(op)) {
+      roots[getRootNumber(op)] = op;
+      removeRootOpAttribute(op);
+    }
     if (hasFusionGroupsAttribute(op)) {
       assert(getFusionGroups(op).size() == 1 && "expected exactly one group");
       producers[getFusionGroups(op).front()].push_back(op);
+      removeFusionGroupsAttribute(op);
     }
   });
 
@@ -867,13 +871,6 @@ void DispatchLinalgOnTensorsViaRegionOpsPass::runOnOperation() {
             funcOp, std::move(foldExtractInsertSliceOps))))
       return signalPassFailure();
   }
-
-  // Finally walk all the ops and remove the attributes
-  funcOp.walk([](Operation *op) {
-    removeFusionGroupsAttribute(op);
-    removeRootOpAttribute(op);
-    op->removeAttr(IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker);
-  });
 }
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
