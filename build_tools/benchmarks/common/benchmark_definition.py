@@ -306,9 +306,9 @@ class BenchmarkInfo:
   model_tags: Sequence[str]
   model_source: str
   bench_mode: Sequence[str]
-  compile_tags: Optional[Sequence[str]]
   driver_info: DriverInfo
   device_info: DeviceInfo
+  compile_tags: Optional[Sequence[str]] = None
 
   def __str__(self):
     # Get the target architecture and better driver name depending on the runner.
@@ -328,6 +328,7 @@ class BenchmarkInfo:
     else:
       model_part = f"{self.model_name} ({self.model_source})"
     device_part = f"{self.device_info.model} ({target_arch})"
+
     if self.compile_tags is not None:
       mode_tags = f'[{",".join(self.compile_tags)}][{",".join(self.bench_mode)}]'
     else:
@@ -350,6 +351,7 @@ class BenchmarkInfo:
     ) = name.split()
     model_source = model_source.strip("()")
     model_tags = model_tags.strip("[]").split(",")
+
     if mode_tags.startswith("[") and mode_tags.endswith("]"):
       bench_mode, compile_tags = mode_tags.strip("[]").split("][")
       bench_mode = mode_tags.split(",")
