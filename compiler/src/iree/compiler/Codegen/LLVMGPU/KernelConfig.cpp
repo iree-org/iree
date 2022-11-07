@@ -226,9 +226,8 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
       // Pick the best configuration where the original shape is aligned on the
       // tile size.
       for (TileWorkgroupSizePair &config : TCtileSizeConfig) {
-        if (sizeK % config.tileSize[2] == 0 &&
-            sizeN % config.tileSize[1] == 0 &&
-            sizeM % config.tileSize[0] == 0) {
+        if (sizeK >= config.tileSize[2] && sizeN >= config.tileSize[1] &&
+            sizeM >= config.tileSize[0]) {
           return setMatmulConfig(
               config.tileSize[0], config.tileSize[1], config.tileSize[2],
               config.workgroupSize,
