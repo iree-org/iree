@@ -40,11 +40,23 @@ void mlir::iree_compiler::registerTransformDialectLLVMGPUExtension(
 // IREE-specific LLVMGPU transformations.
 //===---------------------------------------------------------------------===//
 
+void transform_dialect::MapNestedForeachThreadToGpuThreadsOp::build(
+    OpBuilder &builder, OperationState &result, Value target,
+    ArrayRef<int64_t> workgroupSize) {
+  result.addOperands(target);
+  result.addAttribute(
+      MapNestedForeachThreadToGpuThreadsOp::getWorkgroupSizeAttrName(
+          result.name),
+      builder.getI64ArrayAttr(workgroupSize));
+  MLIRContext *ctx = builder.getContext();
+  result.addTypes({pdl::OperationType::get(ctx)});
+}
+
 // TODO: if the number of threads was wired like the workgroup_count, we could
 // reuse most of the code and not require a static number of threads.
 // TODO: synchronizations for imperfectly nested stuff.
 DiagnosedSilenceableFailure
-transform_dialect::MapNestedForeachThreadToGpuThreads::applyToOne(
+transform_dialect::MapNestedForeachThreadToGpuThreadsOp::applyToOne(
     func::FuncOp target, SmallVectorImpl<Operation *> &results,
     transform::TransformState &state) {
   if (!isa<HAL::ExecutableOp, HAL::ExecutableVariantOp>(state.getTopLevel())) {
@@ -85,6 +97,16 @@ transform_dialect::MapNestedForeachThreadToGpuThreads::applyToOne(
 //===---------------------------------------------------------------------===//
 // VectorToWarpExecuteOnLane0Op.
 //===---------------------------------------------------------------------===//
+void transform_dialect::VectorToWarpExecuteOnLane0Op::build(
+    OpBuilder &builder, OperationState &result, Value target,
+    int64_t warpSize) {
+  MLIRContext *ctx = builder.getContext();
+  result.addOperands(target);
+  result.addAttribute(
+      VectorToWarpExecuteOnLane0Op::getWarpSizeAttrName(result.name),
+      builder.getI64IntegerAttr(warpSize));
+  result.addTypes({pdl::OperationType::get(ctx)});
+}
 
 /// Helper method to replace all uses of the laneId operand by the constant
 /// 0 inside the region. This is a necessary prerequisite to perform any kind of
@@ -296,6 +318,11 @@ transform_dialect::VectorToWarpExecuteOnLane0Op::applyToOne(
 //===---------------------------------------------------------------------===//
 // VectorWarpDistributionOp.
 //===---------------------------------------------------------------------===//
+void transform_dialect::VectorWarpDistributionOp::build(OpBuilder &builder,
+                                                        OperationState &result,
+                                                        Value target) {
+  result.addOperands(target);
+}
 
 /// Emit shared local memory allocation in case it is needed when lowering the
 /// warp operations.
@@ -542,6 +569,12 @@ transform_dialect::VectorWarpDistributionOp::applyToOne(
   }
 
   return DiagnosedSilenceableFailure(success());
+}
+
+void transform_dialect::VectorWarpDistributionOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::modifiesPayload(effects);
 }
 
 #define GET_OP_CLASSES

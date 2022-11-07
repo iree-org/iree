@@ -622,6 +622,12 @@ def HAL_ExecutableTargetAttr :
     // Returns a hal.match.* expression tree that specifically matches a
     // device that can load an executable of this target.
     Attribute getMatchExpression();
+
+    // Returns the executable target configuration for the given operation.
+    // This will recursively walk parent operations until one with the
+    // `hal.executable.target` attribute is found or a `hal.executable.variant`
+    // specifies a value. Returns nullptr if no target specification can be found.
+    static ExecutableTargetAttr lookup(Operation *op);
   }];
 
   let hasCustomAssemblyFormat = 1;

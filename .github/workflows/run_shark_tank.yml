@@ -119,6 +119,7 @@ jobs:
       - cpu
       - os-family=Linux
     env:
+      GCS_LATEST_DIR: "gs://shark-benchmark-artifacts/latest"
       GCS_UPLOAD_DIR: ${{ needs.setup.outputs.artifact-upload-dir }}
       BENCHMARK_RESULTS_DIR: benchmark-results
     steps:
@@ -132,9 +133,17 @@ jobs:
           gcloud alpha storage cp "${GCS_UPLOAD_DIR}/**" "${BENCHMARK_RESULTS_DIR}/"
       - name: "Generating report"
         run: |
+          cp ./build_tools/benchmarks/reporting/data/icelake_baseline.csv ${BENCHMARK_RESULTS_DIR}/
+          cp ./build_tools/benchmarks/reporting/data/a100_baseline.csv ${BENCHMARK_RESULTS_DIR}/
           ./build_tools/github_actions/docker_run.sh \
             gcr.io/iree-oss/shark@sha256:6ca44c4236370054283435d365fefc1a2825f6b92c712e6fa5037309e38c739e \
-          ./build_tools/benchmarks/shark/run_report.sh "${BENCHMARK_RESULTS_DIR}" "${BENCHMARK_RESULTS_DIR}/summary.html"
+          ./build_tools/benchmarks/shark/run_report.sh "${BENCHMARK_RESULTS_DIR}" \
+            "${BENCHMARK_RESULTS_DIR}/icelake_baseline.csv" \
+            "${BENCHMARK_RESULTS_DIR}/a100_baseline.csv" \
+            "${BENCHMARK_RESULTS_DIR}/summary.html"
       - name: "Uploading summary"
         run: |
           gcloud alpha storage cp "${BENCHMARK_RESULTS_DIR}/summary.html" "${GCS_UPLOAD_DIR}/"
+      - name: "Updating latest"
+        run: |
+          gcloud alpha storage cp "${BENCHMARK_RESULTS_DIR}/**" "${GCS_LATEST_DIR}/"

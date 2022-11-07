@@ -8,6 +8,7 @@
 #include "iree-dialects/Dialect/LinalgExt/TransformOps/LinalgExtTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
+#include "iree-dialects/Dialect/LinalgTransform/TransformInterpreterUtils.h"
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
 #include "iree/compiler/Codegen/LLVMCPU/TransformExtensions/LLVMCPUExtensions.h"
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensions.h"
@@ -15,9 +16,7 @@
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/TransformExtensions/FlowExtensions.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/ScopeExit.h"
-#include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/BufferizableOpInterfaceImpl.h"
@@ -37,20 +36,230 @@
 #include "mlir/Dialect/Tensor/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
+#include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/BufferizableOpInterfaceImpl.h"
-#include "mlir/Parser/Parser.h"
+#include "mlir/IR/Builders.h"
+#include "mlir/IR/ImplicitLocOpBuilder.h"
+#include "mlir/IR/Location.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
-#include "mlir/Support/FileUtilities.h"
 
 #define DEBUG_TYPE "iree-transform-dialect-jitter"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 
 using namespace mlir;
 
-namespace {
+// TODO: significantly better namespacing.
+using ::mlir::iree_compiler::IREE::transform_dialect::ApplyPatternsOp;
+using ::mlir::iree_compiler::IREE::transform_dialect::
+    ForeachThreadToWorkgroupOp;
+using ::mlir::iree_compiler::IREE::transform_dialect::IREEBufferizeOp;
+using ::mlir::iree_compiler::IREE::transform_dialect::
+    MapNestedForeachThreadToGpuThreadsOp;
+using ::mlir::iree_compiler::IREE::transform_dialect::
+    TileToForeachThreadAndWorkgroupCountRegionOp;
+using ::mlir::iree_compiler::IREE::transform_dialect::
+    VectorToWarpExecuteOnLane0Op;
+using ::mlir::iree_compiler::IREE::transform_dialect::VectorWarpDistributionOp;
+using ::mlir::transform::FuseIntoContainingOp;
+using ::mlir::transform::MatchOp;
+using ::mlir::transform::MergeHandlesOp;
+using ::mlir::transform::PrintOp;
+using ::mlir::transform::SplitHandlesOp;
+using ::mlir::transform::SplitReductionOp;
+using ::mlir::transform::TileToForeachThreadOp;
+using ::mlir::transform::VectorizeOp;
 
+/// Matches `args` within `targetH` and unpacks a number of handles `N`.
+/// Assumes there are exactly `N` matched ops (but could be relaxed).
+/// Returns the tuple of handles.
+template <int N, typename... MatchingArgs>
+auto matchAndUnpack(ImplicitLocOpBuilder &b, Value targetH,
+                    MatchingArgs... args) {
+  Value matchedH = b.create<MatchOp>(targetH, args...);
+  auto matchOp = b.create<SplitHandlesOp>(matchedH,
+                                          /*numHandles=*/N);
+  assert(matchOp->getNumResults() == N && "Unexpected number of results");
+  std::array<Value, N> a;
+  for (int64_t i = 0; i < N; ++i) a[i] = matchOp->getResult(i);
+  return std::tuple_cat(a);
+}
+
+/// Prints `handles` in order. Prints the whole IR if `handles` is empty.
+static void print(ImplicitLocOpBuilder &b, ValueRange handles = {}) {
+  if (handles.empty()) b.create<PrintOp>();
+  for (auto h : handles) b.create<PrintOp>(h);
+}
+
+namespace {
+struct BatchFusionSpec {};
+struct IterativeFusionSpec {};
+}  // namespace
+
+/// Performs the following transformations:
+///   1. Tiles `rootH` to scf.foreach_thread to with `tileSizesOrNumThreads`
+///      according to whether spec is a TileSizesSpec or a NumThreadsSpec.
+///   2. Maps the resulting scf.foreach_thread to threads according to
+///      `threadDimMapping`.
+///   3. Iterates over `opsHToFuse` in order and fuses into the containing op.
+/// Returns a handle to the resulting scf.foreach_thread.
+///
+/// Fusion is controlled by the BatchOrIterativeFusion templatetype:
+///   1. In batch mode, a single fusion command is issued and a topological sort
+///      is automatically computed by the fusion. Since this applies a single
+///      fusion, no interleaved canonicalization/cse/enabling occur and the
+///      resulting fusion may not be as good.
+///   2. In iterative mode, the user is responsible for providing the fusion
+///      order but interleaved canonicalization/cse/enabling occur which may
+///      result in better fusion results.
+///      TODO: Transform dialect op to apply topological sort and avoid the
+///      manual intervention.
+/// If `resultingFusedOpsHandles` is a non-null pointer, the fused operation are
+/// appended in order.
+// TODO: apply forwarding pattern.
+template <typename TilingTransformOp, typename TileOrNumThreadSpec,
+          typename BatchOrIterativeFusion>
+static Value tileAndFuseAndDistributeImpl(
+    ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
+    ArrayRef<int64_t> tileSizesOrNumThreads, ArrayRef<int64_t> threadDimMapping,
+    SmallVector<Value> *resultingFusedOpsHandles) {
+  auto tileToForeachOp = b.create<TilingTransformOp>(
+      rootH, tileSizesOrNumThreads, TileOrNumThreadSpec(), threadDimMapping);
+  Value foreachThreadH = tileToForeachOp.getForeachThreadOp();
+  if (std::is_same<BatchOrIterativeFusion, BatchFusionSpec>::value) {
+    Value mergedOpsH =
+        b.create<MergeHandlesOp>(opsHToFuse, /*deduplicate=*/true);
+    Value fusedH = b.create<FuseIntoContainingOp>(mergedOpsH, foreachThreadH);
+    (void)fusedH;
+    assert(!resultingFusedOpsHandles && "Handle needs unpacking");
+  } else {
+    for (Value h : opsHToFuse) {
+      Value fusedH = b.create<FuseIntoContainingOp>(h, foreachThreadH);
+      if (resultingFusedOpsHandles) resultingFusedOpsHandles->push_back(fusedH);
+    }
+  }
+  return foreachThreadH;
+}
+
+template <typename TilingTransformOp = TileToForeachThreadOp,
+          typename BatchOrIterativeFusion = BatchFusionSpec>
+static Value tfdWithTileSizes(
+    ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
+    ArrayRef<int64_t> tileSizes, ArrayRef<int64_t> threadDimMapping = {},
+    SmallVector<Value> *resultingFusedOpsHandles = nullptr) {
+  return tileAndFuseAndDistributeImpl<
+      TilingTransformOp, transform::TileSizesSpec, BatchOrIterativeFusion>(
+      b, rootH, opsHToFuse, tileSizes, threadDimMapping,
+      resultingFusedOpsHandles);
+}
+
+template <typename TilingTransformOp = TileToForeachThreadOp,
+          typename BatchOrIterativeFusion = BatchFusionSpec>
+static Value tfdWithNumThreads(
+    ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
+    ArrayRef<int64_t> numThreads, ArrayRef<int64_t> threadDimMapping = {},
+    SmallVector<Value> *resultingFusedOpsHandles = nullptr) {
+  return tileAndFuseAndDistributeImpl<
+      TilingTransformOp, transform::NumThreadsSpec, BatchOrIterativeFusion>(
+      b, rootH, opsHToFuse, numThreads, threadDimMapping,
+      resultingFusedOpsHandles);
+}
+
+/// Apply patterns and vectorize (for now always applies rank-reduction).
+/// Takes a handle to a func.func and returns an updated handle to a
+/// func.func.
+// TODO: configure patterns.
+static Value vectorize(ImplicitLocOpBuilder &b, Value funcH) {
+  funcH = b.create<ApplyPatternsOp>(funcH, /*rankReducing=*/true);
+  return b.create<VectorizeOp>(funcH);
+}
+
+/// Post-bufferization mapping to blocks and threads.
+/// Takes a handle to a func.func and returns an updated handle to a
+/// func.func.
+static Value mapToBlockAndThreads(ImplicitLocOpBuilder &b, Value funcH,
+                                  ArrayRef<int64_t> blockSize) {
+  funcH = b.create<ForeachThreadToWorkgroupOp>(funcH);
+  return b.create<MapNestedForeachThreadToGpuThreadsOp>(funcH, blockSize);
+}
+
+/// Post-bufferization vector distribution with rank-reduction.
+/// Takes a handle to a func.func and returns an updated handle to a
+/// func.func.
+static Value distributeVectors(ImplicitLocOpBuilder &b, Value funcH,
+                               int64_t warpSize = 32) {
+  funcH = b.create<ApplyPatternsOp>(funcH, /*rankReducing=*/true);
+  Value ifH = b.create<MatchOp>(funcH, scf::IfOp::getOperationName());
+  ifH = b.create<VectorToWarpExecuteOnLane0Op>(ifH, warpSize);
+  b.create<VectorWarpDistributionOp>(funcH);
+  return funcH;
+}
+
+// TODO: generialize and automate over and over.
+// TODO: significantly shrink this down.
+static void buildReductionCudaStrategy(ImplicitLocOpBuilder &b,
+                                       Value variantH) {
+  Value originalFillH =
+      b.create<MatchOp>(variantH, linalg::FillOp::getOperationName());
+  Value originalGenericH =
+      b.create<MatchOp>(variantH, linalg::GenericOp::getOperationName());
+
+  // Step 1. Split the reduction to get meatier parallelism.
+  // TODO: use a scf.foreach_thread for this.
+  auto splitReductionTransformOp =
+      b.create<SplitReductionOp>(originalGenericH,
+                                 /*splitFactor=*/2,
+                                 /*insertSplitDimension=*/1);
+  Value splitFillH = splitReductionTransformOp.getFillOp();
+  Value splitLinalgH = splitReductionTransformOp.getSplitLinalgOp();
+  Value combinerH = splitReductionTransformOp.getCombiningLinalgOp();
+
+  // Step 2. First level of tiling + fusion parallelizes to blocks.
+  // clang-format off
+  tfdWithTileSizes<TileToForeachThreadAndWorkgroupCountRegionOp>(
+    b,
+    /*rootH=*/combinerH,
+    /*opsHToFuse=*/{originalFillH, splitFillH, splitLinalgH},
+    /*tileSizes=*/ArrayRef<int64_t>{1});
+  // clang-format on
+
+  // Step 3. Second level of tiling + fusion parallelizes to threads.
+  // TODO: Relying on ordering is brittle, harden this.
+  auto [fill2dH, parParRedH, fill1dH, parRedH] = matchAndUnpack<4>(
+      b, variantH,
+      ArrayRef<StringRef>{linalg::GenericOp::getOperationName(),
+                          linalg::FillOp::getOperationName()});
+  // clang-format off
+  tfdWithTileSizes(b,
+                   /*rootH=*/parRedH,
+                   /*opsHToFuse=*/{fill1dH},
+                   /*tileSizes=*/ArrayRef<int64_t>{1, 0, 0},
+                   /*threadDimMapping=*/ArrayRef<int64_t>{2, 1, 0});
+  tfdWithTileSizes(b,
+                   /*rootH=*/parParRedH,
+                   /*opsHToFuse=*/{fill2dH},
+                   /*tileSizes=*/ArrayRef<int64_t>{1, 1, 0},
+                   /*threadDimMapping=*/ArrayRef<int64_t>{2, 1, 0});
+  // clang-format on
+
+  // Step 4. Rank-reduce and vectorize.
+  Value funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
+  funcH = vectorize(b, funcH);
+
+  // Step 5. Bufferize.
+  variantH = b.create<IREEBufferizeOp>(variantH, /*targetGpu=*/true);
+
+  // Step 6. Post-bufferization mapping to blocks and threads.
+  // Need to match again since bufferizae invalidated all handles.
+  funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
+  funcH = mapToBlockAndThreads(b, funcH, ArrayRef<int64_t>{32, 2, 1});
+
+  // Step 7. Post-bufferization vector distribution with rank-reduction.
+  distributeVectors(b, funcH);
+}
+
+namespace {
 /// Pass declaration.
 /// Jitter pass that applies transform dialect ops for codegen.
 /// This needs to be its own pass because the registration mechanism and ops
@@ -60,9 +269,9 @@ class TransformDialectJitterPass
           TransformDialectJitterPass> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    // TODO: this is only necessary to make registry subset happy when running
-    // the lowering to LLVM. The lowering should be changed to stop using the
-    // nested pass manager and this will go away.
+    // TODO: this is only necessary to make registry subset happy when
+    // running the lowering to LLVM. The lowering should be changed to stop
+    // using the nested pass manager and this will go away.
 
     // clang-format off
     registry.insert<mlir::iree_compiler::IREE::LinalgExt::IREELinalgExtDialect,
@@ -70,6 +279,7 @@ class TransformDialectJitterPass
                     arith::ArithDialect,
                     AffineDialect,
                     bufferization::BufferizationDialect,
+                    BuiltinDialect,
                     func::FuncDialect,
                     gpu::GPUDialect,
                     linalg::LinalgDialect,
@@ -84,8 +294,8 @@ class TransformDialectJitterPass
         // clang-format on
         >();
 
-    // TODO: these should be registered by the extension instead, but there is
-    // no support for it in core currently.
+    // TODO: these should be registered by the extension instead, but there
+    // is no support for it in core currently.
     arith::registerBufferizableOpInterfaceExternalModels(registry);
     linalg::registerBufferizableOpInterfaceExternalModels(registry);
     scf::registerBufferizableOpInterfaceExternalModels(registry);
@@ -106,7 +316,30 @@ class TransformDialectJitterPass
 
   TransformDialectJitterPass() = default;
 
-  void runOnOperation() override {}
+  void runOnOperation() override {
+    Operation *target = getOperation();
+    MLIRContext *ctx = target->getContext();
+    Location loc = target->getLoc();
+
+    OpBuilder b(ctx);
+    auto topLevelTransformModule = b.create<ModuleOp>(loc);
+    Region &topLevelTransformRegion = topLevelTransformModule.getBodyRegion();
+    b.setInsertionPointToStart(&topLevelTransformRegion.front());
+    b.create<::transform_ext::CanonicalizedSequenceOp>(
+        target->getLoc(), transform::FailurePropagationMode::Suppress,
+        [](OpBuilder &b, Location loc, Value variantH) {
+          ImplicitLocOpBuilder ib(loc, b);
+          buildReductionCudaStrategy(ib, variantH);
+          b.create<transform::YieldOp>(loc);
+        });
+
+    LLVM_DEBUG(DBGS() << "apply transform:\n" << topLevelTransformModule);
+    if (failed(transform::applyTransformsInRegion(topLevelTransformRegion,
+                                                  target))) {
+      target->emitOpError() << "transform dialect jitter failed";
+      return signalPassFailure();
+    }
+  }
 };
 }  // namespace
 
