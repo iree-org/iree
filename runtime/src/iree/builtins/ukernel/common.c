@@ -6,16 +6,15 @@
 
 #include "iree/builtins/ukernel/common.h"
 
-IREE_UKERNEL_EXPORT const char* iree_ukernel_status_message(
-    iree_ukernel_status_t status) {
+IREE_UK_EXPORT const char* iree_uk_status_message(iree_uk_status_t status) {
   switch (status) {
-    case iree_ukernel_status_bad_flags:
+    case iree_uk_status_bad_flags:
       return "bad mmt4d flags";
-    case iree_ukernel_status_bad_type:
+    case iree_uk_status_bad_type:
       return "bad mmt4d type enum";
-    case iree_ukernel_status_unsupported_huge_or_negative_dimension:
+    case iree_uk_status_unsupported_huge_or_negative_dimension:
       return "unsupported huge or negative size in mmt4d";
-    case iree_ukernel_status_unsupported_generic_tile_size:
+    case iree_uk_status_unsupported_generic_tile_size:
       return "tile size too large for the generic tile implementation";
     default:
       return "unknown";

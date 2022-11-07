@@ -13,7 +13,7 @@
 // given params, or NULL if no suitable architecture-specific tile function
 // exists for these params, in which case the caller may fall back to a generic
 // tile function.
-iree_ukernel_mmt4d_tile_func_t iree_ukernel_mmt4d_select_tile_func_arch(
-    const iree_ukernel_mmt4d_params_t* params);
+iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func_arch(
+    const iree_uk_mmt4d_params_t* params);
 
 #endif  // IREE_BUILTINS_UKERNEL_ARCH_MMT4D_SELECT_TILE_ARCH_H_

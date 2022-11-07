@@ -13,12 +13,12 @@
 extern "C" {
 #endif
 
-iree_ukernel_ssize_t iree_ukernel_mmt4d_lhs_buffer_size(
-    const iree_ukernel_mmt4d_params_t* params);
-iree_ukernel_ssize_t iree_ukernel_mmt4d_rhs_buffer_size(
-    const iree_ukernel_mmt4d_params_t* params);
-iree_ukernel_ssize_t iree_ukernel_mmt4d_out_buffer_size(
-    const iree_ukernel_mmt4d_params_t* params);
+iree_uk_ssize_t iree_uk_mmt4d_lhs_buffer_size(
+    const iree_uk_mmt4d_params_t* params);
+iree_uk_ssize_t iree_uk_mmt4d_rhs_buffer_size(
+    const iree_uk_mmt4d_params_t* params);
+iree_uk_ssize_t iree_uk_mmt4d_out_buffer_size(
+    const iree_uk_mmt4d_params_t* params);
 
 struct iree_mmt4d_test_random_engine_t;
 typedef struct iree_mmt4d_test_random_engine_t iree_mmt4d_test_random_engine_t;
@@ -29,12 +29,12 @@ int iree_mmt4d_test_random_engine_get_0_or_1(
 int iree_mmt4d_test_random_engine_get_between_minus16_and_plus15(
     iree_mmt4d_test_random_engine_t* e);
 
-void write_random_buffer(void* buffer, iree_ukernel_ssize_t size_in_bytes,
-                         iree_ukernel_type_t type,
+void write_random_buffer(void* buffer, iree_uk_ssize_t size_in_bytes,
+                         iree_uk_type_t type,
                          iree_mmt4d_test_random_engine_t* engine);
 
-const char* get_mmt4d_type_str(const iree_ukernel_mmt4d_params_t* params);
-const char* get_cpu_features_str(const iree_ukernel_mmt4d_params_t* params);
+const char* get_mmt4d_type_str(const iree_uk_mmt4d_params_t* params);
+const char* get_cpu_features_str(const iree_uk_mmt4d_params_t* params);
 
 #ifdef __cplusplus
 }  // extern "C"

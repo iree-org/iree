@@ -2,14 +2,14 @@
 #include "iree/builtins/ukernel/exported_flag_bits.h"
 
 // Parameters:
-//   x0: iree_ukernel_int32_t* out_tile
-//   x1: const iree_ukernel_int8_t* lhs_panel
-//   x2: const iree_ukernel_int8_t* rhs_panel
-//   w3: iree_ukernel_int32_t K. Note: K>=1, as the K==0 case was handled as an early-return.
-//   w4: iree_ukernel_uint32_t flags
+//   x0: iree_uk_int32_t* out_tile
+//   x1: const iree_uk_int8_t* lhs_panel
+//   x2: const iree_uk_int8_t* rhs_panel
+//   w3: iree_uk_int32_t K. Note: K>=1, as the K==0 case was handled as an early-return.
+//   w4: iree_uk_uint32_t flags
 //   x5: (UNUSED) params - relevant params K and flags already passed above.
 
-BEGIN_FUNCTION iree_ukernel_mmt4d_i8i8i32_tile_8x8x8_arm_64_i8mm
+BEGIN_FUNCTION iree_uk_mmt4d_i8i8i32_tile_8x8x8_arm_64_i8mm
 
         // Save callee-saved NEON registers
         stp d8, d9, [sp, -64]!
@@ -18,7 +18,7 @@ BEGIN_FUNCTION iree_ukernel_mmt4d_i8i8i32_tile_8x8x8_arm_64_i8mm
         stp d14, d15, [sp, 48]
 
         // Do we accumulate into or clear the accumulator tile?
-        tbnz w4, IREE_UKERNEL_FLAG_ACCUMULATE_BIT_POS, 1f
+        tbnz w4, IREE_UK_FLAG_ACCUMULATE_BIT_POS, 1f
         
     0:
         // No-accumulate case. Clear the 8x8 accumulator tile.
@@ -286,6 +286,6 @@ BEGIN_FUNCTION iree_ukernel_mmt4d_i8i8i32_tile_8x8x8_arm_64_i8mm
         ldp d8, d9, [sp], 64
         ret
 
-END_FUNCTION iree_ukernel_mmt4d_i8i8i32_tile_8x8x8_arm_64_i8mm
+END_FUNCTION iree_uk_mmt4d_i8i8i32_tile_8x8x8_arm_64_i8mm
 
 ALLOW_NON_EXECUTABLE_STACK
