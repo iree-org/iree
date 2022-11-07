@@ -213,14 +213,16 @@ if __name__ == "__main__":
     print("\n" * 5 + f"Processing image {image}")
     image_url = posixpath.join(IREE_GCR_URL, image)
     tagged_image_url = f"{image_url}"
-    image_path = os.path.join(DOCKER_DIR, image)
+    image_path = os.path.join(DOCKER_DIR, "dockerfiles", f"{image}.Dockerfile")
 
     if args.only_references:
       digest = image_urls_to_prod_digests[image_url]
     else:
-      utils.run_command(
-          ["docker", "build", "--tag", tagged_image_url, image_path],
-          dry_run=args.dry_run)
+      utils.run_command([
+          "docker", "build", "--file", image_path, "--tag", tagged_image_url,
+          DOCKER_DIR
+      ],
+                        dry_run=args.dry_run)
 
       utils.run_command(["docker", "push", tagged_image_url],
                         dry_run=args.dry_run)
