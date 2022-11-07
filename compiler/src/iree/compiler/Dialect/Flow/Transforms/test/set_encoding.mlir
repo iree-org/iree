@@ -1,5 +1,5 @@
 // RUN: iree-opt --iree-flow-set-encoding --cse --split-input-file %s | FileCheck %s
-// RUN: iree-opt --pass-pipeline="func.func(iree-flow-set-encoding{default-padding=4}, cse)" --split-input-file %s | FileCheck %s --check-prefix=PADDING
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-flow-set-encoding{default-padding=4}, cse))" --split-input-file %s | FileCheck %s --check-prefix=PADDING
 
 func.func @matmul_no_padding(%arg0 : tensor<128x256xf32>, %arg1 : tensor<256x512xf32>,
     %arg2 : tensor<128x512xf32>) -> tensor<128x512xf32> {

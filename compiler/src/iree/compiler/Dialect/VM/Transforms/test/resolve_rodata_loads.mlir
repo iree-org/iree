@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="iree-util-fold-globals,vm.module(iree-vm-resolve-rodata-loads,symbol-dce)" --allow-unregistered-dialect %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(iree-util-fold-globals,vm.module(iree-vm-resolve-rodata-loads,symbol-dce))" --allow-unregistered-dialect %s | FileCheck %s
 
 // CHECK-LABEL: @rodata_ref
 module {
