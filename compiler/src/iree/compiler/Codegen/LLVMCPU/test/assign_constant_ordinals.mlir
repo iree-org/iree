@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline="hal.executable(hal.executable.variant(iree-llvmcpu-assign-constant-ordinals))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmcpu-assign-constant-ordinals)))" --split-input-file %s | FileCheck %s
 
 hal.executable private @executable {
   hal.executable.variant public @variant, target = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64"> {
