@@ -11,7 +11,7 @@
 #include "iree/base/internal/cpu.h"
 #include "iree/base/internal/flags.h"
 #include "iree/builtins/ukernel/mmt4d.h"
-#include "iree/builtins/ukernel/tools/mmt4d_test_utils.h"
+#include "iree/builtins/ukernel/tools/ukernel_test_utils.h"
 #include "iree/testing/benchmark.h"
 
 IREE_FLAG(int32_t, batch_count, 1000, "Ops to run per benchmark iteration.");
@@ -58,25 +58,30 @@ static iree_status_t iree_mmt4d_benchmark(
   params.lhs_stride = params.K * params.M0 * params.K0;
   params.rhs_stride = params.K * params.N0 * params.K0;
   params.out_stride = params.N * params.M0 * params.N0;
-  iree_uk_ssize_t lhs_buffer_size = iree_uk_mmt4d_lhs_buffer_size(&params);
-  iree_uk_ssize_t rhs_buffer_size = iree_uk_mmt4d_rhs_buffer_size(&params);
-  iree_uk_ssize_t out_buffer_size = iree_uk_mmt4d_out_buffer_size(&params);
-  void* lhs_buffer = malloc(lhs_buffer_size);
-  void* rhs_buffer = malloc(lhs_buffer_size);
-  void* out_buffer = malloc(lhs_buffer_size);
   iree_uk_type_t lhs_type = iree_uk_mmt4d_lhs_type(params.type);
   iree_uk_type_t rhs_type = iree_uk_mmt4d_rhs_type(params.type);
   iree_uk_type_t out_type = iree_uk_mmt4d_out_type(params.type);
-  iree_mmt4d_test_random_engine_t* engine =
-      iree_mmt4d_test_random_engine_create();
+  iree_uk_ssize_t lhs_buffer_size =
+      iree_uk_test_2d_buffer_length(lhs_type, params.M, params.lhs_stride);
+  iree_uk_ssize_t rhs_buffer_size =
+      iree_uk_test_2d_buffer_length(rhs_type, params.N, params.rhs_stride);
+  iree_uk_ssize_t out_buffer_size =
+      iree_uk_test_2d_buffer_length(out_type, params.M, params.out_stride);
+  void* lhs_buffer = malloc(lhs_buffer_size);
+  void* rhs_buffer = malloc(rhs_buffer_size);
+  void* out_buffer = malloc(out_buffer_size);
+  iree_uk_test_random_engine_t* engine = iree_uk_test_random_engine_create();
   // It's just about plausible that on some platform, for some number type,
   // performance might be different on zero buffers vs random buffers. But it
   // shouldn't matter that we recreate the random engine every time, getting
   // the same random values again.
-  write_random_buffer(lhs_buffer, lhs_buffer_size, lhs_type, engine);
-  write_random_buffer(rhs_buffer, rhs_buffer_size, rhs_type, engine);
-  write_random_buffer(out_buffer, out_buffer_size, out_type, engine);
-  iree_mmt4d_test_random_engine_destroy(engine);
+  iree_uk_test_write_random_buffer(lhs_buffer, lhs_buffer_size, lhs_type,
+                                   engine);
+  iree_uk_test_write_random_buffer(rhs_buffer, rhs_buffer_size, rhs_type,
+                                   engine);
+  iree_uk_test_write_random_buffer(out_buffer, out_buffer_size, out_type,
+                                   engine);
+  iree_uk_test_random_engine_destroy(engine);
   params.lhs_buffer = lhs_buffer;
   params.rhs_buffer = rhs_buffer;
   params.out_buffer = out_buffer;
