@@ -299,7 +299,7 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_driver_create_using_instance(
 
   iree_status_t status = iree_hal_vulkan_driver_create_internal(
       identifier, options, &enabled_extensions, opaque_syms, instance,
-      /*owns_instance=*/true, host_allocator, out_driver);
+      /*owns_instance=*/false, host_allocator, out_driver);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
