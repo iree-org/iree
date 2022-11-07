@@ -6,16 +6,17 @@
 """Helpers to serialize/deserialize objects."""
 
 from enum import Enum
-from types import NoneType
 from typing import Any, Dict, Optional, OrderedDict, Sequence, Type, Union
 import collections
 import dataclasses
 import typing
 
+# types.NoneType is only added after Python 3.10.
+NONE_TYPE = type(None)
 SERIALIZE_FUNC_NAME = "__serialize__"
 DESERIALIZE_FUNC_NAME = "__deserialize__"
 SUPPORTED_DICT_KEY_TYPES = {str, int, float, bool}
-SUPPORTED_PRIMITIVE_TYPES = {str, int, float, bool, NoneType}
+SUPPORTED_PRIMITIVE_TYPES = {str, int, float, bool, NONE_TYPE}
 
 
 def serialize_and_pack(obj,
@@ -101,9 +102,9 @@ def _deserialize(data,
         for key, value in data.items())
   elif typing.get_origin(obj_type) == Union:
     subtypes = typing.get_args(obj_type)
-    if len(subtypes) != 2 or NoneType not in subtypes:
+    if len(subtypes) != 2 or NONE_TYPE not in subtypes:
       raise ValueError(f"Unsupported union type: {obj_type}.")
-    subtype = subtypes[0] if subtypes[1] == NoneType else subtypes[1]
+    subtype = subtypes[0] if subtypes[1] == NONE_TYPE else subtypes[1]
     return _deserialize(data, subtype, keyed_obj_map, obj_cache)
   elif issubclass(obj_type, Enum):
     for member in obj_type:
