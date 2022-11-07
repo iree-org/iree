@@ -6,18 +6,23 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Runs all matched benchmark suites on a Linux device."""
 
+import json
 import sys
 import pathlib
 
 # Add build_tools python dir to the search path.
 sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
 
+from typing import List, Optional
 import subprocess
 import atexit
 import shutil
 import tarfile
+import pathlib
+import typing
 
-from typing import List, Optional
+# Add build_tools python dir to the search path.
+sys.path.insert(0, str(pathlib.Path(__file__).parent / ".." / "python"))
 
 from common.benchmark_driver import BenchmarkDriver
 from common.benchmark_suite import MODEL_FLAGFILE_NAME, BenchmarkCase, BenchmarkSuite
@@ -25,6 +30,10 @@ from common.benchmark_config import BenchmarkConfig
 from common.benchmark_definition import execute_cmd, execute_cmd_and_get_output, get_git_commit_hash, get_iree_benchmark_module_arguments, wait_for_iree_benchmark_module_start
 from common.common_arguments import build_common_argument_parser
 from common.linux_device_utils import get_linux_device_info
+from e2e_test_framework.definitions import common_definitions, iree_definitions
+from e2e_test_framework.device_specs import device_parameters
+from e2e_test_framework import serialization
+from e2e_test_artifacts import iree_artifacts
 
 
 class LinuxBenchmarkDriver(BenchmarkDriver):
@@ -38,32 +47,62 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
                          benchmark_results_filename: Optional[pathlib.Path],
                          capture_filename: Optional[pathlib.Path]) -> None:
 
-    # TODO(pzread): Taskset should be derived from CPU topology.
-    # Only use the low 8 cores.
-    taskset = "0xFF"
+    if benchmark_case.run_config is not None:
+      run_config = benchmark_case.run_config
+      module_path = iree_artifacts.get_module_path(
+          run_config.module_generation_config,
+          root_dir_path=pathlib.Path(self.config.root_benchmark_dir))
+      run_flags = [f"--module_file={module_path}"]
+      run_flags += iree_definitions.get_run_flags_of_model(
+          model=run_config.module_generation_config.imported_model.model,
+          model_input_data=run_config.input_data)
+      run_flags += iree_definitions.get_run_flags_of_execution_config(
+          module_execution_config=run_config.module_execution_config,
+          gpu_id=self.gpu_id)
 
-    # TODO(#11076): Support run_config.
-    if benchmark_case.benchmark_case_dir is None:
-      raise ValueError("benchmark_case_dir can't be None.")
+      wrapper_cmds = self.__build_wrapper_cmds_for_device_spec(
+          run_config.target_device_spec)
+    else:
+      if benchmark_case.benchmark_case_dir is None:
+        raise ValueError(
+            "benchmark_case_dir can't be None if run_config is None.")
 
-    run_flags = self.__parse_flagfile(benchmark_case.benchmark_case_dir)
-    # Replace the CUDA device flag with the specified GPU.
-    if benchmark_case.driver_info.driver_name == "cuda":
-      run_flags = list(
-          filter(lambda flag: not flag.startswith("--device"), run_flags))
-      run_flags.append(f"--device=cuda://{self.gpu_id}")
+      run_flags = self.__parse_flagfile(benchmark_case.benchmark_case_dir)
+      # Replace the CUDA device flag with the specified GPU.
+      if benchmark_case.driver_info.driver_name == "cuda":
+        run_flags = list(
+            filter(lambda flag: not flag.startswith("--device"), run_flags))
+        run_flags.append(f"--device=cuda://{self.gpu_id}")
+      # TODO(pzread): Taskset should be derived from CPU topology.
+      # Only use the low 8 cores.
+      wrapper_cmds = ["taskset", "0xFF"]
 
     if benchmark_results_filename:
       self.__run_benchmark(benchmark_case=benchmark_case,
                            results_filename=benchmark_results_filename,
-                           taskset=taskset,
-                           run_flags=run_flags)
+                           run_flags=run_flags,
+                           wrapper_cmds=wrapper_cmds)
 
     if capture_filename:
       self.__run_capture(benchmark_case=benchmark_case,
                          capture_filename=capture_filename,
-                         taskset=taskset,
-                         run_flags=run_flags)
+                         run_flags=run_flags,
+                         wrapper_cmds=wrapper_cmds)
+
+  def __build_wrapper_cmds_for_device_spec(
+      self, device_spec: common_definitions.DeviceSpec) -> List[str]:
+    affinity_mask = None
+    for param in device_spec.device_parameters:
+      if param == device_parameters.OCTA_CORES:
+        affinity_mask = "0xFF"
+      else:
+        raise ValueError(f"Unsupported device parameter: {param}.")
+
+    cmds = []
+    if affinity_mask is not None:
+      cmds += ["taskset", affinity_mask]
+
+    return cmds
 
   def __parse_flagfile(self, case_dir: pathlib.Path) -> List[str]:
     return [
@@ -72,14 +111,11 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
     ]
 
   def __run_benchmark(self, benchmark_case: BenchmarkCase,
-                      results_filename: pathlib.Path, taskset: str,
-                      run_flags: List[str]):
-    if self.config.normal_benchmark_tool_dir is None:
-      raise ValueError("normal_benchmark_tool_dir can't be None.")
-
+                      results_filename: str, run_flags: List[str],
+                      wrapper_cmds: List[str]):
     tool_name = benchmark_case.benchmark_tool_name
-    tool_path = self.config.normal_benchmark_tool_dir / tool_name
-    cmd = ["taskset", taskset, tool_path] + run_flags
+    tool_path = os.path.join(self.config.normal_benchmark_tool_dir, tool_name)
+    cmd = wrapper_cmds + [tool_path] + run_flags
     if tool_name == "iree-benchmark-module":
       cmd.extend(
           get_iree_benchmark_module_arguments(
@@ -92,15 +128,15 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
     if self.verbose:
       print(result_json)
 
-  def __run_capture(self, benchmark_case: BenchmarkCase,
-                    capture_filename: pathlib.Path, taskset: str,
-                    run_flags: List[str]):
+  def __run_capture(self, benchmark_case: BenchmarkCase, capture_filename: str,
+                    run_flags: List[str], wrapper_cmds: List[str]):
     capture_config = self.config.trace_capture_config
     if capture_config is None:
       raise ValueError("capture_config can't be None.")
 
-    tool_path = capture_config.traced_benchmark_tool_dir / benchmark_case.benchmark_tool_name
-    cmd = ["taskset", taskset, tool_path] + run_flags
+    tool_path = os.path.join(capture_config.traced_benchmark_tool_dir,
+                             benchmark_case.benchmark_tool_name)
+    cmd = wrapper_cmds + [tool_path] + run_flags
     process = subprocess.Popen(cmd,
                                env={"TRACY_NO_EXIT": "1"},
                                cwd=benchmark_case.benchmark_case_dir,
@@ -124,8 +160,19 @@ def main(args):
 
   commit = get_git_commit_hash("HEAD")
   benchmark_config = BenchmarkConfig.build_from_args(args, commit)
-  benchmark_suite = BenchmarkSuite.load_from_benchmark_suite_dir(
-      benchmark_config.root_benchmark_dir)
+
+  if args.run_configs_json is None:
+    benchmark_suite = BenchmarkSuite.load_from_benchmark_suite_dir(
+        benchmark_config.root_benchmark_dir)
+  else:
+    with open(args.run_configs_json, "r") as run_configs_file:
+      run_configs_data = json.load(run_configs_file)
+    run_configs = serialization.unpack_and_deserialize(
+        data=run_configs_data,
+        root_type=typing.List[iree_definitions.E2EModelRunConfig])
+    benchmark_suite = BenchmarkSuite.load_from_run_configs(
+        run_configs=run_configs)
+
   benchmark_driver = LinuxBenchmarkDriver(gpu_id=args.gpu_id,
                                           device_info=device_info,
                                           benchmark_config=benchmark_config,
@@ -177,6 +224,11 @@ def parse_argument():
       type=str,
       default="0",
       help="GPU ID to run the benchmark, e.g., '0' or 'GPU-<UUID>'")
+  #TODO
+  arg_parser.add_argument("--run_configs_json",
+                          type=pathlib.PurePath,
+                          default=None,
+                          help="JSON file of run configs")
 
   return arg_parser.parse_args()
 

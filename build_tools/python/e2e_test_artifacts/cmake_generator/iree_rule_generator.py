@@ -136,7 +136,7 @@ class IreeRuleBuilder(object):
     if arch_info.architecture == "x86_64":
       flags = [
           f"--iree-llvm-target-triple=x86_64-unknown-{target.target_abi.value}",
-          f"--iree-llvm-target-cpu={arch_info.microarchitecture.lower()}"
+          # f"--iree-llvm-target-cpu={arch_info.microarchitecture.lower()}"
       ]
     elif arch_info.architecture == "rv64":
       flags = [
