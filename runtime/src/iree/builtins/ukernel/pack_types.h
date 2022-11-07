@@ -11,17 +11,26 @@
 
 #include "iree/builtins/ukernel/common.h"
 
-// Supported combinations of data types (order: IN, OUT).
-enum iree_ukernel_pack_type_t {
-  iree_ukernel_pack_type_f32f32,
-  iree_ukernel_pack_type_i8i8,
-  iree_ukernel_pack_type_i32i32,
-};
+typedef enum iree_ukernel_pack_type_t {
+  iree_ukernel_pack_type_f32f32 =
+      IREE_UKERNEL_PACK_2_TYPES_LITERAL(FLOAT_32, FLOAT_32),
+  iree_ukernel_pack_type_i8i8 = IREE_UKERNEL_PACK_2_TYPES_LITERAL(INT_8, INT_8),
+  iree_ukernel_pack_type_i32i32 =
+      IREE_UKERNEL_PACK_2_TYPES_LITERAL(INT_32, INT_32),
+} iree_ukernel_pack_type_t;
 
-typedef enum iree_ukernel_pack_type_t iree_ukernel_pack_type_t;
+static inline iree_ukernel_type_t iree_ukernel_pack_in_type(
+    iree_ukernel_pack_type_t type) {
+  return IREE_UKERNEL_UNPACK_TYPE(0, type);
+}
+
+static inline iree_ukernel_type_t iree_ukernel_pack_out_type(
+    iree_ukernel_pack_type_t type) {
+  return IREE_UKERNEL_UNPACK_TYPE(1, type);
+}
 
 // Parameters for a pack operation.
-struct iree_ukernel_pack_params_t {
+typedef struct iree_ukernel_pack_params_t {
   iree_ukernel_pack_type_t type;
   const void* in_buffer;
   void* out_buffer;
@@ -35,21 +44,6 @@ struct iree_ukernel_pack_params_t {
   iree_ukernel_ssize_t out_size3;
   const void* padding_value;
   iree_ukernel_uint32_t flags;
-};
-
-typedef struct iree_ukernel_pack_params_t iree_ukernel_pack_params_t;
-
-static int iree_ukernel_pack_elem_size(iree_ukernel_pack_type_t type) {
-  switch (type) {
-    case iree_ukernel_pack_type_f32f32:
-    case iree_ukernel_pack_type_i32i32:
-      return 4;
-    case iree_ukernel_pack_type_i8i8:
-      return 1;
-    default:
-      assert(0 && "unknown type");
-      return 0;
-  }
-}
+} iree_ukernel_pack_params_t;
 
 #endif  // IREE_BUILTINS_UKERNEL_PACK_TYPES_H_

@@ -30,10 +30,12 @@ static iree_ukernel_status_t iree_ukernel_mmt4d_validate(
   // targets may benefit from K being int32, not int64. We still let K be of
   // type int64 to be future-proof, as types are hard to change later. But we
   // enforce a narrower range here, as we can always relax that later as needed.
-  if (OUTSIDE_UINT_RANGE(params->M, 31) || OUTSIDE_UINT_RANGE(params->M, 31) ||
-      OUTSIDE_UINT_RANGE(params->K, 31) || OUTSIDE_UINT_RANGE(params->M0, 15) ||
-      OUTSIDE_UINT_RANGE(params->N0, 15) ||
-      OUTSIDE_UINT_RANGE(params->K0, 15)) {
+  if (!(IREE_UKERNEL_VALUE_IN_UNSIGNED_INT_RANGE(params->M, 31) &&
+        IREE_UKERNEL_VALUE_IN_UNSIGNED_INT_RANGE(params->M, 31) &&
+        IREE_UKERNEL_VALUE_IN_UNSIGNED_INT_RANGE(params->K, 31) &&
+        IREE_UKERNEL_VALUE_IN_UNSIGNED_INT_RANGE(params->M0, 15) &&
+        IREE_UKERNEL_VALUE_IN_UNSIGNED_INT_RANGE(params->N0, 15) &&
+        IREE_UKERNEL_VALUE_IN_UNSIGNED_INT_RANGE(params->K0, 15))) {
     return iree_ukernel_status_unsupported_huge_or_negative_dimension;
   }
   return iree_ukernel_status_ok;
@@ -66,12 +68,18 @@ static void iree_ukernel_mmt4d_using_tile_func(
   const iree_ukernel_int32_t K = params->K;
   const iree_ukernel_int16_t M0 = params->M0;
   const iree_ukernel_int16_t N0 = params->N0;
+  const iree_ukernel_type_t lhs_type =
+      iree_ukernel_mmt4d_lhs_type(params->type);
+  const iree_ukernel_type_t rhs_type =
+      iree_ukernel_mmt4d_rhs_type(params->type);
+  const iree_ukernel_type_t out_type =
+      iree_ukernel_mmt4d_out_type(params->type);
   const iree_ukernel_int16_t lhs_elem_size_log2 =
-      iree_ukernel_mmt4d_lhs_elem_size_log2(params->type);
+      iree_ukernel_type_size_log2(lhs_type);
   const iree_ukernel_int16_t rhs_elem_size_log2 =
-      iree_ukernel_mmt4d_rhs_elem_size_log2(params->type);
+      iree_ukernel_type_size_log2(rhs_type);
   const iree_ukernel_int16_t out_elem_size_log2 =
-      iree_ukernel_mmt4d_out_elem_size_log2(params->type);
+      iree_ukernel_type_size_log2(out_type);
   char* out_tile_row = params->out_buffer;
   const char* lhs_panel = params->lhs_buffer;
   iree_ukernel_int32_t out_tile_size = (M0 * N0) << out_elem_size_log2;
@@ -107,11 +115,11 @@ void iree_ukernel_memset_zero(void* buf, iree_ukernel_ssize_t n) {
 // Helper for early-return path when K==0 and we just need to clear the output.
 static void iree_ukernel_mmt4d_zero_out(
     const iree_ukernel_mmt4d_params_t* params) {
-  iree_ukernel_ssize_t contiguous_size =
-      params->N * params->M0 * params->N0
-      << iree_ukernel_mmt4d_out_elem_size_log2(params->type);
-  iree_ukernel_ssize_t stride =
-      params->out_stride << iree_ukernel_mmt4d_out_elem_size_log2(params->type);
+  iree_ukernel_type_t out_type = iree_ukernel_mmt4d_out_type(params->type);
+  int out_type_size_log2 = iree_ukernel_type_size_log2(out_type);
+  iree_ukernel_ssize_t contiguous_size = params->N * params->M0 * params->N0
+                                         << out_type_size_log2;
+  iree_ukernel_ssize_t stride = params->out_stride << out_type_size_log2;
   char* out_ptr = params->out_buffer;
   for (iree_ukernel_ssize_t i = 0; i < params->M; ++i) {
     iree_ukernel_memset_zero(out_ptr, contiguous_size);

@@ -43,10 +43,6 @@
 // things that we would otherwise prefer to keep internal in the mmt4d builtin
 // implementation, and would make e2e/matmul tests even more expensive.
 
-// clang-format off
-#include <stdint.h>  // include before ukernel/common.h to keep standard types
-// clang-format on
-
 #include "iree/builtins/ukernel/mmt4d.h"
 
 #include <vector>
@@ -117,8 +113,8 @@ static void test_one_matmul_using_given_lhs_rhs(
   iree_ukernel_ssize_t out_buffer_size =
       iree_ukernel_mmt4d_out_buffer_size(&shared_params);
   reference_params.out_buffer = malloc(out_buffer_size);
-  iree_mmt4d_scalar_type_t out_type =
-      iree_ukernel_mmt4d_out_type(&shared_params);
+  iree_ukernel_type_t out_type =
+      iree_ukernel_mmt4d_out_type(shared_params.type);
   write_random_buffer(reference_params.out_buffer, out_buffer_size, out_type,
                       engine);
 
@@ -195,8 +191,8 @@ static void test_one_matmul_creating_lhs_rhs_for_given_shape(
       iree_ukernel_mmt4d_lhs_buffer_size(&params);
   iree_ukernel_ssize_t rhs_buffer_size =
       iree_ukernel_mmt4d_rhs_buffer_size(&params);
-  iree_mmt4d_scalar_type_t lhs_type = iree_ukernel_mmt4d_lhs_type(&params);
-  iree_mmt4d_scalar_type_t rhs_type = iree_ukernel_mmt4d_rhs_type(&params);
+  iree_ukernel_type_t lhs_type = iree_ukernel_mmt4d_lhs_type(params.type);
+  iree_ukernel_type_t rhs_type = iree_ukernel_mmt4d_rhs_type(params.type);
   void* lhs_buffer = malloc(lhs_buffer_size);
   void* rhs_buffer = malloc(rhs_buffer_size);
   write_random_buffer(lhs_buffer, lhs_buffer_size, lhs_type, engine);
