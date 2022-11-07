@@ -193,11 +193,14 @@ def main(args: argparse.Namespace):
             f"Module path isn't a module cmake target: {module_path}")
       compilation_time_ms = target_build_time_map[cmake_target]
 
-      compilation_info = CompilationInfo(model_name=benchmark_case.model_name,
-                                         model_tags=benchmark_case.model_tags,
-                                         model_source=category,
-                                         target_arch=benchmark_case.target_arch,
-                                         bench_mode=benchmark_case.bench_mode)
+      compilation_info = CompilationInfo(
+          model_name=benchmark_case.model_name,
+          model_tags=benchmark_case.model_tags,
+          model_source=category,
+          target_arch=benchmark_case.target_arch,
+          # TODO(#11071): compile_tags should be retrived from benchmark_case.compile_tags
+          # during the migration.
+          compile_tags=benchmark_case.bench_mode)
       compilation_statistics = CompilationStatistics(
           compilation_info=compilation_info,
           module_component_sizes=module_component_sizes,

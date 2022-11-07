@@ -296,6 +296,8 @@ class BenchmarkInfo:
   - model_source: the source of the model, e.g., 'TensorFlow'
   - bench_mode: a list of tags for benchmark mode,
       e.g., ['1-thread', 'big-core', 'full-inference']
+  - compile_tags: an optional list of tags to describe the compile configs,
+      e.g., ['fuse-padding']
   - runner: which runner is used for benchmarking, e.g., 'iree_vulkan', 'tflite'
   - device_info: an DeviceInfo object describing the device where benchmarks run
   """
@@ -304,6 +306,7 @@ class BenchmarkInfo:
   model_tags: Sequence[str]
   model_source: str
   bench_mode: Sequence[str]
+  compile_tags: Optional[Sequence[str]]
   driver_info: DriverInfo
   device_info: DeviceInfo
 
@@ -325,9 +328,12 @@ class BenchmarkInfo:
     else:
       model_part = f"{self.model_name} ({self.model_source})"
     device_part = f"{self.device_info.model} ({target_arch})"
-    mode = ",".join(self.bench_mode)
+    if self.compile_tags is not None:
+      mode_tags = f'[{",".join(self.compile_tags)}][{",".join(self.bench_mode)}]'
+    else:
+      mode_tags = ",".join(self.bench_mode)
 
-    return f"{model_part} {mode} with {self.driver_info.pretty_name} @ {device_part}"
+    return f"{model_part} {mode_tags} with {self.driver_info.pretty_name} @ {device_part}"
 
   @staticmethod
   def from_device_info_and_name(device_info: DeviceInfo, name: str):
@@ -335,7 +341,7 @@ class BenchmarkInfo:
         model_name,
         model_tags,
         model_source,
-        bench_mode,
+        mode_tags,
         _,  # "with"
         runner,
         _,  # "@"
@@ -344,7 +350,13 @@ class BenchmarkInfo:
     ) = name.split()
     model_source = model_source.strip("()")
     model_tags = model_tags.strip("[]").split(",")
-    bench_mode = bench_mode.split(",")
+    if mode_tags.startswith("[") and mode_tags.endswith("]"):
+      bench_mode, compile_tags = mode_tags.strip("[]").split("][")
+      bench_mode = mode_tags.split(",")
+      compile_tags = compile_tags.split(",")
+    else:
+      bench_mode = mode_tags.split(",")
+      compile_tags = None
 
     driver = IREE_PRETTY_NAME_TO_DRIVER_NAME.get(runner)
     if not driver:
@@ -354,6 +366,7 @@ class BenchmarkInfo:
                          model_tags=model_tags,
                          model_source=model_source,
                          bench_mode=bench_mode,
+                         compile_tags=compile_tags,
                          driver_info=IREE_DRIVERS_INFOS[driver],
                          device_info=device_info)
 
@@ -363,6 +376,7 @@ class BenchmarkInfo:
         "model_tags": self.model_tags,
         "model_source": self.model_source,
         "bench_mode": self.bench_mode,
+        "compile_tags": self.compile_tags,
         # Get the "iree-*" driver name from the DriverInfo.
         "runner": IREE_PRETTY_NAME_TO_DRIVER_NAME[self.driver_info.pretty_name],
         "device_info": self.device_info.to_json_object(),
@@ -378,6 +392,7 @@ class BenchmarkInfo:
                          model_tags=json_object["model_tags"],
                          model_source=json_object["model_source"],
                          bench_mode=json_object["bench_mode"],
+                         compile_tags=json_object.get("compile_tags"),
                          driver_info=driver_info,
                          device_info=DeviceInfo.from_json_object(
                              json_object["device_info"]))
@@ -475,7 +490,7 @@ class CompilationInfo(object):
   model_tags: Sequence[str]
   model_source: str
   target_arch: str
-  bench_mode: Sequence[str]
+  compile_tags: Sequence[str]
 
   def __str__(self):
     if self.model_tags:
@@ -483,8 +498,8 @@ class CompilationInfo(object):
       model_part = f"{self.model_name} [{tags}] ({self.model_source})"
     else:
       model_part = f"{self.model_name} ({self.model_source})"
-    bench_mode_str = ",".join(self.bench_mode)
-    return f"{model_part} {self.target_arch} {bench_mode_str}"
+    compile_tags_str = ",".join(self.compile_tags)
+    return f"{model_part} {self.target_arch} {compile_tags_str}"
 
   @staticmethod
   def from_json_object(json_object: Dict[str, Any]):
