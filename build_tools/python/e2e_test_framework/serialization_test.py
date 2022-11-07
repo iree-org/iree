@@ -33,15 +33,10 @@ def main():
 
   _, run_configs = benchmark_collections.generate_benchmarks()
 
-  serialized_obj_map = collections.OrderedDict()
-  serialized_obj = serialization.serialize(run_configs, serialized_obj_map)
-  objs = serialization.deserialize(
-      serialized_obj, typing.List[iree_definitions.E2EModelRunConfig],
-      serialized_obj_map)
-  for a, b in zip(run_configs, objs):
-    print(a)
-    print(b)
-  print(run_configs == objs)
+  objs = serialization.unpack_and_deserialize(
+      json.loads(json.dumps(serialization.serialize_and_pack(run_configs))),
+      typing.List[iree_definitions.E2EModelRunConfig])
+  print(objs == run_configs)
 
 
 if __name__ == "__main__":
