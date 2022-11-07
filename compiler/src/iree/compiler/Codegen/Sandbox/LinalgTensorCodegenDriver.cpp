@@ -487,12 +487,14 @@ struct CodegenSplitReduction
         rewriter, cast<TilingInterface>(op.getOperation()), optionsFirst);
     if (failed(tileResFirst)) return failure();
     rewriter.replaceOp(op, tileResFirst->replacements);
-    filter.replaceLinalgTransformationFilter(rewriter, tileResFirst->tiledOp);
+    for (auto tiledOp : tileResFirst->tiledOps) {
+      filter.replaceLinalgTransformationFilter(rewriter, tiledOp);
+    }
 
     // 2) Apply splitReduction on the single vector-length array. splitReduction
     // already replaces the op.
     FailureOr<linalg::SplitReductionResult> splitRes =
-        splitReduction(rewriter, tileResFirst->tiledOp, fn);
+        splitReduction(rewriter, tileResFirst->tiledOps.back(), fn);
     if (failed(splitRes)) return failure();
     filter.replaceLinalgTransformationFilter(rewriter, splitRes->splitLinalgOp);
     filter.replaceLinalgTransformationFilter(rewriter,
