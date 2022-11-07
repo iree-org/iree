@@ -85,6 +85,7 @@ iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func_arm_64(
     case iree_uk_mmt4d_type_i8i8i32:
       return iree_uk_mmt4d_select_tile_func_arm_64_i8i8i32(params);
     default:
+      IREE_UK_ASSUME_UNREACHABLE;
       return 0;
   }
 }

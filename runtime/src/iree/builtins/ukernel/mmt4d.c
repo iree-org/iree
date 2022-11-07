@@ -15,6 +15,15 @@
 
 static iree_uk_status_t iree_uk_mmt4d_validate(
     const iree_uk_mmt4d_params_t* params) {
+#ifdef NDEBUG
+  // Avoid validation code overhead (code size and latency) in release builds.
+  // This actually enables more thorough validation as it removes optimization
+  // concerns from the validation code.
+  // Microkernels take raw pointers/sizes/strides anyway, so if params are
+  // incorrect, UB will happen no matter how much we try to validate.
+  return iree_uk_status_ok;
+#endif
+
   if (params->flags & ~IREE_UK_FLAG_ACCUMULATE) {
     return iree_uk_status_bad_flags;
   }
@@ -38,21 +47,27 @@ static iree_uk_status_t iree_uk_mmt4d_validate(
         IREE_UK_VALUE_IN_UNSIGNED_INT_RANGE(params->K0, 15))) {
     return iree_uk_status_unsupported_huge_or_negative_dimension;
   }
+
+  int tile_elems = params->M0 * params->N0;
+  iree_uk_type_t out_type = iree_uk_mmt4d_out_type(params->type);
+  int tile_bytes = tile_elems << iree_uk_type_size_log2(out_type);
+  if (tile_bytes > iree_uk_mmt4d_tile_generic_max_bytes) {
+    return iree_uk_status_unsupported_generic_tile_size;
+  }
+
   return iree_uk_status_ok;
 }
 
 // On success, *out_tile_func is the tile function to use to perform the mmt4d
 // with the given *params.
-static iree_uk_status_t iree_uk_mmt4d_select_tile_func(
-    const iree_uk_mmt4d_params_t* params,
-    iree_uk_mmt4d_tile_func_t* out_tile_func) {
+static iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func(
+    const iree_uk_mmt4d_params_t* params) {
   iree_uk_mmt4d_tile_func_t arch_tile_func =
       iree_uk_mmt4d_select_tile_func_arch(params);
   if (arch_tile_func) {
-    *out_tile_func = arch_tile_func;
-    return iree_uk_status_ok;
+    return arch_tile_func;
   }
-  return iree_uk_mmt4d_select_tile_func_generic(params, out_tile_func);
+  return iree_uk_mmt4d_select_tile_func_generic(params);
 }
 
 // General mmt4d implementation, shared among all cases. The idea is that the
@@ -122,12 +137,10 @@ static void iree_uk_mmt4d_zero_out(const iree_uk_mmt4d_params_t* params) {
 // the entire loop nest.
 // The value |true| is written to the out-param |*done| if an early-return path
 // was taken and the mmt4d work is already done.
-static iree_uk_status_t iree_uk_mmt4d_early(
-    const iree_uk_mmt4d_params_t* params, bool* done) {
+static bool iree_uk_mmt4d_early(const iree_uk_mmt4d_params_t* params) {
   // Trivial cases
   if (params->M == 0 || params->N == 0) {
-    *done = true;
-    return iree_uk_status_ok;
+    return true;
   }
   if (params->K == 0) {
     if (params->flags & IREE_UK_FLAG_ACCUMULATE) {
@@ -135,31 +148,27 @@ static iree_uk_status_t iree_uk_mmt4d_early(
     } else {
       iree_uk_mmt4d_zero_out(params);
     }
-    *done = true;
-    return iree_uk_status_ok;
+    return true;
   }
 
   // Targets that want to specialize the entire loop nest can do so here.
 
-  return iree_uk_status_ok;
+  return false;
 }
 
 IREE_UK_EXPORT iree_uk_status_t
 iree_uk_mmt4d(const iree_uk_mmt4d_params_t* params) {
-  // Validate params.
+  // Validate params (may be vacuous if NDEBUG)
   IREE_UK_RETURN_IF_ERROR(iree_uk_mmt4d_validate(params));
 
   // Maybe handle this mmt4d "early", without needing to select a tile_func.
   // Typical cases include trivial cases (e.g. when params->K == 0) and hardware
   // targets that want to handle the entire loop nest in target-specific code.
-  bool done = false;
-  IREE_UK_RETURN_IF_ERROR(iree_uk_mmt4d_early(params, &done));
-  if (done) return iree_uk_status_ok;
+  if (iree_uk_mmt4d_early(params)) return iree_uk_status_ok;
 
   // Select a target-specific tile_func (inner loop on K, computing one M0xN0
   // tile) and use that with generic outer loops.
-  iree_uk_mmt4d_tile_func_t tile_func;
-  IREE_UK_RETURN_IF_ERROR(iree_uk_mmt4d_select_tile_func(params, &tile_func));
+  iree_uk_mmt4d_tile_func_t tile_func = iree_uk_mmt4d_select_tile_func(params);
   iree_uk_mmt4d_using_tile_func(params, tile_func);
   return iree_uk_status_ok;
 }
