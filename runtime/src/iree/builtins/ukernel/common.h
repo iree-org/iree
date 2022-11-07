@@ -172,6 +172,10 @@ IREE_UK_STATIC_ASSERT(sizeof(iree_uk_uint64_t) == 8);
 #define IREE_UK_UINT32_MAX 0xffffffffui32
 #define IREE_UK_UINT64_MAX 0xffffffffffffffffui64
 
+// Helper for microkernel input validation
+#define IREE_UK_VALUE_IN_UNSIGNED_INT_RANGE(VALUE, BIT_COUNT) \
+  (((VALUE) >= 0) && !((VALUE) >> (BIT_COUNT)))
+
 //===----------------------------------------------------------------------===//
 // Local replacement for ssize_t
 //===----------------------------------------------------------------------===//
@@ -227,6 +231,8 @@ IREE_UK_EXPORT const char* iree_uk_status_message(iree_uk_status_t status);
 
 //===----------------------------------------------------------------------===//
 // Element type IDs for the data accessed by microkernels.
+//===----------------------------------------------------------------------===//
+
 // Inspired by iree_hal_element_type_t, but more compact (8-bit instead of
 // 32-bit), stand-alone (we couldn't use iree_hal_element_type_t at the moment
 // anyway as that would #include more headers), and more specialized towards the
@@ -236,8 +242,7 @@ IREE_UK_EXPORT const char* iree_uk_status_message(iree_uk_status_t status);
 // will have tuples of such element type ids and will perform if-else chains on
 // the tuples, so if they can fit side-by-side in a single register, that will
 // result in more compact code.
-//===----------------------------------------------------------------------===//
-
+//
 // Implementation note: we make this very bare-bones, with
 // iree_uk_type_t just a typedef for iree_uk_uint8_t and
 // the values given by macros, as opposed to trying to do something nicer, more
@@ -324,9 +329,6 @@ enum {
 
 IREE_UK_STATIC_ASSERT(IREE_UK_TYPE_NONE == 0);
 
-#define IREE_UK_VALUE_IN_UNSIGNED_INT_RANGE(VALUE, BIT_COUNT) \
-  (((VALUE) >= 0) && !((VALUE) >> (BIT_COUNT)))
-
 // Accessors.
 static inline iree_uk_uint8_t iree_uk_type_category(iree_uk_type_t t) {
   return t & IREE_UK_TYPE_CATEGORY_MASK;
@@ -353,6 +355,10 @@ static inline int iree_uk_type_bit_count(iree_uk_type_t t) {
 static inline int iree_uk_type_size(iree_uk_type_t t) {
   return 1 << iree_uk_type_size_log2(t);
 }
+
+//===----------------------------------------------------------------------===//
+// Tuples of types, packed into a word.
+//===----------------------------------------------------------------------===//
 
 typedef iree_uk_uint16_t iree_uk_type_pair_t;
 typedef iree_uk_uint32_t iree_uk_type_triple_t;
