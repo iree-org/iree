@@ -1,0 +1,106 @@
+model,engine,dialect,device,shape_type,data_type,iter/sec,ms/iter,vs. PyTorch/TF,iterations,param_count,tags,notes,datetime
+albert-base-v2,tf,mhlo,cuda,static,int32,9.16034128774362,109.16623830795288,=,100,11M,nlp;bert-variant;transformer-encoder,12 layers; 128 embedding dim; 768 hidden dim; 12 attention heads; Smaller than BERTbase (11M params vs 109M params); Uses weight sharing to reduce # params but computational cost is similar to BERT.,2022-11-06 10:37:03.949918
+albert-base-v2,shark_python,mhlo,cuda,static,int32,55.95365654789094,17.871932983398438,6.11x faster,100,,,,2022-11-06 10:37:05.842975
+albert-base-v2,shark_iree_c,mhlo,cuda,static,int32,124.68827930174565,8.02,13.61x faster,100,,,,2022-11-06 10:37:07.114511
+albert-base-v2,torch,linalg,cuda,dynamic,int64,68.15153892862301,14.673182964324951,=,100,11M,nlp;bert-variant;transformer-encoder,12 layers; 128 embedding dim; 768 hidden dim; 12 attention heads; Smaller than BERTbase (11M params vs 109M params); Uses weight sharing to reduce # params but computational cost is similar to BERT.,2022-11-06 10:37:55.916805
+albert-base-v2,shark_python,linalg,cuda,dynamic,int64,123.3750181636986,8.105368614196777,1.81x faster,100,,,,2022-11-06 10:37:56.776348
+albert-base-v2,shark_iree_c,linalg,cuda,dynamic,int64,129.5336787564767,7.72,1.9x faster,100,,,,2022-11-06 10:37:58.055055
+albert-base-v2,torch,linalg,cuda,static,int64,67.95768263923713,14.715039730072021,=,100,11M,nlp;bert-variant;transformer-encoder,12 layers; 128 embedding dim; 768 hidden dim; 12 attention heads; Smaller than BERTbase (11M params vs 109M params); Uses weight sharing to reduce # params but computational cost is similar to BERT.,2022-11-06 10:38:44.016000
+albert-base-v2,shark_python,linalg,cuda,static,int64,121.14286572514808,8.254716396331787,1.78x faster,100,,,,2022-11-06 10:38:44.892696
+albert-base-v2,shark_iree_c,linalg,cuda,static,int64,128.2051282051282,7.8,1.89x faster,100,,,,2022-11-06 10:38:46.186116
+alexnet,torch,linalg,cuda,dynamic,float32,1018.7743046531342,0.9815716743469238,=,100,61M,"cnn,parallel-layers","The CNN that revolutionized computer vision (move away from hand-crafted features to neural networks),10 years old now and probably no longer used in prod.",2022-11-06 10:39:24.461423
+alexnet,shark_python,linalg,cuda,dynamic,float32,101.73788408785887,9.829180240631104,9.01x slower,100,,,,2022-11-06 10:39:25.503904
+alexnet,shark_iree_c,linalg,cuda,dynamic,float32,114.41647597254003,8.740000000000002,7.9x slower,100,,,,2022-11-06 10:39:27.069581
+alexnet,torch,linalg,cuda,static,float32,1012.5250457462063,0.9876298904418945,=,100,61M,"cnn,parallel-layers","The CNN that revolutionized computer vision (move away from hand-crafted features to neural networks),10 years old now and probably no longer used in prod.",2022-11-06 10:40:03.759179
+alexnet,shark_python,linalg,cuda,static,float32,99.53673918589405,10.046541690826416,9.17x slower,100,,,,2022-11-06 10:40:04.823759
+alexnet,shark_iree_c,linalg,cuda,static,float32,115.74074074074073,8.64,7.75x slower,100,,,,2022-11-06 10:40:06.384893
+bert-base-cased,torch,linalg,cuda,dynamic,int64,77.2173147185712,12.95046329498291,=,100,109M,nlp;bert-variant;transformer-encoder,12 layers; 768 hidden; 12 attention heads,2022-11-06 10:41:00.147297
+bert-base-cased,shark_python,linalg,cuda,dynamic,int64,126.59821682704599,7.89900541305542,1.64x faster,100,,,,2022-11-06 10:41:00.986340
+bert-base-cased,shark_iree_c,linalg,cuda,dynamic,int64,133.15579227696404,7.510000000000001,1.72x faster,100,,,,2022-11-06 10:41:02.787529
+bert-base-cased,torch,linalg,cuda,static,int64,74.20203214622225,13.476719856262207,=,100,109M,nlp;bert-variant;transformer-encoder,12 layers; 768 hidden; 12 attention heads,2022-11-06 10:41:56.753058
+bert-base-cased,shark_python,linalg,cuda,static,int64,123.9978454201283,8.064656257629395,1.67x faster,100,,,,2022-11-06 10:41:57.609214
+bert-base-cased,shark_iree_c,linalg,cuda,static,int64,133.15579227696404,7.510000000000001,1.79x faster,100,,,,2022-11-06 10:41:59.415210
+bert-base-uncased,tf,mhlo,cuda,static,int32,7.883824088054842,126.84199810028076,=,100,109M,nlp;bert-variant;transformer-encoder,12 layers; 768 hidden; 12 attention heads,2022-11-06 10:42:38.988768
+bert-base-uncased,shark_python,mhlo,cuda,static,int32,49.54239211461346,20.184733867645264,6.28x faster,100,,,,2022-11-06 10:42:41.121148
+bert-base-uncased,shark_iree_c,mhlo,cuda,static,int32,104.60251046025104,9.56,13.27x faster,100,,,,2022-11-06 10:42:42.959484
+bert-base-uncased,torch,linalg,cuda,dynamic,int64,77.26527997146881,12.942423820495605,=,100,109M,nlp;bert-variant;transformer-encoder,12 layers; 768 hidden; 12 attention heads,2022-11-06 10:43:36.982555
+bert-base-uncased,shark_python,linalg,cuda,dynamic,int64,122.45170602509815,8.166484832763672,1.58x faster,100,,,,2022-11-06 10:43:37.849339
+bert-base-uncased,shark_iree_c,linalg,cuda,dynamic,int64,133.15579227696404,7.510000000000001,1.72x faster,100,,,,2022-11-06 10:43:39.663640
+bert-base-uncased,torch,linalg,cuda,static,int64,75.63741180106963,13.220970630645752,=,100,109M,nlp;bert-variant;transformer-encoder,12 layers; 768 hidden; 12 attention heads,2022-11-06 10:44:33.670872
+bert-base-uncased,shark_python,linalg,cuda,static,int64,123.08053473060991,8.124761581420898,1.63x faster,100,,,,2022-11-06 10:44:34.532591
+bert-base-uncased,shark_iree_c,linalg,cuda,static,int64,133.33333333333334,7.499999999999999,1.76x faster,100,,,,2022-11-06 10:44:36.344867
+camembert-base,tf,mhlo,cuda,static,int32,7.859299577671028,127.23780155181885,=,100,-,-,-,2022-11-06 10:45:16.652592
+camembert-base,shark_python,mhlo,cuda,static,int32,48.89755317777251,20.450921058654785,6.22x faster,100,,,,2022-11-06 10:45:18.815082
+camembert-base,shark_iree_c,mhlo,cuda,static,int32,106.26992561105207,9.41,13.52x faster,100,,,,2022-11-06 10:45:20.654557
+dbmdz/convbert-base-turkish-cased,tf,mhlo,cuda,static,int32,7.747796720677001,129.0689516067505,=,100,-,-,-,2022-11-06 10:46:06.172514
+dbmdz/convbert-base-turkish-cased,shark_python,mhlo,cuda,static,int32,41.329348766042784,24.195880889892578,5.33x faster,100,,,,2022-11-06 10:46:08.730451
+dbmdz/convbert-base-turkish-cased,shark_iree_c,mhlo,cuda,static,int32,75.75757575757576,13.2,9.78x faster,100,,,,2022-11-06 10:46:10.610620
+distilbert-base-uncased,tf,mhlo,cuda,static,int32,13.657672489697248,73.21891784667969,=,100,66M,nlp;bert-variant;transformer-encoder,Smaller and faster than BERT with 97percent retained accuracy.,2022-11-06 10:46:34.892491
+distilbert-base-uncased,shark_python,mhlo,cuda,static,int32,59.89773281949354,16.695122718811035,4.39x faster,100,,,,2022-11-06 10:46:36.655121
+distilbert-base-uncased,shark_iree_c,mhlo,cuda,static,int32,166.94490818030047,5.990000000000001,12.22x faster,100,,,,2022-11-06 10:46:38.206190
+google/electra-small-discriminator,tf,mhlo,cuda,static,int32,25.277578195408154,39.56075191497803,=,100,-,-,-,2022-11-06 10:46:56.468094
+google/electra-small-discriminator,shark_python,mhlo,cuda,static,int32,70.52562161122383,14.179244041442871,2.79x faster,100,,,,2022-11-06 10:46:57.964015
+google/electra-small-discriminator,shark_iree_c,mhlo,cuda,static,int32,258.39793281653743,3.8700000000000006,10.22x faster,100,,,,2022-11-06 10:46:59.592606
+google/mobilebert-uncased,tf,mhlo,cuda,static,int32,9.496143178962383,105.30591011047363,=,100,25M,"nlp,bert-variant,transformer-encoder,mobile","24 layers, 512 hidden size, 128 embedding",2022-11-06 10:47:46.242015
+google/mobilebert-uncased,shark_python,mhlo,cuda,static,int32,43.85095102828986,22.80452251434326,4.62x faster,100,,,,2022-11-06 10:47:48.652215
+google/mobilebert-uncased,shark_iree_c,mhlo,cuda,static,int32,82.64462809917356,12.1,8.7x faster,100,,,,2022-11-06 10:47:50.117482
+google/mobilebert-uncased,torch,linalg,cuda,dynamic,int64,19.756020003475186,50.61748266220093,=,100,25M,"nlp,bert-variant,transformer-encoder,mobile","24 layers, 512 hidden size, 128 embedding",2022-11-06 10:48:21.283382
+google/mobilebert-uncased,shark_python,linalg,cuda,dynamic,int64,91.89091844384785,10.882468223571777,4.65x faster,100,,,,2022-11-06 10:48:22.439064
+google/mobilebert-uncased,shark_iree_c,linalg,cuda,dynamic,int64,95.23809523809523,10.500000000000002,4.82x faster,100,,,,2022-11-06 10:48:23.814299
+google/mobilebert-uncased,torch,linalg,cuda,static,int64,20.05558158883778,49.86143112182617,=,100,25M,"nlp,bert-variant,transformer-encoder,mobile","24 layers, 512 hidden size, 128 embedding",2022-11-06 10:48:54.451190
+google/mobilebert-uncased,shark_python,linalg,cuda,static,int64,92.73998490707548,10.782835483551025,4.62x faster,100,,,,2022-11-06 10:48:55.597090
+google/mobilebert-uncased,shark_iree_c,linalg,cuda,static,int64,94.33962264150944,10.6,4.7x faster,100,,,,2022-11-06 10:48:56.991020
+microsoft/MiniLM-L12-H384-uncased,tf,mhlo,cuda,static,int32,17.95025588815807,55.70951223373413,=,100,66M,nlp;bert-variant;transformer-encoder,Large version has 12 layers; 384 hidden size; Smaller than BERTbase (66M params vs 109M params),2022-11-06 10:49:16.766595
+microsoft/MiniLM-L12-H384-uncased,shark_python,mhlo,cuda,static,int32,163.77717609885582,6.105856895446777,9.12x faster,100,,,,2022-11-06 10:49:17.413804
+microsoft/MiniLM-L12-H384-uncased,shark_iree_c,mhlo,cuda,static,int32,238.09523809523807,4.2,13.26x faster,100,,,,2022-11-06 10:49:19.190612
+microsoft/MiniLM-L12-H384-uncased,torch,linalg,cuda,dynamic,int64,73.43488580074641,13.61750602722168,=,100,66M,nlp;bert-variant;transformer-encoder,Large version has 12 layers; 384 hidden size; Smaller than BERTbase (66M params vs 109M params),2022-11-06 10:49:36.171000
+microsoft/MiniLM-L12-H384-uncased,shark_python,linalg,cuda,dynamic,int64,212.15015338548187,4.713642597198486,2.89x faster,100,,,,2022-11-06 10:49:36.672245
+microsoft/MiniLM-L12-H384-uncased,shark_iree_c,linalg,cuda,dynamic,int64,234.7417840375587,4.26,3.2x faster,100,,,,2022-11-06 10:49:38.454554
+microsoft/MiniLM-L12-H384-uncased,torch,linalg,cuda,static,int64,76.1467939875625,13.132529258728027,=,100,66M,nlp;bert-variant;transformer-encoder,Large version has 12 layers; 384 hidden size; Smaller than BERTbase (66M params vs 109M params),2022-11-06 10:49:55.107647
+microsoft/MiniLM-L12-H384-uncased,shark_python,linalg,cuda,static,int64,199.24109560409283,5.019044876098633,2.62x faster,100,,,,2022-11-06 10:49:55.639290
+microsoft/MiniLM-L12-H384-uncased,shark_iree_c,linalg,cuda,static,int64,231.48148148148147,4.32,3.04x faster,100,,,,2022-11-06 10:49:57.437805
+microsoft/layoutlm-base-uncased,tf,mhlo,cuda,static,int32,7.9477790315266335,125.82131385803221,=,100,-,-,-,2022-11-06 10:50:37.160925
+microsoft/layoutlm-base-uncased,shark_python,mhlo,cuda,static,int32,50.429363969977345,19.829716682434082,6.35x faster,100,,,,2022-11-06 10:50:39.256631
+microsoft/layoutlm-base-uncased,shark_iree_c,mhlo,cuda,static,int32,109.40919037199124,9.14,13.77x faster,100,,,,2022-11-06 10:50:41.099554
+microsoft/resnet-50,torch,linalg,cuda,dynamic,float32,107.92257412449204,9.265902042388916,=,100,23M,"image-classification,cnn,residuals,resnet-variant",Bottlenecks with only conv2d (1x1 conv -> 3x3 conv -> 1x1 conv blocks),2022-11-06 10:50:51.454973
+microsoft/resnet-50,shark_python,linalg,cuda,dynamic,float32,46.85982075015638,21.340243816375732,1.3x slower,100,,,,2022-11-06 10:50:53.723403
+microsoft/resnet-50,shark_iree_c,linalg,cuda,dynamic,float32,50.76142131979696,19.7,1.13x slower,100,,,,2022-11-06 10:50:55.204069
+microsoft/resnet-50,torch,linalg,cuda,static,float32,106.76794546421853,9.366106986999512,=,100,23M,"image-classification,cnn,residuals,resnet-variant",Bottlenecks with only conv2d (1x1 conv -> 3x3 conv -> 1x1 conv blocks),2022-11-06 10:51:05.046185
+microsoft/resnet-50,shark_python,linalg,cuda,static,float32,46.548987871504806,21.482744216918945,1.29x slower,100,,,,2022-11-06 10:51:07.328583
+microsoft/resnet-50,shark_iree_c,linalg,cuda,static,float32,50.5050505050505,19.800000000000004,1.11x slower,100,,,,2022-11-06 10:51:08.816574
+resnet101,torch,linalg,cuda,dynamic,float32,58.82691861575735,16.99902057647705,=,100,29M,"cnn,image-classification,residuals,resnet-variant",Bottlenecks with only conv2d (1x1 conv -> 3x3 conv -> 1x1 conv blocks),2022-11-06 10:51:23.026284
+resnet101,shark_python,linalg,cuda,dynamic,float32,24.00997240369917,41.64936065673828,1.45x slower,100,,,,2022-11-06 10:51:27.427052
+resnet101,shark_iree_c,linalg,cuda,dynamic,float32,25.06265664160401,39.9,1.35x slower,100,,,,2022-11-06 10:51:29.262408
+resnet101,torch,linalg,cuda,static,float32,58.981753965476095,16.95439577102661,=,100,29M,"cnn,image-classification,residuals,resnet-variant",Bottlenecks with only conv2d (1x1 conv -> 3x3 conv -> 1x1 conv blocks),2022-11-06 10:51:43.327255
+resnet101,shark_python,linalg,cuda,static,float32,24.032804176293798,41.609792709350586,1.45x slower,100,,,,2022-11-06 10:51:47.721242
+resnet101,shark_iree_c,linalg,cuda,static,float32,25.0,40.0,1.36x slower,100,,,,2022-11-06 10:51:49.524695
+resnet18,torch,linalg,cuda,dynamic,float32,359.28039485428525,2.783341407775879,=,100,11M,"cnn,image-classification,residuals,resnet-variant",1 7x7 conv2d and the rest are 3x3 conv2d,2022-11-06 10:51:55.175332
+resnet18,shark_python,linalg,cuda,dynamic,float32,84.6359716358883,11.815307140350342,3.25x slower,100,,,,2022-11-06 10:51:56.431912
+resnet18,shark_iree_c,linalg,cuda,dynamic,float32,98.03921568627452,10.2,2.66x slower,100,,,,2022-11-06 10:51:57.734284
+resnet18,torch,linalg,cuda,static,float32,352.96319485118386,2.8331565856933594,=,100,11M,"cnn,image-classification,residuals,resnet-variant",1 7x7 conv2d and the rest are 3x3 conv2d,2022-11-06 10:52:03.193158
+resnet18,shark_python,linalg,cuda,static,float32,84.37540673381207,11.851794719696045,3.18x slower,100,,,,2022-11-06 10:52:04.452958
+resnet18,shark_iree_c,linalg,cuda,static,float32,97.08737864077669,10.3,2.64x slower,100,,,,2022-11-06 10:52:05.755645
+resnet50,tf,mhlo,cuda,static,float32,18.580604920092355,53.81956100463867,=,100,23M,"cnn,image-classification,residuals,resnet-variant",Bottlenecks with only conv2d (1x1 conv -> 3x3 conv -> 1x1 conv blocks),2022-11-06 10:52:22.091460
+resnet50,shark_python,mhlo,cuda,static,float32,71.22130765340933,14.040741920471191,3.83x faster,100,,,,2022-11-06 10:52:23.576995
+resnet50,shark_iree_c,mhlo,cuda,static,float32,80.64516129032258,12.4,4.34x faster,100,,,,2022-11-06 10:52:24.994365
+resnet50,torch,linalg,cuda,dynamic,float32,108.85412476363446,9.186606407165527,=,100,23M,"cnn,image-classification,residuals,resnet-variant",Bottlenecks with only conv2d (1x1 conv -> 3x3 conv -> 1x1 conv blocks),2022-11-06 10:52:35.368373
+resnet50,shark_python,linalg,cuda,dynamic,float32,46.66893207102688,21.427531242370605,1.33x slower,100,,,,2022-11-06 10:52:37.645933
+resnet50,shark_iree_c,linalg,cuda,dynamic,float32,50.5050505050505,19.800000000000004,1.16x slower,100,,,,2022-11-06 10:52:39.129410
+resnet50,torch,linalg,cuda,static,float32,110.36953747884671,9.060471057891846,=,100,23M,"cnn,image-classification,residuals,resnet-variant",Bottlenecks with only conv2d (1x1 conv -> 3x3 conv -> 1x1 conv blocks),2022-11-06 10:52:49.167239
+resnet50,shark_python,linalg,cuda,static,float32,46.40086378561124,21.55132293701172,1.38x slower,100,,,,2022-11-06 10:52:51.459319
+resnet50,shark_iree_c,linalg,cuda,static,float32,50.5050505050505,19.800000000000004,1.19x slower,100,,,,2022-11-06 10:52:52.942668
+roberta-base,tf,mhlo,cuda,static,int32,7.31947855653801,136.6217541694641,=,100,-,-,-,2022-11-06 10:53:35.981365
+roberta-base,shark_python,mhlo,cuda,static,int32,35.15568927271805,28.44489812850952,4.8x faster,100,,,,2022-11-06 10:53:38.983556
+roberta-base,shark_iree_c,mhlo,cuda,static,int32,92.59259259259258,10.8,12.65x faster,100,,,,2022-11-06 10:53:40.913014
+squeezenet1_0,torch,linalg,cuda,dynamic,float32,310.0255009646017,3.225541114807129,=,100,1.25M,"cnn,image-classification,mobile,parallel-layers",Parallel conv2d (1x1 conv to compress -> (3x3 expand | 1x1 expand) -> concat),2022-11-06 10:53:46.800352
+squeezenet1_0,shark_python,linalg,cuda,dynamic,float32,182.82701389367162,5.469651222229004,0.7x slower,100,,,,2022-11-06 10:53:47.379506
+squeezenet1_0,shark_iree_c,linalg,cuda,dynamic,float32,268.81720430107526,3.72,0.15x slower,100,,,,2022-11-06 10:53:48.931989
+squeezenet1_0,torch,linalg,cuda,static,float32,316.9775501844745,3.1547975540161133,=,100,1.25M,"cnn,image-classification,mobile,parallel-layers",Parallel conv2d (1x1 conv to compress -> (3x3 expand | 1x1 expand) -> concat),2022-11-06 10:53:54.351937
+squeezenet1_0,shark_python,linalg,cuda,static,float32,191.2726874737783,5.228137969970703,0.66x slower,100,,,,2022-11-06 10:53:54.906486
+squeezenet1_0,shark_iree_c,linalg,cuda,static,float32,271.00271002710025,3.6900000000000004,0.17x slower,100,,,,2022-11-06 10:53:56.456074
+wide_resnet50_2,torch,linalg,cuda,dynamic,float32,114.92755211644271,8.701133728027344,=,100,69M,"cnn,image-classification,residuals,resnet-variant",Resnet variant where model depth is decreased and width is increased.,2022-11-06 10:54:09.203806
+wide_resnet50_2,shark_python,linalg,cuda,dynamic,float32,20.748801329093446,48.195555210113525,4.54x slower,100,,,,2022-11-06 10:54:14.298529
+wide_resnet50_2,shark_iree_c,linalg,cuda,dynamic,float32,21.459227467811157,46.6,4.36x slower,100,,,,2022-11-06 10:54:16.326040
+wide_resnet50_2,torch,linalg,cuda,static,float32,111.47065217564631,8.97097110748291,=,100,69M,"cnn,image-classification,residuals,resnet-variant",Resnet variant where model depth is decreased and width is increased.,2022-11-06 10:54:29.203437
+wide_resnet50_2,shark_python,linalg,cuda,static,float32,20.76259842956237,48.16352844238281,4.37x slower,100,,,,2022-11-06 10:54:34.273990
+wide_resnet50_2,shark_iree_c,linalg,cuda,static,float32,21.50537634408602,46.5,4.18x slower,100,,,,2022-11-06 10:54:36.298574
