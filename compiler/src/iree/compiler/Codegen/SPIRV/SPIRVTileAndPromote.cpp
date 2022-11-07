@@ -159,6 +159,8 @@ class SPIRVTileAndPromotePass final
   void runOnOperation() override;
 
  private:
+  LogicalResult doPromoteCMatrix(func::FuncOp funcOp) const;
+
   // Whether to promote C matrix to use shared memory.
   bool promoteCMatrix = false;
   // Whether to skip thread level tiling and distribution.
@@ -175,20 +177,7 @@ void SPIRVTileAndPromotePass::runOnOperation() {
 
   // Promote C matrix and propagate the potential fill producer into the
   // allocation. This needs to be done before reduction tiling.
-  if (promoteCMatrix) {
-    RewritePatternSet patterns(&getContext());
-    populateContractPromotionPatterns(patterns, {2});
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-      return signalPassFailure();
-    }
-    propagateSharedMemoryCopy(funcOp);
-
-    LLVM_DEBUG({
-      llvm::dbgs() << "--- After promoting C matrix ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
-  }
+  if (failed(doPromoteCMatrix(funcOp))) return signalPassFailure();
 
   StringLiteral markerAttrName =
       IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker;
@@ -261,7 +250,7 @@ void SPIRVTileAndPromotePass::runOnOperation() {
       }
     });
 
-    RewritePatternSet promotionPatterns(&getContext());
+    RewritePatternSet promotionPatterns(context);
     populatePromotionPatterns(promotionPatterns, workgroupMarker);
     if (failed(applyPatternsAndFoldGreedily(funcOp,
                                             std::move(promotionPatterns)))) {
@@ -305,7 +294,7 @@ void SPIRVTileAndPromotePass::runOnOperation() {
   });
 
   if (!skipThreadLevel) {  // Tile and distribute to invocations.
-    RewritePatternSet tilingPatterns(&getContext());
+    RewritePatternSet tilingPatterns(context);
     IREE::LinalgExt::LinalgTransformationFilter filter({workgroupMarker},
                                                        llvm::None);
     populateTilingToInvocationPatterns(tilingPatterns, filter);
@@ -332,6 +321,36 @@ void SPIRVTileAndPromotePass::runOnOperation() {
       llvm::dbgs() << "\n\n";
     });
   }
+}
+
+LogicalResult SPIRVTileAndPromotePass::doPromoteCMatrix(
+    func::FuncOp funcOp) const {
+  MLIRContext *context = funcOp.getContext();
+  if (!promoteCMatrix) return success();
+
+  // If there are no fused elementwise ops, we can avoid promoting C matrix.
+  SmallVector<Operation *> computeOps;
+  if (failed(getComputeOps(funcOp, computeOps)))
+    return funcOp.emitError("failed to get compute ops");
+  unsigned count = 0;
+  for (Operation *op : computeOps) {
+    if (!isa<linalg::FillOp>(op)) ++count;
+  }
+  if (count <= 1) return success();
+
+  RewritePatternSet patterns(context);
+  populateContractPromotionPatterns(patterns, {2});
+  if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    return failure();
+  }
+  propagateSharedMemoryCopy(funcOp);
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "--- After promoting C matrix ---\n";
+    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    llvm::dbgs() << "\n\n";
+  });
+  return success();
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVTileAndPromotePass(

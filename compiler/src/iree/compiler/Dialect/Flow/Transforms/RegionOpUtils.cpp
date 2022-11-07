@@ -6,9 +6,11 @@
 
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dominance.h"
@@ -31,18 +33,15 @@ static SmallVector<Range> getLoopRangesImpl(TilingInterface tilableOp,
   return loopRanges;
 }
 
-static SmallVector<Range> getLoopRangesImpl(tensor::InsertSliceOp insertSliceOp,
-                                            Location loc, OpBuilder &builder) {
+static SmallVector<Range> getLoopRangesFromValue(Value source, Location loc,
+                                                 OpBuilder &builder) {
+  SmallVector<OpFoldResult> dimValues =
+      tensor::createDimValues(builder, loc, source);
   OpFoldResult zero = builder.getIndexAttr(0);
   OpFoldResult one = builder.getIndexAttr(1);
-  Value source = insertSliceOp.getSource();
-  SmallVector<Range> loopRanges(insertSliceOp.getSourceType().getRank(),
-                                Range{zero, one, one});
-  for (auto dim : llvm::seq<unsigned>(0, loopRanges.size())) {
-    loopRanges[dim].size =
-        builder.create<tensor::DimOp>(loc, source, dim).getResult();
-  }
-  return loopRanges;
+  return llvm::to_vector(llvm::map_range(dimValues, [&](OpFoldResult dimValue) {
+    return Range{zero, dimValue, one};
+  }));
 }
 
 static SmallVector<Range> getLoopRangesImpl(tensor::ExtractSliceOp sliceOp,
@@ -62,13 +61,14 @@ static SmallVector<Range> getLoopRangesImpl(tensor::ExtractSliceOp sliceOp,
 SmallVector<Range> Flow::getLoopRanges(Operation *op, Location loc,
                                        OpBuilder &builder) {
   return llvm::TypeSwitch<Operation *, SmallVector<Range>>(op)
-      .Case([&](TilingInterface op) {
-        return getLoopRangesImpl(op, loc, builder);
+      .Case<LinalgExt::SetEncodingOp, LinalgExt::UnsetEncodingOp,
+            tensor::InsertSliceOp>([&](auto op) {
+        return getLoopRangesFromValue(op.getSource(), loc, builder);
       })
-      .Case([&](tensor::InsertSliceOp op) {
-        return getLoopRangesImpl(op, loc, builder);
+      .Case<tensor::ExtractSliceOp>([&](auto sliceOp) {
+        return getLoopRangesImpl(sliceOp, loc, builder);
       })
-      .Case([&](tensor::ExtractSliceOp op) {
+      .Case<TilingInterface>([&](TilingInterface op) {
         return getLoopRangesImpl(op, loc, builder);
       })
       .Default([](Operation *op) -> SmallVector<Range> {

@@ -1,4 +1,5 @@
 // RUN: iree-opt --split-input-file --verify-diagnostics --pass-pipeline="func.func(iree-flow-dispatch-linalg-on-tensors-pass{aggressive-fusion=true}), cse, canonicalize, cse" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --verify-diagnostics --iree-flow-dispatch-via-region-ops --pass-pipeline="func.func(iree-flow-dispatch-linalg-on-tensors-pass{aggressive-fusion=true}), cse, canonicalize, cse" %s | FileCheck %s --check-prefix=CHECK-VIA-REGIONS
 
 func.func @tile_matmul_alone(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
              %arg2 : tensor<?x?xf32>) -> tensor<?x?xf32> {
@@ -837,6 +838,7 @@ func.func @scatter(
     %original : tensor<?x?xf32>, %indices : tensor<?x1xi32>,
     %update : tensor<?x?xf32>) -> tensor<?x?xf32> {
   %0 = iree_linalg_ext.scatter
+      dimension_map = [0]
       unique_indices(true)
       ins(%update, %indices : tensor<?x?xf32>, tensor<?x1xi32>)
       outs(%original : tensor<?x?xf32>) {
@@ -866,6 +868,7 @@ func.func @scatter(
 //  CHECK-DAG:       %[[INDICES:.+]] = flow.dispatch.tensor.load %[[ARG1_CAPTURE]]
 //  CHECK-DAG:       %[[ORIGINAL:.+]] = flow.dispatch.tensor.load %[[ARG0_CAPTURE]]
 //  CHECK-DAG:       %[[SCATTER:.+]] = iree_linalg_ext.scatter
+// CHECK-SAME:               dimension_map = [0]
 // CHECK-SAME:               unique_indices(true)
 // CHECK-SAME:               ins(%[[UPDATE]], %[[INDICES]] : tensor<?x?xf32>, tensor<?x1xi32>)
 // CHECK-SAME:               outs(%[[ORIGINAL]] : tensor<?x?xf32>)
@@ -925,6 +928,7 @@ func.func @scatter_static(%arg0 : tensor<4xi32>, %arg1 : tensor<4x1xi32>, %arg2 
   %cst_1 = arith.constant dense<[[1], [3], [4], [7]]> : tensor<4x1xi32>
   %cst_2 = arith.constant dense<0> : tensor<8xi32>
   %0 = iree_linalg_ext.scatter
+      dimension_map = [0]
       unique_indices(true)
       ins(%arg0, %arg1 : tensor<4xi32>, tensor<4x1xi32>)
       outs(%arg2 : tensor<8xi32>)  {
@@ -1288,6 +1292,7 @@ func.func @concat_pattern(%src1 : tensor<2x40xf32>, %src2 : tensor<3x40xf32>,
       : tensor<3x40xf32> into tensor<5x40xf32>
   return %1 : tensor<5x40xf32>
 }
+
 //      CHECK: func.func @concat_pattern
 // CHECK-SAME:     %[[SRC1:.+]]: tensor<2x40xf32>
 // CHECK-SAME:     %[[SRC2:.+]]: tensor<3x40xf32>
@@ -1295,6 +1300,14 @@ func.func @concat_pattern(%src1 : tensor<2x40xf32>, %src2 : tensor<3x40xf32>,
 //      CHECK:   %[[UPDATE1:.+]] = flow.tensor.update %[[SRC1]], %[[DEST]]
 //      CHECK:   %[[UPDATE2:.+]] = flow.tensor.update %[[SRC2]], %[[UPDATE1]]
 //      CHECK:   return %[[UPDATE2]]
+
+//      CHECK-VIA-REGIONS: func.func @concat_pattern
+// CHECK-VIA-REGIONS-SAME:     %[[SRC1:.+]]: tensor<2x40xf32>
+// CHECK-VIA-REGIONS-SAME:     %[[SRC2:.+]]: tensor<3x40xf32>
+// CHECK-VIA-REGIONS-SAME:     %[[DEST:.+]]: tensor<5x40xf32>
+//      CHECK-VIA-REGIONS:   %[[UPDATE1:.+]] = flow.tensor.update %[[SRC1]], %[[DEST]]
+//      CHECK-VIA-REGIONS:   %[[UPDATE2:.+]] = flow.tensor.update %[[SRC2]], %[[UPDATE1]]
+//      CHECK-VIA-REGIONS:   return %[[UPDATE2]]
 
 // -----
 
@@ -1798,3 +1811,223 @@ module {
 //   CHECK-DAG:     flow.dispatch.tensor.store %[[GENERIC1]]#2
 //       CHECK:     flow.return
 //       CHECK:   return %[[DISPATCH]]#0, %[[DISPATCH]]#1, %[[DISPATCH]]#2
+
+// -----
+
+func.func @set_encoding_op(%arg0 : tensor<?x?xf32>)
+    -> tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>> {
+  %0 = iree_linalg_ext.set_encoding %arg0
+      : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>
+  return %0 : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>
+}
+//      CHECK: func @set_encoding_op
+// CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32>
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//  CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
+//  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
+//      CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroups[%[[D0]], %[[D1]]](%[[ARG0]], %[[D0]], %[[D1]])
+// CHECK-NEXT:     %[[INARG:.+]]: !flow.dispatch.tensor<readonly:tensor<?x?xf32>>
+// CHECK-SAME:     %[[INDEXARG0:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:     %[[INDEXARG1:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:     %[[OUTARG:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>>
+//      CHECK:     %[[LOAD:.+]] = flow.dispatch.tensor.load %[[INARG]]
+// CHECK-SAME:         !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%[[INDEXARG0]], %[[INDEXARG1]]}
+//      CHECK:     %[[ENCODING:.+]] = iree_linalg_ext.set_encoding %[[LOAD]]
+//      CHECK:     flow.dispatch.tensor.store %[[ENCODING]], %[[OUTARG]]
+// CHECK-SAME:         sizes = [%[[INDEXARG0]], %[[INDEXARG1]]]
+// CHECK-SAME:         !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>>{%[[INDEXARG0]], %[[INDEXARG1]]}
+//      CHECK:     flow.return
+//      CHECK:   count(%[[WL0:[a-zA-Z0-9]+]]: index, %[[WL1:.+]]: index)
+//      CHECK:     %[[X:[a-zA-Z0-9]+]], %[[Y:[a-zA-Z0-9]+]], %[[Z:.+]] = flow.dispatch.workgroup_count_from_set_encoding_op %[[WL0]], %[[WL1]]
+//      CHECK:     flow.return %[[X]], %[[Y]], %[[Z]]
+//      CHECK:   return %[[DISPATCH]]
+
+// -----
+
+func.func @unset_encoding_op(%arg0 : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>)
+    -> tensor<?x?xf32> {
+  %0 = iree_linalg_ext.unset_encoding %arg0
+      : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>> -> tensor<?x?xf32>
+  return %0 : tensor<?x?xf32>
+}
+//      CHECK: func @unset_encoding_op
+// CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//  CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
+//  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
+//      CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroups[%[[D0]], %[[D1]]](%[[ARG0]], %[[D0]], %[[D1]])
+// CHECK-NEXT:     %[[INARG:.+]]: !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>>
+// CHECK-SAME:     %[[INDEXARG0:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:     %[[INDEXARG1:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:     %[[OUTARG:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>
+//      CHECK:     %[[LOAD:.+]] = flow.dispatch.tensor.load %[[INARG]]
+// CHECK-SAME:         sizes = [%[[INDEXARG0]], %[[INDEXARG1]]]
+// CHECK-SAME:         !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>>{%[[INDEXARG0]], %[[INDEXARG1]]}
+//      CHECK:     %[[ENCODING:.+]] = iree_linalg_ext.unset_encoding %[[LOAD]]
+//      CHECK:     flow.dispatch.tensor.store %[[ENCODING]], %[[OUTARG]]
+// CHECK-SAME:         !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%[[INDEXARG0]], %[[INDEXARG1]]}
+//      CHECK:     flow.return
+//      CHECK:   count(%[[WL0:[a-zA-Z0-9]+]]: index, %[[WL1:.+]]: index)
+//      CHECK:     %[[X:[a-zA-Z0-9]+]], %[[Y:[a-zA-Z0-9]+]], %[[Z:.+]] = flow.dispatch.workgroup_count_from_dag_root %[[WL0]], %[[WL1]]
+//      CHECK:     flow.return %[[X]], %[[Y]], %[[Z]]
+//      CHECK:   return %[[DISPATCH]]
+
+// -----
+
+#map = affine_map<()[s0] -> (-s0 + (s0 ceildiv 16) * 16)>
+func.func @pad_and_set_encoding_op(%arg0 : tensor<?x?xf32>)
+    -> tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %cst = arith.constant 0.0 : f32
+  %d0 = tensor.dim %arg0, %c0 : tensor<?x?xf32>
+  %d1 = tensor.dim %arg0, %c1 : tensor<?x?xf32>
+  %p0 = affine.apply #map()[%d0]
+  %p1 = affine.apply #map()[%d1]
+  %pad = tensor.pad %arg0 low[0, 0] high[%p0, %p1] {
+    ^bb0(%b0: index, %b1: index):
+      tensor.yield %cst : f32
+    } : tensor<?x?xf32> to tensor<?x?xf32>
+  %encoding = iree_linalg_ext.set_encoding %pad
+      : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>
+  return %encoding : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>
+}
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> ((s0 ceildiv 16) * 16)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (-s0 + (s0 ceildiv 16) * 16)>
+//      CHECK: func.func @pad_and_set_encoding
+// CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32>
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//  CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
+//  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
+//  CHECK-DAG:   %[[WLIN0:.+]] = affine.apply #[[MAP0]]()[%[[D0]]]
+//  CHECK-DAG:   %[[WLIN1:.+]] = affine.apply #[[MAP0]]()[%[[D1]]]
+//      CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroups[%[[WLIN0]], %[[WLIN1]]](%[[ARG0]], %[[D0]], %[[D1]])
+// CHECK-NEXT:     %[[INARG:.+]]: !flow.dispatch.tensor<readonly:tensor<?x?xf32>>
+// CHECK-SAME:     %[[INDEXARG0:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:     %[[INDEXARG1:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:     %[[OUTARG:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>>
+//      CHECK:     %[[LOAD:.+]] = flow.dispatch.tensor.load %[[INARG]]
+// CHECK-SAME:         !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%[[INDEXARG0]], %[[INDEXARG1]]}
+//      CHECK:     %[[PADDED_D1:.+]] = affine.apply #[[MAP0]]()[%[[INDEXARG1]]]
+//      CHECK:     %[[PADDED_D0:.+]] = affine.apply #[[MAP0]]()[%[[INDEXARG0]]]
+//      CHECK:     %[[HIGHPAD1:.+]] = affine.apply #[[MAP1]]()[%[[INDEXARG1]]]
+//      CHECK:     %[[HIGHPAD0:.+]] = affine.apply #[[MAP1]]()[%[[INDEXARG0]]]
+//      CHECK:     %[[PADDED:.+]] = tensor.pad %[[LOAD]] low[0, 0] high[%[[HIGHPAD0]], %[[HIGHPAD1]]]
+//      CHECK:     %[[SET_ENCODING:.+]] = iree_linalg_ext.set_encoding %[[PADDED]]
+//      CHECK:     flow.dispatch.tensor.store %[[SET_ENCODING]], %[[OUTARG]]
+// CHECK-SAME:         sizes = [%[[PADDED_D0]], %[[PADDED_D1]]]
+// CHECK-SAME:         !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>>{%[[PADDED_D0]], %[[PADDED_D1]]}
+//      CHECK:     flow.return
+//      CHECK:   count(%[[WL0:[a-zA-Z0-9]+]]: index, %[[WL1:.+]]: index)
+//      CHECK:     %[[X:[a-zA-Z0-9]+]], %[[Y:[a-zA-Z0-9]+]], %[[Z:.+]] = flow.dispatch.workgroup_count_from_set_encoding_op %[[WL0]], %[[WL1]]
+//      CHECK:     flow.return %[[X]], %[[Y]], %[[Z]]
+//      CHECK:   return %[[DISPATCH]]
+
+// -----
+
+func.func @unset_encoding_and_slice(
+    %arg0: tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>,
+    %arg1 : index, %arg2 : index) -> tensor<?x?xf32> {
+  %0 = iree_linalg_ext.unset_encoding %arg0
+      : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>> -> tensor<?x?xf32>
+  %1 = tensor.extract_slice %0[0, 0] [%arg1, %arg2] [1, 1]
+      : tensor<?x?xf32> to tensor<?x?xf32>
+  return %1 : tensor<?x?xf32>
+}
+//      CHECK: func @unset_encoding_and_slice
+// CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>
+// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: index
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//  CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
+//  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
+//      CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroups[%[[ARG1]], %[[ARG2]]](%[[ARG0]], %[[D0]], %[[D1]], %[[ARG1]], %[[ARG2]])
+// CHECK-NEXT:     %[[INARG:.+]]: !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>>
+// CHECK-SAME:     %[[INDEXARG0:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:     %[[INDEXARG1:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:     %[[INDEXARG2:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:     %[[INDEXARG3:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:     %[[OUTARG:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>
+//      CHECK:     %[[LOAD:.+]] = flow.dispatch.tensor.load %[[INARG]]
+// CHECK-SAME:         sizes = [%[[INDEXARG0]], %[[INDEXARG1]]]
+// CHECK-SAME:         !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>>{%[[INDEXARG0]], %[[INDEXARG1]]}
+//      CHECK:     %[[ENCODING:.+]] = iree_linalg_ext.unset_encoding %[[LOAD]]
+//      CHECK:     %[[SLICE:.+]] = tensor.extract_slice %[[ENCODING]][0, 0] [%[[INDEXARG2]], %[[INDEXARG3]]]
+//      CHECK:     flow.dispatch.tensor.store %[[SLICE]], %[[OUTARG]]
+// CHECK-SAME:         sizes = [%[[INDEXARG2]], %[[INDEXARG3]]]
+// CHECK-SAME:         !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%[[INDEXARG2]], %[[INDEXARG3]]}
+//      CHECK:     flow.return
+
+// -----
+
+func.func @gemm_encoded(
+    %arg0 : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>,
+    %arg1 : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RHS_TRANSPOSE>>,
+    %arg2 : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RESULT>>)
+    -> tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RESULT>> {
+  %0 = linalg.matmul
+      ins(%arg0, %arg1
+          : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>,
+            tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RHS_TRANSPOSE>>)
+      outs(%arg2 : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RESULT>>)
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RESULT>>
+  return %0 : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RESULT>>
+}
+//      CHECK: func.func @gemm_encoded
+// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>
+// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RHS_TRANSPOSE>>
+// CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RESULT>>
+//      CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroups
+// CHECK-NEXT:     %[[LHS_IN:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>>
+// CHECK-SAME:     %[[RHS_IN:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RHS_TRANSPOSE>>>
+// CHECK-SAME:     %[[INIT_IN:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RESULT>>>
+//  CHECK-DAG:     %[[LHS:.+]] = flow.dispatch.tensor.load %[[LHS_IN]]
+//  CHECK-DAG:     %[[RHS:.+]] = flow.dispatch.tensor.load %[[RHS_IN]]
+//  CHECK-DAG:     %[[INIT:.+]] = flow.dispatch.tensor.load %[[INIT_IN]]
+//      CHECK:     %[[GEMM:.+]] = linalg.matmul
+// CHECK-SAME:         ins(%[[LHS]], %[[RHS]] :
+// CHECK-SAME:         outs(%[[INIT]] :
+//      CHECK:     flow.dispatch.tensor.store %[[GEMM]], %[[INIT_IN]]
+
+// -----
+
+func.func @gemm_fill_encoded(
+    %arg0 : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>,
+    %arg1 : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RHS_TRANSPOSE>>)
+    -> tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RESULT>> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %cst = arith.constant 0.0 : f32
+  %d0 = tensor.dim %arg0, %c0 : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>
+  %d1 = tensor.dim %arg1, %c1 : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RHS_TRANSPOSE>>
+  %empty = tensor.empty(%d0, %d1) : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RESULT>>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RESULT>>)
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RESULT>>
+  %0 = linalg.matmul
+      ins(%arg0, %arg1
+          : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>,
+            tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RHS_TRANSPOSE>>)
+      outs(%fill : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RESULT>>)
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RESULT>>
+  return %0 : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RESULT>>
+}
+//      CHECK: func.func @gemm_fill_encoded
+// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>
+// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RHS_TRANSPOSE>>
+//      CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroups
+// CHECK-NEXT:     %[[LHS_IN:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>>
+// CHECK-SAME:     %[[RHS_IN:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RHS_TRANSPOSE>>>
+// CHECK-SAME:     %[[RESULT:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RESULT>>>
+//  CHECK-DAG:     %[[LHS:.+]] = flow.dispatch.tensor.load %[[LHS_IN]]
+//  CHECK-DAG:     %[[RHS:.+]] = flow.dispatch.tensor.load %[[RHS_IN]]
+//      CHECK:     %[[EMPTY:.+]] = tensor.empty
+//      CHECK:     %[[FILL:.+]] = linalg.fill
+// CHECK-SAME:         outs(%[[EMPTY]] :
+//      CHECK:     %[[GEMM:.+]] = linalg.matmul
+// CHECK-SAME:         ins(%[[LHS]], %[[RHS]] :
+// CHECK-SAME:         outs(%[[FILL]] :
+//      CHECK:     flow.dispatch.tensor.store %[[GEMM]], %[[RESULT]]

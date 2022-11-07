@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(iree-codegen-linalg-to-spirv-pipeline))' --canonicalize --cse %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(iree-codegen-linalg-to-spirv-pipeline, canonicalize, cse))' %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -436,7 +436,6 @@ hal.executable public @generic_batch_matmul_32x128x512x64 {
 //   CHECK-LABEL: spirv.module Logical GLSL450
 
 // CHECK-COUNT-2:   spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<256 x vector<4xf32>>)>, Workgroup>
-//         CHECK:   spirv.GlobalVariable @[[C_MEM:.+]] : !spirv.ptr<!spirv.struct<(!spirv.array<512 x vector<4xf32>>)>, Workgroup>
 
 //         CHECK:   spirv.func @generic_batch_matmul_32x128x512x64
 
@@ -470,11 +469,4 @@ hal.executable public @generic_batch_matmul_32x128x512x64 {
 //         CHECK:       spirv.mlir.merge
 
 // CHECK-COUNT-4:     %{{.+}} = spirv.Load "Function" %{{.+}} : !spirv.coopmatrix<16x16xf16, Subgroup>
-//         CHECK:     %[[AC:.+]] = spirv.AccessChain %[[C_MEM]]
-//         CHECK:     spirv.NV.CooperativeMatrixStore %[[AC]], %{{.+}}, %[[C8]], %[[COL_MAJOR]]
-//         CHECK:     %[[AC:.+]] = spirv.AccessChain %[[C_MEM]]
-//         CHECK:     spirv.NV.CooperativeMatrixStore %[[AC]], %{{.+}}, %[[C8]], %[[COL_MAJOR]]
-//         CHECK:     %[[AC:.+]] = spirv.AccessChain %[[C_MEM]]
-//         CHECK:     spirv.NV.CooperativeMatrixStore %[[AC]], %{{.+}}, %[[C8]], %[[COL_MAJOR]]
-//         CHECK:     %[[AC:.+]] = spirv.AccessChain %[[C_MEM]]
-//         CHECK:     spirv.NV.CooperativeMatrixStore %[[AC]], %{{.+}}, %[[C8]], %[[COL_MAJOR]]
+// CHECK-COUNT-4:     spirv.NV.CooperativeMatrixStore %{{.+}}, %{{.+}}, %[[C64]], %[[COL_MAJOR]]

@@ -17,7 +17,9 @@
 set -xeuo pipefail
 
 RAW_RESULTS_DIR=$1
-SUMMARY_PATH=$2
+CPU_BASELINE=$2
+GPU_BASELINE=$3
+SUMMARY_PATH=$4
 
 python3 -m venv iree.venv
 source iree.venv/bin/activate
@@ -33,8 +35,8 @@ python3 ./build_tools/benchmarks/reporting/parse_shark_benchmarks.py \
   --iree_version="${IREE_VERSION}" \
   --cpu_shark_csv="${RAW_RESULTS_DIR}/cpu_shark_${SHARK_VERSION}.csv" \
   --cpu_iree_csv="${RAW_RESULTS_DIR}/cpu_iree_${IREE_VERSION}.csv" \
-  --cpu_baseline_csv="${RAW_RESULTS_DIR}/cpu_iree_${IREE_VERSION}.csv" \
+  --cpu_baseline_csv="${CPU_BASELINE}" \
   --gpu_shark_csv="${RAW_RESULTS_DIR}/cuda_shark_${SHARK_VERSION}.csv" \
   --gpu_iree_csv="${RAW_RESULTS_DIR}/cuda_iree_${IREE_VERSION}.csv" \
-  --gpu_baseline_csv="${RAW_RESULTS_DIR}/cuda_iree_${IREE_VERSION}.csv" \
+  --gpu_baseline_csv="${GPU_BASELINE}" \
   --output_path="${SUMMARY_PATH}"
