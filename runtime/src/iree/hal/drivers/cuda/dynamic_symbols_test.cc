@@ -16,7 +16,7 @@ namespace hal {
 namespace cuda {
 namespace {
 
-#define CUDE_CHECK_ERRORS(expr)      \
+#define CUDA_CHECK_ERRORS(expr)      \
   {                                  \
     CUresult status = expr;          \
     ASSERT_EQ(CUDA_SUCCESS, status); \
@@ -34,11 +34,11 @@ TEST(DynamicSymbolsTest, CreateFromSystemLoader) {
   }
 
   int device_count = 0;
-  CUDE_CHECK_ERRORS(symbols.cuInit(0));
-  CUDE_CHECK_ERRORS(symbols.cuDeviceGetCount(&device_count));
+  CUDA_CHECK_ERRORS(symbols.cuInit(0));
+  CUDA_CHECK_ERRORS(symbols.cuDeviceGetCount(&device_count));
   if (device_count > 0) {
     CUdevice device;
-    CUDE_CHECK_ERRORS(symbols.cuDeviceGet(&device, /*ordinal=*/0));
+    CUDA_CHECK_ERRORS(symbols.cuDeviceGet(&device, /*ordinal=*/0));
   }
 
   iree_hal_cuda_dynamic_symbols_deinitialize(&symbols);
