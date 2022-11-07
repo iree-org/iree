@@ -13,7 +13,7 @@ include "mlir/Dialect/Transform/IR/TransformInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpBase.td"
 
-def MapNestedForeachThreadToGpuThreads : 
+def MapNestedForeachThreadToGpuThreadsOp : 
   Op<Transform_Dialect, "iree.map_nested_foreach_thread_to_gpu_threads",
     [FunctionalStyleTransformOpTrait, 
      MemoryEffectsOpInterface,
@@ -90,6 +90,10 @@ def MapNestedForeachThreadToGpuThreads :
 
   let assemblyFormat = "$target attr-dict";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let builders = [
+    OpBuilder<(ins "Value":$target, "ArrayRef<int64_t>":$workgroupSize)>
+  ];
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
@@ -193,6 +197,9 @@ def VectorToWarpExecuteOnLane0Op : Op<Transform_Dialect, "iree.vector.to_warp_ex
   let assemblyFormat = "$target attr-dict";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
+  let builders = [
+    OpBuilder<(ins "Value":$target, "int64_t":$warpSize)>
+  ];
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::scf::IfOp target,
@@ -202,10 +209,9 @@ def VectorToWarpExecuteOnLane0Op : Op<Transform_Dialect, "iree.vector.to_warp_ex
 }
 
 def VectorWarpDistributionOp : Op<Transform_Dialect, "iree.vector.warp_distribute",
-    [FunctionalStyleTransformOpTrait, 
-     MemoryEffectsOpInterface,
-     TransformEachOpTrait, 
-     TransformOpInterface]> {
+    [TransformEachOpTrait, 
+     TransformOpInterface,
+     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
   let description = [{
     Given a vector.warp_execute_on_lane_0, apply the patterns to rewrite into
     distributed form with warp synchronization. This produces IR that runs 
@@ -298,6 +304,10 @@ def VectorWarpDistributionOp : Op<Transform_Dialect, "iree.vector.warp_distribut
   let assemblyFormat = "$target attr-dict";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins "Value":$target)>
+  ];
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::Operation *target,

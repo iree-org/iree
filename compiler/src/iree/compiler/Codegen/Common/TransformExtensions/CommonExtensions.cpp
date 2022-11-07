@@ -16,15 +16,14 @@
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSet.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Bufferization/Transforms/AllocTensorElimination.h"
-// #include "mlir/Dialect/Bufferization/Transforms/BufferUtils.h"
 #include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
-// #include "mlir/Dialect/Bufferization/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
@@ -46,12 +45,26 @@ iree_compiler::IREE::transform_dialect::CommonExtensions::CommonExtensions() {
 
 void mlir::iree_compiler::registerTransformDialectCommonExtension(
     DialectRegistry &registry) {
-  registry.addExtensions<transform_dialect::CommonExtensions>();
+  registry.addExtensions<
+      mlir::iree_compiler::IREE::transform_dialect::CommonExtensions>();
 }
 
 //===---------------------------------------------------------------------===//
 // ApplyPatternsOp
 //===---------------------------------------------------------------------===//
+void transform_dialect::ApplyPatternsOp::build(OpBuilder &builder,
+                                               OperationState &result,
+                                               Value target,
+                                               bool rankReducing) {
+  MLIRContext *ctx = builder.getContext();
+  result.addOperands(target);
+  if (rankReducing) {
+    result.addAttribute(ApplyPatternsOp::getRankReducingAttrName(result.name),
+                        builder.getUnitAttr());
+  }
+  result.addTypes({pdl::OperationType::get(ctx)});
+}
+
 namespace {
 /// Rewrite a tensor.generate as an arith.constant when possible.
 struct GenerateToConstant : public OpRewritePattern<tensor::GenerateOp> {
@@ -210,6 +223,13 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
 //===---------------------------------------------------------------------===//
 // ForeachThreadToWorkgroupOp
 //===---------------------------------------------------------------------===//
+
+void transform_dialect::ForeachThreadToWorkgroupOp::build(
+    OpBuilder &builder, OperationState &result, Value target) {
+  result.addOperands(target);
+  MLIRContext *ctx = builder.getContext();
+  result.addTypes({pdl::OperationType::get(ctx)});
+}
 
 /// Populate the workgroup_count region of `dispatchOp`.
 /// For now, this only supports constant index ops and empty workload
@@ -453,8 +473,73 @@ transform_dialect::ForeachThreadToWorkgroupOp::applyToOne(
 }
 
 //===---------------------------------------------------------------------===//
-// TileToForeachThreadAndWorkgroupCountRegion
+// TileToForeachThreadAndWorkgroupCountRegionOp
 //===---------------------------------------------------------------------===//
+
+void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
+    OpBuilder &builder, OperationState &result, Value target,
+    ArrayRef<int64_t> staticTileSizes, transform::TileSizesSpec,
+    ArrayRef<int64_t> threadDimMapping) {
+  return build(builder, result, target,
+               getAsOpFoldResult(builder.getI64ArrayAttr(staticTileSizes)),
+               transform::TileSizesSpec(), threadDimMapping);
+}
+
+void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
+    OpBuilder &builder, OperationState &result, Value target,
+    ArrayRef<OpFoldResult> mixedTileSizes, transform::TileSizesSpec,
+    ArrayRef<int64_t> threadDimMapping) {
+  assert(result.name.isRegistered() && "not registered!!");
+  SmallVector<int64_t> staticTileSizes;
+  SmallVector<Value> dynamicTileSizes;
+  dispatchIndexOpFoldResults(mixedTileSizes, dynamicTileSizes, staticTileSizes,
+                             ShapedType::kDynamicSize);
+  // Call the default builder which sets up the proper operands segment sizes
+  // attributes for multiple variadic operands. In the absence of this, horrible
+  // bugs ensue.
+  MLIRContext *ctx = builder.getContext();
+  auto operationType = pdl::OperationType::get(ctx);
+  auto staticTileSizesAttr = builder.getI64ArrayAttr(staticTileSizes);
+  ArrayAttr threadDimMappingAttr;
+  if (!threadDimMapping.empty())
+    threadDimMappingAttr = builder.getI64ArrayAttr(threadDimMapping);
+  build(builder, result, TypeRange{operationType, operationType}, target,
+        /*numThreads=*/ValueRange{}, dynamicTileSizes,
+        /*staticNumThreads=*/ArrayAttr(), staticTileSizesAttr,
+        threadDimMappingAttr);
+}
+
+void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
+    OpBuilder &builder, OperationState &result, Value target,
+    ArrayRef<int64_t> staticNumThreads, transform::NumThreadsSpec,
+    ArrayRef<int64_t> threadDimMapping) {
+  return build(builder, result, target,
+               getAsOpFoldResult(builder.getI64ArrayAttr(staticNumThreads)),
+               transform::NumThreadsSpec(), threadDimMapping);
+}
+
+void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
+    OpBuilder &builder, OperationState &result, Value target,
+    ArrayRef<OpFoldResult> mixedNumThreads, transform::NumThreadsSpec,
+    ArrayRef<int64_t> threadDimMapping) {
+  assert(result.name.isRegistered() && "not registered!!");
+  SmallVector<int64_t> staticNumThreads;
+  SmallVector<Value> dynamicNumThreads;
+  dispatchIndexOpFoldResults(mixedNumThreads, dynamicNumThreads,
+                             staticNumThreads, ShapedType::kDynamicSize);
+  // Call the default builder which sets up the proper operands segment sizes
+  // attributes for multiple variadic operands. In the absence of this, horrible
+  // bugs ensue.
+  MLIRContext *ctx = builder.getContext();
+  auto operationType = pdl::OperationType::get(ctx);
+  auto staticNumThreadsAttr = builder.getI64ArrayAttr(staticNumThreads);
+  ArrayAttr threadDimMappingAttr;
+  if (!threadDimMapping.empty())
+    threadDimMappingAttr = builder.getI64ArrayAttr(threadDimMapping);
+  build(builder, result, TypeRange{operationType, operationType}, target,
+        dynamicNumThreads, /*tileSizes=*/ValueRange{}, staticNumThreadsAttr,
+        /*staticTileSizes=*/ArrayAttr(), threadDimMappingAttr);
+}
 
 /// Lower the ops within the workgroup count region of `exportOp` that
 /// represents the workgroup count calculation, to the actual
@@ -512,24 +597,24 @@ static LogicalResult lowerWorkgroupCountComputingRegion(
 }
 
 SmallVector<OpFoldResult> transform_dialect::
-    TileToForeachThreadAndWorkgroupCountRegion::getMixedNumThreads() {
+    TileToForeachThreadAndWorkgroupCountRegionOp::getMixedNumThreads() {
   return getMixedSizes(getStaticNumThreads(), getNumThreads());
 }
 
 SmallVector<OpFoldResult> transform_dialect::
-    TileToForeachThreadAndWorkgroupCountRegion::getMixedTileSizes() {
+    TileToForeachThreadAndWorkgroupCountRegionOp::getMixedTileSizes() {
   return getMixedSizes(getStaticTileSizes(), getTileSizes());
 }
 
 LogicalResult
-transform_dialect::TileToForeachThreadAndWorkgroupCountRegion::verify() {
+transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::verify() {
   if (getMixedNumThreads().empty() == getMixedTileSizes().empty())
     return emitOpError("either num_threads or tile_sizes must be specified");
   return success();
 }
 
-void transform_dialect::TileToForeachThreadAndWorkgroupCountRegion::getEffects(
-    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::
+    getEffects(SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::consumesHandle(getTarget(), effects);
   transform::onlyReadsHandle(getTileSizes(), effects);
   transform::onlyReadsHandle(getNumThreads(), effects);
@@ -538,7 +623,7 @@ void transform_dialect::TileToForeachThreadAndWorkgroupCountRegion::getEffects(
 }
 
 DiagnosedSilenceableFailure
-transform_dialect::TileToForeachThreadAndWorkgroupCountRegion::apply(
+transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::apply(
     transform::TransformResults &transformResults,
     transform::TransformState &state) {
   ArrayRef<Operation *> targetOps = state.getPayloadOps(getTarget());
@@ -604,11 +689,23 @@ transform_dialect::TileToForeachThreadAndWorkgroupCountRegion::apply(
 // TODO: Maybe we need both a transform.iree.cpu.bufferize and a
 // transform.iree.gpu.bufferize rather than a single common bufferize op?
 //
-// Note: This has become so specific that it may be worth it to separate in its
-// own .cpp file.
+// Note: This has become so specific that it may be worth it to separate in
+// its own .cpp file.
 using mlir::bufferization::BufferizationOptions;
 using mlir::bufferization::OneShotAnalysisState;
 using mlir::bufferization::OneShotBufferizationOptions;
+
+void transform_dialect::IREEBufferizeOp::build(OpBuilder &builder,
+                                               OperationState &result,
+                                               Value target, bool targetGpu) {
+  result.addOperands(target);
+  if (targetGpu) {
+    result.addAttribute(IREEBufferizeOp::getTargetGpuAttrName(result.name),
+                        builder.getUnitAttr());
+  }
+  MLIRContext *ctx = builder.getContext();
+  result.addTypes(pdl::OperationType::get(ctx));
+}
 
 //===---------------------------------------------------------------------===//
 // Default allocation functions for CPU backend
