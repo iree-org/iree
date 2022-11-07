@@ -5,13 +5,12 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Classes for IREE compilation and run definitions."""
 
+import dataclasses
 from dataclasses import dataclass
 from enum import Enum
 from typing import List
-import dataclasses
 
 from e2e_test_framework.definitions import common_definitions
-from e2e_test_framework import serialization
 
 
 class TargetBackend(Enum):
@@ -46,7 +45,6 @@ class RuntimeDriver(Enum):
   VULKAN = "vulkan"
 
 
-@serialization.serializable
 @dataclass(frozen=True)
 class CompileTarget(object):
   """Describes a target device to build for."""
@@ -55,7 +53,6 @@ class CompileTarget(object):
   target_abi: TargetABI
 
 
-@serialization.serializable(keyed_obj=True, type_key="iree_compile_configs")
 @dataclass(frozen=True)
 class CompileConfig(object):
   """Describes the options to build a module."""
@@ -65,7 +62,6 @@ class CompileConfig(object):
   extra_flags: List[str] = dataclasses.field(default_factory=list)
 
 
-@serialization.serializable(keyed_obj=True, type_key="iree_module_execution_configs")
 @dataclass(frozen=True)
 class ModuleExecutionConfig(object):
   """Describes the options to run a module."""
@@ -94,7 +90,6 @@ MODEL_SOURCE_TO_DIALECT_TYPE_MAP = {
 }
 
 
-@serialization.serializable
 @dataclass(frozen=True)
 class ImportedModel(object):
   """Describes an imported MLIR model."""
@@ -110,7 +105,6 @@ class ImportedModel(object):
         dialect_type=MODEL_SOURCE_TO_DIALECT_TYPE_MAP[model.source_type])
 
 
-@serialization.serializable
 @dataclass(frozen=True)
 class ModuleGenerationConfig(object):
   """Describes a compile target to generate the module."""
@@ -118,7 +112,6 @@ class ModuleGenerationConfig(object):
   compile_config: CompileConfig
 
 
-@serialization.serializable
 @dataclass(frozen=True)
 class E2EModelRunConfig(object):
   """Describes an e2e run."""
