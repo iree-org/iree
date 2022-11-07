@@ -9,6 +9,7 @@
 
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
 #include "iree/hal/api.h"
+#include "iree/modules/hal/module.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -47,10 +48,10 @@ class CompiledBinary {
   void deinitialize();
   Attribute convertVariantToAttribute(Location loc, iree_vm_variant_t& variant);
 
-  iree_hal_device_t* device = nullptr;
-  iree_vm_module_t* hal_module = nullptr;
-  iree_vm_module_t* main_module = nullptr;
-  iree_vm_context_t* context = nullptr;
+  iree::vm::ref<iree_hal_device_t> device;
+  iree::vm::ref<iree_vm_module_t> hal_module;
+  iree::vm::ref<iree_vm_module_t> main_module;
+  iree::vm::ref<iree_vm_context_t> context;
 };
 
 // An in-memory compiled binary and accessors for working with it.
@@ -70,7 +71,7 @@ class Runtime {
   static Runtime& getInstance();
 
   iree_hal_driver_registry_t* registry = nullptr;
-  iree_vm_instance_t* instance = nullptr;
+  iree::vm::ref<iree_vm_instance_t> instance;
 
  private:
   Runtime();
