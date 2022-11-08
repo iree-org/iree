@@ -230,7 +230,7 @@ VULKAN_SRCS = enforce_glob(
     exclude = [
         # TODO(#11081): Enable the test after fixing it.
         "mul.mlir",
-    ]
+    ],
 )
 
 iree_check_single_backend_test_suite(
