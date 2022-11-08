@@ -210,7 +210,8 @@ def TileToForeachThreadAndWorkgroupCountRegionOp :
                    Variadic<PDL_Operation>:$tile_sizes,
                    DefaultValuedAttr<I64ArrayAttr, "{}">:$static_num_threads,
                    DefaultValuedAttr<I64ArrayAttr, "{}">:$static_tile_sizes,
-                   OptionalAttr<I64ArrayAttr>:$thread_dim_mapping);
+                   OptionalAttr<I64ArrayAttr>:$thread_dim_mapping,
+                   UnitAttr:$packed_sizes);
   let results = (outs PDL_Operation:$foreach_thread_op,
                       PDL_Operation:$tiled_op);
   let assemblyFormat = [{
@@ -235,6 +236,11 @@ def TileToForeachThreadAndWorkgroupCountRegionOp :
     OpBuilder<(ins "Value":$target,
                    "ArrayRef<OpFoldResult>":$mixedTileSizes,
                    CArg<"::mlir::transform::TileSizesSpec", 
+                        "::mlir::transform::TileSizesSpec()">,
+                   CArg<"ArrayRef<int64_t>", "{}">:$threadDimMapping)>,
+    OpBuilder<(ins "Value":$target,
+                   "Value":$tileSizeHandle,
+                   CArg<"::mlir::transform::TileSizesSpec",
                         "::mlir::transform::TileSizesSpec()">,
                    CArg<"ArrayRef<int64_t>", "{}">:$threadDimMapping)>,
     OpBuilder<(ins "Value":$target,

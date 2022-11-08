@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <type_traits>
+
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/TransformOps/LinalgExtTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
@@ -97,6 +99,9 @@ static void print(ImplicitLocOpBuilder &b, ValueRange handles = {}) {
 namespace {
 struct BatchFusionSpec {};
 struct IterativeFusionSpec {};
+
+struct TileOrNumThreadHandle {};
+struct TileOrNumThreadList {};
 }  // namespace
 
 /// Performs the following transformations:
@@ -121,10 +126,13 @@ struct IterativeFusionSpec {};
 /// appended in order.
 // TODO: apply forwarding pattern.
 template <typename TilingTransformOp, typename TileOrNumThreadSpec,
-          typename BatchOrIterativeFusion>
+          typename BatchOrIterativeFusion, typename TileOrNumThreadKind>
 static Value tileAndFuseAndDistributeImpl(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
-    ArrayRef<int64_t> tileSizesOrNumThreads, ArrayRef<int64_t> threadDimMapping,
+    std::conditional_t<std::is_same_v<TileOrNumThreadKind, TileOrNumThreadList>,
+                       ArrayRef<int64_t>, Value>
+        tileSizesOrNumThreads,
+    ArrayRef<int64_t> threadDimMapping,
     SmallVector<Value> *resultingFusedOpsHandles) {
   auto tileToForeachOp = b.create<TilingTransformOp>(
       rootH, tileSizesOrNumThreads, TileOrNumThreadSpec(), threadDimMapping);
@@ -151,9 +159,21 @@ static Value tfdWithTileSizes(
     ArrayRef<int64_t> tileSizes, ArrayRef<int64_t> threadDimMapping = {},
     SmallVector<Value> *resultingFusedOpsHandles = nullptr) {
   return tileAndFuseAndDistributeImpl<
-      TilingTransformOp, transform::TileSizesSpec, BatchOrIterativeFusion>(
-      b, rootH, opsHToFuse, tileSizes, threadDimMapping,
-      resultingFusedOpsHandles);
+      TilingTransformOp, transform::TileSizesSpec, BatchOrIterativeFusion,
+      TileOrNumThreadList>(b, rootH, opsHToFuse, tileSizes, threadDimMapping,
+                           resultingFusedOpsHandles);
+}
+
+template <typename TilingTransformOp = TileToForeachThreadOp,
+          typename BatchOrIterativeFusion = BatchFusionSpec>
+static Value tfdWithTileSizeHandle(
+    ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
+    Value tileSizeHandle, ArrayRef<int64_t> threadDimMapping = {},
+    SmallVector<Value> *resultingFusedOpsHandles = nullptr) {
+  return tileAndFuseAndDistributeImpl<
+      TilingTransformOp, transform::TileSizesSpec, BatchOrIterativeFusion,
+      TileOrNumThreadHandle>(b, rootH, opsHToFuse, tileSizeHandle,
+                             threadDimMapping, resultingFusedOpsHandles);
 }
 
 template <typename TilingTransformOp = TileToForeachThreadOp,
@@ -198,19 +218,24 @@ static Value distributeVectors(ImplicitLocOpBuilder &b, Value funcH,
   return funcH;
 }
 
-// TODO: generialize and automate over and over.
-// TODO: significantly shrink this down.
-static void buildReductionCudaStrategy(ImplicitLocOpBuilder &b,
-                                       Value variantH) {
+static Value buildReductionStrategyTilingPart(ImplicitLocOpBuilder &b,
+                                              Value outerVariantH) {
+  OpBuilder::InsertionGuard guard(b);
+  auto operationType = pdl::OperationType::get(b.getContext());
+  auto sequence = b.create<transform::SequenceOp>(
+      TypeRange{operationType}, transform::FailurePropagationMode::Propagate,
+      outerVariantH);
+  Block *sequenceBody =
+      b.createBlock(&sequence.getBodyRegion(), /*insertPt=*/{}, operationType,
+                    outerVariantH.getLoc());
+  Value variantH = sequenceBody->getArgument(0);
+
   Value originalFillH =
       b.create<MatchOp>(variantH, linalg::FillOp::getOperationName());
   Value originalGenericH =
       b.create<MatchOp>(variantH, linalg::GenericOp::getOperationName());
-  // Atm `tileSizes` just get DCE'd, need to pipe through tfdWithTileSizes API.
-  // TODO(ftynse): hmm this seems tricky to control.
   Value tileSizes =
       b.create<ConfigExtractPart>(originalGenericH, "tile_sizes", 0);
-  print(b, tileSizes);
 
   // Step 1. Split the reduction to get meatier parallelism.
   // TODO: use a scf.foreach_thread for this.
@@ -221,25 +246,23 @@ static void buildReductionCudaStrategy(ImplicitLocOpBuilder &b,
   Value splitFillH = splitReductionTransformOp.getFillOp();
   Value splitLinalgH = splitReductionTransformOp.getSplitLinalgOp();
   Value combinerH = splitReductionTransformOp.getCombiningLinalgOp();
-
-  (void)originalFillH;
-  (void)splitFillH;
-  (void)splitLinalgH;
-  (void)combinerH;
-
-#if 0
   // Step 2. First level of tiling + fusion parallelizes to blocks.
-  // clang-format off
-  tfdWithTileSizes<TileToForeachThreadAndWorkgroupCountRegionOp>(
-    b,
-    /*rootH=*/combinerH,
-    /*opsHToFuse=*/{originalFillH, splitFillH, splitLinalgH},
+  tfdWithTileSizeHandle<TileToForeachThreadAndWorkgroupCountRegionOp>(
+      b,
+      /*rootH=*/combinerH,
+      /*opsHToFuse=*/{originalFillH, splitFillH, splitLinalgH}, tileSizes);
+  b.create<transform::YieldOp>(variantH);
+  return sequence->getResult(0);
+}
 
-    // TODO(ftynse): Need to pipe a variadic number of sizes through this API.
-    tileSizes);
-    ///*tileSizes=*/ArrayRef<int64_t>{1});
-  // clang-format on
-
+// TODO: generialize and automate over and over.
+// TODO: significantly shrink this down.
+static void buildReductionCudaStrategy(ImplicitLocOpBuilder &b,
+                                       Value outerVariantH) {
+  // Steps 1 and 2, see inside.
+  Value variantH = buildReductionStrategyTilingPart(b, outerVariantH);
+  (void)variantH;
+#if 0
   // Step 3. Second level of tiling + fusion parallelizes to threads.
   // TODO: Relying on ordering is brittle, harden this.
   auto [fill2dH, parParRedH, fill1dH, parRedH] = matchAndUnpack<4>(
