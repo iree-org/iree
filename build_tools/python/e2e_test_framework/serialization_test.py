@@ -28,7 +28,7 @@ class TestC(object):
   float_val: float
 
 
-@serialization.serializable(keyed_obj=True, type_key="test_b", id_field="key")
+@serialization.serializable(type_key="test_b", id_field="key")
 @dataclass
 class TestB(object):
   key: str
@@ -50,7 +50,7 @@ class TestUnsupported(object):
   path: pathlib.PurePath
 
 
-@serialization.serializable(keyed_obj=True, type_key="test_circular")
+@serialization.serializable(type_key="test_circular")
 @dataclass
 class TestCircularReference(object):
   id: str
@@ -58,22 +58,23 @@ class TestCircularReference(object):
 
 
 class SerializationTest(unittest.TestCase):
-  B_OBJ_A = TestB(key="id_a", int_val=10)
-  B_OBJ_B = TestB(key="id_b", int_val=20)
-  TEST_OBJS = [
-      TestA(b_list=[B_OBJ_A, B_OBJ_B],
-            c_obj=TestC(float_val=0.1),
-            str_val="test1",
-            enum_val=EnumX.OPTION_B),
-      TestA(b_list=[B_OBJ_A],
-            c_obj=TestC(float_val=0.2),
-            str_val=None,
-            enum_val=EnumX.OPTION_C)
-  ]
 
   def test_serialize_and_pack(self):
+    b_obj_a = TestB(key="id_a", int_val=10)
+    b_obj_b = TestB(key="id_b", int_val=20)
+    test_objs = [
+        TestA(b_list=[b_obj_a, b_obj_b],
+              c_obj=TestC(float_val=0.1),
+              str_val="test1",
+              enum_val=EnumX.OPTION_B),
+        TestA(b_list=[b_obj_a],
+              c_obj=TestC(float_val=0.2),
+              str_val=None,
+              enum_val=EnumX.OPTION_C)
+    ]
+
     results = serialization.serialize_and_pack(
-        self.TEST_OBJS,
+        test_objs,
         root_obj_field_name="main_obj",
         keyed_obj_map_field_name="obj_map")
 
@@ -120,15 +121,35 @@ class SerializationTest(unittest.TestCase):
                       lambda: serialization.serialize_and_pack(obj_a))
 
   def test_roundtrip(self):
-    results = serialization.unpack_and_deserialize(
-        serialization.serialize_and_pack(self.TEST_OBJS), typing.List[TestA])
+    b_obj_a = TestB(key="id_a", int_val=10)
+    b_obj_b = TestB(key="id_b", int_val=20)
+    test_objs = [
+        TestA(b_list=[b_obj_a, b_obj_b],
+              c_obj=TestC(float_val=0.1),
+              str_val="test1",
+              enum_val=EnumX.OPTION_B),
+        TestA(b_list=[b_obj_a],
+              c_obj=TestC(float_val=0.2),
+              str_val=None,
+              enum_val=EnumX.OPTION_C),
+        TestA(b_list=[b_obj_b],
+              c_obj=TestC(float_val=0.3),
+              str_val="test3",
+              enum_val=EnumX.OPTION_A),
+    ]
 
-    self.assertEqual(results, self.TEST_OBJS)
+    results = serialization.unpack_and_deserialize(
+        serialization.serialize_and_pack(test_objs), typing.List[TestA])
+
+    self.assertEqual(results, test_objs)
 
   def test_roundtrip_with_json(self):
+    b_obj_a = TestB(key="id_a", int_val=10)
+    b_obj_b = TestB(key="id_b", int_val=20)
+
     objs = collections.OrderedDict(
-        x=self.B_OBJ_A,
-        y=self.B_OBJ_B,
+        x=b_obj_a,
+        y=b_obj_b,
     )
 
     json_str = json.dumps(serialization.serialize_and_pack(objs))

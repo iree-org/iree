@@ -162,15 +162,15 @@ def _get_type_args(tp) -> Tuple:
 
 
 def serializable(cls=None,
-                 keyed_obj: bool = False,
                  type_key: Optional[str] = None,
                  id_field: str = "id"):
   """Decorator to make a dataclass serializable.
   
   Args:
-    keyed_obj: is the class a keyed object, which is unique per id and will only
-      have one copy in the serialization per id.
-    type_key: string defining the object type, must be set if keyed_obj is True.
+    keyed_obj: is 
+    type_key: string defines the object type and indeicates that the class is a
+      keyed object, which is unique per id and will only have one copy in the
+      serialization per id.
     id_field: field name of the id field of a keyed object.
 
   Example:
@@ -185,8 +185,6 @@ def serializable(cls=None,
       id: str
   """
 
-  if keyed_obj and type_key is None:
-    raise ValueError("type_key must be set if keyed_by_id is true.")
   if type_key is not None and ":" in type_key:
     raise ValueError("':' is the reserved character in type_key.")
 
@@ -195,14 +193,14 @@ def serializable(cls=None,
       raise ValueError(f"{cls} is not a dataclass.")
 
     fields = dataclasses.fields(cls)
+    if type_key is not None and all(field.name != id_field for field in fields):
+      raise ValueError(f'Id field "{id_field}" not found in the class {cls}.')
 
     def serialize(self, keyed_obj_map: OrderedDict[str, Any]):
-      if not keyed_obj:
+      if type_key is None:
         return _fields_to_dict(self, fields, keyed_obj_map)
 
       obj_id = getattr(self, id_field)
-      # type_key has been checked to be not None above.
-      assert type_key is not None
       obj_key = f"{type_key}:{obj_id}"
       if obj_key in keyed_obj_map:
         # If the value in the map is None, it means we have visited this object
@@ -220,14 +218,12 @@ def serializable(cls=None,
 
     def deserialize(data, keyed_obj_map: Dict[str, Any], obj_cache: Dict[str,
                                                                          Any]):
-      if not keyed_obj:
+      if type_key is None:
         field_value_map = _dict_to_fields(data, fields, keyed_obj_map,
                                           obj_cache)
         return cls(**field_value_map)
 
       obj_id = data
-      # type_key has been checked to be not None above.
-      assert type_key is not None
       obj_key = f"{type_key}:{obj_id}"
       if obj_key in obj_cache:
         return obj_cache[obj_key]
@@ -242,6 +238,7 @@ def serializable(cls=None,
     setattr(cls, DESERIALIZE_FUNC_NAME, deserialize)
     return cls
 
+  # Trick to allow the decoration with `@serializable(...)`.
   if cls is None:
     return wrap
   return wrap(cls)
