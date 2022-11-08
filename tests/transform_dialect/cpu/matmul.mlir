@@ -17,7 +17,7 @@ func.func @matmul_static(
 // RUN:   --iree-flow-dispatch-via-region-ops-generate-workload-region=false \
 // RUN:   --iree-stream-transformation-pipeline \
 // RUN:   --iree-hal-configuration-pipeline | \
-// RUN: iree-opt --pass-pipeline='hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target))' \
+// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target)))' \
 // RUN:   --iree-codegen-llvmcpu-use-transform-dialect=%p/matmul_codegen_custom_dispatch_formation_spec.mlir | \
 // RUN: FileCheck %s --check-prefix=CODEGEN-CUSTOM-DISPATCH-FORMATION
 
@@ -49,7 +49,7 @@ func.func @matmul_static(
 // RUN:   --iree-flow-transformation-pipeline \
 // RUN:   --iree-stream-transformation-pipeline \
 // RUN:   --iree-hal-configuration-pipeline | \
-// RUN: iree-opt --pass-pipeline='hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target))' \
+// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target)))' \
 // RUN:   --iree-codegen-llvmcpu-use-transform-dialect=%p/matmul_codegen_default_spec.mlir | \
 // RUN: FileCheck %s --check-prefixes=CODEGEN-DEFAULT
 
