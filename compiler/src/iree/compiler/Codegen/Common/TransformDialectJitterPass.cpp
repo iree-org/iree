@@ -218,8 +218,14 @@ static Value distributeVectors(ImplicitLocOpBuilder &b, Value funcH,
   return funcH;
 }
 
-static Value buildReductionStrategyTilingPart(ImplicitLocOpBuilder &b,
-                                              Value outerVariantH) {
+/// Distribute to blocks using the current IREE lowering config.
+///
+/// The tiling and distributing to blocks is done within a transform SequenceOp.
+/// It runs without interleaved canonicalize, CSE or enabling transforms which
+/// allows the transform dialect to build payload IR and not risk seeing it
+/// being DCE'd away immediately.
+static Value buildReductionStrategyBlockDistributionPart(
+    ImplicitLocOpBuilder &b, Value outerVariantH) {
   OpBuilder::InsertionGuard guard(b);
   auto operationType = pdl::OperationType::get(b.getContext());
   auto sequence = b.create<transform::SequenceOp>(
@@ -230,6 +236,8 @@ static Value buildReductionStrategyTilingPart(ImplicitLocOpBuilder &b,
                     outerVariantH.getLoc());
   Value variantH = sequenceBody->getArgument(0);
 
+  // TODO: this still requires specific knowledge of ops present in the IR and
+  // is brittle.
   Value originalFillH =
       b.create<MatchOp>(variantH, linalg::FillOp::getOperationName());
   Value originalGenericH =
@@ -246,7 +254,9 @@ static Value buildReductionStrategyTilingPart(ImplicitLocOpBuilder &b,
   Value splitFillH = splitReductionTransformOp.getFillOp();
   Value splitLinalgH = splitReductionTransformOp.getSplitLinalgOp();
   Value combinerH = splitReductionTransformOp.getCombiningLinalgOp();
-  // Step 2. First level of tiling + fusion parallelizes to blocks.
+
+  // Step 2. First level of tiling + fusion parallelizes to blocks using
+  // `tileSizes`.
   tfdWithTileSizeHandle<TileToForeachThreadAndWorkgroupCountRegionOp>(
       b,
       /*rootH=*/combinerH,
@@ -255,14 +265,15 @@ static Value buildReductionStrategyTilingPart(ImplicitLocOpBuilder &b,
   return sequence->getResult(0);
 }
 
-// TODO: generialize and automate over and over.
+// TODO: generalize and automate over and over.
 // TODO: significantly shrink this down.
 static void buildReductionCudaStrategy(ImplicitLocOpBuilder &b,
                                        Value outerVariantH) {
-  // Steps 1 and 2, see inside.
-  Value variantH = buildReductionStrategyTilingPart(b, outerVariantH);
+  // Step 1: Distribute to blocks using the current IREE lowering config.
+  Value variantH =
+      buildReductionStrategyBlockDistributionPart(b, outerVariantH);
 
-  // Step 3. Second level of tiling + fusion parallelizes to threads.
+  // Step 2. Second level of tiling + fusion parallelizes to threads.
   // TODO: Relying on ordering is brittle, harden this.
   auto [fill2dH, parParRedH, fill1dH, parRedH] = matchAndUnpack<4>(
       b, variantH,
@@ -281,23 +292,22 @@ static void buildReductionCudaStrategy(ImplicitLocOpBuilder &b,
                    /*threadDimMapping=*/ArrayRef<int64_t>{2, 1, 0});
   // clang-format on
 
-  // Step 4. Rank-reduce and vectorize.
+  // Step 3. Rank-reduce and vectorize.
+  // TODO: assumes a single func::FuncOp to transform, may ned hardening.
   Value funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
   funcH = vectorize(b, funcH);
 
-  // Step 5. Bufferize.
+  // Step 4. Bufferize.
   variantH = b.create<IREEBufferizeOp>(variantH, /*targetGpu=*/true);
 
-  // Step 6. Post-bufferization mapping to blocks and threads.
-  // Need to match again since bufferizae invalidated all handles.
+  // Step 5. Post-bufferization mapping to blocks and threads.
+  // Need to match again since bufferize invalidated all handles.
+  // TODO: assumes a single func::FuncOp to transform, may ned hardening.
   funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
   funcH = mapToBlockAndThreads(b, funcH, ArrayRef<int64_t>{32, 2, 1});
 
-#if 0
-  // Step 7. Post-bufferization vector distribution with rank-reduction.
+  // Step 6. Post-bufferization vector distribution with rank-reduction.
   distributeVectors(b, funcH);
-
-#endif
 }
 
 namespace {
@@ -373,7 +383,7 @@ class TransformDialectJitterPass
     Region &topLevelTransformRegion = topLevelTransformModule.getBodyRegion();
     b.setInsertionPointToStart(&topLevelTransformRegion.front());
     b.create<::transform_ext::CanonicalizedSequenceOp>(
-        target->getLoc(), transform::FailurePropagationMode::Propagate,
+        target->getLoc(), transform::FailurePropagationMode::Suppress,
         [](OpBuilder &b, Location loc, Value variantH) {
           ImplicitLocOpBuilder ib(loc, b);
           buildReductionCudaStrategy(ib, variantH);

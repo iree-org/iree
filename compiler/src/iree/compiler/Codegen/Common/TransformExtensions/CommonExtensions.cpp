@@ -29,7 +29,6 @@
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
-#include "mlir/IR/Builders.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
 
@@ -1040,10 +1039,6 @@ DiagnosedSilenceableFailure transform_dialect::ConfigExtractPart::apply(
   for (int64_t ts : vals)
     results.push_back(b.create<arith::ConstantIndexOp>(target->getLoc(), ts));
   transformResults.set(getResultConfigPart().cast<OpResult>(), results);
-  // This is necessary to see that the constants are indeed created before being
-  // DCE'd away (until we connect things properly).
-  // TODO: drop this.
-  target->getParentOfType<ModuleOp>().dump();
   return DiagnosedSilenceableFailure::success();
 }
 
