@@ -2054,3 +2054,31 @@ func.func @gemm_fill_encoded(
 // CHECK-SAME:         ins(%[[LHS]], %[[RHS]] :
 // CHECK-SAME:         outs(%[[FILL]] :
 //      CHECK:     flow.dispatch.tensor.store %[[GEMM]], %[[RESULT]]
+
+// -----
+
+func.func @extract_slice1(%arg0 : tensor<5x24x48xf32>) -> tensor<4xf32> {
+  %0 = tensor.extract_slice %arg0[2, 3, 4] [1, 1, 4] [1, 1, 1]
+      : tensor<5x24x48xf32> to tensor<4xf32>
+  return %0 : tensor<4xf32>
+}
+
+// CHECK-LABEL: func.func @extract_slice1(
+//  CHECK-SAME:   %[[ARG0:.+]]: tensor<5x24x48xf32>)
+//   CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
+//   CHECK-DAG:   %[[C3:.+]] = arith.constant 3 : index
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//   CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
+//       CHECK:   %[[SLICE:.+]] = flow.tensor.slice %[[ARG0]][%[[C2]], %[[C3]], %[[C4]] for %[[C1]], %[[C1]], %[[C4]]]
+//       CHECK:   %[[RESULT:.+]] = flow.tensor.reshape %[[SLICE]]
+//       CHECK:   return %[[RESULT]]
+
+// CHECK-VIA-REGIONS-LABEL: func.func @extract_slice1(
+//  CHECK-VIA-REGIONS-SAME:   %[[ARG0:.+]]: tensor<5x24x48xf32>)
+//   CHECK-VIA-REGIONS-DAG:   %[[C2:.+]] = arith.constant 2 : index
+//   CHECK-VIA-REGIONS-DAG:   %[[C3:.+]] = arith.constant 3 : index
+//   CHECK-VIA-REGIONS-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//   CHECK-VIA-REGIONS-DAG:   %[[C4:.+]] = arith.constant 4 : index
+//       CHECK-VIA-REGIONS:   %[[SLICE:.+]] = flow.tensor.slice %[[ARG0]][%[[C2]], %[[C3]], %[[C4]] for %[[C1]], %[[C1]], %[[C4]]]
+//       CHECK-VIA-REGIONS:   %[[RESULT:.+]] = flow.tensor.reshape %[[SLICE]]
+//       CHECK-VIA-REGIONS:   return %[[RESULT]]

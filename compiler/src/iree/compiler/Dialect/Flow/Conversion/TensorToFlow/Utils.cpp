@@ -135,6 +135,9 @@ LogicalResult convertInsertSliceOpToFlowUpdateOp(
 
 LogicalResult convertExtractSliceOpToFlowSliceOp(
     RewriterBase &rewriter, tensor::ExtractSliceOp sliceOp) {
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(sliceOp);
+
   if (sliceOp->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
     return failure();
   }
