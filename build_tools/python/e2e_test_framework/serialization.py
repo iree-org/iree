@@ -149,6 +149,7 @@ def _get_type_origin(tp):
   """Get the unsubscripted type. Returns None is unsupported.
 
   This is similar to typing.get_origin, but only exists after Python 3.8.
+  TODO(#11087): Replace with typing.get_origin after upgrading to 3.8.
   """
   return getattr(tp, "__origin__", None)
 
@@ -157,6 +158,7 @@ def _get_type_args(tp) -> Tuple:
   """Get the type arguments.
 
   This is similar to typing.get_args, but only exists after Python 3.8.
+  TODO(#11087): Replace with typing.get_origin after upgrading to 3.8.
   """
   return getattr(tp, "__args__", ())
 
