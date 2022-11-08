@@ -43,6 +43,8 @@ DOCKER_DIR = "build_tools/docker/".replace("/", os.sep)
 # Map from image names to images that they depend on.
 IMAGES_TO_DEPENDENCIES = {
     "base": [],
+    "base-bleeding-edge": [],
+    "swiftshader-bleeding-edge": ["base-bleeding-edge"],
     "manylinux2014_x86_64-release": [],
     "android": ["base"],
     "emscripten": ["base"],
@@ -218,9 +220,17 @@ if __name__ == "__main__":
     if args.only_references:
       digest = image_urls_to_prod_digests[image_url]
     else:
+      # We deliberately give the whole repository as context so we can reuse
+      # scripts and such. It would be nice if Docker gave us a way to make this
+      # more explicit, like symlinking files in the context, but they refuse to
+      # with the justification that it makes builds non-hermetic, a hilarious
+      # concern for something that allows and encourages arbitrary network
+      # access in builds.
+      # We're assuming this is being run from the root of the repository.
+      # FIXME: make this more robust to where it is run from.
       utils.run_command([
           "docker", "build", "--file", image_path, "--tag", tagged_image_url,
-          DOCKER_DIR
+          "."
       ],
                         dry_run=args.dry_run)
 

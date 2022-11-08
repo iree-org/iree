@@ -102,6 +102,7 @@ RUN curl -fsSL https://bazel.build/bazel-release.pub.gpg \
 #   only a partial uninstall.
 WORKDIR /install-python
 
+COPY runtime/bindings/python/iree/runtime/build_requirements.txt ./
 RUN apt-get update \
   && apt-get install -y \
     python3.7 \
@@ -116,15 +117,11 @@ RUN apt-get update \
   && python3 -m pip install --upgrade pip>=21.3 \
   && python3 -m pip install --upgrade setuptools \
   # Versions for things required to build IREE should match the minimum versions
-  # in runtime/bindings/python/iree/runtime/build_requirements.txt
-  && python3 -m pip install --ignore-installed \
-    # For building
-    numpy==1.19.4 \
-    PyYAML==5.4.1 \
-    wheel==0.36.2 \
-    pybind11==2.8.0 \
-    # For scripting only
-    requests
+  # in runtime/bindings/python/iree/runtime/build_requirements.txt. There
+  # doesn't appear to be a pip-native way to get the minimum versions, but this
+  # hack works for simple files, at least.
+  && sed -i 's/>=/==/' build_requirements.txt \
+  && python3 -m pip install --ignore-installed -r build_requirements.txt
 
 ENV PYTHON_BIN /usr/bin/python3
 
@@ -150,7 +147,7 @@ WORKDIR /
 ##############
 
 ######## IREE CUDA DEPS ########
-COPY fetch_cuda_deps.sh /usr/local/bin
+COPY build_tools/docker/context/fetch_cuda_deps.sh /usr/local/bin
 RUN /usr/local/bin/fetch_cuda_deps.sh /usr/local/iree_cuda_deps
 ENV IREE_CUDA_DEPS_DIR="/usr/local/iree_cuda_deps"
 ##############

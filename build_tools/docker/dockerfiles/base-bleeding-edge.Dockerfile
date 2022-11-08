@@ -26,7 +26,7 @@ RUN apt-get update \
   && apt-get install -y \
     # For updating IREE's submodules.
     git \
-    # Install our minimum supported clang version.
+    # Install our maximum supported clang version.
     "clang-${LLVM_VERSION}" \
     "lld-${LLVM_VERSION}" \
     # IREE transitive dependencies
@@ -91,6 +91,7 @@ WORKDIR /install-python
 
 ARG PYTHON_VERSION=3.11
 
+COPY runtime/bindings/python/iree/runtime/build_requirements.txt ./
 RUN apt-get update \
   && apt-get install -y \
     "python${PYTHON_VERSION}" \
@@ -104,23 +105,21 @@ RUN apt-get update \
     "python${PYTHON_VERSION}-venv" \
   && python3 -m pip install --upgrade pip \
   && python3 -m pip install --upgrade setuptools \
-  # Versions for things required to build IREE. We install the latest of
+  # Versions for things required to build IREE. We install the latest version
   # of packages in runtime/bindings/python/iree/runtime/build_requirements.txt
-  && python3 -m pip install --ignore-installed \
-    # For building
-    numpy==1.23.4 \
-    PyYAML==6.0 \
-    wheel==0.37.1 \
-    pybind11==2.10.1 \
-    # For scripting only
-    requests
+  # Unlike most places in the project, these dependencies are *not* pinned in
+  # general. This adds non-determinism to the Docker image build, but reduces
+  # maintenance burden. If a new build fails because of a new package version,
+  # we should add a max version constraint in the build_requirements.txt file.
+  && python3 -m pip install --ignore-installed -r build_requirements.txt \
+  && rm -rf /install-python
 
 ENV PYTHON_BIN /usr/bin/python3
 
 ##############
 
 ######## IREE CUDA DEPS ########
-COPY fetch_cuda_deps.sh /usr/local/bin
+COPY build_tools/docker/context/fetch_cuda_deps.sh /usr/local/bin
 RUN /usr/local/bin/fetch_cuda_deps.sh /usr/local/iree_cuda_deps
 ENV IREE_CUDA_DEPS_DIR="/usr/local/iree_cuda_deps"
 ##############
