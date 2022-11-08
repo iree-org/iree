@@ -18,8 +18,18 @@ import lit.formats
 config.name = "IREE"
 config.suffixes = [".mlir", ".txt"]
 config.test_format = lit.formats.ShTest(execute_external=True)
-# Forward all IREE environment variables
-passthrough_env_vars = ["VK_ICD_FILENAMES"]
+
+# Forward all IREE environment variables, as well as some passthroughs.
+# Note: env vars are case-insensitive on Windows, so check matches carefully.
+#     https://stackoverflow.com/q/7797269
+passthrough_env_vars = [
+    # The Vulkan loader uses this
+    "VK_ICD_FILENAMES",
+    # WindowsLinkerTool uses these from vcvarsall
+    "VCTOOLSINSTALLDIR",
+    "UNIVERSALCRTSDKDIR",
+    "UCRTVERSION"
+]
 config.environment.update({
     k: v
     for k, v in os.environ.items()
