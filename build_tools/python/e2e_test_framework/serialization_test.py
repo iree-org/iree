@@ -5,9 +5,9 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 from dataclasses import dataclass
+from typing import List, Optional
 import json
 import pathlib
-from typing import Dict, List, Optional
 import collections
 import enum
 import typing

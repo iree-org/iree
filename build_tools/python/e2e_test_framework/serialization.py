@@ -6,10 +6,9 @@
 """Helpers to serialize/deserialize objects."""
 
 from enum import Enum
-from typing import Any, Dict, Optional, OrderedDict, Sequence, Type, Union
+from typing import Any, Dict, Optional, OrderedDict, Sequence, Tuple, Type, Union
 import collections
 import dataclasses
-import typing
 
 # types.NoneType is only added after Python 3.10.
 NONE_TYPE = type(None)
@@ -117,21 +116,21 @@ def _deserialize(data,
   if deserialize_func is not None:
     return deserialize_func(data, keyed_obj_map, obj_cache)
 
-  elif typing.get_origin(obj_type) == list:
-    subtype, = typing.get_args(obj_type)
+  elif _get_type_origin(obj_type) == list:
+    subtype, = _get_type_args(obj_type)
     return [
         _deserialize(item, subtype, keyed_obj_map, obj_cache) for item in data
     ]
 
-  elif typing.get_origin(obj_type) == collections.OrderedDict:
+  elif _get_type_origin(obj_type) == collections.OrderedDict:
     # Only supports OrderedDict as it provides the clear deterministic semantic.
-    _, value_type = typing.get_args(obj_type)
+    _, value_type = _get_type_args(obj_type)
     return collections.OrderedDict(
         (key, _deserialize(value, value_type, keyed_obj_map, obj_cache))
         for key, value in data.items())
 
-  elif typing.get_origin(obj_type) == Union:
-    subtypes = typing.get_args(obj_type)
+  elif _get_type_origin(obj_type) == Union:
+    subtypes = _get_type_args(obj_type)
     if len(subtypes) != 2 or NONE_TYPE not in subtypes:
       raise ValueError(f"Unsupported union type: {obj_type}.")
     subtype = subtypes[0] if subtypes[1] == NONE_TYPE else subtypes[1]
@@ -144,6 +143,22 @@ def _deserialize(data,
     raise ValueError(f"Member {data} not found in the enum {obj_type}.")
 
   return data
+
+
+def _get_type_origin(tp):
+  """Get the unsubscripted type. Returns None is unsupported.
+
+  This is similar to typing.get_origin, but only exists after Python 3.8.
+  """
+  return getattr(tp, "__origin__", None)
+
+
+def _get_type_args(tp) -> Tuple:
+  """Get the type arguments.
+
+  This is similar to typing.get_args, but only exists after Python 3.8.
+  """
+  return getattr(tp, "__args__", ())
 
 
 def serializable(cls=None,
