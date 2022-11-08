@@ -261,8 +261,7 @@ static void buildReductionCudaStrategy(ImplicitLocOpBuilder &b,
                                        Value outerVariantH) {
   // Steps 1 and 2, see inside.
   Value variantH = buildReductionStrategyTilingPart(b, outerVariantH);
-  (void)variantH;
-#if 0
+
   // Step 3. Second level of tiling + fusion parallelizes to threads.
   // TODO: Relying on ordering is brittle, harden this.
   auto [fill2dH, parParRedH, fill1dH, parRedH] = matchAndUnpack<4>(
@@ -294,6 +293,7 @@ static void buildReductionCudaStrategy(ImplicitLocOpBuilder &b,
   funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
   funcH = mapToBlockAndThreads(b, funcH, ArrayRef<int64_t>{32, 2, 1});
 
+#if 0
   // Step 7. Post-bufferization vector distribution with rank-reduction.
   distributeVectors(b, funcH);
 
