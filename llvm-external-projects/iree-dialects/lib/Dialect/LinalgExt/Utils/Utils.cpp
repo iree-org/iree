@@ -42,6 +42,30 @@ SmallVector<OpFoldResult> getDims(OpBuilder &builder, Location loc,
       [&](int64_t dim) { return getDim(builder, loc, shapedTypeValue, dim); }));
 }
 
+SmallVector<int64_t> computeInterchangeFromDimPos(ArrayRef<int64_t> dimsPos,
+                                                  int64_t rank) {
+  SmallVector<int64_t> interchangeVector;
+  interchangeVector.reserve(dimsPos.size());
+  // First map dims and their position. For example, dims_pos = [2, 0] will map
+  // to:
+  // [
+  //  [ key: 2, value: 0]
+  //  [ key: 0, value: 1]
+  // ]
+  // where key is the idx in dims_pos while value its position in dims_pos.
+  DenseMap<int64_t, int64_t> dimsAndPosMapping;
+  for (int64_t dimsIdx = 0, end = dimsPos.size(); dimsIdx < end; dimsIdx++)
+    dimsAndPosMapping[dimsPos[dimsIdx]] = dimsIdx;
+
+  // Scan the position in order and insert the value in the map
+  // to compute the interchange vector.
+  for (int64_t dimsIdx = 0; dimsIdx < rank; dimsIdx++) {
+    if (dimsAndPosMapping.count(dimsIdx))
+      interchangeVector.push_back(dimsAndPosMapping[dimsIdx]);
+  }
+  return interchangeVector;
+}
+
 } // namespace LinalgExt
 } // namespace IREE
 } // namespace iree_compiler

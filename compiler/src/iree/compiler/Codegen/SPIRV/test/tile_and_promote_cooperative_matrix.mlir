@@ -1,4 +1,5 @@
-// RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline='hal.executable(hal.executable.variant(builtin.module(func.func(iree-spirv-tile-and-promote{skip-thread=true}))))' --cse %s | FileCheck %s
+// RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline='hal.executable(hal.executable.variant(builtin.module(func.func(iree-spirv-tile-and-promote{promote-c=false skip-thread=true}))))' --cse %s | FileCheck %s
+// RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline='hal.executable(hal.executable.variant(builtin.module(func.func(iree-spirv-tile-and-promote{promote-c=true skip-thread=true}))))' --cse %s | FileCheck %s --check-prefix=PROMOTEC
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -90,6 +91,19 @@ hal.executable @matmul_f16_32x32x32 {
 //       CHECK:   linalg.matmul
 //  CHECK-SAME:     __internal_linalg_transform__ = "workgroup_memory"
 //  CHECK-SAME:     ins(%[[LHS]], %[[RHS]] : memref<32x32xf16>, memref<32x32xf16>)
+
+
+// PROMOTEC-LABEL: func.func @matmul_f16_32x32x32()
+
+//       PROMOTEC:   %[[LHS:.+]] = hal.interface.binding.subspan set(0) binding(0)
+//       PROMOTEC:   %[[RHS:.+]] = hal.interface.binding.subspan set(0) binding(1)
+
+//   PROMOTEC-NOT:   memref.alloc()
+//   PROMOTEC-NOT:   memref.copy
+
+//       PROMOTEC:   linalg.matmul
+//  PROMOTEC-SAME:     __internal_linalg_transform__ = "workgroup_memory"
+//  PROMOTEC-SAME:     ins(%[[LHS]], %[[RHS]] : memref<32x32xf16>, memref<32x32xf16>)
 
 // -----
 
@@ -196,3 +210,32 @@ hal.executable @generic_batch_matmul_f16_32x128x512x64 {
 //      CHECK:   linalg.generic
 // CHECK-SAME:    ins(%[[LHS_VIEW]], %[[RHS_VIEW]]
 // CHECK-SAME:    __internal_linalg_transform__ = "workgroup_memory"
+
+
+// PROMOTEC-LABEL: func.func @generic_batch_matmul_f16_32x128x512x64()
+
+//      PROMOTEC: %[[RHS_ALLOC:.+]] = memref.alloc() : memref<1x32x32xf16, 3>
+//      PROMOTEC: %[[LHS_ALLOC:.+]] = memref.alloc() : memref<32x1x32xf16, 3>
+//      PROMOTEC: %[[C_ALLOC:.+]] = memref.alloc() : memref<1x32x32xf16, 3>
+
+//      PROMOTEC: linalg.fill
+// PROMOTEC-SAME:   __internal_linalg_transform__ = "workgroup_memory"
+// PROMOTEC-SAME:   outs(%[[C_ALLOC]]
+
+//      PROMOTEC: scf.for %{{.+}} = %c0 to %c64 step %c32
+//      PROMOTEC:   %[[LHS_VIEW:.+]] = memref.subview %[[LHS_ALLOC]][0, 0, 0] [%c32, %c1, %c32]
+//      PROMOTEC:   %[[RHS_VIEW:.+]] = memref.subview %[[RHS_ALLOC]][0, 0, 0] [%c1, %c32, %c32]
+//      PROMOTEC:   gpu.barrier
+//      PROMOTEC:   memref.copy %{{.+}}, %[[LHS_VIEW]]
+// PROMOTEC-SAME:    __internal_linalg_transform__ = "copy_to_workgroup_memory"
+//      PROMOTEC:   memref.copy %{{.+}}, %[[RHS_VIEW]]
+// PROMOTEC-SAME:    __internal_linalg_transform__ = "copy_to_workgroup_memory"
+//      PROMOTEC:   gpu.barrier
+//      PROMOTEC:   linalg.generic
+// PROMOTEC-SAME:    ins(%[[LHS_VIEW]], %[[RHS_VIEW]]
+// PROMOTEC-SAME:    outs(%[[C_ALLOC]]
+// PROMOTEC-SAME:    __internal_linalg_transform__ = "workgroup_memory"
+//      PROMOTEC: gpu.barrier
+//      PROMOTEC: memref.copy %[[C_ALLOC]]
+// PROMOTEC-SAME:   __internal_linalg_transform__ = "copy_to_workgroup_memory"
+//      PROMOTEC: gpu.barrier

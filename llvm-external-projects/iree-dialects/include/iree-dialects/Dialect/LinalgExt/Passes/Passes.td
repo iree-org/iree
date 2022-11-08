@@ -71,15 +71,15 @@ def TopkSplitReduction:
   ];
 }
 
-def LinalgExtPackOpVectorization:
-    Pass<"iree-linalg-ext-pack-op-vectorization", "func::FuncOp"> {
+def LinalgExtVectorization:
+    Pass<"iree-linalg-ext-vectorization", "func::FuncOp"> {
   let summary = "Vectorization pass for LinalgExt pack ops.";
   let description = [{
     Vectorizes LinalgExt ops when they meet the conditions, e.g., having static
     shapes, etc.
   }];
   let constructor = "mlir::iree_compiler::IREE::LinalgExt::"
-                    "createLinalgExtPackOpVectorizationPass()";
+                    "createLinalgExtVectorizationPass()";
 }
 
 //===---------------------------------------------------------------------====//

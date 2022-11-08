@@ -117,8 +117,6 @@ def LinalgSingleTilingExpert
     ListOption<"transposePaddings", "transpose-paddings", "std::string",
                "Transpose paddings.",
                "llvm::cl::ZeroOrMore">,
-    Option<"scalarizeDynamicDims", "scalarize-dynamic-dims", "bool",
-      /*default=*/"false", "Tile dynamic dimensions by 1.">,
 
     // Generalization options.
     Option<"generalize", "generalize", "bool", /*default=*/"false",

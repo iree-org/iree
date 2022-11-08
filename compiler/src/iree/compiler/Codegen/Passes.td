@@ -476,6 +476,8 @@ def SPIRVTileAndPromote : Pass<"iree-spirv-tile-and-promote", "func::FuncOp"> {
   let constructor =
     "mlir::iree_compiler::createSPIRVTileAndPromotePass()";
   let options = [
+    Option<"promoteC", "promote-c", "bool", /*default=*/"false",
+          "Promote C matrix to use shared memory">,
     Option<"skipThread", "skip-thread", "bool", /*default=*/"false",
           "Skip tiling and distributing to GPU threads">,
   ];

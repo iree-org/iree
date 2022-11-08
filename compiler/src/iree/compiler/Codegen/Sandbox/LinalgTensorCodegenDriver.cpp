@@ -238,7 +238,6 @@ struct LinalgSingleTilingExpertPass
     this->hoistPaddings = options.hoistPaddings;
     this->transposePaddings = options.transposePaddings;
     this->packPaddings = options.packPaddings;
-    this->scalarizeDynamicDims = options.scalarizeDynamicDims;
     this->generalize = options.generalize;
     this->iteratorInterchange = options.iteratorInterchange;
     this->decomposeToLowerDimOp = options.decomposeToLowerDimOp;
@@ -563,10 +562,6 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
   if (!tileInterchange.empty()) {
     tilingOptions = tilingOptions.setInterchange(
         SmallVector<unsigned>(tileInterchange.begin(), tileInterchange.end()));
-  }
-  if (scalarizeDynamicDims) {
-    doTiling = true;
-    tilingOptions = tilingOptions.scalarizeDynamicDims();
   }
   tilingOptions = tilingOptions.setPeeledLoops(peeledLoops);
 
