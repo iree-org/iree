@@ -4,7 +4,7 @@ iree_add_all_subdirs()
 
 iree_microbenchmark_suite(
   NAME
-   "microbenchmark"
+   "microbenchmark_llvm-cpu"
   SRCS
     "dynamic_shape_vectorization.mlir"
     "linalg_mmt4d.mlir"
@@ -17,4 +17,14 @@ iree_microbenchmark_suite(
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=mhlo"
     "--iree-llvm-target-cpu-features=host"
+)
+
+iree_microbenchmark_suite(
+  NAME
+   "microbenchmark_cuda"
+  SRCS
+    "linalg_transpose.mlir"
+  FLAGS
+    "--iree-hal-target-backends=cuda"
+    "--iree-input-type=mhlo"
 )
