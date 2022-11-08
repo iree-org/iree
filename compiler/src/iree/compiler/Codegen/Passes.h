@@ -521,7 +521,7 @@ std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVVectorizePass();
 /// having pointer bitcast.
 std::unique_ptr<OperationPass<ModuleOp>> createSPIRVVectorizeLoadStore();
 
-/// Breaks down large vendors not natively supported by SPIR-V.
+/// Breaks down large vectors not natively supported by SPIR-V.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVBreakDownLargeVectorPass();
 
