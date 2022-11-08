@@ -100,6 +100,8 @@ static LogicalResult simplifyDimOps(RewriterBase &rewriter,
 
     if (!tensorType.isDynamicDim(*idx)) {
       // Rewrite static dimension with constant.
+      OpBuilder::InsertionGuard g(rewriter);
+      rewriter.setInsertionPoint(dimOp);
       int64_t size = tensorType.getShape()[*idx];
       rewriter.replaceOpWithNewOp<arith::ConstantIndexOp>(dimOp, size);
       continue;
@@ -544,12 +546,44 @@ static LogicalResult cloneProducers(RewriterBase &rewriter,
   return success();
 }
 
-/// Helper function that builds the workload region body.
-static void buildWorkloadRegionBody(OpBuilder &builder, Location loc,
-                                    ArrayRef<BlockArgument> args) {
+static void buildSetEncodingWorkloadRegion(OpBuilder &builder, Location loc,
+                                           ArrayRef<BlockArgument> args) {
+  auto numWorkgroupsOp =
+      builder.create<Flow::DispatchWorkgroupCountFromSetEncodingOp>(loc, args);
+  builder.create<Flow::ReturnOp>(loc, numWorkgroupsOp.getResults());
+}
+
+static void buildDefaultWorkloadRegion(OpBuilder &builder, Location loc,
+                                       ArrayRef<BlockArgument> args) {
   auto numWorkgroupsOp =
       builder.create<Flow::DispatchWorkgroupCountFromDagRootOp>(loc, args);
   builder.create<Flow::ReturnOp>(loc, numWorkgroupsOp.getResults());
+}
+
+/// Computes the workload and provides a workload region builder for the given
+/// root op.
+static FailureOr<Flow::WorkloadBuilder> getWorkloadBuilder(OpBuilder &builder,
+                                                           Operation *rootOp) {
+  Flow::WorkloadBuilder result;
+
+  // Compute workload (before entering the dispatch region).
+  OpBuilder::InsertionGuard g(builder);
+  SmallVector<Value> workload;
+  builder.setInsertionPoint(rootOp);
+  FailureOr<SmallVector<Value>> maybeWorkload =
+      getWorkloadForRootOp(builder, rootOp);
+  if (failed(maybeWorkload)) return failure();
+  result.workload = *maybeWorkload;
+
+  // The workload region of the WorkgroupsOp is populated by the
+  // `regionBuilder` during ConvertRegionToWorkgroups .
+  if (isa<LinalgExt::SetEncodingOp>(rootOp)) {
+    result.regionBuilder = buildSetEncodingWorkloadRegion;
+  } else {
+    result.regionBuilder = buildDefaultWorkloadRegion;
+  }
+
+  return result;
 }
 
 /// Create Flow::DispatchGroupsOps based on a fusion heuristic.
@@ -574,16 +608,15 @@ static FailureOr<SmallVector<Flow::DispatchWorkgroupsOp>> createFusionGroups(
   // Create a DispatchRegionOp for every fusion group.
   OpBuilder::InsertionGuard g(rewriter);
   SmallVector<Flow::DispatchRegionOp> regionOps;
-  DenseMap<Flow::DispatchRegionOp, SmallVector<Value>> workloads;
+  DenseMap<Flow::DispatchRegionOp, Optional<Flow::WorkloadBuilder>>
+      workloadBuilders;
   for (const auto &it : llvm::enumerate(roots)) {
     // Compute workload.
-    SmallVector<Value> workload;
+    Optional<Flow::WorkloadBuilder> workloadBuilder = llvm::None;
     if (generateWorkloadRegion) {
-      rewriter.setInsertionPoint(it.value());
-      FailureOr<SmallVector<Value>> maybeWorkload =
-          getWorkloadForRootOp(rewriter, it.value());
-      if (failed(maybeWorkload)) return failure();
-      workload = *maybeWorkload;
+      auto maybeBuilder = getWorkloadBuilder(rewriter, /*rootOp=*/it.value());
+      if (failed(maybeBuilder)) return failure();
+      workloadBuilder = *maybeBuilder;
     }
 
     // Simplify tensor::DimOps.
@@ -595,7 +628,6 @@ static FailureOr<SmallVector<Flow::DispatchWorkgroupsOp>> createFusionGroups(
     auto maybeRegionOp = Flow::wrapOpInDispatchRegion(rewriter, it.value());
     if (failed(maybeRegionOp)) return failure();
     regionOp = *maybeRegionOp;
-    workloads[regionOp] = workload;
 
     // Sort producers topologically. All producers must be in the same block as
     // the root.
@@ -611,6 +643,7 @@ static FailureOr<SmallVector<Flow::DispatchWorkgroupsOp>> createFusionGroups(
       regionOp = *newRegionOp;
     }
 
+    workloadBuilders[regionOp] = workloadBuilder;
     regionOps.push_back(regionOp);
   }
 
@@ -620,8 +653,7 @@ static FailureOr<SmallVector<Flow::DispatchWorkgroupsOp>> createFusionGroups(
     if (failed(cloneProducers(rewriter, regionOp))) return failure();
     auto maybeWorkgroupOp =
         Flow::rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
-            regionOp, rewriter, workloads[regionOp],
-            generateWorkloadRegion ? buildWorkloadRegionBody : nullptr);
+            regionOp, rewriter, workloadBuilders[regionOp]);
     if (failed(maybeWorkgroupOp)) return failure();
 
     result.push_back(*maybeWorkgroupOp);
@@ -635,14 +667,11 @@ static FailureOr<Flow::DispatchWorkgroupsOp> wrapInWorkgroupsOp(
     TensorDimTrackingRewriter &rewriter, Operation *op,
     bool generateWorkloadRegion) {
   // Compute workload.
-  SmallVector<Value> workload;
+  Optional<Flow::WorkloadBuilder> workloadBuilder = llvm::None;
   if (generateWorkloadRegion) {
-    OpBuilder::InsertionGuard g(rewriter);
-    rewriter.setInsertionPoint(op);
-    FailureOr<SmallVector<Value>> maybeWorkload =
-        getWorkloadForRootOp(rewriter, op);
-    if (failed(maybeWorkload)) return failure();
-    workload = *maybeWorkload;
+    auto maybeBuilder = getWorkloadBuilder(rewriter, op);
+    if (failed(maybeBuilder)) return failure();
+    workloadBuilder = *maybeBuilder;
   }
 
   // Simplify tensor::DimOps.
@@ -655,8 +684,7 @@ static FailureOr<Flow::DispatchWorkgroupsOp> wrapInWorkgroupsOp(
   if (failed(regionOp)) return failure();
   if (failed(cloneProducers(rewriter, *regionOp))) return failure();
   auto workgroupsOp = Flow::rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
-      *regionOp, rewriter, workload,
-      generateWorkloadRegion ? buildWorkloadRegionBody : nullptr);
+      *regionOp, rewriter, workloadBuilder);
   if (failed(workgroupsOp)) return failure();
   return *workgroupsOp;
 }
@@ -675,17 +703,18 @@ static FailureOr<SmallVector<Flow::DispatchWorkgroupsOp>> wrapInWorkgroupsOp(
   return result;
 }
 
-/// Wrap all ops of the given type that are direct children of the given op in
-/// a DispatchWorkgroupsOp.
-template <typename OpTy>
+/// Wrap all ops of the given types that are direct children of the given op in
+/// DispatchWorkgroupsOps.
+template <typename... OpTys>
 static FailureOr<SmallVector<Flow::DispatchWorkgroupsOp>> wrapInWorkgroupsOp(
     TensorDimTrackingRewriter &rewriter, Operation *op,
     bool generateWorkloadRegion) {
-  // Find ops of type OpTy.
+  // Find ops of type OpTys.
   SmallVector<Operation *> rootOps;
   for (Region &r : op->getRegions())
     for (Block &b : r.getBlocks())
-      for (auto op : b.getOps<OpTy>()) rootOps.push_back(op.getOperation());
+      for (Operation &op : b)
+        if (isa<OpTys...>(&op)) rootOps.push_back(&op);
 
   // Wrap ops in DispatchWorkgroupsOps.
   return wrapInWorkgroupsOp(rewriter, rootOps, generateWorkloadRegion);
@@ -753,9 +782,11 @@ void DispatchLinalgOnTensorsViaRegionOpsPass::runOnOperation() {
   if (failed(newWorkgroupsOps)) return signalPassFailure();
   workgroupsOps.append(newWorkgroupsOps->begin(), newWorkgroupsOps->end());
 
-  // Step 3: Create a DispatchWorkgroupsOp for every remaining ExtractSliceOp.
-  newWorkgroupsOps = wrapInWorkgroupsOp<tensor::ExtractSliceOp>(
-      rewriter, funcOp, generateWorkloadRegion);
+  // Step 3: Create a DispatchWorkgroupsOp for certain other ops.
+  newWorkgroupsOps =
+      wrapInWorkgroupsOp<tensor::ExtractSliceOp, LinalgExt::SetEncodingOp,
+                         LinalgExt::UnsetEncodingOp>(rewriter, funcOp,
+                                                     generateWorkloadRegion);
   if (failed(newWorkgroupsOps)) return signalPassFailure();
   workgroupsOps.append(newWorkgroupsOps->begin(), newWorkgroupsOps->end());
 
