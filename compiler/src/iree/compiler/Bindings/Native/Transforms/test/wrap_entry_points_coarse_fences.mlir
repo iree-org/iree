@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline='iree-abi-wrap-entry-points{invocation-model=coarse-fences}' --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-abi-wrap-entry-points{invocation-model=coarse-fences})' --split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: func.func @asyncEntry(
 //  CHECK-SAME:   %[[ARG0:.+]]: !hal.buffer_view, %[[ARG1:.+]]: !hal.buffer_view, %[[WAIT:.+]]: !hal.fence, %[[SIGNAL:.+]]: !hal.fence
