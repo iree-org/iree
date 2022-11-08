@@ -252,7 +252,7 @@ iree_bytecode_module(
   MODULE_FILE_NAME
     "${_ROOT_ARTIFACTS_DIR}/iree/c36c63b0-220a-4d78-8ade-c45ce47d89d3_DeepLabV3_fp32/d463322c-24e6-4685-85ca-d541b41a405f/DeepLabV3_fp32.vmfb"
   FLAGS
-    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
     "--iree-flow-mmt4d-target-options=arch=aarch64"
@@ -601,7 +601,7 @@ iree_bytecode_module(
   MODULE_FILE_NAME
     "${_ROOT_ARTIFACTS_DIR}/iree/5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9/PoseNet_fp32.vmfb"
   FLAGS
-    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
@@ -661,7 +661,7 @@ iree_bytecode_module(
   MODULE_FILE_NAME
     "${_ROOT_ARTIFACTS_DIR}/iree/5afc3014-d29d-4e88-a840-fbaf678acf2b_PoseNet_fp32/d463322c-24e6-4685-85ca-d541b41a405f/PoseNet_fp32.vmfb"
   FLAGS
-    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
     "--iree-flow-mmt4d-target-options=arch=aarch64"
@@ -685,7 +685,6 @@ iree_bytecode_module(
     "--iree-hal-target-backends=vulkan-spirv"
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=adreno-unknown-linux-android31"
-    "--iree-flow-mmt4d-target-options=arch=aarch64"
   PUBLIC
 )
 
@@ -815,18 +814,17 @@ iree_bytecode_module(
   SRC
     "${_ROOT_ARTIFACTS_DIR}/iree/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/MobileBertSquad_fp32.mlir"
   MODULE_FILE_NAME
-    "${_ROOT_ARTIFACTS_DIR}/iree/PoseNet_fp32/70b823ca-2807-4531-8c00-e02af7d70466/PoseNet_fp32.vmfb"
+    "${_ROOT_ARTIFACTS_DIR}/iree/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9/MobileBertSquad_fp32.vmfb"
   FLAGS
-    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-vulkan-target-triple=adreno-unknown-linux-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
-    "--iree-hal-benchmark-dispatch-repeat-count=16"
+    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvm-target-cpu=cascadelake"
   PUBLIC
 )
 
 add_dependencies(iree-benchmark-suites
-  ${_PACKAGE_NAME}_iree-module-PoseNet_fp32-70b823ca-2807-4531-8c00-e02af7d70466
+  ${_PACKAGE_NAME}_iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
 )
 
 # Compile the module "${_ROOT_ARTIFACTS_DIR}/iree/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/6d0d5716-5525-44ad-b71d-8075ee1583a6/MobileBertSquad_fp32.vmfb"
@@ -853,69 +851,54 @@ add_dependencies(iree-benchmark-suites
 # Compile the module "${_ROOT_ARTIFACTS_DIR}/iree/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/cdf579a9-5446-403b-a991-802a6c702e65/MobileBertSquad_fp32.vmfb"
 iree_bytecode_module(
   NAME
-    "iree-module-PoseNet_fp32-8da35f2b-a042-4b7d-9dcf-5ebbc1728765"
+    "iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-cdf579a9-5446-403b-a991-802a6c702e65"
   SRC
-    "${_ROOT_ARTIFACTS_DIR}/iree/PoseNet_fp32/PoseNet_fp32.mlir"
+    "${_ROOT_ARTIFACTS_DIR}/iree/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/MobileBertSquad_fp32.mlir"
   MODULE_FILE_NAME
-    "${_ROOT_ARTIFACTS_DIR}/iree/PoseNet_fp32/8da35f2b-a042-4b7d-9dcf-5ebbc1728765/PoseNet_fp32.vmfb"
+    "${_ROOT_ARTIFACTS_DIR}/iree/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/cdf579a9-5446-403b-a991-802a6c702e65/MobileBertSquad_fp32.vmfb"
   FLAGS
-    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-vulkan-target-triple=valhall-unknown-linux-android31"
+    "--iree-llvm-target-triple=riscv64-pc-linux-gnu"
+    "--iree-llvm-target-cpu=generic-rv64"
+    "--iree-llvm-target-abi=lp64d"
+    "--iree-llvm-target-cpu-features=+m,+a,+f,+d,+v"
+    "--riscv-v-vector-bits-min=512"
+    "--riscv-v-fixed-length-vector-lmul-max=8"
   PUBLIC
 )
 
 add_dependencies(iree-benchmark-suites
-  ${_PACKAGE_NAME}_iree-module-PoseNet_fp32-8da35f2b-a042-4b7d-9dcf-5ebbc1728765
+  ${_PACKAGE_NAME}_iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-cdf579a9-5446-403b-a991-802a6c702e65
 )
 
-# Compile the module "${_ROOT_ARTIFACTS_DIR}/iree/PoseNet_fp32/c7eea358-d8d2-4199-9d75-bb741c399b1b/PoseNet_fp32.vmfb"
+# Compile the module "${_ROOT_ARTIFACTS_DIR}/iree/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/1f2adf49-282e-4aff-9d4f-e63b1621f1e8/MobileBertSquad_fp32.vmfb"
 iree_bytecode_module(
   NAME
-    "iree-module-PoseNet_fp32-c7eea358-d8d2-4199-9d75-bb741c399b1b"
+    "iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-1f2adf49-282e-4aff-9d4f-e63b1621f1e8"
   SRC
-    "${_ROOT_ARTIFACTS_DIR}/iree/PoseNet_fp32/PoseNet_fp32.mlir"
+    "${_ROOT_ARTIFACTS_DIR}/iree/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/MobileBertSquad_fp32.mlir"
   MODULE_FILE_NAME
-    "${_ROOT_ARTIFACTS_DIR}/iree/PoseNet_fp32/c7eea358-d8d2-4199-9d75-bb741c399b1b/PoseNet_fp32.vmfb"
+    "${_ROOT_ARTIFACTS_DIR}/iree/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/1f2adf49-282e-4aff-9d4f-e63b1621f1e8/MobileBertSquad_fp32.vmfb"
   FLAGS
-    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-vulkan-target-triple=adreno-unknown-linux-android31"
+    "--iree-llvm-target-triple=aarch64-none-linux-android29"
   PUBLIC
 )
 
 add_dependencies(iree-benchmark-suites
-  ${_PACKAGE_NAME}_iree-module-PoseNet_fp32-c7eea358-d8d2-4199-9d75-bb741c399b1b
+  ${_PACKAGE_NAME}_iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-1f2adf49-282e-4aff-9d4f-e63b1621f1e8
 )
 
-# Compile the module "${_ROOT_ARTIFACTS_DIR}/iree/PoseNet_fp32/d3038b95-c889-456a-bff6-5cbabd10f1ad/PoseNet_fp32.vmfb"
+# Compile the module "${_ROOT_ARTIFACTS_DIR}/iree/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/d463322c-24e6-4685-85ca-d541b41a405f/MobileBertSquad_fp32.vmfb"
 iree_bytecode_module(
   NAME
-    "iree-module-PoseNet_fp32-d3038b95-c889-456a-bff6-5cbabd10f1ad"
+    "iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-d463322c-24e6-4685-85ca-d541b41a405f"
   SRC
-    "${_ROOT_ARTIFACTS_DIR}/iree/PoseNet_fp32/PoseNet_fp32.mlir"
+    "${_ROOT_ARTIFACTS_DIR}/iree/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/MobileBertSquad_fp32.mlir"
   MODULE_FILE_NAME
-    "${_ROOT_ARTIFACTS_DIR}/iree/PoseNet_fp32/d3038b95-c889-456a-bff6-5cbabd10f1ad/PoseNet_fp32.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=vulkan-spirv"
-    "--iree-input-type=tosa"
-    "--iree-vulkan-target-triple=adreno-unknown-linux-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
-  PUBLIC
-)
-
-add_dependencies(iree-benchmark-suites
-  ${_PACKAGE_NAME}_iree-module-PoseNet_fp32-d3038b95-c889-456a-bff6-5cbabd10f1ad
-)
-
-# Compile the module "${_ROOT_ARTIFACTS_DIR}/iree/PoseNet_fp32/d463322c-24e6-4685-85ca-d541b41a405f/PoseNet_fp32.vmfb"
-iree_bytecode_module(
-  NAME
-    "iree-module-PoseNet_fp32-d463322c-24e6-4685-85ca-d541b41a405f"
-  SRC
-    "${_ROOT_ARTIFACTS_DIR}/iree/PoseNet_fp32/PoseNet_fp32.mlir"
-  MODULE_FILE_NAME
-    "${_ROOT_ARTIFACTS_DIR}/iree/PoseNet_fp32/d463322c-24e6-4685-85ca-d541b41a405f/PoseNet_fp32.vmfb"
+    "${_ROOT_ARTIFACTS_DIR}/iree/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/d463322c-24e6-4685-85ca-d541b41a405f/MobileBertSquad_fp32.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
@@ -926,17 +909,130 @@ iree_bytecode_module(
 )
 
 add_dependencies(iree-benchmark-suites
-  ${_PACKAGE_NAME}_iree-module-PoseNet_fp32-d463322c-24e6-4685-85ca-d541b41a405f
+  ${_PACKAGE_NAME}_iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-d463322c-24e6-4685-85ca-d541b41a405f
 )
 
-# Compile the module "${_ROOT_ARTIFACTS_DIR}/iree/PoseNet_fp32/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9/PoseNet_fp32.vmfb"
+# Compile the module "${_ROOT_ARTIFACTS_DIR}/iree/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/c7eea358-d8d2-4199-9d75-bb741c399b1b/MobileBertSquad_fp32.vmfb"
 iree_bytecode_module(
   NAME
-    "iree-module-PoseNet_fp32-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
+    "iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-c7eea358-d8d2-4199-9d75-bb741c399b1b"
   SRC
-    "${_ROOT_ARTIFACTS_DIR}/iree/PoseNet_fp32/PoseNet_fp32.mlir"
+    "${_ROOT_ARTIFACTS_DIR}/iree/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/MobileBertSquad_fp32.mlir"
   MODULE_FILE_NAME
-    "${_ROOT_ARTIFACTS_DIR}/iree/PoseNet_fp32/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9/PoseNet_fp32.vmfb"
+    "${_ROOT_ARTIFACTS_DIR}/iree/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/c7eea358-d8d2-4199-9d75-bb741c399b1b/MobileBertSquad_fp32.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-input-type=tosa"
+    "--iree-vulkan-target-triple=adreno-unknown-linux-android31"
+  PUBLIC
+)
+
+add_dependencies(iree-benchmark-suites
+  ${_PACKAGE_NAME}_iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-c7eea358-d8d2-4199-9d75-bb741c399b1b
+)
+
+# Compile the module "${_ROOT_ARTIFACTS_DIR}/iree/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/d3038b95-c889-456a-bff6-5cbabd10f1ad/MobileBertSquad_fp32.vmfb"
+iree_bytecode_module(
+  NAME
+    "iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-d3038b95-c889-456a-bff6-5cbabd10f1ad"
+  SRC
+    "${_ROOT_ARTIFACTS_DIR}/iree/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/MobileBertSquad_fp32.mlir"
+  MODULE_FILE_NAME
+    "${_ROOT_ARTIFACTS_DIR}/iree/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/d3038b95-c889-456a-bff6-5cbabd10f1ad/MobileBertSquad_fp32.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-input-type=tosa"
+    "--iree-vulkan-target-triple=adreno-unknown-linux-android31"
+    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+  PUBLIC
+)
+
+add_dependencies(iree-benchmark-suites
+  ${_PACKAGE_NAME}_iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-d3038b95-c889-456a-bff6-5cbabd10f1ad
+)
+
+# Compile the module "${_ROOT_ARTIFACTS_DIR}/iree/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/8da35f2b-a042-4b7d-9dcf-5ebbc1728765/MobileBertSquad_fp32.vmfb"
+iree_bytecode_module(
+  NAME
+    "iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-8da35f2b-a042-4b7d-9dcf-5ebbc1728765"
+  SRC
+    "${_ROOT_ARTIFACTS_DIR}/iree/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/MobileBertSquad_fp32.mlir"
+  MODULE_FILE_NAME
+    "${_ROOT_ARTIFACTS_DIR}/iree/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/8da35f2b-a042-4b7d-9dcf-5ebbc1728765/MobileBertSquad_fp32.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-input-type=tosa"
+    "--iree-vulkan-target-triple=valhall-unknown-linux-android31"
+  PUBLIC
+)
+
+add_dependencies(iree-benchmark-suites
+  ${_PACKAGE_NAME}_iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-8da35f2b-a042-4b7d-9dcf-5ebbc1728765
+)
+
+# Compile the module "${_ROOT_ARTIFACTS_DIR}/iree/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/32a56c8d-cc6c-41b8-8620-1f8eda0b8223/MobileBertSquad_fp32.vmfb"
+iree_bytecode_module(
+  NAME
+    "iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-32a56c8d-cc6c-41b8-8620-1f8eda0b8223"
+  SRC
+    "${_ROOT_ARTIFACTS_DIR}/iree/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/MobileBertSquad_fp32.mlir"
+  MODULE_FILE_NAME
+    "${_ROOT_ARTIFACTS_DIR}/iree/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/32a56c8d-cc6c-41b8-8620-1f8eda0b8223/MobileBertSquad_fp32.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-input-type=tosa"
+    "--iree-vulkan-target-triple=valhall-unknown-linux-android31"
+    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+  PUBLIC
+)
+
+add_dependencies(iree-benchmark-suites
+  ${_PACKAGE_NAME}_iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-32a56c8d-cc6c-41b8-8620-1f8eda0b8223
+)
+
+# Compile the module "${_ROOT_ARTIFACTS_DIR}/iree/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/6b601a8d-4824-42e0-bcc6-500c0c3fa346/MobileBertSquad_fp32.vmfb"
+iree_bytecode_module(
+  NAME
+    "iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-6b601a8d-4824-42e0-bcc6-500c0c3fa346"
+  SRC
+    "${_ROOT_ARTIFACTS_DIR}/iree/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/MobileBertSquad_fp32.mlir"
+  MODULE_FILE_NAME
+    "${_ROOT_ARTIFACTS_DIR}/iree/cc69d69f-6d1f-4a1a-a31e-e021888d0d28_MobileBertSquad_fp32/6b601a8d-4824-42e0-bcc6-500c0c3fa346/MobileBertSquad_fp32.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-input-type=tosa"
+    "--iree-vulkan-target-triple=valhall-unknown-linux-android31"
+    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-hal-benchmark-dispatch-repeat-count=32"
+  PUBLIC
+)
+
+add_dependencies(iree-benchmark-suites
+  ${_PACKAGE_NAME}_iree-module-cc69d69f-6d1f-4a1a-a31e-e021888d0d28-6b601a8d-4824-42e0-bcc6-500c0c3fa346
+)
+
+# Import the TFLite model "${_ROOT_ARTIFACTS_DIR}/models/e3997104-a3d2-46b4-9fbf-39069906d123_MobileBertSquad_int8.tflite"
+iree_import_tflite_model(
+  TARGET_NAME
+    "${_PACKAGE_NAME}_iree-imported-model-e3997104-a3d2-46b4-9fbf-39069906d123"
+  SOURCE
+    "${_ROOT_ARTIFACTS_DIR}/models/e3997104-a3d2-46b4-9fbf-39069906d123_MobileBertSquad_int8.tflite"
+  OUTPUT_MLIR_FILE
+    "${_ROOT_ARTIFACTS_DIR}/iree/e3997104-a3d2-46b4-9fbf-39069906d123_MobileBertSquad_int8/MobileBertSquad_int8.mlir"
+)
+
+add_dependencies(iree-benchmark-import-models
+  ${_PACKAGE_NAME}_iree-imported-model-e3997104-a3d2-46b4-9fbf-39069906d123
+)
+
+# Compile the module "${_ROOT_ARTIFACTS_DIR}/iree/e3997104-a3d2-46b4-9fbf-39069906d123_MobileBertSquad_int8/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9/MobileBertSquad_int8.vmfb"
+iree_bytecode_module(
+  NAME
+    "iree-module-e3997104-a3d2-46b4-9fbf-39069906d123-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
+  SRC
+    "${_ROOT_ARTIFACTS_DIR}/iree/e3997104-a3d2-46b4-9fbf-39069906d123_MobileBertSquad_int8/MobileBertSquad_int8.mlir"
+  MODULE_FILE_NAME
+    "${_ROOT_ARTIFACTS_DIR}/iree/e3997104-a3d2-46b4-9fbf-39069906d123_MobileBertSquad_int8/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9/MobileBertSquad_int8.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
@@ -1187,25 +1283,6 @@ add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-78eab9e5-9ff1-4769-9b55-933c81cc9a0f-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
 )
 
-# Compile the module "${_ROOT_ARTIFACTS_DIR}/iree/78eab9e5-9ff1-4769-9b55-933c81cc9a0f_MobileNetV1_fp32/cdf579a9-5446-403b-a991-802a6c702e65/MobileNetV1_fp32.vmfb"
-iree_bytecode_module(
-  NAME
-    "iree-module-78eab9e5-9ff1-4769-9b55-933c81cc9a0f-cdf579a9-5446-403b-a991-802a6c702e65"
-  SRC
-    "${_ROOT_ARTIFACTS_DIR}/iree/78eab9e5-9ff1-4769-9b55-933c81cc9a0f_MobileNetV1_fp32/MobileNetV1_fp32.mlir"
-  MODULE_FILE_NAME
-    "${_ROOT_ARTIFACTS_DIR}/iree/78eab9e5-9ff1-4769-9b55-933c81cc9a0f_MobileNetV1_fp32/1f2adf49-282e-4aff-9d4f-e63b1621f1e8/MobileNetV1_fp32.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
-  PUBLIC
-)
-
-add_dependencies(iree-benchmark-suites
-  ${_PACKAGE_NAME}_iree-module-78eab9e5-9ff1-4769-9b55-933c81cc9a0f-1f2adf49-282e-4aff-9d4f-e63b1621f1e8
-)
-
 # Compile the module "${_ROOT_ARTIFACTS_DIR}/iree/78eab9e5-9ff1-4769-9b55-933c81cc9a0f_MobileNetV1_fp32/6d0d5716-5525-44ad-b71d-8075ee1583a6/MobileNetV1_fp32.vmfb"
 iree_bytecode_module(
   NAME
@@ -1338,6 +1415,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
     "--iree-flow-mmt4d-target-options=arch=aarch64"
+    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
   PUBLIC
 )
 
@@ -1435,178 +1513,6 @@ iree_bytecode_module(
   FLAGS
     "--iree-hal-target-backends=vulkan-spirv"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
-    "--iree-flow-mmt4d-target-options=arch=aarch64"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
-  PUBLIC
-)
-
-add_dependencies(iree-benchmark-suites
-  ${_PACKAGE_NAME}_iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-32a56c8d-cc6c-41b8-8620-1f8eda0b8223
-)
-
-# Compile the module "${_ROOT_ARTIFACTS_DIR}/iree/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32/6b601a8d-4824-42e0-bcc6-500c0c3fa346/MobileNetV2_fp32.vmfb"
-iree_bytecode_module(
-  NAME
-    "iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-6b601a8d-4824-42e0-bcc6-500c0c3fa346"
-  SRC
-    "${_ROOT_ARTIFACTS_DIR}/iree/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32/MobileNetV2_fp32.mlir"
-  MODULE_FILE_NAME
-    "${_ROOT_ARTIFACTS_DIR}/iree/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32/6b601a8d-4824-42e0-bcc6-500c0c3fa346/MobileNetV2_fp32.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=vulkan-spirv"
-    "--iree-input-type=tosa"
-    "--iree-vulkan-target-triple=valhall-unknown-linux-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
-    "--iree-hal-benchmark-dispatch-repeat-count=32"
-  PUBLIC
-)
-
-add_dependencies(iree-benchmark-suites
-  ${_PACKAGE_NAME}_iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-6b601a8d-4824-42e0-bcc6-500c0c3fa346
-)
-
-# Compile the module "${_ROOT_ARTIFACTS_DIR}/iree/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32/75336abd-8108-462c-9ce3-15443e3f32f4/MobileNetV2_fp32.vmfb"
-iree_bytecode_module(
-  NAME
-    "iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-75336abd-8108-462c-9ce3-15443e3f32f4"
-  SRC
-    "${_ROOT_ARTIFACTS_DIR}/iree/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32/MobileNetV2_fp32.mlir"
-  MODULE_FILE_NAME
-    "${_ROOT_ARTIFACTS_DIR}/iree/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32/75336abd-8108-462c-9ce3-15443e3f32f4/MobileNetV2_fp32.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=vmvx"
-    "--iree-input-type=tosa"
-  PUBLIC
-)
-
-add_dependencies(iree-benchmark-suites
-  ${_PACKAGE_NAME}_iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-75336abd-8108-462c-9ce3-15443e3f32f4
-)
-
-# Import the TFLite model "${_ROOT_ARTIFACTS_DIR}/models/58855e40-eba9-4a71-b878-6b35e3460244_MobileNetV3Small_fp32.tflite"
-iree_import_tflite_model(
-  TARGET_NAME
-    "${_PACKAGE_NAME}_iree-imported-model-58855e40-eba9-4a71-b878-6b35e3460244"
-  SOURCE
-    "${_ROOT_ARTIFACTS_DIR}/models/58855e40-eba9-4a71-b878-6b35e3460244_MobileNetV3Small_fp32.tflite"
-  OUTPUT_MLIR_FILE
-    "${_ROOT_ARTIFACTS_DIR}/iree/58855e40-eba9-4a71-b878-6b35e3460244_MobileNetV3Small_fp32/MobileNetV3Small_fp32.mlir"
-)
-
-add_dependencies(iree-benchmark-import-models
-  ${_PACKAGE_NAME}_iree-imported-model-58855e40-eba9-4a71-b878-6b35e3460244
-)
-
-# Compile the module "${_ROOT_ARTIFACTS_DIR}/iree/58855e40-eba9-4a71-b878-6b35e3460244_MobileNetV3Small_fp32/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9/MobileNetV3Small_fp32.vmfb"
-iree_bytecode_module(
-  NAME
-    "iree-module-58855e40-eba9-4a71-b878-6b35e3460244-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
-  SRC
-    "${_ROOT_ARTIFACTS_DIR}/iree/58855e40-eba9-4a71-b878-6b35e3460244_MobileNetV3Small_fp32/MobileNetV3Small_fp32.mlir"
-  MODULE_FILE_NAME
-    "${_ROOT_ARTIFACTS_DIR}/iree/MobileNetV2_fp32/8da35f2b-a042-4b7d-9dcf-5ebbc1728765/MobileNetV2_fp32.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=vulkan-spirv"
-    "--iree-input-type=tosa"
-    "--iree-vulkan-target-triple=valhall-unknown-linux-android31"
-  PUBLIC
-)
-
-add_dependencies(iree-benchmark-suites
-  ${_PACKAGE_NAME}_iree-module-MobileNetV2_fp32-8da35f2b-a042-4b7d-9dcf-5ebbc1728765
-)
-
-# Compile the module "${_ROOT_ARTIFACTS_DIR}/iree/MobileNetV2_fp32/c7eea358-d8d2-4199-9d75-bb741c399b1b/MobileNetV2_fp32.vmfb"
-iree_bytecode_module(
-  NAME
-    "iree-module-MobileNetV2_fp32-c7eea358-d8d2-4199-9d75-bb741c399b1b"
-  SRC
-    "${_ROOT_ARTIFACTS_DIR}/iree/MobileNetV2_fp32/MobileNetV2_fp32.mlir"
-  MODULE_FILE_NAME
-    "${_ROOT_ARTIFACTS_DIR}/iree/MobileNetV2_fp32/c7eea358-d8d2-4199-9d75-bb741c399b1b/MobileNetV2_fp32.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=vulkan-spirv"
-    "--iree-input-type=tosa"
-    "--iree-vulkan-target-triple=adreno-unknown-linux-android31"
-  PUBLIC
-)
-
-add_dependencies(iree-benchmark-suites
-  ${_PACKAGE_NAME}_iree-module-MobileNetV2_fp32-c7eea358-d8d2-4199-9d75-bb741c399b1b
-)
-
-# Compile the module "${_ROOT_ARTIFACTS_DIR}/iree/MobileNetV2_fp32/d3038b95-c889-456a-bff6-5cbabd10f1ad/MobileNetV2_fp32.vmfb"
-iree_bytecode_module(
-  NAME
-    "iree-module-MobileNetV2_fp32-d3038b95-c889-456a-bff6-5cbabd10f1ad"
-  SRC
-    "${_ROOT_ARTIFACTS_DIR}/iree/MobileNetV2_fp32/MobileNetV2_fp32.mlir"
-  MODULE_FILE_NAME
-    "${_ROOT_ARTIFACTS_DIR}/iree/MobileNetV2_fp32/d3038b95-c889-456a-bff6-5cbabd10f1ad/MobileNetV2_fp32.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=vulkan-spirv"
-    "--iree-input-type=tosa"
-    "--iree-vulkan-target-triple=adreno-unknown-linux-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
-  PUBLIC
-)
-
-add_dependencies(iree-benchmark-suites
-  ${_PACKAGE_NAME}_iree-module-MobileNetV2_fp32-d3038b95-c889-456a-bff6-5cbabd10f1ad
-)
-
-# Compile the module "${_ROOT_ARTIFACTS_DIR}/iree/MobileNetV2_fp32/d463322c-24e6-4685-85ca-d541b41a405f/MobileNetV2_fp32.vmfb"
-iree_bytecode_module(
-  NAME
-    "iree-module-MobileNetV2_fp32-d463322c-24e6-4685-85ca-d541b41a405f"
-  SRC
-    "${_ROOT_ARTIFACTS_DIR}/iree/MobileNetV2_fp32/MobileNetV2_fp32.mlir"
-  MODULE_FILE_NAME
-    "${_ROOT_ARTIFACTS_DIR}/iree/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32/70b823ca-2807-4531-8c00-e02af7d70466/MobileNetV2_fp32.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-vulkan-target-triple=adreno-unknown-linux-android31"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
-    "--iree-hal-benchmark-dispatch-repeat-count=16"
-  PUBLIC
-)
-
-add_dependencies(iree-benchmark-suites
-  ${_PACKAGE_NAME}_iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-70b823ca-2807-4531-8c00-e02af7d70466
-)
-
-# Compile the module "${_ROOT_ARTIFACTS_DIR}/iree/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32/8da35f2b-a042-4b7d-9dcf-5ebbc1728765/MobileNetV2_fp32.vmfb"
-iree_bytecode_module(
-  NAME
-    "iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-8da35f2b-a042-4b7d-9dcf-5ebbc1728765"
-  SRC
-    "${_ROOT_ARTIFACTS_DIR}/iree/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32/MobileNetV2_fp32.mlir"
-  MODULE_FILE_NAME
-    "${_ROOT_ARTIFACTS_DIR}/iree/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32/8da35f2b-a042-4b7d-9dcf-5ebbc1728765/MobileNetV2_fp32.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-vulkan-target-triple=valhall-unknown-linux-android31"
-  PUBLIC
-)
-
-add_dependencies(iree-benchmark-suites
-  ${_PACKAGE_NAME}_iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-8da35f2b-a042-4b7d-9dcf-5ebbc1728765
-)
-
-# Compile the module "${_ROOT_ARTIFACTS_DIR}/iree/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32/32a56c8d-cc6c-41b8-8620-1f8eda0b8223/MobileNetV2_fp32.vmfb"
-iree_bytecode_module(
-  NAME
-    "iree-module-7d45f8e5-bb5e-48d0-928d-8f125104578f-32a56c8d-cc6c-41b8-8620-1f8eda0b8223"
-  SRC
-    "${_ROOT_ARTIFACTS_DIR}/iree/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32/MobileNetV2_fp32.mlir"
-  MODULE_FILE_NAME
-    "${_ROOT_ARTIFACTS_DIR}/iree/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32/32a56c8d-cc6c-41b8-8620-1f8eda0b8223/MobileNetV2_fp32.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=valhall-unknown-linux-android31"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
   PUBLIC
@@ -1625,7 +1531,7 @@ iree_bytecode_module(
   MODULE_FILE_NAME
     "${_ROOT_ARTIFACTS_DIR}/iree/7d45f8e5-bb5e-48d0-928d-8f125104578f_MobileNetV2_fp32/6b601a8d-4824-42e0-bcc6-500c0c3fa346/MobileNetV2_fp32.vmfb"
   FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-hal-target-backends=vulkan-spirv"
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=valhall-unknown-linux-android31"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
@@ -1743,65 +1649,6 @@ iree_bytecode_module(
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
     "--iree-flow-mmt4d-target-options=arch=aarch64"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
-  PUBLIC
-)
-
-add_dependencies(iree-benchmark-suites
-  ${_PACKAGE_NAME}_iree-module-MobileNetV2_fp32-d463322c-24e6-4685-85ca-d541b41a405f
-)
-
-# Compile the module "${_ROOT_ARTIFACTS_DIR}/iree/MobileNetV2_fp32/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9/MobileNetV2_fp32.vmfb"
-iree_bytecode_module(
-  NAME
-    "iree-module-MobileNetV2_fp32-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9"
-  SRC
-    "${_ROOT_ARTIFACTS_DIR}/iree/MobileNetV2_fp32/MobileNetV2_fp32.mlir"
-  MODULE_FILE_NAME
-    "${_ROOT_ARTIFACTS_DIR}/iree/MobileNetV2_fp32/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9/MobileNetV2_fp32.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
-  PUBLIC
-)
-
-add_dependencies(iree-benchmark-suites
-  ${_PACKAGE_NAME}_iree-module-58855e40-eba9-4a71-b878-6b35e3460244-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
-)
-
-# Compile the module "${_ROOT_ARTIFACTS_DIR}/iree/58855e40-eba9-4a71-b878-6b35e3460244_MobileNetV3Small_fp32/1f2adf49-282e-4aff-9d4f-e63b1621f1e8/MobileNetV3Small_fp32.vmfb"
-iree_bytecode_module(
-  NAME
-    "iree-module-58855e40-eba9-4a71-b878-6b35e3460244-1f2adf49-282e-4aff-9d4f-e63b1621f1e8"
-  SRC
-    "${_ROOT_ARTIFACTS_DIR}/iree/58855e40-eba9-4a71-b878-6b35e3460244_MobileNetV3Small_fp32/MobileNetV3Small_fp32.mlir"
-  MODULE_FILE_NAME
-    "${_ROOT_ARTIFACTS_DIR}/iree/58855e40-eba9-4a71-b878-6b35e3460244_MobileNetV3Small_fp32/1f2adf49-282e-4aff-9d4f-e63b1621f1e8/MobileNetV3Small_fp32.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
-  PUBLIC
-)
-
-add_dependencies(iree-benchmark-suites
-  ${_PACKAGE_NAME}_iree-module-58855e40-eba9-4a71-b878-6b35e3460244-1f2adf49-282e-4aff-9d4f-e63b1621f1e8
-)
-
-# Compile the module "${_ROOT_ARTIFACTS_DIR}/iree/58855e40-eba9-4a71-b878-6b35e3460244_MobileNetV3Small_fp32/d463322c-24e6-4685-85ca-d541b41a405f/MobileNetV3Small_fp32.vmfb"
-iree_bytecode_module(
-  NAME
-    "iree-module-58855e40-eba9-4a71-b878-6b35e3460244-d463322c-24e6-4685-85ca-d541b41a405f"
-  SRC
-    "${_ROOT_ARTIFACTS_DIR}/iree/58855e40-eba9-4a71-b878-6b35e3460244_MobileNetV3Small_fp32/MobileNetV3Small_fp32.mlir"
-  MODULE_FILE_NAME
-    "${_ROOT_ARTIFACTS_DIR}/iree/58855e40-eba9-4a71-b878-6b35e3460244_MobileNetV3Small_fp32/d463322c-24e6-4685-85ca-d541b41a405f/MobileNetV3Small_fp32.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
-    "--iree-flow-mmt4d-target-options=arch=aarch64"
   PUBLIC
 )
 
@@ -1968,11 +1815,12 @@ iree_bytecode_module(
   SRC
     "${_ROOT_ARTIFACTS_DIR}/iree/bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8/PersonDetect_int8.mlir"
   MODULE_FILE_NAME
-    "${_ROOT_ARTIFACTS_DIR}/iree/bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8/1f2adf49-282e-4aff-9d4f-e63b1621f1e8/PersonDetect_int8.vmfb"
+    "${_ROOT_ARTIFACTS_DIR}/iree/bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9/PersonDetect_int8.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=aarch64-none-linux-android29"
+    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvm-target-cpu=cascadelake"
   PUBLIC
 )
 
@@ -2009,91 +1857,6 @@ iree_bytecode_module(
     "${_ROOT_ARTIFACTS_DIR}/iree/bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8/PersonDetect_int8.mlir"
   MODULE_FILE_NAME
     "${_ROOT_ARTIFACTS_DIR}/iree/bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8/cdf579a9-5446-403b-a991-802a6c702e65/PersonDetect_int8.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=riscv64-pc-linux-gnu"
-    "--iree-llvm-target-cpu=generic-rv64"
-    "--iree-llvm-target-abi=lp64d"
-    "--iree-llvm-target-cpu-features=+m,+a,+f,+d,+v"
-    "--riscv-v-vector-bits-min=512"
-    "--riscv-v-fixed-length-vector-lmul-max=8"
-  PUBLIC
-)
-
-add_dependencies(iree-benchmark-suites
-  ${_PACKAGE_NAME}_iree-module-bc1338be-e3df-44fd-82e4-40ba9560a073-cdf579a9-5446-403b-a991-802a6c702e65
-)
-
-# Compile the module "${_ROOT_ARTIFACTS_DIR}/iree/bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8/6d9ce240-ec14-4d8f-a8e4-1b20aa17b4e4/PersonDetect_int8.vmfb"
-iree_bytecode_module(
-  NAME
-    "iree-module-bc1338be-e3df-44fd-82e4-40ba9560a073-6d9ce240-ec14-4d8f-a8e4-1b20aa17b4e4"
-  SRC
-    "${_ROOT_ARTIFACTS_DIR}/iree/bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8/PersonDetect_int8.mlir"
-  MODULE_FILE_NAME
-    "${_ROOT_ARTIFACTS_DIR}/iree/bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8/6d9ce240-ec14-4d8f-a8e4-1b20aa17b4e4/PersonDetect_int8.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
-  PUBLIC
-)
-
-add_dependencies(iree-benchmark-suites
-  ${_PACKAGE_NAME}_iree-module-bc1338be-e3df-44fd-82e4-40ba9560a073-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
-)
-
-# Compile the module "${_ROOT_ARTIFACTS_DIR}/iree/bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8/cdf579a9-5446-403b-a991-802a6c702e65/PersonDetect_int8.vmfb"
-iree_bytecode_module(
-  NAME
-    "iree-module-bc1338be-e3df-44fd-82e4-40ba9560a073-cdf579a9-5446-403b-a991-802a6c702e65"
-  SRC
-    "${_ROOT_ARTIFACTS_DIR}/iree/bc1338be-e3df-44fd-82e4-40ba9560a073_PersonDetect_int8/PersonDetect_int8.mlir"
-  MODULE_FILE_NAME
-    "${_ROOT_ARTIFACTS_DIR}/iree/4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8/e7e18b0f-c72d-4f1c-89b1-5afee70df6e9/EfficientNet_int8.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
-  PUBLIC
-)
-
-add_dependencies(iree-benchmark-suites
-  ${_PACKAGE_NAME}_iree-module-4a6f545e-1b4e-41a5-9236-792aa578184b-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
-)
-
-# Compile the module "${_ROOT_ARTIFACTS_DIR}/iree/4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8/6d0d5716-5525-44ad-b71d-8075ee1583a6/EfficientNet_int8.vmfb"
-iree_bytecode_module(
-  NAME
-    "iree-module-4a6f545e-1b4e-41a5-9236-792aa578184b-6d0d5716-5525-44ad-b71d-8075ee1583a6"
-  SRC
-    "${_ROOT_ARTIFACTS_DIR}/iree/4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8/EfficientNet_int8.mlir"
-  MODULE_FILE_NAME
-    "${_ROOT_ARTIFACTS_DIR}/iree/4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8/6d0d5716-5525-44ad-b71d-8075ee1583a6/EfficientNet_int8.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvm-target-cpu=cascadelake"
-    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
-  PUBLIC
-)
-
-add_dependencies(iree-benchmark-suites
-  ${_PACKAGE_NAME}_iree-module-4a6f545e-1b4e-41a5-9236-792aa578184b-6d0d5716-5525-44ad-b71d-8075ee1583a6
-)
-
-# Compile the module "${_ROOT_ARTIFACTS_DIR}/iree/4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8/cdf579a9-5446-403b-a991-802a6c702e65/EfficientNet_int8.vmfb"
-iree_bytecode_module(
-  NAME
-    "iree-module-4a6f545e-1b4e-41a5-9236-792aa578184b-cdf579a9-5446-403b-a991-802a6c702e65"
-  SRC
-    "${_ROOT_ARTIFACTS_DIR}/iree/4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8/EfficientNet_int8.mlir"
-  MODULE_FILE_NAME
-    "${_ROOT_ARTIFACTS_DIR}/iree/4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8/cdf579a9-5446-403b-a991-802a6c702e65/EfficientNet_int8.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
     "--iree-input-type=tosa"
@@ -2166,6 +1929,27 @@ iree_bytecode_module(
 
 add_dependencies(iree-benchmark-suites
   ${_PACKAGE_NAME}_iree-module-4a6f545e-1b4e-41a5-9236-792aa578184b-e7e18b0f-c72d-4f1c-89b1-5afee70df6e9
+)
+
+# Compile the module "${_ROOT_ARTIFACTS_DIR}/iree/4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8/6d0d5716-5525-44ad-b71d-8075ee1583a6/EfficientNet_int8.vmfb"
+iree_bytecode_module(
+  NAME
+    "iree-module-4a6f545e-1b4e-41a5-9236-792aa578184b-6d0d5716-5525-44ad-b71d-8075ee1583a6"
+  SRC
+    "${_ROOT_ARTIFACTS_DIR}/iree/4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8/EfficientNet_int8.mlir"
+  MODULE_FILE_NAME
+    "${_ROOT_ARTIFACTS_DIR}/iree/4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8/6d0d5716-5525-44ad-b71d-8075ee1583a6/EfficientNet_int8.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=tosa"
+    "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
+    "--iree-llvm-target-cpu=cascadelake"
+    "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+  PUBLIC
+)
+
+add_dependencies(iree-benchmark-suites
+  ${_PACKAGE_NAME}_iree-module-4a6f545e-1b4e-41a5-9236-792aa578184b-6d0d5716-5525-44ad-b71d-8075ee1583a6
 )
 
 # Compile the module "${_ROOT_ARTIFACTS_DIR}/iree/4a6f545e-1b4e-41a5-9236-792aa578184b_EfficientNet_int8/cdf579a9-5446-403b-a991-802a6c702e65/EfficientNet_int8.vmfb"
