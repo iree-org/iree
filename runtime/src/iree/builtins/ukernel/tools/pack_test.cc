@@ -173,7 +173,7 @@ static void pack_test(const iree_uk_pack_type_t& type) {
   for (const auto& shape : untransposed_out_shapes) {
     for (bool transpose_inner : {false, true}) {
       for (bool transpose_outer : {false, true}) {
-        iree_uk_pack_params_t params;
+        iree_uk_pack_params_t params = {};
         params.type = type;
         params.in_size0 = shape.size0 * shape.size2;
         params.in_size1 = shape.size1 * shape.size3;
