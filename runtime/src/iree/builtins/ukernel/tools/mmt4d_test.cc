@@ -49,7 +49,7 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/cpu.h"
-#include "iree/builtins/ukernel/tools/mmt4d_test_utils.h"
+#include "iree/builtins/ukernel/tools/ukernel_test_utils.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
@@ -105,17 +105,17 @@ static void iree_mmt4d_reference(const iree_uk_mmt4d_params_t& params) {
 
 static void test_one_matmul_using_given_lhs_rhs(
     const iree_uk_mmt4d_params_t& shared_params,
-    iree_mmt4d_test_random_engine_t* engine) {
+    iree_uk_test_random_engine_t* engine) {
   assert(!shared_params.out_buffer);
 
   iree_uk_mmt4d_params_t reference_params;
   memcpy(&reference_params, &shared_params, sizeof shared_params);
-  iree_uk_ssize_t out_buffer_size =
-      iree_uk_mmt4d_out_buffer_size(&shared_params);
-  reference_params.out_buffer = malloc(out_buffer_size);
   iree_uk_type_t out_type = iree_uk_mmt4d_out_type(shared_params.type);
-  write_random_buffer(reference_params.out_buffer, out_buffer_size, out_type,
-                      engine);
+  iree_uk_ssize_t out_buffer_size = iree_uk_test_2d_buffer_length(
+      out_type, shared_params.M, shared_params.out_stride);
+  reference_params.out_buffer = malloc(out_buffer_size);
+  iree_uk_test_write_random_buffer(reference_params.out_buffer, out_buffer_size,
+                                   out_type, engine);
 
   iree_uk_mmt4d_params_t actual_params;
   memcpy(&actual_params, &shared_params, sizeof shared_params);
@@ -142,14 +142,19 @@ static void test_one_matmul_using_given_lhs_rhs(
              out_buffer_size)) {
     const auto& p = actual_params;
     fprintf(stderr, "mmt4d test failure with the following params:\n");
-    fprintf(stderr, "  type=%s\n", get_mmt4d_type_str(&p));
+    char types_str[32];
+    iree_uk_test_type_triple_str(types_str, sizeof types_str, p.type);
+    fprintf(stderr, "  types: %s\n", types_str);
     fprintf(stderr, "  flags: accumulate=%d\n",
-            (int)(p.flags & IREE_UK_FLAG_ACCUMULATE));
+            (bool)(p.flags & IREE_UK_FLAG_ACCUMULATE));
     fprintf(stderr, "  M=%d, N=%d, K=%d\n", (int)p.M, (int)p.N, (int)p.K);
     fprintf(stderr, "  M0=%d, N0=%d, K0=%d\n", (int)p.M0, (int)p.N0, (int)p.K0);
     fprintf(stderr, "  lhs_stride=%zu, rhs_stride=%zu, out_stride=%zu\n",
             (size_t)p.lhs_stride, (size_t)p.rhs_stride, (size_t)p.out_stride);
-    fprintf(stderr, "  cpu features: %s\n", get_cpu_features_str(&p));
+    char cpu_feat_str[32];
+    iree_uk_test_cpu_features_str(cpu_feat_str, sizeof cpu_feat_str, p.cpu_data,
+                                  1);
+    fprintf(stderr, "  cpu features: %s\n", cpu_feat_str);
     // Don't even try to pretty-print matrices. See the comment at the top of
     // this file. Don't try to use GTest primitives to show expected vs actual
     // since that would require dispatching to type-specific code paths.
@@ -169,7 +174,7 @@ static void test_one_matmul_using_given_lhs_rhs(
 
 static void test_one_matmul_creating_lhs_rhs_for_given_shape(
     const iree_uk_mmt4d_params_t& shared_params,
-    iree_mmt4d_test_random_engine_t* engine) {
+    iree_uk_test_random_engine_t* engine) {
   iree_uk_mmt4d_params_t params;
   memcpy(&params, &shared_params, sizeof params);
   assert(!params.lhs_buffer);
@@ -178,22 +183,26 @@ static void test_one_matmul_creating_lhs_rhs_for_given_shape(
   assert(!params.lhs_stride);
   assert(!params.rhs_stride);
   assert(!params.out_stride);
-  // Populate strides first - they are read by the get_*_buffer_size helper.
+  // Populate strides first - we need them below to compute buffer lengths.
   // Randomly make strides either tight or not to exercise all cases.
   params.lhs_stride = params.K * params.M0 * params.K0 +
-                      iree_mmt4d_test_random_engine_get_0_or_1(engine);
+                      iree_uk_test_random_engine_get_0_or_1(engine);
   params.rhs_stride = params.K * params.N0 * params.K0 +
-                      iree_mmt4d_test_random_engine_get_0_or_1(engine);
+                      iree_uk_test_random_engine_get_0_or_1(engine);
   params.out_stride = params.N * params.M0 * params.N0 +
-                      iree_mmt4d_test_random_engine_get_0_or_1(engine);
-  iree_uk_ssize_t lhs_buffer_size = iree_uk_mmt4d_lhs_buffer_size(&params);
-  iree_uk_ssize_t rhs_buffer_size = iree_uk_mmt4d_rhs_buffer_size(&params);
+                      iree_uk_test_random_engine_get_0_or_1(engine);
   iree_uk_type_t lhs_type = iree_uk_mmt4d_lhs_type(params.type);
   iree_uk_type_t rhs_type = iree_uk_mmt4d_rhs_type(params.type);
+  iree_uk_ssize_t lhs_buffer_size =
+      iree_uk_test_2d_buffer_length(lhs_type, params.M, params.lhs_stride);
+  iree_uk_ssize_t rhs_buffer_size =
+      iree_uk_test_2d_buffer_length(rhs_type, params.N, params.rhs_stride);
   void* lhs_buffer = malloc(lhs_buffer_size);
   void* rhs_buffer = malloc(rhs_buffer_size);
-  write_random_buffer(lhs_buffer, lhs_buffer_size, lhs_type, engine);
-  write_random_buffer(rhs_buffer, rhs_buffer_size, rhs_type, engine);
+  iree_uk_test_write_random_buffer(lhs_buffer, lhs_buffer_size, lhs_type,
+                                   engine);
+  iree_uk_test_write_random_buffer(rhs_buffer, rhs_buffer_size, rhs_type,
+                                   engine);
   params.lhs_buffer = lhs_buffer;
   params.rhs_buffer = rhs_buffer;
   test_one_matmul_using_given_lhs_rhs(params, engine);
@@ -203,7 +212,7 @@ static void test_one_matmul_creating_lhs_rhs_for_given_shape(
 
 static void test_matmuls_for_various_MNK_shapes_and_flags(
     const iree_uk_mmt4d_params_t& shared_params,
-    iree_mmt4d_test_random_engine_t* engine) {
+    iree_uk_test_random_engine_t* engine) {
   iree_uk_mmt4d_params_t params;
   memcpy(&params, &shared_params, sizeof params);
   assert(params.M == 0);
@@ -256,8 +265,7 @@ static void mmt4d_test(iree_uk_mmt4d_type_t type, int M0, int N0, int K0,
   // potential downside of repeating the same pseudorandom sequence is OK
   // because any pseudorandom sequence should be equally good at coverage, and
   // different testcases tend to use different tile shapes anyway.
-  iree_mmt4d_test_random_engine_t* engine =
-      iree_mmt4d_test_random_engine_create();
+  iree_uk_test_random_engine_t* engine = iree_uk_test_random_engine_create();
   iree_uk_mmt4d_params_t params;
   memset(&params, 0, sizeof params);
   params.type = type;
@@ -278,17 +286,19 @@ static void mmt4d_test(iree_uk_mmt4d_type_t type, int M0, int N0, int K0,
     params.cpu_data = local_cpu_data_with_bit;
     // Check if the CPU supports the feature (otherwise, we crash).
     bool supported = iree_cpu_data_field(0) & params.cpu_data[0];
+    char cpu_feat_str[32];
+    iree_uk_test_cpu_features_str(cpu_feat_str, sizeof cpu_feat_str,
+                                  params.cpu_data, 1);
     if (supported) {
       // Run with the optional CPU feature.
-      printf("Device supports CPU feature: %s\n",
-             get_cpu_features_str(&params));
+      printf("Device supports CPU feature: %s\n", cpu_feat_str);
       test_matmuls_for_various_MNK_shapes_and_flags(params, engine);
     } else {
       printf("Skipped: device does not support CPU feature: %s\n",
-             get_cpu_features_str(&params));
+             cpu_feat_str);
     }
   }
-  iree_mmt4d_test_random_engine_destroy(engine);
+  iree_uk_test_random_engine_destroy(engine);
 }
 
 #define MMT4D_TEST(type, M0, N0, K0, test_suffix, feature_bit)      \

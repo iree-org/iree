@@ -46,6 +46,9 @@
 //     CHECK-DAG:    %[[C8:.+]] = arith.constant 8 : i32
 //     CHECK-DAG:    %[[C16:.+]] = arith.constant 16 : i32
 //     CHECK-DAG:    %[[C32:.+]] = arith.constant 32 : i32
+//     CHECK-DAG:    %[[C4I:.+]] = arith.constant 4 : index
+//     CHECK-DAG:    %[[C32I:.+]] = arith.constant 32 : index
+//     CHECK-DAG:    %[[IDENTITY:.+]] = arith.constant 0.000000e+00 : f32
 //     CHECK-DAG:    %[[CF:.+]] = arith.constant 1.000000e+00 : f32
 //     CHECK-DAG:    %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<4xf32>
 //     CHECK-DAG:    %[[TID:.+]] = gpu.thread_id  x
@@ -69,11 +72,23 @@
 //         CHECK:    %[[WID:.+]] = arith.divui %{{.*}}, %{{.*}} : index
 //         CHECK:    memref.store %[[R6]], %[[ALLOC]][%[[WID]]] : memref<4xf32, 3>
 //         CHECK:    gpu.barrier
-//         CHECK:    %[[B:.+]] = vector.transfer_read %[[ALLOC]][%[[C0]]], %{{.*}} {in_bounds = [true]} : memref<4xf32, 3>, vector<4xf32>
-//         CHECK:    %[[R7:.+]] = vector.reduction <add>, %[[B]] : vector<4xf32> into f32
-//         CHECK:    %[[R8:.+]] = arith.addf %[[R7]], %[[CF]] : f32
-//         CHECK:    %[[R9:.+]] = vector.splat %[[R8]] : vector<1xf32>
+//         CHECK:    %[[LANE_ID:.+]] = arith.remui %[[TID]], %[[C32I]] : index
+//         CHECK:    %[[LOAD_VAL:.+]] = memref.load %[[ALLOC]][%[[LANE_ID]]] : memref<4xf32, 3>
+//         CHECK:    %[[USE_IDENTITY:.+]] = arith.cmpi sge, %[[LANE_ID]], %[[C4I]] : index
+//         CHECK:    %[[LANE_VAL:.+]] = arith.select %[[USE_IDENTITY]], %[[IDENTITY]], %[[LOAD_VAL]] : f32
+//         CHECK:    %[[S5:.+]], %{{.*}} = gpu.shuffle  xor %[[LANE_VAL]], %[[C1]], %[[C32]] : f32
+//         CHECK:    %[[R7:.+]] = arith.addf %[[LANE_VAL]], %[[S5]] : f32
+//         CHECK:    %[[S6:.+]], %{{.*}} = gpu.shuffle  xor %[[R7]], %[[C2]], %[[C32]] : f32
+//         CHECK:    %[[R8:.+]] = arith.addf %[[R7]], %[[S6]] : f32
+//         CHECK:    %[[S7:.+]], %{{.*}} = gpu.shuffle  xor %[[R8]], %[[C4]], %[[C32]] : f32
+//         CHECK:    %[[R9:.+]] = arith.addf %[[R8]], %[[S7]] : f32
+//         CHECK:    %[[S8:.+]], %{{.*}} = gpu.shuffle  xor %[[R9]], %[[C8]], %[[C32]] : f32
+//         CHECK:    %[[R10:.+]] = arith.addf %[[R9]], %[[S8]] : f32
+//         CHECK:    %[[S9:.+]], %{{.*}} = gpu.shuffle  xor %[[R10]], %[[C16]], %[[C32]] : f32
+//         CHECK:    %[[R11:.+]] = arith.addf %[[R10]], %[[S9]] : f32
+//         CHECK:    %[[R12:.+]] = arith.addf %[[R11]], %[[CF]] : f32
+//         CHECK:    %[[R13:.+]] = vector.splat %[[R12]] : vector<1xf32>
 //         CHECK:    %[[TID0:.+]] = arith.cmpi eq, %[[TID]], %[[C0]] : index
 //         CHECK:    scf.if %[[TID0]] {
-//         CHECK:      vector.transfer_write %[[R9]], %{{.*}}[%{{.*}}] {in_bounds = [true]} : vector<1xf32>, memref<512xf32>
+//         CHECK:      vector.transfer_write %[[R13]], %{{.*}}[%{{.*}}] {in_bounds = [true]} : vector<1xf32>, memref<512xf32>
 //         CHECK:    }

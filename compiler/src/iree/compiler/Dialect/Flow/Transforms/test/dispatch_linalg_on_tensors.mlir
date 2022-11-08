@@ -1,5 +1,5 @@
 // RUN: iree-opt --split-input-file --verify-diagnostics --pass-pipeline="builtin.module(func.func(iree-flow-dispatch-linalg-on-tensors-pass{aggressive-fusion=true}), cse, canonicalize, cse)" %s | FileCheck %s
-// RUN: iree-opt --split-input-file --verify-diagnostics --iree-flow-dispatch-via-region-ops --pass-pipeline="builtin.module(func.func(iree-flow-dispatch-linalg-on-tensors-pass{aggressive-fusion=true}), cse, canonicalize, cse)" %s | FileCheck %s --check-prefix=CHECK-VIA-REGIONS
+// RUN: iree-opt --split-input-file --verify-diagnostics --pass-pipeline="builtin.module(func.func(iree-flow-dispatch-linalg-on-tensors-via-regionops-pass), cse, canonicalize, cse)" %s | FileCheck %s --check-prefix=CHECK-VIA-REGIONS
 
 func.func @tile_matmul_alone(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
              %arg2 : tensor<?x?xf32>) -> tensor<?x?xf32> {
@@ -1843,6 +1843,29 @@ func.func @set_encoding_op(%arg0 : tensor<?x?xf32>)
 //      CHECK:     flow.return %[[X]], %[[Y]], %[[Z]]
 //      CHECK:   return %[[DISPATCH]]
 
+//      CHECK-VIA-REGIONS: func @set_encoding_op
+// CHECK-VIA-REGIONS-SAME:     %[[ARG0:.+]]: tensor<?x?xf32>
+//  CHECK-VIA-REGIONS-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-VIA-REGIONS-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//  CHECK-VIA-REGIONS-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
+//  CHECK-VIA-REGIONS-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
+//      CHECK-VIA-REGIONS:   %[[DISPATCH:.+]] = flow.dispatch.workgroups[%[[D0]], %[[D1]]](%[[ARG0]], %[[D0]], %[[D1]])
+// CHECK-VIA-REGIONS-NEXT:     %[[INARG:.+]]: !flow.dispatch.tensor<readonly:tensor<?x?xf32>>
+// CHECK-VIA-REGIONS-SAME:     %[[INDEXARG0:[a-zA-Z0-9]+]]: index
+// CHECK-VIA-REGIONS-SAME:     %[[INDEXARG1:[a-zA-Z0-9]+]]: index
+// CHECK-VIA-REGIONS-SAME:     %[[OUTARG:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>>
+//      CHECK-VIA-REGIONS:     %[[LOAD:.+]] = flow.dispatch.tensor.load %[[INARG]]
+// CHECK-VIA-REGIONS-SAME:         !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%[[INDEXARG0]], %[[INDEXARG1]]}
+//      CHECK-VIA-REGIONS:     %[[ENCODING:.+]] = iree_linalg_ext.set_encoding %[[LOAD]]
+//      CHECK-VIA-REGIONS:     flow.dispatch.tensor.store %[[ENCODING]], %[[OUTARG]]
+// CHECK-VIA-REGIONS-SAME:         sizes = [%[[INDEXARG0]], %[[INDEXARG1]]]
+// CHECK-VIA-REGIONS-SAME:         !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>>{%[[INDEXARG0]], %[[INDEXARG1]]}
+//      CHECK-VIA-REGIONS:     flow.return
+//      CHECK-VIA-REGIONS:   count(%[[WL0:[a-zA-Z0-9]+]]: index, %[[WL1:.+]]: index)
+//      CHECK-VIA-REGIONS:     %[[X:[a-zA-Z0-9]+]], %[[Y:[a-zA-Z0-9]+]], %[[Z:.+]] = flow.dispatch.workgroup_count_from_set_encoding_op %[[WL0]], %[[WL1]]
+//      CHECK-VIA-REGIONS:     flow.return %[[X]], %[[Y]], %[[Z]]
+//      CHECK-VIA-REGIONS:   return %[[DISPATCH]]
+
 // -----
 
 func.func @unset_encoding_op(%arg0 : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>)
@@ -2031,3 +2054,31 @@ func.func @gemm_fill_encoded(
 // CHECK-SAME:         ins(%[[LHS]], %[[RHS]] :
 // CHECK-SAME:         outs(%[[FILL]] :
 //      CHECK:     flow.dispatch.tensor.store %[[GEMM]], %[[RESULT]]
+
+// -----
+
+func.func @extract_slice1(%arg0 : tensor<5x24x48xf32>) -> tensor<4xf32> {
+  %0 = tensor.extract_slice %arg0[2, 3, 4] [1, 1, 4] [1, 1, 1]
+      : tensor<5x24x48xf32> to tensor<4xf32>
+  return %0 : tensor<4xf32>
+}
+
+// CHECK-LABEL: func.func @extract_slice1(
+//  CHECK-SAME:   %[[ARG0:.+]]: tensor<5x24x48xf32>)
+//   CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
+//   CHECK-DAG:   %[[C3:.+]] = arith.constant 3 : index
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//   CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
+//       CHECK:   %[[SLICE:.+]] = flow.tensor.slice %[[ARG0]][%[[C2]], %[[C3]], %[[C4]] for %[[C1]], %[[C1]], %[[C4]]]
+//       CHECK:   %[[RESULT:.+]] = flow.tensor.reshape %[[SLICE]]
+//       CHECK:   return %[[RESULT]]
+
+// CHECK-VIA-REGIONS-LABEL: func.func @extract_slice1(
+//  CHECK-VIA-REGIONS-SAME:   %[[ARG0:.+]]: tensor<5x24x48xf32>)
+//   CHECK-VIA-REGIONS-DAG:   %[[C2:.+]] = arith.constant 2 : index
+//   CHECK-VIA-REGIONS-DAG:   %[[C3:.+]] = arith.constant 3 : index
+//   CHECK-VIA-REGIONS-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//   CHECK-VIA-REGIONS-DAG:   %[[C4:.+]] = arith.constant 4 : index
+//       CHECK-VIA-REGIONS:   %[[SLICE:.+]] = flow.tensor.slice %[[ARG0]][%[[C2]], %[[C3]], %[[C4]] for %[[C1]], %[[C1]], %[[C4]]]
+//       CHECK-VIA-REGIONS:   %[[RESULT:.+]] = flow.tensor.reshape %[[SLICE]]
+//       CHECK-VIA-REGIONS:   return %[[RESULT]]
