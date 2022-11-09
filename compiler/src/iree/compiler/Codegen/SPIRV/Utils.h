@@ -26,6 +26,14 @@ spirv::TargetEnvAttr getSPIRVTargetEnvAttr(Operation *op);
 /// Returns the attribute name carrying information about distribution.
 const char *getSPIRVDistributeAttrName();
 
+/// Propagates lowering configuration to all compute ops.
+///
+/// This is useful for passes that happen after bufferization and still use
+/// single op Linalg tiling patterns. Under such circumstances, this is needed
+/// to cover `linalg.fill` ops created during converting to destination style
+/// for bufferization.
+LogicalResult propagateLoweringConfigToComputeOps(func::FuncOp funcOp);
+
 /// Generate the operations that compute the processor ID and number of
 /// processors. Used as the callback needed for LinalgDistributionOptions.
 template <typename GPUIdOp, typename GPUCountOp>

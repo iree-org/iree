@@ -138,6 +138,10 @@ void SPIRVTileAndDistributePass::runOnOperation() {
   func::FuncOp funcOp = getOperation();
   if (!isEntryPoint(funcOp)) return;
 
+  if (failed(propagateLoweringConfigToComputeOps(funcOp))) {
+    return signalPassFailure();
+  }
+
   {  // Tile and distribute to invocations.
     RewritePatternSet invocationTilingPatterns(context);
     populateTilingToInvocationPatterns(invocationTilingPatterns);

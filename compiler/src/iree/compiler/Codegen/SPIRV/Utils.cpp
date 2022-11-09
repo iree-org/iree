@@ -12,6 +12,7 @@
 
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 
+#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -33,6 +34,25 @@ spirv::TargetEnvAttr getSPIRVTargetEnvAttr(Operation *op) {
   auto config = targetAttr.getConfiguration();
   if (!config) return nullptr;
   return config.getAs<spirv::TargetEnvAttr>(spirv::getTargetEnvAttrName());
+}
+
+LogicalResult propagateLoweringConfigToComputeOps(func::FuncOp funcOp) {
+  SmallVector<Operation *> computeOps;
+  if (failed(getComputeOps(funcOp, computeOps))) {
+    return funcOp.emitOpError("failed to get compute ops");
+  }
+  IREE::Codegen::LoweringConfigAttr config;
+  for (Operation *op : llvm::reverse(computeOps)) {
+    config = getLoweringConfig(op);
+    if (config != nullptr) break;
+  }
+  if (!config) {
+    return funcOp.emitOpError("no compute ops have lowering configuration");
+  }
+  for (Operation *op : computeOps) {
+    if (!getLoweringConfig(op)) setLoweringConfig(op, config);
+  }
+  return success();
 }
 
 template <typename GPUIdOp, typename GPUCountOp>

@@ -175,6 +175,10 @@ void SPIRVTileAndPromotePass::runOnOperation() {
   FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
   if (failed(exportOp)) return;
 
+  if (failed(propagateLoweringConfigToComputeOps(funcOp))) {
+    return signalPassFailure();
+  }
+
   // Promote C matrix and propagate the potential fill producer into the
   // allocation. This needs to be done before reduction tiling.
   if (failed(doPromoteCMatrix(funcOp))) return signalPassFailure();
