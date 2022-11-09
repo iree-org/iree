@@ -106,7 +106,12 @@ jobs:
           BENCHMARKS_ARCHIVE: benchmarks.tar
           BENCHMARKS_DIR: ${{ steps.build.outputs.benchmarks-dir }}
         run: |
-          tar --exclude '*.tflite' --exclude '*.mlir' -czf \
+          # TODO(#10988): Excludes the experimental `models` and iree` dirs for
+          # now.
+          tar --exclude '*.tflite' --exclude '*.mlir' \
+            --exclude "${BENCHMARKS_DIR}/benchmark_suites/models" \
+            --exclude "${BENCHMARKS_DIR}/benchmark_suites/iree" \
+            -czf \
             "${BENCHMARKS_ARCHIVE}" "${BENCHMARKS_DIR}/benchmark_suites"
           echo "::set-output name=benchmarks-archive::${BENCHMARKS_ARCHIVE}"
       - name: "Uploading benchmarks archive"
