@@ -31,7 +31,7 @@ transform.structured.canonicalized_sequence failures(suppress) {
   %foreach_thread_block_more_parallel_op, %block_more_parallel_op =
     transform.structured.tile_to_foreach_thread_op %grid_more_parallel_op tile_sizes [1, 1, 0] (mapped to dims [2, 1, 0])
   transform.structured.fuse_into_containing_op %fill_2d into %foreach_thread_block_more_parallel_op
-  
+
   // Step 4. Rank-reduce and vectorize.
   // ===========================================================================
   %func = transform.structured.match ops{["func.func"]} in %variant_op

@@ -28,11 +28,11 @@ func.func @promote() -> (tensor<16x128xf32>) {
   %f0 = arith.constant 0.000000e+00 : f32
   %c16 = arith.constant 16 : index
   %c32 = arith.constant 32 : index
-  
+
   %empty = tensor.empty() : tensor<16x128xf32>
   %filled = linalg.fill ins(%f0 : f32) outs(%empty : tensor<16x128xf32>) -> tensor<16x128xf32>
 
-  // CHECK: foreach_thread{{.*}}shared_outs(%[[ARG:.*]] = 
+  // CHECK: foreach_thread{{.*}}shared_outs(%[[ARG:.*]] =
   // CHECK:   %[[A:.*]] = tensor.extract_slice %[[ARG]]
   // CHECK:   %[[B:.*]] = tensor.extract_slice %[[ARG]]
   // CHECK:   %[[C:.*]] = linalg.generic{{.*}}ins(%[[A]]{{.*}}outs(%[[B]]

@@ -351,7 +351,7 @@ hal.executable @generic_batch_matmul_f16_32x128x512x64 {
 //      PROMOTEC: %[[LHS_ALLOC:.+]] = memref.alloc() : memref<32x1x32xf16, 3>
 //  PROMOTEC-NOT: memref.alloc()
 
-//      PROMOTEC: %[[SPAN2:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) 
+//      PROMOTEC: %[[SPAN2:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
 //      PROMOTEC: %[[OUT_VIEW:.+]] = memref.subview %[[SPAN2]]
 
 //      PROMOTEC: linalg.fill

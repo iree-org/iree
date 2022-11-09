@@ -73,10 +73,10 @@ def DispatchLoweringPassPipelineEnum
                     SPIRV_BaseDistribute, SPIRV_BaseVectorize,
                     SPIRV_MatmulPromoteVectorize, SPIRV_CooperativeMatrixVectorize,
                     SPIRV_SubgroupReduce,
-                    VMVX_Default, 
+                    VMVX_Default,
                     // Transform dialect based codegen
-                    Linalg_TransformInterpCodegen, 
-                    Linalg_TransformJitCodegen, 
+                    Linalg_TransformInterpCodegen,
+                    Linalg_TransformJitCodegen,
                     None
                   ]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";

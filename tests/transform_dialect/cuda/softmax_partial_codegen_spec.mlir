@@ -15,7 +15,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   %foreach_thread, %tiled_generic =
     transform.iree.tile_to_foreach_thread_and_workgroup_count_region %root tile_sizes [1, 4]
   transform.structured.fuse_into_containing_op %not_root into %foreach_thread
-  
+
   // Step 2. Second level of tiling + fusion parallelizes to threads.
   // ================================================================
   %fill_linalg = transform.structured.match ops{["linalg.fill"]} in %variant_op
@@ -49,7 +49,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   //
   // That is still not good enough because we need to predicate this in order
   // to enable the parallel reduction on warps.
-  
+
   // Step 3. Rank-reduce and vectorize.
   // ==================================
   %func = transform.structured.match ops{["func.func"]} in %variant_op

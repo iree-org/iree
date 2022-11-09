@@ -1632,8 +1632,8 @@ hal.executable private @tile_multiuse_producer {
             indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>,
                              affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
             iterator_types = ["parallel", "parallel", "reduction"]}
-            ins(%3, %8 : tensor<12x128x128xf32>, tensor<12x128xf32>) 
-            outs(%5, %7 : tensor<12x128x128xf32>, tensor<12x128xf32>) 
+            ins(%3, %8 : tensor<12x128x128xf32>, tensor<12x128xf32>)
+            outs(%5, %7 : tensor<12x128x128xf32>, tensor<12x128xf32>)
             attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[4, 32, 0], [1, 4, 0], [0, 0, 4]]>} {
           ^bb0(%arg0: f32, %arg1: f32, %arg2: f32, %arg3: f32):
             %11 = arith.subf %arg0, %arg1 : f32

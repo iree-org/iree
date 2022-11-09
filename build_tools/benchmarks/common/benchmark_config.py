@@ -75,7 +75,7 @@ class BenchmarkConfig:
   @staticmethod
   def build_from_args(args: Namespace, git_commit_hash: str):
     """Build config from command arguments.
-    
+
     Args:
       args: the command arguments.
       git_commit_hash: the git commit hash of IREE.
