@@ -106,6 +106,8 @@ jobs:
           BENCHMARKS_ARCHIVE: benchmarks.tar
           BENCHMARKS_DIR: ${{ steps.build.outputs.benchmarks-dir }}
         run: |
+          # TODO(#10988): Excludes the experimental `models` and iree` dirs for
+          # now.
           tar --exclude '*.tflite' --exclude '*.mlir' \
             --exclude "${BENCHMARKS_DIR}/benchmark_suites/models" \
             --exclude "${BENCHMARKS_DIR}/benchmark_suites/iree" \
