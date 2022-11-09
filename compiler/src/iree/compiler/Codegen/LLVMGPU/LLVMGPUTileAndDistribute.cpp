@@ -103,6 +103,29 @@ static SmallVector<Value, 4> calculateDistributedTileSize(
   return tileSizesVal;
 }
 
+/// Returns true if a contract op has a multiple of its tile sizes.
+static LogicalResult alignedContractOpFilter(Operation *op) {
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+  if (!linalgOp) return failure();
+
+  if (linalgOp.hasDynamicShape()) return failure();
+
+  // matmul or batch matmul
+  bool isElible = linalg::isaContractionOpInterface(op) &&
+                  linalgOp.getNumParallelLoops() >= 2 &&
+                  linalgOp.getNumParallelLoops() <= 3;
+  if (!isElible) return failure();
+
+  SmallVector<int64_t> wgTileSizes = getTileSizes(op, 0);
+  if (wgTileSizes.empty()) return failure();
+
+  SmallVector<int64_t> sizes = linalgOp.getStaticLoopRanges();
+  for (unsigned i = 0, e = sizes.size(); i != e; ++i) {
+    if (sizes[i] % wgTileSizes[i] != 0) return failure();
+  }
+  return success();
+}
+
 /// Patterns for warp level tiling.
 static void populateTilingToWarpPatterns(
     RewritePatternSet &patterns, SmallVectorImpl<int64_t> &workgroupSize) {
@@ -120,6 +143,7 @@ static void populateTilingToWarpPatterns(
     return getSubgroupIdsAndCounts(builder, loc, /*warpSize=*/32u,
                                    parallelLoopRanges.size(), warpPerWorkgroup);
   };
+
   linalg::LinalgLoopDistributionOptions warpDistributionOptions;
   warpDistributionOptions.procInfo = getWarpProcInfoFn;
 
@@ -133,6 +157,8 @@ static void populateTilingToWarpPatterns(
        StringAttr::get(context, getWorkgroupMemoryMarker())},
       StringAttr::get(context, getVectorizeMarker()));
   filter.setMatchByDefault();
+  // Bail out the case where the tensor sizes are not a multiple of tile sizes.
+  filter.addFilter(alignedContractOpFilter);
   TilingPatterns<linalg::MatmulOp, linalg::FillOp, linalg::BatchMatmulOp,
                  linalg::GenericOp>::insert(patterns, tilingOptions, filter);
 }
