@@ -36,6 +36,7 @@
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -220,6 +221,7 @@ static void specializeDistributionLoops(
 
   // generate scf.if %cond
   auto ifOp = builder.create<scf::IfOp>(loc, cond, /*withElseRegion=*/true);
+  setMarker(ifOp, getWorkgroupSpecializationMarker());
 
   // Transfer the original body to the scf.else body.
   auto origBodyBegin = ++Block::iterator(ifOp);

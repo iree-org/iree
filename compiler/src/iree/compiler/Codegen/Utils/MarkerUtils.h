@@ -33,6 +33,10 @@ StringRef getWorkgroupMemoryMarker();
 /// to workgroups L1 tiles.
 StringRef getWorkgroupL1TileMarker();
 
+/// Marker to scf.IfOp to denote that the op is inserted for workgroup
+/// specialization.
+StringRef getWorkgroupSpecializationMarker();
+
 /// Marker for copy operations that are moving data from StorageClass to
 /// Workgroup memory.
 StringRef getCopyToWorkgroupMemoryMarker();

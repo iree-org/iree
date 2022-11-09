@@ -36,6 +36,10 @@ StringRef getWorkgroupMemoryNumItemsGENumItersMarker() {
   return "workgroup_memory_numprocs_ge_numiters";
 }
 
+StringRef getWorkgroupSpecializationMarker() {
+  return "workgroup_specialization";
+}
+
 StringRef getCopyToWorkgroupMemoryMarker() {
   return "copy_to_workgroup_memory";
 }
