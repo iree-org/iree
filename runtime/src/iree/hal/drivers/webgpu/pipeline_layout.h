@@ -10,6 +10,7 @@
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/webgpu/platform/webgpu.h"
+#include "iree/hal/drivers/webgpu/staging_buffer.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -60,7 +61,9 @@ typedef struct iree_hal_webgpu_set_binding_info_t {
 iree_status_t iree_hal_webgpu_pipeline_layout_create(
     WGPUDevice device, iree_host_size_t set_layout_count,
     iree_hal_descriptor_set_layout_t* const* set_layouts,
-    iree_host_size_t push_constant_count, iree_allocator_t host_allocator,
+    iree_host_size_t push_constant_count,
+    iree_hal_webgpu_staging_buffer_t* staging_buffer,
+    iree_allocator_t host_allocator,
     iree_hal_pipeline_layout_t** out_pipeline_layout);
 
 WGPUPipelineLayout iree_hal_webgpu_pipeline_layout_handle(
