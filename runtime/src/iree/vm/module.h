@@ -15,6 +15,7 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/atomics.h"
 #include "iree/base/string_builder.h"
+#include "iree/vm/ref.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -551,5 +552,7 @@ iree_vm_function_get_attr(iree_vm_function_t function, iree_host_size_t index,
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
+
+IREE_VM_DECLARE_CC_TYPE_ADAPTERS(iree_vm_module, iree_vm_module_t);
 
 #endif  // IREE_VM_MODULE_H_

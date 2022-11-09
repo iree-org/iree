@@ -506,7 +506,7 @@ void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
   build(builder, result, TypeRange{operationType, operationType}, target,
         /*numThreads=*/ValueRange{}, dynamicTileSizes,
         /*staticNumThreads=*/ArrayAttr(), staticTileSizesAttr,
-        threadDimMappingAttr);
+        threadDimMappingAttr, /*packedSizes=*/UnitAttr());
 }
 
 void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
@@ -538,7 +538,28 @@ void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
     threadDimMappingAttr = builder.getI64ArrayAttr(threadDimMapping);
   build(builder, result, TypeRange{operationType, operationType}, target,
         dynamicNumThreads, /*tileSizes=*/ValueRange{}, staticNumThreadsAttr,
-        /*staticTileSizes=*/ArrayAttr(), threadDimMappingAttr);
+        /*staticTileSizes=*/ArrayAttr(), threadDimMappingAttr,
+        /*packedSizes=*/UnitAttr());
+}
+
+void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
+    OpBuilder &builder, OperationState &result, Value target,
+    Value packedTileSizeHandle, transform::TileSizesSpec,
+    ArrayRef<int64_t> threadDimMapping) {
+  MLIRContext *ctx = builder.getContext();
+  auto operationType = pdl::OperationType::get(ctx);
+  SmallVector<int64_t> dummyStaticTileSizes(1, ShapedType::kDynamicSize);
+  auto dummyStaticTileSizesAttr = builder.getI64ArrayAttr(dummyStaticTileSizes);
+  ArrayAttr threadDimMappingAttr;
+  if (!threadDimMapping.empty())
+    threadDimMappingAttr = builder.getI64ArrayAttr(threadDimMapping);
+
+  build(builder, result, TypeRange{operationType, operationType}, target,
+        /*numThreads=*/ValueRange{},
+        /*tileSizes=*/ValueRange{packedTileSizeHandle},
+        /*staticNumThreads=*/ArrayAttr(),
+        /*staticTileSizes=*/dummyStaticTileSizesAttr, threadDimMappingAttr,
+        /*packedSizes=*/builder.getUnitAttr());
 }
 
 /// Lower the ops within the workgroup count region of `exportOp` that
@@ -635,7 +656,24 @@ transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::apply(
                                      "couldn't find export op for func");
   }
 
-  SmallVector<OpFoldResult> mixedTileSizes = getMixedTileSizes();
+  SmallVector<OpFoldResult> mixedTileSizes;
+  if (getPackedSizes()) {
+    ArrayRef<Operation *> sizes = state.getPayloadOps(getTileSizes().front());
+    mixedTileSizes.reserve(sizes.size());
+    for (Operation *sizeProducer : sizes) {
+      if (sizeProducer->getNumResults() != 1) {
+        auto diag = mlir::emitDefiniteFailure(sizeProducer)
+                    << "the operation producing tile size must have one result";
+        diag.attachNote(getLoc()) << "when applying this transform";
+        return diag;
+      }
+      // TODO(ftynse): we may want to pattern-match for integer constants here.
+      mixedTileSizes.push_back(sizeProducer->getResult(0));
+    }
+  } else {
+    mixedTileSizes = getMixedTileSizes();
+  }
+
   if (mixedTileSizes.empty()) {
     return mlir::emitDefiniteFailure(exportOp.value(),
                                      "require tile sizes to be specified");
@@ -937,6 +975,70 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
     return DiagnosedSilenceableFailure::definiteFailure();
 
   results.set(getOperation()->getOpResult(0), payload.front());
+  return DiagnosedSilenceableFailure::success();
+}
+
+//===---------------------------------------------------------------------===//
+// ConfigExtractPart
+//===---------------------------------------------------------------------===//
+void transform_dialect::ConfigExtractPart::build(OpBuilder &builder,
+                                                 OperationState &result,
+                                                 Value target,
+                                                 StringRef attrName,
+                                                 Optional<int64_t> maybeLevel) {
+  MLIRContext *ctx = builder.getContext();
+  result.addOperands(target);
+  result.addAttribute(ConfigExtractPart::getAttrNameAttrName(result.name),
+                      builder.getStringAttr(attrName));
+  if (maybeLevel) {
+    result.addAttribute(ConfigExtractPart::getLevelAttrName(result.name),
+                        builder.getI64IntegerAttr(*maybeLevel));
+  }
+  result.addTypes({pdl::OperationType::get(ctx)});
+}
+
+void transform_dialect::ConfigExtractPart::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::producesHandle(getResultConfigPart(), effects);
+  transform::modifiesPayload(effects);
+}
+
+DiagnosedSilenceableFailure transform_dialect::ConfigExtractPart::apply(
+    transform::TransformResults &transformResults,
+    transform::TransformState &state) {
+  ArrayRef<Operation *> targetOps = state.getPayloadOps(getTarget());
+  if (targetOps.empty()) {
+    transformResults.set(getResultConfigPart().cast<OpResult>(), {});
+    return DiagnosedSilenceableFailure::success();
+  }
+
+  assert(targetOps.size() == 1 && "expected single target op in payload");
+  Operation *target = targetOps.front();
+  auto config = iree_compiler::getLoweringConfig(target);
+  if (!config) {
+    transformResults.set(getResultConfigPart().cast<OpResult>(), {});
+    return emitSilenceableFailure(target) << " has no IREE config";
+  }
+
+  // TODO: op verifier etc.
+  if (getAttrName() != "tile_sizes")
+    return emitDefiniteFailure("unsupported attr");
+
+  if (!getLevel()) {
+    transformResults.set(getResultConfigPart().cast<OpResult>(), {});
+    return emitSilenceableFailure(target) << " level is required for tiling";
+  }
+  auto vals = config.getTileSizeVals(*getLevel());
+  if (vals.empty()) {
+    transformResults.set(getResultConfigPart().cast<OpResult>(), {});
+    return emitSilenceableFailure(target) << " no tiling at level";
+  }
+  SmallVector<Operation *> results;
+  OpBuilder b(target);
+  for (int64_t ts : vals)
+    results.push_back(b.create<arith::ConstantIndexOp>(target->getLoc(), ts));
+  transformResults.set(getResultConfigPart().cast<OpResult>(), results);
   return DiagnosedSilenceableFailure::success();
 }
 

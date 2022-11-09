@@ -1,5 +1,5 @@
-// RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline='hal.executable(hal.executable.variant(builtin.module(func.func(iree-spirv-tile-and-promote{promote-c=false skip-thread=true}, cse))))' %s | FileCheck %s
-// RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline='hal.executable(hal.executable.variant(builtin.module(func.func(iree-spirv-tile-and-promote{promote-c=true skip-thread=true}, cse))))' %s | FileCheck %s --check-prefix=PROMOTEC
+// RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-spirv-tile-and-promote{promote-c=false skip-thread=true}, cse)))))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-spirv-tile-and-promote{promote-c=true skip-thread=true}, cse)))))' %s | FileCheck %s --check-prefix=PROMOTEC
 
 // Single tile per workgroup means no subview ops for promotion.
 

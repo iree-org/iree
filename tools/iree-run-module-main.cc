@@ -89,19 +89,19 @@ iree_status_t Run(int* out_exit_code) {
   IREE_TRACE_SCOPE0("iree-run-module");
 
   iree_allocator_t host_allocator = iree_allocator_system();
-  iree_vm_instance_t* instance = nullptr;
+  vm::ref<iree_vm_instance_t> instance;
   IREE_RETURN_IF_ERROR(iree_tooling_create_instance(host_allocator, &instance),
                        "creating instance");
 
-  iree_vm_module_t* main_module = nullptr;
+  vm::ref<iree_vm_module_t> main_module;
   IREE_RETURN_IF_ERROR(iree_tooling_load_module_from_flags(
-      instance, host_allocator, &main_module));
+      instance.get(), host_allocator, &main_module));
 
-  iree_vm_context_t* context = NULL;
-  iree_hal_device_t* device = NULL;
-  iree_hal_allocator_t* device_allocator = NULL;
+  vm::ref<iree_vm_context_t> context;
+  vm::ref<iree_hal_device_t> device;
+  vm::ref<iree_hal_allocator_t> device_allocator;
   IREE_RETURN_IF_ERROR(iree_tooling_create_context_from_flags(
-      instance, /*user_module_count=*/1, /*user_modules=*/&main_module,
+      instance.get(), /*user_module_count=*/1, /*user_modules=*/&main_module,
       /*default_device_uri=*/iree_string_view_empty(), host_allocator, &context,
       &device, &device_allocator));
 
@@ -113,17 +113,17 @@ iree_status_t Run(int* out_exit_code) {
   } else {
     IREE_RETURN_IF_ERROR(
         iree_vm_module_lookup_function_by_name(
-            main_module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
+            main_module.get(), IREE_VM_FUNCTION_LINKAGE_EXPORT,
             iree_string_view_t{function_name.data(), function_name.size()},
             &function),
         "looking up function '%s'", function_name.c_str());
   }
 
-  IREE_RETURN_IF_ERROR(iree_hal_begin_profiling_from_flags(device));
+  IREE_RETURN_IF_ERROR(iree_hal_begin_profiling_from_flags(device.get()));
 
   vm::ref<iree_vm_list_t> inputs;
   IREE_RETURN_IF_ERROR(ParseToVariantList(
-      device_allocator,
+      device_allocator.get(),
       iree::span<const std::string>{FLAG_function_inputs.data(),
                                     FLAG_function_inputs.size()},
       host_allocator, &inputs));
@@ -131,7 +131,8 @@ iree_status_t Run(int* out_exit_code) {
   // If the function is async add fences so we can invoke it synchronously.
   vm::ref<iree_hal_fence_t> finish_fence;
   IREE_RETURN_IF_ERROR(iree_tooling_append_async_fence_inputs(
-      inputs.get(), &function, device, /*wait_fence=*/NULL, &finish_fence));
+      inputs.get(), &function, device.get(), /*wait_fence=*/NULL,
+      &finish_fence));
 
   vm::ref<iree_vm_list_t> outputs;
   IREE_RETURN_IF_ERROR(iree_vm_list_create(/*element_type=*/nullptr, 16,
@@ -139,18 +140,18 @@ iree_status_t Run(int* out_exit_code) {
 
   printf("EXEC @%s\n", function_name.c_str());
   IREE_RETURN_IF_ERROR(
-      iree_vm_invoke(context, function, IREE_VM_INVOCATION_FLAG_NONE,
+      iree_vm_invoke(context.get(), function, IREE_VM_INVOCATION_FLAG_NONE,
                      /*policy=*/nullptr, inputs.get(), outputs.get(),
                      host_allocator),
       "invoking function '%s'", function_name.c_str());
 
   // If the function is async we need to wait for it to complete.
-  if (!!finish_fence) {
+  if (finish_fence) {
     IREE_RETURN_IF_ERROR(
         iree_hal_fence_wait(finish_fence.get(), iree_infinite_timeout()));
   }
 
-  IREE_RETURN_IF_ERROR(iree_hal_end_profiling_from_flags(device));
+  IREE_RETURN_IF_ERROR(iree_hal_end_profiling_from_flags(device.get()));
 
   if (FLAG_expected_outputs.empty()) {
     IREE_RETURN_IF_ERROR(
@@ -179,17 +180,17 @@ iree_status_t Run(int* out_exit_code) {
   // Release resources before gathering statistics.
   inputs.reset();
   outputs.reset();
-  iree_vm_module_release(main_module);
-  iree_vm_context_release(context);
+  main_module.reset();
+  context.reset();
 
   if (device_allocator && FLAG_print_statistics) {
     IREE_IGNORE_ERROR(
-        iree_hal_allocator_statistics_fprint(stderr, device_allocator));
+        iree_hal_allocator_statistics_fprint(stderr, device_allocator.get()));
   }
 
-  iree_hal_allocator_release(device_allocator);
-  iree_hal_device_release(device);
-  iree_vm_instance_release(instance);
+  device_allocator.reset();
+  device.reset();
+  instance.reset();
   return iree_ok_status();
 }
 

@@ -514,7 +514,7 @@ def HAL_InterfaceBindingAttr :
 
 def HAL_DeviceTargetAttr :
     AttrDef<HAL_Dialect, "DeviceTarget", [
-      DeclareAttrInterfaceMethods<SubElementAttrInterface>,
+      SubElementAttrInterface,
     ]> {
   let mnemonic = "device.target";
   let summary = [{generic device target specification}];

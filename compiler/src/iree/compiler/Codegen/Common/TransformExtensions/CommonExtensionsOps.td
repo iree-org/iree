@@ -210,7 +210,8 @@ def TileToForeachThreadAndWorkgroupCountRegionOp :
                    Variadic<PDL_Operation>:$tile_sizes,
                    DefaultValuedAttr<I64ArrayAttr, "{}">:$static_num_threads,
                    DefaultValuedAttr<I64ArrayAttr, "{}">:$static_tile_sizes,
-                   OptionalAttr<I64ArrayAttr>:$thread_dim_mapping);
+                   OptionalAttr<I64ArrayAttr>:$thread_dim_mapping,
+                   UnitAttr:$packed_sizes);
   let results = (outs PDL_Operation:$foreach_thread_op,
                       PDL_Operation:$tiled_op);
   let assemblyFormat = [{
@@ -238,6 +239,11 @@ def TileToForeachThreadAndWorkgroupCountRegionOp :
                         "::mlir::transform::TileSizesSpec()">,
                    CArg<"ArrayRef<int64_t>", "{}">:$threadDimMapping)>,
     OpBuilder<(ins "Value":$target,
+                   "Value":$tileSizeHandle,
+                   CArg<"::mlir::transform::TileSizesSpec",
+                        "::mlir::transform::TileSizesSpec()">,
+                   CArg<"ArrayRef<int64_t>", "{}">:$threadDimMapping)>,
+    OpBuilder<(ins "Value":$target,
                    "ArrayRef<int64_t>":$staticNumThreads,
                    CArg<"::mlir::transform::NumThreadsSpec", 
                         "::mlir::transform::NumThreadsSpec()">,
@@ -259,5 +265,31 @@ def TileToForeachThreadAndWorkgroupCountRegionOp :
   }];
 }
 
+def ConfigExtractPart :
+    Op<Transform_Dialect, "iree.config.extract_part",
+      [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+       TransformOpInterface]> {
+  let description = [{
+  }];
+  let arguments = (ins PDL_Operation:$target, 
+                       StrAttr:$attr_name,
+                       OptionalAttr<I64Attr>:$level);
+  // TODO: allow return attributes ?
+  let results = (outs PDL_Operation:$resultConfigPart);
+  let assemblyFormat = "attr-dict $target";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+  // TODO: impl me.
+  // let hasVerifier = 1;
+
+  let builders = [
+    OpBuilder<(ins "Value":$target, "StringRef":$attrName, 
+               CArg<"Optional<int64_t>", "llvm::None">:$level)>
+  ];
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure apply(
+        ::mlir::transform::TransformResults &transformResults,
+        ::mlir::transform::TransformState &state);
+  }];
+}
 
 #endif // IREE_COMPILER_CODEGEN_COMMON_TRANSFORMEXTENSIONS_COMMONEXTENSIONS

@@ -241,6 +241,13 @@ typedef IREE_DEVICE_SIZE_T iree_device_size_t;
 #define IREE_VM_EXECUTION_TRACING_SRC_LOC_ENABLE 0
 #endif  // !IREE_VM_EXECUTION_TRACING_SRC_LOC_ENABLE
 
+#if !defined(IREE_VM_BYTECODE_DISPATCH_COMPUTED_GOTO_ENABLE)
+// Enables the use of compute goto for bytecode dispatch. This can have a
+// moderate performance improvement (~10-20%) on very heavy VMVX workloads but
+// adds 20-30KB to the binary size.
+#define IREE_VM_BYTECODE_DISPATCH_COMPUTED_GOTO_ENABLE 0
+#endif  // IREE_VM_BYTECODE_DISPATCH_COMPUTED_GOTO_ENABLE
+
 #if !defined(IREE_VM_EXT_F32_ENABLE)
 // Enables the 32-bit floating-point instruction extension.
 // Targeted from the compiler with `-iree-vm-target-extension-f32`.

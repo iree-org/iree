@@ -428,6 +428,20 @@ static inline iree_uk_type_t iree_uk_unpack_type(int pos,
 #define IREE_UK_ASSUME_UNREACHABLE
 #endif
 
+// Queries for [[attribute]] identifiers in modern compilers.
+#ifdef __has_attribute
+#define IREE_UK_HAVE_ATTRIBUTE(x) __has_attribute(x)
+#else
+#define IREE_UK_HAVE_ATTRIBUTE(x) 0
+#endif  // __has_attribute
+
+#if IREE_UK_HAVE_ATTRIBUTE(noinline) || \
+    (defined(__GNUC__) && !defined(__clang__))
+#define IREE_UK_ATTRIBUTE_NOINLINE __attribute__((noinline))
+#else
+#define IREE_UK_ATTRIBUTE_NOINLINE
+#endif  // IREE_UK_HAVE_ATTRIBUTE(noinline)
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
