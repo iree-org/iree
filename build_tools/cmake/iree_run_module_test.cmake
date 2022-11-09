@@ -6,7 +6,14 @@
 
 # Utility function to return the platform name in crosscompile.
 function(iree_get_platform PLATFORM)
-  set(${PLATFORM} "${CMAKE_SYSTEM_PROCESSOR}-${CMAKE_SYSTEM_NAME}" PARENT_SCOPE)
+  if(ANDROID AND CMAKE_ANDROID_ARCH_ABI STREQUAL "arm64-v8a")
+    set(_PLATFORM "android-arm64-v8a")
+  elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+    set(_PLATFORM "x86_64")
+  else()
+    set(_PLATFORM "${CMAKE_SYSTEM_PROCESSOR}-${CMAKE_SYSTEM_NAME}")
+  endif()
+  set(${PLATFORM} "${_PLATFORM}" PARENT_SCOPE)
 endfunction()
 
 # iree_run_module_test()
