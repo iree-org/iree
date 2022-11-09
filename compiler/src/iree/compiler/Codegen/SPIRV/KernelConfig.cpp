@@ -1087,18 +1087,6 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
       }
       rootOperation = computeOp;
     }
-
-    // Propogate the `lowering_config` attribute to the other ops. This is
-    // necessary because we typically use the last op as the anchor for tiling
-    // and fusion. The last op is not necessarily the root op in the above,
-    // e.g., it can be a fused element-wise op after a convolution/matmul op.
-    // TODO: Update passes to directly query the lowering configuration across
-    // compute ops and use that to drive all.
-    IREE::Codegen::LoweringConfigAttr config = getLoweringConfig(rootOperation);
-    for (auto op : computeOps) {
-      if (op == rootOperation) continue;
-      setLoweringConfig(op, config);
-    }
   }
   return success();
 }

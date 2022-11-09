@@ -84,9 +84,9 @@ static SmallVector<int64_t> deduceSubgroupCounts(linalg::LinalgOp op) {
 }
 
 /// Adds patterns to tile Linalg ops with workgroup markers to subgroups.
-static void populateTilingToSubgroupPatterns(ArrayRef<int64_t> subgroupCounts,
-                                             const unsigned subgroupSize,
-                                             RewritePatternSet &patterns) {
+static void populateTilingToSubgroupPatterns(
+    ArrayRef<int64_t> subgroupCounts, const unsigned subgroupSize,
+    ArrayRef<int64_t> subgroupTileSizes, RewritePatternSet &patterns) {
   MLIRContext *context = patterns.getContext();
 
   auto getSubgroupProcInfoFn = [subgroupCounts, subgroupSize](
@@ -102,8 +102,8 @@ static void populateTilingToSubgroupPatterns(ArrayRef<int64_t> subgroupCounts,
   linalg::LinalgLoopDistributionOptions distributionOptions;
   distributionOptions.procInfo = getSubgroupProcInfoFn;
 
-  auto setTileSizesFn = [](OpBuilder &builder, Operation *op) {
-    SmallVector<int64_t> tileSizes = getTileSizes(op, 1);
+  auto setTileSizesFn = [subgroupTileSizes](OpBuilder &builder, Operation *op) {
+    SmallVector<int64_t> tileSizes = llvm::to_vector(subgroupTileSizes);
     // Only consider parallel dimensions for tiling and distribution. Reduction
     // dimension distribution needs synchronization. We'll use vector unroll
     // later to "tile" along reduction dimensions.
@@ -301,7 +301,9 @@ class SPIRVTileAndVectorizeToCooperativeOpsPass final
         return signalPassFailure();
       }
       RewritePatternSet subgroupTilingPatterns(context);
+      SmallVector<int64_t> subgroupTileSizes = getTileSizes(rootOp, 1);
       populateTilingToSubgroupPatterns(subgroupCounts, subgroupSize,
+                                       subgroupTileSizes,
                                        subgroupTilingPatterns);
       if (failed(applyPatternsAndFoldGreedily(
               funcOp, std::move(subgroupTilingPatterns)))) {

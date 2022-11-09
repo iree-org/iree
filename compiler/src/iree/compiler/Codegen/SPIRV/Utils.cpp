@@ -15,6 +15,7 @@
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -36,23 +37,33 @@ spirv::TargetEnvAttr getSPIRVTargetEnvAttr(Operation *op) {
   return config.getAs<spirv::TargetEnvAttr>(spirv::getTargetEnvAttrName());
 }
 
-LogicalResult propagateLoweringConfigToComputeOps(func::FuncOp funcOp) {
+FailureOr<SmallVector<int64_t>> getSPIRVTileSize(func::FuncOp funcOp,
+                                                 int tilingLevel) {
   SmallVector<Operation *> computeOps;
   if (failed(getComputeOps(funcOp, computeOps))) {
     return funcOp.emitOpError("failed to get compute ops");
   }
-  IREE::Codegen::LoweringConfigAttr config;
-  for (Operation *op : llvm::reverse(computeOps)) {
-    config = getLoweringConfig(op);
-    if (config != nullptr) break;
-  }
+
+  IREE::Codegen::LoweringConfigAttr config = getLoweringConfig(computeOps);
   if (!config) {
-    return funcOp.emitOpError("no compute ops have lowering configuration");
+    return funcOp.emitOpError("failed to get lowering configuration");
   }
-  for (Operation *op : computeOps) {
-    if (!getLoweringConfig(op)) setLoweringConfig(op, config);
-  }
-  return success();
+
+  return config.getTileSizeVals(tilingLevel);
+}
+
+FailureOr<linalg::TileSizeComputationFunction> getSPIRVTileSizeComputeFn(
+    func::FuncOp funcOp, int tilingLevel) {
+  auto tileSizes = getSPIRVTileSize(funcOp, tilingLevel);
+  if (failed(tileSizes)) return failure();
+  linalg::TileSizeComputationFunction computeFn =
+      [tileSizes](OpBuilder &builder, Operation *op) {
+        auto range = llvm::map_range(*tileSizes, [&](int64_t size) -> Value {
+          return builder.create<arith::ConstantIndexOp>(op->getLoc(), size);
+        });
+        return llvm::to_vector<4>(range);
+      };
+  return computeFn;
 }
 
 template <typename GPUIdOp, typename GPUCountOp>

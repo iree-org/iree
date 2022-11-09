@@ -13,6 +13,7 @@
 #ifndef IREE_COMPILER_CODEGEN_SPIRV_UTILS_H_
 #define IREE_COMPILER_CODEGEN_SPIRV_UTILS_H_
 
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
 #include "mlir/IR/Builders.h"
@@ -26,13 +27,15 @@ spirv::TargetEnvAttr getSPIRVTargetEnvAttr(Operation *op);
 /// Returns the attribute name carrying information about distribution.
 const char *getSPIRVDistributeAttrName();
 
-/// Propagates lowering configuration to all compute ops.
-///
-/// This is useful for passes that happen after bufferization and still use
-/// single op Linalg tiling patterns. Under such circumstances, this is needed
-/// to cover `linalg.fill` ops created during converting to destination style
-/// for bufferization.
-LogicalResult propagateLoweringConfigToComputeOps(func::FuncOp funcOp);
+/// Returns the tile sizes at the given `tilingLevel` for compute ops in
+/// `funcOp`.
+FailureOr<SmallVector<int64_t>> getSPIRVTileSize(func::FuncOp funcOp,
+                                                 int tilingLevel);
+
+/// Returns the functor to compute tile sizes at the given `tilingLevel` for
+/// compute ops in `funcOp`.
+FailureOr<linalg::TileSizeComputationFunction> getSPIRVTileSizeComputeFn(
+    func::FuncOp funcOp, int tilingLevel);
 
 /// Generate the operations that compute the processor ID and number of
 /// processors. Used as the callback needed for LinalgDistributionOptions.

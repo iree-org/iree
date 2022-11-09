@@ -54,8 +54,7 @@ hal.executable @matmul_f32_256x1024x128 {
               indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
               iterator_types = ["parallel", "parallel"]}
               ins(%11, %8 : memref<128x128xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<128x128xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>)
-              outs(%11 : memref<128x128xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>)
-              attrs =  {lowering_config = #config} {
+              outs(%11 : memref<128x128xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>) {
             ^bb0(%arg2: f32, %arg3: f32, %arg4: f32):
               %12 = arith.divf %arg2, %arg3 : f32
               linalg.yield %12 : f32
@@ -184,7 +183,7 @@ hal.executable @batch_matmul_16x1024x1024x80 {
                 ins(%subview_1, %subview_2 : memref<1x64x80xf16, strided<[81920, 80, 1], offset: ?>>, memref<1x80x256xf16, strided<[81920, 1024, 1], offset: ?>>)
                 outs(%subview : memref<1x64x256xf16, strided<[1048576, 1024, 1], offset: ?>>)
               linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]}
-                outs(%subview : memref<1x64x256xf16, strided<[1048576, 1024, 1], offset: ?>>) attrs =  {lowering_config = #config} {
+                outs(%subview : memref<1x64x256xf16, strided<[1048576, 1024, 1], offset: ?>>) {
               ^bb0(%out: f16):
                 %13 = arith.truncf %cst : f32 to f16
                 %14 = arith.mulf %out, %13 : f16

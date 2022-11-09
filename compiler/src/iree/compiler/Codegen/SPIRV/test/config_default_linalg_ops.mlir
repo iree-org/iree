@@ -358,7 +358,7 @@ hal.executable @dwconv_elementwise {
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseDistribute>
 //      CHECK: hal.executable.export public @dwconv_elementwise
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
-//      CHECK:   linalg.generic
+//      CHECK:   linalg.depthwise_conv_2d_nhwc_hwcm
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
 
 

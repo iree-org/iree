@@ -67,7 +67,7 @@ hal.executable public @matmul_256x1024x128_div_add {
       %subview = memref.subview %7[%8, %9] [32, 32] [1, 1] : memref<256x128xf16> to memref<32x32xf16, strided<[128, 1], offset: ?>>
       %subview_1 = memref.subview %3[%8, 0] [32, 1024] [1, 1] : memref<256x1024xf16> to memref<32x1024xf16, strided<[1024, 1], offset: ?>>
       %subview_2 = memref.subview %4[0, %9] [1024, 32] [1, 1] : memref<1024x128xf16> to memref<1024x32xf16, strided<[128, 1], offset: ?>>
-      linalg.fill {__internal_linalg_transform__ = "workgroup_memory", lowering_config = #config} ins(%cst : f16) outs(%subview : memref<32x32xf16, strided<[128, 1], offset: ?>>)
+      linalg.fill {__internal_linalg_transform__ = "workgroup_memory"} ins(%cst : f16) outs(%subview : memref<32x32xf16, strided<[128, 1], offset: ?>>)
       scf.for %arg0 = %c0 to %c1024 step %c32 {
         %subview_5 = memref.subview %subview_1[0, %arg0] [32, 32] [1, 1] : memref<32x1024xf16, strided<[1024, 1], offset: ?>> to memref<32x32xf16, strided<[1024, 1], offset: ?>>
         %subview_6 = memref.subview %subview_2[%arg0, 0] [32, 32] [1, 1] : memref<1024x32xf16, strided<[128, 1], offset: ?>> to memref<32x32xf16, strided<[128, 1], offset: ?>>
@@ -102,7 +102,7 @@ hal.executable public @matmul_256x1024x128_div_add {
       }
       ins(%subview_3, %subview_4 : memref<32x32xf16, strided<[128, 1], offset: ?>>, memref<32x32xf16, strided<[128, 1], offset: ?>>)
       outs(%subview : memref<32x32xf16, strided<[128, 1], offset: ?>>)
-      attrs =  {__internal_linalg_transform__ = "workgroup_memory", lowering_config = #config} {
+      attrs =  {__internal_linalg_transform__ = "workgroup_memory"} {
       ^bb0(%in: f16, %in_5: f16, %out: f16):
         %10 = arith.divf %out, %in : f16
         %11 = arith.addf %10, %in_5 : f16
@@ -241,7 +241,7 @@ hal.executable public @matmul_256x1024x128_div_add {
         %subview = memref.subview %6[%workgroup_id_z, %7, %8] [1, 32, 32] [1, 1, 1] : memref<16x128x256xf16> to memref<1x32x32xf16, strided<[32768, 256, 1], offset: ?>>
         %subview_1 = memref.subview %3[%workgroup_id_z, %7, 0] [1, 32, 512] [1, 1, 1] : memref<16x128x512xf16> to memref<1x32x512xf16, strided<[65536, 512, 1], offset: ?>>
         %subview_2 = memref.subview %4[%workgroup_id_z, 0, %8] [1, 512, 32] [1, 1, 1] : memref<16x512x256xf16> to memref<1x512x32xf16, strided<[131072, 256, 1], offset: ?>>
-        linalg.fill {__internal_linalg_transform__ = "workgroup_memory", lowering_config = #config}
+        linalg.fill {__internal_linalg_transform__ = "workgroup_memory"}
           ins(%cst : f16) outs(%subview : memref<1x32x32xf16, strided<[32768, 256, 1], offset: ?>>)
         scf.for %arg0 = %c0 to %c512 step %c32 {
           %subview_4 = memref.subview %subview_1[0, 0, %arg0] [1, 32, 32] [1, 1, 1] : memref<1x32x512xf16, strided<[65536, 512, 1], offset: ?>> to memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>
@@ -275,7 +275,7 @@ hal.executable public @matmul_256x1024x128_div_add {
             iterator_types = ["parallel", "parallel", "parallel"]}
         ins(%subview_3 : memref<1x32x32xf16, strided<[32768, 256, 1], offset: ?>>)
         outs(%subview : memref<1x32x32xf16, strided<[32768, 256, 1], offset: ?>>)
-        attrs = {__internal_linalg_transform__ = "workgroup_memory", lowering_config = #config} {
+        attrs = {__internal_linalg_transform__ = "workgroup_memory"} {
         ^bb0(%in: f16, %out: f16):
           %9 = arith.divf %out, %in : f16
           linalg.yield %9 : f16
