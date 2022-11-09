@@ -38,6 +38,7 @@ static iree_status_t iree_hal_local_task_driver_factory_try_create(
                             (int)driver_name.size, driver_name.data);
   }
 
+  printf("registration/driver_module: %s\n", driver_name.data);
   iree_hal_task_device_params_t default_params;
   iree_hal_task_device_params_initialize(&default_params);
 

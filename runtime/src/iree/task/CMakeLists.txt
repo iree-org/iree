@@ -71,23 +71,6 @@ if(${IREE_NUMA})
       "worker.c"
       "worker.h"
       "numactl.c"
-      "${IREE_ROOT_DIR}/third_party/numactl/distance.c"
-      "${IREE_ROOT_DIR}/third_party/numactl/sysfs.c"
-      "${IREE_ROOT_DIR}/third_party/numactl/rtnetlink.c"
-      "${IREE_ROOT_DIR}/third_party/numactl/affinity.c"
-      "${IREE_ROOT_DIR}/third_party/numactl/syscall.c"
-      "${IREE_ROOT_DIR}/third_party/numactl/shm.c"
-      "${IREE_ROOT_DIR}/third_party/numactl/util.c"
-      "${IREE_ROOT_DIR}/third_party/numactl/libnuma.c"
-      "${IREE_ROOT_DIR}/third_party/numactl/config.h"
-      "${IREE_ROOT_DIR}/third_party/numactl/numa.h"
-      "${IREE_ROOT_DIR}/third_party/numactl/numaif.h"
-      "${IREE_ROOT_DIR}/third_party/numactl/numaint.h"
-      "${IREE_ROOT_DIR}/third_party/numactl/util.h"
-      "${IREE_ROOT_DIR}/third_party/numactl/sysfs.h"
-      "${IREE_ROOT_DIR}/third_party/numactl/rtnetlink.h"
-      "${IREE_ROOT_DIR}/third_party/numactl/affinity.h"
-      "${IREE_ROOT_DIR}/third_party/numactl/shm.h"
       "numactl.h"
     DEPS
       ${IREE_CPUINFO_TARGET}
@@ -103,6 +86,7 @@ if(${IREE_NUMA})
       iree::base::internal::threading
       iree::base::internal::wait_handle
       iree::base::tracing
+      numa::libnuma
     PUBLIC
   )
 endif()
