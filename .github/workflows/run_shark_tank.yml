@@ -74,7 +74,7 @@ jobs:
         # Only Tensorflow is working at the moment so limit benchmarking to TF models.
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/shark@sha256:6ca44c4236370054283435d365fefc1a2825f6b92c712e6fa5037309e38c739e \
+            gcr.io/iree-oss/shark@sha256:b21f1fdaaaa47801af4015ba49a62516d3181632e25606e70629eb046aeb1c01 \
           ./build_tools/benchmarks/shark/run_shark.sh "${SHARK_SHA}" "cpu" "cpu" "${SHARK_OUTPUT_DIR}"
       - name: "Uploading artifacts"
         run: |
@@ -103,7 +103,7 @@ jobs:
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --gpus all \
-            gcr.io/iree-oss/shark@sha256:6ca44c4236370054283435d365fefc1a2825f6b92c712e6fa5037309e38c739e \
+            gcr.io/iree-oss/shark@sha256:b21f1fdaaaa47801af4015ba49a62516d3181632e25606e70629eb046aeb1c01 \
           ./build_tools/benchmarks/shark/run_shark.sh "${SHARK_SHA}" "cuda" "cuda" "${SHARK_OUTPUT_DIR}"
       - name: "Uploading artifacts"
         run: |
@@ -136,7 +136,7 @@ jobs:
           cp ./build_tools/benchmarks/reporting/data/icelake_baseline.csv ${BENCHMARK_RESULTS_DIR}/
           cp ./build_tools/benchmarks/reporting/data/a100_baseline.csv ${BENCHMARK_RESULTS_DIR}/
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/shark@sha256:6ca44c4236370054283435d365fefc1a2825f6b92c712e6fa5037309e38c739e \
+            gcr.io/iree-oss/shark@sha256:b21f1fdaaaa47801af4015ba49a62516d3181632e25606e70629eb046aeb1c01 \
           ./build_tools/benchmarks/shark/run_report.sh "${BENCHMARK_RESULTS_DIR}" \
             "${BENCHMARK_RESULTS_DIR}/icelake_baseline.csv" \
             "${BENCHMARK_RESULTS_DIR}/a100_baseline.csv" \
