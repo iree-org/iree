@@ -441,12 +441,6 @@ void CompositeAttr::print(AsmPrinter &p) const {
   os << "]>";
 }
 
-void CompositeAttr::walkImmediateSubElements(
-    function_ref<void(Attribute)> walkAttrsFn,
-    function_ref<void(Type)> walkTypesFn) const {
-  walkAttrsFn(getValues());
-}
-
 int64_t CompositeAttr::getStorageSize() const { return getTotalLength(); }
 
 LogicalResult CompositeAttr::serializeToBuffer(llvm::support::endianness endian,

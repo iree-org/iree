@@ -198,20 +198,6 @@ void DeviceTargetAttr::print(AsmPrinter &p) const {
   os << ">";
 }
 
-void DeviceTargetAttr::walkImmediateSubElements(
-    function_ref<void(Attribute)> walkAttrsFn,
-    function_ref<void(Type)> walkTypesFn) const {
-  if (auto configuration = getConfiguration()) {
-    walkAttrsFn(configuration);
-  }
-}
-
-Attribute DeviceTargetAttr::replaceImmediateSubElements(
-    ArrayRef<Attribute> replAttrs, ArrayRef<Type> replTypes) const {
-  return DeviceTargetAttr::get(getContext(), getDeviceID(),
-                               replAttrs[0].dyn_cast_or_null<DictionaryAttr>());
-}
-
 std::string DeviceTargetAttr::getSymbolNameFragment() {
   return sanitizeSymbolName(getDeviceID().getValue().lower());
 }
@@ -317,21 +303,6 @@ void ExecutableTargetAttr::print(AsmPrinter &p) const {
     p.printAttribute(config);
   }
   os << ">";
-}
-
-void ExecutableTargetAttr::walkImmediateSubElements(
-    function_ref<void(Attribute)> walkAttrsFn,
-    function_ref<void(Type)> walkTypesFn) const {
-  if (auto configuration = getConfiguration()) {
-    walkAttrsFn(configuration);
-  }
-}
-
-Attribute ExecutableTargetAttr::replaceImmediateSubElements(
-    ArrayRef<Attribute> replAttrs, ArrayRef<Type> replTypes) const {
-  return ExecutableTargetAttr::get(
-      getContext(), getBackend(), getFormat(),
-      replAttrs[0].dyn_cast_or_null<DictionaryAttr>());
 }
 
 std::string ExecutableTargetAttr::getSymbolNameFragment() {
@@ -492,17 +463,6 @@ void MatchAnyAttr::print(AsmPrinter &p) const {
   printMultiMatchAttrList(getConditions(), p);
 }
 
-void MatchAnyAttr::walkImmediateSubElements(
-    function_ref<void(Attribute)> walkAttrsFn,
-    function_ref<void(Type)> walkTypesFn) const {
-  walkAttrsFn(getConditions());
-}
-
-Attribute MatchAnyAttr::replaceImmediateSubElements(
-    ArrayRef<Attribute> replAttrs, ArrayRef<Type> replTypes) const {
-  return MatchAnyAttr::get(getContext(), replAttrs[0].cast<ArrayAttr>());
-}
-
 Value MatchAnyAttr::buildConditionExpression(Location loc, Value value,
                                              OpBuilder builder) const {
   // #hal.match.any<[a, b, c]> -> or(or(a, b), c)
@@ -530,17 +490,6 @@ Attribute MatchAllAttr::parse(AsmParser &p, Type type) {
 
 void MatchAllAttr::print(AsmPrinter &p) const {
   printMultiMatchAttrList(getConditions(), p);
-}
-
-void MatchAllAttr::walkImmediateSubElements(
-    function_ref<void(Attribute)> walkAttrsFn,
-    function_ref<void(Type)> walkTypesFn) const {
-  walkAttrsFn(getConditions());
-}
-
-Attribute MatchAllAttr::replaceImmediateSubElements(
-    ArrayRef<Attribute> replAttrs, ArrayRef<Type> replTypes) const {
-  return MatchAllAttr::get(getContext(), replAttrs[0].cast<ArrayAttr>());
 }
 
 Value MatchAllAttr::buildConditionExpression(Location loc, Value value,
