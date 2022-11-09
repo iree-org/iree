@@ -633,6 +633,8 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
   // requires special capability.
   if (!targetEnv.allows(spirv::Capability::GroupNonUniformShuffle))
     return failure();
+  // TODO: Remove the following once SwiftShader is detached from the default.
+  if (targetEnv.getVendorID() == spirv::Vendor::SwiftShader) return failure();
 
   SmallVector<unsigned> reductionDims;
   op.getReductionDims(reductionDims);
