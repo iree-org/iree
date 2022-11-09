@@ -24,6 +24,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/LLVMIR/NVVMDialect.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Support/MathExtras.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -103,27 +104,21 @@ static SmallVector<Value, 4> calculateDistributedTileSize(
   return tileSizesVal;
 }
 
-/// Returns true if a contract op has a multiple of its tile sizes.
-static LogicalResult alignedContractOpFilter(Operation *op) {
-  auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-  if (!linalgOp) return failure();
+/// Returns true if an op is aligned by checking if
+///   1. the op is inside the workgroup-specialized region, or
+///   2. the op's parent is not the workgroup-specialized region.
+/// The second case does not have a workgroup-spcialized region because
+/// it is already aligned.
+static LogicalResult alignedOpFilter(Operation *op) {
+  Operation *opWithMarker =
+      findAncestorWithMarker(op, getWorkgroupSpecializationMarker());
 
-  if (linalgOp.hasDynamicShape()) return failure();
-
-  // matmul or batch matmul
-  bool isElible = linalg::isaContractionOpInterface(op) &&
-                  linalgOp.getNumParallelLoops() >= 2 &&
-                  linalgOp.getNumParallelLoops() <= 3;
-  if (!isElible) return failure();
-
-  SmallVector<int64_t> wgTileSizes = getTileSizes(op, 0);
-  if (wgTileSizes.empty()) return failure();
-
-  SmallVector<int64_t> sizes = linalgOp.getStaticLoopRanges();
-  for (unsigned i = 0, e = sizes.size(); i != e; ++i) {
-    if (sizes[i] % wgTileSizes[i] != 0) return failure();
+  if (opWithMarker) {
+    auto ifOp = cast<scf::IfOp>(opWithMarker);
+    return success(ifOp.getThenRegion().isAncestor(op->getParentRegion()));
+  } else {
+    return success();
   }
-  return success();
 }
 
 /// Patterns for warp level tiling.
@@ -158,7 +153,7 @@ static void populateTilingToWarpPatterns(
       StringAttr::get(context, getVectorizeMarker()));
   filter.setMatchByDefault();
   // Bail out the case where the tensor sizes are not a multiple of tile sizes.
-  filter.addFilter(alignedContractOpFilter);
+  filter.addFilter(alignedOpFilter);
   TilingPatterns<linalg::MatmulOp, linalg::FillOp, linalg::BatchMatmulOp,
                  linalg::GenericOp>::insert(patterns, tilingOptions, filter);
 }
