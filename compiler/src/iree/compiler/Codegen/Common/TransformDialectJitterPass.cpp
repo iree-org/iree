@@ -4,12 +4,15 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <type_traits>
+
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/TransformOps/LinalgExtTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "iree-dialects/Dialect/LinalgTransform/TransformInterpreterUtils.h"
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
+#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/LLVMCPU/TransformExtensions/LLVMCPUExtensions.h"
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensions.h"
 #include "iree/compiler/Codegen/PassDetail.h"
@@ -52,6 +55,7 @@ using namespace mlir;
 
 // TODO: significantly better namespacing.
 using ::mlir::iree_compiler::IREE::transform_dialect::ApplyPatternsOp;
+using ::mlir::iree_compiler::IREE::transform_dialect::ConfigExtractPart;
 using ::mlir::iree_compiler::IREE::transform_dialect::
     ForeachThreadToWorkgroupOp;
 using ::mlir::iree_compiler::IREE::transform_dialect::IREEBufferizeOp;
@@ -95,6 +99,9 @@ static void print(ImplicitLocOpBuilder &b, ValueRange handles = {}) {
 namespace {
 struct BatchFusionSpec {};
 struct IterativeFusionSpec {};
+
+struct TileOrNumThreadHandle {};
+struct TileOrNumThreadList {};
 }  // namespace
 
 /// Performs the following transformations:
@@ -119,10 +126,13 @@ struct IterativeFusionSpec {};
 /// appended in order.
 // TODO: apply forwarding pattern.
 template <typename TilingTransformOp, typename TileOrNumThreadSpec,
-          typename BatchOrIterativeFusion>
+          typename BatchOrIterativeFusion, typename TileOrNumThreadKind>
 static Value tileAndFuseAndDistributeImpl(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
-    ArrayRef<int64_t> tileSizesOrNumThreads, ArrayRef<int64_t> threadDimMapping,
+    std::conditional_t<std::is_same_v<TileOrNumThreadKind, TileOrNumThreadList>,
+                       ArrayRef<int64_t>, Value>
+        tileSizesOrNumThreads,
+    ArrayRef<int64_t> threadDimMapping,
     SmallVector<Value> *resultingFusedOpsHandles) {
   auto tileToForeachOp = b.create<TilingTransformOp>(
       rootH, tileSizesOrNumThreads, TileOrNumThreadSpec(), threadDimMapping);
@@ -149,9 +159,21 @@ static Value tfdWithTileSizes(
     ArrayRef<int64_t> tileSizes, ArrayRef<int64_t> threadDimMapping = {},
     SmallVector<Value> *resultingFusedOpsHandles = nullptr) {
   return tileAndFuseAndDistributeImpl<
-      TilingTransformOp, transform::TileSizesSpec, BatchOrIterativeFusion>(
-      b, rootH, opsHToFuse, tileSizes, threadDimMapping,
-      resultingFusedOpsHandles);
+      TilingTransformOp, transform::TileSizesSpec, BatchOrIterativeFusion,
+      TileOrNumThreadList>(b, rootH, opsHToFuse, tileSizes, threadDimMapping,
+                           resultingFusedOpsHandles);
+}
+
+template <typename TilingTransformOp = TileToForeachThreadOp,
+          typename BatchOrIterativeFusion = BatchFusionSpec>
+static Value tfdWithTileSizeHandle(
+    ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
+    Value tileSizeHandle, ArrayRef<int64_t> threadDimMapping = {},
+    SmallVector<Value> *resultingFusedOpsHandles = nullptr) {
+  return tileAndFuseAndDistributeImpl<
+      TilingTransformOp, transform::TileSizesSpec, BatchOrIterativeFusion,
+      TileOrNumThreadHandle>(b, rootH, opsHToFuse, tileSizeHandle,
+                             threadDimMapping, resultingFusedOpsHandles);
 }
 
 template <typename TilingTransformOp = TileToForeachThreadOp,
@@ -196,14 +218,32 @@ static Value distributeVectors(ImplicitLocOpBuilder &b, Value funcH,
   return funcH;
 }
 
-// TODO: generialize and automate over and over.
-// TODO: significantly shrink this down.
-static void buildReductionCudaStrategy(ImplicitLocOpBuilder &b,
-                                       Value variantH) {
+/// Distribute to blocks using the current IREE lowering config.
+///
+/// The tiling and distributing to blocks is done within a transform SequenceOp.
+/// It runs without interleaved canonicalize, CSE or enabling transforms which
+/// allows the transform dialect to build payload IR and not risk seeing it
+/// being DCE'd away immediately.
+static Value buildReductionStrategyBlockDistributionPart(
+    ImplicitLocOpBuilder &b, Value outerVariantH) {
+  OpBuilder::InsertionGuard guard(b);
+  auto operationType = pdl::OperationType::get(b.getContext());
+  auto sequence = b.create<transform::SequenceOp>(
+      TypeRange{operationType}, transform::FailurePropagationMode::Propagate,
+      outerVariantH);
+  Block *sequenceBody =
+      b.createBlock(&sequence.getBodyRegion(), /*insertPt=*/{}, operationType,
+                    outerVariantH.getLoc());
+  Value variantH = sequenceBody->getArgument(0);
+
+  // TODO: this still requires specific knowledge of ops present in the IR and
+  // is brittle.
   Value originalFillH =
       b.create<MatchOp>(variantH, linalg::FillOp::getOperationName());
   Value originalGenericH =
       b.create<MatchOp>(variantH, linalg::GenericOp::getOperationName());
+  Value tileSizes =
+      b.create<ConfigExtractPart>(originalGenericH, "tile_sizes", 0);
 
   // Step 1. Split the reduction to get meatier parallelism.
   // TODO: use a scf.foreach_thread for this.
@@ -215,16 +255,25 @@ static void buildReductionCudaStrategy(ImplicitLocOpBuilder &b,
   Value splitLinalgH = splitReductionTransformOp.getSplitLinalgOp();
   Value combinerH = splitReductionTransformOp.getCombiningLinalgOp();
 
-  // Step 2. First level of tiling + fusion parallelizes to blocks.
-  // clang-format off
-  tfdWithTileSizes<TileToForeachThreadAndWorkgroupCountRegionOp>(
-    b,
-    /*rootH=*/combinerH,
-    /*opsHToFuse=*/{originalFillH, splitFillH, splitLinalgH},
-    /*tileSizes=*/ArrayRef<int64_t>{1});
-  // clang-format on
+  // Step 2. First level of tiling + fusion parallelizes to blocks using
+  // `tileSizes`.
+  tfdWithTileSizeHandle<TileToForeachThreadAndWorkgroupCountRegionOp>(
+      b,
+      /*rootH=*/combinerH,
+      /*opsHToFuse=*/{originalFillH, splitFillH, splitLinalgH}, tileSizes);
+  b.create<transform::YieldOp>(variantH);
+  return sequence->getResult(0);
+}
 
-  // Step 3. Second level of tiling + fusion parallelizes to threads.
+// TODO: generalize and automate over and over.
+// TODO: significantly shrink this down.
+static void buildReductionCudaStrategy(ImplicitLocOpBuilder &b,
+                                       Value outerVariantH) {
+  // Step 1: Distribute to blocks using the current IREE lowering config.
+  Value variantH =
+      buildReductionStrategyBlockDistributionPart(b, outerVariantH);
+
+  // Step 2. Second level of tiling + fusion parallelizes to threads.
   // TODO: Relying on ordering is brittle, harden this.
   auto [fill2dH, parParRedH, fill1dH, parRedH] = matchAndUnpack<4>(
       b, variantH,
@@ -243,19 +292,21 @@ static void buildReductionCudaStrategy(ImplicitLocOpBuilder &b,
                    /*threadDimMapping=*/ArrayRef<int64_t>{2, 1, 0});
   // clang-format on
 
-  // Step 4. Rank-reduce and vectorize.
+  // Step 3. Rank-reduce and vectorize.
+  // TODO: assumes a single func::FuncOp to transform, may ned hardening.
   Value funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
   funcH = vectorize(b, funcH);
 
-  // Step 5. Bufferize.
+  // Step 4. Bufferize.
   variantH = b.create<IREEBufferizeOp>(variantH, /*targetGpu=*/true);
 
-  // Step 6. Post-bufferization mapping to blocks and threads.
-  // Need to match again since bufferizae invalidated all handles.
+  // Step 5. Post-bufferization mapping to blocks and threads.
+  // Need to match again since bufferize invalidated all handles.
+  // TODO: assumes a single func::FuncOp to transform, may ned hardening.
   funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
   funcH = mapToBlockAndThreads(b, funcH, ArrayRef<int64_t>{32, 2, 1});
 
-  // Step 7. Post-bufferization vector distribution with rank-reduction.
+  // Step 6. Post-bufferization vector distribution with rank-reduction.
   distributeVectors(b, funcH);
 }
 
@@ -318,6 +369,12 @@ class TransformDialectJitterPass
 
   void runOnOperation() override {
     Operation *target = getOperation();
+    LLVM_DEBUG(DBGS() << "input IR:\n" << *target);
+
+    // TODO: connect the config above to the reduction below.
+    // This connects to Codegen/LLVMGPU/KernelConfig.cpp
+    //   LogicalResult initGPULaunchConfig(ModuleOp moduleOp)
+    //     LogicalResult setWarpReductionConfig(func::FuncOp, LinalgOp)
     MLIRContext *ctx = target->getContext();
     Location loc = target->getLoc();
 

@@ -126,6 +126,7 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
   if (failed(initGPULaunchConfig(moduleOp))) {
     return signalPassFailure();
   }
+
   // There might be multiple entry points in the module. Currently, all of
   // them need to have the same pipeline.
   // TODO(ravishankarm): This is strange that this is not enforced

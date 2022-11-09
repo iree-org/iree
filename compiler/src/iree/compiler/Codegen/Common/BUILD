@@ -102,6 +102,7 @@ iree_compiler_cc_library(
     ],
     deps = [
         # Dialects
+        "//compiler/src/iree/compiler/Codegen/Dialect:IREECodegenDialect",
         "//compiler/src/iree/compiler/Dialect/Flow/IR",
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
         "//llvm-external-projects/iree-dialects:IREELinalgExtTransformOps",
