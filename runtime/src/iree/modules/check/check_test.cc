@@ -177,8 +177,8 @@ class CheckTest : public ::testing::Test {
                           /*outputs=*/nullptr, iree_allocator_system());
   }
 
-  iree_status_t Invoke(const char* function_name,
-                       std::vector<iree_vm_value_t> args) {
+  iree_status_t InvokeValue(const char* function_name,
+                            std::vector<iree_vm_value_t> args) {
     IREE_RETURN_IF_ERROR(
         iree_vm_list_create(/*element_type=*/nullptr, args.size(),
                             iree_allocator_system(), &inputs_));
@@ -216,28 +216,28 @@ iree_vm_module_t* CheckTest::check_module_ = nullptr;
 iree_vm_module_t* CheckTest::hal_module_ = nullptr;
 
 TEST_F(CheckTest, ExpectTrueSuccess) {
-  IREE_ASSERT_OK(Invoke("expect_true", {iree_vm_value_make_i32(1)}));
+  IREE_ASSERT_OK(InvokeValue("expect_true", {iree_vm_value_make_i32(1)}));
 }
 
 TEST_F(CheckTest, ExpectTrueFailure) {
   EXPECT_NONFATAL_FAILURE(
-      IREE_ASSERT_OK(Invoke("expect_true", {iree_vm_value_make_i32(0)})),
+      IREE_ASSERT_OK(InvokeValue("expect_true", {iree_vm_value_make_i32(0)})),
       "Expected 0 to be nonzero");
 }
 
 TEST_F(CheckTest, ExpectFalseSuccess) {
-  IREE_ASSERT_OK(Invoke("expect_false", {iree_vm_value_make_i32(0)}));
+  IREE_ASSERT_OK(InvokeValue("expect_false", {iree_vm_value_make_i32(0)}));
 }
 
 TEST_F(CheckTest, ExpectFalseFailure) {
   EXPECT_NONFATAL_FAILURE(
-      IREE_ASSERT_OK(Invoke("expect_false", {iree_vm_value_make_i32(1)})),
+      IREE_ASSERT_OK(InvokeValue("expect_false", {iree_vm_value_make_i32(1)})),
       "Expected 1 to be zero");
 }
 
 TEST_F(CheckTest, ExpectFalseNotOneFailure) {
   EXPECT_NONFATAL_FAILURE(
-      IREE_ASSERT_OK(Invoke("expect_false", {iree_vm_value_make_i32(42)})),
+      IREE_ASSERT_OK(InvokeValue("expect_false", {iree_vm_value_make_i32(42)})),
       "Expected 42 to be zero");
 }
 
