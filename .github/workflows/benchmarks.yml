@@ -107,8 +107,8 @@ jobs:
           BENCHMARKS_DIR: ${{ steps.build.outputs.benchmarks-dir }}
         run: |
           tar --exclude '*.tflite' --exclude '*.mlir' \
-            --exclude '${BENCHMARKS_DIR}/benchmark_suites/models' \
-            --exclude '${BENCHMARKS_DIR}/benchmark_suites/iree' \
+            --exclude "${BENCHMARKS_DIR}/benchmark_suites/models" \
+            --exclude "${BENCHMARKS_DIR}/benchmark_suites/iree" \
             -czf \
             "${BENCHMARKS_ARCHIVE}" "${BENCHMARKS_DIR}/benchmark_suites"
           echo "::set-output name=benchmarks-archive::${BENCHMARKS_ARCHIVE}"
