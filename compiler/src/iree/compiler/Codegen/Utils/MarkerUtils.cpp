@@ -71,5 +71,13 @@ void setMarker(Operation *op, StringRef marker) {
               StringAttr::get(op->getContext(), marker));
 }
 
+Operation *findAncestorWithMarker(Operation *op, StringRef marker) {
+  while (op) {
+    if (hasMarker(op, marker)) return op;
+    op = op->getParentOp();
+  };
+  return nullptr;
+}
+
 }  // namespace iree_compiler
 }  // namespace mlir

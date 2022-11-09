@@ -63,6 +63,9 @@ bool hasMarker(Operation *, ArrayRef<StringRef> markers = {});
 /// Sets a given marker on an operation.
 void setMarker(Operation *, StringRef);
 
+/// Find an ancester with the given marker.
+Operation *findAncestorWithMarker(Operation *op, StringRef marker);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 
