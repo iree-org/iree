@@ -12,4 +12,4 @@ gcr.io/iree-oss/android@sha256:99a14dfc482dded1f03460b0ff0a818ecc22688a018a2ccee
 gcr.io/iree-oss/manylinux2014_x86_64-release@sha256:cb77ecaedee1987bc38dc5393f6570566c4c4c89697255158ebce3b073e11ca0
 gcr.io/iree-oss/shark@sha256:b21f1fdaaaa47801af4015ba49a62516d3181632e25606e70629eb046aeb1c01
 gcr.io/iree-oss/base-bleeding-edge@sha256:9b496d8ed27c083f63dae68f6cda2af6a711d54ad496f9b1064b3dd2e2e3e6f4
-gcr.io/iree-oss/swiftshader-bleeding-edge@sha256:08cfbe5c77c64aef05c2c767803743045dda5dce4ac9873c2a9e8b907e94405c
+gcr.io/iree-oss/swiftshader-bleeding-edge@sha256:d335b0885871356ebe697a8f3eac7ce7cbc3d84a458652e7cd95291a0aecfead

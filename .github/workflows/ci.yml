@@ -513,7 +513,7 @@ jobs:
           # This gives us access to the latest features and validates that IREE
           # builds using the latest versions.
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/swiftshader-bleeding-edge@sha256:08cfbe5c77c64aef05c2c767803743045dda5dce4ac9873c2a9e8b907e94405c \
+            gcr.io/iree-oss/swiftshader-bleeding-edge@sha256:d335b0885871356ebe697a8f3eac7ce7cbc3d84a458652e7cd95291a0aecfead \
             ./build_tools/cmake/build_and_test_asan.sh
 
   tsan:
