@@ -16,7 +16,7 @@ def __get_iree_run_module_args(
     test_config: test_definitions.ModelTestConfig) -> List[str]:
   model = test_config.model
   args = [f"--entry_function={model.entry_function}"]
-  if test_config.input_data.data_format != common_definitions.InputDataFormat.ZERO:
+  if test_config.input_data != common_definitions.ZEROS_MODEL_INPUT_DATA:
     raise ValueError("Currently only support all-zeros data.")
   args += [
       f"--function_input={input_type}=0" for input_type in model.input_types
