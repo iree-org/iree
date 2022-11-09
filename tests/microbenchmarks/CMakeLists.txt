@@ -19,12 +19,15 @@ iree_microbenchmark_suite(
     "--iree-llvm-target-cpu-features=host"
 )
 
-iree_microbenchmark_suite(
-  NAME
-   "microbenchmark_cuda"
-  SRCS
-    "linalg_transpose.mlir"
-  FLAGS
-    "--iree-hal-target-backends=cuda"
-    "--iree-input-type=mhlo"
-)
+# Only target cuda benchmarks if the backend is enabled.
+if(IREE_TARGET_BACKEND_CUDA)
+  iree_microbenchmark_suite(
+    NAME
+    "microbenchmark_cuda"
+    SRCS
+      "linalg_transpose.mlir"
+    FLAGS
+      "--iree-hal-target-backends=cuda"
+      "--iree-input-type=mhlo"
+  )
+endif()
