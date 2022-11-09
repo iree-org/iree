@@ -83,11 +83,16 @@ static llvm::cl::opt<bool> enableTripleTilingPipeline(
     llvm::cl::desc("enable triple tiling expert for matmul kernels"),
     llvm::cl::init(false));
 
+// Non-static options are used in other places.
 llvm::cl::opt<std::string> clCPUCodegenTransformDialectFileName(
     "iree-codegen-llvmcpu-use-transform-dialect",
     llvm::cl::desc(
         "MLIR file containing a transform dialect specification to apply"),
     llvm::cl::init(""));
+llvm::cl::opt<bool> clCPUEnableTransformDialectJit(
+    "iree-codegen-llvmcpu-enable-transform-dialect-jit",
+    llvm::cl::desc("enable the usage of the transform dialect JIT"),
+    llvm::cl::init(false));
 
 using IREE::Codegen::DispatchLoweringPassPipeline;
 
@@ -1677,11 +1682,21 @@ LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
     if (!exportOp) continue;
     if (getTranslationInfo(exportOp)) continue;
 
-    // If using the transform dialect interpreter, call the proper pipeline.
+    // If using the transform dialect, call the proper pipeline.
+    assert((clCPUCodegenTransformDialectFileName.empty() ||
+            !clCPUEnableTransformDialectJit) &&
+           "Can't use both transform dialect interpreted and jitted modes");
     if (!clCPUCodegenTransformDialectFileName.empty()) {
       auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
           moduleOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
                                      TransformDialectInterpreterCodegen);
+      setTranslationInfo(funcOp, translationInfo);
+      continue;
+    }
+    if (clCPUEnableTransformDialectJit) {
+      auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+          moduleOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
+                                     TransformDialectJitterCodegen);
       setTranslationInfo(funcOp, translationInfo);
       continue;
     }

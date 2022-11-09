@@ -22,6 +22,7 @@ include_directories(
   "${IREE_SOURCE_DIR}/llvm-external-projects/iree-dialects/include"
   "${IREE_SOURCE_DIR}/third_party/llvm-project/mlir/include"
   "${IREE_SOURCE_DIR}/third_party/mlir-hlo/include"
+  "${IREE_SOURCE_DIR}/third_party/mlir-hlo"
 )
 
 # On Unixes, disable the creation of versioned/symlinked `.so` files. With

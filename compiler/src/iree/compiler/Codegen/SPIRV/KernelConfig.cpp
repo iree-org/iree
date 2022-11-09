@@ -624,23 +624,6 @@ static LogicalResult setFftOpConfig(spirv::ResourceLimitsAttr limits,
 // Reduction Default Configuration
 //===----------------------------------------------------------------------===//
 
-// Check if the given function contains an op that may require a broadcast of
-// the reduced result.
-static bool isFusedWithBroadcast(linalg::LinalgOp reduce) {
-  func::FuncOp entryPoint = reduce->getParentOfType<func::FuncOp>();
-  int64_t reducedRank =
-      reduce->getResult(0).getType().cast<ShapedType>().getRank();
-  bool hasBroadcast = false;
-  entryPoint.walk([&](linalg::LinalgOp linalgOp) {
-    if (reduce != linalgOp && linalgOp.getNumLoops() > reducedRank) {
-      hasBroadcast = true;
-      return WalkResult::interrupt();
-    }
-    return WalkResult::advance();
-  });
-  return hasBroadcast;
-}
-
 /// Set the configuration for reductions that can be mapped to warp reductions.
 static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
                                         linalg::GenericOp op) {
@@ -650,6 +633,8 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
   // requires special capability.
   if (!targetEnv.allows(spirv::Capability::GroupNonUniformShuffle))
     return failure();
+  // TODO: Remove the following once SwiftShader is detached from the default.
+  if (targetEnv.getVendorID() == spirv::Vendor::SwiftShader) return failure();
 
   SmallVector<unsigned> reductionDims;
   op.getReductionDims(reductionDims);
@@ -694,11 +679,16 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
     groupSize = llvm::APIntOps::GreatestCommonDivisor(
                     {64, uint64_t(groupSize)}, {64, uint64_t(maxWorkgroupSize)})
                     .getZExtValue();
-    // Workaround, the vector distribution doesn't handle cases where we fuse
-    // the reduction with a consumer that needs to be tiled.
-    // TODO(thomasraoux): remove the restriction once vector distribution is
-    // improved.
-    if (isFusedWithBroadcast(op)) return failure();
+  }
+  // Current warp reduction pattern is a two step butterfly warp reduce.
+  // First, do warp reductions along multiple subgroups.
+  // Second, reduce results from multiple subgroups using single warp reduce.
+  // The final warp reduce requires numSubgroupUsed > subgroupSize to work.
+  // TODO(raikonenfnu): Add flexible num of warp reduce to handle more configs.
+  // TT::CPU and TT::ARM_Valhall is not going through warp reduce.
+  const int64_t numSubgroupsUsed = groupSize / subgroupSize;
+  if (numSubgroupsUsed > subgroupSize) {
+    return failure();
   }
   std::array<int64_t, 3> workgroupSize = {groupSize, 1, 1};
   // Tile all the parallel dimension to 1.

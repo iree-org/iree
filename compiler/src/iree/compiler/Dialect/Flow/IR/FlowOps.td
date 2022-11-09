@@ -1238,8 +1238,18 @@ def FLOW_TensorTraceOp : FLOW_Op<"tensor.trace", []> {
 // Parameterization Ops
 //===---------------------------------------------------------------------===//
 
-def Flow_DispatchWorkgroupCountFromDagRootOp :
-    FLOW_PureOp<"dispatch.workgroup_count_from_dag_root"> {
+class FLOW_DispatchWorkgroupCountOp<string mnemonic, list<Trait> traits = []> :
+    FLOW_PureOp<mnemonic, traits> {
+  let arguments = (ins Variadic<Index>:$operands);
+  let results = (outs Index:$x, Index:$y, Index:$z);
+
+  let assemblyFormat = [{
+    attr-dict $operands
+  }];
+}
+
+def FLOW_DispatchWorkgroupCountFromDagRootOp :
+    FLOW_DispatchWorkgroupCountOp<"dispatch.workgroup_count_from_dag_root"> {
   let summary = [{
     workgroup count computed based on iteration range of the root of the DAG
     for ops within the dispatch.
@@ -1254,12 +1264,20 @@ def Flow_DispatchWorkgroupCountFromDagRootOp :
     (typically based on the tile sizes used to tile and distribute the root of
     the DAG).
   }];
+}
 
-  let arguments = (ins Variadic<Index>:$operands);
-  let results = (outs Index:$x, Index:$y, Index:$z);
-
-  let assemblyFormat = [{
-    attr-dict $operands
+def FLOW_DispatchWorkgroupCountFromSetEncodingOp :
+    FLOW_DispatchWorkgroupCountOp<"dispatch.workgroup_count_from_set_encoding_op"> {
+  let summary = [{
+    Workgroup count for dispatches that have a root as set_encoding op.
+  }];
+  let description = [{
+    For dispatches where the set_encoding operation is the root (producers
+    might be fused into these ops), the actual iteration space is materialized
+    only in the backend. This op is a placeholder to represent the workgroup
+    count calculation that accounts for the materialization.
+    The operands to the op represent the shape of the source of the pack
+    operation.
   }];
 }
 

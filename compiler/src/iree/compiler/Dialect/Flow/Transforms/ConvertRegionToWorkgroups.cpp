@@ -80,7 +80,7 @@ static Optional<Value> findFirstTiedValueOutsideOfRegionOp(
 FailureOr<Flow::DispatchWorkgroupsOp>
 rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
     Flow::DispatchRegionOp regionOp, RewriterBase &rewriter,
-    ValueRange workload, WorkloadBuilderFn workloadRegionBuilder) {
+    Optional<WorkloadBuilder> workloadBuilder) {
   // Only ops with a single block are supported.
   Region &region = regionOp.getBody();
   if (!region.hasOneBlock()) return failure();
@@ -137,6 +137,8 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
       arguments.append(dims.begin(), dims.end());
     }
   }
+  ValueRange workload;
+  if (workloadBuilder.has_value()) workload = workloadBuilder->workload;
   auto workgroupsOp = rewriter.create<IREE::Flow::DispatchWorkgroupsOp>(
       loc, workload, regionOp.getResultTypes(), regionOp.getResultDims(),
       arguments, argumentDims, tiedArguments);
@@ -203,14 +205,14 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
   rewriter.eraseOp(terminator);
 
   // Create workload region.
-  if (workloadRegionBuilder) {
+  if (workloadBuilder.has_value()) {
     Region &workgroupCountRegion = workgroupsOp.getWorkgroupCount();
     Block *body = rewriter.createBlock(&workgroupCountRegion);
     SmallVector<BlockArgument> workloadArgs;
     for (Value v : workload)
       workloadArgs.push_back(body->addArgument(v.getType(), loc));
     rewriter.setInsertionPointToStart(body);
-    workloadRegionBuilder(rewriter, loc, workloadArgs);
+    workloadBuilder->regionBuilder(rewriter, loc, workloadArgs);
   }
 
   rewriter.replaceOp(regionOp, workgroupsOp.getResults());

@@ -252,6 +252,9 @@ iree_bytecode_module(
 native_test(
     name = "simple_embedding_vulkan_test",
     src = ":simple_embedding_vulkan",
+    tags = [
+        "driver=vulkan",
+    ],
 )
 
 iree_cmake_extra_content(

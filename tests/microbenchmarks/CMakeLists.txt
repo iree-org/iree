@@ -4,7 +4,7 @@ iree_add_all_subdirs()
 
 iree_microbenchmark_suite(
   NAME
-   "microbenchmark"
+   "microbenchmark_llvm-cpu"
   SRCS
     "dynamic_shape_vectorization.mlir"
     "linalg_mmt4d.mlir"
@@ -18,3 +18,16 @@ iree_microbenchmark_suite(
     "--iree-input-type=mhlo"
     "--iree-llvm-target-cpu-features=host"
 )
+
+# Only target cuda benchmarks if the backend is enabled.
+if(IREE_TARGET_BACKEND_CUDA)
+  iree_microbenchmark_suite(
+    NAME
+    "microbenchmark_cuda"
+    SRCS
+      "linalg_transpose.mlir"
+    FLAGS
+      "--iree-hal-target-backends=cuda"
+      "--iree-input-type=mhlo"
+  )
+endif()

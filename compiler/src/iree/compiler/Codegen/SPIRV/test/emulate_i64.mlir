@@ -1,5 +1,5 @@
 // RUN: iree-opt --split-input-file \
-// RUN:   --pass-pipeline='hal.executable(hal.executable.variant(builtin.module(iree-spirv-emulate-i64)))' %s | \
+// RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-spirv-emulate-i64))))' %s | \
 // RUN:   FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [

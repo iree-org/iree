@@ -43,6 +43,7 @@ iree_cc_library(
     "VerifyLowerings.cpp"
   DEPS
     ::PassesIncGen
+    IREELinalgExtDialect
     LLVMSupport
     MLIRAffineDialect
     MLIRAnalysis

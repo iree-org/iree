@@ -243,6 +243,8 @@ iree_native_test(
     "simple_embedding_vulkan_test"
   SRC
     ::simple_embedding_vulkan
+  LABELS
+    "driver=vulkan"
 )
 
 endif()

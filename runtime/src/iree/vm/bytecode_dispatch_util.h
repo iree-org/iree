@@ -140,11 +140,12 @@ static inline const iree_vm_type_def_t* iree_vm_map_type(
 #define IREE_DISPATCH_TRACE_INSTRUCTION(...)
 #endif  // IREE_VM_EXECUTION_TRACING_ENABLE
 
-#if defined(IREE_COMPILER_MSVC) && !defined(IREE_COMPILER_CLANG)
-#define IREE_DISPATCH_MODE_SWITCH 1
-#else
+#if defined(IREE_COMPILER_CLANG) && \
+    IREE_VM_BYTECODE_DISPATCH_COMPUTED_GOTO_ENABLE
 #define IREE_DISPATCH_MODE_COMPUTED_GOTO 1
-#endif  // MSVC
+#else
+#define IREE_DISPATCH_MODE_SWITCH 1
+#endif  // IREE_VM_BYTECODE_DISPATCH_COMPUTED_GOTO_ENABLE
 
 #ifndef NDEBUG
 #define VMCHECK(expr) assert(expr)

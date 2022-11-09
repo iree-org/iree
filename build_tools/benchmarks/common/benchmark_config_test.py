@@ -19,14 +19,17 @@ class BenchmarkConfigTest(unittest.TestCase):
   def setUp(self):
     self.build_dir = tempfile.TemporaryDirectory()
     self.tmp_dir = tempfile.TemporaryDirectory()
-    self.normal_tool_dir = os.path.join(self.build_dir.name, "normal_tool")
+    self.normal_tool_dir = os.path.realpath(
+        os.path.join(self.build_dir.name, "normal_tool"))
     os.mkdir(self.normal_tool_dir)
-    self.traced_tool_dir = os.path.join(self.build_dir.name, "traced_tool")
+    self.traced_tool_dir = os.path.realpath(
+        os.path.join(self.build_dir.name, "traced_tool"))
     os.mkdir(self.traced_tool_dir)
     self.trace_capture_tool = tempfile.NamedTemporaryFile()
     os.chmod(self.trace_capture_tool.name, stat.S_IEXEC)
 
   def tearDown(self):
+    self.trace_capture_tool.close()
     self.tmp_dir.cleanup()
     self.build_dir.cleanup()
 
@@ -43,26 +46,27 @@ class BenchmarkConfigTest(unittest.TestCase):
 
     config = BenchmarkConfig.build_from_args(args=args, git_commit_hash="abcd")
 
-    per_commit_tmp_dir = os.path.join(self.tmp_dir.name, "abcd")
+    per_commit_tmp_dir = os.path.realpath(
+        os.path.join(self.tmp_dir.name, "abcd"))
     expected_trace_capture_config = TraceCaptureConfig(
         traced_benchmark_tool_dir=self.traced_tool_dir,
-        trace_capture_tool=self.trace_capture_tool.name,
+        trace_capture_tool=os.path.realpath(self.trace_capture_tool.name),
         capture_tarball=os.path.realpath("capture.tar"),
         capture_tmp_dir=os.path.join(per_commit_tmp_dir, "captures"))
-    self.assertEqual(
-        config,
-        BenchmarkConfig(root_benchmark_dir=os.path.join(self.build_dir.name,
-                                                        "benchmark_suites"),
-                        benchmark_results_dir=os.path.join(
-                            per_commit_tmp_dir, "benchmark-results"),
-                        git_commit_hash="abcd",
-                        normal_benchmark_tool_dir=self.normal_tool_dir,
-                        trace_capture_config=expected_trace_capture_config,
-                        driver_filter="a",
-                        model_name_filter="b",
-                        mode_filter="c",
-                        keep_going=True,
-                        benchmark_min_time=10))
+    expected_config = BenchmarkConfig(
+        root_benchmark_dir=os.path.realpath(
+            os.path.join(self.build_dir.name, "benchmark_suites")),
+        benchmark_results_dir=os.path.realpath(
+            os.path.join(per_commit_tmp_dir, "benchmark-results")),
+        git_commit_hash="abcd",
+        normal_benchmark_tool_dir=self.normal_tool_dir,
+        trace_capture_config=expected_trace_capture_config,
+        driver_filter="a",
+        model_name_filter="b",
+        mode_filter="c",
+        keep_going=True,
+        benchmark_min_time=10)
+    self.assertEqual(config, expected_config)
 
   def test_build_from_args_benchmark_only(self):
     args = build_common_argument_parser().parse_args([

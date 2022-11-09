@@ -13,6 +13,7 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/cpu.h"
 #include "iree/base/internal/flags.h"
+#include "iree/base/internal/math.h"
 #include "iree/base/internal/path.h"
 #include "iree/base/target_platform.h"
 #include "iree/hal/api.h"
@@ -202,7 +203,10 @@ static void write_int_element(iree_hal_element_type_t element_type, int value,
   switch (element_type) {
     WRITE_INT_ELEMENT_CASE(INT_8, int8_t)
     WRITE_INT_ELEMENT_CASE(INT_32, int32_t)
-    WRITE_INT_ELEMENT_CASE(FLOAT_32, float)
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
+      *(uint16_t*)dst = iree_math_f32_to_f16((float)value);
+      break;
+      WRITE_INT_ELEMENT_CASE(FLOAT_32, float)
     default:
       IREE_ASSERT(false, "unhandled element type");
       break;
@@ -224,6 +228,50 @@ static void write_int_element(iree_hal_element_type_t element_type, int value,
  * particular test program is entrenched here.
  *
  *****************************************************************************/
+// Write an int32_t element to a mapped row-major matrix buffer.
+static void write_int_to_matrix_element(int32_t value, iree_hal_dim_t m_size,
+                                        iree_hal_dim_t n_size,
+                                        iree_hal_element_type_t result_type,
+                                        void* data, iree_hal_dim_t m,
+                                        iree_hal_dim_t n) {
+  iree_host_size_t index = n + m * n_size;
+  (void)m_size;
+  if (iree_hal_element_type_is_integer(result_type, 32)) {
+    ((int32_t*)data)[index] = value;
+    return;
+  } else if (result_type == IREE_HAL_ELEMENT_TYPE_FLOAT_16) {
+    ((uint16_t*)data)[index] = iree_math_f32_to_f16((float)value);
+    return;
+  } else if (result_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
+    ((float*)data)[index] = value;
+    return;
+  }
+  IREE_CHECK_OK(iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                 "unhandled matmul result type"));
+}
+
+// Reads an element from a mapped row-major matrix buffer.
+static iree_e2e_test_value_t read_matrix_element(
+    iree_hal_dim_t m_size, iree_hal_dim_t n_size,
+    iree_hal_element_type_t result_type, void* data, iree_hal_dim_t m,
+    iree_hal_dim_t n) {
+  iree_host_size_t index = n + m * n_size;
+  (void)m_size;
+  if (iree_hal_element_type_is_integer(result_type, 8)) {
+    return iree_e2e_test_value_make_i8(((int8_t*)data)[index]);
+  } else if (iree_hal_element_type_is_integer(result_type, 16)) {
+    return iree_e2e_test_value_make_i16(((int16_t*)data)[index]);
+  } else if (iree_hal_element_type_is_integer(result_type, 32)) {
+    return iree_e2e_test_value_make_i32(((int32_t*)data)[index]);
+  } else if (result_type == IREE_HAL_ELEMENT_TYPE_FLOAT_16) {
+    return iree_e2e_test_value_make_f16(((uint16_t*)data)[index]);
+  } else if (result_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
+    return iree_e2e_test_value_make_f32(((float*)data)[index]);
+  }
+  iree_status_abort(iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                     "unhandled matmul result type"));
+  return iree_e2e_test_value_make_none();
+}
 
 // Get the shape of a buffer_view that is a matrix, i.e. 2D shape.
 static iree_status_t get_matrix_shape(iree_hal_buffer_view_t* buffer_view,
@@ -276,34 +324,49 @@ static iree_status_t get_matmul_sizes(
   return iree_ok_status();
 }
 
-// Helper for reference_matmul_element. f32 case.
-static void reference_matmul_element_f32(
-    iree_hal_dim_t m_size, iree_hal_dim_t k_size, iree_hal_dim_t n_size,
-    iree_hal_element_type_t lhs_type, iree_hal_element_type_t rhs_type,
-    float* lhs_data, float* rhs_data, float* acc_data, float* result_data,
-    iree_hal_dim_t m, iree_hal_dim_t n) {
-  float acc = acc_data[n + m * n_size];
-  for (iree_hal_dim_t k = 0; k < k_size; ++k) {
-    float lhs_value = lhs_data[k + m * k_size];
-    float rhs_value = rhs_data[n + k * n_size];
-    acc += lhs_value * rhs_value;
+#define IREE_TRACE_REPLAY_REFERENCE_MATMUL(LHSTYPE, RHSTYPE, RESTYPE, ACCTYPE) \
+  static void reference_matmul_##LHSTYPE##_##RHSTYPE##_##RESTYPE##_##ACCTYPE(  \
+      iree_hal_dim_t m_size, iree_hal_dim_t k_size, iree_hal_dim_t n_size,     \
+      iree_hal_element_type_t lhs_type, iree_hal_element_type_t rhs_type,      \
+      iree_hal_element_type_t acc_type, LHSTYPE* lhs_data, RHSTYPE* rhs_data,  \
+      ACCTYPE* acc_data, RESTYPE* result_data, iree_hal_dim_t m,               \
+      iree_hal_dim_t n) {                                                      \
+    ACCTYPE acc = acc_data[n + m * n_size];                                    \
+    for (iree_hal_dim_t k = 0; k < k_size; ++k) {                              \
+      LHSTYPE lhs_value = lhs_data[k + m * k_size];                            \
+      RHSTYPE rhs_value = rhs_data[n + k * n_size];                            \
+      acc += (ACCTYPE)lhs_value * (ACCTYPE)rhs_value;                          \
+    }                                                                          \
+    result_data[n + m * n_size] = acc;                                         \
   }
-  result_data[n + m * n_size] = acc;
-}
 
-// Helper for reference_matmul_element. i8*i8->i32 case.
-static void reference_matmul_element_i8_i8_i32(
+// Reference mamtul instantiations from macro IREE_TRACE_REPLAY_REFERENCE_MATMUL
+// for the f32 input, f32 accumlation, and f32 result.
+// [float <= float * float + float]
+IREE_TRACE_REPLAY_REFERENCE_MATMUL(float, float, float, float)
+
+// Reference mamtul instantiations from macro IREE_TRACE_REPLAY_REFERENCE_MATMUL
+// for the int8_t input, int32_t accumlation, and int32_t result.
+// [i32 <= i8 * i8 + i32]
+IREE_TRACE_REPLAY_REFERENCE_MATMUL(int8_t, int8_t, int32_t, int32_t)
+
+// Reference mamtul for the half_t input, half_t accumlation, and half_t result.
+// [f16 <= f16 * f16 + f16]
+static void reference_matmul_f16_f16_f16_f16(
     iree_hal_dim_t m_size, iree_hal_dim_t k_size, iree_hal_dim_t n_size,
     iree_hal_element_type_t lhs_type, iree_hal_element_type_t rhs_type,
-    int8_t* lhs_data, int8_t* rhs_data, int32_t* acc_data, int32_t* result_data,
-    iree_hal_dim_t m, iree_hal_dim_t n) {
-  int32_t acc = acc_data[n + m * n_size];
+    iree_hal_element_type_t acc_type, uint16_t* lhs_data, uint16_t* rhs_data,
+    uint16_t* acc_data, uint16_t* result_data, iree_hal_dim_t m,
+    iree_hal_dim_t n) {
+  float acc = iree_math_f16_to_f32(acc_data[n + m * n_size]);
   for (iree_hal_dim_t k = 0; k < k_size; ++k) {
-    int8_t lhs_value = lhs_data[k + m * k_size];
-    int8_t rhs_value = rhs_data[n + k * n_size];
-    acc += ((int32_t)lhs_value) * ((int32_t)rhs_value);
+    acc = iree_math_round_to_nearest_f16(
+        iree_math_round_to_nearest_f16(
+            (iree_math_f16_to_f32(lhs_data[k + m * k_size]) *
+             iree_math_f16_to_f32(rhs_data[n + k * n_size]))) +
+        acc);
   }
-  result_data[n + m * n_size] = acc;
+  result_data[n + m * n_size] = iree_math_f32_to_f16(acc);
 }
 
 // Helper for reference_matmul.
@@ -316,15 +379,22 @@ static void reference_matmul_element(
   if (lhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32 &&
       rhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32 &&
       acc_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
-    reference_matmul_element_f32(m_size, k_size, n_size, lhs_type, rhs_type,
-                                 (float*)lhs_data, (float*)rhs_data,
-                                 (float*)acc_data, (float*)result_data, m, n);
+    reference_matmul_float_float_float_float(
+        m_size, k_size, n_size, lhs_type, rhs_type, acc_type, (float*)lhs_data,
+        (float*)rhs_data, (float*)acc_data, (float*)result_data, m, n);
   } else if (iree_hal_element_type_is_integer(lhs_type, 8) &&
              iree_hal_element_type_is_integer(rhs_type, 8) &&
              iree_hal_element_type_is_integer(acc_type, 32)) {
-    reference_matmul_element_i8_i8_i32(
-        m_size, k_size, n_size, lhs_type, rhs_type, (int8_t*)lhs_data,
+    reference_matmul_int8_t_int8_t_int32_t_int32_t(
+        m_size, k_size, n_size, lhs_type, rhs_type, acc_type, (int8_t*)lhs_data,
         (int8_t*)rhs_data, (int32_t*)acc_data, (int32_t*)result_data, m, n);
+  } else if (lhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_16 &&
+             rhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_16 &&
+             acc_type == IREE_HAL_ELEMENT_TYPE_FLOAT_16) {
+    reference_matmul_f16_f16_f16_f16(m_size, k_size, n_size, lhs_type, rhs_type,
+                                     acc_type, (uint16_t*)lhs_data,
+                                     (uint16_t*)rhs_data, (uint16_t*)acc_data,
+                                     (uint16_t*)result_data, m, n);
   } else {
     iree_status_abort(
         iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -375,28 +445,6 @@ static iree_status_t reference_matmul(iree_vm_list_t* input_list,
   return iree_ok_status();
 }
 
-// Reads an element from a mapped row-major matrix buffer.
-static iree_vm_value_t read_matrix_element(iree_hal_dim_t m_size,
-                                           iree_hal_dim_t n_size,
-                                           iree_hal_element_type_t result_type,
-                                           void* data, iree_hal_dim_t m,
-                                           iree_hal_dim_t n) {
-  iree_host_size_t index = n + m * n_size;
-  (void)m_size;
-  if (iree_hal_element_type_is_integer(result_type, 8)) {
-    return iree_vm_value_make_i8(((int8_t*)data)[index]);
-  } else if (iree_hal_element_type_is_integer(result_type, 16)) {
-    return iree_vm_value_make_i16(((int16_t*)data)[index]);
-  } else if (iree_hal_element_type_is_integer(result_type, 32)) {
-    return iree_vm_value_make_i32(((int32_t*)data)[index]);
-  } else if (result_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
-    return iree_vm_value_make_f32(((float*)data)[index]);
-  }
-  iree_status_abort(iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                                     "unhandled matmul result type"));
-  return iree_vm_value_make_none();
-}
-
 /*****************************************************************************
  *
  * Part 3:
@@ -417,23 +465,27 @@ typedef enum precision_e {
   PRECISION_HIGH,
 } precision_t;
 
-// Prints a iree_vm_value_t to a string buffer. Returns the number of
+// Prints a iree_e2e_test_value_t to a string buffer. Returns the number of
 // characters written. Like snprintf.
-static int snprintf_value(char* buf, size_t bufsize, iree_vm_value_t value,
-                          precision_t precision) {
+static int snprintf_value(char* buf, size_t bufsize,
+                          iree_e2e_test_value_t value, precision_t precision) {
   switch (value.type) {
-    case IREE_VM_VALUE_TYPE_I8:
+    case IREE_E2E_TEST_VALUE_TYPE_I8:
       return snprintf(buf, bufsize, "%" PRIi8, value.i8);
-    case IREE_VM_VALUE_TYPE_I16:
+    case IREE_E2E_TEST_VALUE_TYPE_I16:
       return snprintf(buf, bufsize, "%" PRIi16, value.i16);
-    case IREE_VM_VALUE_TYPE_I32:
+    case IREE_E2E_TEST_VALUE_TYPE_I32:
       return snprintf(buf, bufsize, "%" PRIi32, value.i32);
-    case IREE_VM_VALUE_TYPE_I64:
+    case IREE_E2E_TEST_VALUE_TYPE_I64:
       return snprintf(buf, bufsize, "%" PRIi64, value.i64);
-    case IREE_VM_VALUE_TYPE_F32:
+    case IREE_E2E_TEST_VALUE_TYPE_F16:
+      return snprintf(buf, bufsize,
+                      precision == PRECISION_HIGH ? "%.5g" : "%.4g",
+                      iree_math_f16_to_f32(value.f16_u16));
+    case IREE_E2E_TEST_VALUE_TYPE_F32:
       return snprintf(buf, bufsize,
                       precision == PRECISION_HIGH ? "%.8g" : "%.4g", value.f32);
-    case IREE_VM_VALUE_TYPE_F64:
+    case IREE_E2E_TEST_VALUE_TYPE_F64:
       return snprintf(buf, bufsize,
                       precision == PRECISION_HIGH ? "%.16g" : "%.4g",
                       value.f64);
@@ -445,34 +497,23 @@ static int snprintf_value(char* buf, size_t bufsize, iree_vm_value_t value,
 }
 
 // Returns true if |expected| and |actual| agree to tolerable accuracy.
-static bool matmul_result_elements_agree(iree_vm_value_t expected,
-                                         iree_vm_value_t actual) {
+static bool matmul_result_elements_agree(iree_e2e_test_value_t expected,
+                                         iree_e2e_test_value_t actual) {
   if (expected.type != actual.type) {
     iree_status_abort(
         iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "mismatched types"));
     return false;
   }
   switch (expected.type) {
-    case IREE_VM_VALUE_TYPE_I32:
+    case IREE_E2E_TEST_VALUE_TYPE_I32:
       return actual.i32 == expected.i32;
-    case IREE_VM_VALUE_TYPE_F32:
-      // The absolute value difference comparison here is naive, bad.
-      //
-      // Why it's almost good enough: we are only testing matmuls here, not even
-      // fused with any other op. Because of how matmul is defined (as a
-      // polynomial expression with coefficients either 0 or 1), it's going to
-      // be either correct or completely wrong. That wouldn't be
-      // true if we were pursuing non-trivial accumulation strategies limiting
-      // accumulation depth, but we are not doing that. Also, we are not testing
-      // huge sizes, and all our test data is in the same order of magnitude.
-      //
-      // What would be the better thing to do here: adjust the tolerated
-      // absolute value difference based on the magnitude of the matrix
-      // elements, the accumulation depth (k_size) and the accumulator type's
-      // epsilon. Floating-point calculations should be scale-invariant: matmul
-      // tests should succeed or fail in the same way if we rescale all input
-      // data by a constant factor (as long as we don't run out of exponents).
-      return fabsf(actual.f32 - expected.f32) < 1e-3f;
+    // Since we fill buffers with small integers for floating point GEMMs
+    // functional testing, we test for bit-exactness on the actual and
+    // expected values.
+    case IREE_E2E_TEST_VALUE_TYPE_F16:
+      return actual.f16_u16 == expected.f16_u16;
+    case IREE_E2E_TEST_VALUE_TYPE_F32:
+      return actual.f32 == expected.f32;
     default:
       iree_status_abort(iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                          "unhandled value type"));
@@ -495,7 +536,7 @@ static int get_max_elem_width(precision_t precision, int row_start, int row_end,
   int max_elem_width = 0;
   for (int row = row_start; row < row_end; row++) {
     for (int col = col_start; col < col_end; col++) {
-      iree_vm_value_t elem = read_matrix_element(
+      iree_e2e_test_value_t elem = read_matrix_element(
           rows, cols, elem_type, mapping.contents.data, row, col);
       char buf[64];
       int this_elem_width = snprintf_value(buf, sizeof buf, elem, precision);
@@ -557,11 +598,11 @@ static void print_matrix(FILE* file, const char* label, precision_t precision,
           cols - 1);
   for (int row = row_start; row < row_end; row++) {
     for (int col = col_start; col < col_end; col++) {
-      iree_vm_value_t elem = read_matrix_element(
+      iree_e2e_test_value_t elem = read_matrix_element(
           rows, cols, elem_type, mapping.contents.data, row, col);
       bool disagree = false;
       if (other_matrix) {
-        iree_vm_value_t other_elem = read_matrix_element(
+        iree_e2e_test_value_t other_elem = read_matrix_element(
             rows, cols, elem_type, other_mapping.contents.data, row, col);
         disagree = !matmul_result_elements_agree(elem, other_elem);
       }
@@ -585,8 +626,9 @@ static void print_matrix(FILE* file, const char* label, precision_t precision,
 // Helper for check_matmul_results: handler for the failure case.
 // If |file| is not NULL, detailed logging is written to it.
 static iree_status_t check_matmul_failure(
-    FILE* file, iree_vm_value_t actual_value, iree_vm_value_t expected_value,
-    iree_hal_dim_t row, iree_hal_dim_t col, iree_hal_buffer_view_t* lhs,
+    FILE* file, iree_e2e_test_value_t actual_value,
+    iree_e2e_test_value_t expected_value, iree_hal_dim_t row,
+    iree_hal_dim_t col, iree_hal_buffer_view_t* lhs,
     iree_hal_buffer_view_t* rhs, iree_hal_buffer_view_t* acc,
     iree_hal_buffer_view_t* actual_result,
     iree_hal_buffer_view_t* expected_result) {
@@ -676,10 +718,10 @@ static iree_status_t check_matmul_results_impl(
       iree_hal_buffer_view_element_type(actual_result);
   for (iree_hal_dim_t m = 0; m < m_size; ++m) {
     for (iree_hal_dim_t n = 0; n < n_size; ++n) {
-      iree_vm_value_t actual_value =
+      iree_e2e_test_value_t actual_value =
           read_matrix_element(m_size, n_size, result_type,
                               actual_result_mapping.contents.data, m, n);
-      iree_vm_value_t expected_value =
+      iree_e2e_test_value_t expected_value =
           read_matrix_element(m_size, n_size, result_type,
                               expected_result_mapping.contents.data, m, n);
       if (!matmul_result_elements_agree(actual_value, expected_value)) {

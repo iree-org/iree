@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline="func.func(iree-vmvx-lower-linalg-microkernels, canonicalize, cse)" %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-vmvx-lower-linalg-microkernels, canonicalize, cse))" %s | FileCheck %s
 
 // Verifies the indexing math generated in order to resolve subviews to 1D.
 // This incidentally also verifies vmvx.copy (non-transposed) lowering.

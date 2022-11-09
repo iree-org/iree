@@ -232,12 +232,6 @@ bool AffinityAttr::canExecuteTogether(AffinityAttr lhs, AffinityAttr rhs) {
 // #stream.partitioning_config
 //===----------------------------------------------------------------------===//
 
-void PartitioningConfigAttr::walkImmediateSubElements(
-    function_ref<void(Attribute)> walkAttrsFn,
-    function_ref<void(Type)> walkTypesFn) const {
-  walkAttrsFn(getFavor());
-}
-
 Attribute PartitioningConfigAttr::parse(AsmParser &p, Type type) {
   std::string favorStr;
   if (failed(p.parseLess())) return {};
@@ -273,12 +267,6 @@ PartitioningConfigAttr PartitioningConfigAttr::lookup(Operation *op) {
   // No config found; use defaults.
   auto favorAttr = FavorAttr::get(attrId.getContext(), clPartitioningFavor);
   return PartitioningConfigAttr::get(favorAttr);
-}
-
-Attribute PartitioningConfigAttr::replaceImmediateSubElements(
-    ArrayRef<Attribute> replAttrs, ArrayRef<Type> replTypes) const {
-  return PartitioningConfigAttr::get(
-      replAttrs[0].cast<IREE::Stream::FavorAttr>());
 }
 
 //===----------------------------------------------------------------------===//

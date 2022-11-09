@@ -9,6 +9,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/IR/AsmState.h"
 #include "mlir/IR/PatternMatch.h"
 
 #define DEBUG_TYPE "iree-stream-partitioning"
@@ -17,6 +18,24 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace Stream {
+
+// Returns an AsmState at the ancestor to |block| that is isolated from above.
+// Returns nullptr if debug dumps of partitioning is disabled.
+static std::unique_ptr<AsmState> getRootAsmState(Block *block) {
+  LLVM_DEBUG({
+    auto *rootOp = block->getParentOp();
+    while (auto parentOp = rootOp->getParentOp()) {
+      if (!isa<IREE::Stream::TimelineOpInterface>(parentOp) &&
+          parentOp->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
+        rootOp = parentOp;
+        break;
+      }
+      rootOp = parentOp;
+    }
+    return std::make_unique<AsmState>(rootOp);
+  });
+  return nullptr;
+}
 
 // This is terrible. See Stream/Analysis/Partition.h for a description of what
 // a real implementation would do. We want cost modeling for tie breakers when
@@ -53,6 +72,8 @@ PartitionSet partitionStreamableOpsReference(
   };
   DenseMap<Operation *, OpInfo> opInfos;
 
+  auto asmState = getRootAsmState(block);
+
   for (auto &op : llvm::reverse(*block)) {
     // Skip constants; they just add noise (and since they are heavily CSE'd
     // they have lots of users to test).
@@ -65,7 +86,7 @@ PartitionSet partitionStreamableOpsReference(
       if (!mlir::wouldOpBeTriviallyDead(&op)) {
         LLVM_DEBUG({
           llvm::dbgs() << "Side-effecting op forcing flush and freeze:\n";
-          op.dump();
+          op.print(llvm::dbgs(), *asmState);
         });
         usableBuilders.reset();
       }
@@ -88,7 +109,7 @@ PartitionSet partitionStreamableOpsReference(
 
     LLVM_DEBUG({
       llvm::dbgs() << "====\nPartitioning op:\n";
-      op.dump();
+      op.print(llvm::dbgs(), *asmState);
     });
 
     // Set bits for each partition this op may be able to be placed into.
@@ -99,7 +120,7 @@ PartitionSet partitionStreamableOpsReference(
       auto &userInfo = opInfos[user];
       LLVM_DEBUG({
         llvm::dbgs() << "Testing user:\n";
-        user->dump();
+        user->print(llvm::dbgs(), *asmState);
         for (auto membershipOrdinal : userInfo.membership.set_bits()) {
           llvm::dbgs() << "  member of partition " << membershipOrdinal << "\n";
         }
@@ -230,7 +251,7 @@ PartitionSet partitionStreamableOpsReference(
     partitionSet.partitions.push_back(std::move(partition));
   }
 
-  LLVM_DEBUG(partitionSet.dump(block->getParentOp()));
+  LLVM_DEBUG(partitionSet.dump(*asmState));
 
   return partitionSet;
 }
@@ -243,7 +264,7 @@ PartitionSet partitionRegionConcurrencyReference(
 
   auto favor = config.getFavor().getValue();
   if (favor == IREE::Stream::Favor::Debug) {
-    // Disable partitioning when favoring debugability.
+    // Disable partitioning when favoring debuggability.
     return waveSet;
   }
 
@@ -261,6 +282,8 @@ PartitionSet partitionRegionConcurrencyReference(
     llvm::BitVector hazards;
   };
   DenseMap<Operation *, OpInfo> opInfos;
+
+  auto asmState = getRootAsmState(block);
 
   for (auto &op : llvm::reverse(*block)) {
     // Skip constants; they just add noise (and since they are heavily CSE'd
@@ -281,7 +304,7 @@ PartitionSet partitionRegionConcurrencyReference(
 
     LLVM_DEBUG({
       llvm::dbgs() << "====\nPartitioning op:\n";
-      op.dump();
+      op.print(llvm::dbgs(), *asmState);
     });
 
     // Set bits for each wave this op may be able to be placed into.
@@ -292,7 +315,7 @@ PartitionSet partitionRegionConcurrencyReference(
       auto &userInfo = opInfos[user];
       LLVM_DEBUG({
         llvm::dbgs() << "Testing user:\n";
-        user->dump();
+        user->print(llvm::dbgs(), *asmState);
         for (auto membershipOrdinal : userInfo.membership.set_bits()) {
           llvm::dbgs() << "  member of wave " << membershipOrdinal << "\n";
         }
@@ -375,7 +398,7 @@ PartitionSet partitionRegionConcurrencyReference(
     waveSet.partitions.push_back(std::move(wave));
   }
 
-  LLVM_DEBUG(waveSet.dump(block->getParentOp()));
+  LLVM_DEBUG(waveSet.dump(*asmState));
 
   return waveSet;
 }

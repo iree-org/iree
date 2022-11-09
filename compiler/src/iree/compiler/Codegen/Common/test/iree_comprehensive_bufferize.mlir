@@ -2279,7 +2279,7 @@ func.func @scatter_update_scalar_1D() {
   scf.for %arg0 = %4 to %c4 step %5 {
     %6 = flow.dispatch.tensor.load %0, offsets = [%arg0], sizes = [4], strides = [1] : !flow.dispatch.tensor<readonly:tensor<4xi32>> -> tensor<4xi32>
     %7 = flow.dispatch.tensor.load %1, offsets = [%arg0, 0], sizes = [4, 1], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<4x1xi32>> -> tensor<4x1xi32>
-    %8 = iree_linalg_ext.scatter unique_indices(true) ins(%6, %7 : tensor<4xi32>, tensor<4x1xi32>) outs(%3 : tensor<8xi32>) {
+    %8 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true) ins(%6, %7 : tensor<4xi32>, tensor<4x1xi32>) outs(%3 : tensor<8xi32>) {
     ^bb0(%arg1: i32, %arg2: i32):
       iree_linalg_ext.yield %arg1 : i32
     } -> tensor<8xi32>

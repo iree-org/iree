@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline='iree-abi-wrap-entry-points{invocation-model=sync}' --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-abi-wrap-entry-points{invocation-model=sync})' --split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: func.func @dynamicEntry(
 //  CHECK-SAME:   %[[ARG0:.+]]: !hal.buffer_view, %[[ARG1:.+]]: !hal.buffer_view

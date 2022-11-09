@@ -322,4 +322,10 @@ static inline uint16_t iree_math_f32_to_f16(const float f32_value) {
   return (uint16_t)(sign | exp | mantissa);
 }
 
+// Rounds of 32-bit C `float` value to nearest 16-bit value and returns
+// 32-bit `float`
+static inline float iree_math_round_to_nearest_f16(const float f32_value) {
+  return iree_math_f16_to_f32(iree_math_f32_to_f16(f32_value));
+}
+
 #endif  // IREE_BASE_INTERNAL_MATH_H_
