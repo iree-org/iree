@@ -13,9 +13,9 @@ include "mlir/Dialect/Transform/IR/TransformInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpBase.td"
 
-def MapNestedForeachThreadToGpuThreadsOp : 
+def MapNestedForeachThreadToGpuThreadsOp :
   Op<Transform_Dialect, "iree.map_nested_foreach_thread_to_gpu_threads",
-    [FunctionalStyleTransformOpTrait, 
+    [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,
      TransformEachOpTrait,
      TransformOpInterface]> {
@@ -30,24 +30,24 @@ def MapNestedForeachThreadToGpuThreadsOp :
 
     Multiple scf.foreach_thread are supported per function in which case, the
     max of all the threads is computed and taken for the global gpu.thread_id.
-    If necessary, scf.foreach_thread that do not use the whole thread range 
+    If necessary, scf.foreach_thread that do not use the whole thread range
     result in predicated computations.
-   
+
     Barriers are inserted after each scf.foreach_thread op for now.
 
     Return modes:
     =============
     This operation ignores non-Func ops and drops them in the return.
 
-    If any scf.foreach_thread with tensors is found, the transform definitely 
-    fails.    
+    If any scf.foreach_thread with tensors is found, the transform definitely
+    fails.
 
-    If all the scf.foreach_thread operations contained within the FuncOp 
-    referred to by the `target` PDLOperation lower to GPU properly, the 
+    If all the scf.foreach_thread operations contained within the FuncOp
+    referred to by the `target` PDLOperation lower to GPU properly, the
     transform succeeds. Otherwise the transform definitely fails.
-    
+
     The returned handle points to the same FuncOp operand, consuming it and
-    producing a new SSA value to satisfy chaining and linearity of the IR 
+    producing a new SSA value to satisfy chaining and linearity of the IR
     properties.
 
     Example:
@@ -104,21 +104,21 @@ def MapNestedForeachThreadToGpuThreadsOp :
 }
 
 def VectorToWarpExecuteOnLane0Op : Op<Transform_Dialect, "iree.vector.to_warp_execute_on_lane_0",
-    [FunctionalStyleTransformOpTrait, 
+    [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,
-     TransformEachOpTrait, 
+     TransformEachOpTrait,
      TransformOpInterface]> {
   let description = [{
-    Given an scf.if target predicated by `if (threadIdx.x == 0)`, rewrite its 
+    Given an scf.if target predicated by `if (threadIdx.x == 0)`, rewrite its
     body to vector.execute_on_lane_0 running ***on a single warp***.
 
-    The warp size is determined by the `warp_size` attribute (it is generally 
+    The warp size is determined by the `warp_size` attribute (it is generally
     32 but we do not want to hardcode it).
 
-    This rewrite only applies if it can be determined from the IR (i.e. from 
+    This rewrite only applies if it can be determined from the IR (i.e. from
     the surrounding IREE::HAL::ExecutableExportOp) that the number of threads
     along the warp dimension is a multiple of the warp size. The transformation
-    bails on non-perfect multiples of the warp size that would not properly 
+    bails on non-perfect multiples of the warp size that would not properly
     distribute.
 
     This is the first of two step towards apply vector distribution to a single
@@ -131,14 +131,14 @@ def VectorToWarpExecuteOnLane0Op : Op<Transform_Dialect, "iree.vector.to_warp_ex
 
     If all the operations referred to by the `target` PDLOperation are properly
     properly, the transform succeeds. Otherwise the transform silently fails.
-    
+
     If the transform is anchored at a top-level that is not isolated from above,
     the transform definitely fails.
 
-    If the transform cannot find a proper HAL::ExecutableExportOp with a 
-    well-formed workgroup_size 3-entry attribute such that the threadIdx.x 
+    If the transform cannot find a proper HAL::ExecutableExportOp with a
+    well-formed workgroup_size 3-entry attribute such that the threadIdx.x
     component is a multiple of warp_size, the transform silently fails.
-    If the scf::ForOp predicate does not predicate on threadIdx.x == 0, the 
+    If the scf::ForOp predicate does not predicate on threadIdx.x == 0, the
     transform silently fails.
 
     Otherwise the transformation succeeds and the returned handle points to the
@@ -209,12 +209,12 @@ def VectorToWarpExecuteOnLane0Op : Op<Transform_Dialect, "iree.vector.to_warp_ex
 }
 
 def VectorWarpDistributionOp : Op<Transform_Dialect, "iree.vector.warp_distribute",
-    [TransformEachOpTrait, 
+    [TransformEachOpTrait,
      TransformOpInterface,
      DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
   let description = [{
     Given a vector.warp_execute_on_lane_0, apply the patterns to rewrite into
-    distributed form with warp synchronization. This produces IR that runs 
+    distributed form with warp synchronization. This produces IR that runs
     ***on a single warp***.
 
     IR that cannot be distributed will be predicated by `if (threadIdx.x == 0)`.
@@ -222,14 +222,14 @@ def VectorWarpDistributionOp : Op<Transform_Dialect, "iree.vector.warp_distribut
     This is the second step of two for applying vector distribution to a single
     warp.
 
-            
+
     Return modes:
     =============
-    This operation applies a number of patterns to rewrite vector IR into 
-    distributed warp form. To apply these patterns, this operation must target 
+    This operation applies a number of patterns to rewrite vector IR into
+    distributed warp form. To apply these patterns, this operation must target
     an operation that is isolated from above, otherwise the transform definitely
     fails.
-  
+
     Patterns sets are applied in the following order:
       - applyMultiReductionLoweringPatterns
       - applyVectorTransferWriteDistribution

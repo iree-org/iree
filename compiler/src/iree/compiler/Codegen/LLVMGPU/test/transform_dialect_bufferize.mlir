@@ -26,7 +26,7 @@ hal.executable private @pad_matmul_static_dispatch_0  {
       return %6: tensor<250x1020xf32>
     }
   }
-  
+
   transform.structured.canonicalized_sequence failures(propagate) {
   ^bb1(%variant_op: !pdl.operation):
     transform.iree.bufferize { target_gpu } %variant_op

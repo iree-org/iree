@@ -153,7 +153,7 @@ builtin.module {
 //     CHECK-DAG:   %[[TY:.*]] = gpu.thread_id  y
 //         CHECK:   scf.for %{{.*}} = %[[TY]] to %[[C8]] step %[[C8]] {
 //     CHECK-DAG:     %[[TX:.*]] = gpu.thread_id  x
-//     CHECK-DAG:     %[[TY:.*]] = gpu.thread_id  y  
+//     CHECK-DAG:     %[[TY:.*]] = gpu.thread_id  y
 //         CHECK:     %[[TX4:.*]] = affine.apply #[[$MAP]]()[%[[TX]]]
 //         CHECK:     scf.for %[[IND1:.+]] = %[[TX4]] to %[[C32]] step %[[C32]] {
 //     CHECK-DAG:       memref.subview

@@ -73,7 +73,7 @@ func.func @warp_reduction_broadcast_dispatch() {
   ^bb0(%in: f32, %out: f32):
     %6 = arith.addf %in, %in : f32
     linalg.yield %6 : f32
-  } -> tensor<1x10240xf32>  
+  } -> tensor<1x10240xf32>
   flow.dispatch.tensor.store %b, %1, offsets = [%workgroup_id_x, 0], sizes = [1, 10240], strides = [1, 1] : tensor<1x10240xf32> -> !flow.dispatch.tensor<writeonly:tensor<512x10240xf32>>
   return
 }
