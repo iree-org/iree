@@ -91,10 +91,15 @@ static LogicalResult verifyEntryPoint(
   }
 
   switch (translationInfo.getDispatchLoweringPassPipeline()) {
-    case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVVectorize:
+    case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVBaseVectorize:
       return verifyLoweringConfiguration(moduleOp, translationInfo,
                                          workgroupSizes,
-                                         verifySPIRVVectorizePassPipeline);
+                                         verifySPIRVBaseVectorizePassPipeline);
+    case IREE::Codegen::DispatchLoweringPassPipeline::
+        SPIRVMatmulPromoteVectorize:
+      return verifyLoweringConfiguration(
+          moduleOp, translationInfo, workgroupSizes,
+          verifySPIRVMatmulPromoteVectorizePassPipeline);
       break;
     default:;
   }

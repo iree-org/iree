@@ -1,7 +1,7 @@
-// RUN: iree-opt --pass-pipeline='hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass{test-lowering-configuration=true}))' --verify-diagnostics --split-input-file %s
+// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass{test-lowering-configuration=true})))' --verify-diagnostics --split-input-file %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = []>
-#translation = #iree_codegen.translation_info<SPIRVVectorize>
+#translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -39,7 +39,7 @@ hal.executable private @matmul_tensors {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 64], [4, 4], [0, 0, 4]]>
-#translation = #iree_codegen.translation_info<SPIRVVectorize>
+#translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -77,7 +77,7 @@ hal.executable private @matmul_tensors {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 64], [4, 4], [0, 0, 4]]>
-#translation = #iree_codegen.translation_info<SPIRVVectorize>
+#translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -115,7 +115,7 @@ hal.executable private @matmul_tensors {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 64], [4, 2], [0, 0, 4]]>
-#translation = #iree_codegen.translation_info<SPIRVVectorize>
+#translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -153,7 +153,7 @@ hal.executable private @matmul_tensors {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 64], [16, 8], [0, 0, 4]]>
-#translation = #iree_codegen.translation_info<SPIRVVectorize>
+#translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -191,7 +191,7 @@ hal.executable private @matmul_tensors {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 64], [4, 4], [0, 0, 4]]>
-#translation = #iree_codegen.translation_info<SPIRVVectorize>
+#translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -229,7 +229,7 @@ hal.executable private @matmul_tensors {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 60], [4, 4], [0, 0, 4]]>
-#translation = #iree_codegen.translation_info<SPIRVVectorize>
+#translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -267,7 +267,7 @@ hal.executable private @matmul_tensors {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 64], [4, 4], [0, 0, 4]]>
-#translation = #iree_codegen.translation_info<SPIRVVectorize>
+#translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -305,7 +305,7 @@ hal.executable private @matmul_tensors {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 64], [4, 4], [0, 0, 4]]>
-#translation = #iree_codegen.translation_info<SPIRVVectorize>
+#translation = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -343,7 +343,7 @@ hal.executable private @matmul_tensors {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 4, 4, 16], [0, 2, 2, 2], [0, 0, 0, 0, 1, 1, 4]]>
-#translation = #iree_codegen.translation_info<SPIRVVectorize>
+#translation = #iree_codegen.translation_info<SPIRVBaseVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -369,9 +369,9 @@ hal.executable private @conv_2d_nhwc_hwcf {
         %c16 = arith.constant 16 : index
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f32
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:1x225x225x8xf32>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:3x3x8x16xf32>
-        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:1x112x112x16xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<1x225x225x8xf32>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<3x3x8x16xf32>>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<1x112x112x16xf32>>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
         %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -387,17 +387,17 @@ hal.executable private @conv_2d_nhwc_hwcf {
             %7 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%workgroup_id_x]
             %8 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%workgroup_count_x]
             scf.for %arg2 = %7 to %c16 step %8 {
-              %9 = flow.dispatch.tensor.load %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 4, 4, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<writeonly:1x112x112x16xf32> -> tensor<1x4x4x16xf32>
+              %9 = flow.dispatch.tensor.load %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 4, 4, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<writeonly:tensor<1x112x112x16xf32>> -> tensor<1x4x4x16xf32>
               %10 = affine.apply affine_map<(d0) -> (d0 * 2)>(%arg0)
               %11 = affine.apply affine_map<(d0) -> (d0 * 2)>(%arg1)
-              %12 = flow.dispatch.tensor.load %0, offsets = [0, %10, %11, 0], sizes = [1, 9, 9, 8], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:1x225x225x8xf32> -> tensor<1x9x9x8xf32>
-              %13 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, %arg2], sizes = [3, 3, 8, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:3x3x8x16xf32> -> tensor<3x3x8x16xf32>
+              %12 = flow.dispatch.tensor.load %0, offsets = [0, %10, %11, 0], sizes = [1, 9, 9, 8], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1x225x225x8xf32>> -> tensor<1x9x9x8xf32>
+              %13 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, %arg2], sizes = [3, 3, 8, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<3x3x8x16xf32>> -> tensor<3x3x8x16xf32>
               %14 = linalg.fill ins(%cst : f32) outs(%9 : tensor<1x4x4x16xf32>) -> tensor<1x4x4x16xf32>
               // expected-error @+1 {{expected 4 levels of tiling sizes, got 3}}
               %15 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, lowering_config = #config, strides = dense<2> : tensor<2xi64>}
                       ins(%12, %13 : tensor<1x9x9x8xf32>, tensor<3x3x8x16xf32>)
                       outs(%14 : tensor<1x4x4x16xf32>) -> tensor<1x4x4x16xf32>
-              flow.dispatch.tensor.store %15, %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 4, 4, 16], strides = [1, 1, 1, 1] : tensor<1x4x4x16xf32> -> !flow.dispatch.tensor<writeonly:1x112x112x16xf32>
+              flow.dispatch.tensor.store %15, %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 4, 4, 16], strides = [1, 1, 1, 1] : tensor<1x4x4x16xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x112x112x16xf32>>
             }
           }
         }
@@ -410,7 +410,7 @@ hal.executable private @conv_2d_nhwc_hwcf {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 6, 6, 16], [0, 3, 3, 2], [0, 0, 0, 0, 1, 1, 4], [0, 1, 0, 0]]>
-#translation = #iree_codegen.translation_info<SPIRVVectorize>
+#translation = #iree_codegen.translation_info<SPIRVBaseVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -436,9 +436,9 @@ hal.executable private @conv_2d_nhwc_hwcf {
         %c16 = arith.constant 16 : index
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f32
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:1x225x225x8xf32>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:3x3x8x16xf32>
-        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:1x112x112x16xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<1x225x225x8xf32>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<3x3x8x16xf32>>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<1x112x112x16xf32>>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
         %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -454,17 +454,17 @@ hal.executable private @conv_2d_nhwc_hwcf {
             %7 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%workgroup_id_x]
             %8 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%workgroup_count_x]
             scf.for %arg2 = %7 to %c16 step %8 {
-              %9 = flow.dispatch.tensor.load %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 4, 4, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<writeonly:1x112x112x16xf32> -> tensor<1x4x4x16xf32>
+              %9 = flow.dispatch.tensor.load %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 4, 4, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<writeonly:tensor<1x112x112x16xf32>> -> tensor<1x4x4x16xf32>
               %10 = affine.apply affine_map<(d0) -> (d0 * 2)>(%arg0)
               %11 = affine.apply affine_map<(d0) -> (d0 * 2)>(%arg1)
-              %12 = flow.dispatch.tensor.load %0, offsets = [0, %10, %11, 0], sizes = [1, 9, 9, 8], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:1x225x225x8xf32> -> tensor<1x9x9x8xf32>
-              %13 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, %arg2], sizes = [3, 3, 8, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:3x3x8x16xf32> -> tensor<3x3x8x16xf32>
+              %12 = flow.dispatch.tensor.load %0, offsets = [0, %10, %11, 0], sizes = [1, 9, 9, 8], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1x225x225x8xf32>> -> tensor<1x9x9x8xf32>
+              %13 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, %arg2], sizes = [3, 3, 8, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<3x3x8x16xf32>> -> tensor<3x3x8x16xf32>
               %14 = linalg.fill ins(%cst : f32) outs(%9 : tensor<1x4x4x16xf32>) -> tensor<1x4x4x16xf32>
               // expected-error @+1 {{expected first level tile size divides the output size [OH, OW, OC]}}
               %15 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, lowering_config = #config, strides = dense<2> : tensor<2xi64>}
                       ins(%12, %13 : tensor<1x9x9x8xf32>, tensor<3x3x8x16xf32>)
                       outs(%14 : tensor<1x4x4x16xf32>) -> tensor<1x4x4x16xf32>
-              flow.dispatch.tensor.store %15, %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 4, 4, 16], strides = [1, 1, 1, 1] : tensor<1x4x4x16xf32> -> !flow.dispatch.tensor<writeonly:1x112x112x16xf32>
+              flow.dispatch.tensor.store %15, %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 4, 4, 16], strides = [1, 1, 1, 1] : tensor<1x4x4x16xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x112x112x16xf32>>
             }
           }
         }
@@ -477,7 +477,7 @@ hal.executable private @conv_2d_nhwc_hwcf {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 4, 4, 16], [0, 2, 2, 4], [0, 0, 0, 0, 1, 1, 4], [0, 1, 0, 0]]>
-#translation = #iree_codegen.translation_info<SPIRVVectorize>
+#translation = #iree_codegen.translation_info<SPIRVBaseVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -503,9 +503,9 @@ hal.executable private @conv_2d_nhwc_hwcf {
         %c16 = arith.constant 16 : index
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f32
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:1x225x225x8xf32>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:3x3x8x16xf32>
-        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:1x112x112x16xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<1x225x225x8xf32>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<3x3x8x16xf32>>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<1x112x112x16xf32>>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
         %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -521,17 +521,17 @@ hal.executable private @conv_2d_nhwc_hwcf {
             %7 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%workgroup_id_x]
             %8 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%workgroup_count_x]
             scf.for %arg2 = %7 to %c16 step %8 {
-              %9 = flow.dispatch.tensor.load %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 4, 4, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<writeonly:1x112x112x16xf32> -> tensor<1x4x4x16xf32>
+              %9 = flow.dispatch.tensor.load %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 4, 4, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<writeonly:tensor<1x112x112x16xf32>> -> tensor<1x4x4x16xf32>
               %10 = affine.apply affine_map<(d0) -> (d0 * 2)>(%arg0)
               %11 = affine.apply affine_map<(d0) -> (d0 * 2)>(%arg1)
-              %12 = flow.dispatch.tensor.load %0, offsets = [0, %10, %11, 0], sizes = [1, 9, 9, 8], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:1x225x225x8xf32> -> tensor<1x9x9x8xf32>
-              %13 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, %arg2], sizes = [3, 3, 8, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:3x3x8x16xf32> -> tensor<3x3x8x16xf32>
+              %12 = flow.dispatch.tensor.load %0, offsets = [0, %10, %11, 0], sizes = [1, 9, 9, 8], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1x225x225x8xf32>> -> tensor<1x9x9x8xf32>
+              %13 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, %arg2], sizes = [3, 3, 8, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<3x3x8x16xf32>> -> tensor<3x3x8x16xf32>
               %14 = linalg.fill ins(%cst : f32) outs(%9 : tensor<1x4x4x16xf32>) -> tensor<1x4x4x16xf32>
               // expected-error @+1 {{expected workgroup tile sizes to be the product of thread tile size and workgroup size}}
               %15 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, lowering_config = #config, strides = dense<2> : tensor<2xi64>}
                       ins(%12, %13 : tensor<1x9x9x8xf32>, tensor<3x3x8x16xf32>)
                       outs(%14 : tensor<1x4x4x16xf32>) -> tensor<1x4x4x16xf32>
-              flow.dispatch.tensor.store %15, %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 4, 4, 16], strides = [1, 1, 1, 1] : tensor<1x4x4x16xf32> -> !flow.dispatch.tensor<writeonly:1x112x112x16xf32>
+              flow.dispatch.tensor.store %15, %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, 4, 4, 16], strides = [1, 1, 1, 1] : tensor<1x4x4x16xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x112x112x16xf32>>
             }
           }
         }
@@ -544,7 +544,7 @@ hal.executable private @conv_2d_nhwc_hwcf {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 1, 7, 64], [0, 1, 7, 2], [0, 0, 0, 0, 5, 5], [0, 1, 0, 0]]>
-#translation = #iree_codegen.translation_info<SPIRVVectorize>
+#translation = #iree_codegen.translation_info<SPIRVBaseVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -582,7 +582,7 @@ hal.executable private @depthwise_conv_2d_nhwc_hwc {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 1, 7, 64], [0, 1, 7, 2], [0, 0, 0, 0, 1, 1], [0, 0, 1, 1]]>
-#translation = #iree_codegen.translation_info<SPIRVVectorize>
+#translation = #iree_codegen.translation_info<SPIRVBaseVectorize>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
