@@ -19,8 +19,10 @@ external_cc_library(
   ROOT
     ${TF_MLIR_HLO_SOURCE_DIR}
   INCLUDES
+    "${TF_MLIR_HLO_SOURCE_DIR}"
     "${TF_MLIR_HLO_SOURCE_DIR}/include/"
     "${TF_MLIR_HLO_SOURCE_DIR}/stablehlo/"
+    "${TF_MLIR_HLO_BINARY_DIR}"
     "${TF_MLIR_HLO_BINARY_DIR}/include/"
     "${TF_MLIR_HLO_BINARY_DIR}/stablehlo/"
   PUBLIC

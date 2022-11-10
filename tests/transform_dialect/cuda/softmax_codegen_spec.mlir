@@ -36,7 +36,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   // ops that we find and match the prerequisites
   %func = transform.structured.match ops{["func.func"]} in %variant_op
   %funcx = transform.iree.apply_patterns %func { promote_foreach_thread_capture_to_shared }
- 
+
   // Step 2. Second level of tiling + fusion parallelizes to threads.
   // ================================================================
   %tiled_ops = transform.structured.match ops{["linalg.fill", "linalg.generic"]}
@@ -66,7 +66,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
     : !pdl.operation
   transform.structured.tile_to_foreach_thread_op %parallel_linalg_ops num_threads [1, 4, 32]
       (mapped to dims [2, 1, 0])
-     
+
   // Step 3. Rank-reduce and vectorize.
   // ==================================
   %funcx_2 = transform.structured.match ops{["func.func"]} in %variant_op
