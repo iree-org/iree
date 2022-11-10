@@ -18,6 +18,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "break_down_large_vector.mlir",
             "config_adreno_conv.mlir",
             "config_adreno_matmul.mlir",
             "config_amd_matmul.mlir",

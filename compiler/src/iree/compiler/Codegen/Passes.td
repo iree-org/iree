@@ -500,6 +500,12 @@ def SPIRVVectorizeLoadStore :
   let constructor = "mlir::iree_compiler::createSPIRVVectorizeLoadStore()";
 }
 
+def SPIRVBreakDownLargeVector : Pass<"iree-spirv-breakdown-large-vector",
+                                     "func::FuncOp"> {
+  let summary = "Break down vectors not natively supported by SPIR-V";
+  let constructor = "mlir::iree_compiler::createSPIRVBreakDownLargeVectorPass()";
+}
+
 def SPIRVCreateFastSlowPath :
     Pass<"iree-spirv-create-fast-slow-path", "func::FuncOp"> {
   let summary = "Create separate fast and slow paths to handle padding";

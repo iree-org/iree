@@ -521,6 +521,10 @@ std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVVectorizePass();
 /// having pointer bitcast.
 std::unique_ptr<OperationPass<ModuleOp>> createSPIRVVectorizeLoadStore();
 
+/// Breaks down large vectors not natively supported by SPIR-V.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createSPIRVBreakDownLargeVectorPass();
+
 // Uses `tensor.pad` ops as anchors to create separate fast and slow paths
 // inside the kernel. The fast path is for inner tiles where we don't need
 // padding, while the slow path is for boundary tiles where we do need

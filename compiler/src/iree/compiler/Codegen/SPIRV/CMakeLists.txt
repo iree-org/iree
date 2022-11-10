@@ -25,6 +25,7 @@ iree_cc_library(
     "MaliConfig.cpp"
     "NVIDIAConfig.cpp"
     "Passes.cpp"
+    "SPIRVBreakDownLargeVector.cpp"
     "SPIRVCreateFastSlowPath.cpp"
     "SPIRVDistribute.cpp"
     "SPIRVEmulateI64.cpp"
