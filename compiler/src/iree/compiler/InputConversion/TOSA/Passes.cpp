@@ -59,6 +59,8 @@ void buildTOSAInputConversionPassPipeline(OpPassManager &passManager) {
 
   passManager.addNestedPass<func::FuncOp>(
       createLinalgQuantizedMatmulToMatmulPass());
+  passManager.addNestedPass<func::FuncOp>(
+      createLinalgQuantizedConvToConvPass());
   passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
 
   //----------------------------------------------------------------------------

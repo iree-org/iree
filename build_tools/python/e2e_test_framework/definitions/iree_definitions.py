@@ -69,7 +69,6 @@ class ModuleExecutionConfig(object):
   tags: List[str]
   loader: RuntimeLoader
   driver: RuntimeDriver
-  tool: str
   extra_flags: List[str] = dataclasses.field(default_factory=list)
 
 

@@ -14,7 +14,7 @@
 #include "iree_tf_compiler/MHLO/Passes.h"
 #include "iree_tf_compiler/TF/Passes.h"
 #include "llvm/Support/InitLLVM.h"
-#include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
+#include "mhlo/IR/hlo_ops.h"
 #include "mlir/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"

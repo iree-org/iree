@@ -251,7 +251,7 @@ transform.with_pdl_patterns {
 
 // -----
 
-// This is a regression for reifyDynamicResultDims. 
+// This is a regression for reifyDynamicResultDims.
 
 // CHECK-LABEL: func @reify_result_dims_regression(
 func.func @reify_result_dims_regression(%s1: index, %s2: index) -> (tensor<4x?xf32>) {

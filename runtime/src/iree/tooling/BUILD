@@ -191,6 +191,7 @@ cc_library(
         ":yaml_util",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/base/internal",
         "//runtime/src/iree/base/internal:file_io",
         "//runtime/src/iree/base/internal:path",
         "//runtime/src/iree/hal",

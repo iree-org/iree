@@ -236,37 +236,6 @@ IREE_API_EXPORT bool iree_vm_ref_equal(iree_vm_ref_t* lhs, iree_vm_ref_t* rhs);
 // Type adapter utilities for interfacing with the VM
 //===----------------------------------------------------------------------===//
 
-#ifdef __cplusplus
-namespace iree {
-namespace vm {
-template <typename T>
-struct ref_type_descriptor {
-  static const iree_vm_ref_type_descriptor_t* get();
-};
-}  // namespace vm
-}  // namespace iree
-#define IREE_VM_DECLARE_CC_TYPE_LOOKUP(name, T)         \
-  namespace iree {                                      \
-  namespace vm {                                        \
-  template <>                                           \
-  struct ref_type_descriptor<T> {                       \
-    static const iree_vm_ref_type_descriptor_t* get() { \
-      return name##_get_descriptor();                   \
-    }                                                   \
-  };                                                    \
-  }                                                     \
-  }
-
-#define IREE_VM_REGISTER_CC_TYPE(type, name, descriptor)  \
-  descriptor.type_name = iree_make_cstring_view(name);    \
-  descriptor.offsetof_counter = type::offsetof_counter(); \
-  descriptor.destroy = type::DirectDestroy;               \
-  IREE_RETURN_IF_ERROR(iree_vm_ref_register_type(&descriptor));
-#else
-#define IREE_VM_DECLARE_CC_TYPE_LOOKUP(name, T)
-#define IREE_VM_REGISTER_CC_TYPE(type, name, descriptor)
-#endif  // __cplusplus
-
 // TODO(benvanik): make these macros standard/document them.
 #define IREE_VM_DECLARE_TYPE_ADAPTERS(name, T)                              \
   IREE_API_EXPORT iree_vm_ref_t name##_retain_ref(T* value);                \
@@ -330,6 +299,10 @@ struct ref_type_descriptor {
 // Optional C++ iree::vm::ref<T> wrapper.
 #ifdef __cplusplus
 #include "iree/vm/ref_cc.h"
+#else
+#define IREE_VM_DECLARE_CC_TYPE_LOOKUP(name, T)
+#define IREE_VM_REGISTER_CC_TYPE(type, name, descriptor)
+#define IREE_VM_DECLARE_CC_TYPE_ADAPTERS(name, T)
 #endif  // __cplusplus
 
 #endif  // IREE_VM_REF_H_

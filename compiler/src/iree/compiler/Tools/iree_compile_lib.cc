@@ -155,11 +155,40 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
               "flatbuffer containing a SPIR-V blob)")),
       llvm::cl::init(CompileMode::std), llvm::cl::cat(mainOptions));
 
+  // Debugging/diagnostics.
+  llvm::cl::opt<bool> verifyIR(
+      "verify",
+      llvm::cl::desc("Verifies the IR for correctness throughout compilation."),
+      llvm::cl::init(true));
+
+  llvm::cl::opt<IREEVMPipelinePhase> compileTo(
+      "compile-to",
+      llvm::cl::desc(
+          "Compilation phase to run up until before emitting output."),
+      llvm::cl::values(
+          clEnumValN(IREEVMPipelinePhase::Input, "input",
+                     "Performs input processing and lowering into core IREE "
+                     "input dialects (linalg/etc)."),
+          clEnumValN(
+              IREEVMPipelinePhase::ABI, "abi",
+              "Adjusts program ABI for the specified execution environment."),
+          clEnumValN(IREEVMPipelinePhase::Flow, "flow",
+                     "Compiles up to the `flow` dialect."),
+          clEnumValN(IREEVMPipelinePhase::Stream, "stream",
+                     "Compiles up to the `stream` dialect."),
+          clEnumValN(IREEVMPipelinePhase::HAL, "hal",
+                     "Compiles up to the `hal` dialect, including codegen."),
+          clEnumValN(IREEVMPipelinePhase::VM, "vm",
+                     "Compiles up to the `vm` dialect."),
+          clEnumValN(IREEVMPipelinePhase::End, "end",
+                     "Complete the full compilation pipeline.")),
+      llvm::cl::init(IREEVMPipelinePhase::End));
+
   // Misc options.
   llvm::cl::opt<bool> splitInputFile(
       "split-input-file",
       llvm::cl::desc("Split the input file into pieces and "
-                     "process each chunk independently"),
+                     "process each chunk independently."),
       llvm::cl::init(false));
   llvm::cl::opt<bool> listHalTargets(
       "iree-hal-list-target-backends",
@@ -214,6 +243,7 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
 
     // Main compilation pipeline.
     PassManager passManager(&context);
+    passManager.enableVerifier(verifyIR);
     mlir::applyPassManagerCLOptions(passManager);
     mlir::applyDefaultTimingPassManagerCLOptions(passManager);
     passManager.addInstrumentation(std::make_unique<PassTracing>());
@@ -223,7 +253,7 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
         buildIREEVMTransformPassPipeline(
             bindingOptions, inputOptions, highLevelOptimizationOptions,
             schedulingOptions, halTargetOptions, vmTargetOptions, getHooks(),
-            passManager);
+            passManager, compileTo);
 
         break;
       case CompileMode::vm:
@@ -257,6 +287,12 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
       return failure();
     }
 
+    if (compileTo != IREEVMPipelinePhase::End) {
+      // Ending early and just emitting IR.
+      os << module.get();
+      return success();
+    }
+
     // Switch based on output format.
     switch (outputFormat) {
       case OutputFormat::vm_asm:
@@ -285,14 +321,11 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
         auto rawData = binaryOp.getData().getRawData();
         os.write(rawData.data(), rawData.size());
         return success();
-        break;
       }
       default:
         llvm::errs() << "INTERNAL ERROR: Unknown output format\n";
         return failure();
     }
-
-    return failure();
   };
 
   if (splitInputFile) {

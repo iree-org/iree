@@ -188,6 +188,7 @@ cc_binary(
         "//runtime/src/iree/base",
         "//runtime/src/iree/base:core_headers",
         "//runtime/src/iree/base:tracing",
+        "//runtime/src/iree/base/internal",
         "//runtime/src/iree/base/internal:cpu",
         "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/base/internal:path",

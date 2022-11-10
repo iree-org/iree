@@ -673,15 +673,6 @@ SmallVector<Value> buildResultShape(ShapeAwareOpInterface op,
   return buildShape(op.getLoc(), type, dynamicDims, builder);
 }
 
-//===----------------------------------------------------------------------===//
-// IREE::Util::CompositeAttr
-//===----------------------------------------------------------------------===//
-
-Attribute CompositeAttr::replaceImmediateSubElements(
-    ArrayRef<Attribute> replAttrs, ArrayRef<Type> replTypes) const {
-  return CompositeAttr::get(getContext(), replAttrs);
-}
-
 }  // namespace Util
 }  // namespace IREE
 }  // namespace iree_compiler

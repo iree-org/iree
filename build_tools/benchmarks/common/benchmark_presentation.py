@@ -55,7 +55,7 @@ T = TypeVar("T")
 
 class MetricsToTableMapper(ABC, Generic[T]):
   """Abstract class to help map benchmark metrics to table.
-  
+
     It contains a set of methods to help table generator get the required
     information for a metric. For example, extract the current and base metric
     value, the metric thresholds, the table header of the metrics, ...
@@ -303,7 +303,7 @@ def _categorize_on_single_metric(
       metrics_map: map of (name, metrics object).
       metric_func: the function returns current and base value of the metric.
       thresholds: list of threshold settings to match for categorizing.
-    Returns: 
+    Returns:
       A tuple of (regressed, improved, similar, raw) groups.
   """
 

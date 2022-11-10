@@ -35,10 +35,10 @@ from typing import List, Optional, Sequence
 INDENT_SPACES = " " * 2
 
 
-def _get_string_list(values: List[str], quote: bool = True) -> List[str]:
+def _get_string_list(values: Sequence[str], quote: bool = True) -> List[str]:
   if quote:
-    values = [f'"{value}"' for value in values]
-  return values
+    return [f'"{value}"' for value in values]
+  return list(values)
 
 
 def _get_block_body(body: List[str]) -> List[str]:
@@ -56,7 +56,7 @@ def _get_string_arg_block(keyword: str,
 
 
 def _get_string_list_arg_block(keyword: str,
-                               values: List[str],
+                               values: Sequence[str],
                                quote: bool = True) -> List[str]:
   if len(values) == 0:
     return []
@@ -162,9 +162,48 @@ def build_iree_import_tflite_model(target_path: str, source: str,
                        ]))
 
 
+def build_iree_benchmark_suite_module_test(
+    target_name: str,
+    model: str,
+    driver: str,
+    expected_output: str,
+    runner_args: Sequence[str],
+    timeout_secs: Optional[int] = None,
+    labels: Sequence[str] = [],
+    xfail_platforms: Sequence[str] = [],
+    unsupported_platforms: Sequence[str] = []) -> str:
+  name_block = _get_string_arg_block("NAME", target_name)
+  model_block = _get_string_arg_block("MODEL", model)
+  driver_block = _get_string_arg_block("DRIVER", driver)
+  expected_output_block = _get_string_arg_block("EXPECTED_OUTPUT",
+                                                expected_output)
+  timeout_block = _get_string_arg_block(
+      "TIMEOUT",
+      str(timeout_secs) if timeout_secs is not None else None)
+  runner_args_block = _get_string_list_arg_block("RUNNER_ARGS", runner_args)
+  labels_block = _get_string_list_arg_block("LABELS", labels)
+  xfail_platforms_block = _get_string_list_arg_block("XFAIL_PLATFORMS",
+                                                     xfail_platforms)
+  unsupported_platforms_block = _get_string_list_arg_block(
+      "UNSUPPORTED_PLATFORMS", unsupported_platforms)
+  return _convert_block_to_string(
+      _build_call_rule(rule_name="iree_benchmark_suite_module_test",
+                       parameter_blocks=[
+                           name_block, model_block, driver_block,
+                           expected_output_block, timeout_block,
+                           runner_args_block, labels_block,
+                           xfail_platforms_block, unsupported_platforms_block
+                       ]))
+
+
 def build_add_dependencies(target: str, deps: List[str]) -> str:
   if len(deps) == 0:
     raise ValueError("Target dependencies can't be empty.")
   deps_list = _get_string_list(deps, quote=False)
   return _convert_block_to_string([f"add_dependencies({target}"] +
                                   _get_block_body(deps_list) + [")"])
+
+
+def build_set(variable_name: str, value: str) -> str:
+  return _convert_block_to_string([f"set({variable_name}"] +
+                                  _get_block_body([value]) + [")"])

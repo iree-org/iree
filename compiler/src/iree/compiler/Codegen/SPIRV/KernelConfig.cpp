@@ -633,6 +633,8 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
   // requires special capability.
   if (!targetEnv.allows(spirv::Capability::GroupNonUniformShuffle))
     return failure();
+  // TODO: Remove the following once SwiftShader is detached from the default.
+  if (targetEnv.getVendorID() == spirv::Vendor::SwiftShader) return failure();
 
   SmallVector<unsigned> reductionDims;
   op.getReductionDims(reductionDims);
@@ -677,6 +679,16 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
     groupSize = llvm::APIntOps::GreatestCommonDivisor(
                     {64, uint64_t(groupSize)}, {64, uint64_t(maxWorkgroupSize)})
                     .getZExtValue();
+  }
+  // Current warp reduction pattern is a two step butterfly warp reduce.
+  // First, do warp reductions along multiple subgroups.
+  // Second, reduce results from multiple subgroups using single warp reduce.
+  // The final warp reduce requires numSubgroupUsed > subgroupSize to work.
+  // TODO(raikonenfnu): Add flexible num of warp reduce to handle more configs.
+  // TT::CPU and TT::ARM_Valhall is not going through warp reduce.
+  const int64_t numSubgroupsUsed = groupSize / subgroupSize;
+  if (numSubgroupsUsed > subgroupSize) {
+    return failure();
   }
   std::array<int64_t, 3> workgroupSize = {groupSize, 1, 1};
   // Tile all the parallel dimension to 1.

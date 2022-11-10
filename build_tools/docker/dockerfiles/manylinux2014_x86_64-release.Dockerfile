@@ -48,7 +48,7 @@ ENV BAZEL_LINKLIBS "-lstdc++ -lm"
 # TBB is a dependency of Tracy and there is not a packaged source for a versoin
 # that is compatible with the STL shipped on this OS. So we use a script to
 # fetch/build/install exactly what is needed.
-COPY install_tbb_manylinux2014.sh /usr/local/bin
+COPY build_tools/docker/context/install_tbb_manylinux2014.sh /usr/local/bin
 RUN bash /usr/local/bin/install_tbb_manylinux2014.sh
 
 ######## AMD ROCM #######

@@ -4,7 +4,7 @@
 func.func @conv2d_zps(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<3x4x5x1024xi8>, %arg2: tensor<1x12x13x1024xi32>) -> tensor<1x12x13x1024xi32> {
   %iZp = arith.constant 0 : i32
   %fZp = arith.constant 0 : i32
-  // CHECK: %[[CONV:.+]] = linalg.conv_2d_nhwc_hwcf 
+  // CHECK: %[[CONV:.+]] = linalg.conv_2d_nhwc_hwcf
   // CHECK-SAME:  dilations = dense<1> : tensor<2xi64>
   // CHECK-SAME:  strides = dense<1> : tensor<2xi64>
   // CHECK-SAME:  ins(%arg0, %arg1 : tensor<1x14x16x5xi8>, tensor<3x4x5x1024xi8>)
@@ -28,11 +28,11 @@ func.func @conv2d_filter_zp(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<3x4x5x102
   %fZp = arith.constant 0 : i32
   // CHECK-DAG: %[[C0:.+]] = arith.constant 0
   // CHECK-DAG: %[[C42:.+]] = arith.constant 42
-  // CHECK-DAG: %[[CONV:.+]] = linalg.conv_2d_nhwc_hwcf 
+  // CHECK-DAG: %[[CONV:.+]] = linalg.conv_2d_nhwc_hwcf
   // CHECK-DAG: %[[SUM_INIT:.+]] = tensor.empty() : tensor<1024xi32>
   // CHECK-DAG: %[[SUM_FILL:.+]] = linalg.fill ins(%[[C0]] : i32) outs(%1 : tensor<1024xi32>) -> tensor<1024xi32>
 
-  // CHECK: %[[SUM:.+]] = linalg.generic 
+  // CHECK: %[[SUM:.+]] = linalg.generic
   // CHECK-SAME:  indexing_maps = [#map, #map1]
   // CHECK-SAME:  iterator_types = ["parallel", "reduction", "reduction", "reduction"]}
   // CHECK-SAME:  ins(%arg1 : tensor<3x4x5x1024xi8>)
@@ -43,7 +43,7 @@ func.func @conv2d_filter_zp(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<3x4x5x102
   // CHECK:   linalg.yield %[[ADD]]
 
   // CHECK: %[[INIT:.+]] = tensor.empty() : tensor<1x12x13x1024xi32>
-  // CHECK: %[[GENERIC:.+]] = linalg.generic 
+  // CHECK: %[[GENERIC:.+]] = linalg.generic
   // CHECK-SAME:  indexing_maps = [#map2, #map3, #map2]
   // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
   // CHECK-SAME:  ins(%[[CONV]], %[[SUM]] : tensor<1x12x13x1024xi32>, tensor<1024xi32>)
@@ -70,7 +70,7 @@ func.func @conv2d_input_zp(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<3x4x5x1024
 
   // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : i32
   // CHECK-DAG: %[[C42:.+]] = arith.constant 42 : i32
-  // CHECK-DAG: %[[CONV:.+]] = linalg.conv_2d_nhwc_hwcf 
+  // CHECK-DAG: %[[CONV:.+]] = linalg.conv_2d_nhwc_hwcf
 
   // CHECK: %[[INIT:.+]] = tensor.empty() : tensor<1x14x16xi32>
   // CHECK: %[[FILL:.+]] = linalg.fill ins(%[[C0]] : i32) outs(%[[INIT]] : tensor<1x14x16xi32>)
@@ -84,7 +84,7 @@ func.func @conv2d_input_zp(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<3x4x5x1024
   // CHECK: %[[INIT:.+]] = tensor.empty()
   // CHECK: %[[FILL:.+]] = linalg.fill ins(%[[C0]] : i32) outs(%[[INIT]] : tensor<1x12x13x1xi32>)
   // CHECK: %[[KERNEL:.+]] = tensor.empty() : tensor<3x4xi32>
-  // CHECK: %[[POOL:.+]] = linalg.pooling_nhwc_sum 
+  // CHECK: %[[POOL:.+]] = linalg.pooling_nhwc_sum
   // CHECK-SAME:  dilations = dense<1> : tensor<2xi64>
   // CHECK-SAME:  strides = dense<1> : tensor<2xi64>
   // CHECK-SAME:  ins(%[[EXPAND]], %[[KERNEL]] : tensor<1x14x16x1xi32>, tensor<3x4xi32>)
@@ -92,7 +92,7 @@ func.func @conv2d_input_zp(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<3x4x5x1024
   // CHECK: %[[COLLAPSE:.+]] = tensor.collapse_shape %[[POOL]] {{\[\[}}0], [1], [2, 3]]
 
   // CHECK: %[[INIT:.+]] = tensor.empty() : tensor<1x12x13x1024xi32>
-  // CHECK: %[[GENERIC:.+]] = linalg.generic 
+  // CHECK: %[[GENERIC:.+]] = linalg.generic
   // CHECK-SAME:  indexing_maps = [#map, #map1, #map]
   // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
   // CHECK-SAME:  ins(%[[CONV]], %[[COLLAPSE]] : tensor<1x12x13x1024xi32>, tensor<1x12x13xi32>)
@@ -123,21 +123,21 @@ func.func @conv2d_full(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<3x4x5x1024xi8>
   // CHECK-DAG: %[[C17:.+]] = arith.constant 17 : i32
   // CHECK-DAG: %[[C42:.+]] = arith.constant 42 : i32
 
-  // CHECK: %[[CONV:.+]] = linalg.conv_2d_nhwc_hwcf 
+  // CHECK: %[[CONV:.+]] = linalg.conv_2d_nhwc_hwcf
 
-  // CHECK: %[[SUM:.+]] = linalg.generic 
+  // CHECK: %[[SUM:.+]] = linalg.generic
   // CHECK-SAME:  ins(%arg1 : tensor<3x4x5x1024xi8>)
-  // CHECK: %[[IZP:.+]] = linalg.generic 
+  // CHECK: %[[IZP:.+]] = linalg.generic
   // CHECK-SAME:  ins(%[[CONV]], %[[SUM]] : tensor<1x12x13x1024xi32>, tensor<1024xi32>)
 
   // CHECK: %[[SUM:.+]] = linalg.generic
   // CHECK-SAME:  ins(%arg0 : tensor<1x14x16x5xi8>)
   // CHECK: %[[EXPAND:.+]] = tensor.expand_shape %[[SUM]]
   // CHECK: %[[KERNEL:.+]] = tensor.empty() : tensor<3x4xi32>
-  // CHECK: %[[POOL:.+]] = linalg.pooling_nhwc_sum 
+  // CHECK: %[[POOL:.+]] = linalg.pooling_nhwc_sum
   // CHECK-SAME:  ins(%[[EXPAND]], %[[KERNEL]] : tensor<1x14x16x1xi32>, tensor<3x4xi32>)
   // CHECK: %[[COLLAPSE:.+]] = tensor.collapse_shape %[[POOL]]
-  // CHECK: %[[FZP:.+]] = linalg.generic 
+  // CHECK: %[[FZP:.+]] = linalg.generic
   // CHECK-SAME:  ins(%[[IZP]], %[[COLLAPSE]] : tensor<1x12x13x1024xi32>, tensor<1x12x13xi32>)
 
   // CHECK: %[[INIT:.+]] = tensor.empty() : tensor<1x12x13x1024xi32>
@@ -177,9 +177,9 @@ func.func @conv2d_dyn_filter_zp(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<?x?x5
   %iZp = arith.constant 42 : i32
   %fZp = arith.constant 0 : i32
 
-  // CHECK: %[[CONV:.+]] = linalg.conv_2d_nhwc_hwcf 
+  // CHECK: %[[CONV:.+]] = linalg.conv_2d_nhwc_hwcf
   // CHECK: %[[SUM:.+]] = linalg.generic
-  // CHECK-SAME: ins(%arg1 : tensor<?x?x5x1024xi8>) 
+  // CHECK-SAME: ins(%arg1 : tensor<?x?x5x1024xi8>)
 
   // CHECK: %[[DIM1:.+]] = tensor.dim %arg2, %c1 : tensor<1x?x?x1024xi32>
   // CHECK: %[[DIM2:.+]] = tensor.dim %arg2, %c2 : tensor<1x?x?x1024xi32>
@@ -209,7 +209,7 @@ func.func @conv2d_dyn_input_zp(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<?x?x5x
 
   // CHECK: %[[INIT:.+]] = tensor.empty() : tensor<1x14x16xi32>
   // CHECK: %[[FILL:.+]] = linalg.fill ins(%[[C0]] : i32) outs(%[[INIT]] : tensor<1x14x16xi32>)
-  // CHECK: %[[GENERIC:.+]] = linalg.generic 
+  // CHECK: %[[GENERIC:.+]] = linalg.generic
   // CHECK-SAME: ins(%arg0 : tensor<1x14x16x5xi8>) outs(%[[FILL]] : tensor<1x14x16xi32>)
   // CHECK: %[[EXPAND:.+]] = tensor.expand_shape %[[GENERIC]]
 
@@ -220,7 +220,7 @@ func.func @conv2d_dyn_input_zp(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<?x?x5x
   // CHECK: %[[DIM0:.+]] = tensor.dim %arg1, %[[I0]]
   // CHECK: %[[DIM1:.+]] = tensor.dim %arg1, %[[I1]]
   // CHECK: %[[KERNEL:.+]] = tensor.empty(%[[DIM0]], %[[DIM1]]) : tensor<?x?xi32>
-  // CHECK: %[[POOL:.+]] = linalg.pooling_nhwc_sum 
+  // CHECK: %[[POOL:.+]] = linalg.pooling_nhwc_sum
   // CHECK-SAME: ins(%[[EXPAND]], %[[KERNEL]] : tensor<1x14x16x1xi32>, tensor<?x?xi32>)
   // CHECK-SAME: outs(%[[FILL]] : tensor<1x?x?x1xi32>)
   // CHECK: %[[COLLAPSE:.+]] = tensor.collapse_shape %[[POOL]]
@@ -228,7 +228,7 @@ func.func @conv2d_dyn_input_zp(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<?x?x5x
   // CHECK: %[[DIM1:.+]] = tensor.dim %arg2, %[[I1]]
   // CHECK: %[[DIM2:.+]] = tensor.dim %arg2, %[[I2]]
   // CHECK: %[[INIT:.+]] = tensor.empty(%[[DIM1]], %[[DIM2]]) : tensor<1x?x?x1024xi32>
-  // CHECK: %[[GENERIC:.+]] = linalg.generic 
+  // CHECK: %[[GENERIC:.+]] = linalg.generic
   // CHECK-SAME: ins(%[[CONV]], %[[COLLAPSE]] : tensor<1x?x?x1024xi32>, tensor<1x?x?xi32>)
   // CHECK-SAME: outs(%[[INIT]] : tensor<1x?x?x1024xi32>)
   %0 = linalg.conv_2d_nhwc_hwcf_q {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%arg0, %arg1, %iZp, %fZp : tensor<1x14x16x5xi8>, tensor<?x?x5x1024xi8>, i32, i32) outs(%arg2 : tensor<1x?x?x1024xi32>) -> tensor<1x?x?x1024xi32>
@@ -265,7 +265,7 @@ func.func @conv2d_all_dyn(%arg0: tensor<?x?x?x?xi8>, %arg1: tensor<?x?x?x?xi8>, 
   // CHECK: %[[DIM3:.+]] = tensor.dim %arg1, %[[I3]]
   // CHECK: %[[EMPTY:.+]] = tensor.empty(%[[DIM3]]) : tensor<?xi32>
   // CHECK: %[[FILL:.+]] = linalg.fill ins(%[[C0]] : i32) outs(%[[EMPTY]] : tensor<?xi32>)
-  // CHECK: %[[FSUM:.+]] = linalg.generic 
+  // CHECK: %[[FSUM:.+]] = linalg.generic
   // CHECK-SAME:  indexing_maps = [#map, #map1]
   // CHECK-SAME:  iterator_types = ["parallel", "reduction", "reduction", "reduction"]
   // CHECK-SAME:  ins(%arg1 : tensor<?x?x?x?xi8>)
@@ -276,7 +276,7 @@ func.func @conv2d_all_dyn(%arg0: tensor<?x?x?x?xi8>, %arg1: tensor<?x?x?x?xi8>, 
   // CHECK: %[[DIM2:.+]] = tensor.dim %arg2, %[[I2]]
   // CHECK: %[[DIM3:.+]] = tensor.dim %arg1, %[[I3]]
   // CHECK: %[[EMPTY:.+]] = tensor.empty(%[[DIM0]], %[[DIM1]], %[[DIM2]], %[[DIM3]])
-  // CHECK: %[[CONV_SUMF:.+]] = linalg.generic 
+  // CHECK: %[[CONV_SUMF:.+]] = linalg.generic
   // CHECK-SAME:  indexing_maps = [#map2, #map3, #map2]
   // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel"]
   // CHECK-SAME:  ins(%[[CONV]], %[[FSUM]] : tensor<?x?x?x?xi32>, tensor<?xi32>)
@@ -287,7 +287,7 @@ func.func @conv2d_all_dyn(%arg0: tensor<?x?x?x?xi8>, %arg1: tensor<?x?x?x?xi8>, 
   // CHECK: %[[DIM2:.+]] = tensor.dim %arg0, %[[I2]]
   // CHECK: %[[EMPTY:.+]] = tensor.empty(%[[DIM0]], %[[DIM1]], %[[DIM2]])
   // CHECK: %[[FILL:.+]] = linalg.fill ins(%[[C0]] : i32) outs(%[[EMPTY]] : tensor<?x?x?xi32>)
-  // CHECK: %[[SUMI:.+]] = linalg.generic 
+  // CHECK: %[[SUMI:.+]] = linalg.generic
   // CHECK-SAME:  indexing_maps = [#map2, #map4]
   // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "reduction"]}
   // CHECK-SAME:  ins(%arg0 : tensor<?x?x?x?xi8>)
@@ -302,7 +302,7 @@ func.func @conv2d_all_dyn(%arg0: tensor<?x?x?x?xi8>, %arg1: tensor<?x?x?x?xi8>, 
   // CHECK-DAG: %[[DIM0:.+]] = tensor.dim %arg1, %[[I0]] : tensor<?x?x?x?xi8>
   // CHECK-DAG: %[[DIM1:.+]] = tensor.dim %arg1, %[[I1]] : tensor<?x?x?x?xi8>
   // CHECK: %[[KERNEL:.+]] = tensor.empty(%[[DIM0]], %[[DIM1]]) : tensor<?x?xi32>
-  // CHECK: %[[POOL:.+]] = linalg.pooling_nhwc_sum 
+  // CHECK: %[[POOL:.+]] = linalg.pooling_nhwc_sum
   // CHECK-SAME: dilations = dense<1> : tensor<2xi64>
   // CHECK-SAME: strides = dense<1> : tensor<2xi64>}
   // CHECK-SAME: ins(%[[EXPAND]], %[[KERNEL]] : tensor<?x?x?x1xi32>, tensor<?x?xi32>)
@@ -314,7 +314,7 @@ func.func @conv2d_all_dyn(%arg0: tensor<?x?x?x?xi8>, %arg1: tensor<?x?x?x?xi8>, 
   // CHECK-DAG: %[[DIM2:.+]] = tensor.dim %arg2, %[[I2]]
   // CHECK-DAG: %[[DIM3:.+]] = tensor.dim %arg1, %[[I3]]
   // CHECK: %[[EMPTY:.+]] = tensor.empty(%[[DIM0]], %[[DIM1]], %[[DIM2]], %[[DIM3]])
-  // CHECK: %[[CONV_SUMIF:.+]] = linalg.generic 
+  // CHECK: %[[CONV_SUMIF:.+]] = linalg.generic
   // CHECK-SAME: indexing_maps = [#map2, #map4, #map2]
   // CHECK-SAME: iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
   // CHECK-SAME: ins(%[[CONV_SUMF]], %[[COLLAPSE]] : tensor<?x?x?x?xi32>, tensor<?x?x?xi32>)
@@ -331,7 +331,7 @@ func.func @conv2d_all_dyn(%arg0: tensor<?x?x?x?xi8>, %arg1: tensor<?x?x?x?xi8>, 
   // CHECK: %[[DIM2:.+]] = tensor.dim %arg2, %[[I2]]
   // CHECK: %[[DIM3:.+]] = tensor.dim %arg1, %[[I3]]
   // CHECK: %[[EMPTY:.+]] = tensor.empty(%[[DIM0]], %[[DIM1]], %[[DIM2]], %[[DIM3]]) : tensor<?x?x?x?xi32>
-  // CHECK: %[[RESULT:.+]] = linalg.generic 
+  // CHECK: %[[RESULT:.+]] = linalg.generic
   // CHECK-SAME: indexing_maps = [#map2, #map2]
   // CHECK-SAME: iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
   // CHECK-SAME: ins(%[[CONV_SUMIF]] : tensor<?x?x?x?xi32>)

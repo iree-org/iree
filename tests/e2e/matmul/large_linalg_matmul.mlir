@@ -18,7 +18,7 @@ func.func @matmul_2048x512x1024_f32_f32() {
 
 // Problem size      : 3456x1024x2048
 // Input type        : F16
-// Accumulation type : F16 
+// Accumulation type : F16
 func.func @matmul_3456x1024x2048_f16_f16() {
   %lhs = util.unfoldable_constant dense<1.00> : tensor<3456x2048xf16>
   %rhs = util.unfoldable_constant dense<0.01> : tensor<2048x1024xf16>

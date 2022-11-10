@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(iree-codegen-linalg-to-spirv-pipeline))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-linalg-to-spirv-pipeline)))' %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -76,9 +76,18 @@ hal.executable private @subgroup_reduce {
 
 // CHECK:   spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
 
-// CHECK-COUNT-8:   spirv.Load "Workgroup" %{{.+}} : f32
-// CHECK-COUNT-7:   spirv.FAdd %{{.+}}, %{{.+}} : f32
-//         CHECK:   spirv.FAdd %{{.+}}, %[[F0]] : f32
+// CHECK:   %[[LOAD_VAL:.+]] = spirv.Load "Workgroup" {{.+}} : f32
+// CHECK:   %[[USE_IDENTITY:.+]] = spirv.SGreaterThanEqual {{.+}}, %[[C8]] : i32
+// CHECK:   %[[LANE_VAL:.+]] = spirv.Select %[[USE_IDENTITY]], %[[F0]], %[[LOAD_VAL]] : i1, f32
+// CHECK:   %[[S4:.+]] = spirv.GroupNonUniformShuffleXor <Subgroup> %[[LANE_VAL]], %[[C1]] : f32, i32
+// CHECK:   %[[ADD7:.+]] = spirv.FAdd %[[LANE_VAL]], %[[S4]] : f32
+// CHECK:   %[[S5:.+]] = spirv.GroupNonUniformShuffleXor <Subgroup> %[[ADD7]], %[[C2]] : f32, i32
+// CHECK:   %[[ADD8:.+]] = spirv.FAdd %[[ADD7]], %[[S5]] : f32
+// CHECK:   %[[S6:.+]] = spirv.GroupNonUniformShuffleXor <Subgroup> %[[ADD8]], %[[C4]] : f32, i32
+// CHECK:   %[[ADD9:.+]] = spirv.FAdd %[[ADD8]], %[[S6]] : f32
+// CHECK:   %[[S7:.+]] = spirv.GroupNonUniformShuffleXor <Subgroup> %[[ADD9]], %[[C8]] : f32, i32
+// CHECK:   %[[ADD10:.+]] = spirv.FAdd %[[ADD9]], %[[S7]] : f32
+//         CHECK:   spirv.FAdd %[[ADD10]], %[[F0]] : f32
 
 // CHECK:   %[[EQ:.+]] = spirv.IEqual %{{.+}}, %[[C0]] : i32
 // CHECK:   spirv.mlir.selection {

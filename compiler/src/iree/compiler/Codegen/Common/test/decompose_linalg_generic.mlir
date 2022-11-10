@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="func.func(iree-codegen-decompose-linalg-generic)" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-decompose-linalg-generic))" %s | FileCheck %s
 
 // -----
 // CHECK-LABEL: @parallel_with_broadcast_dynamic

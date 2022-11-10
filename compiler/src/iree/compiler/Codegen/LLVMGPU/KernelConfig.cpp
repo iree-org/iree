@@ -520,6 +520,7 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   tileSizes.emplace_back(std::move(reductionTileSizes));  // reduction level
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, tileSizes,
+      // TODO: should this hook up `TransformDialectJitterCodegen` directly ?
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWarpReduction,
       workgroupSize);
   return success();
@@ -817,13 +818,6 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
       setTranslationInfo(funcOp, translationInfo);
       if (clGPUCodegenTransformDialectTileSizes.empty()) continue;
     }
-    if (clGPUEnableTransformDialectJit) {
-      auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-          moduleOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
-                                     TransformDialectJitterCodegen);
-      setTranslationInfo(funcOp, translationInfo);
-      continue;
-    }
 
     Operation *rootOperation = nullptr;
     // Find the root operation. linalg.generic and linalg.fill are not root
@@ -859,6 +853,7 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
       // continue;
       return funcOp.emitOpError("unable to find root operation");
     }
+
     if (failed(setRootConfig(funcOp, rootOperation))) continue;
 
     // Propogate the configuration to the other ops.
@@ -871,6 +866,15 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
     for (auto op : computeOps) {
       if (op == rootOperation) continue;
       setLoweringConfig(op, config);
+    }
+
+    // TODO: this currently overrides the seeting as soon as the flag is passed.
+    // Should `setLoweringConfig` set `TransformDialectJitterCodegen` instead?
+    if (clGPUEnableTransformDialectJit) {
+      auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+          moduleOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
+                                     TransformDialectJitterCodegen);
+      setTranslationInfo(funcOp, translationInfo);
     }
   }
   return success();

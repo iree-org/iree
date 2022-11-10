@@ -123,17 +123,15 @@ iree_check_single_backend_test_suite(
     srcs = enforce_glob(
         # keep sorted
         [
+            "pack.mlir",
             "reverse.mlir",
             "scan.mlir",
             "scatter.mlir",
             "sort.mlir",
             "top-k.mlir",
-        ],
-        include = ["*.mlir"],
-        exclude = [
-            "pack.mlir",
             "unpack.mlir",
         ],
+        include = ["*.mlir"],
     ),
     driver = "local-task",
     target_backend = "vmvx",

@@ -37,14 +37,16 @@ constexpr int kMaxVectorNumElements = 4;
 namespace mlir {
 namespace iree_compiler {
 
-/// Writes all uses of the given memref `value` and returns true if all uses are
-/// transfer read/write operations.
+/// Scans all uses of the given memref `value` to make sure they are ops that we
+/// can vectorize, including vector transfer ops and GPU subgroup MMA ops, or
+/// other ops that doesn't care. If so, places all vector transfer or GPU
+/// subgroup MMA ops in `uses` and returns true.
 static bool getUsesIfAllTransferOp(Value value,
                                    SmallVectorImpl<Operation *> &uses) {
   assert(uses.empty() && "expected uses to be empty");
   for (Operation *userOp : value.getUsers()) {
     if (isa<memref::DeallocOp, memref::AssumeAlignmentOp>(userOp)) continue;
-    // Only vectorize memref used by vector transfer ops.
+
     if (!isa<gpu::SubgroupMmaLoadMatrixOp, gpu::SubgroupMmaStoreMatrixOp,
              vector::TransferReadOp, vector::TransferWriteOp>(userOp)) {
       uses.clear();
@@ -52,6 +54,16 @@ static bool getUsesIfAllTransferOp(Value value,
                  << "failed: non-transfer-like user: " << *userOp << "\n");
       return false;
     }
+
+    if (auto transferOp = dyn_cast<VectorTransferOpInterface>(userOp)) {
+      if (!transferOp.permutation_map().isMinorIdentity()) {
+        uses.clear();
+        LLVM_DEBUG(llvm::dbgs() << "failed: non-minor-identity transfer user: "
+                                << *userOp << "\n");
+        return false;
+      }
+    }
+
     uses.push_back(userOp);
   }
   return true;
@@ -272,6 +284,8 @@ class ProcessTransferRead final
           read, "cannot be vectorized per memref usage analysis");
     }
 
+    assert(read.getPermutationMap().isMinorIdentity());
+
     Location loc = read.getLoc();
 
     auto scalarMemrefType = read.getSource().getType().dyn_cast<MemRefType>();
@@ -321,6 +335,8 @@ class ProcessTransferWrite final
       return rewriter.notifyMatchFailure(
           write, "cannot be vectorized per memref usage analysis");
     }
+
+    assert(write.getPermutationMap().isMinorIdentity());
 
     Location loc = write.getLoc();
 
@@ -711,24 +727,27 @@ void SPIRVVectorizeLoadStorePass::runOnOperation() {
   target.addDynamicallyLegalOp<memref::AllocOp>([&](memref::AllocOp alloc) {
     return !memrefUsageAnalysis->shouldVectorizeMemRef(alloc);
   });
+  target.addDynamicallyLegalOp<memref::DeallocOp>([&](memref::DeallocOp op) {
+    return !memrefUsageAnalysis->shouldVectorizeMemRef(op.getMemref());
+  });
   target.addDynamicallyLegalOp<IREE::HAL::InterfaceBindingSubspanOp>(
       [&](IREE::HAL::InterfaceBindingSubspanOp bindingOp) {
         return !memrefUsageAnalysis->shouldVectorizeMemRef(bindingOp);
       });
-  target.markUnknownOpDynamicallyLegal([&](Operation *op) {
-    if (isa<vector::TransferWriteOp, vector::TransferReadOp>(op))
-      return !memrefUsageAnalysis->shouldConvertTransfer(op);
-    if (isa<gpu::SubgroupMmaLoadMatrixOp, gpu::SubgroupMmaStoreMatrixOp>(op))
-      return !memrefUsageAnalysis->shouldConvertTransfer(op);
-    if (auto dealloc = dyn_cast<memref::DeallocOp>(op))
-      return !memrefUsageAnalysis->shouldVectorizeMemRef(dealloc.getMemref());
-    if (auto assumeOp = dyn_cast<memref::AssumeAlignmentOp>(op))
-      return !memrefUsageAnalysis->shouldVectorizeMemRef(assumeOp.getMemref());
-    return true;
-  });
+  target.addDynamicallyLegalOp<memref::AssumeAlignmentOp>(
+      [&](memref::AssumeAlignmentOp op) {
+        return !memrefUsageAnalysis->shouldVectorizeMemRef(op.getMemref());
+      });
+  target.addDynamicallyLegalOp<gpu::SubgroupMmaLoadMatrixOp,
+                               gpu::SubgroupMmaStoreMatrixOp,
+                               vector::TransferReadOp, vector::TransferWriteOp>(
+      [&](auto op) { return !memrefUsageAnalysis->shouldConvertTransfer(op); });
+  target.markUnknownOpDynamicallyLegal([&](Operation *op) { return true; });
+
   if (failed(applyPartialConversion(module, target,
-                                    std::move(conversionPatterns))))
+                                    std::move(conversionPatterns)))) {
     return signalPassFailure();
+  }
 
   for (func::FuncOp func : module.getOps<func::FuncOp>()) {
     RewritePatternSet rewritingPatterns(context);

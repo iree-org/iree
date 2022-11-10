@@ -6,6 +6,8 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 import unittest
+import shutil
+import tempfile
 
 from common.common_arguments import build_common_argument_parser
 
@@ -13,11 +15,13 @@ from common.common_arguments import build_common_argument_parser
 class CommonArgumentsTest(unittest.TestCase):
 
   def test_build_common_argument_parser(self):
-    arg_parser = build_common_argument_parser()
-    arg_parser.parse_args([
-        "--normal_benchmark_tool_dir=/tmp", "--traced_benchmark_tool_dir=/tmp",
-        "--trace_capture_tool=/bin/ls", "."
-    ])
+    with tempfile.TemporaryDirectory() as tempdir:
+      arg_parser = build_common_argument_parser()
+      arg_parser.parse_args([
+          "--normal_benchmark_tool_dir=" + tempdir,
+          "--traced_benchmark_tool_dir=" + tempdir,
+          "--trace_capture_tool=" + shutil.which("ls"), "."
+      ])
 
   def test_build_common_argument_parser_check_build_dir(self):
     arg_parser = build_common_argument_parser()

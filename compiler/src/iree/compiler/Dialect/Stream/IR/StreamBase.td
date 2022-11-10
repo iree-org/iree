@@ -162,7 +162,7 @@ def Stream_FavorAttr :
 
 def Stream_PartitioningConfigAttr :
     AttrDef<Stream_Dialect, "PartitioningConfig", [
-      DeclareAttrInterfaceMethods<SubElementAttrInterface>,
+      SubElementAttrInterface,
     ]> {
   let mnemonic = "partitioning_config";
   let summary = [{defines partitioning configuration}];

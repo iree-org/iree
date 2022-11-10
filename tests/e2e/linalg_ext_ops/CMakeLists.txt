@@ -104,11 +104,13 @@ iree_check_single_backend_test_suite(
   NAME
     check_vmvx_local-task
   SRCS
+    "pack.mlir"
     "reverse.mlir"
     "scan.mlir"
     "scatter.mlir"
     "sort.mlir"
     "top-k.mlir"
+    "unpack.mlir"
   TARGET_BACKEND
     "vmvx"
   DRIVER

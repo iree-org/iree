@@ -105,19 +105,19 @@ func.func @dupe_arg_caller_b(%arg0: index) -> index {
 
 // CHECK-LABEL: func.func private @dupe_unused_arg_callee
 // CHECK-SAME: (%[[CALLEE_ARG0:.+]]: index) -> index
-func.func private @dupe_unused_arg_callee(%arg0: index, %arg0_dupe: index) -> index {
+func.func private @dupe_unused_arg_callee(%arg0: index, %arg0_dupe: index) -> (index, index) {
   // CHECK: %[[CALLEE_RET0:.+]] = arith.addi %[[CALLEE_ARG0]], %[[CALLEE_ARG0]]
   %ret0 = arith.addi %arg0_dupe, %arg0_dupe : index
   // CHECK: return %[[CALLEE_RET0]]
-  return %ret0 : index
+  return %ret0, %arg0 : index, index
 }
 
 // CHECK: func.func @dupe_unused_arg_caller(%[[CALLER_ARG0:.+]]: index)
-func.func @dupe_unused_arg_caller(%arg0: index) -> index {
+func.func @dupe_unused_arg_caller(%arg0: index) -> (index, index) {
   // CHECK: %[[CALLER_RET0:.+]] = call @dupe_unused_arg_callee(%[[CALLER_ARG0]]) : (index) -> index
-  %ret0 = call @dupe_unused_arg_callee(%arg0, %arg0) : (index, index) -> index
-  // CHECK: return %[[CALLER_RET0]]
-  return %ret0 : index
+  %ret:2 = call @dupe_unused_arg_callee(%arg0, %arg0) : (index, index) -> (index, index)
+  // CHECK: return %[[CALLER_RET0]], %[[CALLER_ARG0]]
+  return %ret#0, %ret#1 : index, index
 }
 
 // -----
