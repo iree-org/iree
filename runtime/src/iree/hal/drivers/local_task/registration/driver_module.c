@@ -10,6 +10,7 @@
 #include <stddef.h>
 
 #include "iree/base/api.h"
+#include "iree/base/internal/path.h"
 #include "iree/hal/drivers/local_task/task_driver.h"
 #include "iree/hal/local/loaders/registration/init.h"
 #include "iree/task/api.h"
@@ -29,6 +30,11 @@ static iree_status_t iree_hal_local_task_driver_factory_enumerate(
   return iree_ok_status();
 }
 
+void slice(const char *str, char *result, size_t start, size_t end)
+{
+    strncpy(result, str + start, end - start);
+}
+
 static iree_status_t iree_hal_local_task_driver_factory_try_create(
     void* self, iree_string_view_t driver_name, iree_allocator_t host_allocator,
     iree_hal_driver_t** out_driver) {
@@ -38,7 +44,29 @@ static iree_status_t iree_hal_local_task_driver_factory_try_create(
                             (int)driver_name.size, driver_name.data);
   }
 
-  printf("registration/driver_module: %s\n", driver_name.data);
+  iree_string_view_t uri = driver_name;
+  uri.size = strlen(driver_name.data);
+  iree_string_view_t name, device_path, params_str, nodes_name, nodes_value;
+  iree_uri_split(uri, &name, &device_path, &params_str);
+  iree_string_view_t remaining = params_str;
+  iree_string_view_split(remaining, '=', &nodes_name, &nodes_value);
+  nodes_name = iree_string_view_trim(nodes_name);
+  nodes_value = iree_string_view_trim(nodes_value);
+  while (!iree_string_view_is_empty(nodes_value)) {
+    iree_string_view_t key_value;
+    iree_string_view_split(nodes_value, ',', &key_value, &nodes_value);
+    char dest[50];
+    slice(key_value.data, dest, 0, key_value.size);
+    long input_node = strtol(dest, NULL, 10);
+    int maxnode = numa_max_node();
+    if (input_node > maxnode) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "input_node %lu out of range (0 - %d)",
+                              input_node,
+                              maxnode);
+    }
+  }
+
   iree_hal_task_device_params_t default_params;
   iree_hal_task_device_params_initialize(&default_params);
 

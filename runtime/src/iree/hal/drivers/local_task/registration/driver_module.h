@@ -9,6 +9,7 @@
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
+#include "third_party/numactl/numa.h"
 
 #ifdef __cplusplus
 extern "C" {

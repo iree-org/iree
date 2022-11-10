@@ -37,59 +37,57 @@ iree_cc_library(
   PUBLIC
 )
 
-if(${IREE_NUMA})
-  iree_cc_library(
-    NAME
-      task
-    HDRS
-      "affinity_set.h"
-      "executor.h"
-      "list.h"
-      "poller.h"
-      "pool.h"
-      "queue.h"
-      "scope.h"
-      "submission.h"
-      "task.h"
-      "topology.h"
-      "tuning.h"
-    SRCS
-      "executor.c"
-      "executor_impl.h"
-      "list.c"
-      "poller.c"
-      "pool.c"
-      "post_batch.c"
-      "post_batch.h"
-      "queue.c"
-      "scope.c"
-      "submission.c"
-      "task.c"
-      "task_impl.h"
-      "topology.c"
-      "topology_cpuinfo.c"
-      "worker.c"
-      "worker.h"
-      "numactl.c"
-      "numactl.h"
-    DEPS
-      ${IREE_CPUINFO_TARGET}
-      iree::base
-      iree::base::core_headers
-      iree::base::internal
-      iree::base::internal::atomic_slist
-      iree::base::internal::cpu
-      iree::base::internal::event_pool
-      iree::base::internal::fpu_state
-      iree::base::internal::prng
-      iree::base::internal::synchronization
-      iree::base::internal::threading
-      iree::base::internal::wait_handle
-      iree::base::tracing
-      numa::libnuma
-    PUBLIC
-  )
-endif()
+iree_cc_library(
+  NAME
+    task
+  HDRS
+    "affinity_set.h"
+    "executor.h"
+    "list.h"
+    "poller.h"
+    "pool.h"
+    "queue.h"
+    "scope.h"
+    "submission.h"
+    "task.h"
+    "topology.h"
+    "tuning.h"
+  SRCS
+    "executor.c"
+    "executor_impl.h"
+    "list.c"
+    "poller.c"
+    "pool.c"
+    "post_batch.c"
+    "post_batch.h"
+    "queue.c"
+    "scope.c"
+    "submission.c"
+    "task.c"
+    "task_impl.h"
+    "topology.c"
+    "topology_cpuinfo.c"
+    "worker.c"
+    "worker.h"
+    "numactl.c"
+    "numactl.h"
+  DEPS
+    ${IREE_CPUINFO_TARGET}
+    iree::base
+    iree::base::core_headers
+    iree::base::internal
+    iree::base::internal::atomic_slist
+    iree::base::internal::cpu
+    iree::base::internal::event_pool
+    iree::base::internal::fpu_state
+    iree::base::internal::prng
+    iree::base::internal::synchronization
+    iree::base::internal::threading
+    iree::base::internal::wait_handle
+    iree::base::tracing
+    numa::libnuma
+  PUBLIC
+)
 
 iree_cc_test(
   NAME

@@ -89,8 +89,8 @@ iree_status_t iree_task_topology_initialize_from_flags(
   IREE_ASSERT_ARGUMENT(out_topology);
   iree_task_topology_initialize(out_topology);
   if (FLAG_numa_topology_dump == true) {
-    printf("HARDWARE TOPOLOGY:\n");
-    hardware_topology();
+    //printf("HARDWARE TOPOLOGY:\n");
+    //hardware_topology();
   }
 
   if (FLAG_task_topology_group_count != 0) {
