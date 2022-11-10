@@ -281,4 +281,4 @@ hal.executable private @vectorize_fill_conv2d_generic {
 // CHECK-NOT:    linalg.fill
 // CHECK:        vector.outerproduct %{{.+}}, %{{.+}}, %{{.+}} {kind = #vector.kind<add>}
 // CHECK-NOT:    linalg.generic
-// CHECK:        arith.cmpf olt, %{{.+}}, %{{.+}} : vector<4x8xf32>
+// CHECK:        arith.cmpf olt, %{{.+}}, %{{.+}} : vector<7x8xf32>
