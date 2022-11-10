@@ -175,6 +175,20 @@ linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions();
 void replaceMemrefUsesAndPropagateType(Operation *oldOp, Value val,
                                        OpBuilder &builder);
 
+/// Returns true if an op is aligned by checking if
+///   1. the op is inside the workgroup-specialized region, or
+///   2. the op's parent is not the workgroup-specialized region.
+/// The second case does not have a workgroup-spcialized region because
+/// it is already aligned.
+LogicalResult alignedOpFilter(Operation *op);
+
+/// Returns true if an op is unaligned by checking if
+///   1. the op is inside the workgroup-specialized region, or
+///   2. the op's parent is not the workgroup-specialized region.
+/// The second case does not have a workgroup-spcialized region because
+/// it is already aligned.
+LogicalResult unalignedOpFilter(Operation *op);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 

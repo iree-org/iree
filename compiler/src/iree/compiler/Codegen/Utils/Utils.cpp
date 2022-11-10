@@ -677,5 +677,31 @@ void replaceMemrefUsesAndPropagateType(Operation *oldOp, Value val,
   for (Operation *op : opToDelete) op->erase();
 }
 
+LogicalResult alignedOpFilter(Operation *op) {
+  Operation *opWithMarker =
+      findAncestorWithMarker(op, getWorkgroupSpecializationMarker());
+
+  if (opWithMarker) {
+    auto ifOp = cast<scf::IfOp>(opWithMarker);
+    return success(ifOp.getThenRegion().isAncestor(op->getParentRegion()));
+  } else {
+    return success();
+  }
+}
+
+LogicalResult unalignedOpFilter(Operation *op) {
+  Operation *opWithMarker =
+      findAncestorWithMarker(op, getWorkgroupSpecializationMarker());
+
+  if (opWithMarker) {
+    auto ifOp = cast<scf::IfOp>(opWithMarker);
+    return success(ifOp.getElseRegion().isAncestor(op->getParentRegion()));
+  } else {
+    // When there is no workgroup specialization, it means the op is already
+    // aligned.
+    return failure();
+  }
+}
+
 }  // namespace iree_compiler
 }  // namespace mlir

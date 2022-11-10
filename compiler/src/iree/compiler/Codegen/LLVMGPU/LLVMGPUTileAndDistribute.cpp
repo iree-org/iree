@@ -104,42 +104,6 @@ static SmallVector<Value, 4> calculateDistributedTileSize(
   return tileSizesVal;
 }
 
-/// Returns true if an op is aligned by checking if
-///   1. the op is inside the workgroup-specialized region, or
-///   2. the op's parent is not the workgroup-specialized region.
-/// The second case does not have a workgroup-spcialized region because
-/// it is already aligned.
-static LogicalResult alignedOpFilter(Operation *op) {
-  Operation *opWithMarker =
-      findAncestorWithMarker(op, getWorkgroupSpecializationMarker());
-
-  if (opWithMarker) {
-    auto ifOp = cast<scf::IfOp>(opWithMarker);
-    return success(ifOp.getThenRegion().isAncestor(op->getParentRegion()));
-  } else {
-    return success();
-  }
-}
-
-/// Returns true if an op is unaligned by checking if
-///   1. the op is inside the workgroup-specialized region, or
-///   2. the op's parent is not the workgroup-specialized region.
-/// The second case does not have a workgroup-spcialized region because
-/// it is already aligned.
-static LogicalResult unalignedOpFilter(Operation *op) {
-  Operation *opWithMarker =
-      findAncestorWithMarker(op, getWorkgroupSpecializationMarker());
-
-  if (opWithMarker) {
-    auto ifOp = cast<scf::IfOp>(opWithMarker);
-    return success(ifOp.getElseRegion().isAncestor(op->getParentRegion()));
-  } else {
-    // When there is no workgroup specialization, it means the op is already
-    // aligned.
-    return failure();
-  }
-}
-
 /// Patterns for warp level tiling.
 static void populateTilingToWarpPatterns(
     RewritePatternSet &patterns, SmallVectorImpl<int64_t> &workgroupSize) {
