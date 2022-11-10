@@ -102,7 +102,9 @@ static Value groupReduction(Location loc, OpBuilder &builder, Value input,
   assert(
       size % warpSize == 0 &&
       "Group reduction only support for sizes aligned on warp size for now.");
-  Value laneVal = warpReduction(loc, builder, input, kind, warpSize);
+  // First reduce on a single thread to get per lane reduction value.
+  Value laneVal = builder.create<vector::ReductionOp>(loc, kind, input);
+  laneVal = warpReduction(loc, builder, laneVal, kind, warpSize);
   // if we have more than one warp, reduce across warps.
   if (size > warpSize) {
     uint32_t numWarp = size / warpSize;
@@ -110,7 +112,7 @@ static Value groupReduction(Location loc, OpBuilder &builder, Value input,
            "Only support 1 level, need to implement recursive/loop for this "
            "case.");
     MemRefType memrefType =
-        MemRefType::get(numWarp, input.getType(), {},
+        MemRefType::get(numWarp, laneVal.getType(), {},
                         gpu::GPUDialect::getWorkgroupAddressSpace());
     Value alloc = builder.create<memref::AllocOp>(loc, memrefType);
     Value threadX = builder.create<gpu::ThreadIdOp>(loc, builder.getIndexType(),
