@@ -15,15 +15,20 @@
 #
 # Usage:
 #    ./setup_mmperf.sh \
-#        <mmperf repo dir>
+#        <mmperf repo dir> \
+#        <mmperf sha>
 
 set -xeuo pipefail
 
 export REPO_DIR=$1
+export REPO_SHA=$2
 
 pushd ${REPO_DIR}
 git clone --recurse-submodules https://github.com/mmperf/mmperf.git
 pushd mmperf
+
+# Checkout a specific commit.
+git checkout ${REPO_SHA}
 
 # Create virtual environment.
 python3 -m venv mmperf.venv

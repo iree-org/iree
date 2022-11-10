@@ -114,6 +114,7 @@ ENV BLIS_DIR="/opt/blis"
 COPY build_tools/docker/context/setup_mmperf.sh /usr/local/bin
 
 # Generate a version of mmperf for CPU.
-RUN mkdir -p "/usr/local/src/mmperf" && /usr/local/bin/setup_mmperf.sh "/usr/local/src/mmperf"
+RUN mkdir -p "/usr/local/src/mmperf" \
+    && /usr/local/bin/setup_mmperf.sh "/usr/local/src/mmperf" "ae523a3"
 
 ##############
