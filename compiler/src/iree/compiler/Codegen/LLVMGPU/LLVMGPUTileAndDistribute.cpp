@@ -121,6 +121,25 @@ static LogicalResult alignedOpFilter(Operation *op) {
   }
 }
 
+/// Returns true if an op is unaligned by checking if
+///   1. the op is inside the workgroup-specialized region, or
+///   2. the op's parent is not the workgroup-specialized region.
+/// The second case does not have a workgroup-spcialized region because
+/// it is already aligned.
+static LogicalResult unalignedOpFilter(Operation *op) {
+  Operation *opWithMarker =
+      findAncestorWithMarker(op, getWorkgroupSpecializationMarker());
+
+  if (opWithMarker) {
+    auto ifOp = cast<scf::IfOp>(opWithMarker);
+    return success(ifOp.getElseRegion().isAncestor(op->getParentRegion()));
+  } else {
+    // When there is no workgroup specialization, it means the op is already
+    // aligned.
+    return failure();
+  }
+}
+
 /// Patterns for warp level tiling.
 static void populateTilingToWarpPatterns(
     RewritePatternSet &patterns, SmallVectorImpl<int64_t> &workgroupSize) {
@@ -158,9 +177,12 @@ static void populateTilingToWarpPatterns(
                  linalg::GenericOp>::insert(patterns, tilingOptions, filter);
 }
 
+using FilterFunction = std::function<LogicalResult(Operation *)>;
+
 /// Patterns for thread level tiling.
 static void populateTilingToInvocationPatterns(
-    RewritePatternSet &patterns, SmallVectorImpl<int64_t> &workgroupSize) {
+    RewritePatternSet &patterns, SmallVectorImpl<int64_t> &workgroupSize,
+    const FilterFunction &ff = nullptr) {
   linalg::TileSizeComputationFunction getInnerTileSizeFn =
       [&](OpBuilder &builder, Operation *operation) {
         return calculateDistributedTileSize(workgroupSize, builder, operation);
@@ -189,6 +211,8 @@ static void populateTilingToInvocationPatterns(
      // FFT doesn't support second level of tiling yet.
      return success(!isa<IREE::LinalgExt::FftOp>(op));
    }).setMatchByDefault();
+  // Add the user provided filter if available.
+  if (ff) f.addFilter(ff);
   patterns.insert<IREE::LinalgExt::LinalgTilingPattern,
                   IREE::LinalgExt::TilingInterfaceTilingPattern>(
       context, tilingOptions, f);
@@ -271,7 +295,7 @@ struct LLVMGPUTileAndDistributePass
     });
 
     if (distributeToWarp) {
-      // Apply last level of tiling and distribute to warps.
+      // Apply last level of tiling and distribute to warps for aligned ops.
       RewritePatternSet warpLevelTilingPatterns(context);
       populateTilingToWarpPatterns(warpLevelTilingPatterns, workgroupSize);
       if (failed(applyPatternsAndFoldGreedily(
@@ -279,6 +303,14 @@ struct LLVMGPUTileAndDistributePass
         return signalPassFailure();
       }
 
+      // Apply last level of tiling and distribute to threads for unaligned ops.
+      RewritePatternSet threadLevelTilingPatterns(context);
+      populateTilingToInvocationPatterns(threadLevelTilingPatterns,
+                                         workgroupSize, unalignedOpFilter);
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(threadLevelTilingPatterns)))) {
+        return signalPassFailure();
+      }
     } else {
       // Apply last level of tiling and distribute to threads.
       RewritePatternSet threadLevelTilingPatterns(context);
