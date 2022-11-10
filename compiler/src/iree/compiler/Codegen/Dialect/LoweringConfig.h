@@ -101,7 +101,7 @@ inline void setTranslationInfo(
 /// Returns the op that carries the `lowering_config` attribute; returns nullptr
 /// if none is carrying the attribute.
 ///
-/// This scans ops in reverse order and the first one carrying the attribute
+/// This scans ops in top-down order and the first one carrying the attribute
 /// will be returned.
 Operation *getLoweringConfigCarryingOp(ArrayRef<Operation *> computeOps);
 
@@ -113,7 +113,7 @@ IREE::Codegen::LoweringConfigAttr getLoweringConfig(Operation *op);
 /// Returns the lowering configuration from the list of operations; returns
 /// nullptr if unable to find.
 ///
-/// This scans ops in reverse order and the first one carrying the attribute
+/// This scans ops in top-down order and the first one carrying the attribute
 /// will be returned.
 IREE::Codegen::LoweringConfigAttr getLoweringConfig(
     ArrayRef<Operation *> computeOps);

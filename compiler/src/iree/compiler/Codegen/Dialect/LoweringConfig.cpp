@@ -279,7 +279,7 @@ void setTranslationInfo(IREE::HAL::ExecutableExportOp exportOp,
 // ===----------------------------------------------------------------------===//
 
 Operation *getLoweringConfigCarryingOp(ArrayRef<Operation *> computeOps) {
-  for (Operation *op : llvm::reverse(computeOps)) {
+  for (Operation *op : computeOps) {
     if (getLoweringConfig(op)) return op;
   }
   return nullptr;
