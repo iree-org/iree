@@ -16,6 +16,7 @@
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "llvm/Support/Debug.h"
@@ -178,6 +179,7 @@ static void addMemRefLoweringPasses(OpPassManager &pm) {
   // Perform various vector-level cross-op optimizations like load-store
   // forwarding, shape casting and casting op cancelling.
   pm.addNestedPass<func::FuncOp>(createOptimizeVectorTransferPass());
+  pm.addNestedPass<func::FuncOp>(createSPIRVBreakDownLargeVectorPass());
 
   // Perform optimizations that need to across the scf.for region boundary.
   pm.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
@@ -316,7 +318,8 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm) {
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createGPUReduceSharedMemoryBankConflicts());
+      createGPUReduceSharedMemoryBankConflicts(
+          detail::bankConflictReductionPaddingBits));
 
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());

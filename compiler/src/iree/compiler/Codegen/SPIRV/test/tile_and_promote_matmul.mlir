@@ -201,16 +201,15 @@ hal.executable @batch_matmul_16x1024x1024x80 {
 
 // CHECK-LABEL: func.func @batch_matmul_16x1024x1024x80()
 
-// Check that we only have one allocation for RHS---LHS is not well aligned
-// ((64 * 16) % (32 * 8 * 8) != 0) so cannot we cannot perform vector load/store
-// for it.
-
 //  CHECK-NOT: memref.alloc
-//      CHECK: %[[MEM:.+]] = memref.alloc() : memref<1x16x256xf16, 3>
+//  CHECK-DAG: %[[LHS_MEM:.+]] = memref.alloc() : memref<1x64x16xf16, 3>
+//  CHECK-DAG: %[[RHS_MEM:.+]] = memref.alloc() : memref<1x16x256xf16, 3>
 //  CHECK-NOT: memref.alloc
 
 //      CHECK:       gpu.barrier
-//      CHECK:       memref.copy %{{.+}}, %[[MEM]]
+//  CHECK-DAG:       memref.copy %{{.+}}, %[[LHS_MEM]]
+// CHECK-SAME:           __internal_linalg_transform__ = "copy_to_workgroup_memory"
+//  CHECK-DAG:       memref.copy %{{.+}}, %[[RHS_MEM]]
 // CHECK-SAME:           __internal_linalg_transform__ = "copy_to_workgroup_memory"
 //      CHECK:       gpu.barrier
 
@@ -278,15 +277,14 @@ hal.executable @batch_matmul_f32_16x4096x40x4096 {
 
 // CHECK-LABEL: func.func @batch_matmul_f32_16x4096x40x4096()
 
-// Check that we only have one allocation for LHS---RHS is not well aligned
-// ((16 * 8) % (2 * 64 * 4) != 0) so cannot we cannot perform vector load/store
-// for it.
-
 //   CHECK-NOT: memref.alloc()
 //  CHECK-DAG: %[[MEM_A:.+]] = memref.alloc() : memref<1x512x16xf32, 3>
+//  CHECK-DAG: %[[MEM_B:.+]] = memref.alloc() : memref<1x16x8xf32, 3>
 //   CHECK-NOT: memref.alloc()
 
 //      CHECK:       gpu.barrier
 //  CHECK-DAG:       memref.copy %{{.+}}, %[[MEM_A]]
+// CHECK-SAME:           __internal_linalg_transform__ = "copy_to_workgroup_memory"
+//  CHECK-DAG:       memref.copy %{{.+}}, %[[MEM_B]]
 // CHECK-SAME:           __internal_linalg_transform__ = "copy_to_workgroup_memory"
 //      CHECK:       gpu.barrier
