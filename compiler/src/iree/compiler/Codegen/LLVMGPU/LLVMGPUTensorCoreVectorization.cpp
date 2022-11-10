@@ -31,6 +31,8 @@ extern llvm::cl::opt<bool> llvmgpuUseMMASync;
 static void populateVectorizationPatterns(RewritePatternSet &patterns) {
   IREE::LinalgExt::LinalgTransformationFilter f(
       StringAttr::get(patterns.getContext(), getVectorizeMarker()));
+  // only handle aligned ops
+  f.addFilter(alignedOpFilter);
   VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(patterns, f);
   patterns.add<LinalgVectorizationPattern>(
       patterns.getContext(), f.addOpFilter<linalg::ContractionOpInterface>());
