@@ -477,10 +477,11 @@ static int64_t getMaxTileSizeForVectorization(int64_t lb, int64_t ub,
 
   int64_t numIters = ub - lb;
   assert(numIters > 0 && "Number of iterations should be greater than zero");
+  assert(maxSize > 0 && "Max size should be greater zero");
 
   if (priority == PrioritizeNumItersMultiple) {
     // Try to find a size that is multiple of the number of iterations.
-    for (int64_t i = std::min(maxSize, numIters); i > 0; --i) {
+    for (int64_t i = std::min(maxSize, numIters); i > 1; --i) {
       if (numIters % i == 0) {
         return i;
       }
