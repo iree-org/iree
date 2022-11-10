@@ -54,7 +54,7 @@ LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
   const int maxThreads = limits.getMaxComputeWorkgroupInvocations();
   const auto maxWorkGroupSize = llvm::to_vector<3>(llvm::map_range(
       limits.getMaxComputeWorkgroupSize().getAsValueRange<IntegerAttr>(),
-      [](const APInt& dim) { return dim.getSExtValue(); }));
+      [](const APInt &dim) { return dim.getSExtValue(); }));
 
   // Verify each dimension of workgroupSize should be power of two
   if (!llvm::isPowerOf2_64(workgroupSize[0]) ||
