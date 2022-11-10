@@ -364,7 +364,9 @@ static bool tileMatmulK(const int64_t dimK, const int64_t residualTilingFactor,
 /// the tiven tile sizes.
 static int64_t getTileBytes(int64_t mTileSize, int64_t nTileSize,
                             int64_t kTileSize, int64_t elementBits) {
-  const int64_t count = (mTileSize + nTileSize) * kTileSize;
+  const int64_t count =
+      (mTileSize + nTileSize) *
+      (kTileSize + detail::bankConflictReductionPaddingBits / elementBits);
   return (elementBits / 8) * count;
 }
 

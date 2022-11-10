@@ -26,6 +26,8 @@ namespace iree_compiler {
 
 namespace detail {
 
+const int bankConflictReductionPaddingBits = 128;
+
 /// Sets CodeGen configurations via attributes to the given convolution
 /// `linalgOp` by trying to achieve the given `bestTilingFactor`, which is how
 /// many scalar elements each thread should handle.
