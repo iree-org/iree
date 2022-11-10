@@ -554,8 +554,8 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
                                .getElementType();
   if (!elementType.isIntOrFloat()) return failure();
   unsigned bitWidth = elementType.getIntOrFloatBitWidth();
-  // Reduction distribution only supports 32-bit types now.
-  if (bitWidth != 32) return failure();
+  // Reduction distribution only supports 16-bit and 32-bit types now.
+  if (bitWidth != 32 && bitWidth != 16) return failure();
 
   const unsigned largestLoadSizeInBits = 128;
   unsigned vectorSize = largestLoadSizeInBits / bitWidth;
