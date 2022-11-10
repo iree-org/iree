@@ -16,6 +16,7 @@ iree_check_single_backend_test_suite(
   SRCS
     "reverse.mlir"
     "scan.mlir"
+    "scatter.mlir"
     "sort.mlir"
     "top-k.mlir"
   TARGET_BACKEND
@@ -75,6 +76,7 @@ iree_check_single_backend_test_suite(
     "pack.mlir"
     "reverse.mlir"
     "scan.mlir"
+    "scatter.mlir"
     "sort.mlir"
     "top-k.mlir"
     "unpack.mlir"
@@ -102,10 +104,13 @@ iree_check_single_backend_test_suite(
   NAME
     check_vmvx_local-task
   SRCS
+    "pack.mlir"
     "reverse.mlir"
     "scan.mlir"
+    "scatter.mlir"
     "sort.mlir"
     "top-k.mlir"
+    "unpack.mlir"
   TARGET_BACKEND
     "vmvx"
   DRIVER
@@ -117,6 +122,7 @@ iree_check_single_backend_test_suite(
     check_vulkan-spirv_vulkan
   SRCS
     "reverse.mlir"
+    "scatter.mlir"
     "sort.mlir"
   TARGET_BACKEND
     "vulkan-spirv"

@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='func.func(iree-stream-pack-allocations)' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(func.func(iree-stream-pack-allocations))' %s | FileCheck %s
 
 // CHECK-LABEL: @packAllocations
 // CHECK-SAME: (%[[SIZE_A:.+]]: index, %[[SIZE_B:.+]]: index)
@@ -17,10 +17,10 @@ func.func @packAllocations(%size_a: index, %size_b: index) {
   // CHECK: %[[SLICE_B:.+]] = stream.resource.subview %[[ALLOC]][%[[SLICES]]#2]
   // CHECK-SAME: !stream.resource<transient>{%[[SLICES]]#0} -> !stream.resource<transient>{%[[SIZE_B]]}
 
-  // CHECK: util.do_not_optimize(%[[SLICE_A]])
-  util.do_not_optimize(%0#0) : !stream.resource<transient>
-  // CHECK: util.do_not_optimize(%[[SLICE_B]])
-  util.do_not_optimize(%0#1) : !stream.resource<transient>
+  // CHECK: util.optimization_barrier %[[SLICE_A]]
+  util.optimization_barrier %0#0 : !stream.resource<transient>
+  // CHECK: util.optimization_barrier %[[SLICE_B]]
+  util.optimization_barrier %0#1 : !stream.resource<transient>
   return
 }
 
@@ -32,7 +32,7 @@ func.func @packEmpty() {
   %c0 = arith.constant 0 : index
   %0 = stream.resource.alloc : !stream.resource<transient>{%c0}
 
-  // CHECK: util.do_not_optimize(%[[ALLOC]])
-  util.do_not_optimize(%0) : !stream.resource<transient>
+  // CHECK: util.optimization_barrier %[[ALLOC]]
+  util.optimization_barrier %0 : !stream.resource<transient>
   return
 }

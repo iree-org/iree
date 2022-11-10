@@ -67,7 +67,7 @@ static void populateTilingCopyToWorkgroupMemPatterns(
         // distribution.
         SmallVector<Value, 4> tileSizesVal;
         MemRefType dstMemRefType = cast<linalg::GenericOp>(operation)
-                                       .getOutputOperand(0)
+                                       .getDpsInitOperand(0)
                                        ->get()
                                        .getType()
                                        .cast<MemRefType>();
@@ -112,7 +112,7 @@ static void populateTilingCopyToWorkgroupMemPatterns(
 static Optional<SmallVector<int64_t>> getTileToDistributableSize(
     linalg::GenericOp copyOp, int64_t flatWorkgroupSize) {
   SmallVector<int64_t, 4> shape = copyOp.getStaticLoopRanges();
-  unsigned bitWidth = copyOp.getOutputOperand(0)
+  unsigned bitWidth = copyOp.getDpsInitOperand(0)
                           ->get()
                           .getType()
                           .cast<MemRefType>()
@@ -199,7 +199,7 @@ SmallVector<linalg::ProcInfo> getIds(OpBuilder &b, Location loc,
 /// Return the shape of copy op that can be vectorized to a
 /// transfer_read/transfer_write of size `targetVectorSize`.
 SmallVector<int64_t> getNativeDstShape(linalg::GenericOp copyOp) {
-  unsigned bitWidth = copyOp.getOutputOperand(0)
+  unsigned bitWidth = copyOp.getDpsInitOperand(0)
                           ->get()
                           .getType()
                           .cast<MemRefType>()
@@ -369,7 +369,7 @@ class GPUDistributeSharedMemoryCopyPass
     bool isAligned = llvm::all_of(
         copiesToWorkgroupMem, [flatWorkgroupSize](linalg::GenericOp copyOp) {
           MemRefType dstMemRefType =
-              copyOp.getOutputOperand(0)->get().getType().cast<MemRefType>();
+              copyOp.getDpsInitOperand(0)->get().getType().cast<MemRefType>();
           auto shape = dstMemRefType.getShape();
           int targetVectorSize =
               copyVectorNumBits / dstMemRefType.getElementTypeBitWidth();

@@ -33,8 +33,6 @@ typedef struct iree_hal_task_device_t {
   // buffers can contain inlined data uploads).
   iree_arena_block_pool_t large_block_pool;
 
-  iree_task_executor_t* executor;
-
   iree_host_size_t loader_count;
   iree_hal_executable_loader_t** loaders;
 
@@ -56,41 +54,49 @@ static iree_hal_task_device_t* iree_hal_task_device_cast(
 void iree_hal_task_device_params_initialize(
     iree_hal_task_device_params_t* out_params) {
   out_params->arena_block_size = 32 * 1024;
-  out_params->queue_count = 8;
 }
 
 static iree_status_t iree_hal_task_device_check_params(
-    const iree_hal_task_device_params_t* params) {
+    const iree_hal_task_device_params_t* params, iree_host_size_t queue_count) {
   if (params->arena_block_size < 4096) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "arena block size too small (< 4096 bytes)");
   }
-  if (params->queue_count == 0) {
+  if (queue_count == 0) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "at least one queue is required");
+                            "must have at least one queue");
   }
   return iree_ok_status();
 }
 
+// Returns an event pool used for device-wide system event handles.
+// Each queue executor will have its own (potentially shared) pool and prefer
+// that but generic resource requests (creating semaphores, etc) will use this.
+iree_event_pool_t* iree_hal_task_device_shared_event_pool(
+    iree_hal_task_device_t* device) {
+  return iree_task_executor_event_pool(device->queues[0].executor);
+}
+
 iree_status_t iree_hal_task_device_create(
     iree_string_view_t identifier, const iree_hal_task_device_params_t* params,
-    iree_task_executor_t* executor, iree_host_size_t loader_count,
-    iree_hal_executable_loader_t** loaders,
+    iree_host_size_t queue_count, iree_task_executor_t* const* queue_executors,
+    iree_host_size_t loader_count, iree_hal_executable_loader_t** loaders,
     iree_hal_allocator_t* device_allocator, iree_allocator_t host_allocator,
     iree_hal_device_t** out_device) {
   IREE_ASSERT_ARGUMENT(params);
+  IREE_ASSERT_ARGUMENT(!queue_count || queue_executors);
   IREE_ASSERT_ARGUMENT(!loader_count || loaders);
   IREE_ASSERT_ARGUMENT(device_allocator);
   IREE_ASSERT_ARGUMENT(out_device);
   *out_device = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0,
-                                    iree_hal_task_device_check_params(params));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_task_device_check_params(params, queue_count));
 
   iree_hal_task_device_t* device = NULL;
   iree_host_size_t struct_size = sizeof(*device) +
-                                 params->queue_count * sizeof(*device->queues) +
+                                 queue_count * sizeof(*device->queues) +
                                  loader_count * sizeof(*device->loaders);
   iree_host_size_t total_size = struct_size + identifier.size;
   iree_status_t status =
@@ -110,23 +116,19 @@ iree_status_t iree_hal_task_device_create(
     iree_arena_block_pool_initialize(params->arena_block_size, host_allocator,
                                      &device->large_block_pool);
 
-    device->executor = executor;
-    iree_task_executor_retain(device->executor);
-
     device->loader_count = loader_count;
     device->loaders =
         (iree_hal_executable_loader_t**)((uint8_t*)device + sizeof(*device) +
-                                         params->queue_count *
-                                             sizeof(*device->queues));
+                                         queue_count * sizeof(*device->queues));
     for (iree_host_size_t i = 0; i < device->loader_count; ++i) {
       device->loaders[i] = loaders[i];
       iree_hal_executable_loader_retain(device->loaders[i]);
     }
 
-    device->queue_count = params->queue_count;
+    device->queue_count = queue_count;
     for (iree_host_size_t i = 0; i < device->queue_count; ++i) {
       // TODO(benvanik): add a number to each queue ID.
-      iree_hal_task_queue_initialize(device->identifier, device->executor,
+      iree_hal_task_queue_initialize(device->identifier, queue_executors[i],
                                      &device->small_block_pool,
                                      &device->queues[i]);
     }
@@ -152,10 +154,9 @@ static void iree_hal_task_device_destroy(iree_hal_device_t* base_device) {
   for (iree_host_size_t i = 0; i < device->loader_count; ++i) {
     iree_hal_executable_loader_release(device->loaders[i]);
   }
-  iree_task_executor_release(device->executor);
+  iree_hal_allocator_release(device->device_allocator);
   iree_arena_block_pool_deinitialize(&device->large_block_pool);
   iree_arena_block_pool_deinitialize(&device->small_block_pool);
-  iree_hal_allocator_release(device->device_allocator);
   iree_allocator_free(host_allocator, device);
 
   IREE_TRACE_ZONE_END(z0);
@@ -181,10 +182,18 @@ static iree_hal_allocator_t* iree_hal_task_device_allocator(
 
 static iree_status_t iree_hal_task_device_trim(iree_hal_device_t* base_device) {
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
+
+  // Before trimming the block pools try to trim subsystems that may be holding
+  // on to blocks.
+  for (iree_host_size_t i = 0; i < device->queue_count; ++i) {
+    iree_hal_task_queue_trim(&device->queues[i]);
+  }
+  IREE_RETURN_IF_ERROR(iree_hal_allocator_trim(device->device_allocator));
+
   iree_arena_block_pool_trim(&device->small_block_pool);
   iree_arena_block_pool_trim(&device->large_block_pool);
-  iree_task_executor_trim(device->executor);
-  return iree_hal_allocator_trim(device->device_allocator);
+
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_task_device_query_i64(
@@ -207,7 +216,10 @@ static iree_status_t iree_hal_task_device_query_i64(
     }
   } else if (iree_string_view_equal(category, IREE_SV("hal.dispatch"))) {
     if (iree_string_view_equal(key, IREE_SV("concurrency"))) {
-      *out_value = (int64_t)iree_task_executor_worker_count(device->executor);
+      // NOTE: we always return the queue 0 worker count. This will be incorrect
+      // if there are multiple queues with differing queue counts but that's ok.
+      *out_value =
+          (int64_t)iree_task_executor_worker_count(device->queues[0].executor);
       return iree_ok_status();
     }
   } else if (iree_string_view_equal(category, IREE_SV("hal.cpu"))) {
@@ -269,9 +281,17 @@ static iree_status_t iree_hal_task_device_create_executable_cache(
     iree_hal_device_t* base_device, iree_string_view_t identifier,
     iree_loop_t loop, iree_hal_executable_cache_t** out_executable_cache) {
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
+
+  // Sum up the total worker count across all queues so that the loaders can
+  // preallocate worker-specific storage.
+  iree_host_size_t total_worker_count = 0;
+  for (iree_host_size_t i = 0; i < device->queue_count; ++i) {
+    total_worker_count +=
+        iree_task_executor_worker_count(device->queues[i].executor);
+  }
+
   return iree_hal_local_executable_cache_create(
-      identifier, iree_task_executor_worker_count(device->executor),
-      device->loader_count, device->loaders,
+      identifier, total_worker_count, device->loader_count, device->loaders,
       iree_hal_device_host_allocator(base_device), out_executable_cache);
 }
 
@@ -290,7 +310,7 @@ static iree_status_t iree_hal_task_device_create_semaphore(
     iree_hal_semaphore_t** out_semaphore) {
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
   return iree_hal_task_semaphore_create(
-      iree_task_executor_event_pool(device->executor), initial_value,
+      iree_hal_task_device_shared_event_pool(device), initial_value,
       device->host_allocator, out_semaphore);
 }
 
@@ -368,8 +388,28 @@ static iree_status_t iree_hal_task_device_wait_semaphores(
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
   return iree_hal_task_semaphore_multi_wait(
       wait_mode, semaphore_list, timeout,
-      iree_task_executor_event_pool(device->executor),
+      iree_hal_task_device_shared_event_pool(device),
       &device->large_block_pool);
+}
+
+static iree_status_t iree_hal_task_device_profiling_begin(
+    iree_hal_device_t* device,
+    const iree_hal_device_profiling_options_t* options) {
+  // Unimplemented (and that's ok).
+  // We could hook in to vendor APIs (Intel/ARM/etc) or generic perf infra:
+  // https://man7.org/linux/man-pages/man2/perf_event_open.2.html
+  // Capturing things like:
+  //   PERF_COUNT_HW_CPU_CYCLES / PERF_COUNT_HW_INSTRUCTIONS
+  //   PERF_COUNT_HW_CACHE_REFERENCES / PERF_COUNT_HW_CACHE_MISSES
+  //   etc
+  // TODO(benvanik): shared iree/hal/local/profiling implementation of this.
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_task_device_profiling_end(
+    iree_hal_device_t* device) {
+  // Unimplemented (and that's ok).
+  return iree_ok_status();
 }
 
 static const iree_hal_device_vtable_t iree_hal_task_device_vtable = {
@@ -394,4 +434,6 @@ static const iree_hal_device_vtable_t iree_hal_task_device_vtable = {
     .queue_execute = iree_hal_task_device_queue_execute,
     .queue_flush = iree_hal_task_device_queue_flush,
     .wait_semaphores = iree_hal_task_device_wait_semaphores,
+    .profiling_begin = iree_hal_task_device_profiling_begin,
+    .profiling_end = iree_hal_task_device_profiling_end,
 };

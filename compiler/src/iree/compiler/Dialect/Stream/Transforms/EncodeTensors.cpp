@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 // TODO(benvanik): have a stream/upstream equivalent of the flow.dispatch.* ops.
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
@@ -41,7 +42,8 @@ namespace {
 static LogicalResult checkEncoding(Operation *op, RankedTensorType encodingType,
                                    ValueRange encodingDims,
                                    PatternRewriter &rewriter) {
-  if (encodingType.getEncoding()) {
+  auto encoding = encodingType.getEncoding();
+  if (encoding && !encoding.isa<IREE::LinalgExt::EncodingAttr>()) {
     return rewriter.notifyMatchFailure(op, [=](Diagnostic &d) {
       d << "unsupported tensor encoding: " << encodingType;
     });
@@ -615,7 +617,7 @@ class EncodeHostTensorsPass
 // of 2 bit width.
 static IREE::Flow::DispatchTensorType alignDispatchTensorType(
     IREE::Flow::DispatchTensorType originalType) {
-  auto elementType = originalType.getElementType();
+  auto elementType = originalType.getBoundElementType();
   auto alignedType = alignElementType(elementType);
   if (alignedType == elementType) return originalType;
   return IREE::Flow::DispatchTensorType::get(

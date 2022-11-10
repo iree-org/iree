@@ -108,6 +108,11 @@ def _generate_table(df_iree, df_shark, df_baseline, title):
                                          (df_shark.dialect == dialect) &
                                          (df_shark.data_type == data_type) &
                                          (df_shark.device == device)]
+            if shark_results.empty:
+              print(
+                  f"Warning: No SHARK results for {model}, {dialect}, {data_type}, {device}."
+              )
+              continue
 
             shark_latency = shark_results.loc[shark_results.engine ==
                                               "shark_iree_c"]
@@ -214,36 +219,41 @@ def main(args):
   html = html_utils.generate_header_and_legend(verison_html)
 
   # Generate Server CPU Static.
-  html += generate_table(args.cpu_iree_csv,
-                         args.cpu_baseline_csv,
-                         shark_csv=args.cpu_shark_csv,
-                         shape_type="static",
-                         device="cpu",
-                         title="Server Intel Ice Lake CPU (Static Shapes)")
+  if args.cpu_iree_csv is not None:
+    html += generate_table(args.cpu_iree_csv,
+                           args.cpu_baseline_csv,
+                           shark_csv=args.cpu_shark_csv,
+                           shape_type="static",
+                           device="cpu",
+                           title="Server Intel Ice Lake CPU (Static Shapes)")
 
   # Generate Server GPU Static.
-  html += generate_table(args.gpu_iree_csv,
-                         args.gpu_baseline_csv,
-                         shark_csv=args.gpu_shark_csv,
-                         shape_type="static",
-                         device="cuda",
-                         title="Server NVIDIA Tesla A100 GPU (Static Shapes)")
+  if args.gpu_iree_csv is not None:
+    html += generate_table(args.gpu_iree_csv,
+                           args.gpu_baseline_csv,
+                           shark_csv=args.gpu_shark_csv,
+                           shape_type="static",
+                           device="cuda",
+                           title="Server NVIDIA Tesla A100 GPU (Static Shapes)")
 
   # Generate Server CPU Dynamic.
-  html += generate_table(args.cpu_iree_csv,
-                         args.cpu_baseline_csv,
-                         shark_csv=args.cpu_shark_csv,
-                         shape_type="dynamic",
-                         device="cpu",
-                         title="Server Intel Ice Lake CPU (Dynamic Shapes)")
+  if args.cpu_iree_csv is not None:
+    html += generate_table(args.cpu_iree_csv,
+                           args.cpu_baseline_csv,
+                           shark_csv=args.cpu_shark_csv,
+                           shape_type="dynamic",
+                           device="cpu",
+                           title="Server Intel Ice Lake CPU (Dynamic Shapes)")
 
   # Generate Server GPU Dynamic.
-  html += generate_table(args.gpu_iree_csv,
-                         args.gpu_baseline_csv,
-                         shark_csv=args.gpu_shark_csv,
-                         shape_type="dynamic",
-                         device="cuda",
-                         title="Server NVIDIA Tesla A100 GPU (Dynamic Shapes)")
+  if args.gpu_iree_csv is not None:
+    html += generate_table(
+        args.gpu_iree_csv,
+        args.gpu_baseline_csv,
+        shark_csv=args.gpu_shark_csv,
+        shape_type="dynamic",
+        device="cuda",
+        title="Server NVIDIA Tesla A100 GPU (Dynamic Shapes)")
 
   args.output_path.write_text(html)
 

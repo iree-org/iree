@@ -96,6 +96,61 @@ iree_compiler_cc_library(
 )
 
 iree_compiler_cc_library(
+    name = "TransformDialectJitterPass",
+    srcs = [
+        "TransformDialectJitterPass.cpp",
+    ],
+    deps = [
+        # Dialects
+        "//compiler/src/iree/compiler/Codegen/Dialect:IREECodegenDialect",
+        "//compiler/src/iree/compiler/Dialect/Flow/IR",
+        "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
+        "//llvm-external-projects/iree-dialects:IREELinalgExtTransformOps",
+        "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
+        "@llvm-project//mlir:AffineDialect",
+        "@llvm-project//mlir:AffineUtils",
+        "@llvm-project//mlir:AsyncDialect",
+        "@llvm-project//mlir:ArithDialect",
+        "@llvm-project//mlir:ArithUtils",
+        "@llvm-project//mlir:BufferizationDialect",
+        "@llvm-project//mlir:BufferizationTransforms",
+        "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:GPUDialect",
+        "@llvm-project//mlir:LinalgDialect",
+        "@llvm-project//mlir:LLVMDialect",
+        "@llvm-project//mlir:PDLDialect",
+        "@llvm-project//mlir:PDLInterpDialect",
+        "@llvm-project//mlir:SCFDialect",
+        "@llvm-project//mlir:SCFUtils",
+        "@llvm-project//mlir:TensorDialect",
+        "@llvm-project//mlir:TransformDialect",
+        "@llvm-project//mlir:VectorDialect",
+        # IR
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Parser",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Rewrite",
+        # Interfaces
+        # Transforms (needed mostly for the BufferizableOpInterfaceImpl)
+        "@llvm-project//mlir:ArithTransforms",
+        "@llvm-project//mlir:LinalgTransforms",
+        "@llvm-project//mlir:SCFTransforms",
+        "@llvm-project//mlir:TensorTransforms",
+        "@llvm-project//mlir:VectorTransforms",
+        # Other Stuff
+        "//compiler/src/iree/compiler/Codegen:PassHeaders",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:Support",
+        # TransformExtensions
+        "//compiler/src/iree/compiler/Codegen/Common/TransformExtensions:CommonExtensions",
+        "//compiler/src/iree/compiler/Dialect/Flow/TransformExtensions:FlowExtensions",
+        "//compiler/src/iree/compiler/Codegen/LLVMCPU/TransformExtensions:LLVMCPUExtensions",
+        "//compiler/src/iree/compiler/Codegen/LLVMGPU/TransformExtensions:LLVMGPUExtensions",
+        "@llvm-project//mlir:LinalgTransformOps",
+    ],
+)
+
+iree_compiler_cc_library(
     name = "CommonPasses",
     srcs = [
         "BufferizationAnalysis.cpp",
@@ -179,7 +234,9 @@ iree_compiler_cc_library(
         "DecomposeLinalgGeneric.cpp",
         "FoldAffineMinInDistributedLoops.cpp",
         "GPUDistributeSharedMemoryCopy.cpp",
+        "GPUPatterns.cpp",
         "GPUPipelining.cpp",
+        "GPUReduceBankConflicts.cpp",
         "GPUTileReduction.cpp",
         "GPUVectorization.cpp",
         "LinalgOpInfo.cpp",
@@ -194,12 +251,14 @@ iree_compiler_cc_library(
         "WorkGroupSwizzle.cpp",
     ],
     hdrs = [
+        "GPUPatterns.h",
         "LinalgOpInfo.h",
         "UserConfig.h",
     ],
     deps = [
         ":CommonPasses",
         ":TransformDialectInterpreterPass",
+        ":TransformDialectJitterPass",
         "//compiler/src/iree/compiler/Codegen:PassHeaders",
         "//compiler/src/iree/compiler/Codegen/Common:FoldTensorExtractOpIncGen",
         "//compiler/src/iree/compiler/Codegen/Dialect:IREECodegenDialect",
@@ -226,6 +285,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:GPUDialect",
+        "@llvm-project//mlir:GPUTransforms",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LLVMCommonConversion",
         "@llvm-project//mlir:LLVMDialect",

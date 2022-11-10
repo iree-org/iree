@@ -15,10 +15,12 @@ package(
 iree_compiler_cc_library(
     name = "TensorToFlow",
     srcs = [
-        "ConvertTensorToFlow.cpp",
+        "Patterns.cpp",
+        "Utils.cpp",
     ],
     hdrs = [
-        "ConvertTensorToFlow.h",
+        "Patterns.h",
+        "Utils.h",
     ],
     deps = [
         "//compiler/src/iree/compiler/Dialect/Flow/IR",
@@ -28,5 +30,6 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:MemRefTransforms",
         "@llvm-project//mlir:TensorDialect",
+        "@llvm-project//mlir:TensorUtils",
     ],
 )

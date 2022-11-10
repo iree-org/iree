@@ -612,6 +612,15 @@ void addCPUAArchDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
       createOptimizeVectorTransferPass(/*flatten=*/true));
 }
 
+void addCPUDataTilingPipeline(OpPassManager &passManager) {
+  addTileAndDistributePasses(passManager);
+  OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
+  // TODO(#10889): Enable vectorization.
+  // nestedModulePM.addNestedPass<func::FuncOp>(
+  // IREE::LinalgExt::createLinalgExtPackOpVectorizationPass());
+  addBufferizePasses(nestedModulePM);
+}
+
 void addCPUDefaultPassPipeline(OpPassManager &passManager) {
   addTileAndDistributePasses(passManager);
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
@@ -634,6 +643,11 @@ void addTransformDialectInterpreterPasses(OpPassManager &passManager) {
   // This pass does nothing in the case where we apply a separate policy
   // through a file.
   passManager.addPass(createDropSchedulePass());
+}
+
+void addTransformDialectJitterPasses(OpPassManager &passManager) {
+  // Give control to the transform dialect.
+  passManager.addPass(mlir::iree_compiler::createTransformDialectJitterPass());
 }
 
 static void addLowerToLLVMPasses(OpPassManager &passManager) {
@@ -712,10 +726,11 @@ void buildLLVMCPULinkingPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<IREE::HAL::ExecutableOp>(
       mlir::createCanonicalizerPass());
 
-  // Assign final executable constant ordinals.
-  passManager.nest<IREE::HAL::ExecutableOp>()
-      .addNestedPass<IREE::HAL::ExecutableVariantOp>(
-          createLLVMCPUAssignConstantOrdinalsPass());
+  // Assign final executable constant and import ordinals.
+  auto &variantPM = passManager.nest<IREE::HAL::ExecutableOp>()
+                        .nest<IREE::HAL::ExecutableVariantOp>();
+  variantPM.addPass(createLLVMCPUAssignConstantOrdinalsPass());
+  variantPM.addPass(createLLVMCPUAssignImportOrdinalsPass());
 }
 
 }  // namespace iree_compiler

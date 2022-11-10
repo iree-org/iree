@@ -45,10 +45,10 @@ iree_status_t create_sample_device(iree_allocator_t host_allocator,
 
   // Create the device.
   if (iree_status_is_ok(status)) {
-    status = iree_hal_task_device_create(identifier, &params, executor,
-                                         /*loader_count=*/1, &loader,
-                                         device_allocator, host_allocator,
-                                         out_device);
+    status = iree_hal_task_device_create(
+        identifier, &params, /*queue_count=*/1, &executor,
+        /*loader_count=*/1, &loader, device_allocator, host_allocator,
+        out_device);
   }
 
   iree_hal_allocator_release(device_allocator);

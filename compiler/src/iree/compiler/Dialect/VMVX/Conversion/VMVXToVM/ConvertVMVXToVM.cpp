@@ -188,6 +188,19 @@ class Mmt4dOpConversion : public VMVXImportOpConversion<IREE::VMVX::Mmt4dOp> {
   }
 };
 
+// Converts the vmvx.pack op to an appropriate typed import.
+class PackOpConversion : public VMVXImportOpConversion<IREE::VMVX::PackOp> {
+ public:
+  using VMVXImportOpConversion::VMVXImportOpConversion;
+
+  std::string getImportFqName(IREE::VMVX::PackOp op) const override {
+    std::string name("vmvx.pack.");
+    name.append(getTypedTypeStr(op.getInType()));
+    name.append(getTypedTypeStr(op.getOutType()));
+    return name;
+  }
+};
+
 class UnaryOpConversion : public VMVXImportOpConversion<IREE::VMVX::UnaryOp> {
  public:
   using VMVXImportOpConversion::VMVXImportOpConversion;
@@ -212,8 +225,8 @@ void populateVMVXToVMPatterns(MLIRContext *context,
                               SymbolTable &importSymbols,
                               RewritePatternSet &patterns) {
   patterns.insert<BinaryOpConversion, CopyOpConversion, Fill2DOpConversion,
-                  MatmulOpConversion, Mmt4dOpConversion, UnaryOpConversion>(
-      context, importSymbols, typeConverter);
+                  MatmulOpConversion, Mmt4dOpConversion, UnaryOpConversion,
+                  PackOpConversion>(context, importSymbols, typeConverter);
 }
 
 }  // namespace iree_compiler

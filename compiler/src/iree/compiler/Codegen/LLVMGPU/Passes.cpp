@@ -60,7 +60,7 @@ static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
       from.getType().cast<MemRefType>().getMemorySpaceAsInt() == 3 ||
       to.getType().cast<MemRefType>().getMemorySpaceAsInt() == 3;
   if (sharedMemCopy) builder.create<gpu::BarrierOp>(loc);
-  Operation *copy = createLinalgCopyOp(builder, loc, from, to);
+  Operation *copy = builder.create<memref::CopyOp>(loc, from, to);
   if (sharedMemCopy) {
     setMarker(copy, getCopyToWorkgroupMemoryMarker());
     builder.create<gpu::BarrierOp>(loc);
@@ -163,13 +163,14 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
   // distribute foreach threads
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUDistribute());
 
+  nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createGPUDistributeSharedMemoryCopy());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMGPUReduceSharedMemoryBankConflicts());
+      createGPUReduceSharedMemoryBankConflicts());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createWorkGroupSwizzle(logSwizzleTile));
   nestedModulePM.addPass(createCanonicalizerPass());
@@ -232,7 +233,7 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   if (!llvmgpuUseMMASync) {
     nestedModulePM.addNestedPass<func::FuncOp>(
-        createLLVMGPUReduceSharedMemoryBankConflicts());
+        createGPUReduceSharedMemoryBankConflicts());
   }
 
   // Vector -> MMA ops
@@ -283,7 +284,7 @@ void addGPUTransposePassPipeline(OpPassManager &pm) {
 
   // May or may not need to reduce shared mememory conflicts
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMGPUReduceSharedMemoryBankConflicts(/*paddingSizeBits=*/32));
+      createGPUReduceSharedMemoryBankConflicts(/*paddingSizeBits=*/32));
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
   nestedModulePM.addPass(createCanonicalizerPass());
@@ -418,6 +419,11 @@ void addGPUTransformDialectInterpreterPasses(OpPassManager &passManager) {
   // This pass does nothing in the case where we apply a separate policy
   // through a file.
   passManager.addPass(createDropSchedulePass());
+}
+
+void addGPUTransformDialectJitterPasses(OpPassManager &passManager) {
+  // Give control to the transform dialect.
+  passManager.addPass(mlir::iree_compiler::createTransformDialectJitterPass());
 }
 
 void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM) {

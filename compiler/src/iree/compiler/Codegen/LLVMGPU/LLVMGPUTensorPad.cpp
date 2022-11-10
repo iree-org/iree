@@ -35,21 +35,22 @@ static FailureOr<SmallVector<Value>> rewriteAsPaddedOp(
   // size. In this case, this corresponds with the maximum tile size from
   // distributing to workgroups.
   SmallVector<Value> paddedOperands;
-  paddedOperands.reserve(linalgOp.getNumInputsAndOutputs());
-  for (OpOperand *opOperand : linalgOp.getInputAndOutputOperands()) {
+  paddedOperands.reserve(linalgOp.getNumDpsInputs() +
+                         linalgOp.getNumDpsInits());
+  for (OpOperand &opOperand : linalgOp->getOpOperands()) {
     // Find DispatchTensorLoadOp's feeding into the linalg or abort.
     auto tensorLoad = dyn_cast_or_null<IREE::Flow::DispatchTensorLoadOp>(
-        opOperand->get().getDefiningOp());
+        opOperand.get().getDefiningOp());
     if (!tensorLoad) {
       return rewriter.notifyMatchFailure(linalgOp, "does not have tensor load");
     }
 
     // Determine the padded shape from the load
-    ArrayRef<int64_t> shape = linalgOp.getShape(opOperand);
+    ArrayRef<int64_t> shape = linalgOp.getShape(&opOperand);
     SmallVector<int64_t> paddedShape(shape.begin(), shape.end());
     for (const auto &en : llvm::enumerate(tensorLoad.getMixedSizes())) {
       if (Optional<int64_t> cst = getConstantIntValue(en.value())) {
-        paddedShape[en.index()] = cst.getValue();
+        paddedShape[en.index()] = cst.value();
       } else {
         FailureOr<int64_t> upperBound =
             linalg::getConstantUpperBoundForIndex(en.value().get<Value>());
@@ -72,8 +73,9 @@ static FailureOr<SmallVector<Value>> rewriteAsPaddedOp(
   }
 
   // Clone linalgOp to paddedOp with padded input/output shapes.
-  auto resultTensorTypes =
-      ValueRange(paddedOperands).take_back(linalgOp.getNumOutputs()).getTypes();
+  auto resultTensorTypes = ValueRange(paddedOperands)
+                               .take_back(linalgOp.getNumDpsInits())
+                               .getTypes();
   paddedOp = linalgOp.clone(rewriter, loc, resultTensorTypes, paddedOperands);
 
   // Slice out the original shape from the padded result to pass on to

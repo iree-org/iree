@@ -20,42 +20,55 @@ namespace Stream {
 
 #ifndef NDEBUG
 
-void dumpPartition(Partition &partition, AsmState &state) {
+void dumpPartition(Partition &partition, AsmState &asmState) {
+  if (partition.affinity) {
+    llvm::dbgs() << " AFFINITY: ";
+    partition.affinity.dump();
+    llvm::dbgs() << "\n";
+  }
   llvm::dbgs() << " INS:\n  ";
   llvm::interleaveComma(partition.ins, llvm::dbgs(), [&](Value in) {
-    in.printAsOperand(llvm::dbgs(), state);
+    in.printAsOperand(llvm::dbgs(), asmState);
   });
   llvm::dbgs() << "\n OUTS:\n  ";
   llvm::interleaveComma(partition.outs, llvm::dbgs(), [&](Value out) {
-    out.printAsOperand(llvm::dbgs(), state);
+    out.printAsOperand(llvm::dbgs(), asmState);
   });
   llvm::dbgs() << "\n OPS:\n";
   for (auto *op : llvm::reverse(partition.ops)) {
     llvm::dbgs() << "  ";
-    op->print(llvm::dbgs(), state);
+    op->print(llvm::dbgs(), asmState);
     llvm::dbgs() << "\n";
   }
 }
 
-void Partition::dump(Operation *parentOp) {
-  AsmState state(parentOp);
-  dumpPartition(*this, state);
-}
+void Partition::dump(AsmState &asmState) { dumpPartition(*this, asmState); }
 
-void PartitionSet::dump(Operation *parentOp) {
-  AsmState state(parentOp);
+void PartitionSet::dump(AsmState &asmState) {
   for (auto partition : llvm::enumerate(partitions)) {
     llvm::dbgs() << "PARTITION[" << partition.index() << "]:\n";
-    dumpPartition(partition.value(), state);
+    dumpPartition(partition.value(), asmState);
   }
 }
 
 #else
-void Partition::dump(Operation *parentOp) {}
-void PartitionSet::dump(Operation *parentOp) {}
+void Partition::dump(AsmState &asmState) {}
+void PartitionSet::dump(AsmState &asmState) {}
 #endif  // !NDEBUG
 
 LogicalResult Partition::verify(Location loc) {
+  // Ensure all ops are compatible with the partition affinity.
+  for (auto *op : ops) {
+    if (auto affinityOp = dyn_cast<IREE::Stream::AffinityOpInterface>(op)) {
+      if (!IREE::Stream::AffinityAttr::areCompatible(
+              affinity, affinityOp.getAffinity())) {
+        return op->emitError("op affinity ")
+               << affinityOp.getAffinity()
+               << " is not compatible with the partition affinity " << affinity;
+      }
+    }
+  }
+
   // Ensure values are defined either by other ops in the partition or are
   // declared as inputs.
   SetVector<Value> defValues;

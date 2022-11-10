@@ -9,6 +9,10 @@
 
 include "mlir/Pass/PassBase.td"
 
+//===----------------------------------------------------------------------===//
+// Optimization and cleanup
+//===----------------------------------------------------------------------===//
+
 def ApplyPatterns : Pass<"iree-util-apply-patterns", ""> {
   let summary = "Applies some risky/IREE-specific canonicalization patterns.";
   let constructor = [{
@@ -26,7 +30,7 @@ def CombineInitializers : Pass<"iree-util-combine-initializers", "mlir::ModuleOp
 def DropCompilerHints : Pass<"iree-util-drop-compiler-hints", ""> {
   let summary = "Deletes operations that have no runtime equivalent.";
   let description = [{
-    Deletes operations that have no runtime equivalent and are only 
+    Deletes operations that have no runtime equivalent and are only
     used in the compiler. This should be performed after all other
     compiler passes.
   }];
@@ -40,6 +44,13 @@ def FixedPointIterator : Pass<"iree-util-fixed-point-iterator", ""> {
   let constructor = [{
     mlir::iree_compiler::IREE::Util::createFixedPointIteratorPass(
         mlir::OpPassManager("dummy_op"))
+  }];
+}
+
+def IPO : Pass<"iree-util-ipo", "mlir::ModuleOp"> {
+  let summary = "Performs basic inter-procedural optimization.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Util::createIPOPass()
   }];
 }
 
@@ -82,7 +93,7 @@ def HoistIntoGlobals : Pass<"iree-util-hoist-into-globals", "mlir::ModuleOp"> {
   }];
 }
 
-def SimplifyGlobalAccesses : 
+def SimplifyGlobalAccesses :
     InterfacePass<"iree-util-simplify-global-accesses", "mlir::CallableOpInterface"> {
   let summary = "Hoists loads and sinks stores to variables to decrease data dependency regions.";
   let constructor = [{
@@ -136,7 +147,7 @@ def TestConversion : Pass<"iree-util-test-conversion", "mlir::ModuleOp"> {
 def TestFloatRangeAnalysis : Pass<"iree-util-test-float-range-analysis", ""> {
   let summary = "Tests floating point range analysis.";
   let description = [{
-    Tests floating point range analysis by evaluating any 
+    Tests floating point range analysis by evaluating any
     'iree_unregistered.test_fprange' op and setting the results on an attribute.
   }];
   let constructor = [{

@@ -14,3 +14,15 @@ func.func @concatenate(%arg0: tensor<2x2xi32>, %arg1: tensor<2x4xi32>) -> tensor
 // CHECK:         %[[T1:.+]] = tensor.insert_slice %[[CST]] into %[[T0]][0, 2] [2, 3] [1, 1]
 // CHECK:         %[[T2:.+]] = tensor.insert_slice %[[ARG1]] into %[[T1]][0, 5] [2, 4] [1, 1]
 // CHECK:         return %[[T2]]
+
+// -----
+
+// CHECK: ml_program.global private mutable @variable(dense<0> : tensor<2xi32>) : tensor<2xi32>
+ml_program.global private mutable @variable(dense<0> : tensor<2xui32>) : tensor<2xui32>
+// CHECK: func.func @global_types() -> tensor<2xi32>
+func.func @global_types() -> tensor<2xui32> {
+  // CHECK-NEXT: %[[VALUE:.+]] = ml_program.global_load @variable : tensor<2xi32>
+  %0 = ml_program.global_load @variable : tensor<2xui32>
+  // CHECK: return %[[VALUE]] : tensor<2xi32>
+  return %0 : tensor<2xui32>
+}

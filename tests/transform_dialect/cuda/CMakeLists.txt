@@ -14,4 +14,32 @@ if(NOT IREE_HAL_DRIVER_CUDA OR NOT IREE_TARGET_BACKEND_CUDA)
   return()
 endif()
 
+iree_lit_test_suite(
+  NAME
+    lit
+  SRCS
+    "reduction.mlir"
+    "softmax.mlir"
+    "softmax_partial.mlir"
+    "softmax_v2.mlir"
+  TOOLS
+    FileCheck
+    iree-compile
+    iree-opt
+    iree-run-module
+  DATA
+    reduction_codegen_spec.mlir
+    softmax_codegen_spec.mlir
+    softmax_dispatch_spec.mlir
+    softmax_partial_codegen_spec.mlir
+    softmax_v2_codegen_spec.mlir
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-nvidia"
+    "driver=cuda"
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

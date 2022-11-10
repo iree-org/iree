@@ -7,7 +7,7 @@
 #include "iree/compiler/Tools/init_input_dialects.h"
 
 #ifdef IREE_HAVE_MHLO_INPUT
-#include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
+#include "mhlo/IR/hlo_ops.h"
 #include "stablehlo/dialect/ChloOps.h"
 #include "stablehlo/dialect/StablehloOps.h"
 #endif  // IREE_HAVE_MHLO_INPUT

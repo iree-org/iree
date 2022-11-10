@@ -22,6 +22,8 @@ namespace Stream {
 
 // A single slice of ops.
 struct Partition {
+  // Affinity compatible with all ops in the partition.
+  IREE::Stream::AffinityAttr affinity;
   // SSA values defined outside of the partition.
   // All values not defined by ops in the partition must be declared.
   // Multiple partitions may capture the same value.
@@ -35,7 +37,7 @@ struct Partition {
   // streamable (such as constants and arithmetic).
   SetVector<Operation *> ops;
 
-  void dump(Operation *parentOp);
+  void dump(AsmState &asmState);
 
   // Verifies that the partition meets the required conditions.
   LogicalResult verify(Location loc);
@@ -51,7 +53,7 @@ struct PartitionSet {
   // Returns true if the set is empty (no streamable ops).
   bool empty() const { return partitions.empty(); }
 
-  void dump(Operation *parentOp);
+  void dump(AsmState &asmState);
 
   // Verifies that the partition set meets the required conditions.
   LogicalResult verify(Location loc);

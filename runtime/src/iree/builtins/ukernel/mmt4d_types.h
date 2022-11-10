@@ -9,57 +9,43 @@
 
 #include "iree/builtins/ukernel/common.h"
 
-// Supported combinations of data types (order: LHS, RHS, OUT).
-enum iree_ukernel_mmt4d_type_t {
-  iree_ukernel_mmt4d_type_none = 0,
-  iree_ukernel_mmt4d_type_f32f32f32,
-  iree_ukernel_mmt4d_type_i8i8i32,
-};
+typedef enum iree_uk_mmt4d_type_t {
+  iree_uk_mmt4d_type_f32f32f32 =
+      IREE_UK_PACK_3_TYPES_LITERAL(FLOAT_32, FLOAT_32, FLOAT_32),
+  iree_uk_mmt4d_type_i8i8i32 =
+      IREE_UK_PACK_3_TYPES_LITERAL(INT_8, INT_8, INT_32),
+} iree_uk_mmt4d_type_t;
 
-typedef enum iree_ukernel_mmt4d_type_t iree_ukernel_mmt4d_type_t;
+static inline iree_uk_type_t iree_uk_mmt4d_lhs_type(iree_uk_mmt4d_type_t type) {
+  return IREE_UK_UNPACK_TYPE(0, type);
+}
+
+static inline iree_uk_type_t iree_uk_mmt4d_rhs_type(iree_uk_mmt4d_type_t type) {
+  return IREE_UK_UNPACK_TYPE(1, type);
+}
+
+static inline iree_uk_type_t iree_uk_mmt4d_out_type(iree_uk_mmt4d_type_t type) {
+  return IREE_UK_UNPACK_TYPE(2, type);
+}
 
 // Parameters for a mmt4d operation.
-struct iree_ukernel_mmt4d_params_t {
-  iree_ukernel_mmt4d_type_t type;
-  uint32_t flags;
+typedef struct iree_uk_mmt4d_params_t {
+  iree_uk_mmt4d_type_t type;
+  iree_uk_uint32_t flags;
   const void* lhs_buffer;
   const void* rhs_buffer;
   void* out_buffer;
-  iree_ukernel_ssize_t lhs_stride;
-  iree_ukernel_ssize_t rhs_stride;
-  iree_ukernel_ssize_t out_stride;
-  iree_ukernel_ssize_t M;
-  iree_ukernel_ssize_t N;
-  iree_ukernel_ssize_t K;
-  int32_t M0;
-  int32_t N0;
-  int32_t K0;
-  const uint64_t* cpu_data;
-};
-
-typedef struct iree_ukernel_mmt4d_params_t iree_ukernel_mmt4d_params_t;
-
-// Status codes returned by a mmt4d operation.
-enum iree_ukernel_mmt4d_status_t {
-  iree_ukernel_mmt4d_status_ok = 0,
-  iree_ukernel_mmt4d_status_bad_type,
-  iree_ukernel_mmt4d_status_bad_flags,
-  iree_ukernel_mmt4d_status_unsupported_huge_or_negative_dimension,
-  iree_ukernel_mmt4d_status_unsupported_generic_tile_size,
-};
-
-typedef enum iree_ukernel_mmt4d_status_t iree_ukernel_mmt4d_status_t;
-
-// TODO: move these flags to a header file shared with compiler/.
-#define IREE_VMVX_MATMUL_FLAG_ACCUMULATE 1
-
-#define IREE_UKERNEL_MMT4D_RETURN_IF_ERROR(X)     \
-  do {                                            \
-    iree_ukernel_mmt4d_status_t status = (X);     \
-    if (status != iree_ukernel_mmt4d_status_ok) { \
-      return status;                              \
-    }                                             \
-  } while (0)
+  iree_uk_ssize_t lhs_stride;
+  iree_uk_ssize_t rhs_stride;
+  iree_uk_ssize_t out_stride;
+  iree_uk_ssize_t M;
+  iree_uk_ssize_t N;
+  iree_uk_ssize_t K;
+  iree_uk_int32_t M0;
+  iree_uk_int32_t N0;
+  iree_uk_int32_t K0;
+  const iree_uk_uint64_t* cpu_data;
+} iree_uk_mmt4d_params_t;
 
 // Function pointer type for tile functions, i.e. typically architecture
 // specific functions computing one M0xN0 tile of the output matrix, i.e.
@@ -73,59 +59,33 @@ typedef enum iree_ukernel_mmt4d_status_t iree_ukernel_mmt4d_status_t;
 // to address 'params' struct fields in the middle of assembly kernels is
 // good, because it's hard to get the struct field offsets right in assembly
 // and keep that in sync with future struct changes.
-typedef void (*iree_ukernel_mmt4d_tile_func_t)(
+typedef void (*iree_uk_mmt4d_tile_func_t)(
     void* /*out_tile*/, const void* /*lhs_panel*/, const void* /*rhs_panel*/,
-    int32_t /*K*/, uint32_t /*flags*/,
-    const iree_ukernel_mmt4d_params_t* /*params*/);
+    iree_uk_int32_t /*K*/, iree_uk_uint32_t /*flags*/,
+    const iree_uk_mmt4d_params_t* /*params*/);
 
-// Tile kernel declarations. Prototype matches iree_ukernel_mmt4d_tile_func_t.
-#define IREE_UKERNEL_MMT4D_TILE_FUNC_DECL(NAME)                           \
+// Tile kernel declarations. Prototype matches iree_uk_mmt4d_tile_func_t.
+#define IREE_UK_MMT4D_TILE_FUNC_DECL(NAME)                                \
   void NAME(void* out_tile, const void* lhs_panel, const void* rhs_panel, \
-            int32_t K, uint32_t flags,                                    \
-            const iree_ukernel_mmt4d_params_t* params);
+            iree_uk_int32_t K, iree_uk_uint32_t flags,                    \
+            const iree_uk_mmt4d_params_t* params);
 
-// Log2 of size of LHS matrix element type, e.g. f32 --> size=4 --> log2=2
-static inline int iree_ukernel_mmt4d_lhs_elem_size_log2(
-    iree_ukernel_mmt4d_type_t type) {
-  switch (type) {
-    case iree_ukernel_mmt4d_type_f32f32f32:
-      return 2;
-    default:
-      return 0;
-  }
-}
-
-static inline int iree_ukernel_mmt4d_lhs_elem_size(
-    iree_ukernel_mmt4d_type_t type) {
-  return 1 << iree_ukernel_mmt4d_lhs_elem_size_log2(type);
-}
-
-// Log2 of size of RHS matrix element type, e.g. f32 --> size=4 --> log2=2
-static inline int iree_ukernel_mmt4d_rhs_elem_size_log2(
-    iree_ukernel_mmt4d_type_t type) {
-  return iree_ukernel_mmt4d_lhs_elem_size_log2(type);  // for now it's the same
-}
-
-static inline int iree_ukernel_mmt4d_rhs_elem_size(
-    iree_ukernel_mmt4d_type_t type) {
-  return 1 << iree_ukernel_mmt4d_rhs_elem_size_log2(type);
-}
-
-// Log2 of size of OUT matrix element type, e.g. f32 --> size=4 --> log2=2
-static inline int iree_ukernel_mmt4d_out_elem_size_log2(
-    iree_ukernel_mmt4d_type_t type) {
-  switch (type) {
-    case iree_ukernel_mmt4d_type_f32f32f32:
-    case iree_ukernel_mmt4d_type_i8i8i32:
-      return 2;
-    default:
-      return 0;
-  }
-}
-
-static inline int iree_ukernel_mmt4d_out_elem_size(
-    iree_ukernel_mmt4d_type_t type) {
-  return 1 << iree_ukernel_mmt4d_out_elem_size_log2(type);
-}
+// In order to be helpful as a reference for future architecture-specific
+// kernels, the generic kernels are structured like an actual optimized kernel,
+// using an "accumulator tile" that in this case is a stack array (which would
+// become a group of SIMD registers in an actual optimized kernel). The downside
+// of this approach is that we have to set a fixed max size for the accumulator
+// tile, but for now all known cases are comfortably far below where trouble
+// would happen. For reference:
+// - On ARM NEON, the entire register space is 512 bytes, so the accumulator
+//   tile is less than that, typically 256 to 384 bytes.
+// - On ARM SME, we will be working with an accumulator tile as large as 4096
+//   bytes (IIUC).
+// - The smallest stack frame size limit that we know we may have to deal with
+//   on certain targets is 16 kilobytes.
+// The size or architecture-specific tiles is relevant here because this
+// generic code is what will be run as a fallback if the device is found not to
+// support the CPU feature that the tile sizes were picked to target.
+enum { iree_uk_mmt4d_tile_generic_max_bytes = 4096 };
 
 #endif  // IREE_BUILTINS_UKERNEL_MMT4D_TYPES_H_

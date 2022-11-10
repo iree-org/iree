@@ -15,10 +15,10 @@ package(
 iree_compiler_cc_library(
     name = "StreamToHAL",
     srcs = [
-        "ConvertStreamToHAL.cpp",
+        "Patterns.cpp",
     ],
     hdrs = [
-        "ConvertStreamToHAL.h",
+        "Patterns.h",
     ],
     deps = [
         "//compiler/src/iree/compiler/Dialect/HAL/Conversion",

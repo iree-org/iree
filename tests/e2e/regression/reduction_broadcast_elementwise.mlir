@@ -13,7 +13,7 @@ func.func @max_sub_exp() {
   %cst = arith.constant -3.40282347E+38 : f32
   %cst_0 = arith.constant dense<1.000000e+00> : tensor<12x128x128xf32>
   %cst_1 = arith.constant dense<5.000000e+00> : tensor<12x128x128xf32>
-  %0 = util.do_not_optimize(%cst_1) : tensor<12x128x128xf32>
+  %0 = util.optimization_barrier %cst_1 : tensor<12x128x128xf32>
   %1 = tensor.empty() : tensor<12x128xf32>
   %2 = linalg.fill ins(%cst : f32) outs(%1 : tensor<12x128xf32>) -> tensor<12x128xf32>
   %3 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"]} ins(%0 : tensor<12x128x128xf32>) outs(%2 : tensor<12x128xf32>) {

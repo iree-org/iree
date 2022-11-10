@@ -42,8 +42,7 @@ iree_benchmark_suite(
     "linux-riscv"
 
   MODULES
-    # TODO(#10748): Disabled since the iree-import-tflite fails on this model.
-    # "${DEEPLABV3_FP32_MODULE}"
+    "${DEEPLABV3_FP32_MODULE}"
     "${MOBILEBERT_FP32_MODULE}"
     "${MOBILENET_V1_MODULE}"
     "${MOBILEBERT_INT8_MODULE}"

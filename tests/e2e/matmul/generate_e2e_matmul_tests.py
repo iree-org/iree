@@ -25,6 +25,7 @@ class MatrixElemTypeId(enum.Enum):
   I8 = "i8"
   I32 = "i32"
   F32 = "f32"
+  F16 = "f16"
 
 
 # Enumerates of the collections of shapes that we can generate tests for.
@@ -513,7 +514,7 @@ def parse_arguments():
                       required=True)
   parser.add_argument("--lhs_rhs_type",
                       type=str,
-                      choices=["i8", "f32"],
+                      choices=["i8", "f32", "f16"],
                       help="Numeric type of input matrices",
                       required=True)
   parser.add_argument("--shapes",

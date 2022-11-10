@@ -15,10 +15,10 @@ package(
 iree_compiler_cc_library(
     name = "UtilToStream",
     srcs = [
-        "ConvertUtilToStream.cpp",
+        "Patterns.cpp",
     ],
     hdrs = [
-        "ConvertUtilToStream.h",
+        "Patterns.h",
     ],
     deps = [
         "//compiler/src/iree/compiler/Dialect/Stream/Conversion",

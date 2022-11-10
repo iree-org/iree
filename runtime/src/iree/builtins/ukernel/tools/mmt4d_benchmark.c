@@ -4,10 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// clang-format off
-#include <stdint.h>  // include before ukernel/common.h to keep standard types
-// clang-format on
-
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -15,7 +11,7 @@
 #include "iree/base/internal/cpu.h"
 #include "iree/base/internal/flags.h"
 #include "iree/builtins/ukernel/mmt4d.h"
-#include "iree/builtins/ukernel/tools/mmt4d_test_utils.h"
+#include "iree/builtins/ukernel/tools/ukernel_test_utils.h"
 #include "iree/testing/benchmark.h"
 
 IREE_FLAG(int32_t, batch_count, 1000, "Ops to run per benchmark iteration.");
@@ -34,11 +30,11 @@ IREE_FLAG(bool, accumulate, false,
           "tile values, or zero the accumulator tile.");
 
 struct iree_mmt4d_benchmark_user_data_t {
-  iree_ukernel_mmt4d_type_t type;
+  iree_uk_mmt4d_type_t type;
   int M0;
   int N0;
   int K0;
-  const uint64_t* cpu_data;
+  const iree_uk_uint64_t* cpu_data;
 };
 
 typedef struct iree_mmt4d_benchmark_user_data_t
@@ -48,10 +44,10 @@ static iree_status_t iree_mmt4d_benchmark(
     const iree_benchmark_def_t* benchmark_def,
     iree_benchmark_state_t* benchmark_state) {
   const iree_mmt4d_benchmark_user_data_t* user_data = benchmark_def->user_data;
-  iree_ukernel_mmt4d_params_t params;
+  iree_uk_mmt4d_params_t params;
   memset(&params, 0, sizeof params);
   params.type = user_data->type;
-  params.flags = FLAG_accumulate ? IREE_VMVX_MATMUL_FLAG_ACCUMULATE : 0;
+  params.flags = FLAG_accumulate ? IREE_UK_FLAG_ACCUMULATE : 0;
   params.M = FLAG_m_size;
   params.N = FLAG_n_size;
   params.K = FLAG_k_size;
@@ -62,39 +58,41 @@ static iree_status_t iree_mmt4d_benchmark(
   params.lhs_stride = params.K * params.M0 * params.K0;
   params.rhs_stride = params.K * params.N0 * params.K0;
   params.out_stride = params.N * params.M0 * params.N0;
-  iree_ukernel_ssize_t lhs_buffer_size =
-      iree_ukernel_mmt4d_lhs_buffer_size(&params);
-  iree_ukernel_ssize_t rhs_buffer_size =
-      iree_ukernel_mmt4d_rhs_buffer_size(&params);
-  iree_ukernel_ssize_t out_buffer_size =
-      iree_ukernel_mmt4d_out_buffer_size(&params);
+  iree_uk_type_t lhs_type = iree_uk_mmt4d_lhs_type(params.type);
+  iree_uk_type_t rhs_type = iree_uk_mmt4d_rhs_type(params.type);
+  iree_uk_type_t out_type = iree_uk_mmt4d_out_type(params.type);
+  iree_uk_ssize_t lhs_buffer_size =
+      iree_uk_test_2d_buffer_length(lhs_type, params.M, params.lhs_stride);
+  iree_uk_ssize_t rhs_buffer_size =
+      iree_uk_test_2d_buffer_length(rhs_type, params.N, params.rhs_stride);
+  iree_uk_ssize_t out_buffer_size =
+      iree_uk_test_2d_buffer_length(out_type, params.M, params.out_stride);
   void* lhs_buffer = malloc(lhs_buffer_size);
-  void* rhs_buffer = malloc(lhs_buffer_size);
-  void* out_buffer = malloc(lhs_buffer_size);
-  iree_mmt4d_scalar_type_t lhs_type = iree_ukernel_mmt4d_lhs_type(&params);
-  iree_mmt4d_scalar_type_t rhs_type = iree_ukernel_mmt4d_rhs_type(&params);
-  iree_mmt4d_scalar_type_t out_type = iree_ukernel_mmt4d_out_type(&params);
-  iree_mmt4d_test_random_engine_t* engine =
-      iree_mmt4d_test_random_engine_create();
+  void* rhs_buffer = malloc(rhs_buffer_size);
+  void* out_buffer = malloc(out_buffer_size);
+  iree_uk_test_random_engine_t* engine = iree_uk_test_random_engine_create();
   // It's just about plausible that on some platform, for some number type,
   // performance might be different on zero buffers vs random buffers. But it
   // shouldn't matter that we recreate the random engine every time, getting
   // the same random values again.
-  write_random_buffer(lhs_buffer, lhs_buffer_size, lhs_type, engine);
-  write_random_buffer(rhs_buffer, rhs_buffer_size, rhs_type, engine);
-  write_random_buffer(out_buffer, out_buffer_size, out_type, engine);
-  iree_mmt4d_test_random_engine_destroy(engine);
+  iree_uk_test_write_random_buffer(lhs_buffer, lhs_buffer_size, lhs_type,
+                                   engine);
+  iree_uk_test_write_random_buffer(rhs_buffer, rhs_buffer_size, rhs_type,
+                                   engine);
+  iree_uk_test_write_random_buffer(out_buffer, out_buffer_size, out_type,
+                                   engine);
+  iree_uk_test_random_engine_destroy(engine);
   params.lhs_buffer = lhs_buffer;
   params.rhs_buffer = rhs_buffer;
   params.out_buffer = out_buffer;
-  int64_t total_iterations = 0;
+  iree_uk_int64_t total_iterations = 0;
   while (iree_benchmark_keep_running(benchmark_state,
                                      /*batch_count=*/FLAG_batch_count)) {
     for (int i = 0; i < FLAG_batch_count; ++i) {
-      iree_ukernel_mmt4d_status_t status = iree_ukernel_mmt4d(&params);
-      if (status != iree_ukernel_mmt4d_status_ok) {
-        fprintf(stderr, "FATAL: iree_ukernel_mmt4d failed: %s\n",
-                iree_ukernel_mmt4d_status_message(status));
+      iree_uk_status_t status = iree_uk_mmt4d(&params);
+      if (status != iree_uk_status_ok) {
+        fprintf(stderr, "FATAL: iree_uk_mmt4d failed: %s\n",
+                iree_uk_status_message(status));
         iree_abort();
       }
     }
@@ -133,21 +131,20 @@ static void iree_mmt4d_benchmark_register(
   iree_benchmark_register(IREE_SV(name), &benchmark_def);
 }
 
-#define MMT4D_BENCHMARK_REGISTER(_type, _m0, _n0, _k0, _cpu_data_field_0, \
-                                 _label)                                  \
-  do {                                                                    \
-    static const uint64_t local_cpu_data[IREE_CPU_DATA_FIELD_COUNT] = {   \
-        _cpu_data_field_0};                                               \
-    static const iree_mmt4d_benchmark_user_data_t user_data = {           \
-        .type = iree_ukernel_mmt4d_type_##_type,                          \
-        .M0 = _m0,                                                        \
-        .N0 = _n0,                                                        \
-        .K0 = _k0,                                                        \
-        .cpu_data = local_cpu_data,                                       \
-    };                                                                    \
-    iree_mmt4d_benchmark_register(&user_data,                             \
-                                  "iree_ukernel_mmt4d_" #_type "_" #_m0   \
-                                  "x" #_n0 "x" #_k0 "_" #_label);         \
+#define MMT4D_BENCHMARK_REGISTER(_type, _m0, _n0, _k0, _cpu_data_field_0,      \
+                                 _label)                                       \
+  do {                                                                         \
+    static const iree_uk_uint64_t local_cpu_data[IREE_CPU_DATA_FIELD_COUNT] =  \
+        {_cpu_data_field_0};                                                   \
+    static const iree_mmt4d_benchmark_user_data_t user_data = {                \
+        .type = iree_uk_mmt4d_type_##_type,                                    \
+        .M0 = _m0,                                                             \
+        .N0 = _n0,                                                             \
+        .K0 = _k0,                                                             \
+        .cpu_data = local_cpu_data,                                            \
+    };                                                                         \
+    iree_mmt4d_benchmark_register(&user_data, "iree_uk_mmt4d_" #_type "_" #_m0 \
+                                              "x" #_n0 "x" #_k0 "_" #_label);  \
   } while (0)
 
 #define MMT4D_BENCHMARK_REGISTER_GENERIC(_type, _m0, _n0, _k0) \
@@ -179,14 +176,14 @@ int main(int argc, char** argv) {
   MMT4D_BENCHMARK_REGISTER_GENERIC(i8i8i32, 4, 4, 1);
 
 // ARM_64 benchmarks.
-#if defined(IREE_UKERNEL_ARCH_ARM_64)
+#if defined(IREE_UK_ARCH_ARM_64)
 
   MMT4D_BENCHMARK_REGISTER_ARM_64(f32f32f32, 8, 8, 1);
   MMT4D_BENCHMARK_REGISTER_ARM_64(i8i8i32, 8, 8, 1);
   MMT4D_BENCHMARK_REGISTER_ARM_64_WITH_CPU_FEATURE(i8i8i32, 8, 8, 4, DOTPROD);
   MMT4D_BENCHMARK_REGISTER_ARM_64_WITH_CPU_FEATURE(i8i8i32, 8, 8, 8, I8MM);
 
-#endif  // defined(IREE_UKERNEL_ARCH_ARM_64)
+#endif  // defined(IREE_UK_ARCH_ARM_64)
 
   iree_benchmark_run_specified();
   return 0;

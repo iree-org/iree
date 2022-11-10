@@ -69,6 +69,55 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    TransformDialectJitterPass
+  SRCS
+    "TransformDialectJitterPass.cpp"
+  DEPS
+    IREELinalgExtDialect
+    IREELinalgExtTransformOps
+    IREELinalgTransformDialect
+    LLVMSupport
+    MLIRAffineDialect
+    MLIRAffineUtils
+    MLIRArithDialect
+    MLIRArithTransforms
+    MLIRArithUtils
+    MLIRAsyncDialect
+    MLIRBufferizationDialect
+    MLIRBufferizationTransforms
+    MLIRFuncDialect
+    MLIRGPUOps
+    MLIRIR
+    MLIRLLVMDialect
+    MLIRLinalgDialect
+    MLIRLinalgTransformOps
+    MLIRLinalgTransforms
+    MLIRPDLDialect
+    MLIRPDLInterpDialect
+    MLIRParser
+    MLIRPass
+    MLIRRewrite
+    MLIRSCFDialect
+    MLIRSCFTransforms
+    MLIRSCFUtils
+    MLIRSupport
+    MLIRTensorDialect
+    MLIRTensorTransforms
+    MLIRTransformDialect
+    MLIRVectorDialect
+    MLIRVectorTransforms
+    iree::compiler::Codegen::Common::TransformExtensions::CommonExtensions
+    iree::compiler::Codegen::Dialect::IREECodegenDialect
+    iree::compiler::Codegen::LLVMCPU::TransformExtensions::LLVMCPUExtensions
+    iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
+    iree::compiler::Codegen::PassHeaders
+    iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::Flow::TransformExtensions::FlowExtensions
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     CommonPasses
   HDRS
     "BufferizationAnalysis.h"
@@ -147,13 +196,16 @@ iree_cc_library(
   NAME
     Common
   HDRS
+    "GPUPatterns.h"
     "LinalgOpInfo.h"
     "UserConfig.h"
   SRCS
     "DecomposeLinalgGeneric.cpp"
     "FoldAffineMinInDistributedLoops.cpp"
     "GPUDistributeSharedMemoryCopy.cpp"
+    "GPUPatterns.cpp"
     "GPUPipelining.cpp"
+    "GPUReduceBankConflicts.cpp"
     "GPUTileReduction.cpp"
     "GPUVectorization.cpp"
     "LinalgOpInfo.cpp"
@@ -169,6 +221,7 @@ iree_cc_library(
   DEPS
     ::CommonPasses
     ::TransformDialectInterpreterPass
+    ::TransformDialectJitterPass
     IREELinalgExtDialect
     IREELinalgExtPasses
     IREELinalgExtTransforms
@@ -183,6 +236,7 @@ iree_cc_library(
     MLIRBufferizationTransforms
     MLIRFuncDialect
     MLIRGPUOps
+    MLIRGPUTransforms
     MLIRIR
     MLIRLLVMCommonConversion
     MLIRLLVMDialect

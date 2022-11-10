@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="vm.module(iree-vm-ordinal-allocation),vm.module(iree-convert-vm-to-emitc)" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(vm.module(iree-vm-ordinal-allocation),vm.module(iree-convert-vm-to-emitc))" %s | FileCheck %s
 
 vm.module @my_module {
   // CHECK-LABEL: @my_module_branch_empty
@@ -681,7 +681,7 @@ vm.module @my_module {
 
     // Move the i32 value and ref into the result function arguments.
     // CHECK-NEXT: emitc.call "EMITC_DEREF_ASSIGN_VALUE"(%arg5, %arg3) : (!emitc.ptr<i32>, i32) -> ()
-    
+
     // Create duplicate ref for
     // CHECK-NEXT: %[[REF:.+]] = "emitc.variable"() {value = #emitc.opaque<"">} : () -> !emitc.opaque<"iree_vm_ref_t">
     // CHECK-NEXT: %[[REFPTR:.+]] = emitc.apply "&"(%[[REF]]) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>

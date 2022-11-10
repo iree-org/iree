@@ -47,7 +47,7 @@ MODEL_TOOLFILE_NAME = "tool"
 @dataclass
 class BenchmarkCase:
   """Represents a benchmark case.
-  
+
     model_name: the source model, e.g., 'MobileSSD'.
     model_tags: the source model tags, e.g., ['f32'].
     bench_mode: the benchmark mode, e.g., '1-thread,big-core'.

@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(iree-codegen-linalg-to-spirv-pipeline))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-linalg-to-spirv-pipeline)))' %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -23,9 +23,9 @@ hal.executable private @subgroup_reduce {
       func.func @subgroup_reduce() {
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f32
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:2x512xf32>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:2xf32>
-        %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [2, 512], strides = [1, 1] : !flow.dispatch.tensor<readonly:2x512xf32> -> tensor<2x512xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<2x512xf32>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<2xf32>>
+        %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [2, 512], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<2x512xf32>> -> tensor<2x512xf32>
         %3 = tensor.empty() : tensor<2xf32>
         %4 = linalg.fill ins(%cst : f32) outs(%3 : tensor<2xf32>) -> tensor<2xf32>
         %5 = linalg.generic {
@@ -36,7 +36,7 @@ hal.executable private @subgroup_reduce {
           %6 = arith.addf %arg1, %arg0 : f32
           linalg.yield %6 : f32
         } -> tensor<2xf32>
-        flow.dispatch.tensor.store %5, %1, offsets = [0], sizes = [2], strides = [1] : tensor<2xf32> -> !flow.dispatch.tensor<writeonly:2xf32>
+        flow.dispatch.tensor.store %5, %1, offsets = [0], sizes = [2], strides = [1] : tensor<2xf32> -> !flow.dispatch.tensor<writeonly:tensor<2xf32>>
         return
       }
     }
@@ -76,9 +76,18 @@ hal.executable private @subgroup_reduce {
 
 // CHECK:   spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
 
-// CHECK-COUNT-8:   spirv.Load "Workgroup" %{{.+}} : f32
-// CHECK-COUNT-7:   spirv.FAdd %{{.+}}, %{{.+}} : f32
-//         CHECK:   spirv.FAdd %{{.+}}, %[[F0]] : f32
+// CHECK:   %[[LOAD_VAL:.+]] = spirv.Load "Workgroup" {{.+}} : f32
+// CHECK:   %[[USE_IDENTITY:.+]] = spirv.SGreaterThanEqual {{.+}}, %[[C8]] : i32
+// CHECK:   %[[LANE_VAL:.+]] = spirv.Select %[[USE_IDENTITY]], %[[F0]], %[[LOAD_VAL]] : i1, f32
+// CHECK:   %[[S4:.+]] = spirv.GroupNonUniformShuffleXor <Subgroup> %[[LANE_VAL]], %[[C1]] : f32, i32
+// CHECK:   %[[ADD7:.+]] = spirv.FAdd %[[LANE_VAL]], %[[S4]] : f32
+// CHECK:   %[[S5:.+]] = spirv.GroupNonUniformShuffleXor <Subgroup> %[[ADD7]], %[[C2]] : f32, i32
+// CHECK:   %[[ADD8:.+]] = spirv.FAdd %[[ADD7]], %[[S5]] : f32
+// CHECK:   %[[S6:.+]] = spirv.GroupNonUniformShuffleXor <Subgroup> %[[ADD8]], %[[C4]] : f32, i32
+// CHECK:   %[[ADD9:.+]] = spirv.FAdd %[[ADD8]], %[[S6]] : f32
+// CHECK:   %[[S7:.+]] = spirv.GroupNonUniformShuffleXor <Subgroup> %[[ADD9]], %[[C8]] : f32, i32
+// CHECK:   %[[ADD10:.+]] = spirv.FAdd %[[ADD9]], %[[S7]] : f32
+//         CHECK:   spirv.FAdd %[[ADD10]], %[[F0]] : f32
 
 // CHECK:   %[[EQ:.+]] = spirv.IEqual %{{.+}}, %[[C0]] : i32
 // CHECK:   spirv.mlir.selection {
@@ -120,9 +129,9 @@ hal.executable private @subgroup_reduce {
       func.func @subgroup_reduce() {
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f32
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:2x512xf32>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:2xf32>
-        %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [2, 512], strides = [1, 1] : !flow.dispatch.tensor<readonly:2x512xf32> -> tensor<2x512xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<2x512xf32>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<2xf32>>
+        %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [2, 512], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<2x512xf32>> -> tensor<2x512xf32>
         %3 = tensor.empty() : tensor<2xf32>
         %4 = linalg.fill ins(%cst : f32) outs(%3 : tensor<2xf32>) -> tensor<2xf32>
         %5 = linalg.generic {
@@ -133,7 +142,7 @@ hal.executable private @subgroup_reduce {
           %6 = arith.addf %arg1, %arg0 : f32
           linalg.yield %6 : f32
         } -> tensor<2xf32>
-        flow.dispatch.tensor.store %5, %1, offsets = [0], sizes = [2], strides = [1] : tensor<2xf32> -> !flow.dispatch.tensor<writeonly:2xf32>
+        flow.dispatch.tensor.store %5, %1, offsets = [0], sizes = [2], strides = [1] : tensor<2xf32> -> !flow.dispatch.tensor<writeonly:tensor<2xf32>>
         return
       }
     }

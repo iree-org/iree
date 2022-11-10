@@ -209,25 +209,28 @@ func.func @scalarize_vector_transfer_op(%arg: vector<3xf32>) -> (vector<3xf32>) 
 // -----
 
 // CHECK-LABEL: func.func @scalarize_non_minor_identity_transfer_read
-// CHECK: (%[[MEM:.+]]: memref<4x2x3xi32>, %[[I1:.+]]: index, %[[I2:.+]]: index, %[[I3:.+]]: index)
-func.func @scalarize_non_minor_identity_transfer_read(%memory: memref<4x2x3xi32>, %i1: index, %i2: index, %i3: index) -> vector<3xi32> {
+//  CHECK-SAME: (%[[MEM:.+]]: memref<4x2x4xi32>, %[[I1:.+]]: index, %[[I2:.+]]: index, %[[I3:.+]]: index)
+func.func @scalarize_non_minor_identity_transfer_read(%memory: memref<4x2x4xi32>, %i1: index, %i2: index, %i3: index) -> vector<4xi32> {
   %c0 = arith.constant 0 : i32
   %0 = vector.transfer_read %memory[%i1, %i2, %i3], %c0 {
     in_bounds = [true], permutation_map = affine_map<(d0, d1, d2) -> (d0)>
-  } : memref<4x2x3xi32>, vector<3xi32>
-  return %0: vector<3xi32>
+  } : memref<4x2x4xi32>, vector<4xi32>
+  return %0: vector<4xi32>
 }
 
-// CHECK: %[[INIT:.+]] = arith.constant dense<0> : vector<3xi32>
-// CHECK: %[[LD0:.+]] = memref.load %[[MEM]][%[[I1]], %[[I2]], %[[I3]]]
-// CHECK: %[[INSERT0:.+]] = vector.insert %[[LD0]], %[[INIT]] [0] : i32 into vector<3xi32>
+// CHECK: %[[INIT:.+]] = arith.constant dense<0> : vector<4xi32>
+// CHECK: %[[LD0:.+]] = memref.load %[[MEM]][%[[I1]], %[[I2]], %[[I3]]] : memref<4x2x4xi32>
+// CHECK: %[[INSERT0:.+]] = vector.insert %[[LD0]], %[[INIT]] [0] : i32 into vector<4xi32>
 // CHECK: %[[IDX1:.+]] = affine.apply affine_map<()[s0] -> (s0 + 1)>()[%[[I1]]]
-// CHECK: %[[LD1:.+]] = memref.load %[[MEM]][%[[IDX1]], %[[I2]], %[[I3]]]
-// CHECK: %[[INSERT1:.+]] = vector.insert %[[LD1]], %[[INSERT0]] [1] : i32 into vector<3xi32>
+// CHECK: %[[LD1:.+]] = memref.load %[[MEM]][%[[IDX1]], %[[I2]], %[[I3]]] : memref<4x2x4xi32>
+// CHECK: %[[INSERT1:.+]] = vector.insert %[[LD1]], %[[INSERT0]] [1] : i32 into vector<4xi32>
 // CHECK: %[[IDX2:.+]] = affine.apply affine_map<()[s0] -> (s0 + 2)>()[%[[I1]]]
-// CHECK: %[[LD2:.+]] = memref.load %[[MEM]][%[[IDX2]], %[[I2]], %[[I3]]]
-// CHECK: %[[INSERT2:.+]] = vector.insert %[[LD2]], %[[INSERT1]] [2] : i32 into vector<3xi32>
-// CHECK: return %[[INSERT2]] : vector<3xi32>
+// CHECK: %[[LD2:.+]] = memref.load %[[MEM]][%[[IDX2]], %[[I2]], %[[I3]]] : memref<4x2x4xi32>
+// CHECK: %[[INSERT2:.+]] = vector.insert %[[LD2]], %[[INSERT1]] [2] : i32 into vector<4xi32>
+// CHECK: %[[IDX3:.+]] = affine.apply affine_map<()[s0] -> (s0 + 3)>()[%[[I1]]]
+// CHECK: %[[LD3:.+]] = memref.load %[[MEM]][%[[IDX3]], %[[I2]], %[[I3]]] : memref<4x2x4xi32>
+// CHECK: %[[INSERT3:.+]] = vector.insert %[[LD3]], %[[INSERT2]] [3] : i32 into vector<4xi32>
+// CHECK: return %[[INSERT3]]
 
 // -----
 
@@ -235,8 +238,8 @@ func.func @scalarize_non_minor_identity_transfer_read(%memory: memref<4x2x3xi32>
 //  CHECK-SAME: (%[[VALUE:.+]]: vector<4xf32>, %[[I1:.+]]: index, %[[I2:.+]]: index)
 func.func @scalarize_non_minor_identity_transfer_write(%value: vector<4xf32>, %i1: index, %i2: index) {
   %c0 = arith.constant 0: index
-  %buffer = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : memref<1x130x130x1xf32>
-  vector.transfer_write %value, %buffer[%c0, %i1, %i2, %c0] {in_bounds = [true], permutation_map = affine_map<(d0, d1, d2, d3) -> (d2)>} : vector<4xf32>, memref<1x130x130x1xf32>
+  %buffer = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : memref<1x130x130x64xf32>
+  vector.transfer_write %value, %buffer[%c0, %i1, %i2, %c0] {in_bounds = [true], permutation_map = affine_map<(d0, d1, d2, d3) -> (d2)>} : vector<4xf32>, memref<1x130x130x64xf32>
   return
 }
 
@@ -306,3 +309,52 @@ func.func @scalarize_indivisible_vector_transfer_write_op(%value: vector<4xf32>,
 
 // CHECK:         %[[SUBSPAN:.+]] = hal.interface.binding.subspan
 // CHECK-COUNT-4: memref.store %{{.+}}, %[[SUBSPAN]]
+
+// -----
+
+// CHECK-LABEL: func.func @vectorize_alloc_with_mma_load_store
+//  CHECK-SAME: (%[[I0:.+]]: index, %[[I1:.+]]: index)
+func.func @vectorize_alloc_with_mma_load_store(%i0: index, %i1: index) {
+  %alloc = memref.alloc() : memref<32x32xf16, 3>
+  %0 = gpu.subgroup_mma_load_matrix %alloc[%i0, %i1] {leadDimension = 32 : index} : memref<32x32xf16, 3> -> !gpu.mma_matrix<16x16xf16, "COp">
+  gpu.subgroup_mma_store_matrix %0, %alloc[%i0, %i1] {leadDimension = 32 : index} : !gpu.mma_matrix<16x16xf16, "COp">, memref<32x32xf16, 3>
+  return
+}
+
+// CHECK: %[[ALLOC:.+]] = memref.alloc() : memref<32x4xvector<4xf32>, 3>
+// CHECK: %[[IDX:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 8)>()[%[[I1]]]
+// CHECK: %[[LD:.+]] = gpu.subgroup_mma_load_matrix %[[ALLOC]][%[[I0]], %[[IDX]]] {leadDimension = 4 : index} : memref<32x4xvector<4xf32>, 3> -> !gpu.mma_matrix<16x16xf16, "COp">
+// CHECK: gpu.subgroup_mma_store_matrix %[[LD]], %[[ALLOC]][%[[I0]], %[[IDX]]] {leadDimension = 4 : index} : !gpu.mma_matrix<16x16xf16, "COp">, memref<32x4xvector<4xf32>, 3>
+
+// -----
+
+// CHECK-LABEL: func.func @vectorize_alloc_with_mma_load_store
+//  CHECK-SAME: (%[[I0:.+]]: index, %[[I1:.+]]: index)
+func.func @vectorize_alloc_with_mma_load_store(%i0: index, %i1: index) {
+  %alloc = memref.alloc() : memref<32x32xf16, 3>
+  %0 = gpu.subgroup_mma_load_matrix %alloc[%i0, %i1] {leadDimension = 16 : index} : memref<32x32xf16, 3> -> !gpu.mma_matrix<16x16xf16, "COp">
+  gpu.subgroup_mma_store_matrix %0, %alloc[%i0, %i1] {leadDimension = 16 : index} : !gpu.mma_matrix<16x16xf16, "COp">, memref<32x32xf16, 3>
+  return
+}
+
+//      CHECK: affine.apply affine_map<()[s0] -> (s0 floordiv 8)>()
+//      CHECK: gpu.subgroup_mma_load_matrix
+// CHECK-SAME:   leadDimension = 2 : index
+//      CHECK: gpu.subgroup_mma_store_matrix
+// CHECK-SAME:   leadDimension = 2 : index
+
+// -----
+
+// CHECK-LABEL: func.func @vectorize_alloc_with_mma_load_store_unaligned_case
+func.func @vectorize_alloc_with_mma_load_store_unaligned_case(%i0: index, %i1: index) {
+  %alloc = memref.alloc() : memref<32x32xf16, 3>
+  %0 = gpu.subgroup_mma_load_matrix %alloc[%i0, %i1] {leadDimension = 18 : index} : memref<32x32xf16, 3> -> !gpu.mma_matrix<16x16xf16, "COp">
+  gpu.subgroup_mma_store_matrix %0, %alloc[%i0, %i1] {leadDimension = 18 : index} : !gpu.mma_matrix<16x16xf16, "COp">, memref<32x32xf16, 3>
+  return
+}
+
+//  CHECK-NOT: affine.apply
+//      CHECK: gpu.subgroup_mma_load_matrix
+// CHECK-SAME:   leadDimension = 18 : index
+//      CHECK: gpu.subgroup_mma_store_matrix
+// CHECK-SAME:   leadDimension = 18 : index

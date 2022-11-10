@@ -158,6 +158,12 @@ def GPUDistributeSharedMemoryCopy :
   let constructor = "mlir::iree_compiler::createGPUDistributeSharedMemoryCopy()";
 }
 
+def GPUReduceBankConflicts :
+    Pass<"iree-gpu-reduce-bank-conflicts", "func::FuncOp"> {
+  let summary = "Pass to try to reduce the number of bank conflicts.";
+  let constructor = "mlir::iree_compiler::createGPUReduceSharedMemoryBankConflicts()";
+}
+
 def GPUPipelining : Pass<"iree-gpu-pipelining", "func::FuncOp"> {
   let summary = "Pass to do software pipelining.";
   let constructor = "mlir::iree_compiler::createGPUPipeliningPass()";
@@ -197,6 +203,12 @@ def TransformDialectInterpreter :
             "apply. If left empty, the IR is assumed to contain a transform "
             "dialect spec embedded next to the top-level op.">,
   ];
+}
+def TransformDialectJitter :
+    Pass<"iree-transform-dialect-jitter"> {
+  let summary = "Pass to create and apply transform dialect on the fly.";
+  let constructor =
+    "mlir::iree_compiler::createTransformDialectJitterPass()";
 }
 
 def GPUVectorization :
@@ -328,6 +340,12 @@ def LLVMCPUAssignConstantOrdinals :
   let constructor = "mlir::iree_compiler::createLLVMCPUAssignConstantOrdinalsPass()";
 }
 
+def LLVMCPUAssignImportOrdinals :
+    Pass<"iree-llvmcpu-assign-import-ordinals", "IREE::HAL::ExecutableVariantOp"> {
+  let summary = "Assigns executable import ordinals across all LLVMCPU variants.";
+  let constructor = "mlir::iree_compiler::createLLVMCPUAssignImportOrdinalsPass()";
+}
+
 //------------------------------------------------------------------------------
 // LLVMGPU
 //------------------------------------------------------------------------------
@@ -397,12 +415,6 @@ def LLVMGPUMultiBuffering :
   let constructor = "mlir::iree_compiler::createLLVMGPUMultiBuffering()";
 }
 
-def LLVMGPUReduceBankConflicts :
-    Pass<"iree-llvmgpu-reduce-bank-conflicts", "func::FuncOp"> {
-  let summary = "Pass try reduce the number of bank conflicts.";
-  let constructor = "mlir::iree_compiler::createLLVMGPUReduceSharedMemoryBankConflicts()";
-}
-
 def LLVMGPUVectorToGPU :
     Pass<"iree-llvmgpu-vector-to-gpu", "func::FuncOp"> {
   let summary = "Pass to convert vector to gpu.";
@@ -422,6 +434,12 @@ def LLVMGPUTensorPad :
 def ConvertToSPIRV : Pass<"iree-convert-to-spirv", "ModuleOp"> {
   let summary = "Perform the final conversion to SPIR-V dialect";
   let constructor = "mlir::iree_compiler::createConvertToSPIRVPass()";
+}
+
+def SPIRVVectorToGPUSubgroupMMA :
+    Pass<"iree-spirv-vector-to-gpu-subgroup-mma-ops", "func::FuncOp"> {
+  let summary = "Pass to convert vector ops to GPU subgroup MMA ops.";
+  let constructor = "mlir::iree_compiler::createSPIRVVectorToGPUSubgroupMMAOpsPass()";
 }
 
 def SPIRVLowerExecutableTarget :
@@ -463,6 +481,12 @@ def SPIRVTileAndPromote : Pass<"iree-spirv-tile-and-promote", "func::FuncOp"> {
                 "workgroup memory and then tile to invocations";
   let constructor =
     "mlir::iree_compiler::createSPIRVTileAndPromotePass()";
+  let options = [
+    Option<"promoteC", "promote-c", "bool", /*default=*/"false",
+          "Promote C matrix to use shared memory">,
+    Option<"skipThread", "skip-thread", "bool", /*default=*/"false",
+          "Skip tiling and distributing to GPU threads">,
+  ];
 }
 
 def SPIRVVectorize : Pass<"iree-spirv-vectorize", "func::FuncOp"> {
@@ -470,17 +494,16 @@ def SPIRVVectorize : Pass<"iree-spirv-vectorize", "func::FuncOp"> {
   let constructor = "mlir::iree_compiler::createSPIRVVectorizePass()";
 }
 
-def SPIRVVectorToCooperativeOps :
-    Pass<"iree-spirv-vector-to-cooperative-ops", "func::FuncOp"> {
-  let summary = "Convert vector ops to SPIR-V cooperative ops";
-  let constructor =
-      "mlir::iree_compiler::createSPIRVVectorToCooperativeOpsPass()";
-}
-
 def SPIRVVectorizeLoadStore :
     Pass<"iree-spirv-vectorize-load-store", "ModuleOp"> {
   let summary = "Vectorize load/store of memrefs for better memory access";
   let constructor = "mlir::iree_compiler::createSPIRVVectorizeLoadStore()";
+}
+
+def SPIRVBreakDownLargeVector : Pass<"iree-spirv-breakdown-large-vector",
+                                     "func::FuncOp"> {
+  let summary = "Break down vectors not natively supported by SPIR-V";
+  let constructor = "mlir::iree_compiler::createSPIRVBreakDownLargeVectorPass()";
 }
 
 def SPIRVCreateFastSlowPath :

@@ -15,8 +15,8 @@
 #include "iree/compiler/InputConversion/MHLO/PassDetail.h"
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
 #include "iree/compiler/InputConversion/MHLO/Rewriters.h"
-#include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
-#include "mlir-hlo/Dialect/mhlo/transforms/map_mhlo_to_scalar_op.h"
+#include "mhlo/IR/hlo_ops.h"
+#include "mhlo/transforms/map_mhlo_to_scalar_op.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -210,10 +210,6 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
     if (indexVectorDim != indicesRank - 1) return false;
     if (scatterDimsToOperandDims.size() != indexDepth) return false;
 
-    for (auto en : llvm::enumerate(scatterDimsToOperandDims)) {
-      if (en.index() != en.value()) return false;
-    }
-
     auto insertedWindowDims = dimNumbers.getInsertedWindowDims();
     for (auto en : llvm::enumerate(insertedWindowDims)) {
       if (en.index() != en.value()) return false;
@@ -231,20 +227,27 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
       mhlo::ScatterOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const final {
     if (!hasCanonicalDimensionNumbers(op)) return failure();
-    if (llvm::size(op.operands()) != 1)
+    if (llvm::size(op.getInputs()) != 1)
       return op.emitError("NYI variadic operands scatter");
     if (llvm::size(op.getUpdates()) != 1)
       return op.emitError("NYI variadic updates scatter");
 
     ImplicitLocOpBuilder b(op.getLoc(), rewriter);
 
-    Value original = adaptor.operands().front();
+    Value original = adaptor.getInputs().front();
     Value indices = adaptor.getScatterIndices();
     Value updates = adaptor.getUpdates().front();
 
+    llvm::SmallVector<int64_t> scatterDimMap;
+    for (auto dim :
+         op.getScatterDimensionNumbers().getScatterDimsToOperandDims()) {
+      scatterDimMap.push_back(dim);
+    }
+
     auto scatterOp = rewriter.create<IREE::LinalgExt::ScatterOp>(
         op.getLoc(), op->getResultTypes(), ValueRange{updates, indices},
-        ValueRange{original}, op.getUniqueIndices());
+        ValueRange{original}, rewriter.getI64ArrayAttr(scatterDimMap),
+        op.getUniqueIndices());
 
     rewriter.inlineRegionBefore(op.getUpdateComputation(),
                                 scatterOp.getRegion(),
@@ -441,7 +444,7 @@ struct TopkOpConversion : public OpConversionPattern<chlo::TopKOp> {
     Value operand = adaptor.getOperand();
 
     auto inputValuesType = operand.getType().dyn_cast<ShapedType>();
-    auto outputValuesType = op.values().getType().dyn_cast<ShapedType>();
+    auto outputValuesType = op.getValues().getType().dyn_cast<ShapedType>();
     auto outputIndicesType = op.getIndices().getType().dyn_cast<ShapedType>();
     if (!inputValuesType || !outputValuesType || !outputIndicesType) {
       return rewriter.notifyMatchFailure(

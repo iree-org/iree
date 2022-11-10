@@ -10,16 +10,16 @@ func.func @innermost_reduction() {
   %3 = arith.index_cast %0 {stream.alignment = 512 : index, stream.values = [0 : index, 394752 : index, 984064 : index]} : i32 to index
   %4 = arith.index_cast %1 {stream.alignment = 512 : index, stream.values = [0 : index, 196608 : index, 197120 : index]} : i32 to index
   %5 = arith.index_cast %2 {stream.alignment = 512 : index, stream.values = [512 : index, 197120 : index, 197632 : index]} : i32 to index
-  %6 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%3) alignment(64) : !flow.dispatch.tensor<readonly:128x384xf32>
-  %7 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%4) alignment(64) : !flow.dispatch.tensor<readonly:128xf32>
-  %8 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%5) alignment(64) : !flow.dispatch.tensor<writeonly:128xf32>
+  %6 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%3) alignment(64) : !flow.dispatch.tensor<readonly:tensor<128x384xf32>>
+  %7 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%4) alignment(64) : !flow.dispatch.tensor<readonly:tensor<128xf32>>
+  %8 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%5) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<128xf32>>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_count_x = hal.interface.workgroup.count[0] : index
   %9 = affine.apply affine_map<()[s0] -> (s0 * 128)>()[%workgroup_id_x]
   %10 = affine.apply affine_map<()[s0] -> (s0 * 128)>()[%workgroup_count_x]
   scf.for %arg0 = %9 to %c128 step %10 {
-    %11 = flow.dispatch.tensor.load %6, offsets = [%arg0, 0], sizes = [128, 384], strides = [1, 1] : !flow.dispatch.tensor<readonly:128x384xf32> -> tensor<128x384xf32>
-    %12 = flow.dispatch.tensor.load %7, offsets = [%arg0], sizes = [128], strides = [1] : !flow.dispatch.tensor<readonly:128xf32> -> tensor<128xf32>
+    %11 = flow.dispatch.tensor.load %6, offsets = [%arg0, 0], sizes = [128, 384], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<128x384xf32>> -> tensor<128x384xf32>
+    %12 = flow.dispatch.tensor.load %7, offsets = [%arg0], sizes = [128], strides = [1] : !flow.dispatch.tensor<readonly:tensor<128xf32>> -> tensor<128xf32>
     %13 = tensor.empty() : tensor<128xf32>
     %14 = linalg.fill ins(%cst : f32) outs(%13 : tensor<128xf32>) -> tensor<128xf32>
     %15 = linalg.generic {
@@ -33,7 +33,7 @@ func.func @innermost_reduction() {
       %18 = arith.addf %17, %arg3 : f32
       linalg.yield %18 : f32
     } -> tensor<128xf32>
-    flow.dispatch.tensor.store %15, %8, offsets = [%arg0], sizes = [128], strides = [%c1] : tensor<128xf32> -> !flow.dispatch.tensor<writeonly:128xf32>
+    flow.dispatch.tensor.store %15, %8, offsets = [%arg0], sizes = [128], strides = [%c1] : tensor<128xf32> -> !flow.dispatch.tensor<writeonly:tensor<128xf32>>
   }
   return
 }

@@ -42,11 +42,11 @@ namespace {
 using ValueAliasingMap = llvm::MapVector<Value, SmallPtrSet<Value, 16>>;
 
 // Builds a map of value aliases from aliasee to a set of aliasers.
-// Only values that alias will be present in the map.
-static ValueAliasingMap computeExecutionRegionValueAliases(
-    IREE::Stream::AsyncExecuteOp executeOp) {
-  auto *streamBlock = &executeOp.getBody().front();
-  ValueAliasingMap valueAliases;
+// Only values that alias will be present in the map. The map may contain
+// values nested within the |regionOp|.
+static void computeRegionValueAliases(Operation *regionOp,
+                                      ValueAliasingMap &valueAliases) {
+  auto *block = &regionOp->getRegion(0).front();
 
   auto propagateAlias = [&](Value streamValue, Value aliasedValue) {
     auto &baseSet = valueAliases[streamValue];
@@ -58,22 +58,30 @@ static ValueAliasingMap computeExecutionRegionValueAliases(
 
   // Start with outputs so that we handle tied values that may lead all the way
   // back up the chain to the stream inputs.
-  auto tiedStreamOp =
-      cast<IREE::Util::TiedOpInterface>(executeOp.getOperation());
-  auto yieldOp = cast<IREE::Stream::YieldOp>(streamBlock->getTerminator());
+  auto tiedStreamOp = cast<IREE::Util::TiedOpInterface>(regionOp);
+  auto yieldOp = cast<IREE::Stream::YieldOp>(block->getTerminator());
   for (auto it :
-       llvm::zip(executeOp.getResults(), yieldOp.getResourceOperands())) {
+       llvm::zip(regionOp->getResults(), yieldOp.getResourceOperands())) {
     auto outerResult = std::get<0>(it);
     auto innerResult = std::get<1>(it);
     auto tiedOperandIndex =
         tiedStreamOp.getTiedResultOperandIndex(outerResult.getResultNumber());
     if (tiedOperandIndex.has_value()) {
-      auto arg = streamBlock->getArgument(tiedOperandIndex.value());
+      auto arg = block->getArgument(tiedOperandIndex.value());
       propagateAlias(innerResult, arg);
     }
   }
 
-  for (auto &op : *streamBlock) {
+  for (auto &op : *block) {
+    // Recurse into regions to build the alias map. This will introduce aliases
+    // that are outside of the parent block scope but they should only be
+    // present for in-place operations. If we want to allocate within the nested
+    // scopes we'll need to fix up the subsequent liveness analysis code to
+    // handle ops in differing scopes by walking parent chains.
+    if (isa<mlir::RegionBranchOpInterface>(op)) {
+      computeRegionValueAliases(&op, valueAliases);
+    }
+
     // Tied results reuse their operand buffer.
     auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(op);
     for (auto result : op.getResults()) {
@@ -98,7 +106,15 @@ static ValueAliasingMap computeExecutionRegionValueAliases(
       }
     }
   }
+}
 
+// Builds a map of value aliases from aliasee to a set of aliasers.
+// Only values that alias will be present in the map. The map may contain
+// values nested within the |executeOp|.
+static ValueAliasingMap computeExecutionRegionValueAliases(
+    IREE::Stream::AsyncExecuteOp executeOp) {
+  ValueAliasingMap valueAliases;
+  computeRegionValueAliases(executeOp, valueAliases);
   return valueAliases;
 }
 
@@ -201,7 +217,13 @@ static LivenessIntervalList computeExecutionRegionLivenessIntervals(
     auto &aliasee = it.first;
     auto &aliasers = it.second;
     auto &aliaseeInterval = valueIntervals[aliasee];
-    assert(aliaseeInterval.ordinal != -1);
+    if (aliaseeInterval.ordinal == -1) {
+      // Aliasee is nested somewhere within the current scope.
+      // We'd need to update this analysis to handle the nesting in order to
+      // compute the ranges here but that's not (currently) required as all
+      // allocated values roll up to the parent scope by way of the yields.
+      continue;
+    }
     int start = aliaseeInterval.start;
     int end = aliaseeInterval.end;
     for (auto aliaser : aliasers) {
@@ -224,7 +246,10 @@ static LivenessIntervalList computeExecutionRegionLivenessIntervals(
   SmallVector<LivenessInterval> sortedIntervals;
   sortedIntervals.reserve(valueIntervals.size());
   for (auto it : valueIntervals) {
-    sortedIntervals.push_back(it.second);
+    // Filter out values we couldn't analyze.
+    if (it.second.value) {
+      sortedIntervals.push_back(it.second);
+    }
   }
   llvm::stable_sort(sortedIntervals);
   return sortedIntervals;
@@ -744,6 +769,7 @@ static llvm::Optional<TransientAllocation> allocateLocalTransients(
       executeOp, scope.getValueAliases());
   for (auto valueInterval : livenessIntervals) {
     auto value = valueInterval.value;
+    assert(value && "must have value for interval");
     auto valueType = value.getType().dyn_cast<IREE::Stream::ResourceType>();
     if (!valueType) continue;
 

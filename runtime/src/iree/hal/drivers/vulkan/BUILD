@@ -68,7 +68,6 @@ iree_runtime_cc_library(
     deps = [
         ":dynamic_symbols",
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:cc",
         "//runtime/src/iree/base:core_headers",
         "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/base/internal",
@@ -103,7 +102,6 @@ iree_runtime_cc_library(
     ],
     deps = [
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base:cc",
         "//runtime/src/iree/base:core_headers",
         "//runtime/src/iree/base:tracing",
         "//runtime/src/iree/base/internal:dynamic_library",

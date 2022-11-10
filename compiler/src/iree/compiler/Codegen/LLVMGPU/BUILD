@@ -22,7 +22,6 @@ iree_compiler_cc_library(
         "LLVMGPUDistribute.cpp",
         "LLVMGPULowerExecutableTarget.cpp",
         "LLVMGPUMultiBuffering.cpp",
-        "LLVMGPUReduceBankConflicts.cpp",
         "LLVMGPUTensorAlloc.cpp",
         "LLVMGPUTensorCoreVectorization.cpp",
         "LLVMGPUTensorPad.cpp",

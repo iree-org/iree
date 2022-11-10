@@ -213,6 +213,33 @@ py_binary(
 ]]
 
 [iree_generated_trace_runner_test(
+    name = "e2e_matmul_direct_f16_gpu_large_%s" % compilation_info,
+    compiler_flags = [
+        "--iree-hal-cuda-llvm-target-arch=sm_80",
+    ],
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs_rhs_type=f16",
+        "--shapes=gpu_large",
+        "--compilation_info=%s" % compilation_info,
+    ],
+    tags = [
+        # CUDA cuInit fails with sanitizer on.
+        "noasan",
+        "nomsan",
+        "notsan",
+        "noubsan",
+        "requires-gpu-nvidia",
+    ],
+    target_backends_and_drivers = [
+        ("cuda", "cuda"),
+    ],
+    trace_runner = "//tools:iree-e2e-matmul-test",
+) for compilation_info in [
+    "LLVMGPUMatmulTensorCore",
+]]
+
+[iree_generated_trace_runner_test(
     name = "e2e_matmul_direct_%s_large_split_k" % lhs_rhs_type,
     compiler_flags = [
         "--iree-flow-split-matmul-reduction=4",

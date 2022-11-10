@@ -16,10 +16,10 @@ iree_compiler_cc_library(
     name = "StandardToHAL",
     srcs = [
         "ConvertShapeOps.cpp",
-        "ConvertStandardToHAL.cpp",
+        "Patterns.cpp",
     ],
     hdrs = [
-        "ConvertStandardToHAL.h",
+        "Patterns.h",
     ],
     deps = [
         "//compiler/src/iree/compiler/Dialect/HAL/Conversion",

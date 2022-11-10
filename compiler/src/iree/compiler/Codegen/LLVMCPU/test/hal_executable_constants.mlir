@@ -12,4 +12,6 @@ func.func @constant_values() {
   llvm.call @sink(%v0) : (i32) -> ()
   return
 }
-llvm.func @sink(i32)
+llvm.func @sink(%arg0: i32) {
+  llvm.return
+}

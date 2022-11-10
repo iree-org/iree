@@ -40,11 +40,23 @@ void mlir::iree_compiler::registerTransformDialectLLVMGPUExtension(
 // IREE-specific LLVMGPU transformations.
 //===---------------------------------------------------------------------===//
 
+void transform_dialect::MapNestedForeachThreadToGpuThreadsOp::build(
+    OpBuilder &builder, OperationState &result, Value target,
+    ArrayRef<int64_t> workgroupSize) {
+  result.addOperands(target);
+  result.addAttribute(
+      MapNestedForeachThreadToGpuThreadsOp::getWorkgroupSizeAttrName(
+          result.name),
+      builder.getI64ArrayAttr(workgroupSize));
+  MLIRContext *ctx = builder.getContext();
+  result.addTypes({pdl::OperationType::get(ctx)});
+}
+
 // TODO: if the number of threads was wired like the workgroup_count, we could
 // reuse most of the code and not require a static number of threads.
 // TODO: synchronizations for imperfectly nested stuff.
 DiagnosedSilenceableFailure
-transform_dialect::MapNestedForeachThreadToGpuThreads::applyToOne(
+transform_dialect::MapNestedForeachThreadToGpuThreadsOp::applyToOne(
     func::FuncOp target, SmallVectorImpl<Operation *> &results,
     transform::TransformState &state) {
   if (!isa<HAL::ExecutableOp, HAL::ExecutableVariantOp>(state.getTopLevel())) {
@@ -85,6 +97,16 @@ transform_dialect::MapNestedForeachThreadToGpuThreads::applyToOne(
 //===---------------------------------------------------------------------===//
 // VectorToWarpExecuteOnLane0Op.
 //===---------------------------------------------------------------------===//
+void transform_dialect::VectorToWarpExecuteOnLane0Op::build(
+    OpBuilder &builder, OperationState &result, Value target,
+    int64_t warpSize) {
+  MLIRContext *ctx = builder.getContext();
+  result.addOperands(target);
+  result.addAttribute(
+      VectorToWarpExecuteOnLane0Op::getWarpSizeAttrName(result.name),
+      builder.getI64IntegerAttr(warpSize));
+  result.addTypes({pdl::OperationType::get(ctx)});
+}
 
 /// Helper method to replace all uses of the laneId operand by the constant
 /// 0 inside the region. This is a necessary prerequisite to perform any kind of
@@ -238,12 +260,11 @@ transform_dialect::VectorToWarpExecuteOnLane0Op::applyToOne(
     scf::IfOp target, SmallVectorImpl<Operation *> &results,
     transform::TransformState &state) {
   if (!isa<HAL::ExecutableOp, HAL::ExecutableVariantOp>(state.getTopLevel())) {
-    state.getTopLevel()->emitOpError(
-        "requires HAL::ExecutableOp or HAL::ExecutableVariantOp toplevel so "
-        "that IR is properly isolated. This is required so we can safely "
-        "inspect the HAL::ExecutableExportOp under multi-threaded pass "
-        "assumptions.");
-    return DiagnosedSilenceableFailure(reportUnknownTransformError(target));
+    return emitDefaultSilenceableFailure(state.getTopLevel())
+           << "requires HAL::ExecutableOp or HAL::ExecutableVariantOp toplevel "
+              "so that IR is properly isolated. This is required so we can "
+              "safely inspect the HAL::ExecutableExportOp under multi-threaded "
+              "pass assumptions.";
   }
 
   auto halExecutableVariantOp =
@@ -297,6 +318,11 @@ transform_dialect::VectorToWarpExecuteOnLane0Op::applyToOne(
 //===---------------------------------------------------------------------===//
 // VectorWarpDistributionOp.
 //===---------------------------------------------------------------------===//
+void transform_dialect::VectorWarpDistributionOp::build(OpBuilder &builder,
+                                                        OperationState &result,
+                                                        Value target) {
+  result.addOperands(target);
+}
 
 /// Emit shared local memory allocation in case it is needed when lowering the
 /// warp operations.
@@ -318,7 +344,8 @@ static Value allocateGlobalSharedMemory(Location loc, OpBuilder &builder,
 /// Emit warp reduction code sequence for a given input.
 static Value warpReduction(Location loc, OpBuilder &builder, Value input,
                            vector::CombiningKind kind, uint32_t size) {
-  Value laneVal = input;
+  // First reduce on a single thread to get per lane reduction value.
+  Value laneVal = builder.create<vector::ReductionOp>(loc, kind, input);
   // Parallel reduction using butterfly shuffles.
   for (uint64_t i = 1; i < size; i <<= 1) {
     Value shuffled = builder
@@ -423,6 +450,30 @@ struct WarpOpLoad : public OpRewritePattern<vector::WarpExecuteOnLane0Op> {
     return success();
   }
 };
+
+/// Shared memory allocations are representated as AllocOp in IREE but they
+/// really have the semantic of global variables. Therefore hoisting them is
+/// always correct for static allocations.
+struct HoistSharedMemoryAlloc : public OpRewritePattern<memref::AllocOp> {
+  using OpRewritePattern<memref::AllocOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(memref::AllocOp alloc,
+                                PatternRewriter &rewriter) const override {
+    if (alloc.getType().getMemorySpaceAsInt() !=
+            gpu::GPUDialect::getWorkgroupAddressSpace() ||
+        alloc.getNumOperands() != 0)
+      return failure();
+    auto warpParent = alloc->getParentOfType<vector::WarpExecuteOnLane0Op>();
+    if (!warpParent) return failure();
+    alloc->moveBefore(warpParent);
+    // Conservatively move the dealloc after the warpOp. This may extend the
+    // liverange of the allocation but is always correct.
+    for (Operation *user : alloc->getUsers()) {
+      if (isa<memref::DeallocOp>(user)) user->moveAfter(warpParent);
+    }
+    return success();
+  }
+};
+
 }  // namespace
 
 static void populateMultiReductionLoweringPatterns(Operation *target,
@@ -435,13 +486,16 @@ static void populateMultiReductionLoweringPatterns(Operation *target,
   patterns.add<InsertElementToBroadcast>(target->getContext(), benefit);
 }
 
-static AffineMap simpleDistributionFunction(vector::TransferWriteOp writeOp) {
+static AffineMap simpleDistributionFunction(Value val) {
+  AffineMap map = AffineMap::get(val.getContext());
+  auto vecType = val.getType().dyn_cast<VectorType>();
+  if (!vecType) return map;
   // Create a map (d0, d1) -> (d1) to distribute along the inner
   // dimension. Once we support n-d distribution we can add more
   // complex cases.
-  int64_t vecRank = writeOp.getVectorType().getRank();
-  OpBuilder builder(writeOp.getContext());
-  auto map = AffineMap::get(vecRank, 0, builder.getAffineDimExpr(vecRank - 1));
+  int64_t vecRank = vecType.getRank();
+  OpBuilder builder(val.getContext());
+  map = AffineMap::get(vecRank, 0, builder.getAffineDimExpr(vecRank - 1));
   return map;
 }
 
@@ -457,9 +511,11 @@ static void populatePropagateVectorDistribution(Operation *target,
                                                 RewritePatternSet &patterns,
                                                 PatternBenefit benefit) {
   assert(target->hasTrait<OpTrait::IsIsolatedFromAbove>());
-  vector::populatePropagateWarpVectorDistributionPatterns(patterns, benefit);
+  vector::populatePropagateWarpVectorDistributionPatterns(
+      patterns, simpleDistributionFunction, benefit);
   vector::populateDistributeReduction(patterns, warpReduction, benefit);
-  patterns.add<WarpOpLoad>(target->getContext(), benefit);
+  patterns.add<WarpOpLoad, HoistSharedMemoryAlloc>(target->getContext(),
+                                                   benefit);
 }
 
 static void warpSyncronizationFn(Location loc, OpBuilder &builder,
@@ -514,6 +570,12 @@ transform_dialect::VectorWarpDistributionOp::applyToOne(
   }
 
   return DiagnosedSilenceableFailure(success());
+}
+
+void transform_dialect::VectorWarpDistributionOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::modifiesPayload(effects);
 }
 
 #define GET_OP_CLASSES

@@ -9,6 +9,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/IR/AsmState.h"
 #include "mlir/IR/PatternMatch.h"
 
 #define DEBUG_TYPE "iree-stream-partitioning"
@@ -17,6 +18,24 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace Stream {
+
+// Returns an AsmState at the ancestor to |block| that is isolated from above.
+// Returns nullptr if debug dumps of partitioning is disabled.
+static std::unique_ptr<AsmState> getRootAsmState(Block *block) {
+  LLVM_DEBUG({
+    auto *rootOp = block->getParentOp();
+    while (auto parentOp = rootOp->getParentOp()) {
+      if (!isa<IREE::Stream::TimelineOpInterface>(parentOp) &&
+          parentOp->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
+        rootOp = parentOp;
+        break;
+      }
+      rootOp = parentOp;
+    }
+    return std::make_unique<AsmState>(rootOp);
+  });
+  return nullptr;
+}
 
 // This is terrible. See Stream/Analysis/Partition.h for a description of what
 // a real implementation would do. We want cost modeling for tie breakers when
@@ -32,6 +51,15 @@ PartitionSet partitionStreamableOpsReference(
     IREE::Stream::AffinityAttr affinity;
     // Ops present in the partition; ops may be present in multiple partitions.
     SetVector<Operation *> ops;
+    // Ops that were cloned and are known not to have their values escape.
+    DenseSet<Operation *> clonedOps;
+    void insert(Operation *op) {
+      if (auto affinityOp = dyn_cast<IREE::Stream::AffinityOpInterface>(op)) {
+        affinity = affinity ? affinity.joinAND(affinityOp.getAffinity())
+                            : affinityOp.getAffinity();
+      }
+      ops.insert(op);
+    }
   };
   SmallVector<std::unique_ptr<PartitionBuilder>> builders;
   llvm::BitVector usableBuilders;
@@ -43,6 +71,8 @@ PartitionSet partitionStreamableOpsReference(
     llvm::BitVector hazards;
   };
   DenseMap<Operation *, OpInfo> opInfos;
+
+  auto asmState = getRootAsmState(block);
 
   for (auto &op : llvm::reverse(*block)) {
     // Skip constants; they just add noise (and since they are heavily CSE'd
@@ -56,7 +86,7 @@ PartitionSet partitionStreamableOpsReference(
       if (!mlir::wouldOpBeTriviallyDead(&op)) {
         LLVM_DEBUG({
           llvm::dbgs() << "Side-effecting op forcing flush and freeze:\n";
-          op.dump();
+          op.print(llvm::dbgs(), *asmState);
         });
         usableBuilders.reset();
       }
@@ -79,7 +109,7 @@ PartitionSet partitionStreamableOpsReference(
 
     LLVM_DEBUG({
       llvm::dbgs() << "====\nPartitioning op:\n";
-      op.dump();
+      op.print(llvm::dbgs(), *asmState);
     });
 
     // Set bits for each partition this op may be able to be placed into.
@@ -90,7 +120,7 @@ PartitionSet partitionStreamableOpsReference(
       auto &userInfo = opInfos[user];
       LLVM_DEBUG({
         llvm::dbgs() << "Testing user:\n";
-        user->dump();
+        user->print(llvm::dbgs(), *asmState);
         for (auto membershipOrdinal : userInfo.membership.set_bits()) {
           llvm::dbgs() << "  member of partition " << membershipOrdinal << "\n";
         }
@@ -109,7 +139,7 @@ PartitionSet partitionStreamableOpsReference(
 
     // Prune candidates that do not have a compatible affinity.
     for (auto ordinal : candidates.set_bits()) {
-      if (!IREE::Stream::AffinityAttr::areCompatible(
+      if (!IREE::Stream::AffinityAttr::canExecuteTogether(
               affinityAttr, builders[ordinal]->affinity)) {
         LLVM_DEBUG(llvm::dbgs()
                    << "Candidate partition " << ordinal << " incompatible\n");
@@ -136,11 +166,13 @@ PartitionSet partitionStreamableOpsReference(
     if (consumers.any()) {
       // If we are a clonable op (like splat) clone us into every partition.
       // Otherwise we just pick the first we find (probably a bad heuristic).
-      if (streamableOp.preferCloneToConsumers()) {
+      if (streamableOp.preferCloneToConsumers() && consumers.count() > 1) {
         for (auto consumerOrdinal : consumers.set_bits()) {
           LLVM_DEBUG(llvm::dbgs() << "Cloning into consumer partition "
                                   << consumerOrdinal << "\n");
-          builders[consumerOrdinal]->ops.insert(&op);
+          auto &consumerBuilder = builders[consumerOrdinal];
+          consumerBuilder->insert(&op);
+          consumerBuilder->clonedOps.insert(&op);
           opInfo.membership.set(consumerOrdinal);
           opInfo.hazards.reset(consumerOrdinal);
         }
@@ -148,7 +180,8 @@ PartitionSet partitionStreamableOpsReference(
         int consumerOrdinal = consumers.find_last();
         LLVM_DEBUG(llvm::dbgs() << "Moving into consumer partition "
                                 << consumerOrdinal << "\n");
-        builders[consumerOrdinal]->ops.insert(&op);
+        auto &consumerBuilder = builders[consumerOrdinal];
+        consumerBuilder->insert(&op);
         opInfo.membership.set(consumerOrdinal);
         opInfo.hazards.reset(consumerOrdinal);
       }
@@ -161,7 +194,7 @@ PartitionSet partitionStreamableOpsReference(
     if (firstCandidateOrdinal != -1) {
       LLVM_DEBUG(llvm::dbgs() << "Moving to first candidate partition "
                               << firstCandidateOrdinal << " (continue)\n");
-      builders[firstCandidateOrdinal]->ops.insert(&op);
+      builders[firstCandidateOrdinal]->insert(&op);
       opInfo.membership.set(firstCandidateOrdinal);
       opInfo.hazards.reset(firstCandidateOrdinal);
       continue;
@@ -177,7 +210,7 @@ PartitionSet partitionStreamableOpsReference(
     auto builder = std::make_unique<PartitionBuilder>();
     builder->ordinal = builders.size();
     builder->affinity = affinityAttr;
-    builder->ops.insert(&op);
+    builder->insert(&op);
     LLVM_DEBUG(llvm::dbgs()
                << "Created partition " << builder->ordinal << "\n");
     builders.push_back(std::move(builder));
@@ -198,15 +231,19 @@ PartitionSet partitionStreamableOpsReference(
       }
       for (auto result : op->getResults()) {
         producedValues.insert(result);
-        // TODO(benvanik): optimize this - creates n^2/nlogn behavior.
-        for (auto user : result.getUsers()) {
-          if (!builder->ops.contains(user)) {
-            escapingValues.insert(result);
+        // Cloned ops never escape even if the originals did.
+        if (!builder->clonedOps.contains(op)) {
+          // TODO(benvanik): optimize this - creates n^2/nlogn behavior.
+          for (auto user : result.getUsers()) {
+            if (!builder->ops.contains(user)) {
+              escapingValues.insert(result);
+            }
           }
         }
       }
     }
     consumedValues.set_subtract(producedValues);
+    partition.affinity = builder->affinity;
     partition.ins = consumedValues;
     partition.outs = escapingValues;
 
@@ -214,7 +251,7 @@ PartitionSet partitionStreamableOpsReference(
     partitionSet.partitions.push_back(std::move(partition));
   }
 
-  LLVM_DEBUG(partitionSet.dump(block->getParentOp()));
+  LLVM_DEBUG(partitionSet.dump(*asmState));
 
   return partitionSet;
 }
@@ -227,7 +264,7 @@ PartitionSet partitionRegionConcurrencyReference(
 
   auto favor = config.getFavor().getValue();
   if (favor == IREE::Stream::Favor::Debug) {
-    // Disable partitioning when favoring debugability.
+    // Disable partitioning when favoring debuggability.
     return waveSet;
   }
 
@@ -245,6 +282,8 @@ PartitionSet partitionRegionConcurrencyReference(
     llvm::BitVector hazards;
   };
   DenseMap<Operation *, OpInfo> opInfos;
+
+  auto asmState = getRootAsmState(block);
 
   for (auto &op : llvm::reverse(*block)) {
     // Skip constants; they just add noise (and since they are heavily CSE'd
@@ -265,7 +304,7 @@ PartitionSet partitionRegionConcurrencyReference(
 
     LLVM_DEBUG({
       llvm::dbgs() << "====\nPartitioning op:\n";
-      op.dump();
+      op.print(llvm::dbgs(), *asmState);
     });
 
     // Set bits for each wave this op may be able to be placed into.
@@ -276,7 +315,7 @@ PartitionSet partitionRegionConcurrencyReference(
       auto &userInfo = opInfos[user];
       LLVM_DEBUG({
         llvm::dbgs() << "Testing user:\n";
-        user->dump();
+        user->print(llvm::dbgs(), *asmState);
         for (auto membershipOrdinal : userInfo.membership.set_bits()) {
           llvm::dbgs() << "  member of wave " << membershipOrdinal << "\n";
         }
@@ -359,7 +398,7 @@ PartitionSet partitionRegionConcurrencyReference(
     waveSet.partitions.push_back(std::move(wave));
   }
 
-  LLVM_DEBUG(waveSet.dump(block->getParentOp()));
+  LLVM_DEBUG(waveSet.dump(*asmState));
 
   return waveSet;
 }

@@ -162,9 +162,8 @@ function(iree_check_test)
       "${_RULE_DRIVER}"
     SRC
       "${_RUNNER_TARGET}"
-    TEST_INPUT_FILE_ARG
-      "${_MODULE_FILE_NAME}"
     ARGS
+      "{{${_MODULE_FILE_NAME}}}"
       ${_RULE_RUNNER_ARGS}
     LABELS
       ${_RULE_LABELS}

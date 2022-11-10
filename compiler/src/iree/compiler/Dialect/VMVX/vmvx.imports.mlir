@@ -491,4 +491,59 @@ vm.import @mmt4d.i8i8i32(
   %flags : i32
 )
 
+//==============================================================================
+// pack ops
+//==============================================================================
+
+vm.import @pack.f32f32(
+  %in_buffer : !vm.buffer,
+  %in_offset : i64,
+  %in_stride0 : i64,
+  %out_buffer : !vm.buffer,
+  %out_offset : i64,
+  %out_stride0 : i64,
+  %in_size0 : i64,
+  %in_size1 : i64,
+  %out_size0 : i64,
+  %out_size1 : i64,
+  %out_size2 : i64,
+  %out_size3 : i64,
+  %padding_value : f32,
+  %flags : i32
+)
+
+vm.import @pack.i8i8(
+  %in_buffer : !vm.buffer,
+  %in_offset : i64,
+  %in_stride0 : i64,
+  %out_buffer : !vm.buffer,
+  %out_offset : i64,
+  %out_stride0 : i64,
+  %in_size0 : i64,
+  %in_size1 : i64,
+  %out_size0 : i64,
+  %out_size1 : i64,
+  %out_size2 : i64,
+  %out_size3 : i64,
+  %padding_value : i32,
+  %flags : i32
+)
+
+vm.import @pack.i32i32(
+  %in_buffer : !vm.buffer,
+  %in_offset : i64,
+  %in_stride0 : i64,
+  %out_buffer : !vm.buffer,
+  %out_offset : i64,
+  %out_stride0 : i64,
+  %in_size0 : i64,
+  %in_size1 : i64,
+  %out_size0 : i64,
+  %out_size1 : i64,
+  %out_size2 : i64,
+  %out_size3 : i64,
+  %padding_value : i32,
+  %flags : i32
+)
+
 }  // module

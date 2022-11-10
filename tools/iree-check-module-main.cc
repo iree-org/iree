@@ -14,7 +14,6 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/file_io.h"
 #include "iree/base/internal/flags.h"
-#include "iree/base/status_cc.h"
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
@@ -22,6 +21,7 @@
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 #include "iree/tooling/context_util.h"
+#include "iree/tooling/device_util.h"
 #include "iree/tooling/vm_util_cc.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
@@ -50,18 +50,23 @@ class CheckModuleTest : public ::testing::Test {
     IREE_CHECK_OK(iree_tooling_create_context_from_flags(
         instance_, modules_.count, modules_.values,
         /*default_device_uri=*/iree_string_view_empty(),
-        iree_vm_instance_allocator(instance_), &context_,
-        /*out_device=*/NULL, /*out_device_allocator=*/NULL));
+        iree_vm_instance_allocator(instance_), &context_, &device_,
+        /*out_device_allocator=*/NULL));
   }
 
-  void TearDown() override { iree_vm_context_release(context_); }
+  void TearDown() override {
+    iree_vm_context_release(context_);
+    iree_hal_device_release(device_);
+  }
 
   void TestBody() override {
+    IREE_ASSERT_OK(iree_hal_begin_profiling_from_flags(device_));
     IREE_EXPECT_OK(iree_vm_invoke(context_, function_,
                                   IREE_VM_INVOCATION_FLAG_NONE,
                                   /*policy=*/nullptr,
                                   /*inputs=*/nullptr, /*outputs=*/nullptr,
                                   iree_vm_instance_allocator(instance_)));
+    IREE_ASSERT_OK(iree_hal_end_profiling_from_flags(device_));
   }
 
  private:
@@ -70,6 +75,7 @@ class CheckModuleTest : public ::testing::Test {
   iree_vm_function_t function_;
 
   iree_vm_context_t* context_ = nullptr;
+  iree_hal_device_t* device_ = nullptr;
 };
 
 iree_status_t Run(std::string module_file_path, iree_allocator_t host_allocator,

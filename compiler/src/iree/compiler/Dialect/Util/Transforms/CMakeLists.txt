@@ -26,6 +26,7 @@ iree_cc_library(
     "FoldGlobals.cpp"
     "FuseGlobals.cpp"
     "HoistIntoGlobals.cpp"
+    "IPO.cpp"
     "PassDetail.h"
     "Passes.cpp"
     "Patterns.cpp"

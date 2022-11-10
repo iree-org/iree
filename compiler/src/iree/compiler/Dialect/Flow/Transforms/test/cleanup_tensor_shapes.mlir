@@ -7,8 +7,8 @@
 func.func @stripTieShape(%arg0: tensor<?xi32>, %arg1: index) {
   // CHECK-NOT: flow.tensor.tie_shape
   %0 = flow.tensor.tie_shape %arg0 : tensor<?xi32>{%arg1}
-  // CHECK: util.do_not_optimize(%[[ARG0]])
-  %1 = util.do_not_optimize(%0) : tensor<?xi32>
+  // CHECK: util.optimization_barrier %[[ARG0]]
+  %1 = util.optimization_barrier %0 : tensor<?xi32>
   return
 }
 
@@ -23,6 +23,6 @@ func.func @invalidTensorDim(%arg0: tensor<?xi32>) {
   %c0 = arith.constant 0 : index
   // expected-error @+1 {{'tensor.dim' op unexpected during shape cleanup}}
   %0 = tensor.dim %arg0, %c0 : tensor<?xi32>
-  %1 = util.do_not_optimize(%0) : index
+  %1 = util.optimization_barrier %0 : index
   return
 }

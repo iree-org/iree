@@ -91,7 +91,8 @@ iree_status_t status =
 iree_string_view_t identifier = iree_make_cstring_view("local-task");
 if (iree_status_is_ok(status)) {
   // Create the device.
-  status = iree_hal_task_device_create(identifier, &params, executor,
+  status = iree_hal_task_device_create(identifier, &params,
+                                       /*queue_count=*/1, &executor,
                                        /*loader_count=*/1, &loader,
                                        iree_allocator_system(), device);
 ```

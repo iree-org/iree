@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(builtin.module(func.func(iree-llvmgpu-tile-and-distribute))))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-llvmgpu-tile-and-distribute)))))" %s | FileCheck %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[2, 256, 4]]>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt>
@@ -153,7 +153,7 @@ builtin.module {
 //     CHECK-DAG:   %[[TY:.*]] = gpu.thread_id  y
 //         CHECK:   scf.for %{{.*}} = %[[TY]] to %[[C8]] step %[[C8]] {
 //     CHECK-DAG:     %[[TX:.*]] = gpu.thread_id  x
-//     CHECK-DAG:     %[[TY:.*]] = gpu.thread_id  y  
+//     CHECK-DAG:     %[[TY:.*]] = gpu.thread_id  y
 //         CHECK:     %[[TX4:.*]] = affine.apply #[[$MAP]]()[%[[TX]]]
 //         CHECK:     scf.for %[[IND1:.+]] = %[[TX4]] to %[[C32]] step %[[C32]] {
 //     CHECK-DAG:       memref.subview

@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_COMMON_TRANSFORMEXTENSIONS_COMMONEXTENSIONS_H_
 #define IREE_COMPILER_CODEGEN_COMMON_TRANSFORMEXTENSIONS_COMMONEXTENSIONS_H_
 
+#include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/PDL/IR/PDLTypes.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
@@ -21,6 +22,12 @@ class FuncOp;
 namespace scf {
 class ForeachThreadOp;
 }  // namespace scf
+
+namespace transform {
+// Types needed for builders.
+struct TileSizesSpec;
+struct NumThreadsSpec;
+}  // namespace transform
 }  // namespace mlir
 
 #define GET_OP_CLASSES

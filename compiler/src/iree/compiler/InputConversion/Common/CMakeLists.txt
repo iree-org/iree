@@ -38,13 +38,16 @@ iree_cc_library(
     Common
   HDRS
     "Passes.h"
+    "Utils.h"
   SRCS
     "IREEImportPublic.cpp"
     "ImportMLProgram.cpp"
     "Passes.cpp"
+    "QuantizedConvToConv.cpp"
     "QuantizedMatmulToMatmul.cpp"
     "SanitizeModuleNames.cpp"
     "TopLevelSCFToCFG.cpp"
+    "Utils.cpp"
   DEPS
     ::PassHeaders
     ::PassesIncGen

@@ -203,7 +203,7 @@ void LowerGlobalTensors::runOnOperation() {
 
         if (auto assign = llvm::dyn_cast<::mlir::TF::AssignVariableOp>(user)) {
           OpBuilder builder(assign);
-          Value value = assign.value();
+          Value value = assign.getValue();
           if (globalOp.getType() != value.getType()) {
             value = builder
                         .create<UnrealizedConversionCastOp>(

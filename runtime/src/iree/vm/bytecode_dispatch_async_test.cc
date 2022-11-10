@@ -10,7 +10,7 @@
 // avoid defining the IR inline here so that we can run this test on platforms
 // that we can't run the full MLIR compiler stack on.
 
-#include "iree/base/status_cc.h"
+#include "iree/base/api.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 #include "iree/vm/api.h"

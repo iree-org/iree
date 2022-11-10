@@ -14,9 +14,11 @@ iree_cc_library(
   NAME
     TensorToFlow
   HDRS
-    "ConvertTensorToFlow.h"
+    "Patterns.h"
+    "Utils.h"
   SRCS
-    "ConvertTensorToFlow.cpp"
+    "Patterns.cpp"
+    "Utils.cpp"
   DEPS
     MLIRArithDialect
     MLIRFuncDialect
@@ -24,6 +26,7 @@ iree_cc_library(
     MLIRLinalgDialect
     MLIRMemRefTransforms
     MLIRTensorDialect
+    MLIRTensorUtils
     iree::compiler::Dialect::Flow::IR
   PUBLIC
 )

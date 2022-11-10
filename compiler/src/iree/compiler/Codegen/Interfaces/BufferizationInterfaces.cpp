@@ -42,12 +42,11 @@ namespace iree_compiler {
 // Utility functions.
 //===----------------------------------------------------------------------===//
 
-template <typename TensorType>
-static MemRefType getMemrefTypeForTensor(TensorType tensorType,
-                                         MemRefLayoutAttrInterface layout = {},
-                                         Attribute memorySpace = {}) {
-  return MemRefType::get(tensorType.getShape(), tensorType.getElementType(),
-                         layout, memorySpace);
+static MemRefType getMemrefTypeForTensor(
+    IREE::Flow::DispatchTensorType tensorType,
+    MemRefLayoutAttrInterface layout = {}, Attribute memorySpace = {}) {
+  return MemRefType::get(tensorType.getShape(),
+                         tensorType.getBoundElementType(), layout, memorySpace);
 }
 
 /// Find the memref version of the given InterfaceBindingSubspanOp. If no such
@@ -230,23 +229,29 @@ struct DispatchTensorStoreOpInterface
 static LogicalResult bufferizeLinalgExtOp(RewriterBase &rewriter,
                                           IREE::LinalgExt::LinalgExtOp op,
                                           const BufferizationOptions &options) {
+  auto dspOp = dyn_cast<DestinationStyleOpInterface>(op.getOperation());
+  if (!dspOp) {
+    return op->emitOpError(
+        "expected op to implement the `DestinationStyleOpInterface`");
+  }
+
   // Take a guard before anything else.
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(op);
 
   // Nothing to do. This op is already bufferized.
-  if (op.hasBufferSemantics()) return success();
+  if (dspOp.hasBufferSemantics()) return success();
 
   // Ensure op has only tensors. Allow mixed tensor-buffer mode on a per-need
   // basis.
-  if (!op.hasTensorSemantics())
+  if (!dspOp.hasTensorSemantics())
     return op->emitError() << "op does not have tensor semantics";
 
   // New input operands for the cloned op.
   SmallVector<Value> newInputBuffers;
   newInputBuffers.reserve(op.getNumInputs());
   for (OpOperand *opOperand : op.getInputOperands()) {
-    if (op.isScalar(opOperand)) {
+    if (dspOp.isScalar(opOperand)) {
       newInputBuffers.push_back(opOperand->get());
       continue;
     }
@@ -283,7 +288,7 @@ static LogicalResult bufferizeLinalgExtOp(RewriterBase &rewriter,
   // Clone the op, but use the new operands. Move the existing block into the
   // new op. Since the new op does not have any tensor results, it does not
   // return anything.
-  auto newOp = cast<IREE::LinalgExt::LinalgExtOp>(op.cloneWithoutRegions(
+  auto newOp = cast<IREE::LinalgExt::LinalgExtOp>(dspOp.cloneWithoutRegions(
       rewriter, op.getLoc(), /*resultTypes=*/TypeRange{}, newOperands));
   int64_t numRegions = op->getNumRegions();
   for (int64_t i = 0; i < numRegions; ++i) {
@@ -330,11 +335,10 @@ struct LinalgExtOpInterface
 
   SmallVector<OpResult> getAliasingOpResult(Operation *op, OpOperand &opOperand,
                                             const AnalysisState &state) const {
-    auto linalgExtOp = cast<IREE::LinalgExt::LinalgExtOp>(op);
+    auto dspOp = cast<DestinationStyleOpInterface>(op);
 
     // The i-th "out" tensor may alias with the i-th OpResult.
-    if (linalgExtOp.isOutputTensor(&opOperand))
-      return {linalgExtOp.getTiedOpResult(&opOperand)};
+    if (dspOp.isDpsInit(&opOperand)) return {dspOp.getTiedOpResult(&opOperand)};
     return {};
   }
 

@@ -66,13 +66,13 @@ def TensorEncodingEnum
 def TensorEncodingAttr :
   EnumAttr<IREELinalgExt_Dialect, TensorEncodingEnum, ""> {
   let assemblyFormat = "``$value";
-}  
+}
 
 def IREELinalgExt_EncodingAttr : IREELinalgExt_Attr<"Encoding"> {
   let mnemonic = "encoding";
   let summary = [{tensor layout encoding}];
   let description = [{
-    This attribute describes the change in the layout for 
+    This attribute describes the change in the layout for
     a given tensor to execute subsequent operations on
     the tiled layout. The encoding serves as a way to
     represent the change in the way the data is laid out in

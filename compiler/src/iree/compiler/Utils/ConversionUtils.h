@@ -21,6 +21,10 @@ namespace iree_compiler {
 LogicalResult verifyAllOperationsAreLegal(Operation *op,
                                           const ConversionTarget &target);
 
+// Returns |oldAttr| converted to its new type via |typeConverter|, if needed.
+Attribute convertAttribute(Location loc, Attribute oldAttr,
+                           TypeConverter &typeConverter);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 

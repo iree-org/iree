@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(builtin.module(func.func(iree-spirv-tile-and-distribute, cse))))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-spirv-tile-and-distribute, cse)))))' %s | FileCheck %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 0, 16], [1, 0, 1]]>
 #translation = #iree_codegen.translation_info<SPIRVBaseDistribute>
@@ -58,7 +58,6 @@ hal.executable private @static_3d_sort  {
 //       CHECK: scf.for
 //       CHECK:   scf.for
 //       CHECK:     %[[WG_INPUT:.+]] = memref.subview %[[ARG0]]
-//       CHECK:     %[[WG_INPUT_CAST:.+]] = memref.cast %[[WG_INPUT]]
 //       CHECK:     %[[WG_OUTPUT:.+]] = memref.subview %[[ARG1]]
 //       CHECK:     %[[TID_X:.+]] = gpu.thread_id x
 //       CHECK:     %[[DIM_X:.+]] = gpu.block_dim x
@@ -66,7 +65,7 @@ hal.executable private @static_3d_sort  {
 //       CHECK:     %[[DIM_Y:.+]] = gpu.block_dim y
 //       CHECK:     scf.for %[[IV_Y:.+]] = %[[TID_Y]] to %{{.+}} step %[[DIM_Y]]
 //       CHECK:       scf.for %[[IV_X:.+]] = %[[TID_X]] to %{{.+}} step %[[DIM_X]]
-//       CHECK:         %[[COPY_SOURCE:.+]] = memref.subview %[[WG_INPUT_CAST]][%[[IV_Y]], 0, %[[IV_X]]]
+//       CHECK:         %[[COPY_SOURCE:.+]] = memref.subview %[[WG_INPUT]][%[[IV_Y]], 0, %[[IV_X]]]
 //       CHECK:         %[[COPY_DEST:.+]] = memref.subview %[[WG_OUTPUT]][%[[IV_Y]], 0, %[[IV_X]]]
 //       CHECK:         linalg.generic {{.*}} ins(%[[COPY_SOURCE]] {{.*}} outs(%[[COPY_DEST]]
 //       CHECK:     scf.for %[[IV_Y:.+]] = %[[TID_Y]] to %{{.+}} step %[[DIM_Y]]

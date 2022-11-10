@@ -1,20 +1,18 @@
-#include "assembly.h"
-
-// TODO: share these bits with C/C++.
-.equ ACCUMULATE_FLAG_BIT_POS,0
+#include "iree/builtins/ukernel/arch/arm_64/assembly.h"
+#include "iree/builtins/ukernel/exported_flag_bits.h"
 
 // Parameters:
-//   x0: int32_t* out_tile
-//   x1: const int8_t* lhs_panel
-//   x2: const int8_t* rhs_panel
-//   w3: int32_t K. Note: K>=1, as the K==0 case was handled as an early-return.
-//   w4: uint32_t flags
+//   x0: iree_uk_int32_t* out_tile
+//   x1: const iree_uk_int8_t* lhs_panel
+//   x2: const iree_uk_int8_t* rhs_panel
+//   w3: iree_uk_int32_t K. Note: K>=1, as the K==0 case was handled as an early-return.
+//   w4: iree_uk_uint32_t flags
 //   x5: (UNUSED) params - relevant params K and flags already passed above.
 
-BEGIN_FUNCTION iree_ukernel_mmt4d_f32f32f32_tile_8x8x1_arm_64
+BEGIN_FUNCTION iree_uk_mmt4d_tile_f32f32f32_8x8x1_arm_64
 
         // Do we accumulate into or clear the accumulator tile?
-        tbnz w4, ACCUMULATE_FLAG_BIT_POS, 1f
+        tbnz w4, IREE_UK_FLAG_ACCUMULATE_BIT_POS, 1f
 
     0:
         // No-accumulate case. Clear the 8x8 accumulator tile.
@@ -96,12 +94,12 @@ BEGIN_FUNCTION iree_ukernel_mmt4d_f32f32f32_tile_8x8x1_arm_64
         stp q30, q31, [x0, 224]
         ret
 
-END_FUNCTION iree_ukernel_mmt4d_f32f32f32_tile_8x8x1_arm_64
+END_FUNCTION iree_uk_mmt4d_tile_f32f32f32_8x8x1_arm_64
 
-BEGIN_FUNCTION iree_ukernel_mmt4d_i8i8i32_tile_8x8x1_arm_64
+BEGIN_FUNCTION iree_uk_mmt4d_tile_i8i8i32_8x8x1_arm_64
 
         // Do we accumulate into or clear the accumulator tile?
-        tbnz w4, ACCUMULATE_FLAG_BIT_POS, 1f
+        tbnz w4, IREE_UK_FLAG_ACCUMULATE_BIT_POS, 1f
 
     0:
         // No-accumulate case. Clear the 8x8 accumulator tile.
@@ -177,6 +175,6 @@ BEGIN_FUNCTION iree_ukernel_mmt4d_i8i8i32_tile_8x8x1_arm_64
         stp q30, q31, [x0, 224]
         ret
 
-END_FUNCTION iree_ukernel_mmt4d_i8i8i32_tile_8x8x1_arm_64
+END_FUNCTION iree_uk_mmt4d_tile_i8i8i32_8x8x1_arm_64
 
 ALLOW_NON_EXECUTABLE_STACK

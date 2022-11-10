@@ -12,6 +12,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Pass/Pass.h"
@@ -27,17 +28,6 @@ namespace IREE {
 namespace Flow {
 
 namespace {
-
-/// Generates `tensor.dim` operations to get the dynamic sizes of a value `v`.
-static SmallVector<Value, 4> getDynamicDimValues(OpBuilder &b, Location loc,
-                                                 Value v) {
-  SmallVector<Value, 4> dynamicDims;
-  for (auto dim : llvm::enumerate(v.getType().cast<ShapedType>().getShape())) {
-    if (dim.value() != ShapedType::kDynamicSize) continue;
-    dynamicDims.push_back(b.createOrFold<tensor::DimOp>(loc, v, dim.index()));
-  }
-  return dynamicDims;
-}
 
 /// Converts linalg.tensor_reshape operations into flow.tensor.reshape
 /// operations.
@@ -85,8 +75,8 @@ struct LinalgFillToFlowTensorSplat final
       // Don't convert linalg.fill ops that were fused together with other ops.
       return failure();
     }
-    SmallVector<Value, 4> dynamicDims =
-        getDynamicDimValues(rewriter, fillOp.getLoc(), fillOp.output());
+    SmallVector<Value, 4> dynamicDims = tensor::createDynamicDimValues(
+        rewriter, fillOp.getLoc(), fillOp.output());
     rewriter.replaceOpWithNewOp<TensorSplatOp>(
         fillOp, fillOp.output().getType(), fillOp.value(), dynamicDims);
     return success();

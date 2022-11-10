@@ -521,7 +521,7 @@ MMTKernel MMTKernel_8x8x8_i8i8i32_Aarch64I8mm_InlineAsm() {
       // within one row. Even if we put multiple such 16x16 tiles side-by-side
       // in the overall kernel, that will still be at a scale larger than
       // individual NEON/SVE registers.
-      // 
+      //
       // Rows 0-1 of the 8x8 accumulator tile
       zip1 v28.2d, $(acc:0).2d, $(acc:2).2d
       zip2 v29.2d, $(acc:0).2d, $(acc:2).2d

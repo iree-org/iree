@@ -14,9 +14,9 @@ iree_cc_library(
   NAME
     HALToHALInline
   HDRS
-    "ConvertHALToHALInline.h"
+    "Patterns.h"
   SRCS
-    "ConvertHALToHALInline.cpp"
+    "Patterns.cpp"
   DEPS
     LLVMSupport
     MLIRArithDialect

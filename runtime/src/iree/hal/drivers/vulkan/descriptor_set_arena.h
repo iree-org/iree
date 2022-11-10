@@ -13,7 +13,6 @@
 #include <vector>
 
 #include "iree/base/api.h"
-#include "iree/base/status_cc.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/vulkan/descriptor_pool_cache.h"
 #include "iree/hal/drivers/vulkan/dynamic_symbols.h"

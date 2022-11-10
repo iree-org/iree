@@ -11,8 +11,8 @@
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
-#include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
-#include "mlir-hlo/Dialect/mhlo/transforms/rewriters.h"
+#include "mhlo/IR/hlo_ops.h"
+#include "mhlo/transforms/rewriters.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
@@ -471,7 +471,7 @@ struct ScatterOpImplicitIndex : public OpRewritePattern<mhlo::ScatterOp> {
                                                      indices, reassociationMap);
 
     auto newScatter = rewriter.create<mhlo::ScatterOp>(
-        op.getLoc(), op.getResultTypes(), op.operands(), indices,
+        op.getLoc(), op.getResultTypes(), op.getInputs(), indices,
         op.getUpdates(), dimNumbers, op.getIndicesAreSorted(),
         op.getUniqueIndices());
     Region &region = newScatter.getUpdateComputation();
@@ -526,6 +526,13 @@ struct ScatterOpImplicitBatch : public OpRewritePattern<mhlo::ScatterOp> {
           op, "Unable to add implicit batch dim to indice.");
     }
 
+    llvm::SmallVector<int64_t> newUpdateWindowDims;
+    for (auto dim : dimNumbers.getUpdateWindowDims()) {
+      // Batch dimension is inserted at the start so window dimensions are shift
+      // forwards.
+      newUpdateWindowDims.push_back(dim + 1);
+    }
+
     llvm::SmallVector<Value> updates;
     for (Value update : op.getUpdates()) {
       update = addUnitBatchDim(op.getLoc(), update, rewriter);
@@ -537,13 +544,13 @@ struct ScatterOpImplicitBatch : public OpRewritePattern<mhlo::ScatterOp> {
     }
 
     auto newDimNumbers = mhlo::ScatterDimensionNumbersAttr::get(
-        op.getContext(), dimNumbers.getUpdateWindowDims(),
+        op.getContext(), newUpdateWindowDims,
         dimNumbers.getInsertedWindowDims(),
         dimNumbers.getScatterDimsToOperandDims(),
         dimNumbers.getIndexVectorDim() + 1);
 
     auto newScatter = rewriter.create<mhlo::ScatterOp>(
-        op.getLoc(), op.getResultTypes(), op.operands(), indices, updates,
+        op.getLoc(), op.getResultTypes(), op.getInputs(), indices, updates,
         newDimNumbers, op.getIndicesAreSorted(), op.getUniqueIndices());
     Region &region = newScatter.getUpdateComputation();
     rewriter.cloneRegionBefore(op.getUpdateComputation(), region, region.end());
@@ -640,7 +647,7 @@ struct ScatterOpCollapseBatch : public OpRewritePattern<mhlo::ScatterOp> {
         /*indexVectorDim=*/1);
 
     auto newScatter = rewriter.create<mhlo::ScatterOp>(
-        op.getLoc(), op.getResultTypes(), op.operands(), indices, updates,
+        op.getLoc(), op.getResultTypes(), op.getInputs(), indices, updates,
         newDimNumbers, op.getIndicesAreSorted(), op.getUniqueIndices());
     Region &region = newScatter.getUpdateComputation();
     rewriter.cloneRegionBefore(op.getUpdateComputation(), region, region.end());
@@ -684,7 +691,7 @@ struct ScatterMaterializeInsertedDim
   LogicalResult matchAndRewrite(mhlo::ScatterOp op,
                                 PatternRewriter &rewriter) const final {
     auto indices = op.getScatterIndices();
-    auto operand = op.operands().front();
+    auto operand = op.getInputs().front();
     auto indicesTy = indices.getType().cast<ShapedType>();
     auto operandTy = operand.getType().cast<ShapedType>();
     if (!operandTy.hasRank() || !indicesTy.hasRank()) {
@@ -774,9 +781,9 @@ struct ScatterMaterializeInsertedDim
         /*indexVectorDim=*/1);
 
     auto newScatter = rewriter.create<mhlo::ScatterOp>(
-        op.getLoc(), op.getResultTypes(), op.operands(), op.getScatterIndices(),
-        expandedUpdates, newDimNumbers, op.getIndicesAreSorted(),
-        op.getUniqueIndices());
+        op.getLoc(), op.getResultTypes(), op.getInputs(),
+        op.getScatterIndices(), expandedUpdates, newDimNumbers,
+        op.getIndicesAreSorted(), op.getUniqueIndices());
     Region &region = newScatter.getUpdateComputation();
     rewriter.cloneRegionBefore(op.getUpdateComputation(), region, region.end());
     rewriter.replaceOp(op, newScatter.getResults());

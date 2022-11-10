@@ -52,12 +52,14 @@ def match_module_cmake_target(module_path: str) -> Optional[str]:
     return None
   if os.path.splitext(path_parts[3])[1] != MODULE_FILE_EXTENSION:
     return None
-  return os.path.join(*path_parts)
+  # Join to get the CMake target name. This is *not* a filesystem path, so we
+  # don't want \ separators on Windows that we would get with os.path.join().
+  return '/'.join(path_parts)
 
 
 def parse_compilation_time_from_ninja_log(log: TextIO) -> Dict[str, int]:
   """Retrieve the compilation time (ms) from the Ninja build log.
-  
+
   Returns:
     Map of target name and compilation time in ms.
   """

@@ -90,11 +90,11 @@ class InferNumericNarrowingPass
     SmallPtrSet<Value, 8> probePoints;
     getOperation()->walk([&](Operation *op) {
       if (auto linalgOp = llvm::dyn_cast<linalg::LinalgOp>(op)) {
-        for (Value input : linalgOp.getInputs()) {
-          probePoints.insert(input);
+        for (OpOperand *input : linalgOp.getDpsInputOperands()) {
+          probePoints.insert(input->get());
         }
-        for (Value output : linalgOp.getOutputs()) {
-          probePoints.insert(output);
+        for (OpOperand *output : linalgOp.getDpsInitOperands()) {
+          probePoints.insert(output->get());
         }
       }
     });

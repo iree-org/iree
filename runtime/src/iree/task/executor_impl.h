@@ -112,6 +112,11 @@ struct iree_task_executor_t {
   // comment on worker_live_mask.
   iree_atomic_task_affinity_set_t worker_idle_mask;
 
+  // Base value added to each executor-local worker index.
+  // This allows workers to uniquely identify themselves in multi-executor
+  // configurations.
+  iree_host_size_t worker_base_index;
+
   // Specifies how many workers threads there are.
   // For now this number is fixed per executor however if we wanted to enable
   // live join/leave behavior we could change this to a registration mechanism.

@@ -1,21 +1,27 @@
-func.func private @generate_2D_source(%height : index, %width : index) -> tensor<?x?xi32> {
-  %init_source = tensor.empty(%height, %width) : tensor<?x?xi32>
+func.func private @generate_4D_source(%d0: index, %d1: index, %d2: index, %d3: index) -> tensor<?x?x?x?xi32> {
+  %init_source = tensor.empty(%d0, %d1, %d2, %d3) : tensor<?x?x?x?xi32>
   %source = linalg.generic {
-      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>],
-      iterator_types = ["parallel", "parallel"]}
-      outs(%init_source : tensor<?x?xi32>) {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      outs(%init_source : tensor<?x?x?x?xi32>) {
     ^bb0(%b0 : i32):
-      %outer = linalg.index 0 : index
-      %inner = linalg.index 1 : index
-      %strided = arith.muli %outer, %width : index
-      %linearized = arith.addi %inner, %strided : index
-      %linearized_i32 = arith.index_cast %linearized : index to i32
-      linalg.yield %linearized_i32 : i32
-  } -> tensor<?x?xi32>
-  return %source : tensor<?x?xi32>
+      %i = linalg.index 0 : index
+      %j = linalg.index 1 : index
+      %k = linalg.index 2 : index
+      %l = linalg.index 3 : index
+      %t0 = arith.muli %i, %d1 : index
+      %t1 = arith.addi %t0, %j : index
+      %t2 = arith.muli %t1, %d2 : index
+      %t3 = arith.addi %t2, %k : index
+      %t4 = arith.muli %t3, %d3 : index
+      %t5 = arith.addi %t4, %l : index
+      %res = arith.index_cast %t5 : index to i32
+      linalg.yield %res : i32
+  } -> tensor<?x?x?x?xi32>
+  return %source : tensor<?x?x?x?xi32>
 }
 
-func.func @unpack_simple() {
+func.func @static_unpack_simple() {
   %iree_input = util.unfoldable_constant dense<[[[[0, 1], [4, 5]], [[2, 3], [6, 7]]], [[[8, 9], [12, 13]], [[10 ,11], [14, 15]]]]> : tensor<2x2x2x2xi32>
   %init = tensor.empty() : tensor<4x4xi32>
   %unpack = iree_linalg_ext.unpack %iree_input inner_dims_pos = [0, 1] inner_tiles = [2, 2] into %init
@@ -41,7 +47,7 @@ func.func @dynamic_unpack_simple() {
   return
 }
 
-func.func @unpack_simple_extract_slice() {
+func.func @static_unpack_simple_extract_slice() {
   %iree_input = util.unfoldable_constant dense<[[[[0, 1, 2], [4, 5, 6], [8, 9, 10]],
                                        [[3, 0, 0], [7, 0, 0], [11, 0, 0]]],
                                       [[[12, 13, 14], [0, 0, 0], [0, 0, 0]],
@@ -76,150 +82,365 @@ func.func @dynamic_unpack_simple_extract_slice() {
   return
 }
 
-func.func @unpack_large() {
-  %height = arith.constant 128 : index
-  %width = arith.constant 256 : index
-  %0 = call @generate_2D_source(%height, %width) : (index, index) -> tensor<?x?xi32>
-  %source = tensor.cast %0 : tensor<?x?xi32> to tensor<128x256xi32>
-
-  %init_pack = tensor.empty() : tensor<4x16x32x16xi32>
-  %pack = iree_linalg_ext.pack %source inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %init_pack
-      : (tensor<128x256xi32> tensor<4x16x32x16xi32>) -> tensor<4x16x32x16xi32>
+func.func @static_unpack_large() {
+  %d0 = arith.constant 4 : index
+  %d1 = arith.constant 16 : index
+  %d2 = arith.constant 32 : index
+  %d3 = arith.constant 16 : index
+  %0 = call @generate_4D_source(%d0, %d1, %d2, %d3) : (index, index, index, index) -> tensor<?x?x?x?xi32>
+  %source = tensor.cast %0 : tensor<?x?x?x?xi32> to tensor<4x16x32x16xi32>
 
   %init_unpack = tensor.empty() : tensor<128x256xi32>
-  %unpack = iree_linalg_ext.unpack %pack inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %init_unpack
+  %unpack = iree_linalg_ext.unpack %source inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %init_unpack
       : (tensor<4x16x32x16xi32> tensor<128x256xi32>) -> tensor<128x256xi32>
 
-  check.expect_eq(%unpack, %source) : tensor<128x256xi32>
+  %init_transpose = tensor.empty() : tensor<4x32x16x16xi32>
+  %transpose = linalg.transpose
+    ins(%source: tensor<4x16x32x16xi32>)
+    outs(%init_transpose: tensor<4x32x16x16xi32>)
+    permutation = [0, 2, 1, 3]
+  %collapse = tensor.collapse_shape %transpose [[0, 1], [2, 3]] : tensor<4x32x16x16xi32> into tensor<128x256xi32>
+
+  check.expect_eq(%unpack, %collapse) : tensor<128x256xi32>
   return
 }
 
 func.func @dynamic_unpack_large() {
-  %d0 = util.unfoldable_constant 128 : index
-  %d1 = util.unfoldable_constant 256 : index
-  %source = call @generate_2D_source(%d0, %d1) : (index, index) -> tensor<?x?xi32>
+  %d0 = util.unfoldable_constant 4 : index
+  %d1 = util.unfoldable_constant 16 : index
+  %d2 = util.unfoldable_constant 32 : index
+  %d3 = util.unfoldable_constant 16 : index
+  %0 = call @generate_4D_source(%d0, %d1, %d2, %d3) : (index, index, index, index) -> tensor<?x?x?x?xi32>
+  %source = tensor.cast %0 : tensor<?x?x?x?xi32> to tensor<?x?x32x16xi32>
 
-  %c32 = arith.constant 32 : index
-  %c16 = arith.constant 16 : index
-  %tiled_d0 = arith.ceildivui %d0, %c32 : index
-  %tiled_d1 = arith.ceildivui %d1, %c16 : index
-  %dyn_init_pack = tensor.empty(%tiled_d0, %tiled_d1) : tensor<?x?x32x16xi32>
-  %pack = iree_linalg_ext.pack %source inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %dyn_init_pack
-      : (tensor<?x?xi32> tensor<?x?x32x16xi32>) -> tensor<?x?x32x16xi32>
-
-  %init_unpack = tensor.empty(%d0, %d1) : tensor<?x?xi32>
-  %unpack = iree_linalg_ext.unpack %pack inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %init_unpack
+  %packed_d0 = util.unfoldable_constant 128 : index
+  %packed_d1 = util.unfoldable_constant 256 : index
+  %init_unpack = tensor.empty(%packed_d0, %packed_d1) : tensor<?x?xi32>
+  %unpack = iree_linalg_ext.unpack %source inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %init_unpack
       : (tensor<?x?x32x16xi32> tensor<?x?xi32>) -> tensor<?x?xi32>
+  %cast_unpack = tensor.cast %unpack : tensor<?x?xi32> to tensor<128x256xi32>
 
-  check.expect_eq(%unpack, %source) : tensor<?x?xi32>
+  %source2 = call @generate_4D_source(%d0, %d1, %d2, %d3) : (index, index, index, index) -> tensor<?x?x?x?xi32>
+  %static_source = tensor.cast %source2 : tensor<?x?x?x?xi32> to tensor<4x16x32x16xi32>
+  %init_transpose = tensor.empty() : tensor<4x32x16x16xi32>
+  %transpose = linalg.transpose
+    ins(%static_source: tensor<4x16x32x16xi32>)
+    outs(%init_transpose: tensor<4x32x16x16xi32>)
+    permutation = [0, 2, 1, 3]
+  %collapse = tensor.collapse_shape %transpose [[0, 1], [2, 3]] : tensor<4x32x16x16xi32> into tensor<128x256xi32>
+
+  check.expect_eq(%cast_unpack, %collapse) : tensor<128x256xi32>
   return
 }
 
-func.func @dynamic_unpack_transpose_large() {
-  %d0 = util.unfoldable_constant 128 : index
-  %d1 = util.unfoldable_constant 256 : index
-  %source = call @generate_2D_source(%d0, %d1) : (index, index) -> tensor<?x?xi32>
+func.func @dynamic_unpack_transpose_inner_dims_large() {
+  %d0 = util.unfoldable_constant 4 : index
+  %d1 = util.unfoldable_constant 16 : index
+  %d2 = util.unfoldable_constant 16 : index
+  %d3 = util.unfoldable_constant 32 : index
+  %0 = call @generate_4D_source(%d0, %d1, %d2, %d3) : (index, index, index, index) -> tensor<?x?x?x?xi32>
+  %source = tensor.cast %0 : tensor<?x?x?x?xi32> to tensor<?x?x16x32xi32>
 
-  %c32 = arith.constant 32 : index
-  %c16 = arith.constant 16 : index
-  %tiled_d0 = arith.ceildivui %d0, %c32 : index
-  %tiled_d1 = arith.ceildivui %d1, %c16 : index
-  %dyn_init_pack = tensor.empty(%tiled_d0, %tiled_d1) : tensor<?x?x16x32xi32>
-  %pack = iree_linalg_ext.pack %source inner_dims_pos = [1, 0] inner_tiles = [16, 32] into %dyn_init_pack
-      : (tensor<?x?xi32> tensor<?x?x16x32xi32>) -> tensor<?x?x16x32xi32>
-
-  %init_unpack = tensor.empty(%d0, %d1) : tensor<?x?xi32>
-  %unpack = iree_linalg_ext.unpack %pack inner_dims_pos = [1, 0] inner_tiles = [16, 32] into %init_unpack
+  %packed_d0 = util.unfoldable_constant 128 : index
+  %packed_d1 = util.unfoldable_constant 256 : index
+  %init_unpack = tensor.empty(%packed_d0, %packed_d1) : tensor<?x?xi32>
+  %unpack = iree_linalg_ext.unpack %source inner_dims_pos = [1, 0] inner_tiles = [16, 32] into %init_unpack
       : (tensor<?x?x16x32xi32> tensor<?x?xi32>) -> tensor<?x?xi32>
+  %cast_unpack = tensor.cast %unpack : tensor<?x?xi32> to tensor<128x256xi32>
 
-  check.expect_eq(%unpack, %source) : tensor<?x?xi32>
+  %source2 = call @generate_4D_source(%d0, %d1, %d2, %d3) : (index, index, index, index) -> tensor<?x?x?x?xi32>
+  %static_source = tensor.cast %source2 : tensor<?x?x?x?xi32> to tensor<4x16x16x32xi32>
+  %init_transpose = tensor.empty() : tensor<4x32x16x16xi32>
+  // The permutation for [0, 2, 3, 1] -> [0, 1, 2, 3] is [0, 3, 1, 2].
+  %transpose = linalg.transpose
+    ins(%static_source: tensor<4x16x16x32xi32>)
+    outs(%init_transpose: tensor<4x32x16x16xi32>)
+    permutation = [0, 3, 1, 2]
+  %collapse = tensor.collapse_shape %transpose [[0, 1], [2, 3]] : tensor<4x32x16x16xi32> into tensor<128x256xi32>
+
+  check.expect_eq(%cast_unpack, %collapse) : tensor<128x256xi32>
   return
 }
 
-func.func @unpack_extract_slice_large() {
-  %height = arith.constant 100 : index
-  %width = arith.constant 250 : index
-  %0 = call @generate_2D_source(%height, %width) : (index, index) -> tensor<?x?xi32>
-  %source = tensor.cast %0 : tensor<?x?xi32> to tensor<100x250xi32>
-  %padding_value = arith.constant 42 : i32
+func.func @dynamic_unpack_transpose_outer_dims_large() {
+  %d0 = util.unfoldable_constant 16 : index
+  %d1 = util.unfoldable_constant 4 : index
+  %d2 = util.unfoldable_constant 32 : index
+  %d3 = util.unfoldable_constant 16 : index
+  %0 = call @generate_4D_source(%d0, %d1, %d2, %d3) : (index, index, index, index) -> tensor<?x?x?x?xi32>
+  %source = tensor.cast %0 : tensor<?x?x?x?xi32> to tensor<?x?x32x16xi32>
 
-  %init_pack = tensor.empty() : tensor<4x16x32x16xi32>
-  %pack = iree_linalg_ext.pack %source padding_value(%padding_value : i32)
-      inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %init_pack
-      : (tensor<100x250xi32> tensor<4x16x32x16xi32>) -> tensor<4x16x32x16xi32>
+  %packed_d0 = util.unfoldable_constant 128 : index
+  %packed_d1 = util.unfoldable_constant 256 : index
+  %init_unpack = tensor.empty(%packed_d0, %packed_d1) : tensor<?x?xi32>
+  %unpack = iree_linalg_ext.unpack %source outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %init_unpack
+      : (tensor<?x?x32x16xi32> tensor<?x?xi32>) -> tensor<?x?xi32>
+  %cast_unpack = tensor.cast %unpack : tensor<?x?xi32> to tensor<128x256xi32>
+
+  %source2 = call @generate_4D_source(%d0, %d1, %d2, %d3) : (index, index, index, index) -> tensor<?x?x?x?xi32>
+  %static_source = tensor.cast %source2 : tensor<?x?x?x?xi32> to tensor<16x4x32x16xi32>
+  %init_transpose = tensor.empty() : tensor<4x32x16x16xi32>
+  // The permutation for [2, 0, 1, 3] -> [0, 1, 2, 3] is [1, 2, 0, 3].
+  %transpose = linalg.transpose
+    ins(%static_source: tensor<16x4x32x16xi32>)
+    outs(%init_transpose: tensor<4x32x16x16xi32>)
+    permutation = [1, 2, 0, 3]
+  %collapse = tensor.collapse_shape %transpose [[0, 1], [2, 3]] : tensor<4x32x16x16xi32> into tensor<128x256xi32>
+
+  check.expect_eq(%cast_unpack, %collapse) : tensor<128x256xi32>
+  return
+}
+
+func.func @dynamic_unpack_transpose_inner_and_outer_dims_large() {
+  %d0 = util.unfoldable_constant 16 : index
+  %d1 = util.unfoldable_constant 4 : index
+  %d2 = util.unfoldable_constant 16 : index
+  %d3 = util.unfoldable_constant 32 : index
+  %0 = call @generate_4D_source(%d0, %d1, %d2, %d3) : (index, index, index, index) -> tensor<?x?x?x?xi32>
+  %source = tensor.cast %0 : tensor<?x?x?x?xi32> to tensor<?x?x16x32xi32>
+
+  %packed_d0 = util.unfoldable_constant 128 : index
+  %packed_d1 = util.unfoldable_constant 256 : index
+  %init_unpack = tensor.empty(%packed_d0, %packed_d1) : tensor<?x?xi32>
+  %unpack = iree_linalg_ext.unpack %source outer_dims_perm = [1, 0]  inner_dims_pos = [1, 0] inner_tiles = [16, 32] into %init_unpack
+      : (tensor<?x?x16x32xi32> tensor<?x?xi32>) -> tensor<?x?xi32>
+  %cast_unpack = tensor.cast %unpack : tensor<?x?xi32> to tensor<128x256xi32>
+
+  %source2 = call @generate_4D_source(%d0, %d1, %d2, %d3) : (index, index, index, index) -> tensor<?x?x?x?xi32>
+  %static_source = tensor.cast %source2 : tensor<?x?x?x?xi32> to tensor<16x4x16x32xi32>
+  %init_transpose = tensor.empty() : tensor<4x32x16x16xi32>
+  // The permutation for [2, 0, 3, 1] -> [0, 1, 2, 3] is [1, 3, 0, 2].
+  %transpose = linalg.transpose
+    ins(%static_source: tensor<16x4x16x32xi32>)
+    outs(%init_transpose: tensor<4x32x16x16xi32>)
+    permutation = [1, 3, 0, 2]
+  %collapse = tensor.collapse_shape %transpose [[0, 1], [2, 3]] : tensor<4x32x16x16xi32> into tensor<128x256xi32>
+
+  check.expect_eq(%cast_unpack, %collapse) : tensor<128x256xi32>
+  return
+}
+
+func.func @static_unpack_extract_slice_large() {
+  %d0 = arith.constant 4 : index
+  %d1 = arith.constant 16 : index
+  %d2 = arith.constant 32 : index
+  %d3 = arith.constant 16 : index
+  %0 = call @generate_4D_source(%d0, %d1, %d2, %d3) : (index, index, index, index) -> tensor<?x?x?x?xi32>
+  %source = tensor.cast %0 : tensor<?x?x?x?xi32> to tensor<4x16x32x16xi32>
 
   %init_unpack = tensor.empty() : tensor<100x250xi32>
-  %unpack = iree_linalg_ext.unpack %pack inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %init_unpack
+  %unpack = iree_linalg_ext.unpack %source inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %init_unpack
       : (tensor<4x16x32x16xi32> tensor<100x250xi32>) -> tensor<100x250xi32>
 
-  check.expect_eq(%unpack, %source) : tensor<100x250xi32>
+  %init_transpose = tensor.empty() : tensor<4x32x16x16xi32>
+  // The permutation for [0, 2, 1, 3] -> [0, 1, 2, 3] is [0, 2, 1, 3].
+  %transpose = linalg.transpose
+    ins(%source: tensor<4x16x32x16xi32>)
+    outs(%init_transpose: tensor<4x32x16x16xi32>)
+    permutation = [0, 2, 1, 3]
+  %collapse = tensor.collapse_shape %transpose [[0, 1], [2, 3]] : tensor<4x32x16x16xi32> into tensor<128x256xi32>
+  %slice = tensor.extract_slice %collapse [0, 0] [100, 250] [1, 1] : tensor<128x256xi32> to tensor<100x250xi32>
+
+  check.expect_eq(%unpack, %slice) : tensor<100x250xi32>
   return
 }
 
 func.func @dynamic_unpack_extract_slice_large() {
-  %d0 = util.unfoldable_constant 100 : index
-  %d1 = util.unfoldable_constant 250 : index
-  %source = call @generate_2D_source(%d0, %d1) : (index, index) -> tensor<?x?xi32>
-  %padding_value = arith.constant 42 : i32
+  %d0 = util.unfoldable_constant 4 : index
+  %d1 = util.unfoldable_constant 16 : index
+  %d2 = util.unfoldable_constant 32 : index
+  %d3 = util.unfoldable_constant 16 : index
+  %0 = call @generate_4D_source(%d0, %d1, %d2, %d3) : (index, index, index, index) -> tensor<?x?x?x?xi32>
+  %source = tensor.cast %0 : tensor<?x?x?x?xi32> to tensor<?x?x32x16xi32>
 
-  %c32 = arith.constant 32 : index
-  %c16 = arith.constant 16 : index
-  %tiled_d0 = arith.ceildivui %d0, %c32 : index
-  %tiled_d1 = arith.ceildivui %d1, %c16 : index
-  %dyn_init_pack = tensor.empty(%tiled_d0, %tiled_d1) : tensor<?x?x32x16xi32>
-  %pack = iree_linalg_ext.pack %source padding_value(%padding_value : i32)
-      inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %dyn_init_pack
-      : (tensor<?x?xi32> tensor<?x?x32x16xi32>) -> tensor<?x?x32x16xi32>
-
-  %init_unpack = tensor.empty(%d0, %d1) : tensor<?x?xi32>
-  %unpack = iree_linalg_ext.unpack %pack inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %init_unpack
+  %packed_d0 = util.unfoldable_constant 100 : index
+  %packed_d1 = util.unfoldable_constant 250 : index
+  %init_unpack = tensor.empty(%packed_d0, %packed_d1) : tensor<?x?xi32>
+  %unpack = iree_linalg_ext.unpack %source inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %init_unpack
       : (tensor<?x?x32x16xi32> tensor<?x?xi32>) -> tensor<?x?xi32>
+  %cast_unpack = tensor.cast %unpack : tensor<?x?xi32> to tensor<100x250xi32>
 
-  check.expect_eq(%unpack, %source) : tensor<?x?xi32>
+  %source2 = call @generate_4D_source(%d0, %d1, %d2, %d3) : (index, index, index, index) -> tensor<?x?x?x?xi32>
+  %static_source = tensor.cast %source2 : tensor<?x?x?x?xi32> to tensor<4x16x32x16xi32>
+  %init_transpose = tensor.empty() : tensor<4x32x16x16xi32>
+  // The permutation for [0, 2, 1, 3] -> [0, 1, 2, 3] is [0, 2, 1, 3].
+  %transpose = linalg.transpose
+    ins(%static_source: tensor<4x16x32x16xi32>)
+    outs(%init_transpose: tensor<4x32x16x16xi32>)
+    permutation = [0, 2, 1, 3]
+  %collapse = tensor.collapse_shape %transpose [[0, 1], [2, 3]] : tensor<4x32x16x16xi32> into tensor<128x256xi32>
+  %slice = tensor.extract_slice %collapse [0, 0] [100, 250] [1, 1] : tensor<128x256xi32> to tensor<100x250xi32>
+
+  check.expect_eq(%cast_unpack, %slice) : tensor<100x250xi32>
   return
 }
 
-func.func @unpack_extract_slice_transpose_large() {
-  %height = arith.constant 100 : index
-  %width = arith.constant 250 : index
-  %0 = call @generate_2D_source(%height, %width) : (index, index) -> tensor<?x?xi32>
-  %source = tensor.cast %0 : tensor<?x?xi32> to tensor<100x250xi32>
-  %padding_value = arith.constant 42 : i32
-
-  %init_pack = tensor.empty() : tensor<4x16x16x32xi32>
-  %pack = iree_linalg_ext.pack %source padding_value(%padding_value : i32)
-      inner_dims_pos = [1, 0] inner_tiles = [16, 32] into %init_pack
-      : (tensor<100x250xi32> tensor<4x16x16x32xi32>) -> tensor<4x16x16x32xi32>
+func.func @static_unpack_extract_slice_transpose_inner_dims_large() {
+  %d0 = arith.constant 4 : index
+  %d1 = arith.constant 16 : index
+  %d2 = arith.constant 16 : index
+  %d3 = arith.constant 32 : index
+  %0 = call @generate_4D_source(%d0, %d1, %d2, %d3) : (index, index, index, index) -> tensor<?x?x?x?xi32>
+  %source = tensor.cast %0 : tensor<?x?x?x?xi32> to tensor<4x16x16x32xi32>
 
   %init_unpack = tensor.empty() : tensor<100x250xi32>
-  %unpack = iree_linalg_ext.unpack %pack
+  %unpack = iree_linalg_ext.unpack %source
       inner_dims_pos = [1, 0] inner_tiles = [16, 32] into %init_unpack
       : (tensor<4x16x16x32xi32> tensor<100x250xi32>) -> tensor<100x250xi32>
 
-  check.expect_eq(%unpack, %source) : tensor<100x250xi32>
+  %init_transpose = tensor.empty() : tensor<4x32x16x16xi32>
+  // The permutation for [0, 2, 3, 1] -> [0, 1, 2, 3] is [0, 3, 1, 2].
+  %transpose = linalg.transpose
+    ins(%source: tensor<4x16x16x32xi32>)
+    outs(%init_transpose: tensor<4x32x16x16xi32>)
+    permutation = [0, 3, 1, 2]
+  %collapse = tensor.collapse_shape %transpose [[0, 1], [2, 3]] : tensor<4x32x16x16xi32> into tensor<128x256xi32>
+  %slice = tensor.extract_slice %collapse [0, 0] [100, 250] [1, 1] : tensor<128x256xi32> to tensor<100x250xi32>
+
+  check.expect_eq(%unpack, %slice) : tensor<100x250xi32>
   return
 }
 
-func.func @dynamic_unpack_extract_slice_transpose_large() {
-  %d0 = util.unfoldable_constant 100 : index
-  %d1 = util.unfoldable_constant 250 : index
-  %source = call @generate_2D_source(%d0, %d1) : (index, index) -> tensor<?x?xi32>
-  %padding_value = arith.constant 42 : i32
+func.func @static_unpack_extract_slice_transpose_outer_dims_large() {
+  %d0 = arith.constant 16 : index
+  %d1 = arith.constant 4 : index
+  %d2 = arith.constant 32 : index
+  %d3 = arith.constant 16 : index
+  %0 = call @generate_4D_source(%d0, %d1, %d2, %d3) : (index, index, index, index) -> tensor<?x?x?x?xi32>
+  %source = tensor.cast %0 : tensor<?x?x?x?xi32> to tensor<16x4x32x16xi32>
 
-  %c16 = arith.constant 16 : index
-  %c32 = arith.constant 32 : index
-  %tiled_d0 = arith.ceildivui %d0, %c32 : index
-  %tiled_d1 = arith.ceildivui %d1, %c16 : index
-  %init_pack = tensor.empty(%tiled_d0, %tiled_d1) : tensor<?x?x16x32xi32>
-  %pack = iree_linalg_ext.pack %source padding_value(%padding_value : i32)
-      inner_dims_pos = [1, 0] inner_tiles = [16, 32] into %init_pack
-      : (tensor<?x?xi32> tensor<?x?x16x32xi32>) -> tensor<?x?x16x32xi32>
+  %init_unpack = tensor.empty() : tensor<100x250xi32>
+  %unpack = iree_linalg_ext.unpack %source outer_dims_perm = [1, 0]  inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %init_unpack
+      : (tensor<16x4x32x16xi32> tensor<100x250xi32>) -> tensor<100x250xi32>
 
-  %init_unpack = tensor.empty(%d0, %d1) : tensor<?x?xi32>
-  %unpack = iree_linalg_ext.unpack %pack
+  %init_transpose = tensor.empty() : tensor<4x32x16x16xi32>
+  // The permutation for [2, 0, 1, 3] -> [0, 1, 2, 3] is [1, 2, 0, 3].
+  %transpose = linalg.transpose
+    ins(%source: tensor<16x4x32x16xi32>)
+    outs(%init_transpose: tensor<4x32x16x16xi32>)
+    permutation = [1, 2, 0, 3]
+  %collapse = tensor.collapse_shape %transpose [[0, 1], [2, 3]] : tensor<4x32x16x16xi32> into tensor<128x256xi32>
+  %slice = tensor.extract_slice %collapse [0, 0] [100, 250] [1, 1] : tensor<128x256xi32> to tensor<100x250xi32>
+
+  check.expect_eq(%unpack, %slice) : tensor<100x250xi32>
+  return
+}
+
+func.func @static_unpack_extract_slice_transpose_inner_and_outer_dims_large() {
+  %d0 = arith.constant 16 : index
+  %d1 = arith.constant 4 : index
+  %d2 = arith.constant 16 : index
+  %d3 = arith.constant 32 : index
+  %0 = call @generate_4D_source(%d0, %d1, %d2, %d3) : (index, index, index, index) -> tensor<?x?x?x?xi32>
+  %source = tensor.cast %0 : tensor<?x?x?x?xi32> to tensor<16x4x16x32xi32>
+
+  %init_unpack = tensor.empty() : tensor<100x250xi32>
+  %unpack = iree_linalg_ext.unpack %source
+      outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 32] into %init_unpack
+      : (tensor<16x4x16x32xi32> tensor<100x250xi32>) -> tensor<100x250xi32>
+
+  %init_transpose = tensor.empty() : tensor<4x32x16x16xi32>
+  // The permutation for [2, 0, 3, 1] -> [0, 1, 2, 3] is [1, 3, 0, 2].
+  %transpose = linalg.transpose
+    ins(%source: tensor<16x4x16x32xi32>)
+    outs(%init_transpose: tensor<4x32x16x16xi32>)
+    permutation = [1, 3, 0, 2]
+  %collapse = tensor.collapse_shape %transpose [[0, 1], [2, 3]] : tensor<4x32x16x16xi32> into tensor<128x256xi32>
+  %slice = tensor.extract_slice %collapse [0, 0] [100, 250] [1, 1] : tensor<128x256xi32> to tensor<100x250xi32>
+
+  check.expect_eq(%unpack, %slice) : tensor<100x250xi32>
+
+  return
+}
+
+func.func @dynamic_unpack_extract_slice_transpose_inner_dims_large() {
+  %d0 = util.unfoldable_constant 4 : index
+  %d1 = util.unfoldable_constant 16 : index
+  %d2 = util.unfoldable_constant 16 : index
+  %d3 = util.unfoldable_constant 32 : index
+  %0 = call @generate_4D_source(%d0, %d1, %d2, %d3) : (index, index, index, index) -> tensor<?x?x?x?xi32>
+  %source = tensor.cast %0 : tensor<?x?x?x?xi32> to tensor<?x?x16x32xi32>
+
+  %packed_d0 = util.unfoldable_constant 100 : index
+  %packed_d1 = util.unfoldable_constant 250 : index
+  %init_unpack = tensor.empty(%packed_d0, %packed_d1) : tensor<?x?xi32>
+  %unpack = iree_linalg_ext.unpack %source
       inner_dims_pos = [1, 0] inner_tiles = [16, 32] into %init_unpack
       : (tensor<?x?x16x32xi32> tensor<?x?xi32>) -> tensor<?x?xi32>
+  %cast_unpack = tensor.cast %unpack : tensor<?x?xi32> to tensor<100x250xi32>
 
-  check.expect_eq(%unpack, %source) : tensor<?x?xi32>
+  %source2 = call @generate_4D_source(%d0, %d1, %d2, %d3) : (index, index, index, index) -> tensor<?x?x?x?xi32>
+  %static_source = tensor.cast %source2 : tensor<?x?x?x?xi32> to tensor<4x16x16x32xi32>
+  %init_transpose = tensor.empty() : tensor<4x32x16x16xi32>
+  // The permutation for [0, 2, 3, 1] -> [0, 1, 2, 3] is [0, 3, 1, 2].
+  %transpose = linalg.transpose
+    ins(%static_source: tensor<4x16x16x32xi32>)
+    outs(%init_transpose: tensor<4x32x16x16xi32>)
+    permutation = [0, 3, 1, 2]
+  %collapse = tensor.collapse_shape %transpose [[0, 1], [2, 3]] : tensor<4x32x16x16xi32> into tensor<128x256xi32>
+  %slice = tensor.extract_slice %collapse [0, 0] [100, 250] [1, 1] : tensor<128x256xi32> to tensor<100x250xi32>
+
+  check.expect_eq(%cast_unpack, %slice) : tensor<100x250xi32>
+  return
+}
+
+func.func @dynamic_unpack_extract_slice_transpose_outer_dims_large() {
+  %d0 = util.unfoldable_constant 16 : index
+  %d1 = util.unfoldable_constant 4 : index
+  %d2 = util.unfoldable_constant 32 : index
+  %d3 = util.unfoldable_constant 16 : index
+  %0 = call @generate_4D_source(%d0, %d1, %d2, %d3) : (index, index, index, index) -> tensor<?x?x?x?xi32>
+  %source = tensor.cast %0 : tensor<?x?x?x?xi32> to tensor<?x?x32x16xi32>
+
+  %packed_d0 = util.unfoldable_constant 100 : index
+  %packed_d1 = util.unfoldable_constant 250 : index
+  %init_unpack = tensor.empty(%packed_d0, %packed_d1) : tensor<?x?xi32>
+  %unpack = iree_linalg_ext.unpack %source outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 16] into %init_unpack
+      : (tensor<?x?x32x16xi32> tensor<?x?xi32>) -> tensor<?x?xi32>
+  %cast_unpack = tensor.cast %unpack : tensor<?x?xi32> to tensor<100x250xi32>
+
+  %source2 = call @generate_4D_source(%d0, %d1, %d2, %d3) : (index, index, index, index) -> tensor<?x?x?x?xi32>
+  %static_source = tensor.cast %source2 : tensor<?x?x?x?xi32> to tensor<16x4x32x16xi32>
+  %init_transpose = tensor.empty() : tensor<4x32x16x16xi32>
+  // The permutation for [0, 2, 3, 1] -> [0, 1, 2, 3] is [0, 3, 1, 2].
+  %transpose = linalg.transpose
+    ins(%static_source: tensor<16x4x32x16xi32>)
+    outs(%init_transpose: tensor<4x32x16x16xi32>)
+    permutation = [1, 2, 0, 3]
+  %collapse = tensor.collapse_shape %transpose [[0, 1], [2, 3]] : tensor<4x32x16x16xi32> into tensor<128x256xi32>
+  %slice = tensor.extract_slice %collapse [0, 0] [100, 250] [1, 1] : tensor<128x256xi32> to tensor<100x250xi32>
+
+  check.expect_eq(%cast_unpack, %slice) : tensor<100x250xi32>
+  return
+}
+
+func.func @dynamic_unpack_extract_slice_transpose_inner_and_outer_dims_large() {
+  %d0 = util.unfoldable_constant 16 : index
+  %d1 = util.unfoldable_constant 4 : index
+  %d2 = util.unfoldable_constant 16 : index
+  %d3 = util.unfoldable_constant 32 : index
+  %0 = call @generate_4D_source(%d0, %d1, %d2, %d3) : (index, index, index, index) -> tensor<?x?x?x?xi32>
+  %source = tensor.cast %0 : tensor<?x?x?x?xi32> to tensor<?x?x16x32xi32>
+
+  %packed_d0 = util.unfoldable_constant 100 : index
+  %packed_d1 = util.unfoldable_constant 250 : index
+  %init_unpack = tensor.empty(%packed_d0, %packed_d1) : tensor<?x?xi32>
+  %unpack = iree_linalg_ext.unpack %source
+      outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 32] into %init_unpack
+      : (tensor<?x?x16x32xi32> tensor<?x?xi32>) -> tensor<?x?xi32>
+  %cast_unpack = tensor.cast %unpack : tensor<?x?xi32> to tensor<100x250xi32>
+
+  %source2 = call @generate_4D_source(%d0, %d1, %d2, %d3) : (index, index, index, index) -> tensor<?x?x?x?xi32>
+  %static_source = tensor.cast %source2 : tensor<?x?x?x?xi32> to tensor<16x4x16x32xi32>
+  %init_transpose = tensor.empty() : tensor<4x32x16x16xi32>
+  // The permutation for [2, 0, 3, 1] -> [0, 1, 2, 3] is [1, 3, 0, 2].
+  %transpose = linalg.transpose
+    ins(%static_source: tensor<16x4x16x32xi32>)
+    outs(%init_transpose: tensor<4x32x16x16xi32>)
+    permutation = [1, 3, 0, 2]
+  %collapse = tensor.collapse_shape %transpose [[0, 1], [2, 3]] : tensor<4x32x16x16xi32> into tensor<128x256xi32>
+  %slice = tensor.extract_slice %collapse [0, 0] [100, 250] [1, 1] : tensor<128x256xi32> to tensor<100x250xi32>
+
+  check.expect_eq(%cast_unpack, %slice) : tensor<100x250xi32>
   return
 }

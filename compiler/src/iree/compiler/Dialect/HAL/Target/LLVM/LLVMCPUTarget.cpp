@@ -239,6 +239,21 @@ class LLVMCPUTargetBackend final : public TargetBackend {
         }
       } break;
     }
+
+    // Declare dynamically imported functions.
+    auto importsAttrName =
+        StringAttr::get(variantOp.getContext(), "hal.executable.imports");
+    if (auto importsAttr =
+            variantOp->getAttrOfType<ArrayAttr>(importsAttrName)) {
+      for (auto importAttr : importsAttr.getAsValueRange<ArrayAttr>()) {
+        auto nameAttr = importAttr[0].cast<StringAttr>();
+        auto weakAttr = importAttr[1].cast<BoolAttr>();
+        libraryBuilder.addImport(nameAttr.getValue(), weakAttr.getValue());
+      }
+      variantOp->removeAttr(importsAttrName);
+    }
+
+    // Declare exported entry points.
     auto align16 = llvm::Attribute::getWithAlignment(context, llvm::Align(16));
     for (auto exportOp : variantOp.getBlock().getOps<ExecutableExportOp>()) {
       // Find the matching function in the LLVM module.

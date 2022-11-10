@@ -36,7 +36,7 @@ void buildIREEVMTransformPassPipeline(
     SchedulingOptions schedulingOptions,
     IREE::HAL::TargetOptions executableOptions,
     IREE::VM::TargetOptions targetOptions, IREEVMPipelineHooks &hooks,
-    OpPassManager &passManager) {
+    OpPassManager &passManager, IREEVMPipelinePhase compileTo) {
   // Input pipelines can result in changes to the exported functions and types
   // and must run before generating bindings.
   // After input processing, there should only be IREE legal types in
@@ -67,6 +67,7 @@ void buildIREEVMTransformPassPipeline(
   }
 
   buildCommonInputConversionPassPipeline(passManager);
+  if (compileTo == IREEVMPipelinePhase::Input) return;  // early-exit
 
   // Now that inputs are legalized, generate wrapper for entry functions.
   IREE::ABI::InvocationOptions invocationOptions;
@@ -81,6 +82,7 @@ void buildIREEVMTransformPassPipeline(
   if (bindingOptions.tflite) {
     IREE::TFLite::buildTransformPassPipeline(passManager);
   }
+  if (compileTo == IREEVMPipelinePhase::ABI) return;  // early-exit
 
   IREE::Flow::TransformOptions flowOptions;
   flowOptions.constExprHoisting =
@@ -119,8 +121,10 @@ void buildIREEVMTransformPassPipeline(
       break;
     default:
       IREE::Flow::buildFlowTransformPassPipeline(passManager, flowOptions);
+      if (compileTo == IREEVMPipelinePhase::Flow) return;  // early-exit
       IREE::Stream::buildStreamTransformPassPipeline(passManager,
                                                      streamOptions);
+      if (compileTo == IREEVMPipelinePhase::Stream) return;  // early-exit
       break;
   }
 
@@ -142,9 +146,11 @@ void buildIREEVMTransformPassPipeline(
           passManager, executableOptions);
       break;
   }
+  if (compileTo == IREEVMPipelinePhase::HAL) return;  // early-exit
 
   IREE::VM::buildVMTransformPassPipeline(passManager, targetOptions);
   passManager.addPass(IREE::Util::createDropCompilerHintsPass());
+  if (compileTo == IREEVMPipelinePhase::VM) return;  // early-exit
 }
 
 void buildDefaultIREEVMTransformPassPipeline(OpPassManager &passManager) {

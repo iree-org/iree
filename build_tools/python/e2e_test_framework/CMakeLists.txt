@@ -6,9 +6,9 @@
 
 iree_build_tools_py_test(
   NAME
-    cmake_rule_generator_test
+    serialization_test
   SRC
-    "cmake_rule_generator_test.py"
+    "serialization_test.py"
 )
 
 add_subdirectory(device_specs)

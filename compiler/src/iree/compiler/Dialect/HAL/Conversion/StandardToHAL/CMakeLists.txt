@@ -14,10 +14,10 @@ iree_cc_library(
   NAME
     StandardToHAL
   HDRS
-    "ConvertStandardToHAL.h"
+    "Patterns.h"
   SRCS
     "ConvertShapeOps.cpp"
-    "ConvertStandardToHAL.cpp"
+    "Patterns.cpp"
   DEPS
     LLVMSupport
     MLIRArithDialect

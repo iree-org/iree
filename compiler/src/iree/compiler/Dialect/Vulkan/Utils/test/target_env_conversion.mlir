@@ -1,9 +1,9 @@
-// RUN: iree-opt --pass-pipeline='iree-hal-transformation-pipeline{serialize-executables=false}' --iree-hal-target-backends=vulkan-spirv %s | FileCheck %s --check-prefix=DEFAULT
-// RUN: iree-opt --pass-pipeline='iree-hal-transformation-pipeline{serialize-executables=false}' --iree-hal-target-backends=vulkan-spirv --iree-vulkan-target-triple=adreno-a650-android30 %s | FileCheck %s --check-prefix=ADRENO
-// RUN: iree-opt --pass-pipeline='iree-hal-transformation-pipeline{serialize-executables=false}' --iree-hal-target-backends=vulkan-spirv --iree-vulkan-target-triple=valhall-unknown-android31 %s | FileCheck %s --check-prefix=MALI
-// RUN: iree-opt --pass-pipeline='iree-hal-transformation-pipeline{serialize-executables=false}' --iree-hal-target-backends=vulkan-spirv --iree-vulkan-target-triple=turing-t4-linux %s | FileCheck %s --check-prefix=TURINGT4
-// RUN: iree-opt --pass-pipeline='iree-hal-transformation-pipeline{serialize-executables=false}' --iree-hal-target-backends=vulkan-spirv --iree-vulkan-target-triple=rdna1-5700xt-windows %s | FileCheck %s --check-prefix=AMD5700XT
-// RUN: iree-opt --pass-pipeline='iree-hal-transformation-pipeline{serialize-executables=false}' --iree-hal-target-backends=vulkan-spirv --iree-vulkan-target-triple=m1-moltenvk-macos %s | FileCheck %s --check-prefix=M1
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-transformation-pipeline{serialize-executables=false})' --iree-hal-target-backends=vulkan-spirv %s | FileCheck %s --check-prefix=DEFAULT
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-transformation-pipeline{serialize-executables=false})' --iree-hal-target-backends=vulkan-spirv --iree-vulkan-target-triple=adreno-a650-android30 %s | FileCheck %s --check-prefix=ADRENO
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-transformation-pipeline{serialize-executables=false})' --iree-hal-target-backends=vulkan-spirv --iree-vulkan-target-triple=valhall-unknown-android31 %s | FileCheck %s --check-prefix=MALI
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-transformation-pipeline{serialize-executables=false})' --iree-hal-target-backends=vulkan-spirv --iree-vulkan-target-triple=turing-t4-linux %s | FileCheck %s --check-prefix=TURINGT4
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-transformation-pipeline{serialize-executables=false})' --iree-hal-target-backends=vulkan-spirv --iree-vulkan-target-triple=rdna1-5700xt-windows %s | FileCheck %s --check-prefix=AMD5700XT
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-transformation-pipeline{serialize-executables=false})' --iree-hal-target-backends=vulkan-spirv --iree-vulkan-target-triple=m1-moltenvk-macos %s | FileCheck %s --check-prefix=M1
 
 // TODO(antiagainst): Passing in lenghty strings as command-line options is not
 // optimal. We should consider creating a dedicated test pass to pick up
@@ -25,16 +25,16 @@ stream.executable public @reduce_dispatch {
   builtin.module {
     func.func @reduce_dispatch(%arg0_binding: !stream.binding, %arg1_binding: !stream.binding) {
       %c0 = arith.constant 0 : index
-      %arg0 = stream.binding.subspan %arg0_binding[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:16xf32>
-      %arg1 = stream.binding.subspan %arg1_binding[%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:f32>
+      %arg0 = stream.binding.subspan %arg0_binding[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:tensor<16xf32>>
+      %arg1 = stream.binding.subspan %arg1_binding[%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:tensor<f32>>
       %0 = tensor.empty() : tensor<f32>
-      %1 = flow.dispatch.tensor.load %arg0, offsets=[0], sizes=[16], strides=[1] : !flow.dispatch.tensor<readonly:16xf32> -> tensor<16xf32>
+      %1 = flow.dispatch.tensor.load %arg0, offsets=[0], sizes=[16], strides=[1] : !flow.dispatch.tensor<readonly:tensor<16xf32>> -> tensor<16xf32>
       %3 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>], iterator_types = ["reduction"]} ins(%1 : tensor<16xf32>) outs(%0 : tensor<f32>) {
       ^bb0(%arg2: f32, %arg3: f32):
         %4 = arith.addf %arg2, %arg3 : f32
         linalg.yield %4 : f32
       } -> tensor<f32>
-      flow.dispatch.tensor.store %3, %arg1, offsets=[], sizes=[], strides=[] : tensor<f32> -> !flow.dispatch.tensor<writeonly:f32>
+      flow.dispatch.tensor.store %3, %arg1, offsets=[], sizes=[], strides=[] : tensor<f32> -> !flow.dispatch.tensor<writeonly:tensor<f32>>
       return
     }
   }

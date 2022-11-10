@@ -95,8 +95,8 @@ static LogicalResult getPaddingAttrs(func::FuncOp funcOp,
   if (!linalgOp) return success();
 
   OpBuilder builder(funcOp.getContext());
-  for (auto operand : linalgOp.getInputAndOutputOperands()) {
-    auto elemType = getElementTypeOrSelf(operand->get().getType());
+  for (auto &operand : linalgOp->getOpOperands()) {
+    auto elemType = getElementTypeOrSelf(operand.get().getType());
     attrs.push_back(builder.getZeroAttr(elemType));
   }
 
@@ -238,7 +238,6 @@ struct LinalgSingleTilingExpertPass
     this->hoistPaddings = options.hoistPaddings;
     this->transposePaddings = options.transposePaddings;
     this->packPaddings = options.packPaddings;
-    this->scalarizeDynamicDims = options.scalarizeDynamicDims;
     this->generalize = options.generalize;
     this->iteratorInterchange = options.iteratorInterchange;
     this->decomposeToLowerDimOp = options.decomposeToLowerDimOp;
@@ -440,7 +439,7 @@ struct CodegenSplitReduction
     if (op.getNumReductionLoops() != 1) {
       return rewriter.notifyMatchFailure(op, "number of reduction loops != 1");
     }
-    if (op.getNumOutputs() != 1) {
+    if (op.getNumDpsInits() != 1) {
       return rewriter.notifyMatchFailure(op, "doesn't have exactly 1 output");
     }
     if (!op.hasOnlyProjectedPermutations()) {
@@ -450,10 +449,10 @@ struct CodegenSplitReduction
     if (!isa<linalg::GenericOp>(op)) {
       return rewriter.notifyMatchFailure(op, "is not a generic op");
     }
-    if (op.getNumInputs() != 1) {
+    if (op.getNumDpsInputs() != 1) {
       return rewriter.notifyMatchFailure(op, "doesn't have exactly 1 input");
     }
-    auto elementType = op.getInputOperand(0)
+    auto elementType = op.getDpsInputOperand(0)
                            ->get()
                            .getType()
                            .dyn_cast<ShapedType>()
@@ -465,7 +464,7 @@ struct CodegenSplitReduction
 
     SmallVector<unsigned> dims;
     op.getReductionDims(dims);
-    AffineMap map = op.getMatchingIndexingMap(op.getInputOperand(0));
+    AffineMap map = op.getMatchingIndexingMap(op.getDpsInputOperand(0));
     unsigned lastIdx = map.getNumResults() - 1;
     unsigned lastDim = map.getDimPosition(lastIdx);
     if (lastDim != dims[0]) {
@@ -488,12 +487,14 @@ struct CodegenSplitReduction
         rewriter, cast<TilingInterface>(op.getOperation()), optionsFirst);
     if (failed(tileResFirst)) return failure();
     rewriter.replaceOp(op, tileResFirst->replacements);
-    filter.replaceLinalgTransformationFilter(rewriter, tileResFirst->tiledOp);
+    for (auto tiledOp : tileResFirst->tiledOps) {
+      filter.replaceLinalgTransformationFilter(rewriter, tiledOp);
+    }
 
     // 2) Apply splitReduction on the single vector-length array. splitReduction
     // already replaces the op.
     FailureOr<linalg::SplitReductionResult> splitRes =
-        splitReduction(rewriter, tileResFirst->tiledOp, fn);
+        splitReduction(rewriter, tileResFirst->tiledOps.back(), fn);
     if (failed(splitRes)) return failure();
     filter.replaceLinalgTransformationFilter(rewriter, splitRes->splitLinalgOp);
     filter.replaceLinalgTransformationFilter(rewriter,
@@ -563,10 +564,6 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
   if (!tileInterchange.empty()) {
     tilingOptions = tilingOptions.setInterchange(
         SmallVector<unsigned>(tileInterchange.begin(), tileInterchange.end()));
-  }
-  if (scalarizeDynamicDims) {
-    doTiling = true;
-    tilingOptions = tilingOptions.scalarizeDynamicDims();
   }
   tilingOptions = tilingOptions.setPeeledLoops(peeledLoops);
 

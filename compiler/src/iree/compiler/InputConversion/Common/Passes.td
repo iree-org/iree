@@ -21,11 +21,16 @@ def ImportMLProgram :
   let constructor = "mlir::iree_compiler::createImportMLProgramPass()";
 }
 
+def LinalgQuantizedConvToConvPass
+    : Pass<"iree-linalg-quantized-conv-to-conv", "func::FuncOp"> {
+  let summary = "lower quantized_conv to conv";
+  let constructor = "mlir::iree_compiler::createLinalgQuantizedConvToConvPass()";
+}
+
 def LinalgQuantizedMatmulToMatmulPass
     : Pass<"iree-linalg-quantized-matmul-to-matmul", "func::FuncOp"> {
   let summary = "lower quantized_matmul to matmul";
   let constructor = "mlir::iree_compiler::createLinalgQuantizedMatmulToMatmulPass()";
-  // let dependentDialects = ["mlir::linalg::LinalgDialect"];
 }
 
 def SanitizeModuleNames :

@@ -10,8 +10,8 @@
 #include <string>
 #include <vector>
 
+#include "iree/base/api.h"
 #include "iree/base/internal/span.h"
-#include "iree/base/status_cc.h"
 #include "iree/hal/api.h"
 #include "iree/tooling/vm_util.h"
 #include "iree/vm/api.h"

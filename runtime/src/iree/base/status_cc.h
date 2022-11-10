@@ -11,7 +11,9 @@
 #error iree::Status is only usable in C++ code.
 #endif  // !__cplusplus
 
+#include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <memory>
 #include <string>
@@ -108,7 +110,24 @@ class IREE_MUST_USE_RESULT Status;
 class Status final {
  public:
   // Return a combination of the error code name and message.
-  static IREE_MUST_USE_RESULT std::string ToString(iree_status_t status);
+  IREE_MUST_USE_RESULT static inline std::string ToString(
+      iree_status_t status) {
+    if (iree_status_is_ok(status)) {
+      return "OK";
+    }
+    iree_host_size_t buffer_length = 0;
+    if (IREE_UNLIKELY(!iree_status_format(status, /*buffer_capacity=*/0,
+                                          /*buffer=*/NULL, &buffer_length))) {
+      return "<!>";
+    }
+    std::string result(buffer_length, '\0');
+    if (IREE_UNLIKELY(!iree_status_format(status, result.size() + 1,
+                                          const_cast<char*>(result.data()),
+                                          &buffer_length))) {
+      return "<!>";
+    }
+    return result;
+  }
 
   // Creates an OK status with no message.
   Status() = default;
@@ -194,6 +213,8 @@ class Status final {
     return status_impl::exchange(
         value_, iree_status_from_code(iree_status_code(value_)));
   }
+
+  iree_status_t get() const { return value_; }
 
   IREE_MUST_USE_RESULT iree_status_t release() {
     return status_impl::exchange(value_, iree_ok_status());
@@ -317,12 +338,6 @@ using IsStatusOrDirectInitializationValid = status_impl::disjunction<
     // The is_same allows nested status ors to ignore this check iff same type.
     std::is_same<T, std::remove_cv_t<std::remove_reference_t<U>>>,
     status_impl::negation<IsStatusOrDirectInitializationAmbiguous<T, U>>>;
-
-class Helper {
- public:
-  IREE_ATTRIBUTE_NORETURN static void HandleInvalidStatusCtorArg(Status*);
-  IREE_ATTRIBUTE_NORETURN static void Crash(const Status& status);
-};
 
 // Construct an instance of T in `p` through placement new, passing Args... to
 // the constructor.
@@ -479,11 +494,17 @@ class StatusOrData {
   }
 
   void EnsureOk() const {
-    if (IREE_UNLIKELY(!ok())) Helper::Crash(status_);
+    if (IREE_UNLIKELY(!ok())) {
+      iree_status_abort(status_.get());
+    }
   }
 
   void EnsureNotOk() {
-    if (IREE_UNLIKELY(ok())) Helper::HandleInvalidStatusCtorArg(&status_);
+    if (IREE_UNLIKELY(ok())) {
+      iree_status_abort(iree_make_status(
+          IREE_STATUS_FAILED_PRECONDITION,
+          "an OK status is not a valid constructor argument to StatusOr<T>"));
+    }
   }
 
   // Construct the value (data_) through placement new with the passed arg.

@@ -7,7 +7,7 @@
 #include "iree/compiler/InputConversion/MHLO/PassDetail.h"
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
 #include "iree/compiler/InputConversion/MHLO/Rewriters.h"
-#include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
+#include "mhlo/IR/hlo_ops.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -283,7 +283,7 @@ struct ConvertCHLOCompareOp : public OpConversionPattern<CompareOpTy> {
         !isComplexTensor(adaptor.getRhs())) {
       return rewriter.notifyMatchFailure(op, "not complex tensor");
     }
-    if (direction != op.comparison_direction()) {
+    if (direction != op.getComparisonDirection()) {
       return rewriter.notifyMatchFailure(op, "not matching direction");
     }
 
@@ -299,11 +299,12 @@ struct ConvertCHLOCompareOp : public OpConversionPattern<CompareOpTy> {
         rewriter.create<chlo::BroadcastCompareOp>(
             loc, lhsReal, rhsReal,
             /*broadcast_dimensions=*/nullptr,
-            adaptor.comparison_directionAttr(), adaptor.compare_typeAttr()),
+            adaptor.getComparisonDirectionAttr(), adaptor.getCompareTypeAttr()),
         rewriter.create<chlo::BroadcastCompareOp>(
             loc, lhsImag, rhsImag,
             /*broadcast_dimensions=*/nullptr,
-            adaptor.comparison_directionAttr(), adaptor.compare_typeAttr()));
+            adaptor.getComparisonDirectionAttr(),
+            adaptor.getCompareTypeAttr()));
 
     return success();
   }

@@ -209,6 +209,42 @@ py::str HalBufferView::Repr() {
 }
 
 //------------------------------------------------------------------------------
+// HalDevice
+//------------------------------------------------------------------------------
+
+void HalDevice::BeginProfiling(const py::kwargs& kwargs) {
+  iree_hal_device_profiling_options_t options;
+  memset(&options, 0, sizeof(options));
+
+  options.mode = IREE_HAL_DEVICE_PROFILING_MODE_QUEUE_OPERATIONS;
+  if (kwargs.contains("mode")) {
+    auto mode_str = kwargs["mode"].cast<std::string>();
+    if (mode_str == "queue") {
+      options.mode = IREE_HAL_DEVICE_PROFILING_MODE_QUEUE_OPERATIONS;
+    } else if (mode_str == "dispatch") {
+      options.mode = IREE_HAL_DEVICE_PROFILING_MODE_DISPATCH_COUNTERS;
+    } else if (mode_str == "executable") {
+      options.mode = IREE_HAL_DEVICE_PROFILING_MODE_EXECUTABLE_COUNTERS;
+    } else {
+      throw RaiseValueError("unrecognized profiling mode");
+    }
+  }
+
+  std::string file_path = kwargs.contains("file_path")
+                              ? kwargs["file_path"].cast<std::string>()
+                              : "";
+  options.file_path = !file_path.empty() ? file_path.c_str() : NULL;
+
+  CheckApiStatus(iree_hal_device_profiling_begin(raw_ptr(), &options),
+                 "starting device profiling");
+}
+
+void HalDevice::EndProfiling() {
+  CheckApiStatus(iree_hal_device_profiling_end(raw_ptr()),
+                 "ending device profiling");
+}
+
+//------------------------------------------------------------------------------
 // HalDriver
 //------------------------------------------------------------------------------
 
@@ -290,7 +326,7 @@ HalDevice HalDriver::CreateDevice(iree_hal_device_id_t device_id) {
     // Each record is a tuple of (device_id, name).
     auto record_tuple = py::cast<py::tuple>(record);
     py::object found_device_id = record_tuple[0];
-    if (found_device_id == compare_device_id) {
+    if (found_device_id.is(compare_device_id)) {
       found = true;
       break;
     }
@@ -537,7 +573,9 @@ void SetupHalBindings(pybind11::module m) {
           [](HalDevice& self) {
             return HalAllocator::BorrowFromRawPtr(self.allocator());
           },
-          py::keep_alive<0, 1>());
+          py::keep_alive<0, 1>())
+      .def("begin_profiling", &HalDevice::BeginProfiling)
+      .def("end_profiling", &HalDevice::EndProfiling);
 
   py::class_<HalDriver>(m, "HalDriver")
       .def_static("query", &HalDriver::Query)

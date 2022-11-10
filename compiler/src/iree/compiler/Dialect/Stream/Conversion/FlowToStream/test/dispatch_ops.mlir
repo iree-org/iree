@@ -43,3 +43,22 @@ func.func @tiedDispatch(%input0: tensor<i32>, %input1: tensor<2x3xi32>) -> tenso
   // CHECK: return %[[RESULT]], %[[T_SIZE]] : !stream.resource<*>, index
   return %1 : tensor<3x9xi32>
 }
+
+// -----
+
+// CHECK-LABEL: @dispatchAffinity
+//  CHECK-SAME: (%[[INPUT:.+]]: !stream.resource<*>, %[[INPUT_SIZE:.+]]: index, %[[DIM1:.+]]: index, %[[DIM3:.+]]: index)
+func.func @dispatchAffinity(%input: tensor<7x?x24x?xf32>, %dim1: index, %dim3: index) -> (tensor<?x?x1024xf32>, tensor<?x?x1024xf32>) {
+  //      CHECK: %[[RESULT0_SIZE:.+]] = stream.tensor.sizeof on(#hal.affinity.queue<[0]>) tensor<?x?x1024xf32>{%[[DIM1]], %[[DIM3]]}
+  //      CHECK: %[[RESULT0:.+]] = stream.async.dispatch on(#hal.affinity.queue<[0]>) @ex::@entry0(%[[INPUT]])
+  %0 = flow.dispatch @ex::@entry0(%input) {
+    stream.affinity = #hal.affinity.queue<[0]>
+  } : (tensor<7x?x24x?xf32>{%dim1, %dim3}) -> tensor<?x?x1024xf32>{%dim1, %dim3}
+  //      CHECK: %[[RESULT1_SIZE:.+]] = stream.tensor.sizeof on(#hal.affinity.queue<[1]>) tensor<?x?x1024xf32>{%[[DIM3]], %[[DIM1]]}
+  //      CHECK: %[[RESULT1:.+]] = stream.async.dispatch on(#hal.affinity.queue<[1]>) @ex::@entry1(%[[INPUT]])
+  %1 = flow.dispatch @ex::@entry1(%input) {
+    stream.affinity = #hal.affinity.queue<[1]>
+  } : (tensor<7x?x24x?xf32>{%dim1, %dim3}) -> tensor<?x?x1024xf32>{%dim3, %dim1}
+  // return %[[RESULT0]], %[[RESULT0_SIZE]], %[[RESULT1]], %[[RESULT1_SIZE]]
+  return %0, %1 : tensor<?x?x1024xf32>, tensor<?x?x1024xf32>
+}

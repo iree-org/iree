@@ -19,6 +19,7 @@ iree_cc_library(
     "VMVXAssignConstantOrdinals.cpp"
     "VMVXLinkExecutables.cpp"
   DEPS
+    IREELinalgExtDialect
     LLVMSupport
     MLIRArithDialect
     MLIRBufferizationDialect
@@ -28,7 +29,7 @@ iree_cc_library(
     MLIRMemRefDialect
     MLIRPass
     MLIRTransforms
-    iree::builtins::ukernel
+    iree::builtins::ukernel::exported_flag_bits
     iree::compiler::Codegen::PassHeaders
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Util::IR

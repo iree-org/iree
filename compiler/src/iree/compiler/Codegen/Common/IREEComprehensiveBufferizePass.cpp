@@ -210,14 +210,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
       allocationFn, deallocationFn, memCpyFn);
 }
 
-void addIREEComprehensiveBufferizePasses(
-    OpPassManager &passManager,
-    Optional<BufferizationOptions::AllocationFn> allocationFn,
-    Optional<BufferizationOptions::DeallocationFn> deallocationFn,
-    Optional<BufferizationOptions::MemCpyFn> memCpyFn) {
-  passManager.addPass(bufferization::createEmptyTensorToAllocTensorPass());
-  passManager.addPass(createIREEComprehensiveBufferizePass(
-      allocationFn, deallocationFn, memCpyFn));
+void addIREEPostBufferizationPasses(OpPassManager &passManager) {
   passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
   passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<func::FuncOp>(createCSEPass());
@@ -226,6 +219,17 @@ void addIREEComprehensiveBufferizePasses(
   // memrefs are unified in CSE pass, so we can truely remove redundant memcpy.
   passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<func::FuncOp>(createCleanupBufferAllocViewPass());
+}
+
+void addIREEComprehensiveBufferizePasses(
+    OpPassManager &passManager,
+    Optional<BufferizationOptions::AllocationFn> allocationFn,
+    Optional<BufferizationOptions::DeallocationFn> deallocationFn,
+    Optional<BufferizationOptions::MemCpyFn> memCpyFn) {
+  passManager.addPass(bufferization::createEmptyTensorToAllocTensorPass());
+  passManager.addPass(createIREEComprehensiveBufferizePass(
+      allocationFn, deallocationFn, memCpyFn));
+  addIREEPostBufferizationPasses(passManager);
 }
 
 }  // namespace iree_compiler

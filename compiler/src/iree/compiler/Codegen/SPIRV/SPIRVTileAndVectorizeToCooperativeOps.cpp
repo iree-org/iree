@@ -19,15 +19,19 @@
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRV.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
@@ -52,7 +56,7 @@ namespace {
 /// Gets the chosen hardware cooperative op size attached to the given `op`
 /// as CodeGen lowering configuration.
 static SmallVector<int64_t> getTargetCooperativeOpSize(linalg::LinalgOp op) {
-  return getTileSizes(op, 1);  // For subgroup level tiling
+  return getTileSizes(op, 3);  // For native vector sizes
 }
 
 /// Deduces required subgroup counts along all workgroup tiled dimensions.
@@ -61,56 +65,38 @@ static SmallVector<int64_t> getTargetCooperativeOpSize(linalg::LinalgOp op) {
 /// tiling sizes for the workgroup and subgroup.
 static SmallVector<int64_t> deduceSubgroupCounts(linalg::LinalgOp op) {
   SmallVector<int64_t> workgroupTileSizes = getTileSizes(op, 0);
-  SmallVector<int64_t> subgroupCounts(workgroupTileSizes.size(), 1);
-
   SmallVector<int64_t> subgroupTileSizes = getTileSizes(op, 1);
-
   assert(workgroupTileSizes.size() == subgroupTileSizes.size());
-  for (int i = 0, e = subgroupTileSizes.size(); i < e; ++i) {
+
+  SmallVector<int64_t> subgroupCounts;
+  for (int i = 0, e = workgroupTileSizes.size(); i < e; ++i) {
+    if (subgroupTileSizes[i] == 0) continue;
+    if (linalg::isReductionIterator(op.getIteratorTypesArray()[i])) continue;
     assert(workgroupTileSizes[i] % subgroupTileSizes[i] == 0);
-    subgroupCounts[i] = workgroupTileSizes[i] / subgroupTileSizes[i];
+    subgroupCounts.push_back(workgroupTileSizes[i] / subgroupTileSizes[i]);
   }
+  LLVM_DEBUG({
+    llvm::dbgs() << "deduced subgroup counts (X, Y, Z) = [";
+    llvm::interleaveComma(subgroupCounts, llvm::dbgs());
+    llvm::dbgs() << "]\n";
+  });
   return subgroupCounts;
-}
-
-/// Computes subgroup IDs and counts for distribution.
-///
-/// GPU's subgroup ID builtin is a single number. We need to delinearize it to
-/// all workgroup tiled dimensions for distribution at the subgroup level.
-static SmallVector<linalg::ProcInfo, 2> getSubgroupIdsAndCounts(
-    OpBuilder &builder, Location loc, ArrayRef<int64_t> numSubgroups) {
-  Type indexType = builder.getIndexType();
-  Value subgroupId = builder.create<gpu::SubgroupIdOp>(loc, indexType);
-  SmallVector<linalg::ProcInfo, 2> procInfo(numSubgroups.size());
-
-  // subgroupID = id.z * count.y * count.x + id.y * count.x + id.x
-  for (size_t i = 0, e = numSubgroups.size(); i != e; ++i) {
-    Value nprocs = builder.create<arith::ConstantIndexOp>(loc, numSubgroups[i]);
-    AffineExpr d0 = getAffineDimExpr(0, builder.getContext());
-    AffineExpr s0 = getAffineSymbolExpr(0, builder.getContext());
-    Value procId =
-        makeComposedAffineApply(builder, loc, d0 % s0, {subgroupId, nprocs});
-    procInfo[e - i - 1] = linalg::ProcInfo{procId, nprocs};
-    subgroupId = builder.create<arith::DivSIOp>(loc, subgroupId, nprocs);
-  }
-  return procInfo;
 }
 
 /// Adds patterns to tile Linalg ops with workgroup markers to subgroups.
 static void populateTilingToSubgroupPatterns(ArrayRef<int64_t> subgroupCounts,
+                                             const unsigned subgroupSize,
                                              RewritePatternSet &patterns) {
   MLIRContext *context = patterns.getContext();
 
-  auto getSubgroupProcInfoFn = [subgroupCounts](
+  auto getSubgroupProcInfoFn = [subgroupCounts, subgroupSize](
                                    OpBuilder &builder, Location loc,
                                    ArrayRef<Range> parallelLoopRanges) {
     auto counts = llvm::to_vector<3>(subgroupCounts);
-    // Only consider parallel dimensions for tiling and distribution. Reduction
-    // dimension distribution needs synchronization. We'll use vector unroll
-    // later to "tile" along reduction dimensions.
-    unsigned size = std::min(parallelLoopRanges.size(), static_cast<size_t>(3));
-    counts.resize(size, 1);
-    return getSubgroupIdsAndCounts(builder, loc, counts);
+    // `getSubgroupIdsAndCounts` assumes we follow GPU (X, Y, Z) order.
+    std::reverse(counts.begin(), counts.end());
+    return getSubgroupIdsAndCounts(builder, loc, subgroupSize,
+                                   parallelLoopRanges.size(), counts);
   };
 
   linalg::LinalgLoopDistributionOptions distributionOptions;
@@ -128,16 +114,17 @@ static void populateTilingToSubgroupPatterns(ArrayRef<int64_t> subgroupCounts,
           return builder.create<arith::ConstantIndexOp>(op->getLoc(), v);
         }));
   };
-  auto tilingOptions =
-      linalg::LinalgTilingOptions()
-          .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
-          .setTileSizeComputationFunction(setTileSizesFn)
-          .setDistributionOptions(distributionOptions);
+  auto tilingOptions = linalg::LinalgTilingOptions()
+                           .setLoopType(linalg::LinalgTilingLoopType::Loops)
+                           .setTileSizeComputationFunction(setTileSizesFn)
+                           .setDistributionOptions(distributionOptions);
 
-  auto filter = IREE::LinalgExt::LinalgTransformationFilter(
-      ArrayRef<StringAttr>{}, StringAttr::get(context, getVectorizeMarker()));
-  TilingPatterns<linalg::FillOp, linalg::MatmulOp, linalg::GenericOp>::insert(
-      patterns, tilingOptions, filter);
+  IREE::LinalgExt::LinalgTransformationFilter filter(
+      {StringAttr::get(context, getWorkgroupKTiledMarker()),
+       StringAttr::get(context, getWorkgroupMemoryMarker())},
+      StringAttr::get(context, getVectorizeMarker()));
+  TilingPatterns<linalg::BatchMatmulOp, linalg::FillOp, linalg::MatmulOp,
+                 linalg::GenericOp>::insert(patterns, tilingOptions, filter);
 }
 
 //===----------------------------------------------------------------------===//
@@ -177,8 +164,14 @@ Optional<SmallVector<int64_t, 4>> getCooperativeOpVectorShape(
   if (auto writeOp = dyn_cast<vector::TransferWriteOp>(op)) {
     auto insert =
         writeOp.getVector().getDefiningOp<vector::InsertStridedSliceOp>();
-    if (!insert) return llvm::None;
-    return llvm::to_vector<4>(insert.getSourceVectorType().getShape());
+    if (insert) {
+      return llvm::to_vector<4>(insert.getSourceVectorType().getShape());
+    }
+
+    // There can exist vector.transfer_write for initializing output. Unroll
+    // them to native shape. Native shape is for ([B, ]M, N, K), here we only
+    // need ([B, ]M, N).
+    return llvm::to_vector<4>(nativeShape.drop_back());
   }
 
   if (auto readOp = dyn_cast<vector::TransferReadOp>(op)) {
@@ -281,29 +274,35 @@ class SPIRVTileAndVectorizeToCooperativeOpsPass final
     // decided earlier and attached to a linalg op as an attribute.
 
     linalg::LinalgOp rootOp;
-    funcOp.walk([&](linalg::ContractionOpInterface contractOp) {
-      if (getLoweringConfig(contractOp)) {
-        rootOp = cast<linalg::LinalgOp>(contractOp.getOperation());
+    funcOp.walk([&](linalg::LinalgOp linalgOp) {
+      if (isMatmulOrBatchMatmul(linalgOp) && getLoweringConfig(linalgOp)) {
+        rootOp = linalgOp;
         return WalkResult::interrupt();
       }
       return WalkResult::advance();
     });
-
     if (!rootOp) {
-      funcOp.emitError(
-          "expected a linalg::ContractionOpInterface op with "
-          "lowering_config attribute");
+      funcOp.emitError("expected lowering confg on a (batch) matmul op");
       return signalPassFailure();
     }
 
-    auto cooperativeOpSize = getTargetCooperativeOpSize(rootOp);
-    auto subgroupCounts = deduceSubgroupCounts(rootOp);
+    SmallVector<int64_t> cooperativeOpSize = getTargetCooperativeOpSize(rootOp);
+    SmallVector<int64_t> subgroupCounts = deduceSubgroupCounts(rootOp);
 
     // Then tile and distribute to subgroups.
 
     {
+      unsigned subgroupSize = 0;
+      if (spirv::TargetEnvAttr attr = getSPIRVTargetEnvAttr(rootOp)) {
+        subgroupSize = attr.getResourceLimits().getSubgroupSize();
+      }
+      if (!subgroupSize) {
+        funcOp.emitError("expected !spirv.target_env for subgroup size");
+        return signalPassFailure();
+      }
       RewritePatternSet subgroupTilingPatterns(context);
-      populateTilingToSubgroupPatterns(subgroupCounts, subgroupTilingPatterns);
+      populateTilingToSubgroupPatterns(subgroupCounts, subgroupSize,
+                                       subgroupTilingPatterns);
       if (failed(applyPatternsAndFoldGreedily(
               funcOp, std::move(subgroupTilingPatterns)))) {
         return signalPassFailure();

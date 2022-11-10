@@ -77,8 +77,7 @@ static int iree_runtime_demo_main(void) {
   // all of the sessions it has. The instance is thread-safe, while the
   // sessions are only thread-compatible (you need to lock if its required).
   iree_runtime_instance_options_t instance_options;
-  iree_runtime_instance_options_initialize(IREE_API_VERSION_LATEST,
-                                           &instance_options);
+  iree_runtime_instance_options_initialize(&instance_options);
   iree_runtime_instance_options_use_all_available_drivers(&instance_options);
   iree_runtime_instance_t* instance = NULL;
   iree_status_t status = iree_runtime_instance_create(

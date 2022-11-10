@@ -55,8 +55,8 @@ iree_status_t create_device_with_static_loader(iree_allocator_t host_allocator,
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_task_device_create(
-        identifier, &params, executor, /*loader_count=*/1, &library_loader,
-        device_allocator, host_allocator, out_device);
+        identifier, &params, /*queue_count=*/1, &executor, /*loader_count=*/1,
+        &library_loader, device_allocator, host_allocator, out_device);
   }
 
   iree_hal_allocator_release(device_allocator);

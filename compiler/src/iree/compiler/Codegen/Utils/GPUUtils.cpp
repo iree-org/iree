@@ -12,9 +12,14 @@
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/Matchers.h"
+#include "mlir/Transforms/SideEffectUtils.h"
 
 namespace mlir {
 namespace iree_compiler {
+
+//===----------------------------------------------------------------------===//
+// GPU processor IDs and sizes
+//===----------------------------------------------------------------------===//
 
 llvm::SmallVector<mlir::linalg::ProcInfo, 2> getGPUThreadIdsAndCounts(
     mlir::OpBuilder &builder, mlir::Location loc, unsigned numDims,
@@ -35,8 +40,8 @@ llvm::SmallVector<mlir::linalg::ProcInfo, 2> getGPUThreadIdsAndCounts(
 }
 
 llvm::SmallVector<mlir::linalg::ProcInfo, 2> getSubgroupIdsAndCounts(
-    mlir::OpBuilder &builder, mlir::Location loc, unsigned numDims,
-    llvm::ArrayRef<int64_t> numSubgroups) {
+    mlir::OpBuilder &builder, mlir::Location loc, unsigned warpSize,
+    unsigned numDims, llvm::ArrayRef<int64_t> numSubgroups) {
   assert(numDims <= kNumGPUDims);
   llvm::SmallVector<mlir::linalg::ProcInfo, 2> procInfo(numDims);
   std::array<gpu::Dimension, kNumGPUDims> dimAttr{
@@ -48,7 +53,7 @@ llvm::SmallVector<mlir::linalg::ProcInfo, 2> getSubgroupIdsAndCounts(
     if (i == 0) {
       mlir::AffineExpr d0 = builder.getAffineDimExpr(0);
       subgroupId = mlir::makeComposedAffineApply(
-          builder, loc, d0.floorDiv(builder.getAffineConstantExpr(kWarpSize)),
+          builder, loc, d0.floorDiv(builder.getAffineConstantExpr(warpSize)),
           {subgroupId});
     }
     procInfo[numDims - 1 - i] = {
@@ -74,6 +79,10 @@ std::array<int64_t, 3> getWorkgroupSize(mlir::func::FuncOp funcOp) {
   return workgroupSize;
 }
 
+//===----------------------------------------------------------------------===//
+// GPU vectorization
+//===----------------------------------------------------------------------===//
+
 bool canPerformVectorAccessUsingAllThreads(ArrayRef<int64_t> shape,
                                            int64_t threadCount,
                                            int64_t vectorSize) {
@@ -97,6 +106,10 @@ bool canPerformVectorAccessUsingAllThreads(ArrayRef<int64_t> shape,
   }
   return threadsAvailable == 1;
 }
+
+//===----------------------------------------------------------------------===//
+// GPU workgroup memory
+//===----------------------------------------------------------------------===//
 
 Optional<Value> allocateWorkgroupMemory(OpBuilder &builder,
                                         memref::SubViewOp subview,
@@ -125,6 +138,119 @@ Optional<Value> allocateWorkgroupMemory(OpBuilder &builder,
 
 LogicalResult deallocateWorkgroupMemory(OpBuilder &, Value /*buffer*/) {
   return success();
+}
+
+LogicalResult copyToWorkgroupMemory(OpBuilder &b, Value src, Value dst) {
+  Operation *copyOp = b.create<memref::CopyOp>(src.getLoc(), src, dst);
+  setMarker(copyOp, getCopyToWorkgroupMemoryMarker());
+  return success();
+}
+
+static bool propagateCopyDestIntoProducerFill(memref::CopyOp copyOp) {
+  // Look for a fill Op writing into the copyOp source.
+  Operation *prevOp = copyOp->getPrevNode();
+  while (prevOp) {
+    if (isMemoryEffectFree(prevOp)) {
+      prevOp = prevOp->getPrevNode();
+      continue;
+    }
+
+    auto fillOp = dyn_cast<linalg::FillOp>(prevOp);
+    if (!fillOp) break;
+    if (fillOp.output() != copyOp.getSource()) break;
+    // Move the fillOp and change the destination to the copy destination.
+    fillOp->moveBefore(copyOp);
+    fillOp.getOutputsMutable().assign(copyOp.getTarget());
+    return true;
+  }
+  return false;
+}
+
+// Split input/output operand from copy from shared memory into a separate
+// input.
+static void insertInputValueIntoGeneric(Value source, linalg::GenericOp op) {
+  SmallVector<Value> newOperands;
+  SmallVector<AffineMap> maps;
+  for (OpOperand *in : op.getDpsInputOperands()) {
+    newOperands.push_back(in->get());
+    maps.push_back(op.getMatchingIndexingMap(in));
+  }
+  newOperands.push_back(source);
+  assert(op.getNumDpsInits() == 1);
+  OpOperand *outOperand = op.getDpsInitOperand(0);
+  maps.push_back(op.getMatchingIndexingMap(outOperand));
+  maps.push_back(op.getMatchingIndexingMap(outOperand));
+  Location loc = op.getLoc();
+  SmallVector<StringRef> iterTypes(op.getNumLoops(),
+                                   getParallelIteratorTypeName());
+  OpBuilder builder(op);
+  auto newOp = builder.create<linalg::GenericOp>(
+      loc, newOperands, outOperand->get(), maps, iterTypes);
+  newOp.getRegion().getBlocks().splice(newOp.getRegion().begin(),
+                                       op.getRegion().getBlocks());
+
+  Block &payload = newOp.getRegion().front();
+  payload.addArgument(payload.getArguments().back().getType(), loc);
+  setMarker(newOp, getCopyToWorkgroupMemoryMarker());
+}
+
+/// Propagate the shared memory copy into the consumer op if it's a fully
+/// parallel linalg.generic.
+static bool propagateCopySourceIntoConsumerGeneric(
+    memref::CopyOp copyOp, SmallVector<Operation *> &toDelete) {
+  // Look for a generic Op reading the copyOp target.
+  Operation *nextOp = copyOp->getNextNode();
+  while (nextOp) {
+    if (isMemoryEffectFree(nextOp)) {
+      nextOp = nextOp->getNextNode();
+      continue;
+    }
+    auto consumer = dyn_cast<linalg::GenericOp>(nextOp);
+    if (!consumer || consumer.getNumDpsInits() != 1 ||
+        !consumer.getMatchingIndexingMap(consumer.getDpsInitOperand(0))
+             .isIdentity())
+      break;
+    if (*consumer.getOutputs().begin() != copyOp.getTarget()) break;
+    insertInputValueIntoGeneric(copyOp.getSource(), consumer);
+    toDelete.push_back(consumer);
+    return true;
+  }
+  return false;
+}
+
+/// This is needed because we are doing promotion to shared memory on buffers.
+/// This is a fragile and temporary solution until we move to be able to do this
+/// kind of transformations on tensors.
+void propagateSharedMemoryCopy(func::FuncOp funcOp) {
+  SmallVector<Operation *> toDelete;
+  funcOp.walk([&toDelete](memref::CopyOp copyOp) {
+    if (hasMarker(copyOp, getCopyToWorkgroupMemoryMarker())) {
+      if (propagateCopyDestIntoProducerFill(copyOp) ||
+          propagateCopySourceIntoConsumerGeneric(copyOp, toDelete))
+        toDelete.push_back(copyOp.getOperation());
+    }
+  });
+  for (Operation *op : toDelete) op->erase();
+}
+
+void insertBarriersAroundSharedMemoryCopy(func::FuncOp funcOp) {
+  OpBuilder builder(funcOp.getContext());
+  // Insert barriers before and after copies to workgroup memory and skip
+  // insert barriers between back to back copy to workgroup memory.
+  funcOp.walk([&builder](Operation *copyOp) {
+    if (hasMarker(copyOp, getCopyToWorkgroupMemoryMarker())) {
+      Operation *prevOp = copyOp->getPrevNode();
+      if (!prevOp || !hasMarker(prevOp, getCopyToWorkgroupMemoryMarker())) {
+        builder.setInsertionPoint(copyOp);
+        builder.create<gpu::BarrierOp>(copyOp->getLoc());
+      }
+      Operation *nextOp = copyOp->getNextNode();
+      if (!nextOp || !hasMarker(nextOp, getCopyToWorkgroupMemoryMarker())) {
+        builder.setInsertionPointAfter(copyOp);
+        builder.create<gpu::BarrierOp>(copyOp->getLoc());
+      }
+    }
+  });
 }
 
 }  // namespace iree_compiler
