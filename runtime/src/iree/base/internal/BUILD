@@ -164,7 +164,6 @@ iree_runtime_cc_library(
     deps = [
         ":file_io",
         ":internal",
-        "//runtime/src/iree/base",
         "//runtime/src/iree/base:target_platform",
         "//runtime/src/iree/base:tracing",
     ],
