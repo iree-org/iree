@@ -70,7 +70,7 @@ def main(args):
       for asset in release["assets"]:
         url = html.escape(asset['browser_download_url'])
         name = html.escape(asset['name'])
-        f.write(f"    <a href={url}>{name}</a>\n")
+        f.write(f"    <a href={url}>{name}</a><br />\n")
     f.write(textwrap.dedent("""\
       </body>
     </html>
