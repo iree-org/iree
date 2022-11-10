@@ -169,7 +169,6 @@ def serializable(cls=None,
   """Decorator to make a dataclass serializable.
   
   Args:
-    keyed_obj: is 
     type_key: string defines the object type and indeicates that the class is a
       keyed object, which is unique per id and will only have one copy in the
       serialization per id.
@@ -181,7 +180,7 @@ def serializable(cls=None,
     class A(object):
       ...
 
-    @serialzable(keyed_obj=True, type_key="obj_b")
+    @serialzable(type_key="obj_b")
     @dataclass
     class B(object):
       id: str
@@ -240,7 +239,8 @@ def serializable(cls=None,
     setattr(cls, DESERIALIZE_FUNC_NAME, deserialize)
     return cls
 
-  # Trick to allow the decoration with `@serializable(...)`.
+  # Trick to allow the decoration with `@serializable(...)`. In that case,
+  # `serializable` is called without cls and should return a decorator.
   if cls is None:
     return wrap
   return wrap(cls)
