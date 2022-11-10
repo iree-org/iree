@@ -7,9 +7,9 @@
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
-#include "llvm/Support/Debug.h"
 
 #define DEBUG_TYPE "iree-spirv-verifier"
 
