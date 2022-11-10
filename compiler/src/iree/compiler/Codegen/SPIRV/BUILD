@@ -36,6 +36,7 @@ iree_compiler_cc_library(
         "SPIRVVectorize.cpp",
         "SPIRVVectorizeLoadStore.cpp",
         "Utils.cpp",
+        "Verifiers.cpp",
     ],
     hdrs = [
         "KernelConfig.h",

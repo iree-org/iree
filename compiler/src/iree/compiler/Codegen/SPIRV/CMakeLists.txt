@@ -38,6 +38,7 @@ iree_cc_library(
     "SPIRVVectorize.cpp"
     "SPIRVVectorizeLoadStore.cpp"
     "Utils.cpp"
+    "Verifiers.cpp"
   DEPS
     IREELinalgExtDialect
     IREELinalgExtPasses

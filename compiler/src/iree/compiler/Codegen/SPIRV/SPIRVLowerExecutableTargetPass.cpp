@@ -60,6 +60,52 @@ class SPIRVLowerExecutableTargetPass
 };
 }  // namespace
 
+/// Verify that valid configuration is set for all ops within the compiled
+/// module.
+template <typename F>
+static LogicalResult verifyLoweringConfiguration(
+    ModuleOp module, IREE::Codegen::TranslationInfoAttr translationInfo,
+    ArrayRef<int64_t> workgroupSize, F verificationFn) {
+  auto walkResult = module.walk([&](Operation *op) -> WalkResult {
+    IREE::Codegen::LoweringConfigAttr loweringConfig = getLoweringConfig(op);
+    if (!loweringConfig) return WalkResult::advance();
+    return verificationFn(op, loweringConfig, translationInfo, workgroupSize);
+  });
+  return failure(walkResult.wasInterrupted());
+}
+
+static LogicalResult verifyEntryPoint(
+    ModuleOp moduleOp, IREE::Codegen::TranslationInfoAttr translationInfo,
+    IREE::HAL::ExecutableExportOp exportOp) {
+  Optional<mlir::ArrayAttr> workgroupSizeAttr = exportOp.getWorkgroupSize();
+
+  if (workgroupSizeAttr->size() != 3) {
+    return moduleOp.emitError(
+        "expected workgroup size to have three dimensions for SPIR-V "
+        "pipelines");
+  }
+
+  std::array<int64_t, 3> workgroupSizes;
+  for (auto it : llvm::enumerate(workgroupSizeAttr.value())) {
+    workgroupSizes[it.index()] = it.value().cast<IntegerAttr>().getInt();
+  }
+
+  switch (translationInfo.getDispatchLoweringPassPipeline()) {
+    case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVBaseVectorize:
+      return verifyLoweringConfiguration(moduleOp, translationInfo,
+                                         workgroupSizes,
+                                         verifySPIRVBaseVectorizePassPipeline);
+    case IREE::Codegen::DispatchLoweringPassPipeline::
+        SPIRVMatmulPromoteVectorize:
+      return verifyLoweringConfiguration(
+          moduleOp, translationInfo, workgroupSizes,
+          verifySPIRVMatmulPromoteVectorizePassPipeline);
+      break;
+    default:;
+  }
+  return success();
+}
+
 void SPIRVLowerExecutableTargetPass::runOnOperation() {
   IREE::HAL::ExecutableVariantOp variantOp = getOperation();
   ModuleOp moduleOp = variantOp.getInnerModule();
@@ -93,6 +139,11 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
         continue;
       }
       passPipeline = currPipeline;
+      // Verify the properties of each entry point based on the target
+      // pipeline.
+      if (failed(verifyEntryPoint(moduleOp, translationInfo, exportOp))) {
+        return signalPassFailure();
+      }
     }
   }
 
