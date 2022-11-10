@@ -10,8 +10,7 @@ from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework.device_specs import device_collections
 from e2e_test_framework.models import tflite_models
-from benchmark_suites.iree import module_execution_configs
-import benchmark_suites.iree.utils
+from benchmark_suites.iree import benchmark_run_config, module_execution_configs
 
 
 class Android_ARMv8_A_Benchmarks(object):
@@ -57,7 +56,7 @@ class Android_ARMv8_A_Benchmarks(object):
   def generate(
       self
   ) -> Tuple[List[iree_definitions.ModuleGenerationConfig],
-             List[iree_definitions.E2EModelRunConfig]]:
+             List[benchmark_run_config.BenchmarkRunConfig]]:
     """Generates IREE compile and run configs."""
 
     local_sync_execution_configs = [
@@ -93,16 +92,16 @@ class Android_ARMv8_A_Benchmarks(object):
         architecture=common_definitions.DeviceArchitecture.ARMV8_2_A_GENERIC,
         platform=common_definitions.DevicePlatform.GENERIC_ANDROID,
         device_parameters={"big-cores"})
-    run_configs = benchmark_suites.iree.utils.generate_e2e_model_run_configs(
+    run_configs = benchmark_run_config.generate_e2e_model_run_configs(
         module_generation_configs=default_gen_confings,
         module_execution_configs=local_sync_execution_configs +
         local_task_execution_configs,
         device_specs=all_devices)
-    run_configs += benchmark_suites.iree.utils.generate_e2e_model_run_configs(
+    run_configs += benchmark_run_config.generate_e2e_model_run_configs(
         module_generation_configs=experimental_gen_confings,
         module_execution_configs=local_sync_execution_configs,
         device_specs=all_devices)
-    run_configs += benchmark_suites.iree.utils.generate_e2e_model_run_configs(
+    run_configs += benchmark_run_config.generate_e2e_model_run_configs(
         module_generation_configs=experimental_gen_confings,
         module_execution_configs=local_task_execution_configs,
         device_specs=big_cores_devices)

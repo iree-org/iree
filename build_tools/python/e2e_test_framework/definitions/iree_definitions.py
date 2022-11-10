@@ -116,5 +116,4 @@ class E2EModelRunConfig(object):
   """Describes an e2e run."""
   module_generation_config: ModuleGenerationConfig
   module_execution_config: ModuleExecutionConfig
-  target_device_spec: common_definitions.DeviceSpec
   input_data: common_definitions.ModelInputData

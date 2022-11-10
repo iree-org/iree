@@ -10,8 +10,7 @@ from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework.models import tflite_models
 from e2e_test_framework.device_specs import device_collections
-from benchmark_suites.iree import module_execution_configs
-import benchmark_suites.iree.utils
+from benchmark_suites.iree import benchmark_run_config, module_execution_configs
 
 
 class Android_Mali_Benchmarks(object):
@@ -60,7 +59,7 @@ class Android_Mali_Benchmarks(object):
   def generate(
       self
   ) -> Tuple[List[iree_definitions.ModuleGenerationConfig],
-             List[iree_definitions.E2EModelRunConfig]]:
+             List[benchmark_run_config.BenchmarkRunConfig]]:
     default_gen_configs = self._get_module_generation_configs(
         compile_config=self.DEFAULT_COMPILE_CONFIG,
         fp32_models=self.FP32_MODELS,
@@ -77,12 +76,12 @@ class Android_Mali_Benchmarks(object):
     mali_devices = device_collections.DEFAULT_DEVICE_COLLECTION.query_device_specs(
         architecture=common_definitions.DeviceArchitecture.MALI_VALHALL,
         platform=common_definitions.DevicePlatform.GENERIC_ANDROID)
-    run_configs = benchmark_suites.iree.utils.generate_e2e_model_run_configs(
+    run_configs = benchmark_run_config.generate_e2e_model_run_configs(
         module_generation_configs=default_gen_configs +
         fuse_padding_gen_configs,
         module_execution_configs=[module_execution_configs.VULKAN_CONFIG],
         device_specs=mali_devices)
-    run_configs += benchmark_suites.iree.utils.generate_e2e_model_run_configs(
+    run_configs += benchmark_run_config.generate_e2e_model_run_configs(
         module_generation_configs=fuse_padding_repeated_kernel_gen_configs,
         module_execution_configs=[
             module_execution_configs.VULKAN_BATCH_SIZE_32_CONFIG

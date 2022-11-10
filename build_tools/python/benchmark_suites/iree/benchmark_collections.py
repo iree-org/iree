@@ -10,12 +10,12 @@ from e2e_test_framework.definitions import iree_definitions
 from benchmark_suites.iree import (riscv_benchmarks, x86_64_benchmarks,
                                    adreno_benchmarks, armv8_a_benchmarks,
                                    cuda_benchmarks, mali_benchmarks,
-                                   vmvx_benchmarks)
+                                   vmvx_benchmarks, benchmark_run_config)
 
 
 def generate_benchmarks(
 ) -> Tuple[List[iree_definitions.ModuleGenerationConfig],
-           List[iree_definitions.E2EModelRunConfig]]:
+           List[benchmark_run_config.BenchmarkRunConfig]]:
   benchmarks = [
       x86_64_benchmarks.Linux_x86_64_Benchmarks(),
       cuda_benchmarks.Linux_CUDA_Benchmarks(),

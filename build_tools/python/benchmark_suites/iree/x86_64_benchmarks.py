@@ -10,8 +10,7 @@ from e2e_test_framework.device_specs import device_collections
 from e2e_test_framework.models import model_groups
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework import unique_ids
-from benchmark_suites.iree import module_execution_configs
-import benchmark_suites.iree.utils
+from benchmark_suites.iree import benchmark_run_config, module_execution_configs
 
 
 class Linux_x86_64_Benchmarks(object):
@@ -36,7 +35,7 @@ class Linux_x86_64_Benchmarks(object):
   def generate(
       self
   ) -> Tuple[List[iree_definitions.ModuleGenerationConfig],
-             List[iree_definitions.E2EModelRunConfig]]:
+             List[benchmark_run_config.BenchmarkRunConfig]]:
     """Generates IREE compile and run configs."""
 
     gen_configs = [
@@ -60,15 +59,9 @@ class Linux_x86_64_Benchmarks(object):
     cascadelake_devices = device_collections.DEFAULT_DEVICE_COLLECTION.query_device_specs(
         architecture=common_definitions.DeviceArchitecture.X86_64_CASCADELAKE,
         platform=common_definitions.DevicePlatform.GENERIC_LINUX)
-    run_configs = benchmark_suites.iree.utils.generate_e2e_model_run_configs(
+    run_configs = benchmark_run_config.generate_e2e_model_run_configs(
         module_generation_configs=gen_configs,
         module_execution_configs=default_execution_configs,
         device_specs=cascadelake_devices)
 
     return (gen_configs, run_configs)
-
-
-def generate() -> Tuple[List[iree_definitions.ModuleGenerationConfig],
-                        List[iree_definitions.E2EModelRunConfig]]:
-  """Generates all compile and run configs for IREE benchmarks."""
-  return Linux_x86_64_Benchmarks().generate()

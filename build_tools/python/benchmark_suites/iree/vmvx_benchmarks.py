@@ -10,8 +10,7 @@ from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework.device_specs import device_collections
 from e2e_test_framework.models import tflite_models
-import benchmark_suites.iree.module_execution_configs
-import benchmark_suites.iree.utils
+from benchmark_suites.iree import benchmark_run_config, module_execution_configs
 
 
 class Android_VMVX_Benchmarks(object):
@@ -29,7 +28,7 @@ class Android_VMVX_Benchmarks(object):
   def generate(
       self
   ) -> Tuple[List[iree_definitions.ModuleGenerationConfig],
-             List[iree_definitions.E2EModelRunConfig]]:
+             List[benchmark_run_config.BenchmarkRunConfig]]:
     """Generates IREE compile and run configs."""
 
     gen_configs = [
@@ -39,14 +38,13 @@ class Android_VMVX_Benchmarks(object):
         model in [tflite_models.MOBILENET_V2, tflite_models.MOBILENET_V3SMALL]
     ]
     default_execution_configs = [
-        benchmark_suites.iree.module_execution_configs.
-        get_vmvx_local_task_config(thread_num=4)
+        module_execution_configs.get_vmvx_local_task_config(thread_num=4)
     ]
     big_cores_devices = device_collections.DEFAULT_DEVICE_COLLECTION.query_device_specs(
         architecture=common_definitions.DeviceArchitecture.ARMV8_2_A_GENERIC,
         platform=common_definitions.DevicePlatform.GENERIC_ANDROID,
         device_parameters={"big-cores"})
-    run_configs = benchmark_suites.iree.utils.generate_e2e_model_run_configs(
+    run_configs = benchmark_run_config.generate_e2e_model_run_configs(
         module_generation_configs=gen_configs,
         module_execution_configs=default_execution_configs,
         device_specs=big_cores_devices)
