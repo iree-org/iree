@@ -703,6 +703,8 @@ void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager) {
       createVerifyLinalgTransformLegalityPass());
   passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(
       createTypePropagationPass());
+  passManager.nest<ModuleOp>().addNestedPass<func::FuncOp>(
+      createIREEMaterializeEncodingPass());
   passManager.addNestedPass<ModuleOp>(createBufferizeCopyOnlyDispatchesPass());
 
   passManager.addPass(createLLVMCPULowerExecutableTargetPass());

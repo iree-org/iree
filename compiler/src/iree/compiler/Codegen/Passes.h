@@ -183,6 +183,11 @@ createFuseTensorPadWithConsumerPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createConcretizePadResultShapePass();
 
+/// Materialize the encoding of operations. The layout to use for the encoded
+/// operations are backend specific.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createIREEMaterializeEncodingPass();
+
 //----------------------------------------------------------------------------//
 // Common codegen patterns.
 //----------------------------------------------------------------------------//
