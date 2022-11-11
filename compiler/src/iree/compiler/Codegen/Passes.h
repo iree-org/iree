@@ -138,6 +138,10 @@ std::unique_ptr<OperationPass<func::FuncOp>> createMemrefCopyToLinalgPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createGPUDistributeSharedMemoryCopy();
 
+/// Apply multi-buffering transformation.
+std::unique_ptr<OperationPass<func::FuncOp>> createGPUMultiBuffering(
+    unsigned numBuffers = 5);
+
 /// Apply software pipelining.
 std::unique_ptr<OperationPass<func::FuncOp>> createGPUPipeliningPass(
     bool epiloguePeeling = true, unsigned depth = 1);
@@ -428,10 +432,6 @@ createLLVMGPUTensorCoreVectorizationPass();
 /// Lower vector ops before convertion to LLVM.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorLoweringPass();
 
-/// Apply multi-buffering transformation.
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUMultiBuffering(
-    unsigned numBuffers = 5);
-
 /// Apply transformation to reduce the number of bank conflicts when accessing
 /// shared memory by padding fastest moving dimension with the specified size.
 std::unique_ptr<OperationPass<func::FuncOp>>
@@ -454,6 +454,10 @@ void addSPIRVBaseDistributePassPipeline(OpPassManager &pm);
 /// Pass pipeline to lower IREE HAL executables by tiling and distributing to
 /// workgroups and invocations and vectorizing. Each invocation handles a
 /// vector.
+LogicalResult verifySPIRVBaseVectorizePassPipeline(
+    Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
+    IREE::Codegen::TranslationInfoAttr translationInfo,
+    ArrayRef<int64_t> workgroupSize);
 void addSPIRVBaseVectorizePassPipeline(OpPassManager &pm);
 
 /// Pass pipeline to lower IREE HAL executables by tiling and distributing
@@ -465,7 +469,12 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm);
 /// workgroups, promoting to use workgroup memory, and then tiling and
 /// distributing to invocations and vectorizing. Each invocation handles a
 /// vector.
-void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm);
+LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
+    Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
+    IREE::Codegen::TranslationInfoAttr translationInfo,
+    ArrayRef<int64_t> workgroupSize);
+void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm,
+                                                unsigned pipelineDepth);
 
 /// Pass pipeline to lower IREE HAL executables by tiling and distributing
 /// reduction to workgroups and then subgroups.
@@ -520,6 +529,10 @@ std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVVectorizePass();
 /// allow to convert memory accesses to vector load/store in SPIR-V without
 /// having pointer bitcast.
 std::unique_ptr<OperationPass<ModuleOp>> createSPIRVVectorizeLoadStore();
+
+/// Breaks down large vectors not natively supported by SPIR-V.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createSPIRVBreakDownLargeVectorPass();
 
 // Uses `tensor.pad` ops as anchors to create separate fast and slow paths
 // inside the kernel. The fast path is for inner tiles where we don't need

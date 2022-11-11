@@ -60,6 +60,52 @@ class SPIRVLowerExecutableTargetPass
 };
 }  // namespace
 
+/// Verify that valid configuration is set for all ops within the compiled
+/// module.
+template <typename F>
+static LogicalResult verifyLoweringConfiguration(
+    ModuleOp module, IREE::Codegen::TranslationInfoAttr translationInfo,
+    ArrayRef<int64_t> workgroupSize, F verificationFn) {
+  auto walkResult = module.walk([&](Operation *op) -> WalkResult {
+    IREE::Codegen::LoweringConfigAttr loweringConfig = getLoweringConfig(op);
+    if (!loweringConfig) return WalkResult::advance();
+    return verificationFn(op, loweringConfig, translationInfo, workgroupSize);
+  });
+  return failure(walkResult.wasInterrupted());
+}
+
+static LogicalResult verifyEntryPoint(
+    ModuleOp moduleOp, IREE::Codegen::TranslationInfoAttr translationInfo,
+    IREE::HAL::ExecutableExportOp exportOp) {
+  Optional<mlir::ArrayAttr> workgroupSizeAttr = exportOp.getWorkgroupSize();
+
+  if (workgroupSizeAttr->size() != 3) {
+    return moduleOp.emitError(
+        "expected workgroup size to have three dimensions for SPIR-V "
+        "pipelines");
+  }
+
+  std::array<int64_t, 3> workgroupSizes;
+  for (auto it : llvm::enumerate(workgroupSizeAttr.value())) {
+    workgroupSizes[it.index()] = it.value().cast<IntegerAttr>().getInt();
+  }
+
+  switch (translationInfo.getDispatchLoweringPassPipeline()) {
+    case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVBaseVectorize:
+      return verifyLoweringConfiguration(moduleOp, translationInfo,
+                                         workgroupSizes,
+                                         verifySPIRVBaseVectorizePassPipeline);
+    case IREE::Codegen::DispatchLoweringPassPipeline::
+        SPIRVMatmulPromoteVectorize:
+      return verifyLoweringConfiguration(
+          moduleOp, translationInfo, workgroupSizes,
+          verifySPIRVMatmulPromoteVectorizePassPipeline);
+      break;
+    default:;
+  }
+  return success();
+}
+
 void SPIRVLowerExecutableTargetPass::runOnOperation() {
   IREE::HAL::ExecutableVariantOp variantOp = getOperation();
   ModuleOp moduleOp = variantOp.getInnerModule();
@@ -76,28 +122,33 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
   // is fine.
   llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
       getAllEntryPoints(moduleOp);
-  Optional<IREE::Codegen::DispatchLoweringPassPipeline> passPipeline;
+  Optional<IREE::Codegen::TranslationInfoAttr> translationInfo;
   for (auto &it : exportOps) {
     auto exportOp = it.second;
-    if (IREE::Codegen::TranslationInfoAttr translationInfo =
+    if (IREE::Codegen::TranslationInfoAttr currTranslationInfo =
             getTranslationInfo(exportOp)) {
-      IREE::Codegen::DispatchLoweringPassPipeline currPipeline =
-          translationInfo.getDispatchLoweringPassPipeline();
-      if (passPipeline) {
-        if (currPipeline != passPipeline.value()) {
+      if (translationInfo) {
+        if (currTranslationInfo != translationInfo.value()) {
           moduleOp.emitError(
               "unhandled compilation of entry point function with different "
-              "pass pipelines within a module");
+              "translation info within a module");
           return signalPassFailure();
         }
         continue;
       }
-      passPipeline = currPipeline;
+
+      // Verify the properties of each entry point based on the target
+      // pipeline.
+      if (failed(verifyEntryPoint(moduleOp, currTranslationInfo, exportOp))) {
+        return signalPassFailure();
+      }
+
+      translationInfo = currTranslationInfo;
     }
   }
 
-  if (!testLoweringConfiguration && passPipeline.has_value()) {
-    switch (*passPipeline) {
+  if (!testLoweringConfiguration && translationInfo.has_value()) {
+    switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
       case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVBaseDistribute:
         addSPIRVBaseDistributePassPipeline(pipeline);
         break;
@@ -110,7 +161,8 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
         break;
       case IREE::Codegen::DispatchLoweringPassPipeline::
           SPIRVMatmulPromoteVectorize:
-        addSPIRVMatmulPromoteVectorizePassPipeline(pipeline);
+        addSPIRVMatmulPromoteVectorizePassPipeline(
+            pipeline, translationInfo.value().getSoftwarePipelineDepth());
         break;
       case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVSubgroupReduce:
         addSPIRVSubgroupReducePassPipeline(pipeline);

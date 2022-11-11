@@ -164,6 +164,12 @@ def GPUReduceBankConflicts :
   let constructor = "mlir::iree_compiler::createGPUReduceSharedMemoryBankConflicts()";
 }
 
+def GPUMultiBuffering :
+    Pass<"iree-gpu-multi-buffering", "func::FuncOp"> {
+  let summary = "Pass to do multi buffering.";
+  let constructor = "mlir::iree_compiler::createGPUMultiBuffering()";
+}
+
 def GPUPipelining : Pass<"iree-gpu-pipelining", "func::FuncOp"> {
   let summary = "Pass to do software pipelining.";
   let constructor = "mlir::iree_compiler::createGPUPipeliningPass()";
@@ -409,12 +415,6 @@ def LLVMGPUVectorLowering :
   let constructor = "mlir::iree_compiler::createLLVMGPUVectorLoweringPass()";
 }
 
-def LLVMGPUMultiBuffering :
-    Pass<"iree-llvmgpu-multi-buffering", "func::FuncOp"> {
-  let summary = "Pass to do multi buffering.";
-  let constructor = "mlir::iree_compiler::createLLVMGPUMultiBuffering()";
-}
-
 def LLVMGPUVectorToGPU :
     Pass<"iree-llvmgpu-vector-to-gpu", "func::FuncOp"> {
   let summary = "Pass to convert vector to gpu.";
@@ -498,6 +498,12 @@ def SPIRVVectorizeLoadStore :
     Pass<"iree-spirv-vectorize-load-store", "ModuleOp"> {
   let summary = "Vectorize load/store of memrefs for better memory access";
   let constructor = "mlir::iree_compiler::createSPIRVVectorizeLoadStore()";
+}
+
+def SPIRVBreakDownLargeVector : Pass<"iree-spirv-breakdown-large-vector",
+                                     "func::FuncOp"> {
+  let summary = "Break down vectors not natively supported by SPIR-V";
+  let constructor = "mlir::iree_compiler::createSPIRVBreakDownLargeVectorPass()";
 }
 
 def SPIRVCreateFastSlowPath :
