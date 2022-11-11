@@ -38,6 +38,10 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
     # TODO(pzread): Taskset should be derived from CPU topology.
     # Only use the low 8 cores.
     taskset = "0xFF"
+    
+    # TODO(#11076): Support run_config.
+    if benchmark_case.benchmark_case_dir is None:
+      raise ValueError("benchmark_case_dir can't be None.")
 
     run_flags = self.__parse_flagfile(benchmark_case.benchmark_case_dir)
     # Replace the CUDA device flag with the specified GPU.

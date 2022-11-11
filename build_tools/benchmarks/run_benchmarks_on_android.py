@@ -192,6 +192,10 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
                          benchmark_results_filename: Optional[str],
                          capture_filename: Optional[str]) -> None:
     benchmark_case_dir = benchmark_case.benchmark_case_dir
+    # TODO(#11076): Support run_config.
+    if benchmark_case_dir is None:
+      raise ValueError("benchmark_case_dir can't be None.")
+
     android_case_dir = os.path.relpath(benchmark_case_dir,
                                        self.config.root_benchmark_dir)
 
