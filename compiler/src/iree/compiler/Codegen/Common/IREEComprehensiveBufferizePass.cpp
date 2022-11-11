@@ -4,54 +4,32 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-//===- IREEComprehensiveBufferizePass.cpp - -------------------------===//
+//===- IREEComprehensiveBufferizePass.cpp - -------------------------------===//
 //
-// Wrapper pass to use MLIRs ComprehensiveBufferization pass.
+// Wrapper pass to use MLIR's One-Shot Bufferize pass.
 //
 //===----------------------------------------------------------------------===//
-#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree/compiler/Codegen/Common/BufferizationAnalysis.h"
+
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
-#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
-#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
-#include "llvm/ADT/EquivalenceClasses.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/ScopeExit.h"
-#include "llvm/ADT/SetVector.h"
-#include "llvm/ADT/TypeSwitch.h"
-#include "llvm/Support/ErrorHandling.h"
-#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
-#include "mlir/Dialect/Bufferization/Transforms/BufferUtils.h"
 #include "mlir/Dialect/Bufferization/Transforms/EmptyTensorElimination.h"
 #include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
 #include "mlir/Dialect/Bufferization/Transforms/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/Passes.h"
-#include "mlir/Dialect/Linalg/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
-#include "mlir/IR/BlockAndValueMapping.h"
-#include "mlir/IR/Builders.h"
-#include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/Dominance.h"
-#include "mlir/IR/ImplicitLocOpBuilder.h"
-#include "mlir/IR/Matchers.h"
-#include "mlir/IR/Value.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
@@ -135,7 +113,7 @@ static LogicalResult defaultMemCpyFn(OpBuilder &builder, Location loc,
   return success(static_cast<bool>(copyOp));
 }
 
-OneShotBufferizationOptions getBufferizationOptions() {
+static OneShotBufferizationOptions getBufferizationOptions() {
   OneShotBufferizationOptions options;
 
   // bufferization.to_memref is used to bufferize constants in IREE. IREE has
@@ -164,27 +142,34 @@ OneShotBufferizationOptions getBufferizationOptions() {
   return options;
 }
 
+LogicalResult eliminateEmptyTensors(
+    Operation *op, const OneShotBufferizationOptions &options) {
+  // Analyze IR.
+  OneShotAnalysisState state(op, options);
+  if (failed(analyzeOp(op, state))) return failure();
+
+  // Rewrite tensor.empty ops that are anchored on specific ops.
+  IRRewriter rewriter(op->getContext());
+  if (failed(bufferization::insertSliceAnchoredEmptyTensorEliminationStep(
+          rewriter, op, state)))
+    return failure();
+  if (failed(
+          storeTensorOpAnchoredEmptyTensorEliminationStep(rewriter, op, state)))
+    return failure();
+
+  return success();
+}
+
 void EliminateEmptyTensorsPass::runOnOperation() {
   ModuleOp moduleOp = getOperation();
-
-  // Analyze IR.
   OneShotBufferizationOptions options = getBufferizationOptions();
-  OneShotAnalysisState state(moduleOp, options);
-  if (failed(analyzeOp(moduleOp, state))) return signalPassFailure();
-
-  // Rewrite init_tensors that are anchored on specific ops.
-  IRRewriter rewriter(moduleOp->getContext());
-  if (failed(bufferization::insertSliceAnchoredEmptyTensorEliminationStep(
-          rewriter, moduleOp, state)))
-    return signalPassFailure();
-  if (failed(storeTensorOpAnchoredEmptyTensorEliminationStep(rewriter, moduleOp,
-                                                             state)))
+  if (failed(eliminateEmptyTensors(moduleOp, options)))
     return signalPassFailure();
 }
 
 // The following is copied from bufferization::runOneShotBufferize with
 // modifications.
-static LogicalResult runIREEOneShotBufferize(
+LogicalResult runIREEOneShotBufferize(
     Operation *op, const OneShotBufferizationOptions &options) {
   OneShotAnalysisState state(op, options);
   if (failed(analyzeOp(op, state))) return failure();

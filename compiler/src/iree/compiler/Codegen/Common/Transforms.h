@@ -9,7 +9,19 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 
 namespace mlir {
+namespace bufferization {
+struct OneShotBufferizationOptions;
+}  // namespace bufferization
+
 namespace iree_compiler {
+
+/// Eliminate tensor.empty ops to avoid buffer allocations.
+LogicalResult eliminateEmptyTensors(
+    Operation *op, const bufferization::OneShotBufferizationOptions &options);
+
+/// Bufferize the given op with One-Shot Bufferize.
+LogicalResult runIREEOneShotBufferize(
+    Operation *op, const bufferization::OneShotBufferizationOptions &options);
 
 /// Populate patterns related to tile and distribute to workgroups.
 void populateTileAndDistributeToWorkgroupsPatterns(
