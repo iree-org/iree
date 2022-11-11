@@ -488,8 +488,11 @@ static int64_t getMaxTileSizeForVectorization(int64_t lb, int64_t ub,
     }
   }
 
-  // Return the closest power of two lower than the number of iterations.
-  return 1 << llvm::Log2_64(std::min(maxSize, numIters));
+  int64_t maxSizeOutput = 1 << llvm::Log2_64(std::min(maxSize, numIters));
+  int64_t vectorSizeOutput = 1 << llvm::Log2_64(std::min(vectorSize, numIters));
+
+  // TODO.
+  return (numIters % maxSizeOutput) == 0 ? maxSizeOutput : vectorSizeOutput;
 }
 
 /// Returns the tile size to use for the Flow level.
