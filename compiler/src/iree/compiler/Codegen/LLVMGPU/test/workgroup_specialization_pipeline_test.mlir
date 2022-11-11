@@ -42,11 +42,12 @@ module attributes {hal.device.targets = [#hal.device.target<"cuda", {executable_
 // CHECK-LABEL: func.func @forward_dispatch_116_matmul_128x30522x768
 //       CHECK: arith.cmpi eq
 //       CHECK: scf.if
-//       CHECK:   vector.transfer_read
-//       CHECK:   vector.transfer_read
-//       CHECK:   vector.contract
-//       CHECK:   vector.transfer_read
-//       CHECK:   vector.broadcast
-//       CHECK:   vector.transfer_write
+//       CHECK:   gpu.subgroup_mma_load_matrix
+//       CHECK:   gpu.subgroup_mma_load_matrix
+//       CHECK:   gpu.subgroup_mma_load_matrix
+//       CHECK:   gpu.subgroup_mma_load_matrix
+//       CHECK:   gpu.subgroup_mma_compute
+//       CHECK:   gpu.subgroup_mma_compute
+//       CHECK:   gpu.subgroup_mma_store_matrix
 //       CHECK: else
 //   CHECK-NOT:   vector.transfer
