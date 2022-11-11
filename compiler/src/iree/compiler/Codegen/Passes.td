@@ -75,6 +75,12 @@ def BufferizeCopyOnlyDispatches :
   let constructor = "mlir::iree_compiler::createBufferizeCopyOnlyDispatchesPass()";
 }
 
+def EliminateEmptyTensors :
+    Pass<"iree-eliminate-empty-tensors", "ModuleOp"> {
+  let summary = "Eliminate tensor.empty ops to avoid buffer allocations";
+  let constructor = "mlir::iree_compiler::createEliminateEmptyTensorsPass()";
+}
+
 def IREEComprehensiveBufferize :
     Pass<"iree-codegen-iree-comprehensive-bufferize", "ModuleOp"> {
   let summary = "Convert from to Linalg ops on tensors to buffers";

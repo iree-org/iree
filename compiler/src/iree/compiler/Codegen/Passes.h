@@ -81,6 +81,10 @@ std::unique_ptr<OperationPass<>> createFoldTensorExtractOpPass();
 /// scf.for.
 std::unique_ptr<OperationPass<func::FuncOp>> createForOpCanonicalizationPass();
 
+/// A pass to eliminate tensor.empty ops that could turn into allocations
+/// during bufferization.
+std::unique_ptr<OperationPass<ModuleOp>> createEliminateEmptyTensorsPass();
+
 /// Pass to perform linalg on tensor bufferization. The function passed into
 /// the pass through the `allocationFn` argument is invoked whenever a new
 /// buffer is to be created. The callback will be passed the Values for the
