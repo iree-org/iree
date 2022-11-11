@@ -36,7 +36,7 @@ def _generate_artifacts_root(
       parent_path=MODEL_ARTIFACTS_ROOT, models=models)
 
   iree_artifacts_root = iree_artifacts.generate_artifacts_root(
-      parent_path=IREE_ARTIFACTS_ROOT,
+      root_path=pathlib.PurePath(),
       model_artifacts_root=model_artifacts_root,
       module_generation_configs=iree_module_generation_configs)
 

@@ -31,11 +31,15 @@ CMake target, which put them in the following directory structure:
 
 import collections
 import os
+import pathlib
+from platform import architecture
 import re
 
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence, Tuple
 from common.benchmark_definition import IREE_DRIVERS_INFOS, DriverInfo
+from e2e_test_framework.definitions import common_definitions, iree_definitions
+import e2e_test_artifacts.iree_artifacts
 
 # All benchmarks' relative path against root build directory.
 BENCHMARK_SUITE_REL_PATH = "benchmark_suites"
@@ -55,6 +59,8 @@ class BenchmarkCase:
     driver_info: the IREE driver configuration.
     benchmark_case_dir: the path to benchmark case directory.
     benchmark_tool_name: the benchmark tool, e.g., 'iree-benchmark-module'.
+    run_config: the run config from e2e test framework.
+    module_path: the module file path in e2e test framework.
   """
 
   model_name: str
@@ -64,6 +70,8 @@ class BenchmarkCase:
   driver_info: DriverInfo
   benchmark_case_dir: str
   benchmark_tool_name: str
+  run_config: Optional[iree_definitions.E2EModelRunConfig] = None
+  module_path: Optional[pathlib.PurePath] = None
 
 
 class BenchmarkSuite(object):
@@ -160,6 +168,57 @@ class BenchmarkSuite(object):
         chosen_cases.append(benchmark_case)
 
     return chosen_cases
+
+  @staticmethod
+  def load_from_benchmark_framework(
+      artifacts_dir_path: pathlib.PurePath,
+      run_configs: Sequence[iree_definitions.E2EModelRunConfig]):
+
+    suite_map = collections.defaultdict(list)
+    for run_config in run_configs:
+      module_gen_config = run_config.module_generation_config
+      module_exec_config = run_config.module_execution_config
+      target_device_spec = run_config.target_device_spec
+
+      driver_info = None
+      for value in IREE_DRIVERS_INFOS.values():
+        if value.driver_name != module_exec_config.driver.value:
+          continue
+        if value.loader_name != "" and value.loader_name != module_exec_config.loader.value:
+          continue
+        driver_info = value
+        break
+      if driver_info is None:
+        raise ValueError(
+            f"Can't map execution config to driver info: {module_exec_config}.")
+
+      arch_info = target_device_spec.architecture.value
+      target_arch = f"{arch_info.type}-{arch_info.architecture}-{arch_info.microarchitecture}"
+
+      model = module_gen_config.imported_model.model
+      module_path = e2e_test_artifacts.iree_artifacts.get_module_path(
+          root_path=artifacts_dir_path,
+          module_generation_config=module_gen_config)
+
+      bench_mode = list(module_gen_config.compile_config.tags)
+      for tag in module_exec_config.tags:
+        if tag not in bench_mode:
+          bench_mode.append(tag)
+
+      benchmark_case = BenchmarkCase(
+          model_name=model.name,
+          model_tags=model.tags,
+          bench_mode=bench_mode,
+          target_arch=target_arch,
+          driver_info=driver_info,
+          benchmark_case_dir=".",
+          benchmark_tool_name="iree-benchmark-module",
+          run_config=run_config,
+          module_path=module_path)
+      category = model.source_type.value
+      suite_map[category].append(benchmark_case)
+
+    return BenchmarkSuite(suite_map=suite_map)
 
   @staticmethod
   def load_from_benchmark_suite_dir(benchmark_suite_dir: str):
