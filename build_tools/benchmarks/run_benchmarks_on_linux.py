@@ -38,7 +38,7 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
     # TODO(pzread): Taskset should be derived from CPU topology.
     # Only use the low 8 cores.
     taskset = "0xFF"
-    
+
     # TODO(#11076): Support run_config.
     if benchmark_case.benchmark_case_dir is None:
       raise ValueError("benchmark_case_dir can't be None.")
