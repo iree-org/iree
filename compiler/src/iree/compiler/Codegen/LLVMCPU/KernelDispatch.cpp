@@ -785,26 +785,17 @@ static LogicalResult setMatmulNoPadRootConfig(
   // The tiling for parallel dims and reduction dims should be separated.
   const SmallVectorImpl<int64_t> &workgroupTileSizes = inputTileSizes.back();
   SmallVector<int64_t> parallelTileSizes;
-
-  // Prioritize power of two sizes only peeling is enabled and for first
-  // vectorized dimension to avoid remainder loops for higher order dims.
-  // TODO(diegocaballero): Do something smarter when we have more
-  // information about the operation to be vectorized beforehand.
-  bool allowIncompleteTile =
-      vecPreProcStrategy == VectorPreProcStrategy::Peeling ? true : false;
-
-  for (int i = workgroupTileSizes.size() - 1; i >= 0; --i) {
-    int64_t tileSize = workgroupTileSizes[i];
-    if (tileSize != 0) {
-      tileSize = getMaxTileSizeForVectorization(
-          /*lb=*/0, /*ub=*/shape[i],
-          /*maxTileSize=*/tileSize, vectorSize, allowIncompleteTile);
-      if (tileSize > 1) allowIncompleteTile = false;
+  for (auto en : llvm::enumerate(workgroupTileSizes)) {
+    int64_t sz = en.value();
+    if (sz != 0) {
+      sz = getMaxTileSizeForVectorization(
+          /*lb=*/0, /*ub=*/shape[en.index()],
+          /*maxTileSize=*/sz, vectorSize,
+          /*allowIncompleteTile=*/vecPreProcStrategy ==
+              VectorPreProcStrategy::Peeling);
     }
-    parallelTileSizes.push_back(tileSize);
+    parallelTileSizes.push_back(sz);
   }
-  std::reverse(parallelTileSizes.begin(), parallelTileSizes.end());
-
   SmallVector<int64_t> reductionTileSizes;
   splitParallelAndReductionTiles(op.getOperation(), parallelTileSizes,
                                  reductionTileSizes);
@@ -1135,21 +1126,12 @@ static void setX86WorkgroupTileSizes(
     SmallVectorImpl<int64_t> &workgroupTileSizes) {
   workgroupTileSizes.append(numLoops, 0);
   SmallVector<int64_t, 4> staticLoopRanges = genericOp.getStaticLoopRanges();
-
-  // Prioritize power of two sizes only peeling is enabled and for first
-  // vectorized dimension to avoid remainder loops for higher order dims.
-  // TODO(diegocaballero): Do something smarter when we have more
-  // information about the operation to be vectorized beforehand.
-  bool allowIncompleteTile =
-      vecPreProcStrategy == VectorPreProcStrategy::Peeling ? true : false;
-
-  for (int loopNum = numLoops - 1; loopNum >= 0; --loopNum) {
+  for (auto loopNum : llvm::seq<unsigned>(0, numLoops)) {
     if (flowTileSizes[loopNum]) {
       workgroupTileSizes[loopNum] = getMaxTileSizeForVectorization(
           0, flowTileSizes[loopNum], minTileSizes[loopNum],
-          minTileSizes[loopNum], allowIncompleteTile);
-      if (workgroupTileSizes[loopNum] > 1)
-        allowIncompleteTile = false;
+          minTileSizes[loopNum],
+          vecPreProcStrategy == VectorPreProcStrategy::Peeling);
     } else {
       // If the flow level tile size is zero, and static loop range is 0 as
       // well, set the tile sizes here to zero as well.
