@@ -132,6 +132,12 @@ static llvm::cl::opt<bool> clDispatchViaRegionOpsGenerateWorkloadRegion(
                    "iree-flow-dispatch-via-region-ops"),
     llvm::cl::init(true));
 
+static llvm::cl::opt<bool> clZeroFillEmptyTensors(
+    "iree-flow-zero-fill-empty-tensors",
+    llvm::cl::desc(
+        "Zero fill empty tensors instead of leaving them uninitialized"),
+    llvm::cl::init(false));
+
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
@@ -300,7 +306,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPass(createCSEPass);
 
   // Initialize any empty tensors to zero.
-  passManager.addPass(createInitializeEmptyTensorsPass());
+  passManager.addPass(createInitializeEmptyTensorsPass(clZeroFillEmptyTensors));
 
   // Module pass to outline the dispatch regions into their own functions
   // wrapped in executables.

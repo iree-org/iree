@@ -243,11 +243,8 @@ struct EncodeTensorEmptyOp
     }
 
     // Dense:
-    auto resultSize =
-        rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0).getResult();
-    rewriter.replaceOpWithNewOp<IREE::Stream::ResourceAllocOp>(
-        op, op.getResult().getType(), resultSize, /*uninitialized=*/false,
-        op.getAffinityAttr());
+    rewriter.replaceOpWithNewOp<IREE::Stream::AsyncAllocaOp>(
+        op, op.getResult().getType(), op.getResultSize(), op.getAffinityAttr());
 
     return success();
   }

@@ -127,6 +127,10 @@ def InferNumericNarrowing :
 
 def InitializeEmptyTensors : Pass<"iree-flow-initialize-empty-tensors", ""> {
   let summary = "Initialize empty tensors";
+  let options = [
+    Option<"zeroFill", "zero-fill", "bool", /*default=*/"false",
+           "Fills empty tensors with zeros.">,
+  ];
   let constructor = "mlir::iree_compiler::IREE::Flow::createInitializeEmptyTensorsPass()";
 }
 
