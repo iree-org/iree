@@ -1,4 +1,4 @@
-# Embedded Example
+# Native Training Example
 
 This example shows how to
 
@@ -18,8 +18,12 @@ memory. This can be modified to be stored however you see fit.
 ## Running the Example
 
 Install `iree-torch` and other dependencies necessary for this example.
-[iree-torch](git@github.com:iree-org/iree-torch.git) provides a number of
+[iree-torch](https://github.com/iree-org/iree-torch) provides a number of
 convenient wrappers around `torch-mlir` and `iree` compilation:
+
+> **Note**
+> We recommend installing Python packages inside a
+> [virtual environment](https://docs.python.org/3/tutorial/venv.html).
 
 ```shell
 pip install -f https://iree-org.github.io/iree/pip-release-links.html iree-compiler
@@ -44,10 +48,10 @@ cmake --build /tmp/iree-build-runtime/ --target iree_runtime_unified
 Make sure you're in this example's directory:
 
 ```shell
-cd $(git rev-parse --show-toplevel)/samples/embedded
+cd $(git rev-parse --show-toplevel)/samples/native_training
 ```
 
-Build the embedded example:
+Build the native training example:
 
 ```shell
 make
@@ -56,11 +60,11 @@ make
 Generate the IREE VM bytecode for the model:
 
 ```shell
-python embedded.py
+python native_training.py
 ```
 
-Run the embedded model:
+Run the native training model:
 
 ```shell
-./embedded embedded.vmfb
+./native-training native_training.vmfb
 ```

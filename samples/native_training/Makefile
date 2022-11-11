@@ -6,8 +6,8 @@
 
 # This is an example showing a basic makefile that links in the IREE runtime by
 # way of the unified static library. It's recommended that IREE is added as a
-# subproject and cmake is used to add the dependencies (as in the CMakeLists.txt
-# in this directory) but when using other build systems this is easier to adapt.
+# subproject and cmake is used to add the dependencies, but when using other
+# build systems this is easier to adapt.
 #
 # Configure the runtime:
 #   cmake -GNinja -B /tmp/iree-build-runtime/ .
@@ -45,9 +45,9 @@ LINK_LIBRARIES := \
 LIBRARY_FLAGS := $(addprefix -L,${LIBRARY_DIRS}) $(addprefix -l,${LINK_LIBRARIES})
 CXX_FLAGS := -flto -Os ${INCLUDE_FLAGS} ${LIBRARY_FLAGS}
 
-all: embedded
+all: native-training 
 clean:
-	rm -f embedded
+	rm -f native-training 
 
-embedded: ${SRC_FILES}
+native-training: ${SRC_FILES}
 	${CXX} ${SRC_FILES} ${CXX_FLAGS} -o $@

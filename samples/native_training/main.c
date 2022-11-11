@@ -1,4 +1,4 @@
-// Copyright 2021 The IREE Authors
+// Copyright 2022 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -15,12 +15,12 @@ float y[] = {14.0f};
 float loss[] = {1.0f};
 
 void print_state() {
-    printf("Weights:");
+    fprintf(stdout, "Weights:");
     for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(w); ++i) {
         printf(" %f", w[i]);
     }
-    printf(", Bias: %f", b[0]);
-    printf(", Loss: %f\n", loss[0]);
+    fprintf(stdout, ", Bias: %f", b[0]);
+    fprintf(stdout, ", Loss: %f\n", loss[0]);
 }
 
 iree_status_t train(iree_runtime_session_t* session) {
@@ -172,7 +172,7 @@ iree_status_t run_sample(iree_string_view_t bytecode_module_path,
 
   print_state();
   for (int i = 0; i < 10; i++) {
-    train(session);
+    IREE_RETURN_IF_ERROR(train(session));
     print_state();
   }
   //===-------------------------------------------------------------------===//
@@ -190,7 +190,7 @@ int main(int argc, char** argv) {
   if (argc < 2) {
     fprintf(
         stderr,
-        "Usage: embedded </path/to/embedded.vmfb> [<driver_name>]\n");
+        "Usage: native-training </path/to/native_training.vmfb> [<driver_name>]\n");
     fprintf(stderr, "  (See the README for this sample for details)\n ");
     return -1;
   }
