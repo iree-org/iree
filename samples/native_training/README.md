@@ -60,11 +60,11 @@ make
 Generate the IREE VM bytecode for the model:
 
 ```shell
-python native_training.py
+python native_training.py /tmp/native_training.vmfb
 ```
 
 Run the native training model:
 
 ```shell
-./native-training native_training.vmfb
+./native-training /tmp/native_training.vmfb
 ```

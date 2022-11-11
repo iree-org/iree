@@ -31,6 +31,9 @@ b = torch.tensor(0.)
 def _get_argparse():
     parser = argparse.ArgumentParser(
         description="Train and run a regression model.")
+    parser.add_argument("output_file",
+        default="/tmp/native_training.vmfb",
+        help="The path to output the vmfb file to.")
     parser.add_argument("--iree-backend",
         default="llvm-cpu",
         help="See https://iree-org.github.io/iree/deployment-configurations/ "
@@ -95,9 +98,8 @@ def main():
         output_type=torch_mlir.OutputType.LINALG_ON_TENSORS,
         use_tracing=False)
 
-    vmfb = iree_torch.compile_to_vmfb(mlir, "llvm-cpu")
-    with open(os.path.join(os.path.dirname(__file__),
-                           "native_training.vmfb"), "wb") as f:
+    vmfb = iree_torch.compile_to_vmfb(mlir, args.iree_backend)
+    with open(args.output_file, "wb") as f:
         f.write(vmfb)
 
 
