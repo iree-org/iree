@@ -17,7 +17,7 @@ float loss[] = {1.0f};
 void print_state() {
     fprintf(stdout, "Weights:");
     for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(w); ++i) {
-        printf(" %f", w[i]);
+        fprintf(stdout, " %f", w[i]);
     }
     fprintf(stdout, ", Bias: %f", b[0]);
     fprintf(stdout, ", Loss: %f\n", loss[0]);
