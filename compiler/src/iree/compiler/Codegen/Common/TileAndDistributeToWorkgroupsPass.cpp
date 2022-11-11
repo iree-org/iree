@@ -40,17 +40,6 @@
 namespace mlir {
 namespace iree_compiler {
 
-/// Find the root operation of the dispatch, the one (and preferably only one)
-/// that has a lowering configuration.
-static FailureOr<Operation *> getRootOp(ArrayRef<Operation *> computeOps) {
-  for (auto op : computeOps) {
-    IREE::Codegen::LoweringConfigAttr loweringConfig = getLoweringConfig(op);
-    if (!loweringConfig) continue;
-    return op;
-  }
-  return failure();
-}
-
 /// Method to return the configuration to use for first-level tile and
 /// distribute. Returns the
 /// - tileSizes to use
@@ -70,7 +59,7 @@ static LogicalResult getTileAndDistributeConfig(
     SmallVectorImpl<int64_t> &interchange,
     SmallVectorImpl<unsigned> &partitionableLoops) {
   // Find the lowering configuration of the root operation.
-  FailureOr<Operation *> rootOp = getRootOp(computeOps);
+  FailureOr<Operation *> rootOp = getLoweringConfigCarryingOp(computeOps);
   if (failed(rootOp)) {
     // Just return. All the in-out vectors are empty that should default
     // the number of workgroups to {1, 1, 1}
@@ -91,7 +80,7 @@ static LogicalResult getTileAndDistributeConfig(
   // supported max.
   // TODO(ravishankarm): Relax this restriction.
   if (partitionableLoops.size() > kNumMaxParallelDims) {
-    return rootOp.value()->emitOpError(
+    return rootOp.getValue()->emitOpError(
                "expected number of partitionable loops to be less than or "
                "equal to ")
            << kNumMaxParallelDims;
@@ -99,7 +88,7 @@ static LogicalResult getTileAndDistributeConfig(
 
   IREE::Codegen::LoweringConfigAttr rootOpConfig = getLoweringConfig(*rootOp);
   if (!rootOpConfig) {
-    return rootOp.value()->emitOpError(
+    return rootOp.getValue()->emitOpError(
         "unable to find configuration of root op to define workgroup count "
         "region");
   }
@@ -115,7 +104,7 @@ static LogicalResult getTileAndDistributeConfig(
     tileSizes[loopId] = 0;
   }
 
-  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp.value())) {
+  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(*rootOp)) {
     staticLoopRanges = linalgOp.getStaticLoopRanges();
   }
   staticLoopRanges.resize(tileSizes.size(), ShapedType::kDynamicSize);

@@ -1119,18 +1119,6 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
       }
       rootOperation = computeOp;
     }
-
-    // Propogate the `lowering_config` attribute to the other ops.
-    // TODO(ravishankarm, antiagainst): This is a very specific use (and
-    // fragile). In general, this should not be needed. Things are already tiled
-    // and distributed. The rest of the compilation must be structured to either
-    // use `TileAndFuse` or they are independent configurations that are
-    // determined based on the op.
-    IREE::Codegen::LoweringConfigAttr config = getLoweringConfig(rootOperation);
-    for (auto op : computeOps) {
-      if (op == rootOperation) continue;
-      setLoweringConfig(op, config);
-    }
   }
   return success();
 }

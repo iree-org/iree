@@ -442,7 +442,7 @@ hal.executable @matvec {
           %5 = affine.min affine_map<(d0) -> (-d0 + 250, 32)>(%arg0)
           %6 = memref.subview %0[%arg0, 0] [%5, 1024] [1, 1] : memref<250x1024xf32> to memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
           %7 = memref.subview %2[%arg0] [%5] [1] : memref<250xf32> to memref<?xf32, affine_map<(d0)[s0] -> (d0 + s0)>>
-          linalg.fill {lowering_config = #config}
+          linalg.fill
             ins(%cst : f32)
             outs(%7 : memref<?xf32, affine_map<(d0)[s0] -> (d0 + s0)>>)
           linalg.matvec {lowering_config = #config}

@@ -44,7 +44,7 @@ namespace iree_compiler {
 //===----------------------------------------------------------------------===//
 
 /// Collects computation ops which we will use as anchor to tile and fuse.
-static LogicalResult collectComputeOps(
+static FailureOr<IREE::Codegen::LoweringConfigAttr> collectComputeOps(
     func::FuncOp funcOp, SmallVectorImpl<Operation *> &computeOps) {
   // If there are `scf.if` ops, we have both a fast and slow paths for
   // padding handling. Then we need to scan both regions to discover such
@@ -52,39 +52,58 @@ static LogicalResult collectComputeOps(
   SmallVector<scf::IfOp, 1> ifOps;
   funcOp.walk([&ifOps](scf::IfOp ifOp) { ifOps.push_back(ifOp); });
 
+  SmallVector<IREE::Codegen::LoweringConfigAttr> configs;
   if (ifOps.empty()) {
     if (failed(getComputeOps(funcOp, computeOps))) {
       return funcOp.emitOpError("does not contain compute ops");
     }
-    while (computeOps.size() > 1) computeOps.erase(computeOps.begin());
-    return success();
-  }
-
-  if (ifOps.size() > 1) {
-    return funcOp.emitError("expected to contain no more than one scf.if ops");
-  }
-
-  for (Operation &op : llvm::reverse(*ifOps.front().thenBlock())) {
-    if (isa<linalg::LinalgOp, TilingInterface>(op)) {
-      computeOps.push_back(&op);
-      break;
+    for (Operation *op : computeOps) {
+      if (auto config = getLoweringConfig(op)) configs.push_back(config);
     }
-  }
-  if (Block *elseBlock = ifOps.front().elseBlock()) {
-    for (Operation &op : llvm::reverse(*elseBlock)) {
+    if (computeOps.size() > 1) {
+      // Only keep the last compute ops.
+      std::reverse(computeOps.begin(), computeOps.end());
+      computeOps.resize(1);
+    }
+  } else {
+    if (ifOps.size() > 1) {
+      return funcOp.emitError("expected to contain <= 1 scf.if ops");
+    }
+
+    ifOps.front()->walk([&configs](Operation *op) {
+      if (isa<linalg::LinalgOp, TilingInterface>(op)) {
+        if (auto config = getLoweringConfig(op)) configs.push_back(config);
+      }
+    });
+
+    for (Operation &op : llvm::reverse(*ifOps.front().thenBlock())) {
       if (isa<linalg::LinalgOp, TilingInterface>(op)) {
         computeOps.push_back(&op);
         break;
       }
     }
+    if (Block *elseBlock = ifOps.front().elseBlock()) {
+      for (Operation &op : llvm::reverse(*elseBlock)) {
+        if (isa<linalg::LinalgOp, TilingInterface>(op)) {
+          computeOps.push_back(&op);
+          break;
+        }
+      }
+    }
   }
-  return success();
+  if (configs.empty()) {
+    return funcOp.emitError("missing lowering configuration");
+  }
+  if (!llvm::all_equal(configs)) {
+    return funcOp.emitError("contains conflicting lowering configuration");
+  }
+  return configs.front();
 }
 
-static LogicalResult tileAndDistributeToThreads(linalg::LinalgOp consumerOp) {
+static LogicalResult tileAndDistributeToThreads(linalg::LinalgOp consumerOp,
+                                                ArrayRef<int64_t> tileSizes) {
   MLIRContext *context = consumerOp.getContext();
   OpBuilder builder(context);
-  SmallVector<int64_t> tileSizes = getTileSizes(consumerOp, 1);
   auto identityLoopOrder =
       llvm::to_vector<4>(llvm::seq<int64_t>(0, tileSizes.size()));
 
@@ -111,11 +130,16 @@ static LogicalResult tileAndDistributeToThreads(linalg::LinalgOp consumerOp) {
 
 /// Populates `patterns` with patterns that tiles convolution/matmul ops with
 /// markers.
-static void populateTilingReductionPatterns(RewritePatternSet &patterns) {
+static void populateTilingReductionPatterns(RewritePatternSet &patterns,
+                                            ArrayRef<int64_t> tileSizes) {
   MLIRContext *context = patterns.getContext();
-  auto getTileSizeFn = [&](OpBuilder &builder, Operation *op) {
-    return getTileSizes(builder, op, 2);
+  auto getTileSizeFn = [tileSizes](OpBuilder &builder, Operation *op) {
+    auto range = llvm::map_range(tileSizes, [&](int64_t size) -> Value {
+      return builder.create<arith::ConstantIndexOp>(op->getLoc(), size);
+    });
+    return llvm::to_vector<4>(range);
   };
+
   auto tilingOptions = linalg::LinalgTilingOptions()
                            .setLoopType(linalg::LinalgTilingLoopType::Loops)
                            .setTileSizeComputationFunction(getTileSizeFn);
@@ -131,7 +155,8 @@ static void populateTilingReductionPatterns(RewritePatternSet &patterns) {
 }
 
 /// Tiles reduction dimensions.
-static LogicalResult tileReduction(func::FuncOp funcOp) {
+static LogicalResult tileReduction(func::FuncOp funcOp,
+                                   ArrayRef<int64_t> tileSizes) {
   MLIRContext *context = funcOp.getContext();
 
   // Set markers to drive tiling reduction dimensions.
@@ -147,7 +172,7 @@ static LogicalResult tileReduction(func::FuncOp funcOp) {
   });
 
   RewritePatternSet patterns(context);
-  populateTilingReductionPatterns(patterns);
+  populateTilingReductionPatterns(patterns, tileSizes);
   if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
     return funcOp.emitError("failed tiling reduction dimensions");
   }
@@ -192,7 +217,8 @@ static void concretizePadShape(func::FuncOp funcOp) {
 
 /// Tiles one of the convolution output window dimensions with size 1 to prepare
 /// for downsizing 2-D convolution ops into 1-D ones.
-static LogicalResult tileAndUnrollConvWindow(func::FuncOp funcOp) {
+static LogicalResult tileAndUnrollConvWindow(func::FuncOp funcOp,
+                                             ArrayRef<int64_t> tileSizes) {
   SmallVector<linalg::ConvolutionOpInterface, 1> convOps;
   funcOp.walk([&convOps](linalg::ConvolutionOpInterface convOp) {
     convOps.push_back(convOp);
@@ -201,7 +227,6 @@ static LogicalResult tileAndUnrollConvWindow(func::FuncOp funcOp) {
   for (linalg::ConvolutionOpInterface convOp : convOps) {
     auto consumerOp = cast<linalg::LinalgOp>(*convOp);
     OpBuilder builder(funcOp.getContext());
-    SmallVector<int64_t> tileSizes = getTileSizes(consumerOp, 3);
     auto identityLoopOrder =
         llvm::to_vector<4>(llvm::seq<int64_t>(0, tileSizes.size()));
 
@@ -256,15 +281,17 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
 
     // Try to find computation ops which we will use as anchor to tile and fuse.
     SmallVector<Operation *> computeOps;
-    if (failed(collectComputeOps(funcOp, computeOps)))
-      return signalPassFailure();
+    FailureOr<IREE::Codegen::LoweringConfigAttr> loweringConfig =
+        collectComputeOps(funcOp, computeOps);
+    if (failed(loweringConfig)) return signalPassFailure();
     assert(computeOps.size() <= 2);
 
     // Now tile the last computation op to invocations and fuse all operand
     // computation ops into the materialized loop nest.
+    auto threadTileSizes = loweringConfig->getTileSizeVals(1);
     for (Operation *computeOp : computeOps) {
       auto consumerOp = dyn_cast<linalg::LinalgOp>(computeOp);
-      if (failed(tileAndDistributeToThreads(consumerOp)))
+      if (failed(tileAndDistributeToThreads(consumerOp, threadTileSizes)))
         return signalPassFailure();
     }
 
@@ -278,11 +305,18 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
 
     concretizePadShape(funcOp);
 
-    if (failed(tileReduction(funcOp))) return signalPassFailure();
+    SmallVector<int64_t> reductionTileSizes =
+        loweringConfig->getTileSizeVals(2);
+    if (failed(tileReduction(funcOp, reductionTileSizes))) {
+      return signalPassFailure();
+    }
 
     fusePadIntoConsumer(funcOp);
 
-    if (failed(tileAndUnrollConvWindow(funcOp))) return signalPassFailure();
+    SmallVector<int64_t> windowTileSizes = loweringConfig->getTileSizeVals(3);
+    if (failed(tileAndUnrollConvWindow(funcOp, windowTileSizes))) {
+      return signalPassFailure();
+    }
 
     concretizePadShape(funcOp);
 

@@ -13,6 +13,7 @@
 
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Common/GPUPatterns.h"
+#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
@@ -45,14 +46,11 @@ namespace iree_compiler {
 
 static void populateTilingReductionPatterns(
     RewritePatternSet &patterns,
-    IREE::LinalgExt::LinalgTransformationFilter filter) {
-  auto getTileSizeFn = [&](OpBuilder &builder, Operation *op) {
-    return getTileSizes(builder, op, 2);
-  };
-
+    IREE::LinalgExt::LinalgTransformationFilter filter,
+    const linalg::TileSizeComputationFunction &computeFn) {
   auto tilingOptions = linalg::LinalgTilingOptions()
                            .setLoopType(linalg::LinalgTilingLoopType::Loops)
-                           .setTileSizeComputationFunction(getTileSizeFn);
+                           .setTileSizeComputationFunction(computeFn);
   TilingPatterns<linalg::BatchMatmulOp, linalg::MatmulOp,
                  linalg::GenericOp>::insert(patterns, tilingOptions, filter);
 }
@@ -63,12 +61,8 @@ static void populateTilingReductionPatterns(
 
 static void populateTilingToInvocationPatterns(
     RewritePatternSet &patterns,
-    IREE::LinalgExt::LinalgTransformationFilter filter) {
-  linalg::TileSizeComputationFunction getTileSizeFn = [&](OpBuilder &builder,
-                                                          Operation *op) {
-    return getTileSizes(builder, op, 1);
-  };
-
+    IREE::LinalgExt::LinalgTransformationFilter filter,
+    const linalg::TileSizeComputationFunction &computeFn) {
   auto getThreadProcInfoFn = [](OpBuilder &builder, Location loc,
                                 ArrayRef<Range> parallelLoopRanges) {
     return getGPUProcessorIdsAndCounts<gpu::ThreadIdOp, gpu::BlockDimOp>(
@@ -79,7 +73,7 @@ static void populateTilingToInvocationPatterns(
 
   auto tilingOptions = linalg::LinalgTilingOptions()
                            .setLoopType(linalg::LinalgTilingLoopType::Loops)
-                           .setTileSizeComputationFunction(getTileSizeFn)
+                           .setTileSizeComputationFunction(computeFn)
                            .setDistributionOptions(distributionOptions);
 
   TilingPatterns<linalg::BatchMatmulOp, linalg::FillOp, linalg::GenericOp,
@@ -159,6 +153,11 @@ void SPIRVTileAndPromotePass::runOnOperation() {
   FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
   if (failed(exportOp)) return;
 
+  auto threadTileComputeFn = getSPIRVTileSizeComputeFn(funcOp, 1);
+  if (failed(threadTileComputeFn)) return signalPassFailure();
+  auto reductionTileComputeFn = getSPIRVTileSizeComputeFn(funcOp, 2);
+  if (failed(reductionTileComputeFn)) return signalPassFailure();
+
   // Promote C matrix and propagate the potential fill producer into the
   // allocation. This needs to be done before reduction tiling.
   if (failed(doPromoteCMatrix(funcOp))) return signalPassFailure();
@@ -175,7 +174,7 @@ void SPIRVTileAndPromotePass::runOnOperation() {
         {workgroupMarker}, kTiledMarker);
     // Not going through C matrix promotion we will have no marker..
     filter.setMatchByDefault();
-    populateTilingReductionPatterns(patterns, filter);
+    populateTilingReductionPatterns(patterns, filter, *reductionTileComputeFn);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       funcOp.emitOpError() << "failed tiling reduction";
       return signalPassFailure();
@@ -258,7 +257,8 @@ void SPIRVTileAndPromotePass::runOnOperation() {
     RewritePatternSet tilingPatterns(context);
     IREE::LinalgExt::LinalgTransformationFilter filter({workgroupMarker},
                                                        llvm::None);
-    populateTilingToInvocationPatterns(tilingPatterns, filter);
+    populateTilingToInvocationPatterns(tilingPatterns, filter,
+                                       *threadTileComputeFn);
     if (failed(
             applyPatternsAndFoldGreedily(funcOp, std::move(tilingPatterns)))) {
       funcOp.emitOpError() << "failed tiling and distributing to invocations";
