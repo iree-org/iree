@@ -368,19 +368,17 @@ hal.executable private @preset_config_matmul_tensors {
 //  CHECK-DAG:   %[[C32:.+]] = arith.constant 32 : index
 //      CHECK:   hal.return %[[C32]], %[[C4]], %[[C1]]
 //      CHECK: func.func @preset_config()
-//  CHECK-DAG:   %[[C32:.+]] = arith.constant 32 : index
-//  CHECK-DAG:   %[[C16:.+]] = arith.constant 16 : index
 //      CHECK:   scf.for %[[IV0:.+]] =
 //      CHECK:     scf.for %[[IV1:.+]] =
-//  CHECK-DAG:       %[[LHS:.+]] = flow.dispatch.tensor.load %{{.+}}, offsets = [%[[IV0]], 0], sizes = [%[[C32]], 256]
-//  CHECK-DAG:       %[[RHS:.+]] = flow.dispatch.tensor.load %{{.+}}, offsets = [0, %[[IV1]]], sizes = [256, %[[C16]]]
+//  CHECK-DAG:       %[[LHS:.+]] = flow.dispatch.tensor.load %{{.+}}, offsets = [%[[IV0]], 0], sizes = [32, 256]
+//  CHECK-DAG:       %[[RHS:.+]] = flow.dispatch.tensor.load %{{.+}}, offsets = [0, %[[IV1]]], sizes = [256, 16]
 //  CHECK-DAG:       %[[INIT:.+]] = tensor.empty
 //  CHECK-DAG:       %[[FILL:.+]] = linalg.fill
 // CHECK-SAME:           outs(%[[INIT]] :
 //  CHECK-DAG:       %[[GEMM:.+]] = linalg.matmul
 // CHECK-SAME:           outs(%[[FILL]] :
 //      CHECK:       flow.dispatch.tensor.store %[[GEMM]]
-// CHECK-SAME:           offsets = [%[[IV0]], %[[IV1]]], sizes = [%[[C32]], %[[C16]]]
+// CHECK-SAME:           offsets = [%[[IV0]], %[[IV1]]], sizes = [32, 16]
 
 // -----
 

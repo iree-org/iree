@@ -144,6 +144,42 @@ static Optional<BlockArgument> getBindingArgument(Value v) {
   return llvm::None;
 }
 
+/// Returns `true` if the slice (described by the `offset`, `sizes` and
+/// `strides`) spans the dispatch type.
+static bool doesSliceSpanWholeTarget(
+    IREE::Flow::DispatchTensorType dispatchType, ValueRange dispatchTypeDims,
+    ArrayRef<OpFoldResult> offsets, ArrayRef<OpFoldResult> sizes,
+    ArrayRef<OpFoldResult> strides) {
+  // All offsets must be zero.
+  if (!llvm::all_of(offsets, [](OpFoldResult ofr) {
+        return isConstantIntValue(ofr, 0);
+      })) {
+    return false;
+  }
+
+  // All the sizes must match the entire target size.
+  SmallVector<int64_t> staticSizes;
+  SmallVector<Value> dynamicSizes;
+  dispatchIndexOpFoldResults(sizes, dynamicSizes, staticSizes,
+                             ShapedType::kDynamicSize);
+  auto targetType = dispatchType;
+  if (staticSizes != targetType.getShape() ||
+      llvm::any_of(llvm::zip(dynamicSizes, dispatchTypeDims),
+                   [](std::tuple<Value, Value> en) {
+                     return std::get<0>(en) != std::get<1>(en);
+                   })) {
+    return false;
+  }
+
+  // All the strides must be 1.
+  if (!llvm::all_of(strides, [](OpFoldResult ofr) {
+        return isConstantIntValue(ofr, 1);
+      })) {
+    return false;
+  }
+  return true;
+}
+
 //===----------------------------------------------------------------------===//
 // custom<WorkgroupCountRegion>($body)
 //===----------------------------------------------------------------------===//
@@ -609,35 +645,9 @@ SmallVector<int64_t, 4> DispatchTensorLoadOp::getTiedResultOperandIndices() {
 }
 
 bool DispatchTensorLoadOp::isLoadOfWholeSource() {
-  // All offsets must be zero.
-  if (!llvm::all_of(getMixedOffsets(), [](OpFoldResult ofr) {
-        return isConstantIntValue(ofr, 0);
-      })) {
-    return false;
-  }
-
-  // All the sizes must match the entire target size.
-  SmallVector<OpFoldResult> mixedSizes = getMixedSizes();
-  SmallVector<int64_t> staticSizes;
-  SmallVector<Value> dynamicSizes;
-  dispatchIndexOpFoldResults(mixedSizes, dynamicSizes, staticSizes,
-                             ShapedType::kDynamicSize);
-  auto targetType = getSourceType();
-  if (staticSizes != targetType.getShape() ||
-      llvm::any_of(llvm::zip(dynamicSizes, getSourceDims()),
-                   [](std::tuple<Value, Value> en) {
-                     return std::get<0>(en) != std::get<1>(en);
-                   })) {
-    return false;
-  }
-
-  // All the strides must be 1.
-  if (!llvm::all_of(getMixedStrides(), [](OpFoldResult ofr) {
-        return isConstantIntValue(ofr, 1);
-      })) {
-    return false;
-  }
-  return true;
+  return doesSliceSpanWholeTarget(getSourceType(), getSourceDims(),
+                                  getMixedOffsets(), getMixedSizes(),
+                                  getMixedStrides());
 }
 
 //===----------------------------------------------------------------------===//
@@ -693,35 +703,9 @@ llvm::SmallBitVector DispatchTensorStoreOp::getDroppedDims() {
 }
 
 bool DispatchTensorStoreOp::isStoreToWholeTarget() {
-  // All offsets must be zero.
-  if (!llvm::all_of(getMixedOffsets(), [](OpFoldResult ofr) {
-        return isConstantIntValue(ofr, 0);
-      })) {
-    return false;
-  }
-
-  // All the sizes must match the entire target size.
-  SmallVector<OpFoldResult> mixedSizes = getMixedSizes();
-  SmallVector<int64_t> staticSizes;
-  SmallVector<Value> dynamicSizes;
-  dispatchIndexOpFoldResults(mixedSizes, dynamicSizes, staticSizes,
-                             ShapedType::kDynamicSize);
-  auto targetType = getTargetType();
-  if (staticSizes != targetType.getShape() ||
-      llvm::any_of(llvm::zip(dynamicSizes, getTargetDims()),
-                   [](std::tuple<Value, Value> en) {
-                     return std::get<0>(en) != std::get<1>(en);
-                   })) {
-    return false;
-  }
-
-  // All the strides must be 1.
-  if (!llvm::all_of(getMixedStrides(), [](OpFoldResult ofr) {
-        return isConstantIntValue(ofr, 1);
-      })) {
-    return false;
-  }
-  return true;
+  return doesSliceSpanWholeTarget(getTargetType(), getTargetDims(),
+                                  getMixedOffsets(), getMixedSizes(),
+                                  getMixedStrides());
 }
 
 //===----------------------------------------------------------------------===//
