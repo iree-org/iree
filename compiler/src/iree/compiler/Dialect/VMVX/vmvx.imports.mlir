@@ -538,11 +538,63 @@ vm.import @pack.i32i32(
   %out_stride0 : i64,
   %in_size0 : i64,
   %in_size1 : i64,
+  %in_size2 : i64,
+  %in_size3 : i64,
+  %out_size0 : i64,
+  %out_size1 : i64,
+  %padding_value : i32,
+  %flags : i32
+)
+
+//==============================================================================
+// unpack ops
+//==============================================================================
+
+vm.import @unpack.f32f32(
+  %in_buffer : !vm.buffer,
+  %in_offset : i64,
+  %in_stride0 : i64,
+  %out_buffer : !vm.buffer,
+  %out_offset : i64,
+  %out_stride0 : i64,
+  %in_size0 : i64,
+  %in_size1 : i64,
+  %in_size2 : i64,
+  %in_size3 : i64,
+  %out_size0 : i64,
+  %out_size1 : i64,
+  %flags : i32
+)
+
+vm.import @unpack.i8i8(
+  %in_buffer : !vm.buffer,
+  %in_offset : i64,
+  %in_stride0 : i64,
+  %out_buffer : !vm.buffer,
+  %out_offset : i64,
+  %out_stride0 : i64,
+  %in_size0 : i64,
+  %in_size1 : i64,
   %out_size0 : i64,
   %out_size1 : i64,
   %out_size2 : i64,
   %out_size3 : i64,
-  %padding_value : i32,
+  %flags : i32
+)
+
+vm.import @unpack.i32i32(
+  %in_buffer : !vm.buffer,
+  %in_offset : i64,
+  %in_stride0 : i64,
+  %out_buffer : !vm.buffer,
+  %out_offset : i64,
+  %out_stride0 : i64,
+  %in_size0 : i64,
+  %in_size1 : i64,
+  %in_size2 : i64,
+  %in_size3 : i64,
+  %out_size0 : i64,
+  %out_size1 : i64,
   %flags : i32
 )
 

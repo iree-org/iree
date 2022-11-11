@@ -22,6 +22,7 @@
 #include "iree/builtins/ukernel/elementwise.h"
 #include "iree/builtins/ukernel/mmt4d.h"
 #include "iree/builtins/ukernel/pack.h"
+#include "iree/builtins/ukernel/unpack.h"
 
 #define IREE_VMVX_MODULE_VERSION_0_0 0x00000000u
 #define IREE_VMVX_MODULE_VERSION_LATEST IREE_VMVX_MODULE_VERSION_0_0
@@ -851,8 +852,84 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_pack_i8i8, pack_i, v) {
 }
 
 IREE_VMVX_ABI_EXPORT(iree_vmvx_pack_i32i32, pack_i, v) {
-  fprintf(stderr, "iree_vmvx_pack_i32i32 flags=%d\n", args->flags);
   return iree_vmvx_pack_i(iree_uk_pack_type_i32i32, args);
+}
+
+//===----------------------------------------------------------------------===//
+// Exported unpack function definitions
+//===----------------------------------------------------------------------===//
+
+IREE_VMVX_ABI_FIXED_STRUCT(unpack, rIIIrIIIIIIIIi, {
+  iree_vm_ref_t in_ref;
+  int64_t in_offset;
+  int64_t in_stride0;
+  iree_vm_ref_t out_ref;
+  int64_t out_offset;
+  int64_t out_stride0;
+  int64_t in_size0;
+  int64_t in_size1;
+  int64_t in_size2;
+  int64_t in_size3;
+  int64_t out_size0;
+  int64_t out_size1;
+  uint32_t flags;
+});
+IREE_VMVX_ABI_DEFINE_SHIM(unpack, v);
+
+static iree_status_t iree_vmvx_unpack(iree_uk_unpack_type_t type,
+                                      const iree_vm_abi_unpack_t* args) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_host_size_t out_tile_size = args->in_size2 * args->in_size3;
+  int in_elem_size = iree_uk_type_size(iree_uk_unpack_in_type(type));
+  int out_elem_size = iree_uk_type_size(iree_uk_unpack_out_type(type));
+  MAP_BUFFER_2D_UNTYPED_RO(in,
+                           /*dtype_size=*/in_elem_size,
+                           /*buffer_ref=*/args->in_ref,
+                           /*offset=*/args->in_offset,
+                           /*stride0=*/args->in_stride0,
+                           /*stride1=*/1,
+                           /*size0=*/args->in_size0,
+                           /*size1=*/args->in_size1 * out_tile_size);
+  MAP_BUFFER_2D_UNTYPED_RW(out, /*dtype_size=*/out_elem_size,
+                           /*buffer_ref=*/args->out_ref,
+                           /*offset=*/args->out_offset,
+                           /*stride0=*/args->out_stride0,
+                           /*stride1=*/1,
+                           /*size0=*/args->out_size0,
+                           /*size1=*/args->out_size1);
+  iree_uk_unpack_params_t ukernel_params = {
+      .type = type,
+      .in_buffer = in,
+      .out_buffer = out,
+      .in_stride0 = args->in_stride0,
+      .out_stride0 = args->out_stride0,
+      .in_size0 = args->in_size0,
+      .in_size1 = args->in_size1,
+      .in_size2 = args->in_size2,
+      .in_size3 = args->in_size3,
+      .out_size0 = args->out_size0,
+      .out_size1 = args->out_size1,
+      .flags = args->flags,
+  };
+  iree_uk_status_t status = iree_uk_unpack(&ukernel_params);
+  IREE_TRACE_ZONE_END(z0);
+  if (status != iree_uk_status_ok) {
+    return iree_make_status(IREE_STATUS_INTERNAL,
+                            iree_uk_status_message(status));
+  }
+  return iree_ok_status();
+}
+
+IREE_VMVX_ABI_EXPORT(iree_vmvx_unpack_f32f32, unpack, v) {
+  return iree_vmvx_unpack(iree_uk_unpack_type_f32f32, args);
+}
+
+IREE_VMVX_ABI_EXPORT(iree_vmvx_unpack_i8i8, unpack, v) {
+  return iree_vmvx_unpack(iree_uk_unpack_type_i8i8, args);
+}
+
+IREE_VMVX_ABI_EXPORT(iree_vmvx_unpack_i32i32, unpack, v) {
+  return iree_vmvx_unpack(iree_uk_unpack_type_i32i32, args);
 }
 
 //===----------------------------------------------------------------------===//

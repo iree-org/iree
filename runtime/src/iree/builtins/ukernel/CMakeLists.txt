@@ -37,6 +37,7 @@ iree_cc_library(
     "common.h"
     "mmt4d_types.h"
     "pack_types.h"
+    "unpack_types.h"
   SRCS
     "common.c"
   DEPS
@@ -81,9 +82,11 @@ iree_cc_library(
     "elementwise.h"
     "mmt4d.h"
     "pack.h"
+    "unpack.h"
   SRCS
     "mmt4d.c"
     "pack.c"
+    "unpack.c"
   DEPS
     ::common
     ::elementwise
