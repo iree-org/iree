@@ -175,7 +175,7 @@ class BenchmarkSuite(object):
     return chosen_cases
 
   @staticmethod
-  def load_from_benchmark_framework(
+  def load_from_run_configs(
       run_configs: Sequence[iree_definitions.E2EModelRunConfig]):
 
     suite_map = collections.defaultdict(list)
@@ -197,19 +197,14 @@ class BenchmarkSuite(object):
             f"Can't map execution config to driver info: {module_exec_config}.")
 
       arch_info = target_device_spec.architecture.value
-      target_arch = f"{arch_info.type}-{arch_info.architecture}-{arch_info.microarchitecture}"
+      target_arch = f"{arch_info.type.value}-{arch_info.architecture}-{arch_info.microarchitecture}"
 
       model = module_gen_config.imported_model.model
-
-      bench_mode = list(module_gen_config.compile_config.tags)
-      for tag in module_exec_config.tags:
-        if tag not in bench_mode:
-          bench_mode.append(tag)
 
       benchmark_case = BenchmarkCase(
           model_name=model.name,
           model_tags=model.tags,
-          bench_mode=bench_mode,
+          bench_mode=module_exec_config.tags,
           target_arch=target_arch,
           driver_info=driver_info,
           benchmark_tool_name="iree-benchmark-module",

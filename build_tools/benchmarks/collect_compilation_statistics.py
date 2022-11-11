@@ -162,8 +162,12 @@ def main(args: argparse.Namespace):
     benchmark_cases = benchmark_suite.filter_benchmarks_for_category(
         category=category)
     for benchmark_case in benchmark_cases:
-      flag_file_path = os.path.join(benchmark_case.benchmark_case_dir,
-                                    BENCHMARK_FLAGFILE)
+      benchmark_case_dir = benchmark_case.benchmark_case_dir
+      # TODO(#11076): Support run_config.
+      if benchmark_case_dir is None:
+        raise ValueError("benchmark_case_dir can't be None.")
+
+      flag_file_path = os.path.join(benchmark_case_dir, BENCHMARK_FLAGFILE)
       with open(flag_file_path, "r") as flag_file:
         module_path = get_module_path(flag_file)
 
@@ -171,7 +175,7 @@ def main(args: argparse.Namespace):
         raise RuntimeError(
             f"Can't find the module file in the flagfile: {flag_file_path}")
       module_path = os.path.abspath(
-          os.path.join(benchmark_case.benchmark_case_dir, module_path))
+          os.path.join(benchmark_case_dir, module_path))
 
       with open(module_path, "rb") as module_file:
         module_component_sizes = get_module_component_info(
