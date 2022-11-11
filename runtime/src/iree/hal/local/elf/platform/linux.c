@@ -158,7 +158,7 @@ iree_status_t iree_memory_view_protect_ranges(void* base_address,
 
 void iree_memory_view_flush_icache(void* base_address,
                                    iree_host_size_t length) {
-  IREE_ELF_CLEAR_CACHE(base_address, base_address + length);
+  IREE_ELF_CLEAR_CACHE(base_address, ((char*)base_address) + length);
 }
 
 #endif  // IREE_PLATFORM_*
