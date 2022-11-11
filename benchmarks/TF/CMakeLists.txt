@@ -30,6 +30,20 @@ set(MINILM_L12_H384_UNCASED_INT32_SEQLEN128_MODULE
     "1x128xi32,1x128xi32,1x128xi32"
 )
 
+set(VIT_BASE_PATCH16_224_FP32_MODULE
+  NAME
+    "VitBasePatch16224"
+  TAGS
+    "fp32"
+  SOURCE
+    # Derived from https://huggingface.co/google/vit-base-patch16-224.
+    "https://storage.googleapis.com/iree-model-artifacts/google-vit-base-patch16-224-tf-model.tar.gz"
+  ENTRY_FUNCTION
+    "predict"
+  FUNCTION_INPUTS
+    "1x224x224x3xf32"
+)
+
 ################################################################################
 # Add benchmarks for all platforms.                                            #
 ################################################################################

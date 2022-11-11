@@ -44,3 +44,27 @@ iree_benchmark_suite(
   DRIVER
     "cuda"
 )
+
+# GPU, CUDA, SM_80, full-inference
+iree_benchmark_suite(
+  GROUP_NAME
+    "linux-cuda"
+
+  MODULES
+    "${VIT_BASE_PATCH16_224_FP32_MODULE}"
+
+  BENCHMARK_MODES
+    "full-inference,default-flags"
+  TARGET_BACKEND
+    "cuda"
+  TARGET_ARCHITECTURE
+    "GPU-CUDA-SM_80"
+  COMPILATION_FLAGS
+    ${LINUX_CUDA_SM_80_GPU_COMPILATION_FLAGS}
+  BENCHMARK_TOOL
+    iree-benchmark-module
+  CONFIG
+    "iree-cuda"
+  DRIVER
+    "cuda"
+)
