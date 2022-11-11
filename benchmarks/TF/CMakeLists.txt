@@ -44,6 +44,20 @@ set(RESNET50_TF_FP32_MODULE
     "1x224x224x3xf32"
 )
 
+set(BERT_FOR_MASKED_LM_FP32_SEQLEN512_MODULE
+  NAME
+    "BertForMaskedLM"
+  TAGS
+    "fp32,seqlen512"
+  SOURCE
+    # Derived from https://huggingface.co/transformers/v3.0.2/model_doc/bert.html#tfbertformaskedlm.
+    "https://storage.googleapis.com/iree-model-artifacts/bert-for-masked-lm-seq512-tf-model.tar.gz"
+  ENTRY_FUNCTION
+    "forward"
+  FUNCTION_INPUTS
+    "1x512xi32,1x512xi32"
+)
+
 ################################################################################
 # Add benchmarks for all platforms.                                            #
 ################################################################################

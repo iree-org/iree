@@ -29,6 +29,7 @@ iree_benchmark_suite(
   MODULES
     "${MINILM_L12_H384_UNCASED_INT32_SEQLEN128_MODULE}"
     "${RESNET50_TF_FP32_MODULE}"
+    "${BERT_FOR_MASKED_LM_FP32_SEQLEN512_MODULE}"
 
   BENCHMARK_MODES
     "full-inference,default-flags"
