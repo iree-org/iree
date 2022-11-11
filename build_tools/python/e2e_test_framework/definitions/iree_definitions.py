@@ -35,6 +35,8 @@ class RuntimeLoader(Enum):
   EMBEDDED_ELF = "embedded-elf"
   VMVX_MODULE = "vmvx-module"
   SYSTEM_LIBRARY = "system-library"
+  CUDA = "cuda"
+  VULKAN = "vulkan"
 
 
 class RuntimeDriver(Enum):
