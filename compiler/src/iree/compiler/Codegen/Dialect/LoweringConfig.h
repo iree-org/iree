@@ -103,7 +103,8 @@ inline void setTranslationInfo(
 ///
 /// This scans ops in top-down order and the first one carrying the attribute
 /// will be returned.
-Operation *getLoweringConfigCarryingOp(ArrayRef<Operation *> computeOps);
+FailureOr<Operation *> getLoweringConfigCarryingOp(
+    ArrayRef<Operation *> computeOps);
 
 /// Returns the lowering configuration set for an operation. Returns `nullptr`
 /// if no value is set.  It expects that the attribute is stored using the
@@ -115,7 +116,7 @@ IREE::Codegen::LoweringConfigAttr getLoweringConfig(Operation *op);
 ///
 /// This scans ops in top-down order and the first one carrying the attribute
 /// will be returned.
-IREE::Codegen::LoweringConfigAttr getLoweringConfig(
+FailureOr<IREE::Codegen::LoweringConfigAttr> getLoweringConfig(
     ArrayRef<Operation *> computeOps);
 
 /// Returns the tile sizes for a particular operation if the

@@ -59,15 +59,15 @@ static LogicalResult getTileAndDistributeConfig(
     SmallVectorImpl<int64_t> &interchange,
     SmallVectorImpl<unsigned> &partitionableLoops) {
   // Find the lowering configuration of the root operation.
-  Operation *rootOp = getLoweringConfigCarryingOp(computeOps);
-  if (rootOp == nullptr) {
+  FailureOr<Operation *> rootOp = getLoweringConfigCarryingOp(computeOps);
+  if (failed(rootOp)) {
     // Just return. All the in-out vectors are empty that should default
     // the number of workgroups to {1, 1, 1}
     return success();
   }
 
   auto partitionableLoopInterface =
-      dyn_cast<PartitionableLoopsInterface>(rootOp);
+      dyn_cast<PartitionableLoopsInterface>(*rootOp);
   if (!partitionableLoopInterface) {
     // Just return. All the in-out vectors are empty that should default
     // the number of workgroups to {1, 1, 1}
@@ -80,15 +80,15 @@ static LogicalResult getTileAndDistributeConfig(
   // supported max.
   // TODO(ravishankarm): Relax this restriction.
   if (partitionableLoops.size() > kNumMaxParallelDims) {
-    return rootOp->emitOpError(
+    return rootOp.getValue()->emitOpError(
                "expected number of partitionable loops to be less than or "
                "equal to ")
            << kNumMaxParallelDims;
   }
 
-  IREE::Codegen::LoweringConfigAttr rootOpConfig = getLoweringConfig(rootOp);
+  IREE::Codegen::LoweringConfigAttr rootOpConfig = getLoweringConfig(*rootOp);
   if (!rootOpConfig) {
-    return rootOp->emitOpError(
+    return rootOp.getValue()->emitOpError(
         "unable to find configuration of root op to define workgroup count "
         "region");
   }
@@ -104,7 +104,7 @@ static LogicalResult getTileAndDistributeConfig(
     tileSizes[loopId] = 0;
   }
 
-  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp)) {
+  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(*rootOp)) {
     staticLoopRanges = linalgOp.getStaticLoopRanges();
   }
   staticLoopRanges.resize(tileSizes.size(), ShapedType::kDynamicSize);

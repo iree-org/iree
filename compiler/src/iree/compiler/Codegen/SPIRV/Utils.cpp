@@ -44,12 +44,12 @@ FailureOr<SmallVector<int64_t>> getSPIRVTileSize(func::FuncOp funcOp,
     return funcOp.emitOpError("failed to get compute ops");
   }
 
-  IREE::Codegen::LoweringConfigAttr config = getLoweringConfig(computeOps);
-  if (!config) {
+  auto config = getLoweringConfig(computeOps);
+  if (failed(config)) {
     return funcOp.emitOpError("failed to get lowering configuration");
   }
 
-  return config.getTileSizeVals(tilingLevel);
+  return config->getTileSizeVals(tilingLevel);
 }
 
 FailureOr<linalg::TileSizeComputationFunction> getSPIRVTileSizeComputeFn(

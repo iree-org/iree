@@ -44,9 +44,8 @@ namespace iree_compiler {
 //===----------------------------------------------------------------------===//
 
 /// Collects computation ops which we will use as anchor to tile and fuse.
-static LogicalResult collectComputeOps(
-    func::FuncOp funcOp, SmallVectorImpl<Operation *> &computeOps,
-    IREE::Codegen::LoweringConfigAttr &loweringConfig) {
+static FailureOr<IREE::Codegen::LoweringConfigAttr> collectComputeOps(
+    func::FuncOp funcOp, SmallVectorImpl<Operation *> &computeOps) {
   // If there are `scf.if` ops, we have both a fast and slow paths for
   // padding handling. Then we need to scan both regions to discover such
   // computation ops so that we can tile and fuse both regions.
@@ -98,9 +97,7 @@ static LogicalResult collectComputeOps(
   if (!llvm::all_equal(configs)) {
     return funcOp.emitError("contains conflicting lowering configuration");
   }
-  loweringConfig = configs.front();
-
-  return success();
+  return configs.front();
 }
 
 static LogicalResult tileAndDistributeToThreads(linalg::LinalgOp consumerOp,
@@ -284,14 +281,14 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
 
     // Try to find computation ops which we will use as anchor to tile and fuse.
     SmallVector<Operation *> computeOps;
-    IREE::Codegen::LoweringConfigAttr loweringConfig;
-    if (failed(collectComputeOps(funcOp, computeOps, loweringConfig)))
-      return signalPassFailure();
+    FailureOr<IREE::Codegen::LoweringConfigAttr> loweringConfig =
+        collectComputeOps(funcOp, computeOps);
+    if (failed(loweringConfig)) return signalPassFailure();
     assert(computeOps.size() <= 2);
 
     // Now tile the last computation op to invocations and fuse all operand
     // computation ops into the materialized loop nest.
-    auto threadTileSizes = loweringConfig.getTileSizeVals(1);
+    auto threadTileSizes = loweringConfig->getTileSizeVals(1);
     for (Operation *computeOp : computeOps) {
       auto consumerOp = dyn_cast<linalg::LinalgOp>(computeOp);
       if (failed(tileAndDistributeToThreads(consumerOp, threadTileSizes)))
@@ -308,14 +305,15 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
 
     concretizePadShape(funcOp);
 
-    SmallVector<int64_t> reductionTileSizes = loweringConfig.getTileSizeVals(2);
+    SmallVector<int64_t> reductionTileSizes =
+        loweringConfig->getTileSizeVals(2);
     if (failed(tileReduction(funcOp, reductionTileSizes))) {
       return signalPassFailure();
     }
 
     fusePadIntoConsumer(funcOp);
 
-    SmallVector<int64_t> windowTileSizes = loweringConfig.getTileSizeVals(3);
+    SmallVector<int64_t> windowTileSizes = loweringConfig->getTileSizeVals(3);
     if (failed(tileAndUnrollConvWindow(funcOp, windowTileSizes))) {
       return signalPassFailure();
     }

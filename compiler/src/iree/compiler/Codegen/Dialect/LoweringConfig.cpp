@@ -278,22 +278,23 @@ void setTranslationInfo(IREE::HAL::ExecutableExportOp exportOp,
 // operations.
 // ===----------------------------------------------------------------------===//
 
-Operation *getLoweringConfigCarryingOp(ArrayRef<Operation *> computeOps) {
+FailureOr<Operation *> getLoweringConfigCarryingOp(
+    ArrayRef<Operation *> computeOps) {
   for (Operation *op : computeOps) {
     if (getLoweringConfig(op)) return op;
   }
-  return nullptr;
+  return failure();
 }
 
 IREE::Codegen::LoweringConfigAttr getLoweringConfig(Operation *op) {
   return op->getAttrOfType<IREE::Codegen::LoweringConfigAttr>(kConfigAttrName);
 }
 
-IREE::Codegen::LoweringConfigAttr getLoweringConfig(
+FailureOr<IREE::Codegen::LoweringConfigAttr> getLoweringConfig(
     ArrayRef<Operation *> computeOps) {
-  Operation *op = getLoweringConfigCarryingOp(computeOps);
-  if (!op) return nullptr;
-  return getLoweringConfig(op);
+  FailureOr<Operation *> op = getLoweringConfigCarryingOp(computeOps);
+  if (failed(op)) return failure();
+  return getLoweringConfig(*op);
 }
 
 SmallVector<int64_t> getTileSizes(Operation *op, unsigned level) {
