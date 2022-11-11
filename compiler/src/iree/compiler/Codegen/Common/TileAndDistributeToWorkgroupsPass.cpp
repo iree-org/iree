@@ -13,6 +13,8 @@
 // utility method.
 //
 //===---------------------------------------------------------------------===//
+
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Transforms.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
@@ -291,9 +293,10 @@ struct TileAndDistributeToWorkgroupsPass
     : public TileAndDistributeToWorkgroupsBase<
           TileAndDistributeToWorkgroupsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<AffineDialect, IREE::Flow::FlowDialect,
-                    IREE::HAL::HALDialect, linalg::LinalgDialect,
-                    scf::SCFDialect, tensor::TensorDialect>();
+    registry
+        .insert<AffineDialect, IREE::Flow::FlowDialect, IREE::HAL::HALDialect,
+                linalg::LinalgDialect, IREE::LinalgExt::IREELinalgExtDialect,
+                scf::SCFDialect, tensor::TensorDialect>();
   }
 
   void runOnOperation() override;
@@ -409,13 +412,14 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
     });
 
     {
-      // Apply linalg tiling optimization patterns.
-      RewritePatternSet canonicalizationPatterns(context);
-      linalg::populateLinalgTilingCanonicalizationPatterns(
-          canonicalizationPatterns);
-      populateFoldAffineMinInDistributedLoopsPatterns(canonicalizationPatterns);
-      if (failed(applyPatternsAndFoldGreedily(
-              funcOp, std::move(canonicalizationPatterns)))) {
+      // Apply linalg tiling optimization patterns, which includes folding
+      // casting ops into tiled operations.
+      RewritePatternSet patterns(context);
+      linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
+      populateFoldAffineMinInDistributedLoopsPatterns(patterns);
+      context->getOrLoadDialect<IREE::LinalgExt::IREELinalgExtDialect>()
+          ->getCanonicalizationPatterns(patterns);
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         funcOp.emitOpError("tiling canonicalizations failed");
         return signalPassFailure();
       }
