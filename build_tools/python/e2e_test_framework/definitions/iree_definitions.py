@@ -33,6 +33,8 @@ class TargetABI(Enum):
 
 class RuntimeLoader(Enum):
   """IREE runtime loader."""
+  # For target that doesn't support loader configuration.
+  NONE = "none"
   EMBEDDED_ELF = "embedded-elf"
   VMVX_MODULE = "vmvx-module"
   SYSTEM_LIBRARY = "system-library"

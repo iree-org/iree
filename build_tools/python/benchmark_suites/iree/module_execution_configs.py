@@ -14,29 +14,29 @@ ELF_LOCAL_SYNC_CONFIG = iree_definitions.ModuleExecutionConfig(
     loader=iree_definitions.RuntimeLoader.EMBEDDED_ELF,
     driver=iree_definitions.RuntimeDriver.LOCAL_SYNC)
 
-ELF_CUDA_CONFIG = iree_definitions.ModuleExecutionConfig(
+CUDA_CONFIG = iree_definitions.ModuleExecutionConfig(
     id=unique_ids.IREE_MODULE_EXECUTION_CONFIG_CUDA,
     tags=["full-inference", "default-flags"],
-    loader=iree_definitions.RuntimeLoader.EMBEDDED_ELF,
+    loader=iree_definitions.RuntimeLoader.NONE,
     driver=iree_definitions.RuntimeDriver.CUDA)
 
 VULKAN_CONFIG = iree_definitions.ModuleExecutionConfig(
     id=unique_ids.IREE_MODULE_EXECUTION_CONFIG_VULKAN,
     tags=["full-inference", "default-flags"],
-    loader=iree_definitions.RuntimeLoader.EMBEDDED_ELF,
+    loader=iree_definitions.RuntimeLoader.NONE,
     driver=iree_definitions.RuntimeDriver.VULKAN)
 
 VULKAN_BATCH_SIZE_16_CONFIG = iree_definitions.ModuleExecutionConfig(
     id=unique_ids.IREE_MODULE_EXECUTION_CONFIG_VULKAN_BATCH_SIZE_16,
     tags=["full-inference", "experimental-flags"],
-    loader=iree_definitions.RuntimeLoader.EMBEDDED_ELF,
+    loader=iree_definitions.RuntimeLoader.NONE,
     driver=iree_definitions.RuntimeDriver.VULKAN,
     extra_flags=["--batch_size=16"])
 
 VULKAN_BATCH_SIZE_32_CONFIG = iree_definitions.ModuleExecutionConfig(
     id=unique_ids.IREE_MODULE_EXECUTION_CONFIG_VULKAN_BATCH_SIZE_32,
     tags=["full-inference", "experimental-flags"],
-    loader=iree_definitions.RuntimeLoader.EMBEDDED_ELF,
+    loader=iree_definitions.RuntimeLoader.NONE,
     driver=iree_definitions.RuntimeDriver.VULKAN,
     extra_flags=["--batch_size=32"])
 
