@@ -360,15 +360,17 @@ static bool tileMatmulK(const int64_t dimK, const int64_t residualTilingFactor,
   return false;
 }
 
-/// Computes the total number of bytes if promoting both matmul LHS and RHS with
-/// the tiven tile sizes.
-static int64_t getTileBytes(int64_t mTileSize, int64_t nTileSize,
-                            int64_t kTileSize, int64_t elementBits) {
+int64_t getTileBytes(int64_t mTileSize, int64_t nTileSize, int64_t kTileSize,
+                     int64_t elementBits) {
   const int64_t count =
       (mTileSize + nTileSize) *
       (kTileSize + detail::bankConflictReductionPaddingBits / elementBits);
   return (elementBits / 8) * count;
 }
+
+int64_t getMultiBufferMemoryUsage(int64_t singleBufferBytes, unsigned depth) {
+  return singleBufferBytes * (depth ? depth : 1);
+};
 
 /// Tries to adjust workgroup and tile sizes to enable vector load for both
 /// matmul LHS and RHS. Returns false only when it's not beneficial to promote.
@@ -430,19 +432,34 @@ static bool adjustToVectorLoad(ArrayRef<int64_t> dimMNKSize, int64_t &mTileSize,
 static bool adjustToPromote(ArrayRef<int64_t> dimMNKSize, int64_t &mTileSize,
                             int64_t &nTileSize, int64_t &kTileSize,
                             SmallVectorImpl<int64_t> &wgSize,
-                            const int subgroupSize, const int maxBytes,
-                            const int elementBits) {
+                            unsigned &pipelineDepth, const int subgroupSize,
+                            const int maxBytes, const int elementBits) {
   LLVM_DEBUG(llvm::dbgs() << "subgroup size = " << subgroupSize << "\n");
   const int vectorSize = kMaxVectorNumBits / elementBits;
   if (!adjustToVectorLoad(dimMNKSize, mTileSize, nTileSize, kTileSize, wgSize,
                           subgroupSize, vectorSize))
     return false;
 
-  auto usedBytes = getTileBytes(mTileSize, nTileSize, kTileSize, elementBits);
-  LLVM_DEBUG(llvm::dbgs() << "initial tile bytes = " << usedBytes << "\n");
-  if (usedBytes <= maxBytes) return true;
+  // Don't do multibuffering if the inner reduction loop is folded out.
+  if (dimMNKSize[2] == kTileSize) pipelineDepth = 1;
 
-  // Using too much workgorup memory. Try to reduce the tile size for X/Y once
+  auto usedBytes = getTileBytes(mTileSize, nTileSize, kTileSize, elementBits);
+
+  LLVM_DEBUG(llvm::dbgs() << "initial multibuffering bytes = "
+                          << getMultiBufferMemoryUsage(usedBytes, pipelineDepth)
+                          << "\n");
+
+  // First try to fit the given tile sizes with the largest pipelining depth
+  // possible.
+  do {
+    if (getMultiBufferMemoryUsage(usedBytes, pipelineDepth) <= maxBytes)
+      return true;
+  } while (pipelineDepth-- > 1);
+
+  // If we can't fit in workgroup memory, don't multibuffer.
+  pipelineDepth = 1;
+
+  // Using too much workgroup memory. Try to reduce the tile size for X/Y once
   // by a factor of two.
   int64_t &wgDimSize = wgSize[0] > wgSize[1] ? wgSize[0] : wgSize[1];
   int64_t &tileSize = wgSize[0] > wgSize[1] ? nTileSize : mTileSize;
@@ -463,7 +480,8 @@ LogicalResult setMatmulOpConfig(spirv::ResourceLimitsAttr limits,
                                 linalg::LinalgOp op,
                                 std::array<int64_t, 2> bestWorkgroupSizeXY,
                                 std::array<int64_t, 3> bestThreadTileSizeMNK,
-                                bool enablePromotion) {
+                                bool enablePromotion,
+                                unsigned softwarePipelineDepth) {
   LLVM_DEBUG(llvm::dbgs() << "trying to deduce config as matmul...\n");
   OpOperand *lhs = op.getDpsInputOperand(0);
   OpOperand *rhs = op.getDpsInputOperand(1);
@@ -553,14 +571,18 @@ LogicalResult setMatmulOpConfig(spirv::ResourceLimitsAttr limits,
   const int subgroupSize = limits.getSubgroupSize();
   const int maxBytes = limits.getMaxComputeSharedMemorySize();
 
-  auto pipeline =
+  // We want a 2-stage pipeline without multi-buffering if the depth is 0 to
+  // keep the default for compilation configs that don't specify a pipeline
+  // depth.
+  auto pipelineDepth = softwarePipelineDepth ? softwarePipelineDepth : 1;
+
+  // Try to adjust tiling sizes to fit in shared memory.
+  auto usePromotionPipeline =
       enablePromotion &&
-              adjustToPromote({dimM, dimN, dimK}, workgroupTileSizes[mIndex],
-                              workgroupTileSizes[nIndex],
-                              reductionTileSizes[kIndex], workgroupSize,
-                              subgroupSize, maxBytes, elementBits)
-          ? CodeGenPipeline::SPIRVMatmulPromoteVectorize
-          : CodeGenPipeline::SPIRVBaseVectorize;
+      adjustToPromote({dimM, dimN, dimK}, workgroupTileSizes[mIndex],
+                      workgroupTileSizes[nIndex], reductionTileSizes[kIndex],
+                      workgroupSize, pipelineDepth, subgroupSize, maxBytes,
+                      elementBits);
 
   SmallVector<int64_t> threadTileSizes(numLoops, 0);
   if (isBM) {
@@ -576,9 +598,17 @@ LogicalResult setMatmulOpConfig(spirv::ResourceLimitsAttr limits,
   tileSizes.push_back(threadTileSizes);
   tileSizes.push_back(reductionTileSizes);
 
+  // Only the promotion pipeline has multibuffering + pipelining.
+  if (usePromotionPipeline) {
+    return setOpConfigAndEntryPointFnTranslation(
+        op->getParentOfType<func::FuncOp>(), op, tileSizes,
+        CodeGenPipeline::SPIRVMatmulPromoteVectorize, workgroupSize,
+        pipelineDepth);
+  }
+
   return setOpConfigAndEntryPointFnTranslation(
-      op->getParentOfType<func::FuncOp>(), op, tileSizes, pipeline,
-      workgroupSize);
+      op->getParentOfType<func::FuncOp>(), op, tileSizes,
+      CodeGenPipeline::SPIRVBaseVectorize, workgroupSize);
 }
 
 }  // namespace detail

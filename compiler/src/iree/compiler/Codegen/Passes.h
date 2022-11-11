@@ -138,6 +138,10 @@ std::unique_ptr<OperationPass<func::FuncOp>> createMemrefCopyToLinalgPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createGPUDistributeSharedMemoryCopy();
 
+/// Apply multi-buffering transformation.
+std::unique_ptr<OperationPass<func::FuncOp>> createGPUMultiBuffering(
+    unsigned numBuffers = 5);
+
 /// Apply software pipelining.
 std::unique_ptr<OperationPass<func::FuncOp>> createGPUPipeliningPass(
     bool epiloguePeeling = true, unsigned depth = 1);
@@ -428,10 +432,6 @@ createLLVMGPUTensorCoreVectorizationPass();
 /// Lower vector ops before convertion to LLVM.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorLoweringPass();
 
-/// Apply multi-buffering transformation.
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUMultiBuffering(
-    unsigned numBuffers = 5);
-
 /// Apply transformation to reduce the number of bank conflicts when accessing
 /// shared memory by padding fastest moving dimension with the specified size.
 std::unique_ptr<OperationPass<func::FuncOp>>
@@ -473,7 +473,8 @@ LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
     Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
     IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize);
-void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm);
+void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm,
+                                                unsigned pipelineDepth);
 
 /// Pass pipeline to lower IREE HAL executables by tiling and distributing
 /// reduction to workgroups and then subgroups.

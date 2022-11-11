@@ -304,7 +304,9 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVVectorizePass());
 }
 
-void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm) {
+void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm,
+                                                unsigned pipelineDepth) {
+  LLVM_DEBUG(llvm::dbgs() << "Pipeline Depth: " << pipelineDepth << "\n");
   addTileAndDistributeToWorkgroupsPasses(pm);
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
@@ -312,6 +314,11 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm) {
 
   // Tile and distribute to GPU invocations.
   nestedModulePM.addNestedPass<func::FuncOp>(createSPIRVTileAndPromotePass());
+
+  if (pipelineDepth > 1)
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createGPUMultiBuffering(pipelineDepth));
+
   nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createGPUDistributeSharedMemoryCopy());
@@ -331,7 +338,8 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());
 
-  nestedModulePM.addNestedPass<func::FuncOp>(createGPUPipeliningPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createGPUPipeliningPass(pipelineDepth ? pipelineDepth : 1));
 
   addLoopMaterializationPasses(nestedModulePM);
 }

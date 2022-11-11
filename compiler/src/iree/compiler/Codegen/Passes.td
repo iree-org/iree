@@ -164,6 +164,12 @@ def GPUReduceBankConflicts :
   let constructor = "mlir::iree_compiler::createGPUReduceSharedMemoryBankConflicts()";
 }
 
+def GPUMultiBuffering :
+    Pass<"iree-gpu-multi-buffering", "func::FuncOp"> {
+  let summary = "Pass to do multi buffering.";
+  let constructor = "mlir::iree_compiler::createGPUMultiBuffering()";
+}
+
 def GPUPipelining : Pass<"iree-gpu-pipelining", "func::FuncOp"> {
   let summary = "Pass to do software pipelining.";
   let constructor = "mlir::iree_compiler::createGPUPipeliningPass()";
@@ -407,12 +413,6 @@ def LLVMGPUVectorLowering :
     Pass<"iree-llvmgpu-vector-lowering", "func::FuncOp"> {
   let summary = "Pass to lower Vector ops before conversion to LLVM.";
   let constructor = "mlir::iree_compiler::createLLVMGPUVectorLoweringPass()";
-}
-
-def LLVMGPUMultiBuffering :
-    Pass<"iree-llvmgpu-multi-buffering", "func::FuncOp"> {
-  let summary = "Pass to do multi buffering.";
-  let constructor = "mlir::iree_compiler::createLLVMGPUMultiBuffering()";
 }
 
 def LLVMGPUVectorToGPU :

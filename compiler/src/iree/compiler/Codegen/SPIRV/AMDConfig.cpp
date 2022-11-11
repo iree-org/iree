@@ -25,6 +25,8 @@ namespace mlir {
 namespace iree_compiler {
 namespace detail {
 
+constexpr unsigned AMDSoftwarePipelineDepth = 2;
+
 static LogicalResult setAMDMatmulConfig(linalg::LinalgOp op,
                                         spirv::ResourceLimitsAttr limits) {
   const int subgroupSize = limits.getSubgroupSize();
@@ -37,7 +39,7 @@ static LogicalResult setAMDMatmulConfig(linalg::LinalgOp op,
     threadMNK = {8, 4, 16};
   }
   return setMatmulOpConfig(limits, op, workgroupXY, threadMNK,
-                           /*enablePromotion=*/true);
+                           /*enablePromotion=*/true, AMDSoftwarePipelineDepth);
 }
 
 // RDNA architecture:
