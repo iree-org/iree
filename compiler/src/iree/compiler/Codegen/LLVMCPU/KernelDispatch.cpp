@@ -458,41 +458,39 @@ static int64_t getMaxTileSizeForDistribution(int64_t lb, int64_t ub,
   return 1;
 }
 
-/// Prioritization mode for `getMaxTileSizesForVectorization`.
-enum MaxTileSizePriority {
-  // Prioritize sizes that are a power of two.
-  PrioritizePowerOfTwo,
-  // Prioritize sizes that are multiple of the number of iterations.
-  PrioritizeNumItersMultiple,
-};
-
 /// Adjusts the tile sizes related to vectorization and unrolling.
-static int64_t getMaxTileSizeForVectorization(int64_t lb, int64_t ub,
-                                              int64_t maxSize,
-                                              int64_t vectorSize,
-                                              MaxTileSizePriority priority) {
+static int64_t getMaxTileSizeForVectorization(
+    int64_t lb, int64_t ub, int64_t maxSize, int64_t vectorSize,
+    bool allowIncompleteTile = false) {
   if (ub == ShapedType::kDynamicSize || lb == ShapedType::kDynamicSize) {
     return maxSize;
   }
-
   int64_t numIters = ub - lb;
-  assert(numIters > 0 && "Number of iterations should be greater than zero");
-  assert(maxSize > 0 && "Max size should be greater zero");
-
-  if (priority == PrioritizeNumItersMultiple) {
-    // Try to find a size that is multiple of the number of iterations.
-    for (int64_t i = std::min(maxSize, numIters); i > 1; --i) {
-      if (numIters % i == 0) {
-        return i;
-      }
+  if (numIters <= maxSize) {
+    if (numIters < vectorSize) {
+      return numIters;
     }
   }
 
-  int64_t maxSizeOutput = 1 << llvm::Log2_64(std::min(maxSize, numIters));
-  int64_t vectorSizeOutput = 1 << llvm::Log2_64(std::min(vectorSize, numIters));
+  int64_t scaledUB = std::min(maxSize, numIters) / vectorSize * vectorSize;
+  for (int64_t i = scaledUB; i > 0; i -= vectorSize) {
+    if (numIters % i == 0) {
+      return i;
+    }
+  }
+  if (allowIncompleteTile) {
+    return 1 << llvm::Log2_64(std::min(maxSize, numIters));
+  }
 
-  // TODO.
-  return (numIters % maxSizeOutput) == 0 ? maxSizeOutput : vectorSizeOutput;
+  // If it can't be a multiple of `vectorSize`, let's choose a factor of
+  // `numIters` sizes heuristically.
+  int64_t start = std::min(maxSize, numIters);
+  for (int64_t i = start; i > 0; --i) {
+    if (numIters % i == 0) {
+      return i;
+    }
+  }
+  return 1;
 }
 
 /// Returns the tile size to use for the Flow level.
@@ -702,8 +700,7 @@ static LogicalResult setMatmulPadRootConfig(
   auto lhsShapedType = op.lhs().getType().cast<ShapedType>();
   int64_t K = lhsShapedType.getShape().back();
   reductionTileSizes.push_back(getMaxTileSizeForVectorization(
-      0, K, workgroupTileSizes.back(), vectorSize,
-      MaxTileSizePriority::PrioritizeNumItersMultiple));
+      0, K, workgroupTileSizes.back(), vectorSize));
 
   TileSizesListType tileSizes;
   tileSizes.emplace_back(flowTileSizes.begin(), flowTileSizes.end());
@@ -793,19 +790,16 @@ static LogicalResult setMatmulNoPadRootConfig(
   // vectorized dimension to avoid remainder loops for higher order dims.
   // TODO(diegocaballero): Do something smarter when we have more
   // information about the operation to be vectorized beforehand.
-  MaxTileSizePriority priority =
-      vecPreProcStrategy == VectorPreProcStrategy::Peeling
-          ? MaxTileSizePriority::PrioritizePowerOfTwo
-          : MaxTileSizePriority::PrioritizeNumItersMultiple;
+  bool allowIncompleteTile =
+      vecPreProcStrategy == VectorPreProcStrategy::Peeling ? true : false;
 
   for (int i = workgroupTileSizes.size() - 1; i >= 0; --i) {
     int64_t tileSize = workgroupTileSizes[i];
     if (tileSize != 0) {
       tileSize = getMaxTileSizeForVectorization(
           /*lb=*/0, /*ub=*/shape[i],
-          /*maxTileSize=*/tileSize, vectorSize, priority);
-      if (tileSize > 1)
-        priority = MaxTileSizePriority::PrioritizeNumItersMultiple;
+          /*maxTileSize=*/tileSize, vectorSize, allowIncompleteTile);
+      if (tileSize > 1) allowIncompleteTile = false;
     }
     parallelTileSizes.push_back(tileSize);
   }
@@ -845,15 +839,13 @@ static LogicalResult setAArch64RootConfig(func::FuncOp entryPointFn,
   for (auto &en : llvm::enumerate(flowTileSizes.drop_back())) {
     parallelTileSizes.push_back(getMaxTileSizeForVectorization(
         0, en.value() ? en.value() : shape[en.index()],
-        workgroupTileSizes[en.index()], vectorSize,
-        MaxTileSizePriority::PrioritizeNumItersMultiple));
+        workgroupTileSizes[en.index()], vectorSize));
   }
 
   auto lhsShapedType = op.lhs().getType().cast<ShapedType>();
   int64_t K = lhsShapedType.getShape().back();
   parallelTileSizes.push_back(getMaxTileSizeForVectorization(
-      0, K, workgroupTileSizes.back(), vectorSize,
-      MaxTileSizePriority::PrioritizeNumItersMultiple));
+      0, K, workgroupTileSizes.back(), vectorSize));
 
   SmallVector<int64_t> reductionTileSizes;
   splitParallelAndReductionTiles(op.getOperation(), parallelTileSizes,
@@ -1148,18 +1140,16 @@ static void setX86WorkgroupTileSizes(
   // vectorized dimension to avoid remainder loops for higher order dims.
   // TODO(diegocaballero): Do something smarter when we have more
   // information about the operation to be vectorized beforehand.
-  MaxTileSizePriority priority =
-      vecPreProcStrategy == VectorPreProcStrategy::Peeling
-          ? MaxTileSizePriority::PrioritizePowerOfTwo
-          : MaxTileSizePriority::PrioritizeNumItersMultiple;
+  bool allowIncompleteTile =
+      vecPreProcStrategy == VectorPreProcStrategy::Peeling ? true : false;
 
   for (int loopNum = numLoops - 1; loopNum >= 0; --loopNum) {
     if (flowTileSizes[loopNum]) {
       workgroupTileSizes[loopNum] = getMaxTileSizeForVectorization(
           0, flowTileSizes[loopNum], minTileSizes[loopNum],
-          minTileSizes[loopNum], priority);
+          minTileSizes[loopNum], allowIncompleteTile);
       if (workgroupTileSizes[loopNum] > 1)
-        priority = MaxTileSizePriority::PrioritizeNumItersMultiple;
+        allowIncompleteTile = false;
     } else {
       // If the flow level tile size is zero, and static loop range is 0 as
       // well, set the tile sizes here to zero as well.
@@ -1459,8 +1449,7 @@ static LogicalResult setConvRootConfig(func::FuncOp entryPointFn,
     // The ops will be decomposed to lower-rank named ops.
     if (parallelTileSizes[i] != 1) {
       parallelTileSizes[i] = getMaxTileSizeForVectorization(
-          0, tileSize, parallelTileSizes[i], vectorSize,
-          MaxTileSizePriority::PrioritizeNumItersMultiple);
+          0, tileSize, parallelTileSizes[i], vectorSize);
     }
   }
   SmallVector<int64_t> reductionTileSizes;
