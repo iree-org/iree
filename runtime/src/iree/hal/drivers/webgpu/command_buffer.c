@@ -598,13 +598,28 @@ static iree_status_t iree_hal_webgpu_command_buffer_fill_buffer(
       &command_buffer->builtins->fill_buffer;
   target_offset += iree_hal_buffer_byte_offset(target_buffer);
 
-  // DO NOT SUBMIT
-  // change to using what the vulkan emulation does
+  // TODO(scotttodd): change to using what the vulkan emulation does
   uint32_t dword_pattern =
       iree_hal_webgpu_splat_pattern(pattern, pattern_length);
 
-  // if pattern is zero then can wgpuCommandEncoderClearBuffer
-  // else dispatch builtin
+  // If the pattern is zero and both the offset and length are multiples of 4,
+  // we can use the native wgpuCommandEncoderClearBuffer function. Otherwise,
+  // we dispatch our own fill emulation shader.
+  uint32_t zero_pattern = 0;
+  if (memcmp(&dword_pattern, &zero_pattern, pattern_length) == 0 &&
+      target_offset % 4 == 0 && length % 4 == 0) {
+    WGPUCommandEncoder command_encoder = NULL;
+    IREE_RETURN_IF_ERROR(iree_hal_webgpu_command_buffer_acquire_command_encoder(
+        command_buffer, &command_encoder));
+
+    wgpuCommandEncoderClearBuffer(
+        command_encoder,
+        iree_hal_webgpu_buffer_handle(
+            iree_hal_buffer_allocated_buffer(target_buffer)),
+        target_offset, length);
+    return iree_ok_status();
+  }
+
   // need to handle %4!=0 offset and pattern length as with vulkan
 
   // Upload push constant data - this may incur a segment flush if the staging
