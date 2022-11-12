@@ -130,7 +130,7 @@ template <typename TilingTransformOp, typename TileOrNumThreadSpec,
 static Value tileAndFuseAndDistributeImpl(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     std::conditional_t<std::is_same_v<TileOrNumThreadKind, TileOrNumThreadList>,
-                       ArrayRef<int64_t>, Value>
+                       ArrayRef<int64_t>, ArrayRef<OpFoldResult>>
         tileSizesOrNumThreads,
     ArrayAttr threadDimMapping, SmallVector<Value> *resultingFusedOpsHandles) {
   auto tileToForeachOp = b.create<TilingTransformOp>(
@@ -171,20 +171,21 @@ static Value tfdWithTileSizeHandle(
     SmallVector<Value> *resultingFusedOpsHandles = nullptr) {
   return tileAndFuseAndDistributeImpl<
       TilingTransformOp, transform::TileSizesSpec, BatchOrIterativeFusion,
-      TileOrNumThreadHandle>(b, rootH, opsHToFuse, tileSizeHandle,
+      TileOrNumThreadHandle>(b, rootH, opsHToFuse,
+                             ArrayRef<OpFoldResult>{tileSizeHandle},
                              threadDimMapping, resultingFusedOpsHandles);
 }
 
 template <typename TilingTransformOp = TileToForeachThreadOp,
           typename BatchOrIterativeFusion = BatchFusionSpec>
-static Value tfdWithNumThreads(
+static Value tfdWithNumThreadsHandle(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
-    ArrayRef<int64_t> numThreads, ArrayAttr threadDimMapping = {},
+    Value numThreads, ArrayAttr threadDimMapping = {},
     SmallVector<Value> *resultingFusedOpsHandles = nullptr) {
   return tileAndFuseAndDistributeImpl<
       TilingTransformOp, transform::NumThreadsSpec, BatchOrIterativeFusion>(
-      b, rootH, opsHToFuse, numThreads, threadDimMapping,
-      resultingFusedOpsHandles);
+      b, rootH, opsHToFuse, ArrayRef<OpFoldResult>{numThreads},
+      threadDimMapping, resultingFusedOpsHandles);
 }
 
 /// Apply patterns and vectorize (for now always applies rank-reduction).
@@ -224,16 +225,8 @@ static Value distributeVectors(ImplicitLocOpBuilder &b, Value funcH,
 /// allows the transform dialect to build payload IR and not risk seeing it
 /// being DCE'd away immediately.
 static Value buildReductionStrategyBlockDistributionPart(
-    ImplicitLocOpBuilder &b, Value variantH) {
-  // TODO: this still requires specific knowledge of ops present in the IR
-  // and is brittle.
-  Value originalFillH =
-      b.create<MatchOp>(variantH, linalg::FillOp::getOperationName());
-  Value originalGenericH =
-      b.create<MatchOp>(variantH, linalg::GenericOp::getOperationName());
-  Value tileSizes =
-      b.create<ConfigExtractPart>(originalGenericH, "tile_sizes", 0);
-
+    ImplicitLocOpBuilder &b, Value variantH, Value originalFillH,
+    Value originalGenericH, Value tileSizes0Generic) {
   // Step 1. Split the reduction to get meatier parallelism.
   // TODO: use a scf.foreach_thread for this.
   auto splitReductionTransformOp =
@@ -254,20 +247,15 @@ static Value buildReductionStrategyBlockDistributionPart(
   tfdWithTileSizeHandle<TileToForeachThreadAndWorkgroupCountRegionOp>(
       b,
       /*rootH=*/combinerH,
-      /*opsHToFuse=*/{originalFillH, splitFillH, splitLinalgH}, tileSizes,
-      b.getArrayAttr({x}));
+      /*opsHToFuse=*/{originalFillH, splitFillH, splitLinalgH},
+      tileSizes0Generic, b.getArrayAttr({x}));
 
   return variantH;
 }
 
-// TODO: generalize and automate over and over.
-// TODO: significantly shrink this down.
-static void buildReductionCudaStrategy(ImplicitLocOpBuilder &b,
-                                       Value variantH) {
-  // Step 1: Distribute to blocks using the current IREE lowering config.
-  variantH = buildReductionStrategyBlockDistributionPart(b, variantH);
-
-  // Step 2. Second level of tiling + fusion parallelizes to threads.
+static Value buildReductionStrategyThreadDistributionPart(
+    ImplicitLocOpBuilder &b, Value variantH, Value tileSizes1Fill,
+    Value tileSizes1Generic) {
   // TODO: Relying on ordering is brittle, harden this.
   auto [fill2dH, parParRedH, fill1dH, parRedH] = matchAndUnpack<4>(
       b, variantH,
@@ -275,23 +263,52 @@ static void buildReductionCudaStrategy(ImplicitLocOpBuilder &b,
                           linalg::FillOp::getOperationName()});
   auto y = mlir::gpu::GPUThreadMappingAttr::get(b.getContext(),
                                                 ::mlir::gpu::Threads::DimY);
-  auto z = mlir::gpu::GPUThreadMappingAttr::get(b.getContext(),
-                                                ::mlir::gpu::Threads::DimZ);
+  (void)y;
+
   // clang-format off
-  tfdWithTileSizes(b,
+  tfdWithTileSizeHandle<TileToForeachThreadOp>(b,
                    /*rootH=*/parRedH,
                    /*opsHToFuse=*/{fill1dH},
-                   /*tileSizes=*/ArrayRef<int64_t>{1, 0, 0},
-                   /*threadDimMapping=*/b.getArrayAttr({z}));
-  tfdWithTileSizes(b,
+                   /*tileSizes=*/tileSizes1Fill,
+                   /*threadDimMapping=*/b.getArrayAttr({y}));
+  tfdWithTileSizeHandle<TileToForeachThreadOp>(b,
                    /*rootH=*/parParRedH,
                    /*opsHToFuse=*/{fill2dH},
-                   /*tileSizes=*/ArrayRef<int64_t>{1, 1, 0},
-                   /*threadDimMapping=*/b.getArrayAttr({z,y}));
+                   /*tileSizes=*/tileSizes1Generic,
+                   /*threadDimMapping=*/b.getArrayAttr({y}));
   // clang-format on
+  return variantH;
+}
+
+// TODO: generalize and automate over and over.
+// TODO: significantly shrink this down.
+static void buildReductionCudaStrategy(ImplicitLocOpBuilder &b,
+                                       Value variantH) {
+  // Step 0. Fetch transform information from the config and materialize it in
+  // the payload IR.
+  // TODO: this still requires specific knowledge of ops present in the IR
+  // and is very brittle.
+  Value originalFillH =
+      b.create<MatchOp>(variantH, linalg::FillOp::getOperationName());
+  Value originalGenericH =
+      b.create<MatchOp>(variantH, linalg::GenericOp::getOperationName());
+  Value tileSizes0Generic =
+      b.create<ConfigExtractPart>(originalGenericH, "tile_sizes", 0);
+  Value tileSizes1Fill =
+      b.create<ConfigExtractPart>(originalFillH, "tile_sizes", 1);
+  Value tileSizes1Generic =
+      b.create<ConfigExtractPart>(originalGenericH, "tile_sizes", 1);
+
+  // Step 1: Distribute to blocks using the current IREE lowering config.
+  variantH = buildReductionStrategyBlockDistributionPart(
+      b, variantH, originalFillH, originalGenericH, tileSizes0Generic);
+
+  // Step 2. Second level of tiling + fusion parallelizes to threads.
+  variantH = buildReductionStrategyThreadDistributionPart(
+      b, variantH, tileSizes1Fill, tileSizes1Generic);
 
   // Step 3. Rank-reduce and vectorize.
-  // TODO: assumes a single func::FuncOp to transform, may ned hardening.
+  // TODO: assumes a single func::FuncOp to transform, may need hardening.
   Value funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
   funcH = vectorize(b, funcH);
 
@@ -302,7 +319,7 @@ static void buildReductionCudaStrategy(ImplicitLocOpBuilder &b,
   // Need to match again since bufferize invalidated all handles.
   // TODO: assumes a single func::FuncOp to transform, may ned hardening.
   funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
-  funcH = mapToBlockAndThreads(b, funcH, ArrayRef<int64_t>{32, 2, 1});
+  funcH = mapToBlockAndThreads(b, funcH, ArrayRef<int64_t>{32, 1, 1});
 
   // Step 6. Post-bufferization vector distribution with rank-reduction.
   distributeVectors(b, funcH);
