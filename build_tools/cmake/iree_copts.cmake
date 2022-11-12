@@ -190,6 +190,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "-Wliteral-conversion"
     "-Wnon-virtual-dtor"
     "-Woverloaded-virtual"
+    "-Wpointer-arith"
     "-Wself-assign"
     "-Wstring-conversion"
     "-Wtautological-overlap-compare"
@@ -197,6 +198,9 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "-Wthread-safety-beta"
     "-Wunused-comparison"
     "-Wvla"
+
+    # Clang is lax by default on SIMD vector typing. GCC is strict by default.
+    "-fno-lax-vector-conversions"
 
   # TODO(#6959): Enable -Werror once we have a presubmit CI.
   GCC
