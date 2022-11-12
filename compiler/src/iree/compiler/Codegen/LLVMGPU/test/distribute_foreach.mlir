@@ -35,7 +35,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
         %10 = vector.transfer_read %6[%c0, %7], %cst {in_bounds = [true]} : memref<1x256xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, vector<4xf32>
         %11 = arith.addf %9, %10 : vector<4xf32>
         vector.transfer_write %11, %8[%c0, %c0] {in_bounds = [true]} : vector<4xf32>, memref<1x4xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-      } {thread_dim_mapping = [0, 1, 2]}
+      } {mapping = [#gpu.thread<x>, #gpu.thread<y>, #gpu.thread<z>]}
       return
     }
   }

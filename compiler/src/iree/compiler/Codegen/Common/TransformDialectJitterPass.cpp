@@ -132,8 +132,7 @@ static Value tileAndFuseAndDistributeImpl(
     std::conditional_t<std::is_same_v<TileOrNumThreadKind, TileOrNumThreadList>,
                        ArrayRef<int64_t>, Value>
         tileSizesOrNumThreads,
-    ArrayRef<int64_t> threadDimMapping,
-    SmallVector<Value> *resultingFusedOpsHandles) {
+    ArrayAttr threadDimMapping, SmallVector<Value> *resultingFusedOpsHandles) {
   auto tileToForeachOp = b.create<TilingTransformOp>(
       rootH, tileSizesOrNumThreads, TileOrNumThreadSpec(), threadDimMapping);
   Value foreachThreadH = tileToForeachOp.getForeachThreadOp();
@@ -156,7 +155,7 @@ template <typename TilingTransformOp = TileToForeachThreadOp,
           typename BatchOrIterativeFusion = BatchFusionSpec>
 static Value tfdWithTileSizes(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
-    ArrayRef<int64_t> tileSizes, ArrayRef<int64_t> threadDimMapping = {},
+    ArrayRef<int64_t> tileSizes, ArrayAttr threadDimMapping = {},
     SmallVector<Value> *resultingFusedOpsHandles = nullptr) {
   return tileAndFuseAndDistributeImpl<
       TilingTransformOp, transform::TileSizesSpec, BatchOrIterativeFusion,
@@ -168,7 +167,7 @@ template <typename TilingTransformOp = TileToForeachThreadOp,
           typename BatchOrIterativeFusion = BatchFusionSpec>
 static Value tfdWithTileSizeHandle(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
-    Value tileSizeHandle, ArrayRef<int64_t> threadDimMapping = {},
+    Value tileSizeHandle, ArrayAttr threadDimMapping = {},
     SmallVector<Value> *resultingFusedOpsHandles = nullptr) {
   return tileAndFuseAndDistributeImpl<
       TilingTransformOp, transform::TileSizesSpec, BatchOrIterativeFusion,
@@ -180,7 +179,7 @@ template <typename TilingTransformOp = TileToForeachThreadOp,
           typename BatchOrIterativeFusion = BatchFusionSpec>
 static Value tfdWithNumThreads(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
-    ArrayRef<int64_t> numThreads, ArrayRef<int64_t> threadDimMapping = {},
+    ArrayRef<int64_t> numThreads, ArrayAttr threadDimMapping = {},
     SmallVector<Value> *resultingFusedOpsHandles = nullptr) {
   return tileAndFuseAndDistributeImpl<
       TilingTransformOp, transform::NumThreadsSpec, BatchOrIterativeFusion>(
@@ -254,13 +253,20 @@ static Value buildReductionStrategyBlockDistributionPart(
   Value splitFillH = splitReductionTransformOp.getFillOp();
   Value splitLinalgH = splitReductionTransformOp.getSplitLinalgOp();
   Value combinerH = splitReductionTransformOp.getCombiningLinalgOp();
-
+  // TODO IREE needs own workgroup mapping attribute
+  auto x = mlir::gpu::GPUBlockMappingAttr::get(b.getContext(),
+                                               ::mlir::gpu::Blocks::DimX);
+  auto y = mlir::gpu::GPUBlockMappingAttr::get(b.getContext(),
+                                               ::mlir::gpu::Blocks::DimY);
+  auto z = mlir::gpu::GPUBlockMappingAttr::get(b.getContext(),
+                                               ::mlir::gpu::Blocks::DimZ);
   // Step 2. First level of tiling + fusion parallelizes to blocks using
   // `tileSizes`.
   tfdWithTileSizeHandle<TileToForeachThreadAndWorkgroupCountRegionOp>(
       b,
       /*rootH=*/combinerH,
-      /*opsHToFuse=*/{originalFillH, splitFillH, splitLinalgH}, tileSizes);
+      /*opsHToFuse=*/{originalFillH, splitFillH, splitLinalgH}, tileSizes,
+      b.getArrayAttr({x, y, z}));
   b.create<transform::YieldOp>(variantH);
   return sequence->getResult(0);
 }
@@ -279,17 +285,23 @@ static void buildReductionCudaStrategy(ImplicitLocOpBuilder &b,
       b, variantH,
       ArrayRef<StringRef>{linalg::GenericOp::getOperationName(),
                           linalg::FillOp::getOperationName()});
+  auto x = mlir::gpu::GPUThreadMappingAttr::get(b.getContext(),
+                                                ::mlir::gpu::Threads::DimX);
+  auto y = mlir::gpu::GPUThreadMappingAttr::get(b.getContext(),
+                                                ::mlir::gpu::Threads::DimY);
+  auto z = mlir::gpu::GPUThreadMappingAttr::get(b.getContext(),
+                                                ::mlir::gpu::Threads::DimZ);
   // clang-format off
   tfdWithTileSizes(b,
                    /*rootH=*/parRedH,
                    /*opsHToFuse=*/{fill1dH},
                    /*tileSizes=*/ArrayRef<int64_t>{1, 0, 0},
-                   /*threadDimMapping=*/ArrayRef<int64_t>{2, 1, 0});
+                   /*threadDimMapping=*/b.getArrayAttr({z,y,x}));
   tfdWithTileSizes(b,
                    /*rootH=*/parParRedH,
                    /*opsHToFuse=*/{fill2dH},
                    /*tileSizes=*/ArrayRef<int64_t>{1, 1, 0},
-                   /*threadDimMapping=*/ArrayRef<int64_t>{2, 1, 0});
+                   /*threadDimMapping=*/b.getArrayAttr({z,y,x}));
   // clang-format on
 
   // Step 3. Rank-reduce and vectorize.
