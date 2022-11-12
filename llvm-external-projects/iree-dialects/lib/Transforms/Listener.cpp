@@ -28,10 +28,9 @@ void ListenerList::notifyBlockCreated(Block *block) {
     listener->notifyBlockCreated(block);
 }
 
-void ListenerList::notifyOperationReplaced(Operation *op,
-                                           ValueRange newValues) {
+void ListenerList::notifyRootReplaced(Operation *op, ValueRange newValues) {
   for (RewriteListener *listener : listeners)
-    listener->notifyOperationReplaced(op, newValues);
+    listener->notifyRootReplaced(op, newValues);
 }
 
 void ListenerList::notifyOperationRemoved(Operation *op) {
@@ -39,10 +38,12 @@ void ListenerList::notifyOperationRemoved(Operation *op) {
     listener->notifyOperationRemoved(op);
 }
 
-void ListenerList::notifyMatchFailure(
-    Operation *op, function_ref<void(Diagnostic &)> reasonCallback) {
+LogicalResult ListenerList::notifyMatchFailure(
+    Location loc, function_ref<void(Diagnostic &)> reasonCallback) {
+  bool failed = false;
   for (RewriteListener *listener : listeners)
-    listener->notifyMatchFailure(op, reasonCallback);
+    failed |= listener->notifyMatchFailure(loc, reasonCallback).failed();
+  return failure(failed);
 }
 
 } // namespace mlir
