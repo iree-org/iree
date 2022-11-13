@@ -387,7 +387,7 @@ def ConvertToNVVM :
 
 // TODO: Bring the argument in line with the names used elsewhere.
 def LLVMGPULowerExecutableTarget :
-    Pass<"iree-llvmgpu-lower-executable-target-pass", "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
+    Pass<"iree-llvmgpu-lower-executable-target", "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
   let summary = "Perform lowering of executable target using one of the IREE::HAL::DispatchLoweringPassPipeline";
   let constructor = "mlir::iree_compiler::createLLVMGPULowerExecutableTargetPass()";
 }
