@@ -15,7 +15,10 @@ package(
 
 iree_lit_test_suite(
     name = "lit",
-    srcs = ["matmul.mlir"],
+    srcs = [
+        "matmul.mlir",
+        "reduction.mlir",
+    ],
     cfg = "//tests:lit.cfg.py",
     # transform dialect spec files are MLIR files that specify a transformation,
     # they need to be included as data.

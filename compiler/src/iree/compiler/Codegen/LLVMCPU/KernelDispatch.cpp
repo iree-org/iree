@@ -1749,13 +1749,6 @@ LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
       setTranslationInfo(funcOp, translationInfo);
       continue;
     }
-    if (clCPUEnableTransformDialectJit) {
-      auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-          moduleOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
-                                     TransformDialectJitterCodegen);
-      setTranslationInfo(funcOp, translationInfo);
-      continue;
-    }
 
     SmallVector<Operation *> computeOps;
 

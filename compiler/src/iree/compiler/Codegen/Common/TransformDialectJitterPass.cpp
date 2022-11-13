@@ -19,6 +19,7 @@
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/TransformExtensions/FlowExtensions.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -44,14 +45,14 @@
 #include "mlir/Dialect/Vector/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
-#include "mlir/IR/Location.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
 
 #define DEBUG_TYPE "iree-transform-dialect-jitter"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 
-using namespace mlir;
+using namespace ::mlir;
+using namespace ::mlir::iree_compiler::IREE;
 
 // TODO: significantly better namespacing.
 using ::mlir::iree_compiler::IREE::transform_dialect::ApplyPatternsOp;
@@ -153,7 +154,7 @@ static Value tileAndFuseAndDistributeImpl(
 
 template <typename TilingTransformOp = TileToForeachThreadOp,
           typename BatchOrIterativeFusion = BatchFusionSpec>
-static Value tfdWithTileSizes(
+static Value buildTFDWithTileSizes(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     ArrayRef<int64_t> tileSizes, ArrayAttr threadDimMapping = {},
     SmallVector<Value> *resultingFusedOpsHandles = nullptr) {
@@ -165,7 +166,7 @@ static Value tfdWithTileSizes(
 
 template <typename TilingTransformOp = TileToForeachThreadOp,
           typename BatchOrIterativeFusion = BatchFusionSpec>
-static Value tfdWithTileSizeHandle(
+static Value buildTFDWithTileSizes(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     Value tileSizeHandle, ArrayAttr threadDimMapping = {},
     SmallVector<Value> *resultingFusedOpsHandles = nullptr) {
@@ -178,7 +179,19 @@ static Value tfdWithTileSizeHandle(
 
 template <typename TilingTransformOp = TileToForeachThreadOp,
           typename BatchOrIterativeFusion = BatchFusionSpec>
-static Value tfdWithNumThreadsHandle(
+static Value buildTFDWithNumThreads(
+    ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
+    ArrayRef<int64_t> numThreads, ArrayAttr threadDimMapping = {},
+    SmallVector<Value> *resultingFusedOpsHandles = nullptr) {
+  return tileAndFuseAndDistributeImpl<
+      TilingTransformOp, transform::NumThreadsSpec, BatchOrIterativeFusion>(
+      b, rootH, opsHToFuse, numThreads, threadDimMapping,
+      resultingFusedOpsHandles);
+}
+
+template <typename TilingTransformOp = TileToForeachThreadOp,
+          typename BatchOrIterativeFusion = BatchFusionSpec>
+static Value buildTFDWithNumThreads(
     ImplicitLocOpBuilder &b, Value rootH, ValueRange opsHToFuse,
     Value numThreads, ArrayAttr threadDimMapping = {},
     SmallVector<Value> *resultingFusedOpsHandles = nullptr) {
@@ -188,11 +201,11 @@ static Value tfdWithNumThreadsHandle(
       threadDimMapping, resultingFusedOpsHandles);
 }
 
-/// Apply patterns and vectorize (for now always applies rank-reduction).
-/// Takes a handle to a func.func and returns an updated handle to a
-/// func.func.
+/// Apply patterns and buildVectorizeStrategy (for now always applies
+/// rank-reduction). Takes a handle to a func.func and returns an updated handle
+/// to a func.func.
 // TODO: configure patterns.
-static Value vectorize(ImplicitLocOpBuilder &b, Value funcH) {
+static Value buildVectorizeStrategy(ImplicitLocOpBuilder &b, Value funcH) {
   funcH = b.create<ApplyPatternsOp>(funcH, /*rankReducing=*/true);
   return b.create<VectorizeOp>(funcH);
 }
@@ -200,8 +213,8 @@ static Value vectorize(ImplicitLocOpBuilder &b, Value funcH) {
 /// Post-bufferization mapping to blocks and threads.
 /// Takes a handle to a func.func and returns an updated handle to a
 /// func.func.
-static Value mapToBlockAndThreads(ImplicitLocOpBuilder &b, Value funcH,
-                                  ArrayRef<int64_t> blockSize) {
+static Value buildMapToBlockAndThreads(ImplicitLocOpBuilder &b, Value funcH,
+                                       ArrayRef<int64_t> blockSize) {
   funcH = b.create<ForeachThreadToWorkgroupOp>(funcH);
   return b.create<MapNestedForeachThreadToGpuThreadsOp>(funcH, blockSize);
 }
@@ -209,8 +222,8 @@ static Value mapToBlockAndThreads(ImplicitLocOpBuilder &b, Value funcH,
 /// Post-bufferization vector distribution with rank-reduction.
 /// Takes a handle to a func.func and returns an updated handle to a
 /// func.func.
-static Value distributeVectors(ImplicitLocOpBuilder &b, Value funcH,
-                               int64_t warpSize = 32) {
+static Value buildDistributeVectors(ImplicitLocOpBuilder &b, Value funcH,
+                                    int64_t warpSize = 32) {
   funcH = b.create<ApplyPatternsOp>(funcH, /*rankReducing=*/true);
   Value ifH = b.create<MatchOp>(funcH, scf::IfOp::getOperationName());
   ifH = b.create<VectorToWarpExecuteOnLane0Op>(ifH, warpSize);
@@ -224,9 +237,10 @@ static Value distributeVectors(ImplicitLocOpBuilder &b, Value funcH,
 /// It runs without interleaved canonicalize, CSE or enabling transforms which
 /// allows the transform dialect to build payload IR and not risk seeing it
 /// being DCE'd away immediately.
+template <typename TileSizesType>
 static Value buildReductionStrategyBlockDistributionPart(
     ImplicitLocOpBuilder &b, Value variantH, Value originalFillH,
-    Value originalGenericH, Value tileSizes0Generic) {
+    Value originalGenericH, TileSizesType tileSizes0Generic) {
   // Step 1. Split the reduction to get meatier parallelism.
   // TODO: use a scf.foreach_thread for this.
   auto splitReductionTransformOp =
@@ -244,7 +258,7 @@ static Value buildReductionStrategyBlockDistributionPart(
                                                ::mlir::gpu::Blocks::DimX);
   // Step 2. First level of tiling + fusion parallelizes to blocks using
   // `tileSizes`.
-  tfdWithTileSizeHandle<TileToForeachThreadAndWorkgroupCountRegionOp>(
+  buildTFDWithTileSizes<TileToForeachThreadAndWorkgroupCountRegionOp>(
       b,
       /*rootH=*/combinerH,
       /*opsHToFuse=*/{originalFillH, splitFillH, splitLinalgH},
@@ -269,7 +283,7 @@ static Value buildReductionStrategyThreadDistributionPart(
   (void)y;
 
   // clang-format off
-  tfdWithTileSizes<TileToForeachThreadOp>(b,
+  buildTFDWithTileSizes<TileToForeachThreadOp>(b,
                    /*rootH=*/parRedH,
                    /*opsHToFuse=*/{fill1dH},
                   // TODO: activate this, we have the information but it does
@@ -278,7 +292,7 @@ static Value buildReductionStrategyThreadDistributionPart(
                   //  /*threadDimMapping=*/b.getArrayAttr({y}));
                    /*tileSizes=*/ArrayRef<int64_t>{1, 0, 0},
                    /*threadDimMapping=*/b.getArrayAttr({z}));
-  tfdWithTileSizes<TileToForeachThreadOp>(b,
+  buildTFDWithTileSizes<TileToForeachThreadOp>(b,
                    /*rootH=*/parParRedH,
                    /*opsHToFuse=*/{fill2dH},
                   // TODO: activate this, we have the information but it does
@@ -293,8 +307,8 @@ static Value buildReductionStrategyThreadDistributionPart(
 
 // TODO: generalize and automate over and over.
 // TODO: significantly shrink this down.
-static void buildReductionCudaStrategy(ImplicitLocOpBuilder &b,
-                                       Value variantH) {
+static LogicalResult buildReductionCudaStrategy(
+    ImplicitLocOpBuilder &b, Value variantH, ArrayRef<int64_t> workgroupSize) {
   // Step 0. Fetch transform information from the config and materialize it in
   // the payload IR.
   // TODO: this still requires specific knowledge of ops present in the IR
@@ -318,23 +332,66 @@ static void buildReductionCudaStrategy(ImplicitLocOpBuilder &b,
   variantH = buildReductionStrategyThreadDistributionPart(
       b, variantH, tileSizes1Fill, tileSizes1Generic);
 
-  // Step 3. Rank-reduce and vectorize.
+  // Step 3. Rank-reduce and buildVectorizeStrategy.
   // TODO: assumes a single func::FuncOp to transform, may need hardening.
   Value funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
-  funcH = vectorize(b, funcH);
+  funcH = buildVectorizeStrategy(b, funcH);
 
   // Step 4. Bufferize.
   variantH = b.create<IREEBufferizeOp>(variantH, /*targetGpu=*/true);
 
   // Step 5. Post-bufferization mapping to blocks and threads.
   // Need to match again since bufferize invalidated all handles.
-  // TODO: assumes a single func::FuncOp to transform, may ned hardening.
+  // TODO: assumes a single func::FuncOp to transform, may need hardening.
   funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
   // TODO: extract workgroup_size from config.
-  funcH = mapToBlockAndThreads(b, funcH, ArrayRef<int64_t>{32, 2, 1});
+  funcH = buildMapToBlockAndThreads(b, funcH, workgroupSize);
 
   // Step 6. Post-bufferization vector distribution with rank-reduction.
-  distributeVectors(b, funcH);
+  buildDistributeVectors(b, funcH);
+
+  return success();
+}
+
+// TODO: generalize and automate over and over.
+// TODO: significantly shrink this down.
+static LogicalResult buildReductionCpuStrategy(
+    ImplicitLocOpBuilder &b, Value variantH, ArrayRef<int64_t> workgroupSize) {
+  // Step 0. Fetch transform information from the config and materialize it in
+  // the payload IR.
+  // TODO: this still requires specific knowledge of ops present in the IR
+  // and is very brittle.
+  Value originalFillH =
+      b.create<MatchOp>(variantH, linalg::FillOp::getOperationName());
+  Value originalGenericH =
+      b.create<MatchOp>(variantH, linalg::GenericOp::getOperationName());
+  // TODO: no values in config atm.
+  Value tileSizes0Generic =
+      b.create<ConfigExtractPart>(originalGenericH, "tile_sizes", 0);
+  // Value tileSizes1Fill =
+  //     b.create<ConfigExtractPart>(originalFillH, "tile_sizes", 1);
+  // Value tileSizes1Generic =
+  //     b.create<ConfigExtractPart>(originalGenericH, "tile_sizes", 1);
+
+  // Step 1: Distribute to blocks using the current IREE lowering config.
+  variantH = buildReductionStrategyBlockDistributionPart(
+      b, variantH, originalFillH, originalGenericH, tileSizes0Generic);
+
+  // Step 2. Rank-reduce and buildVectorizeStrategy.
+  // TODO: assumes a single func::FuncOp to transform, may need hardening.
+  Value funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
+  funcH = buildVectorizeStrategy(b, funcH);
+
+  // Step 3. Bufferize.
+  variantH = b.create<IREEBufferizeOp>(variantH, /*targetGpu=*/true);
+
+  // Step 4. Post-bufferization mapping to blocks only.
+  // Need to match again since bufferize invalidated all handles.
+  // TODO: assumes a single func::FuncOp to transform, may need hardening.
+  funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
+  funcH = b.create<ForeachThreadToWorkgroupOp>(funcH);
+
+  return success();
 }
 
 namespace {
@@ -391,30 +448,113 @@ class TransformDialectJitterPass
     linalg::registerTransformDialectExtension(registry);
   }
 
-  TransformDialectJitterPass() = default;
+  LogicalResult buildStrategy(ImplicitLocOpBuilder ib, Value variantH,
+                              StringRef target, StringRef strategyName,
+                              ArrayRef<int64_t> workgroupSize) {
+    // TODO: this is very brittle.
+    if (target == "cuda") {
+      if (strategyName == "reduction_strategy")
+        return buildReductionCudaStrategy(ib, variantH, workgroupSize);
+    } else if (target == "llvm-cpu") {
+      if (strategyName == "reduction_strategy")
+        return buildReductionCpuStrategy(ib, variantH, workgroupSize);
+    }
+    return getOperation()->emitError("Unknown strategy: ") << strategyName;
+  }
+
+  // TODO: this is very brittle.
+  FailureOr<StringRef> getTarget(HAL::ExecutableVariantOp variantOp) {
+    HAL::ExecutableTargetAttr targetAttr = variantOp.getTarget();
+    if (!targetAttr || !targetAttr.getBackend()) return failure();
+    return targetAttr.getBackend().getValue();
+  }
+
+  // TODO: this is very brittle.
+  FailureOr<HAL::ExecutableExportOp> getAssumedSingleExport(
+      HAL::ExecutableVariantOp variantOp) {
+    HAL::ExecutableExportOp res;
+    auto lambda = [&](HAL::ExecutableExportOp op) {
+      if (res) return WalkResult::interrupt();
+      res = op;
+      return WalkResult::advance();
+    };
+    if (variantOp->walk(lambda).wasInterrupted()) return failure();
+    return res;
+  }
+
+  // TODO: this is very brittle.
+  FailureOr<StringRef> getStrategyName(HAL::ExecutableExportOp exportOp) {
+    static const char kTranslationInfoAttrName[] = "translation_info";
+    auto attr = exportOp->getAttr(kTranslationInfoAttrName)
+                    .dyn_cast_or_null<Codegen::TranslationInfoAttr>();
+    if (!attr || !attr.getTransfromStrategyName()) return failure();
+    return attr.getTransfromStrategyName().getValue();
+  }
+
+  // TODO: this is very brittle.
+  FailureOr<SmallVector<int64_t>> getWorkgroupSize(
+      HAL::ExecutableExportOp exportOp) {
+    if (!exportOp.getWorkgroupSize()) return failure();
+    auto sizeRange =
+        exportOp.getWorkgroupSize()->getAsValueRange<IntegerAttr>();
+    SmallVector<int64_t> res;
+    res.reserve(3);
+    for (APInt apInt : sizeRange) res.push_back(apInt.getSExtValue());
+    return res;
+  }
 
   void runOnOperation() override {
     Operation *target = getOperation();
     LLVM_DEBUG(DBGS() << "input IR:\n" << *target);
 
-    // TODO: connect the config above to the reduction below.
-    // This connects to Codegen/LLVMGPU/KernelConfig.cpp
-    //   LogicalResult initGPULaunchConfig(ModuleOp moduleOp)
-    //     LogicalResult setWarpReductionConfig(func::FuncOp, LinalgOp)
+    // TODO: all the maybeXXX extractions below are brittle and would be better
+    // served by better matching closer to the strategy building.
+    // For now this is what IREE provide so we connect to the vailable info.
+    auto maybeTarget = getTarget(cast<HAL::ExecutableVariantOp>(target));
+    if (failed(maybeTarget)) {
+      target->emitOpError()
+          << "could not extract target information from executable.variant op";
+      return signalPassFailure();
+    }
+    auto maybeExportOp =
+        getAssumedSingleExport(cast<HAL::ExecutableVariantOp>(target));
+    if (failed(maybeExportOp)) {
+      target->emitOpError()
+          << "could not extract a single exportOp from executable.variant op";
+      return signalPassFailure();
+    }
+    auto maybeStrategyName = getStrategyName(*maybeExportOp);
+    if (failed(maybeStrategyName)) {
+      target->emitOpError()
+          << "could not extract a strategy name from executable.export op";
+      return signalPassFailure();
+    }
+    auto maybeWorkgroupSize = getWorkgroupSize(*maybeExportOp);
+    if (failed(maybeWorkgroupSize)) {
+      target->emitOpError()
+          << "could not extract a workgroup size from executable.export op";
+      return signalPassFailure();
+    }
+
     MLIRContext *ctx = target->getContext();
     Location loc = target->getLoc();
-
     OpBuilder b(ctx);
     auto topLevelTransformModule = b.create<ModuleOp>(loc);
     Region &topLevelTransformRegion = topLevelTransformModule.getBodyRegion();
     b.setInsertionPointToStart(&topLevelTransformRegion.front());
+    bool passFailure = false;
     b.create<::transform_ext::CanonicalizedSequenceOp>(
         target->getLoc(), transform::FailurePropagationMode::Suppress,
-        [](OpBuilder &b, Location loc, Value variantH) {
+        [&](OpBuilder &b, Location loc, Value variantH) {
           ImplicitLocOpBuilder ib(loc, b);
-          buildReductionCudaStrategy(ib, variantH);
+          if (failed(buildStrategy(ib, variantH, *maybeTarget,
+                                   *maybeStrategyName, *maybeWorkgroupSize)))
+            passFailure = true;
           b.create<transform::YieldOp>(loc);
         });
+
+    // Could not construct strategy.
+    if (passFailure) return signalPassFailure();
 
     LLVM_DEBUG(DBGS() << "apply transform:\n" << topLevelTransformModule);
     if (failed(transform::applyTransformsInRegion(topLevelTransformRegion,

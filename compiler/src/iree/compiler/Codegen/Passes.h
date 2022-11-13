@@ -332,12 +332,6 @@ LogicalResult verifyConvTileAndDecomposeExpertConfig(
     ArrayRef<int64_t> workgroupSize = {});
 void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager);
 
-/// Populates the passes from Sandbox for testing transformations from
-/// sandbox. Unlike other pipelines this pass mangaer is nested at the
-/// `hal.executable.variant` op.
-void addTransformDialectInterpreterPasses(OpPassManager &passManager);
-void addTransformDialectJitterPasses(OpPassManager &passManager);
-
 /// Populates the passes needed to multi level tile, fuse and vectorize
 /// lowering of linalg ops on tensors to vectors operations.
 void addCPUAArchDoubleTilingExpertPassPipeline(OpPassManager &passManager);
@@ -350,6 +344,10 @@ void addCPUAArchDoubleTilingExpertPassPipeline(OpPassManager &passManager);
 /// structured ops path. The pass manager `pm` in here should operate on the
 /// module within the IREE::HAL::ExecutableOp.
 void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager);
+
+/// Experimental path for transform dialect.
+void addCPUTransformDialectInterpreterPasses(OpPassManager &passManager);
+void addCPUTransformDialectJitterPasses(OpPassManager &passManager);
 
 //----------------------------------------------------------------------------//
 // LLVMCPU Linking Passes and Pipelines

@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "matmul.mlir"
+    "reduction.mlir"
   TOOLS
     ${IREE_LLD_TARGET}
     FileCheck

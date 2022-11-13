@@ -650,7 +650,7 @@ void addCPUDefaultPassPipeline(OpPassManager &passManager) {
   }
 }
 
-void addTransformDialectInterpreterPasses(OpPassManager &passManager) {
+void addCPUTransformDialectInterpreterPasses(OpPassManager &passManager) {
   // Give control to the transform dialect.
   passManager.addPass(
       mlir::iree_compiler::createTransformDialectInterpreterPass(
@@ -662,7 +662,7 @@ void addTransformDialectInterpreterPasses(OpPassManager &passManager) {
   passManager.addPass(createDropSchedulePass());
 }
 
-void addTransformDialectJitterPasses(OpPassManager &passManager) {
+void addCPUTransformDialectJitterPasses(OpPassManager &passManager) {
   // Give control to the transform dialect.
   passManager.addPass(mlir::iree_compiler::createTransformDialectJitterPass());
   // Dropping the schedule is needed:
