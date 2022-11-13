@@ -17,7 +17,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
   // ==============================================================
   %foreach_thread, %_ =
   transform.iree.tile_to_foreach_thread_and_workgroup_count_region %div tile_sizes [1, 4]  
-    ( mapping = [#gpu.block<x>, #gpu.block<y>, #gpu.block<z>] )
+    ( mapping = [#gpu.block<x>, #gpu.block<y>] )
   // TODO: Merging and fusing merged handles does not work properly atm.
   transform.structured.fuse_into_containing_op %exp_and_exps_sum into %foreach_thread
   transform.structured.fuse_into_containing_op %exps_sum_fill into %foreach_thread
@@ -49,7 +49,7 @@ transform.structured.canonicalized_sequence failures(propagate) {
                                                   %tiled_exp_and_exps_sum
     : !pdl.operation
   transform.structured.tile_to_foreach_thread_op %reduction_linalg_ops tile_sizes [1, 1]
-    ( mapping = [#gpu.thread<z>, #gpu.thread<y>, #gpu.thread<x>] )
+    ( mapping = [#gpu.thread<z>, #gpu.thread<y>] )
   // Fully parallel ops are tiled and mapped.
   %parallel_linalg_ops = transform.merge_handles %tiled_input_max_fill,
                                                  %tiled_exps_sum_fill,
