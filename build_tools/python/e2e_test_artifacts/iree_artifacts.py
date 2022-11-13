@@ -70,7 +70,15 @@ def get_module_path(
     module_generation_config: iree_definitions.ModuleGenerationConfig,
     root_dir_path: pathlib.PurePath = pathlib.PurePath()
 ) -> pathlib.PurePath:
-  """Returns the path of an IREE compiled module."""
+  """Returns the path of an IREE compiled module.
+  
+  Args:
+    module_generation_config: IREE module generation config.
+    root_dir_path: path of the root artifact directory, on which the returned
+      path will be based.
+  Returns:
+    Path of the module file.
+  """
   model_dir_path = _get_model_dir_path(
       root_dir_path=root_dir_path,
       imported_model=module_generation_config.imported_model)

@@ -198,6 +198,13 @@ class BenchmarkSuite(object):
   @staticmethod
   def load_from_run_configs(
       run_configs: Sequence[iree_definitions.E2EModelRunConfig]):
+    """Loads the benchmarks from the run configs.
+
+    Args:
+      run_configs: list of benchmark run configs.
+    Returns:
+      A benchmark suite.
+    """
 
     suite_map = collections.defaultdict(list)
     for run_config in run_configs:
