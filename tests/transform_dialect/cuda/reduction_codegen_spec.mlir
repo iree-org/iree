@@ -14,7 +14,8 @@ transform.structured.canonicalized_sequence failures(suppress) {
   // Step 2. First level of tiling + fusion parallelizes to blocks.
   // ===========================================================================
   %foreach_thread_grid, %grid_combiner_op =
-    transform.iree.tile_to_foreach_thread_and_workgroup_count_region %combiner_op tile_sizes [1]  ( mapping = [#gpu.block<x>, #gpu.block<y>, #gpu.block<z>] )
+    transform.iree.tile_to_foreach_thread_and_workgroup_count_region %combiner_op tile_sizes [1]
+      ( mapping = [#gpu.block<x>] )
   %not_combiner = transform.merge_handles %fill, %more_parallel_fill_op, %more_parallel_op : !pdl.operation
   transform.structured.fuse_into_containing_op %not_combiner into %foreach_thread_grid
 
@@ -22,16 +23,16 @@ transform.structured.canonicalized_sequence failures(suppress) {
   // ===========================================================================
   %fill_1d = transform.structured.match ops{["linalg.fill"]} filter_result_type = tensor<1xf32> in %variant_op
   %foreach_thread_block_combiner_op, %block_combiner_op =
-    transform.structured.tile_to_foreach_thread_op %grid_combiner_op tile_sizes [1, 0, 0] 
-    ( mapping = [#gpu.thread<z>, #gpu.thread<y>, #gpu.thread<x>] )
+    transform.structured.tile_to_foreach_thread_op %grid_combiner_op tile_sizes [1] 
+    ( mapping = [#gpu.thread<z>] )
   transform.structured.fuse_into_containing_op %fill_1d into %foreach_thread_block_combiner_op
 
   %fill_2d = transform.structured.match ops{["linalg.fill"]} filter_result_type = tensor<1x2xf32> in %variant_op
   %grid_more_parallel_op = transform.structured.match interface{LinalgOp}
     attributes{iterator_types = ["parallel", "parallel", "reduction"]} in %variant_op
   %foreach_thread_block_more_parallel_op, %block_more_parallel_op =
-    transform.structured.tile_to_foreach_thread_op %grid_more_parallel_op tile_sizes [1, 1, 0] 
-    ( mapping = [#gpu.thread<z>, #gpu.thread<y>, #gpu.thread<x>] )
+    transform.structured.tile_to_foreach_thread_op %grid_more_parallel_op tile_sizes [1, 1] 
+    ( mapping = [#gpu.thread<z>, #gpu.thread<y>] )
   transform.structured.fuse_into_containing_op %fill_2d into %foreach_thread_block_more_parallel_op
 
   // Step 4. Rank-reduce and vectorize.

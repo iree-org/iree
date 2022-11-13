@@ -267,75 +267,6 @@ static LogicalResult populateWorkgroupCountComputingRegion(
   return success();
 }
 
-/// Apply the permutation `perm` to `vals.
-/// Return failure if perm is not a permutation.
-// TODO: upstream as extraClassDeclaration once stabilized.
-template <typename T>
-static FailureOr<SmallVector<T>> permute(const SmallVector<T> &vals,
-                                         ArrayRef<int64_t> perm) {
-  if (vals.size() != perm.size()) return failure();
-  SmallVector<T> result(vals.size());
-  SmallVector<bool> seen(vals.size());
-  for (const auto &it : llvm::zip(perm, vals)) {
-    // Already seen, invalid thread_dim_mapping.
-    if (seen[std::get<0>(it)]) return failure();
-    result[std::get<0>(it)] = std::get<1>(it);
-    seen[std::get<0>(it)] = true;
-  }
-  // Some not seen, invalid thread_dim_mapping.
-  if (!llvm::all_of(seen, [](bool b) { return b; })) return failure();
-  return result;
-}
-
-/// Helper to get apply the `thread_dim_mapping` permutation of a
-/// `foreachThreadOp` to `values`.
-// TODO: upstream as extraClassDeclaration once stabilized.
-template <typename T>
-static FailureOr<SmallVector<T>> getPermuted(
-    scf::ForeachThreadOp foreachThreadOp, const SmallVector<T> &values) {
-  // Apply mapping permutation if specified.
-  SmallVector<int64_t> mapping;
-  if (!foreachThreadOp.getMapping().has_value())
-    return foreachThreadOp->emitError() << "mapping must be present";
-  // TODO iree should have own device mapping like #hal.workgroup<x/y/z>
-  for (DeviceMappingAttrInterface map :
-       foreachThreadOp.getMapping()->getValue()) {
-    if (auto blockMap = map.dyn_cast<mlir::gpu::GPUBlockMappingAttr>()) {
-      mapping.push_back((int64_t)blockMap.getBlock());
-    } else {
-      return foreachThreadOp->emitError()
-             << "mapping must be #gpu.block<x/y/z/>";
-    }
-  }
-  if (!mapping.empty()) {
-    auto maybePermuted = permute(values, mapping);
-    if (failed(maybePermuted))
-      return foreachThreadOp->emitError("invalid permutation");
-    return *maybePermuted;
-  }
-  return values;
-}
-
-/// Helper to get the `num_threads` of a `foreachThreadOp` after applying the
-/// `thread_dim_mapping` permutation.
-// TODO: upstream as extraClassDeclaration once stabilized.
-static FailureOr<SmallVector<OpFoldResult>> getNumThreads(
-    OpBuilder &b, scf::ForeachThreadOp foreachThreadOp) {
-  SmallVector<OpFoldResult> threadCount = foreachThreadOp.getNumThreads();
-  threadCount.resize(3, b.getIndexAttr(1));
-  return getPermuted(foreachThreadOp, threadCount);
-}
-
-/// Helper to get the thread indices of a `foreachThreadOp` after applying the
-/// `thread_dim_mapping` permutation.
-// TODO: upstream as extraClassDeclaration once stabilized.
-static FailureOr<SmallVector<Value>> getThreadIndices(
-    OpBuilder &b, scf::ForeachThreadOp foreachThreadOp) {
-  SmallVector<Value> threadCount = foreachThreadOp.getThreadIndices();
-  threadCount.resize(3, Value());
-  return getPermuted(foreachThreadOp, threadCount);
-}
-
 //===---------------------------------------------------------------------===//
 // Patterns for ForeachThreadToWorkgroup rewrite.
 //===---------------------------------------------------------------------===//
@@ -343,14 +274,67 @@ static FailureOr<SmallVector<Value>> getThreadIndices(
 LogicalResult rewriteForeachThreadToWorkgroup(
     scf::ForeachThreadOp foreachThreadOp,
     IREE::HAL::ExecutableExportOp exportOp, PatternRewriter &rewriter) {
+  // Step 0. Target-specific verifications. There is no good place to anchor
+  // those right now: the ForeachThreadOp is target-independent and the
+  // transform op does not apply to individual ForeachThreadOp.
+  MLIRContext *ctx = foreachThreadOp->getContext();
+  Location loc = foreachThreadOp->getLoc();
+  // TODO iree should have own device mapping like #hal.workgroup<x/y/z>
+  Attribute bX = gpu::GPUBlockMappingAttr::get(ctx, gpu::Blocks::DimX);
+  Attribute bY = gpu::GPUBlockMappingAttr::get(ctx, gpu::Blocks::DimY);
+  Attribute bZ = gpu::GPUBlockMappingAttr::get(ctx, gpu::Blocks::DimZ);
   if (foreachThreadOp.getNumResults() > 0)
     return foreachThreadOp->emitError(
         "only bufferized scf.foreach_thread lowers to workgroup");
   if (foreachThreadOp.getNumThreads().size() > 3)
     return foreachThreadOp->emitError(
         "scf.foreach_thread with rank > 3 does not lower to workgroup");
+  if (llvm::any_of(foreachThreadOp.getNumThreads(), [](Value v) {
+        return !v.getDefiningOp<arith::ConstantIndexOp>();
+      })) {
+    return foreachThreadOp->emitError(
+        "unsupported dynamic workgroup_count atm --- need to slice out "
+        "workgroup_count computation into ExecutableExport::workgroup_count. "
+        "This region may require arbitrary computations and cannot magically "
+        "match what the `stream.cmd.dispatch` has already imposed on us at a "
+        "distance. For now we must specify the number of values properly "
+        "when applying the topLevel tile_to_foreach_thread_op");
+  }
+  if (!foreachThreadOp.getMapping().has_value())
+    return foreachThreadOp->emitError("mapping must be present");
+  SmallVector<Attribute> blockMapping =
+      llvm::to_vector(foreachThreadOp.getMapping()->getValue());
+  if (llvm::any_of(blockMapping, [](DeviceMappingAttrInterface map) {
+        return !map.isa<gpu::GPUBlockMappingAttr>();
+      })) {
+    return foreachThreadOp->emitError("mapping must be #gpu.block<x/y/z/>");
+  }
 
-  // Step 0. Outline the compute workload region and set up the workload
+  // Step 1. Complete the blockMapping to a full mapping (with 1s) if necessary.
+  SmallVector<Value> numBlocks =
+      llvm::to_vector(foreachThreadOp.getNumThreads());
+  // Ensure we have 3 block sizes, one for each id.
+  Value one;
+  for (auto attr : {bX, bY, bZ}) {
+    if (std::find(blockMapping.begin(), blockMapping.end(), attr) ==
+        blockMapping.end()) {
+      blockMapping.push_back(attr);
+      one = one ? one : rewriter.create<arith::ConstantIndexOp>(loc, 1);
+      numBlocks.push_back(one);
+    }
+  }
+  // Step 2. sort the values by the corresponding GPUBlockMappingAttr.
+  auto comparator = [](Attribute a, Attribute b) -> bool {
+    return static_cast<int64_t>(a.cast<gpu::GPUBlockMappingAttr>().getBlock()) <
+           static_cast<int64_t>(b.cast<gpu::GPUBlockMappingAttr>().getBlock());
+  };
+  SmallVector<Value> gridDimValues = scf::ForeachThreadOp::getValuesSortedByKey(
+      blockMapping, numBlocks, comparator);
+  SmallVector<int64_t> gridDims;
+  for (Value v : gridDimValues)
+    gridDims.push_back(v.getDefiningOp<arith::ConstantIndexOp>().value());
+
+  // Step 3. Outline the compute workload region and set up the workload
   // operands, if this has not been done already.
   // Using `transform.iree.tile_to_foreach_thread_and_workgroup_count_region` is
   // the preferred way to set up tiling and workgroup_count region **at the same
@@ -363,21 +347,6 @@ LogicalResult rewriteForeachThreadToWorkgroup(
   // the flow level and explicitly match the ops we want to fuse.
   // Once fusion is customizable enough in perpetuity, we can retire this.
   if (exportOp.getWorkgroupCount().empty()) {
-    auto maybeWorkgroupCounts = getNumThreads(rewriter, foreachThreadOp);
-    if (failed(maybeWorkgroupCounts) ||
-        llvm::any_of(*maybeWorkgroupCounts, [](OpFoldResult ofr) {
-          return !getConstantIntValue(ofr).has_value();
-        }))
-      return foreachThreadOp->emitError(
-          "unsupported dynamic workgroup_count atm --- need to slice out "
-          "workgroup_count computation into ExecutableExport::workgroup_count. "
-          "This region may require arbitrary computations and cannot magically "
-          "match what the `stream.cmd.dispatch` has already imposed on us at a "
-          "distance. For now we must specify the number of values properly "
-          "when applying the topLevel tile_to_foreach_thread_op");
-    SmallVector<int64_t> workgroupCounts;
-    for (OpFoldResult ofr : *maybeWorkgroupCounts)
-      workgroupCounts.push_back(getConstantIntValue(ofr).value());
     if (failed(populateWorkgroupCountComputingRegion(rewriter, foreachThreadOp,
                                                      exportOp))) {
       return foreachThreadOp->emitOpError(
@@ -386,22 +355,23 @@ LogicalResult rewriteForeachThreadToWorkgroup(
     }
   }
 
-  // Step 1. Create the workgroup id and count ops.
-  Location loc = foreachThreadOp.getLoc();
+  // Step 4. Create the workgroup id and count ops.
   BlockAndValueMapping bvm;
-  SmallVector<Value, 8> workgroupIdOps, workgroupCountOps;
-  for (int64_t rank : llvm::seq<int64_t>(0, 3)) {
+  SmallVector<Value> workgroupIdOps, workgroupCountOps;
+  for (Attribute attr : blockMapping) {
+    auto idx =
+        static_cast<int64_t>(attr.cast<gpu::GPUBlockMappingAttr>().getBlock());
     workgroupIdOps.push_back(
-        rewriter.create<HAL::InterfaceWorkgroupIDOp>(loc, rank));
+        rewriter.create<HAL::InterfaceWorkgroupIDOp>(loc, idx));
     workgroupCountOps.push_back(
-        rewriter.create<HAL::InterfaceWorkgroupCountOp>(loc, rank));
+        rewriter.create<HAL::InterfaceWorkgroupCountOp>(loc, idx));
   }
   bvm.map(foreachThreadOp.getThreadIndices(), workgroupIdOps);
   bvm.map(foreachThreadOp.getNumThreads(), workgroupCountOps);
 
-  // Step 2. Predicate omitted given unique topLevel scf::ForeachThreadOp.
+  // Step 5. Predicate omitted given unique topLevel scf::ForeachThreadOp.
 
-  // Step 3. Move the body of foreachThreadOp.
+  // Step 6. Move the body of foreachThreadOp.
   // Erase the terminator first, it will not be used since we are on buffers.
   rewriter.eraseOp(foreachThreadOp.getTerminator());
   Block *targetBlock;
@@ -412,17 +382,12 @@ LogicalResult rewriteForeachThreadToWorkgroup(
   targetBlock->getOperations().splice(insertionPoint,
                                       sourceBlock.getOperations());
 
-  // Step 4. RAUW thread indices to thread ops.
-  SmallVector<Value> threadIndices =
-      *getThreadIndices(rewriter, foreachThreadOp);
-  assert(workgroupIdOps.size() == 3 && "3 workgroup id ops are required");
-  assert(threadIndices.size() == 3 && "3 thread id dimensions are required");
-  for (auto it : llvm::zip(threadIndices, workgroupIdOps)) {
-    Value val = std::get<0>(it);
-    if (!val) continue;
-    for (Operation *user : llvm::make_early_inc_range(val.getUsers())) {
-      rewriter.updateRootInPlace(
-          user, [&]() { user->replaceUsesOfWith(val, std::get<1>(it)); });
+  // Step 7. RAUW thread indices to thread ops.
+  for (Value blockIdx : foreachThreadOp.getThreadIndices()) {
+    for (Operation *user : llvm::make_early_inc_range(blockIdx.getUsers())) {
+      rewriter.updateRootInPlace(user, [&]() {
+        user->replaceUsesOfWith(blockIdx, bvm.lookup(blockIdx));
+      });
     }
   }
 
