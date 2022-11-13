@@ -29,13 +29,17 @@ Example usages:
     /path/to/host/build/dir
 """
 
+import sys
+import pathlib
+
+# Add build_tools python dir to the search path.
+sys.path.insert(0, str(pathlib.Path(__file__).parent / ".." / "python"))
+
 import atexit
 import os
-import re
 import subprocess
 import tarfile
 import shutil
-import sys
 
 from typing import Optional, Sequence
 from common.benchmark_config import BenchmarkConfig

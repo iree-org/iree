@@ -6,12 +6,16 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Runs all matched benchmark suites on a Linux device."""
 
+import sys
+import pathlib
+
+# Add build_tools python dir to the search path.
+sys.path.insert(0, str(pathlib.Path(__file__).parent / ".." / "python"))
+
 import subprocess
 import atexit
 import os
-import re
 import shutil
-import sys
 import tarfile
 
 from typing import List, Optional
