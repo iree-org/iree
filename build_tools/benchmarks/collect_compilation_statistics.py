@@ -10,6 +10,12 @@ The benchmark suites need to be built with ninja and enable the CMake option
 IREE_ENABLE_COMPILATION_BENCHMARKS.
 """
 
+import pathlib
+import sys
+
+# Add build_tools python dir to the search path.
+sys.path.insert(0, str(pathlib.Path(__file__).parent / ".." / "python"))
+
 import argparse
 import json
 import os
