@@ -9,7 +9,7 @@ import os
 import tempfile
 import unittest
 from typing import Sequence
-from common.benchmark_definition import IREE_DRIVERS_INFOS, DriverInfo
+from common.benchmark_definition import IREE_DRIVERS_INFOS
 from common.benchmark_suite import BenchmarkCase, BenchmarkSuite
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 
@@ -139,7 +139,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
     model_tf = common_definitions.Model(
         id="tf",
         name="model_tf",
-        tags=[],
+        tags=["fp32"],
         source_type=common_definitions.ModelSourceType.EXPORTED_TF,
         source_url="",
         entry_function="predict",
@@ -225,7 +225,7 @@ class BenchmarkSuiteTest(unittest.TestCase):
         suite.filter_benchmarks_for_category(
             category="exported_tf",
             cpu_target_arch_filter="cpu-rv32-generic",
-            model_name_filter="model_tf",
+            model_name_filter="model_tf.*fp32",
             mode_filter="defaults"),
         [
             BenchmarkCase(model_name=model_tf.name,
@@ -241,7 +241,6 @@ class BenchmarkSuiteTest(unittest.TestCase):
         suite.filter_benchmarks_for_category(
             category="exported_tf",
             cpu_target_arch_filter="cpu-rv32-generic",
-            model_name_filter="model_tf",
             mode_filter="experimental"), [])
 
   @staticmethod

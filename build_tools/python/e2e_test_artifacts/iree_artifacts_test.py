@@ -24,8 +24,9 @@ class IreeArtifactsTest(unittest.TestCase):
                                           root_dir_path=root_dir_path)
 
     model = gen_config.imported_model.model
+    iree_artifact_root = root_dir_path / iree_artifacts.IREE_ARTIFACTS_ROOT
     self.assertEqual(
-        path, root_dir_path / "iree" / f"{model.id}_{model.name}" /
+        path, iree_artifact_root / f"{model.id}_{model.name}" /
         gen_config.compile_config.id / f"{model.name}.vmfb")
 
   def test_generate_artifacts_root(self):
@@ -55,8 +56,9 @@ class IreeArtifactsTest(unittest.TestCase):
                 compile_config=test_configs.COMPILE_CONFIG_B),
         ])
 
+    iree_artifact_root = root_dir_path / iree_artifacts.IREE_ARTIFACTS_ROOT
     expect_tflite_dir_path = (
-        root_dir_path / "iree" /
+        iree_artifact_root /
         f"{test_configs.TFLITE_MODEL.id}_{test_configs.TFLITE_MODEL.name}")
     expect_tflite_imported_model_artifact = iree_artifacts.ImportedModelArtifact(
         imported_model=test_configs.TFLITE_IMPORTED_MODEL,
@@ -77,7 +79,7 @@ class IreeArtifactsTest(unittest.TestCase):
                 compile_config=test_configs.COMPILE_CONFIG_B),
     })
     expect_tf_dir_path = (
-        root_dir_path / "iree" /
+        iree_artifact_root /
         f"{test_configs.TF_MODEL.id}_{test_configs.TF_MODEL.name}")
     expect_tf_imported_model_artifact = iree_artifacts.ImportedModelArtifact(
         imported_model=test_configs.TF_IMPORTED_MODEL,

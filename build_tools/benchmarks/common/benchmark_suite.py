@@ -72,6 +72,27 @@ class BenchmarkCase:
   run_config: Optional[iree_definitions.E2EModelRunConfig] = None
 
 
+def _find_driver_info_by_execution_config(
+    module_execution_config: iree_definitions.ModuleExecutionConfig
+) -> Optional[DriverInfo]:
+  """Finds the matched driver info by the module exeuction config.
+
+  Args:
+    module_execution_config: module execution config to match.
+  Returns:
+    A matched driver info. None if not found.
+  """
+  for value in IREE_DRIVERS_INFOS.values():
+    config_driver_name = module_execution_config.driver.value
+    config_loader_name = (module_execution_config.loader.value
+                          if module_execution_config.loader !=
+                          iree_definitions.RuntimeLoader.NONE else "")
+    if (value.driver_name == config_driver_name and
+        value.loader_name == config_loader_name):
+      return value
+  return None
+
+
 class BenchmarkSuite(object):
   """Represents the benchmarks in benchmark suite directory."""
 
@@ -184,14 +205,7 @@ class BenchmarkSuite(object):
       module_exec_config = run_config.module_execution_config
       target_device_spec = run_config.target_device_spec
 
-      driver_info = None
-      for value in IREE_DRIVERS_INFOS.values():
-        if value.driver_name != module_exec_config.driver.value:
-          continue
-        if value.loader_name != "" and value.loader_name != module_exec_config.loader.value:
-          continue
-        driver_info = value
-        break
+      driver_info = _find_driver_info_by_execution_config(module_exec_config)
       if driver_info is None:
         raise ValueError(
             f"Can't map execution config to driver info: {module_exec_config}.")

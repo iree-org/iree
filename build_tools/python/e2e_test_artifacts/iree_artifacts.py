@@ -48,7 +48,6 @@ def _get_imported_model_path(
     parent_path: pathlib.PurePath,
     imported_model: iree_definitions.ImportedModel,
     model_artifact: model_artifacts.ModelArtifact) -> pathlib.PurePath:
-  """Returns the path of an IREE imported MLIR file."""
   model = imported_model.model
   if model.source_type == common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR:
     # Uses the MLIR model directly.
