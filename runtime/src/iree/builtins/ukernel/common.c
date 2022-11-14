@@ -16,6 +16,8 @@ IREE_UK_EXPORT const char* iree_uk_status_message(iree_uk_status_t status) {
       return "unsupported huge or negative size in mmt4d";
     case iree_uk_status_unsupported_generic_tile_size:
       return "tile size too large for the generic tile implementation";
+    case iree_uk_status_shapes_mismatch:
+      return "shapes mismatch";
     default:
       return "unknown";
   }

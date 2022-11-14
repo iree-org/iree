@@ -24,8 +24,9 @@ struct iree_uk_test_random_engine_t;
 typedef struct iree_uk_test_random_engine_t iree_uk_test_random_engine_t;
 iree_uk_test_random_engine_t* iree_uk_test_random_engine_create();
 void iree_uk_test_random_engine_destroy(iree_uk_test_random_engine_t* e);
-int iree_uk_test_random_engine_get_0_or_1(iree_uk_test_random_engine_t* e);
-int iree_uk_test_random_engine_get_between_minus16_and_plus15(
+int iree_uk_test_random_engine_get_0_65535(iree_uk_test_random_engine_t* e);
+int iree_uk_test_random_engine_get_0_1(iree_uk_test_random_engine_t* e);
+int iree_uk_test_random_engine_get_minus16_plus15(
     iree_uk_test_random_engine_t* e);
 void iree_uk_test_write_random_buffer(void* buffer,
                                       iree_uk_ssize_t size_in_bytes,

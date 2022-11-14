@@ -53,6 +53,21 @@ iree_cc_test(
     iree::testing::gtest
 )
 
+iree_cc_binary_benchmark(
+  NAME
+    pack_benchmark
+  SRCS
+    "pack_benchmark.c"
+  DEPS
+    ::ukernel_test_utils
+    iree::base
+    iree::base::internal::cpu
+    iree::base::internal::flags
+    iree::builtins::ukernel
+    iree::testing::benchmark
+  TESTONLY
+)
+
 iree_cc_test(
   NAME
     pack_test
@@ -65,7 +80,6 @@ iree_cc_test(
     iree::base::internal::flags
     iree::builtins::ukernel
     iree::testing::gtest
-    iree::testing::gtest_main
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

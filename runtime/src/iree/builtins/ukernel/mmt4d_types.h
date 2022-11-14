@@ -32,9 +32,6 @@ static inline iree_uk_type_t iree_uk_mmt4d_out_type(iree_uk_mmt4d_type_t type) {
 typedef struct iree_uk_mmt4d_params_t {
   iree_uk_mmt4d_type_t type;
   iree_uk_uint32_t flags;
-  const void* lhs_buffer;
-  const void* rhs_buffer;
-  void* out_buffer;
   iree_uk_ssize_t lhs_stride;
   iree_uk_ssize_t rhs_stride;
   iree_uk_ssize_t out_stride;
@@ -44,6 +41,9 @@ typedef struct iree_uk_mmt4d_params_t {
   iree_uk_int32_t M0;
   iree_uk_int32_t N0;
   iree_uk_int32_t K0;
+  const void* lhs_buffer;
+  const void* rhs_buffer;
+  void* out_buffer;
   const iree_uk_uint64_t* cpu_data;
 } iree_uk_mmt4d_params_t;
 

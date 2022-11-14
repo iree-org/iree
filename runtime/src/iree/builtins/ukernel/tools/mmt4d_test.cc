@@ -186,11 +186,11 @@ static void test_one_matmul_creating_lhs_rhs_for_given_shape(
   // Populate strides first - we need them below to compute buffer lengths.
   // Randomly make strides either tight or not to exercise all cases.
   params.lhs_stride = params.K * params.M0 * params.K0 +
-                      iree_uk_test_random_engine_get_0_or_1(engine);
+                      iree_uk_test_random_engine_get_0_1(engine);
   params.rhs_stride = params.K * params.N0 * params.K0 +
-                      iree_uk_test_random_engine_get_0_or_1(engine);
+                      iree_uk_test_random_engine_get_0_1(engine);
   params.out_stride = params.N * params.M0 * params.N0 +
-                      iree_uk_test_random_engine_get_0_or_1(engine);
+                      iree_uk_test_random_engine_get_0_1(engine);
   iree_uk_type_t lhs_type = iree_uk_mmt4d_lhs_type(params.type);
   iree_uk_type_t rhs_type = iree_uk_mmt4d_rhs_type(params.type);
   iree_uk_ssize_t lhs_buffer_size =
