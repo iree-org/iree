@@ -8,6 +8,7 @@
 
 #include <iree/compiler/Dialect/HAL/IR/HALOps.h>
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "iree-dialects/Transforms/ListenerGreedyPatternRewriteDriver.h"
@@ -1039,10 +1040,15 @@ DiagnosedSilenceableFailure transform_dialect::ConfigExtractPart::apply(
     transformResults.set(getResultConfigPart().cast<OpResult>(), {});
     return emitSilenceableFailure(target) << " no tiling at level";
   }
+  SmallVector<Value> values;
   SmallVector<Operation *> results;
   OpBuilder b(target);
-  for (int64_t ts : vals)
+  for (int64_t ts : vals) {
     results.push_back(b.create<arith::ConstantIndexOp>(target->getLoc(), ts));
+    values.push_back(results.back()->getResult(0));
+  }
+  b.create<LinalgExt::DoNotDCEOperandsOp>(target->getLoc(), values);
+
   transformResults.set(getResultConfigPart().cast<OpResult>(), results);
   return DiagnosedSilenceableFailure::success();
 }

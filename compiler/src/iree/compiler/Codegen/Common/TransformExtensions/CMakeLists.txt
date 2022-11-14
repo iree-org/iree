@@ -32,6 +32,7 @@ iree_cc_library(
   DEPS
     ::CommonExtensionsOpGen
     IREEDialectsTransforms
+    IREELinalgExtDialect
     IREELinalgTransformDialect
     LLVMSupport
     MLIRAffineDialect

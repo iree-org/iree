@@ -224,19 +224,9 @@ static Value distributeVectors(ImplicitLocOpBuilder &b, Value funcH,
 /// allows the transform dialect to build payload IR and not risk seeing it
 /// being DCE'd away immediately.
 static Value buildReductionStrategyBlockDistributionPart(
-    ImplicitLocOpBuilder &b, Value outerVariantH) {
-  OpBuilder::InsertionGuard guard(b);
-  auto operationType = pdl::OperationType::get(b.getContext());
-  auto sequence = b.create<transform::SequenceOp>(
-      TypeRange{operationType}, transform::FailurePropagationMode::Propagate,
-      outerVariantH);
-  Block *sequenceBody =
-      b.createBlock(&sequence.getBodyRegion(), /*insertPt=*/{}, operationType,
-                    outerVariantH.getLoc());
-  Value variantH = sequenceBody->getArgument(0);
-
-  // TODO: this still requires specific knowledge of ops present in the IR and
-  // is brittle.
+    ImplicitLocOpBuilder &b, Value variantH) {
+  // TODO: this still requires specific knowledge of ops present in the IR
+  // and is brittle.
   Value originalFillH =
       b.create<MatchOp>(variantH, linalg::FillOp::getOperationName());
   Value originalGenericH =
@@ -267,17 +257,16 @@ static Value buildReductionStrategyBlockDistributionPart(
       /*rootH=*/combinerH,
       /*opsHToFuse=*/{originalFillH, splitFillH, splitLinalgH}, tileSizes,
       b.getArrayAttr({x, y, z}));
-  b.create<transform::YieldOp>(variantH);
-  return sequence->getResult(0);
+
+  return variantH;
 }
 
 // TODO: generalize and automate over and over.
 // TODO: significantly shrink this down.
 static void buildReductionCudaStrategy(ImplicitLocOpBuilder &b,
-                                       Value outerVariantH) {
+                                       Value variantH) {
   // Step 1: Distribute to blocks using the current IREE lowering config.
-  Value variantH =
-      buildReductionStrategyBlockDistributionPart(b, outerVariantH);
+  variantH = buildReductionStrategyBlockDistributionPart(b, variantH);
 
   // Step 2. Second level of tiling + fusion parallelizes to threads.
   // TODO: Relying on ordering is brittle, harden this.
