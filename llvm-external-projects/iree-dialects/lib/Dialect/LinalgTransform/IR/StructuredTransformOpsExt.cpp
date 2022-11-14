@@ -882,7 +882,7 @@ void transform_ext::CanonicalizedSequenceOp::getEffects(
 
 OperandRange transform_ext::CanonicalizedSequenceOp::getSuccessorEntryOperands(
     Optional<unsigned> index) {
-  assert(index && index.getValue() == 0 && "unexpected region index");
+  assert(index && index.value() == 0 && "unexpected region index");
   if (getOperation()->getNumOperands() == 1)
     return getOperation()->getOperands();
   return OperandRange(getOperation()->operand_end(),
@@ -892,7 +892,7 @@ OperandRange transform_ext::CanonicalizedSequenceOp::getSuccessorEntryOperands(
 void transform_ext::CanonicalizedSequenceOp::getSuccessorRegions(
     Optional<unsigned> index, ArrayRef<Attribute> operands,
     SmallVectorImpl<RegionSuccessor> &regions) {
-  if (!index.hasValue()) {
+  if (!index.has_value()) {
     Region *bodyRegion = &getBody();
     regions.emplace_back(bodyRegion, !operands.empty()
                                          ? bodyRegion->getArguments()

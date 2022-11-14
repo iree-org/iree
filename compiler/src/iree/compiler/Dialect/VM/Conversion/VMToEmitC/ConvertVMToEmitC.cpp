@@ -2566,7 +2566,7 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
             if (failed(updatedOperand)) {
               return failure();
             }
-            updatedOperands.push_back(updatedOperand.getValue());
+            updatedOperands.push_back(updatedOperand.value());
             operandIndex++;
           }
         }
@@ -2576,7 +2576,7 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
         if (failed(updatedOperand)) {
           return failure();
         }
-        updatedOperands.push_back(updatedOperand.getValue());
+        updatedOperands.push_back(updatedOperand.value());
         operandIndex++;
       }
     }

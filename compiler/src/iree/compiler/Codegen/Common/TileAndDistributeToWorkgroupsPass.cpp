@@ -87,7 +87,7 @@ static LogicalResult getTileAndDistributeConfig(
   // supported max.
   // TODO(ravishankarm): Relax this restriction.
   if (partitionableLoops.size() > kNumMaxParallelDims) {
-    return rootOp.getValue()->emitOpError(
+    return rootOp.value()->emitOpError(
                "expected number of partitionable loops to be less than or "
                "equal to ")
            << kNumMaxParallelDims;
@@ -95,7 +95,7 @@ static LogicalResult getTileAndDistributeConfig(
 
   IREE::Codegen::LoweringConfigAttr rootOpConfig = getLoweringConfig(*rootOp);
   if (!rootOpConfig) {
-    return rootOp.getValue()->emitOpError(
+    return rootOp.value()->emitOpError(
         "unable to find configuration of root op to define workgroup count "
         "region");
   }

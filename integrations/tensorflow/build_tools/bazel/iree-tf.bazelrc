@@ -16,6 +16,7 @@ build:generic_gcc --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
 build --nocheck_visibility
 
 # Clang Flags for working around tensorflow warnings.
+build:generic_clang --copt=-Wno-deprecated-declarations --host_copt=-Wno-deprecated-declarations
 build:generic_clang --copt=-Wno-inconsistent-missing-override --host_copt=-Wno-inconsistent-missing-override
 build:generic_clang --copt=-Wno-c++11-narrowing --host_copt=-Wno-c++11-narrowing
 
