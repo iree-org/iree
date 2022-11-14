@@ -108,7 +108,7 @@ jobs:
         run: |
           # TODO(#10988): Excludes the experimental `models` and iree` dirs for
           # now.
-          tar --exclude '*.tflite' --exclude '*.mlir' \
+          tar --exclude '*.tflite' --exclude '*.mlir' --exclude '*-tf-model' \
             --exclude "${BENCHMARKS_DIR}/benchmark_suites/models" \
             --exclude "${BENCHMARKS_DIR}/benchmark_suites/iree" \
             -czf \
