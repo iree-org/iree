@@ -6,7 +6,8 @@ transform.structured.canonicalized_sequence failures(propagate) {
 
   %foreach_thread, %tiled_generic =
     transform.structured.tile_to_foreach_thread_op %0 num_threads [2] 
-    ( mapping = [#gpu.block<x>, #gpu.block<y>, #gpu.block<z>] )
+    // TODO: IREE needs own workgroup mapping attribute.
+    ( mapping = [#gpu.block<x>] )
 
   %1 = transform.iree.bufferize %variant_op
 

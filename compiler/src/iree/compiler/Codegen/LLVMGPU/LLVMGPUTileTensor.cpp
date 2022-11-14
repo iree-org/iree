@@ -136,9 +136,6 @@ static LogicalResult tileParallelDims(func::FuncOp funcOp,
       }
     }
     std::reverse(idDims.begin(), idDims.end());
-    for (int64_t i = threadDim; i < 3; i++)
-      idDims.push_back(getThreadMapping(i));
-
     ArrayAttr mapping = rewriter.getArrayAttr(idDims);
     auto tilingResult =
         linalg::tileToForeachThreadOp(rewriter, tilingOp, numThreads, mapping);

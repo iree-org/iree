@@ -56,7 +56,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //         CHECK:     scf.foreach_thread.perform_concurrently {
 //         CHECK:       tensor.parallel_insert_slice %[[L]] into %[[O]][0, %[[OFF]]] [1, 4] [1, 1] : tensor<1x4xf32> into tensor<1x256xf32>
 //         CHECK:     }
-//         CHECK:   } {mapping = [#gpu.thread<x>, #gpu.thread<y>, #gpu.thread<z>]}
+//         CHECK:   } {mapping = [#gpu.thread<x>]}
 //         CHECK:   flow.dispatch.tensor.store %[[T]], %{{.*}}, offsets = [%{{.*}}, %{{.*}}], sizes = [1, 256], strides = [1, 1] : tensor<1x256xf32> -> !flow.dispatch.tensor<writeonly:tensor<233x1024xf32>>
 
 // -----
@@ -117,7 +117,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb",
 //         CHECK:     scf.foreach_thread.perform_concurrently {
 //         CHECK:       tensor.parallel_insert_slice %[[R]] into %[[O]][%[[ARG]]] [1] [1] : tensor<1xf32> into tensor<64xf32>
 //         CHECK:     }
-//         CHECK:   } {mapping = [#gpu.thread<x>, #gpu.thread<y>, #gpu.thread<z>]}
+//         CHECK:   } {mapping = [#gpu.thread<x>]}
 //         CHECK:   flow.dispatch.tensor.store %[[T]], %{{.}}, offsets = [%{{.*}}], sizes = [64], strides = [1] : tensor<64xf32> -> !flow.dispatch.tensor<writeonly:tensor<128xf32>>
 
 // -----
