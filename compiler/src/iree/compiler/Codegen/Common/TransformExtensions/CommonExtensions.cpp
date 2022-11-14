@@ -23,7 +23,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
-#include "mlir/Dialect/Bufferization/Transforms/AllocTensorElimination.h"
+#include "mlir/Dialect/Bufferization/Transforms/EmptyTensorElimination.h"
 #include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
@@ -783,50 +783,8 @@ static LogicalResult gpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
   return success();
 }
 
-/// Temporarily copied from IREEComprehensiveBufferizePass.cpp to avoid buying
-/// into nested pass pipeline mess.
-static LogicalResult emptyTensorElimination(
-    Operation *op, OneShotBufferizationOptions options) {
-  // Analyze IR.
-  options.testAnalysisOnly = false;
-  options.printConflicts = false;
-  OneShotAnalysisState state(op, options);
-  if (failed(analyzeOp(op, state))) return failure();
-
-  // Rewrite init_tensors that are anchored on specific ops.
-  IRRewriter rewriter(op->getContext());
-  if (failed(bufferization::insertSliceAnchoredAllocTensorEliminationStep(
-          rewriter, op, state)))
-    return failure();
-  if (failed(
-          storeTensorOpAnchoredInitTensorEliminationStep(rewriter, op, state)))
-    return failure();
-
-  return success();
-}
-
-/// Temporarily copied from IREEComprehensiveBufferizePass.cpp to avoid buying
-/// into nested pass pipeline mess.
-// The following is copied from bufferization::runOneShotBufferize with
-// modifications.
-static LogicalResult runIREEOneShotBufferize(
-    Operation *op, const OneShotBufferizationOptions &options) {
-  OneShotAnalysisState state(op, options);
-  if (failed(analyzeOp(op, state))) return failure();
-  if (options.testAnalysisOnly) return success();
-  return bufferization::runOneShotBufferize(op, options);
-}
-
-/// Temporarily copied from IREEComprehensiveBufferizePass.cpp to avoid buying
-/// into nested pass pipeline mess.
-static LogicalResult runIREEBufferizeOnModule(
-    ModuleOp moduleOp, BufferizationOptions::AllocationFn allocationFn,
-    BufferizationOptions::DeallocationFn deallocationFn,
-    BufferizationOptions::MemCpyFn memCpyFn) {
+static OneShotBufferizationOptions getBufferizationOptions() {
   OneShotBufferizationOptions options;
-  options.allocationFn = allocationFn;
-  options.deallocationFn = deallocationFn;
-  options.memCpyFn = memCpyFn;
   // options.testAnalysisOnly = testAnalysisOnly;
   // options.printConflicts = printConflicts;
 
@@ -853,8 +811,53 @@ static LogicalResult runIREEBufferizeOnModule(
                                                               memorySpace);
   };
 
-  if (failed(emptyTensorElimination(moduleOp.getOperation(), options)))
+  return options;
+}
+
+/// Temporarily copied from IREEComprehensiveBufferizePass.cpp to avoid buying
+/// into nested pass pipeline mess.
+static LogicalResult emptyTensorElimination(
+    Operation *op, OneShotBufferizationOptions options) {
+  // Analyze IR.
+  options.testAnalysisOnly = false;
+  options.printConflicts = false;
+  OneShotAnalysisState state(op, options);
+  if (failed(analyzeOp(op, state))) return failure();
+
+  // Rewrite tensor.empty ops that are anchored on specific ops.
+  IRRewriter rewriter(op->getContext());
+  if (failed(bufferization::insertSliceAnchoredEmptyTensorEliminationStep(
+          rewriter, op, state)))
     return failure();
+  if (failed(
+          storeTensorOpAnchoredEmptyTensorEliminationStep(rewriter, op, state)))
+    return failure();
+
+  return success();
+}
+
+/// Temporarily copied from IREEComprehensiveBufferizePass.cpp to avoid buying
+/// into nested pass pipeline mess.
+// The following is copied from bufferization::runOneShotBufferize with
+// modifications.
+static LogicalResult runIREEOneShotBufferize(
+    Operation *op, const OneShotBufferizationOptions &options) {
+  OneShotAnalysisState state(op, options);
+  if (failed(analyzeOp(op, state))) return failure();
+  if (options.testAnalysisOnly) return success();
+  return bufferization::runOneShotBufferize(op, options);
+}
+
+/// Temporarily copied from IREEComprehensiveBufferizePass.cpp to avoid buying
+/// into nested pass pipeline mess.
+static LogicalResult runIREEBufferizeOnModule(
+    ModuleOp moduleOp, BufferizationOptions::AllocationFn allocationFn,
+    BufferizationOptions::DeallocationFn deallocationFn,
+    BufferizationOptions::MemCpyFn memCpyFn) {
+  OneShotBufferizationOptions options = getBufferizationOptions();
+  options.allocationFn = allocationFn;
+  options.deallocationFn = deallocationFn;
+  options.memCpyFn = memCpyFn;
 
   return runIREEOneShotBufferize(moduleOp, options);
 }
@@ -903,7 +906,17 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
     memCpyFn = gpuComprehensiveBufferizeCopyFn;
   }
 
-  //   1. Rewrite tensor.empty to tensor.alloc, without the pass baggage.
+  //   1. Eliminate tensor.empty, without the pass baggage.
+  WalkResult res = state.getTopLevel()->walk([&](ModuleOp moduleOp) {
+    if (failed(emptyTensorElimination(moduleOp.getOperation(),
+                                      getBufferizationOptions())))
+      return WalkResult::interrupt();
+    return WalkResult::advance();
+  });
+  if (res.wasInterrupted())
+    return DiagnosedSilenceableFailure::definiteFailure();
+
+  //   2. Rewrite tensor.empty to tensor.alloc, without the pass baggage.
   RewritePatternSet patterns(getContext());
   patterns.add<EmptyTensorLoweringPattern>(patterns.getContext());
   TrackingListener listener(state);
@@ -919,8 +932,8 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
     return mlir::emitDefiniteFailure(state.getTopLevel(),
                                      "listener tracking failed");
 
-  //   2. Run one-shot-bufferize, without the pass baggage.
-  WalkResult res = state.getTopLevel()->walk([&](ModuleOp moduleOp) {
+  //   3. Run one-shot-bufferize, without the pass baggage.
+  res = state.getTopLevel()->walk([&](ModuleOp moduleOp) {
     if (failed(runIREEBufferizeOnModule(moduleOp, allocationFn, deallocationFn,
                                         memCpyFn)))
       return WalkResult::interrupt();
@@ -929,7 +942,7 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
   if (res.wasInterrupted())
     return DiagnosedSilenceableFailure::definiteFailure();
 
-  //   3. Post-bufferization passes are fine.
+  //   4. Post-bufferization passes are fine.
   PassManager pm(getContext());
   addIREEPostBufferizationPasses(pm);
   res = state.getTopLevel()->walk([&](ModuleOp moduleOp) {
