@@ -31,7 +31,7 @@ iree_lit_test_suite(
     "export_benchmark_funcs.mlir"
     "fusion_of_tensor_ops.mlir"
     "infer_numeric_narrowing.mlir"
-    "initialize_empty_tensor.mlir"
+    "initialize_empty_tensors.mlir"
     "inject_dispatch_tracing.mlir"
     "interchange_generic_ops.mlir"
     "interchange_transpose_generic_ops.mlir"

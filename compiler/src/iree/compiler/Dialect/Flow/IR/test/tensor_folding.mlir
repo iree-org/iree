@@ -35,8 +35,8 @@ func.func @expandDynamicShapeConstant() -> (tensor<?x?xi32>, index, index) {
 
 // -----
 
-// CHECK-LABEL: @tieShapeStaticEmpty
-func.func @tieShapeStaticEmpty(%arg0: tensor<0xi32>) -> tensor<0xi32> {
+// CHECK-LABEL: @tieShapeStaticZeroElements
+func.func @tieShapeStaticZeroElements(%arg0: tensor<0xi32>) -> tensor<0xi32> {
   // CHECK-NOT: flow.tensor.tie_shape
   %0 = flow.tensor.tie_shape %arg0 : tensor<0xi32>
   // CHECK: return %arg0
@@ -45,9 +45,9 @@ func.func @tieShapeStaticEmpty(%arg0: tensor<0xi32>) -> tensor<0xi32> {
 
 // -----
 
-// CHECK-LABEL: @tieShapeDynamicEmpty
+// CHECK-LABEL: @tieShapeDynamicZeroElements
 // CHECK-SAME: (%[[OPERAND:.+]]: tensor<0x?xi32>, %[[DIM:.+]]: index)
-func.func @tieShapeDynamicEmpty(%arg0: tensor<0x?xi32>, %dim: index) -> tensor<0x?xi32> {
+func.func @tieShapeDynamicZeroElements(%arg0: tensor<0x?xi32>, %dim: index) -> tensor<0x?xi32> {
   // CHECK-NOT: flow.tensor.tie_shape
   // CHECK: %[[RET:.+]] = flow.tensor.empty : tensor<0x?xi32>{%[[DIM]]}
   %0 = flow.tensor.tie_shape %arg0 : tensor<0x?xi32>{%dim}
@@ -124,9 +124,9 @@ func.func @flattenReshapeChain(%arg0: tensor<4x?xf32>, %dim0: index, %dim1: inde
 
 // -----
 
-// CHECK-LABEL: @reshapeFromStaticEmpty
+// CHECK-LABEL: @reshapeFromStaticZeroElements
 // CHECK-SAME: (%[[OPERAND:.+]]: tensor<4x0xf32>, %[[DIM:.+]]: index)
-func.func @reshapeFromStaticEmpty(%arg0: tensor<4x0xf32>, %dim: index) -> tensor<4x?xf32> {
+func.func @reshapeFromStaticZeroElements(%arg0: tensor<4x0xf32>, %dim: index) -> tensor<4x?xf32> {
   // CHECK: %[[RET:.+]] = flow.tensor.empty : tensor<4x?xf32>{%[[DIM]]}
   %0 = flow.tensor.reshape %arg0 : tensor<4x0xf32> -> tensor<4x?xf32>{%dim}
   // CHECK-NEXT: return %[[RET]]
@@ -135,9 +135,9 @@ func.func @reshapeFromStaticEmpty(%arg0: tensor<4x0xf32>, %dim: index) -> tensor
 
 // -----
 
-// CHECK-LABEL: @reshapeFromDynamicEmpty
+// CHECK-LABEL: @reshapeFromDynamicZeroElements
 // CHECK-SAME: (%[[OPERAND:.+]]: tensor<0x?xf32>, %[[DIM0:.+]]: index, %[[DIM1:.+]]: index)
-func.func @reshapeFromDynamicEmpty(%arg0: tensor<0x?xf32>, %dim0: index, %dim1: index) -> tensor<4x?xf32> {
+func.func @reshapeFromDynamicZeroElements(%arg0: tensor<0x?xf32>, %dim0: index, %dim1: index) -> tensor<4x?xf32> {
   // CHECK: %[[RET:.+]] = flow.tensor.empty : tensor<4x?xf32>{%[[DIM1]]}
   %0 = flow.tensor.reshape %arg0 : tensor<0x?xf32>{%dim0} -> tensor<4x?xf32>{%dim1}
   // CHECK-NEXT: return %[[RET]]
@@ -146,8 +146,8 @@ func.func @reshapeFromDynamicEmpty(%arg0: tensor<0x?xf32>, %dim0: index, %dim1: 
 
 // -----
 
-// CHECK-LABEL: @reshapeToStaticEmpty
-func.func @reshapeToStaticEmpty(%arg0: tensor<4x?xf32>, %dim0: index) {
+// CHECK-LABEL: @reshapeToStaticZeroElements
+func.func @reshapeToStaticZeroElements(%arg0: tensor<4x?xf32>, %dim0: index) {
   // CHECK-NEXT: %[[RET:.+]] = flow.tensor.empty : tensor<4x0xf32>
   %0 = flow.tensor.reshape %arg0 : tensor<4x?xf32>{%dim0} -> tensor<4x0xf32>
   // CHECK-NEXT: util.optimization_barrier %[[RET]]
@@ -157,9 +157,9 @@ func.func @reshapeToStaticEmpty(%arg0: tensor<4x?xf32>, %dim0: index) {
 
 // -----
 
-// CHECK-LABEL: @reshapeToDynamicEmpty
+// CHECK-LABEL: @reshapeToDynamicZeroElements
 // CHECK-SAME: (%[[OPERAND:.+]]: tensor<4x?xf32>, %[[DIM0:.+]]: index, %[[DIM1:.+]]: index)
-func.func @reshapeToDynamicEmpty(%arg0: tensor<4x?xf32>, %dim0: index, %dim1: index) {
+func.func @reshapeToDynamicZeroElements(%arg0: tensor<4x?xf32>, %dim0: index, %dim1: index) {
   // CHECK: %[[RET:.+]] = flow.tensor.empty : tensor<0x?xf32>{%[[DIM1]]}
   %0 = flow.tensor.reshape %arg0 : tensor<4x?xf32>{%dim0} -> tensor<0x?xf32>{%dim1}
   // CHECK-NEXT: util.optimization_barrier %[[RET]]
@@ -170,8 +170,9 @@ func.func @reshapeToDynamicEmpty(%arg0: tensor<4x?xf32>, %dim0: index, %dim1: in
 // -----
 
 // CHECK-LABEL: @reshapeEmpty
+// CHECK-SAME: (%[[DIM:.+]]: index)
 func.func @reshapeEmpty(%dim: index) -> tensor<?xi32> {
-  // CHECK: %[[RET:.+]] = flow.tensor.empty : tensor<?xi32>
+  // CHECK: %[[RET:.+]] = flow.tensor.empty : tensor<?xi32>{%[[DIM]]}
   %0 = flow.tensor.empty : tensor<1x?xi32>{%dim}
   // CHECK-NOT: flow.tensor.reshape
   %1 = flow.tensor.reshape %0 : tensor<1x?xi32>{%dim} -> tensor<?xi32>{%dim}
@@ -262,8 +263,8 @@ func.func @splatDynamicShape(%dim0: index, %dim1: index) -> tensor<?x?xi32> {
 
 // -----
 
-// CHECK-LABEL: @splatStaticEmpty
-func.func @splatStaticEmpty(%value: f32) -> tensor<0x2xf32> {
+// CHECK-LABEL: @splatStaticZeroElements
+func.func @splatStaticZeroElements(%value: f32) -> tensor<0x2xf32> {
   // CHECK-NEXT: %[[RET:.+]] = flow.tensor.empty : tensor<0x2xf32>
   %0 = flow.tensor.splat %value : tensor<0x2xf32>
   // CHECK-NEXT: return %[[RET]]
@@ -272,9 +273,9 @@ func.func @splatStaticEmpty(%value: f32) -> tensor<0x2xf32> {
 
 // -----
 
-// CHECK-LABEL: @splatDynamicEmpty
+// CHECK-LABEL: @splatDynamicZeroElements
 //  CHECK-SAME: (%[[VALUE:.+]]: f32, %[[DIM:.+]]: index)
-func.func @splatDynamicEmpty(%value: f32, %dim: index) -> tensor<0x?xf32> {
+func.func @splatDynamicZeroElements(%value: f32, %dim: index) -> tensor<0x?xf32> {
   // CHECK-NEXT: %[[RET:.+]] = flow.tensor.empty : tensor<0x?xf32>{%[[DIM]]}
   %0 = flow.tensor.splat %value : tensor<0x?xf32>{%dim}
   // CHECK-NEXT: return %[[RET]]
@@ -294,8 +295,8 @@ func.func @cloneConst() -> tensor<4xi32> {
 
 // -----
 
-// CHECK-LABEL: @cloneConstEmpty
-func.func @cloneConstEmpty() -> tensor<0x2xi32> {
+// CHECK-LABEL: @cloneConstZeroElements
+func.func @cloneConstZeroElements() -> tensor<0x2xi32> {
   // CHECK-NEXT: %[[C:.+]] = arith.constant dense<> : tensor<0x2xi32>
   %0 = arith.constant dense<> : tensor<0x2xi32>
   // CHECK-NOT: flow.tensor.clone
@@ -306,8 +307,8 @@ func.func @cloneConstEmpty() -> tensor<0x2xi32> {
 
 // -----
 
-// CHECK-LABEL: @cloneStaticEmpty
-func.func @cloneStaticEmpty(%arg0: tensor<0x2xf32>) -> tensor<0x2xf32> {
+// CHECK-LABEL: @cloneStaticZeroElements
+func.func @cloneStaticZeroElements(%arg0: tensor<0x2xf32>) -> tensor<0x2xf32> {
   // CHECK-NOT: flow.tensor.clone
   // CHECK-NEXT: %[[RET:.+]] = flow.tensor.empty : tensor<0x2xf32>
   %0 = flow.tensor.clone %arg0 : tensor<0x2xf32>
@@ -317,9 +318,9 @@ func.func @cloneStaticEmpty(%arg0: tensor<0x2xf32>) -> tensor<0x2xf32> {
 
 // -----
 
-// CHECK-LABEL: @cloneDynamicEmpty
+// CHECK-LABEL: @cloneDynamicZeroElements
 //  CHECK-SAME: (%[[OPERAND:.+]]: tensor<0x?xf32>, %[[DIM:.+]]: index)
-func.func @cloneDynamicEmpty(%arg0: tensor<0x?xf32>, %dim: index) -> tensor<0x?xf32> {
+func.func @cloneDynamicZeroElements(%arg0: tensor<0x?xf32>, %dim: index) -> tensor<0x?xf32> {
   // CHECK-NOT: flow.tensor.clone
   // CHECK-NEXT: %[[RET:.+]] = flow.tensor.empty : tensor<0x?xf32>{%[[DIM]]}
   %0 = flow.tensor.clone %arg0 : tensor<0x?xf32>{%dim}
@@ -406,8 +407,8 @@ func.func @sliceConst2DZeroLength01() -> tensor<0x0xi32> {
 
 // -----
 
-// CHECK-LABEL: @sliceFromEmpty
-func.func @sliceFromEmpty(%arg0: tensor<0xi32>) -> tensor<?xi32> {
+// CHECK-LABEL: @sliceFromZeroElements
+func.func @sliceFromZeroElements(%arg0: tensor<0xi32>) -> tensor<?xi32> {
   %c0 = arith.constant 0 : index
   // CHECK-NOT: flow.tensor.slice
   // CHECK: %[[RET:.+]] = flow.tensor.empty : tensor<?xi32>{%c0}
@@ -418,8 +419,8 @@ func.func @sliceFromEmpty(%arg0: tensor<0xi32>) -> tensor<?xi32> {
 
 // -----
 
-// CHECK-LABEL: @sliceEmpty
-func.func @sliceEmpty(%arg0: tensor<?xi32>, %dim: index) -> tensor<0xi32> {
+// CHECK-LABEL: @sliceZeroElements
+func.func @sliceZeroElements(%arg0: tensor<?xi32>, %dim: index) -> tensor<0xi32> {
   %c0 = arith.constant 0 : index
   // CHECK-NOT: flow.tensor.slice
   // CHECK: %[[RET:.+]] = flow.tensor.empty : tensor<0xi32>
@@ -559,8 +560,8 @@ func.func @updateReplace(%arg0 : tensor<4xi32>, %arg1 : tensor<4xi32>) -> tensor
 
 // -----
 
-// CHECK-LABEL: @updateIntoEmpty
-func.func @updateIntoEmpty(%update: tensor<?x?xi32>, %dim: index, %target: tensor<0x0xi32>) -> tensor<0x0xi32> {
+// CHECK-LABEL: @updateIntoZeroElements
+func.func @updateIntoZeroElements(%update: tensor<?x?xi32>, %dim: index, %target: tensor<0x0xi32>) -> tensor<0x0xi32> {
   %c0 = arith.constant 0 : index
   // CHECK-NOT: flow.tensor.update
   // CHECK-NEXT: %[[RET:.+]] = flow.tensor.empty : tensor<0x0xi32>
@@ -571,9 +572,9 @@ func.func @updateIntoEmpty(%update: tensor<?x?xi32>, %dim: index, %target: tenso
 
 // -----
 
-// CHECK-LABEL: @updateEmpty
+// CHECK-LABEL: @updateZeroElements
 //  CHECK-SAME: (%[[UPDATE:.+]]: tensor<0x1xi32>, %[[TARGET:.+]]: tensor<1x1xi32>)
-func.func @updateEmpty(%update: tensor<0x1xi32>, %target: tensor<1x1xi32>) -> tensor<1x1xi32> {
+func.func @updateZeroElements(%update: tensor<0x1xi32>, %target: tensor<1x1xi32>) -> tensor<1x1xi32> {
   %c0 = arith.constant 0 : index
   // CHECK-NOT: flow.tensor.update
   %0 = flow.tensor.update %update, %target[%c0, %c0] : tensor<0x1xi32> -> tensor<1x1xi32>

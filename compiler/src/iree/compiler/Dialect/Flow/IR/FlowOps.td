@@ -1020,7 +1020,8 @@ def FLOW_TensorEmptyOp : FLOW_PureOp<"tensor.empty", [
 ]> {
   let summary = [{an empty tensor carrying metadata but no contents}];
   let description = [{
-    Returns a tensor with no data.
+    Returns a tensor with undefined contents. Subsequent writes must populate
+    any ranges of the tensor that are later read.
   }];
 
   let arguments = (ins

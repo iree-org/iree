@@ -36,7 +36,6 @@ namespace {
 /// Converts an tensor.empty() op to `flow.tensor.splat` op.
 struct RewriteInitTensorToSplat : public OpRewritePattern<tensor::EmptyOp> {
   using OpRewritePattern<tensor::EmptyOp>::OpRewritePattern;
-
   LogicalResult matchAndRewrite(tensor::EmptyOp emptyTensorOp,
                                 PatternRewriter &rewriter) const override {
     if (llvm::all_of(emptyTensorOp->getUsers(), [](Operation *user) -> bool {
@@ -61,6 +60,23 @@ struct RewriteInitTensorToSplat : public OpRewritePattern<tensor::EmptyOp> {
   }
 };
 
+/// Converts an tensor.empty() op to `flow.tensor.empty` op.
+struct RewriteInitTensorToEmpty : public OpRewritePattern<tensor::EmptyOp> {
+  using OpRewritePattern<tensor::EmptyOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(tensor::EmptyOp emptyTensorOp,
+                                PatternRewriter &rewriter) const override {
+    if (llvm::all_of(emptyTensorOp->getUsers(), [](Operation *user) -> bool {
+          return isa<linalg::LinalgOp, LinalgExt::LinalgExtOp>(user);
+        })) {
+      return failure();
+    }
+    RankedTensorType resultType = emptyTensorOp.getType();
+    rewriter.replaceOpWithNewOp<TensorEmptyOp>(emptyTensorOp, resultType,
+                                               emptyTensorOp.getDynamicSizes());
+    return success();
+  }
+};
+
 /// Pass to invoke the pattern.
 struct InitializeEmptyTensorsPass
     : public InitializeEmptyTensorsBase<InitializeEmptyTensorsPass> {
@@ -68,13 +84,18 @@ struct InitializeEmptyTensorsPass
     registry.insert<arith::ArithDialect, IREE::Flow::FlowDialect,
                     linalg::LinalgDialect>();
   }
-  InitializeEmptyTensorsPass() = default;
-  InitializeEmptyTensorsPass(const InitializeEmptyTensorsPass &) {}
+  InitializeEmptyTensorsPass(bool zeroFill) { this->zeroFill = zeroFill; }
+  InitializeEmptyTensorsPass(const InitializeEmptyTensorsPass &pass)
+      : InitializeEmptyTensorsPass(pass.zeroFill) {}
 
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
-    patterns.insert<RewriteInitTensorToSplat>(context);
+    if (zeroFill) {
+      patterns.insert<RewriteInitTensorToSplat>(context);
+    } else {
+      patterns.insert<RewriteInitTensorToEmpty>(context);
+    }
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       return signalPassFailure();
@@ -84,8 +105,8 @@ struct InitializeEmptyTensorsPass
 
 }  // namespace
 
-std::unique_ptr<Pass> createInitializeEmptyTensorsPass() {
-  return std::make_unique<InitializeEmptyTensorsPass>();
+std::unique_ptr<Pass> createInitializeEmptyTensorsPass(bool zeroFill) {
+  return std::make_unique<InitializeEmptyTensorsPass>(zeroFill);
 }
 
 }  // namespace Flow
