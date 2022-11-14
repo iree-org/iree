@@ -193,6 +193,7 @@ iree_bytecode_module(
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
 )
 
@@ -257,6 +258,7 @@ iree_bytecode_module(
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
     "--iree-flow-mmt4d-target-options=arch=aarch64"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
 )
 
@@ -411,6 +413,7 @@ iree_bytecode_module(
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
 )
 
@@ -451,6 +454,7 @@ iree_bytecode_module(
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
     "--iree-flow-mmt4d-target-options=arch=aarch64"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
 )
 
@@ -626,6 +630,7 @@ iree_bytecode_module(
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
 )
 
@@ -666,6 +671,7 @@ iree_bytecode_module(
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
     "--iree-flow-mmt4d-target-options=arch=aarch64"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
 )
 
@@ -841,6 +847,7 @@ iree_bytecode_module(
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
 )
 
@@ -905,6 +912,7 @@ iree_bytecode_module(
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
     "--iree-flow-mmt4d-target-options=arch=aarch64"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
 )
 
@@ -1059,6 +1067,7 @@ iree_bytecode_module(
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
 )
 
@@ -1124,6 +1133,7 @@ iree_bytecode_module(
     "--iree-flow-mmt4d-target-options=arch=aarch64 features=+dotprod"
     "--iree-llvm-target-cpu-features=+dotprod"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
 )
 
@@ -1179,6 +1189,7 @@ iree_bytecode_module(
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
 )
 
@@ -1297,6 +1308,7 @@ iree_bytecode_module(
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
 )
 
@@ -1376,6 +1388,7 @@ iree_bytecode_module(
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
 )
 
@@ -1416,6 +1429,7 @@ iree_bytecode_module(
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
     "--iree-flow-mmt4d-target-options=arch=aarch64"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
 )
 
@@ -1609,6 +1623,7 @@ iree_bytecode_module(
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
 )
 
@@ -1649,6 +1664,7 @@ iree_bytecode_module(
     "--iree-llvm-target-triple=aarch64-none-linux-android29"
     "--iree-flow-mmt4d-target-options=arch=aarch64"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
 )
 
@@ -1842,6 +1858,7 @@ iree_bytecode_module(
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
 )
 
@@ -1945,6 +1962,7 @@ iree_bytecode_module(
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
 )
 
@@ -2050,6 +2068,7 @@ iree_bytecode_module(
     "--iree-llvm-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvm-target-cpu=cascadelake"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
+    "--iree-llvmcpu-enable-pad-consumer-fusion"
   PUBLIC
 )
 

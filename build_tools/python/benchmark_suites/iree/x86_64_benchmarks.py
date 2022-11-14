@@ -31,7 +31,10 @@ class Linux_x86_64_Benchmarks(object):
       id=unique_ids.IREE_COMPILE_CONFIG_LINUX_CASCADELAKE_FUSE_PADDING,
       tags=["experimental-flags", "fuse-padding"],
       compile_targets=[CASCADELAKE_CPU_TARGET],
-      extra_flags=["--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"])
+      extra_flags=[
+          "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops",
+          "--iree-llvmcpu-enable-pad-consumer-fusion"
+      ])
 
   def generate(
       self
