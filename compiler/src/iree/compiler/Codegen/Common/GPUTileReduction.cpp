@@ -39,37 +39,19 @@ static LogicalResult tileReduction(linalg::GenericOp op) {
   if (tileSize.empty() || dims.size() != 1 ||
       tileSize.back() == op.getStaticLoopRanges()[dims.back()])
     return success();
-  // First split the reduction.
   SimpleRewriter rewriter(op.getContext());
+  SmallVector<OpFoldResult> sizes;
+  for (int64_t size : tileSize) {
+    sizes.push_back(rewriter.getIndexAttr(size));
+  }
   rewriter.setInsertionPoint(op);
-  auto control = [](linalg::LinalgOp op) {
-    linalg::SplitReductionOptions option;
-    SmallVector<int64_t> tileSize = getTileSizes(op, 1);
-    option.ratio = tileSize.back();
-    option.innerParallel = true;
-    option.index = op.getNumLoops() - 1;
-    return option;
-  };
-  FailureOr<linalg::SplitReductionResult> result =
-      linalg::splitReduction(rewriter, op, control);
-  if (failed(result)) return failure();
-
-  unsigned numLoops = result->splitLinalgOp.getNumLoops();
-  // Then tile the new dimension to 1.
-  SmallVector<int64_t> tileSizes(numLoops, 0);
-  tileSizes[numLoops - 2] = 1;
-  scf::SCFTilingOptions tileOption;
-  tileOption.setTileSizes(tileSizes);
-  FailureOr<scf::SCFTilingResult> tiledOps = scf::tileUsingSCFForOp(
-      rewriter, cast<TilingInterface>(result->splitLinalgOp.getOperation()),
-      tileOption);
-  if (failed(tiledOps)) return failure();
-  rewriter.replaceOp(result->splitLinalgOp, tiledOps->replacements);
+  FailureOr<scf::SCFReductionTilingResult> results = scf::tileReductionUsingScf(
+      rewriter, cast<PartialReductionOpInterface>(op.getOperation()), sizes);
+  if (failed(results)) return failure();
   return success();
 }
 
 static LogicalResult tileFusedOps(linalg::GenericOp op) {
-  // First split the reduction.
   SimpleRewriter rewriter(op.getContext());
   rewriter.setInsertionPoint(op);
   SmallVector<int64_t> tileSizes = getTileSizes(op, 1);
