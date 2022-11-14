@@ -38,11 +38,17 @@
 #define IREE_UK_FLAG_ACCUMULATE 0x1u
 #define IREE_UK_FLAG_ACCUMULATE_BIT_POS 0
 
-// UKernel-specific bits (bits 16..31)
+// `pack` ukernel-specific bits (bits 16..31)
 #define IREE_UK_FLAG_PACK_TRANSPOSE_INNER 0x10000u
 #define IREE_UK_FLAG_PACK_TRANSPOSE_INNER_BIT_POS 16
 #define IREE_UK_FLAG_PACK_TRANSPOSE_OUTER 0x20000u
 #define IREE_UK_FLAG_PACK_TRANSPOSE_OUTER_BIT_POS 17
+
+// `unpack` ukernel-specific bits (bits 16..31)
+#define IREE_UK_FLAG_UNPACK_TRANSPOSE_INNER 0x10000u
+#define IREE_UK_FLAG_UNPACK_TRANSPOSE_INNER_BIT_POS 16
+#define IREE_UK_FLAG_UNPACK_TRANSPOSE_OUTER 0x20000u
+#define IREE_UK_FLAG_UNPACK_TRANSPOSE_OUTER_BIT_POS 17
 
 // Static assertions ensuring consistency of the above flag values.
 #define IREE_UK_ENSURE_CONSISTENT_FLAG(F) \

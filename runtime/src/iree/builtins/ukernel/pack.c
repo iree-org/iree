@@ -11,8 +11,6 @@
 
 static iree_uk_status_t iree_uk_pack_validate(
     const iree_uk_pack_params_t* params) {
-  const iree_uk_uint32_t allflags =
-      IREE_UK_FLAG_PACK_TRANSPOSE_INNER | IREE_UK_FLAG_PACK_TRANSPOSE_OUTER;
 #ifdef NDEBUG
   // Avoid validation code overhead (code size and latency) in release builds.
   // This actually enables more thorough validation as it removes optimization
@@ -21,6 +19,8 @@ static iree_uk_status_t iree_uk_pack_validate(
   // incorrect, UB will happen no matter how much we try to validate.
   return iree_uk_status_ok;
 #endif
+  const iree_uk_uint32_t allflags =
+      IREE_UK_FLAG_PACK_TRANSPOSE_INNER | IREE_UK_FLAG_PACK_TRANSPOSE_OUTER;
   if (params->flags & ~allflags) {
     return iree_uk_status_bad_flags;
   }

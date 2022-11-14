@@ -1023,6 +1023,135 @@ struct LinalgExtPackConversion
   }
 };
 
+struct LinalgExtUnpackConversion
+    : public OpRewritePattern<IREE::LinalgExt::UnPackOp> {
+  using OpRewritePattern::OpRewritePattern;
+  static bool isSupportedElementTypes(Type inElType, Type outElType) {
+    if (inElType.isF32() && outElType.isF32()) {
+      return true;
+    }
+    if (inElType.isSignlessInteger(8) && inElType.isSignlessInteger(8)) {
+      return true;
+    }
+    if (inElType.isSignlessInteger(32) && inElType.isSignlessInteger(32)) {
+      return true;
+    }
+    return false;
+  }
+
+  LogicalResult matchAndRewrite(IREE::LinalgExt::UnPackOp op,
+                                PatternRewriter &rewriter) const override {
+    MemRefType inType = op.getInputType().cast<MemRefType>();
+    MemRefType outType = op.getOutputType().cast<MemRefType>();
+
+    if (!isSupportedElementTypes(inType.getElementType(),
+                                 outType.getElementType())) {
+      return rewriter.notifyMatchFailure(
+          op, "unsupported combination of in/out element types");
+    }
+
+    if (inType.getRank() != 4) {
+      return rewriter.notifyMatchFailure(op, "expected input to be 4D");
+    }
+
+    if (outType.getRank() != 2) {
+      return rewriter.notifyMatchFailure(op, "expected output to be 2D");
+    }
+
+    int64_t innerDimsPos[2] = {0, 1};
+    if (ArrayAttr innerDimsPosAttr = op.getInnerDimsPosAttr()) {
+      innerDimsPos[0] = innerDimsPosAttr[0].cast<IntegerAttr>().getInt();
+      innerDimsPos[1] = innerDimsPosAttr[1].cast<IntegerAttr>().getInt();
+    }
+
+    int64_t outerDimsPerm[2] = {0, 1};
+    if (ArrayAttr outerDimsPermAttr = op.getOuterDimsPermAttr()) {
+      outerDimsPerm[0] = outerDimsPermAttr[0].cast<IntegerAttr>().getInt();
+      outerDimsPerm[1] = outerDimsPermAttr[1].cast<IntegerAttr>().getInt();
+    }
+
+    int flags = 0;
+
+    if (innerDimsPos[0] == 0 && innerDimsPos[1] == 1) {
+      // nothing to do
+    } else if (innerDimsPos[0] == 1 && innerDimsPos[1] == 0) {
+      flags |= IREE_UK_FLAG_UNPACK_TRANSPOSE_INNER;
+    } else {
+      return rewriter.notifyMatchFailure(op, "unsupported inner_dims_pos");
+    }
+
+    if (outerDimsPerm[0] == 0 && outerDimsPerm[1] == 1) {
+      // nothing to do
+    } else if (outerDimsPerm[0] == 1 && outerDimsPerm[1] == 0) {
+      flags |= IREE_UK_FLAG_UNPACK_TRANSPOSE_OUTER;
+    } else {
+      return rewriter.notifyMatchFailure(op, "unsupported outer_dims_perm");
+    }
+
+    SmallVector<int64_t> outStrides;
+    int64_t outOffset;
+    if (failed(mlir::getStridesAndOffset(outType, outStrides, outOffset))) {
+      return rewriter.notifyMatchFailure(
+          op, "failed to getStridesAndOffset for output");
+    }
+
+    if (outStrides[1] != 1) {
+      return rewriter.notifyMatchFailure(
+          op, "unsupported output layout with non-contiguous inner dimension");
+    }
+
+    if (!verifyMemRefInnerDimsContiguousRowMajor(inType)) {
+      return rewriter.notifyMatchFailure(
+          op,
+          "expected the input's inner dimensions to be contiguous row-major");
+    }
+
+    StridedBufferAnalysis inAnalysis(op.getInput());
+    StridedBufferAnalysis outAnalysis(op.getOutput());
+
+    if (!inAnalysis.isValid()) {
+      return rewriter.notifyMatchFailure(
+          op, "could not compute buffer descriptor for input");
+    }
+
+    if (!outAnalysis.isValid()) {
+      return rewriter.notifyMatchFailure(
+          op, "could not compute buffer descriptor for output");
+    }
+
+    Location loc = op.getLoc();
+
+    StridedBufferDescriptor &inDesc = inAnalysis.getDesc(rewriter);
+    StridedBufferDescriptor &outDesc = outAnalysis.getDesc(rewriter);
+
+    Value inBuffer = inDesc.castToLinear(loc, rewriter);
+    Value outBuffer = outDesc.castToLinear(loc, rewriter);
+    Value inSize0 = inDesc.sizes[0];
+    Value inSize1 = inDesc.sizes[1];
+    Value inSize2 = inDesc.sizes[2];
+    Value inSize3 = inDesc.sizes[3];
+    Value inStride0 = inDesc.strides[0];
+    Value outSize0 = outDesc.sizes[0];
+    Value outSize1 = outDesc.sizes[1];
+    Value outStride0 = outDesc.strides[0];
+
+    rewriter.replaceOpWithNewOp<IREE::VMVX::UnpackOp>(
+        op,
+        // input
+        inBuffer, inDesc.offset, inStride0,
+        // output
+        outBuffer, outDesc.offset, outStride0,
+        // input shape
+        inSize0, inSize1, inSize2, inSize3,
+        // output shape
+        outSize0, outSize1,
+        // flags
+        inDesc.getElementTypeAttr(), outDesc.getElementTypeAttr(),
+        rewriter.getI32IntegerAttr(flags));
+    return success();
+  }
+};
+
 bool isMmt4d(ArrayAttr indexingMaps) {
   if (indexingMaps.size() != 3) return false;
 
@@ -1287,10 +1416,11 @@ class VMVXLowerLinalgMicrokernelsPass
     // Other lowering patterns
     {
       RewritePatternSet patterns(&getContext());
-      patterns.insert<LinalgBinaryGenericConversion, LinalgFillConversion,
-                      LinalgTrivialGenericConversion,
-                      LinalgUnaryGenericConversion, LinalgExtPackConversion>(
-          &getContext());
+      patterns
+          .insert<LinalgBinaryGenericConversion, LinalgFillConversion,
+                  LinalgTrivialGenericConversion, LinalgUnaryGenericConversion,
+                  LinalgExtPackConversion, LinalgExtUnpackConversion>(
+              &getContext());
 
       if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                               std::move(patterns)))) {
