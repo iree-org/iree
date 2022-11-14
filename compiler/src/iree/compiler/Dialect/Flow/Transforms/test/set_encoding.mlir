@@ -134,3 +134,25 @@ func.func @fold_fill_with_set_encoding(%arg0 : index, %arg1 : index)
 //      CHECK:   %[[FILL:.+]] = linalg.fill
 // CHECK-SAME:       outs(%[[EMPTY]] : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_LHS>>)
 //      CHECK:   return %[[FILL]]
+
+// -----
+
+func.func @fold_fill_with_tensor_pad(%arg0 : index, %arg1 : index, %arg2 : index, %arg3 : index)
+    -> tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RESULT>> {
+  %cst = arith.constant 0.0 : f32
+  %0 = tensor.empty(%arg0, %arg1) : tensor<?x?xf32>
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<?x?xf32>) -> tensor<?x?xf32>
+  %2 = tensor.pad %1 low[0, 0] high[%arg2, %arg3] {
+  ^bb0(%b0: index, %b1 : index):
+    tensor.yield %cst : f32
+  } : tensor<?x?xf32> to tensor<?x?xf32>
+  %3 = iree_linalg_ext.set_encoding %2 : tensor<?x?xf32>
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RESULT>>
+  return %3 : tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RESULT>>
+}
+//      CHECK: func @fold_fill_with_tensor_pad(
+//      CHECK:   %[[EMPTY:.+]] = tensor.empty(
+// CHECK-SAME:       tensor<?x?xf32, #iree_linalg_ext.encoding<GEMM_RESULT>>
+//      CHECK:   %[[FILL:.+]] = linalg.fill
+// CHECK-SAME:       outs(%[[EMPTY]] :
+//      CHECK:   return %[[FILL]]

@@ -18,6 +18,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/IR/PatternMatch.h"
@@ -229,12 +230,16 @@ struct SetEncodingPass : public SetEncodingBase<SetEncodingPass> {
 
 void SetEncodingPass::runOnOperation() {
   MLIRContext *context = &getContext();
-  RewritePatternSet patterns(context);
-  patterns.insert<SetMatmulEncoding>(context, defaultPadding);
-  patterns.insert<FoldFillWithSetEncoding>(context);
-  if (failed(
-          applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
-    return signalPassFailure();
+  {
+    RewritePatternSet patterns(context);
+    patterns.insert<SetMatmulEncoding>(context, defaultPadding);
+    linalg::FillOp::getCanonicalizationPatterns(patterns, context);
+    patterns.insert<FoldFillWithSetEncoding>(context);
+    memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(patterns)))) {
+      return signalPassFailure();
+    }
   }
 }
 
