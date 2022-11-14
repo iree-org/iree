@@ -100,9 +100,7 @@ iree_check_single_backend_test_suite(
     name = "check_vmvx_ukernel_local-task",
     srcs = [
         "pack.mlir",
-        # TODO: Uncomment unpack.mlir when this issue is resolved:
-        # https://github.com/iree-org/iree/issues/10796
-        # "unpack.mlir",
+        "unpack.mlir",
     ],
     compiler_flags = [
         "--iree-vmvx-enable-microkernels",

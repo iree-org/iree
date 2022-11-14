@@ -11,6 +11,7 @@ include "mlir/Dialect/PDL/IR/PDLTypes.td"
 include "mlir/Dialect/Transform/IR/TransformDialect.td"
 include "mlir/Dialect/Transform/IR/TransformInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
+include "mlir/Dialect/SCF/IR/DeviceMappingInterface.td"
 include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
 
@@ -210,7 +211,7 @@ def TileToForeachThreadAndWorkgroupCountRegionOp :
                    Variadic<PDL_Operation>:$tile_sizes,
                    DefaultValuedAttr<I64ArrayAttr, "{}">:$static_num_threads,
                    DefaultValuedAttr<I64ArrayAttr, "{}">:$static_tile_sizes,
-                   OptionalAttr<I64ArrayAttr>:$thread_dim_mapping,
+                   OptionalAttr<DeviceMappingArrayAttr>:$mapping,
                    UnitAttr:$packed_sizes);
   let results = (outs PDL_Operation:$foreach_thread_op,
                       PDL_Operation:$tiled_op);
@@ -222,7 +223,7 @@ def TileToForeachThreadAndWorkgroupCountRegionOp :
          `tile_sizes` custom<DynamicIndexList>($tile_sizes,
                                                $static_tile_sizes,
                                                "ShapedType::kDynamicSize"))
-    (`(` `mapped` `to` `dims` $thread_dim_mapping^ `)`)? attr-dict
+    (`(` `mapping` `=` $mapping^ `)`)? attr-dict
   }];
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
   let hasVerifier = 1;
@@ -232,27 +233,27 @@ def TileToForeachThreadAndWorkgroupCountRegionOp :
                    "ArrayRef<int64_t>":$staticTileSizes,
                    CArg<"::mlir::transform::TileSizesSpec",
                         "::mlir::transform::TileSizesSpec()">,
-                   CArg<"ArrayRef<int64_t>", "{}">:$threadDimMapping)>,
+                   CArg<"ArrayAttr", "{}">:$mapping)>,
     OpBuilder<(ins "Value":$target,
                    "ArrayRef<OpFoldResult>":$mixedTileSizes,
                    CArg<"::mlir::transform::TileSizesSpec",
                         "::mlir::transform::TileSizesSpec()">,
-                   CArg<"ArrayRef<int64_t>", "{}">:$threadDimMapping)>,
+                   CArg<"ArrayAttr", "{}">:$mapping)>,
     OpBuilder<(ins "Value":$target,
                    "Value":$tileSizeHandle,
                    CArg<"::mlir::transform::TileSizesSpec",
                         "::mlir::transform::TileSizesSpec()">,
-                   CArg<"ArrayRef<int64_t>", "{}">:$threadDimMapping)>,
+                   CArg<"ArrayAttr", "{}">:$mapping)>,
     OpBuilder<(ins "Value":$target,
                    "ArrayRef<int64_t>":$staticNumThreads,
                    CArg<"::mlir::transform::NumThreadsSpec",
                         "::mlir::transform::NumThreadsSpec()">,
-                   CArg<"ArrayRef<int64_t>", "{}">:$threadDimMapping)>,
+                   CArg<"ArrayAttr", "{}">:$mapping)>,
     OpBuilder<(ins "Value":$target,
                    "ArrayRef<OpFoldResult>":$mixedNumThreads,
                    CArg<"::mlir::transform::NumThreadsSpec",
                         "::mlir::transform::NumThreadsSpec()">,
-                   CArg<"ArrayRef<int64_t>", "{}">:$threadDimMapping)>,
+                   CArg<"ArrayAttr", "{}">:$mapping)>,
   ];
 
   let extraClassDeclaration = [{

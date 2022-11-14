@@ -63,13 +63,13 @@ hal.executable @matmul_f16_32x32x32 {
           %6 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_id_x]
           %7 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_count_x]
           scf.for %arg1 = %6 to %c32 step %7 {
-            linalg.fill {lowering_config = #config} ins(%cst : f16) outs(%3 : memref<32x32xf16>)
+            linalg.fill ins(%cst : f16) outs(%3 : memref<32x32xf16>)
             linalg.matmul {lowering_config = #config}
               ins(%0, %1 : memref<32x32xf16>, memref<32x32xf16>) outs(%3 : memref<32x32xf16>)
             linalg.generic {
                 indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
                 iterator_types = ["parallel", "parallel"]}
-            ins(%2 : memref<32x32xf16>) outs(%3 : memref<32x32xf16>) attrs = {lowering_config = #config} {
+            ins(%2 : memref<32x32xf16>) outs(%3 : memref<32x32xf16>) {
             ^bb0(%in: f16, %out: f16):
               %8 = arith.divf %out, %in : f16
               linalg.yield %8 : f16
@@ -172,8 +172,7 @@ hal.executable @generic_batch_matmul_f16_32x128x512x64 {
               %subview = memref.subview %span2[%arg0, %arg1, %arg2] [1, 32, 32] [1, 1, 1] : memref<32x128x512xf16> to memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>
               %subview_0 = memref.subview %span0[%arg1, %arg0, 0] [32, 1, 64] [1, 1, 1] : memref<128x32x64xf16> to memref<32x1x64xf16, strided<[2048, 64, 1], offset: ?>>
               %subview_1 = memref.subview %span1[%arg0, 0, %arg2] [1, 64, 32] [1, 1, 1] : memref<32x64x512xf16> to memref<1x64x32xf16, strided<[32768, 512, 1], offset: ?>>
-              linalg.fill {lowering_config = #config}
-                ins(%cst : f16) outs(%subview : memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>)
+              linalg.fill ins(%cst : f16) outs(%subview : memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>)
               linalg.generic {
                 indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d1, d0, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>],
                 iterator_types = ["parallel", "parallel", "parallel", "reduction"]}
@@ -190,8 +189,7 @@ hal.executable @generic_batch_matmul_f16_32x128x512x64 {
                   indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
                   iterator_types = ["parallel", "parallel", "parallel"]}
               ins(%subview_2 : memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>)
-              outs(%subview : memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>)
-              attrs = {lowering_config = #config} {
+              outs(%subview : memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>) {
               ^bb0(%in: f16, %out: f16):
                 %8 = arith.divf %out, %in : f16
                 linalg.yield %8 : f16
@@ -321,8 +319,7 @@ hal.executable @generic_batch_matmul_f16_32x128x512x64 {
               %subview = memref.subview %2[%arg0, %arg1, %arg2] [1, 32, 32] [1, 1, 1] : memref<32x128x512xf16> to memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>
               %subview_0 = memref.subview %0[%arg1, %arg0, 0] [32, 1, 64] [1, 1, 1] : memref<128x32x64xf16> to memref<32x1x64xf16, strided<[2048, 64, 1], offset: ?>>
               %subview_1 = memref.subview %1[%arg0, 0, %arg2] [1, 64, 32] [1, 1, 1] : memref<32x64x512xf16> to memref<1x64x32xf16, strided<[32768, 512, 1], offset: ?>>
-              linalg.fill {lowering_config = #config}
-                ins(%cst : f16) outs(%subview : memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>)
+              linalg.fill ins(%cst : f16) outs(%subview : memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>)
               linalg.generic {
                 indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d1, d0, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>],
                 iterator_types = ["parallel", "parallel", "parallel", "reduction"]}

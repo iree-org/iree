@@ -144,6 +144,42 @@ static Optional<BlockArgument> getBindingArgument(Value v) {
   return llvm::None;
 }
 
+/// Returns `true` if the slice (described by the `offset`, `sizes` and
+/// `strides`) spans the dispatch type.
+static bool doesSliceSpanWholeTarget(
+    IREE::Flow::DispatchTensorType dispatchType, ValueRange dispatchTypeDims,
+    ArrayRef<OpFoldResult> offsets, ArrayRef<OpFoldResult> sizes,
+    ArrayRef<OpFoldResult> strides) {
+  // All offsets must be zero.
+  if (!llvm::all_of(offsets, [](OpFoldResult ofr) {
+        return isConstantIntValue(ofr, 0);
+      })) {
+    return false;
+  }
+
+  // All the sizes must match the entire target size.
+  SmallVector<int64_t> staticSizes;
+  SmallVector<Value> dynamicSizes;
+  dispatchIndexOpFoldResults(sizes, dynamicSizes, staticSizes,
+                             ShapedType::kDynamicSize);
+  auto targetType = dispatchType;
+  if (staticSizes != targetType.getShape() ||
+      llvm::any_of(llvm::zip(dynamicSizes, dispatchTypeDims),
+                   [](std::tuple<Value, Value> en) {
+                     return std::get<0>(en) != std::get<1>(en);
+                   })) {
+    return false;
+  }
+
+  // All the strides must be 1.
+  if (!llvm::all_of(strides, [](OpFoldResult ofr) {
+        return isConstantIntValue(ofr, 1);
+      })) {
+    return false;
+  }
+  return true;
+}
+
 //===----------------------------------------------------------------------===//
 // custom<WorkgroupCountRegion>($body)
 //===----------------------------------------------------------------------===//
@@ -608,6 +644,12 @@ SmallVector<int64_t, 4> DispatchTensorLoadOp::getTiedResultOperandIndices() {
   return {0};  // source
 }
 
+bool DispatchTensorLoadOp::isLoadOfWholeSource() {
+  return doesSliceSpanWholeTarget(getSourceType(), getSourceDims(),
+                                  getMixedOffsets(), getMixedSizes(),
+                                  getMixedStrides());
+}
+
 //===----------------------------------------------------------------------===//
 // flow.dispatch.tensor.store
 //===----------------------------------------------------------------------===//
@@ -658,6 +700,12 @@ void DispatchTensorStoreOp::build(OpBuilder &builder, OperationState &state,
 llvm::SmallBitVector DispatchTensorStoreOp::getDroppedDims() {
   return getDroppedDimsImpl(getValue().getType().cast<RankedTensorType>(),
                             getMixedSizes());
+}
+
+bool DispatchTensorStoreOp::isStoreToWholeTarget() {
+  return doesSliceSpanWholeTarget(getTargetType(), getTargetDims(),
+                                  getMixedOffsets(), getMixedSizes(),
+                                  getMixedStrides());
 }
 
 //===----------------------------------------------------------------------===//

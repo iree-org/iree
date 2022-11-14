@@ -1726,3 +1726,92 @@ hal.executable private @no_tile {
 // CHECK-LABEL: func @no_tile()
 //   CHECK-NOT: scf.for
 //       CHECK: iree_linalg_ext.topk
+
+// -----
+
+hal.executable private @pack_lowering {
+  hal.executable.variant public @embedded_elf_x86_64, target = <"llvm-cpu", "embedded-elf-x86_64", {}> {
+    hal.executable.export public @gemm_lhs_pack ordinal(0) 
+        layout(#hal.pipeline.layout<push_constants = 0,
+            sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>)
+        attributes {translation_info = #iree_codegen.translation_info<CPUDataTiling>} {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_set_encoding_op %arg1, %arg2
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @gemm_lhs_pack() {
+        %c0 = arith.constant 0 : index
+        %cst = arith.constant 0.000000e+00 : f32
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64)
+            : !flow.dispatch.tensor<readonly:tensor<100x250xf32>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64)
+            : !flow.dispatch.tensor<writeonly:tensor<14x64x8x4xf32>>
+        %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [100, 250], strides = [1, 1]
+            : !flow.dispatch.tensor<readonly:tensor<100x250xf32>> -> tensor<100x250xf32>
+        %3 = tensor.empty() : tensor<14x64x8x4xf32>
+        %4 = iree_linalg_ext.pack {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 64]]>} %2
+            padding_value(%cst : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 4] into %3
+            : (tensor<100x250xf32> tensor<14x64x8x4xf32>) -> tensor<14x64x8x4xf32>
+        flow.dispatch.tensor.store %4, %1, offsets = [0, 0, 0, 0], sizes = [14, 64, 8, 4], strides = [1, 1, 1, 1]
+            : tensor<14x64x8x4xf32> -> !flow.dispatch.tensor<writeonly:tensor<14x64x8x4xf32>>
+        return
+      }
+    }
+  }
+}
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> ((s0 ceildiv 8) ceildiv 64)
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> ((s0 ceildiv 4) ceildiv 64)
+//      CHECK: hal.executable.export public @gemm_lhs_pack
+// CHECK-NEXT:   %[[ARG0:.+]]: !hal.device
+// CHECK-SAME:   %[[ARG1:.+]]: index,
+// CHECK-SAME:   %[[ARG2:.+]]: index
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//  CHECK-DAG:   %[[W0:.+]] = affine.apply #[[MAP0]]()[%[[ARG1]]]
+//  CHECK-DAG:   %[[W1:.+]] = affine.apply #[[MAP1]]()[%[[ARG2]]]
+//      CHECK:   hal.return %[[W1]], %[[W0]], %[[C1]]
+
+// -----
+
+hal.executable private @pack_lowering {
+  hal.executable.variant public @embedded_elf_x86_64, target = <"llvm-cpu", "embedded-elf-x86_64", {}> {
+    hal.executable.export public @gemm_rhs_transpose_pack ordinal(0) 
+        layout(#hal.pipeline.layout<push_constants = 0,
+            sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>)
+        attributes {translation_info = #iree_codegen.translation_info<CPUDataTiling>} {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_set_encoding_op %arg1, %arg2
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @gemm_rhs_transpose_pack() {
+        %c0 = arith.constant 0 : index
+        %c114688 = arith.constant 114688 : index
+        %cst = arith.constant 0.000000e+00 : f32
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64)
+            : !flow.dispatch.tensor<readonly:tensor<250x500xf32>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c114688) alignment(64)
+            : !flow.dispatch.tensor<writeonly:tensor<64x64x8x4xf32>>
+        %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [250, 500], strides = [1, 1]
+            : !flow.dispatch.tensor<readonly:tensor<250x500xf32>> -> tensor<250x500xf32>
+        %3 = tensor.empty() : tensor<64x64x8x4xf32>
+        %4 = iree_linalg_ext.pack {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 64]]>} %2
+            padding_value(%cst : f32) outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [8, 4] into %3
+            : (tensor<250x500xf32> tensor<64x64x8x4xf32>) -> tensor<64x64x8x4xf32>
+        flow.dispatch.tensor.store %4, %1, offsets = [0, 0, 0, 0], sizes = [64, 64, 8, 4], strides = [1, 1, 1, 1]
+            : tensor<64x64x8x4xf32> -> !flow.dispatch.tensor<writeonly:tensor<64x64x8x4xf32>>
+        return
+      }
+    }
+  }
+}
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> ((s0 ceildiv 8) ceildiv 64)
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> ((s0 ceildiv 4) ceildiv 64)
+//      CHECK: hal.executable.export public @gemm_rhs_transpose_pack
+// CHECK-NEXT:   %[[ARG0:.+]]: !hal.device
+// CHECK-SAME:   %[[ARG1:.+]]: index,
+// CHECK-SAME:   %[[ARG2:.+]]: index
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//  CHECK-DAG:   %[[W0:.+]] = affine.apply #[[MAP0]]()[%[[ARG2]]]
+//  CHECK-DAG:   %[[W1:.+]] = affine.apply #[[MAP1]]()[%[[ARG1]]]
+//      CHECK:   hal.return %[[W1]], %[[W0]], %[[C1]]

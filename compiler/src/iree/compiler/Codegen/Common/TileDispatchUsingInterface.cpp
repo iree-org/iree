@@ -10,7 +10,6 @@
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Utils/GraphUtils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/ViewLikeInterfaceUtils.h"
@@ -23,6 +22,7 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/TilingInterface.h"
+#include "mlir/Transforms/TopologicalSortUtils.h"
 
 #define DEBUG_TYPE "tile-dispatch-using-interface"
 
@@ -535,7 +535,7 @@ struct TileAndFuseDispatchUsingSCFForOp
 }  // namespace
 
 /// Find all producers to fuse and return them in sorted order;
-static std::vector<Operation *> getAllFusableProducers(TilingInterface op) {
+static SmallVector<Operation *> getAllFusableProducers(TilingInterface op) {
   llvm::SetVector<Operation *> producers;
   std::deque<Operation *> worklist;
   worklist.push_back(op);
@@ -555,7 +555,8 @@ static std::vector<Operation *> getAllFusableProducers(TilingInterface op) {
     }
   }
 
-  std::vector<Operation *> sortedOps = sortOpsTopologically(producers);
+  SmallVector<Operation *> sortedOps(producers.begin(), producers.end());
+  mlir::computeTopologicalSorting(sortedOps);
   return sortedOps;
 }
 
@@ -579,7 +580,7 @@ FailureOr<TileAndFuseResult>
 TileAndFuseDispatchUsingSCFForOp::returningMatchAndRewrite(
     TilingInterface op, PatternRewriter &rewriter) const {
   TileAndFuseResult tileAndFuseResult;
-  std::vector<Operation *> fusableProducers = getAllFusableProducers(op);
+  auto fusableProducers = getAllFusableProducers(op);
   // Apply the tiling pattern.
   FailureOr<TilingResult> tilingResult =
       tilingPattern.returningMatchAndRewrite(op, rewriter);

@@ -23,7 +23,7 @@ func.func @denseTensorSizeOfEmpty(%arg0: index) -> index {
 
 // CHECK-LABEL: @denseTensorEmpty
 func.func @denseTensorEmpty(%arg0: index, %arg1: index) -> !stream.resource<*> {
-  // CHECK: %[[RET:.+]] = stream.resource.alloc : !stream.resource<*>{%c0}
+  // CHECK: %[[RET:.+]] = stream.async.alloca : !stream.resource<*>{%arg1}
   %0 = stream.tensor.empty : tensor<?x1xf32>{%arg0} in !stream.resource<*>{%arg1}
   // CHECK: return %[[RET]]
   return %0 : !stream.resource<*>

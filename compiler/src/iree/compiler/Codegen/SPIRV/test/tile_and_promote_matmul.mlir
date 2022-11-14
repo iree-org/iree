@@ -45,7 +45,7 @@ hal.executable @matmul_f32_256x1024x128 {
             %9 = memref.subview %0[%arg0, 0] [128, 128] [1, 1] : memref<256x128xf32> to memref<128x128xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>
             %10 = memref.subview %1[0, %arg1] [128, 128] [1, 1] : memref<128x1024xf32> to memref<128x128xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
             %11 = memref.subview %3[%arg0, %arg1] [128, 128] [1, 1] : memref<256x1024xf32> to memref<128x128xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-            linalg.fill {lowering_config = #config}
+            linalg.fill
               ins(%cst : f32) outs(%11 : memref<128x128xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>)
             linalg.matmul {lowering_config = #config}
               ins(%9, %10 : memref<128x128xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>, memref<128x128xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>)
@@ -54,8 +54,7 @@ hal.executable @matmul_f32_256x1024x128 {
               indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
               iterator_types = ["parallel", "parallel"]}
               ins(%11, %8 : memref<128x128xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<128x128xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>)
-              outs(%11 : memref<128x128xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>)
-              attrs =  {lowering_config = #config} {
+              outs(%11 : memref<128x128xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>) {
             ^bb0(%arg2: f32, %arg3: f32, %arg4: f32):
               %12 = arith.divf %arg2, %arg3 : f32
               linalg.yield %12 : f32
@@ -178,13 +177,13 @@ hal.executable @batch_matmul_16x1024x1024x80 {
               %subview = memref.subview %8[%arg0, %arg1, %arg2] [1, 64, 256] [1, 1, 1] : memref<16x1024x1024xf16> to memref<1x64x256xf16, strided<[1048576, 1024, 1], offset: ?>>
               %subview_1 = memref.subview %6[%arg0, %arg1, 0] [1, 64, 80] [1, 1, 1] : memref<16x1024x80xf16> to memref<1x64x80xf16, strided<[81920, 80, 1], offset: ?>>
               %subview_2 = memref.subview %7[%arg0, 0, %arg2] [1, 80, 256] [1, 1, 1] : memref<16x80x1024xf16> to memref<1x80x256xf16, strided<[81920, 1024, 1], offset: ?>>
-              linalg.fill {lowering_config = #config}
+              linalg.fill
                 ins(%cst_0 : f16) outs(%subview : memref<1x64x256xf16, strided<[1048576, 1024, 1], offset: ?>>)
               linalg.batch_matmul {lowering_config = #config}
                 ins(%subview_1, %subview_2 : memref<1x64x80xf16, strided<[81920, 80, 1], offset: ?>>, memref<1x80x256xf16, strided<[81920, 1024, 1], offset: ?>>)
                 outs(%subview : memref<1x64x256xf16, strided<[1048576, 1024, 1], offset: ?>>)
               linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]}
-                outs(%subview : memref<1x64x256xf16, strided<[1048576, 1024, 1], offset: ?>>) attrs =  {lowering_config = #config} {
+                outs(%subview : memref<1x64x256xf16, strided<[1048576, 1024, 1], offset: ?>>) {
               ^bb0(%out: f16):
                 %13 = arith.truncf %cst : f32 to f16
                 %14 = arith.mulf %out, %13 : f16
@@ -261,7 +260,7 @@ hal.executable @batch_matmul_f32_16x4096x40x4096 {
               %subview = memref.subview %2[%arg0, %arg1, %arg2] [1, 512, 8] [1, 1, 1] : memref<16x4096x40xf32> to memref<1x512x8xf32, strided<[163840, 40, 1], offset: ?>>
               %subview_0 = memref.subview %0[%arg0, %arg1, 0] [1, 512, 4096] [1, 1, 1] : memref<16x4096x4096xf32> to memref<1x512x4096xf32, strided<[16777216, 4096, 1], offset: ?>>
               %subview_1 = memref.subview %1[%arg0, 0, %arg2] [1, 4096, 8] [1, 1, 1] : memref<16x4096x40xf32> to memref<1x4096x8xf32, strided<[163840, 40, 1], offset: ?>>
-              linalg.fill {lowering_config = #config}
+              linalg.fill
                 ins(%cst : f32) outs(%subview : memref<1x512x8xf32, strided<[163840, 40, 1], offset: ?>>)
               linalg.batch_matmul {lowering_config = #config}
                 ins(%subview_0, %subview_1 : memref<1x512x4096xf32, strided<[16777216, 4096, 1], offset: ?>>, memref<1x4096x8xf32, strided<[163840, 40, 1], offset: ?>>)

@@ -95,13 +95,20 @@ def IREEComprehensiveBufferize :
   ];
 }
 
+def IREEMaterializeEncoding :
+    Pass<"iree-codegen-materialize-encoding", "func::FuncOp"> {
+  let summary = "Materialize the encoding for tensor as specified by the backend";
+  let constructor = "mlir::iree_compiler::createIREEMaterializeEncodingPass()";
+}
+
 def OptimizeVectorTransfer :
     Pass<"iree-codegen-optimize-vector-transfer", "func::FuncOp"> {
   let summary =
       "Run optimization transformations on vector transfer operations";
   let constructor = "mlir::iree_compiler::createOptimizeVectorTransferPass()";
   let options = [
-    Option<"optionFlatten", "flatten", "bool", "false", "Flatten the vector type of vector transfers where possible (contiguous row-major data).">
+    Option<"optionFlatten", "flatten", "bool", "false",
+           "Flatten the vector type of vector transfers where possible (contiguous row-major data).">
   ];
 }
 
@@ -168,6 +175,12 @@ def GPUReduceBankConflicts :
     Pass<"iree-gpu-reduce-bank-conflicts", "func::FuncOp"> {
   let summary = "Pass to try to reduce the number of bank conflicts.";
   let constructor = "mlir::iree_compiler::createGPUReduceSharedMemoryBankConflicts()";
+}
+
+def GPUMultiBuffering :
+    Pass<"iree-gpu-multi-buffering", "func::FuncOp"> {
+  let summary = "Pass to do multi buffering.";
+  let constructor = "mlir::iree_compiler::createGPUMultiBuffering()";
 }
 
 def GPUPipelining : Pass<"iree-gpu-pipelining", "func::FuncOp"> {
@@ -413,12 +426,6 @@ def LLVMGPUVectorLowering :
     Pass<"iree-llvmgpu-vector-lowering", "func::FuncOp"> {
   let summary = "Pass to lower Vector ops before conversion to LLVM.";
   let constructor = "mlir::iree_compiler::createLLVMGPUVectorLoweringPass()";
-}
-
-def LLVMGPUMultiBuffering :
-    Pass<"iree-llvmgpu-multi-buffering", "func::FuncOp"> {
-  let summary = "Pass to do multi buffering.";
-  let constructor = "mlir::iree_compiler::createLLVMGPUMultiBuffering()";
 }
 
 def LLVMGPUVectorToGPU :

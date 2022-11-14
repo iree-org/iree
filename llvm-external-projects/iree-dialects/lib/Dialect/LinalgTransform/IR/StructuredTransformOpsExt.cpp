@@ -442,8 +442,8 @@ static Operation *findSingleDefiningOp(Operation *replacedOp,
       });
 }
 
-void mlir::TrackingListener::notifyOperationReplaced(Operation *op,
-                                                     ValueRange newValues) {
+void mlir::TrackingListener::notifyRootReplaced(Operation *op,
+                                                ValueRange newValues) {
   // Bail out if in error state.
   if (hadErrors)
     return;

@@ -42,8 +42,6 @@ hal.executable @warp_reduction_dispatch {
 
 //   CHECK-LABEL:  func.func @warp_reduction_dispatch
 //     CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
-//     CHECK-DAG:    %[[C1i:.+]] = arith.constant 1 : index
-//     CHECK-DAG:    %[[C20:.+]] = arith.constant 20 : index
 //     CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : i32
 //     CHECK-DAG:    %[[C2:.+]] = arith.constant 2 : i32
 //     CHECK-DAG:    %[[C4:.+]] = arith.constant 4 : i32
@@ -52,13 +50,15 @@ hal.executable @warp_reduction_dispatch {
 //     CHECK-DAG:    %[[C32:.+]] = arith.constant 32 : i32
 //     CHECK-DAG:    %[[C4I:.+]] = arith.constant 4 : index
 //     CHECK-DAG:    %[[C32I:.+]] = arith.constant 32 : index
+//     CHECK-DAG:    %[[C512:.+]] = arith.constant 512 : index
+//     CHECK-DAG:    %[[C10240:.+]] = arith.constant 10240 : index
 //     CHECK-DAG:    %[[IDENTITY:.+]] = arith.constant 0.000000e+00 : f32
 //     CHECK-DAG:    %[[CF:.+]] = arith.constant 1.000000e+00 : f32
 //     CHECK-DAG:    %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<4xf32>
 //     CHECK-DAG:    %[[TID:.+]] = gpu.thread_id  x
-//         CHECK:    %[[R0:.+]] = scf.for %{{.*}} = %[[C0]] to %[[C20]] step %[[C1i]] iter_args(%[[A0:.+]] = %[[CST]]) -> (vector<4xf32>) {
-//         CHECK:      %[[V:.+]] = vector.transfer_read {{.*}} {in_bounds = [true]} : memref<1x20x512xf32, strided<[10240, 512, 1], offset: ?>>, vector<4xf32>
-//         CHECK:      %[[A1:.+]] = arith.addf %[[A0]], %[[V]] : vector<4xf32>
+//         CHECK:    %[[R0:.+]] = scf.for %{{.*}} = %[[C0]] to %[[C10240]] step %[[C512]] iter_args(%[[A0:.+]] = %[[CST]]) -> (vector<4xf32>) {
+//         CHECK:      %[[V:.+]] = vector.transfer_read {{.*}} {in_bounds = [true]} : memref<512x10240xf32>, vector<4xf32>
+//         CHECK:      %[[A1:.+]] = arith.addf %[[V]], %[[A0]] : vector<4xf32>
 //         CHECK:      scf.yield %[[A1]] : vector<4xf32>
 //         CHECK:    }
 //         CHECK:    %[[R1:.+]] = vector.reduction <add>, %[[R0]] : vector<4xf32> into f32

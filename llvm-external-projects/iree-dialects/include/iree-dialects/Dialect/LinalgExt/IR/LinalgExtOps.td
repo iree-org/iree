@@ -17,6 +17,24 @@ include "mlir/Interfaces/TilingInterface.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
 
 
+def IREELinalgExt_DoNotDCEOperandsOp : 
+  Op<IREELinalgExt_Dialect, "transform.do_not_dce_operands", []> {
+  let summary = "Unfoldable op that just keeps its operands live";
+  let description = [{
+    Unfoldable op that just keeps its operands live. This is to use with the 
+    transform dialect in case where transforms introduce IR that would be 
+    otherwise DCE'd by canonicalizations.
+
+    This op should be added to the transform dialect in the fullness of time but
+    it can't be registered dynamically on the IREE side as that triggers errors
+    since the op does not implement any transform interface.
+  }];
+
+  let arguments = (ins Variadic<AnyType>:$operands);
+  let results = (outs);
+  let assemblyFormat = "attr-dict $operands `:` type($operands)";
+}
+
 //===----------------------------------------------------------------------===//
 // Base class.
 //===----------------------------------------------------------------------===//
@@ -540,7 +558,7 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
     Example KC_to_CKkc
 
     ```mlir
-    iree_linalg_ext.pack %arg0 outer_dims_pos = [1, 0] inner_dims_pos = [0, 1]
+    iree_linalg_ext.pack %arg0 outer_dims_perm = [1, 0] inner_dims_pos = [0, 1]
       inner_tiles = [32, 8] into %arg1 : (memref<128x256xf32> memref<32x4x32x8xf32>)
     ```
 
@@ -707,7 +725,7 @@ def IREELinalgExt_UnPackOp : IREELinalgExt_Op<"unpack", [
     Example CKkc_to_KC:
 
     ```mlir
-    iree_linalg_ext.unpack %arg1 outer_dims_pos = [1, 0] inner_dims_pos = [0, 1]
+    iree_linalg_ext.unpack %arg1 outer_dims_perm = [1, 0] inner_dims_pos = [0, 1]
       inner_tiles = [32, 8] into %arg0 : (memref<32x4x32x8xf32> memref<128x256xf32>)
     ```
   }];

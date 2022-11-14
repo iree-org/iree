@@ -21,6 +21,7 @@ iree_lit_test_suite(
     "mmt4d.mlir"
     "pack.mlir"
     "unary.mlir"
+    "unpack.mlir"
   TOOLS
     FileCheck
     iree-opt

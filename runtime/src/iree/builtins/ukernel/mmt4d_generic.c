@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/builtins/ukernel/mmt4d_select_tile_generic.h"
+#include "iree/builtins/ukernel/mmt4d_generic.h"
 
 // Generic implementation of matmul tile, i8*i8->i32 case.
 static void iree_uk_mmt4d_tile_i8i8i32_generic(

@@ -148,7 +148,7 @@ static void iree_mmt4d_benchmark_register(
   } while (0)
 
 #define MMT4D_BENCHMARK_REGISTER_GENERIC(_type, _m0, _n0, _k0) \
-  MMT4D_BENCHMARK_REGISTER(_type, _m0, _n0, _k0, 0, GENERIC)
+  MMT4D_BENCHMARK_REGISTER(_type, _m0, _n0, _k0, 0, generic)
 
 #define MMT4D_BENCHMARK_REGISTER_ARM_64(_type, _m0, _n0, _k0) \
   MMT4D_BENCHMARK_REGISTER(_type, _m0, _n0, _k0, 0, arm_64)
@@ -160,10 +160,9 @@ static void iree_mmt4d_benchmark_register(
                            arm_64_##_cpu_feature)
 
 int main(int argc, char** argv) {
-  iree_flags_set_usage(
-      "mmt4d_benchmark",
-      "Benchmarks the libmmt4d implementation of the target machine.\n"
-      "\n");
+  iree_flags_set_usage("mmt4d_benchmark",
+                       "Benchmarks the mmt4d microkernel.\n"
+                       "\n");
 
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_UNDEFINED_OK, &argc, &argv);
   iree_benchmark_initialize(&argc, argv);

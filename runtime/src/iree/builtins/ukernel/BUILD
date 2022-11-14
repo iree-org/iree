@@ -32,6 +32,7 @@ iree_runtime_cc_library(
         "common.h",
         "mmt4d_types.h",
         "pack_types.h",
+        "unpack_types.h",
     ],
     deps = [
         ":exported_flag_bits",
@@ -45,10 +46,12 @@ iree_runtime_cc_library(
 iree_runtime_cc_library(
     name = "generic",
     srcs = [
-        "mmt4d_select_tile_generic.c",
+        "mmt4d_generic.c",
+        "pack_generic.c",
     ],
     hdrs = [
-        "mmt4d_select_tile_generic.h",
+        "mmt4d_generic.h",
+        "pack_generic.h",
     ],
     deps = [
         ":common",
@@ -78,11 +81,13 @@ iree_runtime_cc_library(
     srcs = [
         "mmt4d.c",
         "pack.c",
+        "unpack.c",
     ],
     hdrs = [
         "elementwise.h",
         "mmt4d.h",
         "pack.h",
+        "unpack.h",
     ],
     deps = [
         ":common",

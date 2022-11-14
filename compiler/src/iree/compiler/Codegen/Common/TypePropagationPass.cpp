@@ -74,7 +74,8 @@ static Optional<Type> getLegalizedType(Type t) {
     Optional<Type> legalizedElementType = getLegalizedElementType(elementType);
     if (!legalizedElementType) return llvm::None;
     return RankedTensorType::get(shapedType.getShape(),
-                                 legalizedElementType.value());
+                                 legalizedElementType.value(),
+                                 shapedType.getEncoding());
   }
   return llvm::None;
 }

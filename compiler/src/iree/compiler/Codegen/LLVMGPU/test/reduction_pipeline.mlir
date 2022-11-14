@@ -41,8 +41,6 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 
 //   CHECK-LABEL:  func.func @warp_reduction_dispatch
 //     CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
-//     CHECK-DAG:    %[[C1i:.+]] = arith.constant 1 : index
-//     CHECK-DAG:    %[[C5:.+]] = arith.constant 5 : index
 //     CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : i32
 //     CHECK-DAG:    %[[C2:.+]] = arith.constant 2 : i32
 //     CHECK-DAG:    %[[C4:.+]] = arith.constant 4 : i32
@@ -51,13 +49,15 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 //     CHECK-DAG:    %[[C32:.+]] = arith.constant 32 : i32
 //     CHECK-DAG:    %[[C16I:.+]] = arith.constant 16 : index
 //     CHECK-DAG:    %[[C32I:.+]] = arith.constant 32 : index
+//     CHECK-DAG:    %[[C2048:.+]] = arith.constant 2048 : index
+//     CHECK-DAG:    %[[C10240:.+]] = arith.constant 10240 : index
 //     CHECK-DAG:    %[[IDENTITY:.+]] = arith.constant 0.000000e+00 : f32
 //     CHECK-DAG:    %[[CF:.+]] = arith.constant 1.000000e+00 : f32
 //     CHECK-DAG:    %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<4xf32>
 //     CHECK-DAG:    %[[TID:.+]] = gpu.thread_id  x
-//         CHECK:    %[[R0:.+]] = scf.for %{{.*}} = %[[C0]] to %[[C5]] step %[[C1i]] iter_args(%[[A0:.+]] = %[[CST]]) -> (vector<4xf32>) {
-//         CHECK:      %[[V:.+]] = vector.transfer_read {{.*}} {in_bounds = [true]} : memref<1x5x2048xf32, strided<[10240, 2048, 1], offset: ?>>, vector<4xf32>
-//         CHECK:      %[[A1:.+]] = arith.addf %[[A0]], %[[V]] : vector<4xf32>
+//         CHECK:    %[[R0:.+]] = scf.for %{{.*}} = %[[C0]] to %[[C10240]] step %[[C2048]] iter_args(%[[A0:.+]] = %[[CST]]) -> (vector<4xf32>) {
+//         CHECK:      %[[V:.+]] = vector.transfer_read {{.*}} {in_bounds = [true]} : memref<512x10240xf32>, vector<4xf32>
+//         CHECK:      %[[A1:.+]] = arith.addf %[[V]], %[[A0]] : vector<4xf32>
 //         CHECK:      scf.yield %[[A1]] : vector<4xf32>
 //         CHECK:    }
 //         CHECK:    %[[R1:.+]] = vector.reduction <add>, %[[R0]] : vector<4xf32> into f32
@@ -150,7 +150,7 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 
 //   CHECK-LABEL:  func.func @warp_reduction_broadcast_dispatch
 //         CHECK:    scf.for {{.*}} -> (vector<4xf32>) {
-//         CHECK:      vector.transfer_read {{.*}} : memref<1x5x2048xf32, strided<[10240, 2048, 1], offset: ?>>, vector<4xf32>
+//         CHECK:      vector.transfer_read {{.*}} : memref<512x10240xf32>, vector<4xf32>
 //         CHECK:      arith.addf {{.*}} : vector<4xf32>
 //         CHECK:      scf.yield
 //         CHECK:    vector.reduction <add>, %{{.*}} : vector<4xf32> into f32

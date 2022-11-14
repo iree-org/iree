@@ -31,22 +31,21 @@ void iree_uk_test_random_engine_destroy(iree_uk_test_random_engine_t* e) {
   delete e;
 }
 
-static int iree_uk_test_random_engine_get_in_uint16_range(
-    iree_uk_test_random_engine_t* e) {
+int iree_uk_test_random_engine_get_0_65535(iree_uk_test_random_engine_t* e) {
   iree_uk_uint32_t v = e->cpp_random_engine();
   // Return the middle two out of the 4 bytes of state. It avoids
   // some mild issues with the least-significant and most-significant bytes.
   return (v >> 8) & 0xffff;
 }
 
-int iree_uk_test_random_engine_get_0_or_1(iree_uk_test_random_engine_t* e) {
-  int v = iree_uk_test_random_engine_get_in_uint16_range(e);
+int iree_uk_test_random_engine_get_0_1(iree_uk_test_random_engine_t* e) {
+  int v = iree_uk_test_random_engine_get_0_65535(e);
   return v & 1;
 }
 
-int iree_uk_test_random_engine_get_between_minus16_and_plus15(
+int iree_uk_test_random_engine_get_minus16_plus15(
     iree_uk_test_random_engine_t* e) {
-  int v = iree_uk_test_random_engine_get_in_uint16_range(e);
+  int v = iree_uk_test_random_engine_get_0_65535(e);
   return (v % 32) - 16;
 }
 
@@ -60,8 +59,7 @@ static void iree_uk_test_write_random_buffer(
     // Small integers, should work for now for all the types we currently have
     // and enable exact float arithmetic, allowing to keep tests simpler for
     // now. Watch out for when we'll do float16!
-    T random_val =
-        iree_uk_test_random_engine_get_between_minus16_and_plus15(engine);
+    T random_val = iree_uk_test_random_engine_get_minus16_plus15(engine);
     buffer[i] = random_val;
   }
 }
@@ -104,7 +102,7 @@ static const char* iree_uk_test_type_category_str(const iree_uk_type_t type) {
       return "bf";
     default:
       assert(false && "unknown type category");
-      return "(unknown type category)";
+      return "(?)";
   }
 }
 

@@ -120,21 +120,25 @@ static LogicalResult tileParallelDims(func::FuncOp funcOp,
     // If there are no dimensions to tile skip the transformation.
     if (partitionedLoops.empty()) continue;
     SmallVector<OpFoldResult> numThreads(numLoops, rewriter.getIndexAttr(0));
-    int64_t id = 0;
-    int64_t threadId = 0;
-    SmallVector<int64_t> idDims;
+    int64_t id = 0, threadDim = 0;
+    SmallVector<Attribute> idDims;
+    auto getThreadMapping = [&](int64_t dim) {
+      return mlir::gpu::GPUThreadMappingAttr::get(
+          tilingOp->getContext(), dim == 0   ? mlir::gpu::Threads::DimX
+                                  : dim == 1 ? mlir::gpu::Threads::DimY
+                                             : mlir::gpu::Threads::DimZ);
+    };
     for (unsigned loop : llvm::reverse(partitionedLoops)) {
       int64_t num = elementPerWorkgroup[id++];
       if (num > 1) {
         numThreads[loop] = rewriter.getIndexAttr(num);
-        idDims.push_back(threadId++);
+        idDims.push_back(getThreadMapping(threadDim++));
       }
     }
     std::reverse(idDims.begin(), idDims.end());
-    for (int64_t i = threadId; i < 3; i++) idDims.push_back(i);
-
+    ArrayAttr mapping = rewriter.getArrayAttr(idDims);
     auto tilingResult =
-        linalg::tileToForeachThreadOp(rewriter, tilingOp, numThreads, idDims);
+        linalg::tileToForeachThreadOp(rewriter, tilingOp, numThreads, mapping);
     rewriter.replaceOp(tilingOp, tilingResult->tileOp->getResults());
   }
   return success();
