@@ -23,7 +23,7 @@ set(MINILM_L12_H384_UNCASED_INT32_SEQLEN128_MODULE
     "int32,seqlen128"
   SOURCE
     # Converted from https://huggingface.co/microsoft/MiniLM-L12-H384-uncased/commit/44acabbec0ef496f6dbc93adadea57f376b7c0ec
-    "https://storage.googleapis.com/iree-model-artifacts/minilm-l12-h384-uncased-seqlen128-tf-model.tar.gz"
+    "https://storage.googleapis.com/iree-model-artifacts/minilm-l12-h384-uncased-seqlen128-2-tf-model.tar.gz"
   ENTRY_FUNCTION
     "predict"
   FUNCTION_INPUTS
