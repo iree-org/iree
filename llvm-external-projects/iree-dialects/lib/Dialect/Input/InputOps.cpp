@@ -105,8 +105,8 @@ void GlobalOp::build(OpBuilder &builder, OperationState &result, StringRef name,
   if (isMutable) {
     result.addAttribute("is_mutable", builder.getUnitAttr());
   }
-  if (initialValue.hasValue()) {
-    result.addAttribute("initial_value", initialValue.getValue());
+  if (initialValue.has_value()) {
+    result.addAttribute("initial_value", initialValue.value());
   }
   result.addAttribute("type", TypeAttr::get(type));
   result.attributes.append(attrs.begin(), attrs.end());

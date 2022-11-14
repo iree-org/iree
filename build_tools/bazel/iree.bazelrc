@@ -97,7 +97,6 @@ build:generic_clang --copt=-Wall
 # ratio.
 build:generic_clang --copt=-Wno-ambiguous-member-template
 build:generic_clang --copt=-Wno-char-subscripts
-build:generic_clang --copt=-Wno-deprecated-declarations
 build:generic_clang --copt=-Wno-extern-c-compat # Matches upstream. Cannot impact due to extern C inclusion method.
 build:generic_clang --copt=-Wno-gnu-alignof-expression
 build:generic_clang --copt=-Wno-gnu-variable-sized-type-not-at-end
