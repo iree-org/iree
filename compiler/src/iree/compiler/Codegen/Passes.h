@@ -116,6 +116,13 @@ std::unique_ptr<OperationPass<func::FuncOp>> createVectorizePadPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createOptimizeVectorTransferPass(
     bool flatten = false);
 
+/// Pass to optimize vector transfer_read and transfer_write. See Passes.td for
+/// `option` details.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createSplitFullPartialTransferPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createSplitFullPartialTransferPass(
+    StringRef option);
+
 /// Pass to test Partitionable loop interface
 std::unique_ptr<OperationPass<void>>
 createTestPartitionableLoopsInterfacePass();

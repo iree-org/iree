@@ -112,6 +112,23 @@ def OptimizeVectorTransfer :
   ];
 }
 
+def SplitFullPartialTransfer :
+    Pass<"iree-codegen-split-full-partial-transfer", "func::FuncOp"> {
+  let summary =
+      "Split a vector.transfer operation into an in-bounds (i.e., no "
+      "out-of-bounds masking) fastpath and a slowpath.";
+  let constructor = "mlir::iree_compiler::createSplitFullPartialTransferPass()";
+  let options = [
+    Option<"splitVectorTransfersTo", "split-transfers", "std::string",
+      /*default=*/"",
+      [{Split vector transfers between slow (masked) and fast "
+        "(unmasked) variants. Possible options are:\n"
+          "\tnone [default]: keep unsplit vector.transfer and pay the price\n"
+          "\tlinalg-copy: use linalg.fill + linalg.generic for the slow path\n"
+          "\tvector-transfers: use extra small unmasked vector.transfers for"
+          " the slow path\n}]>,
+  ];
+}
 
 def TestPartitionableLoopsInterface :
     Pass<"iree-codegen-test-partitionable-loops-interface", ""> {
