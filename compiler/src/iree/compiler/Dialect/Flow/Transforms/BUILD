@@ -43,7 +43,6 @@ iree_compiler_cc_library(
         "DeduplicateExecutables.cpp",
         "DetachElementwiseFromNamedOps.cpp",
         "DispatchLinalgOnTensors.cpp",
-        "DispatchLinalgOnTensorsViaRegionOps.cpp",
         "DispatchWithTransformDialect.cpp",
         "DumpDispatchGraph.cpp",
         "ExpandTensorShapes.cpp",
