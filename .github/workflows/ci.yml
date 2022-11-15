@@ -171,14 +171,15 @@ jobs:
         uses: actions/setup-python@7f80679172b057fc5e90d70d197929d454754a5a # v2
         with:
           python-version: "3.10"  # Needs pybind >= 2.10.1 for Python >= 3.11
-      - name: "Configuring MSVC"
-        uses: ilammy/msvc-dev-cmd@7315a94840631165970262a99c72cfb48a65d25d # v1.12.0
-      - name: "Building IREE"
+      - name: "Installing Python packages"
         run: |
           python3 -m venv .venv
           .venv/Scripts/activate.bat
           python3 -m pip install -r runtime/bindings/python/iree/runtime/build_requirements.txt
-          ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
+      - name: "Configuring MSVC"
+        uses: ilammy/msvc-dev-cmd@7315a94840631165970262a99c72cfb48a65d25d # v1.12.0
+      - name: "Building IREE"
+        run: ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
       - name: "Testing IREE"
         run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
 
