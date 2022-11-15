@@ -696,12 +696,8 @@ void FftOp::generateScalarImplWithoutCoeffBuf(OpBuilder &b, Location loc,
       loc, llvm::APFloat(static_cast<float>(-2 * acos(-1))), f32Type);
   coeff = b.create<arith::DivFOp>(loc, coeff, indexToF32(b, loc, wholeSize));
 
-  SmallVector<StringRef> iteratorTypes = llvm::to_vector(
-      llvm::map_range(getLoopIteratorTypes(), [](utils::IteratorType it) {
-        return utils::stringifyIteratorType(it);
-      }));
   b.create<linalg::GenericOp>(
-      loc, TypeRange{}, ValueRange{}, operands, maps, iteratorTypes,
+      loc, TypeRange{}, ValueRange{}, operands, maps, getLoopIteratorTypes(),
       [&](OpBuilder &b, Location loc, ValueRange args) {
         Value lhsReal = args[0];
         Value lhsImag = args[1];
@@ -745,13 +741,10 @@ void FftOp::generateScalarImplWithCoeffBuf(OpBuilder &b, Location loc,
       2, AffineMap::get(rank, 0, b.getAffineDimExpr(rank - 1), b.getContext()));
   maps.append(operands.size(), b.getMultiDimIdentityMap(rank));
 
-  SmallVector<StringRef> iteratorTypes = llvm::to_vector(
-      llvm::map_range(getLoopIteratorTypes(), [](utils::IteratorType it) {
-        return utils::stringifyIteratorType(it);
-      }));
   b.create<linalg::GenericOp>(
       loc, TypeRange{}, ValueRange{getRealCoeff(), getImagCoeff()}, operands,
-      maps, iteratorTypes, [&](OpBuilder &b, Location loc, ValueRange args) {
+      maps, getLoopIteratorTypes(),
+      [&](OpBuilder &b, Location loc, ValueRange args) {
         Value wReal = args[0];
         Value wImag = args[1];
         Value lhsReal = args[2];

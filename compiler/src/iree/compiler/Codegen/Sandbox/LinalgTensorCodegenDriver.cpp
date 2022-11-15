@@ -115,7 +115,7 @@ static LogicalResult getPaddingDims(func::FuncOp funcOp,
   linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(rootOp.value());
   for (auto [index, iterType] :
        llvm::enumerate(linalgOp.getIteratorTypesArray())) {
-    if (iterType == utils::stringifyIteratorType(targetIterType)) {
+    if (iterType == targetIterType) {
       paddingDims.push_back(index);
     }
   }

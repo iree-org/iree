@@ -527,9 +527,9 @@ static void splitParallelAndReductionTiles(
     linalg::LinalgOp op, SmallVectorImpl<int64_t> &parallelSizes,
     SmallVectorImpl<int64_t> &reductionSizes) {
   reductionSizes.assign(parallelSizes.begin(), parallelSizes.end());
-  for (auto [index, iteratorTypeName] :
-       llvm::enumerate(op.getIteratorTypeNames())) {
-    if (iteratorTypeName == getParallelIteratorTypeName()) {
+  for (auto [index, iteratorType] :
+       llvm::enumerate(op.getIteratorTypesArray())) {
+    if (iteratorType == utils::IteratorType::parallel) {
       reductionSizes[index] = 0;
     } else {
       parallelSizes[index] = 0;
@@ -542,10 +542,10 @@ static void setAlwaysVectorizeSizes(linalg::LinalgOp op,
                                     SmallVectorImpl<int64_t> &reductionSizes) {
   SmallVector<int64_t, 4> staticLoopRanges = op.getStaticLoopRanges();
   for (auto [index, valuePair] : llvm::enumerate(
-           llvm::zip(staticLoopRanges, op.getIteratorTypeNames()))) {
+           llvm::zip(staticLoopRanges, op.getIteratorTypesArray()))) {
     auto [size, iterType] = valuePair;
     if (!ShapedType::isDynamic(size)) continue;
-    if (iterType == getParallelIteratorTypeName()) {
+    if (iterType == utils::IteratorType::parallel) {
       parallelSizes[index] = 1;
     } else {
       reductionSizes[index] = 1;

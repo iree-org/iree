@@ -47,12 +47,12 @@ Value sumReduceDimensionSubset(ImplicitLocOpBuilder &rewriter, Value val,
 
   SmallVector<AffineExpr> filterExprs(ty.getRank());
   SmallVector<AffineExpr> outputExprs;
-  SmallVector<StringRef> iterators;
+  SmallVector<utils::IteratorType> iterators;
 
   for (int i = 0, s = ty.getRank(); i < s; i++) {
     if (!is_reduction[i]) {
       auto expr = rewriter.getAffineDimExpr(iterators.size());
-      iterators.push_back(getParallelIteratorTypeName());
+      iterators.push_back(utils::IteratorType::parallel);
 
       outputExprs.push_back(expr);
       filterExprs[i] = expr;
@@ -62,7 +62,7 @@ Value sumReduceDimensionSubset(ImplicitLocOpBuilder &rewriter, Value val,
   for (int i = 0, s = filterExprs.size(); i < s; i++) {
     if (!filterExprs[i]) {
       auto expr = mlir::getAffineDimExpr(iterators.size(), context);
-      iterators.push_back(getReductionIteratorTypeName());
+      iterators.push_back(utils::IteratorType::reduction);
       filterExprs[i] = expr;
     }
   }
