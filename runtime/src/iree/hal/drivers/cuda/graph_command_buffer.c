@@ -543,6 +543,19 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_dispatch_indirect(
                           "need cuda implementation");
 }
 
+static iree_status_t iree_hal_cuda_graph_command_buffer_collective(
+    iree_hal_command_buffer_t* base_command_buffer, iree_hal_channel_t* channel,
+    iree_hal_collective_op_t op, uint32_t param,
+    iree_hal_buffer_binding_t send_binding,
+    iree_hal_buffer_binding_t recv_binding, iree_device_size_t element_count) {
+  // We want to track collectives such that we can emit ncclGroupStart calls on
+  // the first and ncclGroupEnd calls on the next barrier. Here we also want to
+  // use CUDA graph capture so that the NCCL calls end up in the graph:
+  // https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/usage/cudagraph.html
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "need cuda implementation");
+}
+
 static iree_status_t iree_hal_cuda_graph_command_buffer_execute_commands(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_command_buffer_t* base_commands,
@@ -580,5 +593,6 @@ static const iree_hal_command_buffer_vtable_t
         .dispatch = iree_hal_cuda_graph_command_buffer_dispatch,
         .dispatch_indirect =
             iree_hal_cuda_graph_command_buffer_dispatch_indirect,
+        .collective = iree_hal_cuda_graph_command_buffer_collective,
         .execute_commands = iree_hal_cuda_graph_command_buffer_execute_commands,
 };

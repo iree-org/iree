@@ -372,6 +372,15 @@ static iree_status_t iree_hal_rocm_direct_command_buffer_dispatch_indirect(
                           "need rocm implementation");
 }
 
+static iree_status_t iree_hal_rocm_direct_command_buffer_collective(
+    iree_hal_command_buffer_t* base_command_buffer, iree_hal_channel_t* channel,
+    iree_hal_collective_op_t op, uint32_t param,
+    iree_hal_buffer_binding_t send_binding,
+    iree_hal_buffer_binding_t recv_binding, iree_device_size_t element_count) {
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "need rocm implementation");
+}
+
 static iree_status_t iree_hal_rocm_direct_command_buffer_execute_commands(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_command_buffer_t* base_commands,
@@ -404,6 +413,7 @@ static const iree_hal_command_buffer_vtable_t
         .dispatch = iree_hal_rocm_direct_command_buffer_dispatch,
         .dispatch_indirect =
             iree_hal_rocm_direct_command_buffer_dispatch_indirect,
+        .collective = iree_hal_rocm_direct_command_buffer_collective,
         .execute_commands =
             iree_hal_rocm_direct_command_buffer_execute_commands,
 };
