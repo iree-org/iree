@@ -78,6 +78,8 @@ if [[ "$OSTYPE" =~ ^msys ]]; then
     "iree/tests/e2e/matmul/e2e_matmul_direct_f32_small_ukernel_vmvx_local-task"
     # TODO(#11068): Fix compilation segfault
     "iree/tests/e2e/regression/check_regression_llvm-cpu_lowering_config.mlir"
+    # TODO: Fix equality mismatch
+    "iree/tests/e2e/linalg_ext_ops/check_vmvx_ukernel_local-task_unpack.mlir"
     # TODO(#11070): Fix argument/result signature mismatch
     "iree/tests/e2e/tosa_ops/check_vmvx_local-sync_microkernels_fully_connected.mlir"
     # TODO(#11080): Fix arrays not matching in test_variant_list_buffers

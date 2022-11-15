@@ -169,6 +169,8 @@ jobs:
           submodules: true
       - name: "Setting up Python"
         uses: actions/setup-python@7f80679172b057fc5e90d70d197929d454754a5a # v2
+        with:
+          python-version: "3.10"  # Needs pybind >= 2.10.1 for Python >= 3.11
       - name: "Installing Python packages"
         run: |
           python3 -m venv .venv
