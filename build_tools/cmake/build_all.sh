@@ -18,6 +18,7 @@ BUILD_DIR="${1:-${IREE_BUILD_DIR:-build}}"
 INSTALL_DIR="${IREE_INSTALL_DIR:-${BUILD_DIR}/install}"
 IREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS:-ON}"
 IREE_ENABLE_CCACHE="${IREE_ENABLE_CCACHE:-OFF}"
+IREE_PYTHON3_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE:-$(which python3)}"
 
 "$CMAKE_BIN" --version
 ninja --version
@@ -38,10 +39,6 @@ declare -a CMAKE_ARGS=(
   "-DIREE_ENABLE_ASSERTIONS=${IREE_ENABLE_ASSERTIONS}"
   "-DIREE_ENABLE_CCACHE=${IREE_ENABLE_CCACHE}"
 
-  # If a venv has been activated, use that Python version.
-  "-DPython_FIND_VIRTUALENV=FIRST"
-  "-DPython_FIND_REGISTRY=LAST"
-
   # Use `lld` for faster linking.
   "-DIREE_ENABLE_LLD=ON"
 
@@ -51,6 +48,7 @@ declare -a CMAKE_ARGS=(
 
   # Enable building the python bindings on CI.
   "-DIREE_BUILD_PYTHON_BINDINGS=ON"
+  "-DPython3_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
 
   # Enable CUDA compiler and runtime builds unconditionally. Our CI images all
   # have enough deps to at least build CUDA support and compile CUDA binaries
