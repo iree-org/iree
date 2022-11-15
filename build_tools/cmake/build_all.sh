@@ -40,6 +40,7 @@ declare -a CMAKE_ARGS=(
 
   # If a venv has been activated, use that Python version.
   "-DPython_FIND_VIRTUALENV=FIRST"
+  "-DPython_FIND_REGISTRY=LAST"
 
   # Use `lld` for faster linking.
   "-DIREE_ENABLE_LLD=ON"
