@@ -188,8 +188,9 @@ static LogicalResult populateTileAndFuseOptions(
   SmallVector<int64_t> tileOnlySizes;
   // Splits the tileSizes into two sizes. We want to tile-and-fuse on parallel
   // dims and tile-only on reduction dims.
-  for (unsigned i = 0; i < tileSizes.size(); ++i) {
-    if (i < rootOp.getNumParallelLoops()) {
+  auto iteratorTypes = rootOp.getIteratorTypesArray();
+  for (unsigned i = 0; i < tileSizes.size() && i < rootOp.getNumLoops(); ++i) {
+    if (linalg::isParallelIterator(iteratorTypes[i])) {
       tileAndFuseSizes.push_back(tileSizes[i]);
       tileOnlySizes.push_back(0);
     } else {
