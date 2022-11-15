@@ -58,6 +58,7 @@ iree_compiler_cc_library(
         ":IREECodegenDialectGen",
         ":LoweringConfigGen",
         "//compiler/src/iree/compiler/Codegen/Utils",
+        "//compiler/src/iree/compiler/Dialect/HAL/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:DialectUtils",

@@ -45,6 +45,7 @@ iree_cc_library(
     ::PassHeaders
     ::PassesIncGen
     IREELinalgExtDialect
+    MLIRFuncDialect
     MLIRIR
     MLIRPass
     MLIRTransforms

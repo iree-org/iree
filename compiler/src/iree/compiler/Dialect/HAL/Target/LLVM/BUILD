@@ -67,6 +67,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:LLVMToLLVMIRTranslation",
         "@llvm-project//mlir:PDLDialect",
         "@llvm-project//mlir:PDLInterpDialect",
+        "@llvm-project//mlir:Support",
         "@llvm-project//mlir:ToLLVMIRTranslation",
         "@llvm-project//mlir:TransformDialect",
     ],
@@ -116,6 +117,9 @@ iree_compiler_cc_library(
     deps = platform_trampoline_deps("LinkerTools", "compiler/src/iree/compiler/Dialect/HAL/Target/LLVM") + [
         "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Support",
+        "@llvm-project//llvm:Core",
+        "@llvm-project//mlir:Support",
+        ":LLVMTargetOptions",
     ],
 )
 
