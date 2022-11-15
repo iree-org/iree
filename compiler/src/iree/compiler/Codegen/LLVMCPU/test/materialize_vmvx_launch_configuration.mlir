@@ -110,7 +110,7 @@ hal.executable private @static_1d_fft_stage2  {
   }
 }
 
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64]{{\]}}>
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[16]{{\]}}>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<VMVXDefault>
 //       CHECK: hal.executable.export public @static_1d_fft_stage2
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
