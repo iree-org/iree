@@ -31,6 +31,7 @@ iree_benchmark_suite(
     "${MINILM_L12_H384_UNCASED_INT32_SEQLEN128_MODULE}"
     "${RESNET50_TF_FP32_MODULE}"
     "${BERT_FOR_MASKED_LM_FP32_SEQLEN512_MODULE}"
+    "${EFFICIENTNET_V2_S_TF_FP32_MODULE}"
 
   BENCHMARK_MODES
     "full-inference,default-flags"
@@ -57,6 +58,7 @@ iree_benchmark_suite(
     "${MINILM_L12_H384_UNCASED_INT32_SEQLEN128_MODULE}"
     "${RESNET50_TF_FP32_MODULE}"
     "${BERT_FOR_MASKED_LM_FP32_SEQLEN512_MODULE}"
+    "${EFFICIENTNET_V2_S_TF_FP32_MODULE}"
 
   BENCHMARK_MODES
     "1-thread,full-inference,default-flags"
@@ -85,6 +87,7 @@ iree_benchmark_suite(
     "${MINILM_L12_H384_UNCASED_INT32_SEQLEN128_MODULE}"
     "${RESNET50_TF_FP32_MODULE}"
     "${BERT_FOR_MASKED_LM_FP32_SEQLEN512_MODULE}"
+    "${EFFICIENTNET_V2_S_TF_FP32_MODULE}"
 
   BENCHMARK_MODES
     "4-thread,full-inference,default-flags"
@@ -113,6 +116,7 @@ iree_benchmark_suite(
     "${MINILM_L12_H384_UNCASED_INT32_SEQLEN128_MODULE}"
     "${RESNET50_TF_FP32_MODULE}"
     "${BERT_FOR_MASKED_LM_FP32_SEQLEN512_MODULE}"
+    "${EFFICIENTNET_V2_S_TF_FP32_MODULE}"
 
   BENCHMARK_MODES
     "8-thread,full-inference,default-flags"
