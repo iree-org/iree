@@ -21,15 +21,8 @@ struct RewriteListener;
 /// apply any patterns recursively to the regions of `op`. Accepts a listener
 /// so the caller can be notified of rewrite events.
 LogicalResult applyPatternsAndFoldGreedily(
-    MutableArrayRef<Region> regions, const FrozenRewritePatternSet &patterns,
-    const GreedyRewriteConfig &config, RewriteListener *listener);
-
-static inline LogicalResult applyPatternsAndFoldGreedily(
     Operation *op, const FrozenRewritePatternSet &patterns,
-    const GreedyRewriteConfig &config, RewriteListener *listener) {
-  return applyPatternsAndFoldGreedily(op->getRegions(), patterns, config,
-                                      listener);
-}
+    const GreedyRewriteConfig &config, RewriteListener *listener);
 
 /// Apply the given list of transformations to the regions of the
 /// isolated-from-above operation `root` greedily until convergence. Update

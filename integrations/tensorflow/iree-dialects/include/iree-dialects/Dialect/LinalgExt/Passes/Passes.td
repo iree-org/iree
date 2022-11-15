@@ -21,6 +21,18 @@ def TilingInterfaceTiling :
   let constructor = "mlir::iree_compiler::IREE::LinalgExt::createTilingInterfaceTilingPass()";
 }
 
+def MaterializeEncoding :
+    Pass<"iree-linalg-ext-materialize-encoding", "func::FuncOp"> {
+  let summary = "Test pass to materialize ops with tensor encoding into ops with explicit data movement";
+  let constructor = "mlir::iree_compiler::IREE::LinalgExt::createMaterializeEncodingPass()";
+}
+
+def FoldIntoPackAndUnpackOps :
+    Pass<"iree-linalg-ext-fold-into-pack-unpack-ops", "func::FuncOp"> {
+  let summary = "Test pass to fold operations into pack and unpacl operations";
+  let constructor = "mlir::iree_compiler::IREE::LinalgExt::createFoldIntoPackAndUnpackOps()";
+}
+
 def PadContractionToBlockSize :
     Pass<"iree-linalg-pad-contraction-to-block-size", ""> {
   let summary = "Pads contraction (matmul) ops to next multiple of block size";
@@ -57,6 +69,17 @@ def TopkSplitReduction:
     ListOption<"splitRatios", "split-ratios", "int",
            "List of split reduction ratios">,
   ];
+}
+
+def LinalgExtVectorization:
+    Pass<"iree-linalg-ext-vectorization", "func::FuncOp"> {
+  let summary = "Vectorization pass for LinalgExt pack ops.";
+  let description = [{
+    Vectorizes LinalgExt ops when they meet the conditions, e.g., having static
+    shapes, etc.
+  }];
+  let constructor = "mlir::iree_compiler::IREE::LinalgExt::"
+                    "createLinalgExtVectorizationPass()";
 }
 
 //===---------------------------------------------------------------------====//
