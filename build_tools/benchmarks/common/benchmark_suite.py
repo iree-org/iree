@@ -75,7 +75,7 @@ class BenchmarkCase:
 def _find_driver_info_by_execution_config(
     module_execution_config: iree_definitions.ModuleExecutionConfig
 ) -> Optional[DriverInfo]:
-  """Finds the matched driver info by the module exeuction config.
+  """Finds the matched driver info by the module execution config.
 
   Args:
     module_execution_config: module execution config to match.

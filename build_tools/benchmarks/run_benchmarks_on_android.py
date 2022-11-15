@@ -33,7 +33,7 @@ import sys
 import pathlib
 
 # Add build_tools python dir to the search path.
-sys.path.insert(0, str(pathlib.Path(__file__).parent / ".." / "python"))
+sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
 
 import atexit
 import os
