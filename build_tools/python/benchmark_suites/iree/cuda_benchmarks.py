@@ -43,7 +43,7 @@ class Linux_CUDA_Benchmarks(object):
         platform=common_definitions.DevicePlatform.GENERIC_LINUX)
     run_module_configs = benchmark_suites.iree.utils.generate_e2e_model_run_configs(
         module_generation_configs=gen_configs,
-        module_execution_configs=[module_execution_configs.ELF_CUDA_CONFIG],
+        module_execution_configs=[module_execution_configs.CUDA_CONFIG],
         device_specs=sm80_devices)
 
     return (gen_configs, run_module_configs)

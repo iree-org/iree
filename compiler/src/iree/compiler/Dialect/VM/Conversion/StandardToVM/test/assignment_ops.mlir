@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="test-iree-convert-std-to-vm" --iree-vm-target-index-bits=32 %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(test-iree-convert-std-to-vm)" --iree-vm-target-index-bits=32 %s | FileCheck %s
 
 // -----
 // CHECK-LABEL: @t001_cmp_select

@@ -8,6 +8,7 @@
 from dataclasses import dataclass
 from enum import Enum
 from typing import List
+from e2e_test_framework import serialization, unique_ids
 import dataclasses
 
 
@@ -78,10 +79,11 @@ class ModelSourceType(Enum):
 
 class InputDataFormat(Enum):
   """Model input data format."""
-  RANDOM = "random"
+  ZEROS = "zeros"
   NUMPY_NPY = "numpy_npy"
 
 
+@serialization.serializable(type_key="device_specs")
 @dataclass(frozen=True)
 class DeviceSpec(object):
   """Benchmark device specification."""
@@ -97,6 +99,7 @@ class DeviceSpec(object):
   device_parameters: List[str] = dataclasses.field(default_factory=list)
 
 
+@serialization.serializable(type_key="models")
 @dataclass(frozen=True)
 class Model(object):
   """Model to be benchmarked."""
@@ -112,6 +115,7 @@ class Model(object):
   input_types: List[str]
 
 
+@serialization.serializable(type_key="model_input_data")
 @dataclass(frozen=True)
 class ModelInputData(object):
   """Input data to benchmark the model."""
@@ -126,11 +130,11 @@ class ModelInputData(object):
   source_url: str
 
 
-# Random dummy input data. The benchmark runner generates the random inputs with
-# a proper shape.
-RANDOM_MODEL_INPUT_DATA = ModelInputData(id="random",
-                                         model_id="",
-                                         name="random_dummy_input",
-                                         tags=[],
-                                         data_format=InputDataFormat.RANDOM,
-                                         source_url="")
+# All-zeros dummy input data. Runners will generate the zeros input with proper
+# shapes.
+ZEROS_MODEL_INPUT_DATA = ModelInputData(id=unique_ids.MODEL_INPUT_DATA_ZEROS,
+                                        model_id="",
+                                        name="zero_dummy_input",
+                                        tags=[],
+                                        data_format=InputDataFormat.ZEROS,
+                                        source_url="")

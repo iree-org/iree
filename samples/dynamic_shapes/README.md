@@ -93,6 +93,10 @@ them.
     cmake --build ../iree-build/ --target iree_samples_dynamic_shapes
     ```
 
+    Alternatively if using a non-CMake build system the `Makefile` provided can
+    be used as a reference of how to use the IREE runtime in an external
+    project.
+
 5. Run the sample binary:
 
    ```

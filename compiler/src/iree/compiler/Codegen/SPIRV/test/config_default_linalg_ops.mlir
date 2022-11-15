@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass{test-lowering-configuration=true}))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass{test-lowering-configuration=true})))' %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 2, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -358,7 +358,7 @@ hal.executable @dwconv_elementwise {
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVBaseDistribute>
 //      CHECK: hal.executable.export public @dwconv_elementwise
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
-//      CHECK:   linalg.generic
+//      CHECK:   linalg.depthwise_conv_2d_nhwc_hwcm
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
 
 

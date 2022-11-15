@@ -17,6 +17,24 @@ include "mlir/Interfaces/TilingInterface.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
 
 
+def IREELinalgExt_DoNotDCEOperandsOp : 
+  Op<IREELinalgExt_Dialect, "transform.do_not_dce_operands", []> {
+  let summary = "Unfoldable op that just keeps its operands live";
+  let description = [{
+    Unfoldable op that just keeps its operands live. This is to use with the 
+    transform dialect in case where transforms introduce IR that would be 
+    otherwise DCE'd by canonicalizations.
+
+    This op should be added to the transform dialect in the fullness of time but
+    it can't be registered dynamically on the IREE side as that triggers errors
+    since the op does not implement any transform interface.
+  }];
+
+  let arguments = (ins Variadic<AnyType>:$operands);
+  let results = (outs);
+  let assemblyFormat = "attr-dict $operands `:` type($operands)";
+}
+
 //===----------------------------------------------------------------------===//
 // Base class.
 //===----------------------------------------------------------------------===//
@@ -74,6 +92,11 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
     rank(%original) - index_depth values match %(originals) last dimensions,
     with the previous dims extending from the index offsets.
 
+    The dimension_map attributes describes which index value maps to which
+    dimension in the destionation. It cannot contain duplicate values, must
+    have as many entries as index depth, and values must be within the rank of
+    the destination.
+
     The unique_indices attribute carries the information whether all the indices
     are unique. If there are repeated indices, the first iteration loop will be
     marked as reduction.
@@ -85,12 +108,14 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
   let arguments = (ins
       Variadic<AnyRankedTensorOrMemRefType>:$inputs,
       Variadic<AnyRankedTensorOrMemRefType>:$outputs,
+      I64ArrayAttr:$dimension_map,
       DefaultValuedAttr<BoolAttr, "true">:$unique_indices
   );
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let regions = (region AnyRegion:$region);
   let assemblyFormat = [{
-    attr-dict `unique_indices` `(` $unique_indices `)`
+    attr-dict `dimension_map` `=` $dimension_map
+              `unique_indices` `(` $unique_indices `)`
     (`ins` `(` $inputs^ `:` type($inputs) `)`)?
     `outs` `(` $outputs `:` type($outputs) `)`
     $region (`->` type($results)^)?
@@ -136,6 +161,10 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
 
     bool isScalarUpdate() {
       return getUpdateSliceRank() == 0;
+    }
+
+    SmallVector<int64_t> dimensionMap() {
+      return extractFromI64ArrayAttr(getDimensionMap());
     }
 
     // Method to implement for specifying output range for
@@ -529,7 +558,7 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
     Example KC_to_CKkc
 
     ```mlir
-    iree_linalg_ext.pack %arg0 outer_dims_pos = [1, 0] inner_dims_pos = [0, 1]
+    iree_linalg_ext.pack %arg0 outer_dims_perm = [1, 0] inner_dims_pos = [0, 1]
       inner_tiles = [32, 8] into %arg1 : (memref<128x256xf32> memref<32x4x32x8xf32>)
     ```
 
@@ -696,7 +725,7 @@ def IREELinalgExt_UnPackOp : IREELinalgExt_Op<"unpack", [
     Example CKkc_to_KC:
 
     ```mlir
-    iree_linalg_ext.unpack %arg1 outer_dims_pos = [1, 0] inner_dims_pos = [0, 1]
+    iree_linalg_ext.unpack %arg1 outer_dims_perm = [1, 0] inner_dims_pos = [0, 1]
       inner_tiles = [32, 8] into %arg0 : (memref<32x4x32x8xf32> memref<128x256xf32>)
     ```
   }];
@@ -790,7 +819,7 @@ def IREELinalgExt_UnPackOp : IREELinalgExt_Op<"unpack", [
 }
 
 def IREELinalgExt_SetEncodingOp : IREELinalgExt_PureOp<"set_encoding",[
-   DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>
+   DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>, Pure
   ]> {
   let summary = "perform pack and pad operation on source";
   let description = [{
@@ -826,7 +855,9 @@ let builders = [
   }];
 }
 
-def IREELinalgExt_UnsetEncodingOp : IREELinalgExt_PureOp<"unset_encoding"> {
+def IREELinalgExt_UnsetEncodingOp : IREELinalgExt_PureOp<"unset_encoding", [
+    DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>, Pure
+  ]> {
   let summary = "perfom unpack and extract operation on source";
   let description = [{
     Operation to convert an tensor with encoding that represents

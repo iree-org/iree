@@ -126,6 +126,7 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
   if (failed(initGPULaunchConfig(moduleOp))) {
     return signalPassFailure();
   }
+
   // There might be multiple entry points in the module. Currently, all of
   // them need to have the same pipeline.
   // TODO(ravishankarm): This is strange that this is not enforced
@@ -179,9 +180,14 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
       case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWarpReduction:
         addGPUWarpReductionPassPipeline(executableLoweringPipeline);
         break;
+      // Transform-dialect pipelines.
       case IREE::Codegen::DispatchLoweringPassPipeline::
           TransformDialectInterpreterCodegen:
         addGPUTransformDialectInterpreterPasses(executableLoweringPipeline);
+        break;
+      case IREE::Codegen::DispatchLoweringPassPipeline::
+          TransformDialectJitterCodegen:
+        addGPUTransformDialectJitterPasses(executableLoweringPipeline);
         break;
       default:
         variantOp.emitOpError("Unsupported pipeline on GPU target.");

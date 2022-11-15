@@ -32,8 +32,8 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
-#include "mlir/Dialect/Bufferization/Transforms/AllocTensorElimination.h"
 #include "mlir/Dialect/Bufferization/Transforms/BufferUtils.h"
+#include "mlir/Dialect/Bufferization/Transforms/EmptyTensorElimination.h"
 #include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
 #include "mlir/Dialect/Bufferization/Transforms/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -66,6 +66,15 @@ namespace mlir {
 namespace iree_compiler {
 
 namespace {
+class EliminateEmptyTensorsPass
+    : public EliminateEmptyTensorsBase<EliminateEmptyTensorsPass> {
+ public:
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<IREE::Flow::FlowDialect, tensor::TensorDialect>();
+  }
+
+  void runOnOperation() override;
+};
 
 /// Pass to convert from tensor based ops to memref based ops.
 class IREEComprehensiveBufferizePass
@@ -107,46 +116,27 @@ class IREEComprehensiveBufferizePass
 
 static bool isaTensor(Type t) { return t.isa<TensorType>(); };
 
-static LogicalResult emptyTensorElimination(
-    Operation *op, OneShotBufferizationOptions options) {
-  // Analyze IR.
-  options.testAnalysisOnly = false;
-  options.printConflicts = false;
-  OneShotAnalysisState state(op, options);
-  if (failed(analyzeOp(op, state))) return failure();
-
-  // Rewrite init_tensors that are anchored on specific ops.
-  IRRewriter rewriter(op->getContext());
-  if (failed(bufferization::insertSliceAnchoredAllocTensorEliminationStep(
-          rewriter, op, state)))
-    return failure();
-  if (failed(
-          storeTensorOpAnchoredInitTensorEliminationStep(rewriter, op, state)))
-    return failure();
-
+// Default allocation functions.
+static FailureOr<Value> defaultAllocationFn(OpBuilder &builder, Location loc,
+                                            MemRefType allocationType,
+                                            ValueRange dynamicSizes,
+                                            unsigned int alignment) {
+  return builder.create<memref::AllocOp>(loc, allocationType, dynamicSizes)
+      .getResult();
+}
+static LogicalResult defaultDeallocationFn(OpBuilder &builder, Location loc,
+                                           Value allocation) {
+  builder.create<memref::DeallocOp>(loc, allocation);
   return success();
 }
-
-// The following is copied from bufferization::runOneShotBufferize with
-// modifications.
-static LogicalResult runIREEOneShotBufferize(
-    Operation *op, const OneShotBufferizationOptions &options) {
-  OneShotAnalysisState state(op, options);
-  if (failed(analyzeOp(op, state))) return failure();
-  if (options.testAnalysisOnly) return success();
-  return bufferization::runOneShotBufferize(op, options);
+static LogicalResult defaultMemCpyFn(OpBuilder &builder, Location loc,
+                                     Value from, Value to) {
+  Operation *copyOp = createLinalgCopyOp(builder, loc, from, to);
+  return success(static_cast<bool>(copyOp));
 }
 
-/// Run comprehensive bufferize.
-void IREEComprehensiveBufferizePass::runOnOperation() {
-  ModuleOp moduleOp = getOperation();
-
+OneShotBufferizationOptions getBufferizationOptions() {
   OneShotBufferizationOptions options;
-  options.allocationFn = allocationFn;
-  options.deallocationFn = deallocationFn;
-  options.memCpyFn = memCpyFn;
-  options.testAnalysisOnly = testAnalysisOnly;
-  options.printConflicts = printConflicts;
 
   // bufferization.to_memref is used to bufferize constants in IREE. IREE has
   // it's own logic to handle constants. We'd like to leave the arith.constant
@@ -171,32 +161,53 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
                                                               memorySpace);
   };
 
-  if (failed(emptyTensorElimination(moduleOp.getOperation(), options))) {
-    return signalPassFailure();
-  }
-
-  if (failed(runIREEOneShotBufferize(moduleOp, options))) {
-    return signalPassFailure();
-  }
+  return options;
 }
 
-// Default allocation functions.
-static FailureOr<Value> defaultAllocationFn(OpBuilder &builder, Location loc,
-                                            MemRefType allocationType,
-                                            ValueRange dynamicSizes,
-                                            unsigned int alignment) {
-  return builder.create<memref::AllocOp>(loc, allocationType, dynamicSizes)
-      .getResult();
+void EliminateEmptyTensorsPass::runOnOperation() {
+  ModuleOp moduleOp = getOperation();
+
+  // Analyze IR.
+  OneShotBufferizationOptions options = getBufferizationOptions();
+  OneShotAnalysisState state(moduleOp, options);
+  if (failed(analyzeOp(moduleOp, state))) return signalPassFailure();
+
+  // Rewrite init_tensors that are anchored on specific ops.
+  IRRewriter rewriter(moduleOp->getContext());
+  if (failed(bufferization::insertSliceAnchoredEmptyTensorEliminationStep(
+          rewriter, moduleOp, state)))
+    return signalPassFailure();
+  if (failed(storeTensorOpAnchoredEmptyTensorEliminationStep(rewriter, moduleOp,
+                                                             state)))
+    return signalPassFailure();
 }
-static LogicalResult defaultDeallocationFn(OpBuilder &builder, Location loc,
-                                           Value allocation) {
-  builder.create<memref::DeallocOp>(loc, allocation);
-  return success();
+
+// The following is copied from bufferization::runOneShotBufferize with
+// modifications.
+static LogicalResult runIREEOneShotBufferize(
+    Operation *op, const OneShotBufferizationOptions &options) {
+  OneShotAnalysisState state(op, options);
+  if (failed(analyzeOp(op, state))) return failure();
+  if (options.testAnalysisOnly) return success();
+  return bufferization::runOneShotBufferize(op, options);
 }
-static LogicalResult defaultMemCpyFn(OpBuilder &builder, Location loc,
-                                     Value from, Value to) {
-  Operation *copyOp = createLinalgCopyOp(builder, loc, from, to);
-  return success(static_cast<bool>(copyOp));
+
+/// Run comprehensive bufferize.
+void IREEComprehensiveBufferizePass::runOnOperation() {
+  ModuleOp moduleOp = getOperation();
+  OneShotBufferizationOptions options = getBufferizationOptions();
+  options.testAnalysisOnly = testAnalysisOnly;
+  options.printConflicts = printConflicts;
+  options.allocationFn = allocationFn;
+  options.deallocationFn = deallocationFn;
+  options.memCpyFn = memCpyFn;
+
+  if (failed(runIREEOneShotBufferize(moduleOp, options)))
+    return signalPassFailure();
+}
+
+std::unique_ptr<OperationPass<ModuleOp>> createEliminateEmptyTensorsPass() {
+  return std::make_unique<EliminateEmptyTensorsPass>();
 }
 
 std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
@@ -226,6 +237,7 @@ void addIREEComprehensiveBufferizePasses(
     Optional<BufferizationOptions::AllocationFn> allocationFn,
     Optional<BufferizationOptions::DeallocationFn> deallocationFn,
     Optional<BufferizationOptions::MemCpyFn> memCpyFn) {
+  passManager.addPass(createEliminateEmptyTensorsPass());
   passManager.addPass(bufferization::createEmptyTensorToAllocTensorPass());
   passManager.addPass(createIREEComprehensiveBufferizePass(
       allocationFn, deallocationFn, memCpyFn));

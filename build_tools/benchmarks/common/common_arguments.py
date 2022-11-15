@@ -35,12 +35,12 @@ def build_common_argument_parser():
   parser.add_argument(
       "--normal_benchmark_tool_dir",
       "--normal-benchmark-tool-dir",
-      type=check_exe_path,
+      type=check_dir_path,
       default=None,
       help="Path to the normal (non-tracing) iree tool directory")
   parser.add_argument("--traced_benchmark_tool_dir",
                       "--traced-benchmark-tool-dir",
-                      type=check_exe_path,
+                      type=check_dir_path,
                       default=None,
                       help="Path to the tracing-enabled iree tool directory")
   parser.add_argument("--trace_capture_tool",

@@ -15,7 +15,7 @@ iree_status_t reduce_sum_1d(iree_runtime_session_t* session, const int* values,
       session, iree_make_cstring_view("module.reduce_sum_1d"), &call));
 
   iree_hal_buffer_view_t* arg0 = NULL;
-  const iree_hal_dim_t arg0_shape[1] = {values_length};
+  const iree_hal_dim_t arg0_shape[1] = {(iree_hal_dim_t)values_length};
 
   iree_status_t status = iree_ok_status();
   if (iree_status_is_ok(status)) {
@@ -24,8 +24,8 @@ iree_status_t reduce_sum_1d(iree_runtime_session_t* session, const int* values,
         IREE_ARRAYSIZE(arg0_shape), arg0_shape, IREE_HAL_ELEMENT_TYPE_SINT_32,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
         (iree_hal_buffer_params_t){
-            .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
             .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
+            .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
         },
         iree_make_const_byte_span((void*)values, sizeof(int) * values_length),
         &arg0);
@@ -73,8 +73,8 @@ iree_status_t reduce_sum_2d(iree_runtime_session_t* session, const int* values,
         IREE_ARRAYSIZE(arg0_shape), arg0_shape, IREE_HAL_ELEMENT_TYPE_SINT_32,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
         (iree_hal_buffer_params_t){
-            .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
             .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
+            .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
         },
         iree_make_const_byte_span((void*)values, sizeof(int) * values_length),
         &arg0);
@@ -113,8 +113,8 @@ iree_status_t add_one(iree_runtime_session_t* session, const int* values,
         IREE_ARRAYSIZE(arg0_shape), arg0_shape, IREE_HAL_ELEMENT_TYPE_SINT_32,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
         (iree_hal_buffer_params_t){
-            .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
             .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
+            .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
         },
         iree_make_const_byte_span((void*)values, sizeof(int) * values_length),
         &arg0);

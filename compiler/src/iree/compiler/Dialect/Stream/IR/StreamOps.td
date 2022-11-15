@@ -755,6 +755,8 @@ def Stream_TensorEmptyOp : Stream_PureOp<"tensor.empty", [
     Returns a typed resource initialized with no contents. This still carries
     shape metadata and may encode to a non-empty resource such as in cases
     where the empty representation still has data (e.g. sparse tensors).
+    Subsequent writes must populate any ranges of the tensor that are later
+    read.
   }];
 
   let arguments = (ins
@@ -1351,7 +1353,7 @@ def Stream_AsyncAllocaOp : Stream_PureOp<"async.alloca", [
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
   let results = (outs
-    Stream_TransientResource:$result
+    Stream_AnyStreamResource:$result
   );
 
   let assemblyFormat = [{

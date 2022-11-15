@@ -42,7 +42,7 @@ struct RewriteListener {
   /// Notification handler for when the specified operation is about to be
   /// replaced with another set of operations. This is called before the uses of
   /// the operation have been replaced with the specific values.
-  virtual void notifyOperationReplaced(Operation *op, ValueRange newValues) {}
+  virtual void notifyRootReplaced(Operation *op, ValueRange newValues) {}
 
   /// Notification handler for when an the specified operation is about to be
   /// deleted. At this point, the operation has zero uses.
@@ -52,9 +52,11 @@ struct RewriteListener {
   /// and provide a callback to populate a diagnostic with the reason why the
   /// failure occurred. This method allows for derived listeners to optionally
   /// hook into the reason why a rewrite failed, and display it to users.
-  virtual void
-  notifyMatchFailure(Operation *op,
-                     function_ref<void(Diagnostic &)> reasonCallback) {}
+  virtual LogicalResult
+  notifyMatchFailure(Location loc,
+                     function_ref<void(Diagnostic &)> reasonCallback) {
+    return failure();
+  }
 };
 
 //===----------------------------------------------------------------------===//
@@ -72,13 +74,13 @@ public:
   /// Send notification of a block being created to all listeners.
   void notifyBlockCreated(Block *block) override;
   /// Send notification that an operation has been replaced to all listeners.
-  void notifyOperationReplaced(Operation *op, ValueRange newValues) override;
+  void notifyRootReplaced(Operation *op, ValueRange newValues) override;
   /// Send notification that an operation is about to be deleted to all
   /// listeners.
   void notifyOperationRemoved(Operation *op) override;
   /// Notify all listeners that a pattern match failed.
-  void
-  notifyMatchFailure(Operation *op,
+  LogicalResult
+  notifyMatchFailure(Location loc,
                      function_ref<void(Diagnostic &)> reasonCallback) override;
 
 private:
@@ -99,7 +101,7 @@ public:
   /// When an operation is about to be replaced, send out an event to all
   /// attached listeners.
   void replaceOp(Operation *op, ValueRange newValues) override {
-    notifyOperationReplaced(op, newValues);
+    ListenerList::notifyRootReplaced(op, newValues);
     PatternRewriter::replaceOp(op, newValues);
   }
 

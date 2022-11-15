@@ -70,7 +70,7 @@ class PropagateResourceCastsPass
     auto operation = getOperation();
     for (auto func : operation.getOps<func::FuncOp>()) {
       for (auto cast : func.getOps<mlir::TF::CastOp>()) {
-        auto input = cast.x();
+        auto input = cast.getX();
         auto output = cast.getResult();
 
         auto inputTy = input.getType().cast<ShapedType>();

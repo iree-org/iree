@@ -44,8 +44,10 @@ class IreeRuleBuilder(object):
 
     model = imported_model.model
     if model.source_type == common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR:
-      if source_model_rule.file_path != str(output_file_path):
-        raise ValueError("Separate path for Linalg model isn't supported.")
+      if pathlib.PurePath(source_model_rule.file_path) != output_file_path:
+        raise ValueError("Separate path for Linalg model isn't supported ('" +
+                         source_model_rule.file_path + "' != '" +
+                         str(output_file_path) + "')")
       return IreeModelImportRule(target_name=source_model_rule.target_name,
                                  output_file_path=str(output_file_path),
                                  cmake_rules=[])

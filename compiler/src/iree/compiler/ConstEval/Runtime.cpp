@@ -8,7 +8,6 @@
 
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
 #include "iree/hal/drivers/local_task/registration/driver_module.h"
-#include "iree/modules/hal/module.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 
@@ -89,17 +88,17 @@ CompiledBinary::CompiledBinary() {}
 CompiledBinary::~CompiledBinary() {}
 
 void CompiledBinary::deinitialize() {
-  iree_vm_module_release(hal_module);
-  iree_vm_module_release(main_module);
-  iree_vm_context_release(context);
-  iree_hal_device_release(device);
+  hal_module.reset();
+  main_module.reset();
+  context.reset();
+  device.reset();
 }
 
 LogicalResult CompiledBinary::invokeNullary(Location loc, StringRef name,
                                             ResultsCallback callback) {
   iree_vm_function_t function;
   if (auto status = iree_vm_module_lookup_function_by_name(
-          main_module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
+          main_module.get(), IREE_VM_FUNCTION_LINKAGE_EXPORT,
           iree_string_view_t{name.data(), name.size()}, &function)) {
     iree_status_ignore(status);
     return emitError(loc) << "internal error evaling constant: func '" << name
@@ -114,7 +113,7 @@ LogicalResult CompiledBinary::invokeNullary(Location loc, StringRef name,
                                     iree_allocator_system(), &outputs));
 
   if (auto status =
-          iree_vm_invoke(context, function, IREE_VM_INVOCATION_FLAG_NONE,
+          iree_vm_invoke(context.get(), function, IREE_VM_INVOCATION_FLAG_NONE,
                          /*policy=*/nullptr, inputs.get(), outputs.get(),
                          iree_allocator_system())) {
     std::string message;
@@ -272,19 +271,22 @@ void CompiledBinary::initialize(void* data, size_t length) {
   iree_hal_driver_release(driver);
 
   // Create hal module.
-  IREE_CHECK_OK(iree_hal_module_create(runtime.instance, device,
+  IREE_CHECK_OK(iree_hal_module_create(runtime.instance.get(), device.get(),
                                        IREE_HAL_MODULE_FLAG_NONE,
                                        iree_allocator_system(), &hal_module));
 
   // Bytecode module.
   IREE_CHECK_OK(iree_vm_bytecode_module_create(
-      runtime.instance, iree_make_const_byte_span(data, length),
+      runtime.instance.get(), iree_make_const_byte_span(data, length),
       iree_allocator_null(), iree_allocator_system(), &main_module));
 
   // Context.
-  std::array<iree_vm_module_t*, 2> modules = {hal_module, main_module};
+  std::array<iree_vm_module_t*, 2> modules = {
+      hal_module.get(),
+      main_module.get(),
+  };
   IREE_CHECK_OK(iree_vm_context_create_with_modules(
-      runtime.instance, IREE_VM_CONTEXT_FLAG_NONE, modules.size(),
+      runtime.instance.get(), IREE_VM_CONTEXT_FLAG_NONE, modules.size(),
       modules.data(), iree_allocator_system(), &context));
 }
 
@@ -308,11 +310,11 @@ Runtime::Runtime() {
       iree_hal_driver_registry_allocate(iree_allocator_system(), &registry));
   IREE_CHECK_OK(iree_hal_local_task_driver_module_register(registry));
   IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance));
-  IREE_CHECK_OK(iree_hal_module_register_all_types(instance));
+  IREE_CHECK_OK(iree_hal_module_register_all_types(instance.get()));
 }
 
 Runtime::~Runtime() {
-  iree_vm_instance_release(instance);
+  instance.reset();
   iree_hal_driver_registry_free(registry);
 }
 

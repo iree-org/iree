@@ -8,6 +8,7 @@
 #define IREE_VM_INSTANCE_H_
 
 #include "iree/base/api.h"
+#include "iree/vm/ref.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -46,5 +47,7 @@ iree_vm_instance_allocator(iree_vm_instance_t* instance);
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
+
+IREE_VM_DECLARE_CC_TYPE_ADAPTERS(iree_vm_instance, iree_vm_instance_t);
 
 #endif  // IREE_VM_INSTANCE_H_

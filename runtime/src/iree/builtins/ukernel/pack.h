@@ -14,12 +14,11 @@ extern "C" {
 #endif  // __cplusplus
 
 // Main entry point.
-IREE_UKERNEL_EXPORT iree_ukernel_status_t
-iree_ukernel_pack(const iree_ukernel_pack_params_t* params);
+IREE_UK_EXPORT iree_uk_status_t
+iree_uk_pack(const iree_uk_pack_params_t* params);
 
 // Convert a status code to a human-readable string.
-IREE_UKERNEL_EXPORT const char* iree_ukernel_status_message(
-    iree_ukernel_status_t status);
+IREE_UK_EXPORT const char* iree_uk_status_message(iree_uk_status_t status);
 
 #ifdef __cplusplus
 }  // extern "C"

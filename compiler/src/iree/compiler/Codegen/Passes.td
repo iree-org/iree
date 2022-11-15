@@ -75,6 +75,12 @@ def BufferizeCopyOnlyDispatches :
   let constructor = "mlir::iree_compiler::createBufferizeCopyOnlyDispatchesPass()";
 }
 
+def EliminateEmptyTensors :
+    Pass<"iree-eliminate-empty-tensors", "ModuleOp"> {
+  let summary = "Eliminate tensor.empty ops to avoid buffer allocations";
+  let constructor = "mlir::iree_compiler::createEliminateEmptyTensorsPass()";
+}
+
 def IREEComprehensiveBufferize :
     Pass<"iree-codegen-iree-comprehensive-bufferize", "ModuleOp"> {
   let summary = "Convert from to Linalg ops on tensors to buffers";
@@ -89,13 +95,20 @@ def IREEComprehensiveBufferize :
   ];
 }
 
+def IREEMaterializeEncoding :
+    Pass<"iree-codegen-materialize-encoding", "func::FuncOp"> {
+  let summary = "Materialize the encoding for tensor as specified by the backend";
+  let constructor = "mlir::iree_compiler::createIREEMaterializeEncodingPass()";
+}
+
 def OptimizeVectorTransfer :
     Pass<"iree-codegen-optimize-vector-transfer", "func::FuncOp"> {
   let summary =
       "Run optimization transformations on vector transfer operations";
   let constructor = "mlir::iree_compiler::createOptimizeVectorTransferPass()";
   let options = [
-    Option<"optionFlatten", "flatten", "bool", "false", "Flatten the vector type of vector transfers where possible (contiguous row-major data).">
+    Option<"optionFlatten", "flatten", "bool", "false",
+           "Flatten the vector type of vector transfers where possible (contiguous row-major data).">
   ];
 }
 
@@ -164,6 +177,12 @@ def GPUReduceBankConflicts :
   let constructor = "mlir::iree_compiler::createGPUReduceSharedMemoryBankConflicts()";
 }
 
+def GPUMultiBuffering :
+    Pass<"iree-gpu-multi-buffering", "func::FuncOp"> {
+  let summary = "Pass to do multi buffering.";
+  let constructor = "mlir::iree_compiler::createGPUMultiBuffering()";
+}
+
 def GPUPipelining : Pass<"iree-gpu-pipelining", "func::FuncOp"> {
   let summary = "Pass to do software pipelining.";
   let constructor = "mlir::iree_compiler::createGPUPipeliningPass()";
@@ -203,6 +222,12 @@ def TransformDialectInterpreter :
             "apply. If left empty, the IR is assumed to contain a transform "
             "dialect spec embedded next to the top-level op.">,
   ];
+}
+def TransformDialectJitter :
+    Pass<"iree-transform-dialect-jitter"> {
+  let summary = "Pass to create and apply transform dialect on the fly.";
+  let constructor =
+    "mlir::iree_compiler::createTransformDialectJitterPass()";
 }
 
 def GPUVectorization :
@@ -403,12 +428,6 @@ def LLVMGPUVectorLowering :
   let constructor = "mlir::iree_compiler::createLLVMGPUVectorLoweringPass()";
 }
 
-def LLVMGPUMultiBuffering :
-    Pass<"iree-llvmgpu-multi-buffering", "func::FuncOp"> {
-  let summary = "Pass to do multi buffering.";
-  let constructor = "mlir::iree_compiler::createLLVMGPUMultiBuffering()";
-}
-
 def LLVMGPUVectorToGPU :
     Pass<"iree-llvmgpu-vector-to-gpu", "func::FuncOp"> {
   let summary = "Pass to convert vector to gpu.";
@@ -492,6 +511,12 @@ def SPIRVVectorizeLoadStore :
     Pass<"iree-spirv-vectorize-load-store", "ModuleOp"> {
   let summary = "Vectorize load/store of memrefs for better memory access";
   let constructor = "mlir::iree_compiler::createSPIRVVectorizeLoadStore()";
+}
+
+def SPIRVBreakDownLargeVector : Pass<"iree-spirv-breakdown-large-vector",
+                                     "func::FuncOp"> {
+  let summary = "Break down vectors not natively supported by SPIR-V";
+  let constructor = "mlir::iree_compiler::createSPIRVBreakDownLargeVectorPass()";
 }
 
 def SPIRVCreateFastSlowPath :

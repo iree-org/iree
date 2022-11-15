@@ -1,5 +1,5 @@
 // RUN: iree-opt --split-input-file \
-// RUN:   --pass-pipeline='iree-util-test-conversion{widen-integers}, cse, canonicalize' \
+// RUN:   --pass-pipeline='builtin.module(iree-util-test-conversion{widen-integers}, cse, canonicalize)' \
 // RUN:   --verify-diagnostics %s | FileCheck %s
 
 // -----

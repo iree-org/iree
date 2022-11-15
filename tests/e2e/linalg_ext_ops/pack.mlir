@@ -412,7 +412,7 @@ func.func @dynamic_pack_pad_transpose_inner_and_outer_dims_large() {
   %c32 = arith.constant 32 : index
   %tiled_d0 = arith.ceildivui %d0, %c32 : index
   %tiled_d1 = arith.ceildivui %d1, %c16 : index
-  %init_pack = tensor.empty(%tiled_d0, %tiled_d1) : tensor<?x?x16x32xi32>
+  %init_pack = tensor.empty(%tiled_d1, %tiled_d0) : tensor<?x?x16x32xi32>
   %pack = iree_linalg_ext.pack %source padding_value(%padding_value : i32)
       outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 32] into %init_pack
       : (tensor<?x?xi32> tensor<?x?x16x32xi32>) -> tensor<?x?x16x32xi32>

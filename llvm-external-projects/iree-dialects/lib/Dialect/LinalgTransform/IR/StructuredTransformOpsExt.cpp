@@ -58,6 +58,8 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FormatVariadic.h"
+#include <mlir/Dialect/Transform/IR/TransformDialect.h>
+#include <mlir/IR/MLIRContext.h>
 
 #define DEBUG_TYPE "transform-ops-ext"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE << "]: ")
@@ -440,8 +442,8 @@ static Operation *findSingleDefiningOp(Operation *replacedOp,
       });
 }
 
-void mlir::TrackingListener::notifyOperationReplaced(Operation *op,
-                                                     ValueRange newValues) {
+void mlir::TrackingListener::notifyRootReplaced(Operation *op,
+                                                ValueRange newValues) {
   // Bail out if in error state.
   if (hadErrors)
     return;
@@ -489,6 +491,25 @@ void mlir::TrackingListener::removeMappings(Operation *op) {
 //===----------------------------------------------------------------------===//
 // CanonicalizedSequenceOp
 //===----------------------------------------------------------------------===//
+
+void ::transform_ext::CanonicalizedSequenceOp::build(
+    OpBuilder &builder, OperationState &state,
+    transform::FailurePropagationMode failurePropagationMode,
+    ::transform_ext::CanonicalizedSequenceOp::BodyBuilderFn bodyBuilder) {
+  assert(state.name.isRegistered() && "not registered!!");
+  assert(bodyBuilder && "requires a body builder");
+  MLIRContext *ctx = builder.getContext();
+  state.addAttribute(
+      CanonicalizedSequenceOp::getFailurePropagationModeAttrName(state.name),
+      transform::FailurePropagationModeAttr::get(ctx, failurePropagationMode));
+  Region *bodyRegion = state.addRegion();
+  bodyRegion->push_back(new Block);
+  Block &bodyBlock = bodyRegion->front();
+  bodyBlock.addArgument(pdl::OperationType::get(ctx), state.location);
+  OpBuilder::InsertionGuard guard(builder);
+  builder.setInsertionPointToStart(&bodyBlock);
+  bodyBuilder(builder, state.location, bodyBlock.getArgument(0));
+}
 
 /// Run enabling transformations (LICM and its variants, single-iteration loop
 /// removal, CSE) on the given function.
@@ -826,31 +847,17 @@ LogicalResult transform_ext::CanonicalizedSequenceOp::verify() {
 void transform_ext::CanonicalizedSequenceOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   auto *mappingResource = transform::TransformMappingResource::get();
-  effects.emplace_back(MemoryEffects::Read::get(), getRoot(), mappingResource);
-
+  // Effects on root if present.
+  if (getRoot())
+    effects.emplace_back(MemoryEffects::Read::get(), getRoot(),
+                         mappingResource);
+  // Effects on results.
   for (Value result : getResults()) {
     effects.emplace_back(MemoryEffects::Allocate::get(), result,
                          mappingResource);
     effects.emplace_back(MemoryEffects::Write::get(), result, mappingResource);
   }
 
-  if (!getRoot()) {
-    for (Operation &op : *getBodyBlock()) {
-      auto iface = dyn_cast<MemoryEffectOpInterface>(&op);
-      if (!iface) {
-        // TODO: fill all possible effects; or require ops to actually implement
-        // the memory effect interface always
-        assert(false);
-      }
-
-      SmallVector<MemoryEffects::EffectInstance, 2> nestedEffects;
-      iface.getEffects(effects);
-    }
-    return;
-  }
-
-  // Carry over all effects on the argument of the entry block as those on the
-  // operand, this is the same value just remapped.
   for (Operation &op : *getBodyBlock()) {
     auto iface = dyn_cast<MemoryEffectOpInterface>(&op);
     if (!iface) {
@@ -858,17 +865,24 @@ void transform_ext::CanonicalizedSequenceOp::getEffects(
       // the memory effect interface always
       assert(false);
     }
-
-    SmallVector<MemoryEffects::EffectInstance, 2> nestedEffects;
-    iface.getEffectsOnValue(getBodyBlock()->getArgument(0), nestedEffects);
-    for (const auto &effect : nestedEffects)
-      effects.emplace_back(effect.getEffect(), getRoot(), effect.getResource());
+    if (getRoot()) {
+      // Carry over all effects on the argument of the entry block as those on
+      // the operand, this is the same value just remapped.
+      SmallVector<MemoryEffects::EffectInstance, 2> nestedEffects;
+      iface.getEffectsOnValue(getBodyBlock()->getArgument(0), nestedEffects);
+      for (const auto &effect : nestedEffects)
+        effects.emplace_back(effect.getEffect(), getRoot(),
+                             effect.getResource());
+    } else {
+      // Otherwise, get all the effects.
+      iface.getEffects(effects);
+    }
   }
 }
 
 OperandRange transform_ext::CanonicalizedSequenceOp::getSuccessorEntryOperands(
     Optional<unsigned> index) {
-  assert(index && index.getValue() == 0 && "unexpected region index");
+  assert(index && index.value() == 0 && "unexpected region index");
   if (getOperation()->getNumOperands() == 1)
     return getOperation()->getOperands();
   return OperandRange(getOperation()->operand_end(),
@@ -878,7 +892,7 @@ OperandRange transform_ext::CanonicalizedSequenceOp::getSuccessorEntryOperands(
 void transform_ext::CanonicalizedSequenceOp::getSuccessorRegions(
     Optional<unsigned> index, ArrayRef<Attribute> operands,
     SmallVectorImpl<RegionSuccessor> &regions) {
-  if (!index.hasValue()) {
+  if (!index.has_value()) {
     Region *bodyRegion = &getBody();
     regions.emplace_back(bodyRegion, !operands.empty()
                                          ? bodyRegion->getArguments()

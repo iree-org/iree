@@ -36,6 +36,11 @@ llvm::cl::opt<std::string> clGPUCodegenTransformDialectFileName(
         "MLIR file containing a transform dialect specification to apply"),
     llvm::cl::init(""));
 
+llvm::cl::opt<bool> clGPUEnableTransformDialectJit(
+    "iree-codegen-llvmgpu-enable-transform-dialect-jit",
+    llvm::cl::desc("enable the usage of the transform dialect JIT"),
+    llvm::cl::init(false));
+
 llvm::cl::list<int64_t> clGPUCodegenTransformDialectTileSizes(
     "iree-codegen-llvmgpu-workgroup-tile-sizes",
     llvm::cl::desc("Fixed tile sizes when using the transform dialect starting "
@@ -453,20 +458,6 @@ static Optional<int64_t> getLinalgDimSize(linalg::LinalgOp op, int64_t d) {
   return llvm::None;
 }
 
-// Check if the given function contains an op that may require a broadcast of
-// the reduced result.
-static bool isFusedWithBroadcast(func::FuncOp entryPoint,
-                                 linalg::LinalgOp reduce) {
-  int64_t reducedRank =
-      reduce->getResult(0).getType().cast<ShapedType>().getRank();
-  bool hasBroadcast = false;
-  entryPoint.walk([&](linalg::LinalgOp linalgOp) {
-    if (reduce != linalgOp && linalgOp.getNumLoops() > reducedRank)
-      hasBroadcast = true;
-  });
-  return hasBroadcast;
-}
-
 /// Set the configuration for reductions that can be mapped to warp reductions.
 static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
                                             linalg::LinalgOp op) {
@@ -514,11 +505,6 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
     groupSize = llvm::APIntOps::GreatestCommonDivisor(
                     {64, uint64_t(groupSize)}, {64, uint64_t(maxWorkgroupSize)})
                     .getZExtValue();
-    // Workaround, the vector distribution doesn't handle cases where we fuse
-    // the reduction with a consumer that needs to be tiled.
-    // TODO(thomasraoux): remove the restriction once vector distribution is
-    // improved.
-    if (isFusedWithBroadcast(entryPoint, op)) return failure();
   }
   std::array<int64_t, 3> workgroupSize = {groupSize, 1, 1};
   SmallVector<unsigned> partitionedLoops =
@@ -534,6 +520,7 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   tileSizes.emplace_back(std::move(reductionTileSizes));  // reduction level
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, tileSizes,
+      // TODO: should this hook up `TransformDialectJitterCodegen` directly ?
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWarpReduction,
       workgroupSize);
   return success();
@@ -820,6 +807,10 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
       return funcOp.emitOpError("failed to get compute ops");
     }
 
+    // If using the transform dialect, call the proper pipeline.
+    assert((clGPUCodegenTransformDialectFileName.empty() ||
+            !clGPUEnableTransformDialectJit) &&
+           "Can't use both transform dialect interpreted and jitted modes");
     if (clGPUCodegenTransformDialectFileName.size() > 0) {
       auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
           moduleOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
@@ -862,6 +853,7 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
       // continue;
       return funcOp.emitOpError("unable to find root operation");
     }
+
     if (failed(setRootConfig(funcOp, rootOperation))) continue;
 
     // Propogate the configuration to the other ops.
@@ -874,6 +866,15 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
     for (auto op : computeOps) {
       if (op == rootOperation) continue;
       setLoweringConfig(op, config);
+    }
+
+    // TODO: this currently overrides the seeting as soon as the flag is passed.
+    // Should `setLoweringConfig` set `TransformDialectJitterCodegen` instead?
+    if (clGPUEnableTransformDialectJit) {
+      auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+          moduleOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
+                                     TransformDialectJitterCodegen);
+      setTranslationInfo(funcOp, translationInfo);
     }
   }
   return success();

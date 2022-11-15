@@ -20,7 +20,7 @@ def generate_rules(
     package_name: str, root_path: pathlib.PurePath,
     artifacts_root: e2e_test_artifacts.artifacts.ArtifactsRoot) -> List[str]:
   """Generates cmake rules to build artifacts.
-  
+
   Args:
     package_name: root cmake package name.
     root_path: root directory to store all artifacts.

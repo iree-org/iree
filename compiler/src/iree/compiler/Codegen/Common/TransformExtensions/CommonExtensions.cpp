@@ -8,6 +8,7 @@
 
 #include <iree/compiler/Dialect/HAL/IR/HALOps.h>
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "iree-dialects/Transforms/ListenerGreedyPatternRewriteDriver.h"
@@ -16,15 +17,15 @@
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSet.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
-#include "mlir/Dialect/Bufferization/Transforms/AllocTensorElimination.h"
-// #include "mlir/Dialect/Bufferization/Transforms/BufferUtils.h"
+#include "mlir/Dialect/Bufferization/Transforms/EmptyTensorElimination.h"
 #include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
-// #include "mlir/Dialect/Bufferization/Transforms/Passes.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
@@ -46,12 +47,26 @@ iree_compiler::IREE::transform_dialect::CommonExtensions::CommonExtensions() {
 
 void mlir::iree_compiler::registerTransformDialectCommonExtension(
     DialectRegistry &registry) {
-  registry.addExtensions<transform_dialect::CommonExtensions>();
+  registry.addExtensions<
+      mlir::iree_compiler::IREE::transform_dialect::CommonExtensions>();
 }
 
 //===---------------------------------------------------------------------===//
 // ApplyPatternsOp
 //===---------------------------------------------------------------------===//
+void transform_dialect::ApplyPatternsOp::build(OpBuilder &builder,
+                                               OperationState &result,
+                                               Value target,
+                                               bool rankReducing) {
+  MLIRContext *ctx = builder.getContext();
+  result.addOperands(target);
+  if (rankReducing) {
+    result.addAttribute(ApplyPatternsOp::getRankReducingAttrName(result.name),
+                        builder.getUnitAttr());
+  }
+  result.addTypes({pdl::OperationType::get(ctx)});
+}
+
 namespace {
 /// Rewrite a tensor.generate as an arith.constant when possible.
 struct GenerateToConstant : public OpRewritePattern<tensor::GenerateOp> {
@@ -211,6 +226,13 @@ DiagnosedSilenceableFailure transform_dialect::ApplyPatternsOp::applyToOne(
 // ForeachThreadToWorkgroupOp
 //===---------------------------------------------------------------------===//
 
+void transform_dialect::ForeachThreadToWorkgroupOp::build(
+    OpBuilder &builder, OperationState &result, Value target) {
+  result.addOperands(target);
+  MLIRContext *ctx = builder.getContext();
+  result.addTypes({pdl::OperationType::get(ctx)});
+}
+
 /// Populate the workgroup_count region of `dispatchOp`.
 /// For now, this only supports constant index ops and empty workload
 /// operands. Assumes the HAL::ExecutableExportOp is built with an empty
@@ -245,63 +267,6 @@ static LogicalResult populateWorkgroupCountComputingRegion(
   return success();
 }
 
-/// Apply the permutation `perm` to `vals.
-/// Return failure if perm is not a permutation.
-// TODO: upstream as extraClassDeclaration once stabilized.
-template <typename T>
-static FailureOr<SmallVector<T>> permute(const SmallVector<T> &vals,
-                                         ArrayRef<int64_t> perm) {
-  if (vals.size() != perm.size()) return failure();
-  SmallVector<T> result(vals.size());
-  SmallVector<bool> seen(vals.size());
-  for (const auto &it : llvm::zip(perm, vals)) {
-    // Already seen, invalid thread_dim_mapping.
-    if (seen[std::get<0>(it)]) return failure();
-    result[std::get<0>(it)] = std::get<1>(it);
-    seen[std::get<0>(it)] = true;
-  }
-  // Some not seen, invalid thread_dim_mapping.
-  if (!llvm::all_of(seen, [](bool b) { return b; })) return failure();
-  return result;
-}
-
-/// Helper to get apply the `thread_dim_mapping` permutation of a
-/// `foreachThreadOp` to `values`.
-// TODO: upstream as extraClassDeclaration once stabilized.
-template <typename T>
-static FailureOr<SmallVector<T>> getPermuted(
-    scf::ForeachThreadOp foreachThreadOp, const SmallVector<T> &values) {
-  // Apply mapping permutation if specified.
-  auto mapping = foreachThreadOp.getThreadDimMapping();
-  if (mapping && !mapping.empty()) {
-    auto maybePermuted = permute(values, extractFromI64ArrayAttr(mapping));
-    if (failed(maybePermuted))
-      return foreachThreadOp->emitError("invalid permutation");
-    return *maybePermuted;
-  }
-  return values;
-}
-
-/// Helper to get the `num_threads` of a `foreachThreadOp` after applying the
-/// `thread_dim_mapping` permutation.
-// TODO: upstream as extraClassDeclaration once stabilized.
-static FailureOr<SmallVector<OpFoldResult>> getNumThreads(
-    OpBuilder &b, scf::ForeachThreadOp foreachThreadOp) {
-  SmallVector<OpFoldResult> threadCount = foreachThreadOp.getNumThreads();
-  threadCount.resize(3, b.getIndexAttr(1));
-  return getPermuted(foreachThreadOp, threadCount);
-}
-
-/// Helper to get the thread indices of a `foreachThreadOp` after applying the
-/// `thread_dim_mapping` permutation.
-// TODO: upstream as extraClassDeclaration once stabilized.
-static FailureOr<SmallVector<Value>> getThreadIndices(
-    OpBuilder &b, scf::ForeachThreadOp foreachThreadOp) {
-  SmallVector<Value> threadCount = foreachThreadOp.getThreadIndices();
-  threadCount.resize(3, Value());
-  return getPermuted(foreachThreadOp, threadCount);
-}
-
 //===---------------------------------------------------------------------===//
 // Patterns for ForeachThreadToWorkgroup rewrite.
 //===---------------------------------------------------------------------===//
@@ -309,14 +274,67 @@ static FailureOr<SmallVector<Value>> getThreadIndices(
 LogicalResult rewriteForeachThreadToWorkgroup(
     scf::ForeachThreadOp foreachThreadOp,
     IREE::HAL::ExecutableExportOp exportOp, PatternRewriter &rewriter) {
+  // Step 0. Target-specific verifications. There is no good place to anchor
+  // those right now: the ForeachThreadOp is target-independent and the
+  // transform op does not apply to individual ForeachThreadOp.
+  MLIRContext *ctx = foreachThreadOp->getContext();
+  Location loc = foreachThreadOp->getLoc();
+  // TODO iree should have own device mapping like #hal.workgroup<x/y/z>
+  Attribute bX = gpu::GPUBlockMappingAttr::get(ctx, gpu::Blocks::DimX);
+  Attribute bY = gpu::GPUBlockMappingAttr::get(ctx, gpu::Blocks::DimY);
+  Attribute bZ = gpu::GPUBlockMappingAttr::get(ctx, gpu::Blocks::DimZ);
   if (foreachThreadOp.getNumResults() > 0)
     return foreachThreadOp->emitError(
         "only bufferized scf.foreach_thread lowers to workgroup");
   if (foreachThreadOp.getNumThreads().size() > 3)
     return foreachThreadOp->emitError(
         "scf.foreach_thread with rank > 3 does not lower to workgroup");
+  if (llvm::any_of(foreachThreadOp.getNumThreads(), [](Value v) {
+        return !v.getDefiningOp<arith::ConstantIndexOp>();
+      })) {
+    return foreachThreadOp->emitError(
+        "unsupported dynamic workgroup_count atm --- need to slice out "
+        "workgroup_count computation into ExecutableExport::workgroup_count. "
+        "This region may require arbitrary computations and cannot magically "
+        "match what the `stream.cmd.dispatch` has already imposed on us at a "
+        "distance. For now we must specify the number of values properly "
+        "when applying the topLevel tile_to_foreach_thread_op");
+  }
+  if (!foreachThreadOp.getMapping().has_value())
+    return foreachThreadOp->emitError("mapping must be present");
+  SmallVector<Attribute> blockMapping =
+      llvm::to_vector(foreachThreadOp.getMapping()->getValue());
+  if (llvm::any_of(blockMapping, [](DeviceMappingAttrInterface map) {
+        return !map.isa<gpu::GPUBlockMappingAttr>();
+      })) {
+    return foreachThreadOp->emitError("mapping must be #gpu.block<x/y/z/>");
+  }
 
-  // Step 0. Outline the compute workload region and set up the workload
+  // Step 1. Complete the blockMapping to a full mapping (with 1s) if necessary.
+  SmallVector<Value> numBlocks =
+      llvm::to_vector(foreachThreadOp.getNumThreads());
+  // Ensure we have 3 block sizes, one for each id.
+  Value one;
+  for (auto attr : {bX, bY, bZ}) {
+    if (std::find(blockMapping.begin(), blockMapping.end(), attr) ==
+        blockMapping.end()) {
+      blockMapping.push_back(attr);
+      one = one ? one : rewriter.create<arith::ConstantIndexOp>(loc, 1);
+      numBlocks.push_back(one);
+    }
+  }
+  // Step 2. sort the values by the corresponding GPUBlockMappingAttr.
+  auto comparator = [](Attribute a, Attribute b) -> bool {
+    return static_cast<int64_t>(a.cast<gpu::GPUBlockMappingAttr>().getBlock()) <
+           static_cast<int64_t>(b.cast<gpu::GPUBlockMappingAttr>().getBlock());
+  };
+  SmallVector<Value> gridDimValues = scf::ForeachThreadOp::getValuesSortedByKey(
+      blockMapping, numBlocks, comparator);
+  SmallVector<int64_t> gridDims;
+  for (Value v : gridDimValues)
+    gridDims.push_back(v.getDefiningOp<arith::ConstantIndexOp>().value());
+
+  // Step 3. Outline the compute workload region and set up the workload
   // operands, if this has not been done already.
   // Using `transform.iree.tile_to_foreach_thread_and_workgroup_count_region` is
   // the preferred way to set up tiling and workgroup_count region **at the same
@@ -329,21 +347,6 @@ LogicalResult rewriteForeachThreadToWorkgroup(
   // the flow level and explicitly match the ops we want to fuse.
   // Once fusion is customizable enough in perpetuity, we can retire this.
   if (exportOp.getWorkgroupCount().empty()) {
-    auto maybeWorkgroupCounts = getNumThreads(rewriter, foreachThreadOp);
-    if (failed(maybeWorkgroupCounts) ||
-        llvm::any_of(*maybeWorkgroupCounts, [](OpFoldResult ofr) {
-          return !getConstantIntValue(ofr).has_value();
-        }))
-      return foreachThreadOp->emitError(
-          "unsupported dynamic workgroup_count atm --- need to slice out "
-          "workgroup_count computation into ExecutableExport::workgroup_count. "
-          "This region may require arbitrary computations and cannot magically "
-          "match what the `stream.cmd.dispatch` has already imposed on us at a "
-          "distance. For now we must specify the number of values properly "
-          "when applying the topLevel tile_to_foreach_thread_op");
-    SmallVector<int64_t> workgroupCounts;
-    for (OpFoldResult ofr : *maybeWorkgroupCounts)
-      workgroupCounts.push_back(getConstantIntValue(ofr).value());
     if (failed(populateWorkgroupCountComputingRegion(rewriter, foreachThreadOp,
                                                      exportOp))) {
       return foreachThreadOp->emitOpError(
@@ -352,22 +355,23 @@ LogicalResult rewriteForeachThreadToWorkgroup(
     }
   }
 
-  // Step 1. Create the workgroup id and count ops.
-  Location loc = foreachThreadOp.getLoc();
+  // Step 4. Create the workgroup id and count ops.
   BlockAndValueMapping bvm;
-  SmallVector<Value, 8> workgroupIdOps, workgroupCountOps;
-  for (int64_t rank : llvm::seq<int64_t>(0, 3)) {
+  SmallVector<Value> workgroupIdOps, workgroupCountOps;
+  for (Attribute attr : blockMapping) {
+    auto idx =
+        static_cast<int64_t>(attr.cast<gpu::GPUBlockMappingAttr>().getBlock());
     workgroupIdOps.push_back(
-        rewriter.create<HAL::InterfaceWorkgroupIDOp>(loc, rank));
+        rewriter.create<HAL::InterfaceWorkgroupIDOp>(loc, idx));
     workgroupCountOps.push_back(
-        rewriter.create<HAL::InterfaceWorkgroupCountOp>(loc, rank));
+        rewriter.create<HAL::InterfaceWorkgroupCountOp>(loc, idx));
   }
   bvm.map(foreachThreadOp.getThreadIndices(), workgroupIdOps);
   bvm.map(foreachThreadOp.getNumThreads(), workgroupCountOps);
 
-  // Step 2. Predicate omitted given unique topLevel scf::ForeachThreadOp.
+  // Step 5. Predicate omitted given unique topLevel scf::ForeachThreadOp.
 
-  // Step 3. Move the body of foreachThreadOp.
+  // Step 6. Move the body of foreachThreadOp.
   // Erase the terminator first, it will not be used since we are on buffers.
   rewriter.eraseOp(foreachThreadOp.getTerminator());
   Block *targetBlock;
@@ -378,17 +382,12 @@ LogicalResult rewriteForeachThreadToWorkgroup(
   targetBlock->getOperations().splice(insertionPoint,
                                       sourceBlock.getOperations());
 
-  // Step 4. RAUW thread indices to thread ops.
-  SmallVector<Value> threadIndices =
-      *getThreadIndices(rewriter, foreachThreadOp);
-  assert(workgroupIdOps.size() == 3 && "3 workgroup id ops are required");
-  assert(threadIndices.size() == 3 && "3 thread id dimensions are required");
-  for (auto it : llvm::zip(threadIndices, workgroupIdOps)) {
-    Value val = std::get<0>(it);
-    if (!val) continue;
-    for (Operation *user : llvm::make_early_inc_range(val.getUsers())) {
-      rewriter.updateRootInPlace(
-          user, [&]() { user->replaceUsesOfWith(val, std::get<1>(it)); });
+  // Step 7. RAUW thread indices to thread ops.
+  for (Value blockIdx : foreachThreadOp.getThreadIndices()) {
+    for (Operation *user : llvm::make_early_inc_range(blockIdx.getUsers())) {
+      rewriter.updateRootInPlace(user, [&]() {
+        user->replaceUsesOfWith(blockIdx, bvm.lookup(blockIdx));
+      });
     }
   }
 
@@ -453,8 +452,86 @@ transform_dialect::ForeachThreadToWorkgroupOp::applyToOne(
 }
 
 //===---------------------------------------------------------------------===//
-// TileToForeachThreadAndWorkgroupCountRegion
+// TileToForeachThreadAndWorkgroupCountRegionOp
 //===---------------------------------------------------------------------===//
+
+void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
+    OpBuilder &builder, OperationState &result, Value target,
+    ArrayRef<int64_t> staticTileSizes, transform::TileSizesSpec,
+    ArrayAttr threadDimMapping) {
+  return build(builder, result, target,
+               getAsOpFoldResult(builder.getI64ArrayAttr(staticTileSizes)),
+               transform::TileSizesSpec(), threadDimMapping);
+}
+
+void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
+    OpBuilder &builder, OperationState &result, Value target,
+    ArrayRef<OpFoldResult> mixedTileSizes, transform::TileSizesSpec,
+    ArrayAttr threadDimMapping) {
+  assert(result.name.isRegistered() && "not registered!!");
+  SmallVector<int64_t> staticTileSizes;
+  SmallVector<Value> dynamicTileSizes;
+  dispatchIndexOpFoldResults(mixedTileSizes, dynamicTileSizes, staticTileSizes,
+                             ShapedType::kDynamicSize);
+  // Call the default builder which sets up the proper operands segment sizes
+  // attributes for multiple variadic operands. In the absence of this, horrible
+  // bugs ensue.
+  MLIRContext *ctx = builder.getContext();
+  auto operationType = pdl::OperationType::get(ctx);
+  auto staticTileSizesAttr = builder.getI64ArrayAttr(staticTileSizes);
+
+  build(builder, result, TypeRange{operationType, operationType}, target,
+        /*numThreads=*/ValueRange{}, dynamicTileSizes,
+        /*staticNumThreads=*/ArrayAttr(), staticTileSizesAttr, threadDimMapping,
+        /*packedSizes=*/UnitAttr());
+}
+
+void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
+    OpBuilder &builder, OperationState &result, Value target,
+    ArrayRef<int64_t> staticNumThreads, transform::NumThreadsSpec,
+    ArrayAttr threadDimMapping) {
+  return build(builder, result, target,
+               getAsOpFoldResult(builder.getI64ArrayAttr(staticNumThreads)),
+               transform::NumThreadsSpec(), threadDimMapping);
+}
+
+void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
+    OpBuilder &builder, OperationState &result, Value target,
+    ArrayRef<OpFoldResult> mixedNumThreads, transform::NumThreadsSpec,
+    ArrayAttr threadDimMapping) {
+  assert(result.name.isRegistered() && "not registered!!");
+  SmallVector<int64_t> staticNumThreads;
+  SmallVector<Value> dynamicNumThreads;
+  dispatchIndexOpFoldResults(mixedNumThreads, dynamicNumThreads,
+                             staticNumThreads, ShapedType::kDynamicSize);
+  // Call the default builder which sets up the proper operands segment sizes
+  // attributes for multiple variadic operands. In the absence of this, horrible
+  // bugs ensue.
+  MLIRContext *ctx = builder.getContext();
+  auto operationType = pdl::OperationType::get(ctx);
+  auto staticNumThreadsAttr = builder.getI64ArrayAttr(staticNumThreads);
+  build(builder, result, TypeRange{operationType, operationType}, target,
+        dynamicNumThreads, /*tileSizes=*/ValueRange{}, staticNumThreadsAttr,
+        /*staticTileSizes=*/ArrayAttr(), threadDimMapping,
+        /*packedSizes=*/UnitAttr());
+}
+
+void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
+    OpBuilder &builder, OperationState &result, Value target,
+    Value packedTileSizeHandle, transform::TileSizesSpec,
+    ArrayAttr threadDimMapping) {
+  MLIRContext *ctx = builder.getContext();
+  auto operationType = pdl::OperationType::get(ctx);
+  SmallVector<int64_t> dummyStaticTileSizes(1, ShapedType::kDynamicSize);
+  auto dummyStaticTileSizesAttr = builder.getI64ArrayAttr(dummyStaticTileSizes);
+
+  build(builder, result, TypeRange{operationType, operationType}, target,
+        /*numThreads=*/ValueRange{},
+        /*tileSizes=*/ValueRange{packedTileSizeHandle},
+        /*staticNumThreads=*/ArrayAttr(),
+        /*staticTileSizes=*/dummyStaticTileSizesAttr, threadDimMapping,
+        /*packedSizes=*/builder.getUnitAttr());
+}
 
 /// Lower the ops within the workgroup count region of `exportOp` that
 /// represents the workgroup count calculation, to the actual
@@ -512,24 +589,24 @@ static LogicalResult lowerWorkgroupCountComputingRegion(
 }
 
 SmallVector<OpFoldResult> transform_dialect::
-    TileToForeachThreadAndWorkgroupCountRegion::getMixedNumThreads() {
+    TileToForeachThreadAndWorkgroupCountRegionOp::getMixedNumThreads() {
   return getMixedSizes(getStaticNumThreads(), getNumThreads());
 }
 
 SmallVector<OpFoldResult> transform_dialect::
-    TileToForeachThreadAndWorkgroupCountRegion::getMixedTileSizes() {
+    TileToForeachThreadAndWorkgroupCountRegionOp::getMixedTileSizes() {
   return getMixedSizes(getStaticTileSizes(), getTileSizes());
 }
 
 LogicalResult
-transform_dialect::TileToForeachThreadAndWorkgroupCountRegion::verify() {
+transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::verify() {
   if (getMixedNumThreads().empty() == getMixedTileSizes().empty())
     return emitOpError("either num_threads or tile_sizes must be specified");
   return success();
 }
 
-void transform_dialect::TileToForeachThreadAndWorkgroupCountRegion::getEffects(
-    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::
+    getEffects(SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::consumesHandle(getTarget(), effects);
   transform::onlyReadsHandle(getTileSizes(), effects);
   transform::onlyReadsHandle(getNumThreads(), effects);
@@ -538,7 +615,7 @@ void transform_dialect::TileToForeachThreadAndWorkgroupCountRegion::getEffects(
 }
 
 DiagnosedSilenceableFailure
-transform_dialect::TileToForeachThreadAndWorkgroupCountRegion::apply(
+transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::apply(
     transform::TransformResults &transformResults,
     transform::TransformState &state) {
   ArrayRef<Operation *> targetOps = state.getPayloadOps(getTarget());
@@ -550,7 +627,24 @@ transform_dialect::TileToForeachThreadAndWorkgroupCountRegion::apply(
                                      "couldn't find export op for func");
   }
 
-  SmallVector<OpFoldResult> mixedTileSizes = getMixedTileSizes();
+  SmallVector<OpFoldResult> mixedTileSizes;
+  if (getPackedSizes()) {
+    ArrayRef<Operation *> sizes = state.getPayloadOps(getTileSizes().front());
+    mixedTileSizes.reserve(sizes.size());
+    for (Operation *sizeProducer : sizes) {
+      if (sizeProducer->getNumResults() != 1) {
+        auto diag = mlir::emitDefiniteFailure(sizeProducer)
+                    << "the operation producing tile size must have one result";
+        diag.attachNote(getLoc()) << "when applying this transform";
+        return diag;
+      }
+      // TODO(ftynse): we may want to pattern-match for integer constants here.
+      mixedTileSizes.push_back(sizeProducer->getResult(0));
+    }
+  } else {
+    mixedTileSizes = getMixedTileSizes();
+  }
+
   if (mixedTileSizes.empty()) {
     return mlir::emitDefiniteFailure(exportOp.value(),
                                      "require tile sizes to be specified");
@@ -573,8 +667,8 @@ transform_dialect::TileToForeachThreadAndWorkgroupCountRegion::apply(
 
   DiagnosedSilenceableFailure diag = transform::tileToForeachThreadOpImpl(
       rewriter, state, cast<transform::TransformOpInterface>(getOperation()),
-      targets, getMixedNumThreads(), getMixedTileSizes(), getThreadDimMapping(),
-      tileOps, tiledOps);
+      targets, getMixedNumThreads(), getMixedTileSizes(), getMapping(), tileOps,
+      tiledOps);
 
   if (!diag.succeeded()) {
     transformResults.set(getForeachThreadOp().cast<OpResult>(),
@@ -604,11 +698,23 @@ transform_dialect::TileToForeachThreadAndWorkgroupCountRegion::apply(
 // TODO: Maybe we need both a transform.iree.cpu.bufferize and a
 // transform.iree.gpu.bufferize rather than a single common bufferize op?
 //
-// Note: This has become so specific that it may be worth it to separate in its
-// own .cpp file.
+// Note: This has become so specific that it may be worth it to separate in
+// its own .cpp file.
 using mlir::bufferization::BufferizationOptions;
 using mlir::bufferization::OneShotAnalysisState;
 using mlir::bufferization::OneShotBufferizationOptions;
+
+void transform_dialect::IREEBufferizeOp::build(OpBuilder &builder,
+                                               OperationState &result,
+                                               Value target, bool targetGpu) {
+  result.addOperands(target);
+  if (targetGpu) {
+    result.addAttribute(IREEBufferizeOp::getTargetGpuAttrName(result.name),
+                        builder.getUnitAttr());
+  }
+  MLIRContext *ctx = builder.getContext();
+  result.addTypes(pdl::OperationType::get(ctx));
+}
 
 //===---------------------------------------------------------------------===//
 // Default allocation functions for CPU backend
@@ -677,50 +783,8 @@ static LogicalResult gpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
   return success();
 }
 
-/// Temporarily copied from IREEComprehensiveBufferizePass.cpp to avoid buying
-/// into nested pass pipeline mess.
-static LogicalResult emptyTensorElimination(
-    Operation *op, OneShotBufferizationOptions options) {
-  // Analyze IR.
-  options.testAnalysisOnly = false;
-  options.printConflicts = false;
-  OneShotAnalysisState state(op, options);
-  if (failed(analyzeOp(op, state))) return failure();
-
-  // Rewrite init_tensors that are anchored on specific ops.
-  IRRewriter rewriter(op->getContext());
-  if (failed(bufferization::insertSliceAnchoredAllocTensorEliminationStep(
-          rewriter, op, state)))
-    return failure();
-  if (failed(
-          storeTensorOpAnchoredInitTensorEliminationStep(rewriter, op, state)))
-    return failure();
-
-  return success();
-}
-
-/// Temporarily copied from IREEComprehensiveBufferizePass.cpp to avoid buying
-/// into nested pass pipeline mess.
-// The following is copied from bufferization::runOneShotBufferize with
-// modifications.
-static LogicalResult runIREEOneShotBufferize(
-    Operation *op, const OneShotBufferizationOptions &options) {
-  OneShotAnalysisState state(op, options);
-  if (failed(analyzeOp(op, state))) return failure();
-  if (options.testAnalysisOnly) return success();
-  return bufferization::runOneShotBufferize(op, options);
-}
-
-/// Temporarily copied from IREEComprehensiveBufferizePass.cpp to avoid buying
-/// into nested pass pipeline mess.
-static LogicalResult runIREEBufferizeOnModule(
-    ModuleOp moduleOp, BufferizationOptions::AllocationFn allocationFn,
-    BufferizationOptions::DeallocationFn deallocationFn,
-    BufferizationOptions::MemCpyFn memCpyFn) {
+static OneShotBufferizationOptions getBufferizationOptions() {
   OneShotBufferizationOptions options;
-  options.allocationFn = allocationFn;
-  options.deallocationFn = deallocationFn;
-  options.memCpyFn = memCpyFn;
   // options.testAnalysisOnly = testAnalysisOnly;
   // options.printConflicts = printConflicts;
 
@@ -747,8 +811,53 @@ static LogicalResult runIREEBufferizeOnModule(
                                                               memorySpace);
   };
 
-  if (failed(emptyTensorElimination(moduleOp.getOperation(), options)))
+  return options;
+}
+
+/// Temporarily copied from IREEComprehensiveBufferizePass.cpp to avoid buying
+/// into nested pass pipeline mess.
+static LogicalResult emptyTensorElimination(
+    Operation *op, OneShotBufferizationOptions options) {
+  // Analyze IR.
+  options.testAnalysisOnly = false;
+  options.printConflicts = false;
+  OneShotAnalysisState state(op, options);
+  if (failed(analyzeOp(op, state))) return failure();
+
+  // Rewrite tensor.empty ops that are anchored on specific ops.
+  IRRewriter rewriter(op->getContext());
+  if (failed(bufferization::insertSliceAnchoredEmptyTensorEliminationStep(
+          rewriter, op, state)))
     return failure();
+  if (failed(
+          storeTensorOpAnchoredEmptyTensorEliminationStep(rewriter, op, state)))
+    return failure();
+
+  return success();
+}
+
+/// Temporarily copied from IREEComprehensiveBufferizePass.cpp to avoid buying
+/// into nested pass pipeline mess.
+// The following is copied from bufferization::runOneShotBufferize with
+// modifications.
+static LogicalResult runIREEOneShotBufferize(
+    Operation *op, const OneShotBufferizationOptions &options) {
+  OneShotAnalysisState state(op, options);
+  if (failed(analyzeOp(op, state))) return failure();
+  if (options.testAnalysisOnly) return success();
+  return bufferization::runOneShotBufferize(op, options);
+}
+
+/// Temporarily copied from IREEComprehensiveBufferizePass.cpp to avoid buying
+/// into nested pass pipeline mess.
+static LogicalResult runIREEBufferizeOnModule(
+    ModuleOp moduleOp, BufferizationOptions::AllocationFn allocationFn,
+    BufferizationOptions::DeallocationFn deallocationFn,
+    BufferizationOptions::MemCpyFn memCpyFn) {
+  OneShotBufferizationOptions options = getBufferizationOptions();
+  options.allocationFn = allocationFn;
+  options.deallocationFn = deallocationFn;
+  options.memCpyFn = memCpyFn;
 
   return runIREEOneShotBufferize(moduleOp, options);
 }
@@ -797,7 +906,17 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
     memCpyFn = gpuComprehensiveBufferizeCopyFn;
   }
 
-  //   1. Rewrite tensor.empty to tensor.alloc, without the pass baggage.
+  //   1. Eliminate tensor.empty, without the pass baggage.
+  WalkResult res = state.getTopLevel()->walk([&](ModuleOp moduleOp) {
+    if (failed(emptyTensorElimination(moduleOp.getOperation(),
+                                      getBufferizationOptions())))
+      return WalkResult::interrupt();
+    return WalkResult::advance();
+  });
+  if (res.wasInterrupted())
+    return DiagnosedSilenceableFailure::definiteFailure();
+
+  //   2. Rewrite tensor.empty to tensor.alloc, without the pass baggage.
   RewritePatternSet patterns(getContext());
   patterns.add<EmptyTensorLoweringPattern>(patterns.getContext());
   TrackingListener listener(state);
@@ -813,8 +932,8 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
     return mlir::emitDefiniteFailure(state.getTopLevel(),
                                      "listener tracking failed");
 
-  //   2. Run one-shot-bufferize, without the pass baggage.
-  WalkResult res = state.getTopLevel()->walk([&](ModuleOp moduleOp) {
+  //   3. Run one-shot-bufferize, without the pass baggage.
+  res = state.getTopLevel()->walk([&](ModuleOp moduleOp) {
     if (failed(runIREEBufferizeOnModule(moduleOp, allocationFn, deallocationFn,
                                         memCpyFn)))
       return WalkResult::interrupt();
@@ -823,7 +942,7 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
   if (res.wasInterrupted())
     return DiagnosedSilenceableFailure::definiteFailure();
 
-  //   3. Post-bufferization passes are fine.
+  //   4. Post-bufferization passes are fine.
   PassManager pm(getContext());
   addIREEPostBufferizationPasses(pm);
   res = state.getTopLevel()->walk([&](ModuleOp moduleOp) {
@@ -840,6 +959,75 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
     return DiagnosedSilenceableFailure::definiteFailure();
 
   results.set(getOperation()->getOpResult(0), payload.front());
+  return DiagnosedSilenceableFailure::success();
+}
+
+//===---------------------------------------------------------------------===//
+// ConfigExtractPart
+//===---------------------------------------------------------------------===//
+void transform_dialect::ConfigExtractPart::build(OpBuilder &builder,
+                                                 OperationState &result,
+                                                 Value target,
+                                                 StringRef attrName,
+                                                 Optional<int64_t> maybeLevel) {
+  MLIRContext *ctx = builder.getContext();
+  result.addOperands(target);
+  result.addAttribute(ConfigExtractPart::getAttrNameAttrName(result.name),
+                      builder.getStringAttr(attrName));
+  if (maybeLevel) {
+    result.addAttribute(ConfigExtractPart::getLevelAttrName(result.name),
+                        builder.getI64IntegerAttr(*maybeLevel));
+  }
+  result.addTypes({pdl::OperationType::get(ctx)});
+}
+
+void transform_dialect::ConfigExtractPart::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::producesHandle(getResultConfigPart(), effects);
+  transform::modifiesPayload(effects);
+}
+
+DiagnosedSilenceableFailure transform_dialect::ConfigExtractPart::apply(
+    transform::TransformResults &transformResults,
+    transform::TransformState &state) {
+  ArrayRef<Operation *> targetOps = state.getPayloadOps(getTarget());
+  if (targetOps.empty()) {
+    transformResults.set(getResultConfigPart().cast<OpResult>(), {});
+    return DiagnosedSilenceableFailure::success();
+  }
+
+  assert(targetOps.size() == 1 && "expected single target op in payload");
+  Operation *target = targetOps.front();
+  auto config = iree_compiler::getLoweringConfig(target);
+  if (!config) {
+    transformResults.set(getResultConfigPart().cast<OpResult>(), {});
+    return emitSilenceableFailure(target) << " has no IREE config";
+  }
+
+  // TODO: op verifier etc.
+  if (getAttrName() != "tile_sizes")
+    return emitDefiniteFailure("unsupported attr");
+
+  if (!getLevel()) {
+    transformResults.set(getResultConfigPart().cast<OpResult>(), {});
+    return emitSilenceableFailure(target) << " level is required for tiling";
+  }
+  auto vals = config.getTileSizeVals(*getLevel());
+  if (vals.empty()) {
+    transformResults.set(getResultConfigPart().cast<OpResult>(), {});
+    return emitSilenceableFailure(target) << " no tiling at level";
+  }
+  SmallVector<Value> values;
+  SmallVector<Operation *> results;
+  OpBuilder b(target);
+  for (int64_t ts : vals) {
+    results.push_back(b.create<arith::ConstantIndexOp>(target->getLoc(), ts));
+    values.push_back(results.back()->getResult(0));
+  }
+  b.create<LinalgExt::DoNotDCEOperandsOp>(target->getLoc(), values);
+
+  transformResults.set(getResultConfigPart().cast<OpResult>(), results);
   return DiagnosedSilenceableFailure::success();
 }
 

@@ -23,6 +23,7 @@ iree_compiler_cc_library(
         "MaliConfig.cpp",
         "NVIDIAConfig.cpp",
         "Passes.cpp",
+        "SPIRVBreakDownLargeVector.cpp",
         "SPIRVCreateFastSlowPath.cpp",
         "SPIRVDistribute.cpp",
         "SPIRVEmulateI64.cpp",
@@ -35,6 +36,7 @@ iree_compiler_cc_library(
         "SPIRVVectorize.cpp",
         "SPIRVVectorizeLoadStore.cpp",
         "Utils.cpp",
+        "Verifiers.cpp",
     ],
     hdrs = [
         "KernelConfig.h",

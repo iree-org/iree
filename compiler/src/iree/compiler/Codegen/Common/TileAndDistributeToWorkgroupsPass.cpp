@@ -13,6 +13,8 @@
 // utility method.
 //
 //===---------------------------------------------------------------------===//
+
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Transforms.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
@@ -32,6 +34,7 @@
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -40,19 +43,9 @@
 namespace mlir {
 namespace iree_compiler {
 
-/// Find the root operation of the dispatch, the one (and preferably only one)
-/// that has a lowering configuration.
-static FailureOr<Operation *> getRootOp(ArrayRef<Operation *> computeOps) {
-  for (auto op : computeOps) {
-    IREE::Codegen::LoweringConfigAttr loweringConfig = getLoweringConfig(op);
-    if (!loweringConfig) continue;
-    return op;
-  }
-  return failure();
-}
-
 /// Method to return the configuration to use for first-level tile and
 /// distribute. Returns the
+/// - Root op of the dispatch. If no root op was found returns `nullptr`.
 /// - tileSizes to use
 /// - interchange
 /// - loops to be partitioned (the tile sizes for the non-partitioned loop are
@@ -65,17 +58,20 @@ static FailureOr<Operation *> getRootOp(ArrayRef<Operation *> computeOps) {
 // away from using `scf.for` to using a construct that better captures
 // distribution (like `scf.foreach_thread`) this information can be dropped.
 static LogicalResult getTileAndDistributeConfig(
-    ArrayRef<Operation *> computeOps, SmallVectorImpl<int64_t> &tileSizes,
+    ArrayRef<Operation *> computeOps, Operation *&dispatchRootOp,
+    SmallVectorImpl<int64_t> &tileSizes,
     SmallVectorImpl<int64_t> &staticLoopRanges,
     SmallVectorImpl<int64_t> &interchange,
     SmallVectorImpl<unsigned> &partitionableLoops) {
   // Find the lowering configuration of the root operation.
-  FailureOr<Operation *> rootOp = getRootOp(computeOps);
+  FailureOr<Operation *> rootOp = getLoweringConfigCarryingOp(computeOps);
   if (failed(rootOp)) {
     // Just return. All the in-out vectors are empty that should default
     // the number of workgroups to {1, 1, 1}
+    dispatchRootOp = nullptr;
     return success();
   }
+  dispatchRootOp = rootOp.value();
 
   auto partitionableLoopInterface =
       dyn_cast<PartitionableLoopsInterface>(*rootOp);
@@ -115,12 +111,35 @@ static LogicalResult getTileAndDistributeConfig(
     tileSizes[loopId] = 0;
   }
 
-  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp.value())) {
+  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(*rootOp)) {
     staticLoopRanges = linalgOp.getStaticLoopRanges();
   }
   staticLoopRanges.resize(tileSizes.size(), ShapedType::kDynamicSize);
 
   return success();
+}
+
+/// Get the materialization information from a `iree_linalg_ext.pack` operation.
+static FailureOr<IREE::LinalgExt::MaterializeEncodingInfo>
+getMaterializationInfo(IREE::LinalgExt::PackOp packOp) {
+  IREE::LinalgExt::MaterializeEncodingInfo encodingInfo;
+  SmallVector<OpFoldResult> mixedTileSizes = packOp.getMixedTiles();
+  encodingInfo.innerTileSizes.reserve(mixedTileSizes.size());
+  for (auto tileSize : mixedTileSizes) {
+    if (tileSize.is<Value>()) {
+      return packOp.emitOpError(
+          "unhandled distribution of pack op with dynamic inner tile size");
+    }
+    encodingInfo.innerTileSizes.push_back(
+        tileSize.get<Attribute>().cast<IntegerAttr>().getInt());
+  }
+  encodingInfo.innerDimsPos = llvm::to_vector(llvm::map_range(
+      packOp.getInnerDimsPos(),
+      [](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
+  encodingInfo.outerDimsPerm = llvm::to_vector(llvm::map_range(
+      packOp.getOuterDimsPerm(),
+      [](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
+  return encodingInfo;
 }
 
 //===---------------------------------------------------------------------===//
@@ -218,6 +237,53 @@ struct LowerDispatchWorkgroupCountForDagRootOp
   SmallVector<unsigned> partitionedLoops;
 };
 
+/// Pattern to lower a `flow.dispatch.workgroup_count_from_set_encoding` op.
+/// At the Flow level this op uses the logical shape of the tensor
+/// as the workload. This gets materialized into an physical tensor
+/// Lower this operation accounting for the change of shape from
+/// the logical shape to the physical shape. It lowers to
+/// a `flow.dispatch.workgroup_count_from_root_dag` where the root
+/// is the `pack` op that materialized the encoding.
+struct LowerDispatchWorkgroupCountFromSetEncodingOp
+    : public OpRewritePattern<
+          IREE::Flow::DispatchWorkgroupCountFromSetEncodingOp> {
+  LowerDispatchWorkgroupCountFromSetEncodingOp(
+      MLIRContext *context,
+      IREE::LinalgExt::MaterializeEncodingInfo encodingInfo,
+      PatternBenefit benefit = 1)
+      : OpRewritePattern(context, benefit),
+        materializeEncodingInfo(std::move(encodingInfo)) {}
+
+  LogicalResult matchAndRewrite(
+      IREE::Flow::DispatchWorkgroupCountFromSetEncodingOp workgroupCountOp,
+      PatternRewriter &rewriter) const override {
+    ValueRange workload = workgroupCountOp.getOperands();
+    // The workload represents the unpacked shape. Get the workload of the
+    // packed shape.
+    auto getAsOpFoldResults = [&](ArrayRef<int64_t> intVals) {
+      return llvm::to_vector(llvm::map_range(
+          intVals,
+          [&](int64_t i) -> OpFoldResult { return rewriter.getIndexAttr(i); }));
+    };
+    SmallVector<OpFoldResult> resultShape =
+        IREE::LinalgExt::PackOp::getResultShape(
+            rewriter, workgroupCountOp.getLoc(), getAsOpFoldResult(workload),
+            getAsOpFoldResults(materializeEncodingInfo.innerTileSizes),
+            materializeEncodingInfo.innerDimsPos,
+            materializeEncodingInfo.outerDimsPerm);
+
+    rewriter
+        .replaceOpWithNewOp<IREE::Flow::DispatchWorkgroupCountFromDagRootOp>(
+            workgroupCountOp,
+            getValueOrCreateConstantIndexOp(rewriter, workgroupCountOp.getLoc(),
+                                            resultShape));
+    return success();
+  }
+
+ private:
+  IREE::LinalgExt::MaterializeEncodingInfo materializeEncodingInfo;
+};
+
 //===---------------------------------------------------------------------===//
 // Patterns and methods for tile and distribute of Linalg ops to workgroups.
 //===---------------------------------------------------------------------===//
@@ -227,9 +293,10 @@ struct TileAndDistributeToWorkgroupsPass
     : public TileAndDistributeToWorkgroupsBase<
           TileAndDistributeToWorkgroupsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<AffineDialect, IREE::Flow::FlowDialect,
-                    IREE::HAL::HALDialect, linalg::LinalgDialect,
-                    scf::SCFDialect, tensor::TensorDialect>();
+    registry
+        .insert<AffineDialect, IREE::Flow::FlowDialect, IREE::HAL::HALDialect,
+                linalg::LinalgDialect, IREE::LinalgExt::IREELinalgExtDialect,
+                scf::SCFDialect, tensor::TensorDialect>();
   }
 
   void runOnOperation() override;
@@ -259,7 +326,8 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
     }
     SmallVector<int64_t> tileSizes, staticLoopRanges, interchange;
     SmallVector<unsigned> partitionableLoops;
-    if (failed(getTileAndDistributeConfig(computeOps, tileSizes,
+    Operation *dispatchRootOp = nullptr;
+    if (failed(getTileAndDistributeConfig(computeOps, dispatchRootOp, tileSizes,
                                           staticLoopRanges, interchange,
                                           partitionableLoops))) {
       funcOp.emitOpError("failed to get tile and distribute configuration");
@@ -272,6 +340,16 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
       patterns.insert<LowerDispatchWorkgroupCountForDagRootOp>(
           context, tileSizes, staticLoopRanges, interchange,
           partitionableLoops);
+      if (auto packRootOp =
+              dyn_cast_or_null<IREE::LinalgExt::PackOp>(dispatchRootOp)) {
+        FailureOr<IREE::LinalgExt::MaterializeEncodingInfo> encodingInfo =
+            getMaterializationInfo(packRootOp);
+        if (failed(encodingInfo)) {
+          return signalPassFailure();
+        }
+        patterns.insert<LowerDispatchWorkgroupCountFromSetEncodingOp>(
+            context, encodingInfo.value());
+      }
       if (failed(applyPatternsAndFoldGreedily(exportOp, std::move(patterns)))) {
         exportOp.emitOpError("failed to lower number of workgroups");
         return signalPassFailure();
@@ -334,13 +412,14 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
     });
 
     {
-      // Apply linalg tiling optimization patterns.
-      RewritePatternSet canonicalizationPatterns(context);
-      linalg::populateLinalgTilingCanonicalizationPatterns(
-          canonicalizationPatterns);
-      populateFoldAffineMinInDistributedLoopsPatterns(canonicalizationPatterns);
-      if (failed(applyPatternsAndFoldGreedily(
-              funcOp, std::move(canonicalizationPatterns)))) {
+      // Apply linalg tiling optimization patterns, which includes folding
+      // casting ops into tiled operations.
+      RewritePatternSet patterns(context);
+      linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
+      populateFoldAffineMinInDistributedLoopsPatterns(patterns);
+      context->getOrLoadDialect<IREE::LinalgExt::IREELinalgExtDialect>()
+          ->getCanonicalizationPatterns(patterns);
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         funcOp.emitOpError("tiling canonicalizations failed");
         return signalPassFailure();
       }

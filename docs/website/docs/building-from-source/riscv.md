@@ -80,6 +80,7 @@ cmake -GNinja -B ../iree-build-riscv/ \
   -DRISCV_CPU=rv64 \
   -DIREE_BUILD_COMPILER=OFF \
   -DRISCV_TOOLCHAIN_ROOT=${RISCV_TOOLCHAIN_ROOT} \
+  -DIREE_ENABLE_CPUINFO=OFF \
   .
 cmake --build ../iree-build-riscv/
 ```

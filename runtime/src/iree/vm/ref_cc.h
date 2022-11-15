@@ -31,15 +31,20 @@ namespace vm {
 // types. We may still need the iree_vm_ref_type_t exposed but that's relatively
 // simple compared to getting the typed retain/release functions.
 
+template <typename T>
+struct ref_type_descriptor {
+  static const iree_vm_ref_type_descriptor_t* get();
+};
+
 // Users may override this with their custom types to allow the packing code to
 // access their registered type ID at runtime.
 template <typename T>
-IREE_ATTRIBUTE_ALWAYS_INLINE void ref_type_retain(T* p) {
+static inline void ref_type_retain(T* p) {
   iree_vm_ref_object_retain(p, ref_type_descriptor<T>::get());
 }
 
 template <typename T>
-IREE_ATTRIBUTE_ALWAYS_INLINE void ref_type_release(T* p) {
+static inline void ref_type_release(T* p) {
   iree_vm_ref_object_release(p, ref_type_descriptor<T>::get());
 }
 
@@ -228,7 +233,6 @@ template <typename T>
 class ref {
  private:
   typedef ref this_type;
-  typedef T* this_type::*unspecified_bool_type;
 
  public:
   IREE_ATTRIBUTE_ALWAYS_INLINE iree_vm_ref_type_t type() const noexcept {
@@ -329,9 +333,8 @@ class ref {
 
   // Support boolean expression evaluation ala unique_ptr/shared_ptr:
   // https://en.cppreference.com/w/cpp/memory/shared_ptr/operator_bool
-  constexpr operator unspecified_bool_type() const noexcept {  // NOLINT
-    return get() ? reinterpret_cast<unspecified_bool_type>(&this_type::ref_.ptr)
-                 : nullptr;
+  constexpr operator bool() const noexcept {  // NOLINT
+    return get() != nullptr;
   }
   // Supports unary expression evaluation.
   constexpr bool operator!() const noexcept { return !get(); }
@@ -462,5 +465,113 @@ class opaque_ref {
 
 }  // namespace vm
 }  // namespace iree
+
+//===----------------------------------------------------------------------===//
+// ref-type registration and declaration for generic types
+//===----------------------------------------------------------------------===//
+// This adds vm::ref<T> support for any C type that is registered with the
+// dynamic type registration mechanism and that can be wrapped in an
+// iree_vm_ref_t.
+
+#define IREE_VM_DECLARE_CC_TYPE_LOOKUP(name, T)         \
+  namespace iree {                                      \
+  namespace vm {                                        \
+  template <>                                           \
+  struct ref_type_descriptor<T> {                       \
+    static const iree_vm_ref_type_descriptor_t* get() { \
+      return name##_get_descriptor();                   \
+    }                                                   \
+  };                                                    \
+  }                                                     \
+  }
+
+#define IREE_VM_REGISTER_CC_TYPE(type, name, descriptor)  \
+  descriptor.type_name = iree_make_cstring_view(name);    \
+  descriptor.offsetof_counter = type::offsetof_counter(); \
+  descriptor.destroy = type::DirectDestroy;               \
+  IREE_RETURN_IF_ERROR(iree_vm_ref_register_type(&descriptor));
+
+//===----------------------------------------------------------------------===//
+// ref-type registration and declaration for core VM types
+//===----------------------------------------------------------------------===//
+// This adds vm::ref<T> support for arbitrary C types that implement retain and
+// release methods and manage their reference count internally. These are not
+// registered with the dynamic type registration mechanism.
+
+#define IREE_VM_DECLARE_CC_TYPE_ADAPTERS(name, T)                         \
+  namespace iree {                                                        \
+  namespace vm {                                                          \
+  template <>                                                             \
+  inline void ref_type_retain(T* p) {                                     \
+    name##_retain(p);                                                     \
+  }                                                                       \
+  template <>                                                             \
+  inline void ref_type_release(T* p) {                                    \
+    name##_release(p);                                                    \
+  }                                                                       \
+  template <>                                                             \
+  class ref<T> {                                                          \
+   private:                                                               \
+    typedef ref this_type;                                                \
+                                                                          \
+   public:                                                                \
+    IREE_ATTRIBUTE_ALWAYS_INLINE ref() noexcept : ptr_(nullptr) {}        \
+    IREE_ATTRIBUTE_ALWAYS_INLINE ref(std::nullptr_t) noexcept             \
+        : ptr_(nullptr) {}                                                \
+    IREE_ATTRIBUTE_ALWAYS_INLINE ref(T* p) noexcept : ptr_(nullptr) {}    \
+    IREE_ATTRIBUTE_ALWAYS_INLINE ~ref() noexcept {                        \
+      ref_type_release<T>(get());                                         \
+    }                                                                     \
+    ref(const ref& rhs) noexcept : ptr_(rhs.ptr_) {                       \
+      ref_type_retain<T>(get());                                          \
+    }                                                                     \
+    ref& operator=(const ref&) noexcept = delete;                         \
+    ref(ref&& rhs) noexcept : ptr_(rhs.ptr_) { rhs.release(); }           \
+    ref& operator=(ref&& rhs) noexcept {                                  \
+      if (get() != rhs.get()) {                                           \
+        ref_type_release<T>(get());                                       \
+        ptr_ = rhs.ptr_;                                                  \
+        rhs.release();                                                    \
+      }                                                                   \
+      return *this;                                                       \
+    }                                                                     \
+    template <typename U>                                                 \
+    ref(ref<U>&& rhs) noexcept {                                          \
+      ptr_ = static_cast<T*>(rhs.release());                              \
+    }                                                                     \
+    template <typename U>                                                 \
+    ref& operator=(ref<U>&& rhs) noexcept {                               \
+      if (get() != rhs.get()) {                                           \
+        ref_type_release<T>(get());                                       \
+        ptr_ = static_cast<T*>(rhs.release());                            \
+      }                                                                   \
+      return *this;                                                       \
+    }                                                                     \
+    void reset() noexcept {                                               \
+      ref_type_release<T>(get());                                         \
+      ptr_ = nullptr;                                                     \
+    }                                                                     \
+    IREE_ATTRIBUTE_ALWAYS_INLINE T* release() noexcept {                  \
+      T* p = get();                                                       \
+      ptr_ = nullptr;                                                     \
+      return p;                                                           \
+    }                                                                     \
+    IREE_ATTRIBUTE_ALWAYS_INLINE void assign(T* value) noexcept {         \
+      reset();                                                            \
+      ptr_ = value;                                                       \
+    }                                                                     \
+    constexpr T* get() const noexcept { return ptr_; }                    \
+    constexpr T& operator*() const noexcept { return *get(); }            \
+    constexpr T* operator->() const noexcept { return get(); }            \
+    constexpr T** operator&() noexcept { return &ptr_; }                  \
+    constexpr operator bool() const noexcept { return get() != nullptr; } \
+    constexpr bool operator!() const noexcept { return !get(); }          \
+    void swap(ref& rhs) { std::swap(ptr_, rhs.ptr_); }                    \
+                                                                          \
+   private:                                                               \
+    mutable T* ptr_ = nullptr;                                            \
+  };                                                                      \
+  }                                                                       \
+  }
 
 #endif  // IREE_VM_REF_CC_H_

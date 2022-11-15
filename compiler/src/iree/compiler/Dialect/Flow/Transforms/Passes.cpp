@@ -91,6 +91,10 @@ static llvm::cl::opt<bool> clEnableAggressiveFusion(
         "with reduction loops"),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clEnableDataTiling(
+    "iree-flow-enable-data-tiling", llvm::cl::desc("Enable data tiling path"),
+    llvm::cl::init(false));
+
 static llvm::cl::opt<std::string> clMmt4dTargetOptions(
     "iree-flow-mmt4d-target-options",
     llvm::cl::desc("Convert linalg.matmul ops to MMT4D ops targetting the "
@@ -127,6 +131,12 @@ static llvm::cl::opt<bool> clDispatchViaRegionOpsGenerateWorkloadRegion(
     llvm::cl::desc("Generate the workload region when running with "
                    "iree-flow-dispatch-via-region-ops"),
     llvm::cl::init(true));
+
+static llvm::cl::opt<bool> clZeroFillEmptyTensors(
+    "iree-flow-zero-fill-empty-tensors",
+    llvm::cl::desc(
+        "Zero fill empty tensors instead of leaving them uninitialized"),
+    llvm::cl::init(false));
 
 namespace mlir {
 namespace iree_compiler {
@@ -265,6 +275,8 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       // transpose.
       .addPredicatedPass(clNormalizeInputIndexingMap,
                          createInterchangeTransposeGenericOpsPass)
+      // Enable data tiling after all linalg level transformations.
+      .addPredicatedPass(clEnableDataTiling, createSetEncodingPass)
       ////////////////////////////////////////////////////////////////////////
       // Dispatch region formation.
       .addPredicatedPass(!clDispatchTransformFileName.empty(),
@@ -294,7 +306,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPass(createCSEPass);
 
   // Initialize any empty tensors to zero.
-  passManager.addPass(createInitializeEmptyTensorsPass());
+  passManager.addPass(createInitializeEmptyTensorsPass(clZeroFillEmptyTensors));
 
   // Module pass to outline the dispatch regions into their own functions
   // wrapped in executables.

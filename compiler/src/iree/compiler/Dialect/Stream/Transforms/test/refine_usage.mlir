@@ -177,3 +177,19 @@ func.func @explicitAlloc() -> !hal.buffer_view {
   %2 = stream.tensor.export %1 : tensor<f32> in !stream.resource<external>{%c0} -> !hal.buffer_view
   return %2 : !hal.buffer_view
 }
+
+// -----
+
+// Tests that async allocations that escape are turned into non-transient allocs.
+
+// CHECK-LABEL: @escapingAlloca
+func.func @escapingAlloca() -> !hal.buffer_view {
+  %c123 = arith.constant 123 : index
+  // CHECK: %[[ALLOCA:.+]] = stream.async.alloca : !stream.resource<external>{%c123}
+  %0 = stream.async.alloca : !stream.resource<*>{%c123}
+  // CHECK-NOT: stream.async.transfer
+  %1 = stream.async.transfer %0 : !stream.resource<*>{%c123} -> !stream.resource<external>{%c123}
+  // CHECK: stream.tensor.export %[[ALLOCA]] : tensor<f32> in !stream.resource<external>{%c123} -> !hal.buffer_view
+  %2 = stream.tensor.export %1 : tensor<f32> in !stream.resource<external>{%c123} -> !hal.buffer_view
+  return %2 : !hal.buffer_view
+}

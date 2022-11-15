@@ -5,7 +5,9 @@ transform.structured.canonicalized_sequence failures(propagate) {
   %0 = transform.structured.match ops{["linalg.matmul"]} in %variant_op
 
   %foreach_thread, %tiled_generic =
-    transform.structured.tile_to_foreach_thread_op %0 num_threads [2]
+    transform.structured.tile_to_foreach_thread_op %0 num_threads [2] 
+    // TODO: IREE needs own workgroup mapping attribute.
+    ( mapping = [#gpu.block<x>] )
 
   %1 = transform.iree.bufferize %variant_op
 

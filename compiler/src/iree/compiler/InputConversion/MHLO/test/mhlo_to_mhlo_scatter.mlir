@@ -30,7 +30,7 @@ func.func @scatter_implicit_indices(%arg0: tensor<17x11xf32>,
       update_window_dims = [1],
       inserted_window_dims = [0],
       scatter_dims_to_operand_dims = [0],
-      index_vector_dim = 1>, 
+      index_vector_dim = 1>,
       unique_indices = false
       } : (tensor<17x11xf32>, tensor<7xi32>, tensor<7x11xf32>) -> tensor<17x11xf32>
   return %0 : tensor<17x11xf32>

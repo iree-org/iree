@@ -468,8 +468,17 @@ def FLOW_DispatchTensorLoadOp : FLOW_PureOp<"dispatch.tensor.load", [
       return getResult().getType().cast<RankedTensorType>();
     }
 
+    /// Return the type of the source as `IREE::Flow::DispatchTensorType`.
+    IREE::Flow::DispatchTensorType getSourceType() {
+      return getSource().getType().cast<IREE::Flow::DispatchTensorType>();
+    }
+
     ValueRange getOperandDynamicDims(unsigned idx) { return getSourceDims(); }
     ValueRange getResultDynamicDims(unsigned idx) { return getSizes(); }
+
+    /// Returns true if the load is loading the whole source. This is
+    /// best effort since this can miss some dynamic cases.
+    bool isLoadOfWholeSource();
   }];
 
   let hasVerifier = 1;
@@ -547,6 +556,11 @@ def FLOW_DispatchTensorStoreOp : FLOW_Op<"dispatch.tensor.store", [
     /// Return the type of the value type as a RankedTensorType.
     RankedTensorType getValueType() { return getValue().getType().cast<RankedTensorType>(); }
 
+    /// Return the type of the target.
+    IREE::Flow::DispatchTensorType getTargetType() {
+      return getTarget().getType().cast<IREE::Flow::DispatchTensorType>();
+    }
+
     /// Return the number of leading operands before the `offsets`, `sizes` and
     /// and `strides` operands.
     static unsigned getOffsetSizeAndStrideStartOperandIndex() { return 3; }
@@ -569,6 +583,9 @@ def FLOW_DispatchTensorStoreOp : FLOW_Op<"dispatch.tensor.store", [
     /// !flow.dispatch.tensor.load is rank-reducing.
     llvm::SmallBitVector getDroppedDims();
 
+    /// Checks if the store covers the entire target. Note that
+    /// this is best effort, especially in cases where the the shapes are dynamic.
+    bool isStoreToWholeTarget();
   }];
 
   let hasVerifier = 1;
@@ -1003,7 +1020,8 @@ def FLOW_TensorEmptyOp : FLOW_PureOp<"tensor.empty", [
 ]> {
   let summary = [{an empty tensor carrying metadata but no contents}];
   let description = [{
-    Returns a tensor with no data.
+    Returns a tensor with undefined contents. Subsequent writes must populate
+    any ranges of the tensor that are later read.
   }];
 
   let arguments = (ins
@@ -1238,8 +1256,18 @@ def FLOW_TensorTraceOp : FLOW_Op<"tensor.trace", []> {
 // Parameterization Ops
 //===---------------------------------------------------------------------===//
 
-def Flow_DispatchWorkgroupCountFromDagRootOp :
-    FLOW_PureOp<"dispatch.workgroup_count_from_dag_root"> {
+class FLOW_DispatchWorkgroupCountOp<string mnemonic, list<Trait> traits = []> :
+    FLOW_PureOp<mnemonic, traits> {
+  let arguments = (ins Variadic<Index>:$operands);
+  let results = (outs Index:$x, Index:$y, Index:$z);
+
+  let assemblyFormat = [{
+    attr-dict $operands
+  }];
+}
+
+def FLOW_DispatchWorkgroupCountFromDagRootOp :
+    FLOW_DispatchWorkgroupCountOp<"dispatch.workgroup_count_from_dag_root"> {
   let summary = [{
     workgroup count computed based on iteration range of the root of the DAG
     for ops within the dispatch.
@@ -1254,12 +1282,20 @@ def Flow_DispatchWorkgroupCountFromDagRootOp :
     (typically based on the tile sizes used to tile and distribute the root of
     the DAG).
   }];
+}
 
-  let arguments = (ins Variadic<Index>:$operands);
-  let results = (outs Index:$x, Index:$y, Index:$z);
-
-  let assemblyFormat = [{
-    attr-dict $operands
+def FLOW_DispatchWorkgroupCountFromSetEncodingOp :
+    FLOW_DispatchWorkgroupCountOp<"dispatch.workgroup_count_from_set_encoding_op"> {
+  let summary = [{
+    Workgroup count for dispatches that have a root as set_encoding op.
+  }];
+  let description = [{
+    For dispatches where the set_encoding operation is the root (producers
+    might be fused into these ops), the actual iteration space is materialized
+    only in the backend. This op is a placeholder to represent the workgroup
+    count calculation that accounts for the materialization.
+    The operands to the op represent the shape of the source of the pack
+    operation.
   }];
 }
 

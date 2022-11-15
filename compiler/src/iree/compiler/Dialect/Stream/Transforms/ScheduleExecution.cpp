@@ -13,7 +13,6 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
-#include "iree/compiler/Utils/GraphUtils.h"
 #include "llvm/ADT/EquivalenceClasses.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -28,6 +27,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/TopologicalSortUtils.h"
 
 #define DEBUG_TYPE "iree-stream-schedule-execution"
 
@@ -302,7 +302,7 @@ class ScheduleExecutionPass
 
         // Sort the ops in the execution region. This is safe because we are
         // still unaliased and SSA values imply ordering.
-        sortBlockTopologically(block);
+        mlir::sortTopologically(block);
       }
       for (auto *deadOp : llvm::reverse(deadOps)) {
         deadOp->erase();

@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='hal.executable(hal.executable.variant(iree-codegen-linalg-to-spirv-pipeline))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-linalg-to-spirv-pipeline)))' %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -158,3 +158,69 @@ hal.executable @matmul_f16_128x256x64 {
 //   CHECK-COUNT-8: spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
 //  CHECK-COUNT-16: spirv.FDiv %{{.+}}, %{{.+}} : vector<4xf16>
 //   CHECK-COUNT-8: spirv.Store "StorageBuffer" %{{.+}}, %{{.+}} : vector<4xf32>
+
+// -----
+
+// Check scalar load/store for promotion to shared memory.
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>,
+    #hal.descriptor_set.binding<3, storage_buffer>
+  ]>
+]>
+
+#user_config = #iree_codegen.compilation_info<
+  lowering_config = <tile_sizes = [[16, 128], [2, 8], [0, 0, 16]]>,
+  translation_info = <SPIRVMatmulPromoteVectorize>,
+  workgroup_size = [16, 8, 1]>
+
+hal.executable @matmul_f16_32x1280x1280 {
+  hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
+    spirv.target_env = #spirv.target_env<#spirv.vce<v1.5, [Shader, Float16, StorageBuffer16BitAccess], []>, NVIDIA:DiscreteGPU, #spirv.resource_limits<
+      max_compute_shared_memory_size = 49152,
+      max_compute_workgroup_invocations = 1024,
+      max_compute_workgroup_size = [65535, 65535, 65535],
+      subgroup_size = 32>>}> {
+    hal.executable.export public @matmul_f16_32x1280x1280 ordinal(0) layout(#pipeline_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @matmul_f16_32x1280x1280() {
+        %c0 = arith.constant 0 : index
+        %cst = arith.constant 0.000000e+00 : f16
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<32x1280xf16>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:tensor<1280x1280xf16>>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:tensor<32x1280xf16>>
+        %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [32, 1280], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<32x1280xf16>> -> tensor<32x1280xf16>
+        %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [1280, 1280], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1280x1280xf16>> -> tensor<1280x1280xf16>
+        %5 = tensor.empty() : tensor<32x1280xf16>
+        %6 = linalg.fill ins(%cst : f16) outs(%5 : tensor<32x1280xf16>) -> tensor<32x1280xf16>
+        %7 = linalg.matmul {compilation_info = #user_config}
+             ins(%3, %4 : tensor<32x1280xf16>, tensor<1280x1280xf16>) outs(%6 : tensor<32x1280xf16>) -> tensor<32x1280xf16>
+        flow.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [32, 1280], strides = [1, 1] : tensor<32x1280xf16> -> !flow.dispatch.tensor<writeonly:tensor<32x1280xf16>>
+        return
+      }
+    }
+  }
+}
+
+//   CHECK-DAG: spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<2176 x f16>)>, Workgroup>
+//   CHECK-DAG: spirv.GlobalVariable @{{.+}} : !spirv.ptr<!spirv.struct<(!spirv.array<384 x f16>)>, Workgroup>
+
+// CHECK-LABEL: spirv.func @matmul_f16_32x1280x1280
+
+//           CHECK: spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
+//   CHECK-COUNT-2: spirv.mlir.loop
+//           CHECK:   spirv.Store "Workgroup" %{{.+}}, %{{.+}} : f16
+//   CHECK-COUNT-2: spirv.mlir.merge
+//   CHECK-COUNT-2: spirv.mlir.loop
+//           CHECK:   spirv.Store "Workgroup" %{{.+}}, %{{.+}} : f16
+//   CHECK-COUNT-2: spirv.mlir.merge
+//           CHECK: spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
+
+// CHECK-COUNT-160: spirv.Load "Workgroup" %{{.+}} : f16
