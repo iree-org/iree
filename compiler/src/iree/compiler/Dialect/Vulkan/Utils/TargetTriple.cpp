@@ -33,7 +33,7 @@ spirv::Vendor getVendor(const TargetTriple &triple) {
       return spirv::Vendor::Unknown;
     case TargetTripleArch::AMD_RDNAv1:
     case TargetTripleArch::AMD_RDNAv2:
-    case TargetTripleArch::WMMA:
+    case TargetTripleArch::AMD_RDNAv3:
       return spirv::Vendor::AMD;
     case TargetTripleArch::ARM_Valhall:
       return spirv::Vendor::ARM;
@@ -66,7 +66,7 @@ spirv::DeviceType getDeviceType(const TargetTriple &triple) {
       return spirv::DeviceType::CPU;
     case TargetTripleArch::AMD_RDNAv1:
     case TargetTripleArch::AMD_RDNAv2:
-    case TargetTripleArch::WMMA:
+    case TargetTripleArch::AMD_RDNAv3:
     case TargetTripleArch::NV_Turing:
     case TargetTripleArch::NV_Ampere:
       return spirv::DeviceType::DiscreteGPU;
@@ -154,7 +154,7 @@ void getExtensions(const TargetTriple &triple,
       }
       return;
     }
-    case TargetTripleArch::WMMA: {
+    case TargetTripleArch::AMD_RDNAv3: {
       extensions.push_back(Extension::VK_NV_cooperative_matrix);
       break;
     }
@@ -252,7 +252,7 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
 
       variablePointers = variablePointersStorageBuffer = true;
       break;
-    case TargetTripleArch::WMMA: {
+    case TargetTripleArch::AMD_RDNAv3: {
       maxComputeSharedMemorySize = 65536;
       maxComputeWorkGroupInvocations = 1024;
       maxComputeWorkGroupSize = {1024, 1024, 1024};
