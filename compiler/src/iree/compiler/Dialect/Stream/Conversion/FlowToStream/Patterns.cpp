@@ -262,9 +262,15 @@ struct ConvertDispatchOp : public OpConversionPattern<IREE::Flow::DispatchOp> {
   LogicalResult matchAndRewrite(
       IREE::Flow::DispatchOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
+    // Zero is going to be used for each operand to start.
+    auto zeroOffset = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
+
     // Query and resolve all operands and their sizes.
     SmallVector<Value> dispatchOperands;
     SmallVector<Value> dispatchOperandSizes;
+    SmallVector<Value> dispatchOperandOffsets;
+    SmallVector<Value> dispatchOperandEnds;
+    SmallVector<Value> dispatchOperandLengths;
     SmallVector<Value> operandSizes;
     for (auto oldNewOperand :
          llvm::zip(op.getArguments(), adaptor.getArguments())) {
@@ -276,6 +282,9 @@ struct ConvertDispatchOp : public OpConversionPattern<IREE::Flow::DispatchOp> {
         newOperand = newOperandCast.resource;
         dispatchOperandSizes.push_back(newOperandCast.resourceSize);
         operandSizes.push_back(newOperandCast.resourceSize);
+        dispatchOperandOffsets.push_back(zeroOffset);
+        dispatchOperandEnds.push_back(newOperandCast.resourceSize);
+        dispatchOperandLengths.push_back(newOperandCast.resourceSize);
       } else {
         operandSizes.push_back({});
       }
@@ -309,7 +318,8 @@ struct ConvertDispatchOp : public OpConversionPattern<IREE::Flow::DispatchOp> {
 
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncDispatchOp>(
         op, resultTypes, adaptor.getWorkload(), adaptor.getEntryPoint(),
-        dispatchOperands, dispatchOperandSizes, resultSizes,
+        dispatchOperands, dispatchOperandSizes, dispatchOperandOffsets,
+        dispatchOperandEnds, dispatchOperandLengths, resultSizes,
         adaptor.getTiedOperandsAttr(), getAffinityFor(op));
     return success();
   }

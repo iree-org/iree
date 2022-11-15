@@ -1102,7 +1102,10 @@ LogicalResult BuiltinSplatI64Op::convertBuiltinOp(OpBuilder &builder) {
       getValue(),
       count,
   };
-  SmallVector<Value> operandSizes = {};
+  SmallVector<Value> operandSizes;
+  SmallVector<Value> operandOffsets;
+  SmallVector<Value> operandEnds;
+  SmallVector<Value> operandLengths;
   SmallVector<int64_t> tiedOperands = {
       -1,
   };
@@ -1117,8 +1120,8 @@ LogicalResult BuiltinSplatI64Op::convertBuiltinOp(OpBuilder &builder) {
       SymbolRefAttr::get(
           builder.getStringAttr("__builtin_splat_i64"),
           FlatSymbolRefAttr::get(builder.getContext(), "__builtin_splat_i64")),
-      operands, operandSizes, resultSizes,
-      builder.getIndexArrayAttr(tiedOperands), getAffinityAttr());
+      operands, operandSizes, operandOffsets, operandEnds, operandLengths,
+      resultSizes, builder.getIndexArrayAttr(tiedOperands), getAffinityAttr());
   getResult().replaceAllUsesWith(dispatchOp.getResults().front());
   return success();
 }
@@ -1168,6 +1171,15 @@ LogicalResult BuiltinFillI64Op::convertBuiltinOp(OpBuilder &builder) {
   SmallVector<Value> operandSizes = {
       getTargetSize(),
   };
+  SmallVector<Value> operandOffsets = {
+      getTargetOffset(),
+  };
+  SmallVector<Value> operandEnds = {
+      getTargetEnd(),
+  };
+  SmallVector<Value> operandLengths = {
+      getTargetLength(),
+  };
   SmallVector<int64_t> tiedOperands = {
       0,
   };
@@ -1182,8 +1194,8 @@ LogicalResult BuiltinFillI64Op::convertBuiltinOp(OpBuilder &builder) {
       SymbolRefAttr::get(
           builder.getStringAttr("__builtin_fill_i64"),
           FlatSymbolRefAttr::get(builder.getContext(), "__builtin_fill_i64")),
-      operands, operandSizes, resultSizes,
-      builder.getIndexArrayAttr(tiedOperands), getAffinityAttr());
+      operands, operandSizes, operandOffsets, operandEnds, operandLengths,
+      resultSizes, builder.getIndexArrayAttr(tiedOperands), getAffinityAttr());
   getResult().replaceAllUsesWith(dispatchOp.getResults().front());
   return success();
 }
@@ -1398,12 +1410,78 @@ SmallVector<int64_t, 4> AsyncStoreOp::getTiedResultOperandIndices() {
 // stream.async.dispatch
 //===----------------------------------------------------------------------===//
 
+static ParseResult parseDispatchOperands(
+    OpAsmParser &parser,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resourceOperands,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resourceOffsets,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resourceEnds,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resourceLengths) {
+  do {
+    // All entries at least have an %operand.
+    resourceOperands.emplace_back();
+    if (failed(parser.parseOperand(resourceOperands.back()))) return failure();
+    // Resources have a range.
+    if (succeeded(parser.parseOptionalLSquare())) {
+      resourceOffsets.emplace_back();
+      resourceEnds.emplace_back();
+      resourceLengths.emplace_back();
+      if (failed(parser.parseOperand(resourceOffsets.back())) ||
+          failed(parser.parseKeyword("to")) ||
+          failed(parser.parseOperand(resourceEnds.back())) ||
+          failed(parser.parseKeyword("for")) ||
+          failed(parser.parseOperand(resourceLengths.back())) ||
+          failed(parser.parseRSquare())) {
+        return failure();
+      }
+    }
+  } while (succeeded(parser.parseOptionalComma()));
+  return success();
+}
+
+static void printDispatchOperands(OpAsmPrinter &p, Operation *op,
+                                  ValueRange resourceOperands,
+                                  ValueRange resourceOffsets,
+                                  ValueRange resourceEnds,
+                                  ValueRange resourceLengths) {
+  unsigned resourceIndex = 0;
+  llvm::interleaveComma(resourceOperands, p, [&](Value operand) {
+    p.printOperand(operand);
+    if (operand.getType().isa<IREE::Stream::ResourceType>()) {
+      p << "[";
+      p.printOperand(resourceOffsets[resourceIndex]);
+      p << " to ";
+      p.printOperand(resourceEnds[resourceIndex]);
+      p << " for ";
+      p.printOperand(resourceLengths[resourceIndex]);
+      p << "]";
+      ++resourceIndex;
+    }
+  });
+}
+
 LogicalResult AsyncDispatchOp::verify() {
   AsyncDispatchOp op = *this;
   if (failed(verifyOpValueSizes(op, op.getResourceOperands(),
                                 op.getResourceOperandSizes())) ||
       failed(verifyOpValueSizes(op, op.getResults(), op.getResultSizes()))) {
     return failure();
+  }
+  unsigned requiredRangeCount = 0;
+  for (auto value : op.getResourceOperands()) {
+    if (value.getType().isa<IREE::Stream::ResourceType>()) {
+      ++requiredRangeCount;
+    }
+  }
+  unsigned presentRangeCount = op.getResourceOperandOffsets().size();
+  if (op.getResourceOperandEnds().size() != presentRangeCount ||
+      op.getResourceOperandLengths().size() != presentRangeCount) {
+    return op->emitOpError() << "mismatch on resource range "
+                                "offsets/ends/lengths; counts must match";
+  }
+  if (presentRangeCount != requiredRangeCount) {
+    return op->emitOpError() << "expects " << requiredRangeCount
+                             << " resource range operand sets but "
+                             << presentRangeCount << " are present";
   }
   return success();
 }

@@ -414,8 +414,9 @@ func.func @applyAsyncTransferOp(%operand: !stream.resource<transient>, %size: in
 // -----
 
 // CHECK-LABEL: @applyAsyncDispatchOp
-// CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index)
-func.func @applyAsyncDispatchOp(%operand: !stream.resource<transient>, %size: index) {
+// CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index, %[[OFFSET:.+]]: index, %[[END:.+]]: index, %[[LENGTH:.+]]: index)
+func.func @applyAsyncDispatchOp(%operand: !stream.resource<transient>, %size: index, %offset: index, %end: index, %length: index) {
+  %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c4 = arith.constant 4 : index
   // CHECK: %[[ALLOC:.+]] = stream.resource.alloc uninitialized : !stream.resource<transient>{%[[SIZE]]}
@@ -424,10 +425,10 @@ func.func @applyAsyncDispatchOp(%operand: !stream.resource<transient>, %size: in
   // CHECK-SAME:      %[[ALLOC]] as %[[ALLOC_CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]})
   %results:2, %result_timepoint = stream.async.execute with(%operand as %capture: !stream.resource<transient>{%size}) -> (%operand as !stream.resource<transient>{%size}, !stream.resource<transient>{%size}) {
     // CHECK-NEXT: stream.cmd.dispatch @executable::@dispatch[%c1, %c1, %c1](%c4 : index) {
-    // CHECK-NEXT:   rw %[[OPERAND_CAPTURE]][%c0 for %[[SIZE]]] : !stream.resource<transient>{%[[SIZE]]},
-    // CHECK-NEXT:   wo %[[ALLOC_CAPTURE]][%c0 for %[[SIZE]]] : !stream.resource<transient>{%[[SIZE]]}
+    // CHECK-NEXT:   rw %[[OPERAND_CAPTURE]][%[[OFFSET]] for %[[LENGTH]]] : !stream.resource<transient>{%[[SIZE]]},
+    // CHECK-NEXT:   wo %[[ALLOC_CAPTURE]][%c0{{[_0-9]*}} for %[[SIZE]]] : !stream.resource<transient>{%[[SIZE]]}
     // CHECK-NEXT: }
-    %0:2 = stream.async.dispatch @executable::@dispatch[%c1, %c1, %c1](%capture, %c4) : (!stream.resource<transient>{%size}, index) -> (%capture{%size}, !stream.resource<transient>{%size})
+    %0:2 = stream.async.dispatch @executable::@dispatch[%c1, %c1, %c1](%capture[%offset to %end for %length], %c4) : (!stream.resource<transient>{%size}, index) -> (%capture{%size}, !stream.resource<transient>{%size})
     stream.yield %0#0, %0#1 : !stream.resource<transient>{%size}, !stream.resource<transient>{%size}
   } => !stream.timepoint
   // CHECK: util.optimization_barrier %[[TIMEPOINT]]

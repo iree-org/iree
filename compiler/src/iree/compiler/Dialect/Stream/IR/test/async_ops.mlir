@@ -111,12 +111,13 @@ func.func @asyncStore(%arg0: !stream.resource<staging>, %arg1: index, %arg2: f32
 
 // CHECK-LABEL: @asyncDispatch
 func.func @asyncDispatch(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
   %c3 = arith.constant 3 : index
   %c4 = arith.constant 4 : index
-  // CHECK: = stream.async.dispatch @executable::@dispatch[%c1, %c2, %c3](%arg0, %c4) : (!stream.resource<*>{%arg1}, index) -> %arg0{%arg1}
-  %0 = stream.async.dispatch @executable::@dispatch[%c1, %c2, %c3](%arg0, %c4) : (!stream.resource<*>{%arg1}, index) -> %arg0{%arg1}
+  // CHECK: = stream.async.dispatch @executable::@dispatch[%c1, %c2, %c3](%arg0[%c0 to %arg1 for %arg1], %c4) : (!stream.resource<*>{%arg1}, index) -> %arg0{%arg1}
+  %0 = stream.async.dispatch @executable::@dispatch[%c1, %c2, %c3](%arg0[%c0 to %arg1 for %arg1], %c4) : (!stream.resource<*>{%arg1}, index) -> %arg0{%arg1}
   return %0 : !stream.resource<*>
 }
 
@@ -135,11 +136,12 @@ stream.executable private @executable {
 
 // CHECK-LABEL: @asyncDispatchWithWorkgroupCount
 func.func @asyncDispatchWithWorkgroupCount(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
   %c4 = arith.constant 4 : index
-  // CHECK: = stream.async.dispatch @executable::@dispatch[%c1, %c2](%arg0, %c4) : (!stream.resource<*>{%arg1}, index) -> %arg0{%arg1}
-  %0 = stream.async.dispatch @executable::@dispatch[%c1, %c2](%arg0, %c4) : (!stream.resource<*>{%arg1}, index) -> %arg0{%arg1}
+  // CHECK: = stream.async.dispatch @executable::@dispatch[%c1, %c2](%arg0[%c0 to %arg1 for %arg1], %c4) : (!stream.resource<*>{%arg1}, index) -> %arg0{%arg1}
+  %0 = stream.async.dispatch @executable::@dispatch[%c1, %c2](%arg0[%c0 to %arg1 for %arg1], %c4) : (!stream.resource<*>{%arg1}, index) -> %arg0{%arg1}
   return %0 : !stream.resource<*>
 }
 
@@ -157,11 +159,12 @@ stream.executable private @executable {
 }
 
 func.func @asyncDispatchWithInvalidWorkload(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
   %c4 = arith.constant 4 : index
   // expected-error @+1 {{op workload mismatch; entry point expects 1 arguments but dispatch provides 2}}
-  %0 = stream.async.dispatch @executable::@dispatch[%c1, %c2](%arg0, %c4) : (!stream.resource<*>{%arg1}, index) -> %arg0{%arg1}
+  %0 = stream.async.dispatch @executable::@dispatch[%c1, %c2](%arg0[%c0 to %arg1 for %arg1], %c4) : (!stream.resource<*>{%arg1}, index) -> %arg0{%arg1}
   return %0 : !stream.resource<*>
 }
 
@@ -169,9 +172,10 @@ func.func @asyncDispatchWithInvalidWorkload(%arg0: !stream.resource<*>, %arg1: i
 
 // CHECK-LABEL: @asyncDispatchNoWorkload
 func.func @asyncDispatchNoWorkload(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
   %c4 = arith.constant 4 : index
-  // CHECK: = stream.async.dispatch @executable::@dispatch(%arg0, %c4) : (!stream.resource<*>{%arg1}, index) -> %arg0{%arg1}
-  %0 = stream.async.dispatch @executable::@dispatch(%arg0, %c4) : (!stream.resource<*>{%arg1}, index) -> %arg0{%arg1}
+  // CHECK: = stream.async.dispatch @executable::@dispatch(%arg0[%c0 to %arg1 for %arg1], %c4) : (!stream.resource<*>{%arg1}, index) -> %arg0{%arg1}
+  %0 = stream.async.dispatch @executable::@dispatch(%arg0[%c0 to %arg1 for %arg1], %c4) : (!stream.resource<*>{%arg1}, index) -> %arg0{%arg1}
   return %0 : !stream.resource<*>
 }
 

@@ -331,6 +331,8 @@ struct AllocationScope {
   // Performs a memoized add (as many adds of offsets or lengths are redundant).
   Value add(Location loc, Value lhs, Value rhs) {
     // TODO(benvanik): memoize - if worth it. Needs profiling.
+    if (matchPattern(lhs, m_Zero())) return rhs;
+    if (matchPattern(rhs, m_Zero())) return lhs;
     auto result = OpBuilder(rootOp).createOrFold<arith::AddIOp>(loc, lhs, rhs);
     return result;
   }
@@ -594,6 +596,7 @@ static LogicalResult applyAsyncDispatchOp(IREE::Stream::AsyncDispatchOp asyncOp,
   SmallVector<Value> newResourceLengths;
   SmallVector<Attribute> newResourceAccesses;
 
+  unsigned resourceIndex = 0;
   for (auto it : llvm::enumerate(asyncOp.getResourceOperands())) {
     auto operand = it.value();
     if (!operand.getType().isa<IREE::Stream::ResourceType>()) {
@@ -611,8 +614,10 @@ static LogicalResult applyAsyncDispatchOp(IREE::Stream::AsyncDispatchOp asyncOp,
     }
 
     auto resourceRange = scope.lookupResourceRange(operand);
-    auto resourceOffset = resourceRange.offset;
-    auto resourceLength = asyncOp.getOperandSize(operandIdx);
+    auto resourceOffset =
+        scope.add(asyncOp.getLoc(), resourceRange.offset,
+                  asyncOp.getResourceOperandOffsets()[resourceIndex]);
+    auto resourceLength = asyncOp.getResourceOperandLengths()[resourceIndex];
     auto resourceAccess = IREE::Stream::ResourceAccessBitfieldAttr::get(
         builder.getContext(), accessBits);
     newResources.push_back(resourceRange.resource);
@@ -620,6 +625,7 @@ static LogicalResult applyAsyncDispatchOp(IREE::Stream::AsyncDispatchOp asyncOp,
     newResourceOffsets.push_back(resourceOffset);
     newResourceLengths.push_back(resourceLength);
     newResourceAccesses.push_back(resourceAccess);
+    ++resourceIndex;
   }
 
   for (auto result : asyncOp.getResults()) {
