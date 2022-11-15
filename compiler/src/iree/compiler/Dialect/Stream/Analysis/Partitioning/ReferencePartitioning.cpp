@@ -80,6 +80,11 @@ PartitionSet partitionStreamableOpsReference(
     if (op.hasTrait<OpTrait::ConstantLike>()) {
       LLVM_DEBUG(llvm::dbgs() << "(ignoring constant)\n");
       continue;
+    } else if (isa<IREE::Util::GlobalStoreOpInterface>(op)) {
+      // We ignore global stores as they are unobservable within an execution
+      // region - we must still block on loads though.
+      LLVM_DEBUG(llvm::dbgs() << "(ignoring global store)\n");
+      continue;
     } else if (!isa<IREE::Stream::StreamableOpInterface>(op)) {
       // Not a streamable op. If it has side-effects then we force a hazard on
       // all builders so that we don't move ops across it.
