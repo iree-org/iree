@@ -19,9 +19,7 @@ namespace {
 TEST(Generator, TestContents) {
   auto* toc1 = testembed1_create();
   ASSERT_EQ("file1.bin", std::string(toc1->name));
-  EXPECT_EQ(R"(Are you '"Still"' here?)"
-            NEWLINE,
-            std::string(toc1->data));
+  EXPECT_EQ(R"(Are you '"Still"' here?)" NEWLINE, std::string(toc1->data));
 #if defined(_MSC_VER)
   EXPECT_EQ(25, toc1->size);
 #else
@@ -31,9 +29,7 @@ TEST(Generator, TestContents) {
 
   ++toc1;
   ASSERT_EQ("file2.bin", std::string(toc1->name));
-  EXPECT_EQ(R"(¯\_(ツ)_/¯)"
-            NEWLINE,
-            std::string(toc1->data));
+  EXPECT_EQ(R"(¯\_(ツ)_/¯)" NEWLINE, std::string(toc1->data));
 #if defined(_MSC_VER)
   EXPECT_EQ(15, toc1->size);
 #else
@@ -47,9 +43,7 @@ TEST(Generator, TestContents) {
 
   auto* toc2 = testembed2_create();
   ASSERT_EQ("file3.bin", std::string(toc2->name));
-  EXPECT_EQ(R"(ᕕ( ᐛ )ᕗ)"
-            NEWLINE,
-            std::string(toc2->data));
+  EXPECT_EQ(R"(ᕕ( ᐛ )ᕗ)" NEWLINE, std::string(toc2->data));
 #if defined(_MSC_VER)
   EXPECT_EQ(15, toc2->size);
 #else
