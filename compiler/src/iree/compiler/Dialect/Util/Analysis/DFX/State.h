@@ -381,7 +381,7 @@ struct DecIntegerState : public IntegerStateBase<BaseTy, 0, ~BaseTy(0)> {
 // A class for a set state.
 // The assumed boolean state indicates whether the corresponding set is full
 // set or not. If the assumed state is false this is the worst state. The
-// worst state (invalid state) of set of potential values is when the set
+// worst state (invalid state) of a set of potential values is when the set
 // contains every possible value (i.e. we cannot in any way limit the value
 // that the target position can take) but that never happens naturally and we
 // only ever force it.

@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/Stream/Analysis/Partitioning.h"
+#include "iree/compiler/Dialect/Stream/Analysis/ResourceHazards.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -293,6 +294,13 @@ PartitionSet partitionRegionConcurrencyReference(
 
   auto asmState = getRootAsmState(block);
 
+  // Run analysis - if it fails then we'll just be conservative.
+  IREE::Stream::ResourceHazardAnalysis hazardAnalysis(block->getParentOp());
+  if (failed(hazardAnalysis.run())) {
+    LLVM_DEBUG(llvm::dbgs() << "WARNING: resource hazard analysis failed; "
+                               "conservatively scheduling\n");
+  }
+
   for (auto &op : llvm::reverse(*block)) {
     // Skip constants; they just add noise (and since they are heavily CSE'd
     // they have lots of users to test).
@@ -323,7 +331,6 @@ PartitionSet partitionRegionConcurrencyReference(
     // Set bits for each wave this op may be able to be placed into.
     // We prune the set based on whether the users are part of a transitive
     // dependency chain down the use-def chain to a wave.
-    llvm::BitVector consumers(builders.size(), /*t=*/false);
     for (auto user : op.getUsers()) {
       auto &userInfo = opInfos[user];
       LLVM_DEBUG({
@@ -338,8 +345,14 @@ PartitionSet partitionRegionConcurrencyReference(
           llvm::dbgs() << "  hazard w/ waves 0-" << lastHazardOrdinal << "\n";
         }
       });
-      consumers |= userInfo.membership;
-      opInfo.hazards |= userInfo.membership;
+      bool hazardPresent = hazardAnalysis.hasHazard(streamableOp, user);
+      if (hazardPresent) {
+        // Hazard with existing op usage - prevent concurrent scheduling.
+        opInfo.hazards |= userInfo.membership;
+      } else {
+        LLVM_DEBUG(llvm::dbgs() << "  $ hazard analysis says ok to schedule\n");
+      }
+      // Always inherit hazards whether merging or not.
       opInfo.hazards |= userInfo.hazards;
     }
     llvm::BitVector candidates(builders.size(), /*t=*/true);

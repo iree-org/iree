@@ -1375,6 +1375,9 @@ def Stream_AsyncConstantOp : Stream_PureOp<"async.constant", [
   DeclareOpInterfaceMethods<Stream_StreamableOp, [
     "isMetadata",
   ]>,
+  DeclareOpInterfaceMethods<Stream_AsyncAccessOp, [
+    "getAsyncAccessRanges",
+  ]>,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
 ]> {
@@ -1417,6 +1420,9 @@ def Stream_AsyncSplatOp : Stream_Op<"async.splat", [
   DeclareOpInterfaceMethods<Stream_StreamableOp, [
     "preferCloneToConsumers",
   ]>,
+  DeclareOpInterfaceMethods<Stream_AsyncAccessOp, [
+    "getAsyncAccessRanges",
+  ]>,
   Util_SizeAwareOp,
 ]> {
   let summary = [{splats a value into a resource}];
@@ -1455,6 +1461,9 @@ def Stream_AsyncCloneOp : Stream_Op<"async.clone", [
   Stream_AsyncPhaseOp,
   DeclareOpInterfaceMethods<Stream_StreamableOp, [
     "preferCloneToConsumers",
+  ]>,
+  DeclareOpInterfaceMethods<Stream_AsyncAccessOp, [
+    "getAsyncAccessRanges",
   ]>,
   Util_SizeAwareOp,
 ]> {
@@ -1498,6 +1507,9 @@ def Stream_AsyncSliceOp : Stream_PureOp<"async.slice", [
   Stream_AffinityOp,
   Stream_AsyncPhaseOp,
   Stream_StreamableOp,
+  DeclareOpInterfaceMethods<Stream_AsyncAccessOp, [
+    "getAsyncAccessRanges",
+  ]>,
   Util_SizeAwareOp,
 ]> {
   let summary = [{slices out a cloned subview of a value}];
@@ -1542,6 +1554,9 @@ def Stream_AsyncFillOp : Stream_Op<"async.fill", [
   Stream_AffinityOp,
   Stream_AsyncPhaseOp,
   Stream_StreamableOp,
+  DeclareOpInterfaceMethods<Stream_AsyncAccessOp, [
+    "getAsyncAccessRanges",
+  ]>,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
     "getTiedResult",
@@ -1594,6 +1609,9 @@ def Stream_AsyncUpdateOp : Stream_Op<"async.update", [
   Stream_AffinityOp,
   Stream_AsyncPhaseOp,
   Stream_StreamableOp,
+  DeclareOpInterfaceMethods<Stream_AsyncAccessOp, [
+    "getAsyncAccessRanges",
+  ]>,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
     "getTiedResult",
@@ -1648,6 +1666,9 @@ def Stream_AsyncCopyOp : Stream_Op<"async.copy", [
   Stream_AffinityOp,
   Stream_AsyncPhaseOp,
   Stream_StreamableOp,
+  DeclareOpInterfaceMethods<Stream_AsyncAccessOp, [
+    "getAsyncAccessRanges",
+  ]>,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
     "getTiedResult",
@@ -1707,6 +1728,9 @@ def Stream_AsyncTransferOp : Stream_Op<"async.transfer", [
   Stream_AffinityOp,
   Stream_AsyncPhaseOp,
   Stream_StreamableOp,
+  DeclareOpInterfaceMethods<Stream_AsyncAccessOp, [
+    "getAsyncAccessRanges",
+  ]>,
   Util_SizeAwareOp,
 ]> {
   let summary = [{transfers a resource from one location/state to another}];
@@ -1841,6 +1865,9 @@ def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
   Stream_AffinityOp,
   Stream_AsyncPhaseOp,
   Stream_StreamableOp,
+  DeclareOpInterfaceMethods<Stream_AsyncAccessOp, [
+    "getAsyncAccessRanges",
+  ]>,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
     "getTiedOperandsIndexAndLength",
@@ -1917,6 +1944,9 @@ def Stream_AsyncExecuteOp : Stream_Op<"async.execute", [
   SingleBlockImplicitTerminator<"IREE::Stream::YieldOp">,
   Stream_AffinityOp,
   Stream_AsyncPhaseOp,
+  DeclareOpInterfaceMethods<Stream_AsyncAccessOp, [
+    "getAsyncAccessRanges",
+  ]>,
   Stream_TimelineOp,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_ClosureOpInterface>,
@@ -2010,6 +2040,9 @@ def Stream_AsyncConcurrentOp : Stream_Op<"async.concurrent", [
   Stream_AffinityOp,
   Stream_AsyncPhaseOp,
   Stream_StreamableOp,
+  DeclareOpInterfaceMethods<Stream_AsyncAccessOp, [
+    "getAsyncAccessRanges",
+  ]>,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_ClosureOpInterface>,
   DeclareOpInterfaceMethods<Util_TiedOpInterface>,
