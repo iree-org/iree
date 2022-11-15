@@ -38,6 +38,9 @@ declare -a CMAKE_ARGS=(
   "-DIREE_ENABLE_ASSERTIONS=${IREE_ENABLE_ASSERTIONS}"
   "-DIREE_ENABLE_CCACHE=${IREE_ENABLE_CCACHE}"
 
+  # If a venv has been activated, use that Python version.
+  "-DPython_FIND_VIRTUALENV=FIRST"
+
   # Use `lld` for faster linking.
   "-DIREE_ENABLE_LLD=ON"
 
