@@ -827,21 +827,20 @@ func.func @topk_tile_tensor(%input_values: tensor<?x?xf32>, %input_indices: tens
 // CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG:     %[[C10:.+]] = arith.constant 10 : index
-// CHECK-DAG:     %[[C3:.+]] = arith.constant 3 : index
 // CHECK:         %[[D0:.+]] = tensor.dim %[[ARG0:.+]], %[[C0]]
 // CHECK:         %[[D1:.+]] = tensor.dim %[[ARG0:.+]], %[[C1]]
 // CHECK:         %[[RESULT:.+]]:2 = scf.for %[[ARG4:.+]] = %[[C0]] to %[[D0]] step %[[C10]] iter_args(%[[ARG5:.+]] = %[[ARG2]], %[[ARG6:.+]] = %[[ARG3]])
 // CHECK:           %[[D3:.+]] = affine.min #[[MAP0]](%[[ARG4]])[%[[C10]], %[[D0]]]
 // CHECK:           %[[D4:.+]] = tensor.extract_slice %[[ARG0]][%[[ARG4]], 0] [%[[D3]], %[[D1]]] [1, 1]
 // CHECK:           %[[D5:.+]] = tensor.extract_slice %[[ARG1]][%[[ARG4]], 0] [%[[D3]], %[[D1]]] [1, 1]
-// CHECK:           %[[D6:.+]] = tensor.extract_slice %[[ARG2]][%[[ARG4]], 0] [%[[D3]], %[[C3]]] [1, 1]
-// CHECK:           %[[D7:.+]] = tensor.extract_slice %[[ARG3]][%[[ARG4]], 0] [%[[D3]], %[[C3]]] [1, 1]
+// CHECK:           %[[D6:.+]] = tensor.extract_slice %[[ARG2]][%[[ARG4]], 0] [%[[D3]], 3] [1, 1]
+// CHECK:           %[[D7:.+]] = tensor.extract_slice %[[ARG3]][%[[ARG4]], 0] [%[[D3]], 3] [1, 1]
 // CHECK:           %[[D8:.+]]:2 = iree_linalg_ext.topk {__internal_linalg_transform__ = "inner_reduce_output"}
 // CHECK-SAME:      dimension(1)
 // CHECK-SAME:      ins(%[[D4]], %[[D5]]
 // CHECK-SAME:      outs(%[[D6]], %[[D7]]
-// CHECK:           %[[D9:.+]] = tensor.insert_slice %[[D8]]#0 into %[[ARG5]][%[[ARG4]], 0] [%[[D3]], %[[C3]]] [1, 1]
-// CHECK:           %[[D10:.+]] = tensor.insert_slice %[[D8]]#1 into %[[ARG6]][%[[ARG4]], 0] [%[[D3]], %[[C3]]] [1, 1]
+// CHECK:           %[[D9:.+]] = tensor.insert_slice %[[D8]]#0 into %[[ARG5]][%[[ARG4]], 0] [%[[D3]], 3] [1, 1]
+// CHECK:           %[[D10:.+]] = tensor.insert_slice %[[D8]]#1 into %[[ARG6]][%[[ARG4]], 0] [%[[D3]], 3] [1, 1]
 // CHECK:           scf.yield %[[D9]], %[[D10]]
 // CHECK:           return %[[RESULT]]#0, %[[RESULT]]#1
 
@@ -870,15 +869,14 @@ func.func @topk_tile_memref(%input_values: memref<?x?xf32>, %input_indices: memr
 // CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG:     %[[C10:.+]] = arith.constant 10 : index
-// CHECK-DAG:     %[[C3:.+]] = arith.constant 3 : index
 // CHECK:         %[[D0:.+]] = memref.dim %[[ARG0:.+]], %[[C0]]
 // CHECK:         %[[D1:.+]] = memref.dim %[[ARG0:.+]], %[[C1]]
 // CHECK:         scf.for %[[ARG4:.+]] = %[[C0]] to %[[D0]] step %[[C10]]
 // CHECK:           %[[D2:.+]] = affine.min #[[MAP0]](%[[ARG4]])[%[[C10]], %[[D0]]]
 // CHECK:           %[[D3:.+]] = memref.subview %[[ARG0]][%[[ARG4]], 0] [%[[D2]], %[[D1]]] [1, 1]
 // CHECK:           %[[D4:.+]] = memref.subview %[[ARG1]][%[[ARG4]], 0] [%[[D2]], %[[D1]]] [1, 1]
-// CHECK:           %[[D5:.+]] = memref.subview %[[ARG2]][%[[ARG4]], 0] [%[[D2]], %[[C3]]] [1, 1]
-// CHECK:           %[[D6:.+]] = memref.subview %[[ARG3]][%[[ARG4]], 0] [%[[D2]], %[[C3]]] [1, 1]
+// CHECK:           %[[D5:.+]] = memref.subview %[[ARG2]][%[[ARG4]], 0] [%[[D2]], 3] [1, 1]
+// CHECK:           %[[D6:.+]] = memref.subview %[[ARG3]][%[[ARG4]], 0] [%[[D2]], 3] [1, 1]
 // CHECK:           iree_linalg_ext.topk {__internal_linalg_transform__ = "inner_reduce_output"}
 // CHECK-SAME:      dimension(1)
 // CHECK-SAME:      ins(%[[D3]], %[[D4]]
@@ -908,18 +906,17 @@ func.func @topk_tile_tensor_optional(%input_values: tensor<20x10xf32>, %out_valu
 // CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG:     %[[C20:.+]] = arith.constant 20 : index
 // CHECK-DAG:     %[[C10:.+]] = arith.constant 10 : index
-// CHECK-DAG:     %[[C3:.+]] = arith.constant 3 : index
 // CHECK:         %[[RESULT:.+]]:2 = scf.for %[[ARG3:.+]] = %[[C0]] to %[[C20]] step %[[C10]] iter_args(%[[ARG4:.+]] = %[[ARG1]], %[[ARG5:.+]] = %[[ARG2]])
 // CHECK:           %[[D1:.+]] = affine.min #[[MAP0]](%[[ARG3]])[%[[C10]], %[[C20]]]
 // CHECK:           %[[D2:.+]] = tensor.extract_slice %[[ARG0]][%[[ARG3]], 0] [%[[D1]], %[[C10]]] [1, 1]
-// CHECK:           %[[D3:.+]] = tensor.extract_slice %[[ARG1]][%[[ARG3]], 0] [%[[D1]], %[[C3]]] [1, 1]
-// CHECK:           %[[D4:.+]] = tensor.extract_slice %[[ARG2]][%[[ARG3]], 0] [%[[D1]], %[[C3]]] [1, 1]
+// CHECK:           %[[D3:.+]] = tensor.extract_slice %[[ARG1]][%[[ARG3]], 0] [%[[D1]], 3] [1, 1]
+// CHECK:           %[[D4:.+]] = tensor.extract_slice %[[ARG2]][%[[ARG3]], 0] [%[[D1]], 3] [1, 1]
 // CHECK:           %[[D5:.+]]:2 = iree_linalg_ext.topk {__internal_linalg_transform__ = "inner_reduce_output"}
 // CHECK-SAME:      dimension(1)
 // CHECK-SAME:      ins(%[[D2]]
 // CHECK-SAME:      outs(%[[D3]], %[[D4]]
-// CHECK:           %[[D6:.+]] = tensor.insert_slice %[[D5]]#0 into %[[ARG4]][%[[ARG3]], 0] [%[[D1]], %[[C3]]] [1, 1]
-// CHECK:           %[[D7:.+]] = tensor.insert_slice %[[D5]]#1 into %[[ARG5]][%[[ARG3]], 0] [%[[D1]], %[[C3]]] [1, 1]
+// CHECK:           %[[D6:.+]] = tensor.insert_slice %[[D5]]#0 into %[[ARG4]][%[[ARG3]], 0] [%[[D1]], 3] [1, 1]
+// CHECK:           %[[D7:.+]] = tensor.insert_slice %[[D5]]#1 into %[[ARG5]][%[[ARG3]], 0] [%[[D1]], 3] [1, 1]
 // CHECK:           scf.yield %[[D6]], %[[D7]]
 // CHECK:           return %[[RESULT]]#0, %[[RESULT]]#1
 
