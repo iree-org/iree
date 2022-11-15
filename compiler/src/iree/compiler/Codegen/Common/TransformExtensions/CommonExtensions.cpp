@@ -23,7 +23,6 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
-#include "mlir/Dialect/Bufferization/Transforms/EmptyTensorElimination.h"
 #include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
@@ -810,40 +809,6 @@ static OneShotBufferizationOptions getBufferizationOptions() {
 
 /// Temporarily copied from IREEComprehensiveBufferizePass.cpp to avoid buying
 /// into nested pass pipeline mess.
-static LogicalResult emptyTensorElimination(
-    Operation *op, OneShotBufferizationOptions options) {
-  // Analyze IR.
-  options.testAnalysisOnly = false;
-  options.printConflicts = false;
-  OneShotAnalysisState state(op, options);
-  if (failed(analyzeOp(op, state))) return failure();
-
-  // Rewrite tensor.empty ops that are anchored on specific ops.
-  IRRewriter rewriter(op->getContext());
-  if (failed(bufferization::insertSliceAnchoredEmptyTensorEliminationStep(
-          rewriter, op, state)))
-    return failure();
-  if (failed(
-          storeTensorOpAnchoredEmptyTensorEliminationStep(rewriter, op, state)))
-    return failure();
-
-  return success();
-}
-
-/// Temporarily copied from IREEComprehensiveBufferizePass.cpp to avoid buying
-/// into nested pass pipeline mess.
-// The following is copied from bufferization::runOneShotBufferize with
-// modifications.
-static LogicalResult runIREEOneShotBufferize(
-    Operation *op, const OneShotBufferizationOptions &options) {
-  OneShotAnalysisState state(op, options);
-  if (failed(analyzeOp(op, state))) return failure();
-  if (options.testAnalysisOnly) return success();
-  return bufferization::runOneShotBufferize(op, options);
-}
-
-/// Temporarily copied from IREEComprehensiveBufferizePass.cpp to avoid buying
-/// into nested pass pipeline mess.
 static LogicalResult runIREEBufferizeOnModule(
     ModuleOp moduleOp, BufferizationOptions::AllocationFn allocationFn,
     BufferizationOptions::DeallocationFn deallocationFn,
@@ -902,8 +867,8 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
 
   //   1. Eliminate tensor.empty, without the pass baggage.
   WalkResult res = state.getTopLevel()->walk([&](ModuleOp moduleOp) {
-    if (failed(emptyTensorElimination(moduleOp.getOperation(),
-                                      getBufferizationOptions())))
+    if (failed(eliminateEmptyTensors(moduleOp.getOperation(),
+                                     getBufferizationOptions())))
       return WalkResult::interrupt();
     return WalkResult::advance();
   });
