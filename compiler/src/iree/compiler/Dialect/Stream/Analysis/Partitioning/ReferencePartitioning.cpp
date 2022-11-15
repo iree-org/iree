@@ -92,6 +92,7 @@ PartitionSet partitionStreamableOpsReference(
         LLVM_DEBUG({
           llvm::dbgs() << "Side-effecting op forcing flush and freeze:\n";
           op.print(llvm::dbgs(), *asmState);
+          llvm::dbgs() << "\n";
         });
         usableBuilders.reset();
       }
@@ -115,6 +116,7 @@ PartitionSet partitionStreamableOpsReference(
     LLVM_DEBUG({
       llvm::dbgs() << "====\nPartitioning op:\n";
       op.print(llvm::dbgs(), *asmState);
+      llvm::dbgs() << "\n";
     });
 
     // Set bits for each partition this op may be able to be placed into.
@@ -126,6 +128,7 @@ PartitionSet partitionStreamableOpsReference(
       LLVM_DEBUG({
         llvm::dbgs() << "Testing user:\n";
         user->print(llvm::dbgs(), *asmState);
+        llvm::dbgs() << "\n";
         for (auto membershipOrdinal : userInfo.membership.set_bits()) {
           llvm::dbgs() << "  member of partition " << membershipOrdinal << "\n";
         }
@@ -298,6 +301,10 @@ PartitionSet partitionRegionConcurrencyReference(
       continue;
     }
 
+    // NOTE: it's ok if this op is not streamable as we still need to track the
+    // hazards for other ops that it may use/may use it.
+    auto streamableOp = dyn_cast<IREE::Stream::StreamableOpInterface>(op);
+
     // Initialize op info for this op - whether streamable or not. We track
     // transitive hazards on each op. Note that thanks to the ordering of ops
     // in SSA form (_reversed here!_) we know that once we visit this op no
@@ -310,6 +317,7 @@ PartitionSet partitionRegionConcurrencyReference(
     LLVM_DEBUG({
       llvm::dbgs() << "====\nPartitioning op:\n";
       op.print(llvm::dbgs(), *asmState);
+      llvm::dbgs() << "\n";
     });
 
     // Set bits for each wave this op may be able to be placed into.
@@ -321,6 +329,7 @@ PartitionSet partitionRegionConcurrencyReference(
       LLVM_DEBUG({
         llvm::dbgs() << "Testing user:\n";
         user->print(llvm::dbgs(), *asmState);
+        llvm::dbgs() << "\n";
         for (auto membershipOrdinal : userInfo.membership.set_bits()) {
           llvm::dbgs() << "  member of wave " << membershipOrdinal << "\n";
         }
@@ -338,7 +347,6 @@ PartitionSet partitionRegionConcurrencyReference(
 
     // If this op is not streamable then bail here; we've still setup the hazard
     // map for following iteration.
-    auto streamableOp = dyn_cast<IREE::Stream::StreamableOpInterface>(op);
     if (!streamableOp || streamableOp.isMetadata()) {
       LLVM_DEBUG(llvm::dbgs() << "Not streamable/is subview (skip)\n");
       continue;
