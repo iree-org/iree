@@ -29,6 +29,7 @@
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/PDL/IR/PDLTypes.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/Pass/PassManager.h"
@@ -458,16 +459,17 @@ transform_dialect::ForeachThreadToWorkgroupOp::applyToOne(
 void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
     OpBuilder &builder, OperationState &result, Value target,
     ArrayRef<int64_t> staticTileSizes, transform::TileSizesSpec,
-    ArrayAttr threadDimMapping) {
+    ArrayAttr mappingAttr) {
   return build(builder, result, target,
+               /*mixedTileSizes=*/
                getAsOpFoldResult(builder.getI64ArrayAttr(staticTileSizes)),
-               transform::TileSizesSpec(), threadDimMapping);
+               /*_=*/transform::TileSizesSpec(), /*mapping=*/mappingAttr);
 }
 
 void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
     OpBuilder &builder, OperationState &result, Value target,
     ArrayRef<OpFoldResult> mixedTileSizes, transform::TileSizesSpec,
-    ArrayAttr threadDimMapping) {
+    ArrayAttr mappingAttr) {
   assert(result.name.isRegistered() && "not registered!!");
   SmallVector<int64_t> staticTileSizes;
   SmallVector<Value> dynamicTileSizes;
@@ -480,25 +482,32 @@ void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
   auto operationType = pdl::OperationType::get(ctx);
   auto staticTileSizesAttr = builder.getI64ArrayAttr(staticTileSizes);
 
-  build(builder, result, TypeRange{operationType, operationType}, target,
-        /*numThreads=*/ValueRange{}, dynamicTileSizes,
-        /*staticNumThreads=*/ArrayAttr(), staticTileSizesAttr, threadDimMapping,
-        /*packedSizes=*/UnitAttr());
+  build(builder, result,
+        /*resultTypes=*/TypeRange{operationType, operationType},
+        /*target=*/target,
+        /*numThreads=*/ValueRange{},
+        /*tileSizes=*/dynamicTileSizes,
+        /*staticNumThreads=*/ArrayAttr(),
+        /*staticTileSizes=*/staticTileSizesAttr,
+        /*mapping=*/mappingAttr);
 }
 
 void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
     OpBuilder &builder, OperationState &result, Value target,
     ArrayRef<int64_t> staticNumThreads, transform::NumThreadsSpec,
-    ArrayAttr threadDimMapping) {
-  return build(builder, result, target,
+    ArrayAttr mappingAttr) {
+  return build(builder, result,
+               /*target=*/target,
+               /*mixedNumThreads=*/
                getAsOpFoldResult(builder.getI64ArrayAttr(staticNumThreads)),
-               transform::NumThreadsSpec(), threadDimMapping);
+               /*_=*/transform::NumThreadsSpec(),
+               /*mapping=*/mappingAttr);
 }
 
 void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
     OpBuilder &builder, OperationState &result, Value target,
     ArrayRef<OpFoldResult> mixedNumThreads, transform::NumThreadsSpec,
-    ArrayAttr threadDimMapping) {
+    ArrayAttr mappingAttr) {
   assert(result.name.isRegistered() && "not registered!!");
   SmallVector<int64_t> staticNumThreads;
   SmallVector<Value> dynamicNumThreads;
@@ -510,27 +519,14 @@ void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
   MLIRContext *ctx = builder.getContext();
   auto operationType = pdl::OperationType::get(ctx);
   auto staticNumThreadsAttr = builder.getI64ArrayAttr(staticNumThreads);
-  build(builder, result, TypeRange{operationType, operationType}, target,
-        dynamicNumThreads, /*tileSizes=*/ValueRange{}, staticNumThreadsAttr,
-        /*staticTileSizes=*/ArrayAttr(), threadDimMapping,
-        /*packedSizes=*/UnitAttr());
-}
-
-void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
-    OpBuilder &builder, OperationState &result, Value target,
-    Value packedTileSizeHandle, transform::TileSizesSpec,
-    ArrayAttr threadDimMapping) {
-  MLIRContext *ctx = builder.getContext();
-  auto operationType = pdl::OperationType::get(ctx);
-  SmallVector<int64_t> dummyStaticTileSizes(1, ShapedType::kDynamicSize);
-  auto dummyStaticTileSizesAttr = builder.getI64ArrayAttr(dummyStaticTileSizes);
-
-  build(builder, result, TypeRange{operationType, operationType}, target,
-        /*numThreads=*/ValueRange{},
-        /*tileSizes=*/ValueRange{packedTileSizeHandle},
-        /*staticNumThreads=*/ArrayAttr(),
-        /*staticTileSizes=*/dummyStaticTileSizesAttr, threadDimMapping,
-        /*packedSizes=*/builder.getUnitAttr());
+  build(builder, result,
+        /*resultTypes=*/TypeRange{operationType, operationType},
+        /*target=*/target,
+        /*numThreads=*/dynamicNumThreads,
+        /*tileSizes=*/ValueRange{},
+        /*staticNumThreads=*/staticNumThreadsAttr,
+        /*staticTileSizes=*/ArrayAttr(),
+        /*mapping=*/mappingAttr);
 }
 
 /// Lower the ops within the workgroup count region of `exportOp` that
@@ -538,9 +534,11 @@ void transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::build(
 /// computation that returns the number of workgroups. For now
 /// this lowers the `flow.dispatch.workgroup_count_from_dag_root` op
 /// to `ceilDiv(workload, tileSizes)`.
+/// Note: transform::TransformState &state is passed to allow  unpacking
+/// pdl::OperationType handles on the fly.
 static LogicalResult lowerWorkgroupCountComputingRegion(
-    RewriterBase &rewriter, HAL::ExecutableExportOp exportOp,
-    ArrayRef<OpFoldResult> tileSizes) {
+    transform::TransformState &state, RewriterBase &rewriter, Location loc,
+    HAL::ExecutableExportOp exportOp, ArrayRef<OpFoldResult> tileSizes) {
   Region &r = exportOp.getWorkgroupCount();
   if (!r.hasOneBlock()) {
     return rewriter.notifyMatchFailure(exportOp,
@@ -558,7 +556,26 @@ static LogicalResult lowerWorkgroupCountComputingRegion(
   auto workgroupCountOp = *workgroupCountOps.begin();
   auto workload = workgroupCountOp.getOperands();
 
-  if (tileSizes.size() > workload.size()) {
+  SmallVector<OpFoldResult> unpackedTileSizes;
+  for (auto ofr : tileSizes) {
+    if (ofr.is<Value>() &&
+        ofr.get<Value>().getType().isa<pdl::OperationType>()) {
+      for (Operation *sizeProducer : state.getPayloadOps(ofr.get<Value>())) {
+        if (sizeProducer->getNumResults() != 1) {
+          auto diag =
+              mlir::emitDefiniteFailure(sizeProducer)
+              << "the operation producing tile size must have one result";
+          diag.attachNote(loc) << "when applying this transform";
+          return diag;
+        }
+        unpackedTileSizes.push_back(sizeProducer->getResult(0));
+      }
+    } else {
+      unpackedTileSizes.push_back(ofr);
+    }
+  }
+
+  if (unpackedTileSizes.size() > workload.size()) {
     return rewriter.notifyMatchFailure(
         exportOp,
         "number of tile sizes overflow the dimension from the workload");
@@ -567,8 +584,8 @@ static LogicalResult lowerWorkgroupCountComputingRegion(
   SmallVector<OpFoldResult> workgroupCount;
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(workgroupCountOp);
-  Location loc = workgroupCountOp.getLoc();
-  for (auto tileSize : llvm::enumerate(tileSizes)) {
+  loc = workgroupCountOp.getLoc();
+  for (auto tileSize : llvm::enumerate(unpackedTileSizes)) {
     if (isConstantIntValue(tileSize.value(), 0)) {
       workgroupCount.push_back(workload[tileSize.index()]);
       continue;
@@ -627,34 +644,11 @@ transform_dialect::TileToForeachThreadAndWorkgroupCountRegionOp::apply(
                                      "couldn't find export op for func");
   }
 
-  SmallVector<OpFoldResult> mixedTileSizes;
-  if (getPackedSizes()) {
-    ArrayRef<Operation *> sizes = state.getPayloadOps(getTileSizes().front());
-    mixedTileSizes.reserve(sizes.size());
-    for (Operation *sizeProducer : sizes) {
-      if (sizeProducer->getNumResults() != 1) {
-        auto diag = mlir::emitDefiniteFailure(sizeProducer)
-                    << "the operation producing tile size must have one result";
-        diag.attachNote(getLoc()) << "when applying this transform";
-        return diag;
-      }
-      // TODO(ftynse): we may want to pattern-match for integer constants here.
-      mixedTileSizes.push_back(sizeProducer->getResult(0));
-    }
-  } else {
-    mixedTileSizes = getMixedTileSizes();
-  }
-
-  if (mixedTileSizes.empty()) {
-    return mlir::emitDefiniteFailure(exportOp.value(),
-                                     "require tile sizes to be specified");
-  }
-
   /// Lower the workgroup count region in keeping with the way dispatch
   /// regions are created by default in IREEs compilation flow.
   IRRewriter rewriter(getContext());
-  if (failed(lowerWorkgroupCountComputingRegion(rewriter, exportOp.value(),
-                                                mixedTileSizes))) {
+  if (failed(lowerWorkgroupCountComputingRegion(
+          state, rewriter, getLoc(), exportOp.value(), getMixedTileSizes()))) {
     return mlir::emitDefiniteFailure(exportOp.value(),
                                      "failed to lower workgroup count region");
   }
