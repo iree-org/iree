@@ -476,8 +476,6 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
     options.tilingLevel = numLevels - 1;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLinalgSingleTilingExpertPass(options));
-    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
 
   if (clEnablePadConsumerFusion) {
