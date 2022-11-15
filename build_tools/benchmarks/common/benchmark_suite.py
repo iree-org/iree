@@ -31,14 +31,12 @@ CMake target, which put them in the following directory structure:
 
 import collections
 import os
-import pathlib
 import re
 
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence, Tuple
 from common.benchmark_definition import IREE_DRIVERS_INFOS, DriverInfo
 from e2e_test_framework.definitions import iree_definitions
-import e2e_test_artifacts.iree_artifacts
 
 # All benchmarks' relative path against root build directory.
 BENCHMARK_SUITE_REL_PATH = "benchmark_suites"
@@ -72,25 +70,23 @@ class BenchmarkCase:
   run_config: Optional[iree_definitions.E2EModelRunConfig] = None
 
 
-def _find_driver_info_by_execution_config(
-    module_execution_config: iree_definitions.ModuleExecutionConfig
-) -> Optional[DriverInfo]:
-  """Finds the matched driver info by the module execution config.
-
-  Args:
-    module_execution_config: module execution config to match.
-  Returns:
-    A matched driver info. None if not found.
-  """
-  for value in IREE_DRIVERS_INFOS.values():
-    config_driver_name = module_execution_config.driver.value
-    config_loader_name = (module_execution_config.loader.value
-                          if module_execution_config.loader !=
-                          iree_definitions.RuntimeLoader.NONE else "")
-    if (value.driver_name == config_driver_name and
-        value.loader_name == config_loader_name):
-      return value
-  return None
+# A map from execution config to driver info. This is temporary during migration
+# before we can drop the DriverInfo.
+EXECUTION_CONFIG_TO_DRIVER_INFO_KEY_MAP: Dict[Tuple[
+    iree_definitions.RuntimeDriver, iree_definitions.RuntimeLoader], str] = {
+        (iree_definitions.RuntimeDriver.LOCAL_TASK, iree_definitions.RuntimeLoader.EMBEDDED_ELF):
+            "iree-llvm-cpu",
+        (iree_definitions.RuntimeDriver.LOCAL_SYNC, iree_definitions.RuntimeLoader.EMBEDDED_ELF):
+            "iree-llvm-cpu-sync",
+        (iree_definitions.RuntimeDriver.LOCAL_TASK, iree_definitions.RuntimeLoader.VMVX_MODULE):
+            "iree-vmvx",
+        (iree_definitions.RuntimeDriver.LOCAL_SYNC, iree_definitions.RuntimeLoader.VMVX_MODULE):
+            "iree-vmvx-sync",
+        (iree_definitions.RuntimeDriver.VULKAN, iree_definitions.RuntimeLoader.NONE):
+            "iree-vulkan",
+        (iree_definitions.RuntimeDriver.CUDA, iree_definitions.RuntimeLoader.NONE):
+            "iree-cuda",
+    }
 
 
 class BenchmarkSuite(object):
@@ -212,10 +208,12 @@ class BenchmarkSuite(object):
       module_exec_config = run_config.module_execution_config
       target_device_spec = run_config.target_device_spec
 
-      driver_info = _find_driver_info_by_execution_config(module_exec_config)
-      if driver_info is None:
+      driver_info_key = EXECUTION_CONFIG_TO_DRIVER_INFO_KEY_MAP.get(
+          (module_exec_config.driver, module_exec_config.loader))
+      if driver_info_key is None:
         raise ValueError(
             f"Can't map execution config to driver info: {module_exec_config}.")
+      driver_info = IREE_DRIVERS_INFOS[driver_info_key]
 
       arch_info = target_device_spec.architecture.value
       target_arch = f"{arch_info.type.value}-{arch_info.architecture}-{arch_info.microarchitecture}"

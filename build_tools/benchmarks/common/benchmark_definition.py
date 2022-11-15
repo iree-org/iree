@@ -58,7 +58,6 @@ class DriverInfo:
   driver_name: str
   loader_name: str
 
-
 # A map for IREE driver names. This allows us to normalize driver names like
 # mapping to more friendly ones and detach to keep driver names used in
 # benchmark presentation stable.
