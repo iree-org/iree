@@ -15,7 +15,6 @@
 #        <pytest regex> e.g. "cpu", "cuda", "cuda and torch".
 #        <driver> e.g. "cpu", "cuda", "vulkan"
 #        <output directory>
-
 set -xeuo pipefail
 
 export SHARK_SHA=$1
@@ -25,9 +24,11 @@ export SHARK_OUTPUT_DIR=`pwd`/$4
 
 mkdir "${SHARK_OUTPUT_DIR}"
 
-git clone https://github.com/nod-ai/SHARK.git
+# Use a forked version that enables XLA GPU on Tensorflow.
+git clone https://github.com/mariecwhite/SHARK.git
 cd SHARK
-git reset --hard ${SHARK_SHA}
+git checkout tf-gpu
+
 
 # Remove existing data.
 rm -rf ./shark_tmp
@@ -36,6 +37,9 @@ rm -rf ~/.local/shark_tank
 # Run with SHARK-Runtime.
 PYTHON=python3.10 VENV_DIR=shark.venv BENCHMARK=1 IMPORTER=1 ./setup_venv.sh
 source shark.venv/bin/activate
+
+python -c "import tensorflow as tf;tf.config.list_physical_devices()"
+
 export SHARK_VERSION=`pip show iree-compiler | grep Version | sed -e "s/^Version: \(.*\)$/\1/g"`
 pytest --benchmark --update_tank --maxfail=500 tank/test_models.py -k "${BENCHMARK_REGEX}" || true
 
