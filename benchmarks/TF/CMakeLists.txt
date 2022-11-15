@@ -30,6 +30,20 @@ set(MINILM_L12_H384_UNCASED_INT32_SEQLEN128_MODULE
     "1x128xi32,1x128xi32,1x128xi32"
 )
 
+set(RESNET50_TF_FP32_MODULE
+  NAME
+    "Resnet50Tf"
+  TAGS
+    "fp32"
+  SOURCE
+    # Derived from https://github.com/keras-team/keras/blob/v2.10.0/keras/applications/resnet.py.
+    "https://storage.googleapis.com/iree-model-artifacts/resnet50-tf-model.tar.gz"
+  ENTRY_FUNCTION
+    "forward"
+  FUNCTION_INPUTS
+    "1x224x224x3xf32"
+)
+
 ################################################################################
 # Add benchmarks for all platforms.                                            #
 ################################################################################
