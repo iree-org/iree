@@ -482,7 +482,6 @@ static LogicalResult applyAsyncCloneOp(IREE::Stream::AsyncCloneOp asyncOp,
 static LogicalResult applyAsyncSliceOp(IREE::Stream::AsyncSliceOp asyncOp,
                                        AllocationScope &scope,
                                        OpBuilder builder) {
-  // TODO(benvanik): place the allocation instead.
   auto sourceRange = scope.lookupResourceRange(asyncOp.getSource());
   auto sourceOffset = scope.add(asyncOp.getLoc(), sourceRange.offset,
                                 asyncOp.getSourceOffset());
@@ -511,7 +510,6 @@ static LogicalResult applyAsyncFillOp(IREE::Stream::AsyncFillOp asyncOp,
 static LogicalResult applyAsyncUpdateOp(IREE::Stream::AsyncUpdateOp asyncOp,
                                         AllocationScope &scope,
                                         OpBuilder builder) {
-  // TODO(benvanik): place the allocation instead.
   auto sourceRange = scope.lookupResourceRange(asyncOp.getUpdate());
   auto sourceOffset = sourceRange.offset;
   auto targetRange = scope.lookupResourceRange(asyncOp.getResult());

@@ -1497,9 +1497,7 @@ def Stream_AsyncSliceOp : Stream_PureOp<"async.slice", [
   AllTypesMatch<["source", "result"]>,
   Stream_AffinityOp,
   Stream_AsyncPhaseOp,
-  DeclareOpInterfaceMethods<Stream_StreamableOp, [
-    "isMetadata",
-  ]>,
+  Stream_StreamableOp,
   Util_SizeAwareOp,
 ]> {
   let summary = [{slices out a cloned subview of a value}];
@@ -1595,9 +1593,7 @@ def Stream_AsyncUpdateOp : Stream_Op<"async.update", [
   AllTypesMatch<["target", "result"]>,
   Stream_AffinityOp,
   Stream_AsyncPhaseOp,
-  DeclareOpInterfaceMethods<Stream_StreamableOp, [
-    "isMetadata",
-  ]>,
+  Stream_StreamableOp,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
     "getTiedResult",

@@ -272,7 +272,7 @@ func.func @applyAsyncSliceOp(%operand: !stream.resource<transient>, %size: index
   // CHECK-SAME: with(%[[OPERAND]] as %[[OPERAND_CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]},
   // CHECK-SAME:      %[[ALLOC]] as %[[ALLOC_CAPTURE:.+]]: !stream.resource<transient>{%c128})
   %result, %result_timepoint = stream.async.execute with(%operand as %capture: !stream.resource<transient>{%size}) -> !stream.resource<transient>{%c128} {
-    // CHECK: stream.cmd.copy %[[OPERAND_CAPTURE]][%c16_0], %[[ALLOC_CAPTURE]][%c0], %c128
+    // CHECK: stream.cmd.copy %[[OPERAND_CAPTURE]][%c16], %[[ALLOC_CAPTURE]][%c0], %c128
     // CHECK-SAME: : !stream.resource<transient>{%[[SIZE]]} -> !stream.resource<transient>{%c128}
     %0 = stream.async.slice %capture[%c16 to %c144] : !stream.resource<transient>{%size} -> !stream.resource<transient>{%c128}
     stream.yield %0 : !stream.resource<transient>{%c128}
@@ -293,7 +293,7 @@ func.func @applyAsyncFillOp(%operand: !stream.resource<transient>, %size: index)
   %c255_i32 = arith.constant 255 : i32
   // CHECK: stream.cmd.execute with(%[[OPERAND]] as %[[CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]})
   %result, %result_timepoint = stream.async.execute with(%operand as %capture: !stream.resource<transient>{%size}) -> (!stream.resource<transient>{%size}) {
-    // CHECK: stream.cmd.fill %c255_i32, %[[CAPTURE]][%c16_0 for %c128] : i32 -> !stream.resource<transient>{%[[SIZE]]}
+    // CHECK: stream.cmd.fill %c255_i32, %[[CAPTURE]][%c16 for %c128] : i32 -> !stream.resource<transient>{%[[SIZE]]}
     %0 = stream.async.fill %c255_i32, %capture[%c16 to %c144 for %c128] : i32 -> %capture as !stream.resource<transient>{%size}
     stream.yield %0 : !stream.resource<transient>{%size}
   } => !stream.timepoint
@@ -319,7 +319,7 @@ func.func @applyAsyncUpdateOp(%update: !stream.resource<external>, %operand: !st
   // CHECK-SAME: with(%[[UPDATE]] as %[[UPDATE_CAPTURE:.+]]: !stream.resource<external>{%c128},
   // CHECK-SAME:      %[[OPERAND]] as %[[OPERAND_CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]})
   %result, %result_timepoint = stream.async.execute with(%update as %captured_update: !stream.resource<external>{%c128}, %operand as %captured_operand: !stream.resource<transient>{%size}) -> (!stream.resource<transient>{%size}) {
-    // CHECK: stream.cmd.copy %[[UPDATE_CAPTURE]][%c0], %[[OPERAND_CAPTURE]][%c16_0], %c128
+    // CHECK: stream.cmd.copy %[[UPDATE_CAPTURE]][%c0], %[[OPERAND_CAPTURE]][%c16], %c128
     // CHECK-SAME: : !stream.resource<external>{%c128} -> !stream.resource<transient>{%[[SIZE]]}
     %0 = stream.async.update %captured_update, %captured_operand[%c16 to %c144] : !stream.resource<external>{%c128} -> %captured_operand as !stream.resource<transient>{%size}
     stream.yield %0 : !stream.resource<transient>{%size}
@@ -343,7 +343,7 @@ func.func @applyAsyncCopyOp(%source: !stream.resource<external>, %target: !strea
   // CHECK-SAME: with(%[[SOURCE]] as %[[SOURCE_CAPTURE:.+]]: !stream.resource<external>{%[[SIZE]]},
   // CHECK-SAME:      %[[TARGET]] as %[[TARGET_CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]})
   %result, %result_timepoint = stream.async.execute with(%source as %captured_source: !stream.resource<external>{%size}, %target as %captured_target: !stream.resource<transient>{%size}) -> (!stream.resource<transient>{%size}) {
-    // CHECK: stream.cmd.copy %[[SOURCE_CAPTURE]][%c16_0], %[[TARGET_CAPTURE]][%c16_1], %c128
+    // CHECK: stream.cmd.copy %[[SOURCE_CAPTURE]][%c16], %[[TARGET_CAPTURE]][%c16], %c128
     // CHECK-SAME: : !stream.resource<external>{%[[SIZE]]} -> !stream.resource<transient>{%[[SIZE]]}
     %0 = stream.async.copy %captured_source[%c16 to %c144], %captured_target[%c16 to %c144], %c128 : !stream.resource<external>{%size} -> %captured_operand as !stream.resource<transient>{%size}
     stream.yield %0 : !stream.resource<transient>{%size}
@@ -374,10 +374,10 @@ func.func @applyConcurrentAsyncCopyOp(%source: !stream.resource<external>, %targ
   %result, %result_timepoint = stream.async.execute with(%source as %captured_source: !stream.resource<external>{%size}, %target as %captured_target: !stream.resource<transient>{%size}) -> (%target as !stream.resource<transient>{%size}) {
     // CHECK: stream.cmd.concurrent
     %0 = stream.async.concurrent with(%captured_source as %concurrent_source: !stream.resource<external>{%size}, %captured_target as %concurrent_target: !stream.resource<transient>{%size}) -> (%captured_target as !stream.resource<transient>{%size}) {
-      // CHECK: stream.cmd.copy %[[SOURCE_CAPTURE]][%c0_0], %[[TARGET_CAPTURE]][%c0_0], %c16
+      // CHECK: stream.cmd.copy %[[SOURCE_CAPTURE]][%c0], %[[TARGET_CAPTURE]][%c0], %c16
       // CHECK-SAME: : !stream.resource<external>{%[[SIZE]]} -> !stream.resource<transient>{%[[SIZE]]}
       %copy0 = stream.async.copy %concurrent_source[%c0 to %c16], %concurrent_target[%c0 to %c16], %c16 : !stream.resource<external>{%size} -> %concurrent_target as !stream.resource<transient>{%size}
-      // CHECK: stream.cmd.copy %[[SOURCE_CAPTURE]][%c16_1], %[[TARGET_CAPTURE]][%c16_2], %c128
+      // CHECK: stream.cmd.copy %[[SOURCE_CAPTURE]][%c16], %[[TARGET_CAPTURE]][%c16], %c128
       // CHECK-SAME: : !stream.resource<external>{%[[SIZE]]} -> !stream.resource<transient>{%[[SIZE]]}
       %copy1 = stream.async.copy %concurrent_source[%c16 to %c144], %copy0[%c16 to %c144], %c128 : !stream.resource<external>{%size} -> %copy0 as !stream.resource<transient>{%size}
       stream.yield %copy1 : !stream.resource<transient>{%size}

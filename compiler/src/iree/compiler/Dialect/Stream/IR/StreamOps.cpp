@@ -1268,8 +1268,6 @@ LogicalResult AsyncSliceOp::verify() {
   return success();
 }
 
-bool AsyncSliceOp::isMetadata() { return true; }
-
 //===----------------------------------------------------------------------===//
 // stream.async.fill
 //===----------------------------------------------------------------------===//
@@ -1307,8 +1305,6 @@ LogicalResult AsyncUpdateOp::verify() {
   }
   return success();
 }
-
-bool AsyncUpdateOp::isMetadata() { return true; }
 
 Value AsyncUpdateOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(getTarget());

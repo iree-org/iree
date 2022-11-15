@@ -22,6 +22,7 @@ iree_cc_library(
     "DumpStatistics.cpp"
     "ElideAsyncCopies.cpp"
     "ElideTimepoints.cpp"
+    "EmplaceAllocations.cpp"
     "EncodeTensors.cpp"
     "FoldUniformOperands.cpp"
     "FuseDispatchBindings.cpp"

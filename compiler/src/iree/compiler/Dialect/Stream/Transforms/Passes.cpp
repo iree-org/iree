@@ -134,6 +134,9 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   FunctionLikeNest(passManager)
       .addPass(IREE::Stream::createMaterializeCopyOnWritePass);
   passManager.addPass(IREE::Stream::createElideAsyncCopiesPass());
+  FunctionLikeNest(passManager)
+      .addPass(mlir::createCanonicalizerPass)
+      .addPass(IREE::Stream::createEmplaceAllocationsPass);
 
   // Refine lifetime of all resources across the module.
   // We do this after scheduling execution so that we know how the resources
