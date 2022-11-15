@@ -140,6 +140,7 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   // move across devices. We do it before scheduling waves as lifetime doesn't
   // change and it makes the IR cleaner.
   passManager.addPass(IREE::Stream::createRefineUsagePass());
+  addCleanupPatterns(passManager);
 
   //----------------------------------------------------------------------------
   // Stream formation and scheduling
