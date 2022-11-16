@@ -20,6 +20,7 @@ iree_cc_library(
     "Patterns.cpp"
     "Utils.cpp"
   DEPS
+    LLVMSupport
     MLIRArithDialect
     MLIRFuncDialect
     MLIRIR

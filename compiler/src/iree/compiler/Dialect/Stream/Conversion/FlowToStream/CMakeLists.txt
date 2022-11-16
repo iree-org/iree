@@ -22,6 +22,7 @@ iree_cc_library(
     MLIRFuncDialect
     MLIRIR
     MLIRTensorDialect
+    MLIRTransforms
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Stream::Conversion
     iree::compiler::Dialect::Stream::IR

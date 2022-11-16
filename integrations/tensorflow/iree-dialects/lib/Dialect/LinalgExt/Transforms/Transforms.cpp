@@ -54,6 +54,12 @@ FailureOr<linalg::TileLoopNest> tileConsumerAndFuseProducers(
   // Search the number of outer parallel loops to separate them from possible
   // inner reduction dimensions.
   auto iterTypes = consumerOp.getIteratorTypesArray();
+  // Make sure to only look at the leading loops for tiling---we will scan this
+  // array to find the first non-parallel loop later and use that for indexing
+  // into the tile sizes.
+  if (iterTypes.size() > tileSizes.size()) {
+    iterTypes.resize(tileSizes.size());
+  }
   applyPermutationToVector(iterTypes, tileInterchange);
   auto *it = find_if_not(iterTypes, linalg::isParallelIterator);
   int64_t split = std::distance(iterTypes.begin(), it);
@@ -906,8 +912,13 @@ struct GeneralizePackOpPattern : OpRewritePattern<PackOp> {
 
     Value empty = rewriter.create<tensor::EmptyOp>(loc, packOp.getOutputShape(),
                                                    inputType.getElementType());
+<<<<<<< HEAD
     SmallVector<utils::IteratorType, 4> loopAttributeTypes(
         nloops, utils::IteratorType::parallel);
+=======
+    SmallVector<StringRef, 4> loopAttributeTypes(nloops,
+                                                 getParallelIteratorTypeName());
+>>>>>>> origin/main
     SmallVector<AffineMap, 2> indexingMaps = {
         AffineMap::get(nloops, 0, inputExprs, rewriter.getContext()),
         AffineMap::getMultiDimIdentityMap(nloops, rewriter.getContext())};

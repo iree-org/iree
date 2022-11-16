@@ -178,6 +178,7 @@ iree_cc_library(
     iree::base
     iree::base::internal::span
     iree::base::tracing
+    iree::hal
     iree::vm
   PUBLIC
 )

@@ -35,6 +35,7 @@ iree_cc_library(
     MLIRIR
     MLIRParser
     iree::compiler::Codegen::Utils
+    iree::compiler::Dialect::HAL::IR
   PUBLIC
 )
 
