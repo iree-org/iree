@@ -10,6 +10,12 @@ The benchmark suites need to be built with ninja and enable the CMake option
 IREE_ENABLE_COMPILATION_BENCHMARKS.
 """
 
+import pathlib
+import sys
+
+# Add build_tools python dir to the search path.
+sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
+
 import argparse
 import json
 import os
@@ -162,23 +168,26 @@ def main(args: argparse.Namespace):
     benchmark_cases = benchmark_suite.filter_benchmarks_for_category(
         category=category)
     for benchmark_case in benchmark_cases:
-      flag_file_path = os.path.join(benchmark_case.benchmark_case_dir,
-                                    BENCHMARK_FLAGFILE)
-      with open(flag_file_path, "r") as flag_file:
+      # TODO(#11076): Support run_config.
+      if benchmark_case.benchmark_case_dir is None:
+        raise ValueError("benchmark_case_dir can't be None.")
+      benchmark_case_dir = pathlib.Path(benchmark_case.benchmark_case_dir)
+
+      flag_file_path = benchmark_case_dir / BENCHMARK_FLAGFILE
+      with flag_file_path.open("r") as flag_file:
         module_path = get_module_path(flag_file)
 
       if module_path is None:
         raise RuntimeError(
             f"Can't find the module file in the flagfile: {flag_file_path}")
-      module_path = os.path.abspath(
-          os.path.join(benchmark_case.benchmark_case_dir, module_path))
+      module_path = (benchmark_case_dir / module_path).resolve()
 
-      with open(module_path, "rb") as module_file:
+      with module_path.open("rb") as module_file:
         module_component_sizes = get_module_component_info(
             module_file,
             os.stat(module_path).st_size)
 
-      cmake_target = match_module_cmake_target(module_path)
+      cmake_target = match_module_cmake_target(str(module_path))
       if cmake_target is None:
         raise RuntimeError(
             f"Module path isn't a module cmake target: {module_path}")

@@ -26,7 +26,7 @@ class ArtifactsRoot(object):
 
 
 def _generate_artifacts_root(
-    models: Sequence[common_definitions.Model],
+    root_dir_path: pathlib.PurePath, models: Sequence[common_definitions.Model],
     iree_module_generation_configs: Sequence[
         iree_definitions.ModuleGenerationConfig]
 ) -> ArtifactsRoot:
@@ -36,7 +36,7 @@ def _generate_artifacts_root(
       parent_path=MODEL_ARTIFACTS_ROOT, models=models)
 
   iree_artifacts_root = iree_artifacts.generate_artifacts_root(
-      parent_path=IREE_ARTIFACTS_ROOT,
+      root_dir_path=root_dir_path,
       model_artifacts_root=model_artifacts_root,
       module_generation_configs=iree_module_generation_configs)
 
@@ -52,5 +52,7 @@ def generate_default_artifacts_root() -> ArtifactsRoot:
    _) = benchmark_collections.generate_benchmarks()
 
   return _generate_artifacts_root(
+      # Set empty root path to generate the relative paths.
+      root_dir_path=pathlib.PurePath(),
       models=model_groups.ALL,
       iree_module_generation_configs=iree_module_generation_configs)
