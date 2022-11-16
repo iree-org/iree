@@ -69,36 +69,20 @@ RUN ./install_bazel.sh && rm -rf /install-bazel
 ##############
 
 ######## Python ########
-# Note that we use --ignore-installed when installing packages that may have
-# been auto-installed by the OS package manager (i.e. PyYAML is often an
-# implicit OS-level dep). This should not break so long as we do not
-# subsequently reinstall it on the OS side. Failing to do this will yield a
-# hard error with pip along the lines of:
-#   Cannot uninstall 'PyYAML'. It is a distutils installed project and thus we
-#   cannot accurately determine which files belong to it which would lead to
-#   only a partial uninstall.
+
 WORKDIR /install-python
 
-COPY runtime/bindings/python/iree/runtime/build_requirements.txt ./
-RUN apt-get update \
-  && apt-get install -y \
-    python3.7 \
-    python3.7-dev \
-  && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.7 1 \
-  && apt-get install -y \
-    python3-pip \
-    python3-setuptools \
-    python3-distutils \
-    python3-venv \
-    python3.7-venv \
-  && python3 -m pip install --upgrade pip>=21.3 \
-  && python3 -m pip install --upgrade setuptools \
-  # Versions for things required to build IREE should match the minimum versions
-  # in runtime/bindings/python/iree/runtime/build_requirements.txt. There
-  # doesn't appear to be a pip-native way to get the minimum versions, but this
-  # hack works for simple files, at least.
-  && sed -i 's/>=/==/' build_requirements.txt \
-  && python3 -m pip install --ignore-installed -r build_requirements.txt
+# Minimum supported Python version
+ARG PYTHON_VERSION=3.7
+
+# Versions for things required to build IREE should match the minimum
+# supported versions in the requirements file. There doesn't appear to be a
+# pip-native way to get the minimum versions, but this hack works for simple
+# files, at least.
+COPY runtime/bindings/python/iree/runtime/build_requirements.txt build_tools/docker/context/install_python_deps.sh ./
+RUN sed -i 's/>=/==/' build_requirements.txt \
+  && ./install_python_deps.sh "${PYTHON_VERSION?}" \
+  && rm -rf /install-python
 
 ENV PYTHON_BIN /usr/bin/python3
 
