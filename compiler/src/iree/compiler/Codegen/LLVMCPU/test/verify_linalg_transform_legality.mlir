@@ -14,7 +14,7 @@ func.func @matmul_123x456xf32_times_456x789xf32_into_123x789xf32_dispatch_0() {
   %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d1, d0, d3)>,
                                         affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>,
                                         affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>],
-                       iterator_types = ["parallel", "parallel", "parallel", "reduction"]}
+                       iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]}
     ins(%3, %4 : tensor<123x4x114xf32>, tensor<4x114x789xf32>)
     outs(%6 : tensor<4x123x789xf32>)
     attrs =  {__internal_linalg_transform__ = "DEADBEEF", linalg.memoized_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>]} {

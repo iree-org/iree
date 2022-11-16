@@ -40,12 +40,12 @@ hal.executable private @check_no_cse {
         %6 = flow.dispatch.tensor.load %4, offsets = [0, 0], sizes = [7, 384], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<7x384xf32>> -> tensor<7x384xf32>
         %7 = tensor.empty() : tensor<7xf32>
         %8 = linalg.fill ins(%cst_0 : f32) outs(%7 : tensor<7xf32>) -> tensor<7xf32>
-        %9 = linalg.generic {indexing_maps = [#map5, #map4], iterator_types = ["parallel", "reduction"]} ins(%6 : tensor<7x384xf32>) outs(%8 : tensor<7xf32>) {
+        %9 = linalg.generic {indexing_maps = [#map5, #map4], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]} ins(%6 : tensor<7x384xf32>) outs(%8 : tensor<7xf32>) {
         ^bb0(%arg0: f32, %arg1: f32):
           %11 = arith.addf %arg1, %arg0 : f32
           linalg.yield %11 : f32
         } -> tensor<7xf32>
-        %10 = linalg.generic {indexing_maps = [#map3, #map3], iterator_types = ["parallel"]} ins(%9 : tensor<7xf32>) outs(%7 : tensor<7xf32>) {
+        %10 = linalg.generic {indexing_maps = [#map3, #map3], iterator_types = [#linalg.iterator_type<parallel>]} ins(%9 : tensor<7xf32>) outs(%7 : tensor<7xf32>) {
         ^bb0(%arg0: f32, %arg1: f32):
           %11 = arith.divf %arg0, %cst : f32
           linalg.yield %11 : f32
@@ -197,7 +197,7 @@ hal.executable private @check_buffer_ops_vectorization {
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : memref<128x1536xi32>
         memref.assume_alignment %1, 64 : memref<128x1536xi32>
         %2 = memref.subview %1[0, 0] [128, 1024] [1, 1] : memref<128x1536xi32> to memref<128x1024xi32, affine_map<(d0, d1) -> (d0 * 1536 + d1)>>
-        linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+        linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
           ins(%0 : memref<128x1024xi32>)
           outs(%2 : memref<128x1024xi32, affine_map<(d0, d1) -> (d0 * 1536 + d1)>>) {
         ^bb0(%arg0: i32, %arg1: i32):
@@ -256,7 +256,7 @@ hal.executable private @vectorize_fill_conv2d_generic {
             affine_map<(d0, d1, d2, d3) -> (d3)>,
             affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
             affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
-            iterator_types = ["parallel", "parallel", "parallel", "parallel"
+            iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>
           ]} ins(%cst_3, %7 : tensor<16xf32>, tensor<1x112x112x16xf32>) outs(%5 : tensor<1x112x112x16xf32>) {
         ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):
           %9 = arith.addf %arg0, %arg1 : f32

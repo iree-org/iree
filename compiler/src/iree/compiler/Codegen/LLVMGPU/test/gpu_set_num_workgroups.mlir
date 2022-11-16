@@ -19,7 +19,7 @@ hal.executable @add_dispatch_0 {
       %3 = tensor.empty() : tensor<16384xf32>
       %4 = flow.dispatch.tensor.load %0, offsets=[0], sizes=[16384], strides=[1] : !flow.dispatch.tensor<readonly:tensor<16384xf32>> -> tensor<16384xf32>
       %5 = flow.dispatch.tensor.load %1, offsets=[0], sizes=[16384], strides=[1] : !flow.dispatch.tensor<readonly:tensor<16384xf32>> -> tensor<16384xf32>
-      %6 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%4, %5 : tensor<16384xf32>, tensor<16384xf32>) outs(%3 : tensor<16384xf32>) {
+      %6 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = [#linalg.iterator_type<parallel>]} ins(%4, %5 : tensor<16384xf32>, tensor<16384xf32>) outs(%3 : tensor<16384xf32>) {
       ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):  // no predecessors
           %7 = arith.addf %arg0, %arg1 : f32
           linalg.yield %7 : f32
@@ -99,7 +99,7 @@ hal.executable @reduction_dispatch {
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<1000xf32>
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<f32>
         linalg.fill ins(%cst_0 : f32) outs(%1 : memref<f32>)
-        linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>], iterator_types = ["reduction"]} ins(%0 : memref<1000xf32>) outs(%1 : memref<f32>) {
+        linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>], iterator_types = [#linalg.iterator_type<reduction>]} ins(%0 : memref<1000xf32>) outs(%1 : memref<f32>) {
         ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
           %2 = arith.cmpf ogt, %arg0, %arg1 : f32
           %3 = arith.select %2, %arg0, %arg1 : f32
@@ -144,7 +144,7 @@ hal.executable private @reduction_aligned2 {
         %5 = linalg.generic {
           indexing_maps = [affine_map<(d0, d1, d2) -> (d2, d0, d1)>,
                            affine_map<(d0, d1, d2) -> (d0, d1)>],
-          iterator_types = ["parallel", "parallel", "reduction"]}
+          iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]}
           ins(%2 : tensor<4x128x384xf32>) outs(%4 : tensor<128x384xf32>) {
         ^bb0(%arg0: f32, %arg1: f32):
           %6 = arith.addf %arg0, %arg1 : f32
@@ -184,7 +184,7 @@ hal.executable @copy_as_generic {
         %d1 = hal.interface.constant.load[1] : index
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<?x?xi32>{%d0, %d1}
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<?x?xi32>{%d0, %d1}
-        linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+        linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
             ins(%0 : memref<?x?xi32>) outs(%1 : memref<?x?xi32>) {
           ^bb0(%arg4: i32, %s: i32):  // no predecessors
             linalg.yield %arg4 : i32

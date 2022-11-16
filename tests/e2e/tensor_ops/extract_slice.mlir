@@ -2,7 +2,7 @@ func.func @extract_slice_strided() {
   %0 = tensor.empty() : tensor<500x750xi32>
   %1 = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>],
-      iterator_types = ["parallel", "parallel"]}
+      iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
       outs(%0 : tensor<500x750xi32>) {
       ^bb0(%arg0 : i32):
         %2 = linalg.index 0 : index
@@ -19,7 +19,7 @@ func.func @extract_slice_strided() {
   %3 = tensor.empty() : tensor<50x75xi32>
   %4 = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>],
-      iterator_types = ["parallel", "parallel"]}
+      iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
       outs(%3 : tensor<50x75xi32>) {
       ^bb0(%arg0 : i32) :
         %5 = linalg.index 0 : index

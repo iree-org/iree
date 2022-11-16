@@ -4,7 +4,7 @@ func.func @transpose_small() {
         [4, 5, 6],
         [7, 8, 9]]> : tensor<3x3xi32>
     %outs = tensor.empty() : tensor<3x3xi32>
-    %result = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%ins : tensor<3x3xi32>) outs(%outs : tensor<3x3xi32>) {
+    %result = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]} ins(%ins : tensor<3x3xi32>) outs(%outs : tensor<3x3xi32>) {
     ^bb0(%arg1: i32, %arg2: i32):
       linalg.yield %arg1 : i32
     } -> tensor<3x3xi32>
@@ -147,7 +147,7 @@ func.func @transpose_align() {
   58, 59, 60, 61, 62, 63, 64]]
         > : tensor<32x64xi32>
     %outs = tensor.empty() : tensor<64x32xi32>
-    %result = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%ins : tensor<32x64xi32>) outs(%outs : tensor<64x32xi32>) {
+    %result = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]} ins(%ins : tensor<32x64xi32>) outs(%outs : tensor<64x32xi32>) {
     ^bb0(%arg1: i32, %arg2: i32):
       linalg.yield %arg1 : i32
     } -> tensor<64x32xi32>
@@ -384,7 +384,7 @@ func.func @transpose_unalign() {
   39, 40, 41, 42, 43, 44, 45, 46, 47, 48]]
         > : tensor<32x48xi32>
     %outs = tensor.empty() : tensor<48x32xi32>
-    %result = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%ins : tensor<32x48xi32>) outs(%outs : tensor<48x32xi32>) {
+    %result = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]} ins(%ins : tensor<32x48xi32>) outs(%outs : tensor<48x32xi32>) {
     ^bb0(%arg1: i32, %arg2: i32):
       linalg.yield %arg1 : i32
     } -> tensor<48x32xi32>

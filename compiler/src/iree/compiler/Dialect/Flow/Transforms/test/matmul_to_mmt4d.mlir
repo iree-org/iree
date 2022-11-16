@@ -31,7 +31,7 @@ func.func @check_mmt4d_f32_static_nopad(%arg0: tensor<24x8xf32>, %arg1: tensor<8
 //      CHECK: %[[LHS4DT_INIT:.+]] = tensor.empty() : tensor<3x4x8x2xf32>
 //      CHECK: %[[LHS4DT:.+]] = linalg.generic
 // CHECK-SAME:   indexing_maps = [#[[MAP0]], #[[MAP1]]]
-// CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "parallel"]
+// CHECK-SAME:   iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]
 // CHECK-SAME:   ins(%[[LHS4D]] : tensor<3x8x4x2xf32>) outs(%[[LHS4DT_INIT]] : tensor<3x4x8x2xf32>) {
 // CHECK-NEXT:     ^bb0(%{{.*}}: f32, %{{.*}}: f32):
 // CHECK-NEXT:       linalg.yield
@@ -39,7 +39,7 @@ func.func @check_mmt4d_f32_static_nopad(%arg0: tensor<24x8xf32>, %arg1: tensor<8
 //      CHECK: %[[RHS4DT_INIT:.+]] = tensor.empty() : tensor<8x4x4x2xf32>
 //      CHECK: %[[RHS4DT:.+]] = linalg.generic
 // CHECK-SAME:   indexing_maps = [#[[MAP2]], #[[MAP1]]],
-// CHECK-SAME:   iterator_types = ["parallel", "parallel", "parallel", "parallel"]
+// CHECK-SAME:   iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]
 // CHECK-SAME:   ins(%[[RHS4D]] : tensor<4x2x8x4xf32>) outs(%[[RHS4DT_INIT]] : tensor<8x4x4x2xf32>) {
 // CHECK-NEXT:     ^bb0(%{{.*}}: f32, %{{.*}}: f32):
 // CHECK-NEXT:         linalg.yield %{{.*}} : f32
@@ -47,7 +47,7 @@ func.func @check_mmt4d_f32_static_nopad(%arg0: tensor<24x8xf32>, %arg1: tensor<8
 // CHECK-NEXT: %[[DST4DT_INIT:.+]] = tensor.empty() : tensor<3x8x8x4xf32>
 //      CHECK: %[[DST4DT:.+]] = linalg.generic
 // CHECK-SAME: indexing_maps = [#[[MAP0]], #[[MAP1]]]
-// CHECK-SAME: iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+// CHECK-SAME: iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
 // CHECK-SAME:    ins(%[[DST4D]] : tensor<3x8x8x4xf32>) outs(%[[DST4DT_INIT]] : tensor<3x8x8x4xf32>) {
 // CHECK-NEXT:    ^bb0(%{{.*}}: f32, %{{.*}}: f32):
 // CHECK-NEXT:          linalg.yield %{{.*}} : f32
@@ -58,7 +58,7 @@ func.func @check_mmt4d_f32_static_nopad(%arg0: tensor<24x8xf32>, %arg1: tensor<8
 //      CHECK: %[[MMT4DT_INIT:.+]] = tensor.empty() : tensor<3x8x8x4xf32>
 //      CHECK: %[[MMT4DT:.+]] = linalg.generic
 // CHECK-SAME:    indexing_maps = [#[[MAP0]], #[[MAP1]]]
-// CHECK-SAME:    iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+// CHECK-SAME:    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
 // CHECK-SAME:    ins(%[[MMT4D]] : tensor<3x8x8x4xf32>) outs(%[[MMT4DT_INIT]] : tensor<3x8x8x4xf32>) {
 // CHECK-NEXT:    ^bb0(%{{.*}}: f32, %{{.*}}: f32):
 // CHECK-NEXT:           linalg.yield %{{.*}} : f32

@@ -24,7 +24,7 @@ module attributes {hal.device.targets = [#hal.device.target<"cuda", {executable_
           %7 = tensor.empty() : tensor<128x30522xf32>
           %8 = linalg.fill ins(%cst : f32) outs(%7 : tensor<128x30522xf32>) -> tensor<128x30522xf32>
           %9 = linalg.matmul ins(%4, %5 : tensor<128x768xf32>, tensor<768x30522xf32>) outs(%8 : tensor<128x30522xf32>) -> tensor<128x30522xf32>
-          %10 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%9, %6 : tensor<128x30522xf32>, tensor<30522xf32>) outs(%7 : tensor<128x30522xf32>) {
+          %10 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]} ins(%9, %6 : tensor<128x30522xf32>, tensor<30522xf32>) outs(%7 : tensor<128x30522xf32>) {
           ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):
             %11 = arith.addf %arg0, %arg1 : f32
             linalg.yield %11 : f32

@@ -36,7 +36,7 @@ func.func @check_linalg_ok(%conv : tensor<1x112x112x16xf32>, %bias : tensor<16xf
       indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
                        affine_map<(d0, d1, d2, d3) -> (d3)>,
                        affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
-      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
       ins(%conv, %bias : tensor<1x112x112x16xf32>, tensor<16xf32>)
       outs(%init : tensor<1x112x112x16xf32>) {
       ^bb0(%arg0 : f32, %arg1 : f32, %arg2 : f32):

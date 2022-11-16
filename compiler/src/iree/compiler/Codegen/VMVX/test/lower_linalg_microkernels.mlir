@@ -14,7 +14,7 @@ func.func @subview_indexing_2d(%arg0 : memref<384x128xf32>, %arg1 : memref<128x3
   %6 = memref.subview %arg0[%arg2, %arg3] [64, 64] [1, 1] : memref<384x128xf32> to memref<64x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>
   %7 = memref.subview %arg1[%arg3, %arg2] [64, 64] [1, 1] : memref<128x384xf32> to memref<64x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 384 + s0 + d1)>>
   // A non-broadcasting 2d copy.
-  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
     ins(%7 : memref<64x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 384 + s0 + d1)>>)
     outs(%6 : memref<64x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>) {
   ^bb0(%arg4: f32, %arg5: f32):
@@ -36,7 +36,7 @@ func.func @generic_2d_transposed_to_copy(%arg0 : memref<384x128xf32>, %arg1 : me
   %6 = memref.subview %arg0[%arg2, %arg3] [64, 64] [1, 1] : memref<384x128xf32> to memref<64x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>
   %7 = memref.subview %arg1[%arg3, %arg2] [64, 64] [1, 1] : memref<128x384xf32> to memref<64x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 384 + s0 + d1)>>
   // A transposed 2d copy.
-  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
     ins(%7 : memref<64x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 384 + s0 + d1)>>)
     outs(%6 : memref<64x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>) {
   ^bb0(%arg4: f32, %arg5: f32):
@@ -281,7 +281,7 @@ func.func @mmt4d_buffer_layout_edge_case_5(
 //  CHECK-SAME:   out(%[[BB0]] offset %[[OFFSET0]] strides[%[[STRIDES0]]#0, %[[STRIDES0]]#1] : !util.buffer)
 //  CHECK-SAME:   sizes(%[[SIZES0]]#0, %[[SIZES0]]#1)
 func.func @addf2d_rank_broadcast(%arg0 : memref<64x64xf32>, %arg1 : memref<64xf32>) {
-  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
     ins(%arg1 : memref<64xf32>) outs(%arg0 : memref<64x64xf32>) {
   ^bb0(%arg2: f32, %arg3: f32):
     %12 = arith.addf %arg2, %arg3 : f32
@@ -299,7 +299,7 @@ func.func @addf2d_rank_broadcast(%arg0 : memref<64x64xf32>, %arg1 : memref<64xf3
 //  CHECK-SAME:   rhs(%[[BB0]] offset %[[OFFSET0]] strides[%[[C0]], %[[STRIDE0]]] : !util.buffer)
 //  CHECK-SAME:   out(%[[BB0]] offset %[[OFFSET0]] strides[%[[C0]], %[[STRIDE0]]] : !util.buffer) sizes(%[[C1]], %[[SIZE0]])
 func.func @addf0d(%arg0 : memref<2xf32>, %arg1 : memref<f32>) {
-  linalg.generic {indexing_maps = [affine_map<(d0) -> ()>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]}
+  linalg.generic {indexing_maps = [affine_map<(d0) -> ()>, affine_map<(d0) -> (d0)>], iterator_types = [#linalg.iterator_type<parallel>]}
     ins(%arg1 : memref<f32>) outs(%arg0 : memref<2xf32>) {
   ^bb0(%arg2: f32, %arg3: f32):
     %12 = arith.addf %arg2, %arg3 : f32
@@ -313,7 +313,7 @@ func.func @addf0d(%arg0 : memref<2xf32>, %arg1 : memref<f32>) {
 // CHECK-LABEL: @addi
 // CHECK: vmvx.binary op("add" : i32)
 func.func @addi(%arg0 : memref<64x64xi32>, %arg1 : memref<64xi32>) {
-  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
     ins(%arg1 : memref<64xi32>) outs(%arg0 : memref<64x64xi32>) {
   ^bb0(%arg2: i32, %arg3: i32):
     %12 = arith.addi %arg2, %arg3 : i32
@@ -326,7 +326,7 @@ func.func @addi(%arg0 : memref<64x64xi32>, %arg1 : memref<64xi32>) {
 // CHECK-LABEL: @andi
 // CHECK: vmvx.binary op("and" : i32)
 func.func @andi(%arg0 : memref<64x64xi32>, %arg1 : memref<64xi32>) {
-  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
     ins(%arg1 : memref<64xi32>) outs(%arg0 : memref<64x64xi32>) {
   ^bb0(%arg2: i32, %arg3: i32):
     %12 = arith.andi %arg2, %arg3 : i32
@@ -339,7 +339,7 @@ func.func @andi(%arg0 : memref<64x64xi32>, %arg1 : memref<64xi32>) {
 // CHECK-LABEL: @divsi
 // CHECK: vmvx.binary op("divs" : i32)
 func.func @divsi(%arg0 : memref<64x64xi32>, %arg1 : memref<64xi32>) {
-  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
     ins(%arg1 : memref<64xi32>) outs(%arg0 : memref<64x64xi32>) {
   ^bb0(%arg2: i32, %arg3: i32):
     %12 = arith.divsi %arg2, %arg3 : i32
@@ -352,7 +352,7 @@ func.func @divsi(%arg0 : memref<64x64xi32>, %arg1 : memref<64xi32>) {
 // CHECK-LABEL: @divui
 // CHECK: vmvx.binary op("divu" : i32)
 func.func @divui(%arg0 : memref<64x64xi32>, %arg1 : memref<64xi32>) {
-  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
     ins(%arg1 : memref<64xi32>) outs(%arg0 : memref<64x64xi32>) {
   ^bb0(%arg2: i32, %arg3: i32):
     %12 = arith.divui %arg2, %arg3 : i32
@@ -365,7 +365,7 @@ func.func @divui(%arg0 : memref<64x64xi32>, %arg1 : memref<64xi32>) {
 // CHECK-LABEL: @muli
 // CHECK: vmvx.binary op("mul" : i32)
 func.func @muli(%arg0 : memref<64x64xi32>, %arg1 : memref<64xi32>) {
-  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
     ins(%arg1 : memref<64xi32>) outs(%arg0 : memref<64x64xi32>) {
   ^bb0(%arg2: i32, %arg3: i32):
     %12 = arith.muli %arg2, %arg3 : i32
@@ -378,7 +378,7 @@ func.func @muli(%arg0 : memref<64x64xi32>, %arg1 : memref<64xi32>) {
 // CHECK-LABEL: @ori
 // CHECK: vmvx.binary op("or" : i32)
 func.func @ori(%arg0 : memref<64x64xi32>, %arg1 : memref<64xi32>) {
-  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
     ins(%arg1 : memref<64xi32>) outs(%arg0 : memref<64x64xi32>) {
   ^bb0(%arg2: i32, %arg3: i32):
     %12 = arith.ori %arg2, %arg3 : i32
@@ -391,7 +391,7 @@ func.func @ori(%arg0 : memref<64x64xi32>, %arg1 : memref<64xi32>) {
 // CHECK-LABEL: @shli
 // CHECK: vmvx.binary op("shl" : i32)
 func.func @shli(%arg0 : memref<64x64xi32>, %arg1 : memref<64xi32>) {
-  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
     ins(%arg1 : memref<64xi32>) outs(%arg0 : memref<64x64xi32>) {
   ^bb0(%arg2: i32, %arg3: i32):
     %12 = arith.shli %arg2, %arg3 : i32
@@ -404,7 +404,7 @@ func.func @shli(%arg0 : memref<64x64xi32>, %arg1 : memref<64xi32>) {
 // CHECK-LABEL: @shrsi
 // CHECK: vmvx.binary op("shrs" : i32)
 func.func @shrsi(%arg0 : memref<64x64xi32>, %arg1 : memref<64xi32>) {
-  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
     ins(%arg1 : memref<64xi32>) outs(%arg0 : memref<64x64xi32>) {
   ^bb0(%arg2: i32, %arg3: i32):
     %12 = arith.shrsi %arg2, %arg3 : i32
@@ -417,7 +417,7 @@ func.func @shrsi(%arg0 : memref<64x64xi32>, %arg1 : memref<64xi32>) {
 // CHECK-LABEL: @xori
 // CHECK: vmvx.binary op("xor" : i32)
 func.func @xori(%arg0 : memref<64x64xi32>, %arg1 : memref<64xi32>) {
-  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
     ins(%arg1 : memref<64xi32>) outs(%arg0 : memref<64x64xi32>) {
   ^bb0(%arg2: i32, %arg3: i32):
     %12 = arith.xori %arg2, %arg3 : i32
@@ -430,7 +430,7 @@ func.func @xori(%arg0 : memref<64x64xi32>, %arg1 : memref<64xi32>) {
 // CHECK-LABEL: @subi
 // CHECK: vmvx.binary op("sub" : i32)
 func.func @subi(%arg0 : memref<64x64xi32>, %arg1 : memref<64xi32>) {
-  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
     ins(%arg1 : memref<64xi32>) outs(%arg0 : memref<64x64xi32>) {
   ^bb0(%arg2: i32, %arg3: i32):
     %12 = arith.subi %arg2, %arg3 : i32
@@ -442,7 +442,7 @@ func.func @subi(%arg0 : memref<64x64xi32>, %arg1 : memref<64xi32>) {
 // CHECK-LABEL: @divf
 // CHECK: vmvx.binary op("div" : f32)
 func.func @divf(%arg0 : memref<64x64xf32>, %arg1 : memref<64xf32>) {
-  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
     ins(%arg1 : memref<64xf32>) outs(%arg0 : memref<64x64xf32>) {
   ^bb0(%arg2: f32, %arg3: f32):
     %12 = arith.divf %arg2, %arg3 : f32
@@ -454,7 +454,7 @@ func.func @divf(%arg0 : memref<64x64xf32>, %arg1 : memref<64xf32>) {
 // CHECK-LABEL: @mulf
 // CHECK: vmvx.binary op("mul" : f32)
 func.func @mulf(%arg0 : memref<64x64xf32>, %arg1 : memref<64xf32>) {
-  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
     ins(%arg1 : memref<64xf32>) outs(%arg0 : memref<64x64xf32>) {
   ^bb0(%arg2: f32, %arg3: f32):
     %12 = arith.mulf %arg2, %arg3 : f32
@@ -466,7 +466,7 @@ func.func @mulf(%arg0 : memref<64x64xf32>, %arg1 : memref<64xf32>) {
 // CHECK-LABEL: @subf
 // CHECK: vmvx.binary op("sub" : f32)
 func.func @subf(%arg0 : memref<64x64xf32>, %arg1 : memref<64xf32>) {
-  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
     ins(%arg1 : memref<64xf32>) outs(%arg0 : memref<64x64xf32>) {
   ^bb0(%arg2: f32, %arg3: f32):
     %12 = arith.subf %arg2, %arg3 : f32
@@ -479,7 +479,7 @@ func.func @subf(%arg0 : memref<64x64xf32>, %arg1 : memref<64xf32>) {
 // CHECK-LABEL: @absf
 // CHECK: vmvx.unary op("abs" : f32)
 func.func @absf(%arg0 : memref<64x64xf32>, %arg1 : memref<64xf32>) {
-  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
     ins(%arg1 : memref<64xf32>) outs(%arg0 : memref<64x64xf32>) {
   ^bb0(%arg2: f32, %arg3: f32):
     %12 = math.absf %arg2 : f32
@@ -491,7 +491,7 @@ func.func @absf(%arg0 : memref<64x64xf32>, %arg1 : memref<64xf32>) {
 // CHECK-LABEL: @ceilf
 // CHECK: vmvx.unary op("ceil" : f32)
 func.func @ceilf(%arg0 : memref<64x64xf32>, %arg1 : memref<64xf32>) {
-  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
     ins(%arg1 : memref<64xf32>) outs(%arg0 : memref<64x64xf32>) {
   ^bb0(%arg2: f32, %arg3: f32):
     %12 = math.ceil %arg2 : f32
@@ -503,7 +503,7 @@ func.func @ceilf(%arg0 : memref<64x64xf32>, %arg1 : memref<64xf32>) {
 // CHECK-LABEL: @exp
 // CHECK: vmvx.unary op("exp" : f32)
 func.func @expf(%arg0 : memref<64x64xf32>, %arg1 : memref<64xf32>) {
-  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
     ins(%arg1 : memref<64xf32>) outs(%arg0 : memref<64x64xf32>) {
   ^bb0(%arg2: f32, %arg3: f32):
     %12 = math.exp %arg2 : f32
@@ -515,7 +515,7 @@ func.func @expf(%arg0 : memref<64x64xf32>, %arg1 : memref<64xf32>) {
 // CHECK-LABEL: @floorf
 // CHECK: vmvx.unary op("floor" : f32)
 func.func @floorf(%arg0 : memref<64x64xf32>, %arg1 : memref<64xf32>) {
-  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
     ins(%arg1 : memref<64xf32>) outs(%arg0 : memref<64x64xf32>) {
   ^bb0(%arg2: f32, %arg3: f32):
     %12 = math.floor %arg2 : f32
@@ -527,7 +527,7 @@ func.func @floorf(%arg0 : memref<64x64xf32>, %arg1 : memref<64xf32>) {
 // CHECK-LABEL: @log
 // CHECK: vmvx.unary op("log" : f32)
 func.func @logf(%arg0 : memref<64x64xf32>, %arg1 : memref<64xf32>) {
-  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
     ins(%arg1 : memref<64xf32>) outs(%arg0 : memref<64x64xf32>) {
   ^bb0(%arg2: f32, %arg3: f32):
     %12 = math.log %arg2 : f32
@@ -539,7 +539,7 @@ func.func @logf(%arg0 : memref<64x64xf32>, %arg1 : memref<64xf32>) {
 // CHECK-LABEL: @negf
 // CHECK: vmvx.unary op("neg" : f32)
 func.func @negf(%arg0 : memref<64x64xf32>, %arg1 : memref<64xf32>) {
-  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
     ins(%arg1 : memref<64xf32>) outs(%arg0 : memref<64x64xf32>) {
   ^bb0(%arg2: f32, %arg3: f32):
     %12 = arith.negf %arg2 : f32
@@ -551,7 +551,7 @@ func.func @negf(%arg0 : memref<64x64xf32>, %arg1 : memref<64xf32>) {
 // CHECK-LABEL: @rsqrt
 // CHECK: vmvx.unary op("rsqrt" : f32)
 func.func @rsqrt(%arg0 : memref<64x64xf32>, %arg1 : memref<64xf32>) {
-  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+  linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
     ins(%arg1 : memref<64xf32>) outs(%arg0 : memref<64x64xf32>) {
   ^bb0(%arg2: f32, %arg3: f32):
     %12 = math.rsqrt %arg2 : f32

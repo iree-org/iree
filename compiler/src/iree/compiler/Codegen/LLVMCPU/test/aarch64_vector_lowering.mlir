@@ -36,7 +36,7 @@ module {
             %12 = scf.for %arg6 = %c0 to %c512 step %c32 iter_args(%arg7 = %cst) -> (vector<16x16xf32>) {
               %15 = vector.transfer_read %8[%arg2, %arg6], %cst_0 {in_bounds = [true, true]} : tensor<64x512xf32>, vector<16x32xf32>
               %16 = vector.transfer_read %9[%arg6, %arg4], %cst_0 {in_bounds = [true, true]} : tensor<512x64xf32>, vector<32x16xf32>
-              %17 = vector.contract {indexing_maps = [#map1, #map2, #map3], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %15, %16, %arg7 : vector<16x32xf32>, vector<32x16xf32> into vector<16x16xf32>
+              %17 = vector.contract {indexing_maps = [#map1, #map2, #map3], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>], kind = #vector.kind<add>} %15, %16, %arg7 : vector<16x32xf32>, vector<32x16xf32> into vector<16x16xf32>
               scf.yield %17 : vector<16x16xf32>
             }
             %13 = math.exp %12 : vector<16x16xf32>
@@ -136,13 +136,13 @@ module {
             %20 = scf.for %arg6 = %c0 to %c384 step %c32 iter_args(%arg7 = %cst) -> (vector<32x32xf32>) {
               %26 = vector.transfer_read %14[%arg2, %arg6], %cst_0 {in_bounds = [true, true]} : tensor<64x384xf32>, vector<32x32xf32>
               %27 = vector.transfer_read %16[%arg6, %arg4], %cst_0 {in_bounds = [true, true]} : tensor<384x64xf32>, vector<32x32xf32>
-              %28 = vector.contract {indexing_maps = [#map1, #map2, #map3], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %26, %27, %arg7 : vector<32x32xf32>, vector<32x32xf32> into vector<32x32xf32>
+              %28 = vector.contract {indexing_maps = [#map1, #map2, #map3], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>], kind = #vector.kind<add>} %26, %27, %arg7 : vector<32x32xf32>, vector<32x32xf32> into vector<32x32xf32>
               scf.yield %28 : vector<32x32xf32>
             }
             %21 = vector.transfer_write %20, %12[%c0, %c0] {in_bounds = [true, true]} : vector<32x32xf32>, tensor<32x32xf32>
             %22 = tensor.extract_slice %15[%arg2, %arg4] [32, 32] [1, 1] : tensor<64x64xf32> to tensor<32x32xf32>
             %23 = tensor.extract_slice %arg5[%arg2, %arg4] [32, 32] [1, 1] : tensor<64x64xf32> to tensor<32x32xf32>
-            %24 = linalg.generic {indexing_maps = [#map4, #map5, #map4, #map4], iterator_types = ["parallel", "parallel"]} ins(%21, %18, %22 : tensor<32x32xf32>, tensor<32xi32>, tensor<32x32xf32>) outs(%23 : tensor<32x32xf32>) attrs =  {__internal_linalg_transform__ = "vectorize"} {
+            %24 = linalg.generic {indexing_maps = [#map4, #map5, #map4, #map4], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]} ins(%21, %18, %22 : tensor<32x32xf32>, tensor<32xi32>, tensor<32x32xf32>) outs(%23 : tensor<32x32xf32>) attrs =  {__internal_linalg_transform__ = "vectorize"} {
             ^bb0(%arg6: f32, %arg7: i32, %arg8: f32, %arg9: f32):
               %26 = linalg.index 1 : index
               %27 = affine.apply #map6(%arg1, %26, %arg4)

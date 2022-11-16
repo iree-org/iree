@@ -17,7 +17,7 @@ attributes {iree.dispatch_fn_name = ""} {
 //      CHECK:   %[[T2:.+]] = tensor.empty(%[[T0]], %[[T1]])
 //      CHECK:   %[[T3:.+]] = linalg.generic
 // CHECK-SAME:     indexing_maps = [#[[MAP0]], #[[MAP0]]]
-// CHECK-SAME:     iterator_types = ["parallel", "parallel"]}
+// CHECK-SAME:     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
 // CHECK-SAME:     ins(%[[ARG0]] : tensor<?x?xf32>)
 // CHECK-SAME:     outs(%[[T2]] : tensor<?x?xf32>)
 // CHECK-NEXT:     ^{{.+}}(%[[OPERAND_IN:[a-zA-Z0-9_]+]]: f32, %{{.+}}: f32):

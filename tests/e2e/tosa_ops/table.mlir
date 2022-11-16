@@ -5,7 +5,7 @@ func.func @table() {
   %init = tensor.empty() : tensor<513xi16>
   %cst = linalg.generic {
     indexing_maps = [affine_map<(d0) -> (d0)>],
-    iterator_types = ["parallel"]}
+    iterator_types = [#linalg.iterator_type<parallel>]}
     outs(%init: tensor<513xi16>) {
     ^bb0(%arg1: i16):
       %i = linalg.index 0 : index

@@ -32,7 +32,7 @@ func.func @topk_split_reduction_1d(%input_values: tensor<30xf32>, %out_values: t
 // SINGLE:             %[[D10:.*]] = arith.cmpf ogt, %[[ARG3]], %[[ARG4]] : f32
 // SINGLE:             iree_linalg_ext.yield %[[D10]] : i1
 // SINGLE:           } -> tensor<3x3xf32>, tensor<3x3xi32>
-// SINGLE:           %[[ARG3:.*]] = linalg.generic {indexing_maps = [#[[MAP0]]], iterator_types = ["parallel", "parallel"]} outs(%[[D5:.*]]#1 : tensor<3x3xi32>) {
+// SINGLE:           %[[ARG3:.*]] = linalg.generic {indexing_maps = [#[[MAP0]]], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]} outs(%[[D5:.*]]#1 : tensor<3x3xi32>) {
 // SINGLE:           ^bb0(%[[ARG3:.*]]: i32):
 // SINGLE:             %[[D10:.*]] = linalg.index 0 : index
 // SINGLE:             %[[D11:.*]] = arith.index_cast %[[D10]] : index to i32
@@ -82,7 +82,7 @@ func.func @topk_split_reduction_nd(%input_values: tensor<3x10x40x8xf32>, %out_va
 // MULTIPLE:             %[[D10:.*]] = arith.cmpf ogt, %[[ARG3]], %[[ARG4]] : f32
 // MULTIPLE:             iree_linalg_ext.yield %[[D10]] : i1
 // MULTIPLE:           } -> tensor<3x10x4x4x8xf32>, tensor<3x10x4x4x8xi32>
-// MULTIPLE:           %[[D6:.*]] = linalg.generic {indexing_maps = [#[[MAP0]]], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]} outs(%[[D5:.*]]#1 : tensor<3x10x4x4x8xi32>) {
+// MULTIPLE:           %[[D6:.*]] = linalg.generic {indexing_maps = [#[[MAP0]]], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]} outs(%[[D5:.*]]#1 : tensor<3x10x4x4x8xi32>) {
 // MULTIPLE:           ^bb0(%[[ARG3:.*]]: i32):
 // MULTIPLE:             %[[D10:.*]] = linalg.index 2 : index
 // MULTIPLE:             %[[D11:.*]] = arith.index_cast %[[D10]] : index to i32
@@ -132,7 +132,7 @@ func.func @topk_split_reduction_double(%input_values: tensor<400xf32>, %out_valu
 // DOUBLE:             %[[D19:.*]] = arith.cmpf ogt, %[[ARG3]], %[[ARG4]] : f32
 // DOUBLE:             iree_linalg_ext.yield %[[D19]] : i1
 // DOUBLE:           } -> tensor<40x3xf32>, tensor<40x3xi32>
-// DOUBLE:           %[[D6:.*]] = linalg.generic {indexing_maps = [#[[MAP0]]], iterator_types = ["parallel", "parallel"]} outs(%[[D5:.*]]#1 : tensor<40x3xi32>) {
+// DOUBLE:           %[[D6:.*]] = linalg.generic {indexing_maps = [#[[MAP0]]], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]} outs(%[[D5:.*]]#1 : tensor<40x3xi32>) {
 // DOUBLE:           ^bb0(%[[ARG3:.*]]: i32):
 // DOUBLE:             %[[D19:.*]] = linalg.index 0 : index
 // DOUBLE:             %[[D20:.*]] = arith.index_cast %[[D19]] : index to i32

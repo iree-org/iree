@@ -13,7 +13,7 @@ func.func @multi_result() {
                        affine_map<(d0, d1) -> (d0, d1)>,
                        affine_map<(d0, d1) -> (d0, d1)>,
                        affine_map<(d0, d1) -> (d0, d1)>],
-      iterator_types = ["parallel", "parallel"]}
+      iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
       ins(%input1, %input2 : tensor<3x4xi32>, tensor<3x4xi32>)
       outs(%init, %init : tensor<3x4xi32>, tensor<3x4xi32>) {
       ^bb0(%arg0: i32, %arg1: i32, %arg2: i32, %arg3: i32) :
@@ -47,7 +47,7 @@ func.func @operand_fusion() {
       indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
                        affine_map<(d0, d1, d2, d3) -> (d3)>,
                        affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
-      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
       ins(%conv, %bias : tensor<1x112x112x16xf32>, tensor<16xf32>)
       outs(%init : tensor<1x112x112x16xf32>) {
       ^bb0(%arg0 : f32, %arg1 : f32, %arg2 : f32):

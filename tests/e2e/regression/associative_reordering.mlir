@@ -54,7 +54,7 @@ func.func @check_reordering() {
   %1 = util.unfoldable_constant dense<-0.395125> : tensor<f32>
   %2 = tensor.empty() : tensor<f32>
   %3 = linalg.fill ins(%cst : f32) outs(%2 : tensor<f32>) -> tensor<f32>
-  %4 = linalg.generic {indexing_maps = [#map0, #map3, #map3], iterator_types = ["reduction"]}
+  %4 = linalg.generic {indexing_maps = [#map0, #map3, #map3], iterator_types = [#linalg.iterator_type<reduction>]}
     ins(%0, %1 : tensor<384xf32>, tensor<f32>) outs(%3 : tensor<f32>){
   ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):
     %5 = arith.subf %arg3, %arg4 : f32

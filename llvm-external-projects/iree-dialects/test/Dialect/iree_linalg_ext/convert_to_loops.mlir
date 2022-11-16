@@ -389,7 +389,7 @@ func.func @fft_1D(%real: memref<16xf32>, %imag: memref<16xf32>) {
 // CHECK:           %[[R_IMAG_SLICE:.+]] = memref.subview %[[IMAG]][%[[R_OFFSET]]] [%[[C1]]] [1]
 // CHECK:           linalg.generic
 // CHECK-SAME:        indexing_maps = [#[[MAP1]], #[[MAP1]], #[[MAP1]], #[[MAP1]]]
-// CHECK-SAME:        iterator_types = ["parallel"]
+// CHECK-SAME:        iterator_types = [#linalg.iterator_type<parallel>]
 // CHECK-SAME:        outs(%[[L_REAL_SLICE]], %[[L_IMAG_SLICE]], %[[R_REAL_SLICE]], %[[R_IMAG_SLICE]]
 // CHECK:           ^bb0(%[[L_REAL:.+]]: f32, %[[L_IMAG:.+]]: f32, %[[R_REAL:.+]]: f32, %[[R_IMAG:.+]]: f32)
 //
@@ -446,7 +446,7 @@ func.func @fft_2D(%real: memref<?x16xf32>, %imag: memref<?x16xf32>) {
 // CHECK:             %[[R_IMAG_SLICE:.+]] = memref.subview %[[IMAG]][%[[I]], %[[R_OFFSET]]] [1, %[[C2]]] [1, 1]
 // CHECK:             linalg.generic
 // CHECK-SAME:          indexing_maps = [#[[MAP1]], #[[MAP1]], #[[MAP1]], #[[MAP1]]]
-// CHECK-SAME:          iterator_types = ["parallel", "parallel"]
+// CHECK-SAME:          iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]
 // CHECK-SAME:          outs(%[[L_REAL_SLICE]], %[[L_IMAG_SLICE]], %[[R_REAL_SLICE]], %[[R_IMAG_SLICE]]
 //
 //                    The computation is bascially the same, and they are
@@ -482,7 +482,7 @@ func.func @fft_2D_coef_buf(%real: memref<?x16xf32>, %imag: memref<?x16xf32>,
 // CHECK:             %[[R_IMAG_SLICE:.+]] = memref.subview %[[IMAG]][%[[I]], %[[R_OFFSET]]] [1, %[[C1]]] [1, 1]
 // CHECK:             linalg.generic
 // CHECK-SAME:          indexing_maps = [#[[MAP1]], #[[MAP1]], #[[MAP2]], #[[MAP2]], #[[MAP2]], #[[MAP2]]]
-// CHECK-SAME:          iterator_types = ["parallel", "parallel"]
+// CHECK-SAME:          iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]
 // CHECK-SAME:          ins(%[[COEF_REAL]], %[[COEF_IMAG]]
 // CHECK-SAME:          outs(%[[L_REAL_SLICE]], %[[L_IMAG_SLICE]], %[[R_REAL_SLICE]], %[[R_IMAG_SLICE]]
 // CHECK:             ^bb0(%[[W_REAL:.+]]: f32, %[[W_IMAG:.+]]: f32, %[[L_REAL:.+]]: f32, %[[L_IMAG:.+]]: f32, %[[R_REAL:.+]]: f32, %[[R_IMAG:.+]]: f32)

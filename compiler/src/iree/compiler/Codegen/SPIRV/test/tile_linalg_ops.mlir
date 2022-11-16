@@ -24,7 +24,7 @@ func.func @innermost_reduction() {
     %14 = linalg.fill ins(%cst : f32) outs(%13 : tensor<128xf32>) -> tensor<128xf32>
     %15 = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0)>],
-      iterator_types = ["parallel", "reduction"]
+      iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]
     } ins(%11, %12 : tensor<128x384xf32>, tensor<128xf32>) outs(%14 : tensor<128xf32>)
     attrs = {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[128], [4], [0, 4]]>} {
     ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):

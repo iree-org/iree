@@ -13,7 +13,7 @@ func.func @no_fuse_quantized(%arg0 : tensor<?x113x113x64xi8>, %arg1 : tensor<3x3
   %3 = tensor.empty(%d0) : tensor<?x56x56x64xi8>
   %4 = linalg.generic {
       indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
-      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
       ins(%2 : tensor<?x56x56x64xi32>) outs(%3 : tensor<?x56x56x64xi8>) {
     ^bb0(%b0: i32, %b1 : i8):
       %5 = arith.trunci %b0 : i32 to i8
@@ -37,13 +37,13 @@ func.func @reduction_broadcast_elementwise_type_mismatch(%a: tensor<12x16x16xf32
   %cst_47 = arith.constant 0.000000e+00 : f32
   %37 = tensor.empty() : tensor<12x16xf32>
   %38 = linalg.fill ins(%cst_47 : f32) outs(%37 : tensor<12x16xf32>) -> tensor<12x16xf32>
-  %39 = linalg.generic {indexing_maps = [#map2, #map1], iterator_types = ["parallel", "parallel", "reduction"]} ins(%a : tensor<12x16x16xf32>) outs(%38 : tensor<12x16xf32>) {
+  %39 = linalg.generic {indexing_maps = [#map2, #map1], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]} ins(%a : tensor<12x16x16xf32>) outs(%38 : tensor<12x16xf32>) {
     ^bb0(%arg3: f32, %arg4: f32):
     %780 = arith.maxf %arg3, %arg4 : f32
     linalg.yield %780 : f32
   } -> tensor<12x16xf32>
   %40 = tensor.empty() : tensor<12x16x32xi32>
-  %42 = linalg.generic {indexing_maps = [#map2, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel"]} ins(%b, %39 : tensor<12x16x32xf32>, tensor<12x16xf32>) outs(%40 : tensor<12x16x32xi32>) {
+  %42 = linalg.generic {indexing_maps = [#map2, #map1, #map2], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]} ins(%b, %39 : tensor<12x16x32xf32>, tensor<12x16xf32>) outs(%40 : tensor<12x16x32xi32>) {
     ^bb0(%arg3: f32, %arg4: f32, %arg5: i32):
     %780 = arith.subf %arg3, %arg4 : f32
     %781 = arith.fptosi %780 : f32 to i32

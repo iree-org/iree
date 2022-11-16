@@ -5,7 +5,7 @@ func.func @reduction_aligned() {
   %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<128xf32>) -> tensor<128xf32>
   %result = linalg.generic {indexing_maps = [
     affine_map<(d0, d1) -> (d0, d1)>,affine_map<(d0, d1) -> (d0)>],
-    iterator_types = ["parallel", "reduction"]}
+    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]}
     ins(%in : tensor<128x384xf32>) outs(%fill : tensor<128xf32>) {
     ^bb0(%arg3: f32, %arg4: f32):  // no predecessors
       %2 = arith.addf %arg3, %arg4 : f32
@@ -22,7 +22,7 @@ func.func @reduction_unaligned() {
   %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<129xf32>) -> tensor<129xf32>
   %result = linalg.generic {indexing_maps = [
     affine_map<(d0, d1) -> (d0, d1)>,affine_map<(d0, d1) -> (d0)>],
-    iterator_types = ["parallel", "reduction"]}
+    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]}
     ins(%in : tensor<129x384xf32>) outs(%fill : tensor<129xf32>) {
     ^bb0(%arg3: f32, %arg4: f32):  // no predecessors
       %2 = arith.addf %arg3, %arg4 : f32
@@ -40,7 +40,7 @@ func.func @reduction_aligned_larger() {
   %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<2xf32>) -> tensor<2xf32>
   %result = linalg.generic {indexing_maps = [
     affine_map<(d0, d1) -> (d0, d1)>,affine_map<(d0, d1) -> (d0)>],
-    iterator_types = ["parallel", "reduction"]}
+    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]}
     ins(%in : tensor<2x40960xf32>) outs(%fill : tensor<2xf32>) {
     ^bb0(%arg3: f32, %arg4: f32):  // no predecessors
       %2 = arith.addf %arg3, %arg4 : f32

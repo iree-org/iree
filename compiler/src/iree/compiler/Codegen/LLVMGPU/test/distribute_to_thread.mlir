@@ -283,7 +283,7 @@ hal.executable @reduction_dispatch {
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<1000xf32>
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<f32>
         linalg.fill {lowering_config = #config} ins(%cst_0 : f32) outs(%1 : memref<f32>)
-        linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>], iterator_types = ["reduction"]} ins(%0 : memref<1000xf32>) outs(%1 : memref<f32>) attrs = {lowering_config = #config} {
+        linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>], iterator_types = [#linalg.iterator_type<reduction>]} ins(%0 : memref<1000xf32>) outs(%1 : memref<f32>) attrs = {lowering_config = #config} {
         ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
           %2 = arith.cmpf ogt, %arg0, %arg1 : f32
           %3 = arith.select %2, %arg0, %arg1 : f32
@@ -422,7 +422,7 @@ hal.executable private @contract_4d  {
               %24 = memref.subview %12[0, %arg1, %arg0, 0] [%6, %20, 1, 64] [1, 1, 1, 1] : memref<?x?x12x64xf32> to memref<?x?x1x64xf32, affine_map<(d0, d1, d2, d3)[s0, s1] -> (d0 * s1 + s0 + d1 * 768 + d2 * 64 + d3)>>
               %25 = memref.subview %13[0, %arg2, %arg0, 0] [%6, %21, 1, 64] [1, 1, 1, 1] : memref<?x?x12x64xf32> to memref<?x?x1x64xf32, affine_map<(d0, d1, d2, d3)[s0, s1] -> (d0 * s1 + s0 + d1 * 768 + d2 * 64 + d3)>>
               linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0, 1, 2, 256, 4]]>} ins(%cst_0 : f32) outs(%22 : memref<?x1x?x?xf32, affine_map<(d0, d1, d2, d3)[s0, s1, s2, s3] -> (d0 * s1 + s0 + d1 * s2 + d2 * s3 + d3)>>)
-              linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d1, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d1, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]} ins(%24, %25 : memref<?x?x1x64xf32, affine_map<(d0, d1, d2, d3)[s0, s1] -> (d0 * s1 + s0 + d1 * 768 + d2 * 64 + d3)>>, memref<?x?x1x64xf32, affine_map<(d0, d1, d2, d3)[s0, s1] -> (d0 * s1 + s0 + d1 * 768 + d2 * 64 + d3)>>) outs(%22 : memref<?x1x?x?xf32, affine_map<(d0, d1, d2, d3)[s0, s1, s2, s3] -> (d0 * s1 + s0 + d1 * s2 + d2 * s3 + d3)>>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0, 1, 2, 256, 4]]>} {
+              linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d1, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d1, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]} ins(%24, %25 : memref<?x?x1x64xf32, affine_map<(d0, d1, d2, d3)[s0, s1] -> (d0 * s1 + s0 + d1 * 768 + d2 * 64 + d3)>>, memref<?x?x1x64xf32, affine_map<(d0, d1, d2, d3)[s0, s1] -> (d0 * s1 + s0 + d1 * 768 + d2 * 64 + d3)>>) outs(%22 : memref<?x1x?x?xf32, affine_map<(d0, d1, d2, d3)[s0, s1, s2, s3] -> (d0 * s1 + s0 + d1 * s2 + d2 * s3 + d3)>>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0, 1, 2, 256, 4]]>} {
               ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):
                 %26 = arith.mulf %arg3, %arg4 : f32
                 %27 = arith.addf %26, %arg5 : f32

@@ -26,7 +26,7 @@ hal.executable @warp_reduction_dispatch {
         %8 = tensor.empty() : tensor<512xf32>
         %9 = linalg.fill ins(%cst : f32) outs(%8 : tensor<512xf32>) -> tensor<512xf32>
         %10 = linalg.generic {
-            indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>], iterator_types = ["parallel", "reduction"]}
+            indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]}
             ins(%5 : tensor<512x10240xf32>) outs(%9 : tensor<512xf32>) {
           ^bb0(%arg1: f32, %arg2: f32):  // no predecessors
             %11 = arith.addf %arg1, %arg2 : f32

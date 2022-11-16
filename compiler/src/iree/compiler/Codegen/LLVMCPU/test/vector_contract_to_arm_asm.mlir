@@ -20,7 +20,7 @@ func.func @check_in_depth_mmt_8x4x8_i8i8i32(
           affine_map<(d0, d1, d2) -> (d0, d2)>,
           affine_map<(d0, d1, d2) -> (d1, d2)>,
           affine_map<(d0, d1, d2) -> (d0, d1)>
-      ], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>
+      ], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>], kind = #vector.kind<add>
   } %lhs_wide, %rhs_wide, %acc : vector<8x4xi32>, vector<8x4xi32> into vector<8x8xi32>
   return %res : vector<8x8xi32>
 }
@@ -117,7 +117,7 @@ func.func @mmt_8x1x8_f32f32f32(
           affine_map<(d0, d1, d2) -> (d0, d2)>,
           affine_map<(d0, d1, d2) -> (d1, d2)>,
           affine_map<(d0, d1, d2) -> (d0, d1)>
-      ], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>
+      ], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>], kind = #vector.kind<add>
   } %lhs, %rhs, %acc : vector<8x1xf32>, vector<8x1xf32> into vector<8x8xf32>
   return %res : vector<8x8xf32>
 }
@@ -137,7 +137,7 @@ func.func @mmt_8x1x1_f32f32f32_matvec(
           affine_map<(d0, d1, d2) -> (d0, d2)>,
           affine_map<(d0, d1, d2) -> (d1, d2)>,
           affine_map<(d0, d1, d2) -> (d0, d1)>
-      ], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>
+      ], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>], kind = #vector.kind<add>
   } %lhs, %rhs, %acc : vector<8x1xf32>, vector<1x1xf32> into vector<8x1xf32>
   return %res : vector<8x1xf32>
 }
@@ -157,7 +157,7 @@ func.func @mmt_1x1x8_f32f32f32_vecmat(
           affine_map<(d0, d1, d2) -> (d0, d2)>,
           affine_map<(d0, d1, d2) -> (d1, d2)>,
           affine_map<(d0, d1, d2) -> (d0, d1)>
-      ], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>
+      ], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>], kind = #vector.kind<add>
   } %lhs, %rhs, %acc : vector<1x1xf32>, vector<8x1xf32> into vector<1x8xf32>
   return %res : vector<1x8xf32>
 }
@@ -179,7 +179,7 @@ func.func @mmt_8x1x8_i8i8i32(
           affine_map<(d0, d1, d2) -> (d0, d2)>,
           affine_map<(d0, d1, d2) -> (d1, d2)>,
           affine_map<(d0, d1, d2) -> (d0, d1)>
-      ], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>
+      ], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>], kind = #vector.kind<add>
   } %lhs_wide, %rhs_wide, %acc : vector<8x1xi32>, vector<8x1xi32> into vector<8x8xi32>
   return %res : vector<8x8xi32>
 }
@@ -201,7 +201,7 @@ func.func @mmt_8x8x1_i8i8i32_matvec(
           affine_map<(d0, d1, d2) -> (d0, d2)>,
           affine_map<(d0, d1, d2) -> (d1, d2)>,
           affine_map<(d0, d1, d2) -> (d0, d1)>
-      ], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>
+      ], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>], kind = #vector.kind<add>
   } %lhs_wide, %rhs_wide, %acc : vector<8x8xi32>, vector<1x8xi32> into vector<8x1xi32>
   return %res : vector<8x1xi32>
 }
@@ -223,7 +223,7 @@ func.func @mmt_1x8x8_i8i8i32_matvec(
           affine_map<(d0, d1, d2) -> (d0, d2)>,
           affine_map<(d0, d1, d2) -> (d1, d2)>,
           affine_map<(d0, d1, d2) -> (d0, d1)>
-      ], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>
+      ], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>], kind = #vector.kind<add>
   } %lhs_wide, %rhs_wide, %acc : vector<1x8xi32>, vector<8x8xi32> into vector<1x8xi32>
   return %res : vector<1x8xi32>
 }
@@ -245,7 +245,7 @@ func.func @mmt_8x4x8_i8i8i32(
           affine_map<(d0, d1, d2) -> (d0, d2)>,
           affine_map<(d0, d1, d2) -> (d1, d2)>,
           affine_map<(d0, d1, d2) -> (d0, d1)>
-      ], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>
+      ], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>], kind = #vector.kind<add>
   } %lhs_wide, %rhs_wide, %acc : vector<8x4xi32>, vector<8x4xi32> into vector<8x8xi32>
   return %res : vector<8x8xi32>
 }
@@ -267,7 +267,7 @@ func.func @mmt_8x4x1_i8i8i32_matvec(
           affine_map<(d0, d1, d2) -> (d0, d2)>,
           affine_map<(d0, d1, d2) -> (d1, d2)>,
           affine_map<(d0, d1, d2) -> (d0, d1)>
-      ], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>
+      ], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>], kind = #vector.kind<add>
   } %lhs_wide, %rhs_wide, %acc : vector<8x4xi32>, vector<1x4xi32> into vector<8x1xi32>
   return %res : vector<8x1xi32>
 }
@@ -289,7 +289,7 @@ func.func @mmt_1x4x8_i8i8i32_vecmat(
           affine_map<(d0, d1, d2) -> (d0, d2)>,
           affine_map<(d0, d1, d2) -> (d1, d2)>,
           affine_map<(d0, d1, d2) -> (d0, d1)>
-      ], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>
+      ], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>], kind = #vector.kind<add>
   } %lhs_wide, %rhs_wide, %acc : vector<1x4xi32>, vector<8x4xi32> into vector<1x8xi32>
   return %res : vector<1x8xi32>
 }
@@ -311,7 +311,7 @@ func.func @mmt_8x8x8_i8i8i32(
           affine_map<(d0, d1, d2) -> (d0, d2)>,
           affine_map<(d0, d1, d2) -> (d1, d2)>,
           affine_map<(d0, d1, d2) -> (d0, d1)>
-      ], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>
+      ], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>], kind = #vector.kind<add>
   } %lhs_wide, %rhs_wide, %acc : vector<8x8xi32>, vector<8x8xi32> into vector<8x8xi32>
   return %res : vector<8x8xi32>
 }

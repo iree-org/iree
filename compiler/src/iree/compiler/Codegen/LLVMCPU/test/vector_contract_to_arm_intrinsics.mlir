@@ -93,7 +93,7 @@ func.func @vector_i8i8i32matmul(
           affine_map<(d0, d1, d2) -> (d0, d2)>,
           affine_map<(d0, d1, d2) -> (d1, d2)>,
           affine_map<(d0, d1, d2) -> (d0, d1)>
-      ], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>
+      ], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>], kind = #vector.kind<add>
   } %lhs_wide, %rhs_wide, %acc : vector<8x4xi32>, vector<8x4xi32> into vector<8x8xi32>
   return %res : vector<8x8xi32>
 }
@@ -111,7 +111,7 @@ func.func @vector_f32f32f32matmul(
           affine_map<(d0, d1, d2) -> (d0, d2)>,
           affine_map<(d0, d1, d2) -> (d1, d2)>,
           affine_map<(d0, d1, d2) -> (d0, d1)>
-      ], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>
+      ], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>], kind = #vector.kind<add>
   } %lhs, %rhs, %acc : vector<8x4xf32>, vector<8x4xf32> into vector<8x8xf32>
   return %res : vector<8x8xf32>
 }
@@ -130,7 +130,7 @@ func.func @vector_i32i32i32matmul(
           affine_map<(d0, d1, d2) -> (d0, d2)>,
           affine_map<(d0, d1, d2) -> (d1, d2)>,
           affine_map<(d0, d1, d2) -> (d0, d1)>
-      ], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>
+      ], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>], kind = #vector.kind<add>
   } %lhs, %rhs, %acc : vector<8x4xi32>, vector<8x4xi32> into vector<8x8xi32>
   return %res : vector<8x8xi32>
 }

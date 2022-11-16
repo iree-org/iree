@@ -7,7 +7,7 @@
 ]
 #matmul_trait = {
   indexing_maps = #matmul_accesses,
-  iterator_types = ["parallel", "parallel", "reduction"]
+  iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]
 }
 
 // CHECK-LABEL: func.func @test

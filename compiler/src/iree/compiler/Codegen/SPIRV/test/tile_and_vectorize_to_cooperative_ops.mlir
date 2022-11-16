@@ -98,7 +98,7 @@ hal.executable public @matmul_256x1024x128_div_add {
       %subview_4 = memref.subview %6[%8, %9] [32, 32] [1, 1] : memref<256x128xf16> to memref<32x32xf16, strided<[128, 1], offset: ?>>
       linalg.generic {
         indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
-        iterator_types = ["parallel", "parallel"]
+        iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]
       }
       ins(%subview_3, %subview_4 : memref<32x32xf16, strided<[128, 1], offset: ?>>, memref<32x32xf16, strided<[128, 1], offset: ?>>)
       outs(%subview : memref<32x32xf16, strided<[128, 1], offset: ?>>)
@@ -272,7 +272,7 @@ hal.executable public @matmul_256x1024x128_div_add {
         %subview_3 = memref.subview %5[%workgroup_id_z, %7, %8] [1, 32, 32] [1, 1, 1] : memref<16x128x256xf16> to memref<1x32x32xf16, strided<[32768, 256, 1], offset: ?>>
         linalg.generic {
             indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
-            iterator_types = ["parallel", "parallel", "parallel"]}
+            iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
         ins(%subview_3 : memref<1x32x32xf16, strided<[32768, 256, 1], offset: ?>>)
         outs(%subview : memref<1x32x32xf16, strided<[32768, 256, 1], offset: ?>>)
         attrs = {__internal_linalg_transform__ = "workgroup_memory"} {

@@ -2,7 +2,7 @@ func.func private @generate_2D_source(%height : index, %width : index) -> tensor
   %init_source = tensor.empty(%height, %width) : tensor<?x?xi32>
   %source = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>],
-      iterator_types = ["parallel", "parallel"]}
+      iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
       outs(%init_source : tensor<?x?xi32>) {
     ^bb0(%b0 : i32):
       %outer = linalg.index 0 : index

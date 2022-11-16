@@ -16,7 +16,7 @@ func.func @transpsoe_4096_4096() -> tensor<4096x4096xf32> {
   %output = tensor.empty() : tensor<4096x4096xf32>
   %result = linalg.generic {
     indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0, d1)>],
-    iterator_types = ["parallel", "parallel"]}
+    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
     ins(%input : tensor<4096x4096xf32>) outs(%output : tensor<4096x4096xf32>) {
     ^bb0(%arg1: f32, %arg2: f32):
         linalg.yield %arg1 : f32
@@ -32,7 +32,7 @@ func.func @transpsoe_10_1024_2048() -> tensor<10x1024x2048xf32> {
   %output = tensor.empty() : tensor<10x1024x2048xf32>
   %result = linalg.generic {
     indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
-    iterator_types = ["parallel", "parallel", "parallel"]}
+    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
     ins(%input : tensor<10x2048x1024xf32>) outs(%output : tensor<10x1024x2048xf32>) {
     ^bb0(%arg1: f32, %arg2: f32):
         linalg.yield %arg1 : f32
@@ -51,7 +51,7 @@ func.func @transpsoe_10_1024_2048_fusion() -> tensor<10x1024x2048xf32> {
   %output = tensor.empty() : tensor<10x1024x2048xf32>
   %result = linalg.generic {
     indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
-    iterator_types = ["parallel", "parallel", "parallel"]}
+    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
     ins(%lhs, %rhs : tensor<10x2048x1024xf32>, tensor<10x2048x1024xf32>) outs(%output : tensor<10x1024x2048xf32>) {
     ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):
         %0 = arith.addf %arg1, %arg2 : f32
@@ -68,7 +68,7 @@ func.func @transpsoe_10_1024_2064_unaligned() -> tensor<10x1024x2064xf32> {
   %output = tensor.empty() : tensor<10x1024x2064xf32>
   %result = linalg.generic {
     indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
-    iterator_types = ["parallel", "parallel", "parallel"]}
+    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
     ins(%input : tensor<10x2064x1024xf32>) outs(%output : tensor<10x1024x2064xf32>) {
     ^bb0(%arg1: f32, %arg2: f32):
         linalg.yield %arg1 : f32

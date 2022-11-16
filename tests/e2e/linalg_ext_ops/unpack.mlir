@@ -2,7 +2,7 @@ func.func private @generate_4D_source(%d0: index, %d1: index, %d2: index, %d3: i
   %init_source = tensor.empty(%d0, %d1, %d2, %d3) : tensor<?x?x?x?xi32>
   %source = linalg.generic {
       indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
-      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
       outs(%init_source : tensor<?x?x?x?xi32>) {
     ^bb0(%b0 : i32):
       %i = linalg.index 0 : index

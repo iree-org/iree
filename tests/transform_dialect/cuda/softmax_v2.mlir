@@ -39,7 +39,7 @@ func.func @softmax() -> !out_tensor_t {
   %input_max = linalg.generic
     {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
                       affine_map<(d0, d1, d2) -> (d0, d1)>],
-                      iterator_types = ["parallel", "parallel", "reduction"]}
+                      iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]}
      ins(%input : !in_tensor_t)
     outs(%input_max_filled : !tmp_tensor_t) {
       ^bb0(%arg0: f32, %arg1: f32):
@@ -57,7 +57,7 @@ func.func @softmax() -> !out_tensor_t {
                       affine_map<(d0, d1, d2) -> (d0, d1)>,
                       affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
                       affine_map<(d0, d1, d2) -> (d0, d1)>],
-                      iterator_types = ["parallel", "parallel", "reduction"]}
+                      iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]}
      ins(%input, %input_max : !in_tensor_t, !tmp_tensor_t)
     outs(%exps_empty, %exps_sum_filled : !out_tensor_t, !tmp_tensor_t) {
       ^bb0(%arg0: f32, %arg1: f32, %arg2: f32, %arg3: f32):
@@ -72,7 +72,7 @@ func.func @softmax() -> !out_tensor_t {
     {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
                       affine_map<(d0, d1, d2) -> (d0, d1)>,
                       affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
-                      iterator_types = ["parallel", "parallel", "parallel"]}
+                      iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
      ins(%exps, %exps_sum : !out_tensor_t, !tmp_tensor_t)
     outs(%res_empty : !out_tensor_t) {
       ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):

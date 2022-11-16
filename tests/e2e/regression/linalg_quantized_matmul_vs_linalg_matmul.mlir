@@ -28,7 +28,7 @@ func.func private @quantized_matmul_as_matmul_3x4x5(%lhs : tensor<3x4xi8>, %rhs 
   %lhs_sums = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                        affine_map<(d0, d1) -> (d0)>],
-      iterator_types = ["parallel", "reduction"]}
+      iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]}
       ins(%lhs_i32 : tensor<3x4xi32>)
       outs(%zero_lhs_sums : tensor<3xi32>) {
       ^bb0(%arg0: i32, %arg1: i32) :
@@ -43,7 +43,7 @@ func.func private @quantized_matmul_as_matmul_3x4x5(%lhs : tensor<3x4xi8>, %rhs 
   %rhs_sums = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                        affine_map<(d0, d1) -> (d1)>],
-      iterator_types = ["reduction", "parallel"]}
+      iterator_types = [#linalg.iterator_type<reduction>, #linalg.iterator_type<parallel>]}
       ins(%rhs_i32 : tensor<4x5xi32>)
       outs(%zero_rhs_sums : tensor<5xi32>) {
       ^bb0(%arg0: i32, %arg1: i32) :
@@ -61,7 +61,7 @@ func.func private @quantized_matmul_as_matmul_3x4x5(%lhs : tensor<3x4xi8>, %rhs 
         affine_map<(d0, d1) -> ()>,
         affine_map<(d0, d1) -> ()>,
         affine_map<(d0, d1) -> (d0, d1)>],
-      iterator_types = ["parallel", "parallel"]}
+      iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
       ins(%matmul_result, %lhs_sums, %rhs_sums, %lhs_zp, %rhs_zp, %k_size : tensor<3x5xi32>, tensor<3xi32>, tensor<5xi32>, i32, i32, i32)
       outs(%init_acc_uninitialized : tensor<3x5xi32>) {
       ^bb0(%matmul_result_val : i32, %lhs_sums_val: i32, %rhs_sums_val: i32, %lhs_zp_val: i32, %rhs_zp_val: i32, %k : i32, %acc_val: i32) :
@@ -101,7 +101,7 @@ func.func private @quantized_matmul_as_matmul_dynamic(%lhs : tensor<?x?xi8>, %rh
   %lhs_sums = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                        affine_map<(d0, d1) -> (d0)>],
-      iterator_types = ["parallel", "reduction"]}
+      iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]}
       ins(%lhs_i32 : tensor<?x?xi32>)
       outs(%zero_lhs_sums : tensor<?xi32>) {
       ^bb0(%arg0: i32, %arg1: i32) :
@@ -116,7 +116,7 @@ func.func private @quantized_matmul_as_matmul_dynamic(%lhs : tensor<?x?xi8>, %rh
   %rhs_sums = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                        affine_map<(d0, d1) -> (d1)>],
-      iterator_types = ["reduction", "parallel"]}
+      iterator_types = [#linalg.iterator_type<reduction>, #linalg.iterator_type<parallel>]}
       ins(%rhs_i32 : tensor<?x?xi32>)
       outs(%zero_rhs_sums : tensor<?xi32>) {
       ^bb0(%arg0: i32, %arg1: i32) :
@@ -134,7 +134,7 @@ func.func private @quantized_matmul_as_matmul_dynamic(%lhs : tensor<?x?xi8>, %rh
         affine_map<(d0, d1) -> ()>,
         affine_map<(d0, d1) -> ()>,
         affine_map<(d0, d1) -> (d0, d1)>],
-      iterator_types = ["parallel", "parallel"]}
+      iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
       ins(%matmul_result, %lhs_sums, %rhs_sums, %lhs_zp, %rhs_zp, %k_size_i32 : tensor<?x?xi32>, tensor<?xi32>, tensor<?xi32>, i32, i32, i32)
       outs(%init_acc_uninitialized : tensor<?x?xi32>) {
       ^bb0(%matmul_result_val : i32, %lhs_sums_val: i32, %rhs_sums_val: i32, %lhs_zp_val: i32, %rhs_zp_val: i32, %k : i32, %acc_val: i32) :

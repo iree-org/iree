@@ -33,7 +33,7 @@ func.func @dynamicBroadcast(%arg0: tensor<?xf32>, %arg1: tensor<?x?xf32>) -> ten
   // CHECK: cf.assert %[[EQ]], "mismatched dynamic broadcast extents"
 
   // CHECK: %[[INIT_0:.*]] = tensor.empty(%[[ARG1_D0]], %[[ARG0_D0]]) : tensor<?x?xf32>
-  // CHECK: %[[BCAST_ARG0:.*]] = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "parallel"]}
+  // CHECK: %[[BCAST_ARG0:.*]] = linalg.generic {indexing_maps = [#map, #map1], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
   // CHECK-SAME: ins(%arg0 : tensor<?xf32>) outs(%[[INIT_0]] : tensor<?x?xf32>)
 
   // CHECK: %[[RESULT:.*]] = linalg.generic
@@ -100,7 +100,7 @@ func.func @selectv2(%arg0: tensor<2xi1>, %arg1: tensor<2xi32>, %arg2: tensor<2xi
 // CHECK-LABEL: func.func @selectv2_pred_scalar
 func.func @selectv2_pred_scalar(%arg0: tensor<i1>, %arg1: tensor<2xi32>, %arg2: tensor<2xi32>) -> tensor<2xi32> {
   // CHECK: %[[INIT_0:.*]] = tensor.empty() : tensor<2xi1>
-  // CHECK: %[[BCAST_PRED:.*]] = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel"]} ins(%arg0 : tensor<i1>) outs(%[[INIT_0]] : tensor<2xi1>)
+  // CHECK: %[[BCAST_PRED:.*]] = linalg.generic {indexing_maps = [#map, #map1], iterator_types = [#linalg.iterator_type<parallel>]} ins(%arg0 : tensor<i1>) outs(%[[INIT_0]] : tensor<2xi1>)
   // CHECK: %[[INIT_1:.*]] = tensor.empty() : tensor<2xi32>
   // CHECK: linalg.generic
   // CHECK-SAME: ins(%[[BCAST_PRED]], %arg1, %arg2 : tensor<2xi1>, tensor<2xi32>, tensor<2xi32>) outs(%[[INIT_1]] : tensor<2xi32>)
@@ -114,8 +114,8 @@ func.func @selectv2_pred_scalar(%arg0: tensor<i1>, %arg1: tensor<2xi32>, %arg2: 
 // CHECK: #map2 = affine_map<(d0, d1, d2) -> (d1, 0)>
 // CHECK-LABEL: func.func @selectv2_broadcast_then
 func.func @selectv2_broadcast_then(%arg0: tensor<i1>, %arg1: tensor<8x1xi32>, %arg2: tensor<2x8x8xi32>) -> tensor<2x8x8xi32> {
-  // CHECK: %[[BCAST_PRED:.*]] = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg0 : tensor<i1>)
-  // CHECK: %[[BCAST_THEN:.*]] = linalg.generic {indexing_maps = [#map2, #map1], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg1 : tensor<8x1xi32>)
+  // CHECK: %[[BCAST_PRED:.*]] = linalg.generic {indexing_maps = [#map, #map1], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]} ins(%arg0 : tensor<i1>)
+  // CHECK: %[[BCAST_THEN:.*]] = linalg.generic {indexing_maps = [#map2, #map1], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]} ins(%arg1 : tensor<8x1xi32>)
   // CHECK: linalg.generic
   // CHECK-SAME: ins(%[[BCAST_PRED]], %[[BCAST_THEN]], %arg2 : tensor<2x8x8xi1>, tensor<2x8x8xi32>, tensor<2x8x8xi32>)
   // CHECK: arith.select
@@ -129,8 +129,8 @@ func.func @selectv2_broadcast_then(%arg0: tensor<i1>, %arg1: tensor<8x1xi32>, %a
 // CHECK: #map2 = affine_map<(d0, d1, d2) -> (d1, 0)>
 // CHECK-LABEL: func.func @selectv2_broadcast_else
 func.func @selectv2_broadcast_else(%arg0: tensor<i1>, %arg1: tensor<2x8x8xi32>, %arg2: tensor<8x1xi32>) -> tensor<2x8x8xi32> {
-  // CHECK: %[[BCAST_PRED:.*]] = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg0 : tensor<i1>)
-  // CHECK: %[[BCAST_ELSE:.*]] = linalg.generic {indexing_maps = [#map2, #map1], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg2 : tensor<8x1xi32>)
+  // CHECK: %[[BCAST_PRED:.*]] = linalg.generic {indexing_maps = [#map, #map1], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]} ins(%arg0 : tensor<i1>)
+  // CHECK: %[[BCAST_ELSE:.*]] = linalg.generic {indexing_maps = [#map2, #map1], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]} ins(%arg2 : tensor<8x1xi32>)
   // CHECK: linalg.generic
   // CHECK-SAME: ins(%[[BCAST_PRED]], %arg1, %[[BCAST_ELSE]] : tensor<2x8x8xi1>, tensor<2x8x8xi32>, tensor<2x8x8xi32>)
   // CHECK: arith.select
@@ -143,7 +143,7 @@ func.func @selectv2_broadcast_else(%arg0: tensor<i1>, %arg1: tensor<2x8x8xi32>, 
 // CHECK: #map1 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 // CHECK-LABEL: func.func @selectv2_broadcast_pred
 func.func @selectv2_broadcast_pred(%arg0: tensor<1xi1>, %arg1: tensor<2x8x8xi32>, %arg2: tensor<2x8x8xi32>) -> tensor<2x8x8xi32> {
-  // CHECK: %[[BCAST_PRED:.*]] = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg0 : tensor<1xi1>)
+  // CHECK: %[[BCAST_PRED:.*]] = linalg.generic {indexing_maps = [#map, #map1], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]} ins(%arg0 : tensor<1xi1>)
   // CHECK: linalg.generic
   // CHECK-SAME: ins(%[[BCAST_PRED]], %arg1, %arg2 : tensor<2x8x8xi1>, tensor<2x8x8xi32>, tensor<2x8x8xi32>)
   // CHECK: arith.select
@@ -158,9 +158,9 @@ func.func @selectv2_broadcast_pred(%arg0: tensor<1xi1>, %arg1: tensor<2x8x8xi32>
 // CHECK: #map3 = affine_map<(d0, d1, d2) -> (0, 0, d2)>
 // CHECK-LABEL: func.func @selectv2_broadcast_all
 func.func @selectv2_broadcast_all(%arg0: tensor<8x1x1xi1>, %arg1: tensor<1x8x1xi32>, %arg2: tensor<1x1x8xi32>) -> tensor<8x8x8xi32> {
-  // CHECK: %[[BCAST_PRED:.*]] = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg0 : tensor<8x1x1xi1>)
-  // CHECK: %[[BCAST_THEN:.*]] = linalg.generic {indexing_maps = [#map2, #map1], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg1 : tensor<1x8x1xi32>)
-  // CHECK: %[[BCAST_ELSE:.*]] = linalg.generic {indexing_maps = [#map3, #map1], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg2 : tensor<1x1x8xi32>)
+  // CHECK: %[[BCAST_PRED:.*]] = linalg.generic {indexing_maps = [#map, #map1], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]} ins(%arg0 : tensor<8x1x1xi1>)
+  // CHECK: %[[BCAST_THEN:.*]] = linalg.generic {indexing_maps = [#map2, #map1], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]} ins(%arg1 : tensor<1x8x1xi32>)
+  // CHECK: %[[BCAST_ELSE:.*]] = linalg.generic {indexing_maps = [#map3, #map1], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]} ins(%arg2 : tensor<1x1x8xi32>)
   // CHECK: linalg.generic
   // CHECK-SAME: ins(%[[BCAST_PRED]], %[[BCAST_THEN]], %[[BCAST_ELSE]] : tensor<8x8x8xi1>, tensor<8x8x8xi32>, tensor<8x8x8xi32>)
   %0 = "chlo.broadcast_select"(%arg0, %arg1, %arg2) : (tensor<8x1x1xi1>, tensor<1x8x1xi32>, tensor<1x1x8xi32>) -> tensor<8x8x8xi32>

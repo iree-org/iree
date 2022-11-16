@@ -35,7 +35,7 @@ func.func @dynamic_elw() -> tensor<?x?xf32> {
           affine_map<(i, j) -> (i, j)>,
           affine_map<(i, j) -> (i, j)>,
           affine_map<(i, j) -> (i, j)> ],
-      iterator_types = ["parallel", "parallel"]
+      iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]
     }
     ins(%A, %B : tensor<?x?xf32>, tensor<?x?xf32>)
     outs(%C : tensor<?x?xf32>) {

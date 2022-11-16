@@ -68,7 +68,7 @@ hal.executable @matmul_f16_32x32x32 {
               ins(%0, %1 : memref<32x32xf16>, memref<32x32xf16>) outs(%3 : memref<32x32xf16>)
             linalg.generic {
                 indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
-                iterator_types = ["parallel", "parallel"]}
+                iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
             ins(%2 : memref<32x32xf16>) outs(%3 : memref<32x32xf16>) {
             ^bb0(%in: f16, %out: f16):
               %8 = arith.divf %out, %in : f16
@@ -175,7 +175,7 @@ hal.executable @generic_batch_matmul_f16_32x128x512x64 {
               linalg.fill ins(%cst : f16) outs(%subview : memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>)
               linalg.generic {
                 indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d1, d0, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>],
-                iterator_types = ["parallel", "parallel", "parallel", "reduction"]}
+                iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]}
               ins(%subview_0, %subview_1 : memref<32x1x64xf16, strided<[2048, 64, 1], offset: ?>>, memref<1x64x32xf16, strided<[32768, 512, 1], offset: ?>>)
               outs(%subview : memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>)
               attrs = {lowering_config = #config} {
@@ -187,7 +187,7 @@ hal.executable @generic_batch_matmul_f16_32x128x512x64 {
               %subview_2 = memref.subview %span3[%arg0, %arg1, %arg2] [1, 32, 32] [1, 1, 1] : memref<32x128x512xf16> to memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>
               linalg.generic {
                   indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
-                  iterator_types = ["parallel", "parallel", "parallel"]}
+                  iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
               ins(%subview_2 : memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>)
               outs(%subview : memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>) {
               ^bb0(%in: f16, %out: f16):
@@ -322,7 +322,7 @@ hal.executable @generic_batch_matmul_f16_32x128x512x64 {
               linalg.fill ins(%cst : f16) outs(%subview : memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>)
               linalg.generic {
                 indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d1, d0, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>],
-                iterator_types = ["parallel", "parallel", "parallel", "reduction"]}
+                iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]}
               ins(%subview_0, %subview_1 : memref<32x1x64xf16, strided<[2048, 64, 1], offset: ?>>, memref<1x64x32xf16, strided<[32768, 512, 1], offset: ?>>)
               outs(%subview : memref<1x32x32xf16, strided<[65536, 512, 1], offset: ?>>)
               attrs = {lowering_config = #config} {

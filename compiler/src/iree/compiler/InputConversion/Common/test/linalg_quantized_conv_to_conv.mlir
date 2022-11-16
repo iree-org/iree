@@ -34,7 +34,7 @@ func.func @conv2d_filter_zp(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<3x4x5x102
 
   // CHECK: %[[SUM:.+]] = linalg.generic
   // CHECK-SAME:  indexing_maps = [#map, #map1]
-  // CHECK-SAME:  iterator_types = ["parallel", "reduction", "reduction", "reduction"]}
+  // CHECK-SAME:  iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>, #linalg.iterator_type<reduction>, #linalg.iterator_type<reduction>]}
   // CHECK-SAME:  ins(%arg1 : tensor<3x4x5x1024xi8>)
   // CHECK-SAME:  outs(%[[SUM_FILL]] : tensor<1024xi32>)
   // CHECK:   ^bb0(%[[IN:.+]]: i8, %[[OUT:.+]]: i32):
@@ -45,7 +45,7 @@ func.func @conv2d_filter_zp(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<3x4x5x102
   // CHECK: %[[INIT:.+]] = tensor.empty() : tensor<1x12x13x1024xi32>
   // CHECK: %[[GENERIC:.+]] = linalg.generic
   // CHECK-SAME:  indexing_maps = [#map2, #map3, #map2]
-  // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+  // CHECK-SAME:  iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
   // CHECK-SAME:  ins(%[[CONV]], %[[SUM]] : tensor<1x12x13x1024xi32>, tensor<1024xi32>)
   // CHECK-SAME:  outs(%[[INIT]] : tensor<1x12x13x1024xi32>)
   // CHECK:   ^bb0(%[[A0:.+]]: i32, %[[A1:.+]]: i32, %[[A2:.+]]: i32):
@@ -76,7 +76,7 @@ func.func @conv2d_input_zp(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<3x4x5x1024
   // CHECK: %[[FILL:.+]] = linalg.fill ins(%[[C0]] : i32) outs(%[[INIT]] : tensor<1x14x16xi32>)
   // CHECK: %[[SUM:.+]] = linalg.generic
   // CHECK-SAME:  indexing_maps = [#map, #map1]
-  // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "reduction"]
+  // CHECK-SAME:  iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]
   // CHECK-SAME:  ins(%arg0 : tensor<1x14x16x5xi8>)
   // CHECK-SAME:  outs(%[[FILL]] : tensor<1x14x16xi32>)
 
@@ -94,7 +94,7 @@ func.func @conv2d_input_zp(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<3x4x5x1024
   // CHECK: %[[INIT:.+]] = tensor.empty() : tensor<1x12x13x1024xi32>
   // CHECK: %[[GENERIC:.+]] = linalg.generic
   // CHECK-SAME:  indexing_maps = [#map, #map1, #map]
-  // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+  // CHECK-SAME:  iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
   // CHECK-SAME:  ins(%[[CONV]], %[[COLLAPSE]] : tensor<1x12x13x1024xi32>, tensor<1x12x13xi32>)
   // CHECK-SAME:  outs(%[[INIT]] : tensor<1x12x13x1024xi32>)
   // CHECK:   ^bb0(%[[A0:.+]]: i32, %[[A1:.+]]: i32, %[[A2:.+]]: i32):
@@ -142,7 +142,7 @@ func.func @conv2d_full(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<3x4x5x1024xi8>
 
   // CHECK: %[[INIT:.+]] = tensor.empty() : tensor<1x12x13x1024xi32>
   // CHECK: %[[FINAL:.+]] = linalg.generic {indexing_maps = [#map2, #map2]
-  // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+  // CHECK-SAME:  iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
   // CHECK-SAME:  ins(%[[FZP]] : tensor<1x12x13x1024xi32>)
   // CHECK-SAME:  outs(%[[INIT]] : tensor<1x12x13x1024xi32>)
   // CHECK:   ^bb0(%[[A0:.+]]: i32, %[[A1:.+]]: i32):
@@ -267,7 +267,7 @@ func.func @conv2d_all_dyn(%arg0: tensor<?x?x?x?xi8>, %arg1: tensor<?x?x?x?xi8>, 
   // CHECK: %[[FILL:.+]] = linalg.fill ins(%[[C0]] : i32) outs(%[[EMPTY]] : tensor<?xi32>)
   // CHECK: %[[FSUM:.+]] = linalg.generic
   // CHECK-SAME:  indexing_maps = [#map, #map1]
-  // CHECK-SAME:  iterator_types = ["parallel", "reduction", "reduction", "reduction"]
+  // CHECK-SAME:  iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>, #linalg.iterator_type<reduction>, #linalg.iterator_type<reduction>]
   // CHECK-SAME:  ins(%arg1 : tensor<?x?x?x?xi8>)
   // CHECK-SAME:  outs(%[[FILL]] : tensor<?xi32>)
 
@@ -278,7 +278,7 @@ func.func @conv2d_all_dyn(%arg0: tensor<?x?x?x?xi8>, %arg1: tensor<?x?x?x?xi8>, 
   // CHECK: %[[EMPTY:.+]] = tensor.empty(%[[DIM0]], %[[DIM1]], %[[DIM2]], %[[DIM3]])
   // CHECK: %[[CONV_SUMF:.+]] = linalg.generic
   // CHECK-SAME:  indexing_maps = [#map2, #map3, #map2]
-  // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "parallel"]
+  // CHECK-SAME:  iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]
   // CHECK-SAME:  ins(%[[CONV]], %[[FSUM]] : tensor<?x?x?x?xi32>, tensor<?xi32>)
   // CHECK-SAME:  outs(%[[EMPTY]] : tensor<?x?x?x?xi32>)
 
@@ -289,7 +289,7 @@ func.func @conv2d_all_dyn(%arg0: tensor<?x?x?x?xi8>, %arg1: tensor<?x?x?x?xi8>, 
   // CHECK: %[[FILL:.+]] = linalg.fill ins(%[[C0]] : i32) outs(%[[EMPTY]] : tensor<?x?x?xi32>)
   // CHECK: %[[SUMI:.+]] = linalg.generic
   // CHECK-SAME:  indexing_maps = [#map2, #map4]
-  // CHECK-SAME:  iterator_types = ["parallel", "parallel", "parallel", "reduction"]}
+  // CHECK-SAME:  iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]}
   // CHECK-SAME:  ins(%arg0 : tensor<?x?x?x?xi8>)
   // CHECK-SAME:  outs(%[[FILL]] : tensor<?x?x?xi32>)
   // CHECK: %[[EXPAND:.+]] = tensor.expand_shape %[[SUMI]] {{\[\[}}0], [1], [2, 3]]
@@ -316,7 +316,7 @@ func.func @conv2d_all_dyn(%arg0: tensor<?x?x?x?xi8>, %arg1: tensor<?x?x?x?xi8>, 
   // CHECK: %[[EMPTY:.+]] = tensor.empty(%[[DIM0]], %[[DIM1]], %[[DIM2]], %[[DIM3]])
   // CHECK: %[[CONV_SUMIF:.+]] = linalg.generic
   // CHECK-SAME: indexing_maps = [#map2, #map4, #map2]
-  // CHECK-SAME: iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+  // CHECK-SAME: iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
   // CHECK-SAME: ins(%[[CONV_SUMF]], %[[COLLAPSE]] : tensor<?x?x?x?xi32>, tensor<?x?x?xi32>)
   // CHECK-SAME: outs(%[[EMPTY]] : tensor<?x?x?x?xi32>)
 
@@ -333,7 +333,7 @@ func.func @conv2d_all_dyn(%arg0: tensor<?x?x?x?xi8>, %arg1: tensor<?x?x?x?xi8>, 
   // CHECK: %[[EMPTY:.+]] = tensor.empty(%[[DIM0]], %[[DIM1]], %[[DIM2]], %[[DIM3]]) : tensor<?x?x?x?xi32>
   // CHECK: %[[RESULT:.+]] = linalg.generic
   // CHECK-SAME: indexing_maps = [#map2, #map2]
-  // CHECK-SAME: iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+  // CHECK-SAME: iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
   // CHECK-SAME: ins(%[[CONV_SUMIF]] : tensor<?x?x?x?xi32>)
   // CHECK-SAME: outs(%[[EMPTY]] : tensor<?x?x?x?xi32>)
   %0 = linalg.conv_2d_nhwc_hwcf_q {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%arg0, %arg1, %iZp, %fZp : tensor<?x?x?x?xi8>, tensor<?x?x?x?xi8>, i32, i32) outs(%arg2 : tensor<?x?x?x?xi32>) -> tensor<?x?x?x?xi32>

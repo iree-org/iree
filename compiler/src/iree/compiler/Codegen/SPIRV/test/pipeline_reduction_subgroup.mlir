@@ -30,7 +30,7 @@ hal.executable private @subgroup_reduce {
         %4 = linalg.fill ins(%cst : f32) outs(%3 : tensor<2xf32>) -> tensor<2xf32>
         %5 = linalg.generic {
           indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>],
-          iterator_types = ["parallel", "reduction"]
+          iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]
         } ins(%2 : tensor<2x512xf32>) outs(%4 : tensor<2xf32>) {
         ^bb0(%arg0: f32, %arg1: f32):
           %6 = arith.addf %arg1, %arg0 : f32
@@ -136,7 +136,7 @@ hal.executable private @subgroup_reduce {
         %4 = linalg.fill ins(%cst : f32) outs(%3 : tensor<2xf32>) -> tensor<2xf32>
         %5 = linalg.generic {
           indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>],
-          iterator_types = ["parallel", "reduction"]
+          iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]
         } ins(%2 : tensor<2x512xf32>) outs(%4 : tensor<2xf32>) {
         ^bb0(%arg0: f32, %arg1: f32):
           %6 = arith.addf %arg1, %arg0 : f32

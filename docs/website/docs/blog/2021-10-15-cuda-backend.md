@@ -119,7 +119,7 @@ At this stage the IR looks like the following:
         indexing_maps = [affine_map<(d0) -> (d0)>,
                          affine_map<(d0) -> (d0)>,
                          affine_map<(d0) -> (d0)>],
-        iterator_types = ["parallel"]}
+        iterator_types = [#linalg.iterator_type<parallel>]}
       ins(%10, %11 :
           memref<4xf32, affine_map<(d0)[s0] -> (d0 + s0)>>,
           memref<4xf32, affine_map<(d0)[s0] -> (d0 + s0)>>)

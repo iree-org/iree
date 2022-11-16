@@ -54,7 +54,7 @@ hal.executable private @shared_mem_cpy  {
     //     CHECK: vector.transfer_write %[[R1]], %{{.*}}[%[[Y1]], %[[X0]]] {in_bounds = [true, true]} : vector<1x4xf32>, memref<64x16xf32, 3>
 
         linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
-        iterator_types = ["parallel", "parallel"]}
+        iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
           ins(%m0 : memref<64x16xf32>)
           outs(%sm0 : memref<64x16xf32, 3>)
           attrs= {__internal_linalg_transform__ = "copy_to_workgroup_memory"} {
@@ -70,7 +70,7 @@ hal.executable private @shared_mem_cpy  {
     //     CHECK: vector.transfer_write %[[R3]], %{{.*}}[%[[Y2]], %[[C0]]] {in_bounds = [true, true]} : vector<1x4xf32>, memref<256x4xf32, 3>
 
         linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
-        iterator_types = ["parallel", "parallel"]}
+        iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
           ins(%m1 : memref<256x4xf32>)
           outs(%sm1 : memref<256x4xf32, 3>)
           attrs= {__internal_linalg_transform__ = "copy_to_workgroup_memory"} {
@@ -87,7 +87,7 @@ hal.executable private @shared_mem_cpy  {
     //     CHECK: vector.transfer_write %[[R6]], %{{.*}}[%[[C2]], %[[X1]]] {in_bounds = [true, true]} : vector<1x4xf32>, memref<3x512xf32, 3>
 
         linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
-        iterator_types = ["parallel", "parallel"]}
+        iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
           ins(%m2 : memref<3x512xf32>)
           outs(%sm2 : memref<3x512xf32, 3>)
           attrs= {__internal_linalg_transform__ = "copy_to_workgroup_memory"} {
@@ -145,7 +145,7 @@ hal.executable private @unaligned_shared_memory_copy  {
         // CHECK-SAME:         outs(%[[SHARED_SUBVIEW]]
         linalg.generic {
           indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
-          iterator_types = ["parallel", "parallel"]
+          iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]
         }
           ins(%global : memref<56x32xf32, strided<[128, 1], offset: ?>>)
           outs(%shared : memref<56x32xf32, 3>)

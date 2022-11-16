@@ -33,7 +33,7 @@ hal.executable private @transpose_10_8x8_pattern {
         %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [1024, 512], strides = [1, 1] : !flow.dispatch.tensor<writeonly:tensor<1024x512xf32>> -> tensor<1024x512xf32>
         %6 = linalg.generic {
           indexing_maps = [ affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0, d1)>],
-          iterator_types = ["parallel", "parallel"]}
+          iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
           ins(%3 : tensor<512x1024xf32>) outs(%5 : tensor<1024x512xf32>) {
           ^bb0(%arg1: f32, %arg2: f32):
             linalg.yield %arg1 : f32
@@ -91,7 +91,7 @@ hal.executable private @transpose_021_8x8_pattern {
         %5 = flow.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [64, 128, 96], strides = [1, 1, 1] : !flow.dispatch.tensor<writeonly:tensor<64x128x96xf32>> -> tensor<64x128x96xf32>
         %6 = linalg.generic {
           indexing_maps = [ affine_map<(d0, d1, d2) -> (d0, d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
-          iterator_types = ["parallel", "parallel", "parallel"]}
+          iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
           ins(%3 : tensor<64x96x128xf32>) outs(%5 : tensor<64x128x96xf32>) {
           ^bb0(%arg1: f32, %arg2: f32):
             linalg.yield %arg1 : f32
@@ -149,7 +149,7 @@ hal.executable private @transpose_201_8x8_pattern {
         %5 = flow.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [128, 64, 96], strides = [1, 1, 1] : !flow.dispatch.tensor<writeonly:tensor<128x64x96xf32>> -> tensor<128x64x96xf32>
         %6 = linalg.generic {
           indexing_maps = [ affine_map<(d0, d1, d2) -> (d1, d2, d0)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
-          iterator_types = ["parallel", "parallel", "parallel"]}
+          iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
           ins(%3 : tensor<64x96x128xf32>) outs(%5 : tensor<128x64x96xf32>) {
           ^bb0(%arg1: f32, %arg2: f32):
             linalg.yield %arg1 : f32
@@ -207,7 +207,7 @@ hal.executable private @transpose_210_8x8_pattern {
         %5 = flow.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [128, 96, 64], strides = [1, 1, 1] : !flow.dispatch.tensor<writeonly:tensor<128x96x64xf32>> -> tensor<128x96x64xf32>
         %6 = linalg.generic {
           indexing_maps = [ affine_map<(d0, d1, d2) -> (d2, d1, d0)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
-          iterator_types = ["parallel", "parallel", "parallel"]}
+          iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
           ins(%3 : tensor<64x96x128xf32>) outs(%5 : tensor<128x96x64xf32>) {
           ^bb0(%arg1: f32, %arg2: f32):
             linalg.yield %arg1 : f32
@@ -265,7 +265,7 @@ hal.executable private @transpose_120_8x8_pattern {
         %5 = flow.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [96, 128, 64], strides = [1, 1, 1] : !flow.dispatch.tensor<writeonly:tensor<96x128x64xf32>> -> tensor<96x128x64xf32>
         %6 = linalg.generic {
           indexing_maps = [ affine_map<(d0, d1, d2) -> (d2, d0, d1)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
-          iterator_types = ["parallel", "parallel", "parallel"]}
+          iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
           ins(%3 : tensor<64x96x128xf32>) outs(%5 : tensor<96x128x64xf32>) {
           ^bb0(%arg1: f32, %arg2: f32):
             linalg.yield %arg1 : f32
@@ -323,7 +323,7 @@ hal.executable private @transpose_102 {
         %5 = flow.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [96, 64, 128], strides = [1, 1, 1] : !flow.dispatch.tensor<writeonly:tensor<96x64x128xf32>> -> tensor<96x64x128xf32>
         %6 = linalg.generic {
           indexing_maps = [ affine_map<(d0, d1, d2) -> (d1, d0, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
-          iterator_types = ["parallel", "parallel", "parallel"]}
+          iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
           ins(%3 : tensor<64x96x128xf32>) outs(%5 : tensor<96x64x128xf32>) {
           ^bb0(%arg1: f32, %arg2: f32):
             linalg.yield %arg1 : f32
@@ -373,7 +373,7 @@ hal.executable private @test_no_avx2_feature {
         %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [1024, 512], strides = [1, 1] : !flow.dispatch.tensor<writeonly:tensor<1024x512xf32>> -> tensor<1024x512xf32>
         %6 = linalg.generic {
           indexing_maps = [ affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0, d1)>],
-          iterator_types = ["parallel", "parallel"]}
+          iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
           ins(%3 : tensor<512x1024xf32>) outs(%5 : tensor<1024x512xf32>) {
           ^bb0(%arg1: f32, %arg2: f32):
             linalg.yield %arg1 : f32

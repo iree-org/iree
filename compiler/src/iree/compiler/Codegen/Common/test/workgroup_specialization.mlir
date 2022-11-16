@@ -79,7 +79,7 @@ func.func @add_tensors() {
       %10 = flow.dispatch.tensor.load %1, offsets = [%arg0, %arg1], sizes = [%5, %8], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<123x789xf32>> -> tensor<?x?xf32>
       %11 = tensor.empty(%5, %8) : tensor<?x?xf32>
       %12 = linalg.fill ins(%cst : f32) outs(%11 : tensor<?x?xf32>) -> tensor<?x?xf32>
-      %13 = linalg.generic {indexing_maps = [#map3, #map3, #map3], iterator_types = ["parallel", "parallel"]} ins(%9, %10 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%12 : tensor<?x?xf32>) attrs =  {lowering_config = #config} {
+      %13 = linalg.generic {indexing_maps = [#map3, #map3, #map3], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]} ins(%9, %10 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%12 : tensor<?x?xf32>) attrs =  {lowering_config = #config} {
       ^bb0(%arg2: f32, %arg3: f32, %arg4: f32):
         %14 = arith.addf %arg2, %arg3 : f32
         linalg.yield %14 : f32
@@ -137,7 +137,7 @@ func.func @unaligned_partial_loop() {
       %14 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[2, 256, 4]]>} ins(%13, %10 : tensor<2x768xf32>, tensor<768x?xf32>) outs(%12 : tensor<2x?xf32>) -> tensor<2x?xf32>
       %15 = flow.dispatch.tensor.load %2, offsets = [%arg1], sizes = [%8], strides = [1] : !flow.dispatch.tensor<readonly:tensor<30522xf32>> -> tensor<?xf32>
       %16 = tensor.empty(%8) : tensor<2x?xf32>
-      %17 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%14, %15 : tensor<2x?xf32>, tensor<?xf32>) outs(%16 : tensor<2x?xf32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[2, 256, 4]]>} {
+      %17 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]} ins(%14, %15 : tensor<2x?xf32>, tensor<?xf32>) outs(%16 : tensor<2x?xf32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[2, 256, 4]]>} {
       ^bb0(%arg2: f32, %arg3: f32, %arg4: f32):
         %19 = arith.addf %arg2, %arg3 : f32
         linalg.yield %19 : f32

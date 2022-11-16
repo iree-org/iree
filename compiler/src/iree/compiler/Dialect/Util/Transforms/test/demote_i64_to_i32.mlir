@@ -119,7 +119,7 @@ func.func @linalg_generic_i64(%arg: tensor<2xi64>)  -> tensor<2xi64> {
   // CHECK: %[[INIT:.+]] = tensor.empty() : tensor<2xi32>
   %init = tensor.empty() : tensor<2xi64>
   // CHECK: %[[T:.+]] = linalg.generic {{.+}} ins(%[[ARG]] : tensor<2xi32>) outs(%[[INIT]] : tensor<2xi32>)
-  %generic = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%arg : tensor<2xi64>) outs(%init : tensor<2xi64>) {
+  %generic = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = [#linalg.iterator_type<parallel>]} ins(%arg : tensor<2xi64>) outs(%init : tensor<2xi64>) {
   // CHECK-NEXT: ^bb0(%[[A:.+]]: i32, %[[B:.+]]: i32):
   ^bb0(%arg1: i64, %arg2: i64):
     // CHECK-NEXT: linalg.yield %[[A]] : i32

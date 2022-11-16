@@ -97,7 +97,7 @@ func.func @matmul_broadcast_add(%init: tensor<1x8xf32>, %a: tensor<1x8xf32>, %b:
   %matmul = linalg.matmul ins(%a, %b : tensor<1x8xf32>, tensor<8x8xf32>) outs(%c : tensor<1x8xf32>) -> tensor<1x8xf32>
   %bcast_add = linalg.generic {
     indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>],
-    iterator_types = ["parallel", "parallel"]
+    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]
   } ins(%matmul, %bias : tensor<1x8xf32>, tensor<1xf32>) outs(%init : tensor<1x8xf32>) {
   ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):
     %add = arith.addf %arg0, %arg1 : f32
@@ -145,7 +145,7 @@ func.func @matmul_2x8x128_fp16(%a: tensor<2x128xf16>, %b: tensor<128x8xf16>, %x:
   }
   %0 = linalg.generic {
     indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
-    iterator_types = ["parallel", "parallel"]
+    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]
   } ins(%matmul, %x : tensor<2x8xf16>, tensor<2x8xf16>) outs(%y : tensor<2x8xf16>) {
   ^bb0(%arg0: f16, %arg1: f16, %arg2: f16):
     %div = arith.divf %arg0, %arg1 : f16

@@ -19,19 +19,19 @@ func.func @mhloElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
 // CHECK-NEXT: module {
 // CHECK-NEXT:   func.func @mhloElementwiseOps(%arg0: tensor<4xf32>) -> tensor<4xf32> {
 // CHECK-NEXT:     %0 = tensor.empty() : tensor<4xf32>
-// CHECK-NEXT:     %1 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel"]} ins(%arg0 : tensor<4xf32>) outs(%0 : tensor<4xf32>) {
+// CHECK-NEXT:     %1 = linalg.generic {indexing_maps = [#map, #map], iterator_types = [#linalg.iterator_type<parallel>]} ins(%arg0 : tensor<4xf32>) outs(%0 : tensor<4xf32>) {
 // CHECK-NEXT:     ^bb0(%[[ARG1:.*]]: f32, %out: f32):
 // CHECK-NEXT:       %6 = arith.addf %[[ARG1]], %[[ARG1]] : f32
 // CHECK-NEXT:       linalg.yield %6 : f32
 // CHECK-NEXT:     } -> tensor<4xf32>
 // CHECK-NEXT:     %2 = tensor.empty() : tensor<4xf32>
-// CHECK-NEXT:     %3 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel"]} ins(%1, %arg0 : tensor<4xf32>, tensor<4xf32>) outs(%2 : tensor<4xf32>) {
+// CHECK-NEXT:     %3 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = [#linalg.iterator_type<parallel>]} ins(%1, %arg0 : tensor<4xf32>, tensor<4xf32>) outs(%2 : tensor<4xf32>) {
 // CHECK-NEXT:     ^bb0(%[[ARG1:.*]]: f32, %[[ARG2:.*]]: f32, %out: f32):
 // CHECK-NEXT:       %6 = arith.subf %[[ARG1]], %[[ARG2]] : f32
 // CHECK-NEXT:       linalg.yield %6 : f32
 // CHECK-NEXT:     } -> tensor<4xf32>
 // CHECK-NEXT:     %4 = tensor.empty() : tensor<4xf32>
-// CHECK-NEXT:     %5 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel"]} ins(%3, %arg0 : tensor<4xf32>, tensor<4xf32>) outs(%4 : tensor<4xf32>) {
+// CHECK-NEXT:     %5 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = [#linalg.iterator_type<parallel>]} ins(%3, %arg0 : tensor<4xf32>, tensor<4xf32>) outs(%4 : tensor<4xf32>) {
 // CHECK-NEXT:     ^bb0(%[[ARG1:.*]]: f32, %[[ARG2:.*]]: f32, %out: f32):
 // CHECK-NEXT:       %6 = arith.mulf %[[ARG1]], %[[ARG2]] : f32
 // CHECK-NEXT:       linalg.yield %6 : f32
@@ -54,7 +54,7 @@ func.func @interleavedDot(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
 // CHECK-NEXT:   func.func @interleavedDot(%arg0: tensor<4x4xf32>) -> tensor<4x4xf32> {
 // CHECK-NEXT:     %cst = arith.constant 0.000000e+00 : f32
 // CHECK-NEXT:     %0 = tensor.empty() : tensor<4x4xf32>
-// CHECK-NEXT:     %1 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%arg0 : tensor<4x4xf32>) outs(%0 : tensor<4x4xf32>) {
+// CHECK-NEXT:     %1 = linalg.generic {indexing_maps = [#map, #map], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]} ins(%arg0 : tensor<4x4xf32>) outs(%0 : tensor<4x4xf32>) {
 // CHECK-NEXT:     ^bb0(%[[ARG1:.*]]: f32, %out: f32):
 // CHECK-NEXT:       %7 = arith.addf %[[ARG1]], %[[ARG1]] : f32
 // CHECK-NEXT:       linalg.yield %7 : f32
@@ -63,7 +63,7 @@ func.func @interleavedDot(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
 // CHECK-NEXT:     %3 = linalg.fill ins(%cst : f32) outs(%2 : tensor<4x4xf32>) -> tensor<4x4xf32>
 // CHECK-NEXT:     %4 = linalg.matmul ins(%1, %arg0 : tensor<4x4xf32>, tensor<4x4xf32>) outs(%3 : tensor<4x4xf32>) -> tensor<4x4xf32>
 // CHECK-NEXT:     %5 = tensor.empty() : tensor<4x4xf32>
-// CHECK-NEXT:     %6 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel", "parallel"]} ins(%4, %arg0 : tensor<4x4xf32>, tensor<4x4xf32>) outs(%5 : tensor<4x4xf32>) {
+// CHECK-NEXT:     %6 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]} ins(%4, %arg0 : tensor<4x4xf32>, tensor<4x4xf32>) outs(%5 : tensor<4x4xf32>) {
 // CHECK-NEXT:     ^bb0(%[[ARG1:.*]]: f32, %[[ARG2:.*]]: f32, %out: f32):
 // CHECK-NEXT:       %7 = arith.mulf %[[ARG1]], %[[ARG2]] : f32
 // CHECK-NEXT:       linalg.yield %7 : f32
@@ -92,7 +92,7 @@ func.func @reduction(%arg0 : tensor<4x8xf32>) -> tensor<4xf32> {
 // CHECK-NEXT:     %cst = arith.constant 0.000000e+00 : f32
 // CHECK-NEXT:     %0 = tensor.empty() : tensor<4xf32>
 // CHECK-NEXT:     %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<4xf32>) -> tensor<4xf32>
-// CHECK-NEXT:     %2 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "reduction"]} ins(%arg0 : tensor<4x8xf32>) outs(%1 : tensor<4xf32>) {
+// CHECK-NEXT:     %2 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]} ins(%arg0 : tensor<4x8xf32>) outs(%1 : tensor<4xf32>) {
 // CHECK-NEXT:     ^bb0(%[[ARG1:.*]]: f32, %[[ARG2:.*]]: f32):
 // CHECK-NEXT:       %3 = arith.addf %[[ARG2]], %[[ARG1]] : f32
 // CHECK-NEXT:       linalg.yield %3 : f32

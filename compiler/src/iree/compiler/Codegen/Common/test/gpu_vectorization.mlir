@@ -5,7 +5,7 @@ func.func @add_dispatch_0(%arg0: memref<1x8x4xf32>, %arg1: memref<1x4x8xf32>, %a
     [affine_map<(d0, d1, d2) -> (d0, d2, d1)>,
       affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
       affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
-    iterator_types = ["parallel", "parallel", "parallel"]}
+    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
   ins(%arg0, %arg1 : memref<1x8x4xf32>, memref<1x4x8xf32>) outs(%arg2 : memref<1x4x8xf32>)
   attrs =  {__internal_linalg_transform__ = "vectorize"} {
   ^bb0(%arg6: f32, %arg7: f32, %arg8: f32):  // no predecessors

@@ -141,7 +141,7 @@ tensors.
 %3 = linalg.generic
        {args_in = 2 : i64, args_out = 1 : i64,
         indexing_maps = [#map0, #map0, #map0],
-        iterator_types = ["parallel", "parallel"]} %0, %1 {
+        iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]} %0, %1 {
      ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
        %5 = addf %arg0, %arg1 : f32
        linalg.yield %5 : f32
@@ -149,14 +149,14 @@ tensors.
 %4 = linalg.generic
        {args_in = 1 : i64, args_out = 1 : i64,
         indexing_maps = [#map1, #map0],
-        iterator_types = ["parallel", "parallel"]} %2 {
+        iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]} %2 {
      ^bb0(%arg0: f32):  // no predecessors
        linalg.yield %arg0 : f32
      }: tensor<15xf32> -> tensor<10x15xf32>
 %5 = linalg.generic
        {args_in = 2 : i64, args_out = 1 : i64,
         indexing_maps = [#map0, #map0, #map0],
-        iterator_types = ["parallel", "parallel"]} %3, %4 {
+        iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]} %3, %4 {
      ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
        %5 = mulf %arg0, %arg1 : f32
        linalg.yield %5 : f32
@@ -204,7 +204,7 @@ data movement operations. An example of the fused op is shown below.
 %3 = linalg.generic
        {args_in = 3 : i64, args_out = 1 : i64,
         indexing_maps = [#map0, #map0, #map1, #map0],
-        iterator_types = ["parallel", "parallel"]} %0, %1, %2 {
+        iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]} %0, %1, %2 {
      ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):  // no predecessors
        %4 = addf %arg0, %arg1 : f32
        %5 = mulf %4, %arg2 : f32
@@ -308,7 +308,7 @@ func @main_ex_dispatch() {
   linalg.generic
     {args_in = 3 : i64, args_out = 1 : i64,
      indexing_maps = [#map0, #map0, #map1, #map0],
-     iterator_types = ["parallel", "parallel"]} %1, %2, %3, %0 {
+     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]} %1, %2, %3, %0 {
   ^bb0(%arg0: f32, %arg1: f32, %arg2: f32, %arg3: f32):  // no predecessors
     %4 = addf %arg0, %arg1 : f32
     %5 = mulf %4, %arg2 : f32

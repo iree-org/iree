@@ -379,7 +379,7 @@ func.func @rfft_1d(%input: tensor<8xf32>) -> (tensor<5xf32>, tensor<5xf32>) {
 // CHECK-DAG:    %[[INIT_TENSOR:.+]] = tensor.empty() : tensor<8xf32>
 // CHECK:        %[[REORDERED:.+]] = linalg.generic
 // CHECK-SAME:     {indexing_maps = [#[[MAP]], #[[MAP]]]
-// CHECK-SAME:     iterator_types = ["parallel"]
+// CHECK-SAME:     iterator_types = [#linalg.iterator_type<parallel>]
 // CHECK-SAME:     ins(%[[INDICES]]
 // CHECK-SAME:     outs(%[[INIT_TENSOR]]
 // CHECK:        ^bb0(%[[IDX:.+]]: i32, %{{.+}}: f32):
@@ -427,7 +427,7 @@ func.func @rfft_2d(%input: tensor<4x8xf32>) -> (tensor<4x5xf32>, tensor<4x5xf32>
 // CHECK-DAG:    %[[INIT_TENSOR:.+]] = tensor.empty() : tensor<4x8xf32>
 // CHECK:        %[[REORDERED:.+]] = linalg.generic
 // CHECK-SAME:     {indexing_maps = [#[[MAP0]], #[[MAP1]]]
-// CHECK-SAME:     iterator_types = ["parallel", "parallel"]
+// CHECK-SAME:     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]
 // CHECK-SAME:     ins(%[[INDICES]]
 // CHECK-SAME:     outs(%[[INIT_TENSOR]]
 // CHECK:        ^bb0(%[[IDX:.+]]: i32, %{{.+}}: f32):

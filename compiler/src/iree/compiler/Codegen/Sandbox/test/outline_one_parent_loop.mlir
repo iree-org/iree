@@ -78,7 +78,7 @@ func.func @matmul(%arg0: tensor<24x48xf32> {linalg.buffer_layout = affine_map<(d
             %22 = affine.apply affine_map<(d0) -> (d0 ceildiv 32)>(%arg11)
             %23 = vector.transfer_read %9[%14, %22, %c0, %c0], %cst {in_bounds = [true, true]} : tensor<?x?x8x32xf32>, vector<8x32xf32>
             %24 = vector.transfer_read %10[%16, %22, %c0, %c0], %cst {in_bounds = [true, true]} : tensor<?x?x32x8xf32>, vector<32x8xf32>
-            %25 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %23, %24, %arg12 : vector<8x32xf32>, vector<32x8xf32> into vector<8x8xf32>
+            %25 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>], kind = #vector.kind<add>} %23, %24, %arg12 : vector<8x32xf32>, vector<32x8xf32> into vector<8x8xf32>
             scf.yield %25 : vector<8x8xf32>
           }
           %20 = vector.transfer_write %19, %17[%c0, %c0] {in_bounds = [false, true]} : vector<8x8xf32>, tensor<?x8xf32>

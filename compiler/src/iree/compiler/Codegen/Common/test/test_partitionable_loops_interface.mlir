@@ -10,7 +10,7 @@ func.func @generic_dynamic(%arg0 : tensor<?x?x?xf32>) -> tensor<?x?xf32> {
   %init = tensor.empty(%d0, %d2) : tensor<?x?xf32>
   %0 = linalg.generic {
     indexing_maps = [#map1, #map2],
-    iterator_types = ["parallel", "reduction", "parallel"]}
+    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>, #linalg.iterator_type<parallel>]}
     ins(%arg0: tensor<?x?x?xf32>) outs(%init : tensor<?x?xf32>)
     attrs = {__test_interface__ = true} {
       ^bb0(%arg1 : f32, %arg2 : f32):
@@ -31,7 +31,7 @@ func.func @generic_unit_dim(%arg0 : tensor<1x?x?xf32>) -> tensor<1x?xf32> {
   %init = tensor.empty(%d2) : tensor<1x?xf32>
   %0 = linalg.generic {
     indexing_maps = [#map1, #map2],
-    iterator_types = ["parallel", "reduction", "parallel"]}
+    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>, #linalg.iterator_type<parallel>]}
     ins(%arg0: tensor<1x?x?xf32>) outs(%init : tensor<1x?xf32>)
     attrs = {__test_interface__ = true} {
       ^bb0(%arg1 : f32, %arg2 : f32):
@@ -57,7 +57,7 @@ func.func @generic_4D(%arg0: tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32> {
   %init = tensor.empty(%d0, %d1, %d2, %d3) : tensor<?x?x?x?xf32>
   %0 = linalg.generic {
     indexing_maps = [#map, #map],
-    iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
     ins(%arg0: tensor<?x?x?x?xf32>) outs(%init : tensor<?x?x?x?xf32>)
     attrs = {__test_interface__ = true} {
       ^bb0(%arg1 : f32, %arg2 : f32):
@@ -81,7 +81,7 @@ func.func @generic_4D_unit_dim(%arg0: tensor<?x?x1x?xf32>) -> tensor<?x?x1x?xf32
   %init = tensor.empty(%d0, %d1, %d3) : tensor<?x?x1x?xf32>
   %0 = linalg.generic {
     indexing_maps = [#map, #map],
-    iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
     ins(%arg0: tensor<?x?x1x?xf32>) outs(%init : tensor<?x?x1x?xf32>)
     attrs = {__test_interface__ = true} {
       ^bb0(%arg1 : f32, %arg2 : f32):

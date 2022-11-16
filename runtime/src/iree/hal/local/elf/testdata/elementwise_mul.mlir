@@ -59,7 +59,7 @@ hal.executable.source public @ex {
         %dst_init = tensor.empty(%remaining) : tensor<?xf32>
         %dst_tile = linalg.generic {
           indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
-          iterator_types = ["parallel"]
+          iterator_types = [#linalg.iterator_type<parallel>]
         } ins(%lhs_tile, %rhs_tile : tensor<?xf32>, tensor<?xf32>)
           outs(%dst_init : tensor<?xf32>) {
           ^bb0(%lhs_value: f32, %rhs_value: f32, %init_value: f32):

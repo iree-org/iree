@@ -38,7 +38,7 @@ hal.executable @matmul_f32_128x256x64 {
         %7 = tensor.empty() : tensor<128x256xf32>
         %8 = linalg.fill ins(%cst : f32) outs(%7 : tensor<128x256xf32>) -> tensor<128x256xf32>
         %9 = linalg.matmul ins(%4, %5 : tensor<128x512xf32>, tensor<512x256xf32>) outs(%8 : tensor<128x256xf32>) -> tensor<128x256xf32>
-        %10 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel", "parallel"]}
+        %10 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
                 ins(%9, %6 : tensor<128x256xf32>, tensor<128x256xf32>) outs(%7 : tensor<128x256xf32>) {
         ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):
           %11 = arith.divf %arg0, %arg1 : f32

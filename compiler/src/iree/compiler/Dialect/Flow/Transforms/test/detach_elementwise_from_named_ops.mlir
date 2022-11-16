@@ -3,7 +3,7 @@
 func.func @matmul(%a: tensor<?x64xf32>, %b: tensor<64x?xf32>, %c: tensor<?x?xf32>) -> tensor<?x?xf32> {
   %0 = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
-      iterator_types = ["parallel", "parallel"]}
+      iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
       ins(%c : tensor<?x?xf32>) outs(%c : tensor<?x?xf32>) {
     ^bb0(%b0 : f32, %b1 : f32):
       %1 = arith.addf %b0, %b0 : f32
@@ -30,7 +30,7 @@ func.func @matmul(%a: tensor<?x64xf32>, %b: tensor<64x?xf32>, %c: tensor<?x?xf32
 //  CHECK-SAME:     outs(%[[FILL]] : tensor<?x?xf32>)
 //       CHECK:   %[[EW:.+]] = linalg.generic {
 //  CHECK-SAME:     indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>]
-//  CHECK-SAME:     iterator_types = ["parallel", "parallel"]}
+//  CHECK-SAME:     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
 //  CHECK-SAME:     ins(%[[MM]], %[[C]] : tensor<?x?xf32>, tensor<?x?xf32>)
 //  CHECK-SAME:     outs(%[[FILL]] : tensor<?x?xf32>)
 //       CHECK:   ^{{.+}}(%[[ARG0:.+]]: f32, %[[ARG1:.+]]: f32, %{{.+}}: f32):
@@ -43,7 +43,7 @@ func.func @matmul(%a: tensor<?x64xf32>, %b: tensor<64x?xf32>, %c: tensor<?x?xf32
 func.func @batch_matmul(%a: tensor<?x8x?xi32>, %b: tensor<?x?x16xi32>, %c: tensor<?x8x16xi32>) -> tensor<?x8x16xi32> {
   %0 = linalg.generic {
       indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
-      iterator_types = ["parallel", "parallel", "parallel"]}
+      iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
       ins(%c : tensor<?x8x16xi32>) outs(%c : tensor<?x8x16xi32>) {
     ^bb0(%b0 : i32, %b1 : i32):
       %1 = arith.addi %b0, %b0 : i32
@@ -79,7 +79,7 @@ func.func @conv(%input: tensor<1x225x225x3xf32>, %filter: tensor<3x3x3x32xf32>, 
   %init0 = tensor.empty() : tensor<1x112x112x32xf32>
   %0 = linalg.generic {
       indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
-      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
       ins(%init : tensor<32xf32>) outs(%init0 : tensor<1x112x112x32xf32>) {
     ^bb0(%b0 : f32, %b1 : f32):
       linalg.yield %b0 : f32

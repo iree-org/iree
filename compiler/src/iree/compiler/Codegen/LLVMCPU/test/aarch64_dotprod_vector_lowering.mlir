@@ -46,12 +46,12 @@ func.func @mmt4d_kernel_dispatch() {
         %10 = vector.transfer_read %1[%c0, %arg2, %c0, %c0], %c0_i8 {in_bounds = [true, true, true, true]} : memref<1x2x8x4xi8>, vector<1x1x8x4xi8>
         %11 = arith.extsi %9 : vector<1x1x8x4xi8> to vector<1x1x8x4xi32>
         %12 = arith.extsi %10 : vector<1x1x8x4xi8> to vector<1x1x8x4xi32>
-        %13 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d3, d5)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d2, d4, d5)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d4)>], iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"], kind = #vector.kind<add>} %11, %12, %arg3 : vector<1x1x8x4xi32>, vector<1x1x8x4xi32> into vector<1x1x8x8xi32>
+        %13 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d3, d5)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d2, d4, d5)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d4)>], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>], kind = #vector.kind<add>} %11, %12, %arg3 : vector<1x1x8x4xi32>, vector<1x1x8x4xi32> into vector<1x1x8x8xi32>
         scf.yield %13 : vector<1x1x8x8xi32>
       }
       vector.transfer_write %7, %2[%c0, %c0, %c0, %c0] {in_bounds = [true, true, true, true]} : vector<1x1x8x8xi32>, memref<1x1x8x8xi32>
       %8 = memref.subview %2[%arg0, %arg1, 0, 0] [1, 1, 8, 8] [1, 1, 1, 1] : memref<1x1x8x8xi32> to memref<1x1x8x8xi32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 64 + s0 + d1 * 64 + d2 * 8 + d3)>>
-      linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%2 : memref<1x1x8x8xi32>) outs(%8 : memref<1x1x8x8xi32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 64 + s0 + d1 * 64 + d2 * 8 + d3)>>) {
+      linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]} ins(%2 : memref<1x1x8x8xi32>) outs(%8 : memref<1x1x8x8xi32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 64 + s0 + d1 * 64 + d2 * 8 + d3)>>) {
       ^bb0(%arg2: i32, %arg3: i32):
         linalg.yield %arg2 : i32
       }

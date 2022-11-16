@@ -12,7 +12,7 @@ func.func @reduce() -> (!out_tensor_t) {
   %2 = linalg.generic {
     indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                      affine_map<(d0, d1) -> (d0)>],
-    iterator_types = ["parallel", "reduction"]}
+    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]}
     ins(%arg : !in_tensor_t) outs(%1 : !out_tensor_t) {
       ^bb0(%arg3: f32, %arg4: f32):
         %3 = arith.addf %arg3, %arg4 : f32

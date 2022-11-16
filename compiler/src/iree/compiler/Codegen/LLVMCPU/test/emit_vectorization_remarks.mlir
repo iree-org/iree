@@ -11,7 +11,7 @@ module {
     %2 = tensor.empty(%0, %1) : tensor<?x?xf32>
     // expected-warning @+1 {{op is not vectorized}}
     %3 = linalg.generic {indexing_maps = [#map, #map],
-                         iterator_types = ["parallel", "parallel"]}
+                         iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
       ins(%arg0 : tensor<?x?xf32>)
       outs(%2 : tensor<?x?xf32>) {
     ^bb0(%arg1: f32, %arg2: f32):

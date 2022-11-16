@@ -40,7 +40,7 @@ func.func @promote() -> (tensor<16x128xf32>) {
     %11 = affine.apply #map2(%arg1)
     %extracted_slice = tensor.extract_slice %filled[%arg0, %11] [1, 4] [1, 1] : tensor<16x128xf32> to tensor<1x4xf32>
     %extracted_slice_2 = tensor.extract_slice %arg2[%arg0, %11] [1, 4] [1, 1] : tensor<16x128xf32> to tensor<1x4xf32>
-    %13 = linalg.generic {indexing_maps = [#map0, #map0], iterator_types = ["parallel", "parallel"]} ins(%extracted_slice : tensor<1x4xf32>) outs(%extracted_slice_2 : tensor<1x4xf32>) {
+    %13 = linalg.generic {indexing_maps = [#map0, #map0], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]} ins(%extracted_slice : tensor<1x4xf32>) outs(%extracted_slice_2 : tensor<1x4xf32>) {
     ^bb0(%in: f32, %out: f32):
       %res = arith.addf %in, %in: f32
       linalg.yield %res : f32

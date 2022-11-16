@@ -9,7 +9,7 @@ func.func @generic_op_illegal_operand() {
   %4 = tensor.empty(%d) : tensor<?xi8>
   %5 = linalg.generic {
     indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
-    iterator_types = ["parallel"]}
+    iterator_types = [#linalg.iterator_type<parallel>]}
     ins(%3 : tensor<?xi1>) outs(%4 : tensor<?xi8>) {
       ^bb0(%arg0 : i1, %arg1 : i8):
         %6 = arith.extui %arg0 : i1 to i8
@@ -43,7 +43,7 @@ func.func @generic_op_illegal_operand_i7() {
   %4 = tensor.empty(%d) : tensor<?xi8>
   %5 = linalg.generic {
     indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
-    iterator_types = ["parallel"]}
+    iterator_types = [#linalg.iterator_type<parallel>]}
     ins(%3 : tensor<?xi7>) outs(%4 : tensor<?xi8>) {
       ^bb0(%arg0 : i7, %arg1 : i8):
         %6 = arith.extui %arg0 : i7 to i8
@@ -77,7 +77,7 @@ func.func @generic_op_illegal_operand_i33() {
   %4 = tensor.empty(%d) : tensor<?xi64>
   %5 = linalg.generic {
     indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
-    iterator_types = ["parallel"]}
+    iterator_types = [#linalg.iterator_type<parallel>]}
     ins(%3 : tensor<?xi33>) outs(%4 : tensor<?xi64>) {
       ^bb0(%arg0 : i33, %arg1 : i64):
         %6 = arith.extui %arg0 : i33 to i64
@@ -111,7 +111,7 @@ func.func @generic_op_illegal_result() {
   %3 = tensor.empty(%d) : tensor<?xi1>
   %4 = linalg.generic {
     indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
-    iterator_types = ["parallel"]}
+    iterator_types = [#linalg.iterator_type<parallel>]}
     ins(%2 : tensor<?xi8>) outs(%3 : tensor<?xi1>) {
       ^bb0(%arg0 : i8, %arg1 : i1):
         %5 = arith.trunci %arg0 : i8 to i1
@@ -253,7 +253,7 @@ func.func @constant_op() {
   %init = tensor.empty() : tensor<4xi32>
   %result = linalg.generic {
       indexing_maps = [#map, #map, #map, #map],
-      iterator_types = ["parallel"]}
+      iterator_types = [#linalg.iterator_type<parallel>]}
       ins(%select, %at, %bt : tensor<4xi1>, tensor<4xi32>, tensor<4xi32>)
       outs(%init : tensor<4xi32>) {
     ^bb0(%b0 : i1, %b1 : i32, %b2 : i32, %b3 : i32) :
@@ -285,7 +285,7 @@ func.func @constant_splat_op() {
   %init = tensor.empty() : tensor<4xi32>
   %result = linalg.generic {
       indexing_maps = [#map, #map, #map, #map],
-      iterator_types = ["parallel"]}
+      iterator_types = [#linalg.iterator_type<parallel>]}
       ins(%select, %at, %bt : tensor<4xi1>, tensor<4xi32>, tensor<4xi32>)
       outs(%init : tensor<4xi32>) {
     ^bb0(%b0 : i1, %b1 : i32, %b2 : i32, %b3 : i32) :

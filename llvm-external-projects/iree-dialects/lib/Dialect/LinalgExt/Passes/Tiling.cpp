@@ -207,8 +207,8 @@ FailureOr<TiledOp> tileInterfaceOp(OpBuilder &b, TilingInterface tilableOp,
   auto zeroAttr = b.getI64IntegerAttr(0);
 
   // The actual tile sizes used converts `Value` defined as constant 0, to a
-  // zero integer attributes. Currently if the iterator type is not "parallel",
-  // the tile size is forced to zero as well.
+  // zero integer attributes. Currently if the iterator type is not
+  // #linalg.iterator_type<parallel>, the tile size is forced to zero as well.
   auto tileSizes = getAsOpFoldResult(tileSizesVals);
   tileSizes.resize(iteratorTypes.size(), zeroAttr);
   for (auto en : llvm::enumerate(iteratorTypes)) {
@@ -230,7 +230,7 @@ FailureOr<TiledOp> tileInterfaceOp(OpBuilder &b, TilingInterface tilableOp,
   // If the tiled loops are distributed, get the proc_id and nprocs for the
   // distributed loops. First collect the parallel loops by iterating over the
   // tileSizes and getting the loops that are distribute, i.e.,
-  // - parallel, i.e. iteratorTypes is "parallel"
+  // - parallel, i.e. iteratorTypes is #linalg.iterator_type<parallel>
   // - tiled, i.e. tileSize != 0
   if (options.distribution) {
     SmallVector<Range> distributedLoopRange;

@@ -36,8 +36,8 @@ namespace {
 bool isElementTypeLegalForCodegen(Type t) { return !t.isa<ComplexType>(); }
 
 /// Returns an ArrayAttr that contains `nLoops` attributes. All the attributes
-/// are "parallel" except the last `nReduction` elements, where are "reduction"
-/// attributes.
+/// are #linalg.iterator_type<parallel> except the last `nReduction` elements,
+/// which are #linalg.iterator_type<reduction> attributes.
 SmallVector<utils::IteratorType, 3> getParallelAndReductionIterators(
     int nLoops, int nReduction) {
   SmallVector<utils::IteratorType, 3> res(nLoops - nReduction,

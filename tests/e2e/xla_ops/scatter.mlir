@@ -148,7 +148,7 @@ func.func @scatter_1D_large() {
   %init = tensor.empty() : tensor<1400xi32>
   %indices = linalg.generic {
       indexing_maps = [affine_map<(d0) -> (d0)>],
-      iterator_types = ["parallel"]}
+      iterator_types = [#linalg.iterator_type<parallel>]}
       outs(%init : tensor<1400xi32>) {
       ^bb0(%arg0: i32):
         %0 = linalg.index 0 : index
@@ -179,7 +179,7 @@ func.func @scatter_2D_large() {
   %init = tensor.empty() : tensor<200xi32>
   %indices = linalg.generic {
       indexing_maps = [affine_map<(d0) -> (d0)>],
-      iterator_types = ["parallel"]}
+      iterator_types = [#linalg.iterator_type<parallel>]}
       outs(%init : tensor<200xi32>) {
       ^bb0(%arg0: i32):
         %0 = linalg.index 0 : index
@@ -211,7 +211,7 @@ func.func @scatter_2D_large_permuted() {
   %init = tensor.empty() : tensor<300xi32>
   %indices = linalg.generic {
       indexing_maps = [affine_map<(d0) -> (d0)>],
-      iterator_types = ["parallel"]}
+      iterator_types = [#linalg.iterator_type<parallel>]}
       outs(%init : tensor<300xi32>) {
       ^bb0(%arg0: i32):
         %0 = linalg.index 0 : index

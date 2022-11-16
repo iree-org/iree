@@ -13,7 +13,7 @@ func.func @matmul_bias_add(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %ar
       outs(%0 : tensor<?x?xf32>) -> tensor<?x?xf32>
   %2 = linalg.generic {
     indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1)-> (d0, d1)>],
-    iterator_types = ["parallel", "parallel"]}
+    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
     ins(%1, %arg2 : tensor<?x?xf32>, tensor<?xf32>)
     outs(%init : tensor<?x?xf32>) {
       ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):
@@ -46,7 +46,7 @@ func.func @matmul_bias_add_static(%arg0 : tensor<20x60xf32>, %arg1 : tensor<60x1
       outs(%0 : tensor<20x120xf32>) -> tensor<20x120xf32>
   %2 = linalg.generic {
     indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1)-> (d0, d1)>],
-    iterator_types = ["parallel", "parallel"]}
+    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
     ins(%1, %arg2 : tensor<20x120xf32>, tensor<120xf32>)
     outs(%init : tensor<20x120xf32>) {
       ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):
