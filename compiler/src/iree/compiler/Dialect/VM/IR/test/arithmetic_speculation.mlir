@@ -4,10 +4,11 @@
 // RUN:   --pass-pipeline="builtin.module(vm.module(loop-invariant-code-motion))" %s | \
 // RUN:   FileCheck %s
 
-// CHECK-LABEL: @speculate_integer
-vm.module @speculate_integer {
+// CHECK-LABEL: @no_speculate_integer
+vm.module @no_speculate_integer {
   // CHECK-LABEL: vm.func @add_i32
-  // CHECK-NEXT:    vm.add.i32
+  // CHECK-NEXT:    scf.for
+  // CHECK-NEXT:      vm.add.i32
   vm.func @add_i32(%arg0: i32, %arg1: i32,
                    %lb: index, %ub: index, %step: index) -> () {
     scf.for %i = %lb to %ub step %step {
@@ -17,7 +18,8 @@ vm.module @speculate_integer {
   }
 
   // CHECK-LABEL: vm.func @mul_i32
-  // CHECK-NEXT:    vm.mul.i32
+  // CHECK-NEXT:    scf.for
+  // CHECK-NEXT:      vm.mul.i32
   vm.func @mul_i32(%arg0: i32, %arg1: i32,
                    %lb: index, %ub: index, %step: index) -> () {
     scf.for %i = %lb to %ub step %step {
@@ -27,7 +29,8 @@ vm.module @speculate_integer {
   }
 
   // CHECK-LABEL: vm.func @div_ui32
-  // CHECK-NEXT:    vm.div.i32.u
+  // CHECK-NEXT:    scf.for
+  // CHECK-NEXT:      vm.div.i32.u
   vm.func @div_ui32(%arg0: i32, %arg1: i32,
                     %lb: index, %ub: index, %step: index) -> () {
     scf.for %i = %lb to %ub step %step {
@@ -37,7 +40,8 @@ vm.module @speculate_integer {
   }
 
   // CHECK-LABEL: vm.func @shl_i32
-  // CHECK-NEXT:    vm.shl.i32
+  // CHECK-NEXT:    scf.for
+  // CHECK-NEXT:      vm.shl.i32
   vm.func @shl_i32(%arg0: i32, %arg1: i32,
                    %lb: index, %ub: index, %step: index) -> () {
     scf.for %i = %lb to %ub step %step {
@@ -47,7 +51,8 @@ vm.module @speculate_integer {
   }
 
   // CHECK-LABEL: vm.func @fma_i64
-  // CHECK-NEXT:    vm.fma.i64
+  // CHECK-NEXT:    scf.for
+  // CHECK-NEXT:      vm.fma.i64
   vm.func @fma_i64(%arg0: i64, %arg1: i64, %arg2: i64,
                    %lb: index, %ub: index, %step: index) -> () {
     scf.for %i = %lb to %ub step %step {
@@ -55,7 +60,12 @@ vm.module @speculate_integer {
     }
     vm.return
   }
+}
 
+// -----
+
+// CHECK-LABEL: @speculate_integer
+vm.module @speculate_integer {
   // CHECK-LABEL: vm.func @const_i32
   // CHECK-NEXT:    vm.const.i32 0
   vm.func @const_i32(%lb: index, %ub: index, %step: index) -> () {
