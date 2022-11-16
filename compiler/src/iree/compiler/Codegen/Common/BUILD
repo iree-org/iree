@@ -166,6 +166,7 @@ iree_compiler_cc_library(
         "MaterializeEncodingPass.cpp",
         "OptimizeVectorTransferPass.cpp",
         "PolynomialApproximationPass.cpp",
+        "SplitFullPartialTransferPass.cpp",
         "TestPartitionableLoopsInterface.cpp",
         "TileAndDistributeToWorkgroupsPass.cpp",
         "TypePropagationPass.cpp",
