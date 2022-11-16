@@ -13,6 +13,7 @@
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -2243,8 +2244,25 @@ UnPackOp::getTiledImplementation(OpBuilder &builder,
                                           dimAndTileMapping[dim]));
 
       inputIndices.push_back(firstCoord.quotient);
-      inputSizes.push_back(
-          add(sub(lastCoord.quotient, firstCoord.quotient), oneAttr));
+
+      // Get the upper bound because it could be an extract_slice case. The
+      // sizes are determined by loop bound and step, where loop bound is the
+      // size of output shape.
+      // In incomplete tile cases, the input could have larger shape, it is safe
+      // to extend the boundary because they are pre-padded. I.e., the size of
+      // input dim is always aligned to inner_tile_size.
+      FailureOr<int64_t> cstSize = linalg::getConstantUpperBoundForIndex(
+          getValueOrCreateConstantIndexOp(builder, loc, sizes[dim]));
+      Optional<int64_t> cstInnerSize =
+          getConstantIntValue(dimAndTileMapping[dim]);
+      if (!failed(cstSize) && cstInnerSize &&
+          cstSize.value() % cstInnerSize.value() == 0) {
+        inputSizes.push_back(
+            builder.getIndexAttr(cstSize.value() / cstInnerSize.value()));
+      } else {
+        inputSizes.push_back(
+            add(sub(lastCoord.quotient, firstCoord.quotient), oneAttr));
+      }
       outputNewOffsets.push_back(firstCoord.remainder);
 
       AffineExpr i, tile;
