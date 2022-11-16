@@ -23,6 +23,7 @@
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRV.h"
 #include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRVPass.h"
+#include "mlir/Conversion/TosaToArith/TosaToArith.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Func/Transforms/Passes.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
@@ -197,6 +198,11 @@ static void addSPIRVLoweringPasses(OpPassManager &pm, bool enableFastMath) {
   pm.addPass(createCSEPass());
 
   pm.addPass(createLowerAffinePass());
+
+  // Lower ApplyScale before the i64 Emulation Pass so that new 64-bit ops are
+  // also emulated if not supported by the target.
+  pm.addPass(tosa::createTosaToArith(/*includeApplyRescale=*/true,
+                                     /*use32BitApplyRescale=*/true));
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
