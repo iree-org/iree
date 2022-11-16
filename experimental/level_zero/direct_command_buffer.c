@@ -242,7 +242,10 @@ static iree_status_t iree_hal_level_zero_direct_command_buffer_fill_buffer(
       iree_hal_level_zero_buffer_device_pointer(
           iree_hal_buffer_allocated_buffer(target_buffer));
   target_offset += iree_hal_buffer_byte_offset(target_buffer);
-  iree_hal_level_zero_device_ptr_t dst = target_device_buffer + target_offset;
+  iree_hal_level_zero_device_ptr_t dst =
+      (iree_hal_level_zero_device_ptr_t)((uintptr_t)(void*)
+                                             target_device_buffer +
+                                         target_offset);
   LEVEL_ZERO_RETURN_IF_ERROR(
       command_buffer->context->syms,
       zeCommandListAppendMemoryFill(command_buffer->command_list, dst, pattern,
@@ -275,8 +278,14 @@ static iree_status_t iree_hal_level_zero_direct_command_buffer_copy_buffer(
       iree_hal_level_zero_buffer_device_pointer(
           iree_hal_buffer_allocated_buffer(source_buffer));
   source_offset += iree_hal_buffer_byte_offset(source_buffer);
-  iree_hal_level_zero_device_ptr_t dst = target_device_buffer + target_offset;
-  iree_hal_level_zero_device_ptr_t src = source_device_buffer + source_offset;
+  iree_hal_level_zero_device_ptr_t dst =
+      (iree_hal_level_zero_device_ptr_t)((uintptr_t)(void*)
+                                             target_device_buffer +
+                                         target_offset);
+  iree_hal_level_zero_device_ptr_t src =
+      (iree_hal_level_zero_device_ptr_t)((uintptr_t)(void*)
+                                             source_device_buffer +
+                                         source_offset);
   // TODO(raikonenfnu): Currently using NULL stream, need to figure out way to
   // access proper stream from command buffer
   LEVEL_ZERO_RETURN_IF_ERROR(
@@ -345,9 +354,13 @@ iree_hal_level_zero_direct_command_buffer_push_descriptor_set(
     iree_hal_descriptor_set_binding_t binding = bindings[binding_used[i].index];
     iree_hal_level_zero_device_ptr_t device_ptr =
         binding.buffer
-            ? iree_hal_level_zero_buffer_device_pointer(
-                  iree_hal_buffer_allocated_buffer(binding.buffer)) +
-                  iree_hal_buffer_byte_offset(binding.buffer) + binding.offset
+            ? (iree_hal_level_zero_device_ptr_t)((uintptr_t)(void*)
+                                                     iree_hal_level_zero_buffer_device_pointer(
+                                                         iree_hal_buffer_allocated_buffer(
+                                                             binding.buffer)) +
+                                                 iree_hal_buffer_byte_offset(
+                                                     binding.buffer) +
+                                                 binding.offset)
             : 0;
     *((iree_hal_level_zero_device_ptr_t*)
           command_buffer->current_descriptor[i + base_binding]) = device_ptr;
