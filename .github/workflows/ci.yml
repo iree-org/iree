@@ -123,7 +123,7 @@ jobs:
       # counter-productive to do our own.
       - name: "Create build dir archive"
         run: |
-          tar --exclude '*.a' --exclude '*.o' -cfz "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}"
+          tar --exclude '*.a' --exclude '*.o' -cz -f "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}"
           ls -lht "${BUILD_DIR_ARCHIVE}"
       - name: "Upload artifacts"
         uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # v3.1.0
