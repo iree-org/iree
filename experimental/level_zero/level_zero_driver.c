@@ -32,7 +32,7 @@ typedef struct iree_hal_level_zero_driver_t {
 } iree_hal_level_zero_driver_t;
 
 // Pick a fixed lenght size for device names.
-#define IREE_MAX_LEVEL_ZERO_DEVICE_NAME_LENGTH 100
+#define IREE_MAX_LEVEL_ZERO_DEVICE_NAME_LENGTH ZE_MAX_DEVICE_NAME
 
 static const iree_hal_driver_vtable_t iree_hal_level_zero_driver_vtable;
 
@@ -113,9 +113,13 @@ IREE_API_EXPORT iree_status_t iree_hal_level_zero_driver_create(
   return status;
 }
 
+#define IREE_HAL_LEVEL_ZERO_DEVICE_UUID_TEXT_LENGTH 36
+
 // Populates device information from the given Level Zero physical device
 // handle. |out_device_info| must point to valid memory and additional data will
 // be appended to |buffer_ptr| and the new pointer is returned.
+// Puts the device UUID returned from Level Zero into |out_device_info->path|
+// in a UUID canonical textual representation.
 static uint8_t* iree_hal_level_zero_populate_device_info(
     ze_device_handle_t device, iree_hal_level_zero_dynamic_symbols_t* syms,
     uint8_t* buffer_ptr, iree_hal_device_info_t* out_device_info) {
@@ -129,6 +133,25 @@ static uint8_t* iree_hal_level_zero_populate_device_info(
       deviceProperties.name, strlen(deviceProperties.name));
   buffer_ptr += iree_string_view_append_to_buffer(
       device_name_string, &out_device_info->name, (char*)buffer_ptr);
+
+  // Get device UUID.
+  const uint8_t* device_uuid = deviceProperties.uuid.id;
+  char device_path_str[IREE_HAL_LEVEL_ZERO_DEVICE_UUID_TEXT_LENGTH + 1] = {0};
+  snprintf(device_path_str, sizeof(device_path_str),
+           "%02x%02x%02x%02x-"
+           "%02x%02x-"
+           "%02x%02x-"
+           "%02x%02x-"
+           "%02x%02x%02x%02x%02x%02x",
+           device_uuid[0], device_uuid[1], device_uuid[2], device_uuid[3],
+           device_uuid[4], device_uuid[5], device_uuid[6], device_uuid[7],
+           device_uuid[8], device_uuid[9], device_uuid[10], device_uuid[11],
+           device_uuid[12], device_uuid[13], device_uuid[14], device_uuid[15]);
+  iree_string_view_t device_path = iree_make_string_view(
+      device_path_str, IREE_ARRAYSIZE(device_path_str) - 1);
+  buffer_ptr += iree_string_view_append_to_buffer(
+      device_path, &out_device_info->path, (char*)buffer_ptr);
+
   return buffer_ptr;
 }
 
@@ -146,10 +169,11 @@ static iree_status_t iree_hal_level_zero_driver_query_available_devices(
 
   // Allocate the return infos and populate with the devices.
   iree_hal_device_info_t* device_infos = NULL;
-  iree_host_size_t total_size = device_count * sizeof(iree_hal_device_info_t);
-  for (iree_host_size_t i = 0; i < device_count; ++i) {
-    total_size += IREE_MAX_LEVEL_ZERO_DEVICE_NAME_LENGTH * sizeof(char);
-  }
+  iree_host_size_t total_size =
+      device_count * (sizeof(iree_hal_device_info_t) +
+                      (IREE_HAL_LEVEL_ZERO_DEVICE_UUID_TEXT_LENGTH + 1 +
+                       IREE_MAX_LEVEL_ZERO_DEVICE_NAME_LENGTH) *
+                          sizeof(char));
   iree_status_t status =
       iree_allocator_malloc(host_allocator, total_size, (void**)&device_infos);
   if (iree_status_is_ok(status)) {
@@ -248,14 +272,62 @@ static iree_status_t iree_hal_level_zero_driver_create_device_by_id(
   return status;
 }
 
+static bool uuids_equal(const uint8_t* id1, const uint8_t* id2) {
+  return memcmp(id1, id2,
+                16 < ZE_MAX_DEVICE_UUID_SIZE ? 16 : ZE_MAX_DEVICE_UUID_SIZE) ==
+         0;
+}
+
 static iree_status_t iree_hal_level_zero_driver_create_device_by_uuid(
     iree_hal_driver_t* base_driver, iree_string_view_t driver_name,
     const uint8_t* device_uuid, iree_host_size_t param_count,
     const iree_string_pair_t* params, iree_allocator_t host_allocator,
     iree_hal_device_t** out_device) {
-  return iree_make_status(
-      IREE_STATUS_UNIMPLEMENTED,
-      "Creating level zero device from UUID is not implemented.");
+  iree_hal_level_zero_driver_t* driver =
+      iree_hal_level_zero_driver_cast(base_driver);
+  ze_device_handle_t* ze_devices = NULL;
+  iree_status_t status;
+
+  // Get the number of Level Zero devices.
+  uint32_t device_count = 0;
+  IREE_LEVEL_ZERO_TRY(LEVEL_ZERO_RESULT_TO_STATUS(
+      &driver->syms, zeDeviceGet(driver->driver_handle, &device_count, NULL),
+      "zeDeviceGet"));
+
+  // Get all Level Zero devices.
+  iree_allocator_malloc(driver->host_allocator,
+                        sizeof(ze_device_handle_t) * device_count,
+                        (void**)&ze_devices);
+  IREE_LEVEL_ZERO_TRY(LEVEL_ZERO_RESULT_TO_STATUS(
+      &driver->syms,
+      zeDeviceGet(driver->driver_handle, &device_count, ze_devices),
+      "zeDeviceGet"));
+
+  // Find the Level Zero device with the given UUID.
+  bool is_device_found = false;
+  for (uint32_t i = 0; i < device_count; ++i) {
+    ze_device_properties_t device_properties;
+    IREE_LEVEL_ZERO_TRY(LEVEL_ZERO_RESULT_TO_STATUS(
+        &driver->syms, zeDeviceGetProperties(ze_devices[i], &device_properties),
+        "zeDeviceGetProperties"));
+    if (uuids_equal(device_uuid, device_properties.uuid.id)) {
+      IREE_LEVEL_ZERO_TRY(iree_hal_level_zero_driver_create_device_by_id(
+          base_driver, (uintptr_t)ze_devices[i], param_count, params,
+          host_allocator, out_device));
+      is_device_found = true;
+      break;
+    }
+  }
+
+  if (!is_device_found) {
+    status = iree_make_status(IREE_STATUS_NOT_FOUND,
+                              "Could not find Level Zero device by UUID.");
+  }
+
+cleanup:
+  iree_allocator_free(driver->host_allocator, ze_devices);
+
+  return status;
 }
 
 static iree_status_t iree_hal_level_zero_driver_create_device_by_path(

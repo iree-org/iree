@@ -48,6 +48,14 @@ iree_status_t iree_hal_level_zero_result_to_status(
     iree_hal_level_zero_dynamic_symbols_t* syms, ze_result_t result,
     const char* file, uint32_t line);
 
+#define IREE_LEVEL_ZERO_TRY(...)      \
+  do {                                \
+    status = __VA_ARGS__;             \
+    if (!iree_status_is_ok(status)) { \
+      goto cleanup;                   \
+    }                                 \
+  } while (0)
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
