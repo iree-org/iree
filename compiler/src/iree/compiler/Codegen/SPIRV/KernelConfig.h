@@ -54,6 +54,12 @@ LogicalResult setMatmulOpConfig(
     std::array<int64_t, 3> bestThreadTileSizeMNK, bool enablePromotion = false,
     unsigned softwarePipelineDepth = defaultSoftwarePipelineDepth);
 
+/// Sets CodeGen configurations via attributes to the given matmul `linalgOp`
+/// with tile sizes for cooperative matrix, if possible for the given matmul
+/// size.
+LogicalResult setCooperativeMatrixConfig(const spirv::TargetEnv &targetEnv,
+                                         linalg::LinalgOp op);
+
 /// Sets CodeGen configuration for GPUs from a specific vendor.
 ///
 /// If the given `rootOp` has known good CodeGen configuration, attaches a

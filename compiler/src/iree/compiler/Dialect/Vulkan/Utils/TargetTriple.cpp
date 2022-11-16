@@ -33,6 +33,7 @@ spirv::Vendor getVendor(const TargetTriple &triple) {
       return spirv::Vendor::Unknown;
     case TargetTripleArch::AMD_RDNAv1:
     case TargetTripleArch::AMD_RDNAv2:
+    case TargetTripleArch::AMD_RDNAv3:
       return spirv::Vendor::AMD;
     case TargetTripleArch::ARM_Valhall:
       return spirv::Vendor::ARM;
@@ -65,6 +66,7 @@ spirv::DeviceType getDeviceType(const TargetTriple &triple) {
       return spirv::DeviceType::CPU;
     case TargetTripleArch::AMD_RDNAv1:
     case TargetTripleArch::AMD_RDNAv2:
+    case TargetTripleArch::AMD_RDNAv3:
     case TargetTripleArch::NV_Turing:
     case TargetTripleArch::NV_Ampere:
       return spirv::DeviceType::DiscreteGPU;
@@ -151,6 +153,10 @@ void getExtensions(const TargetTriple &triple,
         extensions.push_back(Extension::VK_KHR_8bit_storage);
       }
       return;
+    }
+    case TargetTripleArch::AMD_RDNAv3: {
+      extensions.push_back(Extension::VK_NV_cooperative_matrix);
+      break;
     }
     default:
       break;
@@ -246,6 +252,34 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
 
       variablePointers = variablePointersStorageBuffer = true;
       break;
+    case TargetTripleArch::AMD_RDNAv3: {
+      maxComputeSharedMemorySize = 65536;
+      maxComputeWorkGroupInvocations = 1024;
+      maxComputeWorkGroupSize = {1024, 1024, 1024};
+
+      subgroupSize = 64;
+      subgroupFeatures = SubgroupFeature::Basic | SubgroupFeature::Vote |
+                         SubgroupFeature::Arithmetic | SubgroupFeature::Ballot |
+                         SubgroupFeature::Shuffle |
+                         SubgroupFeature::ShuffleRelative |
+                         SubgroupFeature::Clustered | SubgroupFeature::Quad;
+
+      shaderFloat16 = shaderFloat64 = true;
+      shaderInt8 = shaderInt16 = shaderInt64 = true;
+
+      storageBuffer16BitAccess = storagePushConstant16 = true;
+      uniformAndStorageBuffer16BitAccess = true;
+      storageBuffer8BitAccess = true, storagePushConstant8 = true;
+      uniformAndStorageBuffer8BitAccess = true;
+
+      variablePointers = variablePointersStorageBuffer = true;
+      auto f16t = builder.getF16Type();
+      auto scope = ScopeNVAttr::get(context, ScopeNV::Subgroup);
+      coopmatCases.push_back(CooperativeMatrixPropertiesNVAttr::get(
+          context,
+          /*mSize=*/16, /*nSize=*/16, /*kSize=*/16, /*aType=*/f16t,
+          /*bType=*/f16t, /*cType=*/f16t, /*resultType=*/f16t, scope));
+    } break;
     case TargetTripleArch::Apple_M1:
       // Example: https://vulkan.gpuinfo.org/displayreport.php?id=14673
       maxComputeSharedMemorySize = 32768;
