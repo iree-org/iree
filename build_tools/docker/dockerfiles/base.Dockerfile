@@ -54,20 +54,11 @@ RUN apt-get update \
 ######## CMake ########
 WORKDIR /install-cmake
 
-# These are separate args because there's no way to strip the patch version off
-# to get the /usr/share path.
-# See https://github.com/moby/moby/issues/41383
-ARG CMAKE_MAJOR_VERSION=3
-ARG CMAKE_MINOR_VERSION=21
-ARG CMAKE_PATCH_VERSION=6
+# Install our minimum supported CMake version, which may be ahead of apt-get's version.
+ENV CMAKE_VERSION="3.21.6"
 
-ENV CMAKE_VERSION="${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION}.${CMAKE_PATCH_VERSION}"
-
-# Install our CMake version, which may be ahead of apt-get's version.
-RUN wget "https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION?}/cmake-${CMAKE_VERSION?}-Linux-x86_64.sh" \
-    && chmod +x "./cmake-${CMAKE_VERSION?}-Linux-x86_64.sh" \
-    && "./cmake-${CMAKE_VERSION?}-Linux-x86_64.sh" --skip-license --prefix=/usr/  \
-    && rm -rf /install-cmake
+COPY build_tools/docker/context/install_cmake.sh ./
+RUN ./install_cmake.sh "${CMAKE_VERSION}" && rm -rf /install-cmake
 
 ##############
 
