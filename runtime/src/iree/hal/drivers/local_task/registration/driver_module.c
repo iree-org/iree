@@ -30,11 +30,6 @@ static iree_status_t iree_hal_local_task_driver_factory_enumerate(
   return iree_ok_status();
 }
 
-void slice(const char *str, char *result, size_t start, size_t end)
-{
-    strncpy(result, str + start, end - start);
-}
-
 static iree_status_t iree_hal_local_task_driver_factory_try_create(
     void* self, iree_string_view_t driver_name, iree_allocator_t host_allocator,
     iree_hal_driver_t** out_driver) {
@@ -44,20 +39,21 @@ static iree_status_t iree_hal_local_task_driver_factory_try_create(
                             (int)driver_name.size, driver_name.data);
   }
 
-  iree_string_view_t uri = driver_name;
-  uri.size = strlen(driver_name.data);
+  iree_string_view_t uri = iree_string_view_trim(iree_make_string_view(
+      driver_name.data, strlen(driver_name.data)));
   iree_string_view_t name, device_path, params_str, nodes_name, nodes_value;
   iree_uri_split(uri, &name, &device_path, &params_str);
   iree_string_view_t remaining = params_str;
   iree_string_view_split(remaining, '=', &nodes_name, &nodes_value);
   nodes_name = iree_string_view_trim(nodes_name);
   nodes_value = iree_string_view_trim(nodes_value);
+  int num_nodes = 0;
   while (!iree_string_view_is_empty(nodes_value)) {
     iree_string_view_t key_value;
     iree_string_view_split(nodes_value, ',', &key_value, &nodes_value);
-    char dest[50];
-    slice(key_value.data, dest, 0, key_value.size);
-    long input_node = strtol(dest, NULL, 10);
+    char node_str[3];
+    strncpy(node_str, key_value.data, key_value.size);
+    long input_node = strtol(node_str, NULL, 10);
     int maxnode = numa_max_node();
     if (input_node > maxnode) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -65,6 +61,7 @@ static iree_status_t iree_hal_local_task_driver_factory_try_create(
                               input_node,
                               maxnode);
     }
+    num_nodes++;
   }
 
   iree_hal_task_device_params_t default_params;
@@ -90,7 +87,7 @@ static iree_status_t iree_hal_local_task_driver_factory_try_create(
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_task_driver_create(
-        driver_name, &default_params, /*queue_count=*/1, &executor,
+        driver_name, &default_params, /*queue_count=*/num_nodes, &executor,
         loader_count, loaders, device_allocator, host_allocator, out_driver);
   }
 

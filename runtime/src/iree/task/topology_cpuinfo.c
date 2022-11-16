@@ -79,7 +79,9 @@ static uint32_t iree_task_topology_rotate_from_base_core(uint32_t core_id) {
 static void iree_task_topology_set_affinity_from_processor(
     const struct cpuinfo_processor* processor,
     iree_thread_affinity_t* out_affinity) {
-  memset(out_affinity, 0, sizeof(*out_affinity));
+  if (out_affinity->group == 0) {
+    memset(out_affinity, 0, sizeof(*out_affinity));
+  }
   out_affinity->specified = 1;
 
   // Special bit to indicate that (if required) we want the entire core.
@@ -142,6 +144,7 @@ static uint64_t iree_task_topology_calculate_constructive_sharing_mask(
 static void iree_task_topology_group_initialize_from_core(
     uint32_t group_index, const struct cpuinfo_core* core,
     iree_task_topology_group_t* out_group) {
+  
   iree_task_topology_group_initialize(group_index, out_group);
 
   // Guess: always pick the first processor in a core.
@@ -221,7 +224,9 @@ static void iree_task_topology_initialize_from_physical_cores_with_filter(
   }
   core_count = iree_min(core_count, max_core_count);
 
-  iree_task_topology_initialize(out_topology);
+  if (out_topology->groups[0].ideal_thread_affinity.group == 0) {
+    iree_task_topology_initialize(out_topology);
+  }
 
   // Build each core up to the max allowed.
   // TODO(benvanik): if our group_count <= core_count/2 then distribute better;

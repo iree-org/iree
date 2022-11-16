@@ -80,17 +80,14 @@ IREE_FLAG(
 // configuration as seen by the topology utilities.
 
 IREE_FLAG(
-    bool, numa_topology_dump, false,
-    "Dumps CPU NUMA hardware topology to dump out the current machine\n"
-    "configuration as seen by the topology utilities.\n");
+    string, task_numa_nodes, "",
+    "Creates executors for specified CPU NUMA nodes.\n");
 
 iree_status_t iree_task_topology_initialize_from_flags(
     iree_task_topology_t* out_topology) {
   IREE_ASSERT_ARGUMENT(out_topology);
-  iree_task_topology_initialize(out_topology);
-  if (FLAG_numa_topology_dump == true) {
-    //printf("HARDWARE TOPOLOGY:\n");
-    //hardware_topology();
+  if (out_topology->groups[0].ideal_thread_affinity.group == 0) {
+    iree_task_topology_initialize(out_topology);
   }
 
   if (FLAG_task_topology_group_count != 0) {
@@ -117,21 +114,50 @@ iree_status_t iree_task_topology_initialize_from_flags(
 iree_status_t iree_task_executor_create_from_flags(
     iree_allocator_t host_allocator, iree_task_executor_t** out_executor) {
   IREE_ASSERT_ARGUMENT(out_executor);
+  const char *task_numa_nodes = FLAG_task_numa_nodes;
+  iree_string_view_t numa_nodes = iree_string_view_trim(iree_make_string_view(
+      task_numa_nodes, strlen(task_numa_nodes)));
+  iree_host_size_t num_nodes = 0;
+  iree_host_size_t numactl_node_count = numa_max_node() + 1;
+  iree_host_size_t nodes[numactl_node_count];
+  while (!iree_string_view_is_empty(numa_nodes)) {
+    iree_string_view_t key_value;
+    iree_string_view_split(numa_nodes, ',', &key_value, &numa_nodes);
+    char node_str[3];
+    strncpy(node_str, key_value.data, key_value.size);
+    iree_host_size_t input_node = (iree_host_size_t) strtol(node_str, NULL, 10);
+    nodes[num_nodes] = input_node;
+    if (input_node > numactl_node_count - 1) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "input_node %lu out of range (0 - %zu)",
+                              input_node,
+                              numactl_node_count - 1);
+    }
+    num_nodes++;
+  }
+
   *out_executor = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_task_executor_options_t options;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_task_executor_options_initialize_from_flags(&options));
-
-  iree_task_topology_t topology;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+  iree_status_t status;
+  for (int i = 0; i < num_nodes; i++) {
+    iree_task_topology_t topology;
+    // Set all topology groups to ideal affinity of nodes[i]
+    for (int j = 0; j < IREE_TASK_EXECUTOR_MAX_WORKER_COUNT; j++) {
+      topology.groups[j].ideal_thread_affinity.group = nodes[i];
+    }
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_task_topology_initialize_from_flags(&topology));
+    
+    iree_task_executor_options_t options;
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_task_executor_options_initialize_from_flags(&options));
 
-  iree_status_t status = iree_task_executor_create(
-      options, &topology, host_allocator, out_executor);
+    status = iree_task_executor_create(
+        options, &topology, host_allocator, &out_executor[i]);
 
-  iree_task_topology_deinitialize(&topology);
+    iree_task_topology_deinitialize(&topology);
+  }
 
   IREE_TRACE_ZONE_END(z0);
   return status;

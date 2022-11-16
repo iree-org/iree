@@ -50,7 +50,7 @@ iree_status_t iree_hal_task_driver_create(
   IREE_ASSERT_ARGUMENT(out_driver);
   *out_driver = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
-
+  
   // Allocation is for:
   // - iree_hal_task_driver_t
   //   + loaders[] VLA
