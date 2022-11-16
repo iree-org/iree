@@ -248,18 +248,43 @@ static iree_status_t iree_hal_level_zero_driver_create_device_by_id(
   return status;
 }
 
+static iree_status_t iree_hal_level_zero_driver_create_device_by_uuid(
+    iree_hal_driver_t* base_driver, iree_string_view_t driver_name,
+    const uint8_t* device_uuid, iree_host_size_t param_count,
+    const iree_string_pair_t* params, iree_allocator_t host_allocator,
+    iree_hal_device_t** out_device) {
+  return iree_make_status(
+      IREE_STATUS_UNIMPLEMENTED,
+      "Creating level zero device from UUID is not implemented.");
+}
+
 static iree_status_t iree_hal_level_zero_driver_create_device_by_path(
     iree_hal_driver_t* base_driver, iree_string_view_t driver_name,
     iree_string_view_t device_path, iree_host_size_t param_count,
     const iree_string_pair_t* params, iree_allocator_t host_allocator,
     iree_hal_device_t** out_device) {
-  if (!iree_string_view_is_empty(device_path)) {
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                            "device paths not yet implemented");
+  if (iree_string_view_is_empty(device_path)) {
+    return iree_hal_level_zero_driver_create_device_by_id(
+        base_driver, IREE_HAL_DEVICE_ID_DEFAULT, param_count, params,
+        host_allocator, out_device);
   }
-  return iree_hal_level_zero_driver_create_device_by_id(
-      base_driver, IREE_HAL_DEVICE_ID_DEFAULT, param_count, params,
-      host_allocator, out_device);
+
+  // Try parsing as a device UUID.
+  uint8_t device_uuid[16] = {0};
+  if (iree_string_view_parse_hex_bytes(device_path, 16, device_uuid)) {
+    return iree_hal_level_zero_driver_create_device_by_uuid(
+        base_driver, driver_name, device_uuid, param_count, params,
+        host_allocator, out_device);
+  }
+
+  uint64_t device_id = 0;
+  if (iree_string_view_atoi_uint64(device_path, &device_id)) {
+    return iree_hal_level_zero_driver_create_device_by_id(
+        base_driver, (uintptr_t)device_id, param_count, params, host_allocator,
+        out_device);
+  }
+
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "unsupported device path");
 }
 
 static const iree_hal_driver_vtable_t iree_hal_level_zero_driver_vtable = {
