@@ -39,8 +39,7 @@ class SinkDefiningOpsPass
       // Consider only those constant ops in the entry block.
       SmallVector<std::pair<Operation *, Operation *>, 8> sinks;
       for (auto &op : funcOp.getBlocks().front()) {
-        if (op.getNumResults() != 1 ||
-            !MemoryEffectOpInterface::hasNoEffect(&op)) {
+        if (op.getNumResults() != 1 || !isMemoryEffectFree(&op)) {
           // Probably not safe to move.
           continue;
         }
