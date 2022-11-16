@@ -95,20 +95,15 @@ jobs:
   build_all:
     needs: setup
     if: needs.setup.outputs.should-run == 'true'
-    runs-on:
-      - self-hosted  # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - cpu
-      - os-family=Linux
+    runs-on: ubuntu-20.04-64core
     env:
       BUILD_DIR: full-build-dir
+      BUILD_DIR_ARCHIVE: full-build-dir.tar
     outputs:
       # Pass through the build directory as output so it's available to
       # dependent jobs.
       build-dir: ${{ env.BUILD_DIR }}
-      build-dir-archive: ${{ steps.archive.outputs.build-dir-archive }}
-      build-dir-gcs-artifact: ${{ steps.upload.outputs.build-dir-gcs-artifact }}
+      build-dir-archive: ${{ env.BUILD_DIR_ARCHIVE }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
@@ -120,37 +115,19 @@ jobs:
             gcr.io/iree-oss/base@sha256:7c3027c48b94fc38e64488987fc7893c100526c57308d25cef0c6b76a2dfe117 \
             ./build_tools/cmake/build_all.sh \
             "${BUILD_DIR}"
-      # The archive step below doesn't include these files. Remove them first to
-      # save disk space.
-      # TODO(#10739): This step can be removed once we enlarge the disk sapce.
-      - name: "Removing unused files"
-        run: |
-          find "${BUILD_DIR}" -type f -name "*.a" -o -type f -name "*.o" \
-            -print \
-            -delete
-      # Things get more complicated here than when we're just building the
-      # runtime. The build directory is way bigger. We're also using on our own
-      # runners on GCE. So uploading to GitHub actions artifact storage hosted
-      # on Azure is dirt slow. We drop static libraries and object files, which
-      # aren't needed for testing. Then we do some minimal compression locally
-      # *in parallel* and upload to GCS. This can be further optimized.
-      # Especially decompression is still pretty slow. See #9881.
-      - name: "Creating build dir archive"
-        id: archive
+      # The upload action already does its own gzip compression, so it's
+      # counter-productive to do our own.
+      - name: "Create build dir archive"
+        run: tar -cf --exclude '*.a' --exclude '*.o' ${BUILD_DIR_ARCHIVE} ${BUILD_DIR}
+      - name: "Upload artifacts"
+        uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # v3.1.0
         env:
-          BUILD_DIR_ARCHIVE: ${{ env.BUILD_DIR }}.tar.zst
-        run: |
-          tar -I 'zstd -T0' \
-            -cf ${BUILD_DIR_ARCHIVE} ${BUILD_DIR}
-          echo "::set-output name=build-dir-archive::${BUILD_DIR_ARCHIVE}"
-      - name: "Uploading build dir archive"
-        id: upload
-        env:
-          BUILD_DIR_ARCHIVE: ${{ steps.archive.outputs.build-dir-archive }}
-          BUILD_DIR_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.archive.outputs.build-dir-archive }}
-        run: |
-          gcloud alpha storage cp "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR_GCS_ARTIFACT}"
-          echo "::set-output name=build-dir-gcs-artifact::${BUILD_DIR_GCS_ARTIFACT}"
+          BUILD_DIR_ARCHIVE: ff
+        with:
+          name: ${{ env.BUILD_DIR_ARCHIVE }}
+          path: ${{ env.BUILD_DIR_ARCHIVE }}
+          if-no-files-found: error
+
 
   build_test_all_windows:
     needs: setup
@@ -213,25 +190,21 @@ jobs:
   test_all:
     needs: [setup, build_all]
     if: needs.setup.outputs.should-run == 'true'
-    runs-on:
-      - self-hosted  # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - cpu
-      - os-family=Linux
+    runs-on: ubuntu-20.04-64core
     env:
       BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
       BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2
         with:
           submodules: true
-      - name: "Downloading build dir archive"
-        run: gcloud alpha storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
+      - name: "Downloading runtime build dir archive"
+        uses: actions/download-artifact@fb598a63ae348fa914e94cd0ff38f362e927b741 # v3.0.0
+        with:
+          name: "${{ env.BUILD_DIR_ARCHIVE }}"
       - name: "Extracting build dir archive"
-        run: tar -xf "${BUILD_DIR_ARCHIVE}"
+        run: tar -xf ${BUILD_DIR_ARCHIVE}
       - name: "Testing all"
         run: |
           ./build_tools/github_actions/docker_run.sh \
