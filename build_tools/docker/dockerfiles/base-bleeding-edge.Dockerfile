@@ -16,6 +16,7 @@ FROM ubuntu@sha256:4b1d0c4a2d2aaf63b37111f34eb9fa89fa1bf53dd6e4ca954d47caebca400
 ARG APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=1
 
 ######## Basic stuff ########
+WORKDIR /install-basics
 # Useful utilities for building child images. Best practices would tell us to
 # use multi-stage builds
 # (https://docs.docker.com/develop/develop-images/multistage-build/) but it
@@ -29,36 +30,17 @@ RUN apt-get update \
     curl \
     gnupg2
 
-# Install the latest compiler tools
+# Install the latest supported compiler tools
 ARG LLVM_VERSION=16
 ENV CC /usr/bin/clang-${LLVM_VERSION}
 ENV CXX /usr/bin/clang++-${LLVM_VERSION}
 
-
+COPY build_tools/docker/context/install_iree_deps.sh ./
 RUN echo "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy main" >> /etc/apt/sources.list \
   && curl https://apt.llvm.org/llvm-snapshot.gpg.key \
       | gpg --dearmor > /etc/apt/trusted.gpg.d/llvm-snapshot.gpg \
-  && apt-get update \
-  && apt-get install -y \
-    "clang-${LLVM_VERSION}" \
-    "lld-${LLVM_VERSION}" \
-    # IREE transitive dependencies
-    libsdl2-dev \
-    libssl-dev \
-    # A much better CMake builder
-    ninja-build \
-    # Modern Vulkan versions now available via apt
-    libvulkan-dev \
-    # Needed for building lld with Bazel (as currently configured)
-    libxml2-dev \
-    # Optional for tools like llvm-symbolizer, which we could build from
-    # source but would rather just have available ahead of time
-    llvm-dev \
-    # Being called exactly "lld" appears to be load bearing. Someone is welcome
-    # to tell me a better way to install a specific version as just lld
-    # (lld=<version> doesn't work).
-    && ln -s "lld-${LLVM_VERSION}" /usr/bin/lld \
-    && ln -s "ld.lld-${LLVM_VERSION}" /usr/bin/ld.lld
+  && ./install_iree_deps.sh "${LLVM_VERSION?}" \
+  && rm -rf /install-basics
 
 ######## CMake ########
 WORKDIR /install-cmake
@@ -77,7 +59,6 @@ COPY build_tools/docker/context/install_bazel.sh .bazelversion ./
 RUN ./install_bazel.sh && rm -rf /install-bazel
 
 ##############
-
 
 ######## Python ########
 WORKDIR /install-python

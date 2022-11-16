@@ -4,6 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+# 18.04
 FROM ubuntu@sha256:fd25e706f3dea2a5ff705dbc3353cf37f08307798f3e360a13e9385840f73fb3
 
 # Disable apt-key parse waring. If someone knows how to do whatever the "proper"
@@ -12,6 +13,7 @@ FROM ubuntu@sha256:fd25e706f3dea2a5ff705dbc3353cf37f08307798f3e360a13e9385840f73
 ARG APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=1
 
 ######## Basic stuff ########
+WORKDIR /install-basics
 # Useful utilities for building child images. Best practices would tell us to
 # use multi-stage builds
 # (https://docs.docker.com/develop/develop-images/multistage-build/) but it
@@ -25,30 +27,14 @@ RUN apt-get update \
     curl \
     gnupg2
 
-
-# Install the oldest supported tools
+# Install the oldest supported compiler tools
 ARG LLVM_VERSION=9
 ENV CC /usr/bin/clang-${LLVM_VERSION}
 ENV CXX /usr/bin/clang++-${LLVM_VERSION}
 
-RUN apt-get update \
-  && apt-get install -y \
-    "clang-${LLVM_VERSION}" \
-    "lld-${LLVM_VERSION}" \
-    # IREE transitive dependencies
-    libsdl2-dev \
-    libssl-dev \
-    # A much better CMake builder
-    ninja-build \
-    # Needed for building lld with Bazel (as currently configured)
-    libxml2-dev \
-    # Optional for tools like llvm-symbolizer, which we could build from
-    # source but would rather just have available ahead of time
-    llvm-dev \
-    # Someone is welcome to tell me a better way to just install a specific
-    # version as just lld (lld=<version> doesn't work)
-    && ln -s "lld-${LLVM_VERSION}" /usr/bin/lld \
-    && ln -s "ld.lld-${LLVM_VERSION}" /usr/bin/ld.lld
+COPY build_tools/docker/context/install_iree_deps.sh ./
+RUN ./install_iree_deps.sh "${LLVM_VERSION?}" \
+  && rm -rf /install-basics
 
 ######## CMake ########
 WORKDIR /install-cmake
