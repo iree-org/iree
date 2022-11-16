@@ -125,8 +125,6 @@ jobs:
         run: tar --exclude '*.a' --exclude '*.o' -cf ${BUILD_DIR_ARCHIVE} ${BUILD_DIR}
       - name: "Upload artifacts"
         uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # v3.1.0
-        env:
-          BUILD_DIR_ARCHIVE: ff
         with:
           name: ${{ env.BUILD_DIR_ARCHIVE }}
           path: ${{ env.BUILD_DIR_ARCHIVE }}
