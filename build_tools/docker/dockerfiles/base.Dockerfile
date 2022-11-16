@@ -12,44 +12,43 @@ FROM ubuntu@sha256:fd25e706f3dea2a5ff705dbc3353cf37f08307798f3e360a13e9385840f73
 ARG APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=1
 
 ######## Basic stuff ########
-# Default compiler environment variables for IREE.
-# Matches the version of clang installed below.
-ENV CC /usr/bin/clang-9
-ENV CXX /usr/bin/clang++-9
+# Useful utilities for building child images. Best practices would tell us to
+# use multi-stage builds
+# (https://docs.docker.com/develop/develop-images/multistage-build/) but it
+# turns out that Dockerfile is a thoroughly non-composable awful format and that
+# doesn't actually work that well. These deps are pretty small.
+RUN apt-get update \
+  && apt-get install -y \
+    git \
+    unzip \
+    wget \
+    curl \
+    gnupg2
+
+
+# Install the oldest supported tools
+ARG LLVM_VERSION=9
+ENV CC /usr/bin/clang-${LLVM_VERSION}
+ENV CXX /usr/bin/clang++-${LLVM_VERSION}
 
 RUN apt-get update \
   && apt-get install -y \
-    # For updating IREE's submodules.
-    git \
-    # Install our minimum supported clang version.
-    clang-9 \
-    lld-9 \
+    "clang-${LLVM_VERSION}" \
+    "lld-${LLVM_VERSION}" \
     # IREE transitive dependencies
     libsdl2-dev \
     libssl-dev \
     # A much better CMake builder
     ninja-build \
-    # For building child images. Best practices would tell us to use multi-stage
-    # builds (https://docs.docker.com/develop/develop-images/multistage-build/)
-    # but it turns out that Dockerfile is a thoroughly non-composable awful
-    # format and that doesn't actually work that well. These deps are pretty
-    # small.
-    unzip \
-    wget \
-    gnupg2 \
-    # Needed for installing Bazel, per https://bazel.build/install/ubuntu
-    apt-transport-https \
-    curl \
-    gnupg \
     # Needed for building lld with Bazel (as currently configured)
     libxml2-dev \
     # Optional for tools like llvm-symbolizer, which we could build from
     # source but would rather just have available ahead of time
     llvm-dev \
-    # Someone is welcome to tell me a better way to just install lld-9 as lld
-    # (lld=9 doesn't work)
-    && ln -s lld-9 /usr/bin/lld \
-    && ln -s ld.lld-9 /usr/bin/ld.lld
+    # Someone is welcome to tell me a better way to just install a specific
+    # version as just lld (lld=<version> doesn't work)
+    && ln -s "lld-${LLVM_VERSION}" /usr/bin/lld \
+    && ln -s "ld.lld-${LLVM_VERSION}" /usr/bin/ld.lld
 
 ######## CMake ########
 WORKDIR /install-cmake
