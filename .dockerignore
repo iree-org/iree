@@ -18,3 +18,5 @@
 # Avoid duplicating dependency requirement information
 !runtime/bindings/python/iree/runtime/build_requirements.txt
 !integrations/tensorflow/test/requirements.txt
+# Keep the Bazel version in only one place
+!.bazelversion

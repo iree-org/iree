@@ -78,6 +78,11 @@ RUN wget -q "https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION
 
 ##############
 
+######## Bazel ########
+WORKDIR /install-bazel
+COPY build_tools/docker/context/install_bazel.sh .bazelversion ./
+RUN ./install_bazel.sh && rm -rf /install-bazel
+
 ######## Python ########
 # Note that we use --ignore-installed when installing packages that may have
 # been auto-installed by the OS package manager (i.e. PyYAML is often an

@@ -30,13 +30,11 @@ RUN yum install -y \
   capstone-devel libzstd-devel
 
 ######## Bazel ########
-# Bazel requires Java.
-ARG BAZEL_VERSION=5.1.0
-RUN curl -fsSL \
-  https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/bazel-${BAZEL_VERSION}-linux-x86_64 \
-  -o /usr/local/bin/bazel \
-  && chmod a+x /usr/local/bin/bazel \
-  && /usr/local/bin/bazel --version
+WORKDIR /install-bazel
+COPY build_tools/docker/context/install_bazel.sh .bazelversion ./
+RUN ./install_bazel.sh && rm -rf /install-bazel
+
+##############
 
 # See: https://github.com/bazelbuild/bazel/issues/10327
 # Note also that many things that link fine on newer OS's seem to fail based

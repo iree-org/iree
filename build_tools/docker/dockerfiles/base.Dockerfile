@@ -73,21 +73,8 @@ RUN wget "https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION?}/
 
 ######## Bazel ########
 WORKDIR /install-bazel
-# Making a required Bazel version change? Most images derive from this one
-# and will get it automatically. However these don't. Please update them as
-# well:
-#   manylinux2014_x86_64-release
-ARG BAZEL_VERSION=5.1.0
-
-# https://bazel.build/install/ubuntu
-RUN curl -fsSL https://bazel.build/bazel-release.pub.gpg \
-  | gpg --dearmor >bazel-archive-keyring.gpg \
-  && mv bazel-archive-keyring.gpg /usr/share/keyrings \
-  && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/bazel-archive-keyring.gpg] https://storage.googleapis.com/bazel-apt stable jdk1.8" \
-  | tee /etc/apt/sources.list.d/bazel.list \
-  && apt-get update \
-  && apt-get install -y "bazel=${BAZEL_VERSION?}" \
-  && rm -rf /install-bazel
+COPY build_tools/docker/context/install_bazel.sh .bazelversion ./
+RUN ./install_bazel.sh && rm -rf /install-bazel
 
 ##############
 
