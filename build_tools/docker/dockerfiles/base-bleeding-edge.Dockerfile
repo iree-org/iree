@@ -60,6 +60,17 @@ RUN ./install_bazel.sh && rm -rf /install-bazel
 
 ##############
 
+##############
+
+WORKDIR /install-vulkan
+RUN apt-get update \
+  apt-get install -y \
+    # Modern Vulkan versions now available via apt
+    libvulkan-dev \
+    vulkan-tools
+
+##############
+
 ######## Python ########
 WORKDIR /install-python
 

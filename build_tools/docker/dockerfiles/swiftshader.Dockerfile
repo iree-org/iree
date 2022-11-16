@@ -8,7 +8,9 @@ FROM gcr.io/iree-oss/base@sha256:c5022788b8fb18856be1f573e8321530c36e81df6d444b8
 WORKDIR /install-swiftshader
 
 COPY build_tools/third_party/swiftshader/build_vk_swiftshader.sh ./
-RUN ./build_vk_swiftshader.sh "/swiftshader"
+RUN ./build_vk_swiftshader.sh "/swiftshader" && rm -rf /install-swiftshader
 
 # Set VK_ICD_FILENAMES so Vulkan loader can find the SwiftShader ICD.
 ENV VK_ICD_FILENAMES /swiftshader/vk_swiftshader_icd.json
+
+WORKDIR /

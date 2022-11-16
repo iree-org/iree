@@ -17,8 +17,6 @@ declare -a PACKAGES=(
     libssl-dev
     # A much better CMake builder
     ninja-build
-    # Modern Vulkan versions now available via apt
-    libvulkan-dev
     # Needed for building lld with Bazel (as currently configured)
     libxml2-dev
     # Optional for tools like llvm-symbolizer, which we could build from

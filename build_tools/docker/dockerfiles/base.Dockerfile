@@ -103,12 +103,13 @@ RUN /usr/local/bin/fetch_cuda_deps.sh "${IREE_CUDA_DEPS_DIR?}"
 WORKDIR /install-vulkan
 ARG VULKAN_SDK_VERSION=1.2.154.0
 
-RUN wget -q \
+RUN curl --silent --fail --show-error --location \
   # This file disappeared from the canonical source:
   # "https://sdk.lunarg.com/sdk/download/${VULKAN_SDK_VERSION?}/linux/vulkansdk-linux-${VULKAN_SDK_VERSION?}.tar.gz"
   "https://storage.googleapis.com/iree-shared-files/vulkansdk-linux-${VULKAN_SDK_VERSION?}.tar.gz" \
+  --output vulkansdk.tar.gz \
   && mkdir -p /opt/vulkan-sdk \
-  && tar -xzf "vulkansdk-linux-${VULKAN_SDK_VERSION?}.tar.gz" -C /opt/vulkan-sdk \
+  && tar -xzf vulkansdk.tar.gz -C /opt/vulkan-sdk \
   && rm -rf /install-vulkan
 WORKDIR /
 
