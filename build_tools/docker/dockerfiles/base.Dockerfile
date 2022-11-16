@@ -108,9 +108,9 @@ WORKDIR /
 ##############
 
 ######## IREE CUDA DEPS ########
-COPY build_tools/docker/context/fetch_cuda_deps.sh /usr/local/bin
-RUN /usr/local/bin/fetch_cuda_deps.sh /usr/local/iree_cuda_deps
 ENV IREE_CUDA_DEPS_DIR="/usr/local/iree_cuda_deps"
+COPY build_tools/docker/context/fetch_cuda_deps.sh /usr/local/bin
+RUN /usr/local/bin/fetch_cuda_deps.sh "${IREE_CUDA_DEPS_DIR?}"
 ##############
 
 ######## Vulkan ########
