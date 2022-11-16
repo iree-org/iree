@@ -102,7 +102,7 @@ jobs:
     runs-on: ubuntu-20.04-64core
     env:
       BUILD_DIR: full-build-dir
-      BUILD_DIR_ARCHIVE: full-build-dir.tar
+      BUILD_DIR_ARCHIVE: full-build-dir.tar.gz
     outputs:
       # Pass through the build directory as output so it's available to
       # dependent jobs.
@@ -122,7 +122,9 @@ jobs:
       # The upload action already does its own gzip compression, so it's
       # counter-productive to do our own.
       - name: "Create build dir archive"
-        run: tar --exclude '*.a' --exclude '*.o' -cf ${BUILD_DIR_ARCHIVE} ${BUILD_DIR}
+        run: |
+          tar --exclude '*.a' --exclude '*.o' -cfz "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}"
+          ls -lht "${BUILD_DIR_ARCHIVE}"
       - name: "Upload artifacts"
         uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # v3.1.0
         with:
