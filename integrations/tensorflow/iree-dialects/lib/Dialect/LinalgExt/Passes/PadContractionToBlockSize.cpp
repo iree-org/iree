@@ -105,9 +105,9 @@ struct PadContractionToBlockSizePass
     getOperation()->walk([&](linalg::ContractionOpInterface op) {
       auto linalgOp = llvm::cast<linalg::LinalgOp>(op.getOperation());
       Location loc = op.getLoc();
-      OpOperand *lhs = linalgOp.getInputOperand(0);
-      OpOperand *rhs = linalgOp.getInputOperand(1);
-      OpOperand *output = linalgOp.getOutputOperand(0);
+      OpOperand *lhs = linalgOp.getDpsInputOperand(0);
+      OpOperand *rhs = linalgOp.getDpsInputOperand(1);
+      OpOperand *output = linalgOp.getDpsInitOperand(0);
       Value origOutput = output->get();
       OpResult result = op.getOperation()->getResult(0);
 

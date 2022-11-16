@@ -33,7 +33,7 @@ public:
 #endif // LLVM_ENABLE_ABI_BREAKING_CHECKS
   }
 
-  void notifyOperationReplaced(Operation *op, ValueRange newValues) override;
+  void notifyRootReplaced(Operation *op, ValueRange newValues) override;
 
   void notifyOperationRemoved(Operation *op) override;
 
@@ -43,6 +43,10 @@ public:
 #endif // LLVM_ENABLE_ABI_BREAKING_CHECKS
     return failure(hadErrors);
   }
+
+  /// Remove the mappings between the given operation and any handle that may be
+  /// associated with it in the transform op.
+  void removeMappings(Operation *op);
 
 private:
   InFlightDiagnostic emitError(Operation *op, const llvm::Twine &message = {}) {

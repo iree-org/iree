@@ -58,7 +58,12 @@ SmallVector<Value> tileToSCF(PatternRewriter &rewriter, TilingInterface op,
 
   // Generate loop nest: One loop per dimension.
   llvm::SmallPtrSet<Operation *, 1> preservedUses;
-  SmallVector<Value> destOperand = clonedOp.getDestinationOperands(rewriter);
+  SmallVector<Value> destOperand;
+
+  if (failed(tensor::getOrCreateDestinations(rewriter, loc, clonedOp,
+                                             destOperand)))
+    clonedOp->emitOpError("failed to get destOperand");
+
   auto loopNest = mlir::scf::buildLoopNest(
       rewriter, loc, lbs, /*ubs=*/dims, steps, ValueRange(destOperand),
       [&](OpBuilder &b, Location loc, ValueRange localIvs,

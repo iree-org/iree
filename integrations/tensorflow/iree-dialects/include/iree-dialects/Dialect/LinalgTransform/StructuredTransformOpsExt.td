@@ -41,7 +41,16 @@ def CanonicalizedSequenceOp
   let assemblyFormat =
     "($root^)? `failures` `(` $failure_propagation_mode `)` attr-dict-with-keyword regions (`:` type($results)^)?";
 
+  let builders = [
+    OpBuilder<(ins "::mlir::transform::FailurePropagationMode":$failure_propagation_mode,
+                   CArg<"::llvm::function_ref<void(::mlir::OpBuilder &, ::mlir::Location, ::mlir::Value)>",
+                        "nullptr">)>
+  ];
+
   let extraClassDeclaration = [{
+    using BodyBuilderFn =
+        ::llvm::function_ref<void(::mlir::OpBuilder &, ::mlir::Location, ::mlir::Value)>;
+
     /// Allow the dialect prefix to be omitted.
     static ::llvm::StringRef getDefaultDialect() { return "transform"; }
   }];
@@ -101,16 +110,6 @@ def LowerToLLVMOp : Op<Transform_Dialect, "lower_to_llvm",
      DefaultValuedAttr<BoolAttr, "false">:$enable_async);
 
   let assemblyFormat = "attr-dict";
-  let cppNamespace = "transform_ext";
-}
-
-def PrintOp : Op<Transform_Dialect, "print",
-    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-     DeclareOpInterfaceMethods<TransformOpInterface>]> {
-  let arguments = (ins Optional<PDL_Operation>:$target,
-                       StrAttr:$name);
-  let description = [{Prints the module.}];
-  let assemblyFormat = "($target^)? attr-dict";
   let cppNamespace = "transform_ext";
 }
 
