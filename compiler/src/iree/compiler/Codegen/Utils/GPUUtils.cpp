@@ -12,7 +12,7 @@
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/Matchers.h"
-#include "mlir/Transforms/SideEffectUtils.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
 
 namespace mlir {
 namespace iree_compiler {

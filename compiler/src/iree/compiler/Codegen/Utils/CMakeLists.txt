@@ -37,6 +37,7 @@ iree_cc_library(
     MLIRLinalgUtils
     MLIRMemRefDialect
     MLIRSCFDialect
+    MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTensorDialect
     MLIRTilingInterface
