@@ -19,6 +19,7 @@ add_mlir_library(IREELinalgExtTransforms
   MLIRAsyncDialect
   MLIRSCFToControlFlow
   MLIRLinalgToLLVM
+  MLIRDialectUtils
   MLIRVectorToLLVM
   MLIRMathToLLVM
   MLIRMemRefToLLVM

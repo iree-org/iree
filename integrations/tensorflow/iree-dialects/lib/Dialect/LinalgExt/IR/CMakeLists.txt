@@ -10,8 +10,10 @@ add_mlir_library(IREELinalgExtDialect
   IREELinalgExtIncGen
 
   LINK_LIBS PUBLIC
+  IREELinalgExtUtils
   MLIRAffineDialect
   MLIRArithUtils
+  MLIRDestinationStyleOpInterface
   MLIRDialectUtils
   MLIRIR
   MLIRInferTypeOpInterface
@@ -24,6 +26,7 @@ add_mlir_library(IREELinalgExtDialect
   MLIRSCFDialect
   MLIRFuncDialect
   MLIRTensorDialect
+  MLIRTensorUtils
   MLIRTilingInterface
   MLIRViewLikeInterface
 )

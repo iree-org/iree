@@ -1,5 +1,7 @@
 add_mlir_library(IREELinalgExtPasses
   ConvertToLoops.cpp
+  FoldIntoPackAndUnpackOps.cpp
+  MaterializeEncoding.cpp
   PadContractionToBlockSize.cpp
   Passes.cpp
   SplitReduction.cpp
@@ -11,12 +13,14 @@ add_mlir_library(IREELinalgExtPasses
   LINK_LIBS PUBLIC
   IREEInputDialect
   IREELinalgExtDialect
+  IREELinalgExtUtils
   MLIRAffineDialect
   MLIRIR
   MLIRLinalgDialect
   MLIRLinalgTransforms
   MLIRMathDialect
   MLIRMemRefDialect
+  MLIRMemRefTransforms
   MLIRPass
   MLIRSCFDialect
   MLIRFuncDialect
