@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
+#include "mlir/Dialect/NVGPU/Utils/MMAUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -167,24 +168,40 @@ static Optional<SmallVector<int64_t>> getMmaNativeVectorSize(
     auto resultVectorType = readOp.getVector().getType().cast<VectorType>();
     auto resultElementType = resultVectorType.getElementType();
 
+    FailureOr<nvgpu::WarpMatrixInfo> warpMatrixInfo =
+        nvgpu::getWarpMatrixInfo(op);
+    if (failed(warpMatrixInfo))
+      return std::nullopt;
+
     // Loading F16 values from Shared Memory to Registers.
     if (resultElementType.isF16() || resultElementType.isBF16()) {
-      // MmaSyncOp input operands: matrixA and matrixB. 
-      // LDSMx1, x2, x4:
-      // - LDSMx1 loads a 1 tile  of 8x8.
-      // - LDSMx2 loads a 2 tiles of 8x8.
-      // - LDSMx4 loads a 4 tiles of 8x8. (in use)
-      // IREE uses the largest tiled load, i.e., LDSMx4. 
+      // For matrixC.
+      if (warpMatrixInfo->operandRole == nvgpu::MatMulOperandRole::C) {
+        SmallVector<int64_t> readShape;
+        readShape.append({mmaShapeM, mmaShapeN});
+        return readShape;
+      } 
 
-      // MmaSyncOp source operand: matrixC.
-      // matrixC is also read/written in tiled block of 16x16. In the pass 
-      // OptimizeVectorTransfer, matrixC reads are moved above the mainloop 
-      // and writes are moved below the mainloop. Thus, mma.sync read/write 
-      // accumulator inplace. 
+      // For matrixA and matrixB.
+      if (warpMatrixInfo->operandRole == nvgpu::MatMulOperandRole::A ||
+          warpMatrixInfo->operandRole == nvgpu::MatMulOperandRole::B) {
+        // MmaSyncOp input operands: matrixA and matrixB. 
+        // LDSMx1, x2, x4:
+        // - LDSMx1 loads a 1 tile  of 8x8.
+        // - LDSMx2 loads a 2 tiles of 8x8.
+        // - LDSMx4 loads a 4 tiles of 8x8. (in use)
+        // IREE uses the largest tiled load, i.e., LDSMx4. 
 
-      SmallVector<int64_t> readShape;
-      readShape.append({16, 16});
-      return readShape;
+        // MmaSyncOp source operand: matrixC.
+        // matrixC is also read/written in tiled block of 16x16. In the pass 
+        // OptimizeVectorTransfer, matrixC reads are moved above the mainloop 
+        // and writes are moved below the mainloop. Thus, mma.sync read/write 
+        // accumulator inplace. 
+
+        SmallVector<int64_t> readShape;
+        readShape.append({16, 16});
+        return readShape;
+      }
     }
     
     // Loading F32 values from Shared Memory to Registers.

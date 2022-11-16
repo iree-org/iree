@@ -137,7 +137,7 @@ def get_test_shapes(shapes_id: ShapesId):
         # (see get_test_generators).
     ]
   if shapes_id == ShapesId.GPU_LARGE:
-    return [TestShape(m=256, k=128, n=512)]
+    return [TestShape(m=512, k=128, n=256)]
   raise ValueError(shapes_id)
 
 
@@ -212,7 +212,35 @@ def get_test_compilation_infos(
     tile_workgroup_size_pairs = get_all_spirv_tile_workgroup_size_pairs(4)
   elif compilation_info_id == CompilationInfoId.LLVMGPUMatmulTensorCore:
     tile_workgroup_size_pairs = [
-        TileWorkgroupSizePair([[32, 32, 16]], [64, 2, 1]),
+        # WarpShape = 1x1 (1 warp = 32 threads)
+        # TileWorkgroupSizePair([[16, 8, 16]], [32, 1, 1]), # PASSED uses ld.global and mma.sync (shared memory is disabled, one warp issues single mma.sync)
+        # TileWorkgroupSizePair([[16, 16, 16]], [32, 1, 1]), # DOES NOT COMPILE (Compilation BUG error: 'scf.for' op  along control flow edge from Region #0 to Region #0: source type #0 )
+        # TileWorkgroupSizePair([[32, 32, 32]], [32, 1, 1]), # DOES NOT COMPILE (Compilation BUG error: 'scf.for' op  along control flow edge from Region #0 to Region #0: source type #0 )
+        
+        # WarpShape = 2x1 (2 warps = 64 threads)
+        #TileWorkgroupSizePair([[16, 16, 16]], [64, 1, 1]), # PASSED uses ld.global and mma.sync (shared memory is disabled, each warp issue single mma.sync)
+        #TileWorkgroupSizePair([[32, 8, 16]], [64, 1, 1]),  # PASSED uses ld.global and mma.sync (shared memory is disabled, each warp issue single mma.sync)
+        #TileWorkgroupSizePair([[32, 16, 16]], [64, 1, 1]), # DOES NOT COMPILE (Compilation BUG error: 'scf.for' op  along control flow edge from Region #0 to Region #0: source type #0 )
+        #TileWorkgroupSizePair([[16, 32, 16]], [64, 1, 1]), # DOES NOT COMPILE  
+        
+        # WarpShape = 1x2 (2 warps = 64 threads)
+        #TileWorkgroupSizePair([[16, 16, 16]], [32, 2, 1]), # DOES NOT COMPILE ('nvvm.mma.sync' op unimplemented variant for MMA shape <8, 16, 16>) [This is expected]
+        #TileWorkgroupSizePair([[16, 32, 16]], [32, 2, 1]), # PASSED (Uses FFMA not mma.sync)
+        #TileWorkgroupSizePair([[16, 64, 16]], [32, 2, 1]), # PASSED
+        #TileWorkgroupSizePair([[16, 128, 16]], [32, 2, 1]),# PASSED
+        
+        #TileWorkgroupSizePair([[32, 8, 16]], [32, 2, 1]),  # PASSED (MMA.SYNC for math )
+        #TileWorkgroupSizePair([[32, 16, 16]], [32, 2, 1]),  # DOES NOT COMPILE (Compilation BUG error: 'scf.for' op  along control flow edge from Region #0 to Region #0: source type #0 )
+        TileWorkgroupSizePair([[32, 32, 16]], [32, 2, 1]), # PASSED (FFMA for math)
+
+        # WarpShape = 2x2
+        #TileWorkgroupSizePair([[32, 32, 16]], [64, 2, 1]),   # DOES NOT COMPILE (Compilation BUG error: 'scf.for' op  along control flow edge from Region #0 to Region #0: source type #0 ) 
+        #TileWorkgroupSizePair([[64, 64, 64]], [64, 2, 1]),   # FAILED
+        #TileWorkgroupSizePair([[128, 128, 64]], [64, 2, 1]), # FAILED uses ld.global and mma.sync (shared memory is disabled)
+
+        # WarpShape = 4x1
+        #TileWorkgroupSizePair([[32, 32, 16]], [64, 1, 1]), # FAILED
+        #TileWorkgroupSizePair([[32, 32, 32]], [64, 1, 1]), # FAILED
     ]
 
   compilation_infos = []

@@ -268,10 +268,11 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUVectorToGPU());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
-
+#if 0
   // Pipeline memory operations.
   nestedModulePM.addNestedPass<func::FuncOp>(
       createGPUPipeliningPass(/*epiloguePeeling=*/false, pipelineDepth));
+#endif
 }
 
 void addGPUTransposePassPipeline(OpPassManager &pm) {

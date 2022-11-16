@@ -181,7 +181,7 @@ struct LLVMGPUVectorToGPUPass
     createAsyncGroups(funcOp);
 
     if (llvmgpuUseMMASync) {
-      swizzleSharedMemory(funcOp);
+      // swizzleSharedMemory(funcOp);
     }
   }
 };

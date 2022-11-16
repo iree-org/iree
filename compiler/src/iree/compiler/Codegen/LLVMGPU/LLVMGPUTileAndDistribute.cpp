@@ -190,7 +190,7 @@ struct LLVMGPUTileAndDistributePass
     MLIRContext *context = &getContext();
     auto funcOp = getOperation();
     if (!isEntryPoint(funcOp)) return;
-
+#if 0
     // Promote C matrix and propagate the potential  fill producer into the temp
     // allocation. This needs to be done before reduction tiling.
     {
@@ -202,7 +202,7 @@ struct LLVMGPUTileAndDistributePass
       }
       propagateSharedMemoryCopy(funcOp);
     }
-
+#endif
     // Tile again at the workgroup level since reduction dimension were
     // ignored. Dimensions already tiled will be ignore since we tile to the
     // same size.
@@ -218,10 +218,11 @@ struct LLVMGPUTileAndDistributePass
     auto workgroupSize = llvm::to_vector<4>(llvm::map_range(
         getEntryPoint(funcOp)->getWorkgroupSize().value(),
         [&](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
-
+#if 0
     int64_t flatWorkgroupSize =
         workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
     // Only promote to workgroup size if there are multiple warps.
+
     if (flatWorkgroupSize > kWarpSize) {
       RewritePatternSet promotionPatterns(&getContext());
 
@@ -234,6 +235,7 @@ struct LLVMGPUTileAndDistributePass
       // Insert barriers before and after copies to workgroup memory.
       insertBarriersAroundSharedMemoryCopy(funcOp);
     }
+#endif
 
     {
       RewritePatternSet promotionCanonicalization =
