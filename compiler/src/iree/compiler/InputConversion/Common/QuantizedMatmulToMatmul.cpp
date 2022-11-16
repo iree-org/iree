@@ -113,7 +113,8 @@ struct QuantizedMatmulToMatmul
     // Add the indexing map for the initResult 'output' even though it's unused.
     indexingMaps.push_back(mapIdentity);
     // Create the generic putting all the terms together.
-    SmallVector<StringRef> iterators{"parallel", "parallel"};
+    SmallVector<utils::IteratorType> iterators{utils::IteratorType::parallel,
+                                               utils::IteratorType::parallel};
     rewriter.replaceOpWithNewOp<linalg::GenericOp>(
         quantizedMatmulOp, acc.getType(), ins, ValueRange{initResult},
         indexingMaps, iterators,

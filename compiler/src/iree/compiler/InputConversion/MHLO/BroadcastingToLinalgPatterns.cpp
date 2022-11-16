@@ -38,15 +38,15 @@ bool isElementTypeLegalForCodegen(Type t) { return !t.isa<ComplexType>(); }
 /// Returns an ArrayAttr that contains `nLoops` attributes. All the attributes
 /// are "parallel" except the last `nReduction` elements, where are "reduction"
 /// attributes.
-SmallVector<StringRef, 3> getParallelAndReductionIterators(int nLoops,
-                                                           int nReduction) {
-  SmallVector<StringRef, 3> res(nLoops - nReduction,
-                                getParallelIteratorTypeName());
-  res.append(nReduction, getReductionIteratorTypeName());
+SmallVector<utils::IteratorType, 3> getParallelAndReductionIterators(
+    int nLoops, int nReduction) {
+  SmallVector<utils::IteratorType, 3> res(nLoops - nReduction,
+                                          utils::IteratorType::parallel);
+  res.append(nReduction, utils::IteratorType::reduction);
   return res;
 }
 
-SmallVector<StringRef, 3> getNParallelLoopsAttrs(int nParallelLoops) {
+SmallVector<utils::IteratorType, 3> getNParallelLoopsAttrs(int nParallelLoops) {
   return getParallelAndReductionIterators(nParallelLoops, 0);
 }
 

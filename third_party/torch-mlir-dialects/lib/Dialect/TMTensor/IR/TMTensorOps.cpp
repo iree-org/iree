@@ -155,10 +155,10 @@ SmallVector<Range> ScanOp::getIterationDomain(OpBuilder &builder) {
   return loopBounds;
 }
 
-SmallVector<StringRef> ScanOp::getLoopIteratorTypes() {
-  SmallVector<StringRef> iteratorTypes(getOperandRank(),
-                                       getParallelIteratorTypeName());
-  iteratorTypes[getDimension()] = getReductionIteratorTypeName();
+SmallVector<utils::IteratorType> ScanOp::getLoopIteratorTypes() {
+  SmallVector<utils::IteratorType> iteratorTypes(getOperandRank(),
+                                       utils::IteratorType::parallel);
+  iteratorTypes[getDimension()] = utils::IteratorType::reduction;
   return iteratorTypes;
 }
 
@@ -371,11 +371,11 @@ LogicalResult ScatterOp::verify() {
   return success();
 }
 
-SmallVector<StringRef> ScatterOp::getLoopIteratorTypes() {
-  SmallVector<StringRef> iteratorTypes(getUpdateType().getRank(),
-                                       getParallelIteratorTypeName());
+SmallVector<utils::IteratorType> ScatterOp::getLoopIteratorTypes() {
+  SmallVector<utils::IteratorType> iteratorTypes(getUpdateType().getRank(),
+                                       utils::IteratorType::parallel);
   if (!getUniqueIndices()) {
-    iteratorTypes[0] = getReductionIteratorTypeName();
+    iteratorTypes[0] = utils::IteratorType::reduction;
   }
   return iteratorTypes;
 }

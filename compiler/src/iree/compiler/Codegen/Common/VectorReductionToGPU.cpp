@@ -200,6 +200,22 @@ class InsertElementToBroadcast final
   }
 };
 
+static Value simpleWarpShuffleFunction(Location loc, OpBuilder &builder,
+                                       Value val, Value srcIdx,
+                                       int64_t warpSz) {
+  assert((val.getType().isF32() || val.getType().isInteger(32)) &&
+         "unsupported shuffle type");
+  Type i32Type = builder.getIntegerType(32);
+  Value srcIdxI32 = builder.create<arith::IndexCastOp>(loc, i32Type, srcIdx);
+  Value warpSzI32 = builder.create<arith::ConstantOp>(
+      loc, builder.getIntegerAttr(i32Type, warpSz));
+  Value result = builder
+                     .create<gpu::ShuffleOp>(loc, val, srcIdxI32, warpSzI32,
+                                             gpu::ShuffleMode::IDX)
+                     .getResult(0);
+  return result;
+}
+
 class VectorReduceToGPUPass
     : public VectorReduceToGPUBase<VectorReduceToGPUPass> {
  public:
@@ -297,8 +313,8 @@ class VectorReduceToGPUPass
         return map;
       };
       RewritePatternSet patterns(ctx);
-      vector::populatePropagateWarpVectorDistributionPatterns(patterns,
-                                                              distributionFn);
+      vector::populatePropagateWarpVectorDistributionPatterns(
+          patterns, distributionFn, simpleWarpShuffleFunction);
       vector::populateDistributeReduction(patterns, groupReductionFn);
       vector::populateDistributeTransferWriteOpPatterns(patterns,
                                                         distributionFn);

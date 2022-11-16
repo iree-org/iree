@@ -7,10 +7,10 @@ transform.structured.canonicalized_sequence failures(propagate) {
   // Step 1. First level of tiling + fusion parallelizes to blocks.
   // ==============================================================
   %root = transform.structured.match interface{LinalgOp}
-    attributes{iterator_types = ["parallel", "parallel", "parallel"]} in %variant_op
+    attributes{iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]} in %variant_op
   %fill = transform.structured.match ops{["linalg.fill"]} in %variant_op
   %red = transform.structured.match interface{LinalgOp}
-    attributes{iterator_types = ["parallel", "parallel", "reduction"]} in %variant_op
+    attributes{iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]} in %variant_op
   %not_root = merge_handles %fill, %red : !pdl.operation
   %foreach_thread, %tiled_generic =
     transform.iree.tile_to_foreach_thread_and_workgroup_count_region %root tile_sizes [1, 4]
@@ -21,9 +21,9 @@ transform.structured.canonicalized_sequence failures(propagate) {
   // ================================================================
   %fill_linalg = transform.structured.match ops{["linalg.fill"]} in %variant_op
   %reduction_linalg = transform.structured.match ops{["linalg.generic"]}
-    attributes{iterator_types = ["parallel", "parallel", "reduction"]} in %variant_op
+    attributes{iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]} in %variant_op
   %parallel_linalg = transform.structured.match ops{["linalg.generic"]}
-    attributes{iterator_types = ["parallel", "parallel", "parallel"]} in %variant_op
+    attributes{iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]} in %variant_op
   %foreach_thread_reduction, %tiled_reduction_generic =
     transform.structured.tile_to_foreach_thread_op %reduction_linalg tile_sizes [1, 1]
       ( mapping = [#gpu.thread<z>, #gpu.thread<y>] )
