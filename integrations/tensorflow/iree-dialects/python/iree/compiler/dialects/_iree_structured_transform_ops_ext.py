@@ -135,15 +135,3 @@ class LowerToLLVMOp:
                      _ensure_bool_attr(enable_async, False),
                      loc=loc,
                      ip=ip)
-
-
-class PrintOp:
-
-  def __init__(self,
-               target: Optional[Union[Value, Operation, OpView]],
-               *,
-               name: StringArg,
-               loc=None,
-               ip=None):
-    name = _ensure_string_attr(name)
-    super().__init__(name, target=target, loc=loc, ip=ip)

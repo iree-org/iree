@@ -14,7 +14,7 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpBase.td"
 
 def FuseProducersOp : Op<Transform_Dialect, "fuse_producers",
-    [FunctionalStyleTransformOpTrait, 
+    [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,
      DeclareOpInterfaceMethods<TransformOpInterface>]> {
   let description = [{Fuses the producers for the operands to fuse.}];
@@ -38,7 +38,7 @@ def RewriteForeachThreadToAsyncOp :
 
   let description = [{
     Rewrite a bufferized scf.foreach_thread op to the async dialect.
-        
+
     Return modes:
     =============
     This operation ignores non-Linalg ops and drops them in the return.
@@ -47,8 +47,8 @@ def RewriteForeachThreadToAsyncOp :
 
     If all the operations referred to by the `target` PDLOperation lower
     properly, the transform succeeds. Otherwise the transform silently fails.
-    
-    The returned handle points to only the subset of successfully produced 
+
+    The returned handle points to only the subset of successfully produced
     async operations, which can all be empty.
   }];
   let arguments = (ins PDL_Operation:$target);
@@ -59,8 +59,8 @@ def RewriteForeachThreadToAsyncOp :
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
-        ::mlir::scf::ForeachThreadOp target, 
-        ::llvm::SmallVectorImpl<::mlir::Operation *> &results, 
+        ::mlir::scf::ForeachThreadOp target,
+        ::llvm::SmallVectorImpl<::mlir::Operation *> &results,
         ::mlir::transform::TransformState &state);
   }];
 }
@@ -74,7 +74,7 @@ def RewriteForeachThreadToScfForOp :
 
   let description = [{
     Rewrite a bufferized scf.foreach_thread to a sequential scf.for.
-            
+
     Return modes:
     =============
     This operation ignores non-Linalg ops and drops them in the return.
@@ -83,8 +83,8 @@ def RewriteForeachThreadToScfForOp :
 
     If all the operations referred to by the `target` PDLOperation lower
     properly, the transform succeeds. Otherwise the transform silently fails.
-    
-    The returned handle points to only the subset of successfully produced 
+
+    The returned handle points to only the subset of successfully produced
     scf.for operations, which can all be empty.
   }];
   let arguments = (ins PDL_Operation:$target);
@@ -95,8 +95,8 @@ def RewriteForeachThreadToScfForOp :
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
-        ::mlir::scf::ForeachThreadOp target, 
-        ::llvm::SmallVectorImpl<::mlir::Operation *> &results, 
+        ::mlir::scf::ForeachThreadOp target,
+        ::llvm::SmallVectorImpl<::mlir::Operation *> &results,
         ::mlir::transform::TransformState &state);
   }];
 }

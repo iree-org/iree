@@ -13,6 +13,7 @@
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -696,12 +697,8 @@ void FftOp::generateScalarImplWithoutCoeffBuf(OpBuilder &b, Location loc,
       loc, llvm::APFloat(static_cast<float>(-2 * acos(-1))), f32Type);
   coeff = b.create<arith::DivFOp>(loc, coeff, indexToF32(b, loc, wholeSize));
 
-  SmallVector<StringRef> iteratorTypes = llvm::to_vector(
-      llvm::map_range(getLoopIteratorTypes(), [](utils::IteratorType it) {
-        return utils::stringifyIteratorType(it);
-      }));
   b.create<linalg::GenericOp>(
-      loc, TypeRange{}, ValueRange{}, operands, maps, iteratorTypes,
+      loc, TypeRange{}, ValueRange{}, operands, maps, getLoopIteratorTypes(),
       [&](OpBuilder &b, Location loc, ValueRange args) {
         Value lhsReal = args[0];
         Value lhsImag = args[1];
@@ -745,13 +742,10 @@ void FftOp::generateScalarImplWithCoeffBuf(OpBuilder &b, Location loc,
       2, AffineMap::get(rank, 0, b.getAffineDimExpr(rank - 1), b.getContext()));
   maps.append(operands.size(), b.getMultiDimIdentityMap(rank));
 
-  SmallVector<StringRef> iteratorTypes = llvm::to_vector(
-      llvm::map_range(getLoopIteratorTypes(), [](utils::IteratorType it) {
-        return utils::stringifyIteratorType(it);
-      }));
   b.create<linalg::GenericOp>(
       loc, TypeRange{}, ValueRange{getRealCoeff(), getImagCoeff()}, operands,
-      maps, iteratorTypes, [&](OpBuilder &b, Location loc, ValueRange args) {
+      maps, getLoopIteratorTypes(),
+      [&](OpBuilder &b, Location loc, ValueRange args) {
         Value wReal = args[0];
         Value wImag = args[1];
         Value lhsReal = args[2];
@@ -2250,8 +2244,25 @@ UnPackOp::getTiledImplementation(OpBuilder &builder,
                                           dimAndTileMapping[dim]));
 
       inputIndices.push_back(firstCoord.quotient);
-      inputSizes.push_back(
-          add(sub(lastCoord.quotient, firstCoord.quotient), oneAttr));
+
+      // Get the upper bound because it could be an extract_slice case. The
+      // sizes are determined by loop bound and step, where loop bound is the
+      // size of output shape.
+      // In incomplete tile cases, the input could have larger shape, it is safe
+      // to extend the boundary because they are pre-padded. I.e., the size of
+      // input dim is always aligned to inner_tile_size.
+      FailureOr<int64_t> cstSize = linalg::getConstantUpperBoundForIndex(
+          getValueOrCreateConstantIndexOp(builder, loc, sizes[dim]));
+      Optional<int64_t> cstInnerSize =
+          getConstantIntValue(dimAndTileMapping[dim]);
+      if (!failed(cstSize) && cstInnerSize &&
+          cstSize.value() % cstInnerSize.value() == 0) {
+        inputSizes.push_back(
+            builder.getIndexAttr(cstSize.value() / cstInnerSize.value()));
+      } else {
+        inputSizes.push_back(
+            add(sub(lastCoord.quotient, firstCoord.quotient), oneAttr));
+      }
       outputNewOffsets.push_back(firstCoord.remainder);
 
       AffineExpr i, tile;

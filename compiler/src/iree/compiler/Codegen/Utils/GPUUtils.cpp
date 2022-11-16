@@ -12,7 +12,7 @@
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/Matchers.h"
-#include "mlir/Transforms/SideEffectUtils.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -181,8 +181,8 @@ static void insertInputValueIntoGeneric(Value source, linalg::GenericOp op) {
   maps.push_back(op.getMatchingIndexingMap(outOperand));
   maps.push_back(op.getMatchingIndexingMap(outOperand));
   Location loc = op.getLoc();
-  SmallVector<StringRef> iterTypes(op.getNumLoops(),
-                                   getParallelIteratorTypeName());
+  SmallVector<utils::IteratorType> iterTypes(op.getNumLoops(),
+                                             utils::IteratorType::parallel);
   OpBuilder builder(op);
   auto newOp = builder.create<linalg::GenericOp>(
       loc, newOperands, outOperand->get(), maps, iterTypes);

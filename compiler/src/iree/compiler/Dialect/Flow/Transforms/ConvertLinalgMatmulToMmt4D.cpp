@@ -81,7 +81,8 @@ static Value transpose(mlir::Location loc, PatternRewriter &rewriter,
   Value outputTensor = rewriter.create<tensor::EmptyOp>(
       loc, targetShape, inputType.getElementType());
 
-  SmallVector<StringRef, 4> loopAttributeTypes(nloops, "parallel");
+  SmallVector<utils::IteratorType, 4> loopAttributeTypes(
+      nloops, utils::IteratorType::parallel);
 
   SmallVector<AffineMap, 2> indexingMaps = {
       inversePermutation(

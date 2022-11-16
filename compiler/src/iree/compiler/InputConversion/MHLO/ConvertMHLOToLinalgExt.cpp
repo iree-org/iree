@@ -307,7 +307,8 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
     maps.push_back(
         AffineMap::get(rank, 0, b.getAffineDimExpr(rank - 1), b.getContext()));
     maps.push_back(b.getMultiDimIdentityMap(rank));
-    SmallVector<StringRef> iterTypes(rank, getParallelIteratorTypeName());
+    SmallVector<utils::IteratorType> iterTypes(rank,
+                                               utils::IteratorType::parallel);
 
     Value indices = getBitReversalBuffer(b, fftLength);
     auto genericOp = b.create<linalg::GenericOp>(

@@ -34,7 +34,6 @@
 #include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRV.h"
 #include "mlir/Conversion/SCFToSPIRV/SCFToSPIRV.h"
 #include "mlir/Conversion/TensorToSPIRV/TensorToSPIRV.h"
-#include "mlir/Conversion/TosaToArith/TosaToArith.h"
 #include "mlir/Conversion/VectorToSPIRV/VectorToSPIRV.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -358,15 +357,6 @@ void ConvertToSPIRVPass::runOnOperation() {
 
   // Pull in SCF patterns to convert control flow ops.
   populateSCFToSPIRVPatterns(typeConverter, scfToSPIRVContext, patterns);
-
-  // Use the default 64-bit lowering for TOSA's ApplyScale operator:
-  //   This lowering widens integer types to 64-bit an performs the non-fused
-  //   operations, specifically multiply, add, and shift. Bit-widening
-  //   is used to guarantee higher-order bits are not truncated during the
-  //   multiply or add.
-  //
-  // TODO(antiagainst): Use a lowering that uses specific SPIRV intrinsics.
-  tosa::populateTosaRescaleToArithConversionPatterns(&patterns);
 
   // Pull in MemRef patterns to convert load/store ops.
   populateMemRefToSPIRVPatterns(typeConverter, patterns);

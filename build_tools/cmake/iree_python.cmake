@@ -309,12 +309,13 @@ endfunction()
 # ARGS: Command line arguments to the Python source file.
 # LABELS: Additional labels to apply to the test. The package path is added
 #     automatically.
+# PACKAGE_DIRS: Additional python module paths.
 function(iree_build_tools_py_test)
   cmake_parse_arguments(
     _RULE
     ""
     "NAME;SRC"
-    "ARGS;LABELS"
+    "ARGS;LABELS;PACKAGE_DIRS"
     ${ARGN}
   )
 
@@ -328,6 +329,7 @@ function(iree_build_tools_py_test)
     LABELS
       ${_RULE_LABELS}
     PACKAGE_DIRS
+      ${_RULE_PACKAGE_DIRS}
       "${IREE_ROOT_DIR}/build_tools/python"
   )
 endfunction()

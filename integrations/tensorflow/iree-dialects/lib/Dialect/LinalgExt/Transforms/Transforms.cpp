@@ -9,13 +9,18 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/PassDetail.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
+#include "iree-dialects/Dialect/LinalgExt/Passes/Transforms.h"
+#include "iree-dialects/Dialect/LinalgExt/Utils/Utils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
-#include "mlir/Dialect/Linalg/Utils/Utils.h"
+#include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
+#include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/PassManager.h"
@@ -29,6 +34,10 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace LinalgExt {
+
+//===----------------------------------------------------------------------===//
+// CodegenStrategy patterns and passes.
+//===----------------------------------------------------------------------===//
 
 FailureOr<linalg::TileLoopNest> tileConsumerAndFuseProducers(
     OpBuilder &b, linalg::LinalgOp consumerOp, ArrayRef<int64_t> tileSizes,
@@ -44,7 +53,13 @@ FailureOr<linalg::TileLoopNest> tileConsumerAndFuseProducers(
 
   // Search the number of outer parallel loops to separate them from possible
   // inner reduction dimensions.
-  SmallVector<StringRef> iterTypes = consumerOp.getIteratorTypesArray();
+  auto iterTypes = consumerOp.getIteratorTypesArray();
+  // Make sure to only look at the leading loops for tiling---we will scan this
+  // array to find the first non-parallel loop later and use that for indexing
+  // into the tile sizes.
+  if (iterTypes.size() > tileSizes.size()) {
+    iterTypes.resize(tileSizes.size());
+  }
   applyPermutationToVector(iterTypes, tileInterchange);
   auto *it = find_if_not(iterTypes, linalg::isParallelIterator);
   int64_t split = std::distance(iterTypes.begin(), it);
@@ -57,7 +72,8 @@ FailureOr<linalg::TileLoopNest> tileConsumerAndFuseProducers(
           tileLoopNest.fuseProducer(b, candidates.pop_back_val());
       if (failed(fusedProducer))
         continue;
-      candidates.append(fusedProducer->getInputAndOutputOperands());
+      candidates.append(fusedProducer->getDpsInputOperands());
+      candidates.append(fusedProducer->getDpsInitOperands());
     }
   };
 
@@ -76,13 +92,13 @@ FailureOr<linalg::TileLoopNest> tileConsumerAndFuseProducers(
   if (failed(tileLoopNest.tileRootOp(b, outerTileSizes, tileInterchange,
                                      tileDistribution)))
     return failure();
-  fuseProducersGreedily(tileLoopNest.getRootOp().getOutputOperands());
+  fuseProducersGreedily(tileLoopNest.getRootOp().getDpsInitOperands());
 
   // Tile the remaining loops and fuse the input operands.
   if (failed(tileLoopNest.tileRootOp(b, innerTileSizes, tileInterchange,
                                      tileDistribution)))
     return failure();
-  fuseProducersGreedily(tileLoopNest.getRootOp().getInputOperands());
+  fuseProducersGreedily(tileLoopNest.getRootOp().getDpsInputOperands());
 
   // Exit if the tile loop nest is empty since all tile sizes are zero.
   if (tileLoopNest.isEmpty())
@@ -179,6 +195,26 @@ LinalgTileAndFuseTensorOpsBasePattern::returningMatchAndRewrite(
   rootOp->replaceAllUsesWith(tileLoopNest->getRootOpReplacementResults());
 
   return tileLoopNest;
+}
+
+/// Peel loops after tiling.
+static void peelTiledLinalgOp(RewriterBase &rewriter,
+                              linalg::TiledLinalgOp &res,
+                              ArrayRef<int64_t> peeledLoops,
+                              linalg::LinalgTilingLoopType loopType) {
+  for (int64_t loop : peeledLoops) {
+    assert(loop < static_cast<int64_t>(res.loops.size()) &&
+           "requested peeling of non-existing loop");
+    SmallVector<Value, 4> loopResults;
+    Operation *loopOp = res.loops[loop];
+    loopResults = linalg::peelLoop(rewriter, loopOp);
+
+    // The result of the loop nest may change with peeling.
+    if (res.tensorResults.size() == loopOp->getNumResults() &&
+        std::equal(res.tensorResults.begin(), res.tensorResults.end(),
+                   loopOp->getResults().begin()))
+      res.tensorResults = loopResults;
+  }
 }
 
 /// Linalg tiling pattern.
@@ -782,6 +818,263 @@ createLinalgStrategyLowerVectorsPass(
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLinalgStrategyRemoveMarkersPass() {
   return std::make_unique<LinalgStrategyRemoveMarkersPass>();
+}
+
+//===----------------------------------------------------------------------===//
+// LinalgExt patterns and passes.
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+/// A simple pattern rewriter that implements no special logic.
+class SimpleRewriter : public PatternRewriter {
+public:
+  SimpleRewriter(MLIRContext *context) : PatternRewriter(context) {}
+};
+
+/// Returns a tensor.pad op if padding value is set. Otherwise, returns the
+/// input directly. The method assumes that the `packOp` has static shapes.
+Value getInputOrPaddedInput(OpBuilder &builder, PackOp packOp) {
+  Value input = packOp.getInput();
+  if (!packOp.getPaddingValue()) {
+    return input;
+  }
+
+  Location loc = packOp.getLoc();
+  ShapedType inputType = packOp.getInputType();
+  int64_t inputRank = inputType.getRank();
+  assert(llvm::all_of(packOp.getOutputShape().take_front(inputRank),
+                      [](int64_t val) { return val == 1; }));
+
+  SmallVector<int64_t> paddedShape;
+  DenseMap<int64_t, OpFoldResult> tileAndPosMapping =
+      packOp.getDimAndTileMapping();
+  for (int64_t dim = 0; dim < inputRank; ++dim) {
+    int64_t size = inputType.getDimSize(dim);
+    if (!tileAndPosMapping.count(dim)) {
+      paddedShape.push_back(size);
+      continue;
+    }
+
+    // The size is less than or equal to tileSize because outer dims are all 1s.
+    Optional<int64_t> tileSize =
+        getConstantIntValue(tileAndPosMapping.lookup(dim));
+    assert(tileSize.hasValue() && "dynamic inner tile size is not supported");
+    paddedShape.push_back(tileSize.value());
+  }
+  auto resultType =
+      RankedTensorType::get(paddedShape, inputType.getElementType());
+  return tensor::createPadHighOp(resultType, input, packOp.getPaddingValue(),
+                                 /*nofold=*/false, loc, builder);
+}
+
+/// Rewrites iree_linalg_ext.pack to tensor.pad + rank-up linalg.generic
+/// (transpose) ops.
+struct GeneralizePackOpPattern : OpRewritePattern<PackOp> {
+  using OpRewritePattern<PackOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(PackOp packOp,
+                                PatternRewriter &rewriter) const final {
+    if (!packOp.hasTensorSemantics()) {
+      return rewriter.notifyMatchFailure(packOp, "require tensor semantics");
+    }
+
+    // The expand_shape op can be avoided if outer dimensions of result are all
+    // 1s. This can be relaxed if needed. A tensor.expand_shape will be
+    // generated in that case.
+    int64_t inputRank = packOp.getInputRank();
+    if (llvm::any_of(packOp.getOutputShape().take_front(inputRank),
+                     [](int64_t val) { return val != 1; })) {
+      return rewriter.notifyMatchFailure(
+          packOp, "require the outer dimension of the result are all 1s");
+    }
+
+    Value input = getInputOrPaddedInput(rewriter, packOp);
+
+    SmallVector<AffineExpr> inputExprs;
+    for (int64_t dim = 0; dim < inputRank; ++dim) {
+      inputExprs.push_back(rewriter.getAffineDimExpr(dim));
+    }
+    // The dimensions map in the order of output dimensions. Since the
+    // interchange is applied, we have to undo it for input.
+    if (auto outerDims = packOp.getOuterDimsPerm()) {
+      inputExprs = undoInterchange<AffineExpr>(
+          inputExprs, extractFromI64ArrayAttr(outerDims));
+    }
+    for (auto en :
+         llvm::enumerate(extractFromI64ArrayAttr(packOp.getInnerDimsPos()))) {
+      inputExprs[en.value()] =
+          rewriter.getAffineDimExpr(inputRank + en.index());
+    }
+
+    Location loc = packOp.getLoc();
+    auto inputType = input.getType().cast<RankedTensorType>();
+    auto nloops = packOp.getOutputRank();
+
+    Value empty = rewriter.create<tensor::EmptyOp>(loc, packOp.getOutputShape(),
+                                                   inputType.getElementType());
+    SmallVector<utils::IteratorType, 4> loopAttributeTypes(
+        nloops, utils::IteratorType::parallel);
+    SmallVector<AffineMap, 2> indexingMaps = {
+        AffineMap::get(nloops, 0, inputExprs, rewriter.getContext()),
+        AffineMap::getMultiDimIdentityMap(nloops, rewriter.getContext())};
+
+    auto transposedOp = rewriter.create<linalg::GenericOp>(
+        loc, empty.getType(), input, empty, indexingMaps, loopAttributeTypes,
+        [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
+          nestedBuilder.create<linalg::YieldOp>(nestedLoc, args[0]);
+        });
+    rewriter.replaceOp(packOp, transposedOp.getResult(0));
+    return success();
+  }
+};
+
+/// Rewrites iree_linalg_ext.unpack to rank-reduced extract_slice op + transpose
+/// op + insert_slice op. It requires the outer dims are all 1s.
+struct GeneralizeUnPackOpPattern : OpRewritePattern<UnPackOp> {
+  using OpRewritePattern<UnPackOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(UnPackOp unpackOp,
+                                PatternRewriter &rewriter) const final {
+    if (!unpackOp.hasTensorSemantics()) {
+      return rewriter.notifyMatchFailure(unpackOp, "require tensor semantics");
+    }
+
+    int64_t outputRank = unpackOp.getOutputRank();
+    if (llvm::any_of(unpackOp.getInputShape().take_front(outputRank),
+                     [](int64_t val) { return val != 1; })) {
+      return rewriter.notifyMatchFailure(
+          unpackOp, "require the outer dimension of the result are all 1s");
+    }
+
+    int64_t inputRank = unpackOp.getInputRank();
+
+    Location loc = unpackOp.getLoc();
+    Attribute zeroIdxAttr = rewriter.getIndexAttr(0);
+    Attribute oneIdxAttr = rewriter.getIndexAttr(1);
+    SmallVector<OpFoldResult> readOffsets(inputRank, zeroIdxAttr);
+    SmallVector<OpFoldResult> readStrides(inputRank, oneIdxAttr);
+
+    auto mixedTiles = unpackOp.getMixedTiles();
+    SmallVector<OpFoldResult> readSizes(outputRank, oneIdxAttr);
+    readSizes.append(mixedTiles.begin(), mixedTiles.end());
+
+    // Explicitly create the type for extract_slice op because the inner tile
+    // size could be 1. We want to represent the whole inner tile in this case.
+    ArrayRef<int64_t> readShape =
+        unpackOp.getInputShape().drop_front(outputRank);
+    Type elemType = unpackOp.getInputType().getElementType();
+    auto readType = RankedTensorType::get(readShape, elemType);
+    Value innerTile = rewriter.create<tensor::ExtractSliceOp>(
+        loc, readType, unpackOp.getInput(), readOffsets, readSizes,
+        readStrides);
+
+    SmallVector<int64_t> innerDimsPos =
+        extractFromI64ArrayAttr(unpackOp.getInnerDimsPos());
+    auto interchangeVector =
+        computeInterchangeFromDimPos(innerDimsPos, outputRank);
+    SmallVector<int64_t> transpShape =
+        interchange<int64_t>(readShape, interchangeVector);
+
+    Value empty = rewriter.create<tensor::EmptyOp>(loc, transpShape, elemType);
+    auto transposedOp = rewriter.create<linalg::TransposeOp>(
+        loc, innerTile, empty, interchangeVector);
+
+    // Handle in-complete tiles.
+    int numLoops = transpShape.size();
+    SmallVector<OpFoldResult> tileStrides(numLoops, oneIdxAttr);
+    SmallVector<OpFoldResult> tileOffsets(numLoops, zeroIdxAttr);
+    SmallVector<OpFoldResult> tileSizes;
+    for (int dim : innerDimsPos) {
+      tileSizes.push_back(getDim(rewriter, loc, unpackOp.getOutput(), dim));
+    }
+    tileSizes = interchange<OpFoldResult>(tileSizes, interchangeVector);
+    auto partialTile = rewriter.create<tensor::ExtractSliceOp>(
+        loc, transposedOp.getResult()[0], tileOffsets, tileSizes, tileStrides);
+
+    SmallVector<OpFoldResult> writeSizes;
+    SmallVector<OpFoldResult> writeStrides(outputRank, oneIdxAttr);
+    SmallVector<OpFoldResult> writeOffsets(outputRank, zeroIdxAttr);
+    DenseMap<int64_t, OpFoldResult> dimAndTileMapping =
+        unpackOp.getDimAndTileMapping();
+    for (int i = 0, idx = 0; i < outputRank; ++i) {
+      if (dimAndTileMapping.count(i)) {
+        writeSizes.push_back(tileSizes[idx++]);
+      } else {
+        writeSizes.push_back(oneIdxAttr);
+      }
+    }
+    auto insert = rewriter.create<tensor::InsertSliceOp>(
+        loc, partialTile, unpackOp.getOutput(), writeOffsets, writeSizes,
+        writeStrides);
+    rewriter.replaceOp(unpackOp, insert.getResult());
+
+    return success();
+  }
+};
+
+struct LinalgExtVectorizationPass
+    : public LinalgExtVectorizationBase<LinalgExtVectorizationPass> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<linalg::LinalgDialect, func::FuncDialect,
+                    arith::ArithDialect, scf::SCFDialect, tensor::TensorDialect,
+                    vector::VectorDialect>();
+  }
+
+  void runOnOperation() override {
+    MLIRContext *ctx = &getContext();
+    // Apply tiling to make outer dims be all 1s.
+    {
+      SimpleRewriter rewriter(ctx);
+      auto options = scf::SCFTilingOptions().setTileSizeComputationFunction(
+          [](OpBuilder &builder, Operation *op) {
+            Location loc = op->getLoc();
+            auto packOp = cast<PackOp>(op);
+            auto innerDims = extractFromI64ArrayAttr(packOp.getInnerDimsPos());
+            int inputRank = packOp.getInputRank();
+            SmallVector<Value> tileSizes(
+                inputRank, builder.create<arith::ConstantIndexOp>(loc, 1));
+            return tileSizes;
+          });
+      auto funcOp = getOperation();
+      funcOp->walk([&](LinalgExt::PackOp op) {
+        FailureOr<scf::SCFTilingResult> tilingResult = scf::tileUsingSCFForOp(
+            rewriter, cast<TilingInterface>(op.getOperation()), options);
+        if (failed(tilingResult))
+          return signalPassFailure();
+        rewriter.replaceOp(op, tilingResult->replacements);
+      });
+    }
+
+    // Generalize pack and unpack ops and canonicalize tiled ops.
+    {
+      RewritePatternSet patterns(ctx);
+      linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
+      patterns.add<GeneralizePackOpPattern, GeneralizeUnPackOpPattern>(ctx);
+      if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                              std::move(patterns)))) {
+        return signalPassFailure();
+      }
+    }
+
+    // Kick in generic vectorizer.
+    {
+      RewritePatternSet patterns(ctx);
+      patterns.add<LinalgVectorizationPattern>(ctx);
+      linalg::populatePadOpVectorizationPatterns(patterns);
+      vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
+      vector::TransferReadOp::getCanonicalizationPatterns(patterns, ctx);
+      vector::TransferWriteOp::getCanonicalizationPatterns(patterns, ctx);
+      if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                              std::move(patterns)))) {
+        return signalPassFailure();
+      }
+    }
+  }
+};
+} // namespace
+
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLinalgExtVectorizationPass() {
+  return std::make_unique<LinalgExtVectorizationPass>();
 }
 
 } // namespace LinalgExt

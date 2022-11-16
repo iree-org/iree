@@ -49,8 +49,8 @@ Value applyZeroPoint(ImplicitLocOpBuilder &rewriter, Value conv, Value sum,
     sumExprs.push_back(rewriter.getAffineDimExpr(i));
   }
 
-  SmallVector<StringRef> iterators(convTy.getRank(),
-                                   getParallelIteratorTypeName());
+  SmallVector<utils::IteratorType> iterators(convTy.getRank(),
+                                             utils::IteratorType::parallel);
 
   auto convMap = rewriter.getMultiDimIdentityMap(convTy.getRank());
   auto sumMap = AffineMap::get(convTy.getRank(), 0, sumExprs, context);
@@ -211,8 +211,8 @@ struct QuantizedConvToConv
           builder.create<arith::IndexCastOp>(accETy, mul_dim0_dim1_dim2);
 
       auto convTy = newConv.getType().cast<RankedTensorType>();
-      SmallVector<StringRef> iterators(convTy.getRank(),
-                                       getParallelIteratorTypeName());
+      SmallVector<utils::IteratorType> iterators(convTy.getRank(),
+                                                 utils::IteratorType::parallel);
       auto convMap = rewriter.getMultiDimIdentityMap(convTy.getRank());
       SmallVector<AffineMap> affineMaps{convMap, convMap};
 

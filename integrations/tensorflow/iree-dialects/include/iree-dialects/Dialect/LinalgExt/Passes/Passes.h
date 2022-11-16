@@ -13,6 +13,10 @@
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
+
+class ConversionTarget;
+class TypeConverter;
+
 namespace iree_compiler {
 namespace IREE {
 namespace LinalgExt {
@@ -82,6 +86,60 @@ std::unique_ptr<OperationPass<func::FuncOp>> createTilingInterfaceTilingPass();
 
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgExtToLoopsPass();
 
+/// Container of information needed to materialize the pack operation.
+struct MaterializeEncodingInfo {
+  SmallVector<int64_t> innerDimsPos;
+  SmallVector<int64_t> innerTileSizes;
+  SmallVector<int64_t> outerDimsPerm;
+};
+using MaterializeEncodingFn =
+    std::function<FailureOr<MaterializeEncodingInfo>(TensorEncoding)>;
+
+/// TypeConverter to use for materializing the encoding.
+struct MaterializeEncodingTypeConverter : public TypeConverter {
+  MaterializeEncodingTypeConverter(MaterializeEncodingFn materializeEncodingFn);
+  MaterializeEncodingFn &getMaterializeEncodingFn() {
+    return materializeEncodingFn;
+  }
+
+private:
+  MaterializeEncodingFn materializeEncodingFn;
+};
+
+/// Conversion target to use for for materializing the encoding.
+struct MaterializeEncodingConversionTarget : public ConversionTarget {
+  MaterializeEncodingConversionTarget(MLIRContext &context);
+};
+
+/// Base class for patterns that materialize encoding.
+template <typename OpTy>
+struct OpMaterializeEncodingPattern : public OpConversionPattern<OpTy> {
+  OpMaterializeEncodingPattern(MaterializeEncodingTypeConverter &typeConverter,
+                               MLIRContext *context, PatternBenefit benefit = 1)
+      : OpConversionPattern<OpTy>(typeConverter, context, benefit) {}
+};
+
+/// Method to populate the patterns to convert operations that have operands
+/// with tensor encodings into ops that materialize the layout specified by the
+/// encoding, as well as ops that perform the computation on the materialized
+/// layout. For now these hard-code a fixed way the lowering is encoded, but the
+/// encoding can be made backend specific. Also initializes the
+/// `conversionTarget` and `typeConverter`.
+void populateMaterializeEncodingPatterns(
+    RewritePatternSet &patterns,
+    MaterializeEncodingConversionTarget &conversionTarget,
+    MaterializeEncodingTypeConverter &typeConverter);
+
+/// Pass to apply patterns specified by `populateMaterializeEncodingPass`.
+std::unique_ptr<OperationPass<func::FuncOp>> createMaterializeEncodingPass();
+
+/// Patterns to fold operations like `tensor.pad` and `tensor.extract_slice`
+/// into `linalg_ext.pack` and `linalg_ext.unpack` operations respectively.
+void populateFoldIntoPackAndUnpackOpsPatterns(RewritePatternSet &patterns);
+
+/// Pass to apply patterns specified by `populateFoldIntoPackAndUnpackOps`.
+std::unique_ptr<OperationPass<func::FuncOp>> createFoldIntoPackAndUnpackOps();
+
 std::unique_ptr<OperationPass<>> createPadContractionToBlockSizePass();
 
 /// Function signature to control reduction splitting. This returns the split
@@ -100,6 +158,8 @@ void populateTopkSplitReductionPattern(
         LinalgExt::LinalgTransformationFilter());
 
 std::unique_ptr<OperationPass<func::FuncOp>> createTopkSplitReductionPass();
+
+std::unique_ptr<OperationPass<func::FuncOp>> createLinalgExtVectorizationPass();
 
 // Marker used as attribute the depth of the split reduction transformations.
 const StringLiteral kSplitReductionDepthMarker = "__split_reduction_depth__";

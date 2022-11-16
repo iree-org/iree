@@ -6,7 +6,6 @@
 
 #include "iree-dialects-c/Dialects.h"
 #include "iree-dialects-c/Utils.h"
-#include "mlir-c/Bindings/Python/Interop.h"
 #include "mlir-c/BuiltinAttributes.h"
 #include "mlir-c/BuiltinTypes.h"
 #include "mlir-c/Diagnostics.h"

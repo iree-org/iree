@@ -204,7 +204,8 @@ Value offsetParallelIndices(Location loc, PatternRewriter &rewriter,
   size_t parallelIndicesRank = parallelIndicesType.getRank();
   AffineMap mapIdentity = rewriter.getMultiDimIdentityMap(parallelIndicesRank);
   SmallVector<AffineMap> indexingMaps = {mapIdentity};
-  SmallVector<StringRef> iterators(parallelIndicesRank, "parallel");
+  SmallVector<utils::IteratorType> iterators(parallelIndicesRank,
+                                             utils::IteratorType::parallel);
   Value mSplitVal = rewriter.create<arith::ConstantIntOp>(
       loc, kDimParallelSize, parallelIndicesType.getElementType());
   return rewriter

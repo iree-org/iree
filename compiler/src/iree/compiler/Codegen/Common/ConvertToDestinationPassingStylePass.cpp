@@ -363,8 +363,8 @@ struct AdaptLinalgInputOperandToOutputOperand
     maps.push_back(op.getMatchingIndexingMap(operand));
 
     Location loc = op.getLoc();
-    SmallVector<StringRef> iterTypes(op.getNumLoops(),
-                                     getParallelIteratorTypeName());
+    SmallVector<utils::IteratorType> iterTypes(op.getNumLoops(),
+                                               utils::IteratorType::parallel);
     auto newOp = rewriter.create<linalg::GenericOp>(
         loc, op.getResultTypes(), newOperands, operand->get(), maps, iterTypes,
         /*bodyBuild=*/nullptr, PruneAttributeList(op));

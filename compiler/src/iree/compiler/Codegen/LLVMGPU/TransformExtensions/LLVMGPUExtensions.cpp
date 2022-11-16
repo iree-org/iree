@@ -12,7 +12,6 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/GPU/TransformOps/GPUTransformOps.h"
-#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -507,12 +506,28 @@ static void populateVectorTransferWriteDistribution(Operation *target,
       patterns, simpleDistributionFunction, benefit);
 }
 
+static Value simpleWarpShuffleFunction(Location loc, OpBuilder &builder,
+                                       Value val, Value srcIdx,
+                                       int64_t warpSz) {
+  assert((val.getType().isF32() || val.getType().isInteger(32)) &&
+         "unsupported shuffle type");
+  Type i32Type = builder.getIntegerType(32);
+  Value srcIdxI32 = builder.create<arith::IndexCastOp>(loc, i32Type, srcIdx);
+  Value warpSzI32 = builder.create<arith::ConstantOp>(
+      loc, builder.getIntegerAttr(i32Type, warpSz));
+  Value result = builder
+                     .create<gpu::ShuffleOp>(loc, val, srcIdxI32, warpSzI32,
+                                             gpu::ShuffleMode::IDX)
+                     .getResult(0);
+  return result;
+}
+
 static void populatePropagateVectorDistribution(Operation *target,
                                                 RewritePatternSet &patterns,
                                                 PatternBenefit benefit) {
   assert(target->hasTrait<OpTrait::IsIsolatedFromAbove>());
   vector::populatePropagateWarpVectorDistributionPatterns(
-      patterns, simpleDistributionFunction, benefit);
+      patterns, simpleDistributionFunction, simpleWarpShuffleFunction, benefit);
   vector::populateDistributeReduction(patterns, warpReduction, benefit);
   patterns.add<WarpOpLoad, HoistSharedMemoryAlloc>(target->getContext(),
                                                    benefit);
