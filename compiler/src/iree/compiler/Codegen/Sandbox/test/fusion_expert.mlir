@@ -59,23 +59,29 @@ func.func @matmul_bias_add_static(%arg0 : tensor<20x60xf32>, %arg1 : tensor<60x1
 // CHECK-SAME:     %[[ARG0:.+]]: tensor<20x60xf32>
 // CHECK-SAME:     %[[ARG1:.+]]: tensor<60x120xf32>
 // CHECK-SAME:     %[[ARG2:.+]]: tensor<120xf32>
+//  CHECK-DAG:   %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<10x20xf32>
 //  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //  CHECK-DAG:   %[[C10:.+]] = arith.constant 10 : index
 //  CHECK-DAG:   %[[C20:.+]] = arith.constant 20 : index
+//  CHECK-DAG:   %[[C60:.+]] = arith.constant 60 : index
 //  CHECK-DAG:   %[[C120:.+]] = arith.constant 120 : index
 //      CHECK:   %[[INIT:.+]] = tensor.empty() : tensor<20x120xf32>
 //      CHECK:   %[[RESULT:.+]] = scf.for %[[IV0:.+]] = %[[C0]] to %[[C20]] step %[[C10]]
 // CHECK-SAME:       iter_args(%[[ARG4:.+]] = %[[INIT]])
 //      CHECK:     %[[YIELD:.+]] = scf.for %[[IV1:.+]] = %[[C0]] to %[[C120]]
 // CHECK-SAME:         iter_args(%[[ARG6:.+]] = %[[ARG4]])
-//  CHECK-DAG:       %[[LHS:.+]] = vector.transfer_read %[[ARG0]][%[[IV0]], %[[C0]]]
-//  CHECK-DAG:       %[[RHS:.+]] = vector.transfer_read %[[ARG1]][%[[C0]], %[[IV1]]]
+//      CHECK:       %[[REDUCTION:.+]] = scf.for %[[IV2:.+]] = %[[C0]] to %[[C60]]
+// CHECK-SAME:           iter_args(%[[ARG7:.+]] = %[[CST]])
+//  CHECK-DAG:         %[[LHS:.+]] = vector.transfer_read %[[ARG0]][%[[IV0]], %[[IV2]]]
+//  CHECK-DAG:         %[[RHS:.+]] = vector.transfer_read %[[ARG1]][%[[IV2]], %[[IV1]]]
+//      CHECK:         %[[CONTRACT:.+]] = vector.contract
+// CHECK-SAME:             kind = #vector.kind<add>
+// CHECK-SAME:             %[[LHS]], %[[RHS]], %[[ARG7]]
+//      CHECK:         scf.yield %[[CONTRACT]]
 //  CHECK-DAG:       %[[BIAS:.+]] = vector.transfer_read %[[ARG2]][%[[IV1]]]
-//      CHECK:       %[[OUT:.+]] = vector.broadcast %[[BIAS]]
-//      CHECK:       %[[CONTRACT:.+]] = vector.contract
-// CHECK-SAME:           kind = #vector.kind<add>
-// CHECK-SAME:           %[[LHS]], %[[RHS]], %[[OUT]]
-//      CHECK:       %[[INSERT:.+]] = vector.transfer_write %[[CONTRACT]], %[[ARG6]][%[[IV0]], %[[IV1]]]
+//      CHECK:       %[[BROADCAST_BIAS:.+]] = vector.broadcast %[[BIAS]]
+//      CHECK:       %[[ADD:.+]] = arith.addf %[[REDUCTION]], %[[BROADCAST_BIAS]]
+//      CHECK:       %[[INSERT:.+]] = vector.transfer_write %[[ADD]], %[[ARG6]][%[[IV0]], %[[IV1]]]
 //      CHECK:       scf.yield %[[INSERT]]
 //      CHECK:     scf.yield %[[YIELD]]
 //      CHECK:   return %[[RESULT]]
