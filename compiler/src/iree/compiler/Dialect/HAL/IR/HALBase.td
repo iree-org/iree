@@ -19,6 +19,18 @@ include "mlir/IR/SubElementInterfaces.td"
 // HAL enums
 //===----------------------------------------------------------------------===//
 
+// Wrapper over base I32EnumAttr to set common fields for HAL enums.
+class HAL_I32Enum<string name, string description, list<I32EnumAttrCase> cases>
+    : I32EnumAttr<name, description, cases> {
+  let genSpecializedAttr = 0;
+  let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
+}
+class HAL_I32EnumAttr<string name, string description, string mnemonic,
+                      list<I32EnumAttrCase> cases>
+    : EnumAttr<HAL_Dialect, HAL_I32Enum<name, description, cases>, mnemonic> {
+  let assemblyFormat = "`<` $value `>`";
+}
+
 def HAL_MemoryModel_Unified : I32EnumAttrCase<"Unified", 0>;
 def HAL_MemoryModel_Discrete : I32EnumAttrCase<"Discrete", 1>;
 def HAL_MemoryModelAttr :
@@ -130,12 +142,10 @@ def HAL_CommandCategoryBitfieldAttr :
 def HAL_DescriptorType_UniformBuffer : I32EnumAttrCase<"UniformBuffer", 6, "uniform_buffer">;
 def HAL_DescriptorType_StorageBuffer : I32EnumAttrCase<"StorageBuffer", 7, "storage_buffer">;
 def HAL_DescriptorTypeAttr :
-    I32EnumAttr<"DescriptorType", "valid DescriptorType", [
+    HAL_I32EnumAttr<"DescriptorType", "valid DescriptorType", "descriptor_type", [
       HAL_DescriptorType_UniformBuffer,
       HAL_DescriptorType_StorageBuffer,
-    ]> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
-}
+    ]>;
 
 def HAL_DescriptorFlags_None : I32BitEnumAttrCase<"None", 0x0000>;
 def HAL_DescriptorFlags_ReadOnly : I32BitEnumAttrCase<"ReadOnly", 0x0001>;

@@ -132,7 +132,8 @@ Optional<SmallVector<Value, 4>> rewriteAttrToOperands(
         IntegerAttr::get(inputType,
                          APInt(32, static_cast<int32_t>(intAttr.getInt()))));
     return {{constValue}};
-  } else if (auto elementsAttr = attrValue.dyn_cast<DenseIntElementsAttr>()) {
+  }
+  if (auto elementsAttr = attrValue.dyn_cast<DenseIntElementsAttr>()) {
     SmallVector<Value, 4> elementValues;
     elementValues.reserve(elementsAttr.getNumElements());
     for (auto intAttr : elementsAttr.getValues<Attribute>()) {
@@ -140,7 +141,8 @@ Optional<SmallVector<Value, 4>> rewriteAttrToOperands(
           loc, elementsAttr.getType().getElementType(), intAttr));
     }
     return elementValues;
-  } else if (auto arrayAttr = attrValue.dyn_cast<ArrayAttr>()) {
+  }
+  if (auto arrayAttr = attrValue.dyn_cast<ArrayAttr>()) {
     SmallVector<Value, 4> allValues;
     for (auto elementAttr : arrayAttr) {
       auto flattenedValues =
@@ -149,7 +151,8 @@ Optional<SmallVector<Value, 4>> rewriteAttrToOperands(
       allValues.append(flattenedValues->begin(), flattenedValues->end());
     }
     return allValues;
-  } else if (auto strAttr = attrValue.dyn_cast<StringAttr>()) {
+  }
+  if (auto strAttr = attrValue.dyn_cast<StringAttr>()) {
     return {{rewriter.create<IREE::VM::RodataInlineOp>(loc, strAttr)}};
   }
 
@@ -166,7 +169,7 @@ Optional<SmallVector<Value, 4>> rewriteAttrToOperands(
       // attribute storage elements.
       auto tupleTypes = llvm::to_vector<4>(tupleType.getTypes());
       int ordinal = 0;
-      conversionInterface->walkAttributeStorage(
+      LogicalResult walkStatus = conversionInterface->walkAttributeStorage(
           attrValue, [&](Attribute elementAttr) {
             if (anyFailed) return;
             auto elementType = tupleTypes[ordinal++];
@@ -178,9 +181,10 @@ Optional<SmallVector<Value, 4>> rewriteAttrToOperands(
             }
             allValues.append(flattenedValues->begin(), flattenedValues->end());
           });
+      if (failed(walkStatus)) return llvm::None;
     } else {
       // Custom dialect type maps into zero or more input types (ala arrays).
-      conversionInterface->walkAttributeStorage(
+      LogicalResult walkStatus = conversionInterface->walkAttributeStorage(
           attrValue, [&](Attribute elementAttr) {
             if (anyFailed) return;
             auto flattenedValues =
@@ -191,6 +195,7 @@ Optional<SmallVector<Value, 4>> rewriteAttrToOperands(
             }
             allValues.append(flattenedValues->begin(), flattenedValues->end());
           });
+      if (failed(walkStatus)) return llvm::None;
     }
     if (anyFailed) return llvm::None;
     return allValues;
