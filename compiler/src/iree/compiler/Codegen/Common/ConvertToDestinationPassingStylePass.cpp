@@ -444,6 +444,15 @@ void ConvertToDestinationPassingStylePass::runOnOperation() {
   if (failed(convertToDestinationPassingStyle(b, funcOp))) {
     return signalPassFailure();
   }
+
+  // Add patterns to remove unused operands and results
+  {
+    RewritePatternSet patterns(context);
+    linalg::populateEraseUnusedOperandsAndResultsPatterns(patterns);
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      return signalPassFailure();
+    }
+  }
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>

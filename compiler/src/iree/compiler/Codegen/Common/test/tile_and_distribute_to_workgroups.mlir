@@ -1670,18 +1670,16 @@ hal.executable private @tile_multiuse_producer {
 //       CHECK:     scf.for %[[IV0:.+]] =
 //       CHECK:       scf.for %[[IV1:.+]] =
 //       CHECK:         %[[SRC:.+]] = flow.dispatch.tensor.load %[[SRC_BINDING]], offsets = [%[[IV0]], %[[IV1]], 0]
-//       CHECK:         %[[INIT0:.+]] = tensor.empty
-//       CHECK:         %[[FILL0:.+]] = linalg.fill
+//       CHECK:         %[[INIT0:.+]] = tensor.empty() : tensor<4x32xf32>
+//       CHECK:         %[[FILL:.+]] = linalg.fill
 //  CHECK-SAME:             outs(%[[INIT0]] :
 //       CHECK:         %[[GENERIC0:.+]] = linalg.generic
 //  CHECK-SAME:             ins(%[[SRC]] :
-//  CHECK-SAME:             outs(%[[FILL0]] :
-//       CHECK:         %[[FILL1:.+]] = linalg.fill
-//  CHECK-SAME:             outs(%[[INIT0]]
-//       CHECK:         %[[INIT1:.+]] = tensor.empty
+//  CHECK-SAME:             outs(%[[FILL]] :
+//       CHECK:         %[[INIT1:.+]] = tensor.empty() : tensor<4x32x128xf32>
 //       CHECK:         %[[GENERIC1:.+]]:2 = linalg.generic
 //  CHECK-SAME:             ins(%[[SRC]], %[[GENERIC0]] :
-//  CHECK-SAME:             outs(%[[INIT1]], %[[FILL1]]
+//  CHECK-SAME:             outs(%[[INIT1]], %[[FILL]]
 //       CHECK:         %[[GENERIC2:.+]] = linalg.generic
 //  CHECK-SAME:             ins(%[[GENERIC1]]#0, %[[GENERIC1]]#1 :
 //   CHECK-DAG:         flow.dispatch.tensor.store %[[GENERIC2]], %[[RESULT_BINDING0]], offsets = [%[[IV0]], %[[IV1]], 0]

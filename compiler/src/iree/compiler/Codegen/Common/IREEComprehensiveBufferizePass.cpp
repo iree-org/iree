@@ -23,6 +23,9 @@
 #include "mlir/Dialect/Bufferization/Transforms/Transforms.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Passes.h"
+#include "mlir/Dialect/Linalg/Transforms/BufferizableOpInterfaceImpl.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -30,6 +33,7 @@
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 
 #define DEBUG_TYPE "iree-codegen-linalg-bufferize"
@@ -185,8 +189,18 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
   options.deallocationFn = deallocationFn;
   options.memCpyFn = memCpyFn;
 
-  if (failed(runIREEOneShotBufferize(moduleOp, options)))
+  if (failed(runIREEOneShotBufferize(moduleOp, options))) {
     return signalPassFailure();
+  }
+
+  // Remove redundant args and unused results.
+  {
+    RewritePatternSet patterns(&getContext());
+    linalg::populateEraseUnusedOperandsAndResultsPatterns(patterns);
+    if (failed(applyPatternsAndFoldGreedily(moduleOp, std::move(patterns)))) {
+      return signalPassFailure();
+    }
+  }
 }
 
 std::unique_ptr<OperationPass<ModuleOp>> createEliminateEmptyTensorsPass() {
