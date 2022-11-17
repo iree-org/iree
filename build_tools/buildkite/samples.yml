@@ -43,7 +43,7 @@ steps:
       - "buildkite-agent artifact download --step build-host-install build-artifacts.tgz ./"
       - "tar xzf build-artifacts.tgz"
       - "git submodule update --init --jobs 8 --depth 1"
-      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/emscripten@sha256:b576c4c695143a089066fe753259e9ec3c003658a85b40bf1a09236abc653ed6 ./experimental/web/test_samples.sh"
+      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/emscripten@sha256:6e75298c786a5a7d0a076578a210527bcc753d0a228c635ad3b75efd5421632a ./experimental/web/test_samples.sh"
     env:
       IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
     agents:

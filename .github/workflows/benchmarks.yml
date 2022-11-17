@@ -135,7 +135,7 @@ jobs:
         target:
           - platform: "riscv"
             architecture: "rv64"
-            docker_image: "gcr.io/iree-oss/riscv@sha256:cd2ee29950737f44b5ec54a32c37746e951fc74ef29a586e6d2559b113cdbb69"
+            docker_image: "gcr.io/iree-oss/riscv@sha256:e11710158fd09a04ae7accc275a38c95cd59f83fd15a0630a083eb5623807451"
     outputs:
       benchmark-tools-gcs-artifacts: ${{ toJSON(steps.upload.outputs) }}
     env:
