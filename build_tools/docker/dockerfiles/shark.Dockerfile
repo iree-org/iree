@@ -8,6 +8,8 @@
 
 FROM ubuntu@sha256:fd25e706f3dea2a5ff705dbc3353cf37f08307798f3e360a13e9385840f73fb3
 
+SHELL ["/bin/bash", "-e", "-u", "-o", "pipefail", "-c"]
+
 ######## Basic ########
 WORKDIR /base
 
@@ -53,10 +55,10 @@ ARG VULKAN_SDK_VERSION=1.2.154.0
 
 RUN wget -q \
   # This file disappeared from the canonical source:
-  # "https://sdk.lunarg.com/sdk/download/${VULKAN_SDK_VERSION?}/linux/vulkansdk-linux-${VULKAN_SDK_VERSION?}.tar.gz"
-  "https://storage.googleapis.com/iree-shared-files/vulkansdk-linux-${VULKAN_SDK_VERSION?}.tar.gz" \
+  # "https://sdk.lunarg.com/sdk/download/${VULKAN_SDK_VERSION}/linux/vulkansdk-linux-${VULKAN_SDK_VERSION}.tar.gz"
+  "https://storage.googleapis.com/iree-shared-files/vulkansdk-linux-${VULKAN_SDK_VERSION}.tar.gz" \
   && mkdir -p /opt/vulkan-sdk \
-  && tar -xzf "vulkansdk-linux-${VULKAN_SDK_VERSION?}.tar.gz" -C /opt/vulkan-sdk \
+  && tar -xzf "vulkansdk-linux-${VULKAN_SDK_VERSION}.tar.gz" -C /opt/vulkan-sdk \
   && rm -rf /install-vulkan
 WORKDIR /
 

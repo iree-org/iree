@@ -19,11 +19,11 @@ ARG NVIDIA_COMMON_DEB="libnvidia-common-460_460.39-0ubuntu0.18.04.1_all.deb"
 
 WORKDIR /install-nvidia
 RUN wget -q "https://storage.googleapis.com/iree-shared-files/${NVIDIA_COMMON_DEB}" \
-  && wget -q "https://storage.googleapis.com/iree-shared-files/${NVIDIA_GL_DEB?}" \
+  && wget -q "https://storage.googleapis.com/iree-shared-files/${NVIDIA_GL_DEB}" \
   && wget -q "https://storage.googleapis.com/iree-shared-files/${NVIDIA_COMPUTE_DEB}" \
-  && apt-get install "./${NVIDIA_COMMON_DEB?}" \
-  "./${NVIDIA_GL_DEB?}" \
-  "./${NVIDIA_COMPUTE_DEB?}" \
+  && apt-get install "./${NVIDIA_COMMON_DEB}" \
+  "./${NVIDIA_GL_DEB}" \
+  "./${NVIDIA_COMPUTE_DEB}" \
   && rm -rf /install-nvidia
 
 WORKDIR /

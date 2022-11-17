@@ -7,6 +7,8 @@
 # 18.04
 FROM ubuntu@sha256:fd25e706f3dea2a5ff705dbc3353cf37f08307798f3e360a13e9385840f73fb3
 
+SHELL ["/bin/bash", "-e", "-u", "-o", "pipefail", "-c"]
+
 # Disable apt-key parse waring. If someone knows how to do whatever the "proper"
 # thing is then feel free. The warning complains about parsing apt-key output,
 # which we're not even doing.
@@ -33,7 +35,7 @@ ENV CC /usr/bin/clang-${LLVM_VERSION}
 ENV CXX /usr/bin/clang++-${LLVM_VERSION}
 
 COPY build_tools/docker/context/install_iree_deps.sh ./
-RUN ./install_iree_deps.sh "${LLVM_VERSION?}" \
+RUN ./install_iree_deps.sh "${LLVM_VERSION}" \
   && rm -rf /install-basics
 
 ######## CMake ########
@@ -67,7 +69,7 @@ ARG PYTHON_VERSION=3.7
 # files, at least.
 COPY runtime/bindings/python/iree/runtime/build_requirements.txt build_tools/docker/context/install_python_deps.sh ./
 RUN sed -i 's/>=/==/' build_requirements.txt \
-  && ./install_python_deps.sh "${PYTHON_VERSION?}" \
+  && ./install_python_deps.sh "${PYTHON_VERSION}" \
   && rm -rf /install-python
 
 ENV PYTHON_BIN /usr/bin/python3
@@ -96,7 +98,7 @@ WORKDIR /
 ######## IREE CUDA DEPS ########
 ENV IREE_CUDA_DEPS_DIR="/usr/local/iree_cuda_deps"
 COPY build_tools/docker/context/fetch_cuda_deps.sh /usr/local/bin
-RUN /usr/local/bin/fetch_cuda_deps.sh "${IREE_CUDA_DEPS_DIR?}"
+RUN /usr/local/bin/fetch_cuda_deps.sh "${IREE_CUDA_DEPS_DIR}"
 ##############
 
 ######## Vulkan ########
@@ -105,8 +107,8 @@ ARG VULKAN_SDK_VERSION=1.2.154.0
 
 RUN curl --silent --fail --show-error --location \
   # This file disappeared from the canonical source:
-  # "https://sdk.lunarg.com/sdk/download/${VULKAN_SDK_VERSION?}/linux/vulkansdk-linux-${VULKAN_SDK_VERSION?}.tar.gz"
-  "https://storage.googleapis.com/iree-shared-files/vulkansdk-linux-${VULKAN_SDK_VERSION?}.tar.gz" \
+  # "https://sdk.lunarg.com/sdk/download/${VULKAN_SDK_VERSION}/linux/vulkansdk-linux-${VULKAN_SDK_VERSION}.tar.gz"
+  "https://storage.googleapis.com/iree-shared-files/vulkansdk-linux-${VULKAN_SDK_VERSION}.tar.gz" \
   --output vulkansdk.tar.gz \
   && mkdir -p /opt/vulkan-sdk \
   && tar -xzf vulkansdk.tar.gz -C /opt/vulkan-sdk \

@@ -41,12 +41,12 @@ ENV ANDROID_SDK_ROOT /opt/android-sdk
 ENV ANDROID_HOME ${ANDROID_SDK_ROOT}
 ENV ANDROID_NDK /opt/android-sdk/ndk/${ANDROID_NDK_VERSION}
 
-RUN mkdir -p "${ANDROID_SDK_ROOT?}/cmdline-tools" \
-    && wget -q "https://dl.google.com/android/repository/commandlinetools-linux-${ANDROID_SDK_VERSION?}_latest.zip" \
-    && unzip -q *tools*linux*.zip -d "${ANDROID_SDK_ROOT?}/cmdline-tools" \
-    && mv "${ANDROID_SDK_ROOT?}/cmdline-tools/cmdline-tools" "${ANDROID_SDK_ROOT?}/cmdline-tools/tools" \
-    && yes | "${ANDROID_SDK_ROOT?}/cmdline-tools/tools/bin/sdkmanager" --licenses \
-    && /opt/android-sdk/cmdline-tools/tools/bin/sdkmanager --install "ndk;${ANDROID_NDK_VERSION?}" \
+RUN mkdir -p "${ANDROID_SDK_ROOT}/cmdline-tools" \
+    && wget -q "https://dl.google.com/android/repository/commandlinetools-linux-${ANDROID_SDK_VERSION}_latest.zip" \
+    && unzip -q *tools*linux*.zip -d "${ANDROID_SDK_ROOT}/cmdline-tools" \
+    && mv "${ANDROID_SDK_ROOT}/cmdline-tools/cmdline-tools" "${ANDROID_SDK_ROOT}/cmdline-tools/tools" \
+    && yes | "${ANDROID_SDK_ROOT}/cmdline-tools/tools/bin/sdkmanager" --licenses \
+    && /opt/android-sdk/cmdline-tools/tools/bin/sdkmanager --install "ndk;${ANDROID_NDK_VERSION}" \
     && rm -rf /install-android
 
 WORKDIR /

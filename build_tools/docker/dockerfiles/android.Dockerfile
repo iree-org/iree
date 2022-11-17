@@ -12,8 +12,8 @@ WORKDIR /install-ndk
 
 ENV ANDROID_NDK "/usr/src/android-ndk-${NDK_VERSION}"
 
-RUN wget -q "https://dl.google.com/android/repository/android-ndk-${NDK_VERSION?}-linux.zip" \
-    && unzip -q "android-ndk-${NDK_VERSION?}-linux.zip" -d /usr/src/  \
+RUN wget -q "https://dl.google.com/android/repository/android-ndk-${NDK_VERSION}-linux.zip" \
+    && unzip -q "android-ndk-${NDK_VERSION}-linux.zip" -d /usr/src/  \
     && rm -rf /install-ndk
 
 WORKDIR /

@@ -23,7 +23,7 @@ ARG NVIDIA_COMPUTE_DEB
 
 WORKDIR /fetch-nvidia
 RUN wget -q "https://storage.googleapis.com/iree-shared-files/${NVIDIA_COMMON_DEB}"
-RUN wget -q "https://storage.googleapis.com/iree-shared-files/${NVIDIA_GL_DEB?}"
+RUN wget -q "https://storage.googleapis.com/iree-shared-files/${NVIDIA_GL_DEB}"
 RUN wget -q "https://storage.googleapis.com/iree-shared-files/${NVIDIA_COMPUTE_DEB}"
 
 
@@ -47,9 +47,9 @@ COPY --from=fetch-nvidia \
   "/fetch-nvidia/${NVIDIA_COMPUTE_DEB}" \
   /tmp/
 
-RUN apt-get install "/tmp/${NVIDIA_COMMON_DEB?}" \
-  "/tmp/${NVIDIA_GL_DEB?}" \
-  "/tmp/${NVIDIA_COMPUTE_DEB?}"
+RUN apt-get install "/tmp/${NVIDIA_COMMON_DEB}" \
+  "/tmp/${NVIDIA_GL_DEB}" \
+  "/tmp/${NVIDIA_COMPUTE_DEB}"
 
 # install cuda sdk
 RUN wget https://developer.download.nvidia.com/compute/cuda/11.6.0/local_installers/cuda-repo-debian11-11-6-local_11.6.0-510.39.01-1_amd64.deb \

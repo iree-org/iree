@@ -10,6 +10,8 @@
 # 22.04
 FROM ubuntu@sha256:4b1d0c4a2d2aaf63b37111f34eb9fa89fa1bf53dd6e4ca954d47caebca4005c2
 
+SHELL ["/bin/bash", "-e", "-u", "-o", "pipefail", "-c"]
+
 # Disable apt-key parse waring. If someone knows how to do whatever the "proper"
 # thing is then feel free. The warning complains about parsing apt-key output,
 # which we're not even doing.
@@ -39,7 +41,7 @@ COPY build_tools/docker/context/install_iree_deps.sh ./
 RUN echo "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy main" >> /etc/apt/sources.list \
   && curl https://apt.llvm.org/llvm-snapshot.gpg.key \
       | gpg --dearmor > /etc/apt/trusted.gpg.d/llvm-snapshot.gpg \
-  && ./install_iree_deps.sh "${LLVM_VERSION?}" \
+  && ./install_iree_deps.sh "${LLVM_VERSION}" \
   && rm -rf /install-basics
 
 ######## CMake ########
@@ -64,7 +66,7 @@ RUN ./install_bazel.sh && rm -rf /install-bazel
 
 WORKDIR /install-vulkan
 RUN apt-get update \
-  apt-get install -y \
+  && apt-get install -y \
     # Modern Vulkan versions now available via apt
     libvulkan-dev \
     vulkan-tools
@@ -84,7 +86,7 @@ ARG PYTHON_VERSION=3.10
 # because of a new package version, we should add a max version constraint to
 # the rquireme
 COPY runtime/bindings/python/iree/runtime/build_requirements.txt build_tools/docker/context/install_python_deps.sh ./
-RUN ./install_python_deps.sh "${PYTHON_VERSION?}" \
+RUN ./install_python_deps.sh "${PYTHON_VERSION}" \
   && rm -rf /install-python
 
 ENV PYTHON_BIN /usr/bin/python3
@@ -94,7 +96,7 @@ ENV PYTHON_BIN /usr/bin/python3
 ######## IREE CUDA DEPS ########
 ENV IREE_CUDA_DEPS_DIR="/usr/local/iree_cuda_deps"
 COPY build_tools/docker/context/fetch_cuda_deps.sh /usr/local/bin
-RUN /usr/local/bin/fetch_cuda_deps.sh "${IREE_CUDA_DEPS_DIR?}"
+RUN /usr/local/bin/fetch_cuda_deps.sh "${IREE_CUDA_DEPS_DIR}"
 ##############
 
 ### Clean up

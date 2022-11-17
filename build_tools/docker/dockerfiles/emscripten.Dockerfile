@@ -19,9 +19,9 @@ WORKDIR /
 
 # Follow https://emscripten.org/docs/getting_started/downloads.html.
 RUN git clone https://github.com/emscripten-core/emsdk \
-    && cd emsdk && git checkout "${EMSDK_COMMIT?}" && \
-    ./emsdk install ${SDK_VERSION?} && \
-    ./emsdk activate ${SDK_VERSION?}
+    && cd emsdk && git checkout "${EMSDK_COMMIT}" && \
+    ./emsdk install ${SDK_VERSION} && \
+    ./emsdk activate ${SDK_VERSION}
 
 # Set some environment variables for Emscripten to use.
 ENV EMSDK=/emsdk
@@ -38,9 +38,9 @@ ENV EM_PORTS=${EM_DATA}/ports
 # Since (A) requires less configuration, we'll do that. If multiple tools would
 # want a user directory (like Bazel), we should switch to (B).
 # See https://github.com/emscripten-core/emsdk/issues/535
-RUN mkdir -p "${EM_CACHE?}" && chmod -R 777 "${EM_CACHE?}"
+RUN mkdir -p "${EM_CACHE}" && chmod -R 777 "${EM_CACHE}"
 
 # Normally we'd run `source emsdk_env.sh`, but that doesn't integrate with
 # Docker's environment properties model. Instead, we directly extend the path
 # to include the directories suggested by `emsdk activate`.
-ENV PATH="${EMSDK?}:${EMSDK?}/node/14.18.2_64bit/bin:${EMSDK?}/upstream/emscripten:$PATH"
+ENV PATH="${EMSDK}:${EMSDK}/node/14.18.2_64bit/bin:${EMSDK}/upstream/emscripten:$PATH"
