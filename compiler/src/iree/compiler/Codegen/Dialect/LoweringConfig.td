@@ -113,18 +113,22 @@ def IREECodegen_TranslationInfoAttr :
 
   let assemblyFormat = [{
     `<` `` $passPipeline
-    (`pipeline_depth` `=` $softwarePipelineDepth^)? `>`
+    (`pipeline_depth` `=` $softwarePipelineDepth^)?
+    (`transform_name` `=` $transfromStrategyName^)? `>`
   }];
 
   let parameters = (ins
     AttrParameter<"IREE::Codegen::DispatchLoweringPassPipelineAttr",
         "Name of the pipeline to be invoked on the translation unit.">:$passPipeline,
     OptionalParameter<"unsigned",
-        "The software pipeline depth to be used">:$softwarePipelineDepth
+        "The software pipeline depth to be used">:$softwarePipelineDepth,
+    OptionalParameter<"StringAttr",
+        "Name of the transform startegy to apply">:$transfromStrategyName
   );
   let builders = [
     AttrBuilder<(ins "DispatchLoweringPassPipeline":$passPipeline,
-        CArg<"unsigned", "0">:$softwarePipelineDepth)>
+        CArg<"unsigned", "0">:$softwarePipelineDepth,
+        CArg<"StringAttr", "StringAttr()">:$transfromStrategyName)>
   ];
   let extraClassDeclaration = [{
     // Returns the lowering pass pipeline set.

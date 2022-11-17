@@ -28,6 +28,7 @@ using namespace mlir::iree_compiler;
 
 static constexpr unsigned cudaWarpSize = 32;
 static constexpr StringLiteral kCudaTarget = "cuda";
+static constexpr StringLiteral kReductionStrategyName = "reduction_strategy";
 namespace mlir {
 namespace iree_compiler {
 llvm::cl::opt<std::string> clGPUCodegenTransformDialectFileName(
@@ -513,7 +514,7 @@ static LogicalResult setReductionTransformJitConfig(func::FuncOp entryPoint,
       entryPoint, op, tileSizes,
       IREE::Codegen::DispatchLoweringPassPipeline::
           TransformDialectJitterCodegen,
-      workgroupSize);
+      workgroupSize, 0, kReductionStrategyName);
   return success();
 }
 
