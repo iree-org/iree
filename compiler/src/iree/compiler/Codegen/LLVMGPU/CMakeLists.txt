@@ -15,6 +15,7 @@ iree_cc_library(
     LLVMGPU
   HDRS
     "ConvertToLLVM.h"
+    "GPUTransformDialectStrategies.h"
     "KernelConfig.h"
     "TilingUtils.h"
     "TransposeUtils.h"
@@ -22,6 +23,7 @@ iree_cc_library(
     "ConvertToLLVM.cpp"
     "ConvertToNVVM.cpp"
     "ConvertToROCDL.cpp"
+    "GPUTransformDialectStrategies.cpp"
     "KernelConfig.cpp"
     "LLVMGPUDistribute.cpp"
     "LLVMGPULowerExecutableTarget.cpp"

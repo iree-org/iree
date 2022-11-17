@@ -18,6 +18,7 @@ iree_compiler_cc_library(
         "ConvertToLLVM.cpp",
         "ConvertToNVVM.cpp",
         "ConvertToROCDL.cpp",
+        "GPUTransformDialectStrategies.cpp",
         "KernelConfig.cpp",
         "LLVMGPUDistribute.cpp",
         "LLVMGPULowerExecutableTarget.cpp",
@@ -33,6 +34,7 @@ iree_compiler_cc_library(
     ],
     hdrs = [
         "ConvertToLLVM.h",
+        "GPUTransformDialectStrategies.h",
         "KernelConfig.h",
         "TilingUtils.h",
         "TransposeUtils.h",
