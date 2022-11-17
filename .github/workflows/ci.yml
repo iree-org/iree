@@ -580,19 +580,21 @@ jobs:
       tf-binaries-gcs-artifact: ${{ needs.build_tf_integrations.outputs.binaries-gcs-artifact }}
 
   build_e2e_test_artifacts:
+    needs: [setup, build_all, build_tf_integrations]
+    if: needs.setup.outputs.should-run == 'true'
     runs-on:
-      - self-hosted # must come first
-      - runner-group=${{ inputs.runner-group }}
-      - environment=${{ inputs.runner-env }}
+      - self-hosted  # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
     env:
-      BUILD_DIR: ${{ inputs.build-dir }}
-      BUILD_DIR_ARCHIVE: ${{ inputs.build-dir-archive }}
-      BUILD_DIR_GCS_ARTIFACT: ${{ inputs.build-dir-gcs-artifact }}
-      TF_BINARIES_DIR: ${{ inputs.tf-binaries-dir }}
-      TF_BINARIES_ARCHIVE: ${{ inputs.tf-binaries-archive }}
-      TF_BINARIES_GCS_ARTIFACT: ${{ inputs.tf-binaries-gcs-artifact }}
+      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
+      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
+      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+      TF_BINARIES_DIR: ${{ needs.build_tf_integrations.outputs.binaries-dir }}
+      TF_BINARIES_ARCHIVE: ${{ needs.build_tf_integrations.outputs.binaries-archive }}
+      TF_BINARIES_GCS_ARTIFACT: ${{ needs.build_tf_integrations.outputs.binaries-gcs-artifact }}
     outputs:
       e2e-test-artifacts-dir: ${{ steps.build.outputs.e2e-test-artifacts-dir }}
       e2e-test-artifacts-gcs-artifact-dir: ${{ steps.upload.outputs.e2e-test-artifacts-gcs-artifact-dir }}
